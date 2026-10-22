@@ -1,0 +1,30 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test tooling
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Build
+        run: ./build.sh
+      - name: Built file is up to date
+        run: git diff --exit-code sudden-death.html || (echo "sudden-death.html is stale: run ./build.sh and commit it" && exit 1)
+      - name: Quick checks
+        run: |
+          for t in smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit; do
+            echo "== $t"; timeout 180 python test/$t.py
+          done
+      - name: Bot sanity (no errors or stalls in 30 runs)
+        run: python test/lab.py 30 | tee lab.txt && grep -q "run errors 0" lab.txt && grep -q "stalls 0" lab.txt

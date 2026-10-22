@@ -1,0 +1,36 @@
+import asyncio
+import os
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch()
+        pg = await b.new_page(viewport={'width':1300,'height':1000})
+        errs=[]
+        pg.on('pageerror', lambda e: errs.append(str(e)))
+        await pg.goto('file://' + ROOT + '/sudden-death.html')
+        await pg.wait_for_timeout(500)
+        await pg.evaluate("newRun('ironmaw',[0,3,4]); RUN.path=[]; RUN.gold=200; beginFight({ids:['skelss','thief'], type:'normal', sport:'hockey'});")
+        await pg.wait_for_timeout(2300)
+        await pg.evaluate("B.hand=[mkCard('hof_ogre'),mkCard('slapshot'),mkCard('ply_hip'),mkCard('hof_miracle'),mkCard('pumpfake'),mkCard('gr_pads')]; B.energy=4; UI.hoverCard=1; renderFightHUD(); updatePreview();")
+        await pg.wait_for_timeout(400)
+        await pg.screenshot(path='/tmp/w_hand.png')
+        await pg.evaluate("UI.sel=-1; selectCard(4)")
+        await pg.wait_for_timeout(300)
+        await pg.screenshot(path='/tmp/w_disc.png')
+        await pg.evaluate("selectCard(0)")
+        await pg.wait_for_timeout(900)
+        await pg.evaluate("B.sc.us=3; B.sc.them=1; B.sc.hl=['hattrick']; B.enemies.forEach(e=>{e.hp=0;e.dead=true}); B.over='win'; B.sc.done=false; sportFinal(); finishFight();")
+        await pg.wait_for_timeout(400)
+        await pg.screenshot(path='/tmp/w_reward.png', full_page=True)
+        await pg.evaluate("RUN.panel=null; beginFight({ids:['cheer','cheer','cheer'], type:'normal', sport:'baseball'}); B.sc.bases=[1,0,1]; B.sc.us=2;")
+        await pg.wait_for_timeout(2300)
+        await pg.evaluate("B.hand=[mkCard('ply_squeeze'),mkCard('bp'),mkCard('kob_meteor')]; B.energy=5; renderFightHUD(); selectCard(2); playSelected(B.enemies[0]);")
+        await pg.wait_for_timeout(700)
+        await pg.screenshot(path='/tmp/w_base.png')
+        await pg.evaluate("showPage('best'); BF.rar='l'; renderBestiary();")
+        await pg.wait_for_timeout(500)
+        await pg.screenshot(path='/tmp/w_best.png')
+        print(errs, await pg.evaluate('window.__sdErrs'))
+        await b.close()
+asyncio.run(main())

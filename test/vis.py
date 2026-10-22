@@ -1,0 +1,62 @@
+import asyncio, json, sys
+import os
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch()
+        pg = await b.new_page(viewport={'width':1300,'height':900})
+        errs=[]
+        pg.on('pageerror', lambda e: errs.append(str(e)))
+        await pg.goto('file://' + ROOT + '/sudden-death.html')
+        await pg.wait_for_timeout(800)
+        await pg.screenshot(path='/tmp/v_title.png')
+        await pg.evaluate("newRun('gallowmere',[0,2,3]); RUN.path=[]; showView('map'); renderMap();")
+        await pg.wait_for_timeout(300)
+        await pg.screenshot(path='/tmp/v_map.png', full_page=True)
+        # a fight with three enemies; play some cards, roll a die
+        await pg.evaluate("RUN.deck.push(mkCard('grg_gaze')); beginFight({ids:['cheer','skelss','thief'], type:'normal', sport:'baseball'});")
+        await pg.wait_for_timeout(2200)
+        await pg.evaluate("B.hand.unshift(mkCard('wch_hex')); B.hand.unshift(mkCard('grg_petrify')); B.energy=5; renderFightHUD(); selectCard(0);")
+        await pg.wait_for_timeout(200)
+        await pg.screenshot(path='/tmp/v_target.png')
+        await pg.evaluate("playSelected(B.enemies[1]);")
+        await pg.wait_for_timeout(500)
+        await pg.screenshot(path='/tmp/v_dice.png')
+        await pg.evaluate("doEndTurn()")
+        await pg.wait_for_timeout(900)
+        await pg.screenshot(path='/tmp/v_enemyturn.png')
+        await pg.wait_for_timeout(2500)
+        # reward
+        await pg.evaluate("B.enemies.forEach(e=>{e.hp=0;e.dead=true}); B.over='win'; finishFight();")
+        await pg.wait_for_timeout(300)
+        await pg.click('.reward:last-of-type')
+        await pg.wait_for_timeout(300)
+        await pg.screenshot(path='/tmp/v_reward.png', full_page=True)
+        await pg.evaluate("RUN.gold=400; RUN.panel={t:'shop', shop: makeShop()}; renderPanel();")
+        await pg.wait_for_timeout(300)
+        await pg.screenshot(path='/tmp/v_shop.png', full_page=True)
+        await pg.evaluate("RUN.panel={t:'event', id:'bowling'}; renderPanel();")
+        await pg.wait_for_timeout(300)
+        await pg.screenshot(path='/tmp/v_event.png', full_page=True)
+        await pg.evaluate("RUN.panel={t:'rest'}; renderPanel();")
+        await pg.screenshot(path='/tmp/v_rest.png', full_page=True)
+        # boss fights
+        for boss, sport in [('argus','baseball'),('cube','hockey'),('baron','baseball')]:
+            await pg.evaluate(f"RUN.act={ {'argus':0,'cube':1,'baron':2}[boss] }; beginFight({{ids:['{boss}'], type:'boss', sport:'{sport}'}});")
+            await pg.wait_for_timeout(2300)
+            await pg.screenshot(path=f'/tmp/v_{boss}.png')
+        await pg.evaluate("RUN.act=1; beginFight({ids:['mascot'], type:'elite', sport:'hockey'});")
+        await pg.wait_for_timeout(2300)
+        await pg.screenshot(path='/tmp/v_mascot.png')
+        await pg.evaluate("RUN.act=0; beginFight({ids:['ooze','ooze'], type:'normal', sport:'football'}); B.yards=60;")
+        await pg.wait_for_timeout(2300)
+        await pg.screenshot(path='/tmp/v_ooze.png')
+        await pg.evaluate("recordRun('lose'); showEnd('lose')")
+        await pg.screenshot(path='/tmp/v_end.png', full_page=True)
+        for pgn in ['help','best','rec']:
+            await pg.evaluate(f"showPage('{pgn}')"); await pg.wait_for_timeout(300)
+            await pg.screenshot(path=f'/tmp/v_{pgn}.png', full_page=False)
+        print(errs, await pg.evaluate('window.__sdErrs'))
+        await b.close()
+asyncio.run(main())
