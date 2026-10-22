@@ -246,3 +246,14 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **Waking.** `wInnSpot` picks the tile nearest the innkeeper that is reachable from the town's way in (`bfsReach`), so you wake in front of the counter, not behind it. `wAudit` checks every inn.
 - **Counters.** In a town, if you stand somewhere cut off from the way in, walking into a counter climbs over it (`wTryMove`). From the customer side a counter still stops you.
 - **The menu.** A **Menu** button in the world HUD (`w7b-camp.js`), Esc (when no talk panel is open) and P open Sudden Death's pause screen, `wOpenMenu()`. In the world its **Save and quit to title** saves and clears `WG`, `RUN` and `B` (`openPause` wrapped in `w5-bridge.js`); Continue on the title resumes in the same place.
+
+## Camping out (w15-camp.js)
+
+`w15-camp.js` loads after `w14-ground.js` and changes earlier parts only by reassignment (`wW15` prefix), one `fightStart` hook and `W_ON_END.camp`. The numbers are in `W_CAMP`.
+
+- **Where.** `wCanCamp()` returns '' or why not. Only on the world map (not a town: "sleep at the inn"; not a dungeon), never during a match, and only with a Trail Ration (`W_CAMP.item`).
+- **A night out.** `wMakeCamp(roll?)` uses one ration. Risk: `wCampRisk()` is `W_CAMP.risk` (.33) on a tile where wild teams roam, off the road, and `W_CAMP.riskOpen` (.2) on the road or open ground. A quiet night: sleep until 7 (`W_CAMP.wakeAt`), heal `ceil(maxhp × .5)`, wild-team grace as after a match.
+- **Caught asleep.** The clock goes to 2 (`W_CAMP.attackAt`), you heal a quarter, and a wild match starts with no pre-game card (`card: false`): `world: { kind: 'camp', ref: { heal: .25 } }`, `ambush: true` (they start a score ahead, `w9-road.js`), night-level rules, and the kickoff hook makes your team Weak 1 (`B.wCamp`). `W_ON_END.camp` on a win sleeps until 7 and heals the other quarter. A loss is an ordinary blackout.
+- **UI.** A Make camp row at the top of the Bag tab (`wRenderCamp` wrapped), with the risk where you stand. `#wHelpCampOut`, a paragraph in `#wHelpFeel`.
+- **Bot.** The balance bot does not camp (it rests at inns), so camping is not measured.
+- **Test:** `test/realm_camp.py`.

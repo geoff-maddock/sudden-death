@@ -138,7 +138,8 @@ Meals are worth about 16 points of champion rate and recruiting about 14.
 - **Not measured yet:**
   - night share, ambushes and road events (the bot plays no events);
   - card shop prices;
-  - the gear charges the enchanter can buy.
+  - the gear charges the enchanter can buy;
+  - camping out (the bot sleeps at inns; it never camps).
 
 ## The home ground (epic 2, phase 1)
 
