@@ -150,12 +150,13 @@ async def main():
               for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) if (free(a[0] + dx, a[1] + dy)) { wEnterMap('hatchery', a[0] + dx, a[1] + dy); wDrain(); return { a, c }; }
               return null; })()''')
             check(ap is not None, 'found the Hatch-Mother')
+            await pg.evaluate("for (const R of wDungeonRooms('hatchery')) wSetFlag(R.flag)")  # phase 5: the alpha waits for every room
             await pg.evaluate(f"wUse({ap['a'][0]}, {ap['a'][1]}); wDrain()"); await pg.wait_for_timeout(300)
             ac = await pg.evaluate("({ text: document.getElementById('modalBox').textContent, notyet: !!document.getElementById('wNotYet'), run: !!document.getElementById('wRun') })")
             check('Hatch-Mother' in ac['text'] and ac['notyet'] and not ac['run'], 'the alpha card names the Hatch-Mother, with Not yet instead of Run', ac['text'][:160])
             await pg.click('#wPlay'); await pg.wait_for_timeout(1500)
-            st = await pg.evaluate('({type: B.type, lead: B.enemies[0].n, act: RUN.act, trait: B.trait})')
-            check(st['type'] == 'elite' and 'Hatch-Mother' in st['lead'] and st['act'] == 1, 'the alpha plays an elite match at tier 2, led by the Hatch-Mother', st)
+            st = await pg.evaluate('({type: B.type, lead: B.enemies.find(isBoss).n, act: RUN.act, trait: B.trait})')
+            check(st['type'] == 'boss' and 'Hatch-Mother' in st['lead'] and st['act'] == 1, 'the alpha plays a boss match at tier 2, led by the Hatch-Mother (phase 5)', st)
             over = await win_match(pg)
             check(over == 'win', 'the alpha match is won', over)
             await pg.click('#bCont'); await pg.wait_for_timeout(400)

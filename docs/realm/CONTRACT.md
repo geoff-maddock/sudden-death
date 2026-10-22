@@ -110,3 +110,37 @@ Both load after `w8-boot` and change earlier parts only by reassignment (see the
 - **Enchanter** (`DB.enchanter`, w1): `wOpenEnchanter()`, `wEnchant(service, card)`; `WG.enchUsed[service]` counts uses, so prices climb.
 - **Card vendors** (`DB.cardShops`, w1): `wOpenCardShop(charId)`; stock is `WG.cardShops[charId] = { week, cards: [{ id, price, sold }], removed }` and turns over when `wWeek()` changes. Prices are Sudden Death's `PRICE`; trading a card away is `RUN.removeCost`.
 - **Talk acts** added: `enchant` (Quill), `kitchen` (Tansy), `meals` (every innkeeper), `cards` (the three vendors).
+
+## Dungeons and magic gear (w10-dungeon.js): phase 5
+
+Loads after `w9b-town` and changes earlier parts only by reassignment; saved originals are named `wW10…`. All the numbers are in four tables at the top of the file: `W_DUNGEON` (depth levels, perk and stakes odds, room gear odds), `W_GATE`, `W_ALPHA_BOSS` and `W_MAGIC`. `W_FAMOUS` names each dungeon's teams.
+
+- **Rooms.** `wDungeonRooms(id)` lists a dungeon's famous-team rooms, `{ dg, d, n, x, y, w, h, cx, cy, flag, team }`, from `MAPS[id].rooms` (deterministic), shallowest first by walking distance from the stairs, skipping the stairs room and the alpha's room. One room per `W_FAMOUS[id]` entry (3 or 4). They are cached in `W10.rooms` and never saved. `wRoomAt(id, x, y)` and `wRoomsLeft(id)` read them.
+- **Room matches.** Walking into a room from outside (`wTryMove`, wrapped) calls `wStartRoom(R, o?)`. It plays an elite match with an `ELITE_TRAITS` trait (no Rattled after the first room), and a depth level (`wLevelInfo`, wrapped, says "room N, deeper down"). Deeper rooms are more likely to force a `SPORT_PERKS` perk (`world.perk`, applied in `onHook('fightStart')` when SD's own roll gave none) and `STAKES`. `o` = `{ card: false, perk, stakes, trait }` forces them for tests. The world context is `world.kind: 'room'`, `ref: { dg, room }` (1-based), plus `fam` (the team's colours, used by `wMatchTeam`, wrapped), `room`, `rooms` and `dgName`. The step into a room never rolls a wild match (`wEncounterHook`, wrapped).
+- **Flags.** A won room sets `room_<dungeon>_<n>` (`W_ON_END.room`), and the room stays beaten. Alphas still use `alpha_<id>`, chests `chest_<id>`.
+- **Bosses.** `wStartAlpha` (wrapped) plays each alpha as the Sudden Death boss in `W_ALPHA_BOSS`, with `type: 'boss'`, the boss's escort and its tier:
+
+  | Alpha | Where | Boss | Tier |
+  |---|---|---|---|
+  | the Hatch-Mother | The Drowned Hatchery | `cube` | 2 |
+  | the Warren Queen | Emberdeep Warren | `kqueen` | 2 |
+  | Specimen Nought | The Gene Vault | `mirror` | 3 |
+  | the Seam Wyrm | The Deep Seam | `wyrm` | 3 |
+  | the Elder of the Grove | Elder Grove (lair) | `groundskeeper` | 2 |
+  | the Aurora Matriarch | Aurora Roost (lair) | `banshee` | 2 |
+
+  `wNameLead` (wrapped) gives the boss enemy the alpha's name. A dungeon's alpha only plays once every room is beaten (`W_DUNGEON.alphaNeedsRooms`). SD's boss reward (a boss trophy pick) applies as usual, and the reward panel's Continue (`advanceAct`, already reassigned in w5) goes back to the world.
+- **Gates.** `wGateCheck(locId)` returns `{ ok, need, text }` from `W_GATE`: cups won (`wCupsWon()`, w9; phase 6 sets the `cup_*` flags) and/or a key item. `wStepEnter` (wrapped) refuses a shut dungeon door and logs what is missing, and logs a line about the rooms on the way in. Lairs check the same table before their match. The table: Hatchery and Emberdeep 1 cup, the Gene Vault 2 cups and the keycard, the Deep Seam 3 cups (it is also hidden), Elder Grove none, Aurora Roost 1 cup.
+- **Magic gear.** `wMagicDrop({ relic?, gear?, legend? }, why)` pays a Sudden Death trophy of that rarity (`relicPool`, then `gainRelic`), gear cards (`gr_*`, leaning to the region's sports, through `wGainCard`) and a pick of N Hall of Fame legends (`wGainCard({ pick, pool })`). The prize chests carry `magic: '<chest id>'` (set at load from `W_MAGIC`), and `wGiveLoot` (wrapped) pays it after the usual loot. A lair's win pays `W_MAGIC[alphaId]` (`W_ON_END.lair`, wrapped). A won room drops one gear card `W_DUNGEON.roomGear` of the time.
+
+  | Source | Trophy | Gear | Legends |
+  |---|---|---|---|
+  | Hatchery and Emberdeep prizes | uncommon | 1 | none |
+  | Gene Vault and Deep Seam prizes | rare | 1 | pick of 3 |
+  | Elder Grove win | uncommon | none | pick of 3 |
+  | Aurora Roost win | rare | 1 | pick of 3 |
+  | A won room | none | 1 (35%) | none |
+
+- **Help:** `renderHelp` (wrapped as `wW10RenderHelp`) adds `#wHelp5` inside `#wHelp`.
+- **Skipped:** the Frozen Chapel bell companion (striking the bell still only logs) and TC's stray event. Both are still open.
+- **Test:** `test/realm_dungeon.py`. `test/realm_match.py` now flags the Hatchery's rooms before its alpha, and expects a boss.
