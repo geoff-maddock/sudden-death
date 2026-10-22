@@ -1,5 +1,6 @@
 import asyncio, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 # 1) parity: every kind drawn through the sprite cache matches a live draw at the same moment
 # 2) speed: frame cost with and without sprites
@@ -7,7 +8,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width':1300,'height':950})
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         r = await pg.evaluate("""(() => { const out = []; const team = CLUBS.ironmaw;
           const mk = () => { const cv = document.createElement('canvas'); cv.width = 600; cv.height = 500; return cv; };
           const kinds = Object.keys(KIND).filter(k => !BESPOKE.has(k));

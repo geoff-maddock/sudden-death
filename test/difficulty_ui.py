@@ -1,11 +1,12 @@
 import asyncio, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width':1300,'height':1000})
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         # default from Settings
         await pg.evaluate("showSettings()"); await pg.select_option('#sDiff', '2'); await pg.wait_for_timeout(200)
         await pg.screenshot(path='/tmp/diff_settings.png'); await pg.click('[data-close]')

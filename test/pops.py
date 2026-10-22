@@ -1,5 +1,6 @@
 import asyncio, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 CASES = [('baseball', "sportPop({k:'bat', n:4})", .55), ('hockey', "sportPop({k:'score', what:'goal', n:1}); A.lamp = A.t", .75), ('football', "sportPop({k:'score', what:'touchdown', n:7})", .7),
          ('football', "sportPop({k:'score', what:'field goal', n:3})", .6), ('golf', "sportPop({k:'drive'})", .5), ('bowling', "sportPop({k:'strike'})", .3),
@@ -8,7 +9,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width':1300,'height':950})
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         for i, (sport, js, at) in enumerate(CASES):
             await pg.evaluate(f"TIPS_SEEN.push(...Object.keys(TIPS)); newRun('ironmaw',[0,1,2]); RUN.path=[]; beginFight({{ids:['lb'], type:'normal', sport:'{sport}'}}); A.banner=null;")
             await pg.wait_for_timeout(700)

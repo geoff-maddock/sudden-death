@@ -1,5 +1,6 @@
 import asyncio, os, json
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 WIN = """(() => { beginFight({ ids: ['lb'], type: 'elite', sport: 'baseball' }); A.banner = null; B.energy = 9; B.sc.bases = [1,1,1];
   const c = mkCard('check'); B.hand.unshift(c); B.P.st.str = 20; playCard(0, B.enemies[0].uid);
@@ -8,7 +9,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); ctx = await b.new_context(viewport={'width':1300,'height':1000})
         pg = await ctx.new_page(); errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         # Guest plays a run: goals climb tiers, achievements unlock
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); newRun('ironmaw',[0,1,2]); RUN.path=[]; RUN.goals = { 0: [{ id: 'clean', tier: 0, done: false }, { id: 'reel', tier: 0, done: false }] };")
         for i in range(3): await pg.evaluate(WIN); await pg.wait_for_timeout(200)
@@ -35,7 +36,7 @@ async def midrun():
     async with async_playwright() as p:
         b = await p.chromium.launch(); ctx = await b.new_context(viewport={'width':1300,'height':950})
         pg = await ctx.new_page(); errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         async with pg.expect_navigation(): await pg.evaluate("setTimeout(() => switchProfile(createProfile('Ana')), 0)")
         await pg.wait_for_timeout(500)
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); newRun('frostfang',[0,1,2]); RUN.path=[]; const enc = rollEncounter('normal'); RUN.pending = enc; beginFight(enc);"); await pg.wait_for_timeout(1500)

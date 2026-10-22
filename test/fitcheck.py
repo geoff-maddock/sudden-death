@@ -1,12 +1,13 @@
 import asyncio
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width':1300,'height':950}, device_scale_factor=2)
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         await pg.evaluate("newRun('ironmaw',[0,1,2]); RUN.path=[]; beginFight({ids:['kqueen'], type:'boss', sport:'hockey'})"); await pg.wait_for_timeout(600)
         a = await pg.evaluate("[cv.clientWidth, cv.width, cv._d]")
         await pg.set_viewport_size({'width': 1000, 'height': 950}); await pg.wait_for_timeout(500)

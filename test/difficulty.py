@@ -1,5 +1,6 @@
 import asyncio, sys, json, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 # Difficulty probe. Usage: difficulty.py N '{"draw":4}' [dumb]
 # Reports, for a skilled bot (and optionally a careless one): win rate, deaths by act, HP lost per Act 1 brawl,
@@ -9,7 +10,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page()
         await pg.add_init_script('window.__SD_LAB = true;')
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.add_script_tag(path=ROOT + '/test/lab.js')
+        await pg.goto(GAME_URL); await pg.add_script_tag(path=ROOT + '/test/lab.js')
         for dumb in ([False, True] if both else [False]):
             r = await pg.evaluate(f"""(() => {{ Object.assign(TUNE, {tune}); const S = {{ win: 0, died: [0,0,0], a1lost: [], a1turns: [], boss: [[],[],[]], elLost: [] }};
               for (let i = 0; i < {N}; i++) {{ const l = LABRUN({{ route: 'balanced', dumb: {str(dumb).lower()}, diff: {DIFF} }});

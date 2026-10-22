@@ -1,6 +1,7 @@
 import asyncio, json, sys, collections, statistics as st
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 BOSSES={'argus','groundskeeper','cube','zamboni','banshee','baron','wyrm','mirror'}
 ENEMY_BOSS=lambda d: d in BOSSES or 'kqueen' in d
 from playwright.async_api import async_playwright
@@ -10,7 +11,7 @@ async def main():
         b = await p.chromium.launch(); pg = await b.new_page()
         errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.add_init_script('window.__SD_LAB = true;')
-        await pg.goto('file://' + ROOT + '/sudden-death.html')
+        await pg.goto(GAME_URL)
         await pg.add_script_tag(path=ROOT + '/test/lab.js')
         allres = {}
         for route in ['safe', 'balanced', 'greedy']:

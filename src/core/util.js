@@ -15,3 +15,4 @@ function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w
 const F_HUD = s => `${s}px "Jersey 10", "Courier New", monospace`;
 const F_DSP = s => `700 ${s}px "Grenze Gotisch", Georgia, serif`;
 const F_TXT = (s, w = 700) => `${w} ${s}px "Alegreya Sans", system-ui, sans-serif`;
+const INK = '#17100e';

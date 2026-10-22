@@ -1,11 +1,12 @@
 import asyncio, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width':1300,'height':950})
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); newRun('ironmaw',[0,1,2]); RUN.path=[]; showView('map'); renderMap();"); await pg.wait_for_timeout(400)
         sched = await pg.evaluate("[Object.values(RUN.map.nodes).filter(n => ['fight','elite','rival'].includes(n.t)).every(n => n.sport), scheduleCounts().map(x => x.join(':')).join(' ')]")
         await pg.screenshot(path='/tmp/sched_map.png')

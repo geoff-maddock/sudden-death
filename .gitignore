@@ -1,4 +1,4 @@
-# build intermediates (sudden-death.html itself is committed so the game is playable from the repo)
+# build intermediates (dist/sudden-death.html itself is committed so the game is playable from the repo)
 build/
 __pycache__/
 *.pyc
