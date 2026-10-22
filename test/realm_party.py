@@ -161,11 +161,16 @@ async def main():
         check(lu['offer'] and all(k == lead['kind'] for k in lu['offer']) and lu['pid'] == lead['id'] and lu['banner'] and lu['n'] == 3, "the level-up offers three cards of the player's kind", lu)
         await pg.screenshot(path='/tmp/realm-party-levelup.png')
         pid0 = await pg.evaluate("WG.cardOffer.list[0].id")
-        await pg.click('#modalBox [data-wco="0"]'); await pg.wait_for_timeout(500)
+        await pg.click('#modalBox [data-wco="0"]')
+        # wait for the pick to land rather than a fixed sleep (slow machines)
+        try: await pg.wait_for_function("!WG.cardOffer", timeout=5000)
+        except Exception: pass
         got = await pg.evaluate(f"RUN.deck.some(c => c.id === {json.dumps(pid0)} && c.wp === {lead['id']})")
         check(got, 'the picked card belongs to the player who levelled up')
 
         # ---------- post-game recruit (forced roll) ----------
+        try: await pg.wait_for_selector('#wSign', timeout=5000)
+        except Exception: pass
         rc = await pg.evaluate("({ open: !!document.getElementById('wSign'), sig: !!document.querySelector('#modalBox .wrecsig .card'), img: !!document.querySelector('#modalBox .wrecport'), text: document.getElementById('modalBox').textContent.slice(0, 160) })")
         check(rc['open'] and rc['sig'] and rc['img'], 'after the win, a beaten player asks to join (portrait, signature card)', rc)
         await pg.screenshot(path='/tmp/realm-party-recruit.png')

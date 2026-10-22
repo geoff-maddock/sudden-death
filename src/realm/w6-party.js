@@ -276,7 +276,8 @@ function wPostGameRecruit() {
 
 /* ---------- the prompt queue: level-up picks and recruits, one at a time, when the world is free ---------- */
 function wNextPrompt() {
-  if (!WG || !WG.wprompts || !WG.wprompts.length || WG.cardOffer) return false;
+  // an open road event (w9-road.js) goes first; its card drains the queue once it closes
+  if (!WG || !WG.wprompts || !WG.wprompts.length || WG.cardOffer || WG.event) return false;
   if (LAB) { while (WG.wprompts.length) wPromptLab(WG.wprompts.shift()); return true; }
   if (!wActive()) return false;
   const P = WG.wprompts.shift();

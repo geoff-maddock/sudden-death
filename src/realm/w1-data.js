@@ -90,10 +90,10 @@ DB.crew={
 DB.items={
  ration:{name:'Drill Ration',desc:'Dense, dull biscuit. One per training drill.',use:'Camp → Team → Drill. One ration trains the selected chimera for +35% of a level, once per day.',price:12},
  salve:{name:'Salve',desc:'Restores 60% health to one chimera, even one that has fainted. Not usable mid-battle.',use:'Camp → Team → Salve, or the button here. Heals 60%, even a fainted chimera. Not in battle.',price:30},
- honeydrop:{name:'Honey Drop',desc:'Mosswold honey, set hard.',use:'Food. Eaten before a match.',price:22,food:1},
- saltfish:{name:'Salt Fish',desc:'Brinefen cod, salted stiff.',use:'Food. Eaten before a match.',price:28,food:1},
- jerky:{name:'Ember Jerky',desc:'Peppered dried meat.',use:'Food. Eaten before a match.',price:25,food:1},
- hardtack:{name:'Frost Hardtack',desc:'A biscuit you could shoe a Slagback with.',use:'Food. Eaten before a match.',price:25,food:1},
+ honeydrop:{name:'Honey Drop',desc:'Mosswold honey, set hard.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:22,food:1},
+ saltfish:{name:'Salt Fish',desc:'Brinefen cod, salted stiff.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:28,food:1},
+ jerky:{name:'Ember Jerky',desc:'Peppered dried meat.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:25,food:1},
+ hardtack:{name:'Frost Hardtack',desc:'A biscuit you could shoe a Slagback with.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:25,food:1},
  keycard:{name:'Vault Keycard',desc:'A slab of old plastic. Opens the Gene Vault.',use:'Used automatically at the Gene Vault door, south-east of Graftonbury.'},
  capsule:{name:'Dormant Capsule',desc:'A pre-League pod the size of a loaf, cold, with something folded up asleep inside.',use:'Take it to Dr. Pell (CAPSULE), with Aether energy to wake it.'},
  offering:{name:'Grove Offering',desc:'Honey, berry and aethercap, baked in a leaf. Smells of spring.',use:'Take it to Hermit Oak at the Hollow Shrine (DRAKE).'},
@@ -104,22 +104,50 @@ DB.items={
  bellclapper:{name:'Bell Clapper',desc:'The bronze tongue of a bell, heavy as a leg.',use:'Take it to Brother Halvard in Rimewatch (CLAPPER).'},
  letter:{name:'Sealed Letter',desc:'Herald Pim to Clerk Foss. Do not open.',use:'Carry it to Imelda Foss at the League office and ask about the LETTER.'},
  reply:{name:'Foss\'s Reply',desc:'One line, in a firm hand.',use:'Carry it back to Herald Pim at the Coliseum and ask about his REPLY.'},
- mossberry:{name:'Mossberry',desc:'Sweet, faintly green. From Mosswold bushes.',use:'Camp → Cook. Mossberry Stew (+6 hp). Also wanted by Gaffer Brack and Old Wenna.',price:18},
- emberpepper:{name:'Ember Pepper',desc:'Do not rub your eyes. From Cindermaw bushes.',use:'Camp → Cook. Ember Chili (+2 attack). Also wanted in Cinderhold.',price:18},
- brinekelp:{name:'Brine Kelp',desc:'Salty and rubbery. From Brinefen bushes.',use:'Camp → Cook. Kelp Broth (+2 defence). Also wanted by the diver in Saltmere.',price:18},
- frostmint:{name:'Frost Mint',desc:'Numbs the tongue. From Frostspire bushes.',use:'Camp → Cook. Mint Sorbet (+2 speed). Also wanted at the abbey in Rimewatch.',price:18},
- aethercap:{name:'Aethercap',desc:'A violet mushroom of the central plains.',use:'Camp → Cook. Aethercap Risotto (half a level). Also lamp oil for Fenwick Tallow.',price:22},
- grain:{name:'Grain',desc:'Sack of milled grain.',use:'Camp → Cook. Goes into stew, chili, risotto and trail hash.',price:8},
- salt:{name:'Salt',desc:'A twist of sea salt.',use:'Camp → Cook. Goes into broth, sorbet and trail hash.',price:6}};
+ mossberry:{name:'Mossberry',desc:'Sweet, faintly green. From Mosswold bushes.',use:'Cook it at an inn hearth: Mossberry Stew, Champion\'s Feast. Also wanted by Old Wenna.',price:18},
+ emberpepper:{name:'Ember Pepper',desc:'Do not rub your eyes. From Cindermaw bushes.',use:'Cook it at an inn hearth: Ember Chili, Champion\'s Feast. Also wanted in Cinderhold.',price:18},
+ brinekelp:{name:'Brine Kelp',desc:'Salty and rubbery. From Brinefen bushes.',use:'Cook it at an inn hearth: Kelp Broth, Champion\'s Feast. Also wanted by the diver in Saltmere.',price:18},
+ frostmint:{name:'Frost Mint',desc:'Numbs the tongue. From Frostspire bushes.',use:'Cook it at an inn hearth: Mint Sorbet, Champion\'s Feast. Also wanted at the abbey in Rimewatch.',price:18},
+ aethercap:{name:'Aethercap',desc:'A violet mushroom of the central plains.',use:'Cook it at an inn hearth: Aethercap Risotto, Champion\'s Feast. Also lamp oil for Fenwick Tallow.',price:22},
+ grain:{name:'Grain',desc:'Sack of milled grain.',use:'Cooking: goes into stew, chili, risotto and trail hash.',price:8},
+ salt:{name:'Salt',desc:'A twist of sea salt.',use:'Cooking: goes into broth, sorbet and trail hash.',price:6}};
 DB.forage={bloom:'mossberry',ember:'emberpepper',tide:'brinekelp',rime:'frostmint',aether:'aethercap'};
-DB.recipes={ // dropped: sporeballs, crackers, mintice (they made battle items)
- stew:{name:'Mossberry Stew',needs:{mossberry:2,grain:1},effect:{kind:'perm',stat:'hp',amt:6},desc:'Permanent +6 health.'},chili:{name:'Ember Chili',needs:{emberpepper:2,grain:1},effect:{kind:'perm',stat:'atk',amt:2},desc:'Permanent +2 attack.'},
- broth:{name:'Kelp Broth',needs:{brinekelp:2,salt:1},effect:{kind:'perm',stat:'def',amt:2},desc:'Permanent +2 defence.'},sorbet:{name:'Mint Sorbet',needs:{frostmint:2,salt:1},effect:{kind:'perm',stat:'spd',amt:2},desc:'Permanent +2 speed.'},
- risotto:{name:'Aethercap Risotto',needs:{aethercap:2,grain:1},effect:{kind:'xp',pct:.5},desc:'Half a level of experience.'},hash:{name:'Trail Hash',needs:{grain:1,salt:1},effect:{kind:'healall'},desc:'Restores the whole stable to full health.'},
- honeydrops:{name:'Honey Drops',needs:{mossberry:1,aethercap:1},effect:{kind:'item',item:'honeydrop',n:3},desc:'Three Honey Drops: battle healing that also cures.'},
- jerky:{name:'Ember Jerky',needs:{emberpepper:1,brinekelp:1},effect:{kind:'item',item:'jerky',n:2},desc:'Two strips of Ember Jerky (+30% attack in battle).'},
- offering:{name:'Grove Offering',need:'recipe_offering',needs:{mossberry:2,honeydrop:1,aethercap:1},effect:{kind:'item',item:'offering',n:1},desc:'An offering for the grove. Only Hermit Oak knows the recipe.'},
- feast:{name:"Champion's Feast",needs:{mossberry:1,emberpepper:1,brinekelp:1,frostmint:1,aethercap:1},effect:{kind:'fed'},desc:'The whole team fights the next battle 15% stronger.'}};
+/* phase 4: cooking makes MEALS (DB.meals), one-match buffs eaten before a match. TC's lasting stat meals are gone.
+   dropped: the perm, xp, healall and fed effects; the honeydrops and jerky recipes (both are bought now). */
+DB.recipes={
+ stew:{name:'Mossberry Stew',needs:{mossberry:2,grain:1},effect:{kind:'meal',meal:'stew'}},
+ chili:{name:'Ember Chili',needs:{emberpepper:2,grain:1},effect:{kind:'meal',meal:'chili'}},
+ broth:{name:'Kelp Broth',needs:{brinekelp:2,salt:1},effect:{kind:'meal',meal:'broth'}},
+ sorbet:{name:'Mint Sorbet',needs:{frostmint:2,salt:1},effect:{kind:'meal',meal:'sorbet'}},
+ risotto:{name:'Aethercap Risotto',needs:{aethercap:2,grain:1},effect:{kind:'meal',meal:'risotto'}},
+ hash:{name:'Trail Hash',needs:{grain:1,salt:1},effect:{kind:'meal',meal:'hash'}},
+ feast:{name:"Champion's Feast",needs:{mossberry:1,emberpepper:1,brinekelp:1,frostmint:1,aethercap:1},effect:{kind:'meal',meal:'feast'}},
+ offering:{name:'Grove Offering',need:'recipe_offering',needs:{mossberry:2,honeydrop:1,aethercap:1},effect:{kind:'item',item:'offering',n:1},desc:'An offering for the grove. Only Hermit Oak knows the recipe.'}};
+/* meals: eaten before a match, a meal acts once, at the next kickoff (w9b-town.js, onHook fightStart), then it is gone.
+   fx: block (Block at kickoff), st (statuses on your line), draw and energy (extra on the first turn), heal (HP at kickoff).
+   A snack is a food item (DB.items) eaten from your bag. A charm (a fortune) is not food: it stacks with a meal. */
+DB.meals={
+ stew:{name:'Mossberry Stew',does:'Start the next match with 8 Block.',fx:{block:8}},
+ chili:{name:'Ember Chili',does:'Start the next match with 2 Strength.',fx:{st:{str:2}}},
+ broth:{name:'Kelp Broth',does:'Start the next match with 2 Footwork: Block from cards is 2 more.',fx:{st:{dex:2}}},
+ sorbet:{name:'Mint Sorbet',does:'Draw 2 more cards on the first turn of the next match.',fx:{draw:2}},
+ risotto:{name:'Aethercap Risotto',does:'1 more Stamina on the first turn of the next match.',fx:{energy:1}},
+ hash:{name:'Trail Hash',does:'Heal 10 HP when the next match starts.',fx:{heal:10}},
+ feast:{name:"Champion's Feast",does:'Next match: 1 Strength, and 1 more Stamina and 2 more cards on the first turn.',fx:{st:{str:1},energy:1,draw:2}},
+ honeydrop:{name:'Honey Drop',snack:1,does:'Heal 6 HP when the next match starts.',fx:{heal:6}},
+ saltfish:{name:'Salt Fish',snack:1,does:'Start the next match with 5 Block.',fx:{block:5}},
+ jerky:{name:'Ember Jerky',snack:1,does:'Start the next match with 1 Strength.',fx:{st:{str:1}}},
+ hardtack:{name:'Frost Hardtack',snack:1,does:'Start the next match with 1 Footwork.',fx:{st:{dex:1}}},
+ fortune:{name:"Madame Oriel's fortune",charm:1,does:'1 more Stamina on the first turn of the next match.',fx:{energy:1}}};
+/* what each inn's kitchen sells, by innkeeper. Every inn also has a hearth where you cook your own. */
+DB.innMenu={hq_inn:{hash:12,risotto:24},moss_inn:{hash:12,stew:20},salt_inn:{hash:12,broth:20},cind_inn:{hash:12,chili:22},rime_inn:{hash:12,sorbet:22}};
+/* Brother Quill's services (w9b-town.js). Paid in elemental energy, any kind; each use raises that service's price by step. */
+DB.enchanter={
+ up:{name:'Bind energy into a card',does:'Upgrade a card to its + version.',base:3,step:1,max:8},
+ star:{name:'Drill a card',does:'Practice a card: ★, better at every sport.',base:4,step:1,max:9},
+ gear:{name:'Recharge gear',does:'Upgrade a gear card: more charges every time you play it.',base:2,step:1,max:6}};
+/* card vendors (w9b-town.js): the stock leans to the region's sports and kinds, and turns over every week */
+DB.cardShops={hq_shop:{name:'The card binder at Odd Lots',region:'plains'},netter:{name:'Hob Tarn\'s card crate',region:'tide'},smith:{name:'The Brandt card rack',region:'ember'}};
 DB.enchants={ember:{stat:'atk',amt:2,label:'+2 attack'},tide:{stat:'hp',amt:7,label:'+7 health'},bloom:{stat:'def',amt:2,label:'+2 defence'},rime:{stat:'spd',amt:2,label:'+2 speed'},aether:{stat:'all',amt:1,label:'+1 to attack, defence and speed'}};
 DB.shops={general:{ration:12,salve:30,grain:8,salt:6},hq:{ration:12,salve:30,grain:8,salt:6,aethercap:22},moss:{ration:12,salve:30,honeydrop:22,grain:8,salt:6,mossberry:18},salt:{ration:12,salve:30,saltfish:28,grain:8,salt:4,brinekelp:18},cind:{ration:12,salve:30,jerky:25,grain:8,salt:6,emberpepper:18},rime:{ration:12,salve:28,hardtack:25,grain:8,salt:6,frostmint:18}}; // dropped: snares, battle items, mutagen and purge
 /* the boss of each dungeon and lair. dropped: team (species); phase 5 gives each a Sudden Death boss */
@@ -132,8 +160,15 @@ DB.cups={ // dropped: each round's team (species); phase 6 builds the teams from
  crown:{name:'Terra Chimera Championship',town:'coliseum',elem:'aether',flag:'champion',final:1,rounds:[{who:'@rival1',team:'@rival',lv:0},{who:'@rival2',team:'@rival',lv:1},{who:'@apex',lv:2}]}};
 /* cards: a chest or a topic may pay card:'id', cards:['id',...] or cardChoice:{pick:3, rarity?, kind?, pool?} (see wPayCards, w3).
    Seeded so far: Vesper's cottage and the Hollow Shrine chests (a choice), and Imelda's licence topic (Pick and Roll). */
+/* phase 4 seeds 1-2 card finds per region (w9 test realm_town checks every one pays):
+     plains   cottage_chest (a choice), Imelda's LICENCE (Pick and Roll), genevault_c3 (a rare choice)
+     bloom    shrine_chest (uncommons), Gaffer Brack's HONEY (golf and jousting plays)
+     tide     marigold_chest (bowling and curling cards), hatchery_c3 (uncommons)
+     ember    emberdeep_c3 (football and boxing cards), the smith's PEPPERS (Spiked Shoulder Pads)
+     rime     chapel_chest (hockey and curling cards), Sister Ilka's MINT (uncommons) */
+const wSportPool=sports=>Object.keys(CARDS).filter(id=>{const c=CARDS[id];return c.kind==='any'&&sports.includes(c.sport)&&['c','u','r'].includes(c.rar)});
 /* dropped: part prizes and research data (phase 5 puts magic gear in the prize chests), snares, mutagen and battle items */
-DB.chests={genevault_prize:{gold:300,items:{capsule:1}},emberdeep_prize:{gold:220},hatchery_prize:{gold:180},genevault_c6:{gold:80},emberdeep_c3:{gold:70,items:{emberpepper:3}},emberdeep_c6:{items:{jerky:2}},hatchery_c3:{gold:60,items:{brinekelp:3,saltfish:2}},hatchery_c6:{items:{salve:2}},genevault_c3:{gold:90},cottage_chest:{gold:60,items:{oldbracket:1},cardChoice:{pick:3}},shrine_chest:{gold:30,items:{honeydrop:2},cardChoice:{pick:3,rarity:'u'}},marigold_chest:{gold:40,items:{shiplog:1,saltfish:2}},chapel_chest:{gold:50,items:{bellclapper:1,hardtack:2}},deepseam_prize:{gold:150,items:{glassheart:1}},deepseam_c3:{gold:60,items:{jerky:2}}};
+DB.chests={genevault_prize:{gold:300,items:{capsule:1}},emberdeep_prize:{gold:220},hatchery_prize:{gold:180},genevault_c6:{gold:80},emberdeep_c3:{gold:70,items:{emberpepper:3},cardChoice:{pick:3,pool:wSportPool(['football','boxing'])}},emberdeep_c6:{items:{jerky:2}},hatchery_c3:{gold:60,items:{brinekelp:3,saltfish:2},cardChoice:{pick:3,rarity:'u'}},hatchery_c6:{items:{salve:2}},genevault_c3:{gold:90,cardChoice:{pick:3,rarity:'r'}},cottage_chest:{gold:60,items:{oldbracket:1},cardChoice:{pick:3}},shrine_chest:{gold:30,items:{honeydrop:2},cardChoice:{pick:3,rarity:'u'}},marigold_chest:{gold:40,items:{shiplog:1,saltfish:2},cardChoice:{pick:3,pool:wSportPool(['bowling','curling'])}},chapel_chest:{gold:50,items:{bellclapper:1,hardtack:2},cardChoice:{pick:3,pool:wSportPool(['hockey','curling'])}},deepseam_prize:{gold:150,items:{glassheart:1}},deepseam_c3:{gold:60,items:{jerky:2}}};
 DB.locs=[
  {id:'graftonbury',kind:'town',x:48,y:38,tile:'O',map:'graftonbury',name:'Graftonbury'},{id:'coliseum',kind:'coliseum',x:48,y:30,tile:'Q',map:'coliseum',name:'The Crown Coliseum'},
  {id:'mossgate',kind:'town',x:20,y:54,tile:'O',map:'mossgate',name:'Mossgate'},{id:'saltmere',kind:'town',x:75,y:54,tile:'O',map:'saltmere',name:'Saltmere'},{id:'cinderhold',kind:'town',x:75,y:17,tile:'O',map:'cinderhold',name:'Cinderhold'},{id:'rimewatch',kind:'town',x:21,y:17,tile:'O',map:'rimewatch',name:'Rimewatch'},
@@ -320,35 +355,29 @@ DB.sideplots=[ // dropped: q_hob and rq_patch, whose topics are gone
  {id:'rare_umbralden',title:'The road to nowhere',who:'Ingrith Skarr, Rimewatch',hint:'After surveying the Roost, ask Ingrith about the ROAD; walk it to its end after dark and take what is in the nest.',pay:'A rare Duskhound egg.'},
  {id:'q_letter3',title:'The Coliseum post',who:'Herald Pim, Crown Coliseum',hint:'Carry his LETTER to Imelda Foss, bring back her REPLY.',pay:'80 gold.'},
  {id:'got_keycard',title:'The Gene Vault',who:'Gant Vesper, Graftonbury',hint:'Win two cups, then ask him about the VAULT.',pay:'The keycard, and whatever waits at the bottom.'}];
-/* road events: rolled on the overworld, weighted; one effect each */
+/* road events (phase 4): rolled on the overworld from the encounter hook (w9-road.js), weighted by w. Each opens an
+   event card. A choice may cost (cost: gold, items, hp) and pays effects:
+     gold (n or [lo, hi]), fans, items, energy { here | elem: n or [lo, hi] }, time (minutes), healPct, steal (an item),
+     snack (a meal id into your bag), charm (a fortune for the next match), practice / upgrade (pick a card), lore,
+     card / cards / cardChoice (wGainCard), chance + fail (a gamble), match { type, name, win } (a match: kind 'event').
+   time: 'day' | 'night' only then; region: [ids] only there; need: a flag. By day on a road, nothing that starts a match.
+   Kept from TC (rewritten for teams): pedlar, purse, rival, shed, cook, lostchild, maud, oriel, moth, poacher, wisp, thief.
+   dropped: stray and egg (snaring and eggs are cut), inspector (snares), storm (only lost time), scholar, bard and soto
+   (they paid research data), drover (salves have no use yet), race (one creature's speed), and the four region
+   traders nephew, fisher, miner and pilgrim (the region shops sell the same food). */
 DB.events=[
- {id:'pedlar',w:4,who:{name:'Tamsin Crook, pedlar',look:{coat:'#8a5a2a',acc:'hat',hair:'#b0485a'}},text:'A pedlar with a cart of jars flags you down. "Salves, handler? Rations? Everything fresh this week, or this month, anyway."',choices:[{label:'A salve (25 gold)',cost:{gold:25},items:{salve:1},result:'She wraps it in newspaper.'},{label:'Three rations (30 gold)',cost:{gold:30},items:{ration:3},result:'"Do not eat them all at once. People do."'}]}, // dropped: tonics and salts
- {id:'stray',w:3,who:{kind:'@region'},text:'A stray chimera limps out of the grass, wary but too tired to run. It looks like it would join whoever beats it.',choices:[{label:'Challenge it',act:'stray'}]}, // dropped: snaring; who.chimera is now who.kind
- {id:'purse',w:3,who:{scene:'purse'},text:'Somebody\'s purse lies in the road, dropped from a wagon. There is nobody in sight.',choices:[{label:'Keep it',gold:[15,45],result:'Finders keepers.'},{label:'Leave it at the next League post',result:'A clerk will be pleased. Somebody will be very pleased.'}]}, // dropped: rp
- {id:'rival',w:3,who:'@rival',text:'A rival handler\'s wagon is drawn up at the crossroads. "Friendly match? Winner takes the loser\'s bounty."',choices:[{label:'Accept the match',act:'duel'}]},
- {id:'shed',w:3,who:{scene:'shed'},text:'Fresh shed skin, still warm, glittering with energy where it lies.',auto:{energy:{here:[2,4]}}},
- {id:'storm',w:2,who:{scene:'storm'},text:'A sudden squall. You shelter under the wagon for an hour and lose the light.',auto:{time:60}},
- {id:'scholar',w:2,who:{name:'Dr. Wyn Ashby, League survey',look:{coat:'#3f5a7a',acc:'clip',hair:'#8a857e'}},text:'A scholar with a satchel of forms asks you to describe the last well you drew from. She pays for good notes.',choices:[{label:'Describe it',gold:[10,20],time:30,result:'She writes it all down, twice.'}]}, // dropped: rp
- {id:'egg',w:1,who:{scene:'egg'},text:'An egg, alone in the grass, still warm. Whatever laid it is not coming back.',choices:[{label:'Take it',act:'egg'}]},
- {id:'thief',w:2,who:{kind:'goblin'},text:'A goblin darts out of the wagon with something in its teeth and is gone before you can grab it.',auto:{steal:1}}, // dropped: who.chimera voltmite
- {id:'cook',w:3,who:{name:'Barnaby Stew, road cook',look:{coat:'#a0522d',acc:'apron',hair:'#e8e0f0'}},text:'A travelling cook stirs a pot on a tripod by the road. It smells of pepper and good intentions.',choices:[{label:'A hot meal for the team (15 gold)',cost:{gold:15},healAll:.3,result:'Everyone eats. Everyone feels better.'},{label:'Trade 2 grain for 2 Ember Jerky',cost:{items:{grain:2}},items:{jerky:2},result:'"Fair trade. Mind, it bites back."'}]},
- {id:'lostchild',w:2,time:'day',who:{name:'Wren, aged eight',look:{coat:'#e0457b',hair:'#f2c14e'}},text:'A child is calling into the grass for a Mossprout called Biscuit. "He always comes back. He always comes back."',choices:[{label:'Help look (an hour)',time:60,gold:25,result:'You find Biscuit asleep under a hedge. Her mother presses coins on you and will not take them back.'}]}, // dropped: rp
- {id:'maud',w:2,who:{name:'Old Maud Kerry, retired handler',look:{coat:'#5a6e3a',acc:'scarf',hair:'#c9c9c9'}},text:'An old handler leans on a stick by the milestone. "Your lead stands wrong. I could fix that, for the price of a pie."',choices:[{label:'Pay for a lesson (30 gold)',cost:{gold:30},xpLead:.4,time:90,result:'She drills your lead until it stands right. It does look better.'}]},
- {id:'inspector',w:2,need:'licensed',who:{name:'Inspector Garrow, League',look:{coat:'#3f5a7a',acc:'cap',hair:'#1a1210'}},text:'A League inspector checks your licence, holds it up to the light, and hands it back. "In order. Take these; the League likes its handlers fed."',auto:{items:{ration:2}}}, // dropped: snares
- {id:'bard',w:2,who:{name:'Lark Tully, balladeer',look:{coat:'#b38cf0',acc:'hat',hair:'#7a4a20'}},text:'A bard with a lute made from a Slagback shell is singing to nobody. "A song for the road? Five gold and you choose."',choices:[{label:'Tip for a song (5 gold)',cost:{gold:5},lore:1}]}, // dropped: rp
- // dropped: caravan (it sold aether nuts, salts and mutagen)
- {id:'drover',w:2,who:{name:'A limping drover',look:{coat:'#7a5a32',acc:'hat',hair:'#4a3020'}},text:'A drover sits on a stone holding his ankle. His Slagback stands over him looking worried, as far as a Slagback can.',choices:[{label:'Give him a salve',cost:{items:{salve:1}},gold:50,result:'He is on his feet in minutes and insists on paying.'}]}, // dropped: the tonic choice, and rp
- {id:'oriel',w:2,who:{name:'Madame Oriel',look:{coat:'#5a3d8a',acc:'robe',hair:'#1a1210'}},text:'A fortune teller has set a table in the ditch. "Cross my palm, and I will tell you how your next fight goes."',choices:[{label:'Cross her palm (15 gold)',cost:{gold:15},fed:1,result:'"You will win it. Probably." Your team seems to believe her.'}]},
- // dropped: smuggler (mutagen)
- {id:'moth',w:2,who:{name:'Sister Moth, wandering enchanter',look:{coat:'#bfe6f2',acc:'robe',hair:'#e8e0f0'}},text:'A wandering enchanter is binding a charm into a fencepost. "The land here is generous. I could draw some off for you."',choices:[{label:'Pay her to draw it (20 gold)',cost:{gold:20},energy:{here:3},result:'She draws the energy up out of the ground and into your jars.'}]},
- {id:'poacher',w:2,who:{name:'Skell, a poacher',look:{coat:'#3a2e2c',acc:'hat',hair:'#1a1210'}},text:'A poacher with a cage on his back. Something inside is crying. "Not your business, handler. Unless you want to buy."',choices:[{label:'Free it (fight him)',act:'poacher'},{label:'Buy it (80 gold)',cost:{gold:80},act:'freed'}]},
- {id:'race',w:2,time:'day',who:{name:'Pip Fleet, racer',look:{coat:'#f2c14e',acc:'cap',hair:'#b0485a'}},text:'A boy with a very fast Frostlet. "Race you to the next milestone. Twenty gold says mine wins."',choices:[{label:'Race your lead (stake 20)',cost:{gold:20},act:'race'}]},
- {id:'soto',w:2,who:{name:'Dr. Imani Soto, field researcher',look:{coat:'#2f7a6a',acc:'goggles',hair:'#1a1210',skin:'#7a4a30'}},text:'A field researcher with calipers asks to measure your team. "For the Bestiary. You will be credited. Somewhere."',choices:[{label:'Let her measure them',gold:15,time:30,result:'She measures everything, including you.'}]}, // dropped: rpTeam
- {id:'wisp',w:2,time:'night',who:{scene:'wisp'},text:'Lights move in the grass beside the road, blue and slow, and they seem to want you to follow.',choices:[{label:'Follow the lights',act:'wisp'}]},
- {id:'nephew',w:3,region:['bloom'],who:{name:'Tam Brack, beekeeper\'s nephew',look:{coat:'#a08a55',acc:'hat',hair:'#7a4a20'}},text:'A young beekeeper carries a smoking pot down the road. "Uncle says to give these to handlers. He says you are the only ones the bees like."',auto:{items:{honeydrop:1}}},
- {id:'fisher',w:3,region:['tide'],who:{name:'Old Salt, fisherman',look:{coat:'#235c9c',acc:'cap',hair:'#e8e0f0'}},text:'An old fisherman is gutting cod on an upturned barrel. "Salt fish, dried this week. Your pups will thank you."',choices:[{label:'Two salt fish (20 gold)',cost:{gold:20},items:{saltfish:2}}]},
- {id:'miner',w:3,region:['ember'],who:{name:'A soot-faced miner',look:{coat:'#4a423f',acc:'helmet',hair:'#1a1210'}},text:'A miner coming off shift, black to the eyes. "Salt fish? I would give a lot for a salt fish. Peppers, say."',choices:[{label:'Trade a salt fish for 3 ember peppers',cost:{items:{saltfish:1}},items:{emberpepper:3}}]}, // dropped: the tonic trade
- {id:'pilgrim',w:3,region:['rime'],who:{name:'Pilgrim Ase',look:{coat:'#dfe9ee',acc:'robe',hair:'#c9c9c9'}},text:'A pilgrim on the way to the abbey, shaking with cold. "Could I share your fire? Only for a while."',choices:[{label:'Share your fire (half an hour)',time:30,items:{hardtack:2},result:'She warms her hands and leaves you her travelling biscuits.'}]}];
+ {id:'pedlar',w:4,who:{name:'Tamsin Crook, pedlar',kind:'goblin'},text:'A pedlar with a cart of jars flags you down. "Pies, handler? Grain? Everything fresh this week, or this month, anyway."',choices:[{label:'A Trail Hash to take away (14 gold)',cost:{gold:14},snack:'hash',result:'She wraps it in newspaper. "Eat it before the game, not after."'},{label:'Grain and salt for the pot (10 gold)',cost:{gold:10},items:{grain:2,salt:2},result:'"Do not eat it raw. People do."'}]},
+ {id:'purse',w:3,who:{scene:'purse'},text:'Somebody\'s purse lies in the road, dropped from a wagon. There is nobody in sight.',choices:[{label:'Keep it',gold:[15,45],result:'Finders keepers.'},{label:'Hand it in at the next League post',fans:15,result:'A clerk is pleased. Word gets round that your team plays fair.'}]},
+ {id:'rival',w:3,who:{rival:1},text:'A rival club\'s wagon is drawn up at the crossroads. "Friendly match? Loser buys the next round, and the winner takes the purse."',choices:[{label:'Accept the match',match:{type:'normal',win:{gold:[35,50],fans:20},winText:'They pay up with bad grace.'}}]},
+ {id:'shed',w:3,who:{scene:'shed'},text:'A well by the road has cracked, and shards of raw energy glitter in the grass round it.',auto:{energy:{here:[2,4]}}},
+ {id:'cook',w:3,who:{name:'Barnaby Stew, road cook',kind:'ogre'},text:'A travelling cook stirs a pot on a tripod by the road. It smells of pepper and good intentions.',choices:[{label:'A hot meal for the team now (15 gold)',cost:{gold:15},healPct:.3,result:'Everyone eats. Everyone feels better.'},{label:'A pot of chili to go (20 gold)',cost:{gold:20},snack:'chili',result:'"Eat it before kickoff. It bites back."'}]},
+ {id:'lostchild',w:2,time:'day',who:{name:'Wren, aged eight',kind:'kobold'},text:'A child is calling into the grass for her pet, a Mossprout called Biscuit. "He always comes back. He always comes back."',choices:[{label:'Help look (an hour)',time:60,gold:25,fans:10,result:'You find Biscuit asleep under a hedge. Her mother presses coins on you and will not take them back.'}]},
+ {id:'maud',w:2,who:{name:'Old Maud Kerry, retired coach',kind:'dwarf'},text:'An old coach leans on a stick by the milestone. "Your forwards stand wrong. I could fix that, for the price of a pie."',choices:[{label:'A practice session (40 gold, 90 minutes)',cost:{gold:40},time:90,practice:1,result:'She drills one play until it is second nature.'},{label:'Watch film with her (60 gold, 2 hours)',cost:{gold:60},time:120,upgrade:1,result:'She stops the tape every four seconds. It helps.'}]},
+ {id:'oriel',w:2,who:{name:'Madame Oriel',kind:'witch'},text:'A fortune teller has set a table in the ditch. "Cross my palm, and I will tell you how your next game goes."',choices:[{label:'Cross her palm (15 gold)',cost:{gold:15},charm:'fortune',result:'"You will win it. Probably." Your team seems to believe her.'}]},
+ {id:'moth',w:2,who:{name:'Sister Moth, wandering enchanter',kind:'lich'},text:'A wandering enchanter is binding a charm into a fencepost. "The land here is generous. I could draw some off for you."',choices:[{label:'Pay her to draw it (20 gold)',cost:{gold:20},energy:{here:3},result:'She draws the energy up out of the ground and into your jars.'}]},
+ {id:'poacher',w:2,who:{name:'Skell, a scalper',kind:'werewolf'},text:'A scalper with a cage on his back, full of stolen team mascots. One of them is crying. "Not your business. Unless you want to buy."',choices:[{label:'Free them: play his crew for it',match:{type:'normal',name:'Skell',win:{gold:40,fans:30},winText:'Skell runs. You open the cage, and the mascots\' clubs send their thanks.'}},{label:'Buy them free (80 gold)',cost:{gold:80},fans:40,result:'The mascots go home. Every club in the league hears who paid.'}]},
+ {id:'wisp',w:2,time:'night',who:{scene:'wisp'},text:'Lights move in the grass beside the road, blue and slow, and they seem to want you to follow.',choices:[{label:'Follow the lights',chance:.55,energy:{aether:4},result:'The lights lead you to a hollow full of Aether, and go out.',fail:'The lights go out. Something else was following them.',failMatch:{type:'normal'}}]},
+ {id:'thief',w:2,who:{name:'A goblin pickpocket',kind:'goblin'},text:'A goblin darts out from behind your wagon with something in its teeth and is gone before you can grab it.',auto:{steal:1}}];
 DB.lore=['a song about Ada Quill, the first champion, and the Voltmite she held at arm\'s length','a song about Gant Vesper\'s three cups and his fourth that got away','a song about the Hatch-Mother and the lighthouse that went dark','a song about the road north of the Roost that goes nowhere','a song about Apex Biologic, sung very quietly'];
 /* rare chimera chains */
 DB.chars.almond.topics.unlisted={t:'There is one thing in the Bestiary I have never drawn. A moth, big as your hand, pale, that drinks the lamps dry at night. Fenwick swears it is real. Ask him about the MOTH.',need:'q_almond',needNo:'Finish the Bestiary entry first. Then we will talk about the ones nobody has.',set:'rq_lumi1',xp:10};
@@ -385,5 +414,21 @@ DB.chars.salt_shop.topics.count={t:'The League wants a count of what swims out t
 DB.chars.salt_shop.topics.job.t+=' I also keep the fen COUNT for the League.';
 DB.chars.nell.topics.salt={t:'The sand wants salting before the crown, two twists, or it dusts. Bring me salt and the steward\'s tip is yours.',take:{salt:2},gold:40,once:'q_nell',xp:10,t2:'Salted. It will not dust.',needNo:'Two twists of salt. Any chandler.'};
 DB.chars.nell.topics.job.t+=' I could use SALT for the sand.';
+/* phase 4: card payouts on quest topics */
+DB.chars.brack.topics.honey.cardChoice={pick:3,pool:wSportPool(['golf','jousting'])};
+DB.chars.smith.topics.peppers.card='gr_shoulder';
+DB.chars.monk.topics.mint.cardChoice={pick:3,rarity:'u'};
+/* phase 4: Brother Quill enchants (act 'enchant'), Marrow Tansy cooks (act 'kitchen'), every innkeeper has a MEAL menu
+   (act 'meals'), and three vendors sell cards (act 'cards'). w9b-town.js handles the acts. */
+DB.chars.quill.topics.job.t='Enchanter. The land has ENERGY in it, a different kind in every biome. I bind it into your plays: say ENCHANT and I will show you. If you will have me, I will JOIN.';
+DB.chars.quill.topics.enchant={t:'Bring me energy, any kind, and I will bind it into a card, or drill a play into your players, or put the charge back in your gear.',act:'enchant'};
+DB.chars.tansy.topics.job.t='Cook. A team is what it eats. Bring me FORAGE from the bushes out there and I will COOK you a meal for match day. Say JOIN and I will fetch my pots.';
+DB.chars.tansy.topics.forage.t='Every region has its own bush: mossberry, ember pepper, brine kelp, frost mint, and aethercap here on the plains. Bushes grow back in a few days. Any inn hearth will do for cooking, and so will my canteen.';
+DB.chars.tansy.topics.cook={t:'Sit. What have you brought me?',act:'kitchen'};
+for(const id in DB.innMenu){const ch=DB.chars[id];ch.topics.job.t+=' The kitchen does a MEAL for match day.';ch.topics.meal={t:'Here is what the kitchen can do, and the hearth is yours if you would rather cook.',act:'meals'}}
+DB.chars.hq_shop.topics.job.t+=' I keep a binder of league CARDS, too.';
+DB.chars.netter.topics.job.t+=' There is a crate of league CARDS in the back, if you like.';
+DB.chars.smith.topics.job.t+=' I also keep a rack of league CARDS for the teams.';
+for(const id in DB.cardShops)DB.chars[id].topics.cards={t:'Have a look. New stock every week.',act:'cards'};
 /* flags the engine itself sets; the audit needs to know they are real */
 DB.engineFlags=['cups1','cups2','cups3','cups4','cup_moss','cup_salt','cup_cind','cup_rime','champion'];

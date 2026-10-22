@@ -9,6 +9,7 @@ include src/manifest.txt
 out dist/realm.html
 style src/realm/w0.css
 style src/realm/w6.css
+style src/realm/w9.css
 
 src/realm/w1-data.js
 src/realm/w2-maps.js
@@ -19,3 +20,5 @@ src/realm/w6-party.js
 src/realm/w7-ui.js
 src/realm/w7b-camp.js
 src/realm/w8-boot.js
+src/realm/w9-road.js
+src/realm/w9b-town.js
