@@ -72,8 +72,9 @@ The build output is a single static file, `sudden-death.html`. Host it anywhere 
 - **Python 3.10+ with Playwright and Chromium**, for the test suite:
 
   ```bash
-  python3 -m pip install -r requirements-dev.txt
-  python3 -m playwright install chromium
+python3 -m venv .venv && source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+python -m playwright install chromium
   ```
 
 ### Build

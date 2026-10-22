@@ -32,6 +32,7 @@ Design decisions were usually tested with bots before shipping. For example, "dr
 ## Commands
 
 ```bash
+Activate the venv first (`source .venv/bin/activate`). On macOS, `brew install coreutils` provides `gtimeout` for per-check timeouts (optional).
 ./build.sh                                    # build; fails on syntax errors or duplicate top-level names
 ./test/all.sh                                 # quick suite (several minutes); run before every commit
 python3 test/<name>.py                        # one check
