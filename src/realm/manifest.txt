@@ -7,6 +7,7 @@
 src/realm/w00-pre.js
 include src/manifest.txt
 out dist/realm.html
+title Sudden Death: Realm
 style src/realm/w0.css
 style src/realm/w6.css
 style src/realm/w9.css

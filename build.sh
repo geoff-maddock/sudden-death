@@ -7,11 +7,12 @@
 #   out <file>       where the built page is written (required)
 #   include <file>   read another manifest at this point, as if its lines were pasted in
 #   style <file>     extra CSS added at the end of the shell's <style> (repeatable)
+#   title <text>     replaces the shell's <title> (the page and tab name)
 # Plain bash, no dependencies beyond node (for the syntax check).
 set -e
 cd "$(dirname "$0")"
 MANIFEST="${1:-src/manifest.txt}"
-SHELL_HTML=""; OUT=""; FILES=(); STYLES=()
+SHELL_HTML=""; OUT=""; TITLE=""; FILES=(); STYLES=()
 
 read_manifest() {
   local m="$1" line kw arg
@@ -24,6 +25,7 @@ read_manifest() {
     case "$kw" in
       shell)   SHELL_HTML="$arg" ;;
       out)     OUT="$arg" ;;
+      title)   TITLE="$arg" ;;
       include) read_manifest "$arg" ;;
       style)   [ -f "$arg" ] || { echo "Missing style file in $m: $arg" >&2; exit 1; }
                STYLES+=("$arg") ;;
@@ -48,6 +50,12 @@ if [ ${#STYLES[@]} -gt 0 ]; then
   [ -n "$n" ] || { echo "No '</style>' line in $SHELL_HTML for style lines" >&2; exit 1; }
   { head -n $((n - 1)) "$SHELL_HTML"; cat "${STYLES[@]}"; tail -n +"$n" "$SHELL_HTML"; } > "build/$NAME.shell.html"
   SHELL_HTML="build/$NAME.shell.html"
+fi
+# a title line swaps the shell's <title> (awk reads it from the environment, so no escaping is needed)
+if [ -n "$TITLE" ]; then
+  grep -q '<title>.*</title>' "$SHELL_HTML" || { echo "No <title> in $SHELL_HTML for the title line" >&2; exit 1; }
+  T="$(printf '%s' "$TITLE" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g')" awk '!done && match($0, /<title>.*<\/title>/) { $0 = substr($0, 1, RSTART - 1) "<title>" ENVIRON["T"] "</title>" substr($0, RSTART + RLENGTH); done = 1 } { print }' "$SHELL_HTML" > "build/$NAME.titled.html"
+  SHELL_HTML="build/$NAME.titled.html"
 fi
 { cat "$SHELL_HTML"; echo '<script>'; cat "$JS"; echo '</script>'; echo '</body></html>'; } > "$OUT"
 wc -c "$OUT"
