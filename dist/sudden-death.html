@@ -5259,7 +5259,7 @@ function boot() {
   // fonts land after first paint; repaint the portrait caches and the screens that use them
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { for (const k in PORT) delete PORT[k]; for (const k in EMB) delete EMB[k]; for (const k in BGC) delete BGC[k]; if (UI.screen === 'draft') renderDraft(); if (UI.view === 'map') renderMap(); if (UI.view === 'fight') renderFightHUD(); });
 }
-if (!window.__SD_LAB) boot();
+if (!window.__SD_LAB && !window.__SD_REALM) boot();
 /* p8b: stat sheets — the line and each player, game by game and across runs */
 const PCOL = ['#ffb347', '#7fd6ff', '#d2a6ff', '#7fe08a', '#ff8a7a'];
 // a small SVG line chart: series = [{ name, col, pts: [numbers], dash }]

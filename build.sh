@@ -6,11 +6,12 @@
 #   shell <file>     the HTML page the script is wrapped in (required)
 #   out <file>       where the built page is written (required)
 #   include <file>   read another manifest at this point, as if its lines were pasted in
+#   style <file>     extra CSS added at the end of the shell's <style> (repeatable)
 # Plain bash, no dependencies beyond node (for the syntax check).
 set -e
 cd "$(dirname "$0")"
 MANIFEST="${1:-src/manifest.txt}"
-SHELL_HTML=""; OUT=""; FILES=()
+SHELL_HTML=""; OUT=""; FILES=(); STYLES=()
 
 read_manifest() {
   local m="$1" line kw arg
@@ -24,6 +25,8 @@ read_manifest() {
       shell)   SHELL_HTML="$arg" ;;
       out)     OUT="$arg" ;;
       include) read_manifest "$arg" ;;
+      style)   [ -f "$arg" ] || { echo "Missing style file in $m: $arg" >&2; exit 1; }
+               STYLES+=("$arg") ;;
       *)       [ -f "$line" ] || { echo "Missing source file in $m: $line" >&2; exit 1; }
                FILES+=("$line") ;;
     esac
@@ -39,6 +42,13 @@ JS="build/$NAME.js"
 mkdir -p build "$(dirname "$OUT")"
 cat "${FILES[@]}" > "$JS"
 node --check "$JS"
+# extra styles go just before the shell's first </style>
+if [ ${#STYLES[@]} -gt 0 ]; then
+  n=$(grep -n '^</style>$' "$SHELL_HTML" | head -1 | cut -d: -f1)
+  [ -n "$n" ] || { echo "No '</style>' line in $SHELL_HTML for style lines" >&2; exit 1; }
+  { head -n $((n - 1)) "$SHELL_HTML"; cat "${STYLES[@]}"; tail -n +"$n" "$SHELL_HTML"; } > "build/$NAME.shell.html"
+  SHELL_HTML="build/$NAME.shell.html"
+fi
 { cat "$SHELL_HTML"; echo '<script>'; cat "$JS"; echo '</script>'; echo '</body></html>'; } > "$OUT"
 wc -c "$OUT"
 # every part shares one global scope: a second top-level function or const with the same name silently

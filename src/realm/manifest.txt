@@ -1,0 +1,17 @@
+# Sudden Death: Realm build manifest: ./build.sh src/realm/manifest.txt
+#
+# The prelude loads first so the standalone game's boot (app/boot.js) stands down; then every Sudden Death
+# file, in its own order; then the realm files, which may read any Sudden Death table at load time.
+# The realm's `out` comes after the include, so it replaces Sudden Death's.
+
+src/realm/w00-pre.js
+include src/manifest.txt
+out dist/realm.html
+style src/realm/w0.css
+
+src/realm/w1-data.js
+src/realm/w2-maps.js
+src/realm/w3-state.js
+src/realm/w4-ink.js
+src/realm/w7-ui.js
+src/realm/w8-boot.js
