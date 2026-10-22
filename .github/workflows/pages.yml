@@ -24,7 +24,7 @@ jobs:
       - name: Build
         run: ./build.sh
       - name: Stage site
-        run: mkdir -p _site && cp sudden-death.html _site/index.html && cp sudden-death.html _site/
+        run: mkdir -p _site && cp dist/sudden-death.html _site/index.html && cp dist/sudden-death.html _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

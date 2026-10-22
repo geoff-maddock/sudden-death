@@ -11,7 +11,7 @@ The whole game is one self-contained HTML file. No server, no install, no build 
 
 ## Play
 
-- **Locally:** open `sudden-death.html` in any modern browser (Chrome, Firefox, Safari, Edge).
+- **Locally:** open `dist/sudden-death.html` in any modern browser (Chrome, Firefox, Safari, Edge).
 - **Hosted:** any static host works. See [Deploying](#deploying).
 
 Progress (runs in progress, the record book, careers, achievements, settings) is saved in the browser's `localStorage`, per profile. Nothing is sent anywhere. Fonts load from Google Fonts and fall back to system fonts offline.
@@ -41,7 +41,7 @@ Progress (runs in progress, the record book, careers, achievements, settings) is
 
 ## Deploying
 
-The build output is a single static file, `sudden-death.html`. Host it anywhere that serves static files.
+The build output is a single static file, `dist/sudden-death.html`. Host it anywhere that serves static files.
 
 ### GitHub Pages (included workflow)
 
@@ -53,8 +53,8 @@ The build output is a single static file, `sudden-death.html`. Host it anywhere 
 
 ### Anything else
 
-- **Netlify / Vercel / Cloudflare Pages:** build command `./build.sh`, publish the repo root, and set `sudden-death.html` as the index (or copy it to `index.html` as the Pages workflow does).
-- **Any web server or bucket:** upload `sudden-death.html`.
+- **Netlify / Vercel / Cloudflare Pages:** build command `./build.sh`, publish the `dist/` directory, and set `sudden-death.html` as the index (or copy it to `index.html` as the Pages workflow does).
+- **Any web server or bucket:** upload `dist/sudden-death.html`.
 
 ### Hosting notes
 
@@ -83,20 +83,30 @@ python -m playwright install chromium
 ./build.sh
 ```
 
-This concatenates the ordered parts in `src/` into `build/all.js`, syntax-checks it, refuses to build if two parts define the same top-level name (they share one global scope), and writes `sudden-death.html`.
+This reads `src/manifest.txt`, concatenates the files it lists, in that order, into `build/sudden-death.js`, syntax-checks it, refuses to build if two files define the same top-level name (they share one global scope), and writes `dist/sudden-death.html`.
 
-**Edit `src/`, never `sudden-death.html`.** The HTML file is generated. It is committed so the game is playable straight from the repo.
+**Edit `src/`, never `dist/sudden-death.html`.** The HTML file is generated. It is committed so the game is playable straight from the repo.
+
+The manifest is the build order: one path per line, `#` comments, plus `shell <file>` (the HTML page), `out <file>` (where to write it) and `include <manifest>`. `./build.sh other-manifest.txt` builds from a different one.
 
 ### Project layout
 
 ```
-src/            the game, as ordered parts (see ARCHITECTURE.md for what each does)
-  p0.html       CSS and page shell
-  p1.js … p9.js renderer, data, engine, sports layer, run structure, UI, screens, audio
-test/           Playwright checks and the balance bots
-  all.sh        the quick suite
-  lab.js        headless bot that plays whole runs from the model, not the screen
-build.sh        build script
+src/                the game (see ARCHITECTURE.md for what each file does)
+  manifest.txt      build order: the files load in this order, in one global scope
+  shell.html        CSS and page shell
+  core/             utilities, player profiles, hooks
+  data/             clubs, statuses, cards, trophies, sports, enemies, bosses, the draft class
+  engine/           combat, the sports layer, boss ops, player stats, the sky
+  run/              a run: the map, rewards, events, saves, goals, achievements, trouble
+  render/           the creature renderer, boss art, visual effects
+  ui/               icons, card faces, widgets, the map; fight/ (the fight scene) and screens/
+  app/              sound, music, settings, coach's notes, pause and saves, profiles, boot
+dist/               the built game, sudden-death.html (generated, committed)
+test/               Playwright checks and the balance bots
+  all.sh            the quick suite
+  lab.js            headless bot that plays whole runs from the model, not the screen
+build.sh            build script (reads a manifest)
 docs/           design notes, balance notes, changelog
 ARCHITECTURE.md how the code fits together, conventions, how to add things
 CLAUDE.md       working context for Claude Code
@@ -126,7 +136,7 @@ python3 test/difficulty.py 120 '{}' diff=1 dumb    # skilled vs careless bot on 
 python3 test/difficulty.py 120 '{"draw":4}'        # try a TUNE override
 ```
 
-All difficulty numbers live in `TUNE` and `DIFFS` at the top of `src/p4.js`. The bot is weaker than a careful human, so treat its win rates as relative. Compare before and after, with at least 100 runs per side.
+All difficulty numbers live in `TUNE` and `DIFFS` at the top of `src/engine/combat.js`. The bot is weaker than a careful human, so treat its win rates as relative. Compare before and after, with at least 100 runs per side.
 
 ---
 
