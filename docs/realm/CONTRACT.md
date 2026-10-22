@@ -180,3 +180,41 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
   - `test/realm_lab.js` defines `window.REALMLAB(opts)`. It replaces `beginFight` with a model-only start and `renderPanel` with a no-op, then plays the route through the realm's own functions. It returns a log with matches, stages and a result (`champion`, `stuck` or `dead`).
   - `test/realm_lab.py N [opts] [js]` prints the report.
   - `test/realm_bot.py` is the quick-suite check.
+
+## Phase 8: feel (w13-feel.js)
+
+`w13-feel.js` loads after `w12-renown.js` and changes earlier parts only by reassignment (saved originals carry the `wW13` prefix) and by adding entries to Sudden Death's tables (`THEMES`, `SCALES`, `TIPS`, `ACH`). The numbers it owns are in `W_BAG` at the top of the file.
+
+- **Music.** Eight realm themes in `THEMES`, in Sudden Death's theme format, played by SD's sequencer. `SCALES.ionian` and `SCALES.lydian` are added for them.
+
+  | Theme | Where | Sound |
+  |---|---|---|
+  | `w_plains` | Charter Plains | G ionian, 100 bpm, triangle lead: a walking tune |
+  | `w_bloom` | Mosswold | D dorian, 88 bpm, sine bells, shaker hats |
+  | `w_tide` | Brinefen | G aeolian, 72 bpm, wavering triangle over sine pads |
+  | `w_ember` | Cindermaw | D phrygian, 132 bpm, heavy sawtooth, driving bass |
+  | `w_rime` | Frostspire | A lydian, 96 bpm, high bells, sleigh-bell hats |
+  | `w_town` | every town | C mixolydian, 118 bpm, square organ, oom-pah bass |
+  | `w_dungeon` | dungeons and dungeon rooms | E harmonic minor, 78 bpm, heavy, sparse |
+  | `w_night` | off the road at night | A aeolian, 70 bpm, quiet bells |
+
+  `musicWanted` is reassigned. In the world view (and the reward panel) it returns `[wMusicHere(), 'calm']`. In a realm match it returns `wMusicMatch(world)` with SD's fight/hype mode: the match's region theme, or `w_dungeon` for a match on a dungeon map. Cups play their region's theme; the Crown's rounds play the plains theme. Bosses (alphas and the Crown final) keep SD's act theme. `MUS.want` records the theme asked for. SD's `musicSet` already does nothing in `LAB`.
+- **Tips.** `TIPS.w_walk`, `w_wild`, `w_blackout`, `w_level`, `w_recruit`, `w_cup`, `w_door`, `w_renown`, `w_champ`, `w_night` and `w_bag`, shown once per profile through SD's `tip(id)`. `wFeelTips()` runs every 700 ms (like SD's coach watcher) and reads the state. `w_door` comes from `wGateCheck` (wrapped) and `w_level` from `wGiveXp` (wrapped). `tip()` refuses in `LAB`; realm tests mark every tip seen (`NOTIPS`).
+- **Achievements.** Pushed onto `ACH`:
+
+  | id | Name | Stat | Ladder |
+  |---|---|---|---|
+  | `w_cups` | Silverware | `realmCups` (regional cups won) | 1, 4, 12 |
+  | `w_alphas` | Alpha Hunter | `realmAlphas` (new `alpha_*` flags) | 1, 6, 15 |
+  | `w_crown` | Champions of the Realm | `realmCrowns` | 1, 3, 10 |
+  | `w_iron` | Iron Crown | `realmHardCrowns` (the Crown on Hardcore) | 1, 2, 5 |
+  | `w_scout` | Talent Scout | `realmRecruits` (`wAddPlayer`, not founders) | 3, 10, 30 |
+  | `w_renown` | Household Name | `realmRenown` (best `wRenown()` reached) | 3, 6, 10 |
+  | `w_regions` | Cartographer | `realmRegions` (a set, counted as you walk) | 2, 4, 5 |
+  | `w_feet` | Back on Your Feet | `realmBlackouts` | 1, 5, 20 |
+
+  Counted from `wCupWon`, `wDispatchEnd` and `wAddPlayer` (all wrapped). `achAdd`/`achSet` do nothing in `LAB`.
+- **Records.** `wRecordCrown()` writes the same entry `recordRun` would (`result: 'win'`) plus `realm: { kind: 'crown', year, day, days, cups, alphas, crowns, hardcore, place }`. It never sets `RUN.over` and never calls `clearRun`, so the journey and its save carry on. It is called from the `wCupWon` wrapper on the Crown. `recordRun` is wrapped so a Hardcore loss is tagged with `realm` too. `renderRecords` is wrapped to show realm rows as "Champions of the realm" and "The realm: year Y, day D. N cups, M alphas".
+- **The bag.** `W_BAG` = `{ salve: { heal: .3, min: 10 }, ration: { heal: .15, min: 120 } }`. `wUseItem(id)` returns '' or why not: never during a match, not with none, not at full health. It heals `ceil(maxhp × heal)`, passes the time and saves. The Team screen gets a **Bag** tab (`wOpenCamp` and `wRenderCamp` wrapped). `DB.items.ration` is renamed Trail Ration, and both items' `desc`/`use` text is rewritten from `W_BAG` at load. Shop prices are unchanged (salve 30, or 28 in Rimewatch; ration 12). The bot does not use them.
+- **Help:** `renderHelp` (wrapped as `wW13RenderHelp`) adds `#wHelpFeel` inside `#wHelp`: the bag table, music and medals.
+- **Test:** `test/realm_feel.py`.
