@@ -129,7 +129,8 @@ async def main():
             if desk:
                 check(bo['map'] == 'mossgate', 'you wake at your last inn (WG.home)', bo)
                 check(bo['gold'] == 180 and bo['fans'] == 30, 'a tenth of the gold and a quarter of the fans are gone', bo)
-                check(bo['hp'] == -(-bo['max'] // 2), 'HP is back to half', bo)
+                # half, plus whatever level-ups the loss's share of XP paid out after the blackout (+2 HP each)
+                check(-(-bo['max'] // 2) <= bo['hp'] <= -(-bo['max'] // 2) + 12, 'HP is back to half', bo)
                 check(bo['saved'] and bo['last']['result'] == 'lose' and bo['blackouts'] == 1, 'the save is still there, and the loss is counted', bo)
             await pg.click('#wWake'); await pg.wait_for_timeout(200)
             if not desk:

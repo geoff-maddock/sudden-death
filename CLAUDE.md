@@ -40,6 +40,7 @@ python3 test/lab.py 200                       # balance: win rate, deaths by act
 python3 test/difficulty.py 120 '{}' diff=1 dumb   # skilled vs careless bot on a difficulty
 python3 test/policy.py 200                    # routing policies
 python3 test/clubs.py ironmaw,frostfang 60    # per-club win rates
+python3 test/realm_lab.py 140 '{}'               # the Realm: champion rate, where runs end, per-match cost (docs/realm/BALANCE.md)
 ```
 
 Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screenshots go to `/tmp/`.

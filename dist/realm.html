@@ -8479,7 +8479,7 @@ const W_PARTY = {
   recruitOdds: { normal: .15, elite: .35, rival: .35, boss: .35 },
   force: false,                                            // tests: the next win always brings a recruit
 };
-const wXpNeed = lvl => 10 + 10 * lvl;                      // level 1 to 2: 20 XP; 2 to 3: 30 ...
+const wXpNeed = lvl => 10 + 10 * lvl + 2 * lvl * lvl;     // level 1 to 2: 22 XP; 2 to 3: 38; 9 to 10: 262 (bot-tuned, phase 7)
 const wFee = lvl => 30 + 30 * lvl;                         // a free agent's signing fee in gold
 
 /* ---------- the roster ---------- */
@@ -10427,7 +10427,7 @@ renderHelp = function () {
 const W_CUP = {
   fee: 30,                          // gold to enter a town cup, and to enter again after a loss
   rounds: ['normal', 'elite', 'rival'],
-  tier: [2, 2, 2, 3],               // the field's tier by cups already won: the fourth cup is tier 3
+  tier: [1, 2, 3, 3],               // the field's tier by cups already won (bot-tuned, phase 7: the first cup is the way in)
   lv: [0, 1, 1],                    // level by round, before cups
   lvPerCup: .5,                     // plus floor(cups won x this) levels, at most W_ROAD.maxLv
   prize: { gold: 120, fans: 40, pick: 3, rarity: 'r' },   // a town cup: gold, fans, and a pick of rare cards
@@ -10709,6 +10709,68 @@ renderHelp = function () {
     <p class="hint"><b>Town cups.</b> Mossgate, Saltmere, Cinderhold and Rimewatch each hold a cup. Enter with the town's registrar (ask about the CUP, then ENTER) for ${W_CUP.fee} gold. A cup is three rounds in a row, in the region's sports: a local side, a seeded team with a scouting report, then a rival club. Lose once and you are out, but you can enter again. Each cup you already hold makes the next field tougher. Win all three rounds for gold, fans, a rare card, and a place on the Wall of Awards.</p>
     <p class="hint"><b>Rivals.</b> Four rival clubs follow you round the realm: in the last round of the cups, in the Crown, and on the road. They keep score. The pre-game card says how the last game went, and the Team screen shows your record against each of them.</p>
     <p class="hint"><b>The Crown.</b> Once a year, in championship week (the last ${DB.meta.champWeek} days of the year), Steward Crane at the Crown Coliseum takes entries from teams with all four cups. Three rounds: the two rivals with the best record against you, then Apex Biologic, who field a monster from Sudden Death's last act. Win it and you are champions of the realm, and the road goes on. With four cups and the week still to come, you can WAIT at the Coliseum.</p></div>`);
+};
+/* w12: renown and trophies (phase 7, balance). Loads after w11-cups.js; changes earlier parts only by reassignment
+   (saved originals carry the wW12 prefix) and one fightStart hook.
+
+   What the realm bot found (test/realm_lab.py, 100 runs a side; see docs/realm/BALANCE.md):
+   - Every elite and rival win paid a trophy, as in Sudden Death, where a run meets a handful of elites. A realm journey
+     plays about 25 of them, so a team held 8 trophies by the second dungeon and 23 by the Crown, and after the first
+     cup nothing lost (100% from the second cup on, bosses cost under 20% of max HP). Trophies now come from bosses,
+     strongboxes and lairs, not from ordinary elite and rival wins.
+   - Enemies only grew by tier (1 to 3) and a small level, while the team kept growing (levels, max HP, gear). Renown
+     closes that gap: every cup won and every boss beaten makes the next teams stronger, and the pre-game card says so.
+
+   W_RENOWN    the numbers, for tuning
+   wRenown()   cups won + alphas beaten (dungeon bosses and lairs)
+   Wrapped: combatRewards (no trophy for a realm elite or rival win), wPreGame (the renown line), renderHelp. */
+
+const W_RENOWN = {
+  hpPer: .15,          // foes' HP: +15% for each point of renown
+  strEvery: 2,         // and +1 Strength for every two points
+};
+function wRenown() {
+  if (!WG) return 0;
+  return wCupsWon() + Object.keys(WG.flags || {}).filter(f => /^alpha_/.test(f) && WG.flags[f]).length;
+}
+function wRenownText(n) {
+  const s = Math.floor(n / W_RENOWN.strEvery);
+  return `foes have +${Math.round(W_RENOWN.hpPer * n * 100)}% HP${s ? ` and ${s} Strength` : ''}`;
+}
+
+/* at kickoff: renown makes every realm team stronger (after the level, which w9-road.js applies first) */
+onHook('fightStart', () => {
+  if (!WG || !RUN || !B || !RUN.pending || !RUN.pending.world) return;
+  const n = wRenown(); if (!n) return;
+  const m = 1 + W_RENOWN.hpPer * n, s = Math.floor(n / W_RENOWN.strEvery);
+  for (const e of alive()) { e.max = e.hp = Math.round(e.hp * m); if (s) addSt(e, 'str', s); }
+  B.wRenown = n;
+  log(`Renown ${n} (cups won and bosses beaten): ${wRenownText(n)}.`, 'bad');
+});
+
+/* trophies: Sudden Death pays one for every elite or rival win; in the realm only bosses, strongboxes and lairs do */
+const wW12CombatRewards = combatRewards;
+combatRewards = function () {
+  const out = wW12CombatRewards();
+  if (WG && B && B.type !== 'boss') out.relic = null;
+  return out;
+};
+
+/* the pre-game card says what renown does to this match */
+const wW12PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW12PreGame(enc);
+  const n = wRenown(), box = document.querySelector('#modalBox .wpgtxt'); if (!n || !box) return;
+  box.insertAdjacentHTML('beforeend', `<p class="hint wrenown">Your renown is ${n} (cups won and bosses beaten): ${esc(wRenownText(n))}.</p>`);
+};
+
+const wW12RenderHelp = renderHelp;
+renderHelp = function () {
+  wW12RenderHelp();
+  const sec = $('wHelp'); if (!sec || $('wHelpRenown')) return;
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelpRenown">
+    <p class="hint"><b>Renown.</b> Every cup you win and every boss you beat adds 1 renown, and the realm takes you more seriously: each point gives the teams you meet ${Math.round(W_RENOWN.hpPer * 100)}% more HP, and every ${W_RENOWN.strEvery} points 1 Strength. The pre-game card shows it.</p>
+    <p class="hint"><b>Trophies.</b> In the realm, trophies come from bosses, strongboxes and lairs. An ordinary elite or rival win pays gold and cards.</p></div>`);
 };
 </script>
 </body></html>

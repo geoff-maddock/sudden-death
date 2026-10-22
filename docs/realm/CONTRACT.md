@@ -166,3 +166,17 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **Functions:** `wCupEnter(id, { card? })`, `wCupPlay({ card? })`, `wCupProblem(id)` ('' or why not), `wCupMatch(id, round)` (the `startMatch` options), `wCupWho`, `wCupThe`, `wCupWithdraw`, `wCrownClubs`, `wCrownEnding`, `wH2hRecord(club, r)`, `wH2hLast(club)`.
 - **Wrapped:** `wRunAct` (`cup:*`, `waitweek`), `wPreGame` (round line and the rival's memory), `wMatchTitle`, `wMatchTeam` (club, town and Apex colours), `wOpenEvent`, `wWallText`, `wCampTeam`, `wNextPrompt`, `wReturnToWorld` (the ending), and SD's `renderHelp` (a "Cups, rivals and the Crown" section, `#wHelpCups`). `W_ON_END.cup` is new and `W_ON_END.event` is wrapped, both by assignment. The rival handler's and the registrars' CUP text is rewritten at load.
 - **Test:** `test/realm_cups.py`.
+
+## Balance (w12-renown.js, test/realm_lab.js): phase 7
+
+`w12-renown.js` loads after `w11-cups.js` and changes earlier parts only by reassignment (saved originals carry the `wW12` prefix). See `BALANCE.md` for the measurements behind every number.
+
+- **Renown** (`W_RENOWN`, `wRenown()`) = cups won + `alpha_*` flags. A `fightStart` hook gives every realm team `+hpPer × renown` HP and `floor(renown / strEvery)` Strength. It runs after the level hook from `w9-road.js`, so the two stack. It sets `B.wRenown` and logs a line, and the `wPreGame` wrapper adds a `.wrenown` line to the card.
+- **Trophies:** `combatRewards` is wrapped so that a realm elite or rival win pays no `relic`. Boss picks, strongboxes (`W_MAGIC`) and lairs still pay.
+- **Elsewhere:**
+  - `W_CUP.tier` is `[1, 2, 3, 3]` (`w11-cups.js`);
+  - `wXpNeed` is `10 + 10·lvl + 2·lvl²` (`w6-party.js`).
+- **The bot:**
+  - `test/realm_lab.js` defines `window.REALMLAB(opts)`. It replaces `beginFight` with a model-only start and `renderPanel` with a no-op, then plays the route through the realm's own functions. It returns a log with matches, stages and a result (`champion`, `stuck` or `dead`).
+  - `test/realm_lab.py N [opts] [js]` prints the report.
+  - `test/realm_bot.py` is the quick-suite check.

@@ -27,7 +27,7 @@
 const W_CUP = {
   fee: 30,                          // gold to enter a town cup, and to enter again after a loss
   rounds: ['normal', 'elite', 'rival'],
-  tier: [2, 2, 2, 3],               // the field's tier by cups already won: the fourth cup is tier 3
+  tier: [1, 2, 3, 3],               // the field's tier by cups already won (bot-tuned, phase 7: the first cup is the way in)
   lv: [0, 1, 1],                    // level by round, before cups
   lvPerCup: .5,                     // plus floor(cups won x this) levels, at most W_ROAD.maxLv
   prize: { gold: 120, fans: 40, pick: 3, rarity: 'r' },   // a town cup: gold, fans, and a pick of rare cards

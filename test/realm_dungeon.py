@@ -69,7 +69,8 @@ async def modal_text(pg):
     return await pg.evaluate("document.getElementById('modal').hidden ? null : document.getElementById('modalBox').textContent")
 
 async def win_and_continue(pg):
-    await pg.evaluate("RUN.maxhp = Math.max(RUN.maxhp, 600); RUN.hp = RUN.maxhp")
+    # renown (cups and bosses behind you) makes these teams tough; the checks are about the dungeon, not the fight
+    await pg.evaluate("RUN.maxhp = Math.max(RUN.maxhp, 600); RUN.hp = RUN.maxhp; for (const e of alive()) e.hp = Math.min(e.hp, 6)")
     over = await pg.evaluate('__wbot(120)')
     await pg.evaluate('__wend()')
     await pg.wait_for_function("!!document.getElementById('bCont')")

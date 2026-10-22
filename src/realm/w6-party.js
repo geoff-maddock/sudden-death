@@ -26,7 +26,7 @@ const W_PARTY = {
   recruitOdds: { normal: .15, elite: .35, rival: .35, boss: .35 },
   force: false,                                            // tests: the next win always brings a recruit
 };
-const wXpNeed = lvl => 10 + 10 * lvl;                      // level 1 to 2: 20 XP; 2 to 3: 30 ...
+const wXpNeed = lvl => 10 + 10 * lvl + 2 * lvl * lvl;     // level 1 to 2: 22 XP; 2 to 3: 38; 9 to 10: 262 (bot-tuned, phase 7)
 const wFee = lvl => 30 + 30 * lvl;                         // a free agent's signing fee in gold
 
 /* ---------- the roster ---------- */

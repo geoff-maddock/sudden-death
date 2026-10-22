@@ -95,9 +95,11 @@ async def lose(pg):
     return over
 
 async def next_round(pg):
-    """after a won round: the next round's card comes up by itself once the world is free"""
-    await clear_prompts(pg)
-    await pg.evaluate("wDrain()")
+    """after a won round: the next round's card comes up by itself once the world is free (at once when the win
+    queued nothing; after the level-ups and card picks, which are settled here, when it did)"""
+    if not await pg.evaluate("!!document.getElementById('wPlay')"):
+        await clear_prompts(pg)
+        await pg.evaluate("wDrain()")
     return await play_card(pg)
 
 async def checks(pg):
