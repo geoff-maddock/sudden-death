@@ -87,3 +87,31 @@
   .wthint,.wtx{display:none}
   .wkeys{display:none}
 }
+/* phase 2: matches. The HUD's team HP, Hardcore, the pre-game card, the new-journey card */
+.whud .stat.hp b{color:#ff8a7a}
+.whud .stat.wlow b{color:#ff5a4a;animation:wlow 1.2s ease-in-out infinite alternate}
+@keyframes wlow{to{opacity:.55}}
+.whud .wfans b{color:#d2a6ff}
+.whard{color:#ff8a7a;font-family:var(--hud);letter-spacing:.5px}
+#modalBox:has(.wpg){width:min(620px,100%)}
+.wpg{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:start;margin:4px 0 12px}
+.wpgfoes{display:flex;flex-wrap:wrap;gap:6px;max-width:210px}
+.wpgfoes img{width:64px;height:64px;border-radius:8px;border:1px solid var(--seam);background:#1a120d}
+.wpgfoes img:first-child{width:96px;height:96px}
+.wpgtxt p{margin:0 0 8px}
+.wpgwho{font-size:17px}
+.wpgsport{display:flex;gap:8px;align-items:flex-start;font-size:17px;line-height:1.35}
+.wpgsport svg{flex:none;margin-top:1px}
+.whcbox{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--seam);border-radius:6px;margin:6px 0 12px;cursor:pointer}
+.whcbox input{width:20px;height:20px;margin-top:3px;flex:none}
+.whcbox span{display:grid;gap:3px}
+.whcbox small{color:var(--dim);font-size:14px;line-height:1.35}
+.whelp{margin:0 0 18px}
+#modalBox:has([data-wco]){width:min(860px,100%)}
+@media (max-width:520px){
+  .wpg{grid-template-columns:minmax(0,1fr)}
+  .wpgfoes{max-width:none}
+  .wpgfoes img:first-child{width:72px;height:72px}
+}
+.wmsg p{margin:0 0 8px}
+#modalBox:has(#wWake),#modalBox:has(#wGo){width:min(620px,100%)}

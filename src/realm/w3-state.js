@@ -5,12 +5,15 @@
 
    Dropped from TC's state: roster, bin, research, eggs, rp (research data), know, cups, champion, chron, rivals, fed.
    Kept beyond the contract's list: energy (wells and Quill's enchanting, phase 4), harv (spent wells and bushes),
-   xpk (topics already learned), party and club (the fixed phase 1 line), grace (steps of calm after a transition).
+   xpk (topics already learned), club, hardcore (a lost match ends the save), grace (steps of calm after a transition).
+
+   Phase 2: Sudden Death's RUN lives alongside WG. RUN is the team: RUN.party (who plays), RUN.deck, RUN.hp/maxhp,
+   RUN.fans, and RUN.gold, the only purse (WG has no gold of its own). w5-bridge.js is the seam between the two.
 
    Later phases plug in through:
      wEncounterHook(region, tileCh, info?)   every step that would roll an encounter or road event; info is set for
                                              set pieces (alphas, lairs, the chapel bell, cups) that start a match.
-   Both are no-ops in phase 1. */
+   w5-bridge.js reassigns it to roll wild matches and start alpha matches. */
 let WG = null;
 let WLOG = [];
 /* UI events from the model: talk opened, shop or inn wanted, map changed. w7 drains it every frame. */
@@ -19,7 +22,7 @@ const WSTEP_MIN = { world: 15, town: 2, dungeon: 5 };
 const WREGROW = { V: 1, Y: 3, N: 4 };
 const WDIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 
-function wEncounterHook(region, tileCh, info) { /* phase 2/4: wild matches, road events, alphas, cups */ }
+function wEncounterHook(region, tileCh, info) { /* reassigned in w5-bridge.js: wild matches and alphas */ }
 
 function wLog(t, c) { WLOG.push([t, c || '']); if (WLOG.length > 80) WLOG.shift(); WQ.push({ k: 'log' }); }
 function wFlag(f) { return !!(WG && WG.flags[f]); }
@@ -28,17 +31,19 @@ function wHas(id, n) { return (WG.items[id] || 0) >= (n || 1); }
 function wAddItem(id, n) { WG.items[id] = (WG.items[id] || 0) + n; if (WG.items[id] <= 0) delete WG.items[id]; }
 function wCap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
 
-/* the phase 1 party: the first three players of the first club. Phase 3 replaces this with a real roster. */
-function wDefaultParty() {
-  const id = CLUB_IDS[0], c = CLUBS[id];
-  return { club: id, party: c.roster.slice(0, 3).map(r => ({ n: r[0], kind: r[1], num: r[2] })) };
-}
+/* the starting club: the first three players of the first club. Phase 3 replaces this with a real roster. */
+function wDefaultClub() { return CLUB_IDS[0]; }
+/* who plays: Sudden Death's RUN.party is the source of truth */
+function wParty() { return (RUN && RUN.party) || []; }
 
-function wNewGame() {
-  const p = wDefaultParty();
-  WG = { v: 1, world: WORLD_VER, map: 'graftonbury', x: 5, y: 11, face: 'd', step: 0, gold: 120, year: 1, day: 1, dayAbs: 1, min: 8 * 60,
+/* opts: { hardcore?, club? }. Starts Sudden Death's run too: RUN holds the team, its deck, HP and the purse. */
+function wNewGame(opts) {
+  opts = opts || {};
+  const club = CLUBS[opts.club] ? opts.club : wDefaultClub();
+  WG = { v: 2, world: WORLD_VER, map: 'graftonbury', x: 5, y: 11, face: 'd', step: 0, year: 1, day: 1, dayAbs: 1, min: 8 * 60,
     flags: {}, items: { ration: 3, salve: 2, grain: 2, salt: 2 }, energy: { bloom: 0, ember: 0, tide: 0, rime: 0, aether: 0 },
-    home: null, npc: {}, seen: {}, marks: [], harv: {}, xpk: {}, grace: 0, club: p.club, party: p.party };
+    home: null, npc: {}, seen: {}, marks: [], harv: {}, xpk: {}, grace: 0, club, hardcore: !!opts.hardcore, blackouts: 0 };
+  wNewRun(club, 120);
   WLOG = [];
   wApplyNpcs(WG.map);
   wLog('Graftonbury. The League office is the building to the north-west. Walk into people to talk to them.', 'g');
@@ -47,6 +52,13 @@ function wNewGame() {
 }
 
 /* ---------- time ---------- */
+/* Sudden Death's newRun for the realm: no act map (the realm is the map), and the realm's starting purse */
+function wNewRun(club, gold) {
+  newRun(club, [0, 1, 2]);
+  RUN.map = null; RUN.path = []; RUN.gold = gold;
+  return RUN;
+}
+
 function wHour() { return WG.min / 60; }
 function wAdvance(min) { WG.min += min; while (WG.min >= 1440) { WG.min -= 1440; wNewDay(); } }
 function wNewDay() {
@@ -248,7 +260,7 @@ function wUse(x, y) {
       if (/_prize$/.test(id) && dg && !wFlag('alpha_' + dg.alpha)) return wLog('The alpha stands between you and the strongbox.', 'b');
       wGiveLoot(DB.chests[id] || { gold: 40 }); wSetFlag('chest_' + id); wInvalidate(WG.map); break;
     }
-    case 'alpha': { const a = DB.alphas[meta.alpha] || { name: 'the alpha' }; wLog(wCap(a.name) + ' watches you and does not move. ' + WSOON, 'b'); wEncounterHook(wRegionHere(), c, { kind: 'alpha', alpha: meta.alpha }); break; }
+    case 'alpha': { const a = DB.alphas[meta.alpha] || { name: 'the alpha' }; wLog(wCap(a.name) + ' watches you, and wants a game.', 'b'); wEncounterHook(wRegionHere(), c, { kind: 'alpha', alpha: meta.alpha }); break; }
     case 'bell': {
       const rg = meta.ring; if (!rg) return wLog(wLookText(x, y), 'd');
       if (!wHas(rg.item)) return wLog('A great bronze bell, silent. You have nothing that would make it ring true.', 'd');
@@ -259,7 +271,7 @@ function wUse(x, y) {
     case 'lair': {
       const L = DB.locs.find(l => l.id === meta.loc); if (!L) break;
       if (wFlag('alpha_' + L.alpha)) return wLog(DB.tiles.Z.look0, 'd');
-      wLog(L.name + '. ' + wCap((DB.alphas[L.alpha] || {}).name || 'something big') + ' is home, and is not ready to play you yet. ' + WSOON, 'b');
+      wLog(L.name + '. ' + wCap((DB.alphas[L.alpha] || {}).name || 'something big') + ' is home, and wants a game.', 'b');
       wEncounterHook(wRegionHere(), c, { kind: 'lair', loc: L.id, alpha: L.alpha }); break;
     }
     default: wLog(wLookText(x, y), 'd');
@@ -267,9 +279,20 @@ function wUse(x, y) {
 }
 function wGiveLoot(l) {
   const bits = [];
-  if (l.gold) { WG.gold += l.gold; bits.push(l.gold + ' gold'); }
+  if (l.gold) { RUN.gold += l.gold; bits.push(l.gold + ' gold'); }
   for (const k in l.items || {}) { wAddItem(k, l.items[k]); bits.push(l.items[k] + ' ' + DB.items[k].name); }
+  const cards = [].concat(l.card || [], l.cards || []);
+  if (cards.length) bits.push(cards.length === 1 ? 'a card' : cards.length + ' cards');
+  if (l.cardChoice) bits.push('a choice of cards');
   wLog('Inside: ' + (bits.join(', ') || 'dust') + '.', 'g');
+  wPayCards(l, 'found in a strongbox');
+}
+/* card payouts on loot and topics: card: id, cards: [ids], cardChoice: { pick, rarity?, kind?, pool? }.
+   wGainCard (w5-bridge.js) adds them to RUN.deck, or opens the pick-one panel for a choice. */
+function wPayCards(src, why) {
+  if (typeof wGainCard !== 'function') return;
+  for (const id of [].concat(src.card || [], src.cards || [])) wGainCard(id, why);
+  if (src.cardChoice) wGainCard(src.cardChoice, why);
 }
 function wWallText() {
   const won = Object.keys(DB.cups).filter(c => wFlag(DB.cups[c].flag));
@@ -300,7 +323,8 @@ function wSay(id, kw) {
   for (const e in t.takeEn || {}) WG.energy[e] -= t.takeEn[e];
   for (const k in t.give || {}) { wAddItem(k, t.give[k]); wLog('Received ' + t.give[k] + ' ' + DB.items[k].name + '.', 'm'); }
   for (const k in t.giveEn || {}) { WG.energy[k] = (WG.energy[k] || 0) + t.giveEn[k]; wLog('Received ' + t.giveEn[k] + ' ' + DB.elems.names[k] + ' energy.', 'm'); }
-  if (t.gold) { WG.gold += t.gold; wLog('Received ' + t.gold + ' gold.', 'm'); }
+  if (t.gold) { RUN.gold += t.gold; wLog('Received ' + t.gold + ' gold.', 'm'); }
+  wPayCards(t, 'from ' + ch.name);
   if (t.set) { wSetFlag(t.set); wInvalidate('world'); } // a clue can reveal a hidden place on the world map
   if (t.once) { wSetFlag(t.once); const sp = DB.sideplots.find(s => s.id === t.once); if (sp) wLog('Done: ' + sp.title + '.', 'g'); }
   if (t.xp && !WG.xpk[id + ':' + key]) WG.xpk[id + ':' + key] = 1; // dropped: TC paid research data here
@@ -325,15 +349,16 @@ function wRunAct(act, id) {
 
 /* ---------- shops and inns ---------- */
 function wSellPrice(id) { const it = DB.items[id]; return it && it.price ? Math.max(1, Math.floor(it.price / 2)) : 0; }
-function wBuy(shop, id) { const pr = (DB.shops[shop] || {})[id]; if (pr == null) return 'Not sold here.'; if (WG.gold < pr) return 'You cannot afford that.'; WG.gold -= pr; wAddItem(id, 1); return ''; }
-function wSell(id) { const pr = wSellPrice(id); if (!pr || !wHas(id)) return 'Nobody wants that.'; wAddItem(id, -1); WG.gold += pr; return ''; }
-/* a night at an inn: morning comes, and this town becomes where you wake if a match goes badly */
+function wBuy(shop, id) { const pr = (DB.shops[shop] || {})[id]; if (pr == null) return 'Not sold here.'; if (RUN.gold < pr) return 'You cannot afford that.'; RUN.gold -= pr; wAddItem(id, 1); return ''; }
+function wSell(id) { const pr = wSellPrice(id); if (!pr || !wHas(id)) return 'Nobody wants that.'; wAddItem(id, -1); RUN.gold += pr; return ''; }
+/* a night at an inn: morning comes, the team is fully healed, and this town becomes where you wake if a match goes badly */
 function wSleepInn(price) {
-  if (WG.gold < price) return 'You cannot afford a room.';
-  WG.gold -= price;
+  if (RUN.gold < price) return 'You cannot afford a room.';
+  RUN.gold -= price;
   wAdvance((24 * 60 - WG.min) + 7 * 60);
+  RUN.hp = RUN.maxhp;
   if (wCurMap().kind === 'town') WG.home = WG.map;
-  wLog('You sleep. The stable hands see to your team. It is morning, and you will wake here if a match goes badly.', 'm');
+  wLog('You sleep, and your team is back to full health. It is morning, and you will wake here if a match goes badly.', 'm');
   if (typeof wSave === 'function') wSave();
   return '';
 }
