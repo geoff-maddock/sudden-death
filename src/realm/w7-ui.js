@@ -103,19 +103,22 @@ function wDrain() {
 
 /* ---------- HUD and log ---------- */
 function wRegionName() { const R = DB.regions[wRegionHere()]; return R ? R.name : ''; }
-function wPartyTeam() { const c = CLUBS[WG.club] || CLUBS[CLUB_IDS[0]]; return c; }
+function wPartyTeam() { return CLUBS[(RUN && RUN.club) || WG.club] || CLUBS[CLUB_IDS[0]]; }
 function wRenderHud() {
   if (!WUI.built || !WG) return;
   const m = wCurMap(), crown = wChampWeek() ? 'Championship week' : 'Crown in ' + wDaysToChamp() + ' days';
-  const key = [WG.map, m.kind === 'world' ? wRegionHere() : '', WG.day, WG.year, WG.min, WG.gold].join('|');
+  const key = [WG.map, m.kind === 'world' ? wRegionHere() : '', WG.day, WG.year, WG.min, RUN.gold, RUN.hp, RUN.maxhp, RUN.fans || 0, WG.hardcore ? 1 : 0, wParty().map(p => p.kind).join()].join('|');
   if (key === WUI.hudKey) return;
   WUI.hudKey = key;
   const team = wPartyTeam();
-  const party = WG.party.map(p => `<img src="${portraitURL(p.kind, team, p.num, 64)}" alt="${esc(p.n)}, ${esc(KIND_NAME[p.kind] || p.kind)}" title="${esc(p.n)} (${esc(KIND_NAME[p.kind] || p.kind)})">`).join('');
-  $('wHud').innerHTML = `<div class="wwhere"><b>${esc(m.name)}</b><small>${esc(wRegionName())}</small></div>
+  const party = wParty().map(p => `<img src="${portraitURL(p.kind, team, p.num, 64)}" alt="${esc(p.n)}, ${esc(KIND_NAME[p.kind] || p.kind)}" title="${esc(p.n)} (${esc(KIND_NAME[p.kind] || p.kind)})">`).join('');
+  const low = RUN.hp < RUN.maxhp * .3;
+  $('wHud').innerHTML = `<div class="wwhere"><b>${esc(m.name)}</b><small>${esc(wRegionName())}${WG.hardcore ? ' &middot; <span class="whard" title="A lost match ends this journey">Hardcore</span>' : ''}</small></div>
     <div class="stat"><small>${esc(wSeason())}, day ${WG.day}</small><b>${esc(wPartOfDay())} ${wTimeStr()}</b></div>
     <div class="stat"><small>Year ${WG.year}</small><b class="wcrown">${crown}</b></div>
-    <div class="stat gold"><small>Gold</small><b>${WG.gold}</b></div>
+    <div class="stat hp${low ? ' wlow' : ''}" title="Your team's health. It carries from match to match; a night at an inn restores it."><small>Team HP</small><b>${RUN.hp}/${RUN.maxhp}</b></div>
+    <div class="stat gold"><small>Gold</small><b>${RUN.gold}</b></div>
+    <div class="stat wfans" title="Fans: earned by sports wins"><small>Fans</small><b>${RUN.fans || 0}</b></div>
     <div class="party wparty" title="${esc(team.name)}">${party}</div>`;
 }
 function wRenderLog() {
@@ -180,10 +183,10 @@ function wOpenShop(shop, who, id) {
     <div id="wShopBody"></div>`);
   const render = msg => {
     const sh = DB.shops[shop] || DB.shops.general;
-    let h = `<p class="hint">You have <b class="wgold">${WG.gold} gold</b>.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p><table class="wshop"><tbody>`;
+    let h = `<p class="hint">You have <b class="wgold">${RUN.gold} gold</b>.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p><table class="wshop"><tbody>`;
     for (const k in sh) {
       const it = DB.items[k]; if (!it) continue;
-      h += `<tr><td><b>${esc(it.name)}</b><small>${esc(it.desc)}</small></td><td class="wnum">${sh[k]}g</td><td class="wnum dim">have ${WG.items[k] || 0}</td><td><button class="ghost" data-buy="${k}" ${WG.gold < sh[k] ? 'disabled' : ''}>Buy</button></td></tr>`;
+      h += `<tr><td><b>${esc(it.name)}</b><small>${esc(it.desc)}</small></td><td class="wnum">${sh[k]}g</td><td class="wnum dim">have ${WG.items[k] || 0}</td><td><button class="ghost" data-buy="${k}" ${RUN.gold < sh[k] ? 'disabled' : ''}>Buy</button></td></tr>`;
     }
     const sellable = Object.keys(WG.items).filter(k => wSellPrice(k));
     if (sellable.length) h += `<tr class="wsellh"><td colspan="4"><h4>Sell, at half price</h4></td></tr>${sellable.map(k => `<tr><td>${esc(DB.items[k].name)}</td><td class="wnum">${wSellPrice(k)}g</td><td class="wnum dim">have ${WG.items[k]}</td><td><button class="ghost" data-sell="${k}">Sell one</button></td></tr>`).join('')}`;
@@ -198,9 +201,9 @@ function wOpenShop(shop, who, id) {
 function wOpenInn(price, who) {
   const town = wCurMap().name;
   const close = modal(`<header><h3>${esc(who || 'The inn')}</h3><button class="ghost" data-close>Not now</button></header>
-    <p>A room for the night is <b class="wgold">${price} gold</b>. You have ${WG.gold}.</p>
+    <p>A room for the night is <b class="wgold">${price} gold</b>. You have ${RUN.gold}. Your team wakes at full health (now ${RUN.hp}/${RUN.maxhp}).</p>
     <p class="hint">You sleep until 7 in the morning. If a match goes badly later, you wake up here in ${esc(town)}.${WG.home ? ` Right now you would wake in ${esc((MAPS[WG.home] || {}).name || WG.home)}.` : ''}</p>
-    <div class="row"><button class="btn" id="wSleep" ${WG.gold < price ? 'disabled' : ''}>Sleep (${price} gold)</button></div>`);
+    <div class="row"><button class="btn" id="wSleep" ${RUN.gold < price ? 'disabled' : ''}>Sleep (${price} gold)</button></div>`);
   $('wSleep').onclick = () => { const r = wSleepInn(price); if (r) wLog(r, 'b'); close(); wCloseTalk(); wDrain(); };
 }
 
@@ -289,8 +292,7 @@ function wRender(now) {
   c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, WUI.cv.width, WUI.cv.height);
   c.setTransform(WUI.s, 0, 0, WUI.s, 0, 0);
   // the map without its night: actors go under the darkness, so night is drawn after them
-  const dark = m.dark; m.dark = false;
-  try { wDrawMap(c, WG.map, camX, camY, WUI.vw, WUI.vh, t, { night: 0 }); } finally { m.dark = dark; }
+  wDrawMap(c, WG.map, camX, camY, WUI.vw, WUI.vh, t, { noNight: true });
   // actors, back to front
   c.setTransform(WUI.s, 0, 0, WUI.s, -Math.round(camX * T * WUI.s), -Math.round(camY * T * WUI.s));
   const acts = [];
@@ -309,7 +311,7 @@ function wRender(now) {
     const pos = i === 0 ? lead : wLerpPos(p, now), key = Math.round(pos[0] * 4) + ',' + Math.round(pos[1] * 4);
     if (i > 0 && (drawn.has(key) || (p.tx === WG.x && p.ty === WG.y && !pos[2]))) return;
     drawn.add(key);
-    const pm = WG.party[i]; if (!pm) return;
+    const pm = wParty()[i]; if (!pm) return;
     const moving = pos[2] || (i === 0 && !!WUI.held);
     const face = i === 0 ? WUI.face : (p.tx < p.fx ? 'l' : p.tx > p.fx ? 'r' : WUI.face);
     acts.push({ y: pos[1] + (i === 0 ? .01 : 0), x: pos[0], who: { kind: pm.kind, team: { color: team.color, light: team.light, short: team.short }, num: pm.num, face, walk: moving ? t * 12 + i : 0, seed: i }, size: i === 0 ? 32 : 28, alpha: i === 0 ? 1 : .96 });

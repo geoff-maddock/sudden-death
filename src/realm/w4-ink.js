@@ -4,7 +4,7 @@
 
    API (see docs/realm/CONTRACT.md):
      WTILE, WINK[regionId]
-     wDrawMap(c, mapId, camX, camY, vw, vh, t, opts)   opts = { night: 0..1, lights: [[x, y, r]] } (tiles)
+     wDrawMap(c, mapId, camX, camY, vw, vh, t, opts)   opts = { night: 0..1, lights: [[x, y, r]], noNight? } (tiles)
      wInvalidate(mapId?)
      wDrawActor(c, who, px, py, t, opts)               who = { kind, col?, face: 'l'|'r', walk? }
 
@@ -1128,7 +1128,8 @@ function wDrawMap(c, mapId, camX, camY, vw, vh, t, opts) {
   }
   c.restore();
   // night
-  const night = Math.max(opts.night || 0, m.dark ? .7 : 0);
+  // opts.noNight: the caller draws the night itself (after its actors), so skip it here, even in a dark dungeon
+  const night = opts.noNight ? 0 : Math.max(opts.night || 0, m.dark ? .7 : 0);
   if (night > .02) {
     const lights = (opts.lights || []).slice();
     for (const l of (m.light || [])) lights.push([l[0], l[1], l[2] || 2.6]);
