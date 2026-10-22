@@ -257,3 +257,14 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **UI.** A Make camp row at the top of the Bag tab (`wRenderCamp` wrapped), with the risk where you stand. `#wHelpCampOut`, a paragraph in `#wHelpFeel`.
 - **Bot.** The balance bot does not camp (it rests at inns), so camping is not measured.
 - **Test:** `test/realm_camp.py`.
+
+## Player stats (w16-stats.js)
+
+`w16-stats.js` loads after `w15-camp.js` and changes earlier parts only by reassignment (`wW16` prefix).
+
+- **The data.** `WG.pstats[pid]` is `{ g, w, c, d, b, k, p, mvp, best, sp: { sport: { g, w, p } } }` for this journey: games started, wins (not blacked out), cards, damage, Block, kills, points, player of the game, best single-game damage, and a record per sport. Sudden Death credits a match by kind (`B.ps[kind]`); only one player of a kind starts, so the `logGame` wrapper credits each starter and tags the game record with `g.wp = { kind: pid }`. Benched players add nothing. Released players keep their line.
+- **Older saves.** `wEnsureStats()` rebuilds the lines from `RUN.games` the first time they are needed: a tagged game knows who started; an untagged one credits each kind's numbers to the first player of that kind.
+- **Career.** The Career view reads Sudden Death's careers (`wCareer(p)`, keyed `club:name`), which keep no wins.
+- **UI.** A Stats tab after Deck (`wOpenCamp`/`wRenderCamp` wrapped), sortable by any column, with a page per player (`WSTAT.pid`): their record by sport and last `W_STATS.recent` games. Each lineup row gets a Stats button (`wOpenStats(pid)`). `#wHelpStats`, a paragraph in `#wHelpTeam`.
+- **Next.** These lines are what a later tournament (baseball through Brimstone Diamond, issue to come) can read for form and selection.
+- **Test:** `test/realm_stats.py`.

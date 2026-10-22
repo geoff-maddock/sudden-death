@@ -88,3 +88,37 @@
   .wrecsig{grid-column:1/-1;justify-self:center}
   .wcampb{font-size:17px;padding:6px 9px 4px}
 }
+/* w16: the Stats tab */
+.wcamp{min-width:0}
+.wstsp{width:100%;border-collapse:collapse;font-size:16px}
+.wstsp td{padding:4px 6px;border-top:1px solid var(--seam)}
+.wstsp .wnum{font-family:var(--hud);font-size:18px;text-align:right;white-space:nowrap}
+.wstsp .dim{color:var(--faint);text-align:right;white-space:nowrap}
+.wgood{color:#9be08a}
+.wstview{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:10px 0 6px}
+.wstview .hint{margin:0}
+.wstats{width:100%;border-collapse:collapse;font-family:var(--hud);font-size:18px}
+.wstats th,.wstats td{padding:4px 6px;border-top:1px solid var(--seam);text-align:right;white-space:nowrap}
+.wstats thead th{border-top:0}
+.wstats th:first-child{text-align:left}
+.wstats tr.wst th:first-child{box-shadow:4px 0 0 var(--torch) inset}
+.wstats tr.wsel{background:var(--stone2)}
+.wstats .dim{color:var(--faint)}
+.wsth{background:none;border:0;color:var(--dim);font:inherit;font-size:16px;padding:2px 0;cursor:pointer}
+.wsth[aria-pressed="true"]{color:var(--torch)}
+.wsname{display:flex;gap:8px;align-items:center;background:none;border:0;color:inherit;font:inherit;padding:2px 0 2px 6px;cursor:pointer;text-align:left}
+.wsname img{width:36px;height:36px;border-radius:6px}
+.wsname span{display:grid;line-height:1.1}
+.wsname b{font-family:var(--display);font-size:20px;font-weight:400}
+.wsname small{font-size:14px;color:var(--dim)}
+.wstcard{margin-top:12px;border:1px solid var(--seam);border-radius:6px;background:var(--stone);padding:10px 12px}
+.wstcard .wsthd{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:10px;align-items:start}
+.wstcard .wsthd img{width:72px;height:72px;border-radius:8px}
+.wstcard h4{margin:0}
+.wstcard h4 small{font-family:var(--hud);font-size:16px;color:var(--dim);font-weight:400}
+.wstcard .wsthd p{margin:4px 0 0;font-size:16px;line-height:1.35}
+.wstgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:4px 18px;margin-top:6px}
+.wstgrid h5{margin:8px 0 4px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wstlog{margin:0;padding-left:20px;font-size:16px;line-height:1.35}
+.wstlog small{display:block;color:var(--dim);font-size:14px}
+@media (max-width:600px){.wstcard .wsthd{grid-template-columns:56px minmax(0,1fr)}.wstcard .wsthd img{width:56px;height:56px}.wstcard .wsthd .ghost{grid-column:1/-1;justify-self:end}}

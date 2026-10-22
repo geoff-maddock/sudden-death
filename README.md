@@ -49,7 +49,7 @@ It is one self-contained file too: `dist/realm.html`. Open it in a browser. It k
 
 - **Found a team.** Pick a club and three of its players. More join on the road: free agents at every inn, players you beat, and quest companions. The first three in the lineup start; the rest sit on the bench, and their cards sit out with them.
 - **Walk.** Arrow keys or WASD, or click. Walk into people to talk, and click a CAPITALISED word to ask about it. `Space` uses, `L` looks, `C` opens the team, and `Esc` (or the Menu button) opens the menu, where you can save and quit.
-- **Play matches.** Wild teams in the long grass, road events, famous teams in dungeon rooms, and bosses in lairs. Team HP carries over; an inn heals it, or make camp in the wild with a Trail Ration, if you dare. Lose and you black out at your last inn (or, in Hardcore, the journey ends).
+- **Play matches.** Wild teams in the long grass, road events, famous teams in dungeon rooms, and bosses in lairs. Team HP carries over; an inn heals it, or make camp in the wild with a Trail Ration, if you dare. The Stats tab on the Team screen keeps every player's numbers, by sport, for the journey and their career. Lose and you black out at your last inn (or, in Hardcore, the journey ends).
 - **Grow.** Players level up and bring cards. Cook meals for match day, spend energy at the enchanter, buy cards in three towns, and find gear and Hall of Fame legends in dungeon strongboxes.
 - **Settle.** Buy the old ground behind any inn and its region is home: your crowd at every match there, free beds, and stands, a training pitch, a kitchen and a scout's office to build.
 - **Win.** Take the four regional cups, then the Crown at the Coliseum in championship week.

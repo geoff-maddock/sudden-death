@@ -156,6 +156,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w13-feel.js` | Music per region, tips, Realm achievements, the Crown in the record book, the Bag. |
 | `w14-ground.js` | Your home ground: buy one behind any inn, the home crowd in its region, and its upgrades. |
 | `w15-camp.js` | Camping out in the wild: a Trail Ration for a night's rest, and the risk of being caught asleep. |
+| `w16-stats.js` | Player stats: a Stats tab on the Team screen with each player's numbers for the journey or their career, by sport, and their last games. |
 
 ### The match seam
 
