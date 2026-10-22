@@ -56,7 +56,7 @@ const wW12RenderHelp = renderHelp;
 renderHelp = function () {
   wW12RenderHelp();
   const sec = $('wHelp'); if (!sec || $('wHelpRenown')) return;
-  sec.insertAdjacentHTML('beforeend', `<div id="wHelpRenown">
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelpRenown"><h4>Renown and trophies</h4>
     <p class="hint"><b>Renown.</b> Every cup you win and every boss you beat adds 1 renown, and the realm takes you more seriously: each point gives the teams you meet ${Math.round(W_RENOWN.hpPer * 100)}% more HP, and every ${W_RENOWN.strEvery} points 1 Strength. The pre-game card shows it.</p>
     <p class="hint"><b>Trophies.</b> In the realm, trophies come from bosses, strongboxes and lairs. An ordinary elite or rival win pays gold and cards.</p></div>`);
 };

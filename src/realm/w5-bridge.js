@@ -107,12 +107,14 @@ function wPreGame(enc) {
       </div>
     </div>
     <div class="row"><button class="btn" id="wPlay">Play</button>${wild ? `<button class="ghost" id="wRun">Run (${W_ENC.runMin} minutes, ${W_ENC.runHp} HP${W.night ? ', may fail at night' : ''})</button>` : '<button class="ghost" id="wNotYet">Not yet</button>'}</div>`,
-    () => { if (!chose) { chose = true; if (wild) wRunAway(enc); else wLog('You back away. It will be here when you are ready.', 'd'); wDrain(); } });
+    () => { if (!chose) { chose = true; if (wild) wRunAway(enc); else wBackAway(enc); wDrain(); } });
   $('wPlay').focus();
   $('wPlay').onclick = () => { chose = true; close(); wKickoff(enc); };
   if ($('wRun')) $('wRun').onclick = () => close();
   if ($('wNotYet')) $('wNotYet').onclick = () => close();
 }
+/* Not yet (or closing the card) on a match that is not wild: nothing is lost. w9-road.js wraps it to reopen a road event. */
+function wBackAway(enc) { wLog('You back away. It will be here when you are ready.', 'd'); }
 /* running costs time and a little HP; at night it may fail */
 function wRunAway(enc) {
   if (enc.world.night && Math.random() < W_ENC.runFailNight) { wLog('You run, but they cut you off in the dark. You have to play.', 'b'); wKickoff(enc); return false; }
@@ -138,7 +140,7 @@ wEncounterHook = function (region, tileCh, info) {
   if (info) {
     if (info.kind === 'alpha' || info.kind === 'lair') return wStartAlpha(info);
     if (info.kind === 'wild') return wWildMatch(region);
-    return; // the chapel bell and the cups come in later phases (w3 has already said so)
+    return; // the chapel bell only logs (w3); cups start from the registrar's act (w11-cups.js)
   }
   if (wEncounterRoll(wCurMap(), tileCh, Math.random()) === 'fight') wWildMatch(region);
 };
@@ -316,10 +318,20 @@ renderHelp = function () {
   wSdRenderHelp();
   const two = document.querySelector('#pg-help .two');
   if (!two || $('wHelp')) return;
+  // the realm has no act map: Sudden Death's "The descent" section does not apply
+  const lede = document.querySelector('#pg-help .lede');
+  if (lede) lede.textContent = 'Walk the realm with a team of monster athletes. Every fight on the road is a match under one sport\'s rules, played with the deck your team builds on the way. Win the four regional cups, then the Crown.';
+  [...two.querySelectorAll('section')].forEach(s => { const h = s.querySelector('h3'); if (h && h.textContent === 'The descent') s.remove(); });
+  // each later part adds its own section to #wHelp, in load order: team (w7b), towns and the road (w9b), dungeons
+  // (w10), cups (w11), renown (w12). Keep each section's id: the tests look for them.
   two.insertAdjacentHTML('beforebegin', `<section id="wHelp" class="whelp"><h3>The realm</h3>
-    <p class="hint">You walk the realm with your team. Every fight on the road is a match, played exactly like a Sudden Death fight: wild teams jump you in long grass, woods and fens (more often at night, and the night road is not safe either), and alphas wait in their lairs. Before each match you see who you are facing and the sport. You can try to run from a wild team: it costs time and a little HP, and at night they may cut you off.</p>
-    <p class="hint">Your team's HP carries from match to match. A night at an inn heals it fully, and that inn becomes the place you wake up. Win a match and you get the usual rewards: gold, a card, sometimes a trophy. Cards also come from strongboxes and from people you help.</p>
-    <p class="hint"><b>Lose a match</b> and you black out: you wake at your last inn (Graftonbury's, if you have not slept anywhere yet) with half your HP back, a tenth of your gold gone, and a quarter of your fans. <b>Hardcore</b> is a choice you make when you start a journey: lose one match, and the journey is over.</p></section>`);
+    <p class="hint">This part is about the realm. Further down are Sudden Death's own rules for a match: cards, sports, momentum. They work the same here, with two changes: season goals are off, and an ordinary elite win pays no trophy.</p>
+    <div id="wHelpWorld"><h4>Getting around</h4>
+    <p class="hint">Walk with the arrow keys or <kbd>WASD</kbd>, or click where you want to go. Walk into people to talk to them, and click a CAPITALISED word (or type one) to ask about it. <kbd>Space</kbd> uses what you face, <kbd>L</kbd> looks at it, and <kbd>C</kbd> opens your team. Time passes as you walk. The top bar shows the day, your team's HP, gold, fans and energy, and how long until the Crown.</p></div>
+    <div id="wHelpMatch"><h4>Matches</h4>
+    <p class="hint">Every match is played exactly like a Sudden Death fight. Wild teams jump you in long grass, woods and fens, more often at night, and the night road is not safe either. Before each match a card shows who you face, the sport, and how hard it is. You can run from a wild team: it costs time and a little HP, and at night they may cut you off. Any other match has <b>Not yet</b>, and it waits for you.</p>
+    <p class="hint">Your team's HP carries from match to match. A night at an inn heals it fully, and that inn becomes the place you wake up. A win pays gold, a card, XP for your players and energy for the enchanter. Cards also come from strongboxes, card shops and people you help.</p>
+    <p class="hint"><b>Lose a match</b> and you black out: you wake at your last inn (Graftonbury's, if you have not slept anywhere yet) with at least half your HP, a tenth of your gold gone, and a quarter of your fans. <b>Hardcore</b> is a choice you make when you start a journey: lose one match, and the journey is over.</p></div></section>`);
 };
 
 /* ---------- cards from the world: the one way in, for chests, topics, and (phase 3) players ----------

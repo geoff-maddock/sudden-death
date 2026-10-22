@@ -5956,10 +5956,10 @@ function noise2(seed){const r=mulberry(seed),N=32,gr=[];for(let i=0;i<N*N;i++)gr
 /* TC's weighted pick over [{w:..}] (events). SD's wpick takes {key:weight}: use wpick(Object.fromEntries(region.sports)) for sports. */
 function wWpick(list,rng){let t=0;for(const e of list)t+=e.w;let r=(rng||Math.random)()*t;for(const e of list){r-=e.w;if(r<=0)return e}return list[list.length-1]}
 const DB={};
-DB.meta={night:{encMult:1.25,roadEnc:.02,levels:2,upg:.35,mut:.3,extra:.5},title:'Terra Chimera',yearDays:112,champWeek:7,maxRoster:8,teamSize:3,levelCap:30,tierLv:[4,8,12,16],crownLv:20};
+DB.meta={night:{encMult:1.25,roadEnc:.02,levels:2,upg:.35,mut:.3,extra:.5},title:'Realm',yearDays:112,champWeek:7,maxRoster:8,teamSize:3,levelCap:30,tierLv:[4,8,12,16],crownLv:20};
 DB.elems={order:['ember','bloom','tide','aether','rime'],beats:{ember:['bloom','rime'],bloom:['tide','aether'],tide:['ember','aether'],aether:['ember','rime'],rime:['bloom','tide']},
  names:{ember:'Ember',bloom:'Bloom',tide:'Tide',aether:'Aether',rime:'Rime'}};
-DB.regions={plains:{name:'Charter Plains',sports:[['baseball',3],['basketball',2]],kinds:['goblin','kobold','dwarf','elf','ogre'],arrive:'The Charter Plains: League roads, cropped grass, and Graftonbury smoke on the horizon.',ambient:['A wagon of caged chimeras rattles past toward the Coliseum.','Somewhere a Voltmite is humming in B flat.','A League surveyor waves a flag at nothing in particular.']},
+DB.regions={plains:{name:'Charter Plains',sports:[['baseball',3],['basketball',2]],kinds:['goblin','kobold','dwarf','elf','ogre'],arrive:'The Charter Plains: League roads, cropped grass, and Graftonbury smoke on the horizon.',ambient:['A team wagon rattles past toward the Coliseum, everyone aboard singing badly.','Somewhere a Voltmite is humming in B flat.','A League surveyor waves a flag at nothing in particular.']},
  bloom:{name:'The Mosswold',sports:[['golf',3],['jousting',2]],kinds:['elf','werewolf','spider','gorgon','goblin'],arrive:'The Mosswold closes over the road. Everything drips, and everything is growing.',ambient:['Spores drift through a shaft of green light.','A Gloomcap watches you from a stump and does not move for a very long time.','Bees the size of your thumb work a bank of mossberries.']},
  tide:{name:'The Brinefen',sports:[['bowling',3],['curling',2]],kinds:['zombie','troll','gorgon','wraith','spider'],arrive:'The Brinefen: black water, white sand, and a wind that smells of kelp.',ambient:['A Brinepup barks from a sandbar and dives.','Gulls fight over something that fights back.','Old pilings stand in the fen where a road used to be.']},
  ember:{name:'The Cindermaw',sports:[['football',3],['boxing',2]],kinds:['kobold','minotaur','golem','ogre','dwarf'],arrive:'The Cindermaw. The ground is warm through your boots and the air tastes of pennies.',ambient:['A lava tongue folds over on itself with a sound like tearing cloth.','Something heavy shifts under the ash.','A Cinderkit sits in a hot spring with the expression of a cat in a sunbeam.']},
@@ -5988,7 +5988,7 @@ DB.tiles={
  'O':{name:'town',walk:1,enter:1,look:'A town. Chimney smoke and the smell of somebody else cooking.'},
  'Q':{name:'coliseum',walk:1,enter:1,look:'The Crown Coliseum. The championship is fought here in the last week of the year.'},
  'D':{name:'entrance',walk:1,enter:1,look:'A way down. Cold air comes up out of it.'},
- 'N':{name:'nest',walk:0,use:'nest',look:'A chimera nest of woven twigs and shed fluff.',look0:'An empty nest. Give it a few days.'},
+ 'N':{name:'nest',walk:0,use:'nest',look:'A nest of woven twigs and shed fluff.',look0:'An empty nest. Give it a few days.'},
  'V':{name:'energy well',walk:0,use:'well',look:'An energy well. The crystal hums in your fillings.',look0:'A spent well, dull and cool. It will recharge overnight.'},
  'Y':{name:'forage bush',walk:0,use:'bush',look:'A bush heavy with something the cook will want.',look0:'A picked-over bush.'},
  'Z':{name:'alpha lair',walk:0,use:'lair',look:'A great nest ringed with bone totems. Whatever built it is watching you.',look0:'The lair is quiet now. The totems lean.'},
@@ -6005,8 +6005,8 @@ DB.tiles={
  '-':{name:'counter',walk:0,use:'counter',look:'A counter, polished by elbows.'},
  '+':{name:'door',walk:1,ground:0,look:'A door on a good hinge.'},
  'R':{name:'rubble',walk:0,look:'Fallen masonry. Something nested in it once.'},
- 'M':{name:'alpha',walk:0,use:'alpha',look:'An alpha chimera, big for its kind and not at all afraid of you.'},
- 'F':{name:'fountain',walk:0,look:'The Charter Fountain. The statue is of the first champion, a woman holding a Voltmite at arm\'s length as if it might go off.'},
+ 'M':{name:'alpha',walk:0,use:'alpha',look:'An alpha, big for its kind and not at all afraid of you.'},
+ 'F':{name:'fountain',walk:0,look:'The Charter Fountain. The statue is of the first champion, a woman holding the first ball at arm\'s length as if it might go off.'},
  'm':{name:'market stall',walk:0,look:'A market stall under a striped awning. Something in a cage in the back keeps saying "hello".'},
  'A':{name:'anvil',walk:0,look:'An anvil the size of a bed, pitted by decades of Slagback shoes.'},
  'u':{name:'brazier',walk:0,look:'An iron brazier full of glowing cinders. Two Cinderkits are asleep in it.'},
@@ -6020,29 +6020,27 @@ DB.tiles={
  'v':{name:'pool',walk:0,look:'A tide pool left in the cobbles. Something with too many eyes watches you from it.'},
  'P':{name:'painting',walk:0,use:'sign',look:'A framed painting.'},'q':{name:'table',walk:0,look:'A scrubbed table with the marks of a hundred suppers.'},
  'K':{name:'shelf',walk:0,use:'sign',look:'A shelf of books and jars.'},'t':{name:'trophy case',walk:0,use:'sign',look:'A glass case of trophies.'},
- 'z':{name:'rug',walk:1,ground:1,look:'A woven rug, League colours, frayed where the chimeras sleep on it.'},'&':{name:'bell',walk:0,use:'bell',look:'A great bronze bell.'},
+ 'z':{name:'rug',walk:1,ground:1,look:'A woven rug, League colours, frayed where the team sleeps on it.'},'&':{name:'bell',walk:0,use:'bell',look:'A great bronze bell.'},
  'I':{name:'ice block',walk:0,look:'A block of lake ice, cut square. Something is frozen in the middle of it and it is smiling.'},
  'e':{name:'wreck',walk:1,enter:1,look:'A ship\'s hull, keel up on the sand, weathered to silver.'},'H':{name:'hut',walk:1,enter:1,look:'A small building that nobody has visited in a while.'}};
-DB.companies={ // dropped: perk, starter species and team; the companies become rival clubs
- helix:{name:'Helix & Sons Biotechnic',short:'Helix & Sons',motto:'Measure twice, splice once.',handler:'Cornelius Helix III',look:{coat:'#4a6fb0',acc:'labcoat',hair:'#c9c9c9'}},
- cauldron:{name:'The Cauldron Collective',short:'Cauldron Collective',motto:'A fed chimera is a loyal chimera.',handler:'Nan Okoro',look:{coat:'#a0522d',acc:'apron',hair:'#2a1a12',skin:'#9a6a48'}},
- thaumagen:{name:'Thaumagen Limited',short:'Thaumagen',motto:'Attunement is nine tenths of the law.',handler:'Sable Wren',look:{coat:'#5a3d8a',acc:'robe',hair:'#e8e0f0'}},
- wildgraft:{name:'Wildgraft Outfitters',short:'Wildgraft',motto:'If it runs, we can catch it.',handler:'Bram Kessler',look:{coat:'#5a6e3a',acc:'hat',hair:'#7a4a20'}}};
-DB.apex={name:'Apex Biologic',handler:'Aurelia Vance',look:{coat:'#f2c14e',acc:'scarf',hair:'#1a1210',tall:1}};
+/* the four rival slots. TC's companies (perk, starter species, team, handler, look) are dropped: each slot is played by
+   a Sudden Death club (WG.rivals, w6-party.js), and only the keys are used (W_CUP.home in w11-cups.js). */
+DB.companies={helix:{cup:'rime'},cauldron:{cup:'salt'},thaumagen:{cup:'cind'},wildgraft:{cup:'moss'}};
+DB.apex={name:'Apex Athletic',captain:'Aurelia Vance',look:{coat:'#f2c14e',acc:'scarf',hair:'#1a1210',tall:1}};
 DB.crew={
- handler:{name:'You',role:'Handler',does:'Drills the team, reads the ground, throws the snares.'},
+ coach:{name:'You',role:'Coach',does:'Runs the drills, reads the ground, calls the plays.'},
  // dropped: gen (the geneticist; the gene lab is cut)
- ench:{name:'Brother Quill',role:'Enchanter',flag:'crew_ench',does:'Binds biome energy into a chimera, or re-attunes its element.'},
- cook:{name:'Marrow Tansy',role:'Cook',flag:'crew_cook',does:'Turns forage into meals that make a chimera permanently better.'}};
+ ench:{name:'Brother Quill',role:'Enchanter',flag:'crew_ench',does:'Binds the land\'s energy into your plays.'},
+ cook:{name:'Marrow Tansy',role:'Cook',flag:'crew_cook',does:'Turns forage into meals for match day.'}};
 /* dropped: snare, tonic, salts, antidote, zapnut, sporeball, firecracker, icepack (battle items), mutagen and purge (gene lab) */
 DB.items={
- ration:{name:'Drill Ration',desc:'Dense, dull biscuit. One per training drill.',use:'Camp → Team → Drill. One ration trains the selected chimera for +35% of a level, once per day.',price:12},
- salve:{name:'Salve',desc:'Restores 60% health to one chimera, even one that has fainted. Not usable mid-battle.',use:'Camp → Team → Salve, or the button here. Heals 60%, even a fainted chimera. Not in battle.',price:30},
+ ration:{name:'Drill Ration',desc:'Dense, dull biscuit. One per training drill.',use:'Camp → Team → Drill. One ration trains the selected player for +35% of a level, once per day.',price:12},
+ salve:{name:'Salve',desc:'Restores 60% health to one player, even one who is out cold. Not usable mid-match.',use:'Camp → Team → Salve, or the button here. Heals 60%, even a player who is out cold. Not in a match.',price:30},
  honeydrop:{name:'Honey Drop',desc:'Mosswold honey, set hard.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:22,food:1},
  saltfish:{name:'Salt Fish',desc:'Brinefen cod, salted stiff.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:28,food:1},
  jerky:{name:'Ember Jerky',desc:'Peppered dried meat.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:25,food:1},
  hardtack:{name:'Frost Hardtack',desc:'A biscuit you could shoe a Slagback with.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:25,food:1},
- keycard:{name:'Vault Keycard',desc:'A slab of old plastic. Opens the Gene Vault.',use:'Used automatically at the Gene Vault door, south-east of Graftonbury.'},
+ keycard:{name:'Vault Keycard',desc:'A slab of old plastic. Opens the Sealed Vault.',use:'Used automatically at the Sealed Vault door, south-east of Graftonbury.'},
  capsule:{name:'Dormant Capsule',desc:'A pre-League pod the size of a loaf, cold, with something folded up asleep inside.',use:'Take it to Dr. Pell (CAPSULE), with Aether energy to wake it.'},
  offering:{name:'Grove Offering',desc:'Honey, berry and aethercap, baked in a leaf. Smells of spring.',use:'Take it to Hermit Oak at the Hollow Shrine (DRAKE).'},
  tuningrod:{name:'Abbey Tuning Rod',desc:'A bronze rod that rings like a struck glass.',use:'Strike the bell in the Frozen Chapel with it, after dark.'},
@@ -6099,13 +6097,13 @@ DB.cardShops={hq_shop:{name:'The card binder at Odd Lots',region:'plains'},nette
 DB.enchants={ember:{stat:'atk',amt:2,label:'+2 attack'},tide:{stat:'hp',amt:7,label:'+7 health'},bloom:{stat:'def',amt:2,label:'+2 defence'},rime:{stat:'spd',amt:2,label:'+2 speed'},aether:{stat:'all',amt:1,label:'+1 to attack, defence and speed'}};
 DB.shops={general:{ration:12,salve:30,grain:8,salt:6},hq:{ration:12,salve:30,grain:8,salt:6,aethercap:22},moss:{ration:12,salve:30,honeydrop:22,grain:8,salt:6,mossberry:18},salt:{ration:12,salve:30,saltfish:28,grain:8,salt:4,brinekelp:18},cind:{ration:12,salve:30,jerky:25,grain:8,salt:6,emberpepper:18},rime:{ration:12,salve:28,hardtack:25,grain:8,salt:6,frostmint:18}}; // dropped: snares, battle items, mutagen and purge
 /* the boss of each dungeon and lair. dropped: team (species); phase 5 gives each a Sudden Death boss */
-DB.alphas={grove:{name:'the Elder of the Grove',lv:8},aurora:{name:'the Aurora Matriarch',lv:12},vaultwarden:{name:'Specimen Nought',lv:15},emberqueen:{name:'the Warren Queen',lv:12},seamwyrm:{name:'the Seam Wyrm',lv:11},hatchmother:{name:'the Hatch-Mother',lv:10}};
+DB.alphas={grove:{name:'the Elder of the Grove',lv:8},aurora:{name:'the Aurora Matriarch',lv:12},vaultwarden:{name:'Captain Nought',lv:15},emberqueen:{name:'the Warren Queen',lv:12},seamwyrm:{name:'the Seam Wyrm',lv:11},hatchmother:{name:'the Hatch-Mother',lv:10}};
 DB.cups={ // dropped: each round's team (species); phase 6 builds the teams from Sudden Death clubs
  moss:{name:'Mosswold Cup',town:'mossgate',elem:'bloom',flag:'cup_moss',rounds:[{who:'Pip Alder, a local hopeful'},{who:'@rival0',team:'@rival'},{who:'Warden Hesper Lowe'}]},
  salt:{name:'Brinefen Cup',town:'saltmere',elem:'tide',flag:'cup_salt',rounds:[{who:'Dab Finch, ferry hand'},{who:'@rival1',team:'@rival'},{who:'Harbourmistress Ione Pike'}]},
  cind:{name:'Cindermaw Cup',town:'cinderhold',elem:'ember',flag:'cup_cind',rounds:[{who:'Rook Varga, furnace apprentice'},{who:'@rival2',team:'@rival'},{who:'Forgemaster Tull Brandt'}]},
  rime:{name:'Frostspire Cup',town:'rimewatch',elem:'rime',flag:'cup_rime',rounds:[{who:'Little Asa, the lamplighter'},{who:'@rival0',team:'@rival'},{who:'Abbess Yrsa Holm'}]},
- crown:{name:'Terra Chimera Championship',town:'coliseum',elem:'aether',flag:'champion',final:1,rounds:[{who:'@rival1',team:'@rival',lv:0},{who:'@rival2',team:'@rival',lv:1},{who:'@apex',lv:2}]}};
+ crown:{name:'The Crown',town:'coliseum',elem:'aether',flag:'champion',final:1,rounds:[{who:'@rival1',team:'@rival',lv:0},{who:'@rival2',team:'@rival',lv:1},{who:'@apex',lv:2}]}};
 /* cards: a chest or a topic may pay card:'id', cards:['id',...] or cardChoice:{pick:3, rarity?, kind?, pool?} (see wPayCards, w3).
    Seeded so far: Vesper's cottage and the Hollow Shrine chests (a choice), and Imelda's licence topic (Pick and Roll). */
 /* phase 4 seeds 1-2 card finds per region (w9 test realm_town checks every one pays):
@@ -6120,33 +6118,33 @@ DB.chests={genevault_prize:{gold:300,items:{capsule:1}},emberdeep_prize:{gold:22
 DB.locs=[
  {id:'graftonbury',kind:'town',x:48,y:38,tile:'O',map:'graftonbury',name:'Graftonbury'},{id:'coliseum',kind:'coliseum',x:48,y:30,tile:'Q',map:'coliseum',name:'The Crown Coliseum'},
  {id:'mossgate',kind:'town',x:20,y:54,tile:'O',map:'mossgate',name:'Mossgate'},{id:'saltmere',kind:'town',x:75,y:54,tile:'O',map:'saltmere',name:'Saltmere'},{id:'cinderhold',kind:'town',x:75,y:17,tile:'O',map:'cinderhold',name:'Cinderhold'},{id:'rimewatch',kind:'town',x:21,y:17,tile:'O',map:'rimewatch',name:'Rimewatch'},
- {id:'genevault',kind:'dungeon',x:58,y:43,tile:'D',map:'genevault',name:'The Gene Vault',key:'keycard'},{id:'emberdeep',kind:'dungeon',x:84,y:26,tile:'D',map:'emberdeep',name:'Emberdeep Warren'},{id:'hatchery',kind:'dungeon',x:64,y:61,tile:'D',map:'hatchery',name:'The Drowned Hatchery'},
+ {id:'genevault',kind:'dungeon',x:58,y:43,tile:'D',map:'genevault',name:'The Sealed Vault',key:'keycard'},{id:'emberdeep',kind:'dungeon',x:84,y:26,tile:'D',map:'emberdeep',name:'Emberdeep Warren'},{id:'hatchery',kind:'dungeon',x:64,y:61,tile:'D',map:'hatchery',name:'The Drowned Hatchery'},
  {id:'cottage',kind:'site',x:37,y:45,tile:'H',map:'cottage',name:"Vesper's Cottage",hidden:'clue_cottage'},{id:'hollowshrine',kind:'site',x:13,y:62,tile:'H',map:'hollowshrine',name:'The Hollow Shrine',hidden:'clue_shrine'},
  {id:'marigold',kind:'site',x:86,y:62,tile:'e',map:'marigold',name:'The Wreck of the Marigold',hidden:'clue_marigold'},{id:'deepseam',kind:'dungeon',x:88,y:9,tile:'D',map:'deepseam',name:'The Deep Seam',hidden:'clue_deepseam'},{id:'frozenchapel',kind:'site',x:9,y:9,tile:'H',map:'frozenchapel',name:'The Frozen Chapel',hidden:'clue_chapel'},
  {id:'umbralden',kind:'site',x:37,y:6,tile:'H',map:'umbralden',name:'The Road to Nowhere',hidden:'clue_den'},
  {id:'eldergrove',kind:'lair',x:11,y:45,tile:'Z',alpha:'grove',name:'Elder Grove'},{id:'auroraroost',kind:'lair',x:30,y:8,tile:'Z',alpha:'aurora',name:'Aurora Roost'}]; // dropped: part, egg and mut on both lairs
 /* dropped: egg, mut and enc (species, mutations, encounter tables) */
-DB.dungeons=[{id:'genevault',name:'The Gene Vault',seed:11,elem:'aether',alpha:'vaultwarden',rooms:9},{id:'emberdeep',name:'Emberdeep Warren',seed:23,elem:'ember',alpha:'emberqueen',rooms:8},{id:'hatchery',name:'The Drowned Hatchery',seed:37,elem:'tide',alpha:'hatchmother',rooms:8},{id:'deepseam',name:'The Deep Seam',seed:53,elem:'ember',alpha:'seamwyrm',rooms:6}];
+DB.dungeons=[{id:'genevault',name:'The Sealed Vault',seed:11,elem:'aether',alpha:'vaultwarden',rooms:9},{id:'emberdeep',name:'Emberdeep Warren',seed:23,elem:'ember',alpha:'emberqueen',rooms:8},{id:'hatchery',name:'The Drowned Hatchery',seed:37,elem:'tide',alpha:'hatchmother',rooms:8},{id:'deepseam',name:'The Deep Seam',seed:53,elem:'ember',alpha:'seamwyrm',rooms:6}];
 DB.towns=[
  {id:'graftonbury',name:'Graftonbury',ground:'.',w:36,h:24,street:12,buildings:[
-  {x:2,y:3,w:7,h:7,npc:'clerk',sign:'LEAGUE OFFICE. Licences, brackets, complaints.',furn:[['P',1,1,{text:'The first champion, Ada Quill, holding a Voltmite at arm\'s length. The frame is nicer than the painting.'}],['t',5,1,{text:'A row of small silver cups: every regional winner for twenty years. Three of them say VESPER.'}],['K',1,3,{text:'League Regulations, volumes one to nine. Volume four is missing and nobody will say why.'}]]},
+  {x:2,y:3,w:7,h:7,npc:'clerk',sign:'LEAGUE OFFICE. Licences, brackets, complaints.',furn:[['P',1,1,{text:'The first champion, Ada Quill, holding the first ball at arm\'s length. The frame is nicer than the painting.'}],['t',5,1,{text:'A row of small silver cups: every regional winner for twenty years. Three of them say VESPER.'}],['K',1,3,{text:'League Regulations, volumes one to nine. Volume four is missing and nobody will say why.'}]]},
   {x:10,y:3,w:7,h:7,npc:'pell',counter:false,sign:'WORKSHOP. Knock. Then wait.',furn:[['k',1,1],['k',2,1],['E',5,1],['k',5,4],['K',1,4,{text:'Jars. Most are labelled. One is labelled DO NOT FEED and something inside is tapping.'}]]},
   {x:20,y:3,w:7,h:7,npc:'tansy',counter:false,sign:'CANTEEN. Todays special: whatever is left.',furn:[['h',1,1],['h',5,1],['q',2,3],['q',4,3],['P',3,1,{text:'A still life of a Mossberry Stew, painted with what looks like actual stew.'}]]},
   {x:28,y:3,w:7,h:7,npc:'quill',counter:false,sign:'CHAPEL OF ATTUNEMENT',furn:[['l',1,1],['l',5,1],['P',3,1,{text:'The Five Elements as a wheel: Ember eats Bloom, Bloom eats Tide, Tide eats Ember, and Aether and Rime circling outside, eating what they can.'}],['z',3,3]]},
-  {x:3,y:14,w:9,h:7,door:'n',npc:'hq_shop',sign:'ODD LOTS. Snares, salves, sundries.',furn:[['K',1,4,{text:'Second-hand snares, sorted by how many times they have been thrown.'}]]},
-  {x:22,y:14,w:9,h:7,door:'n',npc:'hq_inn',sign:'THE SPLICED HEN. Beds.',furn:[['B',1,1],['B',7,1],['h',1,5],['q',4,4],['P',4,1,{text:'The Spliced Hen herself: a chicken with a Brinepup\'s tail. The inn\'s founder swore she was real.'}]]}],
-  npcs:[['rival',15,12],['vesper',21,11],['almond',13,16],['tallow',30,10],['rowe',25,15]],decor:[['W',19,10],['l',17,10],['l',17,14],['l',19,20],['F',18,15],['m',14,13],['m',15,13],['S',19,22,{text:'GRAFTONBURY. Charter town of the Chimera League. Coliseum north. Cup towns at the four corners of the map.'}]],
-  arrive:'Graftonbury, the charter town. Every road in Terra Chimera starts here and most of the paperwork never leaves.',ambient:['A clerk hurries past with a stack of bracket sheets.','The Charter Fountain gurgles. Somebody has put dye in it again.','A market crier: "Snares! Salves! Second-hand Voltmites, one previous owner!"','Two handlers argue about Tide versus Ember and neither has a chimera on them.']},
+  {x:3,y:14,w:9,h:7,door:'n',npc:'hq_shop',sign:'ODD LOTS. Salves, sundries, cards.',furn:[['K',1,4,{text:'Second-hand balls, sorted by how many times they have been kicked.'}]]},
+  {x:22,y:14,w:9,h:7,door:'n',npc:'hq_inn',sign:'THE SPECKLED HEN. Beds.',furn:[['B',1,1],['B',7,1],['h',1,5],['q',4,4],['P',4,1,{text:'The Speckled Hen herself, the inn\'s first mascot. She refereed a cup final once, badly, and nobody has forgotten.'}]]}],
+  npcs:[['rival',15,12],['vesper',21,11],['almond',13,16],['tallow',30,10],['rowe',25,15]],decor:[['W',19,10],['l',17,10],['l',17,14],['l',19,20],['F',18,15],['m',14,13],['m',15,13],['S',19,22,{text:'GRAFTONBURY. Charter town of the League. Coliseum north. Cup towns at the four corners of the map.'}]],
+  arrive:'Graftonbury, the charter town. Every road in the realm starts here and most of the paperwork never leaves.',ambient:['A clerk hurries past with a stack of bracket sheets.','The Charter Fountain gurgles. Somebody has put dye in it again.','A market crier: "Salves! Rations! Second-hand jerseys, one previous owner!"','Two coaches argue about Tide versus Ember, and neither of them has a team.']},
  /* Mossgate: a village grown into the trees. Two lanes wind through it; the apiary and the shrine garden are its own. */
  {id:'mossgate',name:'Mossgate',ground:'.',tree:'T',w:30,h:22,trees:34,streets:[[1,11,28,11],[8,0,8,21],[22,4,22,21]],spawn:[8,20],buildings:[
   {x:2,y:2,w:11,h:8,npc:'moss_reg',sign:'MOSSWOLD ARENA',furn:[['W',1,4],['l',9,1],['P',5,1,{text:'The arena in spring, the sand green with sprouting seed. It has to be raked every morning.'}],['z',5,4]]},
-  {x:18,y:2,w:8,h:6,npc:'moss_shop',sign:'GREEN GROCER & SNARES',furn:[['K',1,1,{text:'Jars of pickled mossberry, dated. The oldest is older than the League.'}]]},
+  {x:18,y:2,w:8,h:6,npc:'moss_shop',sign:'GREEN GROCER',furn:[['K',1,1,{text:'Jars of pickled mossberry, dated. The oldest is older than the League.'}]]},
   {x:1,y:13,w:9,h:7,door:'n',npc:'moss_inn',sign:'THE HOLLOW LOG. Beds.',furn:[['B',1,1],['B',7,1],['h',1,5],['q',4,4],['P',4,1,{text:'The log the inn is built in, before it was hollowed. A very large tree, and a very small man with an axe.'}]]},
   {x:13,y:13,w:7,h:6,door:'n',npc:'brack',counter:false,floor:'.',sign:'APIARY. Move slowly.',furn:[['y',1,1],['y',3,1],['y',5,1],['y',1,3],['y',5,3]]},
   {x:24,y:13,w:5,h:7,door:'n',npc:'wenna',counter:false,sign:"WENNA'S. Forage bought.",furn:[['K',1,1,{text:'Sixty years of dried bushes, labelled in a hand that gets shakier as it goes.'}],['h',1,4]]},
   {x:13,y:3,w:4,h:6,door:'s',npc:'fern',counter:false,sign:'SHRINE OF THE GROVE',furn:[['$',1,1],['P',2,1,{text:'The Elder of the Grove coming down the road in spring, antlers full of birds, the whole town out with baskets.'}]]}],
   npcs:[['moss_kid',20,11]],decor:[['l',14,9],['l',10,12],['l',24,19],['$',27,8],['Y',26,16,{elem:'bloom',under:'.'}],['Y',4,21,{elem:'bloom',under:'.'}],['y',3,11]],
-  arrive:'Mossgate. The houses are half timber and half tree, and it is hard to tell which half is winning.',ambient:['Bees drone in the hives by the road.','A Mossprout is being scolded off a roof by a woman with a broom.','Sap drips from the arena beams onto the sand.','The totem by the east gate has fresh berries at its foot.']},
+  arrive:'Mossgate. The houses are half timber and half tree, and it is hard to tell which half is winning.',ambient:['Bees drone in the hives by the road.','A goblin kid is being scolded off a roof by a woman with a broom.','Sap drips from the arena beams onto the sand.','The totem by the east gate has fresh berries at its foot.']},
  /* Saltmere: a harbour town. One long quay street, docks over open water, a lighthouse on the point. */
  {id:'saltmere',name:'Saltmere',ground:':',tree:'T',w:32,h:24,trees:6,streets:[[1,12,30,12],[16,0,16,18],[4,18,27,18]],water:[[0,20,32,4],[0,19,3,1],[29,19,3,1]],spawn:[16,17],buildings:[
   {x:2,y:2,w:12,h:8,npc:'salt_reg',sign:'BRINEFEN ARENA',furn:[['W',1,4],['l',10,1],['v',5,4],['P',6,1,{text:'The arena at high tide, waist deep, the year they forgot to close the sluice. The match went ahead.'}]]},
@@ -6155,104 +6153,104 @@ DB.towns=[
   {x:14,y:14,w:6,h:5,door:'n',npc:'netter',counter:false,sign:'NETS. Repairs.',furn:[['K',1,1,{text:'Nets hung to dry. Every knot is a different knot.'}],['q',3,2]]},
   {x:22,y:13,w:5,h:6,door:'n',npc:'anck',counter:false,sign:'LIGHTHOUSE. Keep off the stairs.',furn:[['l',3,2],['K',1,1,{text:'Forty years of the light log, one line a night: LIT. LIT. LIT. Then nothing.'}],['B',3,3]]}],
   npcs:[['diver',26,11],['marrowbone',24,19]],decor:[['l',18,10],['l',14,10],['m',11,11],['m',12,11],['v',20,10],['w',22,19],['w',23,19],['w',24,19],['w',25,19],['w',26,19],['w',27,19],['j',25,20],['j',9,20],['w',7,19],['w',8,19],['w',9,19],['w',10,19]],
-  arrive:'Saltmere. Everything is damp, everything is salted, and the arena floor drains toward the middle.',ambient:['The ferry bell rings twice: nobody aboard.','A Brinepup sleeps in a coil of rope on the dock.','Gulls have learned to open snares. Hob is furious.','The tide pool by the arena blinks at you.']},
+  arrive:'Saltmere. Everything is damp, everything is salted, and the arena floor drains toward the middle.',ambient:['The ferry bell rings twice: nobody aboard.','A Brinepup sleeps in a coil of rope on the dock.','Gulls have learned to untie nets. Hob is furious.','The tide pool by the arena blinks at you.']},
  /* Cinderhold: black basalt on both banks of a lava channel, joined by two bridges. Forges, braziers, and a hot spring. */
  {id:'cinderhold',name:'Cinderhold',ground:'a',tree:'R',w:30,h:24,trees:10,streets:[[1,12,28,12],[7,0,7,23],[22,0,22,23],[7,5,22,5],[7,19,22,19]],water:[[14,0,2,24,'L']],spawn:[7,22],buildings:[
   {x:1,y:1,w:11,h:9,npc:'cind_reg',sign:'CINDERMAW ARENA',furn:[['W',1,4],['u',9,1],['P',5,1,{text:'The arena floor the year the lava came up through it. Three matches were fought on the crust before anyone said anything.'}],['z',5,5]]},
   {x:17,y:1,w:11,h:8,npc:'cind_shop',sign:'FURNACE STORES',furn:[['u',1,1],['K',9,1,{text:'Peppers by heat: mild, hot, cinder, slag, and one jar marked simply NO.'}]]},
   {x:1,y:14,w:10,h:7,door:'n',npc:'cind_inn',sign:'THE BANKED FIRE. Beds.',furn:[['B',1,1],['B',8,1],['u',1,5],['u',8,5],['q',4,4],['P',4,1,{text:'A Cinderkit asleep on a hearth, painted from life by somebody very patient.'}]]},
   {x:17,y:14,w:11,h:7,door:'n',npc:'smith',counter:false,sign:'BRANDT & SON. Shoes, plate, chain.',furn:[['A',2,2],['u',9,1],['u',9,4],['K',1,1,{text:'Slagback shoes in every size, and one Voltmite-sized set nobody has ever needed.'}]]}],
-  npcs:[['scout',23,11],['grit',11,22],['pyre',4,11]],decor:[['u',9,12],['u',24,12],['u',7,2],['v',11,20],['S',5,22,{text:'HOT SPRING. Bathing at own risk. Chimeras welcome.'}]],
+  npcs:[['scout',23,11],['grit',11,22],['pyre',4,11]],decor:[['u',9,12],['u',24,12],['u',7,2],['v',11,20],['S',5,22,{text:'HOT SPRING. Bathing at own risk. Teams welcome, after the match.'}]],
   arrive:'Cinderhold. The walls are black basalt, the braziers never go out, and the smith is already shouting.',ambient:['The great anvil rings, once, and a Slagback somewhere answers.','Ash sifts down from nowhere in particular.','A miner walks past coughing glitter.','Heat shimmers over the arena sand.','The lava channel folds and sighs under the bridge.']},
  /* Rimewatch: abbey town at the tree line. One street, a frozen pond, a watchtower, cairns. */
  {id:'rimewatch',name:'Rimewatch',ground:'n',tree:'T',w:28,h:22,trees:16,streets:[[1,10,26,10],[14,0,14,21],[5,10,5,21]],water:[[19,14,6,4,'i']],spawn:[14,20],buildings:[
   {x:1,y:1,w:12,h:8,door:'s',npc:'halvard',counter:false,sign:'ABBEY OF THE LAST LAMP',furn:[['&',5,1],['l',1,1],['l',10,1],['P',8,1,{text:'The Matriarch over the abbey, green light streaming, the monks below with their hands over their ears. Or their eyes. The painter could not decide.'}],['K',1,4,{text:'Chant books, and a ledger of bell-feedings going back ninety years.'}],['z',5,4]]},
   {x:16,y:1,w:11,h:8,npc:'rime_reg',sign:'FROSTSPIRE ARENA',furn:[['W',1,4],['l',9,1],['I',5,1],['I',6,1]]},
-  {x:1,y:12,w:8,h:6,door:'n',npc:'rime_shop',sign:'COLD STORES',furn:[['I',1,1],['I',6,1],['K',3,1,{text:'Frost mint by the bunch. Mutagen, purge, and things in ice that Kettil says are for later.'}]]},
+  {x:1,y:12,w:8,h:6,door:'n',npc:'rime_shop',sign:'COLD STORES',furn:[['I',1,1],['I',6,1],['K',3,1,{text:'Frost mint by the bunch, and things in ice that Kettil says are for later.'}]]},
   {x:10,y:12,w:8,h:7,door:'n',npc:'rime_inn',sign:'THE LAST LAMP. Beds.',furn:[['B',1,1],['B',6,1],['h',1,5],['q',3,4],['P',3,1,{text:'The lamp itself, the last one before the snow, painted in the dark with the lamp for light.'}]]},
   {x:21,y:11,w:5,h:3,door:'n',npc:'watcher',counter:false,sign:'WATCH TOWER',furn:[['l',1,1]]}],
   npcs:[['monk',12,11],['ingrith',7,20]],decor:[['r',3,9],['r',26,9],['r',3,20],['r',26,20],['r',20,18],['l',15,4],['I',17,20]],
   arrive:'Rimewatch. The last town before the snow takes over, and it knows it.',ambient:['The abbey bell tolls the hour, a little flat with cold.','A Frostlet is asleep on the arena sign, glazing it.','The lamps come on early here. They have to.','A cairn by the road has a new stone on it.','Children skate on the pond, badly.']},
- {id:'coliseum',name:'The Crown Coliseum',ground:'o',w:30,h:22,trees:0,buildings:[{x:5,y:2,w:21,h:9,npc:'steward',sign:'CHAMPIONSHIP ENTRIES. Four regional cups required. No exceptions, Bram.',furn:[['W',2,5],['W',18,5],['l',5,1],['l',15,1],['t',8,1,{text:'The crown itself, on a cushion. Smaller than you expected. Heavier, the steward says.'}],['t',12,1,{text:'Six years of Apex Biologic team portraits. The Slagback is in all of them and has not aged.'}],['P',10,1,{text:'Aurelia Vance, full length, one hand on a Slagback the size of a cart. The painter was clearly afraid of both.'}],['z',10,5]]}],
+ {id:'coliseum',name:'The Crown Coliseum',ground:'o',w:30,h:22,trees:0,buildings:[{x:5,y:2,w:21,h:9,npc:'steward',sign:'CHAMPIONSHIP ENTRIES. Four regional cups required. No exceptions, Bram.',furn:[['W',2,5],['W',18,5],['l',5,1],['l',15,1],['t',8,1,{text:'The crown itself, on a cushion. Smaller than you expected. Heavier, the steward says.'}],['t',12,1,{text:'Six years of Apex Athletic team portraits. Their goalkeeper is in all of them and has not aged.'}],['P',10,1,{text:'Aurelia Vance, full length, one foot on a ball the size of a cart. The painter was clearly afraid of both.'}],['z',10,5]]}],
   npcs:[['herald',12,14],['nell',18,17],['bookie',8,17]],decor:[['l',13,16],['l',17,16],['l',13,20],['l',17,20],['x',9,13],['x',21,13],['G',15,12],['x',9,20],['x',21,20]],arrive:'The Crown Coliseum. Twenty thousand seats, and every one of them has seen Apex win.',ambient:['Banners crack in the wind.','The statue of Aurelia Vance has been polished again.','A sweeper works the sand in slow, even lines.','Somewhere under the stands, something big is being fed.']},
  /* ---- wilderness sites: small maps, found by following a clue ---- */
- {id:'cottage',name:"Vesper's Cottage",ground:'.',w:14,h:11,trees:6,noStreet:true,spawn:[7,9],buildings:[{x:3,y:1,w:8,h:7,door:'s',counter:false,furn:[['B',1,1],['K',6,1,{text:'Vesper\'s old bracket sheets, twenty years of them, each with his name filled in at the top before the first match.'}],['P',3,1,{text:'A young Gant Vesper with a Glimmerfin on his shoulder. Neither of them is smiling; both look happy.'}],['C',1,4,{chest:'cottage_chest'}],['q',4,4],['h',6,4]]}],decor:[['S',8,8,{text:'VESPER. Go away. — Not you, handler. Come in.'}]],arrive:"Vesper's cottage, shut up for years. The door is not locked. Nothing out here is.",ambient:['Wind in the eaves.']},
+ {id:'cottage',name:"Vesper's Cottage",ground:'.',w:14,h:11,trees:6,noStreet:true,spawn:[7,9],buildings:[{x:3,y:1,w:8,h:7,door:'s',counter:false,furn:[['B',1,1],['K',6,1,{text:'Vesper\'s old bracket sheets, twenty years of them, each with his name filled in at the top before the first match.'}],['P',3,1,{text:'A young Gant Vesper with a Glimmerfin on his shoulder. Neither of them is smiling; both look happy.'}],['C',1,4,{chest:'cottage_chest'}],['q',4,4],['h',6,4]]}],decor:[['S',8,8,{text:'VESPER. Go away. — Not you, captain. Come in.'}]],arrive:"Vesper's cottage, shut up for years. The door is not locked. Nothing out here is.",ambient:['Wind in the eaves.']},
  {id:'hollowshrine',name:'The Hollow Shrine',ground:'.',tree:'T',w:16,h:13,trees:22,noStreet:true,spawn:[8,11],buildings:[],npcs:[['hermit',8,5,1]],decor:[['$',8,4],['$',5,4],['$',11,4],['Y',3,7,{elem:'bloom',under:'.'}],['Y',13,7,{elem:'bloom',under:'.'}],['V',8,2,{elem:'bloom',under:'.'}],['C',2,2,{chest:'shrine_chest'}],['l',6,9],['l',10,9]],arrive:'The Hollow Shrine: three totems in a ring of old trees, and a well that hums.',ambient:['Something large moves in the canopy and settles.','A Gloomcap sits by a totem as if praying.']},
  {id:'marigold',name:'The Wreck of the Marigold',ground:':',w:16,h:11,trees:0,noStreet:true,spawn:[8,9],water:[[0,0,16,3],[0,3,4,1],[12,3,4,1]],buildings:[],decor:[['e',6,3],['e',7,3],['e',8,3],['e',9,3],['e',7,4],['e',8,4],['C',8,5,{chest:'marigold_chest'}],['N',3,6,{elem:'tide',under:':'}],['v',12,7],['S',8,8,{text:'MARIGOLD. Saltmere ferry. Lost with all hands but the captain, who swam.'}]],arrive:'The Marigold, keel up on the sand, the ribs picked clean. Something nests in the bow.',ambient:['Gulls. A great many gulls.']},
  {id:'umbralden',name:'The Road to Nowhere',ground:'n',tree:'T',w:18,h:12,trees:10,noStreet:true,spawn:[2,6],streets:[[1,6,15,6,'=']],buildings:[],decor:[['r',4,4],['r',8,8],['r',12,4],['N',15,6,{elem:'ember',rare:1,night:1,under:'n'}],['S',3,5,{text:'Nobody made this road. It was just here one spring, and it goes nowhere, and at the end of it something waits for the dark.'}]],arrive:'The road north of the Roost. It runs straight into the snow for a mile and stops. There are tracks, too big for a fox.',ambient:['Something pads behind you. There is nothing there.','The snow at the road\'s end is melted in a ring.']}, // dropped: umbralden nest rare:'duskhound' and mut
  {id:'frozenchapel',name:'The Frozen Chapel',ground:'n',tree:'T',w:14,h:12,trees:8,noStreet:true,spawn:[7,10],buildings:[{x:2,y:1,w:10,h:8,door:'s',counter:false,furn:[['&',4,1,{ring:{item:'tuningrod',night:1,set:'rq_aur2'}}],['l',1,1],['l',8,1],['P',6,1,{text:'The Aurora Matriarch, painted from below, much too close. The painter did not finish the tail.'}],['K',1,4,{text:'Chant books frozen shut. One is open to a page about bells and what they call.'}],['C',8,5,{chest:'chapel_chest'}],['I',4,4],['z',4,6]]}],decor:[['r',1,10],['r',12,10]],arrive:'The Frozen Chapel. The abbey before the abbey, abandoned when the snow line moved. The bell is still hung.',ambient:['Ice ticks in the walls as the day warms.']}]; // dropped: chapel bell sp:'aurorel'; ringing it now sets rq_aur2
-const shopTalk=(name,look,shop,line)=>({name,look,shop,greet:line,topics:{job:{t:'I sell what handlers run out of. Say BUY when you want to see the shelves.'},buy:{t:'Have a look.',act:'shop'}}});
-const innTalk=(name,look,price,line)=>({name,look,inn:price,greet:line,topics:{job:{t:'I keep the beds and mind my business. A ROOM is '+price+' gold and the stable hands see to your chimeras overnight.'},room:{t:'Sleep well.',act:'inn'}}});
-const regTalk=(name,look,cup,line,extra)=>({name,look,greet:line,topics:Object.assign({job:{t:'Registrar. I take entries for the CUP, I keep the bracket honest, and I sweep the sand afterwards.'},cup:{t:'Three rounds, back to back, three chimeras a side. Win all three and the cup goes on your wall. The League sets the field to match your record, so it never gets easier. Say ENTER when your team is ready.',xp:10},enter:{t:'Sign here. And here. Mind the scorch marks.',act:'cup:'+cup}},extra||{})});
+const shopTalk=(name,look,shop,line)=>({name,look,shop,greet:line,topics:{job:{t:'I sell what teams run out of. Say BUY when you want to see the shelves.'},buy:{t:'Have a look.',act:'shop'}}});
+const innTalk=(name,look,price,line)=>({name,look,inn:price,greet:line,topics:{job:{t:'I keep the beds and mind my business. A ROOM is '+price+' gold, and your team wakes up fresh.'},room:{t:'Sleep well.',act:'inn'}}});
+const regTalk=(name,look,cup,line,extra)=>({name,look,greet:line,topics:Object.assign({job:{t:'Registrar. I take entries for the CUP, I keep the bracket honest, and I sweep the sand afterwards.'},cup:{t:'Three rounds, back to back, three players a side. Win all three and the cup goes on your wall. The League sets the field to match your record, so it never gets easier. Say ENTER when your team is ready.',xp:10},enter:{t:'Sign here. And here. Mind the scorch marks.',act:'cup:'+cup}},extra||{})});
 DB.chars={
  clerk:{name:'Imelda Foss',look:{coat:'#3f5a7a',acc:'clip',hair:'#8a857e'},greet:'League office. Take a number. You are the only one here, so your number is one.',topics:{
-  job:{t:'I am the League clerk. I issue every LICENCE, record every CUP, and tell every handler the same thing about the CHAMPIONSHIP.'},
-  licence:{t:'Here. One handler licence, no refunds, and a play from the League book: everybody gets the same one. Your CREW is waiting on you: Tansy in the canteen and Quill in the chapel. Go and collect them before you go anywhere.',set:'licensed',once:'got_licence',card:'pickroll',xp:15,t2:'You have your licence. Do not lose it. People lose them.'}, // dropped: give snare:5, and Pell from the crew
+  job:{t:'I am the League clerk. I issue every LICENCE, record every CUP, and tell every captain the same thing about the CHAMPIONSHIP.'},
+  licence:{t:'Here. One team licence, no refunds, and a play from the League book: everybody gets the same one. Your CREW is waiting on you: Tansy in the canteen and Quill in the chapel. Go and collect them before you go anywhere.',set:'licensed',once:'got_licence',card:'pickroll',xp:15,t2:'You have your licence. Do not lose it. People lose them.'}, // dropped: give snare:5, and Pell from the crew
   cup:{t:'Four regional cups: Mosswold south-west, Brinefen south-east, Cindermaw north-east, Frostspire north-west. Any order. The field is scaled to your record, so the fourth is the hard one whichever it is.',xp:10},
-  championship:{t:'Held once a year at the Crown Coliseum, in the last week of the year. Four cups gets you in. Miss the week and you wait for the next one, and Apex Biologic keeps the crown another year.',xp:10},
-  crew:{t:'A handler alone is a person with a net. Your enchanter binds energy and your cook feeds. Use both or lose to somebody who did.'}, // dropped: the geneticist
+  championship:{t:'Held once a year at the Crown Coliseum, in the last week of the year. Four cups gets you in. Miss the week and you wait for the next one, and Apex Athletic keeps the crown another year.',xp:10},
+  crew:{t:'A captain alone is just a loud person with a whistle. Your enchanter binds energy and your cook feeds. Use both or lose to somebody who did.'}, // dropped: the geneticist
   bracket:{t:'The First Bracket! We thought it burned with the old hall. Vesper had it all along, the old thief. Here: a finder\'s fee, and the League\'s thanks, which is worth less.',take:{oldbracket:1},gold:120,once:'q_bracket',xp:20,t2:'It hangs in the office now. Do not touch it.',needNo:'The First Bracket? If it still exists it would be with Vesper\'s things. Ask around the fountain.'},
   letter:{t:'From Pim? Give it here. ... Yes. Yes, fine, the post can run. Take him my reply.',take:{letter:1},give:{reply:1},once:'q_letter2',xp:10,t2:'I have replied. Get it to him.',needNo:'I have no letter from you.'}}},
  pell:{name:'Dr. Odalys Pell',look:{coat:'#2f7a6a',acc:'labcoat',hair:'#2a1a12',skin:'#c99a70'},greet:'Do not touch the jar.',topics:{
-  job:{t:'Geneticist, once. The League shut the lab and I kept the jars. Now I read old things. If you ever find a CAPSULE, bring it to me.'}}}, // dropped: parts, research, join (the gene lab is cut)
- tansy:{name:'Marrow Tansy',look:{coat:'#a0522d',acc:'apron',hair:'#b0485a'},greet:'Sit down, you look underfed. So do your animals.',topics:{
-  job:{t:'Cook. A chimera is what it eats. Bring me FORAGE from the bushes out there and I will make meals that change them for good. Say JOIN and I will fetch my pots.'},
-  forage:{t:'Every region has its own bush: mossberry, ember pepper, brine kelp, frost mint, and aethercap here on the plains. Bushes grow back in a few days. A chimera can only stomach one lasting meal per level, so spend them well.',xp:10},
+  job:{t:'Team doctor, once. The League retired me and I kept the jars. Now I read old things. If you ever find a CAPSULE, bring it to me.'}}}, // dropped: parts, research, join (the gene lab is cut)
+ tansy:{name:'Marrow Tansy',look:{coat:'#a0522d',acc:'apron',hair:'#b0485a'},greet:'Sit down, you look underfed. So does your team.',topics:{
+  job:{t:'Cook. A team is what it eats. Bring me FORAGE from the bushes out there and I will COOK you a meal for match day. Say JOIN and I will fetch my pots.'},
+  forage:{t:'Every region has its own bush: mossberry, ember pepper, brine kelp, frost mint, and aethercap here on the plains. Bushes grow back in a few days. Any inn hearth will do for cooking, and so will my canteen.',xp:10},
   join:{t:'Right. Somebody carry the big pot.',need:'licensed',needNo:'Licence first, love. Foss, across the square.',set:'crew_cook',xp:20,once:'j_cook',t2:'I am coming, I am coming.'}}},
  quill:{name:'Brother Quill',look:{coat:'#5a3d8a',acc:'robe',hair:'#e8e0f0'},greet:'Peace. Mind the circle, it is still wet.',topics:{
-  job:{t:'Enchanter. The land has ENERGY in it, a different kind in every biome. I bind it into living things. If you will have me, I will JOIN.'},
-  energy:{t:'Draw it from the WELLS, the standing crystals. Ember sharpens, Tide fortifies, Bloom toughens, Rime quickens, Aether does a little of everything. Wells refill overnight. Wild chimeras shed a little too.',xp:10},
-  wells:{t:'Three to a region, more or less. The old vaults have their own. I can also re-attune a chimera to a different element entirely, though it costs five.'},
+  job:{t:'Enchanter. The land has ENERGY in it, a different kind in every biome. I bind it into your plays: say ENCHANT and I will show you. If you will have me, I will JOIN.'},
+  energy:{t:'Draw it from the WELLS, the standing crystals. Ember sharpens, Tide fortifies, Bloom toughens, Rime quickens, Aether does a little of everything. Wells refill overnight, and every win leaves a little in your jars too.',xp:10},
+  wells:{t:'Three to a region, more or less. The old vaults have their own. Any kind will do for my work: I take from whatever you have most of.'},
   join:{t:'Then I will walk with you.',need:'licensed',needNo:'The League likes its paperwork before its miracles. See Foss.',set:'crew_ench',xp:20,once:'j_ench',t2:'I am with you already.'}}},
  hq_shop:shopTalk('Merrit Odd',{coat:'#7a5a32',acc:'cap'},'hq','Odd Lots. If I have not got it, you do not need it.'),
- hq_inn:innTalk('Dolores Hen',{coat:'#b0485a',acc:'apron',hair:'#f2c14e'},15,'Beds upstairs, stables out back, no chimeras on the furniture.'),
- rival:{name:'@rival0',look:'@rival0',greet:'Oh. Another company in the running. How nice for the bracket.',topics:{job:{t:'Handler, same as you, but better funded. I will see you in the second round of some CUP or other.'},cup:{t:'Every cup puts a rival company in round two. We do not throw matches. We have shareholders.'}}},
+ hq_inn:innTalk('Dolores Hen',{coat:'#b0485a',acc:'apron',hair:'#f2c14e'},15,'Beds upstairs, kit room out back, no tackling on the furniture.'),
+ rival:{name:'@rival0',look:'@rival0',greet:'Oh. Another club in the running. How nice for the bracket.',topics:{job:{t:'Captain, same as you, but better funded. I will see you in the last round of some CUP or other.'},cup:{t:'Every cup puts a rival club in the last round. We do not throw matches. We have shareholders.'}}},
  vesper:{name:'Gant Vesper',look:{coat:'#6b5313',acc:'scarf',hair:'#c9c9c9',tall:1},greet:'That wall used to have my name on it. Twice.',topics:{
   job:{t:'Retired. I won the CHAMPIONSHIP before Apex bought the league a new roof. Now I stand by the WALL and give advice nobody asked for.'},
   wall:{t:'Every cup you win goes up there, and the bracket fills in toward the crown. Look at it whenever you like. It is good for morale and bad for humility.',act:'wall'},
-  championship:{t:'Vance fields a Slagback that does not fall over. Bring Tide for it. Bring something that heals. And bring parts that are not in any catalogue, the kind you only find in the VAULT and the deep places.',xp:15},
-  vault:{t:'The Gene Vault, south-east of town. Pre-League. I kept a keycard from my last trip down. Here. There is a halo in the bottom of it that I never could reach.',need:'cups2',needNo:'Win two cups and I will believe you would survive it. Then ask me again.',give:{keycard:1},once:'got_keycard',xp:25,t2:'You have the card. The warden down there is called Specimen Nought. It is called that for a reason.'}}},
+  championship:{t:'Vance fields a line that does not fall over. Bring a deck that heals, bring a deck that hits, and bring cards that are not in any catalogue, the kind you only find in the VAULT and the deep places.',xp:15},
+  vault:{t:'The Sealed Vault, south-east of town. Pre-League. I kept a keycard from my last trip down. Here. There is a halo in the bottom of it that I never could reach.',need:'cups2',needNo:'Win two cups and I will believe you would survive it. Then ask me again.',give:{keycard:1},once:'got_keycard',xp:25,t2:'You have the card. The warden down there is called Captain Nought. It plays exactly like you do, and that is the problem.'}}},
  moss_reg:regTalk('Tally Brann',{coat:'#3a7f45',acc:'clip'},'moss','Mosswold Arena. Wipe your feet, the sand is new.'),
- moss_shop:shopTalk('Fenn Greengage',{coat:'#5dbb63',acc:'basket'},'moss','Berries are fresh. Snares are not, but they work.'),
+ moss_shop:shopTalk('Fenn Greengage',{coat:'#5dbb63',acc:'basket'},'moss','Berries are fresh. The grain is dry. Both are rarer than you think.'),
  moss_inn:innTalk('Ma Hollow',{coat:'#7a5a32',acc:'apron'},12,'The Hollow Log. It is an actual log. Mind your head.'),
- wenna:{name:'Old Wenna',look:{coat:'#4a6a4a',acc:'basket',hair:'#e8e0f0'},greet:'Shut the door, you are letting the damp out.',topics:{job:{t:'Forager, sixty years. I know every bush and every NEST between here and the fen.'},nest:{t:'Wild nests give an egg if you are quiet about it, and they fill again in a few days. But the ELDER keeps the best one.',xp:10},elder:{t:'West of here, near the coast, there is a grove with bone totems round a great nest. The Elder of the Grove wears antlers no catalogue sells. Beat it and they are yours to graft.',xp:15},
+ wenna:{name:'Old Wenna',look:{coat:'#4a6a4a',acc:'basket',hair:'#e8e0f0'},greet:'Shut the door, you are letting the damp out.',topics:{job:{t:'Forager, sixty years. I know every bush and every NEST between here and the fen.'},nest:{t:'Wild nests fill again in a few days, and whatever lives in them does not like visitors. The ELDER keeps the biggest one.',xp:10},elder:{t:'West of here, near the coast, there is a grove with bone totems round a great nest. The Elder of the Grove has never lost a game on its own ground. Beat it there and the whole wood will know your name.',xp:15},
   berries:{t:'Three mossberries for the winter jam and I will tell your enchanter where the good sap runs. Here: bloom energy, bottled.',take:{mossberry:3},giveEn:{bloom:6},once:'q_wenna',xp:15,t2:'The jam set nicely.',needNo:'Three mossberries. The bushes are not far.'}}},
- moss_kid:{name:'Button',look:{coat:'#e0457b',hair:'#f2c14e'},greet:'Is that a real one? Can I hold it? Does it bite?',topics:{job:{t:'I am nine. My job is looking for GLOOMCAPS.'},gloomcaps:{t:'They live in the woods and the fen. They are slow so you can catch them easy, but their spores make your chimeras sick for ages. My mum says they win by waiting. If you ever win a cup, come and SHOW me.',xp:10},show:{t:'A real cup! Here, I saved up. Take it. Buy your team a hat.',need:'cups1',needNo:'You have not won one yet. The arena is just there.',gold:30,once:'q_button',xp:20,t2:'I still think about it.'}}}, // dropped: needSp gloomcap and give mutagen; now needs a cup
+ moss_kid:{name:'Button',look:{coat:'#e0457b',hair:'#f2c14e'},greet:'Is that a real team? Are you famous? Can I hold the ball?',topics:{job:{t:'I am nine. My job is looking for GLOOMCAPS.'},gloomcaps:{t:'They live in the woods and the fen. They are slow, so you can watch them easy, but if you get their spores on you, you sneeze for a week. My mum says they win by waiting. If you ever win a cup, come and SHOW me.',xp:10},show:{t:'A real cup! Here, I saved up. Take it. Buy your team a hat.',need:'cups1',needNo:'You have not won one yet. The arena is just there.',gold:30,once:'q_button',xp:20,t2:'I still think about it.'}}}, // dropped: needSp gloomcap and give mutagen; now needs a cup
  salt_reg:regTalk('Osric Tide',{coat:'#235c9c',acc:'clip'},'salt','Brinefen Arena. The floor drains toward the middle. Do not ask why.'),
- salt_shop:shopTalk('Pella Marsh',{coat:'#4f9fe0',acc:'cap'},'salt','Kelp, salt, rope, nets. Cheapest snares on the map.'),
+ salt_shop:shopTalk('Pella Marsh',{coat:'#4f9fe0',acc:'cap'},'salt','Kelp, salt, rope, nets. Cheapest rope on the map.'),
  salt_inn:innTalk('Cob Drysock',{coat:'#7a5a32',acc:'apron'},12,'The Dry Sock. The name is an aspiration.'),
- diver:{name:'Ysolde Wrack',look:{coat:'#2f8f96',acc:'goggles',hair:'#1a1210'},greet:'You will excuse the drip.',topics:{job:{t:'Salvage diver. I work the HATCHERY when the tide lets me.'},hatchery:{t:'South-west of town on the shore, a drowned League-before-the-League building. GLIMMERFIN breed down there and nowhere else worth the name. The Hatch-Mother sits on a pearl crest I would very much like and cannot lift.',xp:15},glimmerfin:{t:'Tide-blooded but they throw Aether light. Fast, fragile, long reach. Their tree ends in a body graft, which is rare.'},
+ diver:{name:'Ysolde Wrack',look:{coat:'#2f8f96',acc:'goggles',hair:'#1a1210'},greet:'You will excuse the drip.',topics:{job:{t:'Salvage diver. I work the HATCHERY when the tide lets me.'},hatchery:{t:'South-west of town on the shore, a drowned League-before-the-League building. GLIMMERFIN breed down there and nowhere else worth the name. The Hatch-Mother sits on a pearl crest I would very much like and cannot lift.',xp:15},glimmerfin:{t:'Tide-blooded, but they throw Aether light. Fast and fragile. They used to race the ferries for fun.'},
   kelp:{t:'Bring me three brine kelp for my joints and I will give you something I fished out of the vault run-off. A purse, still sealed.',take:{brinekelp:3},gold:60,once:'q_kelp',xp:20,t2:'My knees thank you.',needNo:'Three brine kelp. The bushes on the fen have it, or Pella sells it.'}}}, // dropped: give mutagen
- netter:{name:'Hob Tarn',look:{coat:'#5a6e3a',acc:'net'},greet:'Throw from the hip, not the shoulder.',topics:{job:{t:'Net-maker. Fishing nets, mostly, since the League stopped buying snares.'}}}, // dropped: snare and kinds (snaring is cut)
+ netter:{name:'Hob Tarn',look:{coat:'#5a6e3a',acc:'net'},greet:'Throw from the hip, not the shoulder.',topics:{job:{t:'Net-maker. Fishing nets, mostly, and goal nets for the arena when the League remembers to pay.'}}}, // dropped: snare and kinds (snaring is cut)
  cind_reg:regTalk('Marta Klinker',{coat:'#a83a1e',acc:'clip'},'cind','Cindermaw Arena. The floor is warm. That is normal.'),
  cind_shop:shopTalk('Dunstan Coke',{coat:'#6a5a58',acc:'cap'},'cind','Peppers, salves, and one shelf I do not ask questions about.'),
  cind_inn:innTalk('Ember Annie',{coat:'#f0803c',acc:'apron'},14,'The Banked Fire. Nobody has ever complained of the cold.'),
- smith:{name:'Tull Brandt the Younger',look:{coat:'#3a2e2c',acc:'helmet',skin:'#9a6a48'},greet:'Father is at the arena. I am the one who does the work.',topics:{job:{t:'Smith. I shoe Slagbacks, which is as stupid as it sounds. They come up out of the WARREN.'},warren:{t:'Emberdeep, east along the lava. The Warren Queen nests at the bottom round a lump of living rock we call the Magma Heart. It is a body graft. Whatever wears it hits like a furnace door.',xp:15},
+ smith:{name:'Tull Brandt the Younger',look:{coat:'#3a2e2c',acc:'helmet',skin:'#9a6a48'},greet:'Father is at the arena. I am the one who does the work.',topics:{job:{t:'Smith. I shoe Slagbacks, which is as stupid as it sounds. They come up out of the WARREN.'},warren:{t:'Emberdeep, east along the lava. The Warren Queen nests at the bottom round a lump of living rock we call the Magma Heart. Her side hits like a furnace door, and they have never lost at home.',xp:15},
   peppers:{t:'Two ember peppers for the forge stew and I will pay you forge rates.',take:{emberpepper:2},gold:40,once:'q_pepper',xp:15,t2:'Good stew, that was.',needNo:'Two ember peppers. Off the scrub bushes, or from Coke.'}}}, // dropped: give snare:3
  scout:{name:'Ash Peregrine',look:{coat:'#5e5551',acc:'hat'},greet:'Watch the crust. If it is orange, do not step on it.',topics:{job:{t:'League scout. I map the WELLS and keep the roads off the lava.'},wells:{t:'Ember wells here, three of them, all within a morning of the road. Ember energy is attack, plain and simple. Your enchanter will know what to do with it.',xp:10},
   survey:{t:'Nobody has mapped the Warren in a decade. Come back when you have been down and I will pay League survey rates.',need:'seen_emberdeep',needNo:'You have not been down yet. East along the lava.',gold:120,once:'q_survey',xp:15,t2:'The map is filed. Thank you.'}}},
  rime_reg:regTalk('Sigrun Vane',{coat:'#6aa6c4',acc:'clip'},'rime','Frostspire Arena. Breath freezes; do not let it distract you.'),
- rime_shop:shopTalk('Old Kettil',{coat:'#8ab8d0',acc:'hat'},'rime','Mint, salves, purge tonic. Everything keeps up here.'),
+ rime_shop:shopTalk('Old Kettil',{coat:'#8ab8d0',acc:'hat'},'rime','Mint, salves, hardtack. Everything keeps up here.'),
  rime_inn:innTalk('Bera Lastlamp',{coat:'#b38cf0',acc:'scarf'},14,'The Last Lamp. After us it is just snow.'),
- monk:{name:'Sister Ilka',look:{coat:'#bfe6f2',acc:'robe'},greet:'You have walked a long way to be cold.',topics:{job:{t:'I keep the abbey wells. Rime ENERGY is the quick kind.'},energy:{t:'Bind Rime for speed. Speed decides who moves first, and who moves first usually decides the rest. But an enchanter can only bind so much into one creature: a couple of bindings, and one more every third level.',xp:10},
+ monk:{name:'Sister Ilka',look:{coat:'#bfe6f2',acc:'robe'},greet:'You have walked a long way to be cold.',topics:{job:{t:'I keep the abbey wells. Rime ENERGY is the quick kind.'},energy:{t:'Rime is the quick kind. Brother Quill will take any kind for his work, but the abbey likes to think ours binds cleanest.',xp:10},
   mint:{t:'Two frost mint for the abbey tea and the wells are yours to draw from. Take this, drawn already.',take:{frostmint:2},giveEn:{rime:6},once:'q_ilka',xp:15,t2:'The tea was good.',needNo:'Two frost mint. Kettil sells it, or the pinewood bushes.'}}},
- watcher:{name:'Jory Farsight',look:{coat:'#33354a',acc:'goggles'},greet:'Green lights last night. She is nesting again.',topics:{job:{t:'I watch the sky and the ROOST.'},roost:{t:'The Aurora Roost, far up the north coast, east of here. The Matriarch there trails a tail of light. Splice that onto anything and it will lash frost three tiles out. Bring word when she is beaten and I can finally close the LOG.',xp:15},
+ watcher:{name:'Jory Farsight',look:{coat:'#33354a',acc:'goggles'},greet:'Green lights last night. She is nesting again.',topics:{job:{t:'I watch the sky and the ROOST.'},roost:{t:'The Aurora Roost, far up the north coast, east of here. The Matriarch there trails a tail of light, and she plays like weather. Bring word when she is beaten and I can finally close the LOG.',xp:15},
   log:{t:'Then the sky is quiet. Twelve years of watching. Take this; I kept it for the day.',need:'alpha_aurora',needNo:'She is still up there. I would know.',gold:100,once:'q_jory',xp:20,t2:'The log is closed.'}}}, // dropped: give purge:2
- almond:{name:'Prue Almond',look:{coat:'#8a6a3c',acc:'clip',hair:'#e8e0f0'},greet:'Ah. A new face for the BESTIARY.',topics:{job:{t:'I keep the League Bestiary: every kind of chimera anyone has ever snared, drawn in my own hand. It is not finished. It will never be finished. Win a cup, tell me what KINDS you played, and I will add your name to the frontispiece.'},bestiary:{t:'Eight species, that we know of. The vaults have more, or had. Somebody will find them, and I hope it is somebody who can hold a pencil.',xp:10},kinds:{t:'A cup! Tell me who you played. Yes. Yes. Oh, that one is ugly. Take these rations, I never use them, and here is what the League pays a contributor.',need:'cups1',needNo:'No cup yet. Come back when you have one; I am not going anywhere, I have not gone anywhere since the roof.',give:{ration:5},gold:60,once:'q_almond',xp:20,t2:'Your name is in the frontispiece. Second column, small print.'}}}, // dropped: almond.kinds needCaught:5; now needs a cup
+ almond:{name:'Prue Almond',look:{coat:'#8a6a3c',acc:'clip',hair:'#e8e0f0'},greet:'Ah. A new face for the BESTIARY.',topics:{job:{t:'I keep the League Bestiary: every kind of player who ever took the field, drawn in my own hand. It is not finished. It will never be finished. Win a cup, tell me what KINDS you played, and I will add your name to the frontispiece.'},bestiary:{t:'Eighteen kinds, that we know of. The vaults have more, or had. Somebody will find them, and I hope it is somebody who can hold a pencil.',xp:10},kinds:{t:'A cup! Tell me who you played. Yes. Yes. Oh, that one is ugly. Take these rations, I never use them, and here is what the League pays a contributor.',need:'cups1',needNo:'No cup yet. Come back when you have one; I am not going anywhere, I have not gone anywhere since the roof.',give:{ration:5},gold:60,once:'q_almond',xp:20,t2:'Your name is in the frontispiece. Second column, small print.'}}}, // dropped: almond.kinds needCaught:5; now needs a cup
  tallow:{name:'Fenwick Tallow',look:{coat:'#f2c14e',acc:'cap',hair:'#7a4a20'},greet:'Mind the wax. Mind the wick. Mind your feet.',topics:{job:{t:'Lamplighter. Every aether lamp in town is mine to light, and they do not light themselves, whatever people say. They light on AETHERCAP oil.'},aethercap:{t:'Purple caps from the plains. Two of them and I can run the lamps a week, and I will pour you off the energy I do not need.',take:{aethercap:2},giveEn:{aether:5},once:'q_tallow',xp:15,t2:'The lamps are bright this week. Thank you.',needNo:'Two aethercaps. The plains are full of them, and Merrit sells them when he has them.'}}},
- rowe:{name:'Dusty Rowe',look:{coat:'#5e5551',acc:'scarf',hair:'#8a857e'},greet:'Buy me a drink and I will tell you how I lost.',topics:{job:{t:'Handler. Was. I took a team to the crown three years running and Vance beat me three years running. Now I stand by the fountain and tell people about APEX, and about Vesper\'s COTTAGE if they ask nicely.'},apex:{t:'She does not cheat. That is the worst of it. She has a Slagback with a Magma Heart and a Glimmerfin that heals faster than you can hurt it. Bring three chimeras that can each kill one of hers and pray about the order.',xp:15},cottage:{t:'Vesper\'s old place? Out west of town, off the fountain road, past the bushes. He shut it up when he moved to the fountain. Never sold it; never cleared it. There is a board in there Foss would give her clip for.',set:'clue_cottage',xp:10},lost:{t:'The first year I brought all Ember. The second year I brought a healer. The third year I brought everything I had and it was not enough. It is not a fair fight. It is not meant to be.'}}},
+ rowe:{name:'Dusty Rowe',look:{coat:'#5e5551',acc:'scarf',hair:'#8a857e'},greet:'Buy me a drink and I will tell you how I lost.',topics:{job:{t:'Coach. Was. I took a team to the crown three years running and Vance beat me three years running. Now I stand by the fountain and tell people about APEX, and about Vesper\'s COTTAGE if they ask nicely.'},apex:{t:'She does not cheat. That is the worst of it. Her goalkeeper has not missed a game in six years, and her line heals faster than you can hurt it. Bring three players who can each beat one of hers, and pray about the order.',xp:15},cottage:{t:'Vesper\'s old place? Out west of town, off the fountain road, past the bushes. He shut it up when he moved to the fountain. Never sold it; never cleared it. There is a board in there Foss would give her clip for.',set:'clue_cottage',xp:10},lost:{t:'The first year I brought all Ember. The second year I brought a healer. The third year I brought everything I had and it was not enough. It is not a fair fight. It is not meant to be.'}}},
  brack:{name:'Gaffer Brack',look:{coat:'#a08a55',acc:'hat',hair:'#e8e0f0'},greet:'Do not swat. They can smell fear and they think it is funny.',topics:{job:{t:'Beekeeper. The Mosswold bees are the size of thumbs and gentle as lambs unless you are a Gloomcap. I trade HONEY, of a sort.'},honey:{t:'Two sacks of grain for the hives and I will fill your basket with mossberries from my own bank. Better than the grocer sells, and I will not tell him you said so.',take:{grain:2},give:{mossberry:4},once:'q_brack',xp:10,t2:'Come back next season and we will do it again. Not before. The bees would notice.',needNo:'Two sacks of grain. Fenn has it, or Merrit in Graftonbury.'},bees:{t:'They pollinate the mossberry, they keep the Gloomcaps off the road, and once a year they swarm the arena. The registrar stops the match. It is in the rules now.'}}},
  fern:{name:'Sister Fern',look:{coat:'#2f7a3d',acc:'robe',hair:'#3a2c1a',skin:'#9a6a48'},greet:'The totem is not for luck. It is for remembering.',topics:{job:{t:'I keep the TOTEM and the old stories, and I know the way to the old SHRINE. Nobody pays me. The wood does.'},totem:{t:'Before the League, the Elder of the Grove came to Mossgate every spring and the town fed it. Then the League fenced the arena and the Elder stopped coming. The totem is a promise to keep feeding it anyway, in case it changes its mind.',xp:10},elder:{t:'If you go to the grove, go hungry. It respects that. And leave a mossberry on the totem on your way out, whether you win or not.',xp:5},shrine:{t:'There is an older shrine than mine: three totems in the deep wood, south of town on the coast side, and a hermit who keeps them. Follow the bees; they know the way.',set:'clue_shrine',xp:10}}},
- marrowbone:{name:'Captain Lull Marrowbone',look:{coat:'#235c9c',acc:'hat',hair:'#e8e0f0',skin:'#c99a70'},greet:'She still floats. That is more than I can say.',topics:{job:{t:'Ferry captain, retired, unwilling. Fifty years across the fen, most of it on the MARIGOLD. I would give my good leg to see a GLIMMERFIN again.'},glimmerfin:{t:'They used to follow the ferry, bending the light under the bow. Then the hatchery flooded and they stopped. Clear the hatchery and they might come back.',need:'alpha_hatchmother',needNo:'They are still gone. Beat whatever nests in the Drowned Hatchery, south-west of here.',give:{salve:2},once:'q_marrowbone',xp:20,t2:'It bent the light. I saw it bend the light. Thank you.'},ferry:{t:'The ferry does not run. The League built roads and the roads do not sink, which is a low bar but there it is.'},marigold:{t:'My ship. The Marigold. Went over in the big blow, east of here on the outer sands. She is still there, keel up. My LOG is in her, if the gulls have not eaten it.',set:'clue_marigold',xp:10},log:{t:'The log. Fifty years. Give it here. ... Yes. That is my hand. Thank you, handler. Take this; it is what the League paid me for the wreck and I never wanted it.',take:{shiplog:1},gold:100,once:'q_shiplog',xp:20,t2:'I read it every night now.',needNo:'The log is in the Marigold, on the outer sands east of town. Ask me about the MARIGOLD.'}}}, // dropped: needSp glimmerfin; now needs the Hatch-Mother beaten
+ marrowbone:{name:'Captain Lull Marrowbone',look:{coat:'#235c9c',acc:'hat',hair:'#e8e0f0',skin:'#c99a70'},greet:'She still floats. That is more than I can say.',topics:{job:{t:'Ferry captain, retired, unwilling. Fifty years across the fen, most of it on the MARIGOLD. I would give my good leg to see a GLIMMERFIN again.'},glimmerfin:{t:'They used to follow the ferry, bending the light under the bow. Then the hatchery flooded and they stopped. Clear the hatchery and they might come back.',need:'alpha_hatchmother',needNo:'They are still gone. Beat whatever nests in the Drowned Hatchery, south-west of here.',give:{salve:2},once:'q_marrowbone',xp:20,t2:'It bent the light. I saw it bend the light. Thank you.'},ferry:{t:'The ferry does not run. The League built roads and the roads do not sink, which is a low bar but there it is.'},marigold:{t:'My ship. The Marigold. Went over in the big blow, east of here on the outer sands. She is still there, keel up. My LOG is in her, if the gulls have not eaten it.',set:'clue_marigold',xp:10},log:{t:'The log. Fifty years. Give it here. ... Yes. That is my hand. Thank you, captain. Take this; it is what the League paid me for the wreck and I never wanted it.',take:{shiplog:1},gold:100,once:'q_shiplog',xp:20,t2:'I read it every night now.',needNo:'The log is in the Marigold, on the outer sands east of town. Ask me about the MARIGOLD.'}}}, // dropped: needSp glimmerfin; now needs the Hatch-Mother beaten
  anck:{name:'Widow Anck',look:{coat:'#33354a',acc:'scarf',hair:'#8a857e'},greet:'The light is out. I know. Everybody tells me.',topics:{job:{t:'I keep the lighthouse, or I did until the HATCHMOTHER took the lamp room for a nest. I keep the stairs now.'},hatchmother:{t:'A Glimmerfin the size of a boat, grown fat on the light. Beat her, and I can climb back up and light the lamp, and the fen will give up what it has been hoarding.',need:'alpha_hatchmother',needNo:'She is still up there. I can hear her from the stairs.',giveEn:{tide:6},once:'q_anck',xp:20,t2:'The lamp is lit. Look south tonight; you will see it.'},lighthouse:{t:'Forty years of lighting it. My husband built the stairs. Every one of them is a different height, and I could climb them blind.'}}},
  grit:{name:'Grit Halloway',look:{coat:'#4a423f',acc:'helmet',hair:'#1a1210',skin:'#9a6a48'},greet:'Cough. Sorry. Cinder lung. Cough.',topics:{job:{t:'Miner. Basalt, mostly, and the glass that sets in the lava cracks. The cough is the price. There is a REMEDY, if you have the makings.'},remedy:{t:'One ember pepper and two twists of salt, steeped. It does nothing for the lung but it does wonders for the mood. Here: I found this purse in the deep seam and I do not trust it.',take:{emberpepper:1,salt:2},gold:50,once:'q_grit',xp:15,t2:'Breathing easier. Well. Complaining easier.',needNo:'One ember pepper, two salt. The scrub bushes and the chandler, respectively.'},seam:{t:'The Deep Seam. North-east of town, past the last lava tongue, a shaft the League sealed and the miners unsealed. There is a wyrm at the bottom sitting on a heart of GLASS that beats. I want it. I do not want to get it.',set:'clue_deepseam',xp:10},glass:{t:'The Glass Heart. It IS beating. Take the fee, take the ember, and never tell me what was in there with it.',take:{glassheart:1},gold:150,giveEn:{ember:6},once:'q_glass',xp:25,t2:'I keep it in a box. The box hums.',needNo:'The heart is at the bottom of the Deep SEAM. Ask me about it.'}}}, // dropped: give mutagen
- pyre:{name:'Pyre Vasquez',look:{coat:'#a83a1e',acc:'goggles',hair:'#1a1210',skin:'#c99a70'},greet:'You have the look of somebody who has never been set on fire.',topics:{job:{t:'Pit fighter, before the League banned the pits. Now I train handlers who want their chimeras to hit harder. My PRICE is proof you can win, not just pay.'},price:{t:'Two cups. Not bought, not given. Won, by you. Then I will pour you the ember I keep for people who have earned it.',need:'cups2',needNo:'Two cups. Won. I can tell the difference, and so can they.',giveEn:{ember:7},once:'q_pyre',xp:20,t2:'Hit them first. Hit them hardest. The rest is paperwork.'},pits:{t:'The pits were honest. The arena is fair. Those are not the same thing, and Vance knows it.'}}}, // dropped: needCaught:4; now needs two cups
+ pyre:{name:'Pyre Vasquez',look:{coat:'#a83a1e',acc:'goggles',hair:'#1a1210',skin:'#c99a70'},greet:'You have the look of somebody who has never been set on fire.',topics:{job:{t:'Pit fighter, before the League banned the pits. Now I train teams who want to hit harder. My PRICE is proof you can win, not just pay.'},price:{t:'Two cups. Not bought, not given. Won, by you. Then I will pour you the ember I keep for people who have earned it.',need:'cups2',needNo:'Two cups. Won. I can tell the difference, and so can they.',giveEn:{ember:7},once:'q_pyre',xp:20,t2:'Hit them first. Hit them hardest. The rest is paperwork.'},pits:{t:'The pits were honest. The arena is fair. Those are not the same thing, and Vance knows it.'}}}, // dropped: needCaught:4; now needs two cups
  halvard:{name:'Brother Halvard',look:{coat:'#6aa6c4',acc:'robe',hair:'#e8e0f0'},greet:'You are early. Or the bell is late. It is usually the bell.',topics:{job:{t:'Bellringer. The abbey bell keeps the town on time and the Frostlets off the roofs. It is cast from the same alloy as the WELLS, and it needs feeding.'},wells:{t:'A pinch of frost mint and a handful of grain, burnt under the bell once a month, and it rings true. The abbey pays for the makings. Bring them and the fee is yours.',take:{frostmint:1,grain:1},gold:60,once:'q_halvard',xp:15,t2:'The bell rang true this morning. Did you hear it?',needNo:'One frost mint, one sack of grain. Kettil has both.'},bell:{t:'The Matriarch at the Roost hates the bell. Some say the bell was cast to keep her away. Some say it was cast to call her. The abbey does not say. Our bell is the second; the first hangs in the old CHAPEL still.'},chapel:{t:'The Frozen Chapel, west of town in the pines, where the abbey stood before the snow line moved. The first bell is still hung. Its CLAPPER would be worth a great deal to us.',set:'clue_chapel',xp:10},clapper:{t:'The first tongue! Feel the weight of it. The abbot will weep. Take this from the bell fund, and this, drawn from the wells this morning.',take:{bellclapper:1},gold:120,giveEn:{rime:8},once:'q_clapper',xp:25,t2:'It rang at dawn. Did you hear? The whole town heard.',needNo:'The clapper hangs in the old CHAPEL, west in the pines. Ask me.'}}},
  ingrith:{name:'Ingrith Skarr',look:{coat:'#bfe6f2',acc:'goggles',hair:'#f2c14e'},greet:'Do not touch the map. The ink is frozen and it will crack.',topics:{job:{t:'Cartographer. The League pays me by the mile and the Frostspire does not have many miles worth paying for. Except the ROOST.'},roost:{t:'Nobody has surveyed the Aurora Roost and lived to draw it. Go there, come back, and describe it to me. I will pay survey rates and feed you for the trouble.',need:'seen_auroraroost',needNo:'You have not been. I would know; people who have been walk differently.',gold:90,give:{ration:3},once:'q_ingrith',xp:20,t2:'It is on the map now. Your name is in the corner, very small.'},map:{t:'Five regions, four cups, three vaults, two lairs, one crown. And one road that does not go anywhere, north of the Roost. I drew it. I still do not know why.'}}},
  nell:{name:'Old Nell',look:{coat:'#8a857e',acc:'apron',hair:'#e8e0f0'},greet:'Mind the lines. I just did the lines.',topics:{job:{t:'Sweeper. Forty years of sand. I have swept up after every CHAMPION there ever was.'},champion:{t:'Vance leaves the sand clean. Vesper left it in furrows. The one before him, Ada Quill, left it wet, and I never did find out why. Whoever wins next, I will sweep it. That is the job.',xp:10},sand:{t:'Coliseum sand is Brinefen sand, cooked in the Cindermaw, sifted in Rimewatch, and blessed at Mossgate. Four cups in every grain. The League likes a symbol.'}}},
- bookie:{name:'Marco Fine',look:{coat:'#5a3d8a',acc:'cap',hair:'#1a1210',skin:'#9a6a48'},greet:'Odds on the crown: Apex, evens. Everybody else, the LONG shot.',topics:{job:{t:'I make the book on the crown. Legally. Mostly. The LONG shot pays well if anyone ever lands it.'},long:{t:'Three cups and I will believe you are a runner. Take the price of a bet on yourself; put it on yourself, and I will hold the slip.',need:'cups3',needNo:'You have not got three cups. Nobody bets on a handler with fewer than three cups. I have tried.',gold:150,once:'q_bookie',xp:15,t2:'The slip is in the drawer. Win, and I will tear it up with pleasure.'},apex:{t:'Evens, because she has won six years straight and still I would not lay shorter. Something about the way the Slagback looks at the crowd.'}}},
- hermit:{name:'Hermit Oak',look:{coat:'#4a6a4a',acc:'robe',hair:'#e8e0f0',skin:'#9a6a48'},greet:'You found it. Good. Sit. Do not sit there, that is a Gloomcap.',topics:{job:{t:'I keep the shrine the town forgot. The Elder still comes here, some springs. It likes AETHERCAPS, though it will not say so.'},aethercap:{t:'Two aethercaps on the middle totem and the grove will be kinder to you. Take these: the bees leave them for me, I have more than I can eat.',take:{aethercap:2},give:{honeydrop:3},giveEn:{bloom:4},once:'q_hermit',xp:15,t2:'The grove remembers. Go and see.',needNo:'Two aethercaps. Purple, from the plains. You will know them.'},elder:{t:'Fight it if you must. But leave a berry. It counts.'}}},
- steward:{name:'Steward Aurelio Crane',look:{coat:'#f2c14e',acc:'clip',hair:'#1a1210',tall:1},greet:'The Crown Coliseum. Entries are taken in championship week only.',topics:{job:{t:'I run the CHAMPIONSHIP. I also run the WALL, the catering, and the insurance.'},championship:{t:'Three rounds. Two rival companies, then the reigning champion, Aurelia Vance of Apex Biologic. It opens in the last seven days of the year. Four regional cups to ENTER. If you hold four and the week has not come, you may WAIT here as my guest.',xp:10},
+ bookie:{name:'Marco Fine',look:{coat:'#5a3d8a',acc:'cap',hair:'#1a1210',skin:'#9a6a48'},greet:'Odds on the crown: Apex, evens. Everybody else, the LONG shot.',topics:{job:{t:'I make the book on the crown. Legally. Mostly. The LONG shot pays well if anyone ever lands it.'},long:{t:'Three cups and I will believe you are a runner. Take the price of a bet on yourself; put it on yourself, and I will hold the slip.',need:'cups3',needNo:'You have not got three cups. Nobody bets on a team with fewer than three cups. I have tried.',gold:150,once:'q_bookie',xp:15,t2:'The slip is in the drawer. Win, and I will tear it up with pleasure.'},apex:{t:'Evens, because she has won six years straight and still I would not lay shorter. Something about the way her goalkeeper looks at the crowd.'}}},
+ hermit:{name:'Hermit Oak',look:{coat:'#4a6a4a',acc:'robe',hair:'#e8e0f0',skin:'#9a6a48'},greet:'You found it. Good. Sit. Do not sit there, that is a Gloomcap.',topics:{job:{t:'I keep the shrine the town forgot. The Elder still comes here, some springs. It likes AETHERCAPS, though it will not say so.'},aethercap:{t:'Two aethercaps on the middle totem and the grove will be kinder to you. Take these: the bees leave them for me, I have more than I can eat.',take:{aethercap:2},give:{honeydrop:3},giveEn:{bloom:4},once:'q_hermit',xp:15,t2:'The grove remembers. Go and see.',needNo:'Two aethercaps. Purple, from the plains. You will know them.'},elder:{t:'Play it if you must. But leave a berry. It counts.'}}},
+ steward:{name:'Steward Aurelio Crane',look:{coat:'#f2c14e',acc:'clip',hair:'#1a1210',tall:1},greet:'The Crown Coliseum. Entries are taken in championship week only.',topics:{job:{t:'I run the CHAMPIONSHIP. I also run the WALL, the catering, and the insurance.'},championship:{t:'Three rounds. Two rival clubs, then the reigning champions, Aurelia Vance and Apex Athletic. It opens in the last seven days of the year. Four regional cups to ENTER. If you hold four and the week has not come, you may WAIT here as my guest.',xp:10},
   enter:{t:'Then let us see what you have built.',act:'cup:crown'},wait:{t:'The guest rooms are this way.',act:'waitweek'},wall:{t:'Behold. Dust it if you touch it.',act:'wall'}}},
  herald:{name:'Herald Pim',look:{coat:'#e0457b',acc:'hat'},greet:'Hear ye. Sorry. Habit.',topics:{job:{t:'I announce. I also explain the CALENDAR to people who arrive in the wrong week.'},calendar:{t:'The year is one hundred and twelve days, four seasons of twenty-eight. The championship takes the last seven. The date is in the corner of your ledger. If you miss it, there is always next year. There is always a next year.',xp:10},
   letter:{t:'Would you carry a LETTER to Imelda Foss at the League office? The Coliseum post has not run since the roof.',give:{letter:1},once:'q_letter1',xp:5,t2:'Has Foss answered? Bring me her REPLY.'},
@@ -6297,12 +6295,12 @@ DB.sideplots=[ // dropped: q_hob and rq_patch, whose topics are gone
  {id:'rq_lumi3',title:'The lamp moth',who:'Prue Almond and Fenwick Tallow, Graftonbury',hint:'After the Bestiary, ask Prue about the UNLISTED one; bait Tallow\'s lamp with three aethercaps (MOTH); ask about the TRAP after dark.',pay:'A rare Lumivore egg.'},
  {id:'rq_serp3',title:'The serpent in the log',who:'Captain Marrowbone and Ysolde Wrack, Saltmere',hint:'After the Marigold\'s log, ask the captain about the LAST entry, then Ysolde about the SERPENT; beat the Hatch-Mother; bring two salt fish for the CLUTCH.',pay:'A rare Tidewyrmling egg.'},
  {id:'rq_cind2',title:'What the glass held',who:'Pyre Vasquez and Grit Halloway, Cinderhold',hint:'After Pyre\'s price and the Glass Heart, ask Pyre about the PITS, then Grit what is INSIDE.',pay:'A rare Cindermane egg.'},
- {id:'rq_aur2',title:"The bell's answer",who:'Brother Halvard, Rimewatch',hint:'After the first bell, ask Halvard what it was cast to CALL; strike the Frozen Chapel bell after dark and see what comes down.',pay:'A rare Aurorel, if you can hold it.'},
- {id:'rq_vault',title:'The dormant capsule',who:'Dr. Odalys Pell',hint:'Beat Specimen Nought in the Gene Vault; the prize chest holds a capsule. Bring it to Pell with 6 Aether energy (CAPSULE).',pay:'A rare Vaultling egg.'},
+ {id:'rq_aur2',title:"The bell's answer",who:'Brother Halvard, Rimewatch',hint:'After the first bell, ask Halvard what it was cast to CALL; strike the Frozen Chapel bell after dark and see what comes down.',pay:'Whatever comes down out of the lights.'},
+ {id:'rq_vault',title:'The dormant capsule',who:'Dr. Odalys Pell',hint:'Beat Captain Nought in the Sealed Vault; the prize chest holds a capsule. Bring it to Pell with 6 Aether energy (CAPSULE).',pay:'A rare Vaultling egg.'},
  {id:'rq_drake',title:'Feeding the grove',who:'Hermit Oak, the Hollow Shrine',hint:'After the hermit\'s aethercaps, beat the Elder of the Grove; he teaches your cook the OFFERING; cook one and bring it for the DRAKE.',pay:'A rare Bloomdrake egg.'},
- {id:'rare_umbralden',title:'The road to nowhere',who:'Ingrith Skarr, Rimewatch',hint:'After surveying the Roost, ask Ingrith about the ROAD; walk it to its end after dark and take what is in the nest.',pay:'A rare Duskhound egg.'},
+ {id:'rare_umbralden',title:'The road to nowhere',who:'Ingrith Skarr, Rimewatch',hint:'After surveying the Roost, ask Ingrith about the ROAD; walk it to its end after dark and see what is in the nest.',pay:'Whatever waits at the end of the road.'},
  {id:'q_letter3',title:'The Coliseum post',who:'Herald Pim, Crown Coliseum',hint:'Carry his LETTER to Imelda Foss, bring back her REPLY.',pay:'80 gold.'},
- {id:'got_keycard',title:'The Gene Vault',who:'Gant Vesper, Graftonbury',hint:'Win two cups, then ask him about the VAULT.',pay:'The keycard, and whatever waits at the bottom.'}];
+ {id:'got_keycard',title:'The Sealed Vault',who:'Gant Vesper, Graftonbury',hint:'Win two cups, then ask him about the VAULT.',pay:'The keycard, and whatever waits at the bottom.'}];
 /* road events (phase 4): rolled on the overworld from the encounter hook (w9-road.js), weighted by w. Each opens an
    event card. A choice may cost (cost: gold, items, hp) and pays effects:
      gold (n or [lo, hi]), fans, items, energy { here | elem: n or [lo, hi] }, time (minutes), healPct, steal (an item),
@@ -6314,25 +6312,25 @@ DB.sideplots=[ // dropped: q_hob and rq_patch, whose topics are gone
    (they paid research data), drover (salves have no use yet), race (one creature's speed), and the four region
    traders nephew, fisher, miner and pilgrim (the region shops sell the same food). */
 DB.events=[
- {id:'pedlar',w:4,who:{name:'Tamsin Crook, pedlar',kind:'goblin'},text:'A pedlar with a cart of jars flags you down. "Pies, handler? Grain? Everything fresh this week, or this month, anyway."',choices:[{label:'A Trail Hash to take away (14 gold)',cost:{gold:14},snack:'hash',result:'She wraps it in newspaper. "Eat it before the game, not after."'},{label:'Grain and salt for the pot (10 gold)',cost:{gold:10},items:{grain:2,salt:2},result:'"Do not eat it raw. People do."'}]},
+ {id:'pedlar',w:4,who:{name:'Tamsin Crook, pedlar',kind:'goblin'},text:'A pedlar with a cart of jars flags you down. "Pies, captain? Grain? Everything fresh this week, or this month, anyway."',choices:[{label:'A Trail Hash to take away (14 gold)',cost:{gold:14},snack:'hash',result:'She wraps it in newspaper. "Eat it before the game, not after."'},{label:'Grain and salt for the pot (10 gold)',cost:{gold:10},items:{grain:2,salt:2},result:'"Do not eat it raw. People do."'}]},
  {id:'purse',w:3,who:{scene:'purse'},text:'Somebody\'s purse lies in the road, dropped from a wagon. There is nobody in sight.',choices:[{label:'Keep it',gold:[15,45],result:'Finders keepers.'},{label:'Hand it in at the next League post',fans:15,result:'A clerk is pleased. Word gets round that your team plays fair.'}]},
  {id:'rival',w:3,who:{rival:1},text:'A rival club\'s wagon is drawn up at the crossroads. "Friendly match? Loser buys the next round, and the winner takes the purse."',choices:[{label:'Accept the match',match:{type:'normal',win:{gold:[35,50],fans:20},winText:'They pay up with bad grace.'}}]},
  {id:'shed',w:3,who:{scene:'shed'},text:'A well by the road has cracked, and shards of raw energy glitter in the grass round it.',auto:{energy:{here:[2,4]}}},
  {id:'cook',w:3,who:{name:'Barnaby Stew, road cook',kind:'ogre'},text:'A travelling cook stirs a pot on a tripod by the road. It smells of pepper and good intentions.',choices:[{label:'A hot meal for the team now (15 gold)',cost:{gold:15},healPct:.3,result:'Everyone eats. Everyone feels better.'},{label:'A pot of chili to go (20 gold)',cost:{gold:20},snack:'chili',result:'"Eat it before kickoff. It bites back."'}]},
- {id:'lostchild',w:2,time:'day',who:{name:'Wren, aged eight',kind:'kobold'},text:'A child is calling into the grass for her pet, a Mossprout called Biscuit. "He always comes back. He always comes back."',choices:[{label:'Help look (an hour)',time:60,gold:25,fans:10,result:'You find Biscuit asleep under a hedge. Her mother presses coins on you and will not take them back.'}]},
+ {id:'lostchild',w:2,time:'day',who:{name:'Wren, aged eight',kind:'kobold'},text:'A child is calling into the grass for her pet, a moss toad called Biscuit. "He always comes back. He always comes back."',choices:[{label:'Help look (an hour)',time:60,gold:25,fans:10,result:'You find Biscuit asleep under a hedge. Her mother presses coins on you and will not take them back.'}]},
  {id:'maud',w:2,who:{name:'Old Maud Kerry, retired coach',kind:'dwarf'},text:'An old coach leans on a stick by the milestone. "Your forwards stand wrong. I could fix that, for the price of a pie."',choices:[{label:'A practice session (40 gold, 90 minutes)',cost:{gold:40},time:90,practice:1,result:'She drills one play until it is second nature.'},{label:'Watch film with her (60 gold, 2 hours)',cost:{gold:60},time:120,upgrade:1,result:'She stops the tape every four seconds. It helps.'}]},
  {id:'oriel',w:2,who:{name:'Madame Oriel',kind:'witch'},text:'A fortune teller has set a table in the ditch. "Cross my palm, and I will tell you how your next game goes."',choices:[{label:'Cross her palm (15 gold)',cost:{gold:15},charm:'fortune',result:'"You will win it. Probably." Your team seems to believe her.'}]},
  {id:'moth',w:2,who:{name:'Sister Moth, wandering enchanter',kind:'lich'},text:'A wandering enchanter is binding a charm into a fencepost. "The land here is generous. I could draw some off for you."',choices:[{label:'Pay her to draw it (20 gold)',cost:{gold:20},energy:{here:3},result:'She draws the energy up out of the ground and into your jars.'}]},
  {id:'poacher',w:2,who:{name:'Skell, a scalper',kind:'werewolf'},text:'A scalper with a cage on his back, full of stolen team mascots. One of them is crying. "Not your business. Unless you want to buy."',choices:[{label:'Free them: play his crew for it',match:{type:'normal',name:'Skell',win:{gold:40,fans:30},winText:'Skell runs. You open the cage, and the mascots\' clubs send their thanks.'}},{label:'Buy them free (80 gold)',cost:{gold:80},fans:40,result:'The mascots go home. Every club in the league hears who paid.'}]},
  {id:'wisp',w:2,time:'night',who:{scene:'wisp'},text:'Lights move in the grass beside the road, blue and slow, and they seem to want you to follow.',choices:[{label:'Follow the lights',chance:.55,energy:{aether:4},result:'The lights lead you to a hollow full of Aether, and go out.',fail:'The lights go out. Something else was following them.',failMatch:{type:'normal'}}]},
  {id:'thief',w:2,who:{name:'A goblin pickpocket',kind:'goblin'},text:'A goblin darts out from behind your wagon with something in its teeth and is gone before you can grab it.',auto:{steal:1}}];
-DB.lore=['a song about Ada Quill, the first champion, and the Voltmite she held at arm\'s length','a song about Gant Vesper\'s three cups and his fourth that got away','a song about the Hatch-Mother and the lighthouse that went dark','a song about the road north of the Roost that goes nowhere','a song about Apex Biologic, sung very quietly'];
-/* rare chimera chains */
+DB.lore=['a song about Ada Quill, the first champion, and the first ball she held at arm\'s length','a song about Gant Vesper\'s three cups and his fourth that got away','a song about the Hatch-Mother and the lighthouse that went dark','a song about the road north of the Roost that goes nowhere','a song about Apex Athletic, sung very quietly'];
+/* the rare chains: TC's rare-creature quests. Their eggs are dropped; w6-party.js turns the payouts into players */
 DB.chars.almond.topics.unlisted={t:'There is one thing in the Bestiary I have never drawn. A moth, big as your hand, pale, that drinks the lamps dry at night. Fenwick swears it is real. Ask him about the MOTH.',need:'q_almond',needNo:'Finish the Bestiary entry first. Then we will talk about the ones nobody has.',set:'rq_lumi1',xp:10};
 DB.chars.almond.topics.moth={t:'The moth is Fenwick\'s story. Fenwick Tallow, the lamplighter by the fountain. Ask him, not me; I only draw what I am shown.'};
 DB.chars.almond.topics.kinds.t2='Your name is in the frontispiece. Second column, small print. Ask me about the UNLISTED one some time.';
 DB.chars.tallow.topics.moth={t:'The lamp moth! Nobody believes me. It comes after dark and drinks the oil and leaves the glass cold. Three aethercaps and I will brew a bait oil it cannot resist, and then we set a TRAP.',need:'rq_lumi1',take:{aethercap:3},once:'rq_lumi2',xp:10,t2:'The bait oil is in the fountain lamp. Come back after dark and ask about the TRAP.',needNo:'Three aethercaps for the bait, and not before Prue has had her say.'};
-DB.chars.tallow.topics.trap={t:'Look, there, on the fountain lamp. It came, it laid, and it went. That is an egg, handler, warm as a cup of tea. Take it before Prue sees it and wants to draw it.',need:'rq_lumi2',needNight:1,once:'rq_lumi3',xp:25,t2:'The lamps burn true now. I almost miss it.',needNo:'It only comes after dark, and only to a baited lamp.'}; // dropped: giveEgg lumivore; the once flag marks it for a phase 3 quest companion
+DB.chars.tallow.topics.trap={t:'Look, there, on the fountain lamp. It came, it laid, and it went. That is an egg, captain, warm as a cup of tea. Take it before Prue sees it and wants to draw it.',need:'rq_lumi2',needNight:1,once:'rq_lumi3',xp:25,t2:'The lamps burn true now. I almost miss it.',needNo:'It only comes after dark, and only to a baited lamp.'}; // dropped: giveEgg lumivore; the once flag marks it for a phase 3 quest companion
 DB.chars.marrowbone.topics.last={t:'The last entry. I never wrote it; I could not. Something came up under the Marigold as she went over and carried me to the sand on its back. A serpent, gold on green, young. Ysolde reckons it is the Hatch-Mother\'s kin. Ask her about the SERPENT.',need:'q_shiplog',needNo:'My log is lost with my ship. What would I read you?',set:'rq_serp1',xp:10};
 DB.chars.marrowbone.topics.serpent={t:'I only saw its back. Ysolde Wrack knows the deep water. Ask her.'};
 DB.chars.marrowbone.topics.log.t2='I read it every night now. All but the LAST entry.';
@@ -6344,10 +6342,10 @@ DB.chars.pyre.topics.price.t2='Hit them first. Hit them hardest. The rest is pap
 DB.chars.grit.topics.inside={t:'Inside? It cracked last night. I did not want to tell anybody. There is an egg in the box where the heart was, and it is too hot to hold, and it is purring. Take it. Please.',need:['q_glass','rq_cind1'],once:'rq_cind2',xp:25,t2:'The box is empty and it still hums.',needNo:'The box? It is just a box. Why do you ask?'}; // dropped: giveEgg cindermane; the once flag marks it for a phase 3 quest companion
 DB.chars.halvard.topics.call={t:'The first bell was not cast to call the Matriarch. It was cast to call her young. Take the abbey tuning rod and strike the old bell in the Frozen Chapel after dark. Something will come down out of the lights. Be ready; it will not stay.',need:'q_clapper',needNo:'Bring the first bell\'s clapper home before you ask me about bells.',give:{tuningrod:1},once:'rq_aur1',xp:15,t2:'Strike the chapel bell after dark, with the rod.'};
 DB.chars.halvard.topics.clapper.t2='It rang at dawn. Did you hear? The whole town heard. Ask me what it was cast to CALL.';
-DB.chars.pell.topics.capsule={t:'A dormant capsule. Pre-League. Oh, you beautiful thing. Six Aether, straight into the cell, and let us see. ... There. An egg. It grew the shell to hatch from. Put it in the incubator and do not tell the League.',take:{capsule:1},takeEn:{aether:6},once:'rq_vault',xp:25,t2:'I have been reading the capsule for a week. It has a serial number. It has a MANUFACTURER.',needNo:'A capsule? If you ever find one, bring it, and six Aether to wake it. The Gene Vault is where they would be.'}; // dropped: giveEgg vaultling; the once flag marks it for a phase 3 quest companion
-DB.chars.pell.topics.manufacturer={t:'Apex. The serial prefix is Apex Biologic. Before the League. Make of that what you like.',need:'rq_vault',needNo:'What manufacturer?'};
+DB.chars.pell.topics.capsule={t:'A dormant capsule. Pre-League. Oh, you beautiful thing. Six Aether, straight into the cell, and let us see. ... There. It grew a shell, and something stepped out of it. Do not tell the League.',take:{capsule:1},takeEn:{aether:6},once:'rq_vault',xp:25,t2:'I have been reading the capsule for a week. It has a serial number. It has a MANUFACTURER.',needNo:'A capsule? If you ever find one, bring it, and six Aether to wake it. The Sealed Vault is where they would be.'}; // dropped: giveEgg vaultling; the once flag marks it for a phase 3 quest companion
+DB.chars.pell.topics.manufacturer={t:'Apex. The serial prefix is Apex, from before the League, and before the club. Make of that what you like.',need:'rq_vault',needNo:'What manufacturer?'};
 // dropped: pell.stitch (takeParts and a patchwork egg) and its parts hook
-DB.chars.hermit.topics.elder={t:'Fight it if you must. But leave a berry. It counts. And if you beat it fairly, come back and I will teach your cook the OFFERING.'};
+DB.chars.hermit.topics.elder={t:'Play it if you must. But leave a berry. It counts. And if you beat it fairly, come back and I will teach your cook the OFFERING.'};
 DB.chars.hermit.topics.offering={t:'Two mossberries, a honey drop, an aethercap, baked in a leaf. Your cook knows how now; I have told the wind and the wind will tell her. Bring one here and I will call the grove\'s own DRAKE for you.',need:['q_hermit','alpha_grove'],needNo:'The grove has to know you first. Bring me aethercaps, and beat the Elder fairly.',set:'recipe_offering',xp:10};
 DB.chars.hermit.topics.drake={t:'Give it here. ... Listen. There. It came down out of the canopy, took the offering, and left this in the leaves. The Elder\'s own line. Go carefully with it.',take:{offering:1},once:'rq_drake',xp:25,t2:'The grove is quiet and full.',needNo:'An offering first. Your cook will know how, once I have taught it.'}; // dropped: giveEgg bloomdrake; the once flag marks it for a phase 3 quest companion
 DB.chars.ingrith.topics.map.t='Five regions, four cups, three vaults, two lairs, one crown. And one road that does not go anywhere, north of the Roost. I drew it. I still do not know why. If you have been to the Roost, ask me about the ROAD.';
@@ -6368,10 +6366,7 @@ DB.chars.smith.topics.peppers.card='gr_shoulder';
 DB.chars.monk.topics.mint.cardChoice={pick:3,rarity:'u'};
 /* phase 4: Brother Quill enchants (act 'enchant'), Marrow Tansy cooks (act 'kitchen'), every innkeeper has a MEAL menu
    (act 'meals'), and three vendors sell cards (act 'cards'). w9b-town.js handles the acts. */
-DB.chars.quill.topics.job.t='Enchanter. The land has ENERGY in it, a different kind in every biome. I bind it into your plays: say ENCHANT and I will show you. If you will have me, I will JOIN.';
 DB.chars.quill.topics.enchant={t:'Bring me energy, any kind, and I will bind it into a card, or drill a play into your players, or put the charge back in your gear.',act:'enchant'};
-DB.chars.tansy.topics.job.t='Cook. A team is what it eats. Bring me FORAGE from the bushes out there and I will COOK you a meal for match day. Say JOIN and I will fetch my pots.';
-DB.chars.tansy.topics.forage.t='Every region has its own bush: mossberry, ember pepper, brine kelp, frost mint, and aethercap here on the plains. Bushes grow back in a few days. Any inn hearth will do for cooking, and so will my canteen.';
 DB.chars.tansy.topics.cook={t:'Sit. What have you brought me?',act:'kitchen'};
 for(const id in DB.innMenu){const ch=DB.chars[id];ch.topics.job.t+=' The kitchen does a MEAL for match day.';ch.topics.meal={t:'Here is what the kitchen can do, and the hearth is yours if you would rather cook.',act:'meals'}}
 DB.chars.hq_shop.topics.job.t+=' I keep a binder of league CARDS, too.';
@@ -6597,7 +6592,7 @@ function wTileVariant(map, x, y, c) {
   return '1';
 }
 function wNpcAt(x, y) { const m = wCurMap(); return (m.npcs || []).find(n => n.x === x && n.y === y); }
-function wChar(id) { const c = DB.chars[id]; if (!c) return { name: 'Somebody', greet: '...', topics: {}, kind: 'goblin' }; const o = Object.assign({}, c); if (typeof o.name === 'string' && o.name[0] === '@') o.name = 'A rival handler'; return o; }
+function wChar(id) { const c = DB.chars[id]; if (!c) return { name: 'Somebody', greet: '...', topics: {}, kind: 'goblin' }; const o = Object.assign({}, c); if (typeof o.name === 'string' && o.name[0] === '@') o.name = 'A rival captain'; return o; }
 /* NPC positions live in WG.npc so wandering survives a save */
 function wApplyNpcs(id) { const m = MAPS[id], s = WG.npc[id]; if (!m || !s) return; m.npcs.forEach((n, i) => { if (s[i]) { n.x = s[i][0]; n.y = s[i][1]; } }); }
 function wStoreNpcs(id) { const m = MAPS[id]; if (m && m.kind === 'town' && m.npcs.some(n => !n.fixed)) WG.npc[id] = m.npcs.map(n => [n.x, n.y]); }
@@ -6725,7 +6720,6 @@ function wInteract() {
   wLog(wLookText(x, y), 'd');
 }
 function wLook() { const [x, y] = wFacing(); wLog(wLookText(x, y), 'd'); }
-const WSOON = 'Matches out here come in a later update.';
 /* verbs on tiles: the table is DB.tiles[..].use */
 function wUse(x, y) {
   const m = wCurMap(), c = wTileAt(m, x, y), use = (DB.tiles[c] || {}).use, meta = m.meta[x + ',' + y] || {};
@@ -6746,7 +6740,7 @@ function wUse(x, y) {
       wAddItem(it, n); WG.harv[wHkey(x, y)] = WG.dayAbs; wAdvance(20); wInvalidate(WG.map);
       wLog('You pick ' + n + ' ' + DB.items[it].name + '.', 'm'); break;
     }
-    case 'nest': // dropped: eggs. Nests are scenery until a later phase gives them a use.
+    case 'nest': // dropped: eggs. Nests are scenery.
       if (meta.alpha && !wFlag('alpha_' + meta.alpha)) return wLog('The alpha will not let you near its nest.', 'b');
       wLog(wDepleted(x, y, 4) ? DB.tiles.N.look0 : DB.tiles.N.look + ' Whatever lives here is out.', 'd'); break;
     case 'chest': {
@@ -6760,7 +6754,7 @@ function wUse(x, y) {
       const rg = meta.ring; if (!rg) return wLog(wLookText(x, y), 'd');
       if (!wHas(rg.item)) return wLog('A great bronze bell, silent. You have nothing that would make it ring true.', 'd');
       if (rg.night && wDarkness() < .3) return wLog('You strike the bell. In daylight the note just dies in the snow. Come back after dark.', 'd');
-      wLog('You strike the bell with the rod. The note goes up, and up, and the lights shiver. Nothing comes down yet. ' + WSOON, 'g');
+      wLog('You strike the bell with the rod. The note goes up, and up, and the lights shiver. Nothing comes down tonight.', 'g');
       wEncounterHook(wRegionHere(), c, { kind: 'bell', ring: rg }); break;
     }
     case 'lair': {
@@ -6839,8 +6833,8 @@ function wRunAct(act, id) {
   if (act === 'inn') { WQ.push({ k: 'inn', id, price: ch.inn || 12, who: ch.name }); return; }
   if (act === 'wall') { wWallText(); return; }
   if (act === 'waitweek') { wLog(wWaitForWeek(), 'g'); return; }
-  if (act.startsWith('cup:')) { const cup = DB.cups[act.slice(4)]; wLog((cup ? cup.name : 'The cup') + ': the brackets are not drawn yet. Cups come in a later update.', 'b'); wEncounterHook(wRegionHere(), null, { kind: 'cup', cup: act.slice(4) }); return; }
-  wLog('That comes in a later update.', 'd');
+  // cup:<id> is handled by w11-cups.js, which wraps this function
+  wLog('Nothing happens.', 'd');
 }
 
 /* ---------- shops and inns ---------- */
@@ -8189,12 +8183,14 @@ function wPreGame(enc) {
       </div>
     </div>
     <div class="row"><button class="btn" id="wPlay">Play</button>${wild ? `<button class="ghost" id="wRun">Run (${W_ENC.runMin} minutes, ${W_ENC.runHp} HP${W.night ? ', may fail at night' : ''})</button>` : '<button class="ghost" id="wNotYet">Not yet</button>'}</div>`,
-    () => { if (!chose) { chose = true; if (wild) wRunAway(enc); else wLog('You back away. It will be here when you are ready.', 'd'); wDrain(); } });
+    () => { if (!chose) { chose = true; if (wild) wRunAway(enc); else wBackAway(enc); wDrain(); } });
   $('wPlay').focus();
   $('wPlay').onclick = () => { chose = true; close(); wKickoff(enc); };
   if ($('wRun')) $('wRun').onclick = () => close();
   if ($('wNotYet')) $('wNotYet').onclick = () => close();
 }
+/* Not yet (or closing the card) on a match that is not wild: nothing is lost. w9-road.js wraps it to reopen a road event. */
+function wBackAway(enc) { wLog('You back away. It will be here when you are ready.', 'd'); }
 /* running costs time and a little HP; at night it may fail */
 function wRunAway(enc) {
   if (enc.world.night && Math.random() < W_ENC.runFailNight) { wLog('You run, but they cut you off in the dark. You have to play.', 'b'); wKickoff(enc); return false; }
@@ -8220,7 +8216,7 @@ wEncounterHook = function (region, tileCh, info) {
   if (info) {
     if (info.kind === 'alpha' || info.kind === 'lair') return wStartAlpha(info);
     if (info.kind === 'wild') return wWildMatch(region);
-    return; // the chapel bell and the cups come in later phases (w3 has already said so)
+    return; // the chapel bell only logs (w3); cups start from the registrar's act (w11-cups.js)
   }
   if (wEncounterRoll(wCurMap(), tileCh, Math.random()) === 'fight') wWildMatch(region);
 };
@@ -8398,10 +8394,20 @@ renderHelp = function () {
   wSdRenderHelp();
   const two = document.querySelector('#pg-help .two');
   if (!two || $('wHelp')) return;
+  // the realm has no act map: Sudden Death's "The descent" section does not apply
+  const lede = document.querySelector('#pg-help .lede');
+  if (lede) lede.textContent = 'Walk the realm with a team of monster athletes. Every fight on the road is a match under one sport\'s rules, played with the deck your team builds on the way. Win the four regional cups, then the Crown.';
+  [...two.querySelectorAll('section')].forEach(s => { const h = s.querySelector('h3'); if (h && h.textContent === 'The descent') s.remove(); });
+  // each later part adds its own section to #wHelp, in load order: team (w7b), towns and the road (w9b), dungeons
+  // (w10), cups (w11), renown (w12). Keep each section's id: the tests look for them.
   two.insertAdjacentHTML('beforebegin', `<section id="wHelp" class="whelp"><h3>The realm</h3>
-    <p class="hint">You walk the realm with your team. Every fight on the road is a match, played exactly like a Sudden Death fight: wild teams jump you in long grass, woods and fens (more often at night, and the night road is not safe either), and alphas wait in their lairs. Before each match you see who you are facing and the sport. You can try to run from a wild team: it costs time and a little HP, and at night they may cut you off.</p>
-    <p class="hint">Your team's HP carries from match to match. A night at an inn heals it fully, and that inn becomes the place you wake up. Win a match and you get the usual rewards: gold, a card, sometimes a trophy. Cards also come from strongboxes and from people you help.</p>
-    <p class="hint"><b>Lose a match</b> and you black out: you wake at your last inn (Graftonbury's, if you have not slept anywhere yet) with half your HP back, a tenth of your gold gone, and a quarter of your fans. <b>Hardcore</b> is a choice you make when you start a journey: lose one match, and the journey is over.</p></section>`);
+    <p class="hint">This part is about the realm. Further down are Sudden Death's own rules for a match: cards, sports, momentum. They work the same here, with two changes: season goals are off, and an ordinary elite win pays no trophy.</p>
+    <div id="wHelpWorld"><h4>Getting around</h4>
+    <p class="hint">Walk with the arrow keys or <kbd>WASD</kbd>, or click where you want to go. Walk into people to talk to them, and click a CAPITALISED word (or type one) to ask about it. <kbd>Space</kbd> uses what you face, <kbd>L</kbd> looks at it, and <kbd>C</kbd> opens your team. Time passes as you walk. The top bar shows the day, your team's HP, gold, fans and energy, and how long until the Crown.</p></div>
+    <div id="wHelpMatch"><h4>Matches</h4>
+    <p class="hint">Every match is played exactly like a Sudden Death fight. Wild teams jump you in long grass, woods and fens, more often at night, and the night road is not safe either. Before each match a card shows who you face, the sport, and how hard it is. You can run from a wild team: it costs time and a little HP, and at night they may cut you off. Any other match has <b>Not yet</b>, and it waits for you.</p>
+    <p class="hint">Your team's HP carries from match to match. A night at an inn heals it fully, and that inn becomes the place you wake up. A win pays gold, a card, XP for your players and energy for the enchanter. Cards also come from strongboxes, card shops and people you help.</p>
+    <p class="hint"><b>Lose a match</b> and you black out: you wake at your last inn (Graftonbury's, if you have not slept anywhere yet) with at least half your HP, a tenth of your gold gone, and a quarter of your fans. <b>Hardcore</b> is a choice you make when you start a journey: lose one match, and the journey is over.</p></div></section>`);
 };
 
 /* ---------- cards from the world: the one way in, for chests, topics, and (phase 3) players ----------
@@ -8456,7 +8462,7 @@ function wShowCardOffer() {
    WG.roster   [{ id, n, kind, num, flav, lvl, xp, joined, from }] in lineup order: 0..2 start, 3.. are the bench.
                from: 'founder' | 'tavern' | 'postgame' | 'quest'. joined: the day (WG.dayAbs) they signed.
    WG.pid      the next player id.
-   WG.rivals   { companyId: SD club id }: the four TC companies play as these SD clubs (never yours). Phase 6 uses it.
+   WG.rivals   { companyId: SD club id }: the four rival slots (TC's companies) play as these SD clubs (never yours). Phase 6 uses it.
    WG.tavern   { townId: { week, list: [player + fee] } }: free agents, new every week.
    WG.wprompts [{ t: 'level', pid, lvl } | { t: 'recruit', p }]: things to show the player once the world is free.
    WG.wwait    quest companions who could not join a full roster; they wait at camp.
@@ -8547,7 +8553,7 @@ function wPartyInit() {
   wTagCards();
   if (!RUN.battle && !RUN.pending) { wNormalizeLineup(); wSyncParty(); }
 }
-/* the four TC companies play as SD clubs: never yours, never the same one twice */
+/* the four rival slots play as SD clubs: never yours, never the same one twice */
 function wRivalMap(club) {
   const ids = shuffle(CLUB_IDS.filter(c => c !== club && c !== 'free' && CLUBS[c]));
   const out = {}; Object.keys(DB.companies).forEach((k, i) => { out[k] = ids[i % ids.length]; });
@@ -8784,8 +8790,8 @@ const W_QUEST_MATES = {
     t: 'Found it. One egg left in the clutch, under the old pearl bed, and it hatched on the swim up. A wyrmling, gold on green. The captain wants her called Marigold, and she wants to come with you. Tell him.' },
   'grit.inside': { kind: 'kobold', n: 'Pyra', lvl: 5, flav: 'A cindermane kit, out of the glass. Purrs. Burns.', sp: 'rq_cind2',
     t: 'Inside? It cracked last night. A kit came out of the glass, mane on fire, purring, and it will not leave me alone. It likes you better. Take her. Please. She answers to Pyra.' },
-  'pell.capsule': { kind: 'golem', n: 'Specimen One', lvl: 5, flav: 'Pre-League stock, out of a capsule. Does not blink.', sp: 'rq_vault',
-    t: 'A dormant capsule. Pre-League. Oh, you beautiful thing. Six Aether, straight into the cell, and let us see. ... There. It grew a shell, and something stepped out of it. It answers to Specimen One, and it wants to play. Take it before the League asks.' },
+  'pell.capsule': { kind: 'golem', n: 'Cobble', lvl: 5, flav: 'Pre-League make, out of a capsule. Does not blink.', sp: 'rq_vault',
+    t: 'A dormant capsule. Pre-League. Oh, you beautiful thing. Six Aether, straight into the cell, and let us see. ... There. It grew a shell, and something stepped out of it. It answers to Cobble, and it wants to play. Take it before the League asks.' },
   'hermit.drake': { kind: 'troll', n: 'Bramblewick', lvl: 5, flav: 'The Elder\'s own line. Regrows. Remembers.', sp: 'rq_drake',
     t: 'Give it here. ... Listen. There. It came down out of the canopy, took the offering, and left its young in the leaves. The Elder\'s own line: Bramblewick. It will walk with you. Go carefully with it.' },
 };
@@ -8810,6 +8816,7 @@ for (const id of W_TAVERN_INNS) {
   const ch = DB.chars[id]; if (!ch) continue;
   ch.topics.agents = { t: 'Over in the corner. Free agents, every one of them looking for a club. Talk to them yourself.', act: 'agents' };
   ch.topics.job.t += ' Free AGENTS drink in the corner, looking for a club.';
+  ch.greet += ' Free AGENTS in the corner, if you are hiring.';
 }
 function wWeek() { return Math.floor(((WG.dayAbs || 1) - 1) / 7); }
 function wTavern(town) {
@@ -9343,9 +9350,9 @@ function wCampTeam() {
   const rv = WG.rivals || {};
   return `<p class="hint">The first three start every match; their cards and the league cards make the deck. Benched players sit out with their cards, and still earn half the XP. Drag players, or use the arrows, to change the order.</p>
     <h4>Starting three</h4><ol class="wroster">${st.map((p, i) => wCampRow(p, i)).join('')}</ol>
-    <h4>Bench</h4>${bn.length ? `<ol class="wroster" start="4">${bn.map((p, i) => wCampRow(p, i + W_PARTY.starters)).join('')}</ol>` : '<p class="hint">Nobody on the bench yet. Free agents drink at every inn; ask the innkeeper about AGENTS.</p>'}
+    <h4>Bench</h4>${bn.length ? `<ol class="wroster" start="4">${bn.map((p, i) => wCampRow(p, i + W_PARTY.starters)).join('')}</ol>` : '<p class="hint">Nobody on the bench yet. Free agents wait at every inn: talk to the innkeeper and ask about AGENTS.</p>'}
     ${(WG.wwait || []).length ? `<h4>Waiting to join</h4><div class="wwait">${WG.wwait.map((p, i) => `<div class="wag"><img src="${wPlayerPort(p, 64)}" alt=""><div><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}</span></div><button class="btn" data-wait="${i}">Sign</button></div>`).join('')}</div>` : ''}
-    ${Object.keys(rv).length ? `<p class="hint wrivals">Rivals on the road: ${Object.keys(rv).map(k => `${esc(DB.companies[k].short)} (the ${esc(CLUBS[rv[k]].name)})`).join(', ')}.</p>` : ''}`;
+    ${Object.keys(rv).length ? `<p class="hint wrivals">Rivals on the road: ${Object.keys(rv).filter(k => CLUBS[rv[k]]).map(k => `the ${esc(CLUBS[rv[k]].name)}`).join(', ')}.</p>` : ''}`;
 }
 function wCampDeck() {
   const grid = cards => `<div class="cardgrid">${sortDeck(cards).map(c => cardHTML(c, { flav: false })).join('')}</div>`;
@@ -9363,8 +9370,8 @@ renderHelp = function () {
   sec.insertAdjacentHTML('beforeend', `<div id="wHelpTeam"><h4>Your team</h4>
     <p class="hint">You start by picking a club and three of its players. Your team can grow to ${W_PARTY.max} players. The first three in the lineup start every match; the rest sit on the bench. Open the team with the <b>Team</b> button or the <kbd>C</kbd> key to change who starts.</p>
     <p class="hint"><b>Cards belong to players.</b> League cards always play. Every other card belongs to the player of its kind, and plays only when that player starts: bench someone and their cards sit out with them. The Deck tab shows whose cards are whose.</p>
-    <p class="hint"><b>Levels.</b> Players earn XP from every match: starters the full amount (more for a win, a bonus for player of the game), the bench half. Each level up raises the team's max HP by ${W_PARTY.hpPerLvl} and offers a card of that player's kind.</p>
-    <p class="hint"><b>Recruiting.</b> Free agents drink at every inn: ask the innkeeper about AGENTS, and pay a signing fee. They change every week. After a win, one of the players you beat may ask to join, more often after an elite game. Some quests end with a new player, too. A new player brings their signature card and a card or two of their kind. With a full roster you have to release someone first, and a released player takes their cards with them.</p></div>`);
+    <p class="hint"><b>Levels.</b> Players earn XP from every match: starters the full amount (more for a win, a bonus for player of the game), the bench half. Each level up, to level ${W_PARTY.maxLvl}, raises the team's max HP by ${W_PARTY.hpPerLvl} and offers a card of that player's kind. A lost match still pays a quarter.</p>
+    <p class="hint"><b>Recruiting.</b> Free agents wait at every inn: ask the innkeeper about AGENTS (the inn's room menu has a Free agents button too), and pay a signing fee. They change every week. After a win, one of the players you beat may ask to join, more often after an elite game. Some quests end with a new player, too. A new player brings their signature card and a card or two of their kind. With a full roster you have to release someone first, and a released player takes their cards with them.</p></div>`);
 };
 /* w8: Realm boot. Runs after every part has loaded (the prelude stopped app/boot.js booting the standalone game).
    Reassigns (never redeclares) showView, frame and renderTitle, adds saving and loading of WG and RUN, then boots.
@@ -9483,7 +9490,7 @@ boot();
    The tier model. Tier sets the SD act a match is played at (RUN.act = tier - 1: TUNE, spawn and the encounter tables):
      tier 1  the Charter Plains and its roads           (W_TIER, w5)
      tier 2  the four outer regions, Hatchery, Emberdeep (W_TIER, W_DUNGEON_TIER)
-     tier 3  the Gene Vault, the Deep Seam (and later the Crown)
+     tier 3  the Sealed Vault, the Deep Seam, the Crown
    Level (0 to 4) is a finer step inside a tier, added up and shown on the pre-game card:
      +1 per 11 tiles beyond the first 4 from Graftonbury (at most +3; not in dungeons), +1 per two cups won,
      +1 for a night game off the road. Each level gives the other team +8% HP, and from level 2 Strength (W_ROAD.strAt).
@@ -9497,7 +9504,8 @@ boot();
 
    Sudden Death functions reassigned here: rollEncounter (region kinds, per-tier easy games), checkGoals (off in the realm).
    Realm functions wrapped here: wBuildEncounter (level, ambush, team), wPreGame (level and ambush lines), wFoeTeam,
-   wEncounterHook (road events), wStart (reopens an unfinished event card), renderHelp (via w9b). Adds W_ON_END.event. */
+   wEncounterHook (road events), wStart (reopens an unfinished event card), wKickoff (an event closes at kickoff),
+   wBackAway (Not yet on an event match goes back to the event card), renderHelp (via w9b). Adds W_ON_END.event. */
 
 const W_ROAD = {
   distFree: 4, distBand: 11, distMax: 3,    // level from distance to Graftonbury, in world tiles
@@ -9745,7 +9753,8 @@ function wEventChoose(i, o) {
   if (!wAffordable(c)) { wOpenEvent(); return false; }
   const region = wRegionHere();
   if (c.match) {
-    wPayCost(c); WG.event = null;
+    // the event stays open (WG.event) until kickoff, so backing out of the pre-game card brings it back (wBackAway);
+    // the choice's cost is paid at kickoff (wKickoff, below)
     const who = wEventWho(S);
     wLog(c.label + '.', 'd');
     startMatch({ type: c.match.type || 'normal', tier: wTierHere(), name: c.match.name || (S.rival ? who.short : null), world: { kind: 'event', ref: { ev: S.id, c: i, rival: S.rival || null }, region } });
@@ -9776,6 +9785,24 @@ function wEventChoose(i, o) {
   wSave(); wOpenEvent(); wDrain();
   return true;
 }
+/* an event match: the event closes (and its choice is paid for) only when the match kicks off */
+function wEventOfMatch(enc) {
+  const W = enc && enc.world, S = WG && WG.event;
+  return W && W.kind === 'event' && W.ref && S && S.id === W.ref.ev && !S.done ? S : null;
+}
+const wW6Kickoff = wKickoff;
+wKickoff = function (enc) {
+  const S = wEventOfMatch(enc);
+  if (S) { const ev = wEventDef(S.id), c = ev && ev.choices && ev.choices[enc.world.ref.c]; if (c) wPayCost(c); WG.event = null; }
+  return wW6Kickoff(enc);
+};
+/* Not yet on an event match: back to the event card, where the same choice (or Walk on) is still there */
+const wW5BackAway = wBackAway;
+wBackAway = function (enc) {
+  if (!wEventOfMatch(enc)) return wW5BackAway(enc);
+  wLog('You hold off. The offer still stands.', 'd');
+  wSave(); wOpenEvent();
+};
 W_ON_END.event = function (r, ref) {
   if (r !== 'win' || !ref) return;
   const ev = wEventDef(ref.ev), c = ev && ev.choices[ref.c]; if (!c || !c.match) return;
@@ -9823,7 +9850,7 @@ wNextPrompt = function () {
    leans to the region's sports and kinds and turns over every week (WG.cardShops[id].week). Trading a card away costs
    Sudden Death's removeCost (it rises by 25 each time), once per vendor per week.
 
-   Realm functions wrapped: wRunAct (acts enchant, kitchen, meals, cards), wOpenInn (a Meals button), wPreGame (the
+   Realm functions wrapped: wRunAct (acts enchant, kitchen, meals, cards), wOpenInn (Meals and Free agents), wPreGame (the
    meal line), wRenderHud (energy and meal), renderHelp (the road and town section). */
 
 /* ---------- meals ---------- */
@@ -10054,8 +10081,10 @@ wOpenInn = function (price, who) {
   wW7OpenInn(price, who);
   const inn = WUI.talk && DB.innMenu[WUI.talk.id] ? WUI.talk.id : null, row = $('wSleep') && $('wSleep').parentNode;
   if (!row) return;
-  row.insertAdjacentHTML('beforeend', '<button class="ghost" id="wInnMeals">Meals and the hearth</button>');
+  row.insertAdjacentHTML('beforeend', '<button class="ghost" id="wInnMeals">Meals and the hearth</button><button class="ghost" id="wInnAgents">Free agents</button>');
   $('wInnMeals').onclick = () => wOpenMeals(inn);
+  // every inn is a tavern (w6-party.js): the free agents are one button away, not only behind the AGENTS topic
+  $('wInnAgents').onclick = () => wOpenTavern(WG.map, who);
 };
 const wW9RenderHud = wRenderHud;
 wRenderHud = function () {
@@ -10094,12 +10123,14 @@ const wW9RenderHelp = renderHelp;
 renderHelp = function () {
   wW9RenderHelp();
   const sec = $('wHelp'); if (!sec || $('wHelp4')) return;
-  sec.insertAdjacentHTML('beforeend', `<div id="wHelp4">
-    <p class="hint"><b>How hard a game is.</b> The Charter Plains are tier 1, the four outer regions tier 2, and the deepest vaults tier 3. Inside a tier, the level (0 to 4) goes up the further you are from Graftonbury, with every two cups you win, and at night off the road. Each level gives the other team 8% more HP, and from level 2 some Strength. The pre-game card shows the level and why. At night off the road, a wild team may <b>ambush</b> you: they start a score ahead.</p>
-    <p class="hint"><b>Road events.</b> Now and then you meet somebody on the road: a pedlar, a cook, an old coach, a rival club. The card says what each choice costs and what it does. Some lead to a match, and a lost match is a blackout like any other.</p>
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelp4"><div id="wHelpTowns"><h4>Towns</h4>
+    <p class="hint"><b>Inns.</b> Every town has an inn. A room heals your team fully and makes it the place you wake after a lost match. Free agents wait in every inn, too (see Your team).</p>
     <p class="hint"><b>Meals.</b> Cook at any inn hearth (or in Tansy's canteen) from ingredients you pick off bushes or buy, or buy a meal from an inn's kitchen. Meals wait in your pantry. Eat one before a match (from an inn's MEAL menu, or on the pre-game card) and it helps in that match only: Block, Strength, Footwork, extra cards or Stamina on the first turn, or a little HP.</p>
     <p class="hint"><b>Energy and the enchanter.</b> Wells, some road events and every win give elemental energy (wins give the region's kind). Brother Quill, in Graftonbury's chapel, spends it: upgrade a card, drill a card (Practice ★), or recharge a gear card. Any kind of energy pays, and each service costs a little more every time.</p>
-    <p class="hint"><b>Card shops.</b> Odd Lots in Graftonbury, Hob Tarn's nets in Saltmere and the Brandt smithy in Cinderhold sell cards for their region's sports, with new stock every week. They will also take a card off your hands, for a fee.</p></div>`);
+    <p class="hint"><b>Card shops.</b> Odd Lots in Graftonbury, Hob Tarn's nets in Saltmere and the Brandt smithy in Cinderhold sell cards for their region's sports, with new stock every week. They will also take a card off your hands, for a fee.</p></div>
+    <div id="wHelpRoad"><h4>The road</h4>
+    <p class="hint"><b>How hard a game is.</b> The Charter Plains are tier 1, the four outer regions tier 2, and the deepest vaults and the Crown tier 3. Inside a tier, the level (0 to ${W_ROAD.maxLv}) goes up the further you are from Graftonbury, with every ${W_ROAD.cupsPerLv} cups you win, and at night off the road. Each level gives the other team ${Math.round(W_ROAD.hpPerLv * 100)}% more HP, and from level 2 some Strength. The pre-game card shows the level and why. At night off the road, a wild team may <b>ambush</b> you: they start a score ahead.</p>
+    <p class="hint"><b>Road events.</b> Now and then you meet somebody on the road: a pedlar, a cook, an old coach, a rival club. The card says what each choice costs and what it does. Some lead to a match: say Not yet on its pre-game card and you are back at the event, and a lost match is a blackout like any other.</p></div></div>`);
 };
 /* w10: dungeons and magic gear (phase 5). Loads after w9b; changes earlier parts only by reassignment.
 
@@ -10145,7 +10176,7 @@ const W_GATE = {                          // cups: cups won; key: an item in WG.
 const W_ALPHA_BOSS = {                    // the Sudden Death boss each alpha plays as, and its tier
   hatchmother: { boss: 'cube', tier: 2 },        // the Hatch-Mother: splits in two at half health
   emberqueen: { boss: 'kqueen', tier: 2 },       // the Warren Queen: shielded by her squad
-  vaultwarden: { boss: 'mirror', tier: 3 },      // Specimen Nought: your own captain, copied
+  vaultwarden: { boss: 'mirror', tier: 3 },      // Captain Nought: your own captain, copied
   seamwyrm: { boss: 'wyrm', tier: 3 },           // the Seam Wyrm
   grove: { boss: 'groundskeeper', tier: 2 },     // the Elder of the Grove: has kept this ground for ever
   aurora: { boss: 'banshee', tier: 2 },          // the Aurora Matriarch: the wail the bells were cast against
@@ -10162,7 +10193,7 @@ const W_MAGIC = {                         // relic: trophy rarity ('c'|'u'|'r');
 const W_FAMOUS = {
   hatchery: [['The Drowned Eleven', 'DRN', '#235c9c', '#bfe3ff'], ['The Brood Tide', 'BRD', '#2f7f7a', '#c8f0e8'], ['The Shell Game', 'SHL', '#8a6a3c', '#f0e0c0']],
   emberdeep: [['The Cinder Saints', 'CSA', '#a83a1e', '#ff9a7a'], ['Slag Heap United', 'SLG', '#5a4a3a', '#e0c8a8'], ["The Queen's Guard", 'QGD', '#c0392b', '#ffd0c0']],
-  genevault: [['Control Group', 'CTL', '#3a6f8f', '#d0ecff'], ['The Specimen Six', 'SPX', '#6a4a9c', '#e0d0ff'], ['Containment Breach', 'BRC', '#a08010', '#fff3b0'], ['Apex Prototypes', 'APX', '#2a1f3a', '#b494ff']],
+  genevault: [['The Old Guard', 'OLD', '#3a6f8f', '#d0ecff'], ['The Sealed Six', 'SIX', '#6a4a9c', '#e0d0ff'], ['Lockdown United', 'LCK', '#a08010', '#fff3b0'], ['Apex Prototypes', 'APX', '#2a1f3a', '#b494ff']],
   deepseam: [['The Seam Splitters', 'SEA', '#8a3a1e', '#ffb08a'], ['Deep Shift', 'DSH', '#4a3a2a', '#e0c8a0'], ['The Glassheart Few', 'GLS', '#3a8a8a', '#c0fff8']],
 };
 const W10 = { rooms: {}, hold: false, depth: null };
@@ -10393,9 +10424,9 @@ const wW10RenderHelp = renderHelp;
 renderHelp = function () {
   wW10RenderHelp();
   const sec = $('wHelp'); if (!sec || $('wHelp5')) return;
-  sec.insertAdjacentHTML('beforeend', `<div id="wHelp5">
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelp5"><h4>Dungeons and lairs</h4>
     <p class="hint"><b>Dungeons.</b> Each dungeon is a gauntlet. Some rooms hold famous teams: walk in and they want a game, an elite match with a scouting report, and deeper rooms bring sport perks, high stakes and a higher level. A room you win stays won. When every room is beaten, the alpha in the deepest room plays you, and it is a Sudden Death boss. The two lairs out in the wild hold bosses too.</p>
-    <p class="hint"><b>Getting in.</b> Dungeon doors open to teams that have won cups, and the Gene Vault also wants its keycard. A shut door tells you what you are missing.</p>
+    <p class="hint"><b>Getting in.</b> Dungeon doors open to teams that have won cups, and the Sealed Vault also wants its keycard. A shut door tells you what you are missing.</p>
     <p class="hint"><b>Magic gear.</b> The strongbox behind a beaten alpha holds a trophy and a gear card, and in the deepest vaults a pick of Hall of Fame legends. A lair's alpha pays the same way when you beat it, and a beaten room sometimes leaves a gear card behind.</p></div>`);
 };
 /* w11: cups, rivals and the Crown (phase 6).
@@ -10407,13 +10438,13 @@ renderHelp = function () {
    is. Winning a cup sets its flag (cup_moss ...), cups1..cupsN, pays a prize and goes on the Wall of Awards.
    WG.cup = { id, round, ready?, clubs? } is the cup you are in (plain data, saved with WG).
 
-   Rivals remember you. The four TC companies play as the SD clubs in WG.rivals (w6-party.js). They are round 3 of the
+   Rivals remember you. The four rival slots (TC's companies) play as the SD clubs in WG.rivals (w6-party.js). They are round 3 of the
    town cups, the first two rounds of the Crown, and the road's 'rival' event. Every match against one is kept in
    WG.h2h[clubId] = { w, l, last: { r, us, them, sport, day } } ('apex' for the Crown final), shown on the Camp and on
    the pre-game card ("They remember last time: you won, 3-1.").
 
    The Crown. At the Crown Coliseum (Steward Crane, topic ENTER, act 'cup:crown'), only in championship week and only
-   with four cups: two rival clubs (the two with the best record against you), then the apex club, Apex Biologic,
+   with four cups: two rival clubs (the two with the best record against you), then the apex club, Apex Athletic,
    fielding a Sudden Death Act 3 boss. Win it and 'champion' is set and the champion ending shows, with a button to keep
    exploring (the save goes on). Once per year. The steward's WAIT (act 'waitweek') is for entrants with four cups.
 
@@ -10432,15 +10463,13 @@ const W_CUP = {
   lvPerCup: .5,                     // plus floor(cups won x this) levels, at most W_ROAD.maxLv
   prize: { gold: 120, fans: 40, pick: 3, rarity: 'r' },   // a town cup: gold, fans, and a pick of rare cards
   crown: { tier: 3, lv: [1, 2, 3], prize: { gold: 300, fans: 120 } },
-  home: { moss: 'wildgraft', salt: 'cauldron', cind: 'thaumagen', rime: 'helix' },  // each cup's rival company
-  apexTeam: { name: 'Apex Biologic', short: 'APX', color: '#f2c14e', light: '#fff1c2' },
+  home: { moss: 'wildgraft', salt: 'cauldron', cind: 'thaumagen', rime: 'helix' },  // each cup's rival slot (DB.companies)
+  apexTeam: { name: 'Apex Athletic', short: 'APX', color: '#f2c14e', light: '#fff1c2' },
 };
 const W11 = { ending: false };
 const W_TOWN_CUPS = ['moss', 'salt', 'cind', 'rime'];
 
-/* the leftover Terra Chimera names, made the realm's */
-DB.cups.crown.name = 'The Crown';
-DB.chars.rival.topics.job.t = 'Handler, same as you, but better funded. I will see you in the last round of some CUP or other.';
+/* the rival's and the registrars' CUP lines, for the cup rules below (the crown's name and the rival's job are in w1) */
 DB.chars.rival.topics.cup.t = 'Every cup puts a rival club in the last round. We do not throw matches. We have shareholders. And we remember every score.';
 for (const id of ['moss_reg', 'salt_reg', 'cind_reg', 'rime_reg']) if (DB.chars[id]) DB.chars[id].topics.cup.t = `Three rounds, back to back: a local side, a seeded team with a trick or two, then a rival club. Lose once and you are out, but you can enter again. Win all three and the cup goes on your wall. The League sets the field to your record, so it never gets easier. Entry is ${W_CUP.fee} gold. Say ENTER when your team is ready.`;
 
@@ -10522,7 +10551,7 @@ function wCupEnter(id, o) {
     WG.cup = { id, round: 0 };
     if (id === 'crown') { WG.cup.clubs = wCrownClubs(); WG.cup.year = WG.year; }
     else { RUN.gold -= W_CUP.fee; wLog(`You pay ${W_CUP.fee} gold and sign up for ${wCupThe(id)}.`, 'm'); }
-    if (id === 'crown') wLog('You are entered for the Crown. Three rounds, and the last is against Apex Biologic.', 'g');
+    if (id === 'crown') wLog('You are entered for the Crown. Three rounds, and the last is against Apex Athletic.', 'g');
   }
   wSave();
   return wCupPlay(o);
@@ -10563,7 +10592,7 @@ function wCupWon(id) {
   if (id === 'crown') {
     WG.crownYear = WG.year; WG.crowns = (WG.crowns || []).concat(WG.year);
     const P = W_CUP.crown.prize; RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
-    wLog(`You win the Crown! Apex Biologic's run is over. ${P.gold} gold and ${P.fans} fans.`, 'g');
+    wLog(`You win the Crown! Apex Athletic's run is over. ${P.gold} gold and ${P.fans} fans.`, 'g');
     W11.ending = true;
     return;
   }
@@ -10587,7 +10616,7 @@ function wCrownEnding() {
   const h2 = document.querySelector('#scr-end h2'); if (h2) h2.textContent = 'Champions of the realm';
   const hint = document.querySelector('#scr-end .panel > p.hint'); if (hint) hint.textContent = `${profileName()}'s journey${WG.hardcore ? ', Hardcore' : ''}`;
   const lede = document.querySelector('#scr-end .lede');
-  if (lede) lede.textContent = `The ${CLUBS[RUN.club].name} beat Apex Biologic at the Crown Coliseum, on day ${WG.day} of year ${WG.year}. ${RUN.party.map(p => p.n).join(', ')} carry the crown around the sand, and Old Nell sweeps up after them.`;
+  if (lede) lede.textContent = `The ${CLUBS[RUN.club].name} beat Apex Athletic at the Crown Coliseum, on day ${WG.day} of year ${WG.year}. ${RUN.party.map(p => p.n).join(', ')} carry the crown around the sand, and Old Nell sweeps up after them.`;
   const es = document.querySelector('#scr-end .endstats');
   if (es) es.insertAdjacentHTML('afterbegin', `<div><b>${wCupsWon()}</b>cups</div><div><b>${(WG.crowns || []).length}</b>crown${(WG.crowns || []).length === 1 ? '' : 's'}</div>`);
   const b = $('bAgain');
@@ -10634,7 +10663,7 @@ wMatchTitle = function (enc) {
   const W = enc.world, ref = W.ref || {};
   if (W.kind !== 'cup' || !wCupDef(ref.cup)) return wW11MatchTitle(enc);
   const boss = enc.ids.find(id => ENEMIES[id].boss), C = wCupDef(ref.cup);
-  const who = ref.club === 'apex' ? `Apex Biologic and ${boss ? ENEMIES[boss].n.split(',')[0] : wFoeNames(enc)[0]}` : ref.club && CLUBS[ref.club] ? `the ${CLUBS[ref.club].name}` : (W.name || wFoeNames(enc).join(' and '));
+  const who = ref.club === 'apex' ? `Apex Athletic and ${boss ? ENEMIES[boss].n.split(',')[0] : wFoeNames(enc)[0]}` : ref.club && CLUBS[ref.club] ? `the ${CLUBS[ref.club].name}` : (W.name || wFoeNames(enc).join(' and '));
   return `${C.name}, ${ref.cup === 'crown' && ref.round === 2 ? 'the final' : 'round ' + (ref.round + 1)}: ${who}`;
 };
 const wW11PreGame = wPreGame;
@@ -10708,7 +10737,7 @@ renderHelp = function () {
   sec.insertAdjacentHTML('beforeend', `<div id="wHelpCups"><h4>Cups, rivals and the Crown</h4>
     <p class="hint"><b>Town cups.</b> Mossgate, Saltmere, Cinderhold and Rimewatch each hold a cup. Enter with the town's registrar (ask about the CUP, then ENTER) for ${W_CUP.fee} gold. A cup is three rounds in a row, in the region's sports: a local side, a seeded team with a scouting report, then a rival club. Lose once and you are out, but you can enter again. Each cup you already hold makes the next field tougher. Win all three rounds for gold, fans, a rare card, and a place on the Wall of Awards.</p>
     <p class="hint"><b>Rivals.</b> Four rival clubs follow you round the realm: in the last round of the cups, in the Crown, and on the road. They keep score. The pre-game card says how the last game went, and the Team screen shows your record against each of them.</p>
-    <p class="hint"><b>The Crown.</b> Once a year, in championship week (the last ${DB.meta.champWeek} days of the year), Steward Crane at the Crown Coliseum takes entries from teams with all four cups. Three rounds: the two rivals with the best record against you, then Apex Biologic, who field a monster from Sudden Death's last act. Win it and you are champions of the realm, and the road goes on. With four cups and the week still to come, you can WAIT at the Coliseum.</p></div>`);
+    <p class="hint"><b>The Crown.</b> Once a year, in championship week (the last ${DB.meta.champWeek} days of the year), Steward Crane at the Crown Coliseum takes entries from teams with all four cups. Three rounds: the two rivals with the best record against you, then Apex Athletic, who field a monster from Sudden Death's last act. Win it and you are champions of the realm, and the road goes on. With four cups and the week still to come, you can WAIT at the Coliseum.</p></div>`);
 };
 /* w12: renown and trophies (phase 7, balance). Loads after w11-cups.js; changes earlier parts only by reassignment
    (saved originals carry the wW12 prefix) and one fightStart hook.
@@ -10768,7 +10797,7 @@ const wW12RenderHelp = renderHelp;
 renderHelp = function () {
   wW12RenderHelp();
   const sec = $('wHelp'); if (!sec || $('wHelpRenown')) return;
-  sec.insertAdjacentHTML('beforeend', `<div id="wHelpRenown">
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelpRenown"><h4>Renown and trophies</h4>
     <p class="hint"><b>Renown.</b> Every cup you win and every boss you beat adds 1 renown, and the realm takes you more seriously: each point gives the teams you meet ${Math.round(W_RENOWN.hpPer * 100)}% more HP, and every ${W_RENOWN.strEvery} points 1 Strength. The pre-game card shows it.</p>
     <p class="hint"><b>Trophies.</b> In the realm, trophies come from bosses, strongboxes and lairs. An ordinary elite or rival win pays gold and cards.</p></div>`);
 };

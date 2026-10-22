@@ -98,7 +98,7 @@ async def desk_checks(pg):
     check(t['bloom'] == 2 and all(t[r][0] == 2 for r in ['tide', 'ember', 'rime']), 'the outer regions are tier 2', t)
     check(all(t[r][1] >= 2 and t[r][2] == min(4, t[r][1] + 1) for r in ['tide', 'ember', 'rime']), 'remote corners are level 2+, and night off the road adds one', t)
     check(t['rimeCups'] == min(4, t['rime'][1] + 1), 'two cups won add a level', t)
-    check(t['hatchery'] == [2, 0] and t['genevault'][0] == 3, 'dungeons: the Hatchery tier 2, the Gene Vault tier 3, no distance levels', t)
+    check(t['hatchery'] == [2, 0] and t['genevault'][0] == 3, 'dungeons: the Hatchery tier 2, the Sealed Vault tier 3, no distance levels', t)
 
     # ---------- the encounter roll: native kinds, easy pool per tier, goals off ----------
     r = await pg.evaluate("""(() => { const o = {}, a0 = RUN.act;
@@ -188,10 +188,11 @@ async def desk_checks(pg):
             await pg.click(f'#modalBox [data-wev="{i}"]'); await pg.wait_for_timeout(250)
             if kind == 'match':
                 txt = await modal_text(pg)
-                ok = txt is not None and await pg.evaluate("!!document.getElementById('wPlay') && !!document.getElementById('wNotYet') && WG.event === null")
+                ok = txt is not None and await pg.evaluate("!!document.getElementById('wPlay') && !!document.getElementById('wNotYet')")
                 check(ok, f"event {ev['id']} choice {i} leads to a pre-game card", txt and txt[:160])
                 await close_modal(pg)
-                check(await pg.evaluate("UI.view === 'world' && !RUN.pending"), f"event {ev['id']}: Not yet backs away")
+                check(await pg.evaluate(f"UI.view === 'world' && !RUN.pending && !!WG.event && WG.event.id === '{ev['id']}' && !!document.querySelector('#modalBox [data-wev]')"), f"event {ev['id']}: Not yet backs away, back to the event card")
+                await pg.click('#wEvWalk'); await pg.wait_for_timeout(100)
                 continue
             if kind == 'pick':
                 n = await pg.evaluate("document.querySelectorAll('#modalBox .cardgrid .card').length")

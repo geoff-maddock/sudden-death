@@ -3,7 +3,7 @@
    WG.roster   [{ id, n, kind, num, flav, lvl, xp, joined, from }] in lineup order: 0..2 start, 3.. are the bench.
                from: 'founder' | 'tavern' | 'postgame' | 'quest'. joined: the day (WG.dayAbs) they signed.
    WG.pid      the next player id.
-   WG.rivals   { companyId: SD club id }: the four TC companies play as these SD clubs (never yours). Phase 6 uses it.
+   WG.rivals   { companyId: SD club id }: the four rival slots (TC's companies) play as these SD clubs (never yours). Phase 6 uses it.
    WG.tavern   { townId: { week, list: [player + fee] } }: free agents, new every week.
    WG.wprompts [{ t: 'level', pid, lvl } | { t: 'recruit', p }]: things to show the player once the world is free.
    WG.wwait    quest companions who could not join a full roster; they wait at camp.
@@ -94,7 +94,7 @@ function wPartyInit() {
   wTagCards();
   if (!RUN.battle && !RUN.pending) { wNormalizeLineup(); wSyncParty(); }
 }
-/* the four TC companies play as SD clubs: never yours, never the same one twice */
+/* the four rival slots play as SD clubs: never yours, never the same one twice */
 function wRivalMap(club) {
   const ids = shuffle(CLUB_IDS.filter(c => c !== club && c !== 'free' && CLUBS[c]));
   const out = {}; Object.keys(DB.companies).forEach((k, i) => { out[k] = ids[i % ids.length]; });
@@ -331,8 +331,8 @@ const W_QUEST_MATES = {
     t: 'Found it. One egg left in the clutch, under the old pearl bed, and it hatched on the swim up. A wyrmling, gold on green. The captain wants her called Marigold, and she wants to come with you. Tell him.' },
   'grit.inside': { kind: 'kobold', n: 'Pyra', lvl: 5, flav: 'A cindermane kit, out of the glass. Purrs. Burns.', sp: 'rq_cind2',
     t: 'Inside? It cracked last night. A kit came out of the glass, mane on fire, purring, and it will not leave me alone. It likes you better. Take her. Please. She answers to Pyra.' },
-  'pell.capsule': { kind: 'golem', n: 'Specimen One', lvl: 5, flav: 'Pre-League stock, out of a capsule. Does not blink.', sp: 'rq_vault',
-    t: 'A dormant capsule. Pre-League. Oh, you beautiful thing. Six Aether, straight into the cell, and let us see. ... There. It grew a shell, and something stepped out of it. It answers to Specimen One, and it wants to play. Take it before the League asks.' },
+  'pell.capsule': { kind: 'golem', n: 'Cobble', lvl: 5, flav: 'Pre-League make, out of a capsule. Does not blink.', sp: 'rq_vault',
+    t: 'A dormant capsule. Pre-League. Oh, you beautiful thing. Six Aether, straight into the cell, and let us see. ... There. It grew a shell, and something stepped out of it. It answers to Cobble, and it wants to play. Take it before the League asks.' },
   'hermit.drake': { kind: 'troll', n: 'Bramblewick', lvl: 5, flav: 'The Elder\'s own line. Regrows. Remembers.', sp: 'rq_drake',
     t: 'Give it here. ... Listen. There. It came down out of the canopy, took the offering, and left its young in the leaves. The Elder\'s own line: Bramblewick. It will walk with you. Go carefully with it.' },
 };
@@ -357,6 +357,7 @@ for (const id of W_TAVERN_INNS) {
   const ch = DB.chars[id]; if (!ch) continue;
   ch.topics.agents = { t: 'Over in the corner. Free agents, every one of them looking for a club. Talk to them yourself.', act: 'agents' };
   ch.topics.job.t += ' Free AGENTS drink in the corner, looking for a club.';
+  ch.greet += ' Free AGENTS in the corner, if you are hiring.';
 }
 function wWeek() { return Math.floor(((WG.dayAbs || 1) - 1) / 7); }
 function wTavern(town) {

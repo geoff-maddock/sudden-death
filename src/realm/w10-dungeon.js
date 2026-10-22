@@ -42,7 +42,7 @@ const W_GATE = {                          // cups: cups won; key: an item in WG.
 const W_ALPHA_BOSS = {                    // the Sudden Death boss each alpha plays as, and its tier
   hatchmother: { boss: 'cube', tier: 2 },        // the Hatch-Mother: splits in two at half health
   emberqueen: { boss: 'kqueen', tier: 2 },       // the Warren Queen: shielded by her squad
-  vaultwarden: { boss: 'mirror', tier: 3 },      // Specimen Nought: your own captain, copied
+  vaultwarden: { boss: 'mirror', tier: 3 },      // Captain Nought: your own captain, copied
   seamwyrm: { boss: 'wyrm', tier: 3 },           // the Seam Wyrm
   grove: { boss: 'groundskeeper', tier: 2 },     // the Elder of the Grove: has kept this ground for ever
   aurora: { boss: 'banshee', tier: 2 },          // the Aurora Matriarch: the wail the bells were cast against
@@ -59,7 +59,7 @@ const W_MAGIC = {                         // relic: trophy rarity ('c'|'u'|'r');
 const W_FAMOUS = {
   hatchery: [['The Drowned Eleven', 'DRN', '#235c9c', '#bfe3ff'], ['The Brood Tide', 'BRD', '#2f7f7a', '#c8f0e8'], ['The Shell Game', 'SHL', '#8a6a3c', '#f0e0c0']],
   emberdeep: [['The Cinder Saints', 'CSA', '#a83a1e', '#ff9a7a'], ['Slag Heap United', 'SLG', '#5a4a3a', '#e0c8a8'], ["The Queen's Guard", 'QGD', '#c0392b', '#ffd0c0']],
-  genevault: [['Control Group', 'CTL', '#3a6f8f', '#d0ecff'], ['The Specimen Six', 'SPX', '#6a4a9c', '#e0d0ff'], ['Containment Breach', 'BRC', '#a08010', '#fff3b0'], ['Apex Prototypes', 'APX', '#2a1f3a', '#b494ff']],
+  genevault: [['The Old Guard', 'OLD', '#3a6f8f', '#d0ecff'], ['The Sealed Six', 'SIX', '#6a4a9c', '#e0d0ff'], ['Lockdown United', 'LCK', '#a08010', '#fff3b0'], ['Apex Prototypes', 'APX', '#2a1f3a', '#b494ff']],
   deepseam: [['The Seam Splitters', 'SEA', '#8a3a1e', '#ffb08a'], ['Deep Shift', 'DSH', '#4a3a2a', '#e0c8a0'], ['The Glassheart Few', 'GLS', '#3a8a8a', '#c0fff8']],
 };
 const W10 = { rooms: {}, hold: false, depth: null };
@@ -290,8 +290,8 @@ const wW10RenderHelp = renderHelp;
 renderHelp = function () {
   wW10RenderHelp();
   const sec = $('wHelp'); if (!sec || $('wHelp5')) return;
-  sec.insertAdjacentHTML('beforeend', `<div id="wHelp5">
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelp5"><h4>Dungeons and lairs</h4>
     <p class="hint"><b>Dungeons.</b> Each dungeon is a gauntlet. Some rooms hold famous teams: walk in and they want a game, an elite match with a scouting report, and deeper rooms bring sport perks, high stakes and a higher level. A room you win stays won. When every room is beaten, the alpha in the deepest room plays you, and it is a Sudden Death boss. The two lairs out in the wild hold bosses too.</p>
-    <p class="hint"><b>Getting in.</b> Dungeon doors open to teams that have won cups, and the Gene Vault also wants its keycard. A shut door tells you what you are missing.</p>
+    <p class="hint"><b>Getting in.</b> Dungeon doors open to teams that have won cups, and the Sealed Vault also wants its keycard. A shut door tells you what you are missing.</p>
     <p class="hint"><b>Magic gear.</b> The strongbox behind a beaten alpha holds a trophy and a gear card, and in the deepest vaults a pick of Hall of Fame legends. A lair's alpha pays the same way when you beat it, and a beaten room sometimes leaves a gear card behind.</p></div>`);
 };

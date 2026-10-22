@@ -84,7 +84,7 @@ These are the shapes the parts agree on, so they can be built in parallel. See `
 - **Ends** dispatch by name: `W_ON_END[kind](result, ref, world)`, for `wild`, `alpha` and `lair` so far. Never store a callback.
 - **Win:** SD's path (rewards, stakes, the reward panel). Its Continue (`backToMap`/`advanceAct`, both reassigned) returns to the world; `RUN.act` goes back to `act0`, and a boss never advances SD acts.
 - **Loss:** a blackout (`wBlackout`: wake by the innkeeper of `WG.home` or Graftonbury, lose 10% gold and 25% fans, HP back to at least half), or in Hardcore (`WG.hardcore`) `recordRun('lose')` and SD's end screen, which clears the save. Conceding (run bar or pause) is a loss.
-- **Tiers:** `W_TIER` by region (plains 1, the outer regions 2) and `W_DUNGEON_TIER` by dungeon (Hatchery and Emberdeep 2, Gene Vault and Deep Seam 3).
+- **Tiers:** `W_TIER` by region (plains 1, the outer regions 2) and `W_DUNGEON_TIER` by dungeon (Hatchery and Emberdeep 2, Sealed Vault and Deep Seam 3).
 - **Save:** `localStorage[pkey('sd-realm')] = { v: 2, WG, RUN }`. SD's `saveRun`, `loadRun` and `clearRun` are reassigned to it; v1 saves (WG only) get a RUN on load.
 - **Cards from the world:** `wGainCard(id | { id, up } | { pick, rarity?, kind?, pool? }, why)` is the one way in; chests and topics pay through `card:`, `cards:` and `cardChoice:`. Phase 3 calls it for players' cards.
 
@@ -124,19 +124,19 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
   |---|---|---|---|
   | the Hatch-Mother | The Drowned Hatchery | `cube` | 2 |
   | the Warren Queen | Emberdeep Warren | `kqueen` | 2 |
-  | Specimen Nought | The Gene Vault | `mirror` | 3 |
+  | Captain Nought | The Sealed Vault | `mirror` | 3 |
   | the Seam Wyrm | The Deep Seam | `wyrm` | 3 |
   | the Elder of the Grove | Elder Grove (lair) | `groundskeeper` | 2 |
   | the Aurora Matriarch | Aurora Roost (lair) | `banshee` | 2 |
 
   `wNameLead` (wrapped) gives the boss enemy the alpha's name. A dungeon's alpha only plays once every room is beaten (`W_DUNGEON.alphaNeedsRooms`). SD's boss reward (a boss trophy pick) applies as usual, and the reward panel's Continue (`advanceAct`, already reassigned in w5) goes back to the world.
-- **Gates.** `wGateCheck(locId)` returns `{ ok, need, text }` from `W_GATE`: cups won (`wCupsWon()`, w9; phase 6 sets the `cup_*` flags) and/or a key item. `wStepEnter` (wrapped) refuses a shut dungeon door and logs what is missing, and logs a line about the rooms on the way in. Lairs check the same table before their match. The table: Hatchery and Emberdeep 1 cup, the Gene Vault 2 cups and the keycard, the Deep Seam 3 cups (it is also hidden), Elder Grove none, Aurora Roost 1 cup.
+- **Gates.** `wGateCheck(locId)` returns `{ ok, need, text }` from `W_GATE`: cups won (`wCupsWon()`, w9; phase 6 sets the `cup_*` flags) and/or a key item. `wStepEnter` (wrapped) refuses a shut dungeon door and logs what is missing, and logs a line about the rooms on the way in. Lairs check the same table before their match. The table: Hatchery and Emberdeep 1 cup, the Sealed Vault 2 cups and the keycard, the Deep Seam 3 cups (it is also hidden), Elder Grove none, Aurora Roost 1 cup.
 - **Magic gear.** `wMagicDrop({ relic?, gear?, legend? }, why)` pays a Sudden Death trophy of that rarity (`relicPool`, then `gainRelic`), gear cards (`gr_*`, leaning to the region's sports, through `wGainCard`) and a pick of N Hall of Fame legends (`wGainCard({ pick, pool })`). The prize chests carry `magic: '<chest id>'` (set at load from `W_MAGIC`), and `wGiveLoot` (wrapped) pays it after the usual loot. A lair's win pays `W_MAGIC[alphaId]` (`W_ON_END.lair`, wrapped). A won room drops one gear card `W_DUNGEON.roomGear` of the time.
 
   | Source | Trophy | Gear | Legends |
   |---|---|---|---|
   | Hatchery and Emberdeep prizes | uncommon | 1 | none |
-  | Gene Vault and Deep Seam prizes | rare | 1 | pick of 3 |
+  | Sealed Vault and Deep Seam prizes | rare | 1 | pick of 3 |
   | Elder Grove win | uncommon | none | pick of 3 |
   | Aurora Roost win | rare | 1 | pick of 3 |
   | A won room | none | 1 (35%) | none |
@@ -160,7 +160,7 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **Matches:** `world.kind: 'cup'`, `ref: { cup, round, club }` (`club` is an SD club id, `'apex'` for the Crown final, or null). `W_ON_END.cup` advances, knocks out, or awards the cup.
 - **Head to head:** `WG.h2h[clubId | 'apex'] = { w, l, last: { r: 'win'|'lose', us, them, sport, day } }`; the score comes from the last `RUN.games` entry. It is kept for cup matches against a club and for the road's `rival` event (`W_ON_END.event` is wrapped). It shows on the pre-game card (`wH2hLast`: "They remember last time: you won, 3–1 (Hockey). Head to head: 2–1.") and on the Camp's team tab, with the cups held. The road's rival event now draws its club from `WG.rivals` (`wOpenEvent` wrapped).
 - **The Crown** (`DB.cups.crown`, renamed "The Crown" at load; the steward's topic ENTER, act `cup:crown`): only when `wChampWeek()` and `wCupsWon() === 4`, once per year (`WG.crownYear`), no fee. Tier 3, levels `W_CUP.crown.lv`, sports drawn from every region.
-  - Rounds: the two rival clubs with the best record against you (`wCrownClubs`, fixed at entry in `WG.cup.clubs`), then the final: `type: 'boss'` at SD act 3 (`ENCOUNTERS[2].boss`, through `bossId`), in Apex Biologic colours.
+  - Rounds: the two rival clubs with the best record against you (`wCrownClubs`, fixed at entry in `WG.cup.clubs`), then the final: `type: 'boss'` at SD act 3 (`ENCOUNTERS[2].boss`, through `bossId`), in Apex Athletic colours.
   - Winning sets `champion`, pays `W_CUP.crown.prize`, and shows the champion ending: SD's `showEnd('win')`, retitled "Champions of the realm", with **Keep exploring** (back to the world, save intact) and Back to the title. `recordRun` is not called, so the save is not cleared. Level-up prompts wait until Keep exploring.
 - **WAIT** (act `waitweek`) is refused without four cups, and saves after waiting.
 - **Functions:** `wCupEnter(id, { card? })`, `wCupPlay({ card? })`, `wCupProblem(id)` ('' or why not), `wCupMatch(id, round)` (the `startMatch` options), `wCupWho`, `wCupThe`, `wCupWithdraw`, `wCrownClubs`, `wCrownEnding`, `wH2hRecord(club, r)`, `wH2hLast(club)`.

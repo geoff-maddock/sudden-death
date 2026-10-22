@@ -93,9 +93,9 @@ function wCampTeam() {
   const rv = WG.rivals || {};
   return `<p class="hint">The first three start every match; their cards and the league cards make the deck. Benched players sit out with their cards, and still earn half the XP. Drag players, or use the arrows, to change the order.</p>
     <h4>Starting three</h4><ol class="wroster">${st.map((p, i) => wCampRow(p, i)).join('')}</ol>
-    <h4>Bench</h4>${bn.length ? `<ol class="wroster" start="4">${bn.map((p, i) => wCampRow(p, i + W_PARTY.starters)).join('')}</ol>` : '<p class="hint">Nobody on the bench yet. Free agents drink at every inn; ask the innkeeper about AGENTS.</p>'}
+    <h4>Bench</h4>${bn.length ? `<ol class="wroster" start="4">${bn.map((p, i) => wCampRow(p, i + W_PARTY.starters)).join('')}</ol>` : '<p class="hint">Nobody on the bench yet. Free agents wait at every inn: talk to the innkeeper and ask about AGENTS.</p>'}
     ${(WG.wwait || []).length ? `<h4>Waiting to join</h4><div class="wwait">${WG.wwait.map((p, i) => `<div class="wag"><img src="${wPlayerPort(p, 64)}" alt=""><div><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}</span></div><button class="btn" data-wait="${i}">Sign</button></div>`).join('')}</div>` : ''}
-    ${Object.keys(rv).length ? `<p class="hint wrivals">Rivals on the road: ${Object.keys(rv).map(k => `${esc(DB.companies[k].short)} (the ${esc(CLUBS[rv[k]].name)})`).join(', ')}.</p>` : ''}`;
+    ${Object.keys(rv).length ? `<p class="hint wrivals">Rivals on the road: ${Object.keys(rv).filter(k => CLUBS[rv[k]]).map(k => `the ${esc(CLUBS[rv[k]].name)}`).join(', ')}.</p>` : ''}`;
 }
 function wCampDeck() {
   const grid = cards => `<div class="cardgrid">${sortDeck(cards).map(c => cardHTML(c, { flav: false })).join('')}</div>`;
@@ -113,6 +113,6 @@ renderHelp = function () {
   sec.insertAdjacentHTML('beforeend', `<div id="wHelpTeam"><h4>Your team</h4>
     <p class="hint">You start by picking a club and three of its players. Your team can grow to ${W_PARTY.max} players. The first three in the lineup start every match; the rest sit on the bench. Open the team with the <b>Team</b> button or the <kbd>C</kbd> key to change who starts.</p>
     <p class="hint"><b>Cards belong to players.</b> League cards always play. Every other card belongs to the player of its kind, and plays only when that player starts: bench someone and their cards sit out with them. The Deck tab shows whose cards are whose.</p>
-    <p class="hint"><b>Levels.</b> Players earn XP from every match: starters the full amount (more for a win, a bonus for player of the game), the bench half. Each level up raises the team's max HP by ${W_PARTY.hpPerLvl} and offers a card of that player's kind.</p>
-    <p class="hint"><b>Recruiting.</b> Free agents drink at every inn: ask the innkeeper about AGENTS, and pay a signing fee. They change every week. After a win, one of the players you beat may ask to join, more often after an elite game. Some quests end with a new player, too. A new player brings their signature card and a card or two of their kind. With a full roster you have to release someone first, and a released player takes their cards with them.</p></div>`);
+    <p class="hint"><b>Levels.</b> Players earn XP from every match: starters the full amount (more for a win, a bonus for player of the game), the bench half. Each level up, to level ${W_PARTY.maxLvl}, raises the team's max HP by ${W_PARTY.hpPerLvl} and offers a card of that player's kind. A lost match still pays a quarter.</p>
+    <p class="hint"><b>Recruiting.</b> Free agents wait at every inn: ask the innkeeper about AGENTS (the inn's room menu has a Free agents button too), and pay a signing fee. They change every week. After a win, one of the players you beat may ask to join, more often after an elite game. Some quests end with a new player, too. A new player brings their signature card and a card or two of their kind. With a full roster you have to release someone first, and a released player takes their cards with them.</p></div>`);
 };

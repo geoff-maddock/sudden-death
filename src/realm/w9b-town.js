@@ -15,7 +15,7 @@
    leans to the region's sports and kinds and turns over every week (WG.cardShops[id].week). Trading a card away costs
    Sudden Death's removeCost (it rises by 25 each time), once per vendor per week.
 
-   Realm functions wrapped: wRunAct (acts enchant, kitchen, meals, cards), wOpenInn (a Meals button), wPreGame (the
+   Realm functions wrapped: wRunAct (acts enchant, kitchen, meals, cards), wOpenInn (Meals and Free agents), wPreGame (the
    meal line), wRenderHud (energy and meal), renderHelp (the road and town section). */
 
 /* ---------- meals ---------- */
@@ -246,8 +246,10 @@ wOpenInn = function (price, who) {
   wW7OpenInn(price, who);
   const inn = WUI.talk && DB.innMenu[WUI.talk.id] ? WUI.talk.id : null, row = $('wSleep') && $('wSleep').parentNode;
   if (!row) return;
-  row.insertAdjacentHTML('beforeend', '<button class="ghost" id="wInnMeals">Meals and the hearth</button>');
+  row.insertAdjacentHTML('beforeend', '<button class="ghost" id="wInnMeals">Meals and the hearth</button><button class="ghost" id="wInnAgents">Free agents</button>');
   $('wInnMeals').onclick = () => wOpenMeals(inn);
+  // every inn is a tavern (w6-party.js): the free agents are one button away, not only behind the AGENTS topic
+  $('wInnAgents').onclick = () => wOpenTavern(WG.map, who);
 };
 const wW9RenderHud = wRenderHud;
 wRenderHud = function () {
@@ -286,10 +288,12 @@ const wW9RenderHelp = renderHelp;
 renderHelp = function () {
   wW9RenderHelp();
   const sec = $('wHelp'); if (!sec || $('wHelp4')) return;
-  sec.insertAdjacentHTML('beforeend', `<div id="wHelp4">
-    <p class="hint"><b>How hard a game is.</b> The Charter Plains are tier 1, the four outer regions tier 2, and the deepest vaults tier 3. Inside a tier, the level (0 to 4) goes up the further you are from Graftonbury, with every two cups you win, and at night off the road. Each level gives the other team 8% more HP, and from level 2 some Strength. The pre-game card shows the level and why. At night off the road, a wild team may <b>ambush</b> you: they start a score ahead.</p>
-    <p class="hint"><b>Road events.</b> Now and then you meet somebody on the road: a pedlar, a cook, an old coach, a rival club. The card says what each choice costs and what it does. Some lead to a match, and a lost match is a blackout like any other.</p>
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelp4"><div id="wHelpTowns"><h4>Towns</h4>
+    <p class="hint"><b>Inns.</b> Every town has an inn. A room heals your team fully and makes it the place you wake after a lost match. Free agents wait in every inn, too (see Your team).</p>
     <p class="hint"><b>Meals.</b> Cook at any inn hearth (or in Tansy's canteen) from ingredients you pick off bushes or buy, or buy a meal from an inn's kitchen. Meals wait in your pantry. Eat one before a match (from an inn's MEAL menu, or on the pre-game card) and it helps in that match only: Block, Strength, Footwork, extra cards or Stamina on the first turn, or a little HP.</p>
     <p class="hint"><b>Energy and the enchanter.</b> Wells, some road events and every win give elemental energy (wins give the region's kind). Brother Quill, in Graftonbury's chapel, spends it: upgrade a card, drill a card (Practice ★), or recharge a gear card. Any kind of energy pays, and each service costs a little more every time.</p>
-    <p class="hint"><b>Card shops.</b> Odd Lots in Graftonbury, Hob Tarn's nets in Saltmere and the Brandt smithy in Cinderhold sell cards for their region's sports, with new stock every week. They will also take a card off your hands, for a fee.</p></div>`);
+    <p class="hint"><b>Card shops.</b> Odd Lots in Graftonbury, Hob Tarn's nets in Saltmere and the Brandt smithy in Cinderhold sell cards for their region's sports, with new stock every week. They will also take a card off your hands, for a fee.</p></div>
+    <div id="wHelpRoad"><h4>The road</h4>
+    <p class="hint"><b>How hard a game is.</b> The Charter Plains are tier 1, the four outer regions tier 2, and the deepest vaults and the Crown tier 3. Inside a tier, the level (0 to ${W_ROAD.maxLv}) goes up the further you are from Graftonbury, with every ${W_ROAD.cupsPerLv} cups you win, and at night off the road. Each level gives the other team ${Math.round(W_ROAD.hpPerLv * 100)}% more HP, and from level 2 some Strength. The pre-game card shows the level and why. At night off the road, a wild team may <b>ambush</b> you: they start a score ahead.</p>
+    <p class="hint"><b>Road events.</b> Now and then you meet somebody on the road: a pedlar, a cook, an old coach, a rival club. The card says what each choice costs and what it does. Some lead to a match: say Not yet on its pre-game card and you are back at the event, and a lost match is a blackout like any other.</p></div></div>`);
 };

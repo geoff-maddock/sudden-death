@@ -5,7 +5,7 @@
    The tier model. Tier sets the SD act a match is played at (RUN.act = tier - 1: TUNE, spawn and the encounter tables):
      tier 1  the Charter Plains and its roads           (W_TIER, w5)
      tier 2  the four outer regions, Hatchery, Emberdeep (W_TIER, W_DUNGEON_TIER)
-     tier 3  the Gene Vault, the Deep Seam (and later the Crown)
+     tier 3  the Sealed Vault, the Deep Seam, the Crown
    Level (0 to 4) is a finer step inside a tier, added up and shown on the pre-game card:
      +1 per 11 tiles beyond the first 4 from Graftonbury (at most +3; not in dungeons), +1 per two cups won,
      +1 for a night game off the road. Each level gives the other team +8% HP, and from level 2 Strength (W_ROAD.strAt).
@@ -19,7 +19,8 @@
 
    Sudden Death functions reassigned here: rollEncounter (region kinds, per-tier easy games), checkGoals (off in the realm).
    Realm functions wrapped here: wBuildEncounter (level, ambush, team), wPreGame (level and ambush lines), wFoeTeam,
-   wEncounterHook (road events), wStart (reopens an unfinished event card), renderHelp (via w9b). Adds W_ON_END.event. */
+   wEncounterHook (road events), wStart (reopens an unfinished event card), wKickoff (an event closes at kickoff),
+   wBackAway (Not yet on an event match goes back to the event card), renderHelp (via w9b). Adds W_ON_END.event. */
 
 const W_ROAD = {
   distFree: 4, distBand: 11, distMax: 3,    // level from distance to Graftonbury, in world tiles
@@ -267,7 +268,8 @@ function wEventChoose(i, o) {
   if (!wAffordable(c)) { wOpenEvent(); return false; }
   const region = wRegionHere();
   if (c.match) {
-    wPayCost(c); WG.event = null;
+    // the event stays open (WG.event) until kickoff, so backing out of the pre-game card brings it back (wBackAway);
+    // the choice's cost is paid at kickoff (wKickoff, below)
     const who = wEventWho(S);
     wLog(c.label + '.', 'd');
     startMatch({ type: c.match.type || 'normal', tier: wTierHere(), name: c.match.name || (S.rival ? who.short : null), world: { kind: 'event', ref: { ev: S.id, c: i, rival: S.rival || null }, region } });
@@ -298,6 +300,24 @@ function wEventChoose(i, o) {
   wSave(); wOpenEvent(); wDrain();
   return true;
 }
+/* an event match: the event closes (and its choice is paid for) only when the match kicks off */
+function wEventOfMatch(enc) {
+  const W = enc && enc.world, S = WG && WG.event;
+  return W && W.kind === 'event' && W.ref && S && S.id === W.ref.ev && !S.done ? S : null;
+}
+const wW6Kickoff = wKickoff;
+wKickoff = function (enc) {
+  const S = wEventOfMatch(enc);
+  if (S) { const ev = wEventDef(S.id), c = ev && ev.choices && ev.choices[enc.world.ref.c]; if (c) wPayCost(c); WG.event = null; }
+  return wW6Kickoff(enc);
+};
+/* Not yet on an event match: back to the event card, where the same choice (or Walk on) is still there */
+const wW5BackAway = wBackAway;
+wBackAway = function (enc) {
+  if (!wEventOfMatch(enc)) return wW5BackAway(enc);
+  wLog('You hold off. The offer still stands.', 'd');
+  wSave(); wOpenEvent();
+};
 W_ON_END.event = function (r, ref) {
   if (r !== 'win' || !ref) return;
   const ev = wEventDef(ref.ev), c = ev && ev.choices[ref.c]; if (!c || !c.match) return;

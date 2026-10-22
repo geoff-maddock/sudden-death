@@ -103,7 +103,7 @@ function wTileVariant(map, x, y, c) {
   return '1';
 }
 function wNpcAt(x, y) { const m = wCurMap(); return (m.npcs || []).find(n => n.x === x && n.y === y); }
-function wChar(id) { const c = DB.chars[id]; if (!c) return { name: 'Somebody', greet: '...', topics: {}, kind: 'goblin' }; const o = Object.assign({}, c); if (typeof o.name === 'string' && o.name[0] === '@') o.name = 'A rival handler'; return o; }
+function wChar(id) { const c = DB.chars[id]; if (!c) return { name: 'Somebody', greet: '...', topics: {}, kind: 'goblin' }; const o = Object.assign({}, c); if (typeof o.name === 'string' && o.name[0] === '@') o.name = 'A rival captain'; return o; }
 /* NPC positions live in WG.npc so wandering survives a save */
 function wApplyNpcs(id) { const m = MAPS[id], s = WG.npc[id]; if (!m || !s) return; m.npcs.forEach((n, i) => { if (s[i]) { n.x = s[i][0]; n.y = s[i][1]; } }); }
 function wStoreNpcs(id) { const m = MAPS[id]; if (m && m.kind === 'town' && m.npcs.some(n => !n.fixed)) WG.npc[id] = m.npcs.map(n => [n.x, n.y]); }
@@ -231,7 +231,6 @@ function wInteract() {
   wLog(wLookText(x, y), 'd');
 }
 function wLook() { const [x, y] = wFacing(); wLog(wLookText(x, y), 'd'); }
-const WSOON = 'Matches out here come in a later update.';
 /* verbs on tiles: the table is DB.tiles[..].use */
 function wUse(x, y) {
   const m = wCurMap(), c = wTileAt(m, x, y), use = (DB.tiles[c] || {}).use, meta = m.meta[x + ',' + y] || {};
@@ -252,7 +251,7 @@ function wUse(x, y) {
       wAddItem(it, n); WG.harv[wHkey(x, y)] = WG.dayAbs; wAdvance(20); wInvalidate(WG.map);
       wLog('You pick ' + n + ' ' + DB.items[it].name + '.', 'm'); break;
     }
-    case 'nest': // dropped: eggs. Nests are scenery until a later phase gives them a use.
+    case 'nest': // dropped: eggs. Nests are scenery.
       if (meta.alpha && !wFlag('alpha_' + meta.alpha)) return wLog('The alpha will not let you near its nest.', 'b');
       wLog(wDepleted(x, y, 4) ? DB.tiles.N.look0 : DB.tiles.N.look + ' Whatever lives here is out.', 'd'); break;
     case 'chest': {
@@ -266,7 +265,7 @@ function wUse(x, y) {
       const rg = meta.ring; if (!rg) return wLog(wLookText(x, y), 'd');
       if (!wHas(rg.item)) return wLog('A great bronze bell, silent. You have nothing that would make it ring true.', 'd');
       if (rg.night && wDarkness() < .3) return wLog('You strike the bell. In daylight the note just dies in the snow. Come back after dark.', 'd');
-      wLog('You strike the bell with the rod. The note goes up, and up, and the lights shiver. Nothing comes down yet. ' + WSOON, 'g');
+      wLog('You strike the bell with the rod. The note goes up, and up, and the lights shiver. Nothing comes down tonight.', 'g');
       wEncounterHook(wRegionHere(), c, { kind: 'bell', ring: rg }); break;
     }
     case 'lair': {
@@ -345,8 +344,8 @@ function wRunAct(act, id) {
   if (act === 'inn') { WQ.push({ k: 'inn', id, price: ch.inn || 12, who: ch.name }); return; }
   if (act === 'wall') { wWallText(); return; }
   if (act === 'waitweek') { wLog(wWaitForWeek(), 'g'); return; }
-  if (act.startsWith('cup:')) { const cup = DB.cups[act.slice(4)]; wLog((cup ? cup.name : 'The cup') + ': the brackets are not drawn yet. Cups come in a later update.', 'b'); wEncounterHook(wRegionHere(), null, { kind: 'cup', cup: act.slice(4) }); return; }
-  wLog('That comes in a later update.', 'd');
+  // cup:<id> is handled by w11-cups.js, which wraps this function
+  wLog('Nothing happens.', 'd');
 }
 
 /* ---------- shops and inns ---------- */

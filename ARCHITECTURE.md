@@ -127,3 +127,44 @@ Balance is measured with bots that play from the model, not the screen (`test/la
 - `python3 test/difficulty.py 100 '{"draw":4}' dumb`: difficulty probe. Overrides `TUNE` (`engine/combat.js`: cards drawn, enemy HP and damage per act, elite HP, healing between acts), and with `dumb` also runs a careless bot that plays random cards at random targets. The gap between the two is a rough measure of how much skill matters. Add `hard` for Hall of Fame difficulty.
 
 Bot numbers measure relative balance, not how hard the game feels to a person. Compare before and after a change, with at least 100 runs per side, and expect a few points of noise either way.
+
+## Sudden Death: Realm
+
+`./build.sh src/realm/manifest.txt` writes `dist/realm.html`: an open-world build where you walk a realm with your team and every fight is a Sudden Death match. Its manifest loads a prelude, then `include src/manifest.txt` (all of Sudden Death, in its own order), then the realm files. Its `out` line comes after the include, so it replaces Sudden Death's. `style` lines add the realm CSS to the shell's `<style>`. The standalone build never sees a realm file. `docs/realm/` has the plan (`PLAN.md`), the shapes the parts agree on (`CONTRACT.md`) and the balance notes (`BALANCE.md`).
+
+### The files, in build order
+
+| File | What lives there |
+|---|---|
+| `w00-pre.js` | Sets `__SD_REALM` before anything else, so Sudden Death's `app/boot.js` stands down. |
+| *(all of Sudden Death)* | Unchanged. |
+| `w0.css`, `w6.css`, `w9.css` | Realm styles: the world view, the camp, the road and towns. |
+| `w1-data.js` | `DB`: regions, tiles, locations, towns, NPCs and their keyword topics, items, meals, events, cups, quests (ported from Terra Chimera, rewritten for teams). |
+| `w2-maps.js` | `MAPS`: the overworld, towns and dungeons, built deterministically; `worldProblems`, `dungeonProblems`, `wAudit`. |
+| `w3-state.js` | `WG`, the world state: time, movement, map changes, using tiles, NPC talk (`wSay`, `wRunAct`), shops and inns. No DOM. |
+| `w4-ink.js` | The ink tile renderer and actor drawing (`wDrawMap`, `wDrawActor`), with a per-map layer cache. |
+| `w5-bridge.js` | **The match seam**: `startMatch`, the pre-game card, `W_ON_END`, wins and blackouts, the save, `wGainCard`. |
+| `w6-party.js` | The party is the team: roster, lineup, cards owned by players, XP and levels, recruiting, taverns, careers, the new-journey draft. |
+| `w7-ui.js` | The world view: HUD, log, talk panel, shop and inn panels, input, drawing each frame. |
+| `w7b-camp.js` | The camp (Team button, `C`): lineup, levels, cards by player. |
+| `w8-boot.js` | Title screen, new journey, save and resume, the frame loop's world branch. |
+| `w9-road.js` | Tiers and levels, wild teams by region, night ambushes, energy for wins, road events. |
+| `w9b-town.js` | Meals and cooking, the enchanter, card shops. |
+| `w10-dungeon.js` | Dungeon rooms of famous teams, alphas as Sudden Death bosses, gates, magic gear. |
+| `w11-cups.js` | Town cups, rivals and head to head, the Crown and the champion ending. |
+| `w12-renown.js` | Renown (foes grow with cups and bosses), and no trophies from ordinary elite wins. |
+
+### The match seam
+
+`startMatch({ type, tier, sport?, ids?, world: { kind, ref } })` (`w5-bridge.js`) builds a Sudden Death encounter at `RUN.act = tier - 1`, shows the pre-game card and calls `beginFight`. The world context rides on `RUN.pending.world` as plain data, so a mid-match save restores it. When the match ends, `W_ON_END[world.kind](result, ref, world)` runs, looked up by name: `wild`, `alpha`, `lair`, `event`, `room`, `cup`. Nothing stores a callback. A win goes through Sudden Death's reward panel, whose Continue (`backToMap`, reassigned) returns to the world; a loss is a blackout (`wBlackout`), or the end in Hardcore. **Not yet** on the pre-game card calls `wBackAway(enc)`: for a road event's match it reopens the event card (`w9-road.js`), because an event only closes, and its choice is paid, at kickoff.
+
+### Conventions
+
+- **Realm names start with `w` or `W`** (`WG`, `wLog`, `W_CUP`). The Terra Chimera names `DB`, `MAPS`, `WW`, `WH`, `regionAt`, `mulberry`, `noise2` are the only exceptions. Never declare a name Sudden Death already has.
+- **Wrap by reassignment.** Later realm files change earlier ones, and Sudden Death, only by saving the original and reassigning: `const wW11PreGame = wPreGame; wPreGame = function (enc) { wW11PreGame(enc); … };`. The saved original is named `wW<n>` plus the function name, where `<n>` is the part doing the wrapping (`wW10`, `wW11`, `wW12`); a Sudden Death original saved in the realm is `wSd…`. Each file's header comment lists what it wraps.
+- **How to play** is one section, `#wHelp`, built by `w5-bridge.js` and added to by each part's `renderHelp` wrapper, in load order. Each part's block keeps its id (`wHelpTeam`, `wHelp4`, `wHelp5`, `wHelpCups`, `wHelpRenown`): the tests look for them.
+- **Talk topics** are lower-case keys; an ALL-CAPS word in a line becomes a link when the speaker has a topic for it. `test/realm_polish.py` checks every capitalised word leads somewhere, and `wAudit` checks every `need` flag is set by something.
+
+### The save
+
+One record per profile: `localStorage[pkey('sd-realm')] = { v: 2, WG, RUN }`. `saveRun`, `loadRun` and `clearRun` are reassigned to it, so Sudden Death's mid-match snapshot (`RUN.battle`) works unchanged. `WG` and `RUN` must stay plain JSON, like `B`.

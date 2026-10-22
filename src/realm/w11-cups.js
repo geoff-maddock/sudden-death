@@ -7,13 +7,13 @@
    is. Winning a cup sets its flag (cup_moss ...), cups1..cupsN, pays a prize and goes on the Wall of Awards.
    WG.cup = { id, round, ready?, clubs? } is the cup you are in (plain data, saved with WG).
 
-   Rivals remember you. The four TC companies play as the SD clubs in WG.rivals (w6-party.js). They are round 3 of the
+   Rivals remember you. The four rival slots (TC's companies) play as the SD clubs in WG.rivals (w6-party.js). They are round 3 of the
    town cups, the first two rounds of the Crown, and the road's 'rival' event. Every match against one is kept in
    WG.h2h[clubId] = { w, l, last: { r, us, them, sport, day } } ('apex' for the Crown final), shown on the Camp and on
    the pre-game card ("They remember last time: you won, 3-1.").
 
    The Crown. At the Crown Coliseum (Steward Crane, topic ENTER, act 'cup:crown'), only in championship week and only
-   with four cups: two rival clubs (the two with the best record against you), then the apex club, Apex Biologic,
+   with four cups: two rival clubs (the two with the best record against you), then the apex club, Apex Athletic,
    fielding a Sudden Death Act 3 boss. Win it and 'champion' is set and the champion ending shows, with a button to keep
    exploring (the save goes on). Once per year. The steward's WAIT (act 'waitweek') is for entrants with four cups.
 
@@ -32,15 +32,13 @@ const W_CUP = {
   lvPerCup: .5,                     // plus floor(cups won x this) levels, at most W_ROAD.maxLv
   prize: { gold: 120, fans: 40, pick: 3, rarity: 'r' },   // a town cup: gold, fans, and a pick of rare cards
   crown: { tier: 3, lv: [1, 2, 3], prize: { gold: 300, fans: 120 } },
-  home: { moss: 'wildgraft', salt: 'cauldron', cind: 'thaumagen', rime: 'helix' },  // each cup's rival company
-  apexTeam: { name: 'Apex Biologic', short: 'APX', color: '#f2c14e', light: '#fff1c2' },
+  home: { moss: 'wildgraft', salt: 'cauldron', cind: 'thaumagen', rime: 'helix' },  // each cup's rival slot (DB.companies)
+  apexTeam: { name: 'Apex Athletic', short: 'APX', color: '#f2c14e', light: '#fff1c2' },
 };
 const W11 = { ending: false };
 const W_TOWN_CUPS = ['moss', 'salt', 'cind', 'rime'];
 
-/* the leftover Terra Chimera names, made the realm's */
-DB.cups.crown.name = 'The Crown';
-DB.chars.rival.topics.job.t = 'Handler, same as you, but better funded. I will see you in the last round of some CUP or other.';
+/* the rival's and the registrars' CUP lines, for the cup rules below (the crown's name and the rival's job are in w1) */
 DB.chars.rival.topics.cup.t = 'Every cup puts a rival club in the last round. We do not throw matches. We have shareholders. And we remember every score.';
 for (const id of ['moss_reg', 'salt_reg', 'cind_reg', 'rime_reg']) if (DB.chars[id]) DB.chars[id].topics.cup.t = `Three rounds, back to back: a local side, a seeded team with a trick or two, then a rival club. Lose once and you are out, but you can enter again. Win all three and the cup goes on your wall. The League sets the field to your record, so it never gets easier. Entry is ${W_CUP.fee} gold. Say ENTER when your team is ready.`;
 
@@ -122,7 +120,7 @@ function wCupEnter(id, o) {
     WG.cup = { id, round: 0 };
     if (id === 'crown') { WG.cup.clubs = wCrownClubs(); WG.cup.year = WG.year; }
     else { RUN.gold -= W_CUP.fee; wLog(`You pay ${W_CUP.fee} gold and sign up for ${wCupThe(id)}.`, 'm'); }
-    if (id === 'crown') wLog('You are entered for the Crown. Three rounds, and the last is against Apex Biologic.', 'g');
+    if (id === 'crown') wLog('You are entered for the Crown. Three rounds, and the last is against Apex Athletic.', 'g');
   }
   wSave();
   return wCupPlay(o);
@@ -163,7 +161,7 @@ function wCupWon(id) {
   if (id === 'crown') {
     WG.crownYear = WG.year; WG.crowns = (WG.crowns || []).concat(WG.year);
     const P = W_CUP.crown.prize; RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
-    wLog(`You win the Crown! Apex Biologic's run is over. ${P.gold} gold and ${P.fans} fans.`, 'g');
+    wLog(`You win the Crown! Apex Athletic's run is over. ${P.gold} gold and ${P.fans} fans.`, 'g');
     W11.ending = true;
     return;
   }
@@ -187,7 +185,7 @@ function wCrownEnding() {
   const h2 = document.querySelector('#scr-end h2'); if (h2) h2.textContent = 'Champions of the realm';
   const hint = document.querySelector('#scr-end .panel > p.hint'); if (hint) hint.textContent = `${profileName()}'s journey${WG.hardcore ? ', Hardcore' : ''}`;
   const lede = document.querySelector('#scr-end .lede');
-  if (lede) lede.textContent = `The ${CLUBS[RUN.club].name} beat Apex Biologic at the Crown Coliseum, on day ${WG.day} of year ${WG.year}. ${RUN.party.map(p => p.n).join(', ')} carry the crown around the sand, and Old Nell sweeps up after them.`;
+  if (lede) lede.textContent = `The ${CLUBS[RUN.club].name} beat Apex Athletic at the Crown Coliseum, on day ${WG.day} of year ${WG.year}. ${RUN.party.map(p => p.n).join(', ')} carry the crown around the sand, and Old Nell sweeps up after them.`;
   const es = document.querySelector('#scr-end .endstats');
   if (es) es.insertAdjacentHTML('afterbegin', `<div><b>${wCupsWon()}</b>cups</div><div><b>${(WG.crowns || []).length}</b>crown${(WG.crowns || []).length === 1 ? '' : 's'}</div>`);
   const b = $('bAgain');
@@ -234,7 +232,7 @@ wMatchTitle = function (enc) {
   const W = enc.world, ref = W.ref || {};
   if (W.kind !== 'cup' || !wCupDef(ref.cup)) return wW11MatchTitle(enc);
   const boss = enc.ids.find(id => ENEMIES[id].boss), C = wCupDef(ref.cup);
-  const who = ref.club === 'apex' ? `Apex Biologic and ${boss ? ENEMIES[boss].n.split(',')[0] : wFoeNames(enc)[0]}` : ref.club && CLUBS[ref.club] ? `the ${CLUBS[ref.club].name}` : (W.name || wFoeNames(enc).join(' and '));
+  const who = ref.club === 'apex' ? `Apex Athletic and ${boss ? ENEMIES[boss].n.split(',')[0] : wFoeNames(enc)[0]}` : ref.club && CLUBS[ref.club] ? `the ${CLUBS[ref.club].name}` : (W.name || wFoeNames(enc).join(' and '));
   return `${C.name}, ${ref.cup === 'crown' && ref.round === 2 ? 'the final' : 'round ' + (ref.round + 1)}: ${who}`;
 };
 const wW11PreGame = wPreGame;
@@ -308,5 +306,5 @@ renderHelp = function () {
   sec.insertAdjacentHTML('beforeend', `<div id="wHelpCups"><h4>Cups, rivals and the Crown</h4>
     <p class="hint"><b>Town cups.</b> Mossgate, Saltmere, Cinderhold and Rimewatch each hold a cup. Enter with the town's registrar (ask about the CUP, then ENTER) for ${W_CUP.fee} gold. A cup is three rounds in a row, in the region's sports: a local side, a seeded team with a scouting report, then a rival club. Lose once and you are out, but you can enter again. Each cup you already hold makes the next field tougher. Win all three rounds for gold, fans, a rare card, and a place on the Wall of Awards.</p>
     <p class="hint"><b>Rivals.</b> Four rival clubs follow you round the realm: in the last round of the cups, in the Crown, and on the road. They keep score. The pre-game card says how the last game went, and the Team screen shows your record against each of them.</p>
-    <p class="hint"><b>The Crown.</b> Once a year, in championship week (the last ${DB.meta.champWeek} days of the year), Steward Crane at the Crown Coliseum takes entries from teams with all four cups. Three rounds: the two rivals with the best record against you, then Apex Biologic, who field a monster from Sudden Death's last act. Win it and you are champions of the realm, and the road goes on. With four cups and the week still to come, you can WAIT at the Coliseum.</p></div>`);
+    <p class="hint"><b>The Crown.</b> Once a year, in championship week (the last ${DB.meta.champWeek} days of the year), Steward Crane at the Crown Coliseum takes entries from teams with all four cups. Three rounds: the two rivals with the best record against you, then Apex Athletic, who field a monster from Sudden Death's last act. Win it and you are champions of the realm, and the road goes on. With four cups and the week still to come, you can WAIT at the Coliseum.</p></div>`);
 };

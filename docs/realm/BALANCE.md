@@ -15,7 +15,7 @@ Only the fight is played without the screen. Instead of walking, it follows a fi
 2. Mosswold Cup
 3. the Hatchery, then the Elder Grove lair
 4. 2 Brinefen wild games, the Brinefen Cup, Emberdeep, then the Aurora Roost lair
-5. 2 Cindermaw wild games, the Cindermaw Cup, then the Gene Vault
+5. 2 Cindermaw wild games, the Cindermaw Cup, then the Sealed Vault
 6. 2 Frostspire wild games, the Frostspire Cup, then the Deep Seam
 7. the Crown, in championship week
 
@@ -97,8 +97,8 @@ Where the runs that were not champion ended:
 
 | Bot | Ended at |
 |---|---|
-| Skilled | the Hatchery 15, the Crown 13, the first cup 5, the Deep Seam 3, the Gene Vault 3 |
-| Careless | the first cup 57, the Hatchery 54, the Gene Vault 4, the Deep Seam 4 |
+| Skilled | the Hatchery 15, the Crown 13, the first cup 5, the Deep Seam 3, the Sealed Vault 3 |
+| Careless | the first cup 57, the Hatchery 54, the Sealed Vault 4, the Deep Seam 4 |
 
 Single matches, skilled bot (win rate, and HP lost as a share of max):
 
@@ -110,7 +110,7 @@ Single matches, skilled bot (win rate, and HP lost as a share of max):
 | Brinefen Cup, round 3 | 100%, 9% | 100%, 21% |
 | Aurora Roost (the banshee) | 100%, 14% | 79%, 59% |
 | Cindermaw Cup, round 3 | 100%, 3% | 98%, 44% |
-| Gene Vault boss (the mirror) | 100%, 15% | 86%, 55% |
+| Sealed Vault boss (the mirror) | 100%, 15% | 86%, 55% |
 | Frostspire Cup, round 3 | 100%, 11% | 96%, 42% |
 | Deep Seam boss (the wyrm) | 100%, 18% | 77%, 73% |
 | Crown final (Apex's boss) | 100%, 20% | 55%, 78% |
