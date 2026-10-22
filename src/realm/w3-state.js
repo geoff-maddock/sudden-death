@@ -31,19 +31,19 @@ function wHas(id, n) { return (WG.items[id] || 0) >= (n || 1); }
 function wAddItem(id, n) { WG.items[id] = (WG.items[id] || 0) + n; if (WG.items[id] <= 0) delete WG.items[id]; }
 function wCap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
 
-/* the starting club: the first three players of the first club. Phase 3 replaces this with a real roster. */
+/* the default club on the new-journey draft (w6-party.js); the roster itself is WG.roster */
 function wDefaultClub() { return CLUB_IDS[0]; }
 /* who plays: Sudden Death's RUN.party is the source of truth */
 function wParty() { return (RUN && RUN.party) || []; }
 
-/* opts: { hardcore?, club? }. Starts Sudden Death's run too: RUN holds the team, its deck, HP and the purse. */
+/* opts: { hardcore?, club?, picks?, roster?, relic? } (the draft's choices). Starts Sudden Death's run too: RUN holds the team, its deck, HP and the purse. */
 function wNewGame(opts) {
   opts = opts || {};
   const club = CLUBS[opts.club] ? opts.club : wDefaultClub();
   WG = { v: 2, world: WORLD_VER, map: 'graftonbury', x: 5, y: 11, face: 'd', step: 0, year: 1, day: 1, dayAbs: 1, min: 8 * 60,
     flags: {}, items: { ration: 3, salve: 2, grain: 2, salt: 2 }, energy: { bloom: 0, ember: 0, tide: 0, rime: 0, aether: 0 },
     home: null, npc: {}, seen: {}, marks: [], harv: {}, xpk: {}, grace: 0, club, hardcore: !!opts.hardcore, blackouts: 0 };
-  wNewRun(club, 120);
+  wNewRun(club, 120, opts);
   WLOG = [];
   wApplyNpcs(WG.map);
   wLog('Graftonbury. The League office is the building to the north-west. Walk into people to talk to them.', 'g');
@@ -53,8 +53,9 @@ function wNewGame(opts) {
 
 /* ---------- time ---------- */
 /* Sudden Death's newRun for the realm: no act map (the realm is the map), and the realm's starting purse */
-function wNewRun(club, gold) {
-  newRun(club, [0, 1, 2]);
+function wNewRun(club, gold, o) {
+  o = o || {};
+  newRun(club, o.picks && o.picks.length === 3 ? o.picks : [0, 1, 2], o.roster || undefined, o.relic || undefined);
   RUN.map = null; RUN.path = []; RUN.gold = gold;
   return RUN;
 }
@@ -325,6 +326,7 @@ function wSay(id, kw) {
   for (const k in t.giveEn || {}) { WG.energy[k] = (WG.energy[k] || 0) + t.giveEn[k]; wLog('Received ' + t.giveEn[k] + ' ' + DB.elems.names[k] + ' energy.', 'm'); }
   if (t.gold) { RUN.gold += t.gold; wLog('Received ' + t.gold + ' gold.', 'm'); }
   wPayCards(t, 'from ' + ch.name);
+  if (t.recruit && typeof wRecruitTopic === 'function') wRecruitTopic(t.recruit); // a quest companion (w6-party.js)
   if (t.set) { wSetFlag(t.set); wInvalidate('world'); } // a clue can reveal a hidden place on the world map
   if (t.once) { wSetFlag(t.once); const sp = DB.sideplots.find(s => s.id === t.once); if (sp) wLog('Done: ' + sp.title + '.', 'g'); }
   if (t.xp && !WG.xpk[id + ':' + key]) WG.xpk[id + ':' + key] = 1; // dropped: TC paid research data here

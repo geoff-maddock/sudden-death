@@ -87,3 +87,12 @@ These are the shapes the parts agree on, so they can be built in parallel. See `
 - **Tiers:** `W_TIER` by region (plains 1, the outer regions 2) and `W_DUNGEON_TIER` by dungeon (Hatchery and Emberdeep 2, Gene Vault and Deep Seam 3).
 - **Save:** `localStorage[pkey('sd-realm')] = { v: 2, WG, RUN }`. SD's `saveRun`, `loadRun` and `clearRun` are reassigned to it; v1 saves (WG only) get a RUN on load.
 - **Cards from the world:** `wGainCard(id | { id, up } | { pick, rarity?, kind?, pool? }, why)` is the one way in; chests and topics pay through `card:`, `cards:` and `cardChoice:`. Phase 3 calls it for players' cards.
+
+## The party is the team (w6-party.js, w7b-camp.js): phase 3
+
+- **`WG.roster`** = `[{ id, n, kind, num, flav, lvl, xp, joined, from }]` in lineup order: the first 3 start, the rest are the bench (up to 8). Only one player of each kind can start. `RUN.party` is always the 3 starters (`wSyncParty`), so `runKinds`, `cardPool`, `SIG` and the HUD follow the lineup.
+- **Cards belong to players.** `RUN.deck` is the whole collection in the world. A card with `wp` (a player id) plays only when that player starts; a card without one (league cards) always plays. `wKickoff` (wrapped) moves the bench's cards to `RUN.wbench` for the match, so mid-match saves and SD's reward panel see only the match deck; `wDispatchEnd` (wrapped) puts them back and tags new kind cards to the starter of that kind.
+- **Levels:** XP per match (`W_PARTY.xp[type] * tier`, a quarter for a loss, half for the bench, a bonus for player of the game). A level up gives +2 team max HP and a pick of 3 cards of the player's kind (`wGainCard({ pick, pool, pid })`). Picks and recruits queue in `WG.wprompts` and show when the world is free.
+- **Recruiting** always ends in `wRecruit(player, from, done?)`: the signature card and 1-2 kind cards, or a release question when the roster is full. Sources: taverns (topic `agents` at every inn, `WG.tavern[town]`, weekly), post-game (`W_PARTY.recruitOdds`, `W_PARTY.force` for tests), and quest topics with `recruit: { kind, n, lvl }` (paid in `wSay`).
+- **New game:** SD's draft screen (`renderDraft`, reassigned while `DR.realm`) picks the club, the 3 founders and Hardcore; `wStart(null, { club, picks, roster?, relic?, hardcore })`. `WG.rivals` maps each TC company to an SD club other than yours.
+- **Careers:** `logGame` (wrapped) adds each match to SD's careers under `club:name`; `updateCareers` does nothing in the realm, so the Hardcore ending does not count twice.

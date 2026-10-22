@@ -8,11 +8,14 @@ src/realm/w00-pre.js
 include src/manifest.txt
 out dist/realm.html
 style src/realm/w0.css
+style src/realm/w6.css
 
 src/realm/w1-data.js
 src/realm/w2-maps.js
 src/realm/w3-state.js
 src/realm/w4-ink.js
 src/realm/w5-bridge.js
+src/realm/w6-party.js
 src/realm/w7-ui.js
+src/realm/w7b-camp.js
 src/realm/w8-boot.js

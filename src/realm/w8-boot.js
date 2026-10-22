@@ -39,6 +39,7 @@ function wStart(save, opts) {
     wLog('Back on the road: ' + MAPS[WG.map].name + ', ' + wSeason().toLowerCase() + ', day ' + WG.day + '.', 'g');
     WQ.push({ k: 'map' });
   } else wNewGame(opts);
+  wPartyInit(); // the roster (w6-party.js): founders on a new journey, or built from an older save
   wInvalidate();
   // a match in progress picks up where it was: a saved fight on the same turn, a match not yet snapshotted from
   // its kickoff, or the reward panel
@@ -101,16 +102,8 @@ renderTitle = function () {
   showScreen('title');
   if (typeof profileChip === 'function') profileChip();
 };
-/* the new-journey card: the one choice is Hardcore */
-function wNewGameCard() {
-  const club = CLUBS[wDefaultClub()];
-  const close = modal(`<header><h3>A new journey</h3><button class="ghost" data-close>Back</button></header>
-    <p>You lead three players of the ${esc(club.name)} out of Graftonbury. Every fight on the road is a match.</p>
-    <label class="whcbox"><input type="checkbox" id="wHard"><span><b>Hardcore</b><small>Lose a match and the journey is over for good. Without it, a lost match means you black out and wake at your last inn, a little poorer.</small></span></label>
-    <div class="row"><button class="btn" id="wGo">Set out</button></div>`);
-  $('wGo').focus();
-  $('wGo').onclick = () => { const hardcore = $('wHard').checked; close(); wStart(null, { hardcore }); };
-}
+/* a new journey: the draft screen, where you pick a club, three founders and Hardcore (w6-party.js) */
+function wNewGameCard() { wOpenDraft(); }
 // leaving the page keeps your place (a fight saves itself through Sudden Death's own pagehide)
 window.addEventListener('pagehide', () => { if ((UI.view === 'world' || UI.view === 'panel') && !window.__switching) wSave(); });
 

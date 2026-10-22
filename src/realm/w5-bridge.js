@@ -298,6 +298,16 @@ showEnd = function (result) {
   const W = WG.lastMatch, lede = document.querySelector('#scr-end .lede');
   const place = (MAPS[WG.map] || {}).name || 'the realm';
   if (lede && result !== 'win') lede.textContent = `Hardcore. ${result === 'quit' ? 'You walked off the field' : 'Your team went down'} near ${place}, on day ${WG.day} of year ${WG.year}. The journey ends here.`;
+  // the realm's own numbers: no difficulty line, no dungeon score, acts or bosses
+  const hint = document.querySelector('#scr-end .panel > p.hint'); if (hint) hint.textContent = `${profileName()}'s journey, Hardcore`;
+  const h2 = document.querySelector('#scr-end h2'); if (h2 && result !== 'win') h2.textContent = 'The journey ends';
+  const es = document.querySelector('#scr-end .endstats');
+  if (es) {
+    const alphas = Object.keys(WG.flags).filter(f => f.startsWith('alpha_')).length, R = WG.roster || [];
+    const st = [[WG.dayAbs, 'days on the road'], [RUN.stats.fights, 'matches won'], [alphas, 'alphas beaten'], [RUN.stats.sportsWins || 0, 'sports wins'], [RUN.fans || 0, 'fans'], [RUN.stats.gold, 'gold earned']];
+    if (R.length) st.push([R.length, 'players'], [Math.max(...R.map(p => p.lvl || 1)), 'top level']);
+    es.innerHTML = st.map(([n, t]) => `<div><b>${n}</b>${t}</div>`).join('');
+  }
   const b = $('bAgain');
   if (b) { b.textContent = 'Back to the title'; b.onclick = () => { RUN = null; B = null; WG = null; renderTitle(); }; }
 };
@@ -355,7 +365,7 @@ function wShowCardOffer() {
     <p class="hint">${O.why ? esc(wCap(O.why)) + '. ' : ''}Take one for your deck, or skip them all.</p>${cardChoiceRow(O.list, 'wco')}`,
     () => { if (WG && WG.cardOffer === O) { WG.cardOffer = null; wLog('You leave the cards where they are.', 'd'); wSave(); wDrain(); } });
   $('modalBox').querySelectorAll('[data-wco]').forEach(el => {
-    const go = () => { const c = O.list[+el.dataset.wco]; WG.cardOffer = null; close(); wGainCard({ id: c.id, up: c.up }, O.why); wDrain(); };
+    const go = () => { const c = O.list[+el.dataset.wco]; WG.cardOffer = null; close(); wGainCard({ id: c.id, up: c.up, pid: O.pid }, O.why); wDrain(); };
     el.onclick = go; el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   });
 }

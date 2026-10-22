@@ -166,6 +166,8 @@ async def main():
             check(await pg.evaluate("wFlag('chest_hatchery_prize')") and await pg.evaluate('RUN.gold') > g1, 'the prize chest now opens and pays')
 
             # ---------- cards from the world: a strongbox choice, a skipped choice, and a topic ----------
+            # (phase 3: the alpha win levelled players up; set their card picks aside so they do not pop up here)
+            await pg.evaluate("WG.wprompts.length = 0")
             d0 = await pg.evaluate('RUN.deck.length')
             await pg.evaluate(r'''(() => { const m = MAPS.cottage; for (const k in m.meta) if (m.meta[k].chest === 'cottage_chest') { const [x, y] = k.split(',').map(Number); wEnterMap('cottage', m.spawn[0], m.spawn[1]); wDrain(); wUse(x, y); wDrain(); return; } })()''')
             await pg.wait_for_timeout(250)

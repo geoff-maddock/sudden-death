@@ -25,7 +25,7 @@ jobs:
         run: ./build.sh src/realm/manifest.txt && (git diff --exit-code dist/realm.html || (echo "dist/realm.html is stale: run ./build.sh src/realm/manifest.txt and commit it" && exit 1))
       - name: Quick checks
         run: |
-          for t in smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit realm_audit realm_tiles realm_smoke realm_match realm_save; do
+          for t in smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit realm_audit realm_tiles realm_smoke realm_match realm_save realm_party; do
             echo "== $t"; timeout 180 python test/$t.py
           done
       - name: Bot sanity (no errors or stalls in 30 runs)
