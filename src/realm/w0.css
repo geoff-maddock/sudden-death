@@ -1,2 +1,89 @@
-/* w0: Realm styles, injected after Sudden Death's <style> by build-realm.sh */
-#v-world{position:relative}
+/* w0: Realm styles, added to the end of Sudden Death's <style> by the realm manifest's style line */
+.brand h1 small.wrealm{font-family:var(--hud);font-weight:400;font-size:.42em;letter-spacing:1px;color:var(--steel);vertical-align:.35em;margin-left:4px}
+#v-world{position:relative;display:grid;gap:10px}
+/* the HUD: Sudden Death's run bar look */
+.whud{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;padding:8px 12px;border:1px solid var(--seam);border-radius:6px;background:var(--stone);min-height:58px}
+.whud .stat{flex-direction:column;align-items:flex-start;gap:2px}
+.whud .stat small{font-size:15px}
+.whud .stat b{font-weight:400}
+.wwhere{display:grid;line-height:1;gap:3px;min-width:0}
+.wwhere b{font-family:var(--display);font-weight:700;font-size:26px;line-height:.95}
+.wwhere small{font-family:var(--hud);font-size:16px;color:var(--steel)}
+.wcrown{color:var(--dim)}
+.wparty{display:flex;gap:4px;margin-left:auto}
+.wparty img{width:42px;height:42px;border-radius:6px;display:block;border:1px solid var(--seam)}
+.wparty img:first-child{border-color:var(--torch)}
+/* the stage and the side column */
+.wmain{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px;align-items:start}
+.wstage{position:relative;height:clamp(380px,calc(100vh - 250px),720px);border:1px solid var(--seam);border-radius:6px;overflow:hidden;background:#0a0706;touch-action:none;user-select:none;-webkit-user-select:none}
+.wstage canvas{position:absolute;inset:0;display:block;cursor:pointer;image-rendering:auto}
+.wside{display:grid;gap:8px;align-content:start;min-width:0}
+.wlog{height:clamp(220px,calc(100vh - 360px),600px);overflow-y:auto;border:1px solid var(--seam);border-radius:6px;background:var(--stone);padding:8px 12px;font-size:15px;line-height:1.4}
+.wlog p{margin:0 0 6px;color:var(--bone)}
+.wlog p:last-child{margin-bottom:0}
+.wlog .wl-d{color:var(--dim)} .wlog .wl-g{color:var(--torch)} .wlog .wl-m{color:var(--vile)} .wlog .wl-b{color:#ff8a7a}
+.wkeys{margin:0;color:var(--faint);font-size:14px;line-height:1.7}
+.wkeys kbd{font-size:15px}
+/* the place name when you arrive somewhere */
+.wplace{position:absolute;left:0;right:0;top:14px;text-align:center;pointer-events:none;opacity:0;display:grid;gap:2px;justify-items:center}
+.wplace b{font-family:var(--display);font-weight:700;font-size:clamp(28px,4.4vw,46px);line-height:1;color:var(--bone);text-shadow:0 2px 0 #000,0 0 18px rgba(0,0,0,.9)}
+.wplace small{font-family:var(--hud);font-size:20px;color:var(--torch);text-shadow:0 1px 0 #000,0 0 10px #000}
+.wplace.show{animation:wplace 2.6s ease-out forwards}
+@keyframes wplace{0%{opacity:0;transform:translateY(-6px)}12%{opacity:1;transform:none}70%{opacity:1}100%{opacity:0}}
+/* talk: a parchment card over the bottom of the stage */
+.wtalk{position:absolute;left:12px;right:12px;bottom:12px;display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;padding:12px 14px;background:var(--parch);color:var(--ink);border:2px solid var(--ink);border-radius:6px;box-shadow:0 8px 28px rgba(0,0,0,.6);max-height:calc(100% - 24px);overflow-y:auto}
+.wtport{width:96px;height:96px;border-radius:8px;border:2px solid var(--ink);background:#1a120d}
+.wtbody header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wtbody h3{margin:0;font-size:28px;color:var(--ink)}
+.wtalk .ghost{color:var(--ink);border-color:rgba(33,22,15,.4);font-size:19px;padding:6px 11px 4px}
+.wtalk .ghost:hover{border-color:var(--ink);background:rgba(33,22,15,.06)}
+.wsay{margin:6px 0 8px;font-size:17px;line-height:1.45;max-width:72ch}
+.wkw{font:inherit;font-weight:800;color:#8a2d14;background:none;border:0;border-bottom:2px solid rgba(138,45,20,.45);padding:0;cursor:pointer;letter-spacing:.3px}
+.wkw:hover{color:#b8402c;border-bottom-color:#b8402c}
+.wtchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wtchips input{font:inherit;font-size:16px;padding:5px 9px;border:1px solid rgba(33,22,15,.45);border-radius:4px;background:#fffaf0;color:var(--ink);width:150px;flex:0 1 150px;min-width:0}
+.wthint{margin:6px 0 0;color:#6b5a48;font-size:14px}
+.wkwh{font-weight:800;color:#8a2d14}
+/* shop and inn modals */
+.wmport{width:56px;height:56px;border-radius:6px;border:1px solid var(--seam)}
+.wshop{width:100%;border-collapse:collapse}
+.wshop td{padding:7px 8px;border-top:1px solid var(--seam);vertical-align:middle}
+.wshop td small{display:block;color:var(--dim);font-size:14px;line-height:1.3}
+.wshop .wnum{font-family:var(--hud);font-size:20px;white-space:nowrap;text-align:right}
+.wshop .dim{color:var(--faint)}
+.wshop .ghost{font-size:18px;padding:6px 12px 4px;white-space:nowrap}
+.wshop td:last-child{text-align:right;width:1%}
+.wshop .wsellh td{border-top:0;padding-top:16px}
+.wshop .wsellh h4{margin:0}
+#modalBox:has(#wShopBody),#modalBox:has(#wSleep){width:min(680px,100%)}
+.wgold{color:var(--torch)} .wbad{color:#ff8a7a}
+/* the on-screen pad: phones and narrow screens */
+.wpad{display:none;position:absolute;left:10px;right:10px;bottom:10px;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.wdpad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px);gap:2px;pointer-events:auto}
+.wpb{background:rgba(20,15,12,.72);border:1px solid var(--seam);border-radius:8px;color:var(--bone);font-size:18px;line-height:1;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+.wpb:active{background:var(--torch);color:#1e1205}
+.wdpad .up{grid-column:2;grid-row:1} .wdpad .lf{grid-column:1;grid-row:2} .wdpad .rt{grid-column:3;grid-row:2} .wdpad .dn{grid-column:2;grid-row:3}
+.wacts{display:grid;gap:8px;pointer-events:auto}
+.wpb.act,.wpb.look{width:64px;height:48px;font-family:var(--hud);font-size:20px}
+.wpb.act{background:rgba(255,179,71,.85);color:#1e1205;border-color:var(--torchD)}
+.wtalk:not([hidden])~.wpad{display:none!important}
+@media (pointer:coarse){.wpad{display:flex}}
+@media (max-width:860px){
+  .wmain{grid-template-columns:minmax(0,1fr)}
+  .wpad{display:flex}
+  .wstage{height:min(60vh,520px)}
+  .wlog{height:150px}
+  .whud{gap:4px 14px;padding:6px 10px}
+  .whud .stat b{font-size:19px}
+  .whud .stat small{font-size:13px}
+  .wwhere b{font-size:22px}
+  .wparty img{width:34px;height:34px}
+}
+@media (max-width:520px){
+  .wtalk{grid-template-columns:56px minmax(0,1fr);gap:10px;left:6px;right:6px;bottom:6px;padding:10px}
+  .wtport{width:56px;height:56px}
+  .wtbody h3{font-size:22px}
+  .wsay{font-size:16px}
+  .wthint,.wtx{display:none}
+  .wkeys{display:none}
+}

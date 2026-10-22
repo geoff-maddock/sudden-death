@@ -408,8 +408,95 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 .endstats{display:flex;gap:22px;flex-wrap:wrap}
 .endstats div{font-family:var(--hud);font-size:20px;color:var(--dim)}
 .endstats b{display:block;font-size:40px;line-height:1;color:var(--bone);font-weight:400}
-/* w0: Realm styles, injected after Sudden Death's <style> by build-realm.sh */
-#v-world{position:relative}
+/* w0: Realm styles, added to the end of Sudden Death's <style> by the realm manifest's style line */
+.brand h1 small.wrealm{font-family:var(--hud);font-weight:400;font-size:.42em;letter-spacing:1px;color:var(--steel);vertical-align:.35em;margin-left:4px}
+#v-world{position:relative;display:grid;gap:10px}
+/* the HUD: Sudden Death's run bar look */
+.whud{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;padding:8px 12px;border:1px solid var(--seam);border-radius:6px;background:var(--stone);min-height:58px}
+.whud .stat{flex-direction:column;align-items:flex-start;gap:2px}
+.whud .stat small{font-size:15px}
+.whud .stat b{font-weight:400}
+.wwhere{display:grid;line-height:1;gap:3px;min-width:0}
+.wwhere b{font-family:var(--display);font-weight:700;font-size:26px;line-height:.95}
+.wwhere small{font-family:var(--hud);font-size:16px;color:var(--steel)}
+.wcrown{color:var(--dim)}
+.wparty{display:flex;gap:4px;margin-left:auto}
+.wparty img{width:42px;height:42px;border-radius:6px;display:block;border:1px solid var(--seam)}
+.wparty img:first-child{border-color:var(--torch)}
+/* the stage and the side column */
+.wmain{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px;align-items:start}
+.wstage{position:relative;height:clamp(380px,calc(100vh - 250px),720px);border:1px solid var(--seam);border-radius:6px;overflow:hidden;background:#0a0706;touch-action:none;user-select:none;-webkit-user-select:none}
+.wstage canvas{position:absolute;inset:0;display:block;cursor:pointer;image-rendering:auto}
+.wside{display:grid;gap:8px;align-content:start;min-width:0}
+.wlog{height:clamp(220px,calc(100vh - 360px),600px);overflow-y:auto;border:1px solid var(--seam);border-radius:6px;background:var(--stone);padding:8px 12px;font-size:15px;line-height:1.4}
+.wlog p{margin:0 0 6px;color:var(--bone)}
+.wlog p:last-child{margin-bottom:0}
+.wlog .wl-d{color:var(--dim)} .wlog .wl-g{color:var(--torch)} .wlog .wl-m{color:var(--vile)} .wlog .wl-b{color:#ff8a7a}
+.wkeys{margin:0;color:var(--faint);font-size:14px;line-height:1.7}
+.wkeys kbd{font-size:15px}
+/* the place name when you arrive somewhere */
+.wplace{position:absolute;left:0;right:0;top:14px;text-align:center;pointer-events:none;opacity:0;display:grid;gap:2px;justify-items:center}
+.wplace b{font-family:var(--display);font-weight:700;font-size:clamp(28px,4.4vw,46px);line-height:1;color:var(--bone);text-shadow:0 2px 0 #000,0 0 18px rgba(0,0,0,.9)}
+.wplace small{font-family:var(--hud);font-size:20px;color:var(--torch);text-shadow:0 1px 0 #000,0 0 10px #000}
+.wplace.show{animation:wplace 2.6s ease-out forwards}
+@keyframes wplace{0%{opacity:0;transform:translateY(-6px)}12%{opacity:1;transform:none}70%{opacity:1}100%{opacity:0}}
+/* talk: a parchment card over the bottom of the stage */
+.wtalk{position:absolute;left:12px;right:12px;bottom:12px;display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;padding:12px 14px;background:var(--parch);color:var(--ink);border:2px solid var(--ink);border-radius:6px;box-shadow:0 8px 28px rgba(0,0,0,.6);max-height:calc(100% - 24px);overflow-y:auto}
+.wtport{width:96px;height:96px;border-radius:8px;border:2px solid var(--ink);background:#1a120d}
+.wtbody header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wtbody h3{margin:0;font-size:28px;color:var(--ink)}
+.wtalk .ghost{color:var(--ink);border-color:rgba(33,22,15,.4);font-size:19px;padding:6px 11px 4px}
+.wtalk .ghost:hover{border-color:var(--ink);background:rgba(33,22,15,.06)}
+.wsay{margin:6px 0 8px;font-size:17px;line-height:1.45;max-width:72ch}
+.wkw{font:inherit;font-weight:800;color:#8a2d14;background:none;border:0;border-bottom:2px solid rgba(138,45,20,.45);padding:0;cursor:pointer;letter-spacing:.3px}
+.wkw:hover{color:#b8402c;border-bottom-color:#b8402c}
+.wtchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wtchips input{font:inherit;font-size:16px;padding:5px 9px;border:1px solid rgba(33,22,15,.45);border-radius:4px;background:#fffaf0;color:var(--ink);width:150px;flex:0 1 150px;min-width:0}
+.wthint{margin:6px 0 0;color:#6b5a48;font-size:14px}
+.wkwh{font-weight:800;color:#8a2d14}
+/* shop and inn modals */
+.wmport{width:56px;height:56px;border-radius:6px;border:1px solid var(--seam)}
+.wshop{width:100%;border-collapse:collapse}
+.wshop td{padding:7px 8px;border-top:1px solid var(--seam);vertical-align:middle}
+.wshop td small{display:block;color:var(--dim);font-size:14px;line-height:1.3}
+.wshop .wnum{font-family:var(--hud);font-size:20px;white-space:nowrap;text-align:right}
+.wshop .dim{color:var(--faint)}
+.wshop .ghost{font-size:18px;padding:6px 12px 4px;white-space:nowrap}
+.wshop td:last-child{text-align:right;width:1%}
+.wshop .wsellh td{border-top:0;padding-top:16px}
+.wshop .wsellh h4{margin:0}
+#modalBox:has(#wShopBody),#modalBox:has(#wSleep){width:min(680px,100%)}
+.wgold{color:var(--torch)} .wbad{color:#ff8a7a}
+/* the on-screen pad: phones and narrow screens */
+.wpad{display:none;position:absolute;left:10px;right:10px;bottom:10px;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.wdpad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px);gap:2px;pointer-events:auto}
+.wpb{background:rgba(20,15,12,.72);border:1px solid var(--seam);border-radius:8px;color:var(--bone);font-size:18px;line-height:1;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+.wpb:active{background:var(--torch);color:#1e1205}
+.wdpad .up{grid-column:2;grid-row:1} .wdpad .lf{grid-column:1;grid-row:2} .wdpad .rt{grid-column:3;grid-row:2} .wdpad .dn{grid-column:2;grid-row:3}
+.wacts{display:grid;gap:8px;pointer-events:auto}
+.wpb.act,.wpb.look{width:64px;height:48px;font-family:var(--hud);font-size:20px}
+.wpb.act{background:rgba(255,179,71,.85);color:#1e1205;border-color:var(--torchD)}
+.wtalk:not([hidden])~.wpad{display:none!important}
+@media (pointer:coarse){.wpad{display:flex}}
+@media (max-width:860px){
+  .wmain{grid-template-columns:minmax(0,1fr)}
+  .wpad{display:flex}
+  .wstage{height:min(60vh,520px)}
+  .wlog{height:150px}
+  .whud{gap:4px 14px;padding:6px 10px}
+  .whud .stat b{font-size:19px}
+  .whud .stat small{font-size:13px}
+  .wwhere b{font-size:22px}
+  .wparty img{width:34px;height:34px}
+}
+@media (max-width:520px){
+  .wtalk{grid-template-columns:56px minmax(0,1fr);gap:10px;left:6px;right:6px;bottom:6px;padding:10px}
+  .wtport{width:56px;height:56px}
+  .wtbody h3{font-size:22px}
+  .wsay{font-size:16px}
+  .wthint,.wtx{display:none}
+  .wkeys{display:none}
+}
 </style>
 <body>
 <header class="top">
@@ -6198,7 +6285,351 @@ function wAudit(){const P=[];const chk=(c,m)=>{if(!c)P.push(m)};
  for(const m of Object.values(MAPS))if(m.kind==='town'){const seen=bfsReach(m,m.spawn[0],m.spawn[1]);for(const n of m.npcs)chk([[0,0],[1,0],[-1,0],[0,1],[0,-1],[0,2],[0,-2]].some(([dx,dy])=>seen[(n.y+dy)*m.w+n.x+dx]),'town '+m.id+': '+n.id+' cannot be reached');for(const k in m.meta){const[x,y]=k.split(',').map(Number);chk([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen[(y+dy)*m.w+x+dx]),'town '+m.id+': tile '+k+' unreachable')}for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++)if(m.t[y][x]==='W'||m.t[y][x]==='E')chk([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen[(y+dy)*m.w+x+dx]),'town '+m.id+': '+m.t[y][x]+' at '+x+','+y+' unreachable')}
  return P.filter(Boolean)}
 function findTopicStatic(ch,kw){const ks=Object.keys(ch.topics||{});return ks.find(k=>k===kw)||(kw.length>=4?ks.find(k=>k.startsWith(kw.slice(0,4))):null)}
-/* w3: Realm world state (WG), time, movement, map transitions, interaction, NPC keyword talk */
+/* w3: Realm world state (WG), time, movement, map transitions, interaction, NPC keyword talk.
+   Ported from Terra Chimera part4a/4b (newGame, hour/advance/newDay, darkness, tileAt, tileVariant, npcAt, enterMap,
+   tryMove, ambient, leaveToWorld, stepEnter, wanderNpcs, interact, doLook, doUse, giveLoot, say, runAct).
+   No DOM here: the UI (w7) reads WG and the event queue WQ. Everything runs headless.
+
+   Dropped from TC's state: roster, bin, research, eggs, rp (research data), know, cups, champion, chron, rivals, fed.
+   Kept beyond the contract's list: energy (wells and Quill's enchanting, phase 4), harv (spent wells and bushes),
+   xpk (topics already learned), party and club (the fixed phase 1 line), grace (steps of calm after a transition).
+
+   Later phases plug in through:
+     wEncounterHook(region, tileCh, info?)   every step that would roll an encounter or road event; info is set for
+                                             set pieces (alphas, lairs, the chapel bell, cups) that start a match.
+   Both are no-ops in phase 1. */
+let WG = null;
+let WLOG = [];
+/* UI events from the model: talk opened, shop or inn wanted, map changed. w7 drains it every frame. */
+const WQ = [];
+const WSTEP_MIN = { world: 15, town: 2, dungeon: 5 };
+const WREGROW = { V: 1, Y: 3, N: 4 };
+const WDIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
+
+function wEncounterHook(region, tileCh, info) { /* phase 2/4: wild matches, road events, alphas, cups */ }
+
+function wLog(t, c) { WLOG.push([t, c || '']); if (WLOG.length > 80) WLOG.shift(); WQ.push({ k: 'log' }); }
+function wFlag(f) { return !!(WG && WG.flags[f]); }
+function wSetFlag(f) { WG.flags[f] = 1; }
+function wHas(id, n) { return (WG.items[id] || 0) >= (n || 1); }
+function wAddItem(id, n) { WG.items[id] = (WG.items[id] || 0) + n; if (WG.items[id] <= 0) delete WG.items[id]; }
+function wCap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+/* the phase 1 party: the first three players of the first club. Phase 3 replaces this with a real roster. */
+function wDefaultParty() {
+  const id = CLUB_IDS[0], c = CLUBS[id];
+  return { club: id, party: c.roster.slice(0, 3).map(r => ({ n: r[0], kind: r[1], num: r[2] })) };
+}
+
+function wNewGame() {
+  const p = wDefaultParty();
+  WG = { v: 1, world: WORLD_VER, map: 'graftonbury', x: 5, y: 11, face: 'd', step: 0, gold: 120, year: 1, day: 1, dayAbs: 1, min: 8 * 60,
+    flags: {}, items: { ration: 3, salve: 2, grain: 2, salt: 2 }, energy: { bloom: 0, ember: 0, tide: 0, rime: 0, aether: 0 },
+    home: null, npc: {}, seen: {}, marks: [], harv: {}, xpk: {}, grace: 0, club: p.club, party: p.party };
+  WLOG = [];
+  wApplyNpcs(WG.map);
+  wLog('Graftonbury. The League office is the building to the north-west. Walk into people to talk to them.', 'g');
+  WQ.push({ k: 'map' });
+  return WG;
+}
+
+/* ---------- time ---------- */
+function wHour() { return WG.min / 60; }
+function wAdvance(min) { WG.min += min; while (WG.min >= 1440) { WG.min -= 1440; wNewDay(); } }
+function wNewDay() {
+  WG.day++; WG.dayAbs++;
+  if (WG.day > DB.meta.yearDays) { WG.day = 1; WG.year++; wLog('A new year. The brackets are wiped clean; your cups stay on the wall.', 'g'); }
+  if (wChampWeek() && WG.day === DB.meta.yearDays - DB.meta.champWeek + 1) wLog('Championship week has begun at the Crown Coliseum.', 'g');
+  // regrown wells and bushes change how they are drawn
+  wInvalidate();
+}
+function wChampWeek() { return WG.day > DB.meta.yearDays - DB.meta.champWeek; }
+function wDaysToChamp() { return Math.max(0, DB.meta.yearDays - DB.meta.champWeek + 1 - WG.day); }
+function wSeason() { return ['Spring', 'Summer', 'Autumn', 'Winter'][Math.min(3, Math.floor((WG.day - 1) / 28))]; }
+function wTimeStr() { const h = Math.floor(WG.min / 60), mm = WG.min % 60; return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm; }
+function wPartOfDay() { const h = wHour(); return h < 5 ? 'Night' : h < 7 ? 'Dawn' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : h < 20 ? 'Evening' : 'Night'; }
+// 0 by day, up to .62 at night (TC's numbers); dungeons are dark whatever the hour (the renderer handles that)
+function wDarkness() { const h = wHour(); if (h >= 7 && h < 18) return 0; if (h >= 18 && h < 21) return (h - 18) / 3 * .62; if (h >= 5 && h < 7) return (7 - h) / 2 * .62; return .62; }
+function wIsNight() { return wDarkness() > .3; }
+
+/* ---------- maps ---------- */
+function wCurMap() { return MAPS[WG.map]; }
+function wHkey(x, y, map) { return (map || WG.map) + ':' + x + ',' + y; }
+function wDepleted(x, y, days, map) { const d = WG.harv[wHkey(x, y, map)]; return d != null && WG.dayAbs - d < days; }
+/* what is really on a tile: hidden places look like the ground until a clue reveals them; beaten alphas leave floor */
+function wTileAt(map, x, y) {
+  if (x < 0 || y < 0 || x >= map.w || y >= map.h) return map.kind === 'dungeon' ? 'X' : null;
+  const c = map.t[y][x];
+  if (!WG) return c;
+  if (c === 'M') { const m = map.meta[x + ',' + y]; if (m && wFlag('alpha_' + m.alpha)) return 'g'; }
+  if (map.kind === 'world') { const m = map.meta[x + ',' + y]; if (m && m.loc) { const L = DB.locs.find(l => l.id === m.loc); if (L && L.hidden && !wFlag(L.hidden)) return m.under || '.'; } }
+  return c;
+}
+/* '0' = spent well, picked bush, empty nest, opened chest, beaten lair */
+function wTileVariant(map, x, y, c) {
+  const m = map.meta[x + ',' + y] || {};
+  if (!WG) return null;
+  if (c === 'V') return (m.elem || 'aether') + (wDepleted(x, y, 1, map.id) ? '0' : '');
+  if (c === 'Y') return wDepleted(x, y, 3, map.id) ? '0' : (m.elem || 'bloom');
+  if (c === 'N') return wDepleted(x, y, 4, map.id) ? '0' : '1';
+  if (c === 'C') return wFlag('chest_' + m.chest) ? '0' : '1';
+  if (c === 'Z') { const L = DB.locs.find(l => l.id === m.loc); return L && wFlag('alpha_' + L.alpha) ? '0' : '1'; }
+  return '1';
+}
+function wNpcAt(x, y) { const m = wCurMap(); return (m.npcs || []).find(n => n.x === x && n.y === y); }
+function wChar(id) { const c = DB.chars[id]; if (!c) return { name: 'Somebody', greet: '...', topics: {}, kind: 'goblin' }; const o = Object.assign({}, c); if (typeof o.name === 'string' && o.name[0] === '@') o.name = 'A rival handler'; return o; }
+/* NPC positions live in WG.npc so wandering survives a save */
+function wApplyNpcs(id) { const m = MAPS[id], s = WG.npc[id]; if (!m || !s) return; m.npcs.forEach((n, i) => { if (s[i]) { n.x = s[i][0]; n.y = s[i][1]; } }); }
+function wStoreNpcs(id) { const m = MAPS[id]; if (m && m.kind === 'town' && m.npcs.some(n => !n.fixed)) WG.npc[id] = m.npcs.map(n => [n.x, n.y]); }
+function wRegionHere() {
+  const m = wCurMap();
+  if (m.kind === 'world') return regionAt(WG.x, WG.y);
+  const L = DB.locs.find(l => l.map === m.id);
+  return L ? regionAt(L.x, L.y) : 'plains';
+}
+function wEnterMap(id, x, y) {
+  wStoreNpcs(WG.map);
+  WG.map = id; WG.x = x; WG.y = y; WG.grace = 4; WG.bump = null;
+  wApplyNpcs(id);
+  WQ.push({ k: 'map' });
+  if (typeof wSave === 'function') wSave();
+}
+function wLookText(x, y) {
+  const m = wCurMap(), c = wTileAt(m, x, y);
+  if (c == null) return 'The way out of town.';
+  const mm = m.meta[x + ',' + y]; if (mm && mm.look) return mm.look;
+  const n = wNpcAt(x, y); if (n) return wChar(n.id).name + '.';
+  const td = DB.tiles[c] || {}, v = wTileVariant(m, x, y, c);
+  return (String(v).endsWith('0') && td.look0) || td.look || 'Ground.';
+}
+function wFacing() { const [dx, dy] = WDIRS[WG.face] || [0, 1]; return [WG.x + dx, WG.y + dy]; }
+
+/* ---------- movement ---------- */
+/* one step. Returns true if the party moved (or changed map). Walking into somebody talks to them; a second bump
+   squeezes past anyone who is not behind a counter. Walking into a usable tile uses it. */
+function wTryMove(dx, dy) {
+  if (!WG) return false;
+  const m = wCurMap();
+  WG.face = dx < 0 ? 'l' : dx > 0 ? 'r' : dy < 0 ? 'u' : 'd';
+  const nx = WG.x + dx, ny = WG.y + dy, c = wTileAt(m, nx, ny);
+  if (c == null) { if (m.kind === 'town') { wLeaveToWorld(); return true; } return false; }
+  const n = wNpcAt(nx, ny);
+  if (n) {
+    if (WG.bump === n.id) {
+      WG.bump = null;
+      if (n.fixed) wLog(wChar(n.id).name + ' will not budge.', 'd');
+      else { const ox = WG.x, oy = WG.y; WG.x = nx; WG.y = ny; n.x = ox; n.y = oy; WG.step++; wAdvance(2); wLog('You squeeze past ' + wChar(n.id).name + '.', 'd'); return true; }
+    } else { WG.bump = n.id; wTalkTo(n.id); }
+    return false;
+  }
+  const td = DB.tiles[c] || {};
+  if (!td.walk) { if (td.use) wUse(nx, ny); return false; }
+  WG.bump = null;
+  const preReg = m.kind === 'world' ? regionAt(WG.x, WG.y) : null;
+  WG.x = nx; WG.y = ny; WG.step++;
+  wAdvance(WSTEP_MIN[m.kind] || 2);
+  wWanderNpcs(); wAmbient(m, preReg);
+  if (td.enter) { wStepEnter(c, nx, ny); return true; }
+  if (WG.grace > 0) WG.grace--;
+  else if (m.kind !== 'town') wEncounterHook(wRegionHere(), c);
+  return true;
+}
+function wAmbient(m, preReg) {
+  if (m.kind === 'world') {
+    const rg = regionAt(WG.x, WG.y), R = DB.regions[rg];
+    if (R && rg !== preReg) { wLog(R.arrive, 'd'); return; }
+    if (R && R.ambient && WG.step % 11 === 0 && Math.random() < .35) wLog(pick(R.ambient), 'd');
+    return;
+  }
+  if (m.kind === 'town') { const t = DB.towns.find(t => t.id === m.id); if (t && t.ambient && WG.step % 9 === 0 && Math.random() < .4) wLog(pick(t.ambient), 'd'); }
+}
+function wLeaveToWorld() {
+  const L = DB.locs.find(l => l.map === WG.map); if (!L) return;
+  wEnterMap('world', L.x, L.y + 1); WG.face = 'd';
+  wLog('You leave ' + L.name + '.', 'd');
+}
+function wStepEnter(c, x, y) {
+  const m = wCurMap();
+  if (c === '<') { wLeaveToWorld(); return; }
+  const meta = m.meta[x + ',' + y], L = meta && DB.locs.find(l => l.id === meta.loc);
+  if (!L) return;
+  if (L.key && !wHas(L.key)) { wLog(L.name + '. A slab door with a card slot. It wants a ' + DB.items[L.key].name + '.', 'b'); WG.y += 1; return; }
+  const mp = MAPS[L.map]; if (!mp) return;
+  if (!WG.flags['seen_' + L.id]) wSetFlag('seen_' + L.id);
+  wEnterMap(L.map, mp.spawn[0], mp.spawn[1]); WG.face = 'u';
+  const td = DB.towns.find(t => t.id === L.map);
+  wLog(td && td.arrive ? td.arrive : L.name + '.', 'g');
+}
+function wWanderNpcs() {
+  const m = wCurMap(); if (m.kind !== 'town' || WG.step % 3) return;
+  for (const n of m.npcs) {
+    if (n.fixed || Math.random() < .5) continue;
+    n.hx = n.hx == null ? n.x : n.hx; n.hy = n.hy == null ? n.y : n.hy;
+    const [dx, dy] = pick([[1, 0], [-1, 0], [0, 1], [0, -1]]), x = n.x + dx, y = n.y + dy, c = wTileAt(m, x, y);
+    const nearDoor = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => wTileAt(m, x + ax, y + ay) === '+');
+    if (c && DB.tiles[c].walk && !DB.tiles[c].enter && !nearDoor && !wNpcAt(x, y) && !(x === WG.x && y === WG.y) && Math.abs(x - n.hx) + Math.abs(y - n.hy) <= 2) { n.px = n.x; n.py = n.y; n.mt = performance.now(); n.x = x; n.y = y; }
+  }
+  wStoreNpcs(m.id);
+}
+/* the first step of a shortest walk to (tx, ty), for click/tap to move. A blocked target (a person, a sign, a
+   counter) is walked up to, and the last step bumps into it. Returns [dx, dy] or null. */
+function wPathStep(tx, ty) {
+  const m = wCurMap(); if (tx === WG.x && ty === WG.y) return null;
+  const R = 40, W = m.w, H = m.h;
+  const free = (x, y) => { const c = wTileAt(m, x, y); if (c == null) return m.kind === 'town'; const td = DB.tiles[c]; return !!(td && td.walk) && !wNpcAt(x, y); };
+  const goal = (x, y) => x === tx && y === ty;
+  const key = (x, y) => (y + 1) * (W + 2) + (x + 1);
+  const prev = new Map(), q = [[WG.x, WG.y]]; prev.set(key(WG.x, WG.y), null);
+  for (let qi = 0; qi < q.length && qi < 6000; qi++) {
+    const [x, y] = q[qi];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = key(nx, ny);
+      if (prev.has(k) || Math.abs(nx - WG.x) > R || Math.abs(ny - WG.y) > R || nx < -1 || ny < -1 || nx > W || ny > H) continue;
+      if (goal(nx, ny)) { prev.set(k, [x, y]); let cur = [nx, ny]; while (true) { const p = prev.get(key(cur[0], cur[1])); if (!p || (p[0] === WG.x && p[1] === WG.y)) return [cur[0] - WG.x, cur[1] - WG.y]; cur = p; } }
+      if (!free(nx, ny)) continue;
+      // never path through an entrance on the way somewhere else
+      const c = wTileAt(m, nx, ny); if (c && DB.tiles[c] && DB.tiles[c].enter) continue;
+      if (c == null) continue;
+      prev.set(k, [x, y]); q.push([nx, ny]);
+    }
+  }
+  return null;
+}
+
+/* ---------- interaction ---------- */
+function wInteract() {
+  const [x, y] = wFacing(), n = wNpcAt(x, y);
+  if (n) return wTalkTo(n.id);
+  const m = wCurMap(), c = wTileAt(m, x, y);
+  if (c && DB.tiles[c] && DB.tiles[c].use) return wUse(x, y);
+  wLog(wLookText(x, y), 'd');
+}
+function wLook() { const [x, y] = wFacing(); wLog(wLookText(x, y), 'd'); }
+const WSOON = 'Matches out here come in a later update.';
+/* verbs on tiles: the table is DB.tiles[..].use */
+function wUse(x, y) {
+  const m = wCurMap(), c = wTileAt(m, x, y), use = (DB.tiles[c] || {}).use, meta = m.meta[x + ',' + y] || {};
+  switch (use) {
+    case 'counter': { const dx = x - WG.x, dy = y - WG.y, n = wNpcAt(x + dx, y + dy); if (n) wTalkTo(n.id); else wLog(wLookText(x, y), 'd'); break; }
+    case 'sign': wLog((c === 'S' ? 'The sign reads: ' : c === 'P' ? 'The painting: ' : c === 'K' ? 'On the shelf: ' : c === 't' ? 'In the case: ' : '') + (meta.text || '...'), 'g'); break;
+    case 'wall': wWallText(); break;
+    case 'eggs': wLog(wLookText(x, y), 'd'); break; // dropped: eggs (TC's incubator)
+    case 'well': {
+      if (wDepleted(x, y, 1)) return wLog(DB.tiles.V.look0, 'd');
+      const n = ri(2, 3), e = meta.elem || 'aether';
+      WG.energy[e] = (WG.energy[e] || 0) + n; WG.harv[wHkey(x, y)] = WG.dayAbs; wAdvance(20); wInvalidate(WG.map);
+      wLog('You draw ' + n + ' ' + DB.elems.names[e] + ' energy from the well. The enchanter can bind it into your team later.', 'm'); break;
+    }
+    case 'bush': {
+      if (wDepleted(x, y, 3)) return wLog(DB.tiles.Y.look0, 'd');
+      const it = DB.forage[meta.elem || 'aether'] || 'aethercap', n = ri(2, 3);
+      wAddItem(it, n); WG.harv[wHkey(x, y)] = WG.dayAbs; wAdvance(20); wInvalidate(WG.map);
+      wLog('You pick ' + n + ' ' + DB.items[it].name + '.', 'm'); break;
+    }
+    case 'nest': // dropped: eggs. Nests are scenery until a later phase gives them a use.
+      if (meta.alpha && !wFlag('alpha_' + meta.alpha)) return wLog('The alpha will not let you near its nest.', 'b');
+      wLog(wDepleted(x, y, 4) ? DB.tiles.N.look0 : DB.tiles.N.look + ' Whatever lives here is out.', 'd'); break;
+    case 'chest': {
+      const id = meta.chest; if (wFlag('chest_' + id)) return wLog(DB.tiles.C.look0, 'd');
+      const dg = DB.dungeons.find(d => d.id === m.id);
+      if (/_prize$/.test(id) && dg && !wFlag('alpha_' + dg.alpha)) return wLog('The alpha stands between you and the strongbox.', 'b');
+      wGiveLoot(DB.chests[id] || { gold: 40 }); wSetFlag('chest_' + id); wInvalidate(WG.map); break;
+    }
+    case 'alpha': { const a = DB.alphas[meta.alpha] || { name: 'the alpha' }; wLog(wCap(a.name) + ' watches you and does not move. ' + WSOON, 'b'); wEncounterHook(wRegionHere(), c, { kind: 'alpha', alpha: meta.alpha }); break; }
+    case 'bell': {
+      const rg = meta.ring; if (!rg) return wLog(wLookText(x, y), 'd');
+      if (!wHas(rg.item)) return wLog('A great bronze bell, silent. You have nothing that would make it ring true.', 'd');
+      if (rg.night && wDarkness() < .3) return wLog('You strike the bell. In daylight the note just dies in the snow. Come back after dark.', 'd');
+      wLog('You strike the bell with the rod. The note goes up, and up, and the lights shiver. Nothing comes down yet. ' + WSOON, 'g');
+      wEncounterHook(wRegionHere(), c, { kind: 'bell', ring: rg }); break;
+    }
+    case 'lair': {
+      const L = DB.locs.find(l => l.id === meta.loc); if (!L) break;
+      if (wFlag('alpha_' + L.alpha)) return wLog(DB.tiles.Z.look0, 'd');
+      wLog(L.name + '. ' + wCap((DB.alphas[L.alpha] || {}).name || 'something big') + ' is home, and is not ready to play you yet. ' + WSOON, 'b');
+      wEncounterHook(wRegionHere(), c, { kind: 'lair', loc: L.id, alpha: L.alpha }); break;
+    }
+    default: wLog(wLookText(x, y), 'd');
+  }
+}
+function wGiveLoot(l) {
+  const bits = [];
+  if (l.gold) { WG.gold += l.gold; bits.push(l.gold + ' gold'); }
+  for (const k in l.items || {}) { wAddItem(k, l.items[k]); bits.push(l.items[k] + ' ' + DB.items[k].name); }
+  wLog('Inside: ' + (bits.join(', ') || 'dust') + '.', 'g');
+}
+function wWallText() {
+  const won = Object.keys(DB.cups).filter(c => wFlag(DB.cups[c].flag));
+  wLog(won.length ? 'The Wall of Awards. Your cups: ' + won.map(c => DB.cups[c].name).join(', ') + '.' : 'The Wall of Awards. There are hooks waiting for cups, and none of them are yours yet.', 'g');
+}
+
+/* ---------- conversation: wSay() is the model, the talk panel in w7 the view ---------- */
+function wFindTopic(ch, kw) { const ks = Object.keys(ch.topics || {}); return ks.find(k => k === kw) || (kw.length >= 4 ? ks.find(k => k.startsWith(kw.slice(0, 4))) : null); }
+function wTopicBlocked(t) {
+  if (t.need && [].concat(t.need).some(f => !wFlag(f))) return true;
+  if (t.needNight && wDarkness() < .3) return true;
+  if (t.takeEn && Object.keys(t.takeEn).some(e => (WG.energy[e] || 0) < t.takeEn[e])) return true;
+  if (t.take && !Object.keys(t.take).every(k => wHas(k, t.take[k]))) return true;
+  return false;
+}
+/* returns { text, act? }. text null means goodbye. */
+function wSay(id, kw) {
+  const ch = wChar(id); kw = (kw || '').trim().toLowerCase();
+  if (!kw) return { text: ch.greet };
+  if (kw === 'name') return { text: 'I am ' + ch.name + '.' };
+  if (kw === 'bye') return { text: null };
+  const key = wFindTopic(ch, kw);
+  if (!key) return { text: pick(['I could not tell you about that.', 'Not my department.', 'You would have to ask somebody else.']) };
+  const t = ch.topics[key];
+  if (t.once && wFlag(t.once)) return { text: t.t2 || t.t, key };
+  if (wTopicBlocked(t)) return { text: t.needNo || 'Not yet.', key };
+  for (const k in t.take || {}) { wAddItem(k, -t.take[k]); wLog('Handed over ' + t.take[k] + ' ' + DB.items[k].name + '.', 'd'); }
+  for (const e in t.takeEn || {}) WG.energy[e] -= t.takeEn[e];
+  for (const k in t.give || {}) { wAddItem(k, t.give[k]); wLog('Received ' + t.give[k] + ' ' + DB.items[k].name + '.', 'm'); }
+  for (const k in t.giveEn || {}) { WG.energy[k] = (WG.energy[k] || 0) + t.giveEn[k]; wLog('Received ' + t.giveEn[k] + ' ' + DB.elems.names[k] + ' energy.', 'm'); }
+  if (t.gold) { WG.gold += t.gold; wLog('Received ' + t.gold + ' gold.', 'm'); }
+  if (t.set) { wSetFlag(t.set); wInvalidate('world'); } // a clue can reveal a hidden place on the world map
+  if (t.once) { wSetFlag(t.once); const sp = DB.sideplots.find(s => s.id === t.once); if (sp) wLog('Done: ' + sp.title + '.', 'g'); }
+  if (t.xp && !WG.xpk[id + ':' + key]) WG.xpk[id + ':' + key] = 1; // dropped: TC paid research data here
+  return { text: t.t, act: t.act, key };
+}
+function wTalkTo(id) {
+  const r = wSay(id, '');
+  wAdvance(1);
+  WQ.push({ k: 'talk', id, text: r.text });
+}
+/* acts a topic can trigger. The UI calls this after showing the topic's line. */
+function wRunAct(act, id) {
+  if (!act) return;
+  const ch = wChar(id);
+  if (act === 'shop') { WQ.push({ k: 'shop', id, shop: ch.shop || 'general', who: ch.name }); return; }
+  if (act === 'inn') { WQ.push({ k: 'inn', id, price: ch.inn || 12, who: ch.name }); return; }
+  if (act === 'wall') { wWallText(); return; }
+  if (act === 'waitweek') { wLog(wWaitForWeek(), 'g'); return; }
+  if (act.startsWith('cup:')) { const cup = DB.cups[act.slice(4)]; wLog((cup ? cup.name : 'The cup') + ': the brackets are not drawn yet. Cups come in a later update.', 'b'); wEncounterHook(wRegionHere(), null, { kind: 'cup', cup: act.slice(4) }); return; }
+  wLog('That comes in a later update.', 'd');
+}
+
+/* ---------- shops and inns ---------- */
+function wSellPrice(id) { const it = DB.items[id]; return it && it.price ? Math.max(1, Math.floor(it.price / 2)) : 0; }
+function wBuy(shop, id) { const pr = (DB.shops[shop] || {})[id]; if (pr == null) return 'Not sold here.'; if (WG.gold < pr) return 'You cannot afford that.'; WG.gold -= pr; wAddItem(id, 1); return ''; }
+function wSell(id) { const pr = wSellPrice(id); if (!pr || !wHas(id)) return 'Nobody wants that.'; wAddItem(id, -1); WG.gold += pr; return ''; }
+/* a night at an inn: morning comes, and this town becomes where you wake if a match goes badly */
+function wSleepInn(price) {
+  if (WG.gold < price) return 'You cannot afford a room.';
+  WG.gold -= price;
+  wAdvance((24 * 60 - WG.min) + 7 * 60);
+  if (wCurMap().kind === 'town') WG.home = WG.map;
+  wLog('You sleep. The stable hands see to your team. It is morning, and you will wake here if a match goes badly.', 'm');
+  if (typeof wSave === 'function') wSave();
+  return '';
+}
+function wWaitForWeek() {
+  if (wChampWeek()) return 'It is championship week already.';
+  const days = wDaysToChamp();
+  wAdvance(days * 1440 - WG.min + 8 * 60);
+  return 'You wait out ' + days + ' day' + (days === 1 ? '' : 's') + ' in the guest rooms. Championship week has begun.';
+}
 /* w4: Realm ink overworld renderer: tiles, per-map layer cache, NPCs and party leader, night.
    Everything is drawn with Sudden Death's ink look: cel fills lit from the upper left, dark ink outlines,
    hatching in the shade and a little paper grain.
@@ -7414,12 +7845,426 @@ function wActorCol(kind) {
   let h = 0; for (const ch of String(kind)) h = (h * 31 + ch.charCodeAt(0)) | 0;
   return cols[Math.abs(h) % cols.length];
 }
-/* w7: Realm UI: world view DOM, HUD, log, talk panel, input */
+/* w7: Realm UI: world view DOM, HUD, log, talk panel, shop and inn panels, input, and drawing the world each frame.
+   The model is w3 (WG, wTryMove, wSay ...). This part only reads it, calls it, and drains its event queue WQ.
+   Every listener does nothing unless the world view is showing and no modal or pause screen is open. */
+
 // the world view sits beside Sudden Death's map, fight and panel views
 $('v-map').insertAdjacentHTML('afterend', '<div id="v-world" hidden></div>');
-/* w8: Realm boot. Runs after every part has loaded (the prelude stopped p8's boot). */
-const REALM = { v: 0 };
+
+const WSTEP_MS = 150;           // one step per 150 ms while a direction is held
+const WUI = {
+  built: false, cv: null, c: null, cssW: 0, cssH: 0, r: 1, s: 1, zoom: 1, vw: 0, vh: 0,
+  cam: null, held: null, lastStep: 0, goto: null, talk: null, hudKey: '', logDirty: true, last: 0,
+  party: [],                    // [{ fx, fy, tx, ty, t0 }] for the leader and the two followers
+  face: 'r',                    // the last left/right facing (sprites only face left or right)
+};
+const WKEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0] };
+
+function wActive() { return UI.view === 'world' && !!WG && $('modal').hidden && !UI.paused && !$('pg-play').hidden; }
+
+function wBuildView() {
+  if (WUI.built) return;
+  WUI.built = true;
+  $('v-world').innerHTML = `
+    <div class="whud" id="wHud"></div>
+    <div class="wmain">
+      <div class="wstage" id="wStage">
+        <canvas id="wcv" aria-label="The realm, seen from above. Your party is in the middle."></canvas>
+        <div class="wplace" id="wPlace" aria-live="polite"></div>
+        <div class="wtalk" id="wTalk" hidden role="dialog" aria-label="Conversation"></div>
+        <div class="wpad" id="wPad" aria-label="Movement">
+          <div class="wdpad">
+            <button class="wpb up" data-dir="0,-1" aria-label="Walk up">&#9650;</button>
+            <button class="wpb lf" data-dir="-1,0" aria-label="Walk left">&#9664;</button>
+            <button class="wpb rt" data-dir="1,0" aria-label="Walk right">&#9654;</button>
+            <button class="wpb dn" data-dir="0,1" aria-label="Walk down">&#9660;</button>
+          </div>
+          <div class="wacts"><button class="wpb act" id="wActBtn" aria-label="Talk or use">Use</button><button class="wpb look" id="wLookBtn" aria-label="Look">Look</button></div>
+        </div>
+      </div>
+      <aside class="wside">
+        <div class="wlog" id="wLog" aria-live="polite"></div>
+        <p class="wkeys"><kbd>&#8592;&#8593;&#8594;&#8595;</kbd> or <kbd>WASD</kbd> walk &middot; <kbd>Space</kbd> talk or use &middot; <kbd>L</kbd> look &middot; <kbd>Esc</kbd> close. Click a spot to walk there. Walk into people to talk.</p>
+      </aside>
+    </div>`;
+  WUI.cv = $('wcv'); WUI.c = WUI.cv.getContext('2d');
+  WUI.cv.addEventListener('click', wCanvasClick);
+  // the on-screen pad: hold to keep walking
+  $('wPad').querySelectorAll('[data-dir]').forEach(b => {
+    const dir = b.dataset.dir.split(',').map(Number);
+    const down = e => { e.preventDefault(); if (!wActive()) return; WUI.goto = null; WUI.held = dir; wDoStep(dir[0], dir[1]); };
+    const up = () => { if (WUI.held === dir) WUI.held = null; };
+    b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
+  });
+  $('wActBtn').onclick = () => { if (wActive()) { wInteract(); wDrain(); } };
+  $('wLookBtn').onclick = () => { if (wActive()) { wLook(); wDrain(); } };
+}
+
+/* called by showView('world') */
+function wShowWorld() {
+  wBuildView();
+  WUI.cam = null; WUI.hudKey = ''; WUI.logDirty = true; WUI.held = null; WUI.goto = null;
+  wResetParty();
+  wCloseTalk();
+  wDrain();
+  wRenderHud(); wRenderLog();
+}
+
+/* ---------- the party on screen ---------- */
+function wResetParty() { const now = performance.now(); WUI.party = [0, 1, 2].map(() => ({ fx: WG.x, fy: WG.y, tx: WG.x, ty: WG.y, t0: now })); }
+function wPartyMoved(px, py) {
+  const now = performance.now(), P = WUI.party, prev = P.map(p => [p.tx, p.ty]);
+  P[0] = { fx: px, fy: py, tx: WG.x, ty: WG.y, t0: now };
+  for (let i = 1; i < P.length; i++) P[i] = { fx: prev[i][0], fy: prev[i][1], tx: prev[i - 1][0], ty: prev[i - 1][1], t0: now };
+}
+function wLerpPos(p, now) { const k = Math.min(1, (now - p.t0) / WSTEP_MS); return [p.fx + (p.tx - p.fx) * k, p.fy + (p.ty - p.fy) * k, k < 1]; }
+
+/* one step, from a key, the pad, a click path or a test */
+function wDoStep(dx, dy) {
+  if (!WG) return false;
+  if (WUI.talk) wCloseTalk();
+  const map0 = WG.map, px = WG.x, py = WG.y;
+  const moved = wTryMove(dx, dy);
+  if (dx) WUI.face = dx < 0 ? 'l' : 'r';
+  WUI.lastStep = performance.now();
+  if (moved && WG.map === map0 && (WG.x !== px || WG.y !== py)) {
+    if (Math.abs(WG.x - px) + Math.abs(WG.y - py) === 1) wPartyMoved(px, py); else wResetParty();
+  }
+  wDrain();
+  return moved;
+}
+
+/* ---------- the model's event queue ---------- */
+function wDrain() {
+  while (WQ.length) {
+    const e = WQ.shift();
+    if (e.k === 'log') WUI.logDirty = true;
+    else if (e.k === 'map') { WUI.cam = null; WUI.goto = null; WUI.held = null; if (WUI.built) { wResetParty(); wShowPlace(); } }
+    else if (e.k === 'talk') { WUI.goto = null; WUI.held = null; wOpenTalk(e.id, e.text); }
+    else if (e.k === 'shop') { WUI.held = null; wOpenShop(e.shop, e.who, e.id); }
+    else if (e.k === 'inn') { WUI.held = null; wOpenInn(e.price, e.who); }
+  }
+  if (WUI.built && UI.view === 'world') { if (WUI.logDirty) wRenderLog(); wRenderHud(); }
+}
+
+/* ---------- HUD and log ---------- */
+function wRegionName() { const R = DB.regions[wRegionHere()]; return R ? R.name : ''; }
+function wPartyTeam() { const c = CLUBS[WG.club] || CLUBS[CLUB_IDS[0]]; return c; }
+function wRenderHud() {
+  if (!WUI.built || !WG) return;
+  const m = wCurMap(), crown = wChampWeek() ? 'Championship week' : 'Crown in ' + wDaysToChamp() + ' days';
+  const key = [WG.map, m.kind === 'world' ? wRegionHere() : '', WG.day, WG.year, WG.min, WG.gold].join('|');
+  if (key === WUI.hudKey) return;
+  WUI.hudKey = key;
+  const team = wPartyTeam();
+  const party = WG.party.map(p => `<img src="${portraitURL(p.kind, team, p.num, 64)}" alt="${esc(p.n)}, ${esc(KIND_NAME[p.kind] || p.kind)}" title="${esc(p.n)} (${esc(KIND_NAME[p.kind] || p.kind)})">`).join('');
+  $('wHud').innerHTML = `<div class="wwhere"><b>${esc(m.name)}</b><small>${esc(wRegionName())}</small></div>
+    <div class="stat"><small>${esc(wSeason())}, day ${WG.day}</small><b>${esc(wPartOfDay())} ${wTimeStr()}</b></div>
+    <div class="stat"><small>Year ${WG.year}</small><b class="wcrown">${crown}</b></div>
+    <div class="stat gold"><small>Gold</small><b>${WG.gold}</b></div>
+    <div class="party wparty" title="${esc(team.name)}">${party}</div>`;
+}
+function wRenderLog() {
+  if (!WUI.built) return;
+  WUI.logDirty = false;
+  const el = $('wLog');
+  el.innerHTML = WLOG.slice(-40).map(l => `<p class="wl-${l[1] || 'n'}">${esc(l[0])}</p>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+function wShowPlace() {
+  const el = $('wPlace'); if (!el) return;
+  const m = wCurMap();
+  el.innerHTML = `<b>${esc(m.name)}</b>${m.kind === 'world' ? `<small>${esc(wRegionName())}</small>` : ''}`;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+
+/* ---------- talk ---------- */
+function wNpcTeam(kind) { const col = wActorCol(kind); return { color: col, light: tint(col, .55), dark: tint(col, -.6), short: '' }; }
+function wOpenTalk(id, text) {
+  WUI.talk = { id, text, seen: [] };
+  wRenderTalk();
+}
+function wCloseTalk() { WUI.talk = null; const el = $('wTalk'); if (el) { el.hidden = true; el.innerHTML = ''; } }
+function wTalkSay(kw) {
+  const T = WUI.talk; if (!T) return;
+  const r = wSay(T.id, kw);
+  if (r.text == null) { wCloseTalk(); wDrain(); return; }
+  T.text = r.text; T.asked = kw;
+  wRenderTalk();
+  if (r.act) wRunAct(r.act, T.id);
+  wDrain();
+}
+function wRenderTalk() {
+  const T = WUI.talk, el = $('wTalk'); if (!T || !el) return;
+  const ch = wChar(T.id);
+  // TC's keyword links: an ALL-CAPS word somebody answers to becomes a link
+  const text = esc(T.text || '').replace(/\b[A-Z]{3,}\b/g, w => {
+    const k = wFindTopic(ch, w.toLowerCase());
+    if (!k) return w;
+    if (!T.seen.includes(k)) T.seen.push(k);
+    return `<button class="wkw" data-kw="${k}">${w}</button>`;
+  });
+  const chips = ['name', 'job', ...T.seen.filter(k => k !== 'job'), 'bye'];
+  el.innerHTML = `<img class="wtport" src="${portraitURL(ch.kind, wNpcTeam(ch.kind), '', 96)}" alt="">
+    <div class="wtbody">
+      <header><h3>${esc(ch.name)}</h3><button class="ghost wtx" data-kw="bye" aria-label="Close the conversation">Bye</button></header>
+      <p class="wsay">${text}</p>
+      <div class="wtchips">${chips.map(k => `<button class="ghost" data-kw="${k}">${esc(wCap(k))}</button>`).join('')}
+        <input id="wAsk" placeholder="Ask about&hellip;" aria-label="Ask about a word" autocomplete="off" enterkeyhint="send"></div>
+      <p class="hint wthint">Click a <span class="wkwh">CAPITALISED</span> word, or type one, to ask about it.</p>
+    </div>`;
+  el.hidden = false;
+  el.querySelectorAll('[data-kw]').forEach(b => b.onclick = () => wTalkSay(b.dataset.kw));
+  const inp = $('wAsk');
+  inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { const v = inp.value; inp.value = ''; wTalkSay(v || 'bye'); } else if (e.key === 'Escape') wCloseTalk(); };
+}
+
+/* ---------- shop and inn, in Sudden Death's modal ---------- */
+function wOpenShop(shop, who, id) {
+  const ch = id ? wChar(id) : null;
+  modal(`<header><div class="row">${ch ? `<img class="wmport" src="${portraitURL(ch.kind, wNpcTeam(ch.kind), '', 96)}" alt="">` : ''}<h3>${esc(who || 'Shop')}</h3></div><button class="ghost" data-close>Done</button></header>
+    <div id="wShopBody"></div>`);
+  const render = msg => {
+    const sh = DB.shops[shop] || DB.shops.general;
+    let h = `<p class="hint">You have <b class="wgold">${WG.gold} gold</b>.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p><table class="wshop"><tbody>`;
+    for (const k in sh) {
+      const it = DB.items[k]; if (!it) continue;
+      h += `<tr><td><b>${esc(it.name)}</b><small>${esc(it.desc)}</small></td><td class="wnum">${sh[k]}g</td><td class="wnum dim">have ${WG.items[k] || 0}</td><td><button class="ghost" data-buy="${k}" ${WG.gold < sh[k] ? 'disabled' : ''}>Buy</button></td></tr>`;
+    }
+    const sellable = Object.keys(WG.items).filter(k => wSellPrice(k));
+    if (sellable.length) h += `<tr class="wsellh"><td colspan="4"><h4>Sell, at half price</h4></td></tr>${sellable.map(k => `<tr><td>${esc(DB.items[k].name)}</td><td class="wnum">${wSellPrice(k)}g</td><td class="wnum dim">have ${WG.items[k]}</td><td><button class="ghost" data-sell="${k}">Sell one</button></td></tr>`).join('')}`;
+    h += '</tbody></table>';
+    const body = $('wShopBody'); if (!body) return;
+    body.innerHTML = h;
+    body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { const r = wBuy(shop, b.dataset.buy); if (!r) wLog('Bought a ' + DB.items[b.dataset.buy].name + '.', 'm'); render(r); wDrain(); });
+    body.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => { const nm = DB.items[b.dataset.sell].name, r = wSell(b.dataset.sell); if (!r) wLog('Sold a ' + nm + '.', 'm'); render(r); wDrain(); });
+  };
+  render('');
+}
+function wOpenInn(price, who) {
+  const town = wCurMap().name;
+  const close = modal(`<header><h3>${esc(who || 'The inn')}</h3><button class="ghost" data-close>Not now</button></header>
+    <p>A room for the night is <b class="wgold">${price} gold</b>. You have ${WG.gold}.</p>
+    <p class="hint">You sleep until 7 in the morning. If a match goes badly later, you wake up here in ${esc(town)}.${WG.home ? ` Right now you would wake in ${esc((MAPS[WG.home] || {}).name || WG.home)}.` : ''}</p>
+    <div class="row"><button class="btn" id="wSleep" ${WG.gold < price ? 'disabled' : ''}>Sleep (${price} gold)</button></div>`);
+  $('wSleep').onclick = () => { const r = wSleepInn(price); if (r) wLog(r, 'b'); close(); wCloseTalk(); wDrain(); };
+}
+
+/* ---------- input ---------- */
+document.addEventListener('keydown', e => {
+  if (!wActive()) return;
+  if (e.target.closest && e.target.closest('input,textarea,select')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const dir = WKEYS[e.key];
+  if (dir) {
+    e.preventDefault();
+    WUI.goto = null; WUI.held = dir;
+    if (!e.repeat && performance.now() - WUI.lastStep > WSTEP_MS * .5) wDoStep(dir[0], dir[1]);
+    return;
+  }
+  if (e.key === ' ' || e.key === 'Enter' || e.key === 'e' || e.key === 'E') { e.preventDefault(); if (WUI.talk) return; wInteract(); wDrain(); return; }
+  if (e.key === 'l' || e.key === 'L') { e.preventDefault(); wLook(); wDrain(); return; }
+});
+document.addEventListener('keyup', e => { const dir = WKEYS[e.key]; if (dir && WUI.held && WUI.held[0] === dir[0] && WUI.held[1] === dir[1]) WUI.held = null; });
+window.addEventListener('blur', () => { WUI.held = null; });
+// Escape closes the talk panel. Sudden Death's pause key is for runs, which the world view does not have yet:
+// swallow Escape and P here (capture phase, before its listener) unless a modal wants Escape itself.
+window.addEventListener('keydown', e => {
+  if (UI.view !== 'world' || !$('modal').hidden) return;
+  if (e.key === 'Escape') { if (WUI.talk) wCloseTalk(); e.stopPropagation(); e.preventDefault(); }
+  else if ((e.key === 'p' || e.key === 'P') && !(e.target.closest && e.target.closest('input,textarea'))) e.stopPropagation();
+}, true);
+
+function wCanvasClick(e) {
+  if (!wActive() || !WUI.cam) return;
+  const r = WUI.cv.getBoundingClientRect();
+  const tx = Math.floor(WUI.cam[0] + (e.clientX - r.left) / WUI.zoom / WTILE), ty = Math.floor(WUI.cam[1] + (e.clientY - r.top) / WUI.zoom / WTILE);
+  const d = Math.abs(tx - WG.x) + Math.abs(ty - WG.y);
+  if (d === 0) { wInteract(); wDrain(); return; }
+  if (d === 1) { WUI.goto = null; wDoStep(tx - WG.x, ty - WG.y); return; }
+  WUI.goto = [tx, ty];
+  if (performance.now() - WUI.lastStep > WSTEP_MS) wGotoStep();
+}
+function wGotoStep() {
+  const g = WUI.goto; if (!g) return;
+  const st = wPathStep(g[0], g[1]);
+  if (!st) { WUI.goto = null; return; }
+  const last = Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y) === 1;
+  wDoStep(st[0], st[1]);
+  if (last || (WG.x === g[0] && WG.y === g[1])) WUI.goto = null;
+}
+
+/* ---------- drawing, once a frame (w8's frame wrapper calls this) ---------- */
+function wFit() {
+  const st = $('wStage'), cssW = st.clientWidth, cssH = st.clientHeight;
+  if (!cssW || !cssH) return false;
+  const dpr = window.devicePixelRatio || 1;
+  const across = cssW < 520 ? 10 : cssW < 860 ? 13 : 16;
+  const zoom = cssW / (across * WTILE);
+  // device pixels per logical pixel, kept to whole 1/32 steps so a tile is a whole number of device pixels,
+  // and capped at 4 so the renderer's cached chunks stay a sensible size on big retina screens
+  const s = Math.max(1, Math.round(Math.min(4, dpr * zoom) * 32) / 32);
+  const r = s / zoom;
+  const W = Math.round(cssW * r), H = Math.round(cssH * r);
+  if (WUI.cv.width !== W || WUI.cv.height !== H) { WUI.cv.width = W; WUI.cv.height = H; }
+  WUI.cv.style.width = cssW + 'px'; WUI.cv.style.height = cssH + 'px';
+  Object.assign(WUI, { cssW, cssH, zoom, s, r, vw: W / s, vh: H / s });
+  return true;
+}
+function wRender(now) {
+  if (!WUI.built || !WG || !MAPS[WG.map]) return;
+  const dt = Math.min(.1, (now - (WUI.last || now)) / 1000); WUI.last = now;
+  // held keys and click paths step at a steady rate
+  if (wActive()) {
+    if (WUI.held && now - WUI.lastStep >= WSTEP_MS) wDoStep(WUI.held[0], WUI.held[1]);
+    else if (WUI.goto && now - WUI.lastStep >= WSTEP_MS) wGotoStep();
+  }
+  if (!wFit()) return;
+  const c = WUI.c, m = wCurMap(), t = G.time, T = WTILE;
+  const lead = wLerpPos(WUI.party[0], now);
+  // the camera follows the leader smoothly, and stops at the edge of a town or dungeon
+  const vwT = WUI.vw / T, vhT = WUI.vh / T;
+  const clampC = (v, size, view) => size <= view ? (size - view) / 2 : Math.max(0, Math.min(size - view, v));
+  const want = [clampC(lead[0] + .5 - vwT / 2, m.w, vwT), clampC(lead[1] + .5 - vhT / 2, m.h, vhT)];
+  if (!WUI.cam) WUI.cam = want.slice();
+  else { const k = 1 - Math.exp(-dt * 9); WUI.cam[0] += (want[0] - WUI.cam[0]) * k; WUI.cam[1] += (want[1] - WUI.cam[1]) * k; if (Math.abs(want[0] - WUI.cam[0]) < .002) WUI.cam[0] = want[0]; if (Math.abs(want[1] - WUI.cam[1]) < .002) WUI.cam[1] = want[1]; }
+  // whole device pixels: snap the camera to the device grid
+  const snap = v => Math.round(v * T * WUI.s) / (T * WUI.s);
+  const camX = snap(WUI.cam[0]), camY = snap(WUI.cam[1]);
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, WUI.cv.width, WUI.cv.height);
+  c.setTransform(WUI.s, 0, 0, WUI.s, 0, 0);
+  // the map without its night: actors go under the darkness, so night is drawn after them
+  const dark = m.dark; m.dark = false;
+  try { wDrawMap(c, WG.map, camX, camY, WUI.vw, WUI.vh, t, { night: 0 }); } finally { m.dark = dark; }
+  // actors, back to front
+  c.setTransform(WUI.s, 0, 0, WUI.s, -Math.round(camX * T * WUI.s), -Math.round(camY * T * WUI.s));
+  const acts = [];
+  const x0 = camX - 2, y0 = camY - 2, x1 = camX + vwT + 2, y1 = camY + vhT + 3;
+  for (const n of m.npcs || []) {
+    if (n.x < x0 || n.x > x1 || n.y < y0 || n.y > y1) continue;
+    const ch = DB.chars[n.id]; if (!ch || !ch.kind) continue;
+    let nx = n.x, ny = n.y, moving = false;
+    if (n.mt && now - n.mt < WSTEP_MS * 1.6) { const k = (now - n.mt) / (WSTEP_MS * 1.6); nx = n.px + (n.x - n.px) * k; ny = n.py + (n.y - n.py) * k; moving = true; }
+    const near = Math.abs(n.x - WG.x) + Math.abs(n.y - WG.y) <= 3;
+    const face = near ? (WG.x < n.x ? 'l' : 'r') : (((n.x * 7 + n.y * 3) & 1) ? 'l' : 'r');
+    acts.push({ y: ny, x: nx, who: { kind: ch.kind, face, walk: moving ? t * 12 : 0, seed: n.x * 3 + n.y }, size: 30 });
+  }
+  const team = wPartyTeam(), drawn = new Set();
+  WUI.party.forEach((p, i) => {
+    const pos = i === 0 ? lead : wLerpPos(p, now), key = Math.round(pos[0] * 4) + ',' + Math.round(pos[1] * 4);
+    if (i > 0 && (drawn.has(key) || (p.tx === WG.x && p.ty === WG.y && !pos[2]))) return;
+    drawn.add(key);
+    const pm = WG.party[i]; if (!pm) return;
+    const moving = pos[2] || (i === 0 && !!WUI.held);
+    const face = i === 0 ? WUI.face : (p.tx < p.fx ? 'l' : p.tx > p.fx ? 'r' : WUI.face);
+    acts.push({ y: pos[1] + (i === 0 ? .01 : 0), x: pos[0], who: { kind: pm.kind, team: { color: team.color, light: team.light, short: team.short }, num: pm.num, face, walk: moving ? t * 12 + i : 0, seed: i }, size: i === 0 ? 32 : 28, alpha: i === 0 ? 1 : .96 });
+  });
+  acts.sort((a, b) => a.y - b.y);
+  for (const a of acts) wDrawActor(c, a.who, a.x * T + T / 2, a.y * T + T - 3, t, { size: a.size, alpha: a.alpha });
+  c.restore();
+  // night: always in dungeons, by the clock everywhere else, with a light around the party
+  const night = m.kind === 'dungeon' ? .8 : wDarkness() * 1.15;
+  if (night > .02) {
+    const lights = [[lead[0], lead[1], m.kind === 'dungeon' ? 3.6 : 2.8]];
+    for (const l of m.light || []) lights.push([l[0], l[1], l[2] || 2.6]);
+    if (m.kind === 'world') for (const L of DB.locs) if (L.kind !== 'lair' && !(L.hidden && !wFlag(L.hidden))) lights.push([L.x, L.y, 2.2]);
+    const s = Math.round(WUI.s * 100) / 100;
+    c.save();
+    try { wNight(c, 0, 0, WUI.cv.width, WUI.cv.height, -Math.round(camX * T * s), -Math.round(camY * T * s), s, night, lights, m); }
+    finally { c.restore(); }
+  }
+  wRenderHud();
+}
+/* w8: Realm boot. Runs after every part has loaded (the prelude stopped app/boot.js booting the standalone game).
+   Reassigns (never redeclares) showView, frame and renderTitle, adds saving and loading of WG, then boots. */
+const REALM = { v: 1 };
 document.title = 'Sudden Death: Realm';
+
+/* ---------- save and load: one save per profile, { v, WG } ---------- */
+function wSaveKey() { return pkey('sd-realm'); }
+function wSave() {
+  if (LAB || !WG) return false;
+  wStoreNpcs(WG.map);
+  try { localStorage.setItem(wSaveKey(), JSON.stringify({ v: REALM.v, WG })); return true; } catch (e) { return false; }
+}
+function wLoadSave() {
+  try { const r = JSON.parse(localStorage.getItem(wSaveKey()) || 'null'); return r && r.v === REALM.v && r.WG && r.WG.map ? r : null; } catch (e) { return null; }
+}
+function wEnsureMaps() { if (!MAPS.world) buildAllMaps(); }
+function wStart(save) {
+  wEnsureMaps();
+  WQ.length = 0;
+  if (save) {
+    WG = save.WG;
+    const d = wDefaultParty();
+    WG.party = WG.party || d.party; WG.club = WG.club || d.club;
+    for (const k of ['flags', 'items', 'npc', 'seen', 'harv', 'xpk']) WG[k] = WG[k] || {};
+    WG.energy = WG.energy || { bloom: 0, ember: 0, tide: 0, rime: 0, aether: 0 };
+    WG.marks = WG.marks || [];
+    if (!MAPS[WG.map]) { WG.map = 'graftonbury'; WG.x = 5; WG.y = 11; }
+    for (const id in WG.npc) wApplyNpcs(id);
+    WLOG = [];
+    wLog('Back on the road: ' + MAPS[WG.map].name + ', ' + wSeason().toLowerCase() + ', day ' + WG.day + '.', 'g');
+    WQ.push({ k: 'map' });
+  } else wNewGame();
+  wInvalidate();
+  wSave();
+  showView('world');
+}
+
+/* ---------- views: Sudden Death's showView, plus the world ---------- */
+(() => {
+  const sdShowView = showView;
+  showView = function (v) {
+    sdShowView(v);
+    $('v-world').hidden = v !== 'world';
+    $('runbar').hidden = v === 'world';
+    if (v === 'world') wShowWorld();
+  };
+})();
+
+/* ---------- the frame loop: Sudden Death's frame, plus a world branch ----------
+   app/boot.js's frame() ends by calling requestAnimationFrame(frame), which looks the global name up each time,
+   so after this reassignment the loop runs through the wrapper. The wrapper draws the world, then hands over. */
+(() => {
+  const sdFrame = frame;
+  frame = function (now) {
+    if (UI.view === 'world' && WG && !$('pg-play').hidden) {
+      try { cleanCtx(WUI.c || tctx); wRender(now); }
+      catch (e) { console.error(e); if (!frame.err) { frame.err = 1; window.__sdErrs.push(String(e && e.stack || e)); } frame.dirty = 1; }
+    }
+    sdFrame(now);
+  };
+})();
+
+/* ---------- title ---------- */
+(() => {
+  const card = document.querySelector('#scr-title .titlecard');
+  card.querySelector('h2').textContent = 'Walk the realm. Every fight is a game.';
+  card.querySelector('p').textContent = 'Lead three monsters across the Charter Plains, the Mosswold, the Brinefen, the Cindermaw and the Frostspire. Talk to the towns, trade at the shops, and sleep at the inns. Matches, cups and dungeons are on their way: for now the realm is yours to explore.';
+  const bp = document.querySelector('.brand p'); if (bp) bp.textContent = 'Sudden Death: Realm. The Brimstone League takes to the road.';
+  const h1 = document.querySelector('.brand h1'); if (h1) h1.innerHTML = 'Sudden <span>Death</span> <small class="wrealm">Realm</small>';
+})();
+renderTitle = function () {
+  const sv = wLoadSave(), row = $('resumeRow');
+  if (sv) {
+    const W = sv.WG;
+    const where = (DB.towns.find(t => t.id === W.map) || DB.locs.find(l => l.map === W.map || l.id === W.map) || { name: W.map === 'world' ? 'On the road' : W.map }).name;
+    row.hidden = false;
+    row.innerHTML = `<b>Journey in progress</b><span>${esc(where)}. Year ${W.year}, day ${W.day}, ${W.gold} gold.</span><button class="btn" id="bResume" style="font-size:22px">Continue</button>`;
+    $('bResume').onclick = () => wStart(wLoadSave());
+  } else row.hidden = true;
+  const b = $('bNew');
+  b.textContent = 'Walk the realm';
+  b.onclick = () => { if (wLoadSave()) askConfirm('Start a new journey?', 'Your journey in progress on this profile will be replaced.', 'Start over', () => wStart(null)); else wStart(null); };
+  showScreen('title');
+  if (typeof profileChip === 'function') profileChip();
+};
+// leaving the page keeps your place
+window.addEventListener('pagehide', () => { if (UI.view === 'world' && !window.__switching) wSave(); });
+
 boot();
 </script>
 </body></html>
