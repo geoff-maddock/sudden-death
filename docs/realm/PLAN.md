@@ -96,6 +96,19 @@ startMatch({ ids, type: 'normal'|'elite'|'rival'|'boss', sport, tier, trait?, st
   - NPC quest companions found through dialogue keywords.
 - **Start:** pick a club (reuse `renderDraft`, p8) for your 3 founders and your club trophy. TC "companies" become rival SD clubs.
 
+### Where cards come from
+
+Exploring builds your deck. Every card source ends in one helper, `wGainCard(spec, why)` (w5-bridge). It takes either a card id or a choice spec like `{pick:3, rarity?, kind?, pool?}`, and a choice spec reuses SD's card-choice UI with Skip.
+
+| Source | How |
+|---|---|
+| **Players** | A recruit joins with their signature card (`SIG[kind]`) and kind cards. Each level-up offers a choice from that player's kind pool. Benching a player benches their cards. |
+| **Battles** | SD's normal post-match card choice. Elites and rivals give better rarity, and rivals and bosses can give Hall of Fame cards. |
+| **Treasure** | World chests and dungeon chests give a card choice. Dungeon prize chests can hold a fixed legendary or gear card. |
+| **Quests** | NPC topics and sideplot payouts give a specific card (`card:`) or a choice (`cardChoice:`). Longer sideplots end with rare or Hall of Fame cards. |
+
+Card shops in towns (SD's shop) are a possible fifth source, in phase 4.
+
 ### World content mapped to matches
 
 **Regions to sports** (a starting point, tuned with bots):
