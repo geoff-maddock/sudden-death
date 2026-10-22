@@ -78,6 +78,12 @@ async def main():
     amb = [m for l in ok for m in l['matches'] if m['ambush']]
     if amb: print('ambushes', len(amb), 'win', pct(sum(1 for m in amb if m['res'] == 'win'), len(amb)))
     killers = collections.Counter(m['ids'] for l in ok for m in l['matches'] if m['res'] != 'win')
+    home = [m for l in ok for m in l['matches'] if m.get('home')]
+    if home: print('home matches', len(home), 'win', pct(sum(1 for m in home if m['res'] == 'win'), len(home)), ' per run', round(len(home) / len(ok), 1))
+    grounds = [l['ground'] for l in ok if l.get('ground')]
+    if grounds:
+        print('grounds', len(grounds), 'of', len(ok), collections.Counter(g['town'] for g in grounds).most_common(), ' upgrade levels per run', round(sum(sum(g['parts'].values()) for g in grounds) / len(grounds), 1))
+    print('gold at the end', round(sum(l['gold'] for l in ok) / len(ok)))
     print('most losses to', killers.most_common(8))
 
 

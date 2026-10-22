@@ -139,3 +139,20 @@ Meals are worth about 16 points of champion rate and recruiting about 14.
   - night share, ambushes and road events (the bot plays no events);
   - card shop prices;
   - the gear charges the enchanter can buy.
+
+## The home ground (epic 2, phase 1)
+
+The ground is meant to soak up the gold that piled up (about 800 at the Crown) without making the realm easier. The bot buys one at the first cup or dungeon stop with 250 gold to spare. That turns out to be Saltmere in about 80% of runs; about 20% never get there. Once a stage it goes home to build, drill and sleep.
+
+| 140 runs each, skilled bot with meals | Champion | Gold at the end |
+|---|---|---|
+| No ground, batch 1 | 67.1% | 559 |
+| No ground, batch 2 | 63.6% | 568 |
+| Ground, batch 1 | 62.1% | 451 |
+| Ground, batch 2 | 67.1% | 446 |
+| Ground, without the scout's office | 60.0% | |
+
+- **Pooled:** 65.4% without the ground against 64.6% with it. The ground is neutral for the bot, and it spends about 120 gold more a journey.
+- **Home matches:** about 3 a journey, won 98% of the time. The home region is one of five, and the Crown is neutral, so the stands decide little.
+- **Buying early is a trap.** A bot that bought at the first chance (about 210 gold, at the Mosswold Cup) fell to 57%. The first boss went from 61% to 52%, because it had no gold left for cards or a meal. A player who buys with spare gold loses nothing.
+- **The scout's office** is not the cause of anything: without it, 60%, within the noise.

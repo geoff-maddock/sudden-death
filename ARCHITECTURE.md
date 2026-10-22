@@ -153,6 +153,8 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w10-dungeon.js` | Dungeon rooms of famous teams, alphas as Sudden Death bosses, gates, magic gear. |
 | `w11-cups.js` | Town cups, rivals and head to head, the Crown and the champion ending. |
 | `w12-renown.js` | Renown (foes grow with cups and bosses), and no trophies from ordinary elite wins. |
+| `w13-feel.js` | Music per region, tips, Realm achievements, the Crown in the record book, the Bag. |
+| `w14-ground.js` | Your home ground: buy one behind any inn, the home crowd in its region, and its upgrades. |
 
 ### The match seam
 
@@ -161,8 +163,8 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 ### Conventions
 
 - **Realm names start with `w` or `W`** (`WG`, `wLog`, `W_CUP`). The Terra Chimera names `DB`, `MAPS`, `WW`, `WH`, `regionAt`, `mulberry`, `noise2` are the only exceptions. Never declare a name Sudden Death already has.
-- **Wrap by reassignment.** Later realm files change earlier ones, and Sudden Death, only by saving the original and reassigning: `const wW11PreGame = wPreGame; wPreGame = function (enc) { wW11PreGame(enc); … };`. The saved original is named `wW<n>` plus the function name, where `<n>` is the part doing the wrapping (`wW10`, `wW11`, `wW12`); a Sudden Death original saved in the realm is `wSd…`. Each file's header comment lists what it wraps.
-- **How to play** is one section, `#wHelp`, built by `w5-bridge.js` and added to by each part's `renderHelp` wrapper, in load order. Each part's block keeps its id (`wHelpTeam`, `wHelp4`, `wHelp5`, `wHelpCups`, `wHelpRenown`): the tests look for them.
+- **Wrap by reassignment.** Later realm files change earlier ones, and Sudden Death, only by saving the original and reassigning: `const wW11PreGame = wPreGame; wPreGame = function (enc) { wW11PreGame(enc); … };`. The saved original is named `wW<n>` plus the function name, where `<n>` is the part doing the wrapping (`wW10` … `wW14`); a Sudden Death original saved in the realm is `wSd…`. Each file's header comment lists what it wraps.
+- **How to play** is one section, `#wHelp`, built by `w5-bridge.js` and added to by each part's `renderHelp` wrapper, in load order. Each part's block keeps its id (`wHelpTeam`, `wHelp4`, `wHelp5`, `wHelpCups`, `wHelpRenown`, `wHelpGround`): the tests look for them.
 - **Talk topics** are lower-case keys; an ALL-CAPS word in a line becomes a link when the speaker has a topic for it. `test/realm_polish.py` checks every capitalised word leads somewhere, and `wAudit` checks every `need` flag is set by something.
 
 ### The save

@@ -148,7 +148,9 @@ function wTryMove(dx, dy) {
     } else { WG.bump = n.id; wTalkTo(n.id); }
     return false;
   }
-  const td = DB.tiles[c] || {};
+  let td = DB.tiles[c] || {};
+  // cut off behind a counter (an old save, or a bug): you can always climb over it to get back out
+  if (c === '-' && m.kind === 'town' && !bfsReach(m, m.spawn[0], m.spawn[1])[WG.y * m.w + WG.x]) { td = { walk: 1 }; wLog('You climb over the counter.', 'd'); }
   if (!td.walk) { if (td.use) wUse(nx, ny); return false; }
   WG.bump = null;
   const preReg = m.kind === 'world' ? regionAt(WG.x, WG.y) : null;

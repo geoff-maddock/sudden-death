@@ -13,7 +13,9 @@ wRenderHud = function () {
   const hud = $('wHud');
   if (hud && !$('wCampBtn')) {
     hud.insertAdjacentHTML('beforeend', `<button class="ghost wcampb" id="wCampBtn" title="Your team: lineup, levels, cards (C)">Team <small>${wRoster().length}</small></button>`);
+    hud.insertAdjacentHTML('beforeend', `<button class="ghost wcampb" id="wMenuBtn" title="Menu: save and quit, settings (Esc)">Menu</button>`);
     $('wCampBtn').onclick = () => { if (wActive()) wOpenCamp(); };
+    $('wMenuBtn').onclick = () => { if (wActive()) wOpenMenu(); };
     const pa = hud.querySelector('.wparty'); if (pa) { pa.style.cursor = 'pointer'; pa.onclick = () => { if (wActive()) wOpenCamp(); }; }
   } else if (hud) { const sm = $('wCampBtn').querySelector('small'); if (sm && sm.textContent !== String(wRoster().length)) sm.textContent = wRoster().length; }
   wNextPrompt();

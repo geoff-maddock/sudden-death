@@ -64,7 +64,7 @@ window.REALMLAB = function (opts = {}) {
     while (!B.over && g++ < 80) { botTurn(); if (B.over) break; runSteps(endTurn()); }
     const stall = !B.over;
     if (stall) { B.over = 'lose'; B.phase = 'done'; }
-    const res = B.over, m = { stage, what, kind: W.kind, type: enc.type, tier: W.tier, lv: W.lv || 0, sport: B.sport, ids: enc.ids.join('+'), res, lost: hp0 - RUN.hp, hp0, max0, turns: B.turn, stall, meal: !!B.wMeal, ambush: !!W.ambush };
+    const res = B.over, m = { home: !!B.wHome, stage, what, kind: W.kind, type: enc.type, tier: W.tier, lv: W.lv || 0, sport: B.sport, ids: enc.ids.join('+'), res, lost: hp0 - RUN.hp, hp0, max0, turns: B.turn, stall, meal: !!B.wMeal, ambush: !!W.ambush };
     finishFight();
     if (res === 'win') {
       const rw = RUN.panel && RUN.panel.rw;
@@ -155,6 +155,23 @@ window.REALMLAB = function (opts = {}) {
     if (best && RUN.gold >= menu[best] + 30) { wBuyMeal(INN[region], best); wEat(best); }
   }
   const prep = (region, big) => { rest(region); if (big) eat(region); };
+  // the home ground (epic 2): bought at the first cup or dungeon stop with 250 gold to spare (opts.groundSpare; or opts.groundAt), then a trip home once a
+  // stage to build it up (keeping 150 gold back), drill cards, sign the scouts' agents, and sleep and eat for free
+  const GROUND_ORDER = ['stands', 'kitchen', 'pitch', 'scouts', 'stands', 'pitch', 'kitchen', 'scouts'];
+  function ground(region) {
+    if (opts.ground === false) return;
+    const town = TOWN[region];
+    if (!WG.ground && town && (!opts.groundAt || opts.groundAt === town) && RUN.gold >= W_GROUND.price + (opts.groundSpare != null ? opts.groundSpare : 250)) wBuyGround(town);
+    if (!WG.ground) return;
+    const m = WG.map; WG.map = WG.ground.town;
+    try {
+      for (const k of opts.groundOrder || GROUND_ORDER) { const c = wGroundCost(k); if (c != null && RUN.gold >= c + 150) wUpgradeGround(k); }
+      for (let g = 0; g < 2 && wDrillsLeft(); g++) { const c = RUN.deck.filter(practicable).sort((a, b) => (CARDS[b.id].type === 'atk') - (CARDS[a.id].type === 'atk'))[0]; if (!c) break; wDrill(c); }
+      if (RUN.hp < RUN.maxhp) wSleepGround();
+    } finally { WG.map = m; }
+    const home = Object.keys(TOWN).find(r => TOWN[r] === WG.ground.town);
+    if (home && home !== region && opts.groundTavern !== false) tavern(home);
+  }
 
   /* ---------- the route ---------- */
   function wild(region, n) {
@@ -171,7 +188,7 @@ window.REALMLAB = function (opts = {}) {
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       if (id === 'crown') { log.crownTries++; for (let d = 0; d < 200 && !wChampWeek(); d++) wAdvance(24 * 60); }
       atMap(C.town);
-      tavern(region); enchant(); shop(region);
+      ground(region); tavern(region); enchant(); shop(region);
       if (RUN.gold < W_CUP.fee && id !== 'crown') RUN.gold = W_CUP.fee; // a player would grind the fee; not the point
       while (!RUN.over) {
         prep(region, true);
@@ -190,7 +207,7 @@ window.REALMLAB = function (opts = {}) {
   function dungeon(id) {
     const dg = DB.dungeons.find(d => d.id === id), L = loc(id), region = L ? regionAt(L.x, L.y) : 'plains';
     if (!wGateCheck(id).ok) return false;
-    shop(region); enchant();
+    ground(region); shop(region); enchant();
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       for (const R of wDungeonRooms(id)) {
         if (wFlag(R.flag) || RUN.over) continue;
@@ -240,6 +257,7 @@ window.REALMLAB = function (opts = {}) {
     if (!ok && (k === 'cup' || k === 'dungeon')) { log.result = 'stuck'; log.stage = stage; break; }
   }
   if (!log.result) log.result = wFlag('champion') ? 'champion' : 'stuck';
+  log.ground = WG.ground ? { town: WG.ground.town, parts: WG.ground.parts } : null;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;
   return log;
 };

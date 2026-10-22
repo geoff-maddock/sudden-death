@@ -159,7 +159,7 @@ wDispatchEnd = function (W, r) {
 
 /* ---------- XP and levels ---------- */
 function wMatchXp(W, r) {
-  const g = (RUN.games || [])[RUN.games.length - 1] || {};
+  const gs = RUN.games || [], g = gs[gs.length - 1] || {};
   const type = (WG.wfoes && WG.wfoes.type) || g.type || 'normal';
   const base = Math.round((W_PARTY.xp[type] || W_PARTY.xp.normal) * (W.tier || 1) * (r === 'win' ? 1 : W_PARTY.lossShare));
   if (base <= 0) return;

@@ -38,7 +38,7 @@ function wBuildView() {
       </div>
       <aside class="wside">
         <div class="wlog" id="wLog" aria-live="polite"></div>
-        <p class="wkeys"><kbd>&#8592;&#8593;&#8594;&#8595;</kbd> or <kbd>WASD</kbd> walk &middot; <kbd>Space</kbd> talk or use &middot; <kbd>L</kbd> look &middot; <kbd>Esc</kbd> close. Click a spot to walk there. Walk into people to talk.</p>
+        <p class="wkeys"><kbd>&#8592;&#8593;&#8594;&#8595;</kbd> or <kbd>WASD</kbd> walk &middot; <kbd>Space</kbd> talk or use &middot; <kbd>L</kbd> look &middot; <kbd>Esc</kbd> close, or the menu (save and quit). Click a spot to walk there. Walk into people to talk.</p>
       </aside>
     </div>`;
   WUI.cv = $('wcv'); WUI.c = WUI.cv.getContext('2d');
@@ -224,13 +224,16 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { const dir = WKEYS[e.key]; if (dir && WUI.held && WUI.held[0] === dir[0] && WUI.held[1] === dir[1]) WUI.held = null; });
 window.addEventListener('blur', () => { WUI.held = null; });
-// Escape closes the talk panel. Sudden Death's pause key is for runs, which the world view does not have yet:
-// swallow Escape and P here (capture phase, before its listener) unless a modal wants Escape itself.
+// Escape closes the talk panel, and otherwise opens the menu (Sudden Death's pause: resume, save and quit, settings),
+// as P does. Capture phase, before Sudden Death's own listener; once the menu is open, its listener handles the keys.
 window.addEventListener('keydown', e => {
-  if (UI.view !== 'world' || !$('modal').hidden) return;
-  if (e.key === 'Escape') { if (WUI.talk) wCloseTalk(); e.stopPropagation(); e.preventDefault(); }
-  else if ((e.key === 'p' || e.key === 'P') && !(e.target.closest && e.target.closest('input,textarea'))) e.stopPropagation();
+  if (UI.view !== 'world' || !$('modal').hidden || UI.paused) return;
+  if (e.target.closest && e.target.closest('input,textarea')) return;
+  if (e.key === 'Escape') { if (WUI.talk) wCloseTalk(); else wOpenMenu(); e.stopPropagation(); e.preventDefault(); }
+  else if (e.key === 'p' || e.key === 'P') { if (!WUI.talk) wOpenMenu(); e.stopPropagation(); e.preventDefault(); }
 }, true);
+/* the menu, from anywhere in the world: Sudden Death's pause screen, whose Save and quit goes back to the title */
+function wOpenMenu() { if (!WG || !RUN || UI.view !== 'world' || UI.paused) return; WUI.held = null; WUI.goto = null; openPause(); }
 
 function wCanvasClick(e) {
   if (!wActive() || !WUI.cam) return;

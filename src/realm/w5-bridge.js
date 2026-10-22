@@ -212,15 +212,17 @@ function wMatchLost(result) {
   RUN.pending = null; RUN.act = W.act0;
   wBlackout(W, result);
 }
-/* where you wake: next to the innkeeper of your last inn, or Graftonbury's */
+/* where you wake: in front of the innkeeper's counter at your last inn (or Graftonbury's), on a tile you can walk
+   to the rest of the town from. The nearest tile to the innkeeper is behind the counter, so reach decides. */
 function wInnSpot(mapId) {
   const m = MAPS[mapId];
   const inn = (m.npcs || []).find(n => { const ch = DB.chars[n.id]; return ch && Object.values(ch.topics || {}).some(t => t.act === 'inn'); });
   if (inn) {
+    const seen = bfsReach(m, m.spawn[0], m.spawn[1]);
     let best = null;
-    for (let y = inn.y - 3; y <= inn.y + 3; y++) for (let x = inn.x - 3; x <= inn.x + 3; x++) {
+    for (let y = inn.y - 4; y <= inn.y + 4; y++) for (let x = inn.x - 4; x <= inn.x + 4; x++) {
       const c = wTileAt(m, x, y), td = c && DB.tiles[c];
-      if (!td || !td.walk || td.enter || (m.npcs || []).some(n => n.x === x && n.y === y)) continue;
+      if (!td || !td.walk || td.enter || !seen[y * m.w + x] || (m.npcs || []).some(n => n.x === x && n.y === y)) continue;
       const d = Math.abs(x - inn.x) + Math.abs(y - inn.y);
       if (!best || d < best[2]) best = [x, y, d];
     }
@@ -292,6 +294,8 @@ openPause = function () {
     $('pConcede').onclick = wConcede;
   }
   const sv = $('pSave'); if (sv) sv.textContent = 'Save and quit to title';
+  // in the world: save the journey and leave it, so nothing in the world keeps running behind the title
+  if (sv && !inFight) sv.onclick = () => { wSave(); closePause(); musicStop(); B = null; RUN = null; WG = null; UI.view = null; showScreen('title'); renderTitle(); };
 };
 const wSdShowEnd = showEnd;
 showEnd = function (result) {

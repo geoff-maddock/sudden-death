@@ -6437,7 +6437,12 @@ function buildTown(def){const w=def.w||30,h=def.h||22,r=mulberry(def.id.length*7
  for(const d of def.decor||[]){t[d[2]][d[1]]=d[0];if(d[3])map.meta[d[1]+','+d[2]]=d[3];if(d[0]==='l'||d[0]==='u')map.light.push([d[1],d[2]])}
  for(const n of def.npcs||[])map.npcs.push({id:n[0],x:n[1],y:n[2],fixed:!!n[3]});
  for(let i=0;i<(def.trees==null?26:def.trees);i++){const x=1+(r()*(w-2)|0),y=1+(r()*(h-2)|0);if(t[y][x]===gc&&!map.npcs.some(n=>n.x===x&&n.y===y)&&![[1,0],[-1,0],[0,1],[0,-1]].some(([ax,ay])=>t[y+ay][x+ax]==='+'||t[y+ay][x+ax]==='o'))t[y][x]=def.tree||'T'}
+ map.blds=(def.buildings||[]).map(b=>[b.x,b.y,b.w,b.h]);wSettleSpawn(map);
  return MAPS[def.id]=map}
+/* a town's way in is always out in the open: on a street or open ground, never inside a building (Saltmere's was) */
+function wInsideBuilding(m,x,y){return(m.blds||[]).some(([bx,by,bw,bh])=>x>=bx&&x<bx+bw&&y>=by&&y<by+bh)}
+function wOpenTile(m,x,y){const c=m.t[y]&&m.t[y][x];return c!=null&&walkCh(c)&&!DB.tiles[c].enter&&!wInsideBuilding(m,x,y)&&!m.npcs.some(n=>n.x===x&&n.y===y)}
+function wSettleSpawn(m){const[sx,sy]=m.spawn;if(wOpenTile(m,sx,sy))return;let best=null;for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++){if(!wOpenTile(m,x,y))continue;const d=Math.abs(x-sx)+Math.abs(y-sy)+(m.t[y][x]==='o'?0:.5);if(!best||d<best[2])best=[x,y,d]}if(best)m.spawn=[best[0],best[1]]}
 function buildDungeon(def,seedOverride){const w=44,h=32,r=mulberry((seedOverride!=null?seedOverride:def.seed||7)*9176+WORLD_VER),t=[];for(let y=0;y<h;y++){const row=[];for(let x=0;x<w;x++)row.push('X');t.push(row)}
  const rooms=[];for(let i=0;i<70&&rooms.length<(def.rooms||8);i++){const rw=5+(r()*5|0),rh=4+(r()*4|0),rx=1+(r()*(w-rw-2)|0),ry=1+(r()*(h-rh-2)|0);if(rooms.some(o=>rx<o.x+o.w+1&&rx+rw+1>o.x&&ry<o.y+o.h+1&&ry+rh+1>o.y))continue;rooms.push({x:rx,y:ry,w:rw,h:rh,cx:rx+(rw>>1),cy:ry+(rh>>1)});for(let y=ry;y<ry+rh;y++)for(let x=rx;x<rx+rw;x++)t[y][x]='g'}
  for(let i=1;i<rooms.length;i++){const a=rooms[i-1],b=rooms[i];let x=a.cx,y=a.cy;while(x!==b.cx){t[y][x]=t[y][x]==='X'?'g':t[y][x];x+=x<b.cx?1:-1}while(y!==b.cy){t[y][x]=t[y][x]==='X'?'g':t[y][x];y+=y<b.cy?1:-1}}
@@ -6484,7 +6489,7 @@ function wAudit(){const P=[];const chk=(c,m)=>{if(!c)P.push(m)};
  for(const i in DB.items){const sold=Object.values(DB.shops).some(s=>s[i]!=null),given=Object.values(DB.chars).some(c=>Object.values(c.topics||{}).some(t=>t.give&&t.give[i])),chest=Object.values(DB.chests).some(c=>c.items&&c.items[i]),forage=Object.values(DB.forage).includes(i),cooked=Object.values(DB.recipes).some(r=>r.effect&&r.effect.kind==='item'&&r.effect.item===i),evt=(DB.events||[]).some(ev=>[ev.auto||{}].concat(ev.choices||[]).some(e=>e.items&&e.items[i])),start=['ration','salve','grain','salt'].includes(i);chk(sold||given||chest||forage||cooked||evt||start,'item '+i+' cannot be obtained')}
  /* geography */
  if(MAPS.world)for(const p of worldProblems())P.push(p);for(const d of DB.dungeons)if(MAPS[d.id])for(const p of dungeonProblems(MAPS[d.id]))P.push(p);
- for(const m of Object.values(MAPS))if(m.kind==='town'){const seen=bfsReach(m,m.spawn[0],m.spawn[1]);for(const n of m.npcs)chk([[0,0],[1,0],[-1,0],[0,1],[0,-1],[0,2],[0,-2]].some(([dx,dy])=>seen[(n.y+dy)*m.w+n.x+dx]),'town '+m.id+': '+n.id+' cannot be reached');for(const k in m.meta){const[x,y]=k.split(',').map(Number);chk([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen[(y+dy)*m.w+x+dx]),'town '+m.id+': tile '+k+' unreachable')}for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++)if(m.t[y][x]==='W'||m.t[y][x]==='E')chk([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen[(y+dy)*m.w+x+dx]),'town '+m.id+': '+m.t[y][x]+' at '+x+','+y+' unreachable')}
+ for(const m of Object.values(MAPS))if(m.kind==='town'){const seen=bfsReach(m,m.spawn[0],m.spawn[1]);chk(!wInsideBuilding(m,m.spawn[0],m.spawn[1]),'town '+m.id+': you walk in inside a building');if(typeof wInnSpot==='function'&&m.npcs.some(n=>DB.chars[n.id]&&DB.chars[n.id].inn)){const a=wInnSpot(m.id);chk(seen[a[1]*m.w+a[0]],'town '+m.id+': you would wake at '+a+', cut off from the town')}for(const n of m.npcs)chk([[0,0],[1,0],[-1,0],[0,1],[0,-1],[0,2],[0,-2]].some(([dx,dy])=>seen[(n.y+dy)*m.w+n.x+dx]),'town '+m.id+': '+n.id+' cannot be reached');for(const k in m.meta){const[x,y]=k.split(',').map(Number);chk([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen[(y+dy)*m.w+x+dx]),'town '+m.id+': tile '+k+' unreachable')}for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++)if(m.t[y][x]==='W'||m.t[y][x]==='E')chk([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen[(y+dy)*m.w+x+dx]),'town '+m.id+': '+m.t[y][x]+' at '+x+','+y+' unreachable')}
  return P.filter(Boolean)}
 function findTopicStatic(ch,kw){const ks=Object.keys(ch.topics||{});return ks.find(k=>k===kw)||(kw.length>=4?ks.find(k=>k.startsWith(kw.slice(0,4))):null)}
 /* w3: Realm world state (WG), time, movement, map transitions, interaction, NPC keyword talk.
@@ -6637,7 +6642,9 @@ function wTryMove(dx, dy) {
     } else { WG.bump = n.id; wTalkTo(n.id); }
     return false;
   }
-  const td = DB.tiles[c] || {};
+  let td = DB.tiles[c] || {};
+  // cut off behind a counter (an old save, or a bug): you can always climb over it to get back out
+  if (c === '-' && m.kind === 'town' && !bfsReach(m, m.spawn[0], m.spawn[1])[WG.y * m.w + WG.x]) { td = { walk: 1 }; wLog('You climb over the counter.', 'd'); }
   if (!td.walk) { if (td.use) wUse(nx, ny); return false; }
   WG.bump = null;
   const preReg = m.kind === 'world' ? regionAt(WG.x, WG.y) : null;
@@ -8288,15 +8295,17 @@ function wMatchLost(result) {
   RUN.pending = null; RUN.act = W.act0;
   wBlackout(W, result);
 }
-/* where you wake: next to the innkeeper of your last inn, or Graftonbury's */
+/* where you wake: in front of the innkeeper's counter at your last inn (or Graftonbury's), on a tile you can walk
+   to the rest of the town from. The nearest tile to the innkeeper is behind the counter, so reach decides. */
 function wInnSpot(mapId) {
   const m = MAPS[mapId];
   const inn = (m.npcs || []).find(n => { const ch = DB.chars[n.id]; return ch && Object.values(ch.topics || {}).some(t => t.act === 'inn'); });
   if (inn) {
+    const seen = bfsReach(m, m.spawn[0], m.spawn[1]);
     let best = null;
-    for (let y = inn.y - 3; y <= inn.y + 3; y++) for (let x = inn.x - 3; x <= inn.x + 3; x++) {
+    for (let y = inn.y - 4; y <= inn.y + 4; y++) for (let x = inn.x - 4; x <= inn.x + 4; x++) {
       const c = wTileAt(m, x, y), td = c && DB.tiles[c];
-      if (!td || !td.walk || td.enter || (m.npcs || []).some(n => n.x === x && n.y === y)) continue;
+      if (!td || !td.walk || td.enter || !seen[y * m.w + x] || (m.npcs || []).some(n => n.x === x && n.y === y)) continue;
       const d = Math.abs(x - inn.x) + Math.abs(y - inn.y);
       if (!best || d < best[2]) best = [x, y, d];
     }
@@ -8368,6 +8377,8 @@ openPause = function () {
     $('pConcede').onclick = wConcede;
   }
   const sv = $('pSave'); if (sv) sv.textContent = 'Save and quit to title';
+  // in the world: save the journey and leave it, so nothing in the world keeps running behind the title
+  if (sv && !inFight) sv.onclick = () => { wSave(); closePause(); musicStop(); B = null; RUN = null; WG = null; UI.view = null; showScreen('title'); renderTitle(); };
 };
 const wSdShowEnd = showEnd;
 showEnd = function (result) {
@@ -8618,7 +8629,7 @@ wDispatchEnd = function (W, r) {
 
 /* ---------- XP and levels ---------- */
 function wMatchXp(W, r) {
-  const g = (RUN.games || [])[RUN.games.length - 1] || {};
+  const gs = RUN.games || [], g = gs[gs.length - 1] || {};
   const type = (WG.wfoes && WG.wfoes.type) || g.type || 'normal';
   const base = Math.round((W_PARTY.xp[type] || W_PARTY.xp.normal) * (W.tier || 1) * (r === 'win' ? 1 : W_PARTY.lossShare));
   if (base <= 0) return;
@@ -8961,7 +8972,7 @@ function wBuildView() {
       </div>
       <aside class="wside">
         <div class="wlog" id="wLog" aria-live="polite"></div>
-        <p class="wkeys"><kbd>&#8592;&#8593;&#8594;&#8595;</kbd> or <kbd>WASD</kbd> walk &middot; <kbd>Space</kbd> talk or use &middot; <kbd>L</kbd> look &middot; <kbd>Esc</kbd> close. Click a spot to walk there. Walk into people to talk.</p>
+        <p class="wkeys"><kbd>&#8592;&#8593;&#8594;&#8595;</kbd> or <kbd>WASD</kbd> walk &middot; <kbd>Space</kbd> talk or use &middot; <kbd>L</kbd> look &middot; <kbd>Esc</kbd> close, or the menu (save and quit). Click a spot to walk there. Walk into people to talk.</p>
       </aside>
     </div>`;
   WUI.cv = $('wcv'); WUI.c = WUI.cv.getContext('2d');
@@ -9147,13 +9158,16 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { const dir = WKEYS[e.key]; if (dir && WUI.held && WUI.held[0] === dir[0] && WUI.held[1] === dir[1]) WUI.held = null; });
 window.addEventListener('blur', () => { WUI.held = null; });
-// Escape closes the talk panel. Sudden Death's pause key is for runs, which the world view does not have yet:
-// swallow Escape and P here (capture phase, before its listener) unless a modal wants Escape itself.
+// Escape closes the talk panel, and otherwise opens the menu (Sudden Death's pause: resume, save and quit, settings),
+// as P does. Capture phase, before Sudden Death's own listener; once the menu is open, its listener handles the keys.
 window.addEventListener('keydown', e => {
-  if (UI.view !== 'world' || !$('modal').hidden) return;
-  if (e.key === 'Escape') { if (WUI.talk) wCloseTalk(); e.stopPropagation(); e.preventDefault(); }
-  else if ((e.key === 'p' || e.key === 'P') && !(e.target.closest && e.target.closest('input,textarea'))) e.stopPropagation();
+  if (UI.view !== 'world' || !$('modal').hidden || UI.paused) return;
+  if (e.target.closest && e.target.closest('input,textarea')) return;
+  if (e.key === 'Escape') { if (WUI.talk) wCloseTalk(); else wOpenMenu(); e.stopPropagation(); e.preventDefault(); }
+  else if (e.key === 'p' || e.key === 'P') { if (!WUI.talk) wOpenMenu(); e.stopPropagation(); e.preventDefault(); }
 }, true);
+/* the menu, from anywhere in the world: Sudden Death's pause screen, whose Save and quit goes back to the title */
+function wOpenMenu() { if (!WG || !RUN || UI.view !== 'world' || UI.paused) return; WUI.held = null; WUI.goto = null; openPause(); }
 
 function wCanvasClick(e) {
   if (!wActive() || !WUI.cam) return;
@@ -9270,7 +9284,9 @@ wRenderHud = function () {
   const hud = $('wHud');
   if (hud && !$('wCampBtn')) {
     hud.insertAdjacentHTML('beforeend', `<button class="ghost wcampb" id="wCampBtn" title="Your team: lineup, levels, cards (C)">Team <small>${wRoster().length}</small></button>`);
+    hud.insertAdjacentHTML('beforeend', `<button class="ghost wcampb" id="wMenuBtn" title="Menu: save and quit, settings (Esc)">Menu</button>`);
     $('wCampBtn').onclick = () => { if (wActive()) wOpenCamp(); };
+    $('wMenuBtn').onclick = () => { if (wActive()) wOpenMenu(); };
     const pa = hud.querySelector('.wparty'); if (pa) { pa.style.cursor = 'pointer'; pa.onclick = () => { if (wActive()) wOpenCamp(); }; }
   } else if (hud) { const sm = $('wCampBtn').querySelector('small'); if (sm && sm.textContent !== String(wRoster().length)) sm.textContent = wRoster().length; }
   wNextPrompt();
@@ -10986,7 +11002,7 @@ Object.assign(TIPS, {
   w_level: ['Level up', 'A player who levels up raises your team’s max HP and picks a card of their own kind. Their cards only play while they start.'],
   w_recruit: ['A new player', 'Players can join from taverns, after games, and from quests. Open the Team screen (C) to change who starts: only the first three play.'],
   w_cup: ['In a cup', 'A cup is three rounds in a row. Lose one and you are out, but you can enter again. The next round’s card opens when you are ready.'],
-  w_door: ['A shut door', 'Dungeons open as you win cups, and the Gene Vault also wants a keycard. The log says what is missing.'],
+  w_door: ['A shut door', 'Dungeons open as you win cups, and the Sealed Vault also wants a keycard. The log says what is missing.'],
   w_renown: ['Renown', 'Every cup and boss you win makes the realm’s teams take you more seriously: more HP, and later Strength. The pre-game card shows it.'],
   w_champ: ['Championship week', 'The last days of the year. With all four cups, enter the Crown with Steward Crane at the Crown Coliseum.'],
   w_night: ['Night falls', 'After dark, wild teams come out more, the road is not safe, and some ambush you a score ahead. An inn is a good place to wait for morning.'],
@@ -11126,6 +11142,221 @@ renderHelp = function () {
     <div class="tablewrap"><table class="wbagtbl"><thead><tr><th>Item</th><th>Heals</th><th>Time</th><th>Shop price</th></tr></thead><tbody>${row('salve')}${row('ration')}</tbody></table></div>
     <p class="hint"><b>Music.</b> Every region, the towns, the dungeons and the night road have their own tune, and a match plays its region's tune (bosses keep their own).</p>
     <p class="hint"><b>Achievements and records.</b> The realm has its own medals in the record book: cups, alphas, the Crown, players signed, renown, regions visited. Winning the Crown goes in the record book, and your journey carries on.</p></div>`);
+};
+/* w14: your home ground (epic 2, phase 1). Loads after w13-feel.js; changes earlier parts only by reassignment
+   (saved originals carry the wW14 prefix), one fightStart hook, and a topic added to each innkeeper.
+
+   Buy the old ground behind any town's inn (one per journey), then build it up. It is the realm's main gold sink:
+   the balance bot ended journeys with about 800 gold it had no use for (docs/realm/BALANCE.md).
+
+   WG.ground   { town, parts: { stands, pitch, kitchen, scouts } (levels 0..2), drill: { week, n } } or null.
+
+   Home. The ground's region is home. Every match there, except the Crown (neutral ground), has the home crowd:
+   the stands give Block at kickoff, and at level 2 Strength too. The pre-game card says so.
+   The training pitch drills cards (Practice ★) for free, a few a week. The kitchen puts a free meal in your pantry
+   each morning you wake at the ground. The scout's office brings better and more free agents to that town's inn.
+   The ground has beds: sleep there for free, and it becomes where you wake after a blackout, like any inn.
+
+   W_GROUND   the numbers
+   Wrapped: wRunAct (act 'ground'), wOpenInn (the Your ground button), wSleepInn (the kitchen), wTavern (the scouts),
+   wPreGame (the home line), renderHelp. */
+
+const W_GROUND = {
+  price: 150,
+  inns: { graftonbury: 'hq_inn', mossgate: 'moss_inn', saltmere: 'salt_inn', cinderhold: 'cind_inn', rimewatch: 'rime_inn' },
+  parts: {
+    stands: { name: 'The stands', costs: [100, 200], does: ['Home matches start with 6 Block.', 'Home matches start with 6 Block and 1 Strength.'] },
+    pitch: { name: 'Training pitch', costs: [120, 240], does: ['Drill 1 card a week (Practice ★), free.', 'Drill 2 cards a week (Practice ★), free.'] },
+    kitchen: { name: 'The kitchen', costs: [80, 160], does: ['Wake at the ground to a free hash.', 'Wake at the ground to a free hash and the town\'s best dish.'] },
+    scouts: { name: 'Scout\'s office', costs: [100, 200], does: ['Free agents at this inn are a level higher, and at least 2 come each week.', 'Free agents at this inn are two levels higher, and 3 come each week.'] },
+  },
+  block: 6,
+  pantryCap: 2,   // the kitchen stops cooking a dish you already have this many of
+};
+
+/* ---------- the model ---------- */
+function wHomeGround() { return (WG && WG.ground) || null; }
+function wGroundLv(part) { const G = wHomeGround(); return G ? G.parts[part] || 0 : 0; }
+function wTownRegion(town) { const L = DB.locs.find(l => l.map === town); return L ? regionAt(L.x, L.y) : 'plains'; }
+function wHomeRegion() { const G = wHomeGround(); return G ? wTownRegion(G.town) : null; }
+function wTownName(town) { return (MAPS[town] || {}).name || town; }
+/* a match is at home in the ground's region; the Crown is played on neutral ground */
+function wIsHome(W) {
+  if (!W || !wHomeGround()) return false;
+  if (W.kind === 'cup' && W.ref && W.ref.cup === 'crown') return false;
+  return W.region === wHomeRegion();
+}
+function wBuyGround(town) {
+  town = town || WG.map;
+  if (wHomeGround()) return `You already have a ground, in ${wTownName(WG.ground.town)}.`;
+  if (!W_GROUND.inns[town]) return 'There is no ground for sale here.';
+  if (RUN.gold < W_GROUND.price) return 'You cannot afford it.';
+  RUN.gold -= W_GROUND.price;
+  WG.ground = { town, parts: { stands: 0, pitch: 0, kitchen: 0, scouts: 0 }, drill: { week: -1, n: 0 } };
+  achAdd('realmGroundWork', 1);
+  wLog(`You buy the old ground in ${wTownName(town)} for ${W_GROUND.price} gold. ${DB.regions[wHomeRegion()].name} is home now.`, 'g');
+  wSave();
+  return '';
+}
+function wGroundCost(part) { const P = W_GROUND.parts[part], lv = wGroundLv(part); return P && lv < P.costs.length ? P.costs[lv] : null; }
+function wUpgradeGround(part) {
+  const G = wHomeGround(), P = W_GROUND.parts[part];
+  if (!G) return 'You have no ground.';
+  if (!P) return 'There is nothing like that to build.';
+  const cost = wGroundCost(part);
+  if (cost == null) return `${P.name} is as good as it gets.`;
+  if (RUN.gold < cost) return 'You cannot afford that.';
+  RUN.gold -= cost; G.parts[part]++;
+  achAdd('realmGroundWork', 1);
+  wLog(`You build up ${P.name.toLowerCase()} (level ${G.parts[part]}) for ${cost} gold. ${P.does[G.parts[part] - 1]}`, 'g');
+  wSave();
+  return '';
+}
+/* the training pitch: free drills, a few a week */
+function wDrillsLeft() {
+  const G = wHomeGround(), lv = wGroundLv('pitch'); if (!G || !lv) return 0;
+  if (G.drill.week !== wWeek()) G.drill = { week: wWeek(), n: 0 };
+  return Math.max(0, lv - G.drill.n);
+}
+function wDrill(card) {
+  if (!wDrillsLeft()) return 'No drills left this week.';
+  if (!card || !RUN.deck.includes(card) || !practicable(card)) return 'That card cannot take a drill.';
+  card.sk = 1; WG.ground.drill.n++;
+  achAdd('practice', 1);
+  wAdvance(60);
+  wLog(`Your team drills ${wCardName(card.id, card.up)} on the training pitch (★).`, 'm');
+  wSave();
+  return '';
+}
+/* the kitchen: a free meal each morning you wake at the ground */
+function wGroundBreakfast() {
+  const lv = wGroundLv('kitchen'); if (!lv) return [];
+  const menu = DB.innMenu[W_GROUND.inns[WG.ground.town]] || {};
+  const best = Object.keys(menu).filter(id => id !== 'hash').sort((a, b) => menu[b] - menu[a])[0];
+  const dishes = ['hash'].concat(lv >= 2 && best ? [best] : []), got = [];
+  for (const id of dishes) {
+    if (!DB.meals[id] || (wPantry()[id] || 0) >= W_GROUND.pantryCap) continue;
+    WG.pantry[id] = (WG.pantry[id] || 0) + 1; got.push(DB.meals[id].name);
+  }
+  if (got.length) wLog(`The ground's kitchen packs ${got.join(' and ')} for you. It is in your pantry.`, 'm');
+  return got;
+}
+function wSleepGround() {
+  if (!wHomeGround() || WG.map !== WG.ground.town) return 'Your ground is not here.';
+  const r = wSleepInn(0);
+  if (!r) wGroundBreakfast();
+  wSave();
+  return r;
+}
+
+/* ---------- at kickoff: the home crowd ---------- */
+onHook('fightStart', () => {
+  if (!WG || !RUN || !B || !RUN.pending || !wIsHome(RUN.pending.world)) return;
+  const lv = wGroundLv('stands');
+  B.wHome = 1;
+  if (lv) { B.P.block += W_GROUND.block; if (lv >= 2) addSt(B.P, 'str', 1); }
+  log(`Home crowd, ${wTownName(WG.ground.town)}${lv ? `: ${W_GROUND.block} Block${lv >= 2 ? ' and 1 Strength' : ''}` : ''}.`, 'good');
+  if (!LAB) fx({ k: 'banner', t: 'Home crowd', sub: lv ? W_GROUND.parts.stands.does[lv - 1] : 'Build the stands for a real home advantage.', small: 1 });
+});
+
+/* ---------- the scouts: a better corner at the ground's own inn ---------- */
+const wW14Tavern = wTavern;
+wTavern = function (town) {
+  town = town || WG.map;
+  const old = WG.tavern[town], fresh = !old || old.week !== wWeek();
+  const T = wW14Tavern(town), lv = wHomeGround() && WG.ground.town === town ? wGroundLv('scouts') : 0;
+  if (!fresh || !lv) return T;
+  const want = lv + 1;
+  for (let g = 0; T.list.length < want && g < 10; g++) {
+    const kinds = (DB.regions[wTownRegion(town)] || DB.regions.plains).kinds, taken = new Set(wRoster().map(p => p.n).concat(T.list.map(a => a.n)));
+    const r = shuffle(genDraftClass().filter(r => kinds.includes(r[1]) && !taken.has(r[0])))[0];
+    if (!r) break;
+    const tier = W_TIER[wTownRegion(town)] || 1, l = ri(1, 2) + (tier - 1) * 2;
+    T.list.push({ n: r[0], kind: r[1], num: r[2], flav: r[3], lvl: l, fee: wFee(l) });
+  }
+  for (const a of T.list) { a.lvl = clamp(a.lvl + lv, 1, W_PARTY.maxLvl); a.fee = wFee(a.lvl); }
+  return T;
+};
+
+/* ---------- the ground screen ---------- */
+function wOpenGround(town, msg) {
+  town = town || WG.map;
+  const G = wHomeGround(), here = G && G.town === town;
+  let body;
+  if (!G) {
+    const rg = DB.regions[wTownRegion(town)];
+    body = `<p>The old ground behind the inn is for sale: <b class="wgold">${W_GROUND.price} gold</b>. You have ${RUN.gold}.</p>
+      <p class="hint">Buy it and ${esc(rg.name)} is home: every match in the region has your crowd behind it (not the Crown, which is neutral ground). Build stands, a training pitch, a kitchen and a scout's office. The ground has beds, free. You can only own one ground, so choose the region you will play in most.</p>
+      <div class="row"><button class="btn" id="wBuyGround" ${RUN.gold < W_GROUND.price ? 'disabled' : ''}>Buy the ground (${W_GROUND.price} gold)</button></div>`;
+  } else if (!here) {
+    body = `<p>Your ground is in ${esc(wTownName(G.town))}. ${esc(DB.regions[wHomeRegion()].name)} is home.</p><p class="hint">Build it up there.</p>`;
+  } else {
+    const drills = wDrillsLeft();
+    body = `<p class="hint">${esc(DB.regions[wHomeRegion()].name)} is home: matches there have your crowd (not the Crown). You have <b class="wgold">${RUN.gold} gold</b>.</p>
+      <table class="wshop"><tbody>${Object.keys(W_GROUND.parts).map(k => {
+        const P = W_GROUND.parts[k], lv = G.parts[k], cost = wGroundCost(k);
+        return `<tr><td><b>${esc(P.name)}</b> <span class="dim">level ${lv} of ${P.costs.length}</span><small>${esc(lv ? P.does[lv - 1] : 'Not built.')}${cost != null ? ' Next: ' + esc(P.does[lv]) : ''}</small></td><td class="wnum">${cost != null ? cost + 'g' : ''}</td><td>${cost != null ? `<button class="ghost" data-wgup="${k}" ${RUN.gold < cost ? 'disabled' : ''}>${lv ? 'Upgrade' : 'Build'}</button>` : '<span class="dim">Done</span>'}</td></tr>`;
+      }).join('')}</tbody></table>
+      <div class="row"><button class="btn" id="wGroundSleep">Sleep here (free)</button>${G.parts.pitch ? `<button class="ghost" id="wGroundDrill" ${drills ? '' : 'disabled'}>Drill a card (${drills} left this week)</button>` : ''}</div>`;
+  }
+  const close = modal(`<header><h3>${here || !G ? 'Your ground, ' + esc(wTownName(town)) : 'Your ground'}</h3><button class="ghost" data-close>Done</button></header>${msg ? `<p class="wbad">${esc(msg)}</p>` : ''}${body}`);
+  const again = r => { close(); wDrain(); wOpenGround(town, r); };
+  if ($('wBuyGround')) $('wBuyGround').onclick = () => again(wBuyGround(town));
+  $('modalBox').querySelectorAll('[data-wgup]').forEach(b => b.onclick = () => again(wUpgradeGround(b.dataset.wgup)));
+  if ($('wGroundSleep')) $('wGroundSleep').onclick = () => { const r = wSleepGround(); close(); if (typeof wCloseTalk === 'function') wCloseTalk(); if (r) wLog(r, 'b'); wDrain(); };
+  if ($('wGroundDrill')) $('wGroundDrill').onclick = () => { close(); wPickCard(RUN.deck.filter(practicable), 'Drill a card', 'It gains Practice ★. Free, an hour.', card => { const r = card ? wDrill(card) : ''; wDrain(); wOpenGround(town, r); }); };
+}
+
+/* ---------- the innkeepers sell it ---------- */
+for (const town in W_GROUND.inns) {
+  const ch = DB.chars[W_GROUND.inns[town]]; if (!ch) continue;
+  ch.topics.ground = { t: 'The old ground out back? Seats a fair crowd, if somebody fixed the stands. It is yours for the right price, and a team plays better at home.', act: 'ground' };
+  ch.topics.job.t += ' The old GROUND out back is for sale.';
+}
+const wW14RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'ground') return LAB ? null : wOpenGround(WG.map);
+  return wW14RunAct(act, id);
+};
+const wW14OpenInn = wOpenInn;
+wOpenInn = function (price, who) {
+  wW14OpenInn(price, who);
+  const row = $('wSleep') && $('wSleep').parentNode; if (!row || !W_GROUND.inns[WG.map]) return;
+  const G = wHomeGround(), label = !G ? 'The ground (for sale)' : G.town === WG.map ? 'Your ground' : '';
+  if (!label) return;
+  row.insertAdjacentHTML('beforeend', `<button class="ghost" id="wInnGround">${label}</button>`);
+  $('wInnGround').onclick = () => wOpenGround(WG.map);
+};
+
+/* ---------- the pre-game card ---------- */
+const wW14PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW14PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'); if (!box || !wHomeGround()) return;
+  const W = enc.world, lv = wGroundLv('stands');
+  let t = '';
+  if (wIsHome(W)) t = `A home game: your crowd is here.${lv ? ' ' + W_GROUND.parts.stands.does[lv - 1] : ' Build the stands for Block at kickoff.'}`;
+  else if (W.kind === 'cup' && W.ref && W.ref.cup === 'crown') t = 'The Crown is neutral ground: no home crowd.';
+  if (t) box.insertAdjacentHTML('beforeend', `<p class="hint wground">${esc(t)}</p>`);
+};
+
+/* ---------- a tip, an achievement, How to play ---------- */
+TIPS.w_ground = ['A ground of your own', 'Every inn has an old ground out back for sale. Buy one and its region is home: your crowd at every match there, free beds, and upgrades to spend your gold on. Ask the innkeeper about the GROUND.'];
+setInterval(() => {
+  if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world' || wHomeGround()) return;
+  if (W_GROUND.inns[WG.map] && RUN.gold >= W_GROUND.price + 50 && $('modal').hidden) tip('w_ground');
+}, 900);
+ACH.push({ id: 'w_ground', n: 'Home Ground', d: 'Buy a ground and build it up (each buy or upgrade counts)', stat: 'realmGroundWork', at: [1, 5, 9] });
+const wW14RenderHelp = renderHelp;
+renderHelp = function () {
+  wW14RenderHelp();
+  const sec = $('wHelp'); if (!sec || $('wHelpGround')) return;
+  const P = W_GROUND.parts;
+  // in journey order: straight after Towns
+  const towns = $('wHelpTowns');
+  (towns || sec).insertAdjacentHTML(towns ? 'afterend' : 'beforeend', `<div id="wHelpGround"><h4>Your home ground</h4>
+    <p class="hint">Every inn has an old ground out back, for ${W_GROUND.price} gold (ask the innkeeper about the GROUND, or use the inn's Your ground button). You can own one. Its region is <b>home</b>: every match there has your crowd behind it, except the Crown, which is neutral ground. The ground has beds, free, and you wake there after a blackout if you slept there last.</p>
+    <p class="hint">Build it up, two levels each: <b>${P.stands.name}</b> (${esc(P.stands.does[1].toLowerCase())}), <b>${P.pitch.name}</b> (free Practice ★ drills each week), <b>${P.kitchen.name}</b> (a free meal when you wake there) and the <b>${P.scouts.name.toLowerCase()}</b> (better free agents at that inn).</p></div>`);
 };
 </script>
 </body></html>

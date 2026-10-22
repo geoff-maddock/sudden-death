@@ -218,3 +218,31 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **The bag.** `W_BAG` = `{ salve: { heal: .3, min: 10 }, ration: { heal: .15, min: 120 } }`. `wUseItem(id)` returns '' or why not: never during a match, not with none, not at full health. It heals `ceil(maxhp × heal)`, passes the time and saves. The Team screen gets a **Bag** tab (`wOpenCamp` and `wRenderCamp` wrapped). `DB.items.ration` is renamed Trail Ration, and both items' `desc`/`use` text is rewritten from `W_BAG` at load. Shop prices are unchanged (salve 30, or 28 in Rimewatch; ration 12). The bot does not use them.
 - **Help:** `renderHelp` (wrapped as `wW13RenderHelp`) adds `#wHelpFeel` inside `#wHelp`: the bag table, music and medals.
 - **Test:** `test/realm_feel.py`.
+
+## Epic 2, phase 1: the home ground (w14-ground.js)
+
+`w14-ground.js` loads after `w13-feel.js` and changes earlier parts only by reassignment (saved originals carry the `wW14` prefix), one `fightStart` hook, and a `ground` topic added to the five innkeepers. The numbers are in `W_GROUND`.
+
+- **State.** `WG.ground = { town, parts: { stands, pitch, kitchen, scouts }, drill: { week, n } }`, or absent. Plain JSON. One per journey.
+- **Buying.** `wBuyGround(town)` for `W_GROUND.price` (150) in any of the five inn towns (`W_GROUND.inns`). From the inn panel (**The ground (for sale)** / **Your ground**, `wOpenInn` wrapped) or the GROUND topic (`act: 'ground'`, `wRunAct` wrapped). `wOpenGround(town)` is the screen.
+- **Home.** `wHomeRegion()` is the ground town's region. `wIsHome(world)` is true for a match whose `world.region` is home, except the Crown (`kind: 'cup'`, `ref.cup === 'crown'`), which is neutral ground. At kickoff a home match sets `B.wHome` and, with the stands built, adds `W_GROUND.block` (6) Block, and at level 2 1 Strength. The pre-game card (`wPreGame` wrapped) adds a `.wground` line.
+- **Upgrades.** `wUpgradeGround(part)`, two levels each:
+
+  | Part | Costs | Does |
+  |---|---|---|
+  | `stands` | 100, 200 | 6 Block at kickoff in home matches; then 1 Strength too |
+  | `pitch` | 120, 240 | 1, then 2, free Practice ★ drills a week (`wDrill(card)`, `wDrillsLeft()`) |
+  | `kitchen` | 80, 160 | waking at the ground packs a hash; then also the town inn's best dish (never more than 2 of a dish) |
+  | `scouts` | 100, 200 | the ground town's free agents (`wTavern` wrapped, on a new week) are 1, then 2, levels higher, with at least 2, then 3, of them |
+
+- **Beds.** `wSleepGround()`: a free night (`wSleepInn(0)`), so the ground's town becomes where you wake after a blackout, then the kitchen's breakfast.
+- **Tip, achievement, help.** `TIPS.w_ground` (in a town with an inn and 200 gold, before you own a ground; its own watcher, since `wFeelTips` is passed to `setInterval` by reference). `ACH` `w_ground` Home Ground, stat `realmGroundWork` (each buy or upgrade), 1, 5, 9. `#wHelpGround` in How to play.
+- **Bot.** `test/realm_lab.js` buys a ground at the first cup or dungeon stop with 250 gold to spare, then once a stage goes home to build (keeping 150 back), drill, sign the home inn's agents, and sleep. Options: `ground: false`, `groundAt`, `groundSpare`, `groundOrder`, `groundTavern: false`. See `BALANCE.md`.
+- **Test:** `test/realm_ground.py`.
+
+## Ways in and out (test/realm_ways.py)
+
+- **Towns.** `buildTown` keeps each building's rectangle on `map.blds` and calls `wSettleSpawn(map)`: a way in that lands inside a building (Saltmere's did) moves to the nearest open tile, a street first. `wAudit` checks no town's way in is inside a building.
+- **Waking.** `wInnSpot` picks the tile nearest the innkeeper that is reachable from the town's way in (`bfsReach`), so you wake in front of the counter, not behind it. `wAudit` checks every inn.
+- **Counters.** In a town, if you stand somewhere cut off from the way in, walking into a counter climbs over it (`wTryMove`). From the customer side a counter still stops you.
+- **The menu.** A **Menu** button in the world HUD (`w7b-camp.js`), Esc (when no talk panel is open) and P open Sudden Death's pause screen, `wOpenMenu()`. In the world its **Save and quit to title** saves and clears `WG`, `RUN` and `B` (`openPause` wrapped in `w5-bridge.js`); Continue on the title resumes in the same place.

@@ -183,7 +183,7 @@ Object.assign(TIPS, {
   w_level: ['Level up', 'A player who levels up raises your team’s max HP and picks a card of their own kind. Their cards only play while they start.'],
   w_recruit: ['A new player', 'Players can join from taverns, after games, and from quests. Open the Team screen (C) to change who starts: only the first three play.'],
   w_cup: ['In a cup', 'A cup is three rounds in a row. Lose one and you are out, but you can enter again. The next round’s card opens when you are ready.'],
-  w_door: ['A shut door', 'Dungeons open as you win cups, and the Gene Vault also wants a keycard. The log says what is missing.'],
+  w_door: ['A shut door', 'Dungeons open as you win cups, and the Sealed Vault also wants a keycard. The log says what is missing.'],
   w_renown: ['Renown', 'Every cup and boss you win makes the realm’s teams take you more seriously: more HP, and later Strength. The pre-game card shows it.'],
   w_champ: ['Championship week', 'The last days of the year. With all four cups, enter the Crown with Steward Crane at the Crown Coliseum.'],
   w_night: ['Night falls', 'After dark, wild teams come out more, the road is not safe, and some ambush you a score ahead. An inn is a good place to wait for morning.'],
