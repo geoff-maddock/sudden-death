@@ -110,3 +110,25 @@ Both load after `w8-boot` and change earlier parts only by reassignment (see the
 - **Enchanter** (`DB.enchanter`, w1): `wOpenEnchanter()`, `wEnchant(service, card)`; `WG.enchUsed[service]` counts uses, so prices climb.
 - **Card vendors** (`DB.cardShops`, w1): `wOpenCardShop(charId)`; stock is `WG.cardShops[charId] = { week, cards: [{ id, price, sold }], removed }` and turns over when `wWeek()` changes. Prices are Sudden Death's `PRICE`; trading a card away is `RUN.removeCost`.
 - **Talk acts** added: `enchant` (Quill), `kitchen` (Tansy), `meals` (every innkeeper), `cards` (the three vendors).
+
+## Cups, rivals and the Crown (w11-cups.js): phase 6
+
+`w11-cups.js` loads after `w9b-town.js` and changes earlier parts only by reassignment (saved originals carry the `wW11` prefix). Its numbers are in `W_CUP` at the top of the file.
+
+- **Town cups** (`DB.cups.moss|salt|cind|rime`): entered with each town's registrar (topic ENTER, act `cup:<id>`) for `W_CUP.fee` gold. Three rounds in order, in the cup region's sports (`DB.regions[cup.elem].sports`):
+  1. `normal`, against the local side (`rounds[0].who`);
+  2. `elite` with a random `ELITE_TRAITS` trait, against the named seed (`rounds[2].who`);
+  3. `rival`, against the cup's rival club: `WG.rivals[W_CUP.home[cup]]`, in the club's colours, led by its captain.
+  - Tier is `W_CUP.tier[cups already won]` (2, 2, 2, then 3 for the fourth cup). Level is `W_CUP.lv[round] + floor(cups × W_CUP.lvPerCup)`, capped at `W_ROAD.maxLv`. Both are passed to `startMatch`, so distance and night do not add to cup levels.
+  - A loss knocks you out (`WG.cup = null`), and you may pay and enter again at once. Not yet on the pre-game card keeps your place; ENTER again resumes the round. A win sets `WG.cup.ready`, and the next round's card opens when the world is free (`wNextPrompt`, after level-ups and recruits).
+  - Winning sets the flag `cup.flag` (`cup_moss` …) and `cups1`..`cupsN` for N = `wCupsWon()`, records `WG.cupLog[id] = { year, day }`, and pays `W_CUP.prize` (gold, fans, a pick of rare cards). The wall (`wWallText`) lists the cups with their year.
+- **State:** `WG.cup = { id, round, ready?, clubs?, year? }` (the cup you are in), `WG.cupLog`, `WG.h2h`, `WG.crownYear`, `WG.crowns` (years won). All plain JSON in the save.
+- **Matches:** `world.kind: 'cup'`, `ref: { cup, round, club }` (`club` is an SD club id, `'apex'` for the Crown final, or null). `W_ON_END.cup` advances, knocks out, or awards the cup.
+- **Head to head:** `WG.h2h[clubId | 'apex'] = { w, l, last: { r: 'win'|'lose', us, them, sport, day } }`; the score comes from the last `RUN.games` entry. It is kept for cup matches against a club and for the road's `rival` event (`W_ON_END.event` is wrapped). It shows on the pre-game card (`wH2hLast`: "They remember last time: you won, 3–1 (Hockey). Head to head: 2–1.") and on the Camp's team tab, with the cups held. The road's rival event now draws its club from `WG.rivals` (`wOpenEvent` wrapped).
+- **The Crown** (`DB.cups.crown`, renamed "The Crown" at load; the steward's topic ENTER, act `cup:crown`): only when `wChampWeek()` and `wCupsWon() === 4`, once per year (`WG.crownYear`), no fee. Tier 3, levels `W_CUP.crown.lv`, sports drawn from every region.
+  - Rounds: the two rival clubs with the best record against you (`wCrownClubs`, fixed at entry in `WG.cup.clubs`), then the final: `type: 'boss'` at SD act 3 (`ENCOUNTERS[2].boss`, through `bossId`), in Apex Biologic colours.
+  - Winning sets `champion`, pays `W_CUP.crown.prize`, and shows the champion ending: SD's `showEnd('win')`, retitled "Champions of the realm", with **Keep exploring** (back to the world, save intact) and Back to the title. `recordRun` is not called, so the save is not cleared. Level-up prompts wait until Keep exploring.
+- **WAIT** (act `waitweek`) is refused without four cups, and saves after waiting.
+- **Functions:** `wCupEnter(id, { card? })`, `wCupPlay({ card? })`, `wCupProblem(id)` ('' or why not), `wCupMatch(id, round)` (the `startMatch` options), `wCupWho`, `wCupThe`, `wCupWithdraw`, `wCrownClubs`, `wCrownEnding`, `wH2hRecord(club, r)`, `wH2hLast(club)`.
+- **Wrapped:** `wRunAct` (`cup:*`, `waitweek`), `wPreGame` (round line and the rival's memory), `wMatchTitle`, `wMatchTeam` (club, town and Apex colours), `wOpenEvent`, `wWallText`, `wCampTeam`, `wNextPrompt`, `wReturnToWorld` (the ending), and SD's `renderHelp` (a "Cups, rivals and the Crown" section, `#wHelpCups`). `W_ON_END.cup` is new and `W_ON_END.event` is wrapped, both by assignment. The rival handler's and the registrars' CUP text is rewritten at load.
+- **Test:** `test/realm_cups.py`.
