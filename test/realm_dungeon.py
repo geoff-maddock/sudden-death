@@ -132,8 +132,9 @@ async def room_checks(pg):
     check(r['flag'] and r['left'] == 2, 'the beaten room survives a save and reload', r)
     # walking back in: no match
     step = await pg.evaluate("__doorOf(wDungeonRooms('hatchery')[0])")
-    await pg.evaluate(f"wTryMove({step[0]}, {step[1]}); wDrain()")
-    check(await pg.evaluate("document.getElementById('modal').hidden && !RUN.pending && UI.view === 'world'"), 'walking into a beaten room starts nothing')
+    # no wild pickup game on this step (dungeons roll them too), so only the room could start a match
+    await pg.evaluate(f"const m0 = W_ENC.mult; W_ENC.mult = 0; wTryMove({step[0]}, {step[1]}); wDrain(); W_ENC.mult = m0")
+    check(await pg.evaluate("document.getElementById('modal').hidden && !RUN.pending && UI.view === 'world'"), 'walking into a beaten room starts nothing', await pg.evaluate("({m: document.getElementById('modal').hidden ? null : document.getElementById('modal').innerText.slice(0,300), p: !!RUN.pending, v: UI.view, ev: WG.event, co: !!WG.cardOffer, pr: WG.wprompts})"))
     # a deeper room: forced perk and stakes reach the match
     await pg.evaluate("const R = wDungeonRooms('hatchery')[2]; __doorOf(R); wStartRoom(R, { card: false, perk: 'ace', stakes: 'wager', trait: 'armored' })")
     await pg.wait_for_function("UI.view === 'fight' && !!B")

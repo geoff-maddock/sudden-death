@@ -23,3 +23,4 @@ src/realm/w8-boot.js
 src/realm/w9-road.js
 src/realm/w9b-town.js
 src/realm/w10-dungeon.js
+src/realm/w11-cups.js
