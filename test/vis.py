@@ -1,6 +1,7 @@
 import asyncio, json, sys
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
@@ -8,7 +9,7 @@ async def main():
         pg = await b.new_page(viewport={'width':1300,'height':900})
         errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html')
+        await pg.goto(GAME_URL)
         await pg.wait_for_timeout(800)
         await pg.screenshot(path='/tmp/v_title.png')
         await pg.evaluate("newRun('gallowmere',[0,2,3]); RUN.path=[]; showView('map'); renderMap();")

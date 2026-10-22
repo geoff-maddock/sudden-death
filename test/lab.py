@@ -1,6 +1,7 @@
 import asyncio, json, sys, collections
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 async def main():
@@ -10,7 +11,7 @@ async def main():
         errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.add_init_script('window.__SD_LAB = true;')
-        await pg.goto('file://' + ROOT + '/sudden-death.html')
+        await pg.goto(GAME_URL)
         await pg.add_script_tag(path=ROOT + '/test/lab.js')
         logs = await pg.evaluate(f'(() => {{ const out = []; for (let i = 0; i < {N}; i++) {{ try {{ out.push(LABRUN()); }} catch (e) {{ out.push({{ err: String(e.stack || e) }}); }} }} return out; }})()')
         json.dump(logs, open('/tmp/lab.json', 'w'))

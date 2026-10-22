@@ -1,12 +1,13 @@
 import asyncio, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 # every trophy that has a hook does what it says, checked one at a time in a lab fight
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page()
         await pg.add_init_script('window.__SD_LAB = true;')
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.add_script_tag(path=ROOT + '/test/lab.js')
+        await pg.goto(GAME_URL); await pg.add_script_tag(path=ROOT + '/test/lab.js')
         r = await pg.evaluate("""(() => { LAB = true; const res = {};
           const fight = (rel) => { newRun('ironmaw', [0,1,2]); RUN.relics = rel ? [rel] : []; RUN.path = []; RUN.clock = 1; startCombat(['skelss','lb'], 'normal', 'golf'); return B; };
           const base = fight(null); const b0 = { blk: B.P.block, str: sv(B.P,'str'), dex: sv(B.P,'dex'), hand: B.hand.length, en: B.energy, e: B.enemies.map(e => ({ psn: sv(e,'psn'), weak: sv(e,'weak'), vuln: sv(e,'vuln'), str: sv(e,'str'), hp: e.hp, max: e.max })) };

@@ -1,0 +1,92 @@
+# Sudden Death build manifest, read by ./build.sh.
+#
+# ORDER MATTERS. The files below are concatenated, in this order, into one <script>, so they all share one
+# global scope. A file may use anything defined earlier while it loads, but only reach later files at runtime
+# (from inside a function that runs after load). For example, data/draft-class.js sits after engine/sky.js
+# because it reads the sky groups while loading, and app/boot.js starts the game before the stats, treasure
+# and app/ files load; those files patch in afterwards. Folders say what the code is; this list says when it
+# loads. Do not reorder lines without checking what each file reads at load time.
+#
+# Format: one path per line, relative to the repo root. Blank lines and # comments are ignored.
+#   shell <file>       the HTML page the script is wrapped in
+#   out <file>         where the built page is written
+#   include <file>     read another manifest here, as if its lines were pasted in
+
+shell src/shell.html
+out dist/sudden-death.html
+
+# utilities and the creature renderer
+src/core/util.js
+src/render/creatures.js
+
+# data: clubs, statuses, cards, trophies
+src/data/clubs.js
+src/data/statuses.js
+src/data/cards.js
+src/data/trophies-tonics.js
+src/data/cards-extra.js
+
+# profiles (pkey) and hooks (fire, mod, TROPHY_FX)
+src/core/profiles.js
+src/core/hooks.js
+
+# data: sports, acts, enemies, bosses, the sports front office
+src/data/sports-acts-enemies.js
+src/data/bosses.js
+src/data/sport-office.js
+src/data/cards-archetypes.js
+src/data/sport-fits.js
+
+# the engine
+src/engine/combat.js
+src/engine/sports.js
+src/engine/boss-ops.js
+src/engine/stats.js
+src/engine/sky.js
+
+# the open draft class reads the sky groups at load, so it comes after engine/sky.js
+src/data/draft-class.js
+
+# the run
+src/run/run.js
+src/run/map.js
+src/run/rewards-shop.js
+src/run/events.js
+src/run/saves-records.js
+src/run/elite-traits.js
+src/run/goals.js
+src/run/achievements.js
+src/run/trouble.js
+
+# interface helpers and the map
+src/ui/icons.js
+src/ui/card-faces.js
+src/ui/widgets.js
+src/ui/map-view.js
+
+# sound effects, then the fight scene
+src/app/sound.js
+src/ui/fight/arena.js
+src/ui/fight/scene.js
+src/ui/fight/screen.js
+src/render/boss-art.js
+src/render/vfx.js
+src/ui/fight/field.js
+src/ui/fight/sky-view.js
+
+# screens, and boot (boot() runs here, before the files below load)
+src/ui/screens/title.js
+src/ui/screens/draft.js
+src/ui/screens/flow.js
+src/ui/screens/panels.js
+src/ui/screens/pages.js
+src/app/boot.js
+src/ui/screens/stats.js
+src/ui/screens/treasure.js
+
+# music, settings, coach's notes, pause and mid-fight saves, profiles on the title screen
+src/app/music.js
+src/app/settings.js
+src/app/coach.js
+src/app/pause-save.js
+src/app/profiles-ui.js

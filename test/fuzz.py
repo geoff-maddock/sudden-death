@@ -1,12 +1,13 @@
 import asyncio
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width':1300,'height':950})
         errs=[]; pg.on('console', lambda m: errs.append(m.text[:400]) if m.type=='error' and 'resource' not in m.text else None)
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(500)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(500)
         r = await pg.evaluate("""(() => { const bad = []; const cv = document.querySelector('#v-fight canvas') || document.querySelector('canvas'); 
           const ids = Object.keys(ENEMIES); const sts = Object.keys(ST);
           for (const id of ids) for (const sport of ['baseball','hockey','football','basketball','golf','bowling','boxing','curling','jousting']) {

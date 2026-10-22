@@ -1,12 +1,47 @@
 #!/bin/bash
+# Build a game from a manifest: ./build.sh [manifest]   (default: src/manifest.txt)
+#
+# A manifest lists source files, one path per line, relative to the repo root, in the order they are
+# concatenated into one <script>. Blank lines and # comments are ignored. Directives:
+#   shell <file>     the HTML page the script is wrapped in (required)
+#   out <file>       where the built page is written (required)
+#   include <file>   read another manifest at this point, as if its lines were pasted in
+# Plain bash, no dependencies beyond node (for the syntax check).
 set -e
-mkdir -p "$(dirname "$0")/build"
 cd "$(dirname "$0")"
-cat src/p1.js src/p2.js src/p2b.js src/p2e.js src/p2d.js src/p3.js src/p3b.js src/p3c.js src/p4.js src/p4b.js src/p4c.js src/p4d.js src/p4e.js src/p2c.js src/p5.js src/p5b.js src/p5c.js src/p5d.js src/p6.js src/p7.js src/p7b.js src/p7c.js src/p7d.js src/p8.js src/p8b.js src/p8c.js src/p9.js > build/all.js
-node --check build/all.js
-{ cat src/p0.html; echo '<script>'; cat build/all.js; echo '</script>'; echo '</body></html>'; } > sudden-death.html
-wc -c sudden-death.html
+MANIFEST="${1:-src/manifest.txt}"
+SHELL_HTML=""; OUT=""; FILES=()
+
+read_manifest() {
+  local m="$1" line kw arg
+  [ -f "$m" ] || { echo "Manifest not found: $m" >&2; exit 1; }
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"                                   # strip comments
+    line="$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [ -z "$line" ] && continue
+    kw="${line%%[[:space:]]*}"; arg="$(printf '%s' "${line#"$kw"}" | sed -e 's/^[[:space:]]*//')"
+    case "$kw" in
+      shell)   SHELL_HTML="$arg" ;;
+      out)     OUT="$arg" ;;
+      include) read_manifest "$arg" ;;
+      *)       [ -f "$line" ] || { echo "Missing source file in $m: $line" >&2; exit 1; }
+               FILES+=("$line") ;;
+    esac
+  done < "$m"
+}
+read_manifest "$MANIFEST"
+[ -n "$SHELL_HTML" ] || { echo "No 'shell' line in $MANIFEST" >&2; exit 1; }
+[ -n "$OUT" ] || { echo "No 'out' line in $MANIFEST" >&2; exit 1; }
+[ ${#FILES[@]} -gt 0 ] || { echo "No source files in $MANIFEST" >&2; exit 1; }
+
+NAME="$(basename "$OUT" .html)"
+JS="build/$NAME.js"
+mkdir -p build "$(dirname "$OUT")"
+cat "${FILES[@]}" > "$JS"
+node --check "$JS"
+{ cat "$SHELL_HTML"; echo '<script>'; cat "$JS"; echo '</script>'; echo '</body></html>'; } > "$OUT"
+wc -c "$OUT"
 # every part shares one global scope: a second top-level function or const with the same name silently
 # replaces the first, so refuse to build if that happens
-dups=$(grep -oE "^(async )?function [A-Za-z_\$][A-Za-z0-9_\$]*|^(const|let|var) [A-Za-z_\$][A-Za-z0-9_\$]*" build/all.js | awk '{print $NF}' | sort | uniq -d)
+dups=$(grep -oE "^(async )?function [A-Za-z_\$][A-Za-z0-9_\$]*|^(const|let|var) [A-Za-z_\$][A-Za-z0-9_\$]*" "$JS" | awk '{print $NF}' | sort | uniq -d)
 if [ -n "$dups" ]; then echo "Duplicate global names: $dups" >&2; exit 1; fi

@@ -1,12 +1,13 @@
 import asyncio, json, sys
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width': 1300, 'height': 950})
         errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(600)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(600)
         for act, boss in [(0,'argus'),(0,'groundskeeper'),(0,'kqueen'),(1,'cube'),(1,'zamboni'),(1,'banshee'),(2,'baron'),(2,'wyrm'),(2,'mirror')]:
             await pg.evaluate(f"newRun('mirewood',[0,1,4]); RUN.path=[]; RUN.act={act}; RUN.bossIds=[null,null,null]; RUN.bossIds[{act}]='{boss}'; beginFight(rollEncounter('boss'));")
             for _ in range(40):

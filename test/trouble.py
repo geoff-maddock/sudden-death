@@ -1,11 +1,12 @@
 import asyncio, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+from paths import GAME_URL
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width':1300,'height':950})
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file://' + ROOT + '/sudden-death.html'); await pg.wait_for_timeout(400)
+        await pg.goto(GAME_URL); await pg.wait_for_timeout(400)
         r = await pg.evaluate("""(() => { TIPS_SEEN.push(...Object.keys(TIPS)); const out = {};
           // how often maps carry stakes, per act
           newRun('ironmaw',[0,1,2]); out.stakesPerMap = [0,1,2].map(a => { let n = 0; for (let i = 0; i < 30; i++) n += Object.values(genMap(a).nodes).filter(x => x.stakes).length; return (n / 30).toFixed(1); });
