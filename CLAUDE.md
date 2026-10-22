@@ -66,7 +66,7 @@ Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screens
 
 ## Realm rules
 
-Sudden Death: Realm (`src/realm/`, `dist/realm.html`) layers an open world on this game. See the Realm section of `ARCHITECTURE.md` and `docs/realm/`.
+Champions of the Realm (the Realm for short; `src/realm/`, `dist/realm.html`) layers an open world on this game. See the Realm section of `ARCHITECTURE.md` and `docs/realm/`.
 
 - **Rebuild `dist/realm.html` after every change** (`./build.sh src/realm/manifest.txt`) and commit it. CI fails on a stale one. A change to Sudden Death's own files changes both builds.
 - **`w`/`W` names only.** Every realm top-level name starts with `w` or `W` (except the ported `DB`, `MAPS`, `WW`, `WH`, `regionAt`, `mulberry`, `noise2`).

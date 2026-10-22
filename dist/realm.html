@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sudden Death: Realm</title>
+<title>Champions of the Realm</title>
 <meta name="description" content="The Brimstone League goes underground. Draft three monsters, build a deck, and fight down through three acts of a sports-mad dungeon to the Commissioner of the Pit.">
 <meta name="author" content="Geoff Maddock">
 <meta name="theme-color" content="#140f0c">
@@ -9377,7 +9377,7 @@ renderHelp = function () {
    Reassigns (never redeclares) showView, frame and renderTitle, adds saving and loading of WG and RUN, then boots.
    Sudden Death's saveRun/loadRun/clearRun are pointed at this save in w5-bridge.js. */
 const REALM = { v: 2 };
-document.title = 'Sudden Death: Realm';
+document.title = 'Champions of the Realm';
 
 /* ---------- save and load: one save per profile, { v: 2, WG, RUN }. v1 saves held WG only. ---------- */
 function wSaveKey() { return pkey('sd-realm'); }
@@ -9456,9 +9456,9 @@ function wStart(save, opts) {
 (() => {
   const card = document.querySelector('#scr-title .titlecard');
   card.querySelector('h2').textContent = 'Walk the realm. Every fight is a game.';
-  card.querySelector('p').textContent = 'Lead three monsters across the Charter Plains, the Mosswold, the Brinefen, the Cindermaw and the Frostspire. Talk to the towns, trade at the shops, and sleep at the inns. Every fight on the road is a match: wild teams in the long grass, and alphas in their lairs. Cups and dungeons are on their way.';
-  const bp = document.querySelector('.brand p'); if (bp) bp.textContent = 'Sudden Death: Realm. The Brimstone League takes to the road.';
-  const h1 = document.querySelector('.brand h1'); if (h1) h1.innerHTML = 'Sudden <span>Death</span> <small class="wrealm">Realm</small>';
+  card.querySelector('p').textContent = 'Lead three monsters across the Charter Plains, the Mosswold, the Brinefen, the Cindermaw and the Frostspire. Talk to the towns, trade at the shops, and sleep at the inns. Every fight on the road is a match. Win the four cups, brave the dungeons, and take the Crown.';
+  const bp = document.querySelector('.brand p'); if (bp) bp.textContent = 'A Sudden Death journey. The Brimstone League takes to the road.';
+  const h1 = document.querySelector('.brand h1'); if (h1) h1.innerHTML = 'Champions <small class="wrealm">of the</small> <span>Realm</span>';
 })();
 renderTitle = function () {
   const sv = wLoadSave(), row = $('resumeRow');
@@ -11030,7 +11030,7 @@ wGiveXp = function (p, n) {
 ACH.push(
   { id: 'w_cups', n: 'Silverware', d: 'Win regional cups in the realm', stat: 'realmCups', at: [1, 4, 12] },
   { id: 'w_alphas', n: 'Alpha Hunter', d: 'Beat the realm’s alphas (dungeon bosses and lairs)', stat: 'realmAlphas', at: [1, 6, 15] },
-  { id: 'w_crown', n: 'Champions of the Realm', d: 'Win the Crown', stat: 'realmCrowns', at: [1, 3, 10] },
+  { id: 'w_crown', n: 'Wear the Crown', d: 'Win the Crown', stat: 'realmCrowns', at: [1, 3, 10] },
   { id: 'w_iron', n: 'Iron Crown', d: 'Win the Crown on Hardcore', stat: 'realmHardCrowns', at: [1, 2, 5] },
   { id: 'w_scout', n: 'Talent Scout', d: 'Sign players in the realm', stat: 'realmRecruits', at: [3, 10, 30] },
   { id: 'w_renown', n: 'Household Name', d: 'Reach renown in one journey', stat: 'realmRenown', at: [3, 6, 10] },

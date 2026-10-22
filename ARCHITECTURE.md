@@ -128,7 +128,7 @@ Balance is measured with bots that play from the model, not the screen (`test/la
 
 Bot numbers measure relative balance, not how hard the game feels to a person. Compare before and after a change, with at least 100 runs per side, and expect a few points of noise either way.
 
-## Sudden Death: Realm
+## Champions of the Realm
 
 `./build.sh src/realm/manifest.txt` writes `dist/realm.html`: an open-world build where you walk a realm with your team and every fight is a Sudden Death match. Its manifest loads a prelude, then `include src/manifest.txt` (all of Sudden Death, in its own order), then the realm files. Its `out` line comes after the include, so it replaces Sudden Death's. `style` lines add the realm CSS to the shell's `<style>`. The standalone build never sees a realm file. `docs/realm/` has the plan (`PLAN.md`), the shapes the parts agree on (`CONTRACT.md`) and the balance notes (`BALANCE.md`).
 

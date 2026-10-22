@@ -58,8 +58,9 @@ async def to_world(pg, rg):
     return await pg.evaluate(f"(() => {{ const p = __wspot('{rg}'); wEnterMap('world', p[0], p[1]); WG.min = 12 * 60; wDrain(); return {{map: WG.map, x: WG.x, y: WG.y}}; }})()")
 
 async def win_match(pg):
-    await pg.evaluate("RUN.maxhp = Math.max(RUN.maxhp, 400); RUN.hp = RUN.maxhp")
-    over = await pg.evaluate('__wbot(80)')
+    # the checks are about the realm, not the fight: the simple bot sometimes runs out of turns on the Hatch-Mother
+    await pg.evaluate("RUN.maxhp = Math.max(RUN.maxhp, 400); RUN.hp = RUN.maxhp; for (const e of alive()) e.hp = Math.min(e.hp, 6)")
+    over = await pg.evaluate('__wbot(120)')
     await pg.evaluate('__wend()'); await pg.wait_for_timeout(300)
     return over
 

@@ -39,9 +39,9 @@ Progress (runs in progress, the record book, careers, achievements, settings) is
 
 ---
 
-## Sudden Death: Realm
+## Champions of the Realm
 
-**The same game, on the road.** Realm is a second build of Sudden Death: an open-world RPG where you walk a realm of towns, wilds and dungeons with your team, and every fight is a Sudden Death match. Its world (regions, towns, people, road events, cups) is ported from an earlier game, *Terra Chimera*, and redrawn in Sudden Death's ink style.
+**The same game, on the road.** Champions of the Realm is a second build of Sudden Death: an open-world RPG where you walk a realm of towns, wilds and dungeons with your team, and every fight is a Sudden Death match. Its world (regions, towns, people, road events, cups) is ported from an earlier game, *Terra Chimera*, and redrawn in Sudden Death's ink style.
 
 It is one self-contained file too: `dist/realm.html`. Open it in a browser. It keeps its own save, per profile, beside the standalone game's.
 
@@ -130,7 +130,7 @@ src/                the game (see ARCHITECTURE.md for what each file does)
   render/           the creature renderer, boss art, visual effects
   ui/               icons, card faces, widgets, the map; fight/ (the fight scene) and screens/
   app/              sound, music, settings, coach's notes, pause and saves, profiles, boot
-  realm/            Sudden Death: Realm, layered on the files above (its own manifest.txt)
+  realm/            Champions of the Realm, layered on the files above (its own manifest.txt)
 dist/               the built games, sudden-death.html and realm.html (generated, committed)
 test/               Playwright checks and the balance bots
   all.sh            the quick suite

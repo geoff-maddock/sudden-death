@@ -227,7 +227,7 @@ wGiveXp = function (p, n) {
 ACH.push(
   { id: 'w_cups', n: 'Silverware', d: 'Win regional cups in the realm', stat: 'realmCups', at: [1, 4, 12] },
   { id: 'w_alphas', n: 'Alpha Hunter', d: 'Beat the realm’s alphas (dungeon bosses and lairs)', stat: 'realmAlphas', at: [1, 6, 15] },
-  { id: 'w_crown', n: 'Champions of the Realm', d: 'Win the Crown', stat: 'realmCrowns', at: [1, 3, 10] },
+  { id: 'w_crown', n: 'Wear the Crown', d: 'Win the Crown', stat: 'realmCrowns', at: [1, 3, 10] },
   { id: 'w_iron', n: 'Iron Crown', d: 'Win the Crown on Hardcore', stat: 'realmHardCrowns', at: [1, 2, 5] },
   { id: 'w_scout', n: 'Talent Scout', d: 'Sign players in the realm', stat: 'realmRecruits', at: [3, 10, 30] },
   { id: 'w_renown', n: 'Household Name', d: 'Reach renown in one journey', stat: 'realmRenown', at: [3, 6, 10] },

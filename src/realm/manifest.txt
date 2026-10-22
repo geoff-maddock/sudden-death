@@ -1,4 +1,4 @@
-# Sudden Death: Realm build manifest: ./build.sh src/realm/manifest.txt
+# Champions of the Realm build manifest: ./build.sh src/realm/manifest.txt
 #
 # The prelude loads first so the standalone game's boot (app/boot.js) stands down; then every Sudden Death
 # file, in its own order; then the realm files, which may read any Sudden Death table at load time.
@@ -7,7 +7,7 @@
 src/realm/w00-pre.js
 include src/manifest.txt
 out dist/realm.html
-title Sudden Death: Realm
+title Champions of the Realm
 style src/realm/w0.css
 style src/realm/w6.css
 style src/realm/w9.css

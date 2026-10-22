@@ -2,7 +2,7 @@
    Reassigns (never redeclares) showView, frame and renderTitle, adds saving and loading of WG and RUN, then boots.
    Sudden Death's saveRun/loadRun/clearRun are pointed at this save in w5-bridge.js. */
 const REALM = { v: 2 };
-document.title = 'Sudden Death: Realm';
+document.title = 'Champions of the Realm';
 
 /* ---------- save and load: one save per profile, { v: 2, WG, RUN }. v1 saves held WG only. ---------- */
 function wSaveKey() { return pkey('sd-realm'); }
@@ -81,9 +81,9 @@ function wStart(save, opts) {
 (() => {
   const card = document.querySelector('#scr-title .titlecard');
   card.querySelector('h2').textContent = 'Walk the realm. Every fight is a game.';
-  card.querySelector('p').textContent = 'Lead three monsters across the Charter Plains, the Mosswold, the Brinefen, the Cindermaw and the Frostspire. Talk to the towns, trade at the shops, and sleep at the inns. Every fight on the road is a match: wild teams in the long grass, and alphas in their lairs. Cups and dungeons are on their way.';
-  const bp = document.querySelector('.brand p'); if (bp) bp.textContent = 'Sudden Death: Realm. The Brimstone League takes to the road.';
-  const h1 = document.querySelector('.brand h1'); if (h1) h1.innerHTML = 'Sudden <span>Death</span> <small class="wrealm">Realm</small>';
+  card.querySelector('p').textContent = 'Lead three monsters across the Charter Plains, the Mosswold, the Brinefen, the Cindermaw and the Frostspire. Talk to the towns, trade at the shops, and sleep at the inns. Every fight on the road is a match. Win the four cups, brave the dungeons, and take the Crown.';
+  const bp = document.querySelector('.brand p'); if (bp) bp.textContent = 'A Sudden Death journey. The Brimstone League takes to the road.';
+  const h1 = document.querySelector('.brand h1'); if (h1) h1.innerHTML = 'Champions <small class="wrealm">of the</small> <span>Realm</span>';
 })();
 renderTitle = function () {
   const sv = wLoadSave(), row = $('resumeRow');

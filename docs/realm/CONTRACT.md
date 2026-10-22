@@ -206,7 +206,7 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
   |---|---|---|---|
   | `w_cups` | Silverware | `realmCups` (regional cups won) | 1, 4, 12 |
   | `w_alphas` | Alpha Hunter | `realmAlphas` (new `alpha_*` flags) | 1, 6, 15 |
-  | `w_crown` | Champions of the Realm | `realmCrowns` | 1, 3, 10 |
+  | `w_crown` | Wear the Crown | `realmCrowns` | 1, 3, 10 |
   | `w_iron` | Iron Crown | `realmHardCrowns` (the Crown on Hardcore) | 1, 2, 5 |
   | `w_scout` | Talent Scout | `realmRecruits` (`wAddPlayer`, not founders) | 3, 10, 30 |
   | `w_renown` | Household Name | `realmRenown` (best `wRenown()` reached) | 3, 6, 10 |

@@ -158,7 +158,7 @@ async def crown_checks(pg):
     top = st['top'] or {}
     check(st['runs'] == r0 + 1 and top.get('result') == 'win' and (top.get('realm') or {}).get('kind') == 'crown', 'the Crown win goes in the record book', {'runs': [r0, st['runs']], 'realm': top.get('realm')})
     check(st['over'] is None and st['save'] and st['load'], 'and the save survives it (RUN not over, the realm save loads)', st)
-    check(st['crowns'] == c0 + 1 and st['got'] == 0 and st['h2'] == 'Champions of the realm', 'the Crown counts for Champions of the Realm', st)
+    check(st['crowns'] == c0 + 1 and st['got'] == 0 and st['h2'] == 'Champions of the realm', 'the Crown counts for Wear the Crown', st)
     await pg.screenshot(path='/tmp/realm-feel-crown.png')
     await pg.click('#bAgain')
     await pg.wait_for_function("UI.view === 'world' && WG && WG.flags.champion", timeout=T)
