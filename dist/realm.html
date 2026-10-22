@@ -525,6 +525,48 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 }
 .wmsg p{margin:0 0 8px}
 #modalBox:has(#wWake),#modalBox:has(#wGo){width:min(620px,100%)}
+/* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
+.wpglv{font-size:15px;color:var(--dim)}
+.wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
+.wambush b{color:#ff5a4a}
+.wpgmeal{margin:0 0 8px}
+.wpgmeal p{margin:0 0 6px}
+.wpgmeal .row{gap:6px;flex-wrap:wrap}
+.wpgmeal .ghost{font-size:16px;padding:5px 10px 3px}
+/* event cards */
+#modalBox:has(.wev){width:min(640px,100%)}
+.wev .wpgwho{font-size:17px;line-height:1.45}
+.wev .result{margin:4px 0 8px;font-size:17px}
+.wevscene{display:grid;place-items:center;width:96px;height:96px;border-radius:8px;border:1px solid var(--seam);background:#1a120d}
+.wevscene svg{width:60px;height:60px}
+#modalBox .opts{margin:0 0 10px;max-width:none}
+.opt small{display:block;color:var(--dim);font-size:14px;line-height:1.35;margin-top:2px}
+/* meals */
+#modalBox:has(#wMealBody){width:min(720px,100%)}
+#wMealBody h4{margin:10px 0 4px}
+.wmealnow{margin:0 0 8px;font-size:16px}
+.wneeds{font-size:14px;line-height:1.5}
+.wneeds span{display:inline-block;margin-right:10px;white-space:nowrap}
+.wneeds i{color:var(--faint);font-style:normal}
+.wshop .wsellh small{display:inline;margin-left:8px}
+/* enchanter */
+#modalBox:has(.wenergy){width:min(680px,100%)}
+.wenergy{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 10px;font-family:var(--hud);font-size:18px}
+.wenergy b{font-size:22px}
+.wen-ember b{color:#ff8a5a} .wen-bloom b{color:#8ad65a} .wen-tide b{color:#7fd6ff} .wen-aether b{color:#d2a6ff} .wen-rime b{color:#e3f3ff}
+.wentot{color:var(--dim);margin-left:auto}
+.whud .wen b{color:#d2a6ff}
+#wMealBody .wshop .wsellh td{text-align:left}
+/* card shops */
+#modalBox:has([data-wbuyc]){width:min(900px,100%)}
+#modalBox .shopgrid .cardrow{flex-wrap:wrap;justify-content:center}
+@media (max-width:520px){
+  .wevscene{width:72px;height:72px}
+  .wenergy{font-size:16px}
+  .wentot{margin-left:0}
+  #modalBox .shopgrid .cardrow .card{--cw:132px}
+  #modalBox .wmport{display:none}
+}
 </style>
 <body>
 <header class="top">
@@ -5906,10 +5948,10 @@ DB.crew={
 DB.items={
  ration:{name:'Drill Ration',desc:'Dense, dull biscuit. One per training drill.',use:'Camp → Team → Drill. One ration trains the selected chimera for +35% of a level, once per day.',price:12},
  salve:{name:'Salve',desc:'Restores 60% health to one chimera, even one that has fainted. Not usable mid-battle.',use:'Camp → Team → Salve, or the button here. Heals 60%, even a fainted chimera. Not in battle.',price:30},
- honeydrop:{name:'Honey Drop',desc:'Mosswold honey, set hard.',use:'Food. Eaten before a match.',price:22,food:1},
- saltfish:{name:'Salt Fish',desc:'Brinefen cod, salted stiff.',use:'Food. Eaten before a match.',price:28,food:1},
- jerky:{name:'Ember Jerky',desc:'Peppered dried meat.',use:'Food. Eaten before a match.',price:25,food:1},
- hardtack:{name:'Frost Hardtack',desc:'A biscuit you could shoe a Slagback with.',use:'Food. Eaten before a match.',price:25,food:1},
+ honeydrop:{name:'Honey Drop',desc:'Mosswold honey, set hard.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:22,food:1},
+ saltfish:{name:'Salt Fish',desc:'Brinefen cod, salted stiff.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:28,food:1},
+ jerky:{name:'Ember Jerky',desc:'Peppered dried meat.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:25,food:1},
+ hardtack:{name:'Frost Hardtack',desc:'A biscuit you could shoe a Slagback with.',use:'A snack: eat it from the meal menu at any inn, and it helps in your next match.',price:25,food:1},
  keycard:{name:'Vault Keycard',desc:'A slab of old plastic. Opens the Gene Vault.',use:'Used automatically at the Gene Vault door, south-east of Graftonbury.'},
  capsule:{name:'Dormant Capsule',desc:'A pre-League pod the size of a loaf, cold, with something folded up asleep inside.',use:'Take it to Dr. Pell (CAPSULE), with Aether energy to wake it.'},
  offering:{name:'Grove Offering',desc:'Honey, berry and aethercap, baked in a leaf. Smells of spring.',use:'Take it to Hermit Oak at the Hollow Shrine (DRAKE).'},
@@ -5920,22 +5962,50 @@ DB.items={
  bellclapper:{name:'Bell Clapper',desc:'The bronze tongue of a bell, heavy as a leg.',use:'Take it to Brother Halvard in Rimewatch (CLAPPER).'},
  letter:{name:'Sealed Letter',desc:'Herald Pim to Clerk Foss. Do not open.',use:'Carry it to Imelda Foss at the League office and ask about the LETTER.'},
  reply:{name:'Foss\'s Reply',desc:'One line, in a firm hand.',use:'Carry it back to Herald Pim at the Coliseum and ask about his REPLY.'},
- mossberry:{name:'Mossberry',desc:'Sweet, faintly green. From Mosswold bushes.',use:'Camp → Cook. Mossberry Stew (+6 hp). Also wanted by Gaffer Brack and Old Wenna.',price:18},
- emberpepper:{name:'Ember Pepper',desc:'Do not rub your eyes. From Cindermaw bushes.',use:'Camp → Cook. Ember Chili (+2 attack). Also wanted in Cinderhold.',price:18},
- brinekelp:{name:'Brine Kelp',desc:'Salty and rubbery. From Brinefen bushes.',use:'Camp → Cook. Kelp Broth (+2 defence). Also wanted by the diver in Saltmere.',price:18},
- frostmint:{name:'Frost Mint',desc:'Numbs the tongue. From Frostspire bushes.',use:'Camp → Cook. Mint Sorbet (+2 speed). Also wanted at the abbey in Rimewatch.',price:18},
- aethercap:{name:'Aethercap',desc:'A violet mushroom of the central plains.',use:'Camp → Cook. Aethercap Risotto (half a level). Also lamp oil for Fenwick Tallow.',price:22},
- grain:{name:'Grain',desc:'Sack of milled grain.',use:'Camp → Cook. Goes into stew, chili, risotto and trail hash.',price:8},
- salt:{name:'Salt',desc:'A twist of sea salt.',use:'Camp → Cook. Goes into broth, sorbet and trail hash.',price:6}};
+ mossberry:{name:'Mossberry',desc:'Sweet, faintly green. From Mosswold bushes.',use:'Cook it at an inn hearth: Mossberry Stew, Champion\'s Feast. Also wanted by Old Wenna.',price:18},
+ emberpepper:{name:'Ember Pepper',desc:'Do not rub your eyes. From Cindermaw bushes.',use:'Cook it at an inn hearth: Ember Chili, Champion\'s Feast. Also wanted in Cinderhold.',price:18},
+ brinekelp:{name:'Brine Kelp',desc:'Salty and rubbery. From Brinefen bushes.',use:'Cook it at an inn hearth: Kelp Broth, Champion\'s Feast. Also wanted by the diver in Saltmere.',price:18},
+ frostmint:{name:'Frost Mint',desc:'Numbs the tongue. From Frostspire bushes.',use:'Cook it at an inn hearth: Mint Sorbet, Champion\'s Feast. Also wanted at the abbey in Rimewatch.',price:18},
+ aethercap:{name:'Aethercap',desc:'A violet mushroom of the central plains.',use:'Cook it at an inn hearth: Aethercap Risotto, Champion\'s Feast. Also lamp oil for Fenwick Tallow.',price:22},
+ grain:{name:'Grain',desc:'Sack of milled grain.',use:'Cooking: goes into stew, chili, risotto and trail hash.',price:8},
+ salt:{name:'Salt',desc:'A twist of sea salt.',use:'Cooking: goes into broth, sorbet and trail hash.',price:6}};
 DB.forage={bloom:'mossberry',ember:'emberpepper',tide:'brinekelp',rime:'frostmint',aether:'aethercap'};
-DB.recipes={ // dropped: sporeballs, crackers, mintice (they made battle items)
- stew:{name:'Mossberry Stew',needs:{mossberry:2,grain:1},effect:{kind:'perm',stat:'hp',amt:6},desc:'Permanent +6 health.'},chili:{name:'Ember Chili',needs:{emberpepper:2,grain:1},effect:{kind:'perm',stat:'atk',amt:2},desc:'Permanent +2 attack.'},
- broth:{name:'Kelp Broth',needs:{brinekelp:2,salt:1},effect:{kind:'perm',stat:'def',amt:2},desc:'Permanent +2 defence.'},sorbet:{name:'Mint Sorbet',needs:{frostmint:2,salt:1},effect:{kind:'perm',stat:'spd',amt:2},desc:'Permanent +2 speed.'},
- risotto:{name:'Aethercap Risotto',needs:{aethercap:2,grain:1},effect:{kind:'xp',pct:.5},desc:'Half a level of experience.'},hash:{name:'Trail Hash',needs:{grain:1,salt:1},effect:{kind:'healall'},desc:'Restores the whole stable to full health.'},
- honeydrops:{name:'Honey Drops',needs:{mossberry:1,aethercap:1},effect:{kind:'item',item:'honeydrop',n:3},desc:'Three Honey Drops: battle healing that also cures.'},
- jerky:{name:'Ember Jerky',needs:{emberpepper:1,brinekelp:1},effect:{kind:'item',item:'jerky',n:2},desc:'Two strips of Ember Jerky (+30% attack in battle).'},
- offering:{name:'Grove Offering',need:'recipe_offering',needs:{mossberry:2,honeydrop:1,aethercap:1},effect:{kind:'item',item:'offering',n:1},desc:'An offering for the grove. Only Hermit Oak knows the recipe.'},
- feast:{name:"Champion's Feast",needs:{mossberry:1,emberpepper:1,brinekelp:1,frostmint:1,aethercap:1},effect:{kind:'fed'},desc:'The whole team fights the next battle 15% stronger.'}};
+/* phase 4: cooking makes MEALS (DB.meals), one-match buffs eaten before a match. TC's lasting stat meals are gone.
+   dropped: the perm, xp, healall and fed effects; the honeydrops and jerky recipes (both are bought now). */
+DB.recipes={
+ stew:{name:'Mossberry Stew',needs:{mossberry:2,grain:1},effect:{kind:'meal',meal:'stew'}},
+ chili:{name:'Ember Chili',needs:{emberpepper:2,grain:1},effect:{kind:'meal',meal:'chili'}},
+ broth:{name:'Kelp Broth',needs:{brinekelp:2,salt:1},effect:{kind:'meal',meal:'broth'}},
+ sorbet:{name:'Mint Sorbet',needs:{frostmint:2,salt:1},effect:{kind:'meal',meal:'sorbet'}},
+ risotto:{name:'Aethercap Risotto',needs:{aethercap:2,grain:1},effect:{kind:'meal',meal:'risotto'}},
+ hash:{name:'Trail Hash',needs:{grain:1,salt:1},effect:{kind:'meal',meal:'hash'}},
+ feast:{name:"Champion's Feast",needs:{mossberry:1,emberpepper:1,brinekelp:1,frostmint:1,aethercap:1},effect:{kind:'meal',meal:'feast'}},
+ offering:{name:'Grove Offering',need:'recipe_offering',needs:{mossberry:2,honeydrop:1,aethercap:1},effect:{kind:'item',item:'offering',n:1},desc:'An offering for the grove. Only Hermit Oak knows the recipe.'}};
+/* meals: eaten before a match, a meal acts once, at the next kickoff (w9b-town.js, onHook fightStart), then it is gone.
+   fx: block (Block at kickoff), st (statuses on your line), draw and energy (extra on the first turn), heal (HP at kickoff).
+   A snack is a food item (DB.items) eaten from your bag. A charm (a fortune) is not food: it stacks with a meal. */
+DB.meals={
+ stew:{name:'Mossberry Stew',does:'Start the next match with 8 Block.',fx:{block:8}},
+ chili:{name:'Ember Chili',does:'Start the next match with 2 Strength.',fx:{st:{str:2}}},
+ broth:{name:'Kelp Broth',does:'Start the next match with 2 Footwork: Block from cards is 2 more.',fx:{st:{dex:2}}},
+ sorbet:{name:'Mint Sorbet',does:'Draw 2 more cards on the first turn of the next match.',fx:{draw:2}},
+ risotto:{name:'Aethercap Risotto',does:'1 more Stamina on the first turn of the next match.',fx:{energy:1}},
+ hash:{name:'Trail Hash',does:'Heal 10 HP when the next match starts.',fx:{heal:10}},
+ feast:{name:"Champion's Feast",does:'Next match: 1 Strength, and 1 more Stamina and 2 more cards on the first turn.',fx:{st:{str:1},energy:1,draw:2}},
+ honeydrop:{name:'Honey Drop',snack:1,does:'Heal 6 HP when the next match starts.',fx:{heal:6}},
+ saltfish:{name:'Salt Fish',snack:1,does:'Start the next match with 5 Block.',fx:{block:5}},
+ jerky:{name:'Ember Jerky',snack:1,does:'Start the next match with 1 Strength.',fx:{st:{str:1}}},
+ hardtack:{name:'Frost Hardtack',snack:1,does:'Start the next match with 1 Footwork.',fx:{st:{dex:1}}},
+ fortune:{name:"Madame Oriel's fortune",charm:1,does:'1 more Stamina on the first turn of the next match.',fx:{energy:1}}};
+/* what each inn's kitchen sells, by innkeeper. Every inn also has a hearth where you cook your own. */
+DB.innMenu={hq_inn:{hash:12,risotto:24},moss_inn:{hash:12,stew:20},salt_inn:{hash:12,broth:20},cind_inn:{hash:12,chili:22},rime_inn:{hash:12,sorbet:22}};
+/* Brother Quill's services (w9b-town.js). Paid in elemental energy, any kind; each use raises that service's price by step. */
+DB.enchanter={
+ up:{name:'Bind energy into a card',does:'Upgrade a card to its + version.',base:3,step:1,max:8},
+ star:{name:'Drill a card',does:'Practice a card: ★, better at every sport.',base:4,step:1,max:9},
+ gear:{name:'Recharge gear',does:'Upgrade a gear card: more charges every time you play it.',base:2,step:1,max:6}};
+/* card vendors (w9b-town.js): the stock leans to the region's sports and kinds, and turns over every week */
+DB.cardShops={hq_shop:{name:'The card binder at Odd Lots',region:'plains'},netter:{name:'Hob Tarn\'s card crate',region:'tide'},smith:{name:'The Brandt card rack',region:'ember'}};
 DB.enchants={ember:{stat:'atk',amt:2,label:'+2 attack'},tide:{stat:'hp',amt:7,label:'+7 health'},bloom:{stat:'def',amt:2,label:'+2 defence'},rime:{stat:'spd',amt:2,label:'+2 speed'},aether:{stat:'all',amt:1,label:'+1 to attack, defence and speed'}};
 DB.shops={general:{ration:12,salve:30,grain:8,salt:6},hq:{ration:12,salve:30,grain:8,salt:6,aethercap:22},moss:{ration:12,salve:30,honeydrop:22,grain:8,salt:6,mossberry:18},salt:{ration:12,salve:30,saltfish:28,grain:8,salt:4,brinekelp:18},cind:{ration:12,salve:30,jerky:25,grain:8,salt:6,emberpepper:18},rime:{ration:12,salve:28,hardtack:25,grain:8,salt:6,frostmint:18}}; // dropped: snares, battle items, mutagen and purge
 /* the boss of each dungeon and lair. dropped: team (species); phase 5 gives each a Sudden Death boss */
@@ -5948,8 +6018,15 @@ DB.cups={ // dropped: each round's team (species); phase 6 builds the teams from
  crown:{name:'Terra Chimera Championship',town:'coliseum',elem:'aether',flag:'champion',final:1,rounds:[{who:'@rival1',team:'@rival',lv:0},{who:'@rival2',team:'@rival',lv:1},{who:'@apex',lv:2}]}};
 /* cards: a chest or a topic may pay card:'id', cards:['id',...] or cardChoice:{pick:3, rarity?, kind?, pool?} (see wPayCards, w3).
    Seeded so far: Vesper's cottage and the Hollow Shrine chests (a choice), and Imelda's licence topic (Pick and Roll). */
+/* phase 4 seeds 1-2 card finds per region (w9 test realm_town checks every one pays):
+     plains   cottage_chest (a choice), Imelda's LICENCE (Pick and Roll), genevault_c3 (a rare choice)
+     bloom    shrine_chest (uncommons), Gaffer Brack's HONEY (golf and jousting plays)
+     tide     marigold_chest (bowling and curling cards), hatchery_c3 (uncommons)
+     ember    emberdeep_c3 (football and boxing cards), the smith's PEPPERS (Spiked Shoulder Pads)
+     rime     chapel_chest (hockey and curling cards), Sister Ilka's MINT (uncommons) */
+const wSportPool=sports=>Object.keys(CARDS).filter(id=>{const c=CARDS[id];return c.kind==='any'&&sports.includes(c.sport)&&['c','u','r'].includes(c.rar)});
 /* dropped: part prizes and research data (phase 5 puts magic gear in the prize chests), snares, mutagen and battle items */
-DB.chests={genevault_prize:{gold:300,items:{capsule:1}},emberdeep_prize:{gold:220},hatchery_prize:{gold:180},genevault_c6:{gold:80},emberdeep_c3:{gold:70,items:{emberpepper:3}},emberdeep_c6:{items:{jerky:2}},hatchery_c3:{gold:60,items:{brinekelp:3,saltfish:2}},hatchery_c6:{items:{salve:2}},genevault_c3:{gold:90},cottage_chest:{gold:60,items:{oldbracket:1},cardChoice:{pick:3}},shrine_chest:{gold:30,items:{honeydrop:2},cardChoice:{pick:3,rarity:'u'}},marigold_chest:{gold:40,items:{shiplog:1,saltfish:2}},chapel_chest:{gold:50,items:{bellclapper:1,hardtack:2}},deepseam_prize:{gold:150,items:{glassheart:1}},deepseam_c3:{gold:60,items:{jerky:2}}};
+DB.chests={genevault_prize:{gold:300,items:{capsule:1}},emberdeep_prize:{gold:220},hatchery_prize:{gold:180},genevault_c6:{gold:80},emberdeep_c3:{gold:70,items:{emberpepper:3},cardChoice:{pick:3,pool:wSportPool(['football','boxing'])}},emberdeep_c6:{items:{jerky:2}},hatchery_c3:{gold:60,items:{brinekelp:3,saltfish:2},cardChoice:{pick:3,rarity:'u'}},hatchery_c6:{items:{salve:2}},genevault_c3:{gold:90,cardChoice:{pick:3,rarity:'r'}},cottage_chest:{gold:60,items:{oldbracket:1},cardChoice:{pick:3}},shrine_chest:{gold:30,items:{honeydrop:2},cardChoice:{pick:3,rarity:'u'}},marigold_chest:{gold:40,items:{shiplog:1,saltfish:2},cardChoice:{pick:3,pool:wSportPool(['bowling','curling'])}},chapel_chest:{gold:50,items:{bellclapper:1,hardtack:2},cardChoice:{pick:3,pool:wSportPool(['hockey','curling'])}},deepseam_prize:{gold:150,items:{glassheart:1}},deepseam_c3:{gold:60,items:{jerky:2}}};
 DB.locs=[
  {id:'graftonbury',kind:'town',x:48,y:38,tile:'O',map:'graftonbury',name:'Graftonbury'},{id:'coliseum',kind:'coliseum',x:48,y:30,tile:'Q',map:'coliseum',name:'The Crown Coliseum'},
  {id:'mossgate',kind:'town',x:20,y:54,tile:'O',map:'mossgate',name:'Mossgate'},{id:'saltmere',kind:'town',x:75,y:54,tile:'O',map:'saltmere',name:'Saltmere'},{id:'cinderhold',kind:'town',x:75,y:17,tile:'O',map:'cinderhold',name:'Cinderhold'},{id:'rimewatch',kind:'town',x:21,y:17,tile:'O',map:'rimewatch',name:'Rimewatch'},
@@ -6136,35 +6213,29 @@ DB.sideplots=[ // dropped: q_hob and rq_patch, whose topics are gone
  {id:'rare_umbralden',title:'The road to nowhere',who:'Ingrith Skarr, Rimewatch',hint:'After surveying the Roost, ask Ingrith about the ROAD; walk it to its end after dark and take what is in the nest.',pay:'A rare Duskhound egg.'},
  {id:'q_letter3',title:'The Coliseum post',who:'Herald Pim, Crown Coliseum',hint:'Carry his LETTER to Imelda Foss, bring back her REPLY.',pay:'80 gold.'},
  {id:'got_keycard',title:'The Gene Vault',who:'Gant Vesper, Graftonbury',hint:'Win two cups, then ask him about the VAULT.',pay:'The keycard, and whatever waits at the bottom.'}];
-/* road events: rolled on the overworld, weighted; one effect each */
+/* road events (phase 4): rolled on the overworld from the encounter hook (w9-road.js), weighted by w. Each opens an
+   event card. A choice may cost (cost: gold, items, hp) and pays effects:
+     gold (n or [lo, hi]), fans, items, energy { here | elem: n or [lo, hi] }, time (minutes), healPct, steal (an item),
+     snack (a meal id into your bag), charm (a fortune for the next match), practice / upgrade (pick a card), lore,
+     card / cards / cardChoice (wGainCard), chance + fail (a gamble), match { type, name, win } (a match: kind 'event').
+   time: 'day' | 'night' only then; region: [ids] only there; need: a flag. By day on a road, nothing that starts a match.
+   Kept from TC (rewritten for teams): pedlar, purse, rival, shed, cook, lostchild, maud, oriel, moth, poacher, wisp, thief.
+   dropped: stray and egg (snaring and eggs are cut), inspector (snares), storm (only lost time), scholar, bard and soto
+   (they paid research data), drover (salves have no use yet), race (one creature's speed), and the four region
+   traders nephew, fisher, miner and pilgrim (the region shops sell the same food). */
 DB.events=[
- {id:'pedlar',w:4,who:{name:'Tamsin Crook, pedlar',look:{coat:'#8a5a2a',acc:'hat',hair:'#b0485a'}},text:'A pedlar with a cart of jars flags you down. "Salves, handler? Rations? Everything fresh this week, or this month, anyway."',choices:[{label:'A salve (25 gold)',cost:{gold:25},items:{salve:1},result:'She wraps it in newspaper.'},{label:'Three rations (30 gold)',cost:{gold:30},items:{ration:3},result:'"Do not eat them all at once. People do."'}]}, // dropped: tonics and salts
- {id:'stray',w:3,who:{kind:'@region'},text:'A stray chimera limps out of the grass, wary but too tired to run. It looks like it would join whoever beats it.',choices:[{label:'Challenge it',act:'stray'}]}, // dropped: snaring; who.chimera is now who.kind
- {id:'purse',w:3,who:{scene:'purse'},text:'Somebody\'s purse lies in the road, dropped from a wagon. There is nobody in sight.',choices:[{label:'Keep it',gold:[15,45],result:'Finders keepers.'},{label:'Leave it at the next League post',result:'A clerk will be pleased. Somebody will be very pleased.'}]}, // dropped: rp
- {id:'rival',w:3,who:'@rival',text:'A rival handler\'s wagon is drawn up at the crossroads. "Friendly match? Winner takes the loser\'s bounty."',choices:[{label:'Accept the match',act:'duel'}]},
- {id:'shed',w:3,who:{scene:'shed'},text:'Fresh shed skin, still warm, glittering with energy where it lies.',auto:{energy:{here:[2,4]}}},
- {id:'storm',w:2,who:{scene:'storm'},text:'A sudden squall. You shelter under the wagon for an hour and lose the light.',auto:{time:60}},
- {id:'scholar',w:2,who:{name:'Dr. Wyn Ashby, League survey',look:{coat:'#3f5a7a',acc:'clip',hair:'#8a857e'}},text:'A scholar with a satchel of forms asks you to describe the last well you drew from. She pays for good notes.',choices:[{label:'Describe it',gold:[10,20],time:30,result:'She writes it all down, twice.'}]}, // dropped: rp
- {id:'egg',w:1,who:{scene:'egg'},text:'An egg, alone in the grass, still warm. Whatever laid it is not coming back.',choices:[{label:'Take it',act:'egg'}]},
- {id:'thief',w:2,who:{kind:'goblin'},text:'A goblin darts out of the wagon with something in its teeth and is gone before you can grab it.',auto:{steal:1}}, // dropped: who.chimera voltmite
- {id:'cook',w:3,who:{name:'Barnaby Stew, road cook',look:{coat:'#a0522d',acc:'apron',hair:'#e8e0f0'}},text:'A travelling cook stirs a pot on a tripod by the road. It smells of pepper and good intentions.',choices:[{label:'A hot meal for the team (15 gold)',cost:{gold:15},healAll:.3,result:'Everyone eats. Everyone feels better.'},{label:'Trade 2 grain for 2 Ember Jerky',cost:{items:{grain:2}},items:{jerky:2},result:'"Fair trade. Mind, it bites back."'}]},
- {id:'lostchild',w:2,time:'day',who:{name:'Wren, aged eight',look:{coat:'#e0457b',hair:'#f2c14e'}},text:'A child is calling into the grass for a Mossprout called Biscuit. "He always comes back. He always comes back."',choices:[{label:'Help look (an hour)',time:60,gold:25,result:'You find Biscuit asleep under a hedge. Her mother presses coins on you and will not take them back.'}]}, // dropped: rp
- {id:'maud',w:2,who:{name:'Old Maud Kerry, retired handler',look:{coat:'#5a6e3a',acc:'scarf',hair:'#c9c9c9'}},text:'An old handler leans on a stick by the milestone. "Your lead stands wrong. I could fix that, for the price of a pie."',choices:[{label:'Pay for a lesson (30 gold)',cost:{gold:30},xpLead:.4,time:90,result:'She drills your lead until it stands right. It does look better.'}]},
- {id:'inspector',w:2,need:'licensed',who:{name:'Inspector Garrow, League',look:{coat:'#3f5a7a',acc:'cap',hair:'#1a1210'}},text:'A League inspector checks your licence, holds it up to the light, and hands it back. "In order. Take these; the League likes its handlers fed."',auto:{items:{ration:2}}}, // dropped: snares
- {id:'bard',w:2,who:{name:'Lark Tully, balladeer',look:{coat:'#b38cf0',acc:'hat',hair:'#7a4a20'}},text:'A bard with a lute made from a Slagback shell is singing to nobody. "A song for the road? Five gold and you choose."',choices:[{label:'Tip for a song (5 gold)',cost:{gold:5},lore:1}]}, // dropped: rp
- // dropped: caravan (it sold aether nuts, salts and mutagen)
- {id:'drover',w:2,who:{name:'A limping drover',look:{coat:'#7a5a32',acc:'hat',hair:'#4a3020'}},text:'A drover sits on a stone holding his ankle. His Slagback stands over him looking worried, as far as a Slagback can.',choices:[{label:'Give him a salve',cost:{items:{salve:1}},gold:50,result:'He is on his feet in minutes and insists on paying.'}]}, // dropped: the tonic choice, and rp
- {id:'oriel',w:2,who:{name:'Madame Oriel',look:{coat:'#5a3d8a',acc:'robe',hair:'#1a1210'}},text:'A fortune teller has set a table in the ditch. "Cross my palm, and I will tell you how your next fight goes."',choices:[{label:'Cross her palm (15 gold)',cost:{gold:15},fed:1,result:'"You will win it. Probably." Your team seems to believe her.'}]},
- // dropped: smuggler (mutagen)
- {id:'moth',w:2,who:{name:'Sister Moth, wandering enchanter',look:{coat:'#bfe6f2',acc:'robe',hair:'#e8e0f0'}},text:'A wandering enchanter is binding a charm into a fencepost. "The land here is generous. I could draw some off for you."',choices:[{label:'Pay her to draw it (20 gold)',cost:{gold:20},energy:{here:3},result:'She draws the energy up out of the ground and into your jars.'}]},
- {id:'poacher',w:2,who:{name:'Skell, a poacher',look:{coat:'#3a2e2c',acc:'hat',hair:'#1a1210'}},text:'A poacher with a cage on his back. Something inside is crying. "Not your business, handler. Unless you want to buy."',choices:[{label:'Free it (fight him)',act:'poacher'},{label:'Buy it (80 gold)',cost:{gold:80},act:'freed'}]},
- {id:'race',w:2,time:'day',who:{name:'Pip Fleet, racer',look:{coat:'#f2c14e',acc:'cap',hair:'#b0485a'}},text:'A boy with a very fast Frostlet. "Race you to the next milestone. Twenty gold says mine wins."',choices:[{label:'Race your lead (stake 20)',cost:{gold:20},act:'race'}]},
- {id:'soto',w:2,who:{name:'Dr. Imani Soto, field researcher',look:{coat:'#2f7a6a',acc:'goggles',hair:'#1a1210',skin:'#7a4a30'}},text:'A field researcher with calipers asks to measure your team. "For the Bestiary. You will be credited. Somewhere."',choices:[{label:'Let her measure them',gold:15,time:30,result:'She measures everything, including you.'}]}, // dropped: rpTeam
- {id:'wisp',w:2,time:'night',who:{scene:'wisp'},text:'Lights move in the grass beside the road, blue and slow, and they seem to want you to follow.',choices:[{label:'Follow the lights',act:'wisp'}]},
- {id:'nephew',w:3,region:['bloom'],who:{name:'Tam Brack, beekeeper\'s nephew',look:{coat:'#a08a55',acc:'hat',hair:'#7a4a20'}},text:'A young beekeeper carries a smoking pot down the road. "Uncle says to give these to handlers. He says you are the only ones the bees like."',auto:{items:{honeydrop:1}}},
- {id:'fisher',w:3,region:['tide'],who:{name:'Old Salt, fisherman',look:{coat:'#235c9c',acc:'cap',hair:'#e8e0f0'}},text:'An old fisherman is gutting cod on an upturned barrel. "Salt fish, dried this week. Your pups will thank you."',choices:[{label:'Two salt fish (20 gold)',cost:{gold:20},items:{saltfish:2}}]},
- {id:'miner',w:3,region:['ember'],who:{name:'A soot-faced miner',look:{coat:'#4a423f',acc:'helmet',hair:'#1a1210'}},text:'A miner coming off shift, black to the eyes. "Salt fish? I would give a lot for a salt fish. Peppers, say."',choices:[{label:'Trade a salt fish for 3 ember peppers',cost:{items:{saltfish:1}},items:{emberpepper:3}}]}, // dropped: the tonic trade
- {id:'pilgrim',w:3,region:['rime'],who:{name:'Pilgrim Ase',look:{coat:'#dfe9ee',acc:'robe',hair:'#c9c9c9'}},text:'A pilgrim on the way to the abbey, shaking with cold. "Could I share your fire? Only for a while."',choices:[{label:'Share your fire (half an hour)',time:30,items:{hardtack:2},result:'She warms her hands and leaves you her travelling biscuits.'}]}];
+ {id:'pedlar',w:4,who:{name:'Tamsin Crook, pedlar',kind:'goblin'},text:'A pedlar with a cart of jars flags you down. "Pies, handler? Grain? Everything fresh this week, or this month, anyway."',choices:[{label:'A Trail Hash to take away (14 gold)',cost:{gold:14},snack:'hash',result:'She wraps it in newspaper. "Eat it before the game, not after."'},{label:'Grain and salt for the pot (10 gold)',cost:{gold:10},items:{grain:2,salt:2},result:'"Do not eat it raw. People do."'}]},
+ {id:'purse',w:3,who:{scene:'purse'},text:'Somebody\'s purse lies in the road, dropped from a wagon. There is nobody in sight.',choices:[{label:'Keep it',gold:[15,45],result:'Finders keepers.'},{label:'Hand it in at the next League post',fans:15,result:'A clerk is pleased. Word gets round that your team plays fair.'}]},
+ {id:'rival',w:3,who:{rival:1},text:'A rival club\'s wagon is drawn up at the crossroads. "Friendly match? Loser buys the next round, and the winner takes the purse."',choices:[{label:'Accept the match',match:{type:'normal',win:{gold:[35,50],fans:20},winText:'They pay up with bad grace.'}}]},
+ {id:'shed',w:3,who:{scene:'shed'},text:'A well by the road has cracked, and shards of raw energy glitter in the grass round it.',auto:{energy:{here:[2,4]}}},
+ {id:'cook',w:3,who:{name:'Barnaby Stew, road cook',kind:'ogre'},text:'A travelling cook stirs a pot on a tripod by the road. It smells of pepper and good intentions.',choices:[{label:'A hot meal for the team now (15 gold)',cost:{gold:15},healPct:.3,result:'Everyone eats. Everyone feels better.'},{label:'A pot of chili to go (20 gold)',cost:{gold:20},snack:'chili',result:'"Eat it before kickoff. It bites back."'}]},
+ {id:'lostchild',w:2,time:'day',who:{name:'Wren, aged eight',kind:'kobold'},text:'A child is calling into the grass for her pet, a Mossprout called Biscuit. "He always comes back. He always comes back."',choices:[{label:'Help look (an hour)',time:60,gold:25,fans:10,result:'You find Biscuit asleep under a hedge. Her mother presses coins on you and will not take them back.'}]},
+ {id:'maud',w:2,who:{name:'Old Maud Kerry, retired coach',kind:'dwarf'},text:'An old coach leans on a stick by the milestone. "Your forwards stand wrong. I could fix that, for the price of a pie."',choices:[{label:'A practice session (40 gold, 90 minutes)',cost:{gold:40},time:90,practice:1,result:'She drills one play until it is second nature.'},{label:'Watch film with her (60 gold, 2 hours)',cost:{gold:60},time:120,upgrade:1,result:'She stops the tape every four seconds. It helps.'}]},
+ {id:'oriel',w:2,who:{name:'Madame Oriel',kind:'witch'},text:'A fortune teller has set a table in the ditch. "Cross my palm, and I will tell you how your next game goes."',choices:[{label:'Cross her palm (15 gold)',cost:{gold:15},charm:'fortune',result:'"You will win it. Probably." Your team seems to believe her.'}]},
+ {id:'moth',w:2,who:{name:'Sister Moth, wandering enchanter',kind:'lich'},text:'A wandering enchanter is binding a charm into a fencepost. "The land here is generous. I could draw some off for you."',choices:[{label:'Pay her to draw it (20 gold)',cost:{gold:20},energy:{here:3},result:'She draws the energy up out of the ground and into your jars.'}]},
+ {id:'poacher',w:2,who:{name:'Skell, a scalper',kind:'werewolf'},text:'A scalper with a cage on his back, full of stolen team mascots. One of them is crying. "Not your business. Unless you want to buy."',choices:[{label:'Free them: play his crew for it',match:{type:'normal',name:'Skell',win:{gold:40,fans:30},winText:'Skell runs. You open the cage, and the mascots\' clubs send their thanks.'}},{label:'Buy them free (80 gold)',cost:{gold:80},fans:40,result:'The mascots go home. Every club in the league hears who paid.'}]},
+ {id:'wisp',w:2,time:'night',who:{scene:'wisp'},text:'Lights move in the grass beside the road, blue and slow, and they seem to want you to follow.',choices:[{label:'Follow the lights',chance:.55,energy:{aether:4},result:'The lights lead you to a hollow full of Aether, and go out.',fail:'The lights go out. Something else was following them.',failMatch:{type:'normal'}}]},
+ {id:'thief',w:2,who:{name:'A goblin pickpocket',kind:'goblin'},text:'A goblin darts out from behind your wagon with something in its teeth and is gone before you can grab it.',auto:{steal:1}}];
 DB.lore=['a song about Ada Quill, the first champion, and the Voltmite she held at arm\'s length','a song about Gant Vesper\'s three cups and his fourth that got away','a song about the Hatch-Mother and the lighthouse that went dark','a song about the road north of the Roost that goes nowhere','a song about Apex Biologic, sung very quietly'];
 /* rare chimera chains */
 DB.chars.almond.topics.unlisted={t:'There is one thing in the Bestiary I have never drawn. A moth, big as your hand, pale, that drinks the lamps dry at night. Fenwick swears it is real. Ask him about the MOTH.',need:'q_almond',needNo:'Finish the Bestiary entry first. Then we will talk about the ones nobody has.',set:'rq_lumi1',xp:10};
@@ -6201,6 +6272,22 @@ DB.chars.salt_shop.topics.count={t:'The League wants a count of what swims out t
 DB.chars.salt_shop.topics.job.t+=' I also keep the fen COUNT for the League.';
 DB.chars.nell.topics.salt={t:'The sand wants salting before the crown, two twists, or it dusts. Bring me salt and the steward\'s tip is yours.',take:{salt:2},gold:40,once:'q_nell',xp:10,t2:'Salted. It will not dust.',needNo:'Two twists of salt. Any chandler.'};
 DB.chars.nell.topics.job.t+=' I could use SALT for the sand.';
+/* phase 4: card payouts on quest topics */
+DB.chars.brack.topics.honey.cardChoice={pick:3,pool:wSportPool(['golf','jousting'])};
+DB.chars.smith.topics.peppers.card='gr_shoulder';
+DB.chars.monk.topics.mint.cardChoice={pick:3,rarity:'u'};
+/* phase 4: Brother Quill enchants (act 'enchant'), Marrow Tansy cooks (act 'kitchen'), every innkeeper has a MEAL menu
+   (act 'meals'), and three vendors sell cards (act 'cards'). w9b-town.js handles the acts. */
+DB.chars.quill.topics.job.t='Enchanter. The land has ENERGY in it, a different kind in every biome. I bind it into your plays: say ENCHANT and I will show you. If you will have me, I will JOIN.';
+DB.chars.quill.topics.enchant={t:'Bring me energy, any kind, and I will bind it into a card, or drill a play into your players, or put the charge back in your gear.',act:'enchant'};
+DB.chars.tansy.topics.job.t='Cook. A team is what it eats. Bring me FORAGE from the bushes out there and I will COOK you a meal for match day. Say JOIN and I will fetch my pots.';
+DB.chars.tansy.topics.forage.t='Every region has its own bush: mossberry, ember pepper, brine kelp, frost mint, and aethercap here on the plains. Bushes grow back in a few days. Any inn hearth will do for cooking, and so will my canteen.';
+DB.chars.tansy.topics.cook={t:'Sit. What have you brought me?',act:'kitchen'};
+for(const id in DB.innMenu){const ch=DB.chars[id];ch.topics.job.t+=' The kitchen does a MEAL for match day.';ch.topics.meal={t:'Here is what the kitchen can do, and the hearth is yours if you would rather cook.',act:'meals'}}
+DB.chars.hq_shop.topics.job.t+=' I keep a binder of league CARDS, too.';
+DB.chars.netter.topics.job.t+=' There is a crate of league CARDS in the back, if you like.';
+DB.chars.smith.topics.job.t+=' I also keep a rack of league CARDS for the teams.';
+for(const id in DB.cardShops)DB.chars[id].topics.cards={t:'Have a look. New stock every week.',act:'cards'};
 /* flags the engine itself sets; the audit needs to know they are real */
 DB.engineFlags=['cups1','cups2','cups3','cups4','cup_moss','cup_salt','cup_cind','cup_rime','champion'];
 /* w2: Realm map builders, ported from Terra Chimera: overworld, towns, dungeons, repair passes, worldProblems */
@@ -8713,5 +8800,625 @@ function wNewGameCard() {
 window.addEventListener('pagehide', () => { if ((UI.view === 'world' || UI.view === 'panel') && !window.__switching) wSave(); });
 
 boot();
+/* w9: the road (phase 4). Tiers and levels for every match, region-flavoured wild teams, night ambushes, elemental
+   energy for wins, and TC's road events as event cards. Loads after w8, so it wraps earlier realm functions by
+   reassignment instead of editing them.
+
+   The tier model. Tier sets the SD act a match is played at (RUN.act = tier - 1: TUNE, spawn and the encounter tables):
+     tier 1  the Charter Plains and its roads           (W_TIER, w5)
+     tier 2  the four outer regions, Hatchery, Emberdeep (W_TIER, W_DUNGEON_TIER)
+     tier 3  the Gene Vault, the Deep Seam (and later the Crown)
+   Level (0 to 4) is a finer step inside a tier, added up and shown on the pre-game card:
+     +1 per 11 tiles beyond the first 4 from Graftonbury (at most +3; not in dungeons), +1 per two cups won,
+     +1 for a night game off the road. Each level gives the other team +8% HP, and from level 2 Strength (W_ROAD.strAt).
+   It works through enemy HP and Strength (a status you can see on them), so it never touches atkDmg.
+   Night off-road wild games are ambushes half the time: the other team opens a score ahead (Sudden Death's "Hot start"),
+   or in golf, bowling and boxing, with 1 Strength each. Shown on the pre-game card.
+
+   The phase 2 act problem, decided: in the realm, Sudden Death's season goals are off (checkGoals returns nothing:
+   they are per act, and an act here is just a tier), and SD's "easy" encounter pool is used for your first two wins
+   in each tier (WG.tierFights) instead of RUN.actFights, which never resets in the realm. Realm goals can come later.
+
+   Sudden Death functions reassigned here: rollEncounter (region kinds, per-tier easy games), checkGoals (off in the realm).
+   Realm functions wrapped here: wBuildEncounter (level, ambush, team), wPreGame (level and ambush lines), wFoeTeam,
+   wEncounterHook (road events), wStart (reopens an unfinished event card), renderHelp (via w9b). Adds W_ON_END.event. */
+
+const W_ROAD = {
+  distFree: 4, distBand: 11, distMax: 3,    // level from distance to Graftonbury, in world tiles
+  cupsPerLv: 2,                             // +1 level per two cups won
+  maxLv: 4, hpPerLv: .08, strAt: [0, 0, 1, 1, 2],
+  ambushOdds: .5,                           // a night off-road wild game is an ambush this often
+  eventP: .018,                             // TC: a road event on a world step that did not roll a match
+  eventGrace: 6, nativeOdds: .65,           // how often a wild team is drawn from the region's own kinds
+};
+/* wild teams wear their region's colours */
+const W_WILD_TEAM = {
+  plains: { name: 'Charter Plains Pickups', short: 'CPP', color: '#c9a24a', light: '#fff1c2' },
+  bloom: { name: 'Mosswold Wildlings', short: 'MOS', color: '#3a7f45', light: '#bfe8b0' },
+  tide: { name: 'Brinefen Bogtrotters', short: 'BOG', color: '#235c9c', light: '#bfe3ff' },
+  ember: { name: 'Cindermaw Scorchers', short: 'CIN', color: '#a83a1e', light: '#ff9a7a' },
+  rime: { name: 'Frostspire Howlers', short: 'FRO', color: '#6aa6c4', light: '#e3f3ff' },
+};
+const W9 = { encRegion: null, preTeam: null };
+
+/* ---------- level inside a tier ---------- */
+function wCupsWon() { return ['cup_moss', 'cup_salt', 'cup_cind', 'cup_rime'].filter(wFlag).length; }
+function wOnRoad() { const m = wCurMap(); if (m.kind !== 'world') return false; const c = wTileAt(m, WG.x, WG.y); return c === '=' || c === 'b'; }
+function wDistHome() {
+  const hq = DB.locs.find(l => l.id === 'graftonbury'), m = wCurMap();
+  let x = WG.x, y = WG.y;
+  if (m.kind !== 'world') { const L = DB.locs.find(l => l.map === m.id); if (!L) return 0; x = L.x; y = L.y; }
+  return Math.hypot(x - hq.x, y - hq.y);
+}
+/* { lv, why: [reasons] } for a match here; night is the match's own night flag */
+function wLevelInfo(night) {
+  const why = [], m = wCurMap(); let lv = 0;
+  if (m.kind !== 'dungeon') {
+    const d = clamp(Math.floor((wDistHome() - W_ROAD.distFree) / W_ROAD.distBand), 0, W_ROAD.distMax);
+    if (d) { lv += d; why.push(d >= 2 ? 'far from Graftonbury' : 'out from Graftonbury'); }
+  }
+  const c = Math.floor(wCupsWon() / W_ROAD.cupsPerLv);
+  if (c) { lv += c; why.push(wCupsWon() + ' cups won'); }
+  if (night && !wOnRoad()) { lv += 1; why.push('night, off the road'); }
+  return { lv: Math.min(W_ROAD.maxLv, lv), why };
+}
+function wLevelText(lv) {
+  const s = W_ROAD.strAt[lv] || 0;
+  return `foes have +${Math.round(W_ROAD.hpPerLv * lv * 100)}% HP${s ? ` and ${s} Strength` : ''}`;
+}
+function wAmbushText(sport) { return SPORT_UNIT[sport] ? 'they open the game a score ahead' : 'they start with 1 Strength each'; }
+
+/* the encounter: level, ambush and team colours ride on enc.world (plain data) */
+const wW5BuildEncounter = wBuildEncounter;
+wBuildEncounter = function (o) {
+  o = o || {};
+  W9.encRegion = (o.world && o.world.region) || wRegionHere();
+  let enc;
+  try { enc = wW5BuildEncounter(o); } finally { W9.encRegion = null; }
+  const W = enc.world, L = o.lv != null ? { lv: clamp(o.lv, 0, W_ROAD.maxLv), why: [] } : wLevelInfo(W.night);
+  W.lv = L.lv; W.lvWhy = L.why;
+  W.ambush = o.ambush != null ? (o.ambush ? 1 : 0) : (W.kind === 'wild' && W.night && !wOnRoad() && Math.random() < W_ROAD.ambushOdds ? 1 : 0);
+  if (W.kind === 'wild' || W.kind === 'event') W.team = W.region;
+  return enc;
+};
+
+/* Sudden Death's encounter roll, for the realm: the easy pool for your first two wins in a tier, and wild teams drawn
+   from the region's own kinds when the act's tables have them (Sudden Death's tables otherwise) */
+const wSdRollEncounter = rollEncounter;
+rollEncounter = function (type, want) {
+  if (!WG || type === 'boss') return wSdRollEncounter(type, want);
+  const E = ENCOUNTERS[RUN.act], tf = (WG.tierFights || {})[RUN.act + 1] || 0;
+  const pool = type === 'elite' || type === 'rival' ? E.elite : tf < 2 ? E.easy : E.normal;
+  const fits = want ? pool.filter(p => !ENEMIES[p[0]].sport || ENEMIES[p[0]].sport === want) : pool;
+  let P2 = fits.length ? fits : pool;
+  const kinds = (DB.regions[W9.encRegion] || {}).kinds || [];
+  const nat = P2.filter(ids => ids.some(id => kinds.includes(ENEMIES[id].kind)));
+  if (nat.length && Math.random() < W_ROAD.nativeOdds) P2 = nat;
+  let ids, tries = 0;
+  do { ids = pick(P2).slice(); } while (tries++ < 6 && ids.join() === RUN.lastEnc && P2.length > 1);
+  RUN.lastEnc = ids.join();
+  const fixed = ENEMIES[ids[0]].sport;
+  return { ids, type, sport: fixed || want || wpick(ACT_SPORTS[RUN.act]) };
+};
+
+/* season goals are per act; in the realm an act is only a tier, so they are off (see the note at the top) */
+const wSdCheckGoals = checkGoals;
+checkGoals = function () { if (WG) return []; return wSdCheckGoals(); };
+
+/* ---------- at kickoff: level, team colours, ambush ---------- */
+onHook('fightStart', () => {
+  if (!WG || !RUN || !B || !RUN.pending || !RUN.pending.world) return;
+  const W = RUN.pending.world, team = wMatchTeam(W);
+  if (team) for (const e of B.enemies) if (!isBoss(e) && !ENEMIES[e.id].team) e.team = Object.assign({}, team);
+  if (W.lv) {
+    const m = 1 + W_ROAD.hpPerLv * W.lv, s = W_ROAD.strAt[W.lv] || 0;
+    for (const e of alive()) { e.max = e.hp = Math.round(e.hp * m); if (s) addSt(e, 'str', s); }
+    log(`Level ${W.lv} game${W.lvWhy && W.lvWhy.length ? ' (' + W.lvWhy.join(', ') + ')' : ''}: ${wLevelText(W.lv)}.`, 'bad');
+  }
+  if (W.ambush) {
+    B.wAmbush = 1;
+    if (SPORT_UNIT[B.sport] && B.sc) { B.sc.them += SPORT_UNIT[B.sport]; momentumCheck(); }
+    else for (const e of alive()) addSt(e, 'str', 1);
+    fx({ k: 'banner', t: 'Ambush!', sub: 'They jumped you in the dark: ' + wAmbushText(B.sport) + '.', small: 1 });
+    log('Ambush: ' + wAmbushText(B.sport) + '.', 'bad');
+  }
+});
+/* a win counts toward the tier's easy games, and leaves energy of the region's element in your jars */
+function wWinElem(W) { const d = DB.dungeons.find(x => x.id === W.map); return d ? d.elem : REGION_ELEM[W.region] || 'aether'; }
+onHook('fightWon', () => {
+  if (!WG || !RUN || !RUN.pending || !RUN.pending.world) return;
+  const W = RUN.pending.world;
+  WG.tierFights = WG.tierFights || {}; WG.tierFights[W.tier] = (WG.tierFights[W.tier] || 0) + 1;
+  const el = wWinElem(W), n = W.tier + (B && (B.type === 'elite' || B.type === 'rival') ? 1 : 0);
+  WG.energy[el] = (WG.energy[el] || 0) + n;
+  wLog(`The win leaves ${n} ${DB.elems.names[el]} energy in your jars, for the enchanter.`, 'm');
+});
+
+/* the pre-game card: say how hard it is and why, and warn of an ambush */
+function wMatchTeam(W) {
+  const club = W.kind === 'event' && W.ref && W.ref.rival && CLUBS[W.ref.rival];
+  return club ? { name: club.name, short: club.short, color: club.color, light: club.light } : W_WILD_TEAM[W.team] || null;
+}
+const wW5FoeTeam = wFoeTeam;
+wFoeTeam = function (id, tier) { return W9.preTeam && !ENEMIES[id].team ? W9.preTeam : wW5FoeTeam(id, tier); };
+const wW5PreGame = wPreGame;
+wPreGame = function (enc) {
+  W9.preTeam = wMatchTeam(enc.world);
+  try { wW5PreGame(enc); } finally { W9.preTeam = null; }
+  const W = enc.world, box = document.querySelector('#modalBox .wpgtxt'); if (!box) return;
+  const who = box.querySelector('.wpgwho');
+  if (who) who.insertAdjacentHTML('afterend', `<p class="wpglv">Level ${W.lv || 0} of ${W_ROAD.maxLv}${W.lv ? ` (${esc((W.lvWhy || []).join(', ') || 'set')}): ${esc(wLevelText(W.lv))}` : ': no extra edge for them'}.</p>`);
+  if (W.ambush) box.insertAdjacentHTML('afterbegin', `<p class="wambush"><b>Ambush!</b> They jumped you in the dark: ${esc(wAmbushText(enc.sport))}.</p>`);
+};
+
+/* ---------- road events ---------- */
+const wW5EncounterHook = wEncounterHook;
+wEncounterHook = function (region, tileCh, info) {
+  if (info || !WG || !RUN) return wW5EncounterHook(region, tileCh, info);
+  const m = wCurMap();
+  if (wEncounterRoll(m, tileCh, Math.random()) === 'fight') return wWildMatch(region);
+  if (m.kind === 'world' && Math.random() < W_ROAD.eventP) return wRoadEvent();
+};
+function wEventDef(id) { return DB.events.find(e => e.id === id); }
+function wEventMatches(ev) { return (ev.choices || []).some(c => c.match || c.failMatch); }
+function wEventOk(ev) {
+  const night = wIsNight();
+  if (ev.time === 'day' && night) return false;
+  if (ev.time === 'night' && !night) return false;
+  if (ev.region && !ev.region.includes(wRegionHere())) return false;
+  if (ev.need && !wFlag(ev.need)) return false;
+  if (wOnRoad() && !night && wEventMatches(ev)) return false; // by day on the road, nothing that means a match
+  return true;
+}
+function wRange(v) { return Array.isArray(v) ? ri(v[0], v[1]) : v; }
+/* start a road event: an id forces one (tests, debugging) */
+function wRoadEvent(id) {
+  const ev = id ? wEventDef(id) : wWpick(DB.events.filter(wEventOk));
+  if (!ev) return null;
+  WG.grace = W_ROAD.eventGrace;
+  const S = { id: ev.id, done: null };
+  if (ev.who && ev.who.rival) S.rival = pick(CLUB_IDS.filter(c => c !== RUN.club));
+  WG.event = S;
+  WUI.held = null; WUI.goto = null;
+  if (ev.auto) { const bits = wApplyEffects(ev.auto); S.done = bits.join(', ') || ' '; wLog(ev.text + (bits.length ? ' (' + bits.join(', ') + ')' : ''), 'g'); }
+  else wLog(ev.text, 'g');
+  wSave();
+  wOpenEvent();
+  return S;
+}
+function wEventWho(S) {
+  const ev = wEventDef(S.id), w = ev.who || {};
+  if (w.rival && CLUBS[S.rival]) { const c = CLUBS[S.rival], cap = c.roster[0]; return { name: `${cap[0]} of the ${c.name}`, short: cap[0], kind: cap[1], team: c }; }
+  return w;
+}
+function wAffordable(c) {
+  const k = c.cost || {};
+  if (k.gold && RUN.gold < k.gold) return false;
+  if (k.hp && RUN.hp <= k.hp) return false;
+  for (const i in k.items || {}) if (!wHas(i, k.items[i])) return false;
+  if (c.practice && !RUN.deck.some(practicable)) return false;
+  if (c.upgrade && !RUN.deck.some(upgradable)) return false;
+  return true;
+}
+function wPayCost(c) {
+  const k = c.cost || {}; if (k.gold) RUN.gold -= k.gold; if (k.hp) RUN.hp -= k.hp;
+  for (const i in k.items || {}) wAddItem(i, -k.items[i]);
+}
+/* effects: returns short lines for the log and the card ("+20 gold") */
+function wApplyEffects(e) {
+  const bits = [];
+  if (e.gold) { const n = wRange(e.gold); RUN.gold += n; bits.push('+' + n + ' gold'); }
+  if (e.fans) { RUN.fans = (RUN.fans || 0) + e.fans; bits.push('+' + e.fans + ' fans'); }
+  for (const k in e.items || {}) { wAddItem(k, e.items[k]); bits.push('+' + e.items[k] + ' ' + DB.items[k].name); }
+  for (const k in e.energy || {}) { const el = k === 'here' ? REGION_ELEM[wRegionHere()] || 'aether' : k, n = wRange(e.energy[k]); WG.energy[el] = (WG.energy[el] || 0) + n; bits.push('+' + n + ' ' + DB.elems.names[el] + ' energy'); }
+  if (e.time) wAdvance(e.time);
+  if (e.healPct) { const h = Math.min(RUN.maxhp - RUN.hp, Math.ceil(RUN.maxhp * e.healPct)); RUN.hp += h; bits.push('+' + h + ' HP'); }
+  if (e.snack) { WG.pantry = WG.pantry || {}; WG.pantry[e.snack] = (WG.pantry[e.snack] || 0) + 1; bits.push(DB.meals[e.snack].name + ' in your pantry'); }
+  if (e.charm) { WG.charm = e.charm; bits.push(DB.meals[e.charm].name + ' for the next match'); }
+  if (e.steal) {
+    const ks = Object.keys(WG.items).filter(k => DB.items[k] && DB.items[k].price);
+    if (ks.length) { const k = pick(ks); wAddItem(k, -1); bits.push('it took a ' + DB.items[k].name); } else bits.push('there was nothing worth taking');
+  }
+  if (e.lore) bits.push('it is ' + pick(DB.lore));
+  if (e.card || e.cards || e.cardChoice) { wPayCards(e, 'from the road'); bits.push(e.cardChoice ? 'a choice of cards' : 'a card'); }
+  return bits;
+}
+/* what a choice does, in a few words, under its label */
+function wChoiceText(c) {
+  const out = [];
+  if (c.match) { const w = c.match.win || {}; out.push('A match.' + (w.gold || w.fans ? ` Win it for ${[w.gold ? (Array.isArray(w.gold) ? w.gold.join('-') : w.gold) + ' gold' : '', w.fans ? w.fans + ' fans' : ''].filter(Boolean).join(' and ')}.` : '') + ' Lose and you black out.'); }
+  if (c.chance != null) out.push(`A ${Math.round(c.chance * 100)}% chance.` + (c.failMatch ? ' If it goes wrong, a match in the dark.' : ''));
+  if (c.gold) out.push(Array.isArray(c.gold) ? `${c.gold[0]} to ${c.gold[1]} gold.` : `+${c.gold} gold.`);
+  if (c.fans) out.push(`+${c.fans} fans.`);
+  for (const k in c.energy || {}) out.push(`+${Array.isArray(c.energy[k]) ? c.energy[k].join('-') : c.energy[k]} ${k === 'here' ? DB.elems.names[REGION_ELEM[wRegionHere()] || 'aether'] : DB.elems.names[k]} energy.`);
+  for (const k in c.items || {}) out.push(`+${c.items[k]} ${DB.items[k].name}.`);
+  if (c.healPct) out.push(`Heal ${Math.round(c.healPct * 100)}% of your team HP.`);
+  if (c.snack) out.push(`${DB.meals[c.snack].name}: ${DB.meals[c.snack].does}`);
+  if (c.charm) out.push(DB.meals[c.charm].does);
+  if (c.practice) out.push('Practice a card: ★, better at every sport.');
+  if (c.upgrade) out.push('Upgrade a card.');
+  if (c.time) out.push(`Takes ${c.time >= 60 ? (c.time / 60) + (c.time === 60 ? ' hour' : ' hours') : c.time + ' minutes'}.`);
+  return out.join(' ');
+}
+function wEventArt(who) {
+  if (who.kind && KIND[who.kind]) { let src = ''; try { src = portraitURL(who.kind, who.team || wNpcTeam(who.kind), '', 96); } catch (e) { } if (src) return `<img src="${src}" alt="">`; }
+  const ico = { purse: ICO.bag, shed: ICO.gem, wisp: ICO.lantern }[who.scene] || ICO.event;
+  return `<span class="wevscene">${svgI(ico)}</span>`;
+}
+function wOpenEvent() {
+  const S = WG && WG.event; if (!S || LAB) return;
+  const ev = wEventDef(S.id); if (!ev) { WG.event = null; return; }
+  const who = wEventWho(S);
+  const body = ev.who && ev.who.rival ? ev.text.replace("A rival club's", `The ${CLUBS[S.rival].name}'`) : ev.text;
+  let closed = false;
+  const close = modal(`<header><h3>${esc(who.name || 'On the road')}</h3></header>
+    <div class="wpg wev"><div class="wpgfoes">${wEventArt(who)}</div><div class="wpgtxt"><p class="wpgwho">${esc(body)}</p>${S.done && S.done.trim() ? `<p class="result">${esc(S.done)}</p>` : ''}</div></div>
+    ${!S.done && ev.choices ? `<div class="opts">${ev.choices.map((c, i) => `<button class="opt" data-wev="${i}" ${wAffordable(c) ? '' : 'disabled title="You cannot afford that"'}><b>${esc(c.label)}</b><small>${esc(wChoiceText(c))}</small></button>`).join('')}</div>
+      <div class="row"><button class="ghost" id="wEvWalk">Walk on</button></div>` : '<div class="row"><button class="btn" id="wEvDone">Carry on</button></div>'}`,
+    () => { if (closed) return; closed = true; if (WG.event === S) { if (!S.done) wLog('You walk on.', 'd'); WG.event = null; wSave(); } wDrain(); });
+  const shut = () => close();
+  if ($('wEvWalk')) $('wEvWalk').onclick = shut;
+  if ($('wEvDone')) { $('wEvDone').onclick = shut; $('wEvDone').focus(); }
+  $('modalBox').querySelectorAll('[data-wev]').forEach(b => b.onclick = () => { closed = true; close(); wEventChoose(+b.dataset.wev); });
+}
+/* choose: o.roll forces a gamble's roll (tests) */
+function wEventChoose(i, o) {
+  o = o || {};
+  const S = WG && WG.event, ev = S && wEventDef(S.id), c = ev && ev.choices && ev.choices[i];
+  if (!c || S.done) return false;
+  if (!wAffordable(c)) { wOpenEvent(); return false; }
+  const region = wRegionHere();
+  if (c.match) {
+    wPayCost(c); WG.event = null;
+    const who = wEventWho(S);
+    wLog(c.label + '.', 'd');
+    startMatch({ type: c.match.type || 'normal', tier: wTierHere(), name: c.match.name || (S.rival ? who.short : null), world: { kind: 'event', ref: { ev: S.id, c: i, rival: S.rival || null }, region } });
+    return true;
+  }
+  if (c.practice || c.upgrade) {
+    const mode = c.practice ? 'practice' : 'upgrade';
+    wPickCard(RUN.deck.filter(c.practice ? practicable : upgradable), c.practice ? 'Practice a card' : 'Upgrade a card', c.practice ? 'A practiced card (★) gets better at every sport.' : 'The + version, for good.', card => {
+      if (!card) { wOpenEvent(); return; }
+      wPayCost(c);
+      if (mode === 'practice') { card.sk = 1; achAdd('practice', 1); } else card.up = true;
+      const bits = wApplyEffects(c); bits.unshift(wCardName(card.id, card.up) + (mode === 'practice' ? ' ★' : ''));
+      S.done = (c.result || '') + ' (' + bits.join(', ') + ')';
+      wLog(S.done.trim(), 'm'); wSave(); wOpenEvent();
+    });
+    return true;
+  }
+  wPayCost(c);
+  const ok = c.chance == null || (o.roll != null ? o.roll : Math.random()) < c.chance;
+  if (!ok && c.failMatch) {
+    WG.event = null; wLog(c.fail || 'It goes wrong.', 'b'); wSave();
+    startMatch({ type: c.failMatch.type || 'normal', tier: wTierHere(), ambush: true, world: { kind: 'wild', region } });
+    return true;
+  }
+  const bits = ok ? wApplyEffects(c) : [];
+  S.done = ((ok ? c.result : c.fail) || 'Done.') + (bits.length ? ' (' + bits.join(', ') + ')' : '');
+  wLog(S.done, ok ? 'm' : 'b');
+  wSave(); wOpenEvent(); wDrain();
+  return true;
+}
+W_ON_END.event = function (r, ref) {
+  if (r !== 'win' || !ref) return;
+  const ev = wEventDef(ref.ev), c = ev && ev.choices[ref.c]; if (!c || !c.match) return;
+  const bits = wApplyEffects(c.match.win || {});
+  wLog((c.match.winText || 'You win.') + (bits.length ? ' (' + bits.join(', ') + ')' : ''), 'g');
+};
+/* a card picker over a list of deck cards (Sudden Death's pickFromDeck look). done(card) or done(null) on cancel. */
+function wPickCard(list, title, hint, done) {
+  let cb = done;
+  const close = modal(`<header><h3>${esc(title)}</h3><button class="ghost" data-close>Cancel</button></header>
+    <p class="hint">${esc(hint || '')}</p><div class="cardgrid pickable">${sortDeck(list).map(c => cardHTML(c, { flav: false })).join('') || '<p class="hint">No cards fit.</p>'}</div>`, () => { const f = cb; cb = null; if (f) f(null); });
+  $('modalBox').querySelectorAll('.card').forEach(el => {
+    const card = RUN.deck.find(c => c.uid == el.dataset.uid);
+    const go = () => { const f = cb; cb = null; close(); if (f) f(card); };
+    el.onclick = go; el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
+}
+
+/* an unfinished event card comes back after a reload */
+const wW8Start = wStart;
+wStart = function (save, opts) {
+  wW8Start(save, opts);
+  if (WG && WG.event && UI.view === 'world' && !WG.cardOffer) wOpenEvent();
+};
+/* w9b: towns (phase 4). Meals and cooking, Brother Quill the enchanter, card vendors, and the help text for all of it.
+   Loads last; wraps earlier realm functions by reassignment.
+
+   Meals (DB.meals, w1). You cook them at an inn hearth or in Tansy's canteen from foraged and bought ingredients
+   (DB.recipes), or buy them from an inn's kitchen (DB.innMenu). Cooked and bought meals go in your pantry (WG.pantry);
+   snacks (honey drops, salt fish, jerky, hardtack) are items in your bag. Eat one and it is your meal for the next
+   match (WG.meal), applied at kickoff by onHook('fightStart') and then gone. A fortune (WG.charm) stacks with it.
+   Eating a second meal puts the first back in the pantry. wOpenMeals(innId?) is the menu; camp can call it too.
+
+   The enchanter (DB.enchanter): Brother Quill spends elemental energy (WG.energy: wells, road events, and wins, see
+   w9-road.js) to upgrade a card, add a Practice star, or upgrade a gear card. Any kind of energy pays; he takes from
+   what you have most of. Each use of a service raises its price by one, up to a cap (WG.enchUsed). wOpenEnchanter().
+
+   Card vendors (DB.cardShops): three towns sell cards in Sudden Death's shop style and prices (PRICE), with stock that
+   leans to the region's sports and kinds and turns over every week (WG.cardShops[id].week). Trading a card away costs
+   Sudden Death's removeCost (it rises by 25 each time), once per vendor per week.
+
+   Realm functions wrapped: wRunAct (acts enchant, kitchen, meals, cards), wOpenInn (a Meals button), wPreGame (the
+   meal line), wRenderHud (energy and meal), renderHelp (the road and town section). */
+
+/* ---------- meals ---------- */
+function wPantry() { return (WG.pantry = WG.pantry || {}); }
+/* what you could eat: cooked and bought meals, then snacks in your bag. [{ id, n, snack }] */
+function wEdibles() {
+  const out = [];
+  for (const id in wPantry()) if (WG.pantry[id] > 0 && DB.meals[id]) out.push({ id, n: WG.pantry[id], snack: false });
+  for (const id in DB.meals) if (DB.meals[id].snack && (WG.items[id] || 0) > 0) out.push({ id, n: WG.items[id], snack: true });
+  return out;
+}
+function wRecipeKnown(id) { const r = DB.recipes[id]; return !!r && (!r.need || wFlag(r.need)); }
+function wCanCook(id) { const r = DB.recipes[id]; return wRecipeKnown(id) && Object.keys(r.needs).every(k => wHas(k, r.needs[k])); }
+function wCook(id) {
+  const r = DB.recipes[id];
+  if (!r || !wRecipeKnown(id)) return 'You do not know that recipe.';
+  if (!wCanCook(id)) return 'You are missing ingredients.';
+  for (const k in r.needs) wAddItem(k, -r.needs[k]);
+  wAdvance(60);
+  const e = r.effect;
+  if (e.kind === 'meal') { wPantry()[e.meal] = (WG.pantry[e.meal] || 0) + 1; wLog(`You cook ${DB.meals[e.meal].name}. It goes in your pantry.`, 'm'); }
+  else if (e.kind === 'item') { wAddItem(e.item, e.n || 1); wLog(`You make ${e.n || 1} ${DB.items[e.item].name}.`, 'm'); }
+  wSave();
+  return '';
+}
+function wBuyMeal(inn, id) {
+  const pr = (DB.innMenu[inn] || {})[id];
+  if (pr == null) return 'Not on the menu here.';
+  if (RUN.gold < pr) return 'You cannot afford that.';
+  RUN.gold -= pr; wPantry()[id] = (WG.pantry[id] || 0) + 1;
+  wLog(`You buy ${DB.meals[id].name} to take away. It goes in your pantry.`, 'm');
+  wSave();
+  return '';
+}
+/* eat now: it acts at the next kickoff. A meal you already ate goes back where it came from. */
+function wEat(id) {
+  const M = DB.meals[id]; if (!M || M.charm) return 'You cannot eat that.';
+  if (M.snack ? !wHas(id) : !(wPantry()[id] > 0)) return 'You have none.';
+  if (M.snack) wAddItem(id, -1); else { WG.pantry[id]--; if (!WG.pantry[id]) delete WG.pantry[id]; }
+  if (WG.meal) { const old = DB.meals[WG.meal]; if (old && old.snack) wAddItem(WG.meal, 1); else if (old) wPantry()[WG.meal] = (WG.pantry[WG.meal] || 0) + 1; }
+  WG.meal = id;
+  wLog(`You eat ${M.name}. ${M.does}`, 'm');
+  wSave();
+  return '';
+}
+function wMealFx(id) {
+  const M = DB.meals[id]; if (!M || !B) return;
+  const f = M.fx || {};
+  if (f.block) B.P.block += f.block;
+  for (const k in f.st || {}) addSt(B.P, k, f.st[k]);
+  if (f.draw) addSt(B.P, 'drawnext', f.draw);
+  if (f.energy) addSt(B.P, 'nrgnext', f.energy);
+  if (f.heal) healP(f.heal);
+}
+/* at kickoff in the realm: the meal and the fortune act once, then they are gone */
+onHook('fightStart', () => {
+  if (!WG || !RUN || !B || !RUN.pending || !RUN.pending.world) return;
+  const ids = [WG.meal, WG.charm].filter(id => id && DB.meals[id]);
+  if (!ids.length) return;
+  for (const id of ids) { wMealFx(id); log(`Pre-game: ${DB.meals[id].name}. ${DB.meals[id].does}`, 'good'); }
+  B.wMeal = ids.slice();
+  fx({ k: 'banner', t: DB.meals[ids[0]].name, sub: ids.map(id => DB.meals[id].does).join(' '), small: 1 });
+  WG.meal = null; WG.charm = null;
+});
+function wNeedsText(r) { return Object.keys(r.needs).map(k => `${r.needs[k]} ${DB.items[k].name}`).join(', '); }
+/* the meal menu: what you will eat next, your pantry, the inn's kitchen (innId), and the hearth */
+function wOpenMeals(inn) {
+  const who = inn && DB.chars[inn] ? DB.chars[inn].name : 'The hearth';
+  modal(`<header><h3>${inn ? esc(who) + ': meals' : 'Cooking'}</h3><button class="ghost" data-close>Done</button></header><div id="wMealBody"></div>`);
+  const render = msg => {
+    const body = $('wMealBody'); if (!body) return;
+    const now = [WG.meal, WG.charm].filter(Boolean);
+    let h = `<p class="hint">A meal helps in your next match only. You have <b class="wgold">${RUN.gold} gold</b>.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p>`;
+    h += `<h4>Next match</h4><p class="wmealnow">${now.length ? now.map(id => `<b>${esc(DB.meals[id].name)}</b>: ${esc(DB.meals[id].does)}`).join('<br>') : 'Nothing eaten yet.'}</p>`;
+    const ed = wEdibles();
+    h += `<table class="wshop"><tbody><tr class="wsellh"><td colspan="4"><h4>Your pantry</h4></td></tr>`;
+    h += ed.length ? ed.map(e => `<tr><td><b>${esc(DB.meals[e.id].name)}</b><small>${esc(DB.meals[e.id].does)}</small></td><td class="wnum dim">have ${e.n}</td><td></td><td><button class="ghost" data-weat="${e.id}">Eat</button></td></tr>`).join('') : '<tr><td colspan="4" class="dim">Empty. Cook something, or buy it.</td></tr>';
+    if (inn && DB.innMenu[inn]) {
+      h += `<tr class="wsellh"><td colspan="4"><h4>The kitchen</h4></td></tr>`;
+      for (const id in DB.innMenu[inn]) { const pr = DB.innMenu[inn][id]; h += `<tr><td><b>${esc(DB.meals[id].name)}</b><small>${esc(DB.meals[id].does)}</small></td><td class="wnum">${pr}g</td><td></td><td><button class="ghost" data-wbuym="${id}" ${RUN.gold < pr ? 'disabled' : ''}>Buy</button></td></tr>`; }
+    }
+    h += `<tr class="wsellh"><td colspan="4"><h4>Cook at the hearth</h4><small class="dim">An hour each. Ingredients come from bushes and shops.</small></td></tr>`;
+    for (const id in DB.recipes) {
+      if (!wRecipeKnown(id)) continue;
+      const r = DB.recipes[id], M = r.effect.kind === 'meal' ? DB.meals[r.effect.meal] : null;
+      h += `<tr><td><b>${esc(r.name)}</b><small>${esc(M ? M.does : r.desc || '')}</small></td><td class="wneeds" colspan="2">${Object.keys(r.needs).map(k => `<span class="${wHas(k, r.needs[k]) ? '' : 'wbad'}">${r.needs[k]} ${esc(DB.items[k].name)} <i>(${WG.items[k] || 0})</i></span>`).join('')}</td><td><button class="ghost" data-wcook="${id}" ${wCanCook(id) ? '' : 'disabled'}>Cook</button></td></tr>`;
+    }
+    h += '</tbody></table>';
+    body.innerHTML = h;
+    body.querySelectorAll('[data-weat]').forEach(b => b.onclick = () => { render(wEat(b.dataset.weat)); wDrain(); });
+    body.querySelectorAll('[data-wbuym]').forEach(b => b.onclick = () => { render(wBuyMeal(inn, b.dataset.wbuym)); wDrain(); });
+    body.querySelectorAll('[data-wcook]').forEach(b => b.onclick = () => { render(wCook(b.dataset.wcook)); wDrain(); });
+  };
+  render('');
+}
+/* the pre-game card: what you have eaten, or a quick bite from the pantry */
+const wW9PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW9PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'); if (!box) return;
+  const draw = () => {
+    const old = $('wPgMeal'); if (old) old.remove();
+    const now = [WG.meal, WG.charm].filter(Boolean), ed = wEdibles().slice(0, 4);
+    let h = `<div id="wPgMeal" class="wpgmeal">`;
+    h += now.length ? `<p>Pre-game: ${now.map(id => `<b>${esc(DB.meals[id].name)}</b> (${esc(DB.meals[id].does)})`).join(', ')}</p>` : `<p class="hint">Nothing eaten.${ed.length ? ' A bite first?' : ''}</p>`;
+    if (!WG.meal && ed.length) h += `<div class="row">${ed.map(e => `<button class="ghost" data-wpge="${e.id}" title="${esc(DB.meals[e.id].does)}">Eat ${esc(DB.meals[e.id].name)}</button>`).join('')}</div>`;
+    h += '</div>';
+    const hint = [...box.querySelectorAll('p.hint')].pop();
+    if (hint) hint.insertAdjacentHTML('beforebegin', h); else box.insertAdjacentHTML('beforeend', h);
+    box.querySelectorAll('[data-wpge]').forEach(b => b.onclick = () => { wEat(b.dataset.wpge); draw(); });
+  };
+  draw();
+};
+
+/* ---------- the enchanter ---------- */
+function wEnergyTotal() { return Object.values(WG.energy || {}).reduce((a, b) => a + (b || 0), 0); }
+function wEnchCost(k) { const S = DB.enchanter[k], used = (WG.enchUsed || {})[k] || 0; return Math.min(S.max, S.base + S.step * used); }
+/* spend n energy, most plentiful kind first; returns what was spent, e.g. "2 Ember, 1 Tide", or null if short */
+function wSpendEnergy(n) {
+  if (wEnergyTotal() < n) return null;
+  const spent = {};
+  while (n > 0) { const el = Object.keys(WG.energy).sort((a, b) => WG.energy[b] - WG.energy[a])[0]; WG.energy[el]--; spent[el] = (spent[el] || 0) + 1; n--; }
+  return Object.keys(spent).map(e => spent[e] + ' ' + DB.elems.names[e]).join(', ');
+}
+function wEnchList(k) {
+  if (k === 'star') return RUN.deck.filter(practicable);
+  if (k === 'gear') return RUN.deck.filter(c => upgradable(c) && CARDS[c.id].type === 'gear');
+  return RUN.deck.filter(c => upgradable(c) && CARDS[c.id].type !== 'gear');
+}
+/* do a service on a card (tests call this directly; the menu calls it after a pick) */
+function wEnchant(k, card) {
+  const S = DB.enchanter[k]; if (!S || !card) return 'Nothing to enchant.';
+  if (!wEnchList(k).includes(card)) return 'That card cannot take it.';
+  const cost = wEnchCost(k), paid = wSpendEnergy(cost);
+  if (!paid) return `You need ${cost} energy.`;
+  if (k === 'star') { card.sk = 1; achAdd('practice', 1); } else card.up = true;
+  WG.enchUsed = WG.enchUsed || {}; WG.enchUsed[k] = (WG.enchUsed[k] || 0) + 1;
+  wAdvance(45);
+  wLog(`Brother Quill ${k === 'star' ? 'drills' : k === 'gear' ? 'recharges' : 'binds energy into'} ${wCardName(card.id, card.up)}${k === 'star' ? ' (★)' : ''}. (${paid} energy)`, 'm');
+  wSave();
+  return '';
+}
+function wOpenEnchanter(msg) {
+  const ch = DB.chars.quill, en = WG.energy || {};
+  const close = modal(`<header><div class="row"><img class="wmport" src="${portraitURL(ch.kind, wNpcTeam(ch.kind), '', 96)}" alt=""><h3>${esc(ch.name)}, enchanter</h3></div><button class="ghost" data-close>Done</button></header>
+    <p class="hint">Energy comes from wells, from the road, and from every win in a region. Any kind pays: Quill takes from what you have most of. Each service costs one more every time you use it.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p>
+    <div class="wenergy">${DB.elems.order.map(e => `<span class="wen-${e}"><b>${en[e] || 0}</b> ${DB.elems.names[e]}</span>`).join('')}<span class="wentot">${wEnergyTotal()} in all</span></div>
+    <table class="wshop"><tbody>${Object.keys(DB.enchanter).map(k => { const S = DB.enchanter[k], c = wEnchCost(k), n = wEnchList(k).length; return `<tr><td><b>${esc(S.name)}</b><small>${esc(S.does)}${n ? '' : ' (no card in your deck can take it)'}</small></td><td class="wnum">${c} energy</td><td><button class="ghost" data-wench="${k}" ${wEnergyTotal() < c || !n ? 'disabled' : ''}>Choose</button></td></tr>`; }).join('')}</tbody></table>`);
+  $('modalBox').querySelectorAll('[data-wench]').forEach(b => b.onclick = () => {
+    const k = b.dataset.wench, S = DB.enchanter[k];
+    close();
+    wPickCard(wEnchList(k), S.name, `${S.does} Costs ${wEnchCost(k)} energy.`, card => { const r = card ? wEnchant(k, card) : ''; wDrain(); wOpenEnchanter(r); });
+  });
+}
+
+/* ---------- card vendors ---------- */
+function wWeek() { return Math.floor((WG.dayAbs - 1) / 7); }
+function wMakeStock(id) {
+  const S = DB.cardShops[id], Rg = DB.regions[S.region], sports = Rg.sports.map(s => s[0]), kinds = runKinds();
+  const all = Object.values(CARDS).filter(c => ['c', 'u', 'r'].includes(c.rar) && !['junk', 'curse', 'status'].includes(c.type) && (c.kind === 'any' || kinds.includes(c.kind)));
+  // slots 1-3: cards made for the region's sports; slot 4: cards that suit them or a native kind; slot 5: any rare
+  const home = all.filter(c => sports.includes(c.sport));
+  const fit = all.filter(c => sports.includes(c.sport) || Rg.kinds.includes(c.kind) || sportFits(c).slice(0, 2).some(s => sports.includes(s)));
+  const cards = [], free = c => !cards.some(o => o.id === c.id);
+  for (let i = 0; i < 5; i++) {
+    const rar = i === 4 ? 'r' : wpick({ c: 6, u: 3, r: 1 });
+    let pool = (i < 3 ? home : i < 4 ? fit : all).filter(c => c.rar === rar && free(c));
+    if (!pool.length) pool = (i < 3 ? home : fit).filter(free);
+    if (!pool.length) pool = all.filter(c => c.rar === rar && free(c));
+    if (!pool.length) continue;
+    const c = pick(pool);
+    cards.push({ id: c.id, price: Math.round(PRICE[c.rar] * (.9 + R() * .2)), sold: false });
+  }
+  return { week: wWeek(), cards, removed: false };
+}
+function wShopStock(id) {
+  WG.cardShops = WG.cardShops || {};
+  const st = WG.cardShops[id];
+  if (!st || st.week !== wWeek()) { WG.cardShops[id] = wMakeStock(id); wSave(); }
+  return WG.cardShops[id];
+}
+function wBuyCard(id, i) {
+  const st = wShopStock(id), w = st.cards[i];
+  if (!w || w.sold) return 'Sold out.';
+  if (RUN.gold < w.price) return 'You cannot afford that.';
+  RUN.gold -= w.price; w.sold = true;
+  RUN.deck.push(mkCard(w.id)); RUN.stats.cards = (RUN.stats.cards || 0) + 1; assignOwners();
+  wLog(`You buy ${wCardName(w.id)} for ${w.price} gold.`, 'm');
+  wSave();
+  return '';
+}
+/* trade a card away: Sudden Death's removeCost, once per vendor per week */
+function wRemoveCard(id, card) {
+  const st = wShopStock(id);
+  if (st.removed) return 'One trade a week.';
+  if (RUN.gold < RUN.removeCost) return 'You cannot afford that.';
+  const i = RUN.deck.indexOf(card); if (i < 0) return 'Not in your deck.';
+  RUN.deck.splice(i, 1); RUN.gold -= RUN.removeCost; RUN.removeCost += 25; st.removed = true;
+  wLog(`You trade away ${wCardName(card.id, card.up)}.`, 'd');
+  wSave();
+  return '';
+}
+function wOpenCardShop(id, msg) {
+  const S = DB.cardShops[id], ch = DB.chars[id], st = wShopStock(id), Rg = DB.regions[S.region];
+  const days = 7 - ((WG.dayAbs - 1) % 7), ok = p => RUN.gold >= p;
+  const close = modal(`<header><div class="row"><img class="wmport" src="${portraitURL(ch.kind, wNpcTeam(ch.kind), '', 96)}" alt=""><h3>${esc(S.name)}</h3></div><button class="ghost" data-close>Done</button></header>
+    <p class="hint">${esc(Rg.name)} stock: cards for ${esc(Rg.sports.map(s => SPORT_NAME[s[0]].toLowerCase()).join(' and '))}, and the kinds that play here. New stock in ${days} day${days === 1 ? '' : 's'}. You have <b class="wgold">${RUN.gold} gold</b>.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p>
+    <div class="shopgrid"><div class="cardrow">${st.cards.map((w, i) => `<div class="ware${w.sold ? ' sold' : ''}">${cardHTML({ uid: 'ws' + i, id: w.id }, { attrs: `data-wbuyc="${i}"`, flav: false })}<div class="price${ok(w.price) ? '' : ' no'}">${w.sold ? 'Sold' : w.price + ' gold'}</div></div>`).join('')}</div>
+    <div class="items"><button class="item${st.removed ? ' sold' : ''}" id="wRemove" ${st.removed ? 'disabled' : ''}>${svgI('<path d="M6 6l12 12M18 6L6 18" stroke="#e0533a" stroke-width="3"/>')}<span><b>Trade a card away</b></span><small>Remove one card from your deck. Once a week here.</small><span class="price${ok(RUN.removeCost) ? '' : ' no'}">${RUN.removeCost} gold</span></button></div></div>`);
+  $('modalBox').querySelectorAll('[data-wbuyc]').forEach(el => el.onclick = () => { const r = wBuyCard(id, +el.dataset.wbuyc); if (!r && typeof sfx !== 'undefined') sfx.coin(); close(); wDrain(); wOpenCardShop(id, r); });
+  $('wRemove').onclick = () => {
+    if (st.removed || !ok(RUN.removeCost)) { close(); wOpenCardShop(id, st.removed ? 'One trade a week.' : 'You cannot afford that.'); return; }
+    close();
+    wPickCard(RUN.deck.slice(), 'Trade a card away', `It leaves your deck for good. ${RUN.removeCost} gold.`, card => { const r = card ? wRemoveCard(id, card) : ''; wDrain(); wOpenCardShop(id, r); });
+  };
+}
+
+/* ---------- talk acts, the inn, the HUD ---------- */
+const wW3RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'enchant') return LAB ? null : wOpenEnchanter();
+  if (act === 'kitchen') return LAB ? null : wOpenMeals(null);
+  if (act === 'meals') return LAB ? null : wOpenMeals(id);
+  if (act === 'cards' && DB.cardShops[id]) return LAB ? null : wOpenCardShop(id);
+  return wW3RunAct(act, id);
+};
+const wW7OpenInn = wOpenInn;
+wOpenInn = function (price, who) {
+  wW7OpenInn(price, who);
+  const inn = WUI.talk && DB.innMenu[WUI.talk.id] ? WUI.talk.id : null, row = $('wSleep') && $('wSleep').parentNode;
+  if (!row) return;
+  row.insertAdjacentHTML('beforeend', '<button class="ghost" id="wInnMeals">Meals and the hearth</button>');
+  $('wInnMeals').onclick = () => wOpenMeals(inn);
+};
+const wW7RenderHud = wRenderHud;
+wRenderHud = function () {
+  const k0 = WUI.hudKey;
+  wW7RenderHud();
+  if (!WUI.built || !WG) return;
+  const key = [wEnergyTotal(), WG.meal || '', WG.charm || ''].join('|');
+  if (k0 === WUI.hudKey && $('wHudEn') && $('wHudEn').dataset.k === key) return;
+  const old = $('wHudEn'); if (old) old.remove();
+  const en = WG.energy || {}, meal = [WG.meal, WG.charm].filter(Boolean).map(id => DB.meals[id].name).join(', ');
+  const party = document.querySelector('#wHud .wparty');
+  const html = `<div class="stat wen" id="wHudEn" data-k="${esc(key)}" title="Energy for the enchanter: ${esc(DB.elems.order.map(e => (en[e] || 0) + ' ' + DB.elems.names[e]).join(', '))}${meal ? '. Next match: ' + esc(meal) : ''}"><small>Energy${meal ? ' &middot; fed' : ''}</small><b>${wEnergyTotal()}</b></div>`;
+  if (party) party.insertAdjacentHTML('beforebegin', html); else $('wHud').insertAdjacentHTML('beforeend', html);
+};
+
+/* ---------- the audit: phase 4 data refers to real meals, items, cards and people ---------- */
+const wW2Audit = wAudit;
+wAudit = function () {
+  const P = wW2Audit(), chk = (c, m) => { if (!c) P.push(m); };
+  for (const id in DB.meals) { const M = DB.meals[id]; chk(M.name && M.does && M.fx, 'meal ' + id + ' needs name, does and fx'); if (M.snack) chk(DB.items[id], 'snack ' + id + ' is not an item'); for (const k in M.fx.st || {}) chk(ST[k], 'meal ' + id + ' gives unknown status ' + k); }
+  for (const r in DB.recipes) { const e = DB.recipes[r].effect; if (e.kind === 'meal') chk(DB.meals[e.meal], 'recipe ' + r + ' makes unknown meal ' + e.meal); }
+  for (const inn in DB.innMenu) { chk(DB.chars[inn] && DB.chars[inn].inn, 'inn menu ' + inn + ' is not an innkeeper'); for (const id in DB.innMenu[inn]) chk(DB.meals[id] && !DB.meals[id].snack && !DB.meals[id].charm, 'inn ' + inn + ' sells unknown meal ' + id); }
+  for (const id in DB.cardShops) { chk(DB.chars[id] && DB.chars[id].topics.cards, 'card shop ' + id + ' has no CARDS topic'); chk(DB.regions[DB.cardShops[id].region], 'card shop ' + id + ' bad region'); }
+  for (const ev of DB.events) for (const c of [ev.auto || {}].concat(ev.choices || [])) {
+    for (const k of ['snack', 'charm']) if (c[k]) chk(DB.meals[c[k]], 'event ' + ev.id + ' ' + k + ' ' + c[k] + ' is not a meal');
+    for (const k in c.energy || {}) chk(k === 'here' || DB.elems.names[k], 'event ' + ev.id + ' unknown energy ' + k);
+    for (const id of [].concat(c.card || [], c.cards || [])) chk(CARDS[id], 'event ' + ev.id + ' pays unknown card ' + id);
+  }
+  for (const c in DB.chests) for (const id of [].concat(DB.chests[c].card || [], DB.chests[c].cards || [], (DB.chests[c].cardChoice || {}).pool || [])) chk(CARDS[id], 'chest ' + c + ' pays unknown card ' + id);
+  for (const ch in DB.chars) for (const k in DB.chars[ch].topics || {}) { const t = DB.chars[ch].topics[k]; for (const id of [].concat(t.card || [], t.cards || [], (t.cardChoice || {}).pool || [])) chk(CARDS[id], ch + '.' + k + ' pays unknown card ' + id); }
+  return P;
+};
+
+/* ---------- How to play ---------- */
+const wW5RenderHelp = renderHelp;
+renderHelp = function () {
+  wW5RenderHelp();
+  const sec = $('wHelp'); if (!sec || $('wHelp4')) return;
+  sec.insertAdjacentHTML('beforeend', `<div id="wHelp4">
+    <p class="hint"><b>How hard a game is.</b> The Charter Plains are tier 1, the four outer regions tier 2, and the deepest vaults tier 3. Inside a tier, the level (0 to 4) goes up the further you are from Graftonbury, with every two cups you win, and at night off the road. Each level gives the other team 8% more HP, and from level 2 some Strength. The pre-game card shows the level and why. At night off the road, a wild team may <b>ambush</b> you: they start a score ahead.</p>
+    <p class="hint"><b>Road events.</b> Now and then you meet somebody on the road: a pedlar, a cook, an old coach, a rival club. The card says what each choice costs and what it does. Some lead to a match, and a lost match is a blackout like any other.</p>
+    <p class="hint"><b>Meals.</b> Cook at any inn hearth (or in Tansy's canteen) from ingredients you pick off bushes or buy, or buy a meal from an inn's kitchen. Meals wait in your pantry. Eat one before a match (from an inn's MEAL menu, or on the pre-game card) and it helps in that match only: Block, Strength, Footwork, extra cards or Stamina on the first turn, or a little HP.</p>
+    <p class="hint"><b>Energy and the enchanter.</b> Wells, some road events and every win give elemental energy (wins give the region's kind). Brother Quill, in Graftonbury's chapel, spends it: upgrade a card, drill a card (Practice ★), or recharge a gear card. Any kind of energy pays, and each service costs a little more every time.</p>
+    <p class="hint"><b>Card shops.</b> Odd Lots in Graftonbury, Hob Tarn's nets in Saltmere and the Brandt smithy in Cinderhold sell cards for their region's sports, with new stock every week. They will also take a card off your hands, for a fee.</p></div>`);
+};
 </script>
 </body></html>
