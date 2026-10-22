@@ -40,6 +40,8 @@ async def main():
         await pg.evaluate('localStorage.clear()')
         await pg.reload()
         await pg.wait_for_timeout(1200)
+        # coach's notes would cover the shop's buttons; mark them all seen for this profile (kept across the reload below)
+        await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); localStorage.setItem(pkey('sd-tips'), JSON.stringify(TIPS_SEEN))")
         check(await pg.evaluate('(window.__sdErrs || []).length') == 0, 'loads without __sdErrs', await pg.evaluate('window.__sdErrs'))
         check(await pg.evaluate("document.querySelector('#bNew').textContent") == 'Walk the realm', 'title has a "Walk the realm" button')
         await pg.screenshot(path='/tmp/realm-walk-title.png')
