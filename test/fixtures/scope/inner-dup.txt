@@ -1,0 +1,2 @@
+test/fixtures/scope/inner.js
+test/fixtures/scope/dup.js

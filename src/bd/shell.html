@@ -1,0 +1,300 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brimstone Diamond: Monster-League Baseball</title>
+<meta name="description" content="Monster-league baseball under torchlight. Pitch, swing and cast spells with goblins, witches and werewolves; run a full season, kit out your club with magic bats, and send players on dungeon crawls. Free in your browser.">
+<meta name="author" content="Geoff Maddock">
+<meta name="theme-color" content="#0b0f0d">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Brimstone Diamond">
+<meta property="og:title" content="Brimstone Diamond: monster-league baseball">
+<meta property="og:description" content="Monster-league baseball under torchlight: magic pitches, seasons, dungeon crawls. Plays free in your browser.">
+<meta property="og:image" content="brimstone-diamond-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A witch pitching under a full moon in Brimstone Diamond">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Brimstone Diamond: monster-league baseball">
+<meta name="twitter:description" content="Monster-league baseball under torchlight: magic pitches, seasons, dungeon crawls. Plays free in your browser.">
+<meta name="twitter:image" content="brimstone-diamond-card.png">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": [
+  "VideoGame",
+  "WebApplication"
+ ],
+ "name": "Brimstone Diamond",
+ "alternateName": "Brimstone Diamond: Monster-League Baseball",
+ "headline": "Brimstone Diamond: monster-league baseball",
+ "description": "Monster-league baseball under torchlight. Pitch, swing and cast spells with goblins, witches and werewolves; run a full season, kit out your club with magic bats, and send players on dungeon crawls. Free in your browser.",
+ "genre": [
+  "Sports",
+  "Baseball",
+  "Fantasy",
+  "Strategy"
+ ],
+ "keywords": "baseball, fantasy baseball, browser game, monsters, magic, season mode, dungeon crawl",
+ "gamePlatform": "Web browser",
+ "applicationCategory": "GameApplication",
+ "operatingSystem": "Any (runs in a web browser)",
+ "playMode": [
+  "SinglePlayer",
+  "MultiPlayer"
+ ],
+ "numberOfPlayers": {
+  "@type": "QuantitativeValue",
+  "minValue": 1,
+  "maxValue": 2
+ },
+ "inLanguage": "en",
+ "isAccessibleForFree": true,
+ "offers": {
+  "@type": "Offer",
+  "price": "0",
+  "priceCurrency": "USD"
+ },
+ "author": {
+  "@type": "Person",
+  "name": "Geoff Maddock",
+  "alternateName": "Cutups"
+ },
+ "image": "brimstone-diamond-card.png"
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Jersey+10&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<script>
+window.__bdErrs = [];
+window.addEventListener('error', function (e) {
+  var m = (e.message || 'error') + (e.error && e.error.stack ? ' | ' + String(e.error.stack).split('\n').slice(1, 3).join(' ') : '');
+  window.__bdErrs.push(m);
+  var el = document.getElementById('bootErr');
+  if (!el) { el = document.createElement('div'); el.id = 'bootErr'; el.style.cssText = 'position:fixed;left:8px;bottom:8px;right:8px;z-index:9999;background:#3a0d0d;color:#ffd6d6;border:1px solid #ff6a5a;border-radius:6px;padding:8px 12px;font:13px/1.4 monospace;max-height:40vh;overflow:auto'; (document.body || document.documentElement).appendChild(el); }
+  el.textContent = 'Something went wrong (please send this to the developer): ' + window.__bdErrs.join('  ||  ');
+});
+</script>
+<style>
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1>Brimstone <span>Diamond</span></h1>
+    <p>Monster League baseball, under torchlight. Nine innings of fireballs, battle axes and the occasional eaten baserunner.</p>
+  </div>
+  <nav class="tabs" aria-label="Pages">
+    <a href="#play" class="tab" data-page="play" aria-current="page">Play</a>
+    <a href="#guide" class="tab" data-page="guide">How to play</a>
+    <a href="#rosters" class="tab" data-page="rosters">Rosters</a>
+    <a href="#season" class="tab" data-page="season" hidden>Clubhouse</a>
+    <a href="#builder" class="tab" data-page="builder">Team builder</a>
+    <a href="#armory" class="tab" data-page="armory">Armory</a>
+    <a href="#records" class="tab" data-page="records">Records</a>
+    <a href="#stats" class="tab" data-page="stats">Stats</a>
+    <a href="#settings" class="tab" data-page="settings">Settings</a>
+  </nav>
+  <div class="tools">
+    <button class="tbtn" id="bPause" type="button" disabled>Pause</button>
+    <button class="tbtn" id="bMenu" type="button">New game</button>
+  </div>
+</header>
+
+<div class="page" id="pg-play">
+<p class="rotate-note">Turn your phone sideways for a bigger field.</p>
+<div class="stage" id="stage">
+  <canvas id="cv" width="960" height="600" tabindex="0" aria-label="Brimstone Diamond game field"></canvas>
+
+  <div class="overlay" id="menu">
+    <form class="card-menu" id="setup">
+      <h2>Play ball, or else.</h2>
+      <p class="lede">Two monster clubs, one diamond. Pick pitches and aim them, time your swing, then spend mana during the play to blink runners around the bases or feed them to the third baseman.</p>
+      <div class="optgrid">
+      <div class="opt wide"><span>Mode</span>
+        <div class="seg">
+          <input type="radio" name="mode" id="m1" value="1p" checked><label for="m1">1 player vs CPU</label>
+          <input type="radio" name="mode" id="m2" value="2p"><label for="m2">2 players, one keyboard</label>
+          <input type="radio" name="mode" id="m3" value="demo"><label for="m3">Watch CPU vs CPU</label>
+          <input type="radio" name="mode" id="m4" value="season"><label for="m4">Season (roguelike)</label>
+          <input type="radio" name="mode" id="m5" value="cpuseason"><label for="m5">Watch a CPU season</label>
+        </div></div>
+      <div class="opt wide"><span id="teamLbl">Player 1 manages</span>
+        <div class="seg" id="teamSeg">
+          <input type="radio" name="team" id="t1" value="ironmaw" checked><label for="t1" class="iron">Ironmaw Marauders</label>
+          <input type="radio" name="team" id="t2" value="mirewood"><label for="t2" class="mire">Mirewood Hexers</label>
+        </div></div>
+      <div class="opt wide" id="oppOpt"><span id="oppLbl">Opponent (CPU)</span>
+        <div class="seg" id="oppSeg"></div>
+        <p class="hint" style="margin:0">Clubs marked ★ are your own, from the <a href="#builder" data-page="builder">Team builder</a>. The tag on each club is its league and rating (see <a href="#records" data-page="records">Records</a>).</p>
+        <p class="hint matchup" id="matchup" hidden></p></div>
+      </div>
+      <div class="savedgame" id="savedGame" hidden></div>
+      <p class="hint set-rules" id="setupRules"></p>
+      <div class="row"><button class="go" type="button" id="bStart">Play ball</button>
+        <p class="hint">Player 1 bats first. Controls and rules are on the <a href="#guide" data-page="guide">How to play</a> page.</p></div>
+    </form>
+  </div>
+
+  <div class="overlay" id="pause" hidden>
+    <div class="card-menu">
+      <h2>Time out</h2>
+      <p class="lede">The umpire lich is checking the rulebook.</p>
+      <div class="row"><button class="go" type="button" id="bResume">Resume</button><button class="go" type="button" id="bSaveQuit" hidden>Save for later</button><button class="ghost" type="button" id="bQuit">End game</button><a class="ghost" href="#settings" data-page="settings" style="text-decoration:none;color:var(--bone)">Settings</a><a class="ghost" href="#guide" data-page="guide" style="text-decoration:none;color:var(--bone)">How to play</a><a class="ghost" href="#rosters" data-page="rosters" style="text-decoration:none;color:var(--bone)">Rosters</a></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="sOver" hidden>
+    <div class="card-menu">
+      <h2 id="sOverTitle">Victory</h2>
+      <p class="lede" id="sOverSub"></p>
+      <ul class="xplist" id="sOverXP"></ul>
+      <div class="row"><button class="go" type="button" data-act="toclub">To the Clubhouse</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="card-menu">
+      <h2 id="overTitle">Final</h2>
+      <p class="lede" id="overSub"></p>
+      <div class="lswrap" id="overLS"></div>
+      <div class="row"><button class="go" type="button" id="bAgain">Rematch</button><button class="ghost" type="button" id="bSetup">Change setup</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="speedbar" id="speedbar" hidden><span class="sub">CPU vs CPU · speed</span><button class="tbtn" data-speed="1" aria-pressed="true">1×</button><button class="tbtn" data-speed="2">2×</button><button class="tbtn" data-speed="4">4×</button><button class="tbtn" data-speed="8">8×</button><button class="tbtn" data-speed="end">Skip to the end</button></div>
+<section class="readout" id="readout" aria-live="polite" aria-label="Last pitch data"></section>
+
+<div class="touch" id="touch" aria-label="Touch controls for player 1">
+  <div class="dpad">
+    <button type="button" data-k="up" aria-label="Up">▲</button><button type="button" data-k="left" aria-label="Left">◀</button>
+    <button type="button" data-k="right" aria-label="Right">▶</button><button type="button" data-k="down" aria-label="Down">▼</button>
+  </div>
+  <div class="pads">
+    <button type="button" data-k="prev">Q</button><button type="button" data-k="next">E</button><button type="button" data-k="back">Back</button><button type="button" data-k="hus">Hustle</button>
+    <button type="button" data-k="abil" class="big">Magic</button><button type="button" data-k="act" class="big" style="grid-column:span 2">Swing / Go</button>
+  </div>
+</div>
+
+<main class="below" id="pbpMain">
+  <section class="log-wrap">
+    <div>
+      <h3>Play-by-play</h3>
+      <p class="hint tags-legend">Every at-bat lists the powers used in it: <i class="tg tg-ult">★ ultimate</i><i class="tg tg-magic">◆ magic</i><i class="tg tg-club">✦ club magic</i><i class="tg tg-skill">⚡ physical skill</i><i class="tg tg-hustle">▲ hustle</i><i class="tg tg-rollok">d20 roll ✓</i><i class="tg tg-rollbad">d20 roll ✗</i><i class="tg tg-hurt">✚ injury</i><i class="tg tg-gear">⚒ magic gear</i></p>
+      <div class="lswrap" id="lineScore"></div>
+      <ul class="log" id="log"><li class="empty">No pitches thrown yet. Set up a game on the field.</li></ul>
+    </div>
+  </section>
+</main>
+</div>
+
+<div class="page" id="pg-guide" hidden>
+<main class="below doc">
+  <section>
+    <div>
+      <h2 class="pgh">How to play</h2>
+      <p class="lede2">Everything you need at the plate, on the bases and in the field. The game pauses while you read; press <strong>Play</strong> to jump back in.</p>
+      <h3>Base running and fielding</h3>
+      <div class="walk">
+        <div class="card"><h4>When your club is batting</h4>
+          <ol>
+            <li>After contact the view switches to the field. Your runners run on their own, deciding whether to take the extra base.</li>
+            <li><b>Pick a runner</b> with <kbd>A</kbd>/<kbd>D</kbd> (Player 2 <kbd>←</kbd>/<kbd>→</kbd>). The picked runner has a gold ring and is highlighted in the <b>Running</b> panel, bottom left.</li>
+            <li><kbd>W</kbd> sends the picked runner to the next base, <kbd>S</kbd> sends them back. <kbd>F</kbd> sends everyone, <kbd>R</kbd> pulls everyone back.</li>
+            <li><b>Magic:</b> the panel lists spells for the picked runner: their own spell (if they have one), plus <b>Haste</b> and <b>Ghost Slide</b>, which every club has. <kbd>Q</kbd>/<kbd>E</kbd> picks a spell, <kbd>G</kbd> casts it. Purple means ready; grey tells you why not (used, need mana, runner standing).</li>
+            <li><b>Physical skills:</b> runners without a running spell get one instead (Burst, Hook Slide or Barrel Through, by their stats). It's in the same list, shown in yellow with a ⚡ stamina cost instead of mana.</li>
+            <li>Tap <kbd>V</kbd> to make the picked runner sprint.</li>
+            <li>If a fly ball is caught, runners have to get back to their base (tag up) before a fielder with the ball touches it.</li>
+          </ol></div>
+        <div class="card"><h4>When your club is fielding</h4>
+          <ol>
+            <li>Fielders move, catch and throw on their own. The fielder going for the ball has a gold ring.</li>
+            <li><b>Steer the throw:</b> while one of your fielders holds the ball, press a direction: up 2nd, right 1st, left 3rd, down home. Wait half a second and the fielder takes the best throw.</li>
+            <li>Force-outs, tags, tag-up outs and double plays all count automatically.</li>
+            <li><b>Magic:</b> the <b>Fielding</b> panel, bottom right, lists every fielder's spell plus <b>Tailwind</b> and <b>Grasping Roots</b>, which every club has. <kbd>Q</kbd>/<kbd>E</kbd> picks a spell (its range shows as a dashed circle on the field), <kbd>G</kbd> casts it. A message pops up when a targeted spell comes into range.</li>
+            <li><b>Physical skills:</b> the fielder chasing or holding the ball, if he has no fielding spell, gets Diving Catch, Leaping Grab or Rocket Arm. They cost stamina, not mana, and appear in yellow in the same list.</li>
+            <li>Tap <kbd>V</kbd> to hustle the fielder on the ball: more range and a harder throw.</li>
+          </ol></div>
+      </div>
+      <p class="hint">Want on-field help? Turn on <b>Running and fielding help</b> on the <a href="#settings" data-page="settings">Settings</a> page (or here): you get a tip card the first time you run or field, a prompt bar with the key for your next move, and a note when a spell comes into range. <button class="buy" type="button" id="bTips">Help: off</button></p>
+      <h3 style="margin-top:22px">Controls</h3>
+      <div class="tablewrap"><table class="keys">
+        <thead><tr><th></th><th>Player 1</th><th>Player 2</th><th>Gamepad</th></tr></thead>
+        <tbody>
+          <tr><th>Aim pitch / move swing cursor</th><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Arrows</kbd></td><td>Stick / D-pad</td></tr>
+          <tr><th>Pick pitch or batting stance</th><td><kbd>Q</kbd> <kbd>E</kbd> or <kbd>1</kbd>–<kbd>6</kbd></td><td><kbd>.</kbd> <kbd>/</kbd></td><td>LB / RB</td></tr>
+          <tr><th>Throw pitch · Swing</th><td><kbd>F</kbd></td><td><kbd>Enter</kbd></td><td>A</td></tr>
+          <tr><th>Running: pick runner</th><td><kbd>A</kbd> <kbd>D</kbd></td><td><kbd>←</kbd> <kbd>→</kbd></td><td>Left / right</td></tr>
+          <tr><th>Running: send / hold picked runner</th><td><kbd>W</kbd> / <kbd>S</kbd></td><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Up / down</td></tr>
+          <tr><th>Running: send everyone / all back</th><td><kbd>F</kbd> / <kbd>R</kbd></td><td><kbd>Enter</kbd> / <kbd>'</kbd></td><td>A / X</td></tr>
+          <tr><th>Running: pick a spell for the picked runner</th><td><kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>.</kbd> <kbd>/</kbd></td><td>LB / RB</td></tr>
+          <tr><th>Fielding: throw to base</th><td colspan="3">Direction while a fielder holds the ball (up 2B, right 1B, left 3B, down home). Otherwise the fielder picks the best throw.</td></tr>
+          <tr><th>Fielding: pick spell</th><td><kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>.</kbd> <kbd>/</kbd></td><td>LB / RB</td></tr>
+          <tr><th>Hustle: tap repeatedly for extra power, heat or speed</th><td><kbd>V</kbd></td><td><kbd>Right Ctrl</kbd> / <kbd>Num +</kbd></td><td>LT / RT</td></tr>
+          <tr><th>Cast runner or fielder magic</th><td><kbd>G</kbd></td><td><kbd>Right Shift</kbd></td><td>B</td></tr>
+          <tr><th>Batting with runners on: take a lead (press again for a big lead, a third time to go back)</th><td><kbd>G</kbd></td><td><kbd>Right Shift</kbd></td><td>B</td></tr>
+          <tr><th>Batting with runners on: call a steal (press again for a magic steal, again to call it off)</th><td><kbd>R</kbd></td><td><kbd>'</kbd></td><td>X</td></tr>
+          <tr><th>Pitching: throw over to pick off the runner with the biggest lead</th><td><kbd>G</kbd></td><td><kbd>Right Shift</kbd></td><td>B</td></tr>
+        </tbody></table></div>
+      <p class="hint">Pitching: the dashed circle around your crosshair shows where most pitches will land (green crosshair = strike, orange = ball); it grows when your pitcher tires or you hustle. After you press throw, the <b>release meter</b> beside the pitcher fills. Press throw again as it crosses the gold band: perfect cuts the scatter almost in half, good by a fifth, and a mistimed press sprays it wider. Don't press at all and the pitch goes as normal. Fatigue narrows the band.</p>
+      <p class="hint">The <b>data bar</b> under the field breaks down every pitch: the call, pitch type and speed, where it crossed (and how far it missed the target), your release, your swing timing in milliseconds, how far the ball was from your swing circle, and contact quality and exit speed on balls in play.</p>
+      <p class="hint">Batting feedback: your swing circle turns <b>green</b> when the ball's marker is inside it (yellow when close, with a line pointing to the ball). The <b>timing bar</b> under the plate shows the ball's trip and the gold window where a swing connects; your swing drops a tick on it. After the pitch, a small ring marks where the ball really crossed.</p>
+      <p class="hint">Batting: once the ball leaves the hand, a marker shows where it is heading and a ring closes around it. Steer your circle onto the marker and swing when the ring turns gold. Phantom pitches hide the marker mid-flight; the Hex Knuckler makes it wander.</p>
+      <p class="hint"><b>Ultimates (★):</b> every player has one field-changing power, usable once a game for 3 mana. It shows up where that player acts: a batting stance, a pitch, the runner's spell list or the fielding list. Most leave a condition on the field (fire, webs, bog, fog, gas, grasping hands and more). A condition lasts 3 at-bats or until the half-inning ends; the active ones are listed under the count, with the at-bats left. The full list is in the catalog below.</p>
+      <p class="hint"><b>Health (red bar, under stamina):</b> players can get hurt: hit by a pitch, trampled, burned, flattened at the plate, crashing into the wall, gassed, half-digested. Below 60 health a player is hurt (✚): slower, weaker and wilder. At 0 he's knocked out and misses a few at-bats. A knocked-out fielder lies on the field, a knocked-out batter is skipped, and a knocked-out pitcher is replaced from the bullpen. Everyone heals a little each half-inning; trolls heal faster. <b>Injuries</b> are rare by default (set Off, Rare, Occasional or Frequent in <a href="#settings" data-page="settings">Settings</a>): physical skills, max effort, a gassed arm, collisions at the bag and spells that bite back on their caster can cause a minor injury (a chunk of health) or, now and then, a major one. Webs, Petrify, Haunt and Mesmerize can hurt the runner they hit. In a season a major injury sidelines the player for 1-3 games, and anyone under 30 health must sit until he heals: the Clubhouse asks you to sub him out.</p>
+      <p class="hint"><b>Jumping in:</b> while you watch CPU vs CPU (an exhibition or a CPU season), the bar under the field has <b>Take over</b> buttons for both clubs. You play that club as Player 1 from the next pitch; <b>Hand back to the CPU</b> returns it whenever you like. It stays yours for the rest of the run (later season games, rematches) until you hand it back.</p>
+      <p class="hint"><b>Auto powers</b> (Settings page, or press <kbd>T</kbd> any time, even mid-play): your players use their powers on their own, the way the CPU does. Batters pick a spell or skill stance, pitchers sometimes pick a magic pitch, runners cast running spells and skills and call club magic in close races, and fielders cast when a spell comes into range. You still aim, throw, swing and steer the runners, and you can change an auto-picked stance or pitch before it's thrown. Your own casts still work too. The setting applies to every human side, and a badge under the scoreboard shows when it's on.</p>
+      <p class="hint">In 1-player mode, the arrows, Space and Shift work for Player 1 too, and H also hustles. Numpad works for Player 2 (0 swing, . magic, 1/2 pick, 3 back). Esc pauses. M turns the music on or off.</p>
+    </div>
+  </section>
+  <section>
+    <h3>Rules of the diamond</h3>
+    <div class="rules">
+      <div><h4>Mana</h4><p>Each club carries up to <strong>6 mana</strong>. Both clubs gain 1 at the start of every half-inning. Your batting club gains 1 for each hit, your pitcher gains 1 for each strikeout. Magic pitches, batting spells, runner tricks and fielder spells all spend it.</p></div>
+      <div><h4>The at-bat</h4><p>The pitcher picks a pitch and aims it; in 2-player mode the aim stays hidden from the batter. Magic pitches announce themselves on release. The batter moves the swing cursor and presses swing. Contact depends on how close the cursor is to the ball and how well the swing is timed; being late pushes the ball the opposite way, getting under it lifts it.</p></div>
+      <div><h4>The play</h4><p>Fielders chase and throw on their own. You steer the runners, choose throws if you want to, and cast spells. Force outs, tags, tag-ups and double plays all apply. A caught fly sends runners back to tag up.</p></div>
+      <div><h4>Fatigue</h4><p>Every pitch drains the pitcher's stamina, and magic pitches drain more. Below half stamina the pitch comes in slower, flatter and wilder. <strong>ARM</strong> and <strong>POW</strong> decide how deep a pitcher can go. The stamina bar sits under the pitcher's name; press <kbd>C</kbd> (Player 2: <kbd>\</kbd>, gamepad Y) to bring in a reliever from the bullpen. The CPU pulls its pitcher when he's gassed.</p></div>
+      <div><h4>Season mode</h4><p>Pick <strong>Season</strong> in the setup. Your club faces seven rising rivals and then the Brimstone All-Stars; three losses end the run, and losing the final means replaying it. Between games the <strong>Clubhouse</strong> lets you set the lineup and positions, spend <strong>XP</strong> on stats, turn leftover mana into <strong>essence</strong> to enhance powers, and spend <strong>gold</strong> on magic items, free agents (or scout a new batch) and trades. Optional <strong>dungeon crawls</strong> (Settings) send up to three players into one of five dungeons between games for gold, XP, essence and loot; the deeper and harder, the better the treasure and the worse the injuries. The <strong>Front office</strong> can retrain a player to a new position: no more off-position penalty there, but he goes back to level 1 and it costs gold. Stamina carries from game to game, so rest tired players and rotate pitchers. The run saves in this browser. Pick <strong>Watch a CPU season</strong> (or tick <em>The CPU manages this club</em> in the Clubhouse) and the CPU runs the whole thing: it spends points, essence and gold, signs and trades, rests the tired, and plays every game. Watch at 1× to 8×, skip to the final out, or simulate game by game or the rest of the season. Every run, finished or abandoned, goes into the <strong>Records</strong> page: result, game-by-game scores, stars and highlights, and each player's numbers.</p></div>
+      <div><h4>Leads, pickoffs and steals</h4><p>With runners on, the batting side can take a <strong>lead</strong> or a <strong>big lead</strong> before the pitch, and call a <strong>steal</strong>: the runner goes on the release. A lead helps a steal and gives a head start on a ball in play, but the pitcher can <strong>throw over</strong> (up to 4 times an at-bat): d20 + the pitcher's arm and the first baseman's glove against the runner's speed. On a steal the catcher throws: d20 + the runner's speed and lead against the catcher's arm. Slow pitches, Frost Orbs, Meteors and balls in the dirt help the runner; pitchers who stare (Mesmerize, Petrify, Web, Haunt) hold runners close; catchers with Telekinesis, Boulder Arm or Rocket Arm throw harder. A <strong>magic steal</strong> spends the runner's own speed spell or skill (or the Haste spell); Shadowstep can't be thrown out. Weak arms (3 or less) throw it away. Fouls, walks and hit batters call a steal off. Turn it all off in <a href="#settings" data-page="settings">Settings</a>.</p></div>
+      <div><h4>Magic bats and balls</h4><p>Every club owns gear, bought in the <a href="#armory" data-page="armory">Armory</a> between games, and brings one equipped bat and ball. The bat is an extra batting stance and the ball an extra pitch, both marked ⚒ with their charges. Cheap pieces are gone when their charges run out; the costly ones recharge before every game. Exhibition clubs earn gold for every game (more for a win); season clubs pay from the season purse. Rivals in a season bring better gear as they get stronger.</p></div>
+      <div><h4>Moon and stars</h4><p>The moon over the ballpark turns a phase every 9 at-bats, and the constellation beside it changes every 15 (in a season the sky carries on from game to game). Every creature has a phase, shown on its roster card: in it, +1 to its two favourite stats (werewolves +2 POW under the full moon); at the opposite phase, −1 to the first. Shadowstep (new), Glide (waxing crescent), Bull Rush (waxing gibbous), Blood Pact (full), Mesmerize (waning gibbous), Haunt (last quarter) and Invisibility (waning crescent) run 25% stronger in their phase. Moon items (Moonstone Pendant, Nightshard Ring, Silver Sickle Charm) only wake under their moon, and the Moonsilver Bat hits hardest at the full moon. Constellations: the Hound (runners 3% faster), the Anvil (fly balls carry 3% less), the Serpent (swings reach 3% farther), the Broken Crown (more bobbles), the Widow (fielders 3% slower), the Cauldron (spells 5% stronger). Switch it off in <a href="#settings" data-page="settings">Settings</a>.</p></div>
+      <div><h4>The d20</h4><p>Some magic is a gamble. The ogre's <strong>Devour</strong> needs 12+ on a d20 (16+ if the runner is standing on a base), <strong>Petrify</strong> needs 10+, a <strong>Bull Rush</strong> tag needs 11+ to hold, and every <strong>Fireball</strong> hit makes the batter roll d20 + contact against 16 or play on with a scorched bat.</p></div>
+    </div>
+  </section>
+
+  <section id="creatures"></section>
+  <section id="catalog"></section>
+</main>
+</div>
+
+<div class="page" id="pg-builder" hidden>
+<main class="below doc" id="builder"></main>
+</div>
+
+<div class="page" id="pg-stats" hidden>
+<main class="below doc" id="stats"></main>
+</div>
+
+<div class="page" id="pg-records" hidden>
+<main class="below doc" id="records"></main>
+</div>
+
+<div class="page" id="pg-season" hidden>
+<main class="below doc" id="club"></main>
+</div>
+
+<div class="page" id="pg-armory" hidden>
+<main class="below doc" id="armory"></main>
+</div>
+
+<div class="page" id="pg-settings" hidden>
+<main class="below doc" id="settings"></main>
+</div>
+
+<div class="page" id="pg-rosters" hidden>
+<main class="below doc">
+  <h2 class="pgh">Rosters</h2>
+  <p class="lede2">Every club's monsters: stats, powers, pitches and career numbers. Pick a club or show them all, then filter by position, creature or name. The game pauses while you browse.</p>
+  <section id="rosterCtl" class="rv-ctl"></section>
+  <section id="bestiary"></section>
+</main>
+</div>

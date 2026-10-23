@@ -1,0 +1,1 @@
+return { pick, secret, hoisted };

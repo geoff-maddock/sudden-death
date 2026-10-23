@@ -1,0 +1,4 @@
+shell src/bd/shell.html
+out build/scope-ok.html
+test/fixtures/scope/outer.js
+scope sc test/fixtures/scope/inner.txt test/fixtures/scope/exports.js

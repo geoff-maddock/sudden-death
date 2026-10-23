@@ -41,6 +41,7 @@ python3 test/difficulty.py 120 '{}' diff=1 dumb   # skilled vs careless bot on a
 python3 test/policy.py 200                    # routing policies
 python3 test/clubs.py ironmaw,frostfang 60    # per-club win rates
 ./build.sh src/realm/manifest.txt             # Realm build: writes dist/realm.html
+./build.sh src/bd/manifest.txt                # Brimstone Diamond, standalone, into build/ (the Realm's baseball engine; src/bd/README.md)
 python3 test/realm_smoke.py                   # one realm check (realm_*.py; all of them are in ./test/all.sh)
 python3 test/realm_lab.py 140 '{}'            # Realm balance: champion rate, where runs end, per-match cost (docs/realm/BALANCE.md)
 ```

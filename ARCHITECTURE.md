@@ -2,7 +2,7 @@
 
 The game ships as one file, `dist/sudden-death.html`. `./build.sh` reads `src/manifest.txt`, concatenates the files it lists in that order, syntax-checks the result with `node --check`, and wraps it in the HTML shell (`src/shell.html`). Every file shares one global scope, so **order matters**: a file may only use things defined in earlier files at load time (calls made later, at runtime, can reach anything). Folders say what a file is; the manifest says when it loads, and the two do not always agree (sound effects load just before the fight scene, and boot runs before the stats, treasure and `app/` files).
 
-The manifest format: one path per line, relative to the repo root; blank lines and `#` comments are ignored; `shell <file>` names the page, `out <file>` the output, and `include <manifest>` reads another manifest in place. `./build.sh <manifest>` builds from another one.
+The manifest format: one path per line, relative to the repo root; blank lines and `#` comments are ignored; `shell <file>` names the page, `out <file>` the output, and `include <manifest>` reads another manifest in place. `./build.sh <manifest>` builds from another one. `scope <NAME> <manifest> <exports>` wraps another manifest's files in one function, so their top-level names stay private, and sets the global `NAME` to what the exports file returns; duplicate names are checked inside each scope on its own.
 
 Several files still open with their old part name in a comment (`/* p5: ... */`). That is deliberate for now: the move was checked to produce a byte-identical build.
 
@@ -159,6 +159,10 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w16-stats.js` | Player stats: a Stats tab on the Team screen with each player's numbers for the journey or their career, by sport, and their last games. |
 | `w17-bonds.js` | Hometowns and personal quests (talk to a player: a nickname and their kind's Hall of Fame card), and chemistry between starters (a strong pair's combo card). |
 | `w18-league.js` | The league table (rivals and Apex play rounds while you travel; inns post it) and rivals who act: bids for bench players, grudge matches on the road, cup taunts and revenge. |
+
+### Brimstone Diamond (`src/bd/`)
+
+The baseball engine for issue #4, from the same designer's *Brimstone Diamond*. It is split at its own section headers into `src/bd/parts/`, with its page (`shell.html`) and stylesheet (`bd.css`). `./build.sh src/bd/manifest.txt` builds the standalone game into `build/`. The Realm will take the same parts through a `scope wBD …` line, because about 70 of its names (`G`, `S`, `KIND`, `drawFig`, `frame`…) are also Sudden Death's. `src/bd/README.md` has where the source came from and the one edit made for scoping. `test/realm_diamond_source.py` proves both builds play a game and that the scoped one leaks nothing.
 
 ### The match seam
 
