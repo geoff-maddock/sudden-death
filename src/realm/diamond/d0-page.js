@@ -5,7 +5,7 @@
      not the host; body is the page wrapper, head is the root.
    - window's listeners, requestAnimationFrame and setInterval only act while the diamond is on screen (BDX.on), so
      its keys never fire in the world and its frame loop is parked until it is shown.
-   - localStorage is a Map in memory (the Realm keeps the saves), and location and history are stubs (no hash pages).
+   - localStorage is a Map in memory (the Realm keeps the saves, so its cloud sync never starts: window.claude is undefined), and location and history are stubs (no hash pages).
    Its fonts are added to the real page the first time it is shown. */
 const BDX_DOC = globalThis.document, BDX_WIN = globalThis;
 const BDX = { on: false, parked: [], gate: new Map(), host: null, root: null, page: null, fonts: false, onOver: null, onQuit: null };
@@ -57,6 +57,7 @@ const window = new Proxy(BDX_WIN, {
       };
       case 'removeEventListener': return (ty, fn, o) => BDX_WIN.removeEventListener(ty, BDX.gate.get(fn) || fn, o);
       case 'scrollTo': return () => { };
+      case 'claude': return undefined; // its cloud save: the Realm keeps the saves
       case 'document': return document;
       case 'localStorage': return localStorage;
       case 'location': return location;
