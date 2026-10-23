@@ -347,3 +347,10 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - `wBD.onOver` and `wBD.onQuit` are called at a final and when its End game sends it back to its menu.
 - In the diamond, Esc and P are its own Time out: `openPause` does nothing there.
 - `WD` is the game on the field (`{ opts, over, from }`); it is not saved yet (issue #4, phase 4).
+
+## Baseball ratings (w20b-ratings.js)
+
+- `p.bd = { pos, hand, wpn, bat, run, field, ult, pitches, pow, con, spd, arm, fld, lv, got }` on every player in `WG.roster` and `WG.wwait`. Plain JSON, saved with the player.
+- Seeded by `wBD.rate(kind)`: the kind's player on Brimstone Diamond's two founding clubs (so the kind gives the position; kobolds and witches pitch), each stat moved by up to 1.
+- `lv` is the level the ratings have caught up to; `wBdOf(p)` catches them up, a point per level to a stat below 12, weighted by the kind's numbers (`wBD.templ(kind)`). `got` counts those points per stat.
+- `wMakePlayer`, `wGiveXp` and `wStart` call it, so recruits, level-ups, founders and older saves are all covered.

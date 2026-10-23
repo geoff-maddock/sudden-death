@@ -199,3 +199,19 @@
 /* w20: the diamond's bar */
 .wdbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
 .wdbar .hint{flex:1 1 180px;min-width:0}
+
+/* w20b: baseball ratings on a player's stats */
+.wbd{margin-top:6px;border-top:1px solid var(--seam);padding-top:2px}
+.wbd h5{margin:8px 0 4px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wbd .wbdpos{margin:0 0 6px}
+.wbdbars{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 16px;max-width:560px}
+.wbdr{display:grid;grid-template-columns:38px minmax(0,1fr) 22px 24px;gap:6px;align-items:center;font-family:var(--hud);font-size:16px}
+.wbdr i{display:block;height:8px;border-radius:4px;background:var(--seam);overflow:hidden}
+.wbdr em{display:block;height:100%;background:var(--torch)}
+.wbdr b{text-align:right;font-weight:400}
+.wbdr small{color:var(--vile)}
+.wbdpit{margin:6px 0 0}
+.wbdpit b{color:var(--mana);font-weight:600}
+.wbdpw{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.wbdpw small{font-family:var(--hud);color:var(--dim)}
+.wbdpw span{display:block;font-size:15px;color:var(--dim);line-height:1.3}
