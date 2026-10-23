@@ -122,3 +122,20 @@
 .wstlog{margin:0;padding-left:20px;font-size:16px;line-height:1.35}
 .wstlog small{display:block;color:var(--dim);font-size:14px}
 @media (max-width:600px){.wstcard .wsthd{grid-template-columns:56px minmax(0,1fr)}.wstcard .wsthd img{width:56px;height:56px}.wstcard .wsthd .ghost{grid-column:1/-1;justify-self:end}}
+/* w17: quests, chemistry, combo cards */
+.wpq{display:block;color:var(--dim);font-size:14px;line-height:1.3}
+.wpq.wgood{color:#9be08a}
+.wpa .wnews{border-color:var(--torch);color:var(--torch)}
+.wpa .wnews::after{content:" !"}
+.wchem{list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:6px}
+.wchem li{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(48px,140px);gap:10px;align-items:center;padding:4px 8px;border:1px solid var(--seam);border-radius:6px;background:var(--stone)}
+.wchem li.wout{opacity:.6}
+.wchem .wxp{flex:none;width:100%}
+.wbps{display:flex}
+.wbps img{width:40px;height:40px;border-radius:6px}
+.wbps img+img{margin-left:-10px}
+.wchn{display:grid;line-height:1.15;min-width:0}
+.wchn b{font-family:var(--display);font-size:19px;font-weight:400}
+.wchn small{color:var(--dim);font-size:14px}
+.wbondb .wbps img{width:56px;height:56px}
+@media (max-width:600px){.wchem li{grid-template-columns:auto minmax(0,1fr)}.wchem .wxp{grid-column:1/-1}}

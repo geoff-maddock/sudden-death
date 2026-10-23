@@ -134,6 +134,13 @@ async def main():
                 check(-(-bo['max'] // 2) <= bo['hp'] <= -(-bo['max'] // 2) + 12, 'HP is back to half', bo)
                 check(bo['saved'] and bo['last']['result'] == 'lose' and bo['blackouts'] == 1, 'the save is still there, and the loss is counted', bo)
             await pg.click('#wWake'); await pg.wait_for_timeout(200)
+            # a level-up pick the loss paid out opened under the Blackout box: it shows again once you are up
+            pend = await pg.evaluate("({ offer: !!WG.cardOffer, shown: !document.getElementById('modal').hidden && /Pick a card/.test(document.querySelector('#modalBox header').textContent) })")
+            if pend['offer']:
+                check(pend['shown'], f'[{tag}] a card pick from the lost match shows again after you get up', pend)
+                await pg.click('#modalBox [data-close]'); await pg.wait_for_timeout(200)
+                while await pg.evaluate("!!WG.cardOffer || !document.getElementById('modal').hidden"):
+                    await pg.evaluate("document.querySelectorAll('#modalBox [data-close]').forEach(b => b.click())"); await pg.wait_for_timeout(200)
             if not desk:
                 await ctx.close(); continue
 

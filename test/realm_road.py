@@ -135,7 +135,7 @@ async def desk_checks(pg):
     check(st['team'] == 'MOS', 'a Mosswold wild team wears Mosswold colours', st)
     over = await win(pg)
     await pg.evaluate("document.getElementById('bCont').click()"); await pg.wait_for_timeout(300)
-    e1 = await pg.evaluate("({ en: WG.energy.bloom, tf: (WG.tierFights || {})[2] || 0, log: WLOG.slice(-8).map(l => l[0]).join(' | ') })")
+    e1 = await pg.evaluate("({ en: WG.energy.bloom, tf: (WG.tierFights || {})[2] || 0, log: WLOG.slice(-14).map(l => l[0]).join(' | ') })")
     check(over == 'win' and e1['en'] == e0['en'] + 2 and e1['tf'] == e0['tf'] + 1 and 'Bloom energy' in e1['log'], 'a tier 2 win in the Mosswold gives 2 Bloom energy, and counts toward the tier', [e0, e1])
 
     # baseball: a score ahead

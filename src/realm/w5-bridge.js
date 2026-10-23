@@ -245,7 +245,9 @@ function wBlackout(W, result) {
   wSave();
   showView('world');
   if (!LAB) {
-    const close = modal(`<header><h3>Blackout</h3></header><div class="wmsg"><p>${esc(msg)}</p><p class="hint">Sleep at an inn to heal fully, and to choose where you wake next time.</p></div><div class="row"><button class="btn" id="wWake">Get up</button></div>`);
+    // a card pick the match ended with (a level up) opened under this; show it again once you are up
+    const close = modal(`<header><h3>Blackout</h3></header><div class="wmsg"><p>${esc(msg)}</p><p class="hint">Sleep at an inn to heal fully, and to choose where you wake next time.</p></div><div class="row"><button class="btn" id="wWake">Get up</button></div>`,
+      () => { if (WG && WG.cardOffer) wShowCardOffer(); else wDrain(); });
     $('wWake').focus(); $('wWake').onclick = () => close();
   }
 }

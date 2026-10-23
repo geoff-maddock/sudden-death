@@ -169,6 +169,12 @@ async def main():
         check(got, 'the picked card belongs to the player who levelled up')
 
         # ---------- post-game recruit (forced roll) ----------
+        # another starter may have levelled up in the same match: their pick comes first
+        for _ in range(4):
+            if not await pg.evaluate("!!WG.cardOffer && !document.getElementById('wSign')"): break
+            await pg.click('#modalBox [data-wco="0"]')
+            try: await pg.wait_for_function("!WG.cardOffer || !!document.getElementById('wSign')", timeout=5000)
+            except Exception: pass
         try: await pg.wait_for_selector('#wSign', timeout=5000)
         except Exception: pass
         rc = await pg.evaluate("({ open: !!document.getElementById('wSign'), sig: !!document.querySelector('#modalBox .wrecsig .card'), img: !!document.querySelector('#modalBox .wrecport'), text: document.getElementById('modalBox').textContent.slice(0, 160) })")

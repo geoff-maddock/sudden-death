@@ -173,6 +173,17 @@ window.REALMLAB = function (opts = {}) {
     if (home && home !== region && opts.groundTavern !== false) tavern(home);
   }
 
+  // personal quests (epic 2, phase 2): take every quest on as soon as a player offers it, and turn it in when the
+  // route passes through their hometown (no detours)
+  function quests(region) {
+    if (opts.quests === false) return;
+    for (const p of wRoster()) { const q = wQuestOffer(p); if (q && q.st === 'offer') wQuestAccept(p); }
+    const town = TOWN[region]; if (!town) return;
+    const m = WG.map; WG.map = town;
+    try { for (const p of wRoster()) if (p.pq && p.pq.st === 'home' && p.home === town) wQuestTurnIn(p); } finally { WG.map = m; }
+    settle();
+  }
+
   /* ---------- the route ---------- */
   function wild(region, n) {
     const town = TOWN[region];
@@ -188,7 +199,7 @@ window.REALMLAB = function (opts = {}) {
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       if (id === 'crown') { log.crownTries++; for (let d = 0; d < 200 && !wChampWeek(); d++) wAdvance(24 * 60); }
       atMap(C.town);
-      ground(region); tavern(region); enchant(); shop(region);
+      ground(region); tavern(region); quests(region); enchant(); shop(region);
       if (RUN.gold < W_CUP.fee && id !== 'crown') RUN.gold = W_CUP.fee; // a player would grind the fee; not the point
       while (!RUN.over) {
         prep(region, true);
@@ -207,7 +218,7 @@ window.REALMLAB = function (opts = {}) {
   function dungeon(id) {
     const dg = DB.dungeons.find(d => d.id === id), L = loc(id), region = L ? regionAt(L.x, L.y) : 'plains';
     if (!wGateCheck(id).ok) return false;
-    ground(region); shop(region); enchant();
+    ground(region); quests(region); shop(region); enchant();
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       for (const R of wDungeonRooms(id)) {
         if (wFlag(R.flag) || RUN.over) continue;
@@ -258,6 +269,7 @@ window.REALMLAB = function (opts = {}) {
   }
   if (!log.result) log.result = wFlag('champion') ? 'champion' : 'stuck';
   log.ground = WG.ground ? { town: WG.ground.town, parts: WG.ground.parts } : null;
+  log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;
   return log;
 };

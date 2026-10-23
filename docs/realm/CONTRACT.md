@@ -268,3 +268,16 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **UI.** A Stats tab after Deck (`wOpenCamp`/`wRenderCamp` wrapped), sortable by any column, with a page per player (`WSTAT.pid`): their record by sport and last `W_STATS.recent` games. Each lineup row gets a Stats button (`wOpenStats(pid)`). `#wHelpStats`, a paragraph in `#wHelpTeam`.
 - **Next.** These lines are what a later tournament (baseball through Brimstone Diamond, issue to come) can read for form and selection.
 - **Test:** `test/realm_stats.py`.
+
+## Personal quests and bonds (w17-bonds.js)
+
+`w17-bonds.js` loads after `w16-stats.js` and changes earlier parts only by reassignment (`wW17` prefix). Epic #3, phase 2.
+
+- **Hometowns.** `p.home` is a town id (a key of `W_GROUND.inns`): a free agent's is the town they were signed in, anyone else's a town whose region their kind lives in (`wEnsureHome`, set lazily, so older saves get one).
+- **Talking to a player.** Talk ids `p:<pid>`: `wChar` and `wSay` are wrapped, so the talk panel works unchanged (`wTalkPlayer(pid)` opens it from the Team screen; `wRenderTalk` swaps in the player's own portrait). Words: JOB, HOME, and YES while a quest is offered.
+- **Quests.** `p.pq = { t, sport?, n, need, st }`. HOME from level `W_BOND.questLvl` (2) makes one up (`wQuestOffer`, `st: 'offer'`); YES takes it on (`wQuestAccept`, `'go'`). Kinds (`W_PQ`): `home` (a win in their hometown's region), `mvp` (player of the game in 2 wins), `sport` (2 wins in their region's first sport), `big` (an elite, rival or boss win). Only wins with them starting count (`wQuestTick`, from the `wDispatchEnd` wrapper). Done, `st: 'home'`: HOME while you are in their town (`wQuestTurnIn`) sets `p.nick` and gives `hof_<kind>` upgraded, tagged to them. `p.n` never changes (careers are keyed by it); show names with `wNameOf(p)`.
+- **Chemistry.** `WG.bonds['a-b']` (lower id first) `= { n, combo }`: each pair of starters gets 2 for a win, 1 for a loss (`wBondTick`). Good at `W_BOND.good` (4), strong at `W_BOND.strong` (12): a `{ t: 'bond', a, b }` prompt offers a pick of three of `W_COMBOS` (`wb_*`, rarity `'b'`, which no pool rolls). The card taken gets `c.wb = [a, b]` and no `wp`; `wBenchCards`, `wNextMatchDeck` and `wLeagueCards` keep it out unless both start (`wComboOn`). `wRelease` drops the pair's combo cards and chemistry.
+- **Offers after a blackout.** `wBlackout` (w5) now shows a pending card offer again when you get up: before, a level-up pick from a lost match opened under the Blackout box and was lost until a reload. `wShowCardOffer` re-adds the pair's or the level-up banner.
+- **UI.** On the Lineup tab: a Talk button on each row (marked when they have something to say), the quest line, nicknames, and a Chemistry list of the starting pairs (and any good pair). Combo cards get their own section on the Deck tab. `#wHelpBonds` in `#wHelpTeam`.
+- **Bot.** `test/realm_lab.js` takes every quest on when offered and turns it in when the route passes the player's hometown; combo cards are picked at random. `{"quests": false}` turns quests off.
+- **Test:** `test/realm_bonds.py`.

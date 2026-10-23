@@ -157,3 +157,19 @@ The ground is meant to soak up the gold that piled up (about 800 at the Crown) w
 - **Home matches:** about 3 a journey, won 98% of the time. The home region is one of five, and the Crown is neutral, so the stands decide little.
 - **Buying early is a trap.** A bot that bought at the first chance (about 210 gold, at the Mosswold Cup) fell to 57%. The first boss went from 61% to 52%, because it had no gold left for cards or a meal. A player who buys with spare gold loses nothing.
 - **The scout's office** is not the cause of anything: without it, 60%, within the noise.
+
+## Personal quests and bonds (epic 2, phase 2)
+
+The bot takes every quest on when offered and turns it in only when the route passes the player's hometown (no detours), so it finishes about 2 a journey. It picks combo cards at random; because it reorders the lineup by level, many pairs form, and it ends with about 3.7 combo cards.
+
+| 140 runs each, skilled bot with meals | Champion |
+|---|---|
+| Neither, batch 1 / batch 2 | 67.9% / 66.4% |
+| Quests only | 65.7% |
+| Chemistry only | 68.6% |
+| Both, batch 1 / batch 2 | 71.4% / 73.6% |
+| Both, strong at 16 instead of 12, batch 1 / batch 2 | 77.1% / 80.0% |
+
+- **Pooled:** 67.1% with neither (280 runs), 75.5% with both (560 runs, either threshold).
+- **Each alone is neutral**, within the noise. Together the measured lift is about 5 to 8 points, but identical settings varied by about 9 points between batches here, so treat the size as rough.
+- **Raising the threshold to 16 did not cut the combo cards** (3.3 a journey), so it is not the lever; the strong pair stays at 12. If the realm needs pulling back, cap combo cards per team rather than slowing chemistry.
