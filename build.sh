@@ -14,15 +14,18 @@
 #                    added at the end of the function). The manifest's shell, out, style and title lines are
 #                    ignored, so a standalone game's own manifest can be scoped as it is. Duplicate names are
 #                    checked inside each scope on its own. Scopes do not nest.
+#   text <NAME> <file>
+#                    a source line `const NAME = "<the file's contents>";`, so a script can carry a stylesheet or
+#                    markup (the Realm's diamond scope mounts Brimstone Diamond's page from these)
 # Plain bash, no dependencies beyond node (for the syntax check).
 set -e
 cd "$(dirname "$0")"
 MANIFEST="${1:-src/manifest.txt}"
 SHELL_HTML=""; OUT=""; TITLE=""; ITEMS=(); STYLES=(); SCOPE=""
 
-# ITEMS holds f:<file>, o:<scope name> (open a scope) and c:<exports file> (close it)
+# ITEMS holds f:<file>, t:<NAME>=<file> (a text constant), o:<scope name> (open a scope) and c:<exports file> (close it)
 read_manifest() {
-  local m="$1" line kw arg sn sm se
+  local m="$1" line kw arg sn sm se tn tf
   [ -f "$m" ] || { echo "Manifest not found: $m" >&2; exit 1; }
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line%%#*}"                                   # strip comments
@@ -42,6 +45,10 @@ read_manifest() {
                [ -z "$SCOPE" ] || { echo "Scopes do not nest ($sn inside $SCOPE) in $m" >&2; exit 1; }
                [ -f "$se" ] || { echo "Missing exports file in $m: $se" >&2; exit 1; }
                SCOPE="$sn"; ITEMS+=("o:$sn"); read_manifest "$sm"; ITEMS+=("c:$se"); SCOPE="" ;;
+      text)    read -r tn tf <<< "$arg"
+               [[ "$tn" =~ ^[A-Za-z_\$][A-Za-z0-9_\$]*$ ]] || { echo "Bad text name in $m: $tn" >&2; exit 1; }
+               [ -f "$tf" ] || { echo "Missing text file in $m: $tf" >&2; exit 1; }
+               ITEMS+=("t:$tn=$tf") ;;
       *)       [ -f "$line" ] || { echo "Missing source file in $m: $line" >&2; exit 1; }
                ITEMS+=("f:$line") ;;
     esac
@@ -61,6 +68,8 @@ mkdir -p build "$(dirname "$OUT")"
 for it in "${ITEMS[@]}"; do
   case "$it" in
     f:*) cat "${it#f:}" >> "$JS"; cat "${it#f:}" >> "$NS" ;;
+    t:*) tn="${it#t:}"; tn="${tn%%=*}"
+         node -e 'const fs = require("fs"); process.stdout.write("const " + process.argv[1] + " = " + JSON.stringify(fs.readFileSync(process.argv[2], "utf8")).replace(/<\/(script)/gi, "<\\/$1") + ";\n")' "$tn" "${it#*=}" | tee -a "$JS" >> "$NS" ;;
     o:*) printf 'const %s = (function () {\n' "${it#o:}" | tee -a "$JS" >> "build/$NAME.global.js"
          NS="build/$NAME.scope-${it#o:}.js"; : > "$NS"; SPACES+=("$NS") ;;
     c:*) { printf '\n'; cat "${it#c:}"; printf '\n})();\n'; } >> "$JS"; NS="build/$NAME.global.js" ;;

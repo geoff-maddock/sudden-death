@@ -1,0 +1,7 @@
+# The Realm's diamond scope: ./build.sh src/realm/manifest.txt takes this through `scope wBD ...`.
+# The text lines carry Brimstone Diamond's stylesheet and page; d0-page.js mounts them in a shadow root and declares
+# the page names (document, window, localStorage…) its parts see, then the parts load as they are.
+text BDX_CSS src/bd/bd.css
+text BDX_SHELL src/bd/shell.html
+src/realm/diamond/d0-page.js
+include src/bd/manifest.txt

@@ -337,3 +337,13 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
   - **Focus:** closing the journal takes focus off the search box, so the world's keys work again.
 - **Help.** `#wHelpJournal`, at the end of `#wHelp`.
 - **Test:** `test/realm_journal.py`.
+
+## The diamond (w20-diamond.js and the wBD scope)
+
+Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js`, after `w19`. Nothing of it is global but `wBD`:
+
+- `wBD.start(opts)` starts a game on the field, skipping its setup menu (`opts` as its `newGame`: `{ mode: 'demo', team, opp, innings, diff }`). `wBD.G` is its game state (`G.phase === 'over'` at a final), and `wBD.simToEnd(quiet)` plays the rest of a game at once.
+- `wBD.show()` / `wBD.hide()` show it and park it (`wBD.on`); `showView('diamond')` calls them. Inside the scope, its window listeners, frame loop and timers do nothing while it is hidden.
+- `wBD.onOver` and `wBD.onQuit` are called at a final and when its End game sends it back to its menu.
+- In the diamond, Esc and P are its own Time out: `openPause` does nothing there.
+- `WD` is the game on the field (`{ opts, over, from }`); it is not saved yet (issue #4, phase 4).

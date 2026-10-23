@@ -195,3 +195,7 @@
 .wjq.done{opacity:.7}
 .wjbody h4{margin:6px 0 4px;font-family:var(--hud);font-weight:400;color:var(--dim)}
 @media (max-width:600px){.wjwins li{grid-template-columns:1fr}.wjk{justify-self:start}.wjp dl{grid-template-columns:1fr}.wjp dt{margin-top:4px}}
+
+/* w20: the diamond's bar */
+.wdbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
+.wdbar .hint{flex:1 1 180px;min-width:0}

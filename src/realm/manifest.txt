@@ -33,3 +33,7 @@ src/realm/w16-stats.js
 src/realm/w17-bonds.js
 src/realm/w18-league.js
 src/realm/w19-journal.js
+
+# Brimstone Diamond, the baseball game, in its own scope (issue #4): src/realm/diamond/manifest.txt
+scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js
+src/realm/w20-diamond.js
