@@ -281,3 +281,15 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **UI.** On the Lineup tab: a Talk button on each row (marked when they have something to say), the quest line, nicknames, and a Chemistry list of the starting pairs (and any good pair). Combo cards get their own section on the Deck tab. `#wHelpBonds` in `#wHelpTeam`.
 - **Bot.** `test/realm_lab.js` takes every quest on when offered and turns it in when the route passes the player's hometown; combo cards are picked at random. `{"quests": false}` turns quests off.
 - **Test:** `test/realm_bonds.py`.
+
+## The league and rivals who act (w18-league.js)
+
+`w18-league.js` loads after `w17-bonds.js` and changes earlier parts only by reassignment (`wW18` prefix). Epic #3, phase 3.
+
+- **The league.** `WG.league = { str, table, me, results, poached }`. Clubs: the distinct rival clubs in `WG.rivals` and `'apex'` (`wLeagueClubs`). Strength per club is rolled once (`W_LEAGUE.str`, Apex `apexStr`). The `wNewDay` wrapper plays a round every `W_LEAGUE.every` days (`wLeagueRound`: shuffle, pair; one sits out): the stronger club wins `str_a / (str_a + str_b)` of the time, with a score where the sport has a unit (`SPORT_UNIT`). The last `keep` results are posted. Your row (`me`) counts cup games and games against rival clubs (the `W_ON_END.cup` and `W_ON_END.event` wrappers). Rows sort by points (2 a win), then fewer losses.
+- **The inns.** Each tavern innkeeper answers TABLE (act `'league'`, `wOpenLeague`), mentions it in their greeting, and the room menu gets a League table button (`wOpenInn` wrapped).
+- **Bids.** After a win against a rival club, when the head to head has `W_LEAGUE.bidEvery` (2) more wins than at their last bid (`poached[club]`) and there is no grudge, a `{ t: 'bid', club, pid }` prompt bids for your best bench player at `W_LEAGUE.fee(lvl)`. Sell (`wBidSell`: `wRelease`, plus the fee) or refuse (`wBidRefuse`: `WG.grudge = { club, day: tomorrow, n }`). Closing the box counts as refusing. The bot refuses (`W_LEAGUE.labSell` to sell).
+- **Grudges.** The `wEncounterHook` wrapper: on the world map, no event open, no grace, from `WG.grudge.day`, a `W_LEAGUE.grudgeP` chance a step of `wGrudgeMatch()`: a `'rival'` match, one level up, `world: { kind: 'event', ref: { rival, grudge: 1 } }`, so the event rival's colours, head to head and memory line all apply. Either result ends the grudge; a win pays `W_LEAGUE.grudgeWin`.
+- **Taunts.** `wCupEnter` wrapped: entering a town cup whose rival (`wCupRival`) won your last meeting logs the captain's taunt and sets `WG.cup.revenge` and `WG.cup.taunt` (through `wCupPlay`, once the cup exists). Round 3 won against them pays `W_LEAGUE.revenge` on top of the prize. The pre-game card shows the taunt (round 1), the revenge (round 3) or the grudge (`.wtaunt`).
+- **Help.** `#wHelpLeague` in `#wHelpCups`.
+- **Test:** `test/realm_league.py`.

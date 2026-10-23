@@ -52,6 +52,7 @@ It is one self-contained file too: `dist/realm.html`. Open it in a browser. It k
 - **Play matches.** Wild teams in the long grass, road events, famous teams in dungeon rooms, and bosses in lairs. Team HP carries over; an inn heals it, or make camp in the wild with a Trail Ration, if you dare. The Stats tab on the Team screen keeps every player's numbers, by sport, for the journey and their career. Lose and you black out at your last inn (or, in Hardcore, the journey ends).
 - **Grow.** Players level up and bring cards. Talk to them from the Team screen: from level 2 each has a quest back home, worth a nickname and a Hall of Fame card. Players who start together build chemistry, and a strong pair earns a combo card. Cook meals for match day, spend energy at the enchanter, buy cards in three towns, and find gear and Hall of Fame legends in dungeon strongboxes.
 - **Settle.** Buy the old ground behind any inn and its region is home: your crowd at every match there, free beds, and stands, a training pitch, a kitchen and a scout's office to build.
+- **Rivals.** Four rival clubs and Apex Athletic play their own league while you travel; every inn posts the table. Beat a rival twice and they bid for one of your bench players: sell, or refuse and meet them in a grudge match on the road.
 - **Win.** Take the four regional cups, then the Crown at the Coliseum in championship week.
 
 How to play inside the game explains every system, with the current numbers.

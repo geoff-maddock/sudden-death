@@ -189,6 +189,8 @@ window.REALMLAB = function (opts = {}) {
     const town = TOWN[region];
     for (let i = 0; i < n && !RUN.over; i++) {
       prep(region);
+      // a grudge (a bench player the bot would not sell) turns up on the road: the bot plays it on its next wild stop
+      if (WG.grudge && WG.dayAbs >= WG.grudge.day) { atWorld(town, false); play(() => wGrudgeMatch(region), 'grudge'); prep(region); if (RUN.over) break; }
       atWorld(town, Math.random() < (opts.night != null ? opts.night : .25));
       play(() => wWildMatch(region), 'wild ' + region);
     }
@@ -269,6 +271,7 @@ window.REALMLAB = function (opts = {}) {
   }
   if (!log.result) log.result = wFlag('champion') ? 'champion' : 'stuck';
   log.ground = WG.ground ? { town: WG.ground.town, parts: WG.ground.parts } : null;
+  log.grudges = log.matches.filter(m => m.what === 'grudge').length;
   log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;
   return log;

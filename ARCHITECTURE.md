@@ -158,6 +158,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w15-camp.js` | Camping out in the wild: a Trail Ration for a night's rest, and the risk of being caught asleep. |
 | `w16-stats.js` | Player stats: a Stats tab on the Team screen with each player's numbers for the journey or their career, by sport, and their last games. |
 | `w17-bonds.js` | Hometowns and personal quests (talk to a player: a nickname and their kind's Hall of Fame card), and chemistry between starters (a strong pair's combo card). |
+| `w18-league.js` | The league table (rivals and Apex play rounds while you travel; inns post it) and rivals who act: bids for bench players, grudge matches on the road, cup taunts and revenge. |
 
 ### The match seam
 

@@ -31,3 +31,4 @@ src/realm/w14-ground.js
 src/realm/w15-camp.js
 src/realm/w16-stats.js
 src/realm/w17-bonds.js
+src/realm/w18-league.js

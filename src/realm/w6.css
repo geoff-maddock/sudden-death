@@ -139,3 +139,16 @@
 .wchn small{color:var(--dim);font-size:14px}
 .wbondb .wbps img{width:56px;height:56px}
 @media (max-width:600px){.wchem li{grid-template-columns:auto minmax(0,1fr)}.wchem .wxp{grid-column:1/-1}}
+/* w18: the league table, taunts, grudges */
+.wlg{width:100%;border-collapse:collapse;font-family:var(--hud);font-size:18px}
+.wlg th,.wlg td{padding:4px 6px;border-top:1px solid var(--seam);text-align:right;white-space:nowrap}
+.wlg thead th{border-top:0;color:var(--dim);font-size:16px;font-weight:400}
+.wlg tbody th{text-align:left;font-weight:400;white-space:normal}
+.wlg thead th:nth-child(2){text-align:left}
+.wlg tbody th i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+.wlg tr.wme{background:var(--stone2)}
+.wlg tr.wme th{color:var(--torch)}
+.wlg small{color:var(--dim);font-size:14px}
+.wlgres{margin:0;padding-left:18px;font-size:16px;line-height:1.4}
+.wlgres small{color:var(--faint);font-family:var(--hud);margin-right:6px}
+.wtaunt{margin:0 0 6px;padding:6px 10px;border-left:3px solid #e05a4a;background:rgba(224,90,74,.08);font-size:15px}

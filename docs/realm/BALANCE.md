@@ -174,3 +174,14 @@ The bot takes every quest on when offered and turns it in only when the route pa
 - **Each alone is neutral**, within the noise. Together the measured lift is about 5 to 8 points, but identical settings varied by about 9 points between batches here, so treat the size as rough.
 - **Raising the threshold to 16 did not cut the combo cards** (3.3 a journey), so it is not the lever; the strong pair stays at 12.
 - **The cap (Geoff's call):** a team holds 2 combo cards at most (`W_BOND.maxCombos`). With it: 67.9% and 76.4% (pooled 72.1%, 280 runs), against 67.1% with neither. The noise between identical batches is as large as the effect, so all we can say is that quests and chemistry together add a few points at most.
+
+## The league and rivals who act (epic 2, phase 3)
+
+The bot refuses every bid (keeping the player) and plays the grudge on its next wild stop; it never sees a taunt it can act on, but takes the revenge gold when it wins round 3.
+
+| 140 runs each, skilled bot with meals | Champion | Grudge matches a journey |
+|---|---|---|
+| Batch 1 | 67.1% | 0.49 |
+| Batch 2 | 75.0% | 0.58 |
+
+- **Pooled:** 71.1% (280 runs), against 72.1% before this phase: neutral. Bids come rarely (a rival must lose to you twice, and you need a bench), so about one journey in two sees a grudge match.
