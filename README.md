@@ -53,6 +53,7 @@ It is one self-contained file too: `dist/realm.html`. Open it in a browser. It k
 - **Grow.** Players level up and bring cards. Talk to them from the Team screen: from level 2 each has a quest back home, worth a nickname and a Hall of Fame card. Players who start together build chemistry, and a strong pair earns a combo card. Cook meals for match day, spend energy at the enchanter, buy cards in three towns, and find gear and Hall of Fame legends in dungeon strongboxes.
 - **Settle.** Buy the old ground behind any inn and its region is home: your crowd at every match there, free beds, and stands, a training pitch, a kitchen and a scout's office to build.
 - **Rivals.** Four rival clubs and Apex Athletic play their own league while you travel; every inn posts the table. Beat a rival twice and they bid for one of your bench players: sell, or refuse and meet them in a grudge match on the road.
+- **The journal** (`J`). Everyone you've talked to and what they told you, every place you've been (with the rules of cups, dungeons, lairs and your home ground), your big wins, and your quests. Filter by an active quest or by a keyword you've learned.
 - **Win.** Take the four regional cups, then the Crown at the Coliseum in championship week.
 
 How to play inside the game explains every system, with the current numbers.

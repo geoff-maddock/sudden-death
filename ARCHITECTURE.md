@@ -159,6 +159,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w16-stats.js` | Player stats: a Stats tab on the Team screen with each player's numbers for the journey or their career, by sport, and their last games. |
 | `w17-bonds.js` | Hometowns and personal quests (talk to a player: a nickname and their kind's Hall of Fame card), and chemistry between starters (a strong pair's combo card). |
 | `w18-league.js` | The league table (rivals and Apex play rounds while you travel; inns post it) and rivals who act: bids for bench players, grudge matches on the road, cup taunts and revenge. |
+| `w19-journal.js` | The journal (`J`): people you've talked to and what they said, places by region with their rules, big victories, quests; filters by active quest, learned keyword and search. |
 
 ### Brimstone Diamond (`src/bd/`)
 

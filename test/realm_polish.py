@@ -160,7 +160,7 @@ async def help_page(pg):
         bad: (s.textContent.match(re) || [])[0] || null, trophy: /sometimes a trophy/i.test(document.getElementById('pg-help').textContent),
         descent: [...document.querySelectorAll('#pg-help h3')].some(x => x.textContent === 'The descent'),
         text: s.textContent, fee: W_CUP.fee, renown: Math.round(W_RENOWN.hpPer * 100), lv: W_ROAD.maxLv, hp: W_PARTY.hpPerLvl, maxLvl: W_PARTY.maxLvl }}; }})()""")
-    want = ['Getting around', 'Matches', 'Your team', 'Towns', 'Your home ground', 'The road', 'Dungeons and lairs', 'Cups, rivals and the Crown', 'Renown and trophies', 'The bag, music and medals']
+    want = ['Getting around', 'Matches', 'Your team', 'Towns', 'Your home ground', 'The road', 'Dungeons and lairs', 'Cups, rivals and the Crown', 'Renown and trophies', 'The bag, music and medals', 'The journal']
     check(h['h4'] == want, 'How to play: the realm sections, in journey order', h['h4'])
     check(not h['ids'] and h['order'], 'every section keeps its id, in order', h['ids'])
     check(not h['bad'] and not h['trophy'] and not h['descent'], 'no leftovers, no "sometimes a trophy", and no act map section', [h['bad'], h['trophy'], h['descent']])

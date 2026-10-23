@@ -170,14 +170,18 @@ async def main():
 
         # ---------- post-game recruit (forced roll) ----------
         # another starter may have levelled up in the same match: their pick comes first
-        for _ in range(4):
-            if not await pg.evaluate("!!WG.cardOffer && !document.getElementById('wSign')"): break
+        # (the next pick surfaces from the prompt queue a moment after the last one closes, so keep looking until the
+        # recruit box itself is up)
+        for _ in range(6):
+            # (a closed box keeps its buttons, hidden: only an open box counts)
+            up = "!document.getElementById('modal').hidden && "
+            try: await pg.wait_for_function(f"{up}(!!document.getElementById('wSign') || !!document.querySelector('#modalBox [data-wco]'))", timeout=5000)
+            except Exception: break
+            if await pg.evaluate("!!document.getElementById('wSign')"): break
             await pg.click('#modalBox [data-wco="0"]')
-            try: await pg.wait_for_function("!WG.cardOffer || !!document.getElementById('wSign')", timeout=5000)
+            try: await pg.wait_for_function(f"document.getElementById('modal').hidden || !!document.getElementById('wSign') || !document.querySelector('#modalBox [data-wco]')", timeout=5000)
             except Exception: pass
-        try: await pg.wait_for_selector('#wSign', timeout=5000)
-        except Exception: pass
-        rc = await pg.evaluate("({ open: !!document.getElementById('wSign'), sig: !!document.querySelector('#modalBox .wrecsig .card'), img: !!document.querySelector('#modalBox .wrecport'), text: document.getElementById('modalBox').textContent.slice(0, 160) })")
+        rc = await pg.evaluate("({ open: !!document.getElementById('wSign'), sig: !!document.querySelector('#modalBox .wrecsig .card'), img: !!document.querySelector('#modalBox .wrecport'), text: document.getElementById('modalBox').textContent.slice(0, 160), hidden: document.getElementById('modal').hidden, prompts: WG.wprompts, offer: !!WG.cardOffer, view: UI.view, recruit: WG.recruit || null, active: wActive() })")
         check(rc['open'] and rc['sig'] and rc['img'], 'after the win, a beaten player asks to join (portrait, signature card)', rc)
         await pg.screenshot(path='/tmp/realm-party-recruit.png')
         n0 = await pg.evaluate('WG.roster.length')

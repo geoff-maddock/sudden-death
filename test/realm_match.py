@@ -139,8 +139,11 @@ async def main():
             if pend['offer']:
                 check(pend['shown'], f'[{tag}] a card pick from the lost match shows again after you get up', pend)
                 await pg.click('#modalBox [data-close]'); await pg.wait_for_timeout(200)
-                while await pg.evaluate("!!WG.cardOffer || !document.getElementById('modal').hidden"):
-                    await pg.evaluate("document.querySelectorAll('#modalBox [data-close]').forEach(b => b.click())"); await pg.wait_for_timeout(200)
+                for _ in range(30):
+                    if not await pg.evaluate("!!WG.cardOffer || !document.getElementById('modal').hidden"): break
+                    await pg.evaluate("document.querySelectorAll('#modalBox [data-close], #modalBox #wPass').forEach(b => b.click())"); await pg.wait_for_timeout(200)
+                left = await pg.evaluate("({ offer: !!WG.cardOffer, open: !document.getElementById('modal').hidden, head: (document.querySelector('#modalBox header') || {}).textContent || '', closes: document.querySelectorAll('#modalBox [data-close]').length })")
+                check(not left['offer'] and not left['open'], f'[{tag}] the level-up picks can all be put off', left)
             if not desk:
                 await ctx.close(); continue
 
@@ -194,10 +197,11 @@ async def main():
             check(rars and all(r == 'u' for r in rars), 'the shrine strongbox offers uncommons', rars)
             await pg.click('#modalBox [data-close]'); await pg.wait_for_timeout(200)
             check(await pg.evaluate('RUN.deck.length') == d0 + 1 and await pg.evaluate('WG.cardOffer') is None, 'Skip takes nothing')
+            pr0 = await pg.evaluate("RUN.deck.filter(c => c.id === 'pickroll').length")  # the strongbox pick may have been one
             await pg.evaluate("wSay('clerk', 'licence'); wDrain()")
-            check(await pg.evaluate("RUN.deck.filter(c => c.id === 'pickroll').length") == 1 and await pg.evaluate('RUN.deck.length') == d0 + 2, "Imelda's licence topic pays Pick and Roll")
+            check(await pg.evaluate("RUN.deck.filter(c => c.id === 'pickroll').length") == pr0 + 1 and await pg.evaluate('RUN.deck.length') == d0 + 2, "Imelda's licence topic pays Pick and Roll")
             await pg.evaluate("wSay('clerk', 'licence')")
-            check(await pg.evaluate("RUN.deck.filter(c => c.id === 'pickroll').length") == 1, 'asking again does not pay twice')
+            check(await pg.evaluate("RUN.deck.filter(c => c.id === 'pickroll').length") == pr0 + 1, 'asking again does not pay twice')
             deck = await pg.evaluate('RUN.deck.map(c => c.uid + c.id).join()')
             await pg.reload(); await pg.wait_for_timeout(800)
             await pg.click('#bResume'); await pg.wait_for_timeout(500)

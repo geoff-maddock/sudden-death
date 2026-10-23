@@ -293,3 +293,47 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 - **Taunts.** `wCupEnter` wrapped: entering a town cup whose rival (`wCupRival`) won your last meeting logs the captain's taunt and sets `WG.cup.revenge` and `WG.cup.taunt` (through `wCupPlay`, once the cup exists). Round 3 won against them pays `W_LEAGUE.revenge` on top of the prize. The pre-game card shows the taunt (round 1), the revenge (round 3) or the grudge (`.wtaunt`).
 - **Help.** `#wHelpLeague` in `#wHelpCups`.
 - **Test:** `test/realm_league.py`.
+
+## The journal (w19-journal.js)
+
+`w19-journal.js` loads after `w18-league.js` and changes earlier parts only by reassignment (`wW19` prefix).
+
+- **State.** `WG.journal = { people, places, wins, words, quests }`. Each record carries a stamp, `{ a: dayAbs, y, d, where }`.
+  - `people[id]`: `{ n, at, last, said: { topic: text } }`. `'greet'` holds the hello. Your own players are `p:<pid>`.
+  - `places[id]`: `{ at, last }`, keyed by `DB.locs` id. Regions are stored as `'r:<region>'`.
+  - `wins`: entries `{ at, where, k, t, opp, sport, score }`, oldest first. The list is capped at `W_JOURNAL.wins`.
+  - `words[WORD]`: `{ who, n, at }`, recording who said the word first.
+  - `quests[sideplot id]`: the stamp of when that side quest became active.
+- **Older saves.** `wJ()` builds a journal on first use from what the save already holds. Its stamps are `{ old: 1 }`, shown as "before this journal".
+  - **Places:** from the `seen_` flags, the current map, and lairs whose alpha is beaten.
+  - **Victories:** cup titles from `WG.cupLog`, and bosses from the `alpha_` flags.
+- **People and words.** The `wSay` wrapper records every answered line.
+  - Unanswered words and `name` add nothing.
+  - A CAPITALISED word (3+ letters) is learned when some character answers to it, using `wFindTopic`'s rule over `DB.chars`.
+  - `W_JOURNAL.plain` lists the words that are never learned: `JOB`, `NAME`, `BYE`, `YES` and `HOME`.
+- **Quests.** A side quest goes active when one of its givers says one of its hint's CAPITALISED words, or answers a topic matching one.
+  - **Givers:** `wJGivers` takes the `DB.chars` entries whose name appears in the quest's `who`, by full name or by first and last word.
+  - **Done:** a quest is done when its flag is set.
+  - **Players' quests:** your players' quests (`p.pq`) are listed as well.
+- **Places.** These wrappers record places:
+  - `wEnterMap`: towns, dungeons, sites, and the region on return to the world;
+  - `wAmbient`: the region as you cross it;
+  - `wEncounterHook`: a lair, when `info.kind === 'lair'`.
+- **Rules.** `wJRules(locId)` writes the Rules box from the game's own tables, so it stays true if a number changes:
+  - town cups and the Crown use `DB.cups` and `W_CUP`;
+  - dungeons use `DB.dungeons`, `wDungeonRooms`, `W_GATE` and `DB.chests`;
+  - lairs use `DB.alphas` and `W_GATE`;
+  - the home ground uses `W_GROUND`.
+- **Victories.** The `wDispatchEnd` wrapper records only wins:
+  - a `cup` round, plus a title when round 3 sets the cup's flag;
+  - an `alpha` or `lair` boss;
+  - an `event` against a rival club, as either a grudge match or a rival win.
+  
+  Wild matches are not recorded. Each entry's score comes from the last `RUN.games` entry, through `gameScore`.
+- **UI.** `wOpenJournal(tab)` opens the journal. It is reached from the Journal button beside Team (`#wJournalBtn`) or the `J` key.
+  - **Tabs:** People, Places, Victories and Quests, each with a count.
+  - **Filters:** `WJ.quest`, `WJ.word` and `WJ.q` are combined with AND (`wJPass`).
+  - **Keyword links:** a learned CAPITALISED word in the journal links to the keyword filter.
+  - **Focus:** closing the journal takes focus off the search box, so the world's keys work again.
+- **Help.** `#wHelpJournal`, at the end of `#wHelp`.
+- **Test:** `test/realm_journal.py`.
