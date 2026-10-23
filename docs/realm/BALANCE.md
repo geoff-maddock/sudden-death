@@ -172,4 +172,5 @@ The bot takes every quest on when offered and turns it in only when the route pa
 
 - **Pooled:** 67.1% with neither (280 runs), 75.5% with both (560 runs, either threshold).
 - **Each alone is neutral**, within the noise. Together the measured lift is about 5 to 8 points, but identical settings varied by about 9 points between batches here, so treat the size as rough.
-- **Raising the threshold to 16 did not cut the combo cards** (3.3 a journey), so it is not the lever; the strong pair stays at 12. If the realm needs pulling back, cap combo cards per team rather than slowing chemistry.
+- **Raising the threshold to 16 did not cut the combo cards** (3.3 a journey), so it is not the lever; the strong pair stays at 12.
+- **The cap (Geoff's call):** a team holds 2 combo cards at most (`W_BOND.maxCombos`). With it: 67.9% and 76.4% (pooled 72.1%, 280 runs), against 67.1% with neither. The noise between identical batches is as large as the effect, so all we can say is that quests and chemistry together add a few points at most.

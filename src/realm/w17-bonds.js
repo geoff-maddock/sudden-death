@@ -12,7 +12,8 @@
    p.nick   a nickname, once the quest is done (p.n never changes: careers are keyed by it)
 
    Bonds. Two players who start a match together build chemistry: 2 points for a win, 1 for a loss (WG.bonds).
-   At W_BOND.strong points the pair is strong and picks a combo card. A combo card (c.wb = [pid, pid]) belongs to
+   At W_BOND.strong points the pair is strong and picks a combo card, while the team holds fewer than
+   W_BOND.maxCombos (a pair that waited picks after its next match together, once a place opens). A combo card (c.wb = [pid, pid]) belongs to
    both of them and plays only when both start; release either and it goes.
 
    WG.bonds  { 'a-b' (lower id first): { n, combo } }   combo: true once the pair has been offered its card
@@ -27,6 +28,7 @@
 const W_BOND = {
   questLvl: 2,        // a player tells you about home from this level
   good: 4, strong: 12, // chemistry points: a win together is 2, a loss 1
+  maxCombos: 2,        // combo cards a team can hold (uncapped, the bot's 3.5 a journey made the realm 5-8 points easier)
 };
 
 /* ---------- combo cards: kind 'any', rarity 'b', so no reward, shop or library pool ever offers them ---------- */
@@ -181,13 +183,17 @@ function wBondTick(starters, r) {
     const a = starters[i], b = starters[j], k = wBondKey(a.id, b.id);
     const B0 = WG.bonds[k] = WG.bonds[k] || { n: 0, combo: false };
     const was = B0.n; B0.n += r === 'win' ? 2 : 1;
-    if (was < W_BOND.strong && B0.n >= W_BOND.strong && !B0.combo) {
+    // a strong pair picks a card while the team has room for one; a pair that waited picks once a place opens
+    if (B0.n >= W_BOND.strong && !B0.combo && wComboRoom() > 0) {
       B0.combo = true;
       wLog(`${a.n} and ${b.n} play like one player now. They have a combo card for you.`, 'g');
       WG.wprompts.push({ t: 'bond', a: a.id, b: b.id });
-    } else if (was < W_BOND.good && B0.n >= W_BOND.good) wLog(`${a.n} and ${b.n} are getting the hang of each other.`, 'm');
+    } else if (was < W_BOND.strong && B0.n >= W_BOND.strong) wLog(`${a.n} and ${b.n} play like one player now, but the team already has ${W_BOND.maxCombos} combo cards.`, 'm');
+    else if (was < W_BOND.good && B0.n >= W_BOND.good) wLog(`${a.n} and ${b.n} are getting the hang of each other.`, 'm');
   }
 }
+/* room for another combo card: the cap, less the cards held and the offers waiting */
+function wComboRoom() { return W_BOND.maxCombos - wComboCards().length - ((WG && WG.wprompts) || []).filter(P => P.t === 'bond').length - (WG && WG.cardOffer && WG.cardOffer.bond ? 1 : 0); }
 /* the combo cards a pair owns */
 function wComboCards(pid) { return wAllCards().filter(c => c.wb && (pid == null || c.wb.includes(pid))); }
 function wComboOn(c) { return !c.wb || c.wb.every(wIsStarter); }
@@ -336,5 +342,5 @@ renderHelp = function () {
   wW17RenderHelp();
   const team = $('wHelpTeam'); if (!team || $('wHelpBonds')) return;
   team.insertAdjacentHTML('beforeend', `<div id="wHelpBonds"><p class="hint"><b>Hometowns and quests.</b> Every player comes from one of the five towns. Talk to them from the Team screen. From level ${W_BOND.questLvl}, ask about HOME and they tell you what they want to do there; say YES and it is their quest. When it is done, take them home and talk to them there. They earn a nickname and their kind's Hall of Fame card, upgraded, as their own signature card.</p>
-    <p class="hint"><b>Chemistry.</b> Two players who start a match together build chemistry: more for a win than a loss. A strong pair picks a combo card. It belongs to both of them and plays only when both start. Release either one and it goes.</p></div>`);
+    <p class="hint"><b>Chemistry.</b> Two players who start a match together build chemistry: more for a win than a loss. A strong pair picks a combo card, up to ${W_BOND.maxCombos} for the team. It belongs to both of them and plays only when both start. Release either one and it goes, and another strong pair can pick one.</p></div>`);
 };

@@ -134,6 +134,12 @@ async def main():
                 rl = await pg.evaluate("""(() => { const c = wComboCards()[0], pid = c.wb.find(id => !wIsStarter(id)); const why = wRelease(pid);
                   return { why, left: wComboCards().length, bonds: Object.keys(WG.bonds).filter(k => k.split('-').map(Number).includes(pid)).length }; })()""")
                 check(rl['why'] == '' and rl['left'] == 0 and rl['bonds'] == 0, 'release one of the pair and the combo card and their chemistry go', rl)
+                cap = await pg.evaluate("""(() => { const st = wStarters(), k = wBondKey(st[0].id, st[1].id); WG.wprompts = [];
+                  for (let i = 0; i < W_BOND.maxCombos; i++) RUN.deck.push(Object.assign(mkCard('wb_cover'), { wb: [st[1].id, st[2].id] }));
+                  WG.bonds[k] = { n: 11, combo: false }; wBondTick(st, 'win'); const full = WG.wprompts.filter(P => P.t === 'bond').length;
+                  const c = wComboCards()[0]; RUN.deck = RUN.deck.filter(x => x !== c); wBondTick(st, 'win'); const room = WG.wprompts.filter(P => P.t === 'bond').length;
+                  WG.wprompts = []; RUN.deck = RUN.deck.filter(x => !x.wb); return { full, room, max: W_BOND.maxCombos }; })()""")
+                check(cap['max'] == 2 and cap['full'] == 0 and cap['room'] == 1, 'a team holds 2 combo cards at most; a strong pair that waited picks once a place opens', cap)
                 saved = await pg.evaluate("(() => { wSave(); const s = JSON.parse(localStorage.getItem(pkey('sd-realm'))); return !!(s && s.WG && s.WG.bonds && s.WG.roster.some(p => p.nick)); })()")
                 check(saved, 'nicknames and chemistry are saved with the journey')
                 await pg.evaluate("renderHelp()")
