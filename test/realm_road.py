@@ -36,7 +36,8 @@ window.__wend = function () { consumeFx(); renderFightHUD(); finishFight(); };
 window.__wspot = function (rg, far) { const m = MAPS.world, hq = DB.locs.find(l => l.id === 'graftonbury'); let best = null, bd = far ? -1 : 1e9;
   for (let y = 2; y < m.h - 2; y++) for (let x = 2; x < m.w - 2; x++) { if (regionAt(x, y) !== rg) continue; const c = wTileAt(m, x, y), td = DB.tiles[c]; if (!(td && td.walk && !td.enter && c !== "=" && c !== "b")) continue;
     const d = Math.hypot(x - hq.x, y - hq.y); if (far ? d > bd : d < bd) { bd = d; best = [x, y]; } } return best; };
-window.__go = function (rg, far, hour) { const p = __wspot(rg, far); wEnterMap('world', p[0], p[1]); WG.min = (hour == null ? 12 : hour) * 60; WG.grace = 0; wDrain(); return p; };
+// a level-up pick left open from the matches above would come back over every event card: these checks are about events
+window.__go = function (rg, far, hour) { WG.cardOffer = null; WG.wprompts = []; if (typeof WBALL !== 'undefined') WBALL.buried = null; const p = __wspot(rg, far); wEnterMap('world', p[0], p[1]); WG.min = (hour == null ? 12 : hour) * 60; WG.grace = 0; wDrain(); return p; };
 window.__snap = function () { return { gold: RUN.gold, fans: RUN.fans || 0, items: Object.assign({}, WG.items), en: Object.values(WG.energy).reduce((a, b) => a + b, 0),
   pantry: Object.assign({}, WG.pantry || {}), charm: WG.charm || null, hp: RUN.hp, min: WG.dayAbs * 1440 + WG.min, sk: RUN.deck.filter(c => c.sk).length, up: RUN.deck.filter(c => c.up).length }; };
 // did a choice do what its data says? returns a list of problems

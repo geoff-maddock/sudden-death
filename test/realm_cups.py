@@ -63,10 +63,14 @@ async def modal_text(pg):
 
 async def clear_prompts(pg):
     # level-up picks, recruits and prize cards queue up after wins; settle them so the next thing is the cup's
-    await pg.evaluate("WG.wprompts = []; WG.cardOffer = null")
-    if not await pg.evaluate("document.getElementById('modal').hidden"):
+    # closing one panel can raise the next: a queued prompt (closed too), or the next round's card (left up for
+    # next_round). Stop at the cup's card or when nothing is left.
+    for _ in range(8):
+        await pg.evaluate("WG.wprompts = []; WG.cardOffer = null")
+        if await pg.evaluate("document.getElementById('modal').hidden || !!document.getElementById('wPlay')"): break
         await pg.evaluate("(document.querySelector('#modalBox [data-close]') || document.querySelector('#modalBox #wWake') || document.querySelector('#modalBox #wNotYet') || document.getElementById('modal')).click()")
-        await pg.wait_for_function("document.getElementById('modal').hidden", timeout=T)
+        await pg.wait_for_timeout(50)
+    await pg.wait_for_function("document.getElementById('modal').hidden || !!document.getElementById('wPlay')", timeout=T)
     await pg.evaluate("WG.wprompts = []; WG.cardOffer = null")
 
 async def play_card(pg):

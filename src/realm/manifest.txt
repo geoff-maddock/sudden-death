@@ -40,3 +40,4 @@ src/realm/w20-diamond.js
 src/realm/w20b-ratings.js
 src/realm/w20c-nine.js
 src/realm/w20d-ballgame.js
+src/realm/w20e-dcup.js

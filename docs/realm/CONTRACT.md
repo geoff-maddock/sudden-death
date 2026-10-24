@@ -376,3 +376,14 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Leaving.** Save and leave keeps `WG.ball.live`; a reload asks once (`wNextPrompt`), and the Nine tab has Resume the game. Concede is a loss. Brimstone Diamond's End game (don't save) calls the game off: no result, and the club can play you again that day.
 - **Where.** Play a game on the Nine tab, and Host a ball game (you're the home side) at your home ground. Epic #6 adds ballparks to the world.
 - **Stats.** The Stats tab's Baseball view (G, AB, H, HR, RBI, AVG, SB, IP, ERA, K) and a box line on each player's Baseball block.
+- **Card picks.** `modal` (wrapped, `wSdModal`) notes a card pick it opens on top of, and that pick comes back once the world is free (`wNextPrompt`), so it never holds up the prompts after it.
+
+## The Diamond Cup (w20e-dcup.js)
+
+- **Entry.** Ask the League clerk about the DIAMOND cup (act `dcup`), or the Diamond Cup button on the Nine tab. `W_DCUP.fee` (40) gold, the ball game rules (5 players of your own), and one cup a week (`wWeek()`), whether you finish it or not.
+- **The field.** Eight nines: you first, then up to four rival clubs and the regions' nines (`wild:<region>`), drawn at random. The pairings of each round are the previous round's winners in order, two by two (`wDcupPairs(r)`).
+- **Rounds.** `W_DCUP.tiers` = 1, 2, 3 for the quarter-final, semi-final and final: CPU skill Squire, Knight, Archmage, and the other nine one level higher each round. Your game is a ball game (`wStartBall` with `kind: 'dcup'`, `cup: true`, so the once-a-day rule doesn't apply) and pays as one.
+- **The rest of the round.** `W_ON_END.dcup` records your result and sets `pending`; `wDcupCatchUp()` simulates the other games (`wBD.sim`, both sides on the CPU) once you're back in the world, never inside the engine's final. Out of the cup, the rest of the bracket is played to a champion.
+- **State.** `WG.dcup = { week, field, round, games: [[{ a, b, ra, rb, w }]], pending, show, out, done, champ }`, plain JSON. `WG.dcupWins` and `WG.dcupLog` count the cups won.
+- **The prize.** `W_DCUP.prize`: 150 gold, 20 fans, a pick of 3 baseball cards (`wSportPool(['baseball'])`), a journal win and a line on the Wall of Awards. The prize pick shows before the bracket.
+- **Tests.** `W_DCUP.force` (`'win'` | `'lose'`) settles your next cup game that way.

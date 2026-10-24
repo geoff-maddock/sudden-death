@@ -165,6 +165,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w20b-ratings.js` | Baseball ratings: every player's `p.bd` (position, hand, POW/CON/SPD/ARM/FLD 1–12, powers, pitches), seeded from their kind's Brimstone Diamond player, a point per level; a Baseball block on the Stats page. |
 | `w20c-nine.js` | The baseball nine (`WG.nine`): batting order and positions, call-ups at your level for the spots your roster can't fill, `wNineDef()` for the diamond; a Nine tab on the Team screen. |
 | `w20d-ballgame.js` | Ball games from the world (`WG.ball`): Play, Manage or Simulate against the local nine or a rival once you have 5 players, XP, gold, fans, head to head and box scores (`WG.bstats`), save and resume mid-game, a Baseball view on the Stats tab. |
+| `w20e-dcup.js` | The Diamond Cup (`WG.dcup`): baseball's weekly 8-nine bracket, entered through the League clerk (DIAMOND) or the Nine tab; you play your games, the rest are simulated on the engine; prizes, the journal and the Wall of Awards. |
 
 ### Brimstone Diamond (`src/bd/`)
 

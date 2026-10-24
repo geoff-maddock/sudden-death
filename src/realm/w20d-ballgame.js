@@ -10,10 +10,13 @@
              world = { kind: 'ball', ref, club, tier, home, how, day }, plain data; the end dispatches W_ON_END[kind]
              snap = Brimstone Diamond's own snapshot (plain JSON); opp caches each club's nine at the level it was made
    WG.bstats { pid: Brimstone Diamond box line, plus bg (games) }, this journey
+   clubs     a rival's id, 'local' (the region you're in) or 'wild:<region>' (that region's nine)
    wBallProblems()           what stops your team playing a ball game, as sentences (empty when it can)
-   wStartBall({ club, how, home?, tier?, kind?, ref? })   '' when it started, or why not
+   wStartBall({ club, how, home?, tier?, kind?, ref?, cup? })   '' when it started, or why not; cup: true skips the
+                             once-a-day rule (a bracket says who plays whom)
    wResumeBall(), wBallLeave(), wBallConcede(), wOpenBallCard({ home? })
-   Wrapped: wDiamondOver and wLeaveDiamond (w20), wNextPrompt (a game waiting after a reload), wCampNine and
+   Wrapped: wDiamondOver and wLeaveDiamond (w20), wNextPrompt (a game waiting after a reload), modal (wSdModal: a card
+   pick it opens on top of comes back later), wCampNine and
    wRenderCamp (the Play buttons on the Nine tab), wOpenGround (Host a ball game), wCampStats and wStatsCard (the
    Baseball view and box lines), renderHelp (#wHelpBall). */
 
@@ -29,7 +32,7 @@ const W_BALL = {
 };
 const W_BALL_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
 const W_BALL_SKILL = ['Squire', 'Knight', 'Archmage'];
-const WBALL = { saved: 0, asked: false, msg: '' };
+const WBALL = { saved: 0, asked: false, msg: '', buried: null, later: 0 };
 
 function wBall() {
   const B = WG.ball = WG.ball || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0 };
@@ -44,12 +47,15 @@ function wBallProblems() {
 }
 // who you can play: the local nine of the region you're in, and your rival clubs
 function wBallClubs() { return ['local'].concat(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)); }
+// the local nine is the region you're in; 'wild:<region>' is that region's nine wherever you are (the Diamond Cup)
+function wBallRegion(club) { return club === 'local' ? wRegionHere() : String(club).startsWith('wild:') ? club.slice(5) : null; }
 function wBallTeam(club) {
-  if (club !== 'local') return CLUBS[club];
-  const w = W_WILD_TEAM[wRegionHere()] || W_WILD_TEAM.plains;
+  const rg = wBallRegion(club);
+  if (!rg) return CLUBS[club];
+  const w = W_WILD_TEAM[rg] || W_WILD_TEAM.plains;
   return { name: w.name, short: w.short, color: w.color, dark: tint(w.color, -.6), light: w.light, motto: '' };
 }
-function wBallName(club) { return club === 'local' ? 'the ' + wBallTeam(club).name : wTheClub(club); }
+function wBallName(club) { return wBallRegion(club) ? 'the ' + wBallTeam(club).name : wTheClub(club); }
 function wBallTier(club) { return Math.max(1, Math.min(3, wTierHere() + (club === 'local' ? 0 : 1))); }
 function wBallOppLvl(tier) { return Math.min(W_PARTY.maxLvl, wNineTier() + tier - 1); }
 /* a club's nine: a player at every position, its own kinds first, at your level plus the tier. Rivals keep the same
@@ -58,7 +64,7 @@ function wBallOpp(club, tier) {
   const B = wBall(), lvl = wBallOppLvl(tier), C = wBallTeam(club);
   const cached = club !== 'local' && B.opp[club];
   if (cached && cached.lvl === lvl) return JSON.parse(JSON.stringify(cached.def));
-  const own = club === 'local' ? (DB.regions[wRegionHere()] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
+  const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
   const used = new Set(), names = new Set();
   const mk = (pos, as) => {
     const ks = wBD.kindsAt(pos), kind = ks.find(k => own.includes(k) && !used.has(k)) || ks.find(k => !used.has(k)) || pick(ks);
@@ -80,14 +86,14 @@ function wStartBall(o) {
   const probs = wBallProblems(); if (probs.length) return probs.join(' ');
   const B = wBall(), club = o.club;
   if (B.live) return 'Finish the game you started first.';
-  if (club !== 'local' && !CLUBS[club]) return '';
-  if (B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you today. Come back tomorrow.`;
+  if (!wBallRegion(club) && !CLUBS[club]) return '';
+  if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you today. Come back tomorrow.`;
   const how = W_BALL_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club), home = !!o.home;
   const nine = wNineDef(), opp = wBallOpp(club, tier);
-  const world = { kind: o.kind || 'ball', ref: o.ref || null, club, tier, home, how, day: WG.dayAbs, name: opp.name };
+  const world = { kind: o.kind || 'ball', ref: o.ref || null, club, tier, home, how, day: WG.dayAbs, name: opp.name, cup: !!o.cup };
   const opts = { mode: how === 'sim' ? 'demo' : '1p', defs: home ? [opp, nine] : [nine, opp], humanSide: home ? 1 : 0,
     innings: W_BALL.innings, diff: W_BALL.diff[tier] != null ? W_BALL.diff[tier] : 1, rules: Object.assign({}, W_BALL.rules, { auto: how === 'manage' }) };
-  B.met[club] = WG.dayAbs;
+  if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
   WD = { opts, over: null, from: UI.view, ball: true };
   try {
@@ -96,7 +102,7 @@ function wStartBall(o) {
     wBD.start(opts);
   } catch (e) {
     // the game never got going: no game, and the club can play you today after all
-    console.error(e); B.live = null; delete B.met[club];
+    console.error(e); B.live = null; if (!o.cup) delete B.met[club];
     if (UI.view === 'diamond') wLeaveDiamond(); else WD = null;
     return 'The game could not start.';
   }
@@ -126,7 +132,7 @@ function wBallLeave() {
 // Brimstone Diamond's own End game (don't save): no result, and the club can play you again today
 function wBallCallOff(why) {
   const B = wBall(), L = B.live; if (!L) return;
-  B.live = null; delete B.met[L.world.club];
+  B.live = null; if (!L.world.cup) delete B.met[L.world.club];
   wLog(why || `The game against ${wBallName(L.world.club)} is called off. No result.`, 'd');
   wSave();
 }
@@ -192,7 +198,7 @@ function wBallSettle(r, us, them, box, inning) {
     RUN.gold += g; RUN.fans = (RUN.fans || 0) + f; pay = ` +${g} gold, +${f} fans.`;
   }
   // head to head, and the league table when it's a rival
-  if (W.club !== 'local') {
+  if (CLUBS[W.club]) {
     const H = wH2h(), h = H[W.club] = H[W.club] || { w: 0, l: 0 };
     if (win) h.w++; else h.l++;
     h.last = { r: win ? 'win' : 'lose', us, them, sport: 'baseball', day: WG.dayAbs };
@@ -202,6 +208,7 @@ function wBallSettle(r, us, them, box, inning) {
   B.games.length = Math.min(B.games.length, W_BALL.keep);
   wAdvance(W_BALL.minutes);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
+  W.us = us; W.them = them;
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   const who = mvp != null && wPlayer(mvp);
   const msg = `Final: ${win ? 'you win' : 'you lose'} ${us}–${them} against ${wBallName(W.club)}.${pay} ${bits.join('')}${win && who ? `, and +${W_BALL.mvpXp} for ${who.n}, player of the game` : ''}.`;
@@ -276,9 +283,24 @@ function wOpenBallCard(o) {
     if (r) { WBALL.msg = r; wOpenBallCard(o); }
   });
 }
+/* a card pick that another panel opened on top of (a click that closes one panel and opens the next, while closing it
+   raised the pick) comes back once the world is free, rather than holding up every prompt after it */
+const wSdModal = modal;
+modal = function (html, onClose) {
+  if (WG && WG.cardOffer && !$('modal').hidden && $('modalBox').querySelector('[data-wco]')) WBALL.buried = WG.cardOffer;
+  return wSdModal(html, onClose);
+};
 /* after a reload, a saved game is waiting: ask once */
 const wW20dNextPrompt = wNextPrompt;
 wNextPrompt = function () {
+  if (!LAB && WG && WBALL.buried) {
+    // a tick later, so whatever the click that freed the world opens next (a game, another panel) goes first
+    if (WG.cardOffer !== WBALL.buried) WBALL.buried = null;
+    else {
+      if (wActive() && !WBALL.later) WBALL.later = setTimeout(() => { WBALL.later = 0; if (WG && WBALL.buried && WG.cardOffer === WBALL.buried && wActive()) { WBALL.buried = null; wShowCardOffer(); } }, 0);
+      return true;
+    }
+  }
   if (!LAB && wBallLive() && !WBALL.asked && !WD && !WG.cardOffer && !WG.event && wActive()) {
     WBALL.asked = true;
     const L = WG.ball.live, sn = L.snap;
