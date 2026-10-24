@@ -185,3 +185,36 @@ The bot refuses every bid (keeping the player) and plays the grudge on its next 
 | Batch 2 | 75.0% | 0.58 |
 
 - **Pooled:** 71.1% (280 runs), against 72.1% before this phase: neutral. Bids come rarely (a rival must lose to you twice, and you need a bench), so about one journey in two sees a grudge match.
+
+## Baseball (issue #4, phase 6)
+
+`test/realm_diamond_lab.py` plays ball games and Diamond Cups on Brimstone Diamond's own engine, headless (`wBD.sim`, about 180 ms a game). Both sides are on the CPU at the same skill, so this measures **Simulate**: the result comes from the players' ratings, and a tier's CPU skill makes no difference to it. When you Play or Manage, you take the CPU's place on your side, and the CPU skill (Squire, Knight, Archmage by tier) is what you face.
+
+```bash
+python3 test/realm_diamond_lab.py 120                                  # 120 games at each level gap, and 120 cups
+python3 test/realm_diamond_lab.py 120 'W_BALL.oppBonus = { 1: 0, 2: 0, 3: 2 }'   # try a number: JS run in the page first
+```
+
+Part 1 plays a fresh five-player journey at level 3 against a rival's nine at that level plus a gap. Part 2 enters a Diamond Cup at level 3 and simulates every round.
+
+**What it found: levels barely move a ball game.** A level is one rating point on one of five ratings (1 to 12), as in Brimstone Diamond's seasons. Even three levels down, a nine wins about 41% of the time, so the cup's later rounds were no harder than the first. Ratings do matter, though:
+
+| The other nine has | Win rate at an even level (100–120 games) | Cups won by simulating |
+|---|---|---|
+| nothing extra (before the retune) | 49% | 16.7% |
+| +1 to every rating | 31% | 1% |
+| +2 to every rating | 15% | 1% |
+
+**The retune.** `W_BALL.oppBonus = { 1: 0, 2: 0, 3: 1 }`: at tier 3 (the outer regions' rivals, and the cup final), the other nine has +1 to every rating. The level step (their level is yours plus the tier minus 1) stays.
+
+| 120 games each | Before | After |
+|---|---|---|
+| tier 1 | 46% | 49% |
+| tier 2 | 54% | 56% |
+| tier 3 | 47% | 32% |
+| cup quarter-final (tier 1) | 47% | 52% |
+| cup semi-final (tier 2) | 59% | 63% |
+| cup final (tier 3) | 61% | 23% |
+| cups won | 16.7% | 7.5% |
+
+A simulated cup costs about 8 gold on average (the 40 gold fee against the 150 gold prize) and pays about 112 XP across the roster. With 120 games a cell, a rate is good to about ±9%. A player who plays the pitches beats Squire and Knight far more often than a coin flip; nobody has measured that yet.

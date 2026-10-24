@@ -26,6 +26,9 @@ const W_BALL = {
   // Brimstone Diamond's optional rules in the Realm: no injuries (nothing in the Realm heals them), no magic bats and
   // balls (the Realm's gear is cards), no pitch clock or brawls; stealing and the moon and stars stay on
   rules: { injuries: false, gear: false, clock: 0, brawl: false, steal: true, sky: true },
+  // the other nine's ratings, + this to each by tier. A level is one rating point, which hardly moves a game (bot,
+  // docs/realm/BALANCE.md): +1 to every rating takes an even game from about 50% to about 31% for your side
+  oppBonus: { 1: 0, 2: 0, 3: 1 },
   xp: 12, gold: 15, fans: 3,      // a win, times the tier
   lossShare: .25, benchShare: .5, mvpXp: 5,
   minutes: 150, keep: 10, saveMs: 15000
@@ -58,9 +61,14 @@ function wBallTeam(club) {
 function wBallName(club) { return wBallRegion(club) ? 'the ' + wBallTeam(club).name : wTheClub(club); }
 function wBallTier(club) { return Math.max(1, Math.min(3, wTierHere() + (club === 'local' ? 0 : 1))); }
 function wBallOppLvl(tier) { return Math.min(W_PARTY.maxLvl, wNineTier() + tier - 1); }
-/* a club's nine: a player at every position, its own kinds first, at your level plus the tier. Rivals keep the same
-   nine until it would be a different level; the local nine is new each time. */
+/* a club's nine: a player at every position, its own kinds first, at your level plus the tier, and W_BALL.oppBonus on
+   every rating. Rivals keep the same nine until it would be a different level; the local nine is new each time. */
 function wBallOpp(club, tier) {
+  const def = wBallOppBase(club, tier), k = W_BALL.oppBonus[tier] || 0;
+  if (k) for (const p of def.roster.concat(def.pen)) for (const s of wBD.stats) p[s] = Math.min(W_BDR.cap, p[s] + k);
+  return def;
+}
+function wBallOppBase(club, tier) {
   const B = wBall(), lvl = wBallOppLvl(tier), C = wBallTeam(club);
   const cached = club !== 'local' && B.opp[club];
   if (cached && cached.lvl === lvl) return JSON.parse(JSON.stringify(cached.def));
