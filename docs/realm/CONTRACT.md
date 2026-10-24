@@ -354,3 +354,12 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - Seeded by `wBD.rate(kind)`: the kind's player on Brimstone Diamond's two founding clubs (so the kind gives the position; kobolds and witches pitch), each stat moved by up to 1.
 - `lv` is the level the ratings have caught up to; `wBdOf(p)` catches them up, a point per level to a stat below 12, weighted by the kind's numbers (`wBD.templ(kind)`). `got` counts those points per stat.
 - `wMakePlayer`, `wGiveXp` and `wStart` call it, so recruits, level-ups, founders and older saves are all covered.
+
+## The nine (w20c-nine.js)
+
+- `WG.nine = { order: [{ id, pos }], cu: [call-ups], seq, add? }`. `order` is the batting order; `id` is a roster id (a number) or a call-up's `cid` (`'c<n>'`). Plain JSON, saved with `WG`.
+- A call-up is a `wMakePlayer` player (so it has `p.bd`) with `from: 'callup'` and a `cid` in place of an `id`. Call-ups play at `wNineTier()`, the roster's average level rounded down, and catch up when it rises. They are not on the roster and earn nothing.
+- `wNineSync()` keeps the nine whole: anyone who left is dropped, a position nobody holds gets a call-up, and players who joined since (`add`, set by the `wAddPlayer` wrapper) take a call-up's place, at their own position first. A player you sat out stays out.
+- Only a player with pitches (`p.bd.pitches`) can play P, as in Brimstone Diamond. Out of position a player's FLD is 2 lower in `wNineDef()`.
+- `wNineDef()` is the nine as a Brimstone Diamond team (`{ id: 'realm', name, short, color, trim, light, motto, roster, pen }`); each player carries `rid`, their roster id or `cid`. Roster pitchers who sit out are in the pen. Phase 4 plays it.
+- Changes go through `wNineMove`, `wNineSetPos`, `wNineSit`, `wNinePutIn` and `wNineAuto`; each returns a message for the player, or `''`.

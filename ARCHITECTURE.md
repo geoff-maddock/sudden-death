@@ -163,6 +163,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `scope wBD` (`src/realm/diamond/`) | Brimstone Diamond, the baseball game, in its own scope: `d0-page.js` mounts its page in a shadow root inside `#v-diamond` and stands in for `document`, `window`, `localStorage` and the frame loop inside the scope; `exports.js` is what the Realm may call (`wBD`). |
 | `w20-diamond.js` | The diamond view: `showView('diamond')`, the bar above the field, `wDiamondExhibition` (CPU against CPU for now), back to the world. |
 | `w20b-ratings.js` | Baseball ratings: every player's `p.bd` (position, hand, POW/CON/SPD/ARM/FLD 1–12, powers, pitches), seeded from their kind's Brimstone Diamond player, a point per level; a Baseball block on the Stats page. |
+| `w20c-nine.js` | The baseball nine (`WG.nine`): batting order and positions, call-ups at your level for the spots your roster can't fill, `wNineDef()` for the diamond; a Nine tab on the Team screen. |
 
 ### Brimstone Diamond (`src/bd/`)
 

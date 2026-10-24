@@ -22,8 +22,13 @@ function bdxNames() {
   return { ab: o(AB, v => ({ n: v.name, type: v.type, desc: v.desc })), ult: o(ULT, v => ({ n: v.name, role: v.role, desc: v.desc })),
     pitch: o(PITCHES, v => ({ n: v.name, magic: !!v.magic, desc: v.desc })) };
 }
+// the kinds whose player on the founding clubs plays pos (two each), for call-ups
+function bdxKindsAt(pos) { return KINDS.filter(k => TEMPL[k].pos === pos); }
+// a founding club to play against, with a reliever warming up as a quick game gets one
+function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPen(d, innings || 3); return d; }
 return {
   G, newGame, simToEnd, start: bdxStart, show: bdxShow, hide: bdxHide,
   get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; },
-  teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice()
+  teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
+  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice()
 };
