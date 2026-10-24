@@ -134,7 +134,9 @@ function wBallLeave() {
   const sn = L.snap;
   WBALL.asked = true;
   wLeaveDiamond();
-  wLog(sn ? `Your game against ${wBallName(L.world.club)} is saved: ${wBallScore(sn)}. Resume it from the Nine tab on the Team screen.` : 'Your game is saved.', 'd');
+  // before the first pitch there is nothing to keep: the game is called off, and the club can play you again today
+  if (!sn) return wBallCallOff(`You leave before the first pitch, so the game against ${wBallName(L.world.club)} is called off.`);
+  wLog(`Your game against ${wBallName(L.world.club)} is saved: ${wBallScore(sn)}. Resume it from the Nine tab on the Team screen.`, 'd');
   wSave();
 }
 // Brimstone Diamond's own End game (don't save): no result, and the club can play you again today

@@ -54,7 +54,7 @@ function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPe
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
   get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; },
-  get live() { return gameOn(); }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
+  get live() { return gameOn(); }, audio: (music, sfx) => { if (MUS.on !== !!music) setMusic(!!music, true); SND.on = !!sfx; }, get sound() { return { music: !!MUS.on, sfx: !!SND.on }; }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
   teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
   kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice()
 };

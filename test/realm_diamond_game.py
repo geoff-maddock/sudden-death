@@ -139,6 +139,14 @@ async def main():
         await pg.screenshot(path='/tmp/realm-ball-stats.png')
         await close_modal(pg)
 
+        # ---------- leaving before the first pitch ----------
+        early = await pg.evaluate("wBallClubs().find(c => WG.ball.met[c] !== WG.dayAbs)")
+        await pg.evaluate(f"wStartBall({{ club: {json.dumps(early)}, how: 'play' }})")
+        await pg.wait_for_function("UI.view === 'diamond' && WG.ball.live && !WG.ball.live.snap", timeout=15000)
+        await pg.click('#wBallSave'); await pg.wait_for_function("UI.view === 'world'")
+        e = await pg.evaluate(f"({{ live: !!WG.ball.live, met: WG.ball.met[{json.dumps(early)}], last: WLOG[WLOG.length - 1][0] }})")
+        check(not e['live'] and e['met'] is None and 'called off' in e['last'], 'Save and leave before the first pitch calls the game off, and says so', e)
+
         # ---------- concede, and End game ----------
         clubs = await pg.evaluate("wBallClubs().filter(c => WG.ball.met[c] !== WG.dayAbs)")
         await pg.evaluate(f"wStartBall({{ club: {json.dumps(clubs[0])}, how: 'manage' }})")

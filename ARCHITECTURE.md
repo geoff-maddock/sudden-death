@@ -166,6 +166,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w20c-nine.js` | The baseball nine (`WG.nine`): batting order and positions, call-ups at your level for the spots your roster can't fill, `wNineDef()` for the diamond; a Nine tab on the Team screen. |
 | `w20d-ballgame.js` | Ball games from the world (`WG.ball`): Play, Manage or Simulate against the local nine or a rival once you have 5 players, XP, gold, fans, head to head and box scores (`WG.bstats`), save and resume mid-game, a Baseball view on the Stats tab. |
 | `w20e-dcup.js` | The Diamond Cup (`WG.dcup`): baseball's weekly 8-nine bracket, entered through the League clerk (DIAMOND) or the Nine tab; you play your games, the rest are simulated on the engine; prizes, the journal and the Wall of Awards. |
+| `w20f-feel.js` | Baseball's feel: Sudden Death's music stops on the diamond and Brimstone Diamond's follows the Music and Sound settings (`wBD.audio`); coach's notes for playing ball and the Diamond Cup; medals for ball games won and Diamond Cups. |
 
 ### Brimstone Diamond (`src/bd/`)
 

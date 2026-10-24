@@ -387,3 +387,10 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **State.** `WG.dcup = { week, field, round, games: [[{ a, b, ra, rb, w }]], pending, show, out, done, champ }`, plain JSON. `WG.dcupWins` and `WG.dcupLog` count the cups won.
 - **The prize.** `W_DCUP.prize`: 150 gold, 20 fans, a pick of 3 baseball cards (`wSportPool(['baseball'])`), a journal win and a line on the Wall of Awards. The prize pick shows before the bracket.
 - **Tests.** `W_DCUP.force` (`'win'` | `'lose'`) settles your next cup game that way.
+
+## Baseball's feel (w20f-feel.js)
+
+- **Sound.** `musicSet` (wrapped, `wSdMusicSet`) stops Sudden Death's music while `UI.view === 'diamond'`. `showView('diamond')` calls `wBD.audio(SET.music, SET.sfx)`, so the ballpark organ and Brimstone Diamond's sound effects follow your settings. `wBD.sound` reads them back.
+- **Tips.** `w_ball` once the roster has `W_BALL.minOwn` players, and `w_dcup` after your first won ball game.
+- **Medals.** `w_ball` (Play Ball: `realmBallWins` 1, 10, 30) and `w_dcup` (Diamond Cutter: `realmDcups` 1, 3, 8).
+- **Leaving early.** Save and leave before the first pitch has no snapshot to keep, so the game is called off and the club can play you again that day.
