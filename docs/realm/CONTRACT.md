@@ -344,9 +344,11 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 
 - `wBD.start(opts)` starts a game on the field, skipping its setup menu (`opts` as its `newGame`: `{ mode: 'demo', team, opp, innings, diff }`). `wBD.G` is its game state (`G.phase === 'over'` at a final), and `wBD.simToEnd(quiet)` plays the rest of a game at once.
 - `wBD.show()` / `wBD.hide()` show it and park it (`wBD.on`); `showView('diamond')` calls them. Inside the scope, its window listeners, frame loop and timers do nothing while it is hidden.
-- `wBD.onOver` and `wBD.onQuit` are called at a final and when its End game sends it back to its menu.
+- `wBD.start(opts)` also takes `rules: { key: value }`, Brimstone Diamond's optional rules for that game only. `wBD.resume(snap)` puts a snapshot back on the field; `wBD.sim(opts)` plays a whole game at once, CPU against CPU and silent; `wBD.box()` lists each player who appeared with their box line (`{ side, rid, n, line }`); `wBD.live` is true while a game is on.
+- `wBD.onOver` and `wBD.onQuit` are called at a final and when its End game sends it back to its menu; `wBD.onSnap(snap)` at the start of each pitch, with Brimstone Diamond's own snapshot (plain JSON).
+- Its final card only shows between games (`.bdlive` on its page), so a card from a game that just ended never covers the next one.
 - In the diamond, Esc and P are its own Time out: `openPause` does nothing there.
-- `WD` is the game on the field (`{ opts, over, from }`); it is not saved yet (issue #4, phase 4).
+- `WD` is the game on the field (`{ opts, over, from, ball? }`); a ball game from the world (`ball: true`) is saved in `WG.ball.live`.
 
 ## Baseball ratings (w20b-ratings.js)
 
@@ -363,3 +365,14 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - Only a player with pitches (`p.bd.pitches`) can play P, as in Brimstone Diamond. Out of position a player's FLD is 2 lower in `wNineDef()`.
 - `wNineDef()` is the nine as a Brimstone Diamond team (`{ id: 'realm', name, short, color, trim, light, motto, roster, pen }`); each player carries `rid`, their roster id or `cid`. Roster pitchers who sit out are in the pen. Phase 4 plays it.
 - Changes go through `wNineMove`, `wNineSetPos`, `wNineSit`, `wNinePutIn` and `wNineAuto`; each returns a message for the player, or `''`.
+
+## Ball games (w20d-ballgame.js)
+
+- **Who can play.** `wBallProblems()` is empty once the roster has `W_BALL.minOwn` (5) players and the nine can take the field. Opponents are the local nine of the region you're in and your rival clubs (`wBallClubs()`); each plays you once a day (`WG.ball.met[club] = dayAbs`).
+- **How.** `wStartBall({ club, how, home?, tier?, kind?, ref? })` returns `''` or why not. `how` is `play` (every pitch), `manage` (Auto powers on) or `sim` (`wBD.sim`, settled before it returns). The tier is the region's (`wTierHere()`), +1 against a rival; CPU skill is `W_BALL.diff[tier]`, and the other nine (`wBallOpp`) is at your nine's level + tier − 1, its own kinds first. A rival's nine is cached in `WG.ball.opp[club]` until it would be a different level.
+- **Rules.** `W_BALL.rules`: injuries, magic bats and balls, the pitch clock and brawls off; stealing and the moon and stars on.
+- **State.** `WG.ball = { live: null | { world, snap }, met, opp, games: [last 10], w, l }`, plain JSON. `world = { kind: 'ball', ref, club, tier, home, how, day, name }`. `snap` is refreshed at each pitch (`wBD.onSnap`); the save is written at most every 15 seconds and on Save and leave.
+- **The end.** `wBallSettle(r, us, them, box, inning)`: box lines for your own players into `WG.bstats[pid]` (call-ups and the other side have no numeric `rid`), XP (`W_BALL.xp × tier` to the nine, half to players sitting out, a quarter for a loss, `mvpXp` to the player of the game), gold and fans for a win, `WG.h2h[club]` with `sport: 'baseball'`, the league table for a rival, `W_BALL.minutes` on the clock, then `W_ON_END[world.kind]`. There is no team HP on the diamond and no blackout.
+- **Leaving.** Save and leave keeps `WG.ball.live`; a reload asks once (`wNextPrompt`), and the Nine tab has Resume the game. Concede is a loss. Brimstone Diamond's End game (don't save) calls the game off: no result, and the club can play you again that day.
+- **Where.** Play a game on the Nine tab, and Host a ball game (you're the home side) at your home ground. Epic #6 adds ballparks to the world.
+- **Stats.** The Stats tab's Baseball view (G, AB, H, HR, RBI, AVG, SB, IP, ERA, K) and a box line on each player's Baseball block.

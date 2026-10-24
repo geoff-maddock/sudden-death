@@ -8,11 +8,11 @@
    - localStorage is a Map in memory (the Realm keeps the saves, so its cloud sync never starts: window.claude is undefined), and location and history are stubs (no hash pages).
    Its fonts are added to the real page the first time it is shown. */
 const BDX_DOC = globalThis.document, BDX_WIN = globalThis;
-const BDX = { on: false, parked: [], gate: new Map(), host: null, root: null, page: null, fonts: false, onOver: null, onQuit: null };
+const BDX = { on: false, parked: [], gate: new Map(), host: null, root: null, page: null, fonts: false, onOver: null, onQuit: null, onSnap: null };
 /* our rules for its page: only the field, the speed bar, the pitch readout and the play-by-play show */
 const BDX_OWN_CSS = `:host{display:block}:host([hidden]){display:none}
 .bdpage{padding:0 0 24px;background:transparent}
-header.top,.rotate-note,#menu,#sOver,#over .row,#pause .row a,#touch,.page:not(#pg-play),#bSaveQuit,[data-end="save"]{display:none!important}`;
+.bdlive #over,header.top,.rotate-note,#menu,#sOver,#over .row,#pause .row a,#touch,.page:not(#pg-play),#bSaveQuit,[data-end="save"]{display:none!important}`;
 (() => {
   const h = BDX_DOC.createElement('div'); h.id = 'v-diamond'; h.hidden = true;
   (BDX_DOC.getElementById('v-world') || BDX_DOC.getElementById('v-panel')).insertAdjacentElement('afterend', h);

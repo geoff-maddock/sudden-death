@@ -39,3 +39,4 @@ scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js
 src/realm/w20-diamond.js
 src/realm/w20b-ratings.js
 src/realm/w20c-nine.js
+src/realm/w20d-ballgame.js

@@ -38,11 +38,12 @@ function wBuildView() {
       </div>
       <aside class="wside">
         <div class="wlog" id="wLog" aria-live="polite"></div>
-        <p class="wkeys"><kbd>&#8592;&#8593;&#8594;&#8595;</kbd> or <kbd>WASD</kbd> walk &middot; <kbd>Space</kbd> talk or use &middot; <kbd>L</kbd> look &middot; <kbd>Esc</kbd> close, or the menu (save and quit). Click a spot to walk there. Walk into people to talk.</p>
+        <p class="wkeys"><kbd>&#8592;&#8593;&#8594;&#8595;</kbd> or <kbd>WASD</kbd> walk &middot; <kbd>Space</kbd> talk or use &middot; <kbd>L</kbd> look &middot; <kbd>Esc</kbd> close, or the menu (save and quit). Click a spot to walk there, or click a person or a thing to walk up and talk to them, use it or look at it.</p>
       </aside>
     </div>`;
   WUI.cv = $('wcv'); WUI.c = WUI.cv.getContext('2d');
   WUI.cv.addEventListener('click', wCanvasClick);
+  WUI.cv.addEventListener('mousemove', wCanvasHover);
   // the on-screen pad: hold to keep walking
   $('wPad').querySelectorAll('[data-dir]').forEach(b => {
     const dir = b.dataset.dir.split(',').map(Number);
@@ -235,23 +236,58 @@ window.addEventListener('keydown', e => {
 /* the menu, from anywhere in the world: Sudden Death's pause screen, whose Save and quit goes back to the title */
 function wOpenMenu() { if (!WG || !RUN || UI.view !== 'world' || UI.paused) return; WUI.held = null; WUI.goto = null; openPause(); }
 
+/* the tile under a click or tap */
+function wClickTile(e) {
+  const r = WUI.cv.getBoundingClientRect();
+  return [Math.floor(WUI.cam[0] + (e.clientX - r.left) / WUI.zoom / WTILE), Math.floor(WUI.cam[1] + (e.clientY - r.top) / WUI.zoom / WTILE)];
+}
+/* does clicking (x, y) mean "go and deal with it" rather than "walk there"? Somebody to talk to, something to use, or
+   anything you can look at but not stand on (a painting, a shelf, a wall, the water). The way out of town is walked to. */
+function wClickActs(x, y) {
+  const m = wCurMap(), c = wTileAt(m, x, y); if (c == null) return false;
+  const td = DB.tiles[c] || {}, mm = m.meta[x + ',' + y];
+  return !!(wNpcAt(x, y) || !td.walk && !td.enter || (mm && (mm.text || mm.look)) && !td.enter);
+}
+/* face (x, y), next to you, and do what it is for: talk, use, or look */
+function wFaceAndAct(x, y) {
+  const dx = x - WG.x, dy = y - WG.y;
+  WG.face = dx < 0 ? 'l' : dx > 0 ? 'r' : dy < 0 ? 'u' : 'd';
+  if (dx) WUI.face = dx < 0 ? 'l' : 'r';
+  if (WUI.talk) wCloseTalk();
+  wInteract(); wDrain();
+}
+/* a click or tap: on you, act on what you face; on plain ground, walk there; on a person or a thing, walk up to it,
+   then talk to them, use it or look at it. A person who wanders off is followed. Out of reach, you look from here. */
 function wCanvasClick(e) {
   if (!wActive() || !WUI.cam) return;
-  const r = WUI.cv.getBoundingClientRect();
-  const tx = Math.floor(WUI.cam[0] + (e.clientX - r.left) / WUI.zoom / WTILE), ty = Math.floor(WUI.cam[1] + (e.clientY - r.top) / WUI.zoom / WTILE);
-  const d = Math.abs(tx - WG.x) + Math.abs(ty - WG.y);
+  const [tx, ty] = wClickTile(e), d = Math.abs(tx - WG.x) + Math.abs(ty - WG.y);
   if (d === 0) { wInteract(); wDrain(); return; }
-  if (d === 1) { WUI.goto = null; wDoStep(tx - WG.x, ty - WG.y); return; }
-  WUI.goto = [tx, ty];
+  const act = wClickActs(tx, ty), n = act && wNpcAt(tx, ty);
+  if (d === 1) { WUI.goto = null; if (act) wFaceAndAct(tx, ty); else wDoStep(tx - WG.x, ty - WG.y); return; }
+  WUI.goto = [tx, ty, act, n ? n.id : null];
   if (performance.now() - WUI.lastStep > WSTEP_MS) wGotoStep();
 }
 function wGotoStep() {
   const g = WUI.goto; if (!g) return;
-  const st = wPathStep(g[0], g[1]);
-  if (!st) { WUI.goto = null; return; }
-  const last = Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y) === 1;
-  wDoStep(st[0], st[1]);
-  if (last || (WG.x === g[0] && WG.y === g[1])) WUI.goto = null;
+  if (g[3] != null) { const n = (wCurMap().npcs || []).find(o => o.id === g[3]); if (n) { g[0] = n.x; g[1] = n.y; } }
+  const d = Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y);
+  if (g[2] && d === 1) { WUI.goto = null; wFaceAndAct(g[0], g[1]); return; }
+  let st = wPathStep(g[0], g[1]);
+  // somebody behind a counter: go to the counter in front of them, which talks to them
+  if (!st && g[3] != null) {
+    const m = wCurMap(), c = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => [g[0] + dx, g[1] + dy]).find(([x, y]) => wTileAt(m, x, y) === '-' && wPathStep(x, y));
+    if (c) { g[0] = c[0]; g[1] = c[1]; g[3] = null; if (Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y) === 1) { WUI.goto = null; wFaceAndAct(g[0], g[1]); return; } st = wPathStep(g[0], g[1]); }
+  }
+  if (!st) { WUI.goto = null; if (g[2]) { wLog(wLookText(g[0], g[1]), 'd'); wDrain(); } return; }
+  const map0 = WG.map, moved = wDoStep(st[0], st[1]);
+  // a step that went nowhere (a person in the way, a match, a new map) ends the walk
+  if (!moved || WG.map !== map0 || !wActive() || (!g[2] && d === 1) || (WG.x === g[0] && WG.y === g[1])) WUI.goto = null;
+}
+/* a hand over what a click would deal with */
+function wCanvasHover(e) {
+  if (!wActive() || !WUI.cam) return;
+  const [tx, ty] = wClickTile(e), on = (tx !== WG.x || ty !== WG.y) && wClickActs(tx, ty);
+  WUI.cv.style.cursor = on ? 'pointer' : '';
 }
 
 /* ---------- drawing, once a frame (w8's frame wrapper calls this) ---------- */

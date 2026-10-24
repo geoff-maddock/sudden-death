@@ -226,3 +226,15 @@
 .wnr select{font:inherit;font-family:var(--hud);font-size:17px;padding:4px 6px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
 .wnbtn{gap:8px;justify-content:flex-end;margin-top:12px}
 @media (max-width:560px){.wnr{grid-template-columns:24px 48px minmax(0,1fr)}.wnr>img{width:48px;height:48px}.wnr .wpa{grid-column:1/-1;justify-content:flex-start}}
+/* w20d: ball games (the club picker, the Nine tab's last games, the box line) */
+.wbclubs{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.wbcl{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;border:1px solid var(--seam);border-radius:8px;padding:8px 10px}
+.wbcl small{display:block;color:var(--dim)}
+.wbcl .row{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.wbsw{align-self:stretch;border-radius:4px}
+@media (max-width:560px){.wbcl{grid-template-columns:8px 1fr}.wbcl .row{grid-column:1/-1;justify-content:flex-start}}
+.wball{margin-top:8px}
+.wbrh{margin:14px 0 4px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wbd .wbdbox{margin:0 0 6px}
+.wdbar #wBallSave,.wdbar #wBallGive{white-space:nowrap}
+@media (max-width:560px){.wdbar .hint{flex-basis:100%;order:1}.wdbar button{order:2}}

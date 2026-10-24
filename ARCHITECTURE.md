@@ -161,9 +161,10 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w18-league.js` | The league table (rivals and Apex play rounds while you travel; inns post it) and rivals who act: bids for bench players, grudge matches on the road, cup taunts and revenge. |
 | `w19-journal.js` | The journal (`J`): people you've talked to and what they said, places by region with their rules, big victories, quests; filters by active quest, learned keyword and search. |
 | `scope wBD` (`src/realm/diamond/`) | Brimstone Diamond, the baseball game, in its own scope: `d0-page.js` mounts its page in a shadow root inside `#v-diamond` and stands in for `document`, `window`, `localStorage` and the frame loop inside the scope; `exports.js` is what the Realm may call (`wBD`). |
-| `w20-diamond.js` | The diamond view: `showView('diamond')`, the bar above the field, `wDiamondExhibition` (CPU against CPU for now), back to the world. |
+| `w20-diamond.js` | The diamond view: `showView('diamond')`, the bar above the field, `wDiamondExhibition` (CPU against CPU, Watch them play), back to the world. |
 | `w20b-ratings.js` | Baseball ratings: every player's `p.bd` (position, hand, POW/CON/SPD/ARM/FLD 1–12, powers, pitches), seeded from their kind's Brimstone Diamond player, a point per level; a Baseball block on the Stats page. |
 | `w20c-nine.js` | The baseball nine (`WG.nine`): batting order and positions, call-ups at your level for the spots your roster can't fill, `wNineDef()` for the diamond; a Nine tab on the Team screen. |
+| `w20d-ballgame.js` | Ball games from the world (`WG.ball`): Play, Manage or Simulate against the local nine or a rival once you have 5 players, XP, gold, fans, head to head and box scores (`WG.bstats`), save and resume mid-game, a Baseball view on the Stats tab. |
 
 ### Brimstone Diamond (`src/bd/`)
 
