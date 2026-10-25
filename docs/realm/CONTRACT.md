@@ -394,3 +394,11 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Tips.** `w_ball` once the roster has `W_BALL.minOwn` players, and `w_dcup` after your first won ball game.
 - **Medals.** `w_ball` (Play Ball: `realmBallWins` 1, 10, 30) and `w_dcup` (Diamond Cutter: `realmDcups` 1, 3, 8).
 - **Leaving early.** Save and leave before the first pitch has no snapshot to keep, so the game is called off and the club can play you again that day.
+
+## Sports grounds (w21-grounds.js)
+
+- **The grounds.** `W_GRDS`: ten grounds, two per city, one for each sport in its region's `sports` list. Each is a location in `DB.locs` (`kind: 'ground'`, world tile `U`, `map` = its id, plus `city` and `sport`), and its map is a `DB.towns` entry built by `buildTown`, so it behaves like a town: walk off any edge to leave, people wander, ambient lines, no wild matches.
+- **Placement.** `buildWorld` (wrapped) builds the world as before, then places each ground at the clear spot nearest `g.at` (`wGrdSpot`: in the city's region, not a road, no well, bush, nest or entrance within 2 tiles), and carves a road from the city gate (`x, y + 1`) to the ground's. Nothing the original world placed moves, so old saves keep their wells and bushes. The ground locations are added to `DB.locs` by the wrapper, after the original build.
+- **The map.** 24×18: the field (tile `d`, `m.field = { x, y, w, h, sport, gc }`) drawn whole for its sport by `wGrdArt`, stands (`J`) on three sides, a two-tile scoreboard (`%`, a sign), banners, lamps, a path from the gate, the groundskeeper (`gk_<name>`, fixed) and a fan (`gf_<name>`). `m.grd` is the ground's id.
+- **Talk.** Every keeper has `job`, the sport's own keyword (the text of `SPORTS[sport].desc`) and `fixtures`. The Ballpark's keeper also has `game` (act `ball`: `wOpenBallCard`) and `diamond` (act `dcup`).
+- **Drawing.** `WGND.d` draws the tile's piece of the field (outside the field rect, the map's own ground); `WPRI.d = 0`, so the field has hard edges. `WOBJ.U` is a bowl of stands round the sport's field colour, or a hall for the indoor sports (bowling, curling, boxing), with the sport's pennant.
