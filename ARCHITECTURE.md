@@ -168,6 +168,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w20e-dcup.js` | The Diamond Cup (`WG.dcup`): baseball's weekly 8-nine bracket, entered through the League clerk (DIAMOND) or the Nine tab; you play your games, the rest are simulated on the engine; prizes, the journal and the Wall of Awards. |
 | `w20f-feel.js` | Baseball's feel: Sudden Death's music stops on the diamond and Brimstone Diamond's follows the Music and Sound settings (`wBD.audio`); coach's notes for playing ball and the Diamond Cup; medals for ball games won and Diamond Cups. |
 | `w21-grounds.js` | Sports grounds (issue #6): two per city, one for each of its region's sports, on a road outside the gate; each a walk-in map with the field drawn for its sport, stands, a scoreboard, a groundskeeper who explains the scoring and a fan. The Ballpark's keeper books ball games and the Diamond Cup. |
+| `w21b-gmatch.js` | Games at the grounds (issue #6, phase 2): each ground needs a squad sized for its sport (`W_GRD_SQUAD`, 4 to 7); then its keeper puts on a Friendly or a Challenge, a card-game match locked to the ground's sport against the city's club, once a day. The record is on the scoreboard and in the journal. |
 
 ### Brimstone Diamond (`src/bd/`)
 
