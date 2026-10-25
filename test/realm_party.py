@@ -130,8 +130,10 @@ async def main():
         await pg.click('#modalBox [data-close]'); await pg.wait_for_timeout(150)
 
         # ---------- a match with a benched player: their cards sit out, then come back ----------
+        # (against a goblin: only kinds with a signature card and free-agent names ask to join, so a slime or ghoul team
+        # never would, and the recruit below would not come)
         all0 = await pg.evaluate("__uids(wAllCards())")
-        await pg.evaluate("WG.roster.forEach(p => { p.xp = 0; p.lvl = 1; }); WG.roster[0].xp = 19; startMatch({ type: 'normal', tier: 1, card: false, world: { kind: 'wild' } })")
+        await pg.evaluate("WG.roster.forEach(p => { p.xp = 0; p.lvl = 1; }); WG.roster[0].xp = 19; startMatch({ type: 'normal', tier: 1, card: false, ids: ['thief'], world: { kind: 'wild' } })")
         await pg.wait_for_timeout(1200)
         mt = await pg.evaluate(f"({{ deck: __uids(RUN.deck), bench: __uids(RUN.wbench), ok: RUN.deck.every(c => c.wp == null || wIsStarter(c.wp)), party: RUN.party.map(p => p.n) }})")
         check(mt['bench'] == out_cards and mt['ok'], "the benched player's cards are out of the match deck", mt)

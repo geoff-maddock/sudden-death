@@ -26,6 +26,11 @@ async def new_journey(pg):
 # where tile (x, y) is on screen, once the camera has settled
 async def at(pg, x, y):
     await pg.wait_for_timeout(250)
+    prev = None
+    for _ in range(40):
+        cam = await pg.evaluate("WUI.cam.join()")
+        if cam == prev: break
+        prev = cam; await pg.wait_for_timeout(100)
     return await pg.evaluate(f"(() => {{ const r = WUI.cv.getBoundingClientRect(); return [r.left + ({x} + .5 - WUI.cam[0]) * WTILE * WUI.zoom, r.top + ({y} + .5 - WUI.cam[1]) * WTILE * WUI.zoom]; }})()")
 
 async def click_tile(pg, x, y):
@@ -62,8 +67,8 @@ async def main():
         await pg.screenshot(path='/tmp/realm-click.png')
 
         # a person: walk up and talk (Imelda Foss, behind her counter)
-        await pg.evaluate("wCloseTalk(); wEnterMap('graftonbury', 18, 12); wDrain()")
         npc = await pg.evaluate("(() => { const n = MAPS.graftonbury.npcs.find(n => n.id === 'vesper'); return [n.x, n.y]; })()")
+        await pg.evaluate(f"wCloseTalk(); wEnterMap('graftonbury', {npc[0]} - 5, {npc[1]}); wDrain()")
         await click_tile(pg, *npc)
         t = await pg.evaluate("({ talk: WUI.talk && WUI.talk.id, x: WG.x, y: WG.y })")
         check(t['talk'] == 'vesper', 'a person: you walk up and talk to them', {'npc': npc, 't': t})
@@ -85,8 +90,8 @@ async def main():
         check([r['x'], r['y']] == stand and r['last'].startswith('The sign reads:'), 'a sign next to you: read at once, without moving', {'S': S, 'r': r})
 
         # out of reach: looked at from here (the lake beyond Saltmere's docks is walked to, so use a rock in the lava at Cinderhold)
-        await pg.evaluate("wEnterMap('cinderhold', 7, 12); wCloseTalk(); wDrain()")
-        lava = await pg.evaluate("(() => { const m = MAPS.cinderhold; for (const y of [9, 15, 8, 16, 7, 17]) if (m.t[y][14] === 'L' && m.t[y][15] === 'L' && m.t[y][13] !== 'b' && m.t[y][16] !== 'b') return [14, y]; return null; })()")
+        lava = await pg.evaluate("(() => { const m = MAPS.cinderhold, L = (x, y) => m.t[y] && m.t[y][x] === 'L'; for (let x = 1; x < m.w - 2; x++) for (const y of [9, 15, 8, 17, 7, 18]) if (L(x, y) && L(x + 1, y) && L(x, y - 1) && L(x, y + 1)) return [x, y]; return null; })()")
+        await pg.evaluate(f"(() => {{ const m = MAPS.cinderhold; let x = {lava[0]} - 6; while (!wOpenTile(m, x, {lava[1]})) x--; wEnterMap('cinderhold', x, {lava[1]}); wCloseTalk(); wDrain(); }})()")
         await click_tile(pg, *lava)
         r = await pg.evaluate("({ x: WG.x, y: WG.y, last: %s })" % LAST)
         check('lava' in r['last'].lower(), 'lava: you walk to the edge, or look from where you are', {'lava': lava, 'r': r})

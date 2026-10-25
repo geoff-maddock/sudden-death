@@ -44,3 +44,4 @@ src/realm/w20e-dcup.js
 src/realm/w20f-feel.js
 src/realm/w21-grounds.js
 src/realm/w21b-gmatch.js
+src/realm/w22-cities.js
