@@ -429,3 +429,10 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Your fixture.** `wStartGrd(id, 'fixture')`: a `rival` match at the region's tier + `W_FIX.tierUp` (+1 more against Apex Athletic), ref `{ g, mode: 'fixture', club, day }`. The squad rule and the one-game-a-day rule hold. `W_ON_END.ground` (wrapped) marks it done and records it in `L.me`, the club's row, `L.results`, `WG.h2h`; a win adds `W_FIX.fans` and may bring a bid (`wMaybeBid`).
 - **Words.** `wClubName('me')` is your team. Results read "... at <ground>". The inns' table lists the next round. Keepers' `fixtures` (act `fixtures`) opens the list. The scoreboard shows the last league game at its ground. Fans (`gf_*`) greet you by `wMyPlace()`, and the pre-game card at a ground has a crowd line (`wCrowdLine`).
 
+## Home grounds at the sports grounds (w25-home.js)
+
+- **Buying.** `wBuyGround(where)` takes a ground id or a town (a town buys its first ground, `wGrdsOf(town)[0]`). `WG.ground` keeps `town` (the ground's city: the home region, the kitchen's inn menu and the scouts' inn are keyed on it) and gains `grd`. Keepers have `home` (act `ground`); the innkeepers' `ground` still opens the sale, which lists the city's two grounds (`[data-wbuy]`, the first also `#wBuyGround`).
+- **The screen.** `wOpenGround(where)` takes a ground id or a town; owned, it is w14's screen titled `Your ground: <name>`. `wSleepGround` works on the ground's own map too (you still wake at the city's inn). Host a ball game is offered only when the home ground is the Ballpark.
+- **Fixtures.** `wDrawRound` (wrapped): with a home ground that is not the Ballpark, every other round (`L.hosted` toggles) your fixture is at home: `{ a: 'me', b: club, g: grd }`. A match there has the home crowd (w14's `wIsHome`, by region).
+- **Old saves.** `wStart` (wrapped): a `WG.ground` without `grd` gets its city's first ground, once, with a log line; parts and drills are kept.
+
