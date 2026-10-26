@@ -13,6 +13,6 @@ function newRun(clubId, picks, roster, relic) {
   return RUN;
 }
 const runKinds = () => [...new Set(RUN.party.map(p => p.kind).concat(RUN.extra))];
-const clubTeam = () => { const c = CLUBS[RUN.club]; return { color: c.color, light: c.light, short: c.short, dark: c.dark }; };
+function clubTeam() { const c = CLUBS[RUN.club]; return { color: c.color, light: c.light, short: c.short, dark: c.dark }; }
 const memberOf = kind => RUN.party.find(p => p.kind === kind);
 

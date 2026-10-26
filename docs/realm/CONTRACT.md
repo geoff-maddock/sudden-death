@@ -436,3 +436,11 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Fixtures.** `wDrawRound` (wrapped): with a home ground that is not the Ballpark, every other round (`L.hosted` toggles) your fixture is at home: `{ a: 'me', b: club, g: grd }`. A match there has the home crowd (w14's `wIsHome`, by region).
 - **Old saves.** `wStart` (wrapped): a `WG.ground` without `grd` gets its city's first ground, once, with a log line; parts and drills are kept.
 
+
+## The feel of the grounds (w26-gfeel.js)
+
+- **Music.** `THEMES.wg_<ground id>`, one per ground, in Sudden Death's theme format (`wMel` turns a text melody into steps). `wMusicHere` (wrapped) plays the ground's theme on its map; `wMusicMatch` (wrapped) plays it in a match with `world.kind === 'ground'`. Bosses keep Sudden Death's themes.
+- **Tips.** `TIPS.w_grounds`, `w_squad`, `w_fixture` and `w_spot`, from the `wGrdTips` watcher (never in LAB).
+- **Medals.** `w_grounds` (Groundhopper, set stat `realmGrounds`: ground ids, from `W_ON_END.ground` and, for the Ballpark, a `wBallSettle` while `WG.map === 'g_ballpark'`), `w_fixtures` (`realmFixWins`, a fixture won), `w_coach` (`realmSpotWins`, a right answer in `wSpotAnswer`).
+- **Team kit.** `WG.kit = { own: [ids], on: id }`, plain JSON; `home` is the club's own colours and always owned. `W_KITS` (six to buy at `W_KIT.price`), `wBuyKit(id)` returns '' or why not, and wears a kit you own for free. `clubTeam` (Sudden Death's, now a function declaration so it can be wrapped as `wSdClubTeam`) returns the kit's `color`, `light` and `dark` with the club's `short`. The League shop (`lg_shop`, act `kit`) takes the house at 32,21 in Graftonbury. Old saves without `WG.kit` drop `WG.npc.graftonbury` once (townsfolk places are kept by index).
+- **Match days.** `wMatchDayLine(city)`: a poster for tomorrow's league games at the city's grounds (not yours) or today's results there; `wAmbient` (wrapped) logs one now and then in the city and at its grounds.
