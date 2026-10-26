@@ -46,3 +46,4 @@ src/realm/w21-grounds.js
 src/realm/w21b-gmatch.js
 src/realm/w22-cities.js
 src/realm/w23-spots.js
+src/realm/w24-fixtures.js

@@ -80,7 +80,7 @@ function wOpenGrdCard(id, msg) {
   const close = modal(`<header><h3>A game at ${esc(g.name)}</h3><button class="ghost" data-close>Done</button></header>
     ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}${msg ? `<p class="wbad">${esc(msg)}</p>` : ''}
     <p class="wpgsport">${sportSVG(g.sport, 26)}<span><b>${esc(SPORT_NAME[g.sport])}</b> only: ${esc(S.rule)}. ${esc(SPORT_BRIEF[g.sport] || '')}</span></p>
-    <p class="hint">Squad: <b>${n} of ${need}</b> players (${esc(W_GRD_WHY[g.sport])}). The ${esc(wGrdClub(g))} play you once a day, win or lose. A loss is a blackout, as on the road.${rec ? ' ' + esc(rec) : ''}</p>
+    <p class="hint">Squad: ${n < need ? `<b>${n} of ${need}</b> players` : `<b>${n} players</b>, ${need} needed`} (${esc(W_GRD_WHY[g.sport])}). The ${esc(wGrdClub(g))} play you once a day, win or lose. A loss is a blackout, as on the road.${rec ? ' ' + esc(rec) : ''}</p>
     <ul class="wbclubs">${rows}</ul>`);
   $('modalBox').querySelectorAll('[data-gplay]').forEach(b => b.onclick = () => {
     close();

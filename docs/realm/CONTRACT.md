@@ -422,3 +422,10 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Use.** Using the tile, or the coach's `drill` or `challenge` (act `spot`), opens `wOpenSpot`. Drill: once a week (`wWeek()`) per spot, a card from `wSpotCards(sport)` (cards whose `sportFits` include the sport, or any `practicable` card if none do) gets `sk = 1`, an hour passes. Challenge: once a week per spot, three answers from `SPORT_BRIEF` (the spot's sport and two others); right pays `W_SPOT.prize`.
 - **State.** `WG.spots = { id: { drill: week, quiz: week, right } }`, plain JSON.
 
+## Fixtures (w24-fixtures.js)
+
+- **The draw.** `wFixtures()` returns `WG.league.next = { day, games: [{ a, b, g, done? }] }`, drawn lazily and again after each round: the five clubs (`wLeagueClubs()`) and `'me'` paired off; `a` is the home side, and `g` is one of its city's grounds (`wClubTown`: a rival's cup town, Apex Athletic's Graftonbury). You are always away (`b: 'me'`), and never at the Ballpark.
+- **The round.** `wLeagueRound` (wrapped; w18's `wNewDay` calls it every `W_LEAGUE.every` days) plays the drawn clubs' games with `wSimAt(a, b, g)` in the ground's sport (results get `g`), logs your fixture as postponed if it was not played, and draws the next round.
+- **Your fixture.** `wStartGrd(id, 'fixture')`: a `rival` match at the region's tier + `W_FIX.tierUp` (+1 more against Apex Athletic), ref `{ g, mode: 'fixture', club, day }`. The squad rule and the one-game-a-day rule hold. `W_ON_END.ground` (wrapped) marks it done and records it in `L.me`, the club's row, `L.results`, `WG.h2h`; a win adds `W_FIX.fans` and may bring a bid (`wMaybeBid`).
+- **Words.** `wClubName('me')` is your team. Results read "... at <ground>". The inns' table lists the next round. Keepers' `fixtures` (act `fixtures`) opens the list. The scoreboard shows the last league game at its ground. Fans (`gf_*`) greet you by `wMyPlace()`, and the pre-game card at a ground has a crowd line (`wCrowdLine`).
+

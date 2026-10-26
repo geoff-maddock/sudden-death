@@ -149,8 +149,8 @@
 .wlg tr.wme{background:var(--stone2)}
 .wlg tr.wme th{color:var(--torch)}
 .wlg small{color:var(--dim);font-size:14px}
-.wlgres{margin:0;padding-left:18px;font-size:16px;line-height:1.4}
-.wlgres small{color:var(--faint);font-family:var(--hud);margin-right:6px}
+.wlgres,.wlgnext{margin:0;padding-left:18px;font-size:16px;line-height:1.4}
+.wlgres small,.wlgnext small{color:var(--faint);font-family:var(--hud);margin-right:6px}
 .wtaunt{margin:0 0 6px;padding:6px 10px;border-left:3px solid #e05a4a;background:rgba(224,90,74,.08);font-size:15px}
 /* w19: the journal */
 .wjbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:4px 0 6px}
@@ -249,3 +249,4 @@
 .wdcg .wwon b{color:var(--gold,#f2c14e)}
 .wdcg .wlost{opacity:.55}
 @media (max-width:560px){.wdcb{grid-template-columns:1fr}}
+.wlgnext li.wme{font-weight:600}

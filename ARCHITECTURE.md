@@ -171,6 +171,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w21b-gmatch.js` | Games at the grounds (issue #6, phase 2): each ground needs a squad sized for its sport (`W_GRD_SQUAD`, 4 to 7); then its keeper puts on a Friendly or a Challenge, a card-game match locked to the ground's sport against the city's club, once a day. The record is on the scoreboard and in the journal. |
 | `w22-cities.js` | Bigger cities (issue #6, phase 3): the five cities rebuilt at about twice the area with their own districts (`W_CITIES` replaces their `DB.towns` entries), homes you can walk into, and new decor tiles with ink painters (hedge, fence, flower bed, bench, crates, vegetable patch, goalposts, slag heap, fish rack). Old saves standing on a new wall move to the nearest open tile. |
 | `w23-spots.js` | A sport in every city (issue #6, phase 4): two training spots per city (tile `!`), one per regional sport, each with a coach. Once a week at each: drill a card that suits the sport (Practice ★, free, an hour) and answer the coach's challenge on how the sport scores (20 gold and 5 fans). |
+| `w24-fixtures.js` | Fixtures and the league at the grounds (issue #6, phase 5): each league round is drawn up in advance (`WG.league.next`), the clubs' games are played at the home side's grounds (results carry the ground, shown on its scoreboard), and you have a fixture every round, away, played at its ground through the keeper's card. Fans greet you by your place in the table. |
 
 ### Brimstone Diamond (`src/bd/`)
 
