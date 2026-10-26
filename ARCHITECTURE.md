@@ -170,6 +170,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w21-grounds.js` | Sports grounds (issue #6): two per city, one for each of its region's sports, on a road outside the gate; each a walk-in map with the field drawn for its sport, stands, a scoreboard, a groundskeeper who explains the scoring and a fan. The Ballpark's keeper books ball games and the Diamond Cup. |
 | `w21b-gmatch.js` | Games at the grounds (issue #6, phase 2): each ground needs a squad sized for its sport (`W_GRD_SQUAD`, 4 to 7); then its keeper puts on a Friendly or a Challenge, a card-game match locked to the ground's sport against the city's club, once a day. The record is on the scoreboard and in the journal. |
 | `w22-cities.js` | Bigger cities (issue #6, phase 3): the five cities rebuilt at about twice the area with their own districts (`W_CITIES` replaces their `DB.towns` entries), homes you can walk into, and new decor tiles with ink painters (hedge, fence, flower bed, bench, crates, vegetable patch, goalposts, slag heap, fish rack). Old saves standing on a new wall move to the nearest open tile. |
+| `w23-spots.js` | A sport in every city (issue #6, phase 4): two training spots per city (tile `!`), one per regional sport, each with a coach. Once a week at each: drill a card that suits the sport (Practice ★, free, an hour) and answer the coach's challenge on how the sport scores (20 gold and 5 fans). |
 
 ### Brimstone Diamond (`src/bd/`)
 

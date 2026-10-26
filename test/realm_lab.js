@@ -173,6 +173,18 @@ window.REALMLAB = function (opts = {}) {
     if (home && home !== region && opts.groundTavern !== false) tavern(home);
   }
 
+  // training spots (issue #6, phase 4): in a town, drill a card at each of its spots and take each challenge, once a
+  // week (opts.spots === false: never); the skilled bot knows the answer, the careless one guesses
+  function spots(region) {
+    if (opts.spots === false || typeof W_SPOTS === 'undefined') return;
+    const town = TOWN[region]; if (!town) return;
+    for (const sp of W_SPOTS.filter(x => x.city === town)) {
+      const st = wSpotState(sp.id);
+      if (st.drill !== wWeek()) { const c = wSpotCards(sp.sport).sort((a, b) => (CARDS[b.id].type === 'atk') - (CARDS[a.id].type === 'atk'))[0]; if (c) wSpotDrill(sp.id, c); }
+      if (st.quiz !== wWeek()) { const Q = wSpotQuiz(sp.id); wSpotAnswer(sp.id, opts.dumb ? pick(Q.opts) : sp.sport); }
+    }
+  }
+
   // personal quests (epic 2, phase 2): take every quest on as soon as a player offers it, and turn it in when the
   // route passes through their hometown (no detours)
   function quests(region) {
@@ -201,7 +213,7 @@ window.REALMLAB = function (opts = {}) {
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       if (id === 'crown') { log.crownTries++; for (let d = 0; d < 200 && !wChampWeek(); d++) wAdvance(24 * 60); }
       atMap(C.town);
-      ground(region); tavern(region); quests(region); enchant(); shop(region);
+      ground(region); spots(region); tavern(region); quests(region); enchant(); shop(region);
       if (RUN.gold < W_CUP.fee && id !== 'crown') RUN.gold = W_CUP.fee; // a player would grind the fee; not the point
       while (!RUN.over) {
         prep(region, true);
@@ -220,7 +232,7 @@ window.REALMLAB = function (opts = {}) {
   function dungeon(id) {
     const dg = DB.dungeons.find(d => d.id === id), L = loc(id), region = L ? regionAt(L.x, L.y) : 'plains';
     if (!wGateCheck(id).ok) return false;
-    ground(region); quests(region); shop(region); enchant();
+    ground(region); spots(region); quests(region); shop(region); enchant();
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       for (const R of wDungeonRooms(id)) {
         if (wFlag(R.flag) || RUN.over) continue;

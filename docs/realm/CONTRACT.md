@@ -416,3 +416,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Old saves.** `WG.cities` is the layout version (`W_CITY_VER`). Continuing an older save drops the five cities' saved townsfolk places (`WG.npc`), and moves you to the nearest open tile you can walk from (`wNearestOpen`) if you were standing in a town.
 - **Reach.** `test/realm_cities.py` checks that every person (or their counter), object, door and building floor can be reached from the way in, and that you can walk out by an edge.
 
+## Training spots (w23-spots.js)
+
+- **The spots.** `W_SPOTS`: ten, two per city, one for each sport in its region (the batting cage and the hoop at Graftonbury, the putting green and the tilting yard at Mossgate, skittles and stones at Saltmere, the sparring ring and the kick-about pitch at Cinderhold, pond hockey and the stone maker at Rimewatch). Each is a decor tile `!` with meta `{ spot }` pushed into its city's `W_CITIES` def, and a coach (`tc_<name>`, fixed) beside it. One painter (`WOBJ['!']`) draws the thing for the spot's sport.
+- **Use.** Using the tile, or the coach's `drill` or `challenge` (act `spot`), opens `wOpenSpot`. Drill: once a week (`wWeek()`) per spot, a card from `wSpotCards(sport)` (cards whose `sportFits` include the sport, or any `practicable` card if none do) gets `sk = 1`, an hour passes. Challenge: once a week per spot, three answers from `SPORT_BRIEF` (the spot's sport and two others); right pays `W_SPOT.prize`.
+- **State.** `WG.spots = { id: { drill: week, quiz: week, right } }`, plain JSON.
+

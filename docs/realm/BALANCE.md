@@ -218,3 +218,14 @@ Part 1 plays a fresh five-player journey at level 3 against a rival's nine at th
 | cups won | 16.7% | 7.5% |
 
 A simulated cup costs about 8 gold on average (the 40 gold fee against the 150 gold prize) and pays about 112 XP across the roster. With 120 games a cell, a rate is good to about ±9%. A player who plays the pitches beats Squire and Knight far more often than a coin flip; nobody has measured that yet.
+
+## Training spots (issue #6, phase 4)
+
+The bot drills a card and answers the challenge at each spot in every town it stops in, once a week (`opts.spots`). 140 journeys each, skilled bot, meals on:
+
+| | Champion rate | Gold at the Crown | Stuck at the Hatchery |
+|---|---|---|---|
+| Spots off | 73.6% | 582 | 16 |
+| Spots on | 77.9% | 652 | 10 |
+
+About +4 points, inside the noise of two 140-run samples. The free Practice ★ helps most early (the Hatchery), and the prize money adds about 70 gold by the Crown. No retune.
