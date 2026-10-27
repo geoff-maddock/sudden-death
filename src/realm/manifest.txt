@@ -49,3 +49,4 @@ src/realm/w23-spots.js
 src/realm/w24-fixtures.js
 src/realm/w25-home.js
 src/realm/w26-gfeel.js
+src/realm/w27-notices.js

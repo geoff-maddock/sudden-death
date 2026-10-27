@@ -185,6 +185,16 @@ window.REALMLAB = function (opts = {}) {
     }
   }
 
+  // notice boards (epic 2, phase 4): in a town, take the best-paying contracts the route can meet (not ground games,
+  // which the route never plays), up to the limit (opts.notices === false: never)
+  function board(region) {
+    if (opts.notices === false || typeof W_NOTICE === 'undefined') return;
+    const town = TOWN[region]; if (!town || !W_NOTICE_CITY[town]) return;
+    const b = wBoard(town).list.filter(c => c.t !== 'ground').sort((x, y) => y.pay.gold - x.pay.gold);
+    for (const c of b) { if (wNotices().taken.length >= W_NOTICE.max) break; wTakeNotice(town, c.id); }
+    settle();
+  }
+
   // personal quests (epic 2, phase 2): take every quest on as soon as a player offers it, and turn it in when the
   // route passes through their hometown (no detours)
   function quests(region) {
@@ -199,6 +209,7 @@ window.REALMLAB = function (opts = {}) {
   /* ---------- the route ---------- */
   function wild(region, n) {
     const town = TOWN[region];
+    board(region);
     for (let i = 0; i < n && !RUN.over; i++) {
       prep(region);
       // a grudge (a bench player the bot would not sell) turns up on the road: the bot plays it on its next wild stop
@@ -213,7 +224,7 @@ window.REALMLAB = function (opts = {}) {
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       if (id === 'crown') { log.crownTries++; for (let d = 0; d < 200 && !wChampWeek(); d++) wAdvance(24 * 60); }
       atMap(C.town);
-      ground(region); spots(region); tavern(region); quests(region); enchant(); shop(region);
+      ground(region); spots(region); board(region); tavern(region); quests(region); enchant(); shop(region);
       if (RUN.gold < W_CUP.fee && id !== 'crown') RUN.gold = W_CUP.fee; // a player would grind the fee; not the point
       while (!RUN.over) {
         prep(region, true);
@@ -232,7 +243,7 @@ window.REALMLAB = function (opts = {}) {
   function dungeon(id) {
     const dg = DB.dungeons.find(d => d.id === id), L = loc(id), region = L ? regionAt(L.x, L.y) : 'plains';
     if (!wGateCheck(id).ok) return false;
-    ground(region); spots(region); quests(region); shop(region); enchant();
+    ground(region); spots(region); board(region); quests(region); shop(region); enchant();
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       for (const R of wDungeonRooms(id)) {
         if (wFlag(R.flag) || RUN.over) continue;
@@ -284,6 +295,7 @@ window.REALMLAB = function (opts = {}) {
   if (!log.result) log.result = wFlag('champion') ? 'champion' : 'stuck';
   log.ground = WG.ground ? { town: WG.ground.town, parts: WG.ground.parts } : null;
   log.grudges = log.matches.filter(m => m.what === 'grudge').length;
+  log.notices = WG.notice ? WG.notice.done : 0; log.lapsed = WG.notice ? WG.notice.lapsed : 0;
   log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;
   return log;

@@ -229,3 +229,15 @@ The bot drills a card and answers the challenge at each spot in every town it st
 | Spots on | 77.9% | 652 | 10 |
 
 About +4 points, inside the noise of two 140-run samples. The free Practice ★ helps most early (the Hatchery), and the prize money adds about 70 gold by the Crown. No retune.
+
+## Notice boards (epic 2, phase 4)
+
+At every town it stops in, the bot takes the best-paying contracts the route can meet (not ground games, which the route never plays), up to three (`opts.notices`). 140 journeys each, skilled bot:
+
+| | Champion rate | Contracts done | Gold at the end |
+|---|---|---|---|
+| Boards off | 75.7% | 0 | 631 |
+| Boards on, first pay table | 81.4% | 12.8 (4.4 lapsed) | 1,172 |
+| Boards on, gold halved (shipped) | 76.4% | 11.9 (4.8 lapsed) | 853 |
+
+The first pay table nearly doubled the gold a journey ends with, and gold already piles up, so contracts now pay half the gold (`W_NOTICE.gold`), with fans at two fifths of it and the card picks kept. The champion rate is inside the noise either way. The gold sinks of phase 10 should take up the extra 220.
