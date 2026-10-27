@@ -254,3 +254,5 @@
 .wtag.wlegs-fresh{background:#3f6a3a;color:#eef2e6;margin-left:4px}
 .wtag.wlegs-tired{background:#b8862a;color:#1e1205;margin-left:4px}
 .wtag.wlegs-spent{background:#a8402e;color:#fbeee6;margin-left:4px}
+/* w29: the captain's armband */
+.wtag.wcap{background:#f2c14e;color:#1e1205;margin-left:6px;vertical-align:middle;font-size:12px;padding:2px 5px 1px}

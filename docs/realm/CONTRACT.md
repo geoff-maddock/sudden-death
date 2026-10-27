@@ -459,3 +459,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Kickoff.** A `fightStart` hook splices `wFatCards(p)` Sudden Death `fatigue` cards into `B.draw` for each starter and sets `B.wTired`. `wKickoff` (wrapped) then moves the legs: starters +1 (at most `W_FAT.max`), bench −1 (at least 0). Ball games on the diamond do not count.
 - **Rest.** `wSleepInn` (wrapped, so also the home ground's beds) takes `W_FAT.bed` off everyone; `wMakeCamp` (wrapped) `W_FAT.camp`.
 - **Off.** `W_FAT.off` turns it all off (the bot's control runs).
+
+## The captain (w29-captain.js)
+
+- **State.** `WG.captain`: a player id. `wCaptain()` is that player only while they start. `wSetCaptain(pid)` returns '' or why not (only a starter). `wStart` (wrapped) names the first starter if there is none (new journeys and old saves); `wRelease` (wrapped) hands the armband to the first starter.
+- **The bonus.** `W_CAPTAIN[kind] = { n, d, on: { event: fn } }`, one for each of the 18 kinds a player can be (`SIG`). One `onHook(event)` per event used runs the captain's handler during a realm match; `fightStart` also logs it. `W_CAPT.off` turns it off.
+- **UI.** `wCampRow` (wrapped): a `.wcap` tag on the captain, a `[data-capt]` Captain button on other starters. `wPreGame` (wrapped): a `.wcapt` line.
