@@ -50,3 +50,4 @@ src/realm/w24-fixtures.js
 src/realm/w25-home.js
 src/realm/w26-gfeel.js
 src/realm/w27-notices.js
+src/realm/w28-legs.js

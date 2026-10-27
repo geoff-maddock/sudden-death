@@ -452,3 +452,10 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Taking.** `wTakeNotice(city, id)` returns '' or why not (at most `W_NOTICE.max`); a taken contract has `until = dayAbs + W_NOTICE.days`. `wDropNotice(id)`. `wNewDay` (wrapped) lapses the ones past `until`.
 - **Meeting one.** `wDispatchEnd` (wrapped), on a win: `wNoticeFacts(W)` reads the world context and the last game record (`RUN.games`): `{ region, sport, night, us, them, won, type, club: ref.club || ref.rival, g }`. Every taken contract that `wNoticeMet` pays at once (`count` counts up first). Ball games on the diamond do not count.
 - **State.** `WG.notice = { boards: { city: { week, list } }, taken: [contract], done, lapsed }`, plain JSON.
+
+## Tired legs (w28-legs.js)
+
+- **State.** `p.legs` on each roster player (plain number, missing = 0). `wLegsState(p)`: `fresh` below `W_FAT.tired` (3), `tired` below `W_FAT.spent` (5), else `spent`. `wFatCards(p)`: 0, 1 or 2.
+- **Kickoff.** A `fightStart` hook splices `wFatCards(p)` Sudden Death `fatigue` cards into `B.draw` for each starter and sets `B.wTired`. `wKickoff` (wrapped) then moves the legs: starters +1 (at most `W_FAT.max`), bench −1 (at least 0). Ball games on the diamond do not count.
+- **Rest.** `wSleepInn` (wrapped, so also the home ground's beds) takes `W_FAT.bed` off everyone; `wMakeCamp` (wrapped) `W_FAT.camp`.
+- **Off.** `W_FAT.off` turns it all off (the bot's control runs).

@@ -250,3 +250,7 @@
 .wdcg .wlost{opacity:.55}
 @media (max-width:560px){.wdcb{grid-template-columns:1fr}}
 .wlgnext li.wme{font-weight:600}
+/* w28: tired legs on the Team screen */
+.wtag.wlegs-fresh{background:#3f6a3a;color:#eef2e6;margin-left:4px}
+.wtag.wlegs-tired{background:#b8862a;color:#1e1205;margin-left:4px}
+.wtag.wlegs-spent{background:#a8402e;color:#fbeee6;margin-left:4px}
