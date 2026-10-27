@@ -489,3 +489,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 
 - **Training camp.** `wCampDrill(spotId, card)`: only after that spot's free drill this week; `wCampPrice()` from `W_SINK.camp` by sessions this week (`WG.sink = { week, drills, coaches }`). A row added to `wOpenSpot` (wrapped).
 - **Coaches.** `wCoachTrip(from, to)`: `{ dist, price, minutes }` between two of `W_COACH_CITIES`. `wTakeCoach(to)` charges, advances the clock, and puts you at the destination's inn spot (`wInnSpot`) with the usual grace. Innkeepers' `coach` (act `coach`) and the inn's Coach button open `wOpenCoach`.
+
+## Defend the title (w34-defend.js)
+
+- **Champions.** `wChamps()` = crowns held. `wRenown` (wrapped) adds `W_DEF.renown` each. `WG.crownDay` is the day of the last crown.
+- **Defences.** `wDefending(id)`: a town cup on your wall whose `cupLog` year is before this year, once you are champions. `wCupProblem`, `wCupEnter` and `wCupPlay` (wrapped) let you in and mark `WG.cup.defence` before round 1 is built; `wCupMatch` (wrapped) adds `W_DEF.lvUp` levels to a defence and a level per crown to the Crown. `WG.defend.cups[id]` lists the years defended.
+- **The hunt.** `wEncounterHook` (wrapped), from the day after a crown: `W_DEF.huntP` a world step, a rival club's `event` match with `ref: { rival, hunt: 1 }` (so w18 counts it on the table and h2h). `W_ON_END.event` (wrapped) pays `W_DEF.huntWin`.

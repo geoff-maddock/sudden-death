@@ -181,6 +181,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w31-name.js` | Regional fans (epic 2, phase 8): `WG.rep[region]`, earned by wins, cups and contracts there and lost a little by losses. Known: cheaper rooms at the region's inn. Liked: half price, and its free agents a level higher at the same fee. Loved: a home crowd (Block at kickoff) at every match in the region. Shown on the Team screen. |
 | `w32-tour.js` | The Barnstormers (epic 2, phase 9): a show team that tours a region at a time (`WG.tour`), tracked by rumour (innkeepers' BARNSTORMERS, the notice boards' poster, a day behind after a move). In their region's open country they may turn up for a top-tier match; beat them for Showstopper, a Hall of Fame card no pool offers, then they go home for the year. |
 | `w33-sinks.js` | Gold sinks (epic 2, phase 10): paid training camp sessions at the training spots after the week's free drill (rising prices, `WG.sink`), and League coaches between the five cities from any inn (`wTakeCoach`: a fare by distance, half the walking time, no encounters). |
+| `w34-defend.js` | Defend the title (epic 2, phase 11): after the Crown, each crown adds to renown, the cups on your wall reopen the next year as title defences a level harder (`WG.defend`), rival clubs hunt the champions on the road (a rival `event` match with `ref.hunt`), and the Crown is a level harder for each crown held. |
 
 ### Brimstone Diamond (`src/bd/`)
 
