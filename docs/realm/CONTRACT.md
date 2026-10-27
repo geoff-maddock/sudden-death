@@ -484,3 +484,8 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **State.** `WG.tour = { region, prev, since, beat: [years], played }`. The tour starts on day `W_TOUR.start`, away from the Plains; `wNewDay` (wrapped) moves it after `W_TOUR.stay` days (`since` is the day after the move). `wTourOn()`: started, and not beaten this year.
 - **Rumours.** `wTourRumour()`: the region they are in, or for the day between regions where they were. Innkeepers' `barnstormers` (act `tour`) logs it; `wOpenBoard` (wrapped) shows it as a poster.
 - **The match.** `wEncounterHook` (wrapped): on the world map in their region, `W_TOUR.p` a step. `wTourMatch(region)`: `elite`, tier `W_TOUR.tier`, level + `W_TOUR.lvUp`, kind `tour`, in `W_TOUR.team`'s colours (`wMatchTeam`, wrapped). `W_ON_END.tour`: a first win pays `W_TOUR.prize` and the card `tour_showstop` (kind `none`, so no reward pool offers it); later years `W_TOUR.again`. A loss moves them on.
+
+## Gold sinks (w33-sinks.js)
+
+- **Training camp.** `wCampDrill(spotId, card)`: only after that spot's free drill this week; `wCampPrice()` from `W_SINK.camp` by sessions this week (`WG.sink = { week, drills, coaches }`). A row added to `wOpenSpot` (wrapped).
+- **Coaches.** `wCoachTrip(from, to)`: `{ dist, price, minutes }` between two of `W_COACH_CITIES`. `wTakeCoach(to)` charges, advances the clock, and puts you at the destination's inn spot (`wInnSpot`) with the usual grace. Innkeepers' `coach` (act `coach`) and the inn's Coach button open `wOpenCoach`.

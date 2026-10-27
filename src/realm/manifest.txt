@@ -55,3 +55,4 @@ src/realm/w29-captain.js
 src/realm/w30-weather.js
 src/realm/w31-name.js
 src/realm/w32-tour.js
+src/realm/w33-sinks.js
