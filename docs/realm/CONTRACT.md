@@ -472,3 +472,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Which matches.** `wMatchWeather(W)`: a `W_WX_OUT` kind (`wild`, `event`, `camp`, `alpha`, `lair`, `tour`) on the world map, or a `ground` match whose sport is not in `W_WX_INDOOR`. `wBuildEncounter` (wrapped) sets `enc.world.wx`; fog may make a day wild game off the road an ambush.
 - **Kickoff.** A `fightStart` hook gives both sides the marker status (`snowed`, `fogbound`, `ashen`, new `ST` entries) and applies the effect; `B.wWx` is set. Cards: `wx_whiteout`, `wx_fogbank`, `wx_cinder` (kind `any`, uncommon, one regional sport each), using `['ifst', marker, yes, no]`.
 - **UI.** The weather after the region's name in the top bar (`wRenderHud`, wrapped), a `.wwx` pre-game line, and `wDrawWeather` over the world view (`wRender`, wrapped, in screen space inside save/restore).
+
+## Regional fans (w31-name.js)
+
+- **State.** `WG.rep = { region: points }`. `wRepStep(region)` counts the thresholds in `W_REP.at` (10, 25, 50): Unknown, Known, Liked, Loved. `W_REP.off` turns the effects off.
+- **Earning.** `wDispatchEnd` (wrapped): +`W_REP.win` for a win in `W.region`, −`W_REP.lose` for a loss. `wCupWon` (wrapped): +`W_REP.cup` to the cup's region. `wNoticePayOut` (wrapped): +`W_REP.notice` to the contract's region.
+- **Effects.** `wInnPrice(price, region)` (`W_REP.inn` by step) is applied by `wOpenInn` (wrapped) in a city. `wTavern` (wrapped): Liked or better, each new week's agents +1 level, fee unchanged (`T.wrep`). Loved: a `fightStart` hook adds `W_REP.block` Block (`B.wRep`) unless the match is at home (`wIsHome`) or the Crown.

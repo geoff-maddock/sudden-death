@@ -256,6 +256,13 @@
 .wtag.wlegs-spent{background:#a8402e;color:#fbeee6;margin-left:4px}
 /* w29: the captain's armband */
 .wtag.wcap{background:#f2c14e;color:#1e1205;margin-left:6px;vertical-align:middle;font-size:12px;padding:2px 5px 1px}
+/* w31: your name, region by region */
+.wreplist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.wreplist small{color:var(--dim)}
+.wtag.wrep-0{background:var(--seam);color:var(--dim)}
+.wtag.wrep-1{background:#8a6a3a;color:#fbeee6}
+.wtag.wrep-2{background:#3f6a3a;color:#eef2e6}
+.wtag.wrep-3{background:#c9483a;color:#fbeee6}
 /* w30: the weather in the top bar */
 .wwxhud{color:#cfe8f0}
 .wwxhud.wwx-ash{color:#ff9a5a}
