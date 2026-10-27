@@ -478,3 +478,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **State.** `WG.rep = { region: points }`. `wRepStep(region)` counts the thresholds in `W_REP.at` (10, 25, 50): Unknown, Known, Liked, Loved. `W_REP.off` turns the effects off.
 - **Earning.** `wDispatchEnd` (wrapped): +`W_REP.win` for a win in `W.region`, −`W_REP.lose` for a loss. `wCupWon` (wrapped): +`W_REP.cup` to the cup's region. `wNoticePayOut` (wrapped): +`W_REP.notice` to the contract's region.
 - **Effects.** `wInnPrice(price, region)` (`W_REP.inn` by step) is applied by `wOpenInn` (wrapped) in a city. `wTavern` (wrapped): Liked or better, each new week's agents +1 level, fee unchanged (`T.wrep`). Loved: a `fightStart` hook adds `W_REP.block` Block (`B.wRep`) unless the match is at home (`wIsHome`) or the Crown.
+
+## The Barnstormers (w32-tour.js)
+
+- **State.** `WG.tour = { region, prev, since, beat: [years], played }`. The tour starts on day `W_TOUR.start`, away from the Plains; `wNewDay` (wrapped) moves it after `W_TOUR.stay` days (`since` is the day after the move). `wTourOn()`: started, and not beaten this year.
+- **Rumours.** `wTourRumour()`: the region they are in, or for the day between regions where they were. Innkeepers' `barnstormers` (act `tour`) logs it; `wOpenBoard` (wrapped) shows it as a poster.
+- **The match.** `wEncounterHook` (wrapped): on the world map in their region, `W_TOUR.p` a step. `wTourMatch(region)`: `elite`, tier `W_TOUR.tier`, level + `W_TOUR.lvUp`, kind `tour`, in `W_TOUR.team`'s colours (`wMatchTeam`, wrapped). `W_ON_END.tour`: a first win pays `W_TOUR.prize` and the card `tour_showstop` (kind `none`, so no reward pool offers it); later years `W_TOUR.again`. A loss moves them on.
