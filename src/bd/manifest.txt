@@ -1,0 +1,59 @@
+# Brimstone Diamond build manifest: ./build.sh src/bd/manifest.txt   (writes build/brimstone-diamond.html)
+#
+# The original game, split at its section headers; the parts concatenate back to the original script.
+# Built on its own it is the standalone game, used by test/realm_diamond_source.py to prove the split.
+# The Realm takes the same parts inside a scope (build.sh's `scope` line), so its names stay private.
+shell src/bd/shell.html
+style src/bd/bd.css
+out build/brimstone-diamond.html
+
+src/bd/parts/01-utilities.js
+src/bd/parts/02-data-pitches.js
+src/bd/parts/03-data-abilities.js
+src/bd/parts/04-data-teams.js
+src/bd/parts/05-field-geometry.js
+src/bd/parts/06-audio.js
+src/bd/parts/07-input.js
+src/bd/parts/08-ultimates.js
+src/bd/parts/09-weaknesses.js
+src/bd/parts/10-custom-teams.js
+src/bd/parts/11-game-state-flow.js
+src/bd/parts/12-batted-ball-physics.js
+src/bd/parts/13-the-live-play.js
+src/bd/parts/14-rendering.js
+src/bd/parts/15-page-ui.js
+src/bd/parts/16-main-loop.js
+src/bd/parts/17-season-mode.js
+src/bd/parts/18-catalog.js
+src/bd/parts/19-saving-and-returning.js
+src/bd/parts/20-music.js
+src/bd/parts/21-field-conditions.js
+src/bd/parts/22-health-and-injuries.js
+src/bd/parts/23-casting-ultimates.js
+src/bd/parts/24-drawing-field-conditions.js
+src/bd/parts/25-season-history.js
+src/bd/parts/26-team-builder.js
+src/bd/parts/27-cpu-managed-seasons.js
+src/bd/parts/28-player-statistics.js
+src/bd/parts/29-settings-page.js
+src/bd/parts/30-base-stealing.js
+src/bd/parts/31-magic-gear.js
+src/bd/parts/32-game-logs.js
+src/bd/parts/33-phone-panel.js
+src/bd/parts/34-end-game.js
+src/bd/parts/35-injuries.js
+src/bd/parts/36-the-sky.js
+src/bd/parts/37-how-to-play.js
+src/bd/parts/38-leagues.js
+src/bd/parts/39-take-over-cpu-club.js
+src/bd/parts/40-front-office.js
+src/bd/parts/41-offseason-dungeon-crawl.js
+src/bd/parts/42-season-setup.js
+src/bd/parts/43-settings-saved-data.js
+src/bd/parts/44-power-tips.js
+src/bd/parts/45-clubs-that-grow.js
+src/bd/parts/46-close-play-zoom.js
+src/bd/parts/47-detail-pages.js
+src/bd/parts/48-pitch-clock.js
+src/bd/parts/49-dungeon-crawl-replay.js
+src/bd/parts/50-brawling.js

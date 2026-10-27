@@ -1,0 +1,42 @@
+/* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
+.wpglv{font-size:15px;color:var(--dim)}
+.wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
+.wambush b{color:#ff5a4a}
+.wpgmeal{margin:0 0 8px}
+.wpgmeal p{margin:0 0 6px}
+.wpgmeal .row{gap:6px;flex-wrap:wrap}
+.wpgmeal .ghost{font-size:16px;padding:5px 10px 3px}
+/* event cards */
+#modalBox:has(.wev){width:min(640px,100%)}
+.wev .wpgwho{font-size:17px;line-height:1.45}
+.wev .result{margin:4px 0 8px;font-size:17px}
+.wevscene{display:grid;place-items:center;width:96px;height:96px;border-radius:8px;border:1px solid var(--seam);background:#1a120d}
+.wevscene svg{width:60px;height:60px}
+#modalBox .opts{margin:0 0 10px;max-width:none}
+.opt small{display:block;color:var(--dim);font-size:14px;line-height:1.35;margin-top:2px}
+/* meals */
+#modalBox:has(#wMealBody){width:min(720px,100%)}
+#wMealBody h4{margin:10px 0 4px}
+.wmealnow{margin:0 0 8px;font-size:16px}
+.wneeds{font-size:14px;line-height:1.5}
+.wneeds span{display:inline-block;margin-right:10px;white-space:nowrap}
+.wneeds i{color:var(--faint);font-style:normal}
+.wshop .wsellh small{display:inline;margin-left:8px}
+/* enchanter */
+#modalBox:has(.wenergy){width:min(680px,100%)}
+.wenergy{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 10px;font-family:var(--hud);font-size:18px}
+.wenergy b{font-size:22px}
+.wen-ember b{color:#ff8a5a} .wen-bloom b{color:#8ad65a} .wen-tide b{color:#7fd6ff} .wen-aether b{color:#d2a6ff} .wen-rime b{color:#e3f3ff}
+.wentot{color:var(--dim);margin-left:auto}
+.whud .wen b{color:#d2a6ff}
+#wMealBody .wshop .wsellh td{text-align:left}
+/* card shops */
+#modalBox:has([data-wbuyc]){width:min(900px,100%)}
+#modalBox .shopgrid .cardrow{flex-wrap:wrap;justify-content:center}
+@media (max-width:520px){
+  .wevscene{width:72px;height:72px}
+  .wenergy{font-size:16px}
+  .wentot{margin-left:0}
+  #modalBox .shopgrid .cardrow .card{--cw:132px}
+  #modalBox .wmport{display:none}
+}

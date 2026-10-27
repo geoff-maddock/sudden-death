@@ -2,7 +2,7 @@
 
 The game ships as one file, `dist/sudden-death.html`. `./build.sh` reads `src/manifest.txt`, concatenates the files it lists in that order, syntax-checks the result with `node --check`, and wraps it in the HTML shell (`src/shell.html`). Every file shares one global scope, so **order matters**: a file may only use things defined in earlier files at load time (calls made later, at runtime, can reach anything). Folders say what a file is; the manifest says when it loads, and the two do not always agree (sound effects load just before the fight scene, and boot runs before the stats, treasure and `app/` files).
 
-The manifest format: one path per line, relative to the repo root; blank lines and `#` comments are ignored; `shell <file>` names the page, `out <file>` the output, and `include <manifest>` reads another manifest in place. `./build.sh <manifest>` builds from another one.
+The manifest format: one path per line, relative to the repo root; blank lines and `#` comments are ignored; `shell <file>` names the page, `out <file>` the output, and `include <manifest>` reads another manifest in place. `./build.sh <manifest>` builds from another one. `scope <NAME> <manifest> <exports>` wraps another manifest's files in one function, so their top-level names stay private, and sets the global `NAME` to what the exports file returns; duplicate names are checked inside each scope on its own. `text <NAME> <file>` adds a line `const NAME = "<the file's contents>";`, so a script can carry a stylesheet or markup.
 
 Several files still open with their old part name in a comment (`/* p5: ... */`). That is deliberate for now: the move was checked to produce a byte-identical build.
 
@@ -127,3 +127,71 @@ Balance is measured with bots that play from the model, not the screen (`test/la
 - `python3 test/difficulty.py 100 '{"draw":4}' dumb`: difficulty probe. Overrides `TUNE` (`engine/combat.js`: cards drawn, enemy HP and damage per act, elite HP, healing between acts), and with `dumb` also runs a careless bot that plays random cards at random targets. The gap between the two is a rough measure of how much skill matters. Add `hard` for Hall of Fame difficulty.
 
 Bot numbers measure relative balance, not how hard the game feels to a person. Compare before and after a change, with at least 100 runs per side, and expect a few points of noise either way.
+
+## Champions of the Realm
+
+`./build.sh src/realm/manifest.txt` writes `dist/realm.html`: an open-world build where you walk a realm with your team and every fight is a Sudden Death match. Its manifest loads a prelude, then `include src/manifest.txt` (all of Sudden Death, in its own order), then the realm files. Its `out` line comes after the include, so it replaces Sudden Death's. `style` lines add the realm CSS to the shell's `<style>`. The standalone build never sees a realm file. `docs/realm/` has the plan (`PLAN.md`), the shapes the parts agree on (`CONTRACT.md`) and the balance notes (`BALANCE.md`).
+
+### The files, in build order
+
+| File | What lives there |
+|---|---|
+| `w00-pre.js` | Sets `__SD_REALM` before anything else, so Sudden Death's `app/boot.js` stands down. |
+| *(all of Sudden Death)* | Unchanged. |
+| `w0.css`, `w6.css`, `w9.css` | Realm styles: the world view, the camp, the road and towns. |
+| `w1-data.js` | `DB`: regions, tiles, locations, towns, NPCs and their keyword topics, items, meals, events, cups, quests (ported from Terra Chimera, rewritten for teams). |
+| `w2-maps.js` | `MAPS`: the overworld, towns and dungeons, built deterministically; `worldProblems`, `dungeonProblems`, `wAudit`. |
+| `w3-state.js` | `WG`, the world state: time, movement, map changes, using tiles, NPC talk (`wSay`, `wRunAct`), shops and inns. No DOM. |
+| `w4-ink.js` | The ink tile renderer and actor drawing (`wDrawMap`, `wDrawActor`), with a per-map layer cache. |
+| `w5-bridge.js` | **The match seam**: `startMatch`, the pre-game card, `W_ON_END`, wins and blackouts, the save, `wGainCard`. |
+| `w6-party.js` | The party is the team: roster, lineup, cards owned by players, XP and levels, recruiting, taverns, careers, the new-journey draft. |
+| `w7-ui.js` | The world view: HUD, log, talk panel, shop and inn panels, input, drawing each frame. |
+| `w7b-camp.js` | The camp (Team button, `C`): lineup, levels, cards by player. |
+| `w8-boot.js` | Title screen, new journey, save and resume, the frame loop's world branch. |
+| `w9-road.js` | Tiers and levels, wild teams by region, night ambushes, energy for wins, road events. |
+| `w9b-town.js` | Meals and cooking, the enchanter, card shops. |
+| `w10-dungeon.js` | Dungeon rooms of famous teams, alphas as Sudden Death bosses, gates, magic gear. |
+| `w11-cups.js` | Town cups, rivals and head to head, the Crown and the champion ending. |
+| `w12-renown.js` | Renown (foes grow with cups and bosses), and no trophies from ordinary elite wins. |
+| `w13-feel.js` | Music per region, tips, Realm achievements, the Crown in the record book, the Bag. |
+| `w14-ground.js` | Your home ground: buy one behind any inn, the home crowd in its region, and its upgrades. |
+| `w15-camp.js` | Camping out in the wild: a Trail Ration for a night's rest, and the risk of being caught asleep. |
+| `w16-stats.js` | Player stats: a Stats tab on the Team screen with each player's numbers for the journey or their career, by sport, and their last games. |
+| `w17-bonds.js` | Hometowns and personal quests (talk to a player: a nickname and their kind's Hall of Fame card), and chemistry between starters (a strong pair's combo card). |
+| `w18-league.js` | The league table (rivals and Apex play rounds while you travel; inns post it) and rivals who act: bids for bench players, grudge matches on the road, cup taunts and revenge. |
+| `w19-journal.js` | The journal (`J`): people you've talked to and what they said, places by region with their rules, big victories, quests; filters by active quest, learned keyword and search. |
+| `scope wBD` (`src/realm/diamond/`) | Brimstone Diamond, the baseball game, in its own scope: `d0-page.js` mounts its page in a shadow root inside `#v-diamond` and stands in for `document`, `window`, `localStorage` and the frame loop inside the scope; `exports.js` is what the Realm may call (`wBD`). |
+| `w20-diamond.js` | The diamond view: `showView('diamond')`, the bar above the field, `wDiamondExhibition` (CPU against CPU, Watch them play), back to the world. |
+| `w20b-ratings.js` | Baseball ratings: every player's `p.bd` (position, hand, POW/CON/SPD/ARM/FLD 1–12, powers, pitches), seeded from their kind's Brimstone Diamond player, a point per level; a Baseball block on the Stats page. |
+| `w20c-nine.js` | The baseball nine (`WG.nine`): batting order and positions, call-ups at your level for the spots your roster can't fill, `wNineDef()` for the diamond; a Nine tab on the Team screen. |
+| `w20d-ballgame.js` | Ball games from the world (`WG.ball`): Play, Manage or Simulate against the local nine or a rival once you have 5 players, XP, gold, fans, head to head and box scores (`WG.bstats`), save and resume mid-game, a Baseball view on the Stats tab. |
+| `w20e-dcup.js` | The Diamond Cup (`WG.dcup`): baseball's weekly 8-nine bracket, entered through the League clerk (DIAMOND) or the Nine tab; you play your games, the rest are simulated on the engine; prizes, the journal and the Wall of Awards. |
+| `w20f-feel.js` | Baseball's feel: Sudden Death's music stops on the diamond and Brimstone Diamond's follows the Music and Sound settings (`wBD.audio`); coach's notes for playing ball and the Diamond Cup; medals for ball games won and Diamond Cups. |
+| `w21-grounds.js` | Sports grounds (issue #6): two per city, one for each of its region's sports, on a road outside the gate; each a walk-in map with the field drawn for its sport, stands, a scoreboard, a groundskeeper who explains the scoring and a fan. The Ballpark's keeper books ball games and the Diamond Cup. |
+| `w21b-gmatch.js` | Games at the grounds (issue #6, phase 2): each ground needs a squad sized for its sport (`W_GRD_SQUAD`, 4 to 7); then its keeper puts on a Friendly or a Challenge, a card-game match locked to the ground's sport against the city's club, once a day. The record is on the scoreboard and in the journal. |
+| `w22-cities.js` | Bigger cities (issue #6, phase 3): the five cities rebuilt at about twice the area with their own districts (`W_CITIES` replaces their `DB.towns` entries), homes you can walk into, and new decor tiles with ink painters (hedge, fence, flower bed, bench, crates, vegetable patch, goalposts, slag heap, fish rack). Old saves standing on a new wall move to the nearest open tile. |
+| `w23-spots.js` | A sport in every city (issue #6, phase 4): two training spots per city (tile `!`), one per regional sport, each with a coach. Once a week at each: drill a card that suits the sport (Practice ★, free, an hour) and answer the coach's challenge on how the sport scores (20 gold and 5 fans). |
+| `w24-fixtures.js` | Fixtures and the league at the grounds (issue #6, phase 5): each league round is drawn up in advance (`WG.league.next`), the clubs' games are played at the home side's grounds (results carry the ground, shown on its scoreboard), and you have a fixture every round, away, played at its ground through the keeper's card. Fans greet you by your place in the table. |
+| `w25-home.js` | Home grounds move (issue #6, phase 6): the home ground (w14) is one of the sports grounds (`WG.ground.grd`), bought from its groundskeeper (HOME) or from the city's inn. Upgrades, beds, kitchen and scouts work as before; you host your league fixture there every other round (not at the Ballpark, which alone hosts ball games). Old saves move to the city's first ground. |
+| `w26-gfeel.js` | The feel of the grounds (issue #6, phase 7): a theme per ground (`THEMES.wg_*`, walking it and in a match there), tips for the grounds, the squad, your fixture and the training spots, three medals (Groundhopper, Fixture List, Top of the Class), the League shop's team kit in Graftonbury (`WG.kit`, worn through a wrapped `clubTeam`), and match-day posters and results in the cities. |
+
+### Brimstone Diamond (`src/bd/`)
+
+The baseball engine for issue #4, from the same designer's *Brimstone Diamond*. It is split at its own section headers into `src/bd/parts/`, with its page (`shell.html`) and stylesheet (`bd.css`). `./build.sh src/bd/manifest.txt` builds the standalone game into `build/`. The Realm takes the same parts through a `scope wBD …` line (`src/realm/diamond/manifest.txt`), because about 70 of its names (`G`, `S`, `KIND`, `drawFig`, `frame`…) are also Sudden Death's. `src/bd/README.md` has where the source came from and the one edit made for scoping. `test/realm_diamond_source.py` proves both builds play a game and that the scoped one leaks nothing.
+
+**Inside the Realm.** Brimstone Diamond expects to own its page: about 120 `getElementById` calls, document click handlers, window key listeners, a frame loop from load, its own saves and hash pages. `src/realm/diamond/d0-page.js` opens the scope and declares the page names its parts see. `document` looks up ids and selectors in a shadow root inside `#v-diamond`, and puts its listeners there, so its ids (`cv`, `pg-play`…) and its CSS never meet ours. `window`'s listeners, `requestAnimationFrame` and `setInterval` only act while the diamond is shown, so its loop is parked and its keys are dead in the world. `localStorage` is an in-memory Map, and `location`/`history` are stubs. Its CSS is mounted with `:root` turned into `:host` and `body` into the page wrapper; `BDX_OWN_CSS` hides its header, menus and other pages. `exports.js` wraps `gameOver` and `showMenu` inside the scope so the Realm hears about a final or a quit. `test/realm_diamond.py` checks all of this.
+
+### The match seam
+
+`startMatch({ type, tier, sport?, ids?, world: { kind, ref } })` (`w5-bridge.js`) builds a Sudden Death encounter at `RUN.act = tier - 1`, shows the pre-game card and calls `beginFight`. The world context rides on `RUN.pending.world` as plain data, so a mid-match save restores it. When the match ends, `W_ON_END[world.kind](result, ref, world)` runs, looked up by name: `wild`, `alpha`, `lair`, `event`, `room`, `cup`. Nothing stores a callback. A win goes through Sudden Death's reward panel, whose Continue (`backToMap`, reassigned) returns to the world; a loss is a blackout (`wBlackout`), or the end in Hardcore. **Not yet** on the pre-game card calls `wBackAway(enc)`: for a road event's match it reopens the event card (`w9-road.js`), because an event only closes, and its choice is paid, at kickoff.
+
+### Conventions
+
+- **Realm names start with `w` or `W`** (`WG`, `wLog`, `W_CUP`). The Terra Chimera names `DB`, `MAPS`, `WW`, `WH`, `regionAt`, `mulberry`, `noise2` are the only exceptions. Never declare a name Sudden Death already has.
+- **Wrap by reassignment.** Later realm files change earlier ones, and Sudden Death, only by saving the original and reassigning: `const wW11PreGame = wPreGame; wPreGame = function (enc) { wW11PreGame(enc); … };`. The saved original is named `wW<n>` plus the function name, where `<n>` is the part doing the wrapping (`wW10` … `wW15`); a Sudden Death original saved in the realm is `wSd…`. Each file's header comment lists what it wraps.
+- **How to play** is one section, `#wHelp`, built by `w5-bridge.js` and added to by each part's `renderHelp` wrapper, in load order. Each part's block keeps its id (`wHelpTeam`, `wHelp4`, `wHelp5`, `wHelpCups`, `wHelpRenown`, `wHelpGround`): the tests look for them.
+- **Talk topics** are lower-case keys; an ALL-CAPS word in a line becomes a link when the speaker has a topic for it. `test/realm_polish.py` checks every capitalised word leads somewhere, and `wAudit` checks every `need` flag is set by something.
+
+### The save
+
+One record per profile: `localStorage[pkey('sd-realm')] = { v: 2, WG, RUN }`. `saveRun`, `loadRun` and `clearRun` are reassigned to it, so Sudden Death's mid-match snapshot (`RUN.battle`) works unchanged. `WG` and `RUN` must stay plain JSON, like `B`.

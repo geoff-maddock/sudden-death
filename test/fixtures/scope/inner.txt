@@ -1,0 +1,3 @@
+shell src/bd/shell.html
+out build/ignored.html
+test/fixtures/scope/inner.js

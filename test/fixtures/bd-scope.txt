@@ -1,0 +1,6 @@
+# Brimstone Diamond inside a scope, as the Realm will take it: ./build.sh test/fixtures/bd-scope.txt
+# (test/realm_diamond_source.py builds and loads this to prove no Brimstone Diamond name reaches the page)
+shell src/bd/shell.html
+style src/bd/bd.css
+out build/bd-scoped.html
+scope wBD src/bd/manifest.txt test/fixtures/bd-exports.js

@@ -20,10 +20,14 @@ jobs:
       - name: Build
         run: ./build.sh
       - name: Built file is up to date
-        run: git diff --exit-code dist/sudden-death.html || (echo "dist/sudden-death.html is stale: run ./build.sh and commit it" && exit 1)
+        run: |
+          git diff --exit-code dist/sudden-death.html || (echo "dist/sudden-death.html is stale: run ./build.sh and commit it" && exit 1)
+      - name: Realm built file is up to date
+        run: |
+          ./build.sh src/realm/manifest.txt && (git diff --exit-code dist/realm.html || (echo "dist/realm.html is stale: run ./build.sh src/realm/manifest.txt and commit it" && exit 1))
       - name: Quick checks
         run: |
-          for t in smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit; do
+          for t in smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit realm_audit realm_tiles realm_smoke realm_match realm_save realm_party realm_road realm_town realm_dungeon realm_cups realm_bot realm_polish realm_feel realm_ground realm_ways realm_camp realm_stats realm_bonds realm_league realm_diamond_source realm_journal realm_diamond realm_diamond_ratings realm_diamond_nine realm_diamond_game realm_diamond_cup realm_diamond_feel realm_click realm_grounds realm_gmatch realm_cities realm_spots realm_fixtures realm_home realm_gfeel; do
             echo "== $t"; timeout 180 python test/$t.py
           done
       - name: Bot sanity (no errors or stalls in 30 runs)

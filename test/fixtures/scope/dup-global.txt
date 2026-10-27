@@ -1,0 +1,4 @@
+shell src/bd/shell.html
+out build/scope-gdup.html
+test/fixtures/scope/outer.js
+test/fixtures/scope/dup.js

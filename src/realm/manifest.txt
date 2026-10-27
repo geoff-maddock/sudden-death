@@ -1,0 +1,51 @@
+# Champions of the Realm build manifest: ./build.sh src/realm/manifest.txt
+#
+# The prelude loads first so the standalone game's boot (app/boot.js) stands down; then every Sudden Death
+# file, in its own order; then the realm files, which may read any Sudden Death table at load time.
+# The realm's `out` comes after the include, so it replaces Sudden Death's.
+
+src/realm/w00-pre.js
+include src/manifest.txt
+out dist/realm.html
+title Champions of the Realm
+style src/realm/w0.css
+style src/realm/w6.css
+style src/realm/w9.css
+
+src/realm/w1-data.js
+src/realm/w2-maps.js
+src/realm/w3-state.js
+src/realm/w4-ink.js
+src/realm/w5-bridge.js
+src/realm/w6-party.js
+src/realm/w7-ui.js
+src/realm/w7b-camp.js
+src/realm/w8-boot.js
+src/realm/w9-road.js
+src/realm/w9b-town.js
+src/realm/w10-dungeon.js
+src/realm/w11-cups.js
+src/realm/w12-renown.js
+src/realm/w13-feel.js
+src/realm/w14-ground.js
+src/realm/w15-camp.js
+src/realm/w16-stats.js
+src/realm/w17-bonds.js
+src/realm/w18-league.js
+src/realm/w19-journal.js
+
+# Brimstone Diamond, the baseball game, in its own scope (issue #4): src/realm/diamond/manifest.txt
+scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js
+src/realm/w20-diamond.js
+src/realm/w20b-ratings.js
+src/realm/w20c-nine.js
+src/realm/w20d-ballgame.js
+src/realm/w20e-dcup.js
+src/realm/w20f-feel.js
+src/realm/w21-grounds.js
+src/realm/w21b-gmatch.js
+src/realm/w22-cities.js
+src/realm/w23-spots.js
+src/realm/w24-fixtures.js
+src/realm/w25-home.js
+src/realm/w26-gfeel.js

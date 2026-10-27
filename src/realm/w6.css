@@ -1,0 +1,252 @@
+/* w6: Realm phase 3 styles: the team (camp), recruits, taverns, level-ups, the new-journey draft */
+.wcampb{margin-left:4px;padding:7px 12px 5px;font-size:19px;white-space:nowrap}
+.wcampb small{font-size:15px;color:var(--dim);margin-left:2px}
+#modalBox:has(.wcamp){width:min(980px,100%)}
+.wctabs button{font-size:18px}
+.wcsum{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:var(--hud);font-size:18px;color:var(--dim);padding:8px 12px;background:var(--stone2);border:1px solid var(--seam);border-radius:6px}
+.wcsum b{color:var(--bone);font-weight:400}
+.wcsum .whp{color:#ff8a7a} .wcsum .wgold{color:var(--torch)}
+.wcmsg{margin:0}
+.wcamp h4{margin:14px 0 6px}
+.wroster{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.wpr{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:6px 12px;align-items:center;border:1px solid var(--seam);border-radius:6px;background:var(--stone);padding:8px 10px;cursor:grab}
+.wpr.wst{border-left:4px solid var(--torch)}
+.wpr.wdrag{opacity:.45}
+.wpr.wover{box-shadow:0 0 0 2px var(--torch) inset}
+.wpr>img{width:64px;height:64px;border-radius:8px;display:block}
+.wpi{display:grid;gap:3px;min-width:0}
+.wpn{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.wpn b{font-family:var(--display);font-size:24px;line-height:1}
+.wpn .k{font-family:var(--hud);font-size:17px;color:var(--dim)}
+.wtag{font-family:var(--hud);font-size:14px;line-height:1;padding:3px 6px 1px;border-radius:3px;background:var(--torch);color:#1e1205}
+.wtag.wb{background:var(--seam);color:var(--dim)}
+.wlv{display:flex;gap:8px;align-items:center;font-family:var(--hud);font-size:17px}
+.wlv b{font-weight:400;color:var(--torch);min-width:38px}
+.wxp{flex:0 1 160px;min-width:48px;height:8px;border-radius:4px;background:var(--stone2);border:1px solid var(--seam);overflow:hidden}
+.wxp i{display:block;height:100%;background:linear-gradient(90deg,var(--torchD),var(--torch))}
+.wlv small{color:var(--dim);font-size:15px;white-space:nowrap}
+.wcar{color:var(--faint);font-size:14px;line-height:1.3}
+.wpa{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+.wpa .ghost{font-size:17px;padding:6px 10px 4px}
+.wpa .ghost[disabled]{opacity:.35;cursor:default}
+.wpa .wrelx{color:#ff8a7a}
+.wswap,.wpc{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wswap span{font-family:var(--hud);font-size:17px;color:var(--dim)}
+.wswap .ghost{font-size:17px;padding:6px 10px 4px}
+.wswap small{color:var(--dim);font-size:14px}
+.wcc{font-size:14px;padding:3px 8px;border-radius:12px;background:var(--parch);color:var(--ink);border:1px solid var(--parch2);cursor:help}
+.wdk h4{display:flex;gap:8px;align-items:center;margin:14px 0 8px}
+.wdk h4 img{width:32px;height:32px;border-radius:6px}
+.wdk.wout .cardgrid{opacity:.5;filter:grayscale(.5)}
+.wrivals{margin-top:14px}
+/* the full-roster release list, the tavern, camp waiting list */
+.wrel{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.wrelb{display:flex;gap:10px;align-items:center;text-align:left;padding:6px 10px}
+.wrelb img{width:48px;height:48px;border-radius:6px;flex:none}
+.wrelb span{display:grid;gap:2px}
+.wrelb b{font-family:var(--display);font-size:20px;font-weight:700}
+.wrelb small{font-family:var(--body,inherit);font-size:13px;color:var(--dim);line-height:1.3}
+#modalBox:has(#wTavBody){width:min(760px,100%)}
+.wtav,.wwait{display:grid;gap:10px}
+.wag{display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid var(--seam);border-radius:6px;background:var(--stone);padding:10px}
+.wwait .wag{grid-template-columns:64px minmax(0,1fr) auto}
+.wag img{width:76px;height:76px;border-radius:8px}
+.wwait .wag img{width:64px;height:64px}
+.wag b{font-family:var(--display);font-size:24px;line-height:1;display:block}
+.wag .k{font-family:var(--hud);font-size:17px;color:var(--dim)}
+.wag p{margin:4px 0 0;font-size:14px;color:var(--dim);line-height:1.35}
+.wag .sig{font-size:14px;margin-top:4px}
+.wag .sig b{display:inline;font-family:inherit;font-size:inherit;color:var(--torch)}
+.wag .btn{font-size:21px;padding:6px 14px 4px;white-space:nowrap}
+/* a recruit asks to join */
+#modalBox:has(.wrec){width:min(700px,100%)}
+.wrec{display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:14px;align-items:start}
+.wrecport{width:120px;height:120px;border-radius:10px;border:1px solid var(--seam)}
+.wrecwho{font-size:18px;margin:0 0 6px}
+.wrec .hint{margin:0 0 6px}
+.wrecsig .card{--cw:132px;cursor:default}
+/* level up, over the card pick */
+.wlvl{display:flex;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--torchD);border-radius:6px;background:rgba(255,179,71,.08)}
+.wlvl img{width:72px;height:72px;border-radius:8px}
+.wlvl div{display:grid;gap:2px}
+.wlvl small{font-family:var(--hud);font-size:16px;color:var(--torch)}
+.wlvl b{font-family:var(--display);font-size:26px;line-height:1}
+.wlvl span{color:var(--dim);font-size:15px}
+/* the new-journey draft */
+.wdhard{margin:0;padding:6px 10px}
+.wdhard small{font-size:13px}
+@media (max-width:640px){
+  .wpr{grid-template-columns:52px minmax(0,1fr);padding:8px}
+  .wpr>img{width:52px;height:52px}
+  .wpa{grid-column:1/-1;justify-content:flex-start}
+  .wpn b{font-size:21px}
+  .wag{grid-template-columns:56px minmax(0,1fr)}
+  .wag img{width:56px;height:56px}
+  .wag .btn{grid-column:1/-1;justify-self:start}
+  .wrec{grid-template-columns:84px minmax(0,1fr)}
+  .wrecport{width:84px;height:84px}
+  .wrecsig{grid-column:1/-1;justify-self:center}
+  .wcampb{font-size:17px;padding:6px 9px 4px}
+}
+/* w16: the Stats tab */
+.wcamp{min-width:0}
+.wstsp{width:100%;border-collapse:collapse;font-size:16px}
+.wstsp td{padding:4px 6px;border-top:1px solid var(--seam)}
+.wstsp .wnum{font-family:var(--hud);font-size:18px;text-align:right;white-space:nowrap}
+.wstsp .dim{color:var(--faint);text-align:right;white-space:nowrap}
+.wgood{color:#9be08a}
+.wstview{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:10px 0 6px}
+.wstview .hint{margin:0}
+.wstats{width:100%;border-collapse:collapse;font-family:var(--hud);font-size:18px}
+.wstats th,.wstats td{padding:4px 6px;border-top:1px solid var(--seam);text-align:right;white-space:nowrap}
+.wstats thead th{border-top:0}
+.wstats th:first-child{text-align:left}
+.wstats tr.wst th:first-child{box-shadow:4px 0 0 var(--torch) inset}
+.wstats tr.wsel{background:var(--stone2)}
+.wstats .dim{color:var(--faint)}
+.wsth{background:none;border:0;color:var(--dim);font:inherit;font-size:16px;padding:2px 0;cursor:pointer}
+.wsth[aria-pressed="true"]{color:var(--torch)}
+.wsname{display:flex;gap:8px;align-items:center;background:none;border:0;color:inherit;font:inherit;padding:2px 0 2px 6px;cursor:pointer;text-align:left}
+.wsname img{width:36px;height:36px;border-radius:6px}
+.wsname span{display:grid;line-height:1.1}
+.wsname b{font-family:var(--display);font-size:20px;font-weight:400}
+.wsname small{font-size:14px;color:var(--dim)}
+.wstcard{margin-top:12px;border:1px solid var(--seam);border-radius:6px;background:var(--stone);padding:10px 12px}
+.wstcard .wsthd{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:10px;align-items:start}
+.wstcard .wsthd img{width:72px;height:72px;border-radius:8px}
+.wstcard h4{margin:0}
+.wstcard h4 small{font-family:var(--hud);font-size:16px;color:var(--dim);font-weight:400}
+.wstcard .wsthd p{margin:4px 0 0;font-size:16px;line-height:1.35}
+.wstgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:4px 18px;margin-top:6px}
+.wstgrid h5{margin:8px 0 4px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wstlog{margin:0;padding-left:20px;font-size:16px;line-height:1.35}
+.wstlog small{display:block;color:var(--dim);font-size:14px}
+@media (max-width:600px){.wstcard .wsthd{grid-template-columns:56px minmax(0,1fr)}.wstcard .wsthd img{width:56px;height:56px}.wstcard .wsthd .ghost{grid-column:1/-1;justify-self:end}}
+/* w17: quests, chemistry, combo cards */
+.wpq{display:block;color:var(--dim);font-size:14px;line-height:1.3}
+.wpq.wgood{color:#9be08a}
+.wpa .wnews{border-color:var(--torch);color:var(--torch)}
+.wpa .wnews::after{content:" !"}
+.wchem{list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:6px}
+.wchem li{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(48px,140px);gap:10px;align-items:center;padding:4px 8px;border:1px solid var(--seam);border-radius:6px;background:var(--stone)}
+.wchem li.wout{opacity:.6}
+.wchem .wxp{flex:none;width:100%}
+.wbps{display:flex}
+.wbps img{width:40px;height:40px;border-radius:6px}
+.wbps img+img{margin-left:-10px}
+.wchn{display:grid;line-height:1.15;min-width:0}
+.wchn b{font-family:var(--display);font-size:19px;font-weight:400}
+.wchn small{color:var(--dim);font-size:14px}
+.wbondb .wbps img{width:56px;height:56px}
+@media (max-width:600px){.wchem li{grid-template-columns:auto minmax(0,1fr)}.wchem .wxp{grid-column:1/-1}}
+/* w18: the league table, taunts, grudges */
+.wlg{width:100%;border-collapse:collapse;font-family:var(--hud);font-size:18px}
+.wlg th,.wlg td{padding:4px 6px;border-top:1px solid var(--seam);text-align:right;white-space:nowrap}
+.wlg thead th{border-top:0;color:var(--dim);font-size:16px;font-weight:400}
+.wlg tbody th{text-align:left;font-weight:400;white-space:normal}
+.wlg thead th:nth-child(2){text-align:left}
+.wlg tbody th i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+.wlg tr.wme{background:var(--stone2)}
+.wlg tr.wme th{color:var(--torch)}
+.wlg small{color:var(--dim);font-size:14px}
+.wlgres,.wlgnext{margin:0;padding-left:18px;font-size:16px;line-height:1.4}
+.wlgres small,.wlgnext small{color:var(--faint);font-family:var(--hud);margin-right:6px}
+.wtaunt{margin:0 0 6px;padding:6px 10px;border-left:3px solid #e05a4a;background:rgba(224,90,74,.08);font-size:15px}
+/* w19: the journal */
+.wjbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:4px 0 6px}
+.wjbar label{display:flex;gap:6px;align-items:center;font-size:15px;color:var(--dim);min-width:0}
+.wjbar select{max-width:min(240px,60vw)}
+.wjbar input{flex:1 1 160px;min-width:0}
+.wjwhy{margin:0 0 8px;min-height:0}
+.wjwhy:empty{display:none}
+.wjclr{padding:2px 10px;font-size:14px;margin-left:6px}
+.wjbody{display:grid;gap:8px}
+.wjp{border:1px solid var(--seam);border-radius:6px;background:var(--stone)}
+.wjp summary{display:flex;gap:10px;align-items:center;padding:6px 8px;cursor:pointer;list-style:none}
+.wjp summary::-webkit-details-marker{display:none}
+.wjp summary img{width:44px;height:44px;border-radius:6px;flex:none}
+.wjp summary span{display:grid;line-height:1.2;min-width:0}
+.wjp summary b{font-family:var(--display);font-size:19px;font-weight:400}
+.wjp summary small{color:var(--dim);font-size:14px}
+.wjtag{color:var(--torch)!important;font-size:13px!important}
+.wjp dl{margin:0;padding:4px 12px 10px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;font-size:15px;line-height:1.4}
+.wjp dt{color:var(--dim);font-family:var(--hud)}
+.wjp dd{margin:0}
+.wjkw{all:unset;cursor:pointer;color:var(--torch);text-decoration:underline;text-decoration-color:rgba(255,181,71,.4);text-underline-offset:2px}
+.wjkw.on{background:rgba(255,181,71,.22);border-radius:3px;padding:0 2px;text-decoration:none}
+.wjkw:focus-visible{outline:2px solid var(--torch)}
+.wjreg h4{margin:6px 0 4px;font-family:var(--display);font-weight:400;font-size:20px}
+.wjreg h4 small{color:var(--dim);font-size:14px;font-family:var(--hud)}
+.wjplace{padding:6px 8px;border:1px solid var(--seam);border-radius:6px;background:var(--stone);margin-bottom:6px}
+.wjplace small{color:var(--dim);font-size:14px}
+.wjrules{margin-top:6px;padding:6px 10px;border-left:3px solid var(--torch);background:var(--stone2);font-size:15px;line-height:1.4}
+.wjrules h5{margin:0 0 2px;font-family:var(--hud);font-weight:400;color:var(--torch);font-size:14px;text-transform:uppercase;letter-spacing:.05em}
+.wjrules p{margin:0 0 4px}
+.wjok{color:#6fcf6f}
+.wjwins{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.wjwins li{display:grid;grid-template-columns:86px minmax(0,1fr);gap:10px;align-items:start;padding:6px 8px;border:1px solid var(--seam);border-radius:6px;background:var(--stone)}
+.wjwins small{display:block;color:var(--dim);font-size:14px}
+.wjk{font-family:var(--hud);font-size:13px;text-align:center;padding:2px 4px;border-radius:4px;background:var(--stone2);color:var(--dim)}
+.wjk-title{color:var(--torch)}
+.wjk-boss{color:#e05a4a}
+.wjq{padding:6px 10px;border:1px solid var(--seam);border-radius:6px;background:var(--stone);margin-bottom:6px}
+.wjq p{margin:4px 0 0;font-size:15px}
+.wjq small{color:var(--dim);font-size:14px}
+.wjq.done{opacity:.7}
+.wjbody h4{margin:6px 0 4px;font-family:var(--hud);font-weight:400;color:var(--dim)}
+@media (max-width:600px){.wjwins li{grid-template-columns:1fr}.wjk{justify-self:start}.wjp dl{grid-template-columns:1fr}.wjp dt{margin-top:4px}}
+
+/* w20: the diamond's bar */
+.wdbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
+.wdbar .hint{flex:1 1 180px;min-width:0}
+
+/* w20b: baseball ratings on a player's stats */
+.wbd{margin-top:6px;border-top:1px solid var(--seam);padding-top:2px}
+.wbd h5{margin:8px 0 4px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wbd .wbdpos{margin:0 0 6px}
+.wbdbars{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 16px;max-width:560px}
+.wbdr{display:grid;grid-template-columns:38px minmax(0,1fr) 22px 24px;gap:6px;align-items:center;font-family:var(--hud);font-size:16px}
+.wbdr i{display:block;height:8px;border-radius:4px;background:var(--seam);overflow:hidden}
+.wbdr em{display:block;height:100%;background:var(--torch)}
+.wbdr b{text-align:right;font-weight:400}
+.wbdr small{color:var(--vile)}
+.wbdpit{margin:6px 0 0}
+.wbdpit b{color:var(--mana);font-weight:600}
+.wbdpw{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.wbdpw small{font-family:var(--hud);color:var(--dim)}
+.wbdpw span{display:block;font-size:15px;color:var(--dim);line-height:1.3}
+/* w20c: the nine */
+.wnr{grid-template-columns:24px 56px minmax(0,1fr) auto;cursor:default}
+.wnr>img{width:56px;height:56px}
+.wnr.wcu{border-style:dashed}
+.wno{font-family:var(--display);font-size:24px;color:var(--torch);text-align:center}
+.wnst{font-family:var(--hud);font-size:15px;color:var(--dim)}
+.wnst b{font-weight:400;color:var(--bone);margin-right:4px}
+.wnst em{font-style:normal;font-size:14px;white-space:nowrap}
+.wnr select{font:inherit;font-family:var(--hud);font-size:17px;padding:4px 6px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
+.wnbtn{gap:8px;justify-content:flex-end;margin-top:12px}
+@media (max-width:560px){.wnr{grid-template-columns:24px 48px minmax(0,1fr)}.wnr>img{width:48px;height:48px}.wnr .wpa{grid-column:1/-1;justify-content:flex-start}}
+/* w20d: ball games (the club picker, the Nine tab's last games, the box line) */
+.wbclubs{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.wbcl{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;border:1px solid var(--seam);border-radius:8px;padding:8px 10px}
+.wbcl small{display:block;color:var(--dim)}
+.wbcl .row{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.wbsw{align-self:stretch;border-radius:4px}
+@media (max-width:560px){.wbcl{grid-template-columns:8px 1fr}.wbcl .row{grid-column:1/-1;justify-content:flex-start}}
+.wball{margin-top:8px}
+.wbrh{margin:14px 0 4px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wbd .wbdbox{margin:0 0 6px}
+.wdbar #wBallSave,.wdbar #wBallGive{white-space:nowrap}
+@media (max-width:560px){.wdbar .hint{flex-basis:100%;order:1}.wdbar button{order:2}}
+/* w20e: the Diamond Cup bracket */
+.wdcb{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+.wdcb h5{margin:0 0 6px;font-family:var(--hud);font-size:16px;font-weight:400;color:var(--dim)}
+.wdcg{list-style:none;margin:0 0 10px;padding:0;border:1px solid var(--seam);border-radius:6px;overflow:hidden}
+.wdcg li{display:flex;justify-content:space-between;gap:8px;padding:4px 8px;font-size:14px}
+.wdcg li+li{border-top:1px solid var(--seam)}
+.wdcg li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wdcg .wme span{font-weight:700}
+.wdcg .wwon b{color:var(--gold,#f2c14e)}
+.wdcg .wlost{opacity:.55}
+@media (max-width:560px){.wdcb{grid-template-columns:1fr}}
+.wlgnext li.wme{font-weight:600}

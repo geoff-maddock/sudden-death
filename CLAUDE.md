@@ -40,6 +40,11 @@ python3 test/lab.py 200                       # balance: win rate, deaths by act
 python3 test/difficulty.py 120 '{}' diff=1 dumb   # skilled vs careless bot on a difficulty
 python3 test/policy.py 200                    # routing policies
 python3 test/clubs.py ironmaw,frostfang 60    # per-club win rates
+./build.sh src/realm/manifest.txt             # Realm build: writes dist/realm.html
+./build.sh src/bd/manifest.txt                # Brimstone Diamond, standalone, into build/ (the Realm's baseball engine; src/bd/README.md)
+python3 test/realm_smoke.py                   # one realm check (realm_*.py; all of them are in ./test/all.sh)
+python3 test/realm_lab.py 140 '{}'            # Realm balance: champion rate, where runs end, per-match cost (docs/realm/BALANCE.md)
+python3 test/realm_diamond_lab.py 120          # Realm baseball balance: win rate by level gap and tier, Diamond Cups (Simulate)
 ```
 
 Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screenshots go to `/tmp/`.
@@ -60,6 +65,18 @@ Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screens
 - **Every new system gets a test** in `test/` and a line in `test/all.sh`. Known gap: most checks *print* their results (and `errors: [...]`) rather than assert, so a run can exit 0 with a failure in its output. Read the output, and convert checks to asserts when you touch them.
 - **Balance changes get measured.** Use 100+ bot runs per side and report before/after. Bot win rates are relative: a careful human wins far more. When adding rewards, make sure `test/lab.js` spends them like a player would, or the numbers will lie (this happened once).
 - **User-facing text:** plain, short, and specific. Every system is explained in How to play (`renderHelp` in `ui/screens/pages.js`).
+
+## Realm rules
+
+Champions of the Realm (the Realm for short; `src/realm/`, `dist/realm.html`) layers an open world on this game. See the Realm section of `ARCHITECTURE.md` and `docs/realm/`.
+
+- **Rebuild `dist/realm.html` after every change** (`./build.sh src/realm/manifest.txt`) and commit it. CI fails on a stale one. A change to Sudden Death's own files changes both builds.
+- **`w`/`W` names only.** Every realm top-level name starts with `w` or `W` (except the ported `DB`, `MAPS`, `WW`, `WH`, `regionAt`, `mulberry`, `noise2`).
+- **Wrap with the `wW<n>` prefix.** A realm file changes an earlier function only by reassignment, saving the original as `wW<n>Name`, where `<n>` is the wrapping part (`const wW11PreGame = wPreGame;`). Sudden Death originals saved in the realm are `wSdName`. List what a file wraps in its header comment.
+- **`WG` and `RUN` stay plain JSON.** Match ends dispatch by name through `W_ON_END[kind]`; never store a callback.
+- **Every realm system gets a `test/realm_*.py`** with real asserts, a line in `test/all.sh` and in the realm list in `.github/workflows/ci.yml`. Wait on state in tests, not fixed sleeps.
+- **Realm words.** The world was ported from Terra Chimera; it is now a monster sports league. Your party is a team of players, rivals are clubs, fights are matches. No chimeras, snares, handlers or gene labs (`test/realm_polish.py` checks). A renamed talk keyword must be renamed in every topic, `need`, quest hint and test.
+- **How to play** for the realm is `#wHelp`; each part adds its section in load order and keeps its id.
 
 ## Current balance (bot, after the last retune)
 

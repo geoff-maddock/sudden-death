@@ -1,0 +1,3 @@
+shell src/bd/shell.html
+out build/scope-nest.html
+scope sc test/fixtures/scope/nest-inner.txt test/fixtures/scope/exports.js

@@ -39,6 +39,37 @@ Progress (runs in progress, the record book, careers, achievements, settings) is
 
 ---
 
+## Champions of the Realm
+
+**The same game, on the road.** Champions of the Realm is a second build of Sudden Death: an open-world RPG where you walk a realm of towns, wilds and dungeons with your team, and every fight is a Sudden Death match. Its world (regions, towns, people, road events, cups) is ported from an earlier game, *Terra Chimera*, and redrawn in Sudden Death's ink style.
+
+It is one self-contained file too: `dist/realm.html`. Open it in a browser. It keeps its own save, per profile, beside the standalone game's.
+
+### How to play, briefly
+
+- **Found a team.** Pick a club and three of its players. More join on the road: free agents at every inn, players you beat, and quest companions. The first three in the lineup start; the rest sit on the bench, and their cards sit out with them.
+- **Walk.** Arrow keys or WASD, or click. Walk into people to talk, and click a CAPITALISED word to ask about it. `Space` uses, `L` looks, `C` opens the team, and `Esc` (or the Menu button) opens the menu, where you can save and quit.
+- **Play matches.** Wild teams in the long grass, road events, famous teams in dungeon rooms, and bosses in lairs. Team HP carries over; an inn heals it, or make camp in the wild with a Trail Ration, if you dare. The Stats tab on the Team screen keeps every player's numbers, by sport, for the journey and their career. Lose and you black out at your last inn (or, in Hardcore, the journey ends).
+- **Grow.** Players level up and bring cards. Talk to them from the Team screen: from level 2 each has a quest back home, worth a nickname and a Hall of Fame card. Players who start together build chemistry, and a strong pair earns a combo card. Cook meals for match day, spend energy at the enchanter, buy cards in three towns, and find gear and Hall of Fame legends in dungeon strongboxes.
+- **Settle.** Buy the old ground behind any inn and its region is home: your crowd at every match there, free beds, and stands, a training pitch, a kitchen and a scout's office to build.
+- **Rivals.** Four rival clubs and Apex Athletic play their own league while you travel; every inn posts the table. Beat a rival twice and they bid for one of your bench players: sell, or refuse and meet them in a grudge match on the road.
+- **The journal** (`J`). Everyone you've talked to and what they told you, every place you've been (with the rules of cups, dungeons, lairs and your home ground), your big wins, and your quests. Filter by an active quest or by a keyword you've learned.
+- **Win.** Take the four regional cups, then the Crown at the Coliseum in championship week.
+
+How to play inside the game explains every system, with the current numbers.
+
+### Build and test
+
+```bash
+./build.sh src/realm/manifest.txt     # writes dist/realm.html (the standalone build is unaffected)
+python3 test/realm_smoke.py           # any one realm check
+python3 test/realm_lab.py 140         # the realm balance bot: champion rate, where journeys end, per-match cost
+```
+
+`./test/all.sh` runs the realm checks along with the rest: `realm_audit` (the world data and maps), `realm_tiles`, `realm_smoke`, `realm_match` (the match seam, blackouts, Hardcore), `realm_save`, `realm_party`, `realm_road`, `realm_town`, `realm_dungeon`, `realm_cups`, `realm_bot` (four bot journeys) and `realm_polish` (wording, event back-out, taverns, How to play). `docs/realm/` has the plan, the contract between the parts, and the balance notes.
+
+---
+
 ## Deploying
 
 The build output is a single static file, `dist/sudden-death.html`. Host it anywhere that serves static files.
@@ -102,7 +133,8 @@ src/                the game (see ARCHITECTURE.md for what each file does)
   render/           the creature renderer, boss art, visual effects
   ui/               icons, card faces, widgets, the map; fight/ (the fight scene) and screens/
   app/              sound, music, settings, coach's notes, pause and saves, profiles, boot
-dist/               the built game, sudden-death.html (generated, committed)
+  realm/            Champions of the Realm, layered on the files above (its own manifest.txt)
+dist/               the built games, sudden-death.html and realm.html (generated, committed)
 test/               Playwright checks and the balance bots
   all.sh            the quick suite
   lab.js            headless bot that plays whole runs from the model, not the screen
