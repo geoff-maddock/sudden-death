@@ -57,3 +57,4 @@ src/realm/w31-name.js
 src/realm/w32-tour.js
 src/realm/w33-sinks.js
 src/realm/w34-defend.js
+src/realm/w35-legends.js

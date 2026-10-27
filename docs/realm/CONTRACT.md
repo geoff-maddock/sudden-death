@@ -495,3 +495,8 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Champions.** `wChamps()` = crowns held. `wRenown` (wrapped) adds `W_DEF.renown` each. `WG.crownDay` is the day of the last crown.
 - **Defences.** `wDefending(id)`: a town cup on your wall whose `cupLog` year is before this year, once you are champions. `wCupProblem`, `wCupEnter` and `wCupPlay` (wrapped) let you in and mark `WG.cup.defence` before round 1 is built; `wCupMatch` (wrapped) adds `W_DEF.lvUp` levels to a defence and a level per crown to the Crown. `WG.defend.cups[id]` lists the years defended.
 - **The hunt.** `wEncounterHook` (wrapped), from the day after a crown: `W_DEF.huntP` a world step, a rival club's `event` match with `ref: { rival, hunt: 1 }` (so w18 counts it on the table and h2h). `W_ON_END.event` (wrapped) pays `W_DEF.huntWin`.
+
+## The Hall of Legends (w35-legends.js)
+
+- **Storage.** `localStorage[pkey('sd-realm-legends')]`: the latest `W_LEG.keep` entries `{ id, name, short, color, light, year, crowns, hard, at, cap, players: [{ n, kind, lvl, num }] }`, written on a Crown (`wCupWon`, wrapped; never in LAB). One entry per journey (`WG.legId`), updated by later crowns.
+- **Later journeys.** `wStart` (wrapped) copies the Hall into `WG.legends` (never the journey's own). `wLegendMatch(id)`: a `rival` match at tier `W_LEG.tier` against `wLegendIds(L)` (an ordinary enemy of each player's kind, at most one elite), kind `legend`; a `fightStart` hook gives the enemies the legend players' names; `wMatchTeam` (wrapped) their colours. `W_ON_END.legend` records `WG.legBeat[id]` and pays `W_LEG.prize`. Steward Crane's `legends` (act `legends`) opens the Hall; with `W_LEG.roadCups` cups, `wEncounterHook` (wrapped) may bring one on the road.

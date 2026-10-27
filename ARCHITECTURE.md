@@ -182,6 +182,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w32-tour.js` | The Barnstormers (epic 2, phase 9): a show team that tours a region at a time (`WG.tour`), tracked by rumour (innkeepers' BARNSTORMERS, the notice boards' poster, a day behind after a move). In their region's open country they may turn up for a top-tier match; beat them for Showstopper, a Hall of Fame card no pool offers, then they go home for the year. |
 | `w33-sinks.js` | Gold sinks (epic 2, phase 10): paid training camp sessions at the training spots after the week's free drill (rising prices, `WG.sink`), and League coaches between the five cities from any inn (`wTakeCoach`: a fare by distance, half the walking time, no encounters). |
 | `w34-defend.js` | Defend the title (epic 2, phase 11): after the Crown, each crown adds to renown, the cups on your wall reopen the next year as title defences a level harder (`WG.defend`), rival clubs hunt the champions on the road (a rival `event` match with `ref.hunt`), and the Crown is a level harder for each crown held. |
+| `w35-legends.js` | The Hall of Legends (epic 2, phase 12): a Crown writes your team (name, colours, starting three) to `pkey('sd-realm-legends')`, outside the journey's save. Later journeys copy the Hall (`WG.legends`) and meet those champions at the Crown Coliseum (Steward Crane's LEGENDS) and, with two cups, on the road, once a journey each. |
 
 ### Brimstone Diamond (`src/bd/`)
 
