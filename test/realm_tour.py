@@ -72,7 +72,7 @@ async def main():
         await pg.screenshot(path='/tmp/realm-tour-pregame.png')
         await pg.click('#wPlay'); await pg.wait_for_function("UI.view === 'fight' && !!B && B.phase === 'player'")
         m = await pg.evaluate("({ type: B.type, tier: RUN.pending.world.tier, kind: RUN.pending.world.kind, team: B.enemies.map(e => e.team && e.team.name) })")
-        check(m['type'] == 'boss' and m['tier'] == 2 and m['kind'] == 'tour' and all(t == 'The Barnstormers' for t in m['team']), 'a boss match, in their colours', m)
+        check(m['type'] == 'boss' and m['tier'] == 3 and m['kind'] == 'tour' and all(t == 'The Barnstormers' for t in m['team']), 'a boss match, in their colours', m)
         await pg.wait_for_timeout(500); await pg.screenshot(path='/tmp/realm-tour-match.png')
         g0 = await pg.evaluate("({ gold: RUN.gold, fans: RUN.fans || 0 })")
         view = await pg.evaluate(WIN)

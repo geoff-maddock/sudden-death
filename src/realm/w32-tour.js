@@ -5,7 +5,7 @@
    knows exactly where they are; you track them by rumour. Innkeepers have heard (ask about the BARNSTORMERS), and the
    notice boards carry their posters. Rumours lag: for a day after the Barnstormers move on, people still tell you where
    they were (they are on the road between regions). Once you hold W_TOUR.cups cup, walk the open country of their
-   region and they may turn up (W_TOUR.p a step): a boss match, two levels up. Beat them and their ringmaster hands
+   region and they may turn up (W_TOUR.p a step): a boss match at the Crown's tier. Beat them and their ringmaster hands
    over Showstopper, a Hall of Fame card no one else has, with gold and fans; then they go home for the year. Next year they tour again, for a purse only. Lose
    and they pack up and move on.
 
@@ -16,8 +16,8 @@
    Also a medal (w_tour, Showstoppers: realmTour). */
 
 const W_TOUR = {
-  name: 'The Barnstormers', ring: 'Ringmaster Pell', start: 3, stay: 4, p: .045, cups: 1, lvUp: 2,
-  type: 'boss', tier: 2,   // a boss with its brains: as an elite at tier 3 the bot beat them 44 times in 44 (docs/realm/BALANCE.md)
+  name: 'The Barnstormers', ring: 'Ringmaster Pell', start: 3, stay: 4, p: .045, cups: 1, lvUp: 0,
+  type: 'boss', tier: 3,   // a boss at the Crown's tier; the bot wins about 7 in 10 (docs/realm/BALANCE.md)
   team: { name: 'The Barnstormers', short: 'BRN', color: '#d8472e', light: '#ffe2a8' },
   prize: { gold: 150, fans: 40 }, again: { gold: 80, fans: 20 }, card: 'tour_showstop',
 };
@@ -120,5 +120,5 @@ const wW32RenderHelp = renderHelp;
 renderHelp = function () {
   wW32RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpTour')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpTour"><b>The Barnstormers.</b> A famous show team tours the realm, ${W_TOUR.stay} days in each region. Track them by rumour: ask any innkeeper about the BARNSTORMERS, or read the posters on the notice boards (rumours can be a day behind). Once you hold a cup, walk the open country of their region and they may turn up: a boss match, two levels up. Beat them for Showstopper, a Hall of Fame card nobody else has, ${W_TOUR.prize.gold} gold and ${W_TOUR.prize.fans} fans; then they go home until next year. Lose, and they move on.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpTour"><b>The Barnstormers.</b> A famous show team tours the realm, ${W_TOUR.stay} days in each region. Track them by rumour: ask any innkeeper about the BARNSTORMERS, or read the posters on the notice boards (rumours can be a day behind). Once you hold a cup, walk the open country of their region and they may turn up: a boss match at the Crown's tier. Beat them for Showstopper, a Hall of Fame card nobody else has, ${W_TOUR.prize.gold} gold and ${W_TOUR.prize.fans} fans; then they go home until next year. Lose, and they move on.</p>`);
 };
