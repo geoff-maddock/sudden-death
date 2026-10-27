@@ -52,3 +52,4 @@ src/realm/w26-gfeel.js
 src/realm/w27-notices.js
 src/realm/w28-legs.js
 src/realm/w29-captain.js
+src/realm/w30-weather.js

@@ -465,3 +465,10 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **State.** `WG.captain`: a player id. `wCaptain()` is that player only while they start. `wSetCaptain(pid)` returns '' or why not (only a starter). `wStart` (wrapped) names the first starter if there is none (new journeys and old saves); `wRelease` (wrapped) hands the armband to the first starter.
 - **The bonus.** `W_CAPTAIN[kind] = { n, d, on: { event: fn } }`, one for each of the 18 kinds a player can be (`SIG`). One `onHook(event)` per event used runs the captain's handler during a realm match; `fightStart` also logs it. `W_CAPT.off` turns it off.
 - **UI.** `wCampRow` (wrapped): a `.wcap` tag on the captain, a `[data-capt]` Captain button on other starters. `wPreGame` (wrapped): a `.wcapt` line.
+
+## Weather (w30-weather.js)
+
+- **The roll.** `wWeather(region)` rolls `WG.wx = { day, by: { region: kind } }` once per `dayAbs`: `blizzard` (rime), `fog` (tide), `ash` (ember), each with its `W_WX[k].p`. The Plains and the Mosswold stay fair.
+- **Which matches.** `wMatchWeather(W)`: a `W_WX_OUT` kind (`wild`, `event`, `camp`, `alpha`, `lair`, `tour`) on the world map, or a `ground` match whose sport is not in `W_WX_INDOOR`. `wBuildEncounter` (wrapped) sets `enc.world.wx`; fog may make a day wild game off the road an ambush.
+- **Kickoff.** A `fightStart` hook gives both sides the marker status (`snowed`, `fogbound`, `ashen`, new `ST` entries) and applies the effect; `B.wWx` is set. Cards: `wx_whiteout`, `wx_fogbank`, `wx_cinder` (kind `any`, uncommon, one regional sport each), using `['ifst', marker, yes, no]`.
+- **UI.** The weather after the region's name in the top bar (`wRenderHud`, wrapped), a `.wwx` pre-game line, and `wDrawWeather` over the world view (`wRender`, wrapped, in screen space inside save/restore).

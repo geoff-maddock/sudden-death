@@ -256,3 +256,7 @@
 .wtag.wlegs-spent{background:#a8402e;color:#fbeee6;margin-left:4px}
 /* w29: the captain's armband */
 .wtag.wcap{background:#f2c14e;color:#1e1205;margin-left:6px;vertical-align:middle;font-size:12px;padding:2px 5px 1px}
+/* w30: the weather in the top bar */
+.wwxhud{color:#cfe8f0}
+.wwxhud.wwx-ash{color:#ff9a5a}
+.wwxhud.wwx-fog{color:#c4ccd2}
