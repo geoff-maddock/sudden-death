@@ -24,7 +24,7 @@ window.LABRUN = function (opts = {}) {
         s -= (d.toll || 0) * (RUN.hp < 30 ? 3 : 1) + (d.foul || 0) * 4 + (d.exert || 0) * 5 + (d.fatigue || 0) * 2 + (d.goldc ? 4 : 0);
         if (d.type === 'play' || d.type === 'gear') s += 6 + (d.sport === B.sport ? 6 : 0);
         // soccer: string passes first, then shoot (an Attack before three passes is only a pass)
-        if (B.sport === 'soccer' && B.sc) { const ps = B.sc.passes || 0; if (d.type === 'atk') s = ps >= 3 ? s + 6 : s * .6; else if (ps < 3) s += 4; }
+        if (B.sport === 'soccer' && B.sc) { const ps = B.sc.passes || 0; if (d.type === 'atk') s = ps >= SOCCER.passes ? s + 6 : s * .6; else if (ps < SOCCER.passes) s += 4; }
         const v = s / (d.cost + .6);
         if (s > 0 && v > bs) { bs = v; best = i; }
       });

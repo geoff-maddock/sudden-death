@@ -1,5 +1,8 @@
 /* p4b: the sports layer. Every fight keeps score. Cards score by type and by how hard they hit;
    enemy attacks that get through your Block score for them. Win the fight AND the game for a sports win. */
+// soccer: passes needed for a shot, the most they add, and how much must get through your Block for their goal
+// (bot-tuned: 2 and 6 put soccer's sports-win rate with the major sports, 49% over 300 runs; 3 and 5 gave 34%)
+const SOCCER = { passes: 2, cap: 6, theirs: 6 };
 const SPORT_UNIT = { baseball: 1, football: 3, hockey: 1, basketball: 2, jousting: 1, curling: 1, soccer: 1 };
 const HIT_NAME = ['Out', 'Single', 'Double', 'Triple', 'Home run'];
 const hitBases = dmg => dmg <= 0 ? 0 : dmg < 10 ? 1 : dmg < 18 ? 2 : dmg < 25 ? 3 : 4;
@@ -33,7 +36,7 @@ function sportAtkBonus(e) {
   let d = add(t > 0 ? t : 0, MOM_NAME[t]);
   if (B.sport === 'baseball') d += add(Math.min(3, B.sc.bases.filter(Boolean).length), 'Runners on');   // runners on: pressure
   if (B.sport === 'football' && B.yards >= 75) d += add(2, 'Red zone');                                // the red zone
-  if (B.sport === 'soccer' && (B.sc.passes || 0) >= 3) d += add(Math.min(6, B.sc.passes), 'Passes');        // the shot after the passes
+  if (B.sport === 'soccer' && (B.sc.passes || 0) >= SOCCER.passes) d += add(Math.min(SOCCER.cap, B.sc.passes), 'Passes');        // the shot after the passes
   return d;
 }
 function sportEnemyBonus() {
@@ -141,7 +144,7 @@ function sportCardEnd(card, d, tgt) {
     case 'curling': if (card.sk && d.type !== 'atk') B.sc.curlP = (B.sc.curlP || 0) + 1; break;
     case 'soccer': {
       const n = B.sc.passes || 0;
-      if (d.type !== 'atk' || !dmgCard || n < 3) { B.sc.passes = n + 1; break; }
+      if (d.type !== 'atk' || !dmgCard || n < SOCCER.passes) { B.sc.passes = n + 1; break; }
       // a shot: the passes are spent, scored or saved
       B.sc.passes = 0;
       if (top >= SKT(card).kick) {
@@ -174,7 +177,7 @@ function sportEnemyHit(taken, raw) {
   if (taken <= 0) return;
   if (B.sport === 'football') { B.yards = Math.max(0, B.yards - taken); if (taken >= 8) { scoreThem(3); if (perkOn('clutch') && B.turn >= 3) scoreThem(3); } return; }
   if (B.sport === 'hockey' && taken < 3) return;
-  if (B.sport === 'soccer' && taken < 5) return;
+  if (B.sport === 'soccer' && taken < SOCCER.theirs) return;
   if (scored()) { scoreThem(SPORT_UNIT[B.sport]); if (perkOn('clutch') && B.turn >= 3) scoreThem(SPORT_UNIT[B.sport]); }
 }
 function sportTurnEnd() {
@@ -245,7 +248,7 @@ function sportBadge(card, tgt) {
     case 'basketball': { const T = SKT(card); return dmgCard ? (est.top < T.bk ? 'Brick' : `+${((T.threeAny || d.cost >= 2) && est.top >= T.three ? 3 : 2) + (d.type === 'play' && d.sport === 'basketball' ? 1 : 0)}`) : ''; }
     case 'jousting': return d.type === 'atk' && !B.firstAtk ? 'Tilt ×2' : '';
     case 'golf': return est.top >= SKT(card).drive ? 'Long drive' : '';
-    case 'soccer': return d.type === 'atk' && dmgCard && (B.sc.passes || 0) >= 3 ? (est.top >= SKT(card).kick ? 'Goal' : 'Shot') : 'Pass';
+    case 'soccer': return d.type === 'atk' && dmgCard && (B.sc.passes || 0) >= SOCCER.passes ? (est.top >= SKT(card).kick ? 'Goal' : 'Shot') : 'Pass';
   }
   return '';
 }

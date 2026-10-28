@@ -1769,7 +1769,7 @@ const SPORTS = {
   bowling: { n: 'Bowling', rule: 'Pins', desc: 'Knock the whole lineup down in a single turn for a strike: heal 10. A strike by your fourth turn is a sports win.' },
   jousting: { n: 'Jousting', rule: 'The lists', desc: 'The first Attack you play each turn is a tilt and deals double damage. A tilt that deals 12+ shatters a lance: a point. Every enemy hit that gets through your Block is a point for them. Outscore them for a sports win.' },
   curling: { n: 'Curling', rule: 'Sweep', desc: 'At the end of your turn, each card left in hand gives 2 Block. End a turn with 12+ Block and your stone is in the house: a point, and every stone in the house gives you 2 Block at the start of each turn. Every enemy hit that gets through your Block is a point for them. Outscore them for a sports win.' },
-  soccer: { n: 'Soccer', rule: 'Pass and move', desc: 'Every card you play is a pass. An Attack with 3+ passes behind it is a shot: +1 damage per pass (up to 6), and 10+ damage on one enemy is a goal (draw a card). Scored or saved, the passes start again, and they start again every turn. An enemy hit that gets 5+ through your Block is a goal for them. Block every hit in their turn and it is a goal prevented: your next turn starts with a pass. Outscore them for a sports win.' },
+  soccer: { n: 'Soccer', rule: 'Pass and move', desc: 'Every card you play is a pass. An Attack with 2+ passes behind it is a shot: +1 damage per pass (up to 6), and 10+ damage on one enemy is a goal (draw a card). Scored or saved, the passes start again, and they start again every turn. An enemy hit that gets 6+ through your Block is a goal for them. Block every hit in their turn and it is a goal prevented: your next turn starts with a pass. Outscore them for a sports win.' },
   boxing: { n: 'Boxing', rule: 'The bell', desc: 'Each turn is a round, scored on the damage each side throws (blocked punches still count for them). Win more rounds than you lose for a sports win. Take a round by 15+ damage and they are rocked (Weak); lose one by 15+ and you are. Every third turn the bell rings: heal 4 and shake off Weak and Exposed. Win by knockout in three rounds for a highlight.' },
 };
 const ACT_SPORTS = [
@@ -1835,7 +1835,7 @@ const ENCOUNTERS = [
   { easy: [['winger'], ['harpyf', 'harpyf'], ['drow']], normal: [['winger', 'harpyf'], ['enforcer'], ['witchd', 'winger'], ['grinder'], ['netspider', 'harpyf'], ['drow', 'drow'], ['enforcer', 'drow'], ['witchd', 'harpyf']], elite: [['bullpen'], ['mascot']], boss: ['cube'] },
   { easy: [['gorgpg'], ['imp', 'imp'], ['bugbear']], normal: [['lichoc'], ['gorgpg', 'imp'], ['golemnt'], ['hob', 'imp', 'imp'], ['bugbear'], ['lichoc', 'imp'], ['gorgpg', 'hob'], ['imp', 'imp', 'imp'], ['bugbear', 'imp'], ['golemnt', 'imp']], elite: [['champ'], ['matriarch']], boss: ['baron'] },
 ];
-const SPORT_BRIEF = { baseball: 'Hits score runs, and runs hurt every enemy. Score more than they do.', football: 'Damage gains yards; touchdowns and field goals hit every enemy.', hockey: 'Put 12+ on one enemy to score. Half your Block slides over.', basketball: 'Attacks score baskets; the third one sets you On Fire.', golf: 'Make par: 1 turn plus 1 per enemy.', bowling: 'Drop the whole lineup in one turn for a strike.', jousting: 'Your first Attack each turn is a tilt: double damage.', curling: 'Leftover cards give Block; end a turn with 12+ to score.', boxing: 'Win the rounds. The bell heals you every third turn.', soccer: 'Every card is a pass. After three, an Attack is a shot: 10+ on one enemy scores.' };
+const SPORT_BRIEF = { baseball: 'Hits score runs, and runs hurt every enemy. Score more than they do.', football: 'Damage gains yards; touchdowns and field goals hit every enemy.', hockey: 'Put 12+ on one enemy to score. Half your Block slides over.', basketball: 'Attacks score baskets; the third one sets you On Fire.', golf: 'Make par: 1 turn plus 1 per enemy.', bowling: 'Drop the whole lineup in one turn for a strike.', jousting: 'Your first Attack each turn is a tilt: double damage.', curling: 'Leftover cards give Block; end a turn with 12+ to score.', boxing: 'Win the rounds. The bell heals you every third turn.', soccer: 'Every card is a pass. After two, an Attack is a shot: 10+ on one enemy scores.' };
 /* p3b: the bosses. Three per act, one drawn at random each run. Each has a brain that reads the fight,
    phases that change it at half health (or lower), and signature effects (vfx) for the arena. */
 Object.assign(ST, {
@@ -2587,6 +2587,9 @@ function useTonic(slot, ti) {
 }
 /* p4b: the sports layer. Every fight keeps score. Cards score by type and by how hard they hit;
    enemy attacks that get through your Block score for them. Win the fight AND the game for a sports win. */
+// soccer: passes needed for a shot, the most they add, and how much must get through your Block for their goal
+// (bot-tuned: 2 and 6 put soccer's sports-win rate with the major sports, 49% over 300 runs; 3 and 5 gave 34%)
+const SOCCER = { passes: 2, cap: 6, theirs: 6 };
 const SPORT_UNIT = { baseball: 1, football: 3, hockey: 1, basketball: 2, jousting: 1, curling: 1, soccer: 1 };
 const HIT_NAME = ['Out', 'Single', 'Double', 'Triple', 'Home run'];
 const hitBases = dmg => dmg <= 0 ? 0 : dmg < 10 ? 1 : dmg < 18 ? 2 : dmg < 25 ? 3 : 4;
@@ -2620,7 +2623,7 @@ function sportAtkBonus(e) {
   let d = add(t > 0 ? t : 0, MOM_NAME[t]);
   if (B.sport === 'baseball') d += add(Math.min(3, B.sc.bases.filter(Boolean).length), 'Runners on');   // runners on: pressure
   if (B.sport === 'football' && B.yards >= 75) d += add(2, 'Red zone');                                // the red zone
-  if (B.sport === 'soccer' && (B.sc.passes || 0) >= 3) d += add(Math.min(6, B.sc.passes), 'Passes');        // the shot after the passes
+  if (B.sport === 'soccer' && (B.sc.passes || 0) >= SOCCER.passes) d += add(Math.min(SOCCER.cap, B.sc.passes), 'Passes');        // the shot after the passes
   return d;
 }
 function sportEnemyBonus() {
@@ -2728,7 +2731,7 @@ function sportCardEnd(card, d, tgt) {
     case 'curling': if (card.sk && d.type !== 'atk') B.sc.curlP = (B.sc.curlP || 0) + 1; break;
     case 'soccer': {
       const n = B.sc.passes || 0;
-      if (d.type !== 'atk' || !dmgCard || n < 3) { B.sc.passes = n + 1; break; }
+      if (d.type !== 'atk' || !dmgCard || n < SOCCER.passes) { B.sc.passes = n + 1; break; }
       // a shot: the passes are spent, scored or saved
       B.sc.passes = 0;
       if (top >= SKT(card).kick) {
@@ -2761,7 +2764,7 @@ function sportEnemyHit(taken, raw) {
   if (taken <= 0) return;
   if (B.sport === 'football') { B.yards = Math.max(0, B.yards - taken); if (taken >= 8) { scoreThem(3); if (perkOn('clutch') && B.turn >= 3) scoreThem(3); } return; }
   if (B.sport === 'hockey' && taken < 3) return;
-  if (B.sport === 'soccer' && taken < 5) return;
+  if (B.sport === 'soccer' && taken < SOCCER.theirs) return;
   if (scored()) { scoreThem(SPORT_UNIT[B.sport]); if (perkOn('clutch') && B.turn >= 3) scoreThem(SPORT_UNIT[B.sport]); }
 }
 function sportTurnEnd() {
@@ -2832,7 +2835,7 @@ function sportBadge(card, tgt) {
     case 'basketball': { const T = SKT(card); return dmgCard ? (est.top < T.bk ? 'Brick' : `+${((T.threeAny || d.cost >= 2) && est.top >= T.three ? 3 : 2) + (d.type === 'play' && d.sport === 'basketball' ? 1 : 0)}`) : ''; }
     case 'jousting': return d.type === 'atk' && !B.firstAtk ? 'Tilt ×2' : '';
     case 'golf': return est.top >= SKT(card).drive ? 'Long drive' : '';
-    case 'soccer': return d.type === 'atk' && dmgCard && (B.sc.passes || 0) >= 3 ? (est.top >= SKT(card).kick ? 'Goal' : 'Shot') : 'Pass';
+    case 'soccer': return d.type === 'atk' && dmgCard && (B.sc.passes || 0) >= SOCCER.passes ? (est.top >= SKT(card).kick ? 'Goal' : 'Shot') : 'Pass';
   }
   return '';
 }
@@ -4755,7 +4758,7 @@ function drawFieldState(c) {
     const n = Math.min(6, B.sc.passes || 0), p = fp(-.6 + n * .22, .55);
     for (let i = 0; i < n; i++) { const q = fp(-.6 + i * .22, .55); circ(c, q.x, q.y, 3, 'rgba(40,60,120,.55)'); }
     ell(c, p.x, p.y + 4, 9, 3, 'rgba(0,0,0,.25)'); circ(c, p.x, p.y - 4, 8, '#f2ead8'); circ(c, p.x, p.y - 4, 3, '#21160f');
-    if (n >= 3) txt(c, 'SHOT ON', p.x, p.y - 22, F_HUD(16), '#ffd166', 'center');
+    if (n >= SOCCER.passes) txt(c, 'SHOT ON', p.x, p.y - 22, F_HUD(16), '#ffd166', 'center');
     return;
   }
   if (B.sport === 'basketball') {

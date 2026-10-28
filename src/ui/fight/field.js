@@ -85,7 +85,7 @@ function drawFieldState(c) {
     const n = Math.min(6, B.sc.passes || 0), p = fp(-.6 + n * .22, .55);
     for (let i = 0; i < n; i++) { const q = fp(-.6 + i * .22, .55); circ(c, q.x, q.y, 3, 'rgba(40,60,120,.55)'); }
     ell(c, p.x, p.y + 4, 9, 3, 'rgba(0,0,0,.25)'); circ(c, p.x, p.y - 4, 8, '#f2ead8'); circ(c, p.x, p.y - 4, 3, '#21160f');
-    if (n >= 3) txt(c, 'SHOT ON', p.x, p.y - 22, F_HUD(16), '#ffd166', 'center');
+    if (n >= SOCCER.passes) txt(c, 'SHOT ON', p.x, p.y - 22, F_HUD(16), '#ffd166', 'center');
     return;
   }
   if (B.sport === 'basketball') {

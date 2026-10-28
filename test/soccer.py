@@ -1,5 +1,5 @@
-# Soccer (issue #10): the pass-and-move rule. Every card is a pass; an Attack with 3+ passes is a shot that hits +1
-# per pass (up to 6) and scores at 10+ on one enemy; an enemy hit with 5+ through your Block is their goal; an enemy
+# Soccer (issue #10): the pass-and-move rule. Every card is a pass; an Attack with 2+ passes is a shot that hits +1
+# per pass (up to 6) and scores at 10+ on one enemy; an enemy hit with 6+ through your Block is their goal; an enemy
 # turn where every hit is blocked is a save (a goal prevented), and your next turn starts with a pass. Also the
 # practiced and Stopper lines, the highlights, the scoreboard and the in-hand badge.
 # Asserts; exits nonzero on failure.
@@ -46,9 +46,12 @@ async def main():
         # a 6 + 3 passes = 9: under the line, so a save, and the passes start again
         r = await pg.evaluate(PLAY, 't_six')
         check(r['us'] == 0 and r['passes'] == 0, 'a shot under 10 is saved, and the passes reset', r)
-        # an Attack with fewer than 3 passes is only a pass
+        # an Attack with fewer than 2 passes is only a pass; with two, it is a shot
         r = await pg.evaluate(PLAY, 't_six')
-        check(r['us'] == 0 and r['passes'] == 1, 'an Attack without three passes behind it is just a pass', r)
+        check(r['us'] == 0 and r['passes'] == 1, 'an Attack without two passes behind it is just a pass', r)
+        await pg.evaluate("B.hand.push(mkCard('t_pass'))"); await pg.evaluate(PLAY, 't_pass')
+        why2 = await pg.evaluate("dmgWhy(mkCard('t_six'), B.enemies[0])")
+        check(why2 and ['Passes', '+', 2] in why2['parts'], 'two passes are enough for a shot (+2)', why2)
 
         # a goal: three passes, then a big hit
         await pg.evaluate(START, ['t_pass', 't_pass', 't_pass', 't_twelve'])
@@ -61,9 +64,9 @@ async def main():
         check(await pg.evaluate("sportBadge(B.hand[0], B.enemies[0])") == 'Pass', 'with no passes, a card in hand says Pass')
 
         # ---------- their goals ----------
-        g = await pg.evaluate("""(() => { B.P.block = 0; const t0 = B.sc.them; hurtPlayer(4, B.enemies[0]); const a = B.sc.them - t0;
-          hurtPlayer(5, B.enemies[0]); const b = B.sc.them - t0 - a; return [a, b]; })()""")
-        check(g == [0, 1], 'an enemy hit with 4 through is no goal, and 5 through is their goal', g)
+        g = await pg.evaluate("""(() => { B.P.block = 0; const t0 = B.sc.them; hurtPlayer(5, B.enemies[0]); const a = B.sc.them - t0;
+          hurtPlayer(6, B.enemies[0]); const b = B.sc.them - t0 - a; return [a, b]; })()""")
+        check(g == [0, 1], 'an enemy hit with 5 through is no goal, and 6 through is their goal', g)
 
         # ---------- saves ----------
         s = await pg.evaluate("""(() => { B.sc.eh = 0; B.sc.et = 0; B.P.block = 50; hurtPlayer(6, B.enemies[0]); hurtPlayer(6, B.enemies[1]);
