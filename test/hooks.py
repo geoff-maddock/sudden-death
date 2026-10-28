@@ -28,6 +28,7 @@ async def main():
           chk('mitt', () => mod('rewardGold') === 10);
           chk('champring', () => { const g = RUN.gold; gainGold(100); return RUN.gold - g === 125; });
           chk('cupreplica', () => mod('choices') === 1);
+          chk('goldenboot', () => { const golf = mod('passes'); B.sport = 'soccer'; const n = mod('passes'); B.sport = 'golf'; return golf === 0 && n === 1; });
           chk('bowling', () => { B.hand.unshift(mkCard('check')); B.energy = 9; const t = B.enemies[0], h = t.hp + t.block; playCard(0, t.uid); const first = h - (t.hp + t.block); B.hand.unshift(mkCard('check')); const h2 = t.hp + t.block; playCard(0, t.uid); const second = h2 - (t.hp + t.block); return first === second + 8; });
           chk('chalice', () => { RUN.hp = 50; B.enemies[0].hp = 1; B.hand.unshift(mkCard('check')); B.energy = 9; playCard(0, B.enemies[0].uid); return RUN.hp === 53; });
           chk('skates', () => { const n = B.hand.length; B.hand.unshift(mkCard('hold')); B.energy = 9; playCard(0); return B.hand.length === n + 1; });

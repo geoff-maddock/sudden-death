@@ -264,6 +264,7 @@ function atkDmg(base, e, card, extra = 0) {
   if (card && def(card).type === 'atk') {
     d += add(sv(P, 'luckybat') ? 4 : 0, 'Lucky Bat');
     d += sportAtkBonus(e);
+    if (!B.passHit) { const pb = passBonus(); if (pb) { d += add(pb, 'Passes'); B.passHit = 1; } } // soccer: the passes add to a shot once
     if (!B.inCard || !B.skyHit) { d += add(skyAtk(card), 'The sky'); if (B.inCard) B.skyHit = 1; } // the sky adds to a card's first hit only
     if (B.sport === 'basketball' && (sv(P, 'hot') || (!B.inCard && B.atkCount >= 2))) d += add(3, 'On Fire');
     d += add(sv(P, 'oop'), 'Alley-oop');
@@ -280,8 +281,8 @@ function atkDmg(base, e, card, extra = 0) {
 function dmgWhy(card, e) {
   const d = def(card), op = (d.fx || []).find(o => ['d', 'drain', 'dunk', 'drainall'].includes(o[0]));
   if (!op || !e) return null;
-  WHY = []; let n;
-  try { n = atkDmg(op[0] === 'dunk' && e.hp < e.max / 2 ? op[2] : op[1], e, card); } finally { var parts = WHY; WHY = null; }
+  WHY = []; let n; const ph = B.passHit; B.passHit = 0;
+  try { n = atkDmg(op[0] === 'dunk' && e.hp < e.max / 2 ? op[2] : op[1], e, card); } finally { var parts = WHY; WHY = null; B.passHit = ph; }
   return parts.length > 1 ? { parts, n, hits: op[0] === 'd' ? op[2] || 1 : 1 } : null;
 }
 function hurtEnemy(e, dmg, o = {}) {
@@ -352,7 +353,7 @@ function playCard(i, ti, opt = {}) {
   const comboHit = d.combo && B.lastType === d.combo.t;
   const momHit = d.mom && B.cardsThisTurn >= d.mom.n;
   B.cardBonus = d.grow ? (B.grow[card.uid] || 0) : 0;
-  B.who = ownerOf(card); credit('c', 1); B.curCard = card; B.skyHit = 0;
+  B.who = ownerOf(card); credit('c', 1); B.curCard = card; B.skyHit = 0; B.passHit = 0;
   B.curType = d.type;
   sportCardStart(d);
   const times = sv(B.P, 'double') && d.type !== 'pow' ? 2 : 1;
@@ -451,7 +452,7 @@ function resolve(ops, ctx) {
       case 'petrifyall': for (const e of alive()) { if (!isBoss(e) && e.hp <= e.max * op[1]) { fx({ k: 'say', e: e.uid, t: 'Turned to stone' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(op[2], e, ctx.card)); } break;
       case 'bonestorm': { const n = op[1] * B.discard.length; for (const e of alive()) hurtEnemy(e, atkDmg(n, e, ctx.card)); break; }
       case 'freeatk': B.freeAtk = true; log('Every Attack costs 0 for the rest of the turn.', 'good'); break;
-      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance':
+      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance': case 'passes':
         sportOp(op, ctx); break;
     }
     if (checkWin()) return;

@@ -4,6 +4,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 from paths import GAME_URL
 from playwright.async_api import async_playwright
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+PATCH = sys.argv[2] if len(sys.argv) > 2 else ''   # optional JS run after load, to try a tuning, e.g. "SOCCER.theirs = 6"
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch()
@@ -12,6 +13,7 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.add_init_script('window.__SD_LAB = true;')
         await pg.goto(GAME_URL)
+        if PATCH: await pg.evaluate(PATCH)
         await pg.add_script_tag(path=ROOT + '/test/lab.js')
         logs = await pg.evaluate(f'(() => {{ const out = []; for (let i = 0; i < {N}; i++) {{ try {{ out.push(LABRUN()); }} catch (e) {{ out.push({{ err: String(e.stack || e) }}); }} }} return out; }})()')
         json.dump(logs, open('/tmp/lab.json', 'w'))

@@ -58,8 +58,8 @@ const W_GRD_THEMES = {
     // the rink organ runs up and down the scale between whistles
     mel: wMel('0.2.4.6.7.......', '6.4.2...0.......', '7.6.4.2.4.......', '3.2.1...0.......'),
     bassPat: 'x...x...x...x...', drums: { k: 'x.......x.......', s: '....x.......x...', h: 'x...x...x...x...' } },
-  g_sheet: { name: 'Frostspire Sheet', bpm: 80, root: 55, scale: 'aeolian', prog: [0, 5, 3, 4], lead: 'sine', bass: 'sine', pad: 'sine', bell: 1,
-    // a stone sliding a long way in the cold
+  g_sheet: { name: 'Hoarfrost Pitch', bpm: 80, root: 55, scale: 'aeolian', prog: [0, 5, 3, 4], lead: 'sine', bass: 'sine', pad: 'sine', bell: 1,
+    // a long ball through the cold air (the tune of the old curling sheet)
     mel: wMel('7.......6.......', '4...3...2.......', '4.......5.......', '3...2...0.......'),
     bassPat: 'x...............', drums: { k: 'x.......x.......', s: '................', h: '........x.......' } },
 };

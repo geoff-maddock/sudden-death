@@ -185,6 +185,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w35-legends.js` | The Hall of Legends (epic 2, phase 12): a Crown writes your team (name, colours, starting three) to `pkey('sd-realm-legends')`, outside the journey's save. Later journeys copy the Hall (`WG.legends`) and meet those champions at the Crown Coliseum (Steward Crane's LEGENDS) and, with two cups, on the road, once a journey each. |
 | `w36-gate.js` | Gate money at the grounds (issue #6, open question 4): no fee to play; a win at a card-game ground takes `W_TAKE.per` gold a tier (Friendly 5, Challenge 6) times your name in the region (`wTake`), shown on the keeper's and pre-game cards. |
 | `w37-map.js` | The map of wherever you are: `M`, a Map button beside the Journal, or Map on the Menu. The world, a city, a ground, a house or a dungeon, each under its own fog of war (`WG.fog` for the world, `WG.fogs[mapId]` for the rest), revealed as you walk. A tab shows the realm from inside. Dungeon maps cross off beaten teams' rooms and show the alpha, strongboxes and stairs; town maps label the street signs. |
+| `w38-soccer.js` | Soccer at Rimewatch (issue #10): the Rimewatch Sheet is the Hoarfrost Pitch (`g_sheet`, soccer, in `w21-grounds.js`), and an older save clears its curling record there once (`WG.soccer`). |
 
 ### Brimstone Diamond (`src/bd/`)
 

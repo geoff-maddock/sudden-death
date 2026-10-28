@@ -64,6 +64,7 @@ function opText(op, d, ctx) {
     case 'atkcount': return 'Counts as an extra Attack toward On Fire.';
     case 'freestroke': return 'This turn does not count as a stroke.';
     case 'lance': return 'Shatters a lance: a point.';
+    case 'passes': return `Adds ${op[1]} passes.`;
   }
   return '';
 }

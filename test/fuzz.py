@@ -10,7 +10,7 @@ async def main():
         await pg.goto(GAME_URL); await pg.wait_for_timeout(500)
         r = await pg.evaluate("""(() => { const bad = []; const cv = document.querySelector('#v-fight canvas') || document.querySelector('canvas'); 
           const ids = Object.keys(ENEMIES); const sts = Object.keys(ST);
-          for (const id of ids) for (const sport of ['baseball','hockey','football','basketball','golf','bowling','boxing','curling','jousting']) {
+          for (const id of ids) for (const sport of ['baseball','hockey','football','basketball','golf','bowling','boxing','curling','jousting','soccer']) {
             try { newRun(pick(CLUB_IDS),[0,1,2]); RUN.path=[]; RUN.clock = ri(0, 80); startCombat([id], ENEMIES[id].boss ? 'boss' : 'normal', sport); showView('fight'); renderFightHUD && renderFightHUD();
               for (const e of B.enemies) { for (const s of sts) if (Math.random() < .4) e.st[s] = ri(1, 9); e.hp = ri(1, e.max); e.block = ri(0, 30); }
               for (const s of sts) if (Math.random() < .3) B.P.st[s] = ri(1, 5);

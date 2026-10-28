@@ -28,7 +28,7 @@ Progress (runs in progress, the record book, careers, achievements, settings) is
 ### What's in it
 
 - **18 creature kinds**, 8 clubs with their own styles and trophies, plus an open draft of free agents.
-- **9 sports**, each with its own scoring rules, field visuals and scoring animations, a momentum system, highlights and a Highlight Reel.
+- **10 sports**, each with its own scoring rules, field visuals and scoring animations, a momentum system, highlights and a Highlight Reel.
 - **A published schedule:** every fight room shows its sport, and each act has a home sport. Build and route for the games you are good at.
 - **Practice (★):** a second upgrade track that makes a card better at the game without changing its fight stats.
 - **9 bosses** with their own brains and phases, elite scouting reports, rival games, enemy sport perks and high-stakes rooms.

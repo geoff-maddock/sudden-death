@@ -10,6 +10,7 @@ const SPORT_GLYPH = {
   jousting: '<path d="M3 21L17 7" stroke="#c9a36a" stroke-width="2.4" stroke-linecap="round"/><path d="M15 5l5-2-2 5z" fill="#efe4cc" stroke="#21160f"/><path d="M6 15l3 3" stroke="#21160f" stroke-width="3"/>',
   curling: '<ellipse cx="12" cy="16" rx="8" ry="4" fill="#8a8a92" stroke="#21160f" stroke-width="1.4"/><path d="M12 12V7h5" fill="none" stroke="#e0533a" stroke-width="2.2" stroke-linecap="round"/>',
   boxing: '<path d="M7 9c0-3 2-5 6-5s6 3 6 7c0 3-1 5-3 6v3H9v-3c-2-1-2-3-2-5z" fill="#c2264a" stroke="#21160f" stroke-width="1.4"/><path d="M7 11c-2 0-3 1-3 2s1 2 3 2" fill="#c2264a" stroke="#21160f" stroke-width="1.2"/>',
+  soccer: '<circle cx="12" cy="12" r="8" fill="#f2ead8" stroke="#21160f" stroke-width="1.5"/><path d="M12 8.2l3 2.2-1.1 3.5h-3.8L9 10.4z" fill="#21160f"/><path d="M12 8.2V4.4M15 10.4l3.6-1.2M13.9 13.9l2.2 3M10.1 13.9l-2.2 3M9 10.4l-3.6-1.2" stroke="#21160f" stroke-width="1.1"/>',
 };
 const sportSVG = (s, size = 18) => SPORT_GLYPH[s] ? `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${SPORT_GLYPH[s]}</svg>` : '';
 const ACT_HOME = ['baseball', 'hockey', 'football'];
@@ -37,14 +38,15 @@ const PRACTICE = {
   jousting: 'Shatters a lance at 9+ damage.',
   curling: 'Each practiced Skill this turn lowers the house to 3 less Block (down to 6).',
   boxing: 'Damage counts 50% more on the judges’ cards.',
+  soccer: 'Scores a goal at 8+ damage.',
 };
 const practicable = c => !c.sk && !['junk', 'curse', 'status'].includes(CARDS[c.id].type);
 const SKT = c => {
   const T = c && c.sk
-    ? { hit: 1, yards: 1.5, goal: 9, pp: 5, bk: 6, three: 10, threeAny: true, drive: 14, lance: 9, box: 1.5, bowl: 2 }
-    : { hit: 0, yards: 1, goal: 12, pp: 6, bk: 8, three: 12, threeAny: false, drive: 20, lance: 12, box: 1, bowl: 0 };
+    ? { hit: 1, yards: 1.5, goal: 9, pp: 5, bk: 6, three: 10, threeAny: true, drive: 14, lance: 9, box: 1.5, bowl: 2, kick: 8 }
+    : { hit: 0, yards: 1, goal: 12, pp: 6, bk: 8, three: 12, threeAny: false, drive: 20, lance: 12, box: 1, bowl: 0, kick: 10 };
   // an enemy Stopper makes every way of scoring harder
-  if (typeof perkOn === 'function' && perkOn('stopper')) { T.hit -= 1; T.yards *= .75; T.goal += 3; T.pp += 2; T.bk += 3; T.three += 3; T.drive += 4; T.lance += 3; T.box *= .8; }
+  if (typeof perkOn === 'function' && perkOn('stopper')) { T.hit -= 1; T.yards *= .75; T.goal += 3; T.pp += 2; T.bk += 3; T.three += 3; T.drive += 4; T.lance += 3; T.box *= .8; T.kick += 3; }
   return T;
 };
 function practiceTip() { return Object.entries(PRACTICE).map(([s, t]) => `<b>${SPORT_NAME[s]}</b>: ${t}`).join('<br>'); }

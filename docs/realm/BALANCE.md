@@ -281,3 +281,29 @@ A game at a ground costs nothing; a win takes the gate (`W_TAKE`: 5 gold a tier 
 | Ground games, with the gate (shipped) | 82.1% | 8.9 (98.4%) | 89 | 693 |
 
 The gate is a small top-up, about 10 gold a game: less than a Friendly's own match gold (10 to 20). Champion rate and end gold stay within noise, so the gold sinks from epic 2 still hold. Friendlies at the region's tier are easy wins for the bot (98%); the Challenge is the harder game, and pays a little more.
+
+## Soccer (issue #10)
+
+Soccer is Sudden Death's tenth sport. In the Realm it takes the Rimewatch Sheet from curling (the Hoarfrost Pitch), so the Frostspire plays hockey and soccer.
+
+**Sudden Death, the rule** (`SOCCER` in `src/engine/sports.js`; 300 bot runs each, two at a time):
+
+| | `main` | soccer |
+|---|---|---|
+| Run win rate | 22.7% | 23.3% |
+| Deaths in Act 1 | 37.7% | 37.3% |
+| Soccer's sports-win rate | – | 49% |
+
+The first rule (a shot after 3 passes, their goal at 5+ through Block) gave soccer 34%, below every major sport. A shot after 2 passes, and their goal at 6+, puts it at 49%, beside football (51%), hockey (51%), basketball (59%) and baseball (67%). Samples of 150 to 200 runs swung by 7 points between two runs of `main`, so compare 300.
+
+**The Realm** (`python3 test/realm_lab.py 140 '{}'`):
+
+| | `main` | soccer |
+|---|---|---|
+| Champion rate | 77.9% | 78.6% |
+| Frostspire wild match, HP | 12.8 | 19.2 |
+| Rimewatch cup final, win | 98.4% | 95.2% |
+
+The champion rate doesn't move. The Frostspire costs a little more, because soccer replaced curling there, and curling is one of the bot's easiest sports. The soccer run had one stall, a Brinefen wild match against `grinder` (bowling or curling, not soccer).
+
+**After the review fixes** (the pass bonus once per shot, the Harpy Striker elite, the Penalty Spot, the Golden Boot), 300 runs each, side by side: `main` 24.0% run wins and 32.3% deaths in Act 1, this branch 22.0% and 35.7%, with soccer's sports-win rate at 53%. One earlier 300-run sample of the branch gave 17.3%; the side-by-side rerun puts that down to noise.

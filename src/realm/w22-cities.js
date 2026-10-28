@@ -155,7 +155,7 @@ const W_CITIES = {
       ['1', 1, 10], ['1', 2, 10], ['1', 3, 10], ['1', 4, 10], ['1', 5, 10], ['1', 9, 10], ['1', 10, 10], ['1', 11, 10], ['1', 12, 10], ['4', 4, 12], ['3', 2, 11], ['3', 11, 11],
       ['S', 21, 18, { text: 'THE POND. Thick enough, says Old Tove. Skates on, or stay on the bank.' }],
       ['S', 35, 15, { text: 'SLED RUN. One at a time, feet first, and shout.' }],
-      ['S', 19, 29, { text: 'RIMEWATCH. The Pond Rink and the Rimewatch Sheet are down the road from the gate.' }]],
+      ['S', 19, 29, { text: 'RIMEWATCH. The Pond Rink and the Hoarfrost Pitch are down the road from the gate.' }]],
     arrive: 'Rimewatch. The last town before the snow takes over, and it knows it.',
     ambient: ['The abbey bell tolls the hour, a little flat with cold.', 'A Frostlet is asleep on the arena sign, glazing it.', 'The lamps come on early here. They have to.', 'A cairn by the road has a new stone on it.', 'Children skate on the pond, badly.', 'Somebody comes down the sled run much faster than they meant to.'] },
 };

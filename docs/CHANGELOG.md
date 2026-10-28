@@ -2,6 +2,12 @@
 
 Milestones from development, newest first. The game was built in claude.ai and published as an artifact after each step; this is the record of what landed when.
 
+## Soccer, the tenth sport
+- **Pass and move:** every card you play is a pass. An Attack with 3+ passes behind it is a shot, +1 damage per pass (up to 6), and 10+ on one enemy is a goal. An enemy hit with 5+ through your Block is their goal; block every hit in their turn and it is a goal prevented, and your next turn starts with a pass.
+- **Highlights:** golazo, clean sheet, brick wall (three saves), and the hat trick.
+- **On the schedule like a major sport** (2, 2 and 3 across the acts), with five archetype cards, a set play (One-Touch), a snow pitch, the ball working up the pitch with each pass, and a constellation, The Net.
+- **The Realm:** the Rimewatch Sheet, the second curling ground, is the Hoarfrost Pitch, so every ground has its own sport. The Frostspire plays hockey and soccer. Eleven a side, five of your own.
+
 ## Trouble, profiles and achievements
 - **Enemy sport perks:** Ace, Stopper, Hot start and Clutch, shown as gold tags over enemies. Rare in brawls, common among elites, rivals and bosses.
 - **High-stakes rooms** on the map (red badge): Grudge match, Hot-headed ref, Bloodsport and Side bet. They settle on the reward screen.
