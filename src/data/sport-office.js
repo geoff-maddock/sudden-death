@@ -37,14 +37,15 @@ const PRACTICE = {
   jousting: 'Shatters a lance at 9+ damage.',
   curling: 'Each practiced Skill this turn lowers the house to 3 less Block (down to 6).',
   boxing: 'Damage counts 50% more on the judges’ cards.',
+  soccer: 'Scores a goal at 8+ damage.',
 };
 const practicable = c => !c.sk && !['junk', 'curse', 'status'].includes(CARDS[c.id].type);
 const SKT = c => {
   const T = c && c.sk
-    ? { hit: 1, yards: 1.5, goal: 9, pp: 5, bk: 6, three: 10, threeAny: true, drive: 14, lance: 9, box: 1.5, bowl: 2 }
-    : { hit: 0, yards: 1, goal: 12, pp: 6, bk: 8, three: 12, threeAny: false, drive: 20, lance: 12, box: 1, bowl: 0 };
+    ? { hit: 1, yards: 1.5, goal: 9, pp: 5, bk: 6, three: 10, threeAny: true, drive: 14, lance: 9, box: 1.5, bowl: 2, kick: 8 }
+    : { hit: 0, yards: 1, goal: 12, pp: 6, bk: 8, three: 12, threeAny: false, drive: 20, lance: 12, box: 1, bowl: 0, kick: 10 };
   // an enemy Stopper makes every way of scoring harder
-  if (typeof perkOn === 'function' && perkOn('stopper')) { T.hit -= 1; T.yards *= .75; T.goal += 3; T.pp += 2; T.bk += 3; T.three += 3; T.drive += 4; T.lance += 3; T.box *= .8; }
+  if (typeof perkOn === 'function' && perkOn('stopper')) { T.hit -= 1; T.yards *= .75; T.goal += 3; T.pp += 2; T.bk += 3; T.three += 3; T.drive += 4; T.lance += 3; T.box *= .8; T.kick += 3; }
   return T;
 };
 function practiceTip() { return Object.entries(PRACTICE).map(([s, t]) => `<b>${SPORT_NAME[s]}</b>: ${t}`).join('<br>'); }
