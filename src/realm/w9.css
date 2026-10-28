@@ -45,3 +45,5 @@
 .wmapbox{border:2px solid #5a4630;border-radius:4px;overflow:hidden;line-height:0;background:#e9dcbc}
 #wMapCv{width:100%;height:auto;display:block}
 .wmapkey{display:flex;flex-wrap:wrap;gap:4px 14px}
+.wmaptabs{margin:0 0 8px}
+.wmaptabs [aria-selected="true"]{border-color:var(--torch);color:var(--torch)}

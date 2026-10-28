@@ -98,6 +98,45 @@ async def main():
         check(await pg.evaluate(MAP_OPEN + " && !UI.paused"), 'the Menu has a Map button that opens the map')
         await pg.evaluate(CLOSE_ALL)
 
+        # ---------- maps of the places you are in ----------
+        await pg.evaluate(CLOSE_ALL)
+        t = await pg.evaluate("""(() => { wEnterMap('graftonbury', 5, 11); wDrain(); const m = MAPS.graftonbury;
+          return { seen: wMapSeenCount('graftonbury'), all: m.w * m.h, here: wFogSeen(WG.x, WG.y, 'graftonbury') }; })()""")
+        check(0 < t['seen'] < t['all'] // 3 and t['here'], 'a town starts dark, revealed only round your team', t)
+        await pg.wait_for_function("wActive()")
+        await pg.keyboard.press('m')
+        lm = await pg.evaluate("""(() => { const cv = document.getElementById('wMapCv'), b = document.getElementById('modalBox'), m = MAPS.graftonbury;
+          return { title: b.querySelector('h3').textContent, w: cv.width, want: m.w * wMapPx(m), tabs: b.querySelectorAll('[data-wmapv]').length }; })()""")
+        check(lm['title'] == 'Map: Graftonbury' and lm['w'] == lm['want'] and lm['tabs'] == 2, 'in a town, M shows the town\'s own map, with a tab for the realm', lm)
+        await pg.screenshot(path='/tmp/realm-map-town.png')
+        await pg.click('[data-wmapv="world"]')
+        check(await pg.evaluate("document.querySelector('#modalBox h3').textContent === 'Map of the realm' && document.getElementById('wMapCv').width === 96 * 8"), 'the realm tab shows the world')
+        await pg.evaluate(CLOSE_ALL)
+        w = await pg.evaluate("(() => { const n0 = wMapSeenCount('graftonbury'); for (let i = 0; i < 10; i++) { if (!wDoStep(1, 0)) wDoStep(0, 1); } return [n0, wMapSeenCount('graftonbury')]; })()")
+        check(w[1] > w[0], 'walking the town reveals more of it', w)
+        await pg.evaluate(CLOSE_ALL)
+        # a dungeon: dark but round the stairs; walking reveals; the map draws its rooms
+        d = await pg.evaluate("""(() => { const m = MAPS.genevault; wEnterMap('genevault', m.spawn[0], m.spawn[1]); wDrain(); const n0 = wMapSeenCount('genevault');
+          for (let i = 0; i < 8; i++) { if (!wDoStep(0, -1)) if (!wDoStep(1, 0)) wDoStep(-1, 0); }
+          const R = wDungeonRooms('genevault')[0]; wSetFlag(R.flag); for (let y = R.y; y < R.y + R.h; y++) for (let x = R.x; x < R.x + R.w; x++) wFogReveal(x, y, 0, 'genevault');
+          return { n0, n1: wMapSeenCount('genevault'), all: m.w * m.h, small: W_MAP.seeIn.dungeon < W_MAP.seeIn.town }; })()""")
+        check(0 < d['n0'] < d['all'] // 10 and d['n1'] > d['n0'] and d['small'], 'a dungeon starts dark round the stairs, reveals as you walk, and sees less far than a town', d)
+        await pg.evaluate(CLOSE_ALL)
+        # the steps may have taken the stairs out: go back in before opening the map
+        await pg.evaluate("(() => { const m = MAPS.genevault; if (WG.map !== 'genevault') { wEnterMap('genevault', m.spawn[0], m.spawn[1]); wDrain(); } })()")
+        await pg.evaluate(CLOSE_ALL)
+        await pg.evaluate("wOpenMap()")
+        dm = await pg.evaluate("[document.querySelector('#modalBox h3').textContent, document.getElementById('modalBox').textContent.includes('A team you have beaten')]")
+        check(dm == ['Map: The Sealed Vault', True], 'the dungeon map has its own key: stairs, beaten teams, the alpha, strongboxes', dm)
+        await pg.screenshot(path='/tmp/realm-map-dungeon.png')
+        await pg.evaluate(CLOSE_ALL)
+        # an older save: towns you have been to are whole, a dungeon you have been in is revealed round its stairs
+        old2 = await pg.evaluate("""(() => { const save = JSON.parse(JSON.stringify({ WG, RUN })); delete save.WG.fogs; save.WG.flags.seen_saltmere = 1; save.WG.flags.seen_hatchery = 1;
+          save.WG.map = 'world'; wStart(save); const s = MAPS.saltmere, h = MAPS.hatchery;
+          return { salt: wMapSeenCount('saltmere') === s.w * s.h, hatch: wMapSeenCount('hatchery'), hall: h.w * h.h, rime: wMapSeenCount('rimewatch') }; })()""")
+        check(old2['salt'] and 0 < old2['hatch'] < old2['hall'] // 10 and old2['rime'] == 0, 'an older save: a town you have been to is whole, a dungeon round its stairs, and the rest dark', old2)
+        await pg.evaluate(CLOSE_ALL)
+
         # ---------- How to play ----------
         await pg.evaluate("renderHelp()")
         check(await pg.evaluate("!!document.getElementById('wHelpMap')"), 'How to play explains the map')
