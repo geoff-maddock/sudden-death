@@ -57,7 +57,7 @@ Several files still open with their old part name in a comment (`/* p5: ... */`)
 | `ui/screens/flow.js` | Run flow: resume, entering a node, beginning and finishing a fight, the next act. |
 | `ui/screens/panels.js` | Panels: reward, shop, locker room, events, and the end screen. |
 | `ui/screens/pages.js` | Pages: How to play, the bestiary, records and the season table. |
-| `app/boot.js` | The frame loop and `boot()`. Boot runs here, so the files after it patch in once it has started. |
+| `app/boot.js` | The frame loop and `boot()`. Boot runs here, so the files after it patch in once it has started. It leaves the Settings button (`#bSound`) to `app/settings.js`: the Realm calls `boot()` later, after that file has wired it. |
 | `ui/screens/stats.js` | Stat sheets and charts. |
 | `ui/screens/treasure.js` | The treasure trunk scene. |
 | `app/music.js` | Settings store (`SET`), audio buses, the music sequencer. |
@@ -184,6 +184,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w34-defend.js` | Defend the title (epic 2, phase 11): after the Crown, each crown adds to renown, the cups on your wall reopen the next year as title defences a level harder (`WG.defend`), rival clubs hunt the champions on the road (a rival `event` match with `ref.hunt`), and the Crown is a level harder for each crown held. |
 | `w35-legends.js` | The Hall of Legends (epic 2, phase 12): a Crown writes your team (name, colours, starting three) to `pkey('sd-realm-legends')`, outside the journey's save. Later journeys copy the Hall (`WG.legends`) and meet those champions at the Crown Coliseum (Steward Crane's LEGENDS) and, with two cups, on the road, once a journey each. |
 | `w36-gate.js` | Gate money at the grounds (issue #6, open question 4): no fee to play; a win at a card-game ground takes `W_TAKE.per` gold a tier (Friendly 5, Challenge 6) times your name in the region (`wTake`), shown on the keeper's and pre-game cards. |
+| `w37-map.js` | The map of the realm: `M`, a Map button beside the Journal, or Map on the Menu opens the world drawn in ink. Fog of war: tiles within `W_MAP.see` of your team are revealed as you walk and stay revealed (`WG.fog`). Places get a mark once seen and a bold name once visited. |
 
 ### Brimstone Diamond (`src/bd/`)
 

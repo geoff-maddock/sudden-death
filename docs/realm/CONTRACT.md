@@ -506,3 +506,10 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **No fee, a gate on a win.** `wTake(id, mode)` is the gold a win at a card-game ground takes today: `W_TAKE.per[mode]` (Friendly 5, Challenge 6) × `wGrdTier(id, mode)` × `W_TAKE.name[wRepStep(region)]` (1, 1.25, 1.5, 2 for Unknown, Known, Liked, Loved), rounded. 0 at the Ballpark (ball games keep `W_BALL.gold`) and when `W_TAKE.off`.
 - **Paid by** `W_ON_END.ground` (wrapped as `wW36GrdEnd`): worked out before the win adds to your name, so it matches the cards; paid through `gainGold` (trophy gold bonuses apply) with a log line. A loss takes nothing.
 - **Shown** on the keeper's card (`.wgate`, `wOpenGrdCard` wrapped), the pre-game card's ground line (`.wpground`), and How to play (`#wHelpGate` in `#wHelpGrdPlay`).
+
+## The map (w37-map.js)
+
+- **State.** `WG.fog`: the revealed world tiles, a `WW`×`WH` bitset as a base64 string (plain JSON), decoded once per `WG` into a module cache. `wFogSeen(x, y)`, `wFogReveal(x, y, r)` (returns how many tiles were new, and stores), `wMapSeenCount()`.
+- **Reveal.** `wDoStep` and `wEnterMap` (wrapped) reveal a circle of `W_MAP.see` tiles round you when you are on the world map. `wStart` (wrapped): a journey without `WG.fog` (new, or an older save) is revealed `W_MAP.back` tiles round Graftonbury and every place in the journal or with a `seen_` flag.
+- **Drawn** by `wMapDraw` on `#wMapCv` (`W_MAP.px` pixels a tile): `W_MAP_COL` flat tile colours, an inked edge on the fog, `wMapMark` for each place in `wMapPlaces()` (kinds in `W_MAP_KIND`; bold name once in the journal's places; a ground's name on the side away from its city), and a red mark at `wMapHere()` (your tile, or the place whose map you are in).
+- **Opened** by `wOpenMap()`: the `M` key, `#wMapBtn` (`wRenderHud` wrapped, after the Journal button), and `#pMap` on the Menu (`openPause` wrapped, in the world only). How to play: `#wHelpMap`.
