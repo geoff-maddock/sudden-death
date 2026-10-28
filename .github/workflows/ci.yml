@@ -14,7 +14,7 @@ env:
     realm_league realm_diamond_source realm_journal realm_diamond realm_diamond_ratings realm_diamond_nine
     realm_diamond_game realm_diamond_cup realm_diamond_feel realm_click realm_grounds realm_gmatch realm_cities
     realm_spots realm_fixtures realm_home realm_gfeel realm_notices realm_legs realm_captain realm_weather
-    realm_name realm_tour realm_sinks realm_defend realm_legends realm_gate realm_settings realm_map soccer realm_soccer realm_retire indeck
+    realm_name realm_tour realm_sinks realm_defend realm_legends realm_gate realm_settings realm_map soccer realm_soccer realm_retire indeck realm_eggs
   SHARDS: 4
 jobs:
   build:
