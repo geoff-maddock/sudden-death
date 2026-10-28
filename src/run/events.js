@@ -14,6 +14,13 @@ const EVENTS = [
       { label: 'Bowl a frame', desc: 'Roll a d20.', go: () => { const r = evRoll(); if (r === 20) { gainGold(90); return { text: `Natural 20. STRIKE. The skulls explode outward and the ogre weeps with joy. +90 gold, and he insists you keep the lucky ball.`, then: { relic: RUN.relics.includes('bowling') ? randomRelic() : 'bowling' } }; } if (r >= 14) { const g = gainGold(50); return { text: `You roll ${r}. Spare! +${g} gold.` }; } if (r >= 7) { const g = gainGold(15); return { text: `You roll ${r}. Seven pins. +${g} gold for effort.` }; } if (r > 1) return { text: `You roll ${r}. Gutter ball. The ogre laughs for a very long time.` }; RUN.hp = Math.max(1, RUN.hp - 9); return { text: 'Natural 1. You drop the skull on your foot. −9 HP.' }; } },
       { label: 'Just watch', desc: 'Heal 5.', go: () => { RUN.hp = Math.min(RUN.maxhp, RUN.hp + 5); return { text: 'You sit on the bench and eat stale cavern pretzels. +5 HP.' }; } },
     ] },
+  { id: 'penalty', t: 'The Penalty Spot', art: { kind: 'skeleton', team: { color: '#5fa8c9', light: '#e3f3ff', short: 'PKS' }, num: 1 }, acts: [0, 1, 2],
+    text: 'A skeleton keeper stands in a goal chalked on the cavern wall, rattling. "One kick. Beat me and I pay. Miss and you pay. I have not let one in for three hundred years."',
+    opts: () => [
+      { label: 'Take the penalty (bet 20 gold)', desc: 'Roll a d20. 10+ scores.', ok: () => RUN.gold >= 20, go: () => { const r = evRoll(); RUN.gold -= 20; if (r === 20) { gainGold(60); return { text: 'Natural 20. Top corner. The keeper falls apart, then hands you his boots. +60 gold.', then: { relic: RUN.relics.includes('goldenboot') ? randomRelic() : 'goldenboot' } }; } if (r >= 10) { const g = gainGold(45); return { text: `You roll ${r}. GOAL. He picks the ball out of the net and pays up. +${g} gold.` }; } return { text: `You roll ${r}. Saved, with one bony finger. The 20 gold is his.` }; } },
+      { label: 'Go in goal for him', desc: 'Lose 6 HP. Learn a Through Ball.', go: () => { RUN.hp = Math.max(1, RUN.hp - 6); return { text: 'He takes a hundred penalties at you and laughs at every one. You learn how a striker thinks. -6 HP.', then: { cards: [{ id: 'scr_through', up: false }] } }; } },
+      { label: 'Walk on', desc: '', go: () => ({ text: '"Coward," he calls after you, kindly.' }) },
+    ] },
   { id: 'golf', t: 'The Lich’s Nine Holes', art: { kind: 'lich', team: { color: '#3d6a3a', light: '#cfe8a0', short: 'GLF' }, num: 9 }, acts: [0, 1, 2],
     text: 'A lich in plaid trousers is playing through a graveyard. "Par three, over the open grave. Care to make it interesting?"',
     opts: () => [

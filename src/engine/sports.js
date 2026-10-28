@@ -54,7 +54,7 @@ function sportTurnBegin() {
   if (B.sport === 'golf' && B.turn > parFor()) { for (const e of alive()) addSt(e, 'str', 1); fx({ k: 'banner', t: 'In the rough', sub: 'Past par: every enemy gains 1 Strength', small: 1 }); momentumCheck(); }
   B.sc.basket = false; B.sc.played = 0; B.sc.curlP = 0;
   // soccer: the passes start again, with one from the keeper after a save
-  if (B.sport === 'soccer') { B.sc.passes = B.sc.keep ? 1 : 0; B.sc.keep = 0; }
+  if (B.sport === 'soccer') { B.sc.passes = (B.sc.keep ? 1 : 0) + mod('passes'); B.sc.keep = 0; }
 }
 function sportFoul(n) { if (scored()) { scoreThem(SPORT_UNIT[B.sport]); log(`The foul gives them ${SPORT_UNIT[B.sport]}.`, 'bad'); } }
 function splash(n, why) { for (const e of alive()) hurtEnemy(e, n, { raw: true, noScore: 1 }); }

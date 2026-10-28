@@ -2006,6 +2006,7 @@ const RELICS = {
   oldball: { n: 'Signed Game Ball', rar: 'u', desc: 'At the start of each fight, deal 3 damage to all enemies.', ico: 'ball' },
   tooth: { n: 'Mimic Tooth', rar: 'c', desc: 'Raise max HP by 8 when picked up.', ico: 'tooth', gain: r => { r.maxhp += 8; r.hp += 8; } },
   cupreplica: { n: 'Black Ice Cup (replica)', rar: 'u', desc: 'Card rewards offer one more card.', ico: 'cup' },
+  goldenboot: { n: 'Golden Boot', rar: 'u', desc: 'In soccer, start every turn with a pass already made.', ico: 'ball' },
   bowling: { n: 'Bowling Ball of Doom', rar: 'u', desc: 'The first Attack you play each fight deals 8 more damage per hit.', ico: 'ball' },
   jersey: { n: 'Lucky Jersey', rar: 'r', desc: 'Once per fight, the first time you would die, heal to 15 HP instead.', ico: 'jersey' },
   playbook: { n: 'Coach’s Playbook', rar: 'r', desc: 'Draw 1 extra card each turn.', ico: 'book' },
@@ -2185,6 +2186,7 @@ const TROPHY_FX = {
   rallycap: { on: { turnEnd: () => { if (RUN.hp < RUN.maxhp / 2) gainBlock(6, true); } } },
   ring: { on: { turnEndHeal: () => healP(1) } },
   jersey: { on: { lethal: () => { if (B.jersey) return; B.jersey = true; RUN.hp = 15; fx({ k: 'banner', t: 'Lucky Jersey', sub: 'Back on your feet at 15 HP' }); log('The Lucky Jersey holds. 15 HP.', 'good'); return true; } } },
+  goldenboot: { mod: { passes: () => B.sport === 'soccer' ? 1 : 0 } },
   bowling: { mod: { atk: () => B.bowlUsed ? 0 : 8 }, on: { attackPlayed: () => { B.bowlUsed = true; } } },
   foam: { on: { attackPlayed: () => { if (B.atkCount % 3 === 0) { for (const e of alive()) hurtEnemy(e, 5, { raw: true }); log('The crowd goes wild: 5 damage to every enemy.', 'good'); } } } },
   luckstone: { mod: { d20: 2 } },
@@ -2246,6 +2248,7 @@ EN('grinder', 'Troll Grinder', 'troll', [64, 70], { club: { n: 'Tree Trunk', ops
 EN('netspider', 'Spider Netminder', 'spider', [44, 48], { web: { n: 'Web', ops: [['p', 'weak', 2], ['b', 10]] }, fang: { n: 'Venom Fang', ops: [['a', 7], ['p', 'psn', 3]] }, check: { n: 'Eight-Arm Check', ops: [['a', 12]] } }, { rand: { web: 1, fang: 2, check: 2 } }, { flav: 'Eight pads. Four gloves.' });
 EN('drow', 'Drow Sniper', 'drow', [34, 38], { aim: { n: 'Line Up the Shot', ops: [['b', 8], ['s', 'str', 2]] }, arrow: { n: 'Top Shelf', ops: [['a', 15]] } }, { seq: ['aim', 'arrow'] }, { flav: 'Sees in the dark. Scores in it.' });
 EN('bullpen', 'Bull Pen Minotaur', 'minotaur', [96, 100], { gore: { n: 'Gore', ops: [['a', 14], ['p', 'vuln', 1]] }, paw: { n: 'Paws the Ice', ops: [['s', 'str', 3], ['b', 10]] }, stamp: { n: 'Stampede', ops: [['a', 26]] } }, { seq: ['gore', 'paw', 'stamp'] }, { elite: 1, flav: 'Through the boards. Through the next boards.' });
+EN('striker', 'Gale, the Harpy Striker', 'harpy', [88, 94], { onetwo: { n: 'One-Two', ops: [['a', 7, 2]] }, bus: { n: 'Park the Bus', ops: [['b', 16], ['s', 'str', 2]] }, volley: { n: 'Top-Corner Volley', ops: [['a', 22]] } }, { seq: ['onetwo', 'bus', 'volley'] }, { elite: 1, sport: 'soccer', flav: 'Never touches the ball with her hands. Has no hands.' });
 EN('mascot', 'The Mascot', 'mimic', [86, 92], { hide: { n: 'Just a Treasure Chest', ops: [['b', 24]] }, chomp: { n: 'Chomp', ops: [['a', 22]] }, lick: { n: 'Big Sloppy Lick', ops: [['p', 'weak', 2], ['p', 'vuln', 2]] } }, { seq: ['chomp', 'lick', 'chomp'], first: 'hide' }, { elite: 1, gold: 60, flav: 'Everybody loves the mascot. The mascot loves everybody. With its teeth.' });
 EN('cube', 'The Gelatinous Goaltender', 'cube', [240, 240], { engulf: { n: 'Engulf', ops: [['engulf', 2], ['b', 10]] }, slam: { n: 'Pad Stack', ops: [['a', 21]] }, jiggle: { n: 'Jiggle', ops: [['a', 7, 3]] }, save: { n: 'Glove Save', ops: [['b', 24], ['s', 'str', 2]] } }, { seq: ['engulf', 'slam', 'jiggle', 'save', 'slam'] }, { boss: 1, sport: 'hockey', team: { name: 'Rimegrave Wardens', short: 'RIM', color: '#3fbf9f', light: '#bff7e3' }, flav: 'Stops everything. Keeps everything.' });
 // act 3 — the Brimstone Pit
@@ -2268,7 +2271,7 @@ const QUARTER_SPORT = ['baseball', 'football', 'hockey', 'basketball'];
 
 const ENCOUNTERS = [
   { easy: [['cheer', 'cheer'], ['skelss'], ['thief'], ['ooze']], normal: [['cheer', 'cheer', 'cheer'], ['skelss', 'thief'], ['lb'], ['ooze', 'ooze'], ['ghoul', 'cheer'], ['thief', 'thief'], ['lb', 'cheer'], ['ghoul', 'ghoul']], elite: [['gorlak'], ['moonbat']], boss: ['argus'] },
-  { easy: [['winger'], ['harpyf', 'harpyf'], ['drow']], normal: [['winger', 'harpyf'], ['enforcer'], ['witchd', 'winger'], ['grinder'], ['netspider', 'harpyf'], ['drow', 'drow'], ['enforcer', 'drow'], ['witchd', 'harpyf']], elite: [['bullpen'], ['mascot']], boss: ['cube'] },
+  { easy: [['winger'], ['harpyf', 'harpyf'], ['drow']], normal: [['winger', 'harpyf'], ['enforcer'], ['witchd', 'winger'], ['grinder'], ['netspider', 'harpyf'], ['drow', 'drow'], ['enforcer', 'drow'], ['witchd', 'harpyf']], elite: [['bullpen'], ['mascot'], ['striker']], boss: ['cube'] },
   { easy: [['gorgpg'], ['imp', 'imp'], ['bugbear']], normal: [['lichoc'], ['gorgpg', 'imp'], ['golemnt'], ['hob', 'imp', 'imp'], ['bugbear'], ['lichoc', 'imp'], ['gorgpg', 'hob'], ['imp', 'imp', 'imp'], ['bugbear', 'imp'], ['golemnt', 'imp']], elite: [['champ'], ['matriarch']], boss: ['baron'] },
 ];
 const SPORT_BRIEF = { baseball: 'Hits score runs, and runs hurt every enemy. Score more than they do.', football: 'Damage gains yards; touchdowns and field goals hit every enemy.', hockey: 'Put 12+ on one enemy to score. Half your Block slides over.', basketball: 'Attacks score baskets; the third one sets you On Fire.', golf: 'Make par: 1 turn plus 1 per enemy.', bowling: 'Drop the whole lineup in one turn for a strike.', jousting: 'Your first Attack each turn is a tilt: double damage.', curling: 'Leftover cards give Block; end a turn with 12+ to score.', boxing: 'Win the rounds. The bell heals you every third turn.', soccer: 'Every card is a pass. After two, an Attack is a shot: 10+ on one enemy scores.' };
@@ -3078,7 +3081,7 @@ function sportTurnBegin() {
   if (B.sport === 'golf' && B.turn > parFor()) { for (const e of alive()) addSt(e, 'str', 1); fx({ k: 'banner', t: 'In the rough', sub: 'Past par: every enemy gains 1 Strength', small: 1 }); momentumCheck(); }
   B.sc.basket = false; B.sc.played = 0; B.sc.curlP = 0;
   // soccer: the passes start again, with one from the keeper after a save
-  if (B.sport === 'soccer') { B.sc.passes = B.sc.keep ? 1 : 0; B.sc.keep = 0; }
+  if (B.sport === 'soccer') { B.sc.passes = (B.sc.keep ? 1 : 0) + mod('passes'); B.sc.keep = 0; }
 }
 function sportFoul(n) { if (scored()) { scoreThem(SPORT_UNIT[B.sport]); log(`The foul gives them ${SPORT_UNIT[B.sport]}.`, 'bad'); } }
 function splash(n, why) { for (const e of alive()) hurtEnemy(e, n, { raw: true, noScore: 1 }); }
@@ -3786,6 +3789,13 @@ const EVENTS = [
     opts: () => [
       { label: 'Bowl a frame', desc: 'Roll a d20.', go: () => { const r = evRoll(); if (r === 20) { gainGold(90); return { text: `Natural 20. STRIKE. The skulls explode outward and the ogre weeps with joy. +90 gold, and he insists you keep the lucky ball.`, then: { relic: RUN.relics.includes('bowling') ? randomRelic() : 'bowling' } }; } if (r >= 14) { const g = gainGold(50); return { text: `You roll ${r}. Spare! +${g} gold.` }; } if (r >= 7) { const g = gainGold(15); return { text: `You roll ${r}. Seven pins. +${g} gold for effort.` }; } if (r > 1) return { text: `You roll ${r}. Gutter ball. The ogre laughs for a very long time.` }; RUN.hp = Math.max(1, RUN.hp - 9); return { text: 'Natural 1. You drop the skull on your foot. −9 HP.' }; } },
       { label: 'Just watch', desc: 'Heal 5.', go: () => { RUN.hp = Math.min(RUN.maxhp, RUN.hp + 5); return { text: 'You sit on the bench and eat stale cavern pretzels. +5 HP.' }; } },
+    ] },
+  { id: 'penalty', t: 'The Penalty Spot', art: { kind: 'skeleton', team: { color: '#5fa8c9', light: '#e3f3ff', short: 'PKS' }, num: 1 }, acts: [0, 1, 2],
+    text: 'A skeleton keeper stands in a goal chalked on the cavern wall, rattling. "One kick. Beat me and I pay. Miss and you pay. I have not let one in for three hundred years."',
+    opts: () => [
+      { label: 'Take the penalty (bet 20 gold)', desc: 'Roll a d20. 10+ scores.', ok: () => RUN.gold >= 20, go: () => { const r = evRoll(); RUN.gold -= 20; if (r === 20) { gainGold(60); return { text: 'Natural 20. Top corner. The keeper falls apart, then hands you his boots. +60 gold.', then: { relic: RUN.relics.includes('goldenboot') ? randomRelic() : 'goldenboot' } }; } if (r >= 10) { const g = gainGold(45); return { text: `You roll ${r}. GOAL. He picks the ball out of the net and pays up. +${g} gold.` }; } return { text: `You roll ${r}. Saved, with one bony finger. The 20 gold is his.` }; } },
+      { label: 'Go in goal for him', desc: 'Lose 6 HP. Learn a Through Ball.', go: () => { RUN.hp = Math.max(1, RUN.hp - 6); return { text: 'He takes a hundred penalties at you and laughs at every one. You learn how a striker thinks. -6 HP.', then: { cards: [{ id: 'scr_through', up: false }] } }; } },
+      { label: 'Walk on', desc: '', go: () => ({ text: '"Coward," he calls after you, kindly.' }) },
     ] },
   { id: 'golf', t: 'The Lich’s Nine Holes', art: { kind: 'lich', team: { color: '#3d6a3a', light: '#cfe8a0', short: 'GLF' }, num: 9 }, acts: [0, 1, 2],
     text: 'A lich in plaid trousers is playing through a graveyard. "Par three, over the open grave. Care to make it interesting?"',
@@ -11940,7 +11950,8 @@ K('wb_cover', 'Cover for Me', 'any', 'skl', 1, 'b', 'self', [['b', 10], ['draw',
 K('wb_alley', 'Alley-Oop', 'any', 'atk', 2, 'b', 'one', [['d', 16], ['nrg', 1]], { sport: 'basketball', fl: 'Up, and in. Combo: plays when both are on the field.' });
 K('wb_wall', 'Two-Man Wall', 'any', 'skl', 1, 'b', 'self', [['b', 7], ['s', 'weak', 1, 'all']], { sport: 'football', fl: 'Nobody through. Combo: plays when both are on the field.' });
 K('wb_giveandgo', 'Give and Go', 'any', 'atk', 0, 'b', 'one', [['d', 4], ['draw', 2]], { sport: 'hockey', fl: 'Pass, run, take it back. Combo: plays when both are on the field.' });
-const W_COMBOS = ['wb_onetwo', 'wb_cover', 'wb_alley', 'wb_wall', 'wb_giveandgo'];
+K('wb_wallpass', 'Wall Pass', 'any', 'skl', 0, 'b', 'self', [['b', 4], ['draw', 1]], { sport: 'soccer', home: [['passes', 2]], fl: 'Hit it, get it back. Combo: plays when both are on the field.' });
+const W_COMBOS = ['wb_onetwo', 'wb_cover', 'wb_alley', 'wb_wall', 'wb_giveandgo', 'wb_wallpass'];
 
 /* ---------- personal quests ---------- */
 const W_PQ = {

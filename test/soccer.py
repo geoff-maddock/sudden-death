@@ -112,6 +112,20 @@ async def main():
         txt = await pg.evaluate("String(cardText(mkCard('ply_onetouch')))")
         check('2 passes' in txt, 'the set play says what it does at home', txt)
 
+        # ---------- a team that plays soccer, an event, a trophy ----------
+        el = await pg.evaluate("""(() => { const E = ENEMIES.striker; RUN.act = 1;
+          const encs = Array.from({ length: 40 }, () => rollEncounter('elite', 'soccer')), other = Array.from({ length: 40 }, () => rollEncounter('elite', 'hockey'));
+          return { sport: E && E.sport, elite: !!(E && E.elite), inAct2: ENCOUNTERS[1].elite.some(p => p[0] === 'striker'),
+            soccer: encs.some(e => e.ids[0] === 'striker' && e.sport === 'soccer'), never: other.every(e => e.ids[0] !== 'striker') }; })()""")
+        check(el == {'sport': 'soccer', 'elite': True, 'inAct2': True, 'soccer': True, 'never': True}, 'Gale the Harpy Striker: an Act 2 elite who only plays soccer', el)
+        ev = await pg.evaluate("""(() => { const E = EVENTS.find(e => e.id === 'penalty'); if (!E) return null; RUN.gold = 100; RUN.luck = 1;
+          const o = E.opts(), win = o[0].go(); return { n: o.length, text: win.text, relic: win.then && win.then.relic, card: o[1].go().then.cards[0].id }; })()""")
+        check(ev and ev['n'] == 3 and ev['relic'] == 'goldenboot' and ev['card'] == 'scr_through', 'the Penalty Spot event: a natural 20 wins the Golden Boot, and going in goal teaches a Through Ball', ev)
+        await pg.evaluate(START, ['t_pass'])
+        gb = await pg.evaluate("""(() => { RUN.relics.push('goldenboot'); B.phase = 'player'; playerTurnStart(); const a = B.sc.passes;
+          B.sc.eh = 1; B.sc.et = 0; playerTurnStart(); const b = B.sc.passes; RUN.relics.pop(); return [a, b]; })()""")
+        check(gb == [1, 2], 'the Golden Boot starts every soccer turn with a pass (two after a save)', gb)
+
         check(not errs and not await pg.evaluate("window.__sdErrs && window.__sdErrs.length"), 'no page errors', errs)
         await br.close()
     print('errors:', FAILS)

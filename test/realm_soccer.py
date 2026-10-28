@@ -95,6 +95,9 @@ async def main():
         again = await pg.evaluate("(() => { WG.grd.rec.g_sheet = { w: 1, l: 0, last: null }; wStart(JSON.parse(JSON.stringify({ WG, RUN }))); return !!WG.grd.rec.g_sheet; })()")
         check(again, 'after that, a soccer record there is kept')
 
+        cb = await pg.evaluate("[W_COMBOS.includes('wb_wallpass'), CARDS.wb_wallpass && CARDS.wb_wallpass.sport]")
+        check(cb == [True, 'soccer'], 'a bond can bring a soccer combo card, Wall Pass', cb)
+
         # ---------- How to play ----------
         h = await pg.evaluate("(() => { renderHelp(); const a = document.getElementById('wHelpGrounds'), b = document.getElementById('wHelpSpots'); return [a ? a.textContent : '', b ? b.textContent : '']; })()")
         check('snow pitch for soccer at Rimewatch' in h[0] and 'kick-about wall' in h[1], 'How to play names the pitch and the kick-about wall', h)
