@@ -1,7 +1,7 @@
 /* ---------- coach's notes: one-time tips, shown the first time each system matters ---------- */
 const TIPS = {
   fight: ['Your first fight', 'Drag a card onto an enemy, or click a card and then the enemy. Each card costs Stamina (top of the hand). The icon over each enemy is what it will do next turn. When you are out of moves, End Turn.'],
-  sport: ['Every fight is also a game', 'The scoreboard shows this fight’s sport. Its rule, shown on the scoreboard, changes what your cards do; the full rules for all nine sports are on the How to play page. Win the fight and the game for a sports win: bonus gold, style and a Highlight Reel.'],
+  sport: ['Every fight is also a game', 'The scoreboard shows this fight’s sport. Its rule, shown on the scoreboard, changes what your cards do; the full rules for all ten sports are on the How to play page. Win the fight and the game for a sports win: bonus gold, style and a Highlight Reel.'],
   why: ['Why a hit does what it does', 'When you hover or select an attack, the bar at the bottom of the arena breaks its first hit down: base damage, then every bonus and multiplier that applies right now.'],
   momentum: ['Momentum', 'The bar under the scoreboard is a tug of war. Lead by enough and your hits land harder; fall behind and theirs do, until you are far enough behind that you draw an extra card each turn.'],
   sky: ['The sky moved', 'The skylights in the arena wall show the moon and two constellations. They shift as you play and give small boosts to certain kinds. Hover the moon and stars in the top bar for what is up now.'],

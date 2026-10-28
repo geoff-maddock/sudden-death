@@ -4,7 +4,7 @@ Read this first, then `ARCHITECTURE.md` for the code map. `README.md` is the pub
 
 ## What this is
 
-A single-file browser deckbuilder (Slay-the-Spire-like) in the *Fantasy Monster Sports* series. Every fight is also a sports game under one of nine rulesets. The shipped artifact is `dist/sudden-death.html`, which `./build.sh` generates from the source files listed, in order, in `src/manifest.txt`. There is no framework, no bundler and no runtime dependencies: plain JS in one global scope, Canvas 2D for the arena, and DOM for everything else.
+A single-file browser deckbuilder (Slay-the-Spire-like) in the *Fantasy Monster Sports* series. Every fight is also a sports game under one of ten rulesets. The shipped artifact is `dist/sudden-death.html`, which `./build.sh` generates from the source files listed, in order, in `src/manifest.txt`. There is no framework, no bundler and no runtime dependencies: plain JS in one global scope, Canvas 2D for the arena, and DOM for everything else.
 
 ## How it was developed
 
