@@ -60,4 +60,5 @@ src/realm/w34-defend.js
 src/realm/w35-legends.js
 src/realm/w36-gate.js
 src/realm/w37-map.js
+src/realm/w38-soccer.js
 src/realm/w39-retire.js

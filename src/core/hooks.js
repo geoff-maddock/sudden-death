@@ -41,6 +41,7 @@ const TROPHY_FX = {
   rallycap: { on: { turnEnd: () => { if (RUN.hp < RUN.maxhp / 2) gainBlock(6, true); } } },
   ring: { on: { turnEndHeal: () => healP(1) } },
   jersey: { on: { lethal: () => { if (B.jersey) return; B.jersey = true; RUN.hp = 15; fx({ k: 'banner', t: 'Lucky Jersey', sub: 'Back on your feet at 15 HP' }); log('The Lucky Jersey holds. 15 HP.', 'good'); return true; } } },
+  goldenboot: { mod: { passes: () => B.sport === 'soccer' ? 1 : 0 } },
   bowling: { mod: { atk: () => B.bowlUsed ? 0 : 8 }, on: { attackPlayed: () => { B.bowlUsed = true; } } },
   foam: { on: { attackPlayed: () => { if (B.atkCount % 3 === 0) { for (const e of alive()) hurtEnemy(e, 5, { raw: true }); log('The crowd goes wild: 5 damage to every enemy.', 'good'); } } } },
   luckstone: { mod: { d20: 2 } },

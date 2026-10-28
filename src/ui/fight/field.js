@@ -81,6 +81,13 @@ function drawFieldState(c) {
     for (let i = 0; i < B.sc.stones; i++) { const p = fp(Math.cos(i * 2.1) * .12, .5 + Math.sin(i * 2.1) * .06); ell(c, p.x, p.y + 3, 14, 5, '#5a5a62'); ell(c, p.x, p.y, 14, 5, team.color); c.fillStyle = '#333'; c.fillRect(p.x - 2, p.y - 6, 4, 6); }
     return;
   }
+  if (B.sport === 'soccer') { // the ball works up the pitch with every pass
+    const n = Math.min(6, B.sc.passes || 0), p = fp(-.6 + n * .22, .55);
+    for (let i = 0; i < n; i++) { const q = fp(-.6 + i * .22, .55); circ(c, q.x, q.y, 3, 'rgba(40,60,120,.55)'); }
+    ell(c, p.x, p.y + 4, 9, 3, 'rgba(0,0,0,.25)'); circ(c, p.x, p.y - 4, 8, '#f2ead8'); circ(c, p.x, p.y - 4, 3, '#21160f');
+    if (n >= SOCCER.passes) txt(c, 'SHOT ON', p.x, p.y - 22, F_HUD(16), '#ffd166', 'center');
+    return;
+  }
   if (B.sport === 'basketball') {
     const ok = B.sc.basket; c.save(); rr(c, 530, 82, 46, 26, 3); c.fillStyle = '#16100c'; c.fill();
     txt(c, ok ? '24' : B.phase === 'player' ? '!!' : '24', 553, 101, F_HUD(20), ok ? '#7fe08a' : (Math.sin(A.t * 6) > 0 ? '#ff6a5a' : '#ffb347'), 'center'); txt(c, 'SHOT', 553, 78, F_HUD(12), '#b8a68c', 'center'); c.restore();
@@ -140,7 +147,8 @@ function drawSportPops(c) {
         break; }
       case 'goal': { // the puck rips into the net and the twine bulges
         const x = lerp(330, p.tx, Math.min(1, e * 1.3)), y = lerp(400, p.ty + 10, Math.min(1, e * 1.3));
-        ell(c, x, y, 10, 4, '#111'); const b = Math.max(0, (k - .55) / .45);
+        if (B.sport === 'soccer') { circ(c, x, y - 4, 8, '#f2ead8'); circ(c, x, y - 4, 3, '#21160f'); } else ell(c, x, y, 10, 4, '#111'); // a ball, or the puck
+        const b = Math.max(0, (k - .55) / .45);
         if (b > 0) { c.strokeStyle = 'rgba(240,240,255,.8)'; c.lineWidth = 1.5; const w = 70, h = 46, bulge = Math.sin(b * Math.PI) * 18; for (let i = 0; i <= 6; i++) { c.beginPath(); c.moveTo(p.tx + 20 + i * w / 6 - w / 2, p.ty - h); c.quadraticCurveTo(p.tx + 20 + i * w / 6 - w / 2 + bulge, p.ty - h / 2, p.tx + 20 + i * w / 6 - w / 2, p.ty); c.stroke(); } }
         break; }
       case 'touchdown': case 'field goal': { // the ball spirals downfield; a touchdown rains confetti

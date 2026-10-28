@@ -19,11 +19,12 @@
    wMatchTitle, wMatchTeam (the city club's name and the sport's colour), wPreGame (the ground's line), wUse (the
    scoreboard shows your record), wJRules (your record in the journal), renderHelp (#wHelpGrdPlay). */
 
-const W_GRD_SQUAD = { golf: 4, jousting: 4, boxing: 4, curling: 4, bowling: 5, basketball: 5, baseball: W_BALL.minOwn, hockey: 6, football: 7 };
+const W_GRD_SQUAD = { golf: 4, jousting: 4, boxing: 4, curling: 4, bowling: 5, basketball: 5, baseball: W_BALL.minOwn, soccer: 5, hockey: 6, football: 7 };
 const W_GRD_WHY = {
   golf: 'four to a fourball', jousting: 'two to ride and two to squire', boxing: 'a boxer, a second, a cutman and a trainer',
   curling: 'a rink of four: lead, second, third and skip', bowling: 'five to a bowling side', basketball: 'five on the court',
   baseball: 'five of your own, and call-ups fill the nine', hockey: 'six on the ice', football: 'seven on the pitch',
+  soccer: 'eleven a side: five of your own, and call-ups fill the rest'
 };
 const W_GRD_PLAY = {
   friendly: { n: 'Friendly', type: 'normal', up: 0, what: 'the city club, at the region\'s tier' },

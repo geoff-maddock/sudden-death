@@ -514,6 +514,12 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Drawn** by `wMapDraw` on `#wMapCv` (`W_MAP.px` pixels a tile): `W_MAP_COL` flat tile colours, an inked edge on the fog, `wMapMark` for each place in `wMapPlaces()` (kinds in `W_MAP_KIND`; bold name once in the journal's places; a ground's name on the side away from its city), and a red mark at `wMapHere()` (your tile, or the place whose map you are in).
 - **Opened** by `wOpenMap()`: the `M` key, `#wMapBtn` (`wRenderHud` wrapped, after the Journal button), and `#pMap` on the Menu (`openPause` wrapped, in the world only). How to play: `#wHelpMap`.
 
+## Soccer at Rimewatch (w38-soccer.js)
+
+- **The ground.** `g_sheet` keeps its id and is now the Hoarfrost Pitch, a soccer ground (`W_GRDS` in `w21-grounds.js`): Sister Hogline keeps it, its field art is `wGrdArt` case `soccer`, and it is outdoors (not in `W_GRD_INDOOR`), so a blizzard reaches it. `DB.regions.rime.sports = [['hockey', 3], ['soccer', 2]]`. The squad rule is `W_GRD_SQUAD.soccer = 5` ("eleven a side: five of your own, and call-ups fill the rest"). The spot `sp_maker` is the kick-about wall (soccer). `W_NOTICE.margin.soccer = 2`.
+- **Old saves.** `wStart` (wrapped as `wW38Start`): when `WG.soccer !== 1`, `WG.grd.rec.g_sheet` (a curling record) is deleted with a log line, and `WG.soccer = 1`. A home ground at `g_sheet` and fixtures drawn there carry over and play as soccer.
+- **The rule** is Sudden Death's (`SPORTS.soccer`, `src/engine/sports.js`): `B.sc.passes`, `B.sc.saves`, `B.sc.eh`/`B.sc.et` (the enemy turn's hits, and whether any got through), `B.sc.keep` (a pass to start the next turn), all plain numbers.
+
 ## Retiring a card (w39-retire.js)
 
 - **The rule.** `wRetireCard(card)`: at your home ground, once a week (`WG.ground.retired = wWeek()`), for `W_RETIRE.energy` (3) energy of `REGION_ELEM[wHomeRegion()]`, and never below `W_RETIRE.minDeck` (5) cards. `wRetireProblems()` says why not, in a sentence. It doesn't touch `RUN.removeCost`, the card vendors' gold price.

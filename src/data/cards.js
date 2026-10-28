@@ -169,7 +169,7 @@ K('penalty', 'Ejection Notice', 'none', 'curse', -1, 'x', 'self', [], { endHurt:
 
 const KIND_CARDS = {}; for (const c of Object.values(CARDS)) { (KIND_CARDS[c.kind] = KIND_CARDS[c.kind] || []).push(c.id); }
 const SIG = {}; for (const c of Object.values(CARDS)) if (c.rar === 's' && c.kind !== 'any') SIG[c.kind] = c.id;
-const SPORT_NAME = { baseball: 'Baseball', football: 'Football', hockey: 'Hockey', basketball: 'Basketball', golf: 'Golf', bowling: 'Bowling', jousting: 'Jousting', curling: 'Curling', boxing: 'Boxing' };
+const SPORT_NAME = { baseball: 'Baseball', football: 'Football', hockey: 'Hockey', basketball: 'Basketball', golf: 'Golf', bowling: 'Bowling', jousting: 'Jousting', curling: 'Curling', boxing: 'Boxing', soccer: 'Soccer' };
 
 /* ---------- upgrades: one pass in the film room ---------- */
 function upFx(fx) {

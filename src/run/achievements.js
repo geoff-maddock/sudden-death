@@ -7,7 +7,7 @@ const ACH = [
   { id: 'free', n: 'Walk-On', d: 'Win the Cup as Free Agents', stat: 'freeCups', at: [1, 3, 10] },
   { id: 'clubs', n: 'Around the League', d: 'Win the Cup with different clubs', stat: 'clubCups', set: 1, at: [2, 4, 8] },
   { id: 'games', n: 'Gamer', d: 'Win games (sports wins)', stat: 'sportsWins', at: [10, 50, 200] },
-  { id: 'sports', n: 'Nine-Sport Athlete', d: 'Win a game in different sports', stat: 'sportsWon', set: 1, at: [5, 7, 9] },
+  { id: 'sports', n: 'Ten-Sport Athlete', d: 'Win a game in different sports', stat: 'sportsWon', set: 1, at: [5, 8, 10] },
   { id: 'hattrick', n: 'Hat Trick Hero', d: 'Score hat tricks', stat: 'hl_hattrick', at: [1, 5, 20] },
   { id: 'slam', n: 'Grand Slammer', d: 'Hit grand slams', stat: 'hl_grandslam', at: [1, 5, 20] },
   { id: 'walkoff', n: 'Walk-Off', d: 'Win with walk-off hits', stat: 'hl_walkoff', at: [1, 5, 20] },

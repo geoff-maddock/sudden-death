@@ -32,6 +32,7 @@ const STARS = [
   { n: 'The Anvil', desc: 'Stoneborn cards hit 1 harder.', grp: 'stone', atk: 1, pts: [[-18, -6], [10, -6], [18, -12], [6, 4], [-6, 4], [-10, 14], [10, 14]], lines: [[0, 1], [1, 2], [1, 3], [3, 4], [4, 0], [4, 5], [3, 6]] },
   { n: 'The Twin Dice', desc: '+1 to every d20 you roll.', dice: 1, pts: [[-16, -6], [-6, -6], [-6, 4], [-16, 4], [6, -2], [16, -2], [16, 8], [6, 8]], lines: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4]] },
   { n: 'The Huntsman', desc: 'Beast cards hit 1 harder.', grp: 'beast', atk: 1, pts: [[-16, 12], [-6, 2], [4, -6], [16, -14], [-2, -12], [8, 6]], lines: [[0, 1], [1, 2], [2, 3], [2, 4], [2, 5]] },
+  { n: 'The Net', desc: 'Soccer cards hit 1 harder.', sport: 'soccer', atk: 1, pts: [[-16, -8], [16, -8], [-16, 10], [16, 10], [-6, 2], [6, 2]], lines: [[0, 1], [0, 2], [1, 3], [4, 5]] },
 ];
 const MOON_EVERY = 3, STARS_EVERY = 5;
 function skyAt(clock) {

@@ -38,7 +38,8 @@ K('wb_cover', 'Cover for Me', 'any', 'skl', 1, 'b', 'self', [['b', 10], ['draw',
 K('wb_alley', 'Alley-Oop', 'any', 'atk', 2, 'b', 'one', [['d', 16], ['nrg', 1]], { sport: 'basketball', fl: 'Up, and in. Combo: plays when both are on the field.' });
 K('wb_wall', 'Two-Man Wall', 'any', 'skl', 1, 'b', 'self', [['b', 7], ['s', 'weak', 1, 'all']], { sport: 'football', fl: 'Nobody through. Combo: plays when both are on the field.' });
 K('wb_giveandgo', 'Give and Go', 'any', 'atk', 0, 'b', 'one', [['d', 4], ['draw', 2]], { sport: 'hockey', fl: 'Pass, run, take it back. Combo: plays when both are on the field.' });
-const W_COMBOS = ['wb_onetwo', 'wb_cover', 'wb_alley', 'wb_wall', 'wb_giveandgo'];
+K('wb_wallpass', 'Wall Pass', 'any', 'skl', 0, 'b', 'self', [['b', 4], ['draw', 1]], { sport: 'soccer', home: [['passes', 2]], fl: 'Hit it, get it back. Combo: plays when both are on the field.' });
+const W_COMBOS = ['wb_onetwo', 'wb_cover', 'wb_alley', 'wb_wall', 'wb_giveandgo', 'wb_wallpass'];
 
 /* ---------- personal quests ---------- */
 const W_PQ = {

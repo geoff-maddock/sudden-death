@@ -25,6 +25,7 @@ const RELICS = {
   oldball: { n: 'Signed Game Ball', rar: 'u', desc: 'At the start of each fight, deal 3 damage to all enemies.', ico: 'ball' },
   tooth: { n: 'Mimic Tooth', rar: 'c', desc: 'Raise max HP by 8 when picked up.', ico: 'tooth', gain: r => { r.maxhp += 8; r.hp += 8; } },
   cupreplica: { n: 'Black Ice Cup (replica)', rar: 'u', desc: 'Card rewards offer one more card.', ico: 'cup' },
+  goldenboot: { n: 'Golden Boot', rar: 'u', desc: 'In soccer, start every turn with a pass already made.', ico: 'ball' },
   bowling: { n: 'Bowling Ball of Doom', rar: 'u', desc: 'The first Attack you play each fight deals 8 more damage per hit.', ico: 'ball' },
   jersey: { n: 'Lucky Jersey', rar: 'r', desc: 'Once per fight, the first time you would die, heal to 15 HP instead.', ico: 'jersey' },
   playbook: { n: 'Coach’s Playbook', rar: 'r', desc: 'Draw 1 extra card each turn.', ico: 'book' },

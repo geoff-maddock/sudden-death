@@ -27,7 +27,7 @@ const W_NOTICE = {
   // about a dozen a journey, and gold already piles up (docs/realm/BALANCE.md)
   gold: { sport: 20, night: 30, margin: 30, club: 45, ground: 25, seeded: 30, count: 35 },
   card: { club: 1, count: 1, margin: 1 },     // these also pay a pick of 3 cards for the region's sports
-  margin: { baseball: 3, basketball: 6, hockey: 2, football: 7, jousting: 2, curling: 2 },
+  margin: { baseball: 3, basketball: 6, hockey: 2, football: 7, jousting: 2, curling: 2, soccer: 2 },
   count: 3,
 };
 const W_NOTICE_CITY = { graftonbury: 'hq_inn', mossgate: 'moss_inn', saltmere: 'salt_inn', cinderhold: 'cind_inn', rimewatch: 'rime_inn' };

@@ -20,6 +20,7 @@ function sportFits(d) {
   if (blk >= 6) { add('football', 3); add('curling', 3); }
   if (d.retain) add('curling', 3);
   if (draw) add('golf', 2);
+  if (d.cost === 0 || draw) add('soccer', 3);                 // cheap cards and draw keep the passes going
   if (top >= 14) add('football', 2);
   return Object.entries(score).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => s);
 }
