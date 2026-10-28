@@ -40,3 +40,8 @@
   #modalBox .shopgrid .cardrow .card{--cw:132px}
   #modalBox .wmport{display:none}
 }
+/* w37: the map of the realm */
+#modalBox:has(#wMapCv){width:min(820px,100%)}
+.wmapbox{border:2px solid #5a4630;border-radius:4px;overflow:hidden;line-height:0;background:#e9dcbc}
+#wMapCv{width:100%;height:auto;display:block}
+.wmapkey{display:flex;flex-wrap:wrap;gap:4px 14px}
