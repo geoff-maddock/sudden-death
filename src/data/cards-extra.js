@@ -33,6 +33,7 @@ KX('ply_break', 'Fast Break', 'any', 'play', 1, 'c', 'one', [['d', 5], ['draw', 
 KX('ply_heave', 'Full-Court Heave', 'any', 'play', 2, 'u', 'one', [['roll', 11, [['d', 24]], [['d', 4]]]], { sport: 'basketball', home: [['nrg', 1]] });
 KX('ply_mulligan', 'Mulligan', 'any', 'play', 0, 'u', 'self', [['audible']], { sport: 'golf', home: [['freestroke']], fl: 'That one didn’t count.' });
 KX('ply_split', 'Seven-Ten Split', 'any', 'play', 2, 'r', 'all', [['split', 12]], { sport: 'bowling', home: [['nrg', 1]], fl: 'Hits the two at the ends.' });
+KX('ply_onetouch', 'One-Touch', 'any', 'play', 1, 'u', 'one', [['d', 4]], { sport: 'soccer', home: [['passes', 2]], fl: 'The ball never stops.' });
 KX('ply_tilt', 'Shatter the Lance', 'any', 'play', 1, 'u', 'one', [['d', 9]], { sport: 'jousting', home: [['lance']] });
 // gear — stays in play with charges
 KX('gr_pads', 'Goalie Pads', 'any', 'gear', 1, 'u', 'self', [['s', 'pads', 3, 'self']], { sport: 'hockey' });

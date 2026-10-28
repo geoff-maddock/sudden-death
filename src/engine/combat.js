@@ -451,7 +451,7 @@ function resolve(ops, ctx) {
       case 'petrifyall': for (const e of alive()) { if (!isBoss(e) && e.hp <= e.max * op[1]) { fx({ k: 'say', e: e.uid, t: 'Turned to stone' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(op[2], e, ctx.card)); } break;
       case 'bonestorm': { const n = op[1] * B.discard.length; for (const e of alive()) hurtEnemy(e, atkDmg(n, e, ctx.card)); break; }
       case 'freeatk': B.freeAtk = true; log('Every Attack costs 0 for the rest of the turn.', 'good'); break;
-      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance':
+      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance': case 'passes':
         sportOp(op, ctx); break;
     }
     if (checkWin()) return;

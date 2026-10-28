@@ -19,7 +19,7 @@ START = r'''(hand) => { LAB = true; window.SKY_OFF = true;
   K('t_pass', 'Pass', 'any', 'skl', 0, 'c', 'self', [['b', 1]]); K('t_six', 'Six', 'any', 'atk', 0, 'c', 'one', [['d', 6]]); K('t_twelve', 'Twelve', 'any', 'atk', 0, 'c', 'one', [['d', 12]]);
   newRun('ironmaw', [0, 3, 4]); RUN.path = [];
   beginFight({ ids: ['skelss', 'lb'], type: 'normal', sport: 'soccer' }); A.banner = null;
-  for (const e of B.enemies) { e.hp = e.max = 999; e.block = 0; }
+  for (const e of B.enemies) { e.hp = e.max = 999; e.block = 0; delete e.sp; } B.sp = null; // no random perk (a Stopper moves the goal line)
   B.energy = 20; B.hand = hand.map(id => mkCard(id)); B.draw = Array.from({ length: 10 }, () => mkCard('t_pass')); return B.sport; }'''
 PLAY = "(id) => { const i = B.hand.findIndex(c => c.id === id); playCard(i, 0); return { passes: B.sc.passes, us: B.sc.us, them: B.sc.them, hand: B.hand.length }; }"
 
@@ -88,6 +88,19 @@ async def main():
         check(cs == [True, True], 'a win with them on nothing is a clean sheet', cs)
         bw = await pg.evaluate("""(() => { B.sc.saves = 2; B.sc.eh = 1; B.sc.et = 0; playerTurnStart(); return B.sc.hl.includes('brickwall'); })()""")
         check(bw, 'three saves in a game is a brick wall')
+
+        # ---------- cards, fits, the schedule ----------
+        cards = await pg.evaluate("['scr_tiki', 'scr_overlap', 'scr_through', 'scr_volley', 'scr_captain', 'ply_onetouch'].map(id => CARDS[id] ? CARDS[id].sport : null)")
+        check(cards == ['soccer'] * 6, 'six soccer cards: five to build with and a set play', cards)
+        fits = await pg.evaluate("[sportFits(CARDS.scr_tiki), sportFits(CARDS.timeout)]")
+        check('soccer' in fits[0] and 'soccer' in fits[1], 'soccer fits cards that cost nothing or draw', fits)
+        check(await pg.evaluate("ACT_SPORTS.map(a => a.soccer)") == [2, 2, 3], 'soccer is on the schedule like a major sport: 2, 2 and 3', await pg.evaluate("ACT_SPORTS.map(a => a.soccer)"))
+        check(await pg.evaluate("!!SPORT_GLYPH.soccer && sportSVG('soccer').includes('<svg')"), 'soccer has its glyph')
+        await pg.evaluate(START, ['ply_onetouch'])
+        r = await pg.evaluate(PLAY, 'ply_onetouch')
+        check(r['passes'] == 3, 'One-Touch at home is three passes in one card (two from the play, one for the card)', r)
+        txt = await pg.evaluate("String(cardText(mkCard('ply_onetouch')))")
+        check('2 passes' in txt, 'the set play says what it does at home', txt)
 
         check(not errs and not await pg.evaluate("window.__sdErrs && window.__sdErrs.length"), 'no page errors', errs)
         await br.close()

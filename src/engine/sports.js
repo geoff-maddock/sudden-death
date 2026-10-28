@@ -165,6 +165,7 @@ function sportOp(op, ctx) {
     case 'atkcount': B.atkCount += op[1]; if (B.sport === 'basketball' && B.atkCount >= 3 && !sv(B.P, 'hot')) { B.P.st.hot = 1; fx({ k: 'banner', t: 'He’s on fire', sub: '+3 damage per hit this turn', small: 1 }); } break;
     case 'freestroke': if (B.sport === 'golf') B.sc.free++; break;
     case 'lance': if (B.sport === 'jousting') { B.sc.lances++; scoreUs(1, 'lance'); } break;
+    case 'passes': if (B.sport === 'soccer') { B.sc.passes = (B.sc.passes || 0) + op[1]; fx({ k: 'say2', t: `+${op[1]} passes` }); } break;
   }
 }
 function sportEnemyHit(taken, raw) {

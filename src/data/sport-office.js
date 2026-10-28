@@ -10,6 +10,7 @@ const SPORT_GLYPH = {
   jousting: '<path d="M3 21L17 7" stroke="#c9a36a" stroke-width="2.4" stroke-linecap="round"/><path d="M15 5l5-2-2 5z" fill="#efe4cc" stroke="#21160f"/><path d="M6 15l3 3" stroke="#21160f" stroke-width="3"/>',
   curling: '<ellipse cx="12" cy="16" rx="8" ry="4" fill="#8a8a92" stroke="#21160f" stroke-width="1.4"/><path d="M12 12V7h5" fill="none" stroke="#e0533a" stroke-width="2.2" stroke-linecap="round"/>',
   boxing: '<path d="M7 9c0-3 2-5 6-5s6 3 6 7c0 3-1 5-3 6v3H9v-3c-2-1-2-3-2-5z" fill="#c2264a" stroke="#21160f" stroke-width="1.4"/><path d="M7 11c-2 0-3 1-3 2s1 2 3 2" fill="#c2264a" stroke="#21160f" stroke-width="1.2"/>',
+  soccer: '<circle cx="12" cy="12" r="8" fill="#f2ead8" stroke="#21160f" stroke-width="1.5"/><path d="M12 8.2l3 2.2-1.1 3.5h-3.8L9 10.4z" fill="#21160f"/><path d="M12 8.2V4.4M15 10.4l3.6-1.2M13.9 13.9l2.2 3M10.1 13.9l-2.2 3M9 10.4l-3.6-1.2" stroke="#21160f" stroke-width="1.1"/>',
 };
 const sportSVG = (s, size = 18) => SPORT_GLYPH[s] ? `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${SPORT_GLYPH[s]}</svg>` : '';
 const ACT_HOME = ['baseball', 'hockey', 'football'];

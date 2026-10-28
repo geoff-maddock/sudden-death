@@ -1625,6 +1625,7 @@ KX('ply_break', 'Fast Break', 'any', 'play', 1, 'c', 'one', [['d', 5], ['draw', 
 KX('ply_heave', 'Full-Court Heave', 'any', 'play', 2, 'u', 'one', [['roll', 11, [['d', 24]], [['d', 4]]]], { sport: 'basketball', home: [['nrg', 1]] });
 KX('ply_mulligan', 'Mulligan', 'any', 'play', 0, 'u', 'self', [['audible']], { sport: 'golf', home: [['freestroke']], fl: 'That one didn’t count.' });
 KX('ply_split', 'Seven-Ten Split', 'any', 'play', 2, 'r', 'all', [['split', 12]], { sport: 'bowling', home: [['nrg', 1]], fl: 'Hits the two at the ends.' });
+KX('ply_onetouch', 'One-Touch', 'any', 'play', 1, 'u', 'one', [['d', 4]], { sport: 'soccer', home: [['passes', 2]], fl: 'The ball never stops.' });
 KX('ply_tilt', 'Shatter the Lance', 'any', 'play', 1, 'u', 'one', [['d', 9]], { sport: 'jousting', home: [['lance']] });
 // gear — stays in play with charges
 KX('gr_pads', 'Goalie Pads', 'any', 'gear', 1, 'u', 'self', [['s', 'pads', 3, 'self']], { sport: 'hockey' });
@@ -1772,9 +1773,9 @@ const SPORTS = {
   boxing: { n: 'Boxing', rule: 'The bell', desc: 'Each turn is a round, scored on the damage each side throws (blocked punches still count for them). Win more rounds than you lose for a sports win. Take a round by 15+ damage and they are rocked (Weak); lose one by 15+ and you are. Every third turn the bell rings: heal 4 and shake off Weak and Exposed. Win by knockout in three rounds for a highlight.' },
 };
 const ACT_SPORTS = [
-  { baseball: 5, football: 2, basketball: 2, hockey: 2, golf: 1, bowling: 1, curling: 1 },
-  { hockey: 5, football: 3, basketball: 2, baseball: 2, jousting: 1, curling: 1, boxing: 1 },
-  { football: 5, basketball: 3, hockey: 3, baseball: 2, jousting: 1, bowling: 1, boxing: 1, golf: 1 },
+  { baseball: 5, football: 2, basketball: 2, hockey: 2, soccer: 2, golf: 1, bowling: 1, curling: 1 },
+  { hockey: 5, football: 3, basketball: 2, baseball: 2, soccer: 2, jousting: 1, curling: 1, boxing: 1 },
+  { football: 5, basketball: 3, hockey: 3, soccer: 3, baseball: 2, jousting: 1, bowling: 1, boxing: 1, golf: 1 },
 ];
 function wpick(w) { let t = 0; for (const k in w) t += w[k]; let r = R() * t; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return Object.keys(w)[0]; }
 
@@ -1999,6 +2000,7 @@ const SPORT_GLYPH = {
   jousting: '<path d="M3 21L17 7" stroke="#c9a36a" stroke-width="2.4" stroke-linecap="round"/><path d="M15 5l5-2-2 5z" fill="#efe4cc" stroke="#21160f"/><path d="M6 15l3 3" stroke="#21160f" stroke-width="3"/>',
   curling: '<ellipse cx="12" cy="16" rx="8" ry="4" fill="#8a8a92" stroke="#21160f" stroke-width="1.4"/><path d="M12 12V7h5" fill="none" stroke="#e0533a" stroke-width="2.2" stroke-linecap="round"/>',
   boxing: '<path d="M7 9c0-3 2-5 6-5s6 3 6 7c0 3-1 5-3 6v3H9v-3c-2-1-2-3-2-5z" fill="#c2264a" stroke="#21160f" stroke-width="1.4"/><path d="M7 11c-2 0-3 1-3 2s1 2 3 2" fill="#c2264a" stroke="#21160f" stroke-width="1.2"/>',
+  soccer: '<circle cx="12" cy="12" r="8" fill="#f2ead8" stroke="#21160f" stroke-width="1.5"/><path d="M12 8.2l3 2.2-1.1 3.5h-3.8L9 10.4z" fill="#21160f"/><path d="M12 8.2V4.4M15 10.4l3.6-1.2M13.9 13.9l2.2 3M10.1 13.9l-2.2 3M9 10.4l-3.6-1.2" stroke="#21160f" stroke-width="1.1"/>',
 };
 const sportSVG = (s, size = 18) => SPORT_GLYPH[s] ? `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${SPORT_GLYPH[s]}</svg>` : '';
 const ACT_HOME = ['baseball', 'hockey', 'football'];
@@ -2065,6 +2067,12 @@ K('crl_button', 'Draw to the Button', 'any', 'skl', 2, 'u', 'self', [['b', 14]],
 K('crl_hammer', 'Last Rock', 'any', 'atk', 2, 'r', 'one', [['d', 10], ['b', 10]], { sport: 'curling', retain: 1, fl: 'You have the hammer.' });
 K('crl_broom', 'Broom Work', 'any', 'skl', 0, 'c', 'self', [['b', 3], ['draw', 1]], { sport: 'curling', fl: 'Heat the ice. Guide the stone.' });
 // boxing: steady damage and taking rounds
+// soccer: string cheap cards together as passes, then take the shot
+K('scr_tiki', 'Tiki-Taka', 'any', 'skl', 0, 'c', 'self', [['draw', 1]], { sport: 'soccer', fl: 'Short, short, short. Then shorter.' });
+K('scr_overlap', 'Overlapping Run', 'any', 'skl', 1, 'c', 'self', [['b', 5], ['draw', 1]], { sport: 'soccer', fl: 'Round the outside, every time.' });
+K('scr_through', 'Through Ball', 'any', 'atk', 1, 'c', 'one', [['d', 8]], { sport: 'soccer', fl: 'Split the back line.' });
+K('scr_volley', 'Volley', 'any', 'atk', 2, 'u', 'one', [['d', 12]], { sport: 'soccer', fl: 'Never let it bounce.' });
+K('scr_captain', 'Captain’s Armband', 'any', 'pow', 2, 'r', 'self', [['s', 'str', 2, 'self']], { sport: 'soccer', fl: 'Points, shouts, wins the toss.' });
 K('box_jab', 'Jab', 'any', 'atk', 0, 'c', 'one', [['d', 4]], { sport: 'boxing', fl: 'Keep it working.' });
 K('box_onetwo', 'One-Two', 'any', 'atk', 1, 'c', 'one', [['d', 5, 2]], { sport: 'boxing', fl: 'Textbook.' });
 K('box_clinch', 'Clinch', 'any', 'skl', 1, 'c', 'one', [['b', 7], ['s', 'weak', 1]], { sport: 'boxing', fl: 'Tie them up. Catch your breath.' });
@@ -2093,6 +2101,7 @@ function sportFits(d) {
   if (blk >= 6) { add('football', 3); add('curling', 3); }
   if (d.retain) add('curling', 3);
   if (draw) add('golf', 2);
+  if (d.cost === 0 || draw) add('soccer', 3);                 // cheap cards and draw keep the passes going
   if (top >= 14) add('football', 2);
   return Object.entries(score).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => s);
 }
@@ -2549,7 +2558,7 @@ function resolve(ops, ctx) {
       case 'petrifyall': for (const e of alive()) { if (!isBoss(e) && e.hp <= e.max * op[1]) { fx({ k: 'say', e: e.uid, t: 'Turned to stone' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(op[2], e, ctx.card)); } break;
       case 'bonestorm': { const n = op[1] * B.discard.length; for (const e of alive()) hurtEnemy(e, atkDmg(n, e, ctx.card)); break; }
       case 'freeatk': B.freeAtk = true; log('Every Attack costs 0 for the rest of the turn.', 'good'); break;
-      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance':
+      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance': case 'passes':
         sportOp(op, ctx); break;
     }
     if (checkWin()) return;
@@ -2743,6 +2752,7 @@ function sportOp(op, ctx) {
     case 'atkcount': B.atkCount += op[1]; if (B.sport === 'basketball' && B.atkCount >= 3 && !sv(B.P, 'hot')) { B.P.st.hot = 1; fx({ k: 'banner', t: 'He’s on fire', sub: '+3 damage per hit this turn', small: 1 }); } break;
     case 'freestroke': if (B.sport === 'golf') B.sc.free++; break;
     case 'lance': if (B.sport === 'jousting') { B.sc.lances++; scoreUs(1, 'lance'); } break;
+    case 'passes': if (B.sport === 'soccer') { B.sc.passes = (B.sc.passes || 0) + op[1]; fx({ k: 'say2', t: `+${op[1]} passes` }); } break;
   }
 }
 function sportEnemyHit(taken, raw) {
@@ -3772,6 +3782,7 @@ function opText(op, d, ctx) {
     case 'atkcount': return 'Counts as an extra Attack toward On Fire.';
     case 'freestroke': return 'This turn does not count as a stroke.';
     case 'lance': return 'Shatters a lance: a point.';
+    case 'passes': return `Adds ${op[1]} passes.`;
   }
   return '';
 }

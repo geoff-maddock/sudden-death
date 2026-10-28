@@ -14,9 +14,9 @@ const SPORTS = {
   boxing: { n: 'Boxing', rule: 'The bell', desc: 'Each turn is a round, scored on the damage each side throws (blocked punches still count for them). Win more rounds than you lose for a sports win. Take a round by 15+ damage and they are rocked (Weak); lose one by 15+ and you are. Every third turn the bell rings: heal 4 and shake off Weak and Exposed. Win by knockout in three rounds for a highlight.' },
 };
 const ACT_SPORTS = [
-  { baseball: 5, football: 2, basketball: 2, hockey: 2, golf: 1, bowling: 1, curling: 1 },
-  { hockey: 5, football: 3, basketball: 2, baseball: 2, jousting: 1, curling: 1, boxing: 1 },
-  { football: 5, basketball: 3, hockey: 3, baseball: 2, jousting: 1, bowling: 1, boxing: 1, golf: 1 },
+  { baseball: 5, football: 2, basketball: 2, hockey: 2, soccer: 2, golf: 1, bowling: 1, curling: 1 },
+  { hockey: 5, football: 3, basketball: 2, baseball: 2, soccer: 2, jousting: 1, curling: 1, boxing: 1 },
+  { football: 5, basketball: 3, hockey: 3, soccer: 3, baseball: 2, jousting: 1, bowling: 1, boxing: 1, golf: 1 },
 ];
 function wpick(w) { let t = 0; for (const k in w) t += w[k]; let r = R() * t; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return Object.keys(w)[0]; }
 
