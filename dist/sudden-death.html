@@ -5250,8 +5250,7 @@ function frame(now) {
 function boot() {
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => showPage(t.dataset.pg));
   document.addEventListener('click', e => { const g = e.target.closest('[data-goto]'); if (g) showPage(g.dataset.goto); });
-  $('bSound').setAttribute('aria-pressed', SND.on);
-  $('bSound').onclick = () => { SND.on = !SND.on; try { localStorage.setItem('sd-sound', SND.on ? 'on' : 'off'); } catch (e) { } $('bSound').setAttribute('aria-pressed', SND.on); };
+  // the Settings button (#bSound) is wired by app/settings.js, which loads after this file
   $('bNew').onclick = () => { DR.club = null; DR.picks = []; showScreen('draft'); renderDraft(); };
   window.addEventListener('resize', () => { if (UI.view === 'fight') fitStage(); });
   renderTitle();

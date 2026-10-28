@@ -192,6 +192,19 @@ window.REALMLAB = function (opts = {}) {
     }
   }
 
+  // games at the grounds (issue #6): at a cup stop, a Friendly (or opts.groundMode) at each of the city's card-game
+  // grounds the squad is big enough for, rested first (opts.grounds: off unless asked, so older numbers still compare)
+  function grounds(region) {
+    if (!opts.grounds || typeof wStartGrd !== 'function') return;
+    const town = TOWN[region]; if (!town) return;
+    for (const g of wGrdsOf(town)) {
+      if (g.sport === 'baseball' || RUN.over || wGrdProblems(g.id).length) continue;
+      const mode = opts.groundMode || 'friendly', take = typeof wTake === 'function' ? wTake(g.id, mode) : 0;
+      prep(region); atMap(g.id);
+      if (play(() => wStartGrd(g.id, mode), 'ground ' + mode) === 'win') log.take = (log.take || 0) + take;
+    }
+  }
+
   // notice boards (epic 2, phase 4): in a town, take the best-paying contracts the route can meet (not ground games,
   // which the route never plays), up to the limit (opts.notices === false: never)
   function board(region) {
@@ -234,7 +247,7 @@ window.REALMLAB = function (opts = {}) {
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       if (id === 'crown') { log.crownTries++; for (let d = 0; d < 200 && !wChampWeek(); d++) wAdvance(24 * 60); }
       atMap(C.town);
-      ground(region); spots(region); board(region); tavern(region); quests(region); enchant(); shop(region);
+      ground(region); spots(region); board(region); tavern(region); quests(region); grounds(region); enchant(); shop(region);
       if (RUN.gold < W_CUP.fee && id !== 'crown') RUN.gold = W_CUP.fee; // a player would grind the fee; not the point
       while (!RUN.over) {
         prep(region, true);
@@ -305,7 +318,7 @@ window.REALMLAB = function (opts = {}) {
   if (!log.result) log.result = wFlag('champion') ? 'champion' : 'stuck';
   log.ground = WG.ground ? { town: WG.ground.town, parts: WG.ground.parts } : null;
   log.grudges = log.matches.filter(m => m.what === 'grudge').length;
-  log.tour = WG.tour ? WG.tour.beat.length : 0;
+  log.tour = WG.tour ? WG.tour.beat.length : 0; log.take = log.take || 0;
   log.notices = WG.notice ? WG.notice.done : 0; log.lapsed = WG.notice ? WG.notice.lapsed : 0;
   log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;

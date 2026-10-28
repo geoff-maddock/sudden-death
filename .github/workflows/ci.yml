@@ -1,9 +1,24 @@
 name: CI
+# Pushes to main, and pull requests. A push to a PR branch runs once (as the pull request), not twice.
 on:
   push:
+    branches: [main]
   pull_request:
+env:
+  # The quick checks, split across the test job's shards round-robin (check i runs on shard i % SHARDS), so the
+  # slow ones next to each other in the list land on different shards. A new check goes on the end of this list.
+  CHECKS: >-
+    smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit
+    realm_audit realm_tiles realm_smoke realm_match realm_save realm_party realm_road realm_town realm_dungeon
+    realm_cups realm_bot realm_polish realm_feel realm_ground realm_ways realm_camp realm_stats realm_bonds
+    realm_league realm_diamond_source realm_journal realm_diamond realm_diamond_ratings realm_diamond_nine
+    realm_diamond_game realm_diamond_cup realm_diamond_feel realm_click realm_grounds realm_gmatch realm_cities
+    realm_spots realm_fixtures realm_home realm_gfeel realm_notices realm_legs realm_captain realm_weather
+    realm_name realm_tour realm_sinks realm_defend realm_legends realm_gate realm_settings realm_map
+  SHARDS: 4
 jobs:
-  test:
+  build:
+    name: Build, stale files and bot sanity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,10 +28,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install test tooling
-        run: |
-          python -m pip install -r requirements-dev.txt
-          python -m playwright install --with-deps chromium
       - name: Build
         run: ./build.sh
       - name: Built file is up to date
@@ -25,10 +36,35 @@ jobs:
       - name: Realm built file is up to date
         run: |
           ./build.sh src/realm/manifest.txt && (git diff --exit-code dist/realm.html || (echo "dist/realm.html is stale: run ./build.sh src/realm/manifest.txt and commit it" && exit 1))
-      - name: Quick checks
-        run: |
-          for t in smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit realm_audit realm_tiles realm_smoke realm_match realm_save realm_party realm_road realm_town realm_dungeon realm_cups realm_bot realm_polish realm_feel realm_ground realm_ways realm_camp realm_stats realm_bonds realm_league realm_diamond_source realm_journal realm_diamond realm_diamond_ratings realm_diamond_nine realm_diamond_game realm_diamond_cup realm_diamond_feel realm_click realm_grounds realm_gmatch realm_cities realm_spots realm_fixtures realm_home realm_gfeel realm_notices realm_legs realm_captain realm_weather realm_name realm_tour realm_sinks realm_defend realm_legends; do
-            echo "== $t"; timeout 180 python test/$t.py
-          done
+      - uses: ./.github/actions/playwright
       - name: Bot sanity (no errors or stalls in 30 runs)
         run: python test/lab.py 30 | tee lab.txt && grep -q "run errors 0" lab.txt && grep -q "stalls 0" lab.txt
+
+  test:
+    name: Quick checks (shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/playwright
+      - name: Build
+        run: ./build.sh
+      - name: Quick checks
+        run: |
+          i=0; fail=0
+          for t in $CHECKS; do
+            if [ $((i % SHARDS)) -eq ${{ matrix.shard }} ]; then
+              echo "== $t"; timeout 180 python test/$t.py || { echo "FAILED: $t"; fail=1; }
+            fi
+            i=$((i + 1))
+          done
+          exit $fail
