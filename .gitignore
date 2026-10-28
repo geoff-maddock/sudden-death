@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
+# the browser "Save page" snapshot of Brimstone Diamond: its engine is committed as source in src/bd/ (see src/bd/README.md)
+context/Brimstone Diamond_ Monster-League Baseball.html
