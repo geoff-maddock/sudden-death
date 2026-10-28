@@ -6211,7 +6211,7 @@ DB.regions={plains:{name:'Charter Plains',sports:[['baseball',3],['basketball',2
  bloom:{name:'The Mosswold',sports:[['golf',3],['jousting',2]],kinds:['elf','werewolf','spider','gorgon','goblin'],arrive:'The Mosswold closes over the road. Everything drips, and everything is growing.',ambient:['Spores drift through a shaft of green light.','A Gloomcap watches you from a stump and does not move for a very long time.','Bees the size of your thumb work a bank of mossberries.']},
  tide:{name:'The Brinefen',sports:[['bowling',3],['curling',2]],kinds:['zombie','troll','gorgon','wraith','spider'],arrive:'The Brinefen: black water, white sand, and a wind that smells of kelp.',ambient:['A Brinepup barks from a sandbar and dives.','Gulls fight over something that fights back.','Old pilings stand in the fen where a road used to be.']},
  ember:{name:'The Cindermaw',sports:[['football',3],['boxing',2]],kinds:['kobold','minotaur','golem','ogre','dwarf'],arrive:'The Cindermaw. The ground is warm through your boots and the air tastes of pennies.',ambient:['A lava tongue folds over on itself with a sound like tearing cloth.','Something heavy shifts under the ash.','A Cinderkit sits in a hot spring with the expression of a cat in a sunbeam.']},
- rime:{name:'The Frostspire',sports:[['hockey',3],['curling',2]],kinds:['witch','harpy','lich','skeleton','vampire'],arrive:'The Frostspire. Snow squeaks underfoot, and the sky is very close.',ambient:['Green light ripples across the northern sky.','A Frostlet lands on a branch, weighs it down with snow, and looks offended.','Your breath hangs in the air long after you have walked through it.']}};
+ rime:{name:'The Frostspire',sports:[['hockey',3],['soccer',2]],kinds:['witch','harpy','lich','skeleton','vampire'],arrive:'The Frostspire. Snow squeaks underfoot, and the sky is very close.',ambient:['Green light ripples across the northern sky.','A Frostlet lands on a branch, weighs it down with snow, and looks offended.','Your breath hangs in the air long after you have walked through it.']}};
 DB.tiles={
  '.':{name:'grass',walk:1,ground:1,enc:.035,look:'Short grass, cropped by something with small teeth.'},
  '"':{name:'tall grass',walk:1,ground:1,enc:.11,look:'Tall grass. It moves when there is no wind.'},
@@ -22126,7 +22126,7 @@ renderHelp = function () {
      Mossgate      the Links (golf), the Tilting Lists (jousting)
      Saltmere      the Lanes (bowling), the Curling Shed (curling)
      Cinderhold    the Ash Bowl (football), the Anvil Ring (boxing)
-     Rimewatch     the Pond Rink (hockey), the Rimewatch Sheet (curling)
+     Rimewatch     the Pond Rink (hockey), the Hoarfrost Pitch (soccer; it was a curling sheet, and keeps the id g_sheet)
 
    A ground is a location (DB.locs kind 'ground', world tile 'U') with a small walk-in map built like a town
    (buildTown): the field drawn whole for its sport (tile 'd', m.field), stands ('J'), a scoreboard ('%'), a
@@ -22146,7 +22146,7 @@ const W_GRD_REG = { graftonbury: 'plains', mossgate: 'bloom', saltmere: 'tide', 
 const W_GRD_GC = { plains: '.', bloom: '.', tide: ':', ember: 'a', rime: 'n' };
 const W_GRD_TREE = { plains: 'T', bloom: 'T', tide: 'T', ember: 'R', rime: 'T' };
 // the pennant colour of each sport, as on Sudden Death's field
-const W_GRD_COL = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a' };
+const W_GRD_COL = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a', soccer: '#5fa8c9' };
 const W_GRD_INDOOR = { bowling: 1, curling: 1, boxing: 1 };
 
 const W_GRDS = [
@@ -22222,14 +22222,14 @@ const W_GRDS = [
     fan: { name: 'Little Brann', kind: 'harpy', look: { coat: '#3a6ab8', acc: 'cap', hair: '#2a1d16' }, greet: 'I am going to play for Rimewatch when I am bigger. I am already very fast. Watch.' },
     arrive: 'The Pond Rink. The pond is frozen solid, the lines are painted on, and the boards are older than the abbey.',
     ambient: ['A puck cracks against the boards and nobody is there.', 'Children skate in a long chain, shrieking.', 'The ice groans, deep down, and settles.'] },
-  { id: 'g_sheet', city: 'rimewatch', sport: 'curling', name: 'The Rimewatch Sheet', at: [16, 21],
-    look: 'The Rimewatch Sheet. A long hall of ice in the pines, smoke rising from its stove.',
-    keeper: { name: 'Sister Hogline', kind: 'lich', look: { coat: '#b83a3a', acc: 'robe', hair: '#cfe8ff' },
-      greet: 'Walk on the mats. The ice is for the stones, and the stones are for the faithful.',
-      job: 'The abbey keeps the sheet, and I keep it for the abbey: flood it, pebble it, bless the stones. Ask me how CURLING scores. Bring a full squad and I will put on a GAME.' },
-    fan: { name: 'Halla Frost', kind: 'vampire', look: { coat: '#9fe6ff', acc: 'scarf', hair: '#1a1210' }, greet: 'It is always cold in here. I like it. The sun cannot find me.' },
-    arrive: 'The Rimewatch Sheet. Two sheets of ice under a pine roof, the houses painted red and blue, and the stove ticking in the corner.',
-    ambient: ['A stone curls into the house and taps another out.', 'The stove ticks and the ice does not care.', 'Somebody chants a sweeping rhythm under their breath.'] },
+  { id: 'g_sheet', city: 'rimewatch', sport: 'soccer', name: 'The Hoarfrost Pitch', at: [16, 21],
+    look: 'The Hoarfrost Pitch. A snow pitch in the pines below the abbey, a goal at each end, smoke rising from its stove.',
+    keeper: { name: 'Sister Hogline', kind: 'lich', look: { coat: '#5fa8c9', acc: 'robe', hair: '#cfe8ff' },
+      greet: 'Stamp the snow off. Then go back out in it: this pitch is for kicking.',
+      job: 'The abbey keeps the pitch, and I keep it for the abbey: roll the snow, chalk the lines blue, bless the ball. Ask me how SOCCER scores. It is eleven a side: bring five of your own, the call-ups make up the rest, and I will put on a GAME.' },
+    fan: { name: 'Halla Frost', kind: 'vampire', look: { coat: '#9fe6ff', acc: 'scarf', hair: '#1a1210' }, greet: 'It is always cold out here. I like it. The sun cannot find me under all this snow.' },
+    arrive: 'The Hoarfrost Pitch. Snow packed hard and chalked blue, a goal at each end, and the abbey bell for full time.',
+    ambient: ['A ball thumps into the net and the snow falls off the crossbar.', 'The stove by the bench ticks, and nobody stands near it for long.', 'Somebody chants a passing drill under their breath: one, two, three, shoot.'] },
 ];
 function wGrd(id) { return W_GRDS.find(g => g.id === id) || null; }
 function wGrdOfMap(mapId) { return wGrd(mapId); }
@@ -22412,6 +22412,15 @@ function wGrdArt(c, sp, W, H) {
       for (const [x, col] of [[14, '#3a5a9a'], [W - 14, '#c94a3a']]) { const p = pPoly([[x - 9, y - 30], [x + 9, y - 30], [x + 9, y - 14], [x, y - 6], [x - 9, y - 14]]); wFlat(c, p, col, 1.2); }
       break;
     }
+    case 'soccer': { // a snow pitch: grass through the snow, the lines chalked blue, a goal at each end
+      rect(0, 0, W, H, '#e8f0f4');
+      for (let i = 0; i < 30; i++) { const x = (i * 83) % W, y = (i * 47) % H; c.beginPath(); c.ellipse(x, y, 14 + (i % 4) * 5, 4, 0, 0, Math.PI * 2); c.fillStyle = 'rgba(95,140,75,.22)'; c.fill(); }
+      const blue = 'rgba(60,90,150,.8)';
+      box(6, 6, W - 12, H - 12, blue, 2); wLine(c, [[W / 2, 6], [W / 2, H - 6]], 2, blue); ring(W / 2, H / 2, 34, blue, 2); disc(W / 2, H / 2, 3, blue);
+      for (const x of [6, W - 62]) box(x, H / 2 - 60, 56, 120, blue, 2);
+      for (const x of [0, W - 10]) { rect(x, H / 2 - 26, 10, 52, 'rgba(244,244,240,.9)'); box(x, H / 2 - 26, 10, 52, 'rgba(29,20,15,.6)', 1); }
+      break;
+    }
     case 'curling': {
       ice();
       for (const sy of [H * .25, H * .75]) {
@@ -22467,7 +22476,7 @@ WOBJ.U = (c, P, r, e) => {
   if (W_GRD_INDOOR[g.sport]) {
     wHouse(c, 3, 13, 26, 15, col, P, r, g.sport === 'boxing');
   } else {
-    const field = { baseball: '#5f9a44', football: '#4f8a3c', hockey: '#dbe8ef', basketball: '#c8925a', golf: '#6aa84e', jousting: '#c9a46c' }[g.sport] || '#5f9a44';
+    const field = { baseball: '#5f9a44', football: '#4f8a3c', hockey: '#dbe8ef', basketball: '#c8925a', golf: '#6aa84e', jousting: '#c9a46c', soccer: '#e6eef2' }[g.sport] || '#5f9a44';
     const bowl = pEl(16, 20, 15, 9); wCel(c, bowl, '#d8ccb0', 1.2, 1.3);
     for (let i = 0; i < 9; i++) { const a = Math.PI * (.08 + i * .105); c.fillStyle = '#7a6a54'; c.fillRect(16 - Math.cos(a) * 13 - 1, 20 + Math.sin(a) * 7 - 1, 2, 2); }
     const f = pEl(16, 19, 10, 5); wFlat(c, f, field, 1);
@@ -22492,7 +22501,7 @@ const wW21RenderHelp = renderHelp;
 renderHelp = function () {
   wW21RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGrounds')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGrounds"><b>Sports grounds.</b> Every city has two grounds just outside it, one for each sport its region plays, on a road from the city gate: a ballpark and a court at Graftonbury, links and lists at Mossgate, lanes and a curling shed at Saltmere, a football bowl and a boxing ring at Cinderhold, a rink and a curling sheet at Rimewatch. Walk in to see the field. The groundskeeper explains how the sport scores, and at the Graftonbury Ballpark books ball games and the Diamond Cup.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGrounds"><b>Sports grounds.</b> Every city has two grounds just outside it, one for each sport its region plays, on a road from the city gate: a ballpark and a court at Graftonbury, links and lists at Mossgate, lanes and a curling shed at Saltmere, a football bowl and a boxing ring at Cinderhold, a rink and a snow pitch for soccer at Rimewatch. Walk in to see the field. The groundskeeper explains how the sport scores, and at the Graftonbury Ballpark books ball games and the Diamond Cup.</p>`);
 };
 /* w21b: playing at a ground (issue #6, phase 2). Loads after w21-grounds.js; changes earlier parts only by
    reassignment (saved originals carry the wW21b prefix).
@@ -22515,11 +22524,12 @@ renderHelp = function () {
    wMatchTitle, wMatchTeam (the city club's name and the sport's colour), wPreGame (the ground's line), wUse (the
    scoreboard shows your record), wJRules (your record in the journal), renderHelp (#wHelpGrdPlay). */
 
-const W_GRD_SQUAD = { golf: 4, jousting: 4, boxing: 4, curling: 4, bowling: 5, basketball: 5, baseball: W_BALL.minOwn, hockey: 6, football: 7 };
+const W_GRD_SQUAD = { golf: 4, jousting: 4, boxing: 4, curling: 4, bowling: 5, basketball: 5, baseball: W_BALL.minOwn, soccer: 5, hockey: 6, football: 7 };
 const W_GRD_WHY = {
   golf: 'four to a fourball', jousting: 'two to ride and two to squire', boxing: 'a boxer, a second, a cutman and a trainer',
   curling: 'a rink of four: lead, second, third and skip', bowling: 'five to a bowling side', basketball: 'five on the court',
   baseball: 'five of your own, and call-ups fill the nine', hockey: 'six on the ice', football: 'seven on the pitch',
+  soccer: 'eleven a side: five of your own, and call-ups fill the rest'
 };
 const W_GRD_PLAY = {
   friendly: { n: 'Friendly', type: 'normal', up: 0, what: 'the city club, at the region\'s tier' },
@@ -22808,7 +22818,7 @@ const W_CITIES = {
       ['1', 1, 10], ['1', 2, 10], ['1', 3, 10], ['1', 4, 10], ['1', 5, 10], ['1', 9, 10], ['1', 10, 10], ['1', 11, 10], ['1', 12, 10], ['4', 4, 12], ['3', 2, 11], ['3', 11, 11],
       ['S', 21, 18, { text: 'THE POND. Thick enough, says Old Tove. Skates on, or stay on the bank.' }],
       ['S', 35, 15, { text: 'SLED RUN. One at a time, feet first, and shout.' }],
-      ['S', 19, 29, { text: 'RIMEWATCH. The Pond Rink and the Rimewatch Sheet are down the road from the gate.' }]],
+      ['S', 19, 29, { text: 'RIMEWATCH. The Pond Rink and the Hoarfrost Pitch are down the road from the gate.' }]],
     arrive: 'Rimewatch. The last town before the snow takes over, and it knows it.',
     ambient: ['The abbey bell tolls the hour, a little flat with cold.', 'A Frostlet is asleep on the arena sign, glazing it.', 'The lamps come on early here. They have to.', 'A cairn by the road has a new stone on it.', 'Children skate on the pond, badly.', 'Somebody comes down the sled run much faster than they meant to.'] },
 };
@@ -22932,7 +22942,7 @@ renderHelp = function () {
      Mossgate     the putting green by the shrine (golf), the straw targets in the tilting yard (jousting)
      Saltmere     skittles on the quay (bowling), the stones by the sea wall (curling)
      Cinderhold   the sparring ring by the smithy (boxing), the kick-about pitch on the ash (football)
-     Rimewatch    kids' hockey on the pond (hockey), the stone maker's bench (curling)
+     Rimewatch    kids' hockey on the pond (hockey), the kick-about wall (soccer; it was the stone maker's bench, and keeps the id sp_maker)
 
    Use the spot (tile '!', meta { spot }) or ask the coach to DRILL or for a CHALLENGE:
      Drill       once a week at each spot, free, an hour: a card that suits the sport (sportFits) gains Practice ★
@@ -22984,10 +22994,10 @@ const W_SPOTS = [
     look: 'Two little nets on the frozen pond, and a puck the children have lost under the snow.',
     coach: { id: 'tc_pond', at: [26, 23], name: 'Sister Puck', kind: 'witch', look: { coat: '#3a6ab8', acc: 'scarf', hair: '#eef2ef' },
       greet: 'Heads up on the ice! That was a very small child, and she is fine.', job: 'I mind the children on the pond, and the children mind the puck. DRILL a shot once a week, or take my CHALLENGE on how HOCKEY scores.' } },
-  { id: 'sp_maker', city: 'rimewatch', sport: 'curling', name: 'The stone maker\'s bench', at: [31, 12],
-    look: 'A stone maker\'s bench: granite rounds half shaped, handles in a box, and a polishing wheel.',
-    coach: { id: 'tc_maker', at: [31, 11], name: 'Granite Hob', kind: 'dwarf', look: { coat: '#b83a3a', acc: 'apron', hair: '#a0a0a0' },
-      greet: 'Every stone in the realm started on this bench. Some of them came back broken.', job: 'I make the stones for both sheets. DRILL a delivery with one of mine once a week, or take my CHALLENGE on how CURLING scores.' } },
+  { id: 'sp_maker', city: 'rimewatch', sport: 'soccer', name: 'The kick-about wall', at: [31, 12],
+    look: 'A wall behind the abbey with a goal chalked on it in blue, and a ball frozen to the ground beside it.',
+    coach: { id: 'tc_maker', at: [31, 11], name: 'Granite Hob', kind: 'dwarf', look: { coat: '#5fa8c9', acc: 'apron', hair: '#a0a0a0' },
+      greet: 'Every stone I ever made is a doorstop now. Kick the ball, not the wall.', job: 'I made the stones for the sheet until the abbey made it a pitch. Now I chalk goals on walls. DRILL a first touch once a week, or take my CHALLENGE on how SOCCER scores.' } },
 ];
 // the spots in the cities' ambient lines
 const W_SPOT_AMBIENT = {
@@ -22995,7 +23005,7 @@ const W_SPOT_AMBIENT = {
   mossgate: ['A putt rolls round the cup by the shrine and stays out.', 'A lance thumps into a straw target in the tilting yard.'],
   saltmere: ['The skittles on the quay go down with a clatter, and a gull takes off.', 'A curling stone scrapes along the chalked flags by the sea wall.'],
   cinderhold: ['Gloves smack the heavy bag behind the smithy, steady as a hammer.', 'The kick-about on the ash stops for an argument, then starts again.'],
-  rimewatch: ['Children on the pond shriek over a goal that may not have been a goal.', 'The stone maker\'s wheel whines, polishing a curling stone.'],
+  rimewatch: ['Children on the pond shriek over a goal that may not have been a goal.', 'A ball thumps against the abbey wall, again and again.'],
 };
 for (const c in W_SPOT_AMBIENT) W_CITIES[c].ambient.push(...W_SPOT_AMBIENT[c]);
 function wSpot(id) { return W_SPOTS.find(s => s.id === id) || null; }
@@ -23110,7 +23120,7 @@ const wW23RenderHelp = renderHelp;
 renderHelp = function () {
   wW23RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpSpots')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpSpots"><b>Training spots.</b> Every city has two, one for each sport its region plays, with a coach: a batting cage and a hoop at Graftonbury, a putting green and a tilting yard at Mossgate, skittles and curling stones at Saltmere, a sparring ring and a kick-about pitch at Cinderhold, pond hockey and the stone maker at Rimewatch. Once a week at each, drill a card that suits the sport (it gains Practice ★, free, an hour), and take the coach's challenge: say how the sport scores, and win ${W_SPOT.prize.gold} gold and ${W_SPOT.prize.fans} fans.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpSpots"><b>Training spots.</b> Every city has two, one for each sport its region plays, with a coach: a batting cage and a hoop at Graftonbury, a putting green and a tilting yard at Mossgate, skittles and curling stones at Saltmere, a sparring ring and a kick-about pitch at Cinderhold, pond hockey and a kick-about wall at Rimewatch. Once a week at each, drill a card that suits the sport (it gains Practice ★, free, an hour), and take the coach's challenge: say how the sport scores, and win ${W_SPOT.prize.gold} gold and ${W_SPOT.prize.fans} fans.</p>`);
 };
 
 /* ---------- drawing: one painter, a different thing per sport ---------- */
@@ -23152,10 +23162,15 @@ WOBJ['!'] = (c, P, r, e) => {
       disc(26, 27, 3.2, '#5a3d22', .8);
       break;
     }
+    case 'soccer': { // a goal chalked on a wall, and a ball
+      wCel(c, pRR(3, 6, 26, 14, 1), '#9a8f84', .6, 1.1);
+      wLine(c, [[7, 19], [7, 9], [25, 9], [25, 19]], 1.4, '#3c5a96');
+      disc(16, 26, 3.6, '#f4efe0', .8); disc(16, 26, 1.3, '#21160f', .4);
+      break;
+    }
     case 'curling': { // a stack of stones
       const stone = (x, y, f) => { wCel(c, pEl(x, y, 6, 3.4), '#8a8f9a', .6, 1.1); wFlat(c, pRR(x - 2.5, y - 3.6, 5, 1.8, .8), f, .6); };
       stone(10, 26, '#c83a3a'); stone(22, 26, '#3a6ab8'); stone(16, 21, '#c83a3a'); stone(16, 14, '#3a6ab8');
-      if (s && s.id === 'sp_maker') { wCel(c, pRR(2, 5, 7, 6, 1), '#7a5a32', .5, 1); disc(27, 8, 4, '#a0a6b0', .8); }
       break;
     }
     case 'boxing': { // ring posts, ropes and a heavy bag
@@ -23575,8 +23590,8 @@ const W_GRD_THEMES = {
     // the rink organ runs up and down the scale between whistles
     mel: wMel('0.2.4.6.7.......', '6.4.2...0.......', '7.6.4.2.4.......', '3.2.1...0.......'),
     bassPat: 'x...x...x...x...', drums: { k: 'x.......x.......', s: '....x.......x...', h: 'x...x...x...x...' } },
-  g_sheet: { name: 'Frostspire Sheet', bpm: 80, root: 55, scale: 'aeolian', prog: [0, 5, 3, 4], lead: 'sine', bass: 'sine', pad: 'sine', bell: 1,
-    // a stone sliding a long way in the cold
+  g_sheet: { name: 'Hoarfrost Pitch', bpm: 80, root: 55, scale: 'aeolian', prog: [0, 5, 3, 4], lead: 'sine', bass: 'sine', pad: 'sine', bell: 1,
+    // a long ball through the cold air (the tune of the old curling sheet)
     mel: wMel('7.......6.......', '4...3...2.......', '4.......5.......', '3...2...0.......'),
     bassPat: 'x...............', drums: { k: 'x.......x.......', s: '................', h: '........x.......' } },
 };
@@ -23768,7 +23783,7 @@ const W_NOTICE = {
   // about a dozen a journey, and gold already piles up (docs/realm/BALANCE.md)
   gold: { sport: 20, night: 30, margin: 30, club: 45, ground: 25, seeded: 30, count: 35 },
   card: { club: 1, count: 1, margin: 1 },     // these also pay a pick of 3 cards for the region's sports
-  margin: { baseball: 3, basketball: 6, hockey: 2, football: 7, jousting: 2, curling: 2 },
+  margin: { baseball: 3, basketball: 6, hockey: 2, football: 7, jousting: 2, curling: 2, soccer: 2 },
   count: 3,
 };
 const W_NOTICE_CITY = { graftonbury: 'hq_inn', mossgate: 'moss_inn', saltmere: 'salt_inn', cinderhold: 'cind_inn', rimewatch: 'rime_inn' };
@@ -25162,6 +25177,26 @@ renderHelp = function () {
   const sec = $('wHelp'); if (!sec || $('wHelpMap')) return;
   sec.insertAdjacentHTML('beforeend', `<div id="wHelpMap"><h4>The map</h4>
     <p class="hint"><b>Map</b> (<kbd>M</kbd>, or from the Menu) shows the realm as far as your team has seen it. It starts blank and fills in round you as you walk the world, and what you have seen stays on it. Towns, grounds, dungeons and lairs get their mark once you have seen them, and their name in bold once you have been there. The red mark is you.</p></div>`);
+};
+/* w38: soccer at Rimewatch (issue #10). Loads after w37-map.js; changes earlier parts only by reassignment (saved
+   originals carry the wW38 prefix).
+
+   The Rimewatch Sheet was the realm's second curling ground. It is now the Hoarfrost Pitch, a soccer ground
+   (w21-grounds.js), and the Frostspire plays hockey and soccer (w1-data.js). It keeps its id, g_sheet, so a home
+   ground there, the fixtures drawn there and the journal carry over. Its record (WG.grd.rec.g_sheet) was curling,
+   so an older save clears it once, with a line in the log; WG.soccer = 1 marks it done.
+
+   Wrapped: wStart (wW38Start). */
+
+const wW38Start = wStart;
+wStart = function () {
+  const r = wW38Start.apply(this, arguments);
+  if (WG && WG.soccer !== 1) {
+    const R = WG.grd && WG.grd.rec;
+    if (R && R.g_sheet) { delete R.g_sheet; wLog('The Rimewatch Sheet is a soccer ground now: the Hoarfrost Pitch. Your curling record there is in the past.', 'g'); }
+    WG.soccer = 1;
+  }
+  return r;
 };
 </script>
 </body></html>

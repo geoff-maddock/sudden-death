@@ -7,7 +7,7 @@
      Mossgate     the putting green by the shrine (golf), the straw targets in the tilting yard (jousting)
      Saltmere     skittles on the quay (bowling), the stones by the sea wall (curling)
      Cinderhold   the sparring ring by the smithy (boxing), the kick-about pitch on the ash (football)
-     Rimewatch    kids' hockey on the pond (hockey), the stone maker's bench (curling)
+     Rimewatch    kids' hockey on the pond (hockey), the kick-about wall (soccer; it was the stone maker's bench, and keeps the id sp_maker)
 
    Use the spot (tile '!', meta { spot }) or ask the coach to DRILL or for a CHALLENGE:
      Drill       once a week at each spot, free, an hour: a card that suits the sport (sportFits) gains Practice ★
@@ -59,10 +59,10 @@ const W_SPOTS = [
     look: 'Two little nets on the frozen pond, and a puck the children have lost under the snow.',
     coach: { id: 'tc_pond', at: [26, 23], name: 'Sister Puck', kind: 'witch', look: { coat: '#3a6ab8', acc: 'scarf', hair: '#eef2ef' },
       greet: 'Heads up on the ice! That was a very small child, and she is fine.', job: 'I mind the children on the pond, and the children mind the puck. DRILL a shot once a week, or take my CHALLENGE on how HOCKEY scores.' } },
-  { id: 'sp_maker', city: 'rimewatch', sport: 'curling', name: 'The stone maker\'s bench', at: [31, 12],
-    look: 'A stone maker\'s bench: granite rounds half shaped, handles in a box, and a polishing wheel.',
-    coach: { id: 'tc_maker', at: [31, 11], name: 'Granite Hob', kind: 'dwarf', look: { coat: '#b83a3a', acc: 'apron', hair: '#a0a0a0' },
-      greet: 'Every stone in the realm started on this bench. Some of them came back broken.', job: 'I make the stones for both sheets. DRILL a delivery with one of mine once a week, or take my CHALLENGE on how CURLING scores.' } },
+  { id: 'sp_maker', city: 'rimewatch', sport: 'soccer', name: 'The kick-about wall', at: [31, 12],
+    look: 'A wall behind the abbey with a goal chalked on it in blue, and a ball frozen to the ground beside it.',
+    coach: { id: 'tc_maker', at: [31, 11], name: 'Granite Hob', kind: 'dwarf', look: { coat: '#5fa8c9', acc: 'apron', hair: '#a0a0a0' },
+      greet: 'Every stone I ever made is a doorstop now. Kick the ball, not the wall.', job: 'I made the stones for the sheet until the abbey made it a pitch. Now I chalk goals on walls. DRILL a first touch once a week, or take my CHALLENGE on how SOCCER scores.' } },
 ];
 // the spots in the cities' ambient lines
 const W_SPOT_AMBIENT = {
@@ -70,7 +70,7 @@ const W_SPOT_AMBIENT = {
   mossgate: ['A putt rolls round the cup by the shrine and stays out.', 'A lance thumps into a straw target in the tilting yard.'],
   saltmere: ['The skittles on the quay go down with a clatter, and a gull takes off.', 'A curling stone scrapes along the chalked flags by the sea wall.'],
   cinderhold: ['Gloves smack the heavy bag behind the smithy, steady as a hammer.', 'The kick-about on the ash stops for an argument, then starts again.'],
-  rimewatch: ['Children on the pond shriek over a goal that may not have been a goal.', 'The stone maker\'s wheel whines, polishing a curling stone.'],
+  rimewatch: ['Children on the pond shriek over a goal that may not have been a goal.', 'A ball thumps against the abbey wall, again and again.'],
 };
 for (const c in W_SPOT_AMBIENT) W_CITIES[c].ambient.push(...W_SPOT_AMBIENT[c]);
 function wSpot(id) { return W_SPOTS.find(s => s.id === id) || null; }
@@ -185,7 +185,7 @@ const wW23RenderHelp = renderHelp;
 renderHelp = function () {
   wW23RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpSpots')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpSpots"><b>Training spots.</b> Every city has two, one for each sport its region plays, with a coach: a batting cage and a hoop at Graftonbury, a putting green and a tilting yard at Mossgate, skittles and curling stones at Saltmere, a sparring ring and a kick-about pitch at Cinderhold, pond hockey and the stone maker at Rimewatch. Once a week at each, drill a card that suits the sport (it gains Practice ★, free, an hour), and take the coach's challenge: say how the sport scores, and win ${W_SPOT.prize.gold} gold and ${W_SPOT.prize.fans} fans.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpSpots"><b>Training spots.</b> Every city has two, one for each sport its region plays, with a coach: a batting cage and a hoop at Graftonbury, a putting green and a tilting yard at Mossgate, skittles and curling stones at Saltmere, a sparring ring and a kick-about pitch at Cinderhold, pond hockey and a kick-about wall at Rimewatch. Once a week at each, drill a card that suits the sport (it gains Practice ★, free, an hour), and take the coach's challenge: say how the sport scores, and win ${W_SPOT.prize.gold} gold and ${W_SPOT.prize.fans} fans.</p>`);
 };
 
 /* ---------- drawing: one painter, a different thing per sport ---------- */
@@ -227,10 +227,15 @@ WOBJ['!'] = (c, P, r, e) => {
       disc(26, 27, 3.2, '#5a3d22', .8);
       break;
     }
+    case 'soccer': { // a goal chalked on a wall, and a ball
+      wCel(c, pRR(3, 6, 26, 14, 1), '#9a8f84', .6, 1.1);
+      wLine(c, [[7, 19], [7, 9], [25, 9], [25, 19]], 1.4, '#3c5a96');
+      disc(16, 26, 3.6, '#f4efe0', .8); disc(16, 26, 1.3, '#21160f', .4);
+      break;
+    }
     case 'curling': { // a stack of stones
       const stone = (x, y, f) => { wCel(c, pEl(x, y, 6, 3.4), '#8a8f9a', .6, 1.1); wFlat(c, pRR(x - 2.5, y - 3.6, 5, 1.8, .8), f, .6); };
       stone(10, 26, '#c83a3a'); stone(22, 26, '#3a6ab8'); stone(16, 21, '#c83a3a'); stone(16, 14, '#3a6ab8');
-      if (s && s.id === 'sp_maker') { wCel(c, pRR(2, 5, 7, 6, 1), '#7a5a32', .5, 1); disc(27, 8, 4, '#a0a6b0', .8); }
       break;
     }
     case 'boxing': { // ring posts, ropes and a heavy bag
