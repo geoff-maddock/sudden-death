@@ -18,11 +18,11 @@ function arenaBG(sport, act) {
   c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 34, SW, 10);
   for (let x = 12; x < SW; x += 22) { const h = 10 + rnd() * 8; c.fillStyle = `rgba(0,0,0,${.35 + rnd() * .2})`; c.beginPath(); c.arc(x, 34 - h * .3, 6, Math.PI, 0); c.fill(); c.fillRect(x - 6, 34 - h * .3, 12, h * .3 + 2); }
   // pennants for the sport
-  const pcol = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a' }[sport] || '#888';
+  const pcol = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a', soccer: '#5fa8c9' }[sport] || '#888';
   for (const px of [140, 300, 660, 820]) { c.fillStyle = pcol; c.beginPath(); c.moveTo(px - 18, 50); c.lineTo(px + 18, 50); c.lineTo(px, 92); c.fill(); c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 2; c.stroke(); c.fillStyle = 'rgba(255,240,210,.85)'; c.font = '700 16px "Grenze Gotisch", Georgia, serif'; c.textAlign = 'center'; c.fillText(SPORT_NAME[sport][0], px, 70); }
   // the floor
   const floor = new Path2D(); const a = fp(-1, 0), b = fp(1, 0), d2 = fp(1, 1), e = fp(-1, 1); floor.moveTo(-50, FY); floor.lineTo(SW + 50, FY); floor.lineTo(SW + 50, SH); floor.lineTo(-50, SH); floor.closePath();
-  const fcol = { baseball: '#4a3424', football: '#2f4a28', hockey: '#c9dbe6', basketball: '#8a5a30', golf: '#3a5a2a', bowling: '#9a7448', jousting: '#7a6040', curling: '#d2e2ec', boxing: '#3a2a26' }[sport] || A.floor;
+  const fcol = { baseball: '#4a3424', football: '#2f4a28', hockey: '#c9dbe6', basketball: '#8a5a30', golf: '#3a5a2a', bowling: '#9a7448', jousting: '#7a6040', curling: '#d2e2ec', boxing: '#3a2a26', soccer: '#dfe9ee' }[sport] || A.floor;
   c.fillStyle = fcol; c.fill(floor);
   const line = (pts, col = 'rgba(245,240,225,.75)', w = 3) => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.strokeStyle = col; c.lineWidth = w; c.stroke(); };
   const poly = (pts, col) => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fillStyle = col; c.fill(); };
@@ -85,6 +85,18 @@ function arenaBG(sport, act) {
       const g = c.createLinearGradient(0, FY, 0, SH); g.addColorStop(0, '#9fb8c8'); g.addColorStop(1, '#e3eef4'); c.fillStyle = g; c.fill(floor);
       for (const [r, col] of [[.36, '#3a6ab8'], [.24, '#f2f2f2'], [.12, '#c83a3a'], [.04, '#f2f2f2']]) oval(0, .5, r, col, true);
       line([fp(-1.2, .5), fp(1.2, .5)], 'rgba(40,40,60,.4)', 2); line([fp(0, 0), fp(0, 1)], 'rgba(40,40,60,.4)', 2);
+      break;
+    }
+    case 'soccer': { // a snow pitch: grass showing through, the lines chalked blue, a goal at each end
+      const g = c.createLinearGradient(0, FY, 0, SH); g.addColorStop(0, '#b9cdd8'); g.addColorStop(1, '#eef4f7'); c.fillStyle = g; c.fill(floor);
+      for (let i = 0; i < 26; i++) { const p = fp(rnd() * 2 - 1, rnd()); ell(c, p.x, p.y, 18 + rnd() * 26, 4 + rnd() * 4, 'rgba(90,130,70,.22)'); }
+      const ch = 'rgba(60,90,150,.75)';
+      line([fp(0, 0), fp(0, 1)], ch, 4); oval(0, .5, .2, ch); circ(c, fp(0, .5).x, fp(0, .5).y, 5, ch);
+      for (const s of [-1, 1]) {
+        line([fp(s * .88, .22), fp(s * .64, .22), fp(s * .64, .78), fp(s * .88, .78)], ch, 3);
+        const a = fp(s * .88, .38), b = fp(s * .88, .62);
+        line([a, { x: a.x, y: a.y - 42 }, { x: b.x, y: b.y - 42 }, b], '#f4f4f0', 5);
+      }
       break;
     }
     case 'boxing': {

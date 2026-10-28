@@ -3168,7 +3168,7 @@ function sportCardEnd(card, d, tgt) {
       // a shot: the passes are spent, scored or saved
       B.sc.passes = 0;
       if (top >= SKT(card).kick) {
-        B.sc.goals++; scoreUs(1, 'goal'); fx({ k: 'goal' });
+        B.sc.goals++; scoreUs(1, 'goal');
         fx({ k: 'banner', t: 'Goal', sub: n >= 6 ? `After ${n} passes: draw a card` : 'Draw a card', small: 1 }); log(`GOAL after ${n} passes! Draw a card.`, 'good'); drawCards(1);
         if (n >= 6) addHL('golazo');
         if (B.sc.goals >= 3) addHL('hattrick');
@@ -3425,6 +3425,7 @@ const STARS = [
   { n: 'The Anvil', desc: 'Stoneborn cards hit 1 harder.', grp: 'stone', atk: 1, pts: [[-18, -6], [10, -6], [18, -12], [6, 4], [-6, 4], [-10, 14], [10, 14]], lines: [[0, 1], [1, 2], [1, 3], [3, 4], [4, 0], [4, 5], [3, 6]] },
   { n: 'The Twin Dice', desc: '+1 to every d20 you roll.', dice: 1, pts: [[-16, -6], [-6, -6], [-6, 4], [-16, 4], [6, -2], [16, -2], [16, 8], [6, 8]], lines: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4]] },
   { n: 'The Huntsman', desc: 'Beast cards hit 1 harder.', grp: 'beast', atk: 1, pts: [[-16, 12], [-6, 2], [4, -6], [16, -14], [-2, -12], [8, 6]], lines: [[0, 1], [1, 2], [2, 3], [2, 4], [2, 5]] },
+  { n: 'The Net', desc: 'Soccer cards hit 1 harder.', sport: 'soccer', atk: 1, pts: [[-16, -8], [16, -8], [-16, 10], [16, 10], [-6, 2], [6, 2]], lines: [[0, 1], [0, 2], [1, 3], [4, 5]] },
 ];
 const MOON_EVERY = 3, STARS_EVERY = 5;
 function skyAt(clock) {
@@ -4144,6 +4145,7 @@ function emblemURL(sport, col) {
     case 'golf': { O(pRR(30, -60, 5, 110, 2), '#efe4cc'); O(pPoly([[35, -60], [80, -46], [35, -32]]), '#e0533a'); O(pEl(-30, 30, 22, 22), '#f8f4ea'); for (let i = 0; i < 8; i++) circ(c, -38 + (i % 3) * 8, 22 + ((i / 3) | 0) * 8, 2, '#c8c0b0'); O(pEl(-30, 56, 30, 6), '#2f6a2a'); break; }
     case 'bowling': { const pin = new Path2D(); pin.moveTo(0, -64); pin.bezierCurveTo(16, -64, 16, -36, 8, -28); pin.bezierCurveTo(28, -6, 26, 40, 14, 60); pin.lineTo(-14, 60); pin.bezierCurveTo(-26, 40, -28, -6, -8, -28); pin.bezierCurveTo(-16, -36, -16, -64, 0, -64); O(pin, '#f2ead8'); c.fillStyle = '#d83a3a'; c.fillRect(-11, -26, 22, 5); c.fillRect(-12, -18, 24, 5); circ(c, -4, -50, 3, INK); circ(c, 5, -50, 3, INK); break; }
     case 'jousting': { c.save(); c.rotate(-.5); O(pPoly([[-90, -4], [70, -12], [96, 0], [70, 12], [-90, 4]]), '#c9a24a'); c.restore(); O(pPoly([[-40, -40], [10, -40], [10, 0], [-15, 34], [-40, 0]]), '#3a5a9a'); c.strokeStyle = '#ffd166'; c.lineWidth = 4; c.beginPath(); c.moveTo(-15, -40); c.lineTo(-15, 30); c.moveTo(-40, -12); c.lineTo(10, -12); c.stroke(); break; }
+    case 'soccer': { O(pEl(0, 0, 50, 50), '#f2ead8'); O(pPoly([[0, -17], [16, -5], [10, 14], [-10, 14], [-16, -5]]), '#21160f'); break; }
     case 'curling': { O(pEl(0, 24, 54, 22), '#7a7a80'); O(pEl(0, 12, 54, 22), '#a8a8b0'); O(pRR(-6, -38, 12, 40, 4), '#d83a3a'); O(pRR(-6, -42, 40, 12, 5), '#d83a3a'); break; }
     case 'boxing': { const g2 = new Path2D(); g2.moveTo(-34, 30); g2.bezierCurveTo(-44, -10, -36, -52, 4, -52); g2.bezierCurveTo(40, -52, 50, -16, 40, 12); g2.bezierCurveTo(34, 30, 20, 34, 18, 34); g2.lineTo(-30, 34); g2.closePath(); O(g2, '#c2264a'); O(pRR(-32, 34, 52, 22, 5), '#f2ead8'); const th = new Path2D(); th.moveTo(-36, -2); th.bezierCurveTo(-58, -2, -58, 26, -30, 22); O(th, '#a81e3e'); break; }
     default: { O(pEl(0, 0, 40, 40), '#c9a24a'); }
@@ -4443,11 +4445,11 @@ function arenaBG(sport, act) {
   c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 34, SW, 10);
   for (let x = 12; x < SW; x += 22) { const h = 10 + rnd() * 8; c.fillStyle = `rgba(0,0,0,${.35 + rnd() * .2})`; c.beginPath(); c.arc(x, 34 - h * .3, 6, Math.PI, 0); c.fill(); c.fillRect(x - 6, 34 - h * .3, 12, h * .3 + 2); }
   // pennants for the sport
-  const pcol = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a' }[sport] || '#888';
+  const pcol = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a', soccer: '#5fa8c9' }[sport] || '#888';
   for (const px of [140, 300, 660, 820]) { c.fillStyle = pcol; c.beginPath(); c.moveTo(px - 18, 50); c.lineTo(px + 18, 50); c.lineTo(px, 92); c.fill(); c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 2; c.stroke(); c.fillStyle = 'rgba(255,240,210,.85)'; c.font = '700 16px "Grenze Gotisch", Georgia, serif'; c.textAlign = 'center'; c.fillText(SPORT_NAME[sport][0], px, 70); }
   // the floor
   const floor = new Path2D(); const a = fp(-1, 0), b = fp(1, 0), d2 = fp(1, 1), e = fp(-1, 1); floor.moveTo(-50, FY); floor.lineTo(SW + 50, FY); floor.lineTo(SW + 50, SH); floor.lineTo(-50, SH); floor.closePath();
-  const fcol = { baseball: '#4a3424', football: '#2f4a28', hockey: '#c9dbe6', basketball: '#8a5a30', golf: '#3a5a2a', bowling: '#9a7448', jousting: '#7a6040', curling: '#d2e2ec', boxing: '#3a2a26' }[sport] || A.floor;
+  const fcol = { baseball: '#4a3424', football: '#2f4a28', hockey: '#c9dbe6', basketball: '#8a5a30', golf: '#3a5a2a', bowling: '#9a7448', jousting: '#7a6040', curling: '#d2e2ec', boxing: '#3a2a26', soccer: '#dfe9ee' }[sport] || A.floor;
   c.fillStyle = fcol; c.fill(floor);
   const line = (pts, col = 'rgba(245,240,225,.75)', w = 3) => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.strokeStyle = col; c.lineWidth = w; c.stroke(); };
   const poly = (pts, col) => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fillStyle = col; c.fill(); };
@@ -4510,6 +4512,18 @@ function arenaBG(sport, act) {
       const g = c.createLinearGradient(0, FY, 0, SH); g.addColorStop(0, '#9fb8c8'); g.addColorStop(1, '#e3eef4'); c.fillStyle = g; c.fill(floor);
       for (const [r, col] of [[.36, '#3a6ab8'], [.24, '#f2f2f2'], [.12, '#c83a3a'], [.04, '#f2f2f2']]) oval(0, .5, r, col, true);
       line([fp(-1.2, .5), fp(1.2, .5)], 'rgba(40,40,60,.4)', 2); line([fp(0, 0), fp(0, 1)], 'rgba(40,40,60,.4)', 2);
+      break;
+    }
+    case 'soccer': { // a snow pitch: grass showing through, the lines chalked blue, a goal at each end
+      const g = c.createLinearGradient(0, FY, 0, SH); g.addColorStop(0, '#b9cdd8'); g.addColorStop(1, '#eef4f7'); c.fillStyle = g; c.fill(floor);
+      for (let i = 0; i < 26; i++) { const p = fp(rnd() * 2 - 1, rnd()); ell(c, p.x, p.y, 18 + rnd() * 26, 4 + rnd() * 4, 'rgba(90,130,70,.22)'); }
+      const ch = 'rgba(60,90,150,.75)';
+      line([fp(0, 0), fp(0, 1)], ch, 4); oval(0, .5, .2, ch); circ(c, fp(0, .5).x, fp(0, .5).y, 5, ch);
+      for (const s of [-1, 1]) {
+        line([fp(s * .88, .22), fp(s * .64, .22), fp(s * .64, .78), fp(s * .88, .78)], ch, 3);
+        const a = fp(s * .88, .38), b = fp(s * .88, .62);
+        line([a, { x: a.x, y: a.y - 42 }, { x: b.x, y: b.y - 42 }, b], '#f4f4f0', 5);
+      }
       break;
     }
     case 'boxing': {
@@ -5173,6 +5187,13 @@ function drawFieldState(c) {
     for (let i = 0; i < B.sc.stones; i++) { const p = fp(Math.cos(i * 2.1) * .12, .5 + Math.sin(i * 2.1) * .06); ell(c, p.x, p.y + 3, 14, 5, '#5a5a62'); ell(c, p.x, p.y, 14, 5, team.color); c.fillStyle = '#333'; c.fillRect(p.x - 2, p.y - 6, 4, 6); }
     return;
   }
+  if (B.sport === 'soccer') { // the ball works up the pitch with every pass
+    const n = Math.min(6, B.sc.passes || 0), p = fp(-.6 + n * .22, .55);
+    for (let i = 0; i < n; i++) { const q = fp(-.6 + i * .22, .55); circ(c, q.x, q.y, 3, 'rgba(40,60,120,.55)'); }
+    ell(c, p.x, p.y + 4, 9, 3, 'rgba(0,0,0,.25)'); circ(c, p.x, p.y - 4, 8, '#f2ead8'); circ(c, p.x, p.y - 4, 3, '#21160f');
+    if (n >= 3) txt(c, 'SHOT ON', p.x, p.y - 22, F_HUD(16), '#ffd166', 'center');
+    return;
+  }
   if (B.sport === 'basketball') {
     const ok = B.sc.basket; c.save(); rr(c, 530, 82, 46, 26, 3); c.fillStyle = '#16100c'; c.fill();
     txt(c, ok ? '24' : B.phase === 'player' ? '!!' : '24', 553, 101, F_HUD(20), ok ? '#7fe08a' : (Math.sin(A.t * 6) > 0 ? '#ff6a5a' : '#ffb347'), 'center'); txt(c, 'SHOT', 553, 78, F_HUD(12), '#b8a68c', 'center'); c.restore();
@@ -5232,7 +5253,8 @@ function drawSportPops(c) {
         break; }
       case 'goal': { // the puck rips into the net and the twine bulges
         const x = lerp(330, p.tx, Math.min(1, e * 1.3)), y = lerp(400, p.ty + 10, Math.min(1, e * 1.3));
-        ell(c, x, y, 10, 4, '#111'); const b = Math.max(0, (k - .55) / .45);
+        if (B.sport === 'soccer') { circ(c, x, y - 4, 8, '#f2ead8'); circ(c, x, y - 4, 3, '#21160f'); } else ell(c, x, y, 10, 4, '#111'); // a ball, or the puck
+        const b = Math.max(0, (k - .55) / .45);
         if (b > 0) { c.strokeStyle = 'rgba(240,240,255,.8)'; c.lineWidth = 1.5; const w = 70, h = 46, bulge = Math.sin(b * Math.PI) * 18; for (let i = 0; i <= 6; i++) { c.beginPath(); c.moveTo(p.tx + 20 + i * w / 6 - w / 2, p.ty - h); c.quadraticCurveTo(p.tx + 20 + i * w / 6 - w / 2 + bulge, p.ty - h / 2, p.tx + 20 + i * w / 6 - w / 2, p.ty); c.stroke(); } }
         break; }
       case 'touchdown': case 'field goal': { // the ball spirals downfield; a touchdown rains confetti
@@ -5354,7 +5376,7 @@ function showPage(p) {
 }
 
 /* ---------- title ---------- */
-const TITLE = { club: pick(CLUB_IDS), sports: ['football', 'baseball', 'hockey', 'basketball', 'bowling', 'jousting'], i: 0, t0: 0 };
+const TITLE = { club: pick(CLUB_IDS), sports: ['football', 'baseball', 'hockey', 'soccer', 'basketball', 'bowling', 'jousting'], i: 0, t0: 0 };
 TITLE.party = shuffle(CLUBS[TITLE.club].roster.slice()).slice(0, 3);
 function drawTitle(c) {
   const k = (A.t - TITLE.t0); if (k > 5) { TITLE.i = (TITLE.i + 1) % TITLE.sports.length; TITLE.t0 = A.t; }

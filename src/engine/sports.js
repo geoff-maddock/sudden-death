@@ -145,7 +145,7 @@ function sportCardEnd(card, d, tgt) {
       // a shot: the passes are spent, scored or saved
       B.sc.passes = 0;
       if (top >= SKT(card).kick) {
-        B.sc.goals++; scoreUs(1, 'goal'); fx({ k: 'goal' });
+        B.sc.goals++; scoreUs(1, 'goal');
         fx({ k: 'banner', t: 'Goal', sub: n >= 6 ? `After ${n} passes: draw a card` : 'Draw a card', small: 1 }); log(`GOAL after ${n} passes! Draw a card.`, 'good'); drawCards(1);
         if (n >= 6) addHL('golazo');
         if (B.sc.goals >= 3) addHL('hattrick');
