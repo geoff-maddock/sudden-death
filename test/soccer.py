@@ -16,7 +16,7 @@ def check(ok, what, detail=None):
 
 # a fresh soccer fight against two sturdy enemies, with a hand we choose; LAB keeps it quiet
 START = r'''(hand) => { LAB = true; window.SKY_OFF = true;
-  K('t_pass', 'Pass', 'any', 'skl', 0, 'c', 'self', [['b', 1]]); K('t_six', 'Six', 'any', 'atk', 0, 'c', 'one', [['d', 6]]); K('t_twelve', 'Twelve', 'any', 'atk', 0, 'c', 'one', [['d', 12]]);
+  K('t_pass', 'Pass', 'any', 'skl', 0, 'c', 'self', [['b', 1]]); K('t_six', 'Six', 'any', 'atk', 0, 'c', 'one', [['d', 6]]); K('t_twelve', 'Twelve', 'any', 'atk', 0, 'c', 'one', [['d', 12]]); K('t_multi', 'Three Twos', 'any', 'atk', 0, 'c', 'one', [['d', 2, 3]]);
   newRun('ironmaw', [0, 3, 4]); RUN.path = [];
   beginFight({ ids: ['skelss', 'lb'], type: 'normal', sport: 'soccer' }); A.banner = null;
   for (const e of B.enemies) { e.hp = e.max = 999; e.block = 0; delete e.sp; } B.sp = null; // no random perk (a Stopper moves the goal line)
@@ -62,6 +62,13 @@ async def main():
         line = await pg.evaluate("sportLine()")
         check('Passes' in line, 'the scoreboard shows the passes', line)
         check(await pg.evaluate("sportBadge(B.hand[0], B.enemies[0])") == 'Pass', 'with no passes, a card in hand says Pass')
+
+        # a multi-hit shot gets the pass bonus once, on its first hit: 2 x 3 + 2 passes = 8, a save, not 12
+        await pg.evaluate(START, ['t_pass', 't_pass', 't_multi'])
+        for _ in range(2): await pg.evaluate(PLAY, 't_pass')
+        m = await pg.evaluate("(() => { const e = B.enemies[0], c = B.hand.find(c => c.id === 't_multi'), badge = sportBadge(c, e), est = estDamage(c, e).top, hp = e.hp;" +
+                              " playCard(B.hand.indexOf(c), 0); return { badge, est, dealt: hp - e.hp, us: B.sc.us }; })()")
+        check(m == {'badge': 'Shot', 'est': 8, 'dealt': 8, 'us': 0}, 'a multi-hit shot gets the pass bonus once (2 x 3 + 2 = 8): the badge, the estimate and the hit agree, and it is saved', m)
 
         # ---------- their goals ----------
         g = await pg.evaluate("""(() => { B.P.block = 0; const t0 = B.sc.them; hurtPlayer(5, B.enemies[0]); const a = B.sc.them - t0;

@@ -1769,7 +1769,7 @@ const SPORTS = {
   bowling: { n: 'Bowling', rule: 'Pins', desc: 'Knock the whole lineup down in a single turn for a strike: heal 10. A strike by your fourth turn is a sports win.' },
   jousting: { n: 'Jousting', rule: 'The lists', desc: 'The first Attack you play each turn is a tilt and deals double damage. A tilt that deals 12+ shatters a lance: a point. Every enemy hit that gets through your Block is a point for them. Outscore them for a sports win.' },
   curling: { n: 'Curling', rule: 'Sweep', desc: 'At the end of your turn, each card left in hand gives 2 Block. End a turn with 12+ Block and your stone is in the house: a point, and every stone in the house gives you 2 Block at the start of each turn. Every enemy hit that gets through your Block is a point for them. Outscore them for a sports win.' },
-  soccer: { n: 'Soccer', rule: 'Pass and move', desc: 'Every card you play is a pass. An Attack with 2+ passes behind it is a shot: +1 damage per pass (up to 6), and 10+ damage on one enemy is a goal (draw a card). Scored or saved, the passes start again, and they start again every turn. An enemy hit that gets 6+ through your Block is a goal for them. Block every hit in their turn and it is a goal prevented: your next turn starts with a pass. Outscore them for a sports win.' },
+  soccer: { n: 'Soccer', rule: 'Pass and move', desc: 'Every card you play is a pass. An Attack with 2+ passes behind it is a shot: its first hit gets +1 damage per pass (up to 6), and 10+ damage on one enemy is a goal (draw a card). Scored or saved, the passes start again, and they start again every turn. An enemy hit that gets 6+ through your Block is a goal for them. Block every hit in their turn and it is a goal prevented: your next turn starts with a pass. Outscore them for a sports win.' },
   boxing: { n: 'Boxing', rule: 'The bell', desc: 'Each turn is a round, scored on the damage each side throws (blocked punches still count for them). Win more rounds than you lose for a sports win. Take a round by 15+ damage and they are rocked (Weak); lose one by 15+ and you are. Every third turn the bell rings: heal 4 and shake off Weak and Exposed. Win by knockout in three rounds for a highlight.' },
 };
 const ACT_SPORTS = [
@@ -2371,6 +2371,7 @@ function atkDmg(base, e, card, extra = 0) {
   if (card && def(card).type === 'atk') {
     d += add(sv(P, 'luckybat') ? 4 : 0, 'Lucky Bat');
     d += sportAtkBonus(e);
+    if (!B.passHit) { const pb = passBonus(); if (pb) { d += add(pb, 'Passes'); B.passHit = 1; } } // soccer: the passes add to a shot once
     if (!B.inCard || !B.skyHit) { d += add(skyAtk(card), 'The sky'); if (B.inCard) B.skyHit = 1; } // the sky adds to a card's first hit only
     if (B.sport === 'basketball' && (sv(P, 'hot') || (!B.inCard && B.atkCount >= 2))) d += add(3, 'On Fire');
     d += add(sv(P, 'oop'), 'Alley-oop');
@@ -2387,8 +2388,8 @@ function atkDmg(base, e, card, extra = 0) {
 function dmgWhy(card, e) {
   const d = def(card), op = (d.fx || []).find(o => ['d', 'drain', 'dunk', 'drainall'].includes(o[0]));
   if (!op || !e) return null;
-  WHY = []; let n;
-  try { n = atkDmg(op[0] === 'dunk' && e.hp < e.max / 2 ? op[2] : op[1], e, card); } finally { var parts = WHY; WHY = null; }
+  WHY = []; let n; const ph = B.passHit; B.passHit = 0;
+  try { n = atkDmg(op[0] === 'dunk' && e.hp < e.max / 2 ? op[2] : op[1], e, card); } finally { var parts = WHY; WHY = null; B.passHit = ph; }
   return parts.length > 1 ? { parts, n, hits: op[0] === 'd' ? op[2] || 1 : 1 } : null;
 }
 function hurtEnemy(e, dmg, o = {}) {
@@ -2459,7 +2460,7 @@ function playCard(i, ti, opt = {}) {
   const comboHit = d.combo && B.lastType === d.combo.t;
   const momHit = d.mom && B.cardsThisTurn >= d.mom.n;
   B.cardBonus = d.grow ? (B.grow[card.uid] || 0) : 0;
-  B.who = ownerOf(card); credit('c', 1); B.curCard = card; B.skyHit = 0;
+  B.who = ownerOf(card); credit('c', 1); B.curCard = card; B.skyHit = 0; B.passHit = 0;
   B.curType = d.type;
   sportCardStart(d);
   const times = sv(B.P, 'double') && d.type !== 'pow' ? 2 : 1;
@@ -2623,7 +2624,6 @@ function sportAtkBonus(e) {
   let d = add(t > 0 ? t : 0, MOM_NAME[t]);
   if (B.sport === 'baseball') d += add(Math.min(3, B.sc.bases.filter(Boolean).length), 'Runners on');   // runners on: pressure
   if (B.sport === 'football' && B.yards >= 75) d += add(2, 'Red zone');                                // the red zone
-  if (B.sport === 'soccer' && (B.sc.passes || 0) >= SOCCER.passes) d += add(Math.min(SOCCER.cap, B.sc.passes), 'Passes');        // the shot after the passes
   return d;
 }
 function sportEnemyBonus() {
@@ -2632,6 +2632,8 @@ function sportEnemyBonus() {
   if (B.sport === 'football' && B.yards <= 10) d += 1;                               // pinned deep
   return d;
 }
+// soccer: what the passes add to a shot (atkDmg gives it to the shot's first hit only, B.passHit)
+const passBonus = () => B && B.sc && B.sport === 'soccer' && (B.sc.passes || 0) >= SOCCER.passes ? Math.min(SOCCER.cap, B.sc.passes) : 0;
 const sportDrawBonus = () => (B && B.sc && momTier() === -2 ? 1 : 0);
 function sportTurnBegin() {
   // curling: every stone already in the house guards you
@@ -2841,7 +2843,8 @@ function sportBadge(card, tgt) {
 }
 // rough damage forecast (no dice): per target and total
 function estDamage(card, tgt) {
-  const d = def(card), out = { total: 0, top: 0, blk: 0, per: {} };
+  const d = def(card), out = { total: 0, top: 0, blk: 0, per: {} }, ph = B.passHit; B.passHit = 0; // the estimate is one whole card
+  try {
   const add = (e, n) => { if (!e || e.dead) return; const after = d.pierce ? n : Math.max(0, n - e.block); out.per[e.uid] = (out.per[e.uid] || 0) + after; out.total += after; out.top = Math.max(out.top, out.per[e.uid]); };
   const walk = ops => { for (const o of ops) {
     const scope = o[3] || d.tgt;
@@ -2855,6 +2858,7 @@ function estDamage(card, tgt) {
     else if (o[0] === 'bones') out.blk += Math.min(36, o[1] * B.draw.length);
   } };
   walk(d.fx);
+  } finally { B.passHit = ph; }
   out.total = Math.round(out.total);
   return out;
 }

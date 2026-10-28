@@ -85,10 +85,13 @@ async def main():
         old = await pg.evaluate("""(() => { const save = JSON.parse(JSON.stringify({ WG, RUN })); B = null; RUN.pending = null; save.RUN.pending = null; save.RUN.battle = null;
           delete save.WG.soccer; save.WG.grd = save.WG.grd || { met: {}, rec: {} }; save.WG.grd.rec = Object.assign({}, save.WG.grd.rec, { g_sheet: { w: 2, l: 1, last: null }, g_shed: { w: 1, l: 0, last: null } });
           save.WG.ground = { town: 'rimewatch', grd: 'g_sheet', up: [] };
-          wStart(save); return { rec: !!WG.grd.rec.g_sheet, shed: !!WG.grd.rec.g_shed, home: WG.ground && WG.ground.grd, flag: WG.soccer,
+          save.WG.notice = { boards: { rimewatch: { week: 0, list: [{ id: 'nb1', city: 'rimewatch', region: 'rime', t: 'sport', sport: 'curling' }, { id: 'nb2', city: 'rimewatch', region: 'rime', t: 'sport', sport: 'hockey' }] } },
+            taken: [{ id: 'nt1', city: 'rimewatch', region: 'rime', t: 'margin', sport: 'curling', n: 2 }, { id: 'nt2', city: 'saltmere', region: 'tide', t: 'margin', sport: 'curling', n: 2 }], done: 0, lapsed: 0 };
+          wStart(save); return { taken: WG.notice.taken.map(c => c.id), board: WG.notice.boards.rimewatch.list.map(c => c.id), rec: !!WG.grd.rec.g_sheet, shed: !!WG.grd.rec.g_shed, home: WG.ground && WG.ground.grd, flag: WG.soccer,
             log: WLOG.some(l => String(l[0]).includes('Hoarfrost Pitch')) }; })()""")
         check(old['rec'] is False and old['shed'] is True and old['flag'] == 1, 'an older save loses its curling record at the pitch, once, and keeps the rest', old)
         check(old['home'] == 'g_sheet' and old['log'], 'a home ground there stays yours, and the log says what changed', old)
+        check(old['taken'] == ['nt2'] and old['board'] == ['nb2'], 'curling contracts in the Frostspire come down (taken and on the board); Saltmere\'s stay', old)
         again = await pg.evaluate("(() => { WG.grd.rec.g_sheet = { w: 1, l: 0, last: null }; wStart(JSON.parse(JSON.stringify({ WG, RUN }))); return !!WG.grd.rec.g_sheet; })()")
         check(again, 'after that, a soccer record there is kept')
 

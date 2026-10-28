@@ -36,7 +36,6 @@ function sportAtkBonus(e) {
   let d = add(t > 0 ? t : 0, MOM_NAME[t]);
   if (B.sport === 'baseball') d += add(Math.min(3, B.sc.bases.filter(Boolean).length), 'Runners on');   // runners on: pressure
   if (B.sport === 'football' && B.yards >= 75) d += add(2, 'Red zone');                                // the red zone
-  if (B.sport === 'soccer' && (B.sc.passes || 0) >= SOCCER.passes) d += add(Math.min(SOCCER.cap, B.sc.passes), 'Passes');        // the shot after the passes
   return d;
 }
 function sportEnemyBonus() {
@@ -45,6 +44,8 @@ function sportEnemyBonus() {
   if (B.sport === 'football' && B.yards <= 10) d += 1;                               // pinned deep
   return d;
 }
+// soccer: what the passes add to a shot (atkDmg gives it to the shot's first hit only, B.passHit)
+const passBonus = () => B && B.sc && B.sport === 'soccer' && (B.sc.passes || 0) >= SOCCER.passes ? Math.min(SOCCER.cap, B.sc.passes) : 0;
 const sportDrawBonus = () => (B && B.sc && momTier() === -2 ? 1 : 0);
 function sportTurnBegin() {
   // curling: every stone already in the house guards you
@@ -254,7 +255,8 @@ function sportBadge(card, tgt) {
 }
 // rough damage forecast (no dice): per target and total
 function estDamage(card, tgt) {
-  const d = def(card), out = { total: 0, top: 0, blk: 0, per: {} };
+  const d = def(card), out = { total: 0, top: 0, blk: 0, per: {} }, ph = B.passHit; B.passHit = 0; // the estimate is one whole card
+  try {
   const add = (e, n) => { if (!e || e.dead) return; const after = d.pierce ? n : Math.max(0, n - e.block); out.per[e.uid] = (out.per[e.uid] || 0) + after; out.total += after; out.top = Math.max(out.top, out.per[e.uid]); };
   const walk = ops => { for (const o of ops) {
     const scope = o[3] || d.tgt;
@@ -268,6 +270,7 @@ function estDamage(card, tgt) {
     else if (o[0] === 'bones') out.blk += Math.min(36, o[1] * B.draw.length);
   } };
   walk(d.fx);
+  } finally { B.passHit = ph; }
   out.total = Math.round(out.total);
   return out;
 }
