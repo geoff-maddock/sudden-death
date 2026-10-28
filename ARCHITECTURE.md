@@ -186,6 +186,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w36-gate.js` | Gate money at the grounds (issue #6, open question 4): no fee to play; a win at a card-game ground takes `W_TAKE.per` gold a tier (Friendly 5, Challenge 6) times your name in the region (`wTake`), shown on the keeper's and pre-game cards. |
 | `w37-map.js` | The map of the realm: `M`, a Map button beside the Journal, or Map on the Menu opens the world drawn in ink. Fog of war: tiles within `W_MAP.see` of your team are revealed as you walk and stay revealed (`WG.fog`). Places get a mark once seen and a bold name once visited. |
 | `w38-soccer.js` | Soccer at Rimewatch (issue #10): the Rimewatch Sheet is the Hoarfrost Pitch (`g_sheet`, soccer, in `w21-grounds.js`), and an older save clears its curling record there once (`WG.soccer`). |
+| `w39-retire.js` | Retire a card at your home ground: once a week, a card leaves your deck for `W_RETIRE.energy` energy of your home region's element (`WG.ground.retired`). The vendors' gold trade is unchanged. How to play explains both. |
 
 ### Brimstone Diamond (`src/bd/`)
 

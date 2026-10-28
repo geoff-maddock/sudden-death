@@ -29,7 +29,7 @@ function deckSummary() {
     <span style="display:flex;gap:8px;align-items:flex-end">Curve <span class="curve">${curve.map((v, k) => `<span style="height:${Math.max(3, 30 * v / mx)}px" title="${v} cards costing ${k}${k === 3 ? '+' : ''}"><i>${k}${k === 3 ? '+' : ''}</i></span>`).join('')}</span></span></div>`;
 }
 function cardChoiceRow(list, attr) {
-  return `<div class="cardrow">${list.map((c, i) => `<div class="ware">${cardHTML(Object.assign({ uid: attr + i }, c), { attrs: `data-${attr}="${i}"` })}<div class="fit${cardFit(c.id).length ? '' : ' dim'}">${cardFit(c.id).map(esc).join('<br>') || '&nbsp;'}</div></div>`).join('')}</div>`;
+  return `<div class="cardrow">${list.map((c, i) => `<div class="ware">${cardHTML(Object.assign({ uid: attr + i }, c), { attrs: `data-${attr}="${i}"` })}<div class="fit${cardFit(c.id).length ? '' : ' dim'}">${cardFit(c.id).map(esc).join('<br>') || '&nbsp;'}</div>${inDeckHTML(c.id)}</div>`).join('')}</div>`;
 }
 function renderReward() {
   const P = RUN.panel, rw = P.rw, el = $('v-panel');
@@ -82,7 +82,7 @@ function renderShop() {
   const body = $('pbody');
   const affordable = p => RUN.gold >= p;
   body.innerHTML = `<div class="shopgrid">
-    <div><h4>Cards</h4><div class="cardrow">${S.cards.map((w, i) => `<div class="ware${w.sold ? ' sold' : ''}">${cardHTML({ uid: 's' + i, id: w.id }, { attrs: `data-buy-card="${i}"`, flav: false })}<div class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</div></div>`).join('')}</div></div>
+    <div><h4>Cards</h4><div class="cardrow">${S.cards.map((w, i) => `<div class="ware${w.sold ? ' sold' : ''}">${cardHTML({ uid: 's' + i, id: w.id }, { attrs: `data-buy-card="${i}"`, flav: false })}<div class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</div>${inDeckHTML(w.id)}</div>`).join('')}</div></div>
     <div><h4>Trophies</h4><div class="items">${S.relics.map((w, i) => `<button class="item${w.sold ? ' sold' : ''}" data-buy-relic="${i}" ${affordable(w.price) ? '' : 'aria-disabled="true"'}>${relicI(w.id)}<span><b>${esc(RELICS[w.id].n)}</b></span><small>${esc(RELICS[w.id].desc)}</small><span class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</span></button>`).join('')}</div></div>
     <div><h4>Tonics</h4><div class="items">${S.tonics.map((w, i) => `<button class="item${w.sold ? ' sold' : ''}" data-buy-tonic="${i}">${flaskI(TONICS[w.id].col)}<span><b>${esc(TONICS[w.id].n)}</b></span><small>${esc(TONICS[w.id].desc)}</small><span class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</span></button>`).join('')}
       <button class="item${S.removed ? ' sold' : ''}" id="bRemove">${svgI('<path d="M6 6l12 12M18 6L6 18" stroke="#e0533a" stroke-width="3"/>')}<span><b>Trade a card away</b></span><small>Remove one card from your deck.</small><span class="price${affordable(RUN.removeCost) ? '' : ' no'}">${RUN.removeCost} gold</span></button>
@@ -139,7 +139,7 @@ function renderEvent() {
   $('bEvDone').onclick = () => { if (P.then && P.then.relic) { gainRelic(P.then.relic); } backToMap(); };
   if (!T) return;
   if (T === 'remove' || T === 'upgrade') { box.innerHTML = `<button class="ghost" id="bThen">${T === 'remove' ? 'Choose a card to remove' : 'Choose a card to upgrade'}</button>`; $('bThen').onclick = () => pickFromDeck(T, c => { if (c) { P.then = null; saveRun(); renderEvent(); } }); }
-  else if (T.cards) { box.innerHTML = `<div class="cardrow">${T.cards.map((c, i) => cardHTML(Object.assign({ uid: 'e' + i }, c), { attrs: `data-ec="${i}"` })).join('')}</div>${T.cards.length > 1 ? '<p class="hint">Pick one.</p>' : '<p class="hint">Click it to add it to your deck.</p>'}`; box.querySelectorAll('[data-ec]').forEach(el => el.onclick = () => { const c = T.cards[+el.dataset.ec]; RUN.deck.push(mkCard(c.id, c.up)); P.then = null; saveRun(); sfx.card(); renderEvent(); renderRunBar(); }); }
+  else if (T.cards) { box.innerHTML = `<div class="cardrow">${T.cards.map((c, i) => `<div class="ware">${cardHTML(Object.assign({ uid: 'e' + i }, c), { attrs: `data-ec="${i}"` })}${inDeckHTML(c.id)}</div>`).join('')}</div>${T.cards.length > 1 ? '<p class="hint">Pick one.</p>' : '<p class="hint">Click it to add it to your deck.</p>'}`; box.querySelectorAll('[data-ec]').forEach(el => el.onclick = () => { const c = T.cards[+el.dataset.ec]; RUN.deck.push(mkCard(c.id, c.up)); P.then = null; saveRun(); sfx.card(); renderEvent(); renderRunBar(); }); }
   else if (T.relic) { box.innerHTML = `<button class="reward" id="bTR">${relicI(T.relic)}<span><b>${esc(RELICS[T.relic].n)}</b><small>${esc(RELICS[T.relic].desc)}</small></span></button>`; $('bTR').onclick = () => { gainRelic(T.relic); P.then = null; saveRun(); renderEvent(); renderRunBar(); }; }
 }
 

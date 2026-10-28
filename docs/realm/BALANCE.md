@@ -307,3 +307,7 @@ The first rule (a shot after 3 passes, their goal at 5+ through Block) gave socc
 The champion rate doesn't move. The Frostspire costs a little more, because soccer replaced curling there, and curling is one of the bot's easiest sports. The soccer run had one stall, a Brinefen wild match against `grinder` (bowling or curling, not soccer).
 
 **After the review fixes** (the pass bonus once per shot, the Harpy Striker elite, the Penalty Spot, the Golden Boot), 300 runs each, side by side: `main` 24.0% run wins and 32.3% deaths in Act 1, this branch 22.0% and 35.7%, with soccer's sports-win rate at 53%. One earlier 300-run sample of the branch gave 17.3%; the side-by-side rerun puts that down to noise.
+
+## Retiring a card at your home ground
+
+The balance bot retires a basic card (Body Check or Hold the Line) once a week when it can (`opts.retire`). Over 140 journeys each, `main` was champion 79.3% of the time, and with retiring 85.7%. That's about 1.3 standard errors at this sample size, so part of it may be noise. Thinner decks should help, though, and 3 energy a week may be cheap; `W_RETIRE.energy` is the value to raise.

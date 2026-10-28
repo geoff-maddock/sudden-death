@@ -519,3 +519,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **The ground.** `g_sheet` keeps its id and is now the Hoarfrost Pitch, a soccer ground (`W_GRDS` in `w21-grounds.js`): Sister Hogline keeps it, its field art is `wGrdArt` case `soccer`, and it is outdoors (not in `W_GRD_INDOOR`), so a blizzard reaches it. `DB.regions.rime.sports = [['hockey', 3], ['soccer', 2]]`. The squad rule is `W_GRD_SQUAD.soccer = 5` ("eleven a side: five of your own, and call-ups fill the rest"). The spot `sp_maker` is the kick-about wall (soccer). `W_NOTICE.margin.soccer = 2`.
 - **Old saves.** `wStart` (wrapped as `wW38Start`): when `WG.soccer !== 1`, `WG.grd.rec.g_sheet` (a curling record) is deleted with a log line, and `WG.soccer = 1`. A home ground at `g_sheet` and fixtures drawn there carry over and play as soccer.
 - **The rule** is Sudden Death's (`SPORTS.soccer`, `src/engine/sports.js`): `B.sc.passes`, `B.sc.saves`, `B.sc.eh`/`B.sc.et` (the enemy turn's hits, and whether any got through), `B.sc.keep` (a pass to start the next turn), all plain numbers.
+
+## Retiring a card (w39-retire.js)
+
+- **The rule.** `wRetireCard(card)`: at your home ground, once a week (`WG.ground.retired = wWeek()`), for `W_RETIRE.energy` (3) energy of `REGION_ELEM[wHomeRegion()]`, and never below `W_RETIRE.minDeck` (5) cards. `wRetireProblems()` says why not, in a sentence. It doesn't touch `RUN.removeCost`, the card vendors' gold price.
+- **Shown** on the ground's screen (`#wGroundRetire`, `wOpenGround` wrapped), and in How to play (`#wHelpRetire` in the home ground section, `#wHelpTrade` for the vendors' trade in Towns).
+- **Copies in your deck.** `inDeckHTML(id)` (Sudden Death, `src/ui/card-faces.js`) writes "In your deck: N" or "Not in your deck" under a card on offer: the card choices (`cardChoiceRow`, which the Realm's picks use too), the pro shop, an event's cards, and the Realm's card vendors.
