@@ -19,7 +19,7 @@ function showPage(p) {
 }
 
 /* ---------- title ---------- */
-const TITLE = { club: pick(CLUB_IDS), sports: ['football', 'baseball', 'hockey', 'basketball', 'bowling', 'jousting'], i: 0, t0: 0 };
+const TITLE = { club: pick(CLUB_IDS), sports: ['football', 'baseball', 'hockey', 'soccer', 'basketball', 'bowling', 'jousting'], i: 0, t0: 0 };
 TITLE.party = shuffle(CLUBS[TITLE.club].roster.slice()).slice(0, 3);
 function drawTitle(c) {
   const k = (A.t - TITLE.t0); if (k > 5) { TITLE.i = (TITLE.i + 1) % TITLE.sports.length; TITLE.t0 = A.t; }

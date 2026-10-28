@@ -133,10 +133,10 @@ async def main():
 
         # ---------- match days ----------
         md = await pg.evaluate("""(() => { const L = wLeague(); L.next = { day: WG.dayAbs + 1, games: [{ a: wLeagueClubs()[0], b: wLeagueClubs()[1], g: 'g_rink' }, { a: wLeagueClubs()[2], b: 'me', g: 'g_bowl' }] };
-          L.results.unshift({ day: WG.dayAbs, a: wLeagueClubs()[3], b: wLeagueClubs()[4], sport: 'curling', sa: null, sb: null, g: 'g_sheet' });
+          L.results.unshift({ day: WG.dayAbs, a: wLeagueClubs()[3], b: wLeagueClubs()[4], sport: 'soccer', sa: null, sb: null, g: 'g_sheet' });
           const lines = new Set(); for (let i = 0; i < 40; i++) lines.add(wMatchDayLine('rimewatch'));
           return { rime: [...lines], cind: wMatchDayLine('cinderhold'), salt: wMatchDayLine('saltmere') }; })()""")
-        check(any('poster' in l and 'Pond Rink' in l and 'tomorrow' in l for l in md['rime']) and any('Rimewatch Sheet' in l and 'beat' in l for l in md['rime']), 'Rimewatch talks of tomorrow\'s game at the rink and today\'s result at the sheet', md['rime'])
+        check(any('poster' in l and 'Pond Rink' in l and 'tomorrow' in l for l in md['rime']) and any('Hoarfrost Pitch' in l and 'beat' in l for l in md['rime']), 'Rimewatch talks of tomorrow\'s game at the rink and today\'s result at the sheet', md['rime'])
         check(md['cind'] == '' and md['salt'] == '', 'your own fixture is not on the posters; no games, no talk', md)
 
         # ---------- an old save ----------

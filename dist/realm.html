@@ -1938,7 +1938,7 @@ K('penalty', 'Ejection Notice', 'none', 'curse', -1, 'x', 'self', [], { endHurt:
 
 const KIND_CARDS = {}; for (const c of Object.values(CARDS)) { (KIND_CARDS[c.kind] = KIND_CARDS[c.kind] || []).push(c.id); }
 const SIG = {}; for (const c of Object.values(CARDS)) if (c.rar === 's' && c.kind !== 'any') SIG[c.kind] = c.id;
-const SPORT_NAME = { baseball: 'Baseball', football: 'Football', hockey: 'Hockey', basketball: 'Basketball', golf: 'Golf', bowling: 'Bowling', jousting: 'Jousting', curling: 'Curling', boxing: 'Boxing' };
+const SPORT_NAME = { baseball: 'Baseball', football: 'Football', hockey: 'Hockey', basketball: 'Basketball', golf: 'Golf', bowling: 'Bowling', jousting: 'Jousting', curling: 'Curling', boxing: 'Boxing', soccer: 'Soccer' };
 
 /* ---------- upgrades: one pass in the film room ---------- */
 function upFx(fx) {
@@ -2006,6 +2006,7 @@ const RELICS = {
   oldball: { n: 'Signed Game Ball', rar: 'u', desc: 'At the start of each fight, deal 3 damage to all enemies.', ico: 'ball' },
   tooth: { n: 'Mimic Tooth', rar: 'c', desc: 'Raise max HP by 8 when picked up.', ico: 'tooth', gain: r => { r.maxhp += 8; r.hp += 8; } },
   cupreplica: { n: 'Black Ice Cup (replica)', rar: 'u', desc: 'Card rewards offer one more card.', ico: 'cup' },
+  goldenboot: { n: 'Golden Boot', rar: 'u', desc: 'In soccer, start every turn with a pass already made.', ico: 'ball' },
   bowling: { n: 'Bowling Ball of Doom', rar: 'u', desc: 'The first Attack you play each fight deals 8 more damage per hit.', ico: 'ball' },
   jersey: { n: 'Lucky Jersey', rar: 'r', desc: 'Once per fight, the first time you would die, heal to 15 HP instead.', ico: 'jersey' },
   playbook: { n: 'Coach’s Playbook', rar: 'r', desc: 'Draw 1 extra card each turn.', ico: 'book' },
@@ -2061,6 +2062,7 @@ KX('ply_break', 'Fast Break', 'any', 'play', 1, 'c', 'one', [['d', 5], ['draw', 
 KX('ply_heave', 'Full-Court Heave', 'any', 'play', 2, 'u', 'one', [['roll', 11, [['d', 24]], [['d', 4]]]], { sport: 'basketball', home: [['nrg', 1]] });
 KX('ply_mulligan', 'Mulligan', 'any', 'play', 0, 'u', 'self', [['audible']], { sport: 'golf', home: [['freestroke']], fl: 'That one didn’t count.' });
 KX('ply_split', 'Seven-Ten Split', 'any', 'play', 2, 'r', 'all', [['split', 12]], { sport: 'bowling', home: [['nrg', 1]], fl: 'Hits the two at the ends.' });
+KX('ply_onetouch', 'One-Touch', 'any', 'play', 1, 'u', 'one', [['d', 4]], { sport: 'soccer', home: [['passes', 2]], fl: 'The ball never stops.' });
 KX('ply_tilt', 'Shatter the Lance', 'any', 'play', 1, 'u', 'one', [['d', 9]], { sport: 'jousting', home: [['lance']] });
 // gear — stays in play with charges
 KX('gr_pads', 'Goalie Pads', 'any', 'gear', 1, 'u', 'self', [['s', 'pads', 3, 'self']], { sport: 'hockey' });
@@ -2184,6 +2186,7 @@ const TROPHY_FX = {
   rallycap: { on: { turnEnd: () => { if (RUN.hp < RUN.maxhp / 2) gainBlock(6, true); } } },
   ring: { on: { turnEndHeal: () => healP(1) } },
   jersey: { on: { lethal: () => { if (B.jersey) return; B.jersey = true; RUN.hp = 15; fx({ k: 'banner', t: 'Lucky Jersey', sub: 'Back on your feet at 15 HP' }); log('The Lucky Jersey holds. 15 HP.', 'good'); return true; } } },
+  goldenboot: { mod: { passes: () => B.sport === 'soccer' ? 1 : 0 } },
   bowling: { mod: { atk: () => B.bowlUsed ? 0 : 8 }, on: { attackPlayed: () => { B.bowlUsed = true; } } },
   foam: { on: { attackPlayed: () => { if (B.atkCount % 3 === 0) { for (const e of alive()) hurtEnemy(e, 5, { raw: true }); log('The crowd goes wild: 5 damage to every enemy.', 'good'); } } } },
   luckstone: { mod: { d20: 2 } },
@@ -2204,12 +2207,13 @@ const SPORTS = {
   bowling: { n: 'Bowling', rule: 'Pins', desc: 'Knock the whole lineup down in a single turn for a strike: heal 10. A strike by your fourth turn is a sports win.' },
   jousting: { n: 'Jousting', rule: 'The lists', desc: 'The first Attack you play each turn is a tilt and deals double damage. A tilt that deals 12+ shatters a lance: a point. Every enemy hit that gets through your Block is a point for them. Outscore them for a sports win.' },
   curling: { n: 'Curling', rule: 'Sweep', desc: 'At the end of your turn, each card left in hand gives 2 Block. End a turn with 12+ Block and your stone is in the house: a point, and every stone in the house gives you 2 Block at the start of each turn. Every enemy hit that gets through your Block is a point for them. Outscore them for a sports win.' },
+  soccer: { n: 'Soccer', rule: 'Pass and move', desc: 'Every card you play is a pass. An Attack with 2+ passes behind it is a shot: its first hit gets +1 damage per pass (up to 6), and 10+ damage on one enemy is a goal (draw a card). Scored or saved, the passes start again, and they start again every turn. An enemy hit that gets 6+ through your Block is a goal for them. Block every hit in their turn and it is a goal prevented: your next turn starts with a pass. Outscore them for a sports win.' },
   boxing: { n: 'Boxing', rule: 'The bell', desc: 'Each turn is a round, scored on the damage each side throws (blocked punches still count for them). Win more rounds than you lose for a sports win. Take a round by 15+ damage and they are rocked (Weak); lose one by 15+ and you are. Every third turn the bell rings: heal 4 and shake off Weak and Exposed. Win by knockout in three rounds for a highlight.' },
 };
 const ACT_SPORTS = [
-  { baseball: 5, football: 2, basketball: 2, hockey: 2, golf: 1, bowling: 1, curling: 1 },
-  { hockey: 5, football: 3, basketball: 2, baseball: 2, jousting: 1, curling: 1, boxing: 1 },
-  { football: 5, basketball: 3, hockey: 3, baseball: 2, jousting: 1, bowling: 1, boxing: 1, golf: 1 },
+  { baseball: 5, football: 2, basketball: 2, hockey: 2, soccer: 2, golf: 1, bowling: 1, curling: 1 },
+  { hockey: 5, football: 3, basketball: 2, baseball: 2, soccer: 2, jousting: 1, curling: 1, boxing: 1 },
+  { football: 5, basketball: 3, hockey: 3, soccer: 3, baseball: 2, jousting: 1, bowling: 1, boxing: 1, golf: 1 },
 ];
 function wpick(w) { let t = 0; for (const k in w) t += w[k]; let r = R() * t; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return Object.keys(w)[0]; }
 
@@ -2244,6 +2248,7 @@ EN('grinder', 'Troll Grinder', 'troll', [64, 70], { club: { n: 'Tree Trunk', ops
 EN('netspider', 'Spider Netminder', 'spider', [44, 48], { web: { n: 'Web', ops: [['p', 'weak', 2], ['b', 10]] }, fang: { n: 'Venom Fang', ops: [['a', 7], ['p', 'psn', 3]] }, check: { n: 'Eight-Arm Check', ops: [['a', 12]] } }, { rand: { web: 1, fang: 2, check: 2 } }, { flav: 'Eight pads. Four gloves.' });
 EN('drow', 'Drow Sniper', 'drow', [34, 38], { aim: { n: 'Line Up the Shot', ops: [['b', 8], ['s', 'str', 2]] }, arrow: { n: 'Top Shelf', ops: [['a', 15]] } }, { seq: ['aim', 'arrow'] }, { flav: 'Sees in the dark. Scores in it.' });
 EN('bullpen', 'Bull Pen Minotaur', 'minotaur', [96, 100], { gore: { n: 'Gore', ops: [['a', 14], ['p', 'vuln', 1]] }, paw: { n: 'Paws the Ice', ops: [['s', 'str', 3], ['b', 10]] }, stamp: { n: 'Stampede', ops: [['a', 26]] } }, { seq: ['gore', 'paw', 'stamp'] }, { elite: 1, flav: 'Through the boards. Through the next boards.' });
+EN('striker', 'Gale, the Harpy Striker', 'harpy', [88, 94], { onetwo: { n: 'One-Two', ops: [['a', 7, 2]] }, bus: { n: 'Park the Bus', ops: [['b', 16], ['s', 'str', 2]] }, volley: { n: 'Top-Corner Volley', ops: [['a', 22]] } }, { seq: ['onetwo', 'bus', 'volley'] }, { elite: 1, sport: 'soccer', flav: 'Never touches the ball with her hands. Has no hands.' });
 EN('mascot', 'The Mascot', 'mimic', [86, 92], { hide: { n: 'Just a Treasure Chest', ops: [['b', 24]] }, chomp: { n: 'Chomp', ops: [['a', 22]] }, lick: { n: 'Big Sloppy Lick', ops: [['p', 'weak', 2], ['p', 'vuln', 2]] } }, { seq: ['chomp', 'lick', 'chomp'], first: 'hide' }, { elite: 1, gold: 60, flav: 'Everybody loves the mascot. The mascot loves everybody. With its teeth.' });
 EN('cube', 'The Gelatinous Goaltender', 'cube', [240, 240], { engulf: { n: 'Engulf', ops: [['engulf', 2], ['b', 10]] }, slam: { n: 'Pad Stack', ops: [['a', 21]] }, jiggle: { n: 'Jiggle', ops: [['a', 7, 3]] }, save: { n: 'Glove Save', ops: [['b', 24], ['s', 'str', 2]] } }, { seq: ['engulf', 'slam', 'jiggle', 'save', 'slam'] }, { boss: 1, sport: 'hockey', team: { name: 'Rimegrave Wardens', short: 'RIM', color: '#3fbf9f', light: '#bff7e3' }, flav: 'Stops everything. Keeps everything.' });
 // act 3 — the Brimstone Pit
@@ -2266,10 +2271,10 @@ const QUARTER_SPORT = ['baseball', 'football', 'hockey', 'basketball'];
 
 const ENCOUNTERS = [
   { easy: [['cheer', 'cheer'], ['skelss'], ['thief'], ['ooze']], normal: [['cheer', 'cheer', 'cheer'], ['skelss', 'thief'], ['lb'], ['ooze', 'ooze'], ['ghoul', 'cheer'], ['thief', 'thief'], ['lb', 'cheer'], ['ghoul', 'ghoul']], elite: [['gorlak'], ['moonbat']], boss: ['argus'] },
-  { easy: [['winger'], ['harpyf', 'harpyf'], ['drow']], normal: [['winger', 'harpyf'], ['enforcer'], ['witchd', 'winger'], ['grinder'], ['netspider', 'harpyf'], ['drow', 'drow'], ['enforcer', 'drow'], ['witchd', 'harpyf']], elite: [['bullpen'], ['mascot']], boss: ['cube'] },
+  { easy: [['winger'], ['harpyf', 'harpyf'], ['drow']], normal: [['winger', 'harpyf'], ['enforcer'], ['witchd', 'winger'], ['grinder'], ['netspider', 'harpyf'], ['drow', 'drow'], ['enforcer', 'drow'], ['witchd', 'harpyf']], elite: [['bullpen'], ['mascot'], ['striker']], boss: ['cube'] },
   { easy: [['gorgpg'], ['imp', 'imp'], ['bugbear']], normal: [['lichoc'], ['gorgpg', 'imp'], ['golemnt'], ['hob', 'imp', 'imp'], ['bugbear'], ['lichoc', 'imp'], ['gorgpg', 'hob'], ['imp', 'imp', 'imp'], ['bugbear', 'imp'], ['golemnt', 'imp']], elite: [['champ'], ['matriarch']], boss: ['baron'] },
 ];
-const SPORT_BRIEF = { baseball: 'Hits score runs, and runs hurt every enemy. Score more than they do.', football: 'Damage gains yards; touchdowns and field goals hit every enemy.', hockey: 'Put 12+ on one enemy to score. Half your Block slides over.', basketball: 'Attacks score baskets; the third one sets you On Fire.', golf: 'Make par: 1 turn plus 1 per enemy.', bowling: 'Drop the whole lineup in one turn for a strike.', jousting: 'Your first Attack each turn is a tilt: double damage.', curling: 'Leftover cards give Block; end a turn with 12+ to score.', boxing: 'Win the rounds. The bell heals you every third turn.' };
+const SPORT_BRIEF = { baseball: 'Hits score runs, and runs hurt every enemy. Score more than they do.', football: 'Damage gains yards; touchdowns and field goals hit every enemy.', hockey: 'Put 12+ on one enemy to score. Half your Block slides over.', basketball: 'Attacks score baskets; the third one sets you On Fire.', golf: 'Make par: 1 turn plus 1 per enemy.', bowling: 'Drop the whole lineup in one turn for a strike.', jousting: 'Your first Attack each turn is a tilt: double damage.', curling: 'Leftover cards give Block; end a turn with 12+ to score.', boxing: 'Win the rounds. The bell heals you every third turn.', soccer: 'Every card is a pass. After two, an Attack is a shot: 10+ on one enemy scores.' };
 /* p3b: the bosses. Three per act, one drawn at random each run. Each has a brain that reads the fight,
    phases that change it at half health (or lower), and signature effects (vfx) for the arena. */
 Object.assign(ST, {
@@ -2434,6 +2439,7 @@ const SPORT_GLYPH = {
   jousting: '<path d="M3 21L17 7" stroke="#c9a36a" stroke-width="2.4" stroke-linecap="round"/><path d="M15 5l5-2-2 5z" fill="#efe4cc" stroke="#21160f"/><path d="M6 15l3 3" stroke="#21160f" stroke-width="3"/>',
   curling: '<ellipse cx="12" cy="16" rx="8" ry="4" fill="#8a8a92" stroke="#21160f" stroke-width="1.4"/><path d="M12 12V7h5" fill="none" stroke="#e0533a" stroke-width="2.2" stroke-linecap="round"/>',
   boxing: '<path d="M7 9c0-3 2-5 6-5s6 3 6 7c0 3-1 5-3 6v3H9v-3c-2-1-2-3-2-5z" fill="#c2264a" stroke="#21160f" stroke-width="1.4"/><path d="M7 11c-2 0-3 1-3 2s1 2 3 2" fill="#c2264a" stroke="#21160f" stroke-width="1.2"/>',
+  soccer: '<circle cx="12" cy="12" r="8" fill="#f2ead8" stroke="#21160f" stroke-width="1.5"/><path d="M12 8.2l3 2.2-1.1 3.5h-3.8L9 10.4z" fill="#21160f"/><path d="M12 8.2V4.4M15 10.4l3.6-1.2M13.9 13.9l2.2 3M10.1 13.9l-2.2 3M9 10.4l-3.6-1.2" stroke="#21160f" stroke-width="1.1"/>',
 };
 const sportSVG = (s, size = 18) => SPORT_GLYPH[s] ? `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${SPORT_GLYPH[s]}</svg>` : '';
 const ACT_HOME = ['baseball', 'hockey', 'football'];
@@ -2461,14 +2467,15 @@ const PRACTICE = {
   jousting: 'Shatters a lance at 9+ damage.',
   curling: 'Each practiced Skill this turn lowers the house to 3 less Block (down to 6).',
   boxing: 'Damage counts 50% more on the judges’ cards.',
+  soccer: 'Scores a goal at 8+ damage.',
 };
 const practicable = c => !c.sk && !['junk', 'curse', 'status'].includes(CARDS[c.id].type);
 const SKT = c => {
   const T = c && c.sk
-    ? { hit: 1, yards: 1.5, goal: 9, pp: 5, bk: 6, three: 10, threeAny: true, drive: 14, lance: 9, box: 1.5, bowl: 2 }
-    : { hit: 0, yards: 1, goal: 12, pp: 6, bk: 8, three: 12, threeAny: false, drive: 20, lance: 12, box: 1, bowl: 0 };
+    ? { hit: 1, yards: 1.5, goal: 9, pp: 5, bk: 6, three: 10, threeAny: true, drive: 14, lance: 9, box: 1.5, bowl: 2, kick: 8 }
+    : { hit: 0, yards: 1, goal: 12, pp: 6, bk: 8, three: 12, threeAny: false, drive: 20, lance: 12, box: 1, bowl: 0, kick: 10 };
   // an enemy Stopper makes every way of scoring harder
-  if (typeof perkOn === 'function' && perkOn('stopper')) { T.hit -= 1; T.yards *= .75; T.goal += 3; T.pp += 2; T.bk += 3; T.three += 3; T.drive += 4; T.lance += 3; T.box *= .8; }
+  if (typeof perkOn === 'function' && perkOn('stopper')) { T.hit -= 1; T.yards *= .75; T.goal += 3; T.pp += 2; T.bk += 3; T.three += 3; T.drive += 4; T.lance += 3; T.box *= .8; T.kick += 3; }
   return T;
 };
 function practiceTip() { return Object.entries(PRACTICE).map(([s, t]) => `<b>${SPORT_NAME[s]}</b>: ${t}`).join('<br>'); }
@@ -2499,6 +2506,12 @@ K('crl_button', 'Draw to the Button', 'any', 'skl', 2, 'u', 'self', [['b', 14]],
 K('crl_hammer', 'Last Rock', 'any', 'atk', 2, 'r', 'one', [['d', 10], ['b', 10]], { sport: 'curling', retain: 1, fl: 'You have the hammer.' });
 K('crl_broom', 'Broom Work', 'any', 'skl', 0, 'c', 'self', [['b', 3], ['draw', 1]], { sport: 'curling', fl: 'Heat the ice. Guide the stone.' });
 // boxing: steady damage and taking rounds
+// soccer: string cheap cards together as passes, then take the shot
+K('scr_tiki', 'Tiki-Taka', 'any', 'skl', 0, 'c', 'self', [['draw', 1]], { sport: 'soccer', fl: 'Short, short, short. Then shorter.' });
+K('scr_overlap', 'Overlapping Run', 'any', 'skl', 1, 'c', 'self', [['b', 5], ['draw', 1]], { sport: 'soccer', fl: 'Round the outside, every time.' });
+K('scr_through', 'Through Ball', 'any', 'atk', 1, 'c', 'one', [['d', 8]], { sport: 'soccer', fl: 'Split the back line.' });
+K('scr_volley', 'Volley', 'any', 'atk', 2, 'u', 'one', [['d', 12]], { sport: 'soccer', fl: 'Never let it bounce.' });
+K('scr_captain', 'Captain’s Armband', 'any', 'pow', 2, 'r', 'self', [['s', 'str', 2, 'self']], { sport: 'soccer', fl: 'Points, shouts, wins the toss.' });
 K('box_jab', 'Jab', 'any', 'atk', 0, 'c', 'one', [['d', 4]], { sport: 'boxing', fl: 'Keep it working.' });
 K('box_onetwo', 'One-Two', 'any', 'atk', 1, 'c', 'one', [['d', 5, 2]], { sport: 'boxing', fl: 'Textbook.' });
 K('box_clinch', 'Clinch', 'any', 'skl', 1, 'c', 'one', [['b', 7], ['s', 'weak', 1]], { sport: 'boxing', fl: 'Tie them up. Catch your breath.' });
@@ -2527,6 +2540,7 @@ function sportFits(d) {
   if (blk >= 6) { add('football', 3); add('curling', 3); }
   if (d.retain) add('curling', 3);
   if (draw) add('golf', 2);
+  if (d.cost === 0 || draw) add('soccer', 3);                 // cheap cards and draw keep the passes going
   if (top >= 14) add('football', 2);
   return Object.entries(score).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => s);
 }
@@ -2796,6 +2810,7 @@ function atkDmg(base, e, card, extra = 0) {
   if (card && def(card).type === 'atk') {
     d += add(sv(P, 'luckybat') ? 4 : 0, 'Lucky Bat');
     d += sportAtkBonus(e);
+    if (!B.passHit) { const pb = passBonus(); if (pb) { d += add(pb, 'Passes'); B.passHit = 1; } } // soccer: the passes add to a shot once
     if (!B.inCard || !B.skyHit) { d += add(skyAtk(card), 'The sky'); if (B.inCard) B.skyHit = 1; } // the sky adds to a card's first hit only
     if (B.sport === 'basketball' && (sv(P, 'hot') || (!B.inCard && B.atkCount >= 2))) d += add(3, 'On Fire');
     d += add(sv(P, 'oop'), 'Alley-oop');
@@ -2812,8 +2827,8 @@ function atkDmg(base, e, card, extra = 0) {
 function dmgWhy(card, e) {
   const d = def(card), op = (d.fx || []).find(o => ['d', 'drain', 'dunk', 'drainall'].includes(o[0]));
   if (!op || !e) return null;
-  WHY = []; let n;
-  try { n = atkDmg(op[0] === 'dunk' && e.hp < e.max / 2 ? op[2] : op[1], e, card); } finally { var parts = WHY; WHY = null; }
+  WHY = []; let n; const ph = B.passHit; B.passHit = 0;
+  try { n = atkDmg(op[0] === 'dunk' && e.hp < e.max / 2 ? op[2] : op[1], e, card); } finally { var parts = WHY; WHY = null; B.passHit = ph; }
   return parts.length > 1 ? { parts, n, hits: op[0] === 'd' ? op[2] || 1 : 1 } : null;
 }
 function hurtEnemy(e, dmg, o = {}) {
@@ -2884,7 +2899,7 @@ function playCard(i, ti, opt = {}) {
   const comboHit = d.combo && B.lastType === d.combo.t;
   const momHit = d.mom && B.cardsThisTurn >= d.mom.n;
   B.cardBonus = d.grow ? (B.grow[card.uid] || 0) : 0;
-  B.who = ownerOf(card); credit('c', 1); B.curCard = card; B.skyHit = 0;
+  B.who = ownerOf(card); credit('c', 1); B.curCard = card; B.skyHit = 0; B.passHit = 0;
   B.curType = d.type;
   sportCardStart(d);
   const times = sv(B.P, 'double') && d.type !== 'pow' ? 2 : 1;
@@ -2983,7 +2998,7 @@ function resolve(ops, ctx) {
       case 'petrifyall': for (const e of alive()) { if (!isBoss(e) && e.hp <= e.max * op[1]) { fx({ k: 'say', e: e.uid, t: 'Turned to stone' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(op[2], e, ctx.card)); } break;
       case 'bonestorm': { const n = op[1] * B.discard.length; for (const e of alive()) hurtEnemy(e, atkDmg(n, e, ctx.card)); break; }
       case 'freeatk': B.freeAtk = true; log('Every Attack costs 0 for the rest of the turn.', 'good'); break;
-      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance':
+      case 'runners': case 'advance': case 'putOn': case 'yards': case 'ifyards': case 'td': case 'atkcount': case 'freestroke': case 'lance': case 'passes':
         sportOp(op, ctx); break;
     }
     if (checkWin()) return;
@@ -3012,13 +3027,16 @@ function useTonic(slot, ti) {
 }
 /* p4b: the sports layer. Every fight keeps score. Cards score by type and by how hard they hit;
    enemy attacks that get through your Block score for them. Win the fight AND the game for a sports win. */
-const SPORT_UNIT = { baseball: 1, football: 3, hockey: 1, basketball: 2, jousting: 1, curling: 1 };
+// soccer: passes needed for a shot, the most they add, and how much must get through your Block for their goal
+// (bot-tuned: 2 and 6 put soccer's sports-win rate with the major sports, 49% over 300 runs; 3 and 5 gave 34%)
+const SOCCER = { passes: 2, cap: 6, theirs: 6 };
+const SPORT_UNIT = { baseball: 1, football: 3, hockey: 1, basketball: 2, jousting: 1, curling: 1, soccer: 1 };
 const HIT_NAME = ['Out', 'Single', 'Double', 'Triple', 'Home run'];
 const hitBases = dmg => dmg <= 0 ? 0 : dmg < 10 ? 1 : dmg < 18 ? 2 : dmg < 25 ? 3 : 4;
 const PAR = 4;
 const parFor = () => 1 + (B.nStart || 1) + (B.type === 'elite' ? 2 : 0) + (B.type === 'boss' ? 5 : 0);
-const HL_NAME = { walkoff: 'Walk-off', grandslam: 'Grand slam', tdfinish: 'Game-winning touchdown', twotd: 'Two touchdowns', hattrick: 'Hat trick', shutout: 'Shutout', buzzer: 'Buzzer beater', thirty: 'Thirty-point night', eagle: 'Eagle', strike: 'Strike', unhorsed: 'Unhorsed', button: 'Three in the house', ko: 'Knockout' };
-function sportInit() { B.sc = { us: 0, them: 0, bases: [0, 0, 0], outs: 0, goals: 0, pts: 0, td: 0, lances: 0, stones: 0, free: 0, rounds: [0, 0], rd: [0, 0], hl: [], win: false, done: false }; B.yards = 20; }
+const HL_NAME = { walkoff: 'Walk-off', grandslam: 'Grand slam', tdfinish: 'Game-winning touchdown', twotd: 'Two touchdowns', hattrick: 'Hat trick', shutout: 'Shutout', buzzer: 'Buzzer beater', thirty: 'Thirty-point night', eagle: 'Eagle', strike: 'Strike', unhorsed: 'Unhorsed', button: 'Three in the house', ko: 'Knockout', golazo: 'Golazo', cleansheet: 'Clean sheet', brickwall: 'Brick wall' };
+function sportInit() { B.sc = { us: 0, them: 0, bases: [0, 0, 0], outs: 0, goals: 0, pts: 0, td: 0, lances: 0, stones: 0, free: 0, rounds: [0, 0], rd: [0, 0], hl: [], win: false, done: false, passes: 0, saves: 0 }; B.yards = 20; }
 const scored = () => !!SPORT_UNIT[B.sport];
 function cardHasDmg(d) { const has = ops => ops.some(o => ['d', 'drain', 'dunk', 'bodyslam', 'split', 'drainall', 'bonestorm', 'devour', 'petrify', 'petrifyall', 'execute'].includes(o[0]) || (o[0] === 'roll' && (has(o[2]) || has(o[3])))); return has(d.fx); }
 function cardValue(c) { const d = def(c); if (d.type === 'junk' || d.type === 'curse') return -10; return ({ s: 1, c: 2, u: 3, r: 4, l: 6 }[d.rar] || 1) + (c.up ? 1 : 0) - (d.id === 'check' || d.id === 'hold' ? 1 : 0); }
@@ -3027,7 +3045,7 @@ function scoreUs(n, what) { B.sc.us += n; credit('p', n); potg(what, n); fx({ k:
 function scoreThem(n) { if (n && perkOn('ace')) n *= 2; B.sc.them += n; fx({ k: 'score', side: 1, n }); momentumCheck(); }
 /* momentum: the score margin pushes the fight. Lead and your hits land harder; trail and theirs do,
    until you are far enough behind that desperation kicks in (Comeback: an extra card every turn). */
-const MOM = { baseball: [2, 4], football: [7, 14], hockey: [2, 3], basketball: [6, 12], jousting: [2, 3], curling: [2, 3], boxing: [1, 2] };
+const MOM = { baseball: [2, 4], football: [7, 14], hockey: [2, 3], basketball: [6, 12], jousting: [2, 3], curling: [2, 3], boxing: [1, 2], soccer: [2, 3] };
 const MOM_NAME = { 2: 'Rout', 1: 'Crowd on its feet', 0: 'Even game', '-1': 'Their momentum', '-2': 'Comeback mode' };
 const MOM_SUB = { 2: 'Your hits deal 2 more damage', 1: 'Your hits deal 1 more damage', 0: '', '-1': 'Their hits deal 1 more damage', '-2': 'Their hits deal 1 more, but you draw an extra card each turn' };
 function momMargin() { if (!B || !B.sc) return 0; if (B.sport === 'boxing') return B.sc.rounds[0] - B.sc.rounds[1]; if (B.sport === 'golf') return B.turn > parFor() ? -(B.turn - parFor()) * 7 : 0; return B.sc.us - B.sc.them; }
@@ -3053,6 +3071,8 @@ function sportEnemyBonus() {
   if (B.sport === 'football' && B.yards <= 10) d += 1;                               // pinned deep
   return d;
 }
+// soccer: what the passes add to a shot (atkDmg gives it to the shot's first hit only, B.passHit)
+const passBonus = () => B && B.sc && B.sport === 'soccer' && (B.sc.passes || 0) >= SOCCER.passes ? Math.min(SOCCER.cap, B.sc.passes) : 0;
 const sportDrawBonus = () => (B && B.sc && momTier() === -2 ? 1 : 0);
 function sportTurnBegin() {
   // curling: every stone already in the house guards you
@@ -3060,6 +3080,8 @@ function sportTurnBegin() {
   // golf: past par, the rough bites
   if (B.sport === 'golf' && B.turn > parFor()) { for (const e of alive()) addSt(e, 'str', 1); fx({ k: 'banner', t: 'In the rough', sub: 'Past par: every enemy gains 1 Strength', small: 1 }); momentumCheck(); }
   B.sc.basket = false; B.sc.played = 0; B.sc.curlP = 0;
+  // soccer: the passes start again, with one from the keeper after a save
+  if (B.sport === 'soccer') { B.sc.passes = (B.sc.keep ? 1 : 0) + mod('passes'); B.sc.keep = 0; }
 }
 function sportFoul(n) { if (scored()) { scoreThem(SPORT_UNIT[B.sport]); log(`The foul gives them ${SPORT_UNIT[B.sport]}.`, 'bad'); } }
 function splash(n, why) { for (const e of alive()) hurtEnemy(e, n, { raw: true, noScore: 1 }); }
@@ -3148,6 +3170,19 @@ function sportCardEnd(card, d, tgt) {
     case 'golf': if (top >= SKT(card).drive && B.sc.free < B.turn) { fx({ k: 'drive' }); B.sc.free++; fx({ k: 'banner', t: 'Long drive', sub: 'This turn does not count as a stroke', small: 1 }); } break;
     case 'boxing': B.sc.rd[0] += Math.round(C.dmg * SKT(card).box); break;
     case 'curling': if (card.sk && d.type !== 'atk') B.sc.curlP = (B.sc.curlP || 0) + 1; break;
+    case 'soccer': {
+      const n = B.sc.passes || 0;
+      if (d.type !== 'atk' || !dmgCard || n < SOCCER.passes) { B.sc.passes = n + 1; break; }
+      // a shot: the passes are spent, scored or saved
+      B.sc.passes = 0;
+      if (top >= SKT(card).kick) {
+        B.sc.goals++; scoreUs(1, 'goal');
+        fx({ k: 'banner', t: 'Goal', sub: n >= 6 ? `After ${n} passes: draw a card` : 'Draw a card', small: 1 }); log(`GOAL after ${n} passes! Draw a card.`, 'good'); drawCards(1);
+        if (n >= 6) addHL('golazo');
+        if (B.sc.goals >= 3) addHL('hattrick');
+      } else { fx({ k: 'say2', t: 'Saved' }); log('The shot is saved. The passes start again.', 'bad'); }
+      break;
+    }
   }
 }
 function sportOp(op, ctx) {
@@ -3161,13 +3196,16 @@ function sportOp(op, ctx) {
     case 'atkcount': B.atkCount += op[1]; if (B.sport === 'basketball' && B.atkCount >= 3 && !sv(B.P, 'hot')) { B.P.st.hot = 1; fx({ k: 'banner', t: 'He’s on fire', sub: '+3 damage per hit this turn', small: 1 }); } break;
     case 'freestroke': if (B.sport === 'golf') B.sc.free++; break;
     case 'lance': if (B.sport === 'jousting') { B.sc.lances++; scoreUs(1, 'lance'); } break;
+    case 'passes': if (B.sport === 'soccer') { B.sc.passes = (B.sc.passes || 0) + op[1]; fx({ k: 'say2', t: `+${op[1]} passes` }); } break;
   }
 }
 function sportEnemyHit(taken, raw) {
   if (B.sport === 'boxing') B.sc.rd[1] += raw;
+  if (B.sport === 'soccer') { B.sc.eh = (B.sc.eh || 0) + 1; if (taken > 0) B.sc.et = 1; } // for the save: hits, and whether any got through
   if (taken <= 0) return;
   if (B.sport === 'football') { B.yards = Math.max(0, B.yards - taken); if (taken >= 8) { scoreThem(3); if (perkOn('clutch') && B.turn >= 3) scoreThem(3); } return; }
   if (B.sport === 'hockey' && taken < 3) return;
+  if (B.sport === 'soccer' && taken < SOCCER.theirs) return;
   if (scored()) { scoreThem(SPORT_UNIT[B.sport]); if (perkOn('clutch') && B.turn >= 3) scoreThem(SPORT_UNIT[B.sport]); }
 }
 function sportTurnEnd() {
@@ -3183,6 +3221,15 @@ function sportTurnEnd() {
   }
 }
 function sportTurnStart() {
+  // soccer: an enemy turn of hits that all came off your Block is a goal prevented
+  if (B.sport === 'soccer' && B.turn > 1) {
+    if (B.sc.eh && !B.sc.et) {
+      B.sc.saves = (B.sc.saves || 0) + 1; B.sc.keep = 1;
+      fx({ k: 'banner', t: 'Goal prevented', sub: 'You blocked every hit: start this turn with a pass', small: 1 }); log('Goal prevented: every hit blocked. The keeper starts the counter (1 pass).', 'good');
+      if (B.sc.saves >= 3) addHL('brickwall');
+    }
+    B.sc.eh = 0; B.sc.et = 0;
+  }
   if (B.sport === 'boxing' && B.turn > 1) {
     const [u, t] = B.sc.rd; fx({ k: 'bell', win: u > t }); if (u > t) { B.sc.rounds[0]++; scoreUs(0); } else if (t > u) { B.sc.rounds[1]++; scoreThem(0); }
     if (u - t >= 15) { for (const e of alive()) addSt(e, 'weak', 1); fx({ k: 'banner', t: 'They’re rocked', sub: 'You took the round by 15+: every enemy is Weak', small: 1 }); }
@@ -3195,6 +3242,7 @@ function sportFinal() {
   let win = false;
   if (scored()) win = S.us > S.them;
   if (B.sport === 'hockey' && S.them === 0 && S.goals > 0) addHL('shutout');
+  if (B.sport === 'soccer' && S.them === 0 && S.goals > 0 && win) addHL('cleansheet');
   if (B.sport === 'golf') { const strokes = B.turn - S.free; win = strokes <= parFor(); if (strokes <= parFor() - 2) addHL('eagle'); }
   if (B.sport === 'bowling') { win = !!B.strike && B.strike <= 4; if (B.strike && B.turn === 1) addHL('strike'); }
   if (B.sport === 'boxing') { const [u, t] = S.rd; if (u > t) S.rounds[0]++; else if (t > u) S.rounds[1]++; win = S.rounds[0] > S.rounds[1]; if (B.turn <= 2 && B.type !== 'normal') addHL('ko'); }
@@ -3211,6 +3259,7 @@ function sportLine() {
     case 'boxing': return `Round ${B.turn}  Cards ${S.rounds[0]}–${S.rounds[1]}`;
     case 'baseball': return `${me} ${S.us}  ${T} ${S.them}   Outs ${S.outs}`;
     case 'basketball': return `${me} ${S.us}  ${T} ${S.them}${sv(B.P, 'hot') ? '   ON FIRE' : ''}`;
+    case 'soccer': return `${me} ${S.us}  ${T} ${S.them}   Passes ${S.passes || 0}`;
     default: return `${me} ${S.us}  ${T} ${S.them}`;
   }
 }
@@ -3227,12 +3276,14 @@ function sportBadge(card, tgt) {
     case 'basketball': { const T = SKT(card); return dmgCard ? (est.top < T.bk ? 'Brick' : `+${((T.threeAny || d.cost >= 2) && est.top >= T.three ? 3 : 2) + (d.type === 'play' && d.sport === 'basketball' ? 1 : 0)}`) : ''; }
     case 'jousting': return d.type === 'atk' && !B.firstAtk ? 'Tilt ×2' : '';
     case 'golf': return est.top >= SKT(card).drive ? 'Long drive' : '';
+    case 'soccer': return d.type === 'atk' && dmgCard && (B.sc.passes || 0) >= SOCCER.passes ? (est.top >= SKT(card).kick ? 'Goal' : 'Shot') : 'Pass';
   }
   return '';
 }
 // rough damage forecast (no dice): per target and total
 function estDamage(card, tgt) {
-  const d = def(card), out = { total: 0, top: 0, blk: 0, per: {} };
+  const d = def(card), out = { total: 0, top: 0, blk: 0, per: {} }, ph = B.passHit; B.passHit = 0; // the estimate is one whole card
+  try {
   const add = (e, n) => { if (!e || e.dead) return; const after = d.pierce ? n : Math.max(0, n - e.block); out.per[e.uid] = (out.per[e.uid] || 0) + after; out.total += after; out.top = Math.max(out.top, out.per[e.uid]); };
   const walk = ops => { for (const o of ops) {
     const scope = o[3] || d.tgt;
@@ -3246,6 +3297,7 @@ function estDamage(card, tgt) {
     else if (o[0] === 'bones') out.blk += Math.min(36, o[1] * B.draw.length);
   } };
   walk(d.fx);
+  } finally { B.passHit = ph; }
   out.total = Math.round(out.total);
   return out;
 }
@@ -3383,6 +3435,7 @@ const STARS = [
   { n: 'The Anvil', desc: 'Stoneborn cards hit 1 harder.', grp: 'stone', atk: 1, pts: [[-18, -6], [10, -6], [18, -12], [6, 4], [-6, 4], [-10, 14], [10, 14]], lines: [[0, 1], [1, 2], [1, 3], [3, 4], [4, 0], [4, 5], [3, 6]] },
   { n: 'The Twin Dice', desc: '+1 to every d20 you roll.', dice: 1, pts: [[-16, -6], [-6, -6], [-6, 4], [-16, 4], [6, -2], [16, -2], [16, 8], [6, 8]], lines: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4]] },
   { n: 'The Huntsman', desc: 'Beast cards hit 1 harder.', grp: 'beast', atk: 1, pts: [[-16, 12], [-6, 2], [4, -6], [16, -14], [-2, -12], [8, 6]], lines: [[0, 1], [1, 2], [2, 3], [2, 4], [2, 5]] },
+  { n: 'The Net', desc: 'Soccer cards hit 1 harder.', sport: 'soccer', atk: 1, pts: [[-16, -8], [16, -8], [-16, 10], [16, 10], [-6, 2], [6, 2]], lines: [[0, 1], [0, 2], [1, 3], [4, 5]] },
 ];
 const MOON_EVERY = 3, STARS_EVERY = 5;
 function skyAt(clock) {
@@ -3737,6 +3790,13 @@ const EVENTS = [
       { label: 'Bowl a frame', desc: 'Roll a d20.', go: () => { const r = evRoll(); if (r === 20) { gainGold(90); return { text: `Natural 20. STRIKE. The skulls explode outward and the ogre weeps with joy. +90 gold, and he insists you keep the lucky ball.`, then: { relic: RUN.relics.includes('bowling') ? randomRelic() : 'bowling' } }; } if (r >= 14) { const g = gainGold(50); return { text: `You roll ${r}. Spare! +${g} gold.` }; } if (r >= 7) { const g = gainGold(15); return { text: `You roll ${r}. Seven pins. +${g} gold for effort.` }; } if (r > 1) return { text: `You roll ${r}. Gutter ball. The ogre laughs for a very long time.` }; RUN.hp = Math.max(1, RUN.hp - 9); return { text: 'Natural 1. You drop the skull on your foot. −9 HP.' }; } },
       { label: 'Just watch', desc: 'Heal 5.', go: () => { RUN.hp = Math.min(RUN.maxhp, RUN.hp + 5); return { text: 'You sit on the bench and eat stale cavern pretzels. +5 HP.' }; } },
     ] },
+  { id: 'penalty', t: 'The Penalty Spot', art: { kind: 'skeleton', team: { color: '#5fa8c9', light: '#e3f3ff', short: 'PKS' }, num: 1 }, acts: [0, 1, 2],
+    text: 'A skeleton keeper stands in a goal chalked on the cavern wall, rattling. "One kick. Beat me and I pay. Miss and you pay. I have not let one in for three hundred years."',
+    opts: () => [
+      { label: 'Take the penalty (bet 20 gold)', desc: 'Roll a d20. 10+ scores.', ok: () => RUN.gold >= 20, go: () => { const r = evRoll(); RUN.gold -= 20; if (r === 20) { gainGold(60); return { text: 'Natural 20. Top corner. The keeper falls apart, then hands you his boots. +60 gold.', then: { relic: RUN.relics.includes('goldenboot') ? randomRelic() : 'goldenboot' } }; } if (r >= 10) { const g = gainGold(45); return { text: `You roll ${r}. GOAL. He picks the ball out of the net and pays up. +${g} gold.` }; } return { text: `You roll ${r}. Saved, with one bony finger. The 20 gold is his.` }; } },
+      { label: 'Go in goal for him', desc: 'Lose 6 HP. Learn a Through Ball.', go: () => { RUN.hp = Math.max(1, RUN.hp - 6); return { text: 'He takes a hundred penalties at you and laughs at every one. You learn how a striker thinks. -6 HP.', then: { cards: [{ id: 'scr_through', up: false }] } }; } },
+      { label: 'Walk on', desc: '', go: () => ({ text: '"Coward," he calls after you, kindly.' }) },
+    ] },
   { id: 'golf', t: 'The Lich’s Nine Holes', art: { kind: 'lich', team: { color: '#3d6a3a', light: '#cfe8a0', short: 'GLF' }, num: 9 }, acts: [0, 1, 2],
     text: 'A lich in plaid trousers is playing through a graveyard. "Par three, over the open grave. Care to make it interesting?"',
     opts: () => [
@@ -3928,7 +3988,7 @@ const ACH = [
   { id: 'free', n: 'Walk-On', d: 'Win the Cup as Free Agents', stat: 'freeCups', at: [1, 3, 10] },
   { id: 'clubs', n: 'Around the League', d: 'Win the Cup with different clubs', stat: 'clubCups', set: 1, at: [2, 4, 8] },
   { id: 'games', n: 'Gamer', d: 'Win games (sports wins)', stat: 'sportsWins', at: [10, 50, 200] },
-  { id: 'sports', n: 'Nine-Sport Athlete', d: 'Win a game in different sports', stat: 'sportsWon', set: 1, at: [5, 7, 9] },
+  { id: 'sports', n: 'Ten-Sport Athlete', d: 'Win a game in different sports', stat: 'sportsWon', set: 1, at: [5, 8, 10] },
   { id: 'hattrick', n: 'Hat Trick Hero', d: 'Score hat tricks', stat: 'hl_hattrick', at: [1, 5, 20] },
   { id: 'slam', n: 'Grand Slammer', d: 'Hit grand slams', stat: 'hl_grandslam', at: [1, 5, 20] },
   { id: 'walkoff', n: 'Walk-Off', d: 'Win with walk-off hits', stat: 'hl_walkoff', at: [1, 5, 20] },
@@ -4102,6 +4162,7 @@ function emblemURL(sport, col) {
     case 'golf': { O(pRR(30, -60, 5, 110, 2), '#efe4cc'); O(pPoly([[35, -60], [80, -46], [35, -32]]), '#e0533a'); O(pEl(-30, 30, 22, 22), '#f8f4ea'); for (let i = 0; i < 8; i++) circ(c, -38 + (i % 3) * 8, 22 + ((i / 3) | 0) * 8, 2, '#c8c0b0'); O(pEl(-30, 56, 30, 6), '#2f6a2a'); break; }
     case 'bowling': { const pin = new Path2D(); pin.moveTo(0, -64); pin.bezierCurveTo(16, -64, 16, -36, 8, -28); pin.bezierCurveTo(28, -6, 26, 40, 14, 60); pin.lineTo(-14, 60); pin.bezierCurveTo(-26, 40, -28, -6, -8, -28); pin.bezierCurveTo(-16, -36, -16, -64, 0, -64); O(pin, '#f2ead8'); c.fillStyle = '#d83a3a'; c.fillRect(-11, -26, 22, 5); c.fillRect(-12, -18, 24, 5); circ(c, -4, -50, 3, INK); circ(c, 5, -50, 3, INK); break; }
     case 'jousting': { c.save(); c.rotate(-.5); O(pPoly([[-90, -4], [70, -12], [96, 0], [70, 12], [-90, 4]]), '#c9a24a'); c.restore(); O(pPoly([[-40, -40], [10, -40], [10, 0], [-15, 34], [-40, 0]]), '#3a5a9a'); c.strokeStyle = '#ffd166'; c.lineWidth = 4; c.beginPath(); c.moveTo(-15, -40); c.lineTo(-15, 30); c.moveTo(-40, -12); c.lineTo(10, -12); c.stroke(); break; }
+    case 'soccer': { O(pEl(0, 0, 50, 50), '#f2ead8'); O(pPoly([[0, -17], [16, -5], [10, 14], [-10, 14], [-16, -5]]), '#21160f'); break; }
     case 'curling': { O(pEl(0, 24, 54, 22), '#7a7a80'); O(pEl(0, 12, 54, 22), '#a8a8b0'); O(pRR(-6, -38, 12, 40, 4), '#d83a3a'); O(pRR(-6, -42, 40, 12, 5), '#d83a3a'); break; }
     case 'boxing': { const g2 = new Path2D(); g2.moveTo(-34, 30); g2.bezierCurveTo(-44, -10, -36, -52, 4, -52); g2.bezierCurveTo(40, -52, 50, -16, 40, 12); g2.bezierCurveTo(34, 30, 20, 34, 18, 34); g2.lineTo(-30, 34); g2.closePath(); O(g2, '#c2264a'); O(pRR(-32, 34, 52, 22, 5), '#f2ead8'); const th = new Path2D(); th.moveTo(-36, -2); th.bezierCurveTo(-58, -2, -58, 26, -30, 22); O(th, '#a81e3e'); break; }
     default: { O(pEl(0, 0, 40, 40), '#c9a24a'); }
@@ -4176,6 +4237,7 @@ function opText(op, d, ctx) {
     case 'atkcount': return 'Counts as an extra Attack toward On Fire.';
     case 'freestroke': return 'This turn does not count as a stroke.';
     case 'lance': return 'Shatters a lance: a point.';
+    case 'passes': return `Adds ${op[1]} passes.`;
   }
   return '';
 }
@@ -4400,11 +4462,11 @@ function arenaBG(sport, act) {
   c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 34, SW, 10);
   for (let x = 12; x < SW; x += 22) { const h = 10 + rnd() * 8; c.fillStyle = `rgba(0,0,0,${.35 + rnd() * .2})`; c.beginPath(); c.arc(x, 34 - h * .3, 6, Math.PI, 0); c.fill(); c.fillRect(x - 6, 34 - h * .3, 12, h * .3 + 2); }
   // pennants for the sport
-  const pcol = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a' }[sport] || '#888';
+  const pcol = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a', soccer: '#5fa8c9' }[sport] || '#888';
   for (const px of [140, 300, 660, 820]) { c.fillStyle = pcol; c.beginPath(); c.moveTo(px - 18, 50); c.lineTo(px + 18, 50); c.lineTo(px, 92); c.fill(); c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 2; c.stroke(); c.fillStyle = 'rgba(255,240,210,.85)'; c.font = '700 16px "Grenze Gotisch", Georgia, serif'; c.textAlign = 'center'; c.fillText(SPORT_NAME[sport][0], px, 70); }
   // the floor
   const floor = new Path2D(); const a = fp(-1, 0), b = fp(1, 0), d2 = fp(1, 1), e = fp(-1, 1); floor.moveTo(-50, FY); floor.lineTo(SW + 50, FY); floor.lineTo(SW + 50, SH); floor.lineTo(-50, SH); floor.closePath();
-  const fcol = { baseball: '#4a3424', football: '#2f4a28', hockey: '#c9dbe6', basketball: '#8a5a30', golf: '#3a5a2a', bowling: '#9a7448', jousting: '#7a6040', curling: '#d2e2ec', boxing: '#3a2a26' }[sport] || A.floor;
+  const fcol = { baseball: '#4a3424', football: '#2f4a28', hockey: '#c9dbe6', basketball: '#8a5a30', golf: '#3a5a2a', bowling: '#9a7448', jousting: '#7a6040', curling: '#d2e2ec', boxing: '#3a2a26', soccer: '#dfe9ee' }[sport] || A.floor;
   c.fillStyle = fcol; c.fill(floor);
   const line = (pts, col = 'rgba(245,240,225,.75)', w = 3) => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.strokeStyle = col; c.lineWidth = w; c.stroke(); };
   const poly = (pts, col) => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fillStyle = col; c.fill(); };
@@ -4467,6 +4529,18 @@ function arenaBG(sport, act) {
       const g = c.createLinearGradient(0, FY, 0, SH); g.addColorStop(0, '#9fb8c8'); g.addColorStop(1, '#e3eef4'); c.fillStyle = g; c.fill(floor);
       for (const [r, col] of [[.36, '#3a6ab8'], [.24, '#f2f2f2'], [.12, '#c83a3a'], [.04, '#f2f2f2']]) oval(0, .5, r, col, true);
       line([fp(-1.2, .5), fp(1.2, .5)], 'rgba(40,40,60,.4)', 2); line([fp(0, 0), fp(0, 1)], 'rgba(40,40,60,.4)', 2);
+      break;
+    }
+    case 'soccer': { // a snow pitch: grass showing through, the lines chalked blue, a goal at each end
+      const g = c.createLinearGradient(0, FY, 0, SH); g.addColorStop(0, '#b9cdd8'); g.addColorStop(1, '#eef4f7'); c.fillStyle = g; c.fill(floor);
+      for (let i = 0; i < 26; i++) { const p = fp(rnd() * 2 - 1, rnd()); ell(c, p.x, p.y, 18 + rnd() * 26, 4 + rnd() * 4, 'rgba(90,130,70,.22)'); }
+      const ch = 'rgba(60,90,150,.75)';
+      line([fp(0, 0), fp(0, 1)], ch, 4); oval(0, .5, .2, ch); circ(c, fp(0, .5).x, fp(0, .5).y, 5, ch);
+      for (const s of [-1, 1]) {
+        line([fp(s * .88, .22), fp(s * .64, .22), fp(s * .64, .78), fp(s * .88, .78)], ch, 3);
+        const a = fp(s * .88, .38), b = fp(s * .88, .62);
+        line([a, { x: a.x, y: a.y - 42 }, { x: b.x, y: b.y - 42 }, b], '#f4f4f0', 5);
+      }
       break;
     }
     case 'boxing': {
@@ -5130,6 +5204,13 @@ function drawFieldState(c) {
     for (let i = 0; i < B.sc.stones; i++) { const p = fp(Math.cos(i * 2.1) * .12, .5 + Math.sin(i * 2.1) * .06); ell(c, p.x, p.y + 3, 14, 5, '#5a5a62'); ell(c, p.x, p.y, 14, 5, team.color); c.fillStyle = '#333'; c.fillRect(p.x - 2, p.y - 6, 4, 6); }
     return;
   }
+  if (B.sport === 'soccer') { // the ball works up the pitch with every pass
+    const n = Math.min(6, B.sc.passes || 0), p = fp(-.6 + n * .22, .55);
+    for (let i = 0; i < n; i++) { const q = fp(-.6 + i * .22, .55); circ(c, q.x, q.y, 3, 'rgba(40,60,120,.55)'); }
+    ell(c, p.x, p.y + 4, 9, 3, 'rgba(0,0,0,.25)'); circ(c, p.x, p.y - 4, 8, '#f2ead8'); circ(c, p.x, p.y - 4, 3, '#21160f');
+    if (n >= SOCCER.passes) txt(c, 'SHOT ON', p.x, p.y - 22, F_HUD(16), '#ffd166', 'center');
+    return;
+  }
   if (B.sport === 'basketball') {
     const ok = B.sc.basket; c.save(); rr(c, 530, 82, 46, 26, 3); c.fillStyle = '#16100c'; c.fill();
     txt(c, ok ? '24' : B.phase === 'player' ? '!!' : '24', 553, 101, F_HUD(20), ok ? '#7fe08a' : (Math.sin(A.t * 6) > 0 ? '#ff6a5a' : '#ffb347'), 'center'); txt(c, 'SHOT', 553, 78, F_HUD(12), '#b8a68c', 'center'); c.restore();
@@ -5189,7 +5270,8 @@ function drawSportPops(c) {
         break; }
       case 'goal': { // the puck rips into the net and the twine bulges
         const x = lerp(330, p.tx, Math.min(1, e * 1.3)), y = lerp(400, p.ty + 10, Math.min(1, e * 1.3));
-        ell(c, x, y, 10, 4, '#111'); const b = Math.max(0, (k - .55) / .45);
+        if (B.sport === 'soccer') { circ(c, x, y - 4, 8, '#f2ead8'); circ(c, x, y - 4, 3, '#21160f'); } else ell(c, x, y, 10, 4, '#111'); // a ball, or the puck
+        const b = Math.max(0, (k - .55) / .45);
         if (b > 0) { c.strokeStyle = 'rgba(240,240,255,.8)'; c.lineWidth = 1.5; const w = 70, h = 46, bulge = Math.sin(b * Math.PI) * 18; for (let i = 0; i <= 6; i++) { c.beginPath(); c.moveTo(p.tx + 20 + i * w / 6 - w / 2, p.ty - h); c.quadraticCurveTo(p.tx + 20 + i * w / 6 - w / 2 + bulge, p.ty - h / 2, p.tx + 20 + i * w / 6 - w / 2, p.ty); c.stroke(); } }
         break; }
       case 'touchdown': case 'field goal': { // the ball spirals downfield; a touchdown rains confetti
@@ -5311,7 +5393,7 @@ function showPage(p) {
 }
 
 /* ---------- title ---------- */
-const TITLE = { club: pick(CLUB_IDS), sports: ['football', 'baseball', 'hockey', 'basketball', 'bowling', 'jousting'], i: 0, t0: 0 };
+const TITLE = { club: pick(CLUB_IDS), sports: ['football', 'baseball', 'hockey', 'soccer', 'basketball', 'bowling', 'jousting'], i: 0, t0: 0 };
 TITLE.party = shuffle(CLUBS[TITLE.club].roster.slice()).slice(0, 3);
 function drawTitle(c) {
   const k = (A.t - TITLE.t0); if (k > 5) { TITLE.i = (TITLE.i + 1) % TITLE.sports.length; TITLE.t0 = A.t; }
@@ -6000,7 +6082,7 @@ function syncSetBtn() { const b = $('bSound'); if (!b) return; b.textContent = '
 /* ---------- coach's notes: one-time tips, shown the first time each system matters ---------- */
 const TIPS = {
   fight: ['Your first fight', 'Drag a card onto an enemy, or click a card and then the enemy. Each card costs Stamina (top of the hand). The icon over each enemy is what it will do next turn. When you are out of moves, End Turn.'],
-  sport: ['Every fight is also a game', 'The scoreboard shows this fight’s sport. Its rule, shown on the scoreboard, changes what your cards do; the full rules for all nine sports are on the How to play page. Win the fight and the game for a sports win: bonus gold, style and a Highlight Reel.'],
+  sport: ['Every fight is also a game', 'The scoreboard shows this fight’s sport. Its rule, shown on the scoreboard, changes what your cards do; the full rules for all ten sports are on the How to play page. Win the fight and the game for a sports win: bonus gold, style and a Highlight Reel.'],
   why: ['Why a hit does what it does', 'When you hover or select an attack, the bar at the bottom of the arena breaks its first hit down: base damage, then every bonus and multiplier that applies right now.'],
   momentum: ['Momentum', 'The bar under the scoreboard is a tug of war. Lead by enough and your hits land harder; fall behind and theirs do, until you are far enough behind that you draw an extra card each turn.'],
   sky: ['The sky moved', 'The skylights in the arena wall show the moon and two constellations. They shift as you play and give small boosts to certain kinds. Hover the moon and stars in the top bar for what is up now.'],
@@ -6146,7 +6228,7 @@ DB.regions={plains:{name:'Charter Plains',sports:[['baseball',3],['basketball',2
  bloom:{name:'The Mosswold',sports:[['golf',3],['jousting',2]],kinds:['elf','werewolf','spider','gorgon','goblin'],arrive:'The Mosswold closes over the road. Everything drips, and everything is growing.',ambient:['Spores drift through a shaft of green light.','A Gloomcap watches you from a stump and does not move for a very long time.','Bees the size of your thumb work a bank of mossberries.']},
  tide:{name:'The Brinefen',sports:[['bowling',3],['curling',2]],kinds:['zombie','troll','gorgon','wraith','spider'],arrive:'The Brinefen: black water, white sand, and a wind that smells of kelp.',ambient:['A Brinepup barks from a sandbar and dives.','Gulls fight over something that fights back.','Old pilings stand in the fen where a road used to be.']},
  ember:{name:'The Cindermaw',sports:[['football',3],['boxing',2]],kinds:['kobold','minotaur','golem','ogre','dwarf'],arrive:'The Cindermaw. The ground is warm through your boots and the air tastes of pennies.',ambient:['A lava tongue folds over on itself with a sound like tearing cloth.','Something heavy shifts under the ash.','A Cinderkit sits in a hot spring with the expression of a cat in a sunbeam.']},
- rime:{name:'The Frostspire',sports:[['hockey',3],['curling',2]],kinds:['witch','harpy','lich','skeleton','vampire'],arrive:'The Frostspire. Snow squeaks underfoot, and the sky is very close.',ambient:['Green light ripples across the northern sky.','A Frostlet lands on a branch, weighs it down with snow, and looks offended.','Your breath hangs in the air long after you have walked through it.']}};
+ rime:{name:'The Frostspire',sports:[['hockey',3],['soccer',2]],kinds:['witch','harpy','lich','skeleton','vampire'],arrive:'The Frostspire. Snow squeaks underfoot, and the sky is very close.',ambient:['Green light ripples across the northern sky.','A Frostlet lands on a branch, weighs it down with snow, and looks offended.','Your breath hangs in the air long after you have walked through it.']}};
 DB.tiles={
  '.':{name:'grass',walk:1,ground:1,enc:.035,look:'Short grass, cropped by something with small teeth.'},
  '"':{name:'tall grass',walk:1,ground:1,enc:.11,look:'Tall grass. It moves when there is no wind.'},
@@ -11868,7 +11950,8 @@ K('wb_cover', 'Cover for Me', 'any', 'skl', 1, 'b', 'self', [['b', 10], ['draw',
 K('wb_alley', 'Alley-Oop', 'any', 'atk', 2, 'b', 'one', [['d', 16], ['nrg', 1]], { sport: 'basketball', fl: 'Up, and in. Combo: plays when both are on the field.' });
 K('wb_wall', 'Two-Man Wall', 'any', 'skl', 1, 'b', 'self', [['b', 7], ['s', 'weak', 1, 'all']], { sport: 'football', fl: 'Nobody through. Combo: plays when both are on the field.' });
 K('wb_giveandgo', 'Give and Go', 'any', 'atk', 0, 'b', 'one', [['d', 4], ['draw', 2]], { sport: 'hockey', fl: 'Pass, run, take it back. Combo: plays when both are on the field.' });
-const W_COMBOS = ['wb_onetwo', 'wb_cover', 'wb_alley', 'wb_wall', 'wb_giveandgo'];
+K('wb_wallpass', 'Wall Pass', 'any', 'skl', 0, 'b', 'self', [['b', 4], ['draw', 1]], { sport: 'soccer', home: [['passes', 2]], fl: 'Hit it, get it back. Combo: plays when both are on the field.' });
+const W_COMBOS = ['wb_onetwo', 'wb_cover', 'wb_alley', 'wb_wall', 'wb_giveandgo', 'wb_wallpass'];
 
 /* ---------- personal quests ---------- */
 const W_PQ = {
@@ -22061,7 +22144,7 @@ renderHelp = function () {
      Mossgate      the Links (golf), the Tilting Lists (jousting)
      Saltmere      the Lanes (bowling), the Curling Shed (curling)
      Cinderhold    the Ash Bowl (football), the Anvil Ring (boxing)
-     Rimewatch     the Pond Rink (hockey), the Rimewatch Sheet (curling)
+     Rimewatch     the Pond Rink (hockey), the Hoarfrost Pitch (soccer; it was a curling sheet, and keeps the id g_sheet)
 
    A ground is a location (DB.locs kind 'ground', world tile 'U') with a small walk-in map built like a town
    (buildTown): the field drawn whole for its sport (tile 'd', m.field), stands ('J'), a scoreboard ('%'), a
@@ -22081,7 +22164,7 @@ const W_GRD_REG = { graftonbury: 'plains', mossgate: 'bloom', saltmere: 'tide', 
 const W_GRD_GC = { plains: '.', bloom: '.', tide: ':', ember: 'a', rime: 'n' };
 const W_GRD_TREE = { plains: 'T', bloom: 'T', tide: 'T', ember: 'R', rime: 'T' };
 // the pennant colour of each sport, as on Sudden Death's field
-const W_GRD_COL = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a' };
+const W_GRD_COL = { baseball: '#c94a3a', football: '#3f7a3a', hockey: '#3a6ab8', basketball: '#e0742a', golf: '#3d6a3a', bowling: '#9b3a7a', jousting: '#3a5a9a', curling: '#b83a3a', boxing: '#8a1a1a', soccer: '#5fa8c9' };
 const W_GRD_INDOOR = { bowling: 1, curling: 1, boxing: 1 };
 
 const W_GRDS = [
@@ -22157,14 +22240,14 @@ const W_GRDS = [
     fan: { name: 'Little Brann', kind: 'harpy', look: { coat: '#3a6ab8', acc: 'cap', hair: '#2a1d16' }, greet: 'I am going to play for Rimewatch when I am bigger. I am already very fast. Watch.' },
     arrive: 'The Pond Rink. The pond is frozen solid, the lines are painted on, and the boards are older than the abbey.',
     ambient: ['A puck cracks against the boards and nobody is there.', 'Children skate in a long chain, shrieking.', 'The ice groans, deep down, and settles.'] },
-  { id: 'g_sheet', city: 'rimewatch', sport: 'curling', name: 'The Rimewatch Sheet', at: [16, 21],
-    look: 'The Rimewatch Sheet. A long hall of ice in the pines, smoke rising from its stove.',
-    keeper: { name: 'Sister Hogline', kind: 'lich', look: { coat: '#b83a3a', acc: 'robe', hair: '#cfe8ff' },
-      greet: 'Walk on the mats. The ice is for the stones, and the stones are for the faithful.',
-      job: 'The abbey keeps the sheet, and I keep it for the abbey: flood it, pebble it, bless the stones. Ask me how CURLING scores. Bring a full squad and I will put on a GAME.' },
-    fan: { name: 'Halla Frost', kind: 'vampire', look: { coat: '#9fe6ff', acc: 'scarf', hair: '#1a1210' }, greet: 'It is always cold in here. I like it. The sun cannot find me.' },
-    arrive: 'The Rimewatch Sheet. Two sheets of ice under a pine roof, the houses painted red and blue, and the stove ticking in the corner.',
-    ambient: ['A stone curls into the house and taps another out.', 'The stove ticks and the ice does not care.', 'Somebody chants a sweeping rhythm under their breath.'] },
+  { id: 'g_sheet', city: 'rimewatch', sport: 'soccer', name: 'The Hoarfrost Pitch', at: [16, 21],
+    look: 'The Hoarfrost Pitch. A snow pitch in the pines below the abbey, a goal at each end, smoke rising from its stove.',
+    keeper: { name: 'Sister Hogline', kind: 'lich', look: { coat: '#5fa8c9', acc: 'robe', hair: '#cfe8ff' },
+      greet: 'Stamp the snow off. Then go back out in it: this pitch is for kicking.',
+      job: 'The abbey keeps the pitch, and I keep it for the abbey: roll the snow, chalk the lines blue, bless the ball. Ask me how SOCCER scores. It is eleven a side: bring five of your own, the call-ups make up the rest, and I will put on a GAME.' },
+    fan: { name: 'Halla Frost', kind: 'vampire', look: { coat: '#9fe6ff', acc: 'scarf', hair: '#1a1210' }, greet: 'It is always cold out here. I like it. The sun cannot find me under all this snow.' },
+    arrive: 'The Hoarfrost Pitch. Snow packed hard and chalked blue, a goal at each end, and the abbey bell for full time.',
+    ambient: ['A ball thumps into the net and the snow falls off the crossbar.', 'The stove by the bench ticks, and nobody stands near it for long.', 'Somebody chants a passing drill under their breath: one, two, three, shoot.'] },
 ];
 function wGrd(id) { return W_GRDS.find(g => g.id === id) || null; }
 function wGrdOfMap(mapId) { return wGrd(mapId); }
@@ -22347,6 +22430,15 @@ function wGrdArt(c, sp, W, H) {
       for (const [x, col] of [[14, '#3a5a9a'], [W - 14, '#c94a3a']]) { const p = pPoly([[x - 9, y - 30], [x + 9, y - 30], [x + 9, y - 14], [x, y - 6], [x - 9, y - 14]]); wFlat(c, p, col, 1.2); }
       break;
     }
+    case 'soccer': { // a snow pitch: grass through the snow, the lines chalked blue, a goal at each end
+      rect(0, 0, W, H, '#e8f0f4');
+      for (let i = 0; i < 30; i++) { const x = (i * 83) % W, y = (i * 47) % H; c.beginPath(); c.ellipse(x, y, 14 + (i % 4) * 5, 4, 0, 0, Math.PI * 2); c.fillStyle = 'rgba(95,140,75,.22)'; c.fill(); }
+      const blue = 'rgba(60,90,150,.8)';
+      box(6, 6, W - 12, H - 12, blue, 2); wLine(c, [[W / 2, 6], [W / 2, H - 6]], 2, blue); ring(W / 2, H / 2, 34, blue, 2); disc(W / 2, H / 2, 3, blue);
+      for (const x of [6, W - 62]) box(x, H / 2 - 60, 56, 120, blue, 2);
+      for (const x of [0, W - 10]) { rect(x, H / 2 - 26, 10, 52, 'rgba(244,244,240,.9)'); box(x, H / 2 - 26, 10, 52, 'rgba(29,20,15,.6)', 1); }
+      break;
+    }
     case 'curling': {
       ice();
       for (const sy of [H * .25, H * .75]) {
@@ -22402,7 +22494,7 @@ WOBJ.U = (c, P, r, e) => {
   if (W_GRD_INDOOR[g.sport]) {
     wHouse(c, 3, 13, 26, 15, col, P, r, g.sport === 'boxing');
   } else {
-    const field = { baseball: '#5f9a44', football: '#4f8a3c', hockey: '#dbe8ef', basketball: '#c8925a', golf: '#6aa84e', jousting: '#c9a46c' }[g.sport] || '#5f9a44';
+    const field = { baseball: '#5f9a44', football: '#4f8a3c', hockey: '#dbe8ef', basketball: '#c8925a', golf: '#6aa84e', jousting: '#c9a46c', soccer: '#e6eef2' }[g.sport] || '#5f9a44';
     const bowl = pEl(16, 20, 15, 9); wCel(c, bowl, '#d8ccb0', 1.2, 1.3);
     for (let i = 0; i < 9; i++) { const a = Math.PI * (.08 + i * .105); c.fillStyle = '#7a6a54'; c.fillRect(16 - Math.cos(a) * 13 - 1, 20 + Math.sin(a) * 7 - 1, 2, 2); }
     const f = pEl(16, 19, 10, 5); wFlat(c, f, field, 1);
@@ -22427,7 +22519,7 @@ const wW21RenderHelp = renderHelp;
 renderHelp = function () {
   wW21RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGrounds')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGrounds"><b>Sports grounds.</b> Every city has two grounds just outside it, one for each sport its region plays, on a road from the city gate: a ballpark and a court at Graftonbury, links and lists at Mossgate, lanes and a curling shed at Saltmere, a football bowl and a boxing ring at Cinderhold, a rink and a curling sheet at Rimewatch. Walk in to see the field. The groundskeeper explains how the sport scores, and at the Graftonbury Ballpark books ball games and the Diamond Cup.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGrounds"><b>Sports grounds.</b> Every city has two grounds just outside it, one for each sport its region plays, on a road from the city gate: a ballpark and a court at Graftonbury, links and lists at Mossgate, lanes and a curling shed at Saltmere, a football bowl and a boxing ring at Cinderhold, a rink and a snow pitch for soccer at Rimewatch. Walk in to see the field. The groundskeeper explains how the sport scores, and at the Graftonbury Ballpark books ball games and the Diamond Cup.</p>`);
 };
 /* w21b: playing at a ground (issue #6, phase 2). Loads after w21-grounds.js; changes earlier parts only by
    reassignment (saved originals carry the wW21b prefix).
@@ -22450,11 +22542,12 @@ renderHelp = function () {
    wMatchTitle, wMatchTeam (the city club's name and the sport's colour), wPreGame (the ground's line), wUse (the
    scoreboard shows your record), wJRules (your record in the journal), renderHelp (#wHelpGrdPlay). */
 
-const W_GRD_SQUAD = { golf: 4, jousting: 4, boxing: 4, curling: 4, bowling: 5, basketball: 5, baseball: W_BALL.minOwn, hockey: 6, football: 7 };
+const W_GRD_SQUAD = { golf: 4, jousting: 4, boxing: 4, curling: 4, bowling: 5, basketball: 5, baseball: W_BALL.minOwn, soccer: 5, hockey: 6, football: 7 };
 const W_GRD_WHY = {
   golf: 'four to a fourball', jousting: 'two to ride and two to squire', boxing: 'a boxer, a second, a cutman and a trainer',
   curling: 'a rink of four: lead, second, third and skip', bowling: 'five to a bowling side', basketball: 'five on the court',
   baseball: 'five of your own, and call-ups fill the nine', hockey: 'six on the ice', football: 'seven on the pitch',
+  soccer: 'eleven a side: five of your own, and call-ups fill the rest'
 };
 const W_GRD_PLAY = {
   friendly: { n: 'Friendly', type: 'normal', up: 0, what: 'the city club, at the region\'s tier' },
@@ -22743,7 +22836,7 @@ const W_CITIES = {
       ['1', 1, 10], ['1', 2, 10], ['1', 3, 10], ['1', 4, 10], ['1', 5, 10], ['1', 9, 10], ['1', 10, 10], ['1', 11, 10], ['1', 12, 10], ['4', 4, 12], ['3', 2, 11], ['3', 11, 11],
       ['S', 21, 18, { text: 'THE POND. Thick enough, says Old Tove. Skates on, or stay on the bank.' }],
       ['S', 35, 15, { text: 'SLED RUN. One at a time, feet first, and shout.' }],
-      ['S', 19, 29, { text: 'RIMEWATCH. The Pond Rink and the Rimewatch Sheet are down the road from the gate.' }]],
+      ['S', 19, 29, { text: 'RIMEWATCH. The Pond Rink and the Hoarfrost Pitch are down the road from the gate.' }]],
     arrive: 'Rimewatch. The last town before the snow takes over, and it knows it.',
     ambient: ['The abbey bell tolls the hour, a little flat with cold.', 'A Frostlet is asleep on the arena sign, glazing it.', 'The lamps come on early here. They have to.', 'A cairn by the road has a new stone on it.', 'Children skate on the pond, badly.', 'Somebody comes down the sled run much faster than they meant to.'] },
 };
@@ -22867,7 +22960,7 @@ renderHelp = function () {
      Mossgate     the putting green by the shrine (golf), the straw targets in the tilting yard (jousting)
      Saltmere     skittles on the quay (bowling), the stones by the sea wall (curling)
      Cinderhold   the sparring ring by the smithy (boxing), the kick-about pitch on the ash (football)
-     Rimewatch    kids' hockey on the pond (hockey), the stone maker's bench (curling)
+     Rimewatch    kids' hockey on the pond (hockey), the kick-about wall (soccer; it was the stone maker's bench, and keeps the id sp_maker)
 
    Use the spot (tile '!', meta { spot }) or ask the coach to DRILL or for a CHALLENGE:
      Drill       once a week at each spot, free, an hour: a card that suits the sport (sportFits) gains Practice ★
@@ -22919,10 +23012,10 @@ const W_SPOTS = [
     look: 'Two little nets on the frozen pond, and a puck the children have lost under the snow.',
     coach: { id: 'tc_pond', at: [26, 23], name: 'Sister Puck', kind: 'witch', look: { coat: '#3a6ab8', acc: 'scarf', hair: '#eef2ef' },
       greet: 'Heads up on the ice! That was a very small child, and she is fine.', job: 'I mind the children on the pond, and the children mind the puck. DRILL a shot once a week, or take my CHALLENGE on how HOCKEY scores.' } },
-  { id: 'sp_maker', city: 'rimewatch', sport: 'curling', name: 'The stone maker\'s bench', at: [31, 12],
-    look: 'A stone maker\'s bench: granite rounds half shaped, handles in a box, and a polishing wheel.',
-    coach: { id: 'tc_maker', at: [31, 11], name: 'Granite Hob', kind: 'dwarf', look: { coat: '#b83a3a', acc: 'apron', hair: '#a0a0a0' },
-      greet: 'Every stone in the realm started on this bench. Some of them came back broken.', job: 'I make the stones for both sheets. DRILL a delivery with one of mine once a week, or take my CHALLENGE on how CURLING scores.' } },
+  { id: 'sp_maker', city: 'rimewatch', sport: 'soccer', name: 'The kick-about wall', at: [31, 12],
+    look: 'A wall behind the abbey with a goal chalked on it in blue, and a ball frozen to the ground beside it.',
+    coach: { id: 'tc_maker', at: [31, 11], name: 'Granite Hob', kind: 'dwarf', look: { coat: '#5fa8c9', acc: 'apron', hair: '#a0a0a0' },
+      greet: 'Every stone I ever made is a doorstop now. Kick the ball, not the wall.', job: 'I made the stones for the sheet until the abbey made it a pitch. Now I chalk goals on walls. DRILL a first touch once a week, or take my CHALLENGE on how SOCCER scores.' } },
 ];
 // the spots in the cities' ambient lines
 const W_SPOT_AMBIENT = {
@@ -22930,7 +23023,7 @@ const W_SPOT_AMBIENT = {
   mossgate: ['A putt rolls round the cup by the shrine and stays out.', 'A lance thumps into a straw target in the tilting yard.'],
   saltmere: ['The skittles on the quay go down with a clatter, and a gull takes off.', 'A curling stone scrapes along the chalked flags by the sea wall.'],
   cinderhold: ['Gloves smack the heavy bag behind the smithy, steady as a hammer.', 'The kick-about on the ash stops for an argument, then starts again.'],
-  rimewatch: ['Children on the pond shriek over a goal that may not have been a goal.', 'The stone maker\'s wheel whines, polishing a curling stone.'],
+  rimewatch: ['Children on the pond shriek over a goal that may not have been a goal.', 'A ball thumps against the abbey wall, again and again.'],
 };
 for (const c in W_SPOT_AMBIENT) W_CITIES[c].ambient.push(...W_SPOT_AMBIENT[c]);
 function wSpot(id) { return W_SPOTS.find(s => s.id === id) || null; }
@@ -23045,7 +23138,7 @@ const wW23RenderHelp = renderHelp;
 renderHelp = function () {
   wW23RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpSpots')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpSpots"><b>Training spots.</b> Every city has two, one for each sport its region plays, with a coach: a batting cage and a hoop at Graftonbury, a putting green and a tilting yard at Mossgate, skittles and curling stones at Saltmere, a sparring ring and a kick-about pitch at Cinderhold, pond hockey and the stone maker at Rimewatch. Once a week at each, drill a card that suits the sport (it gains Practice ★, free, an hour), and take the coach's challenge: say how the sport scores, and win ${W_SPOT.prize.gold} gold and ${W_SPOT.prize.fans} fans.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpSpots"><b>Training spots.</b> Every city has two, one for each sport its region plays, with a coach: a batting cage and a hoop at Graftonbury, a putting green and a tilting yard at Mossgate, skittles and curling stones at Saltmere, a sparring ring and a kick-about pitch at Cinderhold, pond hockey and a kick-about wall at Rimewatch. Once a week at each, drill a card that suits the sport (it gains Practice ★, free, an hour), and take the coach's challenge: say how the sport scores, and win ${W_SPOT.prize.gold} gold and ${W_SPOT.prize.fans} fans.</p>`);
 };
 
 /* ---------- drawing: one painter, a different thing per sport ---------- */
@@ -23087,10 +23180,15 @@ WOBJ['!'] = (c, P, r, e) => {
       disc(26, 27, 3.2, '#5a3d22', .8);
       break;
     }
+    case 'soccer': { // a goal chalked on a wall, and a ball
+      wCel(c, pRR(3, 6, 26, 14, 1), '#9a8f84', .6, 1.1);
+      wLine(c, [[7, 19], [7, 9], [25, 9], [25, 19]], 1.4, '#3c5a96');
+      disc(16, 26, 3.6, '#f4efe0', .8); disc(16, 26, 1.3, '#21160f', .4);
+      break;
+    }
     case 'curling': { // a stack of stones
       const stone = (x, y, f) => { wCel(c, pEl(x, y, 6, 3.4), '#8a8f9a', .6, 1.1); wFlat(c, pRR(x - 2.5, y - 3.6, 5, 1.8, .8), f, .6); };
       stone(10, 26, '#c83a3a'); stone(22, 26, '#3a6ab8'); stone(16, 21, '#c83a3a'); stone(16, 14, '#3a6ab8');
-      if (s && s.id === 'sp_maker') { wCel(c, pRR(2, 5, 7, 6, 1), '#7a5a32', .5, 1); disc(27, 8, 4, '#a0a6b0', .8); }
       break;
     }
     case 'boxing': { // ring posts, ropes and a heavy bag
@@ -23510,8 +23608,8 @@ const W_GRD_THEMES = {
     // the rink organ runs up and down the scale between whistles
     mel: wMel('0.2.4.6.7.......', '6.4.2...0.......', '7.6.4.2.4.......', '3.2.1...0.......'),
     bassPat: 'x...x...x...x...', drums: { k: 'x.......x.......', s: '....x.......x...', h: 'x...x...x...x...' } },
-  g_sheet: { name: 'Frostspire Sheet', bpm: 80, root: 55, scale: 'aeolian', prog: [0, 5, 3, 4], lead: 'sine', bass: 'sine', pad: 'sine', bell: 1,
-    // a stone sliding a long way in the cold
+  g_sheet: { name: 'Hoarfrost Pitch', bpm: 80, root: 55, scale: 'aeolian', prog: [0, 5, 3, 4], lead: 'sine', bass: 'sine', pad: 'sine', bell: 1,
+    // a long ball through the cold air (the tune of the old curling sheet)
     mel: wMel('7.......6.......', '4...3...2.......', '4.......5.......', '3...2...0.......'),
     bassPat: 'x...............', drums: { k: 'x.......x.......', s: '................', h: '........x.......' } },
 };
@@ -23703,7 +23801,7 @@ const W_NOTICE = {
   // about a dozen a journey, and gold already piles up (docs/realm/BALANCE.md)
   gold: { sport: 20, night: 30, margin: 30, club: 45, ground: 25, seeded: 30, count: 35 },
   card: { club: 1, count: 1, margin: 1 },     // these also pay a pick of 3 cards for the region's sports
-  margin: { baseball: 3, basketball: 6, hockey: 2, football: 7, jousting: 2, curling: 2 },
+  margin: { baseball: 3, basketball: 6, hockey: 2, football: 7, jousting: 2, curling: 2, soccer: 2 },
   count: 3,
 };
 const W_NOTICE_CITY = { graftonbury: 'hq_inn', mossgate: 'moss_inn', saltmere: 'salt_inn', cinderhold: 'cind_inn', rimewatch: 'rime_inn' };
@@ -25097,6 +25195,34 @@ renderHelp = function () {
   const sec = $('wHelp'); if (!sec || $('wHelpMap')) return;
   sec.insertAdjacentHTML('beforeend', `<div id="wHelpMap"><h4>The map</h4>
     <p class="hint"><b>Map</b> (<kbd>M</kbd>, or from the Menu) shows the realm as far as your team has seen it. It starts blank and fills in round you as you walk the world, and what you have seen stays on it. Towns, grounds, dungeons and lairs get their mark once you have seen them, and their name in bold once you have been there. The red mark is you.</p></div>`);
+};
+/* w38: soccer at Rimewatch (issue #10). Loads after w37-map.js; changes earlier parts only by reassignment (saved
+   originals carry the wW38 prefix).
+
+   The Rimewatch Sheet was the realm's second curling ground. It is now the Hoarfrost Pitch, a soccer ground
+   (w21-grounds.js), and the Frostspire plays hockey and soccer (w1-data.js). It keeps its id, g_sheet, so a home
+   ground there, the fixtures drawn there and the journal carry over. Its record (WG.grd.rec.g_sheet) was curling,
+   so an older save clears it once, with a line in the log. Contracts for curling in the Frostspire (taken, or on a
+   board) can no longer be met, so they come down too. WG.soccer = 1 marks it done.
+
+   Wrapped: wStart (wW38Start). */
+
+const wW38Start = wStart;
+wStart = function () {
+  const r = wW38Start.apply(this, arguments);
+  if (WG && WG.soccer !== 1) {
+    const R = WG.grd && WG.grd.rec;
+    if (R && R.g_sheet) { delete R.g_sheet; wLog('The Rimewatch Sheet is a soccer ground now: the Hoarfrost Pitch. Your curling record there is in the past.', 'g'); }
+    const N = WG.notice, gone = c => c && c.region === 'rime' && c.sport === 'curling';
+    if (N) {
+      const n = (N.taken || []).filter(gone).length;
+      N.taken = (N.taken || []).filter(c => !gone(c));
+      for (const k in N.boards || {}) if (N.boards[k] && N.boards[k].list) N.boards[k].list = N.boards[k].list.filter(c => !gone(c));
+      if (n) wLog(`${n === 1 ? 'A contract' : n + ' contracts'} for curling in the Frostspire came down: nobody curls there now.`, 'g');
+    }
+    WG.soccer = 1;
+  }
+  return r;
 };
 </script>
 </body></html>

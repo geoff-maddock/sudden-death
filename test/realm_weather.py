@@ -83,11 +83,11 @@ async def main():
 
         # ---------- under cover: cups, indoor halls; outdoor grounds count ----------
         cover = await pg.evaluate("""(() => { WG.wx = { day: WG.dayAbs, by: { rime: 'blizzard', tide: 'fog' } };
-          const rink = W_GRDS.find(g => g.city === 'rimewatch' && g.sport === 'hockey'), sheet = W_GRDS.find(g => g.city === 'rimewatch' && g.sport === 'curling');
+          const rink = W_GRDS.find(g => g.city === 'rimewatch' && g.sport === 'hockey'), shed = W_GRDS.find(g => g.sport === 'curling'), pitch = W_GRDS.find(g => g.city === 'rimewatch' && g.sport === 'soccer');
           return { cup: wMatchWeather({ kind: 'cup', region: 'rime', map: 'rimewatch', ref: { cup: 'rime' } }), rink: wMatchWeather({ kind: 'ground', region: 'rime', map: rink.id, ref: { g: rink.id } }),
-            sheet: wMatchWeather({ kind: 'ground', region: 'rime', map: sheet.id, ref: { g: sheet.id } }), room: wMatchWeather({ kind: 'room', region: 'tide', map: 'hatchery' }),
+            shed: wMatchWeather({ kind: 'ground', region: 'tide', map: shed.id, ref: { g: shed.id } }), pitch: wMatchWeather({ kind: 'ground', region: 'rime', map: pitch.id, ref: { g: pitch.id } }), room: wMatchWeather({ kind: 'room', region: 'tide', map: 'hatchery' }),
             wild: wMatchWeather({ kind: 'wild', region: 'tide', map: 'world' }) }; })()""")
-        check(cover == {'cup': None, 'rink': 'blizzard', 'sheet': None, 'room': None, 'wild': 'fog'}, 'cups, dungeons and indoor halls are under cover; outdoor grounds are not', cover)
+        check(cover == {'cup': None, 'rink': 'blizzard', 'shed': None, 'pitch': 'blizzard', 'room': None, 'wild': 'fog'}, 'cups, dungeons and indoor halls (the Curling Shed) are under cover; outdoor grounds (the rink, the snow pitch) are not', cover)
 
         # ---------- the cards ----------
         cards = await pg.evaluate("""(() => { const out = {}; const k = Object.keys(ENEMIES).find(id => !ENEMIES[id].boss && !ENEMIES[id].elite && !ENEMIES[id].ai.quarters);

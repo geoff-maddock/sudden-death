@@ -24,6 +24,12 @@ K('crl_button', 'Draw to the Button', 'any', 'skl', 2, 'u', 'self', [['b', 14]],
 K('crl_hammer', 'Last Rock', 'any', 'atk', 2, 'r', 'one', [['d', 10], ['b', 10]], { sport: 'curling', retain: 1, fl: 'You have the hammer.' });
 K('crl_broom', 'Broom Work', 'any', 'skl', 0, 'c', 'self', [['b', 3], ['draw', 1]], { sport: 'curling', fl: 'Heat the ice. Guide the stone.' });
 // boxing: steady damage and taking rounds
+// soccer: string cheap cards together as passes, then take the shot
+K('scr_tiki', 'Tiki-Taka', 'any', 'skl', 0, 'c', 'self', [['draw', 1]], { sport: 'soccer', fl: 'Short, short, short. Then shorter.' });
+K('scr_overlap', 'Overlapping Run', 'any', 'skl', 1, 'c', 'self', [['b', 5], ['draw', 1]], { sport: 'soccer', fl: 'Round the outside, every time.' });
+K('scr_through', 'Through Ball', 'any', 'atk', 1, 'c', 'one', [['d', 8]], { sport: 'soccer', fl: 'Split the back line.' });
+K('scr_volley', 'Volley', 'any', 'atk', 2, 'u', 'one', [['d', 12]], { sport: 'soccer', fl: 'Never let it bounce.' });
+K('scr_captain', 'Captain’s Armband', 'any', 'pow', 2, 'r', 'self', [['s', 'str', 2, 'self']], { sport: 'soccer', fl: 'Points, shouts, wins the toss.' });
 K('box_jab', 'Jab', 'any', 'atk', 0, 'c', 'one', [['d', 4]], { sport: 'boxing', fl: 'Keep it working.' });
 K('box_onetwo', 'One-Two', 'any', 'atk', 1, 'c', 'one', [['d', 5, 2]], { sport: 'boxing', fl: 'Textbook.' });
 K('box_clinch', 'Clinch', 'any', 'skl', 1, 'c', 'one', [['b', 7], ['s', 'weak', 1]], { sport: 'boxing', fl: 'Tie them up. Catch your breath.' });

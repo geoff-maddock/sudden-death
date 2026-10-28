@@ -1,4 +1,4 @@
-import asyncio, os
+import asyncio, sys, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 from paths import GAME_URL
 from playwright.async_api import async_playwright
@@ -21,5 +21,9 @@ async def main():
         await pg.click('[data-fan=hp]'); await pg.wait_for_timeout(200)
         s = await pg.evaluate("[RUN.fans, RUN.maxhp]")
         print('goals hit:', r[0], '| play of the game:', r[1], '| fans:', r[2], '| goals:', r[3], '| after fan stand:', s, '| errors:', errs)
+        # soccer counts for the goals like any scored sport: a clean-sheet win is 'clean', and it is a new sport for 'variety'
+        sg = await pg.evaluate("[GOALS.clean.count({ won: true, them: 0, sport: 'soccer' }), GOALS.clean.count({ won: true, them: 1, sport: 'soccer' })]")
+        print('soccer counts for clean:', sg)
         await b.close()
+        if sg != [1, 0] or errs: print('FAIL soccer and the season goals', sg); sys.exit(1)
 asyncio.run(main())

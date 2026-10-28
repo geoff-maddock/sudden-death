@@ -3,7 +3,7 @@ import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 from paths import GAME_URL
 from playwright.async_api import async_playwright
-SPORTS = ['baseball','football','hockey','basketball','curling','boxing','golf','jousting','bowling']
+SPORTS = ['baseball','football','hockey','basketball','curling','boxing','golf','jousting','bowling','soccer']
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width': 1300, 'height': 950})
