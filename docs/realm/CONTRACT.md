@@ -407,7 +407,7 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 
 - **The squad rule.** `W_GRD_SQUAD[sport]` is how many players of your own a ground needs before it hosts you: golf, jousting, boxing and curling 4; bowling, basketball and baseball 5 (baseball's is `W_BALL.minOwn`); hockey 6; football 7. `wGrdProblems(id)` gives the reasons in sentences (empty when you can play); the Ballpark's are `wBallProblems()`. Wild matches, cups and dungeons need no squad.
 - **A game.** Every keeper but the Ballpark's has `game` (act `gmatch`: `wOpenGrdCard`). `wStartGrd(id, mode)` starts a match through `startMatch` with `sport` = the ground's, `world: { kind: 'ground', ref: { g, mode }, region }`. A Friendly (`normal`) is at the region's tier; a Challenge (`elite`, with a scouting trait) is a tier up. `wBuildEncounter` (wrapped) forces `enc.sport` to the ground's sport, whatever enemies are drawn. The other side wears the city club's name (`<City> <Sport> Club`) and the sport's pennant colour (`wMatchTeam`).
-- **The end.** `W_ON_END.ground` records the result in `WG.grd = { met: { id: dayAbs }, rec: { id: { w, l, last } } }` (plain JSON), and the ground is used up for the day, win or lose. A loss is a blackout, as on the road. The scoreboard (`%`, `wUse` wrapped) and the journal (`wJRules`) show the record. Rewards are Sudden Death's for the match type; there is no fee.
+- **The end.** `W_ON_END.ground` records the result in `WG.grd = { met: { id: dayAbs }, rec: { id: { w, l, last } } }` (plain JSON), and the ground is used up for the day, win or lose. A loss is a blackout, as on the road. The scoreboard (`%`, `wUse` wrapped) and the journal (`wJRules`) show the record. Rewards are Sudden Death's for the match type; there is no fee. A win also takes the gate (w36-gate.js).
 
 ## Bigger cities (w22-cities.js)
 
@@ -500,3 +500,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 
 - **Storage.** `localStorage[pkey('sd-realm-legends')]`: the latest `W_LEG.keep` entries `{ id, name, short, color, light, year, crowns, hard, at, cap, players: [{ n, kind, lvl, num }] }`, written on a Crown (`wCupWon`, wrapped; never in LAB). One entry per journey (`WG.legId`), updated by later crowns.
 - **Later journeys.** `wStart` (wrapped) copies the Hall into `WG.legends` (never the journey's own). `wLegendMatch(id)`: a `rival` match at tier `W_LEG.tier` against `wLegendIds(L)` (an ordinary enemy of each player's kind, at most one elite), kind `legend`; a `fightStart` hook gives the enemies the legend players' names; `wMatchTeam` (wrapped) their colours. `W_ON_END.legend` records `WG.legBeat[id]` and pays `W_LEG.prize`. Steward Crane's `legends` (act `legends`) opens the Hall; with `W_LEG.roadCups` cups, `wEncounterHook` (wrapped) may bring one on the road.
+
+## Gate money (w36-gate.js)
+
+- **No fee, a gate on a win.** `wTake(id, mode)` is the gold a win at a card-game ground takes today: `W_TAKE.per[mode]` (Friendly 5, Challenge 6) × `wGrdTier(id, mode)` × `W_TAKE.name[wRepStep(region)]` (1, 1.25, 1.5, 2 for Unknown, Known, Liked, Loved), rounded. 0 at the Ballpark (ball games keep `W_BALL.gold`) and when `W_TAKE.off`.
+- **Paid by** `W_ON_END.ground` (wrapped as `wW36GrdEnd`): worked out before the win adds to your name, so it matches the cards; paid through `gainGold` (trophy gold bonuses apply) with a log line. A loss takes nothing.
+- **Shown** on the keeper's card (`.wgate`, `wOpenGrdCard` wrapped), the pre-game card's ground line (`.wpground`), and How to play (`#wHelpGate` in `#wHelpGrdPlay`).

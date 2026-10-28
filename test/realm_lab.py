@@ -70,6 +70,8 @@ async def main():
     for k in sorted(agg, key=lambda k: min(i for i, l in enumerate(order) if any(m['stage'] == l for m in agg[k]))):
         v = agg[k]; w = sum(1 for m in v if m['res'] == 'win')
         print(f"{k:22s} {len(v):4d} {pct(w, len(v))} {sum(m['lost'] for m in v) / len(v):7.1f} {100 * sum(m['lost'] / m['max0'] for m in v) / len(v):5.1f} {sum(m['turns'] for m in v) / len(v):6.1f} {sum(m['lv'] for m in v) / len(v):4.1f}")
+    gm = [m for l in ok for m in l['matches'] if m['kind'] == 'ground']
+    if gm: print(f"ground games {len(gm) / len(ok):.1f} a journey, won {pct(sum(1 for m in gm if m['res'] == 'win'), len(gm))}, gate money {sum(l.get('take', 0) for l in ok) / len(ok):.0f} gold a journey")
     bo = [l['blackouts'] for l in ok]
     print('\nblackouts per run', round(sum(bo) / len(bo), 2), ' days', round(sum(l['days'] for l in ok) / len(ok)), ' matches per run', round(sum(len(l['matches']) for l in ok) / len(ok), 1))
     cr = [l for l in ok if l['crownTries']]

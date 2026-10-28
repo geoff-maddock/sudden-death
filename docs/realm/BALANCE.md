@@ -269,3 +269,15 @@ With 140 journeys a side, a difference of up to about 9 points is noise, and eve
 | **Boss, tier 3, no extra levels (shipped)** | **68.5% (54 games)** | **66%** |
 
 The shipped match is about as hard as the Crown final (68%). They only turn up once you hold a cup, and you can always back away from the card. Champion rate with it: 82.9%.
+
+## Gate money (issue #6, open question 4)
+
+A game at a ground costs nothing; a win takes the gate (`W_TAKE`: 5 gold a tier for a Friendly, 6 for a Challenge, up to double where your name is Loved). The route never played ground games before, so the bot now can (`opts.grounds`: a Friendly at each of a cup town's card-game grounds its squad is big enough for, off unless asked, so older rows still compare). 140 journeys each, skilled bot:
+
+| 140 journeys | Champion rate | Ground games a journey (won) | Gate money a journey | Gold at the end |
+|---|---|---|---|---|
+| No ground games (the old route) | 79.3% | - | - | 620 |
+| Ground games, no gate (`W_TAKE.off`) | 82.1% | 8.4 (98.2%) | - | 674 |
+| Ground games, with the gate (shipped) | 82.1% | 8.9 (98.4%) | 89 | 693 |
+
+The gate is a small top-up, about 10 gold a game: less than a Friendly's own match gold (10 to 20). Champion rate and end gold stay within noise, so the gold sinks from epic 2 still hold. Friendlies at the region's tier are easy wins for the bot (98%); the Challenge is the harder game, and pays a little more.

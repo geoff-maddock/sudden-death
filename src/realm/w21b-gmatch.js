@@ -125,8 +125,9 @@ W_ON_END.ground = function (r, ref, W) {
   G.met[g.id] = WG.dayAbs;
   if (r === 'win') h.w++; else h.l++;
   h.last = { r: r === 'win' ? 'win' : 'lose', us: typeof last.us === 'number' ? last.us : null, them: typeof last.them === 'number' ? last.them : null, mode: ref.mode || 'friendly', day: WG.dayAbs };
-  if (r === 'win') wLog(`You beat the ${wGrdClub(g)} at ${g.name}. The crowd stays to clap you off.`, 'g');
-  else wLog(`The ${wGrdClub(g)} beat you at ${g.name}.`, 'b');
+  const at = g.name.replace(/^The /, 'the ');
+  if (r === 'win') wLog(`You beat the ${wGrdClub(g)} at ${at}. The crowd stays to clap you off.`, 'g');
+  else wLog(`The ${wGrdClub(g)} beat you at ${at}.`, 'b');
 };
 
 /* the scoreboard shows the last game here */
