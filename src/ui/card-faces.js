@@ -98,6 +98,12 @@ function cardArt(card) {
   const m = RUN && memberOf(d.kind);
   return portraitURL(d.kind, team, m ? m.num : '', 120);
 }
+// under a card on offer: how many copies of it are already in your deck
+function inDeckHTML(id) {
+  if (!RUN || !RUN.deck) return '';
+  const n = RUN.deck.filter(c => c.id === id).length;
+  return `<div class="indeck${n ? '' : ' new'}">${n ? `In your deck: ${n}` : 'Not in your deck'}</div>`;
+}
 function cardHTML(card, o = {}) {
   const d = def(card), cost = d.cost;
   const kindLabel = d.kind === 'any' ? 'League' : d.kind === 'none' ? '' : (KIND_NAME[d.kind] || d.kind);

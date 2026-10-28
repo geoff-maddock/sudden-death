@@ -170,6 +170,8 @@ window.REALMLAB = function (opts = {}) {
     try {
       for (const k of opts.groundOrder || GROUND_ORDER) { const c = wGroundCost(k); if (c != null && RUN.gold >= c + 150) wUpgradeGround(k); }
       for (let g = 0; g < 2 && wDrillsLeft(); g++) { const c = RUN.deck.filter(practicable).sort((a, b) => (CARDS[b.id].type === 'atk') - (CARDS[a.id].type === 'atk'))[0]; if (!c) break; wDrill(c); }
+      // retire a basic card once a week for home energy, as a player thinning the deck would
+      if (typeof wRetireProblems === 'function' && opts.retire !== false && !wRetireProblems()) { const b = RUN.deck.find(c => !c.wp && /^(check|hold)$/.test(c.id)); if (b) wRetireCard(b); }
       if (RUN.hp < RUN.maxhp) wSleepGround();
     } finally { WG.map = m; }
     const home = Object.keys(TOWN).find(r => TOWN[r] === WG.ground.town);

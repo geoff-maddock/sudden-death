@@ -513,3 +513,9 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Reveal.** `wDoStep` and `wEnterMap` (wrapped) reveal a circle of `W_MAP.see` tiles round you when you are on the world map. `wStart` (wrapped): a journey without `WG.fog` (new, or an older save) is revealed `W_MAP.back` tiles round Graftonbury and every place in the journal or with a `seen_` flag.
 - **Drawn** by `wMapDraw` on `#wMapCv` (`W_MAP.px` pixels a tile): `W_MAP_COL` flat tile colours, an inked edge on the fog, `wMapMark` for each place in `wMapPlaces()` (kinds in `W_MAP_KIND`; bold name once in the journal's places; a ground's name on the side away from its city), and a red mark at `wMapHere()` (your tile, or the place whose map you are in).
 - **Opened** by `wOpenMap()`: the `M` key, `#wMapBtn` (`wRenderHud` wrapped, after the Journal button), and `#pMap` on the Menu (`openPause` wrapped, in the world only). How to play: `#wHelpMap`.
+
+## Retiring a card (w39-retire.js)
+
+- **The rule.** `wRetireCard(card)`: at your home ground, once a week (`WG.ground.retired = wWeek()`), for `W_RETIRE.energy` (3) energy of `REGION_ELEM[wHomeRegion()]`, and never below `W_RETIRE.minDeck` (5) cards. `wRetireProblems()` says why not, in a sentence. It doesn't touch `RUN.removeCost`, the card vendors' gold price.
+- **Shown** on the ground's screen (`#wGroundRetire`, `wOpenGround` wrapped), and in How to play (`#wHelpRetire` in the home ground section, `#wHelpTrade` for the vendors' trade in Towns).
+- **Copies in your deck.** `inDeckHTML(id)` (Sudden Death, `src/ui/card-faces.js`) writes "In your deck: N" or "Not in your deck" under a card on offer: the card choices (`cardChoiceRow`, which the Realm's picks use too), the pro shop, an event's cards, and the Realm's card vendors.

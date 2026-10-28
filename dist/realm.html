@@ -327,6 +327,7 @@ kbd{font-family:var(--hud);font-size:17px;background:var(--stone2);border:1px so
 .price{font-family:var(--hud);font-size:20px;color:var(--torch);text-align:center;margin-top:4px}
 .price.no{color:var(--faint);text-decoration:line-through}
 .ware{display:grid;justify-items:center}
+.indeck{font-size:14px;color:var(--dim);margin-top:2px}.indeck.new{color:var(--vile)}
 .ware.sold{opacity:.25;pointer-events:none}
 .items{display:flex;gap:10px;flex-wrap:wrap}
 .item{display:grid;grid-template-columns:34px 1fr;gap:4px 10px;align-items:center;text-align:left;width:min(300px,100%);background:var(--stone2);border:1px solid var(--seam);border-radius:6px;padding:8px 10px;cursor:pointer}
@@ -4210,6 +4211,12 @@ function cardArt(card) {
   const m = RUN && memberOf(d.kind);
   return portraitURL(d.kind, team, m ? m.num : '', 120);
 }
+// under a card on offer: how many copies of it are already in your deck
+function inDeckHTML(id) {
+  if (!RUN || !RUN.deck) return '';
+  const n = RUN.deck.filter(c => c.id === id).length;
+  return `<div class="indeck${n ? '' : ' new'}">${n ? `In your deck: ${n}` : 'Not in your deck'}</div>`;
+}
 function cardHTML(card, o = {}) {
   const d = def(card), cost = d.cost;
   const kindLabel = d.kind === 'any' ? 'League' : d.kind === 'none' ? '' : (KIND_NAME[d.kind] || d.kind);
@@ -5452,7 +5459,7 @@ function deckSummary() {
     <span style="display:flex;gap:8px;align-items:flex-end">Curve <span class="curve">${curve.map((v, k) => `<span style="height:${Math.max(3, 30 * v / mx)}px" title="${v} cards costing ${k}${k === 3 ? '+' : ''}"><i>${k}${k === 3 ? '+' : ''}</i></span>`).join('')}</span></span></div>`;
 }
 function cardChoiceRow(list, attr) {
-  return `<div class="cardrow">${list.map((c, i) => `<div class="ware">${cardHTML(Object.assign({ uid: attr + i }, c), { attrs: `data-${attr}="${i}"` })}<div class="fit${cardFit(c.id).length ? '' : ' dim'}">${cardFit(c.id).map(esc).join('<br>') || '&nbsp;'}</div></div>`).join('')}</div>`;
+  return `<div class="cardrow">${list.map((c, i) => `<div class="ware">${cardHTML(Object.assign({ uid: attr + i }, c), { attrs: `data-${attr}="${i}"` })}<div class="fit${cardFit(c.id).length ? '' : ' dim'}">${cardFit(c.id).map(esc).join('<br>') || '&nbsp;'}</div>${inDeckHTML(c.id)}</div>`).join('')}</div>`;
 }
 function renderReward() {
   const P = RUN.panel, rw = P.rw, el = $('v-panel');
@@ -5505,7 +5512,7 @@ function renderShop() {
   const body = $('pbody');
   const affordable = p => RUN.gold >= p;
   body.innerHTML = `<div class="shopgrid">
-    <div><h4>Cards</h4><div class="cardrow">${S.cards.map((w, i) => `<div class="ware${w.sold ? ' sold' : ''}">${cardHTML({ uid: 's' + i, id: w.id }, { attrs: `data-buy-card="${i}"`, flav: false })}<div class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</div></div>`).join('')}</div></div>
+    <div><h4>Cards</h4><div class="cardrow">${S.cards.map((w, i) => `<div class="ware${w.sold ? ' sold' : ''}">${cardHTML({ uid: 's' + i, id: w.id }, { attrs: `data-buy-card="${i}"`, flav: false })}<div class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</div>${inDeckHTML(w.id)}</div>`).join('')}</div></div>
     <div><h4>Trophies</h4><div class="items">${S.relics.map((w, i) => `<button class="item${w.sold ? ' sold' : ''}" data-buy-relic="${i}" ${affordable(w.price) ? '' : 'aria-disabled="true"'}>${relicI(w.id)}<span><b>${esc(RELICS[w.id].n)}</b></span><small>${esc(RELICS[w.id].desc)}</small><span class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</span></button>`).join('')}</div></div>
     <div><h4>Tonics</h4><div class="items">${S.tonics.map((w, i) => `<button class="item${w.sold ? ' sold' : ''}" data-buy-tonic="${i}">${flaskI(TONICS[w.id].col)}<span><b>${esc(TONICS[w.id].n)}</b></span><small>${esc(TONICS[w.id].desc)}</small><span class="price${affordable(w.price) ? '' : ' no'}">${w.price} gold</span></button>`).join('')}
       <button class="item${S.removed ? ' sold' : ''}" id="bRemove">${svgI('<path d="M6 6l12 12M18 6L6 18" stroke="#e0533a" stroke-width="3"/>')}<span><b>Trade a card away</b></span><small>Remove one card from your deck.</small><span class="price${affordable(RUN.removeCost) ? '' : ' no'}">${RUN.removeCost} gold</span></button>
@@ -5562,7 +5569,7 @@ function renderEvent() {
   $('bEvDone').onclick = () => { if (P.then && P.then.relic) { gainRelic(P.then.relic); } backToMap(); };
   if (!T) return;
   if (T === 'remove' || T === 'upgrade') { box.innerHTML = `<button class="ghost" id="bThen">${T === 'remove' ? 'Choose a card to remove' : 'Choose a card to upgrade'}</button>`; $('bThen').onclick = () => pickFromDeck(T, c => { if (c) { P.then = null; saveRun(); renderEvent(); } }); }
-  else if (T.cards) { box.innerHTML = `<div class="cardrow">${T.cards.map((c, i) => cardHTML(Object.assign({ uid: 'e' + i }, c), { attrs: `data-ec="${i}"` })).join('')}</div>${T.cards.length > 1 ? '<p class="hint">Pick one.</p>' : '<p class="hint">Click it to add it to your deck.</p>'}`; box.querySelectorAll('[data-ec]').forEach(el => el.onclick = () => { const c = T.cards[+el.dataset.ec]; RUN.deck.push(mkCard(c.id, c.up)); P.then = null; saveRun(); sfx.card(); renderEvent(); renderRunBar(); }); }
+  else if (T.cards) { box.innerHTML = `<div class="cardrow">${T.cards.map((c, i) => `<div class="ware">${cardHTML(Object.assign({ uid: 'e' + i }, c), { attrs: `data-ec="${i}"` })}${inDeckHTML(c.id)}</div>`).join('')}</div>${T.cards.length > 1 ? '<p class="hint">Pick one.</p>' : '<p class="hint">Click it to add it to your deck.</p>'}`; box.querySelectorAll('[data-ec]').forEach(el => el.onclick = () => { const c = T.cards[+el.dataset.ec]; RUN.deck.push(mkCard(c.id, c.up)); P.then = null; saveRun(); sfx.card(); renderEvent(); renderRunBar(); }); }
   else if (T.relic) { box.innerHTML = `<button class="reward" id="bTR">${relicI(T.relic)}<span><b>${esc(RELICS[T.relic].n)}</b><small>${esc(RELICS[T.relic].desc)}</small></span></button>`; $('bTR').onclick = () => { gainRelic(T.relic); P.then = null; saveRun(); renderEvent(); renderRunBar(); }; }
 }
 
@@ -10294,7 +10301,7 @@ function wOpenCardShop(id, msg) {
   const days = 7 - ((WG.dayAbs - 1) % 7), ok = p => RUN.gold >= p;
   const close = modal(`<header><div class="row"><img class="wmport" src="${portraitURL(ch.kind, wNpcTeam(ch.kind), '', 96)}" alt=""><h3>${esc(S.name)}</h3></div><button class="ghost" data-close>Done</button></header>
     <p class="hint">${esc(Rg.name)} stock: cards for ${esc(Rg.sports.map(s => SPORT_NAME[s[0]].toLowerCase()).join(' and '))}, and the kinds that play here. New stock in ${days} day${days === 1 ? '' : 's'}. You have <b class="wgold">${RUN.gold} gold</b>.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p>
-    <div class="shopgrid"><div class="cardrow">${st.cards.map((w, i) => `<div class="ware${w.sold ? ' sold' : ''}">${cardHTML({ uid: 'ws' + i, id: w.id }, { attrs: `data-wbuyc="${i}"`, flav: false })}<div class="price${ok(w.price) ? '' : ' no'}">${w.sold ? 'Sold' : w.price + ' gold'}</div></div>`).join('')}</div>
+    <div class="shopgrid"><div class="cardrow">${st.cards.map((w, i) => `<div class="ware${w.sold ? ' sold' : ''}">${cardHTML({ uid: 'ws' + i, id: w.id }, { attrs: `data-wbuyc="${i}"`, flav: false })}<div class="price${ok(w.price) ? '' : ' no'}">${w.sold ? 'Sold' : w.price + ' gold'}</div>${inDeckHTML(w.id)}</div>`).join('')}</div>
     <div class="items"><button class="item${st.removed ? ' sold' : ''}" id="wRemove" ${st.removed ? 'disabled' : ''}>${svgI('<path d="M6 6l12 12M18 6L6 18" stroke="#e0533a" stroke-width="3"/>')}<span><b>Trade a card away</b></span><small>Remove one card from your deck. Once a week here.</small><span class="price${ok(RUN.removeCost) ? '' : ' no'}">${RUN.removeCost} gold</span></button></div></div>`);
   $('modalBox').querySelectorAll('[data-wbuyc]').forEach(el => el.onclick = () => { const r = wBuyCard(id, +el.dataset.wbuyc); if (!r && typeof sfx !== 'undefined') sfx.coin(); close(); wDrain(); wOpenCardShop(id, r); });
   $('wRemove').onclick = () => {
@@ -25097,6 +25104,61 @@ renderHelp = function () {
   const sec = $('wHelp'); if (!sec || $('wHelpMap')) return;
   sec.insertAdjacentHTML('beforeend', `<div id="wHelpMap"><h4>The map</h4>
     <p class="hint"><b>Map</b> (<kbd>M</kbd>, or from the Menu) shows the realm as far as your team has seen it. It starts blank and fills in round you as you walk the world, and what you have seen stays on it. Towns, grounds, dungeons and lairs get their mark once you have seen them, and their name in bold once you have been there. The red mark is you.</p></div>`);
+};
+/* w39: retire a card at your home ground. Loads after w37-map.js; changes earlier parts only by reassignment (saved
+   originals carry the wW39 prefix).
+
+   Once a week, at your own ground, you can retire a card: it leaves your deck for good. It costs W_RETIRE.energy energy
+   of your home region's element (REGION_ELEM: aether in the Charter Plains, bloom, tide, ember or rime elsewhere), the
+   energy you gather from wells, which Brother Quill also spends on upgrades. It is its own track: the card vendors'
+   trade (w9b, once a week at each of the three, for gold at Sudden Death's rising removeCost) is unchanged.
+
+   WG.ground.retired   the week (wWeek) a card was last retired here
+   wRetireProblems()   why you can't retire a card now, as a sentence ('' when you can)
+   wRetireCard(card)   '' when done, or why not
+   Wrapped: wOpenGround (wW39OpenGround: the button), renderHelp (wW39RenderHelp: #wHelpRetire, and the vendors' trade
+   in How to play's Towns section, #wHelpTrade). */
+
+const W_RETIRE = { energy: 3, minDeck: 5 };
+function wRetireEl() { return REGION_ELEM[wHomeRegion()] || 'aether'; }
+function wRetireProblems() {
+  const G = wHomeGround(); if (!G) return 'You need a home ground.';
+  if (G.retired === wWeek()) return 'You have retired a card here this week. Come back next week.';
+  const el = wRetireEl(), have = WG.energy[el] || 0;
+  if (have < W_RETIRE.energy) return `It takes ${W_RETIRE.energy} ${DB.elems.names[el]} energy, and you have ${have}. Energy wells give it.`;
+  if (RUN.deck.length <= W_RETIRE.minDeck) return `Your deck is down to ${RUN.deck.length} cards. Keep them.`;
+  return '';
+}
+function wRetireCard(card) {
+  const why = wRetireProblems(); if (why) return why;
+  const i = RUN.deck.indexOf(card); if (i < 0) return 'That card is not in your deck.';
+  const el = wRetireEl();
+  RUN.deck.splice(i, 1); WG.energy[el] -= W_RETIRE.energy; WG.ground.retired = wWeek();
+  wLog(`You retire ${wCardName(card.id, card.up)} at your ground. It leaves your deck for good (${W_RETIRE.energy} ${DB.elems.names[el]} energy).`, 'd');
+  wSave();
+  return '';
+}
+
+const wW39OpenGround = wOpenGround;
+wOpenGround = function (town, msg) {
+  wW39OpenGround(town, msg);
+  const G = wHomeGround(), sl = $('wGroundSleep');
+  if (!G || G.town !== wGrdPlace(town || WG.map).town || !sl || $('wGroundRetire')) return;
+  const why = wRetireProblems(), el = wRetireEl();
+  sl.closest('.row').insertAdjacentHTML('afterend', `<div class="row wretire"><button class="ghost" id="wGroundRetire" ${why ? 'disabled' : ''}>Retire a card (${W_RETIRE.energy} ${esc(DB.elems.names[el])} energy)</button>
+    <small class="hint">${esc(why || `Once a week: a card leaves your deck for good. You have ${WG.energy[el] || 0} ${DB.elems.names[el]} energy.`)}</small></div>`);
+  $('wGroundRetire').onclick = () => {
+    $('modalBox').querySelector('[data-close]').click();
+    wPickCard(RUN.deck.slice(), 'Retire a card', `It leaves your deck for good. ${W_RETIRE.energy} ${DB.elems.names[el]} energy.`, card => { const r = card ? wRetireCard(card) : ''; wDrain(); wOpenGround(town, r); });
+  };
+};
+
+const wW39RenderHelp = renderHelp;
+renderHelp = function () {
+  wW39RenderHelp();
+  const g = $('wHelpGround'), t = $('wHelpTowns');
+  if (g && !$('wHelpRetire')) g.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpRetire"><b>Retire a card.</b> Once a week at your ground, a card can leave your deck for good. It costs ${W_RETIRE.energy} energy of your home region's element (the energy wells give it).</p>`);
+  if (t && !$('wHelpTrade')) t.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpTrade"><b>Trading a card away.</b> The three card vendors (Odd Lots in Graftonbury, Hob Tarn in Saltmere, the Brandt smithy in Cinderhold) will take a card off your hands: ask about CARDS, then Trade a card away. Once a week at each, for gold. The price starts at 75 gold and rises by 25 each time. Your home ground can retire a card too.</p>`);
 };
 </script>
 </body></html>

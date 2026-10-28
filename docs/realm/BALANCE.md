@@ -281,3 +281,7 @@ A game at a ground costs nothing; a win takes the gate (`W_TAKE`: 5 gold a tier 
 | Ground games, with the gate (shipped) | 82.1% | 8.9 (98.4%) | 89 | 693 |
 
 The gate is a small top-up, about 10 gold a game: less than a Friendly's own match gold (10 to 20). Champion rate and end gold stay within noise, so the gold sinks from epic 2 still hold. Friendlies at the region's tier are easy wins for the bot (98%); the Challenge is the harder game, and pays a little more.
+
+## Retiring a card at your home ground
+
+The balance bot retires a basic card (Body Check or Hold the Line) once a week when it can (`opts.retire`). Over 140 journeys each, `main` was champion 79.3% of the time, and with retiring 85.7%. That's about 1.3 standard errors at this sample size, so part of it may be noise. Thinner decks should help, though, and 3 energy a week may be cheap; `W_RETIRE.energy` is the value to raise.
