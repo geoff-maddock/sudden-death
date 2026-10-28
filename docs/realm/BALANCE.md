@@ -229,3 +229,43 @@ The bot drills a card and answers the challenge at each spot in every town it st
 | Spots on | 77.9% | 652 | 10 |
 
 About +4 points, inside the noise of two 140-run samples. The free Practice ★ helps most early (the Hatchery), and the prize money adds about 70 gold by the Crown. No retune.
+
+## Notice boards (epic 2, phase 4)
+
+At every town it stops in, the bot takes the best-paying contracts the route can meet (not ground games, which the route never plays), up to three (`opts.notices`). 140 journeys each, skilled bot:
+
+| | Champion rate | Contracts done | Gold at the end |
+|---|---|---|---|
+| Boards off | 75.7% | 0 | 631 |
+| Boards on, first pay table | 81.4% | 12.8 (4.4 lapsed) | 1,172 |
+| Boards on, gold halved (shipped) | 76.4% | 11.9 (4.8 lapsed) | 853 |
+
+The first pay table nearly doubled the gold a journey ends with, and gold already piles up, so contracts now pay half the gold (`W_NOTICE.gold`), with fans at two fifths of it and the card picks kept. The champion rate is inside the noise either way. The gold sinks of phase 10 should take up the extra 220.
+
+## Epic 2, phases 5 to 12
+
+The bot now plays the new systems as a player would: it rotates a Tired starter for a fresh bench player (a Tired one counts a level lower, a Spent one two; `opts.rotate`), keeps a starter as captain, pays the inn's price for your name in the region, takes one paid training camp session a stop while it has 200 gold to spare (`opts.camp`, `opts.campSpare`), and with two cups hunts the Barnstormers on a wild stop in their region (`opts.tour`, `opts.tourCups`). Weather and the regional crowd apply on their own. Defending the title and the Hall of Legends come after the Crown, where the bot's route ends, so they are not measured. Each row switches one system off. 140 journeys each, skilled bot, all run on the same build:
+
+| 140 journeys | Champion rate | Gold at the end | Notes |
+|---|---|---|---|
+| Everything on | 80.7% | 654 | 15% of matches with a Tired starter; 5% in weather |
+| Tired legs off (`W_FAT.off`) | 80.0% | 698 | |
+| Tired legs on, never rotating | 75.0% | 630 | Rotation is worth about 5 points |
+| Captain off (`W_CAPT.off`) | 82.9% | 669 | |
+| Weather off | 84.3% | 686 | Weather matches are mostly wild games, won 98% of the time |
+| Regional fans off (`W_REP.off`) | 85.7% | 662 | The bot is rarely Loved anywhere (5 crowd matches in 140 journeys) |
+| Barnstormers off | 79.3% | 654 | |
+| Training camp off | 81.4% | 972 | About 13 paid sessions a journey: the gold sink takes about 320 |
+
+With 140 journeys a side, a difference of up to about 9 points is noise, and every row is inside it. Together, phases 4 to 12 leave the champion rate where it was (75.7% before the notice boards) and the gold at the end near the old level (631): contracts add about 220, and training camp takes about 320.
+
+**The Barnstormers.** They should be a fight worth a unique Hall of Fame card. The bot hunts them once it has two cups:
+
+| Their match | Bot wins | HP lost (% of max) |
+|---|---|---|
+| Elite, tier 3, two levels up | 44 of 44 | 36% |
+| Boss, tier 2, two levels up | 95% (61 games) | 49% |
+| Boss, tier 3, two levels up | 47% (55 games) | 78% |
+| **Boss, tier 3, no extra levels (shipped)** | **68.5% (54 games)** | **66%** |
+
+The shipped match is about as hard as the Crown final (68%). They only turn up once you hold a cup, and you can always back away from the card. Champion rate with it: 82.9%.

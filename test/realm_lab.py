@@ -84,6 +84,13 @@ async def main():
     grounds = [l['ground'] for l in ok if l.get('ground')]
     if grounds:
         print('grounds', len(grounds), 'of', len(ok), collections.Counter(g['town'] for g in grounds).most_common(), ' upgrade levels per run', round(sum(sum(g['parts'].values()) for g in grounds) / len(grounds), 1))
+    if ok and 'notices' in ok[0]: print(f"contracts done {sum(l['notices'] for l in ok) / len(ok):.2f}, lapsed {sum(l['lapsed'] for l in ok) / len(ok):.2f} a journey")
+    allm = [m for l in ok for m in l['matches']]
+    if allm and 'tired' in allm[0]:
+        ti = [m for m in allm if m['tired']]; wx = [m for m in allm if m['wx']]; rp = [m for m in allm if m['rep']]
+        print(f"tired matches {pct(len(ti), len(allm))} (win {pct(sum(1 for m in ti if m['res'] == 'win'), len(ti))}), weather {pct(len(wx), len(allm))} (win {pct(sum(1 for m in wx if m['res'] == 'win'), len(wx))}), Loved crowd {len(rp)}")
+        tm = [m for m in allm if m['what'] == 'tour']
+        print(f"barnstormers played {len(tm)}, beaten {sum(l.get('tour', 0) for l in ok)} in {len(ok)} journeys; camp sessions {sum(l.get('camp', 0) for l in ok) / len(ok):.1f} a journey")
     print('gold at the end', round(sum(l['gold'] for l in ok) / len(ok)))
     print('most losses to', killers.most_common(8))
 

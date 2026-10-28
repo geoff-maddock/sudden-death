@@ -64,7 +64,7 @@ window.REALMLAB = function (opts = {}) {
     while (!B.over && g++ < 80) { botTurn(); if (B.over) break; runSteps(endTurn()); }
     const stall = !B.over;
     if (stall) { B.over = 'lose'; B.phase = 'done'; }
-    const res = B.over, m = { home: !!B.wHome, stage, what, kind: W.kind, type: enc.type, tier: W.tier, lv: W.lv || 0, sport: B.sport, ids: enc.ids.join('+'), res, lost: hp0 - RUN.hp, hp0, max0, turns: B.turn, stall, meal: !!B.wMeal, ambush: !!W.ambush };
+    const res = B.over, m = { home: !!B.wHome, stage, what, kind: W.kind, type: enc.type, tier: W.tier, lv: W.lv || 0, sport: B.sport, ids: enc.ids.join('+'), res, lost: hp0 - RUN.hp, hp0, max0, turns: B.turn, stall, meal: !!B.wMeal, ambush: !!W.ambush, tired: B.wTired || 0, wx: B.wWx || '', rep: B.wRep || 0 };
     finishFight();
     if (res === 'win') {
       const rw = RUN.panel && RUN.panel.rw;
@@ -105,16 +105,19 @@ window.REALMLAB = function (opts = {}) {
     wAddPlayer(wMakePlayer(p, p.from || 'postgame'));
     return true;
   }
-  // the three highest levels start, one of each kind
+  // the three highest levels start, one of each kind; a Tired starter counts a level lower and a Spent one two
+  // (tired legs, epic 2 phase 5; opts.rotate === false: never rotate). Then a starter wears the captain's armband.
+  const legsCost = p => opts.rotate === false || typeof wFatCards !== 'function' ? 0 : wFatCards(p);
   function bestLineup() {
-    const R = wRoster().slice().sort((a, b) => b.lvl - a.lvl || a.id - b.id), st = [];
+    const R = wRoster().slice().sort((a, b) => (b.lvl - legsCost(b)) - (a.lvl - legsCost(a)) || a.id - b.id), st = [];
     for (const p of R) if (st.length < W_PARTY.starters && !st.some(q => q.kind === p.kind)) st.push(p);
     const order = st.concat(R.filter(p => !st.includes(p)));
     if (order.map(p => p.id).join() !== wRoster().map(p => p.id).join()) wSetOrder(order.map(p => p.id));
+    if (typeof wCaptain === 'function' && !wCaptain() && wStarters()[0]) wSetCaptain(wStarters().slice().sort((a, b) => b.lvl - a.lvl)[0].id);
   }
   // sleep at an inn when hurt (a player walks back to town for it)
   function rest(region) {
-    const price = 12;
+    const price = typeof wInnPrice === 'function' ? wInnPrice(12, region) : 12;
     if (RUN.hp < RUN.maxhp * (opts.restAt || .7) && RUN.gold >= price) { const m = WG.map; WG.map = TOWN[region] || 'graftonbury'; wSleepInn(price); WG.map = m; }
   }
   // the tavern: sign the best free agent who outranks a starter, keeping 40 gold back
@@ -182,7 +185,21 @@ window.REALMLAB = function (opts = {}) {
       const st = wSpotState(sp.id);
       if (st.drill !== wWeek()) { const c = wSpotCards(sp.sport).sort((a, b) => (CARDS[b.id].type === 'atk') - (CARDS[a.id].type === 'atk'))[0]; if (c) wSpotDrill(sp.id, c); }
       if (st.quiz !== wWeek()) { const Q = wSpotQuiz(sp.id); wSpotAnswer(sp.id, opts.dumb ? pick(Q.opts) : sp.sport); }
+      // training camp (epic 2, phase 10): one paid session a stop, keeping opts.campSpare (200) gold back
+      if (opts.camp !== false && typeof wCampDrill === 'function' && st.drill === wWeek() && RUN.gold >= wCampPrice() + (opts.campSpare != null ? opts.campSpare : 200)) {
+        const c = wSpotCards(sp.sport).filter(c => !c.sk).sort((a, b) => (CARDS[b.id].type === 'atk') - (CARDS[a.id].type === 'atk'))[0]; if (c) { log.camp = (log.camp || 0) + 1; wCampDrill(sp.id, c); }
+      }
     }
+  }
+
+  // notice boards (epic 2, phase 4): in a town, take the best-paying contracts the route can meet (not ground games,
+  // which the route never plays), up to the limit (opts.notices === false: never)
+  function board(region) {
+    if (opts.notices === false || typeof W_NOTICE === 'undefined') return;
+    const town = TOWN[region]; if (!town || !W_NOTICE_CITY[town]) return;
+    const b = wBoard(town).list.filter(c => c.t !== 'ground').sort((x, y) => y.pay.gold - x.pay.gold);
+    for (const c of b) { if (wNotices().taken.length >= W_NOTICE.max) break; wTakeNotice(town, c.id); }
+    settle();
   }
 
   // personal quests (epic 2, phase 2): take every quest on as soon as a player offers it, and turn it in when the
@@ -199,10 +216,14 @@ window.REALMLAB = function (opts = {}) {
   /* ---------- the route ---------- */
   function wild(region, n) {
     const town = TOWN[region];
+    board(region);
     for (let i = 0; i < n && !RUN.over; i++) {
       prep(region);
       // a grudge (a bench player the bot would not sell) turns up on the road: the bot plays it on its next wild stop
       if (WG.grudge && WG.dayAbs >= WG.grudge.day) { atWorld(town, false); play(() => wGrudgeMatch(region), 'grudge'); prep(region); if (RUN.over) break; }
+      if (opts.tour !== false && typeof wTourOn === 'function' && wTourOn() && wTour().region === region && wCupsWon() >= (opts.tourCups != null ? opts.tourCups : 2)) {
+        atWorld(town, false); play(() => wTourMatch(region), 'tour'); prep(region); if (RUN.over) break;
+      }
       atWorld(town, Math.random() < (opts.night != null ? opts.night : .25));
       play(() => wWildMatch(region), 'wild ' + region);
     }
@@ -213,7 +234,7 @@ window.REALMLAB = function (opts = {}) {
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       if (id === 'crown') { log.crownTries++; for (let d = 0; d < 200 && !wChampWeek(); d++) wAdvance(24 * 60); }
       atMap(C.town);
-      ground(region); spots(region); tavern(region); quests(region); enchant(); shop(region);
+      ground(region); spots(region); board(region); tavern(region); quests(region); enchant(); shop(region);
       if (RUN.gold < W_CUP.fee && id !== 'crown') RUN.gold = W_CUP.fee; // a player would grind the fee; not the point
       while (!RUN.over) {
         prep(region, true);
@@ -232,7 +253,7 @@ window.REALMLAB = function (opts = {}) {
   function dungeon(id) {
     const dg = DB.dungeons.find(d => d.id === id), L = loc(id), region = L ? regionAt(L.x, L.y) : 'plains';
     if (!wGateCheck(id).ok) return false;
-    ground(region); spots(region); quests(region); shop(region); enchant();
+    ground(region); spots(region); board(region); quests(region); shop(region); enchant();
     for (let t = 0; t <= (opts.retries != null ? opts.retries : 3) && !RUN.over; t++) {
       for (const R of wDungeonRooms(id)) {
         if (wFlag(R.flag) || RUN.over) continue;
@@ -284,6 +305,8 @@ window.REALMLAB = function (opts = {}) {
   if (!log.result) log.result = wFlag('champion') ? 'champion' : 'stuck';
   log.ground = WG.ground ? { town: WG.ground.town, parts: WG.ground.parts } : null;
   log.grudges = log.matches.filter(m => m.what === 'grudge').length;
+  log.tour = WG.tour ? WG.tour.beat.length : 0;
+  log.notices = WG.notice ? WG.notice.done : 0; log.lapsed = WG.notice ? WG.notice.lapsed : 0;
   log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;
   return log;

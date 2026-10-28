@@ -444,3 +444,59 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - **Medals.** `w_grounds` (Groundhopper, set stat `realmGrounds`: ground ids, from `W_ON_END.ground` and, for the Ballpark, a `wBallSettle` while `WG.map === 'g_ballpark'`), `w_fixtures` (`realmFixWins`, a fixture won), `w_coach` (`realmSpotWins`, a right answer in `wSpotAnswer`).
 - **Team kit.** `WG.kit = { own: [ids], on: id }`, plain JSON; `home` is the club's own colours and always owned. `W_KITS` (six to buy at `W_KIT.price`), `wBuyKit(id)` returns '' or why not, and wears a kit you own for free. `clubTeam` (Sudden Death's, now a function declaration so it can be wrapped as `wSdClubTeam`) returns the kit's `color`, `light` and `dark` with the club's `short`. The League shop (`lg_shop`, act `kit`) takes the house at 32,21 in Graftonbury. Old saves without `WG.kit` drop `WG.npc.graftonbury` once (townsfolk places are kept by index).
 - **Match days.** `wMatchDayLine(city)`: a poster for tomorrow's league games at the city's grounds (not yours) or today's results there; `wAmbient` (wrapped) logs one now and then in the city and at its grounds.
+
+## Notice boards (w27-notices.js)
+
+- **The boards.** `W_NOTICE_CITY` maps each city to its inn's keeper, who has `notices` (act `board`: `wOpenBoard(city)`); the inn panel has a Notice board button (`#wInnBoard`). `wBoard(city)` posts `W_NOTICE.posted` contracts of different types once a week (`wWeek()`), for the city's region (`W_GRD_REG`).
+- **Contracts.** `{ id, city, region, t, sport?, n?, club?, g?, pay: { gold, fans, card }, prog, until? }`. Types: `sport`, `night`, `margin` (`W_NOTICE.margin[sport]`, scoreboard sports only), `club` (`wNoticeClub(region)`: the region's cup rival, Apex Athletic for the Charter Plains), `ground` (a city ground other than the Ballpark), `seeded` (`type === 'elite'`), `count` (`W_NOTICE.count` wins). Pay: `W_NOTICE.gold[t]`, times 1.5 in a tier 2 region; fans two fifths of it; `W_NOTICE.card[t]` adds a pick of 3 from `wSportPool` of the region's sports.
+- **Taking.** `wTakeNotice(city, id)` returns '' or why not (at most `W_NOTICE.max`); a taken contract has `until = dayAbs + W_NOTICE.days`. `wDropNotice(id)`. `wNewDay` (wrapped) lapses the ones past `until`.
+- **Meeting one.** `wDispatchEnd` (wrapped), on a win: `wNoticeFacts(W)` reads the world context and the last game record (`RUN.games`): `{ region, sport, night, us, them, won, type, club: ref.club || ref.rival, g }`. Every taken contract that `wNoticeMet` pays at once (`count` counts up first). Ball games on the diamond do not count.
+- **State.** `WG.notice = { boards: { city: { week, list } }, taken: [contract], done, lapsed }`, plain JSON.
+
+## Tired legs (w28-legs.js)
+
+- **State.** `p.legs` on each roster player (plain number, missing = 0). `wLegsState(p)`: `fresh` below `W_FAT.tired` (3), `tired` below `W_FAT.spent` (5), else `spent`. `wFatCards(p)`: 0, 1 or 2.
+- **Kickoff.** A `fightStart` hook splices `wFatCards(p)` Sudden Death `fatigue` cards into `B.draw` for each starter and sets `B.wTired`. `wKickoff` (wrapped) then moves the legs: starters +1 (at most `W_FAT.max`), bench −1 (at least 0). Ball games on the diamond do not count.
+- **Rest.** `wSleepInn` (wrapped, so also the home ground's beds) takes `W_FAT.bed` off everyone; `wMakeCamp` (wrapped) `W_FAT.camp`.
+- **Off.** `W_FAT.off` turns it all off (the bot's control runs).
+
+## The captain (w29-captain.js)
+
+- **State.** `WG.captain`: a player id. `wCaptain()` is that player only while they start. `wSetCaptain(pid)` returns '' or why not (only a starter). `wStart` (wrapped) names the first starter if there is none (new journeys and old saves); `wRelease` (wrapped) hands the armband to the first starter.
+- **The bonus.** `W_CAPTAIN[kind] = { n, d, on: { event: fn } }`, one for each of the 18 kinds a player can be (`SIG`). One `onHook(event)` per event used runs the captain's handler during a realm match; `fightStart` also logs it. `W_CAPT.off` turns it off.
+- **UI.** `wCampRow` (wrapped): a `.wcap` tag on the captain, a `[data-capt]` Captain button on other starters. `wPreGame` (wrapped): a `.wcapt` line.
+
+## Weather (w30-weather.js)
+
+- **The roll.** `wWeather(region)` rolls `WG.wx = { day, by: { region: kind } }` once per `dayAbs`: `blizzard` (rime), `fog` (tide), `ash` (ember), each with its `W_WX[k].p`. The Plains and the Mosswold stay fair.
+- **Which matches.** `wMatchWeather(W)`: a `W_WX_OUT` kind (`wild`, `event`, `camp`, `alpha`, `lair`, `tour`) on the world map, or a `ground` match whose sport is not in `W_WX_INDOOR`. `wBuildEncounter` (wrapped) sets `enc.world.wx`; fog may make a day wild game off the road an ambush.
+- **Kickoff.** A `fightStart` hook gives both sides the marker status (`snowed`, `fogbound`, `ashen`, new `ST` entries) and applies the effect; `B.wWx` is set. Cards: `wx_whiteout`, `wx_fogbank`, `wx_cinder` (kind `any`, uncommon, one regional sport each), using `['ifst', marker, yes, no]`.
+- **UI.** The weather after the region's name in the top bar (`wRenderHud`, wrapped), a `.wwx` pre-game line, and `wDrawWeather` over the world view (`wRender`, wrapped, in screen space inside save/restore).
+
+## Regional fans (w31-name.js)
+
+- **State.** `WG.rep = { region: points }`. `wRepStep(region)` counts the thresholds in `W_REP.at` (10, 25, 50): Unknown, Known, Liked, Loved. `W_REP.off` turns the effects off.
+- **Earning.** `wDispatchEnd` (wrapped): +`W_REP.win` for a win in `W.region`, −`W_REP.lose` for a loss. `wCupWon` (wrapped): +`W_REP.cup` to the cup's region. `wNoticePayOut` (wrapped): +`W_REP.notice` to the contract's region.
+- **Effects.** `wInnPrice(price, region)` (`W_REP.inn` by step) is applied by `wOpenInn` (wrapped) in a city. `wTavern` (wrapped): Liked or better, each new week's agents +1 level, fee unchanged (`T.wrep`). Loved: a `fightStart` hook adds `W_REP.block` Block (`B.wRep`) unless the match is at home (`wIsHome`) or the Crown.
+
+## The Barnstormers (w32-tour.js)
+
+- **State.** `WG.tour = { region, prev, since, beat: [years], played }`. The tour starts on day `W_TOUR.start`, away from the Plains; `wNewDay` (wrapped) moves it after `W_TOUR.stay` days (`since` is the day after the move). `wTourOn()`: started, and not beaten this year.
+- **Rumours.** `wTourRumour()`: the region they are in, or for the day between regions where they were. Innkeepers' `barnstormers` (act `tour`) logs it; `wOpenBoard` (wrapped) shows it as a poster.
+- **The match.** `wEncounterHook` (wrapped): on the world map in their region, `W_TOUR.p` a step. `wTourMatch(region)`: `W_TOUR.type` (`boss`), tier `W_TOUR.tier` (3), level + `W_TOUR.lvUp` (0), only once you hold `W_TOUR.cups` cup, kind `tour`, in `W_TOUR.team`'s colours (`wMatchTeam`, wrapped). `W_ON_END.tour`: a first win pays `W_TOUR.prize` and the card `tour_showstop` (kind `none`, so no reward pool offers it); later years `W_TOUR.again`. A loss moves them on.
+
+## Gold sinks (w33-sinks.js)
+
+- **Training camp.** `wCampDrill(spotId, card)`: only after that spot's free drill this week; `wCampPrice()` from `W_SINK.camp` by sessions this week (`WG.sink = { week, drills, coaches }`). A row added to `wOpenSpot` (wrapped).
+- **Coaches.** `wCoachTrip(from, to)`: `{ dist, price, minutes }` between two of `W_COACH_CITIES`. `wTakeCoach(to)` charges, advances the clock, and puts you at the destination's inn spot (`wInnSpot`) with the usual grace. Innkeepers' `coach` (act `coach`) and the inn's Coach button open `wOpenCoach`.
+
+## Defend the title (w34-defend.js)
+
+- **Champions.** `wChamps()` = crowns held. `wRenown` (wrapped) adds `W_DEF.renown` each. `WG.crownDay` is the day of the last crown.
+- **Defences.** `wDefending(id)`: a town cup on your wall whose `cupLog` year is before this year, once you are champions. `wCupProblem`, `wCupEnter` and `wCupPlay` (wrapped) let you in and mark `WG.cup.defence` before round 1 is built; `wCupMatch` (wrapped) adds `W_DEF.lvUp` levels to a defence and a level per crown to the Crown. `WG.defend.cups[id]` lists the years defended.
+- **The hunt.** `wEncounterHook` (wrapped), from the day after a crown: `W_DEF.huntP` a world step, a rival club's `event` match with `ref: { rival, hunt: 1 }` (so w18 counts it on the table and h2h). `W_ON_END.event` (wrapped) pays `W_DEF.huntWin`.
+
+## The Hall of Legends (w35-legends.js)
+
+- **Storage.** `localStorage[pkey('sd-realm-legends')]`: the latest `W_LEG.keep` entries `{ id, name, short, color, light, year, crowns, hard, at, cap, players: [{ n, kind, lvl, num }] }`, written on a Crown (`wCupWon`, wrapped; never in LAB). One entry per journey (`WG.legId`), updated by later crowns.
+- **Later journeys.** `wStart` (wrapped) copies the Hall into `WG.legends` (never the journey's own). `wLegendMatch(id)`: a `rival` match at tier `W_LEG.tier` against `wLegendIds(L)` (an ordinary enemy of each player's kind, at most one elite), kind `legend`; a `fightStart` hook gives the enemies the legend players' names; `wMatchTeam` (wrapped) their colours. `W_ON_END.legend` records `WG.legBeat[id]` and pays `W_LEG.prize`. Steward Crane's `legends` (act `legends`) opens the Hall; with `W_LEG.roadCups` cups, `wEncounterHook` (wrapped) may bring one on the road.

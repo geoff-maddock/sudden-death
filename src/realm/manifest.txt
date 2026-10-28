@@ -49,3 +49,12 @@ src/realm/w23-spots.js
 src/realm/w24-fixtures.js
 src/realm/w25-home.js
 src/realm/w26-gfeel.js
+src/realm/w27-notices.js
+src/realm/w28-legs.js
+src/realm/w29-captain.js
+src/realm/w30-weather.js
+src/realm/w31-name.js
+src/realm/w32-tour.js
+src/realm/w33-sinks.js
+src/realm/w34-defend.js
+src/realm/w35-legends.js

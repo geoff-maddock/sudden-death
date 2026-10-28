@@ -777,6 +777,23 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 .wdcg .wlost{opacity:.55}
 @media (max-width:560px){.wdcb{grid-template-columns:1fr}}
 .wlgnext li.wme{font-weight:600}
+/* w28: tired legs on the Team screen */
+.wtag.wlegs-fresh{background:#3f6a3a;color:#eef2e6;margin-left:4px}
+.wtag.wlegs-tired{background:#b8862a;color:#1e1205;margin-left:4px}
+.wtag.wlegs-spent{background:#a8402e;color:#fbeee6;margin-left:4px}
+/* w29: the captain's armband */
+.wtag.wcap{background:#f2c14e;color:#1e1205;margin-left:6px;vertical-align:middle;font-size:12px;padding:2px 5px 1px}
+/* w31: your name, region by region */
+.wreplist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.wreplist small{color:var(--dim)}
+.wtag.wrep-0{background:var(--seam);color:var(--dim)}
+.wtag.wrep-1{background:#8a6a3a;color:#fbeee6}
+.wtag.wrep-2{background:#3f6a3a;color:#eef2e6}
+.wtag.wrep-3{background:#c9483a;color:#fbeee6}
+/* w30: the weather in the top bar */
+.wwxhud{color:#cfe8f0}
+.wwxhud.wwx-ash{color:#ff9a5a}
+.wwxhud.wwx-fog{color:#c4ccd2}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -23651,6 +23668,1202 @@ renderHelp = function () {
   const html = `<p class="hint" id="wHelpGrdFeel"><b>At the grounds</b> every ground plays its own music, on the field and in a match. The day before a league round, posters in the city say who plays at its grounds, and the town talks about the results on the day. Medals: Groundhopper (a game at every ground, the Ballpark's a ball game), Fixture List (league fixtures won) and Top of the Class (coaches' challenges).</p>
     <p class="hint" id="wHelpKit"><b>Team kit.</b> The League shop in Graftonbury sells a kit for every region and an away black, ${W_KIT.price} gold a set. Your team plays every match in the kit you wear; a kit you own is free to wear again. Ask Bunty Pennant about KIT.</p>`;
   if (after) after.insertAdjacentHTML('afterend', html); else h.insertAdjacentHTML('beforeend', html);
+};
+/* w27: notice boards (epic 2, phase 4). Loads after w26-gfeel.js; changes earlier parts only by reassignment (saved
+   originals carry the wW27 prefix).
+
+   Every city's inn has a notice board: ask the innkeeper about the NOTICES, or the Notice board button in the room
+   menu. Each week the board posts W_NOTICE.posted contracts for its region. Take up to W_NOTICE.max at once; a taken
+   contract runs W_NOTICE.days days, then lapses (no penalty). A contract is done the moment a match you win meets it,
+   anywhere, and pays at once: gold and fans, and for the harder ones a pick of cards for the region's sports.
+
+     sport    win a <sport> game in the region
+     night    win a <sport> game in the region at night
+     margin   win a <sport> game in the region by <n> or more (the sports with a running score)
+     club     beat the region's rival club (Apex Athletic for the Charter Plains), anywhere
+     ground   win a game at one of the city's grounds (not the Ballpark)
+     seeded   beat a seeded team (a scouting report) in the region
+     count    win <n> games in the region
+
+   WG.notice = { boards: { city: { week, list: [contract] } }, taken: [contract], done, lapsed }, plain data.
+   A contract: { id, city, region, t, sport?, n?, club?, g?, pay: { gold, fans, card? }, prog, until? }
+   W_NOTICE, wBoard(city), wTakeNotice(city, id), wDropNotice(id), wNoticeText(c), wNoticeMet(c, M), wOpenBoard(city)
+   Also a tip (w_notice) and a medal (w_notices, Odd Jobs: realmNotices).
+   Wrapped: wDispatchEnd (contracts met by a win), wNewDay (lapsing), wRunAct (act 'board'), wOpenInn (the Notice
+   board button), wJQuests (contracts in the journal), renderHelp (#wHelpNotices). */
+
+const W_NOTICE = {
+  posted: 3, max: 3, days: 7,
+  // gold by type at tier 1; times 1.5 in a tier 2 region. Fans are two fifths of the gold. Kept small: the bot finishes
+  // about a dozen a journey, and gold already piles up (docs/realm/BALANCE.md)
+  gold: { sport: 20, night: 30, margin: 30, club: 45, ground: 25, seeded: 30, count: 35 },
+  card: { club: 1, count: 1, margin: 1 },     // these also pay a pick of 3 cards for the region's sports
+  margin: { baseball: 3, basketball: 6, hockey: 2, football: 7, jousting: 2, curling: 2 },
+  count: 3,
+};
+const W_NOTICE_CITY = { graftonbury: 'hq_inn', mossgate: 'moss_inn', saltmere: 'salt_inn', cinderhold: 'cind_inn', rimewatch: 'rime_inn' };
+const W_NOTICE_CUP = { bloom: 'moss', tide: 'salt', ember: 'cind', rime: 'rime' };
+
+function wNotices() { return (WG.notice = WG.notice || { boards: {}, taken: [], done: 0, lapsed: 0 }); }
+/* 'the Charter Plains', 'the Mosswold' */
+function wRegThe(r) { const n = (DB.regions[r] || {}).name || r; return 'the ' + n.replace(/^The /, ''); }
+function wNoticeRegion(city) { return W_GRD_REG[city] || 'plains'; }
+function wNoticeClub(region) { return region === 'plains' ? 'apex' : wCupRival(W_NOTICE_CUP[region]); }
+function wNoticePay(t, region) {
+  const g = Math.round(W_NOTICE.gold[t] * ((W_TIER[region] || 1) > 1 ? 1.5 : 1) / 5) * 5;
+  return { gold: g, fans: Math.round(g * 2 / 5), card: W_NOTICE.card[t] ? 1 : 0 };
+}
+/* a fresh contract of type t for a city's board, or null if that type has nothing to offer there */
+function wMakeNotice(city, t) {
+  const region = wNoticeRegion(city), sports = DB.regions[region].sports.map(s => s[0]);
+  const c = { id: 'n' + WG.dayAbs + '_' + Math.floor(Math.random() * 1e6), city, region, t, prog: 0, pay: wNoticePay(t, region) };
+  if (t === 'sport' || t === 'night') c.sport = pick(sports);
+  else if (t === 'margin') { const ok = sports.filter(s => W_NOTICE.margin[s]); if (!ok.length) return null; c.sport = pick(ok); c.n = W_NOTICE.margin[c.sport]; }
+  else if (t === 'club') { c.club = wNoticeClub(region); if (!c.club) return null; }
+  else if (t === 'ground') { const gs = wGrdsOf(city).filter(g => g.sport !== 'baseball'); if (!gs.length) return null; c.g = pick(gs).id; }
+  else if (t === 'count') c.n = W_NOTICE.count;
+  return c;
+}
+/* this week's board for a city: posted once a week, minus what you have taken */
+function wBoard(city) {
+  const N = wNotices(), wk = wWeek();
+  let b = N.boards[city];
+  if (!b || b.week !== wk) {
+    const list = [];
+    for (const t of shuffle(Object.keys(W_NOTICE.gold))) {
+      if (list.length >= W_NOTICE.posted) break;
+      const c = wMakeNotice(city, t); if (c) list.push(c);
+    }
+    b = N.boards[city] = { week: wk, list };
+  }
+  return b;
+}
+function wNoticeTaken(id) { return wNotices().taken.find(c => c.id === id) || null; }
+/* take one: '' or why not */
+function wTakeNotice(city, id) {
+  const N = wNotices(), b = wBoard(city), c = b.list.find(x => x.id === id);
+  if (!c) return 'That notice has gone.';
+  if (N.taken.length >= W_NOTICE.max) return `You can take ${W_NOTICE.max} contracts at a time. Finish or drop one first.`;
+  b.list = b.list.filter(x => x !== c);
+  c.until = WG.dayAbs + W_NOTICE.days;
+  N.taken.push(c);
+  wLog(`You take a contract from the board: ${wNoticeText(c)}.`, 'm');
+  wSave();
+  return '';
+}
+function wDropNotice(id) {
+  const N = wNotices(), c = wNoticeTaken(id); if (!c) return;
+  N.taken = N.taken.filter(x => x !== c);
+  wLog(`You drop a contract: ${wNoticeText(c)}.`, 'd');
+  wSave();
+}
+
+/* ---------- words ---------- */
+function wNoticeText(c) {
+  const R = wRegThe(c.region), sp = c.sport ? (SPORT_NAME[c.sport] || c.sport).toLowerCase() : '';
+  switch (c.t) {
+    case 'sport': return `win a ${sp} game in ${R}`;
+    case 'night': return `win a ${sp} game in ${R} at night`;
+    case 'margin': return `win a ${sp} game in ${R} by ${c.n} or more`;
+    case 'club': return `beat ${wTheClub(c.club)}`;
+    case 'ground': return `win a game at ${((wGrd(c.g) || {}).name || 'the ground').replace(/^The /, 'the ')}`;
+    case 'seeded': return `beat a seeded team in ${R}`;
+    case 'count': return `win ${c.n} games in ${R}`;
+  }
+  return 'a job';
+}
+function wNoticeHow(c) {
+  switch (c.t) {
+    case 'night': return 'Night games are out in the wild after dark.';
+    case 'margin': return 'You must win the game on the scoreboard too, by that much.';
+    case 'club': return 'In a cup, a fixture or a grudge match, wherever they turn up.';
+    case 'ground': return 'A Friendly, a Challenge or your fixture there. The ground wants a full squad.';
+    case 'seeded': return 'Seeded teams have a scouting report: a Challenge at a ground, a cup\'s second round, an alpha.';
+    case 'count': return 'Any games you win in the region count.';
+  }
+  return 'Any match in the region counts: wild, cup, ground or dungeon.';
+}
+function wNoticePayText(p) { return `${p.gold} gold, ${p.fans} fans${p.card ? ', and a pick of cards' : ''}`; }
+
+/* ---------- does a won match meet a contract? M: { region, sport, night, us, them, won, club, g, type } ---------- */
+function wNoticeMet(c, M) {
+  const here = M.region === c.region;
+  switch (c.t) {
+    case 'sport': return here && M.sport === c.sport;
+    case 'night': return here && M.sport === c.sport && !!M.night;
+    case 'margin': return here && M.sport === c.sport && M.won && M.us - M.them >= c.n;
+    case 'club': return !!M.club && M.club === c.club;
+    case 'ground': return M.g === c.g;
+    case 'seeded': return here && M.type === 'elite';
+    case 'count': return here;
+  }
+  return false;
+}
+function wNoticeFacts(W) {
+  const g = (RUN.games || [])[RUN.games.length - 1] || {}, ref = W.ref || {};
+  return { region: W.region, sport: g.sport, night: !!W.night, us: +g.us || 0, them: +g.them || 0, won: !!g.won, type: g.type,
+    club: ref.club || ref.rival || null, g: W.kind === 'ground' ? ref.g : null };
+}
+function wNoticePayOut(c) {
+  const p = c.pay;
+  RUN.gold += p.gold; RUN.fans = (RUN.fans || 0) + p.fans; achAdd('realmNotices', 1);
+  wLog(`Contract done: ${wNoticeText(c)}. ${p.gold} gold and ${p.fans} fans.`, 'g');
+  if (p.card) wGainCard({ pick: 3, pool: wSportPool(DB.regions[c.region].sports.map(s => s[0])) }, 'a contract');
+}
+function wNoticeWin(W) {
+  const N = wNotices(); if (!N.taken.length) return;
+  const M = wNoticeFacts(W);
+  for (const c of N.taken.slice()) {
+    if (!wNoticeMet(c, M)) continue;
+    if (c.t === 'count' && ++c.prog < c.n) { wLog(`Contract: ${c.prog} of ${c.n} wins in ${wRegThe(c.region)}.`, 'm'); continue; }
+    N.taken = N.taken.filter(x => x !== c); N.done++;
+    wNoticePayOut(c);
+  }
+}
+const wW27DispatchEnd = wDispatchEnd;
+wDispatchEnd = function (W, r) {
+  wW27DispatchEnd(W, r);
+  if (W && r === 'win' && WG) { try { wNoticeWin(W); } catch (e) { console.error(e); } }
+};
+const wW27NewDay = wNewDay;
+wNewDay = function () {
+  wW27NewDay();
+  const N = WG && WG.notice; if (!N || !N.taken.length) return;
+  for (const c of N.taken.filter(c => WG.dayAbs > c.until)) { N.lapsed++; wLog(`A contract lapses: ${wNoticeText(c)}.`, 'd'); }
+  N.taken = N.taken.filter(c => WG.dayAbs <= c.until);
+};
+
+/* ---------- the board ---------- */
+function wNoticeRow(c, taken, full) {
+  const left = taken ? c.until - WG.dayAbs : 0;
+  return `<li class="wbcl"><span class="wbsw" style="background:${c.sport ? W_GRD_COL[c.sport] : c.club ? wClubColor(c.club) : '#8a6a3a'}"></span>
+    <div><b>${esc(wCap(wNoticeText(c)))}</b>${c.t === 'count' && taken ? ` <small>(${c.prog} of ${c.n})</small>` : ''}
+    <small>${esc(wNoticeHow(c))} Pays ${esc(wNoticePayText(c.pay))}.${taken ? ` ${left <= 0 ? 'Lapses tonight.' : `${left} day${left === 1 ? '' : 's'} left.`} From ${esc(wTownName(c.city))}.` : ` ${W_NOTICE.days} days once taken.`}</small></div>
+    <div class="row">${taken ? `<button class="ghost" data-ndrop="${c.id}">Drop</button>` : `<button class="btn" data-ntake="${c.id}" ${full ? 'disabled' : ''}>Take</button>`}</div></li>`;
+}
+function wOpenBoard(city, msg) {
+  if (LAB) return;
+  city = city || wCurMap().id;
+  if (!W_NOTICE_CITY[city]) return;
+  const N = wNotices(), b = wBoard(city), full = N.taken.length >= W_NOTICE.max;
+  const close = modal(`<header><h3>The notice board, ${esc(wTownName(city))}</h3><button class="ghost" data-close>Done</button></header>
+    ${msg ? `<p class="${msg.ok ? 'wgood' : 'wbad'}" role="status">${esc(msg.t)}</p>` : ''}
+    <p class="hint">Contracts for ${esc(wRegThe(wNoticeRegion(city)))}, pinned up fresh every week. Take up to ${W_NOTICE.max}; each is done the moment you win a match that meets it, and pays at once.</p>
+    ${b.list.length ? `<ul class="wbclubs">${b.list.map(c => wNoticeRow(c, false, full)).join('')}</ul>` : '<p class="hint">Nothing left on the board this week. New notices go up next week.</p>'}
+    <h4>Your contracts (${N.taken.length} of ${W_NOTICE.max})</h4>${full && b.list.length ? '<p class="hint">You hold as many as you can. Finish or drop one to take another.</p>' : ''}
+    ${N.taken.length ? `<ul class="wbclubs">${N.taken.map(c => wNoticeRow(c, true)).join('')}</ul>` : '<p class="hint">None taken.</p>'}
+    ${N.done ? `<p class="hint">Contracts done this journey: ${N.done}.</p>` : ''}`);
+  $('modalBox').querySelectorAll('[data-ntake]').forEach(e => { e.onclick = () => { const r = wTakeNotice(city, e.dataset.ntake); close(); wDrain(); wOpenBoard(city, { ok: !r, t: r || 'Taken.' }); }; });
+  $('modalBox').querySelectorAll('[data-ndrop]').forEach(e => e.onclick = () => { wDropNotice(e.dataset.ndrop); close(); wDrain(); wOpenBoard(city); });
+}
+for (const city in W_NOTICE_CITY) {
+  const ch = DB.chars[W_NOTICE_CITY[city]]; if (!ch) continue;
+  ch.topics.notices = { t: 'The board by the stairs. Folk pin up jobs for teams: win this, beat them. They pay when it is done.', act: 'board' };
+  ch.greet += ' NOTICES on the board, if you want work.';
+}
+const wW27RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'board') return wOpenBoard(wCurMap().id);
+  return wW27RunAct(act, id);
+};
+const wW27OpenInn = wOpenInn;
+wOpenInn = function (price, who) {
+  wW27OpenInn(price, who);
+  const row = $('wSleep') && $('wSleep').parentNode; if (!row || $('wInnBoard') || !W_NOTICE_CITY[wCurMap().id]) return;
+  row.insertAdjacentHTML('beforeend', '<button class="ghost" id="wInnBoard">Notice board</button>');
+  $('wInnBoard').onclick = () => wOpenBoard(wCurMap().id);
+};
+
+/* ---------- the journal ---------- */
+const wW27JQuests = wJQuests;
+wJQuests = function () {
+  const [n, h] = wW27JQuests(), N = WG && WG.notice;
+  if (!N || !N.taken.length) return [n, h];
+  const rows = N.taken.filter(c => wJPass('quest', c.id, wNoticeText(c))).map(c => `<div class="wjq"><b>Contract: ${esc(wCap(wNoticeText(c)))}</b> <small>from the board at ${esc(wTownName(c.city))} &middot; ${Math.max(0, c.until - WG.dayAbs)} days left${c.t === 'count' ? ` &middot; ${c.prog} of ${c.n}` : ''}</small>
+    <p>${esc(wNoticeHow(c))}</p><p class="hint">Reward: ${esc(wNoticePayText(c.pay))}</p></div>`);
+  if (!rows.length) return [n, h];
+  return [n + rows.length, `<h4>Contracts</h4>${rows.join('')}${n ? h : ''}`];
+};
+
+/* ---------- a tip and a medal ---------- */
+Object.assign(TIPS, { w_notice: ['The notice board', 'The inn here has a notice board. Ask the innkeeper about the NOTICES: contracts for the region that pay gold and fans the moment you win a match that meets them.'] });
+setInterval(() => {
+  if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
+  const m = wCurMap(); if (m && m.kind === 'town' && W_NOTICE_CITY[m.id] && WG.dayAbs >= 2) tip('w_notice');
+}, 900);
+ACH.push({ id: 'w_notices', n: 'Odd Jobs', d: 'Finish contracts from the notice boards', stat: 'realmNotices', at: [1, 10, 25] });
+
+/* ---------- How to play ---------- */
+const wW27RenderHelp = renderHelp;
+renderHelp = function () {
+  wW27RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpNotices')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpNotices"><b>Notice boards.</b> Every city's inn has one: ask the innkeeper about the NOTICES. Each week it posts ${W_NOTICE.posted} contracts for its region, such as "win a hockey game in the Frostspire at night" or "beat the rival club". Take up to ${W_NOTICE.max} at a time; each runs ${W_NOTICE.days} days. A contract is done the moment you win a match that meets it, wherever you are, and pays gold and fans at once; the harder ones add a pick of cards for the region's sports.</p>`);
+};
+/* w28: fatigue and the bench (epic 2, phase 5). Loads after w27-notices.js; changes earlier parts only by reassignment
+   (saved originals carry the wW28 prefix).
+
+   Every player has legs: p.legs counts the matches they have started since they last rested. At kickoff each starter
+   who is Tired (W_FAT.tired or more) shuffles one Fatigue card into the draw pile, and one who is Spent (W_FAT.spent
+   or more) two. Fatigue is Sudden Death's own junk card: it costs 1 to shake off, and melts at the end of the turn.
+   Then every starter's legs go up by one, and every bench player's down by one: the bench is where legs come back.
+   A night in a bed (an inn, your ground) takes W_FAT.bed off everyone's legs, and a night camping out W_FAT.camp.
+   Card games only: ball games on the diamond have their own stamina.
+
+   W_FAT, wLegs(p), wLegsState(p) ('fresh' | 'tired' | 'spent'), wFatCards(p), wRestLegs(n)
+   Wrapped: wKickoff (legs after the match starts), wSleepInn (a bed), wMakeCamp (a camp), wPreGame (who is tired),
+   wCampRow (each player's legs on the Team screen), renderHelp (a paragraph in #wHelpTeam).
+   A fightStart hook shuffles the Fatigue cards in. Also a tip (w_legs). */
+
+const W_FAT = { tired: 3, spent: 5, max: 8, bed: 4, camp: 2, card: 'fatigue', off: false };
+const W_LEGS_WORD = { fresh: 'Fresh', tired: 'Tired', spent: 'Spent' };
+
+function wLegs(p) { return (p && p.legs) || 0; }
+function wLegsState(p) { const n = wLegs(p); return n >= W_FAT.spent ? 'spent' : n >= W_FAT.tired ? 'tired' : 'fresh'; }
+function wFatCards(p) { if (W_FAT.off) return 0; const s = wLegsState(p); return s === 'spent' ? 2 : s === 'tired' ? 1 : 0; }
+function wRestLegs(n) { for (const p of wRoster()) p.legs = Math.max(0, wLegs(p) - n); }
+function wLegsText(p) {
+  const s = wLegsState(p), n = wLegs(p);
+  if (s === 'fresh') return n ? `Fresh (${n} game${n === 1 ? '' : 's'} since a rest)` : 'Fresh';
+  return `${W_LEGS_WORD[s]}: ${n} games since a rest, ${wFatCards(p)} Fatigue card${wFatCards(p) === 1 ? '' : 's'} a match`;
+}
+
+/* ---------- at kickoff: Fatigue cards in, then the legs move ---------- */
+onHook('fightStart', () => {
+  const W = RUN && RUN.pending && RUN.pending.world;
+  if (!WG || !WG.roster || !B || !W || W_FAT.off) return;
+  const who = [];
+  for (const p of wStarters()) {
+    const n = wFatCards(p); if (!n) continue;
+    for (let k = 0; k < n; k++) B.draw.splice(Math.floor(Math.random() * (B.draw.length + 1)), 0, mkCard(W_FAT.card));
+    who.push(p.n);
+  }
+  if (!who.length) return;
+  B.wTired = who.length;
+  log(`Tired legs: ${who.join(', ')}. Fatigue cards go into your draw pile.`, 'bad');
+});
+const wW28Kickoff = wKickoff;
+wKickoff = function (enc) {
+  const r = wW28Kickoff(enc);
+  if (WG && WG.roster && !W_FAT.off) {
+    const st = wStarters();
+    for (const p of wRoster()) p.legs = st.includes(p) ? Math.min(W_FAT.max, wLegs(p) + 1) : Math.max(0, wLegs(p) - 1);
+  }
+  return r;
+};
+
+/* ---------- rest ---------- */
+const wW28SleepInn = wSleepInn;
+wSleepInn = function (price) {
+  const r = wW28SleepInn(price);
+  if (!r && WG && WG.roster) wRestLegs(W_FAT.bed);
+  return r;
+};
+const wW28MakeCamp = wMakeCamp;
+wMakeCamp = function (roll) {
+  const r = wW28MakeCamp(roll);
+  if (!r && WG && WG.roster) wRestLegs(W_FAT.camp);
+  return r;
+};
+
+/* ---------- words: the pre-game card and the Team screen ---------- */
+const wW28PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW28PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'); if (!box || W_FAT.off) return;
+  const tired = wStarters().filter(p => wFatCards(p));
+  if (!tired.length) return;
+  const n = tired.reduce((s, p) => s + wFatCards(p), 0);
+  box.insertAdjacentHTML('beforeend', `<p class="hint wlegs">Tired legs: ${tired.map(p => `${esc(p.n)} (${esc(W_LEGS_WORD[wLegsState(p)].toLowerCase())})`).join(', ')}. ${n} Fatigue card${n === 1 ? '' : 's'} go${n === 1 ? 'es' : ''} into your deck. Rest in a bed, or start someone fresh from the bench.</p>`);
+};
+const wW28CampRow = wCampRow;
+wCampRow = function (p, i) {
+  const h = wW28CampRow(p, i);
+  if (W_FAT.off) return h;
+  const s = wLegsState(p), tag = `<span class="wtag wlegs-${s}" title="${esc(wLegsText(p))}">${W_LEGS_WORD[s]}</span>`;
+  return h.replace(/(<span class="wtag( wb)?">(Starts|Bench)<\/span>)/, `$1${tag}`);
+};
+
+/* ---------- a tip ---------- */
+TIPS.w_legs = ['Tired legs', 'A starter who has played three matches without a rest is Tired, and brings a Fatigue card into every match. Sleep in a bed, or swap in someone fresh from the bench on the Team screen.'];
+setInterval(() => {
+  if (LAB || !SET.tips || !WG || !WG.roster || !RUN || UI.screen !== 'run' || UI.view !== 'world' || W_FAT.off) return;
+  if (wStarters().some(p => wFatCards(p))) tip('w_legs');
+}, 900);
+
+/* ---------- How to play ---------- */
+const wW28RenderHelp = renderHelp;
+renderHelp = function () {
+  wW28RenderHelp();
+  const sec = $('wHelpTeam'); if (!sec || $('wHelpLegs')) return;
+  sec.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpLegs"><b>Tired legs.</b> Each match a player starts adds to their legs; each match on the bench takes one off. After ${W_FAT.tired} matches without rest a starter is Tired and brings 1 Fatigue card into the deck at kickoff; after ${W_FAT.spent}, Spent, and 2. A Fatigue card costs 1 to shake off and melts at the end of the turn. A night in a bed takes ${W_FAT.bed} off everyone's legs, and camping out ${W_FAT.camp}. The Team screen shows who is Fresh, Tired or Spent: on a long road trip, rotate.</p>`);
+};
+/* w29: the captain (epic 2, phase 6). Loads after w28-legs.js; changes earlier parts only by reassignment (saved
+   originals carry the wW29 prefix).
+
+   Name one starter captain on the Team screen. While the captain starts, their kind gives the whole team a bonus in
+   every card-game match (W_CAPTAIN, one for each of the 18 kinds a player can be). The bonuses are declarative: each says what it does and when, as
+   Sudden Death's trophies do (on: { event: fn }), and one onHook per event runs the captain's. A captain on the bench
+   gives nothing until they start again. A new journey makes the first starter captain; so does an old save.
+
+   WG.captain = player id, or null. W_CAPTAIN, wCaptain() (the player, if they start), wSetCaptain(pid)
+   Wrapped: wNewGame (no captain yet), wStart (a captain for a new journey or an old save), wRelease (a released
+   captain hands the armband to the first starter), wPreGame (the captain's line), wCampRow and wRenderCamp (the
+   armband and the Captain button), renderHelp (a paragraph in #wHelpTeam). */
+
+const W_CAPTAIN = {
+  goblin:   { n: 'Pickpocket', d: '6 gold more after every win.', on: { fightWon: () => { RUN.gold += 6; } } },
+  kobold:   { n: 'Firebug', d: 'Every enemy starts with 2 Burn.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'burn', 2); } } },
+  werewolf: { n: 'Pack Leader', d: '1 Strength at kickoff.', on: { fightStart: () => addSt(B.P, 'str', 1) } },
+  dwarf:    { n: 'Shield Wall', d: '8 Block at kickoff.', on: { fightStart: () => { B.P.block += 8; } } },
+  ogre:     { n: 'Looming', d: 'Every enemy starts Weak for a turn.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'weak', 1); } } },
+  minotaur: { n: 'Stampede', d: '4 damage to every enemy at kickoff.', on: { fightStart: () => { for (const e of alive()) hurtEnemy(e, 4, { raw: true }); } } },
+  troll:    { n: 'Thick Hide', d: 'Heal 1 HP at the end of every turn.', on: { turnEndHeal: () => healP(1) } },
+  golem:    { n: 'Bedrock', d: '1 Dexterity at kickoff.', on: { fightStart: () => addSt(B.P, 'dex', 1) } },
+  harpy:    { n: 'Shriek', d: 'Every enemy starts Vulnerable for a turn.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'vuln', 1); } } },
+  elf:      { n: 'Light Feet', d: '4 Block at the start of each of the first three turns.', on: { turnStart: () => { if (B.turn <= 3) B.P.block += 4; } } },
+  wraith:   { n: 'Dread', d: 'The toughest enemy starts Weak for two turns.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => b.hp - a.hp)[0]; if (e) addSt(e, 'weak', 2); } } },
+  vampire:  { n: 'Bloodthirst', d: 'Heal 3 HP whenever an enemy falls.', on: { enemyFalls: () => healP(3) } },
+  lich:     { n: 'Rot', d: 'Every enemy starts with 3 Poison.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'psn', 3); } } },
+  zombie:   { n: 'Shamble', d: '2 Strength at the start of turn 3.', on: { turnStart: () => { if (B.turn === 3) addSt(B.P, 'str', 2); } } },
+  gorgon:   { n: 'Stone Gaze', d: 'The toughest enemy starts Stunned: it loses its first turn.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => b.hp - a.hp)[0]; if (e && !isBoss(e)) addSt(e, 'stun', 1); } } },
+  spider:   { n: 'Web', d: 'Every enemy starts with 1 Poison and Weak for a turn.', on: { fightStart: () => { for (const e of alive()) { addSt(e, 'psn', 1); addSt(e, 'weak', 1); } } } },
+  skeleton: { n: 'Bone Armour', d: '2 Block at the start of every turn.', on: { turnStart: () => { B.P.block += 2; } } },
+  witch:    { n: 'Hex', d: 'One enemy starts Vulnerable for two turns.', on: { fightStart: () => { const e = pick(alive()); if (e) addSt(e, 'vuln', 2); } } },
+};
+const W_CAPT = { off: false };
+
+/* ---------- who ---------- */
+function wCaptainId() { return WG ? WG.captain : null; }
+/* the captain, if they start; null on the bench or with none named */
+function wCaptain() { const id = wCaptainId(); return id != null && wIsStarter(id) ? wPlayer(id) : null; }
+function wCaptainFx() { const p = !W_CAPT.off && wCaptain(); return p ? W_CAPTAIN[p.kind] || null : null; }
+/* '' or why not */
+function wSetCaptain(pid) {
+  const p = wPlayer(pid); if (!p) return 'There is nobody like that on the team.';
+  if (!wIsStarter(pid)) return `${p.n} is on the bench. A captain must start.`;
+  if (WG.captain === pid) return '';
+  WG.captain = pid;
+  const C = W_CAPTAIN[p.kind];
+  wLog(`${p.n} is your captain${C ? `: ${C.n}. ${C.d}` : '.'}`, 'm');
+  wSave();
+  return '';
+}
+function wCaptainEnsure() { if (WG && WG.roster && (WG.captain == null || !wPlayer(WG.captain))) WG.captain = (wStarters()[0] || {}).id ?? null; }
+
+/* ---------- the bonus: one hook per event, running the captain's ---------- */
+for (const ev of [...new Set(Object.values(W_CAPTAIN).flatMap(C => Object.keys(C.on)))]) {
+  onHook(ev, a => {
+    if (!WG || !B || !RUN || !RUN.pending || !RUN.pending.world) return;
+    const C = wCaptainFx(), f = C && C.on[ev]; if (!f) return;
+    if (ev === 'fightStart') { const p = wCaptain(); log(`Captain ${p.n}: ${C.n}. ${C.d}`, 'good'); }
+    f(a);
+  });
+}
+
+/* ---------- a captain for every journey ---------- */
+const wW29NewGame = wNewGame;
+wNewGame = function (opts) { const r = wW29NewGame(opts); if (WG) WG.captain = null; return r; };
+const wW29Start = wStart;
+wStart = function (a, b) {
+  const r = wW29Start(a, b);
+  wCaptainEnsure();
+  return r;
+};
+const wW29Release = wRelease;
+wRelease = function (pid) {
+  const was = WG && WG.captain === pid, why = wW29Release(pid);
+  if (!why && was) { WG.captain = null; wCaptainEnsure(); const p = wPlayer(WG.captain); if (p) wLog(`${p.n} takes the captain's armband.`, 'm'); }
+  return why;
+};
+
+/* ---------- words ---------- */
+const wW29PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW29PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'); if (!box || W_CAPT.off) return;
+  const p = wCaptain(), C = p && W_CAPTAIN[p.kind];
+  const sat = !p && wPlayer(wCaptainId());
+  if (C) box.insertAdjacentHTML('beforeend', `<p class="hint wcapt">Captain ${esc(p.n)}: <b>${esc(C.n)}</b>. ${esc(C.d)}</p>`);
+  else if (sat) box.insertAdjacentHTML('beforeend', `<p class="hint wcapt">Your captain, ${esc(sat.n)}, is on the bench: no captain's bonus.</p>`);
+};
+const wW29CampRow = wCampRow;
+wCampRow = function (p, i) {
+  let h = wW29CampRow(p, i);
+  if (W_CAPT.off) return h;
+  const C = W_CAPTAIN[p.kind], cap = wCaptainId() === p.id, st = i < W_PARTY.starters;
+  const tag = cap ? `<span class="wtag wcap" title="${esc(C ? `${C.n}: ${C.d}${st ? '' : ' (not while on the bench)'}` : 'Captain')}">C</span>` : '';
+  h = h.replace(/(<b>[^<]*<\/b>)/, `$1${tag}`);
+  const btn = st && !cap ? `<button class="ghost" data-capt title="${esc(C ? `${C.n}: ${C.d}` : '')}">Captain</button>` : '';
+  return btn ? h.replace('<div class="wpa">', `<div class="wpa">${btn}`) : h;
+};
+const wW29RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW29RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  body.querySelectorAll('[data-capt]').forEach(b => b.onclick = () => { const why = wSetCaptain(+b.closest('[data-pid]').dataset.pid); wCampSay(why); });
+};
+
+/* ---------- How to play ---------- */
+const wW29RenderHelp = renderHelp;
+renderHelp = function () {
+  wW29RenderHelp();
+  const sec = $('wHelpTeam'); if (!sec || $('wHelpCaptain')) return;
+  sec.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpCaptain"><b>The captain.</b> Name one starter captain on the Team screen (the Captain button; the armband shows as C). While the captain starts, their kind gives the team a bonus in every match: a dwarf's Shield Wall is 8 Block at kickoff, a lich's Rot is 3 Poison on every enemy, a goblin's Pickpocket is 6 gold more after each win. The button says what each player's would be. A captain on the bench gives nothing.</p>`);
+};
+/* w30: weather (epic 2, phase 7). Loads after w29-captain.js; changes earlier parts only by reassignment (saved
+   originals carry the wW30 prefix).
+
+   Three regions have weather, rolled each morning: blizzards in the Frostspire, fog on the Brinefen, ash storms in the
+   Cindermaw. The Charter Plains and the Mosswold stay fair. Like night, weather changes a match out in the open: a
+   wild game, a grudge, a camp, an alpha or lair out in the world, or a game at an outdoor ground (not the bowling,
+   curling or boxing halls). Cups and dungeons are under cover.
+
+     Blizzard   2 Frostbite cards go into your draw pile (unplayable; they melt at the end of the turn), and every
+                enemy starts Weak for a turn: they are cold too
+     Fog        both sides start with 6 Block; by day, a wild game off the road can be an ambush, as at night
+     Ash storm  both sides start with 4 Burn
+
+   Each side also carries a marker for the match (Snowed In, Fogbound, Ash-choked; Sudden Death statuses), so cards
+   can play off it with ['ifst', marker, yes, no]. Three new cards do: Whiteout (hockey), Fog Bank (curling) and Cinder
+   Wind (football), in the region's card pools.
+
+   WG.wx = { day, by: { region: 'blizzard' | 'fog' | 'ash' } }, rolled on the first look each day; plain data.
+   W_WX, wWeather(region), wMatchWeather(W)
+   Wrapped: wBuildEncounter (enc.world.wx; fog's day ambush), wPreGame (the weather line), wRenderHud (the weather by
+   the region's name), wRender (snow, fog or ash over the world), renderHelp (#wHelpWeather).
+   A fightStart hook applies it. Also a tip (w_weather). */
+
+const W_WX = {
+  blizzard: { region: 'rime', p: .3, n: 'Blizzard', mark: 'snowed', d: '2 Frostbite cards in your draw pile; every enemy starts Weak for a turn.', frost: 2, weak: 1 },
+  fog: { region: 'tide', p: .35, n: 'Fog', mark: 'fogbound', d: 'Both sides start with 6 Block. By day, a wild game off the road can be an ambush.', block: 6, ambush: .35 },
+  ash: { region: 'ember', p: .3, n: 'Ash storm', mark: 'ashen', d: 'Both sides start with 4 Burn.', burn: 4 },
+};
+const W_WX_INDOOR = ['bowling', 'curling', 'boxing'];
+const W_WX_OUT = ['wild', 'event', 'camp', 'alpha', 'lair', 'tour'];
+Object.assign(ST, {
+  snowed: { n: 'Snowed In', col: '#cfe8f0', desc: 'A blizzard is blowing. Some cards do more in one.' },
+  fogbound: { n: 'Fogbound', col: '#9aa6ae', desc: 'Thick fog. Some cards do more in it.' },
+  ashen: { n: 'Ash-choked', col: '#c8763a', desc: 'An ash storm. Some cards do more in one.' },
+});
+K('wx_whiteout', 'Whiteout', 'any', 'skl', 1, 'u', 'self', [['ifst', 'snowed', [['b', 13]], [['b', 7]]]], { sport: 'hockey', fl: 'You cannot hit what you cannot see.' });
+K('wx_fogbank', 'Fog Bank', 'any', 'skl', 1, 'u', 'one', [['ifst', 'fogbound', [['s', 'weak', 2], ['s', 'vuln', 2]], [['s', 'weak', 1]]]], { sport: 'curling', fl: 'Where did the house go?' });
+K('wx_cinder', 'Cinder Wind', 'any', 'atk', 1, 'u', 'one', [['ifst', 'ashen', [['d', 15]], [['d', 8]]]], { sport: 'football', fl: 'Play with the wind at your back.' });
+
+/* ---------- today's weather ---------- */
+function wWeather(region) {
+  if (!WG) return null;
+  if (!WG.wx || WG.wx.day !== WG.dayAbs) {
+    const by = {};
+    for (const k in W_WX) if (Math.random() < W_WX[k].p) by[W_WX[k].region] = k;
+    WG.wx = { day: WG.dayAbs, by };
+  }
+  return WG.wx.by[region] || null;
+}
+/* the weather a match is played in: out in the world, or at an outdoor ground */
+function wMatchWeather(W) {
+  if (!W || !W.region) return null;
+  const k = wWeather(W.region); if (!k) return null;
+  if (W.kind === 'ground') { const g = wGrd(W.ref && W.ref.g); return g && !W_WX_INDOOR.includes(g.sport) ? k : null; }
+  return W_WX_OUT.includes(W.kind) && (W.map === 'world' || (MAPS[W.map] || {}).kind === 'world') ? k : null;
+}
+const wW30BuildEncounter = wBuildEncounter;
+wBuildEncounter = function (o) {
+  const enc = wW30BuildEncounter(o), W = enc.world, k = wMatchWeather(W);
+  if (k) {
+    W.wx = k;
+    if (k === 'fog' && W.kind === 'wild' && !W.night && !W.ambush && !wOnRoad() && !(o && o.ambush != null) && Math.random() < W_WX.fog.ambush) W.ambush = 1;
+  }
+  return enc;
+};
+
+/* ---------- at kickoff ---------- */
+onHook('fightStart', () => {
+  const W = RUN && RUN.pending && RUN.pending.world, X = W && W.wx && W_WX[W.wx];
+  if (!WG || !B || !X) return;
+  for (const t of [B.P, ...alive()]) addSt(t, X.mark, 1);
+  if (X.frost) for (let i = 0; i < X.frost; i++) B.draw.splice(Math.floor(Math.random() * (B.draw.length + 1)), 0, mkCard('frostbite'));
+  if (X.weak) for (const e of alive()) addSt(e, 'weak', X.weak);
+  if (X.block) { B.P.block += X.block; for (const e of alive()) e.block += X.block; }
+  if (X.burn) { addSt(B.P, 'burn', X.burn); for (const e of alive()) addSt(e, 'burn', X.burn); }
+  B.wWx = W.wx;
+  log(`${X.n}: ${X.d}`, 'sys');
+  if (!LAB) fx({ k: 'banner', t: X.n, sub: X.d, small: 1 });
+});
+
+/* ---------- words ---------- */
+const wW30PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW30PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'), X = enc.world.wx && W_WX[enc.world.wx]; if (!box || !X) return;
+  box.insertAdjacentHTML('beforeend', `<p class="hint wwx wwx-${enc.world.wx}"><b>${esc(X.n)}.</b> ${esc(X.d)}</p>`);
+};
+const wW30RenderHud = wRenderHud;
+wRenderHud = function () {
+  const k0 = WUI.hudKey;
+  wW30RenderHud();
+  if (WUI.hudKey === k0 || !WG) return;
+  const m = wCurMap(), k = m && m.kind === 'world' ? wWeather(wRegionHere()) : m && m.grd ? wWeather(W_GRD_REG[(wGrd(m.grd) || {}).city]) : null;
+  const sm = document.querySelector('#wHud .wwhere small');
+  if (k && sm) sm.insertAdjacentHTML('beforeend', ` &middot; <span class="wwxhud wwx-${k}" title="${esc(W_WX[k].d)}">${esc(W_WX[k].n)}</span>`);
+};
+
+/* ---------- drawing: snow, fog or ash over the world, in screen space ---------- */
+function wDrawWeather(c, k, w, h, t) {
+  c.save();
+  const u = Math.max(1, w / 900);   // device pixels per CSS pixel, roughly
+  if (k === 'blizzard') {
+    c.fillStyle = 'rgba(225,238,248,.2)'; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(252,253,255,.9)';
+    for (let i = 0; i < 260; i++) {
+      const sx = (i * 97.31) % 1, sy = (i * 57.13) % 1, sp = .6 + (i % 5) * .18, r = (1.2 + (i % 3) * .8) * u;
+      const x = ((sx * w + t * 110 * sp * u + Math.sin(t * 1.3 + i) * 14 * u) % w + w) % w, y = ((sy * h + t * 120 * sp * u) % h + h) % h;
+      c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    }
+  } else if (k === 'fog') {
+    for (let i = 0; i < 6; i++) {
+      const y = h * (i + .5) / 6 + Math.sin(t * .2 + i) * 18, x = ((t * 8 * (1 + i % 3) + i * 170) % (w + 400)) - 200;
+      const g = c.createRadialGradient(x, y, 10, x, y, w * .45);
+      g.addColorStop(0, 'rgba(200,208,214,.28)'); g.addColorStop(1, 'rgba(200,208,214,0)');
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+    }
+    c.fillStyle = 'rgba(190,198,204,.14)'; c.fillRect(0, 0, w, h);
+  } else if (k === 'ash') {
+    c.fillStyle = 'rgba(110,50,24,.2)'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 200; i++) {
+      const sx = (i * 61.7) % 1, sy = (i * 23.9) % 1, sp = .5 + (i % 4) * .2;
+      const x = ((sx * w + t * 80 * sp * u) % w + w) % w, y = ((sy * h + t * 26 * sp * u + Math.sin(t + i) * 10 * u) % h + h) % h;
+      c.fillStyle = i % 6 ? 'rgba(48,40,36,.75)' : 'rgba(255,150,60,.95)';
+      c.fillRect(x, y, 3.2 * u, 2.2 * u);
+    }
+  }
+  c.restore();
+}
+const wW30Render = wRender;
+wRender = function (now) {
+  wW30Render(now);
+  if (!WUI.built || !WG || !WUI.c) return;
+  const m = wCurMap(); if (!m || m.kind !== 'world') return;
+  const k = wWeather(wRegionHere()); if (!k) return;
+  const c = WUI.c;
+  c.save();
+  try { c.setTransform(1, 0, 0, 1, 0, 0); wDrawWeather(c, k, WUI.cv.width, WUI.cv.height, G.time); }
+  finally { c.restore(); }
+};
+
+/* ---------- a tip ---------- */
+TIPS.w_weather = ['Weather', 'Bad weather here today: it changes every match out in the open (the top bar says what it is). Cups, dungeons and indoor halls are under cover.'];
+setInterval(() => {
+  if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
+  const m = wCurMap(); if (m && m.kind === 'world' && wWeather(wRegionHere())) tip('w_weather');
+}, 900);
+
+/* ---------- How to play ---------- */
+const wW30RenderHelp = renderHelp;
+renderHelp = function () {
+  wW30RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpWeather')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpWeather"><b>Weather.</b> Each morning brings its own: blizzards in the Frostspire, fog on the Brinefen, ash storms in the Cindermaw (the top bar says so). Like night, weather changes a match out in the open, and at the outdoor grounds; cups, dungeons and the indoor halls are under cover. ${Object.values(W_WX).map(X => `<b>${X.n}</b>: ${X.d}`).join(' ')} Whiteout, Fog Bank and Cinder Wind are cards that do more in their weather.</p>`);
+};
+/* w31: regional fans (epic 2, phase 8). Loads after w30-weather.js; changes earlier parts only by reassignment (saved
+   originals carry the wW31 prefix).
+
+   Your name is made region by region. Every match you win in a region adds to it, a cup won there adds a lot, a
+   contract from its board adds some, and a match you lose there takes a little away. Three steps (W_REP.at):
+
+     Known   rooms at the region's inn cost a quarter less
+     Liked   rooms half price, and the tavern's free agents are a level higher at the same fee
+     Loved   all that, and a home crowd at every match in the region: Block at kickoff, as at your own ground
+             (not twice: a match at home already has its crowd)
+
+   WG.rep = { region: points }, plain data. W_REP, wRep(region), wRepStep(region) (0..3), wRepName(region), wInnPrice(price, region)
+   Wrapped: wDispatchEnd (wins and losses), wCupWon (a cup), wNoticePayOut (a contract), wOpenInn (the price, and a
+   line), wTavern (better agents), wPreGame (the crowd line), wCampTeam (your name on the Team screen), renderHelp
+   (#wHelpName). A fightStart hook brings the crowd. */
+
+const W_REP = {
+  at: [10, 25, 50], names: ['Unknown', 'Known', 'Liked', 'Loved'],
+  win: 1, cup: 10, notice: 3, lose: 1,
+  inn: [1, .75, .5, .5], block: 4, off: false,
+};
+function wRep(region) { return (WG && WG.rep && WG.rep[region]) || 0; }
+function wRepStep(region) { if (W_REP.off) return 0; const n = wRep(region); return W_REP.at.filter(a => n >= a).length; }
+function wRepName(region) { return W_REP.names[wRepStep(region)]; }
+function wRepAdd(region, n, why) {
+  if (!WG || !region || !DB.regions[region] || !n) return;
+  const R = WG.rep = WG.rep || {}, s0 = wRepStep(region);
+  R[region] = Math.max(0, (R[region] || 0) + n);
+  const s1 = wRepStep(region);
+  if (s1 > s0) wLog(`Your name in ${wRegThe(region)}: ${W_REP.names[s1]}. ${wRepDoes(s1)}`, 'g');
+}
+function wRepDoes(step) {
+  return ['', 'Rooms at its inn cost a quarter less.', 'Rooms are half price, and its free agents are a level higher at the same fee.',
+    `A home crowd at every match there: ${W_REP.block} Block at kickoff.`][step] || '';
+}
+function wInnPrice(price, region) { return Math.round(price * W_REP.inn[wRepStep(region)]); }
+function wCityRegion(map) { return W_GRD_REG[map] || null; }
+
+/* ---------- earning it ---------- */
+const wW31DispatchEnd = wDispatchEnd;
+wDispatchEnd = function (W, r) {
+  wW31DispatchEnd(W, r);
+  if (!W || !WG || !W.region) return;
+  if (r === 'win') wRepAdd(W.region, W_REP.win);
+  else wRepAdd(W.region, -W_REP.lose);
+};
+const wW31CupWon = wCupWon;
+wCupWon = function (id) {
+  const r = wW31CupWon(id), C = DB.cups[id];
+  if (C && id !== 'crown' && DB.regions[C.elem]) wRepAdd(C.elem, W_REP.cup);
+  return r;
+};
+const wW31NoticePayOut = wNoticePayOut;
+wNoticePayOut = function (c) { wW31NoticePayOut(c); wRepAdd(c.region, W_REP.notice); };
+
+/* ---------- what it buys ---------- */
+const wW31OpenInn = wOpenInn;
+wOpenInn = function (price, who) {
+  const region = wCityRegion(WG.map), p = region ? wInnPrice(price, region) : price;
+  wW31OpenInn(p, who);
+  if (!region || p === price) return;
+  const row = $('wSleep') && $('wSleep').parentNode; if (!row) return;
+  row.insertAdjacentHTML('beforebegin', `<p class="hint wrep">You are ${esc(wRepName(region))} in ${esc(wRegThe(region))}: the room is ${p} gold, not ${price}.</p>`);
+};
+const wW31Tavern = wTavern;
+wTavern = function (town) {
+  town = town || WG.map;
+  const T = wW31Tavern(town), region = wCityRegion(town);
+  if (T.wrep || !region || wRepStep(region) < 2) return T;
+  T.wrep = 1;
+  for (const a of T.list) a.lvl = clamp(a.lvl + 1, 1, W_PARTY.maxLvl);
+  return T;
+};
+/* Loved: a home crowd, unless the match is already at home */
+function wRepCrowd(W) { return !!W && !!W.region && wRepStep(W.region) >= 3 && !(typeof wIsHome === 'function' && wIsHome(W)) && !(W.kind === 'cup' && W.ref && W.ref.cup === 'crown'); }
+onHook('fightStart', () => {
+  const W = RUN && RUN.pending && RUN.pending.world;
+  if (!WG || !B || !wRepCrowd(W)) return;
+  B.P.block += W_REP.block; B.wRep = 1;
+  log(`The ${wRegThe(W.region).slice(4)} crowd is with you: ${W_REP.block} Block.`, 'good');
+});
+const wW31PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW31PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'); if (!box || !wRepCrowd(enc.world)) return;
+  box.insertAdjacentHTML('beforeend', `<p class="hint wrep">You are Loved in ${esc(wRegThe(enc.world.region))}: the crowd is yours, ${W_REP.block} Block at kickoff.</p>`);
+};
+
+/* ---------- the Team screen: your name, region by region ---------- */
+function wRepHtml() {
+  const rows = Object.keys(DB.regions).map(r => {
+    const n = wRep(r), s = wRepStep(r), next = W_REP.at[s];
+    return `<li><b>${esc(DB.regions[r].name.replace(/^The /, ''))}</b> <span class="wtag wrep-${s}">${W_REP.names[s]}</span> <small>${n}${next != null ? ` of ${next} for ${W_REP.names[s + 1]}` : ''}${s ? `. ${esc(wRepDoes(s))}` : ''}</small></li>`;
+  }).join('');
+  return `<h4>Your name</h4><p class="hint">Wins in a region make your name there, cups and contracts most of all; losses there cost a little.</p><ul class="wreplist">${rows}</ul>`;
+}
+const wW31CampTeam = wCampTeam;
+wCampTeam = function () { return wW31CampTeam() + (W_REP.off ? '' : wRepHtml()); };
+
+/* ---------- How to play ---------- */
+const wW31RenderHelp = renderHelp;
+renderHelp = function () {
+  wW31RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpName')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpName"><b>Your name in the regions.</b> Each match you win in a region adds ${W_REP.win} to your name there, a cup ${W_REP.cup} and a contract from its board ${W_REP.notice}; a match you lose there takes ${W_REP.lose} away. At ${W_REP.at[0]} you are Known: rooms at its inn cost a quarter less. At ${W_REP.at[1]}, Liked: rooms half price, and its free agents a level higher at the same fee. At ${W_REP.at[2]}, Loved: a home crowd at every match in the region, ${W_REP.block} Block at kickoff. The Team screen shows where you stand.</p>`);
+};
+/* w32: the travelling exhibition team (epic 2, phase 9). Loads after w31-name.js; changes earlier parts only by
+   reassignment (saved originals carry the wW32 prefix).
+
+   The Barnstormers, a famous show team, tour the realm: W_TOUR.stay days in one region, then on to another. Nobody
+   knows exactly where they are; you track them by rumour. Innkeepers have heard (ask about the BARNSTORMERS), and the
+   notice boards carry their posters. Rumours lag: for a day after the Barnstormers move on, people still tell you where
+   they were (they are on the road between regions). Once you hold W_TOUR.cups cup, walk the open country of their
+   region and they may turn up (W_TOUR.p a step): a boss match at the Crown's tier. Beat them and their ringmaster hands
+   over Showstopper, a Hall of Fame card no one else has, with gold and fans; then they go home for the year. Next year they tour again, for a purse only. Lose
+   and they pack up and move on.
+
+   WG.tour = { region, prev, since, beat: [years], played }, plain data. W_TOUR, wTour(), wTourRumour(), wTourMatch()
+   Wrapped: wNewDay (the tour moves), wEncounterHook (they turn up), wMatchTeam (their colours), wPreGame (the line),
+   wOpenBoard (the poster), renderHelp (#wHelpTour). W_ON_END.tour settles it.
+   A fightStart hook puts every enemy, the boss too, in their kit.
+   Also a medal (w_tour, Showstoppers: realmTour). */
+
+const W_TOUR = {
+  name: 'The Barnstormers', ring: 'Ringmaster Pell', start: 3, stay: 4, p: .045, cups: 1, lvUp: 0,
+  type: 'boss', tier: 3,   // a boss at the Crown's tier; the bot wins about 7 in 10 (docs/realm/BALANCE.md)
+  team: { name: 'The Barnstormers', short: 'BRN', color: '#d8472e', light: '#ffe2a8' },
+  prize: { gold: 150, fans: 40 }, again: { gold: 80, fans: 20 }, card: 'tour_showstop',
+};
+K('tour_showstop', 'Showstopper', 'none', 'atk', 2, 'l', 'all', [['d', 8, 2, 'all'], ['b', 8]], { fl: 'The Barnstormers\' closing number. Now it is yours.' });
+
+function wTourRegions() { return Object.keys(DB.regions); }
+function wTour() {
+  if (!WG) return null;
+  if (!WG.tour) WG.tour = { region: pick(wTourRegions().filter(r => r !== 'plains')), prev: null, since: W_TOUR.start, beat: [], played: 0 };
+  return WG.tour;
+}
+function wTourBeaten() { const T = wTour(); return !!T && T.beat.includes(WG.year); }
+function wTourOn() { const T = wTour(); return !!T && WG.dayAbs >= T.since && !wTourBeaten(); }
+/* move on to another region */
+function wTourMove(why) {
+  const T = wTour();
+  T.prev = T.region; T.region = pick(wTourRegions().filter(r => r !== T.region)); T.since = WG.dayAbs + 1;
+  if (why) wLog(why, 'd');
+}
+const wW32NewDay = wNewDay;
+wNewDay = function () {
+  wW32NewDay();
+  const T = WG && WG.tour; if (!T) return;
+  if (WG.dayAbs >= T.since + W_TOUR.stay) wTourMove();
+};
+/* what people say: where they are, or for a day after a move, where they were */
+function wTourRumour() {
+  const T = wTour();
+  if (wTourBeaten()) return `${W_TOUR.name}? Gone home for the year, after somebody beat them. Was that you?`;
+  if (WG.dayAbs < W_TOUR.start) return `${W_TOUR.name} are coming: a show team, the best in the realm. Their tour starts any day.`;
+  const fresh = WG.dayAbs < T.since && T.prev;   // on the road between regions
+  const where = wRegThe(fresh ? T.prev : T.region);
+  return fresh ? `${W_TOUR.name} were playing in ${where}, last anybody heard. Find them out in the open country, off the roads.`
+    : `${W_TOUR.name} are touring ${where} this week. Walk the open country there and they will find you. They play for a Hall of Fame card.`;
+}
+
+/* ---------- they turn up ---------- */
+function wTourMatch(region) {
+  const T = wTour(), L = wLevelInfo(false);
+  T.played++;
+  return startMatch({ type: W_TOUR.type, tier: W_TOUR.tier, lv: Math.min(W_ROAD.maxLv, L.lv + W_TOUR.lvUp), ambush: false, name: W_TOUR.ring,
+    world: { kind: 'tour', ref: { year: WG.year }, region: region || T.region } });
+}
+const wW32EncounterHook = wEncounterHook;
+wEncounterHook = function (region, tileCh, info) {
+  if (!info && WG && RUN && wCurMap().kind === 'world' && !WG.event && !(WG.grace > 0) && wTourOn() && wCupsWon() >= W_TOUR.cups && region === wTour().region && Math.random() < W_TOUR.p) {
+    wLog(`A painted wagon blocks the way, and ${W_TOUR.ring} tips a tall hat: "${W_TOUR.name}! One game, friends. Winner takes the show."`, 'b');
+    return wTourMatch(region);
+  }
+  return wW32EncounterHook(region, tileCh, info);
+};
+// everyone in their kit, the boss too (w9 leaves a boss in its own)
+onHook('fightStart', () => {
+  const W = RUN && RUN.pending && RUN.pending.world;
+  if (!WG || !B || !W || W.kind !== 'tour') return;
+  for (const e of B.enemies) e.team = Object.assign({}, W_TOUR.team);
+});
+W_ON_END.tour = function (r, ref, W) {
+  const T = wTour();
+  if (r !== 'win') { wTourMove(`${W_TOUR.name} take a bow, pack the wagon and move on.`); return; }
+  const first = !T.beat.length;
+  T.beat.push(WG.year);
+  const P = first ? W_TOUR.prize : W_TOUR.again;
+  RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
+  wLog(`You beat ${W_TOUR.name}! ${P.gold} gold and ${P.fans} fans.${first ? '' : ' They go home for the year.'}`, 'g');
+  if (first) { wLog(`${W_TOUR.ring} hands over the show's closing number: Showstopper.`, 'g'); wGainCard(W_TOUR.card, W_TOUR.name); }
+  achAdd('realmTour', 1);
+};
+
+/* ---------- words ---------- */
+const wW32MatchTeam = wMatchTeam;
+wMatchTeam = function (W) { return W && W.kind === 'tour' ? W_TOUR.team : wW32MatchTeam(W); };
+const wW32PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW32PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'); if (!box || enc.world.kind !== 'tour') return;
+  const first = !wTour().beat.length;
+  box.insertAdjacentHTML('afterbegin', `<p class="wtaunt">${esc(W_TOUR.name)}, the touring show team. Win for ${first ? `Showstopper (a Hall of Fame card nobody else has), ${W_TOUR.prize.gold} gold and ${W_TOUR.prize.fans} fans` : `${W_TOUR.again.gold} gold and ${W_TOUR.again.fans} fans`}. Lose, and they move on.</p>`);
+};
+for (const id of W_TAVERN_INNS) {
+  const ch = DB.chars[id]; if (!ch) continue;
+  ch.topics.barnstormers = { t: 'A show team, touring the realm. Ask anyone where they were last seen.', act: 'tour' };
+  if (ch.topics.notices) ch.topics.notices.t += ' And posters for the BARNSTORMERS.';
+}
+const wW32RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'tour') { wLog(`${wChar(id).name}: "${wTourRumour()}"`, 'm'); return null; }
+  return wW32RunAct(act, id);
+};
+const wW32OpenBoard = wOpenBoard;
+wOpenBoard = function (city, msg) {
+  wW32OpenBoard(city, msg);
+  const h = document.querySelector('#modalBox header'); if (!h || LAB) return;
+  h.insertAdjacentHTML('afterend', `<p class="wtour"><b>Poster:</b> ${esc(wTourRumour())}</p>`);
+};
+
+/* ---------- a medal, How to play ---------- */
+ACH.push({ id: 'w_tour', n: 'Showstoppers', d: 'Beat the Barnstormers, the touring show team', stat: 'realmTour', at: [1, 2, 3] });
+const wW32RenderHelp = renderHelp;
+renderHelp = function () {
+  wW32RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpTour')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpTour"><b>The Barnstormers.</b> A famous show team tours the realm, ${W_TOUR.stay} days in each region. Track them by rumour: ask any innkeeper about the BARNSTORMERS, or read the posters on the notice boards (rumours can be a day behind). Once you hold a cup, walk the open country of their region and they may turn up: a boss match at the Crown's tier. Beat them for Showstopper, a Hall of Fame card nobody else has, ${W_TOUR.prize.gold} gold and ${W_TOUR.prize.fans} fans; then they go home until next year. Lose, and they move on.</p>`);
+};
+/* w33: small gold sinks (epic 2, phase 10). Loads after w32-tour.js; changes earlier parts only by reassignment
+   (saved originals carry the wW33 prefix).
+
+   Training camp. At any training spot, after the week's free drill, pay to drill another card that suits the sport
+   (Practice ★). Each paid drill in a week costs more than the last (W_SINK.camp), and an hour.
+   Coaches. The League's coaches run between the five cities. Take one from any inn (ask the innkeeper about the
+   COACH, or the inn's Coach button): it costs W_SINK.coach.base plus a gold for every W_SINK.coach.per tiles, takes
+   half the time walking would, and nobody stops a League coach on the road. You arrive at the inn.
+
+   WG.sink = { week, drills, coaches }, plain data. W_SINK, wCampPrice(), wCampDrill(id, card), wCoachTrip(from, to),
+   wTakeCoach(to)
+   Wrapped: wOpenSpot (the Training camp row), wOpenInn (the Coach button), wRunAct (act 'coach'), renderHelp
+   (#wHelpSinks). */
+
+const W_SINK = { camp: [30, 45, 65, 90, 120], minutes: 60, coach: { base: 10, per: 3, speed: 2 } };
+const W_COACH_CITIES = ['graftonbury', 'mossgate', 'saltmere', 'cinderhold', 'rimewatch'];
+
+function wSink() {
+  const S = WG.sink = WG.sink || { week: -1, drills: 0, coaches: 0 };
+  if (S.week !== wWeek()) { S.week = wWeek(); S.drills = 0; }
+  return S;
+}
+
+/* ---------- training camp ---------- */
+function wCampPrice() { const n = wSink().drills; return W_SINK.camp[Math.min(n, W_SINK.camp.length - 1)]; }
+/* '' or why not */
+function wCampDrill(id, card) {
+  const s = wSpot(id); if (!s) return 'There is no spot like that.';
+  if (wSpotState(id).drill !== wWeek()) return 'Take the free drill first.';
+  const price = wCampPrice();
+  if (RUN.gold < price) return `A camp session is ${price} gold. You have ${RUN.gold}.`;
+  if (!card || !RUN.deck.includes(card) || !practicable(card)) return 'That card cannot take a drill.';
+  RUN.gold -= price; card.sk = 1; wSink().drills++;
+  achAdd('practice', 1);
+  wAdvance(W_SINK.minutes);
+  wLog(`Training camp with ${s.coach.name}: ${wCardName(card.id, card.up)} gains Practice ★ (${price} gold).`, 'm');
+  wSave();
+  return '';
+}
+const wW33OpenSpot = wOpenSpot;
+wOpenSpot = function (id, msg) {
+  wW33OpenSpot(id, msg);
+  const s = wSpot(id), ul = document.querySelector('#modalBox .wbclubs'); if (!s || !ul || $('wCampDrill')) return;
+  const free = wSpotState(id).drill === wWeek(), price = wCampPrice(), cards = wSpotCards(s.sport).filter(c => !c.sk);
+  const why = !free ? 'After the free drill.' : !cards.length ? 'Every card that could take a drill has Practice ★.' : RUN.gold < price ? `You have ${RUN.gold} gold.` : '';
+  ul.insertAdjacentHTML('beforeend', `<li class="wbcl"><span class="wbsw" style="background:#c9a23a"></span><div><b>Training camp</b><small>Drill another card that suits ${esc(SPORT_NAME[s.sport].toLowerCase())}: ${price} gold and an hour. Each session this week costs more.${why ? ' <b>' + esc(why) + '</b>' : ''}</small></div>
+    <div class="row"><button class="ghost" id="wCampDrill" ${why ? 'disabled' : ''}>Pay ${price} gold</button></div></li>`);
+  $('wCampDrill').onclick = () => {
+    $('modalBox').querySelector('[data-close]').click();
+    wPickCard(cards, 'Training camp', `${price} gold. The card gains Practice ★.`, card => {
+      if (!card) return wOpenSpot(id);
+      const r = wCampDrill(id, card); wDrain();
+      wOpenSpot(id, { ok: !r, t: r || `${wCardName(card.id, card.up)} gains Practice ★.` });
+    });
+  };
+};
+
+/* ---------- coaches ---------- */
+function wCityLoc(city) { return DB.locs.find(l => l.map === city && l.kind !== 'ground') || null; }
+/* { dist, price, minutes } from one city to another, or null */
+function wCoachTrip(from, to) {
+  const a = wCityLoc(from), b = wCityLoc(to); if (!a || !b || from === to) return null;
+  const dist = Math.abs(a.x - b.x) + Math.abs(a.y - b.y), C = W_SINK.coach;
+  return { dist, price: C.base + Math.ceil(dist / C.per), minutes: Math.round(dist * WSTEP_MIN.world / C.speed) };
+}
+function wCoachTime(min) { const h = Math.floor(min / 60), m = min % 60; return h ? `${h} hour${h === 1 ? '' : 's'}${m ? ` ${m} minutes` : ''}` : `${m} minutes`; }
+/* '' or why not */
+function wTakeCoach(to) {
+  const from = WG.map, T = wCoachTrip(from, to);
+  if (!W_COACH_CITIES.includes(from)) return 'Coaches leave from the cities\' inns.';
+  if (!T) return 'There is no coach to there.';
+  if (RUN.gold < T.price) return `The fare is ${T.price} gold. You have ${RUN.gold}.`;
+  RUN.gold -= T.price; wSink().coaches++;
+  wAdvance(T.minutes);
+  const at = wInnSpot(to);
+  wEnterMap(to, at[0], at[1]); WG.face = 'd'; WG.grace = W_ENC.grace;
+  if (typeof wResetParty === 'function' && WUI.built) wResetParty();
+  wLog(`The League coach rattles into ${wTownName(to)} after ${wCoachTime(T.minutes)} (${T.price} gold).`, 'm');
+  wSave();
+  return '';
+}
+function wOpenCoach(msg) {
+  if (LAB) return;
+  const from = WG.map;
+  const rows = W_COACH_CITIES.filter(c => c !== from).map(c => { const T = wCoachTrip(from, c); return `<li class="wbcl"><span class="wbsw" style="background:#8a6a3a"></span><div><b>${esc(wTownName(c))}</b><small>${esc(wCap(wRegThe(W_GRD_REG[c])))}. ${wCoachTime(T.minutes)}, ${T.price} gold.</small></div>
+    <div class="row"><button class="btn" data-coach="${c}" ${RUN.gold < T.price ? 'disabled' : ''}>Go, ${T.price} gold</button></div></li>`; }).join('');
+  const close = modal(`<header><h3>The League coach</h3><button class="ghost" data-close>Not now</button></header>
+    ${msg ? `<p class="wbad" role="status">${esc(msg)}</p>` : ''}
+    <p class="hint">It leaves from the inn yard and runs to every city, twice as fast as walking. Nobody stops a League coach on the road. You have ${RUN.gold} gold.</p>
+    <ul class="wbclubs">${rows}</ul>`);
+  $('modalBox').querySelectorAll('[data-coach]').forEach(b => b.onclick = () => { const r = wTakeCoach(b.dataset.coach); close(); wCloseTalk(); if (r) wOpenCoach(r); wDrain(); });
+}
+for (const id of W_TAVERN_INNS) {
+  const ch = DB.chars[id]; if (!ch) continue;
+  ch.topics.coach = { t: 'The League coach leaves from the yard for every city. Faster than walking, and safe.', act: 'coach' };
+  ch.topics.job.t += ' The COACH leaves from the yard.';
+}
+const wW33RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'coach') return wOpenCoach();
+  return wW33RunAct(act, id);
+};
+const wW33OpenInn = wOpenInn;
+wOpenInn = function (price, who) {
+  wW33OpenInn(price, who);
+  const row = $('wSleep') && $('wSleep').parentNode; if (!row || $('wInnCoach') || !W_COACH_CITIES.includes(WG.map)) return;
+  row.insertAdjacentHTML('beforeend', '<button class="ghost" id="wInnCoach">Coach</button>');
+  $('wInnCoach').onclick = () => { $('modalBox').querySelector('[data-close]').click(); wOpenCoach(); };
+};
+
+/* ---------- How to play ---------- */
+const wW33RenderHelp = renderHelp;
+renderHelp = function () {
+  wW33RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpSinks')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpSinks"><b>Training camp and coaches.</b> At a training spot, after the week's free drill, pay for a camp session to drill another card (Practice ★): ${W_SINK.camp.slice(0, 3).join(', ')} gold and up, rising with each session that week. The League COACH runs from every city's inn to the others: ${W_SINK.coach.base} gold plus 1 for every ${W_SINK.coach.per} tiles, half the walking time, and nothing stops it on the road.</p>`);
+};
+/* w34: defend the title (epic 2, phase 11). Loads after w33-sinks.js; changes earlier parts only by reassignment
+   (saved originals carry the wW34 prefix).
+
+   Win the Crown and the journey goes on as a new season, with you as the champions:
+   - Renown carries over and grows: each crown you hold counts W_DEF.renown towards it (foes have more HP and Strength).
+   - The cups reopen. From the year after you won a cup, its registrar takes your entry again: a title defence, at
+     W_DEF.lvUp more levels. Win it and it counts as defended that year, for the usual prize.
+   - Every club is hunting you. Out in the world, any rival club may turn up for a game (W_DEF.huntP a step, from the
+     day after your crown): a rival match at your level plus W_DEF.huntLv. Win for W_DEF.huntWin; it counts on the
+     table and the head to head like any rival game.
+   - The Crown gets harder: its rounds are a level up for each crown you already hold.
+
+   WG.defend = { cups: { cupId: [years defended] }, hunted: n, beaten: n } and WG.crownDay (the day of your
+   last crown), plain data. W_DEF, wChamps() (crowns held),
+   wDefending(id), wHuntMatch(region)
+   Wrapped: wRenown, wCupProblem, wCupEnter and wCupPlay (re-entry, marked as a defence), wCupMatch (defence and Crown levels), wCupWon (defended),
+   wEncounterHook (the hunt), W_ON_END.event (the hunt's purse), wPreGame (lines), wCampTeam (the title), renderHelp
+   (#wHelpDefend). */
+
+const W_DEF = { renown: 2, lvUp: 1, huntP: .02, huntLv: 1, huntWin: { gold: 40, fans: 8 } };
+
+function wChamps() { return ((WG && WG.crowns) || []).length; }
+function wDef() { return (WG.defend = WG.defend || { cups: {}, hunted: 0, beaten: 0 }); }
+/* a cup already on your wall that you may enter again this year */
+function wDefending(id) {
+  const C = DB.cups[id];
+  return !!C && id !== 'crown' && wChamps() > 0 && wFlag(C.flag) && ((WG.cupLog || {})[id] || { year: 0 }).year < WG.year;
+}
+
+/* ---------- renown carries over ---------- */
+const wW34Renown = wRenown;
+wRenown = function () { return wW34Renown() + W_DEF.renown * wChamps(); };
+
+/* ---------- the cups reopen ---------- */
+const wW34CupProblem = wCupProblem;
+wCupProblem = function (id) {
+  const why = wW34CupProblem(id);
+  if (!why || !wDefending(id)) return why;
+  if (RUN.gold < W_CUP.fee) return `Entry is ${W_CUP.fee} gold, and you have ${RUN.gold}.`;
+  return '';
+};
+const wW34CupEnter = wCupEnter;
+wCupEnter = function (id, o) {
+  const fresh = !WG.cup || WG.cup.id !== id;
+  return wW34CupEnter(id, fresh && wDefending(id) ? Object.assign({}, o, { wDefence: 1 }) : o);
+};
+/* the cup state is made inside the original enter; mark the defence before round 1's match is built */
+const wW34CupPlay = wCupPlay;
+wCupPlay = function (o) {
+  if (o && o.wDefence && WG.cup && WG.cup.round === 0 && !WG.cup.defence) { WG.cup.defence = 1; wLog(`A title defence: ${wCupThe(WG.cup.id)}, a level harder than before.`, 'b'); }
+  return wW34CupPlay(o);
+};
+const wW34CupMatch = wCupMatch;
+wCupMatch = function (id, i) {
+  const o = wW34CupMatch(id, i);
+  if (id === 'crown') o.lv = Math.min(W_ROAD.maxLv, o.lv + wChamps());
+  else if (WG.cup && WG.cup.id === id && WG.cup.defence) o.lv = Math.min(W_ROAD.maxLv, o.lv + W_DEF.lvUp);
+  return o;
+};
+const wW34CupWon = wCupWon;
+wCupWon = function (id) {
+  const def = WG.cup && WG.cup.id === id && WG.cup.defence;
+  wW34CupWon(id);
+  if (id === 'crown') WG.crownDay = WG.dayAbs;   // the hunt starts the next day
+  if (def) { const D = wDef(); (D.cups[id] = D.cups[id] || []).push(WG.year); wLog(`${wCap(wCupThe(id))}: title defended.`, 'g'); }
+};
+
+/* ---------- every club is hunting you ---------- */
+function wHuntClub() { const cl = Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i); return cl.length ? pick(cl) : null; }
+function wHuntMatch(region, club) {
+  club = club || wHuntClub(); if (!club) return null;
+  wDef().hunted++;
+  const L = wLevelInfo(false);
+  return startMatch({ type: 'rival', tier: wTierHere(), lv: Math.min(W_ROAD.maxLv, L.lv + W_DEF.huntLv), ambush: false, name: wClubCaptain(club),
+    world: { kind: 'event', ref: { rival: club, hunt: 1 }, region: region || wRegionHere() } });
+}
+const wW34EncounterHook = wEncounterHook;
+wEncounterHook = function (region, tileCh, info) {
+  const day = (WG && WG.crownDay) || 0;
+  if (!info && WG && RUN && wChamps() && WG.dayAbs > day && wCurMap().kind === 'world' && !WG.event && !(WG.grace > 0) && !WG.grudge && Math.random() < W_DEF.huntP) {
+    const club = wHuntClub();
+    if (club) { wLog(`The ${wClubName(club)} have been looking for the champions. ${wClubCaptain(club)}: "Title's on the line. Here. Now."`, 'b'); return wHuntMatch(region, club); }
+  }
+  return wW34EncounterHook(region, tileCh, info);
+};
+const wW34OnEvent = W_ON_END.event;
+W_ON_END.event = function (r, ref, W) {
+  wW34OnEvent(r, ref, W);
+  if (!ref || !ref.hunt) return;
+  if (r === 'win') { const P = W_DEF.huntWin; wDef().beaten++; RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans; wLog(`The champions see off the ${wClubName(ref.rival)}. ${P.gold} gold and ${P.fans} fans.`, 'g'); }
+  else wLog(`The ${wClubName(ref.rival)} beat the champions, and will be telling everyone.`, 'd');
+};
+
+/* ---------- words ---------- */
+const wW34PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW34PreGame(enc);
+  const box = document.querySelector('#modalBox .wpgtxt'), W = enc.world, ref = W.ref || {}; if (!box) return;
+  let t = '';
+  if (W.kind === 'event' && ref.hunt) t = `They want the champions. Win for ${W_DEF.huntWin.gold} gold and ${W_DEF.huntWin.fans} fans.`;
+  else if (W.kind === 'cup' && WG.cup && WG.cup.defence) t = `A title defence: a level harder than when you won it.`;
+  else if (W.kind === 'cup' && ref.cup === 'crown' && wChamps()) t = `Defending the Crown: ${wChamps()} level${wChamps() === 1 ? '' : 's'} harder for every crown you hold.`;
+  if (t) box.insertAdjacentHTML('afterbegin', `<p class="wtaunt">${esc(t)}</p>`);
+};
+const wW34CampTeam = wCampTeam;
+wCampTeam = function () {
+  const h = wW34CampTeam(); if (!wChamps()) return h;
+  const D = wDef(), cups = Object.values(D.cups).reduce((n, y) => n + y.length, 0);
+  return `<p class="wgood wchamps"><b>Champions of the realm</b> (${WG.crowns.join(', ').replace(/(\d+)/g, 'year $1')}). Every club is hunting you.${cups ? ` Titles defended: ${cups}.` : ''}${D.beaten ? ` Hunters seen off: ${D.beaten}.` : ''}</p>` + h;
+};
+
+/* ---------- How to play ---------- */
+const wW34RenderHelp = renderHelp;
+renderHelp = function () {
+  wW34RenderHelp();
+  const sec = $('wHelpCups'); if (!sec || $('wHelpDefend')) return;
+  sec.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDefend"><b>Defend the title.</b> Win the Crown and the journey goes on, with you as the champions. Each crown adds ${W_DEF.renown} to your renown. From the next year, every cup on your wall takes your entry again as a title defence, a level harder. Every rival club is hunting you: out in the world they turn up for a game, a level up, and a win pays ${W_DEF.huntWin.gold} gold and ${W_DEF.huntWin.fans} fans. The Crown itself is a level harder for every crown you already hold.</p>`);
+};
+/* w35: the Hall of Legends (epic 2, phase 12). Loads after w34-defend.js; changes earlier parts only by reassignment
+   (saved originals carry the wW35 prefix).
+
+   Win the Crown and your team goes into the Hall of Legends: its name, colours and starting three, kept per profile
+   outside the journey's save (pkey('sd-realm-legends'), the latest W_LEG.keep). In every later journey those past
+   champions are famous teams:
+   - At the Crown Coliseum, Steward Crane keeps the Hall: ask about the LEGENDS and challenge any of them, once a
+     journey each. A hard match at the top tier against their starting three, by name, in their colours.
+   - Out in the world, once you hold W_LEG.roadCups cups, a legend you have not beaten may turn up (W_LEG.roadP a step).
+   Beat a legend for W_LEG.prize and a pick of rare cards. A journey never meets its own legend.
+
+   wLegendsAll() (the Hall, from storage), WG.legends (this journey's copy, taken at the start), WG.legBeat = { id: day },
+   WG.legId (this journey's own entry, once it has won the Crown). Plain data.
+   W_LEG, wLegendMatch(id), wOpenLegends()
+   Wrapped: wStart (copy the Hall in), wCupWon (into the Hall), wEncounterHook (on the road), wMatchTeam (their
+   colours), wPreGame (the line), wRunAct (act 'legends'), renderHelp (#wHelpLegends). W_ON_END.legend settles it.
+   A fightStart hook names their players. Also a medal (w_legends, Legend Slayer: realmLegends). */
+
+const W_LEG = { keep: 10, roadCups: 2, roadP: .012, tier: 3, lv: 2, prize: { gold: 120, fans: 30, pick: 3, rarity: 'r' } };
+function wLegKey() { return pkey('sd-realm-legends'); }
+function wLegendsAll() { try { return JSON.parse(localStorage.getItem(wLegKey()) || '[]') || []; } catch (e) { return []; } }
+function wLegendsSave(list) { if (LAB) return; try { localStorage.setItem(wLegKey(), JSON.stringify(list.slice(-W_LEG.keep))); } catch (e) { } }
+function wLegends() { return (WG && WG.legends) || []; }
+function wLegend(id) { return wLegends().find(l => l.id === id) || null; }
+function wLegBeaten(id) { return !!(WG.legBeat && WG.legBeat[id]); }
+
+/* ---------- into the Hall: on a Crown, this journey's team (one entry a journey, updated by later crowns) ---------- */
+function wLegendOfJourney() {
+  const team = wPartyTeam(), cap = typeof wCaptain === 'function' && wCaptain();
+  return { id: WG.legId, name: team.name, short: team.short, color: team.color, light: team.light, year: WG.year, crowns: (WG.crowns || []).length,
+    hard: WG.hardcore ? 1 : 0, at: new Date().toISOString().slice(0, 10), cap: cap ? cap.n : (wStarters()[0] || {}).n,
+    players: wStarters().map(p => ({ n: p.n, kind: p.kind, lvl: p.lvl, num: p.num })) };
+}
+const wW35CupWon = wCupWon;
+wCupWon = function (id) {
+  wW35CupWon(id);
+  if (id !== 'crown' || LAB) return;
+  WG.legId = WG.legId || 'L' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
+  const all = wLegendsAll().filter(l => l.id !== WG.legId);
+  all.push(wLegendOfJourney());
+  wLegendsSave(all);
+  wLog('Your team goes into the Hall of Legends at the Crown Coliseum. Later journeys will have to beat you.', 'g');
+};
+/* a new journey takes a copy of the Hall */
+const wW35Start = wStart;
+wStart = function (a, b) {
+  const r = wW35Start(a, b);
+  if (WG && !WG.legends) { WG.legends = wLegendsAll().filter(l => l.id !== WG.legId); WG.legBeat = WG.legBeat || {}; }
+  return r;
+};
+
+/* ---------- a legend's match ---------- */
+function wLegendIds(L) {
+  const plain = id => !ENEMIES[id].boss && !ENEMIES[id].team && !ENEMIES[id].ai.quarters;
+  let elites = 0;
+  return L.players.map(p => {
+    const mine = Object.keys(ENEMIES).filter(id => plain(id) && ENEMIES[id].kind === p.kind);
+    const reg = mine.filter(id => !ENEMIES[id].elite);
+    if (reg.length) return pick(reg);
+    if (mine.length && !elites++) return pick(mine);
+    return pick(Object.keys(ENEMIES).filter(id => plain(id) && !ENEMIES[id].elite));
+  });
+}
+function wLegendMatch(id, region) {
+  const L = wLegend(id); if (!L || wLegBeaten(id)) return null;
+  return startMatch({ type: 'rival', ids: wLegendIds(L), tier: W_LEG.tier, lv: Math.min(W_ROAD.maxLv, W_LEG.lv + (L.crowns || 1) - 1), ambush: false, name: L.cap,
+    world: { kind: 'legend', ref: { id }, region: region || wRegionHere() } });
+}
+onHook('fightStart', () => {
+  const W = RUN && RUN.pending && RUN.pending.world, L = W && W.kind === 'legend' && wLegend(W.ref && W.ref.id);
+  if (!WG || !B || !L) return;
+  B.enemies.forEach((e, i) => { const p = L.players[i]; if (p) { e.n = p.n; e.num = p.num || e.num; } });
+  log(`${L.name}, champions of year ${L.year}${L.crowns > 1 ? `, ${L.crowns} crowns` : ''}. A legend.`, 'sys');
+});
+W_ON_END.legend = function (r, ref, W) {
+  const L = ref && wLegend(ref.id); if (!L) return;
+  if (r !== 'win') { wLog(`${L.name} are still legends. Come back when you are ready.`, 'd'); return; }
+  (WG.legBeat = WG.legBeat || {})[L.id] = WG.dayAbs;
+  const P = W_LEG.prize; RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
+  wLog(`You beat ${L.name}, champions of year ${L.year}! ${P.gold} gold and ${P.fans} fans.`, 'g');
+  wGainCard({ pick: P.pick, rarity: P.rarity }, `beating ${L.name}`);
+  achAdd('realmLegends', 1);
+};
+const wW35MatchTeam = wMatchTeam;
+wMatchTeam = function (W) {
+  const L = W && W.kind === 'legend' && wLegend(W.ref && W.ref.id);
+  return L ? { name: L.name, short: L.short, color: L.color, light: L.light } : wW35MatchTeam(W);
+};
+const wW35PreGame = wPreGame;
+wPreGame = function (enc) {
+  wW35PreGame(enc);
+  const W = enc.world, L = W.kind === 'legend' && wLegend(W.ref && W.ref.id), box = document.querySelector('#modalBox .wpgtxt'); if (!box || !L) return;
+  box.insertAdjacentHTML('afterbegin', `<p class="wtaunt">${esc(L.name)}, from the Hall of Legends: champions of year ${L.year} on ${esc(L.at)}${L.hard ? ', in Hardcore' : ''}. ${esc(L.players.map(p => `${p.n} (${wKindName(p.kind)}, level ${p.lvl})`).join(', '))}. Win for ${W_LEG.prize.gold} gold, ${W_LEG.prize.fans} fans and a pick of rare cards.</p>`);
+};
+
+/* ---------- on the road ---------- */
+const wW35EncounterHook = wEncounterHook;
+wEncounterHook = function (region, tileCh, info) {
+  if (!info && WG && RUN && wCurMap().kind === 'world' && !WG.event && !(WG.grace > 0) && wCupsWon() >= W_LEG.roadCups && Math.random() < W_LEG.roadP) {
+    const L = wLegends().filter(l => !wLegBeaten(l.id))[0];
+    if (L) { wLog(`A team in old-fashioned kit stops on the road. It is ${L.name}, champions of year ${L.year}. "We heard you were good."`, 'b'); return wLegendMatch(L.id, region); }
+  }
+  return wW35EncounterHook(region, tileCh, info);
+};
+
+/* ---------- the Hall, at the Crown Coliseum ---------- */
+function wOpenLegends() {
+  if (LAB) return;
+  const list = wLegends();
+  const rows = list.map(L => `<li class="wbcl"><span class="wbsw" style="background:${L.color}"></span><div><b>${esc(L.name)}</b> <small>champions of year ${L.year}${L.crowns > 1 ? `, ${L.crowns} crowns` : ''}, ${esc(L.at)}${L.hard ? ', Hardcore' : ''}</small>
+    <small>${esc(L.players.map(p => `${p.n} (${wKindName(p.kind)} ${p.lvl})`).join(', '))}</small></div>
+    <div class="row">${wLegBeaten(L.id) ? '<b class="wgood">Beaten</b>' : `<button class="btn" data-legend="${esc(L.id)}">Challenge</button>`}</div></li>`).join('');
+  const close = modal(`<header><h3>The Hall of Legends</h3><button class="ghost" data-close>Done</button></header>
+    <p class="hint">Steward Crane walks you past the portraits. Every team that won the Crown on this profile hangs here. Each will play you once a journey: a hard game at the top tier.</p>
+    ${list.length ? `<ul class="wbclubs">${rows}</ul>` : '<p class="hint">The walls are bare. Win the Crown and yours will be the first portrait.</p>'}`);
+  $('modalBox').querySelectorAll('[data-legend]').forEach(b => b.onclick = () => { close(); wCloseTalk(); wLegendMatch(b.dataset.legend, 'plains'); wDrain(); });
+}
+if (DB.chars.steward) {
+  DB.chars.steward.topics.legends = { t: 'The Hall of Legends: every team that ever won the Crown, on the wall where Apex Athletic cannot take them down. They will still play you.', act: 'legends' };
+  DB.chars.steward.greet += ' The Hall of LEGENDS is through the arch.';
+}
+const wW35RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'legends') return wOpenLegends();
+  return wW35RunAct(act, id);
+};
+
+/* ---------- a medal, How to play ---------- */
+ACH.push({ id: 'w_legends', n: 'Legend Slayer', d: 'Beat a past champion team from the Hall of Legends', stat: 'realmLegends', at: [1, 3, 6] });
+const wW35RenderHelp = renderHelp;
+renderHelp = function () {
+  wW35RenderHelp();
+  const sec = $('wHelpCups'); if (!sec || $('wHelpLegends')) return;
+  sec.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpLegends"><b>The Hall of Legends.</b> Every team that wins the Crown on your profile goes into the Hall at the Crown Coliseum, with its starting three. In later journeys they are famous teams: ask Steward Crane about the LEGENDS to challenge one (once a journey each), and once you hold ${W_LEG.roadCups} cups they may stop you on the road. Beat a legend for ${W_LEG.prize.gold} gold, ${W_LEG.prize.fans} fans and a pick of rare cards.</p>`);
 };
 </script>
 </body></html>
