@@ -19,6 +19,9 @@ function bdxStart(opts) {
   if (!BDX.hinted) { BDX.hinted = true; try { setHints(true); } catch (e) { } }
   newGame(opts);
 }
+// T (or the Settings page) switches Auto powers: onAuto hears the new value, mid-game too
+const bdxSetAuto = setAuto;
+setAuto = function () { const r = bdxSetAuto.apply(this, arguments); try { if (BDX.onAuto) BDX.onAuto(AUTO); } catch (e) { console.error(e); } return r; };
 // a snapshot from onSnap, back on the field where it was taken
 function bdxResume(sn) { actx(); BDX.page.classList.add('bdlive'); resumeSnap(sn, false); }
 // a whole game at once, CPU against CPU and silent: onOver hears the final before this returns
@@ -53,7 +56,7 @@ function bdxKindsAt(pos) { return KINDS.filter(k => TEMPL[k].pos === pos); }
 function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPen(d, innings || 3); return d; }
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
-  get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; },
+  get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; }, set onAuto(f) { BDX.onAuto = f; },
   get live() { return gameOn(); }, audio: (music, sfx) => { if (MUS.on !== !!music) setMusic(!!music, true); SND.on = !!sfx; }, get sound() { return { music: !!MUS.on, sfx: !!SND.on }; }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
   teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
   kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice()

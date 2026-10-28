@@ -90,11 +90,19 @@ async def main():
         rows = await pg.evaluate("[...document.querySelectorAll('#modalBox .wbcl')].map(li => ({ t: li.textContent, off: [...li.querySelectorAll('button')].every(b => b.disabled) }))")
         check(len(rows) >= 3 and rows[0]['off'] and not any(r['off'] for r in rows[1:]), 'the card: the local nine (played today) and the rivals', rows)
         await pg.screenshot(path='/tmp/realm-ball-card.png')
+        check('Press T' in await pg.evaluate("document.getElementById('modalBox').textContent"), 'the card says T switches Auto powers mid-game')
         club = await pg.evaluate("document.querySelectorAll('#modalBox [data-bhow=\"play\"]')[1].dataset.bclub")
         await pg.evaluate("document.querySelectorAll('#modalBox [data-bhow=\"play\"]')[1].click()")
         await pg.wait_for_function("UI.view === 'diamond' && WG.ball.live && wBD.G.phase === 'plate'", timeout=15000)
         bar = await pg.evaluate("({ save: !document.getElementById('wBallSave').hidden, give: !document.getElementById('wBallGive').hidden, back: !document.getElementById('wDiamondBack').hidden, ctl: wBD.G.teams.map(t => t.ctl), note: document.getElementById('wDiamondNote').textContent })")
         check(bar['save'] and bar['give'] and not bar['back'] and bar['ctl'] == ['p1', 'cpu'], 'on the diamond: you bat first, Save and leave and Concede on the bar', bar)
+        # T switches Auto powers mid-game: the bar and the game's record follow (Play <-> Manage)
+        await pg.keyboard.press('t'); await pg.wait_for_function("wBD.G.rules.auto === true", timeout=3000)
+        t1 = await pg.evaluate("({ note: document.getElementById('wDiamondNote').textContent, how: WG.ball.live.world.how })")
+        await pg.keyboard.press('t'); await pg.wait_for_function("wBD.G.rules.auto === false", timeout=3000)
+        t2 = await pg.evaluate("({ note: document.getElementById('wDiamondNote').textContent, how: WG.ball.live.world.how })")
+        check(t1['note'].startswith('Managing') and t1['how'] == 'manage' and t2['note'].startswith('You play every pitch') and t2['how'] == 'play',
+              'T switches Auto powers mid-game, and the bar and the record say so', [t1, t2])
         pitches = 0
         for i in range(14):
             await pg.keyboard.press('Space'); await pg.wait_for_timeout(500)
