@@ -172,7 +172,9 @@ window.REALMLAB = function (opts = {}) {
   function hatchery() {
     if (!opts.hatch || typeof W_HATCH === 'undefined') return;
     for (const d of DB.dungeons) if (DB.rareEggs[d.id] && wFlag('alpha_' + d.alpha) && !wFlag('rare_' + d.id)) { wAddItem(DB.rareEggs[d.id].item, 1); wSetFlag('rare_' + d.id); }
+    if (opts.hatchXpTo != null) W_HATCH.xpTo = opts.hatchXpTo;             // to measure what a prospect's double XP is worth
     const before = wRoster().length; wIncubator(); if (wRoster().length > before) log.hatched = (log.hatched || 0) + 1;
+    if (opts.noHatchCard) RUN.deck = RUN.deck.filter(c => !c.id.startsWith('hx_')); // and what their own card is worth
   }
   // a meal before a big match: an egg dish the team cooked, or the strongest the region's inn serves, if affordable
   function eat(region) {

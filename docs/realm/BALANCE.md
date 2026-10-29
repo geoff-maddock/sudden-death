@@ -326,3 +326,16 @@ With `opts.eggs`, the bot takes a region's nest and bush every 4 days it passes 
 | Grand Tours eaten | – | 0.19 |
 
 The champion rate doesn't move: the gap is about one standard error. Egg dishes mostly take the place of meals the bot would buy at an inn, and the Grand Tour is rare enough (about one journey in five) not to tilt a Crown.
+
+## Rare eggs and prospects (issue #12, phases 3 to 5)
+
+With `opts.hatch`, the bot takes a dungeon's rare egg once its alpha is beaten and hatches it at Pell's when it has the energy. 280 journeys each, with meals and eggs on:
+
+| | Champion rate | Prospects a journey |
+|---|---|---|
+| No hatching | 78.2% | – |
+| Hatching, as built | 87.1% | 1.76 |
+| Hatching, no double XP (`hatchXpTo: 0`) | 88.2% | 1.83 |
+| Hatching, no hatchling card (`noHatchCard`) | 84.6% | 1.71 |
+
+Hatching adds about 9 points, about 2.7 standard errors, so it's real. Double XP isn't the cause: taking it away changes nothing. The hatchling cards are worth perhaps 2 to 3 points, within noise. Most of it comes from the free players themselves: roster depth for tired legs, and the signature and kind cards each new player brings. The levers are `W_HATCH.energy` (6), `W_HATCH.days` (3) and how many rare eggs there are (5 a journey).
