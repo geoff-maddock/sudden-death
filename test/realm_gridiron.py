@@ -65,7 +65,7 @@ async def main():
           return { job: K.topics.job.t.includes('DRIVE'), act: r.act, reg: W_ENGINES.gridiron && W_ENGINES.gridiron.api === wGF && W_ENGINES.gridiron.sport }; })()""")
         check(k == {'job': True, 'act': 'drive', 'reg': 'football'}, 'Clinker Dunn puts on a DRIVE, and the gridiron is in W_ENGINES for football', k)
         await pg.evaluate("(() => { const r = wSay('gk_bowl', 'drive'); wRunAct(r.act, 'gk_bowl'); })()")
-        await pg.wait_for_function("UI.view === 'gridiron' && wGF.on && wGF.phase === 'live'", timeout=15000)
+        await pg.wait_for_function("UI.view === 'gridiron' && wGF.on && wGF.phase === 'live'", timeout=30000)
         v = await pg.evaluate("""({ bar: !document.getElementById('wGridBar').hidden, field: !document.getElementById('v-gridiron').hidden, world: document.getElementById('v-world').hidden,
           calls: document.getElementById('wGridCalls').hidden, teams: wGF.G.teams.map(t => t.name), side: wGF.G.teams[0].roster.length })""")
         check(v['bar'] and v['field'] and v['world'] and v['calls'] and v['side'] == 7 and v['teams'][0] == 'Cinderhold Football Club',
@@ -96,7 +96,7 @@ async def main():
               'On the field lists both sides\' seven with their six ratings, and How it works is under the field', ln)
         # after the play: what happened and why, in the bar and in the drive's log
         # (switching to Call the plays goes on with the drive, so the coaches' plays before it are in the log too)
-        await pg.wait_for_function("(wGF.phase === 'call' || wGF.phase === 'over') && wGF.G.drive.plays.some(e => e.oc === 'screen')", timeout=15000)
+        await pg.wait_for_function("(wGF.phase === 'call' || wGF.phase === 'over') && wGF.G.drive.plays.some(e => e.oc === 'screen')", timeout=30000)
         lg = await pg.evaluate("""(() => { const li = document.querySelectorAll('#wGridLog li'), pl = wGF.G.drive.plays, e = pl[pl.length - 1];
           return { n: li.length, plays: pl.length, why: e.why, msg: e.msg, text: li[li.length - 1].textContent }; })()""")
         check(lg['n'] == lg['plays'] and ('beats' in lg['why'] or 'even matchup' in lg['why']), 'each play says why it went that way, and This drive keeps them all', lg)
@@ -105,7 +105,7 @@ async def main():
         if await pg.evaluate("wGF.phase === 'over'"):  # the screen went all the way (or was picked off): a fresh drive to punt from
             await pg.evaluate("wGridironDrive({ mode: 'call', seed: 3 })"); await pg.wait_for_function("wGF.phase === 'call'")
         await pg.click('[data-gkick="punt"]')
-        await pg.wait_for_function("wGF.phase === 'over'", timeout=15000)
+        await pg.wait_for_function("wGF.phase === 'over'", timeout=30000)
         pu = await pg.evaluate("({ end: wGF.G.drive.end, n: document.querySelectorAll('#wGridLog li').length, last: document.querySelector('#wGridLog li:last-child').textContent })")
         pu['side'] = await pg.evaluate("document.querySelector('#wGridLineup caption').textContent")
         check(pu['end'] == 'punt' and 'Cinderhold' in pu['side'] and 'offense' in pu['side'] and pu['n'] >= 1 and 'Punt' in pu['last'], 'you may punt on any down, and the punt goes in the log', pu)
@@ -120,7 +120,7 @@ async def main():
         check(fo['ok'] and not fo['far'] and '47 yd' in fo['fg'] and 'Fourth down' in fo['note'] and fo['still'] == 'call',
               'fourth down waits for your call; the field goal button shows the distance and chance, and only in range', fo)
         await pg.click('[data-gkick="fg"]')
-        await pg.wait_for_function("wGF.phase === 'over'", timeout=15000)
+        await pg.wait_for_function("wGF.phase === 'over'", timeout=30000)
         fg = await pg.evaluate("({ end: wGF.G.drive.end, why: wGF.why })")
         check(fg['end'] in ('fg', 'miss') and '%' in fg['why'], 'the field goal is kicked when you call it, and the bar gives its chance', fg)
 

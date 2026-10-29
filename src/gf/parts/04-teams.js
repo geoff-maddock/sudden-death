@@ -4,7 +4,11 @@
    The lineup is picked from the ratings: the best arm throws, the best runner carries, the three strongest block, and
    the other two catch; on defense the three strongest rush, the two fastest cover the receivers, and the other two are
    the linebacker and the safety. A team: { name, short, color, light, roster: [{ n, kind, num, r }], off, def, kicker },
-   where off and def map each position to a roster index. */
+   where off and def map each position to a roster index. A team sent with its own off and def (the Realm's lineup,
+   phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12. */
+const GF_OFF_POS = ['QB', 'RB', 'C', 'LG', 'RG', 'X', 'Z'], GF_DEF_POS = ['DT', 'DL', 'DR', 'CL', 'CR', 'LB', 'S'];
+// a position map that names every position once, each to a different player in the roster
+const gfMapOk = (m, pos, n) => !!m && pos.every(k => Number.isInteger(m[k]) && m[k] >= 0 && m[k] < n) && new Set(pos.map(k => m[k])).size === pos.length;
 const GF_STATS = ['spd', 'str', 'hnd', 'arm', 'kck', 'tkl'];
 const GF_KIND = {
   goblin: [7, 3, 6, 5, 6, 4], kobold: [6, 4, 5, 7, 7, 4], werewolf: [8, 7, 5, 4, 3, 8], dwarf: [4, 8, 4, 5, 6, 7],
@@ -32,6 +36,8 @@ function gfTeam(t) {
   roster.forEach((_, i) => free.add(i));
   T.def = {}; [T.def.DT, T.def.DL, T.def.DR] = by(r => r.str * 2 + r.tkl, 3); [T.def.CL, T.def.CR] = by(r => r.spd * 2 + r.hnd * .4, 2);
   T.def.LB = by(r => r.tkl * 2 + r.spd, 1)[0]; T.def.S = [...free][0];
-  T.kicker = roster.reduce((b, p, i) => p.r.kck > roster[b].r.kck ? i : b, 0);
+  if (gfMapOk(t.off, GF_OFF_POS, roster.length)) T.off = Object.assign({}, t.off);
+  if (gfMapOk(t.def, GF_DEF_POS, roster.length)) T.def = Object.assign({}, t.def);
+  T.kicker = Number.isInteger(t.kicker) && roster[t.kicker] ? t.kicker : roster.reduce((b, p, i) => p.r.kck > roster[b].r.kck ? i : b, 0);
   return T;
 }

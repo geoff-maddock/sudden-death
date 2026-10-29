@@ -297,3 +297,8 @@
 .wgmodes button:first-child{border-radius:6px 0 0 6px}
 .wgmodes button:last-child{border-radius:0 6px 6px 0}
 .wgmodes button.on{background:var(--torch);color:#1a120c;border-color:var(--torch)}
+/* w43: the Seven tab */
+.wsvr .wpa{flex-wrap:wrap;gap:6px}
+.wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
+.wsvl select{font:inherit;font-family:var(--hud);font-size:15px;padding:3px 4px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
+.wseven .wno{font-size:18px}

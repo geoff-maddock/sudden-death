@@ -103,13 +103,15 @@ function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
   return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.football} Club` }, A)];
 }
-/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call', seed } */
+/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call' | 'play', seed, teams? } (teams: the two
+   sides, yours first; by default the Cinderhold Football Club against the visitors). Start over keeps the same sides. */
 function wGridironDrive(opts) { return wGridStart('drive', opts); }
 function wGridironGame(opts) { return wGridStart('game', opts); }
 function wGridStart(kind, opts) {
   const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
-  WGF = { kind, mode: o.mode, over: null };
-  wGF[kind === 'game' ? 'game' : 'start']({ teams: wGridTeams(), mode: o.mode, seed: o.seed });
+  const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams();
+  WGF = { kind, mode: o.mode, over: null, teams };
+  wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed });
   $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
   $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
   showView('gridiron');

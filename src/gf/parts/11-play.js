@@ -45,7 +45,7 @@ function gfThrowTo(i, lead) {
   const qb = L.pl[L.id.QB], rc = L.pl[i]; if (!rc) return;
   const [, press] = gfNearest(qb.x, qb.y, gfFree()), hurry = press < 1.8, v = 15 + qb.r.arm * 1.3;
   let [tx, ty] = gfLeadSpot(i, lead);
-  const e = (10 - qb.r.arm) * .1 + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03;
+  const e = Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03;
   tx += gauss() * e; ty += gauss() * e;
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T: Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v), tgt: i });
   L.thrown = true; L.carrier = -1;

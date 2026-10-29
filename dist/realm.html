@@ -825,6 +825,11 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 .wgmodes button:first-child{border-radius:6px 0 0 6px}
 .wgmodes button:last-child{border-radius:0 6px 6px 0}
 .wgmodes button.on{background:var(--torch);color:#1a120c;border-color:var(--torch)}
+/* w43: the Seven tab */
+.wsvr .wpa{flex-wrap:wrap;gap:6px}
+.wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
+.wsvl select{font:inherit;font-family:var(--hud);font-size:15px;padding:3px 4px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
+.wseven .wno{font-size:18px}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -21866,7 +21871,11 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    The lineup is picked from the ratings: the best arm throws, the best runner carries, the three strongest block, and
    the other two catch; on defense the three strongest rush, the two fastest cover the receivers, and the other two are
    the linebacker and the safety. A team: { name, short, color, light, roster: [{ n, kind, num, r }], off, def, kicker },
-   where off and def map each position to a roster index. */
+   where off and def map each position to a roster index. A team sent with its own off and def (the Realm's lineup,
+   phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12. */
+const GF_OFF_POS = ['QB', 'RB', 'C', 'LG', 'RG', 'X', 'Z'], GF_DEF_POS = ['DT', 'DL', 'DR', 'CL', 'CR', 'LB', 'S'];
+// a position map that names every position once, each to a different player in the roster
+const gfMapOk = (m, pos, n) => !!m && pos.every(k => Number.isInteger(m[k]) && m[k] >= 0 && m[k] < n) && new Set(pos.map(k => m[k])).size === pos.length;
 const GF_STATS = ['spd', 'str', 'hnd', 'arm', 'kck', 'tkl'];
 const GF_KIND = {
   goblin: [7, 3, 6, 5, 6, 4], kobold: [6, 4, 5, 7, 7, 4], werewolf: [8, 7, 5, 4, 3, 8], dwarf: [4, 8, 4, 5, 6, 7],
@@ -21894,7 +21903,9 @@ function gfTeam(t) {
   roster.forEach((_, i) => free.add(i));
   T.def = {}; [T.def.DT, T.def.DL, T.def.DR] = by(r => r.str * 2 + r.tkl, 3); [T.def.CL, T.def.CR] = by(r => r.spd * 2 + r.hnd * .4, 2);
   T.def.LB = by(r => r.tkl * 2 + r.spd, 1)[0]; T.def.S = [...free][0];
-  T.kicker = roster.reduce((b, p, i) => p.r.kck > roster[b].r.kck ? i : b, 0);
+  if (gfMapOk(t.off, GF_OFF_POS, roster.length)) T.off = Object.assign({}, t.off);
+  if (gfMapOk(t.def, GF_DEF_POS, roster.length)) T.def = Object.assign({}, t.def);
+  T.kicker = Number.isInteger(t.kicker) && roster[t.kicker] ? t.kicker : roster.reduce((b, p, i) => p.r.kck > roster[b].r.kck ? i : b, 0);
   return T;
 }
 /* Cinder Gridiron: the plays (issue #9, phase 1). Four offense plays against three defenses. Nothing here decides who
@@ -22114,7 +22125,7 @@ function gfThrow(hurry) {
   let tx = rc.x, ty = rc.y, T = 0;
   for (let k = 0; k < 3; k++) { T = hyp(tx - qb.x, ty - qb.y) / v; tx = rc.x + rc.vx * T; ty = rc.y + rc.vy * T; }
   // a long throw, a weak arm and a hurried one all miss by more
-  const e = (10 - qb.r.arm) * .1 + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035;
+  const e = Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035;
   tx += gauss() * e; ty += gauss() * e; T = Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v);
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T, tgt: best });
   L.thrown = true; L.carrier = -1;
@@ -22665,7 +22676,7 @@ function gfThrowTo(i, lead) {
   const qb = L.pl[L.id.QB], rc = L.pl[i]; if (!rc) return;
   const [, press] = gfNearest(qb.x, qb.y, gfFree()), hurry = press < 1.8, v = 15 + qb.r.arm * 1.3;
   let [tx, ty] = gfLeadSpot(i, lead);
-  const e = (10 - qb.r.arm) * .1 + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03;
+  const e = Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03;
   tx += gauss() * e; ty += gauss() * e;
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T: Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v), tgt: i });
   L.thrown = true; L.carrier = -1;
@@ -22760,6 +22771,10 @@ return {
   get isGame() { return !!GD && GD.game; }, get yourBall() { return !!GD && G.poss === GD.you; }, clock: () => G && GD && GD.game ? { half: G.half, text: gfClockText(), name: GF_HALF_NAME[G.half] } : null,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
+  // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
+  // would pick for a roster of seven ({ off, def, kicker }, roster indices)
+  rate: kind => gfRate(kind), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
+  auto: roster => { const T = gfTeam({ name: '', roster }); return { off: T.off, def: T.def, kicker: T.kicker }; },
   plays: Object.fromEntries(GF_OFF_IDS.map(k => [k, { n: GF_PLAYS[k].n, desc: GF_PLAYS[k].desc }])),
   defs: Object.fromEntries(GF_DEF_IDS.map(k => [k, { n: GF_DEFS[k].n, desc: GF_DEFS[k].desc }])),
   // the test's handle on the field: play one down from a spot, both calls given
@@ -27287,13 +27302,15 @@ function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
   return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.football} Club` }, A)];
 }
-/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call', seed } */
+/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call' | 'play', seed, teams? } (teams: the two
+   sides, yours first; by default the Cinderhold Football Club against the visitors). Start over keeps the same sides. */
 function wGridironDrive(opts) { return wGridStart('drive', opts); }
 function wGridironGame(opts) { return wGridStart('game', opts); }
 function wGridStart(kind, opts) {
   const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
-  WGF = { kind, mode: o.mode, over: null };
-  wGF[kind === 'game' ? 'game' : 'start']({ teams: wGridTeams(), mode: o.mode, seed: o.seed });
+  const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams();
+  WGF = { kind, mode: o.mode, over: null, teams };
+  wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed });
   $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
   $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
   showView('gridiron');
@@ -27359,6 +27376,231 @@ renderHelp = function () {
   wW42RenderHelp();
   const g = $('wHelpGrounds'); if (!g || $('wHelpGridiron')) return;
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club, call its plays yourself, or play its offense by hand: hold Space to lead a receiver and let go to throw, steer with WASD, Space for a stiff-arm, and tap Space twice to kick. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
+};
+/* w43: football ratings and the seven (issue #9, phase 3). Every Realm player has Cinder Gridiron ratings, p.gf, as
+   they have baseball's p.bd (w20b): speed, strength, hands, arm, kicking and tackling, 1 to 12. They are seeded from
+   the kind's football ratings (wGF.rate), each moved by up to 1, and every level above 1 adds a point to one of them,
+   weighted by what the kind is good at. So a recruit who joins at level 5 has had 4 points, and an older save's
+   players get theirs when it loads.
+   The seven: football is seven a side, and the same seven play both ways (question 2). The Seven tab on the Team screen
+   picks who plays and where, on offense and on defense; called-up players at your level fill any gap (a roster is up
+   to eight, so one sits out once it is full). Left alone, positions are the coaches' pick from the ratings. Practice
+   game plays your seven against the Cinderhold Football Club on the gridiron; nothing is won or lost.
+
+   p.gf      { spd, str, hnd, arm, kck, tkl, lv, got: { stat: points from levels } }; lv is the level they've caught up to
+   WG.seven  { ids: [7 keys: a roster id, or a call-up's cid], cu: [call-ups], seq, off: { pos: key }, def: { pos: key }, add?: [new ids],
+               mine?: true once you've set a position (until then the coaches re-pick them whenever the seven changes) }
+   wGfOf(p)          p's ratings, made or caught up first
+   wSevenSync()      makes the seven, or brings it up to date with the roster; returns WG.seven
+   wSevenTeam()      the seven as Cinder Gridiron takes a team (yours, with your positions)
+   wSevenSetPos(key, side, pos), wSevenSit(key), wSevenPutIn(pid, key), wSevenAuto()   changes; each returns a
+                     message for the player, or '' when it worked
+   Wrapped: wMakePlayer (wW43MakePlayer), wGiveXp (wW43GiveXp), wStart (wW43Start), wAddPlayer (wW43AddPlayer),
+   wStatsCard (wW43StatsCard: a Football block), wOpenCamp (wW43OpenCamp: the Seven tab), wRenderCamp (wW43RenderCamp),
+   renderHelp (wW43RenderHelp: #wHelpSeven). */
+
+const W_GFR = {
+  cap: 12, side: 7, cuKinds: ['kobold', 'minotaur', 'dwarf', 'goblin', 'elf', 'harpy', 'troll'],
+  stat: { spd: ['Spd', 'Speed: running, covering and chasing'], str: ['Str', 'Strength: blocking, shedding blocks and breaking tackles'],
+    hnd: ['Hnd', 'Hands: catching'], arm: ['Arm', 'Arm: how far and how true the throw'], kck: ['Kck', 'Kicking: field goals and punts'], tkl: ['Tkl', 'Tackling'] },
+  pos: { QB: 'quarterback', RB: 'running back', C: 'center', LG: 'left guard', RG: 'right guard', X: 'receiver (left)', Z: 'receiver (right)',
+    DT: 'tackle', DL: 'left end', DR: 'right end', CL: 'left corner', CR: 'right corner', LB: 'linebacker', S: 'safety' },
+};
+const WSEVEN = { swap: null };
+
+/* ---------- ratings ---------- */
+function wGfOf(p) {
+  if (!p || !p.kind) return null;
+  if (!p.gf) { const r = wGF.rate(p.kind); p.gf = { lv: 1, got: {} }; for (const s of wGF.stats) p.gf[s] = Math.max(1, Math.min(W_GFR.cap, r[s] + Math.floor(Math.random() * 3) - 1)); }
+  const g = p.gf, lvl = p.lvl || 1;
+  while (g.lv < lvl) { g.lv++; const s = wGfGrowStat(p); if (s) { g[s]++; g.got[s] = (g.got[s] || 0) + 1; } }
+  return g;
+}
+// a level's point: any rating below the cap, weighted by the kind's own, so a harpy gets quicker and an ogre stronger
+function wGfGrowStat(p) {
+  const K = wGF.rate(p.kind), open = wGF.stats.filter(s => p.gf[s] < W_GFR.cap);
+  if (!open.length) return null;
+  let r = Math.random() * open.reduce((a, s) => a + K[s], 0);
+  for (const s of open) { r -= K[s]; if (r < 0) return s; }
+  return open[open.length - 1];
+}
+function wGfAll() { if (!WG) return; for (const p of WG.roster || []) wGfOf(p); for (const p of WG.wwait || []) wGfOf(p); for (const c of (WG.seven && WG.seven.cu) || []) wGfOf(c); }
+
+const wW43MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW43MakePlayer(spec, from); wGfOf(p); return p; };
+const wW43GiveXp = wGiveXp;
+wGiveXp = function (p, n) { const r = wW43GiveXp(p, n); wGfOf(p); return r; };
+const wW43Start = wStart;
+wStart = function (save, opts) { const r = wW43Start(save, opts); wGfAll(); if (save) wSave(); return r; };
+// players who join go straight into the seven, as a call-up makes room
+const wW43AddPlayer = wAddPlayer;
+wAddPlayer = function (p) { const r = wW43AddPlayer(p); if (WG && WG.seven) WG.seven.add = (WG.seven.add || []).concat(p.id); return r; };
+
+/* ---------- the seven ---------- */
+function wSevenWho(k) {
+  if (typeof k === 'string') return ((WG.seven && WG.seven.cu) || []).find(c => c.cid === k) || null;
+  return wPlayer(k);
+}
+function wSevenCallUp() {
+  const S = WG.seven, used = new Set(S.ids.map(k => (wSevenWho(k) || {}).kind));
+  const kind = W_GFR.cuKinds.find(k => !used.has(k)) || pick(W_GFR.cuKinds);
+  const taken = new Set(wRoster().map(p => p.n).concat(S.cu.map(c => c.n)));
+  const names = (FA_NAMES[kind] || []).filter(n => !taken.has(n));
+  const c = Object.assign(wMakePlayer({ kind, lvl: wNineTier(), n: names.length ? pick(names) : undefined }, 'callup'), { cid: 'g' + (S.seq++) });
+  S.cu.push(c);
+  return c;
+}
+// a position map is good when every position has a different one of the seven
+function wSevenMapOk(m, pos, ids) { return !!m && pos.every(k => ids.includes(m[k])) && new Set(pos.map(k => m[k])).size === pos.length; }
+// the coaches' positions for the seven, from the ratings
+function wSevenAutoPos() {
+  const S = WG.seven, a = wGF.auto(S.ids.map(k => wSevenPlayer(wSevenWho(k))));
+  S.off = Object.fromEntries(Object.entries(a.off).map(([pos, i]) => [pos, S.ids[i]]));
+  S.def = Object.fromEntries(Object.entries(a.def).map(([pos, i]) => [pos, S.ids[i]]));
+}
+function wSevenSync() {
+  if (!WG) return null;
+  let fresh = false;
+  if (!WG.seven || !Array.isArray(WG.seven.ids)) { WG.seven = { ids: [], cu: [], seq: 1, off: null, def: null }; fresh = true; }
+  const S = WG.seven, before = S.ids.join();
+  S.ids = S.ids.filter((k, i) => wSevenWho(k) && S.ids.indexOf(k) === i);
+  S.cu = S.cu.filter(c => S.ids.includes(c.cid));
+  const tier = wNineTier();
+  for (const c of S.cu) if (c.lvl < tier) { c.lvl = tier; wGfOf(c); }
+  // your own players come first: everyone on a new seven, and anyone who joined since, in a call-up's place
+  const want = wRoster().filter(p => !S.ids.includes(p.id) && (fresh || (S.add || []).includes(p.id)));
+  for (const p of want) {
+    if (S.ids.length < W_GFR.side) { S.ids.push(p.id); continue; }
+    const cu = S.ids.find(k => typeof k === 'string'); if (!cu) break;
+    S.ids[S.ids.indexOf(cu)] = p.id; S.cu = S.cu.filter(c => c.cid !== cu);
+    for (const m of [S.off, S.def]) if (m) for (const pos in m) if (m[pos] === cu) m[pos] = p.id;
+  }
+  delete S.add;
+  while (S.ids.length < W_GFR.side) S.ids.push(wSevenCallUp().cid);
+  if ((S.ids.join() !== before && !S.mine) || !wSevenMapOk(S.off, wGF.offPos, S.ids) || !wSevenMapOk(S.def, wGF.defPos, S.ids)) wSevenAutoPos();
+  return S;
+}
+// a player as Cinder Gridiron takes one
+function wSevenPlayer(p) { return { n: p.n, kind: p.kind, num: p.num, r: Object.fromEntries(wGF.stats.map(s => [s, wGfOf(p)[s]])) }; }
+function wSevenTeam() {
+  const S = wSevenSync(), t = wPartyTeam(), ix = k => S.ids.indexOf(k);
+  return { name: t.name, short: t.short, color: t.color, light: t.light, roster: S.ids.map(k => wSevenPlayer(wSevenWho(k))),
+    off: Object.fromEntries(Object.entries(S.off).map(([pos, k]) => [pos, ix(k)])), def: Object.fromEntries(Object.entries(S.def).map(([pos, k]) => [pos, ix(k)])) };
+}
+// where a player plays: { off, def } positions
+function wSevenPosOf(k) { const S = wSevenSync(), f = m => Object.keys(m).find(pos => m[pos] === k) || null; return { off: f(S.off), def: f(S.def) }; }
+// the kicker is the seven's best boot
+function wSevenKicker() { const S = wSevenSync(); return S.ids.reduce((b, k) => wGfOf(wSevenWho(k)).kck > wGfOf(wSevenWho(b)).kck ? k : b, S.ids[0]); }
+
+/* ---------- changes ---------- */
+function wSevenDone() { wSave(); return ''; }
+// put k at pos on one side; whoever was there takes k's old place
+function wSevenSetPos(k, side, pos) {
+  const S = wSevenSync(), m = side === 'def' ? S.def : S.off, list = side === 'def' ? wGF.defPos : wGF.offPos;
+  if (!S.ids.includes(k) || !list.includes(pos)) return '';
+  const was = Object.keys(m).find(x => m[x] === k); if (was === pos) return '';
+  const other = m[pos]; m[pos] = k; if (was) m[was] = other;
+  S.mine = true;
+  return wSevenDone();
+}
+// a roster player sits out; a call-up takes their places
+function wSevenSit(k) {
+  const S = wSevenSync(), p = wSevenWho(k);
+  if (!p || typeof k === 'string' || !S.ids.includes(k)) return '';
+  const c = wSevenCallUp();
+  S.ids[S.ids.indexOf(k)] = c.cid;
+  for (const m of [S.off, S.def]) for (const pos in m) if (m[pos] === k) m[pos] = c.cid;
+  if (!S.mine) wSevenAutoPos();
+  wSave();
+  return `${p.n} sits out; ${c.n} is called up in their place.`;
+}
+// a roster player sitting out takes k's place, both ways
+function wSevenPutIn(pid, k) {
+  const S = wSevenSync(), p = wPlayer(pid);
+  if (!p || S.ids.includes(pid) || !S.ids.includes(k)) return '';
+  S.ids[S.ids.indexOf(k)] = pid;
+  if (typeof k === 'string') S.cu = S.cu.filter(c => c.cid !== k);
+  for (const m of [S.off, S.def]) for (const pos in m) if (m[pos] === k) m[pos] = pid;
+  if (!S.mine) wSevenAutoPos();
+  return wSevenDone();
+}
+function wSevenAuto() { WG.seven = null; wSevenSync(); return wSevenDone(); }
+// a practice game: your seven against the Cinderhold Football Club, nothing riding on it
+function wSevenPractice() {
+  const home = wGridTeams()[0];
+  if (WCAMP.close) WCAMP.close();
+  wGridironGame({ mode: 'call', teams: [wSevenTeam(), home] });
+}
+
+/* ---------- the Football block on a player's stats ---------- */
+function wGfCard(p) {
+  const g = wGfOf(p); if (!g) return '';
+  const bars = wGF.stats.map(s => { const [ab, what] = W_GFR.stat[s], got = g.got[s] || 0;
+    return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * g[s] / W_GFR.cap)}%"></em></i><b>${g[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
+  const k = p.cid || p.id, S = WG && WG.seven, inS = S && S.ids.includes(k), at = inS ? wSevenPosOf(k) : null;
+  return `<div class="wbd wgfc"><h5>Football</h5><p class="wbdpos">${inS ? `In your seven: ${esc(W_GFR.pos[at.off])} on offense, ${esc(W_GFR.pos[at.def])} on defense.` : 'Not in your seven.'}</p>
+    <div class="wbdbars">${bars}</div><p class="hint">Each level adds a point to one rating (shown as +). Ratings run from 1 to ${W_GFR.cap}.</p></div>`;
+}
+const wW43StatsCard = wStatsCard;
+wStatsCard = function (p) { return wW43StatsCard(p).replace(/<\/section>\s*$/, wGfCard(p) + '</section>'); };
+
+/* ---------- the Seven tab ---------- */
+function wSevenRow(k, out) {
+  const p = wSevenWho(k), g = wGfOf(p), cu = typeof k === 'string', key = esc(String(k)), at = wSevenPosOf(k), kick = wSevenKicker() === k;
+  const sel = (side, list, cur) => `<select data-gpos="${side}" aria-label="${esc(p.n)}'s ${side === 'off' ? 'offense' : 'defense'} position">${list.map(pos => `<option value="${pos}"${pos === cur ? ' selected' : ''}>${pos}: ${esc(W_GFR.pos[pos])}</option>`).join('')}</select>`;
+  const swapping = WSEVEN.swap === String(k);
+  return `<li class="wpr wnr wsvr${cu ? ' wcu' : ''}" data-gid="${key}">
+    <span class="wno">${esc(at.off)}</span><img src="${wPlayerPort(p, 64)}" alt="">
+    <div class="wpi"><div class="wpn"><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}${kick ? ', the kicker' : ''}</span>${cu ? '<span class="wtag wb">Call-up</span>' : ''}</div>
+      <small class="wnst">${wGF.stats.map(s => `${W_GFR.stat[s][0]} <b>${g[s]}</b>`).join(' ')}</small></div>
+    <div class="wpa"><label class="wsvl">Offense ${sel('off', wGF.offPos, at.off)}</label><label class="wsvl">Defense ${sel('def', wGF.defPos, at.def)}</label>
+      ${cu ? `<button class="ghost" data-gswap aria-expanded="${swapping}" ${out.length ? '' : 'disabled title="Your whole team is playing"'}>Replace</button>` : `<button class="ghost" data-gsit>Sit out</button>`}</div>
+    ${swapping ? `<div class="wswap"><span>Put in for ${esc(p.n)}:</span>${out.map(q => `<button class="ghost" data-gin="${q.id}">${esc(q.n)} <small>${esc(wKindName(q.kind))}</small></button>`).join('')}</div>` : ''}
+  </li>`;
+}
+function wCampSeven() {
+  const S = wSevenSync(), out = wRoster().filter(p => !S.ids.includes(p.id));
+  const order = S.ids.slice().sort((a, b) => wGF.offPos.indexOf(wSevenPosOf(a).off) - wGF.offPos.indexOf(wSevenPosOf(b).off));
+  return `<p class="hint">Your football seven. The same seven play offense and defense, so each has a place on both. Change a position and whoever had it swaps with them; until you do, the coaches pick the positions again whenever the seven changes. Called-up players at your level fill any gap. The best kicker kicks. The coaches' pick puts the best arm at quarterback, the strongest on the line, and the fastest at corner.</p>
+    <ol class="wroster wnine wseven">${order.map(k => wSevenRow(k, out)).join('')}</ol>
+    ${out.length ? `<h4>Sitting out</h4><p class="hint">${out.map(p => `${esc(p.n)} (${esc(wKindName(p.kind))})`).join(', ')}. Use Replace on a call-up to put them in.</p>` : ''}
+    <div class="row wnbtn"><button class="ghost" data-gauto>The coaches' pick</button><button class="btn" data-gpractice>Practice game</button></div>`;
+}
+
+const wW43OpenCamp = wOpenCamp;
+wOpenCamp = function (tab) {
+  const want = tab || WCAMP.tab;
+  wW43OpenCamp(want === 'seven' ? 'team' : tab);
+  WSEVEN.swap = null;
+  const tabs = document.querySelector('#modalBox .wctabs');
+  if (!tabs || tabs.querySelector('[data-ctab="seven"]')) return;
+  tabs.lastElementChild.insertAdjacentHTML('afterend', '<button role="tab" data-ctab="seven">Seven</button>');
+  tabs.querySelector('[data-ctab="seven"]').onclick = () => { WCAMP.tab = 'seven'; WCAMP.swap = null; WCAMP.msg = ''; WSEVEN.swap = null; wRenderCamp(); };
+  if (want === 'seven') { WCAMP.tab = 'seven'; wRenderCamp(); }
+};
+const wW43RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  if (WCAMP.tab !== 'seven') return wW43RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  if (!$('modalBox').querySelector('[data-ctab="seven"]')) { WCAMP.tab = 'team'; return wRenderCamp(); }
+  $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'seven'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${wSevenSync().cu.length}</b> at level ${wNineTier()}</span></div>
+    ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampSeven();
+  const keyOf = el => { const k = el.closest('[data-gid]').dataset.gid; return /^g\d+$/.test(k) ? k : +k; };
+  const say = m => { WSEVEN.swap = null; wCampSay(m); };
+  body.querySelectorAll('[data-gpos]').forEach(s => s.onchange = () => say(wSevenSetPos(keyOf(s), s.dataset.gpos, s.value)));
+  body.querySelectorAll('[data-gsit]').forEach(b => b.onclick = () => say(wSevenSit(keyOf(b))));
+  body.querySelectorAll('[data-gswap]').forEach(b => b.onclick = () => { const k = String(keyOf(b)); WSEVEN.swap = WSEVEN.swap === k ? null : k; wCampSay(''); });
+  body.querySelectorAll('[data-gin]').forEach(b => b.onclick = () => say(wSevenPutIn(+b.dataset.gin, keyOf(b))));
+  const auto = body.querySelector('[data-gauto]'); if (auto) auto.onclick = () => say(wSevenAuto());
+  const pr = body.querySelector('[data-gpractice]'); if (pr) pr.onclick = () => wSevenPractice();
+};
+
+const wW43RenderHelp = renderHelp;
+renderHelp = function () {
+  wW43RenderHelp();
+  const after = $('wHelpNine') || $('wHelpGridiron'); if (!after || $('wHelpSeven')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpSeven"><b>Football ratings and the seven.</b> Every player also has football ratings: speed, strength, hands, arm, kicking and tackling (1 to ${W_GFR.cap}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them. Football is seven a side, and the same seven play offense and defense. The Seven tab on the Team screen picks who plays and where on both sides; called-up players at your level fill any gap. Practice game there plays your seven against the Cinderhold Football Club; nothing is won or lost.</p>`);
 };
 </script>
 </body></html>

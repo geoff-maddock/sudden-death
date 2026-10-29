@@ -69,3 +69,4 @@ src/realm/w39-retire.js
 src/realm/w40-eggs.js
 src/realm/w41-prospects.js
 src/realm/w42-gridiron.js
+src/realm/w43-gfseven.js

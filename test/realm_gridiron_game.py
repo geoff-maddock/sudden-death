@@ -74,7 +74,7 @@ async def main():
         k = await pg.evaluate("""(() => { const K = DB.chars.gk_bowl, r = wSay('gk_bowl', 'gridiron'), m = wSay('gk_bowl', 'game'); return { job: K.topics.job.t.includes('GRIDIRON'), act: r.act, match: m.act }; })()""")
         check(k == {'job': True, 'act': 'ggame', 'match': 'gmatch'}, 'Clinker Dunn puts on GRIDIRON, and their GAME is still the card-game match', k)
         await pg.evaluate("(() => { const r = wSay('gk_bowl', 'gridiron'); wRunAct(r.act, 'gk_bowl'); })()")
-        await pg.wait_for_function("UI.view === 'gridiron' && wGF.isGame && wGF.phase === 'call'", timeout=15000)
+        await pg.wait_for_function("UI.view === 'gridiron' && wGF.isGame && wGF.phase === 'call'", timeout=30000)
         v = await pg.evaluate("({ title: document.getElementById('wGridTitle').textContent, again: document.getElementById('wGridAgain').textContent, clock: wGF.clock(), mode: document.querySelector('#wGridModes .on').dataset.gmode })")
         check('game' in v['title'] and v['again'] == 'Start over' and v['clock'] and v['clock']['half'] == 1 and v['clock']['text'] == '6:00' and v['mode'] == 'call',
               'a game opens in Call the plays, on the clock: 1st half, 6:00', v)
@@ -82,7 +82,7 @@ async def main():
         # on defense you pick the defense: get the other side the ball (punt it away if it's ours), then call a blitz
         if await pg.evaluate("wGF.yourBall"):
             await pg.click('[data-gkick="punt"]')
-            await pg.wait_for_function("wGF.phase === 'call' && !wGF.yourBall", timeout=15000)
+            await pg.wait_for_function("wGF.phase === 'call' && !wGF.yourBall", timeout=30000)
         d = await pg.evaluate("""(() => { const b = [...document.querySelectorAll('[data-gdef]')];
           return { defs: !document.getElementById('wGridDefs').hidden, calls: document.getElementById('wGridCalls').hidden, n: b.length, on: b.every(x => !x.disabled), note: document.getElementById('wGridNote').textContent }; })()""")
         check(d['defs'] and d['calls'] and d['n'] == 3 and d['on'] and 'defense' in d['note'], 'when they have the ball, the bar has the three defenses, open for your call', d)

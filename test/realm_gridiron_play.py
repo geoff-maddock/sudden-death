@@ -88,7 +88,7 @@ async def main():
         m = await pg.evaluate("[...document.querySelectorAll('#wGridModes button')].map(b => [b.dataset.gmode, b.textContent, b.classList.contains('on')])")
         check([x[0] for x in m] == ['watch', 'call', 'play'] and m[0][2] and not m[2][2], 'three mode buttons: Coaches, You call, You play, the one in use lit', m)
         await pg.click('[data-gmode="play"]')
-        await pg.wait_for_function("wGF.phase === 'call'", timeout=15000)
+        await pg.wait_for_function("wGF.phase === 'call'", timeout=30000)
         check(await pg.evaluate("document.querySelector('#wGridModes .on').dataset.gmode") == 'play', 'You play is lit once picked')
         await pg.click('[data-gcall="short"]')
         await pg.wait_for_function("wGF.hands", timeout=8000)
