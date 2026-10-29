@@ -12,3 +12,4 @@ src/gf/parts/09-draw.js
 src/gf/parts/10-game.js
 src/gf/parts/11-play.js
 src/gf/parts/12-playbook.js
+src/gf/parts/13-box.js

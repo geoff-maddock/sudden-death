@@ -199,7 +199,7 @@ function gfBall(dt) {
   const [d, dd] = gfNearest(B.tx, B.ty, L.pl.filter(p => p.side === 1 && p.stun <= 0));
   if (Math.abs(B.ty) > GF_HALF || dr > 1.7) { B.st = 'dead'; return gfDead('inc', dr > 1.7 ? 'overthrown' : 'out of bounds'); }
   if (d && dd < 1.4 && dd < dr) {
-    if (R() < .03 + d.r.hnd * .006) { B.st = 'dead'; return gfDead('int', d.n, d.x); }
+    if (R() < .03 + d.r.hnd * .006) { B.st = 'dead'; return gfDead('int', d.n, d.x, L.pl.indexOf(d)); }
     if (R() < .5) { B.st = 'dead'; return gfDead('inc', 'broken up by ' + d.n); }
   }
   // a long ball is a harder catch
@@ -251,7 +251,7 @@ function gfTackles() {
     if (L.arm > 0) { L.arm = 0; d.stun = .55; L.broken++; gfEv('broken', c.n); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
     const pt = clamp(.78 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35, .2, .93);
-    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n);
+    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);
@@ -263,11 +263,12 @@ function gfBounds() {
   if (c.x >= L.toGoal) return gfDead('td');
   if (Math.abs(c.y) > GF_HALF) gfDead('out');
 }
-// the play is over: what happened, the yards it gained and who made it
-function gfDead(what, by, x) {
+// the play is over: what happened, the yards it gained and who made it (byi: the defender who did, in L.pl; ci: the
+// carrier at the end, for the box score)
+function gfDead(what, by, x, byi) {
   const c = L.carrier >= 0 ? L.pl[L.carrier] : null;
   const gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
-  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain };
+  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier };
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)

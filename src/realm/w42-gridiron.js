@@ -126,10 +126,15 @@ function wGridStart(kind, opts) {
   const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams();
   WGF = { kind, mode: o.mode, over: null, teams };
   wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed });
-  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
-  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
+  wGridChrome(kind);
   showView('gridiron');
   wGridBar();
+}
+// the bar's titles for a drive or a game
+function wGridChrome(kind) {
+  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
+  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
+  $('wGridModes').hidden = false;
 }
 function wGridBar() {
   if (!WGF) return;

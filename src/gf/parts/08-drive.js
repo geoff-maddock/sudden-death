@@ -9,7 +9,7 @@
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
-const GF_HOOK = { onOver: null, onPhase: null };
+const GF_HOOK = { onOver: null, onPhase: null, onSnap: null };
 let GD = null;
 
 function gfStart(opts) {
@@ -17,7 +17,7 @@ function gfStart(opts) {
   gfSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
-  gfPlaybookStart();
+  gfPlaybookStart(); gfBoxStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
@@ -35,7 +35,12 @@ function gfCanCall(oc) {
   if (GD.mode !== 'watch' && G.poss !== GD.you) return !!GF_DEFS[oc];
   return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX);
 }
-function gfGo(ph) { GD.ph = ph; GD.t = 0; if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); } }
+function gfGo(ph) {
+  GD.ph = ph; GD.t = 0;
+  // each call is a point to save the game at (13-box.js)
+  if (ph === 'call' && GF_HOOK.onSnap) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
+  if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
+}
 
 function gfTick(dt) {
   if (!GD || GD.ph === 'over') return;
@@ -73,6 +78,7 @@ const gfName = (side) => G.teams[side].name;
 function gfResult(r) {
   const off = G.poss, before = { down: G.down, togo: G.togo, ball: G.ball };
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
+  gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
   if (r.what === 'int') {
@@ -111,6 +117,7 @@ function gfKick() {
   const off = G.poss, k = G.teams[off].roster[G.teams[off].kicker], dist = gfKickDist(), down = G.down, ball = G.ball, ch = gfKickChance(k);
   if (GD.kick === 'fg') {
     const M = GD.meter, r = gfFieldGoal(M ? gfMeterFg(k) : gfKickGood(k));
+    gfBoxAdd(off, G.teams[off].kicker, 'fga'); if (r === 'fg') gfBoxAdd(off, G.teams[off].kicker, 'fgm');
     G.drive.end = r; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
     GD.why = M ? `Power ${Math.round(M.pw * 100)}% (${dist} yards needs ${Math.ceil(dist / gfFgReach(k) * 100)}%), and the aim ${Math.abs(M.aim) <= gfFgWindow(k) ? 'true' : (M.aim < 0 ? 'wide left' : 'wide right')}.`
       : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
@@ -126,7 +133,7 @@ function gfKick() {
 function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name) }; }
 // a whole drive at once, CPU against CPU, through the same flow
 function gfSim(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = null;
+  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   try { gfStart(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 50000 && GD.ph !== 'over'; i++) gfTick(GF_DT * 10); }
   finally { Object.assign(GF_HOOK, hooks); }
   return Object.assign(gfSummary(), { log: G.drive.plays });

@@ -30,6 +30,7 @@ function gfExtraPoint() {
   if (!GD.game) return '';
   const k = G.teams[1 - G.poss].roster[G.teams[1 - G.poss].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
   if (good) G.score[1 - G.poss]++;
+  gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpa'); if (good) gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpm');
   return good ? ' Extra point good.' : ' The extra point is no good.';
 }
 // side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
@@ -70,9 +71,9 @@ function gfGameSummary() {
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = null;
+  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   let secs = 0;
   try { gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; } }
   finally { Object.assign(GF_HOOK, hooks); }
-  return Object.assign(gfGameSummary(), { secs: Math.round(secs) });
+  return Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
 }

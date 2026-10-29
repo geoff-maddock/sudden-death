@@ -22152,7 +22152,7 @@ function gfBall(dt) {
   const [d, dd] = gfNearest(B.tx, B.ty, L.pl.filter(p => p.side === 1 && p.stun <= 0));
   if (Math.abs(B.ty) > GF_HALF || dr > 1.7) { B.st = 'dead'; return gfDead('inc', dr > 1.7 ? 'overthrown' : 'out of bounds'); }
   if (d && dd < 1.4 && dd < dr) {
-    if (R() < .03 + d.r.hnd * .006) { B.st = 'dead'; return gfDead('int', d.n, d.x); }
+    if (R() < .03 + d.r.hnd * .006) { B.st = 'dead'; return gfDead('int', d.n, d.x, L.pl.indexOf(d)); }
     if (R() < .5) { B.st = 'dead'; return gfDead('inc', 'broken up by ' + d.n); }
   }
   // a long ball is a harder catch
@@ -22204,7 +22204,7 @@ function gfTackles() {
     if (L.arm > 0) { L.arm = 0; d.stun = .55; L.broken++; gfEv('broken', c.n); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
     const pt = clamp(.78 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35, .2, .93);
-    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n);
+    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);
@@ -22216,11 +22216,12 @@ function gfBounds() {
   if (c.x >= L.toGoal) return gfDead('td');
   if (Math.abs(c.y) > GF_HALF) gfDead('out');
 }
-// the play is over: what happened, the yards it gained and who made it
-function gfDead(what, by, x) {
+// the play is over: what happened, the yards it gained and who made it (byi: the defender who did, in L.pl; ci: the
+// carrier at the end, for the box score)
+function gfDead(what, by, x, byi) {
   const c = L.carrier >= 0 ? L.pl[L.carrier] : null;
   const gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
-  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain };
+  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier };
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)
@@ -22260,7 +22261,7 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
-const GF_HOOK = { onOver: null, onPhase: null };
+const GF_HOOK = { onOver: null, onPhase: null, onSnap: null };
 let GD = null;
 
 function gfStart(opts) {
@@ -22268,7 +22269,7 @@ function gfStart(opts) {
   gfSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
-  gfPlaybookStart();
+  gfPlaybookStart(); gfBoxStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
@@ -22286,7 +22287,12 @@ function gfCanCall(oc) {
   if (GD.mode !== 'watch' && G.poss !== GD.you) return !!GF_DEFS[oc];
   return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX);
 }
-function gfGo(ph) { GD.ph = ph; GD.t = 0; if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); } }
+function gfGo(ph) {
+  GD.ph = ph; GD.t = 0;
+  // each call is a point to save the game at (13-box.js)
+  if (ph === 'call' && GF_HOOK.onSnap) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
+  if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
+}
 
 function gfTick(dt) {
   if (!GD || GD.ph === 'over') return;
@@ -22324,6 +22330,7 @@ const gfName = (side) => G.teams[side].name;
 function gfResult(r) {
   const off = G.poss, before = { down: G.down, togo: G.togo, ball: G.ball };
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
+  gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
   if (r.what === 'int') {
@@ -22362,6 +22369,7 @@ function gfKick() {
   const off = G.poss, k = G.teams[off].roster[G.teams[off].kicker], dist = gfKickDist(), down = G.down, ball = G.ball, ch = gfKickChance(k);
   if (GD.kick === 'fg') {
     const M = GD.meter, r = gfFieldGoal(M ? gfMeterFg(k) : gfKickGood(k));
+    gfBoxAdd(off, G.teams[off].kicker, 'fga'); if (r === 'fg') gfBoxAdd(off, G.teams[off].kicker, 'fgm');
     G.drive.end = r; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
     GD.why = M ? `Power ${Math.round(M.pw * 100)}% (${dist} yards needs ${Math.ceil(dist / gfFgReach(k) * 100)}%), and the aim ${Math.abs(M.aim) <= gfFgWindow(k) ? 'true' : (M.aim < 0 ? 'wide left' : 'wide right')}.`
       : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
@@ -22377,7 +22385,7 @@ function gfKick() {
 function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name) }; }
 // a whole drive at once, CPU against CPU, through the same flow
 function gfSim(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = null;
+  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   try { gfStart(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 50000 && GD.ph !== 'over'; i++) gfTick(GF_DT * 10); }
   finally { Object.assign(GF_HOOK, hooks); }
   return Object.assign(gfSummary(), { log: G.drive.plays });
@@ -22594,6 +22602,7 @@ function gfExtraPoint() {
   if (!GD.game) return '';
   const k = G.teams[1 - G.poss].roster[G.teams[1 - G.poss].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
   if (good) G.score[1 - G.poss]++;
+  gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpa'); if (good) gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpm');
   return good ? ' Extra point good.' : ' The extra point is no good.';
 }
 // side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
@@ -22634,11 +22643,11 @@ function gfGameSummary() {
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = null;
+  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   let secs = 0;
   try { gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; } }
   finally { Object.assign(GF_HOOK, hooks); }
-  return Object.assign(gfGameSummary(), { secs: Math.round(secs) });
+  return Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
 }
 /* Cinder Gridiron: Play mode (issue #9, phase 2). In 'play' you call your side's plays as in 'call', and then play the
    offense by hand. On defense you call the defense and watch (question 3).
@@ -22761,6 +22770,39 @@ function gfCounterOffense(w) {
   for (const oc in w) { for (const dc in T) w[oc] += gfEdge(oc, dc)[0] * T[dc] * 2.5; w[oc] = Math.max(.15, w[oc]) * (.3 + .7 * gfFresh(G.poss, 'off', oc)); }
   return w;
 }
+/* Cinder Gridiron: box scores, and a game to save and come back to (issue #9, phase 5).
+   The box: every play adds to the lines of the players in it, by side and roster index (G.box = [[line], [line]]).
+   A line counts passing (pa attempts, pc completions, py yards, ptd touchdowns, pint interceptions thrown, sacked),
+   running (ra carries, ry yards), catching (rec, recy), touchdowns scored (td), defense (tkl tackles, sk sacks, ints
+   interceptions) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
+   The snapshot: between plays, at each call, the game is G and GD as plain JSON, and GF_HOOK.onSnap hears it. A saved
+   game comes back on the field at that call (gfResume): the play that was running is played again. */
+function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); }
+function gfBoxAdd(side, ri, k, n) { if (!G.box || ri == null || ri < 0 || !G.box[side][ri]) return; const b = G.box[side][ri]; b[k] = (b[k] || 0) + (n == null ? 1 : n); }
+// a play is over: off had the ball; r is the play's end (L.done)
+function gfBoxPlay(off, r) {
+  if (!L || !G.box) return;
+  const def = 1 - off, ri = i => i >= 0 && L.pl[i] ? L.pl[i].ri : -1, qb = ri(L.id.QB), by = ri(r.byi), car = ri(r.ci);
+  const caught = L.ev.some(e => e.k === 'catch'), td = r.what === 'td';
+  if (L.thrown) {
+    gfBoxAdd(off, qb, 'pa');
+    if (r.what === 'int') { gfBoxAdd(off, qb, 'pint'); gfBoxAdd(def, by, 'ints'); }
+    else if (caught) { gfBoxAdd(off, qb, 'pc'); gfBoxAdd(off, qb, 'py', r.gain); gfBoxAdd(off, car, 'rec'); gfBoxAdd(off, car, 'recy', r.gain); if (td) { gfBoxAdd(off, qb, 'ptd'); gfBoxAdd(off, car, 'td'); } }
+  } else if (r.what === 'sack') { gfBoxAdd(off, qb, 'sacked'); gfBoxAdd(def, by, 'sk'); }
+  else if (car >= 0) { gfBoxAdd(off, car, 'ra'); gfBoxAdd(off, car, 'ry', r.gain); if (td) gfBoxAdd(off, car, 'td'); }
+  if ((r.what === 'tackle' || r.what === 'sack') && by >= 0) gfBoxAdd(def, by, 'tkl');
+}
+// the box as lines with names: [{ side, ri, n, kind, line }]
+function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line) }))) : []; }
+function gfSnapshot() {
+  const D = Object.assign({}, GD, { ph: 'call', t: 0, pick: null, meter: null, stale: null, kick: null, acc: 0 });
+  return JSON.parse(JSON.stringify({ G, GD: D }));
+}
+function gfResume(sn) {
+  const s = JSON.parse(JSON.stringify(sn));
+  G = s.G; GD = s.GD; L = null; gfSeed(null);
+  return G;
+}
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
    engine's parts don't touch the page; this file is the only one that does. */
@@ -22820,7 +22862,9 @@ return {
   get on() { return GFP.on; }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
   get play() { return L; }, pause: on => { GFP.paused = !!on; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; } },
   // Play mode: the page's keys ({ steer, hold, pick, tap }), and what the field shows of them
-  input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; },
+  input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; }, set onSnap(f) { GF_HOOK.onSnap = f; },
+  // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
+  box: () => gfBox(), snapshot: () => GD ? gfSnapshot() : null, resume: sn => { gfResume(sn); gfShow(); return G; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
   canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth() } : null,
   // who is on the field: the drive's offense by position, and the other side's defense
@@ -22836,7 +22880,7 @@ return {
   // coach has seen of them lately (shares of the last few calls)
   fresh: side => G && G.fresh ? JSON.parse(JSON.stringify(G.fresh[side])) : null, tendency: (side, kind) => G ? gfTendency(side, kind) : {},
   cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense() },
-  rate: kind => gfRate(kind), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
+  rate: kind => gfRate(kind), kinds: Object.keys(GF_KIND), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
   auto: roster => { const T = gfTeam({ name: '', roster }); return { off: T.off, def: T.def, kicker: T.kicker }; },
   plays: Object.fromEntries(GF_OFF_IDS.map(k => [k, { n: GF_PLAYS[k].n, desc: GF_PLAYS[k].desc }])),
   defs: Object.fromEntries(GF_DEF_IDS.map(k => [k, { n: GF_DEFS[k].n, desc: GF_DEFS[k].desc }])),
@@ -27388,10 +27432,15 @@ function wGridStart(kind, opts) {
   const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams();
   WGF = { kind, mode: o.mode, over: null, teams };
   wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed });
-  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
-  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
+  wGridChrome(kind);
   showView('gridiron');
   wGridBar();
+}
+// the bar's titles for a drive or a game
+function wGridChrome(kind) {
+  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
+  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
+  $('wGridModes').hidden = false;
 }
 function wGridBar() {
   if (!WGF) return;
@@ -27679,6 +27728,341 @@ renderHelp = function () {
   wW43RenderHelp();
   const after = $('wHelpNine') || $('wHelpGridiron'); if (!after || $('wHelpSeven')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpSeven"><b>Football ratings and the seven.</b> Every player also has football ratings: speed, strength, hands, arm, kicking and tackling (1 to ${W_GFR.cap}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them. Football is seven a side, and the same seven play offense and defense. The Seven tab on the Team screen picks who plays and where on both sides; called-up players at your level fill any gap. Practice game there plays your seven against the Cinderhold Football Club; nothing is won or lost.</p>`);
+};
+/* w44: playing football from the world (issue #9, phase 5). Your seven plays a rival club, or the local side, on
+   Cinder Gridiron, as your nine plays baseball (w20d): Play (you call the plays and play your offense by hand),
+   Manage (you call them, and your players run them), or Simulate (the result at once). A football game needs
+   W_GFG.minOwn players of your own (call-ups fill the seven), and each club plays you once a day. A loss costs
+   nothing but the XP you would have won (question 5), as on the diamond; a tie after Sudden Death pays half. A win
+   pays XP to the seven (half to your players who sat out), gold and fans by tier; every game records the box score
+   for your players, the head to head and the league table. Save and leave keeps the game at its last call, and it is
+   waiting when you come back, after a reload too. Clinker Dunn's GRIDIRON at the Ash Bowl, and the Seven tab, open
+   the game card.
+
+   WG.gfg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_GFG.keep], w, l, t }
+              world = { kind: 'gfgame', ref, club, tier, how, day, name, ids, cup }, plain data; the end dispatches
+              W_ON_END[kind]. ids: the seven's keys at kick-off, so the box lines find your players
+              snap = the engine's snapshot at a call (plain JSON)
+   WG.gfstats { pid: summed box lines, plus gg (games) }, this journey
+   wGridProblems(), wStartGrid({ club, how, tier?, kind?, ref?, cup? }), wResumeGrid(), wGridLeave(), wGridConcede(),
+   wOpenGridCard()
+   Wrapped: wGridBar (wW44GridBar: Save and leave and Concede in a real game), wLeaveGridiron (wW44LeaveGridiron),
+   wRunAct (wW44RunAct: GRIDIRON opens the card), wNextPrompt (wW44NextPrompt: a game waiting after a reload),
+   wCampSeven and wRenderCamp (wW44CampSeven, wW44RenderCamp: Play a game and Resume on the Seven tab), wCampStats and
+   wStatsCard (wW44CampStats, wW44StatsCard: the Football view and box lines), renderHelp (wW44RenderHelp: #wHelpGfGame). */
+
+const W_GFG = {
+  minOwn: 5, xp: 12, gold: 15, fans: 3, lossShare: .25, tieShare: .5, benchShare: .5, mvpXp: 5,
+  // extra rating points for each of the other side's players, by tier, spread over their ratings (6 is +1 to every
+  // one). Measured under the coaches (Simulate): a full point everywhere takes an even game to about 20%
+  oppBonus: { 1: 0, 2: 3, 3: 6 },
+  minutes: 150, keep: 10, saveMs: 15000,
+};
+const W_GFG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
+const WGFG = { saved: 0, asked: false, msg: '' };
+
+function wGfg() {
+  const B = WG.gfg = WG.gfg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0, t: 0 };
+  B.met = B.met || {}; B.opp = B.opp || {}; B.games = B.games || []; B.t = B.t || 0;
+  return B;
+}
+function wGridLive() { return !!(WG && WG.gfg && WG.gfg.live); }
+// a real game is on the field (not a practice or an exhibition)
+function wGridWorld() { return !!(WGF && WGF.world && wGridLive()); }
+function wGridProblems() {
+  const n = wRoster().length;
+  return n < W_GFG.minOwn ? [`Recruit ${W_GFG.minOwn - n} more player${W_GFG.minOwn - n === 1 ? '' : 's'}: a football game needs ${W_GFG.minOwn} of your own, and call-ups fill the rest of the seven.`] : [];
+}
+function wGridOppLvl(tier) { return Math.min(W_PARTY.maxLvl, wNineTier() + tier - 1); }
+/* a club's seven: its own kinds first, at your level plus the tier, and W_GFG.oppBonus on every rating. A rival keeps
+   the same seven until it would be a different level; the local side is new each time. */
+function wGridOpp(club, tier) {
+  const B = wGfg(), lvl = wGridOppLvl(tier), C = wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
+  const cached = club !== 'local' && B.opp[club];
+  let team;
+  if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
+  else {
+    const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
+    const kinds = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i).slice(0, W_GFR.side);
+    const names = new Set();
+    const roster = kinds.map(kind => {
+      const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
+      const p = wMakePlayer({ kind, lvl, n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
+      names.add(p.n);
+      return wSevenPlayer(p);
+    });
+    team = { name: C.name, short: C.short, color: C.color, light: C.light, roster };
+    if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
+  }
+  // the same ratings each time for the same club (a fixed order over the six), so a rival doesn't change between games
+  if (k) for (const p of team.roster) { const st = Object.keys(p.r); for (let i = 0; i < k; i++) { const s = st[(i * 5 + (p.num || 0)) % st.length]; p.r[s] = Math.min(W_GFR.cap, p.r[s] + 1); } }
+  return team;
+}
+
+/* ---------- starting, leaving, coming back ---------- */
+function wStartGrid(o) {
+  if (!WG || !RUN) return '';
+  const probs = wGridProblems(); if (probs.length) return probs.join(' ');
+  const B = wGfg(), club = o.club;
+  if (B.live) return 'Finish the football game you started first.';
+  if (!wBallRegion(club) && !CLUBS[club]) return '';
+  if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you at football today. Come back tomorrow.`;
+  const how = W_GFG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club);
+  const mine = wSevenTeam(), opp = wGridOpp(club, tier);
+  const world = { kind: o.kind || 'gfgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: wSevenSync().ids.slice(), cup: !!o.cup };
+  if (!o.cup) B.met[club] = WG.dayAbs;
+  B.live = { world, snap: null };
+  if (how === 'sim') {
+    const g = wGF.simGame({ teams: [mine, opp] });
+    const msg = wGridSettle(wGridResult(g.score), g.score[0], g.score[1], g.box, g.half);
+    wGridResultCard(msg);
+    return '';
+  }
+  wGridironGame({ mode: how === 'play' ? 'play' : 'call', teams: [mine, opp] });
+  WGF.world = true;
+  $('wGridTitle').textContent = `${mine.name} against ${opp.name}`;
+  wGridBar();
+  wSave();
+  return '';
+}
+const wGridResult = sc => sc[0] > sc[1] ? 'win' : sc[0] < sc[1] ? 'lose' : 'tie';
+function wResumeGrid() {
+  const L = wGridLive() && WG.gfg.live;
+  if (!L) return;
+  if (!L.snap) { wGridCallOff('The game had not reached its first play, so it is called off.'); return; }
+  WGF = { kind: 'game', mode: L.snap.GD.mode, over: null, teams: L.snap.G.teams, world: true };
+  wGF.resume(L.snap);
+  showView('gridiron');
+  wGridChrome('game');
+  $('wGridTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
+  wGridBar();
+}
+// Save and leave: the game stays at its last call in WG.gfg.live
+function wGridLeave() {
+  const L = wGridLive() && WG.gfg.live; if (!L) return wLeaveGridiron();
+  const sn = L.snap;
+  WGFG.asked = true;
+  WGF = null; wLeaveGridiron();
+  if (!sn) return wGridCallOff(`You leave before the first play, so the game against ${wBallName(L.world.club)} is called off.`);
+  wLog(`Your football game against ${wBallName(L.world.club)} is saved: ${wGridScore(sn)}. Resume it from the Seven tab on the Team screen.`, 'd');
+  wSave();
+}
+function wGridCallOff(why) {
+  const B = wGfg(), L = B.live; if (!L) return;
+  B.live = null; if (!L.world.cup) delete B.met[L.world.club];
+  wLog(why || `The football game against ${wBallName(L.world.club)} is called off. No result.`, 'd');
+  wSave();
+}
+function wGridConcede() {
+  if (!wGridWorld()) return;
+  wGF.pause(true);
+  askConfirm('Concede this game?', 'It counts as a loss. A loss on the gridiron costs nothing, but you only get a quarter of the XP.', 'Concede', () => {
+    if (!wGridLive()) return;
+    wGF.pause(false);
+    const G = wGF.G, sc = G ? G.score : [0, 0];
+    wGridSettle('lose', sc[0], sc[1], wGF.box(), G ? G.half : 1);
+    WGF = null; wLeaveGridiron();
+  }, () => wGF.pause(false));
+}
+function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
+wGF.onSnap = sn => {
+  const L = wGridWorld() && WG.gfg.live; if (!L) return;
+  L.snap = sn;
+  const now = Date.now(); if (now - WGFG.saved > W_GFG.saveMs) { WGFG.saved = now; wSave(); }
+};
+// the end of a game on the field: an exhibition as before; a real game settles in the world
+wGF.onOver = s => {
+  if (!WGF) return;
+  WGF.over = s;
+  if (WGF.world && wGridLive()) { const G = wGF.G; WGF.msg = wGridSettle(wGridResult(G.score), G.score[0], G.score[1], wGF.box(), G.half); }
+  wGridBar();
+  const f = WGF.world ? $('wGridBack') : $('wGridAgain'); if (f) f.focus();
+};
+
+/* ---------- the final ---------- */
+function wGridSettle(r, us, them, box, half) {
+  const B = wGfg(), L = B.live, W = L.world, win = r === 'win', tie = r === 'tie';
+  B.live = null;
+  if (win) B.w++; else if (tie) B.t++; else B.l++;
+  // box lines for your own players: side 0, by the seven at kick-off (call-ups have no roster id)
+  const S = WG.gfstats = WG.gfstats || {}, line = {};
+  for (const b of box) {
+    if (b.side !== 0) continue;
+    const id = W.ids[b.ri]; if (typeof id !== 'number' || !wPlayer(id)) continue;
+    const T = S[id] = S[id] || { gg: 0 };
+    T.gg++;
+    for (const k in b.line) T[k] = (T[k] || 0) + b.line[k];
+    line[id] = Object.assign({}, b.line);
+  }
+  const mvp = wGridMvp(line);
+  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(W.ids);
+  for (const p of wRoster()) {
+    const n = inSeven.has(p.id) ? base + (win && mvp === p.id ? W_GFG.mvpXp : 0) : Math.round(base * W_GFG.benchShare);
+    if (n > 0) wGiveXp(p, n);
+  }
+  const bits = `XP +${base} for the seven${wRoster().some(p => !inSeven.has(p.id)) ? `, +${Math.round(base * W_GFG.benchShare)} for those who sat out` : ''}`;
+  let pay = '';
+  if (win) { const g = W_GFG.gold * W.tier, f = W_GFG.fans * W.tier; RUN.gold += g; RUN.fans = (RUN.fans || 0) + f; pay = ` +${g} gold, +${f} fans.`; }
+  if (CLUBS[W.club]) {
+    const H = wH2h(), h = H[W.club] = H[W.club] || { w: 0, l: 0 };
+    if (win) h.w++; else if (!tie) h.l++;
+    h.last = { r, us, them, sport: 'football', day: WG.dayAbs };
+    try { if (!tie && wIsRival(W.club)) wLeagueMine(r); } catch (e) { console.error(e); }
+  }
+  B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, half, mvp, line });
+  B.games.length = Math.min(B.games.length, W_GFG.keep);
+  wAdvance(W_GFG.minutes);
+  WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
+  W.us = us; W.them = them;
+  const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
+  const who = mvp != null && wPlayer(mvp);
+  const msg = `Final: ${win ? 'you win' : tie ? 'a tie' : 'you lose'} ${us}–${them} against ${wBallName(W.club)}${half === 3 ? ', in Sudden Death' : ''}.${pay} ${bits}${win && who ? `, and +${W_GFG.mvpXp} for ${who.n}, player of the game` : ''}.`;
+  wLog(msg, win ? 'g' : 'b');
+  wSave();
+  return msg;
+}
+// player of the game: the best line among your own players
+function wGridMvp(lines) {
+  let best = null, bs = 0;
+  for (const id in lines) {
+    const s = lines[id], v = (s.py || 0) / 25 + (s.ptd || 0) * 4 - (s.pint || 0) * 2 + (s.ry || 0) / 10 + (s.recy || 0) / 10 + (s.td || 0) * 6 + (s.tkl || 0) + (s.sk || 0) * 2 + (s.ints || 0) * 4 + (s.fgm || 0) * 3;
+    if (v > bs) { bs = v; best = +id; }
+  }
+  return best;
+}
+W_ON_END.gfgame = function () { }; // the log line and the rewards are paid in wGridSettle; kinds built on it add theirs
+function wGridResultCard(msg) {
+  if (LAB) return;
+  const close = modal(`<header><h3>Final</h3></header><div class="wmsg"><p>${esc(msg)}</p></div><div class="row"><button class="btn" id="wGridOk">Done</button></div>`, () => wDrain());
+  $('wGridOk').focus(); $('wGridOk').onclick = () => close();
+}
+
+/* ---------- the bar in a real game ---------- */
+$('wGridBack').insertAdjacentHTML('beforebegin', '<button class="ghost" id="wGridSave" hidden>Save and leave</button><button class="ghost" id="wGridGive" hidden>Concede</button>');
+$('wGridSave').onclick = () => wGridLeave();
+$('wGridGive').onclick = () => wGridConcede();
+const wW44GridBar = wGridBar;
+wGridBar = function () {
+  wW44GridBar();
+  const real = !!(WGF && WGF.world), live = real && wGridLive();
+  $('wGridSave').hidden = $('wGridGive').hidden = !live;
+  $('wGridAgain').hidden = real;
+  $('wGridBack').hidden = live;
+  // once a real game is over, it can't be played on as an exhibition
+  $('wGridModes').hidden = real && !live;
+  if (real && !live && WGF.msg) $('wGridNote').textContent = WGF.msg;
+};
+const wW44LeaveGridiron = wLeaveGridiron;
+wLeaveGridiron = function () { wW44LeaveGridiron(); if (WG) { wSave(); wDrain(); } };
+
+/* ---------- picking a game ---------- */
+function wGridH2h(club) { const L = ((WG.h2h || {})[club] || {}).last; return L && L.sport === 'football' ? L : null; }
+function wOpenGridCard() {
+  const probs = wGridProblems(), B = wGfg(), live = wGridLive();
+  const rows = wBallClubs().map(c => {
+    const T = wBallTeam(c), tier = wBallTier(c), met = B.met[c] === WG.dayAbs, last = wGridH2h(c);
+    const btns = Object.keys(W_GFG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-gfclub="${c}" data-gfhow="${how}" ${probs.length || met || live ? 'disabled' : ''}>${W_GFG_HOW[how]}</button>`).join('');
+    return `<li class="wbcl"><span class="wbsw" style="background:${T.color}"></span><div><b>${esc(T.name)}</b>
+      <small>Tier ${tier}: their players are level ${wGridOppLvl(tier)}.${last ? ` Last football game: ${last.r === 'win' ? 'won' : last.r === 'tie' ? 'tied' : 'lost'} ${last.us}–${last.them}.` : ''}${met ? ' <b>Played you today.</b>' : ''}</small></div>
+      <div class="row">${btns}</div></li>`;
+  }).join('');
+  const close = modal(`<header><h3>Play a football game</h3><button class="ghost" data-close>Done</button></header>
+    ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}${WGFG.msg ? `<p class="wbad">${esc(WGFG.msg)}</p>` : ''}
+    ${live ? `<p class="wbad">You have a football game waiting. <button class="btn" id="wGfResume">Resume it</button></p>` : ''}
+    <p class="hint">A game on the gridiron with your seven: two halves, about seven minutes. <b>Play</b>: you call the plays and play your offense by hand. <b>Manage</b>: you call them and your players run them. <b>Simulate</b>: the result now. A win pays ${W_GFG.xp} XP to the seven, ${W_GFG.gold} gold and ${W_GFG.fans} fans, times the tier; a loss pays a quarter of the XP and costs nothing else, and a tie half. Each club plays you once a day, and a game takes ${W_GFG.minutes / 60 | 0} hours or so.</p>
+    <ul class="wbclubs">${rows}</ul>
+    <p class="hint">Or watch an exhibition: <button class="ghost" id="wGfExhib">Cinderhold against Mossgate</button></p>`);
+  WGFG.msg = '';
+  $('modalBox').querySelectorAll('[data-gfclub]').forEach(b => b.onclick = () => {
+    close();
+    const r = wStartGrid({ club: b.dataset.gfclub, how: b.dataset.gfhow });
+    if (r) { WGFG.msg = r; wOpenGridCard(); }
+  });
+  const ex = $('wGfExhib'); if (ex) ex.onclick = () => { close(); wGridironGame({ mode: 'watch' }); };
+  const rs = $('wGfResume'); if (rs) rs.onclick = () => { close(); wResumeGrid(); };
+}
+// Clinker Dunn's GRIDIRON opens the card
+(() => {
+  const K = DB.chars.gk_bowl; if (!K || !K.topics.gridiron) return;
+  K.topics.gridiron.t = 'Real football on the grass, seven a side and the same seven both ways: two halves, about seven minutes. Play a club for real, at the tier you\'re at, or watch an exhibition.';
+})();
+const wW44RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'ggame') return wOpenGridCard(); return wW44RunAct.apply(this, arguments); };
+
+/* after a reload, a saved game is waiting: ask once */
+const wW44NextPrompt = wNextPrompt;
+wNextPrompt = function () {
+  if (!LAB && wGridLive() && !WGFG.asked && !WGF && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    WGFG.asked = true;
+    const L = WG.gfg.live, sn = L.snap;
+    const close = modal(`<header><h3>A football game is waiting</h3></header><div class="wmsg"><p>Your game against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wGridScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Seven tab on the Team screen.</p></div>
+      <div class="row"><button class="btn" id="wGfRes">Resume</button><button class="ghost" id="wGfLater">Later</button></div>`, () => wDrain());
+    $('wGfRes').focus();
+    $('wGfRes').onclick = () => { close(); wResumeGrid(); };
+    $('wGfLater').onclick = () => close();
+    return true;
+  }
+  return wW44NextPrompt();
+};
+
+/* ---------- the Seven tab ---------- */
+const wW44CampSeven = wCampSeven;
+wCampSeven = function () {
+  const html = wW44CampSeven(), probs = wGridProblems(), live = wGridLive();
+  const play = live ? `<button class="btn" data-gfresume>Resume the game</button>` : `<button class="btn" data-gfplay ${probs.length ? 'disabled' : ''}>Play a game</button>`;
+  const gate = !live && probs.length ? `<p class="hint wball">${esc(probs[0])}</p>` : '';
+  return html.replace('<button class="btn" data-gpractice', `${play}<button class="ghost" data-gpractice`).replace(/<\/div>\s*$/, `</div>${gate}${wGridRecent()}`);
+};
+function wGridRecent() {
+  const B = WG.gfg; if (!B || !B.games.length) return '';
+  return `<h5 class="wbrh">Last football games: ${B.w}&ndash;${B.l}${B.t ? `&ndash;${B.t}` : ''}</h5><ol class="wstlog">${B.games.slice(0, 5).map(g => `<li><b class="${g.r === 'win' ? 'wgood' : 'wbad'}">${g.r === 'win' ? 'Won' : g.r === 'tie' ? 'Tied' : 'Lost'}</b> ${g.us}&ndash;${g.them} against ${esc(g.name)}<small>day ${g.day}${g.mvp != null && wPlayer(g.mvp) ? `, player of the game ${esc(wPlayer(g.mvp).n)}` : ''}</small></li>`).join('')}</ol>`;
+}
+const wW44RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW44RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'seven') return;
+  const p = body.querySelector('[data-gfplay]'); if (p) p.onclick = () => { WCAMP.close(); wOpenGridCard(); };
+  const r = body.querySelector('[data-gfresume]'); if (r) r.onclick = () => { WCAMP.close(); wResumeGrid(); };
+};
+
+/* ---------- box scores on the Stats tab ---------- */
+const W_GFG_COLS = [['gg', 'G', 'Football games'], ['pc', 'Cmp', 'Passes completed'], ['pa', 'Att', 'Passes thrown'], ['py', 'PYd', 'Passing yards'], ['ptd', 'PTD', 'Touchdown passes'],
+  ['ry', 'RYd', 'Rushing yards'], ['rec', 'Rec', 'Catches'], ['recy', 'RecYd', 'Receiving yards'], ['td', 'TD', 'Touchdowns scored'], ['tkl', 'Tkl', 'Tackles'], ['sk', 'Sk', 'Sacks'], ['ints', 'Int', 'Interceptions'], ['fgm', 'FG', 'Field goals made']];
+function wGridLine(pid) { return (WG.gfstats || {})[pid] || null; }
+const wW44CampStats = wCampStats;
+wCampStats = function () {
+  const html = wW44CampStats().replace(/(<button data-wsview="career"[^>]*>Career<\/button>)/, `$1<button data-wsview="football" aria-pressed="${WSTAT.view === 'football'}">Football</button>`);
+  if (WSTAT.view !== 'football') return html;
+  const k = WSTAT.sort && W_GFG_COLS.some(c => c[0] === WSTAT.sort) ? WSTAT.sort : null;
+  const rows = wRoster().map((p, i) => ({ p, i, L: wGridLine(p.id) }));
+  if (k) rows.sort((a, b) => (((b.L || {})[k] || 0) - ((a.L || {})[k] || 0)) || a.i - b.i);
+  const head = `<th scope="col"><button class="wsth" data-wsort="" aria-pressed="${!k}">Player</button></th>` + W_GFG_COLS.map(([c, s, l]) => `<th scope="col"><button class="wsth" data-wsort="${c}" title="${esc(l)}" aria-pressed="${k === c}">${s}</button></th>`).join('');
+  const body = rows.map(({ p, L }) => { const at = WG.seven && WG.seven.ids.includes(p.id) ? wSevenPosOf(p.id) : null;
+    return `<tr data-wsp="${p.id}"${WSTAT.pid === p.id ? ' class="wsel"' : ''}><th scope="row"><button class="wsname" data-wsp-open aria-expanded="${WSTAT.pid === p.id}"><img src="${wPlayerPort(p, 40)}" alt=""><span><b>${esc(p.n)}</b><small>${at ? `${at.off} / ${at.def}, ` : ''}Lv ${p.lvl}</small></span></button></th>
+    ${W_GFG_COLS.map(([c]) => `<td>${L ? L[c] || 0 : '<span class="dim">&ndash;</span>'}</td>`).join('')}</tr>`; }).join('');
+  const sel = WSTAT.pid != null && wPlayer(WSTAT.pid);
+  return html.replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every football game they played on this journey (call-ups are not counted). Pick a heading to sort, a player to see more.</small>')
+    .replace(/<div class="tablewrap">[\s\S]*$/, `<div class="tablewrap"><table class="wstats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${sel ? wStatsCard(sel) : ''}`);
+};
+const wW44StatsCard = wStatsCard;
+wStatsCard = function (p) {
+  const L = wGridLine(p.id), html = wW44StatsCard(p);
+  if (!L || !L.gg) return html;
+  const bits = [`${L.gg} football game${L.gg === 1 ? '' : 's'}`];
+  if (L.pa) bits.push(`passing ${L.pc || 0} of ${L.pa} for ${L.py || 0} yards, ${L.ptd || 0} TD, ${L.pint || 0} picked off`);
+  if (L.ra) bits.push(`${L.ra} carries for ${L.ry || 0} yards`);
+  if (L.rec) bits.push(`${L.rec} catches for ${L.recy || 0} yards`);
+  if (L.td) bits.push(`${L.td} touchdown${L.td === 1 ? '' : 's'}`);
+  if (L.tkl || L.sk || L.ints) bits.push(`${L.tkl || 0} tackles, ${L.sk || 0} sacks, ${L.ints || 0} interceptions`);
+  if (L.fga) bits.push(`${L.fgm || 0} of ${L.fga} field goals`);
+  return html.replace('<div class="wbd wgfc"><h5>Football</h5>', `<div class="wbd wgfc"><h5>Football</h5><p class="wbdbox">${bits.join('; ')}.</p>`);
+};
+
+const wW44RenderHelp = renderHelp;
+renderHelp = function () {
+  wW44RenderHelp();
+  const after = $('wHelpSeven'); if (!after || $('wHelpGfGame')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfGame"><b>Football games.</b> Once you have ${W_GFG.minOwn} players of your own, your seven can play football: Play a game on the Seven tab, or ask Clinker Dunn at the Ash Bowl for GRIDIRON. Take on the local side or a rival club, once a day each. Play (you call the plays and play your offense by hand), Manage (you call them, your players run them), or Simulate for the result at once. There is no team HP on the gridiron. A win pays XP to the seven (half to players who sat out), gold and fans; a loss pays a quarter of the XP, and a tie half. Save and leave keeps a game at its last call. The Stats tab's Football view has every player's box score.</p>`);
 };
 </script>
 </body></html>
