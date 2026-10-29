@@ -267,6 +267,8 @@ function wBallBar() {
   $('wDiamondTitle').textContent = `${a.def.name} at ${h.def.name}`;
   $('wDiamondNote').textContent = `${W.how === 'manage' ? 'Managing: your players cast their own powers' : 'You play every pitch'}. ${W_BALL.innings} innings, CPU skill ${W_BALL_SKILL[W_BALL.diff[W.tier]] || 'Knight'}. Space to swing or pitch, WASD to aim and run, G for powers, T for Auto powers, Esc for Time out.`;
 }
+// T on the diamond switches Auto powers for the game: Play becomes Manage and back, and the bar says so
+wBD.onAuto = on => { const L = WG && WG.ball && WG.ball.live; if (!L || !L.world || L.world.how === 'sim') return; L.world.how = on ? 'manage' : 'play'; wBallBar(); };
 const wW20dShowView = showView;
 showView = function (v) { wW20dShowView(v); if (v === 'diamond') wBallBar(); else { $('wBallSave').hidden = $('wBallGive').hidden = true; $('wDiamondBack').hidden = false; } };
 
@@ -284,7 +286,7 @@ function wOpenBallCard(o) {
   }).join('');
   const close = modal(`<header><h3>${o.home ? 'Host a ball game' : 'Play a ball game'}</h3><button class="ghost" data-close>Done</button></header>
     ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}${WBALL.msg ? `<p class="wbad">${esc(WBALL.msg)}</p>` : ''}
-    <p class="hint">${W_BALL.innings} innings on the diamond with your nine${o.home ? ', at your ground' : ''}. <b>Play</b>: you pitch, swing and run. <b>Manage</b>: you do too, but your players cast their own powers. <b>Simulate</b>: the result now. A win pays ${W_BALL.xp} XP to the nine, ${W_BALL.gold} gold and ${W_BALL.fans} fans, times the tier; a loss pays a quarter of the XP and costs nothing else. Each club plays you once a day, and a game takes ${W_BALL.minutes / 60 | 0} hours or so.</p>
+    <p class="hint">${W_BALL.innings} innings on the diamond with your nine${o.home ? ', at your ground' : ''}. <b>Play</b>: you pitch, swing and run. <b>Manage</b>: you do too, but your players cast their own powers. <b>Simulate</b>: the result now. Press T during a game to switch between Play and Manage. A win pays ${W_BALL.xp} XP to the nine, ${W_BALL.gold} gold and ${W_BALL.fans} fans, times the tier; a loss pays a quarter of the XP and costs nothing else. Each club plays you once a day, and a game takes ${W_BALL.minutes / 60 | 0} hours or so.</p>
     <ul class="wbclubs">${rows}</ul>`);
   WBALL.msg = '';
   $('modalBox').querySelectorAll('[data-bclub]').forEach(b => b.onclick = () => {
