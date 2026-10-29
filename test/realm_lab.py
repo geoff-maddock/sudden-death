@@ -76,6 +76,7 @@ async def main():
     print('\nblackouts per run', round(sum(bo) / len(bo), 2), ' days', round(sum(l['days'] for l in ok) / len(ok)), ' matches per run', round(sum(len(l['matches']) for l in ok) / len(ok), 1))
     cr = [l for l in ok if l['crownTries']]
     if cr: print('crown entries per run that got there', round(sum(l['crownTries'] for l in cr) / len(cr), 2))
+    if any(l.get('hatched') for l in ok) or any('hatch' in str(a) for a in sys.argv[2:]): print('prospects hatched per run', round(sum(l.get('hatched', 0) for l in ok) / len(ok), 2))
     if any(l.get('eggs') for l in ok): print('nests per run', round(sum(l.get('eggs', 0) for l in ok) / len(ok), 1), ' egg dishes per run', round(sum(l.get('eggMeals', 0) for l in ok) / len(ok), 1), ' grand tours per run', round(sum(l.get('grandTours', 0) for l in ok) / len(ok), 2))
     meal = [m for l in ok for m in l['matches'] if m['meal']]
     if meal: print('matches with a meal', len(meal), 'win', pct(sum(1 for m in meal if m['res'] == 'win'), len(meal)))

@@ -10,8 +10,8 @@ async def main():
         r = await pg.evaluate("""(() => { TIPS_SEEN.push(...Object.keys(TIPS)); const out = {};
           // how often maps carry stakes, per act
           newRun('ironmaw',[0,1,2]); out.stakesPerMap = [0,1,2].map(a => { let n = 0; for (let i = 0; i < 30; i++) n += Object.values(genMap(a).nodes).filter(x => x.stakes).length; return (n / 30).toFixed(1); });
-          // each perk does what it says
-          const fight = (perk, sport) => { newRun('ironmaw',[0,1,2]); RUN.path=[]; RUN.pending = null; startCombat(['lb','skelss'], 'normal', sport); B.enemies[0].sp = perk; return B; };
+          // each perk does what it says (clear any perk startCombat rolled at random, and its head start)
+          const fight = (perk, sport) => { newRun('ironmaw',[0,1,2]); RUN.path=[]; RUN.pending = null; startCombat(['lb','skelss'], 'normal', sport); B.enemies.forEach(e => delete e.sp); B.sp = null; B.sc.them = 0; B.enemies[0].sp = perk; return B; };
           fight('ace', 'baseball'); scoreThem(1); out.ace = B.sc.them;
           fight('stopper', 'hockey'); out.stopperGoalAt = SKT(mkCard('check')).goal;
           fight('clutch', 'basketball'); B.turn = 3; sportEnemyHit(5); out.clutch = B.sc.them;
