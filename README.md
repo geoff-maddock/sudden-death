@@ -74,17 +74,8 @@ python3 test/realm_lab.py 140         # the realm balance bot: champion rate, wh
 
 The build output is a single static file, `dist/sudden-death.html`. Host it anywhere that serves static files.
 
-### GitHub Pages (included workflow)
-
-`.github/workflows/pages.yml` builds the game on every push to `main` and publishes it to GitHub Pages as `index.html`.
-
-1. Push the repo to GitHub.
-2. In **Settings → Pages**, set **Source** to **GitHub Actions**.
-3. Push to `main`. The site appears at `https://<user>.github.io/<repo>/`.
-
-### Anything else
-
-- **Netlify / Vercel / Cloudflare Pages:** build command `./build.sh`, publish the `dist/` directory, and set `sudden-death.html` as the index (or copy it to `index.html` as the Pages workflow does).
+- **GitHub Pages:** in **Settings → Pages**, set **Source** to a branch with the built file at `index.html`, or add a Pages workflow that runs `./build.sh` and publishes `dist/sudden-death.html` as `index.html`.
+- **Netlify / Vercel / Cloudflare Pages:** build command `./build.sh`, publish the `dist/` directory, and set `sudden-death.html` as the index (or copy it to `index.html`).
 - **Any web server or bucket:** upload `dist/sudden-death.html`.
 
 ### Hosting notes
