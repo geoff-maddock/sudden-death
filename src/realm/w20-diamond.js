@@ -43,8 +43,8 @@ const wW20ShowView = showView;
 showView = function (v) {
   wW20ShowView(v);
   $('wDiamondBar').hidden = v !== 'diamond';
-  if (v === 'diamond') { $('runbar').hidden = true; wBD.show(); }
-  else if (wBD.on) wBD.hide();
+  if (v === 'diamond') $('runbar').hidden = true;
+  wEnginesShow(v);
 };
 const wW20OpenPause = openPause;
 openPause = function () { if (UI.view === 'diamond') return; return wW20OpenPause.apply(this, arguments); };

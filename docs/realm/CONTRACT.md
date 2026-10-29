@@ -343,12 +343,18 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js`, after `w19`. Nothing of it is global but `wBD`:
 
 - `wBD.start(opts)` starts a game on the field, skipping its setup menu (`opts` as its `newGame`: `{ mode: 'demo', team, opp, innings, diff }`). `wBD.G` is its game state (`G.phase === 'over'` at a final), and `wBD.simToEnd(quiet)` plays the rest of a game at once.
-- `wBD.show()` / `wBD.hide()` show it and park it (`wBD.on`); `showView('diamond')` calls them. Inside the scope, its window listeners, frame loop and timers do nothing while it is hidden.
+- `wBD.show()` / `wBD.hide()` show it and park it (`wBD.on`); `showView('diamond')` calls them, through `W_ENGINES`. Inside the scope, its window listeners, frame loop and timers do nothing while it is hidden.
 - `wBD.start(opts)` also takes `rules: { key: value }`, Brimstone Diamond's optional rules for that game only. `wBD.resume(snap)` puts a snapshot back on the field; `wBD.sim(opts)` plays a whole game at once, CPU against CPU and silent; `wBD.box()` lists each player who appeared with their box line (`{ side, rid, n, line }`); `wBD.live` is true while a game is on.
 - `wBD.onOver` and `wBD.onQuit` are called at a final and when its End game sends it back to its menu; `wBD.onSnap(snap)` at the start of each pitch, with Brimstone Diamond's own snapshot (plain JSON).
 - Its final card only shows between games (`.bdlive` on its page), so a card from a game that just ended never covers the next one.
 - In the diamond, Esc and P are its own Time out: `openPause` does nothing there.
 - `WD` is the game on the field (`{ opts, over, from, ball? }`); a ball game from the world (`ball: true`) is saved in `WG.ball.live`.
+
+## The engines (w19b-engines.js) and the wGF scope
+
+- `W_ENGINES = { id: { api, view, sport } }` lists the engines that play a sport on their own field: `diamond` (`wBD`, baseball). Each speaks the same API: `start`, `sim`, `box`, `show`, `hide`, `pause`, `audio`, `on`, `live`, `onOver`, `onQuit`, `onSnap`.
+- `showView(v)` calls `wEnginesShow(v)`: the engine whose `view` is `v` shows, and every other one that is on hides.
+- Cinder Gridiron runs in `scope wGF src/realm/gridiron/manifest.txt src/realm/gridiron/exports.js`, after `wBD`. Nothing of it is global but `wGF`. Phase 0: `wGF.newGame(opts)`, `wGF.spot(gain)` (returns `'td'`, `'safety'`, `'first'`, `'down'` or `'turnover'`), `wGF.G` and `wGF.rules`. It joins `W_ENGINES` (as `gridiron`, football) when it has a field.
 
 ## Baseball ratings (w20b-ratings.js)
 

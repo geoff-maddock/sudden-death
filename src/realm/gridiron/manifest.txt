@@ -1,0 +1,3 @@
+# The Realm's gridiron scope: ./build.sh src/realm/manifest.txt takes this through `scope wGF ...`.
+# Phase 0 has only the rules; the page (a shadow root inside #v-gridiron, as the diamond's) comes with the field.
+include src/gf/manifest.txt

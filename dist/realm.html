@@ -21173,6 +21173,53 @@ return {
 };
 
 })();
+const wGF = (function () {
+/* Cinder Gridiron: the rules (issue #9, phase 0). Plain data and pure functions, no page: who has the ball, where it
+   is, the down, the yards to go and the score. Seven a side; the field, the plays and the clock come later.
+   The ball is in yards from the offense's own goal line: 0 to 100. Reaching 100 is a touchdown; going back past 0 is
+   a safety. Four downs to make the line to gain, ten yards on (or the goal line, if that is nearer): make it and it
+   is first down again; miss on fourth down and the other side takes over where the ball is.
+   G is the game, plain JSON (so a snapshot can be saved): { poss, ball, down, togo, score, plays }. */
+const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, td: 6, safety: 2, start: 25 };
+let G = null;
+
+function gfNewGame(opts) {
+  const o = opts || {};
+  G = { poss: o.poss || 0, ball: GF_RULES.start, down: 1, togo: GF_RULES.chain, score: [0, 0], plays: 0 };
+  return G;
+}
+// first and ten from where the ball is (first and goal inside the ten)
+function gfFirstDown() { G.down = 1; G.togo = Math.min(GF_RULES.chain, GF_RULES.field - G.ball); }
+// the other side has the ball, ball yards from its own goal line
+function gfGive(ball) { G.poss = 1 - G.poss; G.ball = ball; gfFirstDown(); }
+/* a play gained (or lost) yards: move the ball, then the score, the down and the chains.
+   Returns what happened: 'td', 'safety', 'first', 'down' (the next down) or 'turnover' (on downs). */
+function gfSpot(gain) {
+  G.plays++; G.ball += gain;
+  if (G.ball >= GF_RULES.field) { G.score[G.poss] += GF_RULES.td; gfGive(GF_RULES.start); return 'td'; }
+  if (G.ball <= 0) { G.score[1 - G.poss] += GF_RULES.safety; gfGive(GF_RULES.start); return 'safety'; }
+  if (gain >= G.togo) { gfFirstDown(); return 'first'; }
+  if (G.down >= GF_RULES.downs) { gfGive(GF_RULES.field - G.ball); return 'turnover'; }
+  G.down++; G.togo -= gain;
+  return 'down';
+}
+
+/* the end of the wGF scope: what the Realm may call. Phase 0 has the rules only; the seam's start, sim, box, show,
+   hide, pause, audio and onOver/onQuit/onSnap come with the field (phase 1), when it joins W_ENGINES (w19b). */
+return { newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES) };
+
+})();
+/* w19b: the engines (issue #9, phase 0). Some sports have a game of their own beside the card game. Each is built in
+   its own scope and talks to the Realm through the same small API (start, sim, box, show, hide, pause, audio, on,
+   onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
+   Brimstone Diamond (wBD, baseball) is the first. Cinder Gridiron (wGF, football; src/gf/) is built and joins when it
+   has a field to show (phase 1). Nothing here is saved. */
+
+const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' } };
+// on screen: the engine whose view it is shows, and every other one hides
+function wEnginesShow(v) {
+  for (const E of Object.values(W_ENGINES)) { if (E.view === v) E.api.show(); else if (E.api.on) E.api.hide(); }
+}
 /* w20: the diamond (issue #4, phase 1). Brimstone Diamond, the baseball game, runs in the wBD scope
    (src/realm/diamond/: its page sits in a shadow root inside #v-diamond, and none of its names reach ours).
    This part gives it a view beside the world and the fight, a bar above the field, and a way back.
@@ -21218,8 +21265,8 @@ const wW20ShowView = showView;
 showView = function (v) {
   wW20ShowView(v);
   $('wDiamondBar').hidden = v !== 'diamond';
-  if (v === 'diamond') { $('runbar').hidden = true; wBD.show(); }
-  else if (wBD.on) wBD.hide();
+  if (v === 'diamond') $('runbar').hidden = true;
+  wEnginesShow(v);
 };
 const wW20OpenPause = openPause;
 openPause = function () { if (UI.view === 'diamond') return; return wW20OpenPause.apply(this, arguments); };
