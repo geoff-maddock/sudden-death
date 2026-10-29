@@ -1,3 +1,4 @@
 # The Realm's gridiron scope: ./build.sh src/realm/manifest.txt takes this through `scope wGF ...`.
-# Phase 0 has only the rules; the page (a shadow root inside #v-gridiron, as the diamond's) comes with the field.
+# The engine's parts first (they don't touch the page), then its page in the Realm: a canvas in #v-gridiron.
 include src/gf/manifest.txt
+src/realm/gridiron/g1-page.js

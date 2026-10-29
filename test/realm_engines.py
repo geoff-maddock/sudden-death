@@ -1,5 +1,5 @@
-# Realm engines (issue #9, phase 0): W_ENGINES lists the engines that play a sport on their own field, with the diamond
-# behind it (its view shows it, and every other view hides it, as before). Cinder Gridiron builds in its own scope (wGF)
+# Realm engines (issue #9, phase 0): W_ENGINES lists the engines that play a sport on their own field (the diamond and
+# the gridiron), with the diamond behind it (its view shows it, and every other view hides it, as before). Cinder Gridiron builds in its own scope (wGF)
 # and leaves none of its names on the page. Its rules: first and ten from the 25; four downs to make the line to gain;
 # first and goal inside the ten; a touchdown is 6 and the other side starts from its 25; a safety is 2 the other way;
 # missing on fourth down turns the ball over where it is. Asserts; exits nonzero on failure.
@@ -37,8 +37,8 @@ async def main():
           showView('diamond'); const shown = wBD.on && UI.view === 'diamond';
           showView('world'); const hidden = !wBD.on;
           return { ids: Object.keys(W_ENGINES), api: D.api === wBD, view: D.view, sport: D.sport, shown, hidden }; })()""")
-        check(r == {'ids': ['diamond'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
-              'W_ENGINES has the diamond: its view shows it, and another view hides it', r)
+        check(r == {'ids': ['diamond', 'gridiron'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
+              'W_ENGINES has the diamond and the gridiron: the diamond\'s view shows it, and another view hides it', r)
 
         # ---------- the gridiron's scope ----------
         s = await pg.evaluate("""(() => ({ api: typeof wGF === 'object' && typeof wGF.newGame === 'function' && typeof wGF.spot === 'function',

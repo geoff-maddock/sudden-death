@@ -1,10 +1,12 @@
-/* Cinder Gridiron: the rules (issue #9, phase 0). Plain data and pure functions, no page: who has the ball, where it
+/* Cinder Gridiron: the rules (issue #9, phases 0 and 1). Plain data and pure functions, no page: who has the ball, where it
    is, the down, the yards to go and the score. Seven a side; the field, the plays and the clock come later.
    The ball is in yards from the offense's own goal line: 0 to 100. Reaching 100 is a touchdown; going back past 0 is
    a safety. Four downs to make the line to gain, ten yards on (or the goal line, if that is nearer): make it and it
    is first down again; miss on fourth down and the other side takes over where the ball is.
-   G is the game, plain JSON (so a snapshot can be saved): { poss, ball, down, togo, score, plays }. */
-const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, td: 6, safety: 2, start: 25 };
+   A field goal is kicked from 7 yards behind the line, so its distance is the yards to the goal line plus 17.
+   G is the game, plain JSON (so a snapshot can be saved): { poss, ball, down, togo, score, plays }; 08-drive.js adds
+   teams and the drive. */
+const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, td: 6, fg: 3, safety: 2, start: 25 };
 let G = null;
 
 function gfNewGame(opts) {
@@ -26,4 +28,13 @@ function gfSpot(gain) {
   if (G.down >= GF_RULES.downs) { gfGive(GF_RULES.field - G.ball); return 'turnover'; }
   G.down++; G.togo -= gain;
   return 'down';
+}
+// the ball changes hands where it is (an interception, or a punt landing there)
+function gfTurnover() { gfGive(GF_RULES.field - G.ball); }
+function gfKickDist() { return GF_RULES.field - G.ball + 17; }
+// a field goal try: 3 if it is good, and either way the other side has the ball (from its 25, or where the kick was)
+function gfFieldGoal(good) {
+  G.plays++;
+  if (good) { G.score[G.poss] += GF_RULES.fg; gfGive(GF_RULES.start); return 'fg'; }
+  gfGive(Math.max(GF_RULES.start, GF_RULES.field - G.ball - 7)); return 'miss';
 }

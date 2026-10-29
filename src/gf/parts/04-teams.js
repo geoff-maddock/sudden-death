@@ -1,0 +1,35 @@
+/* Cinder Gridiron: teams (issue #9, phase 1). Seven a side, and the same seven play offense and defense (question 2).
+   Ratings, 1 to 10: spd (speed), str (strength: blocking, shedding blocks, breaking tackles), hnd (hands), arm, kck
+   (kicking) and tkl (tackling). GF_KIND seeds them by kind; the Realm's own ratings per player come in phase 3.
+   The lineup is picked from the ratings: the best arm throws, the best runner carries, the three strongest block, and
+   the other two catch; on defense the three strongest rush, the two fastest cover the receivers, and the other two are
+   the linebacker and the safety. A team: { name, short, color, light, roster: [{ n, kind, num, r }], off, def, kicker },
+   where off and def map each position to a roster index. */
+const GF_STATS = ['spd', 'str', 'hnd', 'arm', 'kck', 'tkl'];
+const GF_KIND = {
+  goblin: [7, 3, 6, 5, 6, 4], kobold: [6, 4, 5, 7, 7, 4], werewolf: [8, 7, 5, 4, 3, 8], dwarf: [4, 8, 4, 5, 6, 7],
+  ogre: [3, 10, 3, 4, 4, 7], minotaur: [6, 9, 3, 3, 3, 8], troll: [4, 9, 3, 3, 3, 8], golem: [2, 10, 2, 2, 2, 7],
+  harpy: [9, 2, 8, 4, 5, 3], elf: [9, 3, 8, 7, 7, 4], wraith: [8, 3, 7, 5, 4, 4], vampire: [8, 5, 6, 6, 5, 6],
+  lich: [4, 4, 5, 9, 6, 4], zombie: [3, 7, 3, 3, 3, 6], gorgon: [6, 5, 6, 7, 5, 5], spider: [7, 5, 9, 4, 3, 7],
+  skeleton: [6, 4, 5, 6, 8, 4], witch: [6, 3, 6, 8, 6, 3],
+};
+function gfRate(kind) { const k = GF_KIND[kind] || GF_KIND.goblin; return Object.fromEntries(GF_STATS.map((s, i) => [s, k[i]])); }
+// the two clubs a drive uses when the Realm doesn't send its own: a heavy home line and a fast visiting side
+const GF_CLUBS = {
+  home: { name: 'Cinderhold', short: 'CND', color: '#c8461e', light: '#ffd08a', kinds: ['kobold', 'minotaur', 'golem', 'ogre', 'dwarf', 'goblin', 'troll'] },
+  away: { name: 'Visitors', short: 'VIS', color: '#3f8a5a', light: '#e8f4c8', kinds: ['elf', 'werewolf', 'harpy', 'spider', 'wraith', 'vampire', 'gorgon'] },
+};
+// a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
+function gfTeam(t) {
+  const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side)
+    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }));
+  const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
+  const free = new Set(roster.map((_, i) => i)), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
+  T.off = {}; T.off.QB = by(r => r.arm * 2 + r.hnd * .3, 1)[0]; T.off.RB = by(r => r.spd + r.str * .8, 1)[0];
+  [T.off.C, T.off.LG, T.off.RG] = by(r => r.str * 2 - r.spd * .2, 3); [T.off.X, T.off.Z] = [...free];
+  roster.forEach((_, i) => free.add(i));
+  T.def = {}; [T.def.DT, T.def.DL, T.def.DR] = by(r => r.str * 2 + r.tkl, 3); [T.def.CL, T.def.CR] = by(r => r.spd * 2 + r.hnd * .4, 2);
+  T.def.LB = by(r => r.tkl * 2 + r.spd, 1)[0]; T.def.S = [...free][0];
+  T.kicker = roster.reduce((b, p, i) => p.r.kck > roster[b].r.kck ? i : b, 0);
+  return T;
+}

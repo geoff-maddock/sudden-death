@@ -354,7 +354,11 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 
 - `W_ENGINES = { id: { api, view, sport } }` lists the engines that play a sport on their own field: `diamond` (`wBD`, baseball). Each speaks the same API: `start`, `sim`, `box`, `show`, `hide`, `pause`, `audio`, `on`, `live`, `onOver`, `onQuit`, `onSnap`.
 - `showView(v)` calls `wEnginesShow(v)`: the engine whose `view` is `v` shows, and every other one that is on hides.
-- Cinder Gridiron runs in `scope wGF src/realm/gridiron/manifest.txt src/realm/gridiron/exports.js`, after `wBD`. Nothing of it is global but `wGF`. Phase 0: `wGF.newGame(opts)`, `wGF.spot(gain)` (returns `'td'`, `'safety'`, `'first'`, `'down'` or `'turnover'`), `wGF.G` and `wGF.rules`. It joins `W_ENGINES` (as `gridiron`, football) when it has a field.
+- Cinder Gridiron runs in `scope wGF src/realm/gridiron/manifest.txt src/realm/gridiron/exports.js`, after `wBD`. Nothing of it is global but `wGF`, and it joins `W_ENGINES` as `gridiron` (football, view `gridiron`).
+- `wGF.start({ teams, mode, seed })` puts a drive on the field: `teams` are two `{ name, short, color, light, kinds: [7] }` (or `roster: [{ n, kind, num, r? }]`); `mode` is `'watch'` (the coaches call both sides) or `'call'` (`wGF.call(play)` calls the offense; the defense and fourth down are the coaches'). `wGF.phase` is the drive's beat (`call`, `pre`, `live`, `kick`, `post`, `over`), and `onPhase` and `onOver` hear them.
+- `wGF.sim(opts)` plays a whole drive at once, headless and silent: `{ end, plays, yards, score, teams, log }`. `end` is `td`, `fg`, `miss`, `punt`, `downs`, `int` or `safety`.
+- `wGF.show()`, `wGF.hide()` and `wGF.on`, as the diamond's. `wGF.plays` and `wGF.defs` name the calls. `wGF.down`, `snap` and `step` are the tests' handle on one play.
+- `WGF` (`w42-gridiron.js`) is the drive on the field: `{ mode, over }`. Not saved.
 
 ## Baseball ratings (w20b-ratings.js)
 

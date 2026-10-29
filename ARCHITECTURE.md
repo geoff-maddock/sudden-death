@@ -161,8 +161,8 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w18-league.js` | The league table (rivals and Apex play rounds while you travel; inns post it) and rivals who act: bids for bench players, grudge matches on the road, cup taunts and revenge. |
 | `w19-journal.js` | The journal (`J`): people you've talked to and what they said, places by region with their rules, big victories, quests; filters by active quest, learned keyword and search. |
 | `scope wBD` (`src/realm/diamond/`) | Brimstone Diamond, the baseball game, in its own scope: `d0-page.js` mounts its page in a shadow root inside `#v-diamond` and stands in for `document`, `window`, `localStorage` and the frame loop inside the scope; `exports.js` is what the Realm may call (`wBD`). |
-| `scope wGF` (`src/realm/gridiron/`) | Cinder Gridiron, the football engine (issue #9), in its own scope. Phase 0 has its rules only (`src/gf/parts/01-rules.js`: downs, the chains, touchdowns, safeties, turnovers on downs); `exports.js` is what the Realm may call (`wGF`). |
-| `w19b-engines.js` | `W_ENGINES`: the engines that play a sport on their own field, by id (`{ api, view, sport }`); `wEnginesShow(v)` shows the engine whose view it is and hides the rest. The diamond is in it; the gridiron joins with its field. |
+| `scope wGF` (`src/realm/gridiron/`) | Cinder Gridiron, the football engine (issue #9), in its own scope: `src/gf/parts/` (the engine), then `g1-page.js` (its canvas in `#v-gridiron`, and a frame loop that runs only while it is shown); `exports.js` is what the Realm may call (`wGF`). |
+| `w19b-engines.js` | `W_ENGINES`: the engines that play a sport on their own field, by id (`{ api, view, sport }`): the diamond (baseball) and the gridiron (football). `wEnginesShow(v)` shows the engine whose view it is and hides the rest. |
 | `w20-diamond.js` | The diamond view: `showView('diamond')` (through `wEnginesShow`), the bar above the field, `wDiamondExhibition` (CPU against CPU, Watch them play), back to the world. |
 | `w20b-ratings.js` | Baseball ratings: every player's `p.bd` (position, hand, POW/CON/SPD/ARM/FLD 1–12, powers, pitches), seeded from their kind's Brimstone Diamond player, a point per level; a Baseball block on the Stats page. |
 | `w20c-nine.js` | The baseball nine (`WG.nine`): batting order and positions, call-ups at your level for the spots your roster can't fill, `wNineDef()` for the diamond; a Nine tab on the Team screen. |
@@ -189,6 +189,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w37-map.js` | The map of wherever you are: `M`, a Map button beside the Journal, or Map on the Menu. The world, a city, a ground, a house or a dungeon, each under its own fog of war (`WG.fog` for the world, `WG.fogs[mapId]` for the rest), revealed as you walk. A tab shows the realm from inside. Dungeon maps cross off beaten teams' rooms and show the alpha, strongboxes and stairs; town maps label the street signs. |
 | `w38-soccer.js` | Soccer at Rimewatch (issue #10): the Rimewatch Sheet is the Hoarfrost Pitch (`g_sheet`, soccer, in `w21-grounds.js`), and an older save clears its curling record there once (`WG.soccer`). |
 | `w39-retire.js` | Retire a card at your home ground: once a week, a card leaves your deck for `W_RETIRE.energy` energy of your home region's element (`WG.ground.retired`). The vendors' gold trade is unchanged. How to play explains both. |
+| `w42-gridiron.js` | The gridiron view (issue #9, phase 1): `showView('gridiron')`, a bar with the four calls, Watch or Call the plays, Another drive, back to the world. Clinker Dunn at the Ash Bowl puts on a DRIVE (act `drive`): one drive by the Cinderhold Football Club from its own 25, nothing won or lost. How to play: `#wHelpGridiron`. |
 
 ### Brimstone Diamond (`src/bd/`)
 
@@ -198,7 +199,19 @@ The baseball engine for issue #4, from the same designer's *Brimstone Diamond*. 
 
 ### Cinder Gridiron (`src/gf/`)
 
-The football engine for issue #9, played at the Ash Bowl. Unlike Brimstone Diamond it is new code, written for the Realm: `src/gf/manifest.txt` lists its parts, and the Realm takes them through `scope wGF …` (`src/realm/gridiron/manifest.txt`), so its names stay private. Phase 0 is the rules (`01-rules.js`): `G` is plain JSON (`{ poss, ball, down, togo, score, plays }`), with the ball in yards from the offense's own goal line. The field, the plays and the seam's `start`/`sim`/`show`/`hide` come with phase 1, when it joins `W_ENGINES`. `test/realm_engines.py` checks the registry, the rules and that the scope leaks nothing.
+The football engine for issue #9, played at the Ash Bowl. Unlike Brimstone Diamond it is new code, written for the Realm: `src/gf/manifest.txt` lists its parts, and the Realm takes them through `scope wGF …` (`src/realm/gridiron/manifest.txt`), so its names stay private. What it needs from Brimstone Diamond is copied and adapted, not shared (question 6). The parts, in load order:
+
+- `01-util.js`: the seeded random number (`gfSeed`), so a headless drive plays the same twice, and small helpers.
+- `02-rules.js`: `G` (plain JSON: `{ poss, ball, down, togo, score, plays }`, the ball in yards from the offense's own goal line), downs and the chains (`gfSpot`), field goals, turnovers.
+- `03-figures.js`: Brimstone Diamond's inked players (`drawFig`), copied with the weapons taken out and its clock (`GFT.t`).
+- `04-teams.js`: football ratings by kind (`GF_KIND`: spd, str, hnd, arm, kck, tkl), and the lineup the same seven play both ways.
+- `05-plays.js`: four offense plays and three defenses. Each has its own formation (`set`): on a run the receivers line up tight and block, and on a blitz the linebacker and safety creep up.
+- `06-live.js`: the live play on a fixed step (`L`, plain JSON). Blocks, the handoff or the throw, catches, tackles and broken tackles are settled from the ratings. The calls only say where everyone goes, so their matchups come out of the field.
+- `07-cpu.js`: the coaches' calls and fourth-down decisions.
+- `08-drive.js`: one drive, from call to snap to result; `gfSim` runs the same flow headless.
+- `09-draw.js`: the field, the players, the blocks and the scoreboard.
+
+`test/realm_gridiron.py` asserts the drive, the matchups over 200 seeded downs each (the blitz beats the deep pass, the screen beats the blitz, the deep zone gives up short runs), the view and the calls, and that the scope leaks nothing.
 
 ### The match seam
 
