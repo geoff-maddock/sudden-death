@@ -103,7 +103,7 @@ async def main():
         check(view == 'panel', 'the Friendly is won', view)
         await pg.click('#bCont'); await pg.wait_for_function("UI.view === 'world'")
         await pg.evaluate(CLOSE_ALL)
-        after = await pg.evaluate("({ map: WG.map, rec: WG.grd.rec.g_rink, met: WG.grd.met.g_rink === WG.dayAbs, probs: wGrdProblems('g_rink'), log: WLOG.slice(-8).map(l => l[0]).join(' ') })")
+        after = await pg.evaluate("({ map: WG.map, rec: WG.grd.rec.g_rink, met: WG.grd.met.g_rink === WG.dayAbs, probs: wGrdProblems('g_rink'), log: WLOG.map(l => l[0]).join(' ') })")
         check(after['map'] == 'g_rink' and after['rec']['w'] == 1 and after['rec']['l'] == 0 and after['rec']['last']['mode'] == 'friendly', 'back inside the rink, and the win is on the record', after)
         check(after['met'] and any('today' in x for x in after['probs']) and 'beat the Rimewatch Hockey Club' in after['log'], 'one game a day at a ground', after)
         await pg.evaluate("WLOG.length = 0; wUse(11, 2); wDrain()")
