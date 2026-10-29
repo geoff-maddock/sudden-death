@@ -62,3 +62,4 @@ src/realm/w36-gate.js
 src/realm/w37-map.js
 src/realm/w38-soccer.js
 src/realm/w39-retire.js
+src/realm/w40-eggs.js

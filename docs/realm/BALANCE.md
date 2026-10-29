@@ -313,3 +313,16 @@ The champion rate doesn't move. The Frostspire costs a little more, because socc
 The balance bot retires a basic card (Body Check or Hold the Line) once a week when it can (`opts.retire`). Over 140 journeys each, `main` was champion 79.3% of the time, and with retiring 85.7%. That's about 1.3 standard errors at this sample size, so part of it may be noise.
 
 **Re-measured with 280 journeys each,** on the same build, with `opts.retire` off and on: 80.7% without retiring, 77.1% with it, about one standard error the other way. So retiring doesn't make the Realm easier for the bot, and the first gap was noise. `W_RETIRE.energy` stays at 3.
+
+## Eggs (issue #12, phases 1 and 2)
+
+With `opts.eggs`, the bot takes a region's nest and bush every 4 days it passes through, learns the Grand Tour once it holds one egg of each, keeps one of each back for it, and cooks the strongest egg dish it can before a big match. 280 journeys each, with meals on:
+
+| | Meals only | Meals and eggs |
+|---|---|---|
+| Champion rate | 79.3% | 76.8% |
+| Nests a journey | – | 11.8 |
+| Egg dishes eaten | – | 3.8 |
+| Grand Tours eaten | – | 0.19 |
+
+The champion rate doesn't move: the gap is about one standard error. Egg dishes mostly take the place of meals the bot would buy at an inn, and the Grand Tour is rare enough (about one journey in five) not to tilt a Crown.

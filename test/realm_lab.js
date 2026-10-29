@@ -151,13 +151,31 @@ window.REALMLAB = function (opts = {}) {
     const basic = RUN.deck.find(c => !c.wp && /^(check|hold)$/.test(c.id));
     if (basic && !st.removed && RUN.gold >= RUN.removeCost + 150) wRemoveCard(id, basic);
   }
-  // a meal before a big match: the strongest the region's inn serves, if it is affordable
+  // eggs (opts.eggs): every few days in a region the team takes its nest's eggs and picks its bush, as a player passing
+  // through would, and learns the Grand Tour from Wenna once it holds one egg of each; before a big match it cooks
+  // the strongest egg dish it can
+  const EGGDAY = {};
+  function gather(region) {
+    if (!opts.eggs || typeof W_EGG === 'undefined') return;
+    const el = REGION_ELEM[region] || 'aether';
+    if (EGGDAY[region] != null && WG.dayAbs - EGGDAY[region] < W_EGG.days) return;
+    EGGDAY[region] = WG.dayAbs; wAddItem(DB.eggs[el], ri(1, 2)); wAddItem(DB.forage[el], ri(2, 3)); log.eggs = (log.eggs || 0) + 1;
+    if (!wFlag('recipe_grandtour') && Object.values(DB.eggs).every(id => wHas(id))) { for (const id of Object.values(DB.eggs)) wAddItem(id, -1); wSetFlag('recipe_grandtour'); }
+  }
+  function cookEggs() {
+    if (!opts.eggs || WG.meal) return false;
+    const eggs = Object.values(DB.eggs), spare = id => id === 'grandtour' || Object.keys(DB.recipes[id].needs).every(k => !eggs.includes(k) || (WG.items[k] || 0) > DB.recipes[id].needs[k]); // keep one of each egg back for the Grand Tour
+    for (const id of ['grandtour', 'devilled', 'souffle', 'flip', 'custard', 'bake']) if (wCanCook(id) && spare(id)) { wCook(id); wEat(id); log.eggMeals = (log.eggMeals || 0) + 1; if (id === 'grandtour') log.grandTours = (log.grandTours || 0) + 1; return true; }
+    return false;
+  }
+  // a meal before a big match: an egg dish the team cooked, or the strongest the region's inn serves, if affordable
   function eat(region) {
-    if (!opts.meals || WG.meal) return;
+    if (WG.meal || cookEggs()) return;
+    if (!opts.meals) return;
     const menu = DB.innMenu[INN[region]] || {}, best = Object.keys(menu).filter(id => id !== 'hash').sort((a, b) => menu[b] - menu[a])[0];
     if (best && RUN.gold >= menu[best] + 30) { wBuyMeal(INN[region], best); wEat(best); }
   }
-  const prep = (region, big) => { rest(region); if (big) eat(region); };
+  const prep = (region, big) => { rest(region); gather(region); if (big) eat(region); };
   // the home ground (epic 2): bought at the first cup or dungeon stop with 250 gold to spare (opts.groundSpare; or opts.groundAt), then a trip home once a
   // stage to build it up (keeping 150 gold back), drill cards, sign the scouts' agents, and sleep and eat for free
   const GROUND_ORDER = ['stands', 'kitchen', 'pitch', 'scouts', 'stands', 'pitch', 'kitchen', 'scouts'];
