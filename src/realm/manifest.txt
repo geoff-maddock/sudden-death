@@ -63,3 +63,4 @@ src/realm/w37-map.js
 src/realm/w38-soccer.js
 src/realm/w39-retire.js
 src/realm/w40-eggs.js
+src/realm/w41-prospects.js

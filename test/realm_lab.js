@@ -168,6 +168,12 @@ window.REALMLAB = function (opts = {}) {
     for (const id of ['grandtour', 'devilled', 'souffle', 'flip', 'custard', 'bake']) if (wCanCook(id) && spare(id)) { wCook(id); wEat(id); log.eggMeals = (log.eggMeals || 0) + 1; if (id === 'grandtour') log.grandTours = (log.grandTours || 0) + 1; return true; }
     return false;
   }
+  // rare eggs (opts.hatch): a dungeon's rare egg once its alpha is beaten, then Pell's incubator, as a player would
+  function hatchery() {
+    if (!opts.hatch || typeof W_HATCH === 'undefined') return;
+    for (const d of DB.dungeons) if (DB.rareEggs[d.id] && wFlag('alpha_' + d.alpha) && !wFlag('rare_' + d.id)) { wAddItem(DB.rareEggs[d.id].item, 1); wSetFlag('rare_' + d.id); }
+    const before = wRoster().length; wIncubator(); if (wRoster().length > before) log.hatched = (log.hatched || 0) + 1;
+  }
   // a meal before a big match: an egg dish the team cooked, or the strongest the region's inn serves, if affordable
   function eat(region) {
     if (WG.meal || cookEggs()) return;
@@ -175,7 +181,7 @@ window.REALMLAB = function (opts = {}) {
     const menu = DB.innMenu[INN[region]] || {}, best = Object.keys(menu).filter(id => id !== 'hash').sort((a, b) => menu[b] - menu[a])[0];
     if (best && RUN.gold >= menu[best] + 30) { wBuyMeal(INN[region], best); wEat(best); }
   }
-  const prep = (region, big) => { rest(region); gather(region); if (big) eat(region); };
+  const prep = (region, big) => { rest(region); gather(region); hatchery(); if (big) eat(region); };
   // the home ground (epic 2): bought at the first cup or dungeon stop with 250 gold to spare (opts.groundSpare; or opts.groundAt), then a trip home once a
   // stage to build it up (keeping 150 gold back), drill cards, sign the scouts' agents, and sleep and eat for free
   const GROUND_ORDER = ['stands', 'kitchen', 'pitch', 'scouts', 'stands', 'pitch', 'kitchen', 'scouts'];
