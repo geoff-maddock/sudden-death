@@ -12,11 +12,14 @@ function gfCpuDefense() {
   const d = G.down, tg = G.togo;
   return wpick({ blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 });
 }
-const GF_FG_RANGE = 52;
+// GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call
+const GF_FG_RANGE = 52, GF_FG_MAX = 62;
 function gfFourth() {
   if (gfKickDist() <= GF_FG_RANGE) return 'fg';
   if (G.togo <= 2 && G.ball >= 40) return 'go';
   return 'punt';
 }
-function gfKickGood(k) { return R() < clamp(.99 - (gfKickDist() - 20) * .017 + (k.r.kck - 5) * .03, .05, .99); }
+const gfKicker = () => G.teams[G.poss].roster[G.teams[G.poss].kicker];
+function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03, .05, .99); }
+function gfKickGood(k) { return R() < gfKickChance(k); }
 function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }

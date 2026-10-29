@@ -189,7 +189,7 @@ Bot numbers measure relative balance, not how hard the game feels to a person. C
 | `w37-map.js` | The map of wherever you are: `M`, a Map button beside the Journal, or Map on the Menu. The world, a city, a ground, a house or a dungeon, each under its own fog of war (`WG.fog` for the world, `WG.fogs[mapId]` for the rest), revealed as you walk. A tab shows the realm from inside. Dungeon maps cross off beaten teams' rooms and show the alpha, strongboxes and stairs; town maps label the street signs. |
 | `w38-soccer.js` | Soccer at Rimewatch (issue #10): the Rimewatch Sheet is the Hoarfrost Pitch (`g_sheet`, soccer, in `w21-grounds.js`), and an older save clears its curling record there once (`WG.soccer`). |
 | `w39-retire.js` | Retire a card at your home ground: once a week, a card leaves your deck for `W_RETIRE.energy` energy of your home region's element (`WG.ground.retired`). The vendors' gold trade is unchanged. How to play explains both. |
-| `w42-gridiron.js` | The gridiron view (issue #9, phase 1): `showView('gridiron')`, a bar with the four calls, Watch or Call the plays, Another drive, back to the world. Clinker Dunn at the Ash Bowl puts on a DRIVE (act `drive`): one drive by the Cinderhold Football Club from its own 25, nothing won or lost. How to play: `#wHelpGridiron`. |
+| `w42-gridiron.js` | The gridiron view (issue #9, phase 1): `showView('gridiron')`, a bar with the four calls plus Punt and Field goal, Watch or Call the plays, Another drive, back to the world; under the field, `#wGridPanel`: who is on it with their ratings (hovering a row rings them on the field), the drive play by play with why each went that way, and How it works. Clinker Dunn at the Ash Bowl puts on a DRIVE (act `drive`): one drive by the Cinderhold Football Club from its own 25, nothing won or lost. How to play: `#wHelpGridiron`. |
 
 ### Brimstone Diamond (`src/bd/`)
 
@@ -205,13 +205,13 @@ The football engine for issue #9, played at the Ash Bowl. Unlike Brimstone Diamo
 - `02-rules.js`: `G` (plain JSON: `{ poss, ball, down, togo, score, plays }`, the ball in yards from the offense's own goal line), downs and the chains (`gfSpot`), field goals, turnovers.
 - `03-figures.js`: Brimstone Diamond's inked players (`drawFig`), copied with the weapons taken out and its clock (`GFT.t`).
 - `04-teams.js`: football ratings by kind (`GF_KIND`: spd, str, hnd, arm, kck, tkl), and the lineup the same seven play both ways.
-- `05-plays.js`: four offense plays and three defenses. Each has its own formation (`set`): on a run the receivers line up tight and block, and on a blitz the linebacker and safety creep up.
+- `05-plays.js`: four offense plays and three defenses. Each has its own formation (`set`): on a run the receivers line up tight and block, and on a blitz the linebacker and safety creep up. `GF_EDGE` says how each call tends to go against each defense, for the result's reason.
 - `06-live.js`: the live play on a fixed step (`L`, plain JSON). Blocks, the handoff or the throw, catches, tackles and broken tackles are settled from the ratings. The calls only say where everyone goes, so their matchups come out of the field.
 - `07-cpu.js`: the coaches' calls and fourth-down decisions.
-- `08-drive.js`: one drive, from call to snap to result; `gfSim` runs the same flow headless.
-- `09-draw.js`: the field, the players, the blocks and the scoreboard.
+- `08-drive.js`: one drive, from call to snap to result, with what happened and why (`gfWhy`); you may punt or kick on any down in call mode. `gfSim` runs the same flow headless.
+- `09-draw.js`: the field, the players (with their positions between plays), the blocks and the scoreboard, which gives each result's reason.
 
-`test/realm_gridiron.py` asserts the drive, the matchups over 200 seeded downs each (the blitz beats the deep pass, the screen beats the blitz, the deep zone gives up short runs), the view and the calls, and that the scope leaks nothing.
+`test/realm_gridiron.py` asserts the drive, the matchups over 200 seeded downs each (the blitz beats the deep pass, the screen beats the blitz, the deep zone gives up short runs), the view and the calls, the panel (the lineups, the drive's log with reasons), kicks on any down and fourth down waiting for you, and that the scope leaks nothing.
 
 ### The match seam
 

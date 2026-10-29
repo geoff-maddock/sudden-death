@@ -42,7 +42,7 @@ function gfSnap(oc, dc) {
     carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: GF_RULES.field - G.ball, back: G.ball, ev: [] };
   return L;
 }
-function gfEv(k, s) { L.ev.push({ k, s, t: L.t }); }
+function gfEv(k, s, o) { L.ev.push({ k, s, o: o || '', t: L.t }); }
 // the free defenders (not blocked, not down)
 const gfFree = () => L.pl.filter(p => p.side === 1 && p.eng < 0 && p.stun <= 0);
 function gfNearest(x, y, list) { let b = null, bd = 1e9; for (const p of list) { const d = hyp(p.x - x, p.y - y); if (d < bd) { bd = d; b = p; } } return [b, bd]; }
@@ -166,7 +166,7 @@ function gfThrow(hurry) {
   tx += gauss() * e; ty += gauss() * e; T = Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v);
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T, tgt: best });
   L.thrown = true; L.carrier = -1;
-  gfEv('throw', hurry ? 'hurried' : '');
+  gfEv('throw', hurry ? 'hurried' : '', rc.n);
 }
 
 /* ---------- the ball ---------- */

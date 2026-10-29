@@ -23,6 +23,15 @@ const GF_DEFS = {
   zone: { n: 'Deep zone', desc: 'Three rush, and four drop deep to keep everything in front of them.', rush: ['DT', 'DL', 'DR'], zone: { LB: [8, 0], CL: [15, -11], CR: [15, 11], S: [22, 0] } },
   man: { n: 'Man to man', desc: 'Three rush, everyone else takes a man, and the safety stays deep.', rush: ['DT', 'DL', 'DR'], man: { CL: 'X', CR: 'Z', LB: 'RB' }, zone: { S: [15, 0] } },
 };
+// how each call tends to go against each defense (what test/realm_gridiron.py measures), told after the play: +1 a
+// good call, -1 a bad one; the rest are even
+const GF_EDGE = {
+  'run/blitz': [-1, 'Five rushers fill every gap at the line.'], 'run/zone': [1, 'Only three rush, and the zone sits deep: room to run.'],
+  'deep/blitz': [-1, 'The rush gets home before the long routes open.'], 'deep/man': [1, 'One on one down the field, and the safety alone deep.'],
+  'screen/blitz': [1, 'The rush runs past the back, and the blockers are out in front.'], 'screen/man': [-1, 'The linebacker is on the back.'],
+  'short/blitz': [1, 'The ball is out before the rush arrives.'],
+};
+const gfEdge = (oc, dc) => GF_EDGE[oc + '/' + dc] || [0, ''];
 const GF_OFF_IDS = Object.keys(GF_PLAYS), GF_DEF_IDS = Object.keys(GF_DEFS);
 // a call's formation: the usual one, with the call's own set on top (a defense's too: the blitz creeps up)
 const gfSet = oc => Object.assign({}, GF_OFF_SET, (GF_PLAYS[oc] || {}).set);

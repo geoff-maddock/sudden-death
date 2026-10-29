@@ -87,6 +87,42 @@ async def main():
         check(still == 'call' and e == {'oc': 'screen', 'off': True}, 'the drive waits for your call, then runs the play you called (and the buttons close)', [still, e])
         await pg.screenshot(path='/tmp/realm-gridiron-call.png')
 
+        # the panel under the field: who is on it, with their ratings, and hovering a row rings them on the field
+        ln = await pg.evaluate("""(() => { const rows = [...document.querySelectorAll('#wGridLineup tr[data-gpos]')];
+          rows[0].dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+          return { rows: rows.length, cells: rows[0].querySelectorAll('td').length, key: document.querySelectorAll('#wGridLineup .wgkey').length,
+            how: document.getElementById('wGridHow').textContent, hl: wGF.lineup().length }; })()""")
+        check(ln['rows'] == 14 and ln['cells'] == 8 and ln['key'] >= 14 and 'four downs' in ln['how'] and 'Field goal' in ln['how'],
+              'On the field lists both sides\' seven with their six ratings, and How it works is under the field', ln)
+        # after the play: what happened and why, in the bar and in the drive's log
+        await pg.wait_for_function("(wGF.phase === 'call' || wGF.phase === 'over') && wGF.G.drive.plays.length >= 1", timeout=15000)
+        lg = await pg.evaluate("""(() => { const li = document.querySelectorAll('#wGridLog li'), e = wGF.G.drive.plays[0];
+          return { n: li.length, why: e.why, msg: e.msg, text: li[0].textContent }; })()""")
+        check(lg['n'] == 1 and ('matchup' in lg['why'] or 'call against' in lg['why']), 'each play says why it went that way, and This drive keeps it', lg)
+        check(lg['msg'] and lg['msg'] in lg['text'] and 'Screen vs' in lg['text'], 'This drive shows the call, the result and why', lg)
+        # a punt on any down: the drive ends with the punt
+        if await pg.evaluate("wGF.phase === 'over'"):  # the screen went all the way (or was picked off): a fresh drive to punt from
+            await pg.evaluate("wGridironDrive({ mode: 'call', seed: 3 })"); await pg.wait_for_function("wGF.phase === 'call'")
+        await pg.click('[data-gkick="punt"]')
+        await pg.wait_for_function("wGF.phase === 'over'", timeout=15000)
+        pu = await pg.evaluate("({ end: wGF.G.drive.end, n: document.querySelectorAll('#wGridLog li').length, last: document.querySelector('#wGridLog li:last-child').textContent })")
+        pu['side'] = await pg.evaluate("document.querySelector('#wGridLineup caption').textContent")
+        check(pu['end'] == 'punt' and 'Cinderhold' in pu['side'] and 'offense' in pu['side'] and pu['n'] >= 1 and 'Punt' in pu['last'], 'you may punt on any down, and the punt goes in the log', pu)
+        await pg.screenshot(path='/tmp/realm-gridiron-panel.png', full_page=True)
+        # fourth down waits for you; a field goal is there only in range, and goes through the same kick
+        fo = await pg.evaluate("""(() => { wGridironDrive({ mode: 'call', seed: 7 }); const G = wGF.G; G.down = 4; G.togo = 6; G.ball = 70;
+          wGridBar(); const fg = document.querySelector('[data-gkick="fg"]');
+          const r = { fg: fg.textContent, ok: wGF.canCall('fg'), note: document.getElementById('wGridNote').textContent };
+          G.ball = 20; r.far = wGF.canCall('fg'); G.ball = 70; return r; })()""")
+        await pg.wait_for_timeout(900)
+        fo['still'] = await pg.evaluate("wGF.phase")
+        check(fo['ok'] and not fo['far'] and '47 yd' in fo['fg'] and 'Fourth down' in fo['note'] and fo['still'] == 'call',
+              'fourth down waits for your call; the field goal button shows the distance and chance, and only in range', fo)
+        await pg.click('[data-gkick="fg"]')
+        await pg.wait_for_function("wGF.phase === 'over'", timeout=15000)
+        fg = await pg.evaluate("({ end: wGF.G.drive.end, why: wGF.why })")
+        check(fg['end'] in ('fg', 'miss') and '%' in fg['why'], 'the field goal is kicked when you call it, and the bar gives its chance', fg)
+
         # back to the world: the engine is parked
         await pg.click('#wGridBack')
         b = await pg.evaluate("({ view: UI.view, on: wGF.on, bar: document.getElementById('wGridBar').hidden, field: document.getElementById('v-gridiron').hidden })")
