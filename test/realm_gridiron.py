@@ -74,7 +74,7 @@ async def main():
         await pg.screenshot(path='/tmp/realm-gridiron-live.png')
 
         # your calls: the buttons work only when it's your call, and the play goes in as called
-        await pg.click('#wGridMode')
+        await pg.click('[data-gmode="call"]')
         await pg.wait_for_function("wGF.phase === 'call'")
         c = await pg.evaluate("""(() => { const b = [...document.querySelectorAll('[data-gcall]')];
           return { shown: !document.getElementById('wGridCalls').hidden, enabled: b.every(x => !x.disabled), n: b.length, note: document.getElementById('wGridNote').textContent }; })()""")

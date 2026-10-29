@@ -43,7 +43,9 @@ function gfSnap(oc, dc) {
     if (p.job === 'zone') p.spot = (D.zone && D.zone[k]) || GF_DEF_SET[k];
   }
   L = { oc, dc, t: 0, pl, id, did, ball: { st: 'held', h: id.QB, x: pl[id.QB].x, y: 0, z: 1, fx: 0, fy: 0, tx: 0, ty: 0, bt: 0, T: 0, tgt: -1 },
-    carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: GF_RULES.field - G.ball, back: G.ball, ev: [] };
+    carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: GF_RULES.field - G.ball, back: G.ball, ev: [],
+    // Play mode (11-play.js): your keys for this play, and the stiff-arm
+    hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
   return L;
 }
 function gfEv(k, s, o) { L.ev.push({ k, s, o: o || '', t: L.t }); }
@@ -53,6 +55,7 @@ function gfNearest(x, y, list) { let b = null, bd = 1e9; for (const p of list) {
 
 function gfStep(dt) {
   L.t += dt;
+  if (L.hands) gfHandsStep();
   for (const p of L.pl) { if (p.stun > 0) p.stun -= dt; if (p.slow > 0) p.slow -= dt; if (p.cd > 0) p.cd -= dt; }
   gfQB();
   for (const p of L.pl) {
@@ -78,6 +81,7 @@ function gfMove(p, tx, ty, dt, turn) {
 function gfAim(p) {
   const P = GF_PLAYS[L.oc], i = L.pl.indexOf(p), c = L.carrier >= 0 ? L.pl[L.carrier] : null, pocket = L.carrier === L.id.QB && !L.thrown;
   // the carrier runs (the quarterback never does in phase 1, only hands off or throws)
+  if (L.hands && L.ball.st === 'held' && L.ball.h === i) { const s = gfSteerAim(p); if (s) return s; if (i === L.id.QB && p.x > 0) return gfRunLine(p); }
   if (L.ball.st === 'held' && L.ball.h === i && i !== L.id.QB) return gfRunLine(p);
   if (p.side === 0) {
     const qb = L.pl[L.id.QB];
@@ -108,7 +112,7 @@ function gfAim(p) {
   if (L.ball.st === 'air' && L.ball.bt > GF_READ) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
   // someone else has it: after a catch everyone chases; after a handoff the rush chases at once, the linebacker and
   // the man defenders read the run in under half a second, and the deep zone a beat later
-  if (c && L.carrier !== L.id.QB && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
+  if (c && (L.carrier !== L.id.QB || c.x > 0) && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
   if (p.job === 'rush') return lead(qb);
   if (p.job === 'man') { const m = L.pl[p.mark]; return [m.x + .8, m.y, 3.2]; }
   if (p.job === 'zone') {
@@ -155,7 +159,7 @@ function gfQB() {
     if (!L.handed && L.t > .3 && hyp(rb.x - qb.x, rb.y - qb.y) < 1.3) { L.handed = true; L.carrier = L.id.RB; L.ball.h = L.id.RB; gfEv('handoff', rb.n); }
     return;
   }
-  if (L.thrown || L.carrier !== L.id.QB) return;
+  if (L.thrown || L.carrier !== L.id.QB || L.hands) return;
   const [, press] = gfNearest(qb.x, qb.y, gfFree());
   // under pressure the quarterback tries to get it out early, but doesn't always see the rusher in time
   if (L.t >= P.throwAt || (press < 1.8 && L.t > .55 && (P.hot || R() < GF_DT * 5))) gfThrow(press < 1.8 && L.t < P.throwAt && !P.hot);
@@ -235,11 +239,13 @@ function gfBlocks(dt) {
 /* ---------- tackles, the sideline and the goal line ---------- */
 function gfTackles() {
   if (L.ball.st !== 'held') return;
-  const c = L.pl[L.carrier], sack = L.carrier === L.id.QB && !L.thrown && GF_PLAYS[L.oc].kind === 'pass';
+  const c = L.pl[L.carrier], sack = L.carrier === L.id.QB && !L.thrown && GF_PLAYS[L.oc].kind === 'pass' && c.x < 0;
   for (const d of L.pl) {
     const dd = hyp(d.x - c.x, d.y - c.y);
     if (d.side !== 1 || d.eng >= 0 || d.stun > 0 || d.cd > 0 || dd > GF_REACH) continue;
     d.cd = .6;
+    // your stiff-arm shrugs off the next tackle (Play mode)
+    if (L.arm > 0) { L.arm = 0; d.stun = .55; L.broken++; gfEv('broken', c.n); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
     const pt = clamp(.78 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35, .2, .93);
     if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n);

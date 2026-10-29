@@ -22,5 +22,25 @@ function gfFrame(now) {
   gfRender();
   GFP.raf = requestAnimationFrame(gfFrame);
 }
+// Play mode's keys, only while the field is up and there's something to do with them; in the capture phase, so nothing
+// else on the page takes them
+const GF_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
+const GFK = new Set();
+function gfKeySteer() { let x = 0, y = 0; for (const k of GFK) if (GF_KEYS[k]) { x += GF_KEYS[k][0]; y += GF_KEYS[k][1]; } return [x, y]; }
+function gfKey(e, down) {
+  if (!GFP.on || !GD || GD.mode !== 'play' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input,textarea,select')) return;
+  if (document.getElementById('modal') && !document.getElementById('modal').hidden) return;
+  const k = e.key.toLowerCase(), live = L && L.hands && GD.ph === 'live' && !L.done, kick = GD.ph === 'kick' && GD.meter;
+  if (!live && !kick) return;
+  if (GF_KEYS[k]) { if (down) GFK.add(k); else GFK.delete(k); gfInput({ steer: gfKeySteer() }); }
+  else if (k === ' ') { if (kick) { if (down && !e.repeat) gfInput({ tap: true }); } else if (!e.repeat || !down) gfInput({ hold: down }); }
+  else if ((k === 'q' || k === 'e') && down) gfInput({ pick: k === 'q' ? -1 : 1 });
+  else return;
+  e.preventDefault(); e.stopPropagation();
+}
+window.addEventListener('keydown', e => gfKey(e, true), true);
+window.addEventListener('keyup', e => gfKey(e, false), true);
+window.addEventListener('blur', () => { GFK.clear(); if (L && L.hands) gfInput({ steer: [0, 0] }); });
 function gfShow() { GFP.host.hidden = false; if (GFP.on) return; GFP.on = true; GFP.last = performance.now(); GFP.raf = requestAnimationFrame(gfFrame); }
-function gfHide() { GFP.host.hidden = true; GFP.on = false; cancelAnimationFrame(GFP.raf); }
+function gfHide() { GFK.clear(); GFP.host.hidden = true; GFP.on = false; cancelAnimationFrame(GFP.raf); }

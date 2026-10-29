@@ -20,7 +20,9 @@ function gfDraw(c) {
   GD.cam = lerp(GD.cam, clamp(want, 18, 82), .08);
   gfDrawField(c);
   gfDrawPlayers(c);
+  gfDrawHands(c);
   gfDrawHud(c);
+  gfDrawMeter(c);
 }
 function gfDrawField(c) {
   // the stands: black basalt, warm at the top from the lava beyond
@@ -121,7 +123,7 @@ function gfDrawHud(c) {
   if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}  vs  ${GF_DEFS[GD.dc].n}`;
   if (GD.game) mid += `  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`;
   if (GD.ph === 'call' && GD.mode === 'call' && G.poss !== GD.you) sub = 'Your call: pick a defense';
-  if (GD.ph === 'kick') sub = GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt';
+  if (GD.ph === 'kick') sub = (GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt') + (GD.meter ? ': tap Space twice, for power and aim' : '');
   if (GD.ph === 'kickoff') { mid = `Kickoff  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`; sub = `${G.teams[1 - GD.kickoff].name} kick to ${G.teams[GD.kickoff].name}`; }
   if (GD.ph === 'half') { mid = GD.msg; sub = ''; }
   if (GD.ph === 'post' || GD.ph === 'over') { mid = GD.msg; sub = GD.ph === 'over' ? (GD.game ? gfFinalLine() : gfEndLine()) : ''; }
@@ -130,6 +132,42 @@ function gfDrawHud(c) {
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
   // a broken tackle, a shed block, the catch: the play's last moment, briefly
   if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (e && L.t - e.t < .9 && (e.k === 'broken' || e.k === 'catch')) txt(c, e.k === 'broken' ? 'Broken tackle!' : 'Caught!', 480, 92, F(20, 800), '#ffd08a', 'center'); }
+  c.restore();
+}
+// Play mode on the field: the ring on your target, the lead marker while you hold, and the keys along the bottom
+function gfDrawHands(c) {
+  if (!L || !L.hands || GD.ph !== 'live' || L.done) return;
+  const F = '700 13px "Alegreya Sans", system-ui, sans-serif', at = (x, y) => { const [ax, ay] = gfAbs(x, y); return gfScr(ax, ay); };
+  let hint;
+  if (gfCanThrow()) {
+    const t = L.pl[L.ctl.tgt];
+    if (t) { const s = at(t.x, t.y); c.save(); c.strokeStyle = '#7fd4ff'; c.lineWidth = 2.5; c.setLineDash([5, 4]); c.beginPath(); c.ellipse(s.x, s.y, 19, 7.5, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
+    if (t && L.ctl.hold != null) {
+      const [mx, my] = gfLeadSpot(L.ctl.tgt, Math.min(GF_LEAD, .15 + (L.t - L.ctl.hold) * 1.1)), m = at(mx, my), q = at(L.pl[L.id.QB].x, L.pl[L.id.QB].y);
+      c.save(); c.strokeStyle = 'rgba(127,212,255,.75)'; c.lineWidth = 1.5; c.setLineDash([3, 5]);
+      c.beginPath(); c.moveTo(q.x, q.y - 20); c.quadraticCurveTo((q.x + m.x) / 2, Math.min(q.y, m.y) - 60, m.x, m.y); c.stroke();
+      c.setLineDash([]); c.fillStyle = 'rgba(127,212,255,.35)'; c.strokeStyle = '#7fd4ff'; c.beginPath(); c.ellipse(m.x, m.y, 9, 4, 0, 0, Math.PI * 2); c.fill(); c.stroke(); c.restore();
+    }
+    hint = 'Hold Space to lead your receiver, let go to throw  ·  Q / E: another receiver  ·  WASD: scramble';
+  } else if (L.carrier >= 0) hint = `WASD: steer${L.armUsed ? '' : '  ·  Space: stiff-arm (once a play)'}`;
+  else hint = 'The ball is in the air';
+  c.save(); c.fillStyle = 'rgba(12,10,9,.78)'; c.fillRect(0, 572, 960, 28); txt(c, hint, 480, 591, F, '#d8f0ff', 'center'); c.restore();
+}
+// your kick: a power bar, then an aim bar
+function gfDrawMeter(c) {
+  const M = GD && GD.ph === 'kick' && GD.meter; if (!M) return;
+  const k = G.teams[G.poss].roster[G.teams[G.poss].kicker], fg = GD.kick === 'fg', F = '700 14px "Alegreya Sans", system-ui, sans-serif';
+  const x = 330, w = 300, y = 470, now = M.st < 2 ? gfMeterNow() : null;
+  c.save(); c.fillStyle = 'rgba(12,10,9,.85)'; c.fillRect(x - 20, y - 34, w + 40, 96);
+  txt(c, M.st === 0 ? 'Space: set the power' : M.st === 1 ? 'Space: set the aim' : 'Kicking…', 480, y - 14, F, '#ffd08a', 'center');
+  // power: the mark is how much this kick needs
+  c.fillStyle = '#2a2420'; c.fillRect(x, y, w, 12);
+  const pw = M.st === 0 ? now : M.pw; c.fillStyle = '#ff9a3c'; c.fillRect(x, y, w * pw, 12);
+  if (fg) { const need = clamp(gfKickDist() / gfFgReach(k), 0, 1); c.fillStyle = '#f3ead6'; c.fillRect(x + w * need - 1, y - 3, 2, 18); }
+  // aim: the window in the middle is good
+  const ay = y + 28, win = fg ? gfFgWindow(k) : .3;
+  c.fillStyle = '#2a2420'; c.fillRect(x, ay, w, 12); c.fillStyle = 'rgba(111,191,115,.55)'; c.fillRect(x + w / 2 * (1 - win), ay, w * win, 12);
+  if (M.st >= 1) { const a = M.st === 1 ? now : M.aim; c.fillStyle = '#f3ead6'; c.fillRect(x + w / 2 * (1 + a) - 2, ay - 3, 4, 18); }
   c.restore();
 }
 function gfWrap(c, s, font, w) {

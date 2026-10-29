@@ -2,6 +2,7 @@
    scores, kicks, punts or gives the ball up. Each down goes call → pre (both calls shown) → live (the play) → post
    (the result) → the next call. On fourth down the coach decides (07-cpu.js), and a kick is its own beat.
    mode 'watch': the coaches call both sides. mode 'call': you call the offense (gfCall), and the defense is the CPU's;
+   mode 'play' is 'call', and then you play your offense by hand (11-play.js);
    on any down your call may be a punt or, in range (GF_FG_MAX), a field goal, and fourth down waits for you too.
    In a full game (10-game.js) you call the defense too when the other side has the ball.
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
@@ -18,19 +19,19 @@ function gfStart(opts) {
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: o.mode === 'call' ? 'call' : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
 // (a play, 'punt', or 'fg' when it is in range)
 // (a play, 'punt', or 'fg' when it is in range; a defense when the other side has the ball)
 function gfCall(oc) {
-  if (!GD || GD.ph !== 'call' || GD.mode !== 'call' || !gfCanCall(oc)) return false;
+  if (!GD || GD.ph !== 'call' || GD.mode === 'watch' || !gfCanCall(oc)) return false;
   GD.pick = oc; return true;
 }
-const gfYours = () => GD.mode === 'call' && G.poss === GD.you;
+const gfYours = () => GD.mode !== 'watch' && G.poss === GD.you;
 function gfCanCall(oc) {
-  if (GD.mode === 'call' && G.poss !== GD.you) return !!GF_DEFS[oc];
+  if (GD.mode !== 'watch' && G.poss !== GD.you) return !!GF_DEFS[oc];
   return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX);
 }
 function gfGo(ph) { GD.ph = ph; GD.t = 0; if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); } }
@@ -41,9 +42,9 @@ function gfTick(dt) {
   if (GD.ph === 'call') {
     const mine = gfYours();
     if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
-    if (GD.t < GF_PACE.call || (GD.mode === 'call' && !GD.pick)) return;
-    if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; return gfGo('kick'); }
-    GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode === 'call' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
+    if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
+    if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
+    GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
     return gfGo('pre');
   }
   if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc); GD.acc = 0; gfGo('live'); } return; }
@@ -53,10 +54,11 @@ function gfTick(dt) {
     if (L.done) { gfResult(L.done); gfGo('post'); }
     return;
   }
-  if (GD.ph === 'kick') { if (GD.t >= GF_PACE.kick) { gfKick(); gfGo('post'); } return; }
+  // your kick (Play mode) waits for both taps of the meter
+  if (GD.ph === 'kick') { if (GD.meter ? GD.meter.st >= 2 : GD.t >= GF_PACE.kick) { gfKick(); GD.meter = null; gfGo('post'); } return; }
   if (GD.ph === 'kickoff') { if (GD.t >= GF_PACE.kick) { gfKickoff(); gfGo('post'); } return; }
   if (GD.ph === 'half') { if (GD.t >= GF_PACE.half) gfKickoffTo(GD.next); return; }
-  if (GD.ph === 'post' && GD.t >= (GD.mode === 'call' ? GF_PACE.postCall : GF_PACE.post)) {
+  if (GD.ph === 'post' && GD.t >= (GD.mode !== 'watch' ? GF_PACE.postCall : GF_PACE.post)) {
     // in a game the clock running out ends the drive on the field, and the game goes on to the next beat
     if (GD.game && G.clock <= 0 && !G.drive.end && G.drive.plays.length) G.drive.end = 'clock';
     if (G.drive.end && GD.game && gfGameNext()) return;
@@ -104,14 +106,15 @@ function gfWhy(r) {
 function gfKick() {
   const off = G.poss, k = G.teams[off].roster[G.teams[off].kicker], dist = gfKickDist(), down = G.down, ball = G.ball, ch = gfKickChance(k);
   if (GD.kick === 'fg') {
-    const r = gfFieldGoal(gfKickGood(k));
+    const M = GD.meter, r = gfFieldGoal(M ? gfMeterFg(k) : gfKickGood(k));
     G.drive.end = r; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
-    GD.why = `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
+    GD.why = M ? `Power ${Math.round(M.pw * 100)}% (${dist} yards needs ${Math.ceil(dist / gfFgReach(k) * 100)}%), and the aim ${Math.abs(M.aim) <= gfFgWindow(k) ? 'true' : (M.aim < 0 ? 'wide left' : 'wide right')}.`
+      : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
   } else {
-    const y = gfPuntYards(k); G.plays++;
+    const y = GD.meter ? gfMeterPunt(k) : gfPuntYards(k); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
     G.drive.end = 'punt'; GD.msg = `${k.n} punts, ${y} yards.`;
-    GD.why = `The punt gives the ball away, but a long way from your goal line.`;
+    GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
   }
   G.drive.plays.push({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why });
   gfRunClock(G.drive.end, 5);

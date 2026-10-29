@@ -75,8 +75,8 @@ async def main():
         check(k == {'job': True, 'act': 'ggame', 'match': 'gmatch'}, 'Clinker Dunn puts on GRIDIRON, and their GAME is still the card-game match', k)
         await pg.evaluate("(() => { const r = wSay('gk_bowl', 'gridiron'); wRunAct(r.act, 'gk_bowl'); })()")
         await pg.wait_for_function("UI.view === 'gridiron' && wGF.isGame && wGF.phase === 'call'", timeout=15000)
-        v = await pg.evaluate("({ title: document.getElementById('wGridTitle').textContent, again: document.getElementById('wGridAgain').textContent, clock: wGF.clock(), mode: document.getElementById('wGridMode').textContent })")
-        check('game' in v['title'] and v['again'] == 'Start over' and v['clock'] and v['clock']['half'] == 1 and v['clock']['text'] == '6:00' and 'Hand back' in v['mode'],
+        v = await pg.evaluate("({ title: document.getElementById('wGridTitle').textContent, again: document.getElementById('wGridAgain').textContent, clock: wGF.clock(), mode: document.querySelector('#wGridModes .on').dataset.gmode })")
+        check('game' in v['title'] and v['again'] == 'Start over' and v['clock'] and v['clock']['half'] == 1 and v['clock']['text'] == '6:00' and v['mode'] == 'call',
               'a game opens in Call the plays, on the clock: 1st half, 6:00', v)
 
         # on defense you pick the defense: get the other side the ball (punt it away if it's ours), then call a blitz
@@ -94,9 +94,9 @@ async def main():
         check(lg['heads'] >= 1 and lg['plays'] >= 1, 'the log keeps every drive under its own heading', lg)
         # switching who calls it goes on with the same game
         before = await pg.evaluate("({ drives: wGF.G.drives.length, clock: wGF.G.clock, plays: wGF.G.plays })")
-        await pg.click('#wGridMode')
+        await pg.click('[data-gmode="watch"]')
         after = await pg.evaluate("({ drives: wGF.G.drives.length, clock: wGF.G.clock, plays: wGF.G.plays, game: wGF.isGame })")
-        check(after['game'] and after['drives'] == before['drives'] and after['plays'] == before['plays'], 'Let the coaches call it goes on with the same game', [before, after])
+        check(after['game'] and after['drives'] == before['drives'] and after['plays'] == before['plays'], 'switching to the Coaches goes on with the same game', [before, after])
         await pg.wait_for_timeout(1500)
         await pg.screenshot(path='/tmp/realm-gridiron-game.png')
         h = await pg.evaluate("(() => { renderHelp(); const e = document.getElementById('wHelpGridiron'); return e ? e.textContent : ''; })()")
