@@ -267,3 +267,43 @@
 .wwxhud{color:#cfe8f0}
 .wwxhud.wwx-ash{color:#ff9a5a}
 .wwxhud.wwx-fog{color:#c4ccd2}
+
+/* w42: the gridiron's panel under the field */
+.wgp{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:10px 20px;max-width:960px;margin:10px auto 0}
+.wgp h4{margin:0 0 6px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wgp details{grid-column:1/-1;border-top:1px solid var(--seam);padding-top:6px}
+.wgp summary{cursor:pointer;font-family:var(--hud);font-size:17px;color:var(--torch)}
+.wgline{width:100%;border-collapse:collapse;font-family:var(--hud);font-size:15px;margin-bottom:8px}
+.wgline caption{text-align:left;color:var(--bone);padding:2px 0 4px}
+.wgline caption i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.wgline th{font-weight:400;color:var(--dim);text-align:center;padding:2px 4px}
+.wgline td{text-align:center;padding:2px 4px;border-top:1px solid var(--seam)}
+.wgline th:nth-child(2),.wgline td:nth-child(2){text-align:left}
+.wgline td small{color:var(--dim)}
+.wgline tr[data-gpos]:hover{background:var(--stone2)}
+.wgline .wgkey{color:var(--torch);font-weight:700}
+.wglog{list-style:none;margin:0;padding:0;max-height:420px;overflow-y:auto;display:grid;gap:6px;font-size:15px}
+.wglog li{border-left:3px solid var(--seam);padding:2px 0 2px 8px;line-height:1.3}
+.wglog li.wggood{border-color:#6fbf73}
+.wglog li.wgbad{border-color:#d0604a}
+.wglog small{font-family:var(--hud);color:var(--dim)}
+.wglog em{font-style:normal;color:var(--torch)}
+.wglog span{display:block;color:var(--dim);font-size:14px}
+.wghow{margin:4px 0 8px;padding-left:20px;font-size:15px;line-height:1.35}
+.wghow i{color:var(--dim)}
+@media (max-width:700px){.wgp{grid-template-columns:1fr}}
+.wgmodes{display:inline-flex;gap:0}
+.wgmodes button{border-radius:0}
+.wgmodes button:first-child{border-radius:6px 0 0 6px}
+.wgmodes button:last-child{border-radius:0 6px 6px 0}
+.wgmodes button.on{background:var(--torch);color:#1a120c;border-color:var(--torch)}
+/* w43: the Seven tab */
+.wsvr .wpa{flex-wrap:wrap;gap:6px}
+.wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
+.wsvl select{font:inherit;font-family:var(--hud);font-size:15px;padding:3px 4px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
+.wseven .wno{font-size:18px}
+/* w42: a call button's freshness (the playbook) */
+#wGridCalls [data-gcall],#wGridDefs [data-gdef]{background-image:linear-gradient(var(--torch),var(--torch));background-repeat:no-repeat;background-position:left bottom;background-size:var(--fresh,100%) 3px}
+#wGridCalls .wgworn,#wGridDefs .wgworn{background-image:linear-gradient(#d0a04a,#d0a04a)}
+#wGridCalls .wgtired,#wGridDefs .wgtired{background-image:linear-gradient(#d0604a,#d0604a)}
+#wGridCalls [data-fresh]:not([data-fresh=""])::after,#wGridDefs [data-fresh]:not([data-fresh=""])::after{content:" · " attr(data-fresh);font-size:.8em;opacity:.8}

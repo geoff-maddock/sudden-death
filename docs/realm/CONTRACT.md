@@ -343,12 +343,24 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
 Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js`, after `w19`. Nothing of it is global but `wBD`:
 
 - `wBD.start(opts)` starts a game on the field, skipping its setup menu (`opts` as its `newGame`: `{ mode: 'demo', team, opp, innings, diff }`). `wBD.G` is its game state (`G.phase === 'over'` at a final), and `wBD.simToEnd(quiet)` plays the rest of a game at once.
-- `wBD.show()` / `wBD.hide()` show it and park it (`wBD.on`); `showView('diamond')` calls them. Inside the scope, its window listeners, frame loop and timers do nothing while it is hidden.
+- `wBD.show()` / `wBD.hide()` show it and park it (`wBD.on`); `showView('diamond')` calls them, through `W_ENGINES`. Inside the scope, its window listeners, frame loop and timers do nothing while it is hidden.
 - `wBD.start(opts)` also takes `rules: { key: value }`, Brimstone Diamond's optional rules for that game only. `wBD.resume(snap)` puts a snapshot back on the field; `wBD.sim(opts)` plays a whole game at once, CPU against CPU and silent; `wBD.box()` lists each player who appeared with their box line (`{ side, rid, n, line }`); `wBD.live` is true while a game is on.
 - `wBD.onOver` and `wBD.onQuit` are called at a final and when its End game sends it back to its menu; `wBD.onSnap(snap)` at the start of each pitch, with Brimstone Diamond's own snapshot (plain JSON).
 - Its final card only shows between games (`.bdlive` on its page), so a card from a game that just ended never covers the next one.
 - In the diamond, Esc and P are its own Time out: `openPause` does nothing there.
 - `WD` is the game on the field (`{ opts, over, from, ball? }`); a ball game from the world (`ball: true`) is saved in `WG.ball.live`.
+
+## The engines (w19b-engines.js) and the wGF scope
+
+- `W_ENGINES = { id: { api, view, sport } }` lists the engines that play a sport on their own field: `diamond` (`wBD`, baseball). Each speaks the same API: `start`, `sim`, `box`, `show`, `hide`, `pause`, `audio`, `on`, `live`, `onOver`, `onQuit`, `onSnap`.
+- `showView(v)` calls `wEnginesShow(v)`: the engine whose `view` is `v` shows, and every other one that is on hides.
+- Cinder Gridiron runs in `scope wGF src/realm/gridiron/manifest.txt src/realm/gridiron/exports.js`, after `wBD`. Nothing of it is global but `wGF`, and it joins `W_ENGINES` as `gridiron` (football, view `gridiron`).
+- `wGF.start({ teams, mode, seed })` puts a drive on the field: `teams` are two `{ name, short, color, light, kinds: [7] }` (or `roster: [{ n, kind, num, r? }]`); `mode` is `'watch'` (the coaches call both sides) or `'call'` (`wGF.call(play)` calls the offense, `'punt'` on any down or `'fg'` in range too; fourth down waits for your call; the defense is the coaches'). `wGF.phase` is the drive's beat (`call`, `pre`, `live`, `kick`, `post`, `over`), and `onPhase` and `onOver` hear them.
+- `wGF.game({ teams, mode, seed })` puts a whole game on the field instead (phase 2); in `'call'` mode `wGF.call(defense)` picks your side's defense when the other side has the ball (`wGF.yourBall`). `wGF.clock()` is `{ half, text, name }` in a game, `wGF.isGame` says which it is, `wGF.setMode(m)` switches who calls it without restarting (`'watch'`, `'call'` or `'play'`: in `'play'` you play your offense by hand, through `wGF.input({ steer: [sx, sy], hold, pick, tap })`; `wGF.hands` says a hands-on play is live and `wGF.meter` is your kick meter), and `wGF.simGame(opts)` plays a game headless: `{ score, teams, drives, plays, half, ends, secs }` (`half` 3 is Sudden Death; `secs` is how long it would take to watch). The game adds `half`, `clock`, `recv` and `drives` to `G`, and a drive can end `clock` when its half runs out.
+- The playbook (phase 4): `G.fresh = [{ off: { play: 0..1 }, def: { defense: 0..1 } }, ...]` by side, and `G.seen`, each side's recent calls. `wGF.fresh(side)` and `wGF.tendency(side, 'off' | 'def')` read them for the page; `wGF.cpu.off()` and `wGF.cpu.def()` are the coaches' calls, for the tests.
+- `wGF.sim(opts)` plays a whole drive at once, headless and silent: `{ end, plays, yards, score, teams, log }`. `end` is `td`, `fg`, `miss`, `punt`, `downs`, `int` or `safety`.
+- `wGF.show()`, `wGF.hide()` and `wGF.on`, as the diamond's. `wGF.plays` and `wGF.defs` name the calls. `wGF.canCall(c)` says whether a call can be made now, `wGF.kick()` is the field-goal try from here (`{ dist, chance, inRange, coach }`), `wGF.lineup()` who is on the field (the drive's offense and the other side's defense, with ratings), `wGF.edge(oc, dc)` the matchup (`[+1|0|-1, why]`), `wGF.why` the last result's reason, and `wGF.highlight({ side, pos })` rings a player. Each entry of `G.drive.plays` carries its `msg` and `why`. `wGF.down`, `snap` and `step` are the tests' handle on one play.
+- `WGF` (`w42-gridiron.js`) is the drive or game on the field: `{ kind: 'drive' | 'game', mode, over, teams }` (`teams`: the two sides as the engine takes them, yours first). Not saved.
 
 ## Baseball ratings (w20b-ratings.js)
 
@@ -359,6 +371,8 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 
 ## The nine (w20c-nine.js)
 
+- `p.gf = { spd, str, hnd, arm, kck, tkl, lv, got }` on every player (football, `w43-gfseven.js`), 1 to 12, as `p.bd`. Plain JSON, saved with the player.
+- `WG.seven = { ids: [7 keys], cu: [call-ups], seq, off: { pos: key }, def: { pos: key }, add?, mine? }`: the football seven, a key being a roster id or a call-up's `cid` (`'g<n>'`). `off` and `def` give every position (`wGF.offPos`, `wGF.defPos`) a different one of the seven. Until `mine` is set (you changed a position), the coaches re-pick the positions whenever the seven changes. `wSevenTeam()` is the seven as `wGF.start` and `wGF.game` take a team. `wGF.auto(roster)` is the coaches' pick for any seven, and a team sent with full `off`/`def` maps keeps them.
 - `WG.nine = { order: [{ id, pos }], cu: [call-ups], seq, add? }`. `order` is the batting order; `id` is a roster id (a number) or a call-up's `cid` (`'c<n>'`). Plain JSON, saved with `WG`.
 - A call-up is a `wMakePlayer` player (so it has `p.bd`) with `from: 'callup'` and a `cid` in place of an `id`. Call-ups play at `wNineTier()`, the roster's average level rounded down, and catch up when it rises. They are not on the roster and earn nothing.
 - `wNineSync()` keeps the nine whole: anyone who left is dropped, a position nobody holds gets a call-up, and players who joined since (`add`, set by the `wAddPlayer` wrapper) take a call-up's place, at their own position first. A player you sat out stays out.

@@ -1,0 +1,14 @@
+# Cinder Gridiron, the football engine (issue #9). Its parts, in load order. The Realm takes them inside a scope
+# (src/realm/gridiron/manifest.txt, through `scope wGF ...`), so none of their names reach the page.
+src/gf/parts/01-util.js
+src/gf/parts/02-rules.js
+src/gf/parts/03-figures.js
+src/gf/parts/04-teams.js
+src/gf/parts/05-plays.js
+src/gf/parts/06-live.js
+src/gf/parts/07-cpu.js
+src/gf/parts/08-drive.js
+src/gf/parts/09-draw.js
+src/gf/parts/10-game.js
+src/gf/parts/11-play.js
+src/gf/parts/12-playbook.js

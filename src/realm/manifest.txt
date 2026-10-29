@@ -36,6 +36,10 @@ src/realm/w19-journal.js
 
 # Brimstone Diamond, the baseball game, in its own scope (issue #4): src/realm/diamond/manifest.txt
 scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js
+# Cinder Gridiron, the football engine, in its own scope (issue #9): src/realm/gridiron/manifest.txt
+scope wGF src/realm/gridiron/manifest.txt src/realm/gridiron/exports.js
+# the engines, by id (W_ENGINES)
+src/realm/w19b-engines.js
 src/realm/w20-diamond.js
 src/realm/w20b-ratings.js
 src/realm/w20c-nine.js
@@ -64,3 +68,5 @@ src/realm/w38-soccer.js
 src/realm/w39-retire.js
 src/realm/w40-eggs.js
 src/realm/w41-prospects.js
+src/realm/w42-gridiron.js
+src/realm/w43-gfseven.js

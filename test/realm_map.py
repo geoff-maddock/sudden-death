@@ -15,8 +15,9 @@ def check(ok, what, detail=None):
     if not ok: FAILS.append(what)
     return ok
 
+# (a road event, like a pedlar flagging you down, has no close button: walk on from it)
 CLOSE_ALL = """(() => { for (let i = 0; i < 12 && !document.getElementById('modal').hidden; i++) {
-  const b = document.querySelector('#modalBox [data-close]'); if (!b) break; b.click(); } WG.cardOffer = null; })()"""
+  const b = document.querySelector('#modalBox [data-close], #wEvWalk, #wEvDone'); if (!b) break; b.click(); } WG.cardOffer = null; })()"""
 MAP_OPEN = "!document.getElementById('modal').hidden && !!document.getElementById('wMapCv')"
 
 async def main():
