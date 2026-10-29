@@ -21218,7 +21218,7 @@ function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); ret
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 /* Cinder Gridiron: the rules (issue #9, phases 0 and 1). Plain data and pure functions, no page: who has the ball, where it
-   is, the down, the yards to go and the score. Seven a side; the field, the plays and the clock come later.
+   is, the down, the yards to go and the score. Seven a side; the plays are in 05-plays.js and the game clock in 10-game.js.
    The ball is in yards from the offense's own goal line: 0 to 100. Reaching 100 is a touchdown; going back past 0 is
    a safety. Four downs to make the line to gain, ten yards on (or the goal line, if that is nearer): make it and it
    is first down again; miss on fourth down and the other side takes over where the ball is.
@@ -21871,10 +21871,12 @@ const GF_KIND = {
   skeleton: [6, 4, 5, 6, 8, 4], witch: [6, 3, 6, 8, 6, 3],
 };
 function gfRate(kind) { const k = GF_KIND[kind] || GF_KIND.goblin; return Object.fromEntries(GF_STATS.map((s, i) => [s, k[i]])); }
-// the two clubs a drive uses when the Realm doesn't send its own: a heavy home line and a fast visiting side
+// the two clubs a drive uses when the Realm doesn't send its own: a heavy home line, and a visiting side with two fast
+// catchers and a mixed line. They come out about even under the coaches (a side that is fast everywhere wins nearly
+// every game, so the exhibition doesn't use one)
 const GF_CLUBS = {
   home: { name: 'Cinderhold', short: 'CND', color: '#c8461e', light: '#ffd08a', kinds: ['kobold', 'minotaur', 'golem', 'ogre', 'dwarf', 'goblin', 'troll'] },
-  away: { name: 'Visitors', short: 'VIS', color: '#3f8a5a', light: '#e8f4c8', kinds: ['elf', 'werewolf', 'harpy', 'spider', 'wraith', 'vampire', 'gorgon'] },
+  away: { name: 'Visitors', short: 'VIS', color: '#3f8a5a', light: '#e8f4c8', kinds: ['harpy', 'elf', 'golem', 'zombie', 'troll', 'skeleton', 'goblin'] },
 };
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
 function gfTeam(t) {
@@ -21897,7 +21899,8 @@ function gfTeam(t) {
    Places are [x, y] in yards: x from the line of scrimmage (back is negative), y from the middle of the field.
    A play's set moves players from the usual formation (GF_OFF_SET): on a run the two receivers line up tight beside
    the line and block, so five block against the four defenders near the ball. Routes are waypoints from where the
-   receiver lines up. hot: under pressure the quarterback throws at once (the screen expects the rush). */
+   receiver lines up. hot: under pressure the quarterback throws at once (the screen expects the rush). stunt: the
+   rushers twist and loop, and shed their blocks that many times faster (the blitz). */
 const GF_OFF_SET = { QB: [-4.5, 0], RB: [-6.5, 1.5], C: [-1, 0], LG: [-1, -2.2], RG: [-1, 2.2], X: [-1, -12], Z: [-1, 12] };
 const GF_DEF_SET = { DT: [1, 0], DL: [1, -2.6], DR: [1, 2.6], LB: [5, 0], CL: [6, -12], CR: [6, 12], S: [13, 0] };
 const GF_PLAYS = {
@@ -21910,18 +21913,17 @@ const GF_PLAYS = {
     routes: { X: [[7, 0]], Z: [[7, 0]], RB: [[3.5, 7]] }, release: .7 },
 };
 const GF_DEFS = {
-  blitz: { n: 'Blitz', desc: 'The linebacker and the safety creep up, and five come after the quarterback; the corners play man.', rush: ['DT', 'DL', 'DR', 'LB', 'S'], man: { CL: 'X', CR: 'Z' },
-    set: { LB: [2, -1.4], S: [3, 1.6] } },
+  blitz: { n: 'Blitz', desc: 'The linebacker creeps up and four come after the quarterback on twists and stunts that beat blocks fast; the corners play man, and the safety stays deep.', rush: ['DT', 'DL', 'DR', 'LB'], man: { CL: 'X', CR: 'Z' },
+    zone: { S: [16, 0] }, set: { LB: [2, -1.4] }, stunt: 2.2 },
   zone: { n: 'Deep zone', desc: 'Three rush, and four drop deep to keep everything in front of them.', rush: ['DT', 'DL', 'DR'], zone: { LB: [8, 0], CL: [15, -11], CR: [15, 11], S: [22, 0] } },
   man: { n: 'Man to man', desc: 'Three rush, everyone else takes a man, and the safety stays deep.', rush: ['DT', 'DL', 'DR'], man: { CL: 'X', CR: 'Z', LB: 'RB' }, zone: { S: [15, 0] } },
 };
 // how each call tends to go against each defense (what test/realm_gridiron.py measures), told after the play: +1 a
 // good call, -1 a bad one; the rest are even
 const GF_EDGE = {
-  'run/blitz': [-1, 'Five rushers fill every gap at the line.'], 'run/zone': [1, 'Only three rush, and the zone sits deep: room to run.'],
-  'deep/blitz': [-1, 'The rush gets home before the long routes open.'], 'deep/man': [1, 'One on one down the field, and the safety alone deep.'],
-  'screen/blitz': [1, 'The rush runs past the back, and the blockers are out in front.'], 'screen/man': [-1, 'The linebacker is on the back.'],
-  'short/blitz': [1, 'The ball is out before the rush arrives.'],
+  'run/blitz': [-1, 'The linebacker blitzes into the gap the run wants.'], 'run/zone': [1, 'Only three rush, and the zone sits deep: room to run.'],
+  'deep/blitz': [-1, 'The stunts get home before the long routes open.'], 'deep/man': [1, 'One on one down the field, and the safety alone deep.'],
+  'screen/blitz': [1, 'The rush runs past the back, and the blockers are out in front.'],
 };
 const gfEdge = (oc, dc) => GF_EDGE[oc + '/' + dc] || [0, ''];
 const GF_OFF_IDS = Object.keys(GF_PLAYS), GF_DEF_IDS = Object.keys(GF_DEFS);
@@ -21935,16 +21937,20 @@ const gfDefSet = dc => Object.assign({}, GF_DEF_SET, (GF_DEFS[dc] || {}).set);
    - The quarterback hands off on a run. On a pass they drop back and throw at the call's time, or sooner under
      pressure (a hurried throw is less accurate), to the receiver with the most room, leading them.
    - A thrown ball is caught by hands, broken up or picked off by a defender who gets there first, or lands loose.
-   - A defender next to the ball carrier tries a tackle: their tackling against the carrier's strength and speed. A
-     missed one leaves them down for a moment and slows the carrier: a broken tackle.
+   - A defender within reach of the ball carrier tries a tackle: their tackling against the carrier's strength and
+     speed. One shrugged off up close leaves them down for a moment and slows the carrier: a broken tackle. A defender
+     alongside can dive, at worse odds the further it is, and a missed dive costs only a moment.
+   - Defenders chase on a pursuit angle: the soonest point they can meet the carrier.
+   - Speed counts, but less than its rating spread suggests (6.4 to 7.8 yards a second): a side fast everywhere
+     otherwise won nearly every game, whatever the calls (phase 2 measured it).
    - The carrier runs for the goal line and away from tacklers. The play ends at a tackle, a sack, an incompletion, an
      interception (no returns yet), out of bounds or a touchdown.
    L is the play, plain JSON (players by index, no references): { oc, dc, t, pl, id, did, ball, carrier, thrown,
    handed, done, broken }. Positions are yards from the line of scrimmage (x, downfield) and the middle (y). */
-// GF_READ: how long after the throw a defender breaks on the ball
-const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 10, GF_READ = .35;
+// GF_READ: how long after the throw a defender breaks on the ball; GF_REACH: how far a defender dives to tackle
+const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
-const gfSpeed = p => (4.6 + p.r.spd * .44) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+const gfSpeed = p => (6 + p.r.spd * .2) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
 
 function gfSnap(oc, dc) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
@@ -22030,7 +22036,7 @@ function gfAim(p) {
     return null;
   }
   // defense: once they have read the throw, the ones near where it comes down go for the ball
-  const qb = L.pl[L.id.QB], lead = q => { const t = clamp(hyp(q.x - p.x, q.y - p.y) / gfSpeed(p), 0, 1); return [q.x + q.vx * t, q.y + q.vy * t]; };
+  const qb = L.pl[L.id.QB], lead = q => gfIntercept(p, q);
   if (L.ball.st === 'air' && L.ball.bt > GF_READ) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
   // someone else has it: after a catch everyone chases; after a handoff the rush chases at once, the linebacker and
   // the man defenders read the run in under half a second, and the deep zone a beat later
@@ -22042,6 +22048,13 @@ function gfAim(p) {
     return r && rd < 7 ? [Math.max(r.x + 1.5, p.spot[0] - 3), lerp(p.spot[1], r.y, .7), 3.5] : p.spot;
   }
   return null;
+}
+// a pursuit angle: the soonest point (up to 3 seconds out) where p can meet q if q keeps running as it is; straight at
+// q when there is none
+function gfIntercept(p, q) {
+  const sp = gfSpeed(p);
+  for (let t = .1; t <= 3; t += .1) { const x = q.x + q.vx * t, y = q.y + q.vy * t; if (hyp(x - p.x, y - p.y) <= sp * t) return [x, y]; }
+  return [q.x + q.vx * .5, q.y + q.vy * .5];
 }
 // the carrier looks a few yards ahead for the lane with the fewest defenders in it (a blocked one is still a body in
 // the way), a little more willing to stay in the lane already taken, and keeps in from the sideline
@@ -22146,7 +22159,7 @@ function gfBlocks(dt) {
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;
     const near = c && hyp(c.x - d.x, c.y - d.y) < 1.2 ? 1.6 : 1;
-    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near;
+    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near * (d.job === 'rush' && GF_DEFS[L.dc].stunt || 1);
     if (R() < shed * dt) { o.eng = -1; d.eng = -1; o.stun = .45; gfEv('shed', d.n); }
   }
 }
@@ -22156,10 +22169,14 @@ function gfTackles() {
   if (L.ball.st !== 'held') return;
   const c = L.pl[L.carrier], sack = L.carrier === L.id.QB && !L.thrown && GF_PLAYS[L.oc].kind === 'pass';
   for (const d of L.pl) {
-    if (d.side !== 1 || d.eng >= 0 || d.stun > 0 || d.cd > 0 || hyp(d.x - c.x, d.y - c.y) > 1) continue;
+    const dd = hyp(d.x - c.x, d.y - c.y);
+    if (d.side !== 1 || d.eng >= 0 || d.stun > 0 || d.cd > 0 || dd > GF_REACH) continue;
     d.cd = .6;
-    const pt = clamp(.66 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0), .25, .93);
+    // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
+    const pt = clamp(.78 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35, .2, .93);
     if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n);
+    // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
+    if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);
   }
 }
@@ -22208,10 +22225,11 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
    (the result) → the next call. On fourth down the coach decides (07-cpu.js), and a kick is its own beat.
    mode 'watch': the coaches call both sides. mode 'call': you call the offense (gfCall), and the defense is the CPU's;
    on any down your call may be a punt or, in range (GF_FG_MAX), a field goal, and fourth down waits for you too.
+   In a full game (10-game.js) you call the defense too when the other side has the ball.
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
-const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6 };
+const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
 const GF_HOOK = { onOver: null, onPhase: null };
 let GD = null;
 
@@ -22222,26 +22240,32 @@ function gfStart(opts) {
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: o.mode === 'call' ? 'call' : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6 };
+  GD = { ph: 'call', t: 0, mode: o.mode === 'call' ? 'call' : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
 // (a play, 'punt', or 'fg' when it is in range)
+// (a play, 'punt', or 'fg' when it is in range; a defense when the other side has the ball)
 function gfCall(oc) {
   if (!GD || GD.ph !== 'call' || GD.mode !== 'call' || !gfCanCall(oc)) return false;
   GD.pick = oc; return true;
 }
-function gfCanCall(oc) { return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX); }
+const gfYours = () => GD.mode === 'call' && G.poss === GD.you;
+function gfCanCall(oc) {
+  if (GD.mode === 'call' && G.poss !== GD.you) return !!GF_DEFS[oc];
+  return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX);
+}
 function gfGo(ph) { GD.ph = ph; GD.t = 0; if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); } }
 
 function gfTick(dt) {
   if (!GD || GD.ph === 'over') return;
   GD.t += dt;
   if (GD.ph === 'call') {
-    if (GD.mode === 'watch' && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
+    const mine = gfYours();
+    if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode === 'call' && !GD.pick)) return;
-    if (GD.pick === 'punt' || GD.pick === 'fg') { GD.kick = GD.pick; GD.pick = null; return gfGo('kick'); }
-    GD.oc = GD.mode === 'call' ? GD.pick : gfCpuOffense(); GD.dc = gfCpuDefense(); GD.pick = null;
+    if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; return gfGo('kick'); }
+    GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode === 'call' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
     return gfGo('pre');
   }
   if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc); GD.acc = 0; gfGo('live'); } return; }
@@ -22252,8 +22276,13 @@ function gfTick(dt) {
     return;
   }
   if (GD.ph === 'kick') { if (GD.t >= GF_PACE.kick) { gfKick(); gfGo('post'); } return; }
+  if (GD.ph === 'kickoff') { if (GD.t >= GF_PACE.kick) { gfKickoff(); gfGo('post'); } return; }
+  if (GD.ph === 'half') { if (GD.t >= GF_PACE.half) gfKickoffTo(GD.next); return; }
   if (GD.ph === 'post' && GD.t >= (GD.mode === 'call' ? GF_PACE.postCall : GF_PACE.post)) {
-    if (G.drive.end) { gfGo('over'); if (GF_HOOK.onOver) try { GF_HOOK.onOver(gfSummary()); } catch (e) { console.error(e); } }
+    // in a game the clock running out ends the drive on the field, and the game goes on to the next beat
+    if (GD.game && G.clock <= 0 && !G.drive.end && G.drive.plays.length) G.drive.end = 'clock';
+    if (G.drive.end && GD.game && gfGameNext()) return;
+    if (G.drive.end) { gfGo('over'); if (GF_HOOK.onOver) try { GF_HOOK.onOver(GD.game ? gfGameSummary() : gfSummary()); } catch (e) { console.error(e); } }
     else { GD.kick = null; gfGo('call'); }
   }
 }
@@ -22266,7 +22295,7 @@ function gfResult(r) {
   GD.why = gfWhy(r);
   if (r.what === 'int') {
     G.ball = clamp(G.ball + r.x, 1, 99); gfTurnover(); G.drive.end = 'int';
-    GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; return;
+    GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); return;
   }
   G.drive.yards += r.gain;
   const s = gfSpot(r.gain), yd = n => `${Math.abs(n)} yard${Math.abs(n) === 1 ? '' : 's'}`;
@@ -22277,8 +22306,9 @@ function gfResult(r) {
   if (s === 'first') GD.msg += ' First down.';
   if (s === 'safety') { GD.msg = `Safety: ${r.who} is tackled in the end zone.`; G.drive.end = 'safety'; }
   if (s === 'turnover') { GD.msg += ' Turnover on downs.'; G.drive.end = 'downs'; }
-  if (s === 'td') G.drive.end = 'td';
+  if (s === 'td') { G.drive.end = 'td'; GD.msg += gfExtraPoint(); }
   e.msg = GD.msg; e.why = GD.why;
+  gfRunClock(r.what, L ? L.t : 5);
 }
 // why it went that way: the play's story from its events, then how the calls matched up
 function gfWhy(r) {
@@ -22289,7 +22319,8 @@ function gfWhy(r) {
   const br = L ? L.broken : 0;
   if (br) out.push(`${br} broken tackle${br > 1 ? 's' : ''}.`);
   const [g, why] = gfEdge(GD.oc, GD.dc);
-  out.push(g > 0 ? `Good call against ${GF_DEFS[GD.dc].n}: ${why}` : g < 0 ? `Bad matchup against ${GF_DEFS[GD.dc].n}: ${why}` : `${P.n} against ${GF_DEFS[GD.dc].n} is an even matchup.`);
+  const dn = GF_DEFS[GD.dc].n;
+  out.push(g > 0 ? `${P.n} beats ${dn}: ${why}` : g < 0 ? `${dn} beats ${P.n}: ${why}` : `${P.n} against ${dn} is an even matchup.`);
   return out.join(' ');
 }
 function gfKick() {
@@ -22305,6 +22336,7 @@ function gfKick() {
     GD.why = `The punt gives the ball away, but a long way from your goal line.`;
   }
   G.drive.plays.push({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why });
+  gfRunClock(G.drive.end, 5);
 }
 function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name) }; }
 // a whole drive at once, CPU against CPU, through the same flow
@@ -22332,7 +22364,7 @@ function gfSpotName(b) { return b < 50 ? 'own ' + b : b === 50 ? 'midfield' : 't
 function gfDraw(c) {
   if (!G || !GD) { c.fillStyle = '#0b0907'; c.fillRect(0, 0, 960, 600); return; }
   // the camera: on the ball in a play, a little ahead of the line otherwise
-  const want = L && GD.ph !== 'call' && GD.ph !== 'pre' ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
+  const want = L && (GD.ph === 'live' || GD.ph === 'post') ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
   GD.cam = lerp(GD.cam, clamp(want, 18, 82), .08);
   gfDrawField(c);
   gfDrawPlayers(c);
@@ -22379,7 +22411,7 @@ function gfDrawField(c) {
 }
 function gfDrawPlayers(c) {
   const list = [];
-  if (L && GD.ph !== 'call' && GD.ph !== 'pre') L.pl.forEach((p, i) => list.push({ p, i, x: p.x, y: p.y, mv: hyp(p.vx, p.vy) > .6 }));
+  if (L && (GD.ph === 'live' || GD.ph === 'post')) L.pl.forEach((p, i) => list.push({ p, i, x: p.x, y: p.y, mv: hyp(p.vx, p.vy) > .6 }));
   else {
     // between plays: both sides lined up at the ball
     let i = 0;
@@ -22398,9 +22430,9 @@ function gfDrawPlayers(c) {
     if (o.i === carrier) { c.strokeStyle = 'rgba(255,181,71,.9)'; c.lineWidth = 2; c.beginPath(); c.ellipse(o.x, o.y, 15, 5.5, 0, 0, Math.PI * 2); c.stroke(); }
     const throwK = L && GD.ph === 'live' && p.pos === 'QB' && p.side === 0 && GF_PLAYS[L.oc].kind === 'pass' ? clamp((L.t - GF_PLAYS[L.oc].throwAt + .35) / .35, 0, 1) : null;
     drawFig(c, p.kind, o.x, o.y, 44, T, { num: p.num, run: o.mv ? GFT.t * 16 + o.i : 0, flip, throwK: throwK != null && throwK < 1 ? throwK : null, alpha: p.stun > 0 ? .6 : undefined });
-    if (!L || GD.ph === 'call' || GD.ph === 'pre') txt(c, p.pos, o.x, o.y + 14, '700 11px "Alegreya Sans", system-ui, sans-serif', hl ? '#7fd4ff' : p.side ? '#ffc9b8' : '#fff3d6', 'center');
+    if (!L || GD.ph !== 'live' && GD.ph !== 'post') txt(c, p.pos, o.x, o.y + 14, '700 11px "Alegreya Sans", system-ui, sans-serif', hl ? '#7fd4ff' : p.side ? '#ffc9b8' : '#fff3d6', 'center');
   }
-  if (!L || GD.ph === 'call' || GD.ph === 'pre') return gfDrawBall(c, gfScr(gfAbs(0, 0)[0], 0), 0);
+  if (!L || GD.ph !== 'live' && GD.ph !== 'post') return gfDrawBall(c, gfScr(gfAbs(0, 0)[0], 0), 0);
   // blocks: a spark between each pair, red when the defender is winning
   for (const p of L.pl) if (p.side === 1 && p.eng >= 0) {
     const o = L.pl[p.eng], [ax, ay] = gfAbs((p.x + o.x) / 2, (p.y + o.y) / 2), s = gfScr(ax, ay), win = p.push < -.5;
@@ -22435,8 +22467,12 @@ function gfDrawHud(c) {
   let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   if (GD.ph === 'call') sub = GD.mode !== 'call' ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
   if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}  vs  ${GF_DEFS[GD.dc].n}`;
+  if (GD.game) mid += `  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`;
+  if (GD.ph === 'call' && GD.mode === 'call' && G.poss !== GD.you) sub = 'Your call: pick a defense';
   if (GD.ph === 'kick') sub = GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt';
-  if (GD.ph === 'post' || GD.ph === 'over') { mid = GD.msg; sub = GD.ph === 'over' ? gfEndLine() : ''; }
+  if (GD.ph === 'kickoff') { mid = `Kickoff  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`; sub = `${G.teams[1 - GD.kickoff].name} kick to ${G.teams[GD.kickoff].name}`; }
+  if (GD.ph === 'half') { mid = GD.msg; sub = ''; }
+  if (GD.ph === 'post' || GD.ph === 'over') { mid = GD.msg; sub = GD.ph === 'over' ? (GD.game ? gfFinalLine() : gfEndLine()) : ''; }
   txt(c, mid, 480, 27, F(18, 800), '#f3ead6', 'center');
   if (sub) txt(c, sub, 480, 49, F(15, 600), GD.ph === 'pre' ? '#ffd08a' : '#b9b0a0', 'center');
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
@@ -22450,8 +22486,86 @@ function gfWrap(c, s, font, w) {
   for (const word of s.split(' ')) { const t = out.length ? out[out.length - 1] + ' ' + word : word; if (out.length && c.measureText(t).width <= w) out[out.length - 1] = t; else out.push(word); }
   c.restore(); return out;
 }
-const GF_END = { td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
+const GF_END = { clock: 'The clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
 function gfEndLine() { const d = G.drive; return `Drive over: ${GF_END[d.end]}. ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards.`; }
+/* Cinder Gridiron: a full game (issue #9, phase 2). Two halves on a game clock, drive after drive, both sides.
+   The clock (GF_RULES.half game seconds a half) runs through each play and a runoff between plays (GF_RULES.runoff),
+   and stops on an incompletion, out of bounds, a score or a change of possession, as in real football. A game takes
+   6 to 8 minutes to watch (question 1). A half ends when its clock runs out after a play; the drive on the field ends
+   there. After a touchdown the extra point is kicked at once; after any score the side that scored kicks off, and the
+   other side returns it. The second half opens with a kickoff the other way. A tie at the end goes to Sudden Death: a
+   short extra period, and the first score wins it. Still tied when that runs out, the game is a tie.
+   In 'call' mode you call your side's plays on offense and its defense when the other side has the ball.
+   G gains { half (1, 2, 3 for Sudden Death), clock, recv (who took the opening kick), drives: [past drives] }. */
+const GF_GAME = { half: 360, runoff: 15, ot: 180, pat: .94 };
+const GF_HALF_NAME = ['', '1st half', '2nd half', 'Sudden Death'];
+
+function gfStartGame(opts) {
+  const o = opts || {};
+  gfStart(o);
+  Object.assign(G, { half: 1, clock: GF_GAME.half, recv: R() < .5 ? 0 : 1, drives: [] });
+  GD.game = true;
+  gfKickoffTo(G.recv);
+  return G;
+}
+// the clock after a play: the play's own time, and the runoff unless the clock stopped
+function gfRunClock(what, t) {
+  if (!GD || !GD.game) return;
+  const stop = ['inc', 'out', 'td', 'int', 'safety'].includes(what) || G.drive.end;
+  G.clock = Math.max(0, G.clock - Math.round(t + (stop ? 0 : GF_GAME.runoff)));
+}
+function gfClockText() { const s = Math.max(0, Math.ceil(G.clock)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+// after a touchdown, the extra point
+function gfExtraPoint() {
+  if (!GD.game) return '';
+  const k = G.teams[1 - G.poss].roster[G.teams[1 - G.poss].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
+  if (good) G.score[1 - G.poss]++;
+  return good ? ' Extra point good.' : ' The extra point is no good.';
+}
+// side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
+function gfKickoffTo(side) { G.poss = side; GD.kickoff = side; gfGo('kickoff'); }
+function gfKickoff() {
+  const side = GD.kickoff, T = G.teams[side], ret = T.roster.reduce((b, p) => p.r.spd > b.r.spd ? p : b, T.roster[0]);
+  G.poss = side; G.ball = Math.round(clamp(16 + ret.r.spd * 1.3 + gauss() * 6, 8, 45)); gfFirstDown(); GD.kickoff = null;
+  GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
+  gfNewDrive();
+}
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; }
+/* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
+   a kickoff after a score or a new half, halftime, or the next drive the other way. */
+function gfGameNext() {
+  const d = G.drive, scored = ['td', 'fg', 'safety'].includes(d.end);
+  G.drives.push(d);
+  // Sudden Death: the first score wins
+  if (G.half === 3 && scored) return false;
+  if (G.clock <= 0) {
+    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
+    if (G.score[0] !== G.score[1] || G.half === 3) return false;
+    G.half = 3; G.clock = GF_GAME.ot; GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
+  }
+  // after a score the other side receives: the side that scored kicks off, and after a safety the side scored on
+  // (the drive's offense either way); otherwise the ball has already changed hands
+  if (scored) { gfKickoffTo(1 - d.side); return true; }
+  gfNewDrive(); gfGo('call'); return true;
+}
+function gfScoreLine() { return G.teams.map((t, s) => `${t.name} ${G.score[s]}`).join(', '); }
+function gfFinalLine() {
+  const [a, b] = G.score;
+  return a === b ? `Final: a tie, ${a} to ${b}.` : `Final: ${G.teams[a > b ? 0 : 1].name} win ${Math.max(a, b)} to ${Math.min(a, b)}${G.half === 3 ? ' in Sudden Death' : ''}.`;
+}
+function gfGameSummary() {
+  const all = G.drives.flatMap(d => d.plays);
+  return { score: G.score.slice(), teams: G.teams.map(t => t.name), drives: G.drives.length, plays: all.length, half: G.half,
+    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}) };
+}
+// a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
+function gfSimGame(opts) {
+  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = null;
+  let secs = 0;
+  try { gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; } }
+  finally { Object.assign(GF_HOOK, hooks); }
+  return Object.assign(gfGameSummary(), { secs: Math.round(secs) });
+}
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
    engine's parts don't touch the page; this file is the only one that does. */
@@ -22487,15 +22601,16 @@ function gfHide() { GFP.host.hidden = true; GFP.on = false; cancelAnimationFrame
    box, audio, onQuit and onSnap come with the full game (phases 2 and 5). */
 return {
   newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES),
-  start: gfStart, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
+  start: gfStart, game: gfStartGame, simGame: gfSimGame, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
   get on() { return GFP.on; }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
-  get play() { return L; }, pause: on => { GFP.paused = !!on; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; },
+  get play() { return L; }, pause: on => { GFP.paused = !!on; }, setMode: m => { if (GD) { GD.mode = m === 'call' ? 'call' : 'watch'; GD.pick = null; } }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
   canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth() } : null,
   // who is on the field: the drive's offense by position, and the other side's defense
   lineup: () => G ? [['off', G.drive.side], ['def', 1 - G.drive.side]].map(([m, s]) => ({ side: m === 'off' ? 0 : 1, team: G.teams[s].name, color: G.teams[s].color,
     players: Object.entries(G.teams[s][m]).map(([pos, i]) => Object.assign({ pos }, G.teams[s].roster[i], { r: Object.assign({}, G.teams[s].roster[i].r) })),
     kicker: G.teams[s].roster[G.teams[s].kicker].n })) : [],
+  get isGame() { return !!GD && GD.game; }, get yourBall() { return !!GD && G.poss === GD.you; }, clock: () => G && GD && GD.game ? { half: G.half, text: gfClockText(), name: GF_HALF_NAME[G.half] } : null,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   plays: Object.fromEntries(GF_OFF_IDS.map(k => [k, { n: GF_PLAYS[k].n, desc: GF_PLAYS[k].desc }])),
@@ -26924,12 +27039,13 @@ renderHelp = function () {
    src/realm/gridiron/: a canvas in #v-gridiron, and none of its names reach ours). This part gives it a view beside the
    world, a bar above the field, and a way back.
    Phase 1 plays one drive: the Cinderhold Football Club has the ball on its own 25 against a visiting side. Ask Clinker
-   Dunn at the Ash Bowl for a DRIVE. The coaches call both sides, or you call Cinderhold's plays from the bar (the
+   Dunn at the Ash Bowl for a DRIVE. Phase 2 plays a whole game, GRIDIRON (10-game.js): two halves on the clock, and in Call the
+   plays you pick your side's defense too when the other side has the ball. The coaches call both sides, or you call Cinderhold's plays from the bar (the
    defense stays the coaches'; you may punt or kick on any down, and fourth down is yours). Under the field: who is on
    it with their ratings (hover a row to find them), the drive so far, play by play with why each went the way it did,
    and how it works. Nothing is won or lost, and nothing is saved. Games at the Bowl come in phase 5.
    Wraps: showView (wW42ShowView: the bar), openPause (wW42OpenPause: not on the gridiron), wRunAct (wW42RunAct: 'drive'),
-   renderHelp (wW42RenderHelp: #wHelpGridiron). */
+   renderHelp (wW42RenderHelp: #wHelpGridiron). Leaving or starting over mid-game asks first (wGridForfeit). */
 
 // a position's name and the ratings that matter most there
 const W_GRID_POS = {
@@ -26941,28 +27057,30 @@ const W_GRID_STAT = { spd: ['Spd', 'Speed'], str: ['Str', 'Strength: blocking, s
   arm: ['Arm', 'Arm: how far and how true the throw'], kck: ['Kck', 'Kicking'], tkl: ['Tkl', 'Tackling'] };
 const W_GRID = {
   home: { kinds: ['kobold', 'minotaur', 'golem', 'ogre', 'dwarf', 'goblin', 'troll'], color: '#c8461e', light: '#ffd08a', short: 'CFC' },
-  away: { city: 'mossgate', kinds: ['elf', 'werewolf', 'harpy', 'spider', 'wraith', 'vampire', 'gorgon'], color: '#3f8a5a', light: '#e8f4c8', short: 'MFC' },
+  away: { city: 'mossgate', kinds: ['harpy', 'elf', 'golem', 'zombie', 'troll', 'skeleton', 'goblin'], color: '#3f8a5a', light: '#e8f4c8', short: 'MFC' },
 };
 // the drive on the field: plain data, never saved
 let WGF = null;
 
 $('v-gridiron').insertAdjacentHTML('beforebegin', `<div id="wGridBar" class="wdbar" hidden>
   <b id="wGridTitle">A drive at the Ash Bowl</b><span id="wGridNote" class="hint"></span>
+  <span id="wGridDefs" hidden>${Object.entries(wGF.defs).map(([k, d]) => `<button class="ghost" data-gdef="${k}" title="${esc(d.desc)}">${esc(d.n)}</button>`).join('')}</span>
   <span id="wGridCalls">${Object.entries(wGF.plays).map(([k, p]) => `<button class="ghost" data-gcall="${k}" title="${esc(p.desc + ' ' + wGridEdgeLine(k))}">${esc(p.n)}</button>`).join('')}<button class="ghost" data-gkick="punt" title="Kick it away: the other side gets the ball far from your goal line.">Punt</button><button class="ghost" data-gkick="fg"></button></span>
-  <button class="ghost" id="wGridMode"></button><button class="ghost" id="wGridAgain">Another drive</button>
+  <button class="ghost" id="wGridMode"></button><button class="ghost" id="wGridAgain" title="Throw this one away and start again.">Start over</button>
   <button class="ghost" id="wGridBack">Back to the world</button></div>`);
 $('wGridBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.gcall || b.dataset.gkick) { wGF.call(b.dataset.gcall || b.dataset.gkick); wGridBar(); }
-  else if (b.id === 'wGridMode') { WGF.mode = WGF.mode === 'call' ? 'watch' : 'call'; wGridironDrive({ mode: WGF.mode }); }
-  else if (b.id === 'wGridAgain') wGridironDrive({ mode: WGF.mode });
-  else if (b.id === 'wGridBack') wLeaveGridiron();
+  if (b.dataset.gcall || b.dataset.gkick || b.dataset.gdef) { wGF.call(b.dataset.gcall || b.dataset.gkick || b.dataset.gdef); wGridBar(); }
+  // switching who calls it doesn't restart: the drive (or the game) goes on, or a new one starts once it is over
+  else if (b.id === 'wGridMode') { WGF.mode = WGF.mode === 'call' ? 'watch' : 'call'; if (WGF.over) (WGF.kind === 'game' ? wGridironGame : wGridironDrive)({ mode: WGF.mode }); else { wGF.setMode(WGF.mode); wGridBar(); } }
+  else if (b.id === 'wGridAgain') wGridForfeit('Start over?', () => (WGF.kind === 'game' ? wGridironGame : wGridironDrive)({ mode: WGF.mode }), 'Start over');
+  else if (b.id === 'wGridBack') wGridForfeit('Forfeit the game?', wLeaveGridiron, 'Forfeit and leave');
 });
 
 // under the field: who is on it, the drive so far, and how it works
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
-  <section><h4>This drive</h4><ol id="wGridLog" class="wglog"></ol></section>
+  <section><h4 id="wGridLogH">This drive</h4><ol id="wGridLog" class="wglog"></ol></section>
   <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
@@ -26975,12 +27093,14 @@ function wGridEdgeLine(oc) {
 }
 function wGridHowHTML() {
   const li = (n, d, x) => `<li><b>${esc(n)}</b>: ${esc(d)}${x ? ` <i>${esc(x)}</i>` : ''}</li>`;
-  return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
+  return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points, and the extra point makes 7). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
+  <p class="hint"><b>A game</b> is two halves on the clock. The clock runs through each play and between plays, and stops on an incompletion, out of bounds, a score or a change of possession. After a score the side that scored kicks off. Tied at the end, it goes to <b>Sudden Death</b>: the first score wins.</p>
   <p class="hint"><b>Your calls.</b> Pick a play each down; the other coach picks a defense at the same moment, and you see both at the snap.</p>
+  <p class="hint"><b>The bar.</b> <b>Take over</b> lets you call your side's plays from the bar; <b>Hand back</b> gives them to the coaches again. Either way the game goes on. <b>Start over</b> begins again, and <b>Back to the world</b> leaves; in the middle of a game both ask first, because leaving forfeits it.</p>
   <ul class="wghow">${Object.keys(wGF.plays).map(k => li(wGF.plays[k].n, wGF.plays[k].desc, wGridEdgeLine(k))).join('')}
   ${li('Punt', 'Kick it away on any down. The drive ends, but the other side starts far from your goal line.')}
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
-  <p class="hint"><b>Their defenses.</b></p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
+  <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
   <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, and <b>This drive</b> keeps every play.</p>
   <p class="hint"><b>The ratings</b>, 1 to 10: ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
@@ -26995,39 +27115,60 @@ function wGridLineup() {
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
 function wGridLog() {
   const G = wGF.G; if (!G || !G.drive) return '';
-  const pl = G.drive.plays;
-  if (!pl.length) return '<li class="hint">No plays yet.</li>';
-  return pl.map(e => { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
-    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0];
-    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span></li>`; }).join('');
+  const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
+  if (!drives.some(d => d.plays.length)) return '<li class="hint">No plays yet.</li>';
+  return drives.map(d => (game && d.plays.length ? `<li class="wghead"><b>${esc(G.teams[d.side].name)}</b> · ${['', '1st half', '2nd half', 'Sudden Death'][d.half] || ''}${d.end ? ` · ${esc(W_GRID_END[d.end] || d.end)}, ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards` : ''}</li>` : '')
+    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('');
+}
+const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
+// a play in the log, marked green when it went your side's way and red when it didn't
+function wGridLogLine(e, side) {
+  { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
+    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
+    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span></li>`; }
 }
 function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
   return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.football} Club` }, A)];
 }
-/* one drive on the field. opts: { mode: 'watch' | 'call', seed } */
-function wGridironDrive(opts) {
-  const o = Object.assign({ mode: (WGF && WGF.mode) || 'watch' }, opts || {});
-  WGF = { mode: o.mode, over: null };
-  wGF.start({ teams: wGridTeams(), mode: o.mode, seed: o.seed });
+/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call', seed } */
+function wGridironDrive(opts) { return wGridStart('drive', opts); }
+function wGridironGame(opts) { return wGridStart('game', opts); }
+function wGridStart(kind, opts) {
+  const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
+  WGF = { kind, mode: o.mode, over: null };
+  wGF[kind === 'game' ? 'game' : 'start']({ teams: wGridTeams(), mode: o.mode, seed: o.seed });
+  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
+  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
   showView('gridiron');
   wGridBar();
 }
 function wGridBar() {
   if (!WGF) return;
-  const call = WGF.mode === 'call', yours = call && wGF.phase === 'call';
-  $('wGridCalls').hidden = !call;
+  const call = WGF.mode === 'call', yours = call && wGF.phase === 'call', off = wGF.yourBall;
+  $('wGridCalls').hidden = !call || !off; $('wGridDefs').hidden = !call || off;
+  for (const b of $('wGridDefs').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gdef);
   for (const b of $('wGridCalls').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gcall || b.dataset.gkick);
   const k = wGF.kick(), fg = $('wGridCalls').querySelector('[data-gkick="fg"]');
   if (k) { fg.textContent = k.inRange ? `Field goal (${k.dist} yd, ${Math.round(k.chance * 100)}%)` : 'Field goal'; fg.title = k.inRange ? 'Kick it through the posts for 3 points.' : 'Too far out: get inside about 62 yards first.'; }
   const fourth = wGF.G && wGF.G.down === 4;
-  $('wGridMode').textContent = call ? 'Let the coaches call it' : 'Call the plays';
-  $('wGridNote').textContent = WGF.over ? 'The drive is over.'
+  $('wGridMode').textContent = call ? 'You call it ▸ Hand back' : 'Coaches call it ▸ Take over';
+  $('wGridMode').title = call ? 'You pick the plays from the bar. Click to let the coaches call them; the game goes on.' : 'The coaches pick every play. Click to call your side\'s plays yourself; the game goes on.';
+  const ck = wGF.clock();
+  $('wGridNote').textContent = WGF.over ? (WGF.kind === 'game' ? 'The game is over.' : 'The drive is over.')
+    : yours && !off ? `Your call: pick a defense.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
     : yours && fourth ? `Fourth down: go for it, punt, or kick. The coach would ${k.coach === 'fg' ? 'kick the field goal' : k.coach === 'go' ? 'go for it' : 'punt'}.`
-    : yours ? 'Your call: pick a play, or kick.' : call ? 'You call the offense; the coaches call the defense.' : 'The coaches call both sides.';
+    : yours ? `Your call: pick a play, or kick.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}` : call ? (WGF.kind === 'game' ? 'You call your side\'s plays, on offense and on defense.' : 'You call the offense; the coaches call the defense.') : 'The coaches call both sides.';
   $('wGridLineup').innerHTML = wGridLineup();
   $('wGridLog').innerHTML = wGridLog();
   $('wGridLog').scrollTop = $('wGridLog').scrollHeight;
+}
+// leaving or starting over in the middle of a game forfeits it: ask first, with the field paused while you decide.
+// A practice drive, or a game that's over, goes at once.
+function wGridForfeit(title, go, ok) {
+  if (!WGF || WGF.kind !== 'game' || WGF.over || !wGF.live) return go();
+  wGF.pause(true);
+  askConfirm(title, 'The game isn\'t over: leaving now forfeits it. Nothing is won or lost at the Ash Bowl yet, but the score is gone.', ok, () => { wGF.pause(false); go(); }, () => wGF.pause(false));
 }
 function wLeaveGridiron() {
   WGF = null;
@@ -27049,17 +27190,19 @@ openPause = function () { if (UI.view === 'gridiron') return; return wW42OpenPau
 // Clinker Dunn at the Ash Bowl puts on a drive
 (() => {
   const K = DB.chars.gk_bowl; if (!K) return;
-  K.topics.job.t += ' And come and see the new game on the grass: ask me for a DRIVE.';
+  K.topics.job.t += ' And come and see the new game on the grass: ask me for a DRIVE, or a whole game on the GRIDIRON.';
+  // (not GAME or FOOTBALL: those are the card-game match and how card-game football scores)
+  K.topics.gridiron = { t: 'Two halves on the clock, about seven minutes, and nothing riding on it. Call your side\'s plays on offense and its defense when they have the ball, or let the coaches have it.', act: 'ggame' };
   K.topics.drive = { t: 'Real football, seven a side and the same seven both ways. Our club has the ball on its own 25: four downs to make ten yards. Watch them go, or call the plays yourself, kicks and all. How it works is under the field.', act: 'drive' };
 })();
 const wW42RunAct = wRunAct;
-wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); return wW42RunAct.apply(this, arguments); };
+wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); if (act === 'ggame') return wGridironGame(); return wW42RunAct.apply(this, arguments); };
 
 const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();
   const g = $('wHelpGrounds'); if (!g || $('wHelpGridiron')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for a DRIVE and watch the Cinderhold Football Club try to score from its own 25, or call its plays yourself. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen and the short pass, and a deep zone gives up runs. After each play the bar says what happened and why. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club try to score from its own 25, or call its plays yourself. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
 };
 </script>
 </body></html>

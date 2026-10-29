@@ -5,16 +5,20 @@
    - The quarterback hands off on a run. On a pass they drop back and throw at the call's time, or sooner under
      pressure (a hurried throw is less accurate), to the receiver with the most room, leading them.
    - A thrown ball is caught by hands, broken up or picked off by a defender who gets there first, or lands loose.
-   - A defender next to the ball carrier tries a tackle: their tackling against the carrier's strength and speed. A
-     missed one leaves them down for a moment and slows the carrier: a broken tackle.
+   - A defender within reach of the ball carrier tries a tackle: their tackling against the carrier's strength and
+     speed. One shrugged off up close leaves them down for a moment and slows the carrier: a broken tackle. A defender
+     alongside can dive, at worse odds the further it is, and a missed dive costs only a moment.
+   - Defenders chase on a pursuit angle: the soonest point they can meet the carrier.
+   - Speed counts, but less than its rating spread suggests (6.4 to 7.8 yards a second): a side fast everywhere
+     otherwise won nearly every game, whatever the calls (phase 2 measured it).
    - The carrier runs for the goal line and away from tacklers. The play ends at a tackle, a sack, an incompletion, an
      interception (no returns yet), out of bounds or a touchdown.
    L is the play, plain JSON (players by index, no references): { oc, dc, t, pl, id, did, ball, carrier, thrown,
    handed, done, broken }. Positions are yards from the line of scrimmage (x, downfield) and the middle (y). */
-// GF_READ: how long after the throw a defender breaks on the ball
-const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 10, GF_READ = .35;
+// GF_READ: how long after the throw a defender breaks on the ball; GF_REACH: how far a defender dives to tackle
+const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
-const gfSpeed = p => (4.6 + p.r.spd * .44) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+const gfSpeed = p => (6 + p.r.spd * .2) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
 
 function gfSnap(oc, dc) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
@@ -100,7 +104,7 @@ function gfAim(p) {
     return null;
   }
   // defense: once they have read the throw, the ones near where it comes down go for the ball
-  const qb = L.pl[L.id.QB], lead = q => { const t = clamp(hyp(q.x - p.x, q.y - p.y) / gfSpeed(p), 0, 1); return [q.x + q.vx * t, q.y + q.vy * t]; };
+  const qb = L.pl[L.id.QB], lead = q => gfIntercept(p, q);
   if (L.ball.st === 'air' && L.ball.bt > GF_READ) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
   // someone else has it: after a catch everyone chases; after a handoff the rush chases at once, the linebacker and
   // the man defenders read the run in under half a second, and the deep zone a beat later
@@ -112,6 +116,13 @@ function gfAim(p) {
     return r && rd < 7 ? [Math.max(r.x + 1.5, p.spot[0] - 3), lerp(p.spot[1], r.y, .7), 3.5] : p.spot;
   }
   return null;
+}
+// a pursuit angle: the soonest point (up to 3 seconds out) where p can meet q if q keeps running as it is; straight at
+// q when there is none
+function gfIntercept(p, q) {
+  const sp = gfSpeed(p);
+  for (let t = .1; t <= 3; t += .1) { const x = q.x + q.vx * t, y = q.y + q.vy * t; if (hyp(x - p.x, y - p.y) <= sp * t) return [x, y]; }
+  return [q.x + q.vx * .5, q.y + q.vy * .5];
 }
 // the carrier looks a few yards ahead for the lane with the fewest defenders in it (a blocked one is still a body in
 // the way), a little more willing to stay in the lane already taken, and keeps in from the sideline
@@ -216,7 +227,7 @@ function gfBlocks(dt) {
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;
     const near = c && hyp(c.x - d.x, c.y - d.y) < 1.2 ? 1.6 : 1;
-    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near;
+    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near * (d.job === 'rush' && GF_DEFS[L.dc].stunt || 1);
     if (R() < shed * dt) { o.eng = -1; d.eng = -1; o.stun = .45; gfEv('shed', d.n); }
   }
 }
@@ -226,10 +237,14 @@ function gfTackles() {
   if (L.ball.st !== 'held') return;
   const c = L.pl[L.carrier], sack = L.carrier === L.id.QB && !L.thrown && GF_PLAYS[L.oc].kind === 'pass';
   for (const d of L.pl) {
-    if (d.side !== 1 || d.eng >= 0 || d.stun > 0 || d.cd > 0 || hyp(d.x - c.x, d.y - c.y) > 1) continue;
+    const dd = hyp(d.x - c.x, d.y - c.y);
+    if (d.side !== 1 || d.eng >= 0 || d.stun > 0 || d.cd > 0 || dd > GF_REACH) continue;
     d.cd = .6;
-    const pt = clamp(.66 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0), .25, .93);
+    // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
+    const pt = clamp(.78 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35, .2, .93);
     if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n);
+    // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
+    if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);
   }
 }

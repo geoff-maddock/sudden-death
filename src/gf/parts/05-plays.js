@@ -5,7 +5,8 @@
    Places are [x, y] in yards: x from the line of scrimmage (back is negative), y from the middle of the field.
    A play's set moves players from the usual formation (GF_OFF_SET): on a run the two receivers line up tight beside
    the line and block, so five block against the four defenders near the ball. Routes are waypoints from where the
-   receiver lines up. hot: under pressure the quarterback throws at once (the screen expects the rush). */
+   receiver lines up. hot: under pressure the quarterback throws at once (the screen expects the rush). stunt: the
+   rushers twist and loop, and shed their blocks that many times faster (the blitz). */
 const GF_OFF_SET = { QB: [-4.5, 0], RB: [-6.5, 1.5], C: [-1, 0], LG: [-1, -2.2], RG: [-1, 2.2], X: [-1, -12], Z: [-1, 12] };
 const GF_DEF_SET = { DT: [1, 0], DL: [1, -2.6], DR: [1, 2.6], LB: [5, 0], CL: [6, -12], CR: [6, 12], S: [13, 0] };
 const GF_PLAYS = {
@@ -18,18 +19,17 @@ const GF_PLAYS = {
     routes: { X: [[7, 0]], Z: [[7, 0]], RB: [[3.5, 7]] }, release: .7 },
 };
 const GF_DEFS = {
-  blitz: { n: 'Blitz', desc: 'The linebacker and the safety creep up, and five come after the quarterback; the corners play man.', rush: ['DT', 'DL', 'DR', 'LB', 'S'], man: { CL: 'X', CR: 'Z' },
-    set: { LB: [2, -1.4], S: [3, 1.6] } },
+  blitz: { n: 'Blitz', desc: 'The linebacker creeps up and four come after the quarterback on twists and stunts that beat blocks fast; the corners play man, and the safety stays deep.', rush: ['DT', 'DL', 'DR', 'LB'], man: { CL: 'X', CR: 'Z' },
+    zone: { S: [16, 0] }, set: { LB: [2, -1.4] }, stunt: 2.2 },
   zone: { n: 'Deep zone', desc: 'Three rush, and four drop deep to keep everything in front of them.', rush: ['DT', 'DL', 'DR'], zone: { LB: [8, 0], CL: [15, -11], CR: [15, 11], S: [22, 0] } },
   man: { n: 'Man to man', desc: 'Three rush, everyone else takes a man, and the safety stays deep.', rush: ['DT', 'DL', 'DR'], man: { CL: 'X', CR: 'Z', LB: 'RB' }, zone: { S: [15, 0] } },
 };
 // how each call tends to go against each defense (what test/realm_gridiron.py measures), told after the play: +1 a
 // good call, -1 a bad one; the rest are even
 const GF_EDGE = {
-  'run/blitz': [-1, 'Five rushers fill every gap at the line.'], 'run/zone': [1, 'Only three rush, and the zone sits deep: room to run.'],
-  'deep/blitz': [-1, 'The rush gets home before the long routes open.'], 'deep/man': [1, 'One on one down the field, and the safety alone deep.'],
-  'screen/blitz': [1, 'The rush runs past the back, and the blockers are out in front.'], 'screen/man': [-1, 'The linebacker is on the back.'],
-  'short/blitz': [1, 'The ball is out before the rush arrives.'],
+  'run/blitz': [-1, 'The linebacker blitzes into the gap the run wants.'], 'run/zone': [1, 'Only three rush, and the zone sits deep: room to run.'],
+  'deep/blitz': [-1, 'The stunts get home before the long routes open.'], 'deep/man': [1, 'One on one down the field, and the safety alone deep.'],
+  'screen/blitz': [1, 'The rush runs past the back, and the blockers are out in front.'],
 };
 const gfEdge = (oc, dc) => GF_EDGE[oc + '/' + dc] || [0, ''];
 const GF_OFF_IDS = Object.keys(GF_PLAYS), GF_DEF_IDS = Object.keys(GF_DEFS);

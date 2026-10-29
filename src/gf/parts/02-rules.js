@@ -1,5 +1,5 @@
 /* Cinder Gridiron: the rules (issue #9, phases 0 and 1). Plain data and pure functions, no page: who has the ball, where it
-   is, the down, the yards to go and the score. Seven a side; the field, the plays and the clock come later.
+   is, the down, the yards to go and the score. Seven a side; the plays are in 05-plays.js and the game clock in 10-game.js.
    The ball is in yards from the offense's own goal line: 0 to 100. Reaching 100 is a touchdown; going back past 0 is
    a safety. Four downs to make the line to gain, ten yards on (or the goal line, if that is nearer): make it and it
    is first down again; miss on fourth down and the other side takes over where the ball is.

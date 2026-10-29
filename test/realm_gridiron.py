@@ -95,10 +95,11 @@ async def main():
         check(ln['rows'] == 14 and ln['cells'] == 8 and ln['key'] >= 14 and 'four downs' in ln['how'] and 'Field goal' in ln['how'],
               'On the field lists both sides\' seven with their six ratings, and How it works is under the field', ln)
         # after the play: what happened and why, in the bar and in the drive's log
-        await pg.wait_for_function("(wGF.phase === 'call' || wGF.phase === 'over') && wGF.G.drive.plays.length >= 1", timeout=15000)
-        lg = await pg.evaluate("""(() => { const li = document.querySelectorAll('#wGridLog li'), e = wGF.G.drive.plays[0];
-          return { n: li.length, why: e.why, msg: e.msg, text: li[0].textContent }; })()""")
-        check(lg['n'] == 1 and ('matchup' in lg['why'] or 'call against' in lg['why']), 'each play says why it went that way, and This drive keeps it', lg)
+        # (switching to Call the plays goes on with the drive, so the coaches' plays before it are in the log too)
+        await pg.wait_for_function("(wGF.phase === 'call' || wGF.phase === 'over') && wGF.G.drive.plays.some(e => e.oc === 'screen')", timeout=15000)
+        lg = await pg.evaluate("""(() => { const li = document.querySelectorAll('#wGridLog li'), pl = wGF.G.drive.plays, e = pl[pl.length - 1];
+          return { n: li.length, plays: pl.length, why: e.why, msg: e.msg, text: li[li.length - 1].textContent }; })()""")
+        check(lg['n'] == lg['plays'] and ('beats' in lg['why'] or 'even matchup' in lg['why']), 'each play says why it went that way, and This drive keeps them all', lg)
         check(lg['msg'] and lg['msg'] in lg['text'] and 'Screen vs' in lg['text'], 'This drive shows the call, the result and why', lg)
         # a punt on any down: the drive ends with the punt
         if await pg.evaluate("wGF.phase === 'over'"):  # the screen went all the way (or was picked off): a fresh drive to punt from
@@ -124,7 +125,7 @@ async def main():
         check(fg['end'] in ('fg', 'miss') and '%' in fg['why'], 'the field goal is kicked when you call it, and the bar gives its chance', fg)
 
         # back to the world: the engine is parked
-        await pg.click('#wGridBack')
+        await pg.click('#wGridBack')  # a practice drive leaves without asking
         b = await pg.evaluate("({ view: UI.view, on: wGF.on, bar: document.getElementById('wGridBar').hidden, field: document.getElementById('v-gridiron').hidden })")
         check(b == {'view': 'world', 'on': False, 'bar': True, 'field': True}, 'Back to the world parks the gridiron', b)
         h = await pg.evaluate("(() => { renderHelp(); const e = document.getElementById('wHelpGridiron'); return e ? e.textContent : ''; })()")

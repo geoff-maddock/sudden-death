@@ -14,10 +14,12 @@ const GF_KIND = {
   skeleton: [6, 4, 5, 6, 8, 4], witch: [6, 3, 6, 8, 6, 3],
 };
 function gfRate(kind) { const k = GF_KIND[kind] || GF_KIND.goblin; return Object.fromEntries(GF_STATS.map((s, i) => [s, k[i]])); }
-// the two clubs a drive uses when the Realm doesn't send its own: a heavy home line and a fast visiting side
+// the two clubs a drive uses when the Realm doesn't send its own: a heavy home line, and a visiting side with two fast
+// catchers and a mixed line. They come out about even under the coaches (a side that is fast everywhere wins nearly
+// every game, so the exhibition doesn't use one)
 const GF_CLUBS = {
   home: { name: 'Cinderhold', short: 'CND', color: '#c8461e', light: '#ffd08a', kinds: ['kobold', 'minotaur', 'golem', 'ogre', 'dwarf', 'goblin', 'troll'] },
-  away: { name: 'Visitors', short: 'VIS', color: '#3f8a5a', light: '#e8f4c8', kinds: ['elf', 'werewolf', 'harpy', 'spider', 'wraith', 'vampire', 'gorgon'] },
+  away: { name: 'Visitors', short: 'VIS', color: '#3f8a5a', light: '#e8f4c8', kinds: ['harpy', 'elf', 'golem', 'zombie', 'troll', 'skeleton', 'goblin'] },
 };
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
 function gfTeam(t) {

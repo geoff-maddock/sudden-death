@@ -16,7 +16,7 @@ function gfSpotName(b) { return b < 50 ? 'own ' + b : b === 50 ? 'midfield' : 't
 function gfDraw(c) {
   if (!G || !GD) { c.fillStyle = '#0b0907'; c.fillRect(0, 0, 960, 600); return; }
   // the camera: on the ball in a play, a little ahead of the line otherwise
-  const want = L && GD.ph !== 'call' && GD.ph !== 'pre' ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
+  const want = L && (GD.ph === 'live' || GD.ph === 'post') ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
   GD.cam = lerp(GD.cam, clamp(want, 18, 82), .08);
   gfDrawField(c);
   gfDrawPlayers(c);
@@ -63,7 +63,7 @@ function gfDrawField(c) {
 }
 function gfDrawPlayers(c) {
   const list = [];
-  if (L && GD.ph !== 'call' && GD.ph !== 'pre') L.pl.forEach((p, i) => list.push({ p, i, x: p.x, y: p.y, mv: hyp(p.vx, p.vy) > .6 }));
+  if (L && (GD.ph === 'live' || GD.ph === 'post')) L.pl.forEach((p, i) => list.push({ p, i, x: p.x, y: p.y, mv: hyp(p.vx, p.vy) > .6 }));
   else {
     // between plays: both sides lined up at the ball
     let i = 0;
@@ -82,9 +82,9 @@ function gfDrawPlayers(c) {
     if (o.i === carrier) { c.strokeStyle = 'rgba(255,181,71,.9)'; c.lineWidth = 2; c.beginPath(); c.ellipse(o.x, o.y, 15, 5.5, 0, 0, Math.PI * 2); c.stroke(); }
     const throwK = L && GD.ph === 'live' && p.pos === 'QB' && p.side === 0 && GF_PLAYS[L.oc].kind === 'pass' ? clamp((L.t - GF_PLAYS[L.oc].throwAt + .35) / .35, 0, 1) : null;
     drawFig(c, p.kind, o.x, o.y, 44, T, { num: p.num, run: o.mv ? GFT.t * 16 + o.i : 0, flip, throwK: throwK != null && throwK < 1 ? throwK : null, alpha: p.stun > 0 ? .6 : undefined });
-    if (!L || GD.ph === 'call' || GD.ph === 'pre') txt(c, p.pos, o.x, o.y + 14, '700 11px "Alegreya Sans", system-ui, sans-serif', hl ? '#7fd4ff' : p.side ? '#ffc9b8' : '#fff3d6', 'center');
+    if (!L || GD.ph !== 'live' && GD.ph !== 'post') txt(c, p.pos, o.x, o.y + 14, '700 11px "Alegreya Sans", system-ui, sans-serif', hl ? '#7fd4ff' : p.side ? '#ffc9b8' : '#fff3d6', 'center');
   }
-  if (!L || GD.ph === 'call' || GD.ph === 'pre') return gfDrawBall(c, gfScr(gfAbs(0, 0)[0], 0), 0);
+  if (!L || GD.ph !== 'live' && GD.ph !== 'post') return gfDrawBall(c, gfScr(gfAbs(0, 0)[0], 0), 0);
   // blocks: a spark between each pair, red when the defender is winning
   for (const p of L.pl) if (p.side === 1 && p.eng >= 0) {
     const o = L.pl[p.eng], [ax, ay] = gfAbs((p.x + o.x) / 2, (p.y + o.y) / 2), s = gfScr(ax, ay), win = p.push < -.5;
@@ -119,8 +119,12 @@ function gfDrawHud(c) {
   let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   if (GD.ph === 'call') sub = GD.mode !== 'call' ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
   if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}  vs  ${GF_DEFS[GD.dc].n}`;
+  if (GD.game) mid += `  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`;
+  if (GD.ph === 'call' && GD.mode === 'call' && G.poss !== GD.you) sub = 'Your call: pick a defense';
   if (GD.ph === 'kick') sub = GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt';
-  if (GD.ph === 'post' || GD.ph === 'over') { mid = GD.msg; sub = GD.ph === 'over' ? gfEndLine() : ''; }
+  if (GD.ph === 'kickoff') { mid = `Kickoff  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`; sub = `${G.teams[1 - GD.kickoff].name} kick to ${G.teams[GD.kickoff].name}`; }
+  if (GD.ph === 'half') { mid = GD.msg; sub = ''; }
+  if (GD.ph === 'post' || GD.ph === 'over') { mid = GD.msg; sub = GD.ph === 'over' ? (GD.game ? gfFinalLine() : gfEndLine()) : ''; }
   txt(c, mid, 480, 27, F(18, 800), '#f3ead6', 'center');
   if (sub) txt(c, sub, 480, 49, F(15, 600), GD.ph === 'pre' ? '#ffd08a' : '#b9b0a0', 'center');
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
@@ -134,5 +138,5 @@ function gfWrap(c, s, font, w) {
   for (const word of s.split(' ')) { const t = out.length ? out[out.length - 1] + ' ' + word : word; if (out.length && c.measureText(t).width <= w) out[out.length - 1] = t; else out.push(word); }
   c.restore(); return out;
 }
-const GF_END = { td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
+const GF_END = { clock: 'The clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
 function gfEndLine() { const d = G.drive; return `Drive over: ${GF_END[d.end]}. ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards.`; }

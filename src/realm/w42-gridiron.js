@@ -2,12 +2,13 @@
    src/realm/gridiron/: a canvas in #v-gridiron, and none of its names reach ours). This part gives it a view beside the
    world, a bar above the field, and a way back.
    Phase 1 plays one drive: the Cinderhold Football Club has the ball on its own 25 against a visiting side. Ask Clinker
-   Dunn at the Ash Bowl for a DRIVE. The coaches call both sides, or you call Cinderhold's plays from the bar (the
+   Dunn at the Ash Bowl for a DRIVE. Phase 2 plays a whole game, GRIDIRON (10-game.js): two halves on the clock, and in Call the
+   plays you pick your side's defense too when the other side has the ball. The coaches call both sides, or you call Cinderhold's plays from the bar (the
    defense stays the coaches'; you may punt or kick on any down, and fourth down is yours). Under the field: who is on
    it with their ratings (hover a row to find them), the drive so far, play by play with why each went the way it did,
    and how it works. Nothing is won or lost, and nothing is saved. Games at the Bowl come in phase 5.
    Wraps: showView (wW42ShowView: the bar), openPause (wW42OpenPause: not on the gridiron), wRunAct (wW42RunAct: 'drive'),
-   renderHelp (wW42RenderHelp: #wHelpGridiron). */
+   renderHelp (wW42RenderHelp: #wHelpGridiron). Leaving or starting over mid-game asks first (wGridForfeit). */
 
 // a position's name and the ratings that matter most there
 const W_GRID_POS = {
@@ -19,28 +20,30 @@ const W_GRID_STAT = { spd: ['Spd', 'Speed'], str: ['Str', 'Strength: blocking, s
   arm: ['Arm', 'Arm: how far and how true the throw'], kck: ['Kck', 'Kicking'], tkl: ['Tkl', 'Tackling'] };
 const W_GRID = {
   home: { kinds: ['kobold', 'minotaur', 'golem', 'ogre', 'dwarf', 'goblin', 'troll'], color: '#c8461e', light: '#ffd08a', short: 'CFC' },
-  away: { city: 'mossgate', kinds: ['elf', 'werewolf', 'harpy', 'spider', 'wraith', 'vampire', 'gorgon'], color: '#3f8a5a', light: '#e8f4c8', short: 'MFC' },
+  away: { city: 'mossgate', kinds: ['harpy', 'elf', 'golem', 'zombie', 'troll', 'skeleton', 'goblin'], color: '#3f8a5a', light: '#e8f4c8', short: 'MFC' },
 };
 // the drive on the field: plain data, never saved
 let WGF = null;
 
 $('v-gridiron').insertAdjacentHTML('beforebegin', `<div id="wGridBar" class="wdbar" hidden>
   <b id="wGridTitle">A drive at the Ash Bowl</b><span id="wGridNote" class="hint"></span>
+  <span id="wGridDefs" hidden>${Object.entries(wGF.defs).map(([k, d]) => `<button class="ghost" data-gdef="${k}" title="${esc(d.desc)}">${esc(d.n)}</button>`).join('')}</span>
   <span id="wGridCalls">${Object.entries(wGF.plays).map(([k, p]) => `<button class="ghost" data-gcall="${k}" title="${esc(p.desc + ' ' + wGridEdgeLine(k))}">${esc(p.n)}</button>`).join('')}<button class="ghost" data-gkick="punt" title="Kick it away: the other side gets the ball far from your goal line.">Punt</button><button class="ghost" data-gkick="fg"></button></span>
-  <button class="ghost" id="wGridMode"></button><button class="ghost" id="wGridAgain">Another drive</button>
+  <button class="ghost" id="wGridMode"></button><button class="ghost" id="wGridAgain" title="Throw this one away and start again.">Start over</button>
   <button class="ghost" id="wGridBack">Back to the world</button></div>`);
 $('wGridBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.gcall || b.dataset.gkick) { wGF.call(b.dataset.gcall || b.dataset.gkick); wGridBar(); }
-  else if (b.id === 'wGridMode') { WGF.mode = WGF.mode === 'call' ? 'watch' : 'call'; wGridironDrive({ mode: WGF.mode }); }
-  else if (b.id === 'wGridAgain') wGridironDrive({ mode: WGF.mode });
-  else if (b.id === 'wGridBack') wLeaveGridiron();
+  if (b.dataset.gcall || b.dataset.gkick || b.dataset.gdef) { wGF.call(b.dataset.gcall || b.dataset.gkick || b.dataset.gdef); wGridBar(); }
+  // switching who calls it doesn't restart: the drive (or the game) goes on, or a new one starts once it is over
+  else if (b.id === 'wGridMode') { WGF.mode = WGF.mode === 'call' ? 'watch' : 'call'; if (WGF.over) (WGF.kind === 'game' ? wGridironGame : wGridironDrive)({ mode: WGF.mode }); else { wGF.setMode(WGF.mode); wGridBar(); } }
+  else if (b.id === 'wGridAgain') wGridForfeit('Start over?', () => (WGF.kind === 'game' ? wGridironGame : wGridironDrive)({ mode: WGF.mode }), 'Start over');
+  else if (b.id === 'wGridBack') wGridForfeit('Forfeit the game?', wLeaveGridiron, 'Forfeit and leave');
 });
 
 // under the field: who is on it, the drive so far, and how it works
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
-  <section><h4>This drive</h4><ol id="wGridLog" class="wglog"></ol></section>
+  <section><h4 id="wGridLogH">This drive</h4><ol id="wGridLog" class="wglog"></ol></section>
   <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
@@ -53,12 +56,14 @@ function wGridEdgeLine(oc) {
 }
 function wGridHowHTML() {
   const li = (n, d, x) => `<li><b>${esc(n)}</b>: ${esc(d)}${x ? ` <i>${esc(x)}</i>` : ''}</li>`;
-  return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
+  return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points, and the extra point makes 7). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
+  <p class="hint"><b>A game</b> is two halves on the clock. The clock runs through each play and between plays, and stops on an incompletion, out of bounds, a score or a change of possession. After a score the side that scored kicks off. Tied at the end, it goes to <b>Sudden Death</b>: the first score wins.</p>
   <p class="hint"><b>Your calls.</b> Pick a play each down; the other coach picks a defense at the same moment, and you see both at the snap.</p>
+  <p class="hint"><b>The bar.</b> <b>Take over</b> lets you call your side's plays from the bar; <b>Hand back</b> gives them to the coaches again. Either way the game goes on. <b>Start over</b> begins again, and <b>Back to the world</b> leaves; in the middle of a game both ask first, because leaving forfeits it.</p>
   <ul class="wghow">${Object.keys(wGF.plays).map(k => li(wGF.plays[k].n, wGF.plays[k].desc, wGridEdgeLine(k))).join('')}
   ${li('Punt', 'Kick it away on any down. The drive ends, but the other side starts far from your goal line.')}
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
-  <p class="hint"><b>Their defenses.</b></p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
+  <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
   <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, and <b>This drive</b> keeps every play.</p>
   <p class="hint"><b>The ratings</b>, 1 to 10: ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
@@ -73,39 +78,60 @@ function wGridLineup() {
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
 function wGridLog() {
   const G = wGF.G; if (!G || !G.drive) return '';
-  const pl = G.drive.plays;
-  if (!pl.length) return '<li class="hint">No plays yet.</li>';
-  return pl.map(e => { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
-    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0];
-    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span></li>`; }).join('');
+  const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
+  if (!drives.some(d => d.plays.length)) return '<li class="hint">No plays yet.</li>';
+  return drives.map(d => (game && d.plays.length ? `<li class="wghead"><b>${esc(G.teams[d.side].name)}</b> · ${['', '1st half', '2nd half', 'Sudden Death'][d.half] || ''}${d.end ? ` · ${esc(W_GRID_END[d.end] || d.end)}, ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards` : ''}</li>` : '')
+    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('');
+}
+const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
+// a play in the log, marked green when it went your side's way and red when it didn't
+function wGridLogLine(e, side) {
+  { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
+    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
+    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span></li>`; }
 }
 function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
   return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.football} Club` }, A)];
 }
-/* one drive on the field. opts: { mode: 'watch' | 'call', seed } */
-function wGridironDrive(opts) {
-  const o = Object.assign({ mode: (WGF && WGF.mode) || 'watch' }, opts || {});
-  WGF = { mode: o.mode, over: null };
-  wGF.start({ teams: wGridTeams(), mode: o.mode, seed: o.seed });
+/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call', seed } */
+function wGridironDrive(opts) { return wGridStart('drive', opts); }
+function wGridironGame(opts) { return wGridStart('game', opts); }
+function wGridStart(kind, opts) {
+  const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
+  WGF = { kind, mode: o.mode, over: null };
+  wGF[kind === 'game' ? 'game' : 'start']({ teams: wGridTeams(), mode: o.mode, seed: o.seed });
+  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
+  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
   showView('gridiron');
   wGridBar();
 }
 function wGridBar() {
   if (!WGF) return;
-  const call = WGF.mode === 'call', yours = call && wGF.phase === 'call';
-  $('wGridCalls').hidden = !call;
+  const call = WGF.mode === 'call', yours = call && wGF.phase === 'call', off = wGF.yourBall;
+  $('wGridCalls').hidden = !call || !off; $('wGridDefs').hidden = !call || off;
+  for (const b of $('wGridDefs').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gdef);
   for (const b of $('wGridCalls').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gcall || b.dataset.gkick);
   const k = wGF.kick(), fg = $('wGridCalls').querySelector('[data-gkick="fg"]');
   if (k) { fg.textContent = k.inRange ? `Field goal (${k.dist} yd, ${Math.round(k.chance * 100)}%)` : 'Field goal'; fg.title = k.inRange ? 'Kick it through the posts for 3 points.' : 'Too far out: get inside about 62 yards first.'; }
   const fourth = wGF.G && wGF.G.down === 4;
-  $('wGridMode').textContent = call ? 'Let the coaches call it' : 'Call the plays';
-  $('wGridNote').textContent = WGF.over ? 'The drive is over.'
+  $('wGridMode').textContent = call ? 'You call it ▸ Hand back' : 'Coaches call it ▸ Take over';
+  $('wGridMode').title = call ? 'You pick the plays from the bar. Click to let the coaches call them; the game goes on.' : 'The coaches pick every play. Click to call your side\'s plays yourself; the game goes on.';
+  const ck = wGF.clock();
+  $('wGridNote').textContent = WGF.over ? (WGF.kind === 'game' ? 'The game is over.' : 'The drive is over.')
+    : yours && !off ? `Your call: pick a defense.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
     : yours && fourth ? `Fourth down: go for it, punt, or kick. The coach would ${k.coach === 'fg' ? 'kick the field goal' : k.coach === 'go' ? 'go for it' : 'punt'}.`
-    : yours ? 'Your call: pick a play, or kick.' : call ? 'You call the offense; the coaches call the defense.' : 'The coaches call both sides.';
+    : yours ? `Your call: pick a play, or kick.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}` : call ? (WGF.kind === 'game' ? 'You call your side\'s plays, on offense and on defense.' : 'You call the offense; the coaches call the defense.') : 'The coaches call both sides.';
   $('wGridLineup').innerHTML = wGridLineup();
   $('wGridLog').innerHTML = wGridLog();
   $('wGridLog').scrollTop = $('wGridLog').scrollHeight;
+}
+// leaving or starting over in the middle of a game forfeits it: ask first, with the field paused while you decide.
+// A practice drive, or a game that's over, goes at once.
+function wGridForfeit(title, go, ok) {
+  if (!WGF || WGF.kind !== 'game' || WGF.over || !wGF.live) return go();
+  wGF.pause(true);
+  askConfirm(title, 'The game isn\'t over: leaving now forfeits it. Nothing is won or lost at the Ash Bowl yet, but the score is gone.', ok, () => { wGF.pause(false); go(); }, () => wGF.pause(false));
 }
 function wLeaveGridiron() {
   WGF = null;
@@ -127,15 +153,17 @@ openPause = function () { if (UI.view === 'gridiron') return; return wW42OpenPau
 // Clinker Dunn at the Ash Bowl puts on a drive
 (() => {
   const K = DB.chars.gk_bowl; if (!K) return;
-  K.topics.job.t += ' And come and see the new game on the grass: ask me for a DRIVE.';
+  K.topics.job.t += ' And come and see the new game on the grass: ask me for a DRIVE, or a whole game on the GRIDIRON.';
+  // (not GAME or FOOTBALL: those are the card-game match and how card-game football scores)
+  K.topics.gridiron = { t: 'Two halves on the clock, about seven minutes, and nothing riding on it. Call your side\'s plays on offense and its defense when they have the ball, or let the coaches have it.', act: 'ggame' };
   K.topics.drive = { t: 'Real football, seven a side and the same seven both ways. Our club has the ball on its own 25: four downs to make ten yards. Watch them go, or call the plays yourself, kicks and all. How it works is under the field.', act: 'drive' };
 })();
 const wW42RunAct = wRunAct;
-wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); return wW42RunAct.apply(this, arguments); };
+wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); if (act === 'ggame') return wGridironGame(); return wW42RunAct.apply(this, arguments); };
 
 const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();
   const g = $('wHelpGrounds'); if (!g || $('wHelpGridiron')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for a DRIVE and watch the Cinderhold Football Club try to score from its own 25, or call its plays yourself. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen and the short pass, and a deep zone gives up runs. After each play the bar says what happened and why. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club try to score from its own 25, or call its plays yourself. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
 };

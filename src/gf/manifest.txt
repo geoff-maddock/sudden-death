@@ -9,3 +9,4 @@ src/gf/parts/06-live.js
 src/gf/parts/07-cpu.js
 src/gf/parts/08-drive.js
 src/gf/parts/09-draw.js
+src/gf/parts/10-game.js
