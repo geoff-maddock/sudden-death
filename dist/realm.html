@@ -830,6 +830,11 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 .wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
 .wsvl select{font:inherit;font-family:var(--hud);font-size:15px;padding:3px 4px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
 .wseven .wno{font-size:18px}
+/* w42: a call button's freshness (the playbook) */
+#wGridCalls [data-gcall],#wGridDefs [data-gdef]{background-image:linear-gradient(var(--torch),var(--torch));background-repeat:no-repeat;background-position:left bottom;background-size:var(--fresh,100%) 3px}
+#wGridCalls .wgworn,#wGridDefs .wgworn{background-image:linear-gradient(#d0a04a,#d0a04a)}
+#wGridCalls .wgtired,#wGridDefs .wgtired{background-image:linear-gradient(#d0604a,#d0604a)}
+#wGridCalls [data-fresh]:not([data-fresh=""])::after,#wGridDefs [data-fresh]:not([data-fresh=""])::after{content:" · " attr(data-fresh);font-size:.8em;opacity:.8}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -21966,9 +21971,11 @@ const gfDefSet = dc => Object.assign({}, GF_DEF_SET, (GF_DEFS[dc] || {}).set);
 // GF_READ: how long after the throw a defender breaks on the ball; GF_REACH: how far a defender dives to tackle
 const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
-const gfSpeed = p => (6 + p.r.spd * .2) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+// (a defender who knows the play is coming gets a jump on it; one whose defense is read, a step slow)
+const gfSpeed = p => (6 + p.r.spd * .2) * (p.side === 1 ? 1 + .08 * L.read - .05 * L.tell : 1) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
 
-function gfSnap(oc, dc) {
+// st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense }
+function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
     const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri];
@@ -21993,6 +22000,7 @@ function gfSnap(oc, dc) {
   L = { oc, dc, t: 0, pl, id, did, ball: { st: 'held', h: id.QB, x: pl[id.QB].x, y: 0, z: 1, fx: 0, fy: 0, tx: 0, ty: 0, bt: 0, T: 0, tgt: -1 },
     carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: GF_RULES.field - G.ball, back: G.ball, ev: [],
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
+    read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
   return L;
 }
@@ -22057,7 +22065,7 @@ function gfAim(p) {
   }
   // defense: once they have read the throw, the ones near where it comes down go for the ball
   const qb = L.pl[L.id.QB], lead = q => gfIntercept(p, q);
-  if (L.ball.st === 'air' && L.ball.bt > GF_READ) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
+  if (L.ball.st === 'air' && L.ball.bt > GF_READ * (1 - .6 * L.read)) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
   // someone else has it: after a catch everyone chases; after a handoff the rush chases at once, the linebacker and
   // the man defenders read the run in under half a second, and the deep zone a beat later
   if (c && (L.carrier !== L.id.QB || c.x > 0) && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
@@ -22174,7 +22182,7 @@ function gfBlocks(dt) {
   for (const o of L.pl) {
     if (o.side !== 0 || o.eng < 0) continue;
     // run blocking drives forward: the blockers know the snap count and where the play goes
-    const d = L.pl[o.eng], dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0);
+    const d = L.pl[o.eng], dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5;
     // the pair moves the way the stronger one drives
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;
@@ -22216,20 +22224,19 @@ function gfDead(what, by, x) {
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)
-function gfPlayDown(oc, dc) { gfSnap(oc, dc); while (!L.done) gfStep(GF_DT); return L.done; }
+function gfPlayDown(oc, dc, st) { gfSnap(oc, dc, st); while (!L.done) gfStep(GF_DT); return L.done; }
 /* Cinder Gridiron: the coaches (issue #9, phase 1). Each side's call is a weighted pick from the down and distance,
-   and an offense is less likely to call the same play twice running. On fourth down the coach kicks a field goal in
+   leaning to what beats the other side's recent calls and away from tired ones (12-playbook.js). On fourth down the coach kicks a field goal in
    range, goes for it when it is short, and punts otherwise. */
 function gfCpuOffense() {
-  const d = G.down, tg = G.togo, pl = G.drive.plays, last = pl.length ? pl[pl.length - 1].oc : null;
+  const d = G.down, tg = G.togo;
   const w = { run: 3 + (tg <= 3 ? 3 : 0) - (tg >= 9 && d >= 2 ? 1.5 : 0), short: 3 + (tg >= 4 && tg <= 8 ? 1.5 : 0),
     deep: 1.2 + (tg >= 9 ? 2 : 0) + (d === 3 && tg >= 7 ? 1.5 : 0), screen: 1.3 + (tg >= 6 ? .8 : 0) };
-  if (last) w[last] *= .6;
-  return wpick(w);
+  return wpick(gfCounterOffense(w));
 }
 function gfCpuDefense() {
   const d = G.down, tg = G.togo;
-  return wpick({ blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 });
+  return wpick(gfCounterDefense({ blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 }));
 }
 // GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call
 const GF_FG_RANGE = 52, GF_FG_MAX = 62;
@@ -22261,6 +22268,7 @@ function gfStart(opts) {
   gfSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
+  gfPlaybookStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
@@ -22289,9 +22297,10 @@ function gfTick(dt) {
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
+    GD.stale = gfCallsMade(GD.oc, GD.dc);
     return gfGo('pre');
   }
-  if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc); GD.acc = 0; gfGo('live'); } return; }
+  if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc, GD.stale); GD.acc = 0; gfGo('live'); } return; }
   if (GD.ph === 'live') {
     GD.acc += dt;
     while (GD.acc >= GF_DT && !L.done) { GD.acc -= GF_DT; gfStep(GF_DT); }
@@ -22343,7 +22352,9 @@ function gfWhy(r) {
   const br = L ? L.broken : 0;
   if (br) out.push(`${br} broken tackle${br > 1 ? 's' : ''}.`);
   const [g, why] = gfEdge(GD.oc, GD.dc);
-  const dn = GF_DEFS[GD.dc].n;
+  const dn = GF_DEFS[GD.dc].n, st = GD.stale || {};
+  if (st.read > .45) out.push(`They saw the ${P.n.toLowerCase()} coming: it's been called a lot.`);
+  if (st.tell > .45) out.push(`The ${dn.toLowerCase()} was easy to read: it's been called a lot.`);
   out.push(g > 0 ? `${P.n} beats ${dn}: ${why}` : g < 0 ? `${dn} beats ${P.n}: ${why}` : `${P.n} against ${dn} is an even matchup.`);
   return out.join(' ');
 }
@@ -22602,7 +22613,7 @@ function gfGameNext() {
   // Sudden Death: the first score wins
   if (G.half === 3 && scored) return false;
   if (G.clock <= 0) {
-    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
+    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
     if (G.score[0] !== G.score[1] || G.half === 3) return false;
     G.half = 3; G.clock = GF_GAME.ot; GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
   }
@@ -22702,6 +22713,54 @@ function gfFgWindow(k) { return clamp(.1 + k.r.kck * .022 - (gfKickDist() - 20) 
 function gfFgReach(k) { return 34 + k.r.kck * 2.6; }
 function gfMeterFg(k) { const M = GD.meter; return M.pw * gfFgReach(k) >= gfKickDist() && Math.abs(M.aim) <= gfFgWindow(k); }
 function gfMeterPunt(k) { const M = GD.meter; return Math.max(8, Math.round((22 + M.pw * (22 + k.r.kck * 2.2)) * (1 - Math.abs(M.aim) * .35))); }
+/* Cinder Gridiron: the playbook (issue #9, phase 4). Plays tire with use and recover (question 4); nothing is spent.
+   Every side has a freshness for each of its plays and each of its defenses, 0 to 1 (G.fresh). Calling one costs
+   GF_TIRE; every other one recovers GF_REST each down that side's offense (or defense) is on the field, and the half
+   makes them all fresh again. A stale call is one the other side has seen coming:
+   - a stale play (L.read): the defenders jump the snap, read the throw sooner and win their blocks more often;
+   - a stale defense (L.tell): the offense knows what's coming, and blocks and gets open more easily.
+   The coaches' counter-calls: each coach reads the other side's recent calls this game (the last GF_SEEN) and leans
+   to the call that beats what they keep doing, and away from their own stale ones. So calling the same play every
+   down stops working twice over: it tires, and they see it coming.
+   G.fresh = [{ off: { play: f }, def: { defense: f } }, ...] by side, and G.seen = [[{ oc, dc }], ...]: each side's
+   recent calls, as the other coach saw them. Plain JSON. */
+const GF_TIRE = .4, GF_REST = .15, GF_SEEN = 8;
+function gfFreshAll() { return { off: Object.fromEntries(GF_OFF_IDS.map(k => [k, 1])), def: Object.fromEntries(GF_DEF_IDS.map(k => [k, 1])) }; }
+function gfPlaybookStart() { G.fresh = [gfFreshAll(), gfFreshAll()]; G.seen = [[], []]; }
+// how fresh side's call is, 1 when it has never been called
+const gfFresh = (side, kind, id) => G.fresh ? G.fresh[side][kind][id] : 1;
+// a call is made: it tires, and the others on that side rest
+function gfTire(side, kind, id) {
+  if (!G.fresh) return;
+  const F = G.fresh[side][kind];
+  for (const k in F) F[k] = k === id ? Math.max(0, F[k] - GF_TIRE) : Math.min(1, F[k] + GF_REST);
+}
+// a down is called: how stale each side's call is (for the live play), then both tire, and the coaches see them
+function gfCallsMade(oc, dc) {
+  const off = G.poss, def = 1 - G.poss;
+  const st = { read: 1 - gfFresh(off, 'off', oc), tell: 1 - gfFresh(def, 'def', dc) };
+  gfTire(off, 'off', oc); gfTire(def, 'def', dc);
+  if (G.seen) { G.seen[off].push({ oc }); G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
+  return st;
+}
+function gfHalfRest() { if (G.fresh) G.fresh = [gfFreshAll(), gfFreshAll()]; }
+// what share of side's last calls of a kind were each one
+function gfTendency(side, kind) {
+  const key = kind === 'off' ? 'oc' : 'dc', list = ((G.seen && G.seen[side]) || []).filter(x => x[key]).slice(-GF_SEEN), out = {};
+  for (const x of list) out[x[key]] = (out[x[key]] || 0) + 1 / list.length;
+  return out;
+}
+// the counter-call: weight up the defenses that beat what this offense keeps calling, down the ones it beats
+function gfCounterDefense(w) {
+  const T = gfTendency(G.poss, 'off');
+  for (const dc in w) { for (const oc in T) w[dc] += -gfEdge(oc, dc)[0] * T[oc] * 2.5; w[dc] = Math.max(.15, w[dc]) * (.3 + .7 * gfFresh(1 - G.poss, 'def', dc)); }
+  return w;
+}
+function gfCounterOffense(w) {
+  const T = gfTendency(1 - G.poss, 'def');
+  for (const oc in w) { for (const dc in T) w[oc] += gfEdge(oc, dc)[0] * T[dc] * 2.5; w[oc] = Math.max(.15, w[oc]) * (.3 + .7 * gfFresh(G.poss, 'off', oc)); }
+  return w;
+}
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
    engine's parts don't touch the page; this file is the only one that does. */
@@ -22773,12 +22832,16 @@ return {
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
   // would pick for a roster of seven ({ off, def, kicker }, roster indices)
+  // the playbook (phase 4): how fresh a side's calls are ({ off: { play: 0..1 }, def: {...} }), and what the other
+  // coach has seen of them lately (shares of the last few calls)
+  fresh: side => G && G.fresh ? JSON.parse(JSON.stringify(G.fresh[side])) : null, tendency: (side, kind) => G ? gfTendency(side, kind) : {},
+  cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense() },
   rate: kind => gfRate(kind), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
   auto: roster => { const T = gfTeam({ name: '', roster }); return { off: T.off, def: T.def, kicker: T.kicker }; },
   plays: Object.fromEntries(GF_OFF_IDS.map(k => [k, { n: GF_PLAYS[k].n, desc: GF_PLAYS[k].desc }])),
   defs: Object.fromEntries(GF_DEF_IDS.map(k => [k, { n: GF_DEFS[k].n, desc: GF_DEFS[k].desc }])),
   // the test's handle on the field: play one down from a spot, both calls given
-  down: (oc, dc, opts) => { gfStart(opts); return gfPlayDown(oc, dc); },
+  down: (oc, dc, opts) => { gfStart(opts); return gfPlayDown(oc, dc, opts && opts.st); },
   snap: (oc, dc, opts) => { gfStart(opts); return gfSnap(oc, dc); }, step: () => { if (L && !L.done) gfStep(GF_DT); return L; },
 };
 
@@ -27249,11 +27312,24 @@ $('wGridBar').addEventListener('click', e => {
 // under the field: who is on it, the drive so far, and how it works
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
-  <section><h4 id="wGridLogH">This drive</h4><ol id="wGridLog" class="wglog"></ol></section>
+  <section><h4 id="wGridLogH">This drive</h4><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
   <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
 
+// the playbook (phase 4): each call button shows how fresh the play is, as a bar along its foot and a word once it
+// tires; and the panel says what the other coach has seen of your calls lately
+function wGridFresh() {
+  const F = wGF.fresh(0); if (!F) return;
+  const mark = (b, f, what) => { const pct = Math.round(f * 100), word = f >= .8 ? '' : f >= .45 ? 'worn' : 'tired';
+    b.style.setProperty('--fresh', pct + '%'); b.classList.toggle('wgtired', f < .45); b.classList.toggle('wgworn', f >= .45 && f < .8);
+    b.dataset.fresh = word; b.title = `${what} Fresh: ${pct}%.${word ? ' Called a lot lately, so they see it coming.' : ''}`; };
+  for (const b of $('wGridCalls').querySelectorAll('[data-gcall]')) mark(b, F.off[b.dataset.gcall], wGF.plays[b.dataset.gcall].desc + ' ' + wGridEdgeLine(b.dataset.gcall));
+  for (const b of $('wGridDefs').querySelectorAll('[data-gdef]')) mark(b, F.def[b.dataset.gdef], wGF.defs[b.dataset.gdef].desc);
+  const T = wGF.tendency(0, wGF.yourBall ? 'off' : 'def'), names = wGF.yourBall ? wGF.plays : wGF.defs;
+  const seen = Object.entries(T).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${names[k].n} ${Math.round(v * 100)}%`);
+  $('wGridSeen').textContent = WGF && WGF.mode !== 'watch' && seen.length ? `What they've seen of your ${wGF.yourBall ? 'plays' : 'defenses'} lately: ${seen.join(', ')}. Their coach calls to beat it.` : '';
+}
 // what a call is good and bad against, from the engine's matchups
 function wGridEdgeLine(oc) {
   const by = g => Object.keys(wGF.defs).filter(d => wGF.edge(oc, d)[0] === g).map(d => wGF.defs[d].n).join(' and ');
@@ -27271,9 +27347,10 @@ function wGridHowHTML() {
   <ul class="wghow">${Object.keys(wGF.plays).map(k => li(wGF.plays[k].n, wGF.plays[k].desc, wGridEdgeLine(k))).join('')}
   ${li('Punt', 'Kick it away on any down. The drive ends, but the other side starts far from your goal line.')}
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
+  <p class="hint"><b>Plays tire.</b> Calling a play tires it, and it recovers while you call others; the half freshens everything. A tired play is one they see coming: the defense jumps it and wins more blocks. The bar along the foot of each button is how fresh it is. Their coach also watches what you call and leans to what beats it, so mixing it up pays twice. Their calls tire too: a defense they keep calling is easier to beat.</p>
   <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
   <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, and <b>This drive</b> keeps every play.</p>
-  <p class="hint"><b>The ratings</b>, 1 to 10: ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
+  <p class="hint"><b>The ratings</b> (higher is better; your own players' run to 12): ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
 function wGridLineup() {
   const st = wGF.stats;
@@ -27323,6 +27400,7 @@ function wGridBar() {
   $('wGridCalls').hidden = !call || !off; $('wGridDefs').hidden = !call || off;
   for (const b of $('wGridDefs').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gdef);
   for (const b of $('wGridCalls').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gcall || b.dataset.gkick);
+  wGridFresh();
   const k = wGF.kick(), fg = $('wGridCalls').querySelector('[data-gkick="fg"]');
   if (k) { fg.textContent = k.inRange ? `Field goal (${k.dist} yd, ${Math.round(k.chance * 100)}%)` : 'Field goal'; fg.title = k.inRange ? 'Kick it through the posts for 3 points.' : 'Too far out: get inside about 62 yards first.'; }
   const fourth = wGF.G && wGF.G.down === 4;
@@ -27375,7 +27453,7 @@ const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();
   const g = $('wHelpGrounds'); if (!g || $('wHelpGridiron')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club, call its plays yourself, or play its offense by hand: hold Space to lead a receiver and let go to throw, steer with WASD, Space for a stiff-arm, and tap Space twice to kick. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club, call its plays yourself, or play its offense by hand: hold Space to lead a receiver and let go to throw, steer with WASD, Space for a stiff-arm, and tap Space twice to kick. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Plays tire with use and recover while you call others, and their coach calls to beat what you keep calling. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
 };
 /* w43: football ratings and the seven (issue #9, phase 3). Every Realm player has Cinder Gridiron ratings, p.gf, as
    they have baseball's p.bd (w20b): speed, strength, hands, arm, kicking and tackling, 1 to 12. They are seeded from

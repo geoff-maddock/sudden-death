@@ -18,9 +18,11 @@
 // GF_READ: how long after the throw a defender breaks on the ball; GF_REACH: how far a defender dives to tackle
 const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
-const gfSpeed = p => (6 + p.r.spd * .2) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+// (a defender who knows the play is coming gets a jump on it; one whose defense is read, a step slow)
+const gfSpeed = p => (6 + p.r.spd * .2) * (p.side === 1 ? 1 + .08 * L.read - .05 * L.tell : 1) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
 
-function gfSnap(oc, dc) {
+// st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense }
+function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
     const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri];
@@ -45,6 +47,7 @@ function gfSnap(oc, dc) {
   L = { oc, dc, t: 0, pl, id, did, ball: { st: 'held', h: id.QB, x: pl[id.QB].x, y: 0, z: 1, fx: 0, fy: 0, tx: 0, ty: 0, bt: 0, T: 0, tgt: -1 },
     carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: GF_RULES.field - G.ball, back: G.ball, ev: [],
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
+    read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
   return L;
 }
@@ -109,7 +112,7 @@ function gfAim(p) {
   }
   // defense: once they have read the throw, the ones near where it comes down go for the ball
   const qb = L.pl[L.id.QB], lead = q => gfIntercept(p, q);
-  if (L.ball.st === 'air' && L.ball.bt > GF_READ) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
+  if (L.ball.st === 'air' && L.ball.bt > GF_READ * (1 - .6 * L.read)) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
   // someone else has it: after a catch everyone chases; after a handoff the rush chases at once, the linebacker and
   // the man defenders read the run in under half a second, and the deep zone a beat later
   if (c && (L.carrier !== L.id.QB || c.x > 0) && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
@@ -226,7 +229,7 @@ function gfBlocks(dt) {
   for (const o of L.pl) {
     if (o.side !== 0 || o.eng < 0) continue;
     // run blocking drives forward: the blockers know the snap count and where the play goes
-    const d = L.pl[o.eng], dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0);
+    const d = L.pl[o.eng], dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5;
     // the pair moves the way the stronger one drives
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;
@@ -268,4 +271,4 @@ function gfDead(what, by, x) {
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)
-function gfPlayDown(oc, dc) { gfSnap(oc, dc); while (!L.done) gfStep(GF_DT); return L.done; }
+function gfPlayDown(oc, dc, st) { gfSnap(oc, dc, st); while (!L.done) gfStep(GF_DT); return L.done; }

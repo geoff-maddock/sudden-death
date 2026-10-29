@@ -50,11 +50,24 @@ $('wGridBar').addEventListener('click', e => {
 // under the field: who is on it, the drive so far, and how it works
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
-  <section><h4 id="wGridLogH">This drive</h4><ol id="wGridLog" class="wglog"></ol></section>
+  <section><h4 id="wGridLogH">This drive</h4><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
   <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
 
+// the playbook (phase 4): each call button shows how fresh the play is, as a bar along its foot and a word once it
+// tires; and the panel says what the other coach has seen of your calls lately
+function wGridFresh() {
+  const F = wGF.fresh(0); if (!F) return;
+  const mark = (b, f, what) => { const pct = Math.round(f * 100), word = f >= .8 ? '' : f >= .45 ? 'worn' : 'tired';
+    b.style.setProperty('--fresh', pct + '%'); b.classList.toggle('wgtired', f < .45); b.classList.toggle('wgworn', f >= .45 && f < .8);
+    b.dataset.fresh = word; b.title = `${what} Fresh: ${pct}%.${word ? ' Called a lot lately, so they see it coming.' : ''}`; };
+  for (const b of $('wGridCalls').querySelectorAll('[data-gcall]')) mark(b, F.off[b.dataset.gcall], wGF.plays[b.dataset.gcall].desc + ' ' + wGridEdgeLine(b.dataset.gcall));
+  for (const b of $('wGridDefs').querySelectorAll('[data-gdef]')) mark(b, F.def[b.dataset.gdef], wGF.defs[b.dataset.gdef].desc);
+  const T = wGF.tendency(0, wGF.yourBall ? 'off' : 'def'), names = wGF.yourBall ? wGF.plays : wGF.defs;
+  const seen = Object.entries(T).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${names[k].n} ${Math.round(v * 100)}%`);
+  $('wGridSeen').textContent = WGF && WGF.mode !== 'watch' && seen.length ? `What they've seen of your ${wGF.yourBall ? 'plays' : 'defenses'} lately: ${seen.join(', ')}. Their coach calls to beat it.` : '';
+}
 // what a call is good and bad against, from the engine's matchups
 function wGridEdgeLine(oc) {
   const by = g => Object.keys(wGF.defs).filter(d => wGF.edge(oc, d)[0] === g).map(d => wGF.defs[d].n).join(' and ');
@@ -72,9 +85,10 @@ function wGridHowHTML() {
   <ul class="wghow">${Object.keys(wGF.plays).map(k => li(wGF.plays[k].n, wGF.plays[k].desc, wGridEdgeLine(k))).join('')}
   ${li('Punt', 'Kick it away on any down. The drive ends, but the other side starts far from your goal line.')}
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
+  <p class="hint"><b>Plays tire.</b> Calling a play tires it, and it recovers while you call others; the half freshens everything. A tired play is one they see coming: the defense jumps it and wins more blocks. The bar along the foot of each button is how fresh it is. Their coach also watches what you call and leans to what beats it, so mixing it up pays twice. Their calls tire too: a defense they keep calling is easier to beat.</p>
   <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
   <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, and <b>This drive</b> keeps every play.</p>
-  <p class="hint"><b>The ratings</b>, 1 to 10: ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
+  <p class="hint"><b>The ratings</b> (higher is better; your own players' run to 12): ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
 function wGridLineup() {
   const st = wGF.stats;
@@ -124,6 +138,7 @@ function wGridBar() {
   $('wGridCalls').hidden = !call || !off; $('wGridDefs').hidden = !call || off;
   for (const b of $('wGridDefs').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gdef);
   for (const b of $('wGridCalls').querySelectorAll('button')) b.disabled = !yours || !wGF.canCall(b.dataset.gcall || b.dataset.gkick);
+  wGridFresh();
   const k = wGF.kick(), fg = $('wGridCalls').querySelector('[data-gkick="fg"]');
   if (k) { fg.textContent = k.inRange ? `Field goal (${k.dist} yd, ${Math.round(k.chance * 100)}%)` : 'Field goal'; fg.title = k.inRange ? 'Kick it through the posts for 3 points.' : 'Too far out: get inside about 62 yards first.'; }
   const fourth = wGF.G && wGF.G.down === 4;
@@ -176,5 +191,5 @@ const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();
   const g = $('wHelpGrounds'); if (!g || $('wHelpGridiron')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club, call its plays yourself, or play its offense by hand: hold Space to lead a receiver and let go to throw, steer with WASD, Space for a stiff-arm, and tap Space twice to kick. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club, call its plays yourself, or play its offense by hand: hold Space to lead a receiver and let go to throw, steer with WASD, Space for a stiff-arm, and tap Space twice to kick. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Plays tire with use and recover while you call others, and their coach calls to beat what you keep calling. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
 };

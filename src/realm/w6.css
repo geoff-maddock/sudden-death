@@ -302,3 +302,8 @@
 .wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
 .wsvl select{font:inherit;font-family:var(--hud);font-size:15px;padding:3px 4px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
 .wseven .wno{font-size:18px}
+/* w42: a call button's freshness (the playbook) */
+#wGridCalls [data-gcall],#wGridDefs [data-gdef]{background-image:linear-gradient(var(--torch),var(--torch));background-repeat:no-repeat;background-position:left bottom;background-size:var(--fresh,100%) 3px}
+#wGridCalls .wgworn,#wGridDefs .wgworn{background-image:linear-gradient(#d0a04a,#d0a04a)}
+#wGridCalls .wgtired,#wGridDefs .wgtired{background-image:linear-gradient(#d0604a,#d0604a)}
+#wGridCalls [data-fresh]:not([data-fresh=""])::after,#wGridDefs [data-fresh]:not([data-fresh=""])::after{content:" · " attr(data-fresh);font-size:.8em;opacity:.8}

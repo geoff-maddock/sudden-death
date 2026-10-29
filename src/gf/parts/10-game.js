@@ -49,7 +49,7 @@ function gfGameNext() {
   // Sudden Death: the first score wins
   if (G.half === 3 && scored) return false;
   if (G.clock <= 0) {
-    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
+    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
     if (G.score[0] !== G.score[1] || G.half === 3) return false;
     G.half = 3; G.clock = GF_GAME.ot; GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
   }

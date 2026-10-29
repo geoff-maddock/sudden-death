@@ -17,6 +17,7 @@ function gfStart(opts) {
   gfSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
+  gfPlaybookStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
@@ -45,9 +46,10 @@ function gfTick(dt) {
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
+    GD.stale = gfCallsMade(GD.oc, GD.dc);
     return gfGo('pre');
   }
-  if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc); GD.acc = 0; gfGo('live'); } return; }
+  if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc, GD.stale); GD.acc = 0; gfGo('live'); } return; }
   if (GD.ph === 'live') {
     GD.acc += dt;
     while (GD.acc >= GF_DT && !L.done) { GD.acc -= GF_DT; gfStep(GF_DT); }
@@ -99,7 +101,9 @@ function gfWhy(r) {
   const br = L ? L.broken : 0;
   if (br) out.push(`${br} broken tackle${br > 1 ? 's' : ''}.`);
   const [g, why] = gfEdge(GD.oc, GD.dc);
-  const dn = GF_DEFS[GD.dc].n;
+  const dn = GF_DEFS[GD.dc].n, st = GD.stale || {};
+  if (st.read > .45) out.push(`They saw the ${P.n.toLowerCase()} coming: it's been called a lot.`);
+  if (st.tell > .45) out.push(`The ${dn.toLowerCase()} was easy to read: it's been called a lot.`);
   out.push(g > 0 ? `${P.n} beats ${dn}: ${why}` : g < 0 ? `${dn} beats ${P.n}: ${why}` : `${P.n} against ${dn} is an even matchup.`);
   return out.join(' ');
 }

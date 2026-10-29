@@ -22,11 +22,15 @@ return {
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
   // would pick for a roster of seven ({ off, def, kicker }, roster indices)
+  // the playbook (phase 4): how fresh a side's calls are ({ off: { play: 0..1 }, def: {...} }), and what the other
+  // coach has seen of them lately (shares of the last few calls)
+  fresh: side => G && G.fresh ? JSON.parse(JSON.stringify(G.fresh[side])) : null, tendency: (side, kind) => G ? gfTendency(side, kind) : {},
+  cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense() },
   rate: kind => gfRate(kind), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
   auto: roster => { const T = gfTeam({ name: '', roster }); return { off: T.off, def: T.def, kicker: T.kicker }; },
   plays: Object.fromEntries(GF_OFF_IDS.map(k => [k, { n: GF_PLAYS[k].n, desc: GF_PLAYS[k].desc }])),
   defs: Object.fromEntries(GF_DEF_IDS.map(k => [k, { n: GF_DEFS[k].n, desc: GF_DEFS[k].desc }])),
   // the test's handle on the field: play one down from a spot, both calls given
-  down: (oc, dc, opts) => { gfStart(opts); return gfPlayDown(oc, dc); },
+  down: (oc, dc, opts) => { gfStart(opts); return gfPlayDown(oc, dc, opts && opts.st); },
   snap: (oc, dc, opts) => { gfStart(opts); return gfSnap(oc, dc); }, step: () => { if (L && !L.done) gfStep(GF_DT); return L; },
 };
