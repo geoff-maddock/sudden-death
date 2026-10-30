@@ -41,7 +41,7 @@ function gfKickoff() {
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
 }
-function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; if (G.zones) G.zones = []; gfPowersDrive(); }
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; GD.pow = null; if (G.zones) G.zones = []; gfPowersDrive(); }
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
@@ -70,10 +70,14 @@ function gfGameSummary() {
     ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}) };
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
+// (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
-  let secs = 0;
-  try { gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; } }
-  finally { Object.assign(GF_HOOK, hooks); }
-  return Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
+  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: gfRand } : null;
+  GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
+  let secs = 0, out;
+  try {
+    gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; }
+    out = Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
+  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; gfRand = was.rand; } }
+  return out;
 }

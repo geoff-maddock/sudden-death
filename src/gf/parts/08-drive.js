@@ -11,7 +11,7 @@
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
-const GF_HOOK = { onOver: null, onPhase: null, onSnap: null };
+const GF_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };  // wantSnap: false skips the snapshot
 let GD = null;
 
 function gfStart(opts) {
@@ -43,7 +43,7 @@ function gfCanCall(oc) {
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
   // each call is a point to save the game at (13-box.js)
-  if (ph === 'call' && GF_HOOK.onSnap) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
+  if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 
@@ -54,7 +54,7 @@ function gfTick(dt) {
     const mine = gfYours();
     if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
-    if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
+    if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
     GD.cast = gfCastPowers(GD.oc, GD.dc);
     GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });

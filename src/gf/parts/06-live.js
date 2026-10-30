@@ -26,7 +26,7 @@ function gfSpeed(p) {
   if (p.side === 1) { m *= (1 + .08 * L.read - .05 * L.tell) * F.dSpd; if (p.job === 'rush') m *= F.rushSpd; else if (p.job === 'man' || p.job === 'zone') m *= F.coverSpd; return m; }
   m *= F.oSpd;
   if (held) m *= .94 * F.cSpd; else if (p.job === 'route') m *= F.rSpd * (p.x > 8 ? F.deepSpd : 1);
-  return m * (p.x < 0 ? F.backSpd : Math.abs(p.y) < 6 ? F.midSpd : 1);
+  return m * (p.x < 0 ? F.backSpd : p.x < 18 && Math.abs(p.y) < 6 ? F.midSpd : 1);
 }
 
 // st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense },
@@ -295,7 +295,7 @@ function gfTackles() {
     if (F.untag && L.gotT >= 0 && L.t - L.gotT < F.untag) { d.stun = .3; if (!L.ev.some(e => e.k === 'pow' && e.s === L.src.untag)) gfEv('pow', L.src.untag, `${L.src.untag}: ${c.n} slipped through as bats.`); continue; }
     if (L.breakLeft > 0 && dd <= 1.2) { L.breakLeft--; d.stun = .7; L.broken++; gfEv('broken', c.n); gfEv('pow', L.src.breakN, `${L.src.breakN}: ${c.n} went straight through ${d.n}.`); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
-    const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, .12, .97);
+    const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, F.tkl || F.cStr ? .12 : .2, F.tkl || F.cStr ? .97 : .93);
     if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }

@@ -125,7 +125,7 @@ function gfPowerOptions(side) {
   T.roster.forEach((m, ri) => {
     const pw = GF_POW[m.kind], u = GF_ULT[m.kind], st = G.stam[side][ri];
     const add = (p, ult) => {
-      const cost = ult ? GF_ULT_COST : p.cost, used = ult && G.ultUsed[side][ri];
+      const cost = ult ? GF_ULT_COST : p.cost, used = ult && !!(G.ultUsed[side][m.kind] || G.ultUsed[side][ri]);
       const why = used ? 'used this game' : gfMana(side) < cost ? 'needs mana' : st < GF_STAM.min ? 'winded' : '';
       out.push({ key: ri + ':' + p.id, id: p.id, ri, n: m.n, kind: m.kind, name: p.n, cost, ult: !!ult, fits: ult ? 'any' : p.fits, desc: p.desc, ok: !why, why, stam: Math.round(st), stamCost: gfStamCost(cost, ult) });
     };
@@ -137,7 +137,7 @@ function gfPowerOptions(side) {
 // a power is cast: mana, stamina, the ultimate used, its zone on the field. Returns what the play needs: { id, ri, n, name, ult }
 function gfCast(side, o) {
   G.mana[side] -= o.cost; G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - o.stamCost);
-  if (o.ult) { G.ultUsed[side][o.ri] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
+  if (o.ult) { G.ultUsed[side][o.kind] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
   return { id: o.id, ri: o.ri, n: o.n, name: o.name, ult: o.ult, side };
 }
 // with the call: each side's power. Yours is your pick, or Auto powers', or none; the CPU's is the CPU's

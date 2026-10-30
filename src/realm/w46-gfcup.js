@@ -10,8 +10,8 @@
    instead of a card match, and the clubs' own fixtures there are played on the engine, with real scores. A win is
    two points on the table and the fixture's fans, a tie is no points, and either way the fixture is done.
 
-   WG.gcup  { week, field: [8 ids, 'me' first], round: 0..2, games: [[{ a, b, ra, rb, w, ya?, yb? }]] by round,
-              pending, show, out, done, champ } or null. Plain JSON, as WG.dcup.
+   WG.gcup  { week, field: [8 ids, 'me' first], round: 0..2, games: [[{ a, b, ra, rb, w, ya?, yb?, yd }]] by round,
+              pending, show, out, done, champ } or null; yd: settled on the yards (a tie). A concede is a loss. Plain JSON, as WG.dcup.
    W_GCUP   the numbers; W_GCUP.force ('win' | 'lose') settles your next cup game that way (tests and the bot)
    wGcupEnter(), wGcupPlay(how), wGcupCatchUp(), wOpenGcup(), wGfixPlay(how), W_ON_END.gcup, W_ON_END.gfix
    Wrapped: wNextPrompt (wW46NextPrompt: the rest of the round, then the bracket), wCampSeven and wRenderCamp
@@ -74,22 +74,24 @@ W_ON_END.gcup = function (r, ref, W) {
   const D = wGcup(); if (!D || !ref || D.done || ref.week !== D.week || ref.round !== D.round) return;
   const forced = W_GCUP.force; W_GCUP.force = null;
   const [ya, yb] = W.yards || [0, 0];
-  const w = forced ? (forced === 'win' ? 'me' : W.club) : wGcupWinner('me', W.club, W.us, W.them, ya, yb), win = w === 'me';
-  D.games[D.round].push({ a: 'me', b: W.club, ra: W.us, rb: W.them, ya, yb, w });
+  // (a win or a loss is the result: conceding loses whatever the score; only a tie goes to the yards)
+  const rr = forced || r, yd = rr === 'tie';
+  const w = rr === 'win' ? 'me' : rr === 'lose' ? W.club : wGcupWinner('me', W.club, W.us, W.them, ya, yb), win = w === 'me';
+  D.games[D.round].push({ a: 'me', b: W.club, ra: W.us, rb: W.them, ya, yb, w, yd });
   if (!win) D.out = true;
   D.pending = true;
-  const tb = W.us === W.them ? ` (tied, and ${win ? 'you' : 'they'} had more yards)` : '';
+  const tb = yd ? ` (tied, and ${win ? 'you' : 'they'} had more yards)` : '';
   wLog(win ? `${W_GCUP.rounds[D.round]} won: ${W.us}–${W.them} against ${wGcupName(W.club)}${tb}.` : `Out of the Cinder Cup in the ${W_GCUP.rounds[D.round].toLowerCase()}, ${W.us}–${W.them} to ${wGcupName(W.club)}${tb}.`, win ? 'g' : 'b');
 };
-// a game you are not in, on the same engine, both sides on the coaches
+// a game you are not in, on the same engine, both sides on the coaches (and your own game, if one is on, kept)
 function wGridSimClubs(a, b, tier) {
-  const sk = wGridSkill(tier)[1], g = wGF.simGame({ teams: [wGridOpp(a, tier), wGridOpp(b, tier)], skill: [sk, sk] });
+  const sk = wGridSkill(tier)[1], g = wGF.simGame({ teams: [wGridOpp(a, tier), wGridOpp(b, tier)], skill: [sk, sk], keep: true });
   const yd = s => g.box.filter(x => x.side === s).reduce((t, x) => t + (x.line.py || 0) + (x.line.ry || 0), 0);
   return { ra: g.score[0], rb: g.score[1], ya: yd(0), yb: yd(1) };
 }
 function wGcupSim(a, b, tier) {
   const s = wGridSimClubs(a, b, tier);
-  return { a, b, ra: s.ra, rb: s.rb, ya: s.ya, yb: s.yb, w: wGcupWinner(a, b, s.ra, s.rb, s.ya, s.yb) };
+  return { a, b, ra: s.ra, rb: s.rb, ya: s.ya, yb: s.yb, w: wGcupWinner(a, b, s.ra, s.rb, s.ya, s.yb), yd: s.ra === s.rb };
 }
 // the rest of the round: every game without a result; then the next round, and on to the final if you are out
 function wGcupCatchUp() {
@@ -122,12 +124,12 @@ function wGcupWon() {
 function wGcupBracket() {
   const D = wGcup();
   const cell = (r, a, b) => {
-    const g = wGcupGame(r, a, b), tie = g && g.ra === g.rb;
+    const g = wGcupGame(r, a, b), tie = g && g.yd;
     const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wGcupTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${tie && g.w === id ? '*' : ''}</b></li>`;
     return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
   };
   return `<div class="wdcb">${W_GCUP.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wGcupPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.games.some(R => R.some(g => g.ra === g.rb)) ? '<p class="hint">* Tied after Sudden Death: through on yards from scrimmage.</p>' : ''}`;
+    ${D.games.some(R => R.some(g => g.yd)) ? '<p class="hint">* Tied after Sudden Death: through on yards from scrimmage.</p>' : ''}`;
 }
 function wOpenGcup(msg) {
   if (LAB || !WG) return;
@@ -175,13 +177,13 @@ function wGfixPlay(how) {
   return wStartGrid({ club: f.club, how, tier: wFixTier(f.club, W_GFIX.bowl), kind: 'gfix', ref: { g: W_GFIX.bowl, club: f.club, day: f.day }, cup: true });
 }
 // the fixture's end: as a fixture at any ground (w24's W_ON_END.ground), with the football score; a rival's league
-// row and head to head are counted in wGridSettle already
+// row, and the head to head of any club in CLUBS, are counted in wGridSettle already
 W_ON_END.gfix = function (r, ref, W) {
   if (!ref) return;
   const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
   const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
   if (tie) { wLog(`A tie in the league at the Ash Bowl: no points for either side.`, 'd'); return; }
-  if (!wIsRival(club)) { wLeagueMine(r); wH2hRecord(club, r); }
+  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r); }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
   const res = r === 'win' ? { a: 'me', b: club, sa: W.us, sb: W.them } : { a: club, b: 'me', sa: W.them, sb: W.us };
   L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'football', g: ref.g }));
