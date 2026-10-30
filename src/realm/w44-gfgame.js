@@ -46,7 +46,7 @@ function wGridOppLvl(tier) { return Math.min(W_PARTY.maxLvl, wNineTier() + tier 
 /* a club's seven: its own kinds first, at your level plus the tier, and W_GFG.oppBonus on every rating. A rival keeps
    the same seven until it would be a different level; the local side is new each time. */
 function wGridOpp(club, tier) {
-  const B = wGfg(), lvl = wGridOppLvl(tier), C = wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
+  const B = wGfg(), lvl = wGridOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
   const cached = club !== 'local' && B.opp[club];
   let team;
   if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
@@ -74,7 +74,7 @@ function wStartGrid(o) {
   const probs = wGridProblems(); if (probs.length) return probs.join(' ');
   const B = wGfg(), club = o.club;
   if (B.live) return 'Finish the football game you started first.';
-  if (!wBallRegion(club) && !CLUBS[club]) return '';
+  if (!wBallRegion(club) && !CLUBS[club] && club !== 'apex') return '';
   if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you at football today. Come back tomorrow.`;
   const how = W_GFG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club);
   const mine = wSevenTeam(), opp = wGridOpp(club, tier);
@@ -185,7 +185,8 @@ function wGridSettle(r, us, them, box, half) {
   B.games.length = Math.min(B.games.length, W_GFG.keep);
   wAdvance(W_GFG.minutes);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
-  W.us = us; W.them = them;
+  // (and each side's yards from scrimmage: a knockout settles a tie on them)
+  W.us = us; W.them = them; W.yards = [0, 1].map(s => box.filter(b => b.side === s).reduce((a, b) => a + (b.line.py || 0) + (b.line.ry || 0), 0));
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   const who = mvp != null && wPlayer(mvp);
   const msg = `Final: ${win ? 'you win' : tie ? 'a tie' : 'you lose'} ${us}–${them} against ${wBallName(W.club)}${half === 3 ? ', in Sudden Death' : ''}.${pay} ${bits}${win && who ? `, and +${W_GFG.mvpXp} for ${who.n}, player of the game` : ''}.`;
