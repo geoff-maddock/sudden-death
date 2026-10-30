@@ -43,13 +43,13 @@ function gfPickTarget(d) { const r = gfReceivers(); if (!r.length) return; const
 function gfLeadSpot(i, lead) { const p = L.pl[i]; return [p.x + p.vx * lead, p.y + p.vy * lead]; }
 function gfThrowTo(i, lead) {
   const qb = L.pl[L.id.QB], rc = L.pl[i]; if (!rc) return;
-  const [, press] = gfNearest(qb.x, qb.y, gfFree()), hurry = press < 1.8, v = 15 + qb.r.arm * 1.3;
+  const [, press] = gfNearest(qb.x, qb.y, gfFree()), hurry = press < 1.8, v = gfThrowV(15 + qb.r.arm * 1.3);
   let [tx, ty] = gfLeadSpot(i, lead);
-  const e = Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03;
+  const e = gfThrowErr(Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03);
   tx += gauss() * e; ty += gauss() * e;
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T: Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v), tgt: i });
   L.thrown = true; L.carrier = -1;
-  gfEv('throw', hurry ? 'hurried' : '', rc.n);
+  gfEv('throw', hurry ? 'hurried' : '', rc.n); gfAtThrow(i);
 }
 // each step of a hands-on play: keep the ring on the open receiver until you pick one
 function gfHandsStep() { if (!L.ctl.picked || L.ctl.tgt < 0) L.ctl.tgt = gfOpenest(); if (L.arm > 0) L.arm -= GF_DT; }

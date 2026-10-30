@@ -19,6 +19,6 @@ function gfFourth() {
   return 'punt';
 }
 const gfKicker = () => G.teams[G.poss].roster[G.teams[G.poss].kicker];
-function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03, .05, .99); }
+function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03 + gfZoneSum('kick'), .05, .99); }
 function gfKickGood(k) { return R() < gfKickChance(k); }
 function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }

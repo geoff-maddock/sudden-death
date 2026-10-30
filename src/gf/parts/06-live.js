@@ -19,14 +19,23 @@
 const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
 // (a defender who knows the play is coming gets a jump on it; one whose defense is read, a step slow)
-const gfSpeed = p => (6 + p.r.spd * .2) * (p.side === 1 ? 1 + .08 * L.read - .05 * L.tell : 1) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+// (and the powers and zones on the field, 14-powers.js: by side, job and where they are)
+function gfSpeed(p) {
+  const F = L.fx || GF_FX0, held = L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p);
+  let m = (6 + p.r.spd * .2) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+  if (p.side === 1) { m *= (1 + .08 * L.read - .05 * L.tell) * F.dSpd; if (p.job === 'rush') m *= F.rushSpd; else if (p.job === 'man' || p.job === 'zone') m *= F.coverSpd; return m; }
+  m *= F.oSpd;
+  if (held) m *= .94 * F.cSpd; else if (p.job === 'route') m *= F.rSpd * (p.x > 8 ? F.deepSpd : 1);
+  return m * (p.x < 0 ? F.backSpd : Math.abs(p.y) < 6 ? F.midSpd : 1);
+}
 
-// st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense }
+// st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense },
+// and pw: the powers cast with the calls ({ off, def }, 14-powers.js). A worn player plays on worn ratings (gfWorn)
 function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
     const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri];
-    pl.push({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: m.r, x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 });
+    pl.push({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: gfWorn(side ? 1 - G.poss : G.poss, ri, m.r), x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 });
     return pl.length - 1;
   };
   const set = gfSet(oc);
@@ -49,8 +58,38 @@ function gfSnap(oc, dc, st) {
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
     read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
+  gfSnapFx(st && st.pw);
   return L;
 }
+// the powers on this play: their effects (L.fx), who gave each (L.src, for the reason), and what happens at the snap
+function gfSnapFx(pw) {
+  L.pw = pw || null; L.fx = gfFx(pw); L.src = gfFxSrc(pw); L.breakLeft = L.fx.breakN; L.gotT = -1;
+  const F = L.fx, say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`);
+  const def = L.pl.filter(p => p.side === 1), off = L.pl.filter(p => p.side === 0);
+  if (F.snapAll) { for (const d of def) d.stun = Math.max(d.stun, F.snapAll); say('snapAll', 'every defender staggered at the snap.'); }
+  if (F.snapStun) { for (const d of def) if (d.job === 'rush') d.stun = Math.max(d.stun, F.snapStun); say('snapStun', 'the rushers went down at the snap.'); }
+  if (F.blkStun) { for (const o of off) if (o.job === 'block' || o.job === 'pblock' || o.job === 'stalk') o.stun = Math.max(o.stun, F.blkStun); say('blkStun', 'every blocker stumbled at the snap.'); }
+  if (F.coverSlow) { for (const d of def) if (d.job === 'man' || d.job === 'zone') d.slow = Math.max(d.slow, F.coverSlow); say('coverSlow', 'the coverage lost the receivers off the line.'); }
+  if (F.safetySlow) { const s = L.pl[L.did.S]; if (s) { s.slow = Math.max(s.slow, F.safetySlow); say('safetySlow', `${s.n} at safety is a step slow all play.`); } }
+  if (F.gas) { const hit = def.filter(d => d.job === 'rush' && !GF_UNDEAD.includes(d.kind) && R() < .6); for (const d of hit) d.stun = Math.max(d.stun, F.gas); if (hit.length) say('gas', `${hit.map(d => d.n).join(' and ')} went down in the gas.`); }
+}
+// someone takes the ball (the handoff or the catch): the defense's powers that wait for it
+function gfGotBall(i) {
+  const F = L.fx, c = L.pl[i], say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`);
+  L.gotT = L.t; if (!F) return;
+  if (F.pounce) { const [d, dd] = gfNearest(c.x, c.y, gfFree()); if (d && dd > 1) { const k = Math.min(F.pounce, dd - .8) / dd; d.x += (c.x - d.x) * k; d.y += (c.y - d.y) * k; say('pounce', `${d.n} leapt at ${c.n}.`); } }
+  if (F.cStun && R() < (F.cStunP || 1)) { c.stun = Math.max(c.stun, F.cStun); say('cStun', `${c.n} froze with the ball.`); }
+  if (F.cSlow) { c.slow = Math.max(c.slow, F.cSlow); say('cSlow', `${c.n} was caught in it.`); }
+}
+// the ball is thrown to receiver i: the powers that wait for the throw
+function gfAtThrow(i) {
+  const F = L.fx, rc = L.pl[i], say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`); if (!F || !rc) return;
+  if (F.freezeNear) { const [d] = gfNearest(rc.x, rc.y, L.pl.filter(p => p.side === 1)); if (d) { d.stun = Math.max(d.stun, F.freezeNear); say('freezeNear', `${d.n} turned to stone beside ${rc.n}.`); } }
+  if (F.tgtSlow) { rc.slow = Math.max(rc.slow, F.tgtSlow); say('tgtSlow', `${rc.n} panicked and lost a step.`); }
+}
+// a throw's miss and speed, with the powers on the field
+const gfThrowErr = e => e * (L.fx ? L.fx.errM : 1) + (L.fx ? L.fx.errA : 0);
+const gfThrowV = v => v * (L.fx ? L.fx.ballV : 1);
 function gfEv(k, s, o) { L.ev.push({ k, s, o: o || '', t: L.t }); }
 // the free defenders (not blocked, not down)
 const gfFree = () => L.pl.filter(p => p.side === 1 && p.eng < 0 && p.stun <= 0);
@@ -112,7 +151,7 @@ function gfAim(p) {
   }
   // defense: once they have read the throw, the ones near where it comes down go for the ball
   const qb = L.pl[L.id.QB], lead = q => gfIntercept(p, q);
-  if (L.ball.st === 'air' && L.ball.bt > GF_READ * (1 - .6 * L.read)) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
+  if (L.ball.st === 'air' && L.ball.bt > Math.max(0, GF_READ * (1 - .6 * L.read) + (L.fx ? L.fx.read : 0))) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
   // someone else has it: after a catch everyone chases; after a handoff the rush chases at once, the linebacker and
   // the man defenders read the run in under half a second, and the deep zone a beat later
   if (c && (L.carrier !== L.id.QB || c.x > 0) && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
@@ -159,7 +198,7 @@ function gfQB() {
   const P = GF_PLAYS[L.oc], qb = L.pl[L.id.QB];
   if (P.kind === 'run') {
     const rb = L.pl[L.id.RB];
-    if (!L.handed && L.t > .3 && hyp(rb.x - qb.x, rb.y - qb.y) < 1.3) { L.handed = true; L.carrier = L.id.RB; L.ball.h = L.id.RB; gfEv('handoff', rb.n); }
+    if (!L.handed && L.t > .3 && hyp(rb.x - qb.x, rb.y - qb.y) < 1.3) { L.handed = true; L.carrier = L.id.RB; L.ball.h = L.id.RB; gfEv('handoff', rb.n); gfGotBall(L.id.RB); }
     return;
   }
   if (L.thrown || L.carrier !== L.id.QB || L.hands) return;
@@ -176,15 +215,15 @@ function gfThrow(hurry) {
     const s = Math.min(sep, 8) + p.x * (L.oc === 'deep' ? .08 : .02) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
     if (s > bs) { bs = s; best = i; }
   });
-  const rc = L.pl[best], v = 15 + qb.r.arm * 1.3;
+  const rc = L.pl[best], v = gfThrowV(15 + qb.r.arm * 1.3);
   let tx = rc.x, ty = rc.y, T = 0;
   for (let k = 0; k < 3; k++) { T = hyp(tx - qb.x, ty - qb.y) / v; tx = rc.x + rc.vx * T; ty = rc.y + rc.vy * T; }
   // a long throw, a weak arm and a hurried one all miss by more
-  const e = Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035;
+  const e = gfThrowErr(Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035);
   tx += gauss() * e; ty += gauss() * e; T = Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v);
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T, tgt: best });
   L.thrown = true; L.carrier = -1;
-  gfEv('throw', hurry ? 'hurried' : '', rc.n);
+  gfEv('throw', hurry ? 'hurried' : '', rc.n); gfAtThrow(best);
 }
 
 /* ---------- the ball ---------- */
@@ -198,14 +237,16 @@ function gfBall(dt) {
   const rc = L.pl[B.tgt], dr = hyp(rc.x - B.tx, rc.y - B.ty);
   const [d, dd] = gfNearest(B.tx, B.ty, L.pl.filter(p => p.side === 1 && p.stun <= 0));
   if (Math.abs(B.ty) > GF_HALF || dr > 1.7) { B.st = 'dead'; return gfDead('inc', dr > 1.7 ? 'overthrown' : 'out of bounds'); }
-  if (d && dd < 1.4 && dd < dr) {
-    if (R() < .03 + d.r.hnd * .006) { B.st = 'dead'; return gfDead('int', d.n, d.x); }
+  const F = L.fx || GF_FX0, sure = F.sure > 0;
+  if (d && dd < 1.4 && dd < dr && !sure) {
+    if (R() < (.03 + d.r.hnd * .006) * F.int) { B.st = 'dead'; return gfDead('int', d.n, d.x, L.pl.indexOf(d)); }
     if (R() < .5) { B.st = 'dead'; return gfDead('inc', 'broken up by ' + d.n); }
   }
   // a long ball is a harder catch
   const far = Math.max(0, hyp(B.tx - B.fx, B.ty - B.fy) - 15) * .012;
-  const pc = (d && dd < 1.4 ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - Math.max(0, 1.6 - dd) * .3, .15, .97)) - far;
-  if (R() < pc) { B.st = 'held'; B.h = B.tgt; L.carrier = B.tgt; rc.slow = .15; gfEv('catch', rc.n); }
+  const pc = (d && dd < 1.4 && !sure ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - (sure ? 0 : Math.max(0, 1.6 - dd) * .3), .15, .97)) - far + F.catch;
+  if (sure && d && dd < 1.4) gfEv('pow', L.src.sure || '', `${L.src.sure}: ${rc.n} rose over ${d.n}.`);
+  if (R() < pc) { B.st = 'held'; B.h = B.tgt; L.carrier = B.tgt; rc.slow = Math.max(rc.slow, .15); gfEv('catch', rc.n); gfGotBall(B.tgt); }
   else { B.st = 'dead'; gfDead('inc', 'dropped'); }
 }
 
@@ -229,12 +270,12 @@ function gfBlocks(dt) {
   for (const o of L.pl) {
     if (o.side !== 0 || o.eng < 0) continue;
     // run blocking drives forward: the blockers know the snap count and where the play goes
-    const d = L.pl[o.eng], dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5;
+    const d = L.pl[o.eng], F = L.fx || GF_FX0, dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5 + F.blk - F.dStr;
     // the pair moves the way the stronger one drives
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;
     const near = c && hyp(c.x - d.x, c.y - d.y) < 1.2 ? 1.6 : 1;
-    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near * (d.job === 'rush' && GF_DEFS[L.dc].stunt || 1);
+    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near * (d.job === 'rush' && GF_DEFS[L.dc].stunt || 1) * F.shed;
     if (R() < shed * dt) { o.eng = -1; d.eng = -1; o.stun = .45; gfEv('shed', d.n); }
   }
 }
@@ -249,9 +290,13 @@ function gfTackles() {
     d.cd = .6;
     // your stiff-arm shrugs off the next tackle (Play mode)
     if (L.arm > 0) { L.arm = 0; d.stun = .55; L.broken++; gfEv('broken', c.n); continue; }
+    // powers: no tackle holds for a moment after taking the ball (Bat Swarm), and the first few are broken outright
+    const F = L.fx || GF_FX0;
+    if (F.untag && L.gotT >= 0 && L.t - L.gotT < F.untag) { d.stun = .3; if (!L.ev.some(e => e.k === 'pow' && e.s === L.src.untag)) gfEv('pow', L.src.untag, `${L.src.untag}: ${c.n} slipped through as bats.`); continue; }
+    if (L.breakLeft > 0 && dd <= 1.2) { L.breakLeft--; d.stun = .7; L.broken++; gfEv('broken', c.n); gfEv('pow', L.src.breakN, `${L.src.breakN}: ${c.n} went straight through ${d.n}.`); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
-    const pt = clamp(.78 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35, .2, .93);
-    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n);
+    const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, .12, .97);
+    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);
@@ -263,11 +308,14 @@ function gfBounds() {
   if (c.x >= L.toGoal) return gfDead('td');
   if (Math.abs(c.y) > GF_HALF) gfDead('out');
 }
-// the play is over: what happened, the yards it gained and who made it
-function gfDead(what, by, x) {
+// the play is over: what happened, the yards it gained and who made it (byi: the defender who did, in L.pl; ci: the
+// carrier at the end, for the box score)
+function gfDead(what, by, x, byi) {
   const c = L.carrier >= 0 ? L.pl[L.carrier] : null;
-  const gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
-  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain };
+  let gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
+  // Undying: a loss counts as no gain
+  if (gain < 0 && L.fx && L.fx.nolose && (what === 'tackle' || what === 'sack')) { gfEv('pow', L.src.nolose, `${L.src.nolose}: ${c.n} wouldn't go down backwards.`); gain = 0; }
+  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier };
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)

@@ -4,6 +4,8 @@
    sorted so the nearer ones stand in front. A block shows as a spark between the two: white when it holds, red when the
    defender is winning. The bar at the top has the score, the down, both calls at the snap, and each result with why.
    Between plays each player's position is under them, and GFT.hl ({ side, pos }, set by the page) rings one.
+   Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
+   something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
 const GFT = { t: 0, hl: null };
@@ -19,6 +21,7 @@ function gfDraw(c) {
   const want = L && (GD.ph === 'live' || GD.ph === 'post') ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
   GD.cam = lerp(GD.cam, clamp(want, 18, 82), .08);
   gfDrawField(c);
+  gfDrawZones(c);
   gfDrawPlayers(c);
   gfDrawHands(c);
   gfDrawHud(c);
@@ -62,6 +65,22 @@ function gfDrawField(c) {
     c.fillStyle = 'rgba(90,150,255,.8)'; c.fillRect(los - 1.5, top, 3, bot - top);
     c.fillStyle = 'rgba(255,150,40,.85)'; c.fillRect(gain - 1.5, top, 3, bot - top);
   }
+}
+// a zone on the grass: where it acts, from the line of scrimmage (x) and across (y), by its look
+const GF_ZONE_AREA = { line: [-3, 3, 27], back: [-10, 0, 27], mid: [0, 18, 6], deep: [8, 35, 27], all: [-12, 40, 27] };
+function gfDrawZones(c) {
+  const Z = G.zones || []; if (!Z.length) return;
+  c.save();
+  Z.forEach((z, k) => {
+    const u = GF_ULT_BY[z.id]; if (!u) return;
+    const [col, shape] = u.vis, [x0, x1, w] = GF_ZONE_AREA[shape] || GF_ZONE_AREA.all;
+    const a = gfScr(...gfAbs(x0, -w)), b = gfScr(...gfAbs(x1, w));
+    c.globalAlpha = .16 + .05 * Math.sin(GFT.t * 2 + k); c.fillStyle = col;
+    c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    c.globalAlpha = 1;
+    txt(c, `${z.n} · ${z.left} play${z.left === 1 ? '' : 's'}`, 16 + k * 220, 556, '700 13px "Alegreya Sans", system-ui, sans-serif', tint(col, .35), 'left');
+  });
+  c.restore();
 }
 function gfDrawPlayers(c) {
   const list = [];
@@ -110,13 +129,22 @@ function gfDrawHud(c) {
   c.save();
   const F = (s, w = 700) => `${w} ${s}px "Alegreya Sans", system-ui, sans-serif`;
   // after a play, why it went that way, in as many lines as it takes
-  const why = GD.ph === 'post' || GD.ph === 'over' ? gfWrap(c, GD.why, F(14, 500), 640) : [], h = 58 + why.length * 18 + (why.length && GD.ph === 'over' ? 14 : 0);
+  const why = GD.ph === 'post' || GD.ph === 'over' ? gfWrap(c, GD.why, F(14, 500), 640) : [];
+  // at the snap, the powers each side cast
+  const cast = (GD.ph === 'pre' || GD.ph === 'live') && GD.cast ? [GD.cast.off, GD.cast.def].filter(Boolean).map(x => `${x.ult ? '★ ' : ''}${x.name} (${x.n})`) : [];
+  const h = 58 + why.length * 18 + (why.length && GD.ph === 'over' ? 14 : 0) + (cast.length ? 20 : 0);
   c.fillStyle = 'rgba(12,10,9,.86)'; c.fillRect(0, 0, 960, h); c.fillStyle = 'rgba(255,150,40,.5)'; c.fillRect(0, h, 960, 1.5);
   G.teams.forEach((t, s) => {
     const x = s ? 940 : 20, al = s ? 'right' : 'left';
     c.fillStyle = t.color; c.fillRect(s ? 946 : 8, 10, 6, 38);
     txt(c, t.name + (G.poss === s && GD.ph !== 'over' ? '  ●' : ''), x, 26, F(17, 800), '#f3ead6', al);
     txt(c, String(G.score[s]), x, 50, F(22, 800), '#ffd08a', al);
+    // mana, as diamonds beside the score
+    if (G.mana) for (let i = 0; i < GF_MANA.max; i++) {
+      const px = s ? 940 - 44 - i * 13 : 20 + 44 + i * 13, py = 44;
+      c.beginPath(); c.moveTo(px, py - 5); c.lineTo(px + 4.5, py); c.lineTo(px, py + 5); c.lineTo(px - 4.5, py); c.closePath();
+      c.fillStyle = i < G.mana[s] ? '#a88cff' : 'rgba(168,140,255,.15)'; c.fill();
+    }
   });
   let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   if (GD.ph === 'call') sub = GD.mode !== 'call' ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
@@ -130,8 +158,11 @@ function gfDrawHud(c) {
   txt(c, mid, 480, 27, F(18, 800), '#f3ead6', 'center');
   if (sub) txt(c, sub, 480, 49, F(15, 600), GD.ph === 'pre' ? '#ffd08a' : '#b9b0a0', 'center');
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
+  if (cast.length) txt(c, 'Powers: ' + cast.join('  ·  '), 480, 72, F(14, 700), '#d6c4ff', 'center');
   // a broken tackle, a shed block, the catch: the play's last moment, briefly
-  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (e && L.t - e.t < .9 && (e.k === 'broken' || e.k === 'catch')) txt(c, e.k === 'broken' ? 'Broken tackle!' : 'Caught!', 480, 92, F(20, 800), '#ffd08a', 'center'); }
+  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (e && L.t - e.t < .9 && (e.k === 'broken' || e.k === 'catch')) txt(c, e.k === 'broken' ? 'Broken tackle!' : 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
+  // a power doing its work, a little longer
+  if (L && GD.ph === 'live') { const e = L.ev.slice().reverse().find(x => x.k === 'pow' && x.s && L.t - x.t < 1.3); if (e) txt(c, e.s + '!', 480, 120, F(19, 800), '#d6c4ff', 'center'); }
   c.restore();
 }
 // Play mode on the field: the ring on your target, the lead marker while you hold, and the keys along the bottom

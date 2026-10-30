@@ -835,6 +835,23 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 #wGridCalls .wgworn,#wGridDefs .wgworn{background-image:linear-gradient(#d0a04a,#d0a04a)}
 #wGridCalls .wgtired,#wGridDefs .wgtired{background-image:linear-gradient(#d0604a,#d0604a)}
 #wGridCalls [data-fresh]:not([data-fresh=""])::after,#wGridDefs [data-fresh]:not([data-fresh=""])::after{content:" · " attr(data-fresh);font-size:.8em;opacity:.8}
+/* w45: powers on the gridiron bar, and the tip box */
+.wgpows{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
+.wgpows #wGridMana{font-family:var(--hud);font-weight:400;color:#a88cff;letter-spacing:1px;white-space:nowrap}
+.wgpows #wGridPowList{display:flex;flex-wrap:wrap;gap:6px}
+.wgpows button{padding:3px 8px}
+.wgpows button small{color:var(--dim);font-size:.8em}
+.wgpows button.on{background:#a88cff;color:#1a120c;border-color:#a88cff}
+.wgpows button.on small{color:#2a1a3a}
+.wgpows button.wgult{border-color:rgba(168,140,255,.6)}
+.wgtip{flex-basis:100%;font-size:14px;line-height:1.35;border-left:3px solid #a88cff;padding:2px 0 2px 8px;min-height:6.4em}
+.wgpows button{font-size:15px}
+.wgtip ul{margin:2px 0 0;padding-left:18px}
+.wgtip .wgpro{color:#9fd8a2}
+.wgtip .wgcon{color:#e8a08f}
+.wgtip .wgnote{color:var(--dim)}
+.wgline td.wgbad{color:#e8a08f;font-weight:700}
+.wgbook td{text-align:left;vertical-align:top;font-size:14px}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -21972,14 +21989,23 @@ const gfDefSet = dc => Object.assign({}, GF_DEF_SET, (GF_DEFS[dc] || {}).set);
 const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
 // (a defender who knows the play is coming gets a jump on it; one whose defense is read, a step slow)
-const gfSpeed = p => (6 + p.r.spd * .2) * (p.side === 1 ? 1 + .08 * L.read - .05 * L.tell : 1) * (L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p) ? .94 : 1) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+// (and the powers and zones on the field, 14-powers.js: by side, job and where they are)
+function gfSpeed(p) {
+  const F = L.fx || GF_FX0, held = L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p);
+  let m = (6 + p.r.spd * .2) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+  if (p.side === 1) { m *= (1 + .08 * L.read - .05 * L.tell) * F.dSpd; if (p.job === 'rush') m *= F.rushSpd; else if (p.job === 'man' || p.job === 'zone') m *= F.coverSpd; return m; }
+  m *= F.oSpd;
+  if (held) m *= .94 * F.cSpd; else if (p.job === 'route') m *= F.rSpd * (p.x > 8 ? F.deepSpd : 1);
+  return m * (p.x < 0 ? F.backSpd : Math.abs(p.y) < 6 ? F.midSpd : 1);
+}
 
-// st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense }
+// st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense },
+// and pw: the powers cast with the calls ({ off, def }, 14-powers.js). A worn player plays on worn ratings (gfWorn)
 function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
     const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri];
-    pl.push({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: m.r, x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 });
+    pl.push({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: gfWorn(side ? 1 - G.poss : G.poss, ri, m.r), x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 });
     return pl.length - 1;
   };
   const set = gfSet(oc);
@@ -22002,8 +22028,38 @@ function gfSnap(oc, dc, st) {
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
     read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
+  gfSnapFx(st && st.pw);
   return L;
 }
+// the powers on this play: their effects (L.fx), who gave each (L.src, for the reason), and what happens at the snap
+function gfSnapFx(pw) {
+  L.pw = pw || null; L.fx = gfFx(pw); L.src = gfFxSrc(pw); L.breakLeft = L.fx.breakN; L.gotT = -1;
+  const F = L.fx, say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`);
+  const def = L.pl.filter(p => p.side === 1), off = L.pl.filter(p => p.side === 0);
+  if (F.snapAll) { for (const d of def) d.stun = Math.max(d.stun, F.snapAll); say('snapAll', 'every defender staggered at the snap.'); }
+  if (F.snapStun) { for (const d of def) if (d.job === 'rush') d.stun = Math.max(d.stun, F.snapStun); say('snapStun', 'the rushers went down at the snap.'); }
+  if (F.blkStun) { for (const o of off) if (o.job === 'block' || o.job === 'pblock' || o.job === 'stalk') o.stun = Math.max(o.stun, F.blkStun); say('blkStun', 'every blocker stumbled at the snap.'); }
+  if (F.coverSlow) { for (const d of def) if (d.job === 'man' || d.job === 'zone') d.slow = Math.max(d.slow, F.coverSlow); say('coverSlow', 'the coverage lost the receivers off the line.'); }
+  if (F.safetySlow) { const s = L.pl[L.did.S]; if (s) { s.slow = Math.max(s.slow, F.safetySlow); say('safetySlow', `${s.n} at safety is a step slow all play.`); } }
+  if (F.gas) { const hit = def.filter(d => d.job === 'rush' && !GF_UNDEAD.includes(d.kind) && R() < .6); for (const d of hit) d.stun = Math.max(d.stun, F.gas); if (hit.length) say('gas', `${hit.map(d => d.n).join(' and ')} went down in the gas.`); }
+}
+// someone takes the ball (the handoff or the catch): the defense's powers that wait for it
+function gfGotBall(i) {
+  const F = L.fx, c = L.pl[i], say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`);
+  L.gotT = L.t; if (!F) return;
+  if (F.pounce) { const [d, dd] = gfNearest(c.x, c.y, gfFree()); if (d && dd > 1) { const k = Math.min(F.pounce, dd - .8) / dd; d.x += (c.x - d.x) * k; d.y += (c.y - d.y) * k; say('pounce', `${d.n} leapt at ${c.n}.`); } }
+  if (F.cStun && R() < (F.cStunP || 1)) { c.stun = Math.max(c.stun, F.cStun); say('cStun', `${c.n} froze with the ball.`); }
+  if (F.cSlow) { c.slow = Math.max(c.slow, F.cSlow); say('cSlow', `${c.n} was caught in it.`); }
+}
+// the ball is thrown to receiver i: the powers that wait for the throw
+function gfAtThrow(i) {
+  const F = L.fx, rc = L.pl[i], say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`); if (!F || !rc) return;
+  if (F.freezeNear) { const [d] = gfNearest(rc.x, rc.y, L.pl.filter(p => p.side === 1)); if (d) { d.stun = Math.max(d.stun, F.freezeNear); say('freezeNear', `${d.n} turned to stone beside ${rc.n}.`); } }
+  if (F.tgtSlow) { rc.slow = Math.max(rc.slow, F.tgtSlow); say('tgtSlow', `${rc.n} panicked and lost a step.`); }
+}
+// a throw's miss and speed, with the powers on the field
+const gfThrowErr = e => e * (L.fx ? L.fx.errM : 1) + (L.fx ? L.fx.errA : 0);
+const gfThrowV = v => v * (L.fx ? L.fx.ballV : 1);
 function gfEv(k, s, o) { L.ev.push({ k, s, o: o || '', t: L.t }); }
 // the free defenders (not blocked, not down)
 const gfFree = () => L.pl.filter(p => p.side === 1 && p.eng < 0 && p.stun <= 0);
@@ -22065,7 +22121,7 @@ function gfAim(p) {
   }
   // defense: once they have read the throw, the ones near where it comes down go for the ball
   const qb = L.pl[L.id.QB], lead = q => gfIntercept(p, q);
-  if (L.ball.st === 'air' && L.ball.bt > GF_READ * (1 - .6 * L.read)) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
+  if (L.ball.st === 'air' && L.ball.bt > Math.max(0, GF_READ * (1 - .6 * L.read) + (L.fx ? L.fx.read : 0))) { const B = L.ball; if (hyp(B.tx - p.x, B.ty - p.y) < 13) return [B.tx, B.ty]; }
   // someone else has it: after a catch everyone chases; after a handoff the rush chases at once, the linebacker and
   // the man defenders read the run in under half a second, and the deep zone a beat later
   if (c && (L.carrier !== L.id.QB || c.x > 0) && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
@@ -22112,7 +22168,7 @@ function gfQB() {
   const P = GF_PLAYS[L.oc], qb = L.pl[L.id.QB];
   if (P.kind === 'run') {
     const rb = L.pl[L.id.RB];
-    if (!L.handed && L.t > .3 && hyp(rb.x - qb.x, rb.y - qb.y) < 1.3) { L.handed = true; L.carrier = L.id.RB; L.ball.h = L.id.RB; gfEv('handoff', rb.n); }
+    if (!L.handed && L.t > .3 && hyp(rb.x - qb.x, rb.y - qb.y) < 1.3) { L.handed = true; L.carrier = L.id.RB; L.ball.h = L.id.RB; gfEv('handoff', rb.n); gfGotBall(L.id.RB); }
     return;
   }
   if (L.thrown || L.carrier !== L.id.QB || L.hands) return;
@@ -22129,15 +22185,15 @@ function gfThrow(hurry) {
     const s = Math.min(sep, 8) + p.x * (L.oc === 'deep' ? .08 : .02) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
     if (s > bs) { bs = s; best = i; }
   });
-  const rc = L.pl[best], v = 15 + qb.r.arm * 1.3;
+  const rc = L.pl[best], v = gfThrowV(15 + qb.r.arm * 1.3);
   let tx = rc.x, ty = rc.y, T = 0;
   for (let k = 0; k < 3; k++) { T = hyp(tx - qb.x, ty - qb.y) / v; tx = rc.x + rc.vx * T; ty = rc.y + rc.vy * T; }
   // a long throw, a weak arm and a hurried one all miss by more
-  const e = Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035;
+  const e = gfThrowErr(Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035);
   tx += gauss() * e; ty += gauss() * e; T = Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v);
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T, tgt: best });
   L.thrown = true; L.carrier = -1;
-  gfEv('throw', hurry ? 'hurried' : '', rc.n);
+  gfEv('throw', hurry ? 'hurried' : '', rc.n); gfAtThrow(best);
 }
 
 /* ---------- the ball ---------- */
@@ -22151,14 +22207,16 @@ function gfBall(dt) {
   const rc = L.pl[B.tgt], dr = hyp(rc.x - B.tx, rc.y - B.ty);
   const [d, dd] = gfNearest(B.tx, B.ty, L.pl.filter(p => p.side === 1 && p.stun <= 0));
   if (Math.abs(B.ty) > GF_HALF || dr > 1.7) { B.st = 'dead'; return gfDead('inc', dr > 1.7 ? 'overthrown' : 'out of bounds'); }
-  if (d && dd < 1.4 && dd < dr) {
-    if (R() < .03 + d.r.hnd * .006) { B.st = 'dead'; return gfDead('int', d.n, d.x); }
+  const F = L.fx || GF_FX0, sure = F.sure > 0;
+  if (d && dd < 1.4 && dd < dr && !sure) {
+    if (R() < (.03 + d.r.hnd * .006) * F.int) { B.st = 'dead'; return gfDead('int', d.n, d.x, L.pl.indexOf(d)); }
     if (R() < .5) { B.st = 'dead'; return gfDead('inc', 'broken up by ' + d.n); }
   }
   // a long ball is a harder catch
   const far = Math.max(0, hyp(B.tx - B.fx, B.ty - B.fy) - 15) * .012;
-  const pc = (d && dd < 1.4 ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - Math.max(0, 1.6 - dd) * .3, .15, .97)) - far;
-  if (R() < pc) { B.st = 'held'; B.h = B.tgt; L.carrier = B.tgt; rc.slow = .15; gfEv('catch', rc.n); }
+  const pc = (d && dd < 1.4 && !sure ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - (sure ? 0 : Math.max(0, 1.6 - dd) * .3), .15, .97)) - far + F.catch;
+  if (sure && d && dd < 1.4) gfEv('pow', L.src.sure || '', `${L.src.sure}: ${rc.n} rose over ${d.n}.`);
+  if (R() < pc) { B.st = 'held'; B.h = B.tgt; L.carrier = B.tgt; rc.slow = Math.max(rc.slow, .15); gfEv('catch', rc.n); gfGotBall(B.tgt); }
   else { B.st = 'dead'; gfDead('inc', 'dropped'); }
 }
 
@@ -22182,12 +22240,12 @@ function gfBlocks(dt) {
   for (const o of L.pl) {
     if (o.side !== 0 || o.eng < 0) continue;
     // run blocking drives forward: the blockers know the snap count and where the play goes
-    const d = L.pl[o.eng], dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5;
+    const d = L.pl[o.eng], F = L.fx || GF_FX0, dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5 + F.blk - F.dStr;
     // the pair moves the way the stronger one drives
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;
     const near = c && hyp(c.x - d.x, c.y - d.y) < 1.2 ? 1.6 : 1;
-    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near * (d.job === 'rush' && GF_DEFS[L.dc].stunt || 1);
+    const shed = ((P.kind === 'run' ? .18 : .3) + Math.max(0, -dif) * .14 + (d.job === 'rush' && L.t > 2 ? .35 : 0)) * near * (d.job === 'rush' && GF_DEFS[L.dc].stunt || 1) * F.shed;
     if (R() < shed * dt) { o.eng = -1; d.eng = -1; o.stun = .45; gfEv('shed', d.n); }
   }
 }
@@ -22202,9 +22260,13 @@ function gfTackles() {
     d.cd = .6;
     // your stiff-arm shrugs off the next tackle (Play mode)
     if (L.arm > 0) { L.arm = 0; d.stun = .55; L.broken++; gfEv('broken', c.n); continue; }
+    // powers: no tackle holds for a moment after taking the ball (Bat Swarm), and the first few are broken outright
+    const F = L.fx || GF_FX0;
+    if (F.untag && L.gotT >= 0 && L.t - L.gotT < F.untag) { d.stun = .3; if (!L.ev.some(e => e.k === 'pow' && e.s === L.src.untag)) gfEv('pow', L.src.untag, `${L.src.untag}: ${c.n} slipped through as bats.`); continue; }
+    if (L.breakLeft > 0 && dd <= 1.2) { L.breakLeft--; d.stun = .7; L.broken++; gfEv('broken', c.n); gfEv('pow', L.src.breakN, `${L.src.breakN}: ${c.n} went straight through ${d.n}.`); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
-    const pt = clamp(.78 + (d.r.tkl - c.r.str) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35, .2, .93);
-    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n);
+    const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, .12, .97);
+    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);
@@ -22216,11 +22278,14 @@ function gfBounds() {
   if (c.x >= L.toGoal) return gfDead('td');
   if (Math.abs(c.y) > GF_HALF) gfDead('out');
 }
-// the play is over: what happened, the yards it gained and who made it
-function gfDead(what, by, x) {
+// the play is over: what happened, the yards it gained and who made it (byi: the defender who did, in L.pl; ci: the
+// carrier at the end, for the box score)
+function gfDead(what, by, x, byi) {
   const c = L.carrier >= 0 ? L.pl[L.carrier] : null;
-  const gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
-  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain };
+  let gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
+  // Undying: a loss counts as no gain
+  if (gain < 0 && L.fx && L.fx.nolose && (what === 'tackle' || what === 'sack')) { gfEv('pow', L.src.nolose, `${L.src.nolose}: ${c.n} wouldn't go down backwards.`); gain = 0; }
+  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier };
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)
@@ -22246,7 +22311,7 @@ function gfFourth() {
   return 'punt';
 }
 const gfKicker = () => G.teams[G.poss].roster[G.teams[G.poss].kicker];
-function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03, .05, .99); }
+function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03 + gfZoneSum('kick'), .05, .99); }
 function gfKickGood(k) { return R() < gfKickChance(k); }
 function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
 /* Cinder Gridiron: one drive (issue #9, phase 1). The first side has the ball on its own 25 and drives until it
@@ -22257,10 +22322,12 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
    on any down your call may be a punt or, in range (GF_FG_MAX), a field goal, and fourth down waits for you too.
    In a full game (10-game.js) you call the defense too when the other side has the ball.
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
+   With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
+   GD.cast is what both sides cast for the play on show. opts.skill: the CPU's skill by side ([0..2, 0..2]).
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
-const GF_HOOK = { onOver: null, onPhase: null };
+const GF_HOOK = { onOver: null, onPhase: null, onSnap: null };
 let GD = null;
 
 function gfStart(opts) {
@@ -22268,10 +22335,13 @@ function gfStart(opts) {
   gfSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
-  gfPlaybookStart();
+  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
+  gfPlaybookStart(); gfBoxStart();
+  // (opts.powers false: a game without them, for the balance bot)
+  if (o.powers !== false) gfPowersStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -22286,7 +22356,12 @@ function gfCanCall(oc) {
   if (GD.mode !== 'watch' && G.poss !== GD.you) return !!GF_DEFS[oc];
   return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX);
 }
-function gfGo(ph) { GD.ph = ph; GD.t = 0; if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); } }
+function gfGo(ph) {
+  GD.ph = ph; GD.t = 0;
+  // each call is a point to save the game at (13-box.js)
+  if (ph === 'call' && GF_HOOK.onSnap) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
+  if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
+}
 
 function gfTick(dt) {
   if (!GD || GD.ph === 'over') return;
@@ -22297,7 +22372,8 @@ function gfTick(dt) {
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
-    GD.stale = gfCallsMade(GD.oc, GD.dc);
+    GD.cast = gfCastPowers(GD.oc, GD.dc);
+    GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });
     return gfGo('pre');
   }
   if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc, GD.stale); GD.acc = 0; gfGo('live'); } return; }
@@ -22324,11 +22400,14 @@ const gfName = (side) => G.teams[side].name;
 function gfResult(r) {
   const off = G.poss, before = { down: G.down, togo: G.togo, ball: G.ball };
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
+  const pw = [GD.cast && GD.cast.off, GD.cast && GD.cast.def].filter(Boolean).map(c => ({ side: c.side, n: c.n, name: c.name, ult: c.ult }));
+  if (pw.length) e.pw = pw;
+  gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
   if (r.what === 'int') {
     G.ball = clamp(G.ball + r.x, 1, 99); gfTurnover(); G.drive.end = 'int';
-    GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); return;
+    GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); gfPowersAfter(); return;
   }
   G.drive.yards += r.gain;
   const s = gfSpot(r.gain), yd = n => `${Math.abs(n)} yard${Math.abs(n) === 1 ? '' : 's'}`;
@@ -22337,11 +22416,12 @@ function gfResult(r) {
     : r.what === 'inc' ? `Incomplete: ${r.by}.`
     : `${r.who}, ${r.gain > 0 ? yd(r.gain) : r.gain < 0 ? 'a loss of ' + yd(r.gain) : 'no gain'}${r.what === 'out' ? ', out of bounds' : r.by ? ', brought down by ' + r.by : ''}.`;
   if (s === 'first') GD.msg += ' First down.';
-  if (s === 'safety') { GD.msg = `Safety: ${r.who} is tackled in the end zone.`; G.drive.end = 'safety'; }
+  if (s === 'safety') { GD.msg = `Safety: ${r.who} is tackled in the end zone.`; G.drive.end = 'safety'; gfScoredOn(off); }
   if (s === 'turnover') { GD.msg += ' Turnover on downs.'; G.drive.end = 'downs'; }
-  if (s === 'td') { G.drive.end = 'td'; GD.msg += gfExtraPoint(); }
+  if (s === 'td') { G.drive.end = 'td'; GD.msg += gfExtraPoint(); gfScoredOn(1 - off); }
   e.msg = GD.msg; e.why = GD.why;
   gfRunClock(r.what, L ? L.t : 5);
+  gfPowersAfter();
 }
 // why it went that way: the play's story from its events, then how the calls matched up
 function gfWhy(r) {
@@ -22351,6 +22431,7 @@ function gfWhy(r) {
   else if (P.kind === 'run') out.push(`The handoff went to ${r.who || 'the back'}.`);
   const br = L ? L.broken : 0;
   if (br) out.push(`${br} broken tackle${br > 1 ? 's' : ''}.`);
+  const pw = gfPowWhy(GD.cast); if (pw) out.push(pw);
   const [g, why] = gfEdge(GD.oc, GD.dc);
   const dn = GF_DEFS[GD.dc].n, st = GD.stale || {};
   if (st.read > .45) out.push(`They saw the ${P.n.toLowerCase()} coming: it's been called a lot.`);
@@ -22361,23 +22442,29 @@ function gfWhy(r) {
 function gfKick() {
   const off = G.poss, k = G.teams[off].roster[G.teams[off].kicker], dist = gfKickDist(), down = G.down, ball = G.ball, ch = gfKickChance(k);
   if (GD.kick === 'fg') {
-    const M = GD.meter, r = gfFieldGoal(M ? gfMeterFg(k) : gfKickGood(k));
+    // (a Tempest on the field pushes even a well-struck kick)
+    const M = GD.meter, gust = M && gfZoneSum('kick') < 0 && R() < -gfZoneSum('kick'), r = gfFieldGoal(M ? gfMeterFg(k) && !gust : gfKickGood(k));
+    if (r === 'fg') gfScoredOn(1 - off);
+    gfBoxAdd(off, G.teams[off].kicker, 'fga'); if (r === 'fg') gfBoxAdd(off, G.teams[off].kicker, 'fgm');
     G.drive.end = r; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
     GD.why = M ? `Power ${Math.round(M.pw * 100)}% (${dist} yards needs ${Math.ceil(dist / gfFgReach(k) * 100)}%), and the aim ${Math.abs(M.aim) <= gfFgWindow(k) ? 'true' : (M.aim < 0 ? 'wide left' : 'wide right')}.`
       : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
+    if (gfZoneSum('kick') < 0) GD.why += ` The ${gfZoneName('kick')} pushes the ball${gust ? ' wide' : ''}.`;
   } else {
-    const y = GD.meter ? gfMeterPunt(k) : gfPuntYards(k); G.plays++;
+    const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt'))); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
     G.drive.end = 'punt'; GD.msg = `${k.n} punts, ${y} yards.`;
     GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
   }
+  if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
   G.drive.plays.push({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why });
   gfRunClock(G.drive.end, 5);
+  gfPowersAfter();
 }
 function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name) }; }
 // a whole drive at once, CPU against CPU, through the same flow
 function gfSim(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = null;
+  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   try { gfStart(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 50000 && GD.ph !== 'over'; i++) gfTick(GF_DT * 10); }
   finally { Object.assign(GF_HOOK, hooks); }
   return Object.assign(gfSummary(), { log: G.drive.plays });
@@ -22388,6 +22475,8 @@ function gfSim(opts) {
    sorted so the nearer ones stand in front. A block shows as a spark between the two: white when it holds, red when the
    defender is winning. The bar at the top has the score, the down, both calls at the snap, and each result with why.
    Between plays each player's position is under them, and GFT.hl ({ side, pos }, set by the page) rings one.
+   Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
+   something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
 const GFT = { t: 0, hl: null };
@@ -22403,6 +22492,7 @@ function gfDraw(c) {
   const want = L && (GD.ph === 'live' || GD.ph === 'post') ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
   GD.cam = lerp(GD.cam, clamp(want, 18, 82), .08);
   gfDrawField(c);
+  gfDrawZones(c);
   gfDrawPlayers(c);
   gfDrawHands(c);
   gfDrawHud(c);
@@ -22446,6 +22536,22 @@ function gfDrawField(c) {
     c.fillStyle = 'rgba(90,150,255,.8)'; c.fillRect(los - 1.5, top, 3, bot - top);
     c.fillStyle = 'rgba(255,150,40,.85)'; c.fillRect(gain - 1.5, top, 3, bot - top);
   }
+}
+// a zone on the grass: where it acts, from the line of scrimmage (x) and across (y), by its look
+const GF_ZONE_AREA = { line: [-3, 3, 27], back: [-10, 0, 27], mid: [0, 18, 6], deep: [8, 35, 27], all: [-12, 40, 27] };
+function gfDrawZones(c) {
+  const Z = G.zones || []; if (!Z.length) return;
+  c.save();
+  Z.forEach((z, k) => {
+    const u = GF_ULT_BY[z.id]; if (!u) return;
+    const [col, shape] = u.vis, [x0, x1, w] = GF_ZONE_AREA[shape] || GF_ZONE_AREA.all;
+    const a = gfScr(...gfAbs(x0, -w)), b = gfScr(...gfAbs(x1, w));
+    c.globalAlpha = .16 + .05 * Math.sin(GFT.t * 2 + k); c.fillStyle = col;
+    c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    c.globalAlpha = 1;
+    txt(c, `${z.n} · ${z.left} play${z.left === 1 ? '' : 's'}`, 16 + k * 220, 556, '700 13px "Alegreya Sans", system-ui, sans-serif', tint(col, .35), 'left');
+  });
+  c.restore();
 }
 function gfDrawPlayers(c) {
   const list = [];
@@ -22494,13 +22600,22 @@ function gfDrawHud(c) {
   c.save();
   const F = (s, w = 700) => `${w} ${s}px "Alegreya Sans", system-ui, sans-serif`;
   // after a play, why it went that way, in as many lines as it takes
-  const why = GD.ph === 'post' || GD.ph === 'over' ? gfWrap(c, GD.why, F(14, 500), 640) : [], h = 58 + why.length * 18 + (why.length && GD.ph === 'over' ? 14 : 0);
+  const why = GD.ph === 'post' || GD.ph === 'over' ? gfWrap(c, GD.why, F(14, 500), 640) : [];
+  // at the snap, the powers each side cast
+  const cast = (GD.ph === 'pre' || GD.ph === 'live') && GD.cast ? [GD.cast.off, GD.cast.def].filter(Boolean).map(x => `${x.ult ? '★ ' : ''}${x.name} (${x.n})`) : [];
+  const h = 58 + why.length * 18 + (why.length && GD.ph === 'over' ? 14 : 0) + (cast.length ? 20 : 0);
   c.fillStyle = 'rgba(12,10,9,.86)'; c.fillRect(0, 0, 960, h); c.fillStyle = 'rgba(255,150,40,.5)'; c.fillRect(0, h, 960, 1.5);
   G.teams.forEach((t, s) => {
     const x = s ? 940 : 20, al = s ? 'right' : 'left';
     c.fillStyle = t.color; c.fillRect(s ? 946 : 8, 10, 6, 38);
     txt(c, t.name + (G.poss === s && GD.ph !== 'over' ? '  ●' : ''), x, 26, F(17, 800), '#f3ead6', al);
     txt(c, String(G.score[s]), x, 50, F(22, 800), '#ffd08a', al);
+    // mana, as diamonds beside the score
+    if (G.mana) for (let i = 0; i < GF_MANA.max; i++) {
+      const px = s ? 940 - 44 - i * 13 : 20 + 44 + i * 13, py = 44;
+      c.beginPath(); c.moveTo(px, py - 5); c.lineTo(px + 4.5, py); c.lineTo(px, py + 5); c.lineTo(px - 4.5, py); c.closePath();
+      c.fillStyle = i < G.mana[s] ? '#a88cff' : 'rgba(168,140,255,.15)'; c.fill();
+    }
   });
   let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   if (GD.ph === 'call') sub = GD.mode !== 'call' ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
@@ -22514,8 +22629,11 @@ function gfDrawHud(c) {
   txt(c, mid, 480, 27, F(18, 800), '#f3ead6', 'center');
   if (sub) txt(c, sub, 480, 49, F(15, 600), GD.ph === 'pre' ? '#ffd08a' : '#b9b0a0', 'center');
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
+  if (cast.length) txt(c, 'Powers: ' + cast.join('  ·  '), 480, 72, F(14, 700), '#d6c4ff', 'center');
   // a broken tackle, a shed block, the catch: the play's last moment, briefly
-  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (e && L.t - e.t < .9 && (e.k === 'broken' || e.k === 'catch')) txt(c, e.k === 'broken' ? 'Broken tackle!' : 'Caught!', 480, 92, F(20, 800), '#ffd08a', 'center'); }
+  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (e && L.t - e.t < .9 && (e.k === 'broken' || e.k === 'catch')) txt(c, e.k === 'broken' ? 'Broken tackle!' : 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
+  // a power doing its work, a little longer
+  if (L && GD.ph === 'live') { const e = L.ev.slice().reverse().find(x => x.k === 'pow' && x.s && L.t - x.t < 1.3); if (e) txt(c, e.s + '!', 480, 120, F(19, 800), '#d6c4ff', 'center'); }
   c.restore();
 }
 // Play mode on the field: the ring on your target, the lead marker while you hold, and the keys along the bottom
@@ -22594,6 +22712,7 @@ function gfExtraPoint() {
   if (!GD.game) return '';
   const k = G.teams[1 - G.poss].roster[G.teams[1 - G.poss].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
   if (good) G.score[1 - G.poss]++;
+  gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpa'); if (good) gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpm');
   return good ? ' Extra point good.' : ' The extra point is no good.';
 }
 // side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
@@ -22604,7 +22723,7 @@ function gfKickoff() {
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
 }
-function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; }
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; if (G.zones) G.zones = []; gfPowersDrive(); }
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
@@ -22613,9 +22732,9 @@ function gfGameNext() {
   // Sudden Death: the first score wins
   if (G.half === 3 && scored) return false;
   if (G.clock <= 0) {
-    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
+    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); gfPowersHalf(); GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
     if (G.score[0] !== G.score[1] || G.half === 3) return false;
-    G.half = 3; G.clock = GF_GAME.ot; GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
+    G.half = 3; G.clock = GF_GAME.ot; gfPowersHalf(); GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
   }
   // after a score the other side receives: the side that scored kicks off, and after a safety the side scored on
   // (the drive's offense either way); otherwise the ball has already changed hands
@@ -22634,11 +22753,11 @@ function gfGameSummary() {
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = null;
+  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   let secs = 0;
   try { gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; } }
   finally { Object.assign(GF_HOOK, hooks); }
-  return Object.assign(gfGameSummary(), { secs: Math.round(secs) });
+  return Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
 }
 /* Cinder Gridiron: Play mode (issue #9, phase 2). In 'play' you call your side's plays as in 'call', and then play the
    offense by hand. On defense you call the defense and watch (question 3).
@@ -22685,13 +22804,13 @@ function gfPickTarget(d) { const r = gfReceivers(); if (!r.length) return; const
 function gfLeadSpot(i, lead) { const p = L.pl[i]; return [p.x + p.vx * lead, p.y + p.vy * lead]; }
 function gfThrowTo(i, lead) {
   const qb = L.pl[L.id.QB], rc = L.pl[i]; if (!rc) return;
-  const [, press] = gfNearest(qb.x, qb.y, gfFree()), hurry = press < 1.8, v = 15 + qb.r.arm * 1.3;
+  const [, press] = gfNearest(qb.x, qb.y, gfFree()), hurry = press < 1.8, v = gfThrowV(15 + qb.r.arm * 1.3);
   let [tx, ty] = gfLeadSpot(i, lead);
-  const e = Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03;
+  const e = gfThrowErr(Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.4 : .2) + hyp(tx - qb.x, ty - qb.y) * .03);
   tx += gauss() * e; ty += gauss() * e;
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T: Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v), tgt: i });
   L.thrown = true; L.carrier = -1;
-  gfEv('throw', hurry ? 'hurried' : '', rc.n);
+  gfEv('throw', hurry ? 'hurried' : '', rc.n); gfAtThrow(i);
 }
 // each step of a hands-on play: keep the ring on the open receiver until you pick one
 function gfHandsStep() { if (!L.ctl.picked || L.ctl.tgt < 0) L.ctl.tgt = gfOpenest(); if (L.arm > 0) L.arm -= GF_DT; }
@@ -22736,18 +22855,20 @@ function gfTire(side, kind, id) {
   for (const k in F) F[k] = k === id ? Math.max(0, F[k] - GF_TIRE) : Math.min(1, F[k] + GF_REST);
 }
 // a down is called: how stale each side's call is (for the live play), then both tire, and the coaches see them
-function gfCallsMade(oc, dc) {
+// (a play cast on is remembered: it counts half again in what the other coach has seen)
+function gfCallsMade(oc, dc, cast) {
   const off = G.poss, def = 1 - G.poss;
   const st = { read: 1 - gfFresh(off, 'off', oc), tell: 1 - gfFresh(def, 'def', dc) };
   gfTire(off, 'off', oc); gfTire(def, 'def', dc);
-  if (G.seen) { G.seen[off].push({ oc }); G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
+  if (G.seen) { G.seen[off].push(cast && cast.off ? { oc, pw: 1 } : { oc }); G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
   return st;
 }
 function gfHalfRest() { if (G.fresh) G.fresh = [gfFreshAll(), gfFreshAll()]; }
 // what share of side's last calls of a kind were each one
 function gfTendency(side, kind) {
   const key = kind === 'off' ? 'oc' : 'dc', list = ((G.seen && G.seen[side]) || []).filter(x => x[key]).slice(-GF_SEEN), out = {};
-  for (const x of list) out[x[key]] = (out[x[key]] || 0) + 1 / list.length;
+  const W = list.reduce((a, x) => a + (x.pw ? 1.5 : 1), 0);
+  for (const x of list) out[x[key]] = (out[x[key]] || 0) + (x.pw ? 1.5 : 1) / W;
   return out;
 }
 // the counter-call: weight up the defenses that beat what this offense keeps calling, down the ones it beats
@@ -22760,6 +22881,312 @@ function gfCounterOffense(w) {
   const T = gfTendency(1 - G.poss, 'def');
   for (const oc in w) { for (const dc in T) w[oc] += gfEdge(oc, dc)[0] * T[dc] * 2.5; w[oc] = Math.max(.15, w[oc]) * (.3 + .7 * gfFresh(G.poss, 'off', oc)); }
   return w;
+}
+/* Cinder Gridiron: box scores, and a game to save and come back to (issue #9, phase 5).
+   The box: every play adds to the lines of the players in it, by side and roster index (G.box = [[line], [line]]).
+   A line counts passing (pa attempts, pc completions, py yards, ptd touchdowns, pint interceptions thrown, sacked),
+   running (ra carries, ry yards), catching (rec, recy), touchdowns scored (td), defense (tkl tackles, sk sacks, ints
+   interceptions) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
+   The snapshot: between plays, at each call, the game is G and GD as plain JSON, and GF_HOOK.onSnap hears it. A saved
+   game comes back on the field at that call (gfResume): the play that was running is played again. */
+function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); }
+function gfBoxAdd(side, ri, k, n) { if (!G.box || ri == null || ri < 0 || !G.box[side][ri]) return; const b = G.box[side][ri]; b[k] = (b[k] || 0) + (n == null ? 1 : n); }
+// a play is over: off had the ball; r is the play's end (L.done)
+function gfBoxPlay(off, r) {
+  if (!L || !G.box) return;
+  const def = 1 - off, ri = i => i >= 0 && L.pl[i] ? L.pl[i].ri : -1, qb = ri(L.id.QB), by = ri(r.byi), car = ri(r.ci);
+  const caught = L.ev.some(e => e.k === 'catch'), td = r.what === 'td';
+  if (L.thrown) {
+    gfBoxAdd(off, qb, 'pa');
+    if (r.what === 'int') { gfBoxAdd(off, qb, 'pint'); gfBoxAdd(def, by, 'ints'); }
+    else if (caught) { gfBoxAdd(off, qb, 'pc'); gfBoxAdd(off, qb, 'py', r.gain); gfBoxAdd(off, car, 'rec'); gfBoxAdd(off, car, 'recy', r.gain); if (td) { gfBoxAdd(off, qb, 'ptd'); gfBoxAdd(off, car, 'td'); } }
+  } else if (r.what === 'sack') { gfBoxAdd(off, qb, 'sacked'); gfBoxAdd(def, by, 'sk'); }
+  else if (car >= 0) { gfBoxAdd(off, car, 'ra'); gfBoxAdd(off, car, 'ry', r.gain); if (td) gfBoxAdd(off, car, 'td'); }
+  if ((r.what === 'tackle' || r.what === 'sack') && by >= 0) gfBoxAdd(def, by, 'tkl');
+}
+// the box as lines with names: [{ side, ri, n, kind, line }]
+function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line) }))) : []; }
+function gfSnapshot() {
+  const D = Object.assign({}, GD, { ph: 'call', t: 0, pick: null, meter: null, stale: null, kick: null, acc: 0 });
+  return JSON.parse(JSON.stringify({ G, GD: D }));
+}
+function gfResume(sn) {
+  const s = JSON.parse(JSON.stringify(sn));
+  G = s.G; GD = s.GD; L = null; gfSeed(null);
+  return G;
+}
+/* Cinder Gridiron: monster powers (issue #9, phase 6). They work as they do on Brimstone Diamond, adapted to downs:
+   - Team mana (G.mana, by side), as on the diamond where every inning brings some: 3 to start and back up to 3 at
+     the half, 1 to both sides at every new drive, and 1 more each time the other side scores (up to 6).
+   - Everyday powers: every kind has an offense power and a defense power (GF_POW), cast with the call. A side casts
+     at most one a down. Each costs mana, and stamina from the player who casts it.
+   - The ultimate: one per kind (GF_ULT), once a game, 3 mana. It leaves a zone on the field (G.zones) that lasts 3
+     plays or the drive, whichever ends first; a few hit at once too (Stampede).
+   - Stamina (G.stam, by side and roster index, 0 to 100): the same seven play both ways, so every play costs everyone
+     a little (the undead and golems half as much); casting costs a lot more, and the half gives plenty back. Below
+     half, a player is slower and weaker (gfWorn), and can't cast below GF_STAM.min.
+   - Your side: pick a power with the call (GD.pow), or let Auto powers (GD.auto, on in 'call', T on the page) cast
+     the way the coaches would. The CPU casts at three skill levels (G.skill, by side: 0, 1, 2): a Squire casts at
+     random, a Knight leans to powers that suit the call, and an Archmage casts only those, and saves its ultimates for
+     the downs that matter. Their coach remembers the plays you cast on (12-playbook.js).
+   - On the field every power is one set of effects (GF_FX0), merged into L.fx at the snap from both sides' powers and
+     the zones (gfFx): multipliers multiply, the rest add. 06-live.js reads L.fx; what a power did goes in the play's
+     events, and so in the reason after it.
+   - Power tips (gfPowerTip): the pros and cons of a power for the down, the distance and the field. */
+const GF_MANA = { start: 3, max: 6, scored: 1, drive: 1 }, GF_STAM = { min: 20, per: 6, base: 14, ult: 30, play: 1, half: 50 };
+const GF_ULT_COST = 3, GF_ULT_PLAYS = 3;
+const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
+// the effects, at no effect. Speed: oSpd (the offense), dSpd (the defense), cSpd (the ball carrier), rSpd (receivers on
+// their routes), rushSpd, coverSpd, and by where they are: backSpd (behind the line), midSpd (the middle past the
+// line), deepSpd (receivers 8 yards out). Blocks: shed (how often a block is shed), blk and dStr (strength). Tackles:
+// tkl (added to every try), cStr (the carrier's strength), breakN (tackles the carrier breaks outright), untag (seconds
+// untackleable after taking the ball), nolose (a loss is no gain). The throw: read (seconds later the defense breaks on
+// it), int, errM and errA (how far off it flies), ballV (its speed), catch, sure (no break-ups or picks). Kicks: kick
+// (field goal chance), punt (yards). At the snap: snapStun (rushers down), snapAll (every defender), blkStun (every
+// blocker), coverSlow, safetySlow, gas (Plague Cloud). With the ball: pounce (yards a tackler leaps), cStun and cStunP
+// (frozen, and the chance), cSlow. At the throw: freezeNear (the defender nearest the target), tgtSlow (the target).
+const GF_FX0 = { oSpd: 1, dSpd: 1, cSpd: 1, rSpd: 1, rushSpd: 1, coverSpd: 1, backSpd: 1, midSpd: 1, deepSpd: 1, shed: 1, int: 1, errM: 1, ballV: 1,
+  blk: 0, dStr: 0, tkl: 0, cStr: 0, breakN: 0, untag: 0, nolose: 0, read: 0, errA: 0, catch: 0, sure: 0, kick: 0, punt: 0,
+  snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0 };
+const GF_FX_MUL = new Set(['oSpd', 'dSpd', 'cSpd', 'rSpd', 'rushSpd', 'coverSpd', 'backSpd', 'midSpd', 'deepSpd', 'shed', 'int', 'errM', 'ballV']);
+// everyday powers by kind: [offense, defense]. fits: the call it helps ('run', 'pass' or 'any')
+const GF_POW = {
+  goblin: [{ id: 'shadowstep', n: 'Shadowstep', cost: 1, fits: 'run', desc: 'The ball carrier blinks past the first tackle.', fx: { breakN: 1 } },
+    { id: 'pickpocket', n: 'Pickpocket', cost: 1, fits: 'pass', desc: 'Quick hands: catches are harder, and a throw near a defender is picked off far more often.', fx: { int: 2.5, catch: -.12 } }],
+  kobold: [{ id: 'sling', n: 'Sling Shot', cost: 1, fits: 'pass', desc: 'The throw flies 30% faster and much truer, so the defense has less time to break on it.', fx: { ballV: 1.3, errM: .6, catch: .06 } },
+    { id: 'firebreath', n: 'Fire Breath', cost: 1, fits: 'pass', desc: 'The rushers breathe fire on the blockers: blocks are shed twice as often.', fx: { shed: 2 } }],
+  werewolf: [{ id: 'sprint', n: 'Wolf Sprint', cost: 1, fits: 'run', desc: 'The ball carrier drops to all fours: 12% faster for the play.', fx: { cSpd: 1.12 } },
+    { id: 'pounce', n: 'Pounce', cost: 1, fits: 'any', desc: 'When someone takes the ball, the nearest defender leaps 4 yards at them.', fx: { pounce: 4 } }],
+  dwarf: [{ id: 'axe', n: 'Battle Axe', cost: 1, fits: 'run', desc: 'The ball carrier swings the axe through tackles: +2.5 strength against them.', fx: { cStr: 2.5 } },
+    { id: 'holdline', n: 'Hold the Line', cost: 1, fits: 'run', desc: 'The defense digs in: +3 strength against blocks, and the ball carrier slows in the pile.', fx: { dStr: 3, cSpd: .95 } }],
+  ogre: [{ id: 'crush', n: 'Club Crush', cost: 2, fits: 'any', desc: 'The line clubs the rush at the snap: the rushers go down for nearly two seconds.', fx: { snapStun: 1.8 } },
+    { id: 'devour', n: 'Devour', cost: 2, fits: 'any', desc: 'A hungry defense: every tackle try is far likelier to hold.', fx: { tkl: .3 } }],
+  minotaur: [{ id: 'bullrush', n: 'Bull Rush', cost: 1, fits: 'run', desc: 'The ball carrier lowers the horns: +2 strength against tackles.', fx: { cStr: 2 } },
+    { id: 'gore', n: 'Gore', cost: 1, fits: 'any', desc: 'Horns first: tackles a little likelier, and +1 strength against blocks.', fx: { tkl: .12, dStr: 1 } }],
+  troll: [{ id: 'seismic', n: 'Seismic Snap', cost: 2, fits: 'any', desc: 'The ground heaves at the snap: every defender staggers for a second and a half.', fx: { snapAll: 1.6 } },
+    { id: 'boulder', n: 'Boulder', cost: 1, fits: 'run', desc: 'Boulders for shoulders: tackles a little likelier, and +1.5 strength against blocks.', fx: { tkl: .1, dStr: 1.5 } }],
+  golem: [{ id: 'stoneskin', n: 'Stone Skin', cost: 1, fits: 'pass', desc: 'The pocket turns to stone: blocks hold about four times as long, and the throw goes truer.', fx: { shed: .25, errM: .8 } },
+    { id: 'quake', n: 'Quake', cost: 2, fits: 'any', desc: 'A stomp at the snap: every blocker stumbles.', fx: { blkStun: .8 } }],
+  harpy: [{ id: 'glide', n: 'Glide', cost: 1, fits: 'pass', desc: 'The receiver rises over the defender: no break-ups, no picks.', fx: { sure: 1 } },
+    { id: 'flight', n: 'Take Flight', cost: 1, fits: 'pass', desc: 'The coverage takes wing: 6% faster, and picks off more throws.', fx: { coverSpd: 1.06, int: 1.5 } }],
+  elf: [{ id: 'fleet', n: 'Fleet Foot', cost: 1, fits: 'pass', desc: 'The receivers run their routes 8% faster.', fx: { rSpd: 1.08 } },
+    { id: 'eagle', n: 'Eagle Eye', cost: 1, fits: 'pass', desc: 'The defense reads the throw the moment it leaves the hand.', fx: { read: -.35 } }],
+  wraith: [{ id: 'invis', n: 'Invisibility', cost: 2, fits: 'pass', desc: 'The receivers vanish off the line: the coverage loses them for a second and a half.', fx: { coverSlow: 1.6 } },
+    { id: 'haunt', n: 'Haunt', cost: 1, fits: 'pass', desc: 'The receiver thrown to panics and loses a third of a step.', fx: { tgtSlow: .35 } }],
+  vampire: [{ id: 'swarm', n: 'Bat Swarm', cost: 2, fits: 'run', desc: 'The ball carrier bursts into bats: no tackle holds for 1.5 seconds after taking the ball.', fx: { untag: 1.5 } },
+    { id: 'mesmer', n: 'Mesmerize', cost: 2, fits: 'any', desc: 'Whoever takes the ball freezes for a moment.', fx: { cStun: .9, cStunP: 1 } }],
+  lich: [{ id: 'telek', n: 'Telekinesis', cost: 1, fits: 'pass', desc: 'The throw is guided there: it flies almost true and lands soft.', fx: { errM: .25, catch: .1 } },
+    { id: 'deflect', n: 'Deflect', cost: 1, fits: 'pass', desc: 'A ward in the air pushes the throw off line.', fx: { errA: 1.2 } }],
+  zombie: [{ id: 'undying', n: 'Undying', cost: 1, fits: 'any', desc: 'Won\'t go down backwards: a loss of yards counts as no gain.', fx: { nolose: 1 } },
+    { id: 'horde', n: 'Shambling Horde', cost: 1, fits: 'run', desc: 'They pile on: tackles a little likelier.', fx: { tkl: .12 } }],
+  gorgon: [{ id: 'gaze', n: 'Stone Gaze', cost: 2, fits: 'pass', desc: 'At the throw, the defender nearest the receiver turns to stone for a moment.', fx: { freezeNear: .45 } },
+    { id: 'petrify', n: 'Petrify', cost: 2, fits: 'any', desc: 'Whoever takes the ball may turn to stone (a bit better than even) for a second and a half.', fx: { cStun: 1.5, cStunP: .55 } }],
+  spider: [{ id: 'sticky', n: 'Sticky Hands', cost: 1, fits: 'pass', desc: 'Webbed gloves: catches are likelier.', fx: { catch: .12 } },
+    { id: 'web', n: 'Web', cost: 1, fits: 'run', desc: 'Whoever takes the ball is webbed: nearly half speed for 1.8 seconds.', fx: { cSlow: 1.8 } }],
+  skeleton: [{ id: 'shieldwall', n: 'Shield Wall', cost: 1, fits: 'any', desc: 'The line locks shields around the ball: +2 blocking strength, blocks hold about twice as long, and the carrier +1 strength against tackles.', fx: { blk: 2, shed: .45, cStr: 1 } },
+    { id: 'stand', n: 'Goal-line Stand', cost: 1, fits: 'any', desc: 'Tackles likelier, and much likelier with your goal line close (inside your 20).', fx: { stand: 1 } }],
+  witch: [{ id: 'hex', n: 'Hex', cost: 1, fits: 'pass', desc: 'Hexes their deep safety: nearly half speed for the first four seconds.', fx: { safetySlow: 4 } },
+    { id: 'frost', n: 'Frost Hex', cost: 2, fits: 'any', desc: 'A chill over the field: their whole offense 12% slower.', fx: { oSpd: .88 } }],
+};
+// ultimates by kind: role 'off' or 'def' (when it can be cast), zone: the effects the zone leaves for 3 plays or the
+// drive, now: on the play it is cast only; vis: how the zone looks (09-draw.js)
+const GF_ULT = {
+  goblin: { id: 'smoke', n: 'Smoke Bomb', role: 'off', desc: 'Smoke over the field: the defense loses the receivers in the haze and breaks on the ball late.', zone: { read: 1.2 }, vis: ['#9a9488', 'all'] },
+  kobold: { id: 'inferno', n: 'Inferno', role: 'off', desc: 'The line of scrimmage burns: the rushers wade through fire, 40% slower, and lose their blocks less.', zone: { rushSpd: .6, shed: .7 }, vis: ['#ff6a2a', 'line'] },
+  werewolf: { id: 'howl', n: 'Blood Moon Howl', role: 'def', desc: 'A howl that chills the blood: their whole offense 15% slower in fear.', zone: { oSpd: .85 }, vis: ['#c23a3a', 'all'] },
+  dwarf: { id: 'fissure', n: 'Earthshatter', role: 'off', desc: 'The axe cracks the line open: the rushers stumble in the cracks and shed blocks far less often.', zone: { shed: .3, blk: 2, dSpd: .96 }, vis: ['#7a5a34', 'line'] },
+  ogre: { id: 'crater', n: 'Crater Slam', role: 'def', desc: 'A belly-flop leaves a crater: the ball carrier wades, 28% slower.', zone: { cSpd: .72 }, vis: ['#6a5a3a', 'mid'] },
+  minotaur: { id: 'stampede', n: 'Stampede', role: 'off', desc: 'Charges up the middle: the ball carrier knocks over the first tackler, and the churned ground slows the defense.', now: { breakN: 1 }, zone: { dSpd: .97 }, vis: ['#8a5a34', 'mid'] },
+  troll: { id: 'bog', n: 'Bog Tide', role: 'def', desc: 'Calls up the swamp: their backfield turns to bog, and everyone behind the line moves 35% slower.', zone: { backSpd: .65 }, vis: ['#4a6a3a', 'back'] },
+  golem: { id: 'rampart', n: 'Rampart', role: 'off', desc: 'A wall grows along the line: hardly a rusher gets through.', zone: { shed: .05 }, vis: ['#9a9a9a', 'line'] },
+  harpy: { id: 'tempest', n: 'Tempest', role: 'def', desc: 'A gale over the field: their kicks are pushed off line, and their long throws too.', zone: { kick: -.2, punt: -10, errA: 1 }, vis: ['#9ac8e8', 'all'] },
+  elf: { id: 'overgrowth', n: 'Overgrowth', role: 'off', desc: 'The grass grows knee-high: the defense wades, 6% slower.', zone: { dSpd: .94 }, vis: ['#5aa04a', 'all'] },
+  wraith: { id: 'fog', n: 'Fog of the Dead', role: 'off', desc: 'A grave-fog: the defense hardly picks a throw off, and misses more tackles.', zone: { int: .3, tkl: -.1 }, vis: ['#b8c0c8', 'all'] },
+  vampire: { id: 'eclipse', n: 'Eclipse', role: 'off', desc: 'The torches go out: the defense misses tackles in the dark.', zone: { tkl: -.14 }, vis: ['#2a1a3a', 'all'] },
+  lich: { id: 'gravehands', n: 'Grave Hands', role: 'def', desc: 'Skeletal hands claw at the ball carrier: 20% slower, and a little easier to bring down.', zone: { cSpd: .8, tkl: .05 }, vis: ['#d8d0b8', 'mid'] },
+  zombie: { id: 'plague', n: 'Plague Cloud', role: 'off', desc: 'Grave gas over the line: at each snap a rusher may be knocked flat, and the coughing defense misses tackles (the undead shrug it off).', zone: { gas: 1.6, tkl: -.05 }, vis: ['#8ab04a', 'line'] },
+  gorgon: { id: 'garden', n: 'Stone Garden', role: 'def', desc: 'Statues crowd the middle of the field: their players there move at 45% speed.', zone: { midSpd: .45 }, vis: ['#a8a090', 'mid'] },
+  spider: { id: 'webburst', n: 'Web Burst', role: 'def', desc: 'Webbing over the deep field: receivers past 8 yards stick, at half speed.', zone: { deepSpd: .5 }, vis: ['#e8e8e0', 'deep'] },
+  skeleton: { id: 'bonestorm', n: 'Bone Storm', role: 'off', desc: 'Bursts apart and comes back together: no tackle holds the ball carrier for a moment after taking the ball, and bones litter the field for the defense.', now: { untag: .8 }, zone: { dSpd: .97, tkl: -.04 }, vis: ['#efe6cf', 'all'] },
+  witch: { id: 'blizzard', n: 'Blizzard', role: 'def', desc: 'Snow: their offense slips (15% slower), and throws fly off line.', zone: { oSpd: .85, errA: .4 }, vis: ['#e8f4ff', 'all'] },
+};
+const GF_POW_BY = {}; for (const k in GF_POW) for (const p of GF_POW[k]) GF_POW_BY[p.id] = p;
+const GF_ULT_BY = {}; for (const k in GF_ULT) GF_ULT_BY[GF_ULT[k].id] = GF_ULT[k];
+const gfPowName = id => (GF_POW_BY[id] || GF_ULT_BY[id] || {}).n || id;
+
+function gfPowersStart() {
+  G.mana = [GF_MANA.start, GF_MANA.start]; G.stam = G.teams.map(t => t.roster.map(() => 100)); G.zones = []; G.ultUsed = [{}, {}];
+}
+const gfMana = s => G.mana ? G.mana[s] : 0;
+function gfManaAdd(s, n) { if (G.mana) G.mana[s] = clamp(G.mana[s] + n, 0, GF_MANA.max); }
+// a worn player's ratings: below half stamina, down to 80% at none
+function gfWorn(side, ri, r) {
+  const st = G.stam ? G.stam[side][ri] : 100; if (st >= 50) return r;
+  const f = .8 + .2 * st / 50, o = Object.assign({}, r);
+  for (const k of ['spd', 'str', 'hnd', 'arm', 'tkl']) o[k] = r[k] * f;
+  return o;
+}
+// the ratings a player plays on now, rounded (the lineup shows these)
+function gfRated(side, ri) { const r = gfWorn(side, ri, G.teams[side].roster[ri].r); return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)])); }
+// the half gives a lot back; every play costs everyone a little (the undead and golems tire at half the rate)
+function gfRest(n) { if (G.stam) for (const s of G.stam) for (let i = 0; i < s.length; i++) s[i] = Math.min(100, s[i] + n); }
+function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => s.forEach((v, i) => { s[i] = Math.max(0, v - GF_STAM.play * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)); })); }
+const gfStamCost = (cost, ult) => ult ? GF_STAM.ult : GF_STAM.base + GF_STAM.per * cost;
+const gfRole = side => side === G.poss ? 'off' : 'def';
+/* the powers a side can cast now (with the call): each of its players' everyday power for the side of the ball they
+   are on, and their kind's ultimate if it is that side's and unused. { key, id, ri, n (the player), name, cost, ult,
+   fits, desc, ok, why } */
+function gfPowerOptions(side) {
+  if (!G.mana) return [];
+  const role = gfRole(side), T = G.teams[side], out = [];
+  T.roster.forEach((m, ri) => {
+    const pw = GF_POW[m.kind], u = GF_ULT[m.kind], st = G.stam[side][ri];
+    const add = (p, ult) => {
+      const cost = ult ? GF_ULT_COST : p.cost, used = ult && G.ultUsed[side][ri];
+      const why = used ? 'used this game' : gfMana(side) < cost ? 'needs mana' : st < GF_STAM.min ? 'winded' : '';
+      out.push({ key: ri + ':' + p.id, id: p.id, ri, n: m.n, kind: m.kind, name: p.n, cost, ult: !!ult, fits: ult ? 'any' : p.fits, desc: p.desc, ok: !why, why, stam: Math.round(st), stamCost: gfStamCost(cost, ult) });
+    };
+    if (pw) add(pw[role === 'off' ? 0 : 1], false);
+    if (u && u.role === role) add(u, true);
+  });
+  return out;
+}
+// a power is cast: mana, stamina, the ultimate used, its zone on the field. Returns what the play needs: { id, ri, n, name, ult }
+function gfCast(side, o) {
+  G.mana[side] -= o.cost; G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - o.stamCost);
+  if (o.ult) { G.ultUsed[side][o.ri] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
+  return { id: o.id, ri: o.ri, n: o.n, name: o.name, ult: o.ult, side };
+}
+// with the call: each side's power. Yours is your pick, or Auto powers', or none; the CPU's is the CPU's
+function gfCastPowers(oc, dc) {
+  const out = { off: null, def: null };
+  if (!G.mana) return out;
+  for (const side of [G.poss, 1 - G.poss]) {
+    const role = gfRole(side), call = role === 'off' ? oc : dc, mine = GD.mode !== 'watch' && side === GD.you;
+    let o = null;
+    if (mine && GD.pow) o = gfPowerOptions(side).find(x => x.key === GD.pow && x.ok) || null;
+    else if (!mine || GD.auto) o = gfCpuPower(side, call, mine ? 1 : (G.skill || [1, 1])[side]);
+    if (o) out[role] = gfCast(side, o);
+  }
+  GD.pow = null;
+  return out;
+}
+// how much is riding on this down: third or fourth down, near the goal line, or late in a close game
+function gfLever() {
+  return (G.down >= 3 ? .15 : 0) + (G.ball >= 80 ? .15 : 0) + (GD.game && G.half >= 2 && G.clock < 120 && Math.abs(G.score[0] - G.score[1]) <= 8 ? .15 : 0);
+}
+// what the defense expects: a pass on long yardage, a run on short
+const gfExpect = () => G.togo >= 7 ? 'pass' : G.togo <= 3 ? 'run' : 'any';
+function gfCpuPower(side, call, skill) {
+  const opts = gfPowerOptions(side).filter(o => o.ok); if (!opts.length) return null;
+  const role = gfRole(side), lever = gfLever(), full = gfMana(side) >= GF_MANA.max - 1;
+  // what the play is: the offense knows; a defense guesses from the down (an Archmage reads their habits too)
+  let kind = role === 'off' ? (GF_PLAYS[call] ? GF_PLAYS[call].kind : 'any') : skill >= 1 ? gfExpect() : 'any';
+  if (role === 'def' && skill === 2) { const T = gfTendency(G.poss, 'off'), run = T.run || 0; if (Object.keys(T).length) kind = run >= .5 ? 'run' : run <= .2 ? 'pass' : kind; }
+  // how often: a Squire now and then, a Knight more, an Archmage saves its mana for the downs that matter
+  const p = skill === 2 ? (lever || full ? .85 : .2) : [.25, .4][skill] + lever + (gfMana(side) >= 5 ? .2 : 0);
+  if (R() > p) return null;
+  const fit = o => o.fits === 'any' || kind === 'any' || o.fits === kind;
+  const w = {};
+  for (const o of opts) w[o.key] = skill === 0 ? (o.ult ? .3 : 1)
+    : skill === 1 ? (fit(o) ? 3 : 1) * (o.ult ? (lever ? 3 : 1.5) : 1)
+    : (fit(o) ? 1 : 0) * o.cost * (o.ult ? (lever ? 3 : .15) : 1) * o.stam / 100;
+  const k = wpick(w); return w[k] > 0 ? opts.find(o => o.key === k) : null;
+}
+// the play's effects: the zones on the field and both sides' powers (with an ultimate's effects on the play it is cast)
+function gfFx(pw) {
+  const F = Object.assign({}, GF_FX0);
+  const add = fx => { for (const k in fx) if (k in F) F[k] = GF_FX_MUL.has(k) ? F[k] * fx[k] : F[k] + fx[k]; };
+  for (const z of (G.zones || [])) if (GF_ULT_BY[z.id]) add(GF_ULT_BY[z.id].zone);
+  for (const c of [pw && pw.off, pw && pw.def]) {
+    if (!c) continue;
+    if (GF_POW_BY[c.id]) add(GF_POW_BY[c.id].fx);
+    // an ultimate cast this down: its zone is already on the field (the handle in tests may skip that)
+    const u = GF_ULT_BY[c.id]; if (u) { if (u.now) add(u.now); if (!(G.zones || []).some(z => z.id === c.id)) add(u.zone); }
+  }
+  // Goal-line Stand: more with the goal line close
+  if (F.stand) F.tkl += F.stand * (G.ball >= 80 ? .25 : .08);
+  return F;
+}
+// which power (or zone) gave each effect on this play, by name, for the reason after it
+function gfFxSrc(pw) {
+  const S = {}, mark = (fx, n) => { for (const k in fx) S[k] = n; };
+  for (const z of (G.zones || [])) if (GF_ULT_BY[z.id]) mark(GF_ULT_BY[z.id].zone, z.n);
+  for (const c of [pw && pw.off, pw && pw.def]) {
+    if (!c) continue;
+    if (GF_POW_BY[c.id]) mark(GF_POW_BY[c.id].fx, c.name || gfPowName(c.id));
+    const u = GF_ULT_BY[c.id]; if (u) { mark(u.zone, u.n); if (u.now) mark(u.now, u.n); }
+  }
+  return S;
+}
+// a zone effect summed over the field (the kicks read these), and the name of the zone that gives it
+const gfZoneSum = k => (G && G.zones || []).reduce((a, z) => a + ((((GF_ULT_BY[z.id] || {}).zone || {})[k]) || 0), 0);
+const gfZoneName = k => ((G.zones || []).find(z => ((GF_ULT_BY[z.id] || {}).zone || {})[k] != null) || {}).n || '';
+// after a play: the zones count down, and the drive's end clears them; everyone tires a little
+function gfPowersAfter() {
+  if (!G.zones) return;
+  if (G.drive && G.drive.end) G.zones = [];
+  else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
+  gfTirePlay();
+}
+// a new half (or Sudden Death): mana for the half, and a long rest
+function gfPowersHalf() { if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
+// a new drive: mana for both sides
+function gfPowersDrive() { if (G.mana) for (const s of [0, 1]) gfManaAdd(s, GF_MANA.drive); }
+// a score: the side scored on gets mana back
+function gfScoredOn(side) { gfManaAdd(side, GF_MANA.scored); }
+// G cycles your pick through the powers you can cast now, then none
+function gfCyclePower() {
+  if (!GD || GD.ph !== 'call' || GD.mode === 'watch') return null;
+  const list = gfPowerOptions(GD.you).filter(o => o.ok); if (!list.length) { GD.pow = null; return null; }
+  const i = list.findIndex(o => o.key === GD.pow);
+  GD.pow = i + 1 >= list.length ? null : list[i + 1].key;
+  return GD.pow;
+}
+function gfPickPower(key) {
+  if (!GD || GD.mode === 'watch') return false;
+  if (!key) { GD.pow = null; return true; }
+  const o = gfPowerOptions(GD.you).find(x => x.key === key && x.ok); if (!o) return false;
+  GD.pow = key; return true;
+}
+// a power's pros and cons for this down, this distance and this spot on the field ({ pro, con, note })
+function gfPowerTip(key) {
+  const side = GD ? GD.you : 0, o = gfPowerOptions(side).find(x => x.key === key); if (!o) return null;
+  const T = { pro: [o.desc], con: [], note: [] }, off = gfRole(side) === 'off', near = G.ball >= 80;
+  const name = o.fits === 'run' ? 'a run' : 'a pass (short, deep or a screen)';
+  if (o.fits !== 'any') {
+    if (off) T.con.push(`Only helps ${name}: wasted on the other kind of play.`);
+    else T.con.push(`Only helps against ${name}: wasted if they call the other.`);
+  }
+  if (off && o.fits === 'run' && G.togo <= 3) T.pro.push('Short yardage: a good down to run.');
+  if (off && o.fits === 'pass' && G.togo >= 7) T.pro.push('Long yardage: a passing down.');
+  if (!off && o.fits !== 'any' && gfExpect() === o.fits) T.pro.push(`${G.togo >= 7 ? 'Long' : 'Short'} yardage: they will probably ${o.fits === 'run' ? 'run' : 'pass'}.`);
+  if (!off && o.fits !== 'any' && gfExpect() !== 'any' && gfExpect() !== o.fits) T.con.push(`${G.togo >= 7 ? 'Long' : 'Short'} yardage: they will probably ${gfExpect() === 'run' ? 'run' : 'pass'}.`);
+  if (G.down >= 3) T.pro.push(`${GF_ORD[G.down]} down: a big one to spend on.`);
+  if (near) T.pro.push(off ? 'Near their goal line: a touchdown is close.' : 'Near your goal line: every yard counts.');
+  T.con.push(`${o.cost} mana (${Math.max(0, gfMana(side) - o.cost)} left after). Both sides get 1 at every new drive, and you get 1 more when they score.`);
+  const after = o.stam - o.stamCost;
+  T.con.push(`${o.n} spends ${o.stamCost} stamina (now ${o.stam}%)${after < 50 ? ': then slower and weaker until rested' : ''}.`);
+  if (o.ult) {
+    T.note.push(`Once a game. The zone lasts ${GF_ULT_PLAYS} plays or the drive, whichever ends first.`);
+    if (G.down === GF_RULES.downs) T.con.push('Fourth down: if the drive ends here, the zone goes with it.');
+  }
+  if (!o.ok) T.con.unshift(`Can't cast now: ${o.why}.`);
+  return T;
+}
+// what powers did on a play, for the reason after it
+function gfPowWhy(pw) {
+  const out = [], cast = [pw && pw.off, pw && pw.def].filter(Boolean);
+  for (const c of cast) out.push(`${c.n} cast ${c.name}${c.ult ? ' (once a game)' : ''}.`);
+  const seen = new Set();
+  for (const e of (L ? L.ev : [])) if (e.k === 'pow' && !seen.has(e.o)) { seen.add(e.o); out.push(e.o); }
+  const zones = (G.zones || []).filter(z => !cast.some(c => c.id === z.id)).map(z => z.n);
+  if (zones.length) out.push(`On the field: ${zones.join(', ')}.`);
+  return out.join(' ');
+}
+// the book of powers by kind, for How to play
+function gfPowerBook() {
+  return Object.fromEntries(Object.keys(GF_KIND).map(k => [k, { off: GF_POW[k] && GF_POW[k][0], def: GF_POW[k] && GF_POW[k][1], ult: GF_ULT[k] }]));
 }
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
@@ -22786,15 +23213,23 @@ function gfFrame(now) {
   GFP.raf = requestAnimationFrame(gfFrame);
 }
 // Play mode's keys, only while the field is up and there's something to do with them; in the capture phase, so nothing
-// else on the page takes them
+// else on the page takes them. G and T (powers) work in You call too
 const GF_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
 const GFK = new Set();
 function gfKeySteer() { let x = 0, y = 0; for (const k of GFK) if (GF_KEYS[k]) { x += GF_KEYS[k][0]; y += GF_KEYS[k][1]; } return [x, y]; }
 function gfKey(e, down) {
-  if (!GFP.on || !GD || GD.mode !== 'play' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!GFP.on || !GD || GD.mode === 'watch' || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest && e.target.closest('input,textarea,select')) return;
   if (document.getElementById('modal') && !document.getElementById('modal').hidden) return;
-  const k = e.key.toLowerCase(), live = L && L.hands && GD.ph === 'live' && !L.done, kick = GD.ph === 'kick' && GD.meter;
+  const k = e.key.toLowerCase();
+  // powers, in You call and You play: G picks the next one you can cast with this call (then none), T switches Auto
+  // powers; the page hears it as a new beat, to show it
+  if (k === 'g' || k === 't') {
+    if (down && !e.repeat) { if (k === 'g') gfCyclePower(); else { GD.auto = !GD.auto; if (GD.auto) GD.pow = null; } if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(GD.ph); } catch (er) { console.error(er); } }
+    e.preventDefault(); e.stopPropagation(); return;
+  }
+  if (GD.mode !== 'play') return;
+  const live = L && L.hands && GD.ph === 'live' && !L.done, kick = GD.ph === 'kick' && GD.meter;
   if (!live && !kick) return;
   if (GF_KEYS[k]) { if (down) GFK.add(k); else GFK.delete(k); gfInput({ steer: gfKeySteer() }); }
   else if (k === ' ') { if (kick) { if (down && !e.repeat) gfInput({ tap: true }); } else if (!e.repeat || !down) gfInput({ hold: down }); }
@@ -22818,14 +23253,17 @@ return {
   newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES),
   start: gfStart, game: gfStartGame, simGame: gfSimGame, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
   get on() { return GFP.on; }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
-  get play() { return L; }, pause: on => { GFP.paused = !!on; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; } },
+  get play() { return L; }, pause: on => { GFP.paused = !!on; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
   // Play mode: the page's keys ({ steer, hold, pick, tap }), and what the field shows of them
-  input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; },
+  input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; }, set onSnap(f) { GF_HOOK.onSnap = f; },
+  // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
+  box: () => gfBox(), snapshot: () => GD ? gfSnapshot() : null, resume: sn => { gfResume(sn); gfShow(); return G; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
   canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth() } : null,
-  // who is on the field: the drive's offense by position, and the other side's defense
+  // who is on the field: the drive's offense by position, and the other side's defense (r: the ratings they play on
+  // now, worn when tired; base: their own)
   lineup: () => G ? [['off', G.drive.side], ['def', 1 - G.drive.side]].map(([m, s]) => ({ side: m === 'off' ? 0 : 1, team: G.teams[s].name, color: G.teams[s].color,
-    players: Object.entries(G.teams[s][m]).map(([pos, i]) => Object.assign({ pos }, G.teams[s].roster[i], { r: Object.assign({}, G.teams[s].roster[i].r) })),
+    players: Object.entries(G.teams[s][m]).map(([pos, i]) => Object.assign({ pos }, G.teams[s].roster[i], { r: gfRated(s, i), base: Object.assign({}, G.teams[s].roster[i].r), stam: G.stam ? Math.round(G.stam[s][i]) : 100 })),
     kicker: G.teams[s].roster[G.teams[s].kicker].n })) : [],
   get isGame() { return !!GD && GD.game; }, get yourBall() { return !!GD && G.poss === GD.you; }, clock: () => G && GD && GD.game ? { half: G.half, text: gfClockText(), name: GF_HALF_NAME[G.half] } : null,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
@@ -22836,7 +23274,15 @@ return {
   // coach has seen of them lately (shares of the last few calls)
   fresh: side => G && G.fresh ? JSON.parse(JSON.stringify(G.fresh[side])) : null, tendency: (side, kind) => G ? gfTendency(side, kind) : {},
   cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense() },
-  rate: kind => gfRate(kind), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
+  // powers (phase 6): your side's mana and the powers it can cast with this call ({ key, name, n, cost, ult, fits,
+  // desc, ok, why, stam, stamCost }), your pick and Auto powers, a power's tips ({ pro, con, note }), the zones on
+  // the field, and every kind's powers (for How to play)
+  powers: () => G && GD && G.mana ? { mana: G.mana[GD.you], their: G.mana[1 - GD.you], max: GF_MANA.max, role: gfRole(GD.you), auto: !!GD.auto, pick: GD.pow,
+    list: gfPowerOptions(GD.you), cast: GD.cast ? JSON.parse(JSON.stringify(GD.cast)) : null } : null,
+  pickPower: key => gfPickPower(key), cyclePower: () => gfCyclePower(), setAuto: on => { if (GD) { GD.auto = !!on; GD.pow = on ? null : GD.pow; } return GD ? GD.auto : false; },
+  tip: key => G && GD ? gfPowerTip(key) : null, zones: () => (G && G.zones || []).map(z => ({ id: z.id, n: z.n, left: z.left, side: z.side, team: G.teams[z.side].name, desc: GF_ULT_BY[z.id].desc })),
+  powerBook: gfPowerBook(), ultPlays: GF_ULT_PLAYS, ultCost: GF_ULT_COST, mana: Object.assign({}, GF_MANA),
+  rate: kind => gfRate(kind), kinds: Object.keys(GF_KIND), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
   auto: roster => { const T = gfTeam({ name: '', roster }); return { off: T.off, def: T.def, kicker: T.kicker }; },
   plays: Object.fromEntries(GF_OFF_IDS.map(k => [k, { n: GF_PLAYS[k].n, desc: GF_PLAYS[k].desc }])),
   defs: Object.fromEntries(GF_DEF_IDS.map(k => [k, { n: GF_DEFS[k].n, desc: GF_DEFS[k].desc }])),
@@ -27355,10 +27801,11 @@ function wGridHowHTML() {
 function wGridLineup() {
   const st = wGF.stats;
   return wGF.lineup().map(t => `<div class="tablewrap"><table class="wgline"><caption><i style="background:${t.color}"></i>${esc(t.team)}: ${t.side ? 'defense' : 'offense'}</caption>
-    <thead><tr><th>Pos</th><th>Player</th>${st.map(k => `<th title="${esc(W_GRID_STAT[k][1])}">${W_GRID_STAT[k][0]}</th>`).join('')}</tr></thead>
-    <tbody>${t.players.map(p => { const P = W_GRID_POS[p.pos] || [p.pos, []];
-      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td>${esc(p.n)} <small>#${p.num}</small></td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}</tr>`; }).join('')}</tbody></table>
-    ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position.</p>`}</div>`).join('');
+    <thead><tr><th>Pos</th><th>Player</th>${st.map(k => `<th title="${esc(W_GRID_STAT[k][1])}">${W_GRID_STAT[k][0]}</th>`).join('')}<th title="Stamina: every play costs a little and casting a power a lot; below half a player is slower and weaker. The half gives plenty back.">Sta</th></tr></thead>
+    <tbody>${t.players.map(p => { const P = W_GRID_POS[p.pos] || [p.pos, []], B = wGF.powerBook[p.kind] || {};
+      const pw = [B.off && `${B.off.n} (offense)`, B.def && `${B.def.n} (defense)`, B.ult && `★ ${B.ult.n} (once a game)`].filter(Boolean).join(', ');
+      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td title="${esc('Powers: ' + pw)}">${esc(p.n)} <small>#${p.num}</small></td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}<td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td></tr>`; }).join('')}</tbody></table>
+    ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
 function wGridLog() {
@@ -27379,19 +27826,24 @@ function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
   return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.football} Club` }, A)];
 }
-/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call' | 'play', seed, teams? } (teams: the two
-   sides, yours first; by default the Cinderhold Football Club against the visitors). Start over keeps the same sides. */
+/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call' | 'play', seed, teams?, skill? } (teams: the two
+   sides, yours first; skill: the CPU's casting skill by side, 0 to 2; by default the Cinderhold Football Club against the visitors). Start over keeps the same sides. */
 function wGridironDrive(opts) { return wGridStart('drive', opts); }
 function wGridironGame(opts) { return wGridStart('game', opts); }
 function wGridStart(kind, opts) {
   const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
-  const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams();
-  WGF = { kind, mode: o.mode, over: null, teams };
-  wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed });
-  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
-  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
+  const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams(), skill = o.skill || (WGF && WGF.kind === kind && WGF.skill) || null;
+  WGF = { kind, mode: o.mode, over: null, teams, skill };
+  wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed, skill });
+  wGridChrome(kind);
   showView('gridiron');
   wGridBar();
+}
+// the bar's titles for a drive or a game
+function wGridChrome(kind) {
+  $('wGridLogH').textContent = kind === 'game' ? 'This game' : 'This drive';
+  $('wGridTitle').textContent = kind === 'game' ? 'A game at the Ash Bowl' : 'A drive at the Ash Bowl';
+  $('wGridModes').hidden = false;
 }
 function wGridBar() {
   if (!WGF) return;
@@ -27679,6 +28131,414 @@ renderHelp = function () {
   wW43RenderHelp();
   const after = $('wHelpNine') || $('wHelpGridiron'); if (!after || $('wHelpSeven')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpSeven"><b>Football ratings and the seven.</b> Every player also has football ratings: speed, strength, hands, arm, kicking and tackling (1 to ${W_GFR.cap}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them. Football is seven a side, and the same seven play offense and defense. The Seven tab on the Team screen picks who plays and where on both sides; called-up players at your level fill any gap. Practice game there plays your seven against the Cinderhold Football Club; nothing is won or lost.</p>`);
+};
+/* w44: playing football from the world (issue #9, phase 5). Your seven plays a rival club, or the local side, on
+   Cinder Gridiron, as your nine plays baseball (w20d): Play (you call the plays and play your offense by hand),
+   Manage (you call them, and your players run them), or Simulate (the result at once). A football game needs
+   W_GFG.minOwn players of your own (call-ups fill the seven), and each club plays you once a day. A loss costs
+   nothing but the XP you would have won (question 5), as on the diamond; a tie after Sudden Death pays half. A win
+   pays XP to the seven (half to your players who sat out), gold and fans by tier; every game records the box score
+   for your players, the head to head and the league table. Save and leave keeps the game at its last call, and it is
+   waiting when you come back, after a reload too. Clinker Dunn's GRIDIRON at the Ash Bowl, and the Seven tab, open
+   the game card.
+
+   WG.gfg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_GFG.keep], w, l, t }
+              world = { kind: 'gfgame', ref, club, tier, how, day, name, ids, cup }, plain data; the end dispatches
+              W_ON_END[kind]. ids: the seven's keys at kick-off, so the box lines find your players
+              snap = the engine's snapshot at a call (plain JSON)
+   WG.gfstats { pid: summed box lines, plus gg (games) }, this journey
+   wGridProblems(), wStartGrid({ club, how, tier?, kind?, ref?, cup? }), wResumeGrid(), wGridLeave(), wGridConcede(),
+   wOpenGridCard()
+   Wrapped: wGridBar (wW44GridBar: Save and leave and Concede in a real game), wLeaveGridiron (wW44LeaveGridiron),
+   wRunAct (wW44RunAct: GRIDIRON opens the card), wNextPrompt (wW44NextPrompt: a game waiting after a reload),
+   wCampSeven and wRenderCamp (wW44CampSeven, wW44RenderCamp: Play a game and Resume on the Seven tab), wCampStats and
+   wStatsCard (wW44CampStats, wW44StatsCard: the Football view and box lines), renderHelp (wW44RenderHelp: #wHelpGfGame). */
+
+const W_GFG = {
+  minOwn: 5, xp: 12, gold: 15, fans: 3, lossShare: .25, tieShare: .5, benchShare: .5, mvpXp: 5,
+  // extra rating points for each of the other side's players, by tier, spread over their ratings (6 is +1 to every
+  // one). Measured under the coaches (Simulate): a full point everywhere takes an even game to about 20%
+  oppBonus: { 1: 0, 2: 3, 3: 6 },
+  minutes: 150, keep: 10, saveMs: 15000,
+};
+const W_GFG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
+const WGFG = { saved: 0, asked: false, msg: '' };
+
+function wGfg() {
+  const B = WG.gfg = WG.gfg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0, t: 0 };
+  B.met = B.met || {}; B.opp = B.opp || {}; B.games = B.games || []; B.t = B.t || 0;
+  return B;
+}
+function wGridLive() { return !!(WG && WG.gfg && WG.gfg.live); }
+// a real game is on the field (not a practice or an exhibition)
+function wGridWorld() { return !!(WGF && WGF.world && wGridLive()); }
+function wGridProblems() {
+  const n = wRoster().length;
+  return n < W_GFG.minOwn ? [`Recruit ${W_GFG.minOwn - n} more player${W_GFG.minOwn - n === 1 ? '' : 's'}: a football game needs ${W_GFG.minOwn} of your own, and call-ups fill the rest of the seven.`] : [];
+}
+function wGridOppLvl(tier) { return Math.min(W_PARTY.maxLvl, wNineTier() + tier - 1); }
+/* a club's seven: its own kinds first, at your level plus the tier, and W_GFG.oppBonus on every rating. A rival keeps
+   the same seven until it would be a different level; the local side is new each time. */
+function wGridOpp(club, tier) {
+  const B = wGfg(), lvl = wGridOppLvl(tier), C = wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
+  const cached = club !== 'local' && B.opp[club];
+  let team;
+  if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
+  else {
+    const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
+    const kinds = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i).slice(0, W_GFR.side);
+    const names = new Set();
+    const roster = kinds.map(kind => {
+      const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
+      const p = wMakePlayer({ kind, lvl, n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
+      names.add(p.n);
+      return wSevenPlayer(p);
+    });
+    team = { name: C.name, short: C.short, color: C.color, light: C.light, roster };
+    if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
+  }
+  // the same ratings each time for the same club (a fixed order over the six), so a rival doesn't change between games
+  if (k) for (const p of team.roster) { const st = Object.keys(p.r); for (let i = 0; i < k; i++) { const s = st[(i * 5 + (p.num || 0)) % st.length]; p.r[s] = Math.min(W_GFR.cap, p.r[s] + 1); } }
+  return team;
+}
+
+/* ---------- starting, leaving, coming back ---------- */
+function wStartGrid(o) {
+  if (!WG || !RUN) return '';
+  const probs = wGridProblems(); if (probs.length) return probs.join(' ');
+  const B = wGfg(), club = o.club;
+  if (B.live) return 'Finish the football game you started first.';
+  if (!wBallRegion(club) && !CLUBS[club]) return '';
+  if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you at football today. Come back tomorrow.`;
+  const how = W_GFG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club);
+  const mine = wSevenTeam(), opp = wGridOpp(club, tier);
+  const world = { kind: o.kind || 'gfgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: wSevenSync().ids.slice(), cup: !!o.cup };
+  if (!o.cup) B.met[club] = WG.dayAbs;
+  B.live = { world, snap: null };
+  if (how === 'sim') {
+    const g = wGF.simGame({ teams: [mine, opp], skill: wGridSkill(tier) });
+    const msg = wGridSettle(wGridResult(g.score), g.score[0], g.score[1], g.box, g.half);
+    wGridResultCard(msg);
+    return '';
+  }
+  wGridironGame({ mode: how === 'play' ? 'play' : 'call', teams: [mine, opp], skill: wGridSkill(tier) });
+  WGF.world = true;
+  $('wGridTitle').textContent = `${mine.name} against ${opp.name}`;
+  wGridBar();
+  wSave();
+  return '';
+}
+// how well each side casts its powers when the coaches cast them: yours (Auto powers, and Simulate) as a Knight, theirs
+// by tier, as on the diamond (W_BALL.diff: Squire, Knight, Archmage)
+const wGridSkill = tier => [1, W_BALL.diff[tier] != null ? W_BALL.diff[tier] : 1];
+const wGridResult = sc => sc[0] > sc[1] ? 'win' : sc[0] < sc[1] ? 'lose' : 'tie';
+function wResumeGrid() {
+  const L = wGridLive() && WG.gfg.live;
+  if (!L) return;
+  if (!L.snap) { wGridCallOff('The game had not reached its first play, so it is called off.'); return; }
+  WGF = { kind: 'game', mode: L.snap.GD.mode, over: null, teams: L.snap.G.teams, world: true };
+  wGF.resume(L.snap);
+  showView('gridiron');
+  wGridChrome('game');
+  $('wGridTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
+  wGridBar();
+}
+// Save and leave: the game stays at its last call in WG.gfg.live
+function wGridLeave() {
+  const L = wGridLive() && WG.gfg.live; if (!L) return wLeaveGridiron();
+  const sn = L.snap;
+  WGFG.asked = true;
+  WGF = null; wLeaveGridiron();
+  if (!sn) return wGridCallOff(`You leave before the first play, so the game against ${wBallName(L.world.club)} is called off.`);
+  wLog(`Your football game against ${wBallName(L.world.club)} is saved: ${wGridScore(sn)}. Resume it from the Seven tab on the Team screen.`, 'd');
+  wSave();
+}
+function wGridCallOff(why) {
+  const B = wGfg(), L = B.live; if (!L) return;
+  B.live = null; if (!L.world.cup) delete B.met[L.world.club];
+  wLog(why || `The football game against ${wBallName(L.world.club)} is called off. No result.`, 'd');
+  wSave();
+}
+function wGridConcede() {
+  if (!wGridWorld()) return;
+  wGF.pause(true);
+  askConfirm('Concede this game?', 'It counts as a loss. A loss on the gridiron costs nothing, but you only get a quarter of the XP.', 'Concede', () => {
+    if (!wGridLive()) return;
+    wGF.pause(false);
+    const G = wGF.G, sc = G ? G.score : [0, 0];
+    wGridSettle('lose', sc[0], sc[1], wGF.box(), G ? G.half : 1);
+    WGF = null; wLeaveGridiron();
+  }, () => wGF.pause(false));
+}
+function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
+wGF.onSnap = sn => {
+  const L = wGridWorld() && WG.gfg.live; if (!L) return;
+  L.snap = sn;
+  const now = Date.now(); if (now - WGFG.saved > W_GFG.saveMs) { WGFG.saved = now; wSave(); }
+};
+// the end of a game on the field: an exhibition as before; a real game settles in the world
+wGF.onOver = s => {
+  if (!WGF) return;
+  WGF.over = s;
+  if (WGF.world && wGridLive()) { const G = wGF.G; WGF.msg = wGridSettle(wGridResult(G.score), G.score[0], G.score[1], wGF.box(), G.half); }
+  wGridBar();
+  const f = WGF.world ? $('wGridBack') : $('wGridAgain'); if (f) f.focus();
+};
+
+/* ---------- the final ---------- */
+function wGridSettle(r, us, them, box, half) {
+  const B = wGfg(), L = B.live, W = L.world, win = r === 'win', tie = r === 'tie';
+  B.live = null;
+  if (win) B.w++; else if (tie) B.t++; else B.l++;
+  // box lines for your own players: side 0, by the seven at kick-off (call-ups have no roster id)
+  const S = WG.gfstats = WG.gfstats || {}, line = {};
+  for (const b of box) {
+    if (b.side !== 0) continue;
+    const id = W.ids[b.ri]; if (typeof id !== 'number' || !wPlayer(id)) continue;
+    const T = S[id] = S[id] || { gg: 0 };
+    T.gg++;
+    for (const k in b.line) T[k] = (T[k] || 0) + b.line[k];
+    line[id] = Object.assign({}, b.line);
+  }
+  const mvp = wGridMvp(line);
+  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(W.ids);
+  for (const p of wRoster()) {
+    const n = inSeven.has(p.id) ? base + (win && mvp === p.id ? W_GFG.mvpXp : 0) : Math.round(base * W_GFG.benchShare);
+    if (n > 0) wGiveXp(p, n);
+  }
+  const bits = `XP +${base} for the seven${wRoster().some(p => !inSeven.has(p.id)) ? `, +${Math.round(base * W_GFG.benchShare)} for those who sat out` : ''}`;
+  let pay = '';
+  if (win) { const g = W_GFG.gold * W.tier, f = W_GFG.fans * W.tier; RUN.gold += g; RUN.fans = (RUN.fans || 0) + f; pay = ` +${g} gold, +${f} fans.`; }
+  if (CLUBS[W.club]) {
+    const H = wH2h(), h = H[W.club] = H[W.club] || { w: 0, l: 0 };
+    if (win) h.w++; else if (!tie) h.l++;
+    h.last = { r, us, them, sport: 'football', day: WG.dayAbs };
+    try { if (!tie && wIsRival(W.club)) wLeagueMine(r); } catch (e) { console.error(e); }
+  }
+  B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, half, mvp, line });
+  B.games.length = Math.min(B.games.length, W_GFG.keep);
+  wAdvance(W_GFG.minutes);
+  WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
+  W.us = us; W.them = them;
+  const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
+  const who = mvp != null && wPlayer(mvp);
+  const msg = `Final: ${win ? 'you win' : tie ? 'a tie' : 'you lose'} ${us}–${them} against ${wBallName(W.club)}${half === 3 ? ', in Sudden Death' : ''}.${pay} ${bits}${win && who ? `, and +${W_GFG.mvpXp} for ${who.n}, player of the game` : ''}.`;
+  wLog(msg, win ? 'g' : 'b');
+  wSave();
+  return msg;
+}
+// player of the game: the best line among your own players
+function wGridMvp(lines) {
+  let best = null, bs = 0;
+  for (const id in lines) {
+    const s = lines[id], v = (s.py || 0) / 25 + (s.ptd || 0) * 4 - (s.pint || 0) * 2 + (s.ry || 0) / 10 + (s.recy || 0) / 10 + (s.td || 0) * 6 + (s.tkl || 0) + (s.sk || 0) * 2 + (s.ints || 0) * 4 + (s.fgm || 0) * 3;
+    if (v > bs) { bs = v; best = +id; }
+  }
+  return best;
+}
+W_ON_END.gfgame = function () { }; // the log line and the rewards are paid in wGridSettle; kinds built on it add theirs
+function wGridResultCard(msg) {
+  if (LAB) return;
+  const close = modal(`<header><h3>Final</h3></header><div class="wmsg"><p>${esc(msg)}</p></div><div class="row"><button class="btn" id="wGridOk">Done</button></div>`, () => wDrain());
+  $('wGridOk').focus(); $('wGridOk').onclick = () => close();
+}
+
+/* ---------- the bar in a real game ---------- */
+$('wGridBack').insertAdjacentHTML('beforebegin', '<button class="ghost" id="wGridSave" hidden>Save and leave</button><button class="ghost" id="wGridGive" hidden>Concede</button>');
+$('wGridSave').onclick = () => wGridLeave();
+$('wGridGive').onclick = () => wGridConcede();
+const wW44GridBar = wGridBar;
+wGridBar = function () {
+  wW44GridBar();
+  const real = !!(WGF && WGF.world), live = real && wGridLive();
+  $('wGridSave').hidden = $('wGridGive').hidden = !live;
+  $('wGridAgain').hidden = real;
+  $('wGridBack').hidden = live;
+  // once a real game is over, it can't be played on as an exhibition
+  $('wGridModes').hidden = real && !live;
+  if (real && !live && WGF.msg) $('wGridNote').textContent = WGF.msg;
+};
+const wW44LeaveGridiron = wLeaveGridiron;
+wLeaveGridiron = function () { wW44LeaveGridiron(); if (WG) { wSave(); wDrain(); } };
+
+/* ---------- picking a game ---------- */
+function wGridH2h(club) { const L = ((WG.h2h || {})[club] || {}).last; return L && L.sport === 'football' ? L : null; }
+function wOpenGridCard() {
+  const probs = wGridProblems(), B = wGfg(), live = wGridLive();
+  const rows = wBallClubs().map(c => {
+    const T = wBallTeam(c), tier = wBallTier(c), met = B.met[c] === WG.dayAbs, last = wGridH2h(c);
+    const btns = Object.keys(W_GFG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-gfclub="${c}" data-gfhow="${how}" ${probs.length || met || live ? 'disabled' : ''}>${W_GFG_HOW[how]}</button>`).join('');
+    return `<li class="wbcl"><span class="wbsw" style="background:${T.color}"></span><div><b>${esc(T.name)}</b>
+      <small>Tier ${tier}: their players are level ${wGridOppLvl(tier)}, CPU skill ${W_BALL_SKILL[wGridSkill(tier)[1]]}.${last ? ` Last football game: ${last.r === 'win' ? 'won' : last.r === 'tie' ? 'tied' : 'lost'} ${last.us}–${last.them}.` : ''}${met ? ' <b>Played you today.</b>' : ''}</small></div>
+      <div class="row">${btns}</div></li>`;
+  }).join('');
+  const close = modal(`<header><h3>Play a football game</h3><button class="ghost" data-close>Done</button></header>
+    ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}${WGFG.msg ? `<p class="wbad">${esc(WGFG.msg)}</p>` : ''}
+    ${live ? `<p class="wbad">You have a football game waiting. <button class="btn" id="wGfResume">Resume it</button></p>` : ''}
+    <p class="hint">A game on the gridiron with your seven: two halves, about seven minutes. <b>Play</b>: you call the plays and play your offense by hand. <b>Manage</b>: you call them and your players run them. <b>Simulate</b>: the result now. A win pays ${W_GFG.xp} XP to the seven, ${W_GFG.gold} gold and ${W_GFG.fans} fans, times the tier; a loss pays a quarter of the XP and costs nothing else, and a tie half. Each club plays you once a day, and a game takes ${W_GFG.minutes / 60 | 0} hours or so.</p>
+    <ul class="wbclubs">${rows}</ul>
+    <p class="hint">Or watch an exhibition: <button class="ghost" id="wGfExhib">Cinderhold against Mossgate</button></p>`);
+  WGFG.msg = '';
+  $('modalBox').querySelectorAll('[data-gfclub]').forEach(b => b.onclick = () => {
+    close();
+    const r = wStartGrid({ club: b.dataset.gfclub, how: b.dataset.gfhow });
+    if (r) { WGFG.msg = r; wOpenGridCard(); }
+  });
+  const ex = $('wGfExhib'); if (ex) ex.onclick = () => { close(); wGridironGame({ mode: 'watch' }); };
+  const rs = $('wGfResume'); if (rs) rs.onclick = () => { close(); wResumeGrid(); };
+}
+// Clinker Dunn's GRIDIRON opens the card
+(() => {
+  const K = DB.chars.gk_bowl; if (!K || !K.topics.gridiron) return;
+  K.topics.gridiron.t = 'Real football on the grass, seven a side and the same seven both ways: two halves, about seven minutes. Play a club for real, at the tier you\'re at, or watch an exhibition.';
+})();
+const wW44RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'ggame') return wOpenGridCard(); return wW44RunAct.apply(this, arguments); };
+
+/* after a reload, a saved game is waiting: ask once */
+const wW44NextPrompt = wNextPrompt;
+wNextPrompt = function () {
+  if (!LAB && wGridLive() && !WGFG.asked && !WGF && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    WGFG.asked = true;
+    const L = WG.gfg.live, sn = L.snap;
+    const close = modal(`<header><h3>A football game is waiting</h3></header><div class="wmsg"><p>Your game against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wGridScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Seven tab on the Team screen.</p></div>
+      <div class="row"><button class="btn" id="wGfRes">Resume</button><button class="ghost" id="wGfLater">Later</button></div>`, () => wDrain());
+    $('wGfRes').focus();
+    $('wGfRes').onclick = () => { close(); wResumeGrid(); };
+    $('wGfLater').onclick = () => close();
+    return true;
+  }
+  return wW44NextPrompt();
+};
+
+/* ---------- the Seven tab ---------- */
+const wW44CampSeven = wCampSeven;
+wCampSeven = function () {
+  const html = wW44CampSeven(), probs = wGridProblems(), live = wGridLive();
+  const play = live ? `<button class="btn" data-gfresume>Resume the game</button>` : `<button class="btn" data-gfplay ${probs.length ? 'disabled' : ''}>Play a game</button>`;
+  const gate = !live && probs.length ? `<p class="hint wball">${esc(probs[0])}</p>` : '';
+  return html.replace('<button class="btn" data-gpractice', `${play}<button class="ghost" data-gpractice`).replace(/<\/div>\s*$/, `</div>${gate}${wGridRecent()}`);
+};
+function wGridRecent() {
+  const B = WG.gfg; if (!B || !B.games.length) return '';
+  return `<h5 class="wbrh">Last football games: ${B.w}&ndash;${B.l}${B.t ? `&ndash;${B.t}` : ''}</h5><ol class="wstlog">${B.games.slice(0, 5).map(g => `<li><b class="${g.r === 'win' ? 'wgood' : 'wbad'}">${g.r === 'win' ? 'Won' : g.r === 'tie' ? 'Tied' : 'Lost'}</b> ${g.us}&ndash;${g.them} against ${esc(g.name)}<small>day ${g.day}${g.mvp != null && wPlayer(g.mvp) ? `, player of the game ${esc(wPlayer(g.mvp).n)}` : ''}</small></li>`).join('')}</ol>`;
+}
+const wW44RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW44RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'seven') return;
+  const p = body.querySelector('[data-gfplay]'); if (p) p.onclick = () => { WCAMP.close(); wOpenGridCard(); };
+  const r = body.querySelector('[data-gfresume]'); if (r) r.onclick = () => { WCAMP.close(); wResumeGrid(); };
+};
+
+/* ---------- box scores on the Stats tab ---------- */
+const W_GFG_COLS = [['gg', 'G', 'Football games'], ['pc', 'Cmp', 'Passes completed'], ['pa', 'Att', 'Passes thrown'], ['py', 'PYd', 'Passing yards'], ['ptd', 'PTD', 'Touchdown passes'],
+  ['ry', 'RYd', 'Rushing yards'], ['rec', 'Rec', 'Catches'], ['recy', 'RecYd', 'Receiving yards'], ['td', 'TD', 'Touchdowns scored'], ['tkl', 'Tkl', 'Tackles'], ['sk', 'Sk', 'Sacks'], ['ints', 'Int', 'Interceptions'], ['fgm', 'FG', 'Field goals made']];
+function wGridLine(pid) { return (WG.gfstats || {})[pid] || null; }
+const wW44CampStats = wCampStats;
+wCampStats = function () {
+  const html = wW44CampStats().replace(/(<button data-wsview="career"[^>]*>Career<\/button>)/, `$1<button data-wsview="football" aria-pressed="${WSTAT.view === 'football'}">Football</button>`);
+  if (WSTAT.view !== 'football') return html;
+  const k = WSTAT.sort && W_GFG_COLS.some(c => c[0] === WSTAT.sort) ? WSTAT.sort : null;
+  const rows = wRoster().map((p, i) => ({ p, i, L: wGridLine(p.id) }));
+  if (k) rows.sort((a, b) => (((b.L || {})[k] || 0) - ((a.L || {})[k] || 0)) || a.i - b.i);
+  const head = `<th scope="col"><button class="wsth" data-wsort="" aria-pressed="${!k}">Player</button></th>` + W_GFG_COLS.map(([c, s, l]) => `<th scope="col"><button class="wsth" data-wsort="${c}" title="${esc(l)}" aria-pressed="${k === c}">${s}</button></th>`).join('');
+  const body = rows.map(({ p, L }) => { const at = WG.seven && WG.seven.ids.includes(p.id) ? wSevenPosOf(p.id) : null;
+    return `<tr data-wsp="${p.id}"${WSTAT.pid === p.id ? ' class="wsel"' : ''}><th scope="row"><button class="wsname" data-wsp-open aria-expanded="${WSTAT.pid === p.id}"><img src="${wPlayerPort(p, 40)}" alt=""><span><b>${esc(p.n)}</b><small>${at ? `${at.off} / ${at.def}, ` : ''}Lv ${p.lvl}</small></span></button></th>
+    ${W_GFG_COLS.map(([c]) => `<td>${L ? L[c] || 0 : '<span class="dim">&ndash;</span>'}</td>`).join('')}</tr>`; }).join('');
+  const sel = WSTAT.pid != null && wPlayer(WSTAT.pid);
+  return html.replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every football game they played on this journey (call-ups are not counted). Pick a heading to sort, a player to see more.</small>')
+    .replace(/<div class="tablewrap">[\s\S]*$/, `<div class="tablewrap"><table class="wstats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${sel ? wStatsCard(sel) : ''}`);
+};
+const wW44StatsCard = wStatsCard;
+wStatsCard = function (p) {
+  const L = wGridLine(p.id), html = wW44StatsCard(p);
+  if (!L || !L.gg) return html;
+  const bits = [`${L.gg} football game${L.gg === 1 ? '' : 's'}`];
+  if (L.pa) bits.push(`passing ${L.pc || 0} of ${L.pa} for ${L.py || 0} yards, ${L.ptd || 0} TD, ${L.pint || 0} picked off`);
+  if (L.ra) bits.push(`${L.ra} carries for ${L.ry || 0} yards`);
+  if (L.rec) bits.push(`${L.rec} catches for ${L.recy || 0} yards`);
+  if (L.td) bits.push(`${L.td} touchdown${L.td === 1 ? '' : 's'}`);
+  if (L.tkl || L.sk || L.ints) bits.push(`${L.tkl || 0} tackles, ${L.sk || 0} sacks, ${L.ints || 0} interceptions`);
+  if (L.fga) bits.push(`${L.fgm || 0} of ${L.fga} field goals`);
+  return html.replace('<div class="wbd wgfc"><h5>Football</h5>', `<div class="wbd wgfc"><h5>Football</h5><p class="wbdbox">${bits.join('; ')}.</p>`);
+};
+
+const wW44RenderHelp = renderHelp;
+renderHelp = function () {
+  wW44RenderHelp();
+  const after = $('wHelpSeven'); if (!after || $('wHelpGfGame')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfGame"><b>Football games.</b> Once you have ${W_GFG.minOwn} players of your own, your seven can play football: Play a game on the Seven tab, or ask Clinker Dunn at the Ash Bowl for GRIDIRON. Take on the local side or a rival club, once a day each. Play (you call the plays and play your offense by hand), Manage (you call them, your players run them), or Simulate for the result at once. There is no team HP on the gridiron. A win pays XP to the seven (half to players who sat out), gold and fans; a loss pays a quarter of the XP, and a tie half. Save and leave keeps a game at its last call. The Stats tab's Football view has every player's box score.</p>`);
+};
+/* w45: monster powers on the gridiron (issue #9, phase 6; the engine's side is src/gf/parts/14-powers.js). They work as
+   they do on the diamond: team mana for the game, an offense power and a defense power by kind, cast with the call,
+   and one ultimate a game per kind that leaves a zone for 3 plays or the drive. Casting costs stamina.
+   On the bar, in You call and You play: your mana, the powers your players can cast with this call (pick one, or G to
+   go through them), Auto powers (your players cast their own, as the coaches would; on in You call, T switches it), and
+   a tip box with the pros and cons of the power you point at or picked, for this down. Under the field, How it works
+   explains powers and lists every kind's; How to play has #wHelpGfPowers.
+   Wraps: wGridBar (wW45GridBar: the powers row), renderHelp (wW45RenderHelp: #wHelpGfPowers). */
+// (at the foot of the bar, so the play buttons above don't move as it changes)
+$('wGridBar').insertAdjacentHTML('beforeend', `<span id="wGridPows" class="wgpows" hidden><b id="wGridMana" title="Team mana: 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time they score on you (up to 6)."></b>
+  <span id="wGridPowList"></span><button class="ghost" id="wGridAuto" title="Auto powers: your players cast their own powers with the call, the way the coaches would. T switches it."></button></span>
+  <div id="wGridTip" class="wgtip" hidden></div>`);
+// the power you point at, for the tip box (the one you picked otherwise)
+let wGridTipKey = null;
+$('wGridPows').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'wGridAuto') { wGF.setAuto(!wGF.powers().auto); return wGridBar(); }
+  if (b.dataset.gpow) { const P = wGF.powers(); wGF.pickPower(P.pick === b.dataset.gpow ? null : b.dataset.gpow); wGridBar(); }
+});
+$('wGridPows').addEventListener('mouseover', e => { const b = e.target.closest('[data-gpow]'); const k = b ? b.dataset.gpow : null; if (k !== wGridTipKey) { wGridTipKey = k; wGridTip(); } });
+$('wGridPows').addEventListener('mouseleave', () => { wGridTipKey = null; wGridTip(); });
+
+const wGridDiamonds = (n, max) => '◆'.repeat(n) + '◇'.repeat(Math.max(0, max - n));
+function wGridPowers() {
+  const P = wGF.powers(), show = !!P && !!WGF && WGF.mode !== 'watch' && !WGF.over && wGF.live;
+  $('wGridPows').hidden = !show; if (!show) { $('wGridTip').hidden = true; return; }
+  const yours = wGF.phase === 'call';
+  $('wGridMana').textContent = `Mana ${wGridDiamonds(P.mana, P.max)}`;
+  $('wGridPowList').innerHTML = P.list.length ? P.list.map(o => `<button class="ghost${P.pick === o.key ? ' on' : ''}${o.ult ? ' wgult' : ''}" data-gpow="${esc(o.key)}" ${o.ok && yours ? '' : 'disabled'}
+    title="${esc(`${o.n}: ${o.desc}${o.ok ? '' : ' (' + o.why + ')'}`)}">${o.ult ? '★ ' : ''}${esc(o.name)} <small>${esc(o.n)} · ${o.cost}◆</small></button>`).join('')
+    : '<span class="hint">No powers on this side of the ball.</span>';
+  $('wGridAuto').textContent = `Auto powers: ${P.auto ? 'on' : 'off'}`; $('wGridAuto').classList.toggle('on', P.auto); $('wGridAuto').setAttribute('aria-pressed', P.auto);
+  wGridTip();
+}
+// the tip box: the power you point at, or the one you picked; otherwise what to do
+function wGridTip() {
+  const P = wGF.powers(), box = $('wGridTip');
+  if (!P || $('wGridPows').hidden) { box.hidden = true; return; }
+  const key = wGridTipKey || P.pick, T = key ? wGF.tip(key) : null, o = key ? P.list.find(x => x.key === key) : null;
+  box.hidden = false;
+  if (!T || !o) {
+    box.innerHTML = `<span class="hint">${wGF.phase === 'call' ? `Pick a power to cast with your ${P.role === 'off' ? 'play' : 'defense'} (G goes through them), or none.${P.auto ? ' With Auto powers on, your players cast their own when you don\'t pick one.' : ''}` : 'Powers are picked with the call.'}</span>`;
+    return;
+  }
+  const li = (cls, a) => a.map(x => `<li class="${cls}">${esc(x)}</li>`).join('');
+  box.innerHTML = `<b>${o.ult ? '★ ' : ''}${esc(o.name)}</b> <small>${esc(o.n)}${P.pick === key ? ' · picked' : ''}</small><ul>${li('wgpro', T.pro)}${li('wgcon', T.con)}${li('wgnote', T.note)}</ul>`;
+}
+const wW45GridBar = wGridBar;
+wGridBar = function () {
+  wW45GridBar();
+  wGridPowers();
+  // the keys for powers, while it's your call
+  if (WGF && WGF.mode !== 'watch' && !WGF.over && wGF.phase === 'call' && wGF.powers()) $('wGridNote').textContent += ' G: a power. T: Auto powers.';
+};
+
+// How it works, under the field: powers, and every kind's
+function wGridPowersHowHTML() {
+  const B = wGF.powerBook, row = (k, b) => `<tr><td>${esc(wCap(k))}</td><td>${b.off ? `<b>${esc(b.off.n)}</b> <small>${b.off.cost}◆</small>: ${esc(b.off.desc)}` : ''}</td><td>${b.def ? `<b>${esc(b.def.n)}</b> <small>${b.def.cost}◆</small>: ${esc(b.def.desc)}` : ''}</td><td>${b.ult ? `<b>★ ${esc(b.ult.n)}</b> <small>${b.ult.role === 'off' ? 'on offense' : 'on defense'}</small>: ${esc(b.ult.desc)}` : ''}</td></tr>`;
+  return `<p class="hint"><b>Powers.</b> Every player has two powers by kind: one on offense and one on defense. With each call your side may cast one, paid for with team mana (the diamonds beside each score): 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores on you, up to 6. Pick one on the bar (or press <b>G</b> to go through them) before you pick the play, or leave <b>Auto powers</b> on and your players cast their own (<b>T</b> switches it). Each kind also has an <b>ultimate</b> (★): once a game, ${wGF.ultCost} mana, and it leaves a zone on the field for ${wGF.ultPlays} plays or the drive, whichever ends first. Zones show on the grass with the plays they have left.</p>
+  <p class="hint"><b>Stamina.</b> The same seven play both ways, so every play costs everyone a little, and casting costs a lot more (the undead and golems tire at half the rate). Below half, a player is slower and weaker until rested; the half gives plenty back, and a winded player can't cast. The <b>Sta</b> column under the field shows it. The tip box beside the powers gives the pros and cons of the one you point at, for this down. After each play the reason says what was cast and what it did. Their coach casts too, better at higher tiers, and remembers the plays you cast on.</p>
+  <details class="wghow"><summary>Every kind's powers</summary><div class="tablewrap"><table class="wgline wgbook"><thead><tr><th>Kind</th><th>Offense</th><th>Defense</th><th>Ultimate</th></tr></thead><tbody>${Object.keys(B).map(k => row(k, B[k])).join('')}</tbody></table></div></details>`;
+}
+$('wGridHow').insertAdjacentHTML('beforeend', wGridPowersHowHTML());
+
+const wW45RenderHelp = renderHelp;
+renderHelp = function () {
+  wW45RenderHelp();
+  const g = $('wHelpGridiron'); if (!g || $('wHelpGfPowers')) return;
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfPowers"><b>Powers on the gridiron.</b> They work as they do on the diamond. Your side has team mana: 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores, up to 6. With each call you may cast one power: every kind has one for offense and one for defense (Wolf Sprint speeds up the ball carrier, Web slows whoever takes the ball). Pick it on the bar or press G; with Auto powers on, your players cast their own (T switches it, and it starts on when you manage). Each kind also has an ultimate, once a game for 3 mana, that leaves a zone on the field for 3 plays or the drive (Rampart walls the line, Bog Tide turns their backfield to swamp). Casting costs stamina, and so does every play, because the same seven play both ways: a tired player is slower and weaker until the half. The tip box gives each power's pros and cons for the down, and the reason after each play says what it did. The other side casts too, better at higher tiers. How it works, under the field, lists every kind's powers.</p>`);
 };
 </script>
 </body></html>

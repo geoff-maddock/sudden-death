@@ -73,7 +73,8 @@ async def main():
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
         k = await pg.evaluate("""(() => { const K = DB.chars.gk_bowl, r = wSay('gk_bowl', 'gridiron'), m = wSay('gk_bowl', 'game'); return { job: K.topics.job.t.includes('GRIDIRON'), act: r.act, match: m.act }; })()""")
         check(k == {'job': True, 'act': 'ggame', 'match': 'gmatch'}, 'Clinker Dunn puts on GRIDIRON, and their GAME is still the card-game match', k)
-        await pg.evaluate("(() => { const r = wSay('gk_bowl', 'gridiron'); wRunAct(r.act, 'gk_bowl'); })()")
+        # (GRIDIRON opens the game card since phase 5; the exhibition is the game on its own)
+        await pg.evaluate("wGridironGame()")
         await pg.wait_for_function("UI.view === 'gridiron' && wGF.isGame && wGF.phase === 'call'", timeout=30000)
         v = await pg.evaluate("({ title: document.getElementById('wGridTitle').textContent, again: document.getElementById('wGridAgain').textContent, clock: wGF.clock(), mode: document.querySelector('#wGridModes .on').dataset.gmode })")
         check('game' in v['title'] and v['again'] == 'Start over' and v['clock'] and v['clock']['half'] == 1 and v['clock']['text'] == '6:00' and v['mode'] == 'call',

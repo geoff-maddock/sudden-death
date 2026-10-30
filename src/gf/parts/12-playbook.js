@@ -21,18 +21,20 @@ function gfTire(side, kind, id) {
   for (const k in F) F[k] = k === id ? Math.max(0, F[k] - GF_TIRE) : Math.min(1, F[k] + GF_REST);
 }
 // a down is called: how stale each side's call is (for the live play), then both tire, and the coaches see them
-function gfCallsMade(oc, dc) {
+// (a play cast on is remembered: it counts half again in what the other coach has seen)
+function gfCallsMade(oc, dc, cast) {
   const off = G.poss, def = 1 - G.poss;
   const st = { read: 1 - gfFresh(off, 'off', oc), tell: 1 - gfFresh(def, 'def', dc) };
   gfTire(off, 'off', oc); gfTire(def, 'def', dc);
-  if (G.seen) { G.seen[off].push({ oc }); G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
+  if (G.seen) { G.seen[off].push(cast && cast.off ? { oc, pw: 1 } : { oc }); G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
   return st;
 }
 function gfHalfRest() { if (G.fresh) G.fresh = [gfFreshAll(), gfFreshAll()]; }
 // what share of side's last calls of a kind were each one
 function gfTendency(side, kind) {
   const key = kind === 'off' ? 'oc' : 'dc', list = ((G.seen && G.seen[side]) || []).filter(x => x[key]).slice(-GF_SEEN), out = {};
-  for (const x of list) out[x[key]] = (out[x[key]] || 0) + 1 / list.length;
+  const W = list.reduce((a, x) => a + (x.pw ? 1.5 : 1), 0);
+  for (const x of list) out[x[key]] = (out[x[key]] || 0) + (x.pw ? 1.5 : 1) / W;
   return out;
 }
 // the counter-call: weight up the defenses that beat what this offense keeps calling, down the ones it beats
