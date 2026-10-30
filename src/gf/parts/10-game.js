@@ -41,7 +41,7 @@ function gfKickoff() {
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
 }
-function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; }
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; if (G.zones) G.zones = []; gfPowersDrive(); }
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
@@ -50,9 +50,9 @@ function gfGameNext() {
   // Sudden Death: the first score wins
   if (G.half === 3 && scored) return false;
   if (G.clock <= 0) {
-    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
+    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); gfPowersHalf(); GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
     if (G.score[0] !== G.score[1] || G.half === 3) return false;
-    G.half = 3; G.clock = GF_GAME.ot; GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
+    G.half = 3; G.clock = GF_GAME.ot; gfPowersHalf(); GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
   }
   // after a score the other side receives: the side that scored kicks off, and after a safety the side scored on
   // (the drive's offense either way); otherwise the ball has already changed hands

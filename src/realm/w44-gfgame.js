@@ -82,18 +82,21 @@ function wStartGrid(o) {
   if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
   if (how === 'sim') {
-    const g = wGF.simGame({ teams: [mine, opp] });
+    const g = wGF.simGame({ teams: [mine, opp], skill: wGridSkill(tier) });
     const msg = wGridSettle(wGridResult(g.score), g.score[0], g.score[1], g.box, g.half);
     wGridResultCard(msg);
     return '';
   }
-  wGridironGame({ mode: how === 'play' ? 'play' : 'call', teams: [mine, opp] });
+  wGridironGame({ mode: how === 'play' ? 'play' : 'call', teams: [mine, opp], skill: wGridSkill(tier) });
   WGF.world = true;
   $('wGridTitle').textContent = `${mine.name} against ${opp.name}`;
   wGridBar();
   wSave();
   return '';
 }
+// how well each side casts its powers when the coaches cast them: yours (Auto powers, and Simulate) as a Knight, theirs
+// by tier, as on the diamond (W_BALL.diff: Squire, Knight, Archmage)
+const wGridSkill = tier => [1, W_BALL.diff[tier] != null ? W_BALL.diff[tier] : 1];
 const wGridResult = sc => sc[0] > sc[1] ? 'win' : sc[0] < sc[1] ? 'lose' : 'tie';
 function wResumeGrid() {
   const L = wGridLive() && WG.gfg.live;
@@ -232,7 +235,7 @@ function wOpenGridCard() {
     const T = wBallTeam(c), tier = wBallTier(c), met = B.met[c] === WG.dayAbs, last = wGridH2h(c);
     const btns = Object.keys(W_GFG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-gfclub="${c}" data-gfhow="${how}" ${probs.length || met || live ? 'disabled' : ''}>${W_GFG_HOW[how]}</button>`).join('');
     return `<li class="wbcl"><span class="wbsw" style="background:${T.color}"></span><div><b>${esc(T.name)}</b>
-      <small>Tier ${tier}: their players are level ${wGridOppLvl(tier)}.${last ? ` Last football game: ${last.r === 'win' ? 'won' : last.r === 'tie' ? 'tied' : 'lost'} ${last.us}–${last.them}.` : ''}${met ? ' <b>Played you today.</b>' : ''}</small></div>
+      <small>Tier ${tier}: their players are level ${wGridOppLvl(tier)}, CPU skill ${W_BALL_SKILL[wGridSkill(tier)[1]]}.${last ? ` Last football game: ${last.r === 'win' ? 'won' : last.r === 'tie' ? 'tied' : 'lost'} ${last.us}–${last.them}.` : ''}${met ? ' <b>Played you today.</b>' : ''}</small></div>
       <div class="row">${btns}</div></li>`;
   }).join('');
   const close = modal(`<header><h3>Play a football game</h3><button class="ghost" data-close>Done</button></header>

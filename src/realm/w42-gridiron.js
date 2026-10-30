@@ -93,10 +93,11 @@ function wGridHowHTML() {
 function wGridLineup() {
   const st = wGF.stats;
   return wGF.lineup().map(t => `<div class="tablewrap"><table class="wgline"><caption><i style="background:${t.color}"></i>${esc(t.team)}: ${t.side ? 'defense' : 'offense'}</caption>
-    <thead><tr><th>Pos</th><th>Player</th>${st.map(k => `<th title="${esc(W_GRID_STAT[k][1])}">${W_GRID_STAT[k][0]}</th>`).join('')}</tr></thead>
-    <tbody>${t.players.map(p => { const P = W_GRID_POS[p.pos] || [p.pos, []];
-      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td>${esc(p.n)} <small>#${p.num}</small></td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}</tr>`; }).join('')}</tbody></table>
-    ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position.</p>`}</div>`).join('');
+    <thead><tr><th>Pos</th><th>Player</th>${st.map(k => `<th title="${esc(W_GRID_STAT[k][1])}">${W_GRID_STAT[k][0]}</th>`).join('')}<th title="Stamina: every play costs a little and casting a power a lot; below half a player is slower and weaker. The half gives plenty back.">Sta</th></tr></thead>
+    <tbody>${t.players.map(p => { const P = W_GRID_POS[p.pos] || [p.pos, []], B = wGF.powerBook[p.kind] || {};
+      const pw = [B.off && `${B.off.n} (offense)`, B.def && `${B.def.n} (defense)`, B.ult && `★ ${B.ult.n} (once a game)`].filter(Boolean).join(', ');
+      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td title="${esc('Powers: ' + pw)}">${esc(p.n)} <small>#${p.num}</small></td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}<td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td></tr>`; }).join('')}</tbody></table>
+    ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
 function wGridLog() {
@@ -117,15 +118,15 @@ function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
   return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.football} Club` }, A)];
 }
-/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call' | 'play', seed, teams? } (teams: the two
-   sides, yours first; by default the Cinderhold Football Club against the visitors). Start over keeps the same sides. */
+/* one drive, or a whole game, on the field. opts: { mode: 'watch' | 'call' | 'play', seed, teams?, skill? } (teams: the two
+   sides, yours first; skill: the CPU's casting skill by side, 0 to 2; by default the Cinderhold Football Club against the visitors). Start over keeps the same sides. */
 function wGridironDrive(opts) { return wGridStart('drive', opts); }
 function wGridironGame(opts) { return wGridStart('game', opts); }
 function wGridStart(kind, opts) {
   const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
-  const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams();
-  WGF = { kind, mode: o.mode, over: null, teams };
-  wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed });
+  const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams(), skill = o.skill || (WGF && WGF.kind === kind && WGF.skill) || null;
+  WGF = { kind, mode: o.mode, over: null, teams, skill };
+  wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed, skill });
   wGridChrome(kind);
   showView('gridiron');
   wGridBar();
