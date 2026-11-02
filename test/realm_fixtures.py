@@ -76,8 +76,10 @@ async def main():
         # ---------- your fixture ----------
         await pg.evaluate("(() => { const K = ['troll', 'harpy', 'golem', 'wraith', 'spider']; let i = 0; while (wRoster().length < 7 && i < 10) wRecruit({ kind: K[i++ % K.length], lvl: 3 }, 'tavern'); })()")
         await pg.evaluate(CLOSE_ALL)
-        mine = await pg.evaluate("wMyFixture()")
-        other = await pg.evaluate(f"W_GRDS.find(g => g.id !== '{mine['g']}' && g.sport !== 'baseball').id")
+        # (a card match: a fixture drawn at the Ash Bowl is a football game, in test/realm_gridiron_cup.py)
+        mine = await pg.evaluate("""(() => { const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me');
+          if (f.g === 'g_bowl') f.g = W_GRDS.find(g => g.id !== 'g_bowl' && g.sport !== 'baseball').id; return wMyFixture(); })()""")
+        other = await pg.evaluate(f"W_GRDS.find(g => g.id !== '{mine['g']}' && g.id !== 'g_bowl' && g.sport !== 'baseball').id")
         await pg.evaluate(ENTER + f"('{other}')")
         await pg.evaluate(f"wOpenGrdCard('{other}')")
         elsewhere = await pg.evaluate("({ row: !!document.querySelector('[data-gfix]'), text: document.getElementById('modalBox').textContent })")

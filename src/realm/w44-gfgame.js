@@ -192,11 +192,12 @@ function wGridSettle(r, us, them, box, half) {
   }
   B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, half, mvp, line });
   B.games.length = Math.min(B.games.length, W_GFG.keep);
-  wAdvance(W_GFG.minutes);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
   // (and each side's yards from scrimmage: a knockout settles a tie on them)
   W.us = us; W.them = them; W.yards = [0, 1].map(s => box.filter(b => b.side === s).reduce((a, b) => a + (b.line.py || 0) + (b.line.ry || 0), 0));
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
+  // the clock after the game's own end: a fixture played late on the eve of a round counts in its round, not as postponed
+  wAdvance(W_GFG.minutes);
   const who = mvp != null && wPlayer(mvp);
   const msg = `Final: ${win ? 'you win' : tie ? 'a tie' : 'you lose'} ${us}–${them} against ${wBallName(W.club)}${half === 3 ? ', in Sudden Death' : ''}.${pay} ${bits}${win && who ? `, and +${W_GFG.mvpXp} for ${who.n}, player of the game` : ''}.`;
   wLog(msg, win ? 'g' : 'b');

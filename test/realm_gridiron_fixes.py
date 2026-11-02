@@ -1,7 +1,8 @@
 # Realm gridiron: the fixes from the review of phases 5 to 7 (issue #9). Conceding a cup game you lead puts you out;
 # a game simulated during yours (the clubs' games at the Ash Bowl, the cup's other games) leaves yours on the field; a
 # fixture at the Bowl counts head to head once; a power you pick doesn't outlive a punt; an ultimate is once a game per
-# kind, not per player; Save and leave pressed during a play waits for the next call, so the play counts.
+# kind, not per player; Save and leave pressed during a play waits for the next call, so the play counts; a fixture at
+# the Bowl that ends after midnight on the eve of the round counts in its round.
 # Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -74,8 +75,9 @@ async def main():
           wGF.call(wGF.yourBall ? 'run' : 'zone'); await wait(['pre', 'live']);
           document.getElementById('wGridSave').click();
           const mid = {{ view: UI.view, txt: document.getElementById('wGridSave').textContent, off: document.getElementById('wGridSave').disabled }};
-          for (let i = 0; i < 400 && UI.view === 'gridiron'; i++) await new Promise(r => setTimeout(r, 25));
-          const L = WG.gfg.live; return {{ mid, view: UI.view, saved: !!(L && L.snap), more: L && L.snap ? plays(L.snap) - n0 : 0 }}; }})()""")
+          const seen = [];
+          for (let i = 0; i < 2400 && UI.view === 'gridiron'; i++) {{ if (seen[seen.length - 1] !== wGF.phase) seen.push(wGF.phase); await new Promise(r => setTimeout(r, 25)); }}
+          const L = WG.gfg.live; return {{ mid, seen, view: UI.view, saved: !!(L && L.snap), more: L && L.snap ? plays(L.snap) - n0 : 0 }}; }})()""")
         check(sv['mid']['view'] == 'gridiron' and sv['mid']['off'] and 'next call' in sv['mid']['txt'], 'Save and leave during a play waits, and says it will leave at the next call', sv)
         check(sv['view'] == 'world' and sv['saved'] and sv['more'] >= 1, 'then you leave, and the saved game includes that play', sv)
         await pg.evaluate("wResumeGrid()"); await pg.wait_for_function("UI.view === 'gridiron'")
@@ -89,6 +91,14 @@ async def main():
           wGfixPlay('sim'); const g = WG.gfg.games[0], h1 = H[club] ? H[club].w + H[club].l : 0;
           return { club, inClubs: !!CLUBS[club], r: g.r, more: h1 - h0, sport: H[club] && H[club].last && H[club].last.sport }; })()""")
         check(h['more'] == (0 if h['r'] == 'tie' else 1) and (h['r'] == 'tie' or h['sport'] == 'football'), 'a fixture at the Ash Bowl counts once head to head, with the football score', h)
+        await pg.evaluate(CLOSE_ALL)
+
+        # ---------- a fixture at the Bowl that ends after midnight, on the eve of the round, counts in its round ----------
+        m = await pg.evaluate("""(() => { const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me'); f.g = 'g_bowl'; f.done = 0;
+          while ((WG.dayAbs + 1) % W_LEAGUE.every !== 0) WG.dayAbs++; F.day = WG.dayAbs + 1; WG.min = 1400; WG.gfg.met = {}; const n = WLOG.length;
+          wGfixPlay('sim'); const log = WLOG.slice(n).map(l => l[0]).join(' ');
+          return { done: !!f.done, postponed: /postponed/.test(log), drawn: wLeague().next !== F }; })()""")
+        check(m['done'] and not m['postponed'] and m['drawn'], 'a Bowl fixture that ends after midnight on the eve of the round counts in its round, not as postponed', m)
         await pg.evaluate(CLOSE_ALL)
 
         # ---------- an ultimate is once a game per kind ----------
