@@ -73,3 +73,4 @@ src/realm/w43-gfseven.js
 src/realm/w44-gfgame.js
 src/realm/w45-gfpowers.js
 src/realm/w46-gfcup.js
+src/realm/w47-gffeel.js
