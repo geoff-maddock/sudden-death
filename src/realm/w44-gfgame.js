@@ -23,8 +23,9 @@
 const W_GFG = {
   minOwn: 5, xp: 12, gold: 15, fans: 3, lossShare: .25, tieShare: .5, benchShare: .5, mvpXp: 5,
   // extra rating points for each of the other side's players, by tier, spread over their ratings (6 is +1 to every
-  // one). Measured under the coaches (Simulate): a full point everywhere takes an even game to about 20%
-  oppBonus: { 1: 0, 2: 3, 3: 6 },
+  // one). Measured under the coaches (Simulate, test/realm_gridiron_lab.py, docs/realm/BALANCE.md): a win about 49%
+  // of the time at tier 1, 44% at tier 2 and 25% at tier 3, as on the diamond
+  oppBonus: { 1: 0, 2: 1, 3: 4 },
   minutes: 150, keep: 10, saveMs: 15000,
 };
 const W_GFG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
