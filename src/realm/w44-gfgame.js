@@ -4,7 +4,7 @@
    W_GFG.minOwn players of your own (call-ups fill the seven), and each club plays you once a day. A loss costs
    nothing but the XP you would have won (question 5), as on the diamond; a tie after Sudden Death pays half. A win
    pays XP to the seven (half to your players who sat out), gold and fans by tier; every game records the box score
-   for your players, the head to head and the league table. Save and leave keeps the game at its last call, and it is
+   for your players, the head to head and the league table. Save and leave keeps the game at its last call (pressed during a play, you leave at the next one), and it is
    waiting when you come back, after a reload too. Clinker Dunn's GRIDIRON at the Ash Bowl, and the Seven tab, open
    the game card.
 
@@ -28,7 +28,7 @@ const W_GFG = {
   minutes: 150, keep: 10, saveMs: 15000,
 };
 const W_GFG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WGFG = { saved: 0, asked: false, msg: '' };
+const WGFG = { saved: 0, asked: false, msg: '', leaving: false };
 
 function wGfg() {
   const B = WG.gfg = WG.gfg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0, t: 0 };
@@ -42,11 +42,12 @@ function wGridProblems() {
   const n = wRoster().length;
   return n < W_GFG.minOwn ? [`Recruit ${W_GFG.minOwn - n} more player${W_GFG.minOwn - n === 1 ? '' : 's'}: a football game needs ${W_GFG.minOwn} of your own, and call-ups fill the rest of the seven.`] : [];
 }
-function wGridOppLvl(tier) { return Math.min(W_PARTY.maxLvl, wNineTier() + tier - 1); }
+// (the diamond's formula: one curve for both sports)
+const wGridOppLvl = tier => wBallOppLvl(tier);
 /* a club's seven: its own kinds first, at your level plus the tier, and W_GFG.oppBonus on every rating. A rival keeps
    the same seven until it would be a different level; the local side is new each time. */
 function wGridOpp(club, tier) {
-  const B = wGfg(), lvl = wGridOppLvl(tier), C = wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
+  const B = wGfg(), lvl = wGridOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
   const cached = club !== 'local' && B.opp[club];
   let team;
   if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
@@ -74,7 +75,7 @@ function wStartGrid(o) {
   const probs = wGridProblems(); if (probs.length) return probs.join(' ');
   const B = wGfg(), club = o.club;
   if (B.live) return 'Finish the football game you started first.';
-  if (!wBallRegion(club) && !CLUBS[club]) return '';
+  if (!wBallRegion(club) && !CLUBS[club] && club !== 'apex') return '';
   if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you at football today. Come back tomorrow.`;
   const how = W_GFG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club);
   const mine = wSevenTeam(), opp = wGridOpp(club, tier);
@@ -109,9 +110,13 @@ function wResumeGrid() {
   $('wGridTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
   wGridBar();
 }
-// Save and leave: the game stays at its last call in WG.gfg.live
+// Save and leave: the game stays at its last call in WG.gfg.live. Pressed during a play (or the beat after it), you
+// leave at the next call, so the play counts: leaving can't take back an interception
 function wGridLeave() {
   const L = wGridLive() && WG.gfg.live; if (!L) return wLeaveGridiron();
+  const ph = wGF.phase;
+  if (wGridWorld() && L.snap && ph && ph !== 'call' && ph !== 'over') { WGFG.leaving = true; wGridBar(); return; }
+  WGFG.leaving = false;
   const sn = L.snap;
   WGFG.asked = true;
   WGF = null; wLeaveGridiron();
@@ -137,9 +142,12 @@ function wGridConcede() {
   }, () => wGF.pause(false));
 }
 function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
+wGF.wantSnap = () => wGridWorld();
 wGF.onSnap = sn => {
   const L = wGridWorld() && WG.gfg.live; if (!L) return;
   L.snap = sn;
+  // (Save and leave was pressed during the play: leave now, after the engine's call beat is set)
+  if (WGFG.leaving) { WGFG.leaving = false; setTimeout(() => { if (wGridWorld()) wGridLeave(); }, 0); return; }
   const now = Date.now(); if (now - WGFG.saved > W_GFG.saveMs) { WGFG.saved = now; wSave(); }
 };
 // the end of a game on the field: an exhibition as before; a real game settles in the world
@@ -185,7 +193,8 @@ function wGridSettle(r, us, them, box, half) {
   B.games.length = Math.min(B.games.length, W_GFG.keep);
   wAdvance(W_GFG.minutes);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
-  W.us = us; W.them = them;
+  // (and each side's yards from scrimmage: a knockout settles a tie on them)
+  W.us = us; W.them = them; W.yards = [0, 1].map(s => box.filter(b => b.side === s).reduce((a, b) => a + (b.line.py || 0) + (b.line.ry || 0), 0));
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   const who = mvp != null && wPlayer(mvp);
   const msg = `Final: ${win ? 'you win' : tie ? 'a tie' : 'you lose'} ${us}–${them} against ${wBallName(W.club)}${half === 3 ? ', in Sudden Death' : ''}.${pay} ${bits}${win && who ? `, and +${W_GFG.mvpXp} for ${who.n}, player of the game` : ''}.`;
@@ -218,6 +227,8 @@ wGridBar = function () {
   wW44GridBar();
   const real = !!(WGF && WGF.world), live = real && wGridLive();
   $('wGridSave').hidden = $('wGridGive').hidden = !live;
+  if (!live) WGFG.leaving = false;
+  $('wGridSave').disabled = live && WGFG.leaving; $('wGridSave').textContent = live && WGFG.leaving ? 'Leaving at the next call…' : 'Save and leave';
   $('wGridAgain').hidden = real;
   $('wGridBack').hidden = live;
   // once a real game is over, it can't be played on as an exhibition
@@ -334,5 +345,5 @@ const wW44RenderHelp = renderHelp;
 renderHelp = function () {
   wW44RenderHelp();
   const after = $('wHelpSeven'); if (!after || $('wHelpGfGame')) return;
-  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfGame"><b>Football games.</b> Once you have ${W_GFG.minOwn} players of your own, your seven can play football: Play a game on the Seven tab, or ask Clinker Dunn at the Ash Bowl for GRIDIRON. Take on the local side or a rival club, once a day each. Play (you call the plays and play your offense by hand), Manage (you call them, your players run them), or Simulate for the result at once. There is no team HP on the gridiron. A win pays XP to the seven (half to players who sat out), gold and fans; a loss pays a quarter of the XP, and a tie half. Save and leave keeps a game at its last call. The Stats tab's Football view has every player's box score.</p>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfGame"><b>Football games.</b> Once you have ${W_GFG.minOwn} players of your own, your seven can play football: Play a game on the Seven tab, or ask Clinker Dunn at the Ash Bowl for GRIDIRON. Take on the local side or a rival club, once a day each. Play (you call the plays and play your offense by hand), Manage (you call them, your players run them), or Simulate for the result at once. There is no team HP on the gridiron. A win pays XP to the seven (half to players who sat out), gold and fans; a loss pays a quarter of the XP, and a tie half. Save and leave keeps a game at its last call; pressed during a play, you leave at the next call, so the play counts. The Stats tab's Football view has every player's box score.</p>`);
 };

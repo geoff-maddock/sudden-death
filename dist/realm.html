@@ -21996,7 +21996,7 @@ function gfSpeed(p) {
   if (p.side === 1) { m *= (1 + .08 * L.read - .05 * L.tell) * F.dSpd; if (p.job === 'rush') m *= F.rushSpd; else if (p.job === 'man' || p.job === 'zone') m *= F.coverSpd; return m; }
   m *= F.oSpd;
   if (held) m *= .94 * F.cSpd; else if (p.job === 'route') m *= F.rSpd * (p.x > 8 ? F.deepSpd : 1);
-  return m * (p.x < 0 ? F.backSpd : Math.abs(p.y) < 6 ? F.midSpd : 1);
+  return m * (p.x < 0 ? F.backSpd : p.x < 18 && Math.abs(p.y) < 6 ? F.midSpd : 1);
 }
 
 // st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense },
@@ -22265,7 +22265,7 @@ function gfTackles() {
     if (F.untag && L.gotT >= 0 && L.t - L.gotT < F.untag) { d.stun = .3; if (!L.ev.some(e => e.k === 'pow' && e.s === L.src.untag)) gfEv('pow', L.src.untag, `${L.src.untag}: ${c.n} slipped through as bats.`); continue; }
     if (L.breakLeft > 0 && dd <= 1.2) { L.breakLeft--; d.stun = .7; L.broken++; gfEv('broken', c.n); gfEv('pow', L.src.breakN, `${L.src.breakN}: ${c.n} went straight through ${d.n}.`); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
-    const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, .12, .97);
+    const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, F.tkl || F.cStr ? .12 : .2, F.tkl || F.cStr ? .97 : .93);
     if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }
@@ -22327,7 +22327,7 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
-const GF_HOOK = { onOver: null, onPhase: null, onSnap: null };
+const GF_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };  // wantSnap: false skips the snapshot
 let GD = null;
 
 function gfStart(opts) {
@@ -22359,7 +22359,7 @@ function gfCanCall(oc) {
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
   // each call is a point to save the game at (13-box.js)
-  if (ph === 'call' && GF_HOOK.onSnap) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
+  if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 
@@ -22370,7 +22370,7 @@ function gfTick(dt) {
     const mine = gfYours();
     if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
-    if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
+    if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
     GD.cast = gfCastPowers(GD.oc, GD.dc);
     GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });
@@ -22723,7 +22723,7 @@ function gfKickoff() {
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
 }
-function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; if (G.zones) G.zones = []; gfPowersDrive(); }
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; GD.pow = null; if (G.zones) G.zones = []; gfPowersDrive(); }
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
@@ -22752,12 +22752,16 @@ function gfGameSummary() {
     ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}) };
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
+// (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
-  let secs = 0;
-  try { gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; } }
-  finally { Object.assign(GF_HOOK, hooks); }
-  return Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
+  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: gfRand } : null;
+  GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
+  let secs = 0, out;
+  try {
+    gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; }
+    out = Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
+  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; gfRand = was.rand; } }
+  return out;
 }
 /* Cinder Gridiron: Play mode (issue #9, phase 2). In 'play' you call your side's plays as in 'call', and then play the
    offense by hand. On defense you call the defense and watch (question 3).
@@ -23042,7 +23046,7 @@ function gfPowerOptions(side) {
   T.roster.forEach((m, ri) => {
     const pw = GF_POW[m.kind], u = GF_ULT[m.kind], st = G.stam[side][ri];
     const add = (p, ult) => {
-      const cost = ult ? GF_ULT_COST : p.cost, used = ult && G.ultUsed[side][ri];
+      const cost = ult ? GF_ULT_COST : p.cost, used = ult && !!(G.ultUsed[side][m.kind] || G.ultUsed[side][ri]);
       const why = used ? 'used this game' : gfMana(side) < cost ? 'needs mana' : st < GF_STAM.min ? 'winded' : '';
       out.push({ key: ri + ':' + p.id, id: p.id, ri, n: m.n, kind: m.kind, name: p.n, cost, ult: !!ult, fits: ult ? 'any' : p.fits, desc: p.desc, ok: !why, why, stam: Math.round(st), stamCost: gfStamCost(cost, ult) });
     };
@@ -23054,7 +23058,7 @@ function gfPowerOptions(side) {
 // a power is cast: mana, stamina, the ultimate used, its zone on the field. Returns what the play needs: { id, ri, n, name, ult }
 function gfCast(side, o) {
   G.mana[side] -= o.cost; G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - o.stamCost);
-  if (o.ult) { G.ultUsed[side][o.ri] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
+  if (o.ult) { G.ultUsed[side][o.kind] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
   return { id: o.id, ri: o.ri, n: o.n, name: o.name, ult: o.ult, side };
 }
 // with the call: each side's power. Yours is your pick, or Auto powers', or none; the CPU's is the CPU's
@@ -23255,7 +23259,7 @@ return {
   get on() { return GFP.on; }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
   get play() { return L; }, pause: on => { GFP.paused = !!on; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
   // Play mode: the page's keys ({ steer, hold, pick, tap }), and what the field shows of them
-  input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; }, set onSnap(f) { GF_HOOK.onSnap = f; },
+  input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; }, set onSnap(f) { GF_HOOK.onSnap = f; }, set wantSnap(f) { GF_HOOK.wantSnap = f; },
   // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
   box: () => gfBox(), snapshot: () => GD ? gfSnapshot() : null, resume: sn => { gfResume(sn); gfShow(); return G; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
@@ -28138,7 +28142,7 @@ renderHelp = function () {
    W_GFG.minOwn players of your own (call-ups fill the seven), and each club plays you once a day. A loss costs
    nothing but the XP you would have won (question 5), as on the diamond; a tie after Sudden Death pays half. A win
    pays XP to the seven (half to your players who sat out), gold and fans by tier; every game records the box score
-   for your players, the head to head and the league table. Save and leave keeps the game at its last call, and it is
+   for your players, the head to head and the league table. Save and leave keeps the game at its last call (pressed during a play, you leave at the next one), and it is
    waiting when you come back, after a reload too. Clinker Dunn's GRIDIRON at the Ash Bowl, and the Seven tab, open
    the game card.
 
@@ -28162,7 +28166,7 @@ const W_GFG = {
   minutes: 150, keep: 10, saveMs: 15000,
 };
 const W_GFG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WGFG = { saved: 0, asked: false, msg: '' };
+const WGFG = { saved: 0, asked: false, msg: '', leaving: false };
 
 function wGfg() {
   const B = WG.gfg = WG.gfg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0, t: 0 };
@@ -28176,11 +28180,12 @@ function wGridProblems() {
   const n = wRoster().length;
   return n < W_GFG.minOwn ? [`Recruit ${W_GFG.minOwn - n} more player${W_GFG.minOwn - n === 1 ? '' : 's'}: a football game needs ${W_GFG.minOwn} of your own, and call-ups fill the rest of the seven.`] : [];
 }
-function wGridOppLvl(tier) { return Math.min(W_PARTY.maxLvl, wNineTier() + tier - 1); }
+// (the diamond's formula: one curve for both sports)
+const wGridOppLvl = tier => wBallOppLvl(tier);
 /* a club's seven: its own kinds first, at your level plus the tier, and W_GFG.oppBonus on every rating. A rival keeps
    the same seven until it would be a different level; the local side is new each time. */
 function wGridOpp(club, tier) {
-  const B = wGfg(), lvl = wGridOppLvl(tier), C = wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
+  const B = wGfg(), lvl = wGridOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
   const cached = club !== 'local' && B.opp[club];
   let team;
   if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
@@ -28208,7 +28213,7 @@ function wStartGrid(o) {
   const probs = wGridProblems(); if (probs.length) return probs.join(' ');
   const B = wGfg(), club = o.club;
   if (B.live) return 'Finish the football game you started first.';
-  if (!wBallRegion(club) && !CLUBS[club]) return '';
+  if (!wBallRegion(club) && !CLUBS[club] && club !== 'apex') return '';
   if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you at football today. Come back tomorrow.`;
   const how = W_GFG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club);
   const mine = wSevenTeam(), opp = wGridOpp(club, tier);
@@ -28243,9 +28248,13 @@ function wResumeGrid() {
   $('wGridTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
   wGridBar();
 }
-// Save and leave: the game stays at its last call in WG.gfg.live
+// Save and leave: the game stays at its last call in WG.gfg.live. Pressed during a play (or the beat after it), you
+// leave at the next call, so the play counts: leaving can't take back an interception
 function wGridLeave() {
   const L = wGridLive() && WG.gfg.live; if (!L) return wLeaveGridiron();
+  const ph = wGF.phase;
+  if (wGridWorld() && L.snap && ph && ph !== 'call' && ph !== 'over') { WGFG.leaving = true; wGridBar(); return; }
+  WGFG.leaving = false;
   const sn = L.snap;
   WGFG.asked = true;
   WGF = null; wLeaveGridiron();
@@ -28271,9 +28280,12 @@ function wGridConcede() {
   }, () => wGF.pause(false));
 }
 function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
+wGF.wantSnap = () => wGridWorld();
 wGF.onSnap = sn => {
   const L = wGridWorld() && WG.gfg.live; if (!L) return;
   L.snap = sn;
+  // (Save and leave was pressed during the play: leave now, after the engine's call beat is set)
+  if (WGFG.leaving) { WGFG.leaving = false; setTimeout(() => { if (wGridWorld()) wGridLeave(); }, 0); return; }
   const now = Date.now(); if (now - WGFG.saved > W_GFG.saveMs) { WGFG.saved = now; wSave(); }
 };
 // the end of a game on the field: an exhibition as before; a real game settles in the world
@@ -28319,7 +28331,8 @@ function wGridSettle(r, us, them, box, half) {
   B.games.length = Math.min(B.games.length, W_GFG.keep);
   wAdvance(W_GFG.minutes);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
-  W.us = us; W.them = them;
+  // (and each side's yards from scrimmage: a knockout settles a tie on them)
+  W.us = us; W.them = them; W.yards = [0, 1].map(s => box.filter(b => b.side === s).reduce((a, b) => a + (b.line.py || 0) + (b.line.ry || 0), 0));
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   const who = mvp != null && wPlayer(mvp);
   const msg = `Final: ${win ? 'you win' : tie ? 'a tie' : 'you lose'} ${us}–${them} against ${wBallName(W.club)}${half === 3 ? ', in Sudden Death' : ''}.${pay} ${bits}${win && who ? `, and +${W_GFG.mvpXp} for ${who.n}, player of the game` : ''}.`;
@@ -28352,6 +28365,8 @@ wGridBar = function () {
   wW44GridBar();
   const real = !!(WGF && WGF.world), live = real && wGridLive();
   $('wGridSave').hidden = $('wGridGive').hidden = !live;
+  if (!live) WGFG.leaving = false;
+  $('wGridSave').disabled = live && WGFG.leaving; $('wGridSave').textContent = live && WGFG.leaving ? 'Leaving at the next call…' : 'Save and leave';
   $('wGridAgain').hidden = real;
   $('wGridBack').hidden = live;
   // once a real game is over, it can't be played on as an exhibition
@@ -28468,7 +28483,7 @@ const wW44RenderHelp = renderHelp;
 renderHelp = function () {
   wW44RenderHelp();
   const after = $('wHelpSeven'); if (!after || $('wHelpGfGame')) return;
-  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfGame"><b>Football games.</b> Once you have ${W_GFG.minOwn} players of your own, your seven can play football: Play a game on the Seven tab, or ask Clinker Dunn at the Ash Bowl for GRIDIRON. Take on the local side or a rival club, once a day each. Play (you call the plays and play your offense by hand), Manage (you call them, your players run them), or Simulate for the result at once. There is no team HP on the gridiron. A win pays XP to the seven (half to players who sat out), gold and fans; a loss pays a quarter of the XP, and a tie half. Save and leave keeps a game at its last call. The Stats tab's Football view has every player's box score.</p>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfGame"><b>Football games.</b> Once you have ${W_GFG.minOwn} players of your own, your seven can play football: Play a game on the Seven tab, or ask Clinker Dunn at the Ash Bowl for GRIDIRON. Take on the local side or a rival club, once a day each. Play (you call the plays and play your offense by hand), Manage (you call them, your players run them), or Simulate for the result at once. There is no team HP on the gridiron. A win pays XP to the seven (half to players who sat out), gold and fans; a loss pays a quarter of the XP, and a tie half. Save and leave keeps a game at its last call; pressed during a play, you leave at the next call, so the play counts. The Stats tab's Football view has every player's box score.</p>`);
 };
 /* w45: monster powers on the gridiron (issue #9, phase 6; the engine's side is src/gf/parts/14-powers.js). They work as
    they do on the diamond: team mana for the game, an offense power and a defense power by kind, cast with the call,
@@ -28538,7 +28553,260 @@ const wW45RenderHelp = renderHelp;
 renderHelp = function () {
   wW45RenderHelp();
   const g = $('wHelpGridiron'); if (!g || $('wHelpGfPowers')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfPowers"><b>Powers on the gridiron.</b> They work as they do on the diamond. Your side has team mana: 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores, up to 6. With each call you may cast one power: every kind has one for offense and one for defense (Wolf Sprint speeds up the ball carrier, Web slows whoever takes the ball). Pick it on the bar or press G; with Auto powers on, your players cast their own (T switches it, and it starts on when you manage). Each kind also has an ultimate, once a game for 3 mana, that leaves a zone on the field for 3 plays or the drive (Rampart walls the line, Bog Tide turns their backfield to swamp). Casting costs stamina, and so does every play, because the same seven play both ways: a tired player is slower and weaker until the half. The tip box gives each power's pros and cons for the down, and the reason after each play says what it did. The other side casts too, better at higher tiers. How it works, under the field, lists every kind's powers.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfPowers"><b>Powers on the gridiron.</b> They work as they do on the diamond. Your side has team mana: 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores, up to 6. With each call you may cast one power: every kind has one for offense and one for defense (Wolf Sprint speeds up the ball carrier, Web slows whoever takes the ball). Pick it on the bar or press G; with Auto powers on, your players cast their own (T switches it, and it starts on when you manage). Each kind also has an ultimate, once a game per kind for 3 mana (two goblins share one Smoke Bomb), that leaves a zone on the field for 3 plays or the drive (Rampart walls the line, Bog Tide turns their backfield to swamp). Casting costs stamina, and so does every play, because the same seven play both ways: a tired player is slower and weaker until the half. The tip box gives each power's pros and cons for the down, and the reason after each play says what it did. The other side casts too, better at higher tiers. How it works, under the field, lists every kind's powers.</p>`);
+};
+/* w46: the Cinder Cup, and league fixtures at the Ash Bowl on the gridiron (issue #9, phase 7).
+   The Cinder Cup is football's own cup, as the Diamond Cup (w20e) is baseball's: every week at the Ash Bowl (ask
+   Clinker Dunn about the CINDER cup, or use the button on the Seven tab or the game card). Eight sevens in a bracket:
+   you, rival clubs and the regions' own sides. Three rounds, each one harder (the tier, so their level and their CPU
+   skill, goes up with the round). You play your own games (Play, Manage or Simulate, as any football game) and the
+   rest of each round is simulated on the same engine once yours is done. A tie after Sudden Death goes to the side
+   with more yards from scrimmage. Lose and you're out; the rest of the bracket is played to a champion. Win the final
+   for gold, fans, a pick of football cards, a line in the journal and a place on the Wall of Awards.
+   League fixtures at the Bowl (w24): your fixture there is a football game on the gridiron (Play, Manage or Simulate)
+   instead of a card match, and the clubs' own fixtures there are played on the engine, with real scores. A win is
+   two points on the table and the fixture's fans, a tie is no points, and either way the fixture is done.
+
+   WG.gcup  { week, field: [8 ids, 'me' first], round: 0..2, games: [[{ a, b, ra, rb, w, ya?, yb?, yd }]] by round,
+              pending, show, out, done, champ } or null; yd: settled on the yards (a tie). A concede is a loss. Plain JSON, as WG.dcup.
+   W_GCUP   the numbers; W_GCUP.force ('win' | 'lose') settles your next cup game that way (tests and the bot)
+   wGcupEnter(), wGcupPlay(how), wGcupCatchUp(), wOpenGcup(), wGfixPlay(how), W_ON_END.gcup, W_ON_END.gfix
+   Wrapped: wNextPrompt (wW46NextPrompt: the rest of the round, then the bracket), wCampSeven and wRenderCamp
+   (wW46CampSeven, wW46RenderCamp: a Cinder Cup button), wOpenGridCard (wW46OpenGridCard: the cup and your fixture),
+   wOpenGrdCard (wW46OpenGrdCard: the Bowl's fixture row plays on the gridiron), wSimAt (wW46SimAt: the clubs' games
+   at the Bowl on the engine), wRunAct (wW46RunAct: 'gcup'), wWallText, renderHelp (#wHelpGcup). */
+
+const W_GCUP = {
+  fee: 40, size: 8,
+  tiers: [1, 2, 3],               // the tier of each round: CPU skill Squire, Knight, Archmage
+  rounds: ['Quarter-final', 'Semi-final', 'Final'],
+  prize: { gold: 150, fans: 20, pick: 3 },
+  force: null
+};
+const W_GFIX = { bowl: 'g_bowl', tier: 2 };
+
+function wGcup() { return (WG && WG.gcup) || null; }
+function wGcupOn() { const D = wGcup(); return !!(D && !D.done); }
+function wGcupName(id) { return id === 'me' ? 'your seven' : wBallName(id); }
+function wGcupTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
+function wGcupPairs(r) {
+  const D = wGcup(); let ids = D.field.slice();
+  for (let i = 0; i < r; i++) ids = (D.games[i] || []).map(g => g.w);
+  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
+  return out;
+}
+function wGcupGame(r, a, b) { return ((wGcup().games[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
+function wGcupMine() { const D = wGcup(); if (!D || D.out || D.done) return null; const p = wGcupPairs(D.round).find(x => x.includes('me')); return p && !wGcupGame(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+const wGcupLive = () => wGridLive() && WG.gfg.live.world.kind === 'gcup';
+
+function wGcupProblems() {
+  const D = wGcup(), out = wGridProblems();
+  if (D && !D.done) return out;
+  const left = 7 - ((WG.dayAbs - 1) % 7);
+  if (D && D.week === wWeek()) out.push(`The Cinder Cup is held once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
+  if (RUN.gold < W_GCUP.fee) out.push(`The entry fee is ${W_GCUP.fee} gold, and you have ${RUN.gold}.`);
+  if (wGridLive()) out.push('Finish the football game you started first.');
+  return out;
+}
+// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
+function wGcupEnter() {
+  const probs = wGcupProblems(); if (probs.length) return probs.join(' ');
+  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
+  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
+  const others = shuffle(rivals.concat(wild).slice(0, W_GCUP.size - 1));
+  RUN.gold -= W_GCUP.fee;
+  WG.gcup = { week: wWeek(), field: ['me'].concat(others), round: 0, games: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
+  wLog(`You enter the Cinder Cup (${W_GCUP.fee} gold). ${W_GCUP.rounds[0]}: ${wGcupName(wGcupMine())}.`, 'g');
+  wSave();
+  return '';
+}
+function wGcupPlay(how) {
+  const D = wGcup(), opp = wGcupMine(); if (!opp) return '';
+  return wStartGrid({ club: opp, how, tier: W_GCUP.tiers[D.round], kind: 'gcup', ref: { week: D.week, round: D.round }, cup: true });
+}
+// who goes through: the score, then (a tie after Sudden Death) the yards from scrimmage, then the toss of a coin
+const wGcupWinner = (a, b, ra, rb, ya, yb) => ra !== rb ? (ra > rb ? a : b) : ya !== yb ? (ya > yb ? a : b) : (Math.random() < .5 ? a : b);
+// your game's result; the rest of the round waits until you are back in the world (wGcupCatchUp)
+W_ON_END.gcup = function (r, ref, W) {
+  const D = wGcup(); if (!D || !ref || D.done || ref.week !== D.week || ref.round !== D.round) return;
+  const forced = W_GCUP.force; W_GCUP.force = null;
+  const [ya, yb] = W.yards || [0, 0];
+  // (a win or a loss is the result: conceding loses whatever the score; only a tie goes to the yards)
+  const rr = forced || r, yd = rr === 'tie';
+  const w = rr === 'win' ? 'me' : rr === 'lose' ? W.club : wGcupWinner('me', W.club, W.us, W.them, ya, yb), win = w === 'me';
+  D.games[D.round].push({ a: 'me', b: W.club, ra: W.us, rb: W.them, ya, yb, w, yd });
+  if (!win) D.out = true;
+  D.pending = true;
+  const tb = yd ? ` (tied, and ${win ? 'you' : 'they'} had more yards)` : '';
+  wLog(win ? `${W_GCUP.rounds[D.round]} won: ${W.us}–${W.them} against ${wGcupName(W.club)}${tb}.` : `Out of the Cinder Cup in the ${W_GCUP.rounds[D.round].toLowerCase()}, ${W.us}–${W.them} to ${wGcupName(W.club)}${tb}.`, win ? 'g' : 'b');
+};
+// a game you are not in, on the same engine, both sides on the coaches (and your own game, if one is on, kept)
+function wGridSimClubs(a, b, tier) {
+  const sk = wGridSkill(tier)[1], g = wGF.simGame({ teams: [wGridOpp(a, tier), wGridOpp(b, tier)], skill: [sk, sk], keep: true });
+  const yd = s => g.box.filter(x => x.side === s).reduce((t, x) => t + (x.line.py || 0) + (x.line.ry || 0), 0);
+  return { ra: g.score[0], rb: g.score[1], ya: yd(0), yb: yd(1) };
+}
+function wGcupSim(a, b, tier) {
+  const s = wGridSimClubs(a, b, tier);
+  return { a, b, ra: s.ra, rb: s.rb, ya: s.ya, yb: s.yb, w: wGcupWinner(a, b, s.ra, s.rb, s.ya, s.yb), yd: s.ra === s.rb };
+}
+// the rest of the round: every game without a result; then the next round, and on to the final if you are out
+function wGcupCatchUp() {
+  const D = wGcup(); if (!D || !D.pending || wGridLive() || UI.view === 'gridiron') return false;
+  for (;;) {
+    for (const [a, b] of wGcupPairs(D.round)) if (!wGcupGame(D.round, a, b)) D.games[D.round].push(wGcupSim(a, b, W_GCUP.tiers[D.round]));
+    if (D.round === W_GCUP.rounds.length - 1) { D.done = true; D.champ = D.games[D.round][0].w; break; }
+    D.round++;
+    if (!D.out) break;
+  }
+  D.pending = false; D.show = true;
+  if (D.done && D.champ === 'me') wGcupWon();
+  else if (D.done) wLog(`${wCap(wGcupName(D.champ))} win the Cinder Cup.`, 'd');
+  else wLog(`The ${W_GCUP.rounds[D.round - 1].toLowerCase()}s are in. ${W_GCUP.rounds[D.round]}: ${wGcupName(wGcupMine())}.`, 'g');
+  wSave();
+  return true;
+}
+function wGcupWon() {
+  const P = W_GCUP.prize, D = wGcup(), f = D.games[2][0];
+  RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
+  WG.gcupWins = (WG.gcupWins || 0) + 1;
+  WG.gcupLog = (WG.gcupLog || []).concat({ year: WG.year, day: WG.day });
+  wLog(`You win the Cinder Cup! It goes up on the Wall of Awards. ${P.gold} gold and ${P.fans} fans.`, 'g');
+  try { wJAddWin({ at: wJStamp(), where: wJWhere(), k: 'title', t: 'Won the Cinder Cup', opp: wGcupTeamName(f.b), sport: 'football', score: `${f.ra}–${f.rb}` }); } catch (e) { console.error(e); }
+  const pool = wSportPool(['football']);
+  wGainCard(pool.length >= P.pick ? { pick: P.pick, pool } : { pick: P.pick, rarity: 'r' }, 'the Cinder Cup prize');
+}
+
+/* ---------- the card: entry, the bracket, your next game ---------- */
+function wGcupBracket() {
+  const D = wGcup();
+  const cell = (r, a, b) => {
+    const g = wGcupGame(r, a, b), tie = g && g.yd;
+    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wGcupTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${tie && g.w === id ? '*' : ''}</b></li>`;
+    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
+  };
+  return `<div class="wdcb">${W_GCUP.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wGcupPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
+    ${D.games.some(R => R.some(g => g.yd)) ? '<p class="hint">* Tied after Sudden Death: through on yards from scrimmage.</p>' : ''}`;
+}
+function wOpenGcup(msg) {
+  if (LAB || !WG) return;
+  wGcupCatchUp();
+  if (WG.cardOffer) { if ($('modal').hidden) wShowCardOffer(); return; }
+  if (WG.gcup) WG.gcup.show = false;
+  const D = wGcup(), on = wGcupOn(), probs = wGcupProblems(), opp = on && wGcupMine(), live = wGcupLive();
+  let body;
+  if (!on) {
+    body = `<p>Eight sevens, three rounds: the quarter-finals, the semi-finals and the final. Football on the gridiron at the Ash Bowl, with your seven. Rival clubs and the regions' own sides enter. Each round is harder than the last. Lose once and you're out; a tie after Sudden Death goes to the side with more yards.</p>
+      <p class="hint">Entry ${W_GCUP.fee} gold. Win it for ${W_GCUP.prize.gold} gold, ${W_GCUP.prize.fans} fans, a pick of ${W_GCUP.prize.pick} football cards and a place on the Wall of Awards. Every game also pays as a football game does. One cup a week.${WG.gcupWins ? ` You have won it ${WG.gcupWins} time${WG.gcupWins === 1 ? '' : 's'}.` : ''}</p>
+      ${D && D.done ? `<h5>Last week's bracket</h5>${wGcupBracket()}` : ''}
+      ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}
+      <div class="row"><button class="btn" id="wGcupEnter" ${probs.length ? 'disabled' : ''}>Enter (${W_GCUP.fee} gold)</button></div>`;
+  } else {
+    const tier = W_GCUP.tiers[D.round], h = opp && wGridH2h(opp);
+    const next = live ? `<p>Your ${W_GCUP.rounds[D.round].toLowerCase()} against ${esc(wGcupName(WG.gfg.live.world.club))} is waiting.</p><div class="row"><button class="btn" id="wGcupRes">Resume the game</button></div>`
+      : opp ? `<p><b>${W_GCUP.rounds[D.round]}</b> against ${esc(wGcupName(opp))}: their players are level ${wGridOppLvl(tier)}, CPU skill ${W_BALL_SKILL[wGridSkill(tier)[1]]}.${h ? ` Last football game: ${h.r === 'win' ? 'won' : h.r === 'tie' ? 'tied' : 'lost'} ${h.us}–${h.them}.` : ''}</p>
+        ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}
+        <div class="row">${Object.keys(W_GFG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-gchow="${how}" ${probs.length ? 'disabled' : ''}>${W_GFG_HOW[how]}</button>`).join('')}</div>` : '';
+    body = `${next}${wGcupBracket()}`;
+  }
+  const close = modal(`<header><h3>The Cinder Cup</h3><button class="ghost" data-close>Done</button></header>${msg ? `<p class="wbad">${esc(msg)}</p>` : ''}${body}`, () => wDrain());
+  const again = r => { close(); wOpenGcup(r); };
+  if ($('wGcupEnter')) $('wGcupEnter').onclick = () => again(wGcupEnter());
+  if ($('wGcupRes')) $('wGcupRes').onclick = () => { close(); wResumeGrid(); };
+  $('modalBox').querySelectorAll('[data-gchow]').forEach(b => b.onclick = () => {
+    // (after Simulate, the Final card first; closing it brings the bracket back, through wNextPrompt)
+    close(); const r = wGcupPlay(b.dataset.gchow); if (r) wOpenGcup(r);
+  });
+}
+// back in the world after your game: the rest of the round, then the bracket
+const wW46NextPrompt = wNextPrompt;
+wNextPrompt = function () {
+  const D = wGcup();
+  if (!LAB && D && (D.pending || D.show) && !wGridLive() && UI.view !== 'gridiron' && wActive() && !WG.cardOffer && !WG.event) { wOpenGcup(); return true; }
+  if (LAB && D && D.pending) wGcupCatchUp();
+  return wW46NextPrompt();
+};
+
+/* ---------- league fixtures at the Bowl, on the gridiron ---------- */
+const wGfixHere = () => { const f = wFixHere(W_GFIX.bowl); return f || null; };
+function wGfixPlay(how) {
+  const f = wGfixHere(); if (!f) return 'Your league fixture is not at the Ash Bowl.';
+  return wStartGrid({ club: f.club, how, tier: wFixTier(f.club, W_GFIX.bowl), kind: 'gfix', ref: { g: W_GFIX.bowl, club: f.club, day: f.day }, cup: true });
+}
+// the fixture's end: as a fixture at any ground (w24's W_ON_END.ground), with the football score; a rival's league
+// row, and the head to head of any club in CLUBS, are counted in wGridSettle already
+W_ON_END.gfix = function (r, ref, W) {
+  if (!ref) return;
+  const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
+  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
+  if (tie) { wLog(`A tie in the league at the Ash Bowl: no points for either side.`, 'd'); return; }
+  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r); }
+  if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
+  const res = r === 'win' ? { a: 'me', b: club, sa: W.us, sb: W.them } : { a: club, b: 'me', sa: W.them, sb: W.us };
+  L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'football', g: ref.g }));
+  L.results.length = Math.min(L.results.length, W_LEAGUE.keep);
+  if (r === 'win') {
+    RUN.fans = (RUN.fans || 0) + W_FIX.fans;
+    wLog(`Two points on the table. The crowd at the Ash Bowl stays to sing: ${W_FIX.fans} fans.`, 'g');
+    wMaybeBid(club);
+  }
+};
+// the clubs' own fixtures at the Bowl: played on the engine, a tie going to the yards
+const wW46SimAt = wSimAt;
+wSimAt = function (a, b, g) {
+  if (g !== W_GFIX.bowl || LAB) return wW46SimAt(a, b, g);
+  const L = wLeague(), s = wGridSimClubs(a, b, W_GFIX.tier), w = wGcupWinner(a, b, s.ra, s.rb, s.ya, s.yb), l = w === a ? b : a;
+  L.table[w].w++; L.table[l].l++;
+  const res = { day: WG.dayAbs, a: w, b: l, sport: 'football', sa: Math.max(s.ra, s.rb), sb: Math.min(s.ra, s.rb), g };
+  L.results.unshift(res); L.results.length = Math.min(L.results.length, W_LEAGUE.keep);
+  return res;
+};
+// the Bowl's ground card: the fixture row plays on the gridiron, with Play, Manage and Simulate
+const wW46OpenGrdCard = wOpenGrdCard;
+wOpenGrdCard = function (id, msg) {
+  wW46OpenGrdCard(id, msg);
+  if (id !== W_GFIX.bowl) return;
+  const b = document.querySelector('#modalBox [data-gfix]'), f = wGfixHere(); if (!b || !f) return;
+  const probs = wGridProblems().concat(wGridLive() ? ['Finish the football game you started first.'] : []), row = b.closest('.row');
+  row.innerHTML = Object.keys(W_GFG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-gfixhow="${how}" ${probs.length ? 'disabled' : ''}>${W_GFG_HOW[how]}</button>`).join('');
+  const small = row.closest('li').querySelector('small'); if (small) small.insertAdjacentHTML('beforeend', ` Played on the gridiron with your seven.${probs.length ? ' ' + esc(probs[0]) : ''}`);
+  row.querySelectorAll('[data-gfixhow]').forEach(x => x.onclick = () => { $('modalBox').querySelector('[data-close]').click(); const r = wGfixPlay(x.dataset.gfixhow); if (r) wOpenGrdCard(id, r); });
+};
+
+/* ---------- where it is: the Bowl, the Seven tab, the game card ---------- */
+{
+  const K = DB.chars.gk_bowl;
+  if (K) { K.topics.cinder = { t: 'The Cinder Cup: football on the gridiron, eight sevens and three rounds, every week, right here. Your own seven, mind. I take the entries.', act: 'gcup' }; K.topics.job.t += ' I run the CINDER Cup too.'; }
+}
+const wW46RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'gcup') return wOpenGcup(); return wW46RunAct.apply(this, arguments); };
+const wGcupBtn = () => `<button class="ghost" data-gcup>Cinder Cup${wGcupOn() ? ` (${W_GCUP.rounds[wGcup().round].toLowerCase()})` : ''}</button>`;
+const wW46CampSeven = wCampSeven;
+wCampSeven = function () { return wW46CampSeven().replace('<button class="ghost" data-gpractice', `${wGcupBtn()}<button class="ghost" data-gpractice`); };
+const wW46RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW46RenderCamp();
+  const b = $('wCampBody') && WCAMP.tab === 'seven' && $('wCampBody').querySelector('[data-gcup]');
+  if (b) b.onclick = () => { WCAMP.close(); wOpenGcup(); };
+};
+const wW46OpenGridCard = wOpenGridCard;
+wOpenGridCard = function () {
+  wW46OpenGridCard();
+  const list = document.querySelector('#modalBox .wbclubs'); if (!list) return;
+  const f = wGfixHere(), mine = !f && wMyFixture();
+  list.insertAdjacentHTML('afterend', `<p class="hint">The Cinder Cup: eight sevens, every week. ${wGcupBtn()}${f ? ` Your league fixture against ${esc(wTheClub(f.club))} is here at the Ash Bowl, by day ${f.day}: play it from the ground's GAME card.` : ''}</p>`);
+  const b = $('modalBox').querySelector('[data-gcup]'); if (b) b.onclick = () => { $('modalBox').querySelector('[data-close]').click(); wOpenGcup(); };
+};
+const wW46WallText = wWallText;
+wWallText = function () {
+  wW46WallText();
+  if (WG.gcupWins) wLog(`On its own hook: the Cinder Cup${WG.gcupWins > 1 ? `, ${WG.gcupWins} times` : ''}.`, 'g');
+};
+const wW46RenderHelp = renderHelp;
+renderHelp = function () {
+  wW46RenderHelp();
+  const g = $('wHelpGfPowers') || $('wHelpGridiron'); if (!g || $('wHelpGcup')) return;
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGcup"><b>The Cinder Cup.</b> Football's cup, every week at the Ash Bowl: ask Clinker Dunn about the CINDER cup, or use the Cinder Cup button on the Seven tab. ${W_GCUP.fee} gold to enter. Eight sevens in a bracket, three rounds, each harder than the last; you play your own games and the rest are played out on the gridiron once yours is done. A tie after Sudden Death goes to the side with more yards. Lose and you're out. Win the final for ${W_GCUP.prize.gold} gold, ${W_GCUP.prize.fans} fans, a pick of football cards and a place on the Wall of Awards. League fixtures at the Ash Bowl are football games on the gridiron too: Play, Manage or Simulate, a win is two points on the table, and a tie none.</p>`);
 };
 </script>
 </body></html>
