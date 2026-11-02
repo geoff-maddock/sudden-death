@@ -121,9 +121,10 @@ async def main():
         check(fx['hows'] == ['play', 'manage', 'sim'], 'your fixture at the Ash Bowl is a gridiron game: Play, Manage or Simulate', fx)
         await pg.evaluate(CLOSE_ALL)
         r = await pg.evaluate("""(() => { const L = wLeague(), me0 = L.me.w + L.me.l, n0 = L.results.length; const r = wGfixPlay('sim'); const g = WG.gfg.games[0], F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me');
-          return { r, res: g.r, done: !!f.done, top: L.results[0], me: L.me.w + L.me.l - me0, more: L.results.length - n0 }; })()""")
+          return { r, res: g.r, club: g.club, rival: wIsRival(g.club), errs: (window.__sdErrs || []).slice(-3), done: !!f.done, top: L.results[0], me: L.me.w + L.me.l - me0, more: L.results.length - n0 }; })()""")
         ok_tie = r['res'] == 'tie' and r['done'] and r['me'] == 0
-        ok_res = r['res'] != 'tie' and r['done'] and r['me'] == 1 and r['top']['sport'] == 'football' and r['top']['g'] == 'g_bowl' and isinstance(r['top']['sa'], int)
+        top = r['top'] or {}
+        ok_res = r['res'] != 'tie' and r['done'] and r['me'] == 1 and top.get('sport') == 'football' and top.get('g') == 'g_bowl' and isinstance(top.get('sa'), int)
         check(r['r'] == '' and (ok_tie or ok_res), 'Simulate the fixture: it counts once on the table, with the football score at the Ash Bowl (a tie, no points)', r)
         await pg.evaluate(CLOSE_ALL)
         c = await pg.evaluate("""(() => { const cl = wLeagueClubs(), L = wLeague(), a = cl[0], b = cl[1], w0 = L.table[a].w + L.table[b].w + L.table[a].l + L.table[b].l;

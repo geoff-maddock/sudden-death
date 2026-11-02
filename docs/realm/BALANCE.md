@@ -339,3 +339,34 @@ With `opts.hatch`, the bot takes a dungeon's rare egg once its alpha is beaten a
 | Hatching, no hatchling card (`noHatchCard`) | 84.6% | 1.71 |
 
 Hatching adds about 9 points, about 2.7 standard errors, so it's real. Double XP isn't the cause: taking it away changes nothing. The hatchling cards are worth perhaps 2 to 3 points, within noise. Most of it comes from the free players themselves: roster depth for tired legs, and the signature and kind cards each new player brings. The levers are `W_HATCH.energy` (6), `W_HATCH.days` (3) and how many rare eggs there are (5 a journey).
+
+## Football (issue #9, phase 8)
+
+`test/realm_gridiron_lab.py` plays football games and Cinder Cups on the gridiron engine, headless (`wGF.simGame`, about 45 ms a game), as Simulate plays them: your seven casts its powers as a Knight, the other side at the tier's CPU skill (Squire, Knight, Archmage).
+
+```bash
+python3 test/realm_gridiron_lab.py 150                                      # 150 games a row, and 150 cups
+python3 test/realm_gridiron_lab.py 150 'W_GFG.oppBonus = { 1: 0, 2: 1, 3: 3 }'  # try a number: JS run in the page first
+```
+
+Part 1 plays a fresh five-player journey at level 3 (two call-ups fill the seven) against a rival's seven at that level plus a gap, then by tier. Part 2 sets the other side's CPU skill at an even level. Part 3 turns powers off for both sides. Part 4 enters a Cinder Cup and simulates every round.
+
+**What it found.**
+- **Levels matter more than on the diamond.** An even game is won about 42–50% of the time, three levels down about 21–27%.
+- **The CPU skill makes little difference under Simulate.** Squire, Knight and Archmage were 35%, 29% and 37% (150 games each), inside the noise. Skill picks which power to cast, and both sides cast about 14 a game either way. It shows when you call the plays yourself.
+- **Powers are fair to both sides.** Powers on against off at tier 2 was 29% against 43% in one run of 150 and 33% against 26% in a run of 200, so there is no lean either way. The same seven on either side of the ball wins the same (57% and 58% at tier 1).
+- **The rating bonus by tier was too steep.** With `{ 2: 3, 3: 6 }`, tier 2 was won 30% and tier 3 16%, against the diamond's 56% and 32%.
+
+**The retune.** `W_GFG.oppBonus = { 1: 0, 2: 1, 3: 4 }` (rating points spread over each of their players; 6 is +1 to every rating). 150 games a cell, 250 a tier (a rate is good to about ±6%):
+
+| | Before `{ 2: 3, 3: 6 }` | `{ 2: 1, 3: 3 }` | `{ 2: 2, 3: 4 }` | After `{ 2: 1, 3: 4 }` |
+|---|---|---|---|---|
+| tier 1 | 51% | 45% | 47% | 49% |
+| tier 2 | 30% | 38% | 35% | 44% |
+| tier 3 | 16% | 24% | 22% | 25% |
+| cup quarter-final (tier 1) | 55% | 59% | 57% | 55% |
+| cup semi-final (tier 2) | 34% | 38% | 31% | 43% |
+| cup final (tier 3) | 36% (28 played) | 18% | 19% | 17% |
+| cups won | 6.7% | 4.0% | 3.3% | 4.0% |
+
+Tier 1 changes nothing (no bonus), so its spread from 45% to 51% is the noise. Cups won stay at about 4–7% either way: few runs reach the final (28–36 of 150), so the final's rate swings. A simulated cup pays about 95 XP across the roster and costs about 17 gold. A player who calls the plays beats the coaches more often; nobody has measured that yet.
