@@ -50,7 +50,7 @@ $('wGridBar').addEventListener('click', e => {
 // under the field: who is on it, the drive so far, and how it works
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
-  <section><h4 id="wGridLogH">This drive</h4><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
+  <section><h4 id="wGridLogH">This drive</h4><table id="wGridStats" class="wgstats"></table><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
   <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
@@ -87,7 +87,7 @@ function wGridHowHTML() {
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
   <p class="hint"><b>Plays tire.</b> Calling a play tires it, and it recovers while you call others; the half freshens everything. A tired play is one they see coming: the defense jumps it and wins more blocks. The bar along the foot of each button is how fresh it is. Their coach also watches what you call and leans to what beats it, so mixing it up pays twice. Their calls tire too: a defense they keep calling is easier to beat.</p>
   <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
-  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, and <b>This drive</b> keeps every play.</p>
+  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball, with their name over them. On a big play (a breakaway, a deep ball, a broken tackle, a run at the goal line, a touchdown or an interception) the camera zooms in on the ball and says why. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, a banner on the grass calls a first down, a long gain, a sack or a score, and <b>This drive</b> keeps every play, under each side's yards, passing, running, sacks and interceptions so far and their leaders.</p>
   <p class="hint"><b>The ratings</b> (higher is better; your own players' run to 12): ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
 function wGridLineup() {
@@ -100,6 +100,26 @@ function wGridLineup() {
     ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
+// the team stats so far, side by side, and each side's leaders, from the box score
+function wGridStats() {
+  const G = wGF.G, box = wGF.box(); if (!G || !box.length) return '';
+  const sum = (s, k) => box.filter(b => b.side === s).reduce((n, b) => n + (b.line[k] || 0), 0);
+  const top = (s, k) => box.filter(b => b.side === s && b.line[k]).sort((a, b) => b.line[k] - a.line[k])[0];
+  if (![0, 1].some(s => sum(s, 'pa') + sum(s, 'ra') + sum(s, 'fga'))) return '';
+  const rows = [
+    ['Total yards', s => sum(s, 'py') + sum(s, 'ry')],
+    ['Passing', s => `${sum(s, 'pc')}/${sum(s, 'pa')} <small>for</small> ${sum(s, 'py')}`],
+    ['Running', s => `${sum(s, 'ra')} <small>for</small> ${sum(s, 'ry')}`],
+    ['Sacks made', s => sum(s, 'sk')],
+    ['Interceptions', s => sum(s, 'ints')],
+    ['Field goals', s => `${sum(s, 'fgm')}/${sum(s, 'fga')}`],
+  ];
+  const lead = s => [['py', 'passing', 'yd'], ['ry', 'running', 'yd'], ['recy', 'catching', 'yd'], ['tkl', 'tackles', '']]
+    .map(([k, w, u]) => { const b = top(s, k); return b ? `${esc(b.n)} ${b.line[k]}${u ? ' ' + u : ''} <small>${w}</small>` : ''; }).filter(Boolean).join(', ');
+  const name = s => `<i style="background:${esc(G.teams[s].color)}"></i>${esc(G.teams[s].short || G.teams[s].name)}`;
+  return `<thead><tr><th></th><th>${name(0)}</th><th>${name(1)}</th></tr></thead><tbody>${rows.map(([l, f]) => `<tr><td>${l}</td><td>${f(0)}</td><td>${f(1)}</td></tr>`).join('')}
+    ${[0, 1].map(s => lead(s) ? `<tr><td>Leaders</td><td colspan="2" style="text-align:left">${name(s)}: ${lead(s)}</td></tr>` : '').join('')}</tbody>`;
+}
 function wGridLog() {
   const G = wGF.G; if (!G || !G.drive) return '';
   const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
@@ -155,6 +175,7 @@ function wGridBar() {
     : yours ? `Your call: pick a play, or kick.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
     : WGF.mode === 'play' && off ? 'You play it: Space to throw (hold to lead) or stiff-arm, WASD to run, Q and E for another receiver.' : call ? (WGF.kind === 'game' ? 'You call your side\'s plays, on offense and on defense.' : 'You call the offense; the coaches call the defense.') : 'The coaches call both sides.';
   $('wGridLineup').innerHTML = wGridLineup();
+  $('wGridStats').innerHTML = wGridStats();
   $('wGridLog').innerHTML = wGridLog();
   $('wGridLog').scrollTop = $('wGridLog').scrollHeight;
 }
@@ -177,6 +198,7 @@ const wW42ShowView = showView;
 showView = function (v) {
   wW42ShowView(v);
   $('wGridBar').hidden = v !== 'gridiron';
+  document.body.classList.toggle('wgwide', v === 'gridiron');
   if (v === 'gridiron') $('runbar').hidden = true;
 };
 const wW42OpenPause = openPause;

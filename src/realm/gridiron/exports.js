@@ -21,6 +21,8 @@ return {
     players: Object.entries(G.teams[s][m]).map(([pos, i]) => Object.assign({ pos }, G.teams[s].roster[i], { r: gfRated(s, i), base: Object.assign({}, G.teams[s].roster[i].r), stam: G.stam ? Math.round(G.stam[s][i]) : 100 })),
     kicker: G.teams[s].roster[G.teams[s].kicker].n })) : [],
   get isGame() { return !!GD && GD.game; }, get yourBall() { return !!GD && G.poss === GD.you; }, clock: () => G && GD && GD.game ? { half: G.half, text: gfClockText(), name: GF_HALF_NAME[G.half] } : null,
+  // the camera and the banner: how far in it has zoomed (1 is the whole width), the big play it zoomed for, the last result's banner
+  view: () => ({ zoom: GFT.zoom, why: GFT.why, big: GD && GD.big ? Object.assign({}, GD.big) : null, px: GFP.dpr }),
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches

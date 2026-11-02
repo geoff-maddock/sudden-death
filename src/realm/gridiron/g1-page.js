@@ -1,18 +1,21 @@
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
-   engine's parts don't touch the page; this file is the only one that does. */
+   engine's parts don't touch the page; this file is the only one that does. The canvas fills the width of the page (the
+   page widens on the gridiron, see w6.css) but no taller than the window, and draws at the size it is shown, so it
+   stays sharp on a big screen. */
 const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1 };
 (() => {
   const h = document.createElement('div'); h.id = 'v-gridiron'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
-  cv.style.cssText = 'display:block;width:100%;max-width:960px;margin:0 auto;aspect-ratio:960/600;background:#0b0907;border-radius:6px';
+  cv.style.cssText = 'display:block;width:min(100%, calc((100vh - 16px) * 1.6));margin:0 auto;aspect-ratio:960/600;background:#0b0907;border-radius:6px';
   h.appendChild(cv);
   (document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
   Object.assign(GFP, { host: h, cv, c: cv.getContext('2d') });
 })();
 function gfRender() {
-  const d = Math.min(2, window.devicePixelRatio || 1);
-  if (d !== GFP.dpr || GFP.cv.width !== 960 * d) { GFP.dpr = d; GFP.cv.width = 960 * d; GFP.cv.height = 600 * d; }
+  // pixels per field unit: the shown width times the screen's density, at least the old 1x and at most 4x
+  const d = Math.ceil(clamp((GFP.cv.clientWidth || 960) / 960 * (window.devicePixelRatio || 1), 1, 4) * 8) / 8;
+  if (d !== GFP.dpr || GFP.cv.width !== Math.round(960 * d)) { GFP.dpr = d; GFP.cv.width = Math.round(960 * d); GFP.cv.height = Math.round(600 * d); }
   const c = GFP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); gfDraw(c); c.restore();
 }
 function gfFrame(now) {

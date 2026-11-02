@@ -6,9 +6,13 @@
    Between plays each player's position is under them, and GFT.hl ({ side, pos }, set by the page) rings one.
    Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
    something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
+   The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run at the goal line, and the
+   moment after a touchdown or an interception, the camera zooms in on the ball (GFT.zoom) and a word says why; the
+   score bar and the keys stay put. After a play a banner on the grass says what it came to (GD.big, from gfResult).
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
-const GFT = { t: 0, hl: null };
+const GFT = { t: 0, hl: null, zoom: 1, fx: 480, fy: 345, hold: 0, why: '', bigAt: -1 };
+const GF_ZOOM = 1.65;
 const GF_PX = 19, GF_PY = 8.2, GF_MIDY = 345, GF_ASH = Array.from({ length: 260 }, (_, i) => [((i * 37.7) % 125) - 12, ((i * 23.3) % 53) - 26.5, (i % 5) * .25 + .6]);
 const gfAbs = (x, y) => G.poss === 0 ? [G.ball + x, y] : [GF_RULES.field - G.ball - x, -y];
 const gfScr = (ax, ay, z = 0) => ({ x: 480 + (ax - GD.cam) * GF_PX, y: GF_MIDY + ay * GF_PY - z * 9 });
@@ -20,12 +24,63 @@ function gfDraw(c) {
   // the camera: on the ball in a play, a little ahead of the line otherwise
   const want = L && (GD.ph === 'live' || GD.ph === 'post') ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
   GD.cam = lerp(GD.cam, clamp(want, 18, 82), .08);
+  // the zoom: in on the ball for a big play, the ball drawn toward the middle as it closes in
+  const ex = gfExcite(), b = gfBallScr();
+  if (ex) { GFT.hold = GFT.t + 1.1; GFT.why = ex; }
+  const on = GFT.t < GFT.hold && (GD.ph === 'live' || GD.ph === 'post');
+  if (!on) GFT.why = '';
+  GFT.zoom = lerp(GFT.zoom, on ? GF_ZOOM : 1, on ? .06 : .05);
+  GFT.fx = lerp(GFT.fx, b.x, .25); GFT.fy = lerp(GFT.fy, b.y, .25);
+  const k = clamp((GFT.zoom - 1) / (GF_ZOOM - 1), 0, 1);
+  c.fillStyle = '#070605'; c.fillRect(0, 0, 960, 600);
+  c.save();
+  if (GFT.zoom > 1.005) { c.translate(lerp(GFT.fx, 480, k), lerp(GFT.fy, 350, k)); c.scale(GFT.zoom, GFT.zoom); c.translate(-GFT.fx, -GFT.fy); }
   gfDrawField(c);
   gfDrawZones(c);
   gfDrawPlayers(c);
   gfDrawHands(c);
+  c.restore();
+  gfDrawZoneNames(c);
+  gfDrawBig(c);
   gfDrawHud(c);
+  gfDrawHint(c);
   gfDrawMeter(c);
+}
+// where the ball is on the screen, unzoomed
+function gfBallScr() {
+  if (L && (GD.ph === 'live' || GD.ph === 'post')) { const [x, y] = gfAbs(L.ball.x, L.ball.y); return gfScr(x, y); }
+  return gfScr(gfAbs(0, 0)[0], 0);
+}
+// is this a big play, and what kind: '' when it isn't
+function gfExcite() {
+  if (!L || !GD) return '';
+  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GFT.t - GFT.bigAt < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
+  if (GD.ph !== 'live' || L.done) return '';
+  const B = L.ball;
+  if (B.st === 'air' && B.T > 1.05 && B.bt > .25) return 'Deep ball!';
+  const e = L.ev[L.ev.length - 1];
+  if (e && e.k === 'broken' && L.t - e.t < .8) return 'Broken tackle!';
+  if (B.st !== 'held' || L.carrier < 0) return '';
+  const p = L.pl[L.carrier]; if (!p || p.side !== 0) return '';
+  if (p.x > 1 && L.toGoal - p.x < 9) return 'At the goal line!';
+  if (p.x < 7) return '';
+  let near = 99; for (const d of L.pl) if (d.side === 1 && !(d.stun > 0)) near = Math.min(near, hyp(d.x - p.x, d.y - p.y));
+  return near > 4 ? 'Breakaway!' : '';
+}
+// after a play, what it came to, in big letters on the grass
+const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], fumble: ['FUMBLE', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: ['', '#bfe8a8'] };
+function gfDrawBig(c) {
+  const B = GD.big; if (!B || GD.ph !== 'post' && GD.ph !== 'kick') return;
+  if (GFT.bigAt < 0 || B !== GFT.bigOf) { GFT.bigOf = B; GFT.bigAt = GFT.t; }
+  const a = GFT.t - GFT.bigAt; if (a > 2.4) return;
+  const [word, col] = GF_BIG[B.k] || GF_BIG.long, text = word || `+${B.gain} YARDS`;
+  const al = Math.min(1, a * 5, (2.4 - a) * 2.5), sc = 1 + Math.max(0, .25 - a) * 1.6;
+  c.save(); c.globalAlpha = al; c.translate(480, 488); c.scale(sc, sc);
+  c.font = '900 54px "Alegreya Sans", system-ui, sans-serif'; c.textAlign = 'center';
+  c.lineWidth = 8; c.strokeStyle = 'rgba(12,10,9,.85)'; c.lineJoin = 'round'; c.strokeText(text, 0, 0);
+  c.fillStyle = col; c.fillText(text, 0, 0);
+  if (B.sub) { c.font = '700 20px "Alegreya Sans", system-ui, sans-serif'; c.lineWidth = 5; c.strokeText(B.sub, 0, 30); c.fillStyle = '#f3ead6'; c.fillText(B.sub, 0, 30); }
+  c.restore();
 }
 function gfDrawField(c) {
   // the stands: black basalt, warm at the top from the lava beyond
@@ -78,9 +133,11 @@ function gfDrawZones(c) {
     c.globalAlpha = .16 + .05 * Math.sin(GFT.t * 2 + k); c.fillStyle = col;
     c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
     c.globalAlpha = 1;
-    txt(c, `${z.n} · ${z.left} play${z.left === 1 ? '' : 's'}`, 16 + k * 220, 556, '700 13px "Alegreya Sans", system-ui, sans-serif', tint(col, .35), 'left');
   });
   c.restore();
+}
+function gfDrawZoneNames(c) {
+  (G.zones || []).forEach((z, k) => { const u = GF_ULT_BY[z.id]; if (u) txt(c, `${z.n} · ${z.left} play${z.left === 1 ? '' : 's'}`, 16 + k * 220, 556, '700 13px "Alegreya Sans", system-ui, sans-serif', tint(u.vis[0], .35), 'left'); });
 }
 function gfDrawPlayers(c) {
   const list = [];
@@ -103,6 +160,7 @@ function gfDrawPlayers(c) {
     if (o.i === carrier) { c.strokeStyle = 'rgba(255,181,71,.9)'; c.lineWidth = 2; c.beginPath(); c.ellipse(o.x, o.y, 15, 5.5, 0, 0, Math.PI * 2); c.stroke(); }
     const throwK = L && GD.ph === 'live' && p.pos === 'QB' && p.side === 0 && GF_PLAYS[L.oc].kind === 'pass' ? clamp((L.t - GF_PLAYS[L.oc].throwAt + .35) / .35, 0, 1) : null;
     drawFig(c, p.kind, o.x, o.y, 44, T, { num: p.num, run: o.mv ? GFT.t * 16 + o.i : 0, flip, throwK: throwK != null && throwK < 1 ? throwK : null, alpha: p.stun > 0 ? .6 : undefined });
+    if (o.i === carrier && p.n) txt(c, `${p.n} #${p.num}`, o.x, o.y - 50, '800 13px "Alegreya Sans", system-ui, sans-serif', '#ffd08a', 'center');
     if (!L || GD.ph !== 'live' && GD.ph !== 'post') txt(c, p.pos, o.x, o.y + 14, '700 11px "Alegreya Sans", system-ui, sans-serif', hl ? '#7fd4ff' : p.side ? '#ffc9b8' : '#fff3d6', 'center');
   }
   if (!L || GD.ph !== 'live' && GD.ph !== 'post') return gfDrawBall(c, gfScr(gfAbs(0, 0)[0], 0), 0);
@@ -133,7 +191,7 @@ function gfDrawHud(c) {
   // at the snap, the powers each side cast
   const cast = (GD.ph === 'pre' || GD.ph === 'live') && GD.cast ? [GD.cast.off, GD.cast.def].filter(Boolean).map(x => `${x.ult ? '★ ' : ''}${x.name} (${x.n})`) : [];
   const h = 58 + why.length * 18 + (why.length && GD.ph === 'over' ? 14 : 0) + (cast.length ? 20 : 0);
-  c.fillStyle = 'rgba(12,10,9,.86)'; c.fillRect(0, 0, 960, h); c.fillStyle = 'rgba(255,150,40,.5)'; c.fillRect(0, h, 960, 1.5);
+  c.fillStyle = 'rgba(12,10,9,.93)'; c.fillRect(0, 0, 960, h); c.fillStyle = 'rgba(255,150,40,.5)'; c.fillRect(0, h, 960, 1.5);
   G.teams.forEach((t, s) => {
     const x = s ? 940 : 20, al = s ? 'right' : 'left';
     c.fillStyle = t.color; c.fillRect(s ? 946 : 8, 10, 6, 38);
@@ -160,7 +218,7 @@ function gfDrawHud(c) {
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
   if (cast.length) txt(c, 'Powers: ' + cast.join('  ·  '), 480, 72, F(14, 700), '#d6c4ff', 'center');
   // a broken tackle, a shed block, the catch: the play's last moment, briefly
-  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (e && L.t - e.t < .9 && (e.k === 'broken' || e.k === 'catch')) txt(c, e.k === 'broken' ? 'Broken tackle!' : 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
+  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (GFT.why && GFT.why !== 'Touchdown!' && GFT.why !== 'Picked off!') txt(c, GFT.why, 480, 104, F(24, 900), '#ffd08a', 'center'); else if (e && L.t - e.t < .9 && e.k === 'catch') txt(c, 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
   // a power doing its work, a little longer
   if (L && GD.ph === 'live') { const e = L.ev.slice().reverse().find(x => x.k === 'pow' && x.s && L.t - x.t < 1.3); if (e) txt(c, e.s + '!', 480, 120, F(19, 800), '#d6c4ff', 'center'); }
   c.restore();
@@ -182,7 +240,11 @@ function gfDrawHands(c) {
     hint = 'Hold Space to lead your receiver, let go to throw  ·  Q / E: another receiver  ·  WASD: scramble';
   } else if (L.carrier >= 0) hint = `WASD: steer${L.armUsed ? '' : '  ·  Space: stiff-arm (once a play)'}`;
   else hint = 'The ball is in the air';
-  c.save(); c.fillStyle = 'rgba(12,10,9,.78)'; c.fillRect(0, 572, 960, 28); txt(c, hint, 480, 591, F, '#d8f0ff', 'center'); c.restore();
+  GFT.hint = hint;
+}
+function gfDrawHint(c) {
+  if (!L || !L.hands || GD.ph !== 'live' || L.done || !GFT.hint) return;
+  c.save(); c.fillStyle = 'rgba(12,10,9,.78)'; c.fillRect(0, 572, 960, 28); txt(c, GFT.hint, 480, 591, '700 13px "Alegreya Sans", system-ui, sans-serif', '#d8f0ff', 'center'); c.restore();
 }
 // your kick: a power bar, then an aim bar
 function gfDrawMeter(c) {

@@ -89,6 +89,8 @@ function gfResult(r) {
   gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
+  // what it came to, for the banner on the field (09-draw.js)
+  GD.big = r.what === 'int' ? { k: 'int', sub: 'by ' + r.by } : null;
   if (r.what === 'int') {
     G.ball = clamp(G.ball + r.x, 1, 99); gfTurnover(); G.drive.end = 'int';
     GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); gfPowersAfter(); return;
@@ -103,6 +105,8 @@ function gfResult(r) {
   if (s === 'safety') { GD.msg = `Safety: ${r.who} is tackled in the end zone.`; G.drive.end = 'safety'; gfScoredOn(off); }
   if (s === 'turnover') { GD.msg += ' Turnover on downs.'; G.drive.end = 'downs'; }
   if (s === 'td') { G.drive.end = 'td'; GD.msg += gfExtraPoint(); gfScoredOn(1 - off); }
+  const big = s === 'td' ? 'td' : s === 'safety' ? 'safety' : s === 'turnover' ? 'downs' : r.what === 'sack' ? 'sack' : s === 'first' ? 'first' : r.gain >= 15 ? 'long' : null;
+  GD.big = big && { k: big, gain: r.gain, sub: big === 'td' ? `${r.who}, ${yd(r.gain)}` : big === 'sack' ? 'by ' + r.by : big === 'first' && r.gain >= 10 ? `${r.who}, +${r.gain}` : '' };
   e.msg = GD.msg; e.why = GD.why;
   gfRunClock(r.what, L ? L.t : 5);
   gfPowersAfter();
@@ -130,14 +134,14 @@ function gfKick() {
     const M = GD.meter, gust = M && gfZoneSum('kick') < 0 && R() < -gfZoneSum('kick'), r = gfFieldGoal(M ? gfMeterFg(k) && !gust : gfKickGood(k));
     if (r === 'fg') gfScoredOn(1 - off);
     gfBoxAdd(off, G.teams[off].kicker, 'fga'); if (r === 'fg') gfBoxAdd(off, G.teams[off].kicker, 'fgm');
-    G.drive.end = r; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
+    G.drive.end = r; GD.big = { k: r === 'fg' ? 'fg' : 'miss', sub: `${dist} yards` }; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
     GD.why = M ? `Power ${Math.round(M.pw * 100)}% (${dist} yards needs ${Math.ceil(dist / gfFgReach(k) * 100)}%), and the aim ${Math.abs(M.aim) <= gfFgWindow(k) ? 'true' : (M.aim < 0 ? 'wide left' : 'wide right')}.`
       : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
     if (gfZoneSum('kick') < 0) GD.why += ` The ${gfZoneName('kick')} pushes the ball${gust ? ' wide' : ''}.`;
   } else {
     const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt'))); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
-    G.drive.end = 'punt'; GD.msg = `${k.n} punts, ${y} yards.`;
+    G.drive.end = 'punt'; GD.big = null; GD.msg = `${k.n} punts, ${y} yards.`;
     GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
   }
   if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
