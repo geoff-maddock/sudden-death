@@ -842,6 +842,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wgmodes button:first-child{border-radius:6px 0 0 6px}
 .wgmodes button:last-child{border-radius:0 6px 6px 0}
 .wgmodes button.on{background:var(--torch);color:#1a120c;border-color:var(--torch)}
+.wgstance b{align-self:center;margin-right:6px;font-size:.9em}
+.wgstance button:nth-child(2){border-radius:6px 0 0 6px}
 /* w43: the Seven tab */
 .wsvr .wpa{flex-wrap:wrap;gap:6px}
 .wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
@@ -22003,7 +22005,7 @@ const gfDefSet = dc => Object.assign({}, GF_DEF_SET, (GF_DEFS[dc] || {}).set);
    - Speed counts, but less than its rating spread suggests (6.4 to 7.8 yards a second): a side fast everywhere
      otherwise won nearly every game, whatever the calls (phase 2 measured it).
    - The carrier runs for the goal line and away from tacklers. The play ends at a tackle, a sack, an incompletion, an
-     interception (no returns yet), out of bounds or a touchdown.
+     interception (no returns yet), a fumble (16-stance.js), out of bounds or a touchdown.
    L is the play, plain JSON (players by index, no references): { oc, dc, t, pl, id, did, ball, carrier, thrown,
    handed, done, broken }. Positions are yards from the line of scrimmage (x, downfield) and the middle (y). */
 // GF_READ: how long after the throw a defender breaks on the ball; GF_REACH: how far a defender dives to tackle
@@ -22021,7 +22023,7 @@ function gfSpeed(p) {
 }
 
 // st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense },
-// and pw: the powers cast with the calls ({ off, def }, 14-powers.js). A worn player plays on worn ratings (gfWorn)
+// pw: the powers cast with the calls ({ off, def }, 14-powers.js), and stc: the stances ({ off, def }, 16-stance.js). A worn player plays on worn ratings (gfWorn)
 function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
@@ -22049,12 +22051,13 @@ function gfSnap(oc, dc, st) {
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
     read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
-  gfSnapFx(st && st.pw);
+  gfSnapFx(st && st.pw, st && st.stc);
   return L;
 }
-// the powers on this play: their effects (L.fx), who gave each (L.src, for the reason), and what happens at the snap
-function gfSnapFx(pw) {
-  L.pw = pw || null; L.fx = gfFx(pw); L.src = gfFxSrc(pw); L.breakLeft = L.fx.breakN; L.gotT = -1;
+// the powers on this play: their effects (L.fx), who gave each (L.src, for the reason), and what happens at the snap;
+// the stances' effects go on top (stc: { off, def }, 16-stance.js)
+function gfSnapFx(pw, stc) {
+  L.pw = pw || null; L.stc = stc || null; L.fx = gfStanceFx(gfFx(pw), stc, L.hands); L.src = gfFxSrc(pw); L.breakLeft = L.fx.breakN; L.gotT = -1;
   const F = L.fx, say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`);
   const def = L.pl.filter(p => p.side === 1), off = L.pl.filter(p => p.side === 0);
   if (F.snapAll) { for (const d of def) d.stun = Math.max(d.stun, F.snapAll); say('snapAll', 'every defender staggered at the snap.'); }
@@ -22147,10 +22150,11 @@ function gfAim(p) {
   // the man defenders read the run in under half a second, and the deep zone a beat later
   if (c && (L.carrier !== L.id.QB || c.x > 0) && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
   if (p.job === 'rush') return lead(qb);
-  if (p.job === 'man') { const m = L.pl[p.mark]; return [m.x + .8, m.y, 3.2]; }
+  if (p.job === 'man') { const m = L.pl[p.mark]; return [m.x + .8 + (L.fx ? L.fx.cush : 0) * .4, m.y, 3.2]; }
   if (p.job === 'zone') {
     const [r, rd] = gfNearest(p.spot[0], p.spot[1], L.pl.filter(q => q.side === 0 && q.job === 'route'));
-    return r && rd < 7 ? [Math.max(r.x + 1.5, p.spot[0] - 3), lerp(p.spot[1], r.y, .7), 3.5] : p.spot;
+    const cu = L.fx ? L.fx.cush : 0;
+    return r && rd < 7 ? [Math.max(r.x + 1.5 + cu * .4, p.spot[0] - 3 + cu), lerp(p.spot[1], r.y, .7), 3.5] : [p.spot[0] + cu, p.spot[1]];
   }
   return null;
 }
@@ -22193,9 +22197,14 @@ function gfQB() {
     return;
   }
   if (L.thrown || L.carrier !== L.id.QB || L.hands) return;
-  const [, press] = gfNearest(qb.x, qb.y, gfFree());
-  // under pressure the quarterback tries to get it out early, but doesn't always see the rusher in time
-  if (L.t >= P.throwAt || (press < 1.8 && L.t > .55 && (P.hot || R() < GF_DT * 5))) gfThrow(press < 1.8 && L.t < P.throwAt && !P.hot);
+  const [, press] = gfNearest(qb.x, qb.y, gfFree()), F = L.fx || GF_FX0, at = P.throwAt * F.qbT;
+  // Safe: under pressure, the quarterback may throw it away rather than take the sack (once a play)
+  if (F.away && press < 1.8 && L.t > .55 && !P.hot && !L.awayTried) {
+    L.awayTried = true;
+    if (R() < F.away) { L.thrown = true; L.carrier = -1; Object.assign(L.ball, { st: 'dead', h: -1 }); gfEv('away', qb.n); gfDead('inc', 'thrown away'); return; }
+  }
+  // under pressure the quarterback tries to get it out early, but doesn't always see the rusher in time (Risky holds on longer)
+  if (L.t >= at || (press < 1.8 && L.t > .55 && (P.hot || R() < GF_DT * 5 / F.qbT))) gfThrow(press < 1.8 && L.t < at && !P.hot);
 }
 function gfThrow(hurry) {
   const P = GF_PLAYS[L.oc], qb = L.pl[L.id.QB], free = L.pl.filter(p => p.side === 1 && p.stun <= 0);
@@ -22203,7 +22212,7 @@ function gfThrow(hurry) {
   L.pl.forEach((p, i) => {
     if (p.side !== 0 || p.job !== 'route') return;
     const [, sep] = gfNearest(p.x, p.y, free);
-    const s = Math.min(sep, 8) + p.x * (L.oc === 'deep' ? .08 : .02) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
+    const s = Math.min(sep, 8) + p.x * Math.max(-.02, (L.oc === 'deep' ? .08 : .02) + (L.fx ? L.fx.deepW : 0)) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
     if (s > bs) { bs = s; best = i; }
   });
   const rc = L.pl[best], v = gfThrowV(15 + qb.r.arm * 1.3);
@@ -22229,7 +22238,7 @@ function gfBall(dt) {
   const [d, dd] = gfNearest(B.tx, B.ty, L.pl.filter(p => p.side === 1 && p.stun <= 0));
   if (Math.abs(B.ty) > GF_HALF || dr > 1.7) { B.st = 'dead'; return gfDead('inc', dr > 1.7 ? 'overthrown' : 'out of bounds'); }
   const F = L.fx || GF_FX0, sure = F.sure > 0;
-  if (d && dd < 1.4 && dd < dr && !sure) {
+  if (d && dd < 1.4 + F.jump && dd < dr + F.jump && !sure) {
     if (R() < (.03 + d.r.hnd * .006) * F.int) { B.st = 'dead'; return gfDead('int', d.n, d.x, L.pl.indexOf(d)); }
     if (R() < .5) { B.st = 'dead'; return gfDead('inc', 'broken up by ' + d.n); }
   }
@@ -22287,7 +22296,8 @@ function gfTackles() {
     if (L.breakLeft > 0 && dd <= 1.2) { L.breakLeft--; d.stun = .7; L.broken++; gfEv('broken', c.n); gfEv('pow', L.src.breakN, `${L.src.breakN}: ${c.n} went straight through ${d.n}.`); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
     const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, F.tkl || F.cStr ? .12 : .2, F.tkl || F.cStr ? .97 : .93);
-    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
+    // a tackle that holds may knock the ball loose (16-stance.js; not on a sack)
+    if (R() < pt) return !sack && gfFumbleRoll(c, d) ? gfFumble(c, d) : gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);
@@ -22344,7 +22354,7 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
    In a full game (10-game.js) you call the defense too when the other side has the ball.
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
-   GD.cast is what both sides cast for the play on show. opts.skill: the CPU's skill by side ([0..2, 0..2]).
+   GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..2, 0..2]).
    Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
@@ -22361,9 +22371,10 @@ function gfStart(opts) {
   gfPlaybookStart(); gfBoxStart();
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
+  gfStanceStart(o.stance);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -22384,6 +22395,8 @@ function gfGo(ph) {
   // side, and for yours when they call it (15-bench.js); a play, a kick or a new drive: a potion may be given again
   if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
   if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) GD.item = false;
+  // (a kick isn't played in a stance)
+  if (['kick', 'kickoff', 'half'].includes(ph)) GD.stc = null;
   // each call is a point to save the game at (13-box.js)
   if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
@@ -22398,8 +22411,8 @@ function gfTick(dt) {
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
-    GD.cast = gfCastPowers(GD.oc, GD.dc);
-    GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });
+    GD.cast = gfCastPowers(GD.oc, GD.dc); GD.stc = Object.assign(gfPickStances(), { side: G.poss });
+    GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast, stc: GD.stc });
     return gfGo('pre');
   }
   if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc, GD.stale); GD.acc = 0; gfGo('live'); } return; }
@@ -22428,12 +22441,30 @@ function gfResult(r) {
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
   const pw = [GD.cast && GD.cast.off, GD.cast && GD.cast.def].filter(Boolean).map(c => ({ side: c.side, n: c.n, name: c.name, ult: c.ult }));
   if (pw.length) e.pw = pw;
+  if (GD.stc) e.st = [GD.stc.off, GD.stc.def];
   gfZoneRest(); gfTakeNotes(e);
   gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
   // what it came to, for the banner on the field (09-draw.js)
   GD.big = r.what === 'int' ? { k: 'int', sub: 'by ' + r.by } : null;
+  // a fumble the defense comes up with: the ball changes hands where it came out, and the return may score
+  if (r.what === 'fum' && r.lost) {
+    G.drive.yards += r.gain; G.plays++;
+    G.ball = clamp(G.ball + r.gain, 1, 99); gfTurnover();
+    const ret = Math.min(r.ret || 0, GF_RULES.field - G.ball), back = ret ? ` and runs it back ${ret} yard${ret === 1 ? '' : 's'}` : '';
+    G.ball += ret;
+    if (G.ball >= GF_RULES.field) {
+      G.score[G.poss] += GF_RULES.td; G.drive.end = 'fumtd'; gfBoxAdd(G.poss, L && L.pl[r.reci] ? L.pl[r.reci].ri : -1, 'td');
+      GD.msg = `Fumble! ${r.rec} picks it up${back} for a touchdown.` + gfExtraPoint(G.poss); gfScoredOn(off);
+      GD.big = { k: 'fumtd', sub: `${r.rec}, ${ret} yards` };
+    } else {
+      gfFirstDown(); G.drive.end = 'fum';
+      GD.msg = `Fumble! ${r.who} loses it, and ${r.rec} recovers${back}.`;
+      GD.big = { k: 'fum', sub: `${r.rec} recovers` };
+    }
+    e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); gfPowersAfter(); return;
+  }
   if (r.what === 'int') {
     G.ball = clamp(G.ball + r.x, 1, 99); gfTurnover(); G.drive.end = 'int';
     GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); gfPowersAfter(); return;
@@ -22443,13 +22474,14 @@ function gfResult(r) {
   GD.msg = r.what === 'td' ? `Touchdown, ${gfName(off)}! ${r.who}, ${yd(r.gain)}.`
     : r.what === 'sack' ? `Sacked by ${r.by}: ${r.gain < 0 ? 'a loss of ' + yd(r.gain) : 'no gain'}.`
     : r.what === 'inc' ? `Incomplete: ${r.by}.`
+    : r.what === 'fum' ? `${r.who} fumbles, and ${r.rec} falls on it: ${r.gain > 0 ? yd(r.gain) : r.gain < 0 ? 'a loss of ' + yd(r.gain) : 'no gain'}.`
     : `${r.who}, ${r.gain > 0 ? yd(r.gain) : r.gain < 0 ? 'a loss of ' + yd(r.gain) : 'no gain'}${r.what === 'out' ? ', out of bounds' : r.by ? ', brought down by ' + r.by : ''}.`;
   if (s === 'first') GD.msg += ' First down.';
   if (s === 'safety') { GD.msg = `Safety: ${r.who} is tackled in the end zone.`; G.drive.end = 'safety'; gfScoredOn(off); }
   if (s === 'turnover') { GD.msg += ' Turnover on downs.'; G.drive.end = 'downs'; }
   if (s === 'td') { G.drive.end = 'td'; GD.msg += gfExtraPoint(); gfScoredOn(1 - off); }
-  const big = s === 'td' ? 'td' : s === 'safety' ? 'safety' : s === 'turnover' ? 'downs' : r.what === 'sack' ? 'sack' : s === 'first' ? 'first' : r.gain >= 15 ? 'long' : null;
-  GD.big = big && { k: big, gain: r.gain, sub: big === 'td' ? `${r.who}, ${yd(r.gain)}` : big === 'sack' ? 'by ' + r.by : big === 'first' && r.gain >= 10 ? `${r.who}, +${r.gain}` : '' };
+  const big = s === 'td' ? 'td' : s === 'safety' ? 'safety' : s === 'turnover' ? 'downs' : r.what === 'fum' ? 'fum' : r.what === 'sack' ? 'sack' : s === 'first' ? 'first' : r.gain >= 15 ? 'long' : null;
+  GD.big = big && { k: big, gain: r.gain, sub: big === 'td' ? `${r.who}, ${yd(r.gain)}` : big === 'sack' ? 'by ' + r.by : big === 'fum' ? `${r.rec} falls on it` : big === 'first' && r.gain >= 10 ? `${r.who}, +${r.gain}` : '' };
   e.msg = GD.msg; e.why = GD.why;
   gfRunClock(r.what, L ? L.t : 5);
   gfPowersAfter();
@@ -22458,11 +22490,13 @@ function gfResult(r) {
 function gfWhy(r) {
   const P = GF_PLAYS[GD.oc], ev = L ? L.ev : [], th = ev.find(x => x.k === 'throw'), out = [];
   if (r.what === 'sack') out.push('The rush got to the quarterback before the throw.');
+  else if (r.by === 'thrown away') out.push('The rush got there, and the quarterback threw it away.');
   else if (th) out.push(`${th.s === 'hurried' ? 'Under pressure, the' : 'The'} quarterback threw to ${th.o}.`);
   else if (P.kind === 'run') out.push(`The handoff went to ${r.who || 'the back'}.`);
   const br = L ? L.broken : 0;
   if (br) out.push(`${br} broken tackle${br > 1 ? 's' : ''}.`);
   const pw = gfPowWhy(GD.cast); if (pw) out.push(pw);
+  const sw = gfStanceWhy(r, GD.stc); if (sw) out.push(sw);
   const [g, why] = gfEdge(GD.oc, GD.dc);
   const dn = GF_DEFS[GD.dc].n, st = GD.stale || {};
   if (st.read > .45) out.push(`They saw the ${P.n.toLowerCase()} coming: it's been called a lot.`);
@@ -22510,7 +22544,7 @@ function gfSim(opts) {
    Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
    something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
    The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run that gets to the goal line, and the
-   moment after a touchdown or an interception, the camera zooms in on the ball (GFT.zoom) and a word says why; the
+   moment after a touchdown, an interception or a fumble, the camera zooms in on the ball (GFT.zoom) and a word says why; the
    score bar and the keys stay put. After a play a banner on the grass says what it came to (GD.big, from gfResult).
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
@@ -22559,7 +22593,7 @@ function gfBallScr() {
 // is this a big play, and what kind: '' when it isn't
 function gfExcite() {
   if (!L || !GD) return '';
-  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GD.t < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
+  if (GD.ph === 'post') return GD.big && GD.t < 2 ? ({ td: 'Touchdown!', int: 'Picked off!', fum: 'Fumble!', fumtd: 'Fumble!' })[GD.big.k] || '' : '';
   if (GD.ph !== 'live' || L.done) return '';
   const B = L.ball;
   if (B.st === 'air' && B.T > 1.05 && B.bt > .25) return 'Deep ball!';
@@ -22573,7 +22607,7 @@ function gfExcite() {
   return near > 4 ? 'Breakaway!' : '';
 }
 // after a play, what it came to, in big letters on the grass
-const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: [B => `+${B.gain} YARDS`, '#bfe8a8'] };
+const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], fum: ['FUMBLE', '#ff8a6a'], fumtd: ['FUMBLE: TOUCHDOWN', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: [B => `+${B.gain} YARDS`, '#bfe8a8'] };
 function gfDrawBig(c) {
   // on for the beat after the play, fading out as it ends
   const B = GD.big, a = GD.t, end = Math.min(2.4, GD.mode !== 'watch' ? GF_PACE.postCall : GF_PACE.post);
@@ -22711,7 +22745,9 @@ function gfDrawHud(c) {
   });
   let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   if (GD.ph === 'call') sub = GD.mode !== 'call' ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
-  if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}  vs  ${GF_DEFS[GD.dc].n}`;
+  // (with each side's stance when it isn't Balanced, 16-stance.js)
+  const stn = k => GD.stc && GD.stc[k] && GD.stc[k] !== 'bal' ? ` (${GF_STANCE[GD.stc[k]].n})` : '';
+  if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}${stn('off')}  vs  ${GF_DEFS[GD.dc].n}${stn('def')}`;
   if (GD.game) mid += `  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`;
   if (GD.ph === 'call' && GD.mode === 'call' && G.poss !== GD.you) sub = 'Your call: pick a defense';
   if (GD.ph === 'kick') sub = (GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt') + (GD.meter ? ': tap Space twice, for power and aim' : '');
@@ -22804,11 +22840,12 @@ function gfRunClock(what, t) {
 }
 function gfClockText() { const s = Math.max(0, Math.ceil(G.clock)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 // after a touchdown, the extra point
-function gfExtraPoint() {
+// (side: who scored; by default the side that just gave the ball up, as after a touchdown it has)
+function gfExtraPoint(side) {
   if (!GD.game) return '';
-  const k = G.teams[1 - G.poss].roster[G.teams[1 - G.poss].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
-  if (good) G.score[1 - G.poss]++;
-  gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpa'); if (good) gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpm');
+  const s = side != null ? side : 1 - G.poss, k = G.teams[s].roster[G.teams[s].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
+  if (good) G.score[s]++;
+  gfBoxAdd(s, G.teams[s].kicker, 'xpa'); if (good) gfBoxAdd(s, G.teams[s].kicker, 'xpm');
   return good ? ' Extra point good.' : ' The extra point is no good.';
 }
 // side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
@@ -22823,7 +22860,7 @@ function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: 
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
-  const d = G.drive, scored = ['td', 'fg', 'safety'].includes(d.end);
+  const d = G.drive, scored = ['td', 'fg', 'safety', 'fumtd'].includes(d.end);
   G.drives.push(d);
   // Sudden Death: the first score wins
   if (G.half === 3 && scored) return false;
@@ -22833,8 +22870,9 @@ function gfGameNext() {
     G.half = 3; G.clock = GF_GAME.ot; gfPowersHalf(); GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
   }
   // after a score the other side receives: the side that scored kicks off, and after a safety the side scored on
-  // (the drive's offense either way); otherwise the ball has already changed hands
-  if (scored) { gfKickoffTo(1 - d.side); return true; }
+  // (the drive's offense either way), and after a fumble run back for a touchdown the defense kicks to the drive's
+  // offense; otherwise the ball has already changed hands
+  if (scored) { gfKickoffTo(d.end === 'fumtd' ? d.side : 1 - d.side); return true; }
   gfNewDrive(); gfGo('call'); return true;
 }
 function gfScoreLine() { return G.teams.map((t, s) => `${t.name} ${G.score[s]}`).join(', '); }
@@ -22845,7 +22883,7 @@ function gfFinalLine() {
 function gfGameSummary() {
   const all = G.drives.flatMap(d => d.plays);
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), drives: G.drives.length, plays: all.length, half: G.half,
-    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}) };
+    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}), stance: [gfStanceMost(0), gfStanceMost(1)] };
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 // (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)
@@ -22985,8 +23023,8 @@ function gfCounterOffense(w) {
 /* Cinder Gridiron: box scores, and a game to save and come back to (issue #9, phase 5).
    The box: every play adds to the lines of the players in it, by side and roster index (G.box = [[line], [line]]).
    A line counts passing (pa attempts, pc completions, py yards, ptd touchdowns, pint interceptions thrown, sacked),
-   running (ra carries, ry yards), catching (rec, recy), touchdowns scored (td), defense (tkl tackles, sk sacks, ints
-   interceptions) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
+   running (ra carries, ry yards), catching (rec, recy), touchdowns scored (td), fumbles (fum, and fuml lost), defense
+   (tkl tackles, sk sacks, ints interceptions, ff fumbles forced, fr recovered) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
    The snapshot: between plays, at each call, the game is G and GD as plain JSON, and GF_HOOK.onSnap hears it. A saved
    game comes back on the field at that call (gfResume): the play that was running is played again. */
 function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); G.played = [0, 1].map(gfOnField); }
@@ -23002,7 +23040,12 @@ function gfBoxPlay(off, r) {
     else if (caught) { gfBoxAdd(off, qb, 'pc'); gfBoxAdd(off, qb, 'py', r.gain); gfBoxAdd(off, car, 'rec'); gfBoxAdd(off, car, 'recy', r.gain); if (td) { gfBoxAdd(off, qb, 'ptd'); gfBoxAdd(off, car, 'td'); } }
   } else if (r.what === 'sack') { gfBoxAdd(off, qb, 'sacked'); gfBoxAdd(def, by, 'sk'); }
   else if (car >= 0) { gfBoxAdd(off, car, 'ra'); gfBoxAdd(off, car, 'ry', r.gain); if (td) gfBoxAdd(off, car, 'td'); }
-  if ((r.what === 'tackle' || r.what === 'sack') && by >= 0) gfBoxAdd(def, by, 'tkl');
+  if ((r.what === 'tackle' || r.what === 'sack' || r.what === 'fum') && by >= 0) gfBoxAdd(def, by, 'tkl');
+  // a fumble: the carrier's, the tackler's (forced), and who fell on it (a recovery; a return for a touchdown is counted in gfResult)
+  if (r.what === 'fum') {
+    gfBoxAdd(off, car, 'fum'); gfBoxAdd(def, by, 'ff');
+    if (r.lost) { gfBoxAdd(off, car, 'fuml'); gfBoxAdd(def, ri(r.reci), 'fr'); }
+  }
 }
 // the box as lines with names: [{ side, ri, n, kind, line, played }] (played: they took the field, at kick-off or off the bench)
 function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line), played: !G.played || G.played[s].includes(ri) }))) : []; }
@@ -23047,10 +23090,14 @@ const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
 // (field goal chance), punt (yards). At the snap: snapStun (rushers down), snapAll (every defender), blkStun (every
 // blocker), coverSlow, safetySlow, gas (Plague Cloud). With the ball: pounce (yards a tackler leaps), cStun and cStunP
 // (frozen, and the chance), cSlow. At the throw: freezeNear (the defender nearest the target), tgtSlow (the target).
+// The stances (16-stance.js): qbT (how long the quarterback waits), away (the chance to throw it away under pressure),
+// deepW (how much the quarterback looks deep), fum (the fumble chance), cush (yards of cushion the coverage gives),
+// jump (yards further a defender can get to a throw: more break-ups and picks).
 const GF_FX0 = { oSpd: 1, dSpd: 1, cSpd: 1, rSpd: 1, rushSpd: 1, coverSpd: 1, backSpd: 1, midSpd: 1, deepSpd: 1, shed: 1, int: 1, errM: 1, ballV: 1,
   blk: 0, dStr: 0, tkl: 0, cStr: 0, breakN: 0, untag: 0, nolose: 0, read: 0, errA: 0, catch: 0, sure: 0, kick: 0, punt: 0,
-  snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0 };
-const GF_FX_MUL = new Set(['oSpd', 'dSpd', 'cSpd', 'rSpd', 'rushSpd', 'coverSpd', 'backSpd', 'midSpd', 'deepSpd', 'shed', 'int', 'errM', 'ballV']);
+  snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0,
+  qbT: 1, away: 0, deepW: 0, fum: 1, cush: 0, jump: 0 };
+const GF_FX_MUL = new Set(['oSpd', 'dSpd', 'cSpd', 'rSpd', 'rushSpd', 'coverSpd', 'backSpd', 'midSpd', 'deepSpd', 'shed', 'int', 'errM', 'ballV', 'qbT', 'fum']);
 // everyday powers by kind: [offense, defense]. fits: the call it helps ('run', 'pass' or 'any')
 const GF_POW = {
   goblin: [{ id: 'shadowstep', n: 'Shadowstep', cost: 1, fits: 'run', desc: 'The ball carrier blinks past the first tackle.', fx: { breakN: 1 } },
@@ -23132,8 +23179,8 @@ function gfWorn(side, ri, r) {
 function gfRated(side, ri) { const r = gfWorn(side, ri, G.teams[side].roster[ri].r); return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)])); }
 // the half gives a lot back; every play costs everyone a little (the undead and golems tire at half the rate)
 function gfRest(n) { if (G.stam) for (const s of G.stam) for (let i = 0; i < s.length; i++) s[i] = Math.min(100, s[i] + n); }
-// (the bench rests instead)
-function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
+// (the bench rests instead; the stance sets how hard the seven go, 16-stance.js)
+function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * gfStanceStam(t) * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
 const gfStamCost = (cost, ult) => ult ? GF_STAM.ult : GF_STAM.base + GF_STAM.per * cost;
 const gfRole = side => side === G.poss ? 'off' : 'def';
 /* the powers a side can cast now (with the call): each of its players' everyday power for the side of the ball they
@@ -23335,7 +23382,7 @@ const gfBetween = () => !!GD && !['pre', 'live', 'kick', 'over'].includes(GD.ph)
 // the first half with the score not level (or in Sudden Death)
 function gfLastPlay() {
   if (!GD.game) return !!G.drive.end;
-  if (G.half === 3 && ['td', 'fg', 'safety'].includes(G.drive.end)) return true;
+  if (G.half === 3 && ['td', 'fg', 'safety', 'fumtd'].includes(G.drive.end)) return true;
   return G.clock <= 0 && G.half >= 2 && (G.score[0] !== G.score[1] || G.half === 3);
 }
 
@@ -23400,6 +23447,166 @@ function gfBenchRow(side, i) {
   const T = G.teams[side], m = T.roster[i], at = mp => Object.keys(mp).find(k => mp[k] === i) || null;
   return { ri: i, n: m.n, kind: m.kind, num: m.num, stam: Math.round(gfStamOf(side, i)), off: at(T.off), def: at(T.def), kicker: T.kicker === i };
 }
+/* Cinder Gridiron: stances and fumbles (issue #29). Beside the call, each side of the ball plays Safe, Balanced or
+   Risky. The stance changes how the play is run, not which play:
+   - Risky chases the big play: the quarterback holds it longer for the deep man, throws longer and looser, carriers
+     fight for every yard, blockers release early, the rush pins its ears back, the coverage jumps routes and tacklers
+     go for the strip. More big plays, more sacks, picks and fumbles.
+   - Safe guards against those: the quarterback throws early or throws it away rather than take a sack, two hands on
+     the ball, blocks that stay home, coverage that keeps it in front and tackles that wrap up.
+   - Each stance is a set of effects (GF_STANCE[id].off / .def), merged into the play's L.fx at the snap like a power's
+     (gfStanceFx), and sets how hard the seven go: stam is the stamina a play costs, against Balanced's.
+   - Played by hand (Play mode, on offense), your hands decide most of the risk: the stance has about half its effect on
+     the throw and the carrier (GF_ST_HANDS), and still its full effect on the blocking, the receivers and the energy.
+   - Your stance stays until you change it (G.stance: { off, def }, for GD.you; saved with the game). The coaches pick
+     one each down by skill (gfCpuStance): a Squire at random leaning to Balanced, a Knight by the down, the score and
+     the clock, an Archmage by those, your habits and their own stamina. In 'watch' they pick for both sides.
+   - GD.stc is the play's two stances ({ off, def }) from the call to the next one; G.stUse counts each side's downs by
+     stance (the medals go to the stance a side used most, gfStanceMost).
+   Fumbles (gfFumbleRoll, gfFumble): rare. A tackle that holds may knock the ball loose, more often from a weak or worn
+   carrier and a strong tackler, and far more often when either side plays Risky. The nearest player falls on it, with
+   the defense likelier; a defender who picks it up may run it back, even all the way. */
+const GF_ST_IDS = ['safe', 'bal', 'risky'];
+const GF_STANCE = {
+  safe: { n: 'Safe', stam: .6, desc: 'Guard against the big mistake: fewer sacks, picks and fumbles, and fewer big plays. Half the stamina a play.',
+    off: { qbT: .9, away: .4, errM: .85, int: .5, deepW: -.05, fum: .2, cStr: -1, shed: .85 },
+    def: { rushSpd: .95, shed: .85, int: .55, read: .06, cush: 1.2, tkl: .03, fum: .6 } },
+  bal: { n: 'Balanced', stam: 1, desc: 'Play it as called.', off: {}, def: {} },
+  risky: { n: 'Risky', stam: 1.3, desc: 'Chase the big play: more big gains, more sacks, picks and fumbles. More stamina a play.',
+    off: { qbT: 1.1, errM: 1.15, int: 3.5, deepW: .2, fum: 1.8, cStr: 1, rSpd: 1.05, shed: 1.1 },
+    def: { rushSpd: 1.04, shed: 1.15, int: 3, jump: .5, read: -.12, cush: -1.5, tkl: -.07, fum: 1.8 } },
+};
+// the offense's effects that your hands take over in Play mode, at about half strength
+const GF_ST_HANDS = ['errM', 'int', 'fum', 'cStr'];
+// a fumble: the chance a tackle that holds knocks it loose (Balanced against Balanced), how often the defense falls on it
+const GF_FUM = { base: .012, def: .6 };
+const gfStanceOk = id => GF_ST_IDS.includes(id);
+
+// (force: a stance by side that the coaches must play, for the balance bot: [id or null, id or null])
+function gfStanceStart(force) { G.stance = { off: 'bal', def: 'bal' }; G.stUse = [{}, {}]; G.stForce = Array.isArray(force) ? force.map(id => gfStanceOk(id) ? id : null) : null; }
+// your stance for one side of the ball; it stays until you change it
+function gfSetStance(role, id) {
+  if (!G || !GD || GD.mode === 'watch' || !gfStanceOk(id) || !['off', 'def'].includes(role)) return false;
+  G.stance = G.stance || { off: 'bal', def: 'bal' }; G.stance[role] = id; return true;
+}
+// S steps the stance for the side of the ball you are on now
+function gfCycleStance() {
+  if (!G || !GD || GD.mode === 'watch') return null;
+  const role = gfRole(GD.you), cur = (G.stance || {})[role] || 'bal', id = GF_ST_IDS[(GF_ST_IDS.indexOf(cur) + 1) % GF_ST_IDS.length];
+  gfSetStance(role, id); return id;
+}
+// at the call: both sides' stances for the play (yours as you set it, unless the coaches call your side)
+function gfPickStances() {
+  const out = {};
+  for (const side of [G.poss, 1 - G.poss]) {
+    const role = gfRole(side), mine = GD.mode !== 'watch' && side === GD.you;
+    const id = mine ? ((G.stance || {})[role] || 'bal') : (G.stForce && G.stForce[side]) || gfCpuStance(side, role, (G.skill || [1, 1])[side]);
+    out[role] = id;
+    if (G.stUse) G.stUse[side][id] = (G.stUse[side][id] || 0) + 1;
+  }
+  return out;
+}
+// what the situation asks for: Risky when behind late or on a long third or fourth down, Safe when ahead late or backed up
+function gfStanceSit(side, role) {
+  const m = G.score[side] - G.score[1 - side], late = !!GD.game && (G.half === 3 || (G.half === 2 && G.clock < 150));
+  if (late && m < 0) return 'risky';
+  if (late && m > 0) return 'safe';
+  if (role === 'off') return G.down >= 3 && G.togo >= 8 ? 'risky' : G.ball <= 10 ? 'safe' : 'bal';
+  return G.down >= 3 && G.togo >= 8 ? 'safe' : G.ball >= 90 || (G.down >= 3 && G.togo <= 2) ? 'risky' : 'bal';
+}
+function gfCpuStance(side, role, skill) {
+  if (!skill) return wpick({ safe: 1, bal: 2, risky: 1 });
+  const sit = gfStanceSit(side, role);
+  if (skill === 1 || sit !== 'bal') return sit;
+  // an Archmage: tired legs play Safe, and a defense reads the offense's habits (Safe against the deep ball, Risky
+  // against a side that keeps running)
+  if (gfTired(side) > .45) return 'safe';
+  if (role === 'def') { const T = gfTendency(G.poss, 'off'); if ((T.deep || 0) >= .35) return 'safe'; if ((T.run || 0) >= .55) return 'risky'; }
+  return 'bal';
+}
+// the stances' effects on top of the play's (the powers and zones), as a power's are merged; hands: Play mode
+function gfStanceFx(F, stc, hands) {
+  if (!stc) return F;
+  for (const role of ['off', 'def']) {
+    const S = GF_STANCE[stc[role]]; if (!S) continue;
+    for (const k in S[role]) {
+      if (!(k in F)) continue;
+      const half = hands && role === 'off' && GF_ST_HANDS.includes(k), v = S[role][k];
+      F[k] = GF_FX_MUL.has(k) ? F[k] * (half ? Math.sqrt(v) : v) : F[k] + (half ? v / 2 : v);
+    }
+  }
+  return F;
+}
+// the stamina a play costs a side, by its stance on the play (1 without one)
+function gfStanceStam(side) {
+  const S = GD && GD.stc; if (!S || S.side == null) return 1;
+  const id = side === S.side ? S.off : S.def; return (GF_STANCE[id] || GF_STANCE.bal).stam;
+}
+// the stance a side used on most of its downs (Balanced on a tie)
+function gfStanceMost(side) {
+  const u = (G && G.stUse && G.stUse[side]) || {}; let best = 'bal';
+  for (const id of GF_ST_IDS) if ((u[id] || 0) > (u[best] || 0)) best = id;
+  return best;
+}
+
+/* ---------- fumbles ---------- */
+// does this tackle knock the ball loose: c the carrier, d the tackler
+function gfFumbleRoll(c, d) {
+  const F = L.fx || GF_FX0, worn = gfStamOf(G.poss, c.ri) < 50 ? 1.4 : 1;
+  const p = GF_FUM.base * F.fum * worn * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2);
+  return R() < p;
+}
+// the ball is out: the nearest players go for it, the defense likelier to come up with it; a defender may run it back
+function gfFumble(c, d) {
+  gfEv('fumble', c.n, d.n);
+  const near = side => gfNearest(c.x, c.y, L.pl.filter(p => p.side === side && p !== c && !(p.stun > 0)));
+  const [o, od] = near(0), [x, xd] = near(1), pd = clamp(GF_FUM.def + (od - xd) * .08, .3, .85);
+  const lost = !!x && (!o || R() < pd), rec = lost ? x : (o || c);
+  let ret = 0;
+  if (lost && R() < .55) ret = Math.round(-Math.log(Math.max(.02, R())) * (2 + rec.r.spd * .6));
+  gfEv('recover', rec.n, lost ? 'def' : 'off');
+  const done = gfDead('fum', d.n, c.x, L.pl.indexOf(d));
+  return Object.assign(done, { lost, rec: rec.n, reci: L.pl.indexOf(rec), ret });
+}
+
+/* ---------- the reason, and the coach's tips ---------- */
+// what the stances did on this play, for the reason after it ('' when both played it as called)
+function gfStanceWhy(r, stc) {
+  if (!stc || (stc.off === 'bal' && stc.def === 'bal')) return '';
+  const o = stc.off, d = stc.def, ev = L ? L.ev : [];
+  if (r.what === 'fum') return o === 'risky' ? `Risky: ${r.who} fought for every yard, and the ball came out.` : d === 'risky' ? `Risky: ${r.by} went for the strip.` : '';
+  if (r.what === 'inc' && r.by === 'thrown away') return 'Safe: the quarterback threw it away rather than take a sack.';
+  if (r.what === 'sack') return o === 'risky' ? 'Risky: the quarterback held it for the deep man, and the rush got there.' : d === 'risky' ? 'Risky: the defense sent everyone, and got home.' : '';
+  if (r.what === 'int') return d === 'risky' ? 'Risky: the coverage jumped the route.' : o === 'risky' ? 'Risky: a long, loose throw into coverage.' : '';
+  if (r.gain >= 20) return d === 'risky' ? 'Risky: the defense gambled, and missed.' : o === 'risky' ? 'Risky: they took a shot, and it paid off.' : '';
+  if (d === 'safe' && ev.some(e => e.k === 'catch') && r.gain > 0 && r.gain < 10) return 'Safe: the coverage kept it in front of them.';
+  if (o === 'safe' && ev.some(e => e.k === 'throw') && r.gain > 0 && r.gain < 10) return 'Safe: the quarterback took the short, sure throw.';
+  return '';
+}
+// a stance's pros and cons for your side, this down ({ pro, con, note })
+function gfStanceTip(id) {
+  const S = GF_STANCE[id]; if (!S || !G || !GD) return null;
+  const side = GD.you, role = gfRole(side), off = role === 'off', T = { pro: [], con: [], note: [] };
+  const m = G.score[side] - G.score[1 - side], late = !!GD.game && (G.half === 3 || (G.half === 2 && G.clock < 150)), st = Math.round((1 - gfTired(side)) * 100);
+  const sit = `${GF_ORD[G.down]} and ${G.togo}${m ? `, ${m > 0 ? 'up' : 'down'} by ${Math.abs(m)}` : ''}`;
+  if (id === 'risky') {
+    T.pro.push(off ? 'The quarterback looks deep, carriers fight for extra yards: more big plays.' : 'The rush comes harder and the coverage jumps routes: more sacks, picks and forced fumbles.');
+    T.con.push(off ? 'More sacks, interceptions and fumbles.' : 'More missed tackles and long gains when they guess wrong.');
+    T.con.push(`About ${S.stam}× the stamina a play.`);
+    if (late && m < 0) T.pro.push(`${sit}, late: you need the big play.`);
+    if (off && G.down >= 3 && G.togo >= 8) T.pro.push(`${sit}: Risky gives you the best shot at the first down.`);
+    if (late && m > 0) T.con.push(`${sit}, late: a turnover now could cost the game.`);
+  } else if (id === 'safe') {
+    T.pro.push(off ? 'Short, sure throws, two hands on the ball: almost no fumbles, far fewer picks and sacks.' : 'The coverage keeps it in front and tackles wrap up: few big plays.');
+    T.con.push(off ? 'Fewer big plays: the quarterback takes what is there.' : 'Fewer sacks and turnovers: they will get short gains.');
+    T.pro.push(`Half the stamina a play: your seven are at ${st}%.`);
+    if (late && m > 0) T.pro.push(`${sit}, late: protect the lead.`);
+    if (st < 55) T.pro.push(`Your seven are at ${st}% stamina: Safe saves energy for later.`);
+  } else T.pro.push('Play it as called: no extra risk, the usual stamina.');
+  if (off && GD.mode === 'play') T.note.push('Playing by hand, your throws and runs take about half the stance\'s effect; the blocking and the energy take all of it.');
+  T.note.push('It stays until you change it.');
+  return T;
+}
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
    engine's parts don't touch the page; this file is the only one that does. The canvas fills the width of the page (the
@@ -23433,7 +23640,7 @@ function gfFrame(now) {
   GFP.raf = requestAnimationFrame(gfFrame);
 }
 // Play mode's keys, only while the field is up and there's something to do with them; in the capture phase, so nothing
-// else on the page takes them. G and T (powers) work in You call too
+// else on the page takes them. G and T (powers) and S (the stance) work in You call too
 const GF_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
 const GFK = new Set();
 function gfKeySteer() { let x = 0, y = 0; for (const k of GFK) if (GF_KEYS[k]) { x += GF_KEYS[k][0]; y += GF_KEYS[k][1]; } return [x, y]; }
@@ -23446,6 +23653,11 @@ function gfKey(e, down) {
   // powers; the page hears it as a new beat, to show it
   if (k === 'g' || k === 't') {
     if (down && !e.repeat) { if (k === 'g') gfCyclePower(); else { GD.auto = !GD.auto; if (GD.auto) GD.pow = null; } if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(GD.ph); } catch (er) { console.error(er); } }
+    e.preventDefault(); e.stopPropagation(); return;
+  }
+  // S steps your stance (16-stance.js), except while you steer a play by hand, when it is down
+  if (k === 's' && !(L && L.hands && GD.ph === 'live' && !L.done) && GD.ph !== 'over') {
+    if (down && !e.repeat) { gfCycleStance(); if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(GD.ph); } catch (er) { console.error(er); } }
     e.preventDefault(); e.stopPropagation(); return;
   }
   if (GD.mode !== 'play') return;
@@ -23494,6 +23706,13 @@ return {
   bench: () => G && GD ? { on: gfOnField(GD.you).map(i => gfBenchRow(GD.you, i)), bench: gfBench(GD.you).map(i => gfBenchRow(GD.you, i)), between: gfBetween(), item: !!GD.item, stam: !!G.stam } : null,
   swap: (out, inn) => G && GD ? gfSwapYours(out, inn) : '', useItem: (ri, n, name) => G && GD ? gfUseItem(ri, n, name) : '',
   notes: () => GD && GD.notes ? JSON.parse(JSON.stringify(GD.notes)) : [], swapRules: Object.assign({}, GF_SWAP, { lim: GF_SWAP.lim.slice() }), stamRules: Object.assign({}, GF_STAM),
+  // stances (16-stance.js): yours for each side of the ball ({ off, def }, they stay until changed), the side of the ball
+  // you are on, both sides' stances on the play on show, setting one, S's step, a stance's tips, and the rules
+  stance: () => G && GD ? { mine: Object.assign({ off: 'bal', def: 'bal' }, G.stance), role: gfRole(GD.you), play: GD.stc ? Object.assign({}, GD.stc) : null, used: G.stUse ? JSON.parse(JSON.stringify(G.stUse)) : null } : null,
+  setStance: (role, id) => gfSetStance(role, id), cycleStance: () => gfCycleStance(), stanceTip: id => gfStanceTip(id), stanceMost: side => G ? gfStanceMost(side) : 'bal',
+  stances: Object.fromEntries(GF_ST_IDS.map(k => [k, { n: GF_STANCE[k].n, desc: GF_STANCE[k].desc, stam: GF_STANCE[k].stam, off: Object.assign({}, GF_STANCE[k].off), def: Object.assign({}, GF_STANCE[k].def) }])),
+  // (the fumble rules themselves, not a copy: a test may raise the chance to see one)
+  fumRules: GF_FUM,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
@@ -23501,7 +23720,7 @@ return {
   // the playbook (phase 4): how fresh a side's calls are ({ off: { play: 0..1 }, def: {...} }), and what the other
   // coach has seen of them lately (shares of the last few calls)
   fresh: side => G && G.fresh ? JSON.parse(JSON.stringify(G.fresh[side])) : null, tendency: (side, kind) => G ? gfTendency(side, kind) : {},
-  cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense() },
+  cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense(), stance: (side, role, skill) => gfCpuStance(side, role, skill) },
   // powers (phase 6): your side's mana and the powers it can cast with this call ({ key, name, n, cost, ult, fits,
   // desc, ok, why, stam, stamCost }), your pick and Auto powers, a power's tips ({ pro, con, note }), the zones on
   // the field, and every kind's powers (for How to play)
@@ -23516,7 +23735,7 @@ return {
   defs: Object.fromEntries(GF_DEF_IDS.map(k => [k, { n: GF_DEFS[k].n, desc: GF_DEFS[k].desc }])),
   // the test's handle on the field: play one down from a spot, both calls given
   down: (oc, dc, opts) => { gfStart(opts); return gfPlayDown(oc, dc, opts && opts.st); },
-  snap: (oc, dc, opts) => { gfStart(opts); return gfSnap(oc, dc); }, step: () => { if (L && !L.done) gfStep(GF_DT); return L; },
+  snap: (oc, dc, opts) => { gfStart(opts); return gfSnap(oc, dc, opts && opts.st); }, step: () => { if (L && !L.done) gfStep(GF_DT); return L; },
 };
 
 })();
@@ -28033,7 +28252,7 @@ function wGridHowHTML() {
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
   <p class="hint"><b>Plays tire.</b> Calling a play tires it, and it recovers while you call others; the half freshens everything. A tired play is one they see coming: the defense jumps it and wins more blocks. The bar along the foot of each button is how fresh it is. Their coach also watches what you call and leans to what beats it, so mixing it up pays twice. Their calls tire too: a defense they keep calling is easier to beat.</p>
   <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
-  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball, with their name over them. On a big play (a breakaway, a deep ball, a broken tackle, a run at the goal line, a touchdown or an interception) the camera zooms in on the ball and says why. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, a banner on the grass calls a first down, a long gain, a sack or a score, and <b>This drive</b> keeps every play, under each side's yards, passing, running, sacks and interceptions so far and their leaders.</p>
+  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball, with their name over them. On a big play (a breakaway, a deep ball, a broken tackle, a run at the goal line, a touchdown, an interception or a fumble) the camera zooms in on the ball and says why. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, a banner on the grass calls a first down, a long gain, a sack, a fumble or a score, and <b>This drive</b> keeps every play, under each side's yards, passing, running, sacks, interceptions and fumbles lost so far and their leaders.</p>
   <p class="hint"><b>The ratings</b> (higher is better; your own players' run to 12): ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
 function wGridLineup() {
@@ -28062,6 +28281,7 @@ function wGridStats() {
     ['Running', s => `${sum(s, 'ra')} <small>for</small> ${sum(s, 'ry')}`],
     ['Sacks made', s => sum(s, 'sk')],
     ['Interceptions', s => sum(s, 'ints')],
+    ['Fumbles lost', s => sum(s, 'fuml')],
     ['Field goals', s => `${sum(s, 'fgm')}/${sum(s, 'fga')}`],
   ];
   const lead = s => [['py', 'passing', 'yd'], ['ry', 'running', 'yd'], ['recy', 'catching', 'yd'], ['tkl', 'tackles', '']]
@@ -28084,11 +28304,12 @@ function wGridNotesLine(notes, head) {
   const ico = { swap: '⇄', rest: '✚', pow: '◆' };
   return (head ? `<li class="wgnote"><small>${esc(head)}</small>` : '') + notes.map(n => `<span class="wgnote${n.k}">${ico[n.k] || ''} <b>${who(n.side)}</b> ${esc(n.msg)}</span>`).join('') + (head ? '</li>' : '');
 }
-const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
+const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety', fum: 'Fumble', fumtd: 'Fumble, run back for a touchdown' };
 // a play in the log, marked green when it went your side's way and red when it didn't
 function wGridLogLine(e, side) {
   { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
-    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
+    const tag = i => e.st && typeof wGridStanceTag === 'function' ? wGridStanceTag(e.st[i]) : '';
+    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n}${tag(0)} vs ${wGF.defs[e.dc].n}${tag(1)}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
     return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span>${wGridNotesLine((e.pw || []).map(p => ({ side: p.side, k: 'pow', msg: `${p.ult ? '★ ' : ''}${p.name} (${p.n})` })).concat(e.notes || []))}</li>`; }
 }
 function wGridTeams() {
@@ -28544,7 +28765,7 @@ function wStartGrid(o) {
   B.live = { world, snap: null };
   if (how === 'sim') {
     const g = wGF.simGame({ teams: [mine, opp], skill: wGridSkill(tier) });
-    const msg = wGridSettle(wGridResult(g.score), g.score[0], g.score[1], g.box, g.half);
+    const msg = wGridSettle(wGridResult(g.score), g.score[0], g.score[1], g.box, g.half, g.stance && g.stance[0]);
     wGridResultCard(msg);
     return '';
   }
@@ -28614,7 +28835,7 @@ wGF.onSnap = sn => {
 wGF.onOver = s => {
   if (!WGF) return;
   WGF.over = s;
-  if (WGF.world && wGridLive()) { const G = wGF.G; WGF.msg = wGridSettle(wGridResult(G.score), G.score[0], G.score[1], wGF.box(), G.half); }
+  if (WGF.world && wGridLive()) { const G = wGF.G; WGF.msg = wGridSettle(wGridResult(G.score), G.score[0], G.score[1], wGF.box(), G.half, wGF.stanceMost(0)); }
   wGridBar();
   const f = WGF.world ? $('wGridBack') : $('wGridAgain'); if (f) f.focus();
 };
@@ -29136,8 +29357,8 @@ renderHelp = function () {
 
    Sound. Sudden Death's own effects (sfx), following your Sound effects setting: a whistle at each kickoff (as the ball comes
    down; the game's first is set up before the field shows) and at the half, and at the end of each play a thud for a tackle, a crunch for a sack, a slap for an incompletion, the crowd
-   for a big gain, a horn and the crowd for a touchdown or a field goal, and a groan when the ball is lost or the
-   other side scores. The realm's music plays on, as it does at any ground.
+   for a big gain, a horn and the crowd for a touchdown or a field goal, and a groan when the ball is lost (an interception
+   or a fumble) or the other side scores. The realm's music plays on, as it does at any ground.
    Tips. TIPS.w_grid once your team can play football (W_GFG.minOwn players), TIPS.w_gcup once you have won a
    football game, from a watcher like w20f's.
    Achievements. Football games won (realmGridWins) and Cinder Cups (realmGcups), on SD's ACH.
@@ -29162,7 +29383,8 @@ function wGridSound(ph) {
   if (prev === 'kickoff') { sfx.whistle(); return; }
   if (prev === 'kick') return;
   const r = wGF.play && wGF.play.done; if (!r) return;
-  if (r.what === 'int') { sfx.bad(); return; }
+  if (r.what === 'int' || (r.what === 'fum' && r.lost)) { sfx.bad(); return; }
+  if (r.what === 'fum') { sfx.crunch(); return; }
   if (r.what === 'sack') { sfx.crunch(); return; }
   if (r.what === 'inc') { sfx.block(); return; }
   if (r.what === 'tackle' || r.what === 'out') { if (r.gain >= 10) sfx.crowd(.9); else sfx.hit(.3); }
@@ -29187,7 +29409,7 @@ ACH.push(
 );
 const wW47GridSettle = wGridSettle;
 wGridSettle = function (r, us, them, box, half) {
-  const m = wW47GridSettle(r, us, them, box, half);
+  const m = wW47GridSettle.apply(this, arguments);
   if (!LAB && r === 'win') achAdd('realmGridWins', 1);
   return m;
 };
@@ -29291,6 +29513,80 @@ renderHelp = function () {
   wW48RenderHelp();
   const g = $('wHelpGfPowers') || $('wHelpGridiron'); if (!g || $('wHelpGfBench')) return;
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfBench"><b>Tired players on the gridiron.</b> Each side brings a bench of ${W_GFG.bench}: your players who sit out, then call-ups. Between plays, put a bench player on for a tired one (under the field, Your bench), and the bench rests. Potions from the general stores give stamina back, one a play: a Stamina Draught (one player, ${W_GF_POTIONS.draught.n}) and a Second Wind (the whole seven, ${W_GF_POTIONS.secondwind.n}). The troll's, vampire's, witch's and elf's powers give some back too. Every swap, potion and power goes in the play log.</p>`);
+};
+/* w49: stances on the gridiron (issue #29; the engine's side is src/gf/parts/16-stance.js). Beside the call, your side
+   plays Safe, Balanced or Risky, on offense and on defense: Risky chases the big play (more sacks, picks and fumbles,
+   more stamina a play), Safe guards against them (fewer big plays, less stamina). Fumbles come with it: rare, and
+   likelier the riskier either side plays.
+   On the bar, in You call and You play: three buttons for the side of the ball you are on. Your stance stays until you
+   change it (S steps it, except while you steer a play by hand); point at one for its tips in the tip box (w45). The
+   coaches pick theirs each down, and yours under Coaches and in Simulate. The scoreboard, the play log and the reason
+   after each play show the stances. Medals: Gunslinger (football games won on Risky) and Grinder (on Safe), counted by
+   the stance your side used on most of its downs.
+   Wraps: wGridBar (wW49GridBar: the stance buttons), wGridTip (wW49GridTip: a stance's tips), wGridSettle
+   (wW49GridSettle: the medals), renderHelp (wW49RenderHelp: #wHelpGfStance). */
+
+// the stance you point at, for the tip box
+const WGST = { tip: null };
+$('wGridModes').insertAdjacentHTML('beforebegin', `<span id="wGridStance" class="wgmodes wgstance" role="group" aria-label="Your stance" hidden><b id="wGridStanceL"></b>${Object.entries(wGF.stances).map(([k, s]) => `<button class="ghost" data-gstance="${k}" title="${esc(s.desc + ' S steps it.')}">${esc(s.n)}</button>`).join('')}</span>`);
+$('wGridStance').addEventListener('click', e => {
+  const b = e.target.closest('[data-gstance]'); if (!b) return;
+  const S = wGF.stance(); if (S) wGF.setStance(S.role, b.dataset.gstance);
+  wGridBar();
+});
+$('wGridStance').addEventListener('mouseover', e => { const b = e.target.closest('[data-gstance]'), k = b ? b.dataset.gstance : null; if (k !== WGST.tip) { WGST.tip = k; wGridTip(); } });
+$('wGridStance').addEventListener('mouseleave', () => { WGST.tip = null; wGridTip(); });
+
+function wGridStanceBar() {
+  const S = wGF.stance(), show = !!S && !!WGF && WGF.mode !== 'watch' && !WGF.over && wGF.live;
+  $('wGridStance').hidden = !show; if (!show) return;
+  const cur = S.mine[S.role];
+  $('wGridStanceL').textContent = S.role === 'off' ? 'Offense:' : 'Defense:';
+  for (const b of $('wGridStance').querySelectorAll('[data-gstance]')) { const on = b.dataset.gstance === cur; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
+}
+const wW49GridBar = wGridBar;
+wGridBar = function () {
+  wW49GridBar();
+  wGridStanceBar();
+  if (WGF && WGF.mode !== 'watch' && !WGF.over && wGF.phase === 'call') $('wGridNote').textContent += ' S: your stance.';
+};
+const wW49GridTip = wGridTip;
+wGridTip = function () {
+  wW49GridTip();
+  const T = WGST.tip && !$('wGridStance').hidden ? wGF.stanceTip(WGST.tip) : null; if (!T) return;
+  const S = wGF.stance(), li = (cls, a) => a.map(x => `<li class="${cls}">${esc(x)}</li>`).join(''), box = $('wGridTip');
+  box.hidden = false;
+  box.innerHTML = `<b>${esc(wGF.stances[WGST.tip].n)}</b> <small>${S.role === 'off' ? 'on offense' : 'on defense'}${S.mine[S.role] === WGST.tip ? ' · your stance' : ''}</small><ul>${li('wgpro', T.pro)}${li('wgcon', T.con)}${li('wgnote', T.note)}</ul>`;
+};
+
+// a stance's name in the log and the box (Balanced is how it is called, so it isn't named)
+const wGridStanceTag = id => id && id !== 'bal' && wGF.stances[id] ? ` (${wGF.stances[id].n})` : '';
+
+/* ---------- medals ---------- */
+ACH.push(
+  { id: 'w_gsling', n: 'Gunslinger', d: 'Win football games playing Risky (on most of your downs)', stat: 'realmGridRisky', at: [1, 5, 15] },
+  { id: 'w_ggrind', n: 'Grinder', d: 'Win football games playing Safe (on most of your downs)', stat: 'realmGridSafe', at: [1, 5, 15] },
+);
+// most: the stance your side used on most of its downs
+const wW49GridSettle = wGridSettle;
+wGridSettle = function (r, us, them, box, half, most) {
+  const m = wW49GridSettle.apply(this, arguments);
+  if (!LAB && r === 'win' && most === 'risky') achAdd('realmGridRisky', 1);
+  if (!LAB && r === 'win' && most === 'safe') achAdd('realmGridSafe', 1);
+  return m;
+};
+
+/* ---------- How to play ---------- */
+W_GRID_HOW.push(() => {
+  const S = wGF.stances;
+  return `<p class="hint"><b>Stances.</b> Beside the call, your side plays <b>Safe</b>, <b>Balanced</b> or <b>Risky</b>, on offense and on defense. It changes how the play is run, not which play. <b>Risky</b> chases the big play: the quarterback holds it for the deep man and throws longer, ball carriers fight for every yard, the rush comes harder and the coverage jumps routes. Expect more big gains, sacks, interceptions and fumbles, on both sides. <b>Safe</b> guards against those: short, sure throws (the quarterback throws it away rather than take a sack), two hands on the ball, and coverage that keeps it in front. Expect fewer big plays. The stance also sets how hard your seven go: Risky costs about ${S.risky.stam}× the stamina a play, and Safe about ${S.safe.stam}×. Your stance stays until you change it: the buttons beside the modes, or <b>S</b>. Point at one for its pros and cons this down. Playing by hand, your throws and runs take about half its effect, because your hands decide most of the risk. The coaches pick a stance each down: Risky when behind late or on a long third down, Safe when ahead late or backed up. The scoreboard shows both sides' stances at the snap, and the log and the reason say what they did.</p>
+  <p class="hint"><b>Fumbles</b> are rare: a hard tackle can knock the ball loose, more often from a tired or weak ball carrier, and far more often when either side plays Risky. Whoever is nearest falls on it, the defense more often than not, and a defender who picks it up may run it back. Lost, it ends the drive like an interception.</p>`;
+});
+const wW49RenderHelp = renderHelp;
+renderHelp = function () {
+  wW49RenderHelp();
+  const g = $('wHelpGfBench') || $('wHelpGfPowers') || $('wHelpGridiron'); if (!g || $('wHelpGfStance')) return;
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfStance"><b>Stances on the gridiron.</b> Beside each call your side plays Safe, Balanced or Risky, on offense and on defense (the buttons on the bar, or S). Risky chases big plays and risks sacks, interceptions and fumbles, and tires your seven faster; Safe gives up the big play to avoid them, and saves stamina. It stays until you change it. Fumbles are rare, and likelier the riskier either side plays. Win games playing mostly Risky for the Gunslinger medal, or mostly Safe for the Grinder.</p>`);
 };
 </script>
 </body></html>

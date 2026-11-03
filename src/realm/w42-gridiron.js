@@ -97,7 +97,7 @@ function wGridHowHTML() {
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
   <p class="hint"><b>Plays tire.</b> Calling a play tires it, and it recovers while you call others; the half freshens everything. A tired play is one they see coming: the defense jumps it and wins more blocks. The bar along the foot of each button is how fresh it is. Their coach also watches what you call and leans to what beats it, so mixing it up pays twice. Their calls tire too: a defense they keep calling is easier to beat.</p>
   <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
-  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball, with their name over them. On a big play (a breakaway, a deep ball, a broken tackle, a run at the goal line, a touchdown or an interception) the camera zooms in on the ball and says why. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, a banner on the grass calls a first down, a long gain, a sack or a score, and <b>This drive</b> keeps every play, under each side's yards, passing, running, sacks and interceptions so far and their leaders.</p>
+  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball, with their name over them. On a big play (a breakaway, a deep ball, a broken tackle, a run at the goal line, a touchdown, an interception or a fumble) the camera zooms in on the ball and says why. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, a banner on the grass calls a first down, a long gain, a sack, a fumble or a score, and <b>This drive</b> keeps every play, under each side's yards, passing, running, sacks, interceptions and fumbles lost so far and their leaders.</p>
   <p class="hint"><b>The ratings</b> (higher is better; your own players' run to 12): ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
 function wGridLineup() {
@@ -126,6 +126,7 @@ function wGridStats() {
     ['Running', s => `${sum(s, 'ra')} <small>for</small> ${sum(s, 'ry')}`],
     ['Sacks made', s => sum(s, 'sk')],
     ['Interceptions', s => sum(s, 'ints')],
+    ['Fumbles lost', s => sum(s, 'fuml')],
     ['Field goals', s => `${sum(s, 'fgm')}/${sum(s, 'fga')}`],
   ];
   const lead = s => [['py', 'passing', 'yd'], ['ry', 'running', 'yd'], ['recy', 'catching', 'yd'], ['tkl', 'tackles', '']]
@@ -148,11 +149,12 @@ function wGridNotesLine(notes, head) {
   const ico = { swap: '⇄', rest: '✚', pow: '◆' };
   return (head ? `<li class="wgnote"><small>${esc(head)}</small>` : '') + notes.map(n => `<span class="wgnote${n.k}">${ico[n.k] || ''} <b>${who(n.side)}</b> ${esc(n.msg)}</span>`).join('') + (head ? '</li>' : '');
 }
-const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
+const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety', fum: 'Fumble', fumtd: 'Fumble, run back for a touchdown' };
 // a play in the log, marked green when it went your side's way and red when it didn't
 function wGridLogLine(e, side) {
   { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
-    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
+    const tag = i => e.st && typeof wGridStanceTag === 'function' ? wGridStanceTag(e.st[i]) : '';
+    const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n}${tag(0)} vs ${wGF.defs[e.dc].n}${tag(1)}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
     return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span>${wGridNotesLine((e.pw || []).map(p => ({ side: p.side, k: 'pow', msg: `${p.ult ? '★ ' : ''}${p.name} (${p.n})` })).concat(e.notes || []))}</li>`; }
 }
 function wGridTeams() {

@@ -8,6 +8,8 @@ its powers as a Knight, the other side at the CPU skill of the tier (Squire, Kni
 Part 1, single games: a fresh journey with five players at level 3 (call-ups fill the seven) against a rival's seven at
 that level plus the gap. Win rate by gap, and by the other side's CPU skill at an even level.
 Part 2, powers: the same at an even level with powers off for both sides, to see what powers do to the result.
+Part 2b, stances (issue #29): the same with your side forced to play Safe, Balanced or Risky on every down (theirs
+picked by their coach): win rate, turnovers, plays of 20+ yards and stamina at the end.
 Part 3, whole cups: a fresh journey at level 3, Simulate every round; how far it gets, how often it wins, what it
 earns. Writes /tmp/realm_gridiron_lab.json."""
 import asyncio, json, sys, os, time, collections
@@ -37,8 +39,14 @@ window.GLAB = {
     let opp; try { wGfg().opp = {}; opp = wGridOpp(club, tier); } finally { wBallOppLvl = keep; }
     const sk = wGridSkill(tier); if (o.skill != null) sk[1] = o.skill;
     const t0 = performance.now();
-    const g = wGF.simGame({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false });
-    return { gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
+    const g = wGF.simGame({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false, stance: o.stance ? [o.stance, null] : null });
+    const out = { gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
+    if (o.stance) {
+      const G = wGF.G, mine = g.box.filter(b => b.side === 0), sum = k => mine.reduce((a, b) => a + (b.line[k] || 0), 0), on = [...new Set(Object.values(G.teams[0].off).concat(Object.values(G.teams[0].def)))];
+      Object.assign(out, { stance: o.stance, to: sum('fuml') + sum('pint'), take: sum('ints') + sum('fr'), sacked: g.box.filter(b => b.side === 1).reduce((a, b) => a + (b.line.sk || 0), 0),
+        big: G.drives.filter(d => d.side === 0).reduce((a, d) => a + d.plays.filter(e => e.gain >= 20).length, 0), stam: on.reduce((a, j) => a + (G.stam ? G.stam[0][j] : 100), 0) / on.length });
+    }
+    return out;
   },
   cup(lvl) {
     GLAB.journey(lvl);
@@ -89,9 +97,12 @@ async def main():
         for sk in (0, 1, 2):
             skills += await batch(pg, N, f"GLAB.game(3, 0, 2, {{ skill: {sk} }})")
         nopow = await batch(pg, N, "GLAB.game(3, 0, 2, { skill: 1, powers: false })")
+        stances = []
+        for st in ('safe', 'bal', 'risky'):
+            stances += await batch(pg, N, f"GLAB.game(3, 0, 2, {{ skill: 1, stance: '{st}' }})")
         cups = await batch(pg, N, "GLAB.cup(3)", per=5)
         await br.close()
-    json.dump({'games': games, 'skills': skills, 'nopow': nopow, 'cups': cups}, open('/tmp/realm_gridiron_lab.json', 'w'))
+    json.dump({'games': games, 'skills': skills, 'nopow': nopow, 'stances': stances, 'cups': cups}, open('/tmp/realm_gridiron_lab.json', 'w'))
     allg = games + skills + nopow
     print('override', PRE or '(none)', f' {time.time() - t0:.0f}s, {sum(g["ms"] for g in allg) / len(allg):.0f} ms a game')
     print('page errors', len(errs), errs[:2])
@@ -108,6 +119,12 @@ async def main():
     print('powers, even level, both Knights')
     row('with powers', [g for g in skills if g['skill'] == 1])
     row('without powers', nopow)
+    print('your stance on every down, even level, both Knights (theirs picked by their coach)')
+    print('                                 n    win    tie   points for-against   lost  took  sacked  20+ plays  stamina at the end')
+    for st, name in (('safe', 'Safe'), ('bal', 'Balanced'), ('risky', 'Risky')):
+        rs = [g for g in stances if g['stance'] == st]; m = lambda k: sum(g[k] for g in rs) / len(rs)
+        w = sum(g['win'] for g in rs); t = sum(g['tie'] for g in rs)
+        print(f"  {name:26s} {len(rs):5d}  {pct(w, len(rs))}  {pct(t, len(rs))}   {m('us'):.1f}-{m('them'):.1f}          {m('to'):.2f}  {m('take'):.2f}  {m('sacked'):.2f}    {m('big'):.2f}       {m('stam'):.0f}")
     print('\nCinder Cups, level 3, Simulate every round')
     won = [sum(1 for c in cups for r in c['rounds'] if r['r'] == k and r['win']) for k in range(3)]
     played = [sum(1 for c in cups for r in c['rounds'] if r['r'] == k) for k in range(3)]

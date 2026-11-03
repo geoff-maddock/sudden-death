@@ -29,6 +29,13 @@ return {
   bench: () => G && GD ? { on: gfOnField(GD.you).map(i => gfBenchRow(GD.you, i)), bench: gfBench(GD.you).map(i => gfBenchRow(GD.you, i)), between: gfBetween(), item: !!GD.item, stam: !!G.stam } : null,
   swap: (out, inn) => G && GD ? gfSwapYours(out, inn) : '', useItem: (ri, n, name) => G && GD ? gfUseItem(ri, n, name) : '',
   notes: () => GD && GD.notes ? JSON.parse(JSON.stringify(GD.notes)) : [], swapRules: Object.assign({}, GF_SWAP, { lim: GF_SWAP.lim.slice() }), stamRules: Object.assign({}, GF_STAM),
+  // stances (16-stance.js): yours for each side of the ball ({ off, def }, they stay until changed), the side of the ball
+  // you are on, both sides' stances on the play on show, setting one, S's step, a stance's tips, and the rules
+  stance: () => G && GD ? { mine: Object.assign({ off: 'bal', def: 'bal' }, G.stance), role: gfRole(GD.you), play: GD.stc ? Object.assign({}, GD.stc) : null, used: G.stUse ? JSON.parse(JSON.stringify(G.stUse)) : null } : null,
+  setStance: (role, id) => gfSetStance(role, id), cycleStance: () => gfCycleStance(), stanceTip: id => gfStanceTip(id), stanceMost: side => G ? gfStanceMost(side) : 'bal',
+  stances: Object.fromEntries(GF_ST_IDS.map(k => [k, { n: GF_STANCE[k].n, desc: GF_STANCE[k].desc, stam: GF_STANCE[k].stam, off: Object.assign({}, GF_STANCE[k].off), def: Object.assign({}, GF_STANCE[k].def) }])),
+  // (the fumble rules themselves, not a copy: a test may raise the chance to see one)
+  fumRules: GF_FUM,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
@@ -36,7 +43,7 @@ return {
   // the playbook (phase 4): how fresh a side's calls are ({ off: { play: 0..1 }, def: {...} }), and what the other
   // coach has seen of them lately (shares of the last few calls)
   fresh: side => G && G.fresh ? JSON.parse(JSON.stringify(G.fresh[side])) : null, tendency: (side, kind) => G ? gfTendency(side, kind) : {},
-  cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense() },
+  cpu: { off: () => gfCpuOffense(), def: () => gfCpuDefense(), stance: (side, role, skill) => gfCpuStance(side, role, skill) },
   // powers (phase 6): your side's mana and the powers it can cast with this call ({ key, name, n, cost, ult, fits,
   // desc, ok, why, stam, stamCost }), your pick and Auto powers, a power's tips ({ pro, con, note }), the zones on
   // the field, and every kind's powers (for How to play)
@@ -51,5 +58,5 @@ return {
   defs: Object.fromEntries(GF_DEF_IDS.map(k => [k, { n: GF_DEFS[k].n, desc: GF_DEFS[k].desc }])),
   // the test's handle on the field: play one down from a spot, both calls given
   down: (oc, dc, opts) => { gfStart(opts); return gfPlayDown(oc, dc, opts && opts.st); },
-  snap: (oc, dc, opts) => { gfStart(opts); return gfSnap(oc, dc); }, step: () => { if (L && !L.done) gfStep(GF_DT); return L; },
+  snap: (oc, dc, opts) => { gfStart(opts); return gfSnap(oc, dc, opts && opts.st); }, step: () => { if (L && !L.done) gfStep(GF_DT); return L; },
 };

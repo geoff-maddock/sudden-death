@@ -41,7 +41,7 @@ async def main():
           const x = wGF.simGame({ seed: 77 }), y = wGF.simGame({ seed: 77 }); a.same = JSON.stringify(x) === JSON.stringify(y);
           return a; })()""")
         print('     games:', g)
-        check(g['halves'] and set(g['ends']) <= {'td', 'fg', 'miss', 'punt', 'downs', 'int', 'safety', 'clock'} and 4 <= g['drives'] <= 20,
+        check(g['halves'] and set(g['ends']) <= {'td', 'fg', 'miss', 'punt', 'downs', 'int', 'fum', 'fumtd', 'safety', 'clock'} and 4 <= g['drives'] <= 20,
               'every game plays both halves, drive after drive, and each drive ends in a known way', g)
         check(10 <= g['pts'] <= 50 and g['hi'] < 100, 'games score like football: 10 to 50 points between the sides on average', g)
         check(360 <= g['secs'] <= 540, 'a game takes 6 to 9 minutes to watch', g)
@@ -59,7 +59,7 @@ async def main():
         # Sudden Death: tied when the clock runs out in the second half, a short extra period starts, and the first score wins it
         o = await pg.evaluate("""(() => { const out = { seen: 0, ok: true }; for (let i = 0; i < 300 && out.seen < 3; i++) { const s = wGF.simGame({ seed: 3000 + i });
             if (s.half !== 3) continue; out.seen++; const G = wGF.G, ot = G.drives.filter(d => d.half === 3), last = ot[ot.length - 1];
-            const scored = ot.filter(d => ['td', 'fg', 'safety'].includes(d.end));
+            const scored = ot.filter(d => ['td', 'fg', 'safety', 'fumtd'].includes(d.end));
             if (scored.length > 1 || (scored.length === 1 && last !== scored[0]) || (s.score[0] === s.score[1]) !== (scored.length === 0)) out.ok = false; }
           return out; })()""")
         check(o['seen'] >= 1 and o['ok'], 'a tie goes to Sudden Death: the first score wins, and no score is a tie', o)

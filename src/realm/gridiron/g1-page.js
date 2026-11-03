@@ -31,7 +31,7 @@ function gfFrame(now) {
   GFP.raf = requestAnimationFrame(gfFrame);
 }
 // Play mode's keys, only while the field is up and there's something to do with them; in the capture phase, so nothing
-// else on the page takes them. G and T (powers) work in You call too
+// else on the page takes them. G and T (powers) and S (the stance) work in You call too
 const GF_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
 const GFK = new Set();
 function gfKeySteer() { let x = 0, y = 0; for (const k of GFK) if (GF_KEYS[k]) { x += GF_KEYS[k][0]; y += GF_KEYS[k][1]; } return [x, y]; }
@@ -44,6 +44,11 @@ function gfKey(e, down) {
   // powers; the page hears it as a new beat, to show it
   if (k === 'g' || k === 't') {
     if (down && !e.repeat) { if (k === 'g') gfCyclePower(); else { GD.auto = !GD.auto; if (GD.auto) GD.pow = null; } if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(GD.ph); } catch (er) { console.error(er); } }
+    e.preventDefault(); e.stopPropagation(); return;
+  }
+  // S steps your stance (16-stance.js), except while you steer a play by hand, when it is down
+  if (k === 's' && !(L && L.hands && GD.ph === 'live' && !L.done) && GD.ph !== 'over') {
+    if (down && !e.repeat) { gfCycleStance(); if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(GD.ph); } catch (er) { console.error(er); } }
     e.preventDefault(); e.stopPropagation(); return;
   }
   if (GD.mode !== 'play') return;

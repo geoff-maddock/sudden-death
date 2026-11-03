@@ -30,7 +30,7 @@ const gfBetween = () => !!GD && !['pre', 'live', 'kick', 'over'].includes(GD.ph)
 // the first half with the score not level (or in Sudden Death)
 function gfLastPlay() {
   if (!GD.game) return !!G.drive.end;
-  if (G.half === 3 && ['td', 'fg', 'safety'].includes(G.drive.end)) return true;
+  if (G.half === 3 && ['td', 'fg', 'safety', 'fumtd'].includes(G.drive.end)) return true;
   return G.clock <= 0 && G.half >= 2 && (G.score[0] !== G.score[1] || G.half === 3);
 }
 

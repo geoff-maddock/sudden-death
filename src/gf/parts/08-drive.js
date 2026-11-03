@@ -7,7 +7,7 @@
    In a full game (10-game.js) you call the defense too when the other side has the ball.
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
-   GD.cast is what both sides cast for the play on show. opts.skill: the CPU's skill by side ([0..2, 0..2]).
+   GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..2, 0..2]).
    Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
@@ -24,9 +24,10 @@ function gfStart(opts) {
   gfPlaybookStart(); gfBoxStart();
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
+  gfStanceStart(o.stance);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -47,6 +48,8 @@ function gfGo(ph) {
   // side, and for yours when they call it (15-bench.js); a play, a kick or a new drive: a potion may be given again
   if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
   if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) GD.item = false;
+  // (a kick isn't played in a stance)
+  if (['kick', 'kickoff', 'half'].includes(ph)) GD.stc = null;
   // each call is a point to save the game at (13-box.js)
   if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
@@ -61,8 +64,8 @@ function gfTick(dt) {
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
-    GD.cast = gfCastPowers(GD.oc, GD.dc);
-    GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });
+    GD.cast = gfCastPowers(GD.oc, GD.dc); GD.stc = Object.assign(gfPickStances(), { side: G.poss });
+    GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast, stc: GD.stc });
     return gfGo('pre');
   }
   if (GD.ph === 'pre') { if (GD.t >= GF_PACE.pre) { gfSnap(GD.oc, GD.dc, GD.stale); GD.acc = 0; gfGo('live'); } return; }
@@ -91,12 +94,30 @@ function gfResult(r) {
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
   const pw = [GD.cast && GD.cast.off, GD.cast && GD.cast.def].filter(Boolean).map(c => ({ side: c.side, n: c.n, name: c.name, ult: c.ult }));
   if (pw.length) e.pw = pw;
+  if (GD.stc) e.st = [GD.stc.off, GD.stc.def];
   gfZoneRest(); gfTakeNotes(e);
   gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
   // what it came to, for the banner on the field (09-draw.js)
   GD.big = r.what === 'int' ? { k: 'int', sub: 'by ' + r.by } : null;
+  // a fumble the defense comes up with: the ball changes hands where it came out, and the return may score
+  if (r.what === 'fum' && r.lost) {
+    G.drive.yards += r.gain; G.plays++;
+    G.ball = clamp(G.ball + r.gain, 1, 99); gfTurnover();
+    const ret = Math.min(r.ret || 0, GF_RULES.field - G.ball), back = ret ? ` and runs it back ${ret} yard${ret === 1 ? '' : 's'}` : '';
+    G.ball += ret;
+    if (G.ball >= GF_RULES.field) {
+      G.score[G.poss] += GF_RULES.td; G.drive.end = 'fumtd'; gfBoxAdd(G.poss, L && L.pl[r.reci] ? L.pl[r.reci].ri : -1, 'td');
+      GD.msg = `Fumble! ${r.rec} picks it up${back} for a touchdown.` + gfExtraPoint(G.poss); gfScoredOn(off);
+      GD.big = { k: 'fumtd', sub: `${r.rec}, ${ret} yards` };
+    } else {
+      gfFirstDown(); G.drive.end = 'fum';
+      GD.msg = `Fumble! ${r.who} loses it, and ${r.rec} recovers${back}.`;
+      GD.big = { k: 'fum', sub: `${r.rec} recovers` };
+    }
+    e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); gfPowersAfter(); return;
+  }
   if (r.what === 'int') {
     G.ball = clamp(G.ball + r.x, 1, 99); gfTurnover(); G.drive.end = 'int';
     GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); gfPowersAfter(); return;
@@ -106,13 +127,14 @@ function gfResult(r) {
   GD.msg = r.what === 'td' ? `Touchdown, ${gfName(off)}! ${r.who}, ${yd(r.gain)}.`
     : r.what === 'sack' ? `Sacked by ${r.by}: ${r.gain < 0 ? 'a loss of ' + yd(r.gain) : 'no gain'}.`
     : r.what === 'inc' ? `Incomplete: ${r.by}.`
+    : r.what === 'fum' ? `${r.who} fumbles, and ${r.rec} falls on it: ${r.gain > 0 ? yd(r.gain) : r.gain < 0 ? 'a loss of ' + yd(r.gain) : 'no gain'}.`
     : `${r.who}, ${r.gain > 0 ? yd(r.gain) : r.gain < 0 ? 'a loss of ' + yd(r.gain) : 'no gain'}${r.what === 'out' ? ', out of bounds' : r.by ? ', brought down by ' + r.by : ''}.`;
   if (s === 'first') GD.msg += ' First down.';
   if (s === 'safety') { GD.msg = `Safety: ${r.who} is tackled in the end zone.`; G.drive.end = 'safety'; gfScoredOn(off); }
   if (s === 'turnover') { GD.msg += ' Turnover on downs.'; G.drive.end = 'downs'; }
   if (s === 'td') { G.drive.end = 'td'; GD.msg += gfExtraPoint(); gfScoredOn(1 - off); }
-  const big = s === 'td' ? 'td' : s === 'safety' ? 'safety' : s === 'turnover' ? 'downs' : r.what === 'sack' ? 'sack' : s === 'first' ? 'first' : r.gain >= 15 ? 'long' : null;
-  GD.big = big && { k: big, gain: r.gain, sub: big === 'td' ? `${r.who}, ${yd(r.gain)}` : big === 'sack' ? 'by ' + r.by : big === 'first' && r.gain >= 10 ? `${r.who}, +${r.gain}` : '' };
+  const big = s === 'td' ? 'td' : s === 'safety' ? 'safety' : s === 'turnover' ? 'downs' : r.what === 'fum' ? 'fum' : r.what === 'sack' ? 'sack' : s === 'first' ? 'first' : r.gain >= 15 ? 'long' : null;
+  GD.big = big && { k: big, gain: r.gain, sub: big === 'td' ? `${r.who}, ${yd(r.gain)}` : big === 'sack' ? 'by ' + r.by : big === 'fum' ? `${r.rec} falls on it` : big === 'first' && r.gain >= 10 ? `${r.who}, +${r.gain}` : '' };
   e.msg = GD.msg; e.why = GD.why;
   gfRunClock(r.what, L ? L.t : 5);
   gfPowersAfter();
@@ -121,11 +143,13 @@ function gfResult(r) {
 function gfWhy(r) {
   const P = GF_PLAYS[GD.oc], ev = L ? L.ev : [], th = ev.find(x => x.k === 'throw'), out = [];
   if (r.what === 'sack') out.push('The rush got to the quarterback before the throw.');
+  else if (r.by === 'thrown away') out.push('The rush got there, and the quarterback threw it away.');
   else if (th) out.push(`${th.s === 'hurried' ? 'Under pressure, the' : 'The'} quarterback threw to ${th.o}.`);
   else if (P.kind === 'run') out.push(`The handoff went to ${r.who || 'the back'}.`);
   const br = L ? L.broken : 0;
   if (br) out.push(`${br} broken tackle${br > 1 ? 's' : ''}.`);
   const pw = gfPowWhy(GD.cast); if (pw) out.push(pw);
+  const sw = gfStanceWhy(r, GD.stc); if (sw) out.push(sw);
   const [g, why] = gfEdge(GD.oc, GD.dc);
   const dn = GF_DEFS[GD.dc].n, st = GD.stale || {};
   if (st.read > .45) out.push(`They saw the ${P.n.toLowerCase()} coming: it's been called a lot.`);
