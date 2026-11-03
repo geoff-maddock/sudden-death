@@ -405,4 +405,32 @@ It comes out a mild rock, paper, scissors: Risky edges Balanced, Safe edges Risk
 
 **Your stance, every down, in the Realm lab** (even level, tier 2, both Knights, 150 each): Safe 47%, Balanced 40%, Risky 50%; turnovers lost 0.06, 0.19 and 0.38 a game; sacked 1.0, 2.0 and 3.1; stamina at the end 70, 65 and 59 (the coaches swap tired players, so it stays closer than in the table above).
 
-**Not met yet:** big plays. Over 2,400 seeded downs (`test/realm_gridiron_stance.py`), Risky on offense makes a few more plays of 20+ yards than Safe (276 against 271), and a Risky defense gives up more than a Safe one (254 against 231). In whole games with Realm squads the three stances make about the same number (2.7 to 2.8 a game). Risky's extra yards come mostly from broken tackles and yards after the catch, not from the deep ball: both receivers run the same depth on each call, so looking deeper (`deepW`) rarely changes who gets the ball.
+**Big plays, first pass:** not met. Over 2,400 seeded downs Risky on offense made 276 plays of 20+ yards against Safe's 271, and in whole games the three stances made the same number (2.7 to 2.8 a game). Both receivers ran the same depth on each call, so looking deeper (`deepW`) rarely changed who got the ball.
+
+### Route depths (follow-up to #29)
+
+The short pass now has two depths: X cuts inside at 9 yards and Z runs up the seam (18 yards). The quarterback weighs each receiver by where he would catch it (his position plus his run while the ball is in the air), not where he stands, so the seam counts for its depth. On the deep pass, a Safe offense's back slips out of his block into the flat after 1.3 seconds, once no rusher is within 4 yards of him (`valve`), as a checkdown. Risky's pick chance on offense came down from 3.5× to 2.2×, because the seam throws are contested more often. Balanced plays as before: it almost never takes the seam, and the deep routes did not change.
+
+A 13-yard dig or a 22-yard post on the deep pass instead were tried and dropped. Both cut the deep call's yards a play about in half (8.7 to 4 or 5): the inside routes run into the safety.
+
+**Seeded downs** (900 of each call, every defense, the other side Balanced):
+
+| Offense | Short: throws 15+ yards out | Short: 20+ plays | Deep: mean air yards | Deep: 20+ plays | Picks (short + deep) |
+|---|---|---|---|---|---|
+| Safe | 0% | 59 | 14 (checks down on about a third) | 245 | 0 |
+| Balanced | 1% | 78 | 27 | 293 | 6 |
+| Risky | 46% | 174 | 31 | 270 | 36 |
+
+Over the 2,400 mixed downs of `test/realm_gridiron_stance.py`, Risky makes 396 plays of 20+ yards, Balanced 326, and Safe 264 (before: 276, 271).
+
+**Your stance, every down, in the Realm lab** (600 games each, two runs of 300, against the same 600 before the change):
+
+| Stance | Win, before | Win, after | 20+ plays a game, before | after | Sacked, before | after |
+|---|---|---|---|---|---|---|
+| Safe | 45% | 42% | 2.9 | 2.8 | 1.1 | 1.45 |
+| Balanced | 45% | 43% | 2.7 | 3.6 | 2.2 | 2.1 |
+| Risky | 49% | 52% | 2.8 | 3.9 | 2.9 | 2.9 |
+
+The back first left his block whatever the rush did, which sacked Safe 1.9 times a game and dropped it to 37–41%. Waiting until no rusher is near brought it back. Every Balanced row has more big plays, because the other coach plays Risky some downs and now takes the seam. Cups won: 4.0% and 5.0% (4.7% before).
+
+**Forced stances, whole games** (250 games a row, as the table above): Balanced (Balanced) 42%, Risky (Balanced) 38%, Safe (Balanced) 43%, Risky (Safe) 42%, Safe (Risky) 42%. The rock, paper, scissors has flattened: every pairing is within 4 points of even. 20+ plays a game, home side: 3.5 Balanced, 3.9 Risky, 2.4 Safe.

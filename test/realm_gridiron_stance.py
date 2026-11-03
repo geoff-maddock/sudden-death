@@ -1,5 +1,6 @@
 # Realm gridiron stances (issue #29): Safe, Balanced or Risky on each side of the ball. Over seeded downs Risky gives more
-# sacks, turnovers and big plays than Safe, on offense and on defense; a play costs less stamina on Safe and more on
+# sacks, turnovers and big plays than Safe, on offense and on defense; on the short pass (an in and a seam) Safe throws
+# the in and Risky often takes the seam, and on the deep pass Safe checks down to the back; a play costs less stamina on Safe and more on
 # Risky; fumbles (rare) are lost or kept, run back, and counted in the box, the banner and the log; the stance buttons,
 # S, the scoreboard, the log line and the tip box; your stance stays until you change it and is saved with the game;
 # the coaches play Risky behind late and Safe ahead late; Play mode takes about half the effect on the throw and the
@@ -27,6 +28,15 @@ DOWNS = """([n, off, def]) => { const o = { n, sack: 0, int: 0, fum: 0, lost: 0,
     o.sack += r.what === 'sack'; o.int += r.what === 'int'; o.fum += r.what === 'fum'; o.lost += r.what === 'fum' && !!r.lost; o.big += r.gain >= 20; o.gain += r.gain;
   }
   return o; }"""
+# n seeded downs of one call against every defense, for each offense stance: the share of throws 15+ air yards out,
+# the mean air yards, and the plays of 20 yards or more
+AIR = """([n, oc]) => { const out = {}, dc = Object.keys(wGF.defs);
+  for (const off of ['safe', 'bal', 'risky']) { const o = { th: 0, a15: 0, air: 0, big: 0 };
+    for (let i = 0; i < n; i++) { const r = wGF.down(oc, dc[i % dc.length], { seed: 9000 + i, powers: false, st: { stc: { off, def: 'bal' } } });
+      if (r.air != null) { o.th++; o.a15 += r.air >= 15; o.air += r.air; } o.big += r.gain >= 20; }
+    out[off] = { th: o.th, a15: o.th ? o.a15 / o.th : 0, air: o.th ? o.air / o.th : null, big: o.big };
+  }
+  return out; }"""
 
 async def main():
     subprocess.run(REALM_BUILD, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
@@ -53,6 +63,17 @@ async def main():
         check(rd['big'] > sd['big'], 'on defense, Risky gives up more plays of 20 yards or more than Safe', [rd, sd])
         check(bo['fum'] < N * .02 and so['fum'] <= bo['fum'], 'fumbles are rare, and rarer on Safe', [bo, so])
 
+        # ---------- the short pass's two depths: the stance picks the man ----------
+        sh = await pg.evaluate(AIR, [900, 'short'])
+        print('  short pass, safe / balanced / risky:', sh)
+        check(all(sh[s]['th'] > 800 for s in sh) and all(sh[s]['air'] is not None for s in sh), 'a thrown ball records its air yards', sh)
+        check(sh['safe']['a15'] <= .02 and sh['bal']['a15'] <= .1 and sh['risky']['a15'] >= .3, 'on the short pass, Safe throws the in, and Risky often takes the seam', sh)
+        check(sh['risky']['big'] >= 2 * sh['safe']['big'], 'and Risky makes at least twice the plays of 20 yards or more', sh)
+        dp = await pg.evaluate(AIR, [900, 'deep'])
+        print('  deep pass, safe / balanced / risky:', dp)
+        check(dp['bal']['a15'] >= .98 and dp['risky']['a15'] >= .98 and .2 <= 1 - dp['safe']['a15'] <= .6, 'on the deep pass, Safe checks down to the back on some throws, and the others throw long', dp)
+        check(dp['risky']['big'] > dp['safe']['big'] * .9 and dp['safe']['air'] < dp['risky']['air'] - 8, 'and Safe throws shorter', dp)
+
         # ---------- Play mode: about half the effect on the throw and the carrier ----------
         fx = await pg.evaluate("""(() => { const out = {};
           for (const mode of ['watch', 'play']) { wGF.snap('short', 'man', { mode, powers: false, st: { stc: { off: 'risky', def: 'bal' } } }); const F = wGF.play.fx; out[mode] = { errM: F.errM, fum: F.fum, cStr: F.cStr, shed: F.shed, qbT: F.qbT }; }
@@ -65,9 +86,9 @@ async def main():
 
         # ---------- stamina by stance ----------
         st = await pg.evaluate("""(() => { const out = {}; for (const s of ['safe', 'bal', 'risky']) { let sum = 0;
-          for (let i = 0; i < 6; i++) { wGF.simGame({ teams: wGridTeams(), skill: [1, 1], seed: 300 + i, stance: [s, 'bal'] }); const G = wGF.G, on = [...new Set(Object.values(G.teams[0].off).concat(Object.values(G.teams[0].def)))];
+          for (let i = 0; i < 20; i++) { wGF.simGame({ teams: wGridTeams(), skill: [1, 1], seed: 300 + i, stance: [s, 'bal'] }); const G = wGF.G, on = [...new Set(Object.values(G.teams[0].off).concat(Object.values(G.teams[0].def)))];
             sum += on.reduce((a, j) => a + G.stam[0][j], 0) / on.length; }
-          out[s] = sum / 6; } return out; })()""")
+          out[s] = sum / 20; } return out; })()""")
         check(st['safe'] > st['bal'] > st['risky'], 'a game played Safe leaves the seven fresher than Balanced, and Risky more worn', st)
         check(st['safe'] - st['risky'] >= 15, 'and the difference shows by the end', st)
         sm = await pg.evaluate("wGF.simGame({ teams: wGridTeams(), skill: [1, 1], seed: 5, stance: ['risky', null] }).stance")
