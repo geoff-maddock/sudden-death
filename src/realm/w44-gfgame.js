@@ -54,21 +54,27 @@ const wGridOppLvl = tier => wBallOppLvl(tier);
 function wGridOpp(club, tier) {
   const B = wGfg(), lvl = wGridOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
   const cached = club !== 'local' && B.opp[club];
+  const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
+  // the seven's kinds, then the bench's (more of the same once they run out)
+  const all = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i);
+  const kinds = all.slice(0, W_GFR.side).concat(Array.from({ length: W_GFG.bench }, (_, i) => all[(W_GFR.side + i) % all.length]));
+  const names = new Set(), mk = (kind, i) => {
+    const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
+    const p = wMakePlayer({ kind, lvl: i < W_GFR.side ? lvl : Math.max(1, lvl - 1), n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
+    names.add(p.n);
+    return wSevenPlayer(p);
+  };
   let team;
-  if (cached && cached.lvl === lvl && cached.team.roster.length > W_GFR.side) team = JSON.parse(JSON.stringify(cached.team));
-  else {
-    const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
-    // the seven's kinds, then the bench's (more of the same once they run out)
-    const all = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i);
-    const kinds = all.slice(0, W_GFR.side).concat(Array.from({ length: W_GFG.bench }, (_, i) => all[(W_GFR.side + i) % all.length]));
-    const names = new Set();
-    const roster = kinds.map((kind, i) => {
-      const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
-      const p = wMakePlayer({ kind, lvl: i < W_GFR.side ? lvl : Math.max(1, lvl - 1), n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
-      names.add(p.n);
-      return wSevenPlayer(p);
-    });
-    team = { name: C.name, short: C.short, color: C.color, light: C.light, roster };
+  if (cached && cached.lvl === lvl) {
+    team = JSON.parse(JSON.stringify(cached.team));
+    // a seven kept from before there were benches: it stays, and a bench joins it
+    if (team.roster.length <= W_GFR.side) {
+      for (const p of team.roster) names.add(p.n);
+      team.roster = team.roster.concat(kinds.slice(team.roster.length).map((kind, j) => mk(kind, team.roster.length + j)));
+      B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
+    }
+  } else {
+    team = { name: C.name, short: C.short, color: C.color, light: C.light, roster: kinds.map(mk) };
     if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
   }
   // the same ratings each time for the same club (a fixed order over the six), so a rival doesn't change between games
@@ -86,13 +92,16 @@ function wGridSquad(vs) {
   for (const p of out) { team.roster.push(wSevenPlayer(p)); ids.push(p.id); }
   const used = new Set(team.roster.map(p => p.n).concat(vs ? vs.roster.map(p => p.n) : []));
   for (let i = 0; team.roster.length < W_GFR.side + W_GFG.bench; i++) { team.roster.push(wSevenPlayer(wMakeCallUp(W_GFR.cuKinds[i % W_GFR.cuKinds.length], used))); ids.push(null); }
-  wGridNums(team.roster);
+  // (your own players keep their numbers unless two share one; a call-up moves)
+  wGridNums(team.roster, i => typeof ids[i] === 'number');
   return { team, ids };
 }
-// no two on a side wear the same number: the first to have it keeps it, the rest move up to a free one
-function wGridNums(roster) {
-  const seen = new Set();
-  for (const p of roster) { let n = p.num || 1; while (seen.has(n)) n = n % 99 + 1; p.num = n; seen.add(n); }
+// no two on a side wear the same number: first come those kept first (keep(i), your own players), then the rest; the
+// first to have a number keeps it, and a later one moves up to a free one (0 to 99)
+function wGridNums(roster, keep) {
+  const seen = new Set(), kept = i => !!keep && keep(i), take = p => { let n = p.num == null ? 1 : p.num; while (seen.has(n)) n = (n + 1) % 100; p.num = n; seen.add(n); };
+  roster.forEach((p, i) => { if (kept(i)) take(p); });
+  roster.forEach((p, i) => { if (!kept(i)) take(p); });
   return roster;
 }
 
@@ -131,7 +140,7 @@ function wResumeGrid() {
   if (!L) return;
   if (!L.snap) { wGridCallOff('The game had not reached its first play, so it is called off.'); return; }
   WGF = { kind: 'game', mode: L.snap.GD.mode, over: null, teams: L.snap.G.teams, world: true };
-  wGF.resume(L.snap);
+  wGF.resume(L.snap); WGRID_HOLD.clear(); wGridHold();
   showView('gridiron');
   wGridChrome('game');
   $('wGridTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
@@ -159,14 +168,14 @@ function wGridCallOff(why) {
 }
 function wGridConcede() {
   if (!wGridWorld()) return;
-  wGF.pause(true);
+  wGridHold('ask', true);
   askConfirm('Concede this game?', 'It counts as a loss. A loss on the gridiron costs nothing, but you only get a quarter of the XP.', 'Concede', () => {
     if (!wGridLive()) return;
-    wGF.pause(false);
+    wGridHold('ask', false);
     const G = wGF.G, sc = G ? G.score : [0, 0];
     wGridSettle('lose', sc[0], sc[1], wGF.box(), G ? G.half : 1);
     WGF = null; wLeaveGridiron();
-  }, () => wGF.pause(false));
+  }, () => wGridHold('ask', false));
 }
 function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
 wGF.wantSnap = () => wGridWorld();

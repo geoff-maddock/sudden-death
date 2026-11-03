@@ -10,7 +10,7 @@
    Wrapped: wGridBar (wW48GridBar: the bench panel), renderHelp (wW48RenderHelp: #wHelpGfBench). */
 
 // msg: why the last swap or potion didn't happen, shown until the next call or game (at, G: when it was shown)
-const WGB = { msg: '', at: null, G: null };
+const WGB = { msg: '', at: null, G: null, html: '' };
 const W_GF_POTIONS = {
   draught: { n: 40, all: false, price: 20 },
   secondwind: { n: 15, all: true, price: 45 },
@@ -25,8 +25,12 @@ for (const [c, it] of [['emberdeep_c6', 'draught'], ['hatchery_c6', 'secondwind'
 // a game's save point is the last call: a swap or a potion made at a call is kept in it
 function wGridResnap() { const L = wGridWorld() && WG.gfg.live; if (L && wGF.phase === 'call') L.snap = wGF.snapshot(); }
 function wGridSwap(out, inn) {
+  const b = wGF.bench(); if (!b) return '';
+  if (!b.between) return 'Swaps happen between plays.';
+  if (!b.on.some(p => p.ri === out)) return 'That player is already off the field.';
+  if (!b.bench.some(p => p.ri === inn)) return 'That player is already on the field.';
   const msg = wGF.swap(out, inn);
-  if (!msg) return 'Swaps happen between plays.';
+  if (!msg) return 'That swap can\'t be made now.';
   wGridResnap(); wGridBar(); return '';
 }
 function wGridPotion(id, ri) {
@@ -35,7 +39,9 @@ function wGridPotion(id, ri) {
   if (!wGridWorld()) return 'Potions are for real games, not practice.';
   if (!wHas(id)) return `You have no ${DB.items[id].name}. The general stores sell them.`;
   if (b.item) return 'One potion a play.';
-  if (!wGF.useItem(P.all ? null : ri, P.n, DB.items[id].name)) return 'Potions are given between plays.';
+  if (!b.between) return 'Potions are given between plays, and not after the last one.';
+  if (!P.all && !b.on.some(p => p.ri === ri)) return 'That player is not on the field.';
+  if (!wGF.useItem(P.all ? null : ri, P.n, DB.items[id].name)) return 'That potion can\'t be given now.';
   wAddItem(id, -1); wGridResnap(); wGridBar(); return '';
 }
 
@@ -54,7 +60,7 @@ function wGridBenchHTML() {
   return `<div class="wgbench"><div class="tablewrap"><table class="wgline"><caption>Your bench</caption><thead><tr><th>Player</th><th title="Stamina: on the bench they rest, ${wGF.stamRules.bench} a play">Sta</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="3" class="hint">Nobody on the bench.</td></tr>'}</tbody></table></div>
     <div class="wgpots"><b>Potions</b>${pots}${b.item ? '<small class="hint">One given this play.</small>' : ''}</div>
-    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Coaches, they make the swaps.' : ''}</p></div>`;
+    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : ['post', 'over'].includes(wGF.phase) ? 'That was the last play: no more swaps or potions.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Coaches, they make the swaps.' : ''}</p></div>`;
 }
 $('wGridLineup').insertAdjacentHTML('afterend', '<div id="wGridBench"></div>');
 $('wGridBench').addEventListener('change', e => {
@@ -73,7 +79,7 @@ wGridBar = function () {
   if (WGB.msg && (wGF.G !== WGB.G || (wGF.phase === 'call' && WGB.at !== 'call'))) WGB.msg = '';
   WGB.at = wGF.phase; WGB.G = wGF.G;
   const h = WGF ? wGridBenchHTML() : '';
-  if ($('wGridBench').dataset.html !== h) { $('wGridBench').dataset.html = h; $('wGridBench').innerHTML = h; }
+  if (WGB.html !== h) { WGB.html = h; $('wGridBench').innerHTML = h; }
 };
 
 W_GRID_HOW.push(() => `<p class="hint"><b>Tired players.</b> Under the field, with your lineup: <b>Your bench</b>. Between plays, put a bench player on for a tired one; they take every place the tired one had, on offense and on defense, and the one who comes off rests (${wGF.stamRules.bench} stamina a play) and may go back on. <b>Potions</b>: a Stamina Draught gives one player ${W_GF_POTIONS.draught.n} stamina back, and a Second Wind gives the whole seven ${W_GF_POTIONS.secondwind.n}; one a play, in a real game. The general stores sell them. Some powers give stamina back too: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth. The other side's coach swaps too, and so do yours under Coaches. Every swap, potion and power goes in the play log.</p>`);

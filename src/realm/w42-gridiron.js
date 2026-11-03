@@ -139,7 +139,7 @@ function wGridLog() {
   const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
   if (!drives.some(d => d.plays.length)) return '<li class="hint">No plays yet.</li>';
   return drives.map(d => (game && d.plays.length ? `<li class="wghead"><b>${esc(G.teams[d.side].name)}</b> · ${['', '1st half', '2nd half', 'Sudden Death'][d.half] || ''}${d.end ? ` · ${esc(W_GRID_END[d.end] || d.end)}, ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards` : ''}</li>` : '')
-    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + wGridNotesLine(wGF.notes(), ['pre', 'live'].includes(wGF.phase) ? 'This play' : 'Before the next play');
+    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + (wGF.phase === 'over' ? '' : wGridNotesLine(wGF.notes(), ['pre', 'live'].includes(wGF.phase) ? 'This play' : 'Before the next play'));
 }
 // the powers cast on a play, and the swaps, potions and stamina given back since the last one, each with its team
 function wGridNotesLine(notes, head) {
@@ -167,6 +167,7 @@ function wGridStart(kind, opts) {
   const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
   const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams(), skill = o.skill || (WGF && WGF.kind === kind && WGF.skill) || null;
   WGF = { kind, mode: o.mode, over: null, teams, skill };
+  WGRID_HOLD.clear(); wGridHold();
   wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed, skill });
   wGridChrome(kind);
   showView('gridiron');
@@ -204,8 +205,8 @@ function wGridBar() {
 // A practice drive, or a game that's over, goes at once.
 function wGridForfeit(title, go, ok) {
   if (!WGF || WGF.kind !== 'game' || WGF.over || !wGF.live) return go();
-  wGF.pause(true);
-  askConfirm(title, 'The game isn\'t over: leaving now forfeits it. Nothing is won or lost at the Ash Bowl yet, but the score is gone.', ok, () => { wGF.pause(false); go(); }, () => wGF.pause(false));
+  wGridHold('ask', true);
+  askConfirm(title, 'The game isn\'t over: leaving now forfeits it. Nothing is won or lost at the Ash Bowl yet, but the score is gone.', ok, () => { wGridHold('ask', false); go(); }, () => wGridHold('ask', false));
 }
 function wLeaveGridiron() {
   WGF = null;
@@ -242,8 +243,11 @@ wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); if 
 const wW42ShowPage = showPage;
 showPage = function (p) {
   wW42ShowPage(p);
-  if (WGF && UI.view === 'gridiron' && wGF.live) wGF.pause(p !== 'play');
+  if (WGF && UI.view === 'gridiron' && wGF.live) wGridHold('page', p !== 'play');
 };
+// why the field is held still: a question asked ('ask'), another page up ('page'); it runs when there's none
+const WGRID_HOLD = new Set();
+function wGridHold(why, on) { if (why) { if (on) WGRID_HOLD.add(why); else WGRID_HOLD.delete(why); } wGF.pause(WGRID_HOLD.size > 0); }
 const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();

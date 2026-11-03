@@ -216,11 +216,12 @@ function gfFxSrc(pw) {
 const gfZoneSum = k => (G && G.zones || []).reduce((a, z) => a + ((((GF_ULT_BY[z.id] || {}).zone || {})[k]) || 0), 0);
 const gfZoneName = k => ((G.zones || []).find(z => ((GF_ULT_BY[z.id] || {}).zone || {})[k] != null) || {}).n || '';
 // after a play: the zones count down, and the drive's end clears them; everyone tires a little
+// a zone that gives stamina back does it for every play it is on the field, the last one too (called as the play is
+// logged, so the note goes on that play's line)
+function gfZoneRest() { for (const z of (G.zones || [])) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); } }
 function gfPowersAfter() {
   if (!G.zones) return;
   gfTirePlay();
-  // a zone that gives stamina back does it for every play it was on the field, the last one too
-  for (const z of G.zones) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); }
   if (G.drive && G.drive.end) G.zones = [];
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
 }

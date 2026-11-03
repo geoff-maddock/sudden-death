@@ -1,6 +1,6 @@
 /* Cinder Gridiron: the bench, and getting tired legs back. A team may bring more than seven (04-teams.js): the seven on
    the field are the ones in its off and def maps, and the rest sit on the bench, resting (GF_STAM.bench a play).
-   - Swaps (gfSwap): between plays, a player off the bench takes a tired player's places, on offense and on defense
+   - Swaps (gfSwap): between plays (not after the last one, gfLastPlay), a player off the bench takes a tired player's places, on offense and on defense
      (and the kicks, if they were the kicker). The one who comes off rests, and may come back on later.
    - Stamina back (gfRestore): for one player or the whole seven. The Realm's potions use it (gfUseItem: one a play,
      between plays), and so do a few powers (14-powers.js: rest, restZ; gfPowRest).
@@ -24,8 +24,15 @@ function gfTired(side) { if (!G.stam) return 0; const on = gfOnField(side); retu
 function gfNote(side, k, msg) { (GD.notes = GD.notes || []).push({ side, k, msg }); }
 // a play goes in the log: the notes since the last one go with it
 function gfTakeNotes(e) { if (GD && GD.notes && GD.notes.length) { e.notes = GD.notes; GD.notes = []; } return e; }
-// can a swap or a potion happen now: between plays (not with a play or a kick under way)
-const gfBetween = () => !!GD && !['pre', 'live', 'kick', 'over'].includes(GD.ph);
+// can a swap or a potion happen now: between plays (not with a play or a kick under way, nor after the last play)
+const gfBetween = () => !!GD && !['pre', 'live', 'kick', 'over'].includes(GD.ph) && !(GD.ph === 'post' && gfLastPlay());
+// was that the last play: the drive's end in a single drive; in a game, Sudden Death's score, or the clock out after
+// the first half with the score not level (or in Sudden Death)
+function gfLastPlay() {
+  if (!GD.game) return !!G.drive.end;
+  if (G.half === 3 && ['td', 'fg', 'safety'].includes(G.drive.end)) return true;
+  return G.clock <= 0 && G.half >= 2 && (G.score[0] !== G.score[1] || G.half === 3);
+}
 
 // inn (on the bench) takes out's places, both ways; returns what happened, or '' when it can't
 function gfSwap(side, out, inn) {

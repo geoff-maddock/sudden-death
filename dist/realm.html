@@ -22363,7 +22363,7 @@ function gfStart(opts) {
   if (o.powers !== false) gfPowersStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, swapped: false };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -22380,9 +22380,10 @@ function gfCanCall(oc) {
 }
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
-  // a new call: the coaches may swap again; a play or a kick under way: a potion may be given again after it
-  if (ph === 'call') GD.swapped = false;
-  if (ph === 'pre' || ph === 'kick') GD.item = false;
+  // a new call: the coaches make their swaps first (before the save point and the page hear of it), for the CPU's
+  // side, and for yours when they call it (15-bench.js); a play, a kick or a new drive: a potion may be given again
+  if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
+  if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) GD.item = false;
   // each call is a point to save the game at (13-box.js)
   if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
@@ -22393,9 +22394,6 @@ function gfTick(dt) {
   GD.t += dt;
   if (GD.ph === 'call') {
     const mine = gfYours();
-    // the coaches make their swaps, once a call and before any kick: for the CPU's side, and for yours when they call
-    // it (15-bench.js)
-    if (!GD.swapped) { GD.swapped = true; for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]); }
     if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
@@ -22430,7 +22428,7 @@ function gfResult(r) {
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
   const pw = [GD.cast && GD.cast.off, GD.cast && GD.cast.def].filter(Boolean).map(c => ({ side: c.side, n: c.n, name: c.name, ult: c.ult }));
   if (pw.length) e.pw = pw;
-  gfTakeNotes(e);
+  gfZoneRest(); gfTakeNotes(e);
   gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
@@ -22490,6 +22488,7 @@ function gfKick() {
     GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
   }
   if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
+  gfZoneRest();
   G.drive.plays.push(gfTakeNotes({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why }));
   gfRunClock(G.drive.end, 5);
   gfPowersAfter();
@@ -23234,11 +23233,12 @@ function gfFxSrc(pw) {
 const gfZoneSum = k => (G && G.zones || []).reduce((a, z) => a + ((((GF_ULT_BY[z.id] || {}).zone || {})[k]) || 0), 0);
 const gfZoneName = k => ((G.zones || []).find(z => ((GF_ULT_BY[z.id] || {}).zone || {})[k] != null) || {}).n || '';
 // after a play: the zones count down, and the drive's end clears them; everyone tires a little
+// a zone that gives stamina back does it for every play it is on the field, the last one too (called as the play is
+// logged, so the note goes on that play's line)
+function gfZoneRest() { for (const z of (G.zones || [])) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); } }
 function gfPowersAfter() {
   if (!G.zones) return;
   gfTirePlay();
-  // a zone that gives stamina back does it for every play it was on the field, the last one too
-  for (const z of G.zones) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); }
   if (G.drive && G.drive.end) G.zones = [];
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
 }
@@ -23305,7 +23305,7 @@ function gfPowerBook() {
 }
 /* Cinder Gridiron: the bench, and getting tired legs back. A team may bring more than seven (04-teams.js): the seven on
    the field are the ones in its off and def maps, and the rest sit on the bench, resting (GF_STAM.bench a play).
-   - Swaps (gfSwap): between plays, a player off the bench takes a tired player's places, on offense and on defense
+   - Swaps (gfSwap): between plays (not after the last one, gfLastPlay), a player off the bench takes a tired player's places, on offense and on defense
      (and the kicks, if they were the kicker). The one who comes off rests, and may come back on later.
    - Stamina back (gfRestore): for one player or the whole seven. The Realm's potions use it (gfUseItem: one a play,
      between plays), and so do a few powers (14-powers.js: rest, restZ; gfPowRest).
@@ -23329,8 +23329,15 @@ function gfTired(side) { if (!G.stam) return 0; const on = gfOnField(side); retu
 function gfNote(side, k, msg) { (GD.notes = GD.notes || []).push({ side, k, msg }); }
 // a play goes in the log: the notes since the last one go with it
 function gfTakeNotes(e) { if (GD && GD.notes && GD.notes.length) { e.notes = GD.notes; GD.notes = []; } return e; }
-// can a swap or a potion happen now: between plays (not with a play or a kick under way)
-const gfBetween = () => !!GD && !['pre', 'live', 'kick', 'over'].includes(GD.ph);
+// can a swap or a potion happen now: between plays (not with a play or a kick under way, nor after the last play)
+const gfBetween = () => !!GD && !['pre', 'live', 'kick', 'over'].includes(GD.ph) && !(GD.ph === 'post' && gfLastPlay());
+// was that the last play: the drive's end in a single drive; in a game, Sudden Death's score, or the clock out after
+// the first half with the score not level (or in Sudden Death)
+function gfLastPlay() {
+  if (!GD.game) return !!G.drive.end;
+  if (G.half === 3 && ['td', 'fg', 'safety'].includes(G.drive.end)) return true;
+  return G.clock <= 0 && G.half >= 2 && (G.score[0] !== G.score[1] || G.half === 3);
+}
 
 // inn (on the bench) takes out's places, both ways; returns what happened, or '' when it can't
 function gfSwap(side, out, inn) {
@@ -23466,7 +23473,7 @@ return {
   newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES),
   start: gfStart, game: gfStartGame, simGame: gfSimGame, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
   get on() { return GFP.on; }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
-  get play() { return L; }, pause: on => { GFP.paused = !!on; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
+  get play() { return L; }, pause: on => { GFP.paused = !!on; }, get paused() { return GFP.paused; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
   // Play mode: the page's keys ({ steer, hold, pick, tap }), and what the field shows of them
   input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; }, get onPhase() { return GF_HOOK.onPhase; }, set onSnap(f) { GF_HOOK.onSnap = f; }, set wantSnap(f) { GF_HOOK.wantSnap = f; },
   // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
@@ -28068,7 +28075,7 @@ function wGridLog() {
   const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
   if (!drives.some(d => d.plays.length)) return '<li class="hint">No plays yet.</li>';
   return drives.map(d => (game && d.plays.length ? `<li class="wghead"><b>${esc(G.teams[d.side].name)}</b> · ${['', '1st half', '2nd half', 'Sudden Death'][d.half] || ''}${d.end ? ` · ${esc(W_GRID_END[d.end] || d.end)}, ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards` : ''}</li>` : '')
-    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + wGridNotesLine(wGF.notes(), ['pre', 'live'].includes(wGF.phase) ? 'This play' : 'Before the next play');
+    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + (wGF.phase === 'over' ? '' : wGridNotesLine(wGF.notes(), ['pre', 'live'].includes(wGF.phase) ? 'This play' : 'Before the next play'));
 }
 // the powers cast on a play, and the swaps, potions and stamina given back since the last one, each with its team
 function wGridNotesLine(notes, head) {
@@ -28096,6 +28103,7 @@ function wGridStart(kind, opts) {
   const o = Object.assign({ mode: (WGF && WGF.mode) || (kind === 'game' ? 'call' : 'watch') }, opts || {});
   const teams = o.teams || (WGF && WGF.kind === kind && WGF.teams) || wGridTeams(), skill = o.skill || (WGF && WGF.kind === kind && WGF.skill) || null;
   WGF = { kind, mode: o.mode, over: null, teams, skill };
+  WGRID_HOLD.clear(); wGridHold();
   wGF[kind === 'game' ? 'game' : 'start']({ teams, mode: o.mode, seed: o.seed, skill });
   wGridChrome(kind);
   showView('gridiron');
@@ -28133,8 +28141,8 @@ function wGridBar() {
 // A practice drive, or a game that's over, goes at once.
 function wGridForfeit(title, go, ok) {
   if (!WGF || WGF.kind !== 'game' || WGF.over || !wGF.live) return go();
-  wGF.pause(true);
-  askConfirm(title, 'The game isn\'t over: leaving now forfeits it. Nothing is won or lost at the Ash Bowl yet, but the score is gone.', ok, () => { wGF.pause(false); go(); }, () => wGF.pause(false));
+  wGridHold('ask', true);
+  askConfirm(title, 'The game isn\'t over: leaving now forfeits it. Nothing is won or lost at the Ash Bowl yet, but the score is gone.', ok, () => { wGridHold('ask', false); go(); }, () => wGridHold('ask', false));
 }
 function wLeaveGridiron() {
   WGF = null;
@@ -28171,8 +28179,11 @@ wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); if 
 const wW42ShowPage = showPage;
 showPage = function (p) {
   wW42ShowPage(p);
-  if (WGF && UI.view === 'gridiron' && wGF.live) wGF.pause(p !== 'play');
+  if (WGF && UI.view === 'gridiron' && wGF.live) wGridHold('page', p !== 'play');
 };
+// why the field is held still: a question asked ('ask'), another page up ('page'); it runs when there's none
+const WGRID_HOLD = new Set();
+function wGridHold(why, on) { if (why) { if (on) WGRID_HOLD.add(why); else WGRID_HOLD.delete(why); } wGF.pause(WGRID_HOLD.size > 0); }
 const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();
@@ -28467,21 +28478,27 @@ const wGridOppLvl = tier => wBallOppLvl(tier);
 function wGridOpp(club, tier) {
   const B = wGfg(), lvl = wGridOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
   const cached = club !== 'local' && B.opp[club];
+  const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
+  // the seven's kinds, then the bench's (more of the same once they run out)
+  const all = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i);
+  const kinds = all.slice(0, W_GFR.side).concat(Array.from({ length: W_GFG.bench }, (_, i) => all[(W_GFR.side + i) % all.length]));
+  const names = new Set(), mk = (kind, i) => {
+    const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
+    const p = wMakePlayer({ kind, lvl: i < W_GFR.side ? lvl : Math.max(1, lvl - 1), n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
+    names.add(p.n);
+    return wSevenPlayer(p);
+  };
   let team;
-  if (cached && cached.lvl === lvl && cached.team.roster.length > W_GFR.side) team = JSON.parse(JSON.stringify(cached.team));
-  else {
-    const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
-    // the seven's kinds, then the bench's (more of the same once they run out)
-    const all = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i);
-    const kinds = all.slice(0, W_GFR.side).concat(Array.from({ length: W_GFG.bench }, (_, i) => all[(W_GFR.side + i) % all.length]));
-    const names = new Set();
-    const roster = kinds.map((kind, i) => {
-      const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
-      const p = wMakePlayer({ kind, lvl: i < W_GFR.side ? lvl : Math.max(1, lvl - 1), n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
-      names.add(p.n);
-      return wSevenPlayer(p);
-    });
-    team = { name: C.name, short: C.short, color: C.color, light: C.light, roster };
+  if (cached && cached.lvl === lvl) {
+    team = JSON.parse(JSON.stringify(cached.team));
+    // a seven kept from before there were benches: it stays, and a bench joins it
+    if (team.roster.length <= W_GFR.side) {
+      for (const p of team.roster) names.add(p.n);
+      team.roster = team.roster.concat(kinds.slice(team.roster.length).map((kind, j) => mk(kind, team.roster.length + j)));
+      B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
+    }
+  } else {
+    team = { name: C.name, short: C.short, color: C.color, light: C.light, roster: kinds.map(mk) };
     if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
   }
   // the same ratings each time for the same club (a fixed order over the six), so a rival doesn't change between games
@@ -28499,13 +28516,16 @@ function wGridSquad(vs) {
   for (const p of out) { team.roster.push(wSevenPlayer(p)); ids.push(p.id); }
   const used = new Set(team.roster.map(p => p.n).concat(vs ? vs.roster.map(p => p.n) : []));
   for (let i = 0; team.roster.length < W_GFR.side + W_GFG.bench; i++) { team.roster.push(wSevenPlayer(wMakeCallUp(W_GFR.cuKinds[i % W_GFR.cuKinds.length], used))); ids.push(null); }
-  wGridNums(team.roster);
+  // (your own players keep their numbers unless two share one; a call-up moves)
+  wGridNums(team.roster, i => typeof ids[i] === 'number');
   return { team, ids };
 }
-// no two on a side wear the same number: the first to have it keeps it, the rest move up to a free one
-function wGridNums(roster) {
-  const seen = new Set();
-  for (const p of roster) { let n = p.num || 1; while (seen.has(n)) n = n % 99 + 1; p.num = n; seen.add(n); }
+// no two on a side wear the same number: first come those kept first (keep(i), your own players), then the rest; the
+// first to have a number keeps it, and a later one moves up to a free one (0 to 99)
+function wGridNums(roster, keep) {
+  const seen = new Set(), kept = i => !!keep && keep(i), take = p => { let n = p.num == null ? 1 : p.num; while (seen.has(n)) n = (n + 1) % 100; p.num = n; seen.add(n); };
+  roster.forEach((p, i) => { if (kept(i)) take(p); });
+  roster.forEach((p, i) => { if (!kept(i)) take(p); });
   return roster;
 }
 
@@ -28544,7 +28564,7 @@ function wResumeGrid() {
   if (!L) return;
   if (!L.snap) { wGridCallOff('The game had not reached its first play, so it is called off.'); return; }
   WGF = { kind: 'game', mode: L.snap.GD.mode, over: null, teams: L.snap.G.teams, world: true };
-  wGF.resume(L.snap);
+  wGF.resume(L.snap); WGRID_HOLD.clear(); wGridHold();
   showView('gridiron');
   wGridChrome('game');
   $('wGridTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
@@ -28572,14 +28592,14 @@ function wGridCallOff(why) {
 }
 function wGridConcede() {
   if (!wGridWorld()) return;
-  wGF.pause(true);
+  wGridHold('ask', true);
   askConfirm('Concede this game?', 'It counts as a loss. A loss on the gridiron costs nothing, but you only get a quarter of the XP.', 'Concede', () => {
     if (!wGridLive()) return;
-    wGF.pause(false);
+    wGridHold('ask', false);
     const G = wGF.G, sc = G ? G.score : [0, 0];
     wGridSettle('lose', sc[0], sc[1], wGF.box(), G ? G.half : 1);
     WGF = null; wLeaveGridiron();
-  }, () => wGF.pause(false));
+  }, () => wGridHold('ask', false));
 }
 function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
 wGF.wantSnap = () => wGridWorld();
@@ -29192,7 +29212,7 @@ renderHelp = function () {
    Wrapped: wGridBar (wW48GridBar: the bench panel), renderHelp (wW48RenderHelp: #wHelpGfBench). */
 
 // msg: why the last swap or potion didn't happen, shown until the next call or game (at, G: when it was shown)
-const WGB = { msg: '', at: null, G: null };
+const WGB = { msg: '', at: null, G: null, html: '' };
 const W_GF_POTIONS = {
   draught: { n: 40, all: false, price: 20 },
   secondwind: { n: 15, all: true, price: 45 },
@@ -29207,8 +29227,12 @@ for (const [c, it] of [['emberdeep_c6', 'draught'], ['hatchery_c6', 'secondwind'
 // a game's save point is the last call: a swap or a potion made at a call is kept in it
 function wGridResnap() { const L = wGridWorld() && WG.gfg.live; if (L && wGF.phase === 'call') L.snap = wGF.snapshot(); }
 function wGridSwap(out, inn) {
+  const b = wGF.bench(); if (!b) return '';
+  if (!b.between) return 'Swaps happen between plays.';
+  if (!b.on.some(p => p.ri === out)) return 'That player is already off the field.';
+  if (!b.bench.some(p => p.ri === inn)) return 'That player is already on the field.';
   const msg = wGF.swap(out, inn);
-  if (!msg) return 'Swaps happen between plays.';
+  if (!msg) return 'That swap can\'t be made now.';
   wGridResnap(); wGridBar(); return '';
 }
 function wGridPotion(id, ri) {
@@ -29217,7 +29241,9 @@ function wGridPotion(id, ri) {
   if (!wGridWorld()) return 'Potions are for real games, not practice.';
   if (!wHas(id)) return `You have no ${DB.items[id].name}. The general stores sell them.`;
   if (b.item) return 'One potion a play.';
-  if (!wGF.useItem(P.all ? null : ri, P.n, DB.items[id].name)) return 'Potions are given between plays.';
+  if (!b.between) return 'Potions are given between plays, and not after the last one.';
+  if (!P.all && !b.on.some(p => p.ri === ri)) return 'That player is not on the field.';
+  if (!wGF.useItem(P.all ? null : ri, P.n, DB.items[id].name)) return 'That potion can\'t be given now.';
   wAddItem(id, -1); wGridResnap(); wGridBar(); return '';
 }
 
@@ -29236,7 +29262,7 @@ function wGridBenchHTML() {
   return `<div class="wgbench"><div class="tablewrap"><table class="wgline"><caption>Your bench</caption><thead><tr><th>Player</th><th title="Stamina: on the bench they rest, ${wGF.stamRules.bench} a play">Sta</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="3" class="hint">Nobody on the bench.</td></tr>'}</tbody></table></div>
     <div class="wgpots"><b>Potions</b>${pots}${b.item ? '<small class="hint">One given this play.</small>' : ''}</div>
-    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Coaches, they make the swaps.' : ''}</p></div>`;
+    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : ['post', 'over'].includes(wGF.phase) ? 'That was the last play: no more swaps or potions.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Coaches, they make the swaps.' : ''}</p></div>`;
 }
 $('wGridLineup').insertAdjacentHTML('afterend', '<div id="wGridBench"></div>');
 $('wGridBench').addEventListener('change', e => {
@@ -29255,7 +29281,7 @@ wGridBar = function () {
   if (WGB.msg && (wGF.G !== WGB.G || (wGF.phase === 'call' && WGB.at !== 'call'))) WGB.msg = '';
   WGB.at = wGF.phase; WGB.G = wGF.G;
   const h = WGF ? wGridBenchHTML() : '';
-  if ($('wGridBench').dataset.html !== h) { $('wGridBench').dataset.html = h; $('wGridBench').innerHTML = h; }
+  if (WGB.html !== h) { WGB.html = h; $('wGridBench').innerHTML = h; }
 };
 
 W_GRID_HOW.push(() => `<p class="hint"><b>Tired players.</b> Under the field, with your lineup: <b>Your bench</b>. Between plays, put a bench player on for a tired one; they take every place the tired one had, on offense and on defense, and the one who comes off rests (${wGF.stamRules.bench} stamina a play) and may go back on. <b>Potions</b>: a Stamina Draught gives one player ${W_GF_POTIONS.draught.n} stamina back, and a Second Wind gives the whole seven ${W_GF_POTIONS.secondwind.n}; one a play, in a real game. The general stores sell them. Some powers give stamina back too: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth. The other side's coach swaps too, and so do yours under Coaches. Every swap, potion and power goes in the play log.</p>`);

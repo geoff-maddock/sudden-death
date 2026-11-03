@@ -50,6 +50,10 @@ async def main():
         nums = await pg.evaluate("""(() => { const out = []; for (let i = 0; i < 20; i++) { const o = wGridOpp(pick(['local', ...Object.keys(CLUBS)]), 1 + i % 3), s = wGridSquad(o);
           for (const t of [o, s.team]) out.push(new Set(t.roster.map(p => p.num)).size === t.roster.length); } return out.every(Boolean); })()""")
         check(nums, 'no two players on a side wear the same number')
+        kept = await pg.evaluate("""(() => { const club = Object.keys(CLUBS)[0], B = wGfg(); B.opp = {};
+          const full = wGridOpp(club, 2), seven = JSON.parse(JSON.stringify(B.opp[club])); seven.team.roster = seven.team.roster.slice(0, 7); B.opp[club] = seven;
+          const again = wGridOpp(club, 2); return { n: again.roster.length, same: again.roster.slice(0, 7).map(p => p.n).join() === full.roster.slice(0, 7).map(p => p.n).join(), cached: B.opp[club].team.roster.length }; })()""")
+        check(kept['n'] == 10 and kept['same'] and kept['cached'] == 10, "a rival's seven saved before benches keeps its players, and gains a bench", kept)
 
         # ---------- a game: swaps ----------
         await pg.evaluate("wStartGrid({ club: 'local', how: 'manage' })")
@@ -87,10 +91,12 @@ async def main():
         check(rest1 > rest0, 'the bench rests', [rest0, rest1])
 
         # ---------- one potion between two plays, in the pause after a play and at the call both ----------
-        await pg.evaluate("WG.items.draught = 2; WG.items.secondwind = 2")
-        one = await pg.evaluate("""new Promise(res => { const out = {}; const t = setInterval(() => {
+        await pg.evaluate("WG.items.draught = 9; WG.items.secondwind = 9")
+        # (a kickoff or the half between the two starts it over: a new drive may have a potion of its own)
+        one = await pg.evaluate("""new Promise(res => { let out = {}; const t = setInterval(() => {
           const ph = wGF.phase;
-          if (!('post' in out) && ph === 'post') out.post = wGridPotion('draught', wGF.bench().on[0].ri);
+          if ('post' in out && !('call' in out) && (ph === 'kickoff' || ph === 'half')) out = {};
+          if (!('post' in out) && ph === 'post' && wGF.bench().between) out.post = wGridPotion('draught', wGF.bench().on[0].ri);
           else if ('post' in out && !('call' in out) && ph === 'call') { wGF.pause(true); out.call = wGridPotion('secondwind', null); out.msg = WGB.msg; wGF.pause(false); }
           else if ('call' in out && !('next' in out) && ph === 'post') { out.next = wGridPotion('secondwind', null); out.cleared = WGB.msg; }
           if ('next' in out) { clearInterval(t); res(out); }
@@ -98,7 +104,8 @@ async def main():
         check(one['post'] == '' and one['call'] == 'One potion a play.', 'a potion in the pause after a play, and none again at the call before the next one', one)
         check(one['next'] == '', 'after that play, one more may be given', one)
         await pg.wait_for_function("wGF.phase === 'call'", timeout=60000)
-        await pg.wait_for_timeout(100)
+        try: await pg.wait_for_function("WGB.msg === ''", timeout=5000)
+        except Exception: pass
         check(await pg.evaluate("WGB.msg") == '' and 'One potion a play' not in await pg.evaluate("document.getElementById('wGridBench').textContent"),
               'the refusal under the bench is gone by the next call')
 
@@ -136,6 +143,18 @@ async def main():
           if (wGF.yourBall) wGF.call(Object.keys(wGF.plays)[0]); else wGF.call(Object.keys(wGF.defs)[0]);
         }, 50); })""")
         check(cast and any(n['k'] == 'rest' and 'Hex' in n['msg'] for n in cast['notes']), 'the witch\'s Hex gives the seven stamina back, and it is in the notes', cast and cast['notes'])
+
+        # ---------- a stale swap says what's wrong; nothing after the last play ----------
+        stale = await pg.evaluate("""new Promise(res => { const t = setInterval(() => { if (wGF.phase !== 'call' && wGF.phase !== 'post') return; clearInterval(t);
+          const b = wGF.bench(); res({ off: wGridSwap(b.bench[0].ri, b.bench[1].ri), on: wGridSwap(b.on[0].ri, b.on[1].ri) }); }, 20); })""")
+        check(stale['off'] == 'That player is already off the field.' and stale['on'] == 'That player is already on the field.', 'a swap with a player who has moved says so', stale)
+        await pg.evaluate("WG.items.secondwind = 1; (() => { const G = wGF.G; G.half = 2; G.clock = 1; G.score = [28, 0]; })(); wGF.setMode('watch')")
+        last = await pg.evaluate("""new Promise(res => { const t = setInterval(() => { if (wGF.phase !== 'post' || wGF.G.clock > 0) return; clearInterval(t);
+          res({ msg: wGridPotion('secondwind', null), left: WG.items.secondwind, between: wGF.bench().between }); }, 10); })""")
+        check(last['msg'] == 'Potions are given between plays, and not after the last one.' and last['left'] == 1 and not last['between'],
+              'after the last play of the game, no potion is given, and none is lost', last)
+        await pg.wait_for_function("wGF.phase === 'over'", timeout=60000)
+        await pg.evaluate(CLOSE_ALL)
 
         # ---------- the coaches swap ----------
         cpu = await pg.evaluate("""(() => { const teams = [wGridSquad().team, wGridOpp('local', 1)]; let swaps = [0, 0], played = [0, 0];
