@@ -797,7 +797,16 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 .wwxhud.wwx-fog{color:#c4ccd2}
 
 /* w42: the gridiron's panel under the field */
-.wgp{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:10px 20px;max-width:960px;margin:10px auto 0}
+/* the page widens on the gridiron, as far as the field (the page's full width, 8:5) and the bar above it still fit in
+   the window, so the field is as big as the screen allows */
+body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 210px) * 1.6)))}
+.wgp{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:10px 20px;margin:10px auto 0}
+.wgstats{width:100%;border-collapse:collapse;font-family:var(--hud);font-size:15px;margin-bottom:10px}
+.wgstats th{font-weight:400;color:var(--dim);text-align:right;padding:2px 6px}
+.wgstats th:first-child,.wgstats td:first-child{text-align:left;color:var(--dim)}
+.wgstats td{text-align:right;padding:2px 6px;border-top:1px solid var(--seam)}
+.wgstats td small{color:var(--dim)}
+.wgstats i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
 .wgp h4{margin:0 0 6px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
 .wgp details{grid-column:1/-1;border-top:1px solid var(--seam);padding-top:6px}
 .wgp summary{cursor:pointer;font-family:var(--hud);font-size:17px;color:var(--torch)}
@@ -836,15 +845,16 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 #wGridCalls .wgtired,#wGridDefs .wgtired{background-image:linear-gradient(#d0604a,#d0604a)}
 #wGridCalls [data-fresh]:not([data-fresh=""])::after,#wGridDefs [data-fresh]:not([data-fresh=""])::after{content:" · " attr(data-fresh);font-size:.8em;opacity:.8}
 /* w45: powers on the gridiron bar, and the tip box */
-.wgpows{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
+.wgpows{display:flex;align-items:center;gap:6px;flex-basis:100%}
+.wgpows>*{flex:none}
 .wgpows #wGridMana{font-family:var(--hud);font-weight:400;color:#a88cff;letter-spacing:1px;white-space:nowrap}
-.wgpows #wGridPowList{display:flex;flex-wrap:wrap;gap:6px}
+.wgpows #wGridPowList{display:flex;flex-wrap:wrap;gap:6px;flex:0 1 auto;min-width:0}
 .wgpows button{padding:3px 8px}
 .wgpows button small{color:var(--dim);font-size:.8em}
 .wgpows button.on{background:#a88cff;color:#1a120c;border-color:#a88cff}
 .wgpows button.on small{color:#2a1a3a}
 .wgpows button.wgult{border-color:rgba(168,140,255,.6)}
-.wgtip{flex-basis:100%;font-size:14px;line-height:1.35;border-left:3px solid #a88cff;padding:2px 0 2px 8px;min-height:6.4em}
+.wgtip{flex-basis:100%;font-size:14px;line-height:1.35;border-left:3px solid #a88cff;padding:2px 0 2px 8px;min-height:4.1em}
 .wgpows button{font-size:15px}
 .wgtip ul{margin:2px 0 0;padding-left:18px}
 .wgtip .wgpro{color:#9fd8a2}
@@ -22405,6 +22415,8 @@ function gfResult(r) {
   gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
+  // what it came to, for the banner on the field (09-draw.js)
+  GD.big = r.what === 'int' ? { k: 'int', sub: 'by ' + r.by } : null;
   if (r.what === 'int') {
     G.ball = clamp(G.ball + r.x, 1, 99); gfTurnover(); G.drive.end = 'int';
     GD.msg = `Intercepted by ${r.by}.`; e.msg = GD.msg; e.why = GD.why; gfRunClock(r.what, L ? L.t : 5); gfPowersAfter(); return;
@@ -22419,6 +22431,8 @@ function gfResult(r) {
   if (s === 'safety') { GD.msg = `Safety: ${r.who} is tackled in the end zone.`; G.drive.end = 'safety'; gfScoredOn(off); }
   if (s === 'turnover') { GD.msg += ' Turnover on downs.'; G.drive.end = 'downs'; }
   if (s === 'td') { G.drive.end = 'td'; GD.msg += gfExtraPoint(); gfScoredOn(1 - off); }
+  const big = s === 'td' ? 'td' : s === 'safety' ? 'safety' : s === 'turnover' ? 'downs' : r.what === 'sack' ? 'sack' : s === 'first' ? 'first' : r.gain >= 15 ? 'long' : null;
+  GD.big = big && { k: big, gain: r.gain, sub: big === 'td' ? `${r.who}, ${yd(r.gain)}` : big === 'sack' ? 'by ' + r.by : big === 'first' && r.gain >= 10 ? `${r.who}, +${r.gain}` : '' };
   e.msg = GD.msg; e.why = GD.why;
   gfRunClock(r.what, L ? L.t : 5);
   gfPowersAfter();
@@ -22446,14 +22460,14 @@ function gfKick() {
     const M = GD.meter, gust = M && gfZoneSum('kick') < 0 && R() < -gfZoneSum('kick'), r = gfFieldGoal(M ? gfMeterFg(k) && !gust : gfKickGood(k));
     if (r === 'fg') gfScoredOn(1 - off);
     gfBoxAdd(off, G.teams[off].kicker, 'fga'); if (r === 'fg') gfBoxAdd(off, G.teams[off].kicker, 'fgm');
-    G.drive.end = r; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
+    G.drive.end = r; GD.big = { k: r === 'fg' ? 'fg' : 'miss', sub: `${dist} yards` }; GD.msg = r === 'fg' ? `${k.n} kicks it from ${dist} yards. Good: 3 points.` : `${k.n} misses from ${dist} yards.`;
     GD.why = M ? `Power ${Math.round(M.pw * 100)}% (${dist} yards needs ${Math.ceil(dist / gfFgReach(k) * 100)}%), and the aim ${Math.abs(M.aim) <= gfFgWindow(k) ? 'true' : (M.aim < 0 ? 'wide left' : 'wide right')}.`
       : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
     if (gfZoneSum('kick') < 0) GD.why += ` The ${gfZoneName('kick')} pushes the ball${gust ? ' wide' : ''}.`;
   } else {
     const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt'))); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
-    G.drive.end = 'punt'; GD.msg = `${k.n} punts, ${y} yards.`;
+    G.drive.end = 'punt'; GD.big = null; GD.msg = `${k.n} punts, ${y} yards.`;
     GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
   }
   if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
@@ -22477,9 +22491,13 @@ function gfSim(opts) {
    Between plays each player's position is under them, and GFT.hl ({ side, pos }, set by the page) rings one.
    Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
    something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
+   The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run that gets to the goal line, and the
+   moment after a touchdown or an interception, the camera zooms in on the ball (GFT.zoom) and a word says why; the
+   score bar and the keys stay put. After a play a banner on the grass says what it came to (GD.big, from gfResult).
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
-const GFT = { t: 0, hl: null };
+const GFT = { t: 0, hl: null, zoom: 1, fx: 480, fy: 345, hold: 0, why: '', last: 0 };
+const GF_ZOOM = 1.65;
 const GF_PX = 19, GF_PY = 8.2, GF_MIDY = 345, GF_ASH = Array.from({ length: 260 }, (_, i) => [((i * 37.7) % 125) - 12, ((i * 23.3) % 53) - 26.5, (i % 5) * .25 + .6]);
 const gfAbs = (x, y) => G.poss === 0 ? [G.ball + x, y] : [GF_RULES.field - G.ball - x, -y];
 const gfScr = (ax, ay, z = 0) => ({ x: 480 + (ax - GD.cam) * GF_PX, y: GF_MIDY + ay * GF_PY - z * 9 });
@@ -22491,12 +22509,65 @@ function gfDraw(c) {
   // the camera: on the ball in a play, a little ahead of the line otherwise
   const want = L && (GD.ph === 'live' || GD.ph === 'post') ? gfAbs(L.ball.x, 0)[0] + gfDir() * 4 : gfAbs(6, 0)[0];
   GD.cam = lerp(GD.cam, clamp(want, 18, 82), .08);
+  // the zoom: in on the ball for a big play, the ball drawn toward the middle as it closes in
+  const ex = gfExcite(), b = gfBallScr();
+  if (ex) { GFT.hold = GFT.t + 1.1; GFT.why = ex; }
+  const on = GFT.t < GFT.hold && (GD.ph === 'live' || GD.ph === 'post');
+  if (!on) GFT.why = '';
+  // eased by the time since the last frame, so it moves at the same speed at any frame rate
+  const f = Math.min(.2, Math.max(0, GFT.t - GFT.last)) * 60, ease = r => 1 - Math.pow(1 - r, f); GFT.last = GFT.t;
+  GFT.zoom = lerp(GFT.zoom, on ? GF_ZOOM : 1, ease(on ? .06 : .05));
+  GFT.fx = lerp(GFT.fx, b.x, ease(.25)); GFT.fy = lerp(GFT.fy, b.y, ease(.25));
+  const k = clamp((GFT.zoom - 1) / (GF_ZOOM - 1), 0, 1);
+  c.fillStyle = '#070605'; c.fillRect(0, 0, 960, 600);
+  c.save();
+  if (GFT.zoom > 1.005) { c.translate(lerp(GFT.fx, 480, k), lerp(GFT.fy, 350, k)); c.scale(GFT.zoom, GFT.zoom); c.translate(-GFT.fx, -GFT.fy); }
   gfDrawField(c);
   gfDrawZones(c);
   gfDrawPlayers(c);
   gfDrawHands(c);
+  c.restore();
+  gfDrawZoneNames(c);
+  gfDrawBig(c);
   gfDrawHud(c);
+  gfDrawHint(c);
   gfDrawMeter(c);
+}
+// where the ball is on the screen, unzoomed
+function gfBallScr() {
+  if (L && (GD.ph === 'live' || GD.ph === 'post')) { const [x, y] = gfAbs(L.ball.x, L.ball.y); return gfScr(x, y); }
+  return gfScr(gfAbs(0, 0)[0], 0);
+}
+// is this a big play, and what kind: '' when it isn't
+function gfExcite() {
+  if (!L || !GD) return '';
+  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GD.t < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
+  if (GD.ph !== 'live' || L.done) return '';
+  const B = L.ball;
+  if (B.st === 'air' && B.T > 1.05 && B.bt > .25) return 'Deep ball!';
+  const e = L.ev[L.ev.length - 1];
+  if (e && e.k === 'broken' && L.t - e.t < .8) return 'Broken tackle!';
+  if (B.st !== 'held' || L.carrier < 0) return '';
+  const p = L.pl[L.carrier]; if (!p || p.side !== 0) return '';
+  if (p.x > 3 && L.toGoal - p.x < 3) return 'At the goal line!';
+  if (p.x < 7) return '';
+  let near = 99; for (const d of L.pl) if (d.side === 1 && !(d.stun > 0)) near = Math.min(near, hyp(d.x - p.x, d.y - p.y));
+  return near > 4 ? 'Breakaway!' : '';
+}
+// after a play, what it came to, in big letters on the grass
+const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: [B => `+${B.gain} YARDS`, '#bfe8a8'] };
+function gfDrawBig(c) {
+  // on for the beat after the play, fading out as it ends
+  const B = GD.big, a = GD.t, end = Math.min(2.4, GD.mode !== 'watch' ? GF_PACE.postCall : GF_PACE.post);
+  if (!B || GD.ph !== 'post' || a > end || !GF_BIG[B.k]) return;
+  const [word, col] = GF_BIG[B.k], text = typeof word === 'function' ? word(B) : word;
+  const al = Math.min(1, a * 5, (end - a) * 2.5), sc = 1 + Math.max(0, .25 - a) * 1.6;
+  c.save(); c.globalAlpha = al; c.translate(480, 488); c.scale(sc, sc);
+  c.font = '900 54px "Alegreya Sans", system-ui, sans-serif'; c.textAlign = 'center';
+  c.lineWidth = 8; c.strokeStyle = 'rgba(12,10,9,.85)'; c.lineJoin = 'round'; c.strokeText(text, 0, 0);
+  c.fillStyle = col; c.fillText(text, 0, 0);
+  if (B.sub) { c.font = '700 20px "Alegreya Sans", system-ui, sans-serif'; c.lineWidth = 5; c.strokeText(B.sub, 0, 30); c.fillStyle = '#f3ead6'; c.fillText(B.sub, 0, 30); }
+  c.restore();
 }
 function gfDrawField(c) {
   // the stands: black basalt, warm at the top from the lava beyond
@@ -22549,9 +22620,11 @@ function gfDrawZones(c) {
     c.globalAlpha = .16 + .05 * Math.sin(GFT.t * 2 + k); c.fillStyle = col;
     c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
     c.globalAlpha = 1;
-    txt(c, `${z.n} · ${z.left} play${z.left === 1 ? '' : 's'}`, 16 + k * 220, 556, '700 13px "Alegreya Sans", system-ui, sans-serif', tint(col, .35), 'left');
   });
   c.restore();
+}
+function gfDrawZoneNames(c) {
+  (G.zones || []).forEach((z, k) => { const u = GF_ULT_BY[z.id]; if (u) txt(c, `${z.n} · ${z.left} play${z.left === 1 ? '' : 's'}`, 16 + k * 220, 556, '700 13px "Alegreya Sans", system-ui, sans-serif', tint(u.vis[0], .35), 'left'); });
 }
 function gfDrawPlayers(c) {
   const list = [];
@@ -22574,6 +22647,7 @@ function gfDrawPlayers(c) {
     if (o.i === carrier) { c.strokeStyle = 'rgba(255,181,71,.9)'; c.lineWidth = 2; c.beginPath(); c.ellipse(o.x, o.y, 15, 5.5, 0, 0, Math.PI * 2); c.stroke(); }
     const throwK = L && GD.ph === 'live' && p.pos === 'QB' && p.side === 0 && GF_PLAYS[L.oc].kind === 'pass' ? clamp((L.t - GF_PLAYS[L.oc].throwAt + .35) / .35, 0, 1) : null;
     drawFig(c, p.kind, o.x, o.y, 44, T, { num: p.num, run: o.mv ? GFT.t * 16 + o.i : 0, flip, throwK: throwK != null && throwK < 1 ? throwK : null, alpha: p.stun > 0 ? .6 : undefined });
+    if (o.i === carrier && p.n) txt(c, `${p.n} #${p.num}`, o.x, o.y - 50, '800 13px "Alegreya Sans", system-ui, sans-serif', '#ffd08a', 'center');
     if (!L || GD.ph !== 'live' && GD.ph !== 'post') txt(c, p.pos, o.x, o.y + 14, '700 11px "Alegreya Sans", system-ui, sans-serif', hl ? '#7fd4ff' : p.side ? '#ffc9b8' : '#fff3d6', 'center');
   }
   if (!L || GD.ph !== 'live' && GD.ph !== 'post') return gfDrawBall(c, gfScr(gfAbs(0, 0)[0], 0), 0);
@@ -22604,7 +22678,7 @@ function gfDrawHud(c) {
   // at the snap, the powers each side cast
   const cast = (GD.ph === 'pre' || GD.ph === 'live') && GD.cast ? [GD.cast.off, GD.cast.def].filter(Boolean).map(x => `${x.ult ? '★ ' : ''}${x.name} (${x.n})`) : [];
   const h = 58 + why.length * 18 + (why.length && GD.ph === 'over' ? 14 : 0) + (cast.length ? 20 : 0);
-  c.fillStyle = 'rgba(12,10,9,.86)'; c.fillRect(0, 0, 960, h); c.fillStyle = 'rgba(255,150,40,.5)'; c.fillRect(0, h, 960, 1.5);
+  c.fillStyle = 'rgba(12,10,9,.93)'; c.fillRect(0, 0, 960, h); c.fillStyle = 'rgba(255,150,40,.5)'; c.fillRect(0, h, 960, 1.5);
   G.teams.forEach((t, s) => {
     const x = s ? 940 : 20, al = s ? 'right' : 'left';
     c.fillStyle = t.color; c.fillRect(s ? 946 : 8, 10, 6, 38);
@@ -22631,7 +22705,7 @@ function gfDrawHud(c) {
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
   if (cast.length) txt(c, 'Powers: ' + cast.join('  ·  '), 480, 72, F(14, 700), '#d6c4ff', 'center');
   // a broken tackle, a shed block, the catch: the play's last moment, briefly
-  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (e && L.t - e.t < .9 && (e.k === 'broken' || e.k === 'catch')) txt(c, e.k === 'broken' ? 'Broken tackle!' : 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
+  if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (GFT.why && GFT.why !== 'Touchdown!' && GFT.why !== 'Picked off!') txt(c, GFT.why, 480, 104, F(24, 900), '#ffd08a', 'center'); else if (e && L.t - e.t < .9 && e.k === 'catch') txt(c, 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
   // a power doing its work, a little longer
   if (L && GD.ph === 'live') { const e = L.ev.slice().reverse().find(x => x.k === 'pow' && x.s && L.t - x.t < 1.3); if (e) txt(c, e.s + '!', 480, 120, F(19, 800), '#d6c4ff', 'center'); }
   c.restore();
@@ -22653,7 +22727,11 @@ function gfDrawHands(c) {
     hint = 'Hold Space to lead your receiver, let go to throw  ·  Q / E: another receiver  ·  WASD: scramble';
   } else if (L.carrier >= 0) hint = `WASD: steer${L.armUsed ? '' : '  ·  Space: stiff-arm (once a play)'}`;
   else hint = 'The ball is in the air';
-  c.save(); c.fillStyle = 'rgba(12,10,9,.78)'; c.fillRect(0, 572, 960, 28); txt(c, hint, 480, 591, F, '#d8f0ff', 'center'); c.restore();
+  GFT.hint = hint;
+}
+function gfDrawHint(c) {
+  if (!L || !L.hands || GD.ph !== 'live' || L.done || !GFT.hint) return;
+  c.save(); c.fillStyle = 'rgba(12,10,9,.78)'; c.fillRect(0, 572, 960, 28); txt(c, GFT.hint, 480, 591, '700 13px "Alegreya Sans", system-ui, sans-serif', '#d8f0ff', 'center'); c.restore();
 }
 // your kick: a power bar, then an aim bar
 function gfDrawMeter(c) {
@@ -22723,7 +22801,7 @@ function gfKickoff() {
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
 }
-function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; GD.pow = null; if (G.zones) G.zones = []; gfPowersDrive(); }
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; GD.pow = null; GD.big = null; if (G.zones) G.zones = []; gfPowersDrive(); }
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
@@ -23194,19 +23272,27 @@ function gfPowerBook() {
 }
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
-   engine's parts don't touch the page; this file is the only one that does. */
-const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1 };
+   engine's parts don't touch the page; this file is the only one that does. The canvas fills the width of the page (the
+   page widens on the gridiron, see w6.css) but no taller than the window has room for under the game's bar (#wGridBar;
+   the page scrolls the bar to the top, w42), so the bar and the whole field are in view; never smaller than 960 wide. It draws at the size it is shown, so it stays sharp. */
+const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, mw: 0 };
 (() => {
   const h = document.createElement('div'); h.id = 'v-gridiron'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
-  cv.style.cssText = 'display:block;width:100%;max-width:960px;margin:0 auto;aspect-ratio:960/600;background:#0b0907;border-radius:6px';
+  cv.style.cssText = 'display:block;width:100%;margin:0 auto;aspect-ratio:960/600;background:#0b0907;border-radius:6px';
   h.appendChild(cv);
   (document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
   Object.assign(GFP, { host: h, cv, c: cv.getContext('2d') });
 })();
 function gfRender() {
-  const d = Math.min(2, window.devicePixelRatio || 1);
-  if (d !== GFP.dpr || GFP.cv.width !== 960 * d) { GFP.dpr = d; GFP.cv.width = 960 * d; GFP.cv.height = 600 * d; }
+  // as wide as fits in the window under the game's bar, down to the old 960
+  const bar = document.getElementById('wGridBar'), top = GFP.cv.getBoundingClientRect().top - (bar ? bar.getBoundingClientRect().top : -scrollY);
+  const mw = Math.max(960, Math.floor((innerHeight - top - 12) * 1.6));
+  if (mw !== GFP.mw) { GFP.mw = mw; GFP.cv.style.maxWidth = mw + 'px'; }
+  // device pixels per canvas pixel: the shown width times the screen's density, from 1x up to 2.5x (more costs a lot
+  // to fill each frame and doesn't look any sharper)
+  const d = Math.ceil(clamp((GFP.cv.clientWidth || 960) / 960 * (window.devicePixelRatio || 1), 1, 2.5) * 8) / 8;
+  if (d !== GFP.dpr || GFP.cv.width !== Math.round(960 * d)) { GFP.dpr = d; GFP.cv.width = Math.round(960 * d); GFP.cv.height = Math.round(600 * d); }
   const c = GFP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); gfDraw(c); c.restore();
 }
 function gfFrame(now) {
@@ -23270,6 +23356,8 @@ return {
     players: Object.entries(G.teams[s][m]).map(([pos, i]) => Object.assign({ pos }, G.teams[s].roster[i], { r: gfRated(s, i), base: Object.assign({}, G.teams[s].roster[i].r), stam: G.stam ? Math.round(G.stam[s][i]) : 100 })),
     kicker: G.teams[s].roster[G.teams[s].kicker].n })) : [],
   get isGame() { return !!GD && GD.game; }, get yourBall() { return !!GD && G.poss === GD.you; }, clock: () => G && GD && GD.game ? { half: G.half, text: gfClockText(), name: GF_HALF_NAME[G.half] } : null,
+  // the camera and the banner: how far in it has zoomed (1 is the whole width), the big play it zoomed for, the last result's banner
+  view: () => ({ zoom: GFT.zoom, why: GFT.why, big: GD && GD.big ? Object.assign({}, GD.big) : null, px: GFP.dpr }),
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
@@ -27762,7 +27850,7 @@ $('wGridBar').addEventListener('click', e => {
 // under the field: who is on it, the drive so far, and how it works
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
-  <section><h4 id="wGridLogH">This drive</h4><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
+  <section><h4 id="wGridLogH">This drive</h4><table id="wGridStats" class="wgstats"></table><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
   <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
@@ -27799,7 +27887,7 @@ function wGridHowHTML() {
   ${li('Field goal', 'Kick it through the posts for 3 points. The button shows the distance and the chance; the longest try is about 62 yards.')}</ul>
   <p class="hint"><b>Plays tire.</b> Calling a play tires it, and it recovers while you call others; the half freshens everything. A tired play is one they see coming: the defense jumps it and wins more blocks. The bar along the foot of each button is how fresh it is. Their coach also watches what you call and leans to what beats it, so mixing it up pays twice. Their calls tire too: a defense they keep calling is easier to beat.</p>
   <p class="hint"><b>The defenses.</b> In a game you pick one of these when they have the ball.</p><ul class="wghow">${Object.values(wGF.defs).map(d => li(d.n, d.desc)).join('')}</ul>
-  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, and <b>This drive</b> keeps every play.</p>
+  <p class="hint"><b>Reading the field.</b> The blue line is the line of scrimmage; the orange line is the line to gain. The ring is around whoever has the ball, with their name over them. On a big play (a breakaway, a deep ball, a broken tackle, a run at the goal line, a touchdown or an interception) the camera zooms in on the ball and says why. A spark between two players is a block: white while the blocker holds, red when the defender is winning. Between plays, each player's position is under them; hover a player in <b>On the field</b> to find them. After each play the bar says what happened and why, a banner on the grass calls a first down, a long gain, a sack or a score, and <b>This drive</b> keeps every play, under each side's yards, passing, running, sacks and interceptions so far and their leaders.</p>
   <p class="hint"><b>The ratings</b> (higher is better; your own players' run to 12): ${Object.values(W_GRID_STAT).map(([a, b]) => `<b>${a}</b> ${esc(b.replace(/:.*/, '').toLowerCase())}`).join(', ')}. The best arm throws, the strongest block, and the fastest cover.</p>`;
 }
 function wGridLineup() {
@@ -27812,6 +27900,30 @@ function wGridLineup() {
     ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
+// a side's total of one stat in a box score, and its yards from scrimmage (passing and running); the panel and the
+// game's settle (w44) both count yards this way
+const wGridSum = (box, s, k) => box.filter(b => b.side === s).reduce((n, b) => n + (b.line[k] || 0), 0);
+const wGridYards = (box, s) => wGridSum(box, s, 'py') + wGridSum(box, s, 'ry');
+// the team stats so far, side by side, and each side's leaders, from the box score
+function wGridStats() {
+  const G = wGF.G, box = wGF.box(); if (!G || !box.length) return '';
+  const sum = (s, k) => wGridSum(box, s, k);
+  const top = (s, k) => box.filter(b => b.side === s && b.line[k] > 0).sort((a, b) => b.line[k] - a.line[k])[0];
+  if (![0, 1].some(s => sum(s, 'pa') + sum(s, 'ra') + sum(s, 'fga'))) return '';
+  const rows = [
+    ['Total yards', s => wGridYards(box, s)],
+    ['Passing', s => `${sum(s, 'pc')}/${sum(s, 'pa')} <small>for</small> ${sum(s, 'py')}`],
+    ['Running', s => `${sum(s, 'ra')} <small>for</small> ${sum(s, 'ry')}`],
+    ['Sacks made', s => sum(s, 'sk')],
+    ['Interceptions', s => sum(s, 'ints')],
+    ['Field goals', s => `${sum(s, 'fgm')}/${sum(s, 'fga')}`],
+  ];
+  const lead = s => [['py', 'passing', 'yd'], ['ry', 'running', 'yd'], ['recy', 'catching', 'yd'], ['tkl', 'tackles', '']]
+    .map(([k, w, u]) => { const b = top(s, k); return b ? `${esc(b.n)} ${b.line[k]}${u ? ' ' + u : ''} <small>${w}</small>` : ''; }).filter(Boolean).join(', ');
+  const name = s => `<i style="background:${esc(G.teams[s].color)}"></i>${esc(G.teams[s].short || G.teams[s].name)}`;
+  return `<thead><tr><th></th><th>${name(0)}</th><th>${name(1)}</th></tr></thead><tbody>${rows.map(([l, f]) => `<tr><td>${l}</td><td>${f(0)}</td><td>${f(1)}</td></tr>`).join('')}
+    ${[0, 1].map(s => lead(s) ? `<tr><td>Leaders</td><td colspan="2" style="text-align:left">${name(s)}: ${lead(s)}</td></tr>` : '').join('')}</tbody>`;
+}
 function wGridLog() {
   const G = wGF.G; if (!G || !G.drive) return '';
   const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
@@ -27867,6 +27979,7 @@ function wGridBar() {
     : yours ? `Your call: pick a play, or kick.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
     : WGF.mode === 'play' && off ? 'You play it: Space to throw (hold to lead) or stiff-arm, WASD to run, Q and E for another receiver.' : call ? (WGF.kind === 'game' ? 'You call your side\'s plays, on offense and on defense.' : 'You call the offense; the coaches call the defense.') : 'The coaches call both sides.';
   $('wGridLineup').innerHTML = wGridLineup();
+  $('wGridStats').innerHTML = wGridStats();
   $('wGridLog').innerHTML = wGridLog();
   $('wGridLog').scrollTop = $('wGridLog').scrollHeight;
 }
@@ -27889,7 +28002,10 @@ const wW42ShowView = showView;
 showView = function (v) {
   wW42ShowView(v);
   $('wGridBar').hidden = v !== 'gridiron';
-  if (v === 'gridiron') $('runbar').hidden = true;
+  document.body.classList.toggle('wgwide', v === 'gridiron');
+  if (v === 'gridiron') { $('runbar').hidden = true;
+    // the game fills the window: the bar at the top, the field under it (the field is sized to fit, g1-page.js)
+    requestAnimationFrame(() => scrollTo({ top: Math.max(0, $('wGridBar').getBoundingClientRect().top + scrollY - 6) })); }
 };
 const wW42OpenPause = openPause;
 openPause = function () { if (UI.view === 'gridiron') return; return wW42OpenPause.apply(this, arguments); };
@@ -28332,7 +28448,7 @@ function wGridSettle(r, us, them, box, half) {
   B.games.length = Math.min(B.games.length, W_GFG.keep);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
   // (and each side's yards from scrimmage: a knockout settles a tie on them)
-  W.us = us; W.them = them; W.yards = [0, 1].map(s => box.filter(b => b.side === s).reduce((a, b) => a + (b.line.py || 0) + (b.line.ry || 0), 0));
+  W.us = us; W.them = them; W.yards = [0, 1].map(s => wGridYards(box, s));
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   // the clock after the game's own end: a fixture played late on the eve of a round counts in its round, not as postponed
   wAdvance(W_GFG.minutes);
