@@ -382,3 +382,27 @@ Tier 1 changes nothing (no bonus), so its spread from 45% to 51% is the noise. C
 | cup final, won | 16% (68 played) | 22% (72 played) |
 
 All inside the noise. After the review's fixes (the Archmage casts restoring powers only when they fit, and swaps before kicks too), one more run of 150 a gap and 150 cups: tier 1 53%, tier 2 40%, tier 3 20%, cups won 4.7%. Still inside the noise.
+
+## Football stances (issue #29)
+
+Each side of the ball plays Safe, Balanced or Risky (`GF_STANCE` in `src/gf/parts/16-stance.js`), and fumbles are new. Balanced is how every play ran before, so a game where both sides play Balanced matches the old one. The coaches pick a stance each down (Risky when behind late or on a long third down, Safe when ahead late or backed up), so the Simulate rows shift a little.
+
+**The Realm lab against the bench run** (150 a gap, 250 a tier, 150 cups): tier 1 53% → 56% and 54% (two runs), tier 2 40% → 39% and 36%, tier 3 20% → 22% and 18%, cups won 4.7% → 6.7% and 6.7%. All inside the noise.
+
+**Fumbles** (the coaches picking): about 0.4 lost a game between the two sides, against the issue's one every two or three games for Balanced; about 1.3 a game when both play Risky, and almost none on Safe. One fumble in a few hundred is run back for a touchdown.
+
+**Whole games with a stance forced on one side** (the Ash Bowl's home side against the visitors, both Knights; 200 to 250 games a row; the home side wins about 43% with both on Balanced, ±3%). Tuned over seven rounds. Risky's first numbers (quarterback holding 30% longer, blockers releasing 25% sooner) gave five to seven sacks a game and no more big plays, and Safe beat it about two games in three. Interceptions are rare in the engine (about one in ten games), so a multiplier on them alone changed nothing; a Risky defense now also reaches further for the ball (`jump`, more break-ups and picks).
+
+| Home side's stance (the visitors') | Win | Turnovers lost a game | Sacked | Stamina at the end |
+|---|---|---|---|---|
+| Balanced (Balanced) | 42–47% | 0.2 | 1.3 | 48 |
+| Risky (Balanced) | 48–50% | 0.4 | 1.9 | 36 |
+| Safe (Balanced) | 37% | 0.05 | 0.6 | 63 |
+| Risky (Safe) | 32% | 0.2 | 1.4 | 38 |
+| Safe (Risky) | 49% | 0.2 | 0.9 | 60 |
+
+It comes out a mild rock, paper, scissors: Risky edges Balanced, Safe edges Risky, Balanced edges Safe, each by 5 to 8 points. Both on Risky, the box changes most: about 30 points a game against 22, 2 turnovers against none on Safe, and 6 sacks against fewer than 1.
+
+**Your stance, every down, in the Realm lab** (even level, tier 2, both Knights, 150 each): Safe 47%, Balanced 40%, Risky 50%; turnovers lost 0.06, 0.19 and 0.38 a game; sacked 1.0, 2.0 and 3.1; stamina at the end 70, 65 and 59 (the coaches swap tired players, so it stays closer than in the table above).
+
+**Not met yet:** big plays. Over 2,400 seeded downs (`test/realm_gridiron_stance.py`), Risky on offense makes a few more plays of 20+ yards than Safe (276 against 271), and a Risky defense gives up more than a Safe one (254 against 231). In whole games with Realm squads the three stances make about the same number (2.7 to 2.8 a game). Risky's extra yards come mostly from broken tackles and yards after the catch, not from the deep ball: both receivers run the same depth on each call, so looking deeper (`deepW`) rarely changes who gets the ball.

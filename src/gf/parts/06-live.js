@@ -12,7 +12,7 @@
    - Speed counts, but less than its rating spread suggests (6.4 to 7.8 yards a second): a side fast everywhere
      otherwise won nearly every game, whatever the calls (phase 2 measured it).
    - The carrier runs for the goal line and away from tacklers. The play ends at a tackle, a sack, an incompletion, an
-     interception (no returns yet), out of bounds or a touchdown.
+     interception (no returns yet), a fumble (16-stance.js), out of bounds or a touchdown.
    L is the play, plain JSON (players by index, no references): { oc, dc, t, pl, id, did, ball, carrier, thrown,
    handed, done, broken }. Positions are yards from the line of scrimmage (x, downfield) and the middle (y). */
 // GF_READ: how long after the throw a defender breaks on the ball; GF_REACH: how far a defender dives to tackle
@@ -30,7 +30,7 @@ function gfSpeed(p) {
 }
 
 // st: how stale each call is (12-playbook.js): { read: the defense knows the play, tell: the offense knows the defense },
-// and pw: the powers cast with the calls ({ off, def }, 14-powers.js). A worn player plays on worn ratings (gfWorn)
+// pw: the powers cast with the calls ({ off, def }, 14-powers.js), and stc: the stances ({ off, def }, 16-stance.js). A worn player plays on worn ratings (gfWorn)
 function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
@@ -58,12 +58,13 @@ function gfSnap(oc, dc, st) {
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
     read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
-  gfSnapFx(st && st.pw);
+  gfSnapFx(st && st.pw, st && st.stc);
   return L;
 }
-// the powers on this play: their effects (L.fx), who gave each (L.src, for the reason), and what happens at the snap
-function gfSnapFx(pw) {
-  L.pw = pw || null; L.fx = gfFx(pw); L.src = gfFxSrc(pw); L.breakLeft = L.fx.breakN; L.gotT = -1;
+// the powers on this play: their effects (L.fx), who gave each (L.src, for the reason), and what happens at the snap;
+// the stances' effects go on top (stc: { off, def }, 16-stance.js)
+function gfSnapFx(pw, stc) {
+  L.pw = pw || null; L.stc = stc || null; L.fx = gfStanceFx(gfFx(pw), stc, L.hands); L.src = gfFxSrc(pw); L.breakLeft = L.fx.breakN; L.gotT = -1;
   const F = L.fx, say = (k, s) => gfEv('pow', L.src[k] || '', `${L.src[k]}: ${s}`);
   const def = L.pl.filter(p => p.side === 1), off = L.pl.filter(p => p.side === 0);
   if (F.snapAll) { for (const d of def) d.stun = Math.max(d.stun, F.snapAll); say('snapAll', 'every defender staggered at the snap.'); }
@@ -156,10 +157,11 @@ function gfAim(p) {
   // the man defenders read the run in under half a second, and the deep zone a beat later
   if (c && (L.carrier !== L.id.QB || c.x > 0) && (!L.handed || p.job === 'rush' || L.t > (p.job === 'zone' ? .9 : .45))) return lead(c);
   if (p.job === 'rush') return lead(qb);
-  if (p.job === 'man') { const m = L.pl[p.mark]; return [m.x + .8, m.y, 3.2]; }
+  if (p.job === 'man') { const m = L.pl[p.mark]; return [m.x + .8 + (L.fx ? L.fx.cush : 0) * .4, m.y, 3.2]; }
   if (p.job === 'zone') {
     const [r, rd] = gfNearest(p.spot[0], p.spot[1], L.pl.filter(q => q.side === 0 && q.job === 'route'));
-    return r && rd < 7 ? [Math.max(r.x + 1.5, p.spot[0] - 3), lerp(p.spot[1], r.y, .7), 3.5] : p.spot;
+    const cu = L.fx ? L.fx.cush : 0;
+    return r && rd < 7 ? [Math.max(r.x + 1.5 + cu * .4, p.spot[0] - 3 + cu), lerp(p.spot[1], r.y, .7), 3.5] : [p.spot[0] + cu, p.spot[1]];
   }
   return null;
 }
@@ -202,9 +204,14 @@ function gfQB() {
     return;
   }
   if (L.thrown || L.carrier !== L.id.QB || L.hands) return;
-  const [, press] = gfNearest(qb.x, qb.y, gfFree());
-  // under pressure the quarterback tries to get it out early, but doesn't always see the rusher in time
-  if (L.t >= P.throwAt || (press < 1.8 && L.t > .55 && (P.hot || R() < GF_DT * 5))) gfThrow(press < 1.8 && L.t < P.throwAt && !P.hot);
+  const [, press] = gfNearest(qb.x, qb.y, gfFree()), F = L.fx || GF_FX0, at = P.throwAt * F.qbT;
+  // Safe: under pressure, the quarterback may throw it away rather than take the sack (once a play)
+  if (F.away && press < 1.8 && L.t > .55 && !P.hot && !L.awayTried) {
+    L.awayTried = true;
+    if (R() < F.away) { L.thrown = true; L.carrier = -1; Object.assign(L.ball, { st: 'dead', h: -1 }); gfEv('away', qb.n); gfDead('inc', 'thrown away'); return; }
+  }
+  // under pressure the quarterback tries to get it out early, but doesn't always see the rusher in time (Risky holds on longer)
+  if (L.t >= at || (press < 1.8 && L.t > .55 && (P.hot || R() < GF_DT * 5 / F.qbT))) gfThrow(press < 1.8 && L.t < at && !P.hot);
 }
 function gfThrow(hurry) {
   const P = GF_PLAYS[L.oc], qb = L.pl[L.id.QB], free = L.pl.filter(p => p.side === 1 && p.stun <= 0);
@@ -212,7 +219,7 @@ function gfThrow(hurry) {
   L.pl.forEach((p, i) => {
     if (p.side !== 0 || p.job !== 'route') return;
     const [, sep] = gfNearest(p.x, p.y, free);
-    const s = Math.min(sep, 8) + p.x * (L.oc === 'deep' ? .08 : .02) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
+    const s = Math.min(sep, 8) + p.x * Math.max(-.02, (L.oc === 'deep' ? .08 : .02) + (L.fx ? L.fx.deepW : 0)) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
     if (s > bs) { bs = s; best = i; }
   });
   const rc = L.pl[best], v = gfThrowV(15 + qb.r.arm * 1.3);
@@ -238,7 +245,7 @@ function gfBall(dt) {
   const [d, dd] = gfNearest(B.tx, B.ty, L.pl.filter(p => p.side === 1 && p.stun <= 0));
   if (Math.abs(B.ty) > GF_HALF || dr > 1.7) { B.st = 'dead'; return gfDead('inc', dr > 1.7 ? 'overthrown' : 'out of bounds'); }
   const F = L.fx || GF_FX0, sure = F.sure > 0;
-  if (d && dd < 1.4 && dd < dr && !sure) {
+  if (d && dd < 1.4 + F.jump && dd < dr + F.jump && !sure) {
     if (R() < (.03 + d.r.hnd * .006) * F.int) { B.st = 'dead'; return gfDead('int', d.n, d.x, L.pl.indexOf(d)); }
     if (R() < .5) { B.st = 'dead'; return gfDead('inc', 'broken up by ' + d.n); }
   }
@@ -296,7 +303,8 @@ function gfTackles() {
     if (L.breakLeft > 0 && dd <= 1.2) { L.breakLeft--; d.stun = .7; L.broken++; gfEv('broken', c.n); gfEv('pow', L.src.breakN, `${L.src.breakN}: ${c.n} went straight through ${d.n}.`); continue; }
     // a defender alongside can dive for the carrier, but the further the dive the likelier the miss
     const pt = clamp(.78 + (d.r.tkl - c.r.str - F.cStr) * .05 - (c.r.spd - d.r.spd) * .015 + (sack ? .1 : 0) - Math.max(0, dd - 1) * .35 + F.tkl, F.tkl || F.cStr ? .12 : .2, F.tkl || F.cStr ? .97 : .93);
-    if (R() < pt) return gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
+    // a tackle that holds may knock the ball loose (16-stance.js; not on a sack)
+    if (R() < pt) return !sack && gfFumbleRoll(c, d) ? gfFumble(c, d) : gfDead(sack ? 'sack' : 'tackle', d.n, null, L.pl.indexOf(d));
     // a missed dive only costs the diver a moment; a tackle shrugged off up close is a broken tackle
     if (dd > 1) { d.stun = .3; continue; }
     d.stun = .55; c.slow = .25; L.broken++; gfEv('broken', c.n);

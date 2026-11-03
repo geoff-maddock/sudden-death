@@ -120,7 +120,7 @@ function wStartGrid(o) {
   B.live = { world, snap: null };
   if (how === 'sim') {
     const g = wGF.simGame({ teams: [mine, opp], skill: wGridSkill(tier) });
-    const msg = wGridSettle(wGridResult(g.score), g.score[0], g.score[1], g.box, g.half);
+    const msg = wGridSettle(wGridResult(g.score), g.score[0], g.score[1], g.box, g.half, g.stance && g.stance[0]);
     wGridResultCard(msg);
     return '';
   }
@@ -190,7 +190,7 @@ wGF.onSnap = sn => {
 wGF.onOver = s => {
   if (!WGF) return;
   WGF.over = s;
-  if (WGF.world && wGridLive()) { const G = wGF.G; WGF.msg = wGridSettle(wGridResult(G.score), G.score[0], G.score[1], wGF.box(), G.half); }
+  if (WGF.world && wGridLive()) { const G = wGF.G; WGF.msg = wGridSettle(wGridResult(G.score), G.score[0], G.score[1], wGF.box(), G.half, wGF.stanceMost(0)); }
   wGridBar();
   const f = WGF.world ? $('wGridBack') : $('wGridAgain'); if (f) f.focus();
 };

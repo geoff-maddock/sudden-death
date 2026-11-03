@@ -30,10 +30,14 @@ const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
 // (field goal chance), punt (yards). At the snap: snapStun (rushers down), snapAll (every defender), blkStun (every
 // blocker), coverSlow, safetySlow, gas (Plague Cloud). With the ball: pounce (yards a tackler leaps), cStun and cStunP
 // (frozen, and the chance), cSlow. At the throw: freezeNear (the defender nearest the target), tgtSlow (the target).
+// The stances (16-stance.js): qbT (how long the quarterback waits), away (the chance to throw it away under pressure),
+// deepW (how much the quarterback looks deep), fum (the fumble chance), cush (yards of cushion the coverage gives),
+// jump (yards further a defender can get to a throw: more break-ups and picks).
 const GF_FX0 = { oSpd: 1, dSpd: 1, cSpd: 1, rSpd: 1, rushSpd: 1, coverSpd: 1, backSpd: 1, midSpd: 1, deepSpd: 1, shed: 1, int: 1, errM: 1, ballV: 1,
   blk: 0, dStr: 0, tkl: 0, cStr: 0, breakN: 0, untag: 0, nolose: 0, read: 0, errA: 0, catch: 0, sure: 0, kick: 0, punt: 0,
-  snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0 };
-const GF_FX_MUL = new Set(['oSpd', 'dSpd', 'cSpd', 'rSpd', 'rushSpd', 'coverSpd', 'backSpd', 'midSpd', 'deepSpd', 'shed', 'int', 'errM', 'ballV']);
+  snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0,
+  qbT: 1, away: 0, deepW: 0, fum: 1, cush: 0, jump: 0 };
+const GF_FX_MUL = new Set(['oSpd', 'dSpd', 'cSpd', 'rSpd', 'rushSpd', 'coverSpd', 'backSpd', 'midSpd', 'deepSpd', 'shed', 'int', 'errM', 'ballV', 'qbT', 'fum']);
 // everyday powers by kind: [offense, defense]. fits: the call it helps ('run', 'pass' or 'any')
 const GF_POW = {
   goblin: [{ id: 'shadowstep', n: 'Shadowstep', cost: 1, fits: 'run', desc: 'The ball carrier blinks past the first tackle.', fx: { breakN: 1 } },
@@ -115,8 +119,8 @@ function gfWorn(side, ri, r) {
 function gfRated(side, ri) { const r = gfWorn(side, ri, G.teams[side].roster[ri].r); return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)])); }
 // the half gives a lot back; every play costs everyone a little (the undead and golems tire at half the rate)
 function gfRest(n) { if (G.stam) for (const s of G.stam) for (let i = 0; i < s.length; i++) s[i] = Math.min(100, s[i] + n); }
-// (the bench rests instead)
-function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
+// (the bench rests instead; the stance sets how hard the seven go, 16-stance.js)
+function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * gfStanceStam(t) * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
 const gfStamCost = (cost, ult) => ult ? GF_STAM.ult : GF_STAM.base + GF_STAM.per * cost;
 const gfRole = side => side === G.poss ? 'off' : 'def';
 /* the powers a side can cast now (with the call): each of its players' everyday power for the side of the ball they

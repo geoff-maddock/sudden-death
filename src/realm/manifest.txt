@@ -75,3 +75,4 @@ src/realm/w45-gfpowers.js
 src/realm/w46-gfcup.js
 src/realm/w47-gffeel.js
 src/realm/w48-gfbench.js
+src/realm/w49-gfstance.js

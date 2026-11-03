@@ -26,11 +26,12 @@ function gfRunClock(what, t) {
 }
 function gfClockText() { const s = Math.max(0, Math.ceil(G.clock)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 // after a touchdown, the extra point
-function gfExtraPoint() {
+// (side: who scored; by default the side that just gave the ball up, as after a touchdown it has)
+function gfExtraPoint(side) {
   if (!GD.game) return '';
-  const k = G.teams[1 - G.poss].roster[G.teams[1 - G.poss].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
-  if (good) G.score[1 - G.poss]++;
-  gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpa'); if (good) gfBoxAdd(1 - G.poss, G.teams[1 - G.poss].kicker, 'xpm');
+  const s = side != null ? side : 1 - G.poss, k = G.teams[s].roster[G.teams[s].kicker], good = R() < clamp(GF_GAME.pat + (k.r.kck - 5) * .01, .5, .99);
+  if (good) G.score[s]++;
+  gfBoxAdd(s, G.teams[s].kicker, 'xpa'); if (good) gfBoxAdd(s, G.teams[s].kicker, 'xpm');
   return good ? ' Extra point good.' : ' The extra point is no good.';
 }
 // side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
@@ -45,7 +46,7 @@ function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: 
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
-  const d = G.drive, scored = ['td', 'fg', 'safety'].includes(d.end);
+  const d = G.drive, scored = ['td', 'fg', 'safety', 'fumtd'].includes(d.end);
   G.drives.push(d);
   // Sudden Death: the first score wins
   if (G.half === 3 && scored) return false;
@@ -55,8 +56,9 @@ function gfGameNext() {
     G.half = 3; G.clock = GF_GAME.ot; gfPowersHalf(); GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
   }
   // after a score the other side receives: the side that scored kicks off, and after a safety the side scored on
-  // (the drive's offense either way); otherwise the ball has already changed hands
-  if (scored) { gfKickoffTo(1 - d.side); return true; }
+  // (the drive's offense either way), and after a fumble run back for a touchdown the defense kicks to the drive's
+  // offense; otherwise the ball has already changed hands
+  if (scored) { gfKickoffTo(d.end === 'fumtd' ? d.side : 1 - d.side); return true; }
   gfNewDrive(); gfGo('call'); return true;
 }
 function gfScoreLine() { return G.teams.map((t, s) => `${t.name} ${G.score[s]}`).join(', '); }
@@ -67,7 +69,7 @@ function gfFinalLine() {
 function gfGameSummary() {
   const all = G.drives.flatMap(d => d.plays);
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), drives: G.drives.length, plays: all.length, half: G.half,
-    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}) };
+    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}), stance: [gfStanceMost(0), gfStanceMost(1)] };
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 // (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)

@@ -45,7 +45,7 @@ python3 test/clubs.py ironmaw,frostfang 60    # per-club win rates
 python3 test/realm_smoke.py                   # one realm check (realm_*.py; all of them are in ./test/all.sh)
 python3 test/realm_lab.py 140 '{}'            # Realm balance: champion rate, where runs end, per-match cost (docs/realm/BALANCE.md)
 python3 test/realm_diamond_lab.py 120          # Realm baseball balance: win rate by level gap and tier, Diamond Cups (Simulate)
-python3 test/realm_gridiron_lab.py 120         # Realm football balance: win rate by level gap, tier and CPU skill, powers on and off, Cinder Cups
+python3 test/realm_gridiron_lab.py 120         # Realm football balance: win rate by level gap, tier and CPU skill, powers on and off, stances, Cinder Cups
 ```
 
 Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screenshots go to `/tmp/`.

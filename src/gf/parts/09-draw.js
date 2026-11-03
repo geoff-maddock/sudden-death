@@ -7,7 +7,7 @@
    Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
    something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
    The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run that gets to the goal line, and the
-   moment after a touchdown or an interception, the camera zooms in on the ball (GFT.zoom) and a word says why; the
+   moment after a touchdown, an interception or a fumble, the camera zooms in on the ball (GFT.zoom) and a word says why; the
    score bar and the keys stay put. After a play a banner on the grass says what it came to (GD.big, from gfResult).
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
@@ -56,7 +56,7 @@ function gfBallScr() {
 // is this a big play, and what kind: '' when it isn't
 function gfExcite() {
   if (!L || !GD) return '';
-  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GD.t < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
+  if (GD.ph === 'post') return GD.big && GD.t < 2 ? ({ td: 'Touchdown!', int: 'Picked off!', fum: 'Fumble!', fumtd: 'Fumble!' })[GD.big.k] || '' : '';
   if (GD.ph !== 'live' || L.done) return '';
   const B = L.ball;
   if (B.st === 'air' && B.T > 1.05 && B.bt > .25) return 'Deep ball!';
@@ -70,7 +70,7 @@ function gfExcite() {
   return near > 4 ? 'Breakaway!' : '';
 }
 // after a play, what it came to, in big letters on the grass
-const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: [B => `+${B.gain} YARDS`, '#bfe8a8'] };
+const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], fum: ['FUMBLE', '#ff8a6a'], fumtd: ['FUMBLE: TOUCHDOWN', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: [B => `+${B.gain} YARDS`, '#bfe8a8'] };
 function gfDrawBig(c) {
   // on for the beat after the play, fading out as it ends
   const B = GD.big, a = GD.t, end = Math.min(2.4, GD.mode !== 'watch' ? GF_PACE.postCall : GF_PACE.post);
@@ -208,7 +208,9 @@ function gfDrawHud(c) {
   });
   let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   if (GD.ph === 'call') sub = GD.mode !== 'call' ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
-  if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}  vs  ${GF_DEFS[GD.dc].n}`;
+  // (with each side's stance when it isn't Balanced, 16-stance.js)
+  const stn = k => GD.stc && GD.stc[k] && GD.stc[k] !== 'bal' ? ` (${GF_STANCE[GD.stc[k]].n})` : '';
+  if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}${stn('off')}  vs  ${GF_DEFS[GD.dc].n}${stn('def')}`;
   if (GD.game) mid += `  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`;
   if (GD.ph === 'call' && GD.mode === 'call' && G.poss !== GD.you) sub = 'Your call: pick a defense';
   if (GD.ph === 'kick') sub = (GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt') + (GD.meter ? ': tap Space twice, for power and aim' : '');

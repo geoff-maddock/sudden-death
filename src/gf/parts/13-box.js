@@ -1,8 +1,8 @@
 /* Cinder Gridiron: box scores, and a game to save and come back to (issue #9, phase 5).
    The box: every play adds to the lines of the players in it, by side and roster index (G.box = [[line], [line]]).
    A line counts passing (pa attempts, pc completions, py yards, ptd touchdowns, pint interceptions thrown, sacked),
-   running (ra carries, ry yards), catching (rec, recy), touchdowns scored (td), defense (tkl tackles, sk sacks, ints
-   interceptions) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
+   running (ra carries, ry yards), catching (rec, recy), touchdowns scored (td), fumbles (fum, and fuml lost), defense
+   (tkl tackles, sk sacks, ints interceptions, ff fumbles forced, fr recovered) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
    The snapshot: between plays, at each call, the game is G and GD as plain JSON, and GF_HOOK.onSnap hears it. A saved
    game comes back on the field at that call (gfResume): the play that was running is played again. */
 function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); G.played = [0, 1].map(gfOnField); }
@@ -18,7 +18,12 @@ function gfBoxPlay(off, r) {
     else if (caught) { gfBoxAdd(off, qb, 'pc'); gfBoxAdd(off, qb, 'py', r.gain); gfBoxAdd(off, car, 'rec'); gfBoxAdd(off, car, 'recy', r.gain); if (td) { gfBoxAdd(off, qb, 'ptd'); gfBoxAdd(off, car, 'td'); } }
   } else if (r.what === 'sack') { gfBoxAdd(off, qb, 'sacked'); gfBoxAdd(def, by, 'sk'); }
   else if (car >= 0) { gfBoxAdd(off, car, 'ra'); gfBoxAdd(off, car, 'ry', r.gain); if (td) gfBoxAdd(off, car, 'td'); }
-  if ((r.what === 'tackle' || r.what === 'sack') && by >= 0) gfBoxAdd(def, by, 'tkl');
+  if ((r.what === 'tackle' || r.what === 'sack' || r.what === 'fum') && by >= 0) gfBoxAdd(def, by, 'tkl');
+  // a fumble: the carrier's, the tackler's (forced), and who fell on it (a recovery; a return for a touchdown is counted in gfResult)
+  if (r.what === 'fum') {
+    gfBoxAdd(off, car, 'fum'); gfBoxAdd(def, by, 'ff');
+    if (r.lost) { gfBoxAdd(off, car, 'fuml'); gfBoxAdd(def, ri(r.reci), 'fr'); }
+  }
 }
 // the box as lines with names: [{ side, ri, n, kind, line, played }] (played: they took the field, at kick-off or off the bench)
 function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line), played: !G.played || G.played[s].includes(ri) }))) : []; }

@@ -38,8 +38,8 @@ async def main():
             if (!s.log.length || s.log.some(p => !p.what)) bad++; }
           const a = wGF.sim({ seed: 42 }), b = wGF.sim({ seed: 42 });
           return { ends, plays: plays / 300, bad, ms: (performance.now() - t0) / 302, same: JSON.stringify(a) === JSON.stringify(b) }; })()""")
-        known = {'td', 'fg', 'miss', 'punt', 'downs', 'int', 'safety'}
-        check(set(d['ends']) <= known and not d['bad'], 'every drive ends in a touchdown, a kick, a punt, a turnover or a safety, and logs every play', d)
+        known = {'td', 'fg', 'miss', 'punt', 'downs', 'int', 'fum', 'fumtd', 'safety'}
+        check(set(d['ends']) <= known and not d['bad'], 'every drive ends in a touchdown, a kick, a punt, a turnover (on downs, an interception or a fumble) or a safety, and logs every play', d)
         td = d['ends'].get('td', 0) / 300
         check(.1 <= td <= .4 and d['ends'].get('punt', 0) / 300 <= .7 and 3 <= d['plays'] <= 12, 'drives play like football: 10% to 40% end in a touchdown, at most 70% in a punt, 3 to 12 plays', d)
         check(d['same'] and d['ms'] < 50, 'a seeded drive plays the same twice, and a headless drive takes well under 50 ms', d)

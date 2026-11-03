@@ -3,8 +3,8 @@
 
    Sound. Sudden Death's own effects (sfx), following your Sound effects setting: a whistle at each kickoff (as the ball comes
    down; the game's first is set up before the field shows) and at the half, and at the end of each play a thud for a tackle, a crunch for a sack, a slap for an incompletion, the crowd
-   for a big gain, a horn and the crowd for a touchdown or a field goal, and a groan when the ball is lost or the
-   other side scores. The realm's music plays on, as it does at any ground.
+   for a big gain, a horn and the crowd for a touchdown or a field goal, and a groan when the ball is lost (an interception
+   or a fumble) or the other side scores. The realm's music plays on, as it does at any ground.
    Tips. TIPS.w_grid once your team can play football (W_GFG.minOwn players), TIPS.w_gcup once you have won a
    football game, from a watcher like w20f's.
    Achievements. Football games won (realmGridWins) and Cinder Cups (realmGcups), on SD's ACH.
@@ -29,7 +29,8 @@ function wGridSound(ph) {
   if (prev === 'kickoff') { sfx.whistle(); return; }
   if (prev === 'kick') return;
   const r = wGF.play && wGF.play.done; if (!r) return;
-  if (r.what === 'int') { sfx.bad(); return; }
+  if (r.what === 'int' || (r.what === 'fum' && r.lost)) { sfx.bad(); return; }
+  if (r.what === 'fum') { sfx.crunch(); return; }
   if (r.what === 'sack') { sfx.crunch(); return; }
   if (r.what === 'inc') { sfx.block(); return; }
   if (r.what === 'tackle' || r.what === 'out') { if (r.gain >= 10) sfx.crowd(.9); else sfx.hit(.3); }
@@ -54,7 +55,7 @@ ACH.push(
 );
 const wW47GridSettle = wGridSettle;
 wGridSettle = function (r, us, them, box, half) {
-  const m = wW47GridSettle(r, us, them, box, half);
+  const m = wW47GridSettle.apply(this, arguments);
   if (!LAB && r === 'win') achAdd('realmGridWins', 1);
   return m;
 };
