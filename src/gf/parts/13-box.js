@@ -5,7 +5,7 @@
    interceptions) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
    The snapshot: between plays, at each call, the game is G and GD as plain JSON, and GF_HOOK.onSnap hears it. A saved
    game comes back on the field at that call (gfResume): the play that was running is played again. */
-function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); }
+function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); G.played = [0, 1].map(gfOnField); }
 function gfBoxAdd(side, ri, k, n) { if (!G.box || ri == null || ri < 0 || !G.box[side][ri]) return; const b = G.box[side][ri]; b[k] = (b[k] || 0) + (n == null ? 1 : n); }
 // a play is over: off had the ball; r is the play's end (L.done)
 function gfBoxPlay(off, r) {
@@ -20,8 +20,8 @@ function gfBoxPlay(off, r) {
   else if (car >= 0) { gfBoxAdd(off, car, 'ra'); gfBoxAdd(off, car, 'ry', r.gain); if (td) gfBoxAdd(off, car, 'td'); }
   if ((r.what === 'tackle' || r.what === 'sack') && by >= 0) gfBoxAdd(def, by, 'tkl');
 }
-// the box as lines with names: [{ side, ri, n, kind, line }]
-function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line) }))) : []; }
+// the box as lines with names: [{ side, ri, n, kind, line, played }] (played: they took the field, at kick-off or off the bench)
+function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line), played: !G.played || G.played[s].includes(ri) }))) : []; }
 function gfSnapshot() {
   const D = Object.assign({}, GD, { ph: 'call', t: 0, pick: null, meter: null, stale: null, kick: null, acc: 0 });
   return JSON.parse(JSON.stringify({ G, GD: D }));

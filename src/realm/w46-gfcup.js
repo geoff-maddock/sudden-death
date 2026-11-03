@@ -183,7 +183,7 @@ W_ON_END.gfix = function (r, ref, W) {
   const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
   const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
   if (tie) { wLog(`A tie in the league at the Ash Bowl: no points for either side.`, 'd'); return; }
-  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r); }
+  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) { wH2hRecord(club, r); wH2h()[club].last = { r: r === 'win' ? 'win' : 'lose', us: W.us, them: W.them, sport: 'football', day: WG.dayAbs }; } }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
   const res = r === 'win' ? { a: 'me', b: club, sa: W.us, sb: W.them } : { a: club, b: 'me', sa: W.them, sb: W.us };
   L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'football', g: ref.g }));

@@ -5,7 +5,9 @@
    the other two catch; on defense the three strongest rush, the two fastest cover the receivers, and the other two are
    the linebacker and the safety. A team: { name, short, color, light, roster: [{ n, kind, num, r }], off, def, kicker },
    where off and def map each position to a roster index. A team sent with its own off and def (the Realm's lineup,
-   phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12. */
+   phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12.
+   A roster may be longer than seven: the first seven start (unless off and def say otherwise), and the rest, up to
+   GF_RULES.bench, sit on the bench to come on for a tired player (15-bench.js). */
 const GF_OFF_POS = ['QB', 'RB', 'C', 'LG', 'RG', 'X', 'Z'], GF_DEF_POS = ['DT', 'DL', 'DR', 'CL', 'CR', 'LB', 'S'];
 // a position map that names every position once, each to a different player in the roster
 const gfMapOk = (m, pos, n) => !!m && pos.every(k => Number.isInteger(m[k]) && m[k] >= 0 && m[k] < n) && new Set(pos.map(k => m[k])).size === pos.length;
@@ -27,17 +29,17 @@ const GF_CLUBS = {
 };
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
 function gfTeam(t) {
-  const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side)
+  const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side + GF_RULES.bench)
     .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
-  const free = new Set(roster.map((_, i) => i)), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
+  const starters = roster.slice(0, GF_RULES.side).map((_, i) => i), free = new Set(starters), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
   T.off = {}; T.off.QB = by(r => r.arm * 2 + r.hnd * .3, 1)[0]; T.off.RB = by(r => r.spd + r.str * .8, 1)[0];
   [T.off.C, T.off.LG, T.off.RG] = by(r => r.str * 2 - r.spd * .2, 3); [T.off.X, T.off.Z] = [...free];
-  roster.forEach((_, i) => free.add(i));
+  starters.forEach(i => free.add(i));
   T.def = {}; [T.def.DT, T.def.DL, T.def.DR] = by(r => r.str * 2 + r.tkl, 3); [T.def.CL, T.def.CR] = by(r => r.spd * 2 + r.hnd * .4, 2);
   T.def.LB = by(r => r.tkl * 2 + r.spd, 1)[0]; T.def.S = [...free][0];
   if (gfMapOk(t.off, GF_OFF_POS, roster.length)) T.off = Object.assign({}, t.off);
   if (gfMapOk(t.def, GF_DEF_POS, roster.length)) T.def = Object.assign({}, t.def);
-  T.kicker = Number.isInteger(t.kicker) && roster[t.kicker] ? t.kicker : roster.reduce((b, p, i) => p.r.kck > roster[b].r.kck ? i : b, 0);
+  T.kicker = Number.isInteger(t.kicker) && roster[t.kicker] ? t.kicker : starters.reduce((b, i) => roster[i].r.kck > roster[b].r.kck ? i : b, 0);
   return T;
 }

@@ -150,7 +150,7 @@ function wSevenAuto() { WG.seven = null; wSevenSync(); return wSevenDone(); }
 function wSevenPractice() {
   const home = wGridTeams()[0];
   if (WCAMP.close) WCAMP.close();
-  wGridironGame({ mode: 'call', teams: [wSevenTeam(), home] });
+  wGridironGame({ mode: 'call', teams: [wGridSquad().team, home] });
 }
 
 /* ---------- the Football block on a player's stats ---------- */

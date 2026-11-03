@@ -6,7 +6,7 @@
    A field goal is kicked from 7 yards behind the line, so its distance is the yards to the goal line plus 17.
    G is the game, plain JSON (so a snapshot can be saved): { poss, ball, down, togo, score, plays }; 08-drive.js adds
    teams and the drive. */
-const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, td: 6, fg: 3, safety: 2, start: 25 };
+const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, bench: 5, td: 6, fg: 3, safety: 2, start: 25 };
 let G = null;
 
 function gfNewGame(opts) {

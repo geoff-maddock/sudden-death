@@ -129,7 +129,7 @@ function wNoticeMet(c, M) {
   return false;
 }
 function wNoticeFacts(W) {
-  const g = (RUN.games || [])[RUN.games.length - 1] || {}, ref = W.ref || {};
+  const g = (RUN.games || []).slice(-1)[0] || {}, ref = W.ref || {};
   return { region: W.region, sport: g.sport, night: !!W.night, us: +g.us || 0, them: +g.them || 0, won: !!g.won, type: g.type,
     club: ref.club || ref.rival || null, g: W.kind === 'ground' ? ref.g : null };
 }

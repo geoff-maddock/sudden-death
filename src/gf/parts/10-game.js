@@ -36,7 +36,7 @@ function gfExtraPoint() {
 // side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
 function gfKickoffTo(side) { G.poss = side; GD.kickoff = side; gfGo('kickoff'); }
 function gfKickoff() {
-  const side = GD.kickoff, T = G.teams[side], ret = T.roster.reduce((b, p) => p.r.spd > b.r.spd ? p : b, T.roster[0]);
+  const side = GD.kickoff, T = G.teams[side], ret = gfOnField(side).map(i => T.roster[i]).reduce((b, p) => p.r.spd > b.r.spd ? p : b);
   G.poss = side; G.ball = Math.round(clamp(16 + ret.r.spd * 1.3 + gauss() * 6, 8, 45)); gfFirstDown(); GD.kickoff = null;
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();

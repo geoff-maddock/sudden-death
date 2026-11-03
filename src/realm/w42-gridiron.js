@@ -7,9 +7,11 @@
    Coaches, You call, and You play (11-play.js: you play your offense by hand; on defense you call and watch). The coaches call both sides, or you call Cinderhold's plays from the bar (the
    defense stays the coaches'; you may punt or kick on any down, and fourth down is yours). Under the field: who is on
    it with their ratings (hover a row to find them), the drive so far, play by play with why each went the way it did,
-   and how it works. Nothing is won or lost, and nothing is saved. Games at the Bowl come in phase 5.
+   and a button to How to play, where "Football: how it works" (#wGridHow) has the whole of it: each later part adds its
+   piece to W_GRID_HOW. The game waits while How to play (or any page but Play) is up.
    Wraps: showView (wW42ShowView: the bar), openPause (wW42OpenPause: not on the gridiron), wRunAct (wW42RunAct: 'drive'),
-   renderHelp (wW42RenderHelp: #wHelpGridiron). Leaving or starting over mid-game asks first (wGridForfeit). */
+   showPage (wW42ShowPage: the wait), renderHelp (wW42RenderHelp: #wHelpGridiron and #wGridHow). Leaving or starting
+   over mid-game asks first (wGridForfeit). */
 
 // who plays it: the coaches, you calling the plays, or you calling them and playing your offense by hand
 const W_GRID_MODES = {
@@ -51,7 +53,13 @@ $('wGridBar').addEventListener('click', e => {
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
   <section><h4 id="wGridLogH">This drive</h4><table id="wGridStats" class="wgstats"></table><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
-  <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
+  <p class="hint wghowlink">How the game works: the downs, the plays and defenses, powers and the bench. <button class="ghost" id="wGridHowBtn">How to play football</button> <small>The game waits while you read.</small></p></div>`);
+$('wGridHowBtn').addEventListener('click', wGridOpenHow);
+// How to play, at Football: how it works (the game waits; see showPage below)
+function wGridOpenHow() {
+  showPage('help');
+  const h = $('wGridHow'); if (h) h.scrollIntoView({ block: 'start' });
+}
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
 
@@ -74,6 +82,8 @@ function wGridEdgeLine(oc) {
   const good = by(1), bad = by(-1);
   return [good && `Good against ${good}.`, bad && `Weak against ${bad}.`].filter(Boolean).join(' ');
 }
+// Football: how it works, in How to play: this, then what each later part adds (w45 powers, w48 the bench)
+const W_GRID_HOW = [() => wGridHowHTML()];
 function wGridHowHTML() {
   const li = (n, d, x) => `<li><b>${esc(n)}</b>: ${esc(d)}${x ? ` <i>${esc(x)}</i>` : ''}</li>`;
   return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points, and the extra point makes 7). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
@@ -129,14 +139,21 @@ function wGridLog() {
   const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
   if (!drives.some(d => d.plays.length)) return '<li class="hint">No plays yet.</li>';
   return drives.map(d => (game && d.plays.length ? `<li class="wghead"><b>${esc(G.teams[d.side].name)}</b> · ${['', '1st half', '2nd half', 'Sudden Death'][d.half] || ''}${d.end ? ` · ${esc(W_GRID_END[d.end] || d.end)}, ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards` : ''}</li>` : '')
-    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('');
+    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + wGridNotesLine(wGF.notes(), 'Before the next play');
+}
+// the powers cast on a play, and the swaps, potions and stamina given back since the last one, each with its team
+function wGridNotesLine(notes, head) {
+  const G = wGF.G; if (!G || !notes || !notes.length) return '';
+  const who = s => esc(G.teams[s] ? G.teams[s].short || G.teams[s].name : '');
+  const ico = { swap: '⇄', rest: '✚', pow: '◆' };
+  return (head ? `<li class="wgnote"><small>${esc(head)}</small>` : '') + notes.map(n => `<span class="wgnote${n.k}">${ico[n.k] || ''} <b>${who(n.side)}</b> ${esc(n.msg)}</span>`).join('') + (head ? '</li>' : '');
 }
 const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
 // a play in the log, marked green when it went your side's way and red when it didn't
 function wGridLogLine(e, side) {
   { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
     const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
-    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span></li>`; }
+    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span>${wGridNotesLine((e.pw || []).map(p => ({ side: p.side, k: 'pow', msg: `${p.ult ? '★ ' : ''}${p.name} (${p.n})` })).concat(e.notes || []))}</li>`; }
 }
 function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
@@ -221,9 +238,16 @@ openPause = function () { if (UI.view === 'gridiron') return; return wW42OpenPau
 const wW42RunAct = wRunAct;
 wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); if (act === 'ggame') return wGridironGame(); return wW42RunAct.apply(this, arguments); };
 
+// the game waits while another page (How to play, the Bestiary, Records) is up
+const wW42ShowPage = showPage;
+showPage = function (p) {
+  wW42ShowPage(p);
+  if (WGF && UI.view === 'gridiron' && wGF.live) wGF.pause(p !== 'play');
+};
 const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();
   const g = $('wHelpGrounds'); if (!g || $('wHelpGridiron')) return;
+  $('wHelp').insertAdjacentHTML('beforeend', `<section id="wGridHow" class="wghelp"><h3>Football: how it works</h3>${W_GRID_HOW.map(f => f()).join('')}</section>`);
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club, call its plays yourself, or play its offense by hand: hold Space to lead a receiver and let go to throw, steer with WASD, Space for a stiff-arm, and tap Space twice to kick. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Plays tire with use and recover while you call others, and their coach calls to beat what you keep calling. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
 };

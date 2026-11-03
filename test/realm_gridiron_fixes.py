@@ -86,7 +86,7 @@ async def main():
         await pg.evaluate("wGridConcede(); document.getElementById('cfYes').click()"); await pg.evaluate(CLOSE_ALL)
 
         # ---------- a fixture at the Bowl: head to head counted once ----------
-        h = await pg.evaluate("""(() => { const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me'); f.g = 'g_bowl'; f.done = 0;
+        h = await pg.evaluate("""(() => { const F = wFixtures(), f = F.games.find(x => (x.a === 'me' && CLUBS[x.b]) || (x.b === 'me' && CLUBS[x.a])) || F.games.find(x => x.a === 'me' || x.b === 'me'); f.g = 'g_bowl'; f.done = 0;
           const club = f.a === 'me' ? f.b : f.a, H = wH2h(), h0 = H[club] ? H[club].w + H[club].l : 0; WG.gfg.met = {};
           wGfixPlay('sim'); const g = WG.gfg.games[0], h1 = H[club] ? H[club].w + H[club].l : 0;
           return { club, inClubs: !!CLUBS[club], r: g.r, more: h1 - h0, sport: H[club] && H[club].last && H[club].last.sport }; })()""")
@@ -101,13 +101,22 @@ async def main():
         check(m['done'] and not m['postponed'] and m['drawn'], 'a Bowl fixture that ends after midnight on the eve of the round counts in its round, not as postponed', m)
         await pg.evaluate(CLOSE_ALL)
 
+        # ---------- a fixture against the Apex side, before any Sudden Death game: its result is recorded ----------
+        ap = await pg.evaluate("""(() => { const F = wFixtures(), f = F.games.find(x => (x.a === 'me' || x.b === 'me') && !x.done) || F.games.find(x => x.a === 'me' || x.b === 'me');
+          if (f.a === 'me') f.b = 'apex'; else f.a = 'apex'; f.g = 'g_bowl'; f.done = 0; WG.gfg.met = {}; delete RUN.games;
+          const L = wLeague(), n0 = L.results.length, e0 = (window.__sdErrs || []).length; console.error = (...a) => { (window.__sdErrs = window.__sdErrs || []).push(String(a[0])); };
+          const r = wGfixPlay('sim'), g = WG.gfg.games[0];
+          return { r, res: g.r, more: L.results.length - n0, top: L.results[0] || null, errs: (window.__sdErrs || []).slice(e0) }; })()""")
+        check(ap['r'] == '' and not ap['errs'] and (ap['res'] == 'tie' or (ap['more'] == 1 and ap['top']['sport'] == 'football')), 'a fixture against the Apex side is recorded (no crash in the head to head)', ap)
+        await pg.evaluate(CLOSE_ALL)
+
         # ---------- an ultimate is once a game per kind ----------
         u = await pg.evaluate("""(() => { wGF.simGame({ seed: 41 }); const keys = wGF.G.ultUsed.flatMap(o => Object.keys(o));
           const G = wGF.G, role = wGF.powers().role, k = wGF.kinds.find(x => wGF.powerBook[x].ult.role === role);
           G.teams[0].roster[0].kind = G.teams[0].roster[1].kind = k; G.ultUsed = [{ [k]: true }, {}];
           const ults = wGF.powers().list.filter(o => o.ult && o.kind === k);
-          return { keys, kinds: keys.every(x => wGF.kinds.includes(x)), n: ults.length, used: ults.every(o => !o.ok && o.why === 'used this game') }; })()""")
-        check(u['kinds'] and u['n'] == 2 and u['used'], 'ultimates are marked by kind: two players of one kind share it', u)
+          return { keys, kinds: keys.every(x => wGF.kinds.includes(x)), n: ults.length, want: G.teams[0].roster.filter(p => p.kind === k).length, used: ults.every(o => !o.ok && o.why === 'used this game') }; })()""")
+        check(u['kinds'] and u['n'] == u['want'] >= 2 and u['used'], 'ultimates are marked by kind: two players of one kind share it', u)
 
         check(await pg.evaluate("wAudit().length === 0"), 'the audit is clean', await pg.evaluate("wAudit()"))
         check(not errs and await pg.evaluate("window.__sdErrs.length === 0"), 'no page errors', errs + await pg.evaluate("window.__sdErrs"))

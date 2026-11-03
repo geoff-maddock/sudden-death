@@ -808,8 +808,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wgstats td small{color:var(--dim)}
 .wgstats i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
 .wgp h4{margin:0 0 6px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
-.wgp details{grid-column:1/-1;border-top:1px solid var(--seam);padding-top:6px}
-.wgp summary{cursor:pointer;font-family:var(--hud);font-size:17px;color:var(--torch)}
+.wgp .wghowlink{grid-column:1/-1;border-top:1px solid var(--seam);padding-top:8px}
+#wGridHow h3{margin-top:18px}
 .wgline{width:100%;border-collapse:collapse;font-family:var(--hud);font-size:15px;margin-bottom:8px}
 .wgline caption{text-align:left;color:var(--bone);padding:2px 0 4px}
 .wgline caption i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
@@ -826,6 +826,14 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wglog small{font-family:var(--hud);color:var(--dim)}
 .wglog em{font-style:normal;color:var(--torch)}
 .wglog span{display:block;color:var(--dim);font-size:14px}
+.wglog span.wgnotepow{color:#c8b4ff}
+.wglog span.wgnoteswap{color:#bfe8a8}
+.wglog span.wgnoterest{color:#9fd8e8}
+.wglog li.wgnote{border-color:#a88cff}
+.wgbench{margin:4px 0 10px}
+.wgbench td:first-child,.wgbench th:first-child{text-align:left}
+.wgbench select{font:inherit;font-size:14px;max-width:100%}
+.wgbench .wgpots{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
 .wghow{margin:4px 0 8px;padding-left:20px;font-size:15px;line-height:1.35}
 .wghow i{color:var(--dim)}
 @media (max-width:700px){.wgp{grid-template-columns:1fr}}
@@ -10873,7 +10881,7 @@ function wH2h() { return (WG.h2h = WG.h2h || {}); }
 function wH2hName(k) { return k === 'apex' ? DB.apex.name : CLUBS[k] ? CLUBS[k].name : k; }
 function wH2hRecord(k, r) {
   if (!k || !WG) return;
-  const H = wH2h(), h = H[k] = H[k] || { w: 0, l: 0 }, g = (RUN.games || [])[RUN.games.length - 1] || {};
+  const H = wH2h(), h = H[k] = H[k] || { w: 0, l: 0 }, gs = RUN.games || [], g = gs[gs.length - 1] || {};
   if (r === 'win') h.w++; else h.l++;
   h.last = { r: r === 'win' ? 'win' : 'lose', us: typeof g.us === 'number' ? g.us : null, them: typeof g.them === 'number' ? g.them : null, sport: g.sport || null, day: WG.dayAbs };
 }
@@ -21267,7 +21275,7 @@ function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w
    A field goal is kicked from 7 yards behind the line, so its distance is the yards to the goal line plus 17.
    G is the game, plain JSON (so a snapshot can be saved): { poss, ball, down, togo, score, plays }; 08-drive.js adds
    teams and the drive. */
-const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, td: 6, fg: 3, safety: 2, start: 25 };
+const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, bench: 5, td: 6, fg: 3, safety: 2, start: 25 };
 let G = null;
 
 function gfNewGame(opts) {
@@ -21904,7 +21912,9 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    the other two catch; on defense the three strongest rush, the two fastest cover the receivers, and the other two are
    the linebacker and the safety. A team: { name, short, color, light, roster: [{ n, kind, num, r }], off, def, kicker },
    where off and def map each position to a roster index. A team sent with its own off and def (the Realm's lineup,
-   phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12. */
+   phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12.
+   A roster may be longer than seven: the first seven start (unless off and def say otherwise), and the rest, up to
+   GF_RULES.bench, sit on the bench to come on for a tired player (15-bench.js). */
 const GF_OFF_POS = ['QB', 'RB', 'C', 'LG', 'RG', 'X', 'Z'], GF_DEF_POS = ['DT', 'DL', 'DR', 'CL', 'CR', 'LB', 'S'];
 // a position map that names every position once, each to a different player in the roster
 const gfMapOk = (m, pos, n) => !!m && pos.every(k => Number.isInteger(m[k]) && m[k] >= 0 && m[k] < n) && new Set(pos.map(k => m[k])).size === pos.length;
@@ -21926,18 +21936,18 @@ const GF_CLUBS = {
 };
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
 function gfTeam(t) {
-  const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side)
+  const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side + GF_RULES.bench)
     .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
-  const free = new Set(roster.map((_, i) => i)), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
+  const starters = roster.slice(0, GF_RULES.side).map((_, i) => i), free = new Set(starters), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
   T.off = {}; T.off.QB = by(r => r.arm * 2 + r.hnd * .3, 1)[0]; T.off.RB = by(r => r.spd + r.str * .8, 1)[0];
   [T.off.C, T.off.LG, T.off.RG] = by(r => r.str * 2 - r.spd * .2, 3); [T.off.X, T.off.Z] = [...free];
-  roster.forEach((_, i) => free.add(i));
+  starters.forEach(i => free.add(i));
   T.def = {}; [T.def.DT, T.def.DL, T.def.DR] = by(r => r.str * 2 + r.tkl, 3); [T.def.CL, T.def.CR] = by(r => r.spd * 2 + r.hnd * .4, 2);
   T.def.LB = by(r => r.tkl * 2 + r.spd, 1)[0]; T.def.S = [...free][0];
   if (gfMapOk(t.off, GF_OFF_POS, roster.length)) T.off = Object.assign({}, t.off);
   if (gfMapOk(t.def, GF_DEF_POS, roster.length)) T.def = Object.assign({}, t.def);
-  T.kicker = Number.isInteger(t.kicker) && roster[t.kicker] ? t.kicker : roster.reduce((b, p, i) => p.r.kck > roster[b].r.kck ? i : b, 0);
+  T.kicker = Number.isInteger(t.kicker) && roster[t.kicker] ? t.kicker : starters.reduce((b, i) => roster[i].r.kck > roster[b].r.kck ? i : b, 0);
   return T;
 }
 /* Cinder Gridiron: the plays (issue #9, phase 1). Four offense plays against three defenses. Nothing here decides who
@@ -22334,6 +22344,7 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
    GD.cast is what both sides cast for the play on show. opts.skill: the CPU's skill by side ([0..2, 0..2]).
+   Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
@@ -22351,7 +22362,7 @@ function gfStart(opts) {
   if (o.powers !== false) gfPowersStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -22368,6 +22379,7 @@ function gfCanCall(oc) {
 }
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
+  if (ph === 'call') GD.item = false;
   // each call is a point to save the game at (13-box.js)
   if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
@@ -22381,6 +22393,8 @@ function gfTick(dt) {
     if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
+    // the coaches make their swaps, for the CPU's side, and for yours when they call it (15-bench.js)
+    for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
     GD.cast = gfCastPowers(GD.oc, GD.dc);
     GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });
@@ -22412,6 +22426,7 @@ function gfResult(r) {
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
   const pw = [GD.cast && GD.cast.off, GD.cast && GD.cast.def].filter(Boolean).map(c => ({ side: c.side, n: c.n, name: c.name, ult: c.ult }));
   if (pw.length) e.pw = pw;
+  gfTakeNotes(e);
   gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
@@ -22471,7 +22486,7 @@ function gfKick() {
     GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
   }
   if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
-  G.drive.plays.push({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why });
+  G.drive.plays.push(gfTakeNotes({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why }));
   gfRunClock(G.drive.end, 5);
   gfPowersAfter();
 }
@@ -22796,7 +22811,7 @@ function gfExtraPoint() {
 // side receives a kickoff: the kickoff is its own beat, then a new drive from wherever the return ends
 function gfKickoffTo(side) { G.poss = side; GD.kickoff = side; gfGo('kickoff'); }
 function gfKickoff() {
-  const side = GD.kickoff, T = G.teams[side], ret = T.roster.reduce((b, p) => p.r.spd > b.r.spd ? p : b, T.roster[0]);
+  const side = GD.kickoff, T = G.teams[side], ret = gfOnField(side).map(i => T.roster[i]).reduce((b, p) => p.r.spd > b.r.spd ? p : b);
   G.poss = side; G.ball = Math.round(clamp(16 + ret.r.spd * 1.3 + gauss() * 6, 8, 45)); gfFirstDown(); GD.kickoff = null;
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
@@ -22971,7 +22986,7 @@ function gfCounterOffense(w) {
    interceptions) and kicking (fga, fgm field goals tried and made, xpa, xpm extra points).
    The snapshot: between plays, at each call, the game is G and GD as plain JSON, and GF_HOOK.onSnap hears it. A saved
    game comes back on the field at that call (gfResume): the play that was running is played again. */
-function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); }
+function gfBoxStart() { G.box = G.teams.map(t => t.roster.map(() => ({}))); G.played = [0, 1].map(gfOnField); }
 function gfBoxAdd(side, ri, k, n) { if (!G.box || ri == null || ri < 0 || !G.box[side][ri]) return; const b = G.box[side][ri]; b[k] = (b[k] || 0) + (n == null ? 1 : n); }
 // a play is over: off had the ball; r is the play's end (L.done)
 function gfBoxPlay(off, r) {
@@ -22986,8 +23001,8 @@ function gfBoxPlay(off, r) {
   else if (car >= 0) { gfBoxAdd(off, car, 'ra'); gfBoxAdd(off, car, 'ry', r.gain); if (td) gfBoxAdd(off, car, 'td'); }
   if ((r.what === 'tackle' || r.what === 'sack') && by >= 0) gfBoxAdd(def, by, 'tkl');
 }
-// the box as lines with names: [{ side, ri, n, kind, line }]
-function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line) }))) : []; }
+// the box as lines with names: [{ side, ri, n, kind, line, played }] (played: they took the field, at kick-off or off the bench)
+function gfBox() { return G && G.box ? G.box.flatMap((b, s) => b.map((line, ri) => ({ side: s, ri, n: G.teams[s].roster[ri].n, kind: G.teams[s].roster[ri].kind, line: Object.assign({}, line), played: !G.played || G.played[s].includes(ri) }))) : []; }
 function gfSnapshot() {
   const D = Object.assign({}, GD, { ph: 'call', t: 0, pick: null, meter: null, stale: null, kick: null, acc: 0 });
   return JSON.parse(JSON.stringify({ G, GD: D }));
@@ -23006,7 +23021,9 @@ function gfResume(sn) {
      plays or the drive, whichever ends first; a few hit at once too (Stampede).
    - Stamina (G.stam, by side and roster index, 0 to 100): the same seven play both ways, so every play costs everyone
      a little (the undead and golems half as much); casting costs a lot more, and the half gives plenty back. Below
-     half, a player is slower and weaker (gfWorn), and can't cast below GF_STAM.min.
+     half, a player is slower and weaker (gfWorn), and can't cast below GF_STAM.min. A player on the bench rests
+     (GF_STAM.bench a play; 15-bench.js). A few powers give stamina back too (rest: { team } the seven, { tired: [n, k] }
+     the n most tired; the Overgrowth zone, restZ, every play it lasts).
    - Your side: pick a power with the call (GD.pow), or let Auto powers (GD.auto, on in 'call', T on the page) cast
      the way the coaches would. The CPU casts at three skill levels (G.skill, by side: 0, 1, 2): a Squire casts at
      random, a Knight leans to powers that suit the call, and an Archmage casts only those, and saves its ultimates for
@@ -23015,7 +23032,7 @@ function gfResume(sn) {
      the zones (gfFx): multipliers multiply, the rest add. 06-live.js reads L.fx; what a power did goes in the play's
      events, and so in the reason after it.
    - Power tips (gfPowerTip): the pros and cons of a power for the down, the distance and the field. */
-const GF_MANA = { start: 3, max: 6, scored: 1, drive: 1 }, GF_STAM = { min: 20, per: 6, base: 14, ult: 30, play: 1, half: 50 };
+const GF_MANA = { start: 3, max: 6, scored: 1, drive: 1 }, GF_STAM = { min: 20, per: 6, base: 14, ult: 30, play: 1, half: 50, bench: 4 };
 const GF_ULT_COST = 3, GF_ULT_PLAYS = 3;
 const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
 // the effects, at no effect. Speed: oSpd (the offense), dSpd (the defense), cSpd (the ball carrier), rSpd (receivers on
@@ -23046,7 +23063,7 @@ const GF_POW = {
   minotaur: [{ id: 'bullrush', n: 'Bull Rush', cost: 1, fits: 'run', desc: 'The ball carrier lowers the horns: +2 strength against tackles.', fx: { cStr: 2 } },
     { id: 'gore', n: 'Gore', cost: 1, fits: 'any', desc: 'Horns first: tackles a little likelier, and +1 strength against blocks.', fx: { tkl: .12, dStr: 1 } }],
   troll: [{ id: 'seismic', n: 'Seismic Snap', cost: 2, fits: 'any', desc: 'The ground heaves at the snap: every defender staggers for a second and a half.', fx: { snapAll: 1.6 } },
-    { id: 'boulder', n: 'Boulder', cost: 1, fits: 'run', desc: 'Boulders for shoulders: tackles a little likelier, and +1.5 strength against blocks.', fx: { tkl: .1, dStr: 1.5 } }],
+    { id: 'boulder', n: 'Boulder', cost: 1, fits: 'run', rest: { tired: [2, 15] }, desc: 'Boulders for shoulders: tackles a little likelier, and +1.5 strength against blocks. Troll blood: the two most tired on the field get 15 stamina back.', fx: { tkl: .1, dStr: 1.5 } }],
   golem: [{ id: 'stoneskin', n: 'Stone Skin', cost: 1, fits: 'pass', desc: 'The pocket turns to stone: blocks hold about four times as long, and the throw goes truer.', fx: { shed: .25, errM: .8 } },
     { id: 'quake', n: 'Quake', cost: 2, fits: 'any', desc: 'A stomp at the snap: every blocker stumbles.', fx: { blkStun: .8 } }],
   harpy: [{ id: 'glide', n: 'Glide', cost: 1, fits: 'pass', desc: 'The receiver rises over the defender: no break-ups, no picks.', fx: { sure: 1 } },
@@ -23056,7 +23073,7 @@ const GF_POW = {
   wraith: [{ id: 'invis', n: 'Invisibility', cost: 2, fits: 'pass', desc: 'The receivers vanish off the line: the coverage loses them for a second and a half.', fx: { coverSlow: 1.6 } },
     { id: 'haunt', n: 'Haunt', cost: 1, fits: 'pass', desc: 'The receiver thrown to panics and loses a third of a step.', fx: { tgtSlow: .35 } }],
   vampire: [{ id: 'swarm', n: 'Bat Swarm', cost: 2, fits: 'run', desc: 'The ball carrier bursts into bats: no tackle holds for 1.5 seconds after taking the ball.', fx: { untag: 1.5 } },
-    { id: 'mesmer', n: 'Mesmerize', cost: 2, fits: 'any', desc: 'Whoever takes the ball freezes for a moment.', fx: { cStun: .9, cStunP: 1 } }],
+    { id: 'mesmer', n: 'Mesmerize', cost: 2, fits: 'any', rest: { team: 6 }, desc: 'Whoever takes the ball freezes for a moment, and the vampire drinks: the seven get 6 stamina back.', fx: { cStun: .9, cStunP: 1 } }],
   lich: [{ id: 'telek', n: 'Telekinesis', cost: 1, fits: 'pass', desc: 'The throw is guided there: it flies almost true and lands soft.', fx: { errM: .25, catch: .1 } },
     { id: 'deflect', n: 'Deflect', cost: 1, fits: 'pass', desc: 'A ward in the air pushes the throw off line.', fx: { errA: 1.2 } }],
   zombie: [{ id: 'undying', n: 'Undying', cost: 1, fits: 'any', desc: 'Won\'t go down backwards: a loss of yards counts as no gain.', fx: { nolose: 1 } },
@@ -23067,7 +23084,7 @@ const GF_POW = {
     { id: 'web', n: 'Web', cost: 1, fits: 'run', desc: 'Whoever takes the ball is webbed: nearly half speed for 1.8 seconds.', fx: { cSlow: 1.8 } }],
   skeleton: [{ id: 'shieldwall', n: 'Shield Wall', cost: 1, fits: 'any', desc: 'The line locks shields around the ball: +2 blocking strength, blocks hold about twice as long, and the carrier +1 strength against tackles.', fx: { blk: 2, shed: .45, cStr: 1 } },
     { id: 'stand', n: 'Goal-line Stand', cost: 1, fits: 'any', desc: 'Tackles likelier, and much likelier with your goal line close (inside your 20).', fx: { stand: 1 } }],
-  witch: [{ id: 'hex', n: 'Hex', cost: 1, fits: 'pass', desc: 'Hexes their deep safety: nearly half speed for the first four seconds.', fx: { safetySlow: 4 } },
+  witch: [{ id: 'hex', n: 'Hex', cost: 1, fits: 'pass', rest: { team: 8 }, desc: 'Hexes their deep safety: nearly half speed for the first four seconds, and a draught from the cauldron: the seven get 8 stamina back.', fx: { safetySlow: 4 } },
     { id: 'frost', n: 'Frost Hex', cost: 2, fits: 'any', desc: 'A chill over the field: their whole offense 12% slower.', fx: { oSpd: .88 } }],
 };
 // ultimates by kind: role 'off' or 'def' (when it can be cast), zone: the effects the zone leaves for 3 plays or the
@@ -23082,7 +23099,7 @@ const GF_ULT = {
   troll: { id: 'bog', n: 'Bog Tide', role: 'def', desc: 'Calls up the swamp: their backfield turns to bog, and everyone behind the line moves 35% slower.', zone: { backSpd: .65 }, vis: ['#4a6a3a', 'back'] },
   golem: { id: 'rampart', n: 'Rampart', role: 'off', desc: 'A wall grows along the line: hardly a rusher gets through.', zone: { shed: .05 }, vis: ['#9a9a9a', 'line'] },
   harpy: { id: 'tempest', n: 'Tempest', role: 'def', desc: 'A gale over the field: their kicks are pushed off line, and their long throws too.', zone: { kick: -.2, punt: -10, errA: 1 }, vis: ['#9ac8e8', 'all'] },
-  elf: { id: 'overgrowth', n: 'Overgrowth', role: 'off', desc: 'The grass grows knee-high: the defense wades, 6% slower.', zone: { dSpd: .94 }, vis: ['#5aa04a', 'all'] },
+  elf: { id: 'overgrowth', n: 'Overgrowth', role: 'off', desc: 'The grass grows knee-high: the defense wades, 6% slower, and the elf\'s side rests in it: 4 stamina back each play it lasts.', zone: { dSpd: .94 }, restZ: 4, vis: ['#5aa04a', 'all'] },
   wraith: { id: 'fog', n: 'Fog of the Dead', role: 'off', desc: 'A grave-fog: the defense hardly picks a throw off, and misses more tackles.', zone: { int: .3, tkl: -.1 }, vis: ['#b8c0c8', 'all'] },
   vampire: { id: 'eclipse', n: 'Eclipse', role: 'off', desc: 'The torches go out: the defense misses tackles in the dark.', zone: { tkl: -.14 }, vis: ['#2a1a3a', 'all'] },
   lich: { id: 'gravehands', n: 'Grave Hands', role: 'def', desc: 'Skeletal hands claw at the ball carrier: 20% slower, and a little easier to bring down.', zone: { cSpd: .8, tkl: .05 }, vis: ['#d8d0b8', 'mid'] },
@@ -23112,7 +23129,8 @@ function gfWorn(side, ri, r) {
 function gfRated(side, ri) { const r = gfWorn(side, ri, G.teams[side].roster[ri].r); return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)])); }
 // the half gives a lot back; every play costs everyone a little (the undead and golems tire at half the rate)
 function gfRest(n) { if (G.stam) for (const s of G.stam) for (let i = 0; i < s.length; i++) s[i] = Math.min(100, s[i] + n); }
-function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => s.forEach((v, i) => { s[i] = Math.max(0, v - GF_STAM.play * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)); })); }
+// (the bench rests instead)
+function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
 const gfStamCost = (cost, ult) => ult ? GF_STAM.ult : GF_STAM.base + GF_STAM.per * cost;
 const gfRole = side => side === G.poss ? 'off' : 'def';
 /* the powers a side can cast now (with the call): each of its players' everyday power for the side of the ball they
@@ -23121,7 +23139,9 @@ const gfRole = side => side === G.poss ? 'off' : 'def';
 function gfPowerOptions(side) {
   if (!G.mana) return [];
   const role = gfRole(side), T = G.teams[side], out = [];
+  const on = gfOnField(side);
   T.roster.forEach((m, ri) => {
+    if (!on.includes(ri)) return;
     const pw = GF_POW[m.kind], u = GF_ULT[m.kind], st = G.stam[side][ri];
     const add = (p, ult) => {
       const cost = ult ? GF_ULT_COST : p.cost, used = ult && !!(G.ultUsed[side][m.kind] || G.ultUsed[side][ri]);
@@ -23137,6 +23157,7 @@ function gfPowerOptions(side) {
 function gfCast(side, o) {
   G.mana[side] -= o.cost; G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - o.stamCost);
   if (o.ult) { G.ultUsed[side][o.kind] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
+  const P = GF_POW_BY[o.id]; if (P && P.rest) gfPowRest(side, P.rest, `${o.name} (${o.n})`);
   return { id: o.id, ri: o.ri, n: o.n, name: o.name, ult: o.ult, side };
 }
 // with the call: each side's power. Yours is your pick, or Auto powers', or none; the CPU's is the CPU's
@@ -23173,6 +23194,9 @@ function gfCpuPower(side, call, skill) {
   for (const o of opts) w[o.key] = skill === 0 ? (o.ult ? .3 : 1)
     : skill === 1 ? (fit(o) ? 3 : 1) * (o.ult ? (lever ? 3 : 1.5) : 1)
     : (fit(o) ? 1 : 0) * o.cost * (o.ult ? (lever ? 3 : .15) : 1) * o.stam / 100;
+  // a power that gives stamina back is worth more to a tired side (a Knight and an Archmage see it)
+  const tired = gfTired(side);
+  if (skill >= 1 && tired > .25) for (const o of opts) if ((GF_POW_BY[o.id] || {}).rest || (GF_ULT_BY[o.id] || {}).restZ) w[o.key] = Math.max(w[o.key], .5) * (1 + tired * 4);
   const k = wpick(w); return w[k] > 0 ? opts.find(o => o.key === k) : null;
 }
 // the play's effects: the zones on the field and both sides' powers (with an ultimate's effects on the play it is cast)
@@ -23210,6 +23234,7 @@ function gfPowersAfter() {
   if (G.drive && G.drive.end) G.zones = [];
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
   gfTirePlay();
+  for (const z of G.zones) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); }
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
 function gfPowersHalf() { if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
@@ -23247,6 +23272,8 @@ function gfPowerTip(key) {
   if (G.down >= 3) T.pro.push(`${GF_ORD[G.down]} down: a big one to spend on.`);
   if (near) T.pro.push(off ? 'Near their goal line: a touchdown is close.' : 'Near your goal line: every yard counts.');
   T.con.push(`${o.cost} mana (${Math.max(0, gfMana(side) - o.cost)} left after). Both sides get 1 at every new drive, and you get 1 more when they score.`);
+  const rs = (GF_POW_BY[o.id] || {}).rest, rz = (GF_ULT_BY[o.id] || {}).restZ, tired = gfTired(side);
+  if ((rs || rz) && tired > .25) T.pro.push(`Your seven are tired (${Math.round((1 - tired) * 100)}% stamina on average): this one gives some back.`);
   const after = o.stam - o.stamCost;
   T.con.push(`${o.n} spends ${o.stamCost} stamina (now ${o.stam}%)${after < 50 ? ': then slower and weaker until rested' : ''}.`);
   if (o.ult) {
@@ -23269,6 +23296,96 @@ function gfPowWhy(pw) {
 // the book of powers by kind, for How to play
 function gfPowerBook() {
   return Object.fromEntries(Object.keys(GF_KIND).map(k => [k, { off: GF_POW[k] && GF_POW[k][0], def: GF_POW[k] && GF_POW[k][1], ult: GF_ULT[k] }]));
+}
+/* Cinder Gridiron: the bench, and getting tired legs back. A team may bring more than seven (04-teams.js): the seven on
+   the field are the ones in its off and def maps, and the rest sit on the bench, resting (GF_STAM.bench a play).
+   - Swaps (gfSwap): between plays, a player off the bench takes a tired player's places, on offense and on defense
+     (and the kicks, if they were the kicker). The one who comes off rests, and may come back on later.
+   - Stamina back (gfRestore): for one player or the whole seven. The Realm's potions use it (gfUseItem: one a play,
+     between plays), and so do a few powers (14-powers.js: rest, restZ; gfPowRest).
+   - The coaches swap too (gfCpuSwaps, at each snap, by skill): a Squire now and then, for anyone fresher; a Knight a
+     player under 40, for the freshest who would play those positions at least as well now (gfPlaysAs: the ratings the
+     positions use, worn by stamina); an Archmage a player under 55, for whoever would play them best, and only if
+     better. Never for someone less than GF_SWAP.gap fresher.
+   - The log: every swap, potion and power that gives stamina back waits in GD.notes ({ side, k, msg }) and goes in the
+     next play's log line (gfTakeNotes: e.notes), with the powers cast (e.pw, 08-drive.js).
+   G.played[side]: every roster index that has taken the field (the Realm pays them as the seven). */
+const GF_SWAP = { gap: 25, lim: [30, 40, 55], squire: .3 };
+// the ratings each position leans on (the coaches weigh a swap by them)
+const GF_POS_KEY = { QB: ['arm'], RB: ['spd', 'str'], C: ['str'], LG: ['str'], RG: ['str'], X: ['spd', 'hnd'], Z: ['spd', 'hnd'],
+  DT: ['str', 'tkl'], DL: ['str', 'tkl'], DR: ['str', 'tkl'], CL: ['spd'], CR: ['spd'], LB: ['tkl', 'spd'], S: ['spd', 'tkl'] };
+// who is on the field (the seven, by roster index), and who is on the bench
+const gfOnField = side => { const T = G.teams[side]; return [...new Set(Object.values(T.off).concat(Object.values(T.def)))]; };
+const gfBench = side => { const on = gfOnField(side); return G.teams[side].roster.map((_, i) => i).filter(i => !on.includes(i)); };
+const gfStamOf = (side, ri) => G.stam ? G.stam[side][ri] : 100;
+// how tired the seven are: 0 fresh to 1 spent
+function gfTired(side) { if (!G.stam) return 0; const on = gfOnField(side); return 1 - on.reduce((a, i) => a + G.stam[side][i], 0) / on.length / 100; }
+function gfNote(side, k, msg) { (GD.notes = GD.notes || []).push({ side, k, msg }); }
+// a play goes in the log: the notes since the last one go with it
+function gfTakeNotes(e) { if (GD && GD.notes && GD.notes.length) { e.notes = GD.notes; GD.notes = []; } return e; }
+// can a swap or a potion happen now: between plays (not with a play or a kick under way)
+const gfBetween = () => !!GD && !['pre', 'live', 'kick', 'over'].includes(GD.ph);
+
+// inn (on the bench) takes out's places, both ways; returns what happened, or '' when it can't
+function gfSwap(side, out, inn) {
+  const T = G.teams[side], on = gfOnField(side);
+  if (!on.includes(out) || !T.roster[inn] || on.includes(inn)) return '';
+  for (const m of [T.off, T.def]) for (const k in m) if (m[k] === out) m[k] = inn;
+  if (T.kicker === out) T.kicker = gfOnField(side).reduce((b, i) => T.roster[i].r.kck > T.roster[b].r.kck ? i : b, inn);
+  if (G.played && !G.played[side].includes(inn)) G.played[side].push(inn);
+  const st = i => G.stam ? ` (${Math.round(G.stam[side][i])}%)` : '';
+  const msg = `${T.roster[inn].n}${st(inn)} comes on for ${T.roster[out].n}${st(out)}.`;
+  gfNote(side, 'swap', msg);
+  return msg;
+}
+// your swap: only between plays
+function gfSwapYours(out, inn) { return gfBetween() ? gfSwap(GD.you, out, inn) : ''; }
+// stamina back: ri one player, or null for the whole seven; what: the name of the potion or power
+function gfRestore(side, ri, n, what) {
+  if (!G.stam) return '';
+  const list = ri == null ? gfOnField(side) : [ri];
+  for (const i of list) G.stam[side][i] = Math.min(100, G.stam[side][i] + n);
+  const msg = `${what}: ${ri == null ? 'the seven get' : G.teams[side].roster[ri].n + ' gets'} ${n} stamina back.`;
+  gfNote(side, 'rest', msg);
+  return msg;
+}
+// a power that gives stamina back: the whole seven, or the most tired few
+function gfPowRest(side, rs, what) {
+  if (!G.stam) return;
+  if (rs.team) gfRestore(side, null, rs.team, what);
+  if (rs.tired) for (const i of gfOnField(side).sort((a, b) => G.stam[side][a] - G.stam[side][b]).slice(0, rs.tired[0])) gfRestore(side, i, rs.tired[1], what);
+}
+// a potion from your bag (the Realm keeps the bag): one a play, between plays. ri: one player, or null for the seven
+function gfUseItem(ri, n, name) {
+  if (!G.stam || !gfBetween() || GD.item) return '';
+  if (ri != null && !gfOnField(GD.you).includes(ri)) return '';
+  GD.item = true;
+  return gfRestore(GD.you, ri, n, name);
+}
+// the coaches' swaps at the snap, by skill
+function gfCpuSwaps(side, skill) {
+  if (!G.stam || !gfBench(side).length) return;
+  if (skill === 0 && R() > GF_SWAP.squire) return;
+  const lim = GF_SWAP.lim[skill] || GF_SWAP.lim[1];
+  for (const out of gfOnField(side).sort((a, b) => gfStamOf(side, a) - gfStamOf(side, b))) {
+    if (gfStamOf(side, out) >= lim) break;
+    let bench = gfBench(side).filter(i => gfStamOf(side, i) >= gfStamOf(side, out) + GF_SWAP.gap);
+    if (skill >= 1) { const now = gfPlaysAs(side, out, out); bench = bench.filter(i => skill === 2 ? gfPlaysAs(side, i, out) > now * 1.02 : gfPlaysAs(side, i, out) >= now); }
+    if (!bench.length) continue;
+    const inn = skill === 2 ? bench.sort((a, b) => gfPlaysAs(side, b, out) - gfPlaysAs(side, a, out))[0] : skill === 1 ? bench.sort((a, b) => gfStamOf(side, b) - gfStamOf(side, a))[0] : pick(bench);
+    gfSwap(side, out, inn);
+  }
+}
+// how well i would play out's positions now: the ratings they lean on, worn by i's stamina (and the kicks, by half)
+function gfPlaysAs(side, i, out) {
+  const T = G.teams[side], r = gfWorn(side, i, T.roster[i].r);
+  const keys = Object.keys(T.off).filter(k => T.off[k] === out).concat(Object.keys(T.def).filter(k => T.def[k] === out)).flatMap(k => GF_POS_KEY[k] || []);
+  return keys.reduce((a, k) => a + r[k], 0) + (T.kicker === out ? r.kck * .5 : 0);
+}
+// a row for the page: who, their stamina, and where they play
+function gfBenchRow(side, i) {
+  const T = G.teams[side], m = T.roster[i], at = mp => Object.keys(mp).find(k => mp[k] === i) || null;
+  return { ri: i, n: m.n, kind: m.kind, num: m.num, stam: Math.round(gfStamOf(side, i)), off: at(T.off), def: at(T.def), kicker: T.kicker === i };
 }
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
@@ -23358,6 +23475,12 @@ return {
   get isGame() { return !!GD && GD.game; }, get yourBall() { return !!GD && G.poss === GD.you; }, clock: () => G && GD && GD.game ? { half: G.half, text: gfClockText(), name: GF_HALF_NAME[G.half] } : null,
   // the camera and the banner: how far in it has zoomed (1 is the whole width), the big play it zoomed for, the last result's banner
   view: () => ({ zoom: GFT.zoom, why: GFT.why, big: GD && GD.big ? Object.assign({}, GD.big) : null, px: GFP.dpr }),
+  // the bench (15-bench.js): your seven and your bench with their stamina, whether a swap or a potion can happen now,
+  // a swap (out comes off, inn comes on; returns what happened, or ''), a potion (ri, or null for the seven), and the
+  // notes waiting for the next play's log line
+  bench: () => G && GD ? { on: gfOnField(GD.you).map(i => gfBenchRow(GD.you, i)), bench: gfBench(GD.you).map(i => gfBenchRow(GD.you, i)), between: gfBetween(), item: !!GD.item, stam: !!G.stam } : null,
+  swap: (out, inn) => G && GD ? gfSwapYours(out, inn) : '', useItem: (ri, n, name) => G && GD ? gfUseItem(ri, n, name) : '',
+  notes: () => GD && GD.notes ? JSON.parse(JSON.stringify(GD.notes)) : [], swapRules: Object.assign({}, GF_SWAP, { lim: GF_SWAP.lim.slice() }), stamRules: Object.assign({}, GF_STAM),
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
@@ -24880,7 +25003,7 @@ wPreGame = function (enc) {
 /* ---------- the end ---------- */
 W_ON_END.ground = function (r, ref, W) {
   const g = ref && wGrd(ref.g); if (!g) return;
-  const G = wGrdState(), h = G.rec[g.id] = G.rec[g.id] || { w: 0, l: 0 }, last = (RUN.games || [])[RUN.games.length - 1] || {};
+  const G = wGrdState(), h = G.rec[g.id] = G.rec[g.id] || { w: 0, l: 0 }, last = (RUN.games || []).slice(-1)[0] || {};
   G.met[g.id] = WG.dayAbs;
   if (r === 'win') h.w++; else h.l++;
   h.last = { r: r === 'win' ? 'win' : 'lose', us: typeof last.us === 'number' ? last.us : null, them: typeof last.them === 'number' ? last.them : null, mode: ref.mode || 'friendly', day: WG.dayAbs };
@@ -25616,7 +25739,7 @@ const wW24OnGround = W_ON_END.ground;
 W_ON_END.ground = function (r, ref, W) {
   wW24OnGround(r, ref, W);
   if (!ref || ref.mode !== 'fixture') return;
-  const L = wLeague(), F = wFixtures(), club = ref.club, g = (RUN.games || [])[RUN.games.length - 1] || {};
+  const L = wLeague(), F = wFixtures(), club = ref.club, g = (RUN.games || []).slice(-1)[0] || {};
   const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
   wLeagueMine(r);
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
@@ -26138,7 +26261,7 @@ function wNoticeMet(c, M) {
   return false;
 }
 function wNoticeFacts(W) {
-  const g = (RUN.games || [])[RUN.games.length - 1] || {}, ref = W.ref || {};
+  const g = (RUN.games || []).slice(-1)[0] || {}, ref = W.ref || {};
   return { region: W.region, sport: g.sport, night: !!W.night, us: +g.us || 0, them: +g.them || 0, won: !!g.won, type: g.type,
     club: ref.club || ref.rival || null, g: W.kind === 'ground' ? ref.g : null };
 }
@@ -27807,9 +27930,11 @@ renderHelp = function () {
    Coaches, You call, and You play (11-play.js: you play your offense by hand; on defense you call and watch). The coaches call both sides, or you call Cinderhold's plays from the bar (the
    defense stays the coaches'; you may punt or kick on any down, and fourth down is yours). Under the field: who is on
    it with their ratings (hover a row to find them), the drive so far, play by play with why each went the way it did,
-   and how it works. Nothing is won or lost, and nothing is saved. Games at the Bowl come in phase 5.
+   and a button to How to play, where "Football: how it works" (#wGridHow) has the whole of it: each later part adds its
+   piece to W_GRID_HOW. The game waits while How to play (or any page but Play) is up.
    Wraps: showView (wW42ShowView: the bar), openPause (wW42OpenPause: not on the gridiron), wRunAct (wW42RunAct: 'drive'),
-   renderHelp (wW42RenderHelp: #wHelpGridiron). Leaving or starting over mid-game asks first (wGridForfeit). */
+   showPage (wW42ShowPage: the wait), renderHelp (wW42RenderHelp: #wHelpGridiron and #wGridHow). Leaving or starting
+   over mid-game asks first (wGridForfeit). */
 
 // who plays it: the coaches, you calling the plays, or you calling them and playing your offense by hand
 const W_GRID_MODES = {
@@ -27851,7 +27976,13 @@ $('wGridBar').addEventListener('click', e => {
 $('v-gridiron').insertAdjacentHTML('beforeend', `<div id="wGridPanel" class="wgp">
   <section><h4>On the field</h4><div id="wGridLineup"></div></section>
   <section><h4 id="wGridLogH">This drive</h4><table id="wGridStats" class="wgstats"></table><p id="wGridSeen" class="hint"></p><ol id="wGridLog" class="wglog"></ol></section>
-  <details id="wGridHow" open><summary>How it works</summary>${wGridHowHTML()}</details></div>`);
+  <p class="hint wghowlink">How the game works: the downs, the plays and defenses, powers and the bench. <button class="ghost" id="wGridHowBtn">How to play football</button> <small>The game waits while you read.</small></p></div>`);
+$('wGridHowBtn').addEventListener('click', wGridOpenHow);
+// How to play, at Football: how it works (the game waits; see showPage below)
+function wGridOpenHow() {
+  showPage('help');
+  const h = $('wGridHow'); if (h) h.scrollIntoView({ block: 'start' });
+}
 $('wGridLineup').addEventListener('mouseover', e => { const r = e.target.closest('[data-gpos]'); wGF.highlight(r ? { side: +r.dataset.gside, pos: r.dataset.gpos } : null); });
 $('wGridLineup').addEventListener('mouseleave', () => wGF.highlight(null));
 
@@ -27874,6 +28005,8 @@ function wGridEdgeLine(oc) {
   const good = by(1), bad = by(-1);
   return [good && `Good against ${good}.`, bad && `Weak against ${bad}.`].filter(Boolean).join(' ');
 }
+// Football: how it works, in How to play: this, then what each later part adds (w45 powers, w48 the bench)
+const W_GRID_HOW = [() => wGridHowHTML()];
 function wGridHowHTML() {
   const li = (n, d, x) => `<li><b>${esc(n)}</b>: ${esc(d)}${x ? ` <i>${esc(x)}</i>` : ''}</li>`;
   return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points, and the extra point makes 7). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
@@ -27929,14 +28062,21 @@ function wGridLog() {
   const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
   if (!drives.some(d => d.plays.length)) return '<li class="hint">No plays yet.</li>';
   return drives.map(d => (game && d.plays.length ? `<li class="wghead"><b>${esc(G.teams[d.side].name)}</b> · ${['', '1st half', '2nd half', 'Sudden Death'][d.half] || ''}${d.end ? ` · ${esc(W_GRID_END[d.end] || d.end)}, ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards` : ''}</li>` : '')
-    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('');
+    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + wGridNotesLine(wGF.notes(), 'Before the next play');
+}
+// the powers cast on a play, and the swaps, potions and stamina given back since the last one, each with its team
+function wGridNotesLine(notes, head) {
+  const G = wGF.G; if (!G || !notes || !notes.length) return '';
+  const who = s => esc(G.teams[s] ? G.teams[s].short || G.teams[s].name : '');
+  const ico = { swap: '⇄', rest: '✚', pow: '◆' };
+  return (head ? `<li class="wgnote"><small>${esc(head)}</small>` : '') + notes.map(n => `<span class="wgnote${n.k}">${ico[n.k] || ''} <b>${who(n.side)}</b> ${esc(n.msg)}</span>`).join('') + (head ? '</li>' : '');
 }
 const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety' };
 // a play in the log, marked green when it went your side's way and red when it didn't
 function wGridLogLine(e, side) {
   { const kick = e.oc === 'punt' || e.oc === 'fg' || !e.dc, spot = e.ball < 50 ? 'own ' + e.ball : e.ball === 50 ? 'midfield' : 'their ' + (100 - e.ball);
     const call = kick ? (e.oc === 'fg' ? 'Field goal' : 'Punt') : `${wGF.plays[e.oc].n} vs ${wGF.defs[e.dc].n}`, g = kick ? 0 : wGF.edge(e.oc, e.dc)[0] * (side ? -1 : 1);
-    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span></li>`; }
+    return `<li class="${g > 0 ? 'wggood' : g < 0 ? 'wgbad' : ''}"><small>${W_GRID_ORD[e.down] || ''}${e.togo ? ' & ' + e.togo : ''} · ${spot}</small> <b>${esc(call)}</b>${kick ? '' : ` <em>${e.gain > 0 ? '+' : ''}${e.gain}</em>`}<br>${esc(e.msg || '')}<span>${esc(e.why || '')}</span>${wGridNotesLine((e.pw || []).map(p => ({ side: p.side, k: 'pow', msg: `${p.ult ? '★ ' : ''}${p.name} (${p.n})` })).concat(e.notes || []))}</li>`; }
 }
 function wGridTeams() {
   const g = W_GRDS.find(x => x.id === 'g_bowl'), H = W_GRID.home, A = W_GRID.away;
@@ -28021,10 +28161,17 @@ openPause = function () { if (UI.view === 'gridiron') return; return wW42OpenPau
 const wW42RunAct = wRunAct;
 wRunAct = function (act, id) { if (act === 'drive') return wGridironDrive(); if (act === 'ggame') return wGridironGame(); return wW42RunAct.apply(this, arguments); };
 
+// the game waits while another page (How to play, the Bestiary, Records) is up
+const wW42ShowPage = showPage;
+showPage = function (p) {
+  wW42ShowPage(p);
+  if (WGF && UI.view === 'gridiron' && wGF.live) wGF.pause(p !== 'play');
+};
 const wW42RenderHelp = renderHelp;
 renderHelp = function () {
   wW42RenderHelp();
   const g = $('wHelpGrounds'); if (!g || $('wHelpGridiron')) return;
+  $('wHelp').insertAdjacentHTML('beforeend', `<section id="wGridHow" class="wghelp"><h3>Football: how it works</h3>${W_GRID_HOW.map(f => f()).join('')}</section>`);
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGridiron"><b>Real football.</b> The Ash Bowl is trying out a new game: football on the grass, seven a side, and the same seven play offense and defense. Ask Clinker Dunn for GRIDIRON (a whole game: two halves on the clock, about seven minutes, both sides' drives) or a DRIVE (one drive, to practise). Watch the Cinderhold Football Club, call its plays yourself, or play its offense by hand: hold Space to lead a receiver and let go to throw, steer with WASD, Space for a stiff-arm, and tap Space twice to kick. Four downs to gain 10 yards; a touchdown is 6 points and a field goal 3. Each down, pick Run, Short pass, Deep pass or Screen, or kick: a punt on any down, or a field goal in range (the button shows the distance and the chance). The other coach picks a defense at the same moment. In a game you pick a defense when they have the ball, and a tie at the end goes to Sudden Death: the first score wins. Each defense is good against some plays and weak against others: a blitz stops the run and the deep pass but loses to the screen, and a deep zone gives up runs. After each play the bar says what happened and why. Plays tire with use and recover while you call others, and their coach calls to beat what you keep calling. Under the field: who is on it with their ratings, every play of the drive, and the full rules. Nothing is won or lost yet.</p>`);
 };
 /* w43: football ratings and the seven (issue #9, phase 3). Every Realm player has Cinder Gridiron ratings, p.gf, as
@@ -28179,7 +28326,7 @@ function wSevenAuto() { WG.seven = null; wSevenSync(); return wSevenDone(); }
 function wSevenPractice() {
   const home = wGridTeams()[0];
   if (WCAMP.close) WCAMP.close();
-  wGridironGame({ mode: 'call', teams: [wSevenTeam(), home] });
+  wGridironGame({ mode: 'call', teams: [wGridSquad().team, home] });
 }
 
 /* ---------- the Football block on a player's stats ---------- */
@@ -28264,7 +28411,10 @@ renderHelp = function () {
 
    WG.gfg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_GFG.keep], w, l, t }
               world = { kind: 'gfgame', ref, club, tier, how, day, name, ids, cup }, plain data; the end dispatches
-              W_ON_END[kind]. ids: the seven's keys at kick-off, so the box lines find your players
+              W_ON_END[kind]. ids: the squad's keys at kick-off (the seven, then the bench; null for a bench call-up),
+              so the box lines find your players
+   The bench (w48): each side brings W_GFG.bench players who sit at kick-off and come on for tired ones. Yours is your
+   players who sit out, then call-ups at your level; theirs is more of their kinds.
               snap = the engine's snapshot at a call (plain JSON)
    WG.gfstats { pid: summed box lines, plus gg (games) }, this journey
    wGridProblems(), wStartGrid({ club, how, tier?, kind?, ref?, cup? }), wResumeGrid(), wGridLeave(), wGridConcede(),
@@ -28280,7 +28430,7 @@ const W_GFG = {
   // one). Measured under the coaches (Simulate, test/realm_gridiron_lab.py, docs/realm/BALANCE.md): a win about 49%
   // of the time at tier 1, 44% at tier 2 and 25% at tier 3, as on the diamond
   oppBonus: { 1: 0, 2: 1, 3: 4 },
-  minutes: 150, keep: 10, saveMs: 15000,
+  minutes: 150, keep: 10, saveMs: 15000, bench: 3,
 };
 const W_GFG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
 const WGFG = { saved: 0, asked: false, msg: '', leaving: false };
@@ -28299,20 +28449,23 @@ function wGridProblems() {
 }
 // (the diamond's formula: one curve for both sports)
 const wGridOppLvl = tier => wBallOppLvl(tier);
-/* a club's seven: its own kinds first, at your level plus the tier, and W_GFG.oppBonus on every rating. A rival keeps
-   the same seven until it would be a different level; the local side is new each time. */
+/* a club's squad: its seven, its own kinds first, at your level plus the tier, and W_GFG.oppBonus on every rating; then
+   its bench of W_GFG.bench, reserves a level lower and without the bonus. A rival keeps the same squad until it would
+   be a different level; the local side is new each time. */
 function wGridOpp(club, tier) {
   const B = wGfg(), lvl = wGridOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_GFG.oppBonus[tier] || 0;
   const cached = club !== 'local' && B.opp[club];
   let team;
-  if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
+  if (cached && cached.lvl === lvl && cached.team.roster.length > W_GFR.side) team = JSON.parse(JSON.stringify(cached.team));
   else {
     const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
-    const kinds = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i).slice(0, W_GFR.side);
+    // the seven's kinds, then the bench's (more of the same once they run out)
+    const all = own.filter(x => wGF.kinds.includes(x)).concat(W_GFR.cuKinds).filter((x, i, a) => a.indexOf(x) === i);
+    const kinds = all.slice(0, W_GFR.side).concat(Array.from({ length: W_GFG.bench }, (_, i) => all[(W_GFR.side + i) % all.length]));
     const names = new Set();
-    const roster = kinds.map(kind => {
+    const roster = kinds.map((kind, i) => {
       const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
-      const p = wMakePlayer({ kind, lvl, n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
+      const p = wMakePlayer({ kind, lvl: i < W_GFR.side ? lvl : Math.max(1, lvl - 1), n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined, num: rn ? rn[2] : undefined }, 'opp');
       names.add(p.n);
       return wSevenPlayer(p);
     });
@@ -28320,8 +28473,24 @@ function wGridOpp(club, tier) {
     if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
   }
   // the same ratings each time for the same club (a fixed order over the six), so a rival doesn't change between games
-  if (k) for (const p of team.roster) { const st = Object.keys(p.r); for (let i = 0; i < k; i++) { const s = st[(i * 5 + (p.num || 0)) % st.length]; p.r[s] = Math.min(W_GFR.cap, p.r[s] + 1); } }
+  if (k) for (const p of team.roster.slice(0, W_GFR.side)) { const st = Object.keys(p.r); for (let i = 0; i < k; i++) { const s = st[(i * 5 + (p.num || 0)) % st.length]; p.r[s] = Math.min(W_GFR.cap, p.r[s] + 1); } }
   return team;
+}
+
+/* your squad for a game: the seven, then a bench of W_GFG.bench: your players sitting out first (the highest level
+   first), then call-ups at your level, named apart from the other side (vs: their team). { team (as Cinder Gridiron
+   takes one), ids (roster ids; null for a call-up) } */
+function wGridSquad(vs) {
+  const S = wSevenSync(), team = wSevenTeam(), ids = S.ids.slice();
+  const out = wRoster().filter(p => !S.ids.includes(p.id)).sort((a, b) => b.lvl - a.lvl).slice(0, W_GFG.bench);
+  for (const p of out) { team.roster.push(wSevenPlayer(p)); ids.push(p.id); }
+  const used = new Set(team.roster.map(p => p.n).concat(vs ? vs.roster.map(p => p.n) : []));
+  for (let i = 0; team.roster.length < W_GFR.side + W_GFG.bench && i < 20; i++) {
+    const kind = W_GFR.cuKinds[i % W_GFR.cuKinds.length], free = (FA_NAMES[kind] || []).filter(n => !used.has(n));
+    const p = wMakePlayer({ kind, lvl: wNineTier(), n: free.length ? pick(free) : undefined }, 'callup');
+    used.add(p.n); team.roster.push(wSevenPlayer(p)); ids.push(null);
+  }
+  return { team, ids };
 }
 
 /* ---------- starting, leaving, coming back ---------- */
@@ -28333,8 +28502,8 @@ function wStartGrid(o) {
   if (!wBallRegion(club) && !CLUBS[club] && club !== 'apex') return '';
   if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you at football today. Come back tomorrow.`;
   const how = W_GFG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club);
-  const mine = wSevenTeam(), opp = wGridOpp(club, tier);
-  const world = { kind: o.kind || 'gfgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: wSevenSync().ids.slice(), cup: !!o.cup };
+  const opp = wGridOpp(club, tier), sq = wGridSquad(opp), mine = sq.team;
+  const world = { kind: o.kind || 'gfgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, cup: !!o.cup };
   if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
   if (how === 'sim') {
@@ -28422,7 +28591,7 @@ function wGridSettle(r, us, them, box, half) {
   // box lines for your own players: side 0, by the seven at kick-off (call-ups have no roster id)
   const S = WG.gfstats = WG.gfstats || {}, line = {};
   for (const b of box) {
-    if (b.side !== 0) continue;
+    if (b.side !== 0 || b.played === false) continue;
     const id = W.ids[b.ri]; if (typeof id !== 'number' || !wPlayer(id)) continue;
     const T = S[id] = S[id] || { gg: 0 };
     T.gg++;
@@ -28430,12 +28599,12 @@ function wGridSettle(r, us, them, box, half) {
     line[id] = Object.assign({}, b.line);
   }
   const mvp = wGridMvp(line);
-  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(W.ids);
+  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(box.filter(b => b.side === 0 && (b.played !== undefined ? b.played : b.ri < W_GFR.side)).map(b => W.ids[b.ri]));
   for (const p of wRoster()) {
     const n = inSeven.has(p.id) ? base + (win && mvp === p.id ? W_GFG.mvpXp : 0) : Math.round(base * W_GFG.benchShare);
     if (n > 0) wGiveXp(p, n);
   }
-  const bits = `XP +${base} for the seven${wRoster().some(p => !inSeven.has(p.id)) ? `, +${Math.round(base * W_GFG.benchShare)} for those who sat out` : ''}`;
+  const bits = `XP +${base} for everyone who played${wRoster().some(p => !inSeven.has(p.id)) ? `, +${Math.round(base * W_GFG.benchShare)} for those who sat out` : ''}`;
   let pay = '';
   if (win) { const g = W_GFG.gold * W.tier, f = W_GFG.fans * W.tier; RUN.gold += g; RUN.fans = (RUN.fans || 0) + f; pay = ` +${g} gold, +${f} fans.`; }
   if (CLUBS[W.club]) {
@@ -28608,8 +28777,8 @@ renderHelp = function () {
    and one ultimate a game per kind that leaves a zone for 3 plays or the drive. Casting costs stamina.
    On the bar, in You call and You play: your mana, the powers your players can cast with this call (pick one, or G to
    go through them), Auto powers (your players cast their own, as the coaches would; on in You call, T switches it), and
-   a tip box with the pros and cons of the power you point at or picked, for this down. Under the field, How it works
-   explains powers and lists every kind's; How to play has #wHelpGfPowers.
+   a tip box with the pros and cons of the power you point at or picked, for this down. How to play's Football: how
+   it works (W_GRID_HOW, w42) explains powers and lists every kind's; How to play has #wHelpGfPowers.
    Wraps: wGridBar (wW45GridBar: the powers row), renderHelp (wW45RenderHelp: #wHelpGfPowers). */
 // (at the foot of the bar, so the play buttons above don't move as it changes)
 $('wGridBar').insertAdjacentHTML('beforeend', `<span id="wGridPows" class="wgpows" hidden><b id="wGridMana" title="Team mana: 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time they score on you (up to 6)."></b>
@@ -28658,14 +28827,14 @@ wGridBar = function () {
   if (WGF && WGF.mode !== 'watch' && !WGF.over && wGF.phase === 'call' && wGF.powers()) $('wGridNote').textContent += ' G: a power. T: Auto powers.';
 };
 
-// How it works, under the field: powers, and every kind's
+// Football: how it works (How to play): powers, and every kind's
 function wGridPowersHowHTML() {
   const B = wGF.powerBook, row = (k, b) => `<tr><td>${esc(wCap(k))}</td><td>${b.off ? `<b>${esc(b.off.n)}</b> <small>${b.off.cost}◆</small>: ${esc(b.off.desc)}` : ''}</td><td>${b.def ? `<b>${esc(b.def.n)}</b> <small>${b.def.cost}◆</small>: ${esc(b.def.desc)}` : ''}</td><td>${b.ult ? `<b>★ ${esc(b.ult.n)}</b> <small>${b.ult.role === 'off' ? 'on offense' : 'on defense'}</small>: ${esc(b.ult.desc)}` : ''}</td></tr>`;
   return `<p class="hint"><b>Powers.</b> Every player has two powers by kind: one on offense and one on defense. With each call your side may cast one, paid for with team mana (the diamonds beside each score): 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores on you, up to 6. Pick one on the bar (or press <b>G</b> to go through them) before you pick the play, or leave <b>Auto powers</b> on and your players cast their own (<b>T</b> switches it). Each kind also has an <b>ultimate</b> (★): once a game, ${wGF.ultCost} mana, and it leaves a zone on the field for ${wGF.ultPlays} plays or the drive, whichever ends first. Zones show on the grass with the plays they have left.</p>
   <p class="hint"><b>Stamina.</b> The same seven play both ways, so every play costs everyone a little, and casting costs a lot more (the undead and golems tire at half the rate). Below half, a player is slower and weaker until rested; the half gives plenty back, and a winded player can't cast. The <b>Sta</b> column under the field shows it. The tip box beside the powers gives the pros and cons of the one you point at, for this down. After each play the reason says what was cast and what it did. Their coach casts too, better at higher tiers, and remembers the plays you cast on.</p>
   <details class="wghow"><summary>Every kind's powers</summary><div class="tablewrap"><table class="wgline wgbook"><thead><tr><th>Kind</th><th>Offense</th><th>Defense</th><th>Ultimate</th></tr></thead><tbody>${Object.keys(B).map(k => row(k, B[k])).join('')}</tbody></table></div></details>`;
 }
-$('wGridHow').insertAdjacentHTML('beforeend', wGridPowersHowHTML());
+W_GRID_HOW.push(wGridPowersHowHTML);
 
 const wW45RenderHelp = renderHelp;
 renderHelp = function () {
@@ -28858,7 +29027,7 @@ W_ON_END.gfix = function (r, ref, W) {
   const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
   const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
   if (tie) { wLog(`A tie in the league at the Ash Bowl: no points for either side.`, 'd'); return; }
-  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r); }
+  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) { wH2hRecord(club, r); wH2h()[club].last = { r: r === 'win' ? 'win' : 'lose', us: W.us, them: W.them, sport: 'football', day: WG.dayAbs }; } }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
   const res = r === 'win' ? { a: 'me', b: club, sa: W.us, sb: W.them } : { a: club, b: 'me', sa: W.them, sb: W.us };
   L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'football', g: ref.g }));
@@ -28994,6 +29163,89 @@ renderHelp = function () {
   wW47RenderHelp();
   const d = $('wHelpGcup'); if (!d || $('wHelpGfFeel')) return;
   d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfFeel"><b>On the gridiron</b> you hear the whistle at each kickoff, the hits, and the crowd for a big gain or a score; sounds follow your Sound effects setting, and the realm's music plays on. Football games won and Cinder Cups have medals in the record book.</p>`);
+};
+/* w48: the bench and potions on the gridiron. Tired players can be got back three ways (src/gf/parts/15-bench.js):
+   - Swaps: each side brings a bench (W_GFG.bench, w44: your players who sit out, then call-ups). Between plays, put a
+     bench player on for a tired one; they take every place the tired one had, offense and defense. The bench rests.
+     The coaches swap for their side, and for yours under Coaches (and in Simulate).
+   - Potions (W_GF_POTIONS): a Stamina Draught (one player) and a Second Wind (the whole seven), sold in every general
+     store and found in a few chests. One a play, between plays, in a real game; each use takes one from your bag.
+   - Powers: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth give stamina back.
+   Every swap, potion and power goes in the play log, with its team (w42 wGridNotesLine).
+   wGridSwap(out, inn), wGridPotion(id, ri) return a message for the player, or '' when it worked.
+   Wrapped: wGridBar (wW48GridBar: the bench panel), renderHelp (wW48RenderHelp: #wHelpGfBench). */
+
+const WGB = { msg: '' };
+const W_GF_POTIONS = {
+  draught: { n: 40, all: false, price: 20 },
+  secondwind: { n: 15, all: true, price: 45 },
+};
+DB.items.draught = { name: 'Stamina Draught', desc: 'A bitter green tonic. One tired player gets 40 stamina back.', use: 'In a football game, between plays: Potions, under your lineup. One potion a play.', price: W_GF_POTIONS.draught.price };
+DB.items.secondwind = { name: 'Second Wind', desc: 'A flask of cold mountain air. The whole seven get 15 stamina back.', use: 'In a football game, between plays: Potions, under your lineup. One potion a play.', price: W_GF_POTIONS.secondwind.price };
+for (const k in DB.shops) { DB.shops[k].draught = W_GF_POTIONS.draught.price; DB.shops[k].secondwind = W_GF_POTIONS.secondwind.price; }
+for (const [c, it] of [['emberdeep_c6', 'draught'], ['hatchery_c6', 'secondwind'], ['genevault_c6', 'draught']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+
+// a game's save point is the last call: a swap or a potion made at a call is kept in it
+function wGridResnap() { const L = wGridWorld() && WG.gfg.live; if (L && wGF.phase === 'call') L.snap = wGF.snapshot(); }
+function wGridSwap(out, inn) {
+  const msg = wGF.swap(out, inn);
+  if (!msg) return 'Swaps happen between plays.';
+  wGridResnap(); wGridBar(); return '';
+}
+function wGridPotion(id, ri) {
+  const P = W_GF_POTIONS[id], b = wGF.bench();
+  if (!P || !b) return '';
+  if (!wGridWorld()) return 'Potions are for real games, not practice.';
+  if (!wHas(id)) return `You have no ${DB.items[id].name}. The general stores sell them.`;
+  if (b.item) return 'One potion a play.';
+  if (!wGF.useItem(P.all ? null : ri, P.n, DB.items[id].name)) return 'Potions are given between plays.';
+  wAddItem(id, -1); wGridResnap(); wGridBar(); return '';
+}
+
+// under the field, with your lineup: your bench, and your potions
+function wGridBenchHTML() {
+  const b = wGF.bench(); if (!b || !b.stam) return '';
+  const pos = p => [p.off, p.def].filter(Boolean).join('/'), opt = p => `<option value="${p.ri}">${esc(p.n)} (${pos(p)}), ${p.stam}%</option>`;
+  const tired = b.on.slice().sort((x, y) => x.stam - y.stam), off = !b.between ? ' disabled' : '';
+  const rows = b.bench.map(p => `<tr><td>${esc(p.n)} <small>#${p.num} ${esc(wCap(p.kind))}</small></td><td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td>
+    <td><select data-gin="${p.ri}" aria-label="Put ${esc(p.n)} on for"${off}><option value="">Put on for…</option>${tired.map(opt).join('')}</select></td></tr>`).join('');
+  const world = wGridWorld(), pots = Object.keys(W_GF_POTIONS).map(id => {
+    const n = WG && WG.items ? WG.items[id] || 0 : 0, P = W_GF_POTIONS[id], it = DB.items[id], can = world && n && b.between && !b.item;
+    return P.all ? `<button class="ghost" data-gpot="${id}" title="${esc(it.desc)}"${can ? '' : ' disabled'}>${esc(it.name)} ×${n}</button>`
+      : `<select data-gpot="${id}" aria-label="Give a ${esc(it.name)} to" title="${esc(it.desc)}"${can ? '' : ' disabled'}><option value="">${esc(it.name)} ×${n}: give to…</option>${tired.map(opt).join('')}</select>`;
+  }).join('');
+  return `<div class="wgbench"><div class="tablewrap"><table class="wgline"><caption>Your bench</caption><thead><tr><th>Player</th><th title="Stamina: on the bench they rest, ${wGF.stamRules.bench} a play">Sta</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="3" class="hint">Nobody on the bench.</td></tr>'}</tbody></table></div>
+    <div class="wgpots"><b>Potions</b>${pots}${b.item ? '<small class="hint">One given this play.</small>' : ''}</div>
+    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Coaches, they make the swaps.' : ''}</p></div>`;
+}
+$('wGridLineup').insertAdjacentHTML('afterend', '<div id="wGridBench"></div>');
+$('wGridBench').addEventListener('change', e => {
+  const s = e.target.closest('select'); if (!s || s.value === '') return;
+  const msg = s.dataset.gin != null ? wGridSwap(+s.value, +s.dataset.gin) : wGridPotion(s.dataset.gpot, +s.value);
+  WGB.msg = msg; wGridBar();
+});
+$('wGridBench').addEventListener('click', e => {
+  const b = e.target.closest('button[data-gpot]'); if (!b) return;
+  WGB.msg = wGridPotion(b.dataset.gpot, null); wGridBar();
+});
+// redrawn with the bar, but only when it changes (so an open list isn't shut under you)
+const wW48GridBar = wGridBar;
+wGridBar = function () {
+  wW48GridBar.apply(this, arguments);
+  const h = WGF ? wGridBenchHTML() : '';
+  if ($('wGridBench').dataset.html !== h) { $('wGridBench').dataset.html = h; $('wGridBench').innerHTML = h; }
+};
+
+W_GRID_HOW.push(() => `<p class="hint"><b>Tired players.</b> Under the field, with your lineup: <b>Your bench</b>. Between plays, put a bench player on for a tired one; they take every place the tired one had, on offense and on defense, and the one who comes off rests (${wGF.stamRules.bench} stamina a play) and may go back on. <b>Potions</b>: a Stamina Draught gives one player ${W_GF_POTIONS.draught.n} stamina back, and a Second Wind gives the whole seven ${W_GF_POTIONS.secondwind.n}; one a play, in a real game. The general stores sell them. Some powers give stamina back too: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth. The other side's coach swaps too, and so do yours under Coaches. Every swap, potion and power goes in the play log.</p>`);
+
+const wW48RenderHelp = renderHelp;
+renderHelp = function () {
+  wW48RenderHelp();
+  const g = $('wHelpGfPowers') || $('wHelpGridiron'); if (!g || $('wHelpGfBench')) return;
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfBench"><b>Tired players on the gridiron.</b> Each side brings a bench of ${W_GFG.bench}: your players who sit out, then call-ups. Between plays, put a bench player on for a tired one (under the field, Your bench), and the bench rests. Potions from the general stores give stamina back, one a play: a Stamina Draught (one player, ${W_GF_POTIONS.draught.n}) and a Second Wind (the whole seven, ${W_GF_POTIONS.secondwind.n}). The troll's, vampire's, witch's and elf's powers give some back too. Every swap, potion and power goes in the play log.</p>`);
 };
 </script>
 </body></html>
