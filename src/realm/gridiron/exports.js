@@ -14,7 +14,7 @@ return {
   // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
   box: () => gfBox(), snapshot: () => GD ? gfSnapshot() : null, resume: sn => { gfResume(sn); gfShow(); return G; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
-  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth() } : null,
+  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth(), wary: G.down === GF_RULES.downs ? gfFourthWary(G.poss) : '' } : null,
   // who is on the field: the drive's offense by position, and the other side's defense (r: the ratings they play on
   // now, worn when tired; base: their own)
   lineup: () => G ? [['off', G.drive.side], ['def', 1 - G.drive.side]].map(([m, s]) => ({ side: m === 'off' ? 0 : 1, team: G.teams[s].name, color: G.teams[s].color,
@@ -35,7 +35,7 @@ return {
   setStance: (role, id) => gfSetStance(role, id), cycleStance: () => gfCycleStance(), stanceTip: id => gfStanceTip(id), stanceMost: side => G ? gfStanceMost(side) : 'bal',
   stances: Object.fromEntries(GF_ST_IDS.map(k => [k, { n: GF_STANCE[k].n, desc: GF_STANCE[k].desc, stam: GF_STANCE[k].stam, off: Object.assign({}, GF_STANCE[k].off), def: Object.assign({}, GF_STANCE[k].def) }])),
   // (the fumble rules themselves, not a copy: a test may raise the chance to see one)
-  fumRules: GF_FUM,
+  fumRules: GF_FUM, fumRisk: side => G ? gfFumbleRisk(side) : null,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches

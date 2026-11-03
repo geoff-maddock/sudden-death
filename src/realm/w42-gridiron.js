@@ -195,7 +195,7 @@ function wGridBar() {
   const ck = wGF.clock();
   $('wGridNote').textContent = WGF.over ? (WGF.kind === 'game' ? 'The game is over.' : 'The drive is over.')
     : yours && !off ? `Your call: pick a defense.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
-    : yours && fourth ? `Fourth down: go for it, punt, or kick. The coach would ${k.coach === 'fg' ? 'kick the field goal' : k.coach === 'go' ? 'go for it' : 'punt'}.`
+    : yours && fourth ? `Fourth down: go for it, punt, or kick. The coach would ${k.coach === 'fg' ? 'kick the field goal' : k.coach === 'go' ? 'go for it' : 'punt'}${k.wary && k.coach !== 'fg' ? `, careful of a fumble: ${k.wary}${k.coach === 'go' ? ' (on Safe)' : ''}` : ''}.`
     : yours ? `Your call: pick a play, or kick.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
     : WGF.mode === 'play' && off ? 'You play it: Space to throw (hold to lead) or stiff-arm, WASD to run, Q and E for another receiver.' : call ? (WGF.kind === 'game' ? 'You call your side\'s plays, on offense and on defense.' : 'You call the offense; the coaches call the defense.') : 'The coaches call both sides.';
   $('wGridLineup').innerHTML = wGridLineup();

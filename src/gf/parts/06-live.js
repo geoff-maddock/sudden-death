@@ -132,6 +132,8 @@ function gfAim(p) {
     if (p.job === 'take' && !L.handed) return [qb.x - .6, qb.y + .4];
     // after the handoff or the catch, everyone blocks for the carrier
     if (c && !pocket && p !== c && p.job !== 'stalk') { const [d] = gfNearest(c.x, c.y, gfFree().filter(d => d.x > c.x - 2)); return d && hyp(d.x - c.x, d.y - c.y) < 9 ? [lerp(d.x, c.x, .35), lerp(d.y, c.y, .35)] : null; }
+    // Safe: on a long-developing pass the back slips out into the flat as a checkdown, once no rusher is coming at him
+    if (p.job === 'pblock' && L.fx && L.fx.valve && P.throwAt > 2 && L.t > L.fx.valve && !L.thrown && gfNearest(p.x, p.y, gfFree().filter(d => d.job === 'rush'))[1] > 4) { p.job = 'route'; p.route = [[p.x + 4, p.y + (p.y >= 0 ? 6 : -6)]]; p.wp = 0; }
     if (p.job === 'block' || p.job === 'pblock') {
       if (P.release && L.t > P.release) return [3 + (p.pos === 'C' ? 0 : 2), (P.routes.RB[0][1] > 0 ? 1 : -1) * (p.pos === 'LG' ? 3 : p.pos === 'RG' ? 7 : 5)];
       const home = p.job === 'pblock' ? [qb.x + 1.2, qb.y + 1.5] : P.kind === 'run' ? [p.x + 1.2, p.y] : [-1.8, p.y];
@@ -215,21 +217,23 @@ function gfQB() {
 }
 function gfThrow(hurry) {
   const P = GF_PLAYS[L.oc], qb = L.pl[L.id.QB], free = L.pl.filter(p => p.side === 1 && p.stun <= 0);
+  const v0 = gfThrowV(15 + qb.r.arm * 1.3);
   let best = -1, bs = -1e9;
+  // the open man, weighed by how deep he'd catch it (where his route takes him while the ball is in the air)
   L.pl.forEach((p, i) => {
     if (p.side !== 0 || p.job !== 'route') return;
-    const [, sep] = gfNearest(p.x, p.y, free);
-    const s = Math.min(sep, 8) + p.x * Math.max(-.02, (L.oc === 'deep' ? .08 : .02) + (L.fx ? L.fx.deepW : 0)) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
+    const [, sep] = gfNearest(p.x, p.y, free), lead = p.x + p.vx * hyp(p.x - qb.x, p.y - qb.y) / v0;
+    const s = Math.min(sep, 8) + lead * Math.max(-.02, (L.oc === 'deep' ? .08 : .02) + (L.fx ? L.fx.deepW : 0)) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
     if (s > bs) { bs = s; best = i; }
   });
-  const rc = L.pl[best], v = gfThrowV(15 + qb.r.arm * 1.3);
+  const rc = L.pl[best], v = v0;
   let tx = rc.x, ty = rc.y, T = 0;
   for (let k = 0; k < 3; k++) { T = hyp(tx - qb.x, ty - qb.y) / v; tx = rc.x + rc.vx * T; ty = rc.y + rc.vy * T; }
   // a long throw, a weak arm and a hurried one all miss by more
   const e = gfThrowErr(Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035);
   tx += gauss() * e; ty += gauss() * e; T = Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v);
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T, tgt: best });
-  L.thrown = true; L.carrier = -1;
+  L.air = Math.round(tx); L.thrown = true; L.carrier = -1;
   gfEv('throw', hurry ? 'hurried' : '', rc.n); gfAtThrow(best);
 }
 
@@ -323,7 +327,7 @@ function gfDead(what, by, x, byi) {
   let gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
   // Undying: a loss counts as no gain
   if (gain < 0 && L.fx && L.fx.nolose && (what === 'tackle' || what === 'sack')) { gfEv('pow', L.src.nolose, `${L.src.nolose}: ${c.n} wouldn't go down backwards.`); gain = 0; }
-  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier };
+  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier, air: L.air != null ? L.air : null };
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)
