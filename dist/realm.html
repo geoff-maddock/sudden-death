@@ -22327,7 +22327,7 @@ function gfDead(what, by, x, byi) {
 function gfPlayDown(oc, dc, st) { gfSnap(oc, dc, st); while (!L.done) gfStep(GF_DT); return L.done; }
 /* Cinder Gridiron: the coaches (issue #9, phase 1). Each side's call is a weighted pick from the down and distance,
    leaning to what beats the other side's recent calls and away from tired ones (12-playbook.js). On fourth down the coach kicks a field goal in
-   range, goes for it when it is short, and punts otherwise. */
+   range, goes for it when it is short, and punts otherwise; a Knight or better weighs the fumble risk first (gfFourthWary). */
 function gfCpuOffense() {
   const d = G.down, tg = G.togo;
   const w = { run: 3 + (tg <= 3 ? 3 : 0) - (tg >= 9 && d >= 2 ? 1.5 : 0), short: 3 + (tg >= 4 && tg <= 8 ? 1.5 : 0),
@@ -22342,8 +22342,13 @@ function gfCpuDefense() {
 const GF_FG_RANGE = 52, GF_FG_MAX = 62;
 function gfFourth() {
   if (gfKickDist() <= GF_FG_RANGE) return 'fg';
-  if (G.togo <= 2 && G.ball >= 40) return 'go';
+  if (G.togo <= 2 && G.ball >= 40) return gfFourthWary(G.poss) && !(G.togo <= 1 && G.ball >= 50) ? 'punt' : 'go';
   return 'punt';
+}
+// a careful coach (a Knight or better) sees a fumble coming: the reason, or ''
+function gfFourthWary(side) {
+  if (!(G.skill || [1, 1])[side] || G.togo > 2) return '';
+  const r = gfFumbleRisk(side); return r.x >= GF_FUM.wary ? r.why || 'the back could fumble' : '';
 }
 const gfKicker = () => G.teams[G.poss].roster[G.teams[G.poss].kicker];
 function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03 + gfZoneSum('kick'), .05, .99); }
@@ -22378,7 +22383,7 @@ function gfStart(opts) {
   gfStanceStart(o.stance);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null, wary: '' };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -22411,7 +22416,7 @@ function gfTick(dt) {
   GD.t += dt;
   if (GD.ph === 'call') {
     const mine = gfYours();
-    if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
+    if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); GD.wary = GD.kick === 'punt' && G.togo <= 2 && G.ball >= 40 ? gfFourthWary(G.poss) : ''; if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
@@ -22523,7 +22528,8 @@ function gfKick() {
     const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt'))); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
     G.drive.end = 'punt'; GD.big = null; GD.msg = `${k.n} punts, ${y} yards.`;
-    GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
+    const wary = GD.wary ? `The coach punts on fourth and short rather than risk a fumble: ${GD.wary}. ` : ''; GD.wary = '';
+    GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `${wary}The punt gives the ball away, but a long way from your goal line.`;
   }
   if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
   gfZoneRest();
@@ -23485,7 +23491,9 @@ const GF_STANCE = {
 // the offense's effects that your hands take over in Play mode, at about half strength
 const GF_ST_HANDS = ['errM', 'int', 'fum', 'cStr'];
 // a fumble: the chance a tackle that holds knocks it loose (Balanced against Balanced), how often the defense falls on it
-const GF_FUM = { base: .012, def: .6 };
+// wary: on fourth and short, a careful coach (a Knight or better) whose back is this much likelier than usual to fumble
+// punts, or goes for it on fourth and 1 past midfield playing Safe
+const GF_FUM = { base: .012, def: .6, wary: 2.2 };
 const gfStanceOk = id => GF_ST_IDS.includes(id);
 
 // (force: a stance by side that the coaches must play, for the balance bot: [id or null, id or null])
@@ -23512,11 +23520,13 @@ function gfPickStances() {
   }
   return out;
 }
-// what the situation asks for: Risky when behind late or on a long third or fourth down, Safe when ahead late or backed up
+// what the situation asks for: Risky when behind late or on a long third or fourth down, Safe when ahead late or backed up,
+// and Safe going for it on fourth down with a back likely to fumble
 function gfStanceSit(side, role) {
   const m = G.score[side] - G.score[1 - side], late = !!GD.game && (G.half === 3 || (G.half === 2 && G.clock < 150));
   if (late && m < 0) return 'risky';
   if (late && m > 0) return 'safe';
+  if (role === 'off' && G.down === GF_RULES.downs && gfFourthWary(side)) return 'safe';
   if (role === 'off') return G.down >= 3 && G.togo >= 8 ? 'risky' : G.ball <= 10 ? 'safe' : 'bal';
   return G.down >= 3 && G.togo >= 8 ? 'safe' : G.ball >= 90 || (G.down >= 3 && G.togo <= 2) ? 'risky' : 'bal';
 }
@@ -23556,6 +23566,17 @@ function gfStanceMost(side) {
 }
 
 /* ---------- fumbles ---------- */
+// how likely the back is to put it on the ground this down, against the usual (x: 1 is a fresh back's on Balanced
+// against Balanced): his legs, strength and hands, the other side's tacklers, and the stance their coach would play
+// (a Squire's could be anything). The coaches weigh it on fourth down (gfFourth).
+function gfFumbleRisk(side) {
+  const T = G.teams[side], D = G.teams[1 - side], ri = T.off.RB, c = gfWorn(side, ri, T.roster[ri].r);
+  const tk = Object.values(D.def).reduce((a, j) => a + gfWorn(1 - side, j, D.roster[j].r).tkl, 0) / Object.keys(D.def).length;
+  const dst = (G.skill || [1, 1])[1 - side] ? gfStanceSit(1 - side, 'def') : null, df = dst ? GF_STANCE[dst].def.fum || 1 : 1.1;
+  const worn = gfStamOf(side, ri) < 50, x = df * (worn ? 1.4 : 1) * clamp(1 + (tk - c.str) * .06 + (6 - c.hnd) * .05, .4, 2);
+  const why = [worn && `${T.roster[ri].n} is tired`, c.hnd <= 4 && `${T.roster[ri].n} has loose hands`, dst === 'risky' && 'their defense will go for the ball'].filter(Boolean);
+  return { x, why: why.join(', and ') };
+}
 // does this tackle knock the ball loose: c the carrier, d the tackler
 function gfFumbleRoll(c, d) {
   const F = L.fx || GF_FX0, worn = gfStamOf(G.poss, c.ri) < 50 ? 1.4 : 1;
@@ -23697,7 +23718,7 @@ return {
   // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
   box: () => gfBox(), snapshot: () => GD ? gfSnapshot() : null, resume: sn => { gfResume(sn); gfShow(); return G; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
-  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth() } : null,
+  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth(), wary: G.down === GF_RULES.downs ? gfFourthWary(G.poss) : '' } : null,
   // who is on the field: the drive's offense by position, and the other side's defense (r: the ratings they play on
   // now, worn when tired; base: their own)
   lineup: () => G ? [['off', G.drive.side], ['def', 1 - G.drive.side]].map(([m, s]) => ({ side: m === 'off' ? 0 : 1, team: G.teams[s].name, color: G.teams[s].color,
@@ -23718,7 +23739,7 @@ return {
   setStance: (role, id) => gfSetStance(role, id), cycleStance: () => gfCycleStance(), stanceTip: id => gfStanceTip(id), stanceMost: side => G ? gfStanceMost(side) : 'bal',
   stances: Object.fromEntries(GF_ST_IDS.map(k => [k, { n: GF_STANCE[k].n, desc: GF_STANCE[k].desc, stam: GF_STANCE[k].stam, off: Object.assign({}, GF_STANCE[k].off), def: Object.assign({}, GF_STANCE[k].def) }])),
   // (the fumble rules themselves, not a copy: a test may raise the chance to see one)
-  fumRules: GF_FUM,
+  fumRules: GF_FUM, fumRisk: side => G ? gfFumbleRisk(side) : null,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
@@ -28356,7 +28377,7 @@ function wGridBar() {
   const ck = wGF.clock();
   $('wGridNote').textContent = WGF.over ? (WGF.kind === 'game' ? 'The game is over.' : 'The drive is over.')
     : yours && !off ? `Your call: pick a defense.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
-    : yours && fourth ? `Fourth down: go for it, punt, or kick. The coach would ${k.coach === 'fg' ? 'kick the field goal' : k.coach === 'go' ? 'go for it' : 'punt'}.`
+    : yours && fourth ? `Fourth down: go for it, punt, or kick. The coach would ${k.coach === 'fg' ? 'kick the field goal' : k.coach === 'go' ? 'go for it' : 'punt'}${k.wary && k.coach !== 'fg' ? `, careful of a fumble: ${k.wary}${k.coach === 'go' ? ' (on Safe)' : ''}` : ''}.`
     : yours ? `Your call: pick a play, or kick.${ck ? ` ${ck.name}, ${ck.text} left.` : ''}`
     : WGF.mode === 'play' && off ? 'You play it: Space to throw (hold to lead) or stiff-arm, WASD to run, Q and E for another receiver.' : call ? (WGF.kind === 'game' ? 'You call your side\'s plays, on offense and on defense.' : 'You call the offense; the coaches call the defense.') : 'The coaches call both sides.';
   $('wGridLineup').innerHTML = wGridLineup();
@@ -29585,7 +29606,7 @@ wGridSettle = function (r, us, them, box, half, most) {
 /* ---------- How to play ---------- */
 W_GRID_HOW.push(() => {
   const S = wGF.stances;
-  return `<p class="hint"><b>Stances.</b> Beside the call, your side plays <b>Safe</b>, <b>Balanced</b> or <b>Risky</b>, on offense and on defense. It changes how the play is run, not which play. <b>Risky</b> chases the big play: the quarterback holds it for the deep man and throws longer (on a short pass, he looks for the receiver up the seam rather than the one cutting in), ball carriers fight for every yard, the rush comes harder and the coverage jumps routes. Expect more big gains, sacks, interceptions and fumbles, on both sides. <b>Safe</b> guards against those: short, sure throws (the quarterback throws it away rather than take a sack, and on a deep pass the back slips out as a checkdown), two hands on the ball, and coverage that keeps it in front. Expect fewer big plays. The stance also sets how hard your seven go: Risky costs about ${S.risky.stam}× the stamina a play, and Safe about ${S.safe.stam}×. Your stance stays until you change it: the buttons beside the modes, or <b>S</b>. Point at one for its pros and cons this down. Playing by hand, your throws and runs take about half its effect, because your hands decide most of the risk. The coaches pick a stance each down: Risky when behind late or on a long third down, Safe when ahead late or backed up. The scoreboard shows both sides' stances at the snap, and the log and the reason say what they did.</p>
+  return `<p class="hint"><b>Stances.</b> Beside the call, your side plays <b>Safe</b>, <b>Balanced</b> or <b>Risky</b>, on offense and on defense. It changes how the play is run, not which play. <b>Risky</b> chases the big play: the quarterback holds it for the deep man and throws longer (on a short pass, he looks for the receiver up the seam rather than the one cutting in), ball carriers fight for every yard, the rush comes harder and the coverage jumps routes. Expect more big gains, sacks, interceptions and fumbles, on both sides. <b>Safe</b> guards against those: short, sure throws (the quarterback throws it away rather than take a sack, and on a deep pass the back slips out as a checkdown), two hands on the ball, and coverage that keeps it in front. Expect fewer big plays. The stance also sets how hard your seven go: Risky costs about ${S.risky.stam}× the stamina a play, and Safe about ${S.safe.stam}×. Your stance stays until you change it: the buttons beside the modes, or <b>S</b>. Point at one for its pros and cons this down. Playing by hand, your throws and runs take about half its effect, because your hands decide most of the risk. The coaches pick a stance each down: Risky when behind late or on a long third down, Safe when ahead late or backed up. On fourth and short, a careful coach weighs the fumble too: with a tired back, or one with loose hands, against a defense going for the ball, they punt, or go for it on fourth and 1 past midfield playing Safe. The fourth-down hint says when. The scoreboard shows both sides' stances at the snap, and the log and the reason say what they did.</p>
   <p class="hint"><b>Fumbles</b> are rare: a hard tackle can knock the ball loose, more often from a tired or weak ball carrier, and far more often when either side plays Risky. Whoever is nearest falls on it, the defense more often than not, and a defender who picks it up may run it back. Lost, it ends the drive like an interception.</p>`;
 });
 const wW49RenderHelp = renderHelp;

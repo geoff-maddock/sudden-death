@@ -434,3 +434,12 @@ Over the 2,400 mixed downs of `test/realm_gridiron_stance.py`, Risky makes 396 p
 The back first left his block whatever the rush did, which sacked Safe 1.9 times a game and dropped it to 37–41%. Waiting until no rusher is near brought it back. Every Balanced row has more big plays, because the other coach plays Risky some downs and now takes the seam. Cups won: 4.0% and 5.0% (4.7% before).
 
 **Forced stances, whole games** (250 games a row, as the table above): Balanced (Balanced) 42%, Risky (Balanced) 38%, Safe (Balanced) 43%, Risky (Safe) 42%, Safe (Risky) 42%. The rock, paper, scissors has flattened: every pairing is within 4 points of even. 20+ plays a game, home side: 3.5 Balanced, 3.9 Risky, 2.4 Safe.
+
+### Fourth down and the fumble (follow-up to #29)
+
+On fourth and 2 or less past their own 40, a Knight or Archmage coach now weighs how likely the back is to fumble (`gfFumbleRisk`): his stamina (under 50 is 1.4×), his hands and strength against the tacklers, and the stance the other coach would play (a Knight's defense goes Risky on short yardage, 1.8×; a Squire's could be anything). At 2.2× the usual or more (`GF_FUM.wary`), the coach punts, or on fourth and 1 past midfield goes for it playing Safe. A Squire doesn't weigh it. In practice this means a tired back, or one with poor hands against hard tacklers.
+
+Over 1,000 games, both Knights: the coaches punt for the fumble 37 times (about once every 27 games), and go for it on fourth down 263 times instead of 299. Fumbles on fourth-down tries: 3 either way. It rarely matters, because fourth and short past the 40 is rare, and a fumble there costs little more than being stopped.
+
+**The Realm lab** (300 a row, before → after): tier 1 54.8% → 51.4%, tier 2 37.0% → 41.0%, tier 3 22.2% → 18.8%, Knight 49.0% → 43.7%, cups won 4.0% → 4.0%; your stance every down Safe 41.0% → 41.7%, Balanced 43.0% → 47.3%, Risky 48.3% → 47.7%. All inside the noise.
+

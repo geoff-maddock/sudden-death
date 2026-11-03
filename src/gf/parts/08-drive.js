@@ -27,7 +27,7 @@ function gfStart(opts) {
   gfStanceStart(o.stance);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null, wary: '' };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -60,7 +60,7 @@ function gfTick(dt) {
   GD.t += dt;
   if (GD.ph === 'call') {
     const mine = gfYours();
-    if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
+    if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); GD.wary = GD.kick === 'punt' && G.togo <= 2 && G.ball >= 40 ? gfFourthWary(G.poss) : ''; if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
@@ -172,7 +172,8 @@ function gfKick() {
     const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt'))); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
     G.drive.end = 'punt'; GD.big = null; GD.msg = `${k.n} punts, ${y} yards.`;
-    GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
+    const wary = GD.wary ? `The coach punts on fourth and short rather than risk a fumble: ${GD.wary}. ` : ''; GD.wary = '';
+    GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `${wary}The punt gives the ball away, but a long way from your goal line.`;
   }
   if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
   gfZoneRest();

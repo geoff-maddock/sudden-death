@@ -3,7 +3,8 @@
 # the in and Risky often takes the seam, and on the deep pass Safe checks down to the back; a play costs less stamina on Safe and more on
 # Risky; fumbles (rare) are lost or kept, run back, and counted in the box, the banner and the log; the stance buttons,
 # S, the scoreboard, the log line and the tip box; your stance stays until you change it and is saved with the game;
-# the coaches play Risky behind late and Safe ahead late; Play mode takes about half the effect on the throw and the
+# the coaches play Risky behind late and Safe ahead late, and on fourth and short a Knight or better weighs the
+# fumble (a tired back: punt, or go on Safe on fourth and 1); Play mode takes about half the effect on the throw and the
 # carrier; the Gunslinger and Grinder medals; How to play. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -137,6 +138,26 @@ async def main():
         check(co['longThird'] == 'risky' and co['backedUp'] == 'safe', 'Risky on third and long, Safe backed up near their own goal', co)
         sq = co['squire']
         check(all(sq.get(k, 0) > 40 for k in ('safe', 'bal', 'risky')) and sq['bal'] > sq['safe'] and sq['bal'] > sq['risky'], 'a Squire picks at random, leaning to Balanced', sq)
+
+        # ---------- fourth and short: the coaches weigh the fumble ----------
+        f4 = await pg.evaluate("""(() => { wGF.game({ seed: 3 }); const G = wGF.G, rb = G.teams[0].off.RB, out = {};
+          G.poss = 0; G.skill = [1, 1]; G.half = 1; G.clock = 300; G.score = [0, 0]; G.down = 4; G.togo = 2; G.ball = 45;
+          G.stam[0][rb] = 100; out.fresh = [wGF.kick().coach, wGF.fumRisk(0).x, wGF.kick().wary];
+          G.stam[0][rb] = 30; out.tired = [wGF.kick().coach, wGF.fumRisk(0).x, wGF.kick().wary];
+          G.togo = 1; G.ball = 55; out.oneTired = [wGF.kick().coach, wGF.cpu.stance(0, 'off', 1)];
+          G.togo = 2; G.ball = 45; G.skill = [0, 1]; out.squire = wGF.kick().coach;
+          G.skill = [1, 0]; out.vsSquire = [wGF.kick().coach, wGF.fumRisk(0).x];
+          return out; })()""")
+        check(f4['fresh'][0] == 'go' and not f4['fresh'][2], 'fourth and 2 past their 40 with a fresh back: the coach goes for it', f4)
+        check(f4['tired'][0] == 'punt' and f4['tired'][1] > f4['fresh'][1] and 'tired' in f4['tired'][2], 'with the back tired against a defense that goes for the ball, a Knight punts, and says why', f4)
+        check(f4['oneTired'] == ['go', 'safe'], 'on fourth and 1 past midfield the coach still goes, playing Safe', f4)
+        check(f4['squire'] == 'go', 'a Squire never weighs it', f4)
+        check(f4['vsSquire'][1] < f4['tired'][1], "against a Squire's defense (any stance) the risk counts for less", f4)
+        wy = await pg.evaluate("""(() => { wGF.fumRules.wary = 0; const out = [];
+          for (let i = 0; i < 40 && !out.length; i++) { wGF.simGame({ teams: wGridTeams(), skill: [1, 1], seed: 40 + i });
+            for (const d of wGF.G.drives) for (const e of d.plays) if (e.oc === 'punt' && /rather than risk a fumble/.test(e.why || '')) out.push(e.why); }
+          wGF.fumRules.wary = 2.2; return out; })()""")
+        check(len(wy) > 0 and wy[0].startswith('The coach punts on fourth and short rather than risk a fumble: '), 'a punt for the fumble says so after the play', wy[:1])
 
         # ---------- the bar, in a game you call ----------
         await pg.evaluate("wGridironGame({ mode: 'call', seed: 11 })")

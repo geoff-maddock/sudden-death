@@ -31,7 +31,9 @@ const GF_STANCE = {
 // the offense's effects that your hands take over in Play mode, at about half strength
 const GF_ST_HANDS = ['errM', 'int', 'fum', 'cStr'];
 // a fumble: the chance a tackle that holds knocks it loose (Balanced against Balanced), how often the defense falls on it
-const GF_FUM = { base: .012, def: .6 };
+// wary: on fourth and short, a careful coach (a Knight or better) whose back is this much likelier than usual to fumble
+// punts, or goes for it on fourth and 1 past midfield playing Safe
+const GF_FUM = { base: .012, def: .6, wary: 2.2 };
 const gfStanceOk = id => GF_ST_IDS.includes(id);
 
 // (force: a stance by side that the coaches must play, for the balance bot: [id or null, id or null])
@@ -58,11 +60,13 @@ function gfPickStances() {
   }
   return out;
 }
-// what the situation asks for: Risky when behind late or on a long third or fourth down, Safe when ahead late or backed up
+// what the situation asks for: Risky when behind late or on a long third or fourth down, Safe when ahead late or backed up,
+// and Safe going for it on fourth down with a back likely to fumble
 function gfStanceSit(side, role) {
   const m = G.score[side] - G.score[1 - side], late = !!GD.game && (G.half === 3 || (G.half === 2 && G.clock < 150));
   if (late && m < 0) return 'risky';
   if (late && m > 0) return 'safe';
+  if (role === 'off' && G.down === GF_RULES.downs && gfFourthWary(side)) return 'safe';
   if (role === 'off') return G.down >= 3 && G.togo >= 8 ? 'risky' : G.ball <= 10 ? 'safe' : 'bal';
   return G.down >= 3 && G.togo >= 8 ? 'safe' : G.ball >= 90 || (G.down >= 3 && G.togo <= 2) ? 'risky' : 'bal';
 }
@@ -102,6 +106,17 @@ function gfStanceMost(side) {
 }
 
 /* ---------- fumbles ---------- */
+// how likely the back is to put it on the ground this down, against the usual (x: 1 is a fresh back's on Balanced
+// against Balanced): his legs, strength and hands, the other side's tacklers, and the stance their coach would play
+// (a Squire's could be anything). The coaches weigh it on fourth down (gfFourth).
+function gfFumbleRisk(side) {
+  const T = G.teams[side], D = G.teams[1 - side], ri = T.off.RB, c = gfWorn(side, ri, T.roster[ri].r);
+  const tk = Object.values(D.def).reduce((a, j) => a + gfWorn(1 - side, j, D.roster[j].r).tkl, 0) / Object.keys(D.def).length;
+  const dst = (G.skill || [1, 1])[1 - side] ? gfStanceSit(1 - side, 'def') : null, df = dst ? GF_STANCE[dst].def.fum || 1 : 1.1;
+  const worn = gfStamOf(side, ri) < 50, x = df * (worn ? 1.4 : 1) * clamp(1 + (tk - c.str) * .06 + (6 - c.hnd) * .05, .4, 2);
+  const why = [worn && `${T.roster[ri].n} is tired`, c.hnd <= 4 && `${T.roster[ri].n} has loose hands`, dst === 'risky' && 'their defense will go for the ball'].filter(Boolean);
+  return { x, why: why.join(', and ') };
+}
 // does this tackle knock the ball loose: c the carrier, d the tackler
 function gfFumbleRoll(c, d) {
   const F = L.fx || GF_FX0, worn = gfStamOf(G.poss, c.ri) < 50 ? 1.4 : 1;
