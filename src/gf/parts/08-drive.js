@@ -8,6 +8,7 @@
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
    GD.cast is what both sides cast for the play on show. opts.skill: the CPU's skill by side ([0..2, 0..2]).
+   Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
@@ -25,7 +26,7 @@ function gfStart(opts) {
   if (o.powers !== false) gfPowersStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -42,6 +43,10 @@ function gfCanCall(oc) {
 }
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
+  // a new call: the coaches make their swaps first (before the save point and the page hear of it), for the CPU's
+  // side, and for yours when they call it (15-bench.js); a play, a kick or a new drive: a potion may be given again
+  if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
+  if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) GD.item = false;
   // each call is a point to save the game at (13-box.js)
   if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
@@ -86,6 +91,7 @@ function gfResult(r) {
   const e = { oc: GD.oc, dc: GD.dc, what: r.what, gain: r.gain, by: r.by, who: r.who, ...before };
   const pw = [GD.cast && GD.cast.off, GD.cast && GD.cast.def].filter(Boolean).map(c => ({ side: c.side, n: c.n, name: c.name, ult: c.ult }));
   if (pw.length) e.pw = pw;
+  gfZoneRest(); gfTakeNotes(e);
   gfBoxPlay(off, r);
   G.drive.plays.push(e);
   GD.why = gfWhy(r);
@@ -145,7 +151,8 @@ function gfKick() {
     GD.why = GD.meter ? `Power ${Math.round(GD.meter.pw * 100)}%${Math.abs(GD.meter.aim) > .3 ? ', and a wild aim cost some distance' : ''}. The punt gives the ball away, but a long way from your goal line.` : `The punt gives the ball away, but a long way from your goal line.`;
   }
   if (GD.kick !== 'fg' && gfZoneSum('punt') < 0) GD.why += ` The ${gfZoneName('punt')} cuts it short.`;
-  G.drive.plays.push({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why });
+  gfZoneRest();
+  G.drive.plays.push(gfTakeNotes({ oc: GD.kick, dc: '', what: G.drive.end, gain: 0, by: k.n, who: k.n, down, togo: 0, ball, msg: GD.msg, why: GD.why }));
   gfRunClock(G.drive.end, 5);
   gfPowersAfter();
 }

@@ -97,7 +97,7 @@ async def main():
         check(f0['fresh'] == 1 and f0['word'] == '' and abs(f1['fresh'] - .2) < 1e-9 and f1['short'] == 1 and f1['word'] == 'tired' and 'Fresh: 20%' in f1['title'],
               'two runs in a row: the run tires to 20%, the button says tired, and the others stay fresh', [f0, f1])
         check(f1['ph'] == 'over' or ('Run 100%' in f1['seen'] and 'beat it' in f1['seen']), 'the panel says what their coach has seen of your calls', f1)
-        hw = await pg.evaluate("document.getElementById('wGridHow').textContent")
+        hw = await pg.evaluate("(renderHelp(), document.getElementById('wGridHow').textContent)")
         check('Plays tire' in hw and 'they see coming' in hw, 'How it works explains tiring plays and the counter-calls', hw[-500:])
         check(not errs, 'no page errors', errs)
         await br.close()

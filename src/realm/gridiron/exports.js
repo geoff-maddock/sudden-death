@@ -8,7 +8,7 @@ return {
   newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES),
   start: gfStart, game: gfStartGame, simGame: gfSimGame, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
   get on() { return GFP.on; }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
-  get play() { return L; }, pause: on => { GFP.paused = !!on; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
+  get play() { return L; }, pause: on => { GFP.paused = !!on; }, get paused() { return GFP.paused; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
   // Play mode: the page's keys ({ steer, hold, pick, tap }), and what the field shows of them
   input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; }, get onPhase() { return GF_HOOK.onPhase; }, set onSnap(f) { GF_HOOK.onSnap = f; }, set wantSnap(f) { GF_HOOK.wantSnap = f; },
   // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
@@ -23,6 +23,12 @@ return {
   get isGame() { return !!GD && GD.game; }, get yourBall() { return !!GD && G.poss === GD.you; }, clock: () => G && GD && GD.game ? { half: G.half, text: gfClockText(), name: GF_HALF_NAME[G.half] } : null,
   // the camera and the banner: how far in it has zoomed (1 is the whole width), the big play it zoomed for, the last result's banner
   view: () => ({ zoom: GFT.zoom, why: GFT.why, big: GD && GD.big ? Object.assign({}, GD.big) : null, px: GFP.dpr }),
+  // the bench (15-bench.js): your seven and your bench with their stamina, whether a swap or a potion can happen now,
+  // a swap (out comes off, inn comes on; returns what happened, or ''), a potion (ri, or null for the seven), and the
+  // notes waiting for the next play's log line
+  bench: () => G && GD ? { on: gfOnField(GD.you).map(i => gfBenchRow(GD.you, i)), bench: gfBench(GD.you).map(i => gfBenchRow(GD.you, i)), between: gfBetween(), item: !!GD.item, stam: !!G.stam } : null,
+  swap: (out, inn) => G && GD ? gfSwapYours(out, inn) : '', useItem: (ri, n, name) => G && GD ? gfUseItem(ri, n, name) : '',
+  notes: () => GD && GD.notes ? JSON.parse(JSON.stringify(GD.notes)) : [], swapRules: Object.assign({}, GF_SWAP, { lim: GF_SWAP.lim.slice() }), stamRules: Object.assign({}, GF_STAM),
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches

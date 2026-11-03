@@ -37,7 +37,7 @@ window.GLAB = {
     let opp; try { wGfg().opp = {}; opp = wGridOpp(club, tier); } finally { wBallOppLvl = keep; }
     const sk = wGridSkill(tier); if (o.skill != null) sk[1] = o.skill;
     const t0 = performance.now();
-    const g = wGF.simGame({ teams: [wSevenTeam(), opp], skill: sk, powers: o.powers !== false });
+    const g = wGF.simGame({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false });
     return { gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
   },
   cup(lvl) {

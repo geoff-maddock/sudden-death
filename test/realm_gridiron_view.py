@@ -33,7 +33,7 @@ async def start(br, w, h, scale=1):
     await pg.evaluate(CLOSE_ALL)
     await pg.evaluate("wStartGrid({ club: 'local', how: 'manage' })")
     await pg.wait_for_function("UI.view === 'gridiron' && wGF.phase === 'call'", timeout=30000)
-    await pg.wait_for_timeout(300)
+    await pg.wait_for_function("document.querySelector('#v-gridiron canvas').width === Math.round(960 * wGF.view().px)")
     return pg, errs
 
 async def main():
@@ -68,15 +68,42 @@ async def main():
         v = await pg.evaluate("wGF.view()")
         check(v['why'] in ('Breakaway!', 'Deep ball!', 'Broken tackle!', 'At the goal line!', 'Touchdown!', 'Picked off!'), 'a big play zooms in on the ball, and says why', v)
         await pg.wait_for_function("wGF.phase === 'call' || wGF.phase === 'kickoff'", timeout=60000)
-        await pg.wait_for_timeout(1500)
+        try: await pg.wait_for_function("wGF.view().zoom < 1.05", timeout=4000)
+        except Exception: pass
         check(await pg.evaluate("wGF.view().zoom < 1.05"), 'by the next call the camera is back out', await pg.evaluate("wGF.view()"))
         await pg.wait_for_function("wGF.phase === 'post' && !!wGF.view().big", timeout=120000)
         v = await pg.evaluate("wGF.view()")
         check(v['big']['k'] in ('td', 'int', 'first', 'sack', 'safety', 'downs', 'long', 'fg', 'miss'), 'after a play, a banner says what it came to', v)
         stats = await pg.evaluate("document.getElementById('wGridStats').textContent")
         check('Total yards' in stats and 'Passing' in stats and 'Leaders' in stats, 'the team stats and leaders show under the field', stats)
-        how = await pg.evaluate("document.getElementById('wGridHow').textContent")
+        how = await pg.evaluate("(renderHelp(), document.getElementById('wGridHow').textContent)")
         check('zooms in on the ball' in how and 'banner' in how and 'leaders' in how, 'How it works explains the zoom, the banner and the stats')
+        check(await pg.evaluate("!document.querySelector('#wGridPanel #wGridHow')"), 'How it works is not under the field any more')
+        # the button under the field opens How to play at Football: how it works, and the game waits
+        await pg.click('#wGridHowBtn')
+        await pg.wait_for_function("!document.getElementById('pg-help').hidden && !!document.querySelector('#wHelp #wGridHow')")
+        try: await pg.wait_for_function("Math.abs(document.getElementById('wGridHow').getBoundingClientRect().top) < 80", timeout=3000)
+        except Exception: pass
+        at = await pg.evaluate("document.getElementById('wGridHow').getBoundingClientRect().top")
+        check(abs(at) < 80, 'How to play football opens How to play at Football: how it works', at)
+        # (held still over 90 frames of the page)
+        held = await pg.evaluate("""new Promise(r => { const st = () => JSON.stringify([wGF.G.clock, wGF.G.plays, wGF.phase, wGF.play ? +wGF.play.t.toFixed(2) : 0]), s0 = st(); let n = 0;
+          const f = () => ++n < 90 ? requestAnimationFrame(f) : r({ paused: wGF.paused, same: st() === s0 }); requestAnimationFrame(f); })""")
+        check(held['paused'] and held['same'], 'the game waits while you read', held)
+        c1 = await pg.evaluate("JSON.stringify([wGF.G.clock, wGF.G.plays, wGF.phase, wGF.play ? +wGF.play.t.toFixed(2) : 0])")
+        await pg.evaluate("showPage('play')")
+        try: await pg.wait_for_function("JSON.stringify([wGF.G.clock, wGF.G.plays, wGF.phase, wGF.play ? +wGF.play.t.toFixed(2) : 0]) !== " + json.dumps(c1), timeout=10000)
+        except Exception: pass
+        c2 = await pg.evaluate("JSON.stringify([wGF.G.clock, wGF.G.plays, wGF.phase, wGF.play ? +wGF.play.t.toFixed(2) : 0])")
+        check(c2 != c1 and not await pg.evaluate("wGF.paused"), 'and goes on when you come back to Play', [c1, c2])
+        # a question asked (the forfeit) holds it too, and coming back from another page doesn't let it go
+        await pg.evaluate("wGridForfeit('Forfeit the game?', () => 0, 'Forfeit')")
+        await pg.evaluate("showPage('help'); showPage('play')")
+        check(await pg.evaluate("wGF.paused"), 'with a question up, going to another page and back keeps the game held', await pg.evaluate("wGF.paused"))
+        await pg.evaluate("document.querySelector('#modalBox #cfNo, #modalBox [data-close]') && document.querySelector('#modalBox #cfNo, #modalBox [data-close]').click()")
+        try: await pg.wait_for_function("!wGF.paused", timeout=3000)
+        except Exception: pass
+        check(not await pg.evaluate("wGF.paused"), 'and it goes on once the question is answered')
         check(not errs and await pg.evaluate("window.__sdErrs.length === 0"), 'no page errors', errs)
         await br.close()
     print('errors:', FAILS)

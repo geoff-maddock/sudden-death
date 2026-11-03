@@ -91,7 +91,7 @@ async def main():
         ln = await pg.evaluate("""(() => { const rows = [...document.querySelectorAll('#wGridLineup tr[data-gpos]')];
           rows[0].dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
           return { rows: rows.length, cells: rows[0].querySelectorAll('td').length, key: document.querySelectorAll('#wGridLineup .wgkey').length,
-            how: document.getElementById('wGridHow').textContent, hl: wGF.lineup().length }; })()""")
+            how: (renderHelp(), document.getElementById('wGridHow').textContent), hl: wGF.lineup().length }; })()""")
         check(ln['rows'] == 14 and ln['cells'] == 9 and ln['key'] >= 14 and 'four downs' in ln['how'] and 'Field goal' in ln['how'],
               'On the field lists both sides\' seven with their six ratings, and How it works is under the field', ln)
         # after the play: what happened and why, in the bar and in the drive's log

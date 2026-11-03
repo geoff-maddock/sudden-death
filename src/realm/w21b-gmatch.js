@@ -122,7 +122,7 @@ wPreGame = function (enc) {
 /* ---------- the end ---------- */
 W_ON_END.ground = function (r, ref, W) {
   const g = ref && wGrd(ref.g); if (!g) return;
-  const G = wGrdState(), h = G.rec[g.id] = G.rec[g.id] || { w: 0, l: 0 }, last = (RUN.games || [])[RUN.games.length - 1] || {};
+  const G = wGrdState(), h = G.rec[g.id] = G.rec[g.id] || { w: 0, l: 0 }, last = (RUN.games || []).slice(-1)[0] || {};
   G.met[g.id] = WG.dayAbs;
   if (r === 'win') h.w++; else h.l++;
   h.last = { r: r === 'win' ? 'win' : 'lose', us: typeof last.us === 'number' ? last.us : null, them: typeof last.them === 'number' ? last.them : null, mode: ref.mode || 'friendly', day: WG.dayAbs };

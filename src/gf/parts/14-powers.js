@@ -7,7 +7,9 @@
      plays or the drive, whichever ends first; a few hit at once too (Stampede).
    - Stamina (G.stam, by side and roster index, 0 to 100): the same seven play both ways, so every play costs everyone
      a little (the undead and golems half as much); casting costs a lot more, and the half gives plenty back. Below
-     half, a player is slower and weaker (gfWorn), and can't cast below GF_STAM.min.
+     half, a player is slower and weaker (gfWorn), and can't cast below GF_STAM.min. A player on the bench rests
+     (GF_STAM.bench a play; 15-bench.js). A few powers give stamina back too (rest: { team } the seven, { tired: [n, k] }
+     the n most tired; the Overgrowth zone, restZ, every play it lasts).
    - Your side: pick a power with the call (GD.pow), or let Auto powers (GD.auto, on in 'call', T on the page) cast
      the way the coaches would. The CPU casts at three skill levels (G.skill, by side: 0, 1, 2): a Squire casts at
      random, a Knight leans to powers that suit the call, and an Archmage casts only those, and saves its ultimates for
@@ -16,7 +18,7 @@
      the zones (gfFx): multipliers multiply, the rest add. 06-live.js reads L.fx; what a power did goes in the play's
      events, and so in the reason after it.
    - Power tips (gfPowerTip): the pros and cons of a power for the down, the distance and the field. */
-const GF_MANA = { start: 3, max: 6, scored: 1, drive: 1 }, GF_STAM = { min: 20, per: 6, base: 14, ult: 30, play: 1, half: 50 };
+const GF_MANA = { start: 3, max: 6, scored: 1, drive: 1 }, GF_STAM = { min: 20, per: 6, base: 14, ult: 30, play: 1, half: 50, bench: 4 };
 const GF_ULT_COST = 3, GF_ULT_PLAYS = 3;
 const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
 // the effects, at no effect. Speed: oSpd (the offense), dSpd (the defense), cSpd (the ball carrier), rSpd (receivers on
@@ -47,7 +49,7 @@ const GF_POW = {
   minotaur: [{ id: 'bullrush', n: 'Bull Rush', cost: 1, fits: 'run', desc: 'The ball carrier lowers the horns: +2 strength against tackles.', fx: { cStr: 2 } },
     { id: 'gore', n: 'Gore', cost: 1, fits: 'any', desc: 'Horns first: tackles a little likelier, and +1 strength against blocks.', fx: { tkl: .12, dStr: 1 } }],
   troll: [{ id: 'seismic', n: 'Seismic Snap', cost: 2, fits: 'any', desc: 'The ground heaves at the snap: every defender staggers for a second and a half.', fx: { snapAll: 1.6 } },
-    { id: 'boulder', n: 'Boulder', cost: 1, fits: 'run', desc: 'Boulders for shoulders: tackles a little likelier, and +1.5 strength against blocks.', fx: { tkl: .1, dStr: 1.5 } }],
+    { id: 'boulder', n: 'Boulder', cost: 1, fits: 'run', rest: { tired: [2, 15] }, desc: 'Boulders for shoulders: tackles a little likelier, and +1.5 strength against blocks. Troll blood: the two most tired on the field get 15 stamina back.', fx: { tkl: .1, dStr: 1.5 } }],
   golem: [{ id: 'stoneskin', n: 'Stone Skin', cost: 1, fits: 'pass', desc: 'The pocket turns to stone: blocks hold about four times as long, and the throw goes truer.', fx: { shed: .25, errM: .8 } },
     { id: 'quake', n: 'Quake', cost: 2, fits: 'any', desc: 'A stomp at the snap: every blocker stumbles.', fx: { blkStun: .8 } }],
   harpy: [{ id: 'glide', n: 'Glide', cost: 1, fits: 'pass', desc: 'The receiver rises over the defender: no break-ups, no picks.', fx: { sure: 1 } },
@@ -57,7 +59,7 @@ const GF_POW = {
   wraith: [{ id: 'invis', n: 'Invisibility', cost: 2, fits: 'pass', desc: 'The receivers vanish off the line: the coverage loses them for a second and a half.', fx: { coverSlow: 1.6 } },
     { id: 'haunt', n: 'Haunt', cost: 1, fits: 'pass', desc: 'The receiver thrown to panics and loses a third of a step.', fx: { tgtSlow: .35 } }],
   vampire: [{ id: 'swarm', n: 'Bat Swarm', cost: 2, fits: 'run', desc: 'The ball carrier bursts into bats: no tackle holds for 1.5 seconds after taking the ball.', fx: { untag: 1.5 } },
-    { id: 'mesmer', n: 'Mesmerize', cost: 2, fits: 'any', desc: 'Whoever takes the ball freezes for a moment.', fx: { cStun: .9, cStunP: 1 } }],
+    { id: 'mesmer', n: 'Mesmerize', cost: 2, fits: 'any', rest: { team: 6 }, desc: 'Whoever takes the ball freezes for a moment, and the vampire drinks: the seven get 6 stamina back.', fx: { cStun: .9, cStunP: 1 } }],
   lich: [{ id: 'telek', n: 'Telekinesis', cost: 1, fits: 'pass', desc: 'The throw is guided there: it flies almost true and lands soft.', fx: { errM: .25, catch: .1 } },
     { id: 'deflect', n: 'Deflect', cost: 1, fits: 'pass', desc: 'A ward in the air pushes the throw off line.', fx: { errA: 1.2 } }],
   zombie: [{ id: 'undying', n: 'Undying', cost: 1, fits: 'any', desc: 'Won\'t go down backwards: a loss of yards counts as no gain.', fx: { nolose: 1 } },
@@ -68,7 +70,7 @@ const GF_POW = {
     { id: 'web', n: 'Web', cost: 1, fits: 'run', desc: 'Whoever takes the ball is webbed: nearly half speed for 1.8 seconds.', fx: { cSlow: 1.8 } }],
   skeleton: [{ id: 'shieldwall', n: 'Shield Wall', cost: 1, fits: 'any', desc: 'The line locks shields around the ball: +2 blocking strength, blocks hold about twice as long, and the carrier +1 strength against tackles.', fx: { blk: 2, shed: .45, cStr: 1 } },
     { id: 'stand', n: 'Goal-line Stand', cost: 1, fits: 'any', desc: 'Tackles likelier, and much likelier with your goal line close (inside your 20).', fx: { stand: 1 } }],
-  witch: [{ id: 'hex', n: 'Hex', cost: 1, fits: 'pass', desc: 'Hexes their deep safety: nearly half speed for the first four seconds.', fx: { safetySlow: 4 } },
+  witch: [{ id: 'hex', n: 'Hex', cost: 1, fits: 'pass', rest: { team: 8 }, desc: 'Hexes their deep safety: nearly half speed for the first four seconds, and a draught from the cauldron: the seven get 8 stamina back.', fx: { safetySlow: 4 } },
     { id: 'frost', n: 'Frost Hex', cost: 2, fits: 'any', desc: 'A chill over the field: their whole offense 12% slower.', fx: { oSpd: .88 } }],
 };
 // ultimates by kind: role 'off' or 'def' (when it can be cast), zone: the effects the zone leaves for 3 plays or the
@@ -83,7 +85,7 @@ const GF_ULT = {
   troll: { id: 'bog', n: 'Bog Tide', role: 'def', desc: 'Calls up the swamp: their backfield turns to bog, and everyone behind the line moves 35% slower.', zone: { backSpd: .65 }, vis: ['#4a6a3a', 'back'] },
   golem: { id: 'rampart', n: 'Rampart', role: 'off', desc: 'A wall grows along the line: hardly a rusher gets through.', zone: { shed: .05 }, vis: ['#9a9a9a', 'line'] },
   harpy: { id: 'tempest', n: 'Tempest', role: 'def', desc: 'A gale over the field: their kicks are pushed off line, and their long throws too.', zone: { kick: -.2, punt: -10, errA: 1 }, vis: ['#9ac8e8', 'all'] },
-  elf: { id: 'overgrowth', n: 'Overgrowth', role: 'off', desc: 'The grass grows knee-high: the defense wades, 6% slower.', zone: { dSpd: .94 }, vis: ['#5aa04a', 'all'] },
+  elf: { id: 'overgrowth', n: 'Overgrowth', role: 'off', desc: 'The grass grows knee-high: the defense wades, 6% slower, and the elf\'s side rests in it: 4 stamina back each play it lasts.', zone: { dSpd: .94 }, restZ: 4, vis: ['#5aa04a', 'all'] },
   wraith: { id: 'fog', n: 'Fog of the Dead', role: 'off', desc: 'A grave-fog: the defense hardly picks a throw off, and misses more tackles.', zone: { int: .3, tkl: -.1 }, vis: ['#b8c0c8', 'all'] },
   vampire: { id: 'eclipse', n: 'Eclipse', role: 'off', desc: 'The torches go out: the defense misses tackles in the dark.', zone: { tkl: -.14 }, vis: ['#2a1a3a', 'all'] },
   lich: { id: 'gravehands', n: 'Grave Hands', role: 'def', desc: 'Skeletal hands claw at the ball carrier: 20% slower, and a little easier to bring down.', zone: { cSpd: .8, tkl: .05 }, vis: ['#d8d0b8', 'mid'] },
@@ -113,7 +115,8 @@ function gfWorn(side, ri, r) {
 function gfRated(side, ri) { const r = gfWorn(side, ri, G.teams[side].roster[ri].r); return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)])); }
 // the half gives a lot back; every play costs everyone a little (the undead and golems tire at half the rate)
 function gfRest(n) { if (G.stam) for (const s of G.stam) for (let i = 0; i < s.length; i++) s[i] = Math.min(100, s[i] + n); }
-function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => s.forEach((v, i) => { s[i] = Math.max(0, v - GF_STAM.play * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)); })); }
+// (the bench rests instead)
+function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
 const gfStamCost = (cost, ult) => ult ? GF_STAM.ult : GF_STAM.base + GF_STAM.per * cost;
 const gfRole = side => side === G.poss ? 'off' : 'def';
 /* the powers a side can cast now (with the call): each of its players' everyday power for the side of the ball they
@@ -122,7 +125,9 @@ const gfRole = side => side === G.poss ? 'off' : 'def';
 function gfPowerOptions(side) {
   if (!G.mana) return [];
   const role = gfRole(side), T = G.teams[side], out = [];
+  const on = gfOnField(side);
   T.roster.forEach((m, ri) => {
+    if (!on.includes(ri)) return;
     const pw = GF_POW[m.kind], u = GF_ULT[m.kind], st = G.stam[side][ri];
     const add = (p, ult) => {
       const cost = ult ? GF_ULT_COST : p.cost, used = ult && !!(G.ultUsed[side][m.kind] || G.ultUsed[side][ri]);
@@ -138,6 +143,7 @@ function gfPowerOptions(side) {
 function gfCast(side, o) {
   G.mana[side] -= o.cost; G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - o.stamCost);
   if (o.ult) { G.ultUsed[side][o.kind] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
+  const P = GF_POW_BY[o.id]; if (P && P.rest) gfPowRest(side, P.rest, `${o.name} (${o.n})`);
   return { id: o.id, ri: o.ri, n: o.n, name: o.name, ult: o.ult, side };
 }
 // with the call: each side's power. Yours is your pick, or Auto powers', or none; the CPU's is the CPU's
@@ -174,6 +180,10 @@ function gfCpuPower(side, call, skill) {
   for (const o of opts) w[o.key] = skill === 0 ? (o.ult ? .3 : 1)
     : skill === 1 ? (fit(o) ? 3 : 1) * (o.ult ? (lever ? 3 : 1.5) : 1)
     : (fit(o) ? 1 : 0) * o.cost * (o.ult ? (lever ? 3 : .15) : 1) * o.stam / 100;
+  // a power that gives stamina back is worth more to a tired side (a Knight and an Archmage see it)
+  const tired = gfTired(side);
+  // (a weight, not a floor: an Archmage still casts only powers that fit, and still saves its ultimates)
+  if (skill >= 1 && tired > .25) for (const o of opts) if ((GF_POW_BY[o.id] || {}).rest || (GF_ULT_BY[o.id] || {}).restZ) w[o.key] *= 1 + tired * 4;
   const k = wpick(w); return w[k] > 0 ? opts.find(o => o.key === k) : null;
 }
 // the play's effects: the zones on the field and both sides' powers (with an ultimate's effects on the play it is cast)
@@ -206,11 +216,14 @@ function gfFxSrc(pw) {
 const gfZoneSum = k => (G && G.zones || []).reduce((a, z) => a + ((((GF_ULT_BY[z.id] || {}).zone || {})[k]) || 0), 0);
 const gfZoneName = k => ((G.zones || []).find(z => ((GF_ULT_BY[z.id] || {}).zone || {})[k] != null) || {}).n || '';
 // after a play: the zones count down, and the drive's end clears them; everyone tires a little
+// a zone that gives stamina back does it for every play it is on the field, the last one too (called as the play is
+// logged, so the note goes on that play's line)
+function gfZoneRest() { for (const z of (G.zones || [])) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); } }
 function gfPowersAfter() {
   if (!G.zones) return;
+  gfTirePlay();
   if (G.drive && G.drive.end) G.zones = [];
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
-  gfTirePlay();
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
 function gfPowersHalf() { if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
@@ -248,6 +261,8 @@ function gfPowerTip(key) {
   if (G.down >= 3) T.pro.push(`${GF_ORD[G.down]} down: a big one to spend on.`);
   if (near) T.pro.push(off ? 'Near their goal line: a touchdown is close.' : 'Near your goal line: every yard counts.');
   T.con.push(`${o.cost} mana (${Math.max(0, gfMana(side) - o.cost)} left after). Both sides get 1 at every new drive, and you get 1 more when they score.`);
+  const rs = (GF_POW_BY[o.id] || {}).rest, rz = (GF_ULT_BY[o.id] || {}).restZ, tired = gfTired(side);
+  if ((rs || rz) && tired > .25) T.pro.push(`Your seven are tired (${Math.round((1 - tired) * 100)}% stamina on average): this one gives some back.`);
   const after = o.stam - o.stamCost;
   T.con.push(`${o.n} spends ${o.stamCost} stamina (now ${o.stam}%)${after < 50 ? ': then slower and weaker until rested' : ''}.`);
   if (o.ult) {

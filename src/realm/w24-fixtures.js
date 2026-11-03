@@ -167,7 +167,7 @@ const wW24OnGround = W_ON_END.ground;
 W_ON_END.ground = function (r, ref, W) {
   wW24OnGround(r, ref, W);
   if (!ref || ref.mode !== 'fixture') return;
-  const L = wLeague(), F = wFixtures(), club = ref.club, g = (RUN.games || [])[RUN.games.length - 1] || {};
+  const L = wLeague(), F = wFixtures(), club = ref.club, g = (RUN.games || []).slice(-1)[0] || {};
   const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
   wLeagueMine(r);
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }

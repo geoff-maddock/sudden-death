@@ -14,6 +14,7 @@
    wGfOf(p)          p's ratings, made or caught up first
    wSevenSync()      makes the seven, or brings it up to date with the roster; returns WG.seven
    wSevenTeam()      the seven as Cinder Gridiron takes a team (yours, with your positions)
+   wMakeCallUp(kind, taken)   a call-up at your level with an untaken name (the seven's gaps, and a game's bench, w44)
    wSevenSetPos(key, side, pos), wSevenSit(key), wSevenPutIn(pid, key), wSevenAuto()   changes; each returns a
                      message for the player, or '' when it worked
    Wrapped: wMakePlayer (wW43MakePlayer), wGiveXp (wW43GiveXp), wStart (wW43Start), wAddPlayer (wW43AddPlayer),
@@ -62,12 +63,17 @@ function wSevenWho(k) {
   if (typeof k === 'string') return ((WG.seven && WG.seven.cu) || []).find(c => c.cid === k) || null;
   return wPlayer(k);
 }
+// a called-up player of a kind, at your level, with a name nobody in taken has (it's added to taken)
+function wMakeCallUp(kind, taken) {
+  const names = (FA_NAMES[kind] || []).filter(n => !taken.has(n));
+  const p = wMakePlayer({ kind, lvl: wNineTier(), n: names.length ? pick(names) : undefined }, 'callup');
+  taken.add(p.n);
+  return p;
+}
 function wSevenCallUp() {
   const S = WG.seven, used = new Set(S.ids.map(k => (wSevenWho(k) || {}).kind));
   const kind = W_GFR.cuKinds.find(k => !used.has(k)) || pick(W_GFR.cuKinds);
-  const taken = new Set(wRoster().map(p => p.n).concat(S.cu.map(c => c.n)));
-  const names = (FA_NAMES[kind] || []).filter(n => !taken.has(n));
-  const c = Object.assign(wMakePlayer({ kind, lvl: wNineTier(), n: names.length ? pick(names) : undefined }, 'callup'), { cid: 'g' + (S.seq++) });
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(S.cu.map(c => c.n)))), { cid: 'g' + (S.seq++) });
   S.cu.push(c);
   return c;
 }
@@ -150,7 +156,7 @@ function wSevenAuto() { WG.seven = null; wSevenSync(); return wSevenDone(); }
 function wSevenPractice() {
   const home = wGridTeams()[0];
   if (WCAMP.close) WCAMP.close();
-  wGridironGame({ mode: 'call', teams: [wSevenTeam(), home] });
+  wGridironGame({ mode: 'call', teams: [wGridSquad().team, home] });
 }
 
 /* ---------- the Football block on a player's stats ---------- */

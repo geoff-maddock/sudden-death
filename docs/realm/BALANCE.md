@@ -370,3 +370,15 @@ Part 1 plays a fresh five-player journey at level 3 (two call-ups fill the seven
 | cups won | 6.7% | 4.0% | 3.3% | 4.0% |
 
 Tier 1 changes nothing (no bonus), so its spread from 45% to 51% is the noise. Cups won stay at about 4–7% either way: few runs reach the final (28–36 of 150), so the final's rate swings. A simulated cup pays about 95 XP across the roster and costs about 17 gold. A player who calls the plays beats the coaches more often; nobody has measured that yet.
+
+**The bench (later).** Each side now brings a bench of three, and the coaches swap tired players. A first try gave their bench the tier's rating bonus and let a Knight bring on the freshest player whoever it was. Tier 3 fell from 23% to 16% and cups won from 11% to 2%: their bench was as good as their starters, while yours is call-ups. The fix: their bench is reserves (a level lower, no bonus), and a Knight only brings on someone who would play the positions at least as well now. Your side in Simulate, against the code before the bench:
+
+| | Before | After |
+|---|---|---|
+| tier 1 (150 a gap, 250 a tier after) | 51% | 48% |
+| tier 2 | 42.5% | 40% |
+| tier 3 | 23% | 21% |
+| cups won (300 cups each) | 3.7% | 5.3% |
+| cup final, won | 16% (68 played) | 22% (72 played) |
+
+All inside the noise. After the review's fixes (the Archmage casts restoring powers only when they fit, and swaps before kicks too), one more run of 150 a gap and 150 cups: tier 1 53%, tier 2 40%, tier 3 20%, cups won 4.7%. Still inside the noise.
