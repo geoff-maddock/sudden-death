@@ -26,7 +26,7 @@ function gfStart(opts) {
   if (o.powers !== false) gfPowersStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, swapped: false };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -43,7 +43,9 @@ function gfCanCall(oc) {
 }
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
-  if (ph === 'call') GD.item = false;
+  // a new call: the coaches may swap again; a play or a kick under way: a potion may be given again after it
+  if (ph === 'call') GD.swapped = false;
+  if (ph === 'pre' || ph === 'kick') GD.item = false;
   // each call is a point to save the game at (13-box.js)
   if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
@@ -54,11 +56,12 @@ function gfTick(dt) {
   GD.t += dt;
   if (GD.ph === 'call') {
     const mine = gfYours();
+    // the coaches make their swaps, once a call and before any kick: for the CPU's side, and for yours when they call
+    // it (15-bench.js)
+    if (!GD.swapped) { GD.swapped = true; for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]); }
     if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
-    // the coaches make their swaps, for the CPU's side, and for yours when they call it (15-bench.js)
-    for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
     GD.cast = gfCastPowers(GD.oc, GD.dc);
     GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });

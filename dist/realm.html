@@ -10879,9 +10879,10 @@ for (const id of ['moss_reg', 'salt_reg', 'cind_reg', 'rime_reg']) if (DB.chars[
 /* ---------- head to head ---------- */
 function wH2h() { return (WG.h2h = WG.h2h || {}); }
 function wH2hName(k) { return k === 'apex' ? DB.apex.name : CLUBS[k] ? CLUBS[k].name : k; }
-function wH2hRecord(k, r) {
+// at: the game's { us, them, sport } when it wasn't a card-game match (the last one in RUN.games is used otherwise)
+function wH2hRecord(k, r, at) {
   if (!k || !WG) return;
-  const H = wH2h(), h = H[k] = H[k] || { w: 0, l: 0 }, gs = RUN.games || [], g = gs[gs.length - 1] || {};
+  const H = wH2h(), h = H[k] = H[k] || { w: 0, l: 0 }, gs = RUN.games || [], g = at || gs[gs.length - 1] || {};
   if (r === 'win') h.w++; else h.l++;
   h.last = { r: r === 'win' ? 'win' : 'lose', us: typeof g.us === 'number' ? g.us : null, them: typeof g.them === 'number' ? g.them : null, sport: g.sport || null, day: WG.dayAbs };
 }
@@ -22362,7 +22363,7 @@ function gfStart(opts) {
   if (o.powers !== false) gfPowersStart();
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
-  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false };
+  GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, swapped: false };
   return G;
 }
 // your call for the next down (mode 'call'); returns false when it isn't your call to make
@@ -22379,7 +22380,9 @@ function gfCanCall(oc) {
 }
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
-  if (ph === 'call') GD.item = false;
+  // a new call: the coaches may swap again; a play or a kick under way: a potion may be given again after it
+  if (ph === 'call') GD.swapped = false;
+  if (ph === 'pre' || ph === 'kick') GD.item = false;
   // each call is a point to save the game at (13-box.js)
   if (ph === 'call' && GF_HOOK.onSnap && (!GF_HOOK.wantSnap || GF_HOOK.wantSnap())) try { GF_HOOK.onSnap(gfSnapshot()); } catch (e) { console.error(e); }
   if (GF_HOOK.onPhase) try { GF_HOOK.onPhase(ph); } catch (e) { console.error(e); }
@@ -22390,11 +22393,12 @@ function gfTick(dt) {
   GD.t += dt;
   if (GD.ph === 'call') {
     const mine = gfYours();
+    // the coaches make their swaps, once a call and before any kick: for the CPU's side, and for yours when they call
+    // it (15-bench.js)
+    if (!GD.swapped) { GD.swapped = true; for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]); }
     if (!mine && G.down === GF_RULES.downs && !GD.kick) { GD.kick = gfFourth(); if (GD.kick !== 'go') return gfGo('kick'); }
     if (GD.t < GF_PACE.call || (GD.mode !== 'watch' && !GD.pick)) return;
     if (mine && (GD.pick === 'punt' || GD.pick === 'fg')) { GD.kick = GD.pick; GD.pick = null; GD.pow = null; if (gfHands()) gfMeterStart(); return gfGo('kick'); }
-    // the coaches make their swaps, for the CPU's side, and for yours when they call it (15-bench.js)
-    for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
     GD.oc = mine ? GD.pick : gfCpuOffense(); GD.dc = GD.mode !== 'watch' && !mine ? GD.pick : gfCpuDefense(); GD.pick = null;
     GD.cast = gfCastPowers(GD.oc, GD.dc);
     GD.stale = Object.assign(gfCallsMade(GD.oc, GD.dc, GD.cast), { pw: GD.cast });
@@ -23196,7 +23200,8 @@ function gfCpuPower(side, call, skill) {
     : (fit(o) ? 1 : 0) * o.cost * (o.ult ? (lever ? 3 : .15) : 1) * o.stam / 100;
   // a power that gives stamina back is worth more to a tired side (a Knight and an Archmage see it)
   const tired = gfTired(side);
-  if (skill >= 1 && tired > .25) for (const o of opts) if ((GF_POW_BY[o.id] || {}).rest || (GF_ULT_BY[o.id] || {}).restZ) w[o.key] = Math.max(w[o.key], .5) * (1 + tired * 4);
+  // (a weight, not a floor: an Archmage still casts only powers that fit, and still saves its ultimates)
+  if (skill >= 1 && tired > .25) for (const o of opts) if ((GF_POW_BY[o.id] || {}).rest || (GF_ULT_BY[o.id] || {}).restZ) w[o.key] *= 1 + tired * 4;
   const k = wpick(w); return w[k] > 0 ? opts.find(o => o.key === k) : null;
 }
 // the play's effects: the zones on the field and both sides' powers (with an ultimate's effects on the play it is cast)
@@ -23231,10 +23236,11 @@ const gfZoneName = k => ((G.zones || []).find(z => ((GF_ULT_BY[z.id] || {}).zone
 // after a play: the zones count down, and the drive's end clears them; everyone tires a little
 function gfPowersAfter() {
   if (!G.zones) return;
+  gfTirePlay();
+  // a zone that gives stamina back does it for every play it was on the field, the last one too
+  for (const z of G.zones) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); }
   if (G.drive && G.drive.end) G.zones = [];
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
-  gfTirePlay();
-  for (const z of G.zones) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); }
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
 function gfPowersHalf() { if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
@@ -23303,7 +23309,7 @@ function gfPowerBook() {
      (and the kicks, if they were the kicker). The one who comes off rests, and may come back on later.
    - Stamina back (gfRestore): for one player or the whole seven. The Realm's potions use it (gfUseItem: one a play,
      between plays), and so do a few powers (14-powers.js: rest, restZ; gfPowRest).
-   - The coaches swap too (gfCpuSwaps, at each snap, by skill): a Squire now and then, for anyone fresher; a Knight a
+   - The coaches swap too (gfCpuSwaps, once a call and before any kick, by skill): a Squire now and then, for anyone fresher; a Knight a
      player under 40, for the freshest who would play those positions at least as well now (gfPlaysAs: the ratings the
      positions use, worn by stamina); an Archmage a player under 55, for whoever would play them best, and only if
      better. Never for someone less than GF_SWAP.gap fresher.
@@ -23362,7 +23368,7 @@ function gfUseItem(ri, n, name) {
   GD.item = true;
   return gfRestore(GD.you, ri, n, name);
 }
-// the coaches' swaps at the snap, by skill
+// the coaches' swaps, once a call (before a kick too), by skill
 function gfCpuSwaps(side, skill) {
   if (!G.stam || !gfBench(side).length) return;
   if (skill === 0 && R() > GF_SWAP.squire) return;
@@ -28062,7 +28068,7 @@ function wGridLog() {
   const drives = (G.drives || []).concat((G.drives || []).includes(G.drive) ? [] : [G.drive]), game = wGF.isGame;
   if (!drives.some(d => d.plays.length)) return '<li class="hint">No plays yet.</li>';
   return drives.map(d => (game && d.plays.length ? `<li class="wghead"><b>${esc(G.teams[d.side].name)}</b> · ${['', '1st half', '2nd half', 'Sudden Death'][d.half] || ''}${d.end ? ` · ${esc(W_GRID_END[d.end] || d.end)}, ${d.plays.length} play${d.plays.length === 1 ? '' : 's'}, ${d.yards} yards` : ''}</li>` : '')
-    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + wGridNotesLine(wGF.notes(), 'Before the next play');
+    + d.plays.map(e => wGridLogLine(e, d.side)).join('')).join('') + wGridNotesLine(wGF.notes(), ['pre', 'live'].includes(wGF.phase) ? 'This play' : 'Before the next play');
 }
 // the powers cast on a play, and the swaps, potions and stamina given back since the last one, each with its team
 function wGridNotesLine(notes, head) {
@@ -28190,6 +28196,7 @@ renderHelp = function () {
    wGfOf(p)          p's ratings, made or caught up first
    wSevenSync()      makes the seven, or brings it up to date with the roster; returns WG.seven
    wSevenTeam()      the seven as Cinder Gridiron takes a team (yours, with your positions)
+   wMakeCallUp(kind, taken)   a call-up at your level with an untaken name (the seven's gaps, and a game's bench, w44)
    wSevenSetPos(key, side, pos), wSevenSit(key), wSevenPutIn(pid, key), wSevenAuto()   changes; each returns a
                      message for the player, or '' when it worked
    Wrapped: wMakePlayer (wW43MakePlayer), wGiveXp (wW43GiveXp), wStart (wW43Start), wAddPlayer (wW43AddPlayer),
@@ -28238,12 +28245,17 @@ function wSevenWho(k) {
   if (typeof k === 'string') return ((WG.seven && WG.seven.cu) || []).find(c => c.cid === k) || null;
   return wPlayer(k);
 }
+// a called-up player of a kind, at your level, with a name nobody in taken has (it's added to taken)
+function wMakeCallUp(kind, taken) {
+  const names = (FA_NAMES[kind] || []).filter(n => !taken.has(n));
+  const p = wMakePlayer({ kind, lvl: wNineTier(), n: names.length ? pick(names) : undefined }, 'callup');
+  taken.add(p.n);
+  return p;
+}
 function wSevenCallUp() {
   const S = WG.seven, used = new Set(S.ids.map(k => (wSevenWho(k) || {}).kind));
   const kind = W_GFR.cuKinds.find(k => !used.has(k)) || pick(W_GFR.cuKinds);
-  const taken = new Set(wRoster().map(p => p.n).concat(S.cu.map(c => c.n)));
-  const names = (FA_NAMES[kind] || []).filter(n => !taken.has(n));
-  const c = Object.assign(wMakePlayer({ kind, lvl: wNineTier(), n: names.length ? pick(names) : undefined }, 'callup'), { cid: 'g' + (S.seq++) });
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(S.cu.map(c => c.n)))), { cid: 'g' + (S.seq++) });
   S.cu.push(c);
   return c;
 }
@@ -28473,6 +28485,7 @@ function wGridOpp(club, tier) {
     if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
   }
   // the same ratings each time for the same club (a fixed order over the six), so a rival doesn't change between games
+  wGridNums(team.roster);
   if (k) for (const p of team.roster.slice(0, W_GFR.side)) { const st = Object.keys(p.r); for (let i = 0; i < k; i++) { const s = st[(i * 5 + (p.num || 0)) % st.length]; p.r[s] = Math.min(W_GFR.cap, p.r[s] + 1); } }
   return team;
 }
@@ -28485,12 +28498,15 @@ function wGridSquad(vs) {
   const out = wRoster().filter(p => !S.ids.includes(p.id)).sort((a, b) => b.lvl - a.lvl).slice(0, W_GFG.bench);
   for (const p of out) { team.roster.push(wSevenPlayer(p)); ids.push(p.id); }
   const used = new Set(team.roster.map(p => p.n).concat(vs ? vs.roster.map(p => p.n) : []));
-  for (let i = 0; team.roster.length < W_GFR.side + W_GFG.bench && i < 20; i++) {
-    const kind = W_GFR.cuKinds[i % W_GFR.cuKinds.length], free = (FA_NAMES[kind] || []).filter(n => !used.has(n));
-    const p = wMakePlayer({ kind, lvl: wNineTier(), n: free.length ? pick(free) : undefined }, 'callup');
-    used.add(p.n); team.roster.push(wSevenPlayer(p)); ids.push(null);
-  }
+  for (let i = 0; team.roster.length < W_GFR.side + W_GFG.bench; i++) { team.roster.push(wSevenPlayer(wMakeCallUp(W_GFR.cuKinds[i % W_GFR.cuKinds.length], used))); ids.push(null); }
+  wGridNums(team.roster);
   return { team, ids };
+}
+// no two on a side wear the same number: the first to have it keeps it, the rest move up to a free one
+function wGridNums(roster) {
+  const seen = new Set();
+  for (const p of roster) { let n = p.num || 1; while (seen.has(n)) n = n % 99 + 1; p.num = n; seen.add(n); }
+  return roster;
 }
 
 /* ---------- starting, leaving, coming back ---------- */
@@ -28599,7 +28615,7 @@ function wGridSettle(r, us, them, box, half) {
     line[id] = Object.assign({}, b.line);
   }
   const mvp = wGridMvp(line);
-  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(box.filter(b => b.side === 0 && (b.played !== undefined ? b.played : b.ri < W_GFR.side)).map(b => W.ids[b.ri]));
+  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(box.filter(b => b.side === 0 && b.played).map(b => W.ids[b.ri]).filter(id => typeof id === 'number'));
   for (const p of wRoster()) {
     const n = inSeven.has(p.id) ? base + (win && mvp === p.id ? W_GFG.mvpXp : 0) : Math.round(base * W_GFG.benchShare);
     if (n > 0) wGiveXp(p, n);
@@ -29027,7 +29043,7 @@ W_ON_END.gfix = function (r, ref, W) {
   const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
   const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
   if (tie) { wLog(`A tie in the league at the Ash Bowl: no points for either side.`, 'd'); return; }
-  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) { wH2hRecord(club, r); wH2h()[club].last = { r: r === 'win' ? 'win' : 'lose', us: W.us, them: W.them, sport: 'football', day: WG.dayAbs }; } }
+  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r, { us: W.us, them: W.them, sport: 'football' }); }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
   const res = r === 'win' ? { a: 'me', b: club, sa: W.us, sb: W.them } : { a: club, b: 'me', sa: W.them, sb: W.us };
   L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'football', g: ref.g }));
@@ -29175,7 +29191,8 @@ renderHelp = function () {
    wGridSwap(out, inn), wGridPotion(id, ri) return a message for the player, or '' when it worked.
    Wrapped: wGridBar (wW48GridBar: the bench panel), renderHelp (wW48RenderHelp: #wHelpGfBench). */
 
-const WGB = { msg: '' };
+// msg: why the last swap or potion didn't happen, shown until the next call or game (at, G: when it was shown)
+const WGB = { msg: '', at: null, G: null };
 const W_GF_POTIONS = {
   draught: { n: 40, all: false, price: 20 },
   secondwind: { n: 15, all: true, price: 45 },
@@ -29235,6 +29252,8 @@ $('wGridBench').addEventListener('click', e => {
 const wW48GridBar = wGridBar;
 wGridBar = function () {
   wW48GridBar.apply(this, arguments);
+  if (WGB.msg && (wGF.G !== WGB.G || (wGF.phase === 'call' && WGB.at !== 'call'))) WGB.msg = '';
+  WGB.at = wGF.phase; WGB.G = wGF.G;
   const h = WGF ? wGridBenchHTML() : '';
   if ($('wGridBench').dataset.html !== h) { $('wGridBench').dataset.html = h; $('wGridBench').innerHTML = h; }
 };

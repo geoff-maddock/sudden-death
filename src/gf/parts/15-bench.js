@@ -4,7 +4,7 @@
      (and the kicks, if they were the kicker). The one who comes off rests, and may come back on later.
    - Stamina back (gfRestore): for one player or the whole seven. The Realm's potions use it (gfUseItem: one a play,
      between plays), and so do a few powers (14-powers.js: rest, restZ; gfPowRest).
-   - The coaches swap too (gfCpuSwaps, at each snap, by skill): a Squire now and then, for anyone fresher; a Knight a
+   - The coaches swap too (gfCpuSwaps, once a call and before any kick, by skill): a Squire now and then, for anyone fresher; a Knight a
      player under 40, for the freshest who would play those positions at least as well now (gfPlaysAs: the ratings the
      positions use, worn by stamina); an Archmage a player under 55, for whoever would play them best, and only if
      better. Never for someone less than GF_SWAP.gap fresher.
@@ -63,7 +63,7 @@ function gfUseItem(ri, n, name) {
   GD.item = true;
   return gfRestore(GD.you, ri, n, name);
 }
-// the coaches' swaps at the snap, by skill
+// the coaches' swaps, once a call (before a kick too), by skill
 function gfCpuSwaps(side, skill) {
   if (!G.stam || !gfBench(side).length) return;
   if (skill === 0 && R() > GF_SWAP.squire) return;

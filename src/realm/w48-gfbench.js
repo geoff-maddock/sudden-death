@@ -9,7 +9,8 @@
    wGridSwap(out, inn), wGridPotion(id, ri) return a message for the player, or '' when it worked.
    Wrapped: wGridBar (wW48GridBar: the bench panel), renderHelp (wW48RenderHelp: #wHelpGfBench). */
 
-const WGB = { msg: '' };
+// msg: why the last swap or potion didn't happen, shown until the next call or game (at, G: when it was shown)
+const WGB = { msg: '', at: null, G: null };
 const W_GF_POTIONS = {
   draught: { n: 40, all: false, price: 20 },
   secondwind: { n: 15, all: true, price: 45 },
@@ -69,6 +70,8 @@ $('wGridBench').addEventListener('click', e => {
 const wW48GridBar = wGridBar;
 wGridBar = function () {
   wW48GridBar.apply(this, arguments);
+  if (WGB.msg && (wGF.G !== WGB.G || (wGF.phase === 'call' && WGB.at !== 'call'))) WGB.msg = '';
+  WGB.at = wGF.phase; WGB.G = wGF.G;
   const h = WGF ? wGridBenchHTML() : '';
   if ($('wGridBench').dataset.html !== h) { $('wGridBench').dataset.html = h; $('wGridBench').innerHTML = h; }
 };

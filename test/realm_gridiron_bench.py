@@ -47,6 +47,9 @@ async def main():
         check(len(sq['out']) >= 1 and all(i in sq['ids'][7:] for i in sq['out']), 'your players sitting out are on the bench first, then call-ups', sq)
         opp = await pg.evaluate("wGridOpp('local', 1).roster.length")
         check(opp == 10, 'their squad has a bench of three too', opp)
+        nums = await pg.evaluate("""(() => { const out = []; for (let i = 0; i < 20; i++) { const o = wGridOpp(pick(['local', ...Object.keys(CLUBS)]), 1 + i % 3), s = wGridSquad(o);
+          for (const t of [o, s.team]) out.push(new Set(t.roster.map(p => p.num)).size === t.roster.length); } return out.every(Boolean); })()""")
+        check(nums, 'no two players on a side wear the same number')
 
         # ---------- a game: swaps ----------
         await pg.evaluate("wStartGrid({ club: 'local', how: 'manage' })")
@@ -82,6 +85,33 @@ async def main():
         await pg.wait_for_function("wGF.phase === 'call' || wGF.phase === 'post'", timeout=30000)
         rest1 = await pg.evaluate("wGF.G.stam[0][%d]" % sw['out']['ri'])
         check(rest1 > rest0, 'the bench rests', [rest0, rest1])
+
+        # ---------- one potion between two plays, in the pause after a play and at the call both ----------
+        await pg.evaluate("WG.items.draught = 2; WG.items.secondwind = 2")
+        one = await pg.evaluate("""new Promise(res => { const out = {}; const t = setInterval(() => {
+          const ph = wGF.phase;
+          if (!('post' in out) && ph === 'post') out.post = wGridPotion('draught', wGF.bench().on[0].ri);
+          else if ('post' in out && !('call' in out) && ph === 'call') { wGF.pause(true); out.call = wGridPotion('secondwind', null); out.msg = WGB.msg; wGF.pause(false); }
+          else if ('call' in out && !('next' in out) && ph === 'post') { out.next = wGridPotion('secondwind', null); out.cleared = WGB.msg; }
+          if ('next' in out) { clearInterval(t); res(out); }
+        }, 10); })""")
+        check(one['post'] == '' and one['call'] == 'One potion a play.', 'a potion in the pause after a play, and none again at the call before the next one', one)
+        check(one['next'] == '', 'after that play, one more may be given', one)
+        await pg.wait_for_function("wGF.phase === 'call'", timeout=60000)
+        await pg.wait_for_timeout(100)
+        check(await pg.evaluate("WGB.msg") == '' and 'One potion a play' not in await pg.evaluate("document.getElementById('wGridBench').textContent"),
+              'the refusal under the bench is gone by the next call')
+
+        # ---------- Overgrowth gives stamina back on every play it lasts ----------
+        await pg.wait_for_function("wGF.phase === 'call'", timeout=60000)
+        og = await pg.evaluate("""new Promise(res => { const G = wGF.G; wGF.pause(true);
+          G.zones = (G.zones || []).filter(z => z.id !== 'overgrowth').concat([{ id: 'overgrowth', n: 'Overgrowth', side: 0, left: 3 }]);
+          const d0 = (G.drives || []).length, p0 = G.drive.plays.length, drive = G.drive; wGF.pause(false);
+          const t = setInterval(() => { if (G.zones.some(z => z.id === 'overgrowth')) return; clearInterval(t);
+            const plays = drive.plays.slice(p0), later = (G.drives || []).slice(d0).concat([G.drive]).filter(d => d !== drive).flatMap(d => d.plays);
+            const notes = plays.concat(later).flatMap(e => e.notes || []).concat(wGF.notes()).filter(n => /Overgrowth/.test(n.msg));
+            res({ plays: plays.length, rests: notes.length }); }, 20); })""")
+        check(og['rests'] == og['plays'] and og['plays'] >= 1, 'Overgrowth gives stamina back on every play it is on the field, the last one too', og)
 
         # ---------- powers in the log; a power that gives stamina back ----------
         await pg.wait_for_function("(wGF.G.drives || []).concat([wGF.G.drive]).some(d => d.plays.some(e => e.pw))", timeout=120000)

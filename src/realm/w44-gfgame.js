@@ -72,6 +72,7 @@ function wGridOpp(club, tier) {
     if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
   }
   // the same ratings each time for the same club (a fixed order over the six), so a rival doesn't change between games
+  wGridNums(team.roster);
   if (k) for (const p of team.roster.slice(0, W_GFR.side)) { const st = Object.keys(p.r); for (let i = 0; i < k; i++) { const s = st[(i * 5 + (p.num || 0)) % st.length]; p.r[s] = Math.min(W_GFR.cap, p.r[s] + 1); } }
   return team;
 }
@@ -84,12 +85,15 @@ function wGridSquad(vs) {
   const out = wRoster().filter(p => !S.ids.includes(p.id)).sort((a, b) => b.lvl - a.lvl).slice(0, W_GFG.bench);
   for (const p of out) { team.roster.push(wSevenPlayer(p)); ids.push(p.id); }
   const used = new Set(team.roster.map(p => p.n).concat(vs ? vs.roster.map(p => p.n) : []));
-  for (let i = 0; team.roster.length < W_GFR.side + W_GFG.bench && i < 20; i++) {
-    const kind = W_GFR.cuKinds[i % W_GFR.cuKinds.length], free = (FA_NAMES[kind] || []).filter(n => !used.has(n));
-    const p = wMakePlayer({ kind, lvl: wNineTier(), n: free.length ? pick(free) : undefined }, 'callup');
-    used.add(p.n); team.roster.push(wSevenPlayer(p)); ids.push(null);
-  }
+  for (let i = 0; team.roster.length < W_GFR.side + W_GFG.bench; i++) { team.roster.push(wSevenPlayer(wMakeCallUp(W_GFR.cuKinds[i % W_GFR.cuKinds.length], used))); ids.push(null); }
+  wGridNums(team.roster);
   return { team, ids };
+}
+// no two on a side wear the same number: the first to have it keeps it, the rest move up to a free one
+function wGridNums(roster) {
+  const seen = new Set();
+  for (const p of roster) { let n = p.num || 1; while (seen.has(n)) n = n % 99 + 1; p.num = n; seen.add(n); }
+  return roster;
 }
 
 /* ---------- starting, leaving, coming back ---------- */
@@ -198,7 +202,7 @@ function wGridSettle(r, us, them, box, half) {
     line[id] = Object.assign({}, b.line);
   }
   const mvp = wGridMvp(line);
-  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(box.filter(b => b.side === 0 && (b.played !== undefined ? b.played : b.ri < W_GFR.side)).map(b => W.ids[b.ri]));
+  const base = Math.round(W_GFG.xp * W.tier * (win ? 1 : tie ? W_GFG.tieShare : W_GFG.lossShare)), inSeven = new Set(box.filter(b => b.side === 0 && b.played).map(b => W.ids[b.ri]).filter(id => typeof id === 'number'));
   for (const p of wRoster()) {
     const n = inSeven.has(p.id) ? base + (win && mvp === p.id ? W_GFG.mvpXp : 0) : Math.round(base * W_GFG.benchShare);
     if (n > 0) wGiveXp(p, n);

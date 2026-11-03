@@ -381,4 +381,4 @@ Tier 1 changes nothing (no bonus), so its spread from 45% to 51% is the noise. C
 | cups won (300 cups each) | 3.7% | 5.3% |
 | cup final, won | 16% (68 played) | 22% (72 played) |
 
-All inside the noise.
+All inside the noise. After the review's fixes (the Archmage casts restoring powers only when they fit, and swaps before kicks too), one more run of 150 a gap and 150 cups: tier 1 53%, tier 2 40%, tier 3 20%, cups won 4.7%. Still inside the noise.

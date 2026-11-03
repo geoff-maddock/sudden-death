@@ -45,9 +45,10 @@ for (const id of ['moss_reg', 'salt_reg', 'cind_reg', 'rime_reg']) if (DB.chars[
 /* ---------- head to head ---------- */
 function wH2h() { return (WG.h2h = WG.h2h || {}); }
 function wH2hName(k) { return k === 'apex' ? DB.apex.name : CLUBS[k] ? CLUBS[k].name : k; }
-function wH2hRecord(k, r) {
+// at: the game's { us, them, sport } when it wasn't a card-game match (the last one in RUN.games is used otherwise)
+function wH2hRecord(k, r, at) {
   if (!k || !WG) return;
-  const H = wH2h(), h = H[k] = H[k] || { w: 0, l: 0 }, gs = RUN.games || [], g = gs[gs.length - 1] || {};
+  const H = wH2h(), h = H[k] = H[k] || { w: 0, l: 0 }, gs = RUN.games || [], g = at || gs[gs.length - 1] || {};
   if (r === 'win') h.w++; else h.l++;
   h.last = { r: r === 'win' ? 'win' : 'lose', us: typeof g.us === 'number' ? g.us : null, them: typeof g.them === 'number' ? g.them : null, sport: g.sport || null, day: WG.dayAbs };
 }

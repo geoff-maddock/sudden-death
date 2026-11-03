@@ -182,7 +182,8 @@ function gfCpuPower(side, call, skill) {
     : (fit(o) ? 1 : 0) * o.cost * (o.ult ? (lever ? 3 : .15) : 1) * o.stam / 100;
   // a power that gives stamina back is worth more to a tired side (a Knight and an Archmage see it)
   const tired = gfTired(side);
-  if (skill >= 1 && tired > .25) for (const o of opts) if ((GF_POW_BY[o.id] || {}).rest || (GF_ULT_BY[o.id] || {}).restZ) w[o.key] = Math.max(w[o.key], .5) * (1 + tired * 4);
+  // (a weight, not a floor: an Archmage still casts only powers that fit, and still saves its ultimates)
+  if (skill >= 1 && tired > .25) for (const o of opts) if ((GF_POW_BY[o.id] || {}).rest || (GF_ULT_BY[o.id] || {}).restZ) w[o.key] *= 1 + tired * 4;
   const k = wpick(w); return w[k] > 0 ? opts.find(o => o.key === k) : null;
 }
 // the play's effects: the zones on the field and both sides' powers (with an ultimate's effects on the play it is cast)
@@ -217,10 +218,11 @@ const gfZoneName = k => ((G.zones || []).find(z => ((GF_ULT_BY[z.id] || {}).zone
 // after a play: the zones count down, and the drive's end clears them; everyone tires a little
 function gfPowersAfter() {
   if (!G.zones) return;
+  gfTirePlay();
+  // a zone that gives stamina back does it for every play it was on the field, the last one too
+  for (const z of G.zones) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); }
   if (G.drive && G.drive.end) G.zones = [];
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
-  gfTirePlay();
-  for (const z of G.zones) { const u = GF_ULT_BY[z.id]; if (u && u.restZ) gfRestore(z.side, null, u.restZ, z.n); }
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
 function gfPowersHalf() { if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
