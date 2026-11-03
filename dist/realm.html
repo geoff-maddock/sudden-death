@@ -21966,8 +21966,8 @@ const GF_OFF_SET = { QB: [-4.5, 0], RB: [-6.5, 1.5], C: [-1, 0], LG: [-1, -2.2],
 const GF_DEF_SET = { DT: [1, 0], DL: [1, -2.6], DR: [1, 2.6], LB: [5, 0], CL: [6, -12], CR: [6, 12], S: [13, 0] };
 const GF_PLAYS = {
   run: { n: 'Run', desc: 'Both receivers come in tight to block, and the back takes a handoff behind them.', kind: 'run', set: { X: [-1, -4.6], Z: [-1, 4.6] } },
-  short: { n: 'Short pass', desc: 'Both receivers cut inside; the ball is out in about a second.', kind: 'pass', drop: 1.5, throwAt: 1.1, rb: 'block',
-    routes: { X: [[4, 0], [9, 6]], Z: [[4, 0], [9, -6]] } },
+  short: { n: 'Short pass', desc: 'One receiver cuts inside, the other runs up the seam; the ball is out in about a second.', kind: 'pass', drop: 1.5, throwAt: 1.1, rb: 'block',
+    routes: { X: [[4, 0], [9, 6]], Z: [[18, -3]] } },
   deep: { n: 'Deep pass', desc: 'Both receivers run long. The quarterback needs time to throw.', kind: 'pass', drop: 5, throwAt: 2.4, rb: 'block',
     routes: { X: [[30, 3]], Z: [[30, -3]] } },
   screen: { n: 'Screen', desc: 'Let the rush through, then a short throw to the back out wide, behind the blockers.', kind: 'pass', drop: 4, throwAt: 1.15, rb: 'screen', hot: 1,
@@ -22125,6 +22125,8 @@ function gfAim(p) {
     if (p.job === 'take' && !L.handed) return [qb.x - .6, qb.y + .4];
     // after the handoff or the catch, everyone blocks for the carrier
     if (c && !pocket && p !== c && p.job !== 'stalk') { const [d] = gfNearest(c.x, c.y, gfFree().filter(d => d.x > c.x - 2)); return d && hyp(d.x - c.x, d.y - c.y) < 9 ? [lerp(d.x, c.x, .35), lerp(d.y, c.y, .35)] : null; }
+    // Safe: on a long-developing pass the back slips out into the flat as a checkdown, once no rusher is coming at him
+    if (p.job === 'pblock' && L.fx && L.fx.valve && P.throwAt > 2 && L.t > L.fx.valve && !L.thrown && gfNearest(p.x, p.y, gfFree().filter(d => d.job === 'rush'))[1] > 4) { p.job = 'route'; p.route = [[p.x + 4, p.y + (p.y >= 0 ? 6 : -6)]]; p.wp = 0; }
     if (p.job === 'block' || p.job === 'pblock') {
       if (P.release && L.t > P.release) return [3 + (p.pos === 'C' ? 0 : 2), (P.routes.RB[0][1] > 0 ? 1 : -1) * (p.pos === 'LG' ? 3 : p.pos === 'RG' ? 7 : 5)];
       const home = p.job === 'pblock' ? [qb.x + 1.2, qb.y + 1.5] : P.kind === 'run' ? [p.x + 1.2, p.y] : [-1.8, p.y];
@@ -22208,21 +22210,23 @@ function gfQB() {
 }
 function gfThrow(hurry) {
   const P = GF_PLAYS[L.oc], qb = L.pl[L.id.QB], free = L.pl.filter(p => p.side === 1 && p.stun <= 0);
+  const v0 = gfThrowV(15 + qb.r.arm * 1.3);
   let best = -1, bs = -1e9;
+  // the open man, weighed by how deep he'd catch it (where his route takes him while the ball is in the air)
   L.pl.forEach((p, i) => {
     if (p.side !== 0 || p.job !== 'route') return;
-    const [, sep] = gfNearest(p.x, p.y, free);
-    const s = Math.min(sep, 8) + p.x * Math.max(-.02, (L.oc === 'deep' ? .08 : .02) + (L.fx ? L.fx.deepW : 0)) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
+    const [, sep] = gfNearest(p.x, p.y, free), lead = p.x + p.vx * hyp(p.x - qb.x, p.y - qb.y) / v0;
+    const s = Math.min(sep, 8) + lead * Math.max(-.02, (L.oc === 'deep' ? .08 : .02) + (L.fx ? L.fx.deepW : 0)) + (L.oc === 'screen' && p.pos === 'RB' ? 4 : 0);
     if (s > bs) { bs = s; best = i; }
   });
-  const rc = L.pl[best], v = gfThrowV(15 + qb.r.arm * 1.3);
+  const rc = L.pl[best], v = v0;
   let tx = rc.x, ty = rc.y, T = 0;
   for (let k = 0; k < 3; k++) { T = hyp(tx - qb.x, ty - qb.y) / v; tx = rc.x + rc.vx * T; ty = rc.y + rc.vy * T; }
   // a long throw, a weak arm and a hurried one all miss by more
   const e = gfThrowErr(Math.max(.1, (10 - qb.r.arm) * .1) + (hurry ? 1.6 : .25) + hyp(tx - qb.x, ty - qb.y) * .035);
   tx += gauss() * e; ty += gauss() * e; T = Math.max(.25, hyp(tx - qb.x, ty - qb.y) / v);
   Object.assign(L.ball, { st: 'air', h: -1, fx: qb.x, fy: qb.y, tx, ty, bt: 0, T, tgt: best });
-  L.thrown = true; L.carrier = -1;
+  L.air = Math.round(tx); L.thrown = true; L.carrier = -1;
   gfEv('throw', hurry ? 'hurried' : '', rc.n); gfAtThrow(best);
 }
 
@@ -22316,7 +22320,7 @@ function gfDead(what, by, x, byi) {
   let gain = what === 'inc' ? 0 : what === 'td' ? L.toGoal : what === 'int' ? 0 : Math.round(c.x);
   // Undying: a loss counts as no gain
   if (gain < 0 && L.fx && L.fx.nolose && (what === 'tackle' || what === 'sack')) { gfEv('pow', L.src.nolose, `${L.src.nolose}: ${c.n} wouldn't go down backwards.`); gain = 0; }
-  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier };
+  L.done = { what, gain, by: by || '', who: c ? c.n : '', x: x != null ? Math.round(x) : gain, byi: byi != null ? byi : -1, ci: L.carrier, air: L.air != null ? L.air : null };
   return L.done;
 }
 // a whole play at once (the headless drive and the tests)
@@ -23092,11 +23096,12 @@ const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
 // (frozen, and the chance), cSlow. At the throw: freezeNear (the defender nearest the target), tgtSlow (the target).
 // The stances (16-stance.js): qbT (how long the quarterback waits), away (the chance to throw it away under pressure),
 // deepW (how much the quarterback looks deep), fum (the fumble chance), cush (yards of cushion the coverage gives),
-// jump (yards further a defender can get to a throw: more break-ups and picks).
+// jump (yards further a defender can get to a throw: more break-ups and picks), valve (on a long pass, the seconds
+// before the blocking back slips out as a checkdown; 0 never).
 const GF_FX0 = { oSpd: 1, dSpd: 1, cSpd: 1, rSpd: 1, rushSpd: 1, coverSpd: 1, backSpd: 1, midSpd: 1, deepSpd: 1, shed: 1, int: 1, errM: 1, ballV: 1,
   blk: 0, dStr: 0, tkl: 0, cStr: 0, breakN: 0, untag: 0, nolose: 0, read: 0, errA: 0, catch: 0, sure: 0, kick: 0, punt: 0,
   snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0,
-  qbT: 1, away: 0, deepW: 0, fum: 1, cush: 0, jump: 0 };
+  qbT: 1, away: 0, deepW: 0, fum: 1, cush: 0, jump: 0, valve: 0 };
 const GF_FX_MUL = new Set(['oSpd', 'dSpd', 'cSpd', 'rSpd', 'rushSpd', 'coverSpd', 'backSpd', 'midSpd', 'deepSpd', 'shed', 'int', 'errM', 'ballV', 'qbT', 'fum']);
 // everyday powers by kind: [offense, defense]. fits: the call it helps ('run', 'pass' or 'any')
 const GF_POW = {
@@ -23449,11 +23454,12 @@ function gfBenchRow(side, i) {
 }
 /* Cinder Gridiron: stances and fumbles (issue #29). Beside the call, each side of the ball plays Safe, Balanced or
    Risky. The stance changes how the play is run, not which play:
-   - Risky chases the big play: the quarterback holds it longer for the deep man, throws longer and looser, carriers
+   - Risky chases the big play: the quarterback holds it longer for the deep man (on the short pass, the seam over the
+     in), throws longer and looser, carriers
      fight for every yard, blockers release early, the rush pins its ears back, the coverage jumps routes and tacklers
      go for the strip. More big plays, more sacks, picks and fumbles.
-   - Safe guards against those: the quarterback throws early or throws it away rather than take a sack, two hands on
-     the ball, blocks that stay home, coverage that keeps it in front and tackles that wrap up.
+   - Safe guards against those: the quarterback throws early or throws it away rather than take a sack, the back slips
+     out as a checkdown on the deep pass (valve), two hands on the ball, blocks that stay home, coverage that keeps it in front and tackles that wrap up.
    - Each stance is a set of effects (GF_STANCE[id].off / .def), merged into the play's L.fx at the snap like a power's
      (gfStanceFx), and sets how hard the seven go: stam is the stamina a play costs, against Balanced's.
    - Played by hand (Play mode, on offense), your hands decide most of the risk: the stance has about half its effect on
@@ -23469,11 +23475,11 @@ function gfBenchRow(side, i) {
 const GF_ST_IDS = ['safe', 'bal', 'risky'];
 const GF_STANCE = {
   safe: { n: 'Safe', stam: .6, desc: 'Guard against the big mistake: fewer sacks, picks and fumbles, and fewer big plays. Half the stamina a play.',
-    off: { qbT: .9, away: .4, errM: .85, int: .5, deepW: -.05, fum: .2, cStr: -1, shed: .85 },
+    off: { qbT: .9, away: .4, errM: .85, int: .5, deepW: -.02, fum: .2, cStr: -1, shed: .85, valve: 1.3 },
     def: { rushSpd: .95, shed: .85, int: .55, read: .06, cush: 1.2, tkl: .03, fum: .6 } },
   bal: { n: 'Balanced', stam: 1, desc: 'Play it as called.', off: {}, def: {} },
   risky: { n: 'Risky', stam: 1.3, desc: 'Chase the big play: more big gains, more sacks, picks and fumbles. More stamina a play.',
-    off: { qbT: 1.1, errM: 1.15, int: 3.5, deepW: .2, fum: 1.8, cStr: 1, rSpd: 1.05, shed: 1.1 },
+    off: { qbT: 1.1, errM: 1.15, int: 2.2, deepW: .2, fum: 1.8, cStr: 1, rSpd: 1.05, shed: 1.1 },
     def: { rushSpd: 1.04, shed: 1.15, int: 3, jump: .5, read: -.12, cush: -1.5, tkl: -.07, fum: 1.8 } },
 };
 // the offense's effects that your hands take over in Play mode, at about half strength
@@ -23590,14 +23596,14 @@ function gfStanceTip(id) {
   const m = G.score[side] - G.score[1 - side], late = !!GD.game && (G.half === 3 || (G.half === 2 && G.clock < 150)), st = Math.round((1 - gfTired(side)) * 100);
   const sit = `${GF_ORD[G.down]} and ${G.togo}${m ? `, ${m > 0 ? 'up' : 'down'} by ${Math.abs(m)}` : ''}`;
   if (id === 'risky') {
-    T.pro.push(off ? 'The quarterback looks deep, carriers fight for extra yards: more big plays.' : 'The rush comes harder and the coverage jumps routes: more sacks, picks and forced fumbles.');
+    T.pro.push(off ? 'The quarterback looks deep (on a short pass, up the seam), carriers fight for extra yards: more big plays.' : 'The rush comes harder and the coverage jumps routes: more sacks, picks and forced fumbles.');
     T.con.push(off ? 'More sacks, interceptions and fumbles.' : 'More missed tackles and long gains when they guess wrong.');
     T.con.push(`About ${S.stam}× the stamina a play.`);
     if (late && m < 0) T.pro.push(`${sit}, late: you need the big play.`);
     if (off && G.down >= 3 && G.togo >= 8) T.pro.push(`${sit}: Risky gives you the best shot at the first down.`);
     if (late && m > 0) T.con.push(`${sit}, late: a turnover now could cost the game.`);
   } else if (id === 'safe') {
-    T.pro.push(off ? 'Short, sure throws, two hands on the ball: almost no fumbles, far fewer picks and sacks.' : 'The coverage keeps it in front and tackles wrap up: few big plays.');
+    T.pro.push(off ? 'Short, sure throws (on a deep pass, the back slips out as a checkdown), two hands on the ball: almost no fumbles, far fewer picks and sacks.' : 'The coverage keeps it in front and tackles wrap up: few big plays.');
     T.con.push(off ? 'Fewer big plays: the quarterback takes what is there.' : 'Fewer sacks and turnovers: they will get short gains.');
     T.pro.push(`Half the stamina a play: your seven are at ${st}%.`);
     if (late && m > 0) T.pro.push(`${sit}, late: protect the lead.`);
@@ -29579,7 +29585,7 @@ wGridSettle = function (r, us, them, box, half, most) {
 /* ---------- How to play ---------- */
 W_GRID_HOW.push(() => {
   const S = wGF.stances;
-  return `<p class="hint"><b>Stances.</b> Beside the call, your side plays <b>Safe</b>, <b>Balanced</b> or <b>Risky</b>, on offense and on defense. It changes how the play is run, not which play. <b>Risky</b> chases the big play: the quarterback holds it for the deep man and throws longer, ball carriers fight for every yard, the rush comes harder and the coverage jumps routes. Expect more big gains, sacks, interceptions and fumbles, on both sides. <b>Safe</b> guards against those: short, sure throws (the quarterback throws it away rather than take a sack), two hands on the ball, and coverage that keeps it in front. Expect fewer big plays. The stance also sets how hard your seven go: Risky costs about ${S.risky.stam}× the stamina a play, and Safe about ${S.safe.stam}×. Your stance stays until you change it: the buttons beside the modes, or <b>S</b>. Point at one for its pros and cons this down. Playing by hand, your throws and runs take about half its effect, because your hands decide most of the risk. The coaches pick a stance each down: Risky when behind late or on a long third down, Safe when ahead late or backed up. The scoreboard shows both sides' stances at the snap, and the log and the reason say what they did.</p>
+  return `<p class="hint"><b>Stances.</b> Beside the call, your side plays <b>Safe</b>, <b>Balanced</b> or <b>Risky</b>, on offense and on defense. It changes how the play is run, not which play. <b>Risky</b> chases the big play: the quarterback holds it for the deep man and throws longer (on a short pass, he looks for the receiver up the seam rather than the one cutting in), ball carriers fight for every yard, the rush comes harder and the coverage jumps routes. Expect more big gains, sacks, interceptions and fumbles, on both sides. <b>Safe</b> guards against those: short, sure throws (the quarterback throws it away rather than take a sack, and on a deep pass the back slips out as a checkdown), two hands on the ball, and coverage that keeps it in front. Expect fewer big plays. The stance also sets how hard your seven go: Risky costs about ${S.risky.stam}× the stamina a play, and Safe about ${S.safe.stam}×. Your stance stays until you change it: the buttons beside the modes, or <b>S</b>. Point at one for its pros and cons this down. Playing by hand, your throws and runs take about half its effect, because your hands decide most of the risk. The coaches pick a stance each down: Risky when behind late or on a long third down, Safe when ahead late or backed up. The scoreboard shows both sides' stances at the snap, and the log and the reason say what they did.</p>
   <p class="hint"><b>Fumbles</b> are rare: a hard tackle can knock the ball loose, more often from a tired or weak ball carrier, and far more often when either side plays Risky. Whoever is nearest falls on it, the defense more often than not, and a defender who picks it up may run it back. Lost, it ends the drive like an interception.</p>`;
 });
 const wW49RenderHelp = renderHelp;
