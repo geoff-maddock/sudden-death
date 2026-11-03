@@ -6,12 +6,12 @@
    Between plays each player's position is under them, and GFT.hl ({ side, pos }, set by the page) rings one.
    Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
    something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
-   The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run at the goal line, and the
+   The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run that gets to the goal line, and the
    moment after a touchdown or an interception, the camera zooms in on the ball (GFT.zoom) and a word says why; the
    score bar and the keys stay put. After a play a banner on the grass says what it came to (GD.big, from gfResult).
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
-const GFT = { t: 0, hl: null, zoom: 1, fx: 480, fy: 345, hold: 0, why: '', bigAt: -1 };
+const GFT = { t: 0, hl: null, zoom: 1, fx: 480, fy: 345, hold: 0, why: '', last: 0 };
 const GF_ZOOM = 1.65;
 const GF_PX = 19, GF_PY = 8.2, GF_MIDY = 345, GF_ASH = Array.from({ length: 260 }, (_, i) => [((i * 37.7) % 125) - 12, ((i * 23.3) % 53) - 26.5, (i % 5) * .25 + .6]);
 const gfAbs = (x, y) => G.poss === 0 ? [G.ball + x, y] : [GF_RULES.field - G.ball - x, -y];
@@ -29,8 +29,10 @@ function gfDraw(c) {
   if (ex) { GFT.hold = GFT.t + 1.1; GFT.why = ex; }
   const on = GFT.t < GFT.hold && (GD.ph === 'live' || GD.ph === 'post');
   if (!on) GFT.why = '';
-  GFT.zoom = lerp(GFT.zoom, on ? GF_ZOOM : 1, on ? .06 : .05);
-  GFT.fx = lerp(GFT.fx, b.x, .25); GFT.fy = lerp(GFT.fy, b.y, .25);
+  // eased by the time since the last frame, so it moves at the same speed at any frame rate
+  const f = Math.min(.2, Math.max(0, GFT.t - GFT.last)) * 60, ease = r => 1 - Math.pow(1 - r, f); GFT.last = GFT.t;
+  GFT.zoom = lerp(GFT.zoom, on ? GF_ZOOM : 1, ease(on ? .06 : .05));
+  GFT.fx = lerp(GFT.fx, b.x, ease(.25)); GFT.fy = lerp(GFT.fy, b.y, ease(.25));
   const k = clamp((GFT.zoom - 1) / (GF_ZOOM - 1), 0, 1);
   c.fillStyle = '#070605'; c.fillRect(0, 0, 960, 600);
   c.save();
@@ -54,7 +56,7 @@ function gfBallScr() {
 // is this a big play, and what kind: '' when it isn't
 function gfExcite() {
   if (!L || !GD) return '';
-  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GFT.t - GFT.bigAt < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
+  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GD.t < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
   if (GD.ph !== 'live' || L.done) return '';
   const B = L.ball;
   if (B.st === 'air' && B.T > 1.05 && B.bt > .25) return 'Deep ball!';
@@ -62,19 +64,19 @@ function gfExcite() {
   if (e && e.k === 'broken' && L.t - e.t < .8) return 'Broken tackle!';
   if (B.st !== 'held' || L.carrier < 0) return '';
   const p = L.pl[L.carrier]; if (!p || p.side !== 0) return '';
-  if (p.x > 1 && L.toGoal - p.x < 9) return 'At the goal line!';
+  if (p.x > 3 && L.toGoal - p.x < 3) return 'At the goal line!';
   if (p.x < 7) return '';
   let near = 99; for (const d of L.pl) if (d.side === 1 && !(d.stun > 0)) near = Math.min(near, hyp(d.x - p.x, d.y - p.y));
   return near > 4 ? 'Breakaway!' : '';
 }
 // after a play, what it came to, in big letters on the grass
-const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], fumble: ['FUMBLE', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: ['', '#bfe8a8'] };
+const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: [B => `+${B.gain} YARDS`, '#bfe8a8'] };
 function gfDrawBig(c) {
-  const B = GD.big; if (!B || GD.ph !== 'post' && GD.ph !== 'kick') return;
-  if (GFT.bigAt < 0 || B !== GFT.bigOf) { GFT.bigOf = B; GFT.bigAt = GFT.t; }
-  const a = GFT.t - GFT.bigAt; if (a > 2.4) return;
-  const [word, col] = GF_BIG[B.k] || GF_BIG.long, text = word || `+${B.gain} YARDS`;
-  const al = Math.min(1, a * 5, (2.4 - a) * 2.5), sc = 1 + Math.max(0, .25 - a) * 1.6;
+  // on for the beat after the play, fading out as it ends
+  const B = GD.big, a = GD.t, end = Math.min(2.4, GD.mode !== 'watch' ? GF_PACE.postCall : GF_PACE.post);
+  if (!B || GD.ph !== 'post' || a > end || !GF_BIG[B.k]) return;
+  const [word, col] = GF_BIG[B.k], text = typeof word === 'function' ? word(B) : word;
+  const al = Math.min(1, a * 5, (end - a) * 2.5), sc = 1 + Math.max(0, .25 - a) * 1.6;
   c.save(); c.globalAlpha = al; c.translate(480, 488); c.scale(sc, sc);
   c.font = '900 54px "Alegreya Sans", system-ui, sans-serif'; c.textAlign = 'center';
   c.lineWidth = 8; c.strokeStyle = 'rgba(12,10,9,.85)'; c.lineJoin = 'round'; c.strokeText(text, 0, 0);

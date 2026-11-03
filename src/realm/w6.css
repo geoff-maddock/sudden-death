@@ -317,9 +317,10 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 #wGridCalls .wgtired,#wGridDefs .wgtired{background-image:linear-gradient(#d0604a,#d0604a)}
 #wGridCalls [data-fresh]:not([data-fresh=""])::after,#wGridDefs [data-fresh]:not([data-fresh=""])::after{content:" · " attr(data-fresh);font-size:.8em;opacity:.8}
 /* w45: powers on the gridiron bar, and the tip box */
-.wgpows{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
+.wgpows{display:flex;align-items:center;gap:6px;flex-basis:100%}
+.wgpows>*{flex:none}
 .wgpows #wGridMana{font-family:var(--hud);font-weight:400;color:#a88cff;letter-spacing:1px;white-space:nowrap}
-.wgpows #wGridPowList{display:flex;flex-wrap:wrap;gap:6px}
+.wgpows #wGridPowList{display:flex;flex-wrap:wrap;gap:6px;flex:0 1 auto;min-width:0}
 .wgpows button{padding:3px 8px}
 .wgpows button small{color:var(--dim);font-size:.8em}
 .wgpows button.on{background:#a88cff;color:#1a120c;border-color:#a88cff}

@@ -100,14 +100,18 @@ function wGridLineup() {
     ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
+// a side's total of one stat in a box score, and its yards from scrimmage (passing and running); the panel and the
+// game's settle (w44) both count yards this way
+const wGridSum = (box, s, k) => box.filter(b => b.side === s).reduce((n, b) => n + (b.line[k] || 0), 0);
+const wGridYards = (box, s) => wGridSum(box, s, 'py') + wGridSum(box, s, 'ry');
 // the team stats so far, side by side, and each side's leaders, from the box score
 function wGridStats() {
   const G = wGF.G, box = wGF.box(); if (!G || !box.length) return '';
-  const sum = (s, k) => box.filter(b => b.side === s).reduce((n, b) => n + (b.line[k] || 0), 0);
-  const top = (s, k) => box.filter(b => b.side === s && b.line[k]).sort((a, b) => b.line[k] - a.line[k])[0];
+  const sum = (s, k) => wGridSum(box, s, k);
+  const top = (s, k) => box.filter(b => b.side === s && b.line[k] > 0).sort((a, b) => b.line[k] - a.line[k])[0];
   if (![0, 1].some(s => sum(s, 'pa') + sum(s, 'ra') + sum(s, 'fga'))) return '';
   const rows = [
-    ['Total yards', s => sum(s, 'py') + sum(s, 'ry')],
+    ['Total yards', s => wGridYards(box, s)],
     ['Passing', s => `${sum(s, 'pc')}/${sum(s, 'pa')} <small>for</small> ${sum(s, 'py')}`],
     ['Running', s => `${sum(s, 'ra')} <small>for</small> ${sum(s, 'ry')}`],
     ['Sacks made', s => sum(s, 'sk')],
@@ -199,7 +203,9 @@ showView = function (v) {
   wW42ShowView(v);
   $('wGridBar').hidden = v !== 'gridiron';
   document.body.classList.toggle('wgwide', v === 'gridiron');
-  if (v === 'gridiron') $('runbar').hidden = true;
+  if (v === 'gridiron') { $('runbar').hidden = true;
+    // the game fills the window: the bar at the top, the field under it (the field is sized to fit, g1-page.js)
+    requestAnimationFrame(() => scrollTo({ top: Math.max(0, $('wGridBar').getBoundingClientRect().top + scrollY - 6) })); }
 };
 const wW42OpenPause = openPause;
 openPause = function () { if (UI.view === 'gridiron') return; return wW42OpenPause.apply(this, arguments); };

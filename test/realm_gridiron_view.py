@@ -1,5 +1,5 @@
-# Realm gridiron view: the field fills the page's width, and the page widens on a big screen (but the field still
-# fits in the window); the canvas draws at the size it is shown; on a big play the camera zooms in on the ball and
+# Realm gridiron view: the field fills the page's width, and the page widens on a big screen, but the game's bar and
+# the whole field fit in the window (the page scrolls the bar to the top; the field is never smaller than 960 wide); the canvas draws at the size it is shown; on a big play the camera zooms in on the ball and
 # comes back out by the next call; after a play a banner says what it came to; the team stats show under the field
 # once there are plays; How it works explains them. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
@@ -17,10 +17,10 @@ def check(ok, what, detail=None):
 CLOSE_ALL = """(() => { for (let i = 0; i < 12 && !document.getElementById('modal').hidden; i++) {
   const b = document.querySelector('#modalBox [data-close], #modalBox .btn, #modalBox button'); if (!b) break; b.click(); } })()"""
 SIZES = """(() => { const cv = document.querySelector('#v-gridiron canvas'), m = document.querySelector('main').getBoundingClientRect(), r = cv.getBoundingClientRect();
-  return { main: m.width, cw: r.width, ch: r.height, px: cv.width, win: innerHeight }; })()"""
+  return { main: m.width, cw: r.width, bottom: r.bottom - document.getElementById('wGridBar').getBoundingClientRect().top, inView: r.bottom <= innerHeight + 1, px: cv.width, win: innerHeight }; })()"""
 
-async def start(br, w, h):
-    pg = await br.new_page(viewport={'width': w, 'height': h})
+async def start(br, w, h, scale=1):
+    pg = await br.new_page(viewport={'width': w, 'height': h}, device_scale_factor=scale)
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()'); await pg.goto(REALM_URL)
     await pg.wait_for_function("typeof wStartGrid === 'function'")
@@ -46,14 +46,19 @@ async def main():
         for w, h in ((1280, 800), (1920, 1080), (2560, 1440)):
             pg, errs = await start(br, w, h)
             got[w] = await pg.evaluate(SIZES)
-            check(abs(got[w]['cw'] - got[w]['main']) < 2, f'at {w} wide the field fills the page\'s width', got[w])
-            check(got[w]['ch'] <= got[w]['win'], f'at {w} wide the field is no taller than the window', got[w])
+            g = got[w]; fits = g['bottom'] <= g['win'] + 1 and g['inView']
+            check(fits or g['cw'] <= 961, f'at {w} wide the game\'s bar and the whole field are in the window (or the field is at its smallest, 960)', g)
+            check(abs(g['cw'] - g['main']) < 2 or g['win'] - g['bottom'] < 20, f'at {w} wide the field fills the page\'s width, or the window\'s height', g)
             check(not errs, f'no page errors at {w}', errs)
             if w != 2560: await pg.close()
-        check(got[1920]['cw'] > 1240 and got[2560]['cw'] > got[1920]['cw'] + 300, 'a bigger screen gets a bigger field', got)
+        check(got[1920]['cw'] > 1100 and got[2560]['cw'] > got[1920]['cw'] + 300, 'a bigger screen gets a bigger field', got)
         check(got[2560]['px'] >= got[2560]['cw'] - 2, 'the canvas draws at the size it is shown (sharp)', got[2560])
         await pg.evaluate("showView('world')")
         check(await pg.evaluate("!document.body.classList.contains('wgwide')"), 'the page is its usual width again off the gridiron')
+        await pg.close()
+        pg, errs = await start(br, 2560, 1440, 2)
+        d = await pg.evaluate("[wGF.view().px, document.querySelector('#v-gridiron canvas').width]")
+        check(d[0] == 2.5 and d[1] == 2400, 'on a dense big screen the canvas stops at 2.5 device pixels per canvas pixel', d)
         await pg.close()
 
         # ---------- the zoom, the banner and the stats ----------

@@ -845,9 +845,10 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 #wGridCalls .wgtired,#wGridDefs .wgtired{background-image:linear-gradient(#d0604a,#d0604a)}
 #wGridCalls [data-fresh]:not([data-fresh=""])::after,#wGridDefs [data-fresh]:not([data-fresh=""])::after{content:" · " attr(data-fresh);font-size:.8em;opacity:.8}
 /* w45: powers on the gridiron bar, and the tip box */
-.wgpows{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
+.wgpows{display:flex;align-items:center;gap:6px;flex-basis:100%}
+.wgpows>*{flex:none}
 .wgpows #wGridMana{font-family:var(--hud);font-weight:400;color:#a88cff;letter-spacing:1px;white-space:nowrap}
-.wgpows #wGridPowList{display:flex;flex-wrap:wrap;gap:6px}
+.wgpows #wGridPowList{display:flex;flex-wrap:wrap;gap:6px;flex:0 1 auto;min-width:0}
 .wgpows button{padding:3px 8px}
 .wgpows button small{color:var(--dim);font-size:.8em}
 .wgpows button.on{background:#a88cff;color:#1a120c;border-color:#a88cff}
@@ -22490,12 +22491,12 @@ function gfSim(opts) {
    Between plays each player's position is under them, and GFT.hl ({ side, pos }, set by the page) rings one.
    Powers (14-powers.js): each side's mana under its score, the powers cast at the snap, a callout when one does
    something, and each zone on the grass, tinted where it acts, with its name and the plays it has left.
-   The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run at the goal line, and the
+   The big plays (gfExcite): a breakaway, a deep ball in the air, a broken tackle, a run that gets to the goal line, and the
    moment after a touchdown or an interception, the camera zooms in on the ball (GFT.zoom) and a word says why; the
    score bar and the keys stay put. After a play a banner on the grass says what it came to (GD.big, from gfResult).
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
-const GFT = { t: 0, hl: null, zoom: 1, fx: 480, fy: 345, hold: 0, why: '', bigAt: -1 };
+const GFT = { t: 0, hl: null, zoom: 1, fx: 480, fy: 345, hold: 0, why: '', last: 0 };
 const GF_ZOOM = 1.65;
 const GF_PX = 19, GF_PY = 8.2, GF_MIDY = 345, GF_ASH = Array.from({ length: 260 }, (_, i) => [((i * 37.7) % 125) - 12, ((i * 23.3) % 53) - 26.5, (i % 5) * .25 + .6]);
 const gfAbs = (x, y) => G.poss === 0 ? [G.ball + x, y] : [GF_RULES.field - G.ball - x, -y];
@@ -22513,8 +22514,10 @@ function gfDraw(c) {
   if (ex) { GFT.hold = GFT.t + 1.1; GFT.why = ex; }
   const on = GFT.t < GFT.hold && (GD.ph === 'live' || GD.ph === 'post');
   if (!on) GFT.why = '';
-  GFT.zoom = lerp(GFT.zoom, on ? GF_ZOOM : 1, on ? .06 : .05);
-  GFT.fx = lerp(GFT.fx, b.x, .25); GFT.fy = lerp(GFT.fy, b.y, .25);
+  // eased by the time since the last frame, so it moves at the same speed at any frame rate
+  const f = Math.min(.2, Math.max(0, GFT.t - GFT.last)) * 60, ease = r => 1 - Math.pow(1 - r, f); GFT.last = GFT.t;
+  GFT.zoom = lerp(GFT.zoom, on ? GF_ZOOM : 1, ease(on ? .06 : .05));
+  GFT.fx = lerp(GFT.fx, b.x, ease(.25)); GFT.fy = lerp(GFT.fy, b.y, ease(.25));
   const k = clamp((GFT.zoom - 1) / (GF_ZOOM - 1), 0, 1);
   c.fillStyle = '#070605'; c.fillRect(0, 0, 960, 600);
   c.save();
@@ -22538,7 +22541,7 @@ function gfBallScr() {
 // is this a big play, and what kind: '' when it isn't
 function gfExcite() {
   if (!L || !GD) return '';
-  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GFT.t - GFT.bigAt < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
+  if (GD.ph === 'post') return GD.big && (GD.big.k === 'td' || GD.big.k === 'int') && GD.t < 2 ? (GD.big.k === 'td' ? 'Touchdown!' : 'Picked off!') : '';
   if (GD.ph !== 'live' || L.done) return '';
   const B = L.ball;
   if (B.st === 'air' && B.T > 1.05 && B.bt > .25) return 'Deep ball!';
@@ -22546,19 +22549,19 @@ function gfExcite() {
   if (e && e.k === 'broken' && L.t - e.t < .8) return 'Broken tackle!';
   if (B.st !== 'held' || L.carrier < 0) return '';
   const p = L.pl[L.carrier]; if (!p || p.side !== 0) return '';
-  if (p.x > 1 && L.toGoal - p.x < 9) return 'At the goal line!';
+  if (p.x > 3 && L.toGoal - p.x < 3) return 'At the goal line!';
   if (p.x < 7) return '';
   let near = 99; for (const d of L.pl) if (d.side === 1 && !(d.stun > 0)) near = Math.min(near, hyp(d.x - p.x, d.y - p.y));
   return near > 4 ? 'Breakaway!' : '';
 }
 // after a play, what it came to, in big letters on the grass
-const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], fumble: ['FUMBLE', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: ['', '#bfe8a8'] };
+const GF_BIG = { td: ['TOUCHDOWN', '#ffd08a'], int: ['INTERCEPTED', '#ff8a6a'], sack: ['SACKED', '#ff8a6a'], first: ['FIRST DOWN', '#bfe8a8'], downs: ['TURNOVER ON DOWNS', '#ff8a6a'], safety: ['SAFETY', '#ff8a6a'], fg: ['IT\'S GOOD', '#ffd08a'], miss: ['NO GOOD', '#ff8a6a'], long: [B => `+${B.gain} YARDS`, '#bfe8a8'] };
 function gfDrawBig(c) {
-  const B = GD.big; if (!B || GD.ph !== 'post' && GD.ph !== 'kick') return;
-  if (GFT.bigAt < 0 || B !== GFT.bigOf) { GFT.bigOf = B; GFT.bigAt = GFT.t; }
-  const a = GFT.t - GFT.bigAt; if (a > 2.4) return;
-  const [word, col] = GF_BIG[B.k] || GF_BIG.long, text = word || `+${B.gain} YARDS`;
-  const al = Math.min(1, a * 5, (2.4 - a) * 2.5), sc = 1 + Math.max(0, .25 - a) * 1.6;
+  // on for the beat after the play, fading out as it ends
+  const B = GD.big, a = GD.t, end = Math.min(2.4, GD.mode !== 'watch' ? GF_PACE.postCall : GF_PACE.post);
+  if (!B || GD.ph !== 'post' || a > end || !GF_BIG[B.k]) return;
+  const [word, col] = GF_BIG[B.k], text = typeof word === 'function' ? word(B) : word;
+  const al = Math.min(1, a * 5, (end - a) * 2.5), sc = 1 + Math.max(0, .25 - a) * 1.6;
   c.save(); c.globalAlpha = al; c.translate(480, 488); c.scale(sc, sc);
   c.font = '900 54px "Alegreya Sans", system-ui, sans-serif'; c.textAlign = 'center';
   c.lineWidth = 8; c.strokeStyle = 'rgba(12,10,9,.85)'; c.lineJoin = 'round'; c.strokeText(text, 0, 0);
@@ -22798,7 +22801,7 @@ function gfKickoff() {
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
 }
-function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; GD.pow = null; if (G.zones) G.zones = []; gfPowersDrive(); }
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; GD.pow = null; GD.big = null; if (G.zones) G.zones = []; gfPowersDrive(); }
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
@@ -23270,20 +23273,25 @@ function gfPowerBook() {
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
    engine's parts don't touch the page; this file is the only one that does. The canvas fills the width of the page (the
-   page widens on the gridiron, see w6.css) but no taller than the window, and draws at the size it is shown, so it
-   stays sharp on a big screen. */
-const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1 };
+   page widens on the gridiron, see w6.css) but no taller than the window has room for under the game's bar (#wGridBar;
+   the page scrolls the bar to the top, w42), so the bar and the whole field are in view; never smaller than 960 wide. It draws at the size it is shown, so it stays sharp. */
+const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, mw: 0 };
 (() => {
   const h = document.createElement('div'); h.id = 'v-gridiron'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
-  cv.style.cssText = 'display:block;width:min(100%, calc((100vh - 16px) * 1.6));margin:0 auto;aspect-ratio:960/600;background:#0b0907;border-radius:6px';
+  cv.style.cssText = 'display:block;width:100%;margin:0 auto;aspect-ratio:960/600;background:#0b0907;border-radius:6px';
   h.appendChild(cv);
   (document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
   Object.assign(GFP, { host: h, cv, c: cv.getContext('2d') });
 })();
 function gfRender() {
-  // pixels per field unit: the shown width times the screen's density, at least the old 1x and at most 4x
-  const d = Math.ceil(clamp((GFP.cv.clientWidth || 960) / 960 * (window.devicePixelRatio || 1), 1, 4) * 8) / 8;
+  // as wide as fits in the window under the game's bar, down to the old 960
+  const bar = document.getElementById('wGridBar'), top = GFP.cv.getBoundingClientRect().top - (bar ? bar.getBoundingClientRect().top : -scrollY);
+  const mw = Math.max(960, Math.floor((innerHeight - top - 12) * 1.6));
+  if (mw !== GFP.mw) { GFP.mw = mw; GFP.cv.style.maxWidth = mw + 'px'; }
+  // device pixels per canvas pixel: the shown width times the screen's density, from 1x up to 2.5x (more costs a lot
+  // to fill each frame and doesn't look any sharper)
+  const d = Math.ceil(clamp((GFP.cv.clientWidth || 960) / 960 * (window.devicePixelRatio || 1), 1, 2.5) * 8) / 8;
   if (d !== GFP.dpr || GFP.cv.width !== Math.round(960 * d)) { GFP.dpr = d; GFP.cv.width = Math.round(960 * d); GFP.cv.height = Math.round(600 * d); }
   const c = GFP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); gfDraw(c); c.restore();
 }
@@ -27892,14 +27900,18 @@ function wGridLineup() {
     ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
+// a side's total of one stat in a box score, and its yards from scrimmage (passing and running); the panel and the
+// game's settle (w44) both count yards this way
+const wGridSum = (box, s, k) => box.filter(b => b.side === s).reduce((n, b) => n + (b.line[k] || 0), 0);
+const wGridYards = (box, s) => wGridSum(box, s, 'py') + wGridSum(box, s, 'ry');
 // the team stats so far, side by side, and each side's leaders, from the box score
 function wGridStats() {
   const G = wGF.G, box = wGF.box(); if (!G || !box.length) return '';
-  const sum = (s, k) => box.filter(b => b.side === s).reduce((n, b) => n + (b.line[k] || 0), 0);
-  const top = (s, k) => box.filter(b => b.side === s && b.line[k]).sort((a, b) => b.line[k] - a.line[k])[0];
+  const sum = (s, k) => wGridSum(box, s, k);
+  const top = (s, k) => box.filter(b => b.side === s && b.line[k] > 0).sort((a, b) => b.line[k] - a.line[k])[0];
   if (![0, 1].some(s => sum(s, 'pa') + sum(s, 'ra') + sum(s, 'fga'))) return '';
   const rows = [
-    ['Total yards', s => sum(s, 'py') + sum(s, 'ry')],
+    ['Total yards', s => wGridYards(box, s)],
     ['Passing', s => `${sum(s, 'pc')}/${sum(s, 'pa')} <small>for</small> ${sum(s, 'py')}`],
     ['Running', s => `${sum(s, 'ra')} <small>for</small> ${sum(s, 'ry')}`],
     ['Sacks made', s => sum(s, 'sk')],
@@ -27991,7 +28003,9 @@ showView = function (v) {
   wW42ShowView(v);
   $('wGridBar').hidden = v !== 'gridiron';
   document.body.classList.toggle('wgwide', v === 'gridiron');
-  if (v === 'gridiron') $('runbar').hidden = true;
+  if (v === 'gridiron') { $('runbar').hidden = true;
+    // the game fills the window: the bar at the top, the field under it (the field is sized to fit, g1-page.js)
+    requestAnimationFrame(() => scrollTo({ top: Math.max(0, $('wGridBar').getBoundingClientRect().top + scrollY - 6) })); }
 };
 const wW42OpenPause = openPause;
 openPause = function () { if (UI.view === 'gridiron') return; return wW42OpenPause.apply(this, arguments); };
@@ -28434,7 +28448,7 @@ function wGridSettle(r, us, them, box, half) {
   B.games.length = Math.min(B.games.length, W_GFG.keep);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
   // (and each side's yards from scrimmage: a knockout settles a tie on them)
-  W.us = us; W.them = them; W.yards = [0, 1].map(s => box.filter(b => b.side === s).reduce((a, b) => a + (b.line.py || 0) + (b.line.ry || 0), 0));
+  W.us = us; W.them = them; W.yards = [0, 1].map(s => wGridYards(box, s));
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   // the clock after the game's own end: a fixture played late on the eve of a round counts in its round, not as postponed
   wAdvance(W_GFG.minutes);
