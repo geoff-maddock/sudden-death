@@ -57,8 +57,11 @@ jobs:
           python-version: '3.12'
       - uses: ./.github/actions/playwright
       - name: Build
-        run: ./build.sh
+        run: ./build.sh && ./build.sh src/realm/manifest.txt
       - name: Quick checks
+        # built once above, so the checks don't each rebuild (test/paths.py)
+        env:
+          SD_BUILT: 1
         run: |
           i=0; fail=0
           for t in $CHECKS; do

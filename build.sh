@@ -62,6 +62,12 @@ read_manifest "$MANIFEST"
 NAME="$(basename "$OUT" .html)"
 JS="build/$NAME.js"
 mkdir -p build "$(dirname "$OUT")"
+# one build of a page at a time: a second one (a single check run while the suite runs) waits its turn rather than
+# mixing their files in build/ (a lock left by a killed build is taken over after a minute); and the page is written
+# whole and then moved into place, so a check reading it never gets half of it
+LOCK="build/.$NAME.lock"; n=0
+until mkdir "$LOCK" 2>/dev/null; do n=$((n + 1)); if [ $n -ge 600 ]; then rm -rf "$LOCK"; n=0; else sleep .1; fi; done
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 # the whole script, plus one file per name space for the duplicate check: build/NAME.global.js holds the
 # global files and each scope's `const NAME` line; build/NAME.scope-<S>.js holds what scope S wraps
 : > "$JS"; : > "build/$NAME.global.js"; NS="build/$NAME.global.js"; SPACES=("$NS")
@@ -89,7 +95,8 @@ if [ -n "$TITLE" ]; then
   T="$(printf '%s' "$TITLE" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g')" awk '!done && match($0, /<title>.*<\/title>/) { $0 = substr($0, 1, RSTART - 1) "<title>" ENVIRON["T"] "</title>" substr($0, RSTART + RLENGTH); done = 1 } { print }' "$SHELL_HTML" > "build/$NAME.titled.html"
   SHELL_HTML="build/$NAME.titled.html"
 fi
-{ cat "$SHELL_HTML"; echo '<script>'; cat "$JS"; echo '</script>'; echo '</body></html>'; } > "$OUT"
+{ cat "$SHELL_HTML"; echo '<script>'; cat "$JS"; echo '</script>'; echo '</body></html>'; } > "$OUT.tmp.$$"
+mv -f "$OUT.tmp.$$" "$OUT"
 wc -c "$OUT"
 # every part shares one global scope (or one scope's function): a second top-level function or const with the
 # same name silently replaces the first, so refuse to build if that happens

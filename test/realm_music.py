@@ -237,7 +237,7 @@ async def palette_checks(pg):
     check(so['next'] >= so['ahead'] - 1e-9, 'asked for sooner than the event already planned, it waits for it', so)
 
 LEVEL = r"""async ([key, night, wx]) => {
-  const sr = 44100, secs = 120, oc = new OfflineAudioContext(2, sr * secs, sr), P = W_AMB_PAL[key], v = W_AMB.voices, on = wx && P.wx;
+  const sr = 44100, secs = 60, oc = new OfflineAudioContext(2, sr * secs, sr), P = W_AMB_PAL[key], v = W_AMB.voices, on = wx && P.wx;
   W_AMB.voices = 1e9; const mv = SET.mvol; SET.mvol = .55; WAMB.pal = key; WAMB.ch = wAmbChain(oc); WAMB.ch.fade.gain.value = 1; wAmbHold(oc, P);
   if (on) WAMB.ch.wx.g.gain.value = P.wx.tex.vol * W_AMB.tex;
   WAMB.ch.lp.frequency.value = W_AMB.lp * (night ? .75 : 1) * (on ? P.wx.lp : 1);
@@ -248,17 +248,20 @@ LEVEL = r"""async ([key, night, wx]) => {
 }"""
 
 async def level_checks(ctx):
-    # two minutes of each palette, rendered offline on a page of its own (so its voices never count in the live one);
-    # the noise and the room are seeded, so this is the same every run
-    pg = await ctx.new_page(); await pg.goto(REALM_URL); await pg.wait_for_function("typeof wAmbPlan === 'function'", timeout=T)
-    lv, nt, wx = {}, {}, {}
-    for k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon', 'wreck', 'chapel', 'abbey', 'shrine', 'cottage', 'nowhere', 'hall', 'lair'] + ['grd_g_' + g for g in ['ballpark', 'court', 'links', 'lists', 'lanes', 'shed', 'bowl', 'ring', 'rink', 'sheet']]:
-        lv[k] = round(await pg.evaluate(LEVEL, [k, False, False]), 4)
-    for k in ['plains', 'bloom', 'tide']:
-        nt[k] = round(await pg.evaluate(LEVEL, [k, True, False]), 4)
-    for k in ['tide', 'ember', 'rime']:
-        wx[k] = round(await pg.evaluate(LEVEL, [k, False, True]), 4)
-    await pg.close()
+    # a minute of each palette, rendered offline on pages of their own (so their voices never count in the live one);
+    # the noise and the room are seeded, so this is the same every run. A minute is within 0.05 of two minutes' level
+    # for every palette; 44.1 kHz is needed (at 22 kHz the levels drift by up to 0.67 against the plains). The renders
+    # are shared across a few pages working at once, each rendering its share one after another
+    jobs = [('lv', k, False, False) for k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon', 'wreck', 'chapel', 'abbey', 'shrine', 'cottage', 'nowhere', 'hall', 'lair'] + ['grd_g_' + g for g in ['ballpark', 'court', 'links', 'lists', 'lanes', 'shed', 'bowl', 'ring', 'rink', 'sheet']]]
+    jobs += [('nt', k, True, False) for k in ['plains', 'bloom', 'tide']] + [('wx', k, False, True) for k in ['tide', 'ember', 'rime']]
+    out = {'lv': {}, 'nt': {}, 'wx': {}}
+    async def worker(share):
+        pg = await ctx.new_page(); await pg.goto(REALM_URL); await pg.wait_for_function("typeof wAmbPlan === 'function'", timeout=T)
+        for kind, k, night, w in share: out[kind][k] = round(await pg.evaluate(LEVEL, [k, night, w]), 4)
+        await pg.close()
+    N = 4
+    await asyncio.gather(*[worker(jobs[i::N]) for i in range(N)])
+    lv, nt, wx = out['lv'], out['nt'], out['wx']
     ok = all(.83 <= lv[k] / lv['plains'] <= 1.2 for k in lv)
     check(ok and .008 < lv['plains'] < .04, 'every palette plays about as loud as the next (within a fifth of the plains): the lands, the places, the grounds', lv)
     check(all(.83 <= nt[k] / lv['plains'] <= 1.2 for k in nt), 'and at night', nt)

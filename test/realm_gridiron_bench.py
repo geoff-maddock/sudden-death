@@ -93,14 +93,18 @@ async def main():
         # ---------- one potion between two plays, in the pause after a play and at the call both ----------
         await pg.evaluate("WG.items.draught = 9; WG.items.secondwind = 9")
         # (a kickoff or the half between the two starts it over: a new drive may have a potion of its own)
-        one = await pg.evaluate("""new Promise(res => { let out = {}; const t = setInterval(() => {
+        # (each beat of the game is heard as it comes, through wGF.onPhase: the pause after a play is short, and a timer
+        # looking every few milliseconds can miss it on a busy machine)
+        await pg.evaluate("""(() => { const prev = wGF.onPhase; window.__phl = [];
+          wGF.onPhase = ph => { if (prev) prev(ph); for (const f of __phl.slice()) if (f()) __phl.splice(__phl.indexOf(f), 1); };
+          window.__beats = f => new Promise(res => { const g = () => { const r = f(); if (r) res(r); return r; }; if (!g()) __phl.push(g); }); })()""")
+        one = await pg.evaluate("""(() => { let out = {}; return __beats(() => {
           const ph = wGF.phase;
           if ('post' in out && !('call' in out) && (ph === 'kickoff' || ph === 'half')) out = {};
           if (!('post' in out) && ph === 'post' && wGF.bench().between) out.post = wGridPotion('draught', wGF.bench().on[0].ri);
           else if ('post' in out && !('call' in out) && ph === 'call') { wGF.pause(true); out.call = wGridPotion('secondwind', null); out.msg = WGB.msg; wGF.pause(false); }
           else if ('call' in out && !('next' in out) && ph === 'post') { out.next = wGridPotion('secondwind', null); out.cleared = WGB.msg; }
-          if ('next' in out) { clearInterval(t); res(out); }
-        }, 10); })""")
+          return 'next' in out ? out : null; }); })()""")
         check(one['post'] == '' and one['call'] == 'One potion a play.', 'a potion in the pause after a play, and none again at the call before the next one', one)
         check(one['next'] == '', 'after that play, one more may be given', one)
         await pg.wait_for_function("wGF.phase === 'call'", timeout=60000)
@@ -149,8 +153,8 @@ async def main():
           const b = wGF.bench(); res({ off: wGridSwap(b.bench[0].ri, b.bench[1].ri), on: wGridSwap(b.on[0].ri, b.on[1].ri) }); }, 20); })""")
         check(stale['off'] == 'That player is already off the field.' and stale['on'] == 'That player is already on the field.', 'a swap with a player who has moved says so', stale)
         await pg.evaluate("WG.items.secondwind = 1; (() => { const G = wGF.G; G.half = 2; G.clock = 1; G.score = [28, 0]; })(); wGF.setMode('watch')")
-        last = await pg.evaluate("""new Promise(res => { const t = setInterval(() => { if (wGF.phase !== 'post' || wGF.G.clock > 0) return; clearInterval(t);
-          res({ msg: wGridPotion('secondwind', null), left: WG.items.secondwind, between: wGF.bench().between }); }, 10); })""")
+        last = await pg.evaluate("""__beats(() => wGF.phase !== 'post' || wGF.G.clock > 0 ? null
+          : { msg: wGridPotion('secondwind', null), left: WG.items.secondwind, between: wGF.bench().between })""")
         check(last['msg'] == 'Potions are given between plays, and not after the last one.' and last['left'] == 1 and not last['between'],
               'after the last play of the game, no potion is given, and none is lost', last)
         await pg.wait_for_function("wGF.phase === 'over'", timeout=60000)

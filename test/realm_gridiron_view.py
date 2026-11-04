@@ -23,7 +23,7 @@ async def start(br, w, h, scale=1):
     pg = await br.new_page(viewport={'width': w, 'height': h}, device_scale_factor=scale)
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()'); await pg.goto(REALM_URL)
-    await pg.wait_for_function("typeof wStartGrid === 'function'")
+    await pg.wait_for_function("typeof wStartGrid === 'function'"); await pg.evaluate("wGF.speed = 4")  # the field at 4 steps a frame: the same game, sooner
     await pg.evaluate("SET.tips = false")
     await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
     if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')
