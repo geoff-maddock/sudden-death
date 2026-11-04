@@ -157,6 +157,8 @@ function wBallConcede() {
     wBallSettle('lose', sn ? sn.teams[me].R : 0, sn ? sn.teams[1 - me].R : 0, [], sn ? sn.inning : 1);
     wLeaveDiamond();
   }, () => { wBD.pause(false); wBallFocusField(); });
+  // (closed with Escape or a click outside: go on, as if you'd said no)
+  wAfterAsk(() => { if (wBallLive() && wBD.paused) wBD.pause(false); });
 }
 // after a button on the bar, the keys go back to the field (Space would press the button again, and swing)
 function wBallFocusField() { const a = document.activeElement; if (a && a.blur && $('wDiamondBar').contains(a)) a.blur(); }

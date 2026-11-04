@@ -38,6 +38,8 @@ src/realm/w19-journal.js
 scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js
 # Cinder Gridiron, the football engine, in its own scope (issue #9): src/realm/gridiron/manifest.txt
 scope wGF src/realm/gridiron/manifest.txt src/realm/gridiron/exports.js
+# The Anvil Ring, the boxing engine, in its own scope (issue #23): src/realm/ring/manifest.txt
+scope wBX src/realm/ring/manifest.txt src/realm/ring/exports.js
 # the engines, by id (W_ENGINES)
 src/realm/w19b-engines.js
 src/realm/w20-diamond.js
@@ -77,3 +79,8 @@ src/realm/w47-gffeel.js
 src/realm/w48-gfbench.js
 src/realm/w49-gfstance.js
 src/realm/w50-ambient.js
+src/realm/w51-ring.js
+src/realm/w52-ringcard.js
+src/realm/w53-ringgame.js
+src/realm/w54-ringcup.js
+src/realm/w55-ringfeel.js

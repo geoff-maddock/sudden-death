@@ -314,6 +314,14 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wgmodes button:first-child{border-radius:6px 0 0 6px}
 .wgmodes button:last-child{border-radius:0 6px 6px 0}
 .wgmodes button.on{background:var(--torch);color:#1a120c;border-color:var(--torch)}
+/* the ring (w51): your corner's call, and the pad for boxing by hand */
+#wRingCall{display:inline-flex;gap:4px;flex-wrap:wrap}
+#wRingCall button.on{border-color:var(--torch);box-shadow:0 0 0 1px var(--torch) inset}
+.wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
+.wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
+.wrpow{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
+@media (max-width:560px){.wrpair,.wrpair tbody,.wrpair tr,.wrpair th,.wrpair td{display:block;width:auto}.wrpair tr{padding:6px 0;border-top:1px solid rgba(255,208,160,.15)}.wrpair th,.wrpair td{border:0;padding:2px 0}.wrpair td:nth-child(3){display:none}.wrpair select{width:100%}.wrpair small{overflow-wrap:anywhere}}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}
 /* w43: the Seven tab */
