@@ -29623,7 +29623,8 @@ renderHelp = function () {
    rests), grains (crackle, crickets, drips) and accents (a bell, a lark, a foghorn, an anvil...). One shared reverb
    and a soft master filter make the space.
    The music is planned by wAmbGen(pal, seed): a seeded stream of events in time order, so a stretch is the same in a
-   test and differs from day to day. The live engine only plays that stream; it reads the world and never changes it.
+   test and differs from day to day. The live engine only plays that stream; it reads the world and never changes it (it may be
+   the first to look at the day's weather, which rolls it, as the HUD's look would).
    The mood (wMusicMood) reads the world: the place, the time, the weather, the team (low HP is a danger, tired legs
    thin the sound) and threats (the odds of a wild team on this tile, an alpha or a lair nearby, a dungeon, a grudge,
    fog by day, night off the road). They make one number, the intensity (0 calm to 1 danger), which eases toward its
@@ -29657,7 +29658,7 @@ const W_AMB = {
   cross: 4,              // seconds for one palette to fade out as the next fades in
   tex: 2,                // the texture's level against its palette's vol (it is the main colour when calm)
   keep: 8,               // voices kept back for the pad, the motif and the pulse: accents and grains stop short of them
-  late: .25,             // an event this late (a stall, a sleeping tab) is dropped; only the latest chord and gust catch up
+  late: .25,             // after a stall or a sleeping tab this late, the plan picks up where it was (nothing bursts out)
   settle: 1.2,           // seconds a new palette must be wanted before the bed changes (no flapping at a border)
   pause: .33,            // the bed's level while the game is paused (the tunes drop to .3 of .9)
 };
@@ -29723,7 +29724,7 @@ const W_AMB_PAL = {
 // a calm tune that has an ambient palette
 const W_AMB_THEME = { w_plains: 'plains', w_bloom: 'bloom', w_tide: 'tide', w_ember: 'ember', w_rime: 'rime', w_town: 'town', w_dungeon: 'dungeon' };
 if (SET.mstyle == null) SET.mstyle = 'ambient';
-const WAMB = { i: 0, mood: null, moodKey: '', moodAt: 0, pal: null, low: false, starts: 0, want: null, timer: null, gen: null, ev: null, t0: 0, ch: null, ringing: 0, peak: 0, log: [], noise: null, ir: null };
+const WAMB = { i: 0, mood: null, moodKey: '', moodAt: 0, pal: null, low: false, starts: 0, want: null, killT: 0, timer: null, gen: null, ev: null, t0: 0, ch: null, ringing: 0, peak: 0, log: [], noise: null, ir: null };
 // live voices are counted per bed (ch.live), so a stopped bed's tails never hold the next one back; ringing counts all
 Object.defineProperty(WAMB, 'live', { get: () => WAMB.ch ? WAMB.ch.live : 0, enumerable: true });
 
@@ -29922,27 +29923,28 @@ function wAmbPlay(c, e, t) {
   if (e.k !== 'grain') { WAMB.log.push({ k: e.k, a: e.a, t: e.t, frag: e.frag, src: e.src, deg: e.deg }); if (WAMB.log.length > 200) WAMB.log.shift(); }
 }
 function wAmbTick() {
-  const c = SND.ctx; if (!c || !WAMB.pal || !WAMB.ch) return;
+  const c = SND.ctx; if (!c || !WAMB.pal || !WAMB.ch || !WG || !RUN) return;
   const now = c.currentTime, dt = Math.min(1, Math.max(0, now - (WAMB.at || now))); WAMB.at = now;
   // the mood changes when you step, the clock moves or HP changes; otherwise once a second is plenty
   const key = [WG.map, WG.x, WG.y, WG.min, RUN.hp, RUN.maxhp, WG.dayAbs].join();
   if (key !== WAMB.moodKey || now - WAMB.moodAt > 1) { WAMB.mood = wMusicMood(); WAMB.moodKey = key; WAMB.moodAt = now; }
   wAmbEase(WAMB.mood.intensity, dt);
   const ch = WAMB.ch, P = W_AMB_PAL[WAMB.pal], I = WAMB.i, tired = WAMB.mood.tint.tired, night = WAMB.mood.tint.night, wx = wAmbWx();
-  ch.vol.gain.setTargetAtTime(SET.mvol * W_AMB.vol * (P.gain || 1) * (UI.paused ? W_AMB.pause : 1), now, .2);
-  ch.drone.g.gain.setTargetAtTime((.05 + .035 * I) * (P.droneVol || 1), now, 1); ch.drone.sub.gain.setTargetAtTime(.06 * I, now, 1);
-  ch.drone.lp.frequency.setTargetAtTime((P.droneLp || 420) * (tired ? .7 : 1), now, 2); ch.drone.sl.frequency.setTargetAtTime(tired ? .02 : .04, now, 2);
-  if (ch.wx) ch.wx.g.gain.setTargetAtTime(wx ? P.wx.tex.vol * W_AMB.tex * (1 - .3 * I) : 0, now, 3);
-  ch.lp.frequency.setTargetAtTime(W_AMB.lp * (tired ? .6 : 1) * (night ? .75 : 1) * (wx ? P.wx.lp : 1), now, 2);
-  // after a stall or a sleeping tab, drop what is late rather than play it all at once: only the latest chord and
-  // gust catch up
-  const caught = {};
+  // a parameter only gets a new target when it moves (not 40 times a second toward the same value)
+  const to = (prm, v, tau) => { if (prm.wAmbTo === undefined || Math.abs(prm.wAmbTo - v) > Math.abs(v) * .01 + 1e-5) { prm.setTargetAtTime(v, now, tau); prm.wAmbTo = v; } };
+  to(ch.vol.gain, SET.mvol * W_AMB.vol * (P.gain || 1) * (UI.paused ? W_AMB.pause : 1), .2);
+  to(ch.drone.g.gain, (.05 + .035 * I) * (P.droneVol || 1), 1); to(ch.drone.sub.gain, .06 * I, 1);
+  to(ch.drone.lp.frequency, (P.droneLp || 420) * (tired ? .7 : 1), 2); to(ch.drone.sl.frequency, tired ? .02 : .04, 2);
+  if (ch.wx) to(ch.wx.g.gain, wx ? P.wx.tex.vol * W_AMB.tex * (1 - .3 * I) : 0, 3);
+  to(ch.lp.frequency, W_AMB.lp * (tired ? .6 : 1) * (night ? .75 : 1) * (wx ? P.wx.lp : 1), 2);
+  // after a stall or a sleeping tab, the plan picks up where it was: its clock moves on by the lag, in one step, so
+  // nothing late bursts out and an hour asleep costs nothing to catch up (the drone and the texture played on)
+  if (WAMB.ev && now - (WAMB.t0 + WAMB.ev.t) > W_AMB.late) WAMB.t0 = now + .02 - WAMB.ev.t;
   while (WAMB.ev && WAMB.t0 + WAMB.ev.t < now + W_AMB.look) {
     const e = WAMB.ev, at = WAMB.t0 + e.t;
-    if (now - at < W_AMB.late) wAmbPlay(c, e, Math.max(at, now + .02)); else if (e.k === 'chord' || e.k === 'gust') caught[e.k] = e;
+    wAmbPlay(c, e, Math.max(at, now + .02));
     WAMB.ev = WAMB.gen();
   }
-  for (const k in caught) wAmbPlay(c, caught[k], now + .02);
 }
 function wAmbStart(key) {
   const c = SND.ctx; if (!c || c.state !== 'running' || !SET.music || LAB) return;
@@ -29951,7 +29953,7 @@ function wAmbStart(key) {
   const cross = !!WAMB.pal, fin = cross ? W_AMB.cross : W_AMB.fade;
   if (cross) wAmbStop(W_AMB.cross);
   // the seed is the palette, the day and the hour, and how many beds have started, so coming back is never a replay
-  WAMB.pal = key; WAMB.ch = wAmbChain(c); WAMB.gen = wAmbGen(key, (wAmbSeed(key) ^ Math.imul(++WAMB.starts, 104729)) >>> 0, () => ({ i: WAMB.i, night: !!(WAMB.mood && WAMB.mood.tint.night), wx: wAmbWx() })); WAMB.mood = wMusicMood(); WAMB.moodKey = ''; WAMB.i = WAMB.mood.intensity; WAMB.at = c.currentTime; WAMB.ev = WAMB.gen(); WAMB.t0 = c.currentTime + .1; WAMB.log = [];
+  WAMB.pal = key; WAMB.ch = wAmbChain(c); WAMB.gen = wAmbGen(key, (wAmbSeed(key) ^ Math.imul(++WAMB.starts, 104729)) >>> 0, () => ({ i: WAMB.i, night: !!(WAMB.mood && WAMB.mood.tint.night), wx: wAmbWx() })); WAMB.mood = wMusicMood(); WAMB.moodKey = ''; WAMB.at = c.currentTime; WAMB.ev = WAMB.gen(); WAMB.t0 = c.currentTime + .1; WAMB.log = [];
   WAMB.ch.fade.gain.setValueAtTime(0, c.currentTime); WAMB.ch.fade.gain.linearRampToValueAtTime(1, c.currentTime + fin); WAMB.lastIn = fin;
   wAmbHold(c, W_AMB_PAL[key]);
   clearInterval(WAMB.timer); WAMB.timer = setInterval(wAmbTick, 200); wAmbTick();
@@ -29959,7 +29961,7 @@ function wAmbStart(key) {
 function wAmbStop(fade) {
   clearInterval(WAMB.timer); WAMB.timer = null;
   const c = SND.ctx, ch = WAMB.ch;
-  WAMB.pal = null; WAMB.ch = null; WAMB.gen = null; WAMB.ev = null;
+  WAMB.pal = null; WAMB.ch = null; WAMB.gen = null; WAMB.ev = null; WAMB.want = null;
   if (!c || !ch) return;
   const out = fade || W_AMB.fade / 3, now = c.currentTime; WAMB.lastFade = out;
   ch.fade.gain.cancelScheduledValues(now); ch.fade.gain.setValueAtTime(ch.fade.gain.value, now); ch.fade.gain.linearRampToValueAtTime(0, now + out);
@@ -29974,11 +29976,14 @@ function wAmbEase(target, dt) {
   WAMB.i += (target - WAMB.i) * (1 - Math.exp(-dt / tau));
   return WAMB.i;
 }
+// the site whose map you are in (the wreck, the cottage, the chapel...), or null
+function wAmbSite() { return WG ? DB.locs.find(l => l.kind === 'site' && l.map === WG.map) || null : null; }
 // the nearest unbeaten alpha or lair on this map, in tiles
 function wAmbAlphaNear(m) {
   const R = W_AMB_MOOD.near; let best = null;
   for (let y = WG.y - R; y <= WG.y + R; y++) for (let x = WG.x - R; x <= WG.x + R; x++) {
-    const c = m.t[y] && m.t[y][x]; if (c !== 'M' && c !== 'Z') continue;
+    if (!m.t[y] || m.t[y][x] == null) continue;
+    const c = wTileAt(m, x, y); if (c !== 'M' && c !== 'Z') continue;  // as the map shows it: a hidden lair stays hidden
     const mt = m.meta[x + ',' + y] || {}, L = mt.loc && DB.locs.find(l => l.id === mt.loc), a = c === 'M' ? mt.alpha : L && L.alpha;
     if (!a || wFlag('alpha_' + a)) continue;
     const d = Math.hypot(x - WG.x, y - WG.y); if (d <= R && (!best || d < best.d)) best = { d, lair: c === 'Z', alpha: a };
@@ -29990,7 +29995,7 @@ function wAmbAlphaNear(m) {
 function wMusicMood() {
   const M = W_AMB_MOOD, m = WG && wCurMap();
   if (!m || !RUN) return { place: 'world', palette: null, intensity: 0, tint: {}, why: [] };
-  const world = m.kind === 'world', site = DB.locs.find(l => l.kind === 'site' && l.map === WG.map), night = wIsNight(), road = world && wOnRoad();
+  const world = m.kind === 'world', site = wAmbSite(), night = wIsNight(), road = world && wOnRoad();
   const wx = world ? wWeather(wRegionHere()) : null, hp = RUN.maxhp ? RUN.hp / RUN.maxhp : 1;
   const st = wStarters(), tired = st.length > 0 && st.filter(p => wLegsState(p) !== 'fresh').length / st.length >= M.tired;
   const src = {}, near = m.kind !== 'town' ? wAmbAlphaNear(m) : null;
@@ -30012,7 +30017,7 @@ function wMusicMood() {
 // and off a road at night never swaps the bed for the tune
 function wAmbPalFor(theme) {
   // sites (the wreck, the cottage, the chapel) and grounds keep their tunes until they have palettes (phase 4)
-  if (WG && DB.locs.some(l => l.kind === 'site' && l.map === WG.map)) return null;
+  if (wAmbSite()) return null;
   if (theme === 'w_night') return WG ? W_AMB_THEME[W_MUSIC_REGION[wRegionHere()]] || null : null;
   return W_AMB_THEME[theme] || null;
 }
@@ -30037,7 +30042,7 @@ musicSet = function (theme, mode) {
   }
   WAMB.want = null;
   // a tune's crossfade is under way (it starts in 650 ms): start the bed now, and stop that tune as soon as it starts
-  if (MUS.switching) { wAmbStart(key); setTimeout(() => { if (WAMB.pal && MUS.timer) wW50MusicStop(); }, 700); return; }
+  if (MUS.switching) { wAmbStart(key); if (!WAMB.killT) WAMB.killT = setTimeout(() => { WAMB.killT = 0; if (WAMB.pal && MUS.timer) wW50MusicStop(); }, 700); return; }
   if (MUS.timer) wW50MusicStop();
   wAmbStart(key);
 };

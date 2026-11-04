@@ -251,6 +251,16 @@ async def live_checks(pg):
     await pg.evaluate("__go('bloom', 12); MUS.want = null")
     await pg.wait_for_function("MUS.want !== null", timeout=T)
     check(await pg.evaluate("WAMB.ch === __ch && WAMB.pal === 'bloom'"), 'a quick step over a border and back keeps the same bed (no flapping)')
+    fg = await pg.evaluate("(() => { WAMB.want = { key: 'plains', at: 0 }; wAmbStop(); const o = WAMB.want === null; return o; })()")
+    check(fg, 'a stopped bed forgets the palette it was about to change to (the settle starts again after a match)')
+    await pg.wait_for_function("WAMB.pal === 'bloom'", timeout=T)
+    nt = await pg.evaluate("(() => { const r = RUN; RUN = null; let err = null; try { wAmbTick(); } catch (e) { err = e.message; } RUN = r; return err; })()")
+    check(nt is None, 'with no journey loaded, the tick does nothing (no errors)', nt)
+    ez = await pg.evaluate("(() => { WAMB.i = .1; const h = RUN.hp; RUN.hp = Math.round(RUN.maxhp * .1); wAmbStop(); wAmbStart('bloom'); const o = { i: WAMB.i, target: WAMB.mood.intensity }; RUN.hp = h; return o; })()")
+    check(abs(ez['i'] - .1) < .02 and ez['target'] > .5, 'a new bed keeps the eased intensity and swells toward the target (no jump)', ez)
+    hid = await pg.evaluate("""(() => { const L = DB.locs.find(l => l.kind === 'lair'), was = L.hidden; wEnterMap('world', L.x + 1, L.y); WG.min = 720;
+      const seen = wAmbAlphaNear(MAPS.world); L.hidden = 'clue_nobody_has'; const hidden = wAmbAlphaNear(MAPS.world); if (was) L.hidden = was; else delete L.hidden; __go('bloom', 12); return { seen: !!seen, hidden: !!hidden }; })()""")
+    check(hid['seen'] and not hid['hidden'], 'a lair hidden behind a clue does not swell the music (the map as you see it)', hid)
     # a site keeps its tune
     await pg.evaluate("(() => { const m = MAPS.cottage; wEnterMap('cottage', m.spawn[0], m.spawn[1]); })()")
     await pg.wait_for_function("MUS.theme === 'w_town' && !!MUS.timer && !WAMB.pal", timeout=T)
@@ -288,14 +298,14 @@ async def live_checks(pg):
       const o = { live: WAMB.live, cap: W_AMB.voices }; W_AMB.voices = v; return o; })()""")
     check(cap['live'] <= cap['cap'], 'the bed never goes over its cap of live voices', cap)
     check(await pg.evaluate("WAMB.peak <= W_AMB.voices"), 'nor did it while playing', await pg.evaluate("[WAMB.peak, W_AMB.voices]"))
-    # after the tab slept: only the latest chord and gust catch up
-    cu = await pg.evaluate("""(() => { const n0 = WAMB.log.length; WAMB.t0 -= 120; wAmbTick();
-      const got = WAMB.log.slice(n0); return { chords: got.filter(e => e.k === 'chord').length, gusts: got.filter(e => e.k === 'gust').length, motifs: got.filter(e => e.k === 'motif').length, live: WAMB.live, cap: W_AMB.voices }; })()""")
-    check(cu['chords'] == 1 and cu['gusts'] == 1 and cu['motifs'] == 0 and cu['live'] <= cu['cap'], 'after two minutes asleep, only the latest chord and gust catch up, not all of them', cu)
+    # after the tab slept for an hour: the plan picks up where it was, in one step, and nothing plays late
+    cu = await pg.evaluate("""(() => { const n0 = WAMB.log.length, ev = WAMB.ev; WAMB.t0 -= 3600; const now = SND.ctx.currentTime, t = performance.now(); wAmbTick();
+      const got = WAMB.log.slice(n0); return { first: got.length ? got[0].t === ev.t : true, n: got.length, late: got.filter(e => WAMB.t0 + e.t < now - W_AMB.late).length, ms: performance.now() - t, live: WAMB.live, cap: W_AMB.voices }; })()""")
+    check(cu['first'] and cu['late'] == 0 and cu['n'] < 30 and cu['ms'] < 50 and cu['live'] <= cu['cap'], 'after an hour asleep, the plan picks up where it was, at once, and nothing bursts out', cu)
     st = await pg.evaluate("""(() => { const n0 = WAMB.log.length; WAMB.t0 -= 2.5; const now = SND.ctx.currentTime; wAmbTick();
       const got = WAMB.log.slice(n0), late = e => WAMB.t0 + e.t < now - W_AMB.late;
       return { other: got.filter(e => e.k !== 'chord' && e.k !== 'gust' && late(e)).length, chords: got.filter(e => e.k === 'chord' && late(e)).length, onTime: got.filter(e => !late(e)).length }; })()""")
-    check(st['other'] == 0 and st['chords'] <= 1, 'after a stall of 2.5 s, nothing late bursts out at once (only a chord may catch up)', st)
+    check(st['other'] == 0 and st['chords'] == 0, 'after a stall of 2.5 s, nothing late bursts out at once', st)
     # 3: the cap keeps room for the pad: accents and grains stop short of the last voices
     pr = await pg.evaluate("""(() => { const c = SND.ctx, v = W_AMB.voices, P = W_AMB_PAL[WAMB.pal]; W_AMB.voices = WAMB.live + W_AMB.keep + 2; const n0 = WAMB.live;
       for (let i = 0; i < 4; i++) wAmbPlay(c, { k: 'acc', a: 'sleigh', t: 0, x: .3 + i / 10 }, c.currentTime + .05);
@@ -334,6 +344,14 @@ async def live_checks(pg):
     await pg.evaluate("musicSet('w_town', 'calm'); window.__sw = MUS.switching; SET.mstyle = 'ambient'; musicSet('w_plains', 'calm')")
     await pg.wait_for_function("WAMB.pal === 'plains' && !MUS.switching && !MUS.timer", timeout=T)
     check(await pg.evaluate("__sw === true"), 'mid-crossfade, the bed starts and the incoming tune is stopped')
+    await pg.evaluate("SET.mstyle = 'classic'")
+    await pg.wait_for_function("MUS.theme === 'w_plains' && !!MUS.timer", timeout=T)
+    one = await pg.evaluate("(() => { musicSet('w_town', 'calm'); SET.mstyle = 'ambient'; musicSet('w_plains', 'calm'); const a = WAMB.killT; musicSet('w_plains', 'calm'); musicSet('w_plains', 'calm'); return !!a && WAMB.killT === a; })()")
+    check(one, 'and only one timer is set to stop it, however often the poll asks')
+    await pg.wait_for_function("WAMB.pal === 'plains' && !MUS.switching && !MUS.timer && !WAMB.killT", timeout=T)
+    # parameters get a new target only when they move
+    pm = await pg.evaluate("(() => { const p = WAMB.ch.vol.gain, a = p.wAmbTo; let n = 0; const f = p.setTargetAtTime.bind(p); p.setTargetAtTime = (...x) => { n++; return f(...x); }; for (let i = 0; i < 5; i++) wAmbTick(); delete p.setTargetAtTime; return { n, a }; })()")
+    check(pm['n'] == 0 and pm['a'] is not None, 'a level that has not moved gets no new automation, tick after tick', pm)
     # Classic
     await pg.evaluate("SET.mstyle = 'classic'")
     await pg.wait_for_function("MUS.theme === 'w_plains' && !!MUS.timer && !WAMB.pal", timeout=T)
