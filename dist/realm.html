@@ -24508,6 +24508,23 @@ function bxStyle(r, o) {
   if (r.chin >= 8 && r.sta >= 8) return 'body';
   return r.spd >= 7 ? 'counter' : 'press';
 }
+/* each kind's nature in the ring (BX_TRAIT): a small edge for the kinds the numbers leave behind, a small weakness for
+   the ones they favour, and nothing for the rest. Flavour first: it follows what the kind is, and moves a kind's bouts
+   by a few points, not a lot. The ring reads them where they act (05-ring.js, 07-bout.js): */
+const BX_TRAIT = {
+  spider:   { n: 'Long Arms', desc: 'The jab lands from a little further, and a jab that lands stops a fighter coming forward for a moment.', jabReach: .3, stick: .45 },
+  skeleton: { n: 'Hollow', desc: 'Body shots find little to hit: they hurt it a little less, and take none of its breath.', hollow: .8 },
+  kobold:   { n: 'Quick Recovery', desc: 'Gets its breath back a little faster, and all of it between rounds.', regen: 1.05, corner: 1 },
+  lich:     { n: 'Cold Read', desc: 'Its counters hit harder, and its slips leave a longer window to counter in.', ctrDmg: 1.85, ctrWin: 1.5 },
+  goblin:   { n: 'Scrappy', desc: 'Behind on health, it fights dirtier: its punches land more often.', scrappy: .03 },
+  werewolf: { n: 'Second Wind', desc: 'Once a bout, badly hurt, the wolf in it gives back 15 stamina.', wind: 15 },
+  golem:    { n: 'Stone Weight', desc: 'Slow to get up off the canvas: it needs a count of one more to rise.', rise: 1 },
+  dwarf:    { n: 'Stocky', desc: 'Backs up even slower than most, so it gets pinned on the ropes.', back: .4 },
+  minotaur: { n: 'Charges In', desc: 'Always coming forward, it takes counters harder.', ctrTaken: 1.25 },
+  ogre:     { n: 'Heavy Breather', desc: 'Gets its breath back a little more slowly.', regen: .92 },
+  zombie:   { n: 'Rotting', desc: 'Big shots take more off the most health it can get back.', rot: 1.6 },
+};
+const bxTrait = f => BX_TRAIT[f.kind] || null;
 const BX_HP = 100;
 // the fighter for side from { n, kind, num, r?, style? } (r: ratings to lay over the kind's; style: a plan to box to)
 function bxFighter(p, side) {
@@ -24554,7 +24571,7 @@ let BXE = [];
 
 const bxFrac = f => clamp(f.sta / f.staMax, 0, 1);
 const bxDist = (a, b) => hyp(a.x - b.x, a.y - b.y);
-const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range;
+const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range + (k === 'jab' && BX_TRAIT[f.kind] && BX_TRAIT[f.kind].jabReach || 0);
 // how long everything takes: quicker for the fast, slower when tired
 const bxTempo = f => (1.08 - f.r.spd * .015) * (1 + .5 * (1 - bxFrac(f))) / bxFx(f).spd;
 const bxMoveSpd = f => (2.6 + f.r.spd * .2) * (.6 + .4 * bxFrac(f)) * bxFx(f).move;
@@ -24609,11 +24626,12 @@ function bxBreak() {
 function bxLand(a, b, k) {
   const P = BX_PUNCH[k], ctr = !!a.a.ctr;
   if (b.a.k === 'down' || b.a.k === 'clinch') return;
-  if (bxDist(a, b) > bxRange(a, k) + .12) { bxEv('miss', a.side, { p: k, why: 'short' }); return; }
+  const Ta = bxTrait(a) || {}, Tb = bxTrait(b) || {};
+  if (bxDist(a, b) > bxRange(a, k) + .12) { if (P.power && Ta.whiff) a.sta = Math.max(0, a.sta - Ta.whiff); bxEv('miss', a.side, { p: k, why: 'short' }); return; }
   const Fa = bxFx(a), Fb = bxFx(b);
   if (Fb.miss || (Fb.air && !P.head)) { bxEv('miss', a.side, { p: k, why: Fb.miss ? 'through' : 'over' }); return; }
   if (b.a.k === 'slip' && b.a.t >= BX_SLIP.from && b.a.t <= BX_SLIP.to && (P.head || R() < .5)) {
-    b.rs.def++; b.rs.slips++; b.ctr = BX_SLIP.ctr; bxEv('slip', b.side, { p: k }); return;
+    b.rs.def++; b.rs.slips++; b.ctr = BX_SLIP.ctr * (Tb.ctrWin || 1); if (P.power && Ta.whiff) a.sta = Math.max(0, a.sta - Ta.whiff); bxEv('slip', b.side, { p: k }); return;
   }
   let acc = P.acc + (a.r.spd - b.r.spd) * .008 + (a.r.gui - b.r.gui) * .006 - (1 - bxFrac(a)) * .22 + (1 - bxFrac(b)) * .12;
   const winding = bxPunching(b) && !b.a.done;
@@ -24622,23 +24640,27 @@ function bxLand(a, b, k) {
   if (ctr) acc += .2;
   if (b.a.k === 'stun' || b.a.k === 'grab') acc += .35;
   acc += Fa.acc;
-  if (R() > clamp(acc, .08, .95)) { bxEv('miss', a.side, { p: k, why: 'missed' }); return; }
+  if (Ta.scrappy && a.hp < b.hp) acc += Ta.scrappy;
+  if (R() > clamp(acc, .08, .95)) { if (P.power && Ta.whiff) a.sta = Math.max(0, a.sta - Ta.whiff); bxEv('miss', a.side, { p: k, why: 'missed' }); return; }
   // (Rampart takes a head punch whole: it scores nothing, and no buff is spent on it)
   if (Fb.rampart && P.head) { b.rs.def += .5; b.rs.blocks++; bxEv('block', a.side, { p: k, n: 0, ctr }); return; }
   const blocked = P.head && b.a.k === 'guard';
   let dmg = P.dmg * (.55 + a.r.pow * .09) * (.6 + .4 * bxFrac(a)) / (.4 + b.r.chin * .12);
-  if (ctr) dmg *= 1.5;
+  if (ctr) dmg *= (Ta.ctrDmg || 1.5) * (Tb.ctrTaken || 1);
+  if (k === 'body' && Tb.hollow) dmg *= Tb.hollow;
   if (winding && !blocked) dmg *= 1.1;
   if (blocked) { dmg *= (P.power ? BX_GUARD.power : BX_GUARD.head) * (Fb.leaky ? 2 : 1); b.rs.def += .5; b.rs.blocks++; }
   else { a.rs.landed++; if (P.power) a.rs.power++; }
   dmg *= (.85 + R() * .3) * Fa.dmgOut * Fb.dmgIn;
   if (Fb.rampart) dmg *= .5;
   if (!blocked && P.power && Fa.nextMul !== 1) { dmg *= Fa.nextMul; a.fx = a.fx.filter(s => s.nextMul == null); }
-  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2);
-  if (P.drain) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
+  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1));
+  if (P.drain && !Tb.hollow) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
   bxHurt(a, b, dmg, !blocked);
   if (G.down != null) return;
+  // a spider's jab stops a fighter coming forward
+  if (!blocked && k === 'jab' && Ta.stick) b.halt = Ta.stick;
   if (!blocked && dmg > 5 + b.r.chin * .7) { b.a = { k: 'stun', t: 0, dur: .35 + dmg * .025, id: ++G.aid }; bxEv('stun', b.side, { n: Math.round(dmg) }); }
 }
 // one fighter's action and breath move on by dt
@@ -24647,10 +24669,13 @@ function bxAdvance(f, o, dt) {
   const P = BX_PUNCH[f.a.k];
   if (P && !f.a.done && f.a.t >= f.a.hitAt) { f.a.done = true; bxLand(f, o, f.a.k); }
   if (f.a.k !== 'clinch' && f.a.k !== 'down' && f.a.t >= f.a.dur) f.a = { k: 'idle', t: 0, dur: 0, id: f.a.id };
-  const regen = (3.8 + f.r.sta * .3) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
+  const regen = (3.8 + f.r.sta * .3) * ((bxTrait(f) || {}).regen || 1) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
   if (!bxFx(f).noReg) f.sta = clamp(f.sta + regen * dt, 0, f.staMax);
   if (G.down == null) bxFxTick(f, dt);
   if (f.ctr > 0) f.ctr = Math.max(0, f.ctr - dt);
+  if (f.halt > 0) f.halt = Math.max(0, f.halt - dt);
+  // a werewolf's second wind: once a bout, badly hurt
+  const T = bxTrait(f); if (T && T.wind && !f.wind && f.a.k !== 'down' && f.hp < f.hpMax * .3) { f.wind = 1; f.sta = Math.min(f.staMax, f.sta + T.wind); bxEv('wind', f.side); bxLog(`${f.n} finds a second wind!`); }
 }
 function bxMove(dt) {
   for (const f of G.F) {
@@ -24659,8 +24684,9 @@ function bxMove(dt) {
     const o = G.F[1 - f.side], before = bxDist(f, o), F = bxFx(f);
     if (F.root) continue;
     // backing up is slower than coming forward, and slower again along the ropes: so a presser can cut off the ring
-    const fwd = ((o.x - f.x) * mx + (o.y - f.y) * my) / ((before || 1) * m), back = fwd < 0 ? lerp(1, BX_RING.back, -fwd) : 1;
+    const fwd = ((o.x - f.x) * mx + (o.y - f.y) * my) / ((before || 1) * m), back = fwd < 0 ? lerp(1, (bxTrait(f) || {}).back || BX_RING.back, -fwd) : 1;
     if (F.noBack && fwd < -.2) continue;
+    if (f.halt > 0 && fwd > .2) continue;
     const sp = bxMoveSpd(f) * back * (bxOnRopes(f) ? BX_RING.ropes : 1) * (bxPunching(f) ? (fwd > .3 ? .85 : .35) : f.a.k === 'guard' ? .55 : f.a.k === 'slip' ? .4 : 1) / Math.max(1, m);
     f.x += mx * sp * dt; f.y += my * sp * dt;
     if (bxDist(f, o) < before - .005) f.rs.press += dt;
@@ -24866,7 +24892,7 @@ function bxDown() {
   bxLog(`${f.n} is down!`, true);
   if (bxKnockdown(s) === 'tko') { bxLog(`Three knockdowns: the referee stops it.`, true); bxOver(); return; }
   const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
-  BD.getUp = clamp(Math.round(10.5 - score), 2, BX_RULES.count); BD.count = 1;
+  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0), 2, BX_RULES.count); BD.count = 1;
   bxPh('kd');
 }
 function bxRise() {
@@ -24895,7 +24921,7 @@ function bxRoundEnd() {
 }
 function bxCorner() {
   for (const f of G.F) {
-    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * .35); f.sta = f.sta + (f.staMax - f.sta) * .75; f.ctr = 0;
+    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * .35); f.sta = (bxTrait(f) || {}).corner ? f.staMax : f.sta + (f.staMax - f.sta) * .75; f.ctr = 0; f.halt = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
     if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
@@ -25162,7 +25188,8 @@ function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, 
 function bxDrawIntro(c) {
   bxPanel(c, 230, 270, 500, 110);
   const [A, B] = G.F;
-  txt(c, `${A.n}  vs  ${B.n}`, 480, 300, '800 22px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  const tn = f => bxTrait(f) ? ` (${bxTrait(f).n})` : '';
+  txt(c, `${A.n}${tn(A)}  vs  ${B.n}${tn(B)}`, 480, 300, '800 20px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_STATS.forEach((s, i) => {
     const x = 300 + i * 72;
     txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
@@ -25576,6 +25603,8 @@ return {
   // or the pad through input), every kind's powers (for How to play), the stamina they cost, and a fighter's statuses
   powers: side => G && G.F ? bxPowState(G.F[side == null ? BD.you : side]) : null, cast: (side, which) => bxCast(G.F[side], which),
   powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, { sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }])),
+  // each kind's nature in the ring (a trait for some, none for the rest): { kind: { n, desc } }
+  traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],
   // the ratings, plans, punches and judges, for the page and How to play
   rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
@@ -32189,7 +32218,8 @@ function wRingHowHTML() {
   <p class="hint"><b>Your corner.</b> Before each round you pick a plan: ${Object.values(P).map(p => `<b>${p.n}</b> (${p.desc.toLowerCase().replace(/\.$/, '')})`).join(', ')}. Your corner says what they'd do and why. The cut-man gives back 18 health and a little of what big shots took, once a break and ${R.patches} times a bout.</p>
   <p class="hint"><b>The judges.</b> Three judges score each round 10–9 to whoever did more (10–10 when it's even). Brass likes power punches, Tally likes activity and Slate likes defense, so a close round can split them. A knockdown wins the round 10–8 (10–9 if the fighter who went down was winning it otherwise), and a point more for each one more. After the last round, two judges or three for one fighter wins it.</p>
   <p class="hint"><b>Powers.</b> Every kind has a special, once a round, and an ultimate, once a bout. A special costs ${wBX.powerCost.sp} stamina and an ultimate ${wBX.powerCost.ult}, and neither can be cast while you're down, stunned, clinched or in the middle of a punch. Some act at once (a stun, a push to the ropes, damage that goes through the guard); others last a few seconds (stone skin, a root, health back for what lands). You cast with Q and R, or the buttons under the ring; in You corner your fighter casts them as the CPU would, when the moment suits.</p>
-  <table class="wrpow"><tr><th>Kind</th><th>Special (once a round)</th><th>Ultimate (once a bout)</th></tr>${Object.entries(wBX.powerBook).map(([k, P]) => `<tr><td>${esc(wKindName(k))}</td><td><b>${esc(P.sp.n)}</b>: ${esc(P.sp.desc)}</td><td><b>${esc(P.ult.n)}</b>: ${esc(P.ult.desc)}</td></tr>`).join('')}</table>
+  <p class="hint"><b>Nature.</b> Some kinds have a way of their own in the ring: an edge for those the numbers leave behind (a spider's long arms, a skeleton's hollow ribs, a kobold's quick recovery), and a weakness for the ones they favour (a golem slow off the canvas, a dwarf pinned on the ropes, an ogre short of breath). They nudge a bout, no more.</p>
+  <table class="wrpow"><tr><th>Kind</th><th>Nature</th><th>Special (once a round)</th><th>Ultimate (once a bout)</th></tr>${Object.entries(wBX.powerBook).map(([k, P]) => `<tr><td>${esc(wKindName(k))}</td><td>${wBX.traits[k] ? `<b>${esc(wBX.traits[k].n)}</b>: ${esc(wBX.traits[k].desc)}` : '–'}</td><td><b>${esc(P.sp.n)}</b>: ${esc(P.sp.desc)}</td><td><b>${esc(P.ult.n)}</b>: ${esc(P.ult.desc)}</td></tr>`).join('')}</table>
   <p class="hint"><b>Three ways to box.</b> <b>Corners</b>: you watch. <b>You corner</b>: you pick the plans and the cut-man, and your fighter boxes them. <b>You box</b>: that, and you box the rounds yourself. J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, Q your special, R your ultimate, and WASD or the arrows to move. Let go of the keys and your feet follow your plan, so you can box with the buttons under the ring alone.</p>`;
 }
 wRunAct = function (act, id) { if (act === 'bout') return wRingBout(); return wW51RunAct.apply(this, arguments); };
@@ -32230,7 +32260,7 @@ const W_RING_STAT = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'S
    theirs, title, intro, go: [[label, value], ...] (the buttons that box it), onGo(picks, value) } */
 function wRingPairing(o) {
   const { mine, theirs } = o, auto = wBX.cardAuto(mine.fighters, theirs.fighters);
-  const rate = f => wBX.stats.map(s => `${W_RING_STAT[s]} ${(f.r || wBX.rate(f.kind))[s]}`).join(' · ');
+  const T = k => wBX.traits[k], rate = f => wBX.stats.map(s => `${W_RING_STAT[s]} ${(f.r || wBX.rate(f.kind))[s]}`).join(' · ') + (T(f.kind) ? ` · <span title="${esc(T(f.kind).desc)}">${esc(T(f.kind).n)}</span>` : '');
   const opt = sel => mine.fighters.map((f, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(f.n)}, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}${f.callup ? ' (call-up)' : ''}</option>`).join('');
   const close = modal(`<header><h3>${esc(o.title)}</h3><button class="ghost" data-close>Not now</button></header>
     <div class="wmsg"><p class="hint">${o.intro}</p>
@@ -32241,7 +32271,7 @@ function wRingPairing(o) {
   const sel = () => [...$('modalBox').querySelectorAll('[data-rslot]')].map(s => +s.value);
   const sync = () => {
     const p = sel(), dup = new Set(p).size !== p.length;
-    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).textContent = rate(mine.fighters[+s.value]);
+    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).innerHTML = rate(mine.fighters[+s.value]);
     for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.disabled = dup;
     $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
   };

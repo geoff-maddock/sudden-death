@@ -31,7 +31,7 @@ let BXE = [];
 
 const bxFrac = f => clamp(f.sta / f.staMax, 0, 1);
 const bxDist = (a, b) => hyp(a.x - b.x, a.y - b.y);
-const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range;
+const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range + (k === 'jab' && BX_TRAIT[f.kind] && BX_TRAIT[f.kind].jabReach || 0);
 // how long everything takes: quicker for the fast, slower when tired
 const bxTempo = f => (1.08 - f.r.spd * .015) * (1 + .5 * (1 - bxFrac(f))) / bxFx(f).spd;
 const bxMoveSpd = f => (2.6 + f.r.spd * .2) * (.6 + .4 * bxFrac(f)) * bxFx(f).move;
@@ -86,11 +86,12 @@ function bxBreak() {
 function bxLand(a, b, k) {
   const P = BX_PUNCH[k], ctr = !!a.a.ctr;
   if (b.a.k === 'down' || b.a.k === 'clinch') return;
-  if (bxDist(a, b) > bxRange(a, k) + .12) { bxEv('miss', a.side, { p: k, why: 'short' }); return; }
+  const Ta = bxTrait(a) || {}, Tb = bxTrait(b) || {};
+  if (bxDist(a, b) > bxRange(a, k) + .12) { if (P.power && Ta.whiff) a.sta = Math.max(0, a.sta - Ta.whiff); bxEv('miss', a.side, { p: k, why: 'short' }); return; }
   const Fa = bxFx(a), Fb = bxFx(b);
   if (Fb.miss || (Fb.air && !P.head)) { bxEv('miss', a.side, { p: k, why: Fb.miss ? 'through' : 'over' }); return; }
   if (b.a.k === 'slip' && b.a.t >= BX_SLIP.from && b.a.t <= BX_SLIP.to && (P.head || R() < .5)) {
-    b.rs.def++; b.rs.slips++; b.ctr = BX_SLIP.ctr; bxEv('slip', b.side, { p: k }); return;
+    b.rs.def++; b.rs.slips++; b.ctr = BX_SLIP.ctr * (Tb.ctrWin || 1); if (P.power && Ta.whiff) a.sta = Math.max(0, a.sta - Ta.whiff); bxEv('slip', b.side, { p: k }); return;
   }
   let acc = P.acc + (a.r.spd - b.r.spd) * .008 + (a.r.gui - b.r.gui) * .006 - (1 - bxFrac(a)) * .22 + (1 - bxFrac(b)) * .12;
   const winding = bxPunching(b) && !b.a.done;
@@ -99,23 +100,27 @@ function bxLand(a, b, k) {
   if (ctr) acc += .2;
   if (b.a.k === 'stun' || b.a.k === 'grab') acc += .35;
   acc += Fa.acc;
-  if (R() > clamp(acc, .08, .95)) { bxEv('miss', a.side, { p: k, why: 'missed' }); return; }
+  if (Ta.scrappy && a.hp < b.hp) acc += Ta.scrappy;
+  if (R() > clamp(acc, .08, .95)) { if (P.power && Ta.whiff) a.sta = Math.max(0, a.sta - Ta.whiff); bxEv('miss', a.side, { p: k, why: 'missed' }); return; }
   // (Rampart takes a head punch whole: it scores nothing, and no buff is spent on it)
   if (Fb.rampart && P.head) { b.rs.def += .5; b.rs.blocks++; bxEv('block', a.side, { p: k, n: 0, ctr }); return; }
   const blocked = P.head && b.a.k === 'guard';
   let dmg = P.dmg * (.55 + a.r.pow * .09) * (.6 + .4 * bxFrac(a)) / (.4 + b.r.chin * .12);
-  if (ctr) dmg *= 1.5;
+  if (ctr) dmg *= (Ta.ctrDmg || 1.5) * (Tb.ctrTaken || 1);
+  if (k === 'body' && Tb.hollow) dmg *= Tb.hollow;
   if (winding && !blocked) dmg *= 1.1;
   if (blocked) { dmg *= (P.power ? BX_GUARD.power : BX_GUARD.head) * (Fb.leaky ? 2 : 1); b.rs.def += .5; b.rs.blocks++; }
   else { a.rs.landed++; if (P.power) a.rs.power++; }
   dmg *= (.85 + R() * .3) * Fa.dmgOut * Fb.dmgIn;
   if (Fb.rampart) dmg *= .5;
   if (!blocked && P.power && Fa.nextMul !== 1) { dmg *= Fa.nextMul; a.fx = a.fx.filter(s => s.nextMul == null); }
-  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2);
-  if (P.drain) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
+  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1));
+  if (P.drain && !Tb.hollow) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
   bxHurt(a, b, dmg, !blocked);
   if (G.down != null) return;
+  // a spider's jab stops a fighter coming forward
+  if (!blocked && k === 'jab' && Ta.stick) b.halt = Ta.stick;
   if (!blocked && dmg > 5 + b.r.chin * .7) { b.a = { k: 'stun', t: 0, dur: .35 + dmg * .025, id: ++G.aid }; bxEv('stun', b.side, { n: Math.round(dmg) }); }
 }
 // one fighter's action and breath move on by dt
@@ -124,10 +129,13 @@ function bxAdvance(f, o, dt) {
   const P = BX_PUNCH[f.a.k];
   if (P && !f.a.done && f.a.t >= f.a.hitAt) { f.a.done = true; bxLand(f, o, f.a.k); }
   if (f.a.k !== 'clinch' && f.a.k !== 'down' && f.a.t >= f.a.dur) f.a = { k: 'idle', t: 0, dur: 0, id: f.a.id };
-  const regen = (3.8 + f.r.sta * .3) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
+  const regen = (3.8 + f.r.sta * .3) * ((bxTrait(f) || {}).regen || 1) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
   if (!bxFx(f).noReg) f.sta = clamp(f.sta + regen * dt, 0, f.staMax);
   if (G.down == null) bxFxTick(f, dt);
   if (f.ctr > 0) f.ctr = Math.max(0, f.ctr - dt);
+  if (f.halt > 0) f.halt = Math.max(0, f.halt - dt);
+  // a werewolf's second wind: once a bout, badly hurt
+  const T = bxTrait(f); if (T && T.wind && !f.wind && f.a.k !== 'down' && f.hp < f.hpMax * .3) { f.wind = 1; f.sta = Math.min(f.staMax, f.sta + T.wind); bxEv('wind', f.side); bxLog(`${f.n} finds a second wind!`); }
 }
 function bxMove(dt) {
   for (const f of G.F) {
@@ -136,8 +144,9 @@ function bxMove(dt) {
     const o = G.F[1 - f.side], before = bxDist(f, o), F = bxFx(f);
     if (F.root) continue;
     // backing up is slower than coming forward, and slower again along the ropes: so a presser can cut off the ring
-    const fwd = ((o.x - f.x) * mx + (o.y - f.y) * my) / ((before || 1) * m), back = fwd < 0 ? lerp(1, BX_RING.back, -fwd) : 1;
+    const fwd = ((o.x - f.x) * mx + (o.y - f.y) * my) / ((before || 1) * m), back = fwd < 0 ? lerp(1, (bxTrait(f) || {}).back || BX_RING.back, -fwd) : 1;
     if (F.noBack && fwd < -.2) continue;
+    if (f.halt > 0 && fwd > .2) continue;
     const sp = bxMoveSpd(f) * back * (bxOnRopes(f) ? BX_RING.ropes : 1) * (bxPunching(f) ? (fwd > .3 ? .85 : .35) : f.a.k === 'guard' ? .55 : f.a.k === 'slip' ? .4 : 1) / Math.max(1, m);
     f.x += mx * sp * dt; f.y += my * sp * dt;
     if (bxDist(f, o) < before - .005) f.rs.press += dt;

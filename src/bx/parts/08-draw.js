@@ -196,7 +196,8 @@ function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, 
 function bxDrawIntro(c) {
   bxPanel(c, 230, 270, 500, 110);
   const [A, B] = G.F;
-  txt(c, `${A.n}  vs  ${B.n}`, 480, 300, '800 22px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  const tn = f => bxTrait(f) ? ` (${bxTrait(f).n})` : '';
+  txt(c, `${A.n}${tn(A)}  vs  ${B.n}${tn(B)}`, 480, 300, '800 20px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_STATS.forEach((s, i) => {
     const x = 300 + i * 72;
     txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');

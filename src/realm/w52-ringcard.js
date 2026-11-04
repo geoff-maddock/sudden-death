@@ -26,7 +26,7 @@ const W_RING_STAT = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'S
    theirs, title, intro, go: [[label, value], ...] (the buttons that box it), onGo(picks, value) } */
 function wRingPairing(o) {
   const { mine, theirs } = o, auto = wBX.cardAuto(mine.fighters, theirs.fighters);
-  const rate = f => wBX.stats.map(s => `${W_RING_STAT[s]} ${(f.r || wBX.rate(f.kind))[s]}`).join(' · ');
+  const T = k => wBX.traits[k], rate = f => wBX.stats.map(s => `${W_RING_STAT[s]} ${(f.r || wBX.rate(f.kind))[s]}`).join(' · ') + (T(f.kind) ? ` · <span title="${esc(T(f.kind).desc)}">${esc(T(f.kind).n)}</span>` : '');
   const opt = sel => mine.fighters.map((f, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(f.n)}, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}${f.callup ? ' (call-up)' : ''}</option>`).join('');
   const close = modal(`<header><h3>${esc(o.title)}</h3><button class="ghost" data-close>Not now</button></header>
     <div class="wmsg"><p class="hint">${o.intro}</p>
@@ -37,7 +37,7 @@ function wRingPairing(o) {
   const sel = () => [...$('modalBox').querySelectorAll('[data-rslot]')].map(s => +s.value);
   const sync = () => {
     const p = sel(), dup = new Set(p).size !== p.length;
-    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).textContent = rate(mine.fighters[+s.value]);
+    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).innerHTML = rate(mine.fighters[+s.value]);
     for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.disabled = dup;
     $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
   };

@@ -110,6 +110,38 @@ async def main():
         lk = ed['leaky']
         check(1.7 < lk[1] / max(.01, lk[0]) < 2.3, 'a leaky guard lets twice as much through', lk)
 
+        # ---------- each kind's nature (a trait for some): the edges and the weaknesses ----------
+        nt = await pg.evaluate("""(() => { const out = {}, avg = (fn, n) => { let s = 0, k = 0; for (let i = 0; i < n; i++) { const v = fn(); if (v != null) { s += v; k++; } } return k ? s / k : null; };
+          const even = { reach: 5, pow: 5, spd: 5, chin: 5, sta: 5, gui: 5 }, pair = (a, b, d) => { const G = __setup(d || 2, [a, b]); for (const f of G.F) Object.assign(f.r, even); return G; };
+          // spider: a longer jab, and a landed jab halts a fighter coming forward
+          let G = pair('spider', 'elf'); out.reach = +(wBX.range(0, 'jab') - wBX.range(1, 'jab')).toFixed(2);
+          G = pair('spider', 'elf'); G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; let n = 0; while (!(G.F[1].halt > 0) && n++ < 40) wBX.land(0, 'jab');
+          G.F[1].a = { k: 'idle', t: 0, dur: 0, id: 0 }; const x0 = G.F[1].x; G.F[1].mv = [-1, 0]; G.F[1].think = 99; wBX.step(); out.stick = { halt: G.F[1].halt > 0, held: Math.abs(G.F[1].x - x0) < .01 };
+          // a body shot on a skeleton, against the same on an elf: less damage, no breath taken
+          const body = kind => avg(() => { const G = pair('ogre', kind); G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; const h = G.F[1].hp, s = G.F[1].sta, e0 = wBX.ev.length; wBX.land(0, 'body'); return wBX.ev.slice(e0).some(e => e.k === 'land') ? [h - G.F[1].hp, s - G.F[1].sta] : null; }, 1) || [0, 0];
+          const bodyAvg = kind => { let d = 0, s = 0, k = 0; for (let i = 0; i < 60; i++) { const G = pair('ogre', kind); G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; const h = G.F[1].hp, st = G.F[1].sta, e0 = wBX.ev.length; wBX.land(0, 'body'); if (wBX.ev.slice(e0).some(e => e.k === 'land')) { d += h - G.F[1].hp; s += st - G.F[1].sta; k++; } } return [d / k, s / k]; };
+          out.hollow = [bodyAvg('skeleton'), bodyAvg('elf')];
+          // a counter from a lich, and a counter taken by a minotaur, against plain fighters
+          const ctr = (a, b) => { let d = 0, k = 0; for (let i = 0; i < 60; i++) { const G = pair(a, b); G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; G.F[0].ctr = 1; wBX.act(0, 'jab'); G.F[0].a.done = true; const h = G.F[1].hp, e0 = wBX.ev.length; wBX.land(0, 'jab'); if (wBX.ev.slice(e0).some(e => e.k === 'land')) { d += h - G.F[1].hp; k++; } } return d / k; };
+          out.ctr = { lich: ctr('lich', 'elf'), minotaur: ctr('elf', 'minotaur'), plain: ctr('elf', 'elf') };
+          // a werewolf's second wind, once
+          G = pair('werewolf', 'elf'); G.F[0].sta = 5; G.F[0].hp = 20; wBX.step(); const s1 = G.F[0].sta; G.F[0].sta = 5; wBX.step(); out.wind = [s1 > 15, G.F[0].sta < 15];
+          // a kobold's corner: all its breath back
+          G = pair('kobold', 'ogre'); for (const f of G.F) f.r.chin = 60; n = 0; while (G.clock > .1 && n++ < 4000) wBX.step(); for (const f of G.F) f.sta = 10; n = 0; while (wBX.phase !== 'corner' && n++ < 40) wBX.step(); out.corner = [G.F[0].sta === G.F[0].staMax, G.F[1].sta < G.F[1].staMax];
+          // an ogre's breath comes back slower than an elf's of the same stamina
+          G = pair('ogre', 'elf'); for (const f of G.F) { f.sta = 10; f.think = 99; } G.F[0].x = -6; G.F[1].x = 6; for (let i = 0; i < 20; i++) wBX.step(); out.breath = G.F[0].sta < G.F[1].sta;
+          // a zombie loses more of its most health to a hook
+          const rot = kind => { let d = 0, k = 0; for (let i = 0; i < 40; i++) { const G = pair('ogre', kind); G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; const m = G.F[1].hpMax, e0 = wBX.ev.length; wBX.land(0, 'hook'); if (wBX.ev.slice(e0).some(e => e.k === 'land')) { d += m - G.F[1].hpMax; k++; } } return d / k; };
+          out.rot = [rot('zombie'), rot('elf')];
+          return { out, book: Object.keys(wBX.traits).length }; })()""")
+        o = nt['out']
+        check(nt['book'] == 11 and abs(o['reach'] - .3) < .01 and o['stick'] == {'halt': True, 'held': True}, 'Long Arms: the spider\'s jab reaches further, and a landed jab stops a fighter coming forward', o)
+        check(o['hollow'][0][0] < o['hollow'][1][0] * .9 and o['hollow'][0][1] == 0 and o['hollow'][1][1] > 0, 'Hollow: a body shot hurts a skeleton less and takes none of its breath', o['hollow'])
+        check(o['ctr']['lich'] > o['ctr']['plain'] * 1.15 and o['ctr']['minotaur'] > o['ctr']['plain'] * 1.15, 'Cold Read: a lich counters harder; Charges In: a minotaur takes counters harder', o['ctr'])
+        check(o['wind'] == [True, True], 'Second Wind: once a bout, badly hurt, a werewolf gets its breath back', o['wind'])
+        check(o['corner'] == [True, True], 'Quick Recovery: a kobold has all its breath back between rounds (the other side doesn\'t)', o['corner'])
+        check(o['breath'] and o['rot'][0] > o['rot'][1] * 1.3, 'Heavy Breather: an ogre\'s breath comes back slower; Rotting: a zombie loses more of its most health to a hook', o)
+
         # ---------- the limits ----------
         lim = await pg.evaluate("""(() => { const out = {}; let G = __setup(2, ['troll', 'elf']); const f = G.F[0];
           out.first = wBX.cast(0, 'sp'); out.again = [wBX.cast(0, 'sp'), wBX.powers(0).sp.why]; out.ult = wBX.cast(0, 'ult'); out.ult2 = [wBX.cast(0, 'ult'), wBX.powers(0).ult.why];
@@ -176,7 +208,7 @@ async def main():
         await pg.evaluate("wBX.pause(false)")
         await pg.evaluate("showPage('help')")
         hp = await pg.evaluate("({ rows: document.querySelectorAll('.wrpow tr').length, text: (document.getElementById('wRingHow') || {}).textContent || '' })")
-        check(hp['rows'] == 19 and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'], 'How to play explains powers, with every kind\'s two', hp['rows'])
+        check(hp['rows'] == 19 and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'] and 'Long Arms' in hp['text'] and 'Nature' in hp['text'], 'How to play explains powers and each kind\'s nature, with every kind\'s', hp['rows'])
         await pg.evaluate("showPage('play')")
 
         check(not errs, 'no page errors', errs)

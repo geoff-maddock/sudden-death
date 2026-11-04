@@ -25,6 +25,23 @@ function bxStyle(r, o) {
   if (r.chin >= 8 && r.sta >= 8) return 'body';
   return r.spd >= 7 ? 'counter' : 'press';
 }
+/* each kind's nature in the ring (BX_TRAIT): a small edge for the kinds the numbers leave behind, a small weakness for
+   the ones they favour, and nothing for the rest. Flavour first: it follows what the kind is, and moves a kind's bouts
+   by a few points, not a lot. The ring reads them where they act (05-ring.js, 07-bout.js): */
+const BX_TRAIT = {
+  spider:   { n: 'Long Arms', desc: 'The jab lands from a little further, and a jab that lands stops a fighter coming forward for a moment.', jabReach: .3, stick: .45 },
+  skeleton: { n: 'Hollow', desc: 'Body shots find little to hit: they hurt it a little less, and take none of its breath.', hollow: .8 },
+  kobold:   { n: 'Quick Recovery', desc: 'Gets its breath back a little faster, and all of it between rounds.', regen: 1.05, corner: 1 },
+  lich:     { n: 'Cold Read', desc: 'Its counters hit harder, and its slips leave a longer window to counter in.', ctrDmg: 1.85, ctrWin: 1.5 },
+  goblin:   { n: 'Scrappy', desc: 'Behind on health, it fights dirtier: its punches land more often.', scrappy: .03 },
+  werewolf: { n: 'Second Wind', desc: 'Once a bout, badly hurt, the wolf in it gives back 15 stamina.', wind: 15 },
+  golem:    { n: 'Stone Weight', desc: 'Slow to get up off the canvas: it needs a count of one more to rise.', rise: 1 },
+  dwarf:    { n: 'Stocky', desc: 'Backs up even slower than most, so it gets pinned on the ropes.', back: .4 },
+  minotaur: { n: 'Charges In', desc: 'Always coming forward, it takes counters harder.', ctrTaken: 1.25 },
+  ogre:     { n: 'Heavy Breather', desc: 'Gets its breath back a little more slowly.', regen: .92 },
+  zombie:   { n: 'Rotting', desc: 'Big shots take more off the most health it can get back.', rot: 1.6 },
+};
+const bxTrait = f => BX_TRAIT[f.kind] || null;
 const BX_HP = 100;
 // the fighter for side from { n, kind, num, r?, style? } (r: ratings to lay over the kind's; style: a plan to box to)
 function bxFighter(p, side) {
