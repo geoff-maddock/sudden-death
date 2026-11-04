@@ -3,7 +3,8 @@
    don't touch the page; this file is the only one that does. In You box (phase 2) it hears the keys: WASD or the arrows
    to move, J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch; only during a round, and in the
    capture phase, so nothing else on the page takes them. */
-const BXP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1 };
+// speed: steps a frame, 1 in play; the tests raise it (wBX.speed)
+const BXP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1 };
 (() => {
   const h = document.createElement('div'); h.id = 'v-ring'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
@@ -20,7 +21,7 @@ function bxRender() {
 function bxFrame(now) {
   if (!BXP.on) return;
   const dt = Math.min(.05, Math.max(0, (now - BXP.last) / 1000)); BXP.last = now;
-  if (!BXP.paused) { BXT.t += dt; bxTick(dt); }
+  if (!BXP.paused) for (let i = 0; i < BXP.speed && !BXP.paused; i++) { BXT.t += dt; bxTick(dt); }
   bxRender();
   BXP.raf = requestAnimationFrame(bxFrame);
 }
