@@ -10,6 +10,8 @@
    your call the bar has the five plans (your corner's advice marked) and the cut-man. Switching modes goes on with the
    same bout; the last one picked is kept for the next bout (not saved). How to play has "Boxing: how it works"
    (#wRingHow), and a button under the ring opens it (the bout waits while you read).
+   Phase 4: the pad gains your fighter's special and ultimate (Q and R), named and lit while they can be cast; How it
+   works explains powers, with every kind's two in a table.
    Wraps: showView (wW51ShowView: the bar), openPause (wW51OpenPause: not in the ring), wRunAct (wW51RunAct: 'bout'),
    showPage (wW51ShowPage: the bout waits while another page is up), renderHelp (wW51RenderHelp: #wHelpRing). */
 
@@ -17,10 +19,10 @@
 const W_RING_MODES = {
   watch: { n: 'Corners', title: 'Both corners are the CPU\'s. Switching goes on with the same bout.' },
   call: { n: 'You corner', title: 'You pick your fighter\'s plan before each round, and when the cut-man works. They box it.' },
-  play: { n: 'You box', title: 'Your corner, and you box the rounds: J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, WASD to move.' },
+  play: { n: 'You box', title: 'Your corner, and you box the rounds: J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, Q the special, R the ultimate, WASD to move.' },
 };
 let W_RING_MODE = 'play';
-const W_RING_PAD = [['jab', 'Jab', 'J'], ['hook', 'Hook', 'K'], ['body', 'Body', 'L'], ['guard', 'Guard', 'Space, held'], ['slip', 'Slip', 'Shift'], ['clinch', 'Clinch', 'E']];
+const W_RING_PAD = [['jab', 'Jab', 'J'], ['hook', 'Hook', 'K'], ['body', 'Body', 'L'], ['guard', 'Guard', 'Space, held'], ['slip', 'Slip', 'Shift'], ['clinch', 'Clinch', 'E'], ['sp', 'Special', 'Q'], ['ult', 'Ultimate', 'R']];
 const W_RING = {
   home: { kinds: ['minotaur', 'dwarf', 'ogre', 'golem', 'kobold', 'troll'], color: '#b8231e', light: '#ffd0a0', short: 'CBC' },
   away: { city: 'saltmere', kinds: ['elf', 'harpy', 'vampire', 'spider', 'wraith', 'gorgon'], color: '#2a5fb8', light: '#d6e6ff', short: 'SBC' },
@@ -78,7 +80,7 @@ function wRingBarNote() {
   $('wRingNote').textContent = WBX.over ? WBX.over.verdict
     : w ? `Your call${ph === 'intro' ? ' before the first round' : ` for round ${G.round}`}: pick ${me.n}'s plan. Your corner says ${wBX.plans[w.plan].n} (${w.why}).`
     : ph === 'corner' ? 'Between rounds: the corners talk, and the cut-man works.' : ph === 'kd' ? 'A knockdown: the count is on.'
-    : mode === 'play' && (ph === 'round' || ph === 'rise') ? 'You box: J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch. WASD or the arrows to move; let go and your feet follow your plan.'
+    : mode === 'play' && (ph === 'round' || ph === 'rise') ? 'You box: J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, Q your special, R your ultimate. WASD or the arrows to move; let go and your feet follow your plan.'
     : G ? `${G.F[0].n} the ${G.F[0].kind} against ${G.F[1].n} the ${G.F[1].kind}. Three rounds, three judges.` : '';
   $('wRingCall').hidden = !w;
   for (const b of $('wRingCall').querySelectorAll('[data-rplan]')) { b.classList.toggle('on', !!w && b.dataset.rplan === w.plan); b.title = wBX.plans[b.dataset.rplan].desc + (w && b.dataset.rplan === w.plan ? ' Your corner\'s advice.' : ''); }
@@ -88,6 +90,13 @@ function wRingBarNote() {
   pb.classList.toggle('on', !!w && w.patch);
   for (const b of $('wRingModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.rmode === mode); b.setAttribute('aria-pressed', b.dataset.rmode === mode); }
   $('wRingPad').hidden = mode !== 'play' || !!WBX.over;
+  // the pad's power buttons: your fighter's special and ultimate by name, lit while they can be cast
+  const pw = G && G.F ? wBX.powers(wBX.you) : null;
+  for (const [k, lab] of [['sp', 'Special'], ['ult', 'Ultimate']]) {
+    const b = $('wRingPad').querySelector(`[data-rpad="${k}"]`), P = pw && pw[k];
+    b.hidden = !P; if (!P) continue;
+    b.textContent = P.n; b.title = `${lab} (${k === 'sp' ? 'Q, once a round' : 'R, once a bout'}): ${P.desc}`; b.disabled = P.used;
+  }
 }
 function wLeaveRing() {
   WBX = null;
@@ -127,7 +136,9 @@ function wRingHowHTML() {
   <p class="hint"><b>Reach and size.</b> Reach is how far your punches land from. Backing up is slower than coming forward, and slower again on the ropes, so a fighter who keeps backing off gets trapped. A bigger fighter gives less ground.</p>
   <p class="hint"><b>Your corner.</b> Before each round you pick a plan: ${Object.values(P).map(p => `<b>${p.n}</b> (${p.desc.toLowerCase().replace(/\.$/, '')})`).join(', ')}. Your corner says what they'd do and why. The cut-man gives back 18 health and a little of what big shots took, once a break and ${R.patches} times a bout.</p>
   <p class="hint"><b>The judges.</b> Three judges score each round 10–9 to whoever did more (10–10 when it's even). Brass likes power punches, Tally likes activity and Slate likes defense, so a close round can split them. A knockdown wins the round 10–8 (10–9 if the fighter who went down was winning it otherwise), and a point more for each one more. After the last round, two judges or three for one fighter wins it.</p>
-  <p class="hint"><b>Three ways to box.</b> <b>Corners</b>: you watch. <b>You corner</b>: you pick the plans and the cut-man, and your fighter boxes them. <b>You box</b>: that, and you box the rounds yourself. J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, and WASD or the arrows to move. Let go of the keys and your feet follow your plan, so you can box with the buttons under the ring alone.</p>`;
+  <p class="hint"><b>Powers.</b> Every kind has a special, once a round, and an ultimate, once a bout. A special costs ${wBX.powerCost.sp} stamina and an ultimate ${wBX.powerCost.ult}, and neither can be cast while you're down, stunned, clinched or in the middle of a punch. Some act at once (a stun, a push to the ropes, damage that goes through the guard); others last a few seconds (stone skin, a root, health back for what lands). You cast with Q and R, or the buttons under the ring; in You corner your fighter casts them as the CPU would, when the moment suits.</p>
+  <table class="wrpow"><tr><th>Kind</th><th>Special (once a round)</th><th>Ultimate (once a bout)</th></tr>${Object.entries(wBX.powerBook).map(([k, P]) => `<tr><td>${esc(wKindName(k))}</td><td><b>${esc(P.sp.n)}</b>: ${esc(P.sp.desc)}</td><td><b>${esc(P.ult.n)}</b>: ${esc(P.ult.desc)}</td></tr>`).join('')}</table>
+  <p class="hint"><b>Three ways to box.</b> <b>Corners</b>: you watch. <b>You corner</b>: you pick the plans and the cut-man, and your fighter boxes them. <b>You box</b>: that, and you box the rounds yourself. J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, Q your special, R your ultimate, and WASD or the arrows to move. Let go of the keys and your feet follow your plan, so you can box with the buttons under the ring alone.</p>`;
 }
 wRunAct = function (act, id) { if (act === 'bout') return wRingBout(); return wW51RunAct.apply(this, arguments); };
 

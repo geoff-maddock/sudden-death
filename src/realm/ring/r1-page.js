@@ -1,7 +1,8 @@
 /* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
    don't touch the page; this file is the only one that does. In You box (phase 2) it hears the keys: WASD or the arrows
-   to move, J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch; only during a round and while
+   to move, J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, Q the special and R the
+   ultimate (phase 4); only during a round and while
    the ring is on screen (not under How to play), in the capture phase, so nothing else on the page takes them. A key taken in a round stays
    taken until it is let go, wherever the bout has got to: held through the bell, its repeats and its release don't
    reach the bar (a held Space would otherwise click the button that has focus). Releases are always heard, so nothing
@@ -29,7 +30,7 @@ function bxFrame(now) {
   BXP.raf = requestAnimationFrame(bxFrame);
 }
 const BX_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
-const BX_KEY_ACT = { j: 'jab', k: 'hook', l: 'body', shift: 'slip', e: 'clinch' };
+const BX_KEY_ACT = { j: 'jab', k: 'hook', l: 'body', shift: 'slip', e: 'clinch', q: 'sp', r: 'ult' };
 const BXK = new Set(), BXHELD = new Set();
 function bxKeySteer() { let x = 0, y = 0; for (const k of BXK) if (BX_KEYS[k]) { x += BX_KEYS[k][0]; y += BX_KEYS[k][1]; } return [x, y]; }
 function bxKey(e, down) {

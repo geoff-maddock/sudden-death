@@ -9,6 +9,10 @@
    the three cards round by round, with the punch stats.
    With a corner of your own (phase 2), your fighter has a marker over them, and while the bout waits for your call the
    card says what your corner would do and why. Boxing by hand, a warning when your fighter is tired.
+   Powers (phase 4): a cast is a callout in the caster's colour over the ring, and a power's hit is a word like a punch's;
+   a fighter turned to stone (petrified, or under Stone Skin or Rampart) is drawn grey, one that punches pass through is
+   faint, and a rooted or webbed one has threads at their feet; under each fighter's plan on the bar, their special (◆)
+   and ultimate (★), lit while they can be cast, and the statuses on them.
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -103,7 +107,9 @@ function bxPose(f) {
 }
 function bxDrawFighter(c, f, o) {
   const p = bxProj(f.x, f.y), flip = bxProj(o.x, o.y).x < p.x, team = G.corners[f.side], hpx = 92 * p.k;
-  const opt = { glove: team.color, pose: bxPose(f), flip, num: '' };
+  const F = bxFx(f), stone = (f.a.k === 'stun' && f.a.stone) || F.rampart || F.dmgIn < .6;
+  const opt = { glove: team.color, pose: bxPose(f), flip, num: '', stone, alpha: F.miss ? .38 : null };
+  if (F.root || F.noBack || F.move < .6) { c.save(); c.strokeStyle = 'rgba(236,232,220,.7)'; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + BXT.t * .3; c.beginPath(); c.moveTo(p.x, p.y - 4); c.lineTo(p.x + Math.cos(a) * 26 * p.k, p.y + Math.sin(a) * 6 * p.k); c.stroke(); } c.restore(); }
   if (f.a.k === 'down') {
     const e = Math.min(1, f.a.t / .35);
     ell(c, p.x + (flip ? 1 : -1) * 40 * p.k * e, p.y, 46 * p.k, 7 * p.k, 'rgba(0,0,0,.35)');
@@ -128,10 +134,20 @@ const bxDrawPick = a => a[(Math.random() * a.length) | 0];
 function bxDrawFx(c) {
   for (const e of BXE) {
     if (e.drawn) continue; e.drawn = true;
+    if (e.k === 'cast') { BXT.cast = { n: e.n, ult: e.ult, side: e.side, t: BXT.t }; continue; }
+    if (e.k === 'zap') { const t = G.F[1 - e.side], p = bxProj(t.x, t.y); BXT.fx.push({ x: p.x, y: p.y - 100 * p.k, word: `${e.pw}!`, t: BXT.t, big: true }); continue; }
     if (!['land', 'block', 'slip', 'kd', 'stun'].includes(e.k)) continue;
     const t = G.F[e.k === 'slip' || e.k === 'kd' || e.k === 'stun' ? e.side : 1 - e.side], p = bxProj(t.x, t.y);
     const word = e.k === 'block' ? 'blocked' : e.k === 'slip' ? 'slipped' : e.k === 'kd' ? 'DOWN!' : e.k === 'stun' ? 'HURT!' : e.ctr ? 'COUNTER!' : e.n >= 9 ? bxDrawPick(['WHAM!', 'KRAK!', 'THOOM!']) : e.p === 'body' ? bxDrawPick(['THUD!', 'OOF!']) : bxDrawPick(['POW!', 'BAP!', 'SMACK!']);
     BXT.fx.push({ x: p.x, y: p.y - 100 * p.k, word, t: BXT.t, big: e.k === 'kd' || e.k === 'stun' || e.ctr || e.n >= 9, dim: e.k === 'block' || e.k === 'slip' });
+  }
+  // the cast: the power's name in the caster's colour, for a moment
+  if (BXT.cast && BXT.t - BXT.cast.t < 1.4) {
+    const C = BXT.cast, a = Math.min(1, (1.4 - (BXT.t - C.t)) * 2), col = G.corners[C.side].color;
+    c.save(); c.globalAlpha = a; c.font = `900 ${C.ult ? 30 : 24}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.lineWidth = 6; c.strokeStyle = '#17100e';
+    const y = 142 - (BXT.t - C.t) * 6; c.strokeText(C.n.toUpperCase(), 480, y); c.fillStyle = col; c.fillText(C.n.toUpperCase(), 480, y);
+    if (C.ult) { c.font = '800 12px "Alegreya Sans", sans-serif'; c.lineWidth = 4; c.strokeText('ULTIMATE', 480, y + 16); c.fillStyle = '#ffd24a'; c.fillText('ULTIMATE', 480, y + 16); }
+    c.restore();
   }
   BXT.fx = BXT.fx.filter(f => BXT.t - f.t < .8);
   for (const f of BXT.fx) {
@@ -145,7 +161,9 @@ function bxBarSide(c, f, right) {
   const at = (v, w) => right ? x0 - v - w : x0 + v;
   c.fillStyle = team.color; c.fillRect(right ? 934 : 20, 12, 6, 66);
   txt(c, f.n, x0 + dir * 14, 30, '800 17px "Alegreya Sans", sans-serif', '#f4ead8', right ? 'right' : 'left');
-  txt(c, `${f.kind} · ${BX_PLAN[f.plan].n}`, x0 + dir * 14, 46, '13px "Alegreya Sans", sans-serif', '#b8aa94', right ? 'right' : 'left');
+  const S = bxPowOf(f, 'sp') ? bxPowState(f) : null;
+  const pw = S ? `  ${S.sp.used ? '◇' : '◆'} ${S.sp.n}  ${S.ult.used ? '☆' : '★'} ${S.ult.n}` : '';
+  txt(c, `${f.kind} · ${BX_PLAN[f.plan].n}${pw}${S && S.fx.length ? '  · ' + S.fx.map(x => x.n).join(', ') : ''}`, x0 + dir * 14, 46, '13px "Alegreya Sans", sans-serif', '#b8aa94', right ? 'right' : 'left');
   // health: lost from the most is dark, the rest red to gold
   const hx = x0 + dir * 14, bw = W;
   c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 52, bw, 10);

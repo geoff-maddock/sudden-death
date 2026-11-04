@@ -34,7 +34,7 @@ function bxCardStart(opts) {
   const fine = (L, n) => Array.isArray(L) && L.length === N && new Set(L).size === N && L.every(i => Number.isInteger(i) && i >= 0 && i < n);
   const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
   const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
-  CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, result: null };
+  CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, result: null };
   bxCardBout();
   return CD;
 }
@@ -42,7 +42,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101 });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers });
   G.card = { i: CD.i, n: CD.pairs.length };
 }
 // a bout on the card is over (from bxOver): what the card keeps of it; the last one settles the card
@@ -69,7 +69,7 @@ function bxSimCard(opts) {
     const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
-    const bouts = pairs.map((p, i) => bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill }));
+    const bouts = pairs.map((p, i) => bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers }));
     return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)) };
   } finally { CD = keep; }
 }

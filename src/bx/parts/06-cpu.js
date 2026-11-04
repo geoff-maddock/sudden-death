@@ -26,7 +26,7 @@ function bxThink(f, o, dt) {
   if (bxPunching(o) && !o.a.done && o.a.id !== f.seen && !bxBusy(f)) {
     f.seen = o.a.id;
     if (bxDist(f, o) < bxRange(o, o.a.k) + .4) {
-      const p = clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7);
+      const p = bxFx(f).sight ? .9 : clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7);
       if (R() < p) {
         const slip = R() < clamp(.3 + f.r.gui * .03 + (P.slip || 0) - (BX_PUNCH[o.a.k].head ? 0 : .3), .05, .9);
         bxAct(f, slip ? 'slip' : 'guard'); return;
@@ -37,6 +37,7 @@ function bxThink(f, o, dt) {
   f.think = Math.max(.1, .3 - f.r.gui * .006 - skill * .03) * (.8 + R() * .4);
   const tired = bxFrac(f) < .22, hurt = f.hp < f.hpMax * .3, { d, want } = bxFeet(f, o);
   if (bxBusy(f)) return;
+  if (bxCpuCast(f, o)) return;
   // cover up, tie up
   if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? .2 : 0)) { bxClinch(f, o); return; }
   if (P.guard && R() < P.guard * (tired ? 1.3 : 1)) { bxAct(f, 'guard'); return; }

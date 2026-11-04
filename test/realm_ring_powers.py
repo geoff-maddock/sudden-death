@@ -1,0 +1,156 @@
+# Realm ring, powers (issue #23, phase 4): every kind has a special (once a round) and an ultimate (once a bout). Each
+# power does what its data says: what it does at once (a stun, damage through the guard, a push to the ropes, a dash in,
+# stamina off, health back, a counter window) and the status it leaves, on the right fighter. A few end to end:
+# Petrify freezes them in stone, Vanish and Take Flight make punches miss, Stone Skin and Rampart take the damage off,
+# Drain heals on what lands, Undying stays up on 1, Grave Hands roots them. The limits: once a round and once a bout,
+# the stamina, never down, stunned, clinched, mid-punch or outside a round, none with powers off; statuses wear off and
+# end at the bell. The CPU casts in its bouts (none with powers off), and no kind always wins or loses with them. In the
+# Realm: Q and R (and the pad's buttons, named for your fighter's powers) cast in You box; in You corner your fighter
+# casts by themselves; How to play has every kind's powers. Asserts; exits nonzero on failure.
+# Screenshots: /tmp/realm-ring-powers-*.png.
+import asyncio, json, sys, os, subprocess
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.dirname(__file__))
+from paths import REALM_URL, REALM_BUILD
+from playwright.async_api import async_playwright
+
+FAILS = []
+def check(ok, what, detail=None):
+    print(('ok   ' if ok else 'FAIL ') + what + ('' if ok or detail is None else ': ' + json.dumps(detail)[:700]))
+    if not ok: FAILS.append(what)
+    return ok
+
+# two fighters set up in round 1, standing still, fresh and d apart (kinds: [yours, theirs])
+SETUP = """(d, kinds, o) => { wBX.start(Object.assign({ fighters: (kinds || ['vampire', 'vampire']).map((k, i) => ({ n: 'F' + i, kind: k })), seed: 7 }, o || {}));
+  for (let i = 0; i < 100 && wBX.phase === 'intro'; i++) wBX.step();
+  const G = wBX.G; G.F[0].x = -d / 2; G.F[1].x = d / 2; G.F[0].y = G.F[1].y = 0;
+  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.mv = [0, 0]; f.think = 99; f.r.chin = 60; } return G; }"""
+
+async def main():
+    subprocess.run(REALM_BUILD, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    async with async_playwright() as p:
+        br = await p.chromium.launch()
+        pg = await br.new_page(viewport={'width': 1200, 'height': 1000})
+        errs = []
+        pg.on('pageerror', lambda e: errs.append(str(e)))
+        pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
+        await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
+        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wBX !== 'undefined'"); await pg.evaluate(f"wBX.speed = 4; window.__setup = {SETUP}; 0")
+
+        # ---------- every kind, two powers ----------
+        bk = await pg.evaluate("(() => { const B = wBX.powerBook; return { kinds: Object.keys(B).length, all: wBX.kinds.every(k => B[k] && B[k].sp.n && B[k].sp.desc && B[k].ult.n && B[k].ult.desc), cost: wBX.powerCost }; })()")
+        check(bk['kinds'] == 18 and bk['all'] and bk['cost'] == {'sp': 8, 'ult': 15}, 'every kind has a special and an ultimate, named and described; a special costs 8 stamina, an ultimate 15', bk)
+
+        # ---------- each power does what its data says ----------
+        each = await pg.evaluate("""(() => { const D = wBX.powerData, bad = [];
+          for (const kind of wBX.kinds) for (const which of ['sp', 'ult']) {
+            const P = D[kind][which], N = P.now || {}, G = __setup(N.dash ? 5 : 2, [kind, 'golem']), f = G.F[0], o = G.F[1];
+            f.hp = 50; const before = { fhp: f.hp, ohp: o.hp, osta: o.sta, fsta: f.sta, d: wBX.dist(), ox: o.x, fx: f.x };
+            const ok = wBX.cast(0, which); const why = [];
+            if (!ok) { bad.push(kind + ' ' + which + ': not cast'); continue; }
+            if (Math.round(before.fsta - f.sta) !== wBX.powerCost[which]) why.push('stamina ' + (before.fsta - f.sta));
+            if (N.stun && o.a.k !== 'stun') why.push('no stun');
+            if ((N.dmg || N.hits) && !(o.hp < before.ohp)) why.push('no damage');
+            if (N.push && !(Math.abs(o.x) > Math.abs(before.ox) + .5 || Math.abs(o.x) >= 8.2)) why.push('no push');
+            if (N.dash && !(f.x > before.fx + .5)) why.push('no dash');
+            if (N.hp && !(f.hp > before.fhp)) why.push('no health back');
+            if (N.sta && !(o.sta < before.osta)) why.push('no stamina off');
+            if (N.ctr && !(f.ctr > 0)) why.push('no counter window');
+            if (P.fx) { const on = P.fx.who === 'self' ? f : o, off = P.fx.who === 'self' ? o : f;
+              if (!on.fx.some(s => s.id === P.id)) why.push('no status on ' + P.fx.who); if (off.fx.some(s => s.id === P.id)) why.push('status on the wrong fighter'); }
+            if (why.length) bad.push(kind + ' ' + which + ': ' + why.join(', ')); }
+          return bad; })()""")
+        check(not each, 'each of the 36 powers does what it says at once, and leaves its status on the right fighter, for its stamina', each)
+
+        # ---------- a few end to end ----------
+        e2e = await pg.evaluate("""(() => { const out = {}, last = () => wBX.ev[wBX.ev.length - 1];
+          let G = __setup(2, ['gorgon', 'elf']); wBX.cast(0, 'sp'); out.petrify = [G.F[1].a.k, !!G.F[1].a.stone];
+          G = __setup(2, ['wraith', 'ogre']); wBX.cast(0, 'sp'); wBX.land(1, 'hook'); out.vanish = [last().k, last().why];
+          G = __setup(2, ['harpy', 'ogre']); wBX.cast(0, 'sp'); wBX.land(1, 'body'); out.flight = [last().k, last().why];
+          const dmgs = (kind, cast, k) => { let n = 0, t = 0; for (let i = 0; i < 60; i++) { const G = __setup(2, [kind, 'ogre']); G.F[0].r.chin = 5; if (cast) wBX.cast(0, cast);
+            G.F[0].a = { k: 'stun', t: 0, dur: 9, id: 0 }; const h = G.F[0].hp, n0 = wBX.ev.length; wBX.land(1, k); if (wBX.ev.slice(n0).some(e => e.k === 'land')) { n++; t += h - G.F[0].hp; } } return t / Math.max(1, n); };
+          out.stone = [dmgs('golem', null, 'hook'), dmgs('golem', 'sp', 'hook')]; out.rampart = [dmgs('golem', 'ult', 'hook'), dmgs('golem', 'ult', 'body'), dmgs('golem', null, 'body')];
+          G = __setup(2, ['vampire', 'ogre']); G.F[0].hp = 40; wBX.cast(0, 'sp'); G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; let tries = 0; while (last().k !== 'land' && tries++ < 40) wBX.land(0, 'hook'); out.drain = G.F[0].hp > 40;
+          G = __setup(2, ['zombie', 'ogre']); wBX.cast(0, 'sp'); G.F[0].hp = .5; G.F[0].r.chin = 1; G.F[0].a = { k: 'stun', t: 0, dur: 9, id: 0 }; tries = 0; while (G.F[0].hp === .5 && tries++ < 40) wBX.land(1, 'hook');
+          out.undying = [G.F[0].hp, G.down, G.F[0].fx.some(s => s.undying)];
+          G = __setup(4, ['lich', 'elf']); wBX.cast(0, 'ult'); const x0 = G.F[1].x; G.F[1].mv = [1, 0]; G.F[1].think = 99; for (let i = 0; i < 10; i++) wBX.step(); out.root = Math.abs(G.F[1].x - x0) < .01;
+          return out; })()""")
+        check(e2e['petrify'] == ['stun', True], 'Petrify freezes them, in stone', e2e)
+        check(e2e['vanish'] == ['miss', 'through'] and e2e['flight'] == ['miss', 'over'], 'Vanish: punches pass through; Take Flight: body shots go under', e2e)
+        st, rp = e2e['stone'], e2e['rampart']
+        check(st[1] < st[0] * .5 and rp[0] == 0 and rp[1] < rp[2] * .6, 'Stone Skin takes most of the damage off; under Rampart a head punch does nothing and a body shot half', e2e)
+        check(e2e['drain'], 'Drain: what lands comes back as health', e2e)
+        check(e2e['undying'] == [1, None, False], 'Undying: the knockdown that should come, they stay up on 1, and it is spent', e2e)
+        check(e2e['root'], 'Grave Hands: they can\'t move', e2e)
+
+        # ---------- the limits ----------
+        lim = await pg.evaluate("""(() => { const out = {}; let G = __setup(2, ['troll', 'elf']); const f = G.F[0];
+          out.first = wBX.cast(0, 'sp'); out.again = [wBX.cast(0, 'sp'), wBX.powers(0).sp.why]; out.ult = wBX.cast(0, 'ult'); out.ult2 = [wBX.cast(0, 'ult'), wBX.powers(0).ult.why];
+          G = __setup(2, ['troll', 'elf']); G.F[0].sta = 3; out.breath = [wBX.cast(0, 'sp'), wBX.powers(0).sp.why];
+          for (const k of ['stun', 'down', 'clinch']) { G = __setup(2, ['troll', 'elf']); G.F[0].a = { k, t: 0, dur: 9, id: 0 }; out[k] = wBX.cast(0, 'sp'); }
+          G = __setup(2, ['troll', 'elf']); wBX.act(0, 'hook'); out.punching = wBX.cast(0, 'sp');
+          G = __setup(2, ['troll', 'elf']); G.F[1].a = { k: 'down', t: 0, dur: 9, id: 0 }; out.theyDown = wBX.cast(0, 'sp');
+          wBX.start({ fighters: [{ n: 'A', kind: 'troll' }, { n: 'B', kind: 'elf' }], seed: 3 }); out.intro = wBX.cast(0, 'sp');
+          G = __setup(2, ['troll', 'elf'], { powers: false }); out.off = [wBX.cast(0, 'sp'), wBX.powers(0).sp];
+          // a new round brings the special back; the ultimate stays spent; statuses end at the bell
+          G = __setup(2, ['golem', 'elf']); wBX.cast(0, 'sp'); wBX.cast(0, 'ult'); out.fxOn = G.F[0].fx.length;
+          for (const x of G.F) x.r.chin = 60; let n = 0; while (wBX.phase !== 'corner' && n++ < 4000) wBX.step(); out.fxBell = G.F[0].fx.length;
+          n = 0; while (wBX.phase !== 'round' && n++ < 400) wBX.step(); for (const x of G.F) x.a = { k: 'idle', t: 0, dur: 0, id: 0 };
+          out.next = [wBX.powers(0).sp.ok, wBX.powers(0).ult.ok, wBX.powers(0).ult.why];
+          G = __setup(2, ['werewolf', 'elf']); wBX.cast(0, 'ult'); const t0 = G.F[0].fx[0].t; for (let i = 0; i < 20; i++) wBX.step(); out.wear = [t0, G.F[0].fx.length ? G.F[0].fx[0].t : 0];
+          for (let i = 0; i < 160; i++) wBX.step(); out.gone = G.F[0].fx.length;
+          return out; })()""")
+        check(lim['first'] and lim['again'] == [False, 'used this round'] and lim['ult'] and lim['ult2'] == [False, 'used this bout'], 'a special once a round, an ultimate once a bout', lim)
+        check(lim['breath'] == [False, 'no breath'], 'without the stamina, no power', lim)
+        check(not any([lim['stun'], lim['down'], lim['clinch'], lim['punching'], lim['theyDown'], lim['intro']]), 'no power while stunned, down, clinched, mid-punch, with them down, or before the round', lim)
+        check(lim['off'] == [False, None], 'with powers off, there are none', lim)
+        check(lim['fxOn'] == 2 and lim['fxBell'] == 0 and lim['next'] == [True, False, 'used this bout'], 'statuses end at the bell; the next round brings the special back, not the ultimate', lim)
+        check(lim['wear'][1] < lim['wear'][0] - .9 and lim['gone'] == 0, 'statuses wear off with time', lim)
+
+        # ---------- the CPU casts; the balance ----------
+        cpu = await pg.evaluate("""(() => { const K = wBX.kinds, W = {}; let casts = 0, castsOff = 0, n = 0;
+          for (let i = 0; i < 540; i++) { const a = K[i % 18], b = K[(i * 7 + 3 + Math.floor(i / 18)) % 18]; if (a === b) continue; n++;
+            const s = wBX.simBout({ fighters: [{ n: 'A', kind: a }, { n: 'B', kind: b }], seed: 3000 + i }); casts += s.stats[0].pw + s.stats[1].pw;
+            if (s.over.win != null) for (const [side, k] of [[0, a], [1, b]]) { const r = W[k] = W[k] || [0, 0]; r[1]++; if (s.over.win === side) r[0]++; } }
+          for (let i = 0; i < 20; i++) { const s = wBX.simBout({ fighters: [{ n: 'A', kind: 'witch' }, { n: 'B', kind: 'ogre' }], seed: 50 + i, powers: false }); castsOff += s.stats[0].pw + s.stats[1].pw; }
+          return { casts: casts / n, castsOff, rates: Object.values(W).map(([w, t]) => Math.round(100 * w / t) / 100).sort((x, y) => x - y) }; })()""")
+        check(cpu['casts'] >= 4 and cpu['castsOff'] == 0, 'the CPU casts in its bouts (both fighters), and none with powers off', cpu)
+        check(cpu['rates'][0] >= .12 and cpu['rates'][-1] <= .88, 'with powers, no kind always wins or always loses (of the bouts decided; about 55 a kind)', cpu['rates'])
+
+        # ---------- in the Realm ----------
+        await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS))")
+        await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
+        if await pg.evaluate("!!document.getElementById('cfYes')"):
+            await pg.click('#cfYes')
+        await pg.wait_for_selector('#wGo'); await pg.click('#wGo')
+        await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
+        await pg.evaluate("wBX.speed = 4; W_RING_MODE = 'play'; wRingBout({ kinds: ['gorgon', 'elf'], seed: 4 })")
+        await pg.wait_for_function("UI.view === 'ring' && !!wBX.wait")
+        await pg.click('[data-rplan="press"]')
+        await pg.wait_for_function("wBX.phase === 'round'")
+        await pg.evaluate("wBX.pause(true); (() => { const G = wBX.G; G.F[0].x = -1; G.F[1].x = 1; G.F[0].y = G.F[1].y = 0; for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.think = 99; } })()")
+        pad = await pg.evaluate("(() => { const b = k => document.querySelector(`[data-rpad=\"${k}\"]`); return { sp: [b('sp').textContent, b('sp').hidden, b('sp').disabled], ult: [b('ult').textContent, b('ult').hidden] }; })()")
+        check(pad == {'sp': ['Petrify', False, False], 'ult': ['Stone Garden', False]}, 'the pad has your fighter\'s special and ultimate, by name', pad)
+        await pg.keyboard.press('q')
+        q = await pg.evaluate("(() => { for (let i = 0; i < 3; i++) wBX.step(); return { used: wBX.powers(0).sp.used, them: wBX.G.F[1].a.k, btn: document.querySelector('[data-rpad=\"sp\"]').disabled, log: wBX.G.log.some(l => /casts Petrify/.test(l.msg)) }; })()")
+        check(q == {'used': True, 'them': 'stun', 'btn': True, 'log': True}, 'Q casts your special: Petrify freezes them, the log says so, and its button goes out', q)
+        await pg.evaluate("wBX.pause(false)"); await pg.wait_for_timeout(250); await pg.screenshot(path='/tmp/realm-ring-powers-cast.png'); await pg.evaluate("wBX.pause(true)")
+        await pg.evaluate("(() => { for (const f of wBX.G.F) f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; document.querySelector('[data-rpad=\"ult\"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 3 })); for (let i = 0; i < 3; i++) wBX.step(); })()")
+        u = await pg.evaluate("({ used: wBX.powers(0).ult.used, stone: !!wBX.G.F[1].a.stone })")
+        check(u == {'used': True, 'stone': True}, 'the pad\'s ultimate button casts it (Stone Garden: stone)', u)
+        # You corner: your fighter casts by themselves
+        await pg.click('[data-rmode="call"]')
+        yc = await pg.evaluate("(() => { const G = wBX.G; for (const f of G.F) { f.r.chin = 60; f.think = 0; } let n = 0; const c0 = G.F[0].rs.pw; while (wBX.phase !== 'over' && n++ < 6000) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); } return G.F[0].bs.pw - c0 + G.F[0].rs.pw; })()")
+        check(yc >= 1, 'in You corner your fighter casts powers by themselves', yc)
+        await pg.evaluate("wBX.pause(false)")
+        await pg.evaluate("showPage('help')")
+        hp = await pg.evaluate("({ rows: document.querySelectorAll('.wrpow tr').length, text: (document.getElementById('wRingHow') || {}).textContent || '' })")
+        check(hp['rows'] == 19 and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'], 'How to play explains powers, with every kind\'s two', hp['rows'])
+        await pg.evaluate("showPage('play')")
+
+        check(not errs, 'no page errors', errs)
+        await br.close()
+    print('errors:', FAILS)
+    sys.exit(1 if FAILS else 0)
+
+asyncio.run(main())

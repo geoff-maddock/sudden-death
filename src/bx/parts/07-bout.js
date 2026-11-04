@@ -30,7 +30,7 @@ let BD = null;
 const BX_HOOK = { onOver: null, onPhase: null };
 
 /* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r?, style? }], corners: [2 × { name, short, color, light }],
-   mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..2, 0..2], headless } */
+   mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..2, 0..2], powers (false: none), headless } */
 const BX_MODES = ['watch', 'call', 'play'];
 function bxStart(opts) {
   const o = opts || {};
@@ -38,7 +38,7 @@ function bxStart(opts) {
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
-  Object.assign(G, { aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0 });
+  Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0 });
   BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
   G.wait = null; bxInputClear();
   bxCornerSpots();
@@ -117,6 +117,7 @@ function bxWork() {
 }
 function bxRoundEnd() {
   const work = bxWork(), n = G.round; bxInputClear();
+  for (const f of G.F) f.fx = [];
   G.work.push(work); G.rstats.push(G.F.map(f => Object.assign({}, f.rs, { dmg: Math.round(f.rs.dmg) })));
   for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); }
   const r = bxBell(work), sc = G.cards[G.cards.length - 1];

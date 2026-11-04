@@ -31,9 +31,10 @@ function bxFighter(p, side) {
   const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = Math.round(68 + r.sta * 4.5), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
   return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style,
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
-    a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0,
+    a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false,
     rs: bxStatsZero(), bs: bxStatsZero() };
 }
 // a round's (rs) or bout's (bs) work: punches thrown and landed, power punches landed, damage done, defense as the
-// judges count it (a slip 1, a block half), punches slipped and blocked, seconds pressing forward, clinches started
-function bxStatsZero() { return { thrown: 0, landed: 0, power: 0, dmg: 0, def: 0, slips: 0, blocks: 0, press: 0, clinch: 0 }; }
+// judges count it (a slip 1, a block half), punches slipped and blocked, seconds pressing forward, clinches started,
+// powers cast
+function bxStatsZero() { return { thrown: 0, landed: 0, power: 0, dmg: 0, def: 0, slips: 0, blocks: 0, press: 0, clinch: 0, pw: 0 }; }

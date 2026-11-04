@@ -12,7 +12,8 @@
 const BX_BUFFER = .5, BX_INSTINCT = .6;
 const BXI = { steer: [0, 0], guard: false, q: null, qt: 0 };
 const bxHand = f => !!BD && BD.mode === 'play' && !BD.headless && f.side === BD.you;
-const BX_ACTS = ['jab', 'hook', 'body', 'slip', 'clinch'];
+// (and the powers: 'sp' the special, 'ult' the ultimate; 11-powers.js)
+const BX_ACTS = ['jab', 'hook', 'body', 'slip', 'clinch', 'sp', 'ult'];
 // the page's keys and buttons: { steer: [x, y], guard: true | false, act: 'jab' | 'hook' | 'body' | 'slip' | 'clinch' }
 function bxInput(o) {
   if (o.steer) BXI.steer = [clamp(+o.steer[0] || 0, -1, 1), clamp(+o.steer[1] || 0, -1, 1)];
@@ -23,12 +24,12 @@ function bxInputClear() { BXI.steer = [0, 0]; BXI.guard = false; BXI.q = null; B
 function bxHandThink(f, o, dt) {
   if (BXI.steer[0] || BXI.steer[1]) f.mv = BXI.steer.slice(); else bxFeet(f, o);
   if (bxBusy(f)) return;
-  if (BXI.q) { const k = BXI.q; BXI.q = null; if (k === 'clinch') bxClinch(f, o); else bxAct(f, k); return; }
+  if (BXI.q) { const k = BXI.q; BXI.q = null; if (k === 'clinch') bxClinch(f, o); else if (k === 'sp' || k === 'ult') bxCast(f, k); else bxAct(f, k); return; }
   if (BXI.guard) { bxAct(f, 'guard'); return; }
   if (bxPunching(o) && !o.a.done && o.a.id !== f.seen) {
     f.seen = o.a.id;
     const P = BX_PLAN[f.plan] || BX_PLAN.press, skill = G.skill ? G.skill[f.side] : 1;
-    if (bxDist(f, o) < bxRange(o, o.a.k) + .4 && R() < BX_INSTINCT * clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7))
+    if (bxDist(f, o) < bxRange(o, o.a.k) + .4 && R() < (bxFx(f).sight ? .9 : BX_INSTINCT * clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7)))
       bxAct(f, R() < clamp(.3 + f.r.gui * .03 + (P.slip || 0) - (BX_PUNCH[o.a.k].head ? 0 : .3), .05, .9) ? 'slip' : 'guard');
   }
 }

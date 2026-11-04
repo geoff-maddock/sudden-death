@@ -20,6 +20,11 @@ return {
   cardStart: o => { const c = bxCardStart(o); return JSON.parse(JSON.stringify(c)); }, cardNext: () => bxCardNext(),
   get card() { return CD ? JSON.parse(JSON.stringify(CD)) : null; }, cardScore: () => CD ? bxCardScore() : null,
   cardAuto: (mine, theirs) => bxCardAuto(mine.map(f => Object.assign(bxRate(f.kind), f.r || {})), theirs.map(f => Object.assign(bxRate(f.kind), f.r || {}))), simCard: o => bxSimCard(o),
+  // powers (phase 4): a side's special and ultimate now ({ sp, ult, fx }), casting one (the tests' handle; in play, Q and R
+  // or the pad through input), every kind's powers (for How to play), the stamina they cost, and a fighter's statuses
+  powers: side => G && G.F ? bxPowState(G.F[side == null ? BD.you : side]) : null, cast: (side, which) => bxCast(G.F[side], which),
+  powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, { sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }])),
+  powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],
   // the ratings, plans, punches and judges, for the page and How to play
   rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
   plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),
