@@ -218,14 +218,23 @@ async def palette_checks(pg):
       __go('plains', 12, true); return o; })()""")
     check(pl['marigold'] == ['site', 'wreck'] and pl['frozenchapel'][1] == 'chapel' and pl['hollowshrine'][1] == 'shrine' and pl['cottage'][1] == 'cottage' and pl['umbralden'][1] == 'nowhere', 'each secret site has its own palette', pl)
     check(pl['coliseum'] == ['hall', 'hall'], 'the Coliseum is the Hall of Legends', pl['coliseum'])
+    np_ = await pg.evaluate("(() => { const k = W_AMB_PLACE.cottage; delete W_AMB_PLACE.cottage; const m = MAPS.cottage; wEnterMap('cottage', m.spawn[0], m.spawn[1]); const o = [wAmbPlace(), wAmbPalFor(wMusicHere())]; W_AMB_PLACE.cottage = k; __go('plains', 12, true); return o; })()")
+    check(np_ == [None, None], 'a secret site with no palette keeps its tune (not the town bed)', np_)
     check(pl['abbey'] == ['abbey', 'abbey'] and pl['street'][1] == 'town', 'inside the abbey in Rimewatch, its choir; in the street, the town', [pl['abbey'], pl['street']])
     check(pl['door'][1] == 'lair' and pl['near'][1] != 'lair' and pl['beaten'][1] != 'lair', 'at a lair\'s door its own bed (not further off, nor once its alpha is beaten)', [pl['door'], pl['near'], pl['beaten']])
     th = await pg.evaluate("""(() => { const a = wAmbPlan('plains', 9, 3600), b = wAmbPlan('plains', 9, 3600, 1), th = a.filter(e => e.k === 'theme'), mo = a.filter(e => e.k === 'motif');
-      const gaps = th.slice(1).map((e, i) => e.t - (th[i].t + th[i].dur)), clash = mo.filter(m => th.some(e => m.t >= e.t && m.t < e.t + e.dur)).length;
+      const gaps = th.slice(1).map((e, i) => e.t - (th[i].t + th[i].dur)), clash = mo.filter(m => th.some(e => m.t < e.t + e.dur && m.t + m.dur > e.t)).length;
       return { n: th.length, gapMin: Math.min(...gaps), gapMax: Math.max(...gaps), notes: th.length ? th[0].notes.length : 0, want: wAmbNotes(THEMES.w_plains).length, src: th.length ? th[0].src : '', clash, danger: b.filter(e => e.k === 'theme').length }; })()""")
     check(6 <= th['n'] <= 12 and th['gapMin'] >= 300 - 1e-6 and th['gapMax'] <= 600 + 1e-6, 'the whole tune comes by chance every 5 to 10 minutes', th)
     check(th['notes'] == th['want'] and th['src'] == 'w_plains' and th['clash'] == 0, 'it is the whole tune (every note), and no fragment plays over it', th)
     check(th['danger'] == 0, 'never in danger', th)
+    so = await pg.evaluate("""(() => { const bad = []; for (let sd = 1; sd < 40; sd++) { const g = wAmbGen('plains', sd, () => ({ i: 0 })); g(); g.soon(8); const ev = []; let e; while ((e = g()).t < 120) ev.push(e);
+        const th = ev.filter(e => e.k === 'theme'), mo = ev.filter(e => e.k === 'motif');
+        if (!th.length || th[0].t > 20) bad.push(sd + ': no tune'); if (mo.some(m => th.some(e => m.t < e.t + e.dur && m.t + m.dur > e.t))) bad.push(sd + ': overlap');
+        for (let i = 1; i < ev.length; i++) if (ev[i].t < ev[i - 1].t - 1e-9) { bad.push(sd + ': back in time'); break; } }
+      const g = wAmbGen('plains', 3, () => ({ i: 0 })); let e; while ((e = g()).t < 30) {} const ahead = e.t; g.soon(1); const n = g(); return { bad, ahead, next: n.t }; })()""")
+    check(so['bad'] == [], 'asked for on arriving, the whole tune comes within seconds, no fragment rings over it, and the plan never goes back in time', so['bad'])
+    check(so['next'] >= so['ahead'] - 1e-9, 'asked for sooner than the event already planned, it waits for it', so)
 
 LEVEL = r"""async ([key, night, wx]) => {
   const sr = 44100, secs = 120, oc = new OfflineAudioContext(2, sr * secs, sr), P = W_AMB_PAL[key], v = W_AMB.voices, on = wx && P.wx;
@@ -233,6 +242,7 @@ LEVEL = r"""async ([key, night, wx]) => {
   if (on) WAMB.ch.wx.g.gain.value = P.wx.tex.vol * W_AMB.tex;
   WAMB.ch.lp.frequency.value = W_AMB.lp * (night ? .75 : 1) * (on ? P.wx.lp : 1);
   for (const e of wAmbPlan(key, 4242, secs, 0, night, on ? P.wx.kind : null)) wAmbPlay(oc, e, e.t + .1);
+  wAmbFlush(oc, Infinity);
   const buf = await oc.startRendering(); W_AMB.voices = v; SET.mvol = mv; WAMB.pal = null; WAMB.ch = null;
   const L = buf.getChannelData(0); let ss = 0; for (let i = 0; i < L.length; i++) ss += L[i] * L[i]; return Math.sqrt(ss / L.length);
 }"""
@@ -242,7 +252,7 @@ async def level_checks(ctx):
     # the noise and the room are seeded, so this is the same every run
     pg = await ctx.new_page(); await pg.goto(REALM_URL); await pg.wait_for_function("typeof wAmbPlan === 'function'", timeout=T)
     lv, nt, wx = {}, {}, {}
-    for k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon', 'wreck', 'chapel', 'abbey', 'shrine', 'cottage', 'nowhere', 'hall', 'lair', 'grd_g_ballpark', 'grd_g_bowl', 'grd_g_sheet']:
+    for k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon', 'wreck', 'chapel', 'abbey', 'shrine', 'cottage', 'nowhere', 'hall', 'lair'] + ['grd_g_' + g for g in ['ballpark', 'court', 'links', 'lists', 'lanes', 'shed', 'bowl', 'ring', 'rink', 'sheet']]:
         lv[k] = round(await pg.evaluate(LEVEL, [k, False, False]), 4)
     for k in ['plains', 'bloom', 'tide']:
         nt[k] = round(await pg.evaluate(LEVEL, [k, True, False]), 4)
@@ -253,6 +263,20 @@ async def level_checks(ctx):
     check(ok and .008 < lv['plains'] < .04, 'every palette plays about as loud as the next (within a fifth of the plains): the lands, the places, the grounds', lv)
     check(all(.83 <= nt[k] / lv['plains'] <= 1.2 for k in nt), 'and at night', nt)
     check(all(.83 <= wx[k] / lv['plains'] <= 1.35 for k in wx), 'and in its weather (which may add up to a third: the wind, the ash)', wx)
+    # the whole tune against its own bed: present, and never swamping it, in the quietest and loudest-gained palettes
+    TUNE = r"""async (key) => {
+      const sr = 22050, secs = 40, P = W_AMB_PAL[key], v = W_AMB.voices, mv = SET.mvol; W_AMB.voices = 1e9; SET.mvol = .55;
+      const render = async (tune) => { const oc = new OfflineAudioContext(1, sr * secs, sr); WAMB.pal = key; WAMB.ch = wAmbChain(oc); WAMB.ch.fade.gain.value = 1; wAmbHold(oc, P);
+        const g = wAmbGen(key, 11, () => ({ i: 0 })); g.S.t.theme = tune ? 2 : 1e9; g.S.t.motif = 1e9; let e; while ((e = g()).t < secs) wAmbPlay(oc, e, e.t + .1); wAmbFlush(oc, Infinity);
+        const b = await oc.startRendering(), L = b.getChannelData(0); let ss = 0; for (let i = 2 * sr; i < 32 * sr; i++) ss += L[i] * L[i]; return Math.sqrt(ss / (30 * sr)); };
+      const bed = await render(false), tune = await render(true); W_AMB.voices = v; SET.mvol = mv; WAMB.pal = null; WAMB.ch = null; return { bed, tune, ratio: tune / bed }; }"""
+    pg = await ctx.new_page(); await pg.goto(REALM_URL); await pg.wait_for_function("typeof wAmbPlan === 'function'", timeout=T)
+    tu = {}
+    for k in ['plains', 'cottage', 'hall', 'tide', 'grd_g_ballpark']:
+        tu[k] = round((await pg.evaluate(TUNE, k))['ratio'], 2)
+    print('  the whole tune over its bed (RMS ratio):', tu)
+    await pg.close()
+    check(all(1.1 <= r <= 2.2 for r in tu.values()), 'the whole tune is heard over its bed, and never swamps it (the bed plays on under it)', tu)
 
 async def live_checks(pg):
     await pg.evaluate("actx()")
@@ -288,12 +312,17 @@ async def live_checks(pg):
     ez = await pg.evaluate("(() => { WAMB.i = .1; const h = RUN.hp; RUN.hp = Math.round(RUN.maxhp * .1); wAmbStop(); wAmbStart('bloom'); const o = { i: WAMB.i, target: WAMB.mood.intensity }; RUN.hp = h; return o; })()")
     check(abs(ez['i'] - .1) < .02 and ez['target'] > .5, 'a new bed keeps the eased intensity and swells toward the target (no jump)', ez)
     hid = await pg.evaluate("""(() => { const L = DB.locs.find(l => l.kind === 'lair'), was = L.hidden; wEnterMap('world', L.x + 1, L.y); WG.min = 720;
-      const seen = wAmbAlphaNear(MAPS.world); L.hidden = 'clue_nobody_has'; const hidden = wAmbAlphaNear(MAPS.world); if (was) L.hidden = was; else delete L.hidden; __go('bloom', 12); return { seen: !!seen, hidden: !!hidden }; })()""")
+      const seen = wAmbLairNear(6), pl = wAmbPlace(); L.hidden = 'clue_nobody_has'; const hidden = wAmbLairNear(6), pl2 = wAmbPlace(), why = wMusicMood().why; if (was) L.hidden = was; else delete L.hidden; __go('bloom', 12); return { seen: !!seen && pl === 'lair', hidden: !!hidden || pl2 === 'lair' || why.includes('lair') }; })()""")
     check(hid['seen'] and not hid['hidden'], 'a lair hidden behind a clue does not swell the music (the map as you see it)', hid)
+    # the whole tune, live: every note gets its voices, a few at a time (never refused by the cap)
+    await pg.evaluate("__go('bloom', 12, true); WAMB.tn = 0; WAMB.tnLost = 0; WAMB.gen.soon(SND.ctx.currentTime - WAMB.t0)")
+    await pg.wait_for_function("WAMB.tn >= 8", timeout=60000)
+    tl = await pg.evaluate("({ tn: WAMB.tn, lost: WAMB.tnLost, live: WAMB.live, cap: W_AMB.voices, queued: WAMB.ch.q.length })")
+    check(tl['lost'] == 0 and tl['live'] <= tl['cap'], 'the whole tune plays note after note, none refused by the voice cap', tl)
     # dawn: once a day
-    dn = await pg.evaluate("""(() => { WAMB.gen.S.t.theme = 1e9; WAMB.dawnDay = null; WG.min = 6.5 * 60; wAmbTick(); const a = WAMB.gen.S.t.theme - (SND.ctx.currentTime - WAMB.t0);
-      WAMB.gen.S.t.theme = 1e9; wAmbTick(); const b = WAMB.gen.S.t.theme; WG.min = 12 * 60; return { a, again: b === 1e9 }; })()""")
-    check(dn['a'] < 10 and dn['again'], 'at dawn its whole tune is due, once a day', dn)
+    dn = await pg.evaluate("""(() => { const th0 = WAMB.gen.S.t.theme, min0 = WG.min; WAMB.gen.S.t.theme = 1e9; WAMB.dawnDay = null; WG.min = 6.5 * 60; wAmbTick(); const a = WAMB.gen.S.t.theme - (SND.ctx.currentTime - WAMB.t0);
+      WAMB.gen.S.t.theme = 1e9; wAmbTick(); const b = WAMB.gen.S.t.theme; WAMB.gen.S.t.theme = th0; WG.min = min0; return { a, again: b === 1e9 }; })()""")
+    check(dn['a'] < 12 and dn['again'], 'at dawn its whole tune is due, once a day', dn)
     # a special place has its own bed
     await pg.evaluate("(() => { const m = MAPS.cottage; wEnterMap('cottage', m.spawn[0], m.spawn[1]); })()")
     await pg.wait_for_function("WAMB.pal === 'cottage' && !MUS.timer", timeout=T)

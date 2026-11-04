@@ -29649,9 +29649,11 @@ renderHelp = function () {
 
 /* ---------- the numbers ---------- */
 const W_AMB = {
-  vol: .8,               // the bed's level against SET.mvol (the tunes play at about .9 of it)
+  vol: .68,              // the bed's level against SET.mvol: as loud as the tunes it replaces (about .016 RMS), so the
+                         // sound effects sit over it as they do over the tunes
   fade: 6,               // seconds for the bed to fade in; out takes a third of that
-  voices: 24,            // live voices at most (the drone and the texture are not counted)
+  voices: 32,            // live voices at most (the drone and the texture are not counted); a choir's pad and motif
+                         // need up to 23 at once
   look: 1.5,             // seconds of events scheduled ahead
   motifGap: [20, 60],    // seconds between motif fragments when calm
   answer: .35,           // chance a fragment is answered (played again, a third lower)
@@ -29799,7 +29801,7 @@ for (const id in W_GRD_THEMES) {
 }
 const W_AMB_REGIONS = Object.keys(W_MUSIC_REGION);   // a region palette's key is its region's
 if (SET.mstyle == null) SET.mstyle = 'ambient';
-const WAMB = { i: 0, region: null, dawnDay: null, mood: null, moodKey: '', moodAt: 0, pal: null, low: false, starts: 0, want: null, killT: 0, timer: null, gen: null, ev: null, t0: 0, ch: null, ringing: 0, peak: 0, log: [], noise: null, ir: null };
+const WAMB = { i: 0, tn: 0, tnLost: 0, region: null, dawnDay: null, mood: null, moodKey: '', moodAt: 0, pal: null, low: false, starts: 0, want: null, killT: 0, timer: null, gen: null, ev: null, t0: 0, ch: null, ringing: 0, peak: 0, log: [], noise: null, ir: null };
 // live voices are counted per bed (ch.live), so a stopped bed's tails never hold the next one back; ringing counts all
 Object.defineProperty(WAMB, 'live', { get: () => WAMB.ch ? WAMB.ch.live : 0, enumerable: true });
 
@@ -29829,7 +29831,7 @@ function wAmbGen(key, seed, mood) {
   // the walk leans to the first choices: weights 3, 2, 1
   const walk = d => { const o = (P.walk[d] || [0]).filter(x => x !== d), w = o.map((x, i) => Math.max(1, 3 - i)), s = w.reduce((a, b) => a + b, 0); let x = r() * s; for (let i = 0; i < o.length; i++) if ((x -= w[i]) < 0) return o[i]; return o[0]; };
   const S = { t: { chord: 0, motif: 6 + r() * 8, acc: span(P.accGap) * .5, gust: 0, pulse: 0, grain: 0, theme: span(W_AMB.theme) }, chord: null, last: '', lastAt: -1 };
-  const next = function () { for (;;) {
+  const step = function () { for (;;) {
     const k = Object.keys(S.t).reduce((a, b) => S.t[a] <= S.t[b] ? a : b), t = S.t[k], m = M(), I = m.i || 0;
     const wx = P.wx && m.wx === P.wx.kind ? P.wx : null;
     const beat = 60 / mix(P.bpm, P.bpmHi, I), bar = beat * 4, step = beat / 4 * 1.6;
@@ -29854,6 +29856,9 @@ function wAmbGen(key, seed, mood) {
       let at = 0;
       const lay = f => f.forEach(([d, l]) => { const len = Math.min(l, 8) * step; play.push([degNote(P, d, lo), at, len]); at += len; });
       lay(fr); if (ans) { at += beat * 2; lay(fr.map(([d, l]) => [d - 2, l])); }
+      // a fragment that would still be ringing when the whole tune comes waits for it to finish (not in danger, when
+      // the tune itself waits)
+      if (I <= W_AMB.quietAt && t + at + 1 > S.t.theme) { S.t.motif = S.t.theme + .5; continue; }
       S.last = key; S.lastAt = i; S.t.motif += at + span(gap);
       return { k, t, frag: key, src, answer: ans, notes: play, dur: at };
     }
@@ -29882,8 +29887,11 @@ function wAmbGen(key, seed, mood) {
     S.t.gust += span([3, 7]);
     return { k: 'gust', t, f: P.tex.f * span([.6, 1.5]), v: P.tex.vol * W_AMB.tex * span([.5, 1.2]) * (1 - .6 * I) };
   } };
-  // ask for the whole tune at plan time t (arriving, dawn), unless it is due sooner anyway
-  next.soon = t => { S.t.theme = Math.min(S.t.theme, t); };
+  // the stream keeps where it is (the last event's time) and where the last fragment ends
+  const next = function () { const e = step(); S.lastT = e.t; if (e.k === 'motif') S.mEnd = e.t + e.dur; return e; };
+  // ask for the whole tune at plan time t (arriving, dawn), unless it is due sooner anyway; never before the event
+  // already planned, nor over a fragment still ringing
+  next.soon = t => { S.t.theme = Math.min(S.t.theme, Math.max(t, S.lastT || 0, (S.mEnd || 0) + 1)); };
   next.S = S;
   return next;
 }
@@ -29910,7 +29918,7 @@ function wAmbBufs(c) {
 // the chain: voices go dry and through the reverb, then the master filter, the fade and the volume
 function wAmbChain(c) {
   wAmbBufs(c);
-  const ch = { dry: c.createGain(), wet: c.createGain(), verb: c.createConvolver(), lp: c.createBiquadFilter(), fade: c.createGain(), vol: c.createGain(), hold: [], live: 0, voices: new Set() };
+  const ch = { dry: c.createGain(), wet: c.createGain(), verb: c.createConvolver(), lp: c.createBiquadFilter(), fade: c.createGain(), vol: c.createGain(), hold: [], live: 0, voices: new Set(), q: [] };
   ch.dry.gain.value = .45; ch.wet.gain.value = .8; ch.verb.buffer = WAMB.ir;
   ch.lp.type = 'lowpass'; ch.lp.frequency.value = W_AMB.lp; ch.fade.gain.value = 0; ch.vol.gain.value = SET.mvol * W_AMB.vol * ((WAMB.pal && W_AMB_PAL[WAMB.pal].gain) || 1);
   ch.dry.connect(ch.lp); ch.wet.connect(ch.verb).connect(ch.lp); ch.lp.connect(ch.fade).connect(ch.vol).connect(c.destination);
@@ -30008,7 +30016,9 @@ function wAmbPlay(c, e, t) {
   if (e.k === 'chord') e.notes.forEach((m, i) => { const o = { a: e.dur * .4, r: e.dur * .5, lp: P.padLp };
     if (P.choir) [-7, 7].forEach(dt => wAmbVoice(c, t + i * .15, noteHz(m) * Math.pow(2, dt / 1200), e.dur * .55, P.pad, .012, Object.assign({ vib: .004 }, o)));
     else wAmbVoice(c, t + i * .15, noteHz(m), e.dur * .55, P.pad, .022, o); });
-  else if (e.k === 'theme') e.notes.forEach(([m, at, len]) => { wAmbVoice(c, t + at, noteHz(m), len * .9, P.lead, .03, { a: .08, r: 1.2, lp: P.leadLp || 2600, vib: P.waver ? .006 : 0 }); wAmbVoice(c, t + at, noteHz(m) / 2, len * .9, 'sine', .012, { a: .1, r: 1.2 }); });
+  // the whole tune goes on the bed's queue, note by note: a note is scheduled only as it comes into the lookahead,
+  // so a long tune never fills the voice cap (wAmbFlush plays it)
+  else if (e.k === 'theme') e.notes.forEach(([m, at, len]) => WAMB.ch.q.push({ t: t + at, m, len }));
   else if (e.k === 'motif') e.notes.forEach(([m, at, len]) => {
     // a pluck (wood), a waver (over water) or a bell (an octave above): the lead's colour
     const hz = noteHz(m), env = P.pluck ? { a: .005, r: .7 } : { a: .06, r: .9 };
@@ -30019,6 +30029,17 @@ function wAmbPlay(c, e, t) {
   else if (e.k === 'pulse') { wAmbVoice(c, t, e.hz, .12, 'sine', e.grid ? .07 : .05, { a: .005, r: .2, glide: e.hz * .6, lp: 300 }); if (!e.grid) wAmbVoice(c, t + e.beat * .3, e.hz, .1, 'sine', .03, { a: .005, r: .18, glide: e.hz * .6, lp: 300 }); else wAmbVoice(c, t + e.beat / 2, e.hz * 2, .08, 'triangle', .012, { a: .005, r: .12, lp: 900 }); }
   else if (e.k === 'gust' && WAMB.ch.tex) { WAMB.ch.tex.bp.frequency.setTargetAtTime(e.f, t, 1.5); WAMB.ch.tex.g.gain.setTargetAtTime(e.v, t, 1.5); }
   if (e.k !== 'grain') { WAMB.log.push({ k: e.k, a: e.a, t: e.t, frag: e.frag, src: e.src, deg: e.deg }); if (WAMB.log.length > 200) WAMB.log.shift(); }
+}
+// the queued notes of the whole tune due before `until` (the lookahead; Infinity when rendering offline)
+function wAmbFlush(c, until) {
+  const ch = WAMB.ch, P = W_AMB_PAL[WAMB.pal]; if (!ch || !P) return;
+  while (ch.q.length && ch.q[0].t < until) {
+    const n = ch.q.shift(), hz = noteHz(n.m), t = Math.max(n.t, c.currentTime + .02);
+    // stated over the bed, not lost in it (about a third louder while it plays)
+    const ok = wAmbVoice(c, t, hz, n.len * .9, P.lead, .075, { a: .08, r: 1.2, lp: P.leadLp || 2600, vib: P.waver ? .006 : 0 });
+    wAmbVoice(c, t, hz / 2, n.len * .9, 'sine', .028, { a: .1, r: 1.2 });
+    if (ok) WAMB.tn++; else WAMB.tnLost++;
+  }
 }
 function wAmbTick() {
   const c = SND.ctx; if (!c || !WAMB.pal || !WAMB.ch || !WG || !RUN) return;
@@ -30040,12 +30061,13 @@ function wAmbTick() {
   to(ch.lp.frequency, W_AMB.lp * (tired ? .6 : 1) * (night ? .75 : 1) * (wx ? P.wx.lp : 1), 2);
   // after a stall or a sleeping tab, the plan picks up where it was: its clock moves on by the lag, in one step, so
   // nothing late bursts out and an hour asleep costs nothing to catch up (the drone and the texture played on)
-  if (WAMB.ev && now - (WAMB.t0 + WAMB.ev.t) > W_AMB.late) WAMB.t0 = now + .02 - WAMB.ev.t;
+  if (WAMB.ev && now - (WAMB.t0 + WAMB.ev.t) > W_AMB.late) { const lag = now + .02 - WAMB.ev.t - WAMB.t0; WAMB.t0 += lag; ch.q.forEach(n => n.t += lag); }
   while (WAMB.ev && WAMB.t0 + WAMB.ev.t < now + W_AMB.look) {
     const e = WAMB.ev, at = WAMB.t0 + e.t;
     wAmbPlay(c, e, Math.max(at, now + .02));
     WAMB.ev = WAMB.gen();
   }
+  wAmbFlush(c, now + W_AMB.look);
 }
 function wAmbStart(key) {
   const c = SND.ctx; if (!c || c.state !== 'running' || !SET.music || LAB) return;
@@ -30079,34 +30101,40 @@ function wAmbEase(target, dt) {
   WAMB.i += (target - WAMB.i) * (1 - Math.exp(-dt / tau));
   return WAMB.i;
 }
-// a special place's palette, or null: a secret site, a ground's map, the Hall of Legends (the Coliseum), the abbey
-// (inside it, in Rimewatch), or a lair's door
+/* A special place's palette: a secret site, a ground's map, the Hall of Legends (the Coliseum), the abbey (inside it,
+   in Rimewatch), or a lair's door. undefined: not a special place. null: a special place with no palette yet, which
+   keeps its tune. */
 function wAmbPlace() {
-  if (!WG) return null;
-  const m = wCurMap(); if (!m) return null;
+  if (!WG) return undefined;
+  const m = wCurMap(); if (!m) return undefined;
   const site = wAmbSite(); if (site) return W_AMB_PLACE[site.id] || null;
   if (m.grd) return W_AMB_PAL['grd_' + m.grd] ? 'grd_' + m.grd : null;
   if (WG.map === 'coliseum') return 'hall';
   if (WG.map === 'rimewatch') { const b = wAmbAbbey(); if (b && WG.x > b.x && WG.x < b.x + b.w - 1 && WG.y > b.y && WG.y < b.y + b.h - 1) return 'abbey'; }
-  if (m.kind === 'world') { const L = wAmbLairNear(); if (L) return 'lair'; }
-  return null;
+  if (m.kind === 'world' && wAmbLairNear(W_AMB.lair)) return 'lair';
+  return undefined;
 }
 function wAmbAbbey() { const d = DB.towns.find(t => t.id === 'rimewatch'); return d && (d.buildings || []).find(b => /ABBEY/.test(b.sign || '')) || null; }
-// an unbeaten, found lair within W_AMB.lair tiles of where you stand
-function wAmbLairNear() {
-  return DB.locs.find(l => l.kind === 'lair' && !(l.hidden && !wFlag(l.hidden)) && !wFlag('alpha_' + l.alpha) && Math.hypot(l.x - WG.x, l.y - WG.y) <= W_AMB.lair) || null;
+// the nearest unbeaten, found lair within R tiles out in the world, with its distance: the one rule for lairs (its
+// own bed at the door, and the danger further off). A lair hidden behind a clue stays hidden, as on the map.
+function wAmbLairNear(R) {
+  if (!WG || WG.map !== 'world') return null;
+  let best = null;
+  for (const l of DB.locs) {
+    if (l.kind !== 'lair' || (l.hidden && !wFlag(l.hidden)) || wFlag('alpha_' + l.alpha)) continue;
+    const d = Math.hypot(l.x - WG.x, l.y - WG.y); if (d <= R && (!best || d < best.d)) best = { d, loc: l, alpha: l.alpha };
+  }
+  return best;
 }
 // the site whose map you are in (the wreck, the cottage, the chapel...), or null
 function wAmbSite() { return WG ? DB.locs.find(l => l.kind === 'site' && l.map === WG.map) || null : null; }
-// the nearest unbeaten alpha or lair on this map, in tiles
+// the nearest unbeaten alpha (an M on the map, as it shows) within W_AMB_MOOD.near tiles; lairs are wAmbLairNear's
 function wAmbAlphaNear(m) {
   const R = W_AMB_MOOD.near; let best = null;
   for (let y = WG.y - R; y <= WG.y + R; y++) for (let x = WG.x - R; x <= WG.x + R; x++) {
-    if (!m.t[y] || m.t[y][x] == null) continue;
-    const c = wTileAt(m, x, y); if (c !== 'M' && c !== 'Z') continue;  // as the map shows it: a hidden lair stays hidden
-    const mt = m.meta[x + ',' + y] || {}, L = mt.loc && DB.locs.find(l => l.id === mt.loc), a = c === 'M' ? mt.alpha : L && L.alpha;
-    if (!a || wFlag('alpha_' + a)) continue;
-    const d = Math.hypot(x - WG.x, y - WG.y); if (d <= R && (!best || d < best.d)) best = { d, lair: c === 'Z', alpha: a };
+    if (!m.t[y] || m.t[y][x] !== 'M' || wTileAt(m, x, y) !== 'M') continue;
+    const a = (m.meta[x + ',' + y] || {}).alpha; if (!a || wFlag('alpha_' + a)) continue;
+    const d = Math.hypot(x - WG.x, y - WG.y); if (d <= R && (!best || d < best.d)) best = { d, alpha: a };
   }
   return best;
 }
@@ -30118,9 +30146,10 @@ function wMusicMood() {
   const world = m.kind === 'world', site = wAmbSite(), night = wIsNight(), road = world && wOnRoad();
   const wx = world ? wWeather(wRegionHere()) : null, hp = RUN.maxhp ? RUN.hp / RUN.maxhp : 1;
   const st = wStarters(), tired = st.length > 0 && st.filter(p => wLegsState(p) !== 'fresh').length / st.length >= M.tired;
-  const src = {}, near = m.kind !== 'town' ? wAmbAlphaNear(m) : null;
+  const src = {}, near = m.kind !== 'town' ? wAmbAlphaNear(m) : null, lair = world ? wAmbLairNear(M.near) : null;
   const p = wEncounterP(m, wTileAt(m, WG.x, WG.y)); if (p > 0) src.wild = clamp(p / M.wild[0], 0, 1) * M.wild[1];
-  if (near) src[near.lair ? 'lair' : 'alpha'] = (1 - near.d / (M.near + 1)) * M.alpha;
+  if (near) src.alpha = (1 - near.d / (M.near + 1)) * M.alpha;
+  if (lair) src.lair = (1 - lair.d / (M.near + 1)) * M.alpha;
   if (m.kind === 'dungeon') src.dungeon = M.dungeon;
   if (world && WG.grudge && WG.dayAbs >= WG.grudge.day) src.grudge = M.grudge;
   if (world && !road && wx === 'fog' && !night) src.fog = M.fog;
@@ -30128,15 +30157,16 @@ function wMusicMood() {
   if (hp < M.hurt[0]) src.hurt = (M.hurt[0] - hp) / M.hurt[0] * M.hurt[1];
   const intensity = 1 - Object.values(src).reduce((a, s) => a * (1 - s), 1);
   const pl = wAmbPlace(), place = m.grd ? 'ground' : site ? 'site' : pl === 'hall' ? 'hall' : pl === 'abbey' ? 'abbey' : m.kind === 'town' || m.kind === 'dungeon' ? m.kind : pl === 'lair' ? 'lair' : 'world';
-  return { place, site: site ? site.id : null, palette: wAmbPalFor(wMusicHere()), intensity: Math.round(intensity * 1000) / 1000,
+  return { place, site: site ? site.id : null, palette: wAmbPalFor(wMusicHere(), pl), intensity: Math.round(intensity * 1000) / 1000,
     tint: { night, wx, tired, hurt: hp < M.hurt[0] }, why: Object.keys(src).filter(k => src[k] > .05) };
 }
 
 /* ---------- when it plays ---------- */
 // a tune's palette; the night road (off the road after dark) plays its region's, tinted for night, so stepping on
 // and off a road at night never swaps the bed for the tune
-function wAmbPalFor(theme) {
-  const pl = wAmbPlace(); if (pl) return pl;
+function wAmbPalFor(theme, pl) {
+  if (pl === undefined) pl = wAmbPlace();
+  if (pl !== undefined) return pl;
   if (theme === 'w_night') return WG ? W_AMB_THEME[W_MUSIC_REGION[wRegionHere()]] || null : null;
   return W_AMB_THEME[theme] || null;
 }
@@ -30182,8 +30212,13 @@ function wAmbSettingsRow() {
 const wW50RenderHelp = renderHelp;
 renderHelp = function () {
   wW50RenderHelp();
+  // in the bag, music and medals section (w13), after its line on the tunes
   const sec = $('wHelp'); if (!sec || $('wHelpAmb')) return;
-  sec.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpAmb"><b>Music style.</b> Out in the world the music is ambient: slow and quiet, made fresh as you walk, with bits of the region's tune now and then. It also tells you how things are: it builds, with a heartbeat and then a beat, when you are in danger (off the road where wild teams roam, at night, near an alpha or a lair, in a dungeon, with a grudge after you, or with your team low on HP), and settles after. It goes thinner when your starters are tired, and lower at night. Every region sounds like itself (a breeze on the plains, chimes in the Mosswold, surf and a foghorn on the Brinefen, crackle and a far anvil in the Cindermaw, bells and ice in the Frostspire), and so do the towns and the dungeons; fog, ash and blizzards can be heard. Special places have their own: the creaking wreck, the chapel's and the abbey's choirs, the shrine, the Hall of Legends, a lair's door, and every ground between games. Now and then you hear a place's whole tune, slowly: when you reach a region, at dawn, and once in a while. Matches always play their tunes. Pick Classic in Settings for the tunes everywhere.</p>`);
+  const tunes = [...(($('wHelpFeel') || sec).querySelectorAll('p.hint'))].find(p => /Music\./.test(p.textContent));
+  (tunes || sec).insertAdjacentHTML(tunes ? 'afterend' : 'beforeend', `<div id="wHelpAmb">
+    <p class="hint"><b>Out in the world</b> the music is ambient: slow, quiet and made fresh as you walk. Every region sounds like itself: a breeze on the plains, chimes in the Mosswold, surf and a foghorn on the Brinefen, crackle and a far anvil in the Cindermaw, bells and ice in the Frostspire. The towns and the dungeons have their own, and you can hear fog, ash and blizzards. Special places do too: the creaking wreck, the choirs of the chapel and the abbey, the Hall of Legends, a lair's door, and every ground between games.</p>
+    <p class="hint"><b>It tells you how things are.</b> It builds, with a heartbeat and then a beat, when there is danger: off the road where wild teams roam, at night, near an alpha or a lair, in a dungeon, with a grudge after you, or with your team low on HP. It settles once you are safe. It goes thinner when your starters are tired, and lower at night.</p>
+    <p class="hint"><b>The tunes.</b> Now and then you hear a place's whole tune: when you reach a region, at dawn, and once in a while. Matches always play their tunes. Pick Classic in Settings to hear the tunes everywhere.</p></div>`);
 };
 </script>
 </body></html>
