@@ -2,7 +2,7 @@
 # takes the best total edge (it will send its weakest against their best to win the other two). A card boxes its bouts
 # in order, each with the right two fighters, keeps each result, and is settled after the third (bouts, then knockdowns,
 # then points); nothing comes after it. A headless card is the same twice and leaves the card in the ring alone. In the
-# Realm: Ma Gristle's CARD names the visitors' order and asks who faces each (the corner's pick to start with, the same
+# Realm: Ma Gristle's CARD (its exhibition) names the visitors' order and asks who faces each (the corner's pick to start with, the same
 # fighter twice refused, call-ups when the team is short); the bar has Next bout between bouts and Another card at the
 # end, and a change of mode carries on with the card. How to play explains it. Asserts; exits nonzero on failure.
 # Screenshots: /tmp/realm-ring-card-*.png.
@@ -66,7 +66,9 @@ async def main():
         await pg.evaluate("wBX.speed = 4")
         t = await pg.evaluate("(() => { const K = DB.chars.gk_ring; return { card: K.topics.card && K.topics.card.act, job: /CARD/.test(K.topics.job.t) }; })()")
         check(t == {'card': 'rcard', 'job': True}, 'Ma Gristle puts on a CARD', t)
+        # (CARD opens the card: the clubs, and the exhibition against the Saltmere club; realm_ring_game has the clubs)
         await pg.evaluate("W_RING_MODE = 'watch'; wRunAct('rcard')")
+        await pg.wait_for_selector('#wBxExhib'); await pg.click('#wBxExhib')
         await pg.wait_for_selector('[data-rslot]')
         m = await pg.evaluate("""(() => { const S = [...document.querySelectorAll('[data-rslot]')]; return { n: S.length, picks: S.map(s => +s.value), opts: S[0].options.length,
           roster: wRoster().length, go: !document.getElementById('wRingCardGo').disabled, rate: !!document.querySelector('[data-rrate="0"]').textContent }; })()""")
@@ -99,7 +101,7 @@ async def main():
                 await pg.click('#wRingNext')
         await pg.wait_for_function("!!wBX.card.result && !document.getElementById('wRingAgain').hidden")
         end = await pg.evaluate("({ again: document.getElementById('wRingAgain').textContent, next: document.getElementById('wRingNext').hidden, note: document.getElementById('wRingNote').textContent, result: wBX.card.result })")
-        check(end['again'] == 'Another card' and end['next'] and ('wins the card' in end['note'] or 'draw' in end['note']), 'after the third bout the card is settled on the bar, with Another card', end)
+        check(end['again'] == 'Another card' and end['next'] and ('The card goes to' in end['note'] or 'draw' in end['note']), 'after the third bout the card is settled on the bar, with Another card', end)
         await pg.wait_for_timeout(300); await pg.screenshot(path='/tmp/realm-ring-card-end.png')
         before = await pg.evaluate("wBX.card.sides[1].fighters.map(f => f.n).join()")
         await pg.click('#wRingAgain')

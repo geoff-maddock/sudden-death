@@ -3,7 +3,8 @@
    team faces each (your corner's pairing to start with: wBX.cardAuto). The bouts are boxed one after another in the
    ring, in the mode on the bar; between them the bar has Next bout, and at the end the card is settled (bouts won,
    then knockdowns, then points). Your players box on their kinds' ratings for now; with fewer than three of them,
-   call-ups make up the card. Nothing is won or lost yet, and nothing is saved: games from the world come in phase 5.
+   call-ups make up the card. This exhibition wins and loses nothing and isn't saved; cards from the world (w53) use the
+   same pairing (wRingPairing).
    Wraps: wRingBarNote (wW52RingBarNote: the card on the bar), wRunAct (wW52RunAct: 'rcard'),
    renderHelp (wW52RenderHelp: the card in How to play). */
 
@@ -21,26 +22,35 @@ function wRingTheirs(taken) {
   return { name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.boxing} Club`, short: A.short, color: A.color, light: A.light, fighters };
 }
 const W_RING_STAT = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'Sta', gui: 'Gui' };
-function wRingRatings(kind) { const r = wBX.rate(kind); return wBX.stats.map(s => `${W_RING_STAT[s]} ${r[s]}`).join(' · '); }
-/* the card: their three in order, and who of yours faces each */
-function wRingCard() {
-  const taken = new Set(), mine = wRingMine(taken), theirs = wRingTheirs(taken), auto = wBX.cardAuto(mine.fighters, theirs.fighters);
-  const opt = (sel) => mine.fighters.map((f, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(f.n)}, ${esc(wKindName(f.kind))}${f.callup ? ' (call-up)' : ''}</option>`).join('');
-  const close = modal(`<header><h3>A card at the Anvil Ring</h3><button class="ghost" data-close>Not now</button></header>
-    <div class="wmsg"><p class="hint">Three bouts, one fighter each, and each fighter boxes once. The ${esc(theirs.name)} have named their order. Pick who faces each; your corner has picked to start with. Win more bouts than they do to win the card (level on bouts, knockdowns decide it, then points).</p>
-    <table class="wrcard">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}<br><small>${wRingRatings(f.kind)}</small></td>
+/* the pairing: their three in order, and who of yours faces each (your corner's pick to start with). o: { mine,
+   theirs, title, intro, go: [[label, value], ...] (the buttons that box it), onGo(picks, value) } */
+function wRingPairing(o) {
+  const { mine, theirs } = o, auto = wBX.cardAuto(mine.fighters, theirs.fighters);
+  const rate = f => wBX.stats.map(s => `${W_RING_STAT[s]} ${(f.r || wBX.rate(f.kind))[s]}`).join(' · ');
+  const opt = sel => mine.fighters.map((f, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(f.n)}, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}${f.callup ? ' (call-up)' : ''}</option>`).join('');
+  const close = modal(`<header><h3>${esc(o.title)}</h3><button class="ghost" data-close>Not now</button></header>
+    <div class="wmsg"><p class="hint">${o.intro}</p>
+    <table class="wrcard">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}<br><small>${rate(f)}</small></td>
       <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>`).join('')}</table>
     <p class="hint" id="wRingCardWarn"></p></div>
-    <div class="row"><button class="ghost" id="wRingCardAuto">Your corner's pick</button><button class="btn" id="wRingCardGo">Box the card</button></div>`);
+    <div class="row"><button class="ghost" id="wRingCardAuto">Your corner's pick</button>${o.go.map(([l, v], i) => `<button class="${i ? 'ghost' : 'btn'}" data-rgo="${v}"${i ? '' : ' id="wRingCardGo"'}>${esc(l)}</button>`).join('')}</div>`);
   const sel = () => [...$('modalBox').querySelectorAll('[data-rslot]')].map(s => +s.value);
   const sync = () => {
     const p = sel(), dup = new Set(p).size !== p.length;
-    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).textContent = wRingRatings(mine.fighters[+s.value].kind);
-    $('wRingCardGo').disabled = dup; $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
+    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).textContent = rate(mine.fighters[+s.value]);
+    for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.disabled = dup;
+    $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
   };
   $('modalBox').addEventListener('change', sync); sync();
   $('wRingCardAuto').onclick = () => { $('modalBox').querySelectorAll('[data-rslot]').forEach((s, i) => { s.value = auto[i]; }); sync(); };
-  $('wRingCardGo').onclick = () => { const picks = sel(); close(); wRingCardBox({ mine, theirs, picks }); };
+  for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.onclick = () => { const picks = sel(); close(); o.onGo(picks, b.dataset.rgo); };
+}
+/* the exhibition card: the Saltmere club's three against yours, nothing won or lost */
+function wRingCard() {
+  const taken = new Set(), mine = wRingMine(taken), theirs = wRingTheirs(taken);
+  wRingPairing({ mine, theirs, title: 'A card at the Anvil Ring', go: [['Box the card', 'box']],
+    intro: `Three bouts, one fighter each, and each fighter boxes once. The ${esc(theirs.name)} have named their order. Pick who faces each; your corner has picked to start with. Win more bouts than they do to win the card (level on bouts, knockdowns decide it, then points).`,
+    onGo: picks => wRingCardBox({ mine, theirs, picks }) });
 }
 // box it: the card in the ring, in the mode on the bar
 function wRingCardBox(o) {
@@ -70,7 +80,7 @@ wRingBarNote = function () {
 function wRingCardWords(C) {
   const R = C.result; if (R.win == null) return 'The card is a draw.';
   const w = C.sides[R.win].name, a = R.won[R.win], b = R.won[1 - R.win];
-  return R.by === 'bouts' ? `${w} wins the card, ${a} bouts to ${b}.` : `${w} wins the card on ${R.by}, level at ${a} bouts each.`;
+  return R.by === 'bouts' ? `The card goes to ${w}, ${a} bouts to ${b}.` : `The card goes to ${w} on ${R.by}, level at ${a} bouts each.`;
 }
 // Another card, from the bar at the end of one
 $('wRingBar').addEventListener('click', e => { if (e.target.id === 'wRingAgain' && WBX && WBX.card) { e.stopImmediatePropagation(); wRingCard(); } }, true);

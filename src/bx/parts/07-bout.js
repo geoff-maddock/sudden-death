@@ -27,7 +27,7 @@ const BX_CLUBS = [
   { name: 'Visitors', short: 'VIS', color: '#2a5fb8', light: '#d6e6ff' },
 ];
 let BD = null;
-const BX_HOOK = { onOver: null, onPhase: null };
+const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
 
 /* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r?, style? }], corners: [2 × { name, short, color, light }],
    mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..2, 0..2], powers (false: none), headless } */
@@ -136,6 +136,7 @@ function bxCorner() {
   bxCornerSpots();
   bxPh('corner');
   if (bxYourCorner()) bxAsk();
+  bxSnapNow();
 }
 // your corner: whether you have one, asking you (what your corner would do goes in G.wait), your plan, the cut-man
 const bxYourCorner = () => !!BD && BD.mode !== 'watch' && !BD.headless;
@@ -170,7 +171,7 @@ function bxSetMode(m) {
   // (asked once a break: not again if you've already called it)
   else if (m !== 'watch' && !G.wait && (BD.ph === 'intro' || BD.ph === 'corner') && G.called !== BD.ph + G.round) bxAsk();
 }
-function bxOver() { for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); f.bs.dmg = Math.round(f.bs.dmg); } BD.ph = 'over'; BD.t = 0; if (CD && G.card && !BD.headless) bxCardRecord(); if (!BD.headless && BX_HOOK.onOver) BX_HOOK.onOver(bxSummary()); }
+function bxOver() { for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); f.bs.dmg = Math.round(f.bs.dmg); } BD.ph = 'over'; BD.t = 0; if (CD && G.card && !BD.headless) bxCardRecord(); if (CD && G.card && !BD.headless && !CD.result) bxSnapNow(); if (!BD.headless && BX_HOOK.onOver) BX_HOOK.onOver(bxSummary()); }
 // the result in words: "Grub wins by knockout in round 2", "A split decision for Vex", "A draw"
 function bxVerdict(over) {
   const v = over || G.over; if (!v) return '';

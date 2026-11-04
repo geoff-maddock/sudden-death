@@ -9,7 +9,9 @@ return {
   start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
   get on() { return BXP.on; }, get speed() { return BXP.speed; }, set speed(n) { BXP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
   pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
-  set onOver(f) { BX_HOOK.onOver = f; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
+  set onOver(f) { BX_HOOK.onOver = f; }, get onOver() { return BX_HOOK.onOver; }, set onSnap(f) { BX_HOOK.onSnap = f; }, set wantSnap(f) { BX_HOOK.wantSnap = f; },
+  // save points (phase 5): a snapshot now (between rounds or bouts), and putting one back in the ring
+  snapshot: () => BD && G && G.F ? bxSnapshot() : null, resume: sn => { const g = bxResume(sn); bxShow(); return g; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
   // your corner and your hands (phase 2): who boxes and corners your side ('watch', 'call', 'play'), the side that is
   // yours, what your corner would do while the bout waits for you ({ plan, patch, why }, or null), your plan, the
   // cut-man, and the keys or buttons ({ steer, guard, act })
