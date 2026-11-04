@@ -126,14 +126,15 @@ function wRunAway(enc) {
 
 /* ---------- encounters on the road (TC's encounterRoll) ---------- */
 /* one roll per step: the day road is safe, the night road is not, and off-road at night is 25% busier */
-function wEncounterRoll(m, c, r) {
-  if (m.kind === 'town') return null;
+function wEncounterRoll(m, c, r) { return r < wEncounterP(m, c) ? 'fight' : null; }
+// the chance a step on this tile rolls a wild match (the ambient music reads it too, w50)
+function wEncounterP(m, c) {
+  if (m.kind === 'town') return 0;
   const td = DB.tiles[c] || {}, night = m.kind === 'world' && wIsNight(), road = m.kind === 'world' && (c === '=' || c === 'b'), N = DB.meta.night;
   let p = td.enc || 0;
   if (road) p = night ? N.roadEnc : 0;
   else if (night) p *= N.encMult;
-  p *= W_ENC.mult;
-  return r < p ? 'fight' : null;
+  return p * W_ENC.mult;
 }
 wEncounterHook = function (region, tileCh, info) {
   if (!WG || !RUN) return;
