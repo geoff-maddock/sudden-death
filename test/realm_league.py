@@ -112,7 +112,8 @@ async def main():
                 # ---------- the grudge on the road ----------
                 none = await pg.evaluate("(() => { __clear(); __wild(); WG.grace = 0; W_LEAGUE.grudgeP = 1; const r = wEncounterHook('plains', '.', null); const b = !!B && !!RUN.pending; return b; })()")
                 check(not none or await pg.evaluate("!(RUN.pending && RUN.pending.world.ref && RUN.pending.world.ref.grudge)"), 'not on the same day')
-                await pg.evaluate("document.querySelectorAll('#modalBox #wNotYet, #modalBox #wRun').forEach(b => b.click()); RUN.pending = null; B = null")
+                # (that roll may instead have put a roadside event up; one left open stops a grudge turning up, so it goes too)
+                await pg.evaluate("document.querySelectorAll('#modalBox #wNotYet, #modalBox #wRun').forEach(b => b.click()); RUN.pending = null; B = null; WG.event = null")
                 await pg.evaluate("__clear(); WG.dayAbs = WG.grudge.day; __wild(); WG.grace = 0; wEncounterHook('plains', '.', null)")
                 await pg.wait_for_selector('#modalBox .wtaunt')
                 t = await pg.evaluate("document.querySelector('#modalBox .wtaunt').textContent")
