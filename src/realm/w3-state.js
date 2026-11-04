@@ -272,6 +272,8 @@ function wUse(x, y) {
     }
     case 'lair': {
       const L = DB.locs.find(l => l.id === meta.loc); if (!L) break;
+      // a lair has no map to walk into, so reaching its door is seeing it (Ingrith's ROOST needs seen_auroraroost)
+      if (!WG.flags['seen_' + L.id]) wSetFlag('seen_' + L.id);
       if (wFlag('alpha_' + L.alpha)) return wLog(DB.tiles.Z.look0, 'd');
       wLog(L.name + '. ' + wCap((DB.alphas[L.alpha] || {}).name || 'something big') + ' is home, and wants a game.', 'b');
       wEncounterHook(wRegionHere(), c, { kind: 'lair', loc: L.id, alpha: L.alpha }); break;
