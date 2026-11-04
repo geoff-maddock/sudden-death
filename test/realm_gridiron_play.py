@@ -25,7 +25,7 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
         await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
-        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wGF !== 'undefined'"); await pg.evaluate("wGF.speed = 4")  # the field at 4 steps a frame: the same game, sooner
+        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wGF !== 'undefined'")  # (not sped up: the plays by hand are timed in real seconds)
 
         # ---------- on the field, through the test handle ----------
         e = await pg.evaluate("""(() => { const out = {};
@@ -102,8 +102,9 @@ async def main():
         th = await pg.evaluate("({ thrown: wGF.play.thrown, ev: wGF.play.ev.filter(x => x.k === 'throw').length })")
         check('Space' in note and th['thrown'] and th['ev'] == 1, 'in the Realm: Space held and let go throws the pass, and the bar says how', [note, th])
 
-        # a field goal on the meter: two taps, and the kick waits for them
-        await pg.wait_for_function("wGF.phase === 'call'", timeout=20000)
+        # a field goal on the meter: two taps, and the kick waits for them (a minute for the next call: on a busy machine,
+        # with other checks beside it, the play and the pause after it can take a while)
+        await pg.wait_for_function("wGF.phase === 'call'", timeout=60000)
         await pg.evaluate("(() => { const G = wGF.G; G.ball = 75; G.down = 4; G.togo = 5; wGridBar(); })()")
         await pg.click('[data-gkick="fg"]')
         await pg.wait_for_function("wGF.phase === 'kick' && !!wGF.meter", timeout=4000)

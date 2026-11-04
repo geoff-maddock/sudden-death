@@ -63,11 +63,14 @@ NAME="$(basename "$OUT" .html)"
 JS="build/$NAME.js"
 mkdir -p build "$(dirname "$OUT")"
 # one build of a page at a time: a second one (a single check run while the suite runs) waits its turn rather than
-# mixing their files in build/ (a lock left by a killed build is taken over after a minute); and the page is written
-# whole and then moved into place, so a check reading it never gets half of it
-LOCK="build/.$NAME.lock"; n=0
-until mkdir "$LOCK" 2>/dev/null; do n=$((n + 1)); if [ $n -ge 600 ]; then rm -rf "$LOCK"; n=0; else sleep .1; fi; done
-trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+# mixing their files in build/ (a lock more than a minute old was left by a killed build, and is taken over); and the
+# page is written whole and then moved into place, so a check reading it never gets half of it, and an interrupted
+# build leaves no half-written file behind
+LOCK="build/.$NAME.lock"
+until mkdir "$LOCK" 2>/dev/null; do
+  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then rm -rf "$LOCK"; else sleep .1; fi
+done
+trap 'rmdir "$LOCK" 2>/dev/null; rm -f "$OUT.tmp.$$"' EXIT
 # the whole script, plus one file per name space for the duplicate check: build/NAME.global.js holds the
 # global files and each scope's `const NAME` line; build/NAME.scope-<S>.js holds what scope S wraps
 : > "$JS"; : > "build/$NAME.global.js"; NS="build/$NAME.global.js"; SPACES=("$NS")
