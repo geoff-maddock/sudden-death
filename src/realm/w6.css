@@ -314,6 +314,11 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wgmodes button:first-child{border-radius:6px 0 0 6px}
 .wgmodes button:last-child{border-radius:0 6px 6px 0}
 .wgmodes button.on{background:var(--torch);color:#1a120c;border-color:var(--torch)}
+/* the ring (w51): your corner's call, and the pad for boxing by hand */
+#wRingCall{display:inline-flex;gap:4px;flex-wrap:wrap}
+#wRingCall button.on{border-color:var(--torch);box-shadow:0 0 0 1px var(--torch) inset}
+.wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}
 /* w43: the Seven tab */

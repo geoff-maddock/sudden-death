@@ -7,6 +7,8 @@
    lines of the log. Punches that land show a word (BXT.fx, from BXE). After a knockdown the count is over the fighter;
    between rounds a card has each judge's score for the round and the plans for the next; at the end, the verdict and
    the three cards round by round, with the punch stats.
+   With a corner of your own (phase 2), your fighter has a marker over them, and while the bout waits for your call the
+   card says what your corner would do and why. Boxing by hand, a warning when your fighter is tired.
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -25,6 +27,10 @@ function bxDraw(c) {
   bxDrawFx(c);
   bxDrawBar(c);
   bxDrawFeed(c);
+  if (BD.mode === 'play' && BD.ph === 'round' && bxFrac(G.F[BD.you]) < .25) {
+    c.save(); c.globalAlpha = .65 + .35 * Math.sin(BXT.t * 6);
+    txt(c, 'Tired: ease off and get your breath back', 480, 118, '800 16px "Alegreya Sans", sans-serif', '#5ab8d8', 'center'); c.restore();
+  }
   if (BD.ph === 'kd') bxDrawCount(c);
   if (BD.ph === 'intro') bxDrawIntro(c);
   if (BD.ph === 'corner') bxDrawCorner(c);
@@ -105,6 +111,16 @@ function bxDrawFighter(c, f, o) {
   } else drawFig(c, f.kind, p.x, p.y, hpx, team, opt);
   // a counter window: a glint at the gloves
   if (f.ctr > 0 && f.a.k !== 'down') { c.save(); c.globalAlpha = Math.min(1, f.ctr * 3); txt(c, '✦', p.x + (flip ? -1 : 1) * 30 * p.k, p.y - 92 * p.k, `${14 * p.k}px sans-serif`, '#ffe9a0', 'center'); c.restore(); }
+  // yours: a marker over them
+  if (bxYourCorner() && f.side === BD.you && f.a.k !== 'down') {
+    const y = p.y - 112 * p.k; c.save(); c.fillStyle = '#ffd24a'; c.beginPath(); c.moveTo(p.x - 6, y - 8); c.lineTo(p.x + 6, y - 8); c.lineTo(p.x, y); c.closePath(); c.fill();
+    txt(c, BD.mode === 'play' ? 'you' : 'yours', p.x, y - 11, '700 11px "Alegreya Sans", sans-serif', '#ffd24a', 'center'); c.restore();
+  }
+}
+// while the bout waits for your corner: what they'd do, and why
+function bxDrawAsk(c, y) {
+  if (!G.wait) return;
+  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 // words for what lands: drained from BXE
 function bxDrawFx(c) {
@@ -158,7 +174,7 @@ function bxDrawCount(c) {
 }
 function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, w, h, 8); c.fill(); c.strokeStyle = 'rgba(255,208,160,.25)'; c.lineWidth = 1; c.stroke(); }
 function bxDrawIntro(c) {
-  bxPanel(c, 250, 270, 460, 110);
+  bxPanel(c, 230, 270, 500, 110);
   const [A, B] = G.F;
   txt(c, `${A.n}  vs  ${B.n}`, 480, 300, '800 22px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_STATS.forEach((s, i) => {
@@ -166,14 +182,16 @@ function bxDrawIntro(c) {
     txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
     txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 346, '700 14px "Alegreya Sans", sans-serif', A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
   });
-  txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  if (G.wait) bxDrawAsk(c, 368);
+  else txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 function bxDrawCorner(c) {
   const n = G.cards.length, sc = G.cards[n - 1], T = bxTotals(), pl = G.plans[G.plans.length - 1];
-  bxPanel(c, 280, 270, 400, 110);
+  bxPanel(c, 230, 270, 500, 110);
   txt(c, `End of round ${n}`, 480, 295, '800 18px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_JUDGES.forEach((J, j) => txt(c, `${J.n}  ${sc[j][0]}-${sc[j][1]}  (${T[j][0]}-${T[j][1]})`, 340 + j * 140, 322, '14px "Alegreya Sans", sans-serif', '#e8dcc0', 'center'));
-  txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  if (G.wait) bxDrawAsk(c, 352);
+  else txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 function bxDrawOver(c) {
   const v = G.over, T = bxTotals();

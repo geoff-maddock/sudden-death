@@ -8,3 +8,4 @@ src/bx/parts/05-ring.js
 src/bx/parts/06-cpu.js
 src/bx/parts/07-bout.js
 src/bx/parts/08-draw.js
+src/bx/parts/09-hands.js

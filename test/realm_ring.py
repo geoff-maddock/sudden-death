@@ -118,7 +118,8 @@ async def main():
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
         t = await pg.evaluate("(() => { const K = DB.chars.gk_ring; return { bout: K.topics.bout && K.topics.bout.act, job: /BOUT/.test(K.topics.job.t) }; })()")
         check(t == {'bout': 'bout', 'job': True}, 'Ma Gristle at the Anvil Ring puts on a BOUT', t)
-        await pg.evaluate("wRunAct('bout')")
+        # (Corners: the CPU's both sides, as in phase 1; your corner and your hands are realm_ring_hands)
+        await pg.evaluate("W_RING_MODE = 'watch'; wRunAct('bout')")
         await pg.wait_for_function("UI.view === 'ring' && wBX.on")
         v = await pg.evaluate("""({ ring: !document.getElementById('v-ring').hidden, bar: !document.getElementById('wRingBar').hidden, runbar: document.getElementById('runbar').hidden,
           note: document.getElementById('wRingNote').textContent, fighters: wBX.G.F.map(f => f.kind), corners: wBX.G.corners.map(c => c.name) })""")

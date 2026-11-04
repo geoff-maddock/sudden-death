@@ -1,6 +1,6 @@
 /* the end of the wBX scope: what the Realm may call (w19b-engines.js, w51-ring.js). Phase 0 is the rules; phase 1 boxes
-   one bout, CPU against CPU. start(opts) puts a bout in the ring ({ fighters: [2], corners: [2], mode: 'watch', seed,
-   skill }); simBout(opts) boxes one headless and returns its summary; onPhase hears each beat (intro, round, kd, rise,
+   one bout, CPU against CPU; phase 2 gives you a corner and your hands. start(opts) puts a bout in the ring ({ fighters:
+   [2], corners: [2], mode: 'watch' | 'call' | 'play', you, seed, skill }); simBout(opts) boxes one headless and returns its summary; onPhase hears each beat (intro, round, kd, rise,
    corner, over) and onOver the end, with the summary. The test's handles: G, rules and the pure rule functions, step
    (one beat), and act/clinch (a fighter's move, by side). */
 return {
@@ -10,6 +10,11 @@ return {
   get on() { return BXP.on; }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
   pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
   set onOver(f) { BX_HOOK.onOver = f; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
+  // your corner and your hands (phase 2): who boxes and corners your side ('watch', 'call', 'play'), the side that is
+  // yours, what your corner would do while the bout waits for you ({ plan, patch, why }, or null), your plan, the
+  // cut-man, and the keys or buttons ({ steer, guard, act })
+  setMode: m => bxSetMode(m), get mode() { return BD ? BD.mode : null; }, get you() { return BD ? BD.you : 0; }, get wait() { return G && G.wait ? Object.assign({}, G.wait) : null; },
+  call: plan => bxCall(plan), patch: () => bxPatch(), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
   // the ratings, plans, punches and judges, for the page and How to play
   rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
   plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),

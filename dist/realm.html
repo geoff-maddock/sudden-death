@@ -842,6 +842,11 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wgmodes button:first-child{border-radius:6px 0 0 6px}
 .wgmodes button:last-child{border-radius:0 6px 6px 0}
 .wgmodes button.on{background:var(--torch);color:#1a120c;border-color:var(--torch)}
+/* the ring (w51): your corner's call, and the pad for boxing by hand */
+#wRingCall{display:inline-flex;gap:4px;flex-wrap:wrap}
+#wRingCall button.on{border-color:var(--torch);box-shadow:0 0 0 1px var(--torch) inset}
+.wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}
 /* w43: the Seven tab */
@@ -24662,7 +24667,8 @@ function bxStep(dt) {
    plan) and slip it or cover up. Otherwise every fraction of a second (quicker with guile) they pick where to move (in
    or out to the plan's range, circling once there, off the ropes) and whether to punch, cover or clinch. A slip opens
    a counter window, and a counterpuncher waits for one. Tired fighters back off and throw less; hurt ones tie up.
-   G.skill[side] (0 to 2) sharpens the reading and the timing. */
+   G.skill[side] (0 to 2) sharpens the reading and the timing.
+   A fighter boxed by hand (09-hands.js) does none of the thinking but the footwork, and only while you don't steer. */
 const BX_PLAN = {
   press:   { n: 'Press',     desc: 'Walk them down and stay in their face.',          range: .55, rate: 1.15, mix: { jab: .35, hook: .4, body: .25 }, def: .7 },
   counter: { n: 'Counter',   desc: 'Let them lead, slip it and punish the miss.',     range: .92, rate: .75, mix: { jab: .35, hook: .5, body: .15 }, def: 1.3, slip: .3, wait: true },
@@ -24674,6 +24680,7 @@ const BX_PLAN_IDS = Object.keys(BX_PLAN);
 
 function bxThink(f, o, dt) {
   if (f.a.k === 'down' || f.a.k === 'clinch' || f.a.k === 'stun') { f.mv = [0, 0]; return; }
+  if (bxHand(f)) return bxHandThink(f, o, dt);
   const skill = G.skill ? G.skill[f.side] : 1, P = BX_PLAN[f.plan] || BX_PLAN.press;
   // a punch on its way, seen once
   if (bxPunching(o) && !o.a.done && o.a.id !== f.seen && !bxBusy(f)) {
@@ -24688,9 +24695,24 @@ function bxThink(f, o, dt) {
   }
   f.think -= dt; if (f.think > 0) return;
   f.think = Math.max(.1, .3 - f.r.gui * .006 - skill * .03) * (.8 + R() * .4);
-  const d = bxDist(f, o), dx = (o.x - f.x) / (d || 1), dy = (o.y - f.y) / (d || 1);
-  const tired = bxFrac(f) < .22, hurt = f.hp < f.hpMax * .3;
-  const want = bxRange(f, 'jab') * (tired ? 1.25 : P.range);
+  const tired = bxFrac(f) < .22, hurt = f.hp < f.hpMax * .3, { d, want } = bxFeet(f, o);
+  if (bxBusy(f)) return;
+  // cover up, tie up
+  if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? .2 : 0)) { bxClinch(f, o); return; }
+  if (P.guard && R() < P.guard * (tired ? 1.3 : 1)) { bxAct(f, 'guard'); return; }
+  // a punch in range, at the plan's rate; a counter window says now
+  // (a power punch only from well inside its range: it is slow enough that a fighter backing off gets out of it)
+  const can = BX_PUNCH_IDS.filter(k => d <= bxRange(f, k) * (BX_PUNCH[k].power ? .95 : 1) + .05 && f.sta >= BX_PUNCH[k].sta);
+  if (!can.length) { if (f.a.k === 'guard' && R() < .5) bxAct(f, 'idle'); return; }
+  // still coming in to the plan's range: mostly moving, not punching
+  const rate = P.rate * (.5 + f.r.spd * .015) * (tired ? .4 : 1) * (f.ctr > 0 ? 2.5 : 1) * (P.wait && !f.ctr && !bxPunching(o) ? .5 : 1) * (d > want + .45 ? .35 : 1);
+  if (R() < rate) { const w = {}; for (const k of can) w[k] = P.mix[k] * (o.a.k === 'guard' && k === 'body' ? 2 : 1); bxAct(f, wpick(w)); }
+  else if (R() < .22 * P.def) bxAct(f, 'guard');
+}
+/* the footwork: f.mv toward the range the plan wants (further when tired). Returns { d, want } */
+function bxFeet(f, o) {
+  const P = BX_PLAN[f.plan] || BX_PLAN.press, d = bxDist(f, o), dx = (o.x - f.x) / (d || 1), dy = (o.y - f.y) / (d || 1);
+  const want = bxRange(f, 'jab') * (bxFrac(f) < .22 ? 1.25 : P.range);
   // where to: in or out to the plan's range, circling once there (now and then the other way), off the ropes
   let mx = 0, my = 0;
   const edge = Math.max(Math.abs(f.x), Math.abs(f.y));
@@ -24706,30 +24728,21 @@ function bxThink(f, o, dt) {
   // away from the ropes and corners, toward the middle (harder once they are on them)
   if (edge > 4) { const k = bxOnRopes(f) ? .18 : .08; mx -= f.x * k; my -= f.y * k; }
   f.mv = [mx, my];
-  if (bxBusy(f)) return;
-  // cover up, tie up
-  if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? .2 : 0)) { bxClinch(f, o); return; }
-  if (P.guard && R() < P.guard * (tired ? 1.3 : 1)) { bxAct(f, 'guard'); return; }
-  // a punch in range, at the plan's rate; a counter window says now
-  // (a power punch only from well inside its range: it is slow enough that a fighter backing off gets out of it)
-  const can = BX_PUNCH_IDS.filter(k => d <= bxRange(f, k) * (BX_PUNCH[k].power ? .95 : 1) + .05 && f.sta >= BX_PUNCH[k].sta);
-  if (!can.length) { if (f.a.k === 'guard' && R() < .5) bxAct(f, 'idle'); return; }
-  // still coming in to the plan's range: mostly moving, not punching
-  const rate = P.rate * (.5 + f.r.spd * .015) * (tired ? .4 : 1) * (f.ctr > 0 ? 2.5 : 1) * (P.wait && !f.ctr && !bxPunching(o) ? .5 : 1) * (d > want + .45 ? .35 : 1);
-  if (R() < rate) { const w = {}; for (const k of can) w[k] = P.mix[k] * (o.a.k === 'guard' && k === 'body' ? 2 : 1); bxAct(f, wpick(w)); }
-  else if (R() < .22 * P.def) bxAct(f, 'guard');
+  return { d, want };
 }
-/* the corner's call for the next round: { plan, patch }. Cover up when badly hurt (unless it's the last round and they
-   are behind), press in the last round when behind on the cards, stay safe when well ahead, go for the finish when the
-   other fighter is fading; otherwise their own style. A patch (the cut-man) when they're down to two thirds. */
+/* the corner's call for the next round: { plan, patch, why }. Cover up when badly hurt (unless it's the last round and
+   they are behind), press in the last round when behind on the cards, stay safe when well ahead, go for the finish when
+   the other fighter is fading; otherwise their own style. A patch (the cut-man) when they're down to two thirds. Before
+   the first round it is their style. */
 function bxCornerCpu(f) {
   const o = G.F[1 - f.side], T = bxTotals(), lead = T.reduce((n, t) => n + Math.sign(f.side ? t[1] - t[0] : t[0] - t[1]), 0), last = G.round === G.rounds;
-  let plan = f.style;
-  if (last && lead < 0) plan = 'press';
-  else if (f.hp < f.hpMax * .45 || f.hpMax < 55) plan = 'cover';
-  else if (last && lead >= 2) plan = f.style === 'press' ? 'counter' : 'away';
-  else if (o.hpMax < 60 || o.hp < 40) plan = 'press';
-  return { plan, patch: f.patches > 0 && f.hp < f.hpMax * .67 };
+  let plan = f.style, why = 'it suits them';
+  if (!G.cards.length) why = 'it suits them';
+  else if (last && lead < 0) { plan = 'press'; why = 'behind on the cards, last round'; }
+  else if (f.hp < f.hpMax * .45 || f.hpMax < 55) { plan = 'cover'; why = 'hurt: get the legs back'; }
+  else if (last && lead >= 2) { plan = f.style === 'press' ? 'counter' : 'away'; why = 'ahead on the cards: stay safe'; }
+  else if (o.hpMax < 60 || o.hp < 40) { plan = 'press'; why = 'the other fighter is fading'; }
+  return { plan, patch: f.patches > 0 && f.hp < f.hpMax * .67, why };
 }
 /* The Anvil Ring: a bout (issue #23, phase 1). BD runs it in beats (BD.ph): the intro, each round on the clock, the
    count after a knockdown, the fighter rising, the corner between rounds, and the end. The round clock stops for the
@@ -24740,7 +24753,11 @@ function bxCornerCpu(f) {
    have left to get back and how often they've been down. Counted out is a knockout; the third knockdown stops it. Up
    in time, they have back about half their most, and lose a little of it.
    Between rounds both get their breath back and some health, the corner picks the next round's plan (06-cpu.js), and
-   the cut-man may use a patch (BX_RULES.patches a bout). Phase 2 gives you your corner's calls.
+   the cut-man may use a patch (BX_RULES.patches a bout).
+   Your corner (phase 2): in 'call' and 'play' (BD.mode) the side BD.you is yours. Before the first round and between
+   rounds the bout waits for your plan (G.wait holds what your corner would do, and why); bxCall gives it, bxPatch has
+   the cut-man work (once a break). In 'play' you box the rounds too (09-hands.js). Switching to 'watch' mid-break
+   takes your corner's advice; switching from it asks you.
    G (02-rules.js) carries the fighters too: G.F, the corners G.corners, G.skill, each round's work as the judges saw it
    (G.work), each round's stats (G.rstats), the plans (G.plans), the log, and the seconds boxed (G.secs). All plain JSON.
    BD is the page's side: { ph, t, acc, mode, headless, count, getUp }. */
@@ -24758,8 +24775,9 @@ const BX_CLUBS = [
 let BD = null;
 const BX_HOOK = { onOver: null, onPhase: null };
 
-/* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r? }], corners: [2 × { name, short, color, light }],
-   mode: 'watch', seed, skill: [0..2, 0..2], headless } */
+/* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r?, style? }], corners: [2 × { name, short, color, light }],
+   mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..2, 0..2], headless } */
+const BX_MODES = ['watch', 'call', 'play'];
 function bxStart(opts) {
   const o = opts || {};
   bxSeed(o.seed); bxNewBout(o); BXE = [];
@@ -24767,8 +24785,10 @@ function bxStart(opts) {
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
   Object.assign(G, { aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0 });
-  BD = { ph: 'intro', t: 0, acc: 0, mode: o.mode || 'watch', headless: !!o.headless, count: 0, getUp: 0 };
+  BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
+  G.wait = null;
   bxCornerSpots();
+  if (bxYourCorner()) bxAsk();
   return G;
 }
 function bxPh(ph) { BD.ph = ph; BD.t = 0; if (!BD.headless && BX_HOOK.onPhase) BX_HOOK.onPhase(ph); }
@@ -24786,7 +24806,7 @@ function bxTick(dt) {
 function bxBeat(dt) {
   BD.t += dt;
   switch (BD.ph) {
-    case 'intro': if (BD.t >= BX_BEAT.intro) { bxLog(`Round 1. ${bxName(0)} against ${bxName(1)}.`); bxPh('round'); } break;
+    case 'intro': if (BD.t >= BX_BEAT.intro && !G.wait) { bxLog(`Round 1. ${bxName(0)} against ${bxName(1)}.`); bxPh('round'); } break;
     case 'round':
       bxStep(dt); G.secs += dt; G.clock = Math.max(0, G.clock - dt);
       bxDrain();
@@ -24801,7 +24821,7 @@ function bxBeat(dt) {
       }
       break;
     case 'rise': if (BD.t >= BX_BEAT.rise) bxPh('round'); break;
-    case 'corner': if (BD.t >= BX_BEAT.corner) { bxLog(`Round ${G.round}.`); bxPh('round'); } break;
+    case 'corner': if (BD.t >= BX_BEAT.corner && !G.wait) { bxLog(`Round ${G.round}.`); bxPh('round'); } break;
   }
 }
 // what happened this step, for the log (the page reads BXE itself first, for its words)
@@ -24852,6 +24872,7 @@ function bxRoundEnd() {
 function bxCorner() {
   for (const f of G.F) {
     f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * .35); f.sta = f.sta + (f.staMax - f.sta) * .75; f.ctr = 0;
+    if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
     if (c.patch && f.patches > 0) { f.patches--; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
     f.hp = Math.round(f.hp); f.sta = Math.round(f.sta);
@@ -24859,6 +24880,39 @@ function bxCorner() {
   G.plans.push(G.F.map(f => f.plan));
   bxCornerSpots();
   bxPh('corner');
+  if (bxYourCorner()) bxAsk();
+}
+// your corner: whether you have one, asking you (what your corner would do goes in G.wait), your plan, the cut-man
+const bxYourCorner = () => !!BD && BD.mode !== 'watch' && !BD.headless;
+function bxAsk() {
+  const f = G.F[BD.you], c = bxCornerCpu(f);
+  G.wait = { plan: c.plan, patch: c.patch && G.cards.length > 0, why: c.why };
+  G.plans[G.plans.length - 1][BD.you] = f.plan;
+  if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
+}
+function bxCall(plan) {
+  if (!G || !G.wait || !BX_PLAN[plan]) return false;
+  const f = G.F[BD.you]; f.plan = plan; G.plans[G.plans.length - 1][BD.you] = plan; G.wait = null;
+  // a moment, then the bell
+  BD.t = Math.max(BD.t, (BD.ph === 'intro' ? BX_BEAT.intro : BX_BEAT.corner) - .8);
+  if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
+  return true;
+}
+// the cut-man works on your fighter: between rounds, once a break, while patches last
+function bxPatch() {
+  const f = G && G.wait && BD.ph === 'corner' ? G.F[BD.you] : null;
+  if (!f || f.patches <= 0 || f.patched === G.round) return false;
+  f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.round(Math.min(f.hpMax, f.hp + 18));
+  bxLog(`The cut-man works on ${f.n}.`); G.wait.patch = false;
+  if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
+  return true;
+}
+// who boxes and corners your side, without starting over
+function bxSetMode(m) {
+  if (!BD || !BX_MODES.includes(m) || BD.headless) return;
+  BD.mode = m;
+  if (m === 'watch' && G.wait) { const w = G.wait; if (w.patch) bxPatch(); bxCall(w.plan); }
+  else if (m !== 'watch' && !G.wait && (BD.ph === 'intro' || BD.ph === 'corner')) bxAsk();
 }
 function bxOver() { for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); f.bs.dmg = Math.round(f.bs.dmg); } BD.ph = 'over'; BD.t = 0; if (!BD.headless && BX_HOOK.onOver) BX_HOOK.onOver(bxSummary()); }
 // the result in words: "Grub wins by knockout in round 2", "A split decision for Vex", "A draw"
@@ -24893,6 +24947,8 @@ function bxSimBout(opts) {
    lines of the log. Punches that land show a word (BXT.fx, from BXE). After a knockdown the count is over the fighter;
    between rounds a card has each judge's score for the round and the plans for the next; at the end, the verdict and
    the three cards round by round, with the punch stats.
+   With a corner of your own (phase 2), your fighter has a marker over them, and while the bout waits for your call the
+   card says what your corner would do and why. Boxing by hand, a warning when your fighter is tired.
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -24911,6 +24967,10 @@ function bxDraw(c) {
   bxDrawFx(c);
   bxDrawBar(c);
   bxDrawFeed(c);
+  if (BD.mode === 'play' && BD.ph === 'round' && bxFrac(G.F[BD.you]) < .25) {
+    c.save(); c.globalAlpha = .65 + .35 * Math.sin(BXT.t * 6);
+    txt(c, 'Tired: ease off and get your breath back', 480, 118, '800 16px "Alegreya Sans", sans-serif', '#5ab8d8', 'center'); c.restore();
+  }
   if (BD.ph === 'kd') bxDrawCount(c);
   if (BD.ph === 'intro') bxDrawIntro(c);
   if (BD.ph === 'corner') bxDrawCorner(c);
@@ -24991,6 +25051,16 @@ function bxDrawFighter(c, f, o) {
   } else drawFig(c, f.kind, p.x, p.y, hpx, team, opt);
   // a counter window: a glint at the gloves
   if (f.ctr > 0 && f.a.k !== 'down') { c.save(); c.globalAlpha = Math.min(1, f.ctr * 3); txt(c, '✦', p.x + (flip ? -1 : 1) * 30 * p.k, p.y - 92 * p.k, `${14 * p.k}px sans-serif`, '#ffe9a0', 'center'); c.restore(); }
+  // yours: a marker over them
+  if (bxYourCorner() && f.side === BD.you && f.a.k !== 'down') {
+    const y = p.y - 112 * p.k; c.save(); c.fillStyle = '#ffd24a'; c.beginPath(); c.moveTo(p.x - 6, y - 8); c.lineTo(p.x + 6, y - 8); c.lineTo(p.x, y); c.closePath(); c.fill();
+    txt(c, BD.mode === 'play' ? 'you' : 'yours', p.x, y - 11, '700 11px "Alegreya Sans", sans-serif', '#ffd24a', 'center'); c.restore();
+  }
+}
+// while the bout waits for your corner: what they'd do, and why
+function bxDrawAsk(c, y) {
+  if (!G.wait) return;
+  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 // words for what lands: drained from BXE
 function bxDrawFx(c) {
@@ -25044,7 +25114,7 @@ function bxDrawCount(c) {
 }
 function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, w, h, 8); c.fill(); c.strokeStyle = 'rgba(255,208,160,.25)'; c.lineWidth = 1; c.stroke(); }
 function bxDrawIntro(c) {
-  bxPanel(c, 250, 270, 460, 110);
+  bxPanel(c, 230, 270, 500, 110);
   const [A, B] = G.F;
   txt(c, `${A.n}  vs  ${B.n}`, 480, 300, '800 22px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_STATS.forEach((s, i) => {
@@ -25052,14 +25122,16 @@ function bxDrawIntro(c) {
     txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
     txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 346, '700 14px "Alegreya Sans", sans-serif', A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
   });
-  txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  if (G.wait) bxDrawAsk(c, 368);
+  else txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 function bxDrawCorner(c) {
   const n = G.cards.length, sc = G.cards[n - 1], T = bxTotals(), pl = G.plans[G.plans.length - 1];
-  bxPanel(c, 280, 270, 400, 110);
+  bxPanel(c, 230, 270, 500, 110);
   txt(c, `End of round ${n}`, 480, 295, '800 18px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_JUDGES.forEach((J, j) => txt(c, `${J.n}  ${sc[j][0]}-${sc[j][1]}  (${T[j][0]}-${T[j][1]})`, 340 + j * 140, 322, '14px "Alegreya Sans", sans-serif', '#e8dcc0', 'center'));
-  txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  if (G.wait) bxDrawAsk(c, 352);
+  else txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 function bxDrawOver(c) {
   const v = G.over, T = bxTotals();
@@ -25082,9 +25154,43 @@ function bxDrawOver(c) {
   [['Landed', `${a.landed}/${a.thrown}`, `${b.landed}/${b.thrown}`], ['Power punches', a.power, b.power], ['Slipped / blocked', `${a.slips} / ${a.blocks}`, `${b.slips} / ${b.blocks}`], ['Knockdowns', G.kd[1], G.kd[0]]]
     .forEach(([k, x, y], i) => { const yy = 330 + i * 15; txt(c, String(x), 380, yy, '13px "Alegreya Sans", sans-serif', '#ffb0a0', 'center'); txt(c, k, 480, yy, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center'); txt(c, String(y), 580, yy, '13px "Alegreya Sans", sans-serif', '#a8c8ff', 'center'); });
 }
+/* The Anvil Ring: boxing by hand (issue #23, phase 2). In 'play' mode your fighter (BD.you) throws what you press: a
+   jab, a hook, a body shot, a slip or a clinch; holding the guard keeps it up. A press while they're still busy waits
+   up to BX_BUFFER seconds for them to be free, so a quick one-two comes out as two punches. Steering moves them (screen
+   right is the ring's +x, up is the far side); let go and their feet follow their plan, as a CPU fighter's would, so
+   on a phone you can box with the buttons alone. Their instincts: with your hands free (nothing pressed, nothing
+   waiting) they slip or cover up against a punch they see coming, BX_INSTINCT of the times a CPU fighter of theirs
+   would. Pressing the keys yourself does better: it's every time you get it right.
+   BXI is the page's input, not saved: { steer: [x, y], guard, q (the press waiting), qt (how long it has waited) }. */
+const BX_BUFFER = .5, BX_INSTINCT = .6;
+const BXI = { steer: [0, 0], guard: false, q: null, qt: 0 };
+const bxHand = f => !!BD && BD.mode === 'play' && !BD.headless && f.side === BD.you;
+const BX_ACTS = ['jab', 'hook', 'body', 'slip', 'clinch'];
+// the page's keys and buttons: { steer: [x, y], guard: true | false, act: 'jab' | 'hook' | 'body' | 'slip' | 'clinch' }
+function bxInput(o) {
+  if (o.steer) BXI.steer = [clamp(+o.steer[0] || 0, -1, 1), clamp(+o.steer[1] || 0, -1, 1)];
+  if (o.guard != null) BXI.guard = !!o.guard;
+  if (BX_ACTS.includes(o.act)) { BXI.q = o.act; BXI.qt = 0; }
+}
+function bxInputClear() { BXI.steer = [0, 0]; BXI.guard = false; BXI.q = null; BXI.qt = 0; }
+function bxHandThink(f, o, dt) {
+  if (BXI.steer[0] || BXI.steer[1]) f.mv = BXI.steer.slice(); else bxFeet(f, o);
+  if (BXI.q && (BXI.qt += dt) > BX_BUFFER) BXI.q = null;
+  if (bxBusy(f)) return;
+  if (BXI.q) { const k = BXI.q; BXI.q = null; if (k === 'clinch') bxClinch(f, o); else bxAct(f, k); return; }
+  if (BXI.guard) { bxAct(f, 'guard'); return; }
+  if (bxPunching(o) && !o.a.done && o.a.id !== f.seen) {
+    f.seen = o.a.id;
+    const P = BX_PLAN[f.plan] || BX_PLAN.press, skill = G.skill ? G.skill[f.side] : 1;
+    if (bxDist(f, o) < bxRange(o, o.a.k) + .4 && R() < BX_INSTINCT * clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7))
+      bxAct(f, R() < clamp(.3 + f.r.gui * .03 + (P.slip || 0) - (BX_PUNCH[o.a.k].head ? 0 : .3), .05, .9) ? 'slip' : 'guard');
+  }
+}
 /* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
-   don't touch the page; this file is the only one that does. */
+   don't touch the page; this file is the only one that does. In You box (phase 2) it hears the keys: WASD or the arrows
+   to move, J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch; only during a round, and in the
+   capture phase, so nothing else on the page takes them. */
 const BXP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1 };
 (() => {
   const h = document.createElement('div'); h.id = 'v-ring'; h.hidden = true;
@@ -25106,12 +25212,31 @@ function bxFrame(now) {
   bxRender();
   BXP.raf = requestAnimationFrame(bxFrame);
 }
+const BX_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
+const BX_KEY_ACT = { j: 'jab', k: 'hook', l: 'body', shift: 'slip', e: 'clinch' };
+const BXK = new Set();
+function bxKeySteer() { let x = 0, y = 0; for (const k of BXK) if (BX_KEYS[k]) { x += BX_KEYS[k][0]; y += BX_KEYS[k][1]; } return [x, y]; }
+function bxKey(e, down) {
+  if (!BXP.on || !BD || BD.mode !== 'play' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input,textarea,select')) return;
+  if (document.getElementById('modal') && !document.getElementById('modal').hidden) return;
+  if (BD.ph !== 'round' && BD.ph !== 'rise') { if (!down) { BXK.clear(); bxInputClear(); } return; }
+  const k = e.key.toLowerCase();
+  if (BX_KEYS[k]) { if (down) BXK.add(k); else BXK.delete(k); bxInput({ steer: bxKeySteer() }); }
+  else if (k === ' ') bxInput({ guard: down });
+  else if (BX_KEY_ACT[k]) { if (down && !e.repeat) bxInput({ act: BX_KEY_ACT[k] }); }
+  else return;
+  e.preventDefault(); e.stopPropagation();
+}
+window.addEventListener('keydown', e => bxKey(e, true), true);
+window.addEventListener('keyup', e => bxKey(e, false), true);
+window.addEventListener('blur', () => { BXK.clear(); bxInputClear(); });
 function bxShow() { BXP.host.hidden = false; if (BXP.on) return; BXP.on = true; BXP.last = performance.now(); BXP.raf = requestAnimationFrame(bxFrame); }
-function bxHide() { BXP.host.hidden = true; BXP.on = false; cancelAnimationFrame(BXP.raf); }
+function bxHide() { BXK.clear(); bxInputClear(); BXP.host.hidden = true; BXP.on = false; cancelAnimationFrame(BXP.raf); }
 
 /* the end of the wBX scope: what the Realm may call (w19b-engines.js, w51-ring.js). Phase 0 is the rules; phase 1 boxes
-   one bout, CPU against CPU. start(opts) puts a bout in the ring ({ fighters: [2], corners: [2], mode: 'watch', seed,
-   skill }); simBout(opts) boxes one headless and returns its summary; onPhase hears each beat (intro, round, kd, rise,
+   one bout, CPU against CPU; phase 2 gives you a corner and your hands. start(opts) puts a bout in the ring ({ fighters:
+   [2], corners: [2], mode: 'watch' | 'call' | 'play', you, seed, skill }); simBout(opts) boxes one headless and returns its summary; onPhase hears each beat (intro, round, kd, rise,
    corner, over) and onOver the end, with the summary. The test's handles: G, rules and the pure rule functions, step
    (one beat), and act/clinch (a fighter's move, by side). */
 return {
@@ -25121,6 +25246,11 @@ return {
   get on() { return BXP.on; }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
   pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
   set onOver(f) { BX_HOOK.onOver = f; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
+  // your corner and your hands (phase 2): who boxes and corners your side ('watch', 'call', 'play'), the side that is
+  // yours, what your corner would do while the bout waits for you ({ plan, patch, why }, or null), your plan, the
+  // cut-man, and the keys or buttons ({ steer, guard, act })
+  setMode: m => bxSetMode(m), get mode() { return BD ? BD.mode : null; }, get you() { return BD ? BD.you : 0; }, get wait() { return G && G.wait ? Object.assign({}, G.wait) : null; },
+  call: plan => bxCall(plan), patch: () => bxPatch(), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
   // the ratings, plans, punches and judges, for the page and How to play
   rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
   plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),
@@ -31588,15 +31718,29 @@ renderHelp = function () {
     <p class="hint"><b>It tells you how things are.</b> It builds, with a heartbeat and then a beat, when there is danger: off the road where wild teams roam, at night, near an alpha or a lair, in a dungeon, with a grudge after you, or with your team low on HP. It settles once you are safe. It goes thinner when your starters are tired, and lower at night.</p>
     <p class="hint"><b>The tunes.</b> Now and then you hear a place's whole tune: when you reach a region, at dawn, and once in a while. Matches always play their tunes. Pick Classic in Settings to hear the tunes everywhere.</p></div>`);
 };
-/* w51: the ring (issue #23, phase 1). The Anvil Ring, the boxing engine, runs in the wBX scope (src/bx/ and
+/* w51: the ring (issue #23, phases 1 and 2). The Anvil Ring, the boxing engine, runs in the wBX scope (src/bx/ and
    src/realm/ring/: a canvas in #v-ring, and none of its names reach ours). This part gives it a view beside the world,
    a bar above the ring, and a way back.
    Phase 1 boxes one bout, CPU against CPU: a fighter of the Cinderhold Boxing Club in the red corner against a visitor
    in the blue, three rounds, judged. Ask Ma Gristle at the Anvil Ring for a BOUT. Nothing is won or lost, and nothing
-   is saved. The card of three bouts, your corner's calls and games from the world come in later phases.
+   is saved. The card of three bouts and games from the world come in later phases.
+   Phase 2: three modes on the bar (W_RING_MODES): Corners (both corners are the CPU's), You corner (you pick your
+   fighter's plan before each round, and when the cut-man works) and You box (that, and you box the rounds by hand:
+   the keys are in r1-page.js, and under the ring a pad of buttons does the same on a phone). While the bout waits for
+   your call the bar has the five plans (your corner's advice marked) and the cut-man. Switching modes goes on with the
+   same bout; the last one picked is kept for the next bout (not saved). How to play has "Boxing: how it works"
+   (#wRingHow), and a button under the ring opens it (the bout waits while you read).
    Wraps: showView (wW51ShowView: the bar), openPause (wW51OpenPause: not in the ring), wRunAct (wW51RunAct: 'bout'),
    showPage (wW51ShowPage: the bout waits while another page is up), renderHelp (wW51RenderHelp: #wHelpRing). */
 
+// who boxes and corners your side: the CPU, you in the corner, or you in the ring too
+const W_RING_MODES = {
+  watch: { n: 'Corners', title: 'Both corners are the CPU\'s. Switching goes on with the same bout.' },
+  call: { n: 'You corner', title: 'You pick your fighter\'s plan before each round, and when the cut-man works. They box it.' },
+  play: { n: 'You box', title: 'Your corner, and you box the rounds: J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, WASD to move.' },
+};
+let W_RING_MODE = 'play';
+const W_RING_PAD = [['jab', 'Jab', 'J'], ['hook', 'Hook', 'K'], ['body', 'Body', 'L'], ['guard', 'Guard', 'Space, held'], ['slip', 'Slip', 'Shift'], ['clinch', 'Clinch', 'E']];
 const W_RING = {
   home: { kinds: ['minotaur', 'dwarf', 'ogre', 'golem', 'kobold', 'troll'], color: '#b8231e', light: '#ffd0a0', short: 'CBC' },
   away: { city: 'saltmere', kinds: ['elf', 'harpy', 'vampire', 'spider', 'wraith', 'gorgon'], color: '#2a5fb8', light: '#d6e6ff', short: 'SBC' },
@@ -31606,13 +31750,29 @@ let WBX = null;
 
 $('v-ring').insertAdjacentHTML('beforebegin', `<div id="wRingBar" class="wdbar" hidden>
   <b id="wRingTitle">A bout at the Anvil Ring</b><span id="wRingNote" class="hint"></span>
+  <span id="wRingCall" hidden>${Object.entries(wBX.plans).map(([k, P]) => `<button class="ghost" data-rplan="${k}" title="${esc(P.desc)}">${esc(P.n)}</button>`).join('')}<button class="ghost" id="wRingPatch"></button></span>
+  <span id="wRingModes" class="wgmodes" role="group" aria-label="Who boxes it">${Object.entries(W_RING_MODES).map(([k, m]) => `<button class="ghost" data-rmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <button class="ghost" id="wRingAgain">Another bout</button>
   <button class="ghost" id="wRingBack">Back to the world</button></div>`);
 $('wRingBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.id === 'wRingAgain') wRingBout();
+  if (b.dataset.rplan) { wBX.call(b.dataset.rplan); wRingBarNote(); }
+  else if (b.id === 'wRingPatch') { wBX.patch(); wRingBarNote(); }
+  else if (b.dataset.rmode) { W_RING_MODE = b.dataset.rmode; if (WBX && !WBX.over) wBX.setMode(W_RING_MODE); else if (WBX) wRingBout(); wRingBarNote(); }
+  else if (b.id === 'wRingAgain') wRingBout();
   else if (b.id === 'wRingBack') wLeaveRing();
 });
+// under the ring: the pad (You box), and How boxing works
+$('v-ring').insertAdjacentHTML('beforeend', `<div id="wRingPad" class="wrpad" hidden role="group" aria-label="Box">${W_RING_PAD.map(([k, n, key]) => `<button class="ghost" data-rpad="${k}" title="${esc(key)}">${esc(n)}</button>`).join('')}</div>
+  <p class="hint wghowlink">How boxing works: the punches, defending, the plans and the judges. <button class="ghost" id="wRingHowBtn">How to play boxing</button> <small>The bout waits while you read.</small></p>`);
+$('wRingHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wRingHow'); if (h) h.scrollIntoView({ block: 'start' }); });
+// a punch on the press, the guard while it's held down
+$('wRingPad').addEventListener('pointerdown', e => {
+  const b = e.target.closest('[data-rpad]'); if (!b) return;
+  e.preventDefault();
+  if (b.dataset.rpad === 'guard') { wBX.input({ guard: true }); try { b.setPointerCapture(e.pointerId); } catch (er) { /* no live pointer (a synthetic press) */ } } else wBX.input({ act: b.dataset.rpad });
+});
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) $('wRingPad').addEventListener(ev, e => { if (e.target.closest('[data-rpad="guard"]')) wBX.input({ guard: false }); });
 
 function wRingCorners() {
   const g = W_GRDS.find(x => x.id === 'g_ring'), H = W_RING.home, A = W_RING.away;
@@ -31628,14 +31788,26 @@ function wRingName(kind) {
 function wRingBout(opts) {
   const o = opts || {}, k = o.kinds || [W_RING.home.kinds, W_RING.away.kinds].map(L => L[(Math.random() * L.length) | 0]);
   WBX = { over: null, kinds: k.slice() };
-  wBX.start({ fighters: k.map(wRingFighter), corners: wRingCorners(), mode: 'watch', seed: o.seed });
+  wBX.start({ fighters: k.map(wRingFighter), corners: wRingCorners(), mode: o.mode || W_RING_MODE, you: 0, seed: o.seed });
   showView('ring');
   wRingBarNote();
 }
 function wRingBarNote() {
   if (!WBX) return;
-  const ph = wBX.phase, G = wBX.G;
-  $('wRingNote').textContent = WBX.over ? WBX.over.verdict : ph === 'corner' ? 'Between rounds: the corners talk, and the cut-man works.' : ph === 'kd' ? 'A knockdown: the count is on.' : G ? `${G.F[0].n} the ${G.F[0].kind} against ${G.F[1].n} the ${G.F[1].kind}. Three rounds, three judges.` : '';
+  const ph = wBX.phase, G = wBX.G, w = wBX.wait, mode = wBX.mode || W_RING_MODE, me = G && G.F[wBX.you];
+  $('wRingNote').textContent = WBX.over ? WBX.over.verdict
+    : w ? `Your call${ph === 'intro' ? ' before the first round' : ` for round ${G.round}`}: pick ${me.n}'s plan. Your corner says ${wBX.plans[w.plan].n} (${w.why}).`
+    : ph === 'corner' ? 'Between rounds: the corners talk, and the cut-man works.' : ph === 'kd' ? 'A knockdown: the count is on.'
+    : mode === 'play' && (ph === 'round' || ph === 'rise') ? 'You box: J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch. WASD or the arrows to move; let go and your feet follow your plan.'
+    : G ? `${G.F[0].n} the ${G.F[0].kind} against ${G.F[1].n} the ${G.F[1].kind}. Three rounds, three judges.` : '';
+  $('wRingCall').hidden = !w;
+  for (const b of $('wRingCall').querySelectorAll('[data-rplan]')) { b.classList.toggle('on', !!w && b.dataset.rplan === w.plan); b.title = wBX.plans[b.dataset.rplan].desc + (w && b.dataset.rplan === w.plan ? ' Your corner\'s advice.' : ''); }
+  const left = me ? me.patches : 0, pb = $('wRingPatch');
+  pb.textContent = `Cut-man (${left} left)`; pb.disabled = !w || ph !== 'corner' || !left || me.patched === G.round;
+  pb.title = 'The cut-man works on your fighter: 18 health back, and a little of what big shots took. Once a break, two a bout.' + (w && w.patch ? ' Your corner says now.' : '');
+  pb.classList.toggle('on', !!w && w.patch);
+  for (const b of $('wRingModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.rmode === mode); b.setAttribute('aria-pressed', b.dataset.rmode === mode); }
+  $('wRingPad').hidden = mode !== 'play' || !!WBX.over;
 }
 function wLeaveRing() {
   WBX = null;
@@ -31663,9 +31835,20 @@ showPage = function (p) {
 (() => {
   const K = DB.chars.gk_ring; if (!K) return;
   K.topics.job.t += ' And we box for real now, in the ring itself: ask me for a BOUT.';
-  K.topics.bout = { t: 'Three rounds, three judges, one of ours against a visitor. Stand at the ropes and watch.', act: 'bout' };
+  K.topics.bout = { t: 'Three rounds, three judges, one of ours against a visitor. Watch from the ropes, work the corner, or put the gloves on yourself.', act: 'bout' };
 })();
 const wW51RunAct = wRunAct;
+// How to play: Boxing, how it works
+function wRingHowHTML() {
+  const P = wBX.plans, R = wBX.rules;
+  return `<p class="hint">A bout is ${R.rounds} rounds of about ${R.secs} seconds, one fighter against one. Every punch costs stamina, and stamina comes back when you ease off. A punch that lands costs the other fighter health; at zero they are knocked down. Big shots also lower the most health they can get back, so each knockdown comes easier than the last. Failing to beat the count of ten is a knockout, and ${R.kd} knockdowns stop the bout.</p>
+  <p class="hint"><b>Punches.</b> The <b>jab</b> is quick, reaches furthest and costs little, but it doesn't hurt much. The <b>hook</b> is slow and hurts, and it needs you closer. The <b>body shot</b> goes under the guard and drains their stamina. A punch takes a moment to wind up, so a fighter backing away can get out of a slow one.</p>
+  <p class="hint"><b>Defending.</b> Hold the <b>guard</b> up and a punch to the head mostly bounces off, but body shots get through and your stamina comes back slowly. A <b>slip</b> timed as their punch arrives makes it miss, and your next punch is a counter: it lands more often and harder. From close in a <b>clinch</b> ties you both up until the referee breaks you; it buys time to get your breath back, but the judges don't like it.</p>
+  <p class="hint"><b>Reach and size.</b> Reach is how far your punches land from. Backing up is slower than coming forward, and slower again on the ropes, so a fighter who keeps backing off gets trapped. A bigger fighter gives less ground.</p>
+  <p class="hint"><b>Your corner.</b> Before each round you pick a plan: ${Object.values(P).map(p => `<b>${p.n}</b> (${p.desc.toLowerCase().replace(/\.$/, '')})`).join(', ')}. Your corner says what they'd do and why. The cut-man gives back 18 health and a little of what big shots took, once a break and ${R.patches} times a bout.</p>
+  <p class="hint"><b>The judges.</b> Three judges score each round 10–9 to whoever did more (10–10 when it's even). Brass likes power punches, Tally likes activity and Slate likes defense, so a close round can split them. A knockdown wins the round, a point for each one. After the last round, two judges or three for one fighter wins it.</p>
+  <p class="hint"><b>Three ways to box.</b> <b>Corners</b>: you watch. <b>You corner</b>: you pick the plans and the cut-man, and your fighter boxes them. <b>You box</b>: that, and you box the rounds yourself. J jab, K hook, L body shot, hold Space to guard, Shift to slip, E to clinch, and WASD or the arrows to move. Let go of the keys and your feet follow your plan, so you can box with the buttons under the ring alone.</p>`;
+}
 wRunAct = function (act, id) { if (act === 'bout') return wRingBout(); return wW51RunAct.apply(this, arguments); };
 
 const wW51RenderHelp = renderHelp;
@@ -31673,7 +31856,8 @@ renderHelp = function () {
   wW51RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpRing') || !$('wHelpGrounds')) return;
   const G = [...h.querySelectorAll('[id^="wHelpG"]')], after = G[G.length - 1];
-  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRing"><b>Real boxing.</b> The Anvil Ring is trying out boxing in the ring itself, one fighter against one. Ask Ma Gristle for a BOUT and watch: three rounds, each about 40 seconds. Fighters jab, hook and dig to the body, and they keep their guard up, slip punches and clinch. Every punch costs stamina, and a punch that lands costs health. At zero health a fighter is knocked down. Failing to beat the count is a knockout, and three knockdowns stop the bout. Otherwise three judges score each round 10–9: Brass likes power punches, Tally likes activity and Slate likes defense. Kinds box differently: a golem hits like a wall and moves like one, and a harpy is all speed and no chin. Nothing is won or lost yet.</p>`);
+  h.insertAdjacentHTML('beforeend', `<section id="wRingHow" class="wghelp"><h3>Boxing: how it works</h3>${wRingHowHTML()}</section>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRing"><b>Real boxing.</b> The Anvil Ring is trying out boxing in the ring itself, one fighter against one. Ask Ma Gristle for a BOUT: three rounds, each about 40 seconds. Watch it, pick your fighter's plan between rounds, or box it yourself (see Boxing: how it works). Fighters jab, hook and dig to the body, and they keep their guard up, slip punches and clinch. Every punch costs stamina, and a punch that lands costs health. At zero health a fighter is knocked down. Failing to beat the count is a knockout, and three knockdowns stop the bout. Otherwise three judges score each round 10–9: Brass likes power punches, Tally likes activity and Slate likes defense. Kinds box differently: a golem hits like a wall and moves like one, and a harpy is all speed and no chin. Nothing is won or lost yet.</p>`);
 };
 </script>
 </body></html>

@@ -5,7 +5,8 @@
    plan) and slip it or cover up. Otherwise every fraction of a second (quicker with guile) they pick where to move (in
    or out to the plan's range, circling once there, off the ropes) and whether to punch, cover or clinch. A slip opens
    a counter window, and a counterpuncher waits for one. Tired fighters back off and throw less; hurt ones tie up.
-   G.skill[side] (0 to 2) sharpens the reading and the timing. */
+   G.skill[side] (0 to 2) sharpens the reading and the timing.
+   A fighter boxed by hand (09-hands.js) does none of the thinking but the footwork, and only while you don't steer. */
 const BX_PLAN = {
   press:   { n: 'Press',     desc: 'Walk them down and stay in their face.',          range: .55, rate: 1.15, mix: { jab: .35, hook: .4, body: .25 }, def: .7 },
   counter: { n: 'Counter',   desc: 'Let them lead, slip it and punish the miss.',     range: .92, rate: .75, mix: { jab: .35, hook: .5, body: .15 }, def: 1.3, slip: .3, wait: true },
@@ -17,6 +18,7 @@ const BX_PLAN_IDS = Object.keys(BX_PLAN);
 
 function bxThink(f, o, dt) {
   if (f.a.k === 'down' || f.a.k === 'clinch' || f.a.k === 'stun') { f.mv = [0, 0]; return; }
+  if (bxHand(f)) return bxHandThink(f, o, dt);
   const skill = G.skill ? G.skill[f.side] : 1, P = BX_PLAN[f.plan] || BX_PLAN.press;
   // a punch on its way, seen once
   if (bxPunching(o) && !o.a.done && o.a.id !== f.seen && !bxBusy(f)) {
@@ -31,9 +33,24 @@ function bxThink(f, o, dt) {
   }
   f.think -= dt; if (f.think > 0) return;
   f.think = Math.max(.1, .3 - f.r.gui * .006 - skill * .03) * (.8 + R() * .4);
-  const d = bxDist(f, o), dx = (o.x - f.x) / (d || 1), dy = (o.y - f.y) / (d || 1);
-  const tired = bxFrac(f) < .22, hurt = f.hp < f.hpMax * .3;
-  const want = bxRange(f, 'jab') * (tired ? 1.25 : P.range);
+  const tired = bxFrac(f) < .22, hurt = f.hp < f.hpMax * .3, { d, want } = bxFeet(f, o);
+  if (bxBusy(f)) return;
+  // cover up, tie up
+  if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? .2 : 0)) { bxClinch(f, o); return; }
+  if (P.guard && R() < P.guard * (tired ? 1.3 : 1)) { bxAct(f, 'guard'); return; }
+  // a punch in range, at the plan's rate; a counter window says now
+  // (a power punch only from well inside its range: it is slow enough that a fighter backing off gets out of it)
+  const can = BX_PUNCH_IDS.filter(k => d <= bxRange(f, k) * (BX_PUNCH[k].power ? .95 : 1) + .05 && f.sta >= BX_PUNCH[k].sta);
+  if (!can.length) { if (f.a.k === 'guard' && R() < .5) bxAct(f, 'idle'); return; }
+  // still coming in to the plan's range: mostly moving, not punching
+  const rate = P.rate * (.5 + f.r.spd * .015) * (tired ? .4 : 1) * (f.ctr > 0 ? 2.5 : 1) * (P.wait && !f.ctr && !bxPunching(o) ? .5 : 1) * (d > want + .45 ? .35 : 1);
+  if (R() < rate) { const w = {}; for (const k of can) w[k] = P.mix[k] * (o.a.k === 'guard' && k === 'body' ? 2 : 1); bxAct(f, wpick(w)); }
+  else if (R() < .22 * P.def) bxAct(f, 'guard');
+}
+/* the footwork: f.mv toward the range the plan wants (further when tired). Returns { d, want } */
+function bxFeet(f, o) {
+  const P = BX_PLAN[f.plan] || BX_PLAN.press, d = bxDist(f, o), dx = (o.x - f.x) / (d || 1), dy = (o.y - f.y) / (d || 1);
+  const want = bxRange(f, 'jab') * (bxFrac(f) < .22 ? 1.25 : P.range);
   // where to: in or out to the plan's range, circling once there (now and then the other way), off the ropes
   let mx = 0, my = 0;
   const edge = Math.max(Math.abs(f.x), Math.abs(f.y));
@@ -49,28 +66,19 @@ function bxThink(f, o, dt) {
   // away from the ropes and corners, toward the middle (harder once they are on them)
   if (edge > 4) { const k = bxOnRopes(f) ? .18 : .08; mx -= f.x * k; my -= f.y * k; }
   f.mv = [mx, my];
-  if (bxBusy(f)) return;
-  // cover up, tie up
-  if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? .2 : 0)) { bxClinch(f, o); return; }
-  if (P.guard && R() < P.guard * (tired ? 1.3 : 1)) { bxAct(f, 'guard'); return; }
-  // a punch in range, at the plan's rate; a counter window says now
-  // (a power punch only from well inside its range: it is slow enough that a fighter backing off gets out of it)
-  const can = BX_PUNCH_IDS.filter(k => d <= bxRange(f, k) * (BX_PUNCH[k].power ? .95 : 1) + .05 && f.sta >= BX_PUNCH[k].sta);
-  if (!can.length) { if (f.a.k === 'guard' && R() < .5) bxAct(f, 'idle'); return; }
-  // still coming in to the plan's range: mostly moving, not punching
-  const rate = P.rate * (.5 + f.r.spd * .015) * (tired ? .4 : 1) * (f.ctr > 0 ? 2.5 : 1) * (P.wait && !f.ctr && !bxPunching(o) ? .5 : 1) * (d > want + .45 ? .35 : 1);
-  if (R() < rate) { const w = {}; for (const k of can) w[k] = P.mix[k] * (o.a.k === 'guard' && k === 'body' ? 2 : 1); bxAct(f, wpick(w)); }
-  else if (R() < .22 * P.def) bxAct(f, 'guard');
+  return { d, want };
 }
-/* the corner's call for the next round: { plan, patch }. Cover up when badly hurt (unless it's the last round and they
-   are behind), press in the last round when behind on the cards, stay safe when well ahead, go for the finish when the
-   other fighter is fading; otherwise their own style. A patch (the cut-man) when they're down to two thirds. */
+/* the corner's call for the next round: { plan, patch, why }. Cover up when badly hurt (unless it's the last round and
+   they are behind), press in the last round when behind on the cards, stay safe when well ahead, go for the finish when
+   the other fighter is fading; otherwise their own style. A patch (the cut-man) when they're down to two thirds. Before
+   the first round it is their style. */
 function bxCornerCpu(f) {
   const o = G.F[1 - f.side], T = bxTotals(), lead = T.reduce((n, t) => n + Math.sign(f.side ? t[1] - t[0] : t[0] - t[1]), 0), last = G.round === G.rounds;
-  let plan = f.style;
-  if (last && lead < 0) plan = 'press';
-  else if (f.hp < f.hpMax * .45 || f.hpMax < 55) plan = 'cover';
-  else if (last && lead >= 2) plan = f.style === 'press' ? 'counter' : 'away';
-  else if (o.hpMax < 60 || o.hp < 40) plan = 'press';
-  return { plan, patch: f.patches > 0 && f.hp < f.hpMax * .67 };
+  let plan = f.style, why = 'it suits them';
+  if (!G.cards.length) why = 'it suits them';
+  else if (last && lead < 0) { plan = 'press'; why = 'behind on the cards, last round'; }
+  else if (f.hp < f.hpMax * .45 || f.hpMax < 55) { plan = 'cover'; why = 'hurt: get the legs back'; }
+  else if (last && lead >= 2) { plan = f.style === 'press' ? 'counter' : 'away'; why = 'ahead on the cards: stay safe'; }
+  else if (o.hpMax < 60 || o.hp < 40) { plan = 'press'; why = 'the other fighter is fading'; }
+  return { plan, patch: f.patches > 0 && f.hp < f.hpMax * .67, why };
 }
