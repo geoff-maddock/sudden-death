@@ -24,8 +24,11 @@
 
 const W_BXG = {
   minOwn: 2, xp: 10, gold: 15, fans: 3, lossShare: .25, tieShare: .5, benchShare: .5, koHp: 5, cap: 12,
-  // extra rating points for each of their fighters, by tier, spread over the six (6 is +1 to every one)
-  oppBonus: { 1: 0, 2: 1, 3: 3 },
+  // extra rating points for each of their fighters, by tier, spread over the six (6 is +1 to every one). Measured under
+  // Simulate (test/realm_ring_lab.py, docs/realm/BALANCE.md): a card won about 52% of the time at tier 1, 39-44% at
+  // tier 2 and 26% at tier 3, as on the gridiron. Tier 1 needs a bonus here where football's doesn't: your corner picks
+  // the pairing against their order, and a Squire boxes worse than it plays football
+  oppBonus: { 1: 2, 2: 1, 3: 2 },
   minutes: 90, keep: 10, saveMs: 10000,
 };
 const W_BXG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
@@ -109,6 +112,8 @@ function wStartRing(o) {
   if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already boxed you today. Come back tomorrow.`;
   const how = W_BXG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club), taken = new Set();
   const mine = wRingSide(taken), theirs = wRingOpp(club, tier, taken);
+  // (the bot has no hands for the pairing: it boxes your corner's)
+  if (LAB) { wRingGo(Object.assign({}, o, { how, tier }), mine, theirs, wBX.cardAuto(mine.fighters, theirs.fighters)); return ''; }
   wRingPairing({ mine, theirs, title: `A card against ${wBallName(club)}`, go: [[W_BXG_HOW[how], how]].concat(Object.keys(W_BXG_HOW).filter(h => h !== how).map(h => [W_BXG_HOW[h], h])),
     intro: `Three bouts, one fighter each, and each fighter boxes once. ${esc(wCap(wBallName(club)))} have named their order: tier ${tier}, level ${wBallOppLvl(tier)}. Pick who of yours faces each; your corner has picked to start with. <b>Play</b>: your corner, and you box the rounds. <b>Manage</b>: your corner; your fighters box. <b>Simulate</b>: the result now.`,
     onGo: (picks, h) => wRingGo(Object.assign({}, o, { how: h, tier }), mine, theirs, picks) });

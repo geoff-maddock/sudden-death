@@ -443,3 +443,37 @@ Over 1,000 games, both Knights: the coaches punt for the fumble 37 times (about 
 
 **The Realm lab** (300 a row, before → after): tier 1 54.8% → 51.4%, tier 2 37.0% → 41.0%, tier 3 22.2% → 18.8%, Knight 49.0% → 43.7%, cups won 4.0% → 4.0%; your stance every down Safe 41.0% → 41.7%, Balanced 43.0% → 47.3%, Risky 48.3% → 47.7%. All inside the noise.
 
+
+## Boxing (issue #23, phase 7)
+
+`test/realm_ring_lab.py` boxes cards and Anvil Belts on the Anvil Ring's engine, headless (`wBX.simCard`, about 3 ms a card), as Simulate boxes them: your corner's pairing, your fighters boxing and casting as Knights, theirs at the tier's CPU skill.
+
+```bash
+python3 test/realm_ring_lab.py 300                                         # 300 cards a row, and 300 Belts
+python3 test/realm_ring_lab.py 300 'W_BXG.oppBonus = { 1: 2, 2: 1, 3: 2 }'  # try a number: JS run in the page first
+```
+
+Part 1 boxes a fresh three-player journey at level 3 against a rival's three at that level plus a gap, then by tier as the world sets it (their level is yours plus the tier, less one, with the tier's rating bonus and CPU skill). Part 2 sets their CPU skill at an even level. Part 3 turns powers off for both sides. Part 4 enters an Anvil Belt and simulates every round.
+
+**The engine on its own** (phases 1 to 4, headless bouts between kinds at their own ratings, 1,800 bouts):
+- **Outcomes:** about 54% unanimous decisions, 17% split, 7% majority and 12% draws on the cards (the pro rule's 10-8 for a knockdown levels a card now and then); 10% of bouts are stopped, and 59% have a knockdown.
+- **Kinds** win 32% (spider) to 65% (dwarf) of their decided bouts with powers on; powers move a kind by at most 11 points. The heavy hitters with iron chins (dwarf, golem, minotaur, ogre) are a little strong, and the long, light ones (spider, skeleton, kobold) a little weak.
+- **A +3 in one rating** is worth 56% (reach) to 75% (stamina) of bouts against an even fighter.
+- **The plans** mostly beat each other 37–63%; Cover up is for a hurt fighter, and loses on the cards.
+- **Boxing by hand** (a scripted player): pressing faster than every 0.7 seconds mostly loses (they punch themselves out); about one punch a second with some timed slips wins a little over half.
+
+**Cards, before** (`W_BXG.oppBonus = { 1: 0, 2: 1, 3: 3 }`, 100 a row): tier 1 70%, tier 2 41%, tier 3 13%; Belts won 5%. Tier 1 was far too easy and tier 3 too hard. At an even level with no bonus your three win about half; tier 1's edge comes from your corner picking the pairing against their order, and from a Squire boxing worse than a Knight (Squire, Knight and Archmage at an even level: 53%, 51%, 45%). Unlike football, the CPU's skill shows under Simulate: it reads and defends punches, and picks its moments to cast.
+
+**The retune.** `W_BXG.oppBonus = { 1: 2, 2: 1, 3: 2 }` (rating points spread over each of their fighters; 6 is +1 to every rating). 300 to 400 cards a row (a rate is good to about ±5%):
+
+| | Before `{ 1: 0, 2: 1, 3: 3 }` | `{ 1: 2, 2: 1, 3: 1 }` | `{ 1: 3, 2: 1, 3: 0 }` | `{ 1: 3, 2: 2, 3: 1 }` | After `{ 1: 2, 2: 1, 3: 2 }` |
+|---|---|---|---|---|---|
+| tier 1 | 70% | 51–53% | 48% | 46% | 53% |
+| tier 2 | 41% | 39–44% | 46% | 33% | 39% |
+| tier 3 | 13% | 26–28% | 32% | 28% | 26% |
+| Belt quarter-final (tier 1) | 62% | 50–52% | 47% | 46% | 51% |
+| Belt semi-final (tier 2) | 40% | 44–47% | 39% | 37% | 43% |
+| Belt final (tier 3) | 20% (25 played) | 31–37% | 38% | 28% | 24% (87 played) |
+| Belts won | 5% | 7.7–8% | 7% | 4.7% | 5.2% |
+
+Close to the gridiron's 49%, 44% and 25%. The two settings for tier 3 at 1 and 2 points come out the same (26%) on cards; the final of a Belt, played more rarely, falls from 37% to 24% with 2. A simulated Belt pays about 46 XP across the team and costs about 16 gold, as a Cinder Cup does. Draws of a whole card are rare (under 1%): level on bouts, a card goes to the knockdowns and then the points. Powers at an even level: 51% with them, 45% without (100 a row: inside the noise). A player who boxes by hand or works the corner does better than the CPU's corner; nobody has measured that yet.
