@@ -80,3 +80,4 @@ src/realm/w48-gfbench.js
 src/realm/w49-gfstance.js
 src/realm/w50-ambient.js
 src/realm/w51-ring.js
+src/realm/w52-ringcard.js

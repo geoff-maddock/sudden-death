@@ -6,7 +6,7 @@
 return {
   newBout: bxNewBout, knockdown: bxKnockdown, countOut: bxCountOut, bell: bxBell, roundScore: bxRoundScore, decision: bxDecision,
   totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, rules: Object.assign({}, BX_RULES),
-  start: o => bxStart(o), simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
+  start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
   get on() { return BXP.on; }, get speed() { return BXP.speed; }, set speed(n) { BXP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
   pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
   set onOver(f) { BX_HOOK.onOver = f; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
@@ -15,6 +15,11 @@ return {
   // cut-man, and the keys or buttons ({ steer, guard, act })
   setMode: m => bxSetMode(m), get mode() { return BD ? BD.mode : null; }, get you() { return BD ? BD.you : 0; }, get wait() { return G && G.wait ? Object.assign({}, G.wait) : null; },
   call: plan => bxCall(plan), patch: () => bxPatch(), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
+  // the card (phase 3): a card in the ring ({ sides, picks, order, mode, you, seed }), the next bout on it, the card as
+  // it stands (a copy), the score so far, the corner's pairing, and a whole card headless
+  cardStart: o => { const c = bxCardStart(o); return JSON.parse(JSON.stringify(c)); }, cardNext: () => bxCardNext(),
+  get card() { return CD ? JSON.parse(JSON.stringify(CD)) : null; }, cardScore: () => CD ? bxCardScore() : null,
+  cardAuto: (mine, theirs) => bxCardAuto(mine.map(f => Object.assign(bxRate(f.kind), f.r || {})), theirs.map(f => Object.assign(bxRate(f.kind), f.r || {}))), simCard: o => bxSimCard(o),
   // the ratings, plans, punches and judges, for the page and How to play
   rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
   plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),

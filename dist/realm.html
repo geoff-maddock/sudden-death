@@ -847,6 +847,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 #wRingCall button.on{border-color:var(--torch);box-shadow:0 0 0 1px var(--torch) inset}
 .wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
 .wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
+.wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}
 /* w43: the Seven tab */
@@ -24910,11 +24911,11 @@ function bxPatch() {
 // who boxes and corners your side, without starting over
 function bxSetMode(m) {
   if (!BD || !BX_MODES.includes(m) || BD.headless) return;
-  BD.mode = m;
+  BD.mode = m; if (CD) CD.mode = m;
   if (m === 'watch' && G.wait) { const w = G.wait; if (w.patch) bxPatch(); bxCall(w.plan); }
   else if (m !== 'watch' && !G.wait && (BD.ph === 'intro' || BD.ph === 'corner')) bxAsk();
 }
-function bxOver() { for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); f.bs.dmg = Math.round(f.bs.dmg); } BD.ph = 'over'; BD.t = 0; if (!BD.headless && BX_HOOK.onOver) BX_HOOK.onOver(bxSummary()); }
+function bxOver() { for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); f.bs.dmg = Math.round(f.bs.dmg); } BD.ph = 'over'; BD.t = 0; if (CD && G.card && !BD.headless) bxCardRecord(); if (!BD.headless && BX_HOOK.onOver) BX_HOOK.onOver(bxSummary()); }
 // the result in words: "Grub wins by knockout in round 2", "A split decision for Vex", "A draw"
 function bxVerdict(over) {
   const v = over || G.over; if (!v) return '';
@@ -25134,8 +25135,8 @@ function bxDrawCorner(c) {
   else txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 function bxDrawOver(c) {
-  const v = G.over, T = bxTotals();
-  bxPanel(c, 220, 140, 520, 250);
+  const v = G.over, T = bxTotals(), card = CD && G.card;
+  bxPanel(c, 220, 140, 520, card ? 290 : 250);
   const head = v.how === 'ko' ? 'KNOCKOUT' : v.how === 'tko' ? 'STOPPAGE' : v.win == null ? 'DRAW' : `${v.kind.toUpperCase()} DECISION`;
   txt(c, head, 480, 178, '900 28px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
   txt(c, bxVerdict(), 480, 202, '15px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
@@ -25153,6 +25154,12 @@ function bxDrawOver(c) {
   const [a, b] = G.F.map(f => f.bs);
   [['Landed', `${a.landed}/${a.thrown}`, `${b.landed}/${b.thrown}`], ['Power punches', a.power, b.power], ['Slipped / blocked', `${a.slips} / ${a.blocks}`, `${b.slips} / ${b.blocks}`], ['Knockdowns', G.kd[1], G.kd[0]]]
     .forEach(([k, x, y], i) => { const yy = 330 + i * 15; txt(c, String(x), 380, yy, '13px "Alegreya Sans", sans-serif', '#ffb0a0', 'center'); txt(c, k, 480, yy, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center'); txt(c, String(y), 580, yy, '13px "Alegreya Sans", sans-serif', '#a8c8ff', 'center'); });
+  // on a card: where the card stands, and once it's done, how it was settled
+  if (card) {
+    const sc = bxCardScore(), S = CD.sides, R = CD.result;
+    txt(c, `The card: ${S[0].name} ${sc.won[0]}, ${S[1].name} ${sc.won[1]} (bout ${G.card.i + 1} of ${G.card.n})`, 480, 398, '700 14px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+    txt(c, R ? bxCardVerdict() : 'Next bout on the bar.', 480, 418, `${R ? '800 ' : ''}13px "Alegreya Sans", sans-serif`, R ? '#ffd24a' : '#b8aa94', 'center');
+  }
 }
 /* The Anvil Ring: boxing by hand (issue #23, phase 2). In 'play' mode your fighter (BD.you) throws what you press: a
    jab, a hook, a body shot, a slip or a clinch; holding the guard keeps it up. A press while they're still busy waits
@@ -25185,6 +25192,83 @@ function bxHandThink(f, o, dt) {
     if (bxDist(f, o) < bxRange(o, o.a.k) + .4 && R() < BX_INSTINCT * clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7))
       bxAct(f, R() < clamp(.3 + f.r.gui * .03 + (P.slip || 0) - (BX_PUNCH[o.a.k].head ? 0 : .3), .05, .9) ? 'slip' : 'guard');
   }
+}
+/* The Anvil Ring: the card (issue #23, phase 3). A match is a card of BX_RULES.card bouts (question 1): each side's
+   fighters in order, one fighter a bout, a fighter boxes once. The other side names its order first; you pick who
+   faces each of theirs (or the corner does: bxCardAuto). The bouts are boxed one after another, each a whole bout as
+   07-bout.js has it, and the card is settled by bxCardResult (02-rules.js): bouts won, then knockdowns scored, then
+   points on the cards.
+   CD is the card, plain JSON (so a card can be saved between bouts): { sides: [2 × { name, short, color, light,
+   fighters: [{ n, kind, num, r? }] }], pairs: [[mine, theirs] × 3] (fighter indices), bouts: [{ over } × done],
+   i (the bout on now), mode, you, seed, result }. A bout on the card ends into CD.bouts (bxCardRecord, from bxOver);
+   bxCardNext boxes the next, and after the last CD.result is the card's. */
+let CD = null;
+// how a fighter's ratings stack up against another's for the corner's pairing: the ratings' total, with reach counted
+// against a shorter fighter and chin against a big hitter
+function bxEdge(a, b) {
+  const sum = r => BX_STATS.reduce((n, s) => n + r[s], 0);
+  return sum(a) - sum(b) + (a.reach - b.reach) * .4 + (a.chin - b.pow) * .3 - (b.chin - a.pow) * .3;
+}
+/* the corner's pairing: for their fighters in order (theirs, ratings), the order of yours (mine, ratings; at least as
+   many) that gives the best total edge, every fighter once. Returns indices into mine, one a bout. */
+function bxCardAuto(mine, theirs) {
+  const n = theirs.length; let best = null, bestV = -Infinity;
+  const walk = (left, got) => {
+    if (got.length === n) { const v = got.reduce((s, m, i) => s + Math.tanh(bxEdge(mine[m], theirs[i]) / 6), 0); if (v > bestV) { bestV = v; best = got.slice(); } return; }
+    for (const m of left) walk(left.filter(x => x !== m), got.concat(m));
+  };
+  walk(mine.map((_, i) => i), []);
+  return best;
+}
+/* a card in the ring. opts: { sides: [2 × side], picks: [your fighter index × 3] (the corner's when not given),
+   order: [their fighter index × 3] (their first three when not given), mode, you, seed } */
+function bxCardStart(opts) {
+  const o = opts || {}, you = o.you === 1 ? 1 : 0, S = o.sides.map(s => Object.assign({}, s, { fighters: s.fighters.map(f => Object.assign({}, f)) }));
+  const rate = f => Object.assign(bxRate(f.kind), f.r || {}), N = BX_RULES.card;
+  const order = (o.order || [0, 1, 2]).slice(0, N);
+  const picks = o.picks && o.picks.length === N && new Set(o.picks).size === N ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
+  CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, result: null };
+  bxCardBout();
+  return CD;
+}
+// the bout on now: its two fighters, in their corners' colours
+function bxCardBout() {
+  const p = CD.pairs[CD.i], S = CD.sides;
+  bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101 });
+  G.card = { i: CD.i, n: CD.pairs.length };
+}
+// a bout on the card is over (from bxOver): what the card keeps of it; the last one settles the card
+function bxCardRecord() {
+  const v = G.over; CD.bouts[CD.i] = { over: { how: v.how, win: v.win, kind: v.kind || null, round: v.round, kd: v.kd.slice(), pts: v.pts.slice() }, verdict: bxVerdict() };
+  if (CD.bouts.length === CD.pairs.length) CD.result = bxCardResult(CD.bouts.map(b => b.over));
+}
+function bxCardNext() {
+  if (!CD || CD.result || !CD.bouts[CD.i] || CD.i + 1 >= CD.pairs.length) return false;
+  CD.i++; bxCardBout(); return true;
+}
+// the card so far: bouts won by each side, and how many are left
+function bxCardScore() {
+  const won = [0, 0]; for (const b of CD.bouts) if (b && (b.over.win === 0 || b.over.win === 1)) won[b.over.win]++;
+  return { won, done: CD.bouts.filter(Boolean).length, n: CD.pairs.length };
+}
+/* a whole card headless: { bouts: [summary × 3], result, pairs } (the card and bout in the ring are left as they were) */
+function bxSimCard(opts) {
+  const o = opts || {}, keep = CD, you = o.you === 1 ? 1 : 0;
+  try {
+    const rate = f => Object.assign(bxRate(f.kind), f.r || {}), order = (o.order || [0, 1, 2]).slice(0, BX_RULES.card), S = o.sides;
+    const picks = o.picks || bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
+    const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
+    const bouts = pairs.map((p, i) => bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill }));
+    return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)) };
+  } finally { CD = keep; }
+}
+// the card in words: "The Cinderhold Boxing Club wins the card, 2 bouts to 1", "... on knockdowns", "The card is a draw"
+function bxCardVerdict() {
+  const R = CD && CD.result; if (!R) return '';
+  if (R.win == null) return 'The card is a draw: level on bouts, knockdowns and points.';
+  const w = CD.sides[R.win].name, a = R.won[R.win], b = R.won[1 - R.win];
+  return R.by === 'bouts' ? `${w} wins the card, ${a} bouts to ${b}.` : `${w} wins the card on ${R.by}, level at ${a} bouts each.`;
 }
 /* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
@@ -25243,7 +25327,7 @@ function bxHide() { BXK.clear(); bxInputClear(); BXP.host.hidden = true; BXP.on 
 return {
   newBout: bxNewBout, knockdown: bxKnockdown, countOut: bxCountOut, bell: bxBell, roundScore: bxRoundScore, decision: bxDecision,
   totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, rules: Object.assign({}, BX_RULES),
-  start: o => bxStart(o), simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
+  start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
   get on() { return BXP.on; }, get speed() { return BXP.speed; }, set speed(n) { BXP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
   pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
   set onOver(f) { BX_HOOK.onOver = f; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
@@ -25252,6 +25336,11 @@ return {
   // cut-man, and the keys or buttons ({ steer, guard, act })
   setMode: m => bxSetMode(m), get mode() { return BD ? BD.mode : null; }, get you() { return BD ? BD.you : 0; }, get wait() { return G && G.wait ? Object.assign({}, G.wait) : null; },
   call: plan => bxCall(plan), patch: () => bxPatch(), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
+  // the card (phase 3): a card in the ring ({ sides, picks, order, mode, you, seed }), the next bout on it, the card as
+  // it stands (a copy), the score so far, the corner's pairing, and a whole card headless
+  cardStart: o => { const c = bxCardStart(o); return JSON.parse(JSON.stringify(c)); }, cardNext: () => bxCardNext(),
+  get card() { return CD ? JSON.parse(JSON.stringify(CD)) : null; }, cardScore: () => CD ? bxCardScore() : null,
+  cardAuto: (mine, theirs) => bxCardAuto(mine.map(f => Object.assign(bxRate(f.kind), f.r || {})), theirs.map(f => Object.assign(bxRate(f.kind), f.r || {}))), simCard: o => bxSimCard(o),
   // the ratings, plans, punches and judges, for the page and How to play
   rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
   plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),
@@ -31759,7 +31848,7 @@ $('wRingBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.rplan) { wBX.call(b.dataset.rplan); wRingBarNote(); }
   else if (b.id === 'wRingPatch') { wBX.patch(); wRingBarNote(); }
-  else if (b.dataset.rmode) { W_RING_MODE = b.dataset.rmode; if (WBX && !WBX.over) wBX.setMode(W_RING_MODE); else if (WBX) wRingBout(); wRingBarNote(); }
+  else if (b.dataset.rmode) { W_RING_MODE = b.dataset.rmode; if (WBX && (!WBX.over || WBX.card)) wBX.setMode(W_RING_MODE); else if (WBX) wRingBout(); wRingBarNote(); }
   else if (b.id === 'wRingAgain') wRingBout();
   else if (b.id === 'wRingBack') wLeaveRing();
 });
@@ -31859,6 +31948,99 @@ renderHelp = function () {
   const G = [...h.querySelectorAll('[id^="wHelpG"]')], after = G[G.length - 1];
   h.insertAdjacentHTML('beforeend', `<section id="wRingHow" class="wghelp"><h3>Boxing: how it works</h3>${wRingHowHTML()}</section>`);
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRing"><b>Real boxing.</b> The Anvil Ring is trying out boxing in the ring itself, one fighter against one. Ask Ma Gristle for a BOUT: three rounds, each about 40 seconds. Watch it, pick your fighter's plan between rounds, or box it yourself (see Boxing: how it works). Fighters jab, hook and dig to the body, and they keep their guard up, slip punches and clinch. Every punch costs stamina, and a punch that lands costs health. At zero health a fighter is knocked down. Failing to beat the count is a knockout, and three knockdowns stop the bout. Otherwise three judges score each round 10–9: Brass likes power punches, Tally likes activity and Slate likes defense. Kinds box differently: a golem hits like a wall and moves like one, and a harpy is all speed and no chin. Nothing is won or lost yet.</p>`);
+};
+/* w52: the card at the Anvil Ring (issue #23, phase 3). Three bouts, one fighter a bout, and a fighter boxes once
+   (10-card.js). Ask Ma Gristle for a CARD: the Saltmere Boxing Club names its three in order, and you pick who of your
+   team faces each (your corner's pairing to start with: wBX.cardAuto). The bouts are boxed one after another in the
+   ring, in the mode on the bar; between them the bar has Next bout, and at the end the card is settled (bouts won,
+   then knockdowns, then points). Your players box on their kinds' ratings for now; with fewer than three of them,
+   call-ups make up the card. Nothing is won or lost yet, and nothing is saved: games from the world come in phase 5.
+   Wraps: wRingBarNote (wW52RingBarNote: the card on the bar), wRunAct (wW52RunAct: 'rcard'),
+   renderHelp (wW52RenderHelp: the card in How to play). */
+
+// your side: your team in its order, then call-ups if there are fewer than three
+function wRingMine(taken) {
+  const t = wPartyTeam(), out = wRoster().map(p => ({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl }));
+  for (const f of out) taken.add(f.n);
+  for (let i = 0; out.length < wBX.rules.card; i++) { const p = wMakeCallUp(W_RING.home.kinds[i % W_RING.home.kinds.length], taken); out.push({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl, callup: true }); }
+  return { name: t.name, short: t.short, color: W_RING.home.color, light: W_RING.home.light, fighters: out };
+}
+// the visitors: three of the Saltmere club's kinds, named, in the order they'll box
+function wRingTheirs(taken) {
+  const A = W_RING.away, kinds = A.kinds.slice().sort(() => Math.random() - .5).slice(0, wBX.rules.card);
+  const fighters = kinds.map(kind => { const L = (FA_NAMES[kind] || []).filter(n => !taken.has(n)), n = L.length ? pick(L) : wKindName(kind); taken.add(n); return { n, kind, num: '' }; });
+  return { name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.boxing} Club`, short: A.short, color: A.color, light: A.light, fighters };
+}
+const W_RING_STAT = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'Sta', gui: 'Gui' };
+function wRingRatings(kind) { const r = wBX.rate(kind); return wBX.stats.map(s => `${W_RING_STAT[s]} ${r[s]}`).join(' · '); }
+/* the card: their three in order, and who of yours faces each */
+function wRingCard() {
+  const taken = new Set(), mine = wRingMine(taken), theirs = wRingTheirs(taken), auto = wBX.cardAuto(mine.fighters, theirs.fighters);
+  const opt = (sel) => mine.fighters.map((f, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(f.n)}, ${esc(wKindName(f.kind))}${f.callup ? ' (call-up)' : ''}</option>`).join('');
+  const close = modal(`<header><h3>A card at the Anvil Ring</h3><button class="ghost" data-close>Not now</button></header>
+    <div class="wmsg"><p class="hint">Three bouts, one fighter each, and each fighter boxes once. The ${esc(theirs.name)} have named their order. Pick who faces each; your corner has picked to start with. Win more bouts than they do to win the card (level on bouts, knockdowns decide it, then points).</p>
+    <table class="wrcard">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}<br><small>${wRingRatings(f.kind)}</small></td>
+      <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>`).join('')}</table>
+    <p class="hint" id="wRingCardWarn"></p></div>
+    <div class="row"><button class="ghost" id="wRingCardAuto">Your corner's pick</button><button class="btn" id="wRingCardGo">Box the card</button></div>`);
+  const sel = () => [...$('modalBox').querySelectorAll('[data-rslot]')].map(s => +s.value);
+  const sync = () => {
+    const p = sel(), dup = new Set(p).size !== p.length;
+    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).textContent = wRingRatings(mine.fighters[+s.value].kind);
+    $('wRingCardGo').disabled = dup; $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
+  };
+  $('modalBox').addEventListener('change', sync); sync();
+  $('wRingCardAuto').onclick = () => { $('modalBox').querySelectorAll('[data-rslot]').forEach((s, i) => { s.value = auto[i]; }); sync(); };
+  $('wRingCardGo').onclick = () => { const picks = sel(); close(); wRingCardBox({ mine, theirs, picks }); };
+}
+// box it: the card in the ring, in the mode on the bar
+function wRingCardBox(o) {
+  WBX = { over: null, card: true };
+  wBX.cardStart({ sides: [o.mine, o.theirs], picks: o.picks, mode: W_RING_MODE, you: 0, seed: o.seed });
+  showView('ring');
+  wRingBarNote();
+}
+function wRingCardNext() { if (!WBX || !WBX.card || !wBX.cardNext()) return; WBX.over = null; wRingBarNote(); }
+
+// the bar: the card's bout and score, Next bout between bouts, Another card at the end
+$('wRingAgain').insertAdjacentHTML('beforebegin', '<button class="btn" id="wRingNext" hidden>Next bout</button>');
+$('wRingNext').addEventListener('click', wRingCardNext);
+const wW52RingBarNote = wRingBarNote;
+wRingBarNote = function () {
+  wW52RingBarNote();
+  const C = WBX && WBX.card ? wBX.card : null, done = C && !!C.result, between = C && WBX.over && !done;
+  $('wRingNext').hidden = !between;
+  $('wRingAgain').textContent = C ? 'Another card' : 'Another bout';
+  $('wRingAgain').hidden = !!C && !done;
+  if (!C) { $('wRingTitle').textContent = 'A bout at the Anvil Ring'; return; }
+  const sc = wBX.cardScore();
+  $('wRingTitle').textContent = `A card at the Anvil Ring: bout ${C.i + 1} of ${C.pairs.length}`;
+  if (WBX.over) $('wRingNote').textContent = `${WBX.over.verdict} ${done ? wRingCardWords(C) : `The card: ${C.sides[0].name} ${sc.won[0]}, ${C.sides[1].name} ${sc.won[1]}.`}`;
+  if (between) $('wRingNext').focus();
+};
+function wRingCardWords(C) {
+  const R = C.result; if (R.win == null) return 'The card is a draw.';
+  const w = C.sides[R.win].name, a = R.won[R.win], b = R.won[1 - R.win];
+  return R.by === 'bouts' ? `${w} wins the card, ${a} bouts to ${b}.` : `${w} wins the card on ${R.by}, level at ${a} bouts each.`;
+}
+// Another card, from the bar at the end of one
+$('wRingBar').addEventListener('click', e => { if (e.target.id === 'wRingAgain' && WBX && WBX.card) { e.stopImmediatePropagation(); wRingCard(); } }, true);
+
+// Ma Gristle puts on a card too (not GAME: that's the card-game match)
+(() => {
+  const K = DB.chars.gk_ring; if (!K) return;
+  K.topics.job.t += ' Or bring three of yours for a CARD.';
+  K.topics.card = { t: 'Three bouts, three of yours against three of theirs, one at a time. They name their order; you pick who faces whom.', act: 'rcard' };
+})();
+const wW52RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'rcard') return wRingCard(); return wW52RunAct.apply(this, arguments); };
+
+const wW52RenderHelp = renderHelp;
+renderHelp = function () {
+  wW52RenderHelp();
+  const r = $('wHelpRing'), h = $('wRingHow');
+  if (r && !/a CARD/.test(r.innerHTML)) r.insertAdjacentHTML('beforeend', ' Or ask for a CARD: three bouts, three of your team against three of theirs.');
+  if (h && !$('wRingHowCard')) h.insertAdjacentHTML('beforeend', `<p class="hint" id="wRingHowCard"><b>The card.</b> A card is ${wBX.rules.card} bouts, one fighter a bout, and each fighter boxes once. The other club names its order first, and you pick who faces each of theirs; your corner suggests a pairing, sending reach against shorter arms and a good chin against a big hitter. The side that wins more bouts wins the card. Level on bouts, the side that scored more knockdowns wins it, then the side with more points on the judges' cards.</p>`);
 };
 </script>
 </body></html>

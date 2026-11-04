@@ -319,6 +319,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 #wRingCall button.on{border-color:var(--torch);box-shadow:0 0 0 1px var(--torch) inset}
 .wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
 .wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
+.wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}
 /* w43: the Seven tab */

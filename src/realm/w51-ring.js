@@ -38,7 +38,7 @@ $('wRingBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.rplan) { wBX.call(b.dataset.rplan); wRingBarNote(); }
   else if (b.id === 'wRingPatch') { wBX.patch(); wRingBarNote(); }
-  else if (b.dataset.rmode) { W_RING_MODE = b.dataset.rmode; if (WBX && !WBX.over) wBX.setMode(W_RING_MODE); else if (WBX) wRingBout(); wRingBarNote(); }
+  else if (b.dataset.rmode) { W_RING_MODE = b.dataset.rmode; if (WBX && (!WBX.over || WBX.card)) wBX.setMode(W_RING_MODE); else if (WBX) wRingBout(); wRingBarNote(); }
   else if (b.id === 'wRingAgain') wRingBout();
   else if (b.id === 'wRingBack') wLeaveRing();
 });

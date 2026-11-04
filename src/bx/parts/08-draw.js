@@ -194,8 +194,8 @@ function bxDrawCorner(c) {
   else txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 function bxDrawOver(c) {
-  const v = G.over, T = bxTotals();
-  bxPanel(c, 220, 140, 520, 250);
+  const v = G.over, T = bxTotals(), card = CD && G.card;
+  bxPanel(c, 220, 140, 520, card ? 290 : 250);
   const head = v.how === 'ko' ? 'KNOCKOUT' : v.how === 'tko' ? 'STOPPAGE' : v.win == null ? 'DRAW' : `${v.kind.toUpperCase()} DECISION`;
   txt(c, head, 480, 178, '900 28px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
   txt(c, bxVerdict(), 480, 202, '15px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
@@ -213,4 +213,10 @@ function bxDrawOver(c) {
   const [a, b] = G.F.map(f => f.bs);
   [['Landed', `${a.landed}/${a.thrown}`, `${b.landed}/${b.thrown}`], ['Power punches', a.power, b.power], ['Slipped / blocked', `${a.slips} / ${a.blocks}`, `${b.slips} / ${b.blocks}`], ['Knockdowns', G.kd[1], G.kd[0]]]
     .forEach(([k, x, y], i) => { const yy = 330 + i * 15; txt(c, String(x), 380, yy, '13px "Alegreya Sans", sans-serif', '#ffb0a0', 'center'); txt(c, k, 480, yy, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center'); txt(c, String(y), 580, yy, '13px "Alegreya Sans", sans-serif', '#a8c8ff', 'center'); });
+  // on a card: where the card stands, and once it's done, how it was settled
+  if (card) {
+    const sc = bxCardScore(), S = CD.sides, R = CD.result;
+    txt(c, `The card: ${S[0].name} ${sc.won[0]}, ${S[1].name} ${sc.won[1]} (bout ${G.card.i + 1} of ${G.card.n})`, 480, 398, '700 14px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+    txt(c, R ? bxCardVerdict() : 'Next bout on the bar.', 480, 418, `${R ? '800 ' : ''}13px "Alegreya Sans", sans-serif`, R ? '#ffd24a' : '#b8aa94', 'center');
+  }
 }
