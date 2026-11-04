@@ -7117,6 +7117,8 @@ function wUse(x, y) {
     }
     case 'lair': {
       const L = DB.locs.find(l => l.id === meta.loc); if (!L) break;
+      // a lair has no map to walk into, so reaching its door is seeing it (Ingrith's ROOST needs seen_auroraroost)
+      if (!WG.flags['seen_' + L.id]) wSetFlag('seen_' + L.id);
       if (wFlag('alpha_' + L.alpha)) return wLog(DB.tiles.Z.look0, 'd');
       wLog(L.name + '. ' + wCap((DB.alphas[L.alpha] || {}).name || 'something big') + ' is home, and wants a game.', 'b');
       wEncounterHook(wRegionHere(), c, { kind: 'lair', loc: L.id, alpha: L.alpha }); break;
@@ -9805,6 +9807,8 @@ function wStart(save, opts) {
     WG = save.WG;
     WG.club = CLUBS[WG.club] ? WG.club : wDefaultClub();
     for (const k of ['flags', 'items', 'npc', 'seen', 'harv', 'xpk']) WG[k] = WG[k] || {};
+    // a journey from before lairs were marked seen: beating a lair's alpha means you were there
+    for (const L of DB.locs) if (L.kind === 'lair' && WG.flags['alpha_' + L.alpha]) WG.flags['seen_' + L.id] = 1;
     WG.energy = WG.energy || { bloom: 0, ember: 0, tide: 0, rime: 0, aether: 0 };
     WG.marks = WG.marks || [];
     WG.hardcore = !!WG.hardcore; WG.blackouts = WG.blackouts || 0;

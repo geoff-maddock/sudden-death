@@ -182,6 +182,13 @@ async def lair_checks(pg):
       const L = DB.locs.find(l => l.id === 'auroraroost'); wEnterMap('world', L.x, L.y + 1); WG.grace = 99; document.getElementById('modal').hidden = true;
       wUse(L.x, L.y); return { open: !document.getElementById('modal').hidden, log: WLOG.slice(-2).map(l => l[0]).join(' | ') }; })()""")
     check(not r['open'] and 'Aurora Roost is shut to you' in r['log'], 'the Aurora Roost wants a cup first', r)
+    # reaching a lair's door is seeing it, even shut (it has no map to walk into): Ingrith's ROOST can be answered
+    sn = await pg.evaluate("""(() => { const seen = wFlag('seen_auroraroost'), T = DB.chars.ingrith.topics.roost;
+      return { seen, need: T.need, open: !T.need || wFlag(T.need) }; })()""")
+    check(sn == {'seen': True, 'need': 'seen_auroraroost', 'open': True}, 'reaching the Aurora Roost marks it seen, so Ingrith\'s ROOST resolves', sn)
+    ld = await pg.evaluate("""(() => { const flags = Object.assign({}, WG.flags); delete flags.seen_eldergrove; flags.alpha_grove = 1;
+      const s = { v: 2, WG: Object.assign({}, WG, { flags }), RUN }; wStart(JSON.parse(JSON.stringify(s))); return wFlag('seen_eldergrove'); })()""")
+    check(ld is True, 'a journey saved before this, with a lair\'s alpha beaten, counts the lair as seen', ld)
     await pg.evaluate("wSetFlag('cup_rime'); const L = DB.locs.find(l => l.id === 'auroraroost'); wUse(L.x, L.y); wDrain()")
     await pg.wait_for_function("!document.getElementById('modal').hidden && !!document.getElementById('wPlay')")
     txt = await modal_text(pg)

@@ -24,6 +24,8 @@ function wStart(save, opts) {
     WG = save.WG;
     WG.club = CLUBS[WG.club] ? WG.club : wDefaultClub();
     for (const k of ['flags', 'items', 'npc', 'seen', 'harv', 'xpk']) WG[k] = WG[k] || {};
+    // a journey from before lairs were marked seen: beating a lair's alpha means you were there
+    for (const L of DB.locs) if (L.kind === 'lair' && WG.flags['alpha_' + L.alpha]) WG.flags['seen_' + L.id] = 1;
     WG.energy = WG.energy || { bloom: 0, ember: 0, tide: 0, rime: 0, aether: 0 };
     WG.marks = WG.marks || [];
     WG.hardcore = !!WG.hardcore; WG.blackouts = WG.blackouts || 0;
