@@ -66,7 +66,10 @@ jobs:
           i=0; fail=0
           for t in $CHECKS; do
             if [ $((i % SHARDS)) -eq ${{ matrix.shard }} ]; then
-              echo "== $t"; timeout 180 python test/$t.py || { echo "FAILED: $t"; fail=1; }
+              # (realm_music renders a minute of audio for each of its palettes: on CI's runners that alone takes longer
+              # than the other checks' three minutes)
+              to=180; [ "$t" = realm_music ] && to=600
+              echo "== $t"; timeout $to python test/$t.py || { echo "FAILED: $t (exit $?)"; fail=1; }
             fi
             i=$((i + 1))
           done

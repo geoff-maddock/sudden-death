@@ -6,7 +6,8 @@
 # Each check's output goes to /tmp/sd-<check>.log; the summary prints in list order once they're all done, with each
 # check's last lines, any failures, and the slowest checks. Checks start slowest first (from the last run's times,
 # kept in build/test-times.txt), so the long ones aren't left until the end. The checks don't rebuild (SD_BUILT=1,
-# test/paths.py). Works on macOS and Linux. Uses the project venv if present. Each check has 240 seconds: through GNU
+# test/paths.py). Works on macOS and Linux. Uses the project venv if present. Each check has 240 seconds (realm_music,
+# which renders a minute of audio for each of its palettes, 600): through GNU
 # timeout on Linux, gtimeout from `brew install coreutils` on macOS, or perl's alarm otherwise, so a stuck check fails
 # rather than holding up the suite. Ctrl-C stops the checks that are running too.
 cd "$(dirname "$0")/.."
@@ -29,9 +30,10 @@ TIMES=build/test-times.txt; touch "$TIMES"
 
 # one check: its log, then "<exit code> <seconds>" in build/test-status/<check>
 run_one() {
-  local t="$1" s=$(date +%s) code
-  if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' 240 "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
-  else "$TO" --foreground -k 10 240 "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?
+  local t="$1" s=$(date +%s) code lim=240
+  [ "$t" = realm_music ] && lim=600
+  if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' $lim "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
+  else "$TO" --foreground -k 10 $lim "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?
   echo "$code $(( $(date +%s) - s ))" > "build/test-status/$t"
 }
 export -f run_one
