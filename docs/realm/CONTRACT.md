@@ -363,6 +363,15 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - `wGF.show()`, `wGF.hide()` and `wGF.on`, as the diamond's. `wGF.plays` and `wGF.defs` name the calls. `wGF.canCall(c)` says whether a call can be made now, `wGF.kick()` is the field-goal try from here (`{ dist, chance, inRange, coach }`), `wGF.lineup()` who is on the field (the drive's offense and the other side's defense, with ratings), `wGF.edge(oc, dc)` the matchup (`[+1|0|-1, why]`), `wGF.why` the last result's reason, and `wGF.highlight({ side, pos })` rings a player. Each entry of `G.drive.plays` carries its `msg` and `why`. `wGF.down`, `snap` and `step` are the tests' handle on one play; a down's result carries `air`, the yards past the line the ball was thrown to (null if nothing was thrown).
 - `WGF` (`w42-gridiron.js`) is the drive or game on the field: `{ kind: 'drive' | 'game', mode, over, teams }` (`teams`: the two sides as the engine takes them, yours first). Not saved.
 
+## The ring (w51-ring.js) and the wBX scope
+
+- The Anvil Ring runs in `scope wBX src/realm/ring/manifest.txt src/realm/ring/exports.js`, after `wGF`. Nothing of it is global but `wBX`, and it joins `W_ENGINES` as `ring` (boxing, view `ring`).
+- The rules (phase 0): `wBX.newBout()`, `knockdown(side)` (`'kd'`, or `'tko'` on the third), `countOut(side)`, `bell(work)` (`work`: each judge's view of the round, side 0's less side 1's; `'round'` or `'over'`), `roundScore(work, rkd)`, `decision(cards)`, `totals(cards)` and `cardResult(bouts)`; `wBX.rules` is `{ rounds: 3, secs: 40, kd: 3, count: 10, judges: 3, card: 3, must: 10, patches: 2 }`.
+- `wBX.start({ fighters: [2 × { n, kind, num, r?, style? }], corners: [2 × { name, short, color, light }], mode: 'watch', seed, skill: [0..2, 0..2] })` puts a bout in the ring (phase 1: CPU against CPU). `G` gains the fighters (`G.F`), `corners`, `skill`, `work`, `rstats`, `plans`, `log` and `secs`, all plain JSON. `wBX.phase` is the beat (`intro`, `round`, `kd`, `rise`, `corner`, `over`); `onPhase` hears each one and `onOver` the end, with the summary.
+- `wBX.simBout(opts)` boxes a whole bout headless and silent, and leaves the one in the ring as it was: `{ over, verdict, cards, totals, work, rounds, stats, kd, plans, fighters, secs, log }`. `over` is `{ how: 'ko' | 'tko' | 'dec', win: 0 | 1 | null, kind?, round, kd, pts, totals }`.
+- `wBX.show()`, `hide()`, `on`, `pause(on)`, `paused`, `verdict()`, `summary()`. For the page and How to play: `rate(kind)`, `style(kind)`, `kinds`, `stats`, `plans`, `punches`, `judges`. The tests' handles: `step()` (one beat), `act(side, k)`, `clinch(side)`, `land(side, k)`, `range(side, k)`, `dist()`, `count`, `ev` (the ring's events).
+- `WBX` (`w51-ring.js`) is the bout in the ring: `{ over, kinds }`. Not saved. `wRingBout({ kinds, seed })` starts one; Ma Gristle's BOUT topic runs it.
+
 ## Baseball ratings (w20b-ratings.js)
 
 - `p.bd = { pos, hand, wpn, bat, run, field, ult, pitches, pow, con, spd, arm, fld, lv, got }` on every player in `WG.roster` and `WG.wwait`. Plain JSON, saved with the player.

@@ -1,0 +1,10 @@
+# The Anvil Ring, the boxing engine (issue #23). Its parts, in load order. The Realm takes them inside a scope
+# (src/realm/ring/manifest.txt, through `scope wBX ...`), so none of their names reach the page.
+src/bx/parts/01-util.js
+src/bx/parts/02-rules.js
+src/bx/parts/03-figures.js
+src/bx/parts/04-fighters.js
+src/bx/parts/05-ring.js
+src/bx/parts/06-cpu.js
+src/bx/parts/07-bout.js
+src/bx/parts/08-draw.js

@@ -23772,12 +23772,1375 @@ return {
 };
 
 })();
+const wBX = (function () {
+/* The Anvil Ring: utilities (issue #23). Copied from Cinder Gridiron's (src/gf/parts/01-util.js) and adapted, not
+   shared. R is the engine's random number: Math.random, or seeded (bxSeed) so a headless bout can be boxed again
+   exactly. */
+let bxRand = Math.random;
+function bxSeed(n) {
+  if (n == null) { bxRand = Math.random; return; }
+  let a = n >>> 0;
+  bxRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const R = () => bxRand();
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const hyp = Math.hypot;
+const pick = a => a[(R() * a.length) | 0];
+// a weighted pick: { key: weight }
+function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
+function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+/* The Anvil Ring: the rules (issue #23, phase 0). Plain data and pure functions, no page: the rounds, the knockdowns,
+   the judges' cards and the decision, and how a card of bouts is settled.
+   A bout is BX_RULES.rounds rounds of BX_RULES.secs seconds. A fighter knocked down BX_RULES.kd times in a bout is
+   stopped (a TKO), and one who fails to beat the count is knocked out (a KO). Otherwise three judges score every round
+   on the ten-point must: the round's winner gets 10 and the loser 9 (10-10 when it is even). A knockdown decides the
+   round: the fighter who went down (more often) loses it, by a point for each knockdown more, whoever was winning it
+   (so one knockdown is 10-9, two 10-8; not the pro rule's 10-8 for one, which over three rounds levels too many cards). After the last round each judge adds up
+   their card. Two judges or three for one fighter wins it (unanimous, split or majority); anything else is a draw.
+   A match is a card of BX_RULES.card bouts (question 1). The side that wins more bouts wins; level on bouts, the side
+   with more knockdowns scored wins, then the side with more points on the judges' cards; then it is a draw.
+   G is the bout, plain JSON (so a snapshot can be saved): { round, rounds, clock, kd, rkd, cards, over }. */
+const BX_RULES = { rounds: 3, secs: 40, kd: 3, count: 10, judges: 3, card: 3, must: 10, patches: 2 };
+let G = null;
+
+function bxNewBout(opts) {
+  const o = opts || {};
+  G = { round: 1, rounds: o.rounds || BX_RULES.rounds, clock: BX_RULES.secs, kd: [0, 0], rkd: [0, 0], cards: [], over: null };
+  return G;
+}
+/* side went down. Returns 'kd', or 'tko' when it is the knockdown that stops the bout */
+function bxKnockdown(side) {
+  if (G.over) return null;
+  G.kd[side]++; G.rkd[side]++;
+  if (G.kd[side] >= BX_RULES.kd) { bxEnd({ how: 'tko', win: 1 - side }); return 'tko'; }
+  return 'kd';
+}
+// side didn't beat the count
+function bxCountOut(side) { if (!G.over) bxEnd({ how: 'ko', win: 1 - side }); return 'ko'; }
+/* one round on the judges' cards. work: each judge's view of the round, side 0's work less side 1's (a number). A gap
+   under BX_TIE is even. Returns the round's [[s0, s1], ...] by judge, and starts the next round's knockdown count. */
+const BX_TIE = .15;
+function bxRoundScore(work, rkd) {
+  const k = rkd || G.rkd;
+  return work.map(d => {
+    const even = Math.abs(d) < BX_TIE, gap = k[0] - k[1];
+    if (!gap) return even ? [10, 10] : d > 0 ? [10, 9] : [9, 10];
+    const s = [10, 10];
+    s[gap > 0 ? 0 : 1] = Math.max(6, BX_RULES.must - Math.abs(gap));
+    return s;
+  });
+}
+/* the bell at the end of a round: score it (work as above), then the next round, or the decision after the last.
+   Returns 'round' or 'over'. */
+function bxBell(work) {
+  if (G.over) return 'over';
+  G.cards.push(bxRoundScore(work)); G.rkd = [0, 0];
+  if (G.round >= G.rounds) { bxEnd(bxDecision()); return 'over'; }
+  G.round++; G.clock = BX_RULES.secs;
+  return 'round';
+}
+// each judge's totals so far: [[t0, t1], ...]
+function bxTotals(cards) {
+  const C = cards || G.cards, n = C.length ? C[0].length : BX_RULES.judges;
+  return Array.from({ length: n }, (_, j) => C.reduce((t, r) => [t[0] + r[j][0], t[1] + r[j][1]], [0, 0]));
+}
+/* the decision from the cards: { how: 'dec', win: 0 | 1 | null, kind: 'unanimous' | 'split' | 'majority' | 'draw' } */
+function bxDecision(cards) {
+  const T = bxTotals(cards), v = [0, 0]; let even = 0;
+  for (const [a, b] of T) { if (a > b) v[0]++; else if (b > a) v[1]++; else even++; }
+  const w = v[0] >= 2 ? 0 : v[1] >= 2 ? 1 : null;
+  if (w == null) return { how: 'dec', win: null, kind: 'draw' };
+  return { how: 'dec', win: w, kind: v[w] === T.length ? 'unanimous' : v[1 - w] ? 'split' : 'majority' };
+}
+function bxEnd(r) {
+  const T = bxTotals();
+  G.over = Object.assign({ round: G.round, kd: G.kd.slice(), pts: T.reduce((p, t) => [p[0] + t[0], p[1] + t[1]], [0, 0]), totals: T }, r);
+}
+/* a card of bouts settled: bouts are [{ win: 0 | 1 | null, kd: [a, b], pts: [a, b] }] (a bout's over, as bxEnd leaves
+   it; kd[s] is how often side s went down). Returns { won: [n0, n1], kd: [scored by 0, by 1], pts, win: 0 | 1 | null,
+   by: 'bouts' | 'knockdowns' | 'points' | 'draw' } */
+function bxCardResult(bouts) {
+  const won = [0, 0], kd = [0, 0], pts = [0, 0];
+  for (const b of bouts) {
+    if (b.win === 0 || b.win === 1) won[b.win]++;
+    kd[0] += b.kd[1]; kd[1] += b.kd[0]; pts[0] += b.pts[0]; pts[1] += b.pts[1];
+  }
+  const by = (a, why) => a[0] !== a[1] ? { win: a[0] > a[1] ? 0 : 1, by: why } : null;
+  return Object.assign({ won, kd, pts }, by(won, 'bouts') || by(kd, 'knockdowns') || by(pts, 'points') || { win: null, by: 'draw' });
+}
+/* The Anvil Ring: the fighters, drawn (issue #23, phase 1). Copied from Cinder Gridiron's figures
+   (src/gf/parts/03-figures.js, itself from Brimstone Diamond's) and adapted, not shared: boxers wear gloves in their
+   corner's colour (o.glove) and a singlet with no sleeves, and the animation clock is BXT.t (08-draw.js).
+   drawFig(c, kind, x, y, hpx, team, o): an inked, cel-shaded fighter standing at (x, y), hpx tall, facing right (o.flip
+   faces left); team { color, light, short }; o { num, glove, pose, flip, alpha, noShadow, stone }. A pose moves the
+   arms (armL, the rear hand, and armR, the lead), the legs (legL, legR), and lean, shift, drop and scale. */
+const INK = '#17100e';
+const KIND = {
+  goblin:   { skin: '#7fae4e', h: .8,  w: .9,  cap: true, eye: '#ffe04a' },
+  kobold:   { skin: '#c85a32', h: .74, w: .86, cap: true, eye: '#ffd34a' },
+  werewolf: { skin: '#7a6653', h: 1.06, w: 1.08, eye: '#ffc02e' },
+  dwarf:    { skin: '#e3a47d', h: .8,  w: 1.28, eye: '#2a1a12' },
+  ogre:     { skin: '#8f9d58', h: 1.28, w: 1.6, cap: true, eye: '#3a2412', belly: true },
+  minotaur: { skin: '#70442a', h: 1.16, w: 1.28, eye: '#ff5a3a' },
+  troll:    { skin: '#5f7f8a', h: 1.14, w: 1.35, eye: '#f2e59a', hunch: true },
+  golem:    { skin: '#8e8d86', h: 1.12, w: 1.5, eye: '#7ff0ff' },
+  harpy:    { skin: '#dcc3a2', h: .96, w: .9,  eye: '#d9f25a', talon: true },
+  elf:      { skin: '#eed3b0', h: 1.03, w: .86, eye: '#3fae7a' },
+  wraith:   { skin: '#221c35', h: 1.03, w: .96, eye: '#9ff6ff', robe: '#2b2442' },
+  vampire:  { skin: '#ece7f1', h: 1,   w: .9,  eye: '#ff2a44' },
+  lich:     { skin: '#e6dfc6', h: 1.03, w: .95, eye: '#7fd4ff', robe: '#3d2553', bony: true },
+  zombie:   { skin: '#7f9c79', h: 1.05, w: 1.16, cap: true, eye: '#f2f2d2' },
+  gorgon:   { skin: '#6fa57d', h: 1,   w: .95, eye: '#ffe14a' },
+  spider:   { skin: '#4b2f55', h: .96, w: 1,   eye: '#ff3a4a' },
+  skeleton: { skin: '#ebe5d2', h: 1,   w: .95, eye: '#ff9a3a', bony: true },
+  witch:    { skin: '#bfd9e8', h: .98, w: .88, eye: '#6ad8ff' },
+};
+function rgbOf(h) {
+  if (h[0] === 'r') return h.match(/\d+/g).slice(0, 3).map(Number);
+  h = h.slice(1); if (h.length === 3) h = h.split('').map(x => x + x).join('');
+  const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255];
+}
+function tint(h, f) { const [r, g, b] = rgbOf(h), t = f < 0 ? 0 : 255, k = Math.abs(f); return `rgb(${Math.round(r + (t - r) * k)},${Math.round(g + (t - g) * k)},${Math.round(b + (t - b) * k)})`; }
+function grey(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, v = Math.round(92 + l * .42); return `rgb(${v},${v},${v - 4})`; }
+function pRR(x, y, w, h, r) { const p = new Path2D(); r = Math.min(r, w / 2, h / 2); p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + h, r); p.arcTo(x + w, y + h, x, y + h, r); p.arcTo(x, y + h, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); return p; }
+function pEl(x, y, rx, ry, rot = 0) { const p = new Path2D(); p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); return p; }
+function pPoly(pts) { const p = new Path2D(); pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; }
+let LW = 2, FSC = 1, FLIPPED = false;
+// fill + cel shadow (light from upper left) + ink outline
+function ink(c, path, fill, sx = 0, noShade) {
+  c.fillStyle = fill; c.fill(path);
+  if (!noShade) {
+    c.save(); c.clip(path); c.fillStyle = 'rgba(26,10,36,.3)';
+    c.beginPath(); c.moveTo(sx + 2, -300); c.lineTo(sx + 300, -300); c.lineTo(sx + 300, 80); c.lineTo(sx - 10, 80); c.closePath(); c.fill(); c.restore();
+  }
+  c.lineWidth = LW; c.strokeStyle = INK; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke(path);
+}
+function inkLine(c, pts, col = INK, w = 1) { c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.strokeStyle = col; c.lineWidth = LW * w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
+function glowEye(c, x, y, r, col, st) {
+  if (st) { circ(c, x, y, r, '#5a5a56'); return; }
+  c.save(); c.shadowColor = col; c.shadowBlur = Math.max(2, r * 3.2 * FSC); circ(c, x, y, r, col); c.restore();
+  circ(c, x - r * .35, y - r * .35, r * .38, 'rgba(255,255,255,.95)');
+}
+function slit(c, x, y, r) { c.fillStyle = INK; c.fillRect(x - r * .18, y - r * .8, r * .36, r * 1.6); }
+function cap(c, d, tilt = 0, scale = 1) {
+  const { hy, hr } = d, R = (hr + 1) * scale;
+  c.save(); c.translate(tilt * 8, hy - 3.5 * scale); c.rotate(tilt);
+  const dome = new Path2D(); dome.moveTo(-R, 0); dome.arc(0, 0, R, Math.PI, 0); dome.closePath();
+  ink(c, dome, d.jer);
+  c.fillStyle = d.jerD; c.fillRect(-.8, -R, 1.6, R);
+  ink(c, pEl(0, .6, R + 3.5, 3.1), d.jerD, 0, true);
+  if (FSC * scale > .35) { c.font = `900 ${8.5 * scale}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillStyle = d.trimL; if (FLIPPED) { c.save(); c.scale(-1, 1); } c.fillText(d.letter, 0, -3.2 * scale); if (FLIPPED) c.restore(); }
+  c.restore();
+}
+
+/* things drawn behind the body */
+const BACK = {
+  harpy(c, d) {
+    const f = d.o.fly ? Math.sin(BXT.t * 18) * 12 : Math.sin(BXT.t * 2) * 2, col = d.C('#6b567c'), col2 = d.C('#8b76a0');
+    for (const s of [-1, 1]) {
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 40, d.shY - 34 - f, s * 64, d.shY - 26 - f);
+      p.lineTo(s * 56, d.shY - 10 - f * .6); p.lineTo(s * 62, d.shY + 2 - f * .3); p.lineTo(s * 50, d.shY + 12); p.lineTo(s * 54, d.shY + 26); p.lineTo(s * 38, d.shY + 26); p.lineTo(s * 36, d.shY + 36); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 12 - f * .5 + i * 7]], col2, .7);
+    }
+  },
+  vampire(c, d) {
+    const cape = pPoly([[-d.shw - 2, d.shY], [-d.shw - 12, -8], [0, -12], [d.shw + 12, -8], [d.shw + 2, d.shY]]);
+    ink(c, cape, d.C('#15101a'));
+    ink(c, pPoly([[-d.shw - 3, d.shY - 1], [-d.shw - 6, -14], [-d.shw + 2, d.shY + 4]]), d.C('#8e1426'), 0, true);
+    ink(c, pPoly([[d.shw + 3, d.shY - 1], [d.shw + 6, -14], [d.shw - 2, d.shY + 4]]), d.C('#8e1426'), 0, true);
+    // high collar
+    ink(c, pPoly([[-9, d.shY + 1], [-22, d.hy - 14], [-12, d.hy + 4]]), d.C('#8e1426'));
+    ink(c, pPoly([[9, d.shY + 1], [22, d.hy - 14], [12, d.hy + 4]]), d.C('#8e1426'));
+  },
+  spider(c, d) {
+    const k = d.o.run ? Math.sin(d.o.run) * 6 : Math.sin(BXT.t * 3) * 1.5;
+    ink(c, pEl(0, -30, 20, 17), d.C('#2c1a34'));
+    ink(c, pPoly([[-4, -40], [4, -40], [0, -32], [4, -24], [-4, -24], [0, -32]]), d.C('#d83a4a'), 0, true);
+    for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
+      const y0 = d.shY + 10 + i * 7, kk = (i % 2 ? k : -k) * s;
+      inkLine(c, [[s * 10, y0], [s * (34 + i * 3), y0 - 18 + kk], [s * (44 + i * 2), y0 + 30 - i * 4]], INK, 2.6);
+      inkLine(c, [[s * 10, y0], [s * (34 + i * 3), y0 - 18 + kk], [s * (44 + i * 2), y0 + 30 - i * 4]], d.C('#4b2f55'), 1.3);
+    }
+  },
+  gorgon(c, d) { for (let i = 0; i < 5; i++) snake(c, d, Math.PI * (1.05 + i * .225), 24, i); },
+  witch(c, d) { ink(c, pRR(-15, d.hy - 6, 30, 34, 10), d.C('#eef2f8')); },
+  wraith(c, d) { robeBody(c, d, d.C('#2b2442'), true); },
+  lich(c, d) { robeBody(c, d, d.C('#3d2553'), false); },
+};
+function robeBody(c, d, col, tattered) {
+  const p = new Path2D(); p.moveTo(-d.shw + 2, d.shY); p.lineTo(-d.shw - 7, -4);
+  if (tattered) { for (let i = 0; i <= 8; i++) { const x = -d.shw - 7 + i * (2 * d.shw + 14) / 8; p.lineTo(x, i % 2 ? -10 - Math.sin(BXT.t * 4 + i) * 2 : -1); } }
+  else p.lineTo(d.shw + 7, -4);
+  p.lineTo(d.shw - 2, d.shY); p.closePath();
+  ink(c, p, col);
+  if (!tattered) { c.fillStyle = d.C('#d8b64a'); c.fillRect(-d.shw - 6, -8, 2 * d.shw + 12, 2.4); }
+}
+function snake(c, d, a, len, i) {
+  const wv = Math.sin(BXT.t * 5 + i * 1.7) * 4, x0 = Math.cos(a) * 10, y0 = d.hy + Math.sin(a) * 10;
+  const x1 = Math.cos(a) * len + wv, y1 = d.hy + Math.sin(a) * len - 2;
+  const body = [[x0, y0], [(x0 + x1) / 2 - wv, (y0 + y1) / 2 + 3], [x1, y1]];
+  inkLine(c, body, INK, 3.4); inkLine(c, body, d.C('#3f8a4f'), 2);
+  ink(c, pEl(x1, y1, 3.4, 2.6, a), d.C('#4f9a5d'), 0, true);
+  if (FSC > .4) { circ(c, x1 + Math.cos(a) * 1.2, y1 - 1, .8, d.C('#ffe14a')); }
+}
+
+/* heads and faces */
+const HEAD = {
+  goblin(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { ink(c, pPoly([[s * 9, hy - 4], [s * 35, hy - 15], [s * 29, hy - 6], [s * 10, hy + 5]]), skin); c.fillStyle = C('#c9807a'); c.fill(pPoly([[s * 12, hy - 3], [s * 29, hy - 11], [s * 26, hy - 7], [s * 12, hy + 2]])); }
+    ink(c, pEl(0, hy, 12.5, 12), skin);
+    cap(c, d, -.08);
+    glowEye(c, -5, hy + 1, 2.7, d.eye, d.st); glowEye(c, 5, hy + 1, 2.7, d.eye, d.st); slit(c, -5, hy + 1, 2.7); slit(c, 5, hy + 1, 2.7);
+    ink(c, pPoly([[-1.5, hy + 1], [5, hy + 7.5], [-1, hy + 8]]), tint(skin, -.18));
+    c.beginPath(); c.arc(0, hy + 5, 6.5, .35, Math.PI - .35); c.fillStyle = INK; c.fill();
+    for (const x of [-3.5, 2.5]) tri(c, [x, hy + 9.6], [x + 1.6, hy + 9.6], [x + .8, hy + 7.4], '#f4ecd6');
+  },
+  kobold(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 7, hy - 8], [s * 18, hy - 24], [s * 12, hy - 7]]), C('#efe2c2'));
+    ink(c, pEl(0, hy - 1, 12, 11), skin);
+    cap(c, d, .06, .92);
+    ink(c, pEl(0, hy + 6.5, 9, 5.5), tint(skin, .18));
+    circ(c, -2.5, hy + 5, .9, INK); circ(c, 2.5, hy + 5, .9, INK);
+    inkLine(c, [[-5, hy + 9], [0, hy + 10], [5, hy + 9]], INK, .7);
+    glowEye(c, -5, hy - 1, 2.5, d.eye, d.st); glowEye(c, 5, hy - 1, 2.5, d.eye, d.st); slit(c, -5, hy - 1, 2.5); slit(c, 5, hy - 1, 2.5);
+    for (const [x, y] of [[-9, hy + 2], [8, hy + 3], [-7, hy - 5], [9, hy - 4]]) circ(c, x, y, .9, tint(skin, -.25));
+  },
+  werewolf(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { ink(c, pPoly([[s * 4, hy - 9], [s * 11, hy - 27], [s * 14, hy - 6]]), skin); c.fillStyle = C('#b88878'); c.fill(pPoly([[s * 7, hy - 10], [s * 11, hy - 22], [s * 12, hy - 9]])); }
+    const fur = []; for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, r = i % 2 ? 13 : 16; fur.push([Math.cos(a) * r, hy + 1 + Math.sin(a) * r * .95]); }
+    ink(c, pPoly(fur), skin);
+    ink(c, pEl(0, hy + 6, 8, 6.5), C('#c7b299'));
+    ink(c, pEl(0, hy + 2.5, 3, 2), INK, 0, true);
+    tri(c, [-3, hy + 10], [-1.6, hy + 10], [-2.3, hy + 13.5], '#fff'); tri(c, [1.6, hy + 10], [3, hy + 10], [2.3, hy + 13.5], '#fff');
+    inkLine(c, [[-9, hy - 6], [-3, hy - 3]], INK, .9); inkLine(c, [[9, hy - 6], [3, hy - 3]], INK, .9);
+    glowEye(c, -5.5, hy - 1.5, 2.4, d.eye, d.st); glowEye(c, 5.5, hy - 1.5, 2.4, d.eye, d.st);
+  },
+  dwarf(c, d) {
+    const { hy, C, skin } = d, beard = C('#d4692a');
+    ink(c, pEl(0, hy + 1, 12.5, 12), skin);
+    // beard with braids
+    const b = new Path2D(); b.moveTo(-13, hy + 1); b.quadraticCurveTo(-15, hy + 22, -6, hy + 30); b.lineTo(-4, hy + 38); b.lineTo(0, hy + 31); b.lineTo(4, hy + 38); b.lineTo(6, hy + 30); b.quadraticCurveTo(15, hy + 22, 13, hy + 1); b.quadraticCurveTo(0, hy + 10, -13, hy + 1); b.closePath();
+    ink(c, b, beard);
+    for (const x of [-4, 4]) { c.fillStyle = C('#e8c04a'); c.fillRect(x - 2, hy + 29, 4, 2.4); }
+    inkLine(c, [[-5, hy + 7], [0, hy + 9], [5, hy + 7]], tint(beard, -.3), .8);
+    ink(c, pEl(0, hy + 4.5, 3.6, 3), tint(skin, -.1));
+    // helm
+    const hm = new Path2D(); hm.moveTo(-14, hy - 1); hm.arc(0, hy - 1, 14, Math.PI, 0); hm.closePath();
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 12, hy - 7); p.quadraticCurveTo(s * 26, hy - 8, s * 25, hy - 24); p.quadraticCurveTo(s * 19, hy - 12, s * 10, hy - 3); p.closePath(); ink(c, p, C('#efe3c6')); }
+    ink(c, hm, C('#8f9aa4'));
+    c.fillStyle = C(d.teamColor); c.fillRect(-14, hy - 3, 28, 2.6);
+    ink(c, pRR(-1.8, hy - 3, 3.6, 8, 1), C('#8f9aa4'));
+    inkLine(c, [[-9, hy - 1], [-3, hy]], beard, 1.6); inkLine(c, [[9, hy - 1], [3, hy]], beard, 1.6);
+    glowEye(c, -5, hy + 1.5, 1.6, '#1e140e', true); glowEye(c, 5, hy + 1.5, 1.6, '#1e140e', true);
+  },
+  ogre(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pEl(s * 11.5, hy + 1, 3.2, 4), skin);
+    ink(c, pEl(0, hy, 11, 11.5), skin);
+    ink(c, pEl(0, hy + 7, 10, 5.5), tint(skin, -.05));
+    cap(c, d, .32, .72);
+    ink(c, pRR(-10, hy - 4, 20, 4, 2), tint(skin, -.15));
+    glowEye(c, -4.5, hy + 1, 1.5, '#2a1a0e', true); glowEye(c, 4.5, hy + 1, 1.5, '#2a1a0e', true);
+    ink(c, pEl(0, hy + 4, 4, 2.6), tint(skin, -.12));
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 5, hy + 8], [s * 6.5, hy + 1.5], [s * 3, hy + 8]]), C('#f4ecd6'), 0, true);
+    inkLine(c, [[-6, hy + 9], [6, hy + 9]], INK, .8);
+    circ(c, 7, hy - 5, 1, tint(skin, -.3)); circ(c, -6, hy + 6, .8, tint(skin, -.3));
+  },
+  minotaur(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 9, hy - 9); p.quadraticCurveTo(s * 32, hy - 8, s * 31, hy - 33); p.quadraticCurveTo(s * 24, hy - 14, s * 9, hy - 3); p.closePath(); ink(c, p, C('#efe3c6')); c.fillStyle = C('#b7a78a'); c.fill(pPoly([[s * 29, hy - 26], [s * 31, hy - 33], [s * 25, hy - 22]])); }
+    for (const s of [-1, 1]) ink(c, pEl(s * 16, hy - 2, 6, 2.8, s * .4), skin);
+    ink(c, pEl(0, hy, 13.5, 14), skin);
+    ink(c, pEl(0, hy + 8, 9.5, 7), C('#9a6a4a'));
+    circ(c, -3.5, hy + 8, 1.4, INK); circ(c, 3.5, hy + 8, 1.4, INK);
+    c.beginPath(); c.arc(0, hy + 12, 4, .1, Math.PI - .1); c.strokeStyle = C('#e8c04a'); c.lineWidth = LW * 1.2; c.stroke();
+    ink(c, pPoly([[-5, hy - 13], [0, hy - 6], [5, hy - 13], [0, hy - 16]]), C('#3a2415'), 0, true);
+    glowEye(c, -6, hy - 3, 2.2, d.eye, d.st); glowEye(c, 6, hy - 3, 2.2, d.eye, d.st);
+  },
+  troll(c, d) {
+    const { hy, C, skin } = d;
+    for (let i = -3; i <= 3; i++) inkLine(c, [[i * 3, hy - 10], [i * 6 + Math.sin(BXT.t * 2 + i) * 1.5, hy - 22 - Math.abs(i)]], C('#3f5a2a'), 1.8);
+    ink(c, pEl(0, hy, 13, 12), skin);
+    ink(c, pPoly([[-3, hy - 3], [3, hy - 3], [4, hy + 12], [0, hy + 15], [-2, hy + 11]]), tint(skin, -.1));
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 4, hy + 9], [s * 6, hy + 4], [s * 2.5, hy + 9]]), C('#f0e6cc'), 0, true);
+    glowEye(c, -6, hy - 3, 2, d.eye, d.st); glowEye(c, 6, hy - 3, 2, d.eye, d.st);
+    inkLine(c, [[-10, hy - 7], [-3, hy - 5]], INK, .9); inkLine(c, [[10, hy - 7], [3, hy - 5]], INK, .9);
+    circ(c, -8, hy + 4, 1.1, tint(skin, -.3)); circ(c, 9, hy + 2, .9, tint(skin, -.3));
+  },
+  golem(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pEl(s * (d.shw + 1), d.shY + 3, 9, 7), tint(skin, -.06));
+    ink(c, pRR(-14, hy - 13, 28, 25, 4), skin);
+    ink(c, pRR(-15, hy - 6, 30, 5, 2), tint(skin, -.12));
+    inkLine(c, [[-8, hy - 13], [-4, hy - 6]], INK, .6); inkLine(c, [[6, hy + 3], [11, hy + 10]], INK, .6); inkLine(c, [[-11, hy + 5], [-6, hy + 9], [-7, hy + 12]], INK, .6);
+    for (const x of [-6, 6]) { if (d.st) { c.fillStyle = '#5a5a56'; c.fillRect(x - 3, hy - 1, 6, 3); } else { c.save(); c.shadowColor = d.eye; c.shadowBlur = Math.max(2, 7 * FSC); c.fillStyle = d.eye; c.fillRect(x - 3.2, hy - 1, 6.4, 3); c.restore(); } }
+    c.fillStyle = INK; c.fillRect(-5, hy + 7, 10, 2);
+    // glowing chest rune
+    if (!d.st) { c.save(); c.shadowColor = d.eye; c.shadowBlur = Math.max(2, 6 * FSC); inkLine(c, [[-4, d.shY + 12], [0, d.shY + 7], [4, d.shY + 12], [0, d.shY + 17], [-4, d.shY + 12]], d.eye, .9); c.restore(); }
+  },
+  harpy(c, d) {
+    const { hy, C, skin } = d, fe = C('#6b4f86');
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? fe : tint(fe, .15)); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-1.5, hy + 1], [2.5, hy + 5], [0, hy + 7.5], [-2, hy + 5]]), C('#e8b43a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.3, d.eye, d.st); glowEye(c, 5, hy - 1, 2.3, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5], [-2.5, hy - 3.5]], INK, .8); inkLine(c, [[8, hy - 5], [2.5, hy - 3.5]], INK, .8);
+  },
+  elf(c, d) {
+    const { hy, C, skin } = d, hood = C('#2e5a34');
+    ink(c, pPoly([[0, hy - 25], [15, hy - 6], [17, hy + 12], [0, hy + 17], [-17, hy + 12], [-15, hy - 6]]), hood);
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 9, hy - 1], [s * 29, hy - 12], [s * 11, hy + 5]]), skin);
+    ink(c, pEl(0, hy + 2, 10.5, 11.5), skin);
+    c.fillStyle = C('#caa25a'); c.beginPath(); c.moveTo(-10, hy - 2); c.quadraticCurveTo(0, hy - 13, 10, hy - 2); c.quadraticCurveTo(0, hy - 7, -10, hy - 2); c.fill();
+    for (const s of [-1, 1]) { ink(c, pEl(s * 4.5, hy + 2.5, 2.4, 1.7), '#fff', 0, true); circ(c, s * 4.5, hy + 2.5, 1.3, d.st ? '#555' : d.eye); }
+    inkLine(c, [[-7, hy - .5], [-2.5, hy]], INK, .7); inkLine(c, [[7, hy - .5], [2.5, hy]], INK, .7);
+    inkLine(c, [[-2, hy + 9], [2, hy + 9]], C('#9a5a4a'), .7);
+    ink(c, pEl(0, d.shY + 1, 3.2, 3.2), C('#7fc05a'));
+  },
+  wraith(c, d) {
+    const { hy, C } = d;
+    ink(c, pPoly([[0, hy - 22], [14, hy - 8], [17, hy + 14], [0, hy + 12], [-17, hy + 14], [-14, hy - 8]]), C('#2b2442'));
+    ink(c, pEl(0, hy + 2, 9.5, 10.5), '#05040a', 0, true);
+    glowEye(c, -3.8, hy + 1, 2.2, d.eye, d.st); glowEye(c, 3.8, hy + 1, 2.2, d.eye, d.st);
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { c.globalAlpha *= .5; circ(c, Math.sin(BXT.t * 2 + i * 2) * 8, hy - 26 - ((BXT.t * 10 + i * 6) % 18), 1.6, '#9ff6ff'); c.globalAlpha *= 2; }
+  },
+  vampire(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 11, hy - 3], [s * 18, hy - 10], [s * 12, hy + 3]]), skin);
+    ink(c, pEl(0, hy + 1, 11.5, 13), skin);
+    const hair = new Path2D(); hair.moveTo(-12, hy + 1); hair.quadraticCurveTo(-13, hy - 14, 0, hy - 13); hair.quadraticCurveTo(13, hy - 14, 12, hy + 1); hair.lineTo(8, hy - 6); hair.lineTo(0, hy - 2); hair.lineTo(-8, hy - 6); hair.closePath();
+    ink(c, hair, C('#141019'));
+    glowEye(c, -4.5, hy + 1, 2, d.eye, d.st); glowEye(c, 4.5, hy + 1, 2, d.eye, d.st);
+    inkLine(c, [[-8, hy - 2.5], [-2, hy - 1]], INK, .8); inkLine(c, [[8, hy - 2.5], [2, hy - 1]], INK, .8);
+    inkLine(c, [[-3.5, hy + 8], [3.5, hy + 8]], C('#7a1020'), .9);
+    tri(c, [-3, hy + 8.2], [-1.6, hy + 8.2], [-2.3, hy + 11.5], '#fff'); tri(c, [1.6, hy + 8.2], [3, hy + 8.2], [2.3, hy + 11.5], '#fff');
+  },
+  lich(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy - 1, 12.5, 12.5), skin);
+    ink(c, pRR(-7, hy + 6, 14, 8, 3), skin);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 4.8, hy, 3.6, 4), '#0d0d14', 0, true); glowEye(c, s * 4.8, hy, 1.5, d.eye, d.st); }
+    ink(c, pPoly([[0, hy + 3], [-1.8, hy + 6.5], [1.8, hy + 6.5]]), '#0d0d14', 0, true);
+    for (let i = -2; i <= 2; i++) inkLine(c, [[i * 2.6, hy + 9], [i * 2.6, hy + 13]], INK, .45);
+    inkLine(c, [[3, hy - 12], [5, hy - 7], [3, hy - 5]], INK, .5);
+    const cr = new Path2D(); cr.moveTo(-12, hy - 8); for (let i = 0; i <= 6; i++) cr.lineTo(-12 + i * 4, hy - (i % 2 ? 13 : 22)); cr.lineTo(12, hy - 8); cr.closePath();
+    ink(c, cr, C('#d8b64a'));
+    glowEye(c, 0, hy - 11, 1.8, '#9d7bff', d.st);
+    ink(c, pPoly([[-d.shw + 2, d.shY], [0, d.shY + 12], [d.shw - 2, d.shY], [d.shw - 6, d.shY - 6], [0, d.shY + 3], [-d.shw + 6, d.shY - 6]]), C('#d8b64a'), 0);
+  },
+  zombie(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(-11.5, hy + 1, 2.5, 3.5), skin);
+    ink(c, pEl(0, hy, 12.5, 12.5), skin);
+    cap(c, d, -.34, .95);
+    inkLine(c, [[-10, hy - 3], [3, hy - 7]], C('#3a2a2a'), .6);
+    for (let x = -8; x < 3; x += 3) inkLine(c, [[x, hy - 5.5], [x + 1.4, hy - 3.2]], C('#3a2a2a'), .5);
+    glowEye(c, -5, hy + 1, 3, d.eye, d.st); circ(c, -5, hy + 1, 1, INK);
+    inkLine(c, [[3, hy], [7, hy + 2]], INK, .8); inkLine(c, [[3, hy + 2], [7, hy]], INK, .8);
+    ink(c, pRR(-5, hy + 6, 10, 4.5, 2), '#2a1414', 0, true);
+    for (let x = -3.5; x < 4; x += 2.4) c.fillStyle = '#e9e2c6', c.fillRect(x, hy + 6, 1.4, 1.8);
+  },
+  gorgon(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy + 1, 12, 13), skin);
+    for (let i = 0; i < 4; i++) snake(c, d, Math.PI * (1.18 + i * .22), 19, i + 7);
+    for (const [x, y] of [[-8, hy + 5], [8, hy + 5], [-6, hy - 6], [7, hy - 6], [0, hy - 9]]) inkLine(c, [[x - 1, y], [x, y - 1], [x + 1, y]], tint(skin, -.25), .5);
+    glowEye(c, -4.8, hy + 1, 2.4, d.eye, d.st); glowEye(c, 4.8, hy + 1, 2.4, d.eye, d.st); slit(c, -4.8, hy + 1, 2.4); slit(c, 4.8, hy + 1, 2.4);
+    inkLine(c, [[0, hy + 8], [0, hy + 12], [-1.2, hy + 13.5]], C('#d83a4a'), .7); inkLine(c, [[0, hy + 12], [1.2, hy + 13.5]], C('#d83a4a'), .7);
+  },
+  spider(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy, 12.5, 12), skin);
+    const cr = new Path2D(); cr.moveTo(-10, hy - 8); cr.lineTo(-8, hy - 20); cr.lineTo(-4, hy - 12); cr.lineTo(0, hy - 22); cr.lineTo(4, hy - 12); cr.lineTo(8, hy - 20); cr.lineTo(10, hy - 8); cr.closePath();
+    ink(c, cr, C('#b89ad0'));
+    for (const [x, y, r] of [[-4, hy - 1, 2.2], [4, hy - 1, 2.2], [-8, hy - 3, 1.5], [8, hy - 3, 1.5], [-2, hy - 5, 1.2], [2, hy - 5, 1.2]]) glowEye(c, x, y, r, d.eye, d.st);
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 2.5, hy + 5); p.quadraticCurveTo(s * 7, hy + 9, s * 3, hy + 13); p.quadraticCurveTo(s * 4, hy + 9, s * 1, hy + 7); p.closePath(); ink(c, p, C('#e9e2f2'), 0, true); }
+  },
+  skeleton(c, d) {
+    const { hy, C } = d, steel = C('#7c8490');
+    const pl = new Path2D(); pl.moveTo(0, hy - 14); pl.quadraticCurveTo(10, hy - 34, 20, hy - 30); pl.quadraticCurveTo(10, hy - 26, 4, hy - 13); pl.closePath();
+    ink(c, pl, d.jer);
+    ink(c, pRR(-13, hy - 14, 26, 27, 9), steel);
+    ink(c, pRR(-11, hy - 3, 22, 4.5, 2), '#0b0b10', 0, true);
+    glowEye(c, -4.5, hy - .8, 1.6, d.eye, d.st); glowEye(c, 4.5, hy - .8, 1.6, d.eye, d.st);
+    c.fillStyle = INK; c.fillRect(-.8, hy + 2, 1.6, 9);
+    for (const y of [hy + 5, hy + 8]) for (const x of [-6, -3.5, 3.5, 6]) circ(c, x, y, .8, INK);
+    for (const x of [-10, 10]) circ(c, x, hy - 8, 1, C('#b8c0ca'));
+  },
+  witch(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy + 1, 11, 12), skin);
+    c.fillStyle = C('#eef2f8'); for (const s of [-1, 1]) c.fill(pPoly([[s * 11, hy - 4], [s * 13, hy + 14], [s * 7, hy + 6], [s * 8, hy - 6]]));
+    ink(c, pEl(0, hy - 8, 23, 5), C('#16132a'));
+    const cone = new Path2D(); cone.moveTo(-11, hy - 9); cone.quadraticCurveTo(-5, hy - 30, 8, hy - 47); cone.quadraticCurveTo(4, hy - 30, 11, hy - 9); cone.closePath();
+    ink(c, cone, C('#16132a'));
+    c.fillStyle = d.jer; c.fill(pPoly([[-11, hy - 10], [11, hy - 10], [10, hy - 14], [-10, hy - 14]]));
+    ink(c, pRR(-2.5, hy - 14.5, 5, 5, 1), C('#d8b64a'), 0, true);
+    glowEye(c, -4.3, hy + 2, 2, d.eye, d.st); glowEye(c, 4.3, hy + 2, 2, d.eye, d.st);
+    inkLine(c, [[-2.5, hy + 8.5], [2.5, hy + 8.5]], C('#4a7aa8'), .8);
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { const a = BXT.t * 1.5 + i * 2.1; txt(c, '✦', Math.cos(a) * 20, hy - 18 + Math.sin(a) * 6, '6px sans-serif', 'rgba(200,240,255,.8)', 'center'); }
+  },
+};
+
+/* ---------- bodies: tapered, jointed limbs and a shaped torso, with flourishes per creature ---------- */
+// per-kind body details: feet, socks, muscle, tails, fur, armour and trinkets
+const BODY = {
+  goblin:   { foot: 'claw', musc: 0, slim: true, strap: '#5a3a22', wrist: true },
+  kobold:   { foot: 'claw', slim: true, tail: 'lizard', scales: true },
+  werewolf: { foot: 'claw', musc: .65, tail: 'bushy', tuft: '#4f3d2e', clawHand: true, fur: true },
+  dwarf:    { foot: 'boot', musc: .55, bracer: '#6b4a2a', stout: true },
+  ogre:     { foot: 'claw', musc: .85, torn: true, bone: true },
+  minotaur: { foot: 'hoof', musc: 1, tail: 'tuft', tuft: '#3e2718', bracer: '#6b4a2a', shinFur: '#4a2e1c' },
+  troll:    { foot: 'claw', musc: .7, armLen: 1.16, moss: true, clawHand: true },
+  golem:    { foot: 'stone', musc: .45, stone: true },
+  harpy:    { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true },
+  elf:      { foot: 'boot', slim: true, cloak: '#2e5a34', bracer: '#7a5a34', quiver: true },
+  wraith:   { robe: true, clawHand: true, slim: true },
+  vampire:  { foot: 'pointy', slim: true, lace: true },
+  lich:     { robe: true, slim: true },
+  zombie:   { foot: 'cleat', musc: .3, stitches: true, torn: true },
+  gorgon:   { foot: 'cleat', slim: true, scales: true, snakeBelt: true },
+  spider:   { foot: 'cleat', slim: true, clawHand: true },
+  skeleton: { foot: 'sabaton', armor: true, slim: true },
+  witch:    { foot: 'pointy', slim: true, stripes: true },
+};
+// a limb segment: round ends, tapered, with optional bulges on either side (muscle, calf)
+function capsule(x1, y1, r1, x2, y2, r2, b1 = 0, b2 = 0) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+  const an = Math.atan2(ny, nx), mx = (x1 + x2) / 2, my = (y1 + y2) / 2, rm = (r1 + r2) / 2;
+  const p = new Path2D();
+  p.moveTo(x1 + nx * r1, y1 + ny * r1);
+  p.quadraticCurveTo(mx + nx * (rm + 2 * b1), my + ny * (rm + 2 * b1), x2 + nx * r2, y2 + ny * r2);
+  p.arc(x2, y2, r2, an, an - Math.PI, true);
+  p.quadraticCurveTo(mx - nx * (rm + 2 * b2), my - ny * (rm + 2 * b2), x1 - nx * r1, y1 - ny * r1);
+  p.arc(x1, y1, r1, an - Math.PI, an - 2 * Math.PI, true);
+  p.closePath(); return p;
+}
+const lerpP = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+function bands(c, path, list) { c.save(); c.clip(path); for (const [y0, h, col] of list) { c.fillStyle = col; c.fillRect(-60, y0, 120, h); } c.restore(); c.lineWidth = LW; c.strokeStyle = INK; c.stroke(path); }
+
+// a leg in its own frame: hip at the origin, foot on the ground 36 below; lift raises the knee and foot
+function leg(c, x, a, w, d, side, lift = 0) {
+  const B = d.B, det = FSC > .45;
+  c.save(); c.translate(x, -36); c.rotate(a);
+  const hip = { x: 0, y: -2 }, knee = { x: side * lift * 3, y: 16 - lift * 5 }, ank = { x: side * lift * 1.2, y: 30 - lift * 14 };
+  const rH = w * .47, rK = w * .38, rA = w * (B.birdLeg ? .16 : .25);
+  // shin: sock, stocking, fur, bird leg, stone or greave
+  const shinCol = B.birdLeg ? d.C('#d9a74a') : B.stone ? d.skin : B.armor ? d.C('#8a929c') : B.shinFur ? d.C(B.shinFur) : B.fur ? d.skin : B.stripes ? d.C('#1a1426') : d.jer;
+  const shin = capsule(knee.x, knee.y, rK * (B.birdLeg ? .5 : .95), ank.x, ank.y, rA, w * (B.birdLeg ? 0 : .08), w * (B.birdLeg ? 0 : .06));
+  ink(c, shin, shinCol);
+  if (B.stripes) bands(c, shin, [0, 1, 2, 3].map(i => [knee.y + 2 + i * 3.6, 1.8, d.C('#8a5ad0')]));
+  else if (!B.birdLeg && !B.stone && !B.armor && !B.shinFur && !B.fur) bands(c, shin, [[knee.y + 5, 1.7, d.trimL], [knee.y + 8.2, 1.7, d.trimL]]);
+  if (det) {
+    if (B.birdLeg) for (let i = 1; i < 4; i++) { const p = lerpP(knee, ank, i / 4); inkLine(c, [[p.x - 1.6, p.y], [p.x + 1.6, p.y]], d.C('#9a6a2a'), .5); }
+    if (B.stone) inkLine(c, [[knee.x - 2, knee.y + 5], [knee.x + 1, knee.y + 9], [knee.x - 1, knee.y + 12]], INK, .5);
+    if (B.armor) ink(c, pEl(knee.x, knee.y + 1, rK * 1.05, rK * .9), d.C('#b8c0ca'), 0, true);
+    if (B.fur || B.shinFur) for (const t of [.35, .6]) { const p = lerpP(knee, ank, t); inkLine(c, [[p.x - rK * .6, p.y], [p.x - rK * .2, p.y + 2.5]], INK, .45); inkLine(c, [[p.x + rK * .6, p.y - 1], [p.x + rK * .25, p.y + 1.8]], INK, .45); }
+    if (B.torn && !B.fur) ink(c, pEl(knee.x + side * .6, knee.y + 8, rK * .45, 2.2), d.skin, 0, true);
+  }
+  // thigh in baseball knickers, gathered below the knee
+  const thigh = capsule(hip.x, hip.y, rH, knee.x, knee.y + 1.5, rK * 1.08, w * .07, w * .05);
+  ink(c, thigh, B.stone ? d.skin : d.pants);
+  ink(c, pEl(knee.x, knee.y + 2.6, rK * 1.14, 2.6), B.stone ? tint(d.skin, -.08) : d.pants, 0, true);
+  if (det) inkLine(c, [[knee.x - rK * .9, knee.y + 3.2], [knee.x + rK * .9, knee.y + 3.2]], tint(d.pants, -.25), .45);
+  // team piping down the outer seam
+  if (!B.stone) inkLine(c, [[side * rH * .82, hip.y + 1], [knee.x + side * rK * .95, knee.y]], d.jer, .9);
+  foot(c, ank, w, d, side);
+  c.restore();
+}
+function foot(c, a, w, d, side) {
+  const B = d.B, f = B.foot || 'cleat', x = a.x, y = a.y + 2.4;
+  if (f === 'talon') { for (const dx of [-3.5, 0, 3.5]) ink(c, pPoly([[x + dx - 1.5, a.y + 1], [x + dx + 1.5, a.y + 1], [x + dx + .5, a.y + 6]]), d.C('#e8b43a'), 0, true); return; }
+  if (f === 'hoof') { for (const s of [-1, 1]) ink(c, pEl(x + s * w * .27, y + .4, w * .3, 3.4), d.C('#1b1410'), 0, true); c.fillStyle = d.C('#4a3a30'); c.fillRect(x - w * .5, a.y - 1.2, w, 1.6); return; }
+  if (f === 'stone') { ink(c, pRR(x - w * .62, a.y - 1, w * 1.24, 6.6, 2.4), tint(d.skin, -.1)); return; }
+  if (f === 'claw') {
+    ink(c, pEl(x + side * .6, y, w * .6, 3.6), B.fur ? tint(d.skin, -.1) : d.skin);
+    if (FSC > .35) for (const dx of [-.34, 0, .34]) ink(c, pPoly([[x + dx * w - 1.2, y + 2], [x + dx * w + 1.2, y + 2], [x + dx * w + side * .4, y + 4.8]]), d.C('#efe6cf'), 0, true);
+    return;
+  }
+  const col = f === 'sabaton' ? d.C('#8a929c') : f === 'boot' ? d.C('#4a2e1c') : '#1d1714';
+  if (f === 'boot') ink(c, pRR(x - w * .46, a.y - 4, w * .92, 7, 2.5), col, 0, true);
+  ink(c, pEl(x + side * .9, y, w * .64, 3.8), col, 0, true);
+  if (f === 'pointy') { const p = new Path2D(); p.moveTo(x + side * w * .4, y - 2.4); p.quadraticCurveTo(x + side * w * 1.1, y - .5, x + side * w * 1.05, y - 4.5); p.quadraticCurveTo(x + side * w * .9, y + 2.6, x + side * w * .3, y + 2.6); p.closePath(); ink(c, p, col, 0, true); }
+  if (FSC > .45 && f === 'cleat') inkLine(c, [[x - w * .25, y - 1.8], [x + w * .25, y - 1.8]], '#e8e0cc', .6);
+  if (FSC > .45 && f === 'sabaton') inkLine(c, [[x - w * .4, y - .6], [x + w * .4, y - .6]], d.C('#b8c0ca'), .5);
+}
+
+// an arm from shoulder to hand target, bent at an elbow found by two-bone IK; the old callers pass the same arguments
+function arm(c, sx, sy, hx, hy, d, opt = {}) {
+  const B = d.B, det = FSC > .45, musc = B.musc || 0, bony = d.bony;
+  const aw = 7.2 * clamp(d.w, .9, 1.5) * (bony ? .78 : 1) * (B.slim ? .92 : 1);
+  let Lu = 17.5 * (B.armLen || 1), Lf = 16.5 * (B.armLen || 1);
+  let dx = hx - sx, dy = hy - sy, D = Math.hypot(dx, dy);
+  if (D < 10) { dx = 0; dy = 10; D = 10; }
+  const reach = (Lu + Lf) * .995; if (D > reach) { const k = D / reach; Lu *= k; Lf *= k; }
+  const th = Math.atan2(dy, dx), al = Math.acos(clamp((Lu * Lu + D * D - Lf * Lf) / (2 * Lu * D), -1, 1));
+  const out = sx < 0 ? -1 : 1, E = s => ({ x: sx + Lu * Math.cos(th + s * al), y: sy + Lu * Math.sin(th + s * al) });
+  const e1 = E(1), e2 = E(-1), sc = e => e.x * out + .35 * e.y, el = sc(e1) >= sc(e2) ? e1 : e2;
+  const S = { x: sx, y: sy }, H = { x: sx + dx, y: sy + dy };
+  const skin = d.armC;
+  // forearm, then upper arm over the elbow
+  const fore = capsule(el.x, el.y, aw * .48, H.x, H.y, aw * .34, aw * (.06 + .14 * musc), aw * (.04 + .06 * musc));
+  const upper = capsule(S.x, S.y, aw * .56, el.x, el.y, aw * .46, aw * .14 * musc, aw * .1 * musc);
+  if (d.robe) {
+    ink(c, fore, skin); ink(c, upper, skin);
+    const tip = lerpP(el, H, .82);
+    ink(c, capsule(S.x, S.y, aw * .66, el.x, el.y, aw * .62), d.robe);
+    ink(c, capsule(el.x, el.y, aw * .6, tip.x, tip.y, aw * .86, aw * .06, aw * .06), d.robe);
+    if (det) inkLine(c, [[tip.x - aw * .7, tip.y], [tip.x + aw * .7, tip.y]], d.C('#d8b64a'), .8);
+  } else {
+    ink(c, fore, skin); ink(c, upper, skin);
+    if (bony && det) { inkLine(c, [[el.x, el.y], [lerpP(el, H, .85).x, lerpP(el, H, .85).y]], tint(skin, -.25), .5); circ(c, el.x, el.y, aw * .3, tint(skin, -.08)); }
+    if (B.stone && det) { const m = lerpP(el, H, .5); inkLine(c, [[m.x - 2, m.y - 2], [m.x + 1, m.y], [m.x - 1, m.y + 3]], INK, .5); if (!d.st) { c.save(); c.shadowColor = d.eye; c.shadowBlur = 5 * FSC; circ(c, el.x, el.y, 1.4, d.eye); c.restore(); } }
+    if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
+    if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
+    if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C(i % 2 ? '#6b4f86' : '#8b76a0'), 0, true); }
+    if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
+    if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
+    // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
+    if (!opt.glove) {
+    const sEnd = lerpP(S, el, .55);
+    const sl = capsule(S.x, S.y - 1, aw * .7, sEnd.x, sEnd.y, aw * .62, aw * .05, aw * .05);
+    ink(c, sl, d.jer);
+    if (det) { const ang = Math.atan2(el.y - S.y, el.x - S.x) + Math.PI / 2, cx = Math.cos(ang) * aw * .6, cy = Math.sin(ang) * aw * .6, t2 = lerpP(S, el, .44);
+      if (B.torn) { const pts = []; for (let i = 0; i <= 4; i++) { const k = i / 4 - .5; pts.push([sEnd.x + cx * 2 * k + (i % 2 ? (el.x - S.x) * .08 : 0), sEnd.y + cy * 2 * k + (i % 2 ? (el.y - S.y) * .08 : 0)]); } inkLine(c, pts, INK, .6); }
+      else inkLine(c, [[t2.x - cx, t2.y - cy], [t2.x + cx, t2.y + cy]], d.trimL, 1.3); }
+    }
+    if (B.lace && det) { const p = lerpP(el, H, .9); for (let i = -1; i <= 1; i++) circ(c, p.x + i * aw * .32, p.y + 1.2, aw * .2, '#f2eee6'); }
+  }
+  // hand, turned along the forearm
+  const ang = Math.atan2(-(H.x - el.x), H.y - el.y);
+  c.save(); c.translate(H.x, H.y); c.rotate(ang);
+  if (opt.glove) { ink(c, pEl(0, 3, aw * 1.08, aw * 1.2), d.C(opt.glove)); if (det) { ink(c, pEl(-out * aw * .55, 1.5, aw * .38, aw * .55, out * .4), d.C(tint(opt.glove, -.18)), 0, true); circ(c, out * aw * .3, 1, aw * .22, 'rgba(255,255,255,.35)'); } ink(c, pRR(-aw * .62, -2.2, aw * 1.24, 3, 1), d.C('#efe6d4'), 0, true); }
+  else if (opt.mitt) { ink(c, pEl(0, 2.5, aw * .95, aw * 1.1), d.C('#8a5530')); inkLine(c, [[-aw * .5, 1.5], [aw * .5, 1.5]], d.C('#5a3218'), .6); if (det) inkLine(c, [[-aw * .3, 4.2], [0, 5.4], [aw * .3, 4.2]], d.C('#5a3218'), .5); }
+  else if (!opt.noHand) {
+    ink(c, pEl(0, 1.2, aw * .6, aw * .64), bony ? tint(skin, -.05) : skin);
+    if (det && !opt.ball) ink(c, pEl(-out * aw * .5, .2, aw * .22, aw * .36, out * .5), skin, 0, true);
+    if (bony && det) for (const fx of [-.3, 0, .3]) inkLine(c, [[fx * aw, aw * .5], [fx * aw * 1.2, aw * 1.3]], INK, .45);
+    if ((B.clawHand || B.fur) && det) for (const fx of [-.32, 0, .32]) ink(c, pPoly([[fx * aw - 1, aw * .55], [fx * aw + 1, aw * .55], [fx * aw * 1.25, aw * .55 + 3.2]]), d.C('#efe6cf'), 0, true);
+  }
+  if (opt.ball) ink(c, pEl(0, 3, 3.4, 3.4), '#f6f0e0', 0, true);
+  if (opt.ember && !d.st) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = Math.max(2, 8 * FSC); circ(c, 0, 4, 2.2 + Math.sin(BXT.t * 20) * .5, '#ffcf5a'); c.restore(); }
+  c.restore();
+  // shoulder pieces sit on top of the sleeve
+  if (B.armor) { ink(c, pEl(S.x + out * 1.5, S.y - 1, aw * .95, aw * .72, out * .3), d.C('#8a929c')); if (det) inkLine(c, [[S.x - aw * .6 + out * 1.5, S.y + 1], [S.x + aw * .6 + out * 1.5, S.y + 1]], d.C('#b8c0ca'), .6); }
+  if (B.stone) ink(c, pEl(S.x + out * 1.5, S.y - 2, aw * .95, aw * .8), tint(d.skin, -.06));
+  if (B.moss && det) { for (let i = 0; i < 4; i++) ink(c, pEl(S.x - aw * .5 + i * aw * .34, S.y - 3 - (i % 2) * 1.5, 2.4, 1.8), d.C(i % 2 ? '#4f7a2e' : '#6a9a3a'), 0, true); circ(c, S.x + out * aw * .4, S.y - 6, 1.6, d.C('#d8c9a0')); }
+}
+
+/* tails and cloaks drawn behind the body */
+function tailChain(c, pts, col, tipCol) {
+  for (let i = 0; i < pts.length - 1; i++) ink(c, capsule(pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2]), i === pts.length - 2 && tipCol ? tipCol : col, 0, true);
+}
+BACK.werewolf = (c, d) => {
+  const s = Math.sin(BXT.t * 3 + (d.o.run || 0)) * 4, x = d.shw;
+  const p = new Path2D(); p.moveTo(4, -42); p.bezierCurveTo(x + 6, -46, x + 22 + s, -34, x + 18 + s, -10); p.bezierCurveTo(x + 14 + s, -18, x + 8, -30, 2, -34); p.closePath();
+  ink(c, p, d.C('#5d4a3a')); if (FSC > .45) ink(c, pEl(x + 17 + s, -13, 3.5, 5), d.C('#d8cbb4'), 0, true);
+};
+BACK.minotaur = (c, d) => {
+  const s = Math.sin(BXT.t * 2.4 + (d.o.run || 0)) * 5, x = d.shw;
+  const tl = [[4, -40], [x + 6, -38], [x + 13 + s, -30], [x + 15 + s * 1.3, -22]];
+  inkLine(c, tl, INK, 2.6); inkLine(c, tl, d.skin, 1.4);
+  ink(c, pEl(x + 15 + s * 1.3, -19, 2.8, 4.6, s * .05), d.C('#2a1a10'));
+};
+BACK.kobold = (c, d) => {
+  const s = Math.sin(BXT.t * 3.4 + (d.o.run || 0)) * 4, x = d.shw;
+  tailChain(c, [[2, -38, 5], [x + 6, -26, 4], [x + 16 + s, -10, 2.4], [x + 24 + s * 1.4, -12, .8]], d.skin);
+  if (!d.st && FSC > .3) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = 8 * FSC; const f = Math.sin(BXT.t * 18) * .8; ink(c, pPoly([[x + 21 + s * 1.4, -13], [x + 27 + s * 1.4, -13], [x + 24 + s * 1.4 + f, -21]]), '#ffb03a', 0, true); c.restore(); }
+};
+BACK.elf = (c, d) => {
+  const fl = Math.sin(BXT.t * 2.2 + (d.o.run || 0)) * (d.o.run ? 5 : 1.5), col = d.C(d.B.cloak);
+  const p = new Path2D(); p.moveTo(-d.shw + 1, d.shY); p.quadraticCurveTo(-d.shw - 9, -30, -d.shw - 7 - fl, -10); p.quadraticCurveTo(0, -4 + fl, d.shw + 7 + fl, -10); p.quadraticCurveTo(d.shw + 9, -30, d.shw - 1, d.shY); p.closePath();
+  ink(c, p, col); if (FSC > .45) inkLine(c, [[-d.shw - 5, -12], [-d.shw + 4, -24]], tint(d.B.cloak, -.3), .5);
+};
+
+// a shaped torso: sloped shoulders, chest, waist and hips; bellies for the big eaters
+function torsoPath(d, K) {
+  const B = d.B, shw = d.shw, shY = d.shY, hipY = -36;
+  const waist = shw * (K.belly ? .92 : B.slim ? .7 : B.stout ? .86 : .76), chest = shw * (B.musc ? 1 + .06 * B.musc : .98), belly = K.belly ? 11 * d.w : B.stout ? 3 : 0;
+  const t = new Path2D();
+  t.moveTo(-7, shY - 2);
+  t.quadraticCurveTo(-shw + 5, shY - 3.5, -shw, shY + 4);
+  t.bezierCurveTo(-chest - 1, shY + 14, -waist - belly, hipY - 12, -waist, hipY);
+  t.quadraticCurveTo(0, hipY + 3, waist, hipY);
+  t.bezierCurveTo(waist + belly, hipY - 12, chest + 1, shY + 14, shw, shY + 4);
+  t.quadraticCurveTo(shw - 5, shY - 3.5, 7, shY - 2);
+  t.quadraticCurveTo(0, shY + 1, -7, shY - 2);
+  t.closePath();
+  return { t, waist, belly };
+}
+
+function drawFig(c, kind, x, y, hpx, team, o = {}) {
+  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone;
+  const C = v => st ? grey(v) : v;
+  const hunch = K.hunch ? 6 : 0, shY = -70 + hunch, hipY = -36;
+  const shw = 17 * w * (kind === 'ogre' ? .9 : 1);
+  const hy = kind === 'ogre' ? -80 : kind === 'golem' ? -80 : -83 + hunch * 1.4;
+  const hr = kind === 'ogre' ? 11 : kind === 'minotaur' ? 14 : 12.5;
+  const B = BODY[kind] || {};
+  const d = {
+    o, C, st, w, shY, shw, hy, hr, kind, eye: K.eye, skin: C(K.skin), jer: C(team.color), jerD: C(tint(team.color, -.38)), trimL: C(team.light || '#fff'),
+    teamColor: team.color, letter: (team.short || '?')[0], pants: C('#e4dbc6'), armC: C(K.bony ? '#ebe5d2' : K.skin), bony: K.bony, robe: K.robe ? C(K.robe) : null, B,
+  };
+  c.save(); c.translate(x, y); c.scale(o.flip ? -s : s, s);
+  LW = Math.max(1.25, 1 / s); FSC = s; FLIPPED = !!o.flip;
+  const pose = o.pose || null, det = s > .45;
+  if (o.alpha != null) c.globalAlpha *= o.alpha;
+  if (!o.noShadow) ell(c, 0, 0, 24 * w, 5, 'rgba(0,0,0,.35)');
+  if (o.lift) c.translate(0, -o.lift);
+  const run = o.run || 0, sw = Math.sin(run);
+  if (run) c.translate(0, -Math.abs(Math.cos(run)) * 2.5);
+  if (pose) { c.translate(pose.shift || 0, pose.drop || 0); if (pose.scale && pose.scale !== 1) c.scale(pose.scale, pose.scale); }
+  if (BACK[kind]) BACK[kind](c, d);
+  // legs: running lifts the leading leg; poses drive them directly
+  if (!K.robe) {
+    const lw = 10.5 * w, lx = 6.2 * w;
+    const lL = pose ? pose.legL : { a: sw * .55, lift: run ? Math.max(0, sw) * .4 : 0 }, lR = pose ? pose.legR : { a: -sw * .55, lift: run ? Math.max(0, -sw) * .4 : 0 };
+    leg(c, -lx, lL.a, lw, d, -1, lL.lift || 0); leg(c, lx, lR.a, lw, d, 1, lR.lift || 0);
+    { const sw2 = shw * (K.belly ? .7 : .52), seat = new Path2D(); seat.moveTo(-sw2, hipY - 2); seat.quadraticCurveTo(-sw2 * .9, hipY + 7, 0, hipY + 6); seat.quadraticCurveTo(sw2 * .9, hipY + 7, sw2, hipY - 2); seat.closePath(); ink(c, seat, d.pants, 0, true); } // seat of the knickers
+  } else if (kind === 'lich') { for (const s2 of [-1, 1]) ink(c, pEl(s2 * 6, -2, 5, 3), '#1d1714', 0, true); }
+  c.save(); if (pose && pose.lean) { c.translate(0, hipY); c.rotate(pose.lean); c.translate(0, -hipY); }
+  // torso / jersey
+  const { t, waist } = torsoPath(d, K);
+  ink(c, t, d.jer);
+  if (det) {
+    // placket and buttons, a fold at the waist
+    inkLine(c, [[1.5, shY + 7], [1.5, hipY - 4]], d.jerD, .7);
+    for (let i = 0; i < 3; i++) circ(c, 3.4, shY + 12 + i * 8, .9, d.trimL);
+    inkLine(c, [[-waist + 3, hipY - 9], [-waist + 9, hipY - 6.5]], d.jerD, .5);
+  }
+  inkLine(c, [[-7, shY - 1.5], [0, shY + 7], [7, shY - 1.5]], d.trimL, 1.6);
+  // creature trimmings on the chest
+  if (B.tuft) ink(c, pPoly([[-5, shY - 1], [-3, shY + 5], [-1, shY + 1], [1, shY + 6], [3, shY + 1], [5, shY + 5], [6, shY - 1]]), d.C(B.tuft), 0, true);
+  if (B.strap && det) { inkLine(c, [[-shw + 3, shY + 3], [waist - 2, hipY - 3]], d.C(B.strap), 2.2); for (const k of [.35, .6]) { const px = lerp(-shw + 3, waist - 2, k), py = lerp(shY + 3, hipY - 3, k); ink(c, pRR(px - 2.5, py - 2, 5, 5, 1.2), d.C('#7a5230'), 0, true); } }
+  if (B.quiver && det) inkLine(c, [[shw - 3, shY + 2], [-waist + 2, hipY - 4]], d.C('#6a4a2a'), 1.6);
+  if (B.lace) ink(c, pPoly([[-4, shY - 1], [4, shY - 1], [2.5, shY + 9], [0, shY + 11], [-2.5, shY + 9]]), d.C('#f2eee6'), 0, true);
+  if (B.torn && det) { ink(c, pPoly([[-shw * .45, shY + 20], [-shw * .2, shY + 17], [-shw * .1, shY + 24], [-shw * .3, shY + 27]]), kind === 'zombie' ? d.C('#3a2a2a') : d.skin, 0, true); if (kind === 'zombie') for (let i = 0; i < 3; i++) inkLine(c, [[-shw * .42, shY + 20.5 + i * 2], [-shw * .18, shY + 19.5 + i * 2]], d.C('#e9e2c6'), .5); }
+  if (B.stone && det) { inkLine(c, [[-shw * .5, shY + 6], [-shw * .3, shY + 14], [-shw * .45, shY + 20]], INK, .6); inkLine(c, [[shw * .55, hipY - 14], [shw * .35, hipY - 8]], INK, .6); }
+  if (B.scales && det) for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(-shw * .55 + i * 2.5, shY + 8 + (i % 2) * 2, 1.2, 0, Math.PI); c.strokeStyle = d.jerD; c.lineWidth = LW * .5; c.stroke(); }
+  // belt, and whatever is tucked in it
+  ink(c, pRR(-waist - .5, hipY - 3.5, 2 * waist + 1, 5.5, 1.5), B.snakeBelt ? d.C('#3f8a4f') : '#2a1d17', 0, true);
+  if (B.snakeBelt && det) { ink(c, pEl(waist - 1, hipY - 1, 3.4, 2.6), d.C('#4f9a5d'), 0, true); circ(c, waist, hipY - 1.6, .7, d.C('#ffe14a')); }
+  else ink(c, pRR(B.stout ? -4 : -2.2, hipY - (B.stout ? 4.5 : 3.2), B.stout ? 8 : 4.4, B.stout ? 7 : 4.8, .8), C('#d8b64a'), 0, true);
+  if (B.bone && det) { ink(c, pRR(waist - 8, hipY - 7, 3, 11, 1.4), d.C('#efe6cf'), 0, true); circ(c, waist - 6.5, hipY - 7, 2, d.C('#efe6cf')); }
+  // number
+  if (s * 100 > 26) {
+    c.font = `900 ${16}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    if (o.flip) { c.save(); c.scale(-1, 1); }
+    c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.strokeText(String(o.num ?? ''), 0, shY + 25); c.fillStyle = st ? '#ddd' : '#fbf6ea'; c.fillText(String(o.num ?? ''), 0, shY + 25);
+    if (o.flip) c.restore();
+  }
+  // arms
+  const swing = run ? sw * 7 : 0;
+  if (pose && pose.armR) {
+    arm(c, -shw + 2, shY + 3, pose.armL.x, pose.armL.y, d, { mitt: !o.glove, glove: o.glove });
+    if (pose.trailR && pose.trailR.length > 1 && !st) {
+      c.save(); c.lineCap = 'round';
+      for (let i = pose.trailR.length - 1; i > 0; i--) { const a = pose.trailR[i], b = pose.trailR[i - 1]; c.strokeStyle = `rgba(255,248,230,${.32 * (1 - i / pose.trailR.length)})`; c.lineWidth = 7 * (1 - i / pose.trailR.length) + 1; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+      c.restore();
+    }
+    arm(c, shw - 2, shY + 3, pose.armR.x, pose.armR.y, d, { ball: pose.ball, ember: kind === 'kobold' && !o.glove, glove: o.glove });
+  } else if (o.throwK != null) {
+    const k = clamp(o.throwK, 0, 1), th = lerp(2.5, -.25, k), hx2 = shw + 27 * Math.sin(th), hy2 = shY + 2 - 27 * Math.cos(th);
+    arm(c, -shw + 2, shY + 3, -shw - 5, shY + 22, d, { mitt: true });
+    arm(c, shw - 2, shY + 3, hx2, hy2, d, { ball: true, ember: kind === 'kobold' });
+  } else if (o.follow) {
+    arm(c, -shw + 2, shY + 3, -shw - 5, shY + 22, d, { mitt: true });
+    arm(c, shw - 2, shY + 3, -4, shY + 24, d, {});
+  } else if (kind === 'zombie') {
+    arm(c, -shw + 2, shY + 3, -shw + 2 + swing, shY + 24, d, { mitt: o.mitt });
+    arm(c, shw - 2, shY + 3, shw + 4 - swing, shY + 10, d, {});
+  } else {
+    arm(c, -shw + 2, shY + 3, -shw - 4 + swing, shY + 33, d, { mitt: o.mitt });
+    arm(c, shw - 2, shY + 3, shw + 4 - swing, shY + 33, d, { ember: kind === 'kobold' });
+  }
+  // neck + head
+  if (!K.robe && kind !== 'golem') ink(c, capsule(0, shY + 1, 4.2, 0, hy + 9, 4.6), d.skin, 0, true);
+  HEAD[kind] ? HEAD[kind](c, d) : ink(c, pEl(0, hy, 12, 12), d.skin);
+  c.restore();
+  c.restore();
+}
+
+
+function tri(c, a, b, d, col) { c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.closePath(); c.fillStyle = col; c.fill(); }
+function circ(c, x, y, r, col) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = col; c.fill(); }
+function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = col; c.fill(); }
+/* The Anvil Ring: the fighters (issue #23, phase 1). Six ratings, 1 to 10 (the Realm's own run to 12): reach (how far
+   their punches land from), pow (how hard they hit), spd (how fast they move and punch), chin (how much they take),
+   sta (how long their stamina lasts) and gui (guile: reading the other fighter, slipping and timing). BX_KIND seeds
+   them by kind; size shows here rather than in weight classes (question 3), so a golem hits like a wall and moves like
+   one, and a harpy is all speed and no chin.
+   A fighter in the ring, plain JSON: { side, n, kind, num, r, style, x, y, hp, hpMax, sta, staMax, a, mv, plan, ... }.
+   hp falls when they're hit and zero is a knockdown; big shots also lower hpMax, the most they can get back, so each
+   knockdown comes easier than the last. sta pays for punches and comes back off the gas. a is what they're doing now
+   ({ k, t, dur, hitAt, id }), mv where they want to move. */
+const BX_STATS = ['reach', 'pow', 'spd', 'chin', 'sta', 'gui'];
+const BX_KIND = {
+  goblin: [4, 5, 8, 4, 7, 8], kobold: [4, 5, 7, 5, 8, 7], werewolf: [6, 8, 8, 4, 6, 4], dwarf: [3, 7, 4, 7, 7, 5],
+  ogre: [8, 10, 2, 8, 5, 2], minotaur: [6, 9, 5, 7, 5, 3], troll: [8, 8, 3, 7, 6, 3], golem: [6, 10, 1, 10, 6, 2],
+  harpy: [7, 4, 10, 3, 6, 7], elf: [8, 4, 7, 4, 6, 7], wraith: [6, 4, 8, 3, 6, 9], vampire: [6, 6, 7, 5, 6, 7],
+  lich: [7, 5, 4, 4, 5, 9], zombie: [5, 6, 2, 9, 9, 1], gorgon: [5, 5, 6, 6, 6, 7], spider: [9, 5, 7, 4, 5, 6],
+  skeleton: [7, 4, 6, 4, 8, 6], witch: [5, 4, 6, 4, 7, 9],
+};
+function bxRate(kind) { const k = BX_KIND[kind] || BX_KIND.goblin; return Object.fromEntries(BX_STATS.map((s, i) => [s, k[i]])); }
+/* how a fighter boxes when nobody tells them otherwise: the long-armed stay away (against a shorter fighter, o), the
+   guileful counter, the heavy hitters press, and the iron-chinned grinders work the body */
+function bxStyle(r, o) {
+  if (o ? r.reach >= o.reach + 2 && r.spd >= 3 : r.reach >= 7 && r.spd >= 6) return 'away';
+  if (r.gui >= 8) return 'counter';
+  if (r.pow >= 8) return 'press';
+  if (r.chin >= 8 && r.sta >= 8) return 'body';
+  return r.spd >= 7 ? 'counter' : 'press';
+}
+const BX_HP = 100;
+// the fighter for side from { n, kind, num, r?, style? } (r: ratings to lay over the kind's; style: a plan to box to)
+function bxFighter(p, side) {
+  const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = Math.round(68 + r.sta * 4.5), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
+  return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style,
+    x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
+    a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0,
+    rs: bxStatsZero(), bs: bxStatsZero() };
+}
+// a round's (rs) or bout's (bs) work: punches thrown and landed, power punches landed, damage done, defense as the
+// judges count it (a slip 1, a block half), punches slipped and blocked, seconds pressing forward, clinches started
+function bxStatsZero() { return { thrown: 0, landed: 0, power: 0, dmg: 0, def: 0, slips: 0, blocks: 0, press: 0, clinch: 0 }; }
+/* The Anvil Ring: the ring (issue #23, phase 1). Two fighters, moved on in steps of BX_DT seconds; no plays and no
+   snaps, only a clock. Each fighter does one thing at a time (f.a): stands ready, throws a punch, keeps the guard up,
+   slips, clinches, or is stunned or down. Moving goes on beside it, slower while punching or covering.
+   Ring space: x and y in feet from the middle, the ropes at BX_RING.rope. Distance is the field: a punch lands only
+   from inside its range, which is the fighter's reach times the punch's share (a jab reaches furthest, a body shot
+   least). A punch takes time to wind up (hitAt) and to come back (dur), so it can be seen coming:
+   - a slip (timed so the punch arrives while the head is out of the way) makes a head punch miss, and opens a counter
+     window: the slipper's next punch lands more often and harder;
+   - the guard (held high) takes most of a head punch, but none of a body shot, and recovers stamina slowly;
+   - a clinch, from close in, ties both fighters up until the referee breaks them; nothing is thrown and the holder gets
+     their breath back.
+   A landed punch costs the other fighter health (more for a hard hitter, less against a good chin, less again from a
+   tired arm); a power punch (hook, body shot) that lands also lowers their hpMax a little, and a hard one stuns.
+   Zero health is a knockdown: G.down is set and the bout (07-bout.js) takes over. Body shots drain stamina too.
+   Every punch, slip, block and knockdown is told to BXE ({ k, side, p, n, ctr }), which the page drains for its
+   words and the bout for its log; it is not saved. */
+const BX_DT = .05;
+const BX_RING = { half: 9, rope: 8.3, body: 1.55, back: .6, ropes: .7 };
+const BX_PUNCH = {
+  jab:  { n: 'jab',       hit: .16, dur: .36, range: 1,   dmg: 2,   sta: 3,   acc: .66, head: true },
+  hook: { n: 'hook',      hit: .3,  dur: .64, range: .82, dmg: 8.5, sta: 7,   acc: .48, head: true, power: true },
+  body: { n: 'body shot', hit: .26, dur: .58, range: .78, dmg: 4.5, sta: 6,   acc: .58, drain: 4, power: true },
+};
+const BX_PUNCH_IDS = Object.keys(BX_PUNCH);
+const BX_SLIP = { dur: .38, from: .03, to: .3, sta: 2.5, ctr: .55 };
+const BX_GUARD = { min: .35, head: .18, power: .35 };
+const BX_CLINCH = { max: 2.2, near: 2.2, sta: 2, gap: 2.7 };
+let BXE = [];
+
+const bxFrac = f => clamp(f.sta / f.staMax, 0, 1);
+const bxDist = (a, b) => hyp(a.x - b.x, a.y - b.y);
+const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range;
+// how long everything takes: quicker for the fast, slower when tired
+const bxTempo = f => (1.08 - f.r.spd * .015) * (1 + .5 * (1 - bxFrac(f)));
+const bxMoveSpd = f => (2.6 + f.r.spd * .2) * (.6 + .4 * bxFrac(f));
+const bxPunching = f => !!BX_PUNCH[f.a.k];
+const bxBusy = f => f.a.k !== 'idle' && f.a.k !== 'guard';
+const bxMass = f => { const K = KIND[f.kind] || KIND.goblin; return K.w * K.h; };
+const bxOnRopes = f => Math.max(Math.abs(f.x), Math.abs(f.y)) > BX_RING.rope - .15;
+function bxEv(k, side, o) { BXE.push(Object.assign({ k, side, round: G.round }, o || {})); if (BXE.length > 60) BXE.shift(); }
+
+/* f starts something: a punch ('jab', 'hook', 'body'), 'slip', 'guard' (held for at least BX_GUARD.min; asking again
+   keeps it up) or 'idle'. Returns false when it can't (no breath for the punch). */
+function bxAct(f, k) {
+  const P = BX_PUNCH[k], tm = bxTempo(f);
+  if (P) {
+    if (f.sta < P.sta * .5) return false;
+    f.sta = Math.max(0, f.sta - P.sta); f.rs.thrown++;
+    f.a = { k, t: 0, dur: P.dur * tm, hitAt: P.hit * tm, id: ++G.aid, done: false, ctr: f.ctr > 0 }; f.ctr = 0;
+    return true;
+  }
+  if (k === 'guard' && f.a.k === 'guard') { f.a.dur = f.a.t + BX_GUARD.min; return true; }
+  if (k === 'slip') { f.sta = Math.max(0, f.sta - BX_SLIP.sta); f.a = { k, t: 0, dur: BX_SLIP.dur * Math.min(1.2, tm), id: ++G.aid }; return true; }
+  f.a = { k: k === 'guard' ? 'guard' : 'idle', t: 0, dur: k === 'guard' ? BX_GUARD.min : 0, id: ++G.aid };
+  return true;
+}
+/* a tries to tie b up from close in: the craftier and the stronger get hold more often, and a fighter in the middle of
+   a punch is easier to grab. A miss leaves a open for a moment ('grab'). */
+function bxClinch(a, b) {
+  if (bxDist(a, b) > BX_CLINCH.near || b.a.k === 'down') return false;
+  a.sta = Math.max(0, a.sta - BX_CLINCH.sta); a.rs.clinch++;
+  const p = clamp(.45 + (a.r.gui - b.r.gui) * .04 + (a.r.pow - b.r.pow) * .02 + (bxPunching(b) ? .1 : 0) - (b.a.k === 'slip' ? .2 : 0), .15, .85);
+  if (R() < p) {
+    const t = BX_CLINCH.max * (.6 + R() * .4);
+    a.a = { k: 'clinch', t: 0, dur: t, id: ++G.aid, lead: true }; b.a = { k: 'clinch', t: 0, dur: t, id: ++G.aid };
+    bxEv('clinch', a.side); return true;
+  }
+  a.a = { k: 'grab', t: 0, dur: .3, id: ++G.aid };
+  return false;
+}
+// the referee breaks a clinch: both stand back to arm's length
+function bxBreak() {
+  const [A, B] = G.F; let dx = B.x - A.x, dy = B.y - A.y; const d = hyp(dx, dy) || 1; dx /= d; dy /= d;
+  const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, h = BX_CLINCH.gap / 2;
+  A.x = mx - dx * h; A.y = my - dy * h; B.x = mx + dx * h; B.y = my + dy * h;
+  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; f.x = clamp(f.x, -BX_RING.rope, BX_RING.rope); f.y = clamp(f.y, -BX_RING.rope, BX_RING.rope); }
+  bxEv('break', -1);
+}
+/* a's punch k arrives: out of range, slipped, missed, blocked or landed */
+function bxLand(a, b, k) {
+  const P = BX_PUNCH[k], ctr = !!a.a.ctr;
+  if (b.a.k === 'down' || b.a.k === 'clinch') return;
+  if (bxDist(a, b) > bxRange(a, k) + .12) { bxEv('miss', a.side, { p: k, why: 'short' }); return; }
+  if (b.a.k === 'slip' && b.a.t >= BX_SLIP.from && b.a.t <= BX_SLIP.to && (P.head || R() < .5)) {
+    b.rs.def++; b.rs.slips++; b.ctr = BX_SLIP.ctr; bxEv('slip', b.side, { p: k }); return;
+  }
+  let acc = P.acc + (a.r.spd - b.r.spd) * .008 + (a.r.gui - b.r.gui) * .006 - (1 - bxFrac(a)) * .22 + (1 - bxFrac(b)) * .12;
+  const winding = bxPunching(b) && !b.a.done;
+  if (winding) acc += .06;
+  if (bxOnRopes(b)) acc += .08;
+  if (ctr) acc += .2;
+  if (b.a.k === 'stun' || b.a.k === 'grab') acc += .35;
+  if (R() > clamp(acc, .08, .95)) { bxEv('miss', a.side, { p: k, why: 'missed' }); return; }
+  const blocked = P.head && b.a.k === 'guard';
+  let dmg = P.dmg * (.55 + a.r.pow * .09) * (.6 + .4 * bxFrac(a)) / (.4 + b.r.chin * .12);
+  if (ctr) dmg *= 1.5;
+  if (winding && !blocked) dmg *= 1.1;
+  if (blocked) { dmg *= P.power ? BX_GUARD.power : BX_GUARD.head; b.rs.def += .5; b.rs.blocks++; }
+  else { a.rs.landed++; if (P.power) a.rs.power++; }
+  dmg *= .85 + R() * .3;
+  b.hp -= dmg; a.rs.dmg += dmg;
+  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2);
+  if (P.drain) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
+  bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
+  if (b.hp <= 0) { b.hp = 0; b.a = { k: 'down', t: 0, dur: 0, id: ++G.aid }; G.down = b.side; bxEv('kd', b.side); return; }
+  if (!blocked && dmg > 5 + b.r.chin * .7) { b.a = { k: 'stun', t: 0, dur: .35 + dmg * .025, id: ++G.aid }; bxEv('stun', b.side, { n: Math.round(dmg) }); }
+}
+// one fighter's action and breath move on by dt
+function bxAdvance(f, o, dt) {
+  f.a.t += dt;
+  const P = BX_PUNCH[f.a.k];
+  if (P && !f.a.done && f.a.t >= f.a.hitAt) { f.a.done = true; bxLand(f, o, f.a.k); }
+  if (f.a.k !== 'clinch' && f.a.k !== 'down' && f.a.t >= f.a.dur) f.a = { k: 'idle', t: 0, dur: 0, id: f.a.id };
+  const regen = (3.8 + f.r.sta * .3) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
+  f.sta = clamp(f.sta + regen * dt, 0, f.staMax);
+  if (f.ctr > 0) f.ctr = Math.max(0, f.ctr - dt);
+}
+function bxMove(dt) {
+  for (const f of G.F) {
+    if (['clinch', 'down', 'stun', 'grab'].includes(f.a.k)) continue;
+    const [mx, my] = f.mv, m = hyp(mx, my); if (m < .01) continue;
+    const o = G.F[1 - f.side], before = bxDist(f, o);
+    // backing up is slower than coming forward, and slower again along the ropes: so a presser can cut off the ring
+    const fwd = ((o.x - f.x) * mx + (o.y - f.y) * my) / ((before || 1) * m), back = fwd < 0 ? lerp(1, BX_RING.back, -fwd) : 1;
+    const sp = bxMoveSpd(f) * back * (bxOnRopes(f) ? BX_RING.ropes : 1) * (bxPunching(f) ? (fwd > .3 ? .85 : .35) : f.a.k === 'guard' ? .55 : f.a.k === 'slip' ? .4 : 1) / Math.max(1, m);
+    f.x += mx * sp * dt; f.y += my * sp * dt;
+    if (bxDist(f, o) < before - .005) f.rs.press += dt;
+  }
+  // bodies don't overlap, and the ropes hold them in
+  const [A, B] = G.F; let dx = B.x - A.x, dy = B.y - A.y; const d = hyp(dx, dy) || .001;
+  // the bigger body gives less ground
+  if (d < BX_RING.body) { const ma = bxMass(A), mb = bxMass(B), push = BX_RING.body - d; dx /= d; dy /= d; A.x -= dx * push * mb / (ma + mb); A.y -= dy * push * mb / (ma + mb); B.x += dx * push * ma / (ma + mb); B.y += dy * push * ma / (ma + mb); }
+  for (const f of G.F) { f.x = clamp(f.x, -BX_RING.rope, BX_RING.rope); f.y = clamp(f.y, -BX_RING.rope, BX_RING.rope); }
+}
+/* one step of the round: both fighters think (06-cpu.js), act, breathe and move */
+function bxStep(dt) {
+  for (const f of G.F) bxThink(f, G.F[1 - f.side], dt);
+  for (const f of G.F) { bxAdvance(f, G.F[1 - f.side], dt); if (G.down != null) return; }
+  const [A, B] = G.F;
+  if (A.a.k === 'clinch' && B.a.k === 'clinch' && (A.a.t >= A.a.dur || B.a.t >= B.a.dur)) bxBreak();
+  else if ((A.a.k === 'clinch') !== (B.a.k === 'clinch')) for (const f of G.F) if (f.a.k === 'clinch') f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
+  bxMove(dt);
+}
+/* The Anvil Ring: the fighters' heads, and the corner's plans (issue #23, phase 1). A plan is how a fighter boxes a
+   round: the range they want (a share of their jab's reach), how often they throw, their mix of punches, and how
+   readily they defend. The corner picks one between rounds (07-bout.js); a fighter starts on their kind's style.
+   Thinking: once per punch on its way, a fighter in its range may see it coming (more often with guile and a careful
+   plan) and slip it or cover up. Otherwise every fraction of a second (quicker with guile) they pick where to move (in
+   or out to the plan's range, circling once there, off the ropes) and whether to punch, cover or clinch. A slip opens
+   a counter window, and a counterpuncher waits for one. Tired fighters back off and throw less; hurt ones tie up.
+   G.skill[side] (0 to 2) sharpens the reading and the timing. */
+const BX_PLAN = {
+  press:   { n: 'Press',     desc: 'Walk them down and stay in their face.',          range: .55, rate: 1.15, mix: { jab: .35, hook: .4, body: .25 }, def: .7 },
+  counter: { n: 'Counter',   desc: 'Let them lead, slip it and punish the miss.',     range: .92, rate: .75, mix: { jab: .35, hook: .5, body: .15 }, def: 1.3, slip: .3, wait: true },
+  body:    { n: 'Body work', desc: 'Dig to the body: it drains them, and pays late.', range: .62, rate: .85,  mix: { jab: .35, hook: .2, body: .45 }, def: .8 },
+  away:    { n: 'Stay away', desc: 'Keep them on the end of the jab, and move.',      range: 1,   rate: .85, mix: { jab: .75, hook: .1, body: .15 }, def: 1.1 },
+  cover:   { n: 'Cover up',  desc: 'Hands high, tie them up, get your legs back.',    range: .9,  rate: .35, mix: { jab: .6, hook: .2, body: .2 }, def: 1.6, guard: .5, clinch: true },
+};
+const BX_PLAN_IDS = Object.keys(BX_PLAN);
+
+function bxThink(f, o, dt) {
+  if (f.a.k === 'down' || f.a.k === 'clinch' || f.a.k === 'stun') { f.mv = [0, 0]; return; }
+  const skill = G.skill ? G.skill[f.side] : 1, P = BX_PLAN[f.plan] || BX_PLAN.press;
+  // a punch on its way, seen once
+  if (bxPunching(o) && !o.a.done && o.a.id !== f.seen && !bxBusy(f)) {
+    f.seen = o.a.id;
+    if (bxDist(f, o) < bxRange(o, o.a.k) + .4) {
+      const p = clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7);
+      if (R() < p) {
+        const slip = R() < clamp(.3 + f.r.gui * .03 + (P.slip || 0) - (BX_PUNCH[o.a.k].head ? 0 : .3), .05, .9);
+        bxAct(f, slip ? 'slip' : 'guard'); return;
+      }
+    }
+  }
+  f.think -= dt; if (f.think > 0) return;
+  f.think = Math.max(.1, .3 - f.r.gui * .006 - skill * .03) * (.8 + R() * .4);
+  const d = bxDist(f, o), dx = (o.x - f.x) / (d || 1), dy = (o.y - f.y) / (d || 1);
+  const tired = bxFrac(f) < .22, hurt = f.hp < f.hpMax * .3;
+  const want = bxRange(f, 'jab') * (tired ? 1.25 : P.range);
+  // where to: in or out to the plan's range, circling once there (now and then the other way), off the ropes
+  let mx = 0, my = 0;
+  const edge = Math.max(Math.abs(f.x), Math.abs(f.y));
+  if (d > want + .25) { mx = dx; my = dy; } else if (d < want - .25) { mx = -dx; my = -dy; }
+  if (Math.abs(d - want) < .6 || edge > 6.2 || R() < .3) {
+    if (!f.n2 || R() < .08) f.n2 = R() < .5 ? 1 : -1;
+    // near the ropes they pivot off them toward the middle; otherwise, lined up front to back, they circle back side
+    // by side (the ring is seen from the side)
+    if (edge > 6.2) f.n2 = Math.sign(dy * f.x - dx * f.y) || f.n2;
+    else if (Math.abs(dy) > .45) f.n2 = Math.sign(dx * dy) || f.n2;
+    mx += -dy * f.n2 * .7; my += dx * f.n2 * .7;
+  }
+  // away from the ropes and corners, toward the middle (harder once they are on them)
+  if (edge > 4) { const k = bxOnRopes(f) ? .18 : .08; mx -= f.x * k; my -= f.y * k; }
+  f.mv = [mx, my];
+  if (bxBusy(f)) return;
+  // cover up, tie up
+  if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? .2 : 0)) { bxClinch(f, o); return; }
+  if (P.guard && R() < P.guard * (tired ? 1.3 : 1)) { bxAct(f, 'guard'); return; }
+  // a punch in range, at the plan's rate; a counter window says now
+  // (a power punch only from well inside its range: it is slow enough that a fighter backing off gets out of it)
+  const can = BX_PUNCH_IDS.filter(k => d <= bxRange(f, k) * (BX_PUNCH[k].power ? .95 : 1) + .05 && f.sta >= BX_PUNCH[k].sta);
+  if (!can.length) { if (f.a.k === 'guard' && R() < .5) bxAct(f, 'idle'); return; }
+  // still coming in to the plan's range: mostly moving, not punching
+  const rate = P.rate * (.5 + f.r.spd * .015) * (tired ? .4 : 1) * (f.ctr > 0 ? 2.5 : 1) * (P.wait && !f.ctr && !bxPunching(o) ? .5 : 1) * (d > want + .45 ? .35 : 1);
+  if (R() < rate) { const w = {}; for (const k of can) w[k] = P.mix[k] * (o.a.k === 'guard' && k === 'body' ? 2 : 1); bxAct(f, wpick(w)); }
+  else if (R() < .22 * P.def) bxAct(f, 'guard');
+}
+/* the corner's call for the next round: { plan, patch }. Cover up when badly hurt (unless it's the last round and they
+   are behind), press in the last round when behind on the cards, stay safe when well ahead, go for the finish when the
+   other fighter is fading; otherwise their own style. A patch (the cut-man) when they're down to two thirds. */
+function bxCornerCpu(f) {
+  const o = G.F[1 - f.side], T = bxTotals(), lead = T.reduce((n, t) => n + Math.sign(f.side ? t[1] - t[0] : t[0] - t[1]), 0), last = G.round === G.rounds;
+  let plan = f.style;
+  if (last && lead < 0) plan = 'press';
+  else if (f.hp < f.hpMax * .45 || f.hpMax < 55) plan = 'cover';
+  else if (last && lead >= 2) plan = f.style === 'press' ? 'counter' : 'away';
+  else if (o.hpMax < 60 || o.hp < 40) plan = 'press';
+  return { plan, patch: f.patches > 0 && f.hp < f.hpMax * .67 };
+}
+/* The Anvil Ring: a bout (issue #23, phase 1). BD runs it in beats (BD.ph): the intro, each round on the clock, the
+   count after a knockdown, the fighter rising, the corner between rounds, and the end. The round clock stops for the
+   count. The same beats run on the page (bxTick, in real time) and headless (bxSimBout, as fast as it goes), seeded.
+   At the bell three judges score the round (BX_JUDGES), each from what they like: Brass power punches, Tally activity
+   and Slate defense, with a little of their own eye in it, so close rounds can split them.
+   A knockdown: the count runs to BX_RULES.count; how soon the fighter beats it comes from their chin, the health they
+   have left to get back and how often they've been down. Counted out is a knockout; the third knockdown stops it. Up
+   in time, they have back about half their most, and lose a little of it.
+   Between rounds both get their breath back and some health, the corner picks the next round's plan (06-cpu.js), and
+   the cut-man may use a patch (BX_RULES.patches a bout). Phase 2 gives you your corner's calls.
+   G (02-rules.js) carries the fighters too: G.F, the corners G.corners, G.skill, each round's work as the judges saw it
+   (G.work), each round's stats (G.rstats), the plans (G.plans), the log, and the seconds boxed (G.secs). All plain JSON.
+   BD is the page's side: { ph, t, acc, mode, headless, count, getUp }. */
+const BX_JUDGES = [
+  { n: 'Brass', likes: 'power punches', w: { thrown: 0,  landed: .9,  power: 1.5, def: .25, press: .12, clinch: -.4,  dmg: .03 }, noise: 1.3 },
+  { n: 'Tally', likes: 'activity',      w: { thrown: .12, landed: 1.2, power: .7, def: .15, press: .25, clinch: -.6,  dmg: 0 }, noise: 1.3 },
+  { n: 'Slate', likes: 'defense',       w: { thrown: 0,  landed: 1.1, power: .8, def: .6,  press: 0,   clinch: -.15, dmg: 0 }, noise: 1.3 },
+];
+const BX_BEAT = { intro: 1.6, corner: 4, count: .55, rise: .9 };
+// the two corners a bout uses when the Realm doesn't send its own: red and blue
+const BX_CLUBS = [
+  { name: 'Cinderhold', short: 'CND', color: '#b8231e', light: '#ffd0a0' },
+  { name: 'Visitors', short: 'VIS', color: '#2a5fb8', light: '#d6e6ff' },
+];
+let BD = null;
+const BX_HOOK = { onOver: null, onPhase: null };
+
+/* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r? }], corners: [2 × { name, short, color, light }],
+   mode: 'watch', seed, skill: [0..2, 0..2], headless } */
+function bxStart(opts) {
+  const o = opts || {};
+  bxSeed(o.seed); bxNewBout(o); BXE = [];
+  G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
+  G.F = o.fighters.map((p, s) => bxFighter(p, s));
+  for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
+  Object.assign(G, { aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0 });
+  BD = { ph: 'intro', t: 0, acc: 0, mode: o.mode || 'watch', headless: !!o.headless, count: 0, getUp: 0 };
+  bxCornerSpots();
+  return G;
+}
+function bxPh(ph) { BD.ph = ph; BD.t = 0; if (!BD.headless && BX_HOOK.onPhase) BX_HOOK.onPhase(ph); }
+function bxLog(msg, big) { G.log.push({ r: G.round, t: Math.round((BX_RULES.secs - G.clock) * 10) / 10, msg, big: !!big }); }
+// both fighters back in their corners, facing out of them
+function bxCornerSpots() { const [A, B] = G.F; Object.assign(A, { x: -6.8, y: -5.6, mv: [0, 0] }); Object.assign(B, { x: 6.8, y: 5.6, mv: [0, 0] }); for (const f of G.F) f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; }
+const bxName = s => G.F[s].n;
+
+// the page's clock: real seconds into beats
+function bxTick(dt) {
+  if (!BD || BD.ph === 'over') return;
+  BD.acc += dt;
+  while (BD.acc >= BX_DT && BD.ph !== 'over') { BD.acc -= BX_DT; bxBeat(BX_DT); }
+}
+function bxBeat(dt) {
+  BD.t += dt;
+  switch (BD.ph) {
+    case 'intro': if (BD.t >= BX_BEAT.intro) { bxLog(`Round 1. ${bxName(0)} against ${bxName(1)}.`); bxPh('round'); } break;
+    case 'round':
+      bxStep(dt); G.secs += dt; G.clock = Math.max(0, G.clock - dt);
+      bxDrain();
+      if (G.down != null) bxDown();
+      else if (G.clock <= 0) bxRoundEnd();
+      break;
+    case 'kd':
+      BD.count = Math.min(BX_RULES.count, Math.floor(BD.t / BX_BEAT.count) + 1);
+      if (BD.t >= BD.getUp * BX_BEAT.count) {
+        if (BD.getUp >= BX_RULES.count) { bxCountOut(G.down); bxLog(`${bxName(G.down)} is counted out!`, true); bxOver(); }
+        else bxRise();
+      }
+      break;
+    case 'rise': if (BD.t >= BX_BEAT.rise) bxPh('round'); break;
+    case 'corner': if (BD.t >= BX_BEAT.corner) { bxLog(`Round ${G.round}.`); bxPh('round'); } break;
+  }
+}
+// what happened this step, for the log (the page reads BXE itself first, for its words)
+function bxDrain() {
+  for (const e of BXE) {
+    if (e.seen) continue; e.seen = true;
+    const a = e.side >= 0 ? bxName(e.side) : '', b = e.side >= 0 ? bxName(1 - e.side) : '';
+    if (e.k === 'land' && e.ctr) bxLog(`${a} slips and counters with a ${BX_PUNCH[e.p].n}!`, e.n >= 8);
+    else if (e.k === 'land' && e.n >= 9) bxLog(`${a} lands a big ${BX_PUNCH[e.p].n}.`);
+    else if (e.k === 'stun') bxLog(`${a} is hurt!`, true);
+    else if (e.k === 'clinch') bxLog(`${a} ties ${b} up.`);
+  }
+  if (BD.headless) BXE.length = 0;
+}
+function bxDown() {
+  const s = G.down, f = G.F[s], o = G.F[1 - s];
+  if (o.a.k !== 'down') o.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
+  o.mv = [0, 0];
+  bxLog(`${f.n} is down!`, true);
+  if (bxKnockdown(s) === 'tko') { bxLog(`Three knockdowns: the referee stops it.`, true); bxOver(); return; }
+  const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
+  BD.getUp = clamp(Math.round(10.5 - score), 2, BX_RULES.count); BD.count = 1;
+  bxPh('kd');
+}
+function bxRise() {
+  const s = G.down, f = G.F[s], o = G.F[1 - s];
+  f.hp = Math.round(f.hpMax * .55); f.hpMax = Math.max(35, f.hpMax - 6); f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
+  bxLog(`${f.n} is up at ${BD.getUp}.`);
+  // the other fighter to a neutral corner's distance, and on again
+  const dx = o.x - f.x, dy = o.y - f.y, d = hyp(dx, dy) || 1;
+  o.x = clamp(f.x + dx / d * 3.2, -BX_RING.rope, BX_RING.rope); o.y = clamp(f.y + dy / d * 3.2, -BX_RING.rope, BX_RING.rope);
+  G.down = null;
+  bxPh('rise');
+}
+// the round's work as each judge sees it: side 0's less side 1's
+function bxWork() {
+  const [a, b] = G.F.map(f => f.rs);
+  return BX_JUDGES.map(J => { const v = s => Object.keys(J.w).reduce((n, k) => n + J.w[k] * s[k], 0); return Math.round((v(a) - v(b) + gauss() * J.noise) * 10) / 10; });
+}
+function bxRoundEnd() {
+  const work = bxWork(), n = G.round;
+  G.work.push(work); G.rstats.push(G.F.map(f => Object.assign({}, f.rs, { dmg: Math.round(f.rs.dmg) })));
+  for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); }
+  const r = bxBell(work), sc = G.cards[G.cards.length - 1];
+  bxLog(`End of round ${n}: ${sc.map((s, j) => `${BX_JUDGES[j].n} ${s[0]}-${s[1]}`).join(', ')}.`);
+  if (r === 'over') { bxLog(bxVerdict(), true); bxOver(); } else bxCorner();
+}
+function bxCorner() {
+  for (const f of G.F) {
+    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * .35); f.sta = f.sta + (f.staMax - f.sta) * .75; f.ctr = 0;
+    const c = bxCornerCpu(f); f.plan = c.plan;
+    if (c.patch && f.patches > 0) { f.patches--; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
+    f.hp = Math.round(f.hp); f.sta = Math.round(f.sta);
+  }
+  G.plans.push(G.F.map(f => f.plan));
+  bxCornerSpots();
+  bxPh('corner');
+}
+function bxOver() { for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); f.bs.dmg = Math.round(f.bs.dmg); } BD.ph = 'over'; BD.t = 0; if (!BD.headless && BX_HOOK.onOver) BX_HOOK.onOver(bxSummary()); }
+// the result in words: "Grub wins by knockout in round 2", "A split decision for Vex", "A draw"
+function bxVerdict(over) {
+  const v = over || G.over; if (!v) return '';
+  const w = v.win == null ? '' : G.F[v.win].n;
+  if (v.how === 'ko') return `${w} wins by knockout in round ${v.round}.`;
+  if (v.how === 'tko') return `${w} wins by stoppage in round ${v.round}.`;
+  if (v.win == null) return 'A draw on the cards.';
+  return `${v.kind[0].toUpperCase() + v.kind.slice(1)} decision for ${w}.`;
+}
+function bxSummary() {
+  return { over: Object.assign({}, G.over), verdict: bxVerdict(), cards: JSON.parse(JSON.stringify(G.cards)), totals: bxTotals(), work: G.work.slice(),
+    rounds: JSON.parse(JSON.stringify(G.rstats)), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice(), plans: JSON.parse(JSON.stringify(G.plans)),
+    fighters: G.F.map(f => ({ n: f.n, kind: f.kind, style: f.style, hp: Math.round(f.hp), hpMax: Math.round(f.hpMax) })), secs: Math.round(G.secs * 10) / 10, log: G.log.slice() };
+}
+/* a whole bout headless and silent, seeded; the bout on the page (if any) is left as it was */
+function bxSimBout(opts) {
+  const keep = [G, BD, BXE, bxRand];
+  try {
+    bxStart(Object.assign({}, opts, { headless: true }));
+    for (let n = 0; BD.ph !== 'over' && n < 400000; n++) bxBeat(BX_DT);
+    return bxSummary();
+  } finally { [G, BD, BXE, bxRand] = keep; }
+}
+/* The Anvil Ring: the ring, drawn (issue #23, phase 1). The forge hall from the side and a little above: the ring on
+   its platform, the canvas scorched at the edges, red, white and blue ropes, the red corner at the back left and the blue
+   at the front right, and the crowd in the dark around it. The fighters are the inked figures (03-figures.js) in
+   gloves, posed by what they're doing (bxPose), the nearer one in front, each turned to face the other.
+   The bar at the top has both fighters: health (the dark part is what big shots have taken off their most), stamina,
+   knockdowns, the cut-man's patches and the plan; the round and the clock are in the middle. Under the ring, the last
+   lines of the log. Punches that land show a word (BXT.fx, from BXE). After a knockdown the count is over the fighter;
+   between rounds a card has each judge's score for the round and the plans for the next; at the end, the verdict and
+   the three cards round by round, with the punch stats.
+   Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
+   bigger. */
+const BXT = { t: 0, fx: [], last: 0 };
+const BX_PX = 34, BX_PY = 16, BX_MIDY = 328;
+function bxProj(x, y, z = 0) { const k = 1 + y * .02; return { x: 480 + x * BX_PX * k, y: BX_MIDY + y * BX_PY - z * k, k }; }
+const BX_CROWD = Array.from({ length: 140 }, (_, i) => [((i * 61.7) % 1000) - 20, i % 4, (i * 13) % 7]);
+
+function bxDraw(c) {
+  c.fillStyle = '#0b0807'; c.fillRect(0, 0, 960, 600);
+  if (!G || !BD) return;
+  bxDrawHall(c);
+  bxDrawRing(c, 'back');
+  const order = G.F.slice().sort((a, b) => a.y - b.y);
+  for (const f of order) bxDrawFighter(c, f, G.F[1 - f.side]);
+  bxDrawRing(c, 'front');
+  bxDrawFx(c);
+  bxDrawBar(c);
+  bxDrawFeed(c);
+  if (BD.ph === 'kd') bxDrawCount(c);
+  if (BD.ph === 'intro') bxDrawIntro(c);
+  if (BD.ph === 'corner') bxDrawCorner(c);
+  if (BD.ph === 'over') bxDrawOver(c);
+}
+function bxDrawHall(c) {
+  // a cone of forge light on the ring, and the crowd's heads in the dark
+  const g = c.createRadialGradient(480, 300, 40, 480, 300, 520); g.addColorStop(0, 'rgba(255,170,90,.16)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.fillRect(0, 90, 960, 510);
+  for (const [x, row, v] of BX_CROWD) {
+    const y = 150 + row * 13, s = 6 + row * .8;
+    c.fillStyle = `rgb(${24 + v * 3},${17 + v * 2},${14 + v})`; c.beginPath(); c.arc(x, y, s, Math.PI, 0); c.fill(); c.fillRect(x - s, y, 2 * s, 14);
+  }
+  for (const [x, row, v] of BX_CROWD.slice(0, 60)) {
+    const y = 560 + row * 10, s = 13 + row;
+    c.fillStyle = `rgb(${14 + v * 2},${10 + v},${9 + v})`; c.beginPath(); c.arc((x * 1.3) % 980, y, s, Math.PI, 0); c.fill(); c.fillRect((x * 1.3) % 980 - s, y, 2 * s, 40);
+  }
+}
+const BX_POSTS = [[-9, -9, 'red'], [9, -9, 'white'], [-9, 9, 'white'], [9, 9, 'blue']];
+const BX_ROPE = ['#c8352a', '#f0ebe0', '#2f5fb8'];
+function bxRopeLine(c, a, b, h) { const p = bxProj(a[0], a[1], h), q = bxProj(b[0], b[1], h); c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(q.x, q.y); c.stroke(); }
+function bxDrawPost(c, x, y, col) {
+  const p = bxProj(x, y), top = bxProj(x, y, 84);
+  c.fillStyle = '#5a5550'; c.fillRect(p.x - 3 * p.k, top.y, 6 * p.k, p.y - top.y);
+  c.fillStyle = col === 'red' ? '#b8231e' : col === 'blue' ? '#2a5fb8' : '#e6e0d2';
+  rr(c, p.x - 6 * p.k, bxProj(x, y, 80).y, 12 * p.k, bxProj(x, y, 26).y - bxProj(x, y, 80).y, 3); c.fill();
+}
+function bxDrawRing(c, part) {
+  const H = BX_RING.half, ropeH = [30, 52, 74];
+  if (part === 'back') {
+    // the platform's skirt, then the canvas
+    const fl = bxProj(-H - .6, H + .6), fr = bxProj(H + .6, H + .6);
+    c.fillStyle = '#3a1612'; c.beginPath(); c.moveTo(fl.x, fl.y); c.lineTo(fr.x, fr.y); c.lineTo(fr.x, fr.y + 36); c.lineTo(fl.x, fl.y + 36); c.closePath(); c.fill();
+    txt(c, 'THE ANVIL RING', 480, fl.y + 25, '800 16px "Alegreya Sans", sans-serif', 'rgba(255,208,160,.55)', 'center');
+    const q = [bxProj(-H - .6, -H - .6), bxProj(H + .6, -H - .6), bxProj(H + .6, H + .6), bxProj(-H - .6, H + .6)];
+    c.fillStyle = '#2a1d17'; c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
+    const f = [bxProj(-H, -H), bxProj(H, -H), bxProj(H, H), bxProj(-H, H)];
+    const g = c.createLinearGradient(0, f[0].y, 0, f[2].y); g.addColorStop(0, '#b9ad97'); g.addColorStop(.5, '#d4c9b2'); g.addColorStop(1, '#c4b89f');
+    c.fillStyle = g; c.beginPath(); f.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
+    // scorch at the edges, and an anvil in the middle
+    c.save(); c.clip(); c.strokeStyle = 'rgba(40,24,16,.25)'; c.lineWidth = 18; c.stroke(); c.restore();
+    const m = bxProj(0, 0); c.fillStyle = 'rgba(120,40,30,.22)';
+    c.beginPath(); c.moveTo(m.x - 46, m.y - 8); c.lineTo(m.x + 30, m.y - 8); c.quadraticCurveTo(m.x + 58, m.y - 8, m.x + 62, m.y - 14); c.lineTo(m.x + 30, m.y + 2); c.lineTo(m.x + 18, m.y + 2); c.lineTo(m.x + 24, m.y + 12); c.lineTo(m.x - 30, m.y + 12); c.lineTo(m.x - 24, m.y + 2); c.lineTo(m.x - 46, m.y + 2); c.closePath(); c.fill();
+    // the back and side ropes, and the back posts
+    c.lineWidth = 2.2;
+    ropeH.forEach((h, i) => { c.strokeStyle = BX_ROPE[i]; bxRopeLine(c, [-H, -H], [H, -H], h); bxRopeLine(c, [-H, -H], [-H, H], h); bxRopeLine(c, [H, -H], [H, H], h); });
+    for (const [x, y, col] of BX_POSTS.slice(0, 2)) bxDrawPost(c, x, y, col);
+  } else {
+    c.lineWidth = 2.8;
+    ropeH.forEach((h, i) => { c.strokeStyle = BX_ROPE[i]; bxRopeLine(c, [-H, H], [H, H], h); });
+    for (const [x, y, col] of BX_POSTS.slice(2)) bxDrawPost(c, x, y, col);
+  }
+}
+/* a fighter's pose from what they're doing (in figure units, facing right; the lead hand is armR) */
+function bxPose(f) {
+  const K = KIND[f.kind] || KIND.goblin, sh = 17 * K.w * (f.kind === 'ogre' ? .9 : 1), hy = f.kind === 'ogre' || f.kind === 'golem' ? -80 : -83 + (K.hunch ? 8.4 : 0);
+  const bob = Math.sin(BXT.t * 5 + f.side * 2) * 1.5, a = f.a, k = a.k;
+  const lead = { x: sh + 13, y: hy + 15 + bob }, rear = { x: sh + 3, y: hy + 11 + bob };
+  const P = { legL: { a: .32 }, legR: { a: -.26 }, lean: .04, armL: rear, armR: lead };
+  const ext = () => a.t < a.hitAt ? Math.sin(Math.min(1, a.t / a.hitAt) * Math.PI / 2) : Math.max(0, 1 - (a.t - a.hitAt) / Math.max(.05, a.dur - a.hitAt));
+  if (k === 'jab') { const e = ext(); P.armR = { x: lerp(lead.x, sh + 46, e), y: lerp(lead.y, hy + 6, e) }; P.lean = .04 + .1 * e; P.shift = 3 * e; }
+  else if (k === 'hook') { const e = ext(); P.armL = { x: rear.x + 38 * e, y: rear.y - 12 * Math.sin(Math.PI * e) - 2 * e }; P.armR = { x: lead.x - 6, y: lead.y - 4 }; P.lean = .06 + .14 * e; P.shift = 4 * e; }
+  else if (k === 'body') { const e = ext(); P.armL = { x: rear.x + 32 * e, y: lerp(rear.y, -50, e) }; P.lean = .1 + .2 * e; P.drop = 5 * e; P.shift = 3 * e; }
+  else if (k === 'guard') { P.armR = { x: sh + 8, y: hy + 4 }; P.armL = { x: sh + 2, y: hy + 7 }; P.lean = .1; P.drop = 2; }
+  else if (k === 'slip') { const e = Math.sin(Math.min(1, a.t / a.dur) * Math.PI); P.lean = -.3 * e; P.drop = 7 * e; P.shift = -5 * e; }
+  else if (k === 'clinch') { P.armR = { x: sh + 30, y: hy + 22 }; P.armL = { x: sh + 26, y: hy + 28 }; P.lean = .22; P.shift = 3; }
+  else if (k === 'stun' || k === 'grab') { P.armR = { x: sh + 8, y: -44 }; P.armL = { x: sh - 2, y: -40 }; P.lean = -.12 + Math.sin(BXT.t * 9) * .08; P.drop = 3; }
+  else if (k === 'down') { P.armR = { x: sh + 12, y: -60 }; P.armL = { x: -sh - 6, y: -58 }; P.legL = { a: .5 }; P.legR = { a: -.1 }; }
+  return P;
+}
+function bxDrawFighter(c, f, o) {
+  const p = bxProj(f.x, f.y), flip = bxProj(o.x, o.y).x < p.x, team = G.corners[f.side], hpx = 92 * p.k;
+  const opt = { glove: team.color, pose: bxPose(f), flip, num: '' };
+  if (f.a.k === 'down') {
+    const e = Math.min(1, f.a.t / .35);
+    ell(c, p.x + (flip ? 1 : -1) * 40 * p.k * e, p.y, 46 * p.k, 7 * p.k, 'rgba(0,0,0,.35)');
+    c.save(); c.translate(p.x, p.y); c.rotate((flip ? 1 : -1) * 1.45 * e); drawFig(c, f.kind, 0, 0, hpx, team, Object.assign(opt, { noShadow: true })); c.restore();
+  } else drawFig(c, f.kind, p.x, p.y, hpx, team, opt);
+  // a counter window: a glint at the gloves
+  if (f.ctr > 0 && f.a.k !== 'down') { c.save(); c.globalAlpha = Math.min(1, f.ctr * 3); txt(c, '✦', p.x + (flip ? -1 : 1) * 30 * p.k, p.y - 92 * p.k, `${14 * p.k}px sans-serif`, '#ffe9a0', 'center'); c.restore(); }
+}
+// words for what lands: drained from BXE
+function bxDrawFx(c) {
+  for (const e of BXE) {
+    if (e.drawn) continue; e.drawn = true;
+    if (!['land', 'block', 'slip', 'kd', 'stun'].includes(e.k)) continue;
+    const t = G.F[e.k === 'slip' || e.k === 'kd' || e.k === 'stun' ? e.side : 1 - e.side], p = bxProj(t.x, t.y);
+    const word = e.k === 'block' ? 'blocked' : e.k === 'slip' ? 'slipped' : e.k === 'kd' ? 'DOWN!' : e.k === 'stun' ? 'HURT!' : e.ctr ? 'COUNTER!' : e.n >= 9 ? pick(['WHAM!', 'KRAK!', 'THOOM!']) : e.p === 'body' ? pick(['THUD!', 'OOF!']) : pick(['POW!', 'BAP!', 'SMACK!']);
+    BXT.fx.push({ x: p.x, y: p.y - 100 * p.k, word, t: BXT.t, big: e.k === 'kd' || e.k === 'stun' || e.ctr || e.n >= 9, dim: e.k === 'block' || e.k === 'slip' });
+  }
+  BXT.fx = BXT.fx.filter(f => BXT.t - f.t < .8);
+  for (const f of BXT.fx) {
+    const a = 1 - (BXT.t - f.t) / .8, s = f.big ? 22 : f.dim ? 11 : 15;
+    c.save(); c.globalAlpha = a; c.font = `900 ${s}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.lineWidth = 4; c.strokeStyle = '#17100e';
+    const y = f.y - (1 - a) * 18; c.strokeText(f.word, f.x, y); c.fillStyle = f.dim ? '#d8d0c0' : f.big ? '#ffd24a' : '#fff4dc'; c.fillText(f.word, f.x, y); c.restore();
+  }
+}
+function bxBarSide(c, f, right) {
+  const team = G.corners[f.side], x0 = right ? 940 : 20, dir = right ? -1 : 1, W = 330;
+  const at = (v, w) => right ? x0 - v - w : x0 + v;
+  c.fillStyle = team.color; c.fillRect(right ? 934 : 20, 12, 6, 66);
+  txt(c, f.n, x0 + dir * 14, 30, '800 17px "Alegreya Sans", sans-serif', '#f4ead8', right ? 'right' : 'left');
+  txt(c, `${f.kind} · ${BX_PLAN[f.plan].n}`, x0 + dir * 14, 46, '13px "Alegreya Sans", sans-serif', '#b8aa94', right ? 'right' : 'left');
+  // health: lost from the most is dark, the rest red to gold
+  const hx = x0 + dir * 14, bw = W;
+  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 52, bw, 10);
+  c.fillStyle = '#4a2a24'; c.fillRect(right ? hx - bw * f.hpMax / 100 : hx, 52, bw * f.hpMax / 100, 10);
+  const hp = Math.max(0, f.hp) / 100, g = c.createLinearGradient(hx, 0, hx + dir * bw, 0); g.addColorStop(0, '#c8352a'); g.addColorStop(1, '#f2c14a');
+  c.fillStyle = g; c.fillRect(right ? hx - bw * hp : hx, 52, bw * hp, 10);
+  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 66, bw, 6);
+  c.fillStyle = '#5ab8d8'; c.fillRect(right ? hx - bw * bxFrac(f) : hx, 66, bw * bxFrac(f), 6);
+  // knockdowns taken, and the cut-man's patches left
+  for (let i = 0; i < BX_RULES.kd; i++) { c.beginPath(); c.arc(at(bw + 26 + i * 14, 0), 57, 4.5, 0, Math.PI * 2); c.fillStyle = i < G.kd[f.side] ? '#ff6a4a' : '#2a1d17'; c.fill(); }
+  for (let i = 0; i < BX_RULES.patches; i++) { c.fillStyle = i < f.patches ? '#e8dcc0' : '#2a1d17'; c.fillRect(at(bw + 20 + i * 14, 8), 66, 8, 6); }
+}
+function bxDrawBar(c) {
+  c.fillStyle = 'rgba(14,10,9,.92)'; c.fillRect(0, 0, 960, 90);
+  bxBarSide(c, G.F[0], false); bxBarSide(c, G.F[1], true);
+  const live = BD.ph === 'round' || BD.ph === 'kd' || BD.ph === 'rise';
+  txt(c, BD.ph === 'over' ? 'FINAL' : `ROUND ${G.round} of ${G.rounds}`, 480, 26, '800 13px "Alegreya Sans", sans-serif', '#c9b99c', 'center');
+  txt(c, BD.ph === 'intro' ? `0:${String(BX_RULES.secs).padStart(2, '0')}` : `0:${String(Math.ceil(G.clock)).padStart(2, '0')}`, 480, 60, '800 30px "Alegreya Sans", sans-serif', live ? '#fff4dc' : '#8a7c68', 'center');
+  txt(c, { intro: 'Touch gloves', round: '', kd: 'Knockdown', rise: 'Box on', corner: 'Between rounds', over: '' }[BD.ph], 480, 80, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+}
+function bxDrawFeed(c) {
+  const L = G.log.slice(-3);
+  L.forEach((l, i) => txt(c, l.msg, 480, 548 + i * 17, `${l.big ? '700 ' : ''}14px "Alegreya Sans", sans-serif`, i === L.length - 1 ? '#f4ead8' : 'rgba(220,206,184,.6)', 'center'));
+}
+function bxDrawCount(c) {
+  const f = G.F[G.down], p = bxProj(f.x, f.y);
+  txt(c, String(BD.count), p.x, p.y - 70, '900 54px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
+}
+function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, w, h, 8); c.fill(); c.strokeStyle = 'rgba(255,208,160,.25)'; c.lineWidth = 1; c.stroke(); }
+function bxDrawIntro(c) {
+  bxPanel(c, 250, 270, 460, 110);
+  const [A, B] = G.F;
+  txt(c, `${A.n}  vs  ${B.n}`, 480, 300, '800 22px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  BX_STATS.forEach((s, i) => {
+    const x = 300 + i * 72;
+    txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+    txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 346, '700 14px "Alegreya Sans", sans-serif', A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
+  });
+  txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+}
+function bxDrawCorner(c) {
+  const n = G.cards.length, sc = G.cards[n - 1], T = bxTotals(), pl = G.plans[G.plans.length - 1];
+  bxPanel(c, 280, 270, 400, 110);
+  txt(c, `End of round ${n}`, 480, 295, '800 18px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  BX_JUDGES.forEach((J, j) => txt(c, `${J.n}  ${sc[j][0]}-${sc[j][1]}  (${T[j][0]}-${T[j][1]})`, 340 + j * 140, 322, '14px "Alegreya Sans", sans-serif', '#e8dcc0', 'center'));
+  txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+}
+function bxDrawOver(c) {
+  const v = G.over, T = bxTotals();
+  bxPanel(c, 220, 140, 520, 250);
+  const head = v.how === 'ko' ? 'KNOCKOUT' : v.how === 'tko' ? 'STOPPAGE' : v.win == null ? 'DRAW' : `${v.kind.toUpperCase()} DECISION`;
+  txt(c, head, 480, 178, '900 28px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
+  txt(c, bxVerdict(), 480, 202, '15px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  // the cards, round by round
+  const n = G.cards.length;
+  txt(c, 'Judge', 270, 232, '700 12px "Alegreya Sans", sans-serif', '#b8aa94');
+  for (let r = 0; r < n; r++) txt(c, `R${r + 1}`, 400 + r * 60, 232, '700 12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  txt(c, 'Total', 660, 232, '700 12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  BX_JUDGES.forEach((J, j) => {
+    const y = 254 + j * 20;
+    txt(c, `${J.n} (${J.likes})`, 270, y, '13px "Alegreya Sans", sans-serif', '#e8dcc0');
+    for (let r = 0; r < n; r++) txt(c, `${G.cards[r][j][0]}-${G.cards[r][j][1]}`, 400 + r * 60, y, '13px "Alegreya Sans", sans-serif', '#e8dcc0', 'center');
+    txt(c, n ? `${T[j][0]}-${T[j][1]}` : '-', 660, y, '700 13px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  });
+  const [a, b] = G.F.map(f => f.bs);
+  [['Landed', `${a.landed}/${a.thrown}`, `${b.landed}/${b.thrown}`], ['Power punches', a.power, b.power], ['Slipped / blocked', `${a.slips} / ${a.blocks}`, `${b.slips} / ${b.blocks}`], ['Knockdowns', G.kd[1], G.kd[0]]]
+    .forEach(([k, x, y], i) => { const yy = 330 + i * 15; txt(c, String(x), 380, yy, '13px "Alegreya Sans", sans-serif', '#ffb0a0', 'center'); txt(c, k, 480, yy, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center'); txt(c, String(y), 580, yy, '13px "Alegreya Sans", sans-serif', '#a8c8ff', 'center'); });
+}
+/* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
+   runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
+   don't touch the page; this file is the only one that does. */
+const BXP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1 };
+(() => {
+  const h = document.createElement('div'); h.id = 'v-ring'; h.hidden = true;
+  const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
+  cv.style.cssText = 'display:block;width:100%;max-width:960px;margin:0 auto;aspect-ratio:960/600;background:#0b0807;border-radius:6px';
+  h.appendChild(cv);
+  (document.getElementById('v-gridiron') || document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
+  Object.assign(BXP, { host: h, cv, c: cv.getContext('2d') });
+})();
+function bxRender() {
+  const d = Math.min(2, window.devicePixelRatio || 1);
+  if (d !== BXP.dpr || BXP.cv.width !== 960 * d) { BXP.dpr = d; BXP.cv.width = 960 * d; BXP.cv.height = 600 * d; }
+  const c = BXP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); bxDraw(c); c.restore();
+}
+function bxFrame(now) {
+  if (!BXP.on) return;
+  const dt = Math.min(.05, Math.max(0, (now - BXP.last) / 1000)); BXP.last = now;
+  if (!BXP.paused) { BXT.t += dt; bxTick(dt); }
+  bxRender();
+  BXP.raf = requestAnimationFrame(bxFrame);
+}
+function bxShow() { BXP.host.hidden = false; if (BXP.on) return; BXP.on = true; BXP.last = performance.now(); BXP.raf = requestAnimationFrame(bxFrame); }
+function bxHide() { BXP.host.hidden = true; BXP.on = false; cancelAnimationFrame(BXP.raf); }
+
+/* the end of the wBX scope: what the Realm may call (w19b-engines.js, w51-ring.js). Phase 0 is the rules; phase 1 boxes
+   one bout, CPU against CPU. start(opts) puts a bout in the ring ({ fighters: [2], corners: [2], mode: 'watch', seed,
+   skill }); simBout(opts) boxes one headless and returns its summary; onPhase hears each beat (intro, round, kd, rise,
+   corner, over) and onOver the end, with the summary. The test's handles: G, rules and the pure rule functions, step
+   (one beat), and act/clinch (a fighter's move, by side). */
+return {
+  newBout: bxNewBout, knockdown: bxKnockdown, countOut: bxCountOut, bell: bxBell, roundScore: bxRoundScore, decision: bxDecision,
+  totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, rules: Object.assign({}, BX_RULES),
+  start: o => bxStart(o), simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
+  get on() { return BXP.on; }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
+  pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
+  set onOver(f) { BX_HOOK.onOver = f; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
+  // the ratings, plans, punches and judges, for the page and How to play
+  rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
+  plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),
+  punches: Object.fromEntries(BX_PUNCH_IDS.map(k => [k, { n: BX_PUNCH[k].n, head: !!BX_PUNCH[k].head, power: !!BX_PUNCH[k].power }])),
+  judges: BX_JUDGES.map(J => ({ n: J.n, likes: J.likes })),
+  // the test's handle on the ring: one beat, and a fighter's move
+  step: () => { if (BD && BD.ph !== 'over') bxBeat(BX_DT); return BD ? BD.ph : null; }, act: (side, k) => bxAct(G.F[side], k), clinch: side => bxClinch(G.F[side], G.F[1 - side]),
+  get ev() { return BXE; },
+  range: (side, k) => bxRange(G.F[side], k), dist: () => bxDist(G.F[0], G.F[1]), land: (side, k) => bxLand(G.F[side], G.F[1 - side], k),
+};
+
+})();
 /* w19b: the engines (issue #9, phase 0). Some sports have a game of their own beside the card game. Each is built in
    its own scope and talks to the Realm through the same small API (start, sim, box, show, hide, pause, audio, on,
    onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
-   Brimstone Diamond (wBD, baseball) and Cinder Gridiron (wGF, football; src/gf/). Nothing here is saved. */
+   Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/) and the Anvil Ring (wBX, boxing; src/bx/,
+   issue #23). Nothing here is saved. */
 
-const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' } };
+const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
+  ring: { api: wBX, view: 'ring', sport: 'boxing' } };
 // on screen: the engine whose view it is shows, and every other one hides
 function wEnginesShow(v) {
   for (const E of Object.values(W_ENGINES)) { if (E.view === v) E.api.show(); else if (E.api.on) E.api.hide(); }
@@ -30224,6 +31587,93 @@ renderHelp = function () {
     <p class="hint"><b>Out in the world</b> the music is ambient: slow, quiet and made fresh as you walk. Every region sounds like itself: a breeze on the plains, chimes in the Mosswold, surf and a foghorn on the Brinefen, crackle and a far anvil in the Cindermaw, bells and ice in the Frostspire. The towns and the dungeons have their own, and you can hear fog, ash and blizzards. Special places do too: the creaking wreck, the choirs of the chapel and the abbey, the Hall of Legends, a lair's door, and every ground between games.</p>
     <p class="hint"><b>It tells you how things are.</b> It builds, with a heartbeat and then a beat, when there is danger: off the road where wild teams roam, at night, near an alpha or a lair, in a dungeon, with a grudge after you, or with your team low on HP. It settles once you are safe. It goes thinner when your starters are tired, and lower at night.</p>
     <p class="hint"><b>The tunes.</b> Now and then you hear a place's whole tune: when you reach a region, at dawn, and once in a while. Matches always play their tunes. Pick Classic in Settings to hear the tunes everywhere.</p></div>`);
+};
+/* w51: the ring (issue #23, phase 1). The Anvil Ring, the boxing engine, runs in the wBX scope (src/bx/ and
+   src/realm/ring/: a canvas in #v-ring, and none of its names reach ours). This part gives it a view beside the world,
+   a bar above the ring, and a way back.
+   Phase 1 boxes one bout, CPU against CPU: a fighter of the Cinderhold Boxing Club in the red corner against a visitor
+   in the blue, three rounds, judged. Ask Ma Gristle at the Anvil Ring for a BOUT. Nothing is won or lost, and nothing
+   is saved. The card of three bouts, your corner's calls and games from the world come in later phases.
+   Wraps: showView (wW51ShowView: the bar), openPause (wW51OpenPause: not in the ring), wRunAct (wW51RunAct: 'bout'),
+   showPage (wW51ShowPage: the bout waits while another page is up), renderHelp (wW51RenderHelp: #wHelpRing). */
+
+const W_RING = {
+  home: { kinds: ['minotaur', 'dwarf', 'ogre', 'golem', 'kobold', 'troll'], color: '#b8231e', light: '#ffd0a0', short: 'CBC' },
+  away: { city: 'saltmere', kinds: ['elf', 'harpy', 'vampire', 'spider', 'wraith', 'gorgon'], color: '#2a5fb8', light: '#d6e6ff', short: 'SBC' },
+};
+// the bout in the ring: plain data, never saved
+let WBX = null;
+
+$('v-ring').insertAdjacentHTML('beforebegin', `<div id="wRingBar" class="wdbar" hidden>
+  <b id="wRingTitle">A bout at the Anvil Ring</b><span id="wRingNote" class="hint"></span>
+  <button class="ghost" id="wRingAgain">Another bout</button>
+  <button class="ghost" id="wRingBack">Back to the world</button></div>`);
+$('wRingBar').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'wRingAgain') wRingBout();
+  else if (b.id === 'wRingBack') wLeaveRing();
+});
+
+function wRingCorners() {
+  const g = W_GRDS.find(x => x.id === 'g_ring'), H = W_RING.home, A = W_RING.away;
+  return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.boxing} Club` }, A)];
+}
+// a fighter from a kind, named from the free agents' names for it
+function wRingFighter(kind) { return { n: wRingName(kind), kind, num: '' }; }
+function wRingName(kind) {
+  const L = FA_NAMES[kind] || [];
+  return L.length ? L[(Math.random() * L.length) | 0] : kind[0].toUpperCase() + kind.slice(1);
+}
+/* one bout in the ring. opts: { kinds: [red, blue], seed } (a random pair from each club when not given) */
+function wRingBout(opts) {
+  const o = opts || {}, k = o.kinds || [W_RING.home.kinds, W_RING.away.kinds].map(L => L[(Math.random() * L.length) | 0]);
+  WBX = { over: null, kinds: k.slice() };
+  wBX.start({ fighters: k.map(wRingFighter), corners: wRingCorners(), mode: 'watch', seed: o.seed });
+  showView('ring');
+  wRingBarNote();
+}
+function wRingBarNote() {
+  if (!WBX) return;
+  const ph = wBX.phase, G = wBX.G;
+  $('wRingNote').textContent = WBX.over ? WBX.over.verdict : ph === 'corner' ? 'Between rounds: the corners talk, and the cut-man works.' : ph === 'kd' ? 'A knockdown: the count is on.' : G ? `${G.F[0].n} the ${G.F[0].kind} against ${G.F[1].n} the ${G.F[1].kind}. Three rounds, three judges.` : '';
+}
+function wLeaveRing() {
+  WBX = null;
+  if (WG) showView('world');
+  else { showScreen('title'); renderTitle(); }
+}
+wBX.onPhase = () => { if (UI.view === 'ring') wRingBarNote(); };
+wBX.onOver = s => { if (WBX) { WBX.over = s; wRingBarNote(); $('wRingAgain').focus(); } };
+
+const wW51ShowView = showView;
+showView = function (v) {
+  wW51ShowView(v);
+  $('wRingBar').hidden = v !== 'ring';
+  if (v === 'ring') $('runbar').hidden = true;
+};
+const wW51OpenPause = openPause;
+openPause = function () { if (UI.view === 'ring') return; return wW51OpenPause.apply(this, arguments); };
+const wW51ShowPage = showPage;
+showPage = function (p) {
+  wW51ShowPage(p);
+  if (WBX && UI.view === 'ring') wBX.pause(p !== 'play');
+};
+
+// Ma Gristle at the Anvil Ring puts on a bout (not BOXING or GAME: those are how card-game boxing scores, and the match)
+(() => {
+  const K = DB.chars.gk_ring; if (!K) return;
+  K.topics.job.t += ' And we box for real now, in the ring itself: ask me for a BOUT.';
+  K.topics.bout = { t: 'Three rounds, three judges, one of ours against a visitor. Stand at the ropes and watch.', act: 'bout' };
+})();
+const wW51RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'bout') return wRingBout(); return wW51RunAct.apply(this, arguments); };
+
+const wW51RenderHelp = renderHelp;
+renderHelp = function () {
+  wW51RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpRing') || !$('wHelpGrounds')) return;
+  const G = [...h.querySelectorAll('[id^="wHelpG"]')], after = G[G.length - 1];
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRing"><b>Real boxing.</b> The Anvil Ring is trying out boxing in the ring itself, one fighter against one. Ask Ma Gristle for a BOUT and watch: three rounds, each about 40 seconds. Fighters jab, hook and dig to the body, and they keep their guard up, slip punches and clinch. Every punch costs stamina, and a punch that lands costs health. At zero health a fighter is knocked down. Failing to beat the count is a knockout, and three knockdowns stop the bout. Otherwise three judges score each round 10–9: Brass likes power punches, Tally likes activity and Slate likes defense. Kinds box differently: a golem hits like a wall and moves like one, and a harpy is all speed and no chin. Nothing is won or lost yet.</p>`);
 };
 </script>
 </body></html>

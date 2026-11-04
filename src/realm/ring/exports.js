@@ -1,0 +1,22 @@
+/* the end of the wBX scope: what the Realm may call (w19b-engines.js, w51-ring.js). Phase 0 is the rules; phase 1 boxes
+   one bout, CPU against CPU. start(opts) puts a bout in the ring ({ fighters: [2], corners: [2], mode: 'watch', seed,
+   skill }); simBout(opts) boxes one headless and returns its summary; onPhase hears each beat (intro, round, kd, rise,
+   corner, over) and onOver the end, with the summary. The test's handles: G, rules and the pure rule functions, step
+   (one beat), and act/clinch (a fighter's move, by side). */
+return {
+  newBout: bxNewBout, knockdown: bxKnockdown, countOut: bxCountOut, bell: bxBell, roundScore: bxRoundScore, decision: bxDecision,
+  totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, rules: Object.assign({}, BX_RULES),
+  start: o => bxStart(o), simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
+  get on() { return BXP.on; }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
+  pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
+  set onOver(f) { BX_HOOK.onOver = f; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
+  // the ratings, plans, punches and judges, for the page and How to play
+  rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
+  plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),
+  punches: Object.fromEntries(BX_PUNCH_IDS.map(k => [k, { n: BX_PUNCH[k].n, head: !!BX_PUNCH[k].head, power: !!BX_PUNCH[k].power }])),
+  judges: BX_JUDGES.map(J => ({ n: J.n, likes: J.likes })),
+  // the test's handle on the ring: one beat, and a fighter's move
+  step: () => { if (BD && BD.ph !== 'over') bxBeat(BX_DT); return BD ? BD.ph : null; }, act: (side, k) => bxAct(G.F[side], k), clinch: side => bxClinch(G.F[side], G.F[1 - side]),
+  get ev() { return BXE; },
+  range: (side, k) => bxRange(G.F[side], k), dist: () => bxDist(G.F[0], G.F[1]), land: (side, k) => bxLand(G.F[side], G.F[1 - side], k),
+};
