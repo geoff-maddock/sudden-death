@@ -1,4 +1,4 @@
-/* w50: ambient music out in the world (issue #28, phases 1 to 3). Beside Sudden Death's sequencer (app/music.js, left
+/* w50: ambient music out in the world (issue #28, phases 1 to 4). Beside Sudden Death's sequencer (app/music.js, left
    alone for matches, the title and the other places), a generative engine plays slow layers for where you stand:
    a drone (root and fifth, slow swells under a slow filter), a pad (a chord every 2 to 4 bars, on a weighted random
    walk), a texture (filtered noise: a breeze), motif fragments (2 to 5 notes of the region's tune, varied, with long
@@ -17,7 +17,12 @@
    Palettes (W_AMB_PAL): each region, the towns and the dungeons, so you know where you are with your eyes shut. A
    region's weather has its own layer: fog muffles the Brinefen and sounds the foghorn, an ash storm crackles and
    rumbles in the Cindermaw, a blizzard howls and glitters in the Frostspire. Walking from one to the next crossfades
-   them. Sites and grounds keep their tunes (phase 4); so does a calm tune with no palette (W_AMB_THEME).
+   them. Special places have their own (W_AMB_PLACE): the five secret sites (the wreck creaks, the chapel and the
+   abbey have a choir, the shrine and the Road to Nowhere rise and shimmer), the Hall of Legends at the Coliseum (a
+   slow, grand drone on the League's own tune), and a lair's door. Every ground's map plays a quiet bed between games
+   with the ground's tune as its motif (a far whistle, a clap). A calm tune with no palette keeps playing as it was.
+   The full tune: now and then a palette states its whole tune, slowly: arriving in a region, at dawn, and by chance
+   every 5 to 10 minutes (never in danger), so the tunes still mean something.
    Settings: Music style, Ambient (default) or Classic (the old tunes everywhere), in SET.mstyle. No music in LAB, and
    none with Music off.
    Wraps: musicSet (wW50MusicSet: the ambient bed instead of a calm tune), musicStop (wW50MusicStop: stops the bed
@@ -43,6 +48,9 @@ const W_AMB = {
   late: .25,             // after a stall or a sleeping tab this late, the plan picks up where it was (nothing bursts out)
   settle: 1.2,           // seconds a new palette must be wanted before the bed changes (no flapping at a border)
   pause: .33,            // the bed's level while the game is paused (the tunes drop to .3 of .9)
+  theme: [300, 600],     // seconds between chance statements of the whole tune
+  arrive: 8, dawn: [6, 8],  // a statement this many seconds after reaching a region; at dawn, between these hours
+  lair: 3,               // a lair's own bed within this many tiles of its door
 };
 const W_AMB_MOOD = {
   wild: [.12, .55],      // a tile's wild-match odds at which the threat is full, and what full is worth
@@ -105,8 +113,75 @@ const W_AMB_PAL = {
 };
 // a calm tune that has an ambient palette
 const W_AMB_THEME = { w_plains: 'plains', w_bloom: 'bloom', w_tide: 'tide', w_ember: 'ember', w_rime: 'rime', w_town: 'town', w_dungeon: 'dungeon' };
+/* Special places. Their motifs come from their region's tune (the Hall: the League's own). choir: the pad sung, two
+   detuned voices a note with a slow vibrato. */
+Object.assign(W_AMB_PAL, {
+  // the Wreck of the Marigold: timbers creaking in the swell, low brass, the buoy
+  wreck: { name: 'The Wreck of the Marigold', theme: 'w_tide', root: 33, scale: 'aeolian', bpm: 48, bpmHi: 84,
+    drone: 'sine', pad: 'sine', lead: 'sawtooth', leadLp: 700, padLp: 900,
+    walk: { 0: [5, 3, 6], 5: [3, 0], 3: [6, 0, 5], 6: [0, 3] },
+    tex: { type: 'lowpass', f: 450, q: .4, vol: .06, swell: .08, depth: .8 },
+    acc: ['creak', 'creak', 'buoy', 'gull'], accNight: ['creak', 'buoy'], accGap: [12, 35] },
+  // the Frozen Chapel: a choir under the snow, a bell
+  chapel: { name: 'The Frozen Chapel', theme: 'w_rime', gain: .8, root: 40, scale: 'dorian', bpm: 50, bpmHi: 84, choir: 1,
+    drone: 'sine', pad: 'sawtooth', lead: 'sine', bellLead: 1, padLp: 1100,
+    walk: { 0: [3, 4, 6], 3: [0, 4], 4: [0, 3], 6: [3, 0] },
+    tex: { type: 'highpass', f: 6000, q: .5, vol: .015 },
+    acc: ['bell', 'shimmer'], accNight: ['bell', 'shimmer'], accGap: [25, 60] },
+  // the Abbey of the Last Lamp, in Rimewatch: the monks' choir, indoors
+  abbey: { name: 'The Abbey of the Last Lamp', theme: 'w_rime', root: 43, scale: 'aeolian', bpm: 46, bpmHi: 80, choir: 1,
+    drone: 'sine', pad: 'sawtooth', lead: 'sine', padLp: 1000,
+    walk: { 0: [5, 3], 5: [3, 0], 3: [4, 0], 4: [0, 5] },
+    tex: { type: 'lowpass', f: 220, q: .5, vol: .02 },
+    acc: ['bell'], accNight: ['bell'], accGap: [35, 80] },
+  // the Hollow Shrine, deep in the Mosswold: chimes, drips, a rising shimmer
+  shrine: { name: 'The Hollow Shrine', theme: 'w_bloom', root: 38, scale: 'dorian', bpm: 52, bpmHi: 88,
+    drone: 'sine', pad: 'sine', lead: 'sine', pluck: 1, padLp: 1600, oct: [1, 3],
+    walk: { 0: [3, 6], 3: [0, 6], 6: [0, 3] },
+    tex: { f: 2000, q: .6, vol: .025, swell: .1, depth: .5 },
+    acc: ['chime', 'rise', 'drip'], accNight: ['rise', 'owl'], accGap: [20, 50] },
+  // Vesper's Cottage: a fire in the grate, an old coach's evenings
+  cottage: { name: "Vesper's Cottage", theme: 'w_plains', gain: .6, root: 41, scale: 'mixo', bpm: 54, bpmHi: 88,
+    drone: 'sine', pad: 'triangle', lead: 'triangle', padLp: 1300,
+    walk: { 0: [3, 6, 4], 3: [0, 4], 4: [0, 3], 6: [3, 0] },
+    tex: { f: 500, q: .7, vol: .025 }, grain: { a: 'crackle', gap: [.5, 2.5] },
+    acc: ['bell', 'owl'], accNight: ['owl'], accGap: [30, 70] },
+  // the Road to Nowhere: wind on a road that ends, something rising
+  nowhere: { name: 'The Road to Nowhere', theme: 'w_night', root: 38, scale: 'harmonic', bpm: 44, bpmHi: 84,
+    drone: 'sine', pad: 'sine', lead: 'sine', waver: 1, padLp: 1200,
+    walk: { 0: [5, 4], 5: [4, 0], 4: [0, 5] },
+    tex: { f: 300, q: .7, vol: .05, swell: .1, depth: .7 },
+    acc: ['rise', 'shimmer', 'growl'], accNight: ['rise', 'growl'], accGap: [20, 55] },
+  // the Hall of Legends at the Crown Coliseum: a slow, grand drone on the League's tune
+  hall: { name: 'The Hall of Legends', theme: 'title', gain: 1.7, root: 38, scale: 'aeolian', bpm: 46, bpmHi: 80,
+    drone: 'sawtooth', droneLp: 500, droneVol: .8, pad: 'sawtooth', lead: 'sawtooth', leadLp: 1500, padLp: 1400, choir: 1,
+    walk: { 0: [5, 3, 4], 5: [3, 4], 3: [4, 0], 4: [0, 5] },
+    tex: { f: 450, q: .9, vol: .02, swell: 1.1, depth: .4 },
+    acc: ['bell', 'rise'], accNight: ['bell'], accGap: [30, 70] },
+  // a lair's door: low, a growl in the dark
+  lair: { name: "A Lair's Door", theme: 'w_dungeon', gain: 1.65, root: 26, scale: 'harmonic', bpm: 48, bpmHi: 110,
+    drone: 'sawtooth', droneLp: 220, droneVol: .8, pad: 'sine', lead: 'triangle', padLp: 700,
+    walk: { 0: [5, 4], 5: [4, 0], 4: [0, 5] },
+    tex: { type: 'lowpass', f: 90, q: .8, vol: .07 }, grain: { a: 'drip', gap: [2, 7] },
+    acc: ['growl', 'stone'], accNight: ['growl', 'stone'], accGap: [15, 40] },
+});
+// the secret sites' palettes, by location id
+const W_AMB_PLACE = { marigold: 'wreck', frozenchapel: 'chapel', hollowshrine: 'shrine', cottage: 'cottage', umbralden: 'nowhere' };
+/* Every ground's map, between games: a quiet bed on the ground's own tune, its scale and its chords, a far crowd and
+   a far whistle. Built from the grounds' themes (w26), so a new ground gets one. Their levels, measured as the rest:
+   about 0.019 RMS (a new ground starts at .9). */
+const W_AMB_GRD_GAIN = { g_ballpark: .59, g_court: .97, g_links: .78, g_lists: .79, g_lanes: 1.02, g_shed: .97, g_bowl: .89, g_ring: 1.06, g_rink: 1.2, g_sheet: .98 };
+for (const id in W_GRD_THEMES) {
+  const T = W_GRD_THEMES[id], prog = [...new Set(T.prog)], walk = {};
+  for (const d of prog.concat(prog.includes(0) ? [] : [0])) walk[d] = prog.filter(x => x !== d).concat(d === 0 ? [] : [0]).filter((x, i, a) => a.indexOf(x) === i);
+  W_AMB_PAL['grd_' + id] = { name: T.name, theme: 'wg_' + id, ground: id, root: T.root - 12, scale: T.scale, bpm: 56, bpmHi: 92,
+    drone: 'sine', pad: T.pad === 'square' ? 'triangle' : T.pad, lead: T.lead, leadLp: 1800, padLp: 1400, gain: W_AMB_GRD_GAIN[id] || .9,
+    walk, tex: { f: 480, q: .8, vol: .02, swell: .5, depth: .4 },
+    acc: ['whistle', 'clap', 'bell'], accNight: ['owl', 'whistle'], accGap: [25, 60] };
+}
+const W_AMB_REGIONS = Object.keys(W_MUSIC_REGION);   // a region palette's key is its region's
 if (SET.mstyle == null) SET.mstyle = 'ambient';
-const WAMB = { i: 0, mood: null, moodKey: '', moodAt: 0, pal: null, low: false, starts: 0, want: null, killT: 0, timer: null, gen: null, ev: null, t0: 0, ch: null, ringing: 0, peak: 0, log: [], noise: null, ir: null };
+const WAMB = { i: 0, region: null, dawnDay: null, mood: null, moodKey: '', moodAt: 0, pal: null, low: false, starts: 0, want: null, killT: 0, timer: null, gen: null, ev: null, t0: 0, ch: null, ringing: 0, peak: 0, log: [], noise: null, ir: null };
 // live voices are counted per bed (ch.live), so a stopped bed's tails never hold the next one back; ringing counts all
 Object.defineProperty(WAMB, 'live', { get: () => WAMB.ch ? WAMB.ch.live : 0, enumerable: true });
 
@@ -135,8 +210,8 @@ function wAmbGen(key, seed, mood) {
   const pick = a => a[Math.floor(r() * a.length)], span = ([a, b]) => a + r() * (b - a), mix = (a, b, i) => a + (b - a) * i;
   // the walk leans to the first choices: weights 3, 2, 1
   const walk = d => { const o = (P.walk[d] || [0]).filter(x => x !== d), w = o.map((x, i) => Math.max(1, 3 - i)), s = w.reduce((a, b) => a + b, 0); let x = r() * s; for (let i = 0; i < o.length; i++) if ((x -= w[i]) < 0) return o[i]; return o[0]; };
-  const S = { t: { chord: 0, motif: 6 + r() * 8, acc: span(P.accGap) * .5, gust: 0, pulse: 0, grain: 0 }, chord: null, last: '', lastAt: -1 };
-  return function next() { for (;;) {
+  const S = { t: { chord: 0, motif: 6 + r() * 8, acc: span(P.accGap) * .5, gust: 0, pulse: 0, grain: 0, theme: span(W_AMB.theme) }, chord: null, last: '', lastAt: -1 };
+  const next = function () { for (;;) {
     const k = Object.keys(S.t).reduce((a, b) => S.t[a] <= S.t[b] ? a : b), t = S.t[k], m = M(), I = m.i || 0;
     const wx = P.wx && m.wx === P.wx.kind ? P.wx : null;
     const beat = 60 / mix(P.bpm, P.bpmHi, I), bar = beat * 4, step = beat / 4 * 1.6;
@@ -164,6 +239,14 @@ function wAmbGen(key, seed, mood) {
       S.last = key; S.lastAt = i; S.t.motif += at + span(gap);
       return { k, t, frag: key, src, answer: ans, notes: play, dur: at };
     }
+    if (k === 'theme') {
+      // the whole tune, slowly, on the lead; not in danger (it waits a minute and tries again)
+      if (I > W_AMB.quietAt) { S.t.theme = t + 60; continue; }
+      const play = []; let at = 0;
+      tunes.day.forEach(([d, l]) => { const len = Math.min(l, 8) * step; play.push([degNote(P, d, lo), at, len]); at += len; });
+      S.t.theme = t + at + span(W_AMB.theme); S.t.motif = Math.max(S.t.motif, t + at + 8);
+      return { k, t, src: P.theme, notes: play, dur: at };
+    }
     if (k === 'acc') {
       S.t.acc += span(P.accGap) * (wx ? .6 : 1);
       if (I > W_AMB.quietAt) continue;
@@ -181,6 +264,10 @@ function wAmbGen(key, seed, mood) {
     S.t.gust += span([3, 7]);
     return { k: 'gust', t, f: P.tex.f * span([.6, 1.5]), v: P.tex.vol * W_AMB.tex * span([.5, 1.2]) * (1 - .6 * I) };
   } };
+  // ask for the whole tune at plan time t (arriving, dawn), unless it is due sooner anyway
+  next.soon = t => { S.t.theme = Math.min(S.t.theme, t); };
+  next.S = S;
+  return next;
 }
 // the first secs seconds of a palette's music, for tests: at a fixed intensity, by day or night, in weather
 function wAmbPlan(key, seed, secs, i, night, wx) { const g = wAmbGen(key, seed, () => ({ i: i || 0, night: !!night, wx: wx || null })), out = []; let e; while ((e = g()).t < secs) out.push(e); return out; }
@@ -288,11 +375,22 @@ const W_AMB_SND = {
   stone: (c, e, t, P, r) => wAmbNoise(c, t, .35, 'lowpass', 180, .7, .06, { a: .02, r: .3, off: r() }),
   growl: (c, e, t, P) => { const hz = noteHz(P.root + 12); wAmbVoice(c, t, hz, 1.6, 'sawtooth', .02, { a: .5, r: .8, lp: 260, glide: hz * .85 }); },
   cricket: (c, e, t, P, r) => { const hz = 4300 + r() * 400; for (let i = 0; i < 3; i++) wAmbVoice(c, t + i * .045, hz, .018, 'sine', .0035, { a: .003, r: .01 }); },
+  // timbers: a slow sawtooth buzz through a narrow band, bending down
+  creak: (c, e, t, P, r) => { const n = 1 + Math.floor(r() * 2); for (let i = 0; i < n; i++) { const f = 700 + r() * 500; wAmbVoice(c, t + i * .7, 30 + r() * 20, .5 + r() * .4, 'sawtooth', .05, { a: .1, r: .25, glide: 24, lp: f }); } },
+  // a rising shimmer: a high note sliding up an octave, and a few sparkles
+  rise: (c, e, t, P, r) => { const hz = noteHz(degNote(P, [0, 4][Math.floor(r() * 2)], 3)); wAmbVoice(c, t, hz, 3, 'sine', .006, { a: 1.2, r: 2, glide: hz * 2, vib: .01 }); for (let i = 0; i < 3; i++) wAmbVoice(c, t + 1 + i * .5, hz * (2 + r()), .02, 'sine', .004, { a: .003, r: .8 }); },
+  // a ground between games: a far whistle, and a few hands clapping
+  whistle: (c, e, t, P, r) => { const hz = 2600 + r() * 600; for (const d of r() < .5 ? [0] : [0, .5]) wAmbVoice(c, t + d, hz, .28, 'sine', .006, { a: .01, r: .05, vib: .02, lp: 5000 }); },
+  clap: (c, e, t, P, r) => { const n = 3 + Math.floor(r() * 6); for (let i = 0; i < n; i++) wAmbNoise(c, t + i * (.12 + r() * .1), .01, 'bandpass', 1400 + r() * 600, 1.2, .03, { a: .001, r: .05, off: r() }); },
   crackle: (c, e, t, P, r) => wAmbNoise(c, t, .008, 'bandpass', 2500 + r() * 2500, 1.5, .025, { a: .001, r: .02, off: r() }),
 };
 function wAmbPlay(c, e, t) {
   const P = W_AMB_PAL[WAMB.pal];
-  if (e.k === 'chord') e.notes.forEach((m, i) => wAmbVoice(c, t + i * .15, noteHz(m), e.dur * .55, P.pad, .022, { a: e.dur * .4, r: e.dur * .5, lp: P.padLp }));
+  // the pad: a voice a note, or sung (two detuned voices with a slow vibrato)
+  if (e.k === 'chord') e.notes.forEach((m, i) => { const o = { a: e.dur * .4, r: e.dur * .5, lp: P.padLp };
+    if (P.choir) [-7, 7].forEach(dt => wAmbVoice(c, t + i * .15, noteHz(m) * Math.pow(2, dt / 1200), e.dur * .55, P.pad, .012, Object.assign({ vib: .004 }, o)));
+    else wAmbVoice(c, t + i * .15, noteHz(m), e.dur * .55, P.pad, .022, o); });
+  else if (e.k === 'theme') e.notes.forEach(([m, at, len]) => { wAmbVoice(c, t + at, noteHz(m), len * .9, P.lead, .03, { a: .08, r: 1.2, lp: P.leadLp || 2600, vib: P.waver ? .006 : 0 }); wAmbVoice(c, t + at, noteHz(m) / 2, len * .9, 'sine', .012, { a: .1, r: 1.2 }); });
   else if (e.k === 'motif') e.notes.forEach(([m, at, len]) => {
     // a pluck (wood), a waver (over water) or a bell (an octave above): the lead's colour
     const hz = noteHz(m), env = P.pluck ? { a: .005, r: .7 } : { a: .06, r: .9 };
@@ -312,6 +410,9 @@ function wAmbTick() {
   if (key !== WAMB.moodKey || now - WAMB.moodAt > 1) { WAMB.mood = wMusicMood(); WAMB.moodKey = key; WAMB.moodAt = now; }
   wAmbEase(WAMB.mood.intensity, dt);
   const ch = WAMB.ch, P = W_AMB_PAL[WAMB.pal], I = WAMB.i, tired = WAMB.mood.tint.tired, night = WAMB.mood.tint.night, wx = wAmbWx();
+  // dawn in a region: its whole tune, once a day
+  const h = wHour();
+  if (W_AMB_REGIONS.includes(WAMB.pal) && h >= W_AMB.dawn[0] && h < W_AMB.dawn[1] && WAMB.dawnDay !== WG.dayAbs) { WAMB.dawnDay = WG.dayAbs; WAMB.gen.soon(now - WAMB.t0 + W_AMB.look + 2); }
   // a parameter only gets a new target when it moves (not 40 times a second toward the same value)
   const to = (prm, v, tau) => { if (prm.wAmbTo === undefined || Math.abs(prm.wAmbTo - v) > Math.abs(v) * .01 + 1e-5) { prm.setTargetAtTime(v, now, tau); prm.wAmbTo = v; } };
   to(ch.vol.gain, SET.mvol * W_AMB.vol * (P.gain || 1) * (UI.paused ? W_AMB.pause : 1), .2);
@@ -337,6 +438,8 @@ function wAmbStart(key) {
   // the seed is the palette, the day and the hour, and how many beds have started, so coming back is never a replay
   WAMB.pal = key; WAMB.ch = wAmbChain(c); WAMB.gen = wAmbGen(key, (wAmbSeed(key) ^ Math.imul(++WAMB.starts, 104729)) >>> 0, () => ({ i: WAMB.i, night: !!(WAMB.mood && WAMB.mood.tint.night), wx: wAmbWx() })); WAMB.mood = wMusicMood(); WAMB.moodKey = ''; WAMB.at = c.currentTime; WAMB.ev = WAMB.gen(); WAMB.t0 = c.currentTime + .1; WAMB.log = [];
   WAMB.ch.fade.gain.setValueAtTime(0, c.currentTime); WAMB.ch.fade.gain.linearRampToValueAtTime(1, c.currentTime + fin); WAMB.lastIn = fin;
+  // arriving in a region (not coming back to it after a match): its whole tune, soon
+  if (W_AMB_REGIONS.includes(key) && WAMB.region !== key) { WAMB.gen.soon(W_AMB.arrive); WAMB.region = key; }
   wAmbHold(c, W_AMB_PAL[key]);
   clearInterval(WAMB.timer); WAMB.timer = setInterval(wAmbTick, 200); wAmbTick();
 }
@@ -358,6 +461,23 @@ function wAmbEase(target, dt) {
   WAMB.i += (target - WAMB.i) * (1 - Math.exp(-dt / tau));
   return WAMB.i;
 }
+// a special place's palette, or null: a secret site, a ground's map, the Hall of Legends (the Coliseum), the abbey
+// (inside it, in Rimewatch), or a lair's door
+function wAmbPlace() {
+  if (!WG) return null;
+  const m = wCurMap(); if (!m) return null;
+  const site = wAmbSite(); if (site) return W_AMB_PLACE[site.id] || null;
+  if (m.grd) return W_AMB_PAL['grd_' + m.grd] ? 'grd_' + m.grd : null;
+  if (WG.map === 'coliseum') return 'hall';
+  if (WG.map === 'rimewatch') { const b = wAmbAbbey(); if (b && WG.x > b.x && WG.x < b.x + b.w - 1 && WG.y > b.y && WG.y < b.y + b.h - 1) return 'abbey'; }
+  if (m.kind === 'world') { const L = wAmbLairNear(); if (L) return 'lair'; }
+  return null;
+}
+function wAmbAbbey() { const d = DB.towns.find(t => t.id === 'rimewatch'); return d && (d.buildings || []).find(b => /ABBEY/.test(b.sign || '')) || null; }
+// an unbeaten, found lair within W_AMB.lair tiles of where you stand
+function wAmbLairNear() {
+  return DB.locs.find(l => l.kind === 'lair' && !(l.hidden && !wFlag(l.hidden)) && !wFlag('alpha_' + l.alpha) && Math.hypot(l.x - WG.x, l.y - WG.y) <= W_AMB.lair) || null;
+}
 // the site whose map you are in (the wreck, the cottage, the chapel...), or null
 function wAmbSite() { return WG ? DB.locs.find(l => l.kind === 'site' && l.map === WG.map) || null : null; }
 // the nearest unbeaten alpha or lair on this map, in tiles
@@ -373,7 +493,7 @@ function wAmbAlphaNear(m) {
   return best;
 }
 /* What the music should say here: { place, palette, intensity, tint, why }. place is world, town, dungeon, site,
-   ground or lair; intensity the target (0 to 1); tint { night, wx, tired, hurt }; why the threats, by name. */
+   ground, hall, abbey or lair; intensity the target (0 to 1); tint { night, wx, tired, hurt }; why the threats, by name. */
 function wMusicMood() {
   const M = W_AMB_MOOD, m = WG && wCurMap();
   if (!m || !RUN) return { place: 'world', palette: null, intensity: 0, tint: {}, why: [] };
@@ -389,7 +509,7 @@ function wMusicMood() {
   if (world && !road && night) src.night = M.night;
   if (hp < M.hurt[0]) src.hurt = (M.hurt[0] - hp) / M.hurt[0] * M.hurt[1];
   const intensity = 1 - Object.values(src).reduce((a, s) => a * (1 - s), 1);
-  const place = m.grd ? 'ground' : site ? 'site' : m.kind === 'town' || m.kind === 'dungeon' ? m.kind : near && near.lair && near.d <= 3 ? 'lair' : 'world';
+  const pl = wAmbPlace(), place = m.grd ? 'ground' : site ? 'site' : pl === 'hall' ? 'hall' : pl === 'abbey' ? 'abbey' : m.kind === 'town' || m.kind === 'dungeon' ? m.kind : pl === 'lair' ? 'lair' : 'world';
   return { place, site: site ? site.id : null, palette: wAmbPalFor(wMusicHere()), intensity: Math.round(intensity * 1000) / 1000,
     tint: { night, wx, tired, hurt: hp < M.hurt[0] }, why: Object.keys(src).filter(k => src[k] > .05) };
 }
@@ -398,8 +518,7 @@ function wMusicMood() {
 // a tune's palette; the night road (off the road after dark) plays its region's, tinted for night, so stepping on
 // and off a road at night never swaps the bed for the tune
 function wAmbPalFor(theme) {
-  // sites (the wreck, the cottage, the chapel) and grounds keep their tunes until they have palettes (phase 4)
-  if (wAmbSite()) return null;
+  const pl = wAmbPlace(); if (pl) return pl;
   if (theme === 'w_night') return WG ? W_AMB_THEME[W_MUSIC_REGION[wRegionHere()]] || null : null;
   return W_AMB_THEME[theme] || null;
 }
@@ -434,7 +553,7 @@ function wAmbSettingsRow() {
   const box = $('modalBox'), mv = box && box.querySelector('#sMvol'); if (!mv || box.querySelector('#wMstyle')) return;
   const amb = SET.mstyle !== 'classic';
   mv.closest('label').insertAdjacentHTML('afterend', `<label class="rng"><span>Music style</span><select id="wMstyle"><option value="ambient" ${amb ? 'selected' : ''}>Ambient</option><option value="classic" ${amb ? '' : 'selected'}>Classic</option></select></label>
-    <p class="hint" id="wMstyleHint" style="margin:-6px 12px 0;font-size:14px">${amb ? 'Out in the world: slow, quiet music for the place, with the tune heard now and then. It builds when danger is near. Every region, the towns and the dungeons have their own; special places and grounds still play their tunes.' : 'Every place plays its tune, as before.'} Matches always play their tunes.</p>`);
+    <p class="hint" id="wMstyleHint" style="margin:-6px 12px 0;font-size:14px">${amb ? 'Out in the world: slow, quiet music for the place, with the tune heard now and then. It builds when danger is near. Every region, town, dungeon, special place and ground has its own.' : 'Every place plays its tune, as before.'} Matches always play their tunes.</p>`);
   $('wMstyle').onchange = e => { SET.mstyle = e.target.value; saveSettings(); const [t, m] = musicWanted(); musicSet(t, m); const r = $('wMstyle').closest('label'), h = $('wMstyleHint'); r.remove(); h.remove(); wAmbSettingsRow(); };
   const hint = [...box.querySelectorAll('p.hint')].pop();
   if (WAMB.pal && hint && /Music starts after/.test(hint.innerHTML)) hint.innerHTML = hint.innerHTML.replace('Music starts after your next click or key press.', `Now playing: <b>${esc(W_AMB_PAL[WAMB.pal].name)}</b> (ambient).`);
@@ -446,5 +565,5 @@ const wW50RenderHelp = renderHelp;
 renderHelp = function () {
   wW50RenderHelp();
   const sec = $('wHelp'); if (!sec || $('wHelpAmb')) return;
-  sec.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpAmb"><b>Music style.</b> Out in the world the music is ambient: slow and quiet, made fresh as you walk, with bits of the region's tune now and then. It also tells you how things are: it builds, with a heartbeat and then a beat, when you are in danger (off the road where wild teams roam, at night, near an alpha or a lair, in a dungeon, with a grudge after you, or with your team low on HP), and settles after. It goes thinner when your starters are tired, and lower at night. Every region sounds like itself (a breeze on the plains, chimes in the Mosswold, surf and a foghorn on the Brinefen, crackle and a far anvil in the Cindermaw, bells and ice in the Frostspire), and so do the towns and the dungeons; fog, ash and blizzards can be heard. Special places and grounds still play their tunes. Matches always play their tunes. Pick Classic in Settings for the tunes everywhere.</p>`);
+  sec.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpAmb"><b>Music style.</b> Out in the world the music is ambient: slow and quiet, made fresh as you walk, with bits of the region's tune now and then. It also tells you how things are: it builds, with a heartbeat and then a beat, when you are in danger (off the road where wild teams roam, at night, near an alpha or a lair, in a dungeon, with a grudge after you, or with your team low on HP), and settles after. It goes thinner when your starters are tired, and lower at night. Every region sounds like itself (a breeze on the plains, chimes in the Mosswold, surf and a foghorn on the Brinefen, crackle and a far anvil in the Cindermaw, bells and ice in the Frostspire), and so do the towns and the dungeons; fog, ash and blizzards can be heard. Special places have their own: the creaking wreck, the chapel's and the abbey's choirs, the shrine, the Hall of Legends, a lair's door, and every ground between games. Now and then you hear a place's whole tune, slowly: when you reach a region, at dawn, and once in a while. Matches always play their tunes. Pick Classic in Settings for the tunes everywhere.</p>`);
 };

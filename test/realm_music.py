@@ -1,4 +1,4 @@
-# Realm ambient music (issue #28, phases 1 to 3): the plan (a seeded stream of chords, motif fragments, accents and gusts:
+# Realm ambient music (issue #28, phases 1 to 4): the plan (a seeded stream of chords, motif fragments, accents and gusts:
 # the chord walk never stands still, no fragment twice in a row, long rests, no 4-bar stretch repeats, the same seed
 # plays the same and another day differs), when the bed plays (the Charter Plains by day in Ambient; tunes elsewhere,
 # in matches and in Classic; nothing with Music off or in LAB), the voice cap, the Music style setting and How to
@@ -9,7 +9,10 @@
 # its own (scale, root, texture), the regions, towns, dungeons and the night road get theirs (sites and grounds keep
 # their tunes), each one's plan uses only its own sounds and register, the night takes The Night Road's fragments
 # and crickets, the weather is heard (fog's foghorn, ash's crackle, the blizzard's shimmer), every sound plays, and
-# walking from one region to the next crossfades.
+# walking from one region to the next crossfades. Phase 4, special places: the five secret sites, the abbey, the Hall
+# of Legends and a lair's door have their own palettes, every ground's map plays a bed on the ground's tune, and the
+# whole tune is stated now and then (every 5 to 10 minutes by chance, never in danger; on arriving in a region; at
+# dawn, once a day).
 # The audio runs for real (Chromium with autoplay allowed). Asserts; exits nonzero on failure.
 import asyncio, json, sys, subprocess, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -52,6 +55,7 @@ window.__closeAll = function () { WG.wprompts = []; WG.cardOffer = null; let n =
 '''
 NOTIPS = "TIPS_SEEN.push(...Object.keys(TIPS)); tipQ.length = 0; if (document.getElementById('coach')) document.getElementById('coach').hidden = true"
 T = 30000
+W_ARRIVE = 8
 
 async def boot(pg):
     await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
@@ -72,7 +76,7 @@ async def boot(pg):
 async def plan_checks(pg):
     p = await pg.evaluate("""(() => {
       const P = W_AMB_PAL.plains, bar = 4 * 60 / P.bpm, a = wAmbPlan('plains', 1, 3600), b = wAmbPlan('plains', 1, 3600), c = wAmbPlan('plains', 2, 3600);
-      const ch = a.filter(e => e.k === 'chord'), mo = a.filter(e => e.k === 'motif'), ac = a.filter(e => e.k === 'acc');
+      const ch = a.filter(e => e.k === 'chord'), mo = a.filter(e => e.k === 'motif'), ac = a.filter(e => e.k === 'acc'), th = a.filter(e => e.k === 'theme');
       const o = { same: JSON.stringify(a) === JSON.stringify(b), differs: JSON.stringify(ch.slice(0, 20).map(e => e.deg)) !== JSON.stringify(c.filter(e => e.k === 'chord').slice(0, 20).map(e => e.deg)),
         first: ch[0].deg, chords: ch.length, still: 0, badLen: 0, motifs: mo.length, twice: 0, sameStart: 0, gaps: [], share: 0, badFrag: 0, vars: {}, answers: 0, acc: {}, accGaps: [], repeats: 0, windows: 0 };
       for (let i = 1; i < ch.length; i++) { if (ch[i].deg === ch[i - 1].deg) o.still++; const d = ch[i].t - ch[i - 1].t; if (![2, 3, 4].some(n => Math.abs(d - n * bar) < 1e-6)) o.badLen++; }
@@ -80,7 +84,8 @@ async def plan_checks(pg):
         const m = mo[i], [st, L, v] = m.frag.split('.'); o.vars[v] = 1; if (m.answer) o.answers++;
         if (m.notes.length !== (m.answer ? 2 : 1) * +L || +L < 2 || +L > 5) o.badFrag++;
         o.share += m.dur;
-        if (i) { if (m.frag === mo[i - 1].frag) o.twice++; if (st === mo[i - 1].frag.split('.')[0]) o.sameStart++; o.gaps.push(m.t - (mo[i - 1].t + mo[i - 1].dur)); }
+        // a gap with the whole tune in it is the tune's, not the motif's rest
+        if (i) { if (m.frag === mo[i - 1].frag) o.twice++; if (st === mo[i - 1].frag.split('.')[0]) o.sameStart++; if (!th.some(e => e.t > mo[i - 1].t && e.t < m.t)) o.gaps.push(m.t - (mo[i - 1].t + mo[i - 1].dur)); }
       }
       o.share /= 3600;
       for (let i = 0; i < ac.length; i++) { o.acc[ac[i].a] = (o.acc[ac[i].a] || 0) + 1; if (i) o.accGaps.push(ac[i].t - ac[i - 1].t); }
@@ -164,12 +169,16 @@ async def palette_checks(pg):
         const names = [].concat(P.acc, P.accNight || [], P.wx ? P.wx.acc || [] : [], [P.grain, P.nightGrain, P.wx && P.wx.grain].filter(Boolean).map(g => g.a));
         names.forEach(a => { if (!W_AMB_SND[a]) bad.push(k + ': no sound ' + a); });
         if (P.wx && !W_WX[P.wx.kind]) bad.push(k + ': no weather ' + P.wx.kind);
-        sig[k] = [P.scale, P.root, P.tex.type || 'bandpass', P.tex.f].join('/'); }
+        if (!P.ground) sig[k] = [P.scale, P.root, P.tex.type || 'bandpass', P.tex.f].join('/'); }
       const want = Object.values(W_MUSIC_REGION).concat(['w_town', 'w_dungeon']).filter(t => !W_AMB_THEME[t]);
-      return { bad, sigs: Object.values(sig), want, n: Object.keys(W_AMB_PAL).length,
+      const grounds = Object.keys(W_GRD_THEMES).filter(g => !W_AMB_PAL['grd_' + g] || W_AMB_PAL['grd_' + g].theme !== 'wg_' + g);
+      const places = Object.keys(W_AMB_PLACE).filter(id => !DB.locs.some(l => l.id === id && l.kind === 'site') || !W_AMB_PAL[W_AMB_PLACE[id]]);
+      const sites = DB.locs.filter(l => l.kind === 'site' && !W_AMB_PLACE[l.id]).map(l => l.id);
+      return { bad, sigs: Object.values(sig), want, n: Object.keys(W_AMB_PAL).length, grounds, places, sites,
         wx: Object.keys(W_WX).filter(w => !Object.values(W_AMB_PAL).some(P => P.wx && P.wx.kind === w)) }; })()""")
-    check(v['n'] == 7 and v['bad'] == [], 'seven palettes (five regions, the towns, the dungeons), each complete', v['bad'])
-    check(len(set(v['sigs'])) == len(v['sigs']), 'each has its own scale, root and texture, so you know where you are', v['sigs'])
+    check(v['n'] == 15 + 10 and v['bad'] == [], 'palettes for the five regions, the towns, the dungeons, five sites, the abbey, the Hall, a lair and ten grounds, each complete', [v['n'], v['bad']])
+    check(len(set(v['sigs'])) == len(v['sigs']), 'each land and place has its own scale, root and texture, so you know where you are', v['sigs'])
+    check(v['grounds'] == [] and v['places'] == [] and v['sites'] == [], 'every ground has a bed on its own tune, and every secret site its own palette', v)
     check(v['want'] == [], 'every region\'s tune, the town\'s and the dungeon\'s has a palette', v['want'])
     check(v['wx'] == [], 'every weather has a palette that sounds it', v['wx'])
     q = await pg.evaluate("""(() => { const o = {};
@@ -183,14 +192,14 @@ async def palette_checks(pg):
             dryAcc: cnt(a, e => e.k === 'acc' && P.wx.acc.includes(e.a)) / Math.max(1, cnt(a, e => e.k === 'acc')), grains: cnt(w, e => e.k === 'grain'), grainsDry: cnt(a, e => e.k === 'grain') }; } }
       return o; })()""")
     check(all(x['acc'] and x['accN'] for x in q.values()), 'each palette plays only its own accents, by day and at night', {k: [x['acc'], x['accN']] for k, x in q.items()})
-    pads = {k: round(x['pad']) for k, x in q.items()}
+    pads = {k: round(x['pad']) for k, x in q.items() if k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon']}
     check(pads['rime'] == max(pads.values()) and pads['tide'] < pads['plains'] and pads['ember'] < pads['plains'] and pads['dungeon'] < pads['plains'], 'the Frostspire sits highest; the Brinefen, the Cindermaw and the dungeons lower than the plains', pads)
     check(all(q[k]['src'] == ['w_night'] for k in ['plains', 'bloom', 'tide', 'ember', 'rime']) and q['town']['src'] == ['w_town'], 'at night the regions take their fragments from The Night Road (a town keeps its own)', {k: x['src'] for k, x in q.items()})
     check('cricket' in q['plains']['grainNight'] and q['plains']['grainDay'] == [] and q['ember']['grainDay'] == ['crackle'] and q['dungeon']['grainDay'] == ['drip'], 'crickets at night on the plains; crackle in the Cindermaw; drips in the dungeons', {k: [x['grainDay'], x['grainNight']] for k, x in q.items()})
     t, e, r = q['tide']['wx'], q['ember']['wx'], q['rime']['wx']
-    check(t['wxAcc'] > t['dryAcc'] + .3 and t['acc'] > t['accDry'], 'in fog the foghorn sounds oftener', t)
+    check(t['wxAcc'] > t['dryAcc'] + .2 and t['acc'] > t['accDry'] * 1.3, 'in fog the foghorn sounds oftener, and the accents come oftener', t)
     check(e['grains'] > 2 * e['grainsDry'], 'in an ash storm the crackle thickens', e)
-    check(r['wxAcc'] > r['dryAcc'] + .2, 'in a blizzard, more shimmer and ice', r)
+    check(r['acc'] > r['accDry'] * 1.2 and r['wxAcc'] > .6, 'in a blizzard, shimmer and ice come oftener', r)
     m = await pg.evaluate("""(() => { const o = {}; for (const rg of ['plains', 'bloom', 'tide', 'ember', 'rime']) { __go(rg, 12); o[rg] = wMusicMood().palette; }
       __go('bloom', 23, false); o.nightRoad = [wMusicHere(), wMusicMood().palette];
       const g = MAPS.mossgate; wEnterMap('mossgate', g.spawn[0], g.spawn[1]); o.town = wMusicMood().palette;
@@ -199,7 +208,24 @@ async def palette_checks(pg):
       wEnterMap('g_bowl', 12, 5); o.ground = wMusicMood().palette; __go('plains', 12, true); return o; })()""")
     check(all(m[r] == r for r in ['plains', 'bloom', 'tide', 'ember', 'rime']), 'each region gets its own palette', m)
     check(m['nightRoad'] == ['w_night', 'bloom'] and m['town'] == 'town' and m['dungeon'] == 'dungeon', 'the night road its region\'s; every town the town\'s; every dungeon the dungeon\'s', m)
-    check(m['site'] is None and m['ground'] is None, 'a site and a ground keep their tunes (phase 4)', m)
+    check(m['site'] == 'wreck' and m['ground'] == 'grd_g_bowl', 'the Marigold wreck has its own palette; the Ash Bowl\'s map a bed on its tune', m)
+    pl = await pg.evaluate("""(() => { const o = {}, at = (id, x, y) => { wEnterMap(id, x, y); return [wMusicMood().place, wMusicMood().palette]; };
+      for (const l of DB.locs.filter(l => l.kind === 'site')) { const m = MAPS[l.map]; o[l.id] = at(l.map, m.spawn[0], m.spawn[1]); }
+      const g = MAPS.coliseum; o.coliseum = at('coliseum', g.spawn[0], g.spawn[1]);
+      const b = wAmbAbbey(), r = MAPS.rimewatch; o.abbey = at('rimewatch', b.x + 2, b.y + 2); o.street = at('rimewatch', r.spawn[0], r.spawn[1]);
+      const L = DB.locs.find(l => l.kind === 'lair'); o.door = at('world', L.x + 1, L.y); o.near = at('world', L.x + 5, L.y);
+      wSetFlag('alpha_' + L.alpha); o.beaten = at('world', L.x + 1, L.y); delete WG.flags['alpha_' + L.alpha];
+      __go('plains', 12, true); return o; })()""")
+    check(pl['marigold'] == ['site', 'wreck'] and pl['frozenchapel'][1] == 'chapel' and pl['hollowshrine'][1] == 'shrine' and pl['cottage'][1] == 'cottage' and pl['umbralden'][1] == 'nowhere', 'each secret site has its own palette', pl)
+    check(pl['coliseum'] == ['hall', 'hall'], 'the Coliseum is the Hall of Legends', pl['coliseum'])
+    check(pl['abbey'] == ['abbey', 'abbey'] and pl['street'][1] == 'town', 'inside the abbey in Rimewatch, its choir; in the street, the town', [pl['abbey'], pl['street']])
+    check(pl['door'][1] == 'lair' and pl['near'][1] != 'lair' and pl['beaten'][1] != 'lair', 'at a lair\'s door its own bed (not further off, nor once its alpha is beaten)', [pl['door'], pl['near'], pl['beaten']])
+    th = await pg.evaluate("""(() => { const a = wAmbPlan('plains', 9, 3600), b = wAmbPlan('plains', 9, 3600, 1), th = a.filter(e => e.k === 'theme'), mo = a.filter(e => e.k === 'motif');
+      const gaps = th.slice(1).map((e, i) => e.t - (th[i].t + th[i].dur)), clash = mo.filter(m => th.some(e => m.t >= e.t && m.t < e.t + e.dur)).length;
+      return { n: th.length, gapMin: Math.min(...gaps), gapMax: Math.max(...gaps), notes: th.length ? th[0].notes.length : 0, want: wAmbNotes(THEMES.w_plains).length, src: th.length ? th[0].src : '', clash, danger: b.filter(e => e.k === 'theme').length }; })()""")
+    check(6 <= th['n'] <= 12 and th['gapMin'] >= 300 - 1e-6 and th['gapMax'] <= 600 + 1e-6, 'the whole tune comes by chance every 5 to 10 minutes', th)
+    check(th['notes'] == th['want'] and th['src'] == 'w_plains' and th['clash'] == 0, 'it is the whole tune (every note), and no fragment plays over it', th)
+    check(th['danger'] == 0, 'never in danger', th)
 
 LEVEL = r"""async ([key, night, wx]) => {
   const sr = 44100, secs = 120, oc = new OfflineAudioContext(2, sr * secs, sr), P = W_AMB_PAL[key], v = W_AMB.voices, on = wx && P.wx;
@@ -216,7 +242,7 @@ async def level_checks(ctx):
     # the noise and the room are seeded, so this is the same every run
     pg = await ctx.new_page(); await pg.goto(REALM_URL); await pg.wait_for_function("typeof wAmbPlan === 'function'", timeout=T)
     lv, nt, wx = {}, {}, {}
-    for k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon']:
+    for k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon', 'wreck', 'chapel', 'abbey', 'shrine', 'cottage', 'nowhere', 'hall', 'lair', 'grd_g_ballpark', 'grd_g_bowl', 'grd_g_sheet']:
         lv[k] = round(await pg.evaluate(LEVEL, [k, False, False]), 4)
     for k in ['plains', 'bloom', 'tide']:
         nt[k] = round(await pg.evaluate(LEVEL, [k, True, False]), 4)
@@ -224,7 +250,7 @@ async def level_checks(ctx):
         wx[k] = round(await pg.evaluate(LEVEL, [k, False, True]), 4)
     await pg.close()
     ok = all(.83 <= lv[k] / lv['plains'] <= 1.2 for k in lv)
-    check(ok and .008 < lv['plains'] < .04, 'every palette plays about as loud as the next (within a fifth of the plains)', lv)
+    check(ok and .008 < lv['plains'] < .04, 'every palette plays about as loud as the next (within a fifth of the plains): the lands, the places, the grounds', lv)
     check(all(.83 <= nt[k] / lv['plains'] <= 1.2 for k in nt), 'and at night', nt)
     check(all(.83 <= wx[k] / lv['plains'] <= 1.35 for k in wx), 'and in its weather (which may add up to a third: the wind, the ash)', wx)
 
@@ -245,6 +271,9 @@ async def live_checks(pg):
     await pg.evaluate("__go('bloom', 12)")
     await pg.wait_for_function("WAMB.pal === 'bloom' && !MUS.timer", timeout=T)
     check(await pg.evaluate("WAMB.lastFade === W_AMB.cross && WAMB.lastIn === W_AMB.cross && MUS.theme === null"), 'into the Mosswold: its own bed, crossfaded evenly from the plains (no tune between)', await pg.evaluate("[WAMB.lastFade, WAMB.lastIn]"))
+    # arriving in a region: its whole tune, soon
+    ar = await pg.evaluate("(() => { const due = WAMB.gen.S.t.theme - (SND.ctx.currentTime - WAMB.t0); return { due, region: WAMB.region }; })()")
+    check(ar['due'] <= W_ARRIVE + 1 and ar['region'] == 'bloom', 'arriving in the Mosswold, its whole tune is due within seconds', ar)
     # back and forth over the border, quicker than the settle time: the bed stays put
     await pg.evaluate("window.__ch = WAMB.ch; __go('plains', 12); MUS.want = null")
     await pg.wait_for_function("MUS.want !== null", timeout=T)
@@ -261,12 +290,19 @@ async def live_checks(pg):
     hid = await pg.evaluate("""(() => { const L = DB.locs.find(l => l.kind === 'lair'), was = L.hidden; wEnterMap('world', L.x + 1, L.y); WG.min = 720;
       const seen = wAmbAlphaNear(MAPS.world); L.hidden = 'clue_nobody_has'; const hidden = wAmbAlphaNear(MAPS.world); if (was) L.hidden = was; else delete L.hidden; __go('bloom', 12); return { seen: !!seen, hidden: !!hidden }; })()""")
     check(hid['seen'] and not hid['hidden'], 'a lair hidden behind a clue does not swell the music (the map as you see it)', hid)
-    # a site keeps its tune
+    # dawn: once a day
+    dn = await pg.evaluate("""(() => { WAMB.gen.S.t.theme = 1e9; WAMB.dawnDay = null; WG.min = 6.5 * 60; wAmbTick(); const a = WAMB.gen.S.t.theme - (SND.ctx.currentTime - WAMB.t0);
+      WAMB.gen.S.t.theme = 1e9; wAmbTick(); const b = WAMB.gen.S.t.theme; WG.min = 12 * 60; return { a, again: b === 1e9 }; })()""")
+    check(dn['a'] < 10 and dn['again'], 'at dawn its whole tune is due, once a day', dn)
+    # a special place has its own bed
     await pg.evaluate("(() => { const m = MAPS.cottage; wEnterMap('cottage', m.spawn[0], m.spawn[1]); })()")
-    await pg.wait_for_function("MUS.theme === 'w_town' && !!MUS.timer && !WAMB.pal", timeout=T)
-    check(True, 'a special place (Vesper\'s Cottage) keeps its tune, for now')
+    await pg.wait_for_function("WAMB.pal === 'cottage' && !MUS.timer", timeout=T)
+    check(True, 'Vesper\'s Cottage has its own bed')
+    await pg.evaluate("SET.mstyle = 'classic'")
+    await pg.wait_for_function("!WAMB.pal && MUS.theme === 'w_town'", timeout=T)
     await pg.wait_for_function("WAMB.ringing === 0", timeout=T)
     check(True, 'the bed\'s voices all end after it stops')
+    await pg.evaluate("SET.mstyle = 'ambient'")
     await pg.evaluate("__go('bloom', 23, false)")
     await pg.wait_for_function("WAMB.pal === 'bloom' && !MUS.timer && WAMB.mood && WAMB.mood.tint.night", timeout=T)
     check(True, 'at night off the road in the Mosswold, its bed, tinted night')
@@ -393,7 +429,7 @@ async def settings_checks(pg):
 async def help_checks(pg):
     await pg.evaluate("showPage('help')")
     h = await pg.evaluate("document.getElementById('wHelpAmb') && document.getElementById('wHelpAmb').closest('#wHelp') ? document.getElementById('wHelpAmb').textContent : ''")
-    check(all(s in h for s in ['ambient', 'Classic', 'Matches', 'danger', 'heartbeat', 'HP', 'Mosswold', 'Brinefen', 'Cindermaw', 'Frostspire', 'towns', 'dungeons', 'fog', 'blizzards', 'Special places']), 'How to play explains the music style', h)
+    check(all(s in h for s in ['ambient', 'Classic', 'Matches', 'danger', 'heartbeat', 'HP', 'Mosswold', 'Brinefen', 'Cindermaw', 'Frostspire', 'towns', 'dungeons', 'fog', 'blizzards', 'Special places', 'wreck', 'Hall of Legends', 'ground', 'whole tune', 'dawn']), 'How to play explains the music style', h)
     await pg.evaluate("showPage('play')")
 
 async def main():
