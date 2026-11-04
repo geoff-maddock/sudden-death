@@ -109,45 +109,76 @@ async def main():
         await pg.screenshot(path='/tmp/realm-ring-hands-round.png')
         await pg.evaluate("wBX.pause(true)")
 
+        # ---------- input across changes: a clinch, a change of mode, How to play ----------
+        bc = await pg.evaluate("""(() => { __calm(); const G = wBX.G; for (const x of G.F) x.a = { k: 'clinch', t: 0, dur: 2, id: 0 };
+          wBX.input({ act: 'jab' }); __step(Math.ceil(wBX.buffer / .05) + 2); const q = wBX.inputState.q; const k = G.F[0].a.k; __calm(); return { q, k }; })()""")
+        check(bc['q'] is None and bc['k'] == 'clinch', 'a press made in a clinch waits only its moment, not the whole clinch', bc)
+        await pg.evaluate("wBX.input({ guard: true, steer: [1, 0] })")
+        await pg.click('[data-rmode="call"]'); await pg.click('[data-rmode="play"]')
+        ms = await pg.evaluate("wBX.inputState")
+        check(not ms['guard'] and ms['steer'] == [0, 0], 'a change of mode lets go of the guard and the steering', ms)
+        await pg.evaluate("showPage('help')"); await pg.keyboard.press('j')
+        hk = await pg.evaluate("({ q: wBX.inputState.q, paused: wBX.paused })")
+        await pg.evaluate("showPage('play'); wBX.pause(true)")
+        check(hk == {'q': None, 'paused': True}, 'with How to play up the keys are the page\'s, and nothing is queued', hk)
+
         # ---------- between rounds: your call, and the cut-man ----------
-        cr = await pg.evaluate("(() => { let n = 0; while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) wBX.step(); return wBX.phase; })()")
-        if cr == 'corner':
-            w = await pg.evaluate("""(() => { __step(200); const f = wBX.G.F[0]; return { ph: wBX.phase, wait: !!wBX.wait, hp: f.hp, max: f.hpMax, patches: f.patches,
-              btn: !document.getElementById('wRingPatch').disabled, txt: document.getElementById('wRingPatch').textContent }; })()""")
-            check(w['ph'] == 'corner' and w['wait'] and w['btn'] and w['txt'] == 'Cut-man (2 left)', 'between rounds the bout waits for your call, the cut-man ready', w)
-            await pg.screenshot(path='/tmp/realm-ring-hands-corner.png')
-            await pg.click('#wRingPatch')
-            pt = await pg.evaluate("""(() => { const f = wBX.G.F[0]; return { hp: f.hp, max: f.hpMax, patches: f.patches, btn: document.getElementById('wRingPatch').disabled,
-              txt: document.getElementById('wRingPatch').textContent, again: wBX.patch(), log: wBX.G.log.some(l => /cut-man works on/.test(l.msg)) }; })()""")
-            check(pt['patches'] == 1 and pt['hp'] > w['hp'] - .01 and pt['max'] >= w['max'] and pt['btn'] and pt['txt'] == 'Cut-man (1 left)' and pt['again'] is False and pt['log'],
-                  'the cut-man works once a break: health back, a patch used, the button off', [w, pt])
-            # Corners mid-break takes your corner's advice and goes on with the same bout
-            sw = await pg.evaluate("""(() => { const G = wBX.G, adv = wBX.wait.plan; document.querySelector('[data-rmode="watch"]').click();
-              const r = { same: wBX.G === G, mode: wBX.mode, wait: wBX.wait, plan: G.F[0].plan, adv, call: document.getElementById('wRingCall').hidden, pad: document.getElementById('wRingPad').hidden };
-              r.ph = __step(30); return r; })()""")
-            check(sw['same'] and sw['mode'] == 'watch' and sw['wait'] is None and sw['plan'] == sw['adv'] and sw['call'] and sw['pad'] and sw['ph'] == 'round',
-                  'switching to Corners mid-break takes your corner\'s advice, and the same bout goes on', sw)
-            th = await pg.evaluate("(() => { const f = wBX.G.F[0], t0 = f.rs.thrown; __step(100); return f.rs.thrown - t0; })()")
-            check(th > 0, 'in Corners your fighter boxes by themselves again', th)
-            await pg.keyboard.press('j')
-            kw = await pg.evaluate("wBX.inputState.q")
-            check(kw is None, 'keys do nothing outside You box', kw)
-            # You corner: asked at the next break; they box the plan themselves
-            await pg.click('[data-rmode="call"]')
-            nx = await pg.evaluate("(() => { let n = 0; while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) wBX.step(); return { ph: wBX.phase, wait: !!wBX.wait }; })()")
-            if nx['ph'] == 'corner':
-                check(nx['wait'], 'in You corner the next break waits for your call', nx)
-                await pg.click('[data-rplan="body"]')
-                yc = await pg.evaluate("(() => { __step(30); const f = wBX.G.F[0], t0 = f.rs.thrown; __step(120); return { plan: f.plan, thrown: f.rs.thrown - t0, pad: document.getElementById('wRingPad').hidden }; })()")
-                check(yc['plan'] == 'body' and yc['thrown'] > 0 and yc['pad'], 'and your fighter boxes your plan by themselves (no pad)', yc)
-        else:
-            check(cr == 'over', 'round 1 goes to the bell (or the bout ends inside it)', cr)
+        # (Space held through the bell, with the bar's Another bout focused: its repeats and its release mustn't click it)
+        await pg.evaluate("__calm(); document.getElementById('wRingAgain').focus()")
+        await pg.keyboard.down(' ')
+        G0 = await pg.evaluate("(window.__G0 = wBX.G, __step(1), wBX.G.F[0].a.k)")
+        # (both fighters given iron chins here, so the rounds surely go to the bell)
+        cr = await pg.evaluate("(() => { for (const f of wBX.G.F) f.r.chin = 60; let n = 0; while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) wBX.step(); return wBX.phase; })()")
+        check(cr == 'corner', 'round 1 goes to the bell', cr)
+        await pg.keyboard.down(' '); await pg.keyboard.up(' ')
+        sp = await pg.evaluate("({ same: wBX.G === __G0, ph: wBX.phase, guard: wBX.inputState.guard })")
+        check(G0 == 'guard' and sp == {'same': True, 'ph': 'corner', 'guard': False}, 'Space held through the bell, then let go, leaves the bar alone: the same bout, in the corner', [G0, sp])
+        pz = await pg.evaluate("(() => { document.querySelector('[data-rpad=\"jab\"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 5 })); return wBX.inputState.q; })()")
+        check(pz is None, 'a press on the pad between rounds is dropped (it would fire at the bell)', pz)
+        w = await pg.evaluate("""(() => { __step(200); const f = wBX.G.F[0]; return { ph: wBX.phase, wait: !!wBX.wait, hp: f.hp, max: f.hpMax, patches: f.patches,
+          btn: !document.getElementById('wRingPatch').disabled, txt: document.getElementById('wRingPatch').textContent }; })()""")
+        check(w['ph'] == 'corner' and w['wait'] and w['btn'] and w['txt'] == 'Cut-man (2 left)', 'between rounds the bout waits for your call, the cut-man ready', w)
+        await pg.screenshot(path='/tmp/realm-ring-hands-corner.png')
+        await pg.click('#wRingPatch')
+        pt = await pg.evaluate("""(() => { const f = wBX.G.F[0]; return { hp: f.hp, max: f.hpMax, patches: f.patches, btn: document.getElementById('wRingPatch').disabled,
+          txt: document.getElementById('wRingPatch').textContent, again: wBX.patch(), log: wBX.G.log.some(l => /cut-man works on/.test(l.msg)) }; })()""")
+        check(pt['patches'] == 1 and pt['hp'] > w['hp'] - .01 and pt['max'] >= w['max'] and pt['btn'] and pt['txt'] == 'Cut-man (1 left)' and pt['again'] is False and pt['log'],
+              'the cut-man works once a break: health back, a patch used, the button off', [w, pt])
+        # Corners mid-break takes your corner's advice and goes on with the same bout
+        sw = await pg.evaluate("""(() => { const G = wBX.G, adv = wBX.wait.plan; document.querySelector('[data-rmode="watch"]').click();
+          const r = { same: wBX.G === G, mode: wBX.mode, wait: wBX.wait, plan: G.F[0].plan, adv, call: document.getElementById('wRingCall').hidden, pad: document.getElementById('wRingPad').hidden };
+          r.ph = __step(30); return r; })()""")
+        check(sw['same'] and sw['mode'] == 'watch' and sw['wait'] is None and sw['plan'] == sw['adv'] and sw['call'] and sw['pad'] and sw['ph'] == 'round',
+              'switching to Corners mid-break takes your corner\'s advice, and the same bout goes on', sw)
+        th = await pg.evaluate("(() => { const f = wBX.G.F[0], t0 = f.rs.thrown; __step(100); return f.rs.thrown - t0; })()")
+        check(th > 0, 'in Corners your fighter boxes by themselves again', th)
+        await pg.keyboard.press('j')
+        kw = await pg.evaluate("wBX.inputState.q")
+        check(kw is None, 'keys do nothing outside You box', kw)
+        # You corner: asked at the next break; they box the plan themselves
+        await pg.click('[data-rmode="call"]')
+        nx = await pg.evaluate("(() => { let n = 0; while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) wBX.step(); return { ph: wBX.phase, wait: !!wBX.wait }; })()")
+        check(nx['ph'] == 'corner' and nx['wait'], 'in You corner the next break waits for your call', nx)
+        await pg.click('[data-rplan="body"]')
+        yc = await pg.evaluate("(() => { __step(30); const f = wBX.G.F[0], t0 = f.rs.thrown; __step(120); return { plan: f.plan, thrown: f.rs.thrown - t0, pad: document.getElementById('wRingPad').hidden }; })()")
+        check(yc['plan'] == 'body' and yc['thrown'] > 0 and yc['pad'], 'and your fighter boxes your plan by themselves (no pad)', yc)
         await pg.evaluate("wBX.pause(false)")
+
+        # ---------- the cut-man, once a break, across a change of mode ----------
+        await pg.evaluate("W_RING_MODE = 'watch'; wRingBout({ kinds: ['ogre', 'elf'], seed: 8 }); wBX.pause(true)")
+        cm = await pg.evaluate("""(() => { const f = wBX.G.F[0]; for (const x of wBX.G.F) x.r.chin = 60; let n = 0;
+          while (wBX.phase !== 'round' && n++ < 200) wBX.step(); f.hp = 30;
+          while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) { wBX.step(); if (wBX.phase === 'round') f.hp = Math.min(f.hp, 30); }
+          const after = f.patches; document.querySelector('[data-rmode="call"]').click();
+          const r = { ph: wBX.phase, cpu: 2 - after, wait: wBX.wait, again: wBX.patch(), patches: f.patches, lines: wBX.G.log.filter(l => /cut-man works on/.test(l.msg)).length };
+          wBX.pause(false); return r; })()""")
+        check(cm['ph'] == 'corner' and cm['cpu'] == 1 and cm['wait'] and not cm['wait']['patch'] and cm['again'] is False and cm['patches'] == 1 and cm['lines'] == 1,
+              'the CPU corner\'s patch counts: switching to You corner in that break, the cut-man can\'t work again', cm)
 
         # ---------- How to play ----------
         await pg.click('#wRingHowBtn')
         hw = await pg.evaluate("""(() => { const s = document.getElementById('wRingHow'); return { h: s && s.querySelector('h3').textContent, t: s ? s.textContent : '', paused: wBX.paused }; })()""")
-        check(hw['h'] == 'Boxing: how it works' and all(w in hw['t'] for w in ['J jab', 'Shift to slip', 'Cover up', 'Body work', 'Brass', 'cut-man', 'You box']) and hw['paused'],
+        check(hw['h'] == 'Boxing: how it works' and all(w in hw['t'] for w in ['J jab', 'Shift to slip', 'Cover up', 'Body work', 'Brass', 'cut-man', 'You box', 'knockdown wins the round 10–8', 'a body shot half the time']) and hw['paused'],
               'How to play boxing opens Boxing: how it works (keys, plans, judges, the cut-man), and the bout waits', {'h': hw['h'], 'paused': hw['paused']})
         await pg.evaluate("showPage('play')")
 

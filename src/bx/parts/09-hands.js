@@ -5,6 +5,9 @@
    on a phone you can box with the buttons alone. Their instincts: with your hands free (nothing pressed, nothing
    waiting) they slip or cover up against a punch they see coming, BX_INSTINCT of the times a CPU fighter of theirs
    would. Pressing the keys yourself does better: it's every time you get it right.
+   A press counts only in a round (a pad press in the corner is dropped), and ages from the moment it's made, even while
+   your fighter is clinched, stunned or down (bxThink). The input is cleared at the bell, at a knockdown, at the start
+   of a bout and when the mode changes, so nothing pressed before carries into what comes next.
    BXI is the page's input, not saved: { steer: [x, y], guard, q (the press waiting), qt (how long it has waited) }. */
 const BX_BUFFER = .5, BX_INSTINCT = .6;
 const BXI = { steer: [0, 0], guard: false, q: null, qt: 0 };
@@ -14,12 +17,11 @@ const BX_ACTS = ['jab', 'hook', 'body', 'slip', 'clinch'];
 function bxInput(o) {
   if (o.steer) BXI.steer = [clamp(+o.steer[0] || 0, -1, 1), clamp(+o.steer[1] || 0, -1, 1)];
   if (o.guard != null) BXI.guard = !!o.guard;
-  if (BX_ACTS.includes(o.act)) { BXI.q = o.act; BXI.qt = 0; }
+  if (BX_ACTS.includes(o.act) && BD && (BD.ph === 'round' || BD.ph === 'rise')) { BXI.q = o.act; BXI.qt = 0; }
 }
 function bxInputClear() { BXI.steer = [0, 0]; BXI.guard = false; BXI.q = null; BXI.qt = 0; }
 function bxHandThink(f, o, dt) {
   if (BXI.steer[0] || BXI.steer[1]) f.mv = BXI.steer.slice(); else bxFeet(f, o);
-  if (BXI.q && (BXI.qt += dt) > BX_BUFFER) BXI.q = null;
   if (bxBusy(f)) return;
   if (BXI.q) { const k = BXI.q; BXI.q = null; if (k === 'clinch') bxClinch(f, o); else bxAct(f, k); return; }
   if (BXI.guard) { bxAct(f, 'guard'); return; }

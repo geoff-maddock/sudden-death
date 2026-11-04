@@ -4,7 +4,7 @@
 # clinch ties both up until the referee breaks them; zero health is a knockdown, and the count follows. The bout: the
 # bell, the judges' cards and the corner between rounds; a decision that agrees with the cards; the same seed boxes the
 # same bout, and a headless bout leaves the one in the ring alone. Over many headless bouts the outcomes are mixed
-# (decisions, stoppages and knockdowns, few draws). In the Realm: Ma Gristle at the Anvil Ring puts on a BOUT, in its
+# (decisions, stoppages and knockdowns, some draws). In the Realm: Ma Gristle at the Anvil Ring puts on a BOUT, in its
 # own view behind W_ENGINES, which waits while another page is up; Back to the world parks the engine; How to play
 # explains it. None of the engine's names reach the page. Asserts; exits nonzero on failure.
 # Screenshots: /tmp/realm-ring-*.png.
@@ -21,6 +21,9 @@ def check(ok, what, detail=None):
     return ok
 
 # two fighters set up in the ring in round 1, standing still and fresh, d apart
+# plain JSON: only null, numbers, strings, booleans, arrays and plain objects, all the way down (no functions, Maps,
+# undefined or class instances)
+PLAIN = "v => { const ok = x => x === null || ['number', 'string', 'boolean'].includes(typeof x) || (Array.isArray(x) ? x.every(ok) : typeof x === 'object' && Object.getPrototypeOf(x) === Object.prototype && Object.values(x).every(ok)); return ok(v); }"
 SETUP = """(d, kinds) => { wBX.start({ fighters: (kinds || ['vampire', 'vampire']).map((k, i) => ({ n: 'F' + i, kind: k })), seed: 7 });
   for (let i = 0; i < 100 && wBX.phase === 'intro'; i++) wBX.step();
   const G = wBX.G; G.F[0].x = -d / 2; G.F[1].x = d / 2; G.F[0].y = G.F[1].y = 0;
@@ -36,7 +39,7 @@ async def main():
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
         await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
         await pg.goto(REALM_URL); await pg.wait_for_function("typeof wBX !== 'undefined'"); await pg.evaluate("wBX.speed = 4")  # the ring at 4 steps a frame: the same bout, sooner
-        await pg.evaluate(f"window.__setup = {SETUP}")
+        await pg.evaluate(f"window.__setup = {SETUP}; window.__plain = {PLAIN}; 0")
 
         # ---------- the scope ----------
         leaks = await pg.evaluate("['bxStart', 'bxStep', 'bxBeat', 'bxThink', 'bxLand', 'BD', 'BXT', 'BXP', 'BXE', 'BX_PUNCH', 'BX_KIND', 'BX_PLAN', 'BX_JUDGES', 'bxDraw', 'bxSimBout'].filter(n => (0, eval)('typeof ' + n) !== 'undefined')")
@@ -79,6 +82,14 @@ async def main():
         check((kd['end'] == 'rise' and 0 < kd['hp'] <= kd['hpMax']) or (kd['end'] == 'over' and kd['how'] == 'ko' and kd['counts'][-1] == 10),
               'up before ten they box on with some health back; at ten it is a knockout', kd)
 
+        # ---------- a seeded bout: drawing doesn't change it, and a headless bout in the middle leaves it alone ----------
+        sd = await pg.evaluate("""(() => { const f = [{ n: 'Brisket', kind: 'minotaur' }, { n: 'Fennel', kind: 'elf' }], run = (draw, sim) => {
+            wBX.start({ fighters: f, seed: 7 }); for (let i = 0; i < 20000 && wBX.phase !== 'over'; i++) { wBX.step(); if (draw && i % 3 === 0) wBX.render(); if (sim && i === 900) wBX.simBout({ fighters: f, seed: 99 }); }
+            return JSON.stringify([wBX.G.over, wBX.G.cards]); };
+          const head = wBX.simBout({ fighters: f, seed: 7 }); const a = run(false, false), b = run(true, false), c = run(false, true);
+          return { drawn: a === b, simmed: a === c, headless: a === JSON.stringify([head.over, head.cards]) }; })()""")
+        check(sd == {'drawn': True, 'simmed': True, 'headless': True}, 'a seeded bout goes the same drawn or not, with a headless bout in the middle of it, and as its headless twin', sd)
+
         # ---------- a whole bout, headless ----------
         b = await pg.evaluate("""(() => { const f = [{ n: 'Brisket', kind: 'minotaur' }, { n: 'Fennel', kind: 'elf' }];
           const a = wBX.simBout({ fighters: f, seed: 11 }), c = wBX.simBout({ fighters: f, seed: 11 });
@@ -97,16 +108,16 @@ async def main():
             if (v.how === 'dec') { const T = s.totals, j = [0, 0]; T.forEach(t => { if (t[0] > t[1]) j[0]++; else if (t[1] > t[0]) j[1]++; });
               const w = j[0] >= 2 ? 0 : j[1] >= 2 ? 1 : null; if (w !== v.win || s.cards.length !== 3) out.bad.push({ i, T, v }); out.secs.push(s.secs); }
             if (v.how === 'tko' && Math.max(...s.kd) !== 3) out.bad.push({ i, tko: s.kd });
-            for (const [side, k] of [[0, a], [1, b]]) { const r = out.wins[k] = out.wins[k] || [0, 0]; r[1]++; if (v.win === side) r[0]++; } }
+            if (v.win != null) for (const [side, k] of [[0, a], [1, b]]) { const r = out.wins[k] = out.wins[k] || [0, 0]; r[1]++; if (v.win === side) r[0]++; } }
           out.ms = (performance.now() - t0) / out.n; out.secs = [Math.min(...out.secs), Math.max(...out.secs)]; return out; })()""")
         N = many['n']; H = many['how']
         check(not many['bad'], 'every decision agrees with the judges\' cards, and every stoppage is the third knockdown', many['bad'][:3])
         check(118 <= many['secs'][0] and many['secs'][1] <= 122, 'a bout to the cards is three rounds of 40 seconds', many['secs'])
         stops = (H.get('ko', 0) + H.get('tko', 0)) / N
-        check(.03 <= stops <= .3 and H.get('draw', 0) / N <= .06 and .3 <= many['kd'] / N <= .85,
-              'over many bouts: mostly decisions, some stoppages, knockdowns in many, and few draws', {'how': H, 'n': N, 'kdBouts': many['kd']})
+        check(.03 <= stops <= .3 and H.get('draw', 0) / N <= .15 and .3 <= many['kd'] / N <= .85,
+              'over many bouts: mostly decisions, some stoppages, knockdowns in many, and some draws (the pro rule\'s 10-8 levels cards now and then)', {'how': H, 'n': N, 'kdBouts': many['kd']})
         rates = sorted(round(w / t, 2) for w, t in many['wins'].values())
-        check(rates[0] >= .15 and rates[-1] <= .85, 'no kind always wins or always loses', rates)
+        check(rates[0] >= .08 and rates[-1] <= .92, 'no kind always wins or always loses (of the bouts decided; about 26 a kind here, so the band is wide)', rates)
         check(many['ms'] < 120, 'a headless bout is quick', round(many['ms'], 1))
 
         # ---------- in the Realm ----------
@@ -127,7 +138,7 @@ async def main():
         check(v['corners'][0] == 'Cinderhold Boxing Club' and v['fighters'][0] in ('minotaur', 'dwarf', 'ogre', 'golem', 'kobold', 'troll'), 'the Cinderhold Boxing Club is in the red corner', v)
         await pg.screenshot(path='/tmp/realm-ring-intro.png')
         await pg.wait_for_function("wBX.phase === 'round' && wBX.G.clock < 34", timeout=20000)
-        live = await pg.evaluate("({ thrown: wBX.G.F.reduce((n, f) => n + f.rs.thrown, 0), plain: JSON.stringify(JSON.parse(JSON.stringify(wBX.G))) === JSON.stringify(wBX.G) })")
+        live = await pg.evaluate("({ thrown: wBX.G.F.reduce((n, f) => n + f.rs.thrown, 0), plain: __plain(wBX.G) })")
         check(live['thrown'] > 0, 'in real time, the round is on and punches are thrown', live)
         check(live['plain'], 'the bout (G, with the fighters) is plain JSON', None)
         await pg.screenshot(path='/tmp/realm-ring-round.png')
@@ -141,14 +152,13 @@ async def main():
         await pg.wait_for_function("!wBX.paused && wBX.G.clock < " + str(c0 - .3), timeout=10000)
         # through to the corner: the cards, the plans, a log line
         await pg.evaluate("wBX.pause(true)")
-        cr = await pg.evaluate("""(() => { let n = 0; while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) wBX.step(); const G = wBX.G;
+        # (both fighters given iron chins for this, so round 1 surely goes to the bell)
+        cr = await pg.evaluate("""(() => { for (const f of wBX.G.F) f.r.chin = 60; let n = 0; while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) wBX.step(); const G = wBX.G;
           return { ph: wBX.phase, cards: G.cards.length, plans: G.plans.length, log: G.log.some(l => /^End of round 1/.test(l.msg)), round: G.round, clock: G.clock }; })()""")
         await pg.evaluate("wBX.pause(false)")
-        if cr['ph'] == 'corner':
-            check(cr['cards'] == 1 and cr['plans'] == 2 and cr['log'] and cr['round'] == 2 and cr['clock'] == 40, 'at the bell: the round on the cards, the corners\' plans for the next, and the clock back to 40', cr)
-            await pg.wait_for_timeout(300); await pg.screenshot(path='/tmp/realm-ring-corner.png')
-        else:
-            check(cr['ph'] == 'over', 'the first round ends at the bell (or the bout ends inside it)', cr)
+        check(cr['ph'] == 'corner', 'round 1 goes to the bell', cr)
+        check(cr['cards'] == 1 and cr['plans'] == 2 and cr['log'] and cr['round'] == 2 and cr['clock'] == 40, 'at the bell: the round on the cards, the corners\' plans for the next, and the clock back to 40', cr)
+        await pg.wait_for_timeout(300); await pg.screenshot(path='/tmp/realm-ring-corner.png')
         await pg.evaluate("wBX.pause(true)")
         ov = await pg.evaluate("(() => { let n = 0; while (wBX.phase !== 'over' && n++ < 20000) wBX.step(); return wBX.phase; })()")
         await pg.evaluate("wBX.pause(false)")

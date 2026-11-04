@@ -27,6 +27,6 @@ return {
   judges: BX_JUDGES.map(J => ({ n: J.n, likes: J.likes })),
   // the test's handle on the ring: one beat, and a fighter's move
   step: () => { if (BD && BD.ph !== 'over') bxBeat(BX_DT); return BD ? BD.ph : null; }, act: (side, k) => bxAct(G.F[side], k), clinch: side => bxClinch(G.F[side], G.F[1 - side]),
-  get ev() { return BXE; },
+  get ev() { return BXE; }, get rawCard() { return CD; },
   range: (side, k) => bxRange(G.F[side], k), dist: () => bxDist(G.F[0], G.F[1]), land: (side, k) => bxLand(G.F[side], G.F[1 - side], k),
 };

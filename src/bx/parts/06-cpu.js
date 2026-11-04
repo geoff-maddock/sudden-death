@@ -17,6 +17,8 @@ const BX_PLAN = {
 const BX_PLAN_IDS = Object.keys(BX_PLAN);
 
 function bxThink(f, o, dt) {
+  // (a press made by hand ages whatever the fighter is doing, so it never waits out a clinch: 09-hands.js)
+  if (bxHand(f) && BXI.q && (BXI.qt += dt) > BX_BUFFER) BXI.q = null;
   if (f.a.k === 'down' || f.a.k === 'clinch' || f.a.k === 'stun') { f.mv = [0, 0]; return; }
   if (bxHand(f)) return bxHandThink(f, o, dt);
   const skill = G.skill ? G.skill[f.side] : 1, P = BX_PLAN[f.plan] || BX_PLAN.press;

@@ -40,7 +40,7 @@ function bxStart(opts) {
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
   Object.assign(G, { aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0 });
   BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
-  G.wait = null;
+  G.wait = null; bxInputClear();
   bxCornerSpots();
   if (bxYourCorner()) bxAsk();
   return G;
@@ -91,7 +91,7 @@ function bxDrain() {
   if (BD.headless) BXE.length = 0;
 }
 function bxDown() {
-  const s = G.down, f = G.F[s], o = G.F[1 - s];
+  const s = G.down, f = G.F[s], o = G.F[1 - s]; bxInputClear();
   if (o.a.k !== 'down') o.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
   o.mv = [0, 0];
   bxLog(`${f.n} is down!`, true);
@@ -116,7 +116,7 @@ function bxWork() {
   return BX_JUDGES.map(J => { const v = s => Object.keys(J.w).reduce((n, k) => n + J.w[k] * s[k], 0); return Math.round((v(a) - v(b) + gauss() * J.noise) * 10) / 10; });
 }
 function bxRoundEnd() {
-  const work = bxWork(), n = G.round;
+  const work = bxWork(), n = G.round; bxInputClear();
   G.work.push(work); G.rstats.push(G.F.map(f => Object.assign({}, f.rs, { dmg: Math.round(f.rs.dmg) })));
   for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); }
   const r = bxBell(work), sc = G.cards[G.cards.length - 1];
@@ -128,7 +128,7 @@ function bxCorner() {
     f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * .35); f.sta = f.sta + (f.staMax - f.sta) * .75; f.ctr = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
-    if (c.patch && f.patches > 0) { f.patches--; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
+    if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
     f.hp = Math.round(f.hp); f.sta = Math.round(f.sta);
   }
   G.plans.push(G.F.map(f => f.plan));
@@ -140,13 +140,13 @@ function bxCorner() {
 const bxYourCorner = () => !!BD && BD.mode !== 'watch' && !BD.headless;
 function bxAsk() {
   const f = G.F[BD.you], c = bxCornerCpu(f);
-  G.wait = { plan: c.plan, patch: c.patch && G.cards.length > 0, why: c.why };
+  G.wait = { plan: c.plan, patch: c.patch && G.cards.length > 0 && f.patched !== G.round, why: c.why };
   G.plans[G.plans.length - 1][BD.you] = f.plan;
   if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
 }
 function bxCall(plan) {
   if (!G || !G.wait || !BX_PLAN[plan]) return false;
-  const f = G.F[BD.you]; f.plan = plan; G.plans[G.plans.length - 1][BD.you] = plan; G.wait = null;
+  const f = G.F[BD.you]; f.plan = plan; G.plans[G.plans.length - 1][BD.you] = plan; G.wait = null; G.called = BD.ph + G.round;
   // a moment, then the bell
   BD.t = Math.max(BD.t, (BD.ph === 'intro' ? BX_BEAT.intro : BX_BEAT.corner) - .8);
   if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
@@ -164,9 +164,10 @@ function bxPatch() {
 // who boxes and corners your side, without starting over
 function bxSetMode(m) {
   if (!BD || !BX_MODES.includes(m) || BD.headless) return;
-  BD.mode = m; if (CD) CD.mode = m;
+  BD.mode = m; if (CD) CD.mode = m; bxInputClear();
   if (m === 'watch' && G.wait) { const w = G.wait; if (w.patch) bxPatch(); bxCall(w.plan); }
-  else if (m !== 'watch' && !G.wait && (BD.ph === 'intro' || BD.ph === 'corner')) bxAsk();
+  // (asked once a break: not again if you've already called it)
+  else if (m !== 'watch' && !G.wait && (BD.ph === 'intro' || BD.ph === 'corner') && G.called !== BD.ph + G.round) bxAsk();
 }
 function bxOver() { for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); f.bs.dmg = Math.round(f.bs.dmg); } BD.ph = 'over'; BD.t = 0; if (CD && G.card && !BD.headless) bxCardRecord(); if (!BD.headless && BX_HOOK.onOver) BX_HOOK.onOver(bxSummary()); }
 // the result in words: "Grub wins by knockout in round 2", "A split decision for Vex", "A draw"

@@ -20,6 +20,7 @@ def check(ok, what, detail=None):
 
 # a bout boxed to its end on the engine's clock, with the page's own loop held still
 TO_END = "(() => { wBX.pause(true); for (let i = 0; i < 20000 && wBX.phase !== 'over'; i++) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); } wBX.pause(false); return wBX.phase; })()"
+PLAIN = "v => { const ok = x => x === null || ['number', 'string', 'boolean'].includes(typeof x) || (Array.isArray(x) ? x.every(ok) : typeof x === 'object' && Object.getPrototypeOf(x) === Object.prototype && Object.values(x).every(ok)); return ok(v); }"
 R = lambda v: {s: v for s in ['reach', 'pow', 'spd', 'chin', 'sta', 'gui']}
 
 async def main():
@@ -31,7 +32,7 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
         await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
-        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wBX !== 'undefined'"); await pg.evaluate("wBX.speed = 4")
+        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wBX !== 'undefined'"); await pg.evaluate(f"wBX.speed = 4; window.__plain = {PLAIN}; 0")
 
         # ---------- the corner's pairing ----------
         a = await pg.evaluate("([s, m, w]) => wBX.cardAuto([{ kind: 'elf', r: s }, { kind: 'elf', r: m }, { kind: 'elf', r: w }], [{ kind: 'elf', r: s }, { kind: 'elf', r: m }, { kind: 'elf', r: w }])", [R(9), R(5), R(2)])
@@ -42,7 +43,7 @@ async def main():
           { name: 'Blues', short: 'BLU', color: '#2a5fb8', light: '#fff', fighters: [{ n: 'Eel', kind: 'spider' }, { n: 'Fen', kind: 'golem' }, { n: 'Gil', kind: 'witch' }] }]"""
         c = await pg.evaluate(f"""(() => {{ const S = {SIDES}; const C = wBX.cardStart({{ sides: S, picks: [3, 0, 1], order: [2, 0, 1], mode: 'watch', seed: 9 }});
           const names = [], plain = [];
-          for (let i = 0; i < 3; i++) {{ names.push(wBX.G.F.map(f => f.n)); {TO_END}; plain.push(JSON.stringify(wBX.card) === JSON.stringify(JSON.parse(JSON.stringify(wBX.card))));
+          for (let i = 0; i < 3; i++) {{ names.push(wBX.G.F.map(f => f.n)); {TO_END}; plain.push(__plain(wBX.rawCard) && __plain(wBX.G));
             if (i < 2) wBX.cardNext(); }}
           const K = wBX.card; return {{ pairs: C.pairs, names, bouts: K.bouts.map(b => b.over), result: K.result, again: wBX.cardNext(), plain: plain.every(Boolean),
             check: wBX.cardResult(K.bouts.map(b => b.over)), score: wBX.cardScore() }}; }})()""")
@@ -51,9 +52,9 @@ async def main():
         check(c['result'] == c['check'] and c['score']['done'] == 3 and c['result']['won'] == c['score']['won'], 'after the third bout the card is settled (bouts, then knockdowns, then points)', c)
         check(c['again'] is False and c['plain'], 'nothing comes after the last bout, and the card is plain JSON throughout', c)
         h = await pg.evaluate(f"""(() => {{ const S = {SIDES}; wBX.cardStart({{ sides: S, mode: 'watch', seed: 3 }}); const before = JSON.stringify(wBX.card);
-          const x = wBX.simCard({{ sides: S, seed: 21 }}), y = wBX.simCard({{ sides: S, seed: 21 }});
-          return {{ same: JSON.stringify(x) === JSON.stringify(y), left: JSON.stringify(wBX.card) === before, n: x.bouts.length, ok: JSON.stringify(x.result) === JSON.stringify(wBX.cardResult(x.bouts.map(b => b.over))) }}; }})()""")
-        check(h == {'same': True, 'left': True, 'n': 3, 'ok': True}, 'a headless card is the same twice, settles from its bouts, and leaves the card in the ring alone', h)
+          const live = wBX.rawCard, G0 = wBX.G, x = wBX.simCard({{ sides: S, seed: 21 }}), y = wBX.simCard({{ sides: S, seed: 21 }});
+          return {{ same: JSON.stringify(x) === JSON.stringify(y), left: wBX.rawCard === live && wBX.G === G0 && JSON.stringify(wBX.card) === before, n: x.bouts.length, ok: JSON.stringify(x.result) === JSON.stringify(wBX.cardResult(x.bouts.map(b => b.over))) }}; }})()""")
+        check(h == {'same': True, 'left': True, 'n': 3, 'ok': True}, 'a headless card is the same twice, settles from its bouts, and leaves the card and bout in the ring as they were', h)
 
         # ---------- in the Realm ----------
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS))")
@@ -100,9 +101,11 @@ async def main():
         end = await pg.evaluate("({ again: document.getElementById('wRingAgain').textContent, next: document.getElementById('wRingNext').hidden, note: document.getElementById('wRingNote').textContent, result: wBX.card.result })")
         check(end['again'] == 'Another card' and end['next'] and ('wins the card' in end['note'] or 'draw' in end['note']), 'after the third bout the card is settled on the bar, with Another card', end)
         await pg.wait_for_timeout(300); await pg.screenshot(path='/tmp/realm-ring-card-end.png')
+        before = await pg.evaluate("wBX.card.sides[1].fighters.map(f => f.n).join()")
         await pg.click('#wRingAgain')
         await pg.wait_for_selector('[data-rslot]')
-        check(True, 'Another card asks for the next pairing')
+        ac = await pg.evaluate("({ slots: document.querySelectorAll('[data-rslot]').length, title: document.querySelector('#modalBox h3').textContent, still: !!wBX.card && !!wBX.card.result })")
+        check(ac == {'slots': 3, 'title': 'A card at the Anvil Ring', 'still': True}, 'Another card asks for the next pairing (the last card stays settled until it starts)', ac)
         await pg.evaluate("document.querySelector('#modalBox [data-close]').click()")
         # a team of one: call-ups make up the card
         cu = await pg.evaluate("""(() => { const keep = WG.roster; WG.roster = keep.slice(0, 1); wRingCard();

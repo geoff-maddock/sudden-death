@@ -4,8 +4,8 @@
 # first and goal inside the ten; a touchdown is 6 and the other side starts from its 25; a safety is 2 the other way;
 # missing on fourth down turns the ball over where it is.
 # The Anvil Ring (issue #23, phase 0) builds in its own scope too (wBX). Its rules: three rounds; three judges score each
-# round 10-9 (10-10 when even); a knockdown decides the round, a point for each knockdown more (10-9 for one, 10-8 for
-# two, whoever was winning it on work); three knockdowns stop the bout, and failing to beat the count is a knockout; the decision is
+# round 10-9 (10-10 when even); a knockdown decides the round by the pro rule (10-8 for one, or 10-9 when the fighter who
+# went down was winning it on work; a point more for each knockdown more); three knockdowns stop the bout, and failing to beat the count is a knockout; the decision is
 # unanimous, split or majority, or a draw; a card of bouts goes to the side with more bouts won, then more knockdowns
 # scored, then more points. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
@@ -80,8 +80,8 @@ async def main():
           return { work: wBX.roundScore([2, -3, 0.05], [0, 0]), kdLost: wBX.roundScore([-2], [1, 0]), kdWon: wBX.roundScore([2], [1, 0]), kdEven: wBX.roundScore([0], [0, 1]),
             two: wBX.roundScore([-1], [2, 0]), both: wBX.roundScore([3], [1, 1]) }; })()""")
         check(sc['work'] == [[10, 9], [9, 10], [10, 10]], 'a round goes 10-9 to whoever did more, and 10-10 when it is even', sc)
-        check(sc['kdLost'] == [[9, 10]] and sc['kdWon'] == [[9, 10]] and sc['kdEven'] == [[10, 9]], 'a knockdown decides the round 10-9, whoever was winning it on work', sc)
-        check(sc['two'] == [[8, 10]] and sc['both'] == [[10, 9]], 'each knockdown more is a point more; a knockdown each leaves the round to the work', sc)
+        check(sc['kdLost'] == [[8, 10]] and sc['kdEven'] == [[10, 8]] and sc['kdWon'] == [[9, 10]], 'a knockdown decides the round by the pro rule: 10-8, or 10-9 when the fighter who went down was winning it', sc)
+        check(sc['two'] == [[7, 10]] and sc['both'] == [[10, 9]], 'each knockdown more is a point more; a knockdown each leaves the round to the work', sc)
         bt = await pg.evaluate("""(() => { const G = wBX.newBout();
           const r1 = wBX.bell([1, 1, -1]), r2 = wBX.bell([1, -1, -1]), last = wBX.bell([2, 2, 2]);
           const dec = Object.assign({}, G.over), totals = wBX.totals();

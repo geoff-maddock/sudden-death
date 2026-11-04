@@ -123,12 +123,14 @@ function bxDrawAsk(c, y) {
   txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 // words for what lands: drained from BXE
+// (the words come from Math.random, never the engine's seeded R: drawing must not change how a seeded bout goes)
+const bxDrawPick = a => a[(Math.random() * a.length) | 0];
 function bxDrawFx(c) {
   for (const e of BXE) {
     if (e.drawn) continue; e.drawn = true;
     if (!['land', 'block', 'slip', 'kd', 'stun'].includes(e.k)) continue;
     const t = G.F[e.k === 'slip' || e.k === 'kd' || e.k === 'stun' ? e.side : 1 - e.side], p = bxProj(t.x, t.y);
-    const word = e.k === 'block' ? 'blocked' : e.k === 'slip' ? 'slipped' : e.k === 'kd' ? 'DOWN!' : e.k === 'stun' ? 'HURT!' : e.ctr ? 'COUNTER!' : e.n >= 9 ? pick(['WHAM!', 'KRAK!', 'THOOM!']) : e.p === 'body' ? pick(['THUD!', 'OOF!']) : pick(['POW!', 'BAP!', 'SMACK!']);
+    const word = e.k === 'block' ? 'blocked' : e.k === 'slip' ? 'slipped' : e.k === 'kd' ? 'DOWN!' : e.k === 'stun' ? 'HURT!' : e.ctr ? 'COUNTER!' : e.n >= 9 ? bxDrawPick(['WHAM!', 'KRAK!', 'THOOM!']) : e.p === 'body' ? bxDrawPick(['THUD!', 'OOF!']) : bxDrawPick(['POW!', 'BAP!', 'SMACK!']);
     BXT.fx.push({ x: p.x, y: p.y - 100 * p.k, word, t: BXT.t, big: e.k === 'kd' || e.k === 'stun' || e.ctr || e.n >= 9, dim: e.k === 'block' || e.k === 'slip' });
   }
   BXT.fx = BXT.fx.filter(f => BXT.t - f.t < .8);

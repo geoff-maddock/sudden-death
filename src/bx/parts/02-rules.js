@@ -3,8 +3,9 @@
    A bout is BX_RULES.rounds rounds of BX_RULES.secs seconds. A fighter knocked down BX_RULES.kd times in a bout is
    stopped (a TKO), and one who fails to beat the count is knocked out (a KO). Otherwise three judges score every round
    on the ten-point must: the round's winner gets 10 and the loser 9 (10-10 when it is even). A knockdown decides the
-   round: the fighter who went down (more often) loses it, by a point for each knockdown more, whoever was winning it
-   (so one knockdown is 10-9, two 10-8; not the pro rule's 10-8 for one, which over three rounds levels too many cards). After the last round each judge adds up
+   round, by the pro rule: the fighter who went down (more often) loses it, a point for each knockdown more, and one
+   more unless they were winning it on work (so one knockdown is 10-8, or 10-9 in a round the fighter who went down was
+   winning; a knockdown each leaves the round to the work). After the last round each judge adds up
    their card. Two judges or three for one fighter wins it (unanimous, split or majority); anything else is a draw.
    A match is a card of BX_RULES.card bouts (question 1). The side that wins more bouts wins; level on bouts, the side
    with more knockdowns scored wins, then the side with more points on the judges' cards; then it is a draw.
@@ -34,8 +35,8 @@ function bxRoundScore(work, rkd) {
   return work.map(d => {
     const even = Math.abs(d) < BX_TIE, gap = k[0] - k[1];
     if (!gap) return even ? [10, 10] : d > 0 ? [10, 9] : [9, 10];
-    const s = [10, 10];
-    s[gap > 0 ? 0 : 1] = Math.max(6, BX_RULES.must - Math.abs(gap));
+    const down = gap > 0 ? 0 : 1, winning = !even && (d > 0 ? 0 : 1) === down, s = [10, 10];
+    s[down] = Math.max(6, BX_RULES.must - Math.abs(gap) - (winning ? 0 : 1));
     return s;
   });
 }

@@ -30,8 +30,10 @@ function bxCardAuto(mine, theirs) {
 function bxCardStart(opts) {
   const o = opts || {}, you = o.you === 1 ? 1 : 0, S = o.sides.map(s => Object.assign({}, s, { fighters: s.fighters.map(f => Object.assign({}, f)) }));
   const rate = f => Object.assign(bxRate(f.kind), f.r || {}), N = BX_RULES.card;
-  const order = (o.order || [0, 1, 2]).slice(0, N);
-  const picks = o.picks && o.picks.length === N && new Set(o.picks).size === N ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
+  if (S.some(s => s.fighters.length < N)) throw new Error(`a card needs ${N} fighters a side`);
+  const fine = (L, n) => Array.isArray(L) && L.length === N && new Set(L).size === N && L.every(i => Number.isInteger(i) && i >= 0 && i < n);
+  const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
+  const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
   CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, result: null };
   bxCardBout();
   return CD;
@@ -61,8 +63,11 @@ function bxCardScore() {
 function bxSimCard(opts) {
   const o = opts || {}, keep = CD, you = o.you === 1 ? 1 : 0;
   try {
-    const rate = f => Object.assign(bxRate(f.kind), f.r || {}), order = (o.order || [0, 1, 2]).slice(0, BX_RULES.card), S = o.sides;
-    const picks = o.picks || bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
+    const rate = f => Object.assign(bxRate(f.kind), f.r || {}), N = BX_RULES.card, S = o.sides;
+    if (S.some(s => s.fighters.length < N)) throw new Error(`a card needs ${N} fighters a side`);
+    const fine = (L, n) => Array.isArray(L) && L.length === N && new Set(L).size === N && L.every(i => Number.isInteger(i) && i >= 0 && i < n);
+    const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
+    const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
     const bouts = pairs.map((p, i) => bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill }));
     return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)) };
