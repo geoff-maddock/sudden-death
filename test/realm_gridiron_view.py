@@ -66,7 +66,7 @@ async def main():
         await pg.evaluate("wGF.setMode('watch')")
         await pg.wait_for_function("wGF.view().zoom > 1.5", timeout=120000)
         v = await pg.evaluate("wGF.view()")
-        check(v['why'] in ('Breakaway!', 'Deep ball!', 'Broken tackle!', 'At the goal line!', 'Touchdown!', 'Picked off!'), 'a big play zooms in on the ball, and says why', v)
+        check(v['why'] in ('Breakaway!', 'Deep ball!', 'Broken tackle!', 'At the goal line!', 'Touchdown!', 'Picked off!', 'Fumble!'), 'a big play zooms in on the ball, and says why', v)
         await pg.wait_for_function("wGF.phase === 'call' || wGF.phase === 'kickoff'", timeout=60000)
         try: await pg.wait_for_function("wGF.view().zoom < 1.05", timeout=4000)
         except Exception: pass
