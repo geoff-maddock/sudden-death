@@ -27,7 +27,7 @@ const BX_CLUBS = [
   { name: 'Visitors', short: 'VIS', color: '#2a5fb8', light: '#d6e6ff' },
 ];
 let BD = null;
-const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
+const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 
 /* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r?, style? }], corners: [2 × { name, short, color, light }],
    mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..2, 0..2], powers (false: none), headless } */

@@ -83,3 +83,4 @@ src/realm/w51-ring.js
 src/realm/w52-ringcard.js
 src/realm/w53-ringgame.js
 src/realm/w54-ringcup.js
+src/realm/w55-ringfeel.js

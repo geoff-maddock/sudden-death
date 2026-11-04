@@ -39,7 +39,11 @@ const bxPunching = f => !!BX_PUNCH[f.a.k];
 const bxBusy = f => f.a.k !== 'idle' && f.a.k !== 'guard';
 const bxMass = f => { const K = KIND[f.kind] || KIND.goblin; return K.w * K.h; };
 const bxOnRopes = f => Math.max(Math.abs(f.x), Math.abs(f.y)) > BX_RING.rope - .15;
-function bxEv(k, side, o) { BXE.push(Object.assign({ k, side, round: G.round }, o || {})); if (BXE.length > 60) BXE.shift(); }
+function bxEv(k, side, o) {
+  const e = Object.assign({ k, side, round: G.round }, o || {}); BXE.push(e); if (BXE.length > 60) BXE.shift();
+  // (the page hears each one as it happens, for its sounds: never headless)
+  if (BD && !BD.headless && BX_HOOK.onEv) try { BX_HOOK.onEv(e); } catch (er) { console.error(er); }
+}
 
 /* f starts something: a punch ('jab', 'hook', 'body'), 'slip', 'guard' (held for at least BX_GUARD.min; asking again
    keeps it up) or 'idle'. Returns false when it can't (no breath for the punch). */
