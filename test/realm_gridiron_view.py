@@ -73,7 +73,7 @@ async def main():
         check(await pg.evaluate("wGF.view().zoom < 1.05"), 'by the next call the camera is back out', await pg.evaluate("wGF.view()"))
         await pg.wait_for_function("wGF.phase === 'post' && !!wGF.view().big", timeout=120000)
         v = await pg.evaluate("wGF.view()")
-        check(v['big']['k'] in ('td', 'int', 'first', 'sack', 'safety', 'downs', 'long', 'fg', 'miss'), 'after a play, a banner says what it came to', v)
+        check(v['big']['k'] in ('td', 'int', 'fum', 'first', 'sack', 'safety', 'downs', 'long', 'fg', 'miss'), 'after a play, a banner says what it came to', v)
         stats = await pg.evaluate("document.getElementById('wGridStats').textContent")
         check('Total yards' in stats and 'Passing' in stats and 'Leaders' in stats, 'the team stats and leaders show under the field', stats)
         how = await pg.evaluate("(renderHelp(), document.getElementById('wGridHow').textContent)")
