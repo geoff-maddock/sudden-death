@@ -109,6 +109,22 @@ async def main():
         ac = await pg.evaluate("({ slots: document.querySelectorAll('[data-rslot]').length, title: document.querySelector('#modalBox h3').textContent, still: !!wBX.card && !!wBX.card.result })")
         check(ac == {'slots': 3, 'title': 'A card at the Anvil Ring', 'still': True}, 'Another card asks for the next pairing (the last card stays settled until it starts)', ac)
         await pg.evaluate("document.querySelector('#modalBox [data-close]').click()")
+        # the pairing opened again, after more players joined: changing a pick throws nothing (each screen hears only itself)
+        await pg.evaluate("(() => { for (const kind of ['harpy', 'troll']) wAddPlayer(wMakePlayer({ kind, lvl: 1 }, 'tavern')); wRingCard(); })()")
+        await pg.wait_for_selector('[data-rslot]')
+        n0 = len(errs)
+        await pg.evaluate("(() => { const S = document.querySelectorAll('[data-rslot]'); S[0].value = S[0].options.length - 1; S[0].dispatchEvent(new Event('change', { bubbles: true })); })()")
+        await pg.evaluate("document.querySelector('#modalBox [data-close]').click()")
+        await pg.evaluate("(() => { modal('<select id=\"__s\"><option>1</option><option>2</option></select>'); const s = document.getElementById('__s'); s.value = '2'; s.dispatchEvent(new Event('change', { bubbles: true })); document.getElementById('modal').hidden = true; })()")
+        check(len(errs) == n0, 'a second pairing, and any later screen with a choice on it, throws nothing', errs[n0:])
+        # a phone: the pairing fits inside its box
+        await pg.set_viewport_size({'width': 360, 'height': 800})
+        await pg.evaluate("wRingCard()"); await pg.wait_for_selector('[data-rslot]')
+        ph = await pg.evaluate("(() => { const b = document.getElementById('modalBox'); return { sw: b.scrollWidth, cw: b.clientWidth, doc: document.documentElement.scrollWidth <= window.innerWidth + 1 }; })()")
+        await pg.screenshot(path='/tmp/realm-ring-card-phone.png')
+        check(ph['sw'] <= ph['cw'] + 1 and ph['doc'], 'the pairing fits a phone (nothing cut off inside its box)', ph)
+        await pg.evaluate("document.querySelector('#modalBox [data-close]').click()")
+        await pg.set_viewport_size({'width': 1200, 'height': 1000})
         # a team of one: call-ups make up the card
         cu = await pg.evaluate("""(() => { const keep = WG.roster; WG.roster = keep.slice(0, 1); wRingCard();
           const o = [...document.querySelectorAll('[data-rslot]')[0].options].map(x => x.textContent); WG.roster = keep; document.querySelector('#modalBox [data-close]').click(); return o; })()""")

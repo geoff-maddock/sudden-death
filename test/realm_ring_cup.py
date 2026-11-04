@@ -136,6 +136,9 @@ async def main():
         ok_res = r['res'] != 'tie' and r['done'] and r['me'] == 1 and top.get('sport') == 'boxing' and top.get('g') == 'g_ring' and isinstance(top.get('sa'), int)
         check(ok_tie or ok_res, 'Simulate the fixture: it counts once on the table, with the bouts won at the Anvil Ring (a drawn card, no points)', r)
         await pg.evaluate(CLOSE_ALL)
+        pp = await pg.evaluate("""(() => { const L = wLeague(), F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me'), club = f.a === 'me' ? f.b : f.a, me0 = L.me.w + L.me.l, n0 = L.results.length, d0 = f.done;
+          W_ON_END.bfix('win', { g: 'g_ring', club, day: F.day - 7 }, { us: 2, them: 1 }); return { me: L.me.w + L.me.l - me0, results: L.results.length - n0, done: f.done === d0, log: WLOG.slice(-1)[0][0] }; })()""")
+        check(pp['me'] == 0 and pp['results'] == 0 and pp['done'] and 'postponed' in pp['log'], 'a fixture card finished after its round day counts as a card, not on the table (and leaves the new round\'s fixture alone)', pp)
         c = await pg.evaluate("""(() => { const cl = wLeagueClubs(), L = wLeague(), a = cl[0], b = cl[1], w0 = L.table[a].w + L.table[b].w + L.table[a].l + L.table[b].l;
           const res = wSimAt(a, b, 'g_ring'); return { res, played: L.table[a].w + L.table[b].w + L.table[a].l + L.table[b].l - w0, live: WG.bxg.live }; })()""")
         check(c['res']['sport'] == 'boxing' and c['res']['sa'] >= c['res']['sb'] and c['res']['sa'] <= 3 and c['played'] == 2 and c['live'] is None,
@@ -147,7 +150,8 @@ async def main():
         await pg.set_viewport_size({'width': 390, 'height': 800})
         await pg.evaluate("wOpenBcup()"); await pg.wait_for_selector('#modalBox .wdcb')
         await pg.screenshot(path='/tmp/realm-bcup-phone.png')
-        check(await pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), 'the bracket fits a phone')
+        bf = await pg.evaluate("(() => { const b = document.getElementById('modalBox'); return { sw: b.scrollWidth, cw: b.clientWidth, doc: document.documentElement.scrollWidth <= window.innerWidth + 1 }; })()")
+        check(bf['sw'] <= bf['cw'] + 1 and bf['doc'], 'the bracket fits a phone (nothing cut off inside its box)', bf)
 
         check(not errs, 'no page errors', errs)
         await br.close()

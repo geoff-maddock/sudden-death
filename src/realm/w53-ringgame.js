@@ -176,6 +176,8 @@ function wRingConcede() {
     WBXG.leaving = false; wBX.pause(false);
     WBX = null; wLeaveRing(); wRingResultCard(msg);
   }, () => wBX.pause(false));
+  // (closed with Escape or a click outside: box on, as if you'd said no)
+  wAfterAsk(() => { if (wRingLive() && WBX) wBX.pause(false); });
 }
 function wRingScoreWords(sn) {
   const C = sn.CD; if (!C) return '';

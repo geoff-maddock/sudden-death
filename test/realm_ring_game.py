@@ -158,6 +158,12 @@ async def main():
         await pg.wait_for_selector('[data-rslot]'); await pg.click('[data-rgo="play"]')
         await pg.wait_for_function("UI.view === 'ring' && WBX && WBX.world")
         mode = await pg.evaluate("wBX.mode")
+        # Concede asked and closed with Escape: the bout goes on
+        await pg.evaluate("wBX.pause(true); if (wBX.wait) wBX.call(wBX.wait.plan); for (let i = 0; i < 40 && wBX.phase !== 'round'; i++) wBX.step(); wBX.pause(false)")
+        await pg.click('#wRingGive'); await pg.keyboard.press('Escape')
+        await pg.wait_for_timeout(400)
+        es = await pg.evaluate("({ paused: wBX.paused, modal: document.getElementById('modal').hidden, live: !!WG.bxg.live })")
+        check(es == {'paused': False, 'modal': True, 'live': True}, 'the Concede question closed with Escape: the bout goes on, not paused', es)
         await pg.click('#wRingGive')
         title = await pg.evaluate("(document.querySelector('#modal h3') || {}).textContent")
         await pg.click('#cfYes')

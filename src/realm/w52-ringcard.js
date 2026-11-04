@@ -30,7 +30,7 @@ function wRingPairing(o) {
   const opt = sel => mine.fighters.map((f, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(f.n)}, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}${f.callup ? ' (call-up)' : ''}</option>`).join('');
   const close = modal(`<header><h3>${esc(o.title)}</h3><button class="ghost" data-close>Not now</button></header>
     <div class="wmsg"><p class="hint">${o.intro}</p>
-    <table class="wrcard">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}<br><small>${rate(f)}</small></td>
+    <table class="wrcard wrpair" id="wRingPairT">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}<br><small>${rate(f)}</small></td>
       <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>`).join('')}</table>
     <p class="hint" id="wRingCardWarn"></p></div>
     <div class="row"><button class="ghost" id="wRingCardAuto">Your corner's pick</button>${o.go.map(([l, v], i) => `<button class="${i ? 'ghost' : 'btn'}" data-rgo="${v}"${i ? '' : ' id="wRingCardGo"'}>${esc(l)}</button>`).join('')}</div>`);
@@ -41,7 +41,8 @@ function wRingPairing(o) {
     for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.disabled = dup;
     $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
   };
-  $('modalBox').addEventListener('change', sync); sync();
+  // (on the pairing's own table: a listener on #modalBox would outlive this screen and fire in every later one)
+  $('wRingPairT').addEventListener('change', sync); sync();
   $('wRingCardAuto').onclick = () => { $('modalBox').querySelectorAll('[data-rslot]').forEach((s, i) => { s.value = auto[i]; }); sync(); };
   for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.onclick = () => { const picks = sel(); close(); o.onGo(picks, b.dataset.rgo); };
 }

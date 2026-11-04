@@ -849,6 +849,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
 .wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
 .wrpow{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
+@media (max-width:560px){.wrpair,.wrpair tbody,.wrpair tr,.wrpair th,.wrpair td{display:block;width:auto}.wrpair tr{padding:6px 0;border-top:1px solid rgba(255,208,160,.15)}.wrpair th,.wrpair td{border:0;padding:2px 0}.wrpair td:nth-child(3){display:none}.wrpair select{width:100%}.wrpair small{overflow-wrap:anywhere}}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}
 /* w43: the Seven tab */
@@ -25626,6 +25627,9 @@ return {
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' } };
+/* an engine's question (Concede?) holds the game still until it closes: askConfirm hears only its two buttons, so this
+   runs fn once the box closes however it closes (a button, Escape, a click outside) */
+function wAfterAsk(fn) { const t = setInterval(() => { if (!$('modal').hidden) return; clearInterval(t); try { fn(); } catch (e) { console.error(e); } }, 100); }
 // on screen: the engine whose view it is shows, and every other one hides
 function wEnginesShow(v) {
   for (const E of Object.values(W_ENGINES)) { if (E.view === v) E.api.show(); else if (E.api.on) E.api.hide(); }
@@ -26126,6 +26130,8 @@ function wBallConcede() {
     wBallSettle('lose', sn ? sn.teams[me].R : 0, sn ? sn.teams[1 - me].R : 0, [], sn ? sn.inning : 1);
     wLeaveDiamond();
   }, () => { wBD.pause(false); wBallFocusField(); });
+  // (closed with Escape or a click outside: go on, as if you'd said no)
+  wAfterAsk(() => { if (wBallLive() && wBD.paused) wBD.pause(false); });
 }
 // after a button on the bar, the keys go back to the field (Space would press the button again, and swing)
 function wBallFocusField() { const a = document.activeElement; if (a && a.blur && $('wDiamondBar').contains(a)) a.blur(); }
@@ -30702,6 +30708,8 @@ function wGridConcede() {
     wGridSettle('lose', sc[0], sc[1], wGF.box(), G ? G.half : 1);
     WGF = null; wLeaveGridiron();
   }, () => wGridHold('ask', false));
+  // (closed with Escape or a click outside: go on, as if you'd said no)
+  wAfterAsk(() => wGridHold('ask', false));
 }
 function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
 wGF.wantSnap = () => wGridWorld();
@@ -31163,7 +31171,10 @@ function wGfixPlay(how) {
 W_ON_END.gfix = function (r, ref, W) {
   if (!ref) return;
   const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
-  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
+  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club));
+  // a game saved and finished after its round day: the fixture was postponed, so it's a game like any other now
+  if (F.day !== ref.day || !f || f.done) { wLog('That fixture was postponed on its round day, so the game counts as a game, not on the table.', 'd'); return; }
+  f.done = 1;
   if (tie) { wLog(`A tie in the league at the Ash Bowl: no points for either side.`, 'd'); return; }
   if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r, { us: W.us, them: W.them, sport: 'football' }); }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
@@ -32230,7 +32241,7 @@ renderHelp = function () {
   const h = $('wHelp'); if (!h || $('wHelpRing') || !$('wHelpGrounds')) return;
   const G = [...h.querySelectorAll('[id^="wHelpG"]')], after = G[G.length - 1];
   h.insertAdjacentHTML('beforeend', `<section id="wRingHow" class="wghelp"><h3>Boxing: how it works</h3>${wRingHowHTML()}</section>`);
-  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRing"><b>Real boxing.</b> The Anvil Ring is trying out boxing in the ring itself, one fighter against one. Ask Ma Gristle for a BOUT: three rounds, each about 40 seconds. Watch it, pick your fighter's plan between rounds, or box it yourself (see Boxing: how it works). Fighters jab, hook and dig to the body, and they keep their guard up, slip punches and clinch. Every punch costs stamina, and a punch that lands costs health. At zero health a fighter is knocked down. Failing to beat the count is a knockout, and three knockdowns stop the bout. Otherwise three judges score each round 10–9: Brass likes power punches, Tally likes activity and Slate likes defense. Kinds box differently: a golem hits like a wall and moves like one, and a harpy is all speed and no chin. Nothing is won or lost yet.</p>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRing"><b>Real boxing.</b> The Anvil Ring is trying out boxing in the ring itself, one fighter against one. Ask Ma Gristle for a BOUT: three rounds, each about 40 seconds. Watch it, pick your fighter's plan between rounds, or box it yourself (see Boxing: how it works). Fighters jab, hook and dig to the body, and they keep their guard up, slip punches and clinch. Every punch costs stamina, and a punch that lands costs health. At zero health a fighter is knocked down. Failing to beat the count is a knockout, and three knockdowns stop the bout. Otherwise three judges score each round 10–9: Brass likes power punches, Tally likes activity and Slate likes defense. Kinds box differently: a golem hits like a wall and moves like one, and a harpy is all speed and no chin. A BOUT is an exhibition: nothing is won or lost.</p>`);
 };
 /* w52: the card at the Anvil Ring (issue #23, phase 3). Three bouts, one fighter a bout, and a fighter boxes once
    (10-card.js). Ask Ma Gristle for a CARD: the Saltmere Boxing Club names its three in order, and you pick who of your
@@ -32264,7 +32275,7 @@ function wRingPairing(o) {
   const opt = sel => mine.fighters.map((f, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(f.n)}, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}${f.callup ? ' (call-up)' : ''}</option>`).join('');
   const close = modal(`<header><h3>${esc(o.title)}</h3><button class="ghost" data-close>Not now</button></header>
     <div class="wmsg"><p class="hint">${o.intro}</p>
-    <table class="wrcard">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}<br><small>${rate(f)}</small></td>
+    <table class="wrcard wrpair" id="wRingPairT">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}<br><small>${rate(f)}</small></td>
       <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>`).join('')}</table>
     <p class="hint" id="wRingCardWarn"></p></div>
     <div class="row"><button class="ghost" id="wRingCardAuto">Your corner's pick</button>${o.go.map(([l, v], i) => `<button class="${i ? 'ghost' : 'btn'}" data-rgo="${v}"${i ? '' : ' id="wRingCardGo"'}>${esc(l)}</button>`).join('')}</div>`);
@@ -32275,7 +32286,8 @@ function wRingPairing(o) {
     for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.disabled = dup;
     $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
   };
-  $('modalBox').addEventListener('change', sync); sync();
+  // (on the pairing's own table: a listener on #modalBox would outlive this screen and fire in every later one)
+  $('wRingPairT').addEventListener('change', sync); sync();
   $('wRingCardAuto').onclick = () => { $('modalBox').querySelectorAll('[data-rslot]').forEach((s, i) => { s.value = auto[i]; }); sync(); };
   for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.onclick = () => { const picks = sel(); close(); o.onGo(picks, b.dataset.rgo); };
 }
@@ -32513,6 +32525,8 @@ function wRingConcede() {
     WBXG.leaving = false; wBX.pause(false);
     WBX = null; wLeaveRing(); wRingResultCard(msg);
   }, () => wBX.pause(false));
+  // (closed with Escape or a click outside: box on, as if you'd said no)
+  wAfterAsk(() => { if (wRingLive() && WBX) wBX.pause(false); });
 }
 function wRingScoreWords(sn) {
   const C = sn.CD; if (!C) return '';
@@ -32850,7 +32864,10 @@ function wBfixPlay(how) {
 W_ON_END.bfix = function (r, ref, W) {
   if (!ref) return;
   const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
-  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
+  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club));
+  // a card saved and finished after its round day: the fixture was postponed, so it's a card like any other now
+  if (F.day !== ref.day || !f || f.done) { wLog('That fixture was postponed on its round day, so the card counts as a card, not on the table.', 'd'); return; }
+  f.done = 1;
   if (tie) { wLog(`A drawn card in the league at the Anvil Ring: no points for either side.`, 'd'); return; }
   if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r, { us: W.us, them: W.them, sport: 'boxing' }); }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }

@@ -179,7 +179,10 @@ function wBfixPlay(how) {
 W_ON_END.bfix = function (r, ref, W) {
   if (!ref) return;
   const L = wLeague(), F = wFixtures(), club = ref.club, tie = r === 'tie';
-  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club)); if (f) f.done = 1;
+  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club));
+  // a card saved and finished after its round day: the fixture was postponed, so it's a card like any other now
+  if (F.day !== ref.day || !f || f.done) { wLog('That fixture was postponed on its round day, so the card counts as a card, not on the table.', 'd'); return; }
+  f.done = 1;
   if (tie) { wLog(`A drawn card in the league at the Anvil Ring: no points for either side.`, 'd'); return; }
   if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r, { us: W.us, them: W.them, sport: 'boxing' }); }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }

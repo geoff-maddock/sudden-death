@@ -176,6 +176,8 @@ function wGridConcede() {
     wGridSettle('lose', sc[0], sc[1], wGF.box(), G ? G.half : 1);
     WGF = null; wLeaveGridiron();
   }, () => wGridHold('ask', false));
+  // (closed with Escape or a click outside: go on, as if you'd said no)
+  wAfterAsk(() => wGridHold('ask', false));
 }
 function wGridScore(sn) { const G = sn.G, c = G.clock, m = `${Math.floor(c / 60)}:${String(Math.ceil(c) % 60).padStart(2, '0')}`; return `${G.teams[0].short || G.teams[0].name} ${G.score[0]}, ${G.teams[1].short || G.teams[1].name} ${G.score[1]}, ${['', '1st half', '2nd half', 'Sudden Death'][G.half] || ''} ${m}`; }
 wGF.wantSnap = () => wGridWorld();

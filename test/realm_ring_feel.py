@@ -62,12 +62,15 @@ async def main():
         check(kd['ticks'] >= 1, 'the count ticks', kd)
         check(kd['after'] != 'rise' or kd['bellAgain'] == 0, 'boxing on after a knockdown rings no bell', kd)
         en = await pg.evaluate("""(() => { const G = wBX.G; for (const f of G.F) f.r.chin = 60; __snd.length = 0; let n = 0;
-          while (wBX.phase !== 'corner' && wBX.phase !== 'over' && n++ < 4000) wBX.step(); const corner = wBX.phase === 'corner' ? __n('bell') : null;
-          __snd.length = 0; n = 0; while (wBX.phase !== 'over' && n++ < 20000) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); }
-          const v = G.over; return { corner, end: __n('bell'), horn: __n('horn'), bad: __n('bad'), win: v.win, you: wBX.you }; })()""")
-        check(en['corner'] in (None, 2), 'the bell twice at the end of a round', en)
+          while (wBX.phase !== 'corner' && n++ < 4000) wBX.step(); const corner = __n('bell');
+          // into the last round, then only its end is counted
+          n = 0; while (!(wBX.phase === 'round' && G.round === G.rounds) && n++ < 4000) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); }
+          wBX.step(); __snd.length = 0; n = 0; while (wBX.phase !== 'over' && n++ < 20000) wBX.step();
+          const v = G.over; return { corner, ph: wBX.phase, end: __n('bell'), horn: __n('horn'), bad: __n('bad'), win: v.win, how: v.how, you: wBX.you }; })()""")
+        check(en['corner'] == 2, 'the bell twice at the end of a round', en)
         mine_won, mine_lost = en['win'] == en['you'], en['win'] is not None and en['win'] != en['you']
-        check(en['end'] >= 3 and ((mine_won and en['horn'] >= 1) or (mine_lost and en['bad'] >= 1) or en['win'] is None), 'three bells at the end, and the horn for your win or a groan for your loss', en)
+        check(en['ph'] == 'over' and en['end'] == 3 and ((mine_won and en['horn'] == 1) or (mine_lost and en['bad'] == 1) or (en['win'] is None and en['horn'] == 0 and en['bad'] == 0)),
+              'three bells at the end, and the horn for your win or a groan for your loss', en)
         await pg.evaluate("wBX.pause(false); wLeaveRing()")
 
         # ---------- silence ----------
