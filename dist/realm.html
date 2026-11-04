@@ -24619,6 +24619,8 @@ function bxLand(a, b, k) {
   if (b.a.k === 'stun' || b.a.k === 'grab') acc += .35;
   acc += Fa.acc;
   if (R() > clamp(acc, .08, .95)) { bxEv('miss', a.side, { p: k, why: 'missed' }); return; }
+  // (Rampart takes a head punch whole: it scores nothing, and no buff is spent on it)
+  if (Fb.rampart && P.head) { b.rs.def += .5; b.rs.blocks++; bxEv('block', a.side, { p: k, n: 0, ctr }); return; }
   const blocked = P.head && b.a.k === 'guard';
   let dmg = P.dmg * (.55 + a.r.pow * .09) * (.6 + .4 * bxFrac(a)) / (.4 + b.r.chin * .12);
   if (ctr) dmg *= 1.5;
@@ -24626,12 +24628,12 @@ function bxLand(a, b, k) {
   if (blocked) { dmg *= (P.power ? BX_GUARD.power : BX_GUARD.head) * (Fb.leaky ? 2 : 1); b.rs.def += .5; b.rs.blocks++; }
   else { a.rs.landed++; if (P.power) a.rs.power++; }
   dmg *= (.85 + R() * .3) * Fa.dmgOut * Fb.dmgIn;
-  if (Fb.rampart) dmg *= P.head ? 0 : .5;
+  if (Fb.rampart) dmg *= .5;
   if (!blocked && P.power && Fa.nextMul !== 1) { dmg *= Fa.nextMul; a.fx = a.fx.filter(s => s.nextMul == null); }
   if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2);
   if (P.drain) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
-  bxHurt(a, b, dmg);
+  bxHurt(a, b, dmg, !blocked);
   if (G.down != null) return;
   if (!blocked && dmg > 5 + b.r.chin * .7) { b.a = { k: 'stun', t: 0, dur: .35 + dmg * .025, id: ++G.aid }; bxEv('stun', b.side, { n: Math.round(dmg) }); }
 }
@@ -24643,7 +24645,7 @@ function bxAdvance(f, o, dt) {
   if (f.a.k !== 'clinch' && f.a.k !== 'down' && f.a.t >= f.a.dur) f.a = { k: 'idle', t: 0, dur: 0, id: f.a.id };
   const regen = (3.8 + f.r.sta * .3) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
   if (!bxFx(f).noReg) f.sta = clamp(f.sta + regen * dt, 0, f.staMax);
-  bxFxTick(f, dt);
+  if (G.down == null) bxFxTick(f, dt);
   if (f.ctr > 0) f.ctr = Math.max(0, f.ctr - dt);
 }
 function bxMove(dt) {
@@ -25346,7 +25348,7 @@ const BX_POW = {
   dwarf:    { sp: { id: 'axe', n: 'Battle Axe', when: 'close', desc: 'Winds up the axe arm: the next power punch that lands does 80% more.', fx: { who: 'self', t: 5, nextMul: 1.8 } },
               ult: { id: 'earthshatter', n: 'Earthshatter', when: 'close', desc: 'Stamps the canvas: they stumble for over a second.', now: { stun: 1.2 } } },
   ogre:     { sp: { id: 'crush', n: 'Club Crush', when: 'close', desc: 'A clubbing blow through the guard (6).', now: { dmg: 6 } },
-              ult: { id: 'bellyflop', n: 'Belly Flop', when: 'close', desc: 'Falls on them: 13 through anything, and they stagger.', now: { dmg: 13, stun: .5 } } },
+              ult: { id: 'bellyflop', n: 'Belly Flop', when: 'close', desc: 'Falls on them: 13 through the guard, and they stagger.', now: { dmg: 13, stun: .5 } } },
   minotaur: { sp: { id: 'bullrush', n: 'Bull Rush', when: 'mid', desc: 'Charges them back toward the ropes, and they stagger.', now: { dash: 2, push: 3, stun: .5 } },
               ult: { id: 'stampede', n: 'Stampede', when: 'mid', desc: 'Runs them over: 12 through the guard, and pinned on the ropes.', now: { dash: 3, push: 5, dmg: 12, stun: .8 } } },
   troll:    { sp: { id: 'regen', n: 'Troll Blood', when: 'hurt', desc: '15 health back.', now: { hp: 15 } },
@@ -25410,7 +25412,10 @@ function bxCast(f, which) {
   let dmg = 0;
   if (N.hits) for (let i = 0; i < N.hits; i++) dmg += BX_PUNCH.jab.dmg * (.55 + f.r.pow * .09) / (.4 + o.r.chin * .12);
   if (N.dmg) dmg += N.dmg;
-  if (dmg) { bxHurt(f, o, dmg * bxFx(o).dmgIn * bxFx(f).dmgOut); bxEv('zap', f.side, { n: Math.round(dmg * 10) / 10, pw: P.n }); }
+  // (a power's hit passes through a fighter punches pass through, and Rampart takes half of it)
+  const Fo = bxFx(o);
+  if (dmg && Fo.miss) bxEv('miss', f.side, { p: 'power', why: 'through' });
+  else if (dmg) { dmg *= Fo.dmgIn * bxFx(f).dmgOut * (Fo.rampart ? .5 : 1); bxHurt(f, o, dmg, true); bxEv('zap', f.side, { n: Math.round(dmg * 10) / 10, pw: P.n }); }
   if (N.stun && o.a.k !== 'down' && G.down == null) o.a = { k: 'stun', t: 0, dur: N.stun, id: ++G.aid, stone: P.id === 'petrify' || P.id === 'garden' };
   if (P.fx) { const who = P.fx.who === 'self' ? f : o, s = Object.assign({ id: P.id, n: P.n, from: f.side }, P.fx); delete s.who; who.fx = (who.fx || []).filter(x => x.id !== P.id).concat([s]); }
   f.rs.pw++;
@@ -25421,10 +25426,13 @@ function bxCast(f, which) {
   return true;
 }
 // damage from a power (or a punch, from bxLand): health off, the hit counted, a knockdown at zero (unless undying)
-function bxHurt(a, b, dmg) {
+function bxHurt(a, b, dmg, landed) {
   b.hp -= dmg; a.rs.dmg += dmg;
-  const H = bxFx(a).heal; if (H) a.hp = Math.min(a.hpMax, a.hp + dmg * H);
+  // (Drain and Eclipse heal on what lands: a punch through the guard or a power's hit, not a block or a status's tick)
+  const H = bxFx(a).heal; if (H && landed) a.hp = Math.min(a.hpMax, a.hp + dmg * H);
   if (b.hp <= 0) {
+    // one knockdown at a time: if the other fighter went down this step, this one stays up on the last of their health
+    if (G.down != null && G.down !== b.side) { b.hp = .01; return; }
     const F = bxFx(b);
     if (F.undying) { b.hp = 1; b.fx = b.fx.filter(s => !s.undying); bxEv('undying', b.side); bxLog(`${b.n} will not go down!`, true); return; }
     b.hp = 0; b.a = { k: 'down', t: 0, dur: 0, id: ++G.aid }; G.down = b.side; bxEv('kd', b.side);
@@ -25434,7 +25442,7 @@ function bxHurt(a, b, dmg) {
 function bxFxTick(f, dt) {
   if (!f.fx || !f.fx.length) return;
   const F = bxFx(f);
-  if (F.regHp && f.a.k !== 'down') { const o = G.F[1 - f.side]; if (F.regHp > 0) f.hp = Math.min(f.hpMax, f.hp + F.regHp * dt); else bxHurt(o, f, -F.regHp * dt); }
+  if (F.regHp && f.a.k !== 'down') { const o = G.F[1 - f.side]; if (F.regHp > 0) f.hp = Math.min(f.hpMax, f.hp + F.regHp * dt); else bxHurt(o, f, -F.regHp * dt, false); }
   if (F.regSta) f.sta = clamp(f.sta + F.regSta * dt, 0, f.staMax);
   for (const s of f.fx) s.t -= dt;
   f.fx = f.fx.filter(s => s.t > 0);
@@ -32129,11 +32137,17 @@ function wRingBarNote() {
   for (const [k, lab] of [['sp', 'Special'], ['ult', 'Ultimate']]) {
     const b = $('wRingPad').querySelector(`[data-rpad="${k}"]`), P = pw && pw[k];
     b.hidden = !P; if (!P) continue;
-    b.textContent = P.n; b.title = `${lab} (${k === 'sp' ? 'Q, once a round' : 'R, once a bout'}): ${P.desc}`; b.disabled = P.used;
+    b.textContent = P.n; b.title = `${lab} (${k === 'sp' ? 'Q, once a round' : 'R, once a bout'}): ${P.desc}${P.ok ? '' : ` (${P.why})`}`; b.disabled = !P.ok;
   }
 }
+// (whether a power can go changes inside a round, with breath and what your fighter is doing: the pad looks a few times a second)
+setInterval(() => { if (WBX && UI.view === 'ring' && wBX.mode === 'play' && wBX.phase === 'round' && !$('wRingPad').hidden) wRingPadPowers(); }, 250);
+function wRingPadPowers() {
+  const pw = wBX.G && wBX.G.F ? wBX.powers(wBX.you) : null;
+  for (const k of ['sp', 'ult']) { const b = $('wRingPad').querySelector(`[data-rpad="${k}"]`), P = pw && pw[k]; if (P && !b.hidden) b.disabled = !P.ok; }
+}
 function wLeaveRing() {
-  WBX = null;
+  WBX = null; wBX.pause(false);
   if (WG) showView('world');
   else { showScreen('title'); renderTitle(); }
 }
@@ -32414,7 +32428,7 @@ function wRingGo(o, mine, theirs, picks) {
     wRingResultCard(wRingSettle(r.result, r.bouts.map(b => ({ over: b.over, stats: b.stats, kd: b.kd })), r.pairs));
     return;
   }
-  WBX = { over: null, card: true, world: true, msg: '' };
+  WBX = { over: null, card: true, world: true, msg: '' }; WBXG.leaving = false;
   wBX.cardStart({ sides: [mine, theirs], picks, mode: o.how === 'play' ? 'play' : 'call', you: 0, skill });
   showView('ring');
   wRingBarNote();
@@ -32424,7 +32438,7 @@ function wResumeRing() {
   const L = wRingLive() && WG.bxg.live; if (!L) return;
   if (!L.snap) { wRingCallOff('The card had not reached its first bout, so it is called off.'); return; }
   const C = L.snap.CD, done = C && C.bouts[C.i];
-  WBX = { over: L.snap.BD.ph === 'over' && done ? { verdict: done.verdict } : null, card: true, world: true, msg: '' };
+  WBX = { over: L.snap.BD.ph === 'over' && done ? { verdict: done.verdict } : null, card: true, world: true, msg: '' }; WBXG.leaving = false;
   wBX.resume(L.snap);
   showView('ring');
   wRingBarNote();
@@ -32450,11 +32464,14 @@ function wRingCallOff(why) {
 function wRingConcede() {
   if (!wRingWorld()) return;
   wBX.pause(true);
-  askConfirm('Concede the card?', 'It counts as a loss: a quarter of the XP, and the bouts already boxed count in your lines.', 'Concede', () => {
+  askConfirm('Concede the card?', 'It counts as a loss: a quarter of the XP. The bouts already boxed count in your lines, and so does the one on now, as a loss (a knockout if your fighter is being counted).', 'Concede', () => {
     if (!wRingLive()) return;
-    const C = wBX.card, bouts = C ? C.bouts.filter(Boolean) : [];
-    const won = [0, 0]; for (const b of bouts) if (b.over.win === 0 || b.over.win === 1) won[b.over.win]++;
+    const C = wBX.card, G = wBX.G, bouts = C ? C.bouts.slice(0, C.i + 1) : [];
+    // the bout on now, unless it's over: lost, by knockout if your fighter is down, otherwise retired in the corner
+    if (C && !bouts[C.i] && G && G.F) bouts[C.i] = { over: { how: G.down === 0 ? 'ko' : 'rtd', win: 1, kd: G.kd.slice(), pts: [0, 0] }, stats: G.F.map(f => { const s = Object.assign({}, f.bs); for (const k in f.rs) s[k] = (s[k] || 0) + f.rs[k]; return s; }), kd: G.kd.slice() };
+    const won = [0, 0]; for (const b of bouts) if (b && (b.over.win === 0 || b.over.win === 1)) won[b.over.win]++;
     const msg = wRingSettle({ win: 1, by: 'conceded', won }, bouts, C ? C.pairs : []);
+    WBXG.leaving = false; wBX.pause(false);
     WBX = null; wLeaveRing(); wRingResultCard(msg);
   }, () => wBX.pause(false));
 }
@@ -32469,7 +32486,8 @@ wBX.onSnap = sn => {
   L.snap = sn;
   // (Save and leave was pressed in a round: leave now, at the corner)
   if (WBXG.leaving) { WBXG.leaving = false; setTimeout(() => { if (wRingWorld()) wRingLeave(); }, 0); return; }
-  const now = Date.now(); if (now - WBXG.saved > W_BXG.saveMs) { WBXG.saved = now; wSave(); }
+  // (the start and the end of a bout are always saved, so a result can't be undone by a reload; a corner at most every few seconds)
+  const now = Date.now(); if (sn.BD.ph !== 'corner' || now - WBXG.saved > W_BXG.saveMs) { WBXG.saved = now; wSave(); }
 };
 // the end of a bout: on a real card, once the card is settled, the world pays it
 const wW53OnOver = wBX.onOver;
@@ -32518,8 +32536,9 @@ function wRingSettle(result, bouts, pairs) {
   W.us = won[0]; W.them = won[1];
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   wAdvance(W_BXG.minutes);
-  const how = result.by === 'conceded' ? ', conceded' : result.by && result.by !== 'bouts' && result.by !== 'draw' ? `, on ${result.by}` : '';
-  const msg = `The card: ${win ? 'you win' : tie ? 'a draw' : 'you lose'} ${won[0]}–${won[1]} against ${wBallName(W.club)}${how}.${pay} ${bits}.${kos ? ` ${kos === 1 ? 'A knockout' : `${kos} knockouts`} cost ${kos * W_BXG.koHp} Team HP.` : ''}`;
+  const how = result.by && result.by !== 'bouts' && result.by !== 'draw' && result.by !== 'conceded' ? `, on ${result.by}` : '';
+  const head = result.by === 'conceded' ? `you concede against ${wBallName(W.club)}, at ${won[0]}–${won[1]} in bouts` : `${win ? 'you win' : tie ? 'a draw' : 'you lose'} ${won[0]}–${won[1]} against ${wBallName(W.club)}${how}`;
+  const msg = `The card: ${head}.${pay} ${bits}.${kos ? ` ${kos === 1 ? 'A knockout' : `${kos} knockouts`} cost ${kos * W_BXG.koHp} Team HP.` : ''}`;
   wLog(msg, win ? 'g' : 'b');
   wSave();
   return msg;

@@ -95,11 +95,17 @@ function wRingBarNote() {
   for (const [k, lab] of [['sp', 'Special'], ['ult', 'Ultimate']]) {
     const b = $('wRingPad').querySelector(`[data-rpad="${k}"]`), P = pw && pw[k];
     b.hidden = !P; if (!P) continue;
-    b.textContent = P.n; b.title = `${lab} (${k === 'sp' ? 'Q, once a round' : 'R, once a bout'}): ${P.desc}`; b.disabled = P.used;
+    b.textContent = P.n; b.title = `${lab} (${k === 'sp' ? 'Q, once a round' : 'R, once a bout'}): ${P.desc}${P.ok ? '' : ` (${P.why})`}`; b.disabled = !P.ok;
   }
 }
+// (whether a power can go changes inside a round, with breath and what your fighter is doing: the pad looks a few times a second)
+setInterval(() => { if (WBX && UI.view === 'ring' && wBX.mode === 'play' && wBX.phase === 'round' && !$('wRingPad').hidden) wRingPadPowers(); }, 250);
+function wRingPadPowers() {
+  const pw = wBX.G && wBX.G.F ? wBX.powers(wBX.you) : null;
+  for (const k of ['sp', 'ult']) { const b = $('wRingPad').querySelector(`[data-rpad="${k}"]`), P = pw && pw[k]; if (P && !b.hidden) b.disabled = !P.ok; }
+}
 function wLeaveRing() {
-  WBX = null;
+  WBX = null; wBX.pause(false);
   if (WG) showView('world');
   else { showScreen('title'); renderTitle(); }
 }

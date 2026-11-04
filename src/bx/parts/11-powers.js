@@ -26,7 +26,7 @@ const BX_POW = {
   dwarf:    { sp: { id: 'axe', n: 'Battle Axe', when: 'close', desc: 'Winds up the axe arm: the next power punch that lands does 80% more.', fx: { who: 'self', t: 5, nextMul: 1.8 } },
               ult: { id: 'earthshatter', n: 'Earthshatter', when: 'close', desc: 'Stamps the canvas: they stumble for over a second.', now: { stun: 1.2 } } },
   ogre:     { sp: { id: 'crush', n: 'Club Crush', when: 'close', desc: 'A clubbing blow through the guard (6).', now: { dmg: 6 } },
-              ult: { id: 'bellyflop', n: 'Belly Flop', when: 'close', desc: 'Falls on them: 13 through anything, and they stagger.', now: { dmg: 13, stun: .5 } } },
+              ult: { id: 'bellyflop', n: 'Belly Flop', when: 'close', desc: 'Falls on them: 13 through the guard, and they stagger.', now: { dmg: 13, stun: .5 } } },
   minotaur: { sp: { id: 'bullrush', n: 'Bull Rush', when: 'mid', desc: 'Charges them back toward the ropes, and they stagger.', now: { dash: 2, push: 3, stun: .5 } },
               ult: { id: 'stampede', n: 'Stampede', when: 'mid', desc: 'Runs them over: 12 through the guard, and pinned on the ropes.', now: { dash: 3, push: 5, dmg: 12, stun: .8 } } },
   troll:    { sp: { id: 'regen', n: 'Troll Blood', when: 'hurt', desc: '15 health back.', now: { hp: 15 } },
@@ -90,7 +90,10 @@ function bxCast(f, which) {
   let dmg = 0;
   if (N.hits) for (let i = 0; i < N.hits; i++) dmg += BX_PUNCH.jab.dmg * (.55 + f.r.pow * .09) / (.4 + o.r.chin * .12);
   if (N.dmg) dmg += N.dmg;
-  if (dmg) { bxHurt(f, o, dmg * bxFx(o).dmgIn * bxFx(f).dmgOut); bxEv('zap', f.side, { n: Math.round(dmg * 10) / 10, pw: P.n }); }
+  // (a power's hit passes through a fighter punches pass through, and Rampart takes half of it)
+  const Fo = bxFx(o);
+  if (dmg && Fo.miss) bxEv('miss', f.side, { p: 'power', why: 'through' });
+  else if (dmg) { dmg *= Fo.dmgIn * bxFx(f).dmgOut * (Fo.rampart ? .5 : 1); bxHurt(f, o, dmg, true); bxEv('zap', f.side, { n: Math.round(dmg * 10) / 10, pw: P.n }); }
   if (N.stun && o.a.k !== 'down' && G.down == null) o.a = { k: 'stun', t: 0, dur: N.stun, id: ++G.aid, stone: P.id === 'petrify' || P.id === 'garden' };
   if (P.fx) { const who = P.fx.who === 'self' ? f : o, s = Object.assign({ id: P.id, n: P.n, from: f.side }, P.fx); delete s.who; who.fx = (who.fx || []).filter(x => x.id !== P.id).concat([s]); }
   f.rs.pw++;
@@ -101,10 +104,13 @@ function bxCast(f, which) {
   return true;
 }
 // damage from a power (or a punch, from bxLand): health off, the hit counted, a knockdown at zero (unless undying)
-function bxHurt(a, b, dmg) {
+function bxHurt(a, b, dmg, landed) {
   b.hp -= dmg; a.rs.dmg += dmg;
-  const H = bxFx(a).heal; if (H) a.hp = Math.min(a.hpMax, a.hp + dmg * H);
+  // (Drain and Eclipse heal on what lands: a punch through the guard or a power's hit, not a block or a status's tick)
+  const H = bxFx(a).heal; if (H && landed) a.hp = Math.min(a.hpMax, a.hp + dmg * H);
   if (b.hp <= 0) {
+    // one knockdown at a time: if the other fighter went down this step, this one stays up on the last of their health
+    if (G.down != null && G.down !== b.side) { b.hp = .01; return; }
     const F = bxFx(b);
     if (F.undying) { b.hp = 1; b.fx = b.fx.filter(s => !s.undying); bxEv('undying', b.side); bxLog(`${b.n} will not go down!`, true); return; }
     b.hp = 0; b.a = { k: 'down', t: 0, dur: 0, id: ++G.aid }; G.down = b.side; bxEv('kd', b.side);
@@ -114,7 +120,7 @@ function bxHurt(a, b, dmg) {
 function bxFxTick(f, dt) {
   if (!f.fx || !f.fx.length) return;
   const F = bxFx(f);
-  if (F.regHp && f.a.k !== 'down') { const o = G.F[1 - f.side]; if (F.regHp > 0) f.hp = Math.min(f.hpMax, f.hp + F.regHp * dt); else bxHurt(o, f, -F.regHp * dt); }
+  if (F.regHp && f.a.k !== 'down') { const o = G.F[1 - f.side]; if (F.regHp > 0) f.hp = Math.min(f.hpMax, f.hp + F.regHp * dt); else bxHurt(o, f, -F.regHp * dt, false); }
   if (F.regSta) f.sta = clamp(f.sta + F.regSta * dt, 0, f.staMax);
   for (const s of f.fx) s.t -= dt;
   f.fx = f.fx.filter(s => s.t > 0);

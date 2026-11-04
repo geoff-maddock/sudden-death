@@ -81,6 +81,24 @@ async def main():
         again = await pg.evaluate("wStartRing({ club: 'local', how: 'sim' })")
         check('already boxed you today' in again, 'each club boxes you once a day', again)
 
+        # ---------- the result, settled directly: lines by the pairing, the rest of the team's XP, a knockout's cost ----------
+        st = await pg.evaluate("""(() => { const R = wRoster(), ids = R.map(p => p.id).slice(0, 3); while (ids.length < 3) ids.push(null);
+          const xp = id => wPlayer(id).xp + (wPlayer(id).lvl - 1) * 1000, rest = R.filter(p => !ids.includes(p.id)).map(p => p.id), x0 = Object.fromEntries(R.map(p => [p.id, xp(p.id)]));
+          WG.bxstats = {}; const hp0 = RUN.hp = RUN.maxhp;
+          WG.bxg.live = { world: { kind: 'bxcard', ref: null, club: 'local', tier: 2, how: 'sim', day: WG.dayAbs, name: 'X', ids, cup: true }, snap: null };
+          const bout = (win, how, kd) => ({ over: { how, win, kind: how === 'dec' ? 'split' : null, round: 3, kd, pts: [0, 0] }, stats: [{ landed: 20, thrown: 50, pw: 2 }, {}], kd });
+          // pairs: your fighter 2 boxed bout 1, fighter 0 bout 2, fighter 1 bout 3
+          const msg = wRingSettle({ win: 1, by: 'bouts', won: [1, 2] }, [bout(0, 'tko', [0, 3]), bout(1, 'ko', [2, 0]), bout(1, 'dec', [1, 0])], [[2, 0], [0, 1], [1, 2]]);
+          const L = id => WG.bxstats[id] || null;
+          return { msg, hp: hp0 - RUN.hp, a: ids[2] != null && L(ids[2]), b: ids[0] != null && L(ids[0]), c: ids[1] != null && L(ids[1]), base: 5,
+            boxedXp: ids.filter(id => id != null).map(id => xp(id) - x0[id]), restXp: rest.map(id => xp(id) - x0[id]) }; })()""")
+        a, b2, c3 = st['a'], st['b'], st['c']
+        check(st['hp'] == 5 and 'A knockout cost 5 Team HP' in st['msg'], 'a fighter of yours knocked out costs 5 Team HP (their own win by stoppage costs nothing)', st)
+        check(a and a['w'] == 1 and a['ko'] == 1 and a['kd'] == 3 and a['down'] == 0 and a['pw'] == 2 and a['landed'] == 20, 'box lines go to the fighter who boxed each bout: a win by stoppage, three knockdowns scored, powers and punches', a)
+        check(b2 and b2['l'] == 1 and b2['down'] == 2 and c3 and c3['l'] == 1 and c3['ko'] == 0, 'and the losses, with the knockdowns taken, to the others by the pairing', [b2, c3])
+        check(all(x == 5 for x in st['boxedXp']) and all(x == 3 for x in st['restXp']), 'XP: a quarter of a win for your fighters on a loss (5 at tier 2), and half that for the rest of the team', st)
+        await pg.evaluate(CLOSE)
+
         # ---------- Manage: in the ring, Save and leave, a reload, Resume ----------
         club = await pg.evaluate("wBallClubs().find(c => c !== 'local') || 'local'")
         await pg.evaluate("WG.bxg.met = {}")
@@ -108,6 +126,16 @@ async def main():
         await pg.wait_for_function("UI.view === 'ring' && !!wBX.card && WBX && WBX.world")
         rs = await pg.evaluate("({ ph: wBX.phase, round: wBX.G.round, i: wBX.card.i, wait: !!wBX.wait, save: !document.getElementById('wRingSave').hidden })")
         check(rs == {'ph': 'corner', 'round': 2, 'i': 0, 'wait': True, 'save': True}, 'Resume puts the card back where it was: bout 1, the corner before round 2, waiting for your call', rs)
+        # the end of a bout is saved at once (however recently the last save was), and it can be resumed from there
+        await pg.evaluate("WBXG.saved = Date.now(); wBX.pause(true); for (const f of wBX.G.F) f.r.chin = 60; let n = 0; while (wBX.phase !== 'over' && n++ < 20000) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); } wBX.pause(false)")
+        ov = await pg.evaluate("(() => { const s = JSON.parse(localStorage.getItem(wSaveKey())); return s.WG.bxg.live && s.WG.bxg.live.snap && s.WG.bxg.live.snap.BD.ph; })()")
+        check(ov == 'over', 'the end of a bout is saved at once, so a reload can\'t undo it', ov)
+        await pg.evaluate("(() => { const save = JSON.parse(localStorage.getItem(wSaveKey())); WBX = null; wStart(save); wResumeRing(); })()")
+        await pg.wait_for_function("UI.view === 'ring' && !!wBX.card")
+        ro = await pg.evaluate("({ ph: wBX.phase, next: !document.getElementById('wRingNext').hidden, i: wBX.card.i })")
+        check(ro == {'ph': 'over', 'next': True, 'i': 0}, 'resumed between bouts: bout 1 over, and Next bout on the bar', ro)
+        await pg.click('#wRingNext')
+        check(await pg.evaluate("wBX.card.i === 1 && wBX.phase === 'intro'"), 'Next bout boxes bout 2 after a resume')
         # box it out: three bouts, Next bout between them
         for _ in range(12):
             ph = await pg.evaluate(TO_SAVE)
@@ -133,8 +161,31 @@ async def main():
         await pg.click('#wRingGive')
         title = await pg.evaluate("(document.querySelector('#modal h3') || {}).textContent")
         await pg.click('#cfYes')
-        c = await pg.evaluate("({ view: UI.view, live: WG.bxg.live, r: WG.bxg.cards[0].r, by: WG.bxg.cards[0].by })")
-        check(mode == 'play' and title == 'Concede the card?' and c == {'view': 'world', 'live': None, 'r': 'lose', 'by': 'conceded'}, 'Play opens on You box; Concede asks, then counts it as a loss', [mode, title, c])
+        c = await pg.evaluate("({ view: UI.view, live: WG.bxg.live, r: WG.bxg.cards[0].r, by: WG.bxg.cards[0].by, paused: wBX.paused, leaving: WBXG.leaving, msg: (document.querySelector('#modalBox .wmsg') || {}).textContent || '' })")
+        check(mode == 'play' and title == 'Concede the card?' and {k: c[k] for k in ('view', 'live', 'r', 'by')} == {'view': 'world', 'live': None, 'r': 'lose', 'by': 'conceded'} and 'you concede' in c['msg'],
+              'Play opens on You box; Concede asks, then counts it as a loss', [mode, title, c])
+        check(not c['paused'] and not c['leaving'], 'after Concede the ring isn\'t left paused, and no leave is pending', c)
+        await pg.evaluate(CLOSE)
+        # Save and leave pressed in a round, then Concede: the next card stays in the ring
+        await pg.evaluate("WG.bxg.met = {}; wStartRing({ club: 'local', how: 'manage' })")
+        await pg.wait_for_selector('[data-rslot]'); await pg.click('[data-rgo="manage"]')
+        await pg.wait_for_function("UI.view === 'ring' && WBX && WBX.world")
+        await pg.evaluate("wBX.pause(true); if (wBX.wait) wBX.call(wBX.wait.plan); for (let i = 0; i < 40 && wBX.phase !== 'round'; i++) wBX.step(); wBX.pause(false)")
+        await pg.click('#wRingSave'); await pg.click('#wRingGive'); await pg.click('#cfYes')
+        await pg.evaluate(CLOSE)
+        await pg.evaluate("WG.bxg.met = {}; wStartRing({ club: 'local', how: 'manage' })")
+        await pg.wait_for_selector('[data-rslot]'); await pg.click('[data-rgo="manage"]')
+        await pg.wait_for_timeout(300)
+        nx = await pg.evaluate("({ view: UI.view, live: !!WG.bxg.live, paused: wBX.paused })")
+        check(nx == {'view': 'ring', 'live': True, 'paused': False}, 'a leave pressed before a Concede doesn\'t throw the next card out, and it runs', nx)
+        # conceding while your fighter is being counted: the bout in progress is a knockout (it costs Team HP)
+        hp = await pg.evaluate("(() => { wBX.pause(true); if (wBX.wait) wBX.call(wBX.wait.plan); for (let i = 0; i < 40 && wBX.phase !== 'round'; i++) wBX.step(); const G = wBX.G; G.F[0].x = -1; G.F[1].x = 1; G.F[0].y = G.F[1].y = 0; G.F[0].fx = []; G.F[0].hp = .1; G.F[0].a = { k: 'stun', t: 0, dur: 9, id: 0 }; G.F[1].a = { k: 'idle', t: 0, dur: 0, id: 0 }; for (let i = 0; i < 40 && G.down == null; i++) wBX.land(1, 'hook'); wBX.step(); wBX.pause(false); RUN.hp = RUN.maxhp; return { ph: wBX.phase, down: G.down }; })()")
+        await pg.click('#wRingGive'); await pg.click('#cfYes')
+        kc = await pg.evaluate("({ hp: RUN.maxhp - RUN.hp, kos: WG.bxg.cards[0].kos })")
+        check(hp['ph'] == 'kd' and hp['down'] == 0 and kc == {'hp': 5, 'kos': 1}, 'conceding during the count: the bout is a knockout, and costs the Team HP', [hp, kc])
+        await pg.evaluate(CLOSE)
+        bt = await pg.evaluate("(async () => { W_RING_MODE = 'watch'; wRingBout({ kinds: ['ogre', 'elf'], seed: 2 }); const c0 = wBX.G.clock; await new Promise(r => setTimeout(r, 2600)); const r = { ph: wBX.phase, moved: wBX.G.clock < c0 || wBX.phase !== 'intro', paused: wBX.paused }; wLeaveRing(); return r; })()")
+        check(bt['moved'] and not bt['paused'], 'and a bout after it runs', bt)
         await pg.evaluate(CLOSE)
 
         # ---------- around the Realm ----------

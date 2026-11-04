@@ -96,6 +96,8 @@ function bxLand(a, b, k) {
   if (b.a.k === 'stun' || b.a.k === 'grab') acc += .35;
   acc += Fa.acc;
   if (R() > clamp(acc, .08, .95)) { bxEv('miss', a.side, { p: k, why: 'missed' }); return; }
+  // (Rampart takes a head punch whole: it scores nothing, and no buff is spent on it)
+  if (Fb.rampart && P.head) { b.rs.def += .5; b.rs.blocks++; bxEv('block', a.side, { p: k, n: 0, ctr }); return; }
   const blocked = P.head && b.a.k === 'guard';
   let dmg = P.dmg * (.55 + a.r.pow * .09) * (.6 + .4 * bxFrac(a)) / (.4 + b.r.chin * .12);
   if (ctr) dmg *= 1.5;
@@ -103,12 +105,12 @@ function bxLand(a, b, k) {
   if (blocked) { dmg *= (P.power ? BX_GUARD.power : BX_GUARD.head) * (Fb.leaky ? 2 : 1); b.rs.def += .5; b.rs.blocks++; }
   else { a.rs.landed++; if (P.power) a.rs.power++; }
   dmg *= (.85 + R() * .3) * Fa.dmgOut * Fb.dmgIn;
-  if (Fb.rampart) dmg *= P.head ? 0 : .5;
+  if (Fb.rampart) dmg *= .5;
   if (!blocked && P.power && Fa.nextMul !== 1) { dmg *= Fa.nextMul; a.fx = a.fx.filter(s => s.nextMul == null); }
   if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2);
   if (P.drain) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
-  bxHurt(a, b, dmg);
+  bxHurt(a, b, dmg, !blocked);
   if (G.down != null) return;
   if (!blocked && dmg > 5 + b.r.chin * .7) { b.a = { k: 'stun', t: 0, dur: .35 + dmg * .025, id: ++G.aid }; bxEv('stun', b.side, { n: Math.round(dmg) }); }
 }
@@ -120,7 +122,7 @@ function bxAdvance(f, o, dt) {
   if (f.a.k !== 'clinch' && f.a.k !== 'down' && f.a.t >= f.a.dur) f.a = { k: 'idle', t: 0, dur: 0, id: f.a.id };
   const regen = (3.8 + f.r.sta * .3) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
   if (!bxFx(f).noReg) f.sta = clamp(f.sta + regen * dt, 0, f.staMax);
-  bxFxTick(f, dt);
+  if (G.down == null) bxFxTick(f, dt);
   if (f.ctr > 0) f.ctr = Math.max(0, f.ctr - dt);
 }
 function bxMove(dt) {

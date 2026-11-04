@@ -83,6 +83,33 @@ async def main():
         check(e2e['undying'] == [1, None, False], 'Undying: the knockdown that should come, they stay up on 1, and it is spent', e2e)
         check(e2e['root'], 'Grave Hands: they can\'t move', e2e)
 
+        # ---------- the edges: one knockdown at a time, Rampart, what heals, Vanish against a power, a leaky guard ----------
+        ed = await pg.evaluate("""(() => { const out = {}, ev0 = () => wBX.ev.length;
+          // A under Plague at the last of their health lands the punch that drops B: B goes down, A stays up
+          let G = __setup(2, ['ogre', 'elf']); const [A, B] = G.F; A.r.chin = 60; B.r.chin = 1; B.hp = .1;
+          A.fx = [{ id: 'plague', n: 'Plague Cloud', t: 5, regHp: -2 }]; A.hp = .05; wBX.act(0, 'hook'); B.a = { k: 'stun', t: 0, dur: 9, id: 0 };
+          A.a.t = A.a.hitAt - .01; const R0 = Math.random; for (let i = 0; i < 2 && G.down == null; i++) wBX.step();
+          out.oneKd = { down: G.down, A: A.a.k, B: B.a.k, Ahp: A.hp > 0 };
+          // Rampart: a head punch scores nothing and leaves the Axe's buff for a body shot
+          G = __setup(2, ['golem', 'dwarf']); wBX.cast(1, 'sp'); wBX.cast(0, 'ult'); G.F[0].a = { k: 'stun', t: 0, dur: 9, id: 0 }; const l0 = G.F[1].rs.landed, h0 = G.F[0].hp, n0 = ev0();
+          wBX.land(1, 'hook'); out.rampart = { landed: G.F[1].rs.landed - l0, hp: h0 - G.F[0].hp, ev: wBX.ev.slice(n0).map(e => e.k), buff: G.F[1].fx.some(s => s.nextMul) };
+          // Drain heals on what lands, not on a block
+          G = __setup(2, ['vampire', 'ogre']); G.F[0].hp = 40; wBX.cast(0, 'sp'); G.F[1].a = { k: 'guard', t: 0, dur: 9, id: 0 }; let n = 0, blk = 0; const hpB = G.F[0].hp;
+          while (n++ < 60) { const e0 = ev0(); wBX.land(0, 'jab'); if (wBX.ev.slice(e0).some(e => e.k === 'block')) blk++; } out.drainBlock = { blocks: blk, healed: G.F[0].hp - hpB };
+          // a power's hit passes through Vanish
+          G = __setup(2, ['ogre', 'wraith']); wBX.cast(1, 'sp'); const hv = G.F[1].hp; G.F[0].sta = 99; wBX.cast(0, 'sp'); out.vanish = G.F[1].hp === hv;
+          // a leaky guard lets through twice as much
+          const thru = leaky => { let t = 0, k = 0; for (let i = 0; i < 80; i++) { const G = __setup(2, ['ogre', 'elf']); G.F[1].r.chin = 5; G.F[1].a = { k: 'guard', t: 0, dur: 9, id: 0 }; if (leaky) G.F[1].fx = [{ id: 'firebreath', n: 'Fire Breath', t: 9, leaky: 1 }];
+            const h = G.F[1].hp, e0 = wBX.ev.length; wBX.land(0, 'jab'); if (wBX.ev.slice(e0).some(e => e.k === 'block')) { k++; t += h - G.F[1].hp; } } return t / Math.max(1, k); };
+          out.leaky = [thru(false), thru(true)];
+          return out; })()""")
+        check(ed['oneKd'] == {'down': 1, 'A': 'idle', 'B': 'down', 'Ahp': True}, 'one knockdown at a time: a status tick can\'t drop the puncher in the step their punch drops the other', ed['oneKd'])
+        check(ed['rampart'] == {'landed': 0, 'hp': 0, 'ev': ['block'], 'buff': True}, 'under Rampart a head punch scores nothing, and the Axe\'s buff is kept for one that lands', ed['rampart'])
+        check(ed['drainBlock']['blocks'] > 20 and ed['drainBlock']['healed'] == 0, 'Drain heals on what lands, not on a blocked punch', ed['drainBlock'])
+        check(ed['vanish'], 'a power\'s hit passes through a fighter who has vanished', ed)
+        lk = ed['leaky']
+        check(1.7 < lk[1] / max(.01, lk[0]) < 2.3, 'a leaky guard lets twice as much through', lk)
+
         # ---------- the limits ----------
         lim = await pg.evaluate("""(() => { const out = {}; let G = __setup(2, ['troll', 'elf']); const f = G.F[0];
           out.first = wBX.cast(0, 'sp'); out.again = [wBX.cast(0, 'sp'), wBX.powers(0).sp.why]; out.ult = wBX.cast(0, 'ult'); out.ult2 = [wBX.cast(0, 'ult'), wBX.powers(0).ult.why];
@@ -115,7 +142,7 @@ async def main():
           for (let i = 0; i < 20; i++) { const s = wBX.simBout({ fighters: [{ n: 'A', kind: 'witch' }, { n: 'B', kind: 'ogre' }], seed: 50 + i, powers: false }); castsOff += s.stats[0].pw + s.stats[1].pw; }
           return { casts: casts / n, castsOff, rates: Object.values(W).map(([w, t]) => Math.round(100 * w / t) / 100).sort((x, y) => x - y) }; })()""")
         check(cpu['casts'] >= 4 and cpu['castsOff'] == 0, 'the CPU casts in its bouts (both fighters), and none with powers off', cpu)
-        check(cpu['rates'][0] >= .12 and cpu['rates'][-1] <= .88, 'with powers, no kind always wins or always loses (of the bouts decided; about 55 a kind)', cpu['rates'])
+        check(cpu['rates'][0] >= .12 and cpu['rates'][-1] <= .88, 'with powers, no kind always wins or always loses (of the bouts decided; about 55 a kind here, so the band is wide: the lab measures it finer)', cpu['rates'])
 
         # ---------- in the Realm ----------
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS))")
@@ -134,6 +161,10 @@ async def main():
         await pg.keyboard.press('q')
         q = await pg.evaluate("(() => { for (let i = 0; i < 3; i++) wBX.step(); return { used: wBX.powers(0).sp.used, them: wBX.G.F[1].a.k, btn: document.querySelector('[data-rpad=\"sp\"]').disabled, log: wBX.G.log.some(l => /casts Petrify/.test(l.msg)) }; })()")
         check(q == {'used': True, 'them': 'stun', 'btn': True, 'log': True}, 'Q casts your special: Petrify freezes them, the log says so, and its button goes out', q)
+        await pg.evaluate("wBX.G.F[0].sta = 2; wBX.pause(false)"); await pg.wait_for_timeout(400)
+        nb = await pg.evaluate("({ btn: document.querySelector('[data-rpad=\"ult\"]').disabled, why: wBX.powers(0).ult.why }); ")
+        await pg.evaluate("wBX.pause(true); wBX.G.F[0].sta = wBX.G.F[0].staMax")
+        check(nb['btn'] and nb['why'] in ('no breath', 'busy'), 'without the breath the ultimate\'s button is out, kept up to date during the round', nb)
         await pg.evaluate("wBX.pause(false)"); await pg.wait_for_timeout(250); await pg.screenshot(path='/tmp/realm-ring-powers-cast.png'); await pg.evaluate("wBX.pause(true)")
         await pg.evaluate("(() => { for (const f of wBX.G.F) f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; document.querySelector('[data-rpad=\"ult\"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 3 })); for (let i = 0; i < 3; i++) wBX.step(); })()")
         u = await pg.evaluate("({ used: wBX.powers(0).ult.used, stone: !!wBX.G.F[1].a.stone })")

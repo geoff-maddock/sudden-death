@@ -125,7 +125,7 @@ function wRingGo(o, mine, theirs, picks) {
     wRingResultCard(wRingSettle(r.result, r.bouts.map(b => ({ over: b.over, stats: b.stats, kd: b.kd })), r.pairs));
     return;
   }
-  WBX = { over: null, card: true, world: true, msg: '' };
+  WBX = { over: null, card: true, world: true, msg: '' }; WBXG.leaving = false;
   wBX.cardStart({ sides: [mine, theirs], picks, mode: o.how === 'play' ? 'play' : 'call', you: 0, skill });
   showView('ring');
   wRingBarNote();
@@ -135,7 +135,7 @@ function wResumeRing() {
   const L = wRingLive() && WG.bxg.live; if (!L) return;
   if (!L.snap) { wRingCallOff('The card had not reached its first bout, so it is called off.'); return; }
   const C = L.snap.CD, done = C && C.bouts[C.i];
-  WBX = { over: L.snap.BD.ph === 'over' && done ? { verdict: done.verdict } : null, card: true, world: true, msg: '' };
+  WBX = { over: L.snap.BD.ph === 'over' && done ? { verdict: done.verdict } : null, card: true, world: true, msg: '' }; WBXG.leaving = false;
   wBX.resume(L.snap);
   showView('ring');
   wRingBarNote();
@@ -161,11 +161,14 @@ function wRingCallOff(why) {
 function wRingConcede() {
   if (!wRingWorld()) return;
   wBX.pause(true);
-  askConfirm('Concede the card?', 'It counts as a loss: a quarter of the XP, and the bouts already boxed count in your lines.', 'Concede', () => {
+  askConfirm('Concede the card?', 'It counts as a loss: a quarter of the XP. The bouts already boxed count in your lines, and so does the one on now, as a loss (a knockout if your fighter is being counted).', 'Concede', () => {
     if (!wRingLive()) return;
-    const C = wBX.card, bouts = C ? C.bouts.filter(Boolean) : [];
-    const won = [0, 0]; for (const b of bouts) if (b.over.win === 0 || b.over.win === 1) won[b.over.win]++;
+    const C = wBX.card, G = wBX.G, bouts = C ? C.bouts.slice(0, C.i + 1) : [];
+    // the bout on now, unless it's over: lost, by knockout if your fighter is down, otherwise retired in the corner
+    if (C && !bouts[C.i] && G && G.F) bouts[C.i] = { over: { how: G.down === 0 ? 'ko' : 'rtd', win: 1, kd: G.kd.slice(), pts: [0, 0] }, stats: G.F.map(f => { const s = Object.assign({}, f.bs); for (const k in f.rs) s[k] = (s[k] || 0) + f.rs[k]; return s; }), kd: G.kd.slice() };
+    const won = [0, 0]; for (const b of bouts) if (b && (b.over.win === 0 || b.over.win === 1)) won[b.over.win]++;
     const msg = wRingSettle({ win: 1, by: 'conceded', won }, bouts, C ? C.pairs : []);
+    WBXG.leaving = false; wBX.pause(false);
     WBX = null; wLeaveRing(); wRingResultCard(msg);
   }, () => wBX.pause(false));
 }
@@ -180,7 +183,8 @@ wBX.onSnap = sn => {
   L.snap = sn;
   // (Save and leave was pressed in a round: leave now, at the corner)
   if (WBXG.leaving) { WBXG.leaving = false; setTimeout(() => { if (wRingWorld()) wRingLeave(); }, 0); return; }
-  const now = Date.now(); if (now - WBXG.saved > W_BXG.saveMs) { WBXG.saved = now; wSave(); }
+  // (the start and the end of a bout are always saved, so a result can't be undone by a reload; a corner at most every few seconds)
+  const now = Date.now(); if (sn.BD.ph !== 'corner' || now - WBXG.saved > W_BXG.saveMs) { WBXG.saved = now; wSave(); }
 };
 // the end of a bout: on a real card, once the card is settled, the world pays it
 const wW53OnOver = wBX.onOver;
@@ -229,8 +233,9 @@ function wRingSettle(result, bouts, pairs) {
   W.us = won[0]; W.them = won[1];
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   wAdvance(W_BXG.minutes);
-  const how = result.by === 'conceded' ? ', conceded' : result.by && result.by !== 'bouts' && result.by !== 'draw' ? `, on ${result.by}` : '';
-  const msg = `The card: ${win ? 'you win' : tie ? 'a draw' : 'you lose'} ${won[0]}–${won[1]} against ${wBallName(W.club)}${how}.${pay} ${bits}.${kos ? ` ${kos === 1 ? 'A knockout' : `${kos} knockouts`} cost ${kos * W_BXG.koHp} Team HP.` : ''}`;
+  const how = result.by && result.by !== 'bouts' && result.by !== 'draw' && result.by !== 'conceded' ? `, on ${result.by}` : '';
+  const head = result.by === 'conceded' ? `you concede against ${wBallName(W.club)}, at ${won[0]}–${won[1]} in bouts` : `${win ? 'you win' : tie ? 'a draw' : 'you lose'} ${won[0]}–${won[1]} against ${wBallName(W.club)}${how}`;
+  const msg = `The card: ${head}.${pay} ${bits}.${kos ? ` ${kos === 1 ? 'A knockout' : `${kos} knockouts`} cost ${kos * W_BXG.koHp} Team HP.` : ''}`;
   wLog(msg, win ? 'g' : 'b');
   wSave();
   return msg;
