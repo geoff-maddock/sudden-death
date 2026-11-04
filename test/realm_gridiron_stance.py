@@ -46,7 +46,7 @@ async def main():
         pg = await br.new_page(viewport={'width': 1400, 'height': 1000})
         errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()'); await pg.goto(REALM_URL)
-        await pg.wait_for_function("typeof wGF === 'object' && typeof wGridStanceBar === 'function'")
+        await pg.wait_for_function("typeof wGF === 'object' && typeof wGridStanceBar === 'function'"); await pg.evaluate("wGF.speed = 4")  # the field at 4 steps a frame: the same game, sooner
         await pg.evaluate("SET.tips = false")
 
         # ---------- the effects, over seeded downs ----------

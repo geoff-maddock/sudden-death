@@ -23644,7 +23644,8 @@ function gfStanceTip(id) {
    engine's parts don't touch the page; this file is the only one that does. The canvas fills the width of the page (the
    page widens on the gridiron, see w6.css) but no taller than the window has room for under the game's bar (#wGridBar;
    the page scrolls the bar to the top, w42), so the bar and the whole field are in view; never smaller than 960 wide. It draws at the size it is shown, so it stays sharp. */
-const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, mw: 0 };
+// speed: steps a frame, 1 in play; the tests raise it (wGF.speed) so a game on the field takes less of their time
+const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, mw: 0, speed: 1 };
 (() => {
   const h = document.createElement('div'); h.id = 'v-gridiron'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
@@ -23667,7 +23668,7 @@ function gfRender() {
 function gfFrame(now) {
   if (!GFP.on) return;
   const dt = Math.min(.05, Math.max(0, (now - GFP.last) / 1000)); GFP.last = now;
-  if (!GFP.paused) { GFT.t += dt; gfTick(dt); }
+  if (!GFP.paused) for (let i = 0; i < GFP.speed && !GFP.paused; i++) { GFT.t += dt; gfTick(dt); }
   gfRender();
   GFP.raf = requestAnimationFrame(gfFrame);
 }
@@ -23716,7 +23717,7 @@ function gfHide() { GFK.clear(); GFP.host.hidden = true; GFP.on = false; cancelA
 return {
   newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES),
   start: gfStart, game: gfStartGame, simGame: gfSimGame, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
-  get on() { return GFP.on; }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
+  get on() { return GFP.on; }, get speed() { return GFP.speed; }, set speed(n) { GFP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
   get play() { return L; }, pause: on => { GFP.paused = !!on; }, get paused() { return GFP.paused; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
   // Play mode: the page's keys ({ steer, hold, pick, tap }), and what the field shows of them
   input: o => gfInput(o || {}), get hands() { return !!L && L.hands && GD.ph === 'live' && !L.done; }, get meter() { return GD && GD.meter ? Object.assign({ now: gfMeterNow() }, GD.meter) : null; }, set onOver(f) { GF_HOOK.onOver = f; }, set onPhase(f) { GF_HOOK.onPhase = f; }, get onPhase() { return GF_HOOK.onPhase; }, set onSnap(f) { GF_HOOK.onSnap = f; }, set wantSnap(f) { GF_HOOK.wantSnap = f; },

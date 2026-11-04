@@ -5,7 +5,7 @@ import asyncio, json, sys, subprocess
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
-from paths import GAME_URL, REALM_URL, REALM_BUILD
+from paths import GAME_URL, REALM_URL, REALM_BUILD, GAME_BUILD
 from playwright.async_api import async_playwright
 
 FAILS = []
@@ -39,7 +39,7 @@ async def one(b, name, url):
     await pg.close()
 
 async def main():
-    subprocess.run(['./build.sh'], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(GAME_BUILD, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
     subprocess.run(REALM_BUILD, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
     async with async_playwright() as p:
         b = await p.chromium.launch()

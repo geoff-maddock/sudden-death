@@ -33,7 +33,7 @@ async def main():
         pg = await br.new_page(viewport={'width': 1200, 'height': 900})
         errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
-        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wOpenGcup === 'function'")
+        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wOpenGcup === 'function'"); await pg.evaluate("wGF.speed = 4")  # the field at 4 steps a frame: the same game, sooner
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS))")
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
         if await pg.evaluate("!!document.getElementById('cfYes')"):

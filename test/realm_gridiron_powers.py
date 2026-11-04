@@ -69,7 +69,8 @@ async def main():
         check(g['stamDown'] and g['json'], 'stamina is spent through a game, and mana, stamina and zones are plain JSON', g)
 
         # ---------- on the field in You call: mana, G, the tip box, a cast ----------
-        await pg.evaluate("wGridironGame({ mode: 'call', seed: 5 })")
+        # (seed 7: your side receives the opening kickoff, so it's your call with the ball without watching a drive first)
+        await pg.evaluate("wGridironGame({ mode: 'call', seed: 7 })")
         await pg.wait_for_function("UI.view === 'gridiron'")
         auto = await pg.evaluate("wGF.powers().auto")
         check(auto, 'Auto powers starts on in You call')

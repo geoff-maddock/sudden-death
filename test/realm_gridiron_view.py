@@ -23,7 +23,7 @@ async def start(br, w, h, scale=1):
     pg = await br.new_page(viewport={'width': w, 'height': h}, device_scale_factor=scale)
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()'); await pg.goto(REALM_URL)
-    await pg.wait_for_function("typeof wStartGrid === 'function'")
+    await pg.wait_for_function("typeof wStartGrid === 'function'"); await pg.evaluate("wGF.speed = 4")  # the field at 4 steps a frame: the same game, sooner
     await pg.evaluate("SET.tips = false")
     await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
     if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')
@@ -71,8 +71,8 @@ async def main():
         try: await pg.wait_for_function("wGF.view().zoom < 1.05", timeout=4000)
         except Exception: pass
         check(await pg.evaluate("wGF.view().zoom < 1.05"), 'by the next call the camera is back out', await pg.evaluate("wGF.view()"))
-        await pg.wait_for_function("wGF.phase === 'post' && !!wGF.view().big", timeout=120000)
-        v = await pg.evaluate("wGF.view()")
+        # (the view read in the same moment it's seen, so the banner can't have gone by a second call)
+        v = await (await pg.wait_for_function("wGF.phase === 'post' && wGF.view().big ? wGF.view() : null", timeout=120000)).json_value()
         check(v['big']['k'] in ('td', 'int', 'fum', 'first', 'sack', 'safety', 'downs', 'long', 'fg', 'miss'), 'after a play, a banner says what it came to', v)
         stats = await pg.evaluate("document.getElementById('wGridStats').textContent")
         check('Total yards' in stats and 'Passing' in stats and 'Leaders' in stats, 'the team stats and leaders show under the field', stats)

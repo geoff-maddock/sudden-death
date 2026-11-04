@@ -3,7 +3,8 @@
    engine's parts don't touch the page; this file is the only one that does. The canvas fills the width of the page (the
    page widens on the gridiron, see w6.css) but no taller than the window has room for under the game's bar (#wGridBar;
    the page scrolls the bar to the top, w42), so the bar and the whole field are in view; never smaller than 960 wide. It draws at the size it is shown, so it stays sharp. */
-const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, mw: 0 };
+// speed: steps a frame, 1 in play; the tests raise it (wGF.speed) so a game on the field takes less of their time
+const GFP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, mw: 0, speed: 1 };
 (() => {
   const h = document.createElement('div'); h.id = 'v-gridiron'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
@@ -26,7 +27,7 @@ function gfRender() {
 function gfFrame(now) {
   if (!GFP.on) return;
   const dt = Math.min(.05, Math.max(0, (now - GFP.last) / 1000)); GFP.last = now;
-  if (!GFP.paused) { GFT.t += dt; gfTick(dt); }
+  if (!GFP.paused) for (let i = 0; i < GFP.speed && !GFP.paused; i++) { GFT.t += dt; gfTick(dt); }
   gfRender();
   GFP.raf = requestAnimationFrame(gfFrame);
 }

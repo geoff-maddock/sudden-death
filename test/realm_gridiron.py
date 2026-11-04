@@ -26,7 +26,7 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
         await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
-        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wGF !== 'undefined'")
+        await pg.goto(REALM_URL); await pg.wait_for_function("typeof wGF !== 'undefined'"); await pg.evaluate("wGF.speed = 4")  # the field at 4 steps a frame: the same game, sooner
 
         # ---------- the scope ----------
         leaks = await pg.evaluate("['gfSnap', 'gfStep', 'gfTick', 'gfStart', 'gfSim', 'GF_PLAYS', 'GF_DEFS', 'GFP', 'GD', 'GFT', 'gfDraw', 'GF_KIND'].filter(n => (0, eval)('typeof ' + n) !== 'undefined')")
