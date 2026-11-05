@@ -39,3 +39,13 @@ GF_POW.djinn = [{ id: 'vanish', n: 'Vanishing Act', cost: 1, fits: 'pass', desc:
 GF_ULT.djinn = { id: 'threewishes', n: 'Three Wishes', role: 'off', desc: 'Three wishes at once: the defense reads the play late, the receivers run 5% faster, and the hands are surer.', zone: { read: .8, rSpd: 1.05, catch: .06 }, vis: ['#b38cf0', 'all'] };
 for (const p of GF_POW.djinn) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.djinn.id] = GF_ULT.djinn;
+
+/* The Hydra: three heads, eyes everywhere, hard to bring down. Many Heads on offense (the throw goes truer), Coils
+   on defense (the coverage quicker, more picks), and Regrow: its side grows back, stamina every play, and its carrier
+   harder to bring down. */
+GF_KIND.hydra = [6, 7, 7, 6, 4, 8];
+GF_POW.hydra = [{ id: 'manyheads', n: 'Many Heads', cost: 1, fits: 'pass', desc: 'Eyes everywhere: the quarterback sees the open man, and the throw goes 30% truer.', fx: { errM: .7 } },
+  { id: 'coils', n: 'Coils', cost: 1, fits: 'pass', desc: 'The coverage coils round the receivers: 5% faster, and more throws picked off.', fx: { coverSpd: 1.05, int: 1.3 } }];
+GF_ULT.hydra = { id: 'regrow', n: 'Regrow', role: 'off', desc: 'Cut one head off and two grow back: the hydra\'s side gets 6 stamina back every play it lasts, and its carrier is harder to bring down.', zone: { cStr: 1 }, restZ: 6, vis: ['#3f8a6a', 'all'] };
+for (const p of GF_POW.hydra) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.hydra.id] = GF_ULT.hydra;

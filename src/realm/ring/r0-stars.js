@@ -38,3 +38,13 @@ BX_POW.djinn = {
   ult: { id: 'threewishes', n: 'Three Wishes', when: 'any', desc: 'One wish, the one the moment needs: 22 health back when hurt, 14 through the guard when they are hurt, or 35% quicker for 6 seconds.',
     wish: [{ when: 'hurt', n: 'health', now: { hp: 22 } }, { when: 'theyHurt', n: 'a knockout blow', now: { dmg: 14 } }, { when: 'else', n: 'speed', fx: { who: 'self', t: 6, spd: 1.35, move: 1.2 } }] },
 };
+
+/* The Hydra: gets stronger when hurt. Its nature is Regrow: behind on health its punches land more often
+   (scrappy), and between rounds it grows back far more than anyone (mend, read in 07-bout.js's corner). Triple Bite
+   is three quick hits that land; its ultimate, Regrow, grows the heads back. */
+BX_KIND.hydra = [6, 6, 5, 6, 6, 6];
+BX_TRAIT.hydra = { n: 'Regrow', desc: 'Behind on health it fights harder (its punches land more often), and between rounds it grows back far more than anyone.', scrappy: .03, mend: .6 };
+BX_POW.hydra = {
+  sp: { id: 'triplebite', n: 'Triple Bite', when: 'close', desc: 'Three heads bite at once: three quick hits that all land.', now: { hits: 3 } },
+  ult: { id: 'regrow', n: 'Regrow', when: 'hurt', desc: 'The heads grow back: 20 health now, and 2 a second for 6 seconds.', now: { hp: 20 }, fx: { who: 'self', t: 6, regHp: 2 } },
+};

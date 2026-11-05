@@ -129,7 +129,7 @@ function bxRoundEnd() {
 }
 function bxCorner() {
   for (const f of G.F) {
-    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * .35); f.sta = (bxTrait(f) || {}).corner ? f.staMax : f.sta + (f.staMax - f.sta) * .75; f.ctr = 0; f.halt = 0;
+    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35)); f.sta = (bxTrait(f) || {}).corner ? f.staMax : f.sta + (f.staMax - f.sta) * .75; f.ctr = 0; f.halt = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
     if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }

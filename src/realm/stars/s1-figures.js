@@ -12,7 +12,9 @@
    The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
    hump of moss-grown plates with flowers in it.
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
-   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard. */
+   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
+   The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
+   each with its own eyes and fangs, the middle one's tongue flicking. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -150,4 +152,31 @@
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.djinn = 'Djinn';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.djinn = 'staff';
+
+  // a serpent's head at (x, y), facing out by s (-1 left, 1 right, 0 ahead), r big
+  const serpent = (c, d, x, y, s, r, tongue) => {
+    const skin = d.skin, t = now();
+    ink(c, pPoly([[x - r, y - r * .5], [x - r * .7, y - r * .95], [x + r * .7, y - r * .95], [x + r, y - r * .5], [x + r * .8 + s * r * .5, y + r * .6], [x + s * r * .4, y + r], [x - r * .8 + s * r * .5, y + r * .6]]), skin);
+    for (const e of [-1, 1]) glowEye(c, x + e * r * .42 + s * r * .2, y - r * .3, r * .2, d.eye, d.st);
+    for (const e of [-1, 1]) ink(c, pPoly([[x + e * r * .32 + s * r * .3, y + r * .55], [x + e * r * .22 + s * r * .3, y + r * 1.05], [x + e * r * .12 + s * r * .3, y + r * .55]]), d.C('#f4ead0'), 0, true);
+    inkLine(c, [[x - r * .5, y - r * .62], [x - r * .15, y - r * .5]], INK, .7); inkLine(c, [[x + r * .5, y - r * .62], [x + r * .15, y - r * .5]], INK, .7);
+    if (tongue && !d.st && Math.sin(t * 3) > .2) inkLine(c, [[x, y + r], [x, y + r * 1.6], [x - r * .2, y + r * 1.9]], '#e0457b', .8);
+  };
+  KIND.hydra = { skin: '#3f8a6a', h: 1.12, w: 1.25, eye: '#ffe14a' };
+  BODY.hydra = { foot: 'claw', musc: .6, tail: 'lizard', scales: true, clawHand: true };
+  HEAD.hydra = function (c, d) {
+    const { hy, C } = d, t = now(), neck = C('#3f8a6a'), belly = C('#cfe0a0');
+    // the two side necks, swaying, behind the middle one
+    for (const s of [-1, 1]) {
+      const hx = s * 19 + Math.sin(t * 1.6 + s) * 1.5, hy2 = hy + 4 + Math.cos(t * 1.4 + s) * 1.2;
+      const n = new Path2D(); n.moveTo(s * 6, d.shY + 2); n.quadraticCurveTo(s * 18, d.shY - 6, hx - s * 2, hy2 + 6); n.lineTo(hx + s * 4, hy2 + 8); n.quadraticCurveTo(s * 24, d.shY - 2, s * 13, d.shY + 4); n.closePath();
+      ink(c, n, neck); serpent(c, d, hx, hy2, s, 8, false);
+    }
+    // the middle neck and head, highest
+    ink(c, capsule(0, d.shY + 1, 5, 0, hy - 4, 4.6), neck);
+    for (let i = 0; i < 3; i++) inkLine(c, [[-2.5, d.shY - 4 - i * 6], [2.5, d.shY - 4 - i * 6]], belly, .6);
+    serpent(c, d, 0, hy - 8, 0, 10, true);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
 })();

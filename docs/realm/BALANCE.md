@@ -534,3 +534,26 @@ matters. Shipped level with the other two.
 Guile and speed together were the counter-puncher's old edge (phase 7's Counter plan); a point off each brings it
 level with the others (Phoenix 63.1%, Kraken 62.3%, Behemoth 63.5%).
 
+### The Hydra in the ring (issue #24, phase 3)
+
+| Hydra ratings (reach, pow, spd, chin, sta, gui), Regrow (scrappy .03, mend .6) | Hydra (against the league kinds) |
+|---|---|
+| 6, 6, 5, 6, 7, 6 (first try) | 74.1% |
+| 6, 5, 5, 6, 6, 6 | 55.7% |
+| **6, 6, 5, 6, 6, 6 (shipped)** | **63.4%** |
+
+Its nature carries it (it mends 0.6 of what it lost between rounds, everyone else 0.35), so its ratings are plain.
+
+### All six in the ring
+
+| Superstar | Against the league kinds | Best league kind |
+|---|---|---|
+| Phoenix | 63.1% | about 59% (witch) |
+| Kraken | 62.3% | |
+| Behemoth | 63.5% | |
+| Djinn | 61.8% | |
+| Hydra | 63.4% | |
+
+The Frost Wyrm (strong at everything) is the sixth, still to come. Phase 4 measures the card game, football and
+baseball with the realm, gridiron and diamond labs.
+

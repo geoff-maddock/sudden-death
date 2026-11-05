@@ -21247,6 +21247,14 @@ ULT.threewishes = { kind: 'djinn', role: 'bat', name: 'Three Wishes', desc: 'Thr
 AB.threewishes = { name: '★ ' + ULT.threewishes.name, type: 'ult', role: ULT.threewishes.role, cost: ULT_COST, ult: true, desc: ULT.threewishes.desc };
 ULT_BY_KIND.djinn = 'threewishes';
 MOON_KIND.djinn = [5, ['con', 'fld']];
+
+/* The Hydra: a catcher with three heads, so it sees everything: Undying at the plate (strike three is a foul),
+   Block the Plate in the field; its ultimate Many Heads has every fielder reacting sooner. */
+TEMPL.hydra = { n: 'Threefold', kind: 'hydra', race: 'Hydra', pos: 'C', num: 33, hand: 'R', pow: 7, con: 6, spd: 4, arm: 8, fld: 7, wpn: 'spiked', bat: 'undying', run: null, field: 'block', flav: 'Calls three pitches at once. The pitcher picks.' };
+ULT.manyheads = { kind: 'hydra', role: 'field', name: 'Many Heads', desc: 'Three heads watch every ball: every fielder reacts a quarter of a second sooner.', zone: { shape: 'global', react: -.25, vis: 'grass' } };
+AB.manyheads = { name: '★ ' + ULT.manyheads.name, type: 'ult', role: ULT.manyheads.role, cost: ULT_COST, ult: true, desc: ULT.manyheads.desc };
+ULT_BY_KIND.hydra = 'manyheads';
+MOON_KIND.hydra = [7, ['arm', 'con']];
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -21261,7 +21269,9 @@ MOON_KIND.djinn = [5, ['con', 'fld']];
    The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
    hump of moss-grown plates with flowers in it.
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
-   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard. */
+   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
+   The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
+   each with its own eyes and fangs, the middle one's tongue flicking. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -21399,6 +21409,33 @@ MOON_KIND.djinn = [5, ['con', 'fld']];
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.djinn = 'Djinn';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.djinn = 'staff';
+
+  // a serpent's head at (x, y), facing out by s (-1 left, 1 right, 0 ahead), r big
+  const serpent = (c, d, x, y, s, r, tongue) => {
+    const skin = d.skin, t = now();
+    ink(c, pPoly([[x - r, y - r * .5], [x - r * .7, y - r * .95], [x + r * .7, y - r * .95], [x + r, y - r * .5], [x + r * .8 + s * r * .5, y + r * .6], [x + s * r * .4, y + r], [x - r * .8 + s * r * .5, y + r * .6]]), skin);
+    for (const e of [-1, 1]) glowEye(c, x + e * r * .42 + s * r * .2, y - r * .3, r * .2, d.eye, d.st);
+    for (const e of [-1, 1]) ink(c, pPoly([[x + e * r * .32 + s * r * .3, y + r * .55], [x + e * r * .22 + s * r * .3, y + r * 1.05], [x + e * r * .12 + s * r * .3, y + r * .55]]), d.C('#f4ead0'), 0, true);
+    inkLine(c, [[x - r * .5, y - r * .62], [x - r * .15, y - r * .5]], INK, .7); inkLine(c, [[x + r * .5, y - r * .62], [x + r * .15, y - r * .5]], INK, .7);
+    if (tongue && !d.st && Math.sin(t * 3) > .2) inkLine(c, [[x, y + r], [x, y + r * 1.6], [x - r * .2, y + r * 1.9]], '#e0457b', .8);
+  };
+  KIND.hydra = { skin: '#3f8a6a', h: 1.12, w: 1.25, eye: '#ffe14a' };
+  BODY.hydra = { foot: 'claw', musc: .6, tail: 'lizard', scales: true, clawHand: true };
+  HEAD.hydra = function (c, d) {
+    const { hy, C } = d, t = now(), neck = C('#3f8a6a'), belly = C('#cfe0a0');
+    // the two side necks, swaying, behind the middle one
+    for (const s of [-1, 1]) {
+      const hx = s * 19 + Math.sin(t * 1.6 + s) * 1.5, hy2 = hy + 4 + Math.cos(t * 1.4 + s) * 1.2;
+      const n = new Path2D(); n.moveTo(s * 6, d.shY + 2); n.quadraticCurveTo(s * 18, d.shY - 6, hx - s * 2, hy2 + 6); n.lineTo(hx + s * 4, hy2 + 8); n.quadraticCurveTo(s * 24, d.shY - 2, s * 13, d.shY + 4); n.closePath();
+      ink(c, n, neck); serpent(c, d, hx, hy2, s, 8, false);
+    }
+    // the middle neck and head, highest
+    ink(c, capsule(0, d.shY + 1, 5, 0, hy - 4, 4.6), neck);
+    for (let i = 0; i < 3; i++) inkLine(c, [[-2.5, d.shY - 4 - i * 6], [2.5, d.shY - 4 - i * 6]], belly, .6);
+    serpent(c, d, 0, hy - 8, 0, 10, true);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
 })();
 
 /* the end of the wBD scope: what the Realm may call (w20-diamond.js, w20d-ballgame.js). gameOver, showMenu and exhSnap
@@ -23890,6 +23927,16 @@ GF_POW.djinn = [{ id: 'vanish', n: 'Vanishing Act', cost: 1, fits: 'pass', desc:
 GF_ULT.djinn = { id: 'threewishes', n: 'Three Wishes', role: 'off', desc: 'Three wishes at once: the defense reads the play late, the receivers run 5% faster, and the hands are surer.', zone: { read: .8, rSpd: 1.05, catch: .06 }, vis: ['#b38cf0', 'all'] };
 for (const p of GF_POW.djinn) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.djinn.id] = GF_ULT.djinn;
+
+/* The Hydra: three heads, eyes everywhere, hard to bring down. Many Heads on offense (the throw goes truer), Coils
+   on defense (the coverage quicker, more picks), and Regrow: its side grows back, stamina every play, and its carrier
+   harder to bring down. */
+GF_KIND.hydra = [6, 7, 7, 6, 4, 8];
+GF_POW.hydra = [{ id: 'manyheads', n: 'Many Heads', cost: 1, fits: 'pass', desc: 'Eyes everywhere: the quarterback sees the open man, and the throw goes 30% truer.', fx: { errM: .7 } },
+  { id: 'coils', n: 'Coils', cost: 1, fits: 'pass', desc: 'The coverage coils round the receivers: 5% faster, and more throws picked off.', fx: { coverSpd: 1.05, int: 1.3 } }];
+GF_ULT.hydra = { id: 'regrow', n: 'Regrow', role: 'off', desc: 'Cut one head off and two grow back: the hydra\'s side gets 6 stamina back every play it lasts, and its carrier is harder to bring down.', zone: { cStr: 1 }, restZ: 6, vis: ['#3f8a6a', 'all'] };
+for (const p of GF_POW.hydra) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.hydra.id] = GF_ULT.hydra;
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -23904,7 +23951,9 @@ GF_ULT_BY[GF_ULT.djinn.id] = GF_ULT.djinn;
    The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
    hump of moss-grown plates with flowers in it.
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
-   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard. */
+   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
+   The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
+   each with its own eyes and fangs, the middle one's tongue flicking. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -24042,6 +24091,33 @@ GF_ULT_BY[GF_ULT.djinn.id] = GF_ULT.djinn;
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.djinn = 'Djinn';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.djinn = 'staff';
+
+  // a serpent's head at (x, y), facing out by s (-1 left, 1 right, 0 ahead), r big
+  const serpent = (c, d, x, y, s, r, tongue) => {
+    const skin = d.skin, t = now();
+    ink(c, pPoly([[x - r, y - r * .5], [x - r * .7, y - r * .95], [x + r * .7, y - r * .95], [x + r, y - r * .5], [x + r * .8 + s * r * .5, y + r * .6], [x + s * r * .4, y + r], [x - r * .8 + s * r * .5, y + r * .6]]), skin);
+    for (const e of [-1, 1]) glowEye(c, x + e * r * .42 + s * r * .2, y - r * .3, r * .2, d.eye, d.st);
+    for (const e of [-1, 1]) ink(c, pPoly([[x + e * r * .32 + s * r * .3, y + r * .55], [x + e * r * .22 + s * r * .3, y + r * 1.05], [x + e * r * .12 + s * r * .3, y + r * .55]]), d.C('#f4ead0'), 0, true);
+    inkLine(c, [[x - r * .5, y - r * .62], [x - r * .15, y - r * .5]], INK, .7); inkLine(c, [[x + r * .5, y - r * .62], [x + r * .15, y - r * .5]], INK, .7);
+    if (tongue && !d.st && Math.sin(t * 3) > .2) inkLine(c, [[x, y + r], [x, y + r * 1.6], [x - r * .2, y + r * 1.9]], '#e0457b', .8);
+  };
+  KIND.hydra = { skin: '#3f8a6a', h: 1.12, w: 1.25, eye: '#ffe14a' };
+  BODY.hydra = { foot: 'claw', musc: .6, tail: 'lizard', scales: true, clawHand: true };
+  HEAD.hydra = function (c, d) {
+    const { hy, C } = d, t = now(), neck = C('#3f8a6a'), belly = C('#cfe0a0');
+    // the two side necks, swaying, behind the middle one
+    for (const s of [-1, 1]) {
+      const hx = s * 19 + Math.sin(t * 1.6 + s) * 1.5, hy2 = hy + 4 + Math.cos(t * 1.4 + s) * 1.2;
+      const n = new Path2D(); n.moveTo(s * 6, d.shY + 2); n.quadraticCurveTo(s * 18, d.shY - 6, hx - s * 2, hy2 + 6); n.lineTo(hx + s * 4, hy2 + 8); n.quadraticCurveTo(s * 24, d.shY - 2, s * 13, d.shY + 4); n.closePath();
+      ink(c, n, neck); serpent(c, d, hx, hy2, s, 8, false);
+    }
+    // the middle neck and head, highest
+    ink(c, capsule(0, d.shY + 1, 5, 0, hy - 4, 4.6), neck);
+    for (let i = 0; i < 3; i++) inkLine(c, [[-2.5, d.shY - 4 - i * 6], [2.5, d.shY - 4 - i * 6]], belly, .6);
+    serpent(c, d, 0, hy - 8, 0, 10, true);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
 })();
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
@@ -25321,7 +25397,7 @@ function bxRoundEnd() {
 }
 function bxCorner() {
   for (const f of G.F) {
-    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * .35); f.sta = (bxTrait(f) || {}).corner ? f.staMax : f.sta + (f.staMax - f.sta) * .75; f.ctr = 0; f.halt = 0;
+    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35)); f.sta = (bxTrait(f) || {}).corner ? f.staMax : f.sta + (f.staMax - f.sta) * .75; f.ctr = 0; f.halt = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
     if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
@@ -25963,6 +26039,16 @@ BX_POW.djinn = {
   ult: { id: 'threewishes', n: 'Three Wishes', when: 'any', desc: 'One wish, the one the moment needs: 22 health back when hurt, 14 through the guard when they are hurt, or 35% quicker for 6 seconds.',
     wish: [{ when: 'hurt', n: 'health', now: { hp: 22 } }, { when: 'theyHurt', n: 'a knockout blow', now: { dmg: 14 } }, { when: 'else', n: 'speed', fx: { who: 'self', t: 6, spd: 1.35, move: 1.2 } }] },
 };
+
+/* The Hydra: gets stronger when hurt. Its nature is Regrow: behind on health its punches land more often
+   (scrappy), and between rounds it grows back far more than anyone (mend, read in 07-bout.js's corner). Triple Bite
+   is three quick hits that land; its ultimate, Regrow, grows the heads back. */
+BX_KIND.hydra = [6, 6, 5, 6, 6, 6];
+BX_TRAIT.hydra = { n: 'Regrow', desc: 'Behind on health it fights harder (its punches land more often), and between rounds it grows back far more than anyone.', scrappy: .03, mend: .6 };
+BX_POW.hydra = {
+  sp: { id: 'triplebite', n: 'Triple Bite', when: 'close', desc: 'Three heads bite at once: three quick hits that all land.', now: { hits: 3 } },
+  ult: { id: 'regrow', n: 'Regrow', when: 'hurt', desc: 'The heads grow back: 20 health now, and 2 a second for 6 seconds.', now: { hp: 20 }, fx: { who: 'self', t: 6, regHp: 2 } },
+};
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -25977,7 +26063,9 @@ BX_POW.djinn = {
    The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
    hump of moss-grown plates with flowers in it.
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
-   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard. */
+   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
+   The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
+   each with its own eyes and fangs, the middle one's tongue flicking. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -26115,6 +26203,33 @@ BX_POW.djinn = {
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.djinn = 'Djinn';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.djinn = 'staff';
+
+  // a serpent's head at (x, y), facing out by s (-1 left, 1 right, 0 ahead), r big
+  const serpent = (c, d, x, y, s, r, tongue) => {
+    const skin = d.skin, t = now();
+    ink(c, pPoly([[x - r, y - r * .5], [x - r * .7, y - r * .95], [x + r * .7, y - r * .95], [x + r, y - r * .5], [x + r * .8 + s * r * .5, y + r * .6], [x + s * r * .4, y + r], [x - r * .8 + s * r * .5, y + r * .6]]), skin);
+    for (const e of [-1, 1]) glowEye(c, x + e * r * .42 + s * r * .2, y - r * .3, r * .2, d.eye, d.st);
+    for (const e of [-1, 1]) ink(c, pPoly([[x + e * r * .32 + s * r * .3, y + r * .55], [x + e * r * .22 + s * r * .3, y + r * 1.05], [x + e * r * .12 + s * r * .3, y + r * .55]]), d.C('#f4ead0'), 0, true);
+    inkLine(c, [[x - r * .5, y - r * .62], [x - r * .15, y - r * .5]], INK, .7); inkLine(c, [[x + r * .5, y - r * .62], [x + r * .15, y - r * .5]], INK, .7);
+    if (tongue && !d.st && Math.sin(t * 3) > .2) inkLine(c, [[x, y + r], [x, y + r * 1.6], [x - r * .2, y + r * 1.9]], '#e0457b', .8);
+  };
+  KIND.hydra = { skin: '#3f8a6a', h: 1.12, w: 1.25, eye: '#ffe14a' };
+  BODY.hydra = { foot: 'claw', musc: .6, tail: 'lizard', scales: true, clawHand: true };
+  HEAD.hydra = function (c, d) {
+    const { hy, C } = d, t = now(), neck = C('#3f8a6a'), belly = C('#cfe0a0');
+    // the two side necks, swaying, behind the middle one
+    for (const s of [-1, 1]) {
+      const hx = s * 19 + Math.sin(t * 1.6 + s) * 1.5, hy2 = hy + 4 + Math.cos(t * 1.4 + s) * 1.2;
+      const n = new Path2D(); n.moveTo(s * 6, d.shY + 2); n.quadraticCurveTo(s * 18, d.shY - 6, hx - s * 2, hy2 + 6); n.lineTo(hx + s * 4, hy2 + 8); n.quadraticCurveTo(s * 24, d.shY - 2, s * 13, d.shY + 4); n.closePath();
+      ink(c, n, neck); serpent(c, d, hx, hy2, s, 8, false);
+    }
+    // the middle neck and head, highest
+    ink(c, capsule(0, d.shY + 1, 5, 0, hy - 4, 4.6), neck);
+    for (let i = 0; i < 3; i++) inkLine(c, [[-2.5, d.shY - 4 - i * 6], [2.5, d.shY - 4 - i * 6]], belly, .6);
+    serpent(c, d, 0, hy - 8, 0, 10, true);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
 })();
 /* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
@@ -33886,7 +34001,9 @@ renderHelp = function () {
    The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
    hump of moss-grown plates with flowers in it.
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
-   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard. */
+   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
+   The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
+   each with its own eyes and fangs, the middle one's tongue flicking. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -34024,6 +34141,33 @@ renderHelp = function () {
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.djinn = 'Djinn';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.djinn = 'staff';
+
+  // a serpent's head at (x, y), facing out by s (-1 left, 1 right, 0 ahead), r big
+  const serpent = (c, d, x, y, s, r, tongue) => {
+    const skin = d.skin, t = now();
+    ink(c, pPoly([[x - r, y - r * .5], [x - r * .7, y - r * .95], [x + r * .7, y - r * .95], [x + r, y - r * .5], [x + r * .8 + s * r * .5, y + r * .6], [x + s * r * .4, y + r], [x - r * .8 + s * r * .5, y + r * .6]]), skin);
+    for (const e of [-1, 1]) glowEye(c, x + e * r * .42 + s * r * .2, y - r * .3, r * .2, d.eye, d.st);
+    for (const e of [-1, 1]) ink(c, pPoly([[x + e * r * .32 + s * r * .3, y + r * .55], [x + e * r * .22 + s * r * .3, y + r * 1.05], [x + e * r * .12 + s * r * .3, y + r * .55]]), d.C('#f4ead0'), 0, true);
+    inkLine(c, [[x - r * .5, y - r * .62], [x - r * .15, y - r * .5]], INK, .7); inkLine(c, [[x + r * .5, y - r * .62], [x + r * .15, y - r * .5]], INK, .7);
+    if (tongue && !d.st && Math.sin(t * 3) > .2) inkLine(c, [[x, y + r], [x, y + r * 1.6], [x - r * .2, y + r * 1.9]], '#e0457b', .8);
+  };
+  KIND.hydra = { skin: '#3f8a6a', h: 1.12, w: 1.25, eye: '#ffe14a' };
+  BODY.hydra = { foot: 'claw', musc: .6, tail: 'lizard', scales: true, clawHand: true };
+  HEAD.hydra = function (c, d) {
+    const { hy, C } = d, t = now(), neck = C('#3f8a6a'), belly = C('#cfe0a0');
+    // the two side necks, swaying, behind the middle one
+    for (const s of [-1, 1]) {
+      const hx = s * 19 + Math.sin(t * 1.6 + s) * 1.5, hy2 = hy + 4 + Math.cos(t * 1.4 + s) * 1.2;
+      const n = new Path2D(); n.moveTo(s * 6, d.shY + 2); n.quadraticCurveTo(s * 18, d.shY - 6, hx - s * 2, hy2 + 6); n.lineTo(hx + s * 4, hy2 + 8); n.quadraticCurveTo(s * 24, d.shY - 2, s * 13, d.shY + 4); n.closePath();
+      ink(c, n, neck); serpent(c, d, hx, hy2, s, 8, false);
+    }
+    // the middle neck and head, highest
+    ink(c, capsule(0, d.shY + 1, 5, 0, hy - 4, 4.6), neck);
+    for (let i = 0; i < 3; i++) inkLine(c, [[-2.5, d.shY - 4 - i * 6], [2.5, d.shY - 4 - i * 6]], belly, .6);
+    serpent(c, d, 0, hy - 8, 0, 10, true);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
 })();
 /* w58: meeting and signing a superstar (issue #24, phase 2). A superstar that is built (W_STARS entry with a kind,
    added by its own part: w59 for the Phoenix) is met through someone who knows where it is: ask them about it by
@@ -34324,6 +34468,61 @@ renderHelp = function () {
   wW62RenderHelp();
   const after = $('wHelpBehemoth') || $('wHelpStars'); if (!after || $('wHelpDjinn')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpDjinn"><b>The Djinn.</b> Walk the Road to Nowhere to its end, after dark, on any journey, to unlock it. Then ask Ingrith Skarr, the cartographer in Rimewatch, about the DJINN: it signs for ${W_DJN.price.gold} gold or ${W_DJN.price.items.meadowegg} Meadow Eggs. Its power is Three Wishes. In a card-game match, while it starts, it grants one wish at kickoff, the one the moment needs: ${W_DJN.heal} HP back when Team HP is under half, ${W_DJN.storm} damage to every enemy against three or more, or else ${W_DJN.str} Strength. In the ring its ultimate grants health, a heavy blow or speed, whichever the moment needs; on the gridiron and the diamond it grants three small wishes at once. As captain it gives 1 Strength and 1 Footwork at kickoff.</p>`);
+};
+/* w63: the Hydra (issue #24, phase 3), the fifth superstar. Its drawing is in src/realm/stars/s1-figures.js; its
+   ratings and powers in each engine in src/realm/ring/r0-stars.js (boxing: the Regrow nature, fighting harder when
+   behind and growing back between rounds), src/realm/gridiron/g0-stars.js (the Regrow ultimate) and
+   src/realm/diamond/d1-stars.js (the Many Heads ultimate, a catcher). Here:
+   - Cards: a signature card (Triple Bite) and five of its own kind.
+   - Regrow, in the card game: while the Hydra starts, at the start of each of your turns, if your line was hit since
+     your last one, W_HYD.regrow HP grow back (the turnStart hook; B.hydHp is Team HP at the last turn start).
+   - Captain: Venom, every enemy starts with 3 Plague.
+   - Meeting: Dr. Pell, whose incubator hatched the rare eggs, knows what all five make together; ask about the
+     HYDRA. Its price is W_HYD.price: gold, or a Moss Egg and a Brine Egg.
+   Unlocked by hatching all five rare eggs over any number of journeys (w57). How to play: #wHelpHydra. */
+
+const W_HYD = { regrow: 4, price: { gold: 300, items: { mossegg: 1, brineegg: 1 } } };
+Object.assign(wStar('hydra'), {
+  kind: 'hydra', name: 'Threefold', num: 33,
+  flav: 'Hatched from all five eggs at once, somehow, and argues with itself about tactics.',
+  meet: { who: 'pell', topic: 'hydra', price: W_HYD.price, where: 'Meet them: ask Dr. Pell in Graftonbury about the HYDRA.',
+    rumour: 'Dr. Pell polishes the incubator. "Every rare egg I have hatched left a little something in the shell. When I have had all five through here, over however many journeys it takes, there is enough to grow something with more heads than sense. Bring me all five."',
+    hello: 'Dr. Pell opens the big tank at the back. Three heads rise out of the water at once, look at you, look at each other, and agree.',
+    ask: 'It will play for you, for a price: gold for the League\'s books, or a Moss Egg and a Brine Egg, one for each of two heads. The third does not eat eggs.' },
+});
+FA_NAMES.hydra = ['Threefold'];
+FA_SCOUT.hydra = ['Gets stronger when you hurt it. Stop hurting it.'];
+
+/* ---------- cards ---------- */
+K('hyd_bite', 'Triple Bite', 'hydra', 'atk', 1, 's', 'one', [['d', 3, 3]], { fl: 'Left, middle, right. In that order, usually.', sport: 'hockey' });
+K('hyd_lash', 'Tail Lash', 'hydra', 'atk', 1, 'c', 'one', [['d', 7], ['b', 2]], { sport: 'football' });
+K('hyd_scales', 'Scales', 'hydra', 'skl', 1, 'c', 'self', [['b', 8]], { sport: 'baseball' });
+K('hyd_venom', 'Venom', 'hydra', 'atk', 1, 'u', 'one', [['d', 4], ['s', 'psn', 4]], { sport: 'soccer' });
+K('hyd_regrow', 'Regrow', 'hydra', 'skl', 1, 'u', 'self', [['heal', 6]], { ex: 1, fl: 'Two where there was one.' });
+K('hyd_heads', 'All Heads', 'hydra', 'atk', 2, 'r', 'all', [['d', 5, 2]], { fl: 'Everyone gets one.' });
+SIG.hydra = 'hyd_bite';
+
+/* ---------- Regrow, in the card game ---------- */
+function wHydStarts() { return !!(WG && RUN && wStarters().some(p => p.kind === 'hydra')); }
+onHook('turnStart', () => {
+  if (!B || !wHydStarts()) return;
+  const was = B.hydHp; B.hydHp = RUN.hp;
+  if (was != null && RUN.hp < was && RUN.hp > 0) { healP(W_HYD.regrow); B.hydHp = RUN.hp; log(`Regrow: two heads grow back for every one they hit. ${W_HYD.regrow} HP back.`, 'good'); }
+});
+W_CAPTAIN.hydra = { n: 'Venom', d: 'Every enemy starts with 3 Plague.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'psn', 3); } } };
+
+/* ---------- the meeting: Dr. Pell in Graftonbury ---------- */
+(() => {
+  const S = DB.chars.pell; if (!S) return;
+  S.topics.job.t += ' Hatch all five rare eggs, ever, and ask me about the HYDRA.';
+  S.topics.hydra = { t: 'What five shells make together. Look.', act: 'star:hydra' };
+})();
+
+const wW63RenderHelp = renderHelp;
+renderHelp = function () {
+  wW63RenderHelp();
+  const after = $('wHelpDjinn') || $('wHelpStars'); if (!after || $('wHelpHydra')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpHydra"><b>The Hydra.</b> Hatch all five rare eggs at Pell's, over any number of journeys, to unlock it. Then ask Dr. Pell in Graftonbury about the HYDRA: it signs for ${W_HYD.price.gold} gold, or a Moss Egg and a Brine Egg. Its power is Regrow. In a card-game match, while it starts, if your line was hit since your last turn, ${W_HYD.regrow} HP grow back at the start of your turn. In the ring it fights harder when behind and grows back far more between rounds. On the gridiron its ultimate gives its side stamina back; on the diamond every fielder reacts sooner. As captain every enemy starts with 3 Plague.</p>`);
 };
 </script>
 </body></html>

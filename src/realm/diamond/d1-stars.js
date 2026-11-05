@@ -35,3 +35,11 @@ ULT.threewishes = { kind: 'djinn', role: 'bat', name: 'Three Wishes', desc: 'Thr
 AB.threewishes = { name: '★ ' + ULT.threewishes.name, type: 'ult', role: ULT.threewishes.role, cost: ULT_COST, ult: true, desc: ULT.threewishes.desc };
 ULT_BY_KIND.djinn = 'threewishes';
 MOON_KIND.djinn = [5, ['con', 'fld']];
+
+/* The Hydra: a catcher with three heads, so it sees everything: Undying at the plate (strike three is a foul),
+   Block the Plate in the field; its ultimate Many Heads has every fielder reacting sooner. */
+TEMPL.hydra = { n: 'Threefold', kind: 'hydra', race: 'Hydra', pos: 'C', num: 33, hand: 'R', pow: 7, con: 6, spd: 4, arm: 8, fld: 7, wpn: 'spiked', bat: 'undying', run: null, field: 'block', flav: 'Calls three pitches at once. The pitcher picks.' };
+ULT.manyheads = { kind: 'hydra', role: 'field', name: 'Many Heads', desc: 'Three heads watch every ball: every fielder reacts a quarter of a second sooner.', zone: { shape: 'global', react: -.25, vis: 'grass' } };
+AB.manyheads = { name: '★ ' + ULT.manyheads.name, type: 'ult', role: ULT.manyheads.role, cost: ULT_COST, ult: true, desc: ULT.manyheads.desc };
+ULT_BY_KIND.hydra = 'manyheads';
+MOON_KIND.hydra = [7, ['arm', 'con']];
