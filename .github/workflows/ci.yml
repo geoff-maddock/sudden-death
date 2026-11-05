@@ -1,12 +1,22 @@
 name: CI
-# Pushes to main, and pull requests. A push to a PR branch runs once (as the pull request), not twice.
+# Pull requests only (a merge to main was already checked as its pull request), and not drafts: mark a PR ready for
+# review when you want it checked. Docs-only changes don't run it. A new push to a PR cancels that PR's run in progress.
+# It's one job: test/all.sh runs the checks side by side on the runner's cores, which uses about half the runner minutes
+# of splitting them across shards (each job is counted by the minute, rounded up). Actions minutes are free while the
+# repo is public; if it ever goes private again, that's what keeps it inside the free allowance. Run it by hand from
+# the Actions tab (workflow_dispatch) when you want to check main.
 on:
-  push:
-    branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 env:
-  # The quick checks, split across the test job's shards round-robin (check i runs on shard i % SHARDS), so the
-  # slow ones next to each other in the list land on different shards. A new check goes on the end of this list.
+  # The quick checks, passed to test/all.sh (which runs several at a time, slowest first). A new check goes on the end.
   CHECKS: >-
     smoke tipcheck tooltip fuzz handfit hooks traits sports pausesave practice season_goals profiles trouble forfeit
     realm_audit realm_tiles realm_smoke realm_match realm_save realm_party realm_road realm_town realm_dungeon
@@ -15,11 +25,13 @@ env:
     realm_diamond_game realm_diamond_cup realm_diamond_feel realm_click realm_grounds realm_gmatch realm_cities
     realm_spots realm_fixtures realm_home realm_gfeel realm_notices realm_legs realm_captain realm_weather
     realm_name realm_tour realm_sinks realm_defend realm_legends realm_gate realm_settings realm_map soccer realm_soccer realm_retire indeck realm_eggs realm_prospects realm_engines realm_gridiron realm_gridiron_game realm_gridiron_play realm_gridiron_seven realm_gridiron_playbook realm_gridiron_world realm_gridiron_powers realm_gridiron_cup realm_gridiron_fixes realm_gridiron_feel realm_gridiron_view realm_gridiron_bench realm_gridiron_stance realm_music realm_ring realm_ring_hands realm_ring_card realm_ring_powers realm_ring_game realm_ring_cup realm_ring_feel realm_ring_tab realm_stars realm_phoenix realm_kraken realm_behemoth realm_djinn realm_hydra realm_frostwyrm
-  SHARDS: 4
 jobs:
-  build:
-    name: Build, stale files and bot sanity
+  ci:
+    name: Build, stale files, bot sanity and quick checks
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    # a stuck run stops here rather than burning minutes until GitHub's six-hour limit
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,38 +51,13 @@ jobs:
       - uses: ./.github/actions/playwright
       - name: Bot sanity (no errors or stalls in 30 runs)
         run: python test/lab.py 30 | tee lab.txt && grep -q "run errors 0" lab.txt && grep -q "stalls 0" lab.txt
-
-  test:
-    name: Quick checks (shard ${{ matrix.shard }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: ./.github/actions/playwright
-      - name: Build
-        run: ./build.sh && ./build.sh src/realm/manifest.txt
       - name: Quick checks
-        # built once above, so the checks don't each rebuild (test/paths.py)
-        env:
-          SD_BUILT: 1
+        # one check per core at a time
+        run: JOBS=$(nproc) ./test/all.sh $CHECKS
+      - name: Logs of the failed checks
+        if: failure()
         run: |
-          i=0; fail=0
-          for t in $CHECKS; do
-            if [ $((i % SHARDS)) -eq ${{ matrix.shard }} ]; then
-              # (realm_music renders a minute of audio for each of its palettes: on CI's runners that alone takes longer
-              # than the other checks' three minutes)
-              to=180; [ "$t" = realm_music ] && to=600
-              echo "== $t"; timeout $to python test/$t.py || { echo "FAILED: $t (exit $?)"; fail=1; }
-            fi
-            i=$((i + 1))
+          for s in build/test-status/*; do
+            t=$(basename "$s"); read -r code _ < "$s"
+            [ "$code" = 0 ] || { echo "::group::$t (exit $code)"; cat "/tmp/sd-$t.log"; echo "::endgroup::"; }
           done
-          exit $fail
