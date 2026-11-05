@@ -524,3 +524,13 @@ number stays comparable as more are added; the Phoenix and the Kraken measure 63
 Chin is the steepest rating for a big kind (a point is about ten points of win rate); Living Wall's strength barely
 matters. Shipped level with the other two.
 
+### The Djinn in the ring (issue #24, phase 3)
+
+| Djinn ratings (reach, pow, spd, chin, sta, gui) | Djinn (against the league kinds) |
+|---|---|
+| 6, 5, 7, 5, 6, 10 (first try) | 72.6% |
+| **6, 5, 6, 5, 6, 9 (shipped)** | **61.8%** |
+
+Guile and speed together were the counter-puncher's old edge (phase 7's Counter plan); a point off each brings it
+level with the others (Phoenix 63.1%, Kraken 62.3%, Behemoth 63.5%).
+

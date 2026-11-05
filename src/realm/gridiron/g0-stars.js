@@ -29,3 +29,13 @@ GF_POW.behemoth = [{ id: 'mosswall', n: 'Moss Wall', cost: 1, fits: 'run', desc:
 GF_ULT.behemoth = { id: 'earthquake', n: 'Earthquake', role: 'off', desc: 'The field heaves at the snap: every defender goes down for two seconds, and the broken ground slows them after (5%).', now: { snapAll: 2 }, zone: { dSpd: .95 }, vis: ['#7a5a34', 'all'] };
 for (const p of GF_POW.behemoth) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.behemoth.id] = GF_ULT.behemoth;
+
+/* The Djinn: quick, clever hands. Vanishing Act on offense (the defense breaks on the throw late), Mirage on defense
+   (their carrier chases phantoms, slower), and Three Wishes: three small wishes granted at once, the defense reading
+   the play late, the receivers quicker and the hands surer. */
+GF_KIND.djinn = [8, 3, 8, 8, 6, 4];
+GF_POW.djinn = [{ id: 'vanish', n: 'Vanishing Act', cost: 1, fits: 'pass', desc: 'The receivers blink out of sight: the defense breaks on the throw late.', fx: { read: .6 } },
+  { id: 'phantom', n: 'Mirage', cost: 1, fits: 'run', desc: 'Phantom tacklers everywhere: their carrier 8% slower.', fx: { cSpd: .92 } }];
+GF_ULT.djinn = { id: 'threewishes', n: 'Three Wishes', role: 'off', desc: 'Three wishes at once: the defense reads the play late, the receivers run 5% faster, and the hands are surer.', zone: { read: .8, rSpd: 1.05, catch: .06 }, vis: ['#b38cf0', 'all'] };
+for (const p of GF_POW.djinn) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.djinn.id] = GF_ULT.djinn;

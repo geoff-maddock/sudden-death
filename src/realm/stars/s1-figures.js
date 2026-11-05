@@ -10,7 +10,9 @@
    The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
    tentacles curling up behind it, suckers along them, and arms a little long.
    The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
-   hump of moss-grown plates with flowers in it. */
+   hump of moss-grown plates with flowers in it.
+   The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
+   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -118,4 +120,34 @@
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.behemoth = 'Behemoth';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.behemoth = 'tree';
+
+  KIND.djinn = { skin: '#8a7ae0', h: 1.06, w: 1, eye: '#ffe27a', robe: '#4a3a98' };
+  BODY.djinn = { robe: true, slim: true };
+  BACK.djinn = function (c, d) {
+    const t = now(), col = d.C('#6a5ac8'), sm = d.C('#b8a8f0');
+    // the smoke tail: puffs from the waist down to a point, swaying, and the robe over its top
+    for (let i = 0; i < 9; i++) { const k = i / 8, y = -36 + k * 32, x = Math.sin(t * 2 + k * 4) * 7 * k, r = 17 * (1 - k * .8);
+      ink(c, pEl(x, y, r, r * .7), i % 2 ? col : sm, 0, true); }
+    const p = new Path2D(); p.moveTo(-d.shw + 2, d.shY + 10); p.lineTo(-d.shw - 5, -30); p.quadraticCurveTo(0, -22, d.shw + 5, -30); p.lineTo(d.shw - 2, d.shY + 10); p.closePath();
+    ink(c, p, d.C('#4a3a98'));
+    c.fillStyle = d.C('#d8b64a'); c.fillRect(-d.shw - 4, -32, 2 * d.shw + 8, 2.4);
+    if (!d.st) for (let i = 0; i < 5; i++) { const a = t * 3 + i * 1.3; circ(c, Math.cos(a) * 12, -20 + Math.sin(a * 1.7) * 12, 1.1, '#fff6c8'); }
+  };
+  HEAD.djinn = function (c, d) {
+    const { hy, C, skin } = d, gold = C('#d8b64a');
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 9, hy - 1], [s * 22, hy - 8], [s * 10, hy + 5]]), skin);
+    ink(c, pEl(0, hy + 2, 11, 12), skin);
+    // the curled beard
+    ink(c, pPoly([[-6, hy + 9], [6, hy + 9], [3, hy + 20], [5, hy + 24], [0, hy + 22], [-3, hy + 20]]), C('#2a1d4a'), 0, true);
+    // the turban, its trim and gem
+    ink(c, pEl(0, hy - 9, 15, 10), C('#2f8f96'));
+    inkLine(c, [[-13, hy - 6], [13, hy - 12]], C('#5fbfc6'), 1.2); inkLine(c, [[-12, hy - 12], [12, hy - 5]], C('#5fbfc6'), 1.2);
+    ink(c, pEl(0, hy - 6, 3.2, 4), C('#e0457b'), 0, true); circ(c, -.8, hy - 7, .9, '#fff');
+    ink(c, pRR(-14, hy - 3.5, 28, 3, 1.2), gold, 0, true);
+    glowEye(c, -4.5, hy + 2, 2.2, d.eye, d.st); glowEye(c, 4.5, hy + 2, 2.2, d.eye, d.st);
+    inkLine(c, [[-8, hy - 1], [-2.5, hy + .5]], INK, .8); inkLine(c, [[8, hy - 1], [2.5, hy + .5]], INK, .8);
+    for (const s of [-1, 1]) circ(c, s * 11, hy + 6, 1.3, gold);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.djinn = 'Djinn';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.djinn = 'staff';
 })();

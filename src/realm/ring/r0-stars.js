@@ -27,3 +27,14 @@ BX_POW.behemoth = {
   sp: { id: 'stomp', n: 'Stomp', when: 'close', desc: 'Stamps the canvas: they stumble for a second.', now: { stun: 1 } },
   ult: { id: 'earthquake', n: 'Earthquake', when: 'any', desc: 'The ring heaves under them: 14 through the guard, and they stagger for over a second.', now: { dmg: 14, stun: 1.3 } },
 };
+
+/* The Djinn: all guile. Its nature is Smoke and Mirrors (a slip opens a long window to counter in); Mirage makes
+   punches find only smoke for a moment, and Three Wishes grants the wish that suits the moment (bxWish in
+   11-powers.js): health back when it is hurt, a heavy blow when they are, and speed otherwise. */
+BX_KIND.djinn = [6, 5, 6, 5, 6, 9];
+BX_TRAIT.djinn = { n: 'Smoke and Mirrors', desc: 'When it slips a punch, it leaves a long window to counter in.', ctrWin: 1.6 };
+BX_POW.djinn = {
+  sp: { id: 'mirage', n: 'Mirage', when: 'close', desc: 'For a second and a half, punches find only smoke.', fx: { who: 'self', t: 1.5, miss: 1 } },
+  ult: { id: 'threewishes', n: 'Three Wishes', when: 'any', desc: 'One wish, the one the moment needs: 22 health back when hurt, 14 through the guard when they are hurt, or 35% quicker for 6 seconds.',
+    wish: [{ when: 'hurt', n: 'health', now: { hp: 22 } }, { when: 'theyHurt', n: 'a knockout blow', now: { dmg: 14 } }, { when: 'else', n: 'speed', fx: { who: 'self', t: 6, spd: 1.35, move: 1.2 } }] },
+};

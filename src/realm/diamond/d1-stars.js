@@ -26,3 +26,12 @@ ULT.earthquake = { kind: 'behemoth', role: 'bat', name: 'Earthquake', desc: 'Sta
 AB.earthquake = { name: '★ ' + ULT.earthquake.name, type: 'ult', role: ULT.earthquake.role, cost: ULT_COST, ult: true, desc: ULT.earthquake.desc };
 ULT_BY_KIND.behemoth = 'earthquake';
 MOON_KIND.behemoth = [2, ['pow', 'arm']];
+
+/* The Djinn: a shortstop who reads everything: Dispel at the plate, Invisibility on the bases, Telekinesis in the
+   field; its ultimate Three Wishes grants three at once: the ball carries a little further, and fielders react late
+   and bobble more. */
+TEMPL.djinn = { n: 'Zarim', kind: 'djinn', race: 'Djinn', pos: 'SS', num: 3, hand: 'R', pow: 5, con: 8, spd: 8, arm: 6, fld: 8, wpn: 'bat', bat: 'dispel', run: 'invis', field: 'telek', flav: 'Grants three wishes an inning, all of them to itself.' };
+ULT.threewishes = { kind: 'djinn', role: 'bat', name: 'Three Wishes', desc: 'Three wishes at once: the ball carries a little further, and the fielders react late and bobble more.', zone: { shape: 'global', carry: 1.06, react: .3, bobble: 1.4, vis: 'eclipse' } };
+AB.threewishes = { name: '★ ' + ULT.threewishes.name, type: 'ult', role: ULT.threewishes.role, cost: ULT_COST, ult: true, desc: ULT.threewishes.desc };
+ULT_BY_KIND.djinn = 'threewishes';
+MOON_KIND.djinn = [5, ['con', 'fld']];
