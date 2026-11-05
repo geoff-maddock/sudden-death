@@ -590,6 +590,10 @@ Pickup games were won 98–100% by everyone; superstars lost less HP in them (3�
 - The Behemoth's Earthquake was worth little on turn 3 alone. Every third turn gave 78.5%, every fourth 71.5%;
   shipped on turns 3 and 6.
 - Runs of 400–500 vary by about 4 points, so the Hydra's 46% and the Behemoth's 60% were left alone.
+- A check at 3,000 elite matches each: control 43.8%, Phoenix 56.3%, Behemoth 58.0%, Djinn 53.0%. The Behemoth's
+  60% at 500 was partly noise; its edge (+14) is next to the Phoenix's (+12.5). Two trims at 500 matches (Stomp 5
+  damage and 3 Block with Moss Charge 11; Earthquake on turns 3 and 7) gave 53.6% and 56.6% against 55.2% for the
+  shipped Behemoth, inside the noise, so nothing changed.
 
 ### Football and baseball (1,500 games each)
 
