@@ -66,7 +66,7 @@ async def main():
         # ---------- Eight Arms in a match ----------
         await pg.evaluate("(() => { const p = wRoster().find(x => x.kind === 'kraken'); wMovePlayer(p.id, 0); WG.captain = wRoster()[1].id; })()")
         t2 = await pg.evaluate(TURN2)
-        check(t2['turn'] == 2 and t2['lash'] and t2['block'] >= 3, 'Eight Arms: at the start of your turn a tentacle lashes an enemy and catches Block, which lasts the turn', t2)
+        check(t2['turn'] == 2 and t2['lash'] and t2['block'] >= 2, 'Eight Arms: at the start of your turn a tentacle lashes an enemy and catches Block, which lasts the turn', t2)
         await pg.evaluate(CLOSE)
         bn = await pg.evaluate("(() => { const p = wRoster().find(x => x.kind === 'kraken'); wMovePlayer(p.id, wRoster().length - 1); return " + TURN2 + "; })()")
         check(not bn['lash'], 'from the bench, no tentacle', bn)

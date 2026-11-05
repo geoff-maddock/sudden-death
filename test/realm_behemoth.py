@@ -1,7 +1,7 @@
 # Realm superstars, phase 3 (issue #24): the Behemoth. A kind in every scope, never on a CPU side or a call-up; met
 # through Sister Fern in Mossgate (locked: the story and the feat; unlocked: 300 gold or 2 Moss Eggs), joining at the
-# team's average level with its signature card. Earthquake: in a card-game match while it starts, on your third turn
-# every enemy is Stunned (once; not from the bench). Its captain's 12 Block; in the ring, body shots do little; whole
+# team's average level with its signature card. Earthquake: in a card-game match while it starts, on your third and
+# sixth turns every enemy is Stunned (not from the bench). Its captain's 12 Block; in the ring, body shots do little; whole
 # games in each engine. How to play. Asserts; exits nonzero.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -19,7 +19,7 @@ CLOSE = """(() => { for (let i = 0; i < 12 && !document.getElementById('modal').
   const b = document.querySelector('#modalBox [data-close], #wRelNo, #modalBox button'); if (!b) break; b.click(); } })()"""
 # a match to the start of turn 4: on which turns the enemies were Stunned by the quake, and the Block at kickoff
 QUAKE = """(() => { startMatch({ type: 'normal', tier: 1, card: false, world: { kind: 'wild' } }); const kick = B.P.block, n0 = B.log.length, at = []; RUN.hp = 999;
-  for (let t = 0; t < 3 && !B.over; t++) { runSteps(endTurn()); if (alive().length && alive().every(e => (e.st.stun || 0) > 0)) at.push(B.turn); }
+  for (let t = 0; t < 6 && !B.over; t++) { runSteps(endTurn()); if (alive().length && alive().every(e => (e.st.stun || 0) > 0)) at.push(B.turn); }
   const r = { kick, at, quake: B.log.slice(n0).filter(l => /Earthquake: the Behemoth stamps/.test(l.t)).length };
   B.forfeit = 1; B.over = 'lose'; finishFight(); RUN.hp = RUN.maxhp; return r; })()"""
 
@@ -73,7 +73,7 @@ async def main():
         # ---------- Earthquake in a match, and the captain ----------
         await pg.evaluate("(() => { const p = wRoster().find(x => x.kind === 'behemoth'); wMovePlayer(p.id, 0); WG.captain = p.id; })()")
         q = await pg.evaluate(QUAKE)
-        check(q['at'] == [3] and q['quake'] == 1, 'Earthquake: on your third turn every enemy is Stunned, once a match', q)
+        check(q['at'] == [3, 6] and q['quake'] == 2, 'Earthquake: on your third and sixth turns every enemy is Stunned', q)
         check(q['kick'] >= 12, 'Bulwark: its captain\'s 12 Block at kickoff', q)
         await pg.evaluate(CLOSE)
         bn = await pg.evaluate("(() => { const p = wRoster().find(x => x.kind === 'behemoth'); wMovePlayer(p.id, wRoster().length - 1); WG.captain = wRoster()[0].id; return " + QUAKE + "; })()")

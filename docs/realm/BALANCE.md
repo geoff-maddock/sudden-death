@@ -557,5 +557,56 @@ Its nature carries it (it mends 0.6 of what it lost between rounds, everyone els
 
 The Frost Wyrm (strong at everything): 7, 7, 6, 7, 7, 6 won 74.4%; chin 6 gave 70.3%; chin and power 6, 61.0%;
 shipped at 7, 7, 6, 6, 6, 6, 62.8%. Its edge is being good at everything in every sport, which its price (500 gold,
-the most) pays for. Phase 4 measures the card game, football and baseball with the realm, gridiron and diamond labs.
+the most) pays for.
+
+## Superstars in the card game, football and baseball (issue #24, phase 4)
+
+`python3 test/realm_stars_lab.py N` measures what one superstar adds to a team. Each test is a fresh journey with its
+players at one level, plus one more player at that level who starts: a superstar, or (the control) a league kind the
+team lacks, picked at random. Somebody else is captain. The card game is played by the realm lab's bot
+(`REALMBOT`, now shared from `test/realm_lab.js`) at level 4, tier 2; football and baseball are whole games on
+Simulate at an even level, tier 2. The aim, as in the ring: a superstar is clearly better than an ordinary player, but
+does not win alone.
+
+### The card game (elite matches, 500 each)
+
+Pickup games were won 98–100% by everyone; superstars lost less HP in them (3–6 against 6.6).
+
+| Superstar | First try | Power off (cards only) | Shipped |
+|---|---|---|---|
+| Control | 40.0% | 41.8% | 42.8% |
+| Phoenix | 61.0% | 39.5% | 55.4% |
+| Kraken | 80.3% | 64.5% | 49.6% |
+| Behemoth | 46.0% | 42.2% | 59.6% |
+| Djinn | 52.3% | 36.0% | 55.8% |
+| Hydra | 52.3% | 37.2% | 46.4% |
+| Frost Wyrm | 51.7% | 40.5% | 50.8% |
+
+- The Kraken's edge was mostly its cards: its pool has no slow cards (league kinds alone range 36–52% here), and
+  Tentacle Grab was the zombie's Grave Grip. Shipped: Tentacle Grab Weak 1 (was 2), Tentacle Slam 7 (8), Ink Cloud
+  6 Block (8), From the Depths 4 Block and draw 1 (6, 2), Constrict 8 damage and Weak 1 (7 and Stun), and Eight Arms
+  2 damage and 2 Block a turn (3 and 3).
+- The Phoenix's Rebirth comes back at 20% of max HP (was 30%; 15% gave 54.3%).
+- The Behemoth's Earthquake was worth little on turn 3 alone. Every third turn gave 78.5%, every fourth 71.5%;
+  shipped on turns 3 and 6.
+- Runs of 400–500 vary by about 4 points, so the Hydra's 46% and the Behemoth's 60% were left alone.
+
+### Football and baseball (1,500 games each)
+
+| Superstar | Football, first try (1,000) | Football, shipped | Baseball, first try (1,000) | Baseball, shipped |
+|---|---|---|---|---|
+| Control | 41.2% | 37.4% | 48.0% | 50.1% |
+| Phoenix | 46.2% | 42.6% | 49.8% | 54.5% |
+| Kraken | 36.2% | 46.5% | 49.8% | 55.5% |
+| Behemoth | 39.4% | 44.4% | 48.7% | 55.3% |
+| Djinn | 40.0% | 46.1% | 47.4% | 53.8% |
+| Hydra | 39.8% | 44.1% | 49.1% | 52.9% |
+| Frost Wyrm | 47.0% | 45.9% | 54.2% | 55.9% |
+
+At first only the Phoenix and the Frost Wyrm did better than an ordinary player; the slow Kraken did worse (speed
+counts most in football). Shipped ratings, football (spd, str, hnd, arm, kck, tkl): Kraken 6, 9, 9, 6, 4, 9;
+Behemoth 5, 10, 5, 6, 5, 10; Djinn 9, 5, 9, 9, 6, 5; Hydra 7, 8, 8, 7, 5, 9. Baseball (pow, con, spd, arm, fld):
+Phoenix 7, 8, 9, 6, 8; Kraken 9, 7, 5, 7, 10; Behemoth 10, 8, 4, 9, 8; Djinn 9, 9, 8, 7, 8; Hydra 9, 8, 5, 9, 8
+(league kinds total about 30 there, the superstars 38–42). One player in seven or nine now adds 5–9 points in
+football and 3–6 in baseball.
 

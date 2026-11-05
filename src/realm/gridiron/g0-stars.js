@@ -10,20 +10,20 @@ GF_ULT.phoenix = { id: 'rebirth', n: 'Rebirth', role: 'off', desc: 'The phoenix\
 for (const p of GF_POW.phoenix) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.phoenix.id] = GF_ULT.phoenix;
 
-/* The Kraken: slow, strong, sure hands and a tackler who doesn't let go. Long Reach on offense (catches far surer),
-   Grasp on defense (every tackle try surer), and Eight Arms: tentacles across the field, tackles surer still and the
+/* The Kraken: no sprinter, but strong, with sure hands and a tackler who doesn't let go. Long Reach on offense
+   (catches far surer), Grasp on defense (every tackle try surer), and Eight Arms: tentacles across the field, tackles surer still and the
    carrier slowed. */
-GF_KIND.kraken = [4, 8, 9, 6, 4, 8];
+GF_KIND.kraken = [6, 9, 9, 6, 4, 9];
 GF_POW.kraken = [{ id: 'longreach', n: 'Long Reach', cost: 1, fits: 'pass', desc: 'Eight arms for the ball: the receiver catches far more of what comes near.', fx: { catch: .12 } },
   { id: 'grasp', n: 'Grasp', cost: 1, fits: 'run', desc: 'Tentacles along the line: every tackle try is surer.', fx: { tkl: .12 } }];
 GF_ULT.kraken = { id: 'eightarms', n: 'Eight Arms', role: 'def', desc: 'Tentacles across the whole field: every tackle surer, and the ball carrier 12% slower.', zone: { tkl: .15, cSpd: .88 }, vis: ['#2f8f96', 'all'] };
 for (const p of GF_POW.kraken) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.kraken.id] = GF_ULT.kraken;
 
-/* The Behemoth: the strongest thing on the field and the slowest. Moss Wall on offense (blocks hold, the carrier
+/* The Behemoth: the strongest thing on the field, and no sprinter. Moss Wall on offense (blocks hold, the carrier
    pushes through), Tremor on defense (every blocker stumbles at the snap), and Earthquake: every defender knocked
    off their feet at the snap, and the ground stays broken under them. */
-GF_KIND.behemoth = [3, 10, 4, 5, 5, 9];
+GF_KIND.behemoth = [5, 10, 5, 6, 5, 10];
 GF_POW.behemoth = [{ id: 'mosswall', n: 'Moss Wall', cost: 1, fits: 'run', desc: 'The line grows into a wall: blocks hold twice as long, and the carrier pushes through tackles.', fx: { shed: .5, cStr: 1 } },
   { id: 'tremor', n: 'Tremor', cost: 2, fits: 'any', desc: 'A stamp at the snap: every blocker stumbles.', fx: { blkStun: .7 } }];
 GF_ULT.behemoth = { id: 'earthquake', n: 'Earthquake', role: 'off', desc: 'The field heaves at the snap: every defender goes down for two seconds, and the broken ground slows them after (5%).', now: { snapAll: 2 }, zone: { dSpd: .95 }, vis: ['#7a5a34', 'all'] };
@@ -33,7 +33,7 @@ GF_ULT_BY[GF_ULT.behemoth.id] = GF_ULT.behemoth;
 /* The Djinn: quick, clever hands. Vanishing Act on offense (the defense breaks on the throw late), Mirage on defense
    (their carrier chases phantoms, slower), and Three Wishes: three small wishes granted at once, the defense reading
    the play late, the receivers quicker and the hands surer. */
-GF_KIND.djinn = [8, 3, 8, 8, 6, 4];
+GF_KIND.djinn = [9, 5, 9, 9, 6, 5];
 GF_POW.djinn = [{ id: 'vanish', n: 'Vanishing Act', cost: 1, fits: 'pass', desc: 'The receivers blink out of sight: the defense breaks on the throw late.', fx: { read: .6 } },
   { id: 'phantom', n: 'Mirage', cost: 1, fits: 'run', desc: 'Phantom tacklers everywhere: their carrier 8% slower.', fx: { cSpd: .92 } }];
 GF_ULT.djinn = { id: 'threewishes', n: 'Three Wishes', role: 'off', desc: 'Three wishes at once: the defense reads the play late, the receivers run 5% faster, and the hands are surer.', zone: { read: .8, rSpd: 1.05, catch: .06 }, vis: ['#b38cf0', 'all'] };
@@ -43,7 +43,7 @@ GF_ULT_BY[GF_ULT.djinn.id] = GF_ULT.djinn;
 /* The Hydra: three heads, eyes everywhere, hard to bring down. Many Heads on offense (the throw goes truer), Coils
    on defense (the coverage quicker, more picks), and Regrow: its side grows back, stamina every play, and its carrier
    harder to bring down. */
-GF_KIND.hydra = [6, 7, 7, 6, 4, 8];
+GF_KIND.hydra = [7, 8, 8, 7, 5, 9];
 GF_POW.hydra = [{ id: 'manyheads', n: 'Many Heads', cost: 1, fits: 'pass', desc: 'Eyes everywhere: the quarterback sees the open man, and the throw goes 30% truer.', fx: { errM: .7 } },
   { id: 'coils', n: 'Coils', cost: 1, fits: 'pass', desc: 'The coverage coils round the receivers: 5% faster, and more throws picked off.', fx: { coverSpd: 1.05, int: 1.3 } }];
 GF_ULT.hydra = { id: 'regrow', n: 'Regrow', role: 'off', desc: 'Cut one head off and two grow back: the hydra\'s side gets 6 stamina back every play it lasts, and its carrier is harder to bring down.', zone: { cStr: 1 }, restZ: 6, vis: ['#3f8a6a', 'all'] };

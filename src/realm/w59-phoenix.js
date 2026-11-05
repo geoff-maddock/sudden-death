@@ -11,7 +11,7 @@
      W_PHX.price: gold, or Cinder Eggs from the Cindermaw's nests.
    Also How to play (#wHelpPhoenix, after #wHelpStars). */
 
-const W_PHX = { reborn: .3, price: { gold: 300, items: { cinderegg: 2 } } };
+const W_PHX = { reborn: .2, price: { gold: 300, items: { cinderegg: 2 } } };
 Object.assign(wStar('phoenix'), {
   kind: 'phoenix', name: 'Ashwing', num: 1,
   flav: 'Came down off the crater rim in a shower of sparks. Nobody else has one.',

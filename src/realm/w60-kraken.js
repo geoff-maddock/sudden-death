@@ -9,7 +9,7 @@
      W_KRK.price: gold, or Brine Eggs from the Brinefen's nests.
    Unlocked by winning the Rimewatch cup (w57). Also How to play (#wHelpKraken, after the Phoenix's). */
 
-const W_KRK = { lash: 3, catch: 3, price: { gold: 300, items: { brineegg: 2 } } };
+const W_KRK = { lash: 2, catch: 2, price: { gold: 300, items: { brineegg: 2 } } };
 Object.assign(wStar('kraken'), {
   kind: 'kraken', name: 'Deepmaw', num: 8,
   flav: 'Came up out of the deep water off Saltmere and asked, very politely, for a game.',
@@ -22,11 +22,11 @@ FA_NAMES.kraken = ['Deepmaw'];
 FA_SCOUT.kraken = ['Huge reach, slow to turn, and nothing it catches gets away.'];
 
 /* ---------- cards ---------- */
-K('krk_grab', 'Tentacle Grab', 'kraken', 'atk', 1, 's', 'one', [['d', 5], ['s', 'weak', 2]], { fl: 'It gets a hold of you from across the field.', sport: 'football' });
-K('krk_slam', 'Tentacle Slam', 'kraken', 'atk', 1, 'c', 'one', [['d', 8]], { sport: 'hockey' });
-K('krk_ink', 'Ink Cloud', 'kraken', 'skl', 1, 'c', 'self', [['b', 8]], { fl: 'Where did it go? Where did the ball go?', sport: 'soccer' });
-K('krk_depths', 'From the Depths', 'kraken', 'skl', 1, 'u', 'self', [['b', 6], ['draw', 2]]);
-K('krk_coil', 'Constrict', 'kraken', 'atk', 2, 'u', 'one', [['d', 7], ['s', 'stun', 1]], { sport: 'football' });
+K('krk_grab', 'Tentacle Grab', 'kraken', 'atk', 1, 's', 'one', [['d', 5], ['s', 'weak', 1]], { fl: 'It gets a hold of you from across the field.', sport: 'football' });
+K('krk_slam', 'Tentacle Slam', 'kraken', 'atk', 1, 'c', 'one', [['d', 7]], { sport: 'hockey' });
+K('krk_ink', 'Ink Cloud', 'kraken', 'skl', 1, 'c', 'self', [['b', 6]], { fl: 'Where did it go? Where did the ball go?', sport: 'soccer' });
+K('krk_depths', 'From the Depths', 'kraken', 'skl', 1, 'u', 'self', [['b', 4], ['draw', 1]]);
+K('krk_coil', 'Constrict', 'kraken', 'atk', 2, 'u', 'one', [['d', 8], ['s', 'weak', 1]], { sport: 'football' });
 K('krk_eight', 'Eight Arms', 'kraken', 'atk', 2, 'r', 'one', [['d', 2, 8]], { fl: 'One for each.' });
 SIG.kraken = 'krk_grab';
 

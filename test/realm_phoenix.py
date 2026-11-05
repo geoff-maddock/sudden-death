@@ -86,7 +86,7 @@ async def main():
           loseHP(RUN.hp + 5); out.first = { hp: RUN.hp, want: Math.round(RUN.maxhp * W_PHX.reborn), over: B.over || null };
           loseHP(RUN.hp + 5); out.second = { hp: RUN.hp, over: B.over || null };
           return out; })()""")
-        check(rb['starts'] and rb['first']['hp'] == rb['first']['want'] and rb['first']['over'] is None, 'Rebirth: the first time Team HP falls to 0, the Phoenix brings it back to 30%', rb)
+        check(rb['starts'] and rb['first']['hp'] == rb['first']['want'] and rb['first']['over'] is None, 'Rebirth: the first time Team HP falls to 0, the Phoenix brings it back to 20%', rb)
         check(rb['second'] == {'hp': 0, 'over': 'lose'}, 'once a match: the second time, the line falls', rb)
         await pg.evaluate("(() => { B.forfeit = 1; finishFight(); })()")
         await pg.evaluate(CLOSE)

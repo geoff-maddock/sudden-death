@@ -1,43 +1,46 @@
 // headless realm runs: the realm's own match flow (startMatch, cups, rooms, alphas, rewards, XP, recruits), with the
 // fight played by the model only. A scripted route stands in for walking: wild games, the four cups, the dungeons and
 // lairs as they open, then the Crown. Between matches the bot rests, signs players, eats and enchants like a player.
+
+// one turn of the card-game bot (shared by REALMLAB and test/realm_stars_lab.py): skilled, or careless (opts.dumb)
+window.REALMBOT = function (opts = {}) {
+  const est = (c, tgt) => { const d = def(c); let dmg = 0, blk = 0; const walk = ops => { for (const o of ops) { if (o[0] === 'd') { const n = (o[3] || d.tgt) === 'all' ? alive().length : 1; dmg += atkDmg(o[1], tgt, c) * (o[2] || 1) * n; } else if (o[0] === 'drain' || o[0] === 'dunk') dmg += atkDmg(o[1], tgt, c); else if (o[0] === 'b') blk += o[1] + sv(B.P, 'dex'); else if (o[0] === 'bodyslam') dmg += B.P.block; else if (o[0] === 'roll') { walk(o[2].map(x => x)); } else if (o[0] === 'bones') blk += Math.min(36, o[1] * B.draw.length); } }; walk(d.fx); return { dmg, blk }; };
+  let guard = 0;
+  if (opts.dumb) {
+    while (B.phase === 'player' && !B.over && guard++ < 30) { const al = alive(); if (!al.length) break; const ok = B.hand.map((c, i) => [c, i]).filter(([c]) => canPlay(c) && def(c).type !== 'junk'); if (!ok.length) break; const [c, i] = pick(ok); playCard(i, B.enemies.indexOf(pick(al))); }
+    return;
+  }
+  while (B.phase === 'player' && !B.over && guard++ < 30) {
+    const al = alive(); if (!al.length) break;
+    let incoming = 0; for (const e of al) { if (sv(e, 'stun')) continue; const I = intentInfo(e); if (I.kinds.includes('atk')) incoming += I.dmg * I.hits; }
+    const need = Math.max(0, incoming - B.P.block);
+    const tgt = al.slice().sort((a, b) => (a.hp + a.block) - (b.hp + b.block))[0];
+    let best = null, bs = 0;
+    B.hand.forEach((c, i) => {
+      if (!canPlay(c)) return; const d = def(c);
+      let s = 0;
+      if (d.type === 'pow') s = B.turn <= 3 ? 40 : 6;
+      else if (d.type === 'junk') s = .5;
+      else { const { dmg, blk } = est(c, tgt); s = dmg * (need > 0 ? .8 : 1.2) + Math.min(blk, need) * 1.3 + blk * .15; if (dmg >= tgt.hp + tgt.block) s += 12;
+        for (const o of d.fx) { if (o[0] === 's' && ['weak', 'vuln', 'psn', 'burn', 'stun'].includes(o[1])) s += 5 + (o[1] === 'stun' ? 8 : 0); if (o[0] === 's' && (o[3] === 'self')) s += 6; if (o[0] === 'draw') s += 4 * o[1]; if (o[0] === 'nrg') s += 7 * o[1]; if (o[0] === 'lose') s -= o[1] * (RUN.hp < 25 ? 3 : .8); if (o[0] === 'heal') s += Math.min(o[1], RUN.maxhp - RUN.hp); if (o[0] === 'roll') s += 6; if (o[0] === 'audible') s += 2; if (o[0] === 'add') s += 8; } }
+      s -= (d.toll || 0) * (RUN.hp < 30 ? 3 : 1) + (d.foul || 0) * 4 + (d.exert || 0) * 5 + (d.fatigue || 0) * 2 + (d.goldc ? 4 : 0);
+      if (d.type === 'play' || d.type === 'gear') s += 6 + (d.sport === B.sport ? 6 : 0);
+      const v = s / (d.cost + .6);
+      if (s > 0 && v > bs) { bs = v; best = i; }
+    });
+    if (best == null) break;
+    playCard(best, B.enemies.indexOf(tgt));
+    if (RUN.hp < RUN.maxhp * .3) { const k = RUN.tonics.findIndex(t => t === 'heal'); if (k >= 0) useTonic(k); }
+  }
+  if ((B.type !== 'normal') && B.turn === 1) RUN.tonics.forEach((t, k) => { if (t && t !== 'heal') useTonic(k, B.enemies.indexOf(alive()[0])); });
+};
+
 window.REALMLAB = function (opts = {}) {
   LAB = true;
   // the model only: no fight scene, no reward panel (the bot takes the rewards itself, as test/lab.js does)
   beginFight = enc => { UI.busy = false; startCombat(enc.ids, enc.type, enc.sport, enc.trait); };
   renderPanel = () => { };
-  const est = (c, tgt) => { const d = def(c); let dmg = 0, blk = 0; const walk = ops => { for (const o of ops) { if (o[0] === 'd') { const n = (o[3] || d.tgt) === 'all' ? alive().length : 1; dmg += atkDmg(o[1], tgt, c) * (o[2] || 1) * n; } else if (o[0] === 'drain' || o[0] === 'dunk') dmg += atkDmg(o[1], tgt, c); else if (o[0] === 'b') blk += o[1] + sv(B.P, 'dex'); else if (o[0] === 'bodyslam') dmg += B.P.block; else if (o[0] === 'roll') { walk(o[2].map(x => x)); } else if (o[0] === 'bones') blk += Math.min(36, o[1] * B.draw.length); } }; walk(d.fx); return { dmg, blk }; };
-  // the same two players as test/lab.js: skilled, or careless (opts.dumb)
-  function botTurn() {
-    let guard = 0;
-    if (opts.dumb) {
-      while (B.phase === 'player' && !B.over && guard++ < 30) { const al = alive(); if (!al.length) break; const ok = B.hand.map((c, i) => [c, i]).filter(([c]) => canPlay(c) && def(c).type !== 'junk'); if (!ok.length) break; const [c, i] = pick(ok); playCard(i, B.enemies.indexOf(pick(al))); }
-      return;
-    }
-    while (B.phase === 'player' && !B.over && guard++ < 30) {
-      const al = alive(); if (!al.length) break;
-      let incoming = 0; for (const e of al) { if (sv(e, 'stun')) continue; const I = intentInfo(e); if (I.kinds.includes('atk')) incoming += I.dmg * I.hits; }
-      const need = Math.max(0, incoming - B.P.block);
-      const tgt = al.slice().sort((a, b) => (a.hp + a.block) - (b.hp + b.block))[0];
-      let best = null, bs = 0;
-      B.hand.forEach((c, i) => {
-        if (!canPlay(c)) return; const d = def(c);
-        let s = 0;
-        if (d.type === 'pow') s = B.turn <= 3 ? 40 : 6;
-        else if (d.type === 'junk') s = .5;
-        else { const { dmg, blk } = est(c, tgt); s = dmg * (need > 0 ? .8 : 1.2) + Math.min(blk, need) * 1.3 + blk * .15; if (dmg >= tgt.hp + tgt.block) s += 12;
-          for (const o of d.fx) { if (o[0] === 's' && ['weak', 'vuln', 'psn', 'burn', 'stun'].includes(o[1])) s += 5 + (o[1] === 'stun' ? 8 : 0); if (o[0] === 's' && (o[3] === 'self')) s += 6; if (o[0] === 'draw') s += 4 * o[1]; if (o[0] === 'nrg') s += 7 * o[1]; if (o[0] === 'lose') s -= o[1] * (RUN.hp < 25 ? 3 : .8); if (o[0] === 'heal') s += Math.min(o[1], RUN.maxhp - RUN.hp); if (o[0] === 'roll') s += 6; if (o[0] === 'audible') s += 2; if (o[0] === 'add') s += 8; } }
-        s -= (d.toll || 0) * (RUN.hp < 30 ? 3 : 1) + (d.foul || 0) * 4 + (d.exert || 0) * 5 + (d.fatigue || 0) * 2 + (d.goldc ? 4 : 0);
-        if (d.type === 'play' || d.type === 'gear') s += 6 + (d.sport === B.sport ? 6 : 0);
-        const v = s / (d.cost + .6);
-        if (s > 0 && v > bs) { bs = v; best = i; }
-      });
-      if (best == null) break;
-      playCard(best, B.enemies.indexOf(tgt));
-      if (RUN.hp < RUN.maxhp * .3) { const k = RUN.tonics.findIndex(t => t === 'heal'); if (k >= 0) useTonic(k); }
-    }
-    if ((B.type !== 'normal') && B.turn === 1) RUN.tonics.forEach((t, k) => { if (t && t !== 'heal') useTonic(k, B.enemies.indexOf(alive()[0])); });
-  }
+  const botTurn = () => REALMBOT(opts);
 
   /* ---------- a new journey ---------- */
   const club = opts.club || pick(CLUB_IDS);

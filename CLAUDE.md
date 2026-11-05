@@ -47,6 +47,7 @@ python3 test/realm_lab.py 140 '{}'            # Realm balance: champion rate, wh
 python3 test/realm_diamond_lab.py 120          # Realm baseball balance: win rate by level gap and tier, Diamond Cups (Simulate)
 python3 test/realm_gridiron_lab.py 120         # Realm football balance: win rate by level gap, tier and CPU skill, powers on and off, stances, Cinder Cups
 python3 test/realm_ring_lab.py 120             # Realm boxing balance: card win rate by level gap, tier and CPU skill, powers on and off, Anvil Belts
+python3 test/realm_stars_lab.py 200            # Realm superstar balance: what each superstar adds in the card game, football and baseball, against an ordinary player
 ```
 
 Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screenshots go to `/tmp/`.

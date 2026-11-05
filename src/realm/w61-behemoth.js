@@ -2,14 +2,14 @@
    ratings and powers in each engine in src/realm/ring/r0-stars.js (boxing: the Living Wall nature, body shots doing
    little), src/realm/gridiron/g0-stars.js and src/realm/diamond/d1-stars.js (the Earthquake ultimates). Here:
    - Cards: a signature card (Stomp) and five of its own kind.
-   - Earthquake, in the card game: while the Behemoth starts, on your turn W_BHM.turn of each match the ground heaves
-     and every enemy is Stunned (the turnStart hook).
+   - Earthquake, in the card game: while the Behemoth starts, on your turns W_BHM.turns of each match (3 and 6) the
+     ground heaves and every enemy is Stunned (the turnStart hook).
    - Captain: Bulwark, 12 Block at kickoff.
    - Meeting: Sister Fern, who keeps the totem and the old stories in Mossgate, knows where it sleeps; ask about the
      BEHEMOTH. Its price is W_BHM.price: gold, or Moss Eggs from the Mosswold's nests.
    Unlocked by beating three legends over any number of journeys (w57). How to play: #wHelpBehemoth. */
 
-const W_BHM = { turn: 3, price: { gold: 300, items: { mossegg: 2 } } };
+const W_BHM = { turns: [3, 6], price: { gold: 300, items: { mossegg: 2 } } };
 Object.assign(wStar('behemoth'), {
   kind: 'behemoth', name: 'Hillbreath', num: 70,
   flav: 'Woke up under a hill in the Mosswold, and the hill came with it.',
@@ -33,7 +33,7 @@ SIG.behemoth = 'bhm_stomp';
 /* ---------- Earthquake, in the card game ---------- */
 function wBhmStarts() { return !!(WG && RUN && wStarters().some(p => p.kind === 'behemoth')); }
 onHook('turnStart', () => {
-  if (!B || B.turn !== W_BHM.turn || !wBhmStarts()) return;
+  if (!B || !W_BHM.turns.includes(B.turn) || !wBhmStarts()) return;
   const foes = alive(); if (!foes.length) return;
   for (const e of foes) addSt(e, 'stun', 1);
   fx({ k: 'banner', t: 'Earthquake', sub: 'The ground heaves: every enemy is Stunned' });
@@ -52,5 +52,5 @@ const wW61RenderHelp = renderHelp;
 renderHelp = function () {
   wW61RenderHelp();
   const after = $('wHelpKraken') || $('wHelpStars'); if (!after || $('wHelpBehemoth')) return;
-  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpBehemoth"><b>The Behemoth.</b> Beat three legends from the Hall of Legends, over any number of journeys, to unlock it. Then ask Sister Fern, who keeps the totem in Mossgate, about the BEHEMOTH: it signs for ${W_BHM.price.gold} gold or ${W_BHM.price.items.mossegg} Moss Eggs. Its power is Earthquake. In a card-game match, while it starts, on your turn ${W_BHM.turn} every enemy is Stunned. In the ring body shots do little to it. On the gridiron its ultimate knocks every defender down at the snap, and on the diamond it staggers every fielder. As captain it gives 12 Block at kickoff.</p>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpBehemoth"><b>The Behemoth.</b> Beat three legends from the Hall of Legends, over any number of journeys, to unlock it. Then ask Sister Fern, who keeps the totem in Mossgate, about the BEHEMOTH: it signs for ${W_BHM.price.gold} gold or ${W_BHM.price.items.mossegg} Moss Eggs. Its power is Earthquake. In a card-game match, while it starts, every enemy is Stunned on your turns ${W_BHM.turns.join(' and ')}. In the ring body shots do little to it. On the gridiron its ultimate knocks every defender down at the snap, and on the diamond it staggers every fielder. As captain it gives 12 Block at kickoff.</p>`);
 };
