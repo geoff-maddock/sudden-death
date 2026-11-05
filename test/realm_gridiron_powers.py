@@ -142,7 +142,8 @@ async def main():
         # ---------- the Realm: CPU skill by tier, How it works, How to play ----------
         r = await pg.evaluate("""(() => { renderHelp(); const h = document.getElementById('wHelpGfPowers'), how = document.getElementById('wGridHow').textContent;
           return { skill: [1, 2, 3].map(t => wGridSkill(t)[1]), help: h ? h.textContent : '', how: /ultimate/.test(how) && /Stamina/.test(how), book: document.querySelectorAll('.wgbook tbody tr').length }; })()""")
-        check(r['skill'] == [0, 1, 2] and 'mana' in r['help'] and 'ultimate' in r['help'] and r['how'] and r['book'] == 18,
+        STARS = await pg.evaluate("W_STARS.filter(s => s.kind).length")  # superstars built so far (issue #24): each is a kind of its own
+        check(r['skill'] == [0, 1, 2] and 'mana' in r['help'] and 'ultimate' in r['help'] and r['how'] and r['book'] == 18 + STARS,
               'their CPU casts better by tier, How to play explains powers, and How it works lists every kind\'s', r)
         await pg.evaluate("wLeaveGridiron()")
         check(not errs, 'no page errors', errs)

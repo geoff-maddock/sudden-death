@@ -100,7 +100,8 @@ async def main():
         n = len(a['cards'])
         check(n == (3 if a['over']['how'] == 'dec' else a['over']['round'] - 1) and len(a['rounds']) == n and all(len(r) == 3 for r in a['cards']),
               'each round boxed to the bell is on the three judges\' cards', {'cards': a['cards'], 'over': a['over']})
-        many = await pg.evaluate("""(() => { const K = wBX.kinds, out = { how: {}, bad: [], kd: 0, n: 0, secs: [], wins: {} }; const t0 = performance.now();
+        # the league's 18 kinds (a superstar, issue #24, is not part of how the rules play out across the league)
+        many = await pg.evaluate("""(() => { const K = wBX.kinds.filter(k => !W_STARS.some(st => st.kind === k)), out = { how: {}, bad: [], kd: 0, n: 0, secs: [], wins: {} }; const t0 = performance.now();
           for (let i = 0; i < 240; i++) { const a = K[i % K.length], b = K[(i * 7 + 3) % K.length]; if (a === b) continue;
             const s = wBX.simBout({ fighters: [{ n: 'A', kind: a }, { n: 'B', kind: b }], seed: 500 + i }), v = s.over; out.n++;
             const key = v.how === 'dec' ? (v.win == null ? 'draw' : 'dec') : v.how; out.how[key] = (out.how[key] || 0) + 1;

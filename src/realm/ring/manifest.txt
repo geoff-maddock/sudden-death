@@ -1,4 +1,6 @@
 # The Realm's ring scope: ./build.sh src/realm/manifest.txt takes this through `scope wBX ...`.
 # The engine's parts first (they don't touch the page), then its page in the Realm: a canvas in #v-ring.
 include src/bx/manifest.txt
+src/realm/ring/r0-stars.js
+src/realm/stars/s1-figures.js
 src/realm/ring/r1-page.js

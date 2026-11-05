@@ -360,3 +360,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wstar small{display:block}
 .wstsil{flex:none;width:56px;height:56px;color:#3a332c;filter:drop-shadow(0 0 1px var(--seam))}
 .wstn{display:flex;gap:6px;align-items:center}
+.wstmeet{display:flex;gap:14px;align-items:flex-start}
+.wstmeet>img,.wstmeet>.wstsil{flex:none;width:112px;height:112px;border-radius:8px}
+.wstbuy{gap:8px;flex-wrap:wrap}
+@media (max-width:520px){.wstmeet{flex-direction:column}}

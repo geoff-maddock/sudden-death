@@ -901,7 +901,7 @@ function arm(c, sx, sy, hx, hy, d, opt = {}) {
     if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
     if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
     if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
-    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C(i % 2 ? '#6b4f86' : '#8b76a0'), 0, true); }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C((B.fea || ['#6b4f86', '#8b76a0'])[i % 2 ? 0 : 1]), 0, true); }
     if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
     if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
     // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
@@ -2212,13 +2212,13 @@ function playerTurnStart() {
   const P = B.P;
   skyTick();
   B.turn++; B.phase = 'player';
+  // block drains, unless the ice or bedrock keeps it (before turnStart, so Block a hook gives this turn stays)
+  if (!sv(P, 'barricade') && B.turn > 1) P.block = B.sport === 'hockey' ? Math.floor(P.block / 2) : 0;
   fire('turnStart'); B.atkCount = 0; B.firstAtk = false; B.hits = {}; B.outThisTurn = {}; B.killsThisTurn = 0; B.aliveAtTurnStart = alive().length;
   B.cardsThisTurn = 0; B.lastType = null; B.freeAtk = false; B.tt = { atk: 0, skl: 0, pow: 0, blk: 0, top: 0, dmg: 0 };
   delete P.st.hot; delete P.st.oop; delete P.st.double; delete P.st.called;
   sportTurnStart();
   if (sv(P, 'intang')) addSt(P, 'intang', -1);
-  // block drains, unless the ice or bedrock keeps it
-  if (!sv(P, 'barricade') && B.turn > 1) P.block = B.sport === 'hockey' ? Math.floor(P.block / 2) : 0;
   // the Ash Baron runs the clock: a new quarter every three turns
   const baron = B.enemies.find(e => e.id === 'baron' && !e.dead);
   if (baron && B.turn > 1 && (B.turn - 1) % 3 === 0) {

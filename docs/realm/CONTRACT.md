@@ -177,7 +177,7 @@ Loads after `w9b-town` and changes earlier parts only by reassignment; saved ori
   - `W_CUP.tier` is `[1, 2, 3, 3]` (`w11-cups.js`);
   - `wXpNeed` is `10 + 10·lvl + 2·lvl²` (`w6-party.js`).
 - **The bot:**
-  - `test/realm_lab.js` defines `window.REALMLAB(opts)`. It replaces `beginFight` with a model-only start and `renderPanel` with a no-op, then plays the route through the realm's own functions. It returns a log with matches, stages and a result (`champion`, `stuck` or `dead`).
+  - `test/realm_lab.js` defines `window.REALMBOT(opts)` (one card-game turn, skilled or careless; also used by `test/realm_stars_lab.py`) and `window.REALMLAB(opts)`. It replaces `beginFight` with a model-only start and `renderPanel` with a no-op, then plays the route through the realm's own functions. It returns a log with matches, stages and a result (`champion`, `stuck` or `dead`).
   - `test/realm_lab.py N [opts] [js]` prints the report.
   - `test/realm_bot.py` is the quick-suite check.
 

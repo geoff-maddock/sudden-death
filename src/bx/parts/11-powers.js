@@ -76,9 +76,17 @@ function bxCanCast(f, which) {
   if (f.sta < BX_POW_STA[which]) return { ok: false, why: 'no breath' };
   return { ok: true, why: '' };
 }
+// a power with wishes (a superstar's: the Djinn's Three Wishes) grants the first that suits the moment: { when: 'hurt'
+// (the caster under 45% health), 'theyHurt' (the other fighter under 45%) or 'else', now, fx, n }
+function bxWish(f, o, P) {
+  if (!P.wish) return P;
+  const W = P.wish.find(w => w.when === 'hurt' ? f.hp < f.hpMax * .45 : w.when === 'theyHurt' ? o.hp < o.hpMax * .45 : true) || P.wish[P.wish.length - 1];
+  bxLog(`${f.n} wishes for ${W.n}.`);
+  return Object.assign({}, P, { now: W.now, fx: W.fx });
+}
 function bxCast(f, which) {
   if (!bxCanCast(f, which).ok) return false;
-  const P = bxPowOf(f, which), o = G.F[1 - f.side], N = P.now || {};
+  const o = G.F[1 - f.side], P = bxWish(f, o, bxPowOf(f, which)), N = P.now || {};
   f.sta -= BX_POW_STA[which]; if (which === 'sp') f.spUsed = G.round; else f.ultUsed = true;
   f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
   const d = bxDist(f, o), ux = (o.x - f.x) / (d || 1), uy = (o.y - f.y) / (d || 1);

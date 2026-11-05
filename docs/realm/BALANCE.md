@@ -478,3 +478,139 @@ Part 1 boxes a fresh three-player journey at level 3 against a rival's three at 
 | Belts won | 5% | 7.7–8% | 7% | 4.7% | 5.2% |
 
 Close to the gridiron's 49%, 44% and 25%. The two settings for tier 3 at 1 and 2 points come out the same (26%) on cards; the final of a Belt, played more rarely, falls from 37% to 24% with 2. A simulated Belt pays about 46 XP across the team and costs about 16 gold, as a Cinder Cup does. Draws of a whole card are rare (under 1%): level on bouts, a card goes to the knockdowns and then the points. Powers at an even level: 51% with them, 45% without (100 a row: inside the noise). A player who boxes by hand or works the corner does better than the CPU's corner; nobody has measured that yet.
+
+## Superstars: the Phoenix in the ring (issue #24, phase 2)
+
+A superstar should be strong but not win a journey alone. Round robin, the Phoenix against every league kind at its
+kind's ratings, both CPU Knights, 300 bouts a kind, sides swapped (a draw counts half):
+
+| Phoenix ratings (reach, pow, spd, chin, sta, gui) | Phoenix | Best league kind | Worst |
+|---|---|---|---|
+| 6, 6, 9, 4, 7, 7 (first try) | 66.8% | 58.6% (witch) | 40.0% (lich) |
+| 6, 5, 9, 4, 6, 7 | 57.6% | 58.5% | 40.7% |
+| **6, 6, 9, 4, 6, 7 (shipped)** | **63.1%** | 59.1% | 40.3% |
+
+The best kind in the ring by about four points, with Rebirth (one lost count beaten a bout). The card game's Rebirth
+(30% of max HP once a match), football and baseball are measured in phase 4 with the realm, gridiron and diamond labs.
+
+### The Kraken in the ring (issue #24, phase 3)
+
+Same round robin (300 bouts a kind):
+
+| Kraken ratings (reach, pow, spd, chin, sta, gui) | Kraken | Best league kind |
+|---|---|---|
+| 10, 7, 3, 7, 6, 5 (first try) | 42.5% | 59.2% |
+| 10, 7, 5, 7, 6, 6 | 56.7% | 58.8% |
+| 10, 8, 5, 7, 6, 6 | 66.1% | 58.4% |
+| **10, 7, 5, 8, 6, 6 (shipped)** | **61.3%** | 58.7% |
+
+Speed matters most: at 3 the longest reach in the ring could not make up for it. Shipped just under the Phoenix (63%).
+
+### The Behemoth in the ring (issue #24, phase 3)
+
+Same round robin, from here on against the 18 league kinds only (a superstar against a superstar is left out, so each
+number stays comparable as more are added; the Phoenix and the Kraken measure 63.1% and 62.3% that way):
+
+| Behemoth ratings (reach, pow, spd, chin, sta, gui), Living Wall | Behemoth |
+|---|---|
+| 6, 9, 3, 9, 7, 3, hollow .7 (first try, field included the other superstars) | 84.2% |
+| 6, 8, 2, 8, 6, 3, hollow .8 | 66.3% |
+| 6, 8, 2, 7, 6, 3 | 56.3% |
+| 6, 7, 2, 8, 6, 3 | 59.0% |
+| 6, 8, 2, 8, 5, 3 | 58.7% |
+| 6, 8, 2, 8, 6, 3, hollow .85 | 65.0% |
+| **6, 8, 1, 8, 6, 3, hollow .8 (shipped)** | **63.5%** |
+
+Chin is the steepest rating for a big kind (a point is about ten points of win rate); Living Wall's strength barely
+matters. Shipped level with the other two.
+
+### The Djinn in the ring (issue #24, phase 3)
+
+| Djinn ratings (reach, pow, spd, chin, sta, gui) | Djinn (against the league kinds) |
+|---|---|
+| 6, 5, 7, 5, 6, 10 (first try) | 72.6% |
+| **6, 5, 6, 5, 6, 9 (shipped)** | **61.8%** |
+
+Guile and speed together were the counter-puncher's old edge (phase 7's Counter plan); a point off each brings it
+level with the others (Phoenix 63.1%, Kraken 62.3%, Behemoth 63.5%).
+
+### The Hydra in the ring (issue #24, phase 3)
+
+| Hydra ratings (reach, pow, spd, chin, sta, gui), Regrow (scrappy .03, mend .6) | Hydra (against the league kinds) |
+|---|---|
+| 6, 6, 5, 6, 7, 6 (first try) | 74.1% |
+| 6, 5, 5, 6, 6, 6 | 55.7% |
+| **6, 6, 5, 6, 6, 6 (shipped)** | **63.4%** |
+
+Its nature carries it (it mends 0.6 of what it lost between rounds, everyone else 0.35), so its ratings are plain.
+
+### All six in the ring
+
+| Superstar | Against the league kinds | Best league kind |
+|---|---|---|
+| Phoenix | 63.1% | about 59% (witch) |
+| Kraken | 62.3% | |
+| Behemoth | 63.5% | |
+| Djinn | 61.8% | |
+| Hydra | 63.4% | |
+| Frost Wyrm | 62.8% | |
+
+The Frost Wyrm (strong at everything): 7, 7, 6, 7, 7, 6 won 74.4%; chin 6 gave 70.3%; chin and power 6, 61.0%;
+shipped at 7, 7, 6, 6, 6, 6, 62.8%. Its edge is being good at everything in every sport, which its price (500 gold,
+the most) pays for.
+
+## Superstars in the card game, football and baseball (issue #24, phase 4)
+
+`python3 test/realm_stars_lab.py N` measures what one superstar adds to a team. Each test is a fresh journey with its
+players at one level, plus one more player at that level who starts: a superstar, or (the control) a league kind the
+team lacks, picked at random. Somebody else is captain. The card game is played by the realm lab's bot
+(`REALMBOT`, now shared from `test/realm_lab.js`) at level 4, tier 2; football and baseball are whole games on
+Simulate at an even level, tier 2. The aim, as in the ring: a superstar is clearly better than an ordinary player, but
+does not win alone.
+
+### The card game (elite matches, 500 each)
+
+Pickup games were won 98–100% by everyone; superstars lost less HP in them (3–6 against 6.6).
+
+| Superstar | First try | Power off (cards only) | Shipped |
+|---|---|---|---|
+| Control | 40.0% | 41.8% | 42.8% |
+| Phoenix | 61.0% | 39.5% | 55.4% |
+| Kraken | 80.3% | 64.5% | 49.6% |
+| Behemoth | 46.0% | 42.2% | 59.6% |
+| Djinn | 52.3% | 36.0% | 55.8% |
+| Hydra | 52.3% | 37.2% | 46.4% |
+| Frost Wyrm | 51.7% | 40.5% | 50.8% |
+
+- The Kraken's edge was mostly its cards: its pool has no slow cards (league kinds alone range 36–52% here), and
+  Tentacle Grab was the zombie's Grave Grip. Shipped: Tentacle Grab Weak 1 (was 2), Tentacle Slam 7 (8), Ink Cloud
+  6 Block (8), From the Depths 4 Block and draw 1 (6, 2), Constrict 8 damage and Weak 1 (7 and Stun), and Eight Arms
+  2 damage and 2 Block a turn (3 and 3).
+- The Phoenix's Rebirth comes back at 20% of max HP (was 30%; 15% gave 54.3%).
+- The Behemoth's Earthquake was worth little on turn 3 alone. Every third turn gave 78.5%, every fourth 71.5%;
+  shipped on turns 3 and 6.
+- Runs of 400–500 vary by about 4 points, so the Hydra's 46% and the Behemoth's 60% were left alone.
+- A check at 3,000 elite matches each: control 43.8%, Phoenix 56.3%, Behemoth 58.0%, Djinn 53.0%. The Behemoth's
+  60% at 500 was partly noise; its edge (+14) is next to the Phoenix's (+12.5). Two trims at 500 matches (Stomp 5
+  damage and 3 Block with Moss Charge 11; Earthquake on turns 3 and 7) gave 53.6% and 56.6% against 55.2% for the
+  shipped Behemoth, inside the noise, so nothing changed.
+
+### Football and baseball (1,500 games each)
+
+| Superstar | Football, first try (1,000) | Football, shipped | Baseball, first try (1,000) | Baseball, shipped |
+|---|---|---|---|---|
+| Control | 41.2% | 37.4% | 48.0% | 50.1% |
+| Phoenix | 46.2% | 42.6% | 49.8% | 54.5% |
+| Kraken | 36.2% | 46.5% | 49.8% | 55.5% |
+| Behemoth | 39.4% | 44.4% | 48.7% | 55.3% |
+| Djinn | 40.0% | 46.1% | 47.4% | 53.8% |
+| Hydra | 39.8% | 44.1% | 49.1% | 52.9% |
+| Frost Wyrm | 47.0% | 45.9% | 54.2% | 55.9% |
+
+At first only the Phoenix and the Frost Wyrm did better than an ordinary player; the slow Kraken did worse (speed
+counts most in football). Shipped ratings, football (spd, str, hnd, arm, kck, tkl): Kraken 6, 9, 9, 6, 4, 9;
+Behemoth 5, 10, 5, 6, 5, 10; Djinn 9, 5, 9, 9, 6, 5; Hydra 7, 8, 8, 7, 5, 9. Baseball (pow, con, spd, arm, fld):
+Phoenix 7, 8, 9, 6, 8; Kraken 9, 7, 5, 7, 10; Behemoth 10, 8, 4, 9, 8; Djinn 9, 9, 8, 7, 8; Hydra 9, 8, 5, 9, 8
+(league kinds total about 30 there, the superstars 38–42). One player in seven or nine now adds 5–9 points in
+football and 3–6 in baseball.
+

@@ -86,3 +86,11 @@ src/realm/w54-ringcup.js
 src/realm/w55-ringfeel.js
 src/realm/w56-ringtab.js
 src/realm/w57-stars.js
+src/realm/stars/s1-figures.js
+src/realm/w58-starsign.js
+src/realm/w59-phoenix.js
+src/realm/w60-kraken.js
+src/realm/w61-behemoth.js
+src/realm/w62-djinn.js
+src/realm/w63-hydra.js
+src/realm/w64-frostwyrm.js
