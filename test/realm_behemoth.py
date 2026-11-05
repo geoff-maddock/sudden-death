@@ -50,6 +50,13 @@ async def main():
         check(k['bx'] and k['gf'] and k['bd'] == 'earthquake' and k['pos'] == '3B' and not k['calls'], 'every engine knows it (third base, Earthquake on the diamond), and no call-up is ever one', k)
         check(k['trait'] == 'Living Wall' and k['gfb'] == 'Earthquake' and k['cap'] == 'Bulwark', 'its nature in the ring, its football ultimate, its captain\'s bonus', k)
 
+        # a superstar's name is its own: on no other kind's list, so the draft class (taverns use it) always finishes
+        # (Mossback, the troll's, hung every journey at its first tavern)
+        nm = await pg.evaluate("""(() => { const own = W_STARS.filter(s => s.kind).map(s => [s.kind, s.name]);
+          const clash = own.filter(([k, n]) => Object.entries(FA_NAMES).some(([k2, L]) => k2 !== k && L.includes(n))).map(x => x[1]);
+          let n = 0; for (let i = 0; i < 30; i++) n += genDraftClass().length; return { clash, drafts: n / 30, kinds: Object.keys(KIND_NAME).length }; })()""")
+        check(not nm['clash'] and nm['drafts'] == nm['kinds'], 'every superstar\'s name is its own, and the draft class always finishes', nm)
+
         # ---------- the meeting ----------
         lk = await pg.evaluate("""(() => { const t = DB.chars.fern.topics; wRunAct('star:behemoth', 'fern'); const b = document.getElementById('modalBox');
           return { job: t.job.t.includes('BEHEMOTH'), act: t.behemoth.act, story: b.textContent.includes('breathes'), feat: b.textContent.includes('three legends'), buy: !!document.getElementById('wStarGold') }; })()""")
@@ -60,7 +67,7 @@ async def main():
         check(pr['gold'] and pr['eggs'] and 'Moss Egg' in pr['eggTxt'], 'unlocked: 300 gold (400 is enough) or two Moss Eggs (none in the bag)', pr)
         await pg.click('#wStarGold')
         sg = await pg.evaluate("(() => { const p = wRoster().find(x => x.kind === 'behemoth'); return { p: p && [p.n, p.lvl, p.star], gold: RUN.gold, star: WG.star, card: !!p && wCardsOf(p.id).some(c => c.id === 'bhm_stomp') }; })()")
-        check(sg == {'p': ['Mossback', 5, 'behemoth'], 'gold': 100, 'star': 'behemoth', 'card': True}, 'Mossback joins at level 5 (16 / 3, rounded) for 300 gold, with Stomp', sg)
+        check(sg == {'p': ['Hillbreath', 5, 'behemoth'], 'gold': 100, 'star': 'behemoth', 'card': True}, 'Hillbreath joins at level 5 (16 / 3, rounded) for 300 gold, with Stomp', sg)
         await pg.evaluate(CLOSE)
 
         # ---------- Earthquake in a match, and the captain ----------

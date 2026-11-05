@@ -11,14 +11,14 @@
 
 const W_BHM = { turn: 3, price: { gold: 300, items: { mossegg: 2 } } };
 Object.assign(wStar('behemoth'), {
-  kind: 'behemoth', name: 'Mossback', num: 70,
+  kind: 'behemoth', name: 'Hillbreath', num: 70,
   flav: 'Woke up under a hill in the Mosswold, and the hill came with it.',
   meet: { who: 'fern', topic: 'behemoth', price: W_BHM.price, where: 'Meet them: ask Sister Fern, who keeps the totem in Mossgate, about the BEHEMOTH.',
     rumour: 'Sister Fern touches the totem. "There is a hill in the Mosswold that breathes. The old stories say it gets up for a team that has beaten the legends of the game: three of them, it does not matter how long it takes. Beat three, on any journeys, and I will take you to it."',
     hello: 'Sister Fern walks you into the deep moss to a hill with flowers on it. The hill opens two amber eyes, and stands, and keeps standing.',
     ask: 'It will play for you, for a price: gold for the League\'s books, or two Moss Eggs, which it eats like grapes.' },
 });
-FA_NAMES.behemoth = ['Mossback'];
+FA_NAMES.behemoth = ['Hillbreath'];
 FA_SCOUT.behemoth = ['A wall that moves. Slowly. Through you.'];
 
 /* ---------- cards ---------- */

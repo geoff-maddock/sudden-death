@@ -21,7 +21,7 @@ MOON_KIND.kraken = [2, ['fld', 'pow']];
 /* The Behemoth: a slugger at third, slow as a wall and as hard to move: Seismic Swing at the plate, Stone Skin on the
    bases (immune to fielders' spells), Quake in the field; its ultimate Earthquake staggers every fielder for as long
    as it lasts (slower, and bobbling the ball). */
-TEMPL.behemoth = { n: 'Mossback', kind: 'behemoth', race: 'Behemoth', pos: '3B', num: 70, hand: 'R', pow: 10, con: 4, spd: 2, arm: 8, fld: 5, wpn: 'tree', bat: 'seismic', run: 'stoneskin', field: 'quake', flav: 'The infield grass grows back wherever it has stood.' };
+TEMPL.behemoth = { n: 'Hillbreath', kind: 'behemoth', race: 'Behemoth', pos: '3B', num: 70, hand: 'R', pow: 10, con: 4, spd: 2, arm: 8, fld: 5, wpn: 'tree', bat: 'seismic', run: 'stoneskin', field: 'quake', flav: 'The infield grass grows back wherever it has stood.' };
 ULT.earthquake = { kind: 'behemoth', role: 'bat', name: 'Earthquake', desc: 'Stamps before the pitch. The whole field heaves: fielders move 25% slower and bobble far more.', zone: { shape: 'global', fSpd: .75, bobble: 1.6, vis: 'fissure' } };
 AB.earthquake = { name: '★ ' + ULT.earthquake.name, type: 'ult', role: ULT.earthquake.role, cost: ULT_COST, ult: true, desc: ULT.earthquake.desc };
 ULT_BY_KIND.behemoth = 'earthquake';
