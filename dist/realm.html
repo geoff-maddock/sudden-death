@@ -21255,6 +21255,14 @@ ULT.manyheads = { kind: 'hydra', role: 'field', name: 'Many Heads', desc: 'Three
 AB.manyheads = { name: '★ ' + ULT.manyheads.name, type: 'ult', role: ULT.manyheads.role, cost: ULT_COST, ult: true, desc: ULT.manyheads.desc };
 ULT_BY_KIND.hydra = 'manyheads';
 MOON_KIND.hydra = [7, ['arm', 'con']];
+
+/* The Frost Wyrm (kind frostwyrm): a right fielder good at everything: Blood Pact at the plate, Fleet Foot on the
+   bases, Boulder Arm in the field; its ultimate Whiteout brings the snow, runners slower and swings stiff. */
+TEMPL.frostwyrm = { n: 'Hoarfang', kind: 'frostwyrm', race: 'Frost Wyrm', pos: 'RF', num: 9, hand: 'L', pow: 8, con: 7, spd: 7, arm: 8, fld: 7, wpn: 'spiked', bat: 'pact', run: 'fleet', field: 'boulder', flav: 'The outfield freezes over where it stands. It prefers it that way.' };
+ULT.whiteout = { kind: 'frostwyrm', role: 'field', name: 'Whiteout', desc: 'Brings the snow. Every runner runs 25% slower and swings come stiff.', zone: { shape: 'global', rSpd: .75, swing: .88, vis: 'snow' } };
+AB.whiteout = { name: '★ ' + ULT.whiteout.name, type: 'ult', role: ULT.whiteout.role, cost: ULT_COST, ult: true, desc: ULT.whiteout.desc };
+ULT_BY_KIND.frostwyrm = 'whiteout';
+MOON_KIND.frostwyrm = [6, ['arm', 'pow']];
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -21271,7 +21279,9 @@ MOON_KIND.hydra = [7, ['arm', 'con']];
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
    above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
    The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
-   each with its own eyes and fangs, the middle one's tongue flicking. */
+   each with its own eyes and fangs, the middle one's tongue flicking.
+   The Frost Wyrm (kind frostwyrm: "wyrm" is the Seam Wyrm boss already): a pale ice dragon. Wide membrane wings with frost on their edges, a spiked tail, a wedge of a snout
+   with horns swept back, ice-blue eyes, and frost on its breath. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -21436,6 +21446,42 @@ MOON_KIND.hydra = [7, ['arm', 'con']];
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
+
+  KIND.frostwyrm = { skin: '#bfe0ee', h: 1.2, w: 1.3, eye: '#6ad8ff' };
+  BODY.frostwyrm = { foot: 'claw', musc: .7, tail: 'lizard', scales: true, clawHand: true };
+  BACK.frostwyrm = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 16) * 10 : Math.sin(t * 1.8) * 3, mem = d.C('#6aa8c8'), bone = d.C('#e8f4fa');
+    for (const s of [-1, 1]) {
+      // the wing: a bony arm out and up, three fingers, and the membrane between them scalloped down to the body
+      const sh = [s * 10, d.shY + 2], el = [s * 40, d.shY - 30 - f], tips = [[s * 74, d.shY - 40 - f], [s * 80, d.shY - 6 - f * .5], [s * 66, d.shY + 22]];
+      const p = new Path2D(); p.moveTo(sh[0], sh[1]); p.lineTo(el[0], el[1]); p.lineTo(tips[0][0], tips[0][1]);
+      p.quadraticCurveTo(s * 64, d.shY - 18 - f, tips[1][0], tips[1][1]); p.quadraticCurveTo(s * 58, d.shY + 6, tips[2][0], tips[2][1]); p.quadraticCurveTo(s * 34, d.shY + 14, s * 10, d.shY + 24); p.closePath();
+      ink(c, p, mem, s > 0 ? -999 : 999);
+      for (const q of tips) inkLine(c, [el, q], bone, 1.2);
+      inkLine(c, [sh, el], bone, 1.6);
+      if (!d.st) for (const q of tips) circ(c, q[0], q[1], 1.6, '#ffffff');
+    }
+    // the tail, spiked, curling round behind the legs
+    const tl = []; for (let i = 0; i < 8; i++) tl.push([Math.sin(t * 1.5 + i * .5) * 3 + i * 4.5, -26 + i * 3.4]);
+    for (let i = 0; i < tl.length - 1; i++) inkLine(c, [tl[i], tl[i + 1]], d.C('#9ccbe0'), 3.2 - i * .3);
+    for (let i = 1; i < tl.length; i += 2) ink(c, pPoly([[tl[i][0] - 2, tl[i][1]], [tl[i][0], tl[i][1] - 5], [tl[i][0] + 2, tl[i][1]]]), bone, 0, true);
+  };
+  HEAD.frostwyrm = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#e8f4fa'), t = now();
+    // horns swept back, a frill of ice spikes
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 7, hy - 9); p.quadraticCurveTo(s * 20, hy - 18, s * 26, hy - 30); p.quadraticCurveTo(s * 15, hy - 16, s * 4, hy - 6); p.closePath(); ink(c, p, bone); }
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 4 - 2, hy - 10], [i * 4, hy - 17 + Math.abs(i)], [i * 4 + 2, hy - 10]]), C('#9ccbe0'), 0, true);
+    // a wedge of a head and snout
+    ink(c, pPoly([[-12, hy - 9], [12, hy - 9], [14, hy + 1], [7, hy + 13], [-7, hy + 13], [-14, hy + 1]]), skin);
+    ink(c, pPoly([[-6, hy + 6], [6, hy + 6], [5, hy + 13], [-5, hy + 13]]), C(tint('#bfe0ee', -.12)), 0, true);
+    for (const s of [-1, 1]) circ(c, s * 2.5, hy + 8.5, 1, INK);
+    glowEye(c, -6, hy - 2, 2.4, d.eye, d.st); glowEye(c, 6, hy - 2, 2.4, d.eye, d.st);
+    inkLine(c, [[-11, hy - 6], [-3, hy - 4]], INK, .9); inkLine(c, [[11, hy - 6], [3, hy - 4]], INK, .9);
+    // frost on its breath
+    if (!d.st) { c.save(); c.globalAlpha *= .45 + Math.sin(t * 2) * .15; for (let i = 0; i < 4; i++) circ(c, Math.sin(t + i) * 3, hy + 16 + i * 3.5, 2.5 + i * .8, '#e8f8ff'); c.restore(); }
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.frostwyrm = 'Frost Wyrm';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.frostwyrm = 'spiked';
 })();
 
 /* the end of the wBD scope: what the Realm may call (w20-diamond.js, w20d-ballgame.js). gameOver, showMenu and exhSnap
@@ -23937,6 +23983,16 @@ GF_POW.hydra = [{ id: 'manyheads', n: 'Many Heads', cost: 1, fits: 'pass', desc:
 GF_ULT.hydra = { id: 'regrow', n: 'Regrow', role: 'off', desc: 'Cut one head off and two grow back: the hydra\'s side gets 6 stamina back every play it lasts, and its carrier is harder to bring down.', zone: { cStr: 1 }, restZ: 6, vis: ['#3f8a6a', 'all'] };
 for (const p of GF_POW.hydra) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.hydra.id] = GF_ULT.hydra;
+
+/* The Frost Wyrm (kind frostwyrm): good at everything. Ice Path on offense (the carrier skates, faster), Frostbite on
+   defense (throws fly off line, receivers slower), and Whiteout: a blizzard over the field, their whole offense
+   slower and their throws off line. */
+GF_KIND.frostwyrm = [8, 7, 7, 7, 6, 7];
+GF_POW.frostwyrm = [{ id: 'icepath', n: 'Ice Path', cost: 1, fits: 'run', desc: 'The ground freezes under the carrier: they skate 8% faster.', fx: { cSpd: 1.08 } },
+  { id: 'frostbite', n: 'Frostbite', cost: 1, fits: 'pass', desc: 'Numb fingers and slow feet: the throw flies off line and the receivers run 5% slower.', fx: { errA: .5, rSpd: .95 } }];
+GF_ULT.frostwyrm = { id: 'whiteout', n: 'Whiteout', role: 'def', desc: 'A blizzard over the whole field: their offense 20% slower, and their throws off line.', zone: { oSpd: .8, errA: .5 }, vis: ['#e8f4ff', 'all'] };
+for (const p of GF_POW.frostwyrm) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.frostwyrm.id] = GF_ULT.frostwyrm;
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -23953,7 +24009,9 @@ GF_ULT_BY[GF_ULT.hydra.id] = GF_ULT.hydra;
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
    above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
    The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
-   each with its own eyes and fangs, the middle one's tongue flicking. */
+   each with its own eyes and fangs, the middle one's tongue flicking.
+   The Frost Wyrm (kind frostwyrm: "wyrm" is the Seam Wyrm boss already): a pale ice dragon. Wide membrane wings with frost on their edges, a spiked tail, a wedge of a snout
+   with horns swept back, ice-blue eyes, and frost on its breath. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -24118,6 +24176,42 @@ GF_ULT_BY[GF_ULT.hydra.id] = GF_ULT.hydra;
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
+
+  KIND.frostwyrm = { skin: '#bfe0ee', h: 1.2, w: 1.3, eye: '#6ad8ff' };
+  BODY.frostwyrm = { foot: 'claw', musc: .7, tail: 'lizard', scales: true, clawHand: true };
+  BACK.frostwyrm = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 16) * 10 : Math.sin(t * 1.8) * 3, mem = d.C('#6aa8c8'), bone = d.C('#e8f4fa');
+    for (const s of [-1, 1]) {
+      // the wing: a bony arm out and up, three fingers, and the membrane between them scalloped down to the body
+      const sh = [s * 10, d.shY + 2], el = [s * 40, d.shY - 30 - f], tips = [[s * 74, d.shY - 40 - f], [s * 80, d.shY - 6 - f * .5], [s * 66, d.shY + 22]];
+      const p = new Path2D(); p.moveTo(sh[0], sh[1]); p.lineTo(el[0], el[1]); p.lineTo(tips[0][0], tips[0][1]);
+      p.quadraticCurveTo(s * 64, d.shY - 18 - f, tips[1][0], tips[1][1]); p.quadraticCurveTo(s * 58, d.shY + 6, tips[2][0], tips[2][1]); p.quadraticCurveTo(s * 34, d.shY + 14, s * 10, d.shY + 24); p.closePath();
+      ink(c, p, mem, s > 0 ? -999 : 999);
+      for (const q of tips) inkLine(c, [el, q], bone, 1.2);
+      inkLine(c, [sh, el], bone, 1.6);
+      if (!d.st) for (const q of tips) circ(c, q[0], q[1], 1.6, '#ffffff');
+    }
+    // the tail, spiked, curling round behind the legs
+    const tl = []; for (let i = 0; i < 8; i++) tl.push([Math.sin(t * 1.5 + i * .5) * 3 + i * 4.5, -26 + i * 3.4]);
+    for (let i = 0; i < tl.length - 1; i++) inkLine(c, [tl[i], tl[i + 1]], d.C('#9ccbe0'), 3.2 - i * .3);
+    for (let i = 1; i < tl.length; i += 2) ink(c, pPoly([[tl[i][0] - 2, tl[i][1]], [tl[i][0], tl[i][1] - 5], [tl[i][0] + 2, tl[i][1]]]), bone, 0, true);
+  };
+  HEAD.frostwyrm = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#e8f4fa'), t = now();
+    // horns swept back, a frill of ice spikes
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 7, hy - 9); p.quadraticCurveTo(s * 20, hy - 18, s * 26, hy - 30); p.quadraticCurveTo(s * 15, hy - 16, s * 4, hy - 6); p.closePath(); ink(c, p, bone); }
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 4 - 2, hy - 10], [i * 4, hy - 17 + Math.abs(i)], [i * 4 + 2, hy - 10]]), C('#9ccbe0'), 0, true);
+    // a wedge of a head and snout
+    ink(c, pPoly([[-12, hy - 9], [12, hy - 9], [14, hy + 1], [7, hy + 13], [-7, hy + 13], [-14, hy + 1]]), skin);
+    ink(c, pPoly([[-6, hy + 6], [6, hy + 6], [5, hy + 13], [-5, hy + 13]]), C(tint('#bfe0ee', -.12)), 0, true);
+    for (const s of [-1, 1]) circ(c, s * 2.5, hy + 8.5, 1, INK);
+    glowEye(c, -6, hy - 2, 2.4, d.eye, d.st); glowEye(c, 6, hy - 2, 2.4, d.eye, d.st);
+    inkLine(c, [[-11, hy - 6], [-3, hy - 4]], INK, .9); inkLine(c, [[11, hy - 6], [3, hy - 4]], INK, .9);
+    // frost on its breath
+    if (!d.st) { c.save(); c.globalAlpha *= .45 + Math.sin(t * 2) * .15; for (let i = 0; i < 4; i++) circ(c, Math.sin(t + i) * 3, hy + 16 + i * 3.5, 2.5 + i * .8, '#e8f8ff'); c.restore(); }
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.frostwyrm = 'Frost Wyrm';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.frostwyrm = 'spiked';
 })();
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
@@ -26049,6 +26143,15 @@ BX_POW.hydra = {
   sp: { id: 'triplebite', n: 'Triple Bite', when: 'close', desc: 'Three heads bite at once: three quick hits that all land.', now: { hits: 3 } },
   ult: { id: 'regrow', n: 'Regrow', when: 'hurt', desc: 'The heads grow back: 20 health now, and 2 a second for 6 seconds.', now: { hp: 20 }, fx: { who: 'self', t: 6, regHp: 2 } },
 };
+
+/* The Frost Wyrm (kind frostwyrm): strong at everything. Its nature is Frozen Heart (counters hurt it less); Frost
+   Breath chills them through the guard and slows their feet, and its ultimate, Whiteout, slows them at everything. */
+BX_KIND.frostwyrm = [7, 7, 6, 6, 6, 6];
+BX_TRAIT.frostwyrm = { n: 'Frozen Heart', desc: 'Cold all the way through: counters hurt it less.', ctrTaken: .8 };
+BX_POW.frostwyrm = {
+  sp: { id: 'frostbreath', n: 'Frost Breath', when: 'mid', desc: 'A breath of ice through the guard (5), and their feet slow to 60% for 3 seconds.', now: { dmg: 5 }, fx: { who: 'them', t: 3, move: .6 } },
+  ult: { id: 'whiteout', n: 'Whiteout', when: 'any', desc: 'A storm in the ring: 30% slower at everything for 5 seconds.', fx: { who: 'them', t: 5, spd: .7, move: .7 } },
+};
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -26065,7 +26168,9 @@ BX_POW.hydra = {
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
    above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
    The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
-   each with its own eyes and fangs, the middle one's tongue flicking. */
+   each with its own eyes and fangs, the middle one's tongue flicking.
+   The Frost Wyrm (kind frostwyrm: "wyrm" is the Seam Wyrm boss already): a pale ice dragon. Wide membrane wings with frost on their edges, a spiked tail, a wedge of a snout
+   with horns swept back, ice-blue eyes, and frost on its breath. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -26230,6 +26335,42 @@ BX_POW.hydra = {
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
+
+  KIND.frostwyrm = { skin: '#bfe0ee', h: 1.2, w: 1.3, eye: '#6ad8ff' };
+  BODY.frostwyrm = { foot: 'claw', musc: .7, tail: 'lizard', scales: true, clawHand: true };
+  BACK.frostwyrm = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 16) * 10 : Math.sin(t * 1.8) * 3, mem = d.C('#6aa8c8'), bone = d.C('#e8f4fa');
+    for (const s of [-1, 1]) {
+      // the wing: a bony arm out and up, three fingers, and the membrane between them scalloped down to the body
+      const sh = [s * 10, d.shY + 2], el = [s * 40, d.shY - 30 - f], tips = [[s * 74, d.shY - 40 - f], [s * 80, d.shY - 6 - f * .5], [s * 66, d.shY + 22]];
+      const p = new Path2D(); p.moveTo(sh[0], sh[1]); p.lineTo(el[0], el[1]); p.lineTo(tips[0][0], tips[0][1]);
+      p.quadraticCurveTo(s * 64, d.shY - 18 - f, tips[1][0], tips[1][1]); p.quadraticCurveTo(s * 58, d.shY + 6, tips[2][0], tips[2][1]); p.quadraticCurveTo(s * 34, d.shY + 14, s * 10, d.shY + 24); p.closePath();
+      ink(c, p, mem, s > 0 ? -999 : 999);
+      for (const q of tips) inkLine(c, [el, q], bone, 1.2);
+      inkLine(c, [sh, el], bone, 1.6);
+      if (!d.st) for (const q of tips) circ(c, q[0], q[1], 1.6, '#ffffff');
+    }
+    // the tail, spiked, curling round behind the legs
+    const tl = []; for (let i = 0; i < 8; i++) tl.push([Math.sin(t * 1.5 + i * .5) * 3 + i * 4.5, -26 + i * 3.4]);
+    for (let i = 0; i < tl.length - 1; i++) inkLine(c, [tl[i], tl[i + 1]], d.C('#9ccbe0'), 3.2 - i * .3);
+    for (let i = 1; i < tl.length; i += 2) ink(c, pPoly([[tl[i][0] - 2, tl[i][1]], [tl[i][0], tl[i][1] - 5], [tl[i][0] + 2, tl[i][1]]]), bone, 0, true);
+  };
+  HEAD.frostwyrm = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#e8f4fa'), t = now();
+    // horns swept back, a frill of ice spikes
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 7, hy - 9); p.quadraticCurveTo(s * 20, hy - 18, s * 26, hy - 30); p.quadraticCurveTo(s * 15, hy - 16, s * 4, hy - 6); p.closePath(); ink(c, p, bone); }
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 4 - 2, hy - 10], [i * 4, hy - 17 + Math.abs(i)], [i * 4 + 2, hy - 10]]), C('#9ccbe0'), 0, true);
+    // a wedge of a head and snout
+    ink(c, pPoly([[-12, hy - 9], [12, hy - 9], [14, hy + 1], [7, hy + 13], [-7, hy + 13], [-14, hy + 1]]), skin);
+    ink(c, pPoly([[-6, hy + 6], [6, hy + 6], [5, hy + 13], [-5, hy + 13]]), C(tint('#bfe0ee', -.12)), 0, true);
+    for (const s of [-1, 1]) circ(c, s * 2.5, hy + 8.5, 1, INK);
+    glowEye(c, -6, hy - 2, 2.4, d.eye, d.st); glowEye(c, 6, hy - 2, 2.4, d.eye, d.st);
+    inkLine(c, [[-11, hy - 6], [-3, hy - 4]], INK, .9); inkLine(c, [[11, hy - 6], [3, hy - 4]], INK, .9);
+    // frost on its breath
+    if (!d.st) { c.save(); c.globalAlpha *= .45 + Math.sin(t * 2) * .15; for (let i = 0; i < 4; i++) circ(c, Math.sin(t + i) * 3, hy + 16 + i * 3.5, 2.5 + i * .8, '#e8f8ff'); c.restore(); }
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.frostwyrm = 'Frost Wyrm';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.frostwyrm = 'spiked';
 })();
 /* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
@@ -34003,7 +34144,9 @@ renderHelp = function () {
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
    above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
    The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
-   each with its own eyes and fangs, the middle one's tongue flicking. */
+   each with its own eyes and fangs, the middle one's tongue flicking.
+   The Frost Wyrm (kind frostwyrm: "wyrm" is the Seam Wyrm boss already): a pale ice dragon. Wide membrane wings with frost on their edges, a spiked tail, a wedge of a snout
+   with horns swept back, ice-blue eyes, and frost on its breath. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -34168,6 +34311,42 @@ renderHelp = function () {
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
+
+  KIND.frostwyrm = { skin: '#bfe0ee', h: 1.2, w: 1.3, eye: '#6ad8ff' };
+  BODY.frostwyrm = { foot: 'claw', musc: .7, tail: 'lizard', scales: true, clawHand: true };
+  BACK.frostwyrm = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 16) * 10 : Math.sin(t * 1.8) * 3, mem = d.C('#6aa8c8'), bone = d.C('#e8f4fa');
+    for (const s of [-1, 1]) {
+      // the wing: a bony arm out and up, three fingers, and the membrane between them scalloped down to the body
+      const sh = [s * 10, d.shY + 2], el = [s * 40, d.shY - 30 - f], tips = [[s * 74, d.shY - 40 - f], [s * 80, d.shY - 6 - f * .5], [s * 66, d.shY + 22]];
+      const p = new Path2D(); p.moveTo(sh[0], sh[1]); p.lineTo(el[0], el[1]); p.lineTo(tips[0][0], tips[0][1]);
+      p.quadraticCurveTo(s * 64, d.shY - 18 - f, tips[1][0], tips[1][1]); p.quadraticCurveTo(s * 58, d.shY + 6, tips[2][0], tips[2][1]); p.quadraticCurveTo(s * 34, d.shY + 14, s * 10, d.shY + 24); p.closePath();
+      ink(c, p, mem, s > 0 ? -999 : 999);
+      for (const q of tips) inkLine(c, [el, q], bone, 1.2);
+      inkLine(c, [sh, el], bone, 1.6);
+      if (!d.st) for (const q of tips) circ(c, q[0], q[1], 1.6, '#ffffff');
+    }
+    // the tail, spiked, curling round behind the legs
+    const tl = []; for (let i = 0; i < 8; i++) tl.push([Math.sin(t * 1.5 + i * .5) * 3 + i * 4.5, -26 + i * 3.4]);
+    for (let i = 0; i < tl.length - 1; i++) inkLine(c, [tl[i], tl[i + 1]], d.C('#9ccbe0'), 3.2 - i * .3);
+    for (let i = 1; i < tl.length; i += 2) ink(c, pPoly([[tl[i][0] - 2, tl[i][1]], [tl[i][0], tl[i][1] - 5], [tl[i][0] + 2, tl[i][1]]]), bone, 0, true);
+  };
+  HEAD.frostwyrm = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#e8f4fa'), t = now();
+    // horns swept back, a frill of ice spikes
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 7, hy - 9); p.quadraticCurveTo(s * 20, hy - 18, s * 26, hy - 30); p.quadraticCurveTo(s * 15, hy - 16, s * 4, hy - 6); p.closePath(); ink(c, p, bone); }
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 4 - 2, hy - 10], [i * 4, hy - 17 + Math.abs(i)], [i * 4 + 2, hy - 10]]), C('#9ccbe0'), 0, true);
+    // a wedge of a head and snout
+    ink(c, pPoly([[-12, hy - 9], [12, hy - 9], [14, hy + 1], [7, hy + 13], [-7, hy + 13], [-14, hy + 1]]), skin);
+    ink(c, pPoly([[-6, hy + 6], [6, hy + 6], [5, hy + 13], [-5, hy + 13]]), C(tint('#bfe0ee', -.12)), 0, true);
+    for (const s of [-1, 1]) circ(c, s * 2.5, hy + 8.5, 1, INK);
+    glowEye(c, -6, hy - 2, 2.4, d.eye, d.st); glowEye(c, 6, hy - 2, 2.4, d.eye, d.st);
+    inkLine(c, [[-11, hy - 6], [-3, hy - 4]], INK, .9); inkLine(c, [[11, hy - 6], [3, hy - 4]], INK, .9);
+    // frost on its breath
+    if (!d.st) { c.save(); c.globalAlpha *= .45 + Math.sin(t * 2) * .15; for (let i = 0; i < 4; i++) circ(c, Math.sin(t + i) * 3, hy + 16 + i * 3.5, 2.5 + i * .8, '#e8f8ff'); c.restore(); }
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.frostwyrm = 'Frost Wyrm';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.frostwyrm = 'spiked';
 })();
 /* w58: meeting and signing a superstar (issue #24, phase 2). A superstar that is built (W_STARS entry with a kind,
    added by its own part: w59 for the Phoenix) is met through someone who knows where it is: ask them about it by
@@ -34523,6 +34702,62 @@ renderHelp = function () {
   wW63RenderHelp();
   const after = $('wHelpDjinn') || $('wHelpStars'); if (!after || $('wHelpHydra')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpHydra"><b>The Hydra.</b> Hatch all five rare eggs at Pell's, over any number of journeys, to unlock it. Then ask Dr. Pell in Graftonbury about the HYDRA: it signs for ${W_HYD.price.gold} gold, or a Moss Egg and a Brine Egg. Its power is Regrow. In a card-game match, while it starts, if your line was hit since your last turn, ${W_HYD.regrow} HP grow back at the start of your turn. In the ring it fights harder when behind and grows back far more between rounds. On the gridiron its ultimate gives its side stamina back; on the diamond every fielder reacts sooner. As captain every enemy starts with 3 Plague.</p>`);
+};
+/* w64: the Frost Wyrm (issue #24, phase 3), the sixth superstar (id wyrm, kind frostwyrm: "wyrm" was already the Seam
+   Wyrm boss's kind). Its drawing is in src/realm/stars/s1-figures.js; its ratings and powers in each engine in
+   src/realm/ring/r0-stars.js (boxing: the Frozen Heart nature), src/realm/gridiron/g0-stars.js and
+   src/realm/diamond/d1-stars.js (the Whiteout ultimates: the witch's ultimate is already called Blizzard there). Here:
+   - Cards: a signature card (Frost Breath) and five of its own kind.
+   - Blizzard, in the card game: while the Frost Wyrm starts, every enemy starts Weak and Exposed for W_WYR.turns turns
+     (the fightStart hook).
+   - Captain: Winter's Crown, 1 Strength, 1 Footwork and 5 Block at kickoff.
+   - Meeting: Jory Farsight, who watches the sky over Rimewatch, has seen it circle the peaks; ask about the WYRM. It is
+     the costliest superstar: W_WYR.price, gold, or Rime Eggs from the Frostspire's nests.
+   Unlocked by winning the Crown (w57). How to play: #wHelpWyrm. */
+
+const W_WYR = { turns: 2, price: { gold: 500, items: { rimeegg: 3 } } };
+Object.assign(wStar('wyrm'), {
+  kind: 'frostwyrm', name: 'Hoarfang', num: 9,
+  flav: 'Came down off the Frostspire the winter after you won the Crown, and has not been warm since.',
+  meet: { who: 'watcher', topic: 'wyrm', price: W_WYR.price, where: 'Meet them: ask Jory Farsight, the watcher in Rimewatch, about the WYRM.',
+    rumour: 'Jory hands you the spyglass. "See the peaks? Some nights a shape circles them, bigger than the Roost\'s Matriarch, white on white. It only comes down for a champion. Win the Crown, on any journey, and it will come to you."',
+    hello: 'Jory takes you up the watchtower at dusk. The wind drops, the snow stops in the air, and a dragon of ice settles on the tower, looking down at you like a champion looks at a cup.',
+    ask: 'It is the costliest player in the realm: gold for the League\'s books, or three Rime Eggs, and it will want all three.' },
+});
+FA_NAMES.frostwyrm = ['Hoarfang'];
+FA_SCOUT.frostwyrm = ['Strong at everything, and it knows it.'];
+
+/* ---------- cards ---------- */
+K('wyr_breath', 'Frost Breath', 'frostwyrm', 'atk', 1, 's', 'all', [['d', 3], ['s', 'weak', 1, 'all']], { fl: 'The whole defense, frozen to the spot.', sport: 'hockey' });
+K('wyr_claw', 'Ice Claw', 'frostwyrm', 'atk', 1, 'c', 'one', [['d', 8]], { sport: 'hockey' });
+K('wyr_scales', 'Ice Scales', 'frostwyrm', 'skl', 1, 'c', 'self', [['b', 8]], { sport: 'curling' });
+K('wyr_dive', 'Wyrm Dive', 'frostwyrm', 'atk', 2, 'u', 'one', [['d', 14]], { sport: 'football' });
+K('wyr_rime', 'Rime Armor', 'frostwyrm', 'skl', 1, 'u', 'one', [['b', 7], ['s', 'weak', 1]]);
+K('wyr_storm', 'Blizzard', 'frostwyrm', 'atk', 2, 'r', 'all', [['d', 7], ['s', 'weak', 2, 'all'], ['s', 'vuln', 1, 'all']], { ex: 1, fl: 'Snow on everything. Snow on the scoreboard.' });
+SIG.frostwyrm = 'wyr_breath';
+
+/* ---------- Blizzard, in the card game ---------- */
+function wWyrStarts() { return !!(WG && RUN && wStarters().some(p => p.kind === 'frostwyrm')); }
+onHook('fightStart', () => {
+  if (!B || !wWyrStarts()) return;
+  for (const e of alive()) { addSt(e, 'weak', W_WYR.turns); addSt(e, 'vuln', W_WYR.turns); }
+  fx({ k: 'banner', t: 'Blizzard', sub: `Every enemy Weak and Exposed for ${W_WYR.turns} turns` });
+  log(`Blizzard: the Frost Wyrm brings the snow. Every enemy is Weak and Exposed for ${W_WYR.turns} turns.`, 'good');
+});
+W_CAPTAIN.frostwyrm = { n: 'Winter\'s Crown', d: '1 Strength, 1 Footwork and 5 Block at kickoff.', on: { fightStart: () => { addSt(B.P, 'str', 1); addSt(B.P, 'dex', 1); B.P.block += 5; } } };
+
+/* ---------- the meeting: Jory Farsight in Rimewatch ---------- */
+(() => {
+  const S = DB.chars.watcher; if (!S) return;
+  S.topics.job.t += ' And something bigger than the Matriarch, a WYRM, circles the peaks.';
+  S.topics.wyrm = { t: 'The white shape over the peaks. Take the glass.', act: 'star:wyrm' };
+})();
+
+const wW64RenderHelp = renderHelp;
+renderHelp = function () {
+  wW64RenderHelp();
+  const after = $('wHelpHydra') || $('wHelpStars'); if (!after || $('wHelpWyrm')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpWyrm"><b>The Frost Wyrm.</b> Win the Crown on any journey to unlock it. Then ask Jory Farsight, the watcher in Rimewatch, about the WYRM. It is the costliest superstar: ${W_WYR.price.gold} gold or ${W_WYR.price.items.rimeegg} Rime Eggs. Its power is Blizzard. In a card-game match, while it starts, every enemy starts Weak and Exposed for ${W_WYR.turns} turns. In the ring, counters hurt it less. Its ultimate, Whiteout, brings the snow: slower at everything in the ring, a slow offense on the gridiron, slow runners on the diamond. As captain it gives 1 Strength, 1 Footwork and 5 Block at kickoff.</p>`);
 };
 </script>
 </body></html>

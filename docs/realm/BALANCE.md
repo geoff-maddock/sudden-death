@@ -553,7 +553,9 @@ Its nature carries it (it mends 0.6 of what it lost between rounds, everyone els
 | Behemoth | 63.5% | |
 | Djinn | 61.8% | |
 | Hydra | 63.4% | |
+| Frost Wyrm | 62.8% | |
 
-The Frost Wyrm (strong at everything) is the sixth, still to come. Phase 4 measures the card game, football and
-baseball with the realm, gridiron and diamond labs.
+The Frost Wyrm (strong at everything): 7, 7, 6, 7, 7, 6 won 74.4%; chin 6 gave 70.3%; chin and power 6, 61.0%;
+shipped at 7, 7, 6, 6, 6, 6, 62.8%. Its edge is being good at everything in every sport, which its price (500 gold,
+the most) pays for. Phase 4 measures the card game, football and baseball with the realm, gridiron and diamond labs.
 

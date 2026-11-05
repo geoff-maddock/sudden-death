@@ -43,3 +43,11 @@ ULT.manyheads = { kind: 'hydra', role: 'field', name: 'Many Heads', desc: 'Three
 AB.manyheads = { name: '★ ' + ULT.manyheads.name, type: 'ult', role: ULT.manyheads.role, cost: ULT_COST, ult: true, desc: ULT.manyheads.desc };
 ULT_BY_KIND.hydra = 'manyheads';
 MOON_KIND.hydra = [7, ['arm', 'con']];
+
+/* The Frost Wyrm (kind frostwyrm): a right fielder good at everything: Blood Pact at the plate, Fleet Foot on the
+   bases, Boulder Arm in the field; its ultimate Whiteout brings the snow, runners slower and swings stiff. */
+TEMPL.frostwyrm = { n: 'Hoarfang', kind: 'frostwyrm', race: 'Frost Wyrm', pos: 'RF', num: 9, hand: 'L', pow: 8, con: 7, spd: 7, arm: 8, fld: 7, wpn: 'spiked', bat: 'pact', run: 'fleet', field: 'boulder', flav: 'The outfield freezes over where it stands. It prefers it that way.' };
+ULT.whiteout = { kind: 'frostwyrm', role: 'field', name: 'Whiteout', desc: 'Brings the snow. Every runner runs 25% slower and swings come stiff.', zone: { shape: 'global', rSpd: .75, swing: .88, vis: 'snow' } };
+AB.whiteout = { name: '★ ' + ULT.whiteout.name, type: 'ult', role: ULT.whiteout.role, cost: ULT_COST, ult: true, desc: ULT.whiteout.desc };
+ULT_BY_KIND.frostwyrm = 'whiteout';
+MOON_KIND.frostwyrm = [6, ['arm', 'pow']];

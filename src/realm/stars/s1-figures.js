@@ -14,7 +14,9 @@
    The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
    above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
    The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
-   each with its own eyes and fangs, the middle one's tongue flicking. */
+   each with its own eyes and fangs, the middle one's tongue flicking.
+   The Frost Wyrm (kind frostwyrm: "wyrm" is the Seam Wyrm boss already): a pale ice dragon. Wide membrane wings with frost on their edges, a spiked tail, a wedge of a snout
+   with horns swept back, ice-blue eyes, and frost on its breath. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -179,4 +181,40 @@
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
+
+  KIND.frostwyrm = { skin: '#bfe0ee', h: 1.2, w: 1.3, eye: '#6ad8ff' };
+  BODY.frostwyrm = { foot: 'claw', musc: .7, tail: 'lizard', scales: true, clawHand: true };
+  BACK.frostwyrm = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 16) * 10 : Math.sin(t * 1.8) * 3, mem = d.C('#6aa8c8'), bone = d.C('#e8f4fa');
+    for (const s of [-1, 1]) {
+      // the wing: a bony arm out and up, three fingers, and the membrane between them scalloped down to the body
+      const sh = [s * 10, d.shY + 2], el = [s * 40, d.shY - 30 - f], tips = [[s * 74, d.shY - 40 - f], [s * 80, d.shY - 6 - f * .5], [s * 66, d.shY + 22]];
+      const p = new Path2D(); p.moveTo(sh[0], sh[1]); p.lineTo(el[0], el[1]); p.lineTo(tips[0][0], tips[0][1]);
+      p.quadraticCurveTo(s * 64, d.shY - 18 - f, tips[1][0], tips[1][1]); p.quadraticCurveTo(s * 58, d.shY + 6, tips[2][0], tips[2][1]); p.quadraticCurveTo(s * 34, d.shY + 14, s * 10, d.shY + 24); p.closePath();
+      ink(c, p, mem, s > 0 ? -999 : 999);
+      for (const q of tips) inkLine(c, [el, q], bone, 1.2);
+      inkLine(c, [sh, el], bone, 1.6);
+      if (!d.st) for (const q of tips) circ(c, q[0], q[1], 1.6, '#ffffff');
+    }
+    // the tail, spiked, curling round behind the legs
+    const tl = []; for (let i = 0; i < 8; i++) tl.push([Math.sin(t * 1.5 + i * .5) * 3 + i * 4.5, -26 + i * 3.4]);
+    for (let i = 0; i < tl.length - 1; i++) inkLine(c, [tl[i], tl[i + 1]], d.C('#9ccbe0'), 3.2 - i * .3);
+    for (let i = 1; i < tl.length; i += 2) ink(c, pPoly([[tl[i][0] - 2, tl[i][1]], [tl[i][0], tl[i][1] - 5], [tl[i][0] + 2, tl[i][1]]]), bone, 0, true);
+  };
+  HEAD.frostwyrm = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#e8f4fa'), t = now();
+    // horns swept back, a frill of ice spikes
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 7, hy - 9); p.quadraticCurveTo(s * 20, hy - 18, s * 26, hy - 30); p.quadraticCurveTo(s * 15, hy - 16, s * 4, hy - 6); p.closePath(); ink(c, p, bone); }
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 4 - 2, hy - 10], [i * 4, hy - 17 + Math.abs(i)], [i * 4 + 2, hy - 10]]), C('#9ccbe0'), 0, true);
+    // a wedge of a head and snout
+    ink(c, pPoly([[-12, hy - 9], [12, hy - 9], [14, hy + 1], [7, hy + 13], [-7, hy + 13], [-14, hy + 1]]), skin);
+    ink(c, pPoly([[-6, hy + 6], [6, hy + 6], [5, hy + 13], [-5, hy + 13]]), C(tint('#bfe0ee', -.12)), 0, true);
+    for (const s of [-1, 1]) circ(c, s * 2.5, hy + 8.5, 1, INK);
+    glowEye(c, -6, hy - 2, 2.4, d.eye, d.st); glowEye(c, 6, hy - 2, 2.4, d.eye, d.st);
+    inkLine(c, [[-11, hy - 6], [-3, hy - 4]], INK, .9); inkLine(c, [[11, hy - 6], [3, hy - 4]], INK, .9);
+    // frost on its breath
+    if (!d.st) { c.save(); c.globalAlpha *= .45 + Math.sin(t * 2) * .15; for (let i = 0; i < 4; i++) circ(c, Math.sin(t + i) * 3, hy + 16 + i * 3.5, 2.5 + i * .8, '#e8f8ff'); c.restore(); }
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.frostwyrm = 'Frost Wyrm';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.frostwyrm = 'spiked';
 })();

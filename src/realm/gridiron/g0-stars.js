@@ -49,3 +49,13 @@ GF_POW.hydra = [{ id: 'manyheads', n: 'Many Heads', cost: 1, fits: 'pass', desc:
 GF_ULT.hydra = { id: 'regrow', n: 'Regrow', role: 'off', desc: 'Cut one head off and two grow back: the hydra\'s side gets 6 stamina back every play it lasts, and its carrier is harder to bring down.', zone: { cStr: 1 }, restZ: 6, vis: ['#3f8a6a', 'all'] };
 for (const p of GF_POW.hydra) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.hydra.id] = GF_ULT.hydra;
+
+/* The Frost Wyrm (kind frostwyrm): good at everything. Ice Path on offense (the carrier skates, faster), Frostbite on
+   defense (throws fly off line, receivers slower), and Whiteout: a blizzard over the field, their whole offense
+   slower and their throws off line. */
+GF_KIND.frostwyrm = [8, 7, 7, 7, 6, 7];
+GF_POW.frostwyrm = [{ id: 'icepath', n: 'Ice Path', cost: 1, fits: 'run', desc: 'The ground freezes under the carrier: they skate 8% faster.', fx: { cSpd: 1.08 } },
+  { id: 'frostbite', n: 'Frostbite', cost: 1, fits: 'pass', desc: 'Numb fingers and slow feet: the throw flies off line and the receivers run 5% slower.', fx: { errA: .5, rSpd: .95 } }];
+GF_ULT.frostwyrm = { id: 'whiteout', n: 'Whiteout', role: 'def', desc: 'A blizzard over the whole field: their offense 20% slower, and their throws off line.', zone: { oSpd: .8, errA: .5 }, vis: ['#e8f4ff', 'all'] };
+for (const p of GF_POW.frostwyrm) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.frostwyrm.id] = GF_ULT.frostwyrm;

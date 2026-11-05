@@ -48,3 +48,12 @@ BX_POW.hydra = {
   sp: { id: 'triplebite', n: 'Triple Bite', when: 'close', desc: 'Three heads bite at once: three quick hits that all land.', now: { hits: 3 } },
   ult: { id: 'regrow', n: 'Regrow', when: 'hurt', desc: 'The heads grow back: 20 health now, and 2 a second for 6 seconds.', now: { hp: 20 }, fx: { who: 'self', t: 6, regHp: 2 } },
 };
+
+/* The Frost Wyrm (kind frostwyrm): strong at everything. Its nature is Frozen Heart (counters hurt it less); Frost
+   Breath chills them through the guard and slows their feet, and its ultimate, Whiteout, slows them at everything. */
+BX_KIND.frostwyrm = [7, 7, 6, 6, 6, 6];
+BX_TRAIT.frostwyrm = { n: 'Frozen Heart', desc: 'Cold all the way through: counters hurt it less.', ctrTaken: .8 };
+BX_POW.frostwyrm = {
+  sp: { id: 'frostbreath', n: 'Frost Breath', when: 'mid', desc: 'A breath of ice through the guard (5), and their feet slow to 60% for 3 seconds.', now: { dmg: 5 }, fx: { who: 'them', t: 3, move: .6 } },
+  ult: { id: 'whiteout', n: 'Whiteout', when: 'any', desc: 'A storm in the ring: 30% slower at everything for 5 seconds.', fx: { who: 'them', t: 5, spd: .7, move: .7 } },
+};
