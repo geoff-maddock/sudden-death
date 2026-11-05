@@ -39,7 +39,8 @@ async def main():
 
         # ---------- every kind, two powers (the 18 league kinds and the Phoenix, a superstar: issue #24) ----------
         bk = await pg.evaluate("(() => { const B = wBX.powerBook; return { kinds: Object.keys(B).length, all: wBX.kinds.every(k => B[k] && B[k].sp.n && B[k].sp.desc && B[k].ult.n && B[k].ult.desc), cost: wBX.powerCost }; })()")
-        check(bk['kinds'] == 19 and bk['all'] and bk['cost'] == {'sp': 8, 'ult': 15}, 'every kind has a special and an ultimate, named and described; a special costs 8 stamina, an ultimate 15', bk)
+        STARS = await pg.evaluate("W_STARS.filter(s => s.kind).length")  # superstars built so far (issue #24): each is a kind of its own
+        check(bk['kinds'] == 18 + STARS and bk['all'] and bk['cost'] == {'sp': 8, 'ult': 15}, 'every kind has a special and an ultimate, named and described; a special costs 8 stamina, an ultimate 15', bk)
 
         # ---------- each power does what its data says ----------
         each = await pg.evaluate("""(() => { const D = wBX.powerData, bad = [];
@@ -135,7 +136,7 @@ async def main():
           out.rot = [rot('zombie'), rot('elf')];
           return { out, book: Object.keys(wBX.traits).length }; })()""")
         o = nt['out']
-        check(nt['book'] == 12 and abs(o['reach'] - .3) < .01 and o['stick'] == {'halt': True, 'held': True}, 'Long Arms: the spider\'s jab reaches further, and a landed jab stops a fighter coming forward', o)
+        check(nt['book'] == 11 + STARS and abs(o['reach'] - .3) < .01 and o['stick'] == {'halt': True, 'held': True}, 'Long Arms: the spider\'s jab reaches further, and a landed jab stops a fighter coming forward', o)
         check(o['hollow'][0][0] < o['hollow'][1][0] * .9 and o['hollow'][0][1] == 0 and o['hollow'][1][1] > 0, 'Hollow: a body shot hurts a skeleton less and takes none of its breath', o['hollow'])
         check(o['ctr']['lich'] > o['ctr']['plain'] * 1.15 and o['ctr']['minotaur'] > o['ctr']['plain'] * 1.15, 'Cold Read: a lich counters harder; Charges In: a minotaur takes counters harder', o['ctr'])
         check(o['wind'] == [True, True], 'Second Wind: once a bout, badly hurt, a werewolf gets its breath back', o['wind'])
@@ -193,9 +194,10 @@ async def main():
         await pg.keyboard.press('q')
         q = await pg.evaluate("(() => { for (let i = 0; i < 3; i++) wBX.step(); return { used: wBX.powers(0).sp.used, them: wBX.G.F[1].a.k, btn: document.querySelector('[data-rpad=\"sp\"]').disabled, log: wBX.G.log.some(l => /casts Petrify/.test(l.msg)) }; })()")
         check(q == {'used': True, 'them': 'stun', 'btn': True, 'log': True}, 'Q casts your special: Petrify freezes them, the log says so, and its button goes out', q)
-        await pg.evaluate("wBX.G.F[0].sta = 2; wBX.pause(false)"); await pg.wait_for_timeout(400)
+        # (no breath coming back while it waits: how long 400 ms of play is depends on the machine's load)
+        await pg.evaluate("wBX.G.F[0].sta = 2; wBX.G.F[0].fx.push({ id: 'test', n: 'test', t: 99, noReg: 1 }); wBX.pause(false)"); await pg.wait_for_timeout(400)
         nb = await pg.evaluate("({ btn: document.querySelector('[data-rpad=\"ult\"]').disabled, why: wBX.powers(0).ult.why }); ")
-        await pg.evaluate("wBX.pause(true); wBX.G.F[0].sta = wBX.G.F[0].staMax")
+        await pg.evaluate("wBX.pause(true); wBX.G.F[0].fx = wBX.G.F[0].fx.filter(x => x.id !== 'test'); wBX.G.F[0].sta = wBX.G.F[0].staMax")
         check(nb['btn'] and nb['why'] in ('no breath', 'busy'), 'without the breath the ultimate\'s button is out, kept up to date during the round', nb)
         await pg.evaluate("wBX.pause(false)"); await pg.wait_for_timeout(250); await pg.screenshot(path='/tmp/realm-ring-powers-cast.png'); await pg.evaluate("wBX.pause(true)")
         await pg.evaluate("(() => { for (const f of wBX.G.F) f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; document.querySelector('[data-rpad=\"ult\"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 3 })); for (let i = 0; i < 3; i++) wBX.step(); })()")
@@ -208,7 +210,7 @@ async def main():
         await pg.evaluate("wBX.pause(false)")
         await pg.evaluate("showPage('help')")
         hp = await pg.evaluate("({ rows: document.querySelectorAll('.wrpow tr').length, text: (document.getElementById('wRingHow') || {}).textContent || '' })")
-        check(hp['rows'] == 20 and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'] and 'Long Arms' in hp['text'] and 'Nature' in hp['text'], 'How to play explains powers and each kind\'s nature, with every kind\'s', hp['rows'])
+        check(hp['rows'] == 19 + STARS and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'] and 'Long Arms' in hp['text'] and 'Nature' in hp['text'], 'How to play explains powers and each kind\'s nature, with every kind\'s', hp['rows'])
         await pg.evaluate("showPage('play')")
 
         check(not errs, 'no page errors', errs)

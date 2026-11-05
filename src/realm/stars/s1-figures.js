@@ -6,7 +6,9 @@
    their own (performance.now).
 
    The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
-   a crest of fire and a tail of it. */
+   a crest of fire and a tail of it.
+   The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
+   tentacles curling up behind it, suckers along them, and arms a little long. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -49,4 +51,40 @@
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+
+  // a tapered tentacle along the points pts, w0 wide at the root, curling at the tip, with suckers on one side
+  const tentacle = (c, d, pts, w0, col, suck) => {
+    const L = [], R = [], n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], m = Math.hypot(dx, dy) || 1, w = w0 * (1 - i / n * .85);
+      L.push([pts[i][0] - dy / m * w, pts[i][1] + dx / m * w]); R.push([pts[i][0] + dy / m * w, pts[i][1] - dx / m * w]);
+    }
+    const p = new Path2D(); p.moveTo(L[0][0], L[0][1]); for (const q of L.slice(1)) p.lineTo(q[0], q[1]);
+    p.lineTo(pts[n - 1][0], pts[n - 1][1]); for (const q of R.slice().reverse()) p.lineTo(q[0], q[1]); p.closePath();
+    ink(c, p, col, 0, true);
+    if (suck) for (let i = 1; i < n - 1; i += 2) { const q = L[i], r = pts[i]; circ(c, (q[0] * 2 + r[0]) / 3, (q[1] * 2 + r[1]) / 3, Math.max(.8, w0 * .3 * (1 - i / n)), suck); }
+  };
+  // a wavy line of n points from (x, y), len long at angle a, curling by curl, swaying with the clock
+  const curve = (x, y, a, len, curl, ph, n = 9) => { const t = now(), out = []; let px = x, py = y, ang = a;
+    for (let i = 0; i < n; i++) { out.push([px, py]); ang += curl / n + Math.sin(t * 2.2 + ph + i * .6) * .07; px += Math.cos(ang) * len / n; py += Math.sin(ang) * len / n; }
+    return out; };
+  KIND.kraken = { skin: '#4a7fa8', h: 1.16, w: 1.3, eye: '#ffd84a' };
+  BODY.kraken = { foot: 'claw', musc: .5, armLen: 1.15, scales: true };
+  BACK.kraken = function (c, d) {
+    const col = d.C('#3d6c92'), suck = d.C('#e8c8a8');
+    [[-1, -2.5, 1.6], [-1, -2.0, 1.1], [1, -.64, -1.6], [1, -1.14, -1.1]].forEach(([s, a, cu], i) =>
+      tentacle(c, d, curve(s * 10, d.shY + 10, a, 64 - i % 2 * 10, cu, i * 1.9), 8, col, suck));
+  };
+  HEAD.kraken = function (c, d) {
+    const { hy, C, skin } = d, beard = C('#3d6c92'), suck = C('#e8c8a8');
+    // the beard: tentacles hanging from the jaw, swaying
+    for (let i = 0; i < 5; i++) tentacle(c, d, curve(-8 + i * 4, hy + 8, Math.PI / 2 + (i - 2) * .12, 20 + (i % 2) * 6, (i - 2) * .5, i * 1.3, 6), 3.2, beard, i % 2 ? null : suck);
+    // the mantle: a tall dome, ridged
+    ink(c, pEl(0, hy - 8, 15, 19), skin);
+    for (const k of [-6, 0, 6]) inkLine(c, [[k * .8, hy - 24], [k, hy - 2]], C(tint('#4a7fa8', -.25)), .6);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 6, hy + 1, 5, 4.4), C('#f4e9c8'), 0, true); glowEye(c, s * 6, hy + 1, 2.8, d.eye, d.st); if (!d.st) { c.fillStyle = INK; c.fillRect(s * 6 - 2.4, hy + .6, 4.8, 1); } }
+    inkLine(c, [[-10, hy - 4], [-3, hy - 2.5]], INK, .9); inkLine(c, [[10, hy - 4], [3, hy - 2.5]], INK, .9);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.kraken = 'Kraken';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.kraken = 'log';
 })();

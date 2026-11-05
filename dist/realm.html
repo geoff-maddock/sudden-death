@@ -2747,13 +2747,13 @@ function playerTurnStart() {
   const P = B.P;
   skyTick();
   B.turn++; B.phase = 'player';
+  // block drains, unless the ice or bedrock keeps it (before turnStart, so Block a hook gives this turn stays)
+  if (!sv(P, 'barricade') && B.turn > 1) P.block = B.sport === 'hockey' ? Math.floor(P.block / 2) : 0;
   fire('turnStart'); B.atkCount = 0; B.firstAtk = false; B.hits = {}; B.outThisTurn = {}; B.killsThisTurn = 0; B.aliveAtTurnStart = alive().length;
   B.cardsThisTurn = 0; B.lastType = null; B.freeAtk = false; B.tt = { atk: 0, skl: 0, pow: 0, blk: 0, top: 0, dmg: 0 };
   delete P.st.hot; delete P.st.oop; delete P.st.double; delete P.st.called;
   sportTurnStart();
   if (sv(P, 'intang')) addSt(P, 'intang', -1);
-  // block drains, unless the ice or bedrock keeps it
-  if (!sv(P, 'barricade') && B.turn > 1) P.block = B.sport === 'hockey' ? Math.floor(P.block / 2) : 0;
   // the Ash Baron runs the clock: a new quarter every three turns
   const baron = B.enemies.find(e => e.id === 'baron' && !e.dead);
   if (baron && B.turn > 1 && (B.turn - 1) % 3 === 0) {
@@ -21221,6 +21221,14 @@ ULT.sunfire = { kind: 'phoenix', role: 'bat', name: 'Sunfire', desc: 'The sky ca
 AB.sunfire = { name: '★ ' + ULT.sunfire.name, type: 'ult', role: ULT.sunfire.role, cost: ULT_COST, ult: true, desc: ULT.sunfire.desc };
 ULT_BY_KIND.phoenix = 'sunfire';
 MOON_KIND.phoenix = [4, ['spd', 'pow']];
+
+/* The Kraken: a first baseman with a long reach and a sticky bat (suckers on the barrel), slow on the bases; its
+   ultimate Eight Arms sends tentacles up through the basepaths to grab the runners (the Grave Hands' grab). */
+TEMPL.kraken = { n: 'Deepmaw', kind: 'kraken', race: 'Kraken', pos: '1B', num: 8, hand: 'L', pow: 8, con: 6, spd: 3, arm: 7, fld: 9, wpn: 'log', bat: 'sticky', run: null, field: null, flav: 'Has never dropped a throw. Has never given one back, either.' };
+ULT.eightarms = { kind: 'kraken', role: 'field', name: 'Eight Arms', desc: 'Tentacles reach up through the basepaths and grab at every runner who passes.', zone: { shape: 'paths', grab: .5, vis: 'hands' } };
+AB.eightarms = { name: '★ ' + ULT.eightarms.name, type: 'ult', role: ULT.eightarms.role, cost: ULT_COST, ult: true, desc: ULT.eightarms.desc };
+ULT_BY_KIND.kraken = 'eightarms';
+MOON_KIND.kraken = [2, ['fld', 'pow']];
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -21229,7 +21237,9 @@ MOON_KIND.phoenix = [4, ['spd', 'pow']];
    their own (performance.now).
 
    The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
-   a crest of fire and a tail of it. */
+   a crest of fire and a tail of it.
+   The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
+   tentacles curling up behind it, suckers along them, and arms a little long. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -21272,6 +21282,42 @@ MOON_KIND.phoenix = [4, ['spd', 'pow']];
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+
+  // a tapered tentacle along the points pts, w0 wide at the root, curling at the tip, with suckers on one side
+  const tentacle = (c, d, pts, w0, col, suck) => {
+    const L = [], R = [], n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], m = Math.hypot(dx, dy) || 1, w = w0 * (1 - i / n * .85);
+      L.push([pts[i][0] - dy / m * w, pts[i][1] + dx / m * w]); R.push([pts[i][0] + dy / m * w, pts[i][1] - dx / m * w]);
+    }
+    const p = new Path2D(); p.moveTo(L[0][0], L[0][1]); for (const q of L.slice(1)) p.lineTo(q[0], q[1]);
+    p.lineTo(pts[n - 1][0], pts[n - 1][1]); for (const q of R.slice().reverse()) p.lineTo(q[0], q[1]); p.closePath();
+    ink(c, p, col, 0, true);
+    if (suck) for (let i = 1; i < n - 1; i += 2) { const q = L[i], r = pts[i]; circ(c, (q[0] * 2 + r[0]) / 3, (q[1] * 2 + r[1]) / 3, Math.max(.8, w0 * .3 * (1 - i / n)), suck); }
+  };
+  // a wavy line of n points from (x, y), len long at angle a, curling by curl, swaying with the clock
+  const curve = (x, y, a, len, curl, ph, n = 9) => { const t = now(), out = []; let px = x, py = y, ang = a;
+    for (let i = 0; i < n; i++) { out.push([px, py]); ang += curl / n + Math.sin(t * 2.2 + ph + i * .6) * .07; px += Math.cos(ang) * len / n; py += Math.sin(ang) * len / n; }
+    return out; };
+  KIND.kraken = { skin: '#4a7fa8', h: 1.16, w: 1.3, eye: '#ffd84a' };
+  BODY.kraken = { foot: 'claw', musc: .5, armLen: 1.15, scales: true };
+  BACK.kraken = function (c, d) {
+    const col = d.C('#3d6c92'), suck = d.C('#e8c8a8');
+    [[-1, -2.5, 1.6], [-1, -2.0, 1.1], [1, -.64, -1.6], [1, -1.14, -1.1]].forEach(([s, a, cu], i) =>
+      tentacle(c, d, curve(s * 10, d.shY + 10, a, 64 - i % 2 * 10, cu, i * 1.9), 8, col, suck));
+  };
+  HEAD.kraken = function (c, d) {
+    const { hy, C, skin } = d, beard = C('#3d6c92'), suck = C('#e8c8a8');
+    // the beard: tentacles hanging from the jaw, swaying
+    for (let i = 0; i < 5; i++) tentacle(c, d, curve(-8 + i * 4, hy + 8, Math.PI / 2 + (i - 2) * .12, 20 + (i % 2) * 6, (i - 2) * .5, i * 1.3, 6), 3.2, beard, i % 2 ? null : suck);
+    // the mantle: a tall dome, ridged
+    ink(c, pEl(0, hy - 8, 15, 19), skin);
+    for (const k of [-6, 0, 6]) inkLine(c, [[k * .8, hy - 24], [k, hy - 2]], C(tint('#4a7fa8', -.25)), .6);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 6, hy + 1, 5, 4.4), C('#f4e9c8'), 0, true); glowEye(c, s * 6, hy + 1, 2.8, d.eye, d.st); if (!d.st) { c.fillStyle = INK; c.fillRect(s * 6 - 2.4, hy + .6, 4.8, 1); } }
+    inkLine(c, [[-10, hy - 4], [-3, hy - 2.5]], INK, .9); inkLine(c, [[10, hy - 4], [3, hy - 2.5]], INK, .9);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.kraken = 'Kraken';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.kraken = 'log';
 })();
 
 /* the end of the wBD scope: what the Realm may call (w20-diamond.js, w20d-ballgame.js). gameOver, showMenu and exhSnap
@@ -23733,6 +23779,16 @@ GF_POW.phoenix = [{ id: 'blaze', n: 'Blaze', cost: 1, fits: 'run', desc: 'The ca
 GF_ULT.phoenix = { id: 'rebirth', n: 'Rebirth', role: 'off', desc: 'The phoenix\'s side rises from the ashes: 8 stamina back for all seven each play it lasts, and the defense wades through fire, 5% slower.', zone: { dSpd: .95 }, restZ: 8, vis: ['#ff8a3c', 'all'] };
 for (const p of GF_POW.phoenix) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.phoenix.id] = GF_ULT.phoenix;
+
+/* The Kraken: slow, strong, sure hands and a tackler who doesn't let go. Long Reach on offense (catches far surer),
+   Grasp on defense (every tackle try surer), and Eight Arms: tentacles across the field, tackles surer still and the
+   carrier slowed. */
+GF_KIND.kraken = [4, 8, 9, 6, 4, 8];
+GF_POW.kraken = [{ id: 'longreach', n: 'Long Reach', cost: 1, fits: 'pass', desc: 'Eight arms for the ball: the receiver catches far more of what comes near.', fx: { catch: .12 } },
+  { id: 'grasp', n: 'Grasp', cost: 1, fits: 'run', desc: 'Tentacles along the line: every tackle try is surer.', fx: { tkl: .12 } }];
+GF_ULT.kraken = { id: 'eightarms', n: 'Eight Arms', role: 'def', desc: 'Tentacles across the whole field: every tackle surer, and the ball carrier 12% slower.', zone: { tkl: .15, cSpd: .88 }, vis: ['#2f8f96', 'all'] };
+for (const p of GF_POW.kraken) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.kraken.id] = GF_ULT.kraken;
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -23741,7 +23797,9 @@ GF_ULT_BY[GF_ULT.phoenix.id] = GF_ULT.phoenix;
    their own (performance.now).
 
    The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
-   a crest of fire and a tail of it. */
+   a crest of fire and a tail of it.
+   The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
+   tentacles curling up behind it, suckers along them, and arms a little long. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -23784,6 +23842,42 @@ GF_ULT_BY[GF_ULT.phoenix.id] = GF_ULT.phoenix;
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+
+  // a tapered tentacle along the points pts, w0 wide at the root, curling at the tip, with suckers on one side
+  const tentacle = (c, d, pts, w0, col, suck) => {
+    const L = [], R = [], n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], m = Math.hypot(dx, dy) || 1, w = w0 * (1 - i / n * .85);
+      L.push([pts[i][0] - dy / m * w, pts[i][1] + dx / m * w]); R.push([pts[i][0] + dy / m * w, pts[i][1] - dx / m * w]);
+    }
+    const p = new Path2D(); p.moveTo(L[0][0], L[0][1]); for (const q of L.slice(1)) p.lineTo(q[0], q[1]);
+    p.lineTo(pts[n - 1][0], pts[n - 1][1]); for (const q of R.slice().reverse()) p.lineTo(q[0], q[1]); p.closePath();
+    ink(c, p, col, 0, true);
+    if (suck) for (let i = 1; i < n - 1; i += 2) { const q = L[i], r = pts[i]; circ(c, (q[0] * 2 + r[0]) / 3, (q[1] * 2 + r[1]) / 3, Math.max(.8, w0 * .3 * (1 - i / n)), suck); }
+  };
+  // a wavy line of n points from (x, y), len long at angle a, curling by curl, swaying with the clock
+  const curve = (x, y, a, len, curl, ph, n = 9) => { const t = now(), out = []; let px = x, py = y, ang = a;
+    for (let i = 0; i < n; i++) { out.push([px, py]); ang += curl / n + Math.sin(t * 2.2 + ph + i * .6) * .07; px += Math.cos(ang) * len / n; py += Math.sin(ang) * len / n; }
+    return out; };
+  KIND.kraken = { skin: '#4a7fa8', h: 1.16, w: 1.3, eye: '#ffd84a' };
+  BODY.kraken = { foot: 'claw', musc: .5, armLen: 1.15, scales: true };
+  BACK.kraken = function (c, d) {
+    const col = d.C('#3d6c92'), suck = d.C('#e8c8a8');
+    [[-1, -2.5, 1.6], [-1, -2.0, 1.1], [1, -.64, -1.6], [1, -1.14, -1.1]].forEach(([s, a, cu], i) =>
+      tentacle(c, d, curve(s * 10, d.shY + 10, a, 64 - i % 2 * 10, cu, i * 1.9), 8, col, suck));
+  };
+  HEAD.kraken = function (c, d) {
+    const { hy, C, skin } = d, beard = C('#3d6c92'), suck = C('#e8c8a8');
+    // the beard: tentacles hanging from the jaw, swaying
+    for (let i = 0; i < 5; i++) tentacle(c, d, curve(-8 + i * 4, hy + 8, Math.PI / 2 + (i - 2) * .12, 20 + (i % 2) * 6, (i - 2) * .5, i * 1.3, 6), 3.2, beard, i % 2 ? null : suck);
+    // the mantle: a tall dome, ridged
+    ink(c, pEl(0, hy - 8, 15, 19), skin);
+    for (const k of [-6, 0, 6]) inkLine(c, [[k * .8, hy - 24], [k, hy - 2]], C(tint('#4a7fa8', -.25)), .6);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 6, hy + 1, 5, 4.4), C('#f4e9c8'), 0, true); glowEye(c, s * 6, hy + 1, 2.8, d.eye, d.st); if (!d.st) { c.fillStyle = INK; c.fillRect(s * 6 - 2.4, hy + .6, 4.8, 1); } }
+    inkLine(c, [[-10, hy - 4], [-3, hy - 2.5]], INK, .9); inkLine(c, [[10, hy - 4], [3, hy - 2.5]], INK, .9);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.kraken = 'Kraken';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.kraken = 'log';
 })();
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
@@ -25668,6 +25762,15 @@ BX_POW.phoenix = {
   sp: { id: 'flare', n: 'Flare', when: 'mid', desc: 'A burst of fire through the guard (6), and they flinch for half a second.', now: { dmg: 6, stun: .5 } },
   ult: { id: 'sunfire', n: 'Sunfire', when: 'hurt', desc: 'Burns bright: 18 health back, and 25% quicker for 5 seconds.', now: { hp: 18 }, fx: { who: 'self', t: 5, spd: 1.25 } },
 };
+
+/* The Kraken: the longest reach in the ring, slowish feet and a good chin; its nature is Eight Arms, a jab that lands from much
+   further away. It grabs from range (rooted) and, once a bout, throws punches with every arm at once. */
+BX_KIND.kraken = [10, 7, 5, 8, 6, 6];
+BX_TRAIT.kraken = { n: 'Eight Arms', desc: 'Its jab lands from much further away than anyone else\'s.', jabReach: .55 };
+BX_POW.kraken = {
+  sp: { id: 'grab', n: 'Tentacle Grab', when: 'mid', desc: 'A tentacle wraps round their legs from range: rooted for 2 seconds.', fx: { who: 'them', t: 2, root: 1 } },
+  ult: { id: 'eightarms', n: 'Eight Arms', when: 'mid', desc: 'Every arm at once: five punches that all land.', now: { hits: 5 } },
+};
 /* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
    gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -25676,7 +25779,9 @@ BX_POW.phoenix = {
    their own (performance.now).
 
    The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
-   a crest of fire and a tail of it. */
+   a crest of fire and a tail of it.
+   The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
+   tentacles curling up behind it, suckers along them, and arms a little long. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -25719,6 +25824,42 @@ BX_POW.phoenix = {
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+
+  // a tapered tentacle along the points pts, w0 wide at the root, curling at the tip, with suckers on one side
+  const tentacle = (c, d, pts, w0, col, suck) => {
+    const L = [], R = [], n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], m = Math.hypot(dx, dy) || 1, w = w0 * (1 - i / n * .85);
+      L.push([pts[i][0] - dy / m * w, pts[i][1] + dx / m * w]); R.push([pts[i][0] + dy / m * w, pts[i][1] - dx / m * w]);
+    }
+    const p = new Path2D(); p.moveTo(L[0][0], L[0][1]); for (const q of L.slice(1)) p.lineTo(q[0], q[1]);
+    p.lineTo(pts[n - 1][0], pts[n - 1][1]); for (const q of R.slice().reverse()) p.lineTo(q[0], q[1]); p.closePath();
+    ink(c, p, col, 0, true);
+    if (suck) for (let i = 1; i < n - 1; i += 2) { const q = L[i], r = pts[i]; circ(c, (q[0] * 2 + r[0]) / 3, (q[1] * 2 + r[1]) / 3, Math.max(.8, w0 * .3 * (1 - i / n)), suck); }
+  };
+  // a wavy line of n points from (x, y), len long at angle a, curling by curl, swaying with the clock
+  const curve = (x, y, a, len, curl, ph, n = 9) => { const t = now(), out = []; let px = x, py = y, ang = a;
+    for (let i = 0; i < n; i++) { out.push([px, py]); ang += curl / n + Math.sin(t * 2.2 + ph + i * .6) * .07; px += Math.cos(ang) * len / n; py += Math.sin(ang) * len / n; }
+    return out; };
+  KIND.kraken = { skin: '#4a7fa8', h: 1.16, w: 1.3, eye: '#ffd84a' };
+  BODY.kraken = { foot: 'claw', musc: .5, armLen: 1.15, scales: true };
+  BACK.kraken = function (c, d) {
+    const col = d.C('#3d6c92'), suck = d.C('#e8c8a8');
+    [[-1, -2.5, 1.6], [-1, -2.0, 1.1], [1, -.64, -1.6], [1, -1.14, -1.1]].forEach(([s, a, cu], i) =>
+      tentacle(c, d, curve(s * 10, d.shY + 10, a, 64 - i % 2 * 10, cu, i * 1.9), 8, col, suck));
+  };
+  HEAD.kraken = function (c, d) {
+    const { hy, C, skin } = d, beard = C('#3d6c92'), suck = C('#e8c8a8');
+    // the beard: tentacles hanging from the jaw, swaying
+    for (let i = 0; i < 5; i++) tentacle(c, d, curve(-8 + i * 4, hy + 8, Math.PI / 2 + (i - 2) * .12, 20 + (i % 2) * 6, (i - 2) * .5, i * 1.3, 6), 3.2, beard, i % 2 ? null : suck);
+    // the mantle: a tall dome, ridged
+    ink(c, pEl(0, hy - 8, 15, 19), skin);
+    for (const k of [-6, 0, 6]) inkLine(c, [[k * .8, hy - 24], [k, hy - 2]], C(tint('#4a7fa8', -.25)), .6);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 6, hy + 1, 5, 4.4), C('#f4e9c8'), 0, true); glowEye(c, s * 6, hy + 1, 2.8, d.eye, d.st); if (!d.st) { c.fillStyle = INK; c.fillRect(s * 6 - 2.4, hy + .6, 4.8, 1); } }
+    inkLine(c, [[-10, hy - 4], [-3, hy - 2.5]], INK, .9); inkLine(c, [[10, hy - 4], [3, hy - 2.5]], INK, .9);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.kraken = 'Kraken';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.kraken = 'log';
 })();
 /* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
@@ -33484,7 +33625,9 @@ renderHelp = function () {
    their own (performance.now).
 
    The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
-   a crest of fire and a tail of it. */
+   a crest of fire and a tail of it.
+   The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
+   tentacles curling up behind it, suckers along them, and arms a little long. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -33527,6 +33670,42 @@ renderHelp = function () {
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+
+  // a tapered tentacle along the points pts, w0 wide at the root, curling at the tip, with suckers on one side
+  const tentacle = (c, d, pts, w0, col, suck) => {
+    const L = [], R = [], n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], m = Math.hypot(dx, dy) || 1, w = w0 * (1 - i / n * .85);
+      L.push([pts[i][0] - dy / m * w, pts[i][1] + dx / m * w]); R.push([pts[i][0] + dy / m * w, pts[i][1] - dx / m * w]);
+    }
+    const p = new Path2D(); p.moveTo(L[0][0], L[0][1]); for (const q of L.slice(1)) p.lineTo(q[0], q[1]);
+    p.lineTo(pts[n - 1][0], pts[n - 1][1]); for (const q of R.slice().reverse()) p.lineTo(q[0], q[1]); p.closePath();
+    ink(c, p, col, 0, true);
+    if (suck) for (let i = 1; i < n - 1; i += 2) { const q = L[i], r = pts[i]; circ(c, (q[0] * 2 + r[0]) / 3, (q[1] * 2 + r[1]) / 3, Math.max(.8, w0 * .3 * (1 - i / n)), suck); }
+  };
+  // a wavy line of n points from (x, y), len long at angle a, curling by curl, swaying with the clock
+  const curve = (x, y, a, len, curl, ph, n = 9) => { const t = now(), out = []; let px = x, py = y, ang = a;
+    for (let i = 0; i < n; i++) { out.push([px, py]); ang += curl / n + Math.sin(t * 2.2 + ph + i * .6) * .07; px += Math.cos(ang) * len / n; py += Math.sin(ang) * len / n; }
+    return out; };
+  KIND.kraken = { skin: '#4a7fa8', h: 1.16, w: 1.3, eye: '#ffd84a' };
+  BODY.kraken = { foot: 'claw', musc: .5, armLen: 1.15, scales: true };
+  BACK.kraken = function (c, d) {
+    const col = d.C('#3d6c92'), suck = d.C('#e8c8a8');
+    [[-1, -2.5, 1.6], [-1, -2.0, 1.1], [1, -.64, -1.6], [1, -1.14, -1.1]].forEach(([s, a, cu], i) =>
+      tentacle(c, d, curve(s * 10, d.shY + 10, a, 64 - i % 2 * 10, cu, i * 1.9), 8, col, suck));
+  };
+  HEAD.kraken = function (c, d) {
+    const { hy, C, skin } = d, beard = C('#3d6c92'), suck = C('#e8c8a8');
+    // the beard: tentacles hanging from the jaw, swaying
+    for (let i = 0; i < 5; i++) tentacle(c, d, curve(-8 + i * 4, hy + 8, Math.PI / 2 + (i - 2) * .12, 20 + (i % 2) * 6, (i - 2) * .5, i * 1.3, 6), 3.2, beard, i % 2 ? null : suck);
+    // the mantle: a tall dome, ridged
+    ink(c, pEl(0, hy - 8, 15, 19), skin);
+    for (const k of [-6, 0, 6]) inkLine(c, [[k * .8, hy - 24], [k, hy - 2]], C(tint('#4a7fa8', -.25)), .6);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 6, hy + 1, 5, 4.4), C('#f4e9c8'), 0, true); glowEye(c, s * 6, hy + 1, 2.8, d.eye, d.st); if (!d.st) { c.fillStyle = INK; c.fillRect(s * 6 - 2.4, hy + .6, 4.8, 1); } }
+    inkLine(c, [[-10, hy - 4], [-3, hy - 2.5]], INK, .9); inkLine(c, [[10, hy - 4], [3, hy - 2.5]], INK, .9);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.kraken = 'Kraken';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.kraken = 'log';
 })();
 /* w58: meeting and signing a superstar (issue #24, phase 2). A superstar that is built (W_STARS entry with a kind,
    added by its own part: w59 for the Phoenix) is met through someone who knows where it is: ask them about it by
@@ -33655,6 +33834,61 @@ renderHelp = function () {
   wW59RenderHelp();
   const after = $('wHelpStars'); if (!after || $('wHelpPhoenix')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPhoenix"><b>The Phoenix.</b> Win the Cinder Cup on any journey to unlock it. Then ask Ash Peregrine, the scout in Cinderhold, about the PHOENIX: it signs for ${W_PHX.price.gold} gold or ${W_PHX.price.items.cinderegg} Cinder Eggs. Its power is Rebirth. In a card-game match, while it starts, the first time Team HP would fall to 0 you are back at ${Math.round(W_PHX.reborn * 100)}% of your max HP instead. In the ring it beats one count it would have lost, once a bout. On the gridiron its ultimate gives its side stamina back. On the diamond its ultimate, Sunfire, makes fly balls carry further. As captain it heals 5 HP at kickoff.</p>`);
+};
+/* w60: the Kraken (issue #24, phase 3), the second superstar. Its drawing is in src/realm/stars/s1-figures.js; its
+   ratings and powers in each engine in src/realm/ring/r0-stars.js (boxing: the Eight Arms nature, a jab from much
+   further away), src/realm/gridiron/g0-stars.js and src/realm/diamond/d1-stars.js (the Eight Arms ultimates). Here:
+   - Cards: a signature card (Tentacle Grab) and five of its own kind.
+   - Eight Arms, in the card game: while the Kraken starts, at the start of each of your turns a tentacle lashes a
+     random enemy for W_KRK.lash and catches W_KRK.catch Block for you (the turnStart hook).
+   - Captain: Ink Cloud, 6 Block at kickoff and one enemy Weak for two turns.
+   - Meeting: Ysolde Wrack, the salvage diver in Saltmere, has seen it; ask about the KRAKEN. Its price is
+     W_KRK.price: gold, or Brine Eggs from the Brinefen's nests.
+   Unlocked by winning the Rimewatch cup (w57). Also How to play (#wHelpKraken, after the Phoenix's). */
+
+const W_KRK = { lash: 3, catch: 3, price: { gold: 300, items: { brineegg: 2 } } };
+Object.assign(wStar('kraken'), {
+  kind: 'kraken', name: 'Deepmaw', num: 8,
+  flav: 'Came up out of the deep water off Saltmere and asked, very politely, for a game.',
+  meet: { who: 'diver', topic: 'kraken', price: W_KRK.price, where: 'Meet them: ask Ysolde Wrack, the diver in Saltmere, about the KRAKEN.',
+    rumour: 'Ysolde wrings out her hair. "Out past the drowned hatchery there is something with more arms than I can count, and it watches the matches from the water. It only comes in for a team that has won the cup at Rimewatch. Win that, on any journey, and I will row you out."',
+    hello: 'Ysolde rows you out past the hatchery at slack tide. The water bulges, and a head the size of a boat rises, gold-eyed, with arms enough for a whole team.',
+    ask: 'It will play for you, for a price: gold for the League\'s books, or two Brine Eggs, which it misses.' },
+});
+FA_NAMES.kraken = ['Deepmaw'];
+FA_SCOUT.kraken = ['Huge reach, slow to turn, and nothing it catches gets away.'];
+
+/* ---------- cards ---------- */
+K('krk_grab', 'Tentacle Grab', 'kraken', 'atk', 1, 's', 'one', [['d', 5], ['s', 'weak', 2]], { fl: 'It gets a hold of you from across the field.', sport: 'football' });
+K('krk_slam', 'Tentacle Slam', 'kraken', 'atk', 1, 'c', 'one', [['d', 8]], { sport: 'hockey' });
+K('krk_ink', 'Ink Cloud', 'kraken', 'skl', 1, 'c', 'self', [['b', 8]], { fl: 'Where did it go? Where did the ball go?', sport: 'soccer' });
+K('krk_depths', 'From the Depths', 'kraken', 'skl', 1, 'u', 'self', [['b', 6], ['draw', 2]]);
+K('krk_coil', 'Constrict', 'kraken', 'atk', 2, 'u', 'one', [['d', 7], ['s', 'stun', 1]], { sport: 'football' });
+K('krk_eight', 'Eight Arms', 'kraken', 'atk', 2, 'r', 'one', [['d', 2, 8]], { fl: 'One for each.' });
+SIG.kraken = 'krk_grab';
+
+/* ---------- Eight Arms, in the card game ---------- */
+function wKrkStarts() { return !!(WG && RUN && wStarters().some(p => p.kind === 'kraken')); }
+onHook('turnStart', () => {
+  if (!B || !wKrkStarts()) return;
+  const foes = alive(); if (!foes.length) return;
+  const e = pick(foes); hurtEnemy(e, W_KRK.lash, { raw: true, src: 'Eight Arms' }); gainBlock(W_KRK.catch, true);
+  log(`Eight Arms: a tentacle lashes ${e.n} for ${W_KRK.lash} and catches ${W_KRK.catch} Block.`, 'good');
+});
+W_CAPTAIN.kraken = { n: 'Ink Cloud', d: '6 Block at kickoff, and one enemy starts Weak for two turns.', on: { fightStart: () => { B.P.block += 6; const e = pick(alive()); if (e) addSt(e, 'weak', 2); } } };
+
+/* ---------- the meeting: Ysolde Wrack in Saltmere ---------- */
+(() => {
+  const S = DB.chars.diver; if (!S) return;
+  S.topics.job.t += ' And I have seen a KRAKEN out past the hatchery.';
+  S.topics.kraken = { t: 'The thing out past the hatchery. Sit down.', act: 'star:kraken' };
+})();
+
+const wW60RenderHelp = renderHelp;
+renderHelp = function () {
+  wW60RenderHelp();
+  const after = $('wHelpPhoenix') || $('wHelpStars'); if (!after || $('wHelpKraken')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpKraken"><b>The Kraken.</b> Win the Rimewatch cup on any journey to unlock it. Then ask Ysolde Wrack, the diver in Saltmere, about the KRAKEN: it signs for ${W_KRK.price.gold} gold or ${W_KRK.price.items.brineegg} Brine Eggs. Its power is Eight Arms. In a card-game match, while it starts, a tentacle hits a random enemy for ${W_KRK.lash} at the start of each of your turns and catches you ${W_KRK.catch} Block. In the ring its jab lands from much further away. On the gridiron and the diamond its ultimate reaches across the field: surer tackles, or runners grabbed on the basepaths. As captain it gives 6 Block and a Weak enemy at kickoff.</p>`);
 };
 </script>
 </body></html>

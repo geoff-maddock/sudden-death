@@ -89,3 +89,4 @@ src/realm/w57-stars.js
 src/realm/stars/s1-figures.js
 src/realm/w58-starsign.js
 src/realm/w59-phoenix.js
+src/realm/w60-kraken.js

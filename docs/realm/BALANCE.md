@@ -493,3 +493,16 @@ kind's ratings, both CPU Knights, 300 bouts a kind, sides swapped (a draw counts
 The best kind in the ring by about four points, with Rebirth (one lost count beaten a bout). The card game's Rebirth
 (30% of max HP once a match), football and baseball are measured in phase 4 with the realm, gridiron and diamond labs.
 
+### The Kraken in the ring (issue #24, phase 3)
+
+Same round robin (300 bouts a kind):
+
+| Kraken ratings (reach, pow, spd, chin, sta, gui) | Kraken | Best league kind |
+|---|---|---|
+| 10, 7, 3, 7, 6, 5 (first try) | 42.5% | 59.2% |
+| 10, 7, 5, 7, 6, 6 | 56.7% | 58.8% |
+| 10, 8, 5, 7, 6, 6 | 66.1% | 58.4% |
+| **10, 7, 5, 8, 6, 6 (shipped)** | **61.3%** | 58.7% |
+
+Speed matters most: at 3 the longest reach in the ring could not make up for it. Shipped just under the Phoenix (63%).
+

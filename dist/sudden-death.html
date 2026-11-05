@@ -2212,13 +2212,13 @@ function playerTurnStart() {
   const P = B.P;
   skyTick();
   B.turn++; B.phase = 'player';
+  // block drains, unless the ice or bedrock keeps it (before turnStart, so Block a hook gives this turn stays)
+  if (!sv(P, 'barricade') && B.turn > 1) P.block = B.sport === 'hockey' ? Math.floor(P.block / 2) : 0;
   fire('turnStart'); B.atkCount = 0; B.firstAtk = false; B.hits = {}; B.outThisTurn = {}; B.killsThisTurn = 0; B.aliveAtTurnStart = alive().length;
   B.cardsThisTurn = 0; B.lastType = null; B.freeAtk = false; B.tt = { atk: 0, skl: 0, pow: 0, blk: 0, top: 0, dmg: 0 };
   delete P.st.hot; delete P.st.oop; delete P.st.double; delete P.st.called;
   sportTurnStart();
   if (sv(P, 'intang')) addSt(P, 'intang', -1);
-  // block drains, unless the ice or bedrock keeps it
-  if (!sv(P, 'barricade') && B.turn > 1) P.block = B.sport === 'hockey' ? Math.floor(P.block / 2) : 0;
   // the Ash Baron runs the clock: a new quarter every three turns
   const baron = B.enemies.find(e => e.id === 'baron' && !e.dead);
   if (baron && B.turn > 1 && (B.turn - 1) % 3 === 0) {

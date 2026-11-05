@@ -9,3 +9,11 @@ ULT.sunfire = { kind: 'phoenix', role: 'bat', name: 'Sunfire', desc: 'The sky ca
 AB.sunfire = { name: '★ ' + ULT.sunfire.name, type: 'ult', role: ULT.sunfire.role, cost: ULT_COST, ult: true, desc: ULT.sunfire.desc };
 ULT_BY_KIND.phoenix = 'sunfire';
 MOON_KIND.phoenix = [4, ['spd', 'pow']];
+
+/* The Kraken: a first baseman with a long reach and a sticky bat (suckers on the barrel), slow on the bases; its
+   ultimate Eight Arms sends tentacles up through the basepaths to grab the runners (the Grave Hands' grab). */
+TEMPL.kraken = { n: 'Deepmaw', kind: 'kraken', race: 'Kraken', pos: '1B', num: 8, hand: 'L', pow: 8, con: 6, spd: 3, arm: 7, fld: 9, wpn: 'log', bat: 'sticky', run: null, field: null, flav: 'Has never dropped a throw. Has never given one back, either.' };
+ULT.eightarms = { kind: 'kraken', role: 'field', name: 'Eight Arms', desc: 'Tentacles reach up through the basepaths and grab at every runner who passes.', zone: { shape: 'paths', grab: .5, vis: 'hands' } };
+AB.eightarms = { name: '★ ' + ULT.eightarms.name, type: 'ult', role: ULT.eightarms.role, cost: ULT_COST, ult: true, desc: ULT.eightarms.desc };
+ULT_BY_KIND.kraken = 'eightarms';
+MOON_KIND.kraken = [2, ['fld', 'pow']];
