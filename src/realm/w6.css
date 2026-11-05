@@ -353,3 +353,10 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wgtip .wgnote{color:var(--dim)}
 .wgline td.wgbad{color:#e8a08f;font-weight:700}
 .wgbook td{text-align:left;vertical-align:top;font-size:14px}
+.wstars{list-style:none;margin:8px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.wstar{display:flex;gap:10px;align-items:flex-start;padding:8px;border:1px solid var(--seam);border-radius:6px;color:var(--dim)}
+.wstar.won{border-color:var(--torch)}
+.wstar>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wstar small{display:block}
+.wstsil{flex:none;width:56px;height:56px;color:#3a332c;filter:drop-shadow(0 0 1px var(--seam))}
+.wstn{display:flex;gap:6px;align-items:center}
