@@ -506,3 +506,21 @@ Same round robin (300 bouts a kind):
 
 Speed matters most: at 3 the longest reach in the ring could not make up for it. Shipped just under the Phoenix (63%).
 
+### The Behemoth in the ring (issue #24, phase 3)
+
+Same round robin, from here on against the 18 league kinds only (a superstar against a superstar is left out, so each
+number stays comparable as more are added; the Phoenix and the Kraken measure 63.1% and 62.3% that way):
+
+| Behemoth ratings (reach, pow, spd, chin, sta, gui), Living Wall | Behemoth |
+|---|---|
+| 6, 9, 3, 9, 7, 3, hollow .7 (first try, field included the other superstars) | 84.2% |
+| 6, 8, 2, 8, 6, 3, hollow .8 | 66.3% |
+| 6, 8, 2, 7, 6, 3 | 56.3% |
+| 6, 7, 2, 8, 6, 3 | 59.0% |
+| 6, 8, 2, 8, 5, 3 | 58.7% |
+| 6, 8, 2, 8, 6, 3, hollow .85 | 65.0% |
+| **6, 8, 1, 8, 6, 3, hollow .8 (shipped)** | **63.5%** |
+
+Chin is the steepest rating for a big kind (a point is about ten points of win rate); Living Wall's strength barely
+matters. Shipped level with the other two.
+

@@ -8,7 +8,9 @@
    The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
    a crest of fire and a tail of it.
    The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
-   tentacles curling up behind it, suckers along them, and arms a little long. */
+   tentacles curling up behind it, suckers along them, and arms a little long.
+   The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
+   hump of moss-grown plates with flowers in it. */
 (() => {
   if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
@@ -87,4 +89,33 @@
   };
   if (typeof KIND_NAME !== 'undefined') KIND_NAME.kraken = 'Kraken';
   if (typeof KIND_WPN !== 'undefined') KIND_WPN.kraken = 'log';
+
+  // a little five-petal flower
+  const flower = (c, d, x, y, r, col) => { for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; circ(c, x + Math.cos(a) * r, y + Math.sin(a) * r, r * .75, col); } circ(c, x, y, r * .55, d.C('#ffe27a')); };
+  KIND.behemoth = { skin: '#7a8a52', h: 1.3, w: 1.7, eye: '#ffb03a', belly: true };
+  BODY.behemoth = { foot: 'hoof', musc: 1, moss: true, shinFur: '#4f5e2c', tuft: '#5a6a32' };
+  BACK.behemoth = function (c, d) {
+    const moss = d.C('#5a6a32'), plate = d.C('#8a7a5a');
+    // the hump: plates in a ridge over the shoulders, moss on top, flowers in the moss
+    ink(c, pEl(0, d.shY - 4, d.shw + 12, 22), moss);
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 11 - 7, d.shY - 6], [i * 11, d.shY - 28 + Math.abs(i) * 5], [i * 11 + 7, d.shY - 6]]), plate);
+    for (let i = -3; i <= 3; i++) ink(c, pEl(i * 8, d.shY - 10 + Math.abs(i) * 1.5, 6, 4), moss, 0, true);
+    [[-18, -14, '#ff8ab0'], [6, -18, '#f2f2ff'], [20, -10, '#ff8ab0'], [-6, -12, '#c8a8ff']].forEach(([x, y, col]) => flower(c, d, x, d.shY + y, 2.2, d.C(col)));
+  };
+  HEAD.behemoth = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#efe2c0');
+    // horns: out from the temples, then up
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 9, hy - 6); p.quadraticCurveTo(s * 30, hy - 4, s * 30, hy - 26); p.quadraticCurveTo(s * 25, hy - 12, s * 9, hy - 1); p.closePath(); ink(c, p, bone); }
+    // a broad low head under a heavy brow
+    ink(c, pRR(-15, hy - 10, 30, 24, 10), skin);
+    ink(c, pRR(-15, hy - 11, 30, 8, 4), C(tint('#7a8a52', -.18)), 0, true);
+    ink(c, pEl(0, hy - 13, 10, 4), C('#5a6a32'), 0, true); flower(c, d, 3, hy - 14, 1.6, C('#ff8ab0'));
+    glowEye(c, -6, hy - 3, 2.1, d.eye, d.st); glowEye(c, 6, hy - 3, 2.1, d.eye, d.st);
+    // tusks up from the jaw, and nostrils
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 8, hy + 10], [s * 13, hy + 1], [s * 11, hy + 11]]), bone, 0, true);
+    for (const s of [-1, 1]) circ(c, s * 3, hy + 5, 1.2, INK);
+    inkLine(c, [[-7, hy + 10], [7, hy + 10]], INK, .7);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.behemoth = 'Behemoth';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.behemoth = 'tree';
 })();

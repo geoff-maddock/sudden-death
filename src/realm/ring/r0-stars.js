@@ -18,3 +18,12 @@ BX_POW.kraken = {
   sp: { id: 'grab', n: 'Tentacle Grab', when: 'mid', desc: 'A tentacle wraps round their legs from range: rooted for 2 seconds.', fx: { who: 'them', t: 2, root: 1 } },
   ult: { id: 'eightarms', n: 'Eight Arms', when: 'mid', desc: 'Every arm at once: five punches that all land.', now: { hits: 5 } },
 };
+
+/* The Behemoth: a wall that moves. Big power, a good chin, as slow as a golem; its nature is Living Wall, body shots sinking into
+   moss (they hurt it less and take none of its breath). It stamps (a stumble) and, once a bout, Earthquake. */
+BX_KIND.behemoth = [6, 8, 1, 8, 6, 3];
+BX_TRAIT.behemoth = { n: 'Living Wall', desc: 'Body shots sink into moss and do little: they hurt it less, and take none of its breath.', hollow: .8 };
+BX_POW.behemoth = {
+  sp: { id: 'stomp', n: 'Stomp', when: 'close', desc: 'Stamps the canvas: they stumble for a second.', now: { stun: 1 } },
+  ult: { id: 'earthquake', n: 'Earthquake', when: 'any', desc: 'The ring heaves under them: 14 through the guard, and they stagger for over a second.', now: { dmg: 14, stun: 1.3 } },
+};

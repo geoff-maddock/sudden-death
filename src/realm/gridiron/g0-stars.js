@@ -19,3 +19,13 @@ GF_POW.kraken = [{ id: 'longreach', n: 'Long Reach', cost: 1, fits: 'pass', desc
 GF_ULT.kraken = { id: 'eightarms', n: 'Eight Arms', role: 'def', desc: 'Tentacles across the whole field: every tackle surer, and the ball carrier 12% slower.', zone: { tkl: .15, cSpd: .88 }, vis: ['#2f8f96', 'all'] };
 for (const p of GF_POW.kraken) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.kraken.id] = GF_ULT.kraken;
+
+/* The Behemoth: the strongest thing on the field and the slowest. Moss Wall on offense (blocks hold, the carrier
+   pushes through), Tremor on defense (every blocker stumbles at the snap), and Earthquake: every defender knocked
+   off their feet at the snap, and the ground stays broken under them. */
+GF_KIND.behemoth = [3, 10, 4, 5, 5, 9];
+GF_POW.behemoth = [{ id: 'mosswall', n: 'Moss Wall', cost: 1, fits: 'run', desc: 'The line grows into a wall: blocks hold twice as long, and the carrier pushes through tackles.', fx: { shed: .5, cStr: 1 } },
+  { id: 'tremor', n: 'Tremor', cost: 2, fits: 'any', desc: 'A stamp at the snap: every blocker stumbles.', fx: { blkStun: .7 } }];
+GF_ULT.behemoth = { id: 'earthquake', n: 'Earthquake', role: 'off', desc: 'The field heaves at the snap: every defender goes down for two seconds, and the broken ground slows them after (5%).', now: { snapAll: 2 }, zone: { dSpd: .95 }, vis: ['#7a5a34', 'all'] };
+for (const p of GF_POW.behemoth) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.behemoth.id] = GF_ULT.behemoth;
