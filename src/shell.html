@@ -238,7 +238,7 @@ kbd{font-family:var(--hud);font-size:17px;background:var(--stone2);border:1px so
 #cv{display:block;width:100%;height:auto;aspect-ratio:960/460;touch-action:manipulation}
 .dock{display:grid;grid-template-columns:200px minmax(0,1fr) 170px;gap:10px;align-items:end;margin-top:8px;min-height:calc(var(--cw) * 1.4 + 20px)}
 @media (max-width:820px){.dock{grid-template-columns:1fr 1fr}.hand{grid-column:1/-1;order:3}}
-.me{display:grid;gap:8px;align-content:end}
+.me{display:grid;gap:8px;align-content:end;position:relative;z-index:6}
 .hpbar{position:relative;height:26px;border-radius:4px;background:#2a1712;border:1px solid #5a2a20;overflow:hidden}
 .hpbar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(#e0533a,#a8321e);transition:width .25s}
 .hpbar span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--hud);font-size:21px;line-height:1;text-shadow:0 1px 0 #000}
@@ -249,13 +249,13 @@ kbd{font-family:var(--hud);font-size:17px;background:var(--stone2);border:1px so
 .pst{display:flex;flex-wrap:wrap;gap:4px}
 .chip{font-family:var(--hud);font-size:17px;line-height:1;padding:3px 6px 1px;border-radius:3px;background:var(--stone2);border:1px solid var(--seam);cursor:help}
 .hand{display:flex;justify-content:center;align-items:flex-end;min-height:calc(var(--cw) * 1.4 + 8px);padding-top:18px;perspective:800px}
-.hand .card{margin:0 calc(var(--cw) * -.1);transition:transform .14s, box-shadow .14s;transform-origin:50% 120%}
+.hand .card{margin:0 var(--hov, calc(var(--cw) * -.1));transition:transform .14s, box-shadow .14s;transform-origin:50% 120%}
 .hand .card:hover,.hand .card.sel{transform:translateY(-22px) rotate(0deg)!important;z-index:5;box-shadow:0 10px 24px rgba(0,0,0,.6)}
 .hand .card.sel{box-shadow:0 0 0 3px var(--torch),0 10px 24px rgba(0,0,0,.6)}
 .hand .card.no{filter:grayscale(.5) brightness(.75)}
 .hand .card .key{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:var(--hud);font-size:16px;color:var(--faint)}
 .hand.wait .card{pointer-events:none;filter:brightness(.7)}
-.ctl{display:grid;gap:8px;justify-items:end}
+.ctl{display:grid;gap:8px;justify-items:end;position:relative;z-index:6}
 .piles{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .pile{font-family:var(--hud);font-size:18px;line-height:1;padding:6px 8px 4px;border:1px solid var(--seam);border-radius:4px;background:var(--stone2);cursor:pointer}
 .pile:hover{border-color:var(--torch)}
