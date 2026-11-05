@@ -85,3 +85,4 @@ src/realm/w53-ringgame.js
 src/realm/w54-ringcup.js
 src/realm/w55-ringfeel.js
 src/realm/w56-ringtab.js
+src/realm/w57-stars.js
