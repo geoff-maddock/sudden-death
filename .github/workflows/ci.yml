@@ -8,7 +8,7 @@ env:
   # The quick checks, split across the test job's shards round-robin (check i runs on shard i % SHARDS), so the
   # slow ones next to each other in the list land on different shards. A new check goes on the end of this list.
   CHECKS: >-
-    smoke tipcheck tooltip fuzz hooks traits sports pausesave practice season_goals profiles trouble forfeit
+    smoke tipcheck tooltip fuzz handfit hooks traits sports pausesave practice season_goals profiles trouble forfeit
     realm_audit realm_tiles realm_smoke realm_match realm_save realm_party realm_road realm_town realm_dungeon
     realm_cups realm_bot realm_polish realm_feel realm_ground realm_ways realm_camp realm_stats realm_bonds
     realm_league realm_diamond_source realm_journal realm_diamond realm_diamond_ratings realm_diamond_nine

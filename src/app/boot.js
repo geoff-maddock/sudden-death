@@ -20,7 +20,7 @@ function boot() {
   document.addEventListener('click', e => { const g = e.target.closest('[data-goto]'); if (g) showPage(g.dataset.goto); });
   // the Settings button (#bSound) is wired by app/settings.js, which loads after this file
   $('bNew').onclick = () => { DR.club = null; DR.picks = []; showScreen('draft'); renderDraft(); };
-  window.addEventListener('resize', () => { if (UI.view === 'fight') fitStage(); });
+  window.addEventListener('resize', () => { if (UI.view === 'fight') { fitStage(); if (B) fitHand(); } });
   renderTitle();
   requestAnimationFrame(frame);
   // fonts land after first paint; repaint the portrait caches and the screens that use them

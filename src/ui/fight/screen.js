@@ -57,6 +57,7 @@ function renderHand() {
     return cardHTML(c, { live: true, tgt: UI.sel === i ? UI.kbTarget : null, key: i < 10 ? String((i + 1) % 10) : '', cls: (UI.sel === i ? 'sel ' : '') + (canPlay(c) ? '' : 'no'), attrs: `style="transform:rotate(${rot}deg) translateY(${lift}px)" data-i="${i}"` });
   }).join('');
   h.classList.toggle('pickdisc', !!UI.disc);
+  fitHand();
   h.querySelectorAll('.card').forEach(el => {
     const i = +el.dataset.i;
     el.onclick = () => { if (UI.dragged) { UI.dragged = false; return; } selectCard(i); };
@@ -72,6 +73,14 @@ function renderHand() {
   const any = B.phase === 'player' && !B.over && B.hand.some(c => canPlay(c) && !['junk', 'curse'].includes(def(c).type));
   const be = $('bEnd'); if (be) be.classList.toggle('nudge', B.phase === 'player' && !B.over && !UI.busy && !any);
   updatePreview();
+}
+// a big hand overlaps more, so it never spills over the buttons beside it or off the screen
+function fitHand() {
+  const h = $('hand'), cards = h.querySelectorAll('.card'), n = cards.length;
+  if (!n) return;
+  const cw = cards[0].offsetWidth, room = h.clientWidth - 32; // room for the tilt of the outer cards
+  const step = n > 1 ? Math.min(cw * .8, (room - cw) / (n - 1)) : cw;
+  h.style.setProperty('--hov', n > 1 && room > 0 ? `${(step - cw) / 2}px` : '');
 }
 function updatePreview() {
   UI.why = null;
