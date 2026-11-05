@@ -98,12 +98,15 @@ function bxDown() {
   if (bxKnockdown(s) === 'tko') { bxLog(`Three knockdowns: the referee stops it.`, true); bxOver(); return; }
   const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
   BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0), 2, BX_RULES.count); BD.count = 1;
+  // Rebirth (a superstar's nature): once a bout, a count it would not beat, it beats at nine, and rises with most of its health
+  if (BD.getUp >= BX_RULES.count && (bxTrait(f) || {}).reborn && !f.reborn) { f.reborn = 1; BD.getUp = BX_RULES.count - 1; }
   bxPh('kd');
 }
 function bxRise() {
   const s = G.down, f = G.F[s], o = G.F[1 - s];
   f.hp = Math.round(f.hpMax * .55); f.hpMax = Math.max(35, f.hpMax - 6); f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
-  bxLog(`${f.n} is up at ${BD.getUp}.`);
+  if (f.reborn === 1) { f.reborn = 2; f.hpMax = Math.max(f.hpMax, 80); f.hp = Math.round(f.hpMax * .85); bxLog(`${f.n} rises from the ashes at ${BD.getUp}!`, true); bxEv('reborn', s); }
+  else bxLog(`${f.n} is up at ${BD.getUp}.`);
   // the other fighter to a neutral corner's distance, and on again
   const dx = o.x - f.x, dy = o.y - f.y, d = hyp(dx, dy) || 1;
   o.x = clamp(f.x + dx / d * 3.2, -BX_RING.rope, BX_RING.rope); o.y = clamp(f.y + dy / d * 3.2, -BX_RING.rope, BX_RING.rope);

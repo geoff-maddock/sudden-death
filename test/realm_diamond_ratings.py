@@ -48,7 +48,7 @@ async def main():
         # ---------- every kind, joining at level 5 ----------
         kinds = await pg.evaluate("""(() => Object.keys(KIND_NAME).map(kind => { const p = wMakePlayer({ kind, lvl: 5 }, 'tavern');
           return { kind, bd: p.bd, ab: ['bat', 'run', 'field', 'ult'].map(k => p.bd[k]).filter(Boolean).every(id => { const N = wBdNames(); return N.ab[id] || N.ult[id]; }) }; }))()""")
-        check(len(kinds) == 18 and all(k['bd'] for k in kinds), 'a recruit of each of the 18 kinds gets ratings', [k['kind'] for k in kinds if not k['bd']])
+        check(len(kinds) == 19 and all(k['bd'] for k in kinds), 'a recruit of each of the 18 kinds, and the Phoenix, gets ratings', [k['kind'] for k in kinds if not k['bd']])
         check(all(k['bd']['lv'] == 5 and got(k['bd']) == 4 for k in kinds), 'joining at level 5 means 4 points from levels', [(k['kind'], k['bd']['got']) for k in kinds if got(k['bd']) != 4])
         pit = sorted(k['kind'] for k in kinds if k['bd']['pos'] == 'P')
         check(pit == ['kobold', 'witch'] and all((k['bd']['pitches'] or []) for k in kinds if k['bd']['pos'] == 'P') and not any(k['bd']['pitches'] for k in kinds if k['bd']['pos'] != 'P'),

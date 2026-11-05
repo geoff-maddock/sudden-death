@@ -37,9 +37,9 @@ async def main():
         await pg.goto(REALM_URL); await pg.evaluate('localStorage.clear()')
         await pg.goto(REALM_URL); await pg.wait_for_function("typeof wBX !== 'undefined'"); await pg.evaluate(f"wBX.speed = 4; window.__setup = {SETUP}; 0")
 
-        # ---------- every kind, two powers ----------
+        # ---------- every kind, two powers (the 18 league kinds and the Phoenix, a superstar: issue #24) ----------
         bk = await pg.evaluate("(() => { const B = wBX.powerBook; return { kinds: Object.keys(B).length, all: wBX.kinds.every(k => B[k] && B[k].sp.n && B[k].sp.desc && B[k].ult.n && B[k].ult.desc), cost: wBX.powerCost }; })()")
-        check(bk['kinds'] == 18 and bk['all'] and bk['cost'] == {'sp': 8, 'ult': 15}, 'every kind has a special and an ultimate, named and described; a special costs 8 stamina, an ultimate 15', bk)
+        check(bk['kinds'] == 19 and bk['all'] and bk['cost'] == {'sp': 8, 'ult': 15}, 'every kind has a special and an ultimate, named and described; a special costs 8 stamina, an ultimate 15', bk)
 
         # ---------- each power does what its data says ----------
         each = await pg.evaluate("""(() => { const D = wBX.powerData, bad = [];
@@ -135,7 +135,7 @@ async def main():
           out.rot = [rot('zombie'), rot('elf')];
           return { out, book: Object.keys(wBX.traits).length }; })()""")
         o = nt['out']
-        check(nt['book'] == 11 and abs(o['reach'] - .3) < .01 and o['stick'] == {'halt': True, 'held': True}, 'Long Arms: the spider\'s jab reaches further, and a landed jab stops a fighter coming forward', o)
+        check(nt['book'] == 12 and abs(o['reach'] - .3) < .01 and o['stick'] == {'halt': True, 'held': True}, 'Long Arms: the spider\'s jab reaches further, and a landed jab stops a fighter coming forward', o)
         check(o['hollow'][0][0] < o['hollow'][1][0] * .9 and o['hollow'][0][1] == 0 and o['hollow'][1][1] > 0, 'Hollow: a body shot hurts a skeleton less and takes none of its breath', o['hollow'])
         check(o['ctr']['lich'] > o['ctr']['plain'] * 1.15 and o['ctr']['minotaur'] > o['ctr']['plain'] * 1.15, 'Cold Read: a lich counters harder; Charges In: a minotaur takes counters harder', o['ctr'])
         check(o['wind'] == [True, True], 'Second Wind: once a bout, badly hurt, a werewolf gets its breath back', o['wind'])
@@ -208,7 +208,7 @@ async def main():
         await pg.evaluate("wBX.pause(false)")
         await pg.evaluate("showPage('help')")
         hp = await pg.evaluate("({ rows: document.querySelectorAll('.wrpow tr').length, text: (document.getElementById('wRingHow') || {}).textContent || '' })")
-        check(hp['rows'] == 19 and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'] and 'Long Arms' in hp['text'] and 'Nature' in hp['text'], 'How to play explains powers and each kind\'s nature, with every kind\'s', hp['rows'])
+        check(hp['rows'] == 20 and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'] and 'Long Arms' in hp['text'] and 'Nature' in hp['text'], 'How to play explains powers and each kind\'s nature, with every kind\'s', hp['rows'])
         await pg.evaluate("showPage('play')")
 
         check(not errs, 'no page errors', errs)

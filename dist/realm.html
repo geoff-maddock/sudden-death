@@ -888,6 +888,10 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wstar small{display:block}
 .wstsil{flex:none;width:56px;height:56px;color:#3a332c;filter:drop-shadow(0 0 1px var(--seam))}
 .wstn{display:flex;gap:6px;align-items:center}
+.wstmeet{display:flex;gap:14px;align-items:flex-start}
+.wstmeet>img,.wstmeet>.wstsil{flex:none;width:112px;height:112px;border-radius:8px}
+.wstbuy{gap:8px;flex-wrap:wrap}
+@media (max-width:520px){.wstmeet{flex-direction:column}}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -1432,7 +1436,7 @@ function arm(c, sx, sy, hx, hy, d, opt = {}) {
     if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
     if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
     if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
-    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C(i % 2 ? '#6b4f86' : '#8b76a0'), 0, true); }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C((B.fea || ['#6b4f86', '#8b76a0'])[i % 2 ? 0 : 1]), 0, true); }
     if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
     if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
     // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
@@ -15046,7 +15050,7 @@ function arm(c, sx, sy, hx, hy, d, opt = {}) {
     if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
     if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
     if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
-    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C(i % 2 ? '#6b4f86' : '#8b76a0'), 0, true); }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C((B.fea || ['#6b4f86', '#8b76a0'])[i % 2 ? 0 : 1]), 0, true); }
     if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
     if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
     // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
@@ -21206,6 +21210,69 @@ try { renderSetupRules(); if (PAGE === 'settings') renderSettings(); } catch (e)
 // every game starts with a clean slate: no brawl in progress, no cooldowns, the CPU's temper reset
 { const o = newGame; newGame = function () { BR = null; G.brawled = {}; G.brawlCPU = {}; G.brawlPending = null; return o.apply(this, arguments); }; }
 { const o = resumeSnap; resumeSnap = function () { BR = null; G.brawled = {}; G.brawlCPU = {}; G.brawlPending = null; return o.apply(this, arguments); }; }
+/* Brimstone Diamond's superstars (issue #24, phase 2), inside the wBD scope: each superstar's player template and
+   ultimate, added to the engine's own tables after its parts load (an ultimate is also an ability, AB, as
+   08-ultimates.js makes them). Plain assignments, nothing declared. A superstar
+   is not added to KINDS, so no club and no call-up ever has one; the Realm sends it as your own player (wBD.rate).
+   The Phoenix: a centre fielder, fast, with a bat; Eagle Eye at the plate, Glide on the bases, Take Flight in the
+   field, and its ultimate Sunfire: the sky burns over the outfield and fly balls carry further. */
+TEMPL.phoenix = { n: 'Ashwing', kind: 'phoenix', race: 'Phoenix', pos: 'CF', num: 1, hand: 'R', pow: 6, con: 7, spd: 9, arm: 6, fld: 8, wpn: 'bat', bat: 'eagle', run: 'glide', field: 'flight', flav: 'Caught a home run ball and set it on fire, gently.' };
+ULT.sunfire = { kind: 'phoenix', role: 'bat', name: 'Sunfire', desc: 'The sky catches fire over the outfield. Fly balls carry about 15% further while it burns.', zone: { shape: 'global', carry: 1.15, vis: 'fire' } };
+AB.sunfire = { name: '★ ' + ULT.sunfire.name, type: 'ult', role: ULT.sunfire.role, cost: ULT_COST, ult: true, desc: ULT.sunfire.desc };
+ULT_BY_KIND.phoenix = 'sunfire';
+MOON_KIND.phoenix = [4, ['spd', 'pow']];
+/* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
+   gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+   INK) belong to that engine's own copy of the renderer. So it declares nothing at the top: it only adds each
+   superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
+   their own (performance.now).
+
+   The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
+   a crest of fire and a tail of it. */
+(() => {
+  if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  // a tongue of fire from (x, y), len long, leaning by lean; three colours, hottest inside
+  const flame = (c, d, x, y, len, lean, wide, ph) => {
+    const t = now(), fl = Math.sin(t * 9 + ph) * .14 + Math.sin(t * 15 + ph * 2) * .07, L = len * (1 + fl);
+    const cols = d.st ? [d.C('#c8562a'), d.C('#e88a3a'), d.C('#f5d27a')] : ['#d8402a', '#ff8a3c', '#ffe27a'];
+    cols.forEach((col, i) => {
+      const k = 1 - i * .3, w = wide * k, tip = [x + lean * L * k, y - L * k], p = new Path2D();
+      p.moveTo(x - w, y); p.quadraticCurveTo(x - w * 1.1 + lean * L * .4 * k, y - L * .55 * k, tip[0], tip[1]);
+      p.quadraticCurveTo(x + w * 1.1 + lean * L * .4 * k, y - L * .55 * k, x + w, y); p.closePath();
+      if (i === 0) ink(c, p, col, 0, true); else { c.fillStyle = col; c.fill(p); }
+    });
+  };
+  KIND.phoenix = { skin: '#f0b04a', h: 1, w: .9, eye: '#fff3a0', talon: true };
+  BODY.phoenix = { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true, tuft: '#e0502a', fea: ['#d8452a', '#ff9a3c'] };
+  BACK.phoenix = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 18) * 12 : Math.sin(t * 2.4) * 3, col = d.C('#d8452a'), col2 = d.C('#ff9a3c');
+    if (!d.st) { c.save(); c.globalAlpha *= .22; c.fillStyle = '#ff8a3c'; c.beginPath(); c.ellipse(0, d.shY - 6, 70, 40, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+    for (const s of [-1, 1]) {
+      // the wing: long primaries swept up and out, each tipped with fire
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 38, d.shY - 40 - f, s * 66, d.shY - 34 - f);
+      p.lineTo(s * 60, d.shY - 18 - f * .6); p.lineTo(s * 68, d.shY - 6 - f * .3); p.lineTo(s * 54, d.shY + 6); p.lineTo(s * 58, d.shY + 20); p.lineTo(s * 40, d.shY + 22); p.lineTo(s * 38, d.shY + 34); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 14 - f * .5 + i * 7]], col2, .8);
+      if (d.o.det !== false) [[66, -34, -.2], [68, -6, .2], [58, 20, .5]].forEach(([x, y, l], i) => flame(c, d, s * x, d.shY + y - f * (i === 2 ? 0 : .5), 14, s * (l + .3), 3.4, i + (s > 0 ? 3 : 0)));
+    }
+    // the tail: three tongues of fire falling behind the legs
+    for (let i = -1; i <= 1; i++) flame(c, d, i * 6, -30, -22 + Math.abs(i) * 5, i * .25, 4, i * 1.7);
+  };
+  HEAD.phoenix = function (c, d) {
+    const { hy, C, skin } = d;
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? C('#d8452a') : C('#ff8a3c')); }
+    // the crest: a fan of fire over the feathers, behind the face
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * .38; flame(c, d, Math.cos(a) * 8, hy - 9 + Math.sin(a) * 4, 22 - Math.abs(i - 2) * 4, Math.cos(a) * .8, 3.6, i * 1.3); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-2, hy + 1], [3, hy + 5.5], [0, hy + 9], [-2.5, hy + 5]]), C('#ffd84a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.4, d.eye, d.st); glowEye(c, 5, hy - 1, 2.4, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5.5], [-2.5, hy - 3]], INK, .8); inkLine(c, [[8, hy - 5.5], [2.5, hy - 3]], INK, .8);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+})();
 
 /* the end of the wBD scope: what the Realm may call (w20-diamond.js, w20d-ballgame.js). gameOver, showMenu and exhSnap
    are wrapped here, inside the scope, so the Realm hears about a final, a game given up from the Time out box (its End
@@ -21761,7 +21828,7 @@ function arm(c, sx, sy, hx, hy, d, opt = {}) {
     if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
     if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
     if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
-    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C(i % 2 ? '#6b4f86' : '#8b76a0'), 0, true); }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C((B.fea || ['#6b4f86', '#8b76a0'])[i % 2 ? 0 : 1]), 0, true); }
     if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
     if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
     // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
@@ -23655,6 +23722,69 @@ function gfStanceTip(id) {
   T.note.push('It stays until you change it.');
   return T;
 }
+/* Cinder Gridiron's superstars (issue #24, phase 2), inside the wGF scope: each superstar's ratings and powers, added
+   to the engine's own tables after its parts load. Plain assignments, nothing declared.
+   The Phoenix: fast, good hands; its offense power sets the carrier alight, its defense power drops ash in the
+   offense's eyes, and its ultimate is Rebirth: its whole side rises from the ashes, stamina back every play it lasts,
+   while the field burns under the defense. */
+GF_KIND.phoenix = [9, 4, 8, 6, 5, 5];
+GF_POW.phoenix = [{ id: 'blaze', n: 'Blaze', cost: 1, fits: 'run', desc: 'The carrier catches fire: 8% faster, and untackleable for half a second after the handoff.', fx: { cSpd: 1.08, untag: .5 } },
+  { id: 'ashfall', n: 'Ash Fall', cost: 1, fits: 'any', desc: 'Ash in their eyes: the throw flies wider, and the carrier is 6% slower.', fx: { errM: 1.3, cSpd: .94 } }];
+GF_ULT.phoenix = { id: 'rebirth', n: 'Rebirth', role: 'off', desc: 'The phoenix\'s side rises from the ashes: 8 stamina back for all seven each play it lasts, and the defense wades through fire, 5% slower.', zone: { dSpd: .95 }, restZ: 8, vis: ['#ff8a3c', 'all'] };
+for (const p of GF_POW.phoenix) GF_POW_BY[p.id] = p;
+GF_ULT_BY[GF_ULT.phoenix.id] = GF_ULT.phoenix;
+/* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
+   gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+   INK) belong to that engine's own copy of the renderer. So it declares nothing at the top: it only adds each
+   superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
+   their own (performance.now).
+
+   The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
+   a crest of fire and a tail of it. */
+(() => {
+  if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  // a tongue of fire from (x, y), len long, leaning by lean; three colours, hottest inside
+  const flame = (c, d, x, y, len, lean, wide, ph) => {
+    const t = now(), fl = Math.sin(t * 9 + ph) * .14 + Math.sin(t * 15 + ph * 2) * .07, L = len * (1 + fl);
+    const cols = d.st ? [d.C('#c8562a'), d.C('#e88a3a'), d.C('#f5d27a')] : ['#d8402a', '#ff8a3c', '#ffe27a'];
+    cols.forEach((col, i) => {
+      const k = 1 - i * .3, w = wide * k, tip = [x + lean * L * k, y - L * k], p = new Path2D();
+      p.moveTo(x - w, y); p.quadraticCurveTo(x - w * 1.1 + lean * L * .4 * k, y - L * .55 * k, tip[0], tip[1]);
+      p.quadraticCurveTo(x + w * 1.1 + lean * L * .4 * k, y - L * .55 * k, x + w, y); p.closePath();
+      if (i === 0) ink(c, p, col, 0, true); else { c.fillStyle = col; c.fill(p); }
+    });
+  };
+  KIND.phoenix = { skin: '#f0b04a', h: 1, w: .9, eye: '#fff3a0', talon: true };
+  BODY.phoenix = { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true, tuft: '#e0502a', fea: ['#d8452a', '#ff9a3c'] };
+  BACK.phoenix = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 18) * 12 : Math.sin(t * 2.4) * 3, col = d.C('#d8452a'), col2 = d.C('#ff9a3c');
+    if (!d.st) { c.save(); c.globalAlpha *= .22; c.fillStyle = '#ff8a3c'; c.beginPath(); c.ellipse(0, d.shY - 6, 70, 40, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+    for (const s of [-1, 1]) {
+      // the wing: long primaries swept up and out, each tipped with fire
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 38, d.shY - 40 - f, s * 66, d.shY - 34 - f);
+      p.lineTo(s * 60, d.shY - 18 - f * .6); p.lineTo(s * 68, d.shY - 6 - f * .3); p.lineTo(s * 54, d.shY + 6); p.lineTo(s * 58, d.shY + 20); p.lineTo(s * 40, d.shY + 22); p.lineTo(s * 38, d.shY + 34); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 14 - f * .5 + i * 7]], col2, .8);
+      if (d.o.det !== false) [[66, -34, -.2], [68, -6, .2], [58, 20, .5]].forEach(([x, y, l], i) => flame(c, d, s * x, d.shY + y - f * (i === 2 ? 0 : .5), 14, s * (l + .3), 3.4, i + (s > 0 ? 3 : 0)));
+    }
+    // the tail: three tongues of fire falling behind the legs
+    for (let i = -1; i <= 1; i++) flame(c, d, i * 6, -30, -22 + Math.abs(i) * 5, i * .25, 4, i * 1.7);
+  };
+  HEAD.phoenix = function (c, d) {
+    const { hy, C, skin } = d;
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? C('#d8452a') : C('#ff8a3c')); }
+    // the crest: a fan of fire over the feathers, behind the face
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * .38; flame(c, d, Math.cos(a) * 8, hy - 9 + Math.sin(a) * 4, 22 - Math.abs(i - 2) * 4, Math.cos(a) * .8, 3.6, i * 1.3); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-2, hy + 1], [3, hy + 5.5], [0, hy + 9], [-2.5, hy + 5]]), C('#ffd84a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.4, d.eye, d.st); glowEye(c, 5, hy - 1, 2.4, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5.5], [-2.5, hy - 3]], INK, .8); inkLine(c, [[8, hy - 5.5], [2.5, hy - 3]], INK, .8);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+})();
 /* The gridiron's page in the Realm (issue #9, phase 1). A canvas in #v-gridiron, after the world view, and a frame
    loop that runs only while it is on screen (show/hide): it moves the drive on (gfTick) and draws it (gfDraw). The
    engine's parts don't touch the page; this file is the only one that does. The canvas fills the width of the page (the
@@ -24319,7 +24449,7 @@ function arm(c, sx, sy, hx, hy, d, opt = {}) {
     if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
     if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
     if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
-    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C(i % 2 ? '#6b4f86' : '#8b76a0'), 0, true); }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C((B.fea || ['#6b4f86', '#8b76a0'])[i % 2 ? 0 : 1]), 0, true); }
     if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
     if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
     // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
@@ -24902,12 +25032,15 @@ function bxDown() {
   if (bxKnockdown(s) === 'tko') { bxLog(`Three knockdowns: the referee stops it.`, true); bxOver(); return; }
   const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
   BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0), 2, BX_RULES.count); BD.count = 1;
+  // Rebirth (a superstar's nature): once a bout, a count it would not beat, it beats at nine, and rises with most of its health
+  if (BD.getUp >= BX_RULES.count && (bxTrait(f) || {}).reborn && !f.reborn) { f.reborn = 1; BD.getUp = BX_RULES.count - 1; }
   bxPh('kd');
 }
 function bxRise() {
   const s = G.down, f = G.F[s], o = G.F[1 - s];
   f.hp = Math.round(f.hpMax * .55); f.hpMax = Math.max(35, f.hpMax - 6); f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
-  bxLog(`${f.n} is up at ${BD.getUp}.`);
+  if (f.reborn === 1) { f.reborn = 2; f.hpMax = Math.max(f.hpMax, 80); f.hp = Math.round(f.hpMax * .85); bxLog(`${f.n} rises from the ashes at ${BD.getUp}!`, true); bxEv('reborn', s); }
+  else bxLog(`${f.n} is up at ${BD.getUp}.`);
   // the other fighter to a neutral corner's distance, and on again
   const dx = o.x - f.x, dy = o.y - f.y, d = hyp(dx, dy) || 1;
   o.x = clamp(f.x + dx / d * 3.2, -BX_RING.rope, BX_RING.rope); o.y = clamp(f.y + dy / d * 3.2, -BX_RING.rope, BX_RING.rope);
@@ -25524,6 +25657,69 @@ function bxSnapNow() {
   if (!BD || BD.headless || !BX_HOOK.onSnap || (BX_HOOK.wantSnap && !BX_HOOK.wantSnap())) return;
   BX_HOOK.onSnap(bxSnapshot());
 }
+/* The Anvil Ring's superstars (issue #24, phase 2), inside the wBX scope: each superstar's ratings, nature and powers,
+   added to the engine's own tables after its parts load. Plain assignments, nothing declared. A superstar is never
+   picked for a CPU side by kind (the Realm only ever sends one as your own player).
+   The Phoenix: fast, a fair chin, and its nature is Rebirth (BX_TRAIT reborn, in 07-bout.js): once a bout, a count it
+   would not beat, it beats, and gets up with most of its health. */
+BX_KIND.phoenix = [6, 6, 9, 4, 6, 7];
+BX_TRAIT.phoenix = { n: 'Rebirth', desc: 'Once a bout, a count it would not beat, it beats, rising from the ashes with most of its health.', reborn: 1 };
+BX_POW.phoenix = {
+  sp: { id: 'flare', n: 'Flare', when: 'mid', desc: 'A burst of fire through the guard (6), and they flinch for half a second.', now: { dmg: 6, stun: .5 } },
+  ult: { id: 'sunfire', n: 'Sunfire', when: 'hurt', desc: 'Burns bright: 18 health back, and 25% quicker for 5 seconds.', now: { hp: 18 }, fx: { who: 'self', t: 5, spd: 1.25 } },
+};
+/* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
+   gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+   INK) belong to that engine's own copy of the renderer. So it declares nothing at the top: it only adds each
+   superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
+   their own (performance.now).
+
+   The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
+   a crest of fire and a tail of it. */
+(() => {
+  if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  // a tongue of fire from (x, y), len long, leaning by lean; three colours, hottest inside
+  const flame = (c, d, x, y, len, lean, wide, ph) => {
+    const t = now(), fl = Math.sin(t * 9 + ph) * .14 + Math.sin(t * 15 + ph * 2) * .07, L = len * (1 + fl);
+    const cols = d.st ? [d.C('#c8562a'), d.C('#e88a3a'), d.C('#f5d27a')] : ['#d8402a', '#ff8a3c', '#ffe27a'];
+    cols.forEach((col, i) => {
+      const k = 1 - i * .3, w = wide * k, tip = [x + lean * L * k, y - L * k], p = new Path2D();
+      p.moveTo(x - w, y); p.quadraticCurveTo(x - w * 1.1 + lean * L * .4 * k, y - L * .55 * k, tip[0], tip[1]);
+      p.quadraticCurveTo(x + w * 1.1 + lean * L * .4 * k, y - L * .55 * k, x + w, y); p.closePath();
+      if (i === 0) ink(c, p, col, 0, true); else { c.fillStyle = col; c.fill(p); }
+    });
+  };
+  KIND.phoenix = { skin: '#f0b04a', h: 1, w: .9, eye: '#fff3a0', talon: true };
+  BODY.phoenix = { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true, tuft: '#e0502a', fea: ['#d8452a', '#ff9a3c'] };
+  BACK.phoenix = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 18) * 12 : Math.sin(t * 2.4) * 3, col = d.C('#d8452a'), col2 = d.C('#ff9a3c');
+    if (!d.st) { c.save(); c.globalAlpha *= .22; c.fillStyle = '#ff8a3c'; c.beginPath(); c.ellipse(0, d.shY - 6, 70, 40, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+    for (const s of [-1, 1]) {
+      // the wing: long primaries swept up and out, each tipped with fire
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 38, d.shY - 40 - f, s * 66, d.shY - 34 - f);
+      p.lineTo(s * 60, d.shY - 18 - f * .6); p.lineTo(s * 68, d.shY - 6 - f * .3); p.lineTo(s * 54, d.shY + 6); p.lineTo(s * 58, d.shY + 20); p.lineTo(s * 40, d.shY + 22); p.lineTo(s * 38, d.shY + 34); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 14 - f * .5 + i * 7]], col2, .8);
+      if (d.o.det !== false) [[66, -34, -.2], [68, -6, .2], [58, 20, .5]].forEach(([x, y, l], i) => flame(c, d, s * x, d.shY + y - f * (i === 2 ? 0 : .5), 14, s * (l + .3), 3.4, i + (s > 0 ? 3 : 0)));
+    }
+    // the tail: three tongues of fire falling behind the legs
+    for (let i = -1; i <= 1; i++) flame(c, d, i * 6, -30, -22 + Math.abs(i) * 5, i * .25, 4, i * 1.7);
+  };
+  HEAD.phoenix = function (c, d) {
+    const { hy, C, skin } = d;
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? C('#d8452a') : C('#ff8a3c')); }
+    // the crest: a fan of fire over the feathers, behind the face
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * .38; flame(c, d, Math.cos(a) * 8, hy - 9 + Math.sin(a) * 4, 22 - Math.abs(i - 2) * 4, Math.cos(a) * .8, 3.6, i * 1.3); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-2, hy + 1], [3, hy + 5.5], [0, hy + 9], [-2.5, hy + 5]]), C('#ffd84a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.4, d.eye, d.st); glowEye(c, 5, hy - 1, 2.4, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5.5], [-2.5, hy - 3]], INK, .8); inkLine(c, [[8, hy - 5.5], [2.5, hy - 3]], INK, .8);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+})();
 /* The ring's page in the Realm (issue #23, phase 1). A canvas in #v-ring, after the gridiron's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the bout on (bxTick) and draws it (bxDraw). The engine's parts
    don't touch the page; this file is the only one that does. In You box (phase 2) it hears the keys: WASD or the arrows
@@ -33239,15 +33435,17 @@ function wStarSil(s, on) {
 function wStarRow(s, S, fresh) {
   const on = !!S.un[s.id], n = s.need ? wStarProgress(s.id, S) : 0;
   const prog = !on && s.need ? ` <small class="wstprog">${n} of ${s.need} so far.</small>` : '';
-  return `<li class="wstar${on ? ' won' : ''}" data-star="${s.id}">${wStarSil(s, on)}<div>
+  const built = on && typeof wStarBuilt === 'function' && wStarBuilt(s);
+  const meet = !on ? '' : !built ? '<small>Meeting them in the world comes in a later update.</small>' : WG && WG.star === s.id ? `<small class="wgood">${esc(s.name)} is on your team this journey.</small>` : `<small>${esc(s.meet.where)}</small>`;
+  return `<li class="wstar${on ? ' won' : ''}" data-star="${s.id}">${built ? `<img class="wstsil" src="${portraitURL(s.kind, wPartyTeam(), s.num != null ? s.num : 1, 64)}" alt="">` : wStarSil(s, on)}<div>
     <span class="wstn"><b>${on ? esc(s.n) : '???'}</b>${on && fresh ? ' <span class="wtag">New</span>' : ''}</span> <small class="k">${on ? `${esc(wCap(s.el))}. ${esc(s.plays)}` : `A superstar of ${esc(s.el)}.`}</small>
-    ${on ? `<small>Power: <b>${esc(s.pow)}</b>. ${esc(s.powd)}</small><small class="wgood">Unlocked on ${esc(S.un[s.id])}.</small>` : `<small>To unlock: ${esc(s.feat)}${prog}</small>`}</div></li>`;
+    ${on ? `<small>Power: <b>${esc(s.pow)}</b>. ${esc(s.powd)}</small><small class="wgood">Unlocked on ${esc(S.un[s.id])}.</small>${meet}` : `<small>To unlock: ${esc(s.feat)}${prog}</small>`}</div></li>`;
 }
 function wCampStars() {
   const S = wStarsAll(), fresh = W_STARS.filter(s => S.un[s.id] && !S.seen.includes(s.id)).map(s => s.id), n = Object.keys(S.un).length;
   if (fresh.length) { S.seen = S.seen.concat(fresh); wStarsSave(S); }
   return `<p class="hint">Superstars are monsters of a kind no club and no tavern has. Each one is unlocked by a feat, and an unlock is kept for every later journey on this profile. Once unlocked, a superstar can be met in a later journey and asked to sign; they join at your team's average level. One superstar a journey.</p>
-    <p class="hint">Unlocked: <b>${n} of ${W_STARS.length}</b>.${n ? ' Meeting them in the world comes in a later update.' : ''}</p>
+    <p class="hint">Unlocked: <b>${n} of ${W_STARS.length}</b>.${WG && WG.star ? ` This journey's superstar: <b>${esc((wStar(WG.star) || {}).name || '')}</b>.` : ''}</p>
     <ol class="wstars">${W_STARS.map(s => wStarRow(s, S, fresh.includes(s.id))).join('')}</ol>`;
 }
 const wW57OpenCamp = wOpenCamp;
@@ -33277,6 +33475,186 @@ renderHelp = function () {
   wW57RenderHelp();
   const after = $('wHelpLegends'); if (!after || $('wHelpStars')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpStars"><b>Superstars.</b> Six monsters of kinds no club and no tavern has, each unlocked by a feat: win the Cinder Cup, win the Rimewatch cup, beat three legends, walk the Road to Nowhere to its end, hatch all five rare eggs, or win the Crown. Beating legends and hatching eggs add up over any number of journeys. An unlock is kept on your profile for every later journey. The Stars tab on the Team screen shows them all, and what each one still needs. Once unlocked, a superstar can be met in a later journey and signed, one a journey, at your team's average level.</p>`);
+};
+/* Superstars, drawn (issue #24, phase 2). One file, loaded four times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX: their manifests in src/realm/diamond,
+   gridiron and ring), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+   INK) belong to that engine's own copy of the renderer. So it declares nothing at the top: it only adds each
+   superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
+   their own (performance.now).
+
+   The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
+   a crest of fire and a tail of it. */
+(() => {
+  if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  // a tongue of fire from (x, y), len long, leaning by lean; three colours, hottest inside
+  const flame = (c, d, x, y, len, lean, wide, ph) => {
+    const t = now(), fl = Math.sin(t * 9 + ph) * .14 + Math.sin(t * 15 + ph * 2) * .07, L = len * (1 + fl);
+    const cols = d.st ? [d.C('#c8562a'), d.C('#e88a3a'), d.C('#f5d27a')] : ['#d8402a', '#ff8a3c', '#ffe27a'];
+    cols.forEach((col, i) => {
+      const k = 1 - i * .3, w = wide * k, tip = [x + lean * L * k, y - L * k], p = new Path2D();
+      p.moveTo(x - w, y); p.quadraticCurveTo(x - w * 1.1 + lean * L * .4 * k, y - L * .55 * k, tip[0], tip[1]);
+      p.quadraticCurveTo(x + w * 1.1 + lean * L * .4 * k, y - L * .55 * k, x + w, y); p.closePath();
+      if (i === 0) ink(c, p, col, 0, true); else { c.fillStyle = col; c.fill(p); }
+    });
+  };
+  KIND.phoenix = { skin: '#f0b04a', h: 1, w: .9, eye: '#fff3a0', talon: true };
+  BODY.phoenix = { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true, tuft: '#e0502a', fea: ['#d8452a', '#ff9a3c'] };
+  BACK.phoenix = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 18) * 12 : Math.sin(t * 2.4) * 3, col = d.C('#d8452a'), col2 = d.C('#ff9a3c');
+    if (!d.st) { c.save(); c.globalAlpha *= .22; c.fillStyle = '#ff8a3c'; c.beginPath(); c.ellipse(0, d.shY - 6, 70, 40, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+    for (const s of [-1, 1]) {
+      // the wing: long primaries swept up and out, each tipped with fire
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 38, d.shY - 40 - f, s * 66, d.shY - 34 - f);
+      p.lineTo(s * 60, d.shY - 18 - f * .6); p.lineTo(s * 68, d.shY - 6 - f * .3); p.lineTo(s * 54, d.shY + 6); p.lineTo(s * 58, d.shY + 20); p.lineTo(s * 40, d.shY + 22); p.lineTo(s * 38, d.shY + 34); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 14 - f * .5 + i * 7]], col2, .8);
+      if (d.o.det !== false) [[66, -34, -.2], [68, -6, .2], [58, 20, .5]].forEach(([x, y, l], i) => flame(c, d, s * x, d.shY + y - f * (i === 2 ? 0 : .5), 14, s * (l + .3), 3.4, i + (s > 0 ? 3 : 0)));
+    }
+    // the tail: three tongues of fire falling behind the legs
+    for (let i = -1; i <= 1; i++) flame(c, d, i * 6, -30, -22 + Math.abs(i) * 5, i * .25, 4, i * 1.7);
+  };
+  HEAD.phoenix = function (c, d) {
+    const { hy, C, skin } = d;
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? C('#d8452a') : C('#ff8a3c')); }
+    // the crest: a fan of fire over the feathers, behind the face
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * .38; flame(c, d, Math.cos(a) * 8, hy - 9 + Math.sin(a) * 4, 22 - Math.abs(i - 2) * 4, Math.cos(a) * .8, 3.6, i * 1.3); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-2, hy + 1], [3, hy + 5.5], [0, hy + 9], [-2.5, hy + 5]]), C('#ffd84a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.4, d.eye, d.st); glowEye(c, 5, hy - 1, 2.4, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5.5], [-2.5, hy - 3]], INK, .8); inkLine(c, [[8, hy - 5.5], [2.5, hy - 3]], INK, .8);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+})();
+/* w58: meeting and signing a superstar (issue #24, phase 2). A superstar that is built (W_STARS entry with a kind,
+   added by its own part: w59 for the Phoenix) is met through someone who knows where it is: ask them about it by
+   name (its meet.topic) and the superstar comes to you. Locked, they tell you the story and the feat. Unlocked, it
+   names its price: gold, or something it wants (meet.price: { gold, items: { id: n } }), and you pick which to pay.
+   It joins at your team's average level (rounded), with its signature card. One superstar a journey: WG.star holds
+   the one you signed (kept even if they leave later). A full roster asks who to release before you pay.
+
+   WG.star = superstar id, or absent. Players: p.star = superstar id (plain JSON).
+   wStarLvl(), wStarCanSign(id) ('' or why not), wOpenStar(id), wSignStar(id, how)
+   Wraps: wMakePlayer (wW58MakePlayer: keeps p.star), wRunAct (wW58RunAct: 'star:<id>'). W_FROM.star. */
+
+W_FROM.star = 'a superstar';
+function wStarLvl() { const R = wRoster(); return R.length ? clamp(Math.round(R.reduce((n, p) => n + p.lvl, 0) / R.length), 1, W_PARTY.maxLvl) : 1; }
+function wStarBuilt(s) { return !!(s && s.kind && s.meet && KIND_NAME[s.kind]); }
+function wStarCanSign(id) {
+  const s = wStar(id);
+  if (!wStarBuilt(s)) return 'Nobody has seen one yet.';
+  if (!wStarOn(id)) return `Locked. ${s.feat}`;
+  if (WG.star) { const w = wStar(WG.star); return WG.star === id ? `${s.name} is already with you this journey.` : `One superstar a journey, and the ${w ? w.n : 'other one'} is yours.`; }
+  return '';
+}
+function wStarPrice(s, how) {
+  const P = s.meet.price || {};
+  if (how === 'gold') return RUN.gold >= (P.gold || 0) ? '' : `You need ${P.gold} gold.`;
+  if (how === 'items') return Object.entries(P.items || {}).every(([k, n]) => wHas(k, n)) ? '' : `You need ${wStarItems(P)}.`;
+  return 'There is no price like that.';
+}
+function wStarItems(P) { return Object.entries(P.items || {}).map(([k, n]) => `${n} ${DB.items[k] ? DB.items[k].name : k}${n === 1 ? '' : 's'}`).join(' and '); }
+// sign: why not, or '' once they have joined (done(true)) or asked who to release first
+function wSignStar(id, how, done) {
+  const s = wStar(id), why = wStarCanSign(id) || wStarPrice(s, how);
+  if (why) { if (done) done(false); return why; }
+  const spec = { kind: s.kind, n: s.name, lvl: wStarLvl(), num: s.num != null ? s.num : 1, star: id, flav: s.flav };
+  wRecruit(spec, 'star', ok => {
+    if (ok) {
+      const P = s.meet.price || {};
+      if (how === 'gold') RUN.gold -= P.gold || 0; else for (const [k, n] of Object.entries(P.items || {})) wAddItem(k, -n);
+      WG.star = id;
+      wLog(`${s.name} the ${s.n} joins your team at level ${spec.lvl}. There is nobody else like them.`, 'g');
+      if (typeof wSave === 'function') wSave();
+    }
+    if (done) done(!!ok);
+  });
+  return '';
+}
+const wW58MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW58MakePlayer.apply(this, arguments); if (spec && spec.star) p.star = spec.star; return p; };
+
+/* ---------- the meeting ---------- */
+function wOpenStar(id) {
+  const s = wStar(id); if (!s || !wStarBuilt(s) || LAB) return;
+  const why = wStarCanSign(id), P = s.meet.price || {}, port = portraitURL(s.kind, wPartyTeam(), s.num != null ? s.num : 1, 128);
+  const locked = !wStarOn(id);
+  const body = locked
+    ? `<p class="hint">${esc(s.meet.rumour)}</p><p class="hint">To unlock: <b>${esc(s.feat)}</b> An unlock is kept on your profile for every later journey.</p>`
+    : why ? `<p class="hint">${esc(s.meet.hello)}</p><p class="hint wball">${esc(why)}</p>`
+    : `<p class="hint">${esc(s.meet.hello)}</p><p class="hint">${esc(s.meet.ask)} ${esc(s.name)} joins at level ${wStarLvl()}, your team's average, with their own card.</p>
+       <div class="row wstbuy"><button class="btn" id="wStarGold" ${wStarPrice(s, 'gold') ? 'disabled' : ''}>Pay ${P.gold} gold</button>${P.items ? `<button class="btn" id="wStarItems" ${wStarPrice(s, 'items') ? 'disabled' : ''}>Give ${esc(wStarItems(P))}</button>` : ''}</div>
+       <p class="hint">You have ${RUN.gold} gold${P.items ? ` and ${esc(Object.keys(P.items).map(k => `${WG.items[k] || 0} ${DB.items[k].name}${(WG.items[k] || 0) === 1 ? '' : 's'}`).join(', '))}` : ''}.</p>`;
+  const close = modal(`<header><h3>${locked ? 'A story about a superstar' : `${esc(s.name)} the ${esc(s.n)}`}</h3><button class="ghost" data-close>${locked || why ? 'Done' : 'Not now'}</button></header>
+    <div class="wstmeet">${locked ? wStarSil(s, false) : `<img src="${port}" alt="">`}<div>${body}${locked ? '' : `<p class="hint">Power: <b>${esc(s.pow)}</b>. ${esc(s.powd)}</p>`}</div></div>`);
+  const go = how => { close(); wSignStar(id, how); if (typeof wDrain === 'function') wDrain(); };
+  const g = $('wStarGold'); if (g) g.onclick = () => go('gold');
+  const it = $('wStarItems'); if (it) it.onclick = () => go('items');
+}
+const wW58RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (typeof act === 'string' && act.startsWith('star:')) { wOpenStar(act.slice(5)); return; }
+  return wW58RunAct(act, id);
+};
+/* w59: the Phoenix (issue #24, phase 2), the first superstar built end to end. Its drawing is in
+   src/realm/stars/s1-figures.js (all four scopes); its ratings and powers in each engine are in
+   src/realm/ring/r0-stars.js (boxing: Rebirth beats a lost count once a bout), src/realm/gridiron/g0-stars.js
+   (football: the Rebirth ultimate) and src/realm/diamond/d1-stars.js (baseball: the Sunfire ultimate). Here, the card
+   game and the world:
+   - Cards: a signature card (Flare) and five of its own kind, in the Phoenix's rewards like any kind's.
+   - Rebirth: while the Phoenix starts, once a match, when Team HP would fall to 0 it comes back at W_PHX.reborn of
+     your max HP instead (the lethal hook, as the Phylactery does). B.phxReborn marks it used.
+   - Captain: Sunrise, 5 HP back at kickoff.
+   - Meeting: Ash Peregrine, the League scout in Cinderhold, knows the story; ask about the PHOENIX. Its price is
+     W_PHX.price: gold, or Cinder Eggs from the Cindermaw's nests.
+   Also How to play (#wHelpPhoenix, after #wHelpStars). */
+
+const W_PHX = { reborn: .3, price: { gold: 300, items: { cinderegg: 2 } } };
+Object.assign(wStar('phoenix'), {
+  kind: 'phoenix', name: 'Ashwing', num: 1,
+  flav: 'Came down off the crater rim in a shower of sparks. Nobody else has one.',
+  meet: { who: 'scout', topic: 'phoenix', price: W_PHX.price, where: 'Meet them: ask Ash Peregrine, the scout in Cinderhold, about the PHOENIX.',
+    rumour: 'Ash Peregrine lowers her voice. "Up on the crater rim, some nights, there is a light that is not lava. A bird of fire. It only comes down for a team that has won the Cinder Cup. Win that, on any journey, and come and ask me again."',
+    hello: 'Ash Peregrine takes you up the crater road at dusk. On the rim a shape unfolds out of the glow: a bird of fire, taller than you, looking at your team the way a scout does.',
+    ask: 'It will play for you, for a price: gold for the League\'s books, or two Cinder Eggs to keep warm in.' },
+});
+FA_NAMES.phoenix = ['Ashwing'];
+FA_SCOUT.phoenix = ['Fast, fragile, and very hard to keep down.'];
+
+/* ---------- cards ---------- */
+K('phx_flare', 'Flare', 'phoenix', 'atk', 1, 's', 'one', [['d', 6], ['s', 'burn', 3]], { fl: 'It lights up the whole stadium. And the defender.', sport: 'basketball' });
+K('phx_dive', 'Firedive', 'phoenix', 'atk', 1, 'c', 'one', [['d', 9]], { fl: 'Straight down, on fire, every time.', sport: 'football' });
+K('phx_ash', 'Ash Cloud', 'phoenix', 'skl', 1, 'c', 'one', [['b', 6], ['s', 'weak', 1]], { sport: 'soccer' });
+K('phx_kindle', 'Kindle', 'phoenix', 'skl', 0, 'u', 'self', [['heal', 4], ['draw', 1]], { fl: 'A little warmth goes a long way.' });
+K('phx_wings', 'Wings of Fire', 'phoenix', 'atk', 2, 'u', 'all', [['d', 6], ['s', 'burn', 2, 'all']], { sport: 'basketball' });
+K('phx_pyre', 'Pyre', 'phoenix', 'atk', 2, 'r', 'one', [['d', 16], ['s', 'burn', 4]], { ex: 1, fl: 'What burns comes back. Not for them.' });
+SIG.phoenix = 'phx_flare';
+
+/* ---------- Rebirth, in the card game ---------- */
+function wPhxStarts() { return !!(WG && RUN && wStarters().some(p => p.kind === 'phoenix')); }
+onHook('lethal', () => {
+  if (!B || B.phxReborn || !wPhxStarts()) return;
+  B.phxReborn = 1; RUN.hp = Math.max(1, Math.round(RUN.maxhp * W_PHX.reborn));
+  fx({ k: 'banner', t: 'Rebirth', sub: `The Phoenix rises: back at ${RUN.hp} HP` });
+  log('Rebirth: the Phoenix rises from the ashes, and your line gets up with it.', 'good');
+  return true;
+});
+W_CAPTAIN.phoenix = { n: 'Sunrise', d: '5 HP back at kickoff.', on: { fightStart: () => healP(5) } };
+
+/* ---------- the meeting: Ash Peregrine in Cinderhold ---------- */
+(() => {
+  const S = DB.chars.scout; if (!S) return;
+  S.topics.job.t += ' And there is a story about a PHOENIX up on the crater rim.';
+  S.topics.phoenix = { t: 'The bird on the crater rim. Let me tell you.', act: 'star:phoenix' };
+})();
+
+const wW59RenderHelp = renderHelp;
+renderHelp = function () {
+  wW59RenderHelp();
+  const after = $('wHelpStars'); if (!after || $('wHelpPhoenix')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPhoenix"><b>The Phoenix.</b> Win the Cinder Cup on any journey to unlock it. Then ask Ash Peregrine, the scout in Cinderhold, about the PHOENIX: it signs for ${W_PHX.price.gold} gold or ${W_PHX.price.items.cinderegg} Cinder Eggs. Its power is Rebirth. In a card-game match, while it starts, the first time Team HP would fall to 0 you are back at ${Math.round(W_PHX.reborn * 100)}% of your max HP instead. In the ring it beats one count it would have lost, once a bout. On the gridiron its ultimate gives its side stamina back. On the diamond its ultimate, Sunfire, makes fly balls carry further. As captain it heals 5 HP at kickoff.</p>`);
 };
 </script>
 </body></html>

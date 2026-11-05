@@ -5,3 +5,5 @@ text BDX_CSS src/bd/bd.css
 text BDX_SHELL src/bd/shell.html
 src/realm/diamond/d0-page.js
 include src/bd/manifest.txt
+src/realm/diamond/d1-stars.js
+src/realm/stars/s1-figures.js

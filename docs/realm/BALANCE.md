@@ -478,3 +478,18 @@ Part 1 boxes a fresh three-player journey at level 3 against a rival's three at 
 | Belts won | 5% | 7.7–8% | 7% | 4.7% | 5.2% |
 
 Close to the gridiron's 49%, 44% and 25%. The two settings for tier 3 at 1 and 2 points come out the same (26%) on cards; the final of a Belt, played more rarely, falls from 37% to 24% with 2. A simulated Belt pays about 46 XP across the team and costs about 16 gold, as a Cinder Cup does. Draws of a whole card are rare (under 1%): level on bouts, a card goes to the knockdowns and then the points. Powers at an even level: 51% with them, 45% without (100 a row: inside the noise). A player who boxes by hand or works the corner does better than the CPU's corner; nobody has measured that yet.
+
+## Superstars: the Phoenix in the ring (issue #24, phase 2)
+
+A superstar should be strong but not win a journey alone. Round robin, the Phoenix against every league kind at its
+kind's ratings, both CPU Knights, 300 bouts a kind, sides swapped (a draw counts half):
+
+| Phoenix ratings (reach, pow, spd, chin, sta, gui) | Phoenix | Best league kind | Worst |
+|---|---|---|---|
+| 6, 6, 9, 4, 7, 7 (first try) | 66.8% | 58.6% (witch) | 40.0% (lich) |
+| 6, 5, 9, 4, 6, 7 | 57.6% | 58.5% | 40.7% |
+| **6, 6, 9, 4, 6, 7 (shipped)** | **63.1%** | 59.1% | 40.3% |
+
+The best kind in the ring by about four points, with Rebirth (one lost count beaten a bout). The card game's Rebirth
+(30% of max HP once a match), football and baseball are measured in phase 4 with the realm, gridiron and diamond labs.
+

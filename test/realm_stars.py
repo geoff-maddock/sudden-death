@@ -81,8 +81,8 @@ async def main():
         await pg.evaluate("wOpenCamp('stars')"); await pg.wait_for_selector('#modalBox .wstars')
         u = await pg.evaluate("""(() => { const rows = [...document.querySelectorAll('#modalBox .wstar')];
           return { won: rows.filter(r => r.classList.contains('won')).length, names: rows.every(r => !r.textContent.includes('???')), pow: rows[0].textContent.includes('Rebirth'), fresh: document.querySelectorAll('#modalBox .wstar .wtag').length,
-            color: rows[0].querySelector('path').getAttribute('fill') }; })()""")
-        check(u['won'] == 6 and u['names'] and u['pow'] and u['fresh'] == 6 and u['color'] == '#ff8a3c', 'unlocked, each shows their name, element colour and power, marked New', u)
+            color: rows[1].querySelector('path').getAttribute('fill'), port: !!rows[0].querySelector('img') }; })()""")
+        check(u['won'] == 6 and u['names'] and u['pow'] and u['fresh'] == 6 and u['color'] == '#6fd0e0' and u['port'], 'unlocked, each shows their name, element colour (a portrait once built: the Phoenix) and power, marked New', u)
         await pg.screenshot(path='/tmp/realm-stars-open.png')
         await pg.evaluate("wRenderCamp()")
         check(await pg.evaluate("document.querySelectorAll('#modalBox .wstar .wtag').length") == 0, 'New shows only the first time')

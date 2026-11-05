@@ -111,15 +111,17 @@ function wStarSil(s, on) {
 function wStarRow(s, S, fresh) {
   const on = !!S.un[s.id], n = s.need ? wStarProgress(s.id, S) : 0;
   const prog = !on && s.need ? ` <small class="wstprog">${n} of ${s.need} so far.</small>` : '';
-  return `<li class="wstar${on ? ' won' : ''}" data-star="${s.id}">${wStarSil(s, on)}<div>
+  const built = on && typeof wStarBuilt === 'function' && wStarBuilt(s);
+  const meet = !on ? '' : !built ? '<small>Meeting them in the world comes in a later update.</small>' : WG && WG.star === s.id ? `<small class="wgood">${esc(s.name)} is on your team this journey.</small>` : `<small>${esc(s.meet.where)}</small>`;
+  return `<li class="wstar${on ? ' won' : ''}" data-star="${s.id}">${built ? `<img class="wstsil" src="${portraitURL(s.kind, wPartyTeam(), s.num != null ? s.num : 1, 64)}" alt="">` : wStarSil(s, on)}<div>
     <span class="wstn"><b>${on ? esc(s.n) : '???'}</b>${on && fresh ? ' <span class="wtag">New</span>' : ''}</span> <small class="k">${on ? `${esc(wCap(s.el))}. ${esc(s.plays)}` : `A superstar of ${esc(s.el)}.`}</small>
-    ${on ? `<small>Power: <b>${esc(s.pow)}</b>. ${esc(s.powd)}</small><small class="wgood">Unlocked on ${esc(S.un[s.id])}.</small>` : `<small>To unlock: ${esc(s.feat)}${prog}</small>`}</div></li>`;
+    ${on ? `<small>Power: <b>${esc(s.pow)}</b>. ${esc(s.powd)}</small><small class="wgood">Unlocked on ${esc(S.un[s.id])}.</small>${meet}` : `<small>To unlock: ${esc(s.feat)}${prog}</small>`}</div></li>`;
 }
 function wCampStars() {
   const S = wStarsAll(), fresh = W_STARS.filter(s => S.un[s.id] && !S.seen.includes(s.id)).map(s => s.id), n = Object.keys(S.un).length;
   if (fresh.length) { S.seen = S.seen.concat(fresh); wStarsSave(S); }
   return `<p class="hint">Superstars are monsters of a kind no club and no tavern has. Each one is unlocked by a feat, and an unlock is kept for every later journey on this profile. Once unlocked, a superstar can be met in a later journey and asked to sign; they join at your team's average level. One superstar a journey.</p>
-    <p class="hint">Unlocked: <b>${n} of ${W_STARS.length}</b>.${n ? ' Meeting them in the world comes in a later update.' : ''}</p>
+    <p class="hint">Unlocked: <b>${n} of ${W_STARS.length}</b>.${WG && WG.star ? ` This journey's superstar: <b>${esc((wStar(WG.star) || {}).name || '')}</b>.` : ''}</p>
     <ol class="wstars">${W_STARS.map(s => wStarRow(s, S, fresh.includes(s.id))).join('')}</ol>`;
 }
 const wW57OpenCamp = wOpenCamp;
