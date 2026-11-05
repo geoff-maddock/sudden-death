@@ -17,8 +17,10 @@ def check(ok, what, detail=None):
 
 CLOSE = """(() => { for (let i = 0; i < 12 && !document.getElementById('modal').hidden; i++) {
   const b = document.querySelector('#modalBox [data-close], #wRelNo, #modalBox button'); if (!b) break; b.click(); } })()"""
-# a match to the start of turn 4: on which turns the enemies were Stunned by the quake, and the Block at kickoff
-QUAKE = """(() => { startMatch({ type: 'normal', tier: 1, card: false, world: { kind: 'wild' } }); const kick = B.P.block, n0 = B.log.length, at = []; RUN.hp = 999;
+# a match to the start of turn 7: on which turns the enemies were Stunned by the quake, and the Block at kickoff
+# (against a fixed pair of Kobold Cheer Squads: a random tier-1 draw is sometimes a Goblin Base Thief, who steals home
+# on turn 5 and ends the match before the second quake)
+QUAKE = """(() => { startMatch({ type: 'normal', tier: 1, card: false, ids: ['cheer', 'cheer'], world: { kind: 'wild' } }); const kick = B.P.block, n0 = B.log.length, at = []; RUN.hp = 999;
   for (let t = 0; t < 6 && !B.over; t++) { runSteps(endTurn()); if (alive().length && alive().every(e => (e.st.stun || 0) > 0)) at.push(B.turn); }
   const r = { kick, at, quake: B.log.slice(n0).filter(l => /Earthquake: the Behemoth stamps/.test(l.t)).length };
   B.forfeit = 1; B.over = 'lose'; finishFight(); RUN.hp = RUN.maxhp; return r; })()"""
