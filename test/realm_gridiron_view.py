@@ -64,7 +64,9 @@ async def main():
         # ---------- the zoom, the banner and the stats ----------
         pg, errs = await start(br, 1600, 1000)
         await pg.evaluate("wGF.setMode('watch')")
-        await pg.wait_for_function("wGF.view().zoom > 1.5", timeout=120000)
+        # (zoomed in and captioned at the same moment: the camera eases back out after the caption clears, so under load
+        # a check of the zoom alone could land in the ease-out, zoomed with no caption)
+        await pg.wait_for_function("wGF.view().zoom > 1.5 && !!wGF.view().why", timeout=120000)
         v = await pg.evaluate("wGF.view()")
         check(v['why'] in ('Breakaway!', 'Deep ball!', 'Broken tackle!', 'At the goal line!', 'Touchdown!', 'Picked off!', 'Fumble!'), 'a big play zooms in on the ball, and says why', v)
         await pg.wait_for_function("wGF.phase === 'call' || wGF.phase === 'kickoff'", timeout=60000)
