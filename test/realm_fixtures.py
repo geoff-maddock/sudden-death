@@ -4,6 +4,8 @@
 # (the keeper's GAME card): a rival match in the ground's sport against that club, which goes on the table, the
 # results and the head to head, and the crowd adds fans. The fans greet you by your place in the table; the keepers
 # post the FIXTURES; the save keeps the draw; How to play says so; the audit is clean.
+# (A fixture at the Ash Bowl or the Anvil Ring is moved to another ground here: those are tested in their engines' own
+# checks, realm_gridiron_cup.py and realm_ring_cup.py.)
 # Asserts; exits nonzero on failure. Screenshots: /tmp/realm-fixtures-*.png.
 import asyncio, json, sys, os
 sys.path.insert(0, os.path.dirname(__file__))
@@ -76,10 +78,12 @@ async def main():
         # ---------- your fixture ----------
         await pg.evaluate("(() => { const K = ['troll', 'harpy', 'golem', 'wraith', 'spider']; let i = 0; while (wRoster().length < 7 && i < 10) wRecruit({ kind: K[i++ % K.length], lvl: 3 }, 'tavern'); })()")
         await pg.evaluate(CLOSE_ALL)
-        # (a card match: a fixture drawn at the Ash Bowl is a football game, in test/realm_gridiron_cup.py)
-        mine = await pg.evaluate("""(() => { const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me');
-          if (f.g === 'g_bowl') f.g = W_GRDS.find(g => g.id !== 'g_bowl' && g.sport !== 'baseball').id; return wMyFixture(); })()""")
-        other = await pg.evaluate(f"W_GRDS.find(g => g.id !== '{mine['g']}' && g.id !== 'g_bowl' && g.sport !== 'baseball').id")
+        # (a card match: a fixture drawn at the Ash Bowl is a football game, in test/realm_gridiron_cup.py, and one at the
+        # Anvil Ring a boxing card, in test/realm_ring_cup.py; each has its own engine and its own card)
+        OWN = "['g_bowl', 'g_ring']"
+        mine = await pg.evaluate(f"""(() => {{ const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me'), own = {OWN};
+          if (own.includes(f.g)) f.g = W_GRDS.find(g => !own.includes(g.id) && g.sport !== 'baseball').id; return wMyFixture(); }})()""")
+        other = await pg.evaluate(f"W_GRDS.find(g => g.id !== '{mine['g']}' && !{OWN}.includes(g.id) && g.sport !== 'baseball').id")
         await pg.evaluate(ENTER + f"('{other}')")
         await pg.evaluate(f"wOpenGrdCard('{other}')")
         elsewhere = await pg.evaluate("({ row: !!document.querySelector('[data-gfix]'), text: document.getElementById('modalBox').textContent })")
