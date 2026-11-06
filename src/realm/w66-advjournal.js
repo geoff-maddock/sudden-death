@@ -93,7 +93,9 @@ function wAdvJournalHtml(S) {
         ${items.length ? `<p>Carrying: ${items.join(', ')}.</p>` : ''}${next ? `<p>Next game: ${wAdvCondText(next.step).map(esc).join(' ')}</p>` : ''}</div>`);
     } else if (A.st === 'won') {
       const U = D.end && D.end.unlock, home = U ? wAdvHome(U.at) : '';
-      const keep = !U ? '' : U.recruit ? `${esc(U.recruit.n)} waits ${wChar(U.at).name === U.recruit.n ? '' : 'with ' + esc(wChar(U.at).name) + ' '}${home ? 'in ' + esc(home) : ''} for every journey: ask about ${esc(U.kw.toUpperCase())}.`
+      const where = !U ? '' : [wChar(U.at).name === (U.recruit || {}).n ? '' : 'with ' + esc(wChar(U.at).name), home ? 'in ' + esc(home) : ''].filter(Boolean).join(' ');
+      const keep = !U ? '' : U.recruit ? (wRoster().some(p => p.n === U.recruit.n) ? `${esc(U.recruit.n)} is with you. On a later journey, look for him ${where}: ask about ${esc(U.kw.toUpperCase())}.`
+        : `${esc(U.recruit.n)} waits ${where} for every journey: ask about ${esc(U.kw.toUpperCase())}.`)
         : `${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''} keeps your reward${U.relic && RELICS[U.relic] ? ' (the ' + esc(RELICS[U.relic].n) + ')' : ''} for every journey: ask about ${esc(U.kw.toUpperCase())}.`;
       won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc(wAdvEndText(D, A))}</p>${keep ? `<p class="hint">${keep}</p>` : ''}</div>`);
     } else {

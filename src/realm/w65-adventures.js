@@ -71,7 +71,7 @@ function wAdvBegin(id) {
 }
 function wAdvLearn(id, t) { if (t) wAdvEdit(id, A => A.learned.push({ t, d: wAdvToday() })); }
 function wAdvPay(pay, from) {
-  if (!pay || !RUN) return;
+  if (!pay || !RUN || (WG && WG.advDead)) return;
   if (pay.gold) { RUN.gold += pay.gold; wLog(`Received ${pay.gold} gold.`, 'm'); }
   if (pay.fans) { RUN.fans = (RUN.fans || 0) + pay.fans; wLog(`${pay.fans} new fans.`, 'm'); }
   if (pay.cards) wPayCards({ cards: pay.cards }, from);
@@ -116,6 +116,8 @@ function wAdvReapply(S) {
 function wAdvGiveKeep(D) {
   const U = D.end && D.end.unlock; if (!U) return 'none';
   WG.advRec = WG.advRec || {}; WG.advItems = WG.advItems || {};
+  if (WG.advRec[D.id] && WG.advItems[D.id] == null) WG.advItems[D.id] = 1; // a save from before advItems: handed over already
+  if (WG.advDead) return 'none'; // (a hardcore journey that is ending gets nothing)
   let gave = false;
   // the trophy and cards come at once; only a player waits for room on the team
   if (!WG.advItems[D.id]) {
@@ -127,7 +129,7 @@ function wAdvGiveKeep(D) {
   if (WG.advRec[D.id]) return 'already';
   if (!LAB && wRoster().length >= W_PARTY.max) return 'full';
   WG.advRec[D.id] = 1;
-  wRecruitTopic(Object.assign({}, U.recruit, U.recruit.lvl === 'team' ? { lvl: typeof wStarLvl === 'function' ? wStarLvl() : 1 } : {}));
+  wRecruitTopic(Object.assign({}, U.recruit, U.recruit.lvl === 'team' ? { lvl: wStarLvl() } : {}));
   return 'given';
 }
 function wAdvKeepLine(D, got) {
@@ -170,7 +172,6 @@ function wAdvTalk(id, kw) {
     // the reward character, once per journey
     const U = D.end && D.end.unlock;
     if (A && A.st === 'won' && U && U.at === id && wKwHit(U.kw, kw)) {
-      WG.advRec = WG.advRec || {};
       // marked only once given: with a full team a player waits until you make room
       return { text: wAdvKeepLine(D, wAdvGiveKeep(D)), key: U.kw };
     }
@@ -296,7 +297,11 @@ W_ON_END.adv = function (r, ref, W) {
   const step = D.chapters[R.ch].steps[R.si], kick = A.kick && A.kick.ref === ref ? A.kick : null;
   const met = wAdvCondMet(step, wAdvMatchFacts(r, W), W, kick);
   // a game that counts win or lose (always): a win marks it, for the better ending
-  if (step.always) { if (met && step.mark) wAdvEdit(R.id, A2 => { A2.marks = Object.assign({}, A2.marks, { [step.mark]: 1 }); }); wLog((met ? step.win : step.lose) || '', met ? 'g' : 'm'); wAdvDone(R.id, R.si); return; }
+  if (step.always) {
+    if (met && step.mark) wAdvEdit(R.id, A2 => { A2.marks = Object.assign({}, A2.marks, { [step.mark]: 1 }); });
+    const line = met ? step.win : step.lose; if (line) wLog(line, met ? 'g' : 'm');
+    wAdvDone(R.id, R.si); return;
+  }
   if (met) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
   if (step.pinnacle) { wAdvLose(R.id, step.lose || 'You lost.'); return; }
   if (step.lose) wLog(step.lose, 'd');
@@ -305,7 +310,8 @@ W_ON_END.adv = function (r, ref, W) {
 const wW65MatchLost = wMatchLost;
 wMatchLost = function (result) {
   const W = RUN && RUN.pending && RUN.pending.world;
-  if (WG && WG.hardcore && W && W.kind === 'adv') { try { W_ON_END.adv('lose', W.ref, W); } catch (e) { console.error(e); } }
+  // (the story is told, but nothing is paid into a journey that is about to end: WG.advDead)
+  if (WG && WG.hardcore && W && W.kind === 'adv') { WG.advDead = 1; try { W_ON_END.adv('lose', W.ref, W); } catch (e) { console.error(e); } finally { delete WG.advDead; } }
   return wW65MatchLost(result);
 };
 function wAdvChoose(id, si, i) {

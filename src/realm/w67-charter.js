@@ -111,6 +111,7 @@ wEncounterHook = function (region, tileCh, info) {
 /* ---------- the reward: a trophy and a card no pool offers ---------- */
 RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 1 Strength and 1 Footwork.', ico: 'boot' };
 TROPHY_FX.founders = { on: { fightStart: () => { addSt(B.P, 'str', 1); addSt(B.P, 'dex', 1); } } };
+Object.assign(RELICS.founders, TROPHY_FX.founders); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 const wSdRelicPool = relicPool;
 relicPool = function (rar) { return wSdRelicPool(rar).filter(k => !RELICS[k].adv); };
 K('adv_founding', 'The Founding Rule', 'none', 'skl', 1, 'l', 'self', [['b', 9], ['s', 'str', 1, 'self'], ['s', 'dex', 1, 'self']], { fl: 'Written in 1 AL, torn in the fire, read aloud again by you.' });

@@ -138,6 +138,9 @@ async def main():
         await pg.evaluate(CLOSE_ALL)
         r = await pg.evaluate("(() => { const p = new Set(); for (let i = 0; i < 40; i++) relicPool().forEach(k => p.add(k)); return { pool: p.has('founders'), hof: !!CARDS.adv_founding && CARDS.adv_founding.rar === 'l' }; })()")
         check(not r['pool'] and r['hof'], 'no trophy pool offers the Founder\'s Charm; The Founding Rule is a Hall of Fame card', r)
+        r = await pg.evaluate("(() => { startMatch({ type: 'normal', tier: 1, card: false, ids: ['cheer', 'cheer'], world: { kind: 'wild' } }); const st = { str: B.P.st.str || 0, dex: B.P.st.dex || 0 }; B.forfeit = 1; B.over = 'lose'; finishFight(); RUN.hp = RUN.maxhp; return st; })()")
+        check(r['str'] >= 1 and r['dex'] >= 1, 'the Founder\'s Charm works: 1 Strength and 1 Footwork at the start of a fight', r)
+        await pg.evaluate(CLOSE_ALL)
         await pg.evaluate("wSave()")
 
         # ---------- a new journey ----------

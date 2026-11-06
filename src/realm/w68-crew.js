@@ -18,7 +18,10 @@
    fans after every win).
 
    The four stand in their cities beside the training coaches (w23), on open ground the test checks.
-   Wraps: wSay (wW68Say: Marrowbone's CREW hint once the log is home, until the story starts). */
+   While Gale plays for you, his figure on the quay steps off the map (wCrewPlace).
+   Wraps: wSay (wW68Say: Marrowbone's CREW hint once the log is home, until the story starts; Gale leaving the quay),
+   wEnterMap (wW68EnterMap: Gale's place on the quay), wBallSettle, wGridSettle, wRingSettle (wW68BallSettle,
+   wW68GridSettle, wW68RingSettle: the Marigold's Flag pays its fans for a win in every engine). */
 
 /* ---------- the four, placed in their cities ---------- */
 const W_CREW = [
@@ -44,7 +47,15 @@ DB.chars.marrowbone.topics.crew = { t: 'They lived. I know they did. The log say
 
 /* ---------- the reward ---------- */
 RELICS.marigold = { n: "The Marigold's Flag", adv: 1, desc: 'After every win, 3 more fans come to watch.', ico: 'horn' };
-TROPHY_FX.marigold = { on: { fightWon: () => { RUN.fans = (RUN.fans || 0) + 3; } } };
+TROPHY_FX.marigold = { on: { fightWon: () => { RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; } } };
+Object.assign(RELICS.marigold, TROPHY_FX.marigold); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
+// the other engines don't fire fightWon: their wins pay the flag's fans as they settle
+const W_CREW_FLAG = 3;
+function wCrewFlagFans(r) { if (r === 'win' && RUN && RUN.relics.includes('marigold')) RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; }
+const wW68BallSettle = wBallSettle, wW68GridSettle = wGridSettle, wW68RingSettle = wRingSettle;
+wBallSettle = function (r) { wCrewFlagFans(r); return wW68BallSettle.apply(this, arguments); };
+wGridSettle = function (r) { wCrewFlagFans(r); return wW68GridSettle.apply(this, arguments); };
+wRingSettle = function (r) { wCrewFlagFans(r); return wW68RingSettle.apply(this, arguments); };
 K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 12], ['s', 'weak', 1, 'all']], { fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
 
 /* ---------- the story ---------- */
@@ -86,7 +97,17 @@ W_ADV.push({
 const wW68Say = wSay;
 wSay = function (id, kw) {
   const r = wW68Say(id, kw);
-  if (id === 'marrowbone' && WG && r && r.key === 'log' && wFlag('q_shiplog') && !wAdvState('crew') && r.text === DB.chars.marrowbone.topics.log.t2)
+  const L = DB.chars.marrowbone.topics.log;
+  if (id === 'marrowbone' && WG && r && r.key === 'log' && wFlag('q_shiplog') && !wAdvState('crew') && (r.text === L.t || r.text === L.t2))
     r.text += ' Five names on the last page. The CREW lived, I tell you.';
+  if (r && r.key === 'join' && id === 'adv_gale') wCrewPlace();
   return r;
 };
+/* while Gale plays for you, his place on the quay is empty (he steps off the map, and comes back if you let him go) */
+function wCrewPlace() {
+  const C = W_CREW[0], M = MAPS[C.city], n = M && (M.npcs || []).find(x => x.id === C.id); if (!n || !WG) return;
+  const away = wRoster().some(p => p.n === 'Bosun Gale'), x = away ? -1 : C.at[0], y = away ? -1 : C.at[1];
+  if (n.x !== x || n.y !== y) { n.x = x; n.y = y; wInvalidate(C.city); }
+}
+const wW68EnterMap = wEnterMap;
+wEnterMap = function (id, x, y) { const r = wW68EnterMap(id, x, y); try { if (id === W_CREW[0].city) wCrewPlace(); } catch (e) { console.error(e); } return r; };

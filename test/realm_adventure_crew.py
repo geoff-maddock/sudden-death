@@ -60,8 +60,8 @@ async def main():
         check(await pg.evaluate("!wAdv('crew').chapters.some(C => C.steps.some(s => s.pinnacle))"), 'nothing in the story is a pinnacle: it can\'t be lost')
 
         # ---------- the start ----------
-        r = await pg.evaluate("(() => { const a = wSay('marrowbone', 'crew').text, before = wAdvState('crew'); wSetFlag('q_shiplog'); const log = wSay('marrowbone', 'log').text; const c = wSay('marrowbone', 'crew').text; return { a, before, log, c, s: " + ST + " }; })()")
-        check(r['before'] is None and 'CREW' in r['log'], 'it doesn\'t start before the log is home; then Marrowbone talks about the CREW', r)
+        r = await pg.evaluate("(() => { const a = wSay('marrowbone', 'crew').text, before = wAdvState('crew'); wAddItem('shiplog', 1); const log = wSay('marrowbone', 'log').text; const c = wSay('marrowbone', 'crew').text; return { a, before, log, c, s: " + ST + " }; })()")
+        check(r['before'] is None and 'CREW' in r['log'], 'it doesn\'t start before the log is home; handing it over, Marrowbone talks about the CREW', r)
         check('Bosun' not in r['a'] and 'Gale' in r['c'] and r['s']['st'] == 'active', 'asking about the CREW then starts it, with the five names', r)
 
         # ---------- 1. the four, and Pip ----------
@@ -108,7 +108,11 @@ async def main():
           return { s: """ + ST + """, gale: g ? [g.kind, g.lvl] : null, lv, relic: RUN.relics.includes('marigold'), card: RUN.deck.some(c => c.id === 'adv_anchor'), j }; })()""")
         check(r['s']['st'] == 'won' and not r['s']['marks'].get('won'), 'losing the reunion still finishes the story', r['s'])
         check(r['gale'] == ['troll', r['lv']] and r['relic'] and r['card'], 'Bosun Gale joins at the team\'s level, with Drop Anchor and the Marigold\'s Flag', r)
-        check('played their last game' in r['j'] and 'beat the champions' not in r['j'] and 'Bosun Gale waits in Saltmere' in r['j'], 'the journal tells the losing ending, and where Gale waits', r['j'][:400])
+        check('played their last game' in r['j'] and 'beat the champions' not in r['j'] and 'Bosun Gale is with you' in r['j'] and 'in Saltmere' in r['j'], 'the journal tells the losing ending, that Gale is with you, and where to find him next time', r['j'][:400])
+        r = await pg.evaluate("""(() => { const M = MAPS.saltmere; wEnterMap('saltmere', M.spawn[0], M.spawn[1]); const n = M.npcs.find(x => x.id === 'adv_gale'), off = n.x < 0;
+          const f0 = RUN.fans || 0; fire('fightWon'); const fans = (RUN.fans || 0) - f0; return { off, fans }; })()""")
+        check(r['off'], 'while Gale plays for you, his place on the quay is empty', r)
+        check(r['fans'] == 3, 'the Marigold\'s Flag works: 3 more fans after a win', r)
         await pg.evaluate(CLOSE_ALL)
         await pg.evaluate("""(s) => { const o = JSON.parse(s); localStorage.setItem(wAdvKey(), o.adv); WG.roster = o.roster; RUN.relics = o.relics; RUN.deck = o.deck; WG.advRec = o.rec || {}; WG.advItems = o.items || {}; }""", snap)
         r = await pg.evaluate("""(() => { RUN.games.push({ us: 5, them: 2, sport: 'soccer' }); W_ON_END.adv('win', 'crew:1:1', { kind: 'adv' }); wOpenJournal('adv'); const j = document.getElementById('wJBody').textContent;
@@ -122,6 +126,8 @@ async def main():
 
         # ---------- a new journey ----------
         await new_journey(pg)
+        r = await pg.evaluate("(() => { const M = MAPS.saltmere; wEnterMap('saltmere', M.spawn[0], M.spawn[1]); const n = M.npcs.find(x => x.id === 'adv_gale'); return [n.x, n.y]; })()")
+        check(r == [18, 26], 'on a new journey (without him) Gale is back on the quay', r)
         r = await pg.evaluate("""(() => { while (wRoster().length < W_PARTY.max) wAddPlayer(wMakePlayer({ kind: 'dwarf' }, 'tavern'));
           const full = wSay('adv_gale', 'join').text, items = RUN.relics.includes('marigold') && RUN.deck.some(c => c.id === 'adv_anchor'), gale = wRoster().some(p => p.n === 'Bosun Gale'); WG.roster.pop();
           return { full, items, gale }; })()""")
@@ -129,6 +135,12 @@ async def main():
         r = await pg.evaluate("""(() => { const had = wRoster().some(p => p.n === 'Bosun Gale'); const t = wSay('adv_gale', 'join').text;
           return { had, t, now: wRoster().some(p => p.n === 'Bosun Gale'), relic: RUN.relics.includes('marigold'), card: RUN.deck.some(c => c.id === 'adv_anchor'), again: wSay('adv_gale', 'join').text }; })()""")
         check(not r['had'] and r['now'] and r['relic'] and r['card'] and 'already with you' in r['again'] and await pg.evaluate("RUN.deck.filter(c => c.id === 'adv_anchor').length") == 1, 'with room made, Gale joins on the quay (and the card isn\'t given twice)', r)
+        # ---------- hardcore: losing the reunion ends the story, and pays nothing into the ending journey ----------
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate("""(() => { PROFILES.cur = 'crewHC'; const S = wAdvAll(); S.a.crew = { st: 'active', ch: 1, done: [0], items: {}, learned: [], since: '2026-11-06' }; wAdvSave(S);
+          WG.hardcore = 1; const why = wAdvStartMatch('crew', 1), f0 = RUN.fans || 0, g0 = RUN.gold, n0 = wRoster().length; wMatchLost('lose');
+          const A = wAdvState('crew'); PROFILES.cur = 'guest'; return { why, st: A.st, fans: (RUN.fans || 0) - f0, gold: RUN.gold - g0, joined: wRoster().length - n0 }; })()""")
+        check(r['why'] == '' and r['st'] == 'won' and r['fans'] == 0 and r['gold'] == 0 and r['joined'] == 0, 'a hardcore loss of the reunion ends the story but pays nothing into the ending journey', r)
         check(not errs, 'no page errors', errs)
         await br.close()
     print('errors:', FAILS)
