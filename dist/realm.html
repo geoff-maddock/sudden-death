@@ -34791,13 +34791,16 @@ renderHelp = function () {
           { k: 'choice', who, kw, q, opts, right, win, lose }, each with t?, learn?, pinnacle?, after? (a step of the
           same chapter that has to be done first), set? (flags: a clue that reveals a place; kept on every journey by
           wAdvReapply), and for a card match rules: 'old' (w67). need can ask for night, season, weather or tide.
-   end.unlock is a reward kept for good: a recruit, or a relic and cards, handed over once a journey (WG.advRec).
+   A match step with always: true counts win or lose (a win sets marks[step.mark], for end.tWin).
+   end.unlock is a reward kept for good: a recruit (lvl 'team' joins at the team's level) and/or a relic and cards,
+   handed over when the story ends and then once a journey by asking (WG.advRec).
    A chapter's steps go in order, or in any order with any: true. W_ADV_ITEMS are adventure items, kept on the
    profile (not WG.items, which every journey starts empty).
 
    Storage: pkey('sd-realm-adv') = { a: { advId: { st: 'active'|'won'|'lost', ch, done: [step], items: { id: n },
    learned: [{ t, d }], since, ended?, why? } }, rec: {} }, written the moment anything changes, so reloading a journey
-   save can't undo a pinnacle. WG.advRec = { advId: 1 } marks a reward character recruited this journey. Nothing is
+   save can't undo a pinnacle. WG.advRec = { advId: 1 } marks a kept reward handed over this journey, WG.advItems its
+   trophy and cards (given at once, while a player can wait for room). Nothing is
    stored in LAB.
 
    Matches start with kind 'adv' and ref '<advId>:<chapter>:<step>'; W_ON_END.adv checks the result against the
@@ -34885,22 +34888,39 @@ function wAdvReapply(S) {
   }
   if (any) wInvalidate('world');
 }
-/* a kept reward that isn't a player: a trophy and cards, handed over once a journey */
+/* the reward kept for good, handed over once a journey: a player (who needs room on the team), a trophy, cards.
+   Returns 'given', 'full' (a player waits until there's room), 'already' or 'none' */
 function wAdvGiveKeep(D) {
-  const U = D.end && D.end.unlock; if (!U || U.recruit) return false;
-  WG.advRec = WG.advRec || {};
-  if (WG.advRec[D.id]) return false;
+  const U = D.end && D.end.unlock; if (!U) return 'none';
+  WG.advRec = WG.advRec || {}; WG.advItems = WG.advItems || {};
+  let gave = false;
+  // the trophy and cards come at once; only a player waits for room on the team
+  if (!WG.advItems[D.id]) {
+    WG.advItems[D.id] = 1;
+    if (U.relic && RELICS[U.relic] && !RUN.relics.includes(U.relic)) { gainRelic(U.relic); wLog(`Received the ${RELICS[U.relic].n}.`, 'm'); gave = true; }
+    if (U.cards) { wPayCards({ cards: U.cards }, D.title); gave = true; }
+  }
+  if (!U.recruit) { WG.advRec[D.id] = 1; return gave ? 'given' : 'already'; }
+  if (WG.advRec[D.id]) return 'already';
+  if (!LAB && wRoster().length >= W_PARTY.max) return 'full';
   WG.advRec[D.id] = 1;
-  if (U.relic && RELICS[U.relic] && !RUN.relics.includes(U.relic)) { gainRelic(U.relic); wLog(`Received the ${RELICS[U.relic].n}.`, 'm'); }
-  if (U.cards) wPayCards({ cards: U.cards }, D.title);
-  return true;
+  wRecruitTopic(Object.assign({}, U.recruit, U.recruit.lvl === 'team' ? { lvl: typeof wStarLvl === 'function' ? wStarLvl() : 1 } : {}));
+  return 'given';
 }
+function wAdvKeepLine(D, got) {
+  const U = D.end.unlock, who = U.recruit && U.recruit.n;
+  if (got === 'given') return U.t || (who ? `${who} joins you.` : 'This is yours.');
+  if (got === 'full') return `${who} would join you, but your team is full. Make room and ask again.`;
+  return who ? `${who} is already with you.` : U.t2 || 'You have it already.';
+}
+/* the ending's words: a better one when the step it names was won (end.tWin, end.winMark) */
+function wAdvEndText(D, A) { const E = D.end || {}; return E.tWin && A && A.marks && A.marks[E.winMark || 'won'] ? E.tWin : E.t || ''; }
 function wAdvWin(id) {
   const D = wAdv(id); if (!D) return;
   const E = D.end || {};
-  if (WG && !LAB) wLog(`${D.title}: ${E.t || 'the end'}`, 'g');
+  if (WG && !LAB) wLog(`${D.title}: ${wAdvEndText(D, wAdvState(id)) || 'the end'}`, 'g');
   wAdvPay(E.pay, D.title);
-  if (WG && RUN) wAdvGiveKeep(D);
+  if (WG && RUN && E.unlock && wAdvGiveKeep(D) === 'full') wLog(`${E.unlock.recruit.n} will join you when there's room on the team: ask ${wChar(E.unlock.at).name} about ${E.unlock.kw.toUpperCase()}.`, 'm');
   if (E.feat && typeof wStarsAll === 'function') { const S = wStarsAll(); if (!S.un[E.feat]) { S.un[E.feat] = wAdvToday(); wStarsSave(S); } }
 }
 function wAdvLose(id, why) {
@@ -34928,13 +34948,8 @@ function wAdvTalk(id, kw) {
     const U = D.end && D.end.unlock;
     if (A && A.st === 'won' && U && U.at === id && wKwHit(U.kw, kw)) {
       WG.advRec = WG.advRec || {};
-      if (!U.recruit) return wAdvGiveKeep(D) ? { text: U.t || 'This is yours.', key: U.kw } : { text: U.t2 || 'You have it already.', key: U.kw };
-      if (WG.advRec[D.id]) return { text: `${U.recruit.n} is already with you.`, key: U.kw };
-      // marked only once they join: with a full team they wait until you make room
-      if (!LAB && wRoster().length >= W_PARTY.max) return { text: `${U.recruit.n} would join you, but your team is full. Make room and ask again.`, key: U.kw };
-      WG.advRec[D.id] = 1;
-      wRecruitTopic(U.recruit);
-      return { text: U.t || `${U.recruit.n} joins you.`, key: U.kw };
+      // marked only once given: with a full team a player waits until you make room
+      return { text: wAdvKeepLine(D, wAdvGiveKeep(D)), key: U.kw };
     }
     // the start
     const St = D.starter;
@@ -35056,7 +35071,10 @@ W_ON_END.adv = function (r, ref, W) {
   const R = wAdvRef(ref), A = wAdvState(R.id), D = wAdv(R.id);
   if (!A || !D || A.st !== 'active' || A.ch !== R.ch || !wAdvLive(R.id).some(L => L.si === R.si)) return;
   const step = D.chapters[R.ch].steps[R.si], kick = A.kick && A.kick.ref === ref ? A.kick : null;
-  if (wAdvCondMet(step, wAdvMatchFacts(r, W), W, kick)) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
+  const met = wAdvCondMet(step, wAdvMatchFacts(r, W), W, kick);
+  // a game that counts win or lose (always): a win marks it, for the better ending
+  if (step.always) { if (met && step.mark) wAdvEdit(R.id, A2 => { A2.marks = Object.assign({}, A2.marks, { [step.mark]: 1 }); }); wLog((met ? step.win : step.lose) || '', met ? 'g' : 'm'); wAdvDone(R.id, R.si); return; }
+  if (met) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
   if (step.pinnacle) { wAdvLose(R.id, step.lose || 'You lost.'); return; }
   if (step.lose) wLog(step.lose, 'd');
 };
@@ -35169,9 +35187,9 @@ function wAdvJournalHtml(S) {
         ${items.length ? `<p>Carrying: ${items.join(', ')}.</p>` : ''}${next ? `<p>Next game: ${wAdvCondText(next.step).map(esc).join(' ')}</p>` : ''}</div>`);
     } else if (A.st === 'won') {
       const U = D.end && D.end.unlock, home = U ? wAdvHome(U.at) : '';
-      const keep = !U ? '' : U.recruit ? `${esc(U.recruit.n)} waits with ${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''}: ask about ${esc(U.kw.toUpperCase())}.`
+      const keep = !U ? '' : U.recruit ? `${esc(U.recruit.n)} waits ${wChar(U.at).name === U.recruit.n ? '' : 'with ' + esc(wChar(U.at).name) + ' '}${home ? 'in ' + esc(home) : ''} for every journey: ask about ${esc(U.kw.toUpperCase())}.`
         : `${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''} keeps your reward${U.relic && RELICS[U.relic] ? ' (the ' + esc(RELICS[U.relic].n) + ')' : ''} for every journey: ask about ${esc(U.kw.toUpperCase())}.`;
-      won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc((D.end && D.end.t) || '')}</p>${keep ? `<p class="hint">${keep}</p>` : ''}</div>`);
+      won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc(wAdvEndText(D, A))}</p>${keep ? `<p class="hint">${keep}</p>` : ''}</div>`);
     } else {
       lost.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc(D.lostText || 'It ended badly.')}</p>${A.why ? `<p class="hint">${esc(A.why)}</p>` : ''}</div>`);
     }
@@ -35373,6 +35391,98 @@ renderHelp = function () {
   const h = $('wHelp'); if (!h || $('wHelpTide')) return;
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpOldRules"><b>Old rules.</b> Some games are played the way the League's founders played: no gear, no set plays, no Hall of Fame cards, and your trophies sit the game out. Your other cards play as usual, and everything comes back when the game ends. The game card says when a game is under old rules.</p>`);
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpTide"><b>The tide.</b> The Brinefen coast has two low waters a day, two hours each, and they come about 48 minutes later every day. Captain Marrowbone in Saltmere will tell you when (ask about the TIDE).</p>`);
+};
+/* w68: adventures, phase 3 (issue #47): The Marigold's Crew. The Marigold carried the last champion team before
+   Vance's run and was lost on the outer sands. Captain Marrowbone always said the crew lived, and the ship's log
+   (q_shiplog) lists five who swam for it. The story starts once the log is home (the first time; after that it
+   carries across journeys), and it can't be lost: the last game counts win or lose.
+
+     1  Four who swam, one who didn't (any order). Each lives somewhere new and comes back only for the sport they
+        loved, in every engine:
+          Bosun Gale     a troll, minding the harbour light on the Saltmere quay: a BASEBALL game (the diamond)
+          Kestrel Ashby  a harpy, mining at Cinderhold: a boxing card of three BOUTS (the ring)
+          Liss Varo      an elf at the Rimewatch abbey: SOCCER in a blizzard (the card game)
+          Coach Horne    a minotaur coaching children at Mossgate: a FOOTBALL game against his pupils (the gridiron)
+          Pip Tarrow     never made it. Dusty Rowe, who coached them, knows where the crew buried Pip: on the dunes
+                         by the wreck
+     2  One last game: the four play you together at the Crown (ask Herald Pim for the REUNION). Win or lose, the
+        story ends; a win gets the better ending.
+   Reward, kept for good: Bosun Gale joins at the team's level (and on any later journey, ask him to JOIN on the
+   Saltmere quay), with Drop Anchor (a Hall of Fame card) and the Marigold's Flag (a trophy no pool offers: 3 more
+   fans after every win).
+
+   The four stand in their cities beside the training coaches (w23), on open ground the test checks.
+   Wraps: wSay (wW68Say: Marrowbone's CREW hint once the log is home, until the story starts). */
+
+/* ---------- the four, placed in their cities ---------- */
+const W_CREW = [
+  { id: 'adv_gale', city: 'saltmere', at: [18, 26], name: 'Bosun Gale', kind: 'troll', look: { coat: '#235c9c', acc: 'hat', hair: '#8a857e' },
+    greet: 'Mind the rope. The light does not mind itself.', job: 'I mind the harbour light here on the quay. Quiet work. I used to play first base for a living.' },
+  { id: 'adv_kestrel', city: 'cinderhold', at: [32, 26], name: 'Kestrel Ashby', kind: 'harpy', look: { coat: '#5a3a2a', acc: 'goggles', hair: '#1a1210' },
+    greet: 'You are standing on my pick.', job: 'Seam work, deep shift. I box on Sundays to keep my hands honest.' },
+  { id: 'adv_liss', city: 'rimewatch', at: [30, 11], name: 'Liss Varo', kind: 'elf', look: { coat: '#bfe6f2', acc: 'robe', hair: '#f2c14e' },
+    greet: 'The abbey is closed to visitors. I am not, apparently.', job: 'I copy books for the abbey. I kick a ball against its wall when nobody is looking.' },
+  { id: 'adv_horne', city: 'mossgate', at: [9, 12], name: 'Coach Horne', kind: 'minotaur', look: { coat: '#4a6a4a', acc: 'cap', hair: '#6c625c', tall: 1 },
+    greet: 'Whistle first, questions after.', job: 'I coach the Mossgate youngsters. Football, mostly. They are better than you would think.' },
+];
+for (const C of W_CREW) {
+  W_CITIES[C.city].npcs.push([C.id, C.at[0], C.at[1], 1]);
+  DB.chars[C.id] = { name: C.name, kind: C.kind, look: C.look, greet: C.greet, topics: { job: { t: C.job } } };
+}
+// what each says about the Marigold when the story isn't answering (before it starts, or once their part is done)
+DB.chars.adv_gale.topics.marigold = { t: 'She was a good ship. I do not talk about her much.' };
+DB.chars.adv_kestrel.topics.marigold = { t: 'Old news. Mine it somewhere else.' };
+DB.chars.adv_liss.topics.marigold = { t: 'I copied her log once, for the abbey. I did not tell them I was in it.' };
+DB.chars.adv_horne.topics.marigold = { t: 'I tell the youngsters about her when they will not listen to anything else.' };
+DB.chars.marrowbone.topics.crew = { t: 'They lived. I know they did. The log says where they swam for, if you have the log.' };
+
+/* ---------- the reward ---------- */
+RELICS.marigold = { n: "The Marigold's Flag", adv: 1, desc: 'After every win, 3 more fans come to watch.', ico: 'horn' };
+TROPHY_FX.marigold = { on: { fightWon: () => { RUN.fans = (RUN.fans || 0) + 3; } } };
+K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 12], ['s', 'weak', 1, 'all']], { fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
+
+/* ---------- the story ---------- */
+W_ADV.push({
+  id: 'crew', title: "The Marigold's Crew", regions: ['tide', 'ember', 'rime', 'bloom', 'plains'],
+  teaser: 'The Marigold\'s champion crew, scattered across the realm since the wreck.',
+  rumours: ['Captain Marrowbone in Saltmere swears the Marigold\'s CREW lived. Nobody believes him. Bring him the ship\'s log and ask.',
+    'There is a troll on the Saltmere quay who will not talk about a ship called the Marigold. Marrowbone knows about the CREW.'],
+  starter: { who: 'marrowbone', kw: 'crew', need: ['q_shiplog'], learn: 'The Marigold\'s log lists five who swam: Bosun Gale for the Saltmere quay, Kestrel Ashby for Cinderhold, Liss Varo for the Rimewatch abbey, and Horne for Mossgate. Pip Tarrow: Dusty Rowe, who coached them, would know.',
+    t: 'The last page of the log. Five names, and where each swam for. Gale, for the Saltmere quay. Kestrel Ashby, for Cinderhold. Liss Varo, for the abbey at Rimewatch. Horne, for Mossgate. And Pip Tarrow. Dusty Rowe coached them; ask him about Pip. Ask each of the others about the MARIGOLD.' },
+  chapters: [
+    { t: 'Four who swam, one who didn\'t', sum: 'Find the crew: Bosun Gale in Saltmere, Kestrel Ashby in Cinderhold, Liss Varo in Rimewatch and Coach Horne in Mossgate (ask each about the MARIGOLD), and ask Dusty Rowe in Graftonbury about PIP.', pay: { gold: 80, fans: 20 }, any: true, steps: [
+      { k: 'talk', who: 'adv_gale', kw: 'marigold', t: 'Marrowbone sent you. Course he did. I will come back for one game with the old crew, if you show me you can play mine first. BASEBALL. Nine innings.', learn: 'Bosun Gale will come back if you beat him at BASEBALL.' },
+      { k: 'match', who: 'adv_gale', kw: 'baseball', after: 0, engine: 'ball', tier: 2, club: 'local', t: 'Gale whistles up a side from the quay. "Nine innings. Play ball."',
+        win: 'Gale laughs till the light shakes. "All right. One last game."', lose: 'Gale coils his rope. "Again, when your swing is better."' },
+      { k: 'talk', who: 'adv_kestrel', kw: 'marigold', t: 'Gale is alive? Then so am I, I suppose. I will play the old crew\'s game if you go three BOUTS with my Sunday lot first.', learn: 'Kestrel Ashby will come back if you win a card of three BOUTS.' },
+      { k: 'match', who: 'adv_kestrel', kw: 'bouts', after: 2, engine: 'ring', tier: 2, club: 'local', t: 'Kestrel tapes her hands. "Three bouts. Pick your order."',
+        win: 'Kestrel grins through a split lip. "Fine. I will be there."', lose: '"Come back with harder hands."' },
+      { k: 'talk', who: 'adv_liss', kw: 'marigold', t: 'I have been waiting for someone to ask. I will come, but you will play me first: SOCCER, in the snow, the way we played on the deck in the Frostspire crossings.', learn: 'Liss Varo will come back if you win a game of SOCCER in a Rimewatch blizzard.' },
+      { k: 'match', who: 'adv_liss', kw: 'soccer', after: 4, engine: 'card', sport: 'soccer', tier: 2, cond: { weather: 'blizzard' }, t: 'Liss pulls her hood up. "Snow on the ball. Just like the crossings."',
+        win: 'Liss is laughing as the snow comes down. "I will tell the abbey I am going on a pilgrimage."', lose: '"The snow beat you, not me. Come back in the next blizzard."' },
+      { k: 'talk', who: 'adv_horne', kw: 'marigold', t: 'My youngsters have heard about the Marigold their whole lives. Play them at FOOTBALL. If they beat you, they will never let me forget it. If you beat them, I will come.', learn: 'Coach Horne will come back if you beat his pupils at FOOTBALL.' },
+      { k: 'match', who: 'adv_horne', kw: 'football', after: 6, engine: 'grid', tier: 1, club: 'local', t: 'The youngsters line up, very serious. Horne blows the whistle.',
+        win: 'The youngsters mob Horne. "Go on, coach. Go and play."', lose: 'The youngsters are unbearable about it. "Again," says Horne, "when you can stand the shame."' },
+      { k: 'talk', who: 'rowe', kw: 'pip', set: ['clue_marigold'], t: 'Pip. Fastest wing I ever coached. Pip went back for the others and did not come up. The crew buried Pip on the dunes by the wreck. Go and see. Say I sent you.', learn: 'Pip Tarrow went back for the others. The crew buried Pip on the dunes by the Marigold wreck.' },
+      { k: 'visit', loc: 'marigold', after: 8, t: 'On the dunes above the wreck, a cairn of driftwood. Carved on the top plank: PIP TARROW, WHO WENT BACK.', learn: 'You found Pip\'s cairn on the dunes above the wreck.' }] },
+    { t: 'One last game', sum: 'The four will play you together at the Crown Coliseum. Ask Herald Pim for the REUNION game.', steps: [
+      { k: 'talk', who: 'marrowbone', kw: 'crew', t: 'All four. And Pip\'s cairn. ... They want one last game together, at the Crown, against you. Ask Herald Pim for the REUNION.', learn: 'The crew will play you at the Crown Coliseum. Ask Herald Pim for the REUNION.' },
+      { k: 'match', who: 'herald', kw: 'reunion', after: 0, engine: 'card', tier: 3, type: 'elite', name: 'The Marigold Crew', always: true, mark: 'won',
+        t: 'Herald Pim has hung the Marigold\'s colours over the Coliseum gate. The old crew, together again, against you. Win or lose, this is the last game.',
+        win: 'You beat the Marigold crew. They carry you off the pitch anyway.', lose: 'The Marigold crew win one more. They are crying, and so is Marrowbone.' }] }],
+  end: { t: 'the Marigold crew played their last game, and Bosun Gale is going with you.', tWin: 'you beat the champions of the Marigold in their last game, and Bosun Gale is going with you.',
+    pay: { gold: 150, fans: 30 },
+    unlock: { at: 'adv_gale', kw: 'join', recruit: { kind: 'troll', n: 'Bosun Gale', lvl: 'team', flav: 'First base on the Marigold, the last champions before Vance. Drops anchor when it matters.' },
+      relic: 'marigold', cards: ['adv_anchor'], t: 'Gale picks up his old glove. "Right. Where are we playing?"' } },
+});
+
+/* Marrowbone hints at the crew once the log is home (until the story starts) */
+const wW68Say = wSay;
+wSay = function (id, kw) {
+  const r = wW68Say(id, kw);
+  if (id === 'marrowbone' && WG && r && r.key === 'log' && wFlag('q_shiplog') && !wAdvState('crew') && r.text === DB.chars.marrowbone.topics.log.t2)
+    r.text += ' Five names on the last page. The CREW lived, I tell you.';
+  return r;
 };
 </script>
 </body></html>
