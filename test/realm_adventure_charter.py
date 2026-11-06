@@ -74,9 +74,20 @@ async def main():
         r = await pg.evaluate("(() => { const b = document.getElementById('wAdvMarks'); const was = b.checked; b.click(); return { was, now: SET.advMarks, saved: JSON.parse(localStorage.getItem('sd-settings')).advMarks }; })()")
         check(r == {'was': False, 'now': True, 'saved': True}, 'the Settings panel has an Adventure markers switch, and it is saved', r)
         await pg.evaluate(CLOSE_ALL)
-        r = await pg.evaluate("(() => { wOpenMap('world'); const cv = document.getElementById('wMapCv'); return !!cv && cv.width > 0; })()")
-        check(r, 'the world map draws with the markers on')
+        r = await pg.evaluate("""(() => { wOpenMap('world'); const cv = document.getElementById('wMapCv'), S = W_MAP.px, M = wAdvMarks()[0];
+          const px = cv.getContext('2d').getImageData(M.x * S + S / 2 + 10, M.y * S + S / 2 - 2, 1, 1).data, key = (document.getElementById('wAdvKey') || {}).textContent || '';
+          return { px: [px[0], px[1], px[2]], key }; })()""")
+        check(abs(r['px'][0] - 0xd9) < 12 and abs(r['px'][1] - 0xa6) < 12 and abs(r['px'][2] - 0x2e) < 12, 'the world map draws the gold marker beside Graftonbury', r)
+        check('The Lost Charter' in r['key'] and 'Graftonbury' in r['key'], 'and the map key says it is for The Lost Charter, at Graftonbury', r['key'])
         await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate("""(() => { const M = MAPS.graftonbury; wEnterMap('graftonbury', M.spawn[0], M.spawn[1]); wFogRevealAll('graftonbury'); wOpenMap();
+          const n = M.npcs.find(x => x.id === 'vesper'), S = wMapPx(M), cv = document.getElementById('wMapCv'), px = cv.getContext('2d').getImageData(n.x * S + S / 2 + 7, n.y * S + S / 2, 1, 1).data;
+          return { key: (document.getElementById('wAdvKey') || {}).textContent || '', px: [px[0], px[1], px[2]] }; })()""")
+        check('Gant Vesper' in r['key'] and abs(r['px'][0] - 0xd9) < 25 and abs(r['px'][1] - 0xa6) < 25, 'in Graftonbury the town map rings Gant Vesper in gold and names him in the key', r)
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate("""(() => { const S = wAdvAll(); const keep = JSON.stringify(S); S.a.charter.ch = 1; S.a.charter.done = []; wAdvSave(S); const flag = WG.flags.clue_shrine; delete WG.flags.clue_shrine;
+          const marks = wAdvMarks().map(m => m.loc); localStorage.setItem(wAdvKey(), keep); if (flag) WG.flags.clue_shrine = flag; return marks; })()""")
+        check('hollowshrine' not in r, 'a place the story has not revealed yet is never marked', r)
         await pg.evaluate("(() => { SET.advMarks = false; saveSettings(); })()")
 
         # ---------- 1. Vesper ----------

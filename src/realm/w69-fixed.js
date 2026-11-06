@@ -6,7 +6,7 @@
         journal only ever calls it "the club they're paying", so a story carried to a new journey stays true). You
         win, and they clearly threw it.
      2  Three clues and a name, in any order:
-          a marked ball      the Graftonbury Ballpark keeper kept one; beat her side at baseball for it
+          a marked ball      the Graftonbury Ballpark keeper kept one; beat the keeper's side at baseball for it
           a ledger page      on the Saltmere docks, after dark: payments, signed O.V.
           the referee        Referee Dunmore in Rimewatch called games as he was paid to. He'll tell the League,
                              once you win a game with his CROOKED calls against you (every opposing player starts

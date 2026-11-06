@@ -104,7 +104,7 @@ finishFight = function () { try { return wW67FinishFight.apply(this, arguments);
 // (measured with the realm lab, docs/realm/BALANCE.md: 1 Strength and 1 Footwork every fight was far too strong for a
 // reward handed over at the start of every later journey)
 RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 4 Block.', ico: 'boot' };
-TROPHY_FX.founders = { on: { fightStart: () => { B.P.block += 4; } } };
+TROPHY_FX.founders = { on: { fightStart: () => { gainBlock(4, true); } } };
 Object.assign(RELICS.founders, TROPHY_FX.founders); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 const wSdRelicPool = relicPool;
 // (and none you own: during an old-rules game your trophies are set aside in RUN.oldRelics, not gone)
