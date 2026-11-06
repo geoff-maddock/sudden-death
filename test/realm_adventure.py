@@ -45,6 +45,10 @@ TEST_ADV = r"""(() => { if (wAdv('adv_t1')) return;
     chapters: [{ t: 'One', steps: [{ k: 'talk', who: 'rowe', kw: 'finish', t: 'Finished.' }] }], end: { t: 'Done.', feat: 'djinn' } });
   W_ADV.push({ id: 'adv_t3', title: 'Test Three', starter: { who: 'clerk', kw: 'grudge', t: 'A grudge.' }, lostText: 'It ended badly.',
     chapters: [{ t: 'One', steps: [{ k: 'match', who: 'clerk', kw: 'showdown', engine: 'card', tier: 1, ids: ['cheer', 'cheer'], pinnacle: true, win: 'Won.', lose: 'Lost.' }] }] });
+  W_ADV.push({ id: 'adv_t4', title: 'Test Four', starter: { who: 'clerk', kw: 'nightgame' },
+    chapters: [{ t: 'One', steps: [{ k: 'match', who: 'clerk', kw: 'lamps', engine: 'card', tier: 1, ids: ['cheer', 'cheer'], cond: { night: true }, win: 'Won.', lose: 'Lost.' }] }] });
+  W_ADV.push({ id: 'adv_t5', title: 'Test Five', starter: { who: 'clerk', kw: 'hardline' }, lostText: 'Gone.',
+    chapters: [{ t: 'One', steps: [{ k: 'match', who: 'clerk', kw: 'onechance', engine: 'card', tier: 1, ids: ['cheer', 'cheer'], pinnacle: true, win: 'Won.', lose: 'Lost.' }] }] });
 })()"""
 ST = "((id) => { const A = wAdvState(id); return A && { st: A.st, ch: A.ch, done: A.done, items: A.items, why: A.why || '' }; })"
 def st(i): return f"{ST}('{i}')"
@@ -70,7 +74,7 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
         await new_journey(pg, clear=True)
-        check(await pg.evaluate("W_ADV.length === 3 && W_ADV_CFG.key === 'sd-realm-adv'"), 'the test adventures are registered (the game ships none)')
+        check(await pg.evaluate("W_ADV.length === 5 && W_ADV_CFG.key === 'sd-realm-adv'"), 'the test adventures are registered (the game ships none)')
 
         # ---------- the store ----------
         r = await pg.evaluate("(() => { localStorage.setItem(wAdvKey(), '{bad'); let ok = true, v; try { v = wAdvAll(); } catch (e) { ok = String(e); } localStorage.removeItem(wAdvKey()); return { ok, v }; })()")
@@ -98,13 +102,17 @@ async def main():
         check(r['done'] == [0] and r['items'] == {'adv_tok': 1}, 'going to Saltmere does the visit step and finds the token', r)
         r = await pg.evaluate(f"(() => {{ const t = wSay('rowe', 'toke').text; return {{ t, s: {st('adv_t1')} }}; }})()")
         check(r['t'] == 'Ah, my token.' and r['s']['ch'] == 1, 'a talk step answers to the first four letters too', r)
-        r = await pg.evaluate("wSay('clerk', 'friendly').act")
-        check(r == 'adv:adv_t1:0', 'a live match step offers the game', r)
+        r = await pg.evaluate("(() => { const a = wSay('clerk', 'friendly'); return { act: a.act, t: a.text }; })()")
+        check(r['act'] == 'adv:adv_t1:0' and r['t'], 'a live match step offers the game (and says something, though the step has no line)', r)
         r = await pg.evaluate(f"(() => {{ {SET}('adv_t1', {{ ch: 2 }}); wSay('clerk', 'beta'); const a = {st('adv_t1')}; wSay('rowe', 'alpha'); return {{ a, b: {st('adv_t1')} }}; }})()")
         check(r['a']['done'] == [1] and r['b']['ch'] == 3, 'an any-order chapter takes its steps in either order', r)
         r = await pg.evaluate(f"""(() => {{ {SET}('adv_t1', {{ st: 'won', ch: 4 }}); const n0 = wRoster().length, a = wSay('rowe', 'veteran').text, n1 = wRoster().length, b = wSay('rowe', 'veteran').text;
           return {{ a, b, add: n1 - n0, again: wRoster().length - n1, testa: wRoster().some(p => p.n === 'Old Testa') }}; }})()""")
         check(r['a'] == 'Testa joins.' and r['add'] == 1 and r['again'] == 0 and r['testa'], 'the reward character joins once a journey', r)
+        r = await pg.evaluate("""(() => { WG.roster = WG.roster.filter(p => p.n !== 'Old Testa'); delete WG.advRec.adv_t1; while (wRoster().length < W_PARTY.max) wAddPlayer(wMakePlayer({ kind: 'dwarf' }, 'tavern'));
+          const full = wSay('rowe', 'veteran').text, marked = !!WG.advRec.adv_t1; WG.roster.pop(); const t = wSay('rowe', 'veteran').text;
+          return { full, marked, t, testa: wRoster().some(p => p.n === 'Old Testa') }; })()""")
+        check('team is full' in r['full'] and not r['marked'] and r['t'] == 'Testa joins.' and r['testa'], 'with a full team they wait until you make room, rather than being lost for the journey', r)
         await pg.evaluate("wSave()")
         await new_journey(pg)
         r = await pg.evaluate(f"(() => {{ const s = {st('adv_t1')}, had = wRoster().some(p => p.n === 'Old Testa'); wSay('rowe', 'veteran'); return {{ s, had, now: wRoster().some(p => p.n === 'Old Testa') }}; }})()")
@@ -137,6 +145,19 @@ async def main():
         check(r['s']['ch'] == 2, 'a simulated baseball game settles through the adventure (a win moves on)', r)
         await pg.evaluate(CLOSE_ALL)
 
+        # ---------- conditions that can't be met aren't offered; night is judged at kickoff ----------
+        r = await pg.evaluate("""(() => { const n0 = wIsNight; wIsNight = () => false; wSay('clerk', 'nightgame'); wRunAct(wSay('clerk', 'lamps').act, 'clerk');
+          const why = (document.getElementById('wAdvWhy') || {}).textContent || '', off = document.getElementById('wAdvPlay').disabled, start = wAdvStartMatch('adv_t4', 0);
+          wIsNight = n0; return { why, off, start, fight: !!RUN.pending }; })()""")
+        check('after dark' in r['why'] and r['off'] and 'after dark' in r['start'] and not r['fight'], "a night game in daylight says why and won't start", r)
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate(f"""(() => {{ const n0 = wIsNight; wIsNight = () => false; const S = wAdvAll(); S.a.adv_t4.kick = {{ ref: 'adv_t4:0:0', night: 1 }}; wAdvSave(S);
+          W_ON_END.adv('win', 'adv_t4:0:0', {{ kind: 'adv' }}); const a = {st('adv_t4')}; wIsNight = n0; return a; }})()""")
+        check(r['st'] == 'won', 'a game that kicked off at night counts as a night game, whatever the clock says at the end', r)
+        r = await pg.evaluate("""(() => { const X = wRoster()[0].id, seven = wRoster().slice(1, 8).map(p => p.id); while (seven.length < 7) seven.push(null);
+          return { bench: wAdvStarted({ pid: X }, { ids: seven.concat([X]) }, 'grid'), start: wAdvStarted({ pid: X }, { ids: [X].concat(seven.slice(0, 6)) }, 'grid') }; })()""")
+        check(r['bench'] is False and r['start'] is True, "in football a benched player doesn't count as starting", r)
+
         # ---------- a pinnacle ----------
         await pg.evaluate("wSay('clerk', 'grudge')")
         r = await pg.evaluate("(() => { wRunAct(wSay('clerk', 'showdown').act, 'clerk'); const w = document.getElementById('wAdvWarn'); return w && w.textContent; })()")
@@ -164,8 +185,8 @@ async def main():
         # ---------- the journal, the Bag, rumours, How to play ----------
         await pg.evaluate(CLOSE_ALL)
         await pg.evaluate(f"(() => {{ {SET}('adv_t1', {{ ch: 1, items: {{ adv_tok: 1 }} }}); {SET}('adv_t2', {{ st: 'won', ch: 1 }}); }})()")
-        r = await pg.evaluate("""(() => { wOpenJournal(); document.querySelector('[data-jadv]').click(); const t = document.getElementById('wJBody').textContent;
-          const n = document.querySelector('[data-jadv] small').textContent; document.querySelector('[data-jtab=\"people\"]').click(); const back = document.getElementById('wJBody').textContent !== t;
+        r = await pg.evaluate("""(() => { wOpenJournal(); document.querySelector('[data-jtab="adv"]').click(); const t = document.getElementById('wJBody').textContent;
+          const n = document.querySelector('[data-jtab="adv"] small').textContent; document.querySelector('[data-jtab=\"people\"]').click(); const back = document.getElementById('wJBody').textContent !== t;
           return { t, n, back }; })()""")
         check(all(w in r['t'] for w in ['Under way', 'Finished', 'Ended badly', 'Test One', 'Test Two', 'Test Three', 'It ended badly.', 'Win by at least 1.']), 'the Adventures tab shows under way, finished and ended badly', r)
         check(r['n'] == '1' and r['back'], 'the tab counts the active adventures, and the other tabs still work', r)
@@ -179,6 +200,11 @@ async def main():
         check('Nothing worth repeating.' in r['quiet'], 'with every adventure started, there\'s nothing to repeat', r)
         r = await pg.evaluate("(() => { renderHelp(); const e = document.getElementById('wHelpAdventures'); return e ? e.textContent : ''; })()")
         check("can't" in r and 'RUMOURS' in r and 'Test' not in r, 'How to play explains adventures without naming any', r)
+        # ---------- hardcore: a lost pinnacle ends the journey and the adventure ----------
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate(f"""(() => {{ WG.hardcore = 1; wSay('clerk', 'hardline'); const why = wAdvStartMatch('adv_t5', 0); const kind = RUN.pending && RUN.pending.world.kind;
+          wMatchLost('lose'); return {{ why, kind, s: {st('adv_t5')} }}; }})()""")
+        check(r['why'] == '' and r['kind'] == 'adv' and r['s']['st'] == 'lost', 'a hardcore loss at a pinnacle loses the adventure too', r)
         check(not errs, 'no page errors', errs)
         await br.close()
     print('errors:', FAILS)

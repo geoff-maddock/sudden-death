@@ -3,9 +3,8 @@
    badly), the profile's adventure items in the Bag, rumours from the innkeepers (ask about RUMOURS) and on the notice
    boards, and How to play (#wHelpAdventures). The model is in w65.
 
-   Wraps: wRunAct (wW66RunAct: 'adv:<id>:<step>' opens the match or choice card, 'advrumour' tells a rumour),
-   wOpenJournal and wRenderJournal (wW66OpenJournal, wW66RenderJournal: the Adventures tab; its button is data-jadv,
-   not data-jtab, because the journal's own renderer looks every data-jtab up in its own table), wRenderCamp
+   The journal tab registers through W_JTABS / W_JTAB_FN (w19).
+   Wraps: wRunAct (wW66RunAct: 'adv:<id>:<step>' opens the match or choice card, 'advrumour' tells a rumour), wRenderCamp
    (wW66RenderCamp: the Bag's Adventures section), wOpenBoard (wW66OpenBoard: a rumour on the board), renderHelp
    (wW66RenderHelp). */
 
@@ -22,13 +21,14 @@ function wAdvFoeText(step) {
 function wAdvMatchCard(id, si) {
   const D = wAdv(id), step = wAdvStep(id, si); if (!D || !step) return;
   let chose = false;
+  const unmet = wAdvUnmet(step);
   const close = modal(`<header><h3>${esc(D.title)}</h3></header>
     ${step.t ? `<p>${esc(step.t)}</p>` : ''}
     <p><b>The game:</b> ${esc(wAdvFoeText(step))}.</p>
     <ul class="wadvcond">${wAdvCondText(step).map(c => `<li>${esc(c)}</li>`).join('')}</ul>
     ${step.pinnacle ? `<p class="wbad" id="wAdvWarn">${esc(W_ADV_TEXT.warn)}</p>` : ''}
-    <p class="wbad" id="wAdvWhy" hidden></p>
-    <div class="row"><button class="btn" id="wAdvPlay">Play</button><button class="ghost" id="wAdvNo">Not yet</button></div>`,
+    ${unmet.length ? `<p class="wbad" id="wAdvWhy">${unmet.map(esc).join(' ')}</p>` : ''}
+    <div class="row"><button class="btn" id="wAdvPlay"${unmet.length ? ' disabled' : ''}>Play</button><button class="ghost" id="wAdvNo">Not yet</button></div>`,
     () => { if (!chose) wDrain(); });
   $('wAdvNo').onclick = () => close();
   $('wAdvPlay').onclick = () => {
@@ -81,14 +81,14 @@ function wAdvHome(charId) {
   const t = DB.towns.find(T => (T.npcs || []).some(n => n[0] === charId));
   return t ? wTownName(t.id) : '';
 }
-function wAdvJournalHtml() {
-  const S = wAdvAll(), on = [], won = [], lost = [];
+function wAdvJournalHtml(S) {
+  S = S || wAdvAll(); const on = [], won = [], lost = [];
   for (const D of W_ADV) {
     const A = S.a[D.id]; if (!A) continue;
     const learned = A.learned.length ? `<ul>${A.learned.map(l => `<li>${esc(l.t)}</li>`).join('')}</ul>` : '';
     if (A.st === 'active') {
       const C = D.chapters[A.ch] || {}, items = Object.keys(A.items).map(k => `${esc((W_ADV_ITEMS[k] || {}).n || k)}${A.items[k] > 1 ? ' ×' + A.items[k] : ''}`);
-      const next = wAdvLive(D.id).find(L => L.step.k === 'match');
+      const next = wAdvLive(D.id, S).find(L => L.step.k === 'match');
       on.push(`<div class="wjq"><b>${esc(D.title)}</b>: ${esc(C.t || '')}<p class="hint">${esc(C.sum || D.teaser || '')}</p>${learned}
         ${items.length ? `<p>Carrying: ${items.join(', ')}.</p>` : ''}${next ? `<p>Next game: ${wAdvCondText(next.step).map(esc).join(' ')}</p>` : ''}</div>`);
     } else if (A.st === 'won') {
@@ -101,33 +101,8 @@ function wAdvJournalHtml() {
   if (!on.length && !won.length && !lost.length) return `<p class="hint">${esc(W_ADV_TEXT.none)}</p>`;
   return `${on.length ? `<h4>Under way</h4>${on.join('')}` : ''}${won.length ? `<h4>Finished</h4>${won.join('')}` : ''}${lost.length ? `<h4>Ended badly</h4>${lost.join('')}` : ''}`;
 }
-const wW66OpenJournal = wOpenJournal;
-wOpenJournal = function (tab) {
-  const want = tab || WJ.tab;
-  if (want === 'adv') WJ.tab = 'people';
-  wW66OpenJournal(tab === 'adv' ? undefined : tab);
-  const tabs = document.querySelector('#modalBox .wjtabs'); if (!tabs) return;
-  if (!tabs.querySelector('[data-jadv]')) {
-    tabs.insertAdjacentHTML('beforeend', '<button role="tab" data-jadv>Adventures <small></small></button>');
-    tabs.querySelector('[data-jadv]').onclick = () => { WJ.tab = 'adv'; wRenderJournal(); };
-  }
-  if (want === 'adv') { WJ.tab = 'adv'; }
-  wRenderJournal();
-};
-const wW66RenderJournal = wRenderJournal;
-wRenderJournal = function () {
-  const adv = WJ.tab === 'adv';
-  if (adv) WJ.tab = 'people';
-  wW66RenderJournal();
-  if (adv) WJ.tab = 'adv';
-  const box = $('modalBox'), b = box && box.querySelector('[data-jadv]'); if (!b) return;
-  const S = wAdvAll();
-  b.querySelector('small').textContent = W_ADV.filter(D => S.a[D.id] && S.a[D.id].st === 'active').length;
-  b.setAttribute('aria-pressed', adv); b.setAttribute('aria-selected', adv);
-  if (!adv) return;
-  box.querySelectorAll('[data-jtab]').forEach(t => { t.setAttribute('aria-pressed', false); t.setAttribute('aria-selected', false); });
-  $('wJBody').innerHTML = wAdvJournalHtml();
-};
+W_JTABS.push(['adv', 'Adventures']);
+W_JTAB_FN.adv = () => { const S = wAdvAll(); return [W_ADV.filter(D => S.a[D.id] && S.a[D.id].st === 'active').length, wAdvJournalHtml(S)]; };
 
 /* ---------- the Bag ---------- */
 const wW66RenderCamp = wRenderCamp;

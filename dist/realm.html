@@ -7178,10 +7178,13 @@ function wWallText() {
 }
 
 /* ---------- conversation: wSay() is the model, the talk panel in w7 the view ---------- */
-function wFindTopic(ch, kw) { const ks = Object.keys(ch.topics || {}); return ks.find(k => k === kw) || (kw.length >= 4 ? ks.find(k => k.startsWith(kw.slice(0, 4))) : null); }
+/* a typed word asks about a keyword when it is the keyword, or (4 letters or more) starts the same 4 letters */
+function wKwHit(key, kw) { return key === kw || (kw.length >= 4 && key.startsWith(kw.slice(0, 4))); }
+function wNightTalk() { return wDarkness() >= .3; } // when a needNight topic will be talked about
+function wFindTopic(ch, kw) { const ks = Object.keys(ch.topics || {}); return ks.find(k => k === kw) || ks.find(k => k !== kw && wKwHit(k, kw)) || null; }
 function wTopicBlocked(t) {
   if (t.need && [].concat(t.need).some(f => !wFlag(f))) return true;
-  if (t.needNight && wDarkness() < .3) return true;
+  if (t.needNight && !wNightTalk()) return true;
   if (t.takeEn && Object.keys(t.takeEn).some(e => (WG.energy[e] || 0) < t.takeEn[e])) return true;
   if (t.take && !Object.keys(t.take).every(k => wHas(k, t.take[k]))) return true;
   return false;
@@ -12658,6 +12661,8 @@ renderHelp = function () {
 const W_JOURNAL = { wins: 300, plain: ['JOB', 'NAME', 'BYE', 'YES', 'HOME'] };
 const WJ = { tab: 'people', quest: '', word: '', q: '', close: null };
 const W_JTABS = [['people', 'People'], ['places', 'Places'], ['wins', 'Victories'], ['quests', 'Quests']];
+/* a later part adds a tab with W_JTABS.push([key, name]) and W_JTAB_FN[key] = () => [count, html] (w66: Adventures) */
+const W_JTAB_FN = {};
 const W_JWIN_KIND = { cup: 'Cup round', title: 'Title', boss: 'Boss', grudge: 'Grudge', rival: 'Rival' };
 
 /* ---------- the record ---------- */
@@ -12996,6 +13001,8 @@ function wRenderJournal() {
   $('wJWhy').innerHTML = why.join(' ');
   if ($('wJClear')) $('wJClear').onclick = () => { WJ.quest = ''; WJ.word = ''; WJ.q = ''; $('wJFind').value = ''; wRenderJournal(); };
   const tabs = { people: wJPeople(), places: wJPlaces(), wins: wJWins(), quests: wJQuests() };
+  for (const k in W_JTAB_FN) tabs[k] = W_JTAB_FN[k]();
+  if (!tabs[WJ.tab]) WJ.tab = 'people';
   $('modalBox').querySelectorAll('[data-jtab]').forEach(b => {
     const on = b.dataset.jtab === WJ.tab; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on);
     b.querySelector('small').textContent = tabs[b.dataset.jtab][0];
@@ -34794,7 +34801,10 @@ renderHelp = function () {
    step's conditions (every engine calls W_ON_END[W.kind]).
 
    Wraps: wSay (wW65Say: starters, talk steps, the match and choice triggers, reward recruits), wEnterMap
-   (wW65EnterMap: visit steps). The cards, the journal tab, the Bag, rumours and How to play are in w66. */
+   (wW65EnterMap: visit steps), wMatchLost (wW65MatchLost: a hardcore loss, which ends the journey without the usual
+   dispatch). A game whose night, weather or starter can't be met isn't offered; night and weather are judged as they
+   were at kickoff (AS.kick). Calling a ball, football or ring game off before its first pitch, play or bout is no
+   result, like "Not yet": not an attempt. The cards, the journal tab, the Bag, rumours and How to play are in w66. */
 
 const W_ADV = [];
 const W_ADV_ITEMS = {};
@@ -34808,14 +34818,14 @@ function wAdvAll() {
   return { a: S.a && typeof S.a === 'object' ? S.a : {}, rec: S.rec && typeof S.rec === 'object' ? S.rec : {} };
 }
 function wAdvSave(S) { if (LAB) return; try { localStorage.setItem(wAdvKey(), JSON.stringify(S)); } catch (e) { } }
-function wAdvToday() { return new Date().toISOString().slice(0, 10); }
+function wAdvToday() { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; } // local, as w57 stamps unlocks
 function wAdv(id) { return W_ADV.find(a => a.id === id) || null; }
-function wAdvState(id) { return wAdvAll().a[id] || null; }
+function wAdvState(id, S) { return (S || wAdvAll()).a[id] || null; }
 function wAdvEdit(id, fn) { const S = wAdvAll(), A = S.a[id]; if (!A) return null; fn(A, S); wAdvSave(S); return A; }
 
 /* the steps you can do now: the first not done, or every one not done in an any-order chapter */
-function wAdvLive(id) {
-  const D = wAdv(id), A = wAdvState(id);
+function wAdvLive(id, S) {
+  const D = wAdv(id), A = wAdvState(id, S);
   if (!D || !A || A.st !== 'active') return [];
   const C = D.chapters[A.ch]; if (!C) return [];
   const open = C.steps.map((step, si) => ({ ch: A.ch, si, step })).filter(s => !A.done.includes(s.si));
@@ -34873,10 +34883,9 @@ function wAdvLose(id, why) {
 }
 
 /* ---------- talk and places ---------- */
-function wAdvKw(want, kw) { return kw === want || (kw.length >= 4 && want.startsWith(kw.slice(0, 4))); }
 function wAdvNeedMet(need) {
   if (!need) return true;
-  if (need.night && !wIsNight()) return false;
+  if (need.night && !wNightTalk()) return false;
   if (need.season && wSeason() !== need.season) return false;
   if (need.weather && wWeather(wRegionHere()) !== need.weather) return false;
   return true;
@@ -34884,40 +34893,45 @@ function wAdvNeedMet(need) {
 /* returns { text, act?, key } when an adventure answers, or null to let the character answer as usual */
 function wAdvTalk(id, kw) {
   if (!WG || !kw) return null;
+  const S = wAdvAll();
   for (const D of W_ADV) {
-    const A = wAdvState(D.id);
+    const A = S.a[D.id] || null;
     // the reward character, once per journey
     const U = D.end && D.end.unlock;
-    if (A && A.st === 'won' && U && U.at === id && wAdvKw(U.kw, kw)) {
+    if (A && A.st === 'won' && U && U.at === id && wKwHit(U.kw, kw)) {
       WG.advRec = WG.advRec || {};
       if (WG.advRec[D.id]) return { text: `${U.recruit.n} is already with you.`, key: U.kw };
+      // marked only once they join: with a full team they wait until you make room
+      if (!LAB && wRoster().length >= W_PARTY.max) return { text: `${U.recruit.n} would join you, but your team is full. Make room and ask again.`, key: U.kw };
       WG.advRec[D.id] = 1;
-      if (typeof wRecruitTopic === 'function') wRecruitTopic(U.recruit);
+      wRecruitTopic(U.recruit);
       return { text: U.t || `${U.recruit.n} joins you.`, key: U.kw };
     }
     // the start
     const St = D.starter;
-    if (!A && St && St.who === id && wAdvKw(St.kw, kw)) {
+    if (!A && St && St.who === id && wKwHit(St.kw, kw)) {
       if (St.need && [].concat(St.need).some(f => !wFlag(f))) continue;
       wAdvBegin(D.id);
       return { text: St.t || `${D.title}.`, key: St.kw };
     }
     // the live steps
-    for (const L of wAdvLive(D.id)) {
+    for (const L of wAdvLive(D.id, S)) {
       const s = L.step;
-      if (s.k === 'visit' || s.who !== id || !wAdvKw(s.kw, kw)) continue;
-      if (s.k === 'match' || s.k === 'choice') return { text: s.t || '', act: `adv:${D.id}:${L.si}`, key: s.kw };
+      if (s.k === 'visit' || s.who !== id || !wKwHit(s.kw, kw)) continue;
+      if (s.k === 'match') return { text: s.t || 'A game, then. Here is what it takes.', act: `adv:${D.id}:${L.si}`, key: s.kw };
+      if (s.k === 'choice') return { text: s.t || s.q || 'Think it over.', act: `adv:${D.id}:${L.si}`, key: s.kw };
       if (!wAdvNeedMet(s.need)) return { text: s.tNo || 'Not yet.', key: s.kw };
       if (s.take && !wAdvHas(A, s.take)) return { text: s.tNo || 'Not yet.', key: s.kw };
       wAdvDone(D.id, L.si);
-      return { text: s.t || '', key: s.kw };
+      return { text: s.t || 'Good.', key: s.kw };
     }
   }
   return null;
 }
 function wAdvVisit(mapId) {
   if (!WG) return;
-  for (const D of W_ADV) for (const L of wAdvLive(D.id)) {
+  const S = wAdvAll();
+  for (const D of W_ADV) for (const L of wAdvLive(D.id, S)) {
     const s = L.step; if (s.k !== 'visit') continue;
     const loc = DB.locs.find(l => l.id === s.loc); if (!loc || loc.map !== mapId) continue;
     if (!wAdvNeedMet(s.need)) { if (s.tNo) wLog(s.tNo, 'd'); continue; }
@@ -34956,10 +34970,29 @@ function wAdvCondText(step) {
   if (!out.length) out.push('Win.');
   return out;
 }
+/* who starts in each engine: the card game's starters, the nine, the seven (not the bench), the card's fighters */
+function wAdvStarted(cond, W, eng) {
+  const hit = pid => { const p = wRoster().find(q => q.id === pid); return !!p && (cond.pid != null ? p.id === cond.pid : p.kind === cond.kind); };
+  if (eng === 'grid') return W && Array.isArray(W.ids) ? W.ids.slice(0, W_GFR.side).some(hit) : wSevenSync().ids.slice(0, W_GFR.side).some(hit);
+  if (eng === 'ring') return W && Array.isArray(W.ids) ? W.ids.some(hit) : true; // fighters are picked at the pairing, after the card
+  if (eng === 'ball') return !!WG.nine && WG.nine.order.some(o => hit(o.id));
+  return wStarters().some(p => hit(p.id));
+}
+/* what stops this game counting if you played it now: a game that can't be met isn't offered */
+function wAdvUnmet(step) {
+  const c = step.cond || {}, out = [], eng = step.engine || 'card';
+  if (c.night && !wIsNight()) out.push('It has to be played at night. Come back after dark.');
+  if (c.weather && wWeather(wRegionHere()) !== c.weather) out.push(`It has to be played in the ${c.weather}.`);
+  if (c.starter && !wAdvStarted(c.starter, null, eng)) out.push(`${wAdvCondText({ cond: { starter: c.starter } })[0].replace(' must start.', '')} isn't starting. Change your lineup on the Team screen.`);
+  return out;
+}
 function wAdvStartMatch(id, si, how) {
   const A = wAdvState(id), step = wAdvStep(id, si);
   if (!A || A.st !== 'active' || !step || step.k !== 'match') return 'That game is not on.';
+  const unmet = wAdvUnmet(step); if (unmet.length) return unmet.join(' ');
   const ref = `${id}:${A.ch}:${si}`, tier = step.tier || 1, eng = step.engine || 'card';
+  // night and weather are judged as they were at kickoff (the engines move the clock on before they report)
+  wAdvEdit(id, A2 => { A2.kick = { ref, night: wIsNight() ? 1 : 0, wx: wWeather(wRegionHere()) || null }; });
   if (eng === 'card') {
     startMatch({ type: step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name, world: { kind: 'adv', ref } });
     return '';
@@ -34974,28 +35007,29 @@ function wAdvMatchFacts(r, W) {
   if (us == null && RUN && RUN.games && RUN.games.length) { const g = RUN.games[RUN.games.length - 1]; us = g.us; them = g.them; }
   return { win: r === 'win', us: us || 0, them: them || 0 };
 }
-function wAdvStarted(cond, W) {
-  const hit = p => p && (cond.pid != null ? p.id === cond.pid : p.kind === cond.kind);
-  if (W && Array.isArray(W.ids) && W.ids.length) return W.ids.some(pid => hit(wRoster().find(p => p.id === pid)));
-  if (W && W.how && WG.nine) return WG.nine.order.some(o => hit(wRoster().find(p => p.id === o.id))); // baseball: the nine
-  return wStarters().some(hit);
-}
-function wAdvCondMet(step, facts, W) {
+function wAdvCondMet(step, facts, W, kick) {
   if (!facts.win) return false;
-  const c = step.cond || {};
+  const c = step.cond || {}, eng = step.engine || 'card';
   if (c.margin && facts.us - facts.them < c.margin) return false;
-  if (c.starter && !wAdvStarted(c.starter, W)) return false;
-  if (c.night && !wIsNight()) return false;
-  if (c.weather && wWeather(wRegionHere()) !== c.weather) return false;
+  if (c.starter && !wAdvStarted(c.starter, W, eng)) return false;
+  if (c.night && !(kick ? kick.night : wIsNight())) return false;
+  if (c.weather && (kick ? kick.wx : wWeather(wRegionHere())) !== c.weather) return false;
   return true;
 }
 W_ON_END.adv = function (r, ref, W) {
   const R = wAdvRef(ref), A = wAdvState(R.id), D = wAdv(R.id);
   if (!A || !D || A.st !== 'active' || A.ch !== R.ch || !wAdvLive(R.id).some(L => L.si === R.si)) return;
-  const step = D.chapters[R.ch].steps[R.si];
-  if (wAdvCondMet(step, wAdvMatchFacts(r, W), W)) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
+  const step = D.chapters[R.ch].steps[R.si], kick = A.kick && A.kick.ref === ref ? A.kick : null;
+  if (wAdvCondMet(step, wAdvMatchFacts(r, W), W, kick)) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
   if (step.pinnacle) { wAdvLose(R.id, step.lose || 'You lost.'); return; }
   if (step.lose) wLog(step.lose, 'd');
+};
+/* hardcore: a lost card match ends the journey without the usual dispatch, so the adventure hears of it here */
+const wW65MatchLost = wMatchLost;
+wMatchLost = function (result) {
+  const W = RUN && RUN.pending && RUN.pending.world;
+  if (WG && WG.hardcore && W && W.kind === 'adv') { try { W_ON_END.adv('lose', W.ref, W); } catch (e) { console.error(e); } }
+  return wW65MatchLost(result);
 };
 function wAdvChoose(id, si, i) {
   const A = wAdvState(id), step = wAdvStep(id, si);
@@ -35009,9 +35043,8 @@ function wAdvChoose(id, si, i) {
    badly), the profile's adventure items in the Bag, rumours from the innkeepers (ask about RUMOURS) and on the notice
    boards, and How to play (#wHelpAdventures). The model is in w65.
 
-   Wraps: wRunAct (wW66RunAct: 'adv:<id>:<step>' opens the match or choice card, 'advrumour' tells a rumour),
-   wOpenJournal and wRenderJournal (wW66OpenJournal, wW66RenderJournal: the Adventures tab; its button is data-jadv,
-   not data-jtab, because the journal's own renderer looks every data-jtab up in its own table), wRenderCamp
+   The journal tab registers through W_JTABS / W_JTAB_FN (w19).
+   Wraps: wRunAct (wW66RunAct: 'adv:<id>:<step>' opens the match or choice card, 'advrumour' tells a rumour), wRenderCamp
    (wW66RenderCamp: the Bag's Adventures section), wOpenBoard (wW66OpenBoard: a rumour on the board), renderHelp
    (wW66RenderHelp). */
 
@@ -35028,13 +35061,14 @@ function wAdvFoeText(step) {
 function wAdvMatchCard(id, si) {
   const D = wAdv(id), step = wAdvStep(id, si); if (!D || !step) return;
   let chose = false;
+  const unmet = wAdvUnmet(step);
   const close = modal(`<header><h3>${esc(D.title)}</h3></header>
     ${step.t ? `<p>${esc(step.t)}</p>` : ''}
     <p><b>The game:</b> ${esc(wAdvFoeText(step))}.</p>
     <ul class="wadvcond">${wAdvCondText(step).map(c => `<li>${esc(c)}</li>`).join('')}</ul>
     ${step.pinnacle ? `<p class="wbad" id="wAdvWarn">${esc(W_ADV_TEXT.warn)}</p>` : ''}
-    <p class="wbad" id="wAdvWhy" hidden></p>
-    <div class="row"><button class="btn" id="wAdvPlay">Play</button><button class="ghost" id="wAdvNo">Not yet</button></div>`,
+    ${unmet.length ? `<p class="wbad" id="wAdvWhy">${unmet.map(esc).join(' ')}</p>` : ''}
+    <div class="row"><button class="btn" id="wAdvPlay"${unmet.length ? ' disabled' : ''}>Play</button><button class="ghost" id="wAdvNo">Not yet</button></div>`,
     () => { if (!chose) wDrain(); });
   $('wAdvNo').onclick = () => close();
   $('wAdvPlay').onclick = () => {
@@ -35087,14 +35121,14 @@ function wAdvHome(charId) {
   const t = DB.towns.find(T => (T.npcs || []).some(n => n[0] === charId));
   return t ? wTownName(t.id) : '';
 }
-function wAdvJournalHtml() {
-  const S = wAdvAll(), on = [], won = [], lost = [];
+function wAdvJournalHtml(S) {
+  S = S || wAdvAll(); const on = [], won = [], lost = [];
   for (const D of W_ADV) {
     const A = S.a[D.id]; if (!A) continue;
     const learned = A.learned.length ? `<ul>${A.learned.map(l => `<li>${esc(l.t)}</li>`).join('')}</ul>` : '';
     if (A.st === 'active') {
       const C = D.chapters[A.ch] || {}, items = Object.keys(A.items).map(k => `${esc((W_ADV_ITEMS[k] || {}).n || k)}${A.items[k] > 1 ? ' ×' + A.items[k] : ''}`);
-      const next = wAdvLive(D.id).find(L => L.step.k === 'match');
+      const next = wAdvLive(D.id, S).find(L => L.step.k === 'match');
       on.push(`<div class="wjq"><b>${esc(D.title)}</b>: ${esc(C.t || '')}<p class="hint">${esc(C.sum || D.teaser || '')}</p>${learned}
         ${items.length ? `<p>Carrying: ${items.join(', ')}.</p>` : ''}${next ? `<p>Next game: ${wAdvCondText(next.step).map(esc).join(' ')}</p>` : ''}</div>`);
     } else if (A.st === 'won') {
@@ -35107,33 +35141,8 @@ function wAdvJournalHtml() {
   if (!on.length && !won.length && !lost.length) return `<p class="hint">${esc(W_ADV_TEXT.none)}</p>`;
   return `${on.length ? `<h4>Under way</h4>${on.join('')}` : ''}${won.length ? `<h4>Finished</h4>${won.join('')}` : ''}${lost.length ? `<h4>Ended badly</h4>${lost.join('')}` : ''}`;
 }
-const wW66OpenJournal = wOpenJournal;
-wOpenJournal = function (tab) {
-  const want = tab || WJ.tab;
-  if (want === 'adv') WJ.tab = 'people';
-  wW66OpenJournal(tab === 'adv' ? undefined : tab);
-  const tabs = document.querySelector('#modalBox .wjtabs'); if (!tabs) return;
-  if (!tabs.querySelector('[data-jadv]')) {
-    tabs.insertAdjacentHTML('beforeend', '<button role="tab" data-jadv>Adventures <small></small></button>');
-    tabs.querySelector('[data-jadv]').onclick = () => { WJ.tab = 'adv'; wRenderJournal(); };
-  }
-  if (want === 'adv') { WJ.tab = 'adv'; }
-  wRenderJournal();
-};
-const wW66RenderJournal = wRenderJournal;
-wRenderJournal = function () {
-  const adv = WJ.tab === 'adv';
-  if (adv) WJ.tab = 'people';
-  wW66RenderJournal();
-  if (adv) WJ.tab = 'adv';
-  const box = $('modalBox'), b = box && box.querySelector('[data-jadv]'); if (!b) return;
-  const S = wAdvAll();
-  b.querySelector('small').textContent = W_ADV.filter(D => S.a[D.id] && S.a[D.id].st === 'active').length;
-  b.setAttribute('aria-pressed', adv); b.setAttribute('aria-selected', adv);
-  if (!adv) return;
-  box.querySelectorAll('[data-jtab]').forEach(t => { t.setAttribute('aria-pressed', false); t.setAttribute('aria-selected', false); });
-  $('wJBody').innerHTML = wAdvJournalHtml();
-};
+W_JTABS.push(['adv', 'Adventures']);
+W_JTAB_FN.adv = () => { const S = wAdvAll(); return [W_ADV.filter(D => S.a[D.id] && S.a[D.id].st === 'active').length, wAdvJournalHtml(S)]; };
 
 /* ---------- the Bag ---------- */
 const wW66RenderCamp = wRenderCamp;

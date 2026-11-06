@@ -304,10 +304,13 @@ function wWallText() {
 }
 
 /* ---------- conversation: wSay() is the model, the talk panel in w7 the view ---------- */
-function wFindTopic(ch, kw) { const ks = Object.keys(ch.topics || {}); return ks.find(k => k === kw) || (kw.length >= 4 ? ks.find(k => k.startsWith(kw.slice(0, 4))) : null); }
+/* a typed word asks about a keyword when it is the keyword, or (4 letters or more) starts the same 4 letters */
+function wKwHit(key, kw) { return key === kw || (kw.length >= 4 && key.startsWith(kw.slice(0, 4))); }
+function wNightTalk() { return wDarkness() >= .3; } // when a needNight topic will be talked about
+function wFindTopic(ch, kw) { const ks = Object.keys(ch.topics || {}); return ks.find(k => k === kw) || ks.find(k => k !== kw && wKwHit(k, kw)) || null; }
 function wTopicBlocked(t) {
   if (t.need && [].concat(t.need).some(f => !wFlag(f))) return true;
-  if (t.needNight && wDarkness() < .3) return true;
+  if (t.needNight && !wNightTalk()) return true;
   if (t.takeEn && Object.keys(t.takeEn).some(e => (WG.energy[e] || 0) < t.takeEn[e])) return true;
   if (t.take && !Object.keys(t.take).every(k => wHas(k, t.take[k]))) return true;
   return false;
