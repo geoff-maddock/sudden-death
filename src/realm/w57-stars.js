@@ -79,7 +79,7 @@ function wStarsCheck() {
     wyrm: (WG.crowns || []).length > 0 || wLegendsAll().length > 0,
   };
   const got = W_STARS.filter(s => done[s.id] && !S.un[s.id]);
-  for (const s of got) { const t = new Date(); S.un[s.id] = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
+  for (const s of got) S.un[s.id] = wDateStamp();
   if (JSON.stringify(S) !== had) wStarsSave(S);
   for (const s of got) {
     wLog(`A superstar is unlocked: the ${s.n}. ${s.feat.replace(/\.$/, '')}: done. From now on they can join a later journey.`, 'g');

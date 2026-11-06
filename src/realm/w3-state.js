@@ -24,6 +24,8 @@ const WDIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 
 function wEncounterHook(region, tileCh, info) { /* reassigned in w5-bridge.js: wild matches and alphas */ }
 
+/* today's date as YYYY-MM-DD, local time (unlocks kept on the profile: superstars, adventures) */
+function wDateStamp() { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
 function wLog(t, c) { WLOG.push([t, c || '']); if (WLOG.length > 80) WLOG.shift(); WQ.push({ k: 'log' }); }
 function wFlag(f) { return !!(WG && WG.flags[f]); }
 function wSetFlag(f) { WG.flags[f] = 1; }

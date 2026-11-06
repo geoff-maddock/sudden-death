@@ -18,14 +18,14 @@
    Reward: the Founder's Charm (a trophy no pool offers: 1 Strength and 1 Footwork at the start of every fight) and
    The Founding Rule (a Hall of Fame card no pool offers), handed over again by Foss on any later journey (FOUNDERS).
 
+   The Frozen Chapel bell's flag is set in w5 (wEncounterHook), in the side quest's order (w1: ring.need).
    Also here: the tide (wTide: a 12.4-hour tide on the running clock, so two low waters a day, two hours each, about
    48 minutes later each day; Marrowbone tells you when), old rules in the card game (no gear, set plays or Hall of
-   Fame cards, and the trophies sit out until the match has ended), and a fix for the Frozen Chapel bell, which never
-   set its quest flag (rq_aur2, once Halvard has sent you: rq_aur1).
+   Fame cards, and the trophies sit out until the match has ended), .
 
    Wraps: wSay (wW67Say: Marrowbone's TIDE), wBuildEncounter (wW67BuildEncounter: carries world.rules), startCombat (wSdStartCombat: old rules thin the
-   deck to basic cards and set the trophies aside), finishFight (wW67FinishFight: the trophies come back),
-   wEncounterHook (wW67EncounterHook: the bell sets its flag), relicPool (wSdRelicPool: no pool offers an adventure
+   deck to basic cards and set the trophies aside), finishFight (wW67FinishFight: the trophies come back), wStart
+   (wW67Start: trophies a stray game left aside come back), relicPool (wSdRelicPool: no pool offers an adventure
    trophy), renderHelp (wW67RenderHelp: #wHelpOldRules, #wHelpTide). */
 
 /* ---------- the tide ---------- */
@@ -86,33 +86,27 @@ wBuildEncounter = function (o) {
 const wSdStartCombat = startCombat;
 startCombat = function () {
   const W = WG && RUN && RUN.pending && RUN.pending.world;
-  if (!W || W.rules !== 'old') return wSdStartCombat.apply(this, arguments);
+  if (!W || W.rules !== 'old') { wAdvRelicsBack(); return wSdStartCombat.apply(this, arguments); } // (never carry trophies left aside into another game)
   const deck = RUN.deck, keep = deck.filter(wAdvOldOk);
   RUN.deck = keep.length ? keep : deck; // (a deck of nothing but gear, plays and Hall of Fame cards can't be played at all)
   if (!RUN.oldRelics) { RUN.oldRelics = RUN.relics; RUN.relics = []; }
   try { return wSdStartCombat.apply(this, arguments); } finally { RUN.deck = deck; }
 };
 function wAdvRelicsBack() { if (RUN && RUN.oldRelics) { RUN.relics = RUN.oldRelics; delete RUN.oldRelics; } }
+// trophies left aside by a game that never finished (an abandoned battle) come back when a journey starts or loads
+const wW67Start = wStart;
+wStart = function (save, opts) { const r = wW67Start(save, opts); if (RUN && !RUN.battle) wAdvRelicsBack(); return r; };
 const wW67FinishFight = finishFight;
 // after the match's own end (its fightWon trophies and reward gold included), so no trophy pays out for an old-rules game
 finishFight = function () { try { return wW67FinishFight.apply(this, arguments); } finally { wAdvRelicsBack(); } };
 
-/* ---------- the Frozen Chapel bell sets its flag (it only ever logged) ---------- */
-const wW67EncounterHook = wEncounterHook;
-wEncounterHook = function (region, tileCh, info) {
-  // (only once Halvard has sent you, rq_aur1: the side quest's own order)
-  if (info && info.kind === 'bell' && info.ring && info.ring.set && WG && wFlag('rq_aur1') && !wFlag(info.ring.set)) {
-    wSetFlag(info.ring.set);
-    const sp = DB.sideplots.find(x => x.id === info.ring.set); if (sp) wLog('Done: ' + sp.title + '.', 'g');
-  }
-  return wW67EncounterHook(region, tileCh, info);
-};
-
 /* ---------- the reward: a trophy and a card no pool offers ---------- */
 RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 1 Strength and 1 Footwork.', ico: 'boot' };
 TROPHY_FX.founders = { on: { fightStart: () => { addSt(B.P, 'str', 1); addSt(B.P, 'dex', 1); } } };
+Object.assign(RELICS.founders, TROPHY_FX.founders); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 const wSdRelicPool = relicPool;
-relicPool = function (rar) { return wSdRelicPool(rar).filter(k => !RELICS[k].adv); };
+// (and none you own: during an old-rules game your trophies are set aside in RUN.oldRelics, not gone)
+relicPool = function (rar) { return wSdRelicPool(rar).filter(k => !RELICS[k].adv && !(RUN && RUN.oldRelics && RUN.oldRelics.includes(k))); };
 K('adv_founding', 'The Founding Rule', 'none', 'skl', 1, 'l', 'self', [['b', 9], ['s', 'str', 1, 'self'], ['s', 'dex', 1, 'self']], { fl: 'Written in 1 AL, torn in the fire, read aloud again by you.' });
 
 /* ---------- the story ---------- */

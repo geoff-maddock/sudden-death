@@ -14,13 +14,16 @@
           { k: 'choice', who, kw, q, opts, right, win, lose }, each with t?, learn?, pinnacle?, after? (a step of the
           same chapter that has to be done first), set? (flags: a clue that reveals a place; kept on every journey by
           wAdvReapply), and for a card match rules: 'old' (w67). need can ask for night, season, weather or tide.
-   end.unlock is a reward kept for good: a recruit, or a relic and cards, handed over once a journey (WG.advRec).
+   A match step with always: true counts win or lose (a win sets marks[step.mark], for end.tWin).
+   end.unlock is a reward kept for good: a recruit (lvl 'team' joins at the team's level) and/or a relic and cards,
+   handed over when the story ends and then once a journey by asking (WG.advRec).
    A chapter's steps go in order, or in any order with any: true. W_ADV_ITEMS are adventure items, kept on the
    profile (not WG.items, which every journey starts empty).
 
    Storage: pkey('sd-realm-adv') = { a: { advId: { st: 'active'|'won'|'lost', ch, done: [step], items: { id: n },
    learned: [{ t, d }], since, ended?, why? } }, rec: {} }, written the moment anything changes, so reloading a journey
-   save can't undo a pinnacle. WG.advRec = { advId: 1 } marks a reward character recruited this journey. Nothing is
+   save can't undo a pinnacle. WG.advRec = { advId: 1 } marks a kept reward handed over this journey, WG.advItems its
+   trophy and cards (given at once, while a player can wait for room). Nothing is
    stored in LAB.
 
    Matches start with kind 'adv' and ref '<advId>:<chapter>:<step>'; W_ON_END.adv checks the result against the
@@ -44,7 +47,7 @@ function wAdvAll() {
   return { a: S.a && typeof S.a === 'object' ? S.a : {}, rec: S.rec && typeof S.rec === 'object' ? S.rec : {} };
 }
 function wAdvSave(S) { if (LAB) return; try { localStorage.setItem(wAdvKey(), JSON.stringify(S)); } catch (e) { } }
-function wAdvToday() { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; } // local, as w57 stamps unlocks
+function wAdvToday() { return wDateStamp(); }
 function wAdv(id) { return W_ADV.find(a => a.id === id) || null; }
 function wAdvState(id, S) { return (S || wAdvAll()).a[id] || null; }
 function wAdvEdit(id, fn) { const S = wAdvAll(), A = S.a[id]; if (!A) return null; fn(A, S); wAdvSave(S); return A; }
@@ -68,7 +71,7 @@ function wAdvBegin(id) {
 }
 function wAdvLearn(id, t) { if (t) wAdvEdit(id, A => A.learned.push({ t, d: wAdvToday() })); }
 function wAdvPay(pay, from) {
-  if (!pay || !RUN) return;
+  if (!pay || !RUN || (WG && WG.advDead)) return;
   if (pay.gold) { RUN.gold += pay.gold; wLog(`Received ${pay.gold} gold.`, 'm'); }
   if (pay.fans) { RUN.fans = (RUN.fans || 0) + pay.fans; wLog(`${pay.fans} new fans.`, 'm'); }
   if (pay.cards) wPayCards({ cards: pay.cards }, from);
@@ -81,20 +84,19 @@ function wAdvItemsMove(A, take, give) {
 function wAdvHas(A, take) { return Object.keys(take || {}).every(k => (A.items[k] || 0) >= take[k]); }
 /* a step is done: its items move, the chapter (and then the adventure) completes once every step is done */
 function wAdvDone(id, si) {
-  const D = wAdv(id), A0 = wAdvState(id);
-  if (!D || !A0 || A0.st !== 'active' || A0.done.includes(si)) return;
-  const C = D.chapters[A0.ch], step = C.steps[si];
+  const D = wAdv(id), S = wAdvAll(), A = S.a[id];
+  if (!D || !A || A.st !== 'active' || A.done.includes(si)) return;
+  const C = D.chapters[A.ch], step = C.steps[si];
   let chDone = false, won = false;
-  wAdvEdit(id, A => {
-    wAdvItemsMove(A, step.take, step.give);
-    for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
-    if (step.learn) A.learned.push({ t: step.learn, d: wAdvToday() });
-    A.done.push(si);
-    if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
-  });
+  wAdvItemsMove(A, step.take, step.give);
+  for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
+  if (step.learn) A.learned.push({ t: step.learn, d: wAdvToday() });
+  A.done.push(si);
+  if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
+  wAdvSave(S);
   const flags = [].concat(step.set || []); for (const f of flags) wSetFlag(f); if (flags.length) wInvalidate('world');
-  if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[wAdvState(id).ch].t}.`, 'g'); }
-  if (won) wAdvWin(id);
+  if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[A.ch].t}.`, 'g'); }
+  if (won) wAdvWin(id, A);
 }
 /* the places an adventure has shown you stay shown on every journey: the flags its done steps set (on a journey's
    start or load: wW65Start) */
@@ -108,22 +110,41 @@ function wAdvReapply(S) {
   }
   if (any) wInvalidate('world');
 }
-/* a kept reward that isn't a player: a trophy and cards, handed over once a journey */
+/* the reward kept for good, handed over once a journey: a player (who needs room on the team), a trophy, cards.
+   Returns 'given', 'full' (a player waits until there's room), 'already' or 'none' */
 function wAdvGiveKeep(D) {
-  const U = D.end && D.end.unlock; if (!U || U.recruit) return false;
-  WG.advRec = WG.advRec || {};
-  if (WG.advRec[D.id]) return false;
+  const U = D.end && D.end.unlock; if (!U) return 'none';
+  WG.advRec = WG.advRec || {}; WG.advItems = WG.advItems || {};
+  if (WG.advRec[D.id] && WG.advItems[D.id] == null) WG.advItems[D.id] = 1; // a save from before advItems: handed over already
+  if (WG.advDead) return 'none'; // (a hardcore journey that is ending gets nothing)
+  let gave = false;
+  // the trophy and cards come at once; only a player waits for room on the team
+  if (!WG.advItems[D.id]) {
+    WG.advItems[D.id] = 1;
+    if (U.relic && RELICS[U.relic] && !RUN.relics.includes(U.relic)) { gainRelic(U.relic); wLog(`Received the ${RELICS[U.relic].n}.`, 'm'); gave = true; }
+    if (U.cards) { wPayCards({ cards: U.cards }, D.title); gave = true; }
+  }
+  if (!U.recruit) { WG.advRec[D.id] = 1; return gave ? 'given' : 'already'; }
+  if (wRoster().some(p => p.n === U.recruit.n)) return 'already'; // (one you let go can be asked back)
+  if (!LAB && wRoster().length >= W_PARTY.max) return 'full';
   WG.advRec[D.id] = 1;
-  if (U.relic && RELICS[U.relic] && !RUN.relics.includes(U.relic)) { gainRelic(U.relic); wLog(`Received the ${RELICS[U.relic].n}.`, 'm'); }
-  if (U.cards) wPayCards({ cards: U.cards }, D.title);
-  return true;
+  wRecruitTopic(Object.assign({}, U.recruit, U.recruit.lvl === 'team' ? { lvl: wStarLvl() } : {}));
+  return 'given';
 }
-function wAdvWin(id) {
+function wAdvKeepLine(D, got) {
+  const U = D.end.unlock, who = U.recruit && U.recruit.n;
+  if (got === 'given') return U.t || (who ? `${who} joins you.` : 'This is yours.');
+  if (got === 'full') return `${who} would join you, but your team is full. Make room and ask again.`;
+  return who ? `${who} is already with you.` : U.t2 || 'You have it already.';
+}
+/* the ending's words: a better one when the step it names was won (end.tWin, end.winMark) */
+function wAdvEndText(D, A) { const E = D.end || {}; return E.tWin && A && A.marks && A.marks[E.winMark || 'won'] ? E.tWin : E.t || ''; }
+function wAdvWin(id, A) {
   const D = wAdv(id); if (!D) return;
   const E = D.end || {};
-  if (WG && !LAB) wLog(`${D.title}: ${E.t || 'the end'}`, 'g');
+  if (WG && !LAB) wLog(`${D.title}: ${wAdvEndText(D, A || wAdvState(id)) || 'the end'}`, 'g');
   wAdvPay(E.pay, D.title);
-  if (WG && RUN) wAdvGiveKeep(D);
+  if (WG && RUN && E.unlock && wAdvGiveKeep(D) === 'full') wLog(`${E.unlock.recruit.n} will join you when there's room on the team: ask ${wChar(E.unlock.at).name} about ${E.unlock.kw.toUpperCase()}.`, 'm');
   if (E.feat && typeof wStarsAll === 'function') { const S = wStarsAll(); if (!S.un[E.feat]) { S.un[E.feat] = wAdvToday(); wStarsSave(S); } }
 }
 function wAdvLose(id, why) {
@@ -135,7 +156,7 @@ function wAdvLose(id, why) {
 /* ---------- talk and places ---------- */
 function wAdvNeedMet(need) {
   if (!need) return true;
-  if (need.night && !wNightTalk()) return false;
+  if (need.night && !wIsNight()) return false; // (the same night as a match's night condition)
   if (need.season && wSeason() !== need.season) return false;
   if (need.weather && wWeather(wRegionHere()) !== need.weather) return false;
   if (need.tide && (typeof wTide !== 'function' || wTide() !== need.tide)) return false;
@@ -150,14 +171,8 @@ function wAdvTalk(id, kw) {
     // the reward character, once per journey
     const U = D.end && D.end.unlock;
     if (A && A.st === 'won' && U && U.at === id && wKwHit(U.kw, kw)) {
-      WG.advRec = WG.advRec || {};
-      if (!U.recruit) return wAdvGiveKeep(D) ? { text: U.t || 'This is yours.', key: U.kw } : { text: U.t2 || 'You have it already.', key: U.kw };
-      if (WG.advRec[D.id]) return { text: `${U.recruit.n} is already with you.`, key: U.kw };
-      // marked only once they join: with a full team they wait until you make room
-      if (!LAB && wRoster().length >= W_PARTY.max) return { text: `${U.recruit.n} would join you, but your team is full. Make room and ask again.`, key: U.kw };
-      WG.advRec[D.id] = 1;
-      wRecruitTopic(U.recruit);
-      return { text: U.t || `${U.recruit.n} joins you.`, key: U.kw };
+      // marked only once given: with a full team a player waits until you make room
+      return { text: wAdvKeepLine(D, wAdvGiveKeep(D)), key: U.kw };
     }
     // the start
     const St = D.starter;
@@ -184,6 +199,7 @@ function wAdvVisit(mapId, S) {
   if (!WG) return;
   S = S || wAdvAll();
   for (const D of W_ADV) for (const L of wAdvLive(D.id, S)) {
+    const A = wAdvState(D.id); if (!A || A.st !== 'active' || A.ch !== L.ch) break; // a visit just finished the chapter
     const s = L.step; if (s.k !== 'visit') continue;
     const loc = DB.locs.find(l => l.id === s.loc); if (!loc || loc.map !== mapId) continue;
     if (!wAdvNeedMet(s.need)) { if (s.tNo) wLog(s.tNo, 'd'); continue; }
@@ -279,7 +295,14 @@ W_ON_END.adv = function (r, ref, W) {
   const R = wAdvRef(ref), A = wAdvState(R.id), D = wAdv(R.id);
   if (!A || !D || A.st !== 'active' || A.ch !== R.ch || !wAdvLive(R.id).some(L => L.si === R.si)) return;
   const step = D.chapters[R.ch].steps[R.si], kick = A.kick && A.kick.ref === ref ? A.kick : null;
-  if (wAdvCondMet(step, wAdvMatchFacts(r, W), W, kick)) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
+  const met = wAdvCondMet(step, wAdvMatchFacts(r, W), W, kick);
+  // a game that counts win or lose (always): a win marks it, for the better ending
+  if (step.always) {
+    if (met && step.mark) wAdvEdit(R.id, A2 => { A2.marks = Object.assign({}, A2.marks, { [step.mark]: 1 }); });
+    const line = met ? step.win : step.lose; if (line) wLog(line, met ? 'g' : 'm');
+    wAdvDone(R.id, R.si); return;
+  }
+  if (met) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
   if (step.pinnacle) { wAdvLose(R.id, step.lose || 'You lost.'); return; }
   if (step.lose) wLog(step.lose, 'd');
 };
@@ -287,7 +310,8 @@ W_ON_END.adv = function (r, ref, W) {
 const wW65MatchLost = wMatchLost;
 wMatchLost = function (result) {
   const W = RUN && RUN.pending && RUN.pending.world;
-  if (WG && WG.hardcore && W && W.kind === 'adv') { try { W_ON_END.adv('lose', W.ref, W); } catch (e) { console.error(e); } }
+  // (the story is told, but nothing is paid into a journey that is about to end: WG.advDead)
+  if (WG && WG.hardcore && W && W.kind === 'adv') { WG.advDead = 1; try { W_ON_END.adv('lose', W.ref, W); } catch (e) { console.error(e); } finally { delete WG.advDead; } }
   return wW65MatchLost(result);
 };
 function wAdvChoose(id, si, i) {

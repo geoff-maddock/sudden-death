@@ -13,8 +13,8 @@ const W_ADV_TEXT = { warn: "This can't be retried.", none: 'No adventures yet. R
 /* ---------- the cards ---------- */
 function wAdvFoeText(step) {
   if ((step.engine || 'card') === 'card') {
-    const names = [...new Set((step.ids || []).map(id => (ENEMIES[id] || {}).n).filter(Boolean))];
-    return `${names.length ? names.join(' and ') : 'A local side'}, in ${W_ADV_CFG.engines.card} (tier ${step.tier || 1})`;
+    const names = step.name ? [step.name] : [...new Set((step.ids || []).map(id => (ENEMIES[id] || {}).n).filter(Boolean))];
+    return `${names.length ? names.join(' and ') : 'A local side'}, in ${W_ADV_CFG.engines.card}${step.sport ? ' (' + SPORT_NAME[step.sport].toLowerCase() + ')' : ''}, tier ${step.tier || 1}`;
   }
   return `${wCap(wBallName(step.club || 'local'))}, at ${W_ADV_CFG.engines[step.engine]} (tier ${step.tier || 1})`;
 }
@@ -93,9 +93,11 @@ function wAdvJournalHtml(S) {
         ${items.length ? `<p>Carrying: ${items.join(', ')}.</p>` : ''}${next ? `<p>Next game: ${wAdvCondText(next.step).map(esc).join(' ')}</p>` : ''}</div>`);
     } else if (A.st === 'won') {
       const U = D.end && D.end.unlock, home = U ? wAdvHome(U.at) : '';
-      const keep = !U ? '' : U.recruit ? `${esc(U.recruit.n)} waits with ${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''}: ask about ${esc(U.kw.toUpperCase())}.`
+      const where = !U ? '' : [wChar(U.at).name === (U.recruit || {}).n ? '' : 'with ' + esc(wChar(U.at).name), home ? 'in ' + esc(home) : ''].filter(Boolean).join(' ');
+      const keep = !U ? '' : U.recruit ? (wRoster().some(p => p.n === U.recruit.n) ? `${esc(U.recruit.n)} is with you. On a later journey, look for him ${where}: ask about ${esc(U.kw.toUpperCase())}.`
+        : `${esc(U.recruit.n)} waits ${where} for every journey: ask about ${esc(U.kw.toUpperCase())}.`)
         : `${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''} keeps your reward${U.relic && RELICS[U.relic] ? ' (the ' + esc(RELICS[U.relic].n) + ')' : ''} for every journey: ask about ${esc(U.kw.toUpperCase())}.`;
-      won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc((D.end && D.end.t) || '')}</p>${keep ? `<p class="hint">${keep}</p>` : ''}</div>`);
+      won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc(wAdvEndText(D, A))}</p>${keep ? `<p class="hint">${keep}</p>` : ''}</div>`);
     } else {
       lost.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc(D.lostText || 'It ended badly.')}</p>${A.why ? `<p class="hint">${esc(A.why)}</p>` : ''}</div>`);
     }
