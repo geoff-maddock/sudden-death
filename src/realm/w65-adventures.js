@@ -11,7 +11,10 @@
    W_ADV is the table of adventures (empty in this phase: the stories come in later phases; the test adds its own).
    Steps: { k: 'talk', who, kw, need?, tNo?, take?, give? }, { k: 'visit', loc, need?, tNo?, give? },
           { k: 'match', who, kw, engine: card|ball|grid|ring, tier, ids?, sport?, club?, cond?, win, lose },
-          { k: 'choice', who, kw, q, opts, right, win, lose }, each with t?, learn?, pinnacle?.
+          { k: 'choice', who, kw, q, opts, right, win, lose }, each with t?, learn?, pinnacle?, after? (a step of the
+          same chapter that has to be done first), set? (flags: a clue that reveals a place; kept on every journey by
+          wAdvReapply), and for a card match rules: 'old' (w67). need can ask for night, season, weather or tide.
+   end.unlock is a reward kept for good: a recruit, or a relic and cards, handed over once a journey (WG.advRec).
    A chapter's steps go in order, or in any order with any: true. W_ADV_ITEMS are adventure items, kept on the
    profile (not WG.items, which every journey starts empty).
 
@@ -51,7 +54,7 @@ function wAdvLive(id, S) {
   const D = wAdv(id), A = wAdvState(id, S);
   if (!D || !A || A.st !== 'active') return [];
   const C = D.chapters[A.ch]; if (!C) return [];
-  const open = C.steps.map((step, si) => ({ ch: A.ch, si, step })).filter(s => !A.done.includes(s.si));
+  const open = C.steps.map((step, si) => ({ ch: A.ch, si, step })).filter(s => !A.done.includes(s.si) && (s.step.after == null || A.done.includes(s.step.after)));
   return C.any ? open : open.slice(0, 1);
 }
 function wAdvBegin(id) {
@@ -89,14 +92,38 @@ function wAdvDone(id, si) {
     A.done.push(si);
     if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
   });
+  for (const f of [].concat(step.set || [])) { wSetFlag(f); wInvalidate('world'); }
   if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[wAdvState(id).ch].t}.`, 'g'); }
   if (won) wAdvWin(id);
+}
+/* the places an adventure has shown you stay shown on every journey: the flags its starter and its done steps set */
+function wAdvReapply(S) {
+  if (!WG) return;
+  S = S || wAdvAll(); let any = false;
+  const put = f => { for (const x of [].concat(f || [])) if (!WG.flags[x]) { WG.flags[x] = 1; any = true; } };
+  for (const D of W_ADV) {
+    const A = S.a[D.id]; if (!A) continue;
+    if (D.starter) put(D.starter.set);
+    D.chapters.forEach((C, ci) => C.steps.forEach((st, si) => { if (ci < A.ch || (ci === A.ch && A.done.includes(si))) put(st.set); }));
+  }
+  if (any) wInvalidate('world');
+}
+/* a kept reward that isn't a player: a trophy and cards, handed over once a journey */
+function wAdvGiveKeep(D) {
+  const U = D.end && D.end.unlock; if (!U || U.recruit) return false;
+  WG.advRec = WG.advRec || {};
+  if (WG.advRec[D.id]) return false;
+  WG.advRec[D.id] = 1;
+  if (U.relic && RELICS[U.relic] && !RUN.relics.includes(U.relic)) { gainRelic(U.relic); wLog(`Received the ${RELICS[U.relic].n}.`, 'm'); }
+  if (U.cards) wPayCards({ cards: U.cards }, D.title);
+  return true;
 }
 function wAdvWin(id) {
   const D = wAdv(id); if (!D) return;
   const E = D.end || {};
   if (WG && !LAB) wLog(`${D.title}: ${E.t || 'the end'}`, 'g');
   wAdvPay(E.pay, D.title);
+  if (WG && RUN) wAdvGiveKeep(D);
   if (E.feat && typeof wStarsAll === 'function') { const S = wStarsAll(); if (!S.un[E.feat]) { S.un[E.feat] = wAdvToday(); wStarsSave(S); } }
 }
 function wAdvLose(id, why) {
@@ -111,6 +138,7 @@ function wAdvNeedMet(need) {
   if (need.night && !wNightTalk()) return false;
   if (need.season && wSeason() !== need.season) return false;
   if (need.weather && wWeather(wRegionHere()) !== need.weather) return false;
+  if (need.tide && (typeof wTide !== 'function' || wTide() !== need.tide)) return false;
   return true;
 }
 /* returns { text, act?, key } when an adventure answers, or null to let the character answer as usual */
@@ -123,6 +151,7 @@ function wAdvTalk(id, kw) {
     const U = D.end && D.end.unlock;
     if (A && A.st === 'won' && U && U.at === id && wKwHit(U.kw, kw)) {
       WG.advRec = WG.advRec || {};
+      if (!U.recruit) return wAdvGiveKeep(D) ? { text: U.t || 'This is yours.', key: U.kw } : { text: U.t2 || 'You have it already.', key: U.kw };
       if (WG.advRec[D.id]) return { text: `${U.recruit.n} is already with you.`, key: U.kw };
       // marked only once they join: with a full team they wait until you make room
       if (!LAB && wRoster().length >= W_PARTY.max) return { text: `${U.recruit.n} would join you, but your team is full. Make room and ask again.`, key: U.kw };
@@ -134,7 +163,7 @@ function wAdvTalk(id, kw) {
     const St = D.starter;
     if (!A && St && St.who === id && wKwHit(St.kw, kw)) {
       if (St.need && [].concat(St.need).some(f => !wFlag(f))) continue;
-      wAdvBegin(D.id);
+      wAdvBegin(D.id); wAdvReapply();
       return { text: St.t || `${D.title}.`, key: St.kw };
     }
     // the live steps
@@ -174,7 +203,7 @@ wSay = function (id, kw) {
 const wW65EnterMap = wEnterMap;
 wEnterMap = function (id, x, y) {
   const r = wW65EnterMap(id, x, y);
-  try { wAdvVisit(id); } catch (e) { console.error(e); }
+  try { wAdvReapply(); wAdvVisit(id); } catch (e) { console.error(e); }
   return r;
 };
 
@@ -190,6 +219,7 @@ function wAdvCondText(step) {
   }
   if (c.night) out.push('At night.');
   if (c.weather) out.push(`In the ${c.weather}.`);
+  if (step.rules === 'old') out.push('Old rules: no gear, no set plays, no Hall of Fame cards, and no trophies.');
   if (!out.length) out.push('Win.');
   return out;
 }
@@ -217,7 +247,7 @@ function wAdvStartMatch(id, si, how) {
   // night and weather are judged as they were at kickoff (the engines move the clock on before they report)
   wAdvEdit(id, A2 => { A2.kick = { ref, night: wIsNight() ? 1 : 0, wx: wWeather(wRegionHere()) || null }; });
   if (eng === 'card') {
-    startMatch({ type: step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name, world: { kind: 'adv', ref } });
+    startMatch({ type: step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name, world: { kind: 'adv', ref, rules: step.rules || null } });
     return '';
   }
   const o = { club: step.club || 'local', how: how || 'play', tier, kind: 'adv', ref };

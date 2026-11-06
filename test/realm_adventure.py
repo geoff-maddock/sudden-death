@@ -26,6 +26,7 @@ WIN = r'''(() => { RUN.maxhp = Math.max(RUN.maxhp, 900); RUN.hp = RUN.maxhp; let
 
 # the throwaway adventures (registered again after every page load)
 TEST_ADV = r"""(() => { if (wAdv('adv_t1')) return;
+  W_ADV.splice(0, W_ADV.length); // the shipped stories are set aside: this checks the plumbing with throwaway ones
   W_ADV_ITEMS.adv_tok = { n: 'Test Token', d: 'A token.' };
   W_ADV.push({ id: 'adv_t1', title: 'Test One', teaser: 'A test.', regions: ['hq', 'tide'], rumours: ['Foss has been asking odd questions.'],
     starter: { who: 'clerk', kw: 'testcase', t: 'Funny you should ask.', learn: 'Foss has a job.' }, lostText: 'Test One went wrong.',
@@ -74,7 +75,7 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
         await new_journey(pg, clear=True)
-        check(await pg.evaluate("W_ADV.length === 5 && W_ADV_CFG.key === 'sd-realm-adv'"), 'the test adventures are registered (the game ships none)')
+        check(await pg.evaluate("W_ADV.length === 5 && W_ADV_CFG.key === 'sd-realm-adv'"), 'the test adventures are registered (the shipped stories set aside)')
 
         # ---------- the store ----------
         r = await pg.evaluate("(() => { localStorage.setItem(wAdvKey(), '{bad'); let ok = true, v; try { v = wAdvAll(); } catch (e) { ok = String(e); } localStorage.removeItem(wAdvKey()); return { ok, v }; })()")
