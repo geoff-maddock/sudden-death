@@ -27,7 +27,7 @@
    step's conditions (every engine calls W_ON_END[W.kind]).
 
    Wraps: wSay (wW65Say: starters, talk steps, the match and choice triggers, reward recruits), wEnterMap
-   (wW65EnterMap: visit steps), wMatchLost (wW65MatchLost: a hardcore loss, which ends the journey without the usual
+   (wW65EnterMap: visit steps), wStart (wW65Start: the places adventures have shown you, on every journey), wMatchLost (wW65MatchLost: a hardcore loss, which ends the journey without the usual
    dispatch). A game whose night, weather or starter can't be met isn't offered; night and weather are judged as they
    were at kickoff (AS.kick). Calling a ball, football or ring game off before its first pitch, play or bout is no
    result, like "Not yet": not an attempt. The cards, the journal tab, the Bag, rumours and How to play are in w66. */
@@ -92,18 +92,18 @@ function wAdvDone(id, si) {
     A.done.push(si);
     if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
   });
-  for (const f of [].concat(step.set || [])) { wSetFlag(f); wInvalidate('world'); }
+  const flags = [].concat(step.set || []); for (const f of flags) wSetFlag(f); if (flags.length) wInvalidate('world');
   if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[wAdvState(id).ch].t}.`, 'g'); }
   if (won) wAdvWin(id);
 }
-/* the places an adventure has shown you stay shown on every journey: the flags its starter and its done steps set */
+/* the places an adventure has shown you stay shown on every journey: the flags its done steps set (on a journey's
+   start or load: wW65Start) */
 function wAdvReapply(S) {
   if (!WG) return;
   S = S || wAdvAll(); let any = false;
   const put = f => { for (const x of [].concat(f || [])) if (!WG.flags[x]) { WG.flags[x] = 1; any = true; } };
   for (const D of W_ADV) {
     const A = S.a[D.id]; if (!A) continue;
-    if (D.starter) put(D.starter.set);
     D.chapters.forEach((C, ci) => C.steps.forEach((st, si) => { if (ci < A.ch || (ci === A.ch && A.done.includes(si))) put(st.set); }));
   }
   if (any) wInvalidate('world');
@@ -163,7 +163,7 @@ function wAdvTalk(id, kw) {
     const St = D.starter;
     if (!A && St && St.who === id && wKwHit(St.kw, kw)) {
       if (St.need && [].concat(St.need).some(f => !wFlag(f))) continue;
-      wAdvBegin(D.id); wAdvReapply();
+      wAdvBegin(D.id);
       return { text: St.t || `${D.title}.`, key: St.kw };
     }
     // the live steps
@@ -180,9 +180,9 @@ function wAdvTalk(id, kw) {
   }
   return null;
 }
-function wAdvVisit(mapId) {
+function wAdvVisit(mapId, S) {
   if (!WG) return;
-  const S = wAdvAll();
+  S = S || wAdvAll();
   for (const D of W_ADV) for (const L of wAdvLive(D.id, S)) {
     const s = L.step; if (s.k !== 'visit') continue;
     const loc = DB.locs.find(l => l.id === s.loc); if (!loc || loc.map !== mapId) continue;
@@ -203,7 +203,13 @@ wSay = function (id, kw) {
 const wW65EnterMap = wEnterMap;
 wEnterMap = function (id, x, y) {
   const r = wW65EnterMap(id, x, y);
-  try { wAdvReapply(); wAdvVisit(id); } catch (e) { console.error(e); }
+  try { wAdvVisit(id); } catch (e) { console.error(e); }
+  return r;
+};
+const wW65Start = wStart;
+wStart = function (save, opts) {
+  const r = wW65Start(save, opts);
+  try { wAdvReapply(); } catch (e) { console.error(e); }
   return r;
 };
 

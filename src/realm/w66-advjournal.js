@@ -93,7 +93,9 @@ function wAdvJournalHtml(S) {
         ${items.length ? `<p>Carrying: ${items.join(', ')}.</p>` : ''}${next ? `<p>Next game: ${wAdvCondText(next.step).map(esc).join(' ')}</p>` : ''}</div>`);
     } else if (A.st === 'won') {
       const U = D.end && D.end.unlock, home = U ? wAdvHome(U.at) : '';
-      won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc((D.end && D.end.t) || '')}</p>${U ? `<p class="hint">${esc(U.recruit.n)} waits with ${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''}: ask about ${esc(U.kw.toUpperCase())}.</p>` : ''}</div>`);
+      const keep = !U ? '' : U.recruit ? `${esc(U.recruit.n)} waits with ${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''}: ask about ${esc(U.kw.toUpperCase())}.`
+        : `${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''} keeps your reward${U.relic && RELICS[U.relic] ? ' (the ' + esc(RELICS[U.relic].n) + ')' : ''} for every journey: ask about ${esc(U.kw.toUpperCase())}.`;
+      won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc((D.end && D.end.t) || '')}</p>${keep ? `<p class="hint">${keep}</p>` : ''}</div>`);
     } else {
       lost.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc(D.lostText || 'It ended badly.')}</p>${A.why ? `<p class="hint">${esc(A.why)}</p>` : ''}</div>`);
     }

@@ -18,29 +18,38 @@
    Reward: the Founder's Charm (a trophy no pool offers: 1 Strength and 1 Footwork at the start of every fight) and
    The Founding Rule (a Hall of Fame card no pool offers), handed over again by Foss on any later journey (FOUNDERS).
 
-   Also here: the tide (wTide: two low waters a day, two hours each, 48 minutes later each day; Marrowbone tells
-   you when), old rules in the card game, and a fix for the Frozen Chapel bell, which never set its quest flag.
+   Also here: the tide (wTide: a 12.4-hour tide on the running clock, so two low waters a day, two hours each, about
+   48 minutes later each day; Marrowbone tells you when), old rules in the card game (no gear, set plays or Hall of
+   Fame cards, and the trophies sit out until the match has ended), and a fix for the Frozen Chapel bell, which never
+   set its quest flag (rq_aur2, once Halvard has sent you: rq_aur1).
 
    Wraps: wSay (wW67Say: Marrowbone's TIDE), wBuildEncounter (wW67BuildEncounter: carries world.rules), startCombat (wSdStartCombat: old rules thin the
    deck to basic cards and set the trophies aside), finishFight (wW67FinishFight: the trophies come back),
    wEncounterHook (wW67EncounterHook: the bell sets its flag), relicPool (wSdRelicPool: no pool offers an adventure
-   trophy), renderHelp (wW67RenderHelp: #wHelpTide). */
+   trophy), renderHelp (wW67RenderHelp: #wHelpOldRules, #wHelpTide). */
 
 /* ---------- the tide ---------- */
-const W_TIDE = { low: 2, period: 12, first: 2, shift: .8 };
-function wTideOff() { return ((W_TIDE.first + (WG ? WG.dayAbs : 0) * W_TIDE.shift) % W_TIDE.period + W_TIDE.period) % W_TIDE.period; }
-function wTide() {
+/* a 12.4-hour tide on the realm's running clock (so two low waters a day, about 48 minutes later each day, and no
+   jump at midnight) */
+const W_TIDE = { low: 2, period: 12.4, first: 2 };
+function wTideNow() { return WG ? WG.dayAbs * 24 + wHour() : 0; }
+function wTidePhase(t) { const P = W_TIDE.period; return (((t == null ? wTideNow() : t) - W_TIDE.first) % P + P) % P; }
+function wTide(t) {
   if (!WG) return 'high';
-  const d = ((wHour() - wTideOff()) % W_TIDE.period + W_TIDE.period) % W_TIDE.period;
-  return d < W_TIDE.low ? 'low' : d < W_TIDE.period / 2 ? 'rising' : d < W_TIDE.period / 2 + W_TIDE.low ? 'high' : 'falling';
+  const d = wTidePhase(t), P = W_TIDE.period;
+  return d < W_TIDE.low ? 'low' : d < P / 2 ? 'rising' : d < P / 2 + W_TIDE.low ? 'high' : 'falling';
 }
+/* when today's low waters start, as clock times */
 function wTideTimes() {
-  const fmt = h => { const m = Math.round(h * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
-  const a = wTideOff(); return [a, a + W_TIDE.period].map(fmt);
+  const day0 = WG.dayAbs * 24, P = W_TIDE.period, out = [];
+  let s = wTideNow() - wTidePhase();
+  while (s >= day0) s -= P;
+  for (s += P; s < day0 + 24; s += P) if (s >= day0) out.push(s);
+  return out.map(x => { const m = Math.round((x - day0) * 60); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; });
 }
 function wTideLine() {
-  const [a, b] = wTideTimes(), now = wTide();
-  return `Low water today about ${a} and ${b}, two hours each, a little later every day. It is ${now} now. The Marigold's hold is only dry at low water.`;
+  const T = wTideTimes(), now = wTide();
+  return `Low water today about ${T.join(' and ')}, two hours each, a little later every day. It is ${now} now. The Marigold's hold is only dry at low water.`;
 }
 const wW67Say = wSay;
 wSay = function (id, kw) {
@@ -50,14 +59,23 @@ wSay = function (id, kw) {
     try { wJHeard(id, k, r); } catch (e) { console.error(e); }
     return r;
   }
-  return wW67Say(id, kw);
+  const r = wW67Say(id, kw);
+  if (id === 'clerk' && WG && r && r.text != null) {
+    const A = wAdvState('charter');
+    // the charter's fallback line follows the story; the frame hint only until the story starts
+    const T = DB.chars.clerk.topics;
+    if (r.key === 'charter' && A && r.text === T.charter.t) r.text = A.st === 'won' ? 'Framed, whole, and back in the rulebook. Ask about the FOUNDERS whenever you like.'
+      : A.st === 'lost' ? 'In the drawer. The League calls it a curiosity. Let us not talk about it.' : 'You know as much as I do now. Your journal has the rest.';
+    if (r.key === 'bracket' && wFlag('q_bracket') && !A && (r.text === T.bracket.t || r.text === T.bracket.t2)) r.text += ' Odd: the frame was backed with a torn page of something. The old CHARTER, I think.';
+  }
+  return r;
 };
 
 /* ---------- old rules in the card game ---------- */
+/* what the old rules allow: everything but gear, set plays and Hall of Fame cards (as the match card says) */
 function wAdvOldOk(c) {
   const d = CARDS[c.id]; if (!d) return false;
-  if (d.type === 'junk' || d.type === 'curse') return true; // the old rules never cleared a deck of its troubles
-  return (d.rar === 's' || d.rar === 'c') && d.type !== 'gear' && d.type !== 'play';
+  return d.rar !== 'l' && d.type !== 'gear' && d.type !== 'play';
 }
 const wW67BuildEncounter = wBuildEncounter;
 wBuildEncounter = function (o) {
@@ -70,18 +88,20 @@ startCombat = function () {
   const W = WG && RUN && RUN.pending && RUN.pending.world;
   if (!W || W.rules !== 'old') return wSdStartCombat.apply(this, arguments);
   const deck = RUN.deck, keep = deck.filter(wAdvOldOk);
-  RUN.deck = keep.length >= 5 ? keep : deck; // a deck too thin to play keeps its cards
+  RUN.deck = keep.length ? keep : deck; // (a deck of nothing but gear, plays and Hall of Fame cards can't be played at all)
   if (!RUN.oldRelics) { RUN.oldRelics = RUN.relics; RUN.relics = []; }
   try { return wSdStartCombat.apply(this, arguments); } finally { RUN.deck = deck; }
 };
 function wAdvRelicsBack() { if (RUN && RUN.oldRelics) { RUN.relics = RUN.oldRelics; delete RUN.oldRelics; } }
 const wW67FinishFight = finishFight;
-finishFight = function () { wAdvRelicsBack(); return wW67FinishFight.apply(this, arguments); };
+// after the match's own end (its fightWon trophies and reward gold included), so no trophy pays out for an old-rules game
+finishFight = function () { try { return wW67FinishFight.apply(this, arguments); } finally { wAdvRelicsBack(); } };
 
 /* ---------- the Frozen Chapel bell sets its flag (it only ever logged) ---------- */
 const wW67EncounterHook = wEncounterHook;
 wEncounterHook = function (region, tileCh, info) {
-  if (info && info.kind === 'bell' && info.ring && info.ring.set && WG && !wFlag(info.ring.set)) {
+  // (only once Halvard has sent you, rq_aur1: the side quest's own order)
+  if (info && info.kind === 'bell' && info.ring && info.ring.set && WG && wFlag('rq_aur1') && !wFlag(info.ring.set)) {
     wSetFlag(info.ring.set);
     const sp = DB.sideplots.find(x => x.id === info.ring.set); if (sp) wLog('Done: ' + sp.title + '.', 'g');
   }
@@ -141,14 +161,14 @@ W_ADV.push({
     unlock: { at: 'clerk', kw: 'founders', relic: 'founders', cards: ['adv_founding'], t: 'The founders would have wanted you to have these. The League office keeps copies.', t2: 'You have them already.' } },
 });
 // Foss notices the frame when you bring the First Bracket home
-if (DB.chars.clerk && DB.chars.clerk.topics.bracket) DB.chars.clerk.topics.bracket.t2 += ' Odd: the frame was backed with a torn page of something. The old CHARTER, I think.';
-// what she says about it when the adventure isn't answering (before the First Bracket is home, or once it is under way)
-if (DB.chars.clerk) DB.chars.clerk.topics.charter = { t: 'The League charter burned with the old hall, they say. I have my doubts. Check your journal, and keep looking.' };
+// what she says when the adventure isn't answering (before the First Bracket is home; later lines follow the story, wW67Say)
+if (DB.chars.clerk) DB.chars.clerk.topics.charter = { t: 'The League charter burned with the old hall, they say. I have my doubts. The First BRACKET might know more, if anyone ever finds it.' };
 
 /* ---------- How to play: the tide ---------- */
 const wW67RenderHelp = renderHelp;
 renderHelp = function () {
   wW67RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpTide')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpOldRules"><b>Old rules.</b> Some games are played the way the League's founders played: no gear, no set plays, no Hall of Fame cards, and your trophies sit the game out. Your other cards play as usual, and everything comes back when the game ends. The game card says when a game is under old rules.</p>`);
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpTide"><b>The tide.</b> The Brinefen coast has two low waters a day, two hours each, and they come about 48 minutes later every day. Captain Marrowbone in Saltmere will tell you when (ask about the TIDE).</p>`);
 };
