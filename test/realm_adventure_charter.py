@@ -67,6 +67,29 @@ async def main():
         check('CHARTER' in r['b'], 'Foss notices the frame once the First Bracket is home', r['b'])
         check('Vesper was there' in r['c'] and r['s']['st'] == 'active', 'then asking Foss about the CHARTER starts it', r)
 
+        # ---------- markers: off by default; on, the map marks where the story goes next ----------
+        r = await pg.evaluate("(() => { const off = !SET.advMarks; return { off, marks: wAdvMarks().map(m => m.loc) }; })()")
+        check(r['off'] and r['marks'] == ['graftonbury'], 'adventure markers are off by default; the next step is in Graftonbury (Vesper)', r)
+        await pg.click('#bSound'); await pg.wait_for_selector('#modal:not([hidden]) #wAdvMarks')
+        r = await pg.evaluate("(() => { const b = document.getElementById('wAdvMarks'); const was = b.checked; b.click(); return { was, now: SET.advMarks, saved: JSON.parse(localStorage.getItem('sd-settings')).advMarks }; })()")
+        check(r == {'was': False, 'now': True, 'saved': True}, 'the Settings panel has an Adventure markers switch, and it is saved', r)
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate("""(() => { wOpenMap('world'); const cv = document.getElementById('wMapCv'), S = W_MAP.px, M = wAdvMarks()[0];
+          const px = cv.getContext('2d').getImageData(M.x * S + S / 2 + 10, M.y * S + S / 2 - 2, 1, 1).data, key = (document.getElementById('wAdvKey') || {}).textContent || '';
+          return { px: [px[0], px[1], px[2]], key }; })()""")
+        check(abs(r['px'][0] - 0xd9) < 12 and abs(r['px'][1] - 0xa6) < 12 and abs(r['px'][2] - 0x2e) < 12, 'the world map draws the gold marker beside Graftonbury', r)
+        check('The Lost Charter' in r['key'] and 'Graftonbury' in r['key'], 'and the map key says it is for The Lost Charter, at Graftonbury', r['key'])
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate("""(() => { const M = MAPS.graftonbury; wEnterMap('graftonbury', M.spawn[0], M.spawn[1]); wFogRevealAll('graftonbury'); wOpenMap();
+          const n = M.npcs.find(x => x.id === 'vesper'), S = wMapPx(M), cv = document.getElementById('wMapCv'), px = cv.getContext('2d').getImageData(n.x * S + S / 2 + 7, n.y * S + S / 2, 1, 1).data;
+          return { key: (document.getElementById('wAdvKey') || {}).textContent || '', px: [px[0], px[1], px[2]] }; })()""")
+        check('Gant Vesper' in r['key'] and abs(r['px'][0] - 0xd9) < 25 and abs(r['px'][1] - 0xa6) < 25, 'in Graftonbury the town map rings Gant Vesper in gold and names him in the key', r)
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate("""(() => { const S = wAdvAll(); const keep = JSON.stringify(S); S.a.charter.ch = 1; S.a.charter.done = []; wAdvSave(S); const flag = WG.flags.clue_shrine; delete WG.flags.clue_shrine;
+          const marks = wAdvMarks().map(m => m.loc); localStorage.setItem(wAdvKey(), keep); if (flag) WG.flags.clue_shrine = flag; return marks; })()""")
+        check('hollowshrine' not in r, 'a place the story has not revealed yet is never marked', r)
+        await pg.evaluate("(() => { SET.advMarks = false; saveSettings(); })()")
+
         # ---------- 1. Vesper ----------
         r = await pg.evaluate("(() => { const a = wSay('gk_court', 'vesper').act || ''; const t = wSay('vesper', 'charter').text; const b = wSay('gk_court', 'vesper').act; wRunAct(b, 'gk_court'); const card = document.getElementById('modalBox').textContent; return { a, t, b, card }; })()")
         check('Gant Vesper' in r['card'] and 'basketball' in r['card'], 'the game card names Vesper and the sport', r['card'][:200])
@@ -145,8 +168,9 @@ async def main():
         await pg.evaluate(CLOSE_ALL)
         r = await pg.evaluate("(() => { const p = new Set(); for (let i = 0; i < 40; i++) relicPool().forEach(k => p.add(k)); return { pool: p.has('founders'), hof: !!CARDS.adv_founding && CARDS.adv_founding.rar === 'l' }; })()")
         check(not r['pool'] and r['hof'], 'no trophy pool offers the Founder\'s Charm; The Founding Rule is a Hall of Fame card', r)
-        r = await pg.evaluate("(() => { startMatch({ type: 'normal', tier: 1, card: false, ids: ['cheer', 'cheer'], world: { kind: 'wild' } }); const st = { str: B.P.st.str || 0, dex: B.P.st.dex || 0 }; B.forfeit = 1; B.over = 'lose'; finishFight(); RUN.hp = RUN.maxhp; return st; })()")
-        check(r['str'] >= 1 and r['dex'] >= 1, 'the Founder\'s Charm works: 1 Strength and 1 Footwork at the start of a fight', r)
+        r = await pg.evaluate("""(() => { const W0 = wWeather; wWeather = () => null; const without = RUN.relics.filter(k => k !== 'founders'), keep = RUN.relics; RUN.relics = without; startMatch({ type: 'normal', tier: 1, card: false, ids: ['cheer', 'cheer'], world: { kind: 'wild' } }); const a = B.P.block; B.forfeit = 1; B.over = 'lose'; finishFight();
+          RUN.relics = keep; startMatch({ type: 'normal', tier: 1, card: false, ids: ['cheer', 'cheer'], world: { kind: 'wild' } }); const b = B.P.block; B.forfeit = 1; B.over = 'lose'; finishFight(); RUN.hp = RUN.maxhp; wWeather = W0; return { a, b }; })()""")
+        check(r['b'] - r['a'] == 4, 'the Founder\'s Charm works: 4 more Block at the start of a fight', r)
         await pg.evaluate(CLOSE_ALL)
         await pg.evaluate("wSave()")
 

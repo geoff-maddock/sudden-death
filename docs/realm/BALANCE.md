@@ -614,3 +614,38 @@ Phoenix 7, 8, 9, 6, 8; Kraken 9, 7, 5, 7, 10; Behemoth 10, 8, 4, 9, 8; Djinn 9, 
 (league kinds total about 30 there, the superstars 38–42). One player in seven or nine now adds 5–9 points in
 football and 3–6 in baseball.
 
+
+## Adventure rewards (issue #47, phase 5)
+
+The three adventures' kept rewards are handed over again at the start of every later journey, so a profile that has
+finished them plays every journey with them from day one. That is what the bot measured: each reward given at
+`wStart`, 300 journeys a row, with `test/realm_lab.py` and a `wStart` wrapper as the tuning snippet.
+
+As first written, they made the Crown close to a formality:
+
+| Champion rate (300 runs each) | Skilled | Careless | Hardcore |
+|---|---|---|---|
+| No adventure rewards | 77.7% | 36.3% | 15.7% |
+| All of them | 97.7% | 65.0% | 52.0% |
+| Founder's Charm alone (1 Strength and 1 Footwork every fight) | 90.3% | 50.3% | 36.3% |
+| The two Hall of Fame cards alone | 91.0% | 48.0% | 31.7% |
+
+The retune:
+
+- **Founder's Charm:** 4 Block at the start of each fight (was 1 Strength and 1 Footwork).
+- **The Founding Rule:** 6 Block and 1 Strength, and it Exhausts (was 9 Block, 1 Strength and 1 Footwork, every time).
+- **Drop Anchor:** 8 Block and every enemy Weak, and it Exhausts (was 12 Block).
+- **The Marigold's Flag** is unchanged (3 fans after a win). On its own it's within noise: 81.3% / 33.7% / 19.0%.
+
+After, with the shipped values and a fresh baseline:
+
+| Champion rate (300 runs each) | Skilled | Careless | Hardcore |
+|---|---|---|---|
+| No adventure rewards | 79.0% | 32.7% | 22.3% |
+| All of them | 85.0% | 39.3% | 22.3% |
+
+So all three adventures finished is worth about six points of champion rate to the skilled and careless bots, and
+nothing measurable in hardcore (whose baseline moved from 15.7% to 22.3% between runs: that is its noise). The two
+reward players, Bosun Gale and Rook Halloran, are an ordinary troll and werewolf at the team's level, as a tavern
+recruit would be, so they add a body, not a power. The ending pay (gold and fans, once) was not measured: the bot
+already spends what it earns.

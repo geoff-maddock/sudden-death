@@ -99,3 +99,4 @@ src/realm/w66-advjournal.js
 src/realm/w67-charter.js
 src/realm/w68-crew.js
 src/realm/w69-fixed.js
+src/realm/w70-advmarks.js
