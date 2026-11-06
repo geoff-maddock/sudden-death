@@ -96,3 +96,4 @@ src/realm/w63-hydra.js
 src/realm/w64-frostwyrm.js
 src/realm/w65-adventures.js
 src/realm/w66-advjournal.js
+src/realm/w67-charter.js
