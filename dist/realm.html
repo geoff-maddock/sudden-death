@@ -34768,5 +34768,390 @@ renderHelp = function () {
   const after = $('wHelpHydra') || $('wHelpStars'); if (!after || $('wHelpWyrm')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpWyrm"><b>The Frost Wyrm.</b> Win the Crown on any journey to unlock it. Then ask Jory Farsight, the watcher in Rimewatch, about the WYRM. It is the costliest superstar: ${W_WYR.price.gold} gold or ${W_WYR.price.items.rimeegg} Rime Eggs. Its power is Blizzard. In a card-game match, while it starts, every enemy starts Weak and Exposed for ${W_WYR.turns} turns. In the ring, counters hurt it less. Its ultimate, Whiteout, brings the snow: slower at everything in the ring, a slow offense on the gridiron, slow runners on the diamond. As captain it gives 1 Strength, 1 Footwork and 5 Block at kickoff.</p>`);
 };
+/* w65: adventures, phase 1 (issue #47): the plumbing. Long story lines across the Realm, in chapters of steps: talk
+   to someone about a keyword, go somewhere, win a particular game, make a choice. The design is in
+   docs/superpowers/specs/2026-11-05-realm-adventures-design.md.
+
+   Settled with Geoff: progress belongs to the profile, not the journey (a journey that ends halfway leaves the
+   adventure where it was, for the next journey on the same profile). A finished adventure stays finished and its
+   reward is kept: a reward character lives in one place and recruits on any later journey. Most steps can be tried
+   again; a pinnacle step can't, and failing it loses the adventure on that profile for good (the journal keeps it as
+   a story that ended badly). An adventure starts only from the right conversation; rumours at the inns point there.
+
+   W_ADV is the table of adventures (empty in this phase: the stories come in later phases; the test adds its own).
+   Steps: { k: 'talk', who, kw, need?, tNo?, take?, give? }, { k: 'visit', loc, need?, tNo?, give? },
+          { k: 'match', who, kw, engine: card|ball|grid|ring, tier, ids?, sport?, club?, cond?, win, lose },
+          { k: 'choice', who, kw, q, opts, right, win, lose }, each with t?, learn?, pinnacle?.
+   A chapter's steps go in order, or in any order with any: true. W_ADV_ITEMS are adventure items, kept on the
+   profile (not WG.items, which every journey starts empty).
+
+   Storage: pkey('sd-realm-adv') = { a: { advId: { st: 'active'|'won'|'lost', ch, done: [step], items: { id: n },
+   learned: [{ t, d }], since, ended?, why? } }, rec: {} }, written the moment anything changes, so reloading a journey
+   save can't undo a pinnacle. WG.advRec = { advId: 1 } marks a reward character recruited this journey. Nothing is
+   stored in LAB.
+
+   Matches start with kind 'adv' and ref '<advId>:<chapter>:<step>'; W_ON_END.adv checks the result against the
+   step's conditions (every engine calls W_ON_END[W.kind]).
+
+   Wraps: wSay (wW65Say: starters, talk steps, the match and choice triggers, reward recruits), wEnterMap
+   (wW65EnterMap: visit steps). The cards, the journal tab, the Bag, rumours and How to play are in w66. */
+
+const W_ADV = [];
+const W_ADV_ITEMS = {};
+const W_ADV_CFG = { key: 'sd-realm-adv', engines: { card: 'the card game', ball: 'baseball', grid: 'football', ring: 'boxing' } };
+
+/* ---------- the store ---------- */
+function wAdvKey() { return pkey(W_ADV_CFG.key); }
+function wAdvAll() {
+  let S; try { S = JSON.parse(localStorage.getItem(wAdvKey()) || 'null'); } catch (e) { S = null; }
+  S = S && typeof S === 'object' && !Array.isArray(S) ? S : {};
+  return { a: S.a && typeof S.a === 'object' ? S.a : {}, rec: S.rec && typeof S.rec === 'object' ? S.rec : {} };
+}
+function wAdvSave(S) { if (LAB) return; try { localStorage.setItem(wAdvKey(), JSON.stringify(S)); } catch (e) { } }
+function wAdvToday() { return new Date().toISOString().slice(0, 10); }
+function wAdv(id) { return W_ADV.find(a => a.id === id) || null; }
+function wAdvState(id) { return wAdvAll().a[id] || null; }
+function wAdvEdit(id, fn) { const S = wAdvAll(), A = S.a[id]; if (!A) return null; fn(A, S); wAdvSave(S); return A; }
+
+/* the steps you can do now: the first not done, or every one not done in an any-order chapter */
+function wAdvLive(id) {
+  const D = wAdv(id), A = wAdvState(id);
+  if (!D || !A || A.st !== 'active') return [];
+  const C = D.chapters[A.ch]; if (!C) return [];
+  const open = C.steps.map((step, si) => ({ ch: A.ch, si, step })).filter(s => !A.done.includes(s.si));
+  return C.any ? open : open.slice(0, 1);
+}
+function wAdvBegin(id) {
+  const D = wAdv(id), S = wAdvAll();
+  if (!D || S.a[id]) return false;
+  S.a[id] = { st: 'active', ch: 0, done: [], items: {}, learned: [], since: wAdvToday() };
+  if (D.starter && D.starter.learn) S.a[id].learned.push({ t: D.starter.learn, d: wAdvToday() });
+  wAdvSave(S);
+  if (WG && !LAB) wLog(`A new adventure: ${D.title}.`, 'g');
+  return true;
+}
+function wAdvLearn(id, t) { if (t) wAdvEdit(id, A => A.learned.push({ t, d: wAdvToday() })); }
+function wAdvPay(pay, from) {
+  if (!pay || !RUN) return;
+  if (pay.gold) { RUN.gold += pay.gold; wLog(`Received ${pay.gold} gold.`, 'm'); }
+  if (pay.fans) { RUN.fans = (RUN.fans || 0) + pay.fans; wLog(`${pay.fans} new fans.`, 'm'); }
+  if (pay.cards) wPayCards({ cards: pay.cards }, from);
+  for (const k in pay.items || {}) { wAddItem(k, pay.items[k]); wLog(`Received ${pay.items[k]} ${(DB.items[k] || {}).name || k}.`, 'm'); }
+}
+function wAdvItemsMove(A, take, give) {
+  for (const k in take || {}) { A.items[k] = (A.items[k] || 0) - take[k]; if (A.items[k] <= 0) delete A.items[k]; }
+  for (const k in give || {}) A.items[k] = (A.items[k] || 0) + give[k];
+}
+function wAdvHas(A, take) { return Object.keys(take || {}).every(k => (A.items[k] || 0) >= take[k]); }
+/* a step is done: its items move, the chapter (and then the adventure) completes once every step is done */
+function wAdvDone(id, si) {
+  const D = wAdv(id), A0 = wAdvState(id);
+  if (!D || !A0 || A0.st !== 'active' || A0.done.includes(si)) return;
+  const C = D.chapters[A0.ch], step = C.steps[si];
+  let chDone = false, won = false;
+  wAdvEdit(id, A => {
+    wAdvItemsMove(A, step.take, step.give);
+    for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
+    if (step.learn) A.learned.push({ t: step.learn, d: wAdvToday() });
+    A.done.push(si);
+    if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
+  });
+  if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[wAdvState(id).ch].t}.`, 'g'); }
+  if (won) wAdvWin(id);
+}
+function wAdvWin(id) {
+  const D = wAdv(id); if (!D) return;
+  const E = D.end || {};
+  if (WG && !LAB) wLog(`${D.title}: ${E.t || 'the end'}`, 'g');
+  wAdvPay(E.pay, D.title);
+  if (E.feat && typeof wStarsAll === 'function') { const S = wStarsAll(); if (!S.un[E.feat]) { S.un[E.feat] = wAdvToday(); wStarsSave(S); } }
+}
+function wAdvLose(id, why) {
+  const D = wAdv(id);
+  const A = wAdvEdit(id, A => { if (A.st !== 'active') return; A.st = 'lost'; A.ended = wAdvToday(); A.why = why || ''; });
+  if (A && D && WG && !LAB) wLog(`${D.title}: ${D.lostText || 'it ended badly.'}`, 'd');
+}
+
+/* ---------- talk and places ---------- */
+function wAdvKw(want, kw) { return kw === want || (kw.length >= 4 && want.startsWith(kw.slice(0, 4))); }
+function wAdvNeedMet(need) {
+  if (!need) return true;
+  if (need.night && !wIsNight()) return false;
+  if (need.season && wSeason() !== need.season) return false;
+  if (need.weather && wWeather(wRegionHere()) !== need.weather) return false;
+  return true;
+}
+/* returns { text, act?, key } when an adventure answers, or null to let the character answer as usual */
+function wAdvTalk(id, kw) {
+  if (!WG || !kw) return null;
+  for (const D of W_ADV) {
+    const A = wAdvState(D.id);
+    // the reward character, once per journey
+    const U = D.end && D.end.unlock;
+    if (A && A.st === 'won' && U && U.at === id && wAdvKw(U.kw, kw)) {
+      WG.advRec = WG.advRec || {};
+      if (WG.advRec[D.id]) return { text: `${U.recruit.n} is already with you.`, key: U.kw };
+      WG.advRec[D.id] = 1;
+      if (typeof wRecruitTopic === 'function') wRecruitTopic(U.recruit);
+      return { text: U.t || `${U.recruit.n} joins you.`, key: U.kw };
+    }
+    // the start
+    const St = D.starter;
+    if (!A && St && St.who === id && wAdvKw(St.kw, kw)) {
+      if (St.need && [].concat(St.need).some(f => !wFlag(f))) continue;
+      wAdvBegin(D.id);
+      return { text: St.t || `${D.title}.`, key: St.kw };
+    }
+    // the live steps
+    for (const L of wAdvLive(D.id)) {
+      const s = L.step;
+      if (s.k === 'visit' || s.who !== id || !wAdvKw(s.kw, kw)) continue;
+      if (s.k === 'match' || s.k === 'choice') return { text: s.t || '', act: `adv:${D.id}:${L.si}`, key: s.kw };
+      if (!wAdvNeedMet(s.need)) return { text: s.tNo || 'Not yet.', key: s.kw };
+      if (s.take && !wAdvHas(A, s.take)) return { text: s.tNo || 'Not yet.', key: s.kw };
+      wAdvDone(D.id, L.si);
+      return { text: s.t || '', key: s.kw };
+    }
+  }
+  return null;
+}
+function wAdvVisit(mapId) {
+  if (!WG) return;
+  for (const D of W_ADV) for (const L of wAdvLive(D.id)) {
+    const s = L.step; if (s.k !== 'visit') continue;
+    const loc = DB.locs.find(l => l.id === s.loc); if (!loc || loc.map !== mapId) continue;
+    if (!wAdvNeedMet(s.need)) { if (s.tNo) wLog(s.tNo, 'd'); continue; }
+    if (s.t) wLog(s.t, 'm');
+    wAdvDone(D.id, L.si);
+  }
+}
+const wW65Say = wSay;
+wSay = function (id, kw) {
+  const k = (kw || '').trim().toLowerCase();
+  let r = null;
+  try { r = wAdvTalk(id, k); } catch (e) { console.error(e); }
+  if (!r) return wW65Say(id, kw);
+  try { if (typeof wJHeard === 'function') wJHeard(id, k, r); } catch (e) { console.error(e); }
+  return r;
+};
+const wW65EnterMap = wEnterMap;
+wEnterMap = function (id, x, y) {
+  const r = wW65EnterMap(id, x, y);
+  try { wAdvVisit(id); } catch (e) { console.error(e); }
+  return r;
+};
+
+/* ---------- matches ---------- */
+function wAdvRef(ref) { const [id, ch, si] = String(ref || '').split(':'); return { id, ch: +ch, si: +si }; }
+function wAdvStep(id, si) { const D = wAdv(id), A = wAdvState(id); return D && A && D.chapters[A.ch] ? D.chapters[A.ch].steps[si] || null : null; }
+function wAdvCondText(step) {
+  const c = step.cond || {}, out = [];
+  if (c.margin) out.push(`Win by at least ${c.margin}.`);
+  if (c.starter) {
+    const who = c.starter.pid != null ? (wRoster().find(p => p.id === c.starter.pid) || {}).n : null;
+    out.push(who ? `${who} must start.` : `A ${wKindName(c.starter.kind).toLowerCase()} must start.`);
+  }
+  if (c.night) out.push('At night.');
+  if (c.weather) out.push(`In the ${c.weather}.`);
+  if (!out.length) out.push('Win.');
+  return out;
+}
+function wAdvStartMatch(id, si, how) {
+  const A = wAdvState(id), step = wAdvStep(id, si);
+  if (!A || A.st !== 'active' || !step || step.k !== 'match') return 'That game is not on.';
+  const ref = `${id}:${A.ch}:${si}`, tier = step.tier || 1, eng = step.engine || 'card';
+  if (eng === 'card') {
+    startMatch({ type: step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name, world: { kind: 'adv', ref } });
+    return '';
+  }
+  const o = { club: step.club || 'local', how: how || 'play', tier, kind: 'adv', ref };
+  const f = { ball: wStartBall, grid: wStartGrid, ring: wStartRing }[eng];
+  return f ? f(o) || '' : 'That game is not on.';
+}
+function wAdvMatchFacts(r, W) {
+  W = W || {};
+  let us = W.us, them = W.them;
+  if (us == null && RUN && RUN.games && RUN.games.length) { const g = RUN.games[RUN.games.length - 1]; us = g.us; them = g.them; }
+  return { win: r === 'win', us: us || 0, them: them || 0 };
+}
+function wAdvStarted(cond, W) {
+  const hit = p => p && (cond.pid != null ? p.id === cond.pid : p.kind === cond.kind);
+  if (W && Array.isArray(W.ids) && W.ids.length) return W.ids.some(pid => hit(wRoster().find(p => p.id === pid)));
+  if (W && W.how && WG.nine) return WG.nine.order.some(o => hit(wRoster().find(p => p.id === o.id))); // baseball: the nine
+  return wStarters().some(hit);
+}
+function wAdvCondMet(step, facts, W) {
+  if (!facts.win) return false;
+  const c = step.cond || {};
+  if (c.margin && facts.us - facts.them < c.margin) return false;
+  if (c.starter && !wAdvStarted(c.starter, W)) return false;
+  if (c.night && !wIsNight()) return false;
+  if (c.weather && wWeather(wRegionHere()) !== c.weather) return false;
+  return true;
+}
+W_ON_END.adv = function (r, ref, W) {
+  const R = wAdvRef(ref), A = wAdvState(R.id), D = wAdv(R.id);
+  if (!A || !D || A.st !== 'active' || A.ch !== R.ch || !wAdvLive(R.id).some(L => L.si === R.si)) return;
+  const step = D.chapters[R.ch].steps[R.si];
+  if (wAdvCondMet(step, wAdvMatchFacts(r, W), W)) { if (step.win) wLog(step.win, 'g'); wAdvDone(R.id, R.si); return; }
+  if (step.pinnacle) { wAdvLose(R.id, step.lose || 'You lost.'); return; }
+  if (step.lose) wLog(step.lose, 'd');
+};
+function wAdvChoose(id, si, i) {
+  const A = wAdvState(id), step = wAdvStep(id, si);
+  if (!A || A.st !== 'active' || !step || step.k !== 'choice' || !wAdvLive(id).some(L => L.si === si)) return;
+  if (i === step.right) { if (step.win) wLog(step.win, 'g'); wAdvDone(id, si); return; }
+  if (step.pinnacle) { wAdvLose(id, step.lose || 'That was wrong.'); return; }
+  if (step.lose) wLog(step.lose, 'd');
+}
+/* w66: adventures, phase 1 (issue #47): what the player sees. The match card (the opponent, the conditions, and a
+   plain warning before a pinnacle), the choice card, an Adventures tab in the journal (under way, finished, ended
+   badly), the profile's adventure items in the Bag, rumours from the innkeepers (ask about RUMOURS) and on the notice
+   boards, and How to play (#wHelpAdventures). The model is in w65.
+
+   Wraps: wRunAct (wW66RunAct: 'adv:<id>:<step>' opens the match or choice card, 'advrumour' tells a rumour),
+   wOpenJournal and wRenderJournal (wW66OpenJournal, wW66RenderJournal: the Adventures tab; its button is data-jadv,
+   not data-jtab, because the journal's own renderer looks every data-jtab up in its own table), wRenderCamp
+   (wW66RenderCamp: the Bag's Adventures section), wOpenBoard (wW66OpenBoard: a rumour on the board), renderHelp
+   (wW66RenderHelp). */
+
+const W_ADV_TEXT = { warn: "This can't be retried.", none: 'No adventures yet. Rumours at the inns sometimes point the way.', quiet: 'Nothing worth repeating.' };
+
+/* ---------- the cards ---------- */
+function wAdvFoeText(step) {
+  if ((step.engine || 'card') === 'card') {
+    const names = [...new Set((step.ids || []).map(id => (ENEMIES[id] || {}).n).filter(Boolean))];
+    return `${names.length ? names.join(' and ') : 'A local side'}, in ${W_ADV_CFG.engines.card} (tier ${step.tier || 1})`;
+  }
+  return `${wCap(wBallName(step.club || 'local'))}, at ${W_ADV_CFG.engines[step.engine]} (tier ${step.tier || 1})`;
+}
+function wAdvMatchCard(id, si) {
+  const D = wAdv(id), step = wAdvStep(id, si); if (!D || !step) return;
+  let chose = false;
+  const close = modal(`<header><h3>${esc(D.title)}</h3></header>
+    ${step.t ? `<p>${esc(step.t)}</p>` : ''}
+    <p><b>The game:</b> ${esc(wAdvFoeText(step))}.</p>
+    <ul class="wadvcond">${wAdvCondText(step).map(c => `<li>${esc(c)}</li>`).join('')}</ul>
+    ${step.pinnacle ? `<p class="wbad" id="wAdvWarn">${esc(W_ADV_TEXT.warn)}</p>` : ''}
+    <p class="wbad" id="wAdvWhy" hidden></p>
+    <div class="row"><button class="btn" id="wAdvPlay">Play</button><button class="ghost" id="wAdvNo">Not yet</button></div>`,
+    () => { if (!chose) wDrain(); });
+  $('wAdvNo').onclick = () => close();
+  $('wAdvPlay').onclick = () => {
+    chose = true; close();
+    const why = wAdvStartMatch(id, si);
+    if (why) { wLog(why, 'd'); wDrain(); }
+  };
+}
+function wAdvChoiceCard(id, si) {
+  const D = wAdv(id), step = wAdvStep(id, si); if (!D || !step) return;
+  const close = modal(`<header><h3>${esc(D.title)}</h3></header>
+    <p>${esc(step.q || step.t || '')}</p>
+    ${step.pinnacle ? `<p class="wbad" id="wAdvWarn">${esc(W_ADV_TEXT.warn)}</p>` : ''}
+    <div class="row wadvopts">${step.opts.map((o, i) => `<button class="btn" data-advopt="${i}">${esc(o)}</button>`).join('')}<button class="ghost" id="wAdvNo">Not yet</button></div>`,
+    () => wDrain());
+  $('wAdvNo').onclick = () => close();
+  $('modalBox').querySelectorAll('[data-advopt]').forEach(b => b.onclick = () => { const i = +b.dataset.advopt; close(); wAdvChoose(id, si, i); wSave(); wDrain(); });
+}
+
+/* ---------- rumours ---------- */
+function wAdvRumour() {
+  const S = wAdvAll(), lines = [];
+  for (const D of W_ADV) if (!S.a[D.id]) for (const t of D.rumours || []) lines.push(t);
+  return lines.length ? lines[(WG ? WG.dayAbs : 0) % lines.length] : '';
+}
+for (const id of W_TAVERN_INNS) {
+  const ch = DB.chars[id]; if (!ch) continue;
+  ch.topics.rumours = { t: 'Folk talk. Here is what I heard.', act: 'advrumour' };
+}
+const wW66RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'advrumour') { wLog(`${wChar(id).name}: "${wAdvRumour() || W_ADV_TEXT.quiet}"`, 'm'); return null; }
+  if (typeof act === 'string' && act.startsWith('adv:')) {
+    const [, aid, si] = act.split(':'), step = wAdvStep(aid, +si);
+    if (!step || !wAdvLive(aid).some(L => L.si === +si)) return null;
+    if (step.k === 'match') wAdvMatchCard(aid, +si); else if (step.k === 'choice') wAdvChoiceCard(aid, +si);
+    return null;
+  }
+  return wW66RunAct(act, id);
+};
+const wW66OpenBoard = wOpenBoard;
+wOpenBoard = function (city, msg) {
+  wW66OpenBoard(city, msg);
+  const h = document.querySelector('#modalBox header'), t = wAdvRumour(); if (!h || LAB || !t) return;
+  h.insertAdjacentHTML('afterend', `<p class="wadvrum"><b>Heard around:</b> ${esc(t)}</p>`);
+};
+
+/* ---------- the journal: the Adventures tab ---------- */
+function wAdvHome(charId) {
+  const t = DB.towns.find(T => (T.npcs || []).some(n => n[0] === charId));
+  return t ? wTownName(t.id) : '';
+}
+function wAdvJournalHtml() {
+  const S = wAdvAll(), on = [], won = [], lost = [];
+  for (const D of W_ADV) {
+    const A = S.a[D.id]; if (!A) continue;
+    const learned = A.learned.length ? `<ul>${A.learned.map(l => `<li>${esc(l.t)}</li>`).join('')}</ul>` : '';
+    if (A.st === 'active') {
+      const C = D.chapters[A.ch] || {}, items = Object.keys(A.items).map(k => `${esc((W_ADV_ITEMS[k] || {}).n || k)}${A.items[k] > 1 ? ' ×' + A.items[k] : ''}`);
+      const next = wAdvLive(D.id).find(L => L.step.k === 'match');
+      on.push(`<div class="wjq"><b>${esc(D.title)}</b>: ${esc(C.t || '')}<p class="hint">${esc(C.sum || D.teaser || '')}</p>${learned}
+        ${items.length ? `<p>Carrying: ${items.join(', ')}.</p>` : ''}${next ? `<p>Next game: ${wAdvCondText(next.step).map(esc).join(' ')}</p>` : ''}</div>`);
+    } else if (A.st === 'won') {
+      const U = D.end && D.end.unlock, home = U ? wAdvHome(U.at) : '';
+      won.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc((D.end && D.end.t) || '')}</p>${U ? `<p class="hint">${esc(U.recruit.n)} waits with ${esc(wChar(U.at).name)}${home ? ' in ' + esc(home) : ''}: ask about ${esc(U.kw.toUpperCase())}.</p>` : ''}</div>`);
+    } else {
+      lost.push(`<div class="wjq"><b>${esc(D.title)}</b><p>${esc(D.lostText || 'It ended badly.')}</p>${A.why ? `<p class="hint">${esc(A.why)}</p>` : ''}</div>`);
+    }
+  }
+  if (!on.length && !won.length && !lost.length) return `<p class="hint">${esc(W_ADV_TEXT.none)}</p>`;
+  return `${on.length ? `<h4>Under way</h4>${on.join('')}` : ''}${won.length ? `<h4>Finished</h4>${won.join('')}` : ''}${lost.length ? `<h4>Ended badly</h4>${lost.join('')}` : ''}`;
+}
+const wW66OpenJournal = wOpenJournal;
+wOpenJournal = function (tab) {
+  const want = tab || WJ.tab;
+  if (want === 'adv') WJ.tab = 'people';
+  wW66OpenJournal(tab === 'adv' ? undefined : tab);
+  const tabs = document.querySelector('#modalBox .wjtabs'); if (!tabs) return;
+  if (!tabs.querySelector('[data-jadv]')) {
+    tabs.insertAdjacentHTML('beforeend', '<button role="tab" data-jadv>Adventures <small></small></button>');
+    tabs.querySelector('[data-jadv]').onclick = () => { WJ.tab = 'adv'; wRenderJournal(); };
+  }
+  if (want === 'adv') { WJ.tab = 'adv'; }
+  wRenderJournal();
+};
+const wW66RenderJournal = wRenderJournal;
+wRenderJournal = function () {
+  const adv = WJ.tab === 'adv';
+  if (adv) WJ.tab = 'people';
+  wW66RenderJournal();
+  if (adv) WJ.tab = 'adv';
+  const box = $('modalBox'), b = box && box.querySelector('[data-jadv]'); if (!b) return;
+  const S = wAdvAll();
+  b.querySelector('small').textContent = W_ADV.filter(D => S.a[D.id] && S.a[D.id].st === 'active').length;
+  b.setAttribute('aria-pressed', adv); b.setAttribute('aria-selected', adv);
+  if (!adv) return;
+  box.querySelectorAll('[data-jtab]').forEach(t => { t.setAttribute('aria-pressed', false); t.setAttribute('aria-selected', false); });
+  $('wJBody').innerHTML = wAdvJournalHtml();
+};
+
+/* ---------- the Bag ---------- */
+const wW66RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW66RenderCamp();
+  if (WCAMP.tab !== 'bag') return;
+  const body = $('wCampBody'); if (!body) return;
+  const S = wAdvAll(), rows = [];
+  for (const D of W_ADV) { const A = S.a[D.id]; if (!A) continue; for (const k in A.items) { const I = W_ADV_ITEMS[k] || { n: k, d: '' }; rows.push(`<li><b>${esc(I.n)}</b>${A.items[k] > 1 ? ' ×' + A.items[k] : ''}: ${esc(I.d)} <span class="hint">(${esc(D.title)})</span></li>`); } }
+  if (rows.length) body.insertAdjacentHTML('beforeend', `<div id="wBagAdv"><h4>Adventures</h4><ul>${rows.join('')}</ul></div>`);
+};
+
+/* ---------- How to play ---------- */
+const wW66RenderHelp = renderHelp;
+renderHelp = function () {
+  wW66RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpAdventures')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpAdventures"><b>Adventures.</b> Some people in the Realm know the start of a longer story. Press the right person about the right thing and an adventure begins: chapters across the regions, with games to win along the way. Rumours at the inns can point you to them (ask an innkeeper about RUMOURS). Your progress stays with your profile from one journey to the next, and a finished adventure's reward is yours for good. Most setbacks can be tried again, but a few moments can't; the game tells you when. The journal's Adventures tab keeps track.</p>`);
+};
 </script>
 </body></html>
