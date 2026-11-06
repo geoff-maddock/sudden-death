@@ -66,8 +66,9 @@ async def main():
         await pg.evaluate("wGF.setMode('watch')")
         # (zoomed in and captioned at the same moment: the camera eases back out after the caption clears, so under load
         # a check of the zoom alone could land in the ease-out, zoomed with no caption)
-        await pg.wait_for_function("wGF.view().zoom > 1.5 && !!wGF.view().why", timeout=120000)
-        v = await pg.evaluate("wGF.view()")
+        # (the view is read in the same call that sees the moment: a second call afterwards could already be in the ease-out)
+        h = await pg.wait_for_function("(() => { const v = wGF.view(); return v.zoom > 1.5 && v.why ? v : null; })()", timeout=120000)
+        v = await h.json_value()
         check(v['why'] in ('Breakaway!', 'Deep ball!', 'Broken tackle!', 'At the goal line!', 'Touchdown!', 'Picked off!', 'Fumble!'), 'a big play zooms in on the ball, and says why', v)
         await pg.wait_for_function("wGF.phase === 'call' || wGF.phase === 'kickoff'", timeout=60000)
         try: await pg.wait_for_function("wGF.view().zoom < 1.05", timeout=4000)
