@@ -37,6 +37,12 @@
 
 const W_ADV = [];
 const W_ADV_ITEMS = {};
+/* @name in a step's strings is filled in when the step is read, from W_ADV_TOKENS[name]() (a later part adds them:
+   w69's @fixclub is whichever club the fixer pays on this journey). Learned lines keep to words that stay true on
+   every journey, so they don't use them. */
+const W_ADV_TOKENS = {};
+/* match rules beyond the plain game: what the card says (the rules themselves live with the story that uses them) */
+const W_ADV_RULES = { old: 'Old rules: no gear, no set plays, no Hall of Fame cards, and no trophies.' };
 const W_ADV_CFG = { key: 'sd-realm-adv', engines: { card: 'the card game', ball: 'baseball', grid: 'football', ring: 'boxing' } };
 
 /* ---------- the store ---------- */
@@ -49,6 +55,13 @@ function wAdvAll() {
 function wAdvSave(S) { if (LAB) return; try { localStorage.setItem(wAdvKey(), JSON.stringify(S)); } catch (e) { } }
 function wAdvToday() { return wDateStamp(); }
 function wAdv(id) { return W_ADV.find(a => a.id === id) || null; }
+function wAdvFill(t) { return typeof t === 'string' && t.includes('@') ? t.replace(/@(\w+)/g, (m, k) => W_ADV_TOKENS[k] ? String(W_ADV_TOKENS[k]()) : m) : t; }
+const W_ADV_TOKD = new WeakMap(); // step definition -> whether any of its strings has an @token (worked out once)
+function wAdvResolve(step) {
+  if (!step || typeof step !== 'object') return step;
+  if (!W_ADV_TOKD.has(step)) W_ADV_TOKD.set(step, /@\w/.test(JSON.stringify(step)));
+  return W_ADV_TOKD.get(step) ? JSON.parse(JSON.stringify(step), (k, v) => wAdvFill(v)) : step;
+}
 function wAdvState(id, S) { return (S || wAdvAll()).a[id] || null; }
 function wAdvEdit(id, fn) { const S = wAdvAll(), A = S.a[id]; if (!A) return null; fn(A, S); wAdvSave(S); return A; }
 
@@ -57,7 +70,7 @@ function wAdvLive(id, S) {
   const D = wAdv(id), A = wAdvState(id, S);
   if (!D || !A || A.st !== 'active') return [];
   const C = D.chapters[A.ch]; if (!C) return [];
-  const open = C.steps.map((step, si) => ({ ch: A.ch, si, step })).filter(s => !A.done.includes(s.si) && (s.step.after == null || A.done.includes(s.step.after)));
+  const open = C.steps.map((step, si) => ({ ch: A.ch, si, step: wAdvResolve(step) })).filter(s => !A.done.includes(s.si) && (s.step.after == null || A.done.includes(s.step.after)));
   return C.any ? open : open.slice(0, 1);
 }
 function wAdvBegin(id) {
@@ -86,7 +99,7 @@ function wAdvHas(A, take) { return Object.keys(take || {}).every(k => (A.items[k
 function wAdvDone(id, si) {
   const D = wAdv(id), S = wAdvAll(), A = S.a[id];
   if (!D || !A || A.st !== 'active' || A.done.includes(si)) return;
-  const C = D.chapters[A.ch], step = C.steps[si];
+  const C = D.chapters[A.ch], step = wAdvResolve(C.steps[si]);
   let chDone = false, won = false;
   wAdvItemsMove(A, step.take, step.give);
   for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
@@ -106,7 +119,7 @@ function wAdvReapply(S) {
   const put = f => { for (const x of [].concat(f || [])) if (!WG.flags[x]) { WG.flags[x] = 1; any = true; } };
   for (const D of W_ADV) {
     const A = S.a[D.id]; if (!A) continue;
-    D.chapters.forEach((C, ci) => C.steps.forEach((st, si) => { if (ci < A.ch || (ci === A.ch && A.done.includes(si))) put(st.set); }));
+    D.chapters.forEach((C, ci) => C.steps.forEach((st, si) => { if (ci < A.ch || (ci === A.ch && A.done.includes(si))) put(wAdvResolve(st).set); }));
   }
   if (any) wInvalidate('world');
 }
@@ -179,7 +192,7 @@ function wAdvTalk(id, kw) {
     if (!A && St && St.who === id && wKwHit(St.kw, kw)) {
       if (St.need && [].concat(St.need).some(f => !wFlag(f))) continue;
       wAdvBegin(D.id);
-      return { text: St.t || `${D.title}.`, key: St.kw };
+      return { text: wAdvFill(St.t) || `${D.title}.`, key: St.kw };
     }
     // the live steps
     for (const L of wAdvLive(D.id, S)) {
@@ -231,7 +244,7 @@ wStart = function (save, opts) {
 
 /* ---------- matches ---------- */
 function wAdvRef(ref) { const [id, ch, si] = String(ref || '').split(':'); return { id, ch: +ch, si: +si }; }
-function wAdvStep(id, si) { const D = wAdv(id), A = wAdvState(id); return D && A && D.chapters[A.ch] ? D.chapters[A.ch].steps[si] || null : null; }
+function wAdvStep(id, si) { const D = wAdv(id), A = wAdvState(id); return D && A && D.chapters[A.ch] ? wAdvResolve(D.chapters[A.ch].steps[si]) || null : null; }
 function wAdvCondText(step) {
   const c = step.cond || {}, out = [];
   if (c.margin) out.push(`Win by at least ${c.margin}.`);
@@ -241,7 +254,7 @@ function wAdvCondText(step) {
   }
   if (c.night) out.push('At night.');
   if (c.weather) out.push(`In the ${c.weather}.`);
-  if (step.rules === 'old') out.push('Old rules: no gear, no set plays, no Hall of Fame cards, and no trophies.');
+  if (step.rules && W_ADV_RULES[step.rules]) out.push(W_ADV_RULES[step.rules]);
   if (!out.length) out.push('Win.');
   return out;
 }
@@ -269,10 +282,14 @@ function wAdvStartMatch(id, si, how) {
   // night and weather are judged as they were at kickoff (the engines move the clock on before they report)
   wAdvEdit(id, A2 => { A2.kick = { ref, night: wIsNight() ? 1 : 0, wx: wWeather(wRegionHere()) || null }; });
   if (eng === 'card') {
-    startMatch({ type: step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name, world: { kind: 'adv', ref, rules: step.rules || null } });
+    // against a club, its own side (as a league grudge match is: a rival game led by the captain)
+    const club = step.club && CLUBS[step.club] ? step.club : null;
+    startMatch({ type: club ? 'rival' : step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name || (club ? wClubCaptain(club) : null), world: { kind: 'adv', ref, rules: step.rules || null } });
     return '';
   }
   const o = { club: step.club || 'local', how: how || 'play', tier, kind: 'adv', ref };
+  // a story game is on whenever the story says (an engine otherwise turns away a second game with a club in a day)
+  const St = { ball: wBall, grid: wGfg, ring: wBxg }[eng]; if (St) delete St().met[o.club];
   const f = { ball: wStartBall, grid: wStartGrid, ring: wStartRing }[eng];
   return f ? f(o) || '' : 'That game is not on.';
 }
@@ -294,7 +311,7 @@ function wAdvCondMet(step, facts, W, kick) {
 W_ON_END.adv = function (r, ref, W) {
   const R = wAdvRef(ref), A = wAdvState(R.id), D = wAdv(R.id);
   if (!A || !D || A.st !== 'active' || A.ch !== R.ch || !wAdvLive(R.id).some(L => L.si === R.si)) return;
-  const step = D.chapters[R.ch].steps[R.si], kick = A.kick && A.kick.ref === ref ? A.kick : null;
+  const step = wAdvResolve(D.chapters[R.ch].steps[R.si]), kick = A.kick && A.kick.ref === ref ? A.kick : null;
   const met = wAdvCondMet(step, wAdvMatchFacts(r, W), W, kick);
   // a game that counts win or lose (always): a win marks it, for the better ending
   if (step.always) {
