@@ -56,7 +56,12 @@ function wAdvSave(S) { if (LAB) return; try { localStorage.setItem(wAdvKey(), JS
 function wAdvToday() { return wDateStamp(); }
 function wAdv(id) { return W_ADV.find(a => a.id === id) || null; }
 function wAdvFill(t) { return typeof t === 'string' && t.includes('@') ? t.replace(/@(\w+)/g, (m, k) => W_ADV_TOKENS[k] ? String(W_ADV_TOKENS[k]()) : m) : t; }
-function wAdvResolve(step) { return step && JSON.stringify(step).includes('@') ? JSON.parse(JSON.stringify(step), (k, v) => wAdvFill(v)) : step; }
+const W_ADV_TOKD = new WeakMap(); // step definition -> whether any of its strings has an @token (worked out once)
+function wAdvResolve(step) {
+  if (!step || typeof step !== 'object') return step;
+  if (!W_ADV_TOKD.has(step)) W_ADV_TOKD.set(step, /@\w/.test(JSON.stringify(step)));
+  return W_ADV_TOKD.get(step) ? JSON.parse(JSON.stringify(step), (k, v) => wAdvFill(v)) : step;
+}
 function wAdvState(id, S) { return (S || wAdvAll()).a[id] || null; }
 function wAdvEdit(id, fn) { const S = wAdvAll(), A = S.a[id]; if (!A) return null; fn(A, S); wAdvSave(S); return A; }
 
@@ -94,7 +99,7 @@ function wAdvHas(A, take) { return Object.keys(take || {}).every(k => (A.items[k
 function wAdvDone(id, si) {
   const D = wAdv(id), S = wAdvAll(), A = S.a[id];
   if (!D || !A || A.st !== 'active' || A.done.includes(si)) return;
-  const C = D.chapters[A.ch], step = C.steps[si];
+  const C = D.chapters[A.ch], step = wAdvResolve(C.steps[si]);
   let chDone = false, won = false;
   wAdvItemsMove(A, step.take, step.give);
   for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
@@ -114,7 +119,7 @@ function wAdvReapply(S) {
   const put = f => { for (const x of [].concat(f || [])) if (!WG.flags[x]) { WG.flags[x] = 1; any = true; } };
   for (const D of W_ADV) {
     const A = S.a[D.id]; if (!A) continue;
-    D.chapters.forEach((C, ci) => C.steps.forEach((st, si) => { if (ci < A.ch || (ci === A.ch && A.done.includes(si))) put(st.set); }));
+    D.chapters.forEach((C, ci) => C.steps.forEach((st, si) => { if (ci < A.ch || (ci === A.ch && A.done.includes(si))) put(wAdvResolve(st).set); }));
   }
   if (any) wInvalidate('world');
 }
@@ -277,10 +282,14 @@ function wAdvStartMatch(id, si, how) {
   // night and weather are judged as they were at kickoff (the engines move the clock on before they report)
   wAdvEdit(id, A2 => { A2.kick = { ref, night: wIsNight() ? 1 : 0, wx: wWeather(wRegionHere()) || null }; });
   if (eng === 'card') {
-    startMatch({ type: step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name, world: { kind: 'adv', ref, rules: step.rules || null } });
+    // against a club, its own side (as a league grudge match is: a rival game led by the captain)
+    const club = step.club && CLUBS[step.club] ? step.club : null;
+    startMatch({ type: club ? 'rival' : step.type || 'normal', tier, ids: step.ids, sport: step.sport, card: false, name: step.name || (club ? wClubCaptain(club) : null), world: { kind: 'adv', ref, rules: step.rules || null } });
     return '';
   }
   const o = { club: step.club || 'local', how: how || 'play', tier, kind: 'adv', ref };
+  // a story game is on whenever the story says (an engine otherwise turns away a second game with a club in a day)
+  const St = { ball: wBall, grid: wGfg, ring: wBxg }[eng]; if (St) delete St().met[o.club];
   const f = { ball: wStartBall, grid: wStartGrid, ring: wStartRing }[eng];
   return f ? f(o) || '' : 'That game is not on.';
 }

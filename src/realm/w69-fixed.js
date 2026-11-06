@@ -12,10 +12,11 @@
                              once you win a game with his CROOKED calls against you (every opposing player starts
                              with 8 Block, and you start Weak)
           Orla Vantage       a club backer in Graftonbury, who signs her letters O.V. (after the ledger)
-     3  The accusation: before Imelda Foss and Herald Pim, name the fixer. A pinnacle: name the wrong one and the
+     3  The accusation: Imelda Foss puts it before the League; name the fixer. A pinnacle: name the wrong one and the
         trail goes cold for good.
-     4  The grudge final: the club they're paying, at full strength, in the engine they're best at. Lose and play it
-        again.
+     4  The grudge final: the club they're paying, at full strength, in their best game (W_FXG.best: each club's,
+        by its character; in the card game it's the club's own side, as a league grudge match is). Lose and play it
+        again, the same day if you like.
    Reward: 80 fans and 150 gold on the journey you finish it; Rook Halloran, the fixer's best player, joins at the
    team's level and waits with Herald Pim at the Crown on any later journey (ask about ROOK); and a League honour on
    the Team screen, for good.
@@ -25,11 +26,14 @@
    #wHelpCrooked). Crooked calls are a fightStart hook (onHook). */
 
 /* ---------- the club they're paying, and what they play best ---------- */
-const W_FXG = { engines: ['card', 'ball', 'grid', 'ring'], crooked: { block: 8, weak: 1 }, honour: 'Cleaned up the League: exposed the fixer of the Fixed Game.' };
-function wFixClub() { const R = Object.values((WG && WG.rivals) || {}).filter(c => CLUBS[c]); return R[0] || 'apex'; }
-function wFixEngine() { const c = wFixClub(); let h = 0; for (const ch of c) h += ch.charCodeAt(0); return W_FXG.engines[h % W_FXG.engines.length]; }
+/* each club's best game, by its character (the Marauders and Brutes box, the Tusks and Feasters play football, the
+   Rollers and Glaciers play baseball, the Hexers and Banshees out-think you at cards) */
+const W_FXG = { best: { ironmaw: 'ring', bramblegate: 'ring', cragspire: 'grid', duskhollow: 'grid', rattlebone: 'ball', frostfang: 'ball', mirewood: 'card', gallowmere: 'card', apex: 'card' },
+  crooked: { block: 8, weak: 1 }, honour: 'Cleaned up the League: exposed the fixer of the Fixed Game.' };
+function wFixClub() { return wLeagueClubs()[0]; } // this journey's first rival (apex when there are none)
+function wFixEngine() { return W_FXG.best[wFixClub()] || 'card'; }
 Object.assign(W_ADV_TOKENS, {
-  fixclub: () => (CLUBS[wFixClub()] || { name: 'Apex Athletic' }).name,
+  fixclub: () => wClubName(wFixClub()),
   fixclubid: () => wFixClub(),
   fixengine: () => wFixEngine(),
   fixgame: () => W_ADV_CFG.engines[wFixEngine()],
@@ -74,7 +78,7 @@ W_ADV.push({
   lostText: 'The League cleared the one you named, and the real fixer left on the next coach. The odds still move before some games. Nobody asks why any more.',
   chapters: [
     { t: 'Long odds', sum: 'Marco Fine at the Crown wants you to play the club they\'re paying, and watch how they lose.', pay: { gold: 40 }, steps: [
-      { k: 'match', who: 'bookie', kw: 'watch', engine: 'card', tier: 2, type: 'elite', name: '@fixclub', t: '"@fixclub. Even money. Go and win it, and watch them."',
+      { k: 'match', who: 'bookie', kw: 'watch', engine: 'card', tier: 2, club: '@fixclubid', t: '"@fixclub. Even money. Go and win it, and watch them."',
         win: 'You win. Too easily: their keeper stepped aside on the last play. Marco writes something in a small black book.', lose: 'They beat you fair and square, for once. Marco sighs. "Again. I need to see them throw it."',
         learn: 'The club they\'re paying threw the game against you. Somebody is paying them to lose.' }] },
     { t: 'Three clues and a name', sum: 'Marco says to look in three places: the Graftonbury Ballpark (a MARKED ball), the Saltmere docks after dark, and a retired referee in Rimewatch (his CALLS).', pay: { gold: 60 }, any: true, steps: [
@@ -88,14 +92,14 @@ W_ADV.push({
       { k: 'match', who: 'adv_ref', kw: 'crooked', after: 4, engine: 'card', tier: 2, rules: 'crooked', t: 'Dunmore blows the whistle and points the wrong way, twice, before the first play.',
         win: 'Dunmore puts the whistle away. "You won through all that. All right. The money came through a backer. O.V."', lose: '"Told you. You cannot beat the calls." Try again.',
         learn: 'Referee Dunmore will tell the League the money came from a backer who signs as O.V.' }] },
-    { t: 'The accusation', sum: 'Take what you know to Imelda Foss in Graftonbury. Herald Pim will hear it too. You get one go.', steps: [
+    { t: 'The accusation', sum: 'Take the evidence to Imelda Foss at the League office in Graftonbury, and name the fixer. You get one go.', steps: [
       { k: 'talk', who: 'clerk', kw: 'fixing', take: { fx_ball: 1, fx_ledger: 1 }, tNo: 'Bring me evidence: the marked ball and the ledger page. Words are cheap in this office.',
-        t: 'A marked ball, a ledger, and a referee who will talk. Pim is here. Say it in front of us both: ACCUSE whoever you think it is. You get one go, and the League does not forgive a wrong name.', learn: 'Foss and Herald Pim will hear your accusation. One go.' },
+        t: 'A marked ball, a ledger, and a referee who will talk. That is enough to put before the League. I will write it up and send it to Herald Pim at the Crown. Tell me who to name: ACCUSE whoever you think it is. You get one go, and the League does not forgive a wrong name.', learn: 'Imelda Foss will put your accusation before the League. One go.' },
       { k: 'choice', who: 'clerk', kw: 'accuse', after: 0, pinnacle: true, q: 'Who has been fixing games?', right: 1,
         opts: ['Marco Fine, the bookie', 'Orla Vantage, the backer', 'Herald Pim', 'Referee Dunmore'],
         win: 'Orla Vantage goes white. The League bans her from every ground in the realm, and her money with her.', lose: 'The League clears the one you named. By the time anyone thinks of the backer, she has left on the night coach.' }] },
     { t: 'The grudge final', sum: 'The club they were paying want it settled: a grudge final at full strength. Ask Herald Pim for the FINAL.', steps: [
-      { k: 'match', who: 'herald', kw: 'final', engine: '@fixengine', club: '@fixclubid', tier: 3, type: 'elite', name: '@fixclub',
+      { k: 'match', who: 'herald', kw: 'final', engine: '@fixengine', club: '@fixclubid', tier: 3,
         t: '@fixclub want it settled, at full strength, at @fixgame. "No more favours," says their captain. "Just the game."',
         win: 'You beat them clean. The crowd has been waiting years to see a game nobody paid for.', lose: '@fixclub take it. Fair and square, this time. Ask Pim again when you are ready.' }] }],
   end: { t: 'the fixer is banned, the League is clean, and the odds are just the odds again.', pay: { gold: 150, fans: 80 },

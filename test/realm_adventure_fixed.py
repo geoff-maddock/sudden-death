@@ -64,12 +64,17 @@ async def main():
         club = await pg.evaluate("CLUBS[wFixClub()].name")
         r = await pg.evaluate("(() => { const n0 = WLOG.length; wRunAct('advrumour', 'hq_inn'); wRunAct('advrumour', 'hq_inn'); const t = wSay('bookie', 'odds').text; return { t, s: " + ST + ", learned: wAdvState('fixed').learned.map(l => l.t).join(' '), long: wSay('bookie', 'long').text }; })()")
         check(club in r['t'] and r['s']['st'] == 'active', 'asking Marco about the ODDS starts it (no cups needed), naming the club they\'re paying on this journey', r)
-        check(club not in r['learned'] and 'Three cups' not in r['long'] or 'not got three cups' in r['long'], 'the journal\'s lines never name the club (they stay true on another journey); Marco\'s LONG shot is unchanged', r)
+        check(club not in r['learned'] and ('Three cups' not in r['long'] or 'not got three cups' in r['long']), 'the journal\'s line doesn\'t name the club; Marco\'s LONG shot is unchanged', r)
+        r = await pg.evaluate("W_ADV.flatMap(D => [D.starter && D.starter.learn].concat(D.chapters.flatMap(C => C.steps.map(s => s.learn)))).filter(t => t && t.includes('@'))")
+        check(r == [], 'no adventure\'s journal line uses an @token (they stay true on any journey)', r)
 
         # ---------- 1. long odds ----------
-        why, seen = await win_card(pg, 0, "({ lead: B.enemies[0].n, kind: RUN.pending.world.kind })")
+        card = await pg.evaluate("(() => { wRunAct(wSay('bookie', 'watch').act, 'bookie'); const t = document.getElementById('modalBox').textContent; return t; })()")
+        await pg.evaluate(CLOSE_ALL)
+        why, seen = await win_card(pg, 0, "({ lead: B.enemies[0].n, type: B.type, cap: wClubCaptain(wFixClub()) })")
         r = await pg.evaluate(ST)
-        check(why == '' and seen['lead'] == club and r['ch'] == 1, 'the thrown game is a real match against that club, and winning it moves on', {'seen': seen, 's': r})
+        check(club in card, 'the game card names the club', card[:200])
+        check(why == '' and seen['type'] == 'rival' and seen['lead'] == seen['cap'] and r['ch'] == 1, 'the thrown game is against that club\'s own side, led by its captain, and winning it moves on', {'seen': seen, 's': r})
 
         # ---------- 2. the clues ----------
         r = await pg.evaluate("""(() => { wSay('gk_ballpark', 'marked'); const act = wSay('gk_ballpark', 'diamond').act; let tries = 0;
@@ -104,8 +109,8 @@ async def main():
 
         # ---------- 4. the grudge final ----------
         r = await pg.evaluate("""(() => { const s = wAdvStep('fixed', 0); wRunAct(wSay('herald', 'final').act, 'herald'); const card = document.getElementById('modalBox').textContent;
-          return { engine: s.engine, club: s.club, name: s.name, want: [wFixEngine(), wFixClub(), CLUBS[wFixClub()].name], game: W_ADV_CFG.engines[wFixEngine()], card }; })()""")
-        check([r['engine'], r['club'], r['name']] == r['want'] and r['game'] in r['card'], 'the grudge final is against that club, in the engine it\'s best at', r)
+          return { engine: s.engine, club: s.club, want: [W_FXG.best[wFixClub()], wFixClub()], name: wClubName(wFixClub()), game: W_ADV_CFG.engines[wFixEngine()], card }; })()""")
+        check([r['engine'], r['club']] == r['want'] and r['game'] in r['card'] and r['name'] in r['card'], 'the grudge final is against that club, in its best game', r)
         await pg.evaluate(CLOSE_ALL)
         r = await pg.evaluate("(() => { W_ON_END.adv('lose', 'fixed:3:0', { kind: 'adv', us: 1, them: 3 }); return " + ST + "; })()")
         check(r['st'] == 'active' and r['ch'] == 3, 'losing the grudge final can be tried again', r)
@@ -125,11 +130,20 @@ async def main():
         check(not r['had'] and r['now'] and r['h'], 'on a new journey Rook joins again at the Crown (ask Pim about ROOK), and the honour is still there', r)
         await pg.evaluate(CLOSE_ALL)
         r = await pg.evaluate("""(() => { const S = wAdvAll(), keep = S.a.fixed; S.a.fixed = { st: 'active', ch: 3, done: [], items: {}, learned: keep.learned, since: keep.since }; wAdvSave(S);
-          const name = wAdvStep('fixed', 0).name, want = CLUBS[wFixClub()].name, names = Object.values(CLUBS).map(c => c.name), learned = keep.learned.map(l => l.t).join(' ');
+          const name = wAdvStep('fixed', 0).club, want = wFixClub(), names = Object.values(CLUBS).map(c => c.name), learned = keep.learned.map(l => l.t).join(' ');
           S.a.fixed = keep; wAdvSave(S); return { name, want, named: names.filter(n => learned.includes(n)) }; })()""")
         check(r['name'] == r['want'] and r['named'] == [], 'carried to a new journey, the story names this journey\'s club, and the journal names none', r)
         r = await pg.evaluate("(() => { renderHelp(); const t = id => (document.getElementById(id) || {}).textContent || ''; return { c: t('wHelpCrooked'), a: t('wHelpAdventures') }; })()")
         check('8 Block' in r['c'] and 'Fixed' not in r['a'], 'How to play explains crooked calls, and still names no adventure', r)
+        # ---------- a story game is on even after meeting that club in the same engine today (its own profile: a simulated win pays out) ----------
+        await pg.evaluate(CLOSE_ALL)
+        r = await pg.evaluate("""(() => { const eng = wFixEngine(); if (eng === 'card') return { eng, skip: 1 };
+          while (wRoster().length < W_PARTY.max - 1) wAddPlayer(wMakePlayer({ kind: 'dwarf', lvl: 4 }, 'tavern'));
+          PROFILES.cur = 'fixSim'; const S = wAdvAll(); S.a.fixed = { st: 'active', ch: 3, done: [], items: {}, learned: [], since: '2026-11-06' }; wAdvSave(S);
+          const St = { ball: wBall, grid: wGfg, ring: wBxg }[eng](); St.met[wFixClub()] = WG.dayAbs; St.live = null;
+          const why = wAdvStartMatch('fixed', 0, 'sim'); for (let i = 0; i < 6 && !document.getElementById('modal').hidden; i++) { const b = document.querySelector('#modalBox [data-close], #modalBox button'); if (b) b.click(); }
+          PROFILES.cur = 'guest'; return { eng, why }; })()""")
+        check(r.get('skip') or r['why'] == '', 'a story game is on even after meeting that club in the same engine today', r)
         check(not errs, 'no page errors', errs)
         await br.close()
     print('errors:', FAILS)
