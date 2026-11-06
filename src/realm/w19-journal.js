@@ -21,6 +21,8 @@
 const W_JOURNAL = { wins: 300, plain: ['JOB', 'NAME', 'BYE', 'YES', 'HOME'] };
 const WJ = { tab: 'people', quest: '', word: '', q: '', close: null };
 const W_JTABS = [['people', 'People'], ['places', 'Places'], ['wins', 'Victories'], ['quests', 'Quests']];
+/* a later part adds a tab with W_JTABS.push([key, name]) and W_JTAB_FN[key] = () => [count, html] (w66: Adventures) */
+const W_JTAB_FN = {};
 const W_JWIN_KIND = { cup: 'Cup round', title: 'Title', boss: 'Boss', grudge: 'Grudge', rival: 'Rival' };
 
 /* ---------- the record ---------- */
@@ -359,6 +361,8 @@ function wRenderJournal() {
   $('wJWhy').innerHTML = why.join(' ');
   if ($('wJClear')) $('wJClear').onclick = () => { WJ.quest = ''; WJ.word = ''; WJ.q = ''; $('wJFind').value = ''; wRenderJournal(); };
   const tabs = { people: wJPeople(), places: wJPlaces(), wins: wJWins(), quests: wJQuests() };
+  for (const k in W_JTAB_FN) tabs[k] = W_JTAB_FN[k]();
+  if (!tabs[WJ.tab]) WJ.tab = 'people';
   $('modalBox').querySelectorAll('[data-jtab]').forEach(b => {
     const on = b.dataset.jtab === WJ.tab; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on);
     b.querySelector('small').textContent = tabs[b.dataset.jtab][0];

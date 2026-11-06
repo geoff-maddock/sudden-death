@@ -140,7 +140,7 @@ async def main():
                 await pg.wait_for_selector('#wJournalBtn')
                 await pg.click('#wJournalBtn'); await pg.wait_for_selector('#wJBody')
                 tabs = await pg.evaluate("[...document.querySelectorAll('#modalBox [data-jtab]')].map(b => b.textContent.trim())")
-                check([t.split(' ')[0] for t in tabs] == ['People', 'Places', 'Victories', 'Quests'], 'the Journal button opens four tabs, with counts', tabs)
+                check([t.split(' ')[0] for t in tabs] == ['People', 'Places', 'Victories', 'Quests', 'Adventures'], 'the Journal button opens its tabs (the four, and Adventures from w66), with counts', tabs)
                 await pg.screenshot(path='/tmp/realm-journal-people.png')
                 await pg.click('#modalBox [data-jtab="places"]')
                 pv = await pg.evaluate("({ regs: document.querySelectorAll('#wJBody .wjreg').length, rules: document.querySelectorAll('#wJBody .wjrules').length, txt: document.getElementById('wJBody').textContent })")
