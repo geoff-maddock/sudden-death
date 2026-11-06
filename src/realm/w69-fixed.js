@@ -82,15 +82,15 @@ W_ADV.push({
         win: 'You win. Too easily: their keeper stepped aside on the last play. Marco writes something in a small black book.', lose: 'They beat you fair and square, for once. Marco sighs. "Again. I need to see them throw it."',
         learn: 'The club they\'re paying threw the game against you. Somebody is paying them to lose.' }] },
     { t: 'Three clues and a name', sum: 'Marco says to look in three places: the Graftonbury Ballpark (a MARKED ball), the Saltmere docks after dark, and a retired referee in Rimewatch (his CALLS).', pay: { gold: 60 }, any: true, steps: [
-      { k: 'talk', who: 'gk_ballpark', kw: 'marked', t: 'Marked balls, yes. Scuffed so they dip late. I kept one. Beat my side at baseball, and you can have it: ask for a DIAMOND game.', learn: 'The Graftonbury Ballpark keeper kept a marked ball. Beat her side at baseball for it (a DIAMOND game).' },
-      { k: 'match', who: 'gk_ballpark', kw: 'diamond', after: 0, engine: 'ball', tier: 2, club: 'local', give: { fx_ball: 1 }, t: 'Nine innings. She is pitching.',
+      { k: 'talk', who: 'gk_ballpark', kw: 'marked', t: 'Marked balls, yes. Scuffed so they dip late. I kept one. Beat my side at baseball, and you can have it: ask for a DIAMOND game.', learn: 'The Graftonbury Ballpark keeper kept a marked ball. Beat the keeper\'s side at baseball for it (a DIAMOND game).' },
+      { k: 'match', who: 'gk_ballpark', kw: 'diamond', after: 0, engine: 'ball', tier: 2, club: 'local', give: { fx_ball: 1 }, t: 'Nine innings. The keeper is pitching.',
         win: 'The keeper hands you a scuffed ball. "Stamped by the supplier. Look who pays the supplier."', lose: '"Not today. Come back."' },
       { k: 'visit', loc: 'saltmere', need: { night: true }, give: { fx_ledger: 1 }, tNo: 'The docks are busy by day. Whatever is hidden here, you would want to look after dark.',
         t: 'On the dock after dark, a crate in @fixclub colours. Under it, a torn ledger page: payments, a week before each loss. Signed O.V.', learn: 'A ledger page from the Saltmere docks: payments to the club they\'re paying, signed O.V.' },
       { k: 'talk', who: 'adv_orla', kw: 'league', after: 2, t: 'Orla Vantage. I back winners. ... A ledger? How dreadful. I sign everything O.V., of course, but so do a great many people.', learn: 'Orla Vantage, a club backer in Graftonbury, signs everything O.V.' },
       { k: 'talk', who: 'adv_ref', kw: 'calls', t: 'Fine. I called some games the way I was paid to call them. I will say it to the League, but only to a team that has won with my calls going against it. CROOKED calls. Ask me for that game.', learn: 'Referee Dunmore will testify, if you win a game with his CROOKED calls against you.' },
       { k: 'match', who: 'adv_ref', kw: 'crooked', after: 4, engine: 'card', tier: 2, rules: 'crooked', t: 'Dunmore blows the whistle and points the wrong way, twice, before the first play.',
-        win: 'Dunmore puts the whistle away. "You won through all that. All right. The money came through a backer. O.V."', lose: '"Told you. You cannot beat the calls." Try again.',
+        win: 'Dunmore puts the whistle away. "You won through all that. All right. The money came through a backer. O.V."', lose: '"Told you. You cannot beat the calls." Ask him again when you are ready.',
         learn: 'Referee Dunmore will tell the League the money came from a backer who signs as O.V.' }] },
     { t: 'The accusation', sum: 'Take the evidence to Imelda Foss at the League office in Graftonbury, and name the fixer. You get one go.', steps: [
       { k: 'talk', who: 'clerk', kw: 'fixing', take: { fx_ball: 1, fx_ledger: 1 }, tNo: 'Bring me evidence: the marked ball and the ledger page. Words are cheap in this office.',

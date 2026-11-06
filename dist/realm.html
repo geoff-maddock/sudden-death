@@ -35267,7 +35267,7 @@ renderHelp = function () {
      3  The founding rule: Foss reads the charter aloud. Its lost rule: a game is won by three clear points, under the
         old rules. Herald Pim stages an EXHIBITION under it at the Crown Coliseum. A pinnacle: lose it and the charter
         goes back in a drawer for good.
-   Reward: the Founder's Charm (a trophy no pool offers: 1 Strength and 1 Footwork at the start of every fight) and
+   Reward: the Founder's Charm (a trophy no pool offers: 4 Block at the start of every fight) and
    The Founding Rule (a Hall of Fame card no pool offers), handed over again by Foss on any later journey (FOUNDERS).
 
    The Frozen Chapel bell's flag is set in w5 (wEncounterHook), in the side quest's order (w1: ring.need).
@@ -35353,13 +35353,15 @@ const wW67FinishFight = finishFight;
 finishFight = function () { try { return wW67FinishFight.apply(this, arguments); } finally { wAdvRelicsBack(); } };
 
 /* ---------- the reward: a trophy and a card no pool offers ---------- */
-RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 1 Strength and 1 Footwork.', ico: 'boot' };
-TROPHY_FX.founders = { on: { fightStart: () => { addSt(B.P, 'str', 1); addSt(B.P, 'dex', 1); } } };
+// (measured with the realm lab, docs/realm/BALANCE.md: 1 Strength and 1 Footwork every fight was far too strong for a
+// reward handed over at the start of every later journey)
+RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 4 Block.', ico: 'boot' };
+TROPHY_FX.founders = { on: { fightStart: () => { B.P.block += 4; } } };
 Object.assign(RELICS.founders, TROPHY_FX.founders); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 const wSdRelicPool = relicPool;
 // (and none you own: during an old-rules game your trophies are set aside in RUN.oldRelics, not gone)
 relicPool = function (rar) { return wSdRelicPool(rar).filter(k => !RELICS[k].adv && !(RUN && RUN.oldRelics && RUN.oldRelics.includes(k))); };
-K('adv_founding', 'The Founding Rule', 'none', 'skl', 1, 'l', 'self', [['b', 9], ['s', 'str', 1, 'self'], ['s', 'dex', 1, 'self']], { fl: 'Written in 1 AL, torn in the fire, read aloud again by you.' });
+K('adv_founding', 'The Founding Rule', 'none', 'skl', 1, 'l', 'self', [['b', 6], ['s', 'str', 1, 'self']], { ex: 1, fl: 'Written in 1 AL, torn in the fire, read aloud again by you.' });
 
 /* ---------- the story ---------- */
 Object.assign(W_ADV_ITEMS, {
@@ -35376,14 +35378,14 @@ W_ADV.push({
     'They say the League CHARTER burned with the old hall. Imelda Foss in Graftonbury does not think so.'],
   starter: { who: 'clerk', kw: 'charter', need: ['q_bracket'], learn: 'The First Bracket was framed with a page of the League charter. The rest was torn up the night the old hall burned. Foss thinks Gant Vesper knows more.',
     t: 'Look at this. The First Bracket was framed with a page of the old CHARTER, torn along the top. The charter itself was lost the night the hall burned, in five pieces, they say. Vesper was there that night. Ask him.' },
-  lostText: 'Herald Pim\'s side won the exhibition, and the League called the founding rule a curiosity. The charter went back in a drawer, and nobody has asked about it since.',
+  lostText: 'The League Select won the exhibition, and the League called the founding rule a curiosity. The charter went back in a drawer, and nobody has asked about it since.',
   chapters: [
     { t: 'The torn page', sum: 'Gant Vesper has one piece of the charter. Talk to him in Graftonbury.', pay: { gold: 40 }, steps: [
       { k: 'talk', who: 'vesper', kw: 'charter', t: 'Fine. I took a piece the night the hall burned. Somebody had to save something. You want it, you beat me at my old game: basketball, at the Charter Court, east of the square. Tell the keeper you are there for the VESPER game.', learn: 'Vesper will give up his piece for a win over him at basketball, at the Charter Court. Ask the keeper for the VESPER game.' },
       { k: 'match', who: 'gk_court', kw: 'vesper', engine: 'card', sport: 'basketball', tier: 1, name: 'Gant Vesper', t: 'Vesper is already stretching. He says he will go easy on you. He will not.',
-        give: { ch_vesper: 1 }, win: 'Vesper hands over a folded page from his scarf. "The other four went out with the crews that night, one to every region. Foss will know where to look."', lose: 'Vesper sinks the last shot and grins. "Come back when you have practised."' }] },
-    { t: 'Four pieces', sum: 'One piece in each region: the Hollow Shrine in the Mosswold, the Marigold wreck in the Brinefen, the Anvil Ring in Cindermaw, and the Frozen Chapel in the Frostspire. Ask about the CHARTER there.', pay: { gold: 60, fans: 15 }, any: true, steps: [
-      { k: 'talk', who: 'clerk', kw: 'pieces', set: ['clue_shrine', 'clue_marigold', 'clue_chapel'], t: 'Four crews, four regions. Hermit Oak at the Hollow Shrine in the Mosswold. Captain Marrowbone in Saltmere, for the Brinefen. Ma Gristle at the Anvil Ring, for Cindermaw. Brother Halvard in Rimewatch. I have marked the old places on your map.', learn: 'Foss marked the Hollow Shrine, the Marigold wreck and the Frozen Chapel on the map.' },
+        give: { ch_vesper: 1 }, win: 'Vesper hands over a folded page from his scarf. "The other four went out with the crews that night, one to every region. Ask Foss about the PIECES: she will know where to look."', lose: 'Vesper sinks the last shot and grins. "Come back when you have practised."' }] },
+    { t: 'Four pieces', sum: 'One piece went to each region. Ask Imelda Foss in Graftonbury about the PIECES, then ask about the CHARTER in each place she names.', pay: { gold: 60, fans: 15 }, any: true, steps: [
+      { k: 'talk', who: 'clerk', kw: 'pieces', set: ['clue_shrine', 'clue_marigold', 'clue_chapel'], t: 'Four crews, four regions. Hermit Oak at the Hollow Shrine in the Mosswold. Captain Marrowbone in Saltmere, for the Brinefen. Ma Gristle at the Anvil Ring, for Cindermaw. Brother Halvard in Rimewatch, for the Frostspire. Ask each of them about the CHARTER. I have marked the old places on your map.', learn: 'The other four pieces: Hermit Oak at the Hollow Shrine, Captain Marrowbone in Saltmere, Ma Gristle at the Anvil Ring, and Brother Halvard in Rimewatch. Ask each about the CHARTER.' },
       { k: 'talk', who: 'hermit', kw: 'charter', after: 0, t: 'The founders played here once, before trophies and gear and all your clever plays. I keep their page under the altar. Play me under their old RULES and it is yours.', learn: 'Hermit Oak wants a game under the old RULES: no gear, no set plays, no Hall of Fame cards, no trophies.' },
       { k: 'match', who: 'hermit', kw: 'rules', after: 1, engine: 'card', tier: 2, rules: 'old', name: 'Hermit Oak', t: 'The hermit clears the moss off a flat stone. "No gear. No tricks. Just the game."',
         give: { ch_moss: 1 }, win: 'The hermit lifts the altar stone and hands you a pressed, green-edged page.', lose: '"Again, when you have remembered how the game goes without the trimmings."' },
@@ -35472,7 +35474,7 @@ const W_CREW_FLAG = 3;
 const wCrewFlagFans = () => { RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; };
 TROPHY_FX.marigold = { on: { fightWon: wCrewFlagFans, matchWon: wCrewFlagFans } };
 Object.assign(RELICS.marigold, TROPHY_FX.marigold); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
-K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 12], ['s', 'weak', 1, 'all']], { fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
+K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 8], ['s', 'weak', 1, 'all']], { ex: 1, fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
 
 /* ---------- the story ---------- */
 W_ADV.push({
@@ -35487,7 +35489,7 @@ W_ADV.push({
       { k: 'talk', who: 'adv_gale', kw: 'marigold', t: 'Marrowbone sent you. Course he did. I will come back for one game with the old crew, if you show me you can play mine first. BASEBALL. Nine innings.', learn: 'Bosun Gale will come back if you beat him at BASEBALL.' },
       { k: 'match', who: 'adv_gale', kw: 'baseball', after: 0, engine: 'ball', tier: 2, club: 'local', t: 'Gale whistles up a side from the quay. "Nine innings. Play ball."',
         win: 'Gale laughs till the light shakes. "All right. One last game."', lose: 'Gale coils his rope. "Again, when your swing is better."' },
-      { k: 'talk', who: 'adv_kestrel', kw: 'marigold', t: 'Gale is alive? Then so am I, I suppose. I will play the old crew\'s game if you go three BOUTS with my Sunday lot first.', learn: 'Kestrel Ashby will come back if you win a card of three BOUTS.' },
+      { k: 'talk', who: 'adv_kestrel', kw: 'marigold', t: 'Marrowbone and his log. So the old crew are turning up again. Then so am I, I suppose. I will play the old crew\'s game if you go three BOUTS with my Sunday lot first.', learn: 'Kestrel Ashby will come back if you win a card of three BOUTS.' },
       { k: 'match', who: 'adv_kestrel', kw: 'bouts', after: 2, engine: 'ring', tier: 2, club: 'local', t: 'Kestrel tapes her hands. "Three bouts. Pick your order."',
         win: 'Kestrel grins through a split lip. "Fine. I will be there."', lose: '"Come back with harder hands."' },
       { k: 'talk', who: 'adv_liss', kw: 'marigold', t: 'I have been waiting for someone to ask. I will come, but you will play me first: SOCCER, in the snow, the way we played on the deck in the Frostspire crossings.', learn: 'Liss Varo will come back if you win a game of SOCCER in a Rimewatch blizzard.' },
@@ -35496,7 +35498,7 @@ W_ADV.push({
       { k: 'talk', who: 'adv_horne', kw: 'marigold', t: 'My youngsters have heard about the Marigold their whole lives. Play them at FOOTBALL. If they beat you, they will never let me forget it. If you beat them, I will come.', learn: 'Coach Horne will come back if you beat his pupils at FOOTBALL.' },
       { k: 'match', who: 'adv_horne', kw: 'football', after: 6, engine: 'grid', tier: 1, club: 'local', t: 'The youngsters line up, very serious. Horne blows the whistle.',
         win: 'The youngsters mob Horne. "Go on, coach. Go and play."', lose: 'The youngsters are unbearable about it. "Again," says Horne, "when you can stand the shame."' },
-      { k: 'talk', who: 'rowe', kw: 'pip', set: ['clue_marigold'], t: 'Pip. Fastest wing I ever coached. Pip went back for the others and did not come up. The crew buried Pip on the dunes by the wreck. Go and see. Say I sent you.', learn: 'Pip Tarrow went back for the others. The crew buried Pip on the dunes by the Marigold wreck.' },
+      { k: 'talk', who: 'rowe', kw: 'pip', set: ['clue_marigold'], t: 'Pip. Fastest wing I ever coached. Pip went back for the others and did not come up. The crew buried Pip on the dunes by the wreck. Go and see.', learn: 'Pip Tarrow went back for the others. The crew buried Pip on the dunes by the Marigold wreck.' },
       { k: 'visit', loc: 'marigold', after: 8, t: 'On the dunes above the wreck, a cairn of driftwood. Carved on the top plank: PIP TARROW, WHO WENT BACK.', learn: 'You found Pip\'s cairn on the dunes above the wreck.' }] },
     { t: 'One last game', sum: 'The four will play you together at the Crown Coliseum. Ask Herald Pim for the REUNION game.', steps: [
       { k: 'talk', who: 'marrowbone', kw: 'crew', t: 'All four. And Pip\'s cairn. ... They want one last game together, at the Crown, against you. Ask Herald Pim for the REUNION.', learn: 'The crew will play you at the Crown Coliseum. Ask Herald Pim for the REUNION.' },
@@ -35611,15 +35613,15 @@ W_ADV.push({
         win: 'You win. Too easily: their keeper stepped aside on the last play. Marco writes something in a small black book.', lose: 'They beat you fair and square, for once. Marco sighs. "Again. I need to see them throw it."',
         learn: 'The club they\'re paying threw the game against you. Somebody is paying them to lose.' }] },
     { t: 'Three clues and a name', sum: 'Marco says to look in three places: the Graftonbury Ballpark (a MARKED ball), the Saltmere docks after dark, and a retired referee in Rimewatch (his CALLS).', pay: { gold: 60 }, any: true, steps: [
-      { k: 'talk', who: 'gk_ballpark', kw: 'marked', t: 'Marked balls, yes. Scuffed so they dip late. I kept one. Beat my side at baseball, and you can have it: ask for a DIAMOND game.', learn: 'The Graftonbury Ballpark keeper kept a marked ball. Beat her side at baseball for it (a DIAMOND game).' },
-      { k: 'match', who: 'gk_ballpark', kw: 'diamond', after: 0, engine: 'ball', tier: 2, club: 'local', give: { fx_ball: 1 }, t: 'Nine innings. She is pitching.',
+      { k: 'talk', who: 'gk_ballpark', kw: 'marked', t: 'Marked balls, yes. Scuffed so they dip late. I kept one. Beat my side at baseball, and you can have it: ask for a DIAMOND game.', learn: 'The Graftonbury Ballpark keeper kept a marked ball. Beat the keeper\'s side at baseball for it (a DIAMOND game).' },
+      { k: 'match', who: 'gk_ballpark', kw: 'diamond', after: 0, engine: 'ball', tier: 2, club: 'local', give: { fx_ball: 1 }, t: 'Nine innings. The keeper is pitching.',
         win: 'The keeper hands you a scuffed ball. "Stamped by the supplier. Look who pays the supplier."', lose: '"Not today. Come back."' },
       { k: 'visit', loc: 'saltmere', need: { night: true }, give: { fx_ledger: 1 }, tNo: 'The docks are busy by day. Whatever is hidden here, you would want to look after dark.',
         t: 'On the dock after dark, a crate in @fixclub colours. Under it, a torn ledger page: payments, a week before each loss. Signed O.V.', learn: 'A ledger page from the Saltmere docks: payments to the club they\'re paying, signed O.V.' },
       { k: 'talk', who: 'adv_orla', kw: 'league', after: 2, t: 'Orla Vantage. I back winners. ... A ledger? How dreadful. I sign everything O.V., of course, but so do a great many people.', learn: 'Orla Vantage, a club backer in Graftonbury, signs everything O.V.' },
       { k: 'talk', who: 'adv_ref', kw: 'calls', t: 'Fine. I called some games the way I was paid to call them. I will say it to the League, but only to a team that has won with my calls going against it. CROOKED calls. Ask me for that game.', learn: 'Referee Dunmore will testify, if you win a game with his CROOKED calls against you.' },
       { k: 'match', who: 'adv_ref', kw: 'crooked', after: 4, engine: 'card', tier: 2, rules: 'crooked', t: 'Dunmore blows the whistle and points the wrong way, twice, before the first play.',
-        win: 'Dunmore puts the whistle away. "You won through all that. All right. The money came through a backer. O.V."', lose: '"Told you. You cannot beat the calls." Try again.',
+        win: 'Dunmore puts the whistle away. "You won through all that. All right. The money came through a backer. O.V."', lose: '"Told you. You cannot beat the calls." Ask him again when you are ready.',
         learn: 'Referee Dunmore will tell the League the money came from a backer who signs as O.V.' }] },
     { t: 'The accusation', sum: 'Take the evidence to Imelda Foss at the League office in Graftonbury, and name the fixer. You get one go.', steps: [
       { k: 'talk', who: 'clerk', kw: 'fixing', take: { fx_ball: 1, fx_ledger: 1 }, tNo: 'Bring me evidence: the marked ball and the ledger page. Words are cheap in this office.',
@@ -35651,6 +35653,60 @@ renderHelp = function () {
   wW69RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpCrooked')) return;
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpCrooked"><b>Crooked calls.</b> Some games have a referee against you: every opposing player starts with ${W_FXG.crooked.block} Block, and you start Weak. The game card says so.</p>`);
+};
+/* w70: adventures, phase 5 (issue #47): map markers, for players who want a nudge. Off by default: a setting
+   (Adventure markers, SET.advMarks, kept per device like the other settings). When it's on, the world map marks
+   where each adventure under way goes next: a place to visit, or the town (or ground, or site) where the person to
+   talk to stands. Discovery stays the default; this only helps someone who has lost the thread.
+
+   wAdvMarks() returns [{ x, y, loc, title }], one per place.
+   Wraps: wMapDraw (wW70MapDraw: the marks on the world map), renderHelp (wW70RenderHelp: a line in
+   #wHelpAdventures). The settings row is added when the Settings panel opens (a MutationObserver, as w50's is). */
+
+const W_ADV_MARK = { col: '#d9a62e', ring: '#2a1c10' };
+function wAdvMapOf(who) { const m = Object.values(MAPS).find(M => M && (M.npcs || []).some(n => n.id === who)); return m ? m.id : null; }
+function wAdvLocOfStep(s) {
+  if (s.k === 'visit') return DB.locs.find(l => l.id === s.loc) || null;
+  const map = wAdvMapOf(s.who); return map ? DB.locs.find(l => l.map === map) || null : null;
+}
+function wAdvMarks() {
+  if (!WG) return [];
+  const S = wAdvAll(), out = [];
+  for (const D of W_ADV) for (const L of wAdvLive(D.id, S)) {
+    const loc = wAdvLocOfStep(L.step); if (!loc || out.some(o => o.loc === loc.id)) continue;
+    out.push({ x: loc.x, y: loc.y, loc: loc.id, title: D.title });
+  }
+  return out;
+}
+const wW70MapDraw = wMapDraw;
+wMapDraw = function (cv) {
+  wW70MapDraw(cv);
+  if (!SET.advMarks) return;
+  const S = W_MAP.px, c = cv.getContext('2d');
+  c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const M of wAdvMarks()) {
+    const cx = M.x * S + S / 2, cy = M.y * S + S / 2;
+    c.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 4 : 10, a = -Math.PI / 2 + i * Math.PI / 5; c.lineTo(cx + Math.cos(a) * r, cy - 22 + Math.sin(a) * r); } c.closePath();
+    c.fillStyle = W_ADV_MARK.col; c.fill(); c.lineWidth = 1.5; c.strokeStyle = W_ADV_MARK.ring; c.stroke();
+    wMapLabel(c, M.title, cx, cy - 36, 11, true, W_ADV_MARK.ring);
+  }
+  c.restore();
+};
+
+/* ---------- the setting ---------- */
+function wAdvMarksRow() {
+  const box = $('modalBox'), tips = box && box.querySelector('#sTips'); if (!tips || !WG || box.querySelector('#wAdvMarks')) return;
+  tips.closest('label').insertAdjacentHTML('afterend', `<label class="tog"><input type="checkbox" id="wAdvMarks" ${SET.advMarks ? 'checked' : ''}><span><b>Adventure markers</b><small>A star on the world map where each adventure under way goes next. Off, you find the way yourself.</small></span></label>`);
+  $('wAdvMarks').onchange = e => { SET.advMarks = !!e.target.checked; saveSettings(); };
+}
+(() => { const box = $('modalBox'); if (box) new MutationObserver(wAdvMarksRow).observe(box, { childList: true }); })();
+
+const wW70RenderHelp = renderHelp;
+renderHelp = function () {
+  wW70RenderHelp();
+  const h = $('wHelpAdventures'); if (!h || h.dataset.marks) return;
+  h.dataset.marks = 1;
+  h.insertAdjacentHTML('beforeend', ' If you lose the thread, turn on Adventure markers in Settings: the map shows where each one goes next.');
 };
 </script>
 </body></html>

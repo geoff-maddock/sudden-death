@@ -15,7 +15,7 @@
      3  The founding rule: Foss reads the charter aloud. Its lost rule: a game is won by three clear points, under the
         old rules. Herald Pim stages an EXHIBITION under it at the Crown Coliseum. A pinnacle: lose it and the charter
         goes back in a drawer for good.
-   Reward: the Founder's Charm (a trophy no pool offers: 1 Strength and 1 Footwork at the start of every fight) and
+   Reward: the Founder's Charm (a trophy no pool offers: 4 Block at the start of every fight) and
    The Founding Rule (a Hall of Fame card no pool offers), handed over again by Foss on any later journey (FOUNDERS).
 
    The Frozen Chapel bell's flag is set in w5 (wEncounterHook), in the side quest's order (w1: ring.need).
@@ -101,13 +101,15 @@ const wW67FinishFight = finishFight;
 finishFight = function () { try { return wW67FinishFight.apply(this, arguments); } finally { wAdvRelicsBack(); } };
 
 /* ---------- the reward: a trophy and a card no pool offers ---------- */
-RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 1 Strength and 1 Footwork.', ico: 'boot' };
-TROPHY_FX.founders = { on: { fightStart: () => { addSt(B.P, 'str', 1); addSt(B.P, 'dex', 1); } } };
+// (measured with the realm lab, docs/realm/BALANCE.md: 1 Strength and 1 Footwork every fight was far too strong for a
+// reward handed over at the start of every later journey)
+RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 4 Block.', ico: 'boot' };
+TROPHY_FX.founders = { on: { fightStart: () => { B.P.block += 4; } } };
 Object.assign(RELICS.founders, TROPHY_FX.founders); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 const wSdRelicPool = relicPool;
 // (and none you own: during an old-rules game your trophies are set aside in RUN.oldRelics, not gone)
 relicPool = function (rar) { return wSdRelicPool(rar).filter(k => !RELICS[k].adv && !(RUN && RUN.oldRelics && RUN.oldRelics.includes(k))); };
-K('adv_founding', 'The Founding Rule', 'none', 'skl', 1, 'l', 'self', [['b', 9], ['s', 'str', 1, 'self'], ['s', 'dex', 1, 'self']], { fl: 'Written in 1 AL, torn in the fire, read aloud again by you.' });
+K('adv_founding', 'The Founding Rule', 'none', 'skl', 1, 'l', 'self', [['b', 6], ['s', 'str', 1, 'self']], { ex: 1, fl: 'Written in 1 AL, torn in the fire, read aloud again by you.' });
 
 /* ---------- the story ---------- */
 Object.assign(W_ADV_ITEMS, {
@@ -124,14 +126,14 @@ W_ADV.push({
     'They say the League CHARTER burned with the old hall. Imelda Foss in Graftonbury does not think so.'],
   starter: { who: 'clerk', kw: 'charter', need: ['q_bracket'], learn: 'The First Bracket was framed with a page of the League charter. The rest was torn up the night the old hall burned. Foss thinks Gant Vesper knows more.',
     t: 'Look at this. The First Bracket was framed with a page of the old CHARTER, torn along the top. The charter itself was lost the night the hall burned, in five pieces, they say. Vesper was there that night. Ask him.' },
-  lostText: 'Herald Pim\'s side won the exhibition, and the League called the founding rule a curiosity. The charter went back in a drawer, and nobody has asked about it since.',
+  lostText: 'The League Select won the exhibition, and the League called the founding rule a curiosity. The charter went back in a drawer, and nobody has asked about it since.',
   chapters: [
     { t: 'The torn page', sum: 'Gant Vesper has one piece of the charter. Talk to him in Graftonbury.', pay: { gold: 40 }, steps: [
       { k: 'talk', who: 'vesper', kw: 'charter', t: 'Fine. I took a piece the night the hall burned. Somebody had to save something. You want it, you beat me at my old game: basketball, at the Charter Court, east of the square. Tell the keeper you are there for the VESPER game.', learn: 'Vesper will give up his piece for a win over him at basketball, at the Charter Court. Ask the keeper for the VESPER game.' },
       { k: 'match', who: 'gk_court', kw: 'vesper', engine: 'card', sport: 'basketball', tier: 1, name: 'Gant Vesper', t: 'Vesper is already stretching. He says he will go easy on you. He will not.',
-        give: { ch_vesper: 1 }, win: 'Vesper hands over a folded page from his scarf. "The other four went out with the crews that night, one to every region. Foss will know where to look."', lose: 'Vesper sinks the last shot and grins. "Come back when you have practised."' }] },
-    { t: 'Four pieces', sum: 'One piece in each region: the Hollow Shrine in the Mosswold, the Marigold wreck in the Brinefen, the Anvil Ring in Cindermaw, and the Frozen Chapel in the Frostspire. Ask about the CHARTER there.', pay: { gold: 60, fans: 15 }, any: true, steps: [
-      { k: 'talk', who: 'clerk', kw: 'pieces', set: ['clue_shrine', 'clue_marigold', 'clue_chapel'], t: 'Four crews, four regions. Hermit Oak at the Hollow Shrine in the Mosswold. Captain Marrowbone in Saltmere, for the Brinefen. Ma Gristle at the Anvil Ring, for Cindermaw. Brother Halvard in Rimewatch. I have marked the old places on your map.', learn: 'Foss marked the Hollow Shrine, the Marigold wreck and the Frozen Chapel on the map.' },
+        give: { ch_vesper: 1 }, win: 'Vesper hands over a folded page from his scarf. "The other four went out with the crews that night, one to every region. Ask Foss about the PIECES: she will know where to look."', lose: 'Vesper sinks the last shot and grins. "Come back when you have practised."' }] },
+    { t: 'Four pieces', sum: 'One piece went to each region. Ask Imelda Foss in Graftonbury about the PIECES, then ask about the CHARTER in each place she names.', pay: { gold: 60, fans: 15 }, any: true, steps: [
+      { k: 'talk', who: 'clerk', kw: 'pieces', set: ['clue_shrine', 'clue_marigold', 'clue_chapel'], t: 'Four crews, four regions. Hermit Oak at the Hollow Shrine in the Mosswold. Captain Marrowbone in Saltmere, for the Brinefen. Ma Gristle at the Anvil Ring, for Cindermaw. Brother Halvard in Rimewatch, for the Frostspire. Ask each of them about the CHARTER. I have marked the old places on your map.', learn: 'The other four pieces: Hermit Oak at the Hollow Shrine, Captain Marrowbone in Saltmere, Ma Gristle at the Anvil Ring, and Brother Halvard in Rimewatch. Ask each about the CHARTER.' },
       { k: 'talk', who: 'hermit', kw: 'charter', after: 0, t: 'The founders played here once, before trophies and gear and all your clever plays. I keep their page under the altar. Play me under their old RULES and it is yours.', learn: 'Hermit Oak wants a game under the old RULES: no gear, no set plays, no Hall of Fame cards, no trophies.' },
       { k: 'match', who: 'hermit', kw: 'rules', after: 1, engine: 'card', tier: 2, rules: 'old', name: 'Hermit Oak', t: 'The hermit clears the moss off a flat stone. "No gear. No tricks. Just the game."',
         give: { ch_moss: 1 }, win: 'The hermit lifts the altar stone and hands you a pressed, green-edged page.', lose: '"Again, when you have remembered how the game goes without the trimmings."' },

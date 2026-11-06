@@ -52,7 +52,7 @@ const W_CREW_FLAG = 3;
 const wCrewFlagFans = () => { RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; };
 TROPHY_FX.marigold = { on: { fightWon: wCrewFlagFans, matchWon: wCrewFlagFans } };
 Object.assign(RELICS.marigold, TROPHY_FX.marigold); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
-K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 12], ['s', 'weak', 1, 'all']], { fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
+K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 8], ['s', 'weak', 1, 'all']], { ex: 1, fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
 
 /* ---------- the story ---------- */
 W_ADV.push({
@@ -67,7 +67,7 @@ W_ADV.push({
       { k: 'talk', who: 'adv_gale', kw: 'marigold', t: 'Marrowbone sent you. Course he did. I will come back for one game with the old crew, if you show me you can play mine first. BASEBALL. Nine innings.', learn: 'Bosun Gale will come back if you beat him at BASEBALL.' },
       { k: 'match', who: 'adv_gale', kw: 'baseball', after: 0, engine: 'ball', tier: 2, club: 'local', t: 'Gale whistles up a side from the quay. "Nine innings. Play ball."',
         win: 'Gale laughs till the light shakes. "All right. One last game."', lose: 'Gale coils his rope. "Again, when your swing is better."' },
-      { k: 'talk', who: 'adv_kestrel', kw: 'marigold', t: 'Gale is alive? Then so am I, I suppose. I will play the old crew\'s game if you go three BOUTS with my Sunday lot first.', learn: 'Kestrel Ashby will come back if you win a card of three BOUTS.' },
+      { k: 'talk', who: 'adv_kestrel', kw: 'marigold', t: 'Marrowbone and his log. So the old crew are turning up again. Then so am I, I suppose. I will play the old crew\'s game if you go three BOUTS with my Sunday lot first.', learn: 'Kestrel Ashby will come back if you win a card of three BOUTS.' },
       { k: 'match', who: 'adv_kestrel', kw: 'bouts', after: 2, engine: 'ring', tier: 2, club: 'local', t: 'Kestrel tapes her hands. "Three bouts. Pick your order."',
         win: 'Kestrel grins through a split lip. "Fine. I will be there."', lose: '"Come back with harder hands."' },
       { k: 'talk', who: 'adv_liss', kw: 'marigold', t: 'I have been waiting for someone to ask. I will come, but you will play me first: SOCCER, in the snow, the way we played on the deck in the Frostspire crossings.', learn: 'Liss Varo will come back if you win a game of SOCCER in a Rimewatch blizzard.' },
@@ -76,7 +76,7 @@ W_ADV.push({
       { k: 'talk', who: 'adv_horne', kw: 'marigold', t: 'My youngsters have heard about the Marigold their whole lives. Play them at FOOTBALL. If they beat you, they will never let me forget it. If you beat them, I will come.', learn: 'Coach Horne will come back if you beat his pupils at FOOTBALL.' },
       { k: 'match', who: 'adv_horne', kw: 'football', after: 6, engine: 'grid', tier: 1, club: 'local', t: 'The youngsters line up, very serious. Horne blows the whistle.',
         win: 'The youngsters mob Horne. "Go on, coach. Go and play."', lose: 'The youngsters are unbearable about it. "Again," says Horne, "when you can stand the shame."' },
-      { k: 'talk', who: 'rowe', kw: 'pip', set: ['clue_marigold'], t: 'Pip. Fastest wing I ever coached. Pip went back for the others and did not come up. The crew buried Pip on the dunes by the wreck. Go and see. Say I sent you.', learn: 'Pip Tarrow went back for the others. The crew buried Pip on the dunes by the Marigold wreck.' },
+      { k: 'talk', who: 'rowe', kw: 'pip', set: ['clue_marigold'], t: 'Pip. Fastest wing I ever coached. Pip went back for the others and did not come up. The crew buried Pip on the dunes by the wreck. Go and see.', learn: 'Pip Tarrow went back for the others. The crew buried Pip on the dunes by the Marigold wreck.' },
       { k: 'visit', loc: 'marigold', after: 8, t: 'On the dunes above the wreck, a cairn of driftwood. Carved on the top plank: PIP TARROW, WHO WENT BACK.', learn: 'You found Pip\'s cairn on the dunes above the wreck.' }] },
     { t: 'One last game', sum: 'The four will play you together at the Crown Coliseum. Ask Herald Pim for the REUNION game.', steps: [
       { k: 'talk', who: 'marrowbone', kw: 'crew', t: 'All four. And Pip\'s cairn. ... They want one last game together, at the Crown, against you. Ask Herald Pim for the REUNION.', learn: 'The crew will play you at the Crown Coliseum. Ask Herald Pim for the REUNION.' },
