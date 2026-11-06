@@ -6558,7 +6558,7 @@ DB.towns=[
  {id:'hollowshrine',name:'The Hollow Shrine',ground:'.',tree:'T',w:16,h:13,trees:22,noStreet:true,spawn:[8,11],buildings:[],npcs:[['hermit',8,5,1]],decor:[['$',8,4],['$',5,4],['$',11,4],['Y',3,7,{elem:'bloom',under:'.'}],['Y',13,7,{elem:'bloom',under:'.'}],['V',8,2,{elem:'bloom',under:'.'}],['C',2,2,{chest:'shrine_chest'}],['l',6,9],['l',10,9]],arrive:'The Hollow Shrine: three totems in a ring of old trees, and a well that hums.',ambient:['Something large moves in the canopy and settles.','A Gloomcap sits by a totem as if praying.']},
  {id:'marigold',name:'The Wreck of the Marigold',ground:':',w:16,h:11,trees:0,noStreet:true,spawn:[8,9],water:[[0,0,16,3],[0,3,4,1],[12,3,4,1]],buildings:[],decor:[['e',6,3],['e',7,3],['e',8,3],['e',9,3],['e',7,4],['e',8,4],['C',8,5,{chest:'marigold_chest'}],['N',3,6,{elem:'tide',under:':'}],['v',12,7],['S',8,8,{text:'MARIGOLD. Saltmere ferry. Lost with all hands but the captain, who swam.'}]],arrive:'The Marigold, keel up on the sand, the ribs picked clean. Something nests in the bow.',ambient:['Gulls. A great many gulls.']},
  {id:'umbralden',name:'The Road to Nowhere',ground:'n',tree:'T',w:18,h:12,trees:10,noStreet:true,spawn:[2,6],streets:[[1,6,15,6,'=']],buildings:[],decor:[['r',4,4],['r',8,8],['r',12,4],['N',15,6,{elem:'ember',rare:1,night:1,under:'n'}],['S',3,5,{text:'Nobody made this road. It was just here one spring, and it goes nowhere, and at the end of it something waits for the dark.'}]],arrive:'The road north of the Roost. It runs straight into the snow for a mile and stops. There are tracks, too big for a fox.',ambient:['Something pads behind you. There is nothing there.','The snow at the road\'s end is melted in a ring.']}, // dropped: umbralden nest rare:'duskhound' and mut
- {id:'frozenchapel',name:'The Frozen Chapel',ground:'n',tree:'T',w:14,h:12,trees:8,noStreet:true,spawn:[7,10],buildings:[{x:2,y:1,w:10,h:8,door:'s',counter:false,furn:[['&',4,1,{ring:{item:'tuningrod',night:1,set:'rq_aur2'}}],['l',1,1],['l',8,1],['P',6,1,{text:'The Aurora Matriarch, painted from below, much too close. The painter did not finish the tail.'}],['K',1,4,{text:'Chant books frozen shut. One is open to a page about bells and what they call.'}],['C',8,5,{chest:'chapel_chest'}],['I',4,4],['z',4,6]]}],decor:[['r',1,10],['r',12,10]],arrive:'The Frozen Chapel. The abbey before the abbey, abandoned when the snow line moved. The bell is still hung.',ambient:['Ice ticks in the walls as the day warms.']}]; // dropped: chapel bell sp:'aurorel'; ringing it now sets rq_aur2
+ {id:'frozenchapel',name:'The Frozen Chapel',ground:'n',tree:'T',w:14,h:12,trees:8,noStreet:true,spawn:[7,10],buildings:[{x:2,y:1,w:10,h:8,door:'s',counter:false,furn:[['&',4,1,{ring:{item:'tuningrod',night:1,set:'rq_aur2',need:'rq_aur1'}}],['l',1,1],['l',8,1],['P',6,1,{text:'The Aurora Matriarch, painted from below, much too close. The painter did not finish the tail.'}],['K',1,4,{text:'Chant books frozen shut. One is open to a page about bells and what they call.'}],['C',8,5,{chest:'chapel_chest'}],['I',4,4],['z',4,6]]}],decor:[['r',1,10],['r',12,10]],arrive:'The Frozen Chapel. The abbey before the abbey, abandoned when the snow line moved. The bell is still hung.',ambient:['Ice ticks in the walls as the day warms.']}]; // dropped: chapel bell sp:'aurorel'; ringing it now sets rq_aur2
 const shopTalk=(name,look,shop,line)=>({name,look,shop,greet:line,topics:{job:{t:'I sell what teams run out of. Say BUY when you want to see the shelves.'},buy:{t:'Have a look.',act:'shop'}}});
 const innTalk=(name,look,price,line)=>({name,look,inn:price,greet:line,topics:{job:{t:'I keep the beds and mind my business. A ROOM is '+price+' gold, and your team wakes up fresh.'},room:{t:'Sleep well.',act:'inn'}}});
 const regTalk=(name,look,cup,line,extra)=>({name,look,greet:line,topics:Object.assign({job:{t:'Registrar. I take entries for the CUP, I keep the bracket honest, and I sweep the sand afterwards.'},cup:{t:'Three rounds, back to back, three players a side. Win all three and the cup goes on your wall. The League sets the field to match your record, so it never gets easier. Say ENTER when your team is ready.',xp:10},enter:{t:'Sign here. And here. Mind the scorch marks.',act:'cup:'+cup}},extra||{})});
@@ -6898,6 +6898,8 @@ const WDIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 
 function wEncounterHook(region, tileCh, info) { /* reassigned in w5-bridge.js: wild matches and alphas */ }
 
+/* today's date as YYYY-MM-DD, local time (unlocks kept on the profile: superstars, adventures) */
+function wDateStamp() { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
 function wLog(t, c) { WLOG.push([t, c || '']); if (WLOG.length > 80) WLOG.shift(); WQ.push({ k: 'log' }); }
 function wFlag(f) { return !!(WG && WG.flags[f]); }
 function wSetFlag(f) { WG.flags[f] = 1; }
@@ -8609,7 +8611,12 @@ wEncounterHook = function (region, tileCh, info) {
   if (info) {
     if (info.kind === 'alpha' || info.kind === 'lair') return wStartAlpha(info);
     if (info.kind === 'wild') return wWildMatch(region);
-    return; // the chapel bell only logs (w3); cups start from the registrar's act (w11-cups.js)
+    // the chapel bell: its ring sets its flag (once what it needs is done); cups start from the registrar's act (w11-cups.js)
+    if (info.kind === 'bell' && info.ring && info.ring.set && !wFlag(info.ring.set) && (!info.ring.need || wFlag(info.ring.need))) {
+      wSetFlag(info.ring.set);
+      const sp = DB.sideplots.find(x => x.id === info.ring.set); if (sp) wLog('Done: ' + sp.title + '.', 'g');
+    }
+    return;
   }
   if (wEncounterRoll(wCurMap(), tileCh, Math.random()) === 'fight') wWildMatch(region);
 };
@@ -27030,7 +27037,7 @@ wDiamondOver = function () {
 function wBallSettle(r, us, them, box, inning) {
   const B = wBall(), L = B.live, W = L.world, win = r === 'win';
   B.live = null;
-  if (win) B.w++; else B.l++;
+  if (win) { B.w++; fire('matchWon', { engine: 'ball' }); } else B.l++; // (a trophy can answer any engine's win: matchWon)
   // box scores, for your own players (call-ups and the other side have no rid that is yours)
   const S = WG.bstats = WG.bstats || {}, line = {};
   for (const b of box) {
@@ -31605,7 +31612,7 @@ wGF.onOver = s => {
 function wGridSettle(r, us, them, box, half) {
   const B = wGfg(), L = B.live, W = L.world, win = r === 'win', tie = r === 'tie';
   B.live = null;
-  if (win) B.w++; else if (tie) B.t++; else B.l++;
+  if (win) { B.w++; fire('matchWon', { engine: 'grid' }); } else if (tie) B.t++; else B.l++;
   // box lines for your own players: side 0, by the seven at kick-off (call-ups have no roster id)
   const S = WG.gfstats = WG.gfstats || {}, line = {};
   for (const b of box) {
@@ -33428,7 +33435,7 @@ wBX.onOver = s => {
 function wRingSettle(result, bouts, pairs) {
   const B = wBxg(), L = B.live, W = L.world, r = result.win === 0 ? 'win' : result.win === 1 ? 'lose' : 'tie', win = r === 'win', tie = r === 'tie';
   B.live = null;
-  if (win) B.w++; else if (tie) B.t++; else B.l++;
+  if (win) { B.w++; fire('matchWon', { engine: 'ring' }); } else if (tie) B.t++; else B.l++;
   // your boxers' lines, and what a knockout costs
   const S = WG.bxstats = WG.bxstats || {}, boxed = new Set(); let kos = 0;
   bouts.forEach((b, i) => {
@@ -34071,7 +34078,7 @@ function wStarsCheck() {
     wyrm: (WG.crowns || []).length > 0 || wLegendsAll().length > 0,
   };
   const got = W_STARS.filter(s => done[s.id] && !S.un[s.id]);
-  for (const s of got) { const t = new Date(); S.un[s.id] = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
+  for (const s of got) S.un[s.id] = wDateStamp();
   if (JSON.stringify(S) !== had) wStarsSave(S);
   for (const s of got) {
     wLog(`A superstar is unlocked: the ${s.n}. ${s.feat.replace(/\.$/, '')}: done. From now on they can join a later journey.`, 'g');
@@ -34824,7 +34831,7 @@ function wAdvAll() {
   return { a: S.a && typeof S.a === 'object' ? S.a : {}, rec: S.rec && typeof S.rec === 'object' ? S.rec : {} };
 }
 function wAdvSave(S) { if (LAB) return; try { localStorage.setItem(wAdvKey(), JSON.stringify(S)); } catch (e) { } }
-function wAdvToday() { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; } // local, as w57 stamps unlocks
+function wAdvToday() { return wDateStamp(); }
 function wAdv(id) { return W_ADV.find(a => a.id === id) || null; }
 function wAdvState(id, S) { return (S || wAdvAll()).a[id] || null; }
 function wAdvEdit(id, fn) { const S = wAdvAll(), A = S.a[id]; if (!A) return null; fn(A, S); wAdvSave(S); return A; }
@@ -34861,20 +34868,19 @@ function wAdvItemsMove(A, take, give) {
 function wAdvHas(A, take) { return Object.keys(take || {}).every(k => (A.items[k] || 0) >= take[k]); }
 /* a step is done: its items move, the chapter (and then the adventure) completes once every step is done */
 function wAdvDone(id, si) {
-  const D = wAdv(id), A0 = wAdvState(id);
-  if (!D || !A0 || A0.st !== 'active' || A0.done.includes(si)) return;
-  const C = D.chapters[A0.ch], step = C.steps[si];
+  const D = wAdv(id), S = wAdvAll(), A = S.a[id];
+  if (!D || !A || A.st !== 'active' || A.done.includes(si)) return;
+  const C = D.chapters[A.ch], step = C.steps[si];
   let chDone = false, won = false;
-  wAdvEdit(id, A => {
-    wAdvItemsMove(A, step.take, step.give);
-    for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
-    if (step.learn) A.learned.push({ t: step.learn, d: wAdvToday() });
-    A.done.push(si);
-    if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
-  });
+  wAdvItemsMove(A, step.take, step.give);
+  for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
+  if (step.learn) A.learned.push({ t: step.learn, d: wAdvToday() });
+  A.done.push(si);
+  if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
+  wAdvSave(S);
   const flags = [].concat(step.set || []); for (const f of flags) wSetFlag(f); if (flags.length) wInvalidate('world');
-  if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[wAdvState(id).ch].t}.`, 'g'); }
-  if (won) wAdvWin(id);
+  if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[A.ch].t}.`, 'g'); }
+  if (won) wAdvWin(id, A);
 }
 /* the places an adventure has shown you stay shown on every journey: the flags its done steps set (on a journey's
    start or load: wW65Start) */
@@ -34903,7 +34909,7 @@ function wAdvGiveKeep(D) {
     if (U.cards) { wPayCards({ cards: U.cards }, D.title); gave = true; }
   }
   if (!U.recruit) { WG.advRec[D.id] = 1; return gave ? 'given' : 'already'; }
-  if (WG.advRec[D.id]) return 'already';
+  if (wRoster().some(p => p.n === U.recruit.n)) return 'already'; // (one you let go can be asked back)
   if (!LAB && wRoster().length >= W_PARTY.max) return 'full';
   WG.advRec[D.id] = 1;
   wRecruitTopic(Object.assign({}, U.recruit, U.recruit.lvl === 'team' ? { lvl: wStarLvl() } : {}));
@@ -34917,10 +34923,10 @@ function wAdvKeepLine(D, got) {
 }
 /* the ending's words: a better one when the step it names was won (end.tWin, end.winMark) */
 function wAdvEndText(D, A) { const E = D.end || {}; return E.tWin && A && A.marks && A.marks[E.winMark || 'won'] ? E.tWin : E.t || ''; }
-function wAdvWin(id) {
+function wAdvWin(id, A) {
   const D = wAdv(id); if (!D) return;
   const E = D.end || {};
-  if (WG && !LAB) wLog(`${D.title}: ${wAdvEndText(D, wAdvState(id)) || 'the end'}`, 'g');
+  if (WG && !LAB) wLog(`${D.title}: ${wAdvEndText(D, A || wAdvState(id)) || 'the end'}`, 'g');
   wAdvPay(E.pay, D.title);
   if (WG && RUN && E.unlock && wAdvGiveKeep(D) === 'full') wLog(`${E.unlock.recruit.n} will join you when there's room on the team: ask ${wChar(E.unlock.at).name} about ${E.unlock.kw.toUpperCase()}.`, 'm');
   if (E.feat && typeof wStarsAll === 'function') { const S = wStarsAll(); if (!S.un[E.feat]) { S.un[E.feat] = wAdvToday(); wStarsSave(S); } }
@@ -34934,7 +34940,7 @@ function wAdvLose(id, why) {
 /* ---------- talk and places ---------- */
 function wAdvNeedMet(need) {
   if (!need) return true;
-  if (need.night && !wNightTalk()) return false;
+  if (need.night && !wIsNight()) return false; // (the same night as a match's night condition)
   if (need.season && wSeason() !== need.season) return false;
   if (need.weather && wWeather(wRegionHere()) !== need.weather) return false;
   if (need.tide && (typeof wTide !== 'function' || wTide() !== need.tide)) return false;
@@ -34977,6 +34983,7 @@ function wAdvVisit(mapId, S) {
   if (!WG) return;
   S = S || wAdvAll();
   for (const D of W_ADV) for (const L of wAdvLive(D.id, S)) {
+    const A = wAdvState(D.id); if (!A || A.st !== 'active' || A.ch !== L.ch) break; // a visit just finished the chapter
     const s = L.step; if (s.k !== 'visit') continue;
     const loc = DB.locs.find(l => l.id === s.loc); if (!loc || loc.map !== mapId) continue;
     if (!wAdvNeedMet(s.need)) { if (s.tNo) wLog(s.tNo, 'd'); continue; }
@@ -35113,8 +35120,8 @@ const W_ADV_TEXT = { warn: "This can't be retried.", none: 'No adventures yet. R
 /* ---------- the cards ---------- */
 function wAdvFoeText(step) {
   if ((step.engine || 'card') === 'card') {
-    const names = [...new Set((step.ids || []).map(id => (ENEMIES[id] || {}).n).filter(Boolean))];
-    return `${names.length ? names.join(' and ') : 'A local side'}, in ${W_ADV_CFG.engines.card} (tier ${step.tier || 1})`;
+    const names = step.name ? [step.name] : [...new Set((step.ids || []).map(id => (ENEMIES[id] || {}).n).filter(Boolean))];
+    return `${names.length ? names.join(' and ') : 'A local side'}, in ${W_ADV_CFG.engines.card}${step.sport ? ' (' + SPORT_NAME[step.sport].toLowerCase() + ')' : ''}, tier ${step.tier || 1}`;
   }
   return `${wCap(wBallName(step.club || 'local'))}, at ${W_ADV_CFG.engines[step.engine]} (tier ${step.tier || 1})`;
 }
@@ -35246,14 +35253,14 @@ renderHelp = function () {
    Reward: the Founder's Charm (a trophy no pool offers: 1 Strength and 1 Footwork at the start of every fight) and
    The Founding Rule (a Hall of Fame card no pool offers), handed over again by Foss on any later journey (FOUNDERS).
 
+   The Frozen Chapel bell's flag is set in w5 (wEncounterHook), in the side quest's order (w1: ring.need).
    Also here: the tide (wTide: a 12.4-hour tide on the running clock, so two low waters a day, two hours each, about
    48 minutes later each day; Marrowbone tells you when), old rules in the card game (no gear, set plays or Hall of
-   Fame cards, and the trophies sit out until the match has ended), and a fix for the Frozen Chapel bell, which never
-   set its quest flag (rq_aur2, once Halvard has sent you: rq_aur1).
+   Fame cards, and the trophies sit out until the match has ended), .
 
    Wraps: wSay (wW67Say: Marrowbone's TIDE), wBuildEncounter (wW67BuildEncounter: carries world.rules), startCombat (wSdStartCombat: old rules thin the
-   deck to basic cards and set the trophies aside), finishFight (wW67FinishFight: the trophies come back),
-   wEncounterHook (wW67EncounterHook: the bell sets its flag), relicPool (wSdRelicPool: no pool offers an adventure
+   deck to basic cards and set the trophies aside), finishFight (wW67FinishFight: the trophies come back), wStart
+   (wW67Start: trophies a stray game left aside come back), relicPool (wSdRelicPool: no pool offers an adventure
    trophy), renderHelp (wW67RenderHelp: #wHelpOldRules, #wHelpTide). */
 
 /* ---------- the tide ---------- */
@@ -35314,34 +35321,27 @@ wBuildEncounter = function (o) {
 const wSdStartCombat = startCombat;
 startCombat = function () {
   const W = WG && RUN && RUN.pending && RUN.pending.world;
-  if (!W || W.rules !== 'old') return wSdStartCombat.apply(this, arguments);
+  if (!W || W.rules !== 'old') { wAdvRelicsBack(); return wSdStartCombat.apply(this, arguments); } // (never carry trophies left aside into another game)
   const deck = RUN.deck, keep = deck.filter(wAdvOldOk);
   RUN.deck = keep.length ? keep : deck; // (a deck of nothing but gear, plays and Hall of Fame cards can't be played at all)
   if (!RUN.oldRelics) { RUN.oldRelics = RUN.relics; RUN.relics = []; }
   try { return wSdStartCombat.apply(this, arguments); } finally { RUN.deck = deck; }
 };
 function wAdvRelicsBack() { if (RUN && RUN.oldRelics) { RUN.relics = RUN.oldRelics; delete RUN.oldRelics; } }
+// trophies left aside by a game that never finished (an abandoned battle) come back when a journey starts or loads
+const wW67Start = wStart;
+wStart = function (save, opts) { const r = wW67Start(save, opts); if (RUN && !RUN.battle) wAdvRelicsBack(); return r; };
 const wW67FinishFight = finishFight;
 // after the match's own end (its fightWon trophies and reward gold included), so no trophy pays out for an old-rules game
 finishFight = function () { try { return wW67FinishFight.apply(this, arguments); } finally { wAdvRelicsBack(); } };
-
-/* ---------- the Frozen Chapel bell sets its flag (it only ever logged) ---------- */
-const wW67EncounterHook = wEncounterHook;
-wEncounterHook = function (region, tileCh, info) {
-  // (only once Halvard has sent you, rq_aur1: the side quest's own order)
-  if (info && info.kind === 'bell' && info.ring && info.ring.set && WG && wFlag('rq_aur1') && !wFlag(info.ring.set)) {
-    wSetFlag(info.ring.set);
-    const sp = DB.sideplots.find(x => x.id === info.ring.set); if (sp) wLog('Done: ' + sp.title + '.', 'g');
-  }
-  return wW67EncounterHook(region, tileCh, info);
-};
 
 /* ---------- the reward: a trophy and a card no pool offers ---------- */
 RELICS.founders = { n: "Founder's Charm", adv: 1, desc: 'Start each fight with 1 Strength and 1 Footwork.', ico: 'boot' };
 TROPHY_FX.founders = { on: { fightStart: () => { addSt(B.P, 'str', 1); addSt(B.P, 'dex', 1); } } };
 Object.assign(RELICS.founders, TROPHY_FX.founders); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 const wSdRelicPool = relicPool;
-relicPool = function (rar) { return wSdRelicPool(rar).filter(k => !RELICS[k].adv); };
+// (and none you own: during an old-rules game your trophies are set aside in RUN.oldRelics, not gone)
+relicPool = function (rar) { return wSdRelicPool(rar).filter(k => !RELICS[k].adv && !(RUN && RUN.oldRelics && RUN.oldRelics.includes(k))); };
 K('adv_founding', 'The Founding Rule', 'none', 'skl', 1, 'l', 'self', [['b', 9], ['s', 'str', 1, 'self'], ['s', 'dex', 1, 'self']], { fl: 'Written in 1 AL, torn in the fire, read aloud again by you.' });
 
 /* ---------- the story ---------- */
@@ -35423,8 +35423,8 @@ renderHelp = function () {
    The four stand in their cities beside the training coaches (w23), on open ground the test checks.
    While Gale plays for you, his figure on the quay steps off the map (wCrewPlace).
    Wraps: wSay (wW68Say: Marrowbone's CREW hint once the log is home, until the story starts; Gale leaving the quay),
-   wEnterMap (wW68EnterMap: Gale's place on the quay), wBallSettle, wGridSettle, wRingSettle (wW68BallSettle,
-   wW68GridSettle, wW68RingSettle: the Marigold's Flag pays its fans for a win in every engine). */
+   wEnterMap (wW68EnterMap: Gale's place on the quay). The Marigold's Flag answers fightWon and matchWon, so it pays
+   for a win in every engine. */
 
 /* ---------- the four, placed in their cities ---------- */
 const W_CREW = [
@@ -35450,15 +35450,11 @@ DB.chars.marrowbone.topics.crew = { t: 'They lived. I know they did. The log say
 
 /* ---------- the reward ---------- */
 RELICS.marigold = { n: "The Marigold's Flag", adv: 1, desc: 'After every win, 3 more fans come to watch.', ico: 'horn' };
-TROPHY_FX.marigold = { on: { fightWon: () => { RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; } } };
-Object.assign(RELICS.marigold, TROPHY_FX.marigold); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
-// the other engines don't fire fightWon: their wins pay the flag's fans as they settle
+// a win in any engine: the card game fires fightWon, baseball, football and boxing fire matchWon (w20d, w44, w53)
 const W_CREW_FLAG = 3;
-function wCrewFlagFans(r) { if (r === 'win' && RUN && RUN.relics.includes('marigold')) RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; }
-const wW68BallSettle = wBallSettle, wW68GridSettle = wGridSettle, wW68RingSettle = wRingSettle;
-wBallSettle = function (r) { wCrewFlagFans(r); return wW68BallSettle.apply(this, arguments); };
-wGridSettle = function (r) { wCrewFlagFans(r); return wW68GridSettle.apply(this, arguments); };
-wRingSettle = function (r) { wCrewFlagFans(r); return wW68RingSettle.apply(this, arguments); };
+const wCrewFlagFans = () => { RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; };
+TROPHY_FX.marigold = { on: { fightWon: wCrewFlagFans, matchWon: wCrewFlagFans } };
+Object.assign(RELICS.marigold, TROPHY_FX.marigold); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 12], ['s', 'weak', 1, 'all']], { fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
 
 /* ---------- the story ---------- */

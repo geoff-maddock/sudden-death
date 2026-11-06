@@ -201,7 +201,7 @@ wGF.onOver = s => {
 function wGridSettle(r, us, them, box, half) {
   const B = wGfg(), L = B.live, W = L.world, win = r === 'win', tie = r === 'tie';
   B.live = null;
-  if (win) B.w++; else if (tie) B.t++; else B.l++;
+  if (win) { B.w++; fire('matchWon', { engine: 'grid' }); } else if (tie) B.t++; else B.l++;
   // box lines for your own players: side 0, by the seven at kick-off (call-ups have no roster id)
   const S = WG.gfstats = WG.gfstats || {}, line = {};
   for (const b of box) {

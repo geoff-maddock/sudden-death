@@ -207,7 +207,7 @@ wBX.onOver = s => {
 function wRingSettle(result, bouts, pairs) {
   const B = wBxg(), L = B.live, W = L.world, r = result.win === 0 ? 'win' : result.win === 1 ? 'lose' : 'tie', win = r === 'win', tie = r === 'tie';
   B.live = null;
-  if (win) B.w++; else if (tie) B.t++; else B.l++;
+  if (win) { B.w++; fire('matchWon', { engine: 'ring' }); } else if (tie) B.t++; else B.l++;
   // your boxers' lines, and what a knockout costs
   const S = WG.bxstats = WG.bxstats || {}, boxed = new Set(); let kos = 0;
   bouts.forEach((b, i) => {

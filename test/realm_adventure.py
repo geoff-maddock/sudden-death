@@ -48,6 +48,9 @@ TEST_ADV = r"""(() => { if (wAdv('adv_t1')) return;
     chapters: [{ t: 'One', steps: [{ k: 'match', who: 'clerk', kw: 'showdown', engine: 'card', tier: 1, ids: ['cheer', 'cheer'], pinnacle: true, win: 'Won.', lose: 'Lost.' }] }] });
   W_ADV.push({ id: 'adv_t4', title: 'Test Four', starter: { who: 'clerk', kw: 'nightgame' },
     chapters: [{ t: 'One', steps: [{ k: 'match', who: 'clerk', kw: 'lamps', engine: 'card', tier: 1, ids: ['cheer', 'cheer'], cond: { night: true }, win: 'Won.', lose: 'Lost.' }] }] });
+  W_ADV.push({ id: 'adv_t6', title: 'Test Six', starter: { who: 'rowe', kw: 'sixer' },
+    chapters: [{ t: 'Two visits', any: true, steps: [{ k: 'visit', loc: 'saltmere' }, { k: 'visit', loc: 'saltmere' }] },
+      { t: 'Next', steps: [{ k: 'talk', who: 'rowe', kw: 'after' }, { k: 'visit', loc: 'saltmere' }] }] });
   W_ADV.push({ id: 'adv_t5', title: 'Test Five', starter: { who: 'clerk', kw: 'hardline' }, lostText: 'Gone.',
     chapters: [{ t: 'One', steps: [{ k: 'match', who: 'clerk', kw: 'onechance', engine: 'card', tier: 1, ids: ['cheer', 'cheer'], pinnacle: true, win: 'Won.', lose: 'Lost.' }] }] });
 })()"""
@@ -75,7 +78,7 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
         await new_journey(pg, clear=True)
-        check(await pg.evaluate("W_ADV.length === 5 && W_ADV_CFG.key === 'sd-realm-adv'"), 'the test adventures are registered (the shipped stories set aside)')
+        check(await pg.evaluate("W_ADV.length === 6 && W_ADV_CFG.key === 'sd-realm-adv'"), 'the test adventures are registered (the shipped stories set aside)')
 
         # ---------- the store ----------
         r = await pg.evaluate("(() => { localStorage.setItem(wAdvKey(), '{bad'); let ok = true, v; try { v = wAdvAll(); } catch (e) { ok = String(e); } localStorage.removeItem(wAdvKey()); return { ok, v }; })()")
@@ -118,6 +121,9 @@ async def main():
         await new_journey(pg)
         r = await pg.evaluate(f"(() => {{ const s = {st('adv_t1')}, had = wRoster().some(p => p.n === 'Old Testa'); wSay('rowe', 'veteran'); return {{ s, had, now: wRoster().some(p => p.n === 'Old Testa') }}; }})()")
         check(r['s']['st'] == 'won' and not r['had'] and r['now'], 'a new journey keeps the finished adventure, and the reward character joins again', r)
+
+        r = await pg.evaluate(f"""(() => {{ wSay('rowe', 'sixer'); const M = MAPS.saltmere; wEnterMap('saltmere', M.spawn[0], M.spawn[1]); return {st('adv_t6')}; }})()""")
+        check(r['ch'] == 1 and r['done'] == [], 'two visits that finish a chapter don\'t tick off a step of the next one', r)
 
         # ---------- matches ----------
         await pg.evaluate(f"{SET}('adv_t1', {{ ch: 1 }})")
@@ -190,7 +196,7 @@ async def main():
           const n = document.querySelector('[data-jtab="adv"] small').textContent; document.querySelector('[data-jtab=\"people\"]').click(); const back = document.getElementById('wJBody').textContent !== t;
           return { t, n, back }; })()""")
         check(all(w in r['t'] for w in ['Under way', 'Finished', 'Ended badly', 'Test One', 'Test Two', 'Test Three', 'It ended badly.', 'Win by at least 1.']), 'the Adventures tab shows under way, finished and ended badly', r)
-        check(r['n'] == '1' and r['back'], 'the tab counts the active adventures, and the other tabs still work', r)
+        check(r['n'] == '2' and r['back'], 'the tab counts the active adventures (Test One and Test Six), and the other tabs still work', r)
         await pg.evaluate(CLOSE_ALL)
         r = await pg.evaluate("(() => { wOpenCamp('bag'); const e = document.getElementById('wBagAdv'); return e ? e.textContent : ''; })()")
         check('Test Token' in r and 'Test One' in r, 'the Bag lists the profile\'s adventure items', r)

@@ -141,7 +141,12 @@ wEncounterHook = function (region, tileCh, info) {
   if (info) {
     if (info.kind === 'alpha' || info.kind === 'lair') return wStartAlpha(info);
     if (info.kind === 'wild') return wWildMatch(region);
-    return; // the chapel bell only logs (w3); cups start from the registrar's act (w11-cups.js)
+    // the chapel bell: its ring sets its flag (once what it needs is done); cups start from the registrar's act (w11-cups.js)
+    if (info.kind === 'bell' && info.ring && info.ring.set && !wFlag(info.ring.set) && (!info.ring.need || wFlag(info.ring.need))) {
+      wSetFlag(info.ring.set);
+      const sp = DB.sideplots.find(x => x.id === info.ring.set); if (sp) wLog('Done: ' + sp.title + '.', 'g');
+    }
+    return;
   }
   if (wEncounterRoll(wCurMap(), tileCh, Math.random()) === 'fight') wWildMatch(region);
 };

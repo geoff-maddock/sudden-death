@@ -20,8 +20,8 @@
    The four stand in their cities beside the training coaches (w23), on open ground the test checks.
    While Gale plays for you, his figure on the quay steps off the map (wCrewPlace).
    Wraps: wSay (wW68Say: Marrowbone's CREW hint once the log is home, until the story starts; Gale leaving the quay),
-   wEnterMap (wW68EnterMap: Gale's place on the quay), wBallSettle, wGridSettle, wRingSettle (wW68BallSettle,
-   wW68GridSettle, wW68RingSettle: the Marigold's Flag pays its fans for a win in every engine). */
+   wEnterMap (wW68EnterMap: Gale's place on the quay). The Marigold's Flag answers fightWon and matchWon, so it pays
+   for a win in every engine. */
 
 /* ---------- the four, placed in their cities ---------- */
 const W_CREW = [
@@ -47,15 +47,11 @@ DB.chars.marrowbone.topics.crew = { t: 'They lived. I know they did. The log say
 
 /* ---------- the reward ---------- */
 RELICS.marigold = { n: "The Marigold's Flag", adv: 1, desc: 'After every win, 3 more fans come to watch.', ico: 'horn' };
-TROPHY_FX.marigold = { on: { fightWon: () => { RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; } } };
-Object.assign(RELICS.marigold, TROPHY_FX.marigold); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
-// the other engines don't fire fightWon: their wins pay the flag's fans as they settle
+// a win in any engine: the card game fires fightWon, baseball, football and boxing fire matchWon (w20d, w44, w53)
 const W_CREW_FLAG = 3;
-function wCrewFlagFans(r) { if (r === 'win' && RUN && RUN.relics.includes('marigold')) RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; }
-const wW68BallSettle = wBallSettle, wW68GridSettle = wGridSettle, wW68RingSettle = wRingSettle;
-wBallSettle = function (r) { wCrewFlagFans(r); return wW68BallSettle.apply(this, arguments); };
-wGridSettle = function (r) { wCrewFlagFans(r); return wW68GridSettle.apply(this, arguments); };
-wRingSettle = function (r) { wCrewFlagFans(r); return wW68RingSettle.apply(this, arguments); };
+const wCrewFlagFans = () => { RUN.fans = (RUN.fans || 0) + W_CREW_FLAG; };
+TROPHY_FX.marigold = { on: { fightWon: wCrewFlagFans, matchWon: wCrewFlagFans } };
+Object.assign(RELICS.marigold, TROPHY_FX.marigold); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 K('adv_anchor', 'Drop Anchor', 'none', 'skl', 1, 'l', 'self', [['b', 12], ['s', 'weak', 1, 'all']], { fl: 'Bosun Gale\'s old call. The whole crew knew what came next.' });
 
 /* ---------- the story ---------- */

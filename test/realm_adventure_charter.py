@@ -68,7 +68,9 @@ async def main():
         check('Vesper was there' in r['c'] and r['s']['st'] == 'active', 'then asking Foss about the CHARTER starts it', r)
 
         # ---------- 1. Vesper ----------
-        r = await pg.evaluate("(() => { const a = wSay('gk_court', 'vesper').act || ''; const t = wSay('vesper', 'charter').text; const b = wSay('gk_court', 'vesper').act; return { a, t, b }; })()")
+        r = await pg.evaluate("(() => { const a = wSay('gk_court', 'vesper').act || ''; const t = wSay('vesper', 'charter').text; const b = wSay('gk_court', 'vesper').act; wRunAct(b, 'gk_court'); const card = document.getElementById('modalBox').textContent; return { a, t, b, card }; })()")
+        check('Gant Vesper' in r['card'] and 'basketball' in r['card'], 'the game card names Vesper and the sport', r['card'][:200])
+        await pg.evaluate(CLOSE_ALL)
         check(not r['a'].startswith('adv:') and 'Charter Court' in r['t'] and r['b'] == 'adv:charter:1', 'Vesper sends you to the Charter Court, whose keeper then offers the game', r)
         g0 = await pg.evaluate("RUN.gold")
         why, seen = await play_card(pg, 1, "({ sport: B.sport, lead: B.enemies[0].n })")
@@ -85,19 +87,24 @@ async def main():
         check('Old rules' in r, 'the hermit\'s game card says it\'s under the old rules', r[:300])
         await pg.evaluate(CLOSE_ALL)
         why, seen = await play_card(pg, 2, """(() => { const all = B.draw.concat(B.hand, B.discard); return { gear: all.filter(c => ['gear', 'play'].includes(def(c).type) || def(c).rar === 'l').map(c => c.id), n: all.length,
-          relics: RUN.relics.slice(), held: (RUN.oldRelics || []).slice(), rules: RUN.pending.world.rules, uncommon: all.some(c => c.id === 'gob_smoke') }; })()""")
+          relics: RUN.relics.slice(), held: (RUN.oldRelics || []).slice(), rules: RUN.pending.world.rules, uncommon: all.some(c => c.id === 'gob_smoke'), offered: (() => { const p = new Set(); for (let i = 0; i < 30; i++) relicPool().forEach(k => p.add(k)); return p.has('boots'); })() }; })()""")
         check(why == '' and seen['rules'] == 'old' and seen['gear'] == [] and seen['n'] >= 5, 'under the old rules there\'s no gear, no set plays and no Hall of Fame cards', seen)
         check(seen['uncommon'], 'and nothing else is taken out (an uncommon card still plays)', seen)
         check(seen['relics'] == [] and 'boots' in seen['held'], 'and the trophies are set aside for the game', seen)
+        check(not seen['offered'], 'while they are set aside, no reward offers a trophy you own', seen)
         r = await pg.evaluate("({ relics: RUN.relics.includes('boots'), helmet: RUN.deck.some(c => c.id === 'gr_helmet'), s: " + ST + " })")
         check(r['relics'] and r['helmet'], 'after the game the trophies and the whole deck are back', r)
         check(r['s']['items'].get('ch_moss') == 1, 'the hermit gives the Mosswold piece', r)
+        r = await pg.evaluate("""(() => { RUN.oldRelics = RUN.relics; RUN.relics = []; startMatch({ type: 'normal', tier: 1, card: false, ids: ['cheer', 'cheer'], world: { kind: 'wild' } });
+          const back = RUN.relics.includes('boots') && !RUN.oldRelics; B.forfeit = 1; B.over = 'lose'; finishFight(); RUN.hp = RUN.maxhp; return back; })()""")
+        check(r, 'trophies an unfinished old-rules game left aside come back at the next ordinary game', r)
+        await pg.evaluate(CLOSE_ALL)
         # Brinefen: the tide
         r = await pg.evaluate("(() => { wSay('marrowbone', 'charter'); return { t: wSay('marrowbone', 'tide').text, tide: wTide(), times: wTideTimes() }; })()")
         check('Low water today about' in r['t'] and r['tide'] in ('low', 'rising', 'high', 'falling') and all(len(x) == 5 for x in r['times']), 'Marrowbone tells you the tide', r)
-        r = await pg.evaluate("""(() => { const t0 = wTide, n0 = wNightTalk, M = MAPS.marigold; wTide = () => 'high'; wNightTalk = () => true; wEnterMap('marigold', M.spawn[0], M.spawn[1]); const high = !!wAdvState('charter').items.ch_tide;
-          wTide = () => 'low'; wNightTalk = () => false; wEnterMap('marigold', M.spawn[0], M.spawn[1]); const day = !!wAdvState('charter').items.ch_tide;
-          wTide = () => 'low'; wNightTalk = () => true; wEnterMap('marigold', M.spawn[0], M.spawn[1]); const ok = !!wAdvState('charter').items.ch_tide; wTide = t0; wNightTalk = n0; return { high, day, ok }; })()""")
+        r = await pg.evaluate("""(() => { const t0 = wTide, n0 = wIsNight, M = MAPS.marigold; wTide = () => 'high'; wIsNight = () => true; wEnterMap('marigold', M.spawn[0], M.spawn[1]); const high = !!wAdvState('charter').items.ch_tide;
+          wTide = () => 'low'; wIsNight = () => false; wEnterMap('marigold', M.spawn[0], M.spawn[1]); const day = !!wAdvState('charter').items.ch_tide;
+          wTide = () => 'low'; wIsNight = () => true; wEnterMap('marigold', M.spawn[0], M.spawn[1]); const ok = !!wAdvState('charter').items.ch_tide; wTide = t0; wIsNight = n0; return { high, day, ok }; })()""")
         check(r == {'high': False, 'day': False, 'ok': True}, 'the Marigold\'s hold gives its piece only at low tide after dark', r)
         # Cindermaw: the ring
         r = await pg.evaluate("""(() => { wSay('gk_ring', 'charter'); const act = wSay('gk_ring', 'bout').act; let tries = 0;
@@ -152,7 +159,7 @@ async def main():
         check(all(r['flags']), 'and the places the charter showed you are still on the map', r)
 
         # ---------- the bell, How to play ----------
-        r = await pg.evaluate("""(() => { const ring = { kind: 'bell', ring: { item: 'tuningrod', night: 1, set: 'rq_aur2' } }; wEncounterHook('rime', '&', ring); const early = wFlag('rq_aur2');
+        r = await pg.evaluate("""(() => { const ring = { kind: 'bell', ring: Object.values(MAPS.frozenchapel.meta).find(m => m.ring).ring }; wEncounterHook('rime', '&', ring); const early = wFlag('rq_aur2');
           wSetFlag('rq_aur1'); wEncounterHook('rime', '&', ring); return { early, b: wFlag('rq_aur2') }; })()""")
         check(not r['early'] and r['b'], 'striking the Frozen Chapel bell sets its quest flag, once Halvard has sent you', r)
         r = await pg.evaluate("(() => { const d = WG.dayAbs * 24 + 24, a = wTidePhase(d - 1 / 60), b = wTidePhase(d); return { a, b, step: ((b - a) + 12.4) % 12.4, times: wTideTimes() }; })()")

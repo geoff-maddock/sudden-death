@@ -47,7 +47,7 @@ function wAdvAll() {
   return { a: S.a && typeof S.a === 'object' ? S.a : {}, rec: S.rec && typeof S.rec === 'object' ? S.rec : {} };
 }
 function wAdvSave(S) { if (LAB) return; try { localStorage.setItem(wAdvKey(), JSON.stringify(S)); } catch (e) { } }
-function wAdvToday() { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; } // local, as w57 stamps unlocks
+function wAdvToday() { return wDateStamp(); }
 function wAdv(id) { return W_ADV.find(a => a.id === id) || null; }
 function wAdvState(id, S) { return (S || wAdvAll()).a[id] || null; }
 function wAdvEdit(id, fn) { const S = wAdvAll(), A = S.a[id]; if (!A) return null; fn(A, S); wAdvSave(S); return A; }
@@ -84,20 +84,19 @@ function wAdvItemsMove(A, take, give) {
 function wAdvHas(A, take) { return Object.keys(take || {}).every(k => (A.items[k] || 0) >= take[k]); }
 /* a step is done: its items move, the chapter (and then the adventure) completes once every step is done */
 function wAdvDone(id, si) {
-  const D = wAdv(id), A0 = wAdvState(id);
-  if (!D || !A0 || A0.st !== 'active' || A0.done.includes(si)) return;
-  const C = D.chapters[A0.ch], step = C.steps[si];
+  const D = wAdv(id), S = wAdvAll(), A = S.a[id];
+  if (!D || !A || A.st !== 'active' || A.done.includes(si)) return;
+  const C = D.chapters[A.ch], step = C.steps[si];
   let chDone = false, won = false;
-  wAdvEdit(id, A => {
-    wAdvItemsMove(A, step.take, step.give);
-    for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
-    if (step.learn) A.learned.push({ t: step.learn, d: wAdvToday() });
-    A.done.push(si);
-    if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
-  });
+  wAdvItemsMove(A, step.take, step.give);
+  for (const k in step.give || {}) if (WG && !LAB) wLog(`Found: ${(W_ADV_ITEMS[k] || {}).n || k}.`, 'm');
+  if (step.learn) A.learned.push({ t: step.learn, d: wAdvToday() });
+  A.done.push(si);
+  if (A.done.length >= C.steps.length) { chDone = true; A.ch++; A.done = []; if (A.ch >= D.chapters.length) { won = true; A.st = 'won'; A.ended = wAdvToday(); } }
+  wAdvSave(S);
   const flags = [].concat(step.set || []); for (const f of flags) wSetFlag(f); if (flags.length) wInvalidate('world');
-  if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[wAdvState(id).ch].t}.`, 'g'); }
-  if (won) wAdvWin(id);
+  if (chDone) { wAdvPay(C.pay, D.title); if (!won && WG && !LAB) wLog(`${D.title}: chapter done. ${D.chapters[A.ch].t}.`, 'g'); }
+  if (won) wAdvWin(id, A);
 }
 /* the places an adventure has shown you stay shown on every journey: the flags its done steps set (on a journey's
    start or load: wW65Start) */
@@ -126,7 +125,7 @@ function wAdvGiveKeep(D) {
     if (U.cards) { wPayCards({ cards: U.cards }, D.title); gave = true; }
   }
   if (!U.recruit) { WG.advRec[D.id] = 1; return gave ? 'given' : 'already'; }
-  if (WG.advRec[D.id]) return 'already';
+  if (wRoster().some(p => p.n === U.recruit.n)) return 'already'; // (one you let go can be asked back)
   if (!LAB && wRoster().length >= W_PARTY.max) return 'full';
   WG.advRec[D.id] = 1;
   wRecruitTopic(Object.assign({}, U.recruit, U.recruit.lvl === 'team' ? { lvl: wStarLvl() } : {}));
@@ -140,10 +139,10 @@ function wAdvKeepLine(D, got) {
 }
 /* the ending's words: a better one when the step it names was won (end.tWin, end.winMark) */
 function wAdvEndText(D, A) { const E = D.end || {}; return E.tWin && A && A.marks && A.marks[E.winMark || 'won'] ? E.tWin : E.t || ''; }
-function wAdvWin(id) {
+function wAdvWin(id, A) {
   const D = wAdv(id); if (!D) return;
   const E = D.end || {};
-  if (WG && !LAB) wLog(`${D.title}: ${wAdvEndText(D, wAdvState(id)) || 'the end'}`, 'g');
+  if (WG && !LAB) wLog(`${D.title}: ${wAdvEndText(D, A || wAdvState(id)) || 'the end'}`, 'g');
   wAdvPay(E.pay, D.title);
   if (WG && RUN && E.unlock && wAdvGiveKeep(D) === 'full') wLog(`${E.unlock.recruit.n} will join you when there's room on the team: ask ${wChar(E.unlock.at).name} about ${E.unlock.kw.toUpperCase()}.`, 'm');
   if (E.feat && typeof wStarsAll === 'function') { const S = wStarsAll(); if (!S.un[E.feat]) { S.un[E.feat] = wAdvToday(); wStarsSave(S); } }
@@ -157,7 +156,7 @@ function wAdvLose(id, why) {
 /* ---------- talk and places ---------- */
 function wAdvNeedMet(need) {
   if (!need) return true;
-  if (need.night && !wNightTalk()) return false;
+  if (need.night && !wIsNight()) return false; // (the same night as a match's night condition)
   if (need.season && wSeason() !== need.season) return false;
   if (need.weather && wWeather(wRegionHere()) !== need.weather) return false;
   if (need.tide && (typeof wTide !== 'function' || wTide() !== need.tide)) return false;
@@ -200,6 +199,7 @@ function wAdvVisit(mapId, S) {
   if (!WG) return;
   S = S || wAdvAll();
   for (const D of W_ADV) for (const L of wAdvLive(D.id, S)) {
+    const A = wAdvState(D.id); if (!A || A.st !== 'active' || A.ch !== L.ch) break; // a visit just finished the chapter
     const s = L.step; if (s.k !== 'visit') continue;
     const loc = DB.locs.find(l => l.id === s.loc); if (!loc || loc.map !== mapId) continue;
     if (!wAdvNeedMet(s.need)) { if (s.tNo) wLog(s.tNo, 'd'); continue; }

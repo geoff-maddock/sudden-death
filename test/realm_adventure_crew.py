@@ -113,6 +113,10 @@ async def main():
           const f0 = RUN.fans || 0; fire('fightWon'); const fans = (RUN.fans || 0) - f0; return { off, fans }; })()""")
         check(r['off'], 'while Gale plays for you, his place on the quay is empty', r)
         check(r['fans'] == 3, 'the Marigold\'s Flag works: 3 more fans after a win', r)
+        r = await pg.evaluate("(() => { const f0 = RUN.fans || 0; fire('matchWon', { engine: 'ring' }); return (RUN.fans || 0) - f0; })()")
+        check(r == 3, 'and after a win in the other engines (matchWon)', r)
+        r = await pg.evaluate("""(() => { WG.roster = WG.roster.filter(p => p.n !== 'Bosun Gale'); const t = wSay('adv_gale', 'join').text; return { t, back: wRoster().some(p => p.n === 'Bosun Gale') }; })()""")
+        check(r['back'] and 'already' not in r['t'], 'let Gale go and you can ask him back on the same journey', r)
         await pg.evaluate(CLOSE_ALL)
         await pg.evaluate("""(s) => { const o = JSON.parse(s); localStorage.setItem(wAdvKey(), o.adv); WG.roster = o.roster; RUN.relics = o.relics; RUN.deck = o.deck; WG.advRec = o.rec || {}; WG.advItems = o.items || {}; }""", snap)
         r = await pg.evaluate("""(() => { RUN.games.push({ us: 5, them: 2, sport: 'soccer' }); W_ON_END.adv('win', 'crew:1:1', { kind: 'adv' }); wOpenJournal('adv'); const j = document.getElementById('wJBody').textContent;

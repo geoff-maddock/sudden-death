@@ -13,8 +13,8 @@ const W_ADV_TEXT = { warn: "This can't be retried.", none: 'No adventures yet. R
 /* ---------- the cards ---------- */
 function wAdvFoeText(step) {
   if ((step.engine || 'card') === 'card') {
-    const names = [...new Set((step.ids || []).map(id => (ENEMIES[id] || {}).n).filter(Boolean))];
-    return `${names.length ? names.join(' and ') : 'A local side'}, in ${W_ADV_CFG.engines.card} (tier ${step.tier || 1})`;
+    const names = step.name ? [step.name] : [...new Set((step.ids || []).map(id => (ENEMIES[id] || {}).n).filter(Boolean))];
+    return `${names.length ? names.join(' and ') : 'A local side'}, in ${W_ADV_CFG.engines.card}${step.sport ? ' (' + SPORT_NAME[step.sport].toLowerCase() + ')' : ''}, tier ${step.tier || 1}`;
   }
   return `${wCap(wBallName(step.club || 'local'))}, at ${W_ADV_CFG.engines[step.engine]} (tier ${step.tier || 1})`;
 }

@@ -185,7 +185,7 @@ wDiamondOver = function () {
 function wBallSettle(r, us, them, box, inning) {
   const B = wBall(), L = B.live, W = L.world, win = r === 'win';
   B.live = null;
-  if (win) B.w++; else B.l++;
+  if (win) { B.w++; fire('matchWon', { engine: 'ball' }); } else B.l++; // (a trophy can answer any engine's win: matchWon)
   // box scores, for your own players (call-ups and the other side have no rid that is yours)
   const S = WG.bstats = WG.bstats || {}, line = {};
   for (const b of box) {
