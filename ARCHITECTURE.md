@@ -11,7 +11,7 @@ Several files still open with their old part name in a comment (`/* p5: ... */`)
 | File | What lives there |
 |---|---|
 | `shell.html` | CSS and the page shell (header, views, modal). |
-| `core/util.js` | Small shared utilities: random helpers, `esc`, `$`, text and rounded-rect drawing, fonts. |
+| `core/util.js` | Small shared utilities: random helpers, `esc`, `$`, text and rounded-rect drawing, fonts. `R()` is seeded for a run with `RUN.seed` (issue #60): a run stream reseeded per room (`act:pos`) and per act's map (`rngWith('map:<act>')`), and a fight stream in `B.rng`, so a seed plays the same however earlier rooms went and a restored fight carries on the same way. Unseeded runs (the Realm, older saves, most tests) use `Math.random` as before. Cosmetic code (shake, pops, sounds, the treasure scene) calls `Math.random` directly and must never use `R`, `pick` or `shuffle`. `test/seeded.py` asserts it. |
 | `render/creatures.js` | The creature renderer: ink style, every kind's body and weapon, portraits, dungeon-folk and bespoke monsters. |
 | `data/clubs.js` | Clubs and their styles (`CLUBS`, `CLUB_STYLE`). |
 | `data/statuses.js` | Statuses (`ST`). |

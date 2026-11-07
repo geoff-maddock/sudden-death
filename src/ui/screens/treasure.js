@@ -6,7 +6,7 @@ function trunkScene(cv, P) {
   const relicIm = P.relic ? svgImg(P.relic, ICO[RELICS[P.relic].ico] || ICO.gem) : null;
   const S = { t0: P.opened && !P.anim ? -10 : null, coins: [], sparks: [] };
   const cx = 260, by = 240, bw = 190, bh = 92; // body box
-  const stencil = P.stencil || (P.stencil = pick(['AWAY', 'VISITORS', 'PROPERTY OF', 'DO NOT OPEN', 'EQUIP. ROOM 4']));
+  const stencil = P.stencil || (P.stencil = ((a) => a[(Math.random() * a.length) | 0])(['AWAY', 'VISITORS', 'PROPERTY OF', 'DO NOT OPEN', 'EQUIP. ROOM 4']));
   function lidQuad(a) { // a: 0 closed .. 1 open. lid hinges at the back top edge
     const h = 34, ang = a * Math.PI * .62, top = by - bh;
     const dy = Math.cos(ang) * h, back = top - Math.sin(ang) * 26;

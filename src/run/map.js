@@ -82,7 +82,8 @@ function repair(nodes, act) {
   }
   return !mapProblems(nodes, act).probs.length;
 }
-function genMap(act) {
+function genMap(act) { return rngWith('map:' + act, () => genMapRaw(act)); }
+function genMapRaw(act) {
   for (let tries = 0; tries < 30; tries++) {
     const nodes = mapShape();
     for (const n of Object.values(nodes).filter(n => n.k !== 'boss').sort((a, b) => a.r - b.r)) {

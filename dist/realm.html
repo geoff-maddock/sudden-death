@@ -996,7 +996,29 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 window.__SD_REALM = true;
 /* ================= Sudden Death — a Brimstone League dungeon card battler ================= */
 /* p1: utilities and the league's creature renderer (shared with Brimstone Diamond and Black Ice) */
-const R = Math.random;
+/* Randomness. A run with a seed (RUN.seed, set by newRun) is the same for everyone who plays that seed:
+   - the run stream (map, encounters, rewards, shops, events) is reseeded from the seed and the room (act:pos) the
+     first time it is used in each room, and each act's map from 'map:<act>', so how you played earlier rooms does
+     not change later ones;
+   - the fight stream lives in B.rng, seeded from the seed and the room at startCombat, so it is saved with B;
+   - anything cosmetic (shake, pops, sounds, the title screen) calls Math.random directly and never takes from either.
+   A run without a seed (older saves, the Realm, most tests) uses Math.random, as before. */
+const RND0 = Math.random; // kept at load, as the old `const R = Math.random` was, so a stubbed Math.random (tests) doesn't reach R
+function seedHash(seed, key) { let h = (seed ^ 0x9e3779b9) >>> 0; key = String(key); for (let i = 0; i < key.length; i++) { h = Math.imul(h ^ key.charCodeAt(i), 0x85ebca6b); h ^= h >>> 13; } h = Math.imul(h ^ (h >>> 16), 0xc2b2ae35); return (h ^ (h >>> 16)) >>> 0; }
+function rngStep(o, k) { let t = (o[k] = (o[k] + 0x6D2B79F5) >>> 0); t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+function newSeed() { return (RND0() * 4294967296) >>> 0; }
+function R() {
+  if (!RUN || RUN.seed == null) return RND0();
+  if (B && !B.over && B.rng != null) return rngStep(B, 'rng');
+  if (!RUN.rngPin) { const key = RUN.act + ':' + RUN.pos; if (RUN.rngAt !== key) { RUN.rngAt = key; RUN.rng = seedHash(RUN.seed, key); } }
+  return rngStep(RUN, 'rng');
+}
+// run fn on its own run stream (e.g. 'map:1'), then put the room's stream back as it was
+function rngWith(key, fn) {
+  if (!RUN || RUN.seed == null) return fn();
+  const s = [RUN.rngAt, RUN.rng, RUN.rngPin]; RUN.rngAt = key; RUN.rng = seedHash(RUN.seed, key); RUN.rngPin = 1;
+  try { return fn(); } finally { [RUN.rngAt, RUN.rng, RUN.rngPin] = s; }
+}
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const pick = a => a[(R() * a.length) | 0];
@@ -2674,7 +2696,8 @@ function startCombat(ids, type, sport, trait) {
   const act = RUN.act;
   B = { type, sport, enemies: [], draw: [], hand: [], discard: [], exhaust: [], engulfed: [], turn: 0, energy: 0, maxE: 3, P: { block: 0, st: {} },
     yards: 0, downs: 0, hits: {}, outThisTurn: {}, atkCount: 0, firstAtk: false, bowlUsed: false, jersey: false, killsThisTurn: 0, aliveAtTurnStart: 0,
-    fx: [], log: [], over: null, phase: 'player', quarter: 0, gold: 0, luck: RUN.luck || 0, lastRoll: null, totalDmg: 0, grow: {}, cardsThisTurn: 0, lastType: null, freeAtk: false };
+    fx: [], log: [], over: null, phase: 'player', quarter: 0, gold: 0, luck: RUN.luck || 0, lastRoll: null, totalDmg: 0, grow: {}, cardsThisTurn: 0, lastType: null, freeAtk: false,
+    rng: RUN.seed != null ? seedHash(RUN.seed, 'fight:' + act + ':' + RUN.pos) : null };
   sportInit();
   ids.forEach(id => spawn(id));
   B.nStart = ids.length;
@@ -3612,11 +3635,12 @@ function genDraftClass() {
 const kindGroups = kind => Object.keys(SKY_GROUPS).filter(g => SKY_GROUPS[g].includes(kind)).map(g => GROUP_NAME[g]);
 /* p5: the run — drafting, the map, rewards, shops, locker rooms, events, saves and records */
 const START_HP = 75, FLOORS = 13; // rows 0..12, then the boss
-function newRun(clubId, picks, roster, relic) {
+function newRun(clubId, picks, roster, relic, seed) {
   const club = CLUBS[clubId], R0 = roster || club.roster;
   const party = picks.map(i => { const [n, kind, num, flav] = R0[i]; return { n, kind, num, flav }; });
   RUN = { v: 1, club: clubId, party, extra: [], hp: START_HP, maxhp: START_HP, gold: 99, relics: [relic || club.relic], tonics: [null, null], deck: [], act: 0, map: null, pos: null, floor: 0,
     stats: { fights: 0, elites: 0, bosses: 0, cards: 0, dmg: 0, turns: 0, gold: 0, sportsWins: 0, highlights: 0 }, style: 0, luck: 0, removeCost: 75, practiceCost: 50, tonicOdds: 40, pending: null, started: Date.now(), seen: {} };
+  if (seed != null) RUN.seed = seed >>> 0; // a seeded run (see R in core/util.js); the Realm and older saves have none
   for (let i = 0; i < 4; i++) RUN.deck.push(mkCard('check'));
   for (let i = 0; i < 4; i++) RUN.deck.push(mkCard('hold'));
   for (const p of party) RUN.deck.push(mkCard(SIG[p.kind]));
@@ -3712,7 +3736,8 @@ function repair(nodes, act) {
   }
   return !mapProblems(nodes, act).probs.length;
 }
-function genMap(act) {
+function genMap(act) { return rngWith('map:' + act, () => genMapRaw(act)); }
+function genMapRaw(act) {
   for (let tries = 0; tries < 30; tries++) {
     const nodes = mapShape();
     for (const n of Object.values(nodes).filter(n => n.k !== 'boss').sort((a, b) => a.r - b.r)) {
@@ -4526,7 +4551,7 @@ function tone(f, d, type = 'square', vol = .08, slide = 0, delay = 0) {
 function noise(d, vol = .15, fq = 1200, q = 1, delay = 0, sweep = 0) {
   if (!SND.on || LAB) return; const c = actx(); if (!c) return;
   const t = c.currentTime + delay, n = Math.max(1, (c.sampleRate * d) | 0), b = c.createBuffer(1, n, c.sampleRate), a = b.getChannelData(0);
-  for (let i = 0; i < n; i++) a[i] = (R() * 2 - 1) * (1 - i / n);
+  for (let i = 0; i < n; i++) a[i] = (Math.random() * 2 - 1) * (1 - i / n);
   const s = c.createBufferSource(); s.buffer = b; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(fq, t); f.Q.value = q;
   if (sweep) f.frequency.exponentialRampToValueAtTime(Math.max(60, fq + sweep), t + d);
   const g = c.createGain(); g.gain.value = vol; s.connect(f).connect(g).connect(sfxOut(c)); s.start(t);
@@ -4762,7 +4787,7 @@ function drawFight(c, dt) {
   if (A.scoreFlash && A.t - A.scoreFlash.t < .9) { const k = A.t - A.scoreFlash.t; c.save(); c.globalAlpha = 1 - k / .9; rr(c, 480 - (A.sbw || 128), 8, (A.sbw || 128) * 2, MOM[B.sport] ? 64 : 54, 4); c.strokeStyle = A.scoreFlash.side ? '#ff6a5a' : '#7fe08a'; c.lineWidth = 4; c.stroke(); c.restore(); }
   if (B.sport === 'football') { txt(c, `Ball on the ${B.yards < 50 ? 'own ' + B.yards : B.yards === 50 ? '50' : 'their ' + (100 - B.yards)}${B.yards >= 75 ? ': RED ZONE' : B.yards <= 10 ? ': PINNED DEEP' : B.yards >= 60 ? ': field goal range' : ''}`, 480, 92, F_HUD(16), B.yards >= 75 ? '#ff8a6a' : '#b8a68c', 'center'); }
   if (B.sport === 'baseball' && B.sc) { const cx = 480 + (A.sbw || 128) + 32, cy = 36; rr(c, cx - 26, cy - 26, 52, 54, 4); c.fillStyle = '#16100c'; c.fill(); for (const [i, dx, dy] of [[0, 14, 0], [1, 0, -14], [2, -14, 0]]) { c.save(); c.translate(cx + dx, cy + dy); c.rotate(Math.PI / 4); c.fillStyle = B.sc.bases[i] ? '#ffd166' : 'rgba(255,255,255,.15)'; c.fillRect(-5, -5, 10, 10); c.restore(); } c.save(); c.translate(cx, cy + 14); c.rotate(Math.PI / 4); c.fillStyle = '#efe4cc'; c.fillRect(-4, -4, 8, 8); c.restore(); }
-  const sh = A.shake > 0 ? (R() - .5) * A.shake * 14 : 0; A.shake = Math.max(0, A.shake - dt * 2.5);
+  const sh = A.shake > 0 ? (Math.random() - .5) * A.shake * 14 : 0; A.shake = Math.max(0, A.shake - dt * 2.5);
   c.save(); c.translate(sh, sh * .4);
   // party, back to front
   const party = RUN.party.map((p, i) => ({ p, i, pos: PARTY_POS[i] })).sort((a, b) => a.pos.y - b.pos.y);
@@ -4876,14 +4901,14 @@ function consumeFx() {
     const f = B.fx.shift(), t0 = A.t + delay;
     switch (f.k) {
       case 'play': { const who = RUN.party.find(p => p.kind === f.kind) || RUN.party[0]; const a = entA('p:' + who.kind); if (f.atk) { a.lunge = A.t; a.lungeAtk = 1; sfx.card(); } else { a.glow = A.t; sfx.magic(); } break; }
-      case 'hit': { const a = entA(f.e); a.hit = t0 + .08; const p = ep(f.e); if (f.amt > 0) A.pops.push({ x: p.x + (R() - .5) * 30, y: p.y, t: String(f.amt), col: f.col || '#ffe0d0', t0: t0 + .08, life: 1.1, size: f.amt >= 20 ? 40 : 30 }); else if (f.blk) A.pops.push({ x: p.x, y: p.y, t: 'Blocked', col: '#8fc2e8', t0: t0 + .08, life: .9, size: 22 }); setTimeout(() => f.blk && !f.amt ? sfx.block() : sfx.hit(Math.min(1, f.amt / 20)), delay * 1000 + 80); delay += .09; break; }
+      case 'hit': { const a = entA(f.e); a.hit = t0 + .08; const p = ep(f.e); if (f.amt > 0) A.pops.push({ x: p.x + (Math.random() - .5) * 30, y: p.y, t: String(f.amt), col: f.col || '#ffe0d0', t0: t0 + .08, life: 1.1, size: f.amt >= 20 ? 40 : 30 }); else if (f.blk) A.pops.push({ x: p.x, y: p.y, t: 'Blocked', col: '#8fc2e8', t0: t0 + .08, life: .9, size: 22 }); setTimeout(() => f.blk && !f.amt ? sfx.block() : sfx.hit(Math.min(1, f.amt / 20)), delay * 1000 + 80); delay += .09; break; }
       case 'die': entA(f.e).die = A.t + delay; if (!f.quiet) setTimeout(sfx.die, delay * 1000); else A.vfx.push({ k: 'shock', x: entA(f.e).x || 700, y: entA(f.e).y || 400, t0: A.t, life: .7, col: '#7fe0b8', r: 180 }); break;
       case 'dice': A.dice = { r: f.r, bonus: f.bonus, dc: f.dc, ok: f.ok, crit: f.crit, label: f.label, t0: A.t }; sfx.dice(); if (f.crit) setTimeout(sfx.crit, 650); break;
       case 'lunge': { const a = entA(f.e); a.lunge = A.t; a.lungeAtk = f.atk; a.far = f.far; break; }
       case 'vfx': spawnVfx(f.v, f.e); break;
       case 'phase': { const a = entA(f.e); a.phaseT = A.t; A.shake = 1.2; A.vfx.push({ k: 'flash', t0: A.t, life: .5, col: '#ffffff' }); A.vfx.push({ k: 'shock', x: a.x || 720, y: a.y || 400, t0: A.t, life: .9, col: '#ff6a3d', r: 260 }); A.banner = { t: f.t, sub: f.sub, t0: A.t + .25, life: 2.2 }; sfx.horn(); setTimeout(() => sfx.crunch(), 120); break; }
       case 'hitP': { if (f.amt > 0) { A.shake = Math.min(1, .3 + f.amt / 30); for (const p of RUN.party) entA('p:' + p.kind).hit = A.t; sfx.hurt(); } else sfx.block(); break; }
-      case 'num': { const p = f.p ? partyPt() : ep(f.e); A.pops.push({ x: p.x + (f.p ? (R() - .5) * 60 : 0), y: p.y + (f.small ? 20 : 0), t: f.t, col: f.col, t0: A.t + delay * .5, life: 1.2, size: f.small ? 20 : 26 }); break; }
+      case 'num': { const p = f.p ? partyPt() : ep(f.e); A.pops.push({ x: p.x + (f.p ? (Math.random() - .5) * 60 : 0), y: p.y + (f.small ? 20 : 0), t: f.t, col: f.col, t0: A.t + delay * .5, life: 1.2, size: f.small ? 20 : 26 }); break; }
       case 'say': { const a = entA(f.e); a.say = { text: f.t, t: A.t }; break; }
       case 'banner': A.banner = { t: f.t, sub: f.sub, t0: A.t + delay, life: f.small ? 1.3 : 1.9, small: f.small }; if (/Touchdown|Strike!|on fire/i.test(f.t)) sfx.crowd(); else sfx.whistle(); break;
       case 'pst': { const p = partyPt(); const s = ST[f.st]; if (s && s.n) A.pops.push({ x: p.x, y: p.y + 30, t: `${s.n} ${f.n > 0 ? '+' : ''}${f.n}`, col: s.col, t0: A.t + delay, life: 1.2, size: 20 }); break; }
@@ -5564,7 +5589,7 @@ function renderDraft() {
   el.querySelectorAll('[data-pi]').forEach(b => b.onclick = () => { const i = +b.dataset.pi; if (DR.picks.includes(i)) DR.picks = DR.picks.filter(x => x !== i); else if (DR.picks.length < 3) DR.picks.push(i); renderDraft(); });
   if ($('bReroll')) $('bReroll').onclick = () => { DR.cls = genDraftClass(); DR.picks = []; renderDraft(); };
   el.querySelectorAll('[data-diff]').forEach(b => b.onclick = () => { DR.diff = +b.dataset.diff; SET.diff = DR.diff; saveSettings(); renderDraft(); });
-  $('bGo').onclick = () => { if (free) newRun('free', DR.picks, DR.cls, DR.relic); else newRun(DR.club, DR.picks); RUN.path = []; RUN.diff = DR.diff != null ? DR.diff : SET.diff; DR.cls = null; showView('map'); renderMap(); };
+  $('bGo').onclick = () => { if (free) newRun('free', DR.picks, DR.cls, DR.relic, newSeed()); else newRun(DR.club, DR.picks, undefined, undefined, newSeed()); RUN.path = []; RUN.diff = DR.diff != null ? DR.diff : SET.diff; DR.cls = null; showView('map'); renderMap(); };
   $('bBack').onclick = () => renderTitle();
 }
 
@@ -5973,7 +5998,7 @@ function trunkScene(cv, P) {
   const relicIm = P.relic ? svgImg(P.relic, ICO[RELICS[P.relic].ico] || ICO.gem) : null;
   const S = { t0: P.opened && !P.anim ? -10 : null, coins: [], sparks: [] };
   const cx = 260, by = 240, bw = 190, bh = 92; // body box
-  const stencil = P.stencil || (P.stencil = pick(['AWAY', 'VISITORS', 'PROPERTY OF', 'DO NOT OPEN', 'EQUIP. ROOM 4']));
+  const stencil = P.stencil || (P.stencil = ((a) => a[(Math.random() * a.length) | 0])(['AWAY', 'VISITORS', 'PROPERTY OF', 'DO NOT OPEN', 'EQUIP. ROOM 4']));
   function lidQuad(a) { // a: 0 closed .. 1 open. lid hinges at the back top edge
     const h = 34, ang = a * Math.PI * .62, top = by - bh;
     const dy = Math.cos(ang) * h, back = top - Math.sin(ang) * 26;
