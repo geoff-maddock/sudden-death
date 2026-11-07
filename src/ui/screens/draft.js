@@ -28,7 +28,7 @@ function renderDraft() {
   el.querySelectorAll('[data-pi]').forEach(b => b.onclick = () => { const i = +b.dataset.pi; if (DR.picks.includes(i)) DR.picks = DR.picks.filter(x => x !== i); else if (DR.picks.length < 3) DR.picks.push(i); renderDraft(); });
   if ($('bReroll')) $('bReroll').onclick = () => { DR.cls = genDraftClass(); DR.picks = []; renderDraft(); };
   el.querySelectorAll('[data-diff]').forEach(b => b.onclick = () => { DR.diff = +b.dataset.diff; SET.diff = DR.diff; saveSettings(); renderDraft(); });
-  $('bGo').onclick = () => { if (free) newRun('free', DR.picks, DR.cls, DR.relic); else newRun(DR.club, DR.picks); RUN.path = []; RUN.diff = DR.diff != null ? DR.diff : SET.diff; DR.cls = null; showView('map'); renderMap(); };
+  $('bGo').onclick = () => { if (free) newRun('free', DR.picks, DR.cls, DR.relic, newSeed()); else newRun(DR.club, DR.picks, undefined, undefined, newSeed()); RUN.path = []; RUN.diff = DR.diff != null ? DR.diff : SET.diff; DR.cls = null; showView('map'); renderMap(); };
   $('bBack').onclick = () => renderTitle();
 }
 

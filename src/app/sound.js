@@ -12,7 +12,7 @@ function tone(f, d, type = 'square', vol = .08, slide = 0, delay = 0) {
 function noise(d, vol = .15, fq = 1200, q = 1, delay = 0, sweep = 0) {
   if (!SND.on || LAB) return; const c = actx(); if (!c) return;
   const t = c.currentTime + delay, n = Math.max(1, (c.sampleRate * d) | 0), b = c.createBuffer(1, n, c.sampleRate), a = b.getChannelData(0);
-  for (let i = 0; i < n; i++) a[i] = (R() * 2 - 1) * (1 - i / n);
+  for (let i = 0; i < n; i++) a[i] = (Math.random() * 2 - 1) * (1 - i / n);
   const s = c.createBufferSource(); s.buffer = b; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(fq, t); f.Q.value = q;
   if (sweep) f.frequency.exponentialRampToValueAtTime(Math.max(60, fq + sweep), t + d);
   const g = c.createGain(); g.gain.value = vol; s.connect(f).connect(g).connect(sfxOut(c)); s.start(t);

@@ -77,7 +77,7 @@ function drawFight(c, dt) {
   if (A.scoreFlash && A.t - A.scoreFlash.t < .9) { const k = A.t - A.scoreFlash.t; c.save(); c.globalAlpha = 1 - k / .9; rr(c, 480 - (A.sbw || 128), 8, (A.sbw || 128) * 2, MOM[B.sport] ? 64 : 54, 4); c.strokeStyle = A.scoreFlash.side ? '#ff6a5a' : '#7fe08a'; c.lineWidth = 4; c.stroke(); c.restore(); }
   if (B.sport === 'football') { txt(c, `Ball on the ${B.yards < 50 ? 'own ' + B.yards : B.yards === 50 ? '50' : 'their ' + (100 - B.yards)}${B.yards >= 75 ? ': RED ZONE' : B.yards <= 10 ? ': PINNED DEEP' : B.yards >= 60 ? ': field goal range' : ''}`, 480, 92, F_HUD(16), B.yards >= 75 ? '#ff8a6a' : '#b8a68c', 'center'); }
   if (B.sport === 'baseball' && B.sc) { const cx = 480 + (A.sbw || 128) + 32, cy = 36; rr(c, cx - 26, cy - 26, 52, 54, 4); c.fillStyle = '#16100c'; c.fill(); for (const [i, dx, dy] of [[0, 14, 0], [1, 0, -14], [2, -14, 0]]) { c.save(); c.translate(cx + dx, cy + dy); c.rotate(Math.PI / 4); c.fillStyle = B.sc.bases[i] ? '#ffd166' : 'rgba(255,255,255,.15)'; c.fillRect(-5, -5, 10, 10); c.restore(); } c.save(); c.translate(cx, cy + 14); c.rotate(Math.PI / 4); c.fillStyle = '#efe4cc'; c.fillRect(-4, -4, 8, 8); c.restore(); }
-  const sh = A.shake > 0 ? (R() - .5) * A.shake * 14 : 0; A.shake = Math.max(0, A.shake - dt * 2.5);
+  const sh = A.shake > 0 ? (Math.random() - .5) * A.shake * 14 : 0; A.shake = Math.max(0, A.shake - dt * 2.5);
   c.save(); c.translate(sh, sh * .4);
   // party, back to front
   const party = RUN.party.map((p, i) => ({ p, i, pos: PARTY_POS[i] })).sort((a, b) => a.pos.y - b.pos.y);
@@ -191,14 +191,14 @@ function consumeFx() {
     const f = B.fx.shift(), t0 = A.t + delay;
     switch (f.k) {
       case 'play': { const who = RUN.party.find(p => p.kind === f.kind) || RUN.party[0]; const a = entA('p:' + who.kind); if (f.atk) { a.lunge = A.t; a.lungeAtk = 1; sfx.card(); } else { a.glow = A.t; sfx.magic(); } break; }
-      case 'hit': { const a = entA(f.e); a.hit = t0 + .08; const p = ep(f.e); if (f.amt > 0) A.pops.push({ x: p.x + (R() - .5) * 30, y: p.y, t: String(f.amt), col: f.col || '#ffe0d0', t0: t0 + .08, life: 1.1, size: f.amt >= 20 ? 40 : 30 }); else if (f.blk) A.pops.push({ x: p.x, y: p.y, t: 'Blocked', col: '#8fc2e8', t0: t0 + .08, life: .9, size: 22 }); setTimeout(() => f.blk && !f.amt ? sfx.block() : sfx.hit(Math.min(1, f.amt / 20)), delay * 1000 + 80); delay += .09; break; }
+      case 'hit': { const a = entA(f.e); a.hit = t0 + .08; const p = ep(f.e); if (f.amt > 0) A.pops.push({ x: p.x + (Math.random() - .5) * 30, y: p.y, t: String(f.amt), col: f.col || '#ffe0d0', t0: t0 + .08, life: 1.1, size: f.amt >= 20 ? 40 : 30 }); else if (f.blk) A.pops.push({ x: p.x, y: p.y, t: 'Blocked', col: '#8fc2e8', t0: t0 + .08, life: .9, size: 22 }); setTimeout(() => f.blk && !f.amt ? sfx.block() : sfx.hit(Math.min(1, f.amt / 20)), delay * 1000 + 80); delay += .09; break; }
       case 'die': entA(f.e).die = A.t + delay; if (!f.quiet) setTimeout(sfx.die, delay * 1000); else A.vfx.push({ k: 'shock', x: entA(f.e).x || 700, y: entA(f.e).y || 400, t0: A.t, life: .7, col: '#7fe0b8', r: 180 }); break;
       case 'dice': A.dice = { r: f.r, bonus: f.bonus, dc: f.dc, ok: f.ok, crit: f.crit, label: f.label, t0: A.t }; sfx.dice(); if (f.crit) setTimeout(sfx.crit, 650); break;
       case 'lunge': { const a = entA(f.e); a.lunge = A.t; a.lungeAtk = f.atk; a.far = f.far; break; }
       case 'vfx': spawnVfx(f.v, f.e); break;
       case 'phase': { const a = entA(f.e); a.phaseT = A.t; A.shake = 1.2; A.vfx.push({ k: 'flash', t0: A.t, life: .5, col: '#ffffff' }); A.vfx.push({ k: 'shock', x: a.x || 720, y: a.y || 400, t0: A.t, life: .9, col: '#ff6a3d', r: 260 }); A.banner = { t: f.t, sub: f.sub, t0: A.t + .25, life: 2.2 }; sfx.horn(); setTimeout(() => sfx.crunch(), 120); break; }
       case 'hitP': { if (f.amt > 0) { A.shake = Math.min(1, .3 + f.amt / 30); for (const p of RUN.party) entA('p:' + p.kind).hit = A.t; sfx.hurt(); } else sfx.block(); break; }
-      case 'num': { const p = f.p ? partyPt() : ep(f.e); A.pops.push({ x: p.x + (f.p ? (R() - .5) * 60 : 0), y: p.y + (f.small ? 20 : 0), t: f.t, col: f.col, t0: A.t + delay * .5, life: 1.2, size: f.small ? 20 : 26 }); break; }
+      case 'num': { const p = f.p ? partyPt() : ep(f.e); A.pops.push({ x: p.x + (f.p ? (Math.random() - .5) * 60 : 0), y: p.y + (f.small ? 20 : 0), t: f.t, col: f.col, t0: A.t + delay * .5, life: 1.2, size: f.small ? 20 : 26 }); break; }
       case 'say': { const a = entA(f.e); a.say = { text: f.t, t: A.t }; break; }
       case 'banner': A.banner = { t: f.t, sub: f.sub, t0: A.t + delay, life: f.small ? 1.3 : 1.9, small: f.small }; if (/Touchdown|Strike!|on fire/i.test(f.t)) sfx.crowd(); else sfx.whistle(); break;
       case 'pst': { const p = partyPt(); const s = ST[f.st]; if (s && s.n) A.pops.push({ x: p.x, y: p.y + 30, t: `${s.n} ${f.n > 0 ? '+' : ''}${f.n}`, col: s.col, t0: A.t + delay, life: 1.2, size: 20 }); break; }

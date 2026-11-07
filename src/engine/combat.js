@@ -28,7 +28,8 @@ function startCombat(ids, type, sport, trait) {
   const act = RUN.act;
   B = { type, sport, enemies: [], draw: [], hand: [], discard: [], exhaust: [], engulfed: [], turn: 0, energy: 0, maxE: 3, P: { block: 0, st: {} },
     yards: 0, downs: 0, hits: {}, outThisTurn: {}, atkCount: 0, firstAtk: false, bowlUsed: false, jersey: false, killsThisTurn: 0, aliveAtTurnStart: 0,
-    fx: [], log: [], over: null, phase: 'player', quarter: 0, gold: 0, luck: RUN.luck || 0, lastRoll: null, totalDmg: 0, grow: {}, cardsThisTurn: 0, lastType: null, freeAtk: false };
+    fx: [], log: [], over: null, phase: 'player', quarter: 0, gold: 0, luck: RUN.luck || 0, lastRoll: null, totalDmg: 0, grow: {}, cardsThisTurn: 0, lastType: null, freeAtk: false,
+    rng: RUN.seed != null ? seedHash(RUN.seed, 'fight:' + act + ':' + RUN.pos) : null };
   sportInit();
   ids.forEach(id => spawn(id));
   B.nStart = ids.length;

@@ -41,9 +41,14 @@ window.LABRUN = function (opts = {}) {
     if (!B.over) { B.over = 'lose'; B.stall = 1; }
     return B.over;
   }
+  // seeded like a run from the game, unless opts.seed says otherwise (a number, or null for an unseeded run)
+  const seed = opts.seed !== undefined ? opts.seed : newSeed();
+  // the club, picks and free-agent class below come from the seed too (a stand-in RUN until newRun replaces it), or
+  // from Math.random for an unseeded run; never from the last run's streams
+  RUN = seed != null ? { seed, act: 0, pos: 'draft' } : null; B = null;
   const clubs = opts.club ? [opts.club] : CLUB_IDS;
   const club = pick(clubs), picks = opts.picks || shuffle([0, 1, 2, 3, 4, 5]).slice(0, 3);
-  if (opts.free) newRun('free', shuffle([...Array(18).keys()]).slice(0, 3), genDraftClass(), CLUBS[pick(CLUB_IDS)].relic); else newRun(club, picks); RUN.path = []; if (opts.hard) RUN.diff = 3; if (opts.diff != null) RUN.diff = opts.diff;
+  if (opts.free) newRun('free', shuffle([...Array(18).keys()]).slice(0, 3), genDraftClass(), CLUBS[pick(CLUB_IDS)].relic, seed); else newRun(club, picks, undefined, undefined, seed); RUN.path = []; if (opts.hard) RUN.diff = 3; if (opts.diff != null) RUN.diff = opts.diff;
   const log = { club, party: RUN.party.map(p => p.kind), fights: [], result: null, act: 0, floor: 0, death: null };
   outer: for (let act = 0; act < 3; act++) {
     while (true) {
