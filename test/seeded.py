@@ -41,14 +41,31 @@ async def main():
           // 4. the fight stream is saved with B, so a restored fight carries on the same way
           newRun('ironmaw', [0, 1, 2], undefined, undefined, 31337); RUN.path = []; RUN.pos = RUN.map.start ? RUN.map.start : Object.keys(RUN.map.nodes)[0];
           startCombat(['lb', 'skelss'], 'normal', 'hockey');
-          const snap = JSON.stringify(B); const seqA = [R(), R(), R(), R()].join();
-          B = JSON.parse(snap); const seqB = [R(), R(), R(), R()].join();
-          out.restore = seqA === seqB; out.bHasRng = typeof JSON.parse(snap).rng === 'number';
+          const snap = JSON.parse(JSON.stringify(B)); const seqA = [R(), R(), R(), R()].join();
+          restoreBattle(snap); const seqB = [R(), R(), R(), R()].join();
+          out.restore = seqA === seqB; out.bHasRng = typeof snap.rng === 'number';
           // 5. a fight doesn't move the room's run stream
           const rs = RUN.rng; R(); R(); out.fightKeepsRun = RUN.rng === rs;
           // 6. no seed (the Realm, older saves, most tests): Math.random as before
           newRun('ironmaw', [0, 1, 2]); out.unseeded = RUN.seed == null; out.unseededVaries = [R(), R()].join() !== [R(), R()].join();
           startCombat(['lb'], 'normal', 'hockey'); out.unseededFight = B.rng == null;
+          // 7. a new run ignores an unfinished fight from an earlier one
+          const map0 = s => { newRun('ironmaw', [0, 1, 2], undefined, undefined, s); return JSON.stringify(RUN.map.nodes) + JSON.stringify(RUN.goals); };
+          const clean = map0(555); newRun('ironmaw', [0, 1, 2], undefined, undefined, 9); RUN.path = []; RUN.pos = Object.keys(RUN.map.nodes)[0];
+          startCombat(['lb'], 'normal', 'hockey'); out.leftover = !B.over && B.rng != null; out.afterFight = map0(555) === clean;
+          // 8. the act's boss is the same whether the map screen or the boss room asks first
+          const bossFrom = pos => { newRun('ironmaw', [0, 1, 2], undefined, undefined, 2024); RUN.pos = pos; return bossId(); };
+          out.boss = [null, 'boss', Object.keys(RUN.map.nodes)[3]].map(bossFrom); out.bossSame = new Set(out.boss).size === 1;
+          // 9. the season goal's rare cards are rolled once: Later and reopening shows the same three
+          newRun('ironmaw', [0, 1, 2], undefined, undefined, 808); RUN.path = []; RUN.rareTokens = 1;
+          RUN.panel = { t: 'reward', type: 'normal', rw: { gold: 10, cards: [], sports: null } };
+          const offer = () => { renderPanel(); const b = [...document.querySelectorAll('#rwList .reward')].find(x => /rare card/.test(x.textContent)); b.click();
+            const ids = [...document.querySelectorAll('#modalBox [data-gr]')].map(x => x.textContent).join('|'); document.querySelector('#modalBox [data-close]').click(); return ids; };
+          const o1 = offer(); R(); R(); RUN.pos = Object.keys(RUN.map.nodes)[2]; const o2 = offer(); out.rareSame = !!o1 && o1 === o2;
+          // 10. a lab run on a seed, free agents and club picks included, plays the same twice
+          const free = () => JSON.stringify(LABRUN({ seed: 77, free: true, diff: 0 })) + RUN.party.map(p => p.n).join();
+          const club = () => JSON.stringify(LABRUN({ seed: 78, diff: 0 }));
+          out.labFree = free() === free(); out.labClub = club() === club();
           return out;
         })()""")
         print(r)
@@ -62,11 +79,17 @@ async def main():
         check(r['bHasRng'], 'the fight stream is saved in B as a number')
         check(r['restore'], 'a fight restored from a snapshot draws the same numbers')
         check(r['fightKeepsRun'], "drawing in a fight doesn't move the run stream")
+        check(r['leftover'] and r['afterFight'], 'a new run ignores an unfinished fight from an earlier run')
+        check(r['bossSame'], f"the act's boss doesn't depend on where it is first asked for {r['boss']}")
+        check(r['rareSame'], "the season goal's three rare cards stay the same after Later and in another room")
+        check(r['labFree'] and r['labClub'], 'a seeded lab run (free agents, or a club and picks from the seed) plays the same twice')
         check(r['unseeded'] and r['unseededVaries'] and r['unseededFight'], 'a run without a seed uses Math.random')
         # the cosmetic code never takes from the seeded streams
-        for f in ['src/ui/fight/scene.js', 'src/app/sound.js', 'src/render/vfx.js', 'src/ui/screens/treasure.js']:
+        cosmetic = ['src/ui/fight/scene.js', 'src/ui/fight/arena.js', 'src/ui/fight/field.js', 'src/ui/fight/sky-view.js', 'src/app/sound.js', 'src/app/music.js',
+                    'src/render/vfx.js', 'src/render/boss-art.js', 'src/render/creatures.js', 'src/ui/screens/treasure.js']
+        for f in cosmetic:
             src = open(os.path.join(ROOT, f)).read()
-            check(not re.search(r'(?<![\w.])(R\(\)|pick\(|shuffle\()', src), f'{f} uses Math.random, not R/pick/shuffle')
+            check(not re.search(r'(?<![\w.])(R|pick|shuffle|ri|d20|wpick|randomRelic)\(', src), f'{f} uses Math.random or pickFx, never the seeded helpers')
         check(not errs, f'no page errors {errs[:2]}')
         await b.close()
 

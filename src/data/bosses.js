@@ -11,7 +11,7 @@ Object.assign(ST, {
 ENCOUNTERS[0].boss = ['argus', 'groundskeeper', 'kqueen'];
 ENCOUNTERS[1].boss = ['cube', 'zamboni', 'banshee'];
 ENCOUNTERS[2].boss = ['baron', 'wyrm', 'mirror'];
-function bossId() { RUN.bossIds = RUN.bossIds || [null, null, null]; if (!RUN.bossIds[RUN.act]) RUN.bossIds[RUN.act] = pick(ENCOUNTERS[RUN.act].boss); return RUN.bossIds[RUN.act]; }
+function bossId() { RUN.bossIds = RUN.bossIds || [null, null, null]; if (!RUN.bossIds[RUN.act]) RUN.bossIds[RUN.act] = rngWith('boss:' + RUN.act, () => pick(ENCOUNTERS[RUN.act].boss)); return RUN.bossIds[RUN.act]; }
 
 /* ----- the old guard, smartened up ----- */
 Object.assign(ENEMIES.argus.moves, {

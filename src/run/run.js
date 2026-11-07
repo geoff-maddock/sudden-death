@@ -1,6 +1,7 @@
 /* p5: the run — drafting, the map, rewards, shops, locker rooms, events, saves and records */
 const START_HP = 75, FLOORS = 13; // rows 0..12, then the boss
 function newRun(clubId, picks, roster, relic, seed) {
+  B = null; // a fight left from an earlier run must not lend its stream to this one (see R in core/util.js)
   const club = CLUBS[clubId], R0 = roster || club.roster;
   const party = picks.map(i => { const [n, kind, num, flav] = R0[i]; return { n, kind, num, flav }; });
   RUN = { v: 1, club: clubId, party, extra: [], hp: START_HP, maxhp: START_HP, gold: 99, relics: [relic || club.relic], tonics: [null, null], deck: [], act: 0, map: null, pos: null, floor: 0,

@@ -51,9 +51,9 @@ function renderReward() {
   // season-goal payouts that need a choice
   if (RUN.pracTokens) item(svgI(SPORT_GLYPH[ACT_HOME[RUN.act]]), 'Season goal: practice', 'Practice a card: ★, better at every sport.', () => pickFromDeck('practice', c => { if (c) { RUN.pracTokens--; saveRun(); take(); } }), !RUN.deck.some(practicable));
   if (RUN.rareTokens) item(svgI(ICO.gem), 'Season goal: a rare card', 'Pick one of three rare cards.', () => {
-    const list = shuffle(cardPool('r').slice()).slice(0, 3).map(c => ({ id: c.id, up: false }));
+    const list = RUN.rareOffer || (RUN.rareOffer = shuffle(cardPool('r').slice()).slice(0, 3).map(c => ({ id: c.id, up: false })));
     const close = modal(`<header><h3>Pick a rare card</h3><button class="ghost" data-close>Later</button></header>${cardChoiceRow(list, 'gr')}`);
-    $('modalBox').querySelectorAll('[data-gr]').forEach(el => el.onclick = () => { const c = list[+el.dataset.gr]; RUN.deck.push(mkCard(c.id)); RUN.stats.cards++; RUN.rareTokens--; saveRun(); close(); take(); });
+    $('modalBox').querySelectorAll('[data-gr]').forEach(el => el.onclick = () => { const c = list[+el.dataset.gr]; RUN.deck.push(mkCard(c.id)); RUN.stats.cards++; RUN.rareTokens--; RUN.rareOffer = null; saveRun(); close(); take(); });
   });
   // the highlight reel, for sports wins
   if (rw.reel && !rw.reelTaken) {

@@ -1022,6 +1022,7 @@ function rngWith(key, fn) {
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const pick = a => a[(R() * a.length) | 0];
+const pickFx = a => a[(Math.random() * a.length) | 0]; // cosmetic: never draws from a seeded stream
 const d20 = () => 1 + (R() * 20 | 0);
 const ri = (a, b) => a + ((R() * (b - a + 1)) | 0);
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = (R() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -2410,7 +2411,7 @@ Object.assign(ST, {
 ENCOUNTERS[0].boss = ['argus', 'groundskeeper', 'kqueen'];
 ENCOUNTERS[1].boss = ['cube', 'zamboni', 'banshee'];
 ENCOUNTERS[2].boss = ['baron', 'wyrm', 'mirror'];
-function bossId() { RUN.bossIds = RUN.bossIds || [null, null, null]; if (!RUN.bossIds[RUN.act]) RUN.bossIds[RUN.act] = pick(ENCOUNTERS[RUN.act].boss); return RUN.bossIds[RUN.act]; }
+function bossId() { RUN.bossIds = RUN.bossIds || [null, null, null]; if (!RUN.bossIds[RUN.act]) RUN.bossIds[RUN.act] = rngWith('boss:' + RUN.act, () => pick(ENCOUNTERS[RUN.act].boss)); return RUN.bossIds[RUN.act]; }
 
 /* ----- the old guard, smartened up ----- */
 Object.assign(ENEMIES.argus.moves, {
@@ -3636,6 +3637,7 @@ const kindGroups = kind => Object.keys(SKY_GROUPS).filter(g => SKY_GROUPS[g].inc
 /* p5: the run — drafting, the map, rewards, shops, locker rooms, events, saves and records */
 const START_HP = 75, FLOORS = 13; // rows 0..12, then the boss
 function newRun(clubId, picks, roster, relic, seed) {
+  B = null; // a fight left from an earlier run must not lend its stream to this one (see R in core/util.js)
   const club = CLUBS[clubId], R0 = roster || club.roster;
   const party = picks.map(i => { const [n, kind, num, flav] = R0[i]; return { n, kind, num, flav }; });
   RUN = { v: 1, club: clubId, party, extra: [], hp: START_HP, maxhp: START_HP, gold: 99, relics: [relic || club.relic], tonics: [null, null], deck: [], act: 0, map: null, pos: null, floor: 0,
@@ -5696,9 +5698,9 @@ function renderReward() {
   // season-goal payouts that need a choice
   if (RUN.pracTokens) item(svgI(SPORT_GLYPH[ACT_HOME[RUN.act]]), 'Season goal: practice', 'Practice a card: ★, better at every sport.', () => pickFromDeck('practice', c => { if (c) { RUN.pracTokens--; saveRun(); take(); } }), !RUN.deck.some(practicable));
   if (RUN.rareTokens) item(svgI(ICO.gem), 'Season goal: a rare card', 'Pick one of three rare cards.', () => {
-    const list = shuffle(cardPool('r').slice()).slice(0, 3).map(c => ({ id: c.id, up: false }));
+    const list = RUN.rareOffer || (RUN.rareOffer = shuffle(cardPool('r').slice()).slice(0, 3).map(c => ({ id: c.id, up: false })));
     const close = modal(`<header><h3>Pick a rare card</h3><button class="ghost" data-close>Later</button></header>${cardChoiceRow(list, 'gr')}`);
-    $('modalBox').querySelectorAll('[data-gr]').forEach(el => el.onclick = () => { const c = list[+el.dataset.gr]; RUN.deck.push(mkCard(c.id)); RUN.stats.cards++; RUN.rareTokens--; saveRun(); close(); take(); });
+    $('modalBox').querySelectorAll('[data-gr]').forEach(el => el.onclick = () => { const c = list[+el.dataset.gr]; RUN.deck.push(mkCard(c.id)); RUN.stats.cards++; RUN.rareTokens--; RUN.rareOffer = null; saveRun(); close(); take(); });
   });
   // the highlight reel, for sports wins
   if (rw.reel && !rw.reelTaken) {
@@ -5998,7 +6000,7 @@ function trunkScene(cv, P) {
   const relicIm = P.relic ? svgImg(P.relic, ICO[RELICS[P.relic].ico] || ICO.gem) : null;
   const S = { t0: P.opened && !P.anim ? -10 : null, coins: [], sparks: [] };
   const cx = 260, by = 240, bw = 190, bh = 92; // body box
-  const stencil = P.stencil || (P.stencil = ((a) => a[(Math.random() * a.length) | 0])(['AWAY', 'VISITORS', 'PROPERTY OF', 'DO NOT OPEN', 'EQUIP. ROOM 4']));
+  const stencil = P.stencil || (P.stencil = pickFx(['AWAY', 'VISITORS', 'PROPERTY OF', 'DO NOT OPEN', 'EQUIP. ROOM 4']));
   function lidQuad(a) { // a: 0 closed .. 1 open. lid hinges at the back top edge
     const h = 34, ang = a * Math.PI * .62, top = by - bh;
     const dy = Math.cos(ang) * h, back = top - Math.sin(ang) * 26;
