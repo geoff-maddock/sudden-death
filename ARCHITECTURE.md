@@ -40,6 +40,7 @@ Several files still open with their old part name in a comment (`/* p5: ... */`)
 | `run/goals.js` | Season goals (`GOALS`, `checkGoals`) and the fan stand (`FAN_STAND`). |
 | `run/achievements.js` | Achievements: bronze/silver/gold ladders counted across runs, per profile, with toasts. |
 | `run/trouble.js` | Trouble: enemy sport perks (Ace, Stopper, Hot start, Clutch) and high-stakes rooms on the map. |
+| `run/daily.js` | The daily challenge (issue #60). `dailyOf(key)` works out a day's game from the local date alone: the seed, the club and line, a twist (`DAILY_TWISTS`, applied once at the start on the `twist` stream) and the difficulty (`DAILY_DIFF`, Rookie on Sunday to Hall of Fame on Saturday). `newDailyRun` starts it (the bots use it through `LABRUN({ daily })`), and `dailyStart` starts it once a day and records it in `pkey('sd-daily')`. Wraps `recordRun` to put the result on the day. `dailyStreak`, `dailyState`. |
 | `ui/icons.js` | Icons (`ICO`, `NODE_ICO`) and sport emblems for league cards. |
 | `ui/card-faces.js` | Card text and card faces (`cardText`, `cardHTML`). |
 | `ui/widgets.js` | Tooltips, the run bar, `modal`, the deck viewer and deck picker. |
@@ -65,6 +66,7 @@ Several files still open with their old part name in a comment (`/* p5: ... */`)
 | `app/coach.js` | Coach's notes. |
 | `app/pause-save.js` | Pause, and saving a fight to come back to (`snapBattle`, `restoreBattle`). |
 | `app/profiles-ui.js` | Profiles on the title screen, and `askConfirm`. |
+| `ui/screens/daily.js` | The Daily tab (`renderDaily`: today's game, Play or Continue, the streak, every day's result), the title screen's Daily button, and How to play's section (`#helpDaily`, not in the Realm). Wraps `renderTitle` and `renderHelp`. `test/daily.py` asserts it. |
 
 ## The core loop of a fight
 
