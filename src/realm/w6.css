@@ -322,6 +322,19 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
 .wrpow{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
 .wring .wnst span{white-space:nowrap}
+/* w52: the tale of the tape (issue #62): yours on the left, theirs on the right, the better of each pair marked */
+.wrtape td{border-top:0;padding-top:0}.wrtape summary{cursor:pointer;color:var(--dim);font-size:.92em}
+.wtape{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:3px 10px;align-items:center;margin:6px 0 4px}
+.wtape .wtn{display:grid;min-width:0}.wtape .wtn small{color:var(--dim)}.wtape .wa{text-align:right;justify-self:end}
+.wtape .wtl{color:var(--dim);font-size:12px;text-align:center}
+.wtv{display:flex;align-items:center;gap:6px;min-height:20px;min-width:0;width:100%}.wtv.wa{flex-direction:row-reverse}
+.wtv i{display:block;height:6px;border-radius:3px;background:rgba(255,208,160,.28);flex:0 0 auto}
+.wtv b{min-width:1.6em;text-align:center}.wtv small{color:#9fcf8a;font-size:11px}
+.wtv.wbest b{color:#ffd24a}.wtv.wbest i{background:#ffd24a}.wtv.wbest b::after{content:' \25B2';font-size:9px;vertical-align:2px}
+.wtape .wtr{font-size:.92em}
+.wtape2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 14px;font-size:.92em;margin-bottom:6px}
+.wtape2 .wtsec{grid-column:1/-1;color:var(--dim);font-size:12px;text-align:center;border-top:1px solid rgba(255,208,160,.12);padding-top:4px;margin-top:2px}
+.wtape2 .wtt{overflow-wrap:anywhere}.wtape2 .wa{text-align:right}
 @media (max-width:560px){.wrpair,.wrpair tbody,.wrpair tr,.wrpair th,.wrpair td{display:block;width:auto}.wrpair tr{padding:6px 0;border-top:1px solid rgba(255,208,160,.15)}.wrpair th,.wrpair td{border:0;padding:2px 0}.wrpair td:nth-child(3){display:none}.wrpair select{width:100%}.wrpair small{overflow-wrap:anywhere}}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}

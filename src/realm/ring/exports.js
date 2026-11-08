@@ -8,7 +8,7 @@ return {
   totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, rules: Object.assign({}, BX_RULES),
   start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
   get on() { return BXP.on; }, get speed() { return BXP.speed; }, set speed(n) { BXP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
-  pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
+  pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '', intro: () => G && G.F ? bxIntroTape() : null, live: () => G && G.F && BD ? bxLive() : null,
   set onOver(f) { BX_HOOK.onOver = f; }, get onOver() { return BX_HOOK.onOver; }, set onSnap(f) { BX_HOOK.onSnap = f; }, set wantSnap(f) { BX_HOOK.wantSnap = f; }, set onEv(f) { BX_HOOK.onEv = f; }, get onEv() { return BX_HOOK.onEv; },
   // save points (phase 5): a snapshot now (between rounds or bouts), and putting one back in the ring
   snapshot: () => BD && G && G.F ? bxSnapshot() : null, resume: sn => { const g = bxResume(sn); bxShow(); return g; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
@@ -30,7 +30,7 @@ return {
   traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],
   // the ratings, plans, punches and judges, for the page and How to play
-  rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
+  rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), styleOf: r => bxStyle(Object.assign(bxRate('goblin'), r)), staMax: r => bxStaMax(r), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
   plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),
   punches: Object.fromEntries(BX_PUNCH_IDS.map(k => [k, { n: BX_PUNCH[k].n, head: !!BX_PUNCH[k].head, power: !!BX_PUNCH[k].power }])),
   judges: BX_JUDGES.map(J => ({ n: J.n, likes: J.likes })),
