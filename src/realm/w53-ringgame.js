@@ -65,7 +65,7 @@ function wBxGrowStat(p) {
   for (const s of open) { r -= K[s]; if (r < 0) return s; }
   return open[open.length - 1];
 }
-function wBxFighter(p) { const b = wBxOf(p); return { n: p.n, kind: p.kind, num: p.num, lvl: p.lvl || 1, pid: p.id == null ? null : p.id, r: Object.fromEntries(wBX.stats.map(s => [s, b[s]])) }; }
+function wBxFighter(p) { const b = wBxOf(p); return { n: p.n, kind: p.kind, num: p.num, lvl: p.lvl || 1, pid: p.id == null ? null : p.id, rec: wRingRec(p.id), r: Object.fromEntries(wBX.stats.map(s => [s, b[s]])) }; }
 
 /* ---------- the two sides ---------- */
 // yours: your team in its order (by roster id), then call-ups at your level to make three

@@ -43,10 +43,12 @@ const BX_TRAIT = {
 };
 const bxTrait = f => BX_TRAIT[f.kind] || null;
 const BX_HP = 100;
-// the fighter for side from { n, kind, num, r?, style? } (r: ratings to lay over the kind's; style: a plan to box to)
+const bxStaMax = r => Math.round(68 + r.sta * 4.5); // the most stamina a fighter has, from their stamina rating
+/* the fighter for side from { n, kind, num, r?, style?, lvl?, rec? } (r: ratings to lay over the kind's; style: a plan
+   to box to; lvl and rec, their level and record { bb, w, l, d, ko }, only for the intro to show) */
 function bxFighter(p, side) {
-  const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = Math.round(68 + r.sta * 4.5), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
-  return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style,
+  const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = bxStaMax(r), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
+  return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
     a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false,
     rs: bxStatsZero(), bs: bxStatsZero() };

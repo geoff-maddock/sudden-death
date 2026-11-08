@@ -850,6 +850,19 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
 .wrpow{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
 .wring .wnst span{white-space:nowrap}
+/* w52: the tale of the tape (issue #62): yours on the left, theirs on the right, the better of each pair marked */
+.wrtape td{border-top:0;padding-top:0}.wrtape summary{cursor:pointer;color:var(--dim);font-size:.92em}
+.wtape{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:3px 10px;align-items:center;margin:6px 0 4px}
+.wtape .wtn{display:grid;min-width:0}.wtape .wtn small{color:var(--dim)}.wtape .wa{text-align:right;justify-self:end}
+.wtape .wtl{color:var(--dim);font-size:12px;text-align:center}
+.wtv{display:flex;align-items:center;gap:6px;min-height:20px;min-width:0;width:100%}.wtv.wa{flex-direction:row-reverse}
+.wtv i{display:block;height:6px;border-radius:3px;background:rgba(255,208,160,.28);flex:0 0 auto}
+.wtv b{min-width:1.6em;text-align:center}.wtv small{color:#9fcf8a;font-size:11px}
+.wtv.wbest b{color:#ffd24a}.wtv.wbest i{background:#ffd24a}.wtv.wbest b::after{content:' \25B2';font-size:9px;vertical-align:2px}
+.wtape .wtr{font-size:.92em}
+.wtape2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 14px;font-size:.92em;margin-bottom:6px}
+.wtape2 .wtsec{grid-column:1/-1;color:var(--dim);font-size:12px;text-align:center;border-top:1px solid rgba(255,208,160,.12);padding-top:4px;margin-top:2px}
+.wtape2 .wtt{overflow-wrap:anywhere}.wtape2 .wa{text-align:right}
 @media (max-width:560px){.wrpair,.wrpair tbody,.wrpair tr,.wrpair th,.wrpair td{display:block;width:auto}.wrpair tr{padding:6px 0;border-top:1px solid rgba(255,208,160,.15)}.wrpair th,.wrpair td{border:0;padding:2px 0}.wrpair td:nth-child(3){display:none}.wrpair select{width:100%}.wrpair small{overflow-wrap:anywhere}}
 .wgstance b{align-self:center;margin-right:6px;font-size:.9em}
 .wgstance button:nth-child(2){border-radius:6px 0 0 6px}
@@ -25143,10 +25156,12 @@ const BX_TRAIT = {
 };
 const bxTrait = f => BX_TRAIT[f.kind] || null;
 const BX_HP = 100;
-// the fighter for side from { n, kind, num, r?, style? } (r: ratings to lay over the kind's; style: a plan to box to)
+const bxStaMax = r => Math.round(68 + r.sta * 4.5); // the most stamina a fighter has, from their stamina rating
+/* the fighter for side from { n, kind, num, r?, style?, lvl?, rec? } (r: ratings to lay over the kind's; style: a plan
+   to box to; lvl and rec, their level and record { bb, w, l, d, ko }, only for the intro to show) */
 function bxFighter(p, side) {
-  const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = Math.round(68 + r.sta * 4.5), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
-  return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style,
+  const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = bxStaMax(r), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
+  return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
     a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false,
     rs: bxStatsZero(), bs: bxStatsZero() };
@@ -25625,6 +25640,10 @@ function bxSimBout(opts) {
    a fighter turned to stone (petrified, or under Stone Skin or Rampart) is drawn grey, one that punches pass through is
    faint, and a rooted or webbed one has threads at their feet; under each fighter's plan on the bar, their special (◆)
    and ultimate (★), lit while they can be cast, and the statuses on them.
+   The bout at a glance (issue #62 follow-up): in each top corner under the bar a card with the fighter's six ratings
+   (the better of each pair lit) and their work so far this bout; at the top in the middle the judges' running totals,
+   with the round on now scored as it stands (bxLive: the judges' weights without their own eye, so drawing never
+   draws from the seeded stream; the real card at the bell can differ in a close round).
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -25642,10 +25661,11 @@ function bxDraw(c) {
   bxDrawRing(c, 'front');
   bxDrawFx(c);
   bxDrawBar(c);
+  if (BD.ph !== 'intro') bxDrawLive(c);
   bxDrawFeed(c);
   if (BD.mode === 'play' && BD.ph === 'round' && bxFrac(G.F[BD.you]) < .25) {
     c.save(); c.globalAlpha = .65 + .35 * Math.sin(BXT.t * 6);
-    txt(c, 'Tired: ease off and get your breath back', 480, 118, '800 16px "Alegreya Sans", sans-serif', '#5ab8d8', 'center'); c.restore();
+    txt(c, 'Tired: ease off and get your breath back', 480, 226, '800 16px "Alegreya Sans", sans-serif', '#5ab8d8', 'center'); c.restore();
   }
   if (BD.ph === 'kd') bxDrawCount(c);
   if (BD.ph === 'intro') bxDrawIntro(c);
@@ -25757,7 +25777,7 @@ function bxDrawFx(c) {
   if (BXT.cast && BXT.t - BXT.cast.t < 1.4) {
     const C = BXT.cast, a = Math.min(1, (1.4 - (BXT.t - C.t)) * 2), col = G.corners[C.side].color;
     c.save(); c.globalAlpha = a; c.font = `900 ${C.ult ? 30 : 24}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.lineWidth = 6; c.strokeStyle = '#17100e';
-    const y = 142 - (BXT.t - C.t) * 6; c.strokeText(C.n.toUpperCase(), 480, y); c.fillStyle = col; c.fillText(C.n.toUpperCase(), 480, y);
+    const y = 188 - (BXT.t - C.t) * 6; c.strokeText(C.n.toUpperCase(), 480, y); c.fillStyle = col; c.fillText(C.n.toUpperCase(), 480, y);
     if (C.ult) { c.font = '800 12px "Alegreya Sans", sans-serif'; c.lineWidth = 4; c.strokeText('ULTIMATE', 480, y + 16); c.fillStyle = '#ffd24a'; c.fillText('ULTIMATE', 480, y + 16); }
     c.restore();
   }
@@ -25796,6 +25816,42 @@ function bxDrawBar(c) {
   txt(c, BD.ph === 'intro' ? `0:${String(BX_RULES.secs).padStart(2, '0')}` : `0:${String(Math.ceil(G.clock)).padStart(2, '0')}`, 480, 60, '800 30px "Alegreya Sans", sans-serif', live ? '#fff4dc' : '#8a7c68', 'center');
   txt(c, { intro: 'Touch gloves', round: '', kd: 'Knockdown', rise: 'Box on', corner: 'Between rounds', over: '' }[BD.ph], 480, 80, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
+/* the bout at a glance: each fighter's ratings and work this bout (rounds done and the round on now), and each judge's
+   totals with the round on now as it stands. round is null between rounds and at the end */
+function bxLive() {
+  const work = G.F.map(f => { const s = Object.assign({}, f.bs); for (const k in f.rs) s[k] = (s[k] || 0) + f.rs[k]; return s; });
+  const live = BD.ph === 'round' || BD.ph === 'kd' || BD.ph === 'rise', T = bxTotals(), [a, b] = G.F.map(f => f.rs);
+  const lean = live ? bxRoundScore(BX_JUDGES.map(J => { const v = s => Object.keys(J.w).reduce((n, k) => n + J.w[k] * s[k], 0); return Math.round((v(a) - v(b)) * 10) / 10; })) : null;
+  return {
+    F: G.F.map((f, i) => ({ r: Object.assign({}, f.r), landed: work[i].landed, thrown: work[i].thrown, power: work[i].power, slips: work[i].slips, blocks: work[i].blocks, kd: G.kd[1 - i] })),
+    judges: BX_JUDGES.map((J, j) => ({ n: J.n, likes: J.likes, total: lean ? [T[j][0] + lean[j][0], T[j][1] + lean[j][1]] : T[j].slice(), round: lean ? lean[j] : null })),
+  };
+}
+const BX_STAT_AB = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'Sta', gui: 'Gui' };
+function bxDrawLive(c) {
+  const L = bxLive(), col = ['#ffb0a0', '#a8c8ff'], dim = '#b8aa94', F = (w, n) => `${w ? w + ' ' : ''}${n}px "Alegreya Sans", sans-serif`;
+  // the fighters' cards
+  L.F.forEach((X, i) => {
+    const O = L.F[1 - i], x = i ? 792 : 8, al = i ? 'right' : 'left', tx = i ? x + 152 : x + 8;
+    c.save(); c.globalAlpha = .88; bxPanel(c, x, 96, 160, 124); c.restore();
+    c.fillStyle = G.corners[i].color; c.fillRect(i ? x + 157 : x, 100, 3, 116);
+    BX_STATS.forEach((s, k) => {
+      const cx = x + 10 + (k % 3) * 50, cy = 114 + Math.floor(k / 3) * 18;
+      txt(c, BX_STAT_AB[s], cx, cy, F(0, 11), dim); txt(c, String(X.r[s]), cx + 26, cy, F(700, 13), X.r[s] > O.r[s] ? col[i] : '#e8dcc0');
+    });
+    const pct = X.thrown ? ` (${Math.round(100 * X.landed / X.thrown)}%)` : '';
+    [`Landed ${X.landed} of ${X.thrown}${pct}`, `Power punches ${X.power}`, `Slipped ${X.slips} · blocked ${X.blocks}`, `Knockdowns ${X.kd}`]
+      .forEach((t, k) => txt(c, t, tx, 160 + k * 15, F(0, 12), '#e8dcc0', al));
+  });
+  // the judges
+  c.save(); c.globalAlpha = .82; bxPanel(c, 340, 94, 280, L.judges[0].round ? 54 : 40); c.restore();
+  L.judges.forEach((J, j) => {
+    const x = 387 + j * 93, [p, q] = J.total, lead = p > q ? col[0] : q > p ? col[1] : '#e8dcc0';
+    txt(c, J.n, x, 108, F(700, 11), dim, 'center');
+    txt(c, `${p}-${q}`, x, 126, F(800, 15), lead, 'center');
+    if (J.round) txt(c, `round ${J.round[0]}-${J.round[1]}`, x, 141, F(0, 10), dim, 'center');
+  });
+}
 function bxDrawFeed(c) {
   const L = G.log.slice(-3);
   L.forEach((l, i) => txt(c, l.msg, 480, 548 + i * 17, `${l.big ? '700 ' : ''}14px "Alegreya Sans", sans-serif`, i === L.length - 1 ? '#f4ead8' : 'rgba(220,206,184,.6)', 'center'));
@@ -25805,18 +25861,32 @@ function bxDrawCount(c) {
   txt(c, String(BD.count), p.x, p.y - 70, '900 54px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, w, h, 8); c.fill(); c.strokeStyle = 'rgba(255,208,160,.25)'; c.lineWidth = 1; c.stroke(); }
+/* the tale of the tape, short (issue #62): each fighter's name, level and nature in their own column, the six ratings
+   side by side (the better of each pair in its corner's colour), their powers and their record. bxIntroTape is what
+   it shows, as words (the tests read it) */
+const BX_STAT_WORD = { reach: 'reach', pow: 'power', spd: 'speed', chin: 'chin', sta: 'stamina', gui: 'guile' };
+function bxIntroTape() {
+  const one = f => { const L = f.rec, P = bxPowOn() && BX_POW[f.kind], T = bxTrait(f);
+    return { n: f.n, sub: [f.lvl ? `level ${f.lvl}` : '', T ? T.n : ''].filter(Boolean).join(', '), r: Object.assign({}, f.r),
+      pow: P ? `${P.sp.n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
+  return G.F.map(one);
+}
 function bxDrawIntro(c) {
-  bxPanel(c, 230, 270, 500, 110);
-  const [A, B] = G.F;
-  const tn = f => bxTrait(f) ? ` (${bxTrait(f).n})` : '';
-  txt(c, `${A.n}${tn(A)}  vs  ${B.n}${tn(B)}`, 480, 300, '800 20px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  bxPanel(c, 190, 228, 580, 196);
+  const [A, B] = bxIntroTape(), col = [335, 625], dim = '#b8aa94', F = (w, n) => `${w ? w + ' ' : ''}${n}px "Alegreya Sans", sans-serif`;
+  txt(c, A.n, col[0], 256, F(800, 20), '#ffb0a0', 'center'); txt(c, 'vs', 480, 256, F(700, 14), dim, 'center'); txt(c, B.n, col[1], 256, F(800, 20), '#a8c8ff', 'center');
+  txt(c, A.sub, col[0], 276, F(0, 12), dim, 'center'); txt(c, B.sub, col[1], 276, F(0, 12), dim, 'center');
   BX_STATS.forEach((s, i) => {
     const x = 300 + i * 72;
-    txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
-    txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 346, '700 14px "Alegreya Sans", sans-serif', A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
+    txt(c, BX_STAT_WORD[s], x + 18, 302, F(0, 12), dim, 'center');
+    txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 322, F(700, 14), A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
   });
-  if (G.wait) bxDrawAsk(c, 368);
-  else txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  [['powers', 'pow'], ['record', 'rec']].forEach(([k, f], i) => {
+    const y = 348 + i * 20;
+    txt(c, A[f], col[0], y, F(0, 13), '#e8dcc0', 'center'); txt(c, k, 480, y, F(0, 12), dim, 'center'); txt(c, B[f], col[1], y, F(0, 13), '#e8dcc0', 'center');
+  });
+  if (G.wait) bxDrawAsk(c, 406);
+  else txt(c, `red corner: ${BX_PLAN[G.F[0].plan].n}  ·  blue corner: ${BX_PLAN[G.F[1].plan].n}`, 480, 406, F(0, 12), dim, 'center');
 }
 function bxDrawCorner(c) {
   const n = G.cards.length, sc = G.cards[n - 1], T = bxTotals(), pl = G.plans[G.plans.length - 1];
@@ -26492,7 +26562,7 @@ return {
   totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, rules: Object.assign({}, BX_RULES),
   start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
   get on() { return BXP.on; }, get speed() { return BXP.speed; }, set speed(n) { BXP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
-  pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '',
+  pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '', intro: () => G && G.F ? bxIntroTape() : null, live: () => G && G.F && BD ? bxLive() : null,
   set onOver(f) { BX_HOOK.onOver = f; }, get onOver() { return BX_HOOK.onOver; }, set onSnap(f) { BX_HOOK.onSnap = f; }, set wantSnap(f) { BX_HOOK.wantSnap = f; }, set onEv(f) { BX_HOOK.onEv = f; }, get onEv() { return BX_HOOK.onEv; },
   // save points (phase 5): a snapshot now (between rounds or bouts), and putting one back in the ring
   snapshot: () => BD && G && G.F ? bxSnapshot() : null, resume: sn => { const g = bxResume(sn); bxShow(); return g; }, set onPhase(f) { BX_HOOK.onPhase = f; }, get onPhase() { return BX_HOOK.onPhase; },
@@ -26514,7 +26584,7 @@ return {
   traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],
   // the ratings, plans, punches and judges, for the page and How to play
-  rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
+  rate: kind => bxRate(kind), style: kind => bxStyle(bxRate(kind)), styleOf: r => bxStyle(Object.assign(bxRate('goblin'), r)), staMax: r => bxStaMax(r), kinds: Object.keys(BX_KIND), stats: BX_STATS.slice(),
   plans: Object.fromEntries(BX_PLAN_IDS.map(k => [k, { n: BX_PLAN[k].n, desc: BX_PLAN[k].desc }])),
   punches: Object.fromEntries(BX_PUNCH_IDS.map(k => [k, { n: BX_PUNCH[k].n, head: !!BX_PUNCH[k].head, power: !!BX_PUNCH[k].power }])),
   judges: BX_JUDGES.map(J => ({ n: J.n, likes: J.likes })),
@@ -33155,13 +33225,15 @@ renderHelp = function () {
    ring, in the mode on the bar; between them the bar has Next bout, and at the end the card is settled (bouts won,
    then knockdowns, then points). Your players box on their kinds' ratings for now; with fewer than three of them,
    call-ups make up the card. This exhibition wins and loses nothing and isn't saved; cards from the world (w53) use the
-   same pairing (wRingPairing).
+   same pairing (wRingPairing). Under each bout, the tale of the tape (issue #62: wRingTape): the two fighters side by
+   side, their ratings and most stamina with the better of each pair marked, then their nature, natural style, powers
+   and record.
    Wraps: wRingBarNote (wW52RingBarNote: the card on the bar), wRunAct (wW52RunAct: 'rcard'),
    renderHelp (wW52RenderHelp: the card in How to play). */
 
 // your side: your team in its order, then call-ups if there are fewer than three
 function wRingMine(taken) {
-  const t = wPartyTeam(), out = wRoster().map(p => ({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl }));
+  const t = wPartyTeam(), out = wRoster().map(p => ({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl, pid: p.id, rec: wRingRec(p.id) }));
   for (const f of out) taken.add(f.n);
   for (let i = 0; out.length < wBX.rules.card; i++) { const p = wMakeCallUp(W_RING.home.kinds[i % W_RING.home.kinds.length], taken); out.push({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl, callup: true }); }
   return { name: t.name, short: t.short, color: W_RING.home.color, light: W_RING.home.light, fighters: out };
@@ -33173,6 +33245,41 @@ function wRingTheirs(taken) {
   return { name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.boxing} Club`, short: A.short, color: A.color, light: A.light, fighters };
 }
 const W_RING_STAT = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'Sta', gui: 'Gui' };
+/* ---------- the tale of the tape (issue #62) ---------- */
+const W_RING_TAPE = { reach: ['Reach', 'How far their punches land from'], pow: ['Power', 'How hard they hit'], spd: ['Speed', 'How fast they move and punch'],
+  chin: ['Chin', 'How much they can take'], sta: ['Stamina', 'How long their breath lasts'], gui: ['Guile', 'Reading punches, slipping and timing'] };
+// a player of yours's boxing record this journey, a copy (null for anyone else, or before their first bout)
+function wRingRec(pid) {
+  const L = pid != null && wPlayer(pid) && (WG.bxstats || {})[pid];
+  return L && L.bb ? { bb: L.bb, w: L.w, l: L.l, d: L.d, ko: L.ko, kd: L.kd, down: L.down, landed: L.landed, thrown: L.thrown } : null;
+}
+// what the tape shows of a fighter: ratings, most stamina, nature, natural style, powers, level growth (only for your
+// players on their own ratings) and record
+function wRingTapeOf(f) {
+  const r = Object.assign(wBX.rate(f.kind), f.r || {}), p = f.r && f.pid != null ? wPlayer(f.pid) : null;
+  return { f, r, sta: wBX.staMax(r), T: wBX.traits[f.kind] || null, style: wBX.plans[wBX.styleOf(r)], P: wBX.powerBook[f.kind] || null,
+    got: p && p.bx && p.bx.got || {}, rec: f.rec || wRingRec(f.pid) };
+}
+// a, yours (on the left); b, theirs. The better value of each pair is marked (wbest); level values aren't
+function wRingTape(a, b) {
+  const X = [wRingTapeOf(a), wRingTapeOf(b)], cost = wBX.powerCost, staTop = wBX.staMax({ sta: W_BXG.cap });
+  const who = (t, j) => `<div class="wtn w${'ab'[j]}"><b>${esc(t.f.n)}</b><small>${esc(wKindName(t.f.kind))}${t.f.lvl ? `, level ${t.f.lvl}` : ''}${t.f.callup ? ', call-up' : ''}</small></div>`;
+  const val = (key, label, tip, get, top, plus) => {
+    const v = X.map(get), cell = (t, j) => `<div class="wtv w${'ab'[j]}${v[j] > v[1 - j] ? ' wbest' : ''}" data-tv="${key}"><i style="width:${Math.round(60 * v[j] / top)}%"></i><b>${v[j]}</b>${plus && t.got[key] ? `<small title="From their levels">+${t.got[key]}</small>` : ''}</div>`;
+    return cell(X[0], 0) + `<div class="wtl" title="${esc(tip)}">${label}</div>` + cell(X[1], 1);
+  };
+  const rows = wBX.stats.map(s => val(s, W_RING_TAPE[s][0], W_RING_TAPE[s][1], t => t.r[s], W_BXG.cap, true)).join('')
+    + val('stamax', 'Breath', 'The most stamina they have: punches and powers spend it, and it comes back off the gas', t => t.sta, staTop, false);
+  const rec = (k, label, fn) => X.map((t, j) => `<div class="wtr w${'ab'[j]}" data-tr="${k}">${t.rec ? fn(t.rec) : '&ndash;'}</div>`).join(`<div class="wtl">${label}</div>`);
+  const pct = L => L.thrown ? ` (${Math.round(100 * L.landed / L.thrown)}%)` : '';
+  const words = (k, head, fn) => `<div class="wtsec">${head}</div>` + X.map((t, j) => `<div class="wtt w${'ab'[j]}" data-tt="${k}">${fn(t)}</div>`).join('');
+  const pow = w => t => t.P ? `<b>${esc(t.P[w].n)}</b>. ${esc(t.P[w].desc)}` : '&ndash;';
+  return `<div class="wtape">${who(X[0], 0)}<div></div>${who(X[1], 1)}${rows}
+      ${rec('bouts', 'Bouts', L => `${L.bb}: ${L.w}&ndash;${L.l}${L.d ? `&ndash;${L.d}` : ''}`)}${rec('ko', 'KOs', L => L.ko)}${rec('kd', 'Knockdowns', L => `${L.kd} / ${L.down}`)}${rec('landed', 'Landed', L => `${L.landed} of ${L.thrown}${pct(L)}`)}</div>
+    <div class="wtape2">${words('nature', 'Nature', t => t.T ? `<b>${esc(t.T.n)}</b>. ${esc(t.T.desc)}` : 'None: their kind boxes on its ratings alone.')}
+      ${words('style', 'Natural style', t => `<b>${esc(t.style.n)}</b>. ${esc(t.style.desc)}`)}
+      ${words('sp', `Special <small>(${cost.sp} stamina, once a round)</small>`, pow('sp'))}${words('ult', `Ultimate <small>(${cost.ult} stamina, once a bout)</small>`, pow('ult'))}</div>`;
+}
 /* the pairing: their three in order, and who of yours faces each (your corner's pick to start with). o: { mine,
    theirs, title, intro, go: [[label, value], ...] (the buttons that box it), onGo(picks, value) } */
 function wRingPairing(o) {
@@ -33182,13 +33289,18 @@ function wRingPairing(o) {
   const close = modal(`<header><h3>${esc(o.title)}</h3><button class="ghost" data-close>Not now</button></header>
     <div class="wmsg"><p class="hint">${o.intro}</p>
     <table class="wrcard wrpair" id="wRingPairT">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}<br><small>${rate(f)}</small></td>
-      <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>`).join('')}</table>
+      <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>
+      <tr class="wrtape"><td colspan="4"><details data-tapeat="${i}"${i ? '' : ' open'}><summary>Tale of the tape</summary><div data-tape="${i}"></div></details></td></tr>`).join('')}</table>
     <p class="hint" id="wRingCardWarn"></p></div>
     <div class="row"><button class="ghost" id="wRingCardAuto">Your corner's pick</button>${o.go.map(([l, v], i) => `<button class="${i ? 'ghost' : 'btn'}" data-rgo="${v}"${i ? '' : ' id="wRingCardGo"'}>${esc(l)}</button>`).join('')}</div>`);
   const sel = () => [...$('modalBox').querySelectorAll('[data-rslot]')].map(s => +s.value);
   const sync = () => {
     const p = sel(), dup = new Set(p).size !== p.length;
-    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).innerHTML = rate(mine.fighters[+s.value]);
+    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) {
+      const i = s.dataset.rslot, f = mine.fighters[+s.value];
+      $('modalBox').querySelector(`[data-rrate="${i}"]`).innerHTML = rate(f);
+      $('modalBox').querySelector(`[data-tape="${i}"]`).innerHTML = wRingTape(f, theirs.fighters[+i]);
+    }
     for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.disabled = dup;
     $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
   };
@@ -33251,6 +33363,8 @@ renderHelp = function () {
   wW52RenderHelp();
   const r = $('wHelpRing'), h = $('wRingHow');
   if (r && !/a CARD/.test(r.innerHTML)) r.insertAdjacentHTML('beforeend', ' Or ask for a CARD: three bouts, three of your team against three of theirs.');
+  if (h && !$('wRingHowTape')) h.insertAdjacentHTML('beforeend', `<p class="hint" id="wRingHowTape"><b>The tale of the tape.</b> Before a card, each bout has its tale of the tape: your fighter on the left, theirs on the right. It has their six ratings and their breath (the most stamina they have, which comes from their stamina rating), with the better of each pair marked, and a + for the points their levels have added. Under that are their records (bouts won and lost, knockouts, knockdowns scored and taken, punches landed), their natures, the style they box to when nobody tells them otherwise, and their two powers with what they cost. Everyone starts a bout on 100 health. The ring shows a short version as the fighters touch gloves.</p>`);
+  if (h && !$('wRingHowLive')) h.insertAdjacentHTML('beforeend', `<p class="hint" id="wRingHowLive"><b>During the bout.</b> A card in each top corner of the ring shows that fighter's six ratings (the better of each pair lit in their corner's colour) and their work so far: punches landed of thrown, power punches, punches slipped and blocked, and knockdowns scored. At the top in the middle are the three judges' running totals. During a round they count the round as it stands, and the small line under each says how that judge scores it so far. The judges' own eye can still split a close round at the bell.</p>`);
   if (h && !$('wRingHowCard')) h.insertAdjacentHTML('beforeend', `<p class="hint" id="wRingHowCard"><b>The card.</b> A card is ${wBX.rules.card} bouts, one fighter a bout, and each fighter boxes once. The other club names its order first, and you pick who faces each of theirs; your corner suggests a pairing, sending reach against shorter arms and a good chin against a big hitter. The side that wins more bouts wins the card. Level on bouts, the side that scored more knockdowns wins it, then the side with more points on the judges' cards.</p>`);
 };
 /* w53: boxing from the world (issue #23, phase 5). A card of three bouts against a rival club, or the local side, at
@@ -33320,7 +33434,7 @@ function wBxGrowStat(p) {
   for (const s of open) { r -= K[s]; if (r < 0) return s; }
   return open[open.length - 1];
 }
-function wBxFighter(p) { const b = wBxOf(p); return { n: p.n, kind: p.kind, num: p.num, lvl: p.lvl || 1, pid: p.id == null ? null : p.id, r: Object.fromEntries(wBX.stats.map(s => [s, b[s]])) }; }
+function wBxFighter(p) { const b = wBxOf(p); return { n: p.n, kind: p.kind, num: p.num, lvl: p.lvl || 1, pid: p.id == null ? null : p.id, rec: wRingRec(p.id), r: Object.fromEntries(wBX.stats.map(s => [s, b[s]])) }; }
 
 /* ---------- the two sides ---------- */
 // yours: your team in its order (by roster id), then call-ups at your level to make three

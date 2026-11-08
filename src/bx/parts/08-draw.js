@@ -13,6 +13,10 @@
    a fighter turned to stone (petrified, or under Stone Skin or Rampart) is drawn grey, one that punches pass through is
    faint, and a rooted or webbed one has threads at their feet; under each fighter's plan on the bar, their special (◆)
    and ultimate (★), lit while they can be cast, and the statuses on them.
+   The bout at a glance (issue #62 follow-up): in each top corner under the bar a card with the fighter's six ratings
+   (the better of each pair lit) and their work so far this bout; at the top in the middle the judges' running totals,
+   with the round on now scored as it stands (bxLive: the judges' weights without their own eye, so drawing never
+   draws from the seeded stream; the real card at the bell can differ in a close round).
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -30,10 +34,11 @@ function bxDraw(c) {
   bxDrawRing(c, 'front');
   bxDrawFx(c);
   bxDrawBar(c);
+  if (BD.ph !== 'intro') bxDrawLive(c);
   bxDrawFeed(c);
   if (BD.mode === 'play' && BD.ph === 'round' && bxFrac(G.F[BD.you]) < .25) {
     c.save(); c.globalAlpha = .65 + .35 * Math.sin(BXT.t * 6);
-    txt(c, 'Tired: ease off and get your breath back', 480, 118, '800 16px "Alegreya Sans", sans-serif', '#5ab8d8', 'center'); c.restore();
+    txt(c, 'Tired: ease off and get your breath back', 480, 226, '800 16px "Alegreya Sans", sans-serif', '#5ab8d8', 'center'); c.restore();
   }
   if (BD.ph === 'kd') bxDrawCount(c);
   if (BD.ph === 'intro') bxDrawIntro(c);
@@ -145,7 +150,7 @@ function bxDrawFx(c) {
   if (BXT.cast && BXT.t - BXT.cast.t < 1.4) {
     const C = BXT.cast, a = Math.min(1, (1.4 - (BXT.t - C.t)) * 2), col = G.corners[C.side].color;
     c.save(); c.globalAlpha = a; c.font = `900 ${C.ult ? 30 : 24}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.lineWidth = 6; c.strokeStyle = '#17100e';
-    const y = 142 - (BXT.t - C.t) * 6; c.strokeText(C.n.toUpperCase(), 480, y); c.fillStyle = col; c.fillText(C.n.toUpperCase(), 480, y);
+    const y = 188 - (BXT.t - C.t) * 6; c.strokeText(C.n.toUpperCase(), 480, y); c.fillStyle = col; c.fillText(C.n.toUpperCase(), 480, y);
     if (C.ult) { c.font = '800 12px "Alegreya Sans", sans-serif'; c.lineWidth = 4; c.strokeText('ULTIMATE', 480, y + 16); c.fillStyle = '#ffd24a'; c.fillText('ULTIMATE', 480, y + 16); }
     c.restore();
   }
@@ -184,6 +189,42 @@ function bxDrawBar(c) {
   txt(c, BD.ph === 'intro' ? `0:${String(BX_RULES.secs).padStart(2, '0')}` : `0:${String(Math.ceil(G.clock)).padStart(2, '0')}`, 480, 60, '800 30px "Alegreya Sans", sans-serif', live ? '#fff4dc' : '#8a7c68', 'center');
   txt(c, { intro: 'Touch gloves', round: '', kd: 'Knockdown', rise: 'Box on', corner: 'Between rounds', over: '' }[BD.ph], 480, 80, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
+/* the bout at a glance: each fighter's ratings and work this bout (rounds done and the round on now), and each judge's
+   totals with the round on now as it stands. round is null between rounds and at the end */
+function bxLive() {
+  const work = G.F.map(f => { const s = Object.assign({}, f.bs); for (const k in f.rs) s[k] = (s[k] || 0) + f.rs[k]; return s; });
+  const live = BD.ph === 'round' || BD.ph === 'kd' || BD.ph === 'rise', T = bxTotals(), [a, b] = G.F.map(f => f.rs);
+  const lean = live ? bxRoundScore(BX_JUDGES.map(J => { const v = s => Object.keys(J.w).reduce((n, k) => n + J.w[k] * s[k], 0); return Math.round((v(a) - v(b)) * 10) / 10; })) : null;
+  return {
+    F: G.F.map((f, i) => ({ r: Object.assign({}, f.r), landed: work[i].landed, thrown: work[i].thrown, power: work[i].power, slips: work[i].slips, blocks: work[i].blocks, kd: G.kd[1 - i] })),
+    judges: BX_JUDGES.map((J, j) => ({ n: J.n, likes: J.likes, total: lean ? [T[j][0] + lean[j][0], T[j][1] + lean[j][1]] : T[j].slice(), round: lean ? lean[j] : null })),
+  };
+}
+const BX_STAT_AB = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'Sta', gui: 'Gui' };
+function bxDrawLive(c) {
+  const L = bxLive(), col = ['#ffb0a0', '#a8c8ff'], dim = '#b8aa94', F = (w, n) => `${w ? w + ' ' : ''}${n}px "Alegreya Sans", sans-serif`;
+  // the fighters' cards
+  L.F.forEach((X, i) => {
+    const O = L.F[1 - i], x = i ? 792 : 8, al = i ? 'right' : 'left', tx = i ? x + 152 : x + 8;
+    c.save(); c.globalAlpha = .88; bxPanel(c, x, 96, 160, 124); c.restore();
+    c.fillStyle = G.corners[i].color; c.fillRect(i ? x + 157 : x, 100, 3, 116);
+    BX_STATS.forEach((s, k) => {
+      const cx = x + 10 + (k % 3) * 50, cy = 114 + Math.floor(k / 3) * 18;
+      txt(c, BX_STAT_AB[s], cx, cy, F(0, 11), dim); txt(c, String(X.r[s]), cx + 26, cy, F(700, 13), X.r[s] > O.r[s] ? col[i] : '#e8dcc0');
+    });
+    const pct = X.thrown ? ` (${Math.round(100 * X.landed / X.thrown)}%)` : '';
+    [`Landed ${X.landed} of ${X.thrown}${pct}`, `Power punches ${X.power}`, `Slipped ${X.slips} · blocked ${X.blocks}`, `Knockdowns ${X.kd}`]
+      .forEach((t, k) => txt(c, t, tx, 160 + k * 15, F(0, 12), '#e8dcc0', al));
+  });
+  // the judges
+  c.save(); c.globalAlpha = .82; bxPanel(c, 340, 94, 280, L.judges[0].round ? 54 : 40); c.restore();
+  L.judges.forEach((J, j) => {
+    const x = 387 + j * 93, [p, q] = J.total, lead = p > q ? col[0] : q > p ? col[1] : '#e8dcc0';
+    txt(c, J.n, x, 108, F(700, 11), dim, 'center');
+    txt(c, `${p}-${q}`, x, 126, F(800, 15), lead, 'center');
+    if (J.round) txt(c, `round ${J.round[0]}-${J.round[1]}`, x, 141, F(0, 10), dim, 'center');
+  });
+}
 function bxDrawFeed(c) {
   const L = G.log.slice(-3);
   L.forEach((l, i) => txt(c, l.msg, 480, 548 + i * 17, `${l.big ? '700 ' : ''}14px "Alegreya Sans", sans-serif`, i === L.length - 1 ? '#f4ead8' : 'rgba(220,206,184,.6)', 'center'));
@@ -193,18 +234,32 @@ function bxDrawCount(c) {
   txt(c, String(BD.count), p.x, p.y - 70, '900 54px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, w, h, 8); c.fill(); c.strokeStyle = 'rgba(255,208,160,.25)'; c.lineWidth = 1; c.stroke(); }
+/* the tale of the tape, short (issue #62): each fighter's name, level and nature in their own column, the six ratings
+   side by side (the better of each pair in its corner's colour), their powers and their record. bxIntroTape is what
+   it shows, as words (the tests read it) */
+const BX_STAT_WORD = { reach: 'reach', pow: 'power', spd: 'speed', chin: 'chin', sta: 'stamina', gui: 'guile' };
+function bxIntroTape() {
+  const one = f => { const L = f.rec, P = bxPowOn() && BX_POW[f.kind], T = bxTrait(f);
+    return { n: f.n, sub: [f.lvl ? `level ${f.lvl}` : '', T ? T.n : ''].filter(Boolean).join(', '), r: Object.assign({}, f.r),
+      pow: P ? `${P.sp.n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
+  return G.F.map(one);
+}
 function bxDrawIntro(c) {
-  bxPanel(c, 230, 270, 500, 110);
-  const [A, B] = G.F;
-  const tn = f => bxTrait(f) ? ` (${bxTrait(f).n})` : '';
-  txt(c, `${A.n}${tn(A)}  vs  ${B.n}${tn(B)}`, 480, 300, '800 20px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  bxPanel(c, 190, 228, 580, 196);
+  const [A, B] = bxIntroTape(), col = [335, 625], dim = '#b8aa94', F = (w, n) => `${w ? w + ' ' : ''}${n}px "Alegreya Sans", sans-serif`;
+  txt(c, A.n, col[0], 256, F(800, 20), '#ffb0a0', 'center'); txt(c, 'vs', 480, 256, F(700, 14), dim, 'center'); txt(c, B.n, col[1], 256, F(800, 20), '#a8c8ff', 'center');
+  txt(c, A.sub, col[0], 276, F(0, 12), dim, 'center'); txt(c, B.sub, col[1], 276, F(0, 12), dim, 'center');
   BX_STATS.forEach((s, i) => {
     const x = 300 + i * 72;
-    txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
-    txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 346, '700 14px "Alegreya Sans", sans-serif', A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
+    txt(c, BX_STAT_WORD[s], x + 18, 302, F(0, 12), dim, 'center');
+    txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 322, F(700, 14), A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
   });
-  if (G.wait) bxDrawAsk(c, 368);
-  else txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  [['powers', 'pow'], ['record', 'rec']].forEach(([k, f], i) => {
+    const y = 348 + i * 20;
+    txt(c, A[f], col[0], y, F(0, 13), '#e8dcc0', 'center'); txt(c, k, 480, y, F(0, 12), dim, 'center'); txt(c, B[f], col[1], y, F(0, 13), '#e8dcc0', 'center');
+  });
+  if (G.wait) bxDrawAsk(c, 406);
+  else txt(c, `red corner: ${BX_PLAN[G.F[0].plan].n}  ·  blue corner: ${BX_PLAN[G.F[1].plan].n}`, 480, 406, F(0, 12), dim, 'center');
 }
 function bxDrawCorner(c) {
   const n = G.cards.length, sc = G.cards[n - 1], T = bxTotals(), pl = G.plans[G.plans.length - 1];
