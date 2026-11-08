@@ -48,7 +48,10 @@ async def main():
           R1 = run(days.lean); out.lean = R1.deck.filter(c => c.id === 'check').length === b0.checks - 2;
           R1 = run(days.glass); out.glass = R1.maxhp === b0.hp - 15 && R1.deck.length === b0.deck + 1 && CARDS[R1.deck[R1.deck.length - 1].id].rar === 'r';
           R1 = run(days.iron); out.iron = R1.maxhp === b0.hp + 15 && R1.hp === R1.maxhp && R1.deck.some(c => c.id === 'penalty');
-          R1 = run(days.scouted); out.scouted = R1.party.every(p => R1.deck.find(c => c.id === SIG[p.kind]).up);
+          R1 = run(days.scouted); out.scouted = R1.party.filter(p => R1.deck.find(c => c.id === SIG[p.kind]).up).length === 1;
+          // the bots' twist in place of the day's: the same club and line, the other twist, or none
+          const D0 = dailyOf(days.purse), Dn = dailyOf(days.purse, 'none'), Dl = dailyOf(days.purse, 'lean');
+          out.forced = Dn.club === D0.club && JSON.stringify(Dn.line) === JSON.stringify(D0.line) && Dn.twist === 'none' && Dl.twist === 'lean' && (() => { newDailyRun(days.purse, 'none'); return RUN.gold !== 250 && RUN.club === D0.club; })();
           R1 = run(days.medicine); out.medicine = R1.tonics.every(t => t);
           R1 = run(days.free); out.free = R1.club === 'free' && R1.relics.length >= 1;
           const snap = k => { newDailyRun(k); return JSON.stringify([RUN.seed, RUN.diff, RUN.party, RUN.map.nodes, RUN.deck.map(c => c.id + c.up), RUN.relics, RUN.tonics, RUN.gold, RUN.maxhp]); };
@@ -62,6 +65,7 @@ async def main():
         })""", days)
         for t in ['purse', 'heirloom', 'lean', 'glass', 'iron', 'scouted', 'medicine', 'free']:
             check(r[t], f'the {t} twist does what it says')
+        check(r['forced'], "the bots' twist override keeps the day's club and line, and 'none' plays it plain")
         check(r['twice'], "a day's run is the same every time (line, map, deck, trophies, tonics, gold, HP)")
         check(r['diffSet'] == 3, "the run is played at the day's difficulty", r['diffSet'])
         check(r['untouched'], "working out a day's game never moves the live run's or fight's streams")
