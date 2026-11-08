@@ -34,7 +34,8 @@ function bxCardStart(opts) {
   const fine = (L, n) => Array.isArray(L) && L.length === N && new Set(L).size === N && L.every(i => Number.isInteger(i) && i >= 0 && i < n);
   const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
   const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
-  CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null };
+  CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null,
+    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] };
   bxCardBout();
   return CD;
 }
@@ -42,13 +43,16 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}] });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
 // a bout on the card is over (from bxOver): what the card keeps of it; the last one settles the card
 function bxCardRecord() {
-  const v = G.over; CD.bouts[CD.i] = { over: { how: v.how, win: v.win, kind: v.kind || null, round: v.round, kd: v.kd.slice(), pts: v.pts.slice() }, verdict: bxVerdict(), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice() };
+  const v = G.over;
+  // the bags as this bout left them, for the next (13-kit.js)
+  CD.bags = JSON.parse(JSON.stringify(G.bags || [{}, {}])); CD.pots = (CD.pots || []).concat((G.pots || []).map(p => Object.assign({ b: CD.i }, p)));
+  CD.bouts[CD.i] = { over: { how: v.how, win: v.win, kind: v.kind || null, round: v.round, kd: v.kd.slice(), pts: v.pts.slice() }, verdict: bxVerdict(), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice() };
   if (CD.bouts.length === CD.pairs.length) CD.result = bxCardResult(CD.bouts.map(b => b.over));
 }
 function bxCardNext() {
@@ -70,8 +74,9 @@ function bxSimCard(opts) {
     const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
-    const bouts = pairs.map((p, i) => bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers }));
-    return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)) };
+    let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}]));
+    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags }); bags = b.bags; return b; });
+    return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)), bags };
   } finally { CD = keep; }
 }
 // the card in words: "The card goes to the Cinderhold Boxing Club, 2 bouts to 1", "... on knockdowns", "The card is a draw"

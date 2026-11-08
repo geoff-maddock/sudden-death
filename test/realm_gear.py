@@ -88,8 +88,9 @@ async def main():
         check(r == {'ring': 't_guard', 'grid': 't_cleats'}, 'what each player wears is kept in the save', r)
 
         # ---- the match bag ----
-        r = await pg.evaluate("(() => { wAddItem('draught', 2); return { grid: wMatchBag('grid').map(x => [x.id, x.n]), ring: wMatchBag('ring') }; })()")
-        check(['draught', 2] in r['grid'] and r['ring'] == [], 'the match bag lists the potions you have for that sport', r)
+        r = await pg.evaluate("""(() => { wAddItem('draught', 2); wPotionAdd('t_grip', { sport: 'grid' }); DB.items.t_grip = { name: 'Test Grip', desc: '' }; wAddItem('t_grip', 1);
+          return { grid: wMatchBag('grid').map(x => [x.id, x.n]), ring: wMatchBag('ring').map(x => x.id) }; })()""")
+        check(['draught', 2] in r['grid'] and ['t_grip', 1] in r['grid'] and 't_grip' not in r['ring'], "the match bag lists the potions you have for that sport, and not another sport's", r)
 
         # ---- on screen: the Bag's Put gear on, the stats card's Take off ----
         await pg.evaluate("wOpenCamp('bag')")

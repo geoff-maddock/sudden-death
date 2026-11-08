@@ -16,7 +16,9 @@ return {
   // yours, what your corner would do while the bout waits for you ({ plan, patch, why }, or null), your plan, the
   // cut-man, and the keys or buttons ({ steer, guard, act })
   setMode: m => bxSetMode(m), get mode() { return BD ? BD.mode : null; }, get you() { return BD ? BD.you : 0; }, get wait() { return G && G.wait ? Object.assign({}, G.wait) : null; },
-  call: plan => bxCall(plan), patch: () => bxPatch(), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
+  call: plan => bxCall(plan), patch: () => bxPatch(),
+  // gear and potions (issue #61, phase 2: 13-kit.js): a potion from your bag in the corner, what each does, a side's bag now
+  potion: id => bxPotion(id), potionOk: id => !!BD && bxPotionOk(BD.you, id), potions: JSON.parse(JSON.stringify(BX_POTIONS)), bag: side => bxBagOf(side == null ? (BD ? BD.you : 0) : side), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
   // the card (phase 3): a card in the ring ({ sides, picks, order, mode, you, seed }), the next bout on it, the card as
   // it stands (a copy), the score so far, the corner's pairing, and a whole card headless
   cardStart: o => { const c = bxCardStart(o); return JSON.parse(JSON.stringify(c)); }, cardNext: () => bxCardNext(),

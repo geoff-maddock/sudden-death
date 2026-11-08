@@ -25163,6 +25163,8 @@ function bxFighter(p, side) {
   const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = bxStaMax(r), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
   return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
+    // gear (13-kit.js): its name, and what it does beyond the ratings (already laid on r)
+    gear: p.gear && p.gear.name ? p.gear.name : null, gx: p.gear && p.gear.fx ? JSON.parse(JSON.stringify(Object.assign({}, p.gear.fx, { r: undefined }))) : null,
     a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false,
     rs: bxStatsZero(), bs: bxStatsZero() };
 }
@@ -25284,9 +25286,11 @@ function bxLand(a, b, k) {
   if (blocked) { dmg *= (P.power ? BX_GUARD.power : BX_GUARD.head) * (Fb.leaky ? 2 : 1); b.rs.def += .5; b.rs.blocks++; }
   else { a.rs.landed++; if (P.power) a.rs.power++; }
   dmg *= (.85 + R() * .3) * Fa.dmgOut * Fb.dmgIn;
+  // gear (13-kit.js): hand wraps hit harder; a mouthguard takes some off a head punch
+  const Ga = bxGx(a), Gb = bxGx(b); if (Ga.dmg) dmg *= Ga.dmg; if (P.head && Gb.headIn) dmg *= Gb.headIn;
   if (Fb.rampart) dmg *= .5;
   if (!blocked && P.power && Fa.nextMul !== 1) { dmg *= Fa.nextMul; a.fx = a.fx.filter(s => s.nextMul == null); }
-  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1));
+  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1) * (Ga.cut || 1));
   if (P.drain && !Tb.hollow) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
   bxHurt(a, b, dmg, !blocked);
@@ -25465,7 +25469,10 @@ function bxStart(opts) {
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
-  Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0 });
+  Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0,
+    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] });
+  // gear with a status at the opening bell (13-kit.js)
+  for (const f of G.F) { const op = bxGx(f).open; if (op) f.fx.push(Object.assign({ id: 'g_open' }, op)); }
   BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
   G.wait = null; bxInputClear();
   bxCornerSpots();
@@ -25524,7 +25531,9 @@ function bxDown() {
   bxLog(`${f.n} is down!`, true);
   if (bxKnockdown(s) === 'tko') { bxLog(`Three knockdowns: the referee stops it.`, true); bxOver(); return; }
   const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
-  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0), 2, BX_RULES.count); BD.count = 1;
+  // gear's seconds off the count, and smelling salts (once: 13-kit.js)
+  const quick = (bxGx(f).rise || 0) + (f.salts || 0); if (f.salts) { f.salts = 0; bxLog(`The smelling salts clear ${f.n}'s head.`); }
+  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0) - quick, 2, BX_RULES.count); BD.count = 1;
   // Rebirth (a superstar's nature): once a bout, a count it would not beat, it beats at nine, and rises with most of its health
   if (BD.getUp >= BX_RULES.count && (bxTrait(f) || {}).reborn && !f.reborn) { f.reborn = 1; BD.getUp = BX_RULES.count - 1; }
   bxPh('kd');
@@ -25565,6 +25574,8 @@ function bxCorner() {
   G.plans.push(G.F.map(f => f.plan));
   bxCornerSpots();
   bxPh('corner');
+  // the CPU corners' potions (13-kit.js), now that the break has begun
+  for (const f of G.F) if (!(bxYourCorner() && f.side === BD.you)) bxCornerPotion(f);
   if (bxYourCorner()) bxAsk();
   bxSnapNow();
 }
@@ -25572,7 +25583,7 @@ function bxCorner() {
 const bxYourCorner = () => !!BD && BD.mode !== 'watch' && !BD.headless;
 function bxAsk() {
   const f = G.F[BD.you], c = bxCornerCpu(f);
-  G.wait = { plan: c.plan, patch: c.patch && G.cards.length > 0 && f.patched !== G.round, why: c.why };
+  G.wait = { plan: c.plan, patch: c.patch && G.cards.length > 0 && f.patched !== G.round, why: c.why, pot: BD.ph === 'corner' ? bxPotionAdvice(f) : null };
   G.plans[G.plans.length - 1][BD.you] = f.plan;
   if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
 }
@@ -25597,7 +25608,7 @@ function bxPatch() {
 function bxSetMode(m) {
   if (!BD || !BX_MODES.includes(m) || BD.headless) return;
   BD.mode = m; if (CD) CD.mode = m; bxInputClear();
-  if (m === 'watch' && G.wait) { const w = G.wait; if (w.patch) bxPatch(); bxCall(w.plan); }
+  if (m === 'watch' && G.wait) { const w = G.wait; if (w.patch) bxPatch(); if (w.pot) bxPotion(w.pot.id); bxCall(w.plan); }
   // (asked once a break: not again if you've already called it)
   else if (m !== 'watch' && !G.wait && (BD.ph === 'intro' || BD.ph === 'corner') && G.called !== BD.ph + G.round) bxAsk();
 }
@@ -25614,7 +25625,8 @@ function bxVerdict(over) {
 function bxSummary() {
   return { over: Object.assign({}, G.over), verdict: bxVerdict(), cards: JSON.parse(JSON.stringify(G.cards)), totals: bxTotals(), work: G.work.slice(),
     rounds: JSON.parse(JSON.stringify(G.rstats)), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice(), plans: JSON.parse(JSON.stringify(G.plans)),
-    fighters: G.F.map(f => ({ n: f.n, kind: f.kind, style: f.style, hp: Math.round(f.hp), hpMax: Math.round(f.hpMax) })), secs: Math.round(G.secs * 10) / 10, log: G.log.slice() };
+    fighters: G.F.map(f => ({ n: f.n, kind: f.kind, style: f.style, hp: Math.round(f.hp), hpMax: Math.round(f.hpMax) })), secs: Math.round(G.secs * 10) / 10, log: G.log.slice(),
+    bags: JSON.parse(JSON.stringify(G.bags || [{}, {}])), pots: (G.pots || []).slice() };
 }
 /* a whole bout headless and silent, seeded; the bout on the page (if any) is left as it was */
 function bxSimBout(opts) {
@@ -25758,7 +25770,7 @@ function bxDrawFighter(c, f, o) {
 // while the bout waits for your corner: what they'd do, and why
 function bxDrawAsk(c, y) {
   if (!G.wait) return;
-  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
+  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}${G.wait.pot && BX_POTIONS[G.wait.pot.id] ? `, and the ${BX_POTIONS[G.wait.pot.id].n}` : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 // words for what lands: drained from BXE
 // (the words come from Math.random, never the engine's seeded R: drawing must not change how a seeded bout goes)
@@ -25994,7 +26006,8 @@ function bxCardStart(opts) {
   const fine = (L, n) => Array.isArray(L) && L.length === N && new Set(L).size === N && L.every(i => Number.isInteger(i) && i >= 0 && i < n);
   const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
   const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
-  CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null };
+  CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null,
+    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] };
   bxCardBout();
   return CD;
 }
@@ -26002,13 +26015,16 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}] });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
 // a bout on the card is over (from bxOver): what the card keeps of it; the last one settles the card
 function bxCardRecord() {
-  const v = G.over; CD.bouts[CD.i] = { over: { how: v.how, win: v.win, kind: v.kind || null, round: v.round, kd: v.kd.slice(), pts: v.pts.slice() }, verdict: bxVerdict(), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice() };
+  const v = G.over;
+  // the bags as this bout left them, for the next (13-kit.js)
+  CD.bags = JSON.parse(JSON.stringify(G.bags || [{}, {}])); CD.pots = (CD.pots || []).concat((G.pots || []).map(p => Object.assign({ b: CD.i }, p)));
+  CD.bouts[CD.i] = { over: { how: v.how, win: v.win, kind: v.kind || null, round: v.round, kd: v.kd.slice(), pts: v.pts.slice() }, verdict: bxVerdict(), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice() };
   if (CD.bouts.length === CD.pairs.length) CD.result = bxCardResult(CD.bouts.map(b => b.over));
 }
 function bxCardNext() {
@@ -26030,8 +26046,9 @@ function bxSimCard(opts) {
     const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
-    const bouts = pairs.map((p, i) => bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers }));
-    return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)) };
+    let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}]));
+    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags }); bags = b.bags; return b; });
+    return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)), bags };
   } finally { CD = keep; }
 }
 // the card in words: "The card goes to the Cinderhold Boxing Club, 2 bouts to 1", "... on knockdowns", "The card is a draw"
@@ -26213,6 +26230,76 @@ function bxSnapNow() {
   if (!BD || BD.headless || !BX_HOOK.onSnap || (BX_HOOK.wantSnap && !BX_HOOK.wantSnap())) return;
   BX_HOOK.onSnap(bxSnapshot());
 }
+/* The Anvil Ring: gear and potions (issue #61, phase 2). The engine's side; the Realm's is src/realm/w73-ringkit.js.
+   Gear: a fighter may wear one piece (from { gear: { id, name, fx } } on the fighter it is given; fx.r is laid on the
+   ratings before the engine sees them). The engine reads the rest of fx (f.gx):
+     dmg: damage out ×, cut: what their power punches take off the other fighter's most health ×, headIn: head
+     punches to them ×, rise: seconds off every count, open: a status at the opening bell ({ t, acc?, dmgIn?, ... }).
+   Potions: each side brings a bag ({ id: n }; G.bags, CD.bags on a card, so what is used in one bout is gone for the
+   next). Between rounds, one a round, in the corner: yours with bxPotion (it waits for your call), theirs by the CPU
+   corner at its skill (bxCornerPotion: the best of what suits the moment; a Squire picks worse and later). Every use
+   goes in the log with its reason. BX_POTIONS: what each one does, all through the fighter's statuses or a number on
+   the fighter, so it is all plain data and saved with the bout. */
+const BX_POTIONS = {
+  draught: { n: 'Stamina Draught', desc: 'Full breath now, and breath comes back faster for the first 15 seconds of the round.' },
+  cutsalve: { n: 'Cut Salve', desc: 'Closes the cuts: 15 back on their most health, and 10 health.' },
+  smellsalts: { n: 'Smelling Salts', desc: 'The next count this bout, they beat it 3 seconds sooner.' },
+  ragetonic: { n: 'Rage Tonic', desc: 'For the next round, 20% more damage, and 15% more taken.' },
+};
+const BX_GX0 = Object.freeze({});
+const BX_DRAUGHT = { t: 15, reg: 1.5 }; // the draught's faster breath: for t seconds, reg more a second (40 s at 2.5 cost a tier-3 card 14 points: test/realm_ring_kit.py's notes)
+const bxGx = f => f.gx || BX_GX0;
+// a potion now: on f, for the round to come
+function bxPotionApply(f, id) {
+  if (id === 'draught') { f.sta = f.staMax; f.fx.push({ id: 'p_draught', t: BX_DRAUGHT.t, regSta: BX_DRAUGHT.reg }); }
+  else if (id === 'cutsalve') { f.hpMax = Math.min(BX_HP, f.hpMax + 15); f.hp = Math.round(Math.min(f.hpMax, f.hp + 10)); }
+  else if (id === 'smellsalts') f.salts = 3;
+  else if (id === 'ragetonic') f.fx.push({ id: 'p_rage', t: BX_RULES.secs, dmgOut: 1.2, dmgIn: 1.15 });
+}
+// whether side s may take a potion now: in the corner, one a round, from what is left in its bag
+function bxPotionOk(s, id) {
+  const f = G && G.F && G.F[s], bag = G && G.bags && G.bags[s];
+  if (!f || !BX_POTIONS[id] || !bag || !(bag[id] > 0)) return false;
+  return BD && BD.ph === 'corner' && f.potRound !== G.round;
+}
+function bxPotionUse(s, id, why) {
+  if (!bxPotionOk(s, id)) return false;
+  const f = G.F[s];
+  G.bags[s][id]--; f.potRound = G.round; (G.pots = G.pots || []).push({ s, id, r: G.round });
+  bxPotionApply(f, id);
+  bxLog(`${G.corners[s].name}'s corner gives ${f.n} ${/^[aeiou]/i.test(BX_POTIONS[id].n) ? 'an' : 'a'} ${BX_POTIONS[id].n}${why ? `: ${why}` : ''}.`);
+  return true;
+}
+// your potion, while the bout waits for your call between rounds
+function bxPotion(id) {
+  if (!G || !G.wait || !bxPotionOk(BD.you, id)) return false;
+  bxPotionUse(BD.you, id, '');
+  G.wait.pot = null;
+  if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
+  return true;
+}
+/* what suits the moment: [{ id, v (how much it would help), why }], best first */
+function bxPotionNeeds(f) {
+  const bag = (G.bags && G.bags[f.side]) || {}, T = bxTotals(), last = G.round === G.rounds;
+  const lead = T.reduce((n, t) => n + Math.sign(f.side ? t[1] - t[0] : t[0] - t[1]), 0), o = G.F[1 - f.side], out = [];
+  const has = id => bag[id] > 0;
+  if (has('cutsalve') && f.hpMax < 80) out.push({ id: 'cutsalve', v: (BX_HP - f.hpMax) / 6, why: `cut up, their most health down to ${Math.round(f.hpMax)}` });
+  if (has('smellsalts') && !f.salts && (G.kd[f.side] > 0 || f.hp < f.hpMax * .5)) out.push({ id: 'smellsalts', v: 3 + G.kd[f.side] * 2, why: G.kd[f.side] ? 'they have been down already' : 'hurt, and a knockdown could come' });
+  if (has('ragetonic') && G.cards.length && (last ? lead <= 0 : lead < 0) && f.hp > f.hpMax * .5) out.push({ id: 'ragetonic', v: last ? 6 : 3, why: last ? 'behind or level going into the last round' : 'behind on the cards' });
+  if (has('draught') && f.staMax < 115 && (f.plan === 'press' || o.plan === 'press' || bxFrac(f) < .9)) out.push({ id: 'draught', v: 2 + (115 - f.staMax) / 15, why: 'short of breath for the round to come' });
+  return out.sort((a, b) => b.v - a.v);
+}
+// the CPU corner's potion: a Knight or Archmage takes the best when it is worth it; a Squire, now and then, whatever is first in the bag
+function bxCornerPotion(f) {
+  const skill = G.skill ? G.skill[f.side] : 1, bag = (G.bags && G.bags[f.side]) || {};
+  if (skill === 0) { const any = Object.keys(bag).filter(id => bag[id] > 0 && BX_POTIONS[id]); if (any.length && R() < .35) bxPotionUse(f.side, any[0], 'their corner reaches for the bag'); return; }
+  const N = bxPotionNeeds(f), top = N[0];
+  if (top && top.v >= (skill === 2 ? 3 : 4.5)) bxPotionUse(f.side, top.id, top.why);
+}
+// what your corner would give, for the call (the Knight's choice)
+function bxPotionAdvice(f) { const top = bxPotionNeeds(f)[0]; return top && top.v >= 3 ? { id: top.id, why: top.why } : null; }
+// a side's bag, and what each potion does (for the page)
+function bxBagOf(s) { return G && G.bags && G.bags[s] ? Object.assign({}, G.bags[s]) : {}; }
 /* The Anvil Ring's superstars (issue #24, phase 2), inside the wBX scope: each superstar's ratings, nature and powers,
    added to the engine's own tables after its parts load. Plain assignments, nothing declared. A superstar is never
    picked for a CPU side by kind (the Realm only ever sends one as your own player).
@@ -26570,7 +26657,9 @@ return {
   // yours, what your corner would do while the bout waits for you ({ plan, patch, why }, or null), your plan, the
   // cut-man, and the keys or buttons ({ steer, guard, act })
   setMode: m => bxSetMode(m), get mode() { return BD ? BD.mode : null; }, get you() { return BD ? BD.you : 0; }, get wait() { return G && G.wait ? Object.assign({}, G.wait) : null; },
-  call: plan => bxCall(plan), patch: () => bxPatch(), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
+  call: plan => bxCall(plan), patch: () => bxPatch(),
+  // gear and potions (issue #61, phase 2: 13-kit.js): a potion from your bag in the corner, what each does, a side's bag now
+  potion: id => bxPotion(id), potionOk: id => !!BD && bxPotionOk(BD.you, id), potions: JSON.parse(JSON.stringify(BX_POTIONS)), bag: side => bxBagOf(side == null ? (BD ? BD.you : 0) : side), input: o => bxInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BXI)); }, buffer: BX_BUFFER,
   // the card (phase 3): a card in the ring ({ sides, picks, order, mode, you, seed }), the next bout on it, the card as
   // it stands (a copy), the score so far, the corner's pairing, and a whole card headless
   cardStart: o => { const c = bxCardStart(o); return JSON.parse(JSON.stringify(c)); }, cardNext: () => bxCardNext(),
@@ -35899,7 +35988,7 @@ renderHelp = function () {
    the engine's ratings ({ pow: 1 }); phases 2 and 3 add the effects only one sport has (cuts, fumbles...), read by the
    engines from the fighter's or player's gear. Every piece is also an item (DB.items[id], with gear: sport), so shops,
    chests and the Bag carry it like anything else; while a player wears it, it is out of the bag.
-   W_POTIONS: id -> { sport, ... }: the potions each sport uses in a match (football's two from w48; boxing's in phase 2).
+   W_POTIONS: id -> { sport (or sports: [...]), ... }: the potions each sport uses in a match (football's two from w48; boxing's in phase 2).
    wMatchBag(sport) lists the ones in your bag.
 
    State: p.gear = { ring?: id, grid?: id } on a roster player (plain JSON, in the save). A released player's gear goes
@@ -35922,6 +36011,8 @@ function wGearAdd(id, def) {
   return def;
 }
 function wPotionAdd(id, def) { W_POTIONS[id] = def; return def; }
+// the sports a potion is for (sport, or sports when it serves more than one)
+const wPotionSports = id => { const P = W_POTIONS[id]; return P ? P.sports || [P.sport] : []; };
 // football's potions, from w48
 for (const id of Object.keys(W_GF_POTIONS)) wPotionAdd(id, Object.assign({ sport: 'grid' }, W_GF_POTIONS[id]));
 
@@ -35992,7 +36083,7 @@ wSevenPlayer = function (p) {
 // the potions in your bag that this sport uses in a match: [{ id, n, name, desc }]
 function wMatchBag(sport) {
   if (!WG || !WG.items) return [];
-  return Object.keys(W_POTIONS).filter(id => W_POTIONS[id].sport === sport && (WG.items[id] || 0) > 0 && DB.items[id])
+  return Object.keys(W_POTIONS).filter(id => wPotionSports(id).includes(sport) && (WG.items[id] || 0) > 0 && DB.items[id])
     .map(id => ({ id, n: WG.items[id], name: DB.items[id].name, desc: DB.items[id].desc }));
 }
 
@@ -36040,6 +36131,145 @@ renderHelp = function () {
   wW72RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGear')) return;
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Boxers and football players can wear one piece of gear each in their sport: one for boxing and one for football. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
+};
+/* w73: boxing gear and potions (issue #61, phase 2), end to end. The engine's side is src/bx/parts/13-kit.js; the
+   plumbing (W_GEAR, W_POTIONS, slots, the Bag) is w72.
+   Gear (W_RING_GEAR, one piece a boxer): Hand Wraps, a Mouthguard and Lucky Trunks from the Cinderhold store; Weighted
+   Gloves and the Ember Robe from chests; the Anvil Belt's prize adds the first piece you don't have yet.
+   Potions (one a round, in the corner between rounds): the Stamina Draught (football's too), Cut Salve and Smelling
+   Salts in every general store, the Rage Tonic in Cinderhold's. In Play and Manage your bag goes to the corner and you
+   give them from the ring bar (your corner says which, and why); Simulate leaves your bag alone. The other side's corner
+   brings W_RING_KIT.opp[tier] and uses it at its skill. Every use is in the bout's log, with its reason. What your
+   corner used comes out of your bag when the card is settled (so a reload back to a corner gives a potion back to the
+   card and the bag alike), and the pairing says what each corner brings.
+   Wraps: wStartRing (wW73StartRing: the pairing's club and tier), wRingGo (wW73RingGo: the bags), wRingSettle
+   (wW73RingSettle: the bag), wRingPairing (wW73RingPairing: the bags in words), wRingTape (wW73RingTape: gear on the
+   tape), wRingBarNote (wW73RingBarNote: the potions in the corner), wBcupWon (wW73BcupWon: the Belt's gear),
+   renderHelp (wW73RenderHelp: #wHelpRingKit); and wBX.cardStart and wBX.simCard (the bags go in). */
+
+const W_RING_GEAR = {
+  bx_wraps: { sport: 'ring', name: 'Hand Wraps', price: 60, desc: 'Their punches hit 8% harder and cut deeper: their power punches take a third more off the other fighter’s most health.', fx: { dmg: 1.08, cut: 1.33 } },
+  bx_guard: { sport: 'ring', name: 'Mouthguard', price: 65, desc: 'Punches to the head do 5% less to them, so fewer of them stagger.', fx: { headIn: .95 } },
+  bx_trunks: { sport: 'ring', name: 'Lucky Trunks', price: 50, desc: '+1 chin, and they beat every count a second sooner.', fx: { r: { chin: 1 }, rise: 1 } },
+  bx_gloves: { sport: 'ring', name: 'Weighted Gloves', price: 70, desc: 'Heavier and slower: +2 power, −1 speed.', fx: { r: { pow: 2, spd: -1 } } },
+  bx_robe: { sport: 'ring', name: 'Ember Robe', price: 90, desc: 'For the first 12 seconds of every bout, their punches land more often and they take a fifth less.', fx: { open: { t: 12, acc: .08, dmgIn: .8 } } },
+};
+for (const id of Object.keys(W_RING_GEAR)) wGearAdd(id, W_RING_GEAR[id]);
+const W_RING_KIT = {
+  potions: { draught: 20, cutsalve: 30, smellsalts: 25, ragetonic: 35 }, // prices (the draught's is football's)
+  store: ['bx_wraps', 'bx_guard', 'bx_trunks'], // Cinderhold's gear
+  belt: ['bx_robe', 'bx_gloves', 'bx_wraps', 'bx_guard', 'bx_trunks'], beltGold: 60,
+  opp: { 1: { cutsalve: 1 }, 2: { cutsalve: 1, smellsalts: 1 }, 3: { cutsalve: 1, smellsalts: 1, ragetonic: 1, draught: 1 } },
+};
+// the potions: the engine's words, sold where they belong
+for (const id of Object.keys(wBX.potions)) {
+  const P = wBX.potions[id];
+  if (id === 'draught') {
+    W_POTIONS.draught.sports = ['grid', 'ring'];
+    DB.items.draught.desc += ` In boxing: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items.draught.use = 'In a football game, between plays (one potion a play), or in the corner between rounds of a bout (one a round).';
+    continue;
+  }
+  wPotionAdd(id, { sport: 'ring' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a bout, in the corner between rounds: one potion a round, from the ring bar.', price: W_RING_KIT.potions[id] };
+}
+for (const k in DB.shops) { DB.shops[k].cutsalve = W_RING_KIT.potions.cutsalve; DB.shops[k].smellsalts = W_RING_KIT.potions.smellsalts; }
+if (DB.shops.cind) { DB.shops.cind.ragetonic = W_RING_KIT.potions.ragetonic; for (const id of W_RING_KIT.store) DB.shops.cind[id] = W_RING_GEAR[id].price; }
+for (const [c, it] of [['emberdeep_prize', 'bx_gloves'], ['deepseam_prize', 'bx_robe'], ['emberdeep_c3', 'smellsalts'], ['hatchery_c3', 'cutsalve']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+
+/* ---------- the bags ---------- */
+const WRK = { next: null, simBags: null, club: null, tier: null };
+const wRingKitIds = () => Object.keys(wBX.potions);
+function wRingBagMine() { const o = {}; for (const id of wRingKitIds()) if ((WG.items[id] || 0) > 0) o[id] = WG.items[id]; return o; }
+function wRingBagTheirs(tier) { return Object.assign({}, W_RING_KIT.opp[tier] || {}); }
+const wRingBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0); return ks.length ? ks.map(id => `${bag[id]} ${wBX.potions[id].n}`).join(', ') : 'nothing'; };
+const wW73StartRing = wStartRing;
+wStartRing = function (o) {
+  WRK.club = o && o.club; WRK.tier = o && (o.tier || (o.club ? wBallTier(o.club) : null));
+  try { return wW73StartRing(o); } finally { WRK.club = WRK.tier = null; }
+};
+const wW73RingGo = wRingGo;
+wRingGo = function (o, mine, theirs, picks) {
+  if (wBxg().live) return wW73RingGo(o, mine, theirs, picks);
+  WRK.next = [o.how === 'sim' ? {} : wRingBagMine(), wRingBagTheirs(o.tier)];
+  try { return wW73RingGo(o, mine, theirs, picks); } finally { WRK.next = null; }
+};
+// the bags go in with a card from the world, and the card keeps what you brought (to settle the bag at the end)
+const wW73CardStart = wBX.cardStart, wW73SimCard = wBX.simCard;
+wBX.cardStart = o => { if (WRK.next) { o = Object.assign({}, o, { bags: WRK.next }); const L = wBxg().live; if (L) L.world.bag0 = WRK.next[0]; } return wW73CardStart(o); };
+wBX.simCard = o => {
+  if (!WRK.next) return wW73SimCard(o);
+  const r = wW73SimCard(Object.assign({}, o, { bags: WRK.next })), L = wBxg().live;
+  if (L) L.world.bag0 = WRK.next[0];
+  WRK.simBags = r.bags; return r;
+};
+// what your corner used comes out of your bag
+const wW73RingSettle = wRingSettle;
+wRingSettle = function (result, bouts, pairs) {
+  const L = wBxg().live, bag0 = L && L.world && L.world.bag0;
+  let left = null;
+  if (bag0) {
+    const G = wBX.G, C = wBX.card;
+    left = WRK.simBags ? WRK.simBags[0] : G && G.bags && G.card ? G.bags[0] : C && C.bags ? C.bags[0] : bag0;
+  }
+  WRK.simBags = null;
+  const msg = wW73RingSettle(result, bouts, pairs);
+  if (bag0 && left) {
+    const used = [];
+    for (const id of Object.keys(bag0)) { const n = bag0[id] - (left[id] || 0); if (n > 0) { wAddItem(id, -Math.min(n, WG.items[id] || 0)); used.push(`${n} ${wBX.potions[id].n}`); } }
+    if (used.length) { wLog(`Used in the corner: ${used.join(', ')}.`, 'm'); wSave(); }
+  }
+  return msg;
+};
+
+/* ---------- on screen ---------- */
+// the pairing: what each corner brings
+const wW73RingPairing = wRingPairing;
+wRingPairing = function (o) {
+  if (o && o.onGo && WRK.tier) {
+    const mine = wRingBagMine(), theirs = wRingBagTheirs(WRK.tier);
+    o = Object.assign({}, o, { intro: `${o.intro} <span data-rkbags>Your corner's bag: <b>${esc(wRingBagWords(mine))}</b> (Play and Manage; Simulate leaves it alone). Theirs: <b>${esc(wRingBagWords(theirs))}</b>.</span>` });
+  }
+  return wW73RingPairing(o);
+};
+// the tape: what each fighter wears
+const wW73RingTape = wRingTape;
+wRingTape = function (a, b) {
+  const g = f => f && f.gear ? `<b title="${esc((W_GEAR[f.gear.id] || {}).desc || '')}">${esc(f.gear.name)}</b>` : '<span class="dim">none</span>';
+  return wW73RingTape(a, b) + `<div class="wtgear" data-tgear>Gear: ${g(a)} · ${g(b)}</div>`;
+};
+// the corner: your potions, between rounds
+$('wRingPatch').insertAdjacentHTML('afterend', '<span id="wRingPots"></span>');
+$('wRingPots').addEventListener('click', e => { const b = e.target.closest('[data-rpot]'); if (!b) return; wBX.potion(b.dataset.rpot); wRingBarNote(); });
+const wW73RingBarNote = wRingBarNote;
+wRingBarNote = function () {
+  wW73RingBarNote();
+  const el = $('wRingPots'); if (!el || !WBX) return;
+  const w = wBX.wait, G = wBX.G, bag = G && G.bags ? wBX.bag() : {};
+  el.innerHTML = Object.keys(bag).filter(id => bag[id] > 0 && wBX.potions[id]).map(id => { const P = wBX.potions[id], adv = w && w.pot && w.pot.id === id;
+    return `<button class="ghost${adv ? ' on' : ''}" data-rpot="${id}" ${wBX.potionOk(id) && w ? '' : 'disabled'} title="${esc(P.desc + ' One potion a round, between rounds.' + (adv ? ` Your corner says now: ${w.pot.why}.` : ''))}">${esc(P.n)} (${bag[id]})</button>`; }).join('');
+  if (w && w.pot && wBX.potions[w.pot.id]) $('wRingNote').textContent += ` And the ${wBX.potions[w.pot.id].n}: ${w.pot.why}.`;
+};
+// the Belt: the first piece of gear you don't have yet
+const wW73BcupWon = wBcupWon;
+wBcupWon = function () {
+  wW73BcupWon();
+  const have = id => (WG.items[id] || 0) > 0 || wRoster().some(p => p.gear && p.gear.ring === id);
+  const id = W_RING_KIT.belt.find(x => !have(x));
+  if (id) { wAddItem(id, 1); wLog(`The Belt comes with gear: the ${W_RING_GEAR[id].name}. ${W_RING_GEAR[id].desc}`, 'g'); }
+  else { RUN.gold += W_RING_KIT.beltGold; wLog(`You have every piece of boxing gear, so the Belt pays ${W_RING_KIT.beltGold} gold more instead.`, 'g'); }
+};
+
+/* ---------- How to play ---------- */
+const wW73RenderHelp = renderHelp;
+renderHelp = function () {
+  wW73RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpRingKit')) return;
+  const G = Object.values(W_RING_GEAR).map(g => `<b>${esc(g.name)}</b> (${esc(g.desc.charAt(0).toLowerCase() + g.desc.slice(1).replace(/\.$/, ''))})`).join('; ');
+  const P = Object.values(wBX.potions).map(p => `<b>${esc(p.n)}</b> (${esc(p.desc.charAt(0).toLowerCase() + p.desc.slice(1).replace(/\.$/, ''))})`).join('; ');
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpRingKit"><b>Boxing gear and potions.</b> Each boxer can wear one piece of boxing gear: ${G}. Hand Wraps, the Mouthguard and Lucky Trunks are sold in Cinderhold; the rest are found, and the Anvil Belt adds a piece you don't have. Between rounds your corner can give one potion a round from your bag: ${P}. Cut Salve and Smelling Salts are in every general store, the Rage Tonic in Cinderhold's. In Play and Manage the potions are on the ring bar in the corner, and your corner says which suits the moment; Simulate leaves your bag alone. The other corner brings potions too (more at a harder tier) and uses them; the log says when, and why. The pairing says what each corner brings, and the tale of the tape shows each fighter's gear.</p>`);
 };
 </script>
 </body></html>
