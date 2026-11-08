@@ -4,13 +4,15 @@
    ring, in the mode on the bar; between them the bar has Next bout, and at the end the card is settled (bouts won,
    then knockdowns, then points). Your players box on their kinds' ratings for now; with fewer than three of them,
    call-ups make up the card. This exhibition wins and loses nothing and isn't saved; cards from the world (w53) use the
-   same pairing (wRingPairing).
+   same pairing (wRingPairing). Under each bout, the tale of the tape (issue #62: wRingTape): the two fighters side by
+   side, their ratings and most stamina with the better of each pair marked, then their nature, natural style, powers
+   and record.
    Wraps: wRingBarNote (wW52RingBarNote: the card on the bar), wRunAct (wW52RunAct: 'rcard'),
    renderHelp (wW52RenderHelp: the card in How to play). */
 
 // your side: your team in its order, then call-ups if there are fewer than three
 function wRingMine(taken) {
-  const t = wPartyTeam(), out = wRoster().map(p => ({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl }));
+  const t = wPartyTeam(), out = wRoster().map(p => ({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl, pid: p.id, rec: wRingRec(p.id) }));
   for (const f of out) taken.add(f.n);
   for (let i = 0; out.length < wBX.rules.card; i++) { const p = wMakeCallUp(W_RING.home.kinds[i % W_RING.home.kinds.length], taken); out.push({ n: p.n, kind: p.kind, num: p.num, lvl: p.lvl, callup: true }); }
   return { name: t.name, short: t.short, color: W_RING.home.color, light: W_RING.home.light, fighters: out };
@@ -22,6 +24,41 @@ function wRingTheirs(taken) {
   return { name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.boxing} Club`, short: A.short, color: A.color, light: A.light, fighters };
 }
 const W_RING_STAT = { reach: 'Rch', pow: 'Pow', spd: 'Spd', chin: 'Chn', sta: 'Sta', gui: 'Gui' };
+/* ---------- the tale of the tape (issue #62) ---------- */
+const W_RING_TAPE = { reach: ['Reach', 'How far their punches land from'], pow: ['Power', 'How hard they hit'], spd: ['Speed', 'How fast they move and punch'],
+  chin: ['Chin', 'How much they can take'], sta: ['Stamina', 'How long their breath lasts'], gui: ['Guile', 'Reading punches, slipping and timing'] };
+// a player of yours's boxing record this journey, a copy (null for anyone else, or before their first bout)
+function wRingRec(pid) {
+  const L = pid != null && wPlayer(pid) && (WG.bxstats || {})[pid];
+  return L && L.bb ? { bb: L.bb, w: L.w, l: L.l, d: L.d, ko: L.ko, kd: L.kd, down: L.down, landed: L.landed, thrown: L.thrown } : null;
+}
+// what the tape shows of a fighter: ratings, most stamina, nature, natural style, powers, level growth (only for your
+// players on their own ratings) and record
+function wRingTapeOf(f) {
+  const r = Object.assign(wBX.rate(f.kind), f.r || {}), p = f.r && f.pid != null ? wPlayer(f.pid) : null;
+  return { f, r, sta: wBX.staMax(r), T: wBX.traits[f.kind] || null, style: wBX.plans[wBX.styleOf(r)], P: wBX.powerBook[f.kind] || null,
+    got: p && p.bx && p.bx.got || {}, rec: f.rec || wRingRec(f.pid) };
+}
+// a, yours (on the left); b, theirs. The better value of each pair is marked (wbest); level values aren't
+function wRingTape(a, b) {
+  const X = [wRingTapeOf(a), wRingTapeOf(b)], cost = wBX.powerCost, staTop = wBX.staMax({ sta: W_BXG.cap });
+  const who = (t, j) => `<div class="wtn w${'ab'[j]}"><b>${esc(t.f.n)}</b><small>${esc(wKindName(t.f.kind))}${t.f.lvl ? `, level ${t.f.lvl}` : ''}${t.f.callup ? ', call-up' : ''}</small></div>`;
+  const val = (key, label, tip, get, top, plus) => {
+    const v = X.map(get), cell = (t, j) => `<div class="wtv w${'ab'[j]}${v[j] > v[1 - j] ? ' wbest' : ''}" data-tv="${key}"><i style="width:${Math.round(60 * v[j] / top)}%"></i><b>${v[j]}</b>${plus && t.got[key] ? `<small title="From their levels">+${t.got[key]}</small>` : ''}</div>`;
+    return cell(X[0], 0) + `<div class="wtl" title="${esc(tip)}">${label}</div>` + cell(X[1], 1);
+  };
+  const rows = wBX.stats.map(s => val(s, W_RING_TAPE[s][0], W_RING_TAPE[s][1], t => t.r[s], W_BXG.cap, true)).join('')
+    + val('stamax', 'Breath', 'The most stamina they have: punches and powers spend it, and it comes back off the gas', t => t.sta, staTop, false);
+  const rec = (k, label, fn) => X.map((t, j) => `<div class="wtr w${'ab'[j]}" data-tr="${k}">${t.rec ? fn(t.rec) : '&ndash;'}</div>`).join(`<div class="wtl">${label}</div>`);
+  const pct = L => L.thrown ? ` (${Math.round(100 * L.landed / L.thrown)}%)` : '';
+  const words = (k, head, fn) => `<div class="wtsec">${head}</div>` + X.map((t, j) => `<div class="wtt w${'ab'[j]}" data-tt="${k}">${fn(t)}</div>`).join('');
+  const pow = w => t => t.P ? `<b>${esc(t.P[w].n)}</b>. ${esc(t.P[w].desc)}` : '&ndash;';
+  return `<div class="wtape">${who(X[0], 0)}<div></div>${who(X[1], 1)}${rows}
+      ${rec('bouts', 'Bouts', L => `${L.bb}: ${L.w}&ndash;${L.l}${L.d ? `&ndash;${L.d}` : ''}`)}${rec('ko', 'KOs', L => L.ko)}${rec('kd', 'Knockdowns', L => `${L.kd} / ${L.down}`)}${rec('landed', 'Landed', L => `${L.landed} of ${L.thrown}${pct(L)}`)}</div>
+    <div class="wtape2">${words('nature', 'Nature', t => t.T ? `<b>${esc(t.T.n)}</b>. ${esc(t.T.desc)}` : 'None: their kind boxes on its ratings alone.')}
+      ${words('style', 'Natural style', t => `<b>${esc(t.style.n)}</b>. ${esc(t.style.desc)}`)}
+      ${words('sp', `Special <small>(${cost.sp} stamina, once a round)</small>`, pow('sp'))}${words('ult', `Ultimate <small>(${cost.ult} stamina, once a bout)</small>`, pow('ult'))}</div>`;
+}
 /* the pairing: their three in order, and who of yours faces each (your corner's pick to start with). o: { mine,
    theirs, title, intro, go: [[label, value], ...] (the buttons that box it), onGo(picks, value) } */
 function wRingPairing(o) {
@@ -31,13 +68,18 @@ function wRingPairing(o) {
   const close = modal(`<header><h3>${esc(o.title)}</h3><button class="ghost" data-close>Not now</button></header>
     <div class="wmsg"><p class="hint">${o.intro}</p>
     <table class="wrcard wrpair" id="wRingPairT">${theirs.fighters.map((f, i) => `<tr><th>Bout ${i + 1}</th><td><b>${esc(f.n)}</b>, ${esc(wKindName(f.kind))}${f.lvl ? `, level ${f.lvl}` : ''}<br><small>${rate(f)}</small></td>
-      <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>`).join('')}</table>
+      <td>against</td><td><select data-rslot="${i}" aria-label="Your fighter for bout ${i + 1}">${opt(auto[i])}</select><br><small data-rrate="${i}"></small></td></tr>
+      <tr class="wrtape"><td colspan="4"><details data-tapeat="${i}"${i ? '' : ' open'}><summary>Tale of the tape</summary><div data-tape="${i}"></div></details></td></tr>`).join('')}</table>
     <p class="hint" id="wRingCardWarn"></p></div>
     <div class="row"><button class="ghost" id="wRingCardAuto">Your corner's pick</button>${o.go.map(([l, v], i) => `<button class="${i ? 'ghost' : 'btn'}" data-rgo="${v}"${i ? '' : ' id="wRingCardGo"'}>${esc(l)}</button>`).join('')}</div>`);
   const sel = () => [...$('modalBox').querySelectorAll('[data-rslot]')].map(s => +s.value);
   const sync = () => {
     const p = sel(), dup = new Set(p).size !== p.length;
-    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) $('modalBox').querySelector(`[data-rrate="${s.dataset.rslot}"]`).innerHTML = rate(mine.fighters[+s.value]);
+    for (const s of $('modalBox').querySelectorAll('[data-rslot]')) {
+      const i = s.dataset.rslot, f = mine.fighters[+s.value];
+      $('modalBox').querySelector(`[data-rrate="${i}"]`).innerHTML = rate(f);
+      $('modalBox').querySelector(`[data-tape="${i}"]`).innerHTML = wRingTape(f, theirs.fighters[+i]);
+    }
     for (const b of $('modalBox').querySelectorAll('[data-rgo]')) b.disabled = dup;
     $('wRingCardWarn').textContent = dup ? 'A fighter boxes once: pick a different one for each bout.' : '';
   };
@@ -100,5 +142,6 @@ renderHelp = function () {
   wW52RenderHelp();
   const r = $('wHelpRing'), h = $('wRingHow');
   if (r && !/a CARD/.test(r.innerHTML)) r.insertAdjacentHTML('beforeend', ' Or ask for a CARD: three bouts, three of your team against three of theirs.');
+  if (h && !$('wRingHowTape')) h.insertAdjacentHTML('beforeend', `<p class="hint" id="wRingHowTape"><b>The tale of the tape.</b> Before a card, each bout has its tale of the tape: your fighter on the left, theirs on the right. It has their six ratings and their breath (the most stamina they have, which comes from their stamina rating), with the better of each pair marked, and a + for the points their levels have added. Under that are their records (bouts won and lost, knockouts, knockdowns scored and taken, punches landed), their natures, the style they box to when nobody tells them otherwise, and their two powers with what they cost. Everyone starts a bout on 100 health. The ring shows a short version as the fighters touch gloves.</p>`);
   if (h && !$('wRingHowCard')) h.insertAdjacentHTML('beforeend', `<p class="hint" id="wRingHowCard"><b>The card.</b> A card is ${wBX.rules.card} bouts, one fighter a bout, and each fighter boxes once. The other club names its order first, and you pick who faces each of theirs; your corner suggests a pairing, sending reach against shorter arms and a good chin against a big hitter. The side that wins more bouts wins the card. Level on bouts, the side that scored more knockdowns wins it, then the side with more points on the judges' cards.</p>`);
 };

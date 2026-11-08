@@ -193,18 +193,32 @@ function bxDrawCount(c) {
   txt(c, String(BD.count), p.x, p.y - 70, '900 54px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, w, h, 8); c.fill(); c.strokeStyle = 'rgba(255,208,160,.25)'; c.lineWidth = 1; c.stroke(); }
+/* the tale of the tape, short (issue #62): each fighter's name, level and nature in their own column, the six ratings
+   side by side (the better of each pair in its corner's colour), their powers and their record. bxIntroTape is what
+   it shows, as words (the tests read it) */
+const BX_STAT_WORD = { reach: 'reach', pow: 'power', spd: 'speed', chin: 'chin', sta: 'stamina', gui: 'guile' };
+function bxIntroTape() {
+  const one = f => { const L = f.rec, P = bxPowOn() && BX_POW[f.kind], T = bxTrait(f);
+    return { n: f.n, sub: [f.lvl ? `level ${f.lvl}` : '', T ? T.n : ''].filter(Boolean).join(', '), r: Object.assign({}, f.r),
+      pow: P ? `${P.sp.n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
+  return G.F.map(one);
+}
 function bxDrawIntro(c) {
-  bxPanel(c, 230, 270, 500, 110);
-  const [A, B] = G.F;
-  const tn = f => bxTrait(f) ? ` (${bxTrait(f).n})` : '';
-  txt(c, `${A.n}${tn(A)}  vs  ${B.n}${tn(B)}`, 480, 300, '800 20px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
+  bxPanel(c, 190, 228, 580, 196);
+  const [A, B] = bxIntroTape(), col = [335, 625], dim = '#b8aa94', F = (w, n) => `${w ? w + ' ' : ''}${n}px "Alegreya Sans", sans-serif`;
+  txt(c, A.n, col[0], 256, F(800, 20), '#ffb0a0', 'center'); txt(c, 'vs', 480, 256, F(700, 14), dim, 'center'); txt(c, B.n, col[1], 256, F(800, 20), '#a8c8ff', 'center');
+  txt(c, A.sub, col[0], 276, F(0, 12), dim, 'center'); txt(c, B.sub, col[1], 276, F(0, 12), dim, 'center');
   BX_STATS.forEach((s, i) => {
     const x = 300 + i * 72;
-    txt(c, s === 'gui' ? 'guile' : s === 'sta' ? 'stamina' : s === 'pow' ? 'power' : s === 'spd' ? 'speed' : s, x + 18, 326, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
-    txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 346, '700 14px "Alegreya Sans", sans-serif', A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
+    txt(c, BX_STAT_WORD[s], x + 18, 302, F(0, 12), dim, 'center');
+    txt(c, `${A.r[s]} · ${B.r[s]}`, x + 18, 322, F(700, 14), A.r[s] > B.r[s] ? '#ffb0a0' : A.r[s] < B.r[s] ? '#a8c8ff' : '#e8dcc0', 'center');
   });
-  if (G.wait) bxDrawAsk(c, 368);
-  else txt(c, `red corner: ${BX_PLAN[A.plan].n}  ·  blue corner: ${BX_PLAN[B.plan].n}`, 480, 368, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  [['powers', 'pow'], ['record', 'rec']].forEach(([k, f], i) => {
+    const y = 348 + i * 20;
+    txt(c, A[f], col[0], y, F(0, 13), '#e8dcc0', 'center'); txt(c, k, 480, y, F(0, 12), dim, 'center'); txt(c, B[f], col[1], y, F(0, 13), '#e8dcc0', 'center');
+  });
+  if (G.wait) bxDrawAsk(c, 406);
+  else txt(c, `red corner: ${BX_PLAN[G.F[0].plan].n}  ·  blue corner: ${BX_PLAN[G.F[1].plan].n}`, 480, 406, F(0, 12), dim, 'center');
 }
 function bxDrawCorner(c) {
   const n = G.cards.length, sc = G.cards[n - 1], T = bxTotals(), pl = G.plans[G.plans.length - 1];
