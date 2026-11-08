@@ -92,3 +92,4 @@ src/app/coach.js
 src/app/pause-save.js
 src/app/profiles-ui.js
 src/ui/screens/daily.js
+src/ui/screens/daily-board.js

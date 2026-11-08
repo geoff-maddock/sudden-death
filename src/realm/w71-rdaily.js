@@ -17,7 +17,9 @@
    Wraps: wRingGo (wW71RingGo: a card at the Ring is the attempt once its pairing is boxed), wMatchLost (wW71MatchLost:
    a Hardcore loss, which ends the journey without the usual dispatch), wStart (wW71Start: the day's daily in the log),
    wOpenCamp and wRenderCamp (wW71OpenCamp, wW71RenderCamp: the Daily tab), renderHelp (wW71RenderHelp: #wHelpRDaily).
-   Replaces renderDaily (Sudden Death's Daily page, ui/screens/daily.js): in the Realm the top bar's Daily is this daily. */
+   Replaces renderDaily (Sudden Death's Daily page, ui/screens/daily.js): in the Realm the top bar's Daily is this daily.
+   The shared board (phase 5, ui/screens/daily-board.js): results posted as game 'rd' (rank: the result, then the
+   margin), today's board on the tab and the page. */
 
 const W_RDAILY = {
   key: 'sd-realm-daily',
@@ -118,6 +120,8 @@ W_ON_END.rdaily = function (r, ref, W) {
   e.st = r === 'win' ? 'win' : r === 'tie' ? 'tie' : 'lose'; e.us = f.us; e.them = f.them;
   if (W && W.tier) e.tier = W.tier;
   wRdailySave(rec);
+  // the shared board (issue #60, phase 5; ui/screens/daily-board.js): the result first, then the margin
+  try { boardPost('rd', ref, wRdailyRank(e), { st: e.st, us: e.us || 0, them: e.them || 0, eng: e.eng }); } catch (er) { console.error(er); }
   let line;
   if (e.st === 'win' && !WG.advDead) {
     const t = e.tier || 1, g = W_RDAILY.gold * t, fa = W_RDAILY.fans * t;
@@ -131,7 +135,9 @@ W_ON_END.rdaily = function (r, ref, W) {
 const wW71MatchLost = wMatchLost;
 wMatchLost = function (result) {
   const W = RUN && RUN.pending && RUN.pending.world;
-  if (WG && WG.hardcore && W && W.kind === 'rdaily') { WG.advDead = 1; try { W_ON_END.rdaily('lose', W.ref, W); } catch (e) { console.error(e); } finally { delete WG.advDead; } }
+  // (the score from the match itself: the season log doesn't have this game yet, so the facts would be the last game's)
+  const S = B && B.sc, sc = S ? (B.sport === 'boxing' && S.rounds ? { us: S.rounds[0], them: S.rounds[1] } : { us: S.us, them: S.them }) : {};
+  if (WG && WG.hardcore && W && W.kind === 'rdaily') { WG.advDead = 1; try { W_ON_END.rdaily('lose', W.ref, Object.assign({}, W, sc)); } catch (e) { console.error(e); } finally { delete WG.advDead; } }
   return wW71MatchLost(result);
 };
 const wW71Start = wStart;
@@ -140,6 +146,12 @@ wStart = function (save, opts) {
   try { if (WG && !LAB && !wRdailyAll().days[wRdailyToday()]) wLog(`Today’s daily: ${wRdailyWhat(wRdailyDay())}. Play it from the Team screen’s Daily tab.`); } catch (e) { console.error(e); }
   return r;
 };
+
+/* ---------- the shared board ---------- */
+const wRdailyRank = e => (e.st === 'win' ? 2 : e.st === 'tie' ? 1 : 0) * 1000 + 500 + clamp((e.us || 0) - (e.them || 0), -499, 499);
+BOARD.local.rd = () => { const days = wRdailyAll().days; return Object.keys(days).filter(k => days[k].st && days[k].st !== 'on').map(k => { const e = days[k];
+  return [k, wRdailyRank(e), { st: e.st, us: e.us || 0, them: e.them || 0, eng: e.eng }]; }); };
+BOARD.fmt.rd = s => `${s.st === 'win' ? 'Won' : s.st === 'tie' ? 'Drew' : 'Lost'} ${s.us || 0}–${s.them || 0}`;
 
 /* ---------- the Daily tab on the Team screen ---------- */
 function wRdailyResult(e) {
@@ -159,7 +171,7 @@ function wCampDaily() {
   const keys = Object.keys(rec.days).filter(k => k !== D.key).sort().reverse().slice(0, W_RDAILY.shown);
   const past = keys.length ? `<h5 class="wbrh">Past days</h5><ol class="wstlog" data-rdpast>${keys.map(k => { const x = rec.days[k];
     return `<li><b class="${x.st === 'win' ? 'wgood' : 'wbad'}">${esc(wRdailyResult(x))}</b> ${esc(dayName(k))}: ${esc(x.eng === 'card' && x.sport ? SPORT_NAME[x.sport].toLowerCase() : W_RDAILY.names[x.eng] || '')} against ${esc(x.club ? wBallName(x.club) : '')}, tier ${x.tier || 1}</li>`; }).join('')}</ol>` : '';
-  return `<p class="hint">One match a day, the same for everyone: the game, the club and the difficulty come from the date. It gets harder through the week, from Sunday to Saturday. Your own team plays it, once.</p>${head}${act}${past}`;
+  return `<p class="hint">One match a day, the same for everyone: the game, the club and the difficulty come from the date. It gets harder through the week, from Sunday to Saturday. Your own team plays it, once.</p>${head}${act}${boardHTML('rd', D.key, 'Today’s board')}${past}`;
 }
 const wW71OpenCamp = wOpenCamp;
 wOpenCamp = function (tab) {
@@ -179,6 +191,7 @@ wRenderCamp = function () {
   $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'daily'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
   body.innerHTML = wRdailySum() + (WCAMP.msg ? `<p class="hint wball">${esc(WCAMP.msg)}</p>` : '') + wCampDaily();
   wRdailyWire(body, () => WCAMP.close(), why => { WCAMP.msg = why; wOpenCamp('daily'); });
+  boardNames();
 };
 function wRdailySum() {
   const rec = wRdailyAll();
@@ -211,6 +224,7 @@ renderDaily = function () {
   el.innerHTML = `${head}<div class="wrdpage">${wRdailySum()}${WRDP.msg ? `<p class="hint wball">${esc(WRDP.msg)}</p>` : ''}${wCampDaily()}</div>`;
   WRDP.msg = '';
   wRdailyWire(el, () => showPage('play'), why => { WRDP.msg = why; showPage('daily'); });
+  boardNames();
 };
 
 /* ---------- How to play ---------- */
@@ -218,5 +232,5 @@ const wW71RenderHelp = renderHelp;
 renderHelp = function () {
   wW71RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpRDaily')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpRDaily"><b>The daily.</b> One match a day, the same for everyone who plays that day: the game (the card game, baseball, football or boxing), the club you face and, for the card game, the sport and their side all come from the date. It gets harder through the week: tier 1 on Sunday and Monday, tier 2 from Tuesday to Thursday, tier 3 on Friday and Saturday. Your own team plays it, from the Daily tab on the Team screen or the Daily page in the top bar. You get one attempt: the day is used once the game starts, even on another journey, and a missed day can't be played later. A win pays the usual, plus ${W_RDAILY.gold} gold and ${W_RDAILY.fans} fans a tier. The tab keeps your streak and your past days.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpRDaily"><b>The daily.</b> One match a day, the same for everyone who plays that day: the game (the card game, baseball, football or boxing), the club you face and, for the card game, the sport and their side all come from the date. It gets harder through the week: tier 1 on Sunday and Monday, tier 2 from Tuesday to Thursday, tier 3 on Friday and Saturday. Your own team plays it, from the Daily tab on the Team screen or the Daily page in the top bar. You get one attempt: the day is used once the game starts, even on another journey, and a missed day can't be played later. A win pays the usual, plus ${W_RDAILY.gold} gold and ${W_RDAILY.fans} fans a tier. The tab keeps your streak and your past days and, when the game is played on claude.ai, today’s board: everyone’s result, wins first, then by the margin.</p>`);
 };

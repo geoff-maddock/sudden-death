@@ -68,6 +68,7 @@ Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screens
 - **Engine never touches the DOM.** It emits `fx({k: …})` events, and the scene drains them in `consumeFx()`. `LAB` mode (bots) disables sound, saves, tips, music and achievements.
 - **Every new system gets a test** in `test/` and a line in `test/all.sh`. Known gap: most checks *print* their results (and `errors: [...]`) rather than assert, so a run can exit 0 with a failure in its output. Read the output, and convert checks to asserts when you touch them.
 - **Balance changes get measured.** Use 100+ bot runs per side and report before/after. Bot win rates are relative: a careful human wins far more. When adding rewards, make sure `test/lab.js` spends them like a player would, or the numbers will lie (this happened once).
+- **Publishing as a claude.ai artifact:** declare the `db` and `user` capabilities, with the rules in `ui/screens/daily-board.js`'s header, or the daily's shared board stays off (each build is its own artifact with its own board).
 - **User-facing text:** plain, short, and specific. Every system is explained in How to play (`renderHelp` in `ui/screens/pages.js`).
 
 ## Realm rules
@@ -99,5 +100,4 @@ Routing: a balanced route that reads elite traits beats taking every elite, whic
 - **Instant replay** of the best play at the end of a fight.
 - **Simulated league standings** next to your season record.
 - **Rival continuity** across acts (they remember your last game).
-- **Daily seeded challenge** with a shared record.
 - **Folding momentum and the sky into the sports layer** to reduce the number of separate meta-systems.

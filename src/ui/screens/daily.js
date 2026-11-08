@@ -53,7 +53,8 @@ function renderDaily() {
     $('pg-help').insertAdjacentHTML('beforeend', `<section id="helpDaily"><h3>The Daily</h3>
       <p class="hint">Once a day there is a daily game, the same for everyone: the same club and three players, the same dungeon, and the same rewards, shops, events and fights, so you can compare how you did. Each day also has a twist, such as more gold, a second trophy or a thinner deck.</p>
       <p class="hint">It gets harder through the week: Rookie on Sunday and Monday, Contender on Tuesday and Wednesday, All-Star on Thursday and Friday, and Hall of Fame on Saturday. A new daily starts at midnight, your time.</p>
-      <p class="hint">You get one go. Starting it uses up the day, and a day you miss can’t be played later. You can save and quit and come back to it, as with any run. The Daily tab shows today’s game, your streak of days in a row, and how every daily went.</p></section>`);
+      <p class="hint">You get one go. Starting it uses up the day, and a day you miss can’t be played later. You can save and quit and come back to it, as with any run. The Daily tab shows today’s game, your streak of days in a row, and how every daily went.</p>
+      <p class="hint" id="helpBoard">Played on claude.ai, the Daily tab also has today’s board and yesterday’s: everyone’s result for the day, by score, with yours marked. A daily goes on the board when it ends, won or lost. Anywhere else, your own record is all there is.</p></section>`);
   };
   if (UI.screen === 'title') renderTitle();
 })();
