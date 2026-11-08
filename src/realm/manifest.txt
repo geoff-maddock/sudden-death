@@ -100,3 +100,4 @@ src/realm/w67-charter.js
 src/realm/w68-crew.js
 src/realm/w69-fixed.js
 src/realm/w70-advmarks.js
+src/realm/w72-gear.js
