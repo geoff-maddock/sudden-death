@@ -127,10 +127,37 @@ async def main():
         await pg.screenshot(path='/tmp/realm-ring-tape-intro.png')
         await pg.evaluate("wBX.pause(false)")
 
+        # ---------- during the bout: each fighter's card and the judges' running totals ----------
+        lv = await pg.evaluate("""(() => { wBX.pause(true);
+          wBX.start({ fighters: [{ n: 'Vexa', kind: 'werewolf' }, { n: 'Smolder', kind: 'kobold' }], mode: 'watch', seed: 5 });
+          const intro = wBX.live();
+          for (let i = 0; i < 20000 && !(wBX.G.round === 2 && wBX.phase === 'round' && wBX.G.clock < 20); i++) { wBX.step(); wBX.render(); }
+          const G = wBX.G, L = wBX.live(), T = wBX.totals();
+          const work = G.F.map(f => { const s = Object.assign({}, f.bs); for (const k in f.rs) s[k] += f.rs[k]; return s; });
+          const fOk = L.F.every((X, i) => JSON.stringify(X.r) === JSON.stringify(G.F[i].r) && X.landed === work[i].landed && X.thrown === work[i].thrown && X.power === work[i].power
+            && X.slips === work[i].slips && X.blocks === work[i].blocks && X.kd === G.kd[1 - i]);
+          const jOk = L.judges.length === 3 && L.judges.every((J, j) => J.round && J.round.includes(10) && J.total[0] === T[j][0] + J.round[0] && J.total[1] === T[j][1] + J.round[1]);
+          for (let i = 0; i < 20000 && wBX.phase !== 'corner'; i++) wBX.step();
+          const C = wBX.live(), T2 = wBX.totals(), cOk = C.judges.every((J, j) => J.round === null && J.total.join() === T2[j].join());
+          wBX.pause(false); return { fOk, jOk, cOk, L, done: T[0][0] > 0, intro: !!intro }; })()""")
+        check(lv['fOk'], "during a bout each fighter's card has their ratings and their work so far (rounds done and the round on)", lv['L']['F'])
+        check(lv['done'] and lv['jOk'], "the judges' running totals are the rounds done plus the round on as it stands", lv['L']['judges'])
+        check(lv['cOk'], 'between rounds the totals are the cards as scored, and no round on', None)
+        sd = await pg.evaluate("""(() => { wBX.pause(true); const go = draw => { wBX.start({ fighters: [{ n: 'A', kind: 'lich' }, { n: 'B', kind: 'ogre' }], mode: 'watch', seed: 11 });
+            for (let i = 0; i < 40000 && wBX.phase !== 'over'; i++) { wBX.step(); if (draw) wBX.render(); } return JSON.stringify(wBX.summary()); };
+          const a = go(false), b = go(true); wBX.pause(false); return a === b; })()""")
+        check(sd, 'drawing the cards and the judges never changes how a seeded bout goes', None)
+        await pg.evaluate("""(() => { wBX.pause(true); wBX.start({ fighters: [{ n: 'Vexa', kind: 'werewolf' }, { n: 'Smolder', kind: 'kobold' }], mode: 'watch', seed: 5 });
+          for (let i = 0; i < 20000 && !(wBX.G.round === 2 && wBX.phase === 'round' && wBX.G.clock < 20); i++) wBX.step(); wBX.render(); })()""")
+        await pg.screenshot(path='/tmp/realm-ring-tape-live.png')
+        await pg.evaluate("wBX.pause(false)")
+
         # ---------- How to play ----------
         await pg.evaluate("renderHelp()")
         hp = await pg.evaluate("(() => { const h = document.getElementById('wRingHowTape'); return h ? h.textContent : ''; })()")
         check('tale of the tape' in hp and 'breath' in hp and 'powers' in hp and 'record' in hp, 'How to play explains the tale of the tape', hp[:200])
+        hl = await pg.evaluate("(() => { const h = document.getElementById('wRingHowLive'); return h ? h.textContent : ''; })()")
+        check('ratings' in hl and 'judges' in hl and 'landed' in hl, 'How to play explains the cards and the judges during a bout', hl[:200])
         check(not errs, 'no page errors', errs[:3])
         await br.close()
 
