@@ -416,6 +416,7 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
   <nav class="nav" aria-label="Pages">
     <div class="tabs" role="tablist">
       <button class="tab" data-pg="play" aria-current="page">Play</button>
+      <button class="tab" data-pg="daily">Daily</button>
       <button class="tab" data-pg="help">How to play</button>
       <button class="tab" data-pg="best">Bestiary</button>
       <button class="tab" data-pg="rec">Records</button>
@@ -432,7 +433,7 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
           <h2>Three monsters. Three acts. One sport per brawl.</h2>
           <p>Draft three monsters from a Brimstone League club, build a deck from their powers, and fight down through three acts of a dungeon where every brawl is played under one sport’s rules. At the bottom waits the Commissioner of the Pit.</p>
           <div id="resumeRow" class="resume" hidden></div>
-          <div class="row"><button class="btn" id="bNew">Draft a line</button><button class="ghost" data-goto="help">How to play</button></div>
+          <div class="row"><button class="btn" id="bNew">Draft a line</button><button class="ghost" id="bDaily">The Daily</button><button class="ghost" data-goto="help">How to play</button></div>
         </div>
       </div>
     </div>
@@ -452,6 +453,7 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
     </div>
     <div id="scr-end" hidden></div>
   </section>
+  <section id="pg-daily" class="doc" hidden></section>
   <section id="pg-help" class="doc" hidden></section>
   <section id="pg-best" class="doc" hidden></section>
   <section id="pg-rec" class="doc" hidden></section>
