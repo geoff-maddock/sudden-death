@@ -92,11 +92,12 @@ async def main():
         await pg.evaluate(RES)
         no = await pg.evaluate("(() => { wGF.G.poss = 1; return wGF.potionWhy('gfresin', null); })()")
         check(no == 'Resin is for when you have the ball.', 'Resin only when you have the ball', no)
+        wGF_BALM = await pg.evaluate("wGF.potions.gfsalve.rest")
         await pg.evaluate(RES)
         bm = await pg.evaluate("""(() => { const G = wGF.G, ri = G.teams[0].off.QB; G.stam[0][ri] = 20;
           const msg = wGF.potion('gfsalve', ri), all = wGF.lineup().flatMap(t => t.players.filter(x => x.n === G.teams[0].roster[ri].n));
           return { msg, st: G.stam[0][ri], full: all.every(x => Object.keys(x.base).every(k => x.r[k] === Math.round(x.base[k]))), salve: G.salve[0], again: wGF.potionWhy('gfsalve', ri) }; })()""")
-        check('Mending Balm' in bm['msg'] and bm['st'] == 35 and bm['full'], 'the Mending Balm: 15 stamina back, and full ratings though worn down', bm)
+        check('Mending Balm' in bm['msg'] and bm['st'] == 20 + wGF_BALM and bm['full'], 'the Mending Balm: its stamina back, and full ratings though worn down', bm)
         await pg.evaluate(RES)
         adv = await pg.evaluate("""(() => { const G = wGF.G, ri = G.teams[0].off.RB; G.half = 2; G.stam[0][ri] = 25; return { a: wGF.advice({ gfsalve: 1 }), none: wGF.advice({}) }; })()""")
         check(adv['a'] and adv['a']['id'] == 'gfsalve' and adv['a']['why'] and adv['none'] is None, 'your sideline advises the Balm for a worn-down back late on, and nothing from an empty bag', adv)
