@@ -57,6 +57,7 @@ src/run/elite-traits.js
 src/run/goals.js
 src/run/achievements.js
 src/run/trouble.js
+src/run/daily.js
 
 # interface helpers and the map
 src/ui/icons.js
@@ -90,3 +91,5 @@ src/app/settings.js
 src/app/coach.js
 src/app/pause-save.js
 src/app/profiles-ui.js
+src/ui/screens/daily.js
+src/ui/screens/daily-board.js
