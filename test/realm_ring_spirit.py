@@ -40,7 +40,7 @@ async def main():
           return { n: K.length, two: K.filter(k => B[k].sp2 && B[k].sp2.n && B[k].sp2.desc && B[k].sp2.n !== B[k].sp.n).length,
             stars: W_STARS.filter(s => s.kind).map(s => !!B[s.kind].sp2), names: new Set(K.flatMap(k => [B[k].sp.n, B[k].sp2.n])).size }; })()""")
         check(bk['n'] == 18 and bk['two'] == 18 and bk['names'] == 36, 'every league kind has two specials, each named and described, none the same', bk)
-        check(not any(bk['stars']), 'the superstars keep one for now (their second comes in phase 6)', bk)
+        check(bk['stars'] and all(bk['stars']), 'the superstars have two as well (phase 6)', bk)
 
         # ---- the pick, and each second special at work ----
         pk = await pg.evaluate("""(() => { let G = __setup(2, ['gorgon', 'elf'], ['sp2', null], 100); const a = wBX.powers(0), b = wBX.powers(1);
@@ -143,7 +143,7 @@ async def main():
         # ---- How to play ----
         await pg.evaluate("showPage('help')")
         hp = await pg.evaluate("({ text: (document.getElementById('wHelpRingSpirit') || {}).textContent || '', rows: document.querySelectorAll('#wHelpRingSpirit tr').length })")
-        check('spirit' in hp['text'] and 'Ring tab' in hp['text'] and hp['rows'] == 19, 'How to play explains spirit and the choice, with every kind\'s two specials', hp['rows'])
+        check('spirit' in hp['text'] and 'Ring tab' in hp['text'] and hp['rows'] == 19 + len(bk['stars']), 'How to play explains spirit and the choice, with every kind\'s two specials (the superstars\' too)', hp['rows'])
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()

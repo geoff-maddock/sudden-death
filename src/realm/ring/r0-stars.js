@@ -1,6 +1,7 @@
 /* The Anvil Ring's superstars (issue #24, phase 2), inside the wBX scope: each superstar's ratings, nature and powers,
    added to the engine's own tables after its parts load. Plain assignments, nothing declared. A superstar is never
-   picked for a CPU side by kind (the Realm only ever sends one as your own player).
+   picked for a CPU side by kind (the Realm only ever sends one as your own player). Each has a second special too
+   (issue #61, phase 6), at the foot of this file.
    The Phoenix: fast, a fair chin, and its nature is Rebirth (BX_TRAIT reborn, in 07-bout.js): once a bout, a count it
    would not beat, it beats, and gets up with most of its health. */
 BX_KIND.phoenix = [6, 6, 9, 4, 6, 7];
@@ -57,3 +58,11 @@ BX_POW.frostwyrm = {
   sp: { id: 'frostbreath', n: 'Frost Breath', when: 'mid', desc: 'A breath of ice through the guard (5), and their feet slow to 60% for 3 seconds.', now: { dmg: 5 }, fx: { who: 'them', t: 3, move: .6 } },
   ult: { id: 'whiteout', n: 'Whiteout', when: 'any', desc: 'A storm in the ring: 30% slower at everything for 5 seconds.', fx: { who: 'them', t: 5, spd: .7, move: .7 } },
 };
+
+/* Their second specials (issue #61, phase 6), as every league kind has: the one each brings is picked on the Ring tab. */
+BX_POW.phoenix.sp2 = { id: 'heatwall', n: 'Wall of Heat', when: 'close', desc: 'A wall of heat: for 3 seconds their punches find it 12% less often, and 4 stamina back.', now: { mySta: 4 }, fx: { who: 'them', t: 3, acc: -.12 } };
+BX_POW.kraken.sp2 = { id: 'inkcloud', n: 'Ink Cloud', when: 'mid', desc: 'Ink in their eyes: for 3 seconds their punches find it less often, and their feet slow.', fx: { who: 'them', t: 3, acc: -.1, move: .85 } };
+BX_POW.behemoth.sp2 = { id: 'mossbind', n: 'Moss Bind', when: 'close', desc: 'Moss grows over their feet: rooted for 3 seconds, and slower to punch.', fx: { who: 'them', t: 3, root: 1, spd: .8 } };
+BX_POW.djinn.sp2 = { id: 'lampsmoke', n: 'Lamp Smoke', when: 'tired', desc: 'A breath of smoke from the lamp: 10 stamina and 4 health back.', now: { mySta: 10, hp: 4 } };
+BX_POW.hydra.sp2 = { id: 'venomspit', n: 'Venom Spit', when: 'mid', desc: 'Spit through the guard (3), and venom: 1 health a second for 4 seconds.', now: { dmg: 3 }, fx: { who: 'them', t: 4, regHp: -1 } };
+BX_POW.frostwyrm.sp2 = { id: 'iceshield', n: 'Ice Shield', when: 'close', desc: 'A shell of ice: for 4 seconds punches do 45% less.', fx: { who: 'self', t: 4, dmgIn: .55 } };

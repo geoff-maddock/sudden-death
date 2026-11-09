@@ -40,6 +40,7 @@ async def main():
           return { n: K.length, two: K.filter(k => B[k].off2 && B[k].def2 && B[k].off2.desc && B[k].def2.desc && B[k].off2.n !== B[k].off.n && B[k].def2.n !== B[k].def.n).length,
             sits: Object.keys(wGF.situations) }; })()""")
         check(bk['n'] == 18 and bk['two'] == 18, 'every league kind has a second offense and defense power, named and described', bk)
+        STARS = await pg.evaluate("W_STARS.filter(s => s.kind).length")
         check(sorted(bk['sits']) == ['gamble', 'goalwall', 'twominute'], 'three situation powers', bk['sits'])
 
         # ---- the pick, and each second power on the play ----
@@ -146,7 +147,7 @@ async def main():
         # ---- How to play ----
         await pg.evaluate("renderHelp()")
         hp = await pg.evaluate("({ text: (document.getElementById('wHelpGfPow2') || {}).textContent || '', rows: document.querySelectorAll('#wHelpGfPow2 tr').length })")
-        check(all(w in hp['text'] for w in ['Seven tab', 'Goal-line Wall', 'Two-minute Drill', 'Fourth-down Gamble']) and hp['rows'] == 19, 'How to play explains the second powers and the situation powers', hp['rows'])
+        check(all(w in hp['text'] for w in ['Seven tab', 'Goal-line Wall', 'Two-minute Drill', 'Fourth-down Gamble']) and hp['rows'] == 19 + STARS, 'How to play explains the second powers (the superstars\' too) and the situation powers', hp['rows'])
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()
