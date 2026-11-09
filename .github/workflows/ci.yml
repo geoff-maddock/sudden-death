@@ -18,13 +18,13 @@ concurrency:
 env:
   # The quick checks, passed to test/all.sh (which runs several at a time, slowest first). A new check goes on the end.
   CHECKS: >-
-    smoke seeded tipcheck tooltip fuzz handfit hooks traits sports pausesave practice season_goals profiles trouble forfeit
+    smoke seeded daily daily_board tipcheck tooltip fuzz handfit hooks traits sports pausesave practice season_goals profiles trouble forfeit
     realm_audit realm_tiles realm_smoke realm_match realm_save realm_party realm_road realm_town realm_dungeon
     realm_cups realm_bot realm_polish realm_feel realm_ground realm_ways realm_camp realm_stats realm_bonds
     realm_league realm_diamond_source realm_journal realm_diamond realm_diamond_ratings realm_diamond_nine
     realm_diamond_game realm_diamond_cup realm_diamond_feel realm_click realm_grounds realm_gmatch realm_cities
     realm_spots realm_fixtures realm_home realm_gfeel realm_notices realm_legs realm_captain realm_weather
-    realm_name realm_tour realm_sinks realm_defend realm_legends realm_gate realm_settings realm_map soccer realm_soccer realm_retire indeck realm_eggs realm_prospects realm_engines realm_gridiron realm_gridiron_game realm_gridiron_play realm_gridiron_seven realm_gridiron_playbook realm_gridiron_world realm_gridiron_powers realm_gridiron_cup realm_gridiron_fixes realm_gridiron_feel realm_gridiron_view realm_gridiron_bench realm_gridiron_stance realm_music realm_ring realm_ring_hands realm_ring_card realm_ring_powers realm_ring_game realm_ring_cup realm_ring_feel realm_ring_tab realm_ring_tape realm_stars realm_phoenix realm_kraken realm_behemoth realm_djinn realm_hydra realm_frostwyrm realm_adventure realm_adventure_charter realm_adventure_crew realm_adventure_fixed realm_gear realm_ring_kit realm_grid_kit realm_ring_spirit realm_grid_powers2 realm_star_powers2
+    realm_name realm_tour realm_sinks realm_defend realm_legends realm_gate realm_settings realm_map soccer realm_soccer realm_retire indeck realm_eggs realm_prospects realm_engines realm_gridiron realm_gridiron_game realm_gridiron_play realm_gridiron_seven realm_gridiron_playbook realm_gridiron_world realm_gridiron_powers realm_gridiron_cup realm_gridiron_fixes realm_gridiron_feel realm_gridiron_view realm_gridiron_bench realm_gridiron_stance realm_music realm_ring realm_ring_hands realm_ring_card realm_ring_powers realm_ring_game realm_ring_cup realm_ring_feel realm_ring_tab realm_ring_tape realm_stars realm_phoenix realm_kraken realm_behemoth realm_djinn realm_hydra realm_frostwyrm realm_adventure realm_adventure_charter realm_adventure_crew realm_adventure_fixed realm_daily realm_gear realm_ring_kit realm_grid_kit realm_ring_spirit realm_grid_powers2 realm_star_powers2
 jobs:
   ci:
     name: Build, stale files, bot sanity and quick checks

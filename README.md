@@ -34,6 +34,7 @@ Progress (runs in progress, the record book, careers, achievements, settings) is
 - **9 bosses** with their own brains and phases, elite scouting reports, rival games, enemy sport perks and high-stakes rooms.
 - **Season goals** (three-tier ladders per act), **fans** to spend at the fan stand, and the **play of the game**.
 - **Four difficulty levels:** Rookie, Contender, All-Star, Hall of Fame.
+- **The Daily:** one seeded game a day, the same for everyone, with a twist. It gets harder from Sunday to Saturday, you get one go, and it keeps your streak.
 - **Achievements** (bronze/silver/gold), **player profiles**, player stats and careers, a season log, and mid-fight save and resume.
 - A procedural soundtrack with a theme per act, and coach's notes for first-time players.
 
