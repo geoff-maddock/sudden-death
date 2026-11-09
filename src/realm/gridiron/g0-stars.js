@@ -59,3 +59,19 @@ GF_POW.frostwyrm = [{ id: 'icepath', n: 'Ice Path', cost: 1, fits: 'run', desc: 
 GF_ULT.frostwyrm = { id: 'whiteout', n: 'Whiteout', role: 'def', desc: 'A blizzard over the whole field: their offense 20% slower, and their throws off line.', zone: { oSpd: .8, errA: .5 }, vis: ['#e8f4ff', 'all'] };
 for (const p of GF_POW.frostwyrm) GF_POW_BY[p.id] = p;
 GF_ULT_BY[GF_ULT.frostwyrm.id] = GF_ULT.frostwyrm;
+
+/* Their second powers (issue #61, phase 6), as every league kind has: the one each brings, each way, is picked on the
+   Seven tab. [offense, defense], into GF_POW2. */
+GF_POW2.phoenix = [{ id: 'firewings', n: 'Fire Wings', cost: 1, fits: 'pass', desc: 'Receivers on wings of flame: 6% faster on their routes, and 5% more past 8 yards.', fx: { rSpd: 1.06, deepSpd: 1.05 } },
+  { id: 'scorch', n: 'Scorched Earth', cost: 1, fits: 'run', desc: 'The ground burns where the ball is taken: the carrier slowed for 1.2 seconds.', fx: { cSlow: 1.2 } }];
+GF_POW2.kraken = [{ id: 'inkscreen', n: 'Ink Screen', cost: 1, fits: 'pass', desc: 'A cloud of ink off the line: the coverage loses the receivers for a second.', fx: { coverSlow: 1 } },
+  { id: 'tentaclewall', n: 'Tentacle Wall', cost: 1, fits: 'pass', desc: 'Tentacles pull the blockers off: blocks are shed 40% more often.', fx: { shed: 1.4 } }];
+GF_POW2.behemoth = [{ id: 'bulldoze', n: 'Bulldoze', cost: 1, fits: 'run', desc: 'Straight through: the carrier +2.5 strength against tackles, and +1 blocking strength.', fx: { cStr: 2.5, blk: 1 } },
+  { id: 'boulderline', n: 'Boulder Line', cost: 1, fits: 'run', desc: 'A line of boulders: +3 strength against blocks.', fx: { dStr: 3 } }];
+GF_POW2.djinn = [{ id: 'luckywish', n: 'Lucky Wish', cost: 1, fits: 'pass', desc: 'A wish on the throw: it flies truer and is likelier caught.', fx: { errM: .8, catch: .1 } },
+  { id: 'mirrorimage', n: 'Mirror Image', cost: 1, fits: 'pass', desc: 'Mirror images in the coverage: more throws picked off, and the defense reads them sooner.', fx: { int: 1.6, read: -.2 } }];
+GF_POW2.hydra = [{ id: 'threeway', n: 'Three-way Option', cost: 1, fits: 'run', desc: 'Three heads, three ways to go: the carrier through the first tackle, and 4% faster.', fx: { breakN: 1, cSpd: 1.04 } },
+  { id: 'hydrabite', n: 'Many Bites', cost: 1, fits: 'any', desc: 'A head for every ball carrier: tackles likelier.', fx: { tkl: .15 } }];
+GF_POW2.frostwyrm = [{ id: 'iceglide', n: 'Ice Glide', cost: 1, fits: 'pass', desc: 'The ball glides on frost: 15% faster through the air, and the receivers 4% faster.', fx: { ballV: 1.15, rSpd: 1.04 } },
+  { id: 'deepfreeze', n: 'Deep Freeze', cost: 1, fits: 'run', desc: 'The carrier freezes up: 12% slower, and tackles a little likelier.', fx: { cSpd: .88, tkl: .05 } }];
+for (const k of ['phoenix', 'kraken', 'behemoth', 'djinn', 'hydra', 'frostwyrm']) for (const p of GF_POW2[k]) GF_POW_BY[p.id] = p;
