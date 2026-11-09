@@ -41,7 +41,7 @@ function bkPressure(h) {
   const p = L.pl[h], [nd, ndd] = bkNearest(p.x, p.y, bkDefense());
   if (!nd || ndd >= 1 || nd.stun > 0) return false;
   const Pr = bkPress(nd.side), Df = bkDefNow(), press = Df.back ? (bkU(p.side, p.x) > 14 ? Df.back : Df.front) : 1;
-  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02) * press * Pr.steal * bkPace(p.side).risk) { bkPicked(nd); return true; }
+  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02) * press * Pr.steal * bkPace(p.side).risk * bkFx('stl')) { bkPicked(nd); return true; }
   if (R() < BK_THINK.reach * Pr.foul) { bkReach(nd); return true; }
   return false;
 }
@@ -52,7 +52,7 @@ function bkLaneBlock(p) {
   for (const d of bkDefense()) {
     if (d.stun > 0) continue;
     const s = ((d.x - p.x) * ax + (d.y - p.y) * ay) / (len * len); if (s < .05 || s > 1) continue;
-    if (Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len < .9 + (d.r.siz - 5) * .04 + (bkDefNow().lane || 0) && s < bs) { bs = s; best = d; }
+    if (Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len < .9 + (d.r.siz - 5) * .04 + (bkDefNow().lane || 0) + bkFx('lane') && s < bs) { bs = s; best = d; }
   }
   return best;
 }
@@ -66,7 +66,7 @@ function bkThink(h) {
     if (dist < 1.4) return bkShoot();
     const d = bkLaneBlock(p);
     if (d && dist > 1.8) {
-      if (R() < clamp(.35 + (p.r.hnd + p.r.spd - d.r.def - d.r.spd) * .05, .08, .75)) { d.stun = .45; bkEv('beat', p.n, d.n); return; }
+      if (R() < clamp(.35 + (p.r.hnd + p.r.spd - d.r.def - d.r.spd) * .05, .08, .75) + bkFx('beat')) { d.stun = .45; bkEv('beat', p.n, d.n); return; }
       if (dist < 4.5 && R() < .45) return bkShoot();
       L.drive = false;
     }

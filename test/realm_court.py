@@ -43,7 +43,7 @@ async def main():
 
         # ---------- the play ----------
         # a game on, stepped through the tip to the first live play
-        r = await pg.evaluate("""(() => { wBK.start({ seed: 5 }); const ph0 = wBK.phase; let n = 0;
+        r = await pg.evaluate("""(() => { wBK.start({ seed: 5, powers: false }); const ph0 = wBK.phase; let n = 0;
           while (wBK.phase === 'intro' && n++ < 200) wBK.step();
           const G = wBK.G, P = wBK.play; const h = P.ball.st === 'held' ? P.pl[P.ball.h] : null;
           return { ph0, ph: wBK.phase, poss: G.poss, side: h ? h.side : -1, n: P.pl.length, five: [0, 1].map(s => P.pl.filter(p => p.side === s).length), plain: __plain(G) && __plain(P) }; })()""")

@@ -4,6 +4,8 @@
    hears each beat (intro, live, dead, walk, ft, break, over) and onOver the end, with the summary. The tests' handles:
    G, the rules and the pure rule functions, step (one beat of the play), play (the live play, L), ev (its events). */
 // a table's names and descriptions, by id
+// a power's name, cost, fit and description (for the page)
+function bkNameP(p) { return p ? { id: p.id, n: p.n, cost: p.cost, fits: p.fits, desc: p.desc } : null; }
 function bkNameDesc(T) { return Object.fromEntries(Object.entries(T).map(([k, v]) => [k, { n: v.n, desc: v.desc }])); }
 return {
   newGame: bkNewGame, score: bkScore, shotValue: bkShotValue, run: (dt, hold) => bkRun(dt, hold), give: bkGive, violation: bkViolation, foul: bkFoul,
@@ -35,6 +37,18 @@ return {
   edge: (o, d) => bkEdge(o, d).slice(), call: (kind, id, side) => G && G.call ? bkCall(side == null ? GD.you : side, kind, id) : 'No game on.',
   calls: () => G && G.call ? JSON.parse(JSON.stringify({ call: G.call, cur: G.cur, scout: G.scout, to: G.to, sets: G.setLog, skill: G.skill })) : null,
   timeout: side => G && G.to ? bkTimeout(side == null ? GD.you : side) : 'No game on.', skills: BK_SKILL.slice(), toRules: Object.assign({}, BK_TO),
+  // powers (phase 6): each side's mana, spirit, zones and casts on this possession; the powers a side could cast now and
+  // for each end; ultimates and situation powers; your queue (role, ri, id), your ultimate and situation power now ('' or
+  // why not); Auto powers; the rules; and every kind's powers for How to play
+  powers: side => G && G.mana ? { mana: Math.floor(G.mana[side] + 1e-9), spirit: Math.round(G.spirit[side]), ultUsed: G.ultUsed[side], zones: JSON.parse(JSON.stringify(G.zones)), cast: G.cur && G.cur.cast ? JSON.parse(JSON.stringify(G.cur.cast)) : [], on: G.powers } : null,
+  powerOptions: side => G && G.cur ? bkPowerOptions(side) : [], powerList: (side, role) => G && G.on ? bkPowerList(side, role) : [], ultOptions: side => G && G.on ? bkUltOptions(side) : [], sitOptions: side => G && G.cur ? bkSitOptions(side) : [],
+  queue: (role, ri, id) => G && GD ? bkPowQueue(role, ri, id) : 'No game on.', get queued() { return GD && GD.pow ? JSON.parse(JSON.stringify(GD.pow)) : null; }, ult: ri => G && GD ? bkUltNow(GD.you, ri) : 'No game on.', sit: id => G && GD ? bkSitNow(GD.you, id) : 'No game on.',
+  // (the tests' handle: cast this power of player ri now, as if at the start of the possession)
+  castNow: (side, ri, id) => { const o = bkPowerList(side, G.cur && G.cur.side === side ? 'off' : 'def').find(x => x.ri === ri && x.id === id); if (!o) return false; const ok = bkCast(side, o); bkFxNow(); bkFxStart(); return ok; },
+  get auto() { return !!GD && GD.auto; }, set auto(v) { if (GD) GD.auto = !!v; }, fx: k => bkFx(k), fits: Object.assign({}, BK_FITS),
+  powerRules: { mana: Object.assign({}, BK_MANA), sta: Object.assign({}, BK_POW_STA), spirit: Object.assign({}, BK_SPIRIT), ultPoss: BK_ULT_POSS },
+  powerBook: Object.fromEntries(Object.keys(BK_POW).map(k => [k, { off: bkNameP(BK_POW[k][0]), def: bkNameP(BK_POW[k][1]), off2: bkNameP(BK_POW2[k][0]), def2: bkNameP(BK_POW2[k][1]), ult: bkNameP(BK_ULT[k]) }])),
+  sits: JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(BK_SIT).map(([k, v]) => [k, { n: v.n, desc: v.desc, cost: v.cost, when: v.when }])))), powerData: JSON.parse(JSON.stringify({ pow: BK_POW, pow2: BK_POW2, ult: BK_ULT })),
   // save points and the ground (phase 5): a snapshot now, putting one back on the court, the hooks for each stoppage's
   // snapshot, and the Charter Court's state ({ wax, bent, roar }, or null away from it)
   snapshot: () => G && GD && G.teams ? bkSnapshot() : null, resume: sn => { BKP.paused = false; bkResume(sn); bkShow(); return G; },

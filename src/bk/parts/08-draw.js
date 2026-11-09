@@ -8,6 +8,8 @@
    Phase 2: by hand, the player you play has a marker over them, and the release meter rises beside your shooter (the
    window in green, its heart, the swish, brighter); after a shot the meter stays a moment with where you let go. A
    player on fire has flames at their feet. A pick shows the screener's spot.
+   Phase 6, powers: each side's mana (pips) and spirit (a bar, gold when it can pay for the ultimate) under the score,
+   and the zones on the floor with their names.
    Phase 5, the Charter Court's own: a shine on the waxed patches, a bent rim hanging down, the crowd on its feet in a
    roar.
    Court space is metres (05-live.js); bkScr turns it into canvas pixels. */
@@ -22,6 +24,7 @@ function bkDraw(c) {
   bkDrawBack(c);
   bkDrawHoop(c, 0, true);
   bkDrawHoop(c, 1, true);
+  bkDrawZones(c);
   bkDrawPlayers(c);
   bkDrawHoop(c, 0, false);
   bkDrawHoop(c, 1, false);
@@ -143,7 +146,7 @@ function bkDrawBall(c) {
   c.restore();
 }
 // a big moment in big letters on the floor, for a moment; and at the end, the final
-const BK_BIG = { bent: ['RIM BENT', '#ffb070'], roar: ['THE YARD ROARS', '#ffd08a'], swish: ['SWISH', '#bfe8a8'], alley: ['ALLEY-OOP', '#ffd08a'], goaltend: ['GOALTENDING', '#ff8a6a'], fire: ['ON FIRE', '#ffb02e'], break: ['FAST BREAK', '#bfe8a8'], dunk: ['SLAM DUNK', '#ffd08a'], three: ['FROM THREE', '#ffd08a'], block: ['BLOCKED', '#ff8a6a'], andone: ['AND ONE', '#ffd08a'], clock: ['SHOT CLOCK', '#ff8a6a'] };
+const BK_BIG = { ult: ['ULTIMATE', '#c9a0ff'], bent: ['RIM BENT', '#ffb070'], roar: ['THE YARD ROARS', '#ffd08a'], swish: ['SWISH', '#bfe8a8'], alley: ['ALLEY-OOP', '#ffd08a'], goaltend: ['GOALTENDING', '#ff8a6a'], fire: ['ON FIRE', '#ffb02e'], break: ['FAST BREAK', '#bfe8a8'], dunk: ['SLAM DUNK', '#ffd08a'], three: ['FROM THREE', '#ffd08a'], block: ['BLOCKED', '#ff8a6a'], andone: ['AND ONE', '#ffd08a'], clock: ['SHOT CLOCK', '#ff8a6a'] };
 function bkDrawBig(c) {
   let word = null, col = '#ffd08a', sub = '', al = 1, sc = 1;
   if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}`; }
@@ -165,6 +168,11 @@ function bkDrawHud(c) {
     const T = G.teams[s], al = s ? 'right' : 'left';
     c.fillStyle = T.color; c.fillRect(s ? 930 : 20, 12, 10, 40);
     txt(c, T.name, s ? 920 : 40, 30, `800 20px ${BK_FONT}`, '#f3ead6', al);
+    // mana (whole points, as pips) and spirit (a bar, gold once it can pay for the ultimate), phase 6
+    if (G.powers && G.mana) { const m = Math.floor(G.mana[s] + 1e-9), x0 = s ? 760 : 200;
+      for (let k = 0; k < BK_MANA.max; k++) { c.fillStyle = k < m ? '#7fd4ff' : 'rgba(127,212,255,.18)'; c.beginPath(); c.arc(x0 + (s ? -k : k) * 9, 50, 3.2, 0, Math.PI * 2); c.fill(); }
+      const sp = G.spirit[s] / BK_SPIRIT.max, bx = s ? 700 : 200, w = 56; c.fillStyle = 'rgba(255,208,138,.18)'; c.fillRect(s ? bx - w + 60 : bx, 56, w, 4);
+      c.fillStyle = G.spirit[s] >= BK_SPIRIT.ult && !G.ultUsed[s] ? '#ffd08a' : '#c98a4a'; c.fillRect(s ? bx - w + 60 : bx, 56, w * sp, 4); }
     txt(c, `Fouls ${G.tf[s]}${G.tf[1 - s] > BK_RULES.limit ? ' · in the bonus' : ''}`, s ? 920 : 40, 50, `600 13px ${BK_FONT}`, G.tf[1 - s] > BK_RULES.limit ? '#ffb070' : 'rgba(243,234,214,.6)', al);
     txt(c, String(G.score[s]), s ? 640 : 320, 46, `900 38px ${BK_FONT}`, G.poss === s && GD.ph !== 'over' ? T.light || '#fff' : '#f3ead6', 'center');
     if (G.poss === s && GD.ph !== 'over') txt(c, '●', s ? 600 : 360, 40, `14px ${BK_FONT}`, T.color, 'center');
@@ -202,4 +210,17 @@ function bkDrawMeter(c) {
   if (M) { c.fillStyle = '#ffd08a'; c.fillRect(x - 7, yAt(M.t / M.T) - 1.5, 14, 3); }
   else { const e = R0.e, good = e <= w / 2; txt(c, e <= w * BK_WIN.perfect ? 'Perfect' : good ? 'Good' : e <= w ? 'Off' : 'Way off', x + 10, yAt(1) + 4, `700 12px ${BK_FONT}`, good ? '#bfe8a8' : '#ff8a6a'); }
   c.restore();
+}
+// the zones on the floor (phase 6): each ultimate's (or a situation power's) area, tinted, with its name and what's left
+function bkDrawZones(c) {
+  if (!G.zones || !G.zones.length) return;
+  G.zones.forEach((z, k) => {
+    // (drawn at the end the play is at: the basket the offense attacks)
+    const U0 = BK_ULT_BY[z.id], vis = U0 ? U0.vis : ['#ffd08a', 'all'], end = G.cur ? G.cur.side : z.side;
+    c.save(); c.globalAlpha = .12 + .04 * Math.sin(BKT.t * 2 + k); c.fillStyle = vis[0];
+    const r = (u0, v0, u1, v1) => { const a = bkScr(...bkAt(end, u0, v0)), b = bkScr(...bkAt(end, u1, v1)); c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y)); };
+    if (vis[1] === 'paint') r(0, -2.45, 5.8, 2.45); else if (vis[1] === 'arc') { r(0, -7.5, 9, -3); r(0, 3, 9, 7.5); r(7, -3, 9.5, 3); } else if (vis[1] === 'half') r(0, -7.5, 14, 7.5); else r(0, -7.5, 28, 7.5);
+    c.restore();
+    txt(c, `${z.n} · ${z.left - 1} more`, 20 + k * 230, 500, `700 12px ${BK_FONT}`, tint(vis[0], .3), 'left');
+  });
 }

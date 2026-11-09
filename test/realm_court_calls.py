@@ -25,7 +25,7 @@ T = "[{ name: 'A', kinds: ['goblin', 'elf', 'werewolf', 'minotaur', 'troll', 'ko
 # n fixed-call games, both ways round: side 0 runs `off` against `def`, side 1 runs motion against man; the totals
 LAB = f"""(off, def, n, extra) => {{ const T = (extra && extra.teams) || {T}; const t = {{ pts: 0, poss: 0, tpa: 0, fga: 0, rim: 0, big: 0, ast: 0, stl: 0, screen: 0, beat: 0, pf: 0, tov: 0, games: 0, possAll: 0 }};
   for (let i = 0; i < n; i++) for (const sw of [0, 1]) {{ const teams = sw ? [T[1], T[0]] : T;
-    const s = wBK.simGame(Object.assign({{ teams, seed: 3000 + i, calls: [Object.assign({{ off, def: 'man' }}, extra && extra[0]), Object.assign({{ off: 'motion', def }}, extra && extra[1])] }}, extra && extra.opts));
+    const s = wBK.simGame(Object.assign({{ teams, seed: 3000 + i, powers: false, calls: [Object.assign({{ off, def: 'man' }}, extra && extra[0]), Object.assign({{ off: 'motion', def }}, extra && extra[1])] }}, extra && extra.opts));
     const L = s.sets[0][off] || {{ n: 0, pts: 0 }}, b = s.box[0].tot; t.pts += L.pts; t.poss += L.n; t.tpa += b.tpa; t.fga += b.fga; t.ast += b.ast; t.stl += s.box[1].tot.stl; t.pf += s.box[1].tot.pf; t.tov += b.tov; t.games++; t.possAll += s.poss[0] + s.poss[1];
     t.rim += s.log.filter(l => l.side === 0 && (l.k === 'layup' || l.k === 'dunk')).length; t.screen += s.tally.screen; t.beat += s.tally.beat; }}
   t.ppp = t.pts / Math.max(1, t.poss); t.three = t.tpa / Math.max(1, t.fga); return t; }}"""

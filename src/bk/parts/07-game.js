@@ -30,14 +30,14 @@ function bkStart(opts) {
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
   bkCallsStart(o);
-  bkCourtStart(!!o.court);
+  bkCourtStart(!!o.court); bkPowersStart(o.powers);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
   // how often the big plays came up (from the play's events): fast breaks, players on fire, picks set, lobs, moves that beat a man, goaltending, alley-oops made, and the Charter Court's slips, bent rims and roars
-  G.tally = { break: 0, fire: 0, screen: 0, lob: 0, beat: 0, goaltend: 0, alley: 0, slip: 0, bent: 0, roar: 0 };
+  G.tally = { break: 0, fire: 0, screen: 0, lob: 0, beat: 0, goaltend: 0, alley: 0, slip: 0, bent: 0, roar: 0, pow: 0, ult: 0, sit: 0 };
   bkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: 0, meter: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: 0, meter: null, auto: true, pow: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
   bkInputClear(); bkTipSet();
   return G;
 }
@@ -46,7 +46,7 @@ function bkGo(ph) {
   // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
   // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
-  if (ph === 'break') bkStamBreak(GD.half);
+  if (ph === 'break') { bkStamBreak(GD.half); bkManaAdd(0, BK_MANA.brk); bkManaAdd(1, BK_MANA.brk); }
   if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
   // a new half: timeouts again (one more in each overtime); a stoppage: the CPU's coaches may call one
   if (ph === 'break' && GD.half) G.to = [BK_TO.n, BK_TO.n];
@@ -142,7 +142,7 @@ function bkWalk(clock) {
 // a change of possession in the play (a steal, a defensive rebound, a loose ball): the play goes on the other way
 function bkPossession(how) {
   const lost = 1 - G.poss;
-  if (how === 'steal' && L.lost >= 0) { bkBoxAdd(lost, L.pl[L.lost].ri, 'tov'); L.lost = -1; }
+  if (how === 'steal' && L.lost >= 0) { bkBoxAdd(lost, L.pl[L.lost].ri, 'tov'); L.lost = -1; bkSpiritAdd(1 - lost, BK_SPIRIT.steal); }
 }
 function bkViolationNow() {
   const side = G.poss, h = bkHand() >= 0 ? bkHand() : L.ball.st === 'pass' ? L.ball.from : -1;
@@ -167,10 +167,12 @@ function bkShotDone(S) {
     GD.big = S.goaltend ? { k: 'goaltend' } : S.alley ? { k: 'alley' } : S.dunk ? { k: 'dunk' } : S.swish ? { k: 'swish' } : three ? { k: 'three' } : null; GD.net = { hoop: bkHoopX(S.side) > BK_RULES.len / 2 ? 1 : 0 };
   } else if (S.block) { GD.big = { k: 'block' }; }
   else GD.msg = `${p.n} misses${three ? ' from three' : S.rim ? ' at the rim' : ''}.`;
-  bkCourtShot(S, p);
+  bkCourtShot(S, p); bkSpiritShot(S);
   // the hot hand: makes in a row; the third sets them on fire, and a miss puts it out
   const hot = G.hot[S.side], was = bkOnFire(p);
-  if (S.made) { hot[p.ri] = (hot[p.ri] || 0) + 1; if (hot[p.ri] === BK_FIRE.n) { GD.msg += ` ${p.n} is on fire!`; GD.big = { k: 'fire' }; bkEv('fire', p.n); } }
+  if (S.made) { hot[p.ri] = (hot[p.ri] || 0) + 1; if (hot[p.ri] === BK_FIRE.n) { if (G.kept) G.kept[S.side][p.ri] = false; GD.msg += ` ${p.n} is on fire!`; GD.big = { k: 'fire' }; bkEv('fire', p.n); } }
+  // (a miss puts the fire out, unless the crowd's spirit keeps it going one more)
+  else if (was && bkSpiritKeep(p)) GD.msg += ` The crowd keeps ${p.n} on fire.`;
   else { hot[p.ri] = 0; if (was) GD.msg += ` ${p.n} has cooled off.`; }
   if (S.foul) {
     const d = L.pl[S.by], who = d.n, f = bkFoulOn(D, d, { shooting: true, made: S.made, three });
@@ -223,11 +225,13 @@ function bkFreeThrows(side, i, n) {
   }
   const s = L.pl[i]; s.x = hx - dir * 4.225; s.y = 0; s.vx = s.vy = 0;
   Object.assign(L.ball, { st: 'held', h: i, to: -1 }); L.drive = false; L.shot = null; L.last = null;
+  // (the other coach may ice them, Ice It, 14-powers.js: before the beat, so its save point has it)
+  bkCpuIceAt(side);
   bkGo('ft');
 }
 // one free throw: touch, nothing else (nerve comes later); yours on the meter (o.e: how far from the top you let go)
 function bkFreeThrow(o) {
-  const F = GD.ft, p = L.pl[F.i], ch = bkFtChance(p), e = o && o.e;
+  const F = GD.ft, p = L.pl[F.i], ch = clamp(bkFtChance(p) + (G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + (F.ice || 0), .05, .98), e = o && o.e;
   const good = R() < (e == null ? ch : bkTimed(ch, e, bkFtWindow(p), BK_FT_TIMED));
   F.n--; bkBoxAdd(F.side, p.ri, 'fta');
   if (good) { F.made++; bkScore(F.side, 1); bkRunAdd(F.side, 1); bkBoxAdd(F.side, p.ri, 'ftm'); bkBoxAdd(F.side, p.ri, 'pts'); G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: F.side, pts: 1, who: p.n, ri: p.ri, k: 'ft', ast: '' }); }

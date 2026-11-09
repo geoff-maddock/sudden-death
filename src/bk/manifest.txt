@@ -13,3 +13,4 @@ src/bk/parts/10-bench.js
 src/bk/parts/11-calls.js
 src/bk/parts/12-save.js
 src/bk/parts/13-court.js
+src/bk/parts/14-powers.js

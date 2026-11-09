@@ -40,7 +40,7 @@ function bkCourtShot(S, p) {
   if (big) bkRoar(side);
   else if (G.run.side >= 0 && G.run.pts >= BK_ROAR.run && !G.run.roared) { G.run.roared = true; bkRoar(G.run.side); }
 }
-function bkRoar(side) { if (!G.court) return; G.court.roar = { side, t: BK_ROAR.secs }; bkEv('roar', G.teams[side].name); }
+function bkRoar(side) { if (!G.court) return; G.court.roar = { side, t: BK_ROAR.secs }; bkSpiritAdd(side, BK_SPIRIT.roar); bkEv('roar', G.teams[side].name); }
 function bkCourtStep(dt) { if (G.court && G.court.roar && (G.court.roar.t -= dt) <= 0) G.court.roar = null; bkWaxStep(dt); }
 // what the ground does to a shot: the bent rim, and the roar behind the shooter
 function bkCourtMod(p) {

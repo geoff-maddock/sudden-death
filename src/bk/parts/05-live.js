@@ -66,7 +66,7 @@ function bkSetSpots(side) {
 }
 // a player's speed now: metres a second
 function bkSpeed(p, i) {
-  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p));
+  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p)) * (G.cur ? (p.side === G.cur.side ? bkFx('oSpd') : bkFx('dSpd')) : 1);
   if (i === bkHand()) m *= .9;
   if (p.stun > 0) m *= .25;
   return m;
@@ -127,7 +127,7 @@ function bkAim(p, i) {
     if (i === h) return L.drive ? [bkHoopX(p.side), 0] : bkHandlerSpot(p);
     // a cutter goes to the rim; the others hold their spot (with a drift, so the defense has to move)
     if (p.cut) return p.cut;
-    if (p.cd <= 0 && L.t > 1.5 && h >= 0 && bkU(p.side, L.pl[h].x) < 11 && R() < .006 * (bkSetNow().cut || 1) * (bkDefNow().cut || 1)) { const u = 1.6 + R() * 1.2; p.cut = bkAt(p.side, u, (R() - .5) * 2.4); p.cutT = 1.4; p.cd = 3 + R() * 2; }
+    if (p.cd <= 0 && L.t > 1.5 && h >= 0 && bkU(p.side, L.pl[h].x) < 11 && R() < .006 * (bkSetNow().cut || 1) * (bkDefNow().cut || 1) * bkFx('cut')) { const u = 1.6 + R() * 1.2; p.cut = bkAt(p.side, u, (R() - .5) * 2.4); p.cutT = 1.4; p.cd = 3 + R() * 2; }
     const s = bkAt(p.side, ...bkSpot(p.side, p.pos)), w = Math.sin(L.t * .9 + i * 1.7) * .8;
     return [s[0] + w * .4, s[1] + w];
   }
@@ -192,7 +192,9 @@ function bkCatch() {
   bkGain(B.to, 'pass');
   rc.cut = null;
   // a lob caught near the rim by a leaper goes straight up and in: the alley-oop
-  if (lob && bkRimDist(rc.side, rc.x, rc.y) < 2.6 && bkLeaper(rc)) bkShoot({ alley: true });
+  // (Skyhook: from anywhere inside the arc, to anyone)
+  const sky = bkFx('oop') > 0;
+  if (lob && (sky ? bkRimDist(rc.side, rc.x, rc.y) < BK_RULES.arc : bkRimDist(rc.side, rc.x, rc.y) < 2.6 && bkLeaper(rc))) bkShoot({ alley: true });
 }
 /* the pass: from the handler to teammate j, led to where they're going. Any defender close to its lane may step in:
    settled now, and the flight shows it. A lob is slower and high: only a defender near where it comes down can reach
@@ -208,7 +210,7 @@ function bkPass(j, lob) {
     if (s < (lob ? .8 : .15) || s > .95) continue;
     const off = Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len;
     if (off > .95 || d.stun > 0) continue;
-    const ch = (.95 - off) / .95 * (.07 + d.r.def * .022 + d.r.spd * .006) * (1.25 - p.r.hnd * .04) * (lob ? .5 + d.r.hop * .03 : 1) * bkPress(d.side).steal * bkPace(p.side).risk * (bkDefNow().lanes || 1);
+    const ch = (.95 - off) / .95 * (.07 + d.r.def * .022 + d.r.spd * .006) * (1.25 - p.r.hnd * .04) * (lob ? .5 + d.r.hop * .03 : 1) * bkPress(d.side).steal * bkPace(p.side).risk * (bkDefNow().lanes || 1) * bkFx('stl');
     if (R() < ch) { stl = L.pl.indexOf(d); tx = lerp(p.x, tx, s); ty = lerp(p.y, ty, s); T *= s; break; }
   }
   Object.assign(L.ball, { st: 'pass', h: -1, fx: p.x, fy: p.y, tx, ty, t: 0, T, to: j, from: h, stl, lob: !!lob });
@@ -219,7 +221,7 @@ function bkPass(j, lob) {
 // to 1 smothered), rim (at the rim), dunk }
 function bkShotP(p, x, y) {
   const dist = bkRimDist(p.side, x, y), [d, dd] = bkNearest(x, y, L.pl.filter(q => q.side !== p.side && q.stun <= 0));
-  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) * bkPress(d.side).con : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
+  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) * bkPress(d.side).con * (G.cur && d.side !== G.cur.side ? bkFx('con') : 1) : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
   const rim = dist < 1.5, dunk = rim && p.r.siz + p.r.hop >= 13 && con < .7;
   let pr;
   if (rim) pr = .68 + (p.r.siz + p.r.hop - 12) * .016 - con * (.24 - (p.r.siz - (d ? d.r.siz : 5)) * .01) + (dunk ? .18 : 0);
@@ -227,6 +229,8 @@ function bkShotP(p, x, y) {
   if (bkOnFire(p)) pr += BK_FIRE.p;
   pr -= .1 * bkTired(p);
   pr += bkCallMod(p, dist) + bkCourtMod(p);
+  // (the powers on the floor: every shot, threes, at the rim)
+  if (G.cur && p.side === G.cur.side) pr += bkFx('shot') + (bkShotValue(dist, y) === 3 ? bkFx('three') : 0) + (rim ? bkFx('rim') : 0);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
 }
 /* the shot: settled at the release. A defender close enough may block it (it comes off loose) or foul (free throws:
@@ -244,7 +248,7 @@ function bkShoot(o) {
     // the jump: a defender already up as the shot goes up (just before it) blocks far more; one you play who didn't jump, far less
     jumped = d.act === 'jump' && d.jumpAt != null && L.t - d.jumpAt < BK_JUMP.window;
     const mine = bkYoursNow(S.d) && !jumped;
-    const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1) * bkPress(d.side).block;
+    const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1) * bkPress(d.side).block * bkFx('blk');
     block = R() < pb;
     foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul;
     if (!mine && !jumped) { d.act = 'jump'; d.actT = .5; d.jumpAt = L.t; }
@@ -278,7 +282,7 @@ function bkRebound() {
   const B = L.ball, c = [];
   for (const p of L.pl) {
     const d = hyp(p.x - B.tx, p.y - B.ty); if (d > 2.2 || p.stun > 0) continue;
-    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) : 1) * bkBoxOut(p)]);
+    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) * bkFx('dreb') : bkFx('reb')) * bkBoxOut(p)]);
   }
   if (!c.length) { B.st = 'free'; return; }
   let s = c.reduce((a, [, w]) => a + w, 0) * R(), win = c[0][0];
@@ -332,8 +336,10 @@ function bkPickRes() {
   if (bi < 0) { const [q] = bkNearest(Bg.x, Bg.y, L.pl.filter(q => q.side !== H.side && q !== D)); bi = q ? L.pl.indexOf(q) : -1; }
   const BD = bi >= 0 ? L.pl[bi] : null;
   L.pick = null;
-  const k = !BD ? 'over' : bkDefNow().allSwitch ? 'switch' : wpick({ switch: 1.1, over: .8 + (D.r.def + D.r.spd - 12) * .08, trap: .55 });
+  const k = bkFx('fade') ? 'fade' : bkFx('wall') ? 'wall' : !BD ? 'over' : bkDefNow().allSwitch ? 'switch' : wpick({ switch: 1.1, over: .8 + (D.r.def + D.r.spd - 12) * .08, trap: .55 });
   if (k === 'switch') { D.mark = P.big; BD.mark = P.h; GD.msg = `Pick and roll: they switch, and ${BD.n} the ${BD.kind} has ${H.n} now.`; }
+  else if (k === 'fade') { GD.msg = `Pick and roll: ${D.n} fades through the screen like smoke.`; }
+  else if (k === 'wall') { D.stun = 1.3; GD.msg = `Pick and roll: ${D.n} can't get over the screen, and ${H.n} is free.`; }
   else if (k === 'over') { D.stun = .6; GD.msg = `Pick and roll: ${D.n} goes over the screen, and ${H.n} has a step.`; }
   else { L.trap = { i: bi, t: L.t + 1.6 }; GD.msg = `Pick and roll: they trap ${H.n}, and ${Bg.n} rolls free.`; }
   L.pickLast = k;

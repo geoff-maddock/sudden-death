@@ -3,7 +3,7 @@
    (GD trimmed to what play needs to go on from there). bkResume puts one back at the same beat, on fresh random
    numbers and with no keys held. */
 const BK_SNAP_AT = ['dead', 'break', 'ft', 'timeout'];
-const BK_GD_KEEP = ['ph', 't', 'mode', 'you', 'msg', 'walk', 'ft', 'half', 'keep', 'notes', 'toAsk', 'toWas'];
+const BK_GD_KEEP = ['ph', 't', 'mode', 'you', 'msg', 'walk', 'ft', 'half', 'keep', 'notes', 'toAsk', 'toWas', 'auto', 'pow'];
 function bkSnapshot() {
   const gd = {}; for (const k of BK_GD_KEEP) if (GD[k] !== undefined) gd[k] = GD[k];
   return JSON.parse(JSON.stringify({ G, L, GD: gd }));

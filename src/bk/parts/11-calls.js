@@ -85,11 +85,16 @@ function bkPossStart(side) {
   G.seen[side].push(off); if (G.seen[side].length > 8) G.seen[side].shift();
   G.cur = { side, off, def: G.call[1 - side].def, stale: Math.min(2, sc.n - 1), star: bkStar(side) };
   G.possScore = G.score[side];
+  // (the powers cast with it, and the zones on the floor: 14-powers.js)
+  bkPowersPoss();
 }
 function bkPossEnd() {
   const C = G.cur; if (!C || G.possScore == null) return;
   const L0 = G.setLog[C.side][C.off] || (G.setLog[C.side][C.off] = { n: 0, pts: 0 });
-  L0.n++; L0.pts += G.score[C.side] - G.possScore; G.possScore = null;
+  const pts = G.score[C.side] - G.possScore;
+  L0.n++; L0.pts += pts; G.possScore = null;
+  // (the side scored on gets mana)
+  if (pts > 0) bkManaAdd(1 - C.side, BK_MANA.scored);
 }
 // the offense's best scorer (Isolation's star): handle, touch and speed
 function bkStar(side) { const on = G.on[side], T = G.teams[side]; return on.reduce((b, ri) => { const r = T.roster[ri].r, v = r.hnd + r.tch + r.spd * .5; return v > b[1] ? [ri, v] : b; }, [on[0], -1])[0]; }

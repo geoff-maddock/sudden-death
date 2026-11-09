@@ -391,3 +391,6 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wccrow .wccl{min-width:80px;font-weight:700}
 .wccrow button.on{background:var(--gold,#ffb02e);color:#17100e}
 .wcedge td,.wcedge th{text-align:center}.wcedge td:first-child{text-align:left}
+/* powers on the court (w81) */
+.wcpow{font-size:.88em}.wcpow td{min-width:110px}
+.wccpow{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}

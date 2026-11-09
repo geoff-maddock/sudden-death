@@ -27,7 +27,7 @@ PLACE = """(side, pos, u, v, near) => {
   P.pl[i].x = hx - dir * u; P.pl[i].y = v || 0;
   Object.assign(P.ball, { st: 'held', h: i, to: -1, lob: false }); P.shot = null; P.pick = null; P.trap = null; P.moveCd = 0; P.drive = false; P.me = -1; P.think = 9;
   G.shot = 14; G.clock = Math.max(G.clock, 40); return i; }"""
-SETUP = """(side, pos, u, v, seed, near) => { wBK.start({ seed: seed || 3, mode: 'play', skill: [0, 0] }); let n = 0; while (wBK.phase !== 'live' && n++ < 300) wBK.step(); return __place(side, pos, u, v, near); }"""
+SETUP = """(side, pos, u, v, seed, near) => { wBK.start({ seed: seed || 3, mode: 'play', skill: [0, 0], powers: false }); let n = 0; while (wBK.phase !== 'live' && n++ < 300) wBK.step(); return __place(side, pos, u, v, near); }"""
 
 async def main():
     subprocess.run(REALM_BUILD, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
