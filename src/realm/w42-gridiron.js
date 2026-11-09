@@ -106,7 +106,7 @@ function wGridLineup() {
     <thead><tr><th>Pos</th><th>Player</th>${st.map(k => `<th title="${esc(W_GRID_STAT[k][1])}">${W_GRID_STAT[k][0]}</th>`).join('')}<th title="Stamina: every play costs a little and casting a power a lot; below half a player is slower and weaker. The half gives plenty back.">Sta</th></tr></thead>
     <tbody>${t.players.map(p => { const P = W_GRID_POS[p.pos] || [p.pos, []], B = wGF.powerBook[p.kind] || {};
       const pw = [B.off && `${B.off.n} (offense)`, B.def && `${B.def.n} (defense)`, B.ult && `★ ${B.ult.n} (once a game)`].filter(Boolean).join(', ');
-      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td title="${esc('Powers: ' + pw)}">${esc(p.n)} <small>#${p.num}</small></td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}<td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td></tr>`; }).join('')}</tbody></table>
+      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td title="${esc('Powers: ' + pw)}">${esc(p.n)} <small>#${p.num}</small>${typeof wGridGearTag === 'function' ? wGridGearTag(p) : ''}</td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}<td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td></tr>`; }).join('')}</tbody></table>
     ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
@@ -146,7 +146,7 @@ function wGridLog() {
 function wGridNotesLine(notes, head) {
   const G = wGF.G; if (!G || !notes || !notes.length) return '';
   const who = s => esc(G.teams[s] ? G.teams[s].short || G.teams[s].name : '');
-  const ico = { swap: '⇄', rest: '✚', pow: '◆' };
+  const ico = { swap: '⇄', rest: '✚', pow: '◆', pot: '⚗' };
   return (head ? `<li class="wgnote"><small>${esc(head)}</small>` : '') + notes.map(n => `<span class="wgnote${n.k}">${ico[n.k] || ''} <b>${who(n.side)}</b> ${esc(n.msg)}</span>`).join('') + (head ? '</li>' : '');
 }
 const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety', fum: 'Fumble', fumtd: 'Fumble, run back for a touchdown' };

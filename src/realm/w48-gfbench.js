@@ -7,6 +7,7 @@
    - Powers: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth give stamina back.
    Every swap, potion and power goes in the play log, with its team (w42 wGridNotesLine).
    wGridSwap(out, inn), wGridPotion(id, ri) return a message for the player, or '' when it worked.
+   More gear and potions (issue #61, phase 3): w74 (the Resin, the Elixir, the Fog, the Balm, and their bag for the other side).
    Wrapped: wGridBar (wW48GridBar: the bench panel), renderHelp (wW48RenderHelp: #wHelpGfBench). */
 
 // msg: why the last swap or potion didn't happen, shown until the next call or game (at, G: when it was shown)

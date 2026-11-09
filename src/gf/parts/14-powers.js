@@ -111,7 +111,7 @@ const gfMana = s => G.mana ? G.mana[s] : 0;
 function gfManaAdd(s, n) { if (G.mana) G.mana[s] = clamp(G.mana[s] + n, 0, GF_MANA.max); }
 // a worn player's ratings: below half stamina, down to 80% at none
 function gfWorn(side, ri, r) {
-  const st = G.stam ? G.stam[side][ri] : 100; if (st >= 50) return r;
+  const st = G.stam ? G.stam[side][ri] : 100; if (st >= 50 || gfSalved(side, ri)) return r;
   const f = .8 + .2 * st / 50, o = Object.assign({}, r);
   for (const k of ['spd', 'str', 'hnd', 'arm', 'tkl']) o[k] = r[k] * f;
   return o;
@@ -231,7 +231,7 @@ function gfPowersAfter() {
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
-function gfPowersHalf() { if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
+function gfPowersHalf() { if (G.salve) G.salve = [[], []]; if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
 // a new drive: mana for both sides
 function gfPowersDrive() { if (G.mana) for (const s of [0, 1]) gfManaAdd(s, GF_MANA.drive); }
 // a score: the side scored on gets mana back

@@ -301,6 +301,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wglog span.wgnotepow{color:#c8b4ff}
 .wglog span.wgnoteswap{color:#bfe8a8}
 .wglog span.wgnoterest{color:#9fd8e8}
+.wglog span.wgnotepot{color:#ffc98a}
+.wggear{color:#ffd08a;margin-left:4px}
 .wglog li.wgnote{border-color:#a88cff}
 .wgbench{margin:4px 0 10px}
 .wgbench td:first-child,.wgbench th:first-child{text-align:left}

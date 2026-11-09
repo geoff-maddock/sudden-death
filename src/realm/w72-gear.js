@@ -8,7 +8,7 @@
    the engine's ratings ({ pow: 1 }); phases 2 and 3 add the effects only one sport has (cuts, fumbles...), read by the
    engines from the fighter's or player's gear. Every piece is also an item (DB.items[id], with gear: sport), so shops,
    chests and the Bag carry it like anything else; while a player wears it, it is out of the bag.
-   W_POTIONS: id -> { sport (or sports: [...]), ... }: the potions each sport uses in a match (football's two from w48; boxing's in phase 2).
+   W_POTIONS: id -> { sport (or sports: [...]), ... }: the potions each sport uses in a match (football's two from w48 and four from w74; boxing's from w73).
    wMatchBag(sport) lists the ones in your bag.
 
    State: p.gear = { ring?: id, grid?: id } on a roster player (plain JSON, in the save). A released player's gear goes

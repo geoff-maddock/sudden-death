@@ -19,10 +19,10 @@
 const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
 // (a defender who knows the play is coming gets a jump on it; one whose defense is read, a step slow)
-// (and the powers and zones on the field, 14-powers.js: by side, job and where they are)
+// (and the powers and zones on the field, 14-powers.js: by side, job and where they are; and gear and the Speed Elixir: p.sm, p.tn, 17-kit.js)
 function gfSpeed(p) {
   const F = L.fx || GF_FX0, held = L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p);
-  let m = (6 + p.r.spd * .2) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+  let m = (6 + p.r.spd * .2) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1) * (p.sm || 1);
   if (p.side === 1) { m *= (1 + .08 * L.read - .05 * L.tell) * F.dSpd; if (p.job === 'rush') m *= F.rushSpd; else if (p.job === 'man' || p.job === 'zone') m *= F.coverSpd; return m; }
   m *= F.oSpd;
   if (held) m *= .94 * F.cSpd; else if (p.job === 'route') m *= F.rSpd * (p.x > 8 ? F.deepSpd : 1);
@@ -34,8 +34,8 @@ function gfSpeed(p) {
 function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
-    const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri];
-    pl.push({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: gfWorn(side ? 1 - G.poss : G.poss, ri, m.r), x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 });
+    const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri], tm = side ? 1 - G.poss : G.poss;
+    pl.push(Object.assign({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: gfWorn(tm, ri, m.r), gx: m.gx || null }, gfKitMove(tm, ri, m), { x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 }));
     return pl.length - 1;
   };
   const set = gfSet(oc);
@@ -116,7 +116,7 @@ function gfStep(dt) {
 // turn: how quickly a player changes direction (7 a second; a defender in coverage turns slower, so a cut gains room)
 function gfMove(p, tx, ty, dt, turn) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(gfSpeed(p), d / .25);
-  const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0, k = Math.min(1, dt * (turn || 7));
+  const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0, k = Math.min(1, dt * (turn || 7) * (p.tn || 1));
   p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k; p.x += p.vx * dt; p.y += p.vy * dt;
 }
 
@@ -255,7 +255,7 @@ function gfBall(dt) {
   }
   // a long ball is a harder catch
   const far = Math.max(0, hyp(B.tx - B.fx, B.ty - B.fy) - 15) * .012;
-  const pc = (d && dd < 1.4 && !sure ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - (sure ? 0 : Math.max(0, 1.6 - dd) * .3), .15, .97)) - far + F.catch;
+  const pc = (d && dd < 1.4 && !sure ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - (sure ? 0 : Math.max(0, 1.6 - dd) * .3), .15, .97)) - far + F.catch + (gfGxOf(rc).catch || 0);
   if (sure && d && dd < 1.4) gfEv('pow', L.src.sure || '', `${L.src.sure}: ${rc.n} rose over ${d.n}.`);
   if (R() < pc) { B.st = 'held'; B.h = B.tgt; L.carrier = B.tgt; rc.slow = Math.max(rc.slow, .15); gfEv('catch', rc.n); gfGotBall(B.tgt); }
   else { B.st = 'dead'; gfDead('inc', 'dropped'); }
@@ -281,7 +281,7 @@ function gfBlocks(dt) {
   for (const o of L.pl) {
     if (o.side !== 0 || o.eng < 0) continue;
     // run blocking drives forward: the blockers know the snap count and where the play goes
-    const d = L.pl[o.eng], F = L.fx || GF_FX0, dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5 + F.blk - F.dStr;
+    const d = L.pl[o.eng], F = L.fx || GF_FX0, dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5 + F.blk - F.dStr + (gfGxOf(o).blk || 0) - (gfGxOf(d).blk || 0);
     // the pair moves the way the stronger one drives
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;

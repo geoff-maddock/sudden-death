@@ -103,3 +103,4 @@ src/realm/w70-advmarks.js
 src/realm/w71-rdaily.js
 src/realm/w72-gear.js
 src/realm/w73-ringkit.js
+src/realm/w74-gridkit.js

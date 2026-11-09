@@ -68,6 +68,6 @@ function gfMeterTap() {
 }
 // what the meter says: a field goal is good or not, a punt goes so far
 function gfFgWindow(k) { return clamp(.1 + k.r.kck * .022 - (gfKickDist() - 20) * .003, .05, .32); }
-function gfFgReach(k) { return 34 + k.r.kck * 2.6; }
+function gfFgReach(k) { return 34 + k.r.kck * 2.6 + (gfGxOf(k).kick || 0); }
 function gfMeterFg(k) { const M = GD.meter; return M.pw * gfFgReach(k) >= gfKickDist() && Math.abs(M.aim) <= gfFgWindow(k); }
-function gfMeterPunt(k) { const M = GD.meter; return Math.max(8, Math.round((22 + M.pw * (22 + k.r.kck * 2.2)) * (1 - Math.abs(M.aim) * .35))); }
+function gfMeterPunt(k) { const M = GD.meter; return Math.max(8, Math.round((22 + M.pw * (22 + k.r.kck * 2.2) + (gfGxOf(k).punt || 0)) * (1 - Math.abs(M.aim) * .35))); }
