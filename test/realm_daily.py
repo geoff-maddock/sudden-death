@@ -6,7 +6,7 @@
 # match, the buttons, the streak, past days, the result); the log line; and How to play. Exits nonzero on failure.
 import asyncio, json, sys, os
 sys.path.insert(0, os.path.dirname(__file__))
-from paths import REALM_URL
+from paths import REALM_URL, ROOT
 from playwright.async_api import async_playwright
 
 FAILS = []
@@ -176,7 +176,35 @@ async def main():
         h = await pg.evaluate("(() => { renderHelp(); const e = document.getElementById('wHelpRDaily'); return e ? e.textContent : ''; })()")
         check('one attempt' in h and 'Daily tab' in h and 'Sunday' in h, 'How to play explains the daily', h[:200])
         check(not errs, 'no page errors', errs[:4])
+        check(await pg.evaluate("BOARD.st") == 'off' and await pg.evaluate("document.querySelectorAll('[data-board]').length") == 0, 'off the claude.ai runtime there is no board')
         print('errors:', errs[:4])
+
+        # ---- the shared board (phase 5), on a stand-in for the claude.ai runtime ----
+        pg2 = await br.new_page(viewport={'width': 1200, 'height': 900})
+        errs2 = []
+        pg2.on('pageerror', lambda e: errs2.append(str(e)))
+        fake = open(os.path.join(ROOT, 'test', 'daily_fake_runtime.js')).read()
+        await pg2.add_init_script("window.__FAKE_CFG = { names: { u_me: 'Me', u_ada: 'Ada' } };\n" + fake)
+        await new_journey(pg2, clear=True)
+        await pg2.wait_for_function("BOARD.st === 'on'")
+        await pg2.evaluate("(() => { while (wRoster().length < W_PARTY.max - 1) wAddPlayer(wMakePlayer({ kind: 'dwarf', lvl: 4 }, 'tavern')); })()")
+        # a baseball day from today on (the board keeps the last month, counted from the real date)
+        k = await pg2.evaluate("(() => { const d = dayDate(dayKey()); for (let i = 0; i < 200; i++, d.setDate(d.getDate() + 1)) if (wRdailyOf(dayKey(d)).eng === 'ball') return dayKey(d); })()")
+        await pg2.evaluate(DAY(k))
+        await pg2.evaluate(f"""__FAKE.seed('u_ada', {{ v: 1, 'rd_{k.replace('-', '')}': 2503, rd: {{ '{k}': {{ st: 'win', us: 5, them: 2, eng: 'ball' }} }} }})""")
+        await pg2.evaluate("wRdailyStart('sim')")
+        await pg2.evaluate("BOARD.busy")
+        await pg2.evaluate(CLOSE_ALL)
+        r = await pg2.evaluate(f"""(() => {{ const d = __FAKE.docs['boards/u_me'] || {{}}, e = wRdailyAll().days['{k}'];
+          return {{ rank: d['rd_{k.replace('-', '')}'], want: e && wRdailyRank(e), shown: (d.rd || {{}})['{k}'] || null, st: e && e.st }}; }})()""")
+        check(r['rank'] is not None and r['rank'] == r['want'] and r['shown'] and r['shown']['st'] == r['st'] and r['shown']['eng'] == 'ball', 'a Realm daily goes on the shared board: the result, then the margin', r)
+        await pg2.evaluate("wOpenCamp('daily')")
+        await pg2.wait_for_function("document.querySelectorAll('#wCampBody [data-board] li').length === 2 && ![...document.querySelectorAll('[data-bname]')].some(e => e.textContent === '…')")
+        rows = await pg2.evaluate("[...document.querySelectorAll('#wCampBody [data-board] li')].map(li => [li.querySelector('.dbn').textContent, li.querySelector('.dbr').textContent])")
+        want_first = 'You' if r['rank'] > 2503 else 'Ada'
+        check(rows[0][0] == want_first and {x[0] for x in rows} == {'You', 'Ada'} and any(x[1] == 'Won 5–2' for x in rows), "the Daily tab shows today's board, in order, with names", rows)
+        check(not errs2, 'no page errors (board)', errs2[:4])
+        await pg2.close()
         await br.close()
     sys.exit(1 if FAILS else 0)
 
