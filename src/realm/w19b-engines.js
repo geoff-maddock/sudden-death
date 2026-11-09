@@ -1,11 +1,11 @@
 /* w19b: the engines (issue #9, phase 0). Some sports have a game of their own beside the card game. Each is built in
    its own scope and talks to the Realm through the same small API (start, sim, box, show, hide, pause, audio, on,
    onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
-   Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/) and the Anvil Ring (wBX, boxing; src/bx/,
-   issue #23). Nothing here is saved. */
+   Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/), the Anvil Ring (wBX, boxing; src/bx/,
+   issue #23) and the Charter Court (wBK, basketball; src/bk/, issue #77). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
-  ring: { api: wBX, view: 'ring', sport: 'boxing' } };
+  ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' } };
 /* an engine's question (Concede?) holds the game still until it closes: askConfirm hears only its two buttons, so this
    runs fn once the box closes however it closes (a button, Escape, a click outside) */
 function wAfterAsk(fn) { const t = setInterval(() => { if (!$('modal').hidden) return; clearInterval(t); try { fn(); } catch (e) { console.error(e); } }, 100); }

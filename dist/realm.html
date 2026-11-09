@@ -908,6 +908,11 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wstmeet>img,.wstmeet>.wstsil{flex:none;width:112px;height:112px;border-radius:8px}
 .wstbuy{gap:8px;flex-wrap:wrap}
 @media (max-width:520px){.wstmeet{flex-direction:column}}
+/* the court's box score (w77) */
+.wcbox{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:960px;margin:8px auto}
+.wcbox caption{text-align:left;font-weight:700;padding:2px 6px}
+.wcboxt td small{opacity:.7}
+@media (max-width:760px){.wcbox{grid-template-columns:1fr}}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -27306,14 +27311,1525 @@ return {
 };
 
 })();
+const wBK = (function () {
+/* The Charter Court: utilities (issue #77). R is the engine's random number: Math.random, or seeded (bkSeed) so a
+   headless game can be played again exactly. */
+let bkRand = Math.random;
+function bkSeed(n) {
+  if (n == null) { bkRand = Math.random; return; }
+  let a = n >>> 0;
+  bkRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const R = () => bkRand();
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const hyp = Math.hypot;
+// a weighted pick: { key: weight }
+function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
+function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
+/* The Charter Court: the rules (issue #77, phases 0 and 1). Plain data and pure functions, no page: the score, the
+   quarters and the game clock, the shot clock, fouls and free throws, and which basket each side attacks.
+   Five a side. A game is BK_RULES.mins minutes (5 by default; the Realm's settings offer 3, 5, 8 or 12), four quarters
+   of a quarter of that each. The shot clock is BK_RULES.shot seconds whatever the length: running out turns the ball
+   over, and a shot that hits the rim resets it. A basket is 2, or 3 from beyond the arc (BK_RULES.arc metres from the
+   rim, or from BK_RULES.corner metres out from the middle in the corners, where the line runs straight); a free throw is 1.
+   Fouls: a shooting foul gives two free throws, three on a three-point try, and one (the and-one) if the shot went in
+   anyway. Past BK_RULES.limit team fouls in a quarter (the bonus), every foul gives two. Five personal fouls and a
+   player is out of the game (a substitute comes in); with nobody left to come in they stay on, but every further foul
+   they commit gives one free throw more.
+   Level after the fourth quarter, an overtime of BK_RULES.ot seconds, and another, up to BK_RULES.ots; still level
+   after those, the game is a tie.
+   G is the game, plain JSON (so a snapshot can be saved): { mins, qlen, q, clock, shot, poss, score, tf, pf, arrow,
+   over }. pf: personal fouls by side, by roster index. 07-game.js adds the teams and the rest. */
+const BK_RULES = { side: 5, bench: 5, mins: 5, minsAt: [3, 5, 8, 12], quarters: 4, shot: 14, arc: 6.75, corner: 6.6, two: 2, three: 3, ft: 1,
+  limit: 4, out: 5, ot: 30, ots: 3, len: 28, wid: 15, rim: 1.575 };
+let G = null;
+
+function bkNewGame(opts) {
+  const o = opts || {}, mins = BK_RULES.minsAt.includes(o.mins) ? o.mins : BK_RULES.mins, qlen = mins * 60 / BK_RULES.quarters;
+  G = { mins, qlen, q: 1, clock: qlen, shot: BK_RULES.shot, poss: o.poss || 0, score: [0, 0], tf: [0, 0], pf: [{}, {}], arrow: 1 - (o.poss || 0), over: null };
+  return G;
+}
+// a basket from d metres out (from the rim), y across from the middle, is worth this
+const bkShotValue = (d, y) => d >= BK_RULES.arc || Math.abs(y || 0) >= BK_RULES.corner ? BK_RULES.three : BK_RULES.two;
+function bkScore(side, pts) { G.score[side] += pts; return G.score[side]; }
+// the shot clock: full again (a new possession, or a shot off the rim)
+function bkShotReset() { G.shot = BK_RULES.shot; }
+// side has the ball now, on a full shot clock
+function bkGive(side) { G.poss = side; bkShotReset(); }
+/* the clocks run dt seconds: 'shot' when the shot clock runs out (the ball goes over, bkViolation), 'end' when the
+   period's clock does, '' otherwise. The shot clock holds while a shot is in the air or the ball is loose (hold),
+   and is off when the period has less time left than it: no violation. */
+function bkRun(dt, hold) {
+  if (G.over) return '';
+  G.clock = Math.max(0, G.clock - dt);
+  const off = hold || G.clock < G.shot;
+  if (!off) G.shot = Math.max(0, G.shot - dt);
+  if (G.clock <= 0) return 'end';
+  if (!off && G.shot <= 0) return 'shot';
+  return '';
+}
+function bkViolation() { bkGive(1 - G.poss); }
+/* a foul by side's player ri. o: { shooting, made (the shot went in anyway), three (it was a three-point try),
+   benchLeft (players who could come in for them) }. Returns { shots (free throws for the other side), bonus, out (they
+   fouled out just now and must come off), extra (they stay on past the limit and gave one more), pf, tf }. */
+function bkFoul(side, ri, o) {
+  const f = o || {}, pf = G.pf[side];
+  pf[ri] = (pf[ri] || 0) + 1; G.tf[side]++;
+  const bonus = G.tf[side] > BK_RULES.limit, over = pf[ri] > BK_RULES.out, stays = over && !f.benchLeft;
+  let shots = f.shooting ? (f.made ? 1 : f.three ? 3 : 2) : bonus ? 2 : 0;
+  if (stays) shots++;
+  return { shots, bonus, out: pf[ri] === BK_RULES.out && !!f.benchLeft, extra: stays, pf: pf[ri], tf: G.tf[side] };
+}
+// side's player ri has fouled out (and isn't still on because nobody could come in)
+const bkFouledOut = (side, ri) => (G.pf[side][ri] || 0) >= BK_RULES.out;
+/* the period is over: the next quarter (team fouls start again), halftime after the second, overtime after the fourth
+   when level, or the end. Returns 'quarter', 'half', 'ot' or 'over'. The ball after a break goes by the arrow, which
+   swaps each time (the side that lost the opening tip has it first). */
+function bkPeriodEnd() {
+  if (G.over) return 'over';
+  const last = BK_RULES.quarters + BK_RULES.ots;
+  if (G.q >= BK_RULES.quarters && (G.score[0] !== G.score[1] || G.q >= last)) {
+    G.over = { win: G.score[0] === G.score[1] ? null : G.score[0] > G.score[1] ? 0 : 1, score: G.score.slice(), ot: Math.max(0, G.q - BK_RULES.quarters) };
+    return 'over';
+  }
+  G.q++; G.tf = [0, 0]; G.clock = G.q > BK_RULES.quarters ? BK_RULES.ot : G.qlen;
+  bkGive(G.arrow); G.arrow = 1 - G.arrow;
+  return G.q > BK_RULES.quarters ? 'ot' : G.q === 3 ? 'half' : 'quarter';
+}
+// the basket side attacks: +1 the right-hand one, -1 the left; the sides swap ends at halftime
+const bkDir = side => (G.q <= 2) === (side === 0) ? 1 : -1;
+// where that basket is, in court metres (x along, from the left baseline; y across, from the middle)
+const bkHoopX = side => bkDir(side) > 0 ? BK_RULES.len - BK_RULES.rim : BK_RULES.rim;
+const bkPeriodName = q => q <= BK_RULES.quarters ? ['', '1st', '2nd', '3rd', '4th'][q] : q === BK_RULES.quarters + 1 ? 'OT' : `${q - BK_RULES.quarters}OT`;
+/* The Charter Court: the players, drawn (issue #77, phase 1). Copied from Cinder Gridiron's figures
+   (src/gf/parts/03-figures.js, itself from Brimstone Diamond's) and adapted, not shared: the animation clock is BKT.t
+   (08-draw.js). drawFig(c, kind, x, y, hpx, team, o): an inked, cel-shaded player standing at (x, y), hpx tall; team
+   { color, light, short }; o { num, run (a stride phase), flip, alpha, throwK (0..1, the shooting arm), lift, noShadow }. */
+const INK = '#17100e';
+const KIND = {
+  goblin:   { skin: '#7fae4e', h: .8,  w: .9,  cap: true, eye: '#ffe04a' },
+  kobold:   { skin: '#c85a32', h: .74, w: .86, cap: true, eye: '#ffd34a' },
+  werewolf: { skin: '#7a6653', h: 1.06, w: 1.08, eye: '#ffc02e' },
+  dwarf:    { skin: '#e3a47d', h: .8,  w: 1.28, eye: '#2a1a12' },
+  ogre:     { skin: '#8f9d58', h: 1.28, w: 1.6, cap: true, eye: '#3a2412', belly: true },
+  minotaur: { skin: '#70442a', h: 1.16, w: 1.28, eye: '#ff5a3a' },
+  troll:    { skin: '#5f7f8a', h: 1.14, w: 1.35, eye: '#f2e59a', hunch: true },
+  golem:    { skin: '#8e8d86', h: 1.12, w: 1.5, eye: '#7ff0ff' },
+  harpy:    { skin: '#dcc3a2', h: .96, w: .9,  eye: '#d9f25a', talon: true },
+  elf:      { skin: '#eed3b0', h: 1.03, w: .86, eye: '#3fae7a' },
+  wraith:   { skin: '#221c35', h: 1.03, w: .96, eye: '#9ff6ff', robe: '#2b2442' },
+  vampire:  { skin: '#ece7f1', h: 1,   w: .9,  eye: '#ff2a44' },
+  lich:     { skin: '#e6dfc6', h: 1.03, w: .95, eye: '#7fd4ff', robe: '#3d2553', bony: true },
+  zombie:   { skin: '#7f9c79', h: 1.05, w: 1.16, cap: true, eye: '#f2f2d2' },
+  gorgon:   { skin: '#6fa57d', h: 1,   w: .95, eye: '#ffe14a' },
+  spider:   { skin: '#4b2f55', h: .96, w: 1,   eye: '#ff3a4a' },
+  skeleton: { skin: '#ebe5d2', h: 1,   w: .95, eye: '#ff9a3a', bony: true },
+  witch:    { skin: '#bfd9e8', h: .98, w: .88, eye: '#6ad8ff' },
+};
+function rgbOf(h) {
+  if (h[0] === 'r') return h.match(/\d+/g).slice(0, 3).map(Number);
+  h = h.slice(1); if (h.length === 3) h = h.split('').map(x => x + x).join('');
+  const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255];
+}
+function tint(h, f) { const [r, g, b] = rgbOf(h), t = f < 0 ? 0 : 255, k = Math.abs(f); return `rgb(${Math.round(r + (t - r) * k)},${Math.round(g + (t - g) * k)},${Math.round(b + (t - b) * k)})`; }
+function grey(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, v = Math.round(92 + l * .42); return `rgb(${v},${v},${v - 4})`; }
+function pRR(x, y, w, h, r) { const p = new Path2D(); r = Math.min(r, w / 2, h / 2); p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + h, r); p.arcTo(x + w, y + h, x, y + h, r); p.arcTo(x, y + h, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); return p; }
+function pEl(x, y, rx, ry, rot = 0) { const p = new Path2D(); p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); return p; }
+function pPoly(pts) { const p = new Path2D(); pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; }
+let LW = 2, FSC = 1, FLIPPED = false;
+// fill + cel shadow (light from upper left) + ink outline
+function ink(c, path, fill, sx = 0, noShade) {
+  c.fillStyle = fill; c.fill(path);
+  if (!noShade) {
+    c.save(); c.clip(path); c.fillStyle = 'rgba(26,10,36,.3)';
+    c.beginPath(); c.moveTo(sx + 2, -300); c.lineTo(sx + 300, -300); c.lineTo(sx + 300, 80); c.lineTo(sx - 10, 80); c.closePath(); c.fill(); c.restore();
+  }
+  c.lineWidth = LW; c.strokeStyle = INK; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke(path);
+}
+function inkLine(c, pts, col = INK, w = 1) { c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.strokeStyle = col; c.lineWidth = LW * w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
+function glowEye(c, x, y, r, col, st) {
+  if (st) { circ(c, x, y, r, '#5a5a56'); return; }
+  c.save(); c.shadowColor = col; c.shadowBlur = Math.max(2, r * 3.2 * FSC); circ(c, x, y, r, col); c.restore();
+  circ(c, x - r * .35, y - r * .35, r * .38, 'rgba(255,255,255,.95)');
+}
+function slit(c, x, y, r) { c.fillStyle = INK; c.fillRect(x - r * .18, y - r * .8, r * .36, r * 1.6); }
+function cap(c, d, tilt = 0, scale = 1) {
+  const { hy, hr } = d, R = (hr + 1) * scale;
+  c.save(); c.translate(tilt * 8, hy - 3.5 * scale); c.rotate(tilt);
+  const dome = new Path2D(); dome.moveTo(-R, 0); dome.arc(0, 0, R, Math.PI, 0); dome.closePath();
+  ink(c, dome, d.jer);
+  c.fillStyle = d.jerD; c.fillRect(-.8, -R, 1.6, R);
+  ink(c, pEl(0, .6, R + 3.5, 3.1), d.jerD, 0, true);
+  if (FSC * scale > .35) { c.font = `900 ${8.5 * scale}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillStyle = d.trimL; if (FLIPPED) { c.save(); c.scale(-1, 1); } c.fillText(d.letter, 0, -3.2 * scale); if (FLIPPED) c.restore(); }
+  c.restore();
+}
+
+/* things drawn behind the body */
+const BACK = {
+  harpy(c, d) {
+    const f = d.o.fly ? Math.sin(BKT.t * 18) * 12 : Math.sin(BKT.t * 2) * 2, col = d.C('#6b567c'), col2 = d.C('#8b76a0');
+    for (const s of [-1, 1]) {
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 40, d.shY - 34 - f, s * 64, d.shY - 26 - f);
+      p.lineTo(s * 56, d.shY - 10 - f * .6); p.lineTo(s * 62, d.shY + 2 - f * .3); p.lineTo(s * 50, d.shY + 12); p.lineTo(s * 54, d.shY + 26); p.lineTo(s * 38, d.shY + 26); p.lineTo(s * 36, d.shY + 36); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 12 - f * .5 + i * 7]], col2, .7);
+    }
+  },
+  vampire(c, d) {
+    const cape = pPoly([[-d.shw - 2, d.shY], [-d.shw - 12, -8], [0, -12], [d.shw + 12, -8], [d.shw + 2, d.shY]]);
+    ink(c, cape, d.C('#15101a'));
+    ink(c, pPoly([[-d.shw - 3, d.shY - 1], [-d.shw - 6, -14], [-d.shw + 2, d.shY + 4]]), d.C('#8e1426'), 0, true);
+    ink(c, pPoly([[d.shw + 3, d.shY - 1], [d.shw + 6, -14], [d.shw - 2, d.shY + 4]]), d.C('#8e1426'), 0, true);
+    // high collar
+    ink(c, pPoly([[-9, d.shY + 1], [-22, d.hy - 14], [-12, d.hy + 4]]), d.C('#8e1426'));
+    ink(c, pPoly([[9, d.shY + 1], [22, d.hy - 14], [12, d.hy + 4]]), d.C('#8e1426'));
+  },
+  spider(c, d) {
+    const k = d.o.run ? Math.sin(d.o.run) * 6 : Math.sin(BKT.t * 3) * 1.5;
+    ink(c, pEl(0, -30, 20, 17), d.C('#2c1a34'));
+    ink(c, pPoly([[-4, -40], [4, -40], [0, -32], [4, -24], [-4, -24], [0, -32]]), d.C('#d83a4a'), 0, true);
+    for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
+      const y0 = d.shY + 10 + i * 7, kk = (i % 2 ? k : -k) * s;
+      inkLine(c, [[s * 10, y0], [s * (34 + i * 3), y0 - 18 + kk], [s * (44 + i * 2), y0 + 30 - i * 4]], INK, 2.6);
+      inkLine(c, [[s * 10, y0], [s * (34 + i * 3), y0 - 18 + kk], [s * (44 + i * 2), y0 + 30 - i * 4]], d.C('#4b2f55'), 1.3);
+    }
+  },
+  gorgon(c, d) { for (let i = 0; i < 5; i++) snake(c, d, Math.PI * (1.05 + i * .225), 24, i); },
+  witch(c, d) { ink(c, pRR(-15, d.hy - 6, 30, 34, 10), d.C('#eef2f8')); },
+  wraith(c, d) { robeBody(c, d, d.C('#2b2442'), true); },
+  lich(c, d) { robeBody(c, d, d.C('#3d2553'), false); },
+};
+function robeBody(c, d, col, tattered) {
+  const p = new Path2D(); p.moveTo(-d.shw + 2, d.shY); p.lineTo(-d.shw - 7, -4);
+  if (tattered) { for (let i = 0; i <= 8; i++) { const x = -d.shw - 7 + i * (2 * d.shw + 14) / 8; p.lineTo(x, i % 2 ? -10 - Math.sin(BKT.t * 4 + i) * 2 : -1); } }
+  else p.lineTo(d.shw + 7, -4);
+  p.lineTo(d.shw - 2, d.shY); p.closePath();
+  ink(c, p, col);
+  if (!tattered) { c.fillStyle = d.C('#d8b64a'); c.fillRect(-d.shw - 6, -8, 2 * d.shw + 12, 2.4); }
+}
+function snake(c, d, a, len, i) {
+  const wv = Math.sin(BKT.t * 5 + i * 1.7) * 4, x0 = Math.cos(a) * 10, y0 = d.hy + Math.sin(a) * 10;
+  const x1 = Math.cos(a) * len + wv, y1 = d.hy + Math.sin(a) * len - 2;
+  const body = [[x0, y0], [(x0 + x1) / 2 - wv, (y0 + y1) / 2 + 3], [x1, y1]];
+  inkLine(c, body, INK, 3.4); inkLine(c, body, d.C('#3f8a4f'), 2);
+  ink(c, pEl(x1, y1, 3.4, 2.6, a), d.C('#4f9a5d'), 0, true);
+  if (FSC > .4) { circ(c, x1 + Math.cos(a) * 1.2, y1 - 1, .8, d.C('#ffe14a')); }
+}
+
+/* heads and faces */
+const HEAD = {
+  goblin(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { ink(c, pPoly([[s * 9, hy - 4], [s * 35, hy - 15], [s * 29, hy - 6], [s * 10, hy + 5]]), skin); c.fillStyle = C('#c9807a'); c.fill(pPoly([[s * 12, hy - 3], [s * 29, hy - 11], [s * 26, hy - 7], [s * 12, hy + 2]])); }
+    ink(c, pEl(0, hy, 12.5, 12), skin);
+    cap(c, d, -.08);
+    glowEye(c, -5, hy + 1, 2.7, d.eye, d.st); glowEye(c, 5, hy + 1, 2.7, d.eye, d.st); slit(c, -5, hy + 1, 2.7); slit(c, 5, hy + 1, 2.7);
+    ink(c, pPoly([[-1.5, hy + 1], [5, hy + 7.5], [-1, hy + 8]]), tint(skin, -.18));
+    c.beginPath(); c.arc(0, hy + 5, 6.5, .35, Math.PI - .35); c.fillStyle = INK; c.fill();
+    for (const x of [-3.5, 2.5]) tri(c, [x, hy + 9.6], [x + 1.6, hy + 9.6], [x + .8, hy + 7.4], '#f4ecd6');
+  },
+  kobold(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 7, hy - 8], [s * 18, hy - 24], [s * 12, hy - 7]]), C('#efe2c2'));
+    ink(c, pEl(0, hy - 1, 12, 11), skin);
+    cap(c, d, .06, .92);
+    ink(c, pEl(0, hy + 6.5, 9, 5.5), tint(skin, .18));
+    circ(c, -2.5, hy + 5, .9, INK); circ(c, 2.5, hy + 5, .9, INK);
+    inkLine(c, [[-5, hy + 9], [0, hy + 10], [5, hy + 9]], INK, .7);
+    glowEye(c, -5, hy - 1, 2.5, d.eye, d.st); glowEye(c, 5, hy - 1, 2.5, d.eye, d.st); slit(c, -5, hy - 1, 2.5); slit(c, 5, hy - 1, 2.5);
+    for (const [x, y] of [[-9, hy + 2], [8, hy + 3], [-7, hy - 5], [9, hy - 4]]) circ(c, x, y, .9, tint(skin, -.25));
+  },
+  werewolf(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { ink(c, pPoly([[s * 4, hy - 9], [s * 11, hy - 27], [s * 14, hy - 6]]), skin); c.fillStyle = C('#b88878'); c.fill(pPoly([[s * 7, hy - 10], [s * 11, hy - 22], [s * 12, hy - 9]])); }
+    const fur = []; for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, r = i % 2 ? 13 : 16; fur.push([Math.cos(a) * r, hy + 1 + Math.sin(a) * r * .95]); }
+    ink(c, pPoly(fur), skin);
+    ink(c, pEl(0, hy + 6, 8, 6.5), C('#c7b299'));
+    ink(c, pEl(0, hy + 2.5, 3, 2), INK, 0, true);
+    tri(c, [-3, hy + 10], [-1.6, hy + 10], [-2.3, hy + 13.5], '#fff'); tri(c, [1.6, hy + 10], [3, hy + 10], [2.3, hy + 13.5], '#fff');
+    inkLine(c, [[-9, hy - 6], [-3, hy - 3]], INK, .9); inkLine(c, [[9, hy - 6], [3, hy - 3]], INK, .9);
+    glowEye(c, -5.5, hy - 1.5, 2.4, d.eye, d.st); glowEye(c, 5.5, hy - 1.5, 2.4, d.eye, d.st);
+  },
+  dwarf(c, d) {
+    const { hy, C, skin } = d, beard = C('#d4692a');
+    ink(c, pEl(0, hy + 1, 12.5, 12), skin);
+    // beard with braids
+    const b = new Path2D(); b.moveTo(-13, hy + 1); b.quadraticCurveTo(-15, hy + 22, -6, hy + 30); b.lineTo(-4, hy + 38); b.lineTo(0, hy + 31); b.lineTo(4, hy + 38); b.lineTo(6, hy + 30); b.quadraticCurveTo(15, hy + 22, 13, hy + 1); b.quadraticCurveTo(0, hy + 10, -13, hy + 1); b.closePath();
+    ink(c, b, beard);
+    for (const x of [-4, 4]) { c.fillStyle = C('#e8c04a'); c.fillRect(x - 2, hy + 29, 4, 2.4); }
+    inkLine(c, [[-5, hy + 7], [0, hy + 9], [5, hy + 7]], tint(beard, -.3), .8);
+    ink(c, pEl(0, hy + 4.5, 3.6, 3), tint(skin, -.1));
+    // helm
+    const hm = new Path2D(); hm.moveTo(-14, hy - 1); hm.arc(0, hy - 1, 14, Math.PI, 0); hm.closePath();
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 12, hy - 7); p.quadraticCurveTo(s * 26, hy - 8, s * 25, hy - 24); p.quadraticCurveTo(s * 19, hy - 12, s * 10, hy - 3); p.closePath(); ink(c, p, C('#efe3c6')); }
+    ink(c, hm, C('#8f9aa4'));
+    c.fillStyle = C(d.teamColor); c.fillRect(-14, hy - 3, 28, 2.6);
+    ink(c, pRR(-1.8, hy - 3, 3.6, 8, 1), C('#8f9aa4'));
+    inkLine(c, [[-9, hy - 1], [-3, hy]], beard, 1.6); inkLine(c, [[9, hy - 1], [3, hy]], beard, 1.6);
+    glowEye(c, -5, hy + 1.5, 1.6, '#1e140e', true); glowEye(c, 5, hy + 1.5, 1.6, '#1e140e', true);
+  },
+  ogre(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pEl(s * 11.5, hy + 1, 3.2, 4), skin);
+    ink(c, pEl(0, hy, 11, 11.5), skin);
+    ink(c, pEl(0, hy + 7, 10, 5.5), tint(skin, -.05));
+    cap(c, d, .32, .72);
+    ink(c, pRR(-10, hy - 4, 20, 4, 2), tint(skin, -.15));
+    glowEye(c, -4.5, hy + 1, 1.5, '#2a1a0e', true); glowEye(c, 4.5, hy + 1, 1.5, '#2a1a0e', true);
+    ink(c, pEl(0, hy + 4, 4, 2.6), tint(skin, -.12));
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 5, hy + 8], [s * 6.5, hy + 1.5], [s * 3, hy + 8]]), C('#f4ecd6'), 0, true);
+    inkLine(c, [[-6, hy + 9], [6, hy + 9]], INK, .8);
+    circ(c, 7, hy - 5, 1, tint(skin, -.3)); circ(c, -6, hy + 6, .8, tint(skin, -.3));
+  },
+  minotaur(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 9, hy - 9); p.quadraticCurveTo(s * 32, hy - 8, s * 31, hy - 33); p.quadraticCurveTo(s * 24, hy - 14, s * 9, hy - 3); p.closePath(); ink(c, p, C('#efe3c6')); c.fillStyle = C('#b7a78a'); c.fill(pPoly([[s * 29, hy - 26], [s * 31, hy - 33], [s * 25, hy - 22]])); }
+    for (const s of [-1, 1]) ink(c, pEl(s * 16, hy - 2, 6, 2.8, s * .4), skin);
+    ink(c, pEl(0, hy, 13.5, 14), skin);
+    ink(c, pEl(0, hy + 8, 9.5, 7), C('#9a6a4a'));
+    circ(c, -3.5, hy + 8, 1.4, INK); circ(c, 3.5, hy + 8, 1.4, INK);
+    c.beginPath(); c.arc(0, hy + 12, 4, .1, Math.PI - .1); c.strokeStyle = C('#e8c04a'); c.lineWidth = LW * 1.2; c.stroke();
+    ink(c, pPoly([[-5, hy - 13], [0, hy - 6], [5, hy - 13], [0, hy - 16]]), C('#3a2415'), 0, true);
+    glowEye(c, -6, hy - 3, 2.2, d.eye, d.st); glowEye(c, 6, hy - 3, 2.2, d.eye, d.st);
+  },
+  troll(c, d) {
+    const { hy, C, skin } = d;
+    for (let i = -3; i <= 3; i++) inkLine(c, [[i * 3, hy - 10], [i * 6 + Math.sin(BKT.t * 2 + i) * 1.5, hy - 22 - Math.abs(i)]], C('#3f5a2a'), 1.8);
+    ink(c, pEl(0, hy, 13, 12), skin);
+    ink(c, pPoly([[-3, hy - 3], [3, hy - 3], [4, hy + 12], [0, hy + 15], [-2, hy + 11]]), tint(skin, -.1));
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 4, hy + 9], [s * 6, hy + 4], [s * 2.5, hy + 9]]), C('#f0e6cc'), 0, true);
+    glowEye(c, -6, hy - 3, 2, d.eye, d.st); glowEye(c, 6, hy - 3, 2, d.eye, d.st);
+    inkLine(c, [[-10, hy - 7], [-3, hy - 5]], INK, .9); inkLine(c, [[10, hy - 7], [3, hy - 5]], INK, .9);
+    circ(c, -8, hy + 4, 1.1, tint(skin, -.3)); circ(c, 9, hy + 2, .9, tint(skin, -.3));
+  },
+  golem(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pEl(s * (d.shw + 1), d.shY + 3, 9, 7), tint(skin, -.06));
+    ink(c, pRR(-14, hy - 13, 28, 25, 4), skin);
+    ink(c, pRR(-15, hy - 6, 30, 5, 2), tint(skin, -.12));
+    inkLine(c, [[-8, hy - 13], [-4, hy - 6]], INK, .6); inkLine(c, [[6, hy + 3], [11, hy + 10]], INK, .6); inkLine(c, [[-11, hy + 5], [-6, hy + 9], [-7, hy + 12]], INK, .6);
+    for (const x of [-6, 6]) { if (d.st) { c.fillStyle = '#5a5a56'; c.fillRect(x - 3, hy - 1, 6, 3); } else { c.save(); c.shadowColor = d.eye; c.shadowBlur = Math.max(2, 7 * FSC); c.fillStyle = d.eye; c.fillRect(x - 3.2, hy - 1, 6.4, 3); c.restore(); } }
+    c.fillStyle = INK; c.fillRect(-5, hy + 7, 10, 2);
+    // glowing chest rune
+    if (!d.st) { c.save(); c.shadowColor = d.eye; c.shadowBlur = Math.max(2, 6 * FSC); inkLine(c, [[-4, d.shY + 12], [0, d.shY + 7], [4, d.shY + 12], [0, d.shY + 17], [-4, d.shY + 12]], d.eye, .9); c.restore(); }
+  },
+  harpy(c, d) {
+    const { hy, C, skin } = d, fe = C('#6b4f86');
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? fe : tint(fe, .15)); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-1.5, hy + 1], [2.5, hy + 5], [0, hy + 7.5], [-2, hy + 5]]), C('#e8b43a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.3, d.eye, d.st); glowEye(c, 5, hy - 1, 2.3, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5], [-2.5, hy - 3.5]], INK, .8); inkLine(c, [[8, hy - 5], [2.5, hy - 3.5]], INK, .8);
+  },
+  elf(c, d) {
+    const { hy, C, skin } = d, hood = C('#2e5a34');
+    ink(c, pPoly([[0, hy - 25], [15, hy - 6], [17, hy + 12], [0, hy + 17], [-17, hy + 12], [-15, hy - 6]]), hood);
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 9, hy - 1], [s * 29, hy - 12], [s * 11, hy + 5]]), skin);
+    ink(c, pEl(0, hy + 2, 10.5, 11.5), skin);
+    c.fillStyle = C('#caa25a'); c.beginPath(); c.moveTo(-10, hy - 2); c.quadraticCurveTo(0, hy - 13, 10, hy - 2); c.quadraticCurveTo(0, hy - 7, -10, hy - 2); c.fill();
+    for (const s of [-1, 1]) { ink(c, pEl(s * 4.5, hy + 2.5, 2.4, 1.7), '#fff', 0, true); circ(c, s * 4.5, hy + 2.5, 1.3, d.st ? '#555' : d.eye); }
+    inkLine(c, [[-7, hy - .5], [-2.5, hy]], INK, .7); inkLine(c, [[7, hy - .5], [2.5, hy]], INK, .7);
+    inkLine(c, [[-2, hy + 9], [2, hy + 9]], C('#9a5a4a'), .7);
+    ink(c, pEl(0, d.shY + 1, 3.2, 3.2), C('#7fc05a'));
+  },
+  wraith(c, d) {
+    const { hy, C } = d;
+    ink(c, pPoly([[0, hy - 22], [14, hy - 8], [17, hy + 14], [0, hy + 12], [-17, hy + 14], [-14, hy - 8]]), C('#2b2442'));
+    ink(c, pEl(0, hy + 2, 9.5, 10.5), '#05040a', 0, true);
+    glowEye(c, -3.8, hy + 1, 2.2, d.eye, d.st); glowEye(c, 3.8, hy + 1, 2.2, d.eye, d.st);
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { c.globalAlpha *= .5; circ(c, Math.sin(BKT.t * 2 + i * 2) * 8, hy - 26 - ((BKT.t * 10 + i * 6) % 18), 1.6, '#9ff6ff'); c.globalAlpha *= 2; }
+  },
+  vampire(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 11, hy - 3], [s * 18, hy - 10], [s * 12, hy + 3]]), skin);
+    ink(c, pEl(0, hy + 1, 11.5, 13), skin);
+    const hair = new Path2D(); hair.moveTo(-12, hy + 1); hair.quadraticCurveTo(-13, hy - 14, 0, hy - 13); hair.quadraticCurveTo(13, hy - 14, 12, hy + 1); hair.lineTo(8, hy - 6); hair.lineTo(0, hy - 2); hair.lineTo(-8, hy - 6); hair.closePath();
+    ink(c, hair, C('#141019'));
+    glowEye(c, -4.5, hy + 1, 2, d.eye, d.st); glowEye(c, 4.5, hy + 1, 2, d.eye, d.st);
+    inkLine(c, [[-8, hy - 2.5], [-2, hy - 1]], INK, .8); inkLine(c, [[8, hy - 2.5], [2, hy - 1]], INK, .8);
+    inkLine(c, [[-3.5, hy + 8], [3.5, hy + 8]], C('#7a1020'), .9);
+    tri(c, [-3, hy + 8.2], [-1.6, hy + 8.2], [-2.3, hy + 11.5], '#fff'); tri(c, [1.6, hy + 8.2], [3, hy + 8.2], [2.3, hy + 11.5], '#fff');
+  },
+  lich(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy - 1, 12.5, 12.5), skin);
+    ink(c, pRR(-7, hy + 6, 14, 8, 3), skin);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 4.8, hy, 3.6, 4), '#0d0d14', 0, true); glowEye(c, s * 4.8, hy, 1.5, d.eye, d.st); }
+    ink(c, pPoly([[0, hy + 3], [-1.8, hy + 6.5], [1.8, hy + 6.5]]), '#0d0d14', 0, true);
+    for (let i = -2; i <= 2; i++) inkLine(c, [[i * 2.6, hy + 9], [i * 2.6, hy + 13]], INK, .45);
+    inkLine(c, [[3, hy - 12], [5, hy - 7], [3, hy - 5]], INK, .5);
+    const cr = new Path2D(); cr.moveTo(-12, hy - 8); for (let i = 0; i <= 6; i++) cr.lineTo(-12 + i * 4, hy - (i % 2 ? 13 : 22)); cr.lineTo(12, hy - 8); cr.closePath();
+    ink(c, cr, C('#d8b64a'));
+    glowEye(c, 0, hy - 11, 1.8, '#9d7bff', d.st);
+    ink(c, pPoly([[-d.shw + 2, d.shY], [0, d.shY + 12], [d.shw - 2, d.shY], [d.shw - 6, d.shY - 6], [0, d.shY + 3], [-d.shw + 6, d.shY - 6]]), C('#d8b64a'), 0);
+  },
+  zombie(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(-11.5, hy + 1, 2.5, 3.5), skin);
+    ink(c, pEl(0, hy, 12.5, 12.5), skin);
+    cap(c, d, -.34, .95);
+    inkLine(c, [[-10, hy - 3], [3, hy - 7]], C('#3a2a2a'), .6);
+    for (let x = -8; x < 3; x += 3) inkLine(c, [[x, hy - 5.5], [x + 1.4, hy - 3.2]], C('#3a2a2a'), .5);
+    glowEye(c, -5, hy + 1, 3, d.eye, d.st); circ(c, -5, hy + 1, 1, INK);
+    inkLine(c, [[3, hy], [7, hy + 2]], INK, .8); inkLine(c, [[3, hy + 2], [7, hy]], INK, .8);
+    ink(c, pRR(-5, hy + 6, 10, 4.5, 2), '#2a1414', 0, true);
+    for (let x = -3.5; x < 4; x += 2.4) c.fillStyle = '#e9e2c6', c.fillRect(x, hy + 6, 1.4, 1.8);
+  },
+  gorgon(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy + 1, 12, 13), skin);
+    for (let i = 0; i < 4; i++) snake(c, d, Math.PI * (1.18 + i * .22), 19, i + 7);
+    for (const [x, y] of [[-8, hy + 5], [8, hy + 5], [-6, hy - 6], [7, hy - 6], [0, hy - 9]]) inkLine(c, [[x - 1, y], [x, y - 1], [x + 1, y]], tint(skin, -.25), .5);
+    glowEye(c, -4.8, hy + 1, 2.4, d.eye, d.st); glowEye(c, 4.8, hy + 1, 2.4, d.eye, d.st); slit(c, -4.8, hy + 1, 2.4); slit(c, 4.8, hy + 1, 2.4);
+    inkLine(c, [[0, hy + 8], [0, hy + 12], [-1.2, hy + 13.5]], C('#d83a4a'), .7); inkLine(c, [[0, hy + 12], [1.2, hy + 13.5]], C('#d83a4a'), .7);
+  },
+  spider(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy, 12.5, 12), skin);
+    const cr = new Path2D(); cr.moveTo(-10, hy - 8); cr.lineTo(-8, hy - 20); cr.lineTo(-4, hy - 12); cr.lineTo(0, hy - 22); cr.lineTo(4, hy - 12); cr.lineTo(8, hy - 20); cr.lineTo(10, hy - 8); cr.closePath();
+    ink(c, cr, C('#b89ad0'));
+    for (const [x, y, r] of [[-4, hy - 1, 2.2], [4, hy - 1, 2.2], [-8, hy - 3, 1.5], [8, hy - 3, 1.5], [-2, hy - 5, 1.2], [2, hy - 5, 1.2]]) glowEye(c, x, y, r, d.eye, d.st);
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 2.5, hy + 5); p.quadraticCurveTo(s * 7, hy + 9, s * 3, hy + 13); p.quadraticCurveTo(s * 4, hy + 9, s * 1, hy + 7); p.closePath(); ink(c, p, C('#e9e2f2'), 0, true); }
+  },
+  skeleton(c, d) {
+    const { hy, C } = d, steel = C('#7c8490');
+    const pl = new Path2D(); pl.moveTo(0, hy - 14); pl.quadraticCurveTo(10, hy - 34, 20, hy - 30); pl.quadraticCurveTo(10, hy - 26, 4, hy - 13); pl.closePath();
+    ink(c, pl, d.jer);
+    ink(c, pRR(-13, hy - 14, 26, 27, 9), steel);
+    ink(c, pRR(-11, hy - 3, 22, 4.5, 2), '#0b0b10', 0, true);
+    glowEye(c, -4.5, hy - .8, 1.6, d.eye, d.st); glowEye(c, 4.5, hy - .8, 1.6, d.eye, d.st);
+    c.fillStyle = INK; c.fillRect(-.8, hy + 2, 1.6, 9);
+    for (const y of [hy + 5, hy + 8]) for (const x of [-6, -3.5, 3.5, 6]) circ(c, x, y, .8, INK);
+    for (const x of [-10, 10]) circ(c, x, hy - 8, 1, C('#b8c0ca'));
+  },
+  witch(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy + 1, 11, 12), skin);
+    c.fillStyle = C('#eef2f8'); for (const s of [-1, 1]) c.fill(pPoly([[s * 11, hy - 4], [s * 13, hy + 14], [s * 7, hy + 6], [s * 8, hy - 6]]));
+    ink(c, pEl(0, hy - 8, 23, 5), C('#16132a'));
+    const cone = new Path2D(); cone.moveTo(-11, hy - 9); cone.quadraticCurveTo(-5, hy - 30, 8, hy - 47); cone.quadraticCurveTo(4, hy - 30, 11, hy - 9); cone.closePath();
+    ink(c, cone, C('#16132a'));
+    c.fillStyle = d.jer; c.fill(pPoly([[-11, hy - 10], [11, hy - 10], [10, hy - 14], [-10, hy - 14]]));
+    ink(c, pRR(-2.5, hy - 14.5, 5, 5, 1), C('#d8b64a'), 0, true);
+    glowEye(c, -4.3, hy + 2, 2, d.eye, d.st); glowEye(c, 4.3, hy + 2, 2, d.eye, d.st);
+    inkLine(c, [[-2.5, hy + 8.5], [2.5, hy + 8.5]], C('#4a7aa8'), .8);
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { const a = BKT.t * 1.5 + i * 2.1; txt(c, '✦', Math.cos(a) * 20, hy - 18 + Math.sin(a) * 6, '6px sans-serif', 'rgba(200,240,255,.8)', 'center'); }
+  },
+};
+
+/* ---------- bodies: tapered, jointed limbs and a shaped torso, with flourishes per creature ---------- */
+// per-kind body details: feet, socks, muscle, tails, fur, armour and trinkets
+const BODY = {
+  goblin:   { foot: 'claw', musc: 0, slim: true, strap: '#5a3a22', wrist: true },
+  kobold:   { foot: 'claw', slim: true, tail: 'lizard', scales: true },
+  werewolf: { foot: 'claw', musc: .65, tail: 'bushy', tuft: '#4f3d2e', clawHand: true, fur: true },
+  dwarf:    { foot: 'boot', musc: .55, bracer: '#6b4a2a', stout: true },
+  ogre:     { foot: 'claw', musc: .85, torn: true, bone: true },
+  minotaur: { foot: 'hoof', musc: 1, tail: 'tuft', tuft: '#3e2718', bracer: '#6b4a2a', shinFur: '#4a2e1c' },
+  troll:    { foot: 'claw', musc: .7, armLen: 1.16, moss: true, clawHand: true },
+  golem:    { foot: 'stone', musc: .45, stone: true },
+  harpy:    { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true },
+  elf:      { foot: 'boot', slim: true, cloak: '#2e5a34', bracer: '#7a5a34', quiver: true },
+  wraith:   { robe: true, clawHand: true, slim: true },
+  vampire:  { foot: 'pointy', slim: true, lace: true },
+  lich:     { robe: true, slim: true },
+  zombie:   { foot: 'cleat', musc: .3, stitches: true, torn: true },
+  gorgon:   { foot: 'cleat', slim: true, scales: true, snakeBelt: true },
+  spider:   { foot: 'cleat', slim: true, clawHand: true },
+  skeleton: { foot: 'sabaton', armor: true, slim: true },
+  witch:    { foot: 'pointy', slim: true, stripes: true },
+};
+// a limb segment: round ends, tapered, with optional bulges on either side (muscle, calf)
+function capsule(x1, y1, r1, x2, y2, r2, b1 = 0, b2 = 0) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+  const an = Math.atan2(ny, nx), mx = (x1 + x2) / 2, my = (y1 + y2) / 2, rm = (r1 + r2) / 2;
+  const p = new Path2D();
+  p.moveTo(x1 + nx * r1, y1 + ny * r1);
+  p.quadraticCurveTo(mx + nx * (rm + 2 * b1), my + ny * (rm + 2 * b1), x2 + nx * r2, y2 + ny * r2);
+  p.arc(x2, y2, r2, an, an - Math.PI, true);
+  p.quadraticCurveTo(mx - nx * (rm + 2 * b2), my - ny * (rm + 2 * b2), x1 - nx * r1, y1 - ny * r1);
+  p.arc(x1, y1, r1, an - Math.PI, an - 2 * Math.PI, true);
+  p.closePath(); return p;
+}
+const lerpP = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+function bands(c, path, list) { c.save(); c.clip(path); for (const [y0, h, col] of list) { c.fillStyle = col; c.fillRect(-60, y0, 120, h); } c.restore(); c.lineWidth = LW; c.strokeStyle = INK; c.stroke(path); }
+
+// a leg in its own frame: hip at the origin, foot on the ground 36 below; lift raises the knee and foot
+function leg(c, x, a, w, d, side, lift = 0) {
+  const B = d.B, det = FSC > .45;
+  c.save(); c.translate(x, -36); c.rotate(a);
+  const hip = { x: 0, y: -2 }, knee = { x: side * lift * 3, y: 16 - lift * 5 }, ank = { x: side * lift * 1.2, y: 30 - lift * 14 };
+  const rH = w * .47, rK = w * .38, rA = w * (B.birdLeg ? .16 : .25);
+  // shin: sock, stocking, fur, bird leg, stone or greave
+  const shinCol = B.birdLeg ? d.C('#d9a74a') : B.stone ? d.skin : B.armor ? d.C('#8a929c') : B.shinFur ? d.C(B.shinFur) : B.fur ? d.skin : B.stripes ? d.C('#1a1426') : d.jer;
+  const shin = capsule(knee.x, knee.y, rK * (B.birdLeg ? .5 : .95), ank.x, ank.y, rA, w * (B.birdLeg ? 0 : .08), w * (B.birdLeg ? 0 : .06));
+  ink(c, shin, shinCol);
+  if (B.stripes) bands(c, shin, [0, 1, 2, 3].map(i => [knee.y + 2 + i * 3.6, 1.8, d.C('#8a5ad0')]));
+  else if (!B.birdLeg && !B.stone && !B.armor && !B.shinFur && !B.fur) bands(c, shin, [[knee.y + 5, 1.7, d.trimL], [knee.y + 8.2, 1.7, d.trimL]]);
+  if (det) {
+    if (B.birdLeg) for (let i = 1; i < 4; i++) { const p = lerpP(knee, ank, i / 4); inkLine(c, [[p.x - 1.6, p.y], [p.x + 1.6, p.y]], d.C('#9a6a2a'), .5); }
+    if (B.stone) inkLine(c, [[knee.x - 2, knee.y + 5], [knee.x + 1, knee.y + 9], [knee.x - 1, knee.y + 12]], INK, .5);
+    if (B.armor) ink(c, pEl(knee.x, knee.y + 1, rK * 1.05, rK * .9), d.C('#b8c0ca'), 0, true);
+    if (B.fur || B.shinFur) for (const t of [.35, .6]) { const p = lerpP(knee, ank, t); inkLine(c, [[p.x - rK * .6, p.y], [p.x - rK * .2, p.y + 2.5]], INK, .45); inkLine(c, [[p.x + rK * .6, p.y - 1], [p.x + rK * .25, p.y + 1.8]], INK, .45); }
+    if (B.torn && !B.fur) ink(c, pEl(knee.x + side * .6, knee.y + 8, rK * .45, 2.2), d.skin, 0, true);
+  }
+  // thigh in baseball knickers, gathered below the knee
+  const thigh = capsule(hip.x, hip.y, rH, knee.x, knee.y + 1.5, rK * 1.08, w * .07, w * .05);
+  ink(c, thigh, B.stone ? d.skin : d.pants);
+  ink(c, pEl(knee.x, knee.y + 2.6, rK * 1.14, 2.6), B.stone ? tint(d.skin, -.08) : d.pants, 0, true);
+  if (det) inkLine(c, [[knee.x - rK * .9, knee.y + 3.2], [knee.x + rK * .9, knee.y + 3.2]], tint(d.pants, -.25), .45);
+  // team piping down the outer seam
+  if (!B.stone) inkLine(c, [[side * rH * .82, hip.y + 1], [knee.x + side * rK * .95, knee.y]], d.jer, .9);
+  foot(c, ank, w, d, side);
+  c.restore();
+}
+function foot(c, a, w, d, side) {
+  const B = d.B, f = B.foot || 'cleat', x = a.x, y = a.y + 2.4;
+  if (f === 'talon') { for (const dx of [-3.5, 0, 3.5]) ink(c, pPoly([[x + dx - 1.5, a.y + 1], [x + dx + 1.5, a.y + 1], [x + dx + .5, a.y + 6]]), d.C('#e8b43a'), 0, true); return; }
+  if (f === 'hoof') { for (const s of [-1, 1]) ink(c, pEl(x + s * w * .27, y + .4, w * .3, 3.4), d.C('#1b1410'), 0, true); c.fillStyle = d.C('#4a3a30'); c.fillRect(x - w * .5, a.y - 1.2, w, 1.6); return; }
+  if (f === 'stone') { ink(c, pRR(x - w * .62, a.y - 1, w * 1.24, 6.6, 2.4), tint(d.skin, -.1)); return; }
+  if (f === 'claw') {
+    ink(c, pEl(x + side * .6, y, w * .6, 3.6), B.fur ? tint(d.skin, -.1) : d.skin);
+    if (FSC > .35) for (const dx of [-.34, 0, .34]) ink(c, pPoly([[x + dx * w - 1.2, y + 2], [x + dx * w + 1.2, y + 2], [x + dx * w + side * .4, y + 4.8]]), d.C('#efe6cf'), 0, true);
+    return;
+  }
+  const col = f === 'sabaton' ? d.C('#8a929c') : f === 'boot' ? d.C('#4a2e1c') : '#1d1714';
+  if (f === 'boot') ink(c, pRR(x - w * .46, a.y - 4, w * .92, 7, 2.5), col, 0, true);
+  ink(c, pEl(x + side * .9, y, w * .64, 3.8), col, 0, true);
+  if (f === 'pointy') { const p = new Path2D(); p.moveTo(x + side * w * .4, y - 2.4); p.quadraticCurveTo(x + side * w * 1.1, y - .5, x + side * w * 1.05, y - 4.5); p.quadraticCurveTo(x + side * w * .9, y + 2.6, x + side * w * .3, y + 2.6); p.closePath(); ink(c, p, col, 0, true); }
+  if (FSC > .45 && f === 'cleat') inkLine(c, [[x - w * .25, y - 1.8], [x + w * .25, y - 1.8]], '#e8e0cc', .6);
+  if (FSC > .45 && f === 'sabaton') inkLine(c, [[x - w * .4, y - .6], [x + w * .4, y - .6]], d.C('#b8c0ca'), .5);
+}
+
+// an arm from shoulder to hand target, bent at an elbow found by two-bone IK; the old callers pass the same arguments
+function arm(c, sx, sy, hx, hy, d, opt = {}) {
+  const B = d.B, det = FSC > .45, musc = B.musc || 0, bony = d.bony;
+  const aw = 7.2 * clamp(d.w, .9, 1.5) * (bony ? .78 : 1) * (B.slim ? .92 : 1);
+  let Lu = 17.5 * (B.armLen || 1), Lf = 16.5 * (B.armLen || 1);
+  let dx = hx - sx, dy = hy - sy, D = Math.hypot(dx, dy);
+  if (D < 10) { dx = 0; dy = 10; D = 10; }
+  const reach = (Lu + Lf) * .995; if (D > reach) { const k = D / reach; Lu *= k; Lf *= k; }
+  const th = Math.atan2(dy, dx), al = Math.acos(clamp((Lu * Lu + D * D - Lf * Lf) / (2 * Lu * D), -1, 1));
+  const out = sx < 0 ? -1 : 1, E = s => ({ x: sx + Lu * Math.cos(th + s * al), y: sy + Lu * Math.sin(th + s * al) });
+  const e1 = E(1), e2 = E(-1), sc = e => e.x * out + .35 * e.y, el = sc(e1) >= sc(e2) ? e1 : e2;
+  const S = { x: sx, y: sy }, H = { x: sx + dx, y: sy + dy };
+  const skin = d.armC;
+  // forearm, then upper arm over the elbow
+  const fore = capsule(el.x, el.y, aw * .48, H.x, H.y, aw * .34, aw * (.06 + .14 * musc), aw * (.04 + .06 * musc));
+  const upper = capsule(S.x, S.y, aw * .56, el.x, el.y, aw * .46, aw * .14 * musc, aw * .1 * musc);
+  if (d.robe) {
+    ink(c, fore, skin); ink(c, upper, skin);
+    const tip = lerpP(el, H, .82);
+    ink(c, capsule(S.x, S.y, aw * .66, el.x, el.y, aw * .62), d.robe);
+    ink(c, capsule(el.x, el.y, aw * .6, tip.x, tip.y, aw * .86, aw * .06, aw * .06), d.robe);
+    if (det) inkLine(c, [[tip.x - aw * .7, tip.y], [tip.x + aw * .7, tip.y]], d.C('#d8b64a'), .8);
+  } else {
+    ink(c, fore, skin); ink(c, upper, skin);
+    if (bony && det) { inkLine(c, [[el.x, el.y], [lerpP(el, H, .85).x, lerpP(el, H, .85).y]], tint(skin, -.25), .5); circ(c, el.x, el.y, aw * .3, tint(skin, -.08)); }
+    if (B.stone && det) { const m = lerpP(el, H, .5); inkLine(c, [[m.x - 2, m.y - 2], [m.x + 1, m.y], [m.x - 1, m.y + 3]], INK, .5); if (!d.st) { c.save(); c.shadowColor = d.eye; c.shadowBlur = 5 * FSC; circ(c, el.x, el.y, 1.4, d.eye); c.restore(); } }
+    if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
+    if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
+    if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C((B.fea || ['#6b4f86', '#8b76a0'])[i % 2 ? 0 : 1]), 0, true); }
+    if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
+    if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
+    // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
+    const sEnd = lerpP(S, el, .55);
+    const sl = capsule(S.x, S.y - 1, aw * .7, sEnd.x, sEnd.y, aw * .62, aw * .05, aw * .05);
+    ink(c, sl, d.jer);
+    if (det) { const ang = Math.atan2(el.y - S.y, el.x - S.x) + Math.PI / 2, cx = Math.cos(ang) * aw * .6, cy = Math.sin(ang) * aw * .6, t2 = lerpP(S, el, .44);
+      if (B.torn) { const pts = []; for (let i = 0; i <= 4; i++) { const k = i / 4 - .5; pts.push([sEnd.x + cx * 2 * k + (i % 2 ? (el.x - S.x) * .08 : 0), sEnd.y + cy * 2 * k + (i % 2 ? (el.y - S.y) * .08 : 0)]); } inkLine(c, pts, INK, .6); }
+      else inkLine(c, [[t2.x - cx, t2.y - cy], [t2.x + cx, t2.y + cy]], d.trimL, 1.3); }
+    if (B.lace && det) { const p = lerpP(el, H, .9); for (let i = -1; i <= 1; i++) circ(c, p.x + i * aw * .32, p.y + 1.2, aw * .2, '#f2eee6'); }
+  }
+  // hand, turned along the forearm
+  const ang = Math.atan2(-(H.x - el.x), H.y - el.y);
+  c.save(); c.translate(H.x, H.y); c.rotate(ang);
+  if (opt.mitt) { ink(c, pEl(0, 2.5, aw * .95, aw * 1.1), d.C('#8a5530')); inkLine(c, [[-aw * .5, 1.5], [aw * .5, 1.5]], d.C('#5a3218'), .6); if (det) inkLine(c, [[-aw * .3, 4.2], [0, 5.4], [aw * .3, 4.2]], d.C('#5a3218'), .5); }
+  else if (!opt.noHand) {
+    ink(c, pEl(0, 1.2, aw * .6, aw * .64), bony ? tint(skin, -.05) : skin);
+    if (det && !opt.ball) ink(c, pEl(-out * aw * .5, .2, aw * .22, aw * .36, out * .5), skin, 0, true);
+    if (bony && det) for (const fx of [-.3, 0, .3]) inkLine(c, [[fx * aw, aw * .5], [fx * aw * 1.2, aw * 1.3]], INK, .45);
+    if ((B.clawHand || B.fur) && det) for (const fx of [-.32, 0, .32]) ink(c, pPoly([[fx * aw - 1, aw * .55], [fx * aw + 1, aw * .55], [fx * aw * 1.25, aw * .55 + 3.2]]), d.C('#efe6cf'), 0, true);
+  }
+  if (opt.ball) ink(c, pEl(0, 3, 3.4, 3.4), '#f6f0e0', 0, true);
+  if (opt.ember && !d.st) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = Math.max(2, 8 * FSC); circ(c, 0, 4, 2.2 + Math.sin(BKT.t * 20) * .5, '#ffcf5a'); c.restore(); }
+  c.restore();
+  // shoulder pieces sit on top of the sleeve
+  if (B.armor) { ink(c, pEl(S.x + out * 1.5, S.y - 1, aw * .95, aw * .72, out * .3), d.C('#8a929c')); if (det) inkLine(c, [[S.x - aw * .6 + out * 1.5, S.y + 1], [S.x + aw * .6 + out * 1.5, S.y + 1]], d.C('#b8c0ca'), .6); }
+  if (B.stone) ink(c, pEl(S.x + out * 1.5, S.y - 2, aw * .95, aw * .8), tint(d.skin, -.06));
+  if (B.moss && det) { for (let i = 0; i < 4; i++) ink(c, pEl(S.x - aw * .5 + i * aw * .34, S.y - 3 - (i % 2) * 1.5, 2.4, 1.8), d.C(i % 2 ? '#4f7a2e' : '#6a9a3a'), 0, true); circ(c, S.x + out * aw * .4, S.y - 6, 1.6, d.C('#d8c9a0')); }
+}
+
+/* tails and cloaks drawn behind the body */
+function tailChain(c, pts, col, tipCol) {
+  for (let i = 0; i < pts.length - 1; i++) ink(c, capsule(pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2]), i === pts.length - 2 && tipCol ? tipCol : col, 0, true);
+}
+BACK.werewolf = (c, d) => {
+  const s = Math.sin(BKT.t * 3 + (d.o.run || 0)) * 4, x = d.shw;
+  const p = new Path2D(); p.moveTo(4, -42); p.bezierCurveTo(x + 6, -46, x + 22 + s, -34, x + 18 + s, -10); p.bezierCurveTo(x + 14 + s, -18, x + 8, -30, 2, -34); p.closePath();
+  ink(c, p, d.C('#5d4a3a')); if (FSC > .45) ink(c, pEl(x + 17 + s, -13, 3.5, 5), d.C('#d8cbb4'), 0, true);
+};
+BACK.minotaur = (c, d) => {
+  const s = Math.sin(BKT.t * 2.4 + (d.o.run || 0)) * 5, x = d.shw;
+  const tl = [[4, -40], [x + 6, -38], [x + 13 + s, -30], [x + 15 + s * 1.3, -22]];
+  inkLine(c, tl, INK, 2.6); inkLine(c, tl, d.skin, 1.4);
+  ink(c, pEl(x + 15 + s * 1.3, -19, 2.8, 4.6, s * .05), d.C('#2a1a10'));
+};
+BACK.kobold = (c, d) => {
+  const s = Math.sin(BKT.t * 3.4 + (d.o.run || 0)) * 4, x = d.shw;
+  tailChain(c, [[2, -38, 5], [x + 6, -26, 4], [x + 16 + s, -10, 2.4], [x + 24 + s * 1.4, -12, .8]], d.skin);
+  if (!d.st && FSC > .3) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = 8 * FSC; const f = Math.sin(BKT.t * 18) * .8; ink(c, pPoly([[x + 21 + s * 1.4, -13], [x + 27 + s * 1.4, -13], [x + 24 + s * 1.4 + f, -21]]), '#ffb03a', 0, true); c.restore(); }
+};
+BACK.elf = (c, d) => {
+  const fl = Math.sin(BKT.t * 2.2 + (d.o.run || 0)) * (d.o.run ? 5 : 1.5), col = d.C(d.B.cloak);
+  const p = new Path2D(); p.moveTo(-d.shw + 1, d.shY); p.quadraticCurveTo(-d.shw - 9, -30, -d.shw - 7 - fl, -10); p.quadraticCurveTo(0, -4 + fl, d.shw + 7 + fl, -10); p.quadraticCurveTo(d.shw + 9, -30, d.shw - 1, d.shY); p.closePath();
+  ink(c, p, col); if (FSC > .45) inkLine(c, [[-d.shw - 5, -12], [-d.shw + 4, -24]], tint(d.B.cloak, -.3), .5);
+};
+
+// a shaped torso: sloped shoulders, chest, waist and hips; bellies for the big eaters
+function torsoPath(d, K) {
+  const B = d.B, shw = d.shw, shY = d.shY, hipY = -36;
+  const waist = shw * (K.belly ? .92 : B.slim ? .7 : B.stout ? .86 : .76), chest = shw * (B.musc ? 1 + .06 * B.musc : .98), belly = K.belly ? 11 * d.w : B.stout ? 3 : 0;
+  const t = new Path2D();
+  t.moveTo(-7, shY - 2);
+  t.quadraticCurveTo(-shw + 5, shY - 3.5, -shw, shY + 4);
+  t.bezierCurveTo(-chest - 1, shY + 14, -waist - belly, hipY - 12, -waist, hipY);
+  t.quadraticCurveTo(0, hipY + 3, waist, hipY);
+  t.bezierCurveTo(waist + belly, hipY - 12, chest + 1, shY + 14, shw, shY + 4);
+  t.quadraticCurveTo(shw - 5, shY - 3.5, 7, shY - 2);
+  t.quadraticCurveTo(0, shY + 1, -7, shY - 2);
+  t.closePath();
+  return { t, waist, belly };
+}
+
+function drawFig(c, kind, x, y, hpx, team, o = {}) {
+  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone;
+  const C = v => st ? grey(v) : v;
+  const hunch = K.hunch ? 6 : 0, shY = -70 + hunch, hipY = -36;
+  const shw = 17 * w * (kind === 'ogre' ? .9 : 1);
+  const hy = kind === 'ogre' ? -80 : kind === 'golem' ? -80 : -83 + hunch * 1.4;
+  const hr = kind === 'ogre' ? 11 : kind === 'minotaur' ? 14 : 12.5;
+  const B = BODY[kind] || {};
+  const d = {
+    o, C, st, w, shY, shw, hy, hr, kind, eye: K.eye, skin: C(K.skin), jer: C(team.color), jerD: C(tint(team.color, -.38)), trimL: C(team.light || '#fff'),
+    teamColor: team.color, letter: (team.short || '?')[0], pants: C('#e4dbc6'), armC: C(K.bony ? '#ebe5d2' : K.skin), bony: K.bony, robe: K.robe ? C(K.robe) : null, B,
+  };
+  c.save(); c.translate(x, y); c.scale(o.flip ? -s : s, s);
+  LW = Math.max(1.25, 1 / s); FSC = s; FLIPPED = !!o.flip;
+  const pose = o.pose || null, det = s > .45;
+  if (o.alpha != null) c.globalAlpha *= o.alpha;
+  if (!o.noShadow) ell(c, 0, 0, 24 * w, 5, 'rgba(0,0,0,.35)');
+  if (o.lift) c.translate(0, -o.lift);
+  const run = o.run || 0, sw = Math.sin(run);
+  if (run) c.translate(0, -Math.abs(Math.cos(run)) * 2.5);
+  if (pose) { c.translate(pose.shift || 0, pose.drop || 0); if (pose.scale && pose.scale !== 1) c.scale(pose.scale, pose.scale); }
+  if (BACK[kind]) BACK[kind](c, d);
+  // legs: running lifts the leading leg; poses drive them directly
+  if (!K.robe) {
+    const lw = 10.5 * w, lx = 6.2 * w;
+    const lL = pose ? pose.legL : { a: sw * .55, lift: run ? Math.max(0, sw) * .4 : 0 }, lR = pose ? pose.legR : { a: -sw * .55, lift: run ? Math.max(0, -sw) * .4 : 0 };
+    leg(c, -lx, lL.a, lw, d, -1, lL.lift || 0); leg(c, lx, lR.a, lw, d, 1, lR.lift || 0);
+    { const sw2 = shw * (K.belly ? .7 : .52), seat = new Path2D(); seat.moveTo(-sw2, hipY - 2); seat.quadraticCurveTo(-sw2 * .9, hipY + 7, 0, hipY + 6); seat.quadraticCurveTo(sw2 * .9, hipY + 7, sw2, hipY - 2); seat.closePath(); ink(c, seat, d.pants, 0, true); } // seat of the knickers
+  } else if (kind === 'lich') { for (const s2 of [-1, 1]) ink(c, pEl(s2 * 6, -2, 5, 3), '#1d1714', 0, true); }
+  c.save(); if (pose && pose.lean) { c.translate(0, hipY); c.rotate(pose.lean); c.translate(0, -hipY); }
+  // torso / jersey
+  const { t, waist } = torsoPath(d, K);
+  ink(c, t, d.jer);
+  if (det) {
+    // placket and buttons, a fold at the waist
+    inkLine(c, [[1.5, shY + 7], [1.5, hipY - 4]], d.jerD, .7);
+    for (let i = 0; i < 3; i++) circ(c, 3.4, shY + 12 + i * 8, .9, d.trimL);
+    inkLine(c, [[-waist + 3, hipY - 9], [-waist + 9, hipY - 6.5]], d.jerD, .5);
+  }
+  inkLine(c, [[-7, shY - 1.5], [0, shY + 7], [7, shY - 1.5]], d.trimL, 1.6);
+  // creature trimmings on the chest
+  if (B.tuft) ink(c, pPoly([[-5, shY - 1], [-3, shY + 5], [-1, shY + 1], [1, shY + 6], [3, shY + 1], [5, shY + 5], [6, shY - 1]]), d.C(B.tuft), 0, true);
+  if (B.strap && det) { inkLine(c, [[-shw + 3, shY + 3], [waist - 2, hipY - 3]], d.C(B.strap), 2.2); for (const k of [.35, .6]) { const px = lerp(-shw + 3, waist - 2, k), py = lerp(shY + 3, hipY - 3, k); ink(c, pRR(px - 2.5, py - 2, 5, 5, 1.2), d.C('#7a5230'), 0, true); } }
+  if (B.quiver && det) inkLine(c, [[shw - 3, shY + 2], [-waist + 2, hipY - 4]], d.C('#6a4a2a'), 1.6);
+  if (B.lace) ink(c, pPoly([[-4, shY - 1], [4, shY - 1], [2.5, shY + 9], [0, shY + 11], [-2.5, shY + 9]]), d.C('#f2eee6'), 0, true);
+  if (B.torn && det) { ink(c, pPoly([[-shw * .45, shY + 20], [-shw * .2, shY + 17], [-shw * .1, shY + 24], [-shw * .3, shY + 27]]), kind === 'zombie' ? d.C('#3a2a2a') : d.skin, 0, true); if (kind === 'zombie') for (let i = 0; i < 3; i++) inkLine(c, [[-shw * .42, shY + 20.5 + i * 2], [-shw * .18, shY + 19.5 + i * 2]], d.C('#e9e2c6'), .5); }
+  if (B.stone && det) { inkLine(c, [[-shw * .5, shY + 6], [-shw * .3, shY + 14], [-shw * .45, shY + 20]], INK, .6); inkLine(c, [[shw * .55, hipY - 14], [shw * .35, hipY - 8]], INK, .6); }
+  if (B.scales && det) for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(-shw * .55 + i * 2.5, shY + 8 + (i % 2) * 2, 1.2, 0, Math.PI); c.strokeStyle = d.jerD; c.lineWidth = LW * .5; c.stroke(); }
+  // belt, and whatever is tucked in it
+  ink(c, pRR(-waist - .5, hipY - 3.5, 2 * waist + 1, 5.5, 1.5), B.snakeBelt ? d.C('#3f8a4f') : '#2a1d17', 0, true);
+  if (B.snakeBelt && det) { ink(c, pEl(waist - 1, hipY - 1, 3.4, 2.6), d.C('#4f9a5d'), 0, true); circ(c, waist, hipY - 1.6, .7, d.C('#ffe14a')); }
+  else ink(c, pRR(B.stout ? -4 : -2.2, hipY - (B.stout ? 4.5 : 3.2), B.stout ? 8 : 4.4, B.stout ? 7 : 4.8, .8), C('#d8b64a'), 0, true);
+  if (B.bone && det) { ink(c, pRR(waist - 8, hipY - 7, 3, 11, 1.4), d.C('#efe6cf'), 0, true); circ(c, waist - 6.5, hipY - 7, 2, d.C('#efe6cf')); }
+  // number
+  if (s * 100 > 26) {
+    c.font = `900 ${16}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    if (o.flip) { c.save(); c.scale(-1, 1); }
+    c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.strokeText(String(o.num ?? ''), 0, shY + 25); c.fillStyle = st ? '#ddd' : '#fbf6ea'; c.fillText(String(o.num ?? ''), 0, shY + 25);
+    if (o.flip) c.restore();
+  }
+  // arms
+  const swing = run ? sw * 7 : 0;
+  if (pose && pose.armR) {
+    arm(c, -shw + 2, shY + 3, pose.armL.x, pose.armL.y, d, { mitt: true });
+    if (pose.trailR && pose.trailR.length > 1 && !st) {
+      c.save(); c.lineCap = 'round';
+      for (let i = pose.trailR.length - 1; i > 0; i--) { const a = pose.trailR[i], b = pose.trailR[i - 1]; c.strokeStyle = `rgba(255,248,230,${.32 * (1 - i / pose.trailR.length)})`; c.lineWidth = 7 * (1 - i / pose.trailR.length) + 1; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+      c.restore();
+    }
+    arm(c, shw - 2, shY + 3, pose.armR.x, pose.armR.y, d, { ball: pose.ball, ember: kind === 'kobold' });
+  } else if (o.throwK != null) {
+    const k = clamp(o.throwK, 0, 1), th = lerp(2.5, -.25, k), hx2 = shw + 27 * Math.sin(th), hy2 = shY + 2 - 27 * Math.cos(th);
+    arm(c, -shw + 2, shY + 3, -shw - 5, shY + 22, d, { mitt: true });
+    arm(c, shw - 2, shY + 3, hx2, hy2, d, { ball: true, ember: kind === 'kobold' });
+  } else if (o.follow) {
+    arm(c, -shw + 2, shY + 3, -shw - 5, shY + 22, d, { mitt: true });
+    arm(c, shw - 2, shY + 3, -4, shY + 24, d, {});
+  } else if (kind === 'zombie') {
+    arm(c, -shw + 2, shY + 3, -shw + 2 + swing, shY + 24, d, { mitt: o.mitt });
+    arm(c, shw - 2, shY + 3, shw + 4 - swing, shY + 10, d, {});
+  } else {
+    arm(c, -shw + 2, shY + 3, -shw - 4 + swing, shY + 33, d, { mitt: o.mitt });
+    arm(c, shw - 2, shY + 3, shw + 4 - swing, shY + 33, d, { ember: kind === 'kobold' });
+  }
+  // neck + head
+  if (!K.robe && kind !== 'golem') ink(c, capsule(0, shY + 1, 4.2, 0, hy + 9, 4.6), d.skin, 0, true);
+  HEAD[kind] ? HEAD[kind](c, d) : ink(c, pEl(0, hy, 12, 12), d.skin);
+  c.restore();
+  c.restore();
+}
+
+
+function tri(c, a, b, d, col) { c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.closePath(); c.fillStyle = col; c.fill(); }
+function circ(c, x, y, r, col) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = col; c.fill(); }
+function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = col; c.fill(); }
+/* The Charter Court: teams (issue #77, phase 1). Five a side, and the same five play at both ends.
+   Ratings, 1 to 10 (the Realm's own run to 12, phase 3): spd (speed), siz (size: height and reach, on blocks,
+   rebounds and shots at the rim), hop (hops), tch (touch: shooting), hnd (handle) and def (defense). Size counts, but
+   it is one rating of six: a goblin with good defense who times the jump can block an ogre. BK_KIND seeds them by kind.
+   The spots: two guards (PG, SG: they handle), a wing (SF: they shoot) and two bigs (PF, C: they screen, rebound and
+   block). Any player can play anywhere; phase 1 picks the five's spots from the ratings, and phase 3 lets you set them.
+   A team: { name, short, color, light, roster: [{ n, kind, num, r }], spot: { PG: ri, ... } }. A roster may be longer
+   than five: the first five start, and the rest (up to BK_RULES.bench) sit on the bench. */
+const BK_POS = ['PG', 'SG', 'SF', 'PF', 'C'];
+const BK_ROLE = { PG: 'guard', SG: 'guard', SF: 'wing', PF: 'big', C: 'big' };
+const BK_STATS = ['spd', 'siz', 'hop', 'tch', 'hnd', 'def'];
+const BK_KIND = {
+  goblin: [7, 3, 6, 6, 9, 5], kobold: [7, 3, 5, 7, 7, 5], werewolf: [8, 7, 7, 4, 5, 7], dwarf: [4, 4, 4, 7, 6, 7],
+  ogre: [3, 10, 3, 3, 2, 6], minotaur: [6, 8, 6, 3, 4, 7], troll: [4, 9, 4, 3, 3, 7], golem: [2, 10, 2, 3, 2, 8],
+  harpy: [9, 2, 10, 5, 6, 4], elf: [8, 5, 7, 9, 7, 5], wraith: [8, 5, 6, 6, 8, 6], vampire: [8, 6, 7, 7, 6, 6],
+  lich: [4, 6, 4, 9, 5, 5], zombie: [3, 7, 4, 3, 3, 6], gorgon: [6, 6, 5, 7, 6, 7], spider: [7, 6, 6, 5, 7, 9],
+  skeleton: [6, 5, 5, 8, 5, 4], witch: [6, 4, 5, 8, 6, 4],
+};
+function bkRate(kind) { const k = BK_KIND[kind] || BK_KIND.goblin; return Object.fromEntries(BK_STATS.map((s, i) => [s, k[i]])); }
+// the two clubs a game uses when the Realm doesn't send its own: about even under the CPU
+const BK_CLUBS = {
+  home: { name: 'Graftonbury', short: 'GRB', color: '#e0742a', light: '#fff0d8', kinds: ['goblin', 'elf', 'werewolf', 'minotaur', 'troll'] },
+  away: { name: 'Visitors', short: 'VIS', color: '#3a6fb0', light: '#e2eeff', kinds: ['kobold', 'vampire', 'gorgon', 'spider', 'golem'] },
+};
+// a spot map that names every spot once, each to a different player in the roster
+const bkSpotOk = (m, n) => !!m && BK_POS.every(k => Number.isInteger(m[k]) && m[k] >= 0 && m[k] < n) && new Set(BK_POS.map(k => m[k])).size === BK_POS.length;
+// a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [5 or more kinds] }
+function bkTeam(t) {
+  const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 3 + i * 7 }))).slice(0, BK_RULES.side + BK_RULES.bench)
+    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }));
+  const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
+  // the five's spots: the best handler at the point, the two biggest inside, then the better shooter on the wing
+  const free = new Set(roster.slice(0, BK_RULES.side).map((_, i) => i)), by = f => { const i = [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r))[0]; free.delete(i); return i; };
+  T.spot = {}; T.spot.PG = by(r => r.hnd * 2 + r.spd - r.siz * .5); T.spot.C = by(r => r.siz * 2 + r.def * .5 + r.hop * .5); T.spot.PF = by(r => r.siz * 2 + r.hop);
+  T.spot.SF = by(r => r.tch * 2 + r.hop * .5); T.spot.SG = [...free][0];
+  if (bkSpotOk(t.spot, roster.length)) T.spot = Object.assign({}, t.spot);
+  return T;
+}
+/* The Charter Court: the live play (issue #77, phase 1). Ten players on a full court on a fixed step (BK_DT), the
+   ball in a hand, in the air or loose. The ratings settle what happens when players meet.
+   - The offense spreads to its spots in the half it attacks (BK_SPOT): the guards up top and on a wing, the wing in a
+     corner, the bigs at the elbow and on the block. Off the ball they drift, and now and then cut to the basket.
+   - The defense plays man to man: each defender takes the player in the same spot, between them and the basket, close
+     on the ball and sagging off it the further their man is from the rim.
+   - The ball handler thinks a few times a second (06-cpu.js): shoot, drive, pass or keep the dribble.
+   - A shot is settled at the release (bkShotP): the distance, the shooter's touch, and the contest (how close the
+     nearest defender is, and how good). At the rim size and hops count, and a big leaper dunks. A defender close
+     enough may block it or foul. A miss off the rim resets the shot clock and comes off for a rebound: whoever is
+     nearest where it comes down, with size and hops and the defense's inside position (the box-out), takes it.
+   - A pass into a defender's lane can be stolen; a defender up close on the dribble can pick it, or reach and foul.
+   - After a defensive rebound or a steal the play goes on the other way at once: a side that gets back slowly gives
+     up a fast break.
+   Court metres: x along the court from the left baseline (0 to 28), y across from the middle (-7.5 to 7.5).
+   L is the play, plain JSON (players by index, no references): { pl, ball, t, ev, think, last, shot }. */
+const BK_DT = 1 / 30, BK_BODY = .55, BK_PASS_V = 12;
+// spots in the half a side attacks: [metres from that baseline, across] (mirrored at the other end)
+const BK_SPOT = { PG: [8.6, .6], SG: [5.0, -4.6], SF: [1.1, 6.8], PF: [5.6, 2.7], C: [2.3, -2.1] };
+// the defense's set at the start of a possession: each defender between their man and the rim
+let L = null;
+
+// a point in the half side attacks, from [metres from its baseline, across], to court metres
+function bkAt(side, u, v) { const d = bkDir(side); return [d > 0 ? BK_RULES.len - u : u, v * d]; }
+// how far a court point is from the baseline side attacks (more is further up the floor)
+const bkU = (side, x) => bkDir(side) > 0 ? BK_RULES.len - x : x;
+const bkRimDist = (side, x, y) => hyp(x - bkHoopX(side), y);
+function bkEv(k, s, o) { const e = { k, s: s || '', o: o || '', t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (L.ev.length > 60) L.ev.shift(); bkSayEv(e); }
+
+// the play at the start: both fives at the spots they line up on (plain data); ball to pl index h
+function bkNewPlay() {
+  const pl = [];
+  for (const side of [0, 1]) {
+    const T = G.teams[side];
+    for (const pos of BK_POS) {
+      const ri = G.on[side][BK_POS.indexOf(pos)], m = T.roster[ri];
+      pl.push({ side, ri, pos, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r), x: 14, y: 0, vx: 0, vy: 0, mark: -1, cut: null, cutT: 0, stun: 0, run: 0, act: '', actT: 0, cd: 0 });
+    }
+  }
+  // each defender takes the player in the same spot
+  pl.forEach((p, i) => { p.mark = (i + 5) % 10; });
+  L = { pl, ball: { st: 'held', h: -1, x: 14, y: 0, z: 1, fx: 0, fy: 0, tx: 0, ty: 0, t: 0, T: 0, to: -1 }, t: 0, ev: [], think: .3, last: null, shot: null, lost: -1 };
+  return L;
+}
+const bkHand = () => L.ball.st === 'held' ? L.ball.h : -1;
+const bkOffense = () => L.pl.filter(p => p.side === G.poss);
+const bkDefense = () => L.pl.filter(p => p.side !== G.poss);
+function bkNearest(x, y, list) { let b = null, bd = 1e9; for (const p of list) { const d = hyp(p.x - x, p.y - y); if (d < bd) { bd = d; b = p; } } return [b, bd]; }
+// the set: the offense at its spots with the ball at the point, each defender a stride inside their man
+function bkSetSpots(side) {
+  const at = {};
+  for (const p of L.pl) {
+    if (p.side === side) at[L.pl.indexOf(p)] = bkAt(side, ...BK_SPOT[p.pos]);
+  }
+  for (const p of L.pl) {
+    if (p.side === side) continue;
+    const m = at[p.mark], hx = bkHoopX(side), d = hyp(m[0] - hx, m[1]) || 1, g = Math.min(1.6, d * .3);
+    at[L.pl.indexOf(p)] = [m[0] + (hx - m[0]) / d * g, m[1] - m[1] / d * g];
+  }
+  return at;
+}
+// a player's speed now: metres a second
+function bkSpeed(p, i) {
+  let m = 4.2 + p.r.spd * .38;
+  if (i === bkHand()) m *= .9;
+  if (p.stun > 0) m *= .25;
+  return m;
+}
+
+function bkStep(dt) {
+  L.t += dt;
+  for (const p of L.pl) { if (p.stun > 0) p.stun -= dt; if (p.cd > 0) p.cd -= dt; if (p.actT > 0 && (p.actT -= dt) <= 0) p.act = ''; if (p.cutT > 0 && (p.cutT -= dt) <= 0) p.cut = null; }
+  const h = bkHand();
+  if (h >= 0 && L.pl[h].side === G.poss && !L.shot) { L.think -= dt; if (L.think <= 0) { L.think = .28 + R() * .22; bkThink(h); } }
+  L.pl.forEach((p, i) => { const tg = bkAim(p, i); if (tg) bkMove(p, i, tg[0], tg[1], dt); else { p.vx *= .8; p.vy *= .8; p.x += p.vx * dt; p.y += p.vy * dt; } p.run += hyp(p.vx, p.vy) * dt * 2.2; });
+  bkSeparate();
+  bkBall(dt);
+}
+function bkMove(p, i, tx, ty, dt) {
+  const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(bkSpeed(p, i), d / .2);
+  const wx = d > .03 ? dx / d * sp : 0, wy = d > .03 ? dy / d * sp : 0, k = Math.min(1, dt * 7);
+  p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k;
+  p.x = clamp(p.x + p.vx * dt, .3, BK_RULES.len - .3); p.y = clamp(p.y + p.vy * dt, -BK_RULES.wid / 2 + .3, BK_RULES.wid / 2 - .3);
+}
+function bkSeparate() {
+  const pl = L.pl;
+  for (let a = 0; a < pl.length; a++) for (let b = a + 1; b < pl.length; b++) {
+    const A = pl[a], B = pl[b], dx = B.x - A.x, dy = B.y - A.y, d = hyp(dx, dy);
+    if (d < BK_BODY && d > .001) { const k = (BK_BODY - d) / 2 / d; A.x -= dx * k; A.y -= dy * k; B.x += dx * k; B.y += dy * k; }
+  }
+}
+
+/* ---------- where each player is going ---------- */
+function bkAim(p, i) {
+  const B = L.ball, off = p.side === G.poss, h = bkHand();
+  // a shooter stays put through the shot; a jumper (a contest or a block) lands where they jumped
+  if (p.act === 'shoot' || p.act === 'jump') return [p.x, p.y];
+  // the ball loose (a rebound, a block, a tip): everyone near goes for where it comes down, the rest get back or spread
+  if (B.st === 'loose' || B.st === 'free') {
+    const d = hyp(p.x - B.tx, p.y - B.ty);
+    if (d < 6.5 || p.pos === 'C' || p.pos === 'PF') {
+      // the defense keeps inside position: a stride between its man and the ball
+      if (!off && B.st === 'loose' && L.pl[p.mark]) { const m = L.pl[p.mark]; return [lerp(B.tx, m.x, .25), lerp(B.ty, m.y, .25)]; }
+      return [B.tx, B.ty];
+    }
+    return off ? bkAt(p.side, ...BK_SPOT[p.pos]) : bkGuardSpot(p);
+  }
+  if (B.st === 'pass' && B.to === i) return [B.tx, B.ty];
+  if (off) {
+    if (i === h) return L.drive ? [bkHoopX(p.side), 0] : bkHandlerSpot(p);
+    // a cutter goes to the rim; the others hold their spot (with a drift, so the defense has to move)
+    if (p.cut) return p.cut;
+    if (p.cd <= 0 && L.t > 1.5 && h >= 0 && bkU(p.side, L.pl[h].x) < 11 && R() < .006) { const u = 1.6 + R() * 1.2; p.cut = bkAt(p.side, u, (R() - .5) * 2.4); p.cutT = 1.4; p.cd = 3 + R() * 2; }
+    const s = bkAt(p.side, ...BK_SPOT[p.pos]), w = Math.sin(L.t * .9 + i * 1.7) * .8;
+    return [s[0] + w * .4, s[1] + w];
+  }
+  return bkGuardSpot(p);
+}
+// the handler brings it up to the point, then works around it
+function bkHandlerSpot(p) {
+  const s = bkAt(p.side, ...BK_SPOT[p.pos]);
+  return [s[0] + Math.sin(L.t * .7) * .9, s[1] + Math.sin(L.t * 1.1) * 1.6];
+}
+// a defender between their man and the rim: tight on the ball, sagging off it
+function bkGuardSpot(p) {
+  const m = L.pl[p.mark], hx = bkHoopX(m.side), dx = hx - m.x, dy = -m.y, d = hyp(dx, dy) || 1;
+  const onBall = L.pl.indexOf(m) === bkHand() || (L.ball.st === 'pass' && L.ball.to === L.pl.indexOf(m));
+  const gap = onBall ? Math.min(d * .5, .95) : clamp(d * .32, .9, 3.2);
+  let x = m.x + dx / d * gap, y = m.y + dy / d * gap;
+  // off the ball, help toward a driver
+  if (!onBall && L.drive && bkHand() >= 0) { const hb = L.pl[bkHand()]; x = lerp(x, hb.x, .25); y = lerp(y, hb.y, .25); }
+  return [x, y];
+}
+
+/* ---------- the ball ---------- */
+function bkBall(dt) {
+  const B = L.ball;
+  if (B.st === 'held') { const p = L.pl[B.h]; if (p) { B.x = p.x + .25; B.y = p.y; B.z = p.act === 'shoot' ? 2.3 : .9 + Math.abs(Math.sin(L.t * 9)) * .5; } return; }
+  if (B.st === 'tip') return;
+  B.t += dt; const u = Math.min(1, B.t / B.T);
+  B.x = lerp(B.fx, B.tx, u); B.y = lerp(B.fy, B.ty, u);
+  if (B.st === 'pass') { B.z = 1.3 + (B.lob ? 2.5 : .4) * 4 * u * (1 - u); if (u >= 1) bkCatch(); return; }
+  if (B.st === 'shot') { B.z = lerp(2.3, 3.05, u) + (2 + B.T) * 4 * u * (1 - u); if (u >= 1) bkShotLands(); return; }
+  if (B.st === 'loose') {
+    B.z = lerp(B.z0, .6, u) + 1.4 * 4 * u * (1 - u);
+    if (u >= 1) bkRebound();
+    return;
+  }
+  if (B.st === 'free') { B.z = .2; B.tx = B.x; B.ty = B.y; const [p, d] = bkNearest(B.x, B.y, L.pl); if (p && d < .7) bkGain(L.pl.indexOf(p), 'loose'); }
+}
+// player i has the ball: a change of possession if they're on the other side (the play goes on the other way)
+function bkGain(i, how) {
+  const p = L.pl[i], B = L.ball;
+  Object.assign(B, { st: 'held', h: i, to: -1, lob: false });
+  L.drive = false; L.shot = null; L.got = L.t; L.think = .25 + R() * .2;
+  // (an assist is for the pass the shooter caught: a rebound, a steal or a loose ball leaves nobody to credit)
+  if (how !== 'pass') L.last = null;
+  if (p.side !== G.poss) { bkGive(p.side); bkEv('change', how, p.n); bkPossession(how); }
+}
+function bkCatch() {
+  const B = L.ball, rc = L.pl[B.to];
+  if (B.stl >= 0) { const d = L.pl[B.stl]; bkBoxAdd(d.side, d.ri, 'stl'); bkEv('steal', d.n, L.pl[B.from].n); L.lost = B.from; B.stl = -1; return bkGain(L.pl.indexOf(d), 'steal'); }
+  L.last = { i: B.from, t: L.t };
+  bkGain(B.to, 'pass');
+  rc.cut = null;
+}
+/* the pass: from the handler to teammate j, led to where they're going. Any defender close to its lane may step in:
+   settled now, and the flight shows it */
+function bkPass(j) {
+  const h = bkHand(), p = L.pl[h], rc = L.pl[j];
+  let tx = rc.x, ty = rc.y, T = 0;
+  for (let k = 0; k < 3; k++) { T = hyp(tx - p.x, ty - p.y) / BK_PASS_V; tx = rc.x + rc.vx * T; ty = rc.y + rc.vy * T; }
+  T = Math.max(.18, T);
+  let stl = -1;
+  for (const d of bkDefense()) {
+    const ax = tx - p.x, ay = ty - p.y, len = hyp(ax, ay) || 1, s = ((d.x - p.x) * ax + (d.y - p.y) * ay) / (len * len);
+    if (s < .15 || s > .95) continue;
+    const off = Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len;
+    if (off > .95 || d.stun > 0) continue;
+    const ch = (.95 - off) / .95 * (.07 + d.r.def * .022 + d.r.spd * .006) * (1.25 - p.r.hnd * .04);
+    if (R() < ch) { stl = L.pl.indexOf(d); tx = lerp(p.x, tx, s); ty = lerp(p.y, ty, s); T *= s; break; }
+  }
+  Object.assign(L.ball, { st: 'pass', h: -1, fx: p.x, fy: p.y, tx, ty, t: 0, T, to: j, from: h, stl, lob: false });
+  L.drive = false;
+  bkEv('pass', p.n, rc.n);
+}
+// how likely a shot from (x, y) by shooter p goes in, with the nearest defender d at dd: { p, d (metres), con (0 open
+// to 1 smothered), rim (at the rim), dunk }
+function bkShotP(p, x, y) {
+  const dist = bkRimDist(p.side, x, y), [d, dd] = bkNearest(x, y, L.pl.filter(q => q.side !== p.side && q.stun <= 0));
+  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
+  const rim = dist < 1.5, dunk = rim && p.r.siz + p.r.hop >= 13 && con < .7;
+  let pr;
+  if (rim) pr = .68 + (p.r.siz + p.r.hop - 12) * .016 - con * (.24 - (p.r.siz - (d ? d.r.siz : 5)) * .01) + (dunk ? .18 : 0);
+  else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
+  return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
+}
+/* the shot: settled at the release. A defender close enough may block it (it comes off loose) or foul (free throws:
+   the game, 07-game.js, takes them when the shot comes down). Otherwise in or out by bkShotP; a miss mostly hits the rim */
+function bkShoot() {
+  const h = bkHand(), p = L.pl[h], S = bkShotP(p, p.x, p.y), d = S.d >= 0 ? L.pl[S.d] : null;
+  const pts = S.three ? 3 : 2, near = d && S.dd < 1.2;
+  let block = false, foul = false;
+  if (near) {
+    const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4);
+    block = R() < pb;
+    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05);
+    d.act = 'jump'; d.actT = .5;
+  }
+  const made = !block && R() < S.p * (foul ? .45 : 1);
+  p.act = 'shoot'; p.actT = .35;
+  L.shot = { i: h, side: p.side, pts, made, block, foul, by: d ? S.d : -1, dist: Math.round(S.dist * 10) / 10, rim: S.rim, dunk: S.dunk && !block, p: Math.round(S.p * 100) / 100, con: Math.round(S.con * 100) / 100, ast: L.last && L.last.i !== h && L.t - L.last.t < 3.5 && L.pl[L.last.i].side === p.side ? L.last.i : -1 };
+  const hx = bkHoopX(p.side), T = block ? .16 : S.rim ? .32 : .5 + S.dist * .05;
+  Object.assign(L.ball, { st: 'shot', h: -1, fx: p.x, fy: p.y, tx: block ? lerp(p.x, hx, .2) : hx, ty: block ? p.y * .8 : 0, t: 0, T });
+  L.drive = false;
+  bkEv('shot', p.n, S.three ? 'three' : S.dunk ? 'dunk' : S.rim ? 'layup' : 'jumper');
+}
+function bkShotLands() {
+  const S = L.shot, p = L.pl[S.i];
+  if (S.block) { const d = L.pl[S.by]; bkBoxAdd(d.side, d.ri, 'blk'); bkEv('block', d.n, p.n); bkLoose(L.ball.x, L.ball.y, 2.2, 1.6); }
+  else if (S.made) { bkEv('made', p.n, S.pts); }
+  else { bkEv('miss', p.n); bkShotReset(); bkLoose(bkHoopX(S.side), 0, 3.05, S.pts === 3 ? 3.2 : 2.1); }
+  // the game (07-game.js) scores it, and takes any free throws
+  bkShotDone(S);
+}
+// the ball comes off loose from (x, y) at height z0, landing r metres away on average, back toward the floor
+function bkLoose(x, y, z0, r) {
+  const back = bkDir(G.poss), a = Math.PI + (R() - .5) * 2.4, rr = r * (.55 + R() * .7);
+  let tx = x + Math.cos(a) * rr * back, ty = y + Math.sin(a) * rr;
+  tx = clamp(tx, .5, BK_RULES.len - .5); ty = clamp(ty, -BK_RULES.wid / 2 + .5, BK_RULES.wid / 2 - .5);
+  Object.assign(L.ball, { st: 'loose', h: -1, fx: x, fy: y, tx, ty, t: 0, T: .55 + rr * .08, z0 });
+}
+// a rebound: the nearest, the biggest and the best leapers have the best of it, and the defense has inside position
+function bkRebound() {
+  const B = L.ball, c = [];
+  for (const p of L.pl) {
+    const d = hyp(p.x - B.tx, p.y - B.ty); if (d > 2.2 || p.stun > 0) continue;
+    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 : 1)]);
+  }
+  if (!c.length) { B.st = 'free'; return; }
+  let s = c.reduce((a, [, w]) => a + w, 0) * R(), win = c[0][0];
+  for (const [p, w] of c) { s -= w; if (s <= 0) { win = p; break; } }
+  const off = win.side === G.poss;
+  bkBoxAdd(win.side, win.ri, off ? 'oreb' : 'dreb');
+  bkEv('reb', win.n, off ? 'off' : 'def');
+  bkGain(L.pl.indexOf(win), 'rebound');
+}
+// the handler loses it on the dribble to defender d
+function bkPicked(d) {
+  const h = bkHand(); bkBoxAdd(d.side, d.ri, 'stl'); bkEv('steal', d.n, L.pl[h].n); L.lost = h;
+  L.pl[h].stun = .35; bkGain(L.pl.indexOf(d), 'steal');
+}
+/* The Charter Court: the ball handler's mind (issue #77, phase 1). A few times a second the player with the ball weighs
+   what they could do, and picks by weight (so it isn't the same every time):
+   - shoot: what the shot is worth from here (bkShotP times 2 or 3); a good look gets taken, and a poor one only as the
+     shot clock runs down;
+   - drive: at the rim if no defender stands in the lane, better with speed and handle;
+   - pass: to the teammate with the best look, less the risk of a defender in the lane;
+   - keep the dribble: work toward the spot, and let the offense set up.
+   In the backcourt the handler brings it up (or pushes it, with defenders behind the ball: a fast break). A defender
+   up close may pick the dribble or reach in and foul (bkReach, 07-game.js takes the foul). */
+const BK_THINK = { shootAt: .92, urgent: 3.2, pick: .0045, reach: .006 };
+// what a pass to j would be worth: their look, less the chance it's picked off
+// (a big inside is worth a post move to the rim, not only the shot from where they stand)
+function bkPassValue(h, j) {
+  const p = L.pl[h], q = L.pl[j];
+  let S = bkShotP(q, q.x, q.y);
+  if (BK_ROLE[q.pos] === 'big' && S.dist < 3.4) { const hx = bkHoopX(q.side), k = 1.1 / S.dist, P = bkShotP(q, hx + (q.x - hx) * k, q.y * k); if (P.p * .85 > S.p) S = Object.assign(P, { p: P.p * .85 }); }
+  let risk = 0;
+  for (const d of bkDefense()) {
+    const ax = q.x - p.x, ay = q.y - p.y, len = hyp(ax, ay) || 1, s = ((d.x - p.x) * ax + (d.y - p.y) * ay) / (len * len);
+    if (s < .15 || s > .95) continue;
+    const off = Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len;
+    if (off < .95) risk += (.95 - off) * .4;
+  }
+  return S.p * (S.three ? 3 : 2) - risk - (len2(p, q) > 14 ? .3 : 0);
+}
+const len2 = (a, b) => hyp(a.x - b.x, a.y - b.y);
+// the defender standing in the lane to the rim (within about a metre of the line from the handler to it), or null
+function bkLaneBlock(p) {
+  const hx = bkHoopX(p.side), ax = hx - p.x, ay = -p.y, len = hyp(ax, ay) || 1;
+  let best = null, bs = 2;
+  for (const d of bkDefense()) {
+    if (d.stun > 0) continue;
+    const s = ((d.x - p.x) * ax + (d.y - p.y) * ay) / (len * len); if (s < .05 || s > 1) continue;
+    if (Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len < .9 + (d.r.siz - 5) * .04 && s < bs) { bs = s; best = d; }
+  }
+  return best;
+}
+const bkLaneOpen = p => !bkLaneBlock(p);
+function bkThink(h) {
+  const p = L.pl[h], dist = bkRimDist(p.side, p.x, p.y), u = bkU(p.side, p.x), [nd, ndd] = bkNearest(p.x, p.y, bkDefense());
+  // on the dribble a defender up close may pick it, or reach in for a foul
+  if (nd && ndd < 1 && nd.stun <= 0) {
+    if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd) * .0018, .001, .02)) return bkPicked(nd);
+    if (R() < BK_THINK.reach) return bkReach(nd);
+  }
+  // driving: at the rim, it's a layup or a dunk. A defender in the lane: beat them (handle and speed against defense
+  // and speed: they're left a step behind), pull up for the shot, or pull it back out
+  if (L.drive) {
+    if (dist < 1.4) return bkShoot();
+    const d = bkLaneBlock(p);
+    if (d && dist > 1.8) {
+      if (R() < clamp(.35 + (p.r.hnd + p.r.spd - d.r.def - d.r.spd) * .05, .08, .75)) { d.stun = .45; bkEv('beat', p.n, d.n); return; }
+      if (dist < 4.5 && R() < .45) return bkShoot();
+      L.drive = false;
+    }
+    return;
+  }
+  const urgent = G.shot < BK_THINK.urgent && G.shot < G.clock, late = G.clock < 4 && G.clock <= G.shot;
+  // the backcourt: bring it up, push it with numbers, or hit a teammate ahead
+  if (u > 14) {
+    const ahead = bkOffense().filter(q => q !== p && bkU(q.side, q.x) < u - 4), behind = bkDefense().filter(d => bkU(p.side, d.x) < u).length;
+    if (ahead.length && R() < .35) { const best = ahead.map(q => [L.pl.indexOf(q), bkPassValue(h, L.pl.indexOf(q))]).sort((a, b) => b[1] - a[1])[0]; if (best[1] > .9) return bkPass(best[0]); }
+    if (behind <= 2 && bkLaneOpen(p)) L.drive = true;
+    return;
+  }
+  const S = bkShotP(p, p.x, p.y), sv = S.p * (S.three ? 3 : 2);
+  const mates = bkOffense().filter(q => q !== p).map(q => [L.pl.indexOf(q), bkPassValue(h, L.pl.indexOf(q))]).sort((a, b) => b[1] - a[1]);
+  // (the longer one player has had it, the more the others want it)
+  const best = mates[0], lane = dist > 2 && bkLaneOpen(p), held = Math.max(0, L.t - (L.got || 0));
+  const w = {
+    shoot: (sv > BK_THINK.shootAt ? (sv - .6) * 5 : .04) + (urgent || late ? 6 : 0) + (S.rim ? 2 : 0),
+    drive: dist > 2 ? (lane ? 1 : .35) + (p.r.spd + p.r.hnd - 11) * .12 + (urgent ? 1 : 0) + (BK_ROLE[p.pos] === 'big' && dist < 3.6 ? 1.6 + (p.r.siz - 5) * .2 : 0) : .05,
+    pass: best ? Math.max(.05, (best[1] - sv * .8) * 3 + .7) * (1 + held * .7) * (urgent && G.shot < 1.2 ? .2 : 1) : 0,
+    hold: Math.max(.05, 1.4 * (G.shot - 4) / 10),
+  };
+  const k = wpick(w);
+  if (k === 'shoot') return bkShoot();
+  if (k === 'drive') { L.drive = true; bkEv('drive', p.n); return; }
+  if (k === 'pass' && best) return bkPass(best[0]);
+}
+/* The Charter Court: a game (issue #77, phase 1). Tip-off, then possession after possession on the game clock, four
+   quarters, until the end (or overtime). The beats (GD.ph):
+   - intro: both fives at the centre circle, then the tip: the two centres jump, size and hops against size and hops.
+   - live: the play (05-live.js) on the game clock and the shot clock.
+   - dead: a moment after a basket, a violation or a foul away from the shot; then the walk.
+   - walk: the side with the ball brings it up to its spots and the defense meets it, sped through (BK_PACE.walk
+     seconds to watch, BK_PACE.walkSecs off the clocks; none after a break between periods).
+   - ft: free throws, one beat each. A miss on the last one is a live rebound; a make gives the ball to the other side.
+   - break: between periods (longer at halftime); the ball goes by the arrow.
+   - over: the end; onOver hears the summary.
+   A side whose player fouls out puts its best player from the bench on in that spot; with nobody on the bench the
+   player stays on (02-rules.js). The box score (G.box, by side and roster index): pts, reb (oreb, dreb), ast, stl,
+   blk, fgm, fga, tpm, tpa, ftm, fta, pf, tov and sec (seconds on the floor). G.log has every score.
+   GD is the game on show (not saved). The headless game (bkSimGame) runs this same flow with bigger steps, so the
+   view and the bot can't drift apart. */
+const BK_PACE = { intro: 1.4, dead: .9, walk: .9, walkSecs: 3, ft: 1.05, break: 2.2, half: 3.4 };
+const BK_HOOK = { onOver: null, onPhase: null };
+let GD = null;
+
+function bkStart(opts) {
+  const o = opts || {}, T = o.teams || [];
+  bkSeed(o.seed);
+  bkNewGame({ mins: o.mins });
+  G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
+  G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
+  G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
+  G.log = []; G.poss0 = [0, 0]; G.secs = 0;
+  bkNewPlay();
+  GD = { ph: 'intro', t: 0, acc: 0, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
+  bkTipSet();
+  return G;
+}
+function bkGo(ph) {
+  GD.ph = ph; GD.t = 0;
+  // (a note, a foul-out, is for the stop in play it came with)
+  if (ph === 'live') GD.notes = [];
+  if (BK_HOOK.onPhase) try { BK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
+}
+function bkBoxAdd(side, ri, k, n) {
+  const b = G.box[side][ri]; if (!b) return; const v = n == null ? 1 : n;
+  b[k] += v; if (k === 'oreb' || k === 'dreb') b.reb += v;
+}
+// the line in the bar under the court: what just happened (GD.msg), from the play's events
+const BK_SAY = {
+  steal: e => `${e.s} steals it from ${e.o}.`, block: e => `${e.s} blocks ${e.o}!`,
+  reb: e => e.o === 'off' ? `${e.s} gets the offensive rebound.` : `${e.s} with the rebound.`,
+};
+function bkSayEv(e) { if (GD && BK_SAY[e.k]) GD.msg = BK_SAY[e.k](e); }
+// where everyone stands for the tip: both fives around the centre circle, each on the side of the basket it defends
+function bkTipSet() {
+  const mid = BK_RULES.len / 2, at = { C: [.6, 0], PF: [2.4, 2.6], SF: [2.4, -2.6], SG: [4.5, 3.2], PG: [4.5, -3.2] };
+  for (const p of L.pl) { const [dx, dy] = at[p.pos], back = -bkDir(p.side); p.x = mid + back * (p.pos === 'C' ? .6 : dx); p.y = dy * (p.side ? -1 : 1); p.vx = p.vy = 0; }
+  Object.assign(L.ball, { st: 'tip', h: -1, x: mid, y: 0, z: 3 });
+}
+function bkTip() {
+  const c = [0, 1].map(s => L.pl[s * 5 + BK_POS.indexOf('C')]), d = (c[0].r.siz + c[0].r.hop) - (c[1].r.siz + c[1].r.hop), win = R() < clamp(.5 + d * .04, .15, .85) ? 0 : 1;
+  bkGive(win); G.arrow = 1 - win;
+  const pg = L.pl[win * 5 + BK_POS.indexOf('PG')];
+  Object.assign(L.ball, { st: 'held', h: L.pl.indexOf(pg) });
+  GD.msg = `${c[win].n} wins the tip for ${G.teams[win].name}.`; G.poss0[win]++;
+  bkGo('live');
+}
+function bkTick(dt) {
+  if (!GD || GD.ph === 'over') return;
+  GD.t += dt;
+  if (GD.ph === 'intro') { if (GD.t >= BK_PACE.intro) bkTip(); return; }
+  if (GD.ph === 'live') {
+    GD.acc += dt;
+    while (GD.acc >= BK_DT && GD.ph === 'live') {
+      GD.acc -= BK_DT; bkStep(BK_DT); if (GD.ph !== 'live') break;
+      // (a shot in the air when the clock runs out still counts: the period ends when it comes down)
+      if (L.buzzer) continue;
+      bkMinutes(Math.min(BK_DT, G.clock));
+      const B = L.ball, r = bkRun(BK_DT, B.st === 'shot' || B.st === 'loose' || B.st === 'free');
+      if (r === 'shot') { bkViolationNow(); break; }
+      if (r === 'end') { if (B.st === 'shot') L.buzzer = true; else { bkPeriodOver(); break; } }
+    }
+    return;
+  }
+  // (after a reach the offense keeps it where it was, the ball with the player fouled: no walk up the floor)
+  if (GD.ph === 'dead') { if (GD.t >= BK_PACE.dead) { if (GD.keep) { GD.keep = false; for (const p of L.pl) { p.vx = p.vy = 0; p.stun = 0; } L.drive = false; L.think = .4; bkGo('live'); } else bkWalk(true); } return; }
+  if (GD.ph === 'walk') {
+    const W = GD.walk, u = Math.min(1, GD.t / BK_PACE.walk), e = u * u * (3 - 2 * u);
+    L.pl.forEach((p, i) => { const a = W.from[i], b = W.to[i]; const px = p.x, py = p.y; p.x = lerp(a[0], b[0], e); p.y = lerp(a[1], b[1], e); p.vx = (p.x - px) / Math.max(dt, 1e-3); p.vy = (p.y - py) / Math.max(dt, 1e-3); p.run += hyp(p.x - px, p.y - py) * 2.2; });
+    bkBall(dt);
+    if (W.clock) { const s = Math.min(G.clock, BK_PACE.walkSecs * e - (W.ran || 0)); W.ran = BK_PACE.walkSecs * e; bkMinutes(s); if (bkRun(s) === 'end') { bkPeriodOver(); return; } }
+    if (u >= 1) { for (const p of L.pl) { p.vx = p.vy = 0; } L.t = 0; L.got = 0; L.think = .4; bkGo('live'); }
+    return;
+  }
+  if (GD.ph === 'ft') { if (GD.t >= BK_PACE.ft) bkFreeThrow(); return; }
+  if (GD.ph === 'break') { if (GD.t >= (GD.half ? BK_PACE.half : BK_PACE.break)) bkWalk(false); }
+}
+function bkMinutes(s) { for (const p of L.pl) G.box[p.side][p.ri].sec += s; G.secs += s; }
+// the ball to side's point guard, and everyone to the set: the walk up the floor (clock: the clocks run through it)
+function bkWalk(clock) {
+  const side = G.poss, at = bkSetSpots(side), pg = L.pl.findIndex(p => p.side === side && p.pos === 'PG');
+  // the set starts from wherever they are now; the inbound starts under the other basket
+  GD.walk = { from: L.pl.map(p => [p.x, p.y]), to: L.pl.map((_, i) => at[i]), clock };
+  Object.assign(L, { shot: null, drive: false, buzzer: false, last: null });
+  for (const p of L.pl) { p.stun = 0; p.act = ''; p.cut = null; }
+  Object.assign(L.ball, { st: 'held', h: pg, to: -1 });
+  G.poss0[side]++;
+  bkGo('walk');
+}
+// a change of possession in the play (a steal, a defensive rebound, a loose ball): the play goes on the other way
+function bkPossession(how) {
+  const lost = 1 - G.poss;
+  if (how === 'steal' && L.lost >= 0) { bkBoxAdd(lost, L.pl[L.lost].ri, 'tov'); L.lost = -1; }
+  G.poss0[G.poss]++;
+}
+function bkViolationNow() {
+  const side = G.poss, h = bkHand() >= 0 ? bkHand() : L.ball.st === 'pass' ? L.ball.from : -1;
+  if (h >= 0) bkBoxAdd(side, L.pl[h].ri, 'tov');
+  bkViolation();
+  GD.msg = `Shot clock! ${G.teams[side].name} turn it over.`; GD.big = { k: 'clock' };
+  bkGo('dead');
+}
+// the shot has come down (05-live.js): score it, and take any free throws
+function bkShotDone(S) {
+  const p = L.pl[S.i], three = S.pts === 3, D = 1 - S.side;
+  // (a miss when fouled is no attempt: it's the free throws)
+  if (S.made || !S.foul) { bkBoxAdd(S.side, p.ri, 'fga'); if (three) bkBoxAdd(S.side, p.ri, 'tpa'); }
+  if (S.made) {
+    bkScore(S.side, S.pts); bkBoxAdd(S.side, p.ri, 'fgm'); bkBoxAdd(S.side, p.ri, 'pts', S.pts); if (three) bkBoxAdd(S.side, p.ri, 'tpm');
+    const a = S.ast >= 0 ? L.pl[S.ast] : null; if (a) bkBoxAdd(S.side, a.ri, 'ast');
+    G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: S.side, pts: S.pts, who: p.n, ri: p.ri, k: S.dunk ? 'dunk' : three ? 'three' : S.rim ? 'layup' : 'jumper', ast: a ? a.n : '' });
+    GD.msg = (S.dunk ? `${p.n} throws it down!` : three ? `${p.n} for three: good!` : S.rim ? `${p.n} lays it in.` : `${p.n} hits from ${S.dist} metres.`) + (a ? ` ${a.n} with the pass.` : '');
+    GD.big = S.dunk ? { k: 'dunk' } : three ? { k: 'three' } : null; GD.net = { hoop: bkHoopX(S.side) > BK_RULES.len / 2 ? 1 : 0 };
+  } else if (S.block) { GD.big = { k: 'block' }; }
+  else GD.msg = `${p.n} misses${three ? ' from three' : S.rim ? ' at the rim' : ''}.`;
+  if (S.foul) {
+    const d = L.pl[S.by], who = d.n, f = bkFoulOn(D, d, { shooting: true, made: S.made, three });
+    GD.msg += ` Foul on ${who}${S.made ? ': and one!' : `: ${f.shots} free throw${f.shots === 1 ? '' : 's'}.`}`;
+    if (S.made) GD.big = { k: 'andone' };
+    return bkFreeThrows(S.side, S.i, f.shots);
+  }
+  if (S.made) { bkGive(D); return L.buzzer ? bkPeriodOver() : bkGo('dead'); }
+  // a miss or a block: the ball is loose and the play goes on (unless the clock has run out)
+  if (L.buzzer) bkPeriodOver();
+}
+// a foul by side's player d (in L.pl): the box score, and off they come at five if there's anyone to come in
+function bkFoulOn(side, d, o) {
+  const bench = bkBench(side), f = bkFoul(side, d.ri, Object.assign({ benchLeft: bench.length }, o));
+  bkBoxAdd(side, d.ri, 'pf');
+  if (f.out) bkFoulOut(side, d, bench);
+  return f;
+}
+// side's bench: roster indices not on the floor and not fouled out
+function bkBench(side) { return G.teams[side].roster.map((_, i) => i).filter(i => !G.on[side].includes(i) && !bkFouledOut(side, i)); }
+function bkFoulOut(side, d, bench) {
+  const T = G.teams[side], inn = bench.slice().sort((a, b) => bkFit(T.roster[b].r, d.pos) - bkFit(T.roster[a].r, d.pos))[0], m = T.roster[inn];
+  G.on[side][BK_POS.indexOf(d.pos)] = inn;
+  GD.notes = (GD.notes || []).concat(`${d.n} fouls out; ${m.n} comes on.`);
+  Object.assign(d, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
+}
+// how well ratings r suit a spot
+const bkFit = (r, pos) => BK_ROLE[pos] === 'guard' ? r.hnd * 2 + r.spd : BK_ROLE[pos] === 'wing' ? r.tch * 2 + r.hop : r.siz * 2 + r.def + r.hop * .5;
+// a foul away from the shot (06-cpu.js): in the bonus it's two shots; otherwise the offense keeps it, on at least 8
+function bkReach(d) {
+  const h = bkHand(), p = L.pl[h], who = d.n, f = bkFoulOn(d.side, d, {});
+  GD.msg = `Foul on ${who}, reaching in${f.shots ? `: ${f.bonus ? 'in the bonus, ' : ''}${f.shots} free throw${f.shots === 1 ? '' : 's'}.` : '.'}`;
+  if (f.shots) return bkFreeThrows(p.side, h, f.shots);
+  G.shot = Math.max(G.shot, 8); GD.keep = true;
+  bkGo('dead');
+}
+// free throws: the shooter at the line, everyone else along the lane
+function bkFreeThrows(side, i, n) {
+  GD.ft = { side, i, n, made: 0, of: n };
+  const hx = bkHoopX(side), dir = bkDir(side), lane = [[1.2, 2.4], [2.6, 2.4], [1.2, -2.4], [2.6, -2.4], [3.9, 2.4], [3.9, -2.4]];
+  let k = 0;
+  // the defense takes the spots nearest the rim
+  const rest = L.pl.map((p, j) => j).filter(j => j !== i).sort((a, b) => (L.pl[a].side === side) - (L.pl[b].side === side));
+  for (const j of rest) {
+    const p = L.pl[j];
+    if (k < lane.length && (p.pos === 'C' || p.pos === 'PF' || p.pos === 'SF')) { const [u, v] = lane[k++]; p.x = hx - dir * u; p.y = v; }
+    else { p.x = hx - dir * (8 + (j % 3)); p.y = (j % 2 ? 1 : -1) * (2 + j % 4); }
+    p.vx = p.vy = 0; p.act = ''; p.stun = 0;
+  }
+  const s = L.pl[i]; s.x = hx - dir * 4.225; s.y = 0; s.vx = s.vy = 0;
+  Object.assign(L.ball, { st: 'held', h: i, to: -1 }); L.drive = false; L.shot = null; L.last = null;
+  bkGo('ft');
+}
+// one free throw: touch, nothing else (nerve comes later)
+function bkFreeThrow() {
+  const F = GD.ft, p = L.pl[F.i], good = R() < bkFtChance(p);
+  F.n--; bkBoxAdd(F.side, p.ri, 'fta');
+  if (good) { F.made++; bkScore(F.side, 1); bkBoxAdd(F.side, p.ri, 'ftm'); bkBoxAdd(F.side, p.ri, 'pts'); G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: F.side, pts: 1, who: p.n, ri: p.ri, k: 'ft', ast: '' }); }
+  GD.msg = `${p.n} at the line: ${good ? 'good' : 'no good'} (${F.made} of ${F.of - F.n}).`; if (good) GD.net = { hoop: bkHoopX(F.side) > BK_RULES.len / 2 ? 1 : 0 };
+  if (F.n > 0) { GD.t = 0; return; }
+  GD.ft = null;
+  if (G.clock <= 0) return bkPeriodOver();
+  if (good) { bkGive(1 - F.side); return bkGo('dead'); }
+  // a miss on the last one: a live rebound
+  bkShotReset(); bkLoose(bkHoopX(F.side), 0, 3.05, 1.8); L.t = 0; bkGo('live');
+}
+const bkFtChance = p => clamp(.5 + p.r.tch * .04, .3, .95);
+function bkPeriodOver() {
+  const was = G.q, r = bkPeriodEnd();
+  L.buzzer = false;
+  if (r === 'over') {
+    const [a, b] = G.score, w = G.over.win;
+    GD.msg = w == null ? `Final: a tie, ${a} all.` : `Final: ${G.teams[w].name} win ${Math.max(a, b)} to ${Math.min(a, b)}${G.over.ot ? ` in ${bkPeriodName(was)}` : ''}.`;
+    bkGo('over');
+    if (BK_HOOK.onOver) try { BK_HOOK.onOver(bkSummary()); } catch (e) { console.error(e); }
+    return;
+  }
+  GD.half = r === 'half';
+  GD.msg = r === 'ot' ? `Level at ${G.score[0]}: overtime.` : `End of the ${bkPeriodName(was)}: ${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}.`;
+  Object.assign(L, { shot: null, drive: false });
+  bkGo('break');
+}
+// the game clock as it shows: m:ss, and tenths in the last ten seconds
+function bkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function bkSummary() {
+  return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, q: G.q, ot: G.over ? G.over.ot : 0, mins: G.mins,
+    poss: G.poss0.slice(), secs: Math.round(G.secs), box: bkBox(), log: G.log.slice() };
+}
+// the box score: by side, each player who played, with their line, and the team's totals
+function bkBox() {
+  return G.teams.map((T, s) => {
+    const rows = T.roster.map((m, i) => Object.assign({ n: m.n, kind: m.kind, num: m.num, ri: i, out: bkFouledOut(s, i) && !G.on[s].includes(i) }, G.box[s][i], { sec: Math.round(G.box[s][i].sec) })).filter(r => r.sec > 0 || r.pf > 0 || G.on[s].includes(r.ri));
+    const tot = {}; for (const k of ['pts', 'reb', 'oreb', 'dreb', 'ast', 'stl', 'blk', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'pf', 'tov']) tot[k] = rows.reduce((a, r) => a + r[k], 0);
+    return { team: T.name, rows, tot };
+  });
+}
+// a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
+function bkSimGame(opts) {
+  const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: bkRand } : null;
+  BK_HOOK.onOver = BK_HOOK.onPhase = null;
+  let watch = 0, out;
+  try {
+    bkStart(opts);
+    for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { bkTick(BK_DT * 4); watch += BK_DT * 4; }
+    out = Object.assign(bkSummary(), { watch: Math.round(watch) });
+  } finally { Object.assign(BK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; bkRand = was.rand; } }
+  return out;
+}
+/* The Charter Court: the court, drawn (issue #77, phase 1). The Charter Court from above and a little to one side: a
+   boarded floor in a walled yard, keys painted in the club's orange, chain nets on both hoops. The whole court is in
+   view, so there's no camera. Players are the inked figures (03-figures.js), sorted so the nearer ones stand in front;
+   the ball handler has a ring in their side's colour under them, and the ball has its shadow on the floor.
+   The bar at the top has the score, the period, the game clock and the shot clock, and each side's team fouls (lit in
+   the bonus). Under the court, what just happened (GD.msg). A big moment (a dunk, a three, a block, an and-one, the
+   shot clock running out) puts a word on the floor for a moment; at the end, the final score.
+   Court space is metres (05-live.js); bkScr turns it into canvas pixels. */
+const BKT = { t: 0, box: null, boxKey: '', bg: null, bgKey: '' };
+const BK_PX = 30, BK_PY = 22, BK_X0 = 60, BK_Y0 = 318, BK_PZ = 15;
+const bkScr = (x, y, z = 0) => ({ x: BK_X0 + x * BK_PX, y: BK_Y0 + y * BK_PY - z * BK_PZ });
+const BK_FONT = '"Alegreya Sans", system-ui, sans-serif';
+
+function bkDraw(c) {
+  c.fillStyle = '#120d0a'; c.fillRect(0, 0, 960, 600);
+  if (!G || !GD || !L) return;
+  bkDrawBack(c);
+  bkDrawHoop(c, 0, true);
+  bkDrawHoop(c, 1, true);
+  bkDrawPlayers(c);
+  bkDrawHoop(c, 0, false);
+  bkDrawHoop(c, 1, false);
+  bkDrawBall(c);
+  bkDrawBig(c);
+  bkDrawHud(c);
+  bkDrawMsg(c);
+}
+// what never moves (the yard's bricks, the floor, the lines) is drawn once into a canvas of its own at the density the
+// court is drawn at, and copied each frame; the crowd on the wall is drawn live over it
+function bkDrawBack(c) {
+  const k = c.getTransform().a || 1, key = `${k}|${G.teams[0].color}`;
+  if (BKT.bgKey !== key) {
+    const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(Math.round(960 * k), Math.round(600 * k)) : Object.assign(document.createElement('canvas'), { width: Math.round(960 * k), height: Math.round(600 * k) });
+    const b = cv.getContext('2d'); b.setTransform(k, 0, 0, k, 0, 0); bkDrawYard(b); bkDrawFloor(b);
+    BKT.bg = cv; BKT.bgKey = key;
+  }
+  c.drawImage(BKT.bg, 0, 0, 960, 600);
+  bkDrawCrowd(c);
+}
+// the walled yard: brick walls close on every side
+function bkDrawYard(c) {
+  const g = c.createLinearGradient(0, 64, 0, 600); g.addColorStop(0, '#3a2219'); g.addColorStop(1, '#1c120d');
+  c.fillStyle = g; c.fillRect(0, 64, 960, 536);
+  c.save(); c.globalAlpha = .35; c.strokeStyle = '#120a07'; c.lineWidth = 1;
+  for (let y = 72; y < 600; y += 12) { c.beginPath(); c.moveTo(0, y); c.lineTo(960, y); c.stroke(); for (let x = ((y / 12) % 2) * 18; x < 960; x += 36) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 12); c.stroke(); } }
+  c.restore();
+}
+// a row of heads along the top wall, bobbing a little
+function bkDrawCrowd(c) {
+  for (let i = 0; i < 46; i++) { const x = 22 + i * 20.5, b = Math.sin(BKT.t * 2 + i * 1.3) * 1.5; c.fillStyle = ['#6b4a3a', '#8a6a4a', '#4a3a3a', '#a07a5a'][i % 4]; c.beginPath(); c.arc(x, 92 + b + (i % 3) * 2, 7, 0, Math.PI * 2); c.fill(); c.fillStyle = i % 5 ? '#2c1d17' : '#e0742a'; c.fillRect(x - 8, 99 + b + (i % 3) * 2, 16, 10); }
+}
+function bkDrawFloor(c) {
+  const a = bkScr(0, -BK_RULES.wid / 2), b = bkScr(BK_RULES.len, BK_RULES.wid / 2), W = b.x - a.x, H = b.y - a.y;
+  // the apron, then the boards: planks along the court in a few shades of honey
+  c.fillStyle = '#7a4a2a'; c.fillRect(a.x - 18, a.y - 14, W + 36, H + 28);
+  for (let i = 0, y = a.y; y < b.y; i++, y += 6) { c.fillStyle = ['#c99256', '#c48c50', '#cf9a5c', '#c08a4e'][i % 4]; c.fillRect(a.x, y, W, Math.min(6, b.y - y)); }
+  c.save(); c.globalAlpha = .18; c.strokeStyle = '#7a4a2a';
+  for (let i = 0, y = a.y; y < b.y; i++, y += 6) for (let x = a.x + ((i * 53) % 90); x < b.x; x += 90) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 6); c.stroke(); }
+  c.restore();
+  // a shine down the middle: the wax
+  const sh = c.createLinearGradient(0, a.y, 0, b.y); sh.addColorStop(0, 'rgba(255,240,210,0)'); sh.addColorStop(.45, 'rgba(255,240,210,.12)'); sh.addColorStop(.55, 'rgba(255,240,210,.12)'); sh.addColorStop(1, 'rgba(255,240,210,0)');
+  c.fillStyle = sh; c.fillRect(a.x, a.y, W, H);
+  // the keys, painted in the home side's colour
+  for (const s of [0, 1]) {
+    const x0 = s ? BK_RULES.len - 5.8 : 0, k0 = bkScr(x0, -2.45), k1 = bkScr(x0 + 5.8, 2.45);
+    c.save(); c.globalAlpha = .55; c.fillStyle = G.teams[0].color; c.fillRect(k0.x, k0.y, k1.x - k0.x, k1.y - k0.y); c.restore();
+  }
+  c.save(); c.strokeStyle = 'rgba(250,244,228,.9)'; c.lineWidth = 2;
+  c.strokeRect(a.x, a.y, W, H);
+  const m = bkScr(BK_RULES.len / 2, 0); c.beginPath(); c.moveTo(m.x, a.y); c.lineTo(m.x, b.y); c.stroke();
+  c.beginPath(); c.ellipse(m.x, m.y, 1.8 * BK_PX, 1.8 * BK_PY, 0, 0, Math.PI * 2); c.stroke();
+  for (const s of [0, 1]) {
+    const dir = s ? -1 : 1, bx = s ? BK_RULES.len : 0, rim = bx + dir * BK_RULES.rim;
+    const k0 = bkScr(bx, -2.45), k1 = bkScr(bx + dir * 5.8, 2.45); c.strokeRect(Math.min(k0.x, k1.x), k0.y, Math.abs(k1.x - k0.x), k1.y - k0.y);
+    const ft = bkScr(bx + dir * 5.8, 0); c.beginPath(); c.ellipse(ft.x, ft.y, 1.8 * BK_PX, 1.8 * BK_PY, 0, -Math.PI / 2, Math.PI / 2, s === 1); c.stroke();
+    // the arc: straight in the corners, round from where it meets them
+    const yc = BK_RULES.corner, xc = Math.sqrt(BK_RULES.arc ** 2 - yc ** 2);
+    c.beginPath();
+    let p = bkScr(bx, -yc); c.moveTo(p.x, p.y); p = bkScr(rim + dir * xc, -yc); c.lineTo(p.x, p.y);
+    const a0 = Math.atan2(-yc, xc);
+    for (let k = 0; k <= 40; k++) { const ang = a0 + (-2 * a0) * k / 40, q = bkScr(rim + dir * Math.cos(ang) * BK_RULES.arc, Math.sin(ang) * BK_RULES.arc); c.lineTo(q.x, q.y); }
+    p = bkScr(bx, yc); c.lineTo(p.x, p.y); c.stroke();
+  }
+  // the club's name at centre court
+  txt(c, 'THE CHARTER COURT', m.x, m.y + 6, `800 15px ${BK_FONT}`, 'rgba(122,74,42,.55)', 'center');
+  c.restore();
+}
+// a hoop: the pole and the backboard behind (back), or the rim and its chain net in front (front)
+function bkDrawHoop(c, s, back) {
+  const dir = s ? -1 : 1, bx = s ? BK_RULES.len : 0, rim = bx + dir * BK_RULES.rim, R0 = bkScr(rim, 0, 3.05), bb = bkScr(bx + dir * 1.2, 0, 3.4);
+  c.save();
+  if (back) {
+    const pole = bkScr(bx - dir * .6, 0); c.strokeStyle = '#2a201a'; c.lineWidth = 5; c.beginPath(); c.moveTo(pole.x, pole.y); c.lineTo(pole.x, bb.y); c.lineTo(bb.x, bb.y); c.stroke();
+    c.fillStyle = 'rgba(240,236,224,.92)'; c.strokeStyle = '#17100e'; c.lineWidth = 2; c.fillRect(bb.x - 3, bb.y - 26, 6, 44); c.strokeRect(bb.x - 3, bb.y - 26, 6, 44);
+  } else {
+    // the rim: bent after a big dunk comes later (phase 5); the net is chain, and it swings when a shot goes through
+    const N = GD.net && GD.net.hoop === s ? GD.net : null; if (N && N.at == null) N.at = BKT.t;
+    const sw = N ? Math.max(0, 1 - (BKT.t - N.at) * 1.5) : 0;
+    c.strokeStyle = '#9aa0a6'; c.lineWidth = 1.2;
+    for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(R0.x + k * 2.6, R0.y); c.lineTo(R0.x + k * 1.6 + Math.sin(BKT.t * 18 + k) * sw * 3, R0.y + 16); c.stroke(); }
+    c.strokeStyle = '#e0742a'; c.lineWidth = 3; c.beginPath(); c.ellipse(R0.x, R0.y, 9, 3.5, 0, 0, Math.PI * 2); c.stroke();
+  }
+  c.restore();
+}
+function bkDrawPlayers(c) {
+  const h = L.ball.st === 'held' ? L.ball.h : -1, list = L.pl.map((p, i) => ({ p, i })).sort((a, b) => a.p.y - b.p.y);
+  for (const { p, i } of list) {
+    const s = bkScr(p.x, p.y), T = G.teams[p.side], mv = hyp(p.vx, p.vy) > .5;
+    if (i === h) { c.save(); c.strokeStyle = T.light || '#fff'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(s.x, s.y, 15, 5, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
+    const face = mv ? p.vx < 0 : bkDir(p.side) < 0, lift = p.act === 'shoot' ? 9 : p.act === 'jump' ? 11 : 0;
+    drawFig(c, p.kind, s.x, s.y, 50, T, { num: p.num, run: mv ? p.run : 0, flip: face, throwK: p.act === 'shoot' ? 1 : 0, lift, alpha: p.stun > 0 ? .75 : 1 });
+  }
+}
+function bkDrawBall(c) {
+  const B = L.ball; if (GD.ph === 'over' || GD.ph === 'break') return;
+  let x = B.x, y = B.y, z = B.z;
+  // a free throw in the air: from the line to the rim, over the beat
+  if (GD.ph === 'ft' && GD.ft) { const p = L.pl[GD.ft.i], u = clamp((GD.t - .45) / .5, 0, 1); if (u > 0) { const hx = bkHoopX(GD.ft.side); x = lerp(p.x, hx, u); y = lerp(p.y, 0, u); z = lerp(2.3, 3.05, u) + 2.5 * 4 * u * (1 - u); } }
+  if (GD.ph === 'intro') z = 2.4 + Math.min(GD.t, 1.2) * 1.5;
+  const g = bkScr(x, y), b = bkScr(x, y, z);
+  c.save();
+  c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(g.x, g.y, 5, 2, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#e0742a'; c.strokeStyle = '#17100e'; c.lineWidth = 1.5; c.beginPath(); c.arc(b.x, b.y, 5.5, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.lineWidth = 1; c.beginPath(); c.moveTo(b.x - 5.5, b.y); c.lineTo(b.x + 5.5, b.y); c.moveTo(b.x, b.y - 5.5); c.lineTo(b.x, b.y + 5.5); c.stroke();
+  c.restore();
+}
+// a big moment in big letters on the floor, for a moment; and at the end, the final
+const BK_BIG = { dunk: ['SLAM DUNK', '#ffd08a'], three: ['FROM THREE', '#ffd08a'], block: ['BLOCKED', '#ff8a6a'], andone: ['AND ONE', '#ffd08a'], clock: ['SHOT CLOCK', '#ff8a6a'] };
+function bkDrawBig(c) {
+  let word = null, col = '#ffd08a', sub = '', al = 1, sc = 1;
+  if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}`; }
+  else if (GD.big && BK_BIG[GD.big.k]) {
+    if (GD.big.at == null) GD.big.at = BKT.t;
+    const a = BKT.t - GD.big.at; if (a > 1.6) { GD.big = null; return; }
+    [word, col] = BK_BIG[GD.big.k]; al = Math.min(1, a * 5, (1.6 - a) * 2.5); sc = 1 + Math.max(0, .25 - a) * 1.6;
+  } else if (GD.ph === 'break') { word = GD.half ? 'HALFTIME' : G.q > BK_RULES.quarters ? 'OVERTIME' : `END OF THE ${bkPeriodName(G.q - 1).toUpperCase()}`; }
+  if (!word) return;
+  c.save(); c.globalAlpha = al; c.translate(480, 330); c.scale(sc, sc);
+  c.font = `900 50px ${BK_FONT}`; c.textAlign = 'center'; c.lineJoin = 'round';
+  c.lineWidth = 8; c.strokeStyle = 'rgba(12,10,9,.85)'; c.strokeText(word, 0, 0); c.fillStyle = col; c.fillText(word, 0, 0);
+  if (sub) { c.font = `700 22px ${BK_FONT}`; c.lineWidth = 5; c.strokeText(sub, 0, 32); c.fillStyle = '#f3ead6'; c.fillText(sub, 0, 32); }
+  c.restore();
+}
+function bkDrawHud(c) {
+  c.fillStyle = '#0d0907'; c.fillRect(0, 0, 960, 64);
+  for (const s of [0, 1]) {
+    const T = G.teams[s], al = s ? 'right' : 'left';
+    c.fillStyle = T.color; c.fillRect(s ? 930 : 20, 12, 10, 40);
+    txt(c, T.name, s ? 920 : 40, 30, `800 20px ${BK_FONT}`, '#f3ead6', al);
+    txt(c, `Fouls ${G.tf[s]}${G.tf[1 - s] > BK_RULES.limit ? ' · in the bonus' : ''}`, s ? 920 : 40, 50, `600 13px ${BK_FONT}`, G.tf[1 - s] > BK_RULES.limit ? '#ffb070' : 'rgba(243,234,214,.6)', al);
+    txt(c, String(G.score[s]), s ? 640 : 320, 46, `900 38px ${BK_FONT}`, G.poss === s && GD.ph !== 'over' ? T.light || '#fff' : '#f3ead6', 'center');
+    if (G.poss === s && GD.ph !== 'over') txt(c, '●', s ? 600 : 360, 40, `14px ${BK_FONT}`, T.color, 'center');
+  }
+  txt(c, `${bkPeriodName(G.q)}  ${bkClockText()}`, 480, 30, `800 20px ${BK_FONT}`, '#f3ead6', 'center');
+  const sc = Math.ceil(G.shot), off = G.clock < G.shot;
+  txt(c, off ? '–' : String(sc), 480, 54, `900 18px ${BK_FONT}`, !off && sc <= 4 ? '#ff6a4a' : '#ffd08a', 'center');
+}
+function bkDrawMsg(c) {
+  const notes = GD.notes && GD.notes.length ? ' ' + GD.notes.join(' ') : '';
+  txt(c, (GD.msg || '') + notes, 480, 520, `600 17px ${BK_FONT}`, '#f3ead6', 'center');
+  // under it, the box line for the game so far: field goals, threes, free throws and rebounds, each side
+  const key = `${L.evN || 0}|${G.log.length}|${GD.ph}|${G.score}|${GD.ft ? GD.ft.n : ''}`;
+  if (BKT.boxKey !== key) { BKT.boxKey = key; BKT.box = bkBox(); }
+  BKT.box.forEach((b, s) => { const t = b.tot; txt(c, `${b.team}: FG ${t.fgm}/${t.fga} · 3PT ${t.tpm}/${t.tpa} · FT ${t.ftm}/${t.fta} · Reb ${t.reb} · Ast ${t.ast} · Stl ${t.stl} · Blk ${t.blk}`, 480, 552 + s * 22, `500 13px ${BK_FONT}`, 'rgba(243,234,214,.65)', 'center'); });
+}
+/* The court's page in the Realm (issue #77, phase 1). A canvas in #v-court, after the ring's, and a frame loop that
+   runs only while it is on screen (show/hide): it moves the game on (bkTick) and draws it (bkDraw). The engine's parts
+   don't touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp. */
+// speed: steps a frame, 1 to watch; the tests raise it (wBK.speed)
+const BKP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1 };
+(() => {
+  const h = document.createElement('div'); h.id = 'v-court'; h.hidden = true;
+  const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
+  cv.style.cssText = 'display:block;width:100%;max-width:960px;margin:0 auto;aspect-ratio:960/600;background:#120d0a;border-radius:6px';
+  h.appendChild(cv);
+  (document.getElementById('v-ring') || document.getElementById('v-gridiron') || document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
+  Object.assign(BKP, { host: h, cv, c: cv.getContext('2d') });
+})();
+function bkRender() {
+  const d = Math.min(2, window.devicePixelRatio || 1);
+  // (whole pixels on both sides: at a fractional density the canvas would otherwise be resized, and cleared, every frame)
+  if (d !== BKP.dpr || BKP.cv.width !== Math.round(960 * d)) { BKP.dpr = d; BKP.cv.width = Math.round(960 * d); BKP.cv.height = Math.round(600 * d); }
+  const c = BKP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); bkDraw(c); c.restore();
+}
+function bkFrame(now) {
+  if (!BKP.on) return;
+  const dt = Math.min(.05, Math.max(0, (now - BKP.last) / 1000)); BKP.last = now;
+  if (!BKP.paused) for (let i = 0; i < BKP.speed && !BKP.paused; i++) { BKT.t += dt; bkTick(dt); }
+  bkRender();
+  BKP.raf = requestAnimationFrame(bkFrame);
+}
+function bkShow() { BKP.host.hidden = false; if (BKP.on) return; BKP.on = true; BKP.last = performance.now(); BKP.raf = requestAnimationFrame(bkFrame); }
+function bkHide() { BKP.host.hidden = true; BKP.on = false; cancelAnimationFrame(BKP.raf); }
+
+/* the end of the wBK scope: what the Realm may call (w19b-engines.js, w77-court.js). Phase 0 is the rules; phase 1
+   plays one game, CPU against CPU. start(opts) puts a game on the court ({ teams: [2], mins, seed }), never paused; simGame(opts)
+   plays one headless and returns its summary ({ score, teams, win, q, ot, mins, poss, secs, box, log, watch }); onPhase
+   hears each beat (intro, live, dead, walk, ft, break, over) and onOver the end, with the summary. The tests' handles:
+   G, the rules and the pure rule functions, step (one beat of the play), play (the live play, L), ev (its events). */
+return {
+  newGame: bkNewGame, score: bkScore, shotValue: bkShotValue, run: (dt, hold) => bkRun(dt, hold), give: bkGive, violation: bkViolation, foul: bkFoul,
+  periodEnd: bkPeriodEnd, dir: bkDir, hoopX: bkHoopX, periodName: bkPeriodName, get G() { return G; }, rules: JSON.parse(JSON.stringify(BK_RULES)),
+  start: o => { BKP.paused = false; return bkStart(o); }, simGame: o => bkSimGame(o), show: bkShow, hide: bkHide, render: bkRender, summary: () => G && G.teams ? bkSummary() : null, box: () => G && G.teams ? bkBox() : null,
+  get on() { return BKP.on; }, get speed() { return BKP.speed; }, set speed(n) { BKP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); },
+  get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { q: G.q, name: bkPeriodName(G.q), text: bkClockText(), shot: Math.ceil(G.shot) } : null,
+  pause: on => { BKP.paused = !!on; }, get paused() { return BKP.paused; },
+  set onOver(f) { BK_HOOK.onOver = f; }, get onOver() { return BK_HOOK.onOver; }, set onPhase(f) { BK_HOOK.onPhase = f; }, get onPhase() { return BK_HOOK.onPhase; },
+  // the ratings, the spots and the clubs, for the page and How to play
+  rate: kind => bkRate(kind), kinds: Object.keys(BK_KIND), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),
+  ftChance: r => bkFtChance({ r: Object.assign(bkRate('goblin'), r) }),
+  // the test's handle on the court: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
+  step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) bkTick(BK_DT); return GD ? GD.ph : null; },
+  get play() { return L; }, get ev() { return L ? L.ev : []; }, shotP: (i, x, y) => L ? bkShotP(L.pl[i], x == null ? L.pl[i].x : x, y == null ? L.pl[i].y : y) : null,
+};
+
+})();
 /* w19b: the engines (issue #9, phase 0). Some sports have a game of their own beside the card game. Each is built in
    its own scope and talks to the Realm through the same small API (start, sim, box, show, hide, pause, audio, on,
    onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
-   Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/) and the Anvil Ring (wBX, boxing; src/bx/,
-   issue #23). Nothing here is saved. */
+   Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/), the Anvil Ring (wBX, boxing; src/bx/,
+   issue #23) and the Charter Court (wBK, basketball; src/bk/, issue #77). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
-  ring: { api: wBX, view: 'ring', sport: 'boxing' } };
+  ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' } };
 /* an engine's question (Concede?) holds the game still until it closes: askConfirm hears only its two buttons, so this
    runs fn once the box closes however it closes (a button, Escape, a click outside) */
 function wAfterAsk(fn) { const t = setInterval(() => { if (!$('modal').hidden) return; clearInterval(t); try { fn(); } catch (e) { console.error(e); } }, 100); }
@@ -37423,6 +38939,137 @@ renderHelp = function () {
   wW76RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGfPow2')) return;
   h.insertAdjacentHTML('beforeend', wGridPow2HowHTML('wHelpGfPow2'));
+};
+/* w77: the court (issue #77, phases 0 and 1). The Charter Court, the basketball engine, runs in the wBK scope (src/bk/
+   and src/realm/court/: a canvas in #v-court, and none of its names reach ours). This part gives it a view beside the
+   world, a bar above the court, a box score under it, and a way back.
+   Phase 1 plays one game, CPU against CPU: the Graftonbury Basketball Club against a visiting five from Saltmere, four
+   quarters on the game clock, a 14-second shot clock, fouls and free throws. Ask Nim Hoopwright at the Charter Court
+   for a SCRIMMAGE (GAME and BASKETBALL stay the card-game match and how it scores). Nothing is won or lost, and nothing
+   is saved. Playing it by hand, the five and the calls come in later phases.
+   The game length is a setting (SET.courtMins: 3, 5, 8 or 12 minutes; 5 by default), on the Settings panel and on the
+   bar; the shot clock is 14 seconds whatever the length.
+   Wraps: showView (wW77ShowView: the bar), openPause (wW77OpenPause: not on the court), wRunAct (wW77RunAct:
+   'scrimmage'), showPage (wW77ShowPage: the game waits while another page is up), renderHelp (wW77RenderHelp:
+   #wHelpCourt and #wCourtHow). The Settings row goes in by an observer on the modal, as w50's and w70's do. */
+
+const W_COURT = {
+  home: { kinds: ['goblin', 'elf', 'werewolf', 'minotaur', 'troll', 'kobold', 'zombie'], color: '#e0742a', light: '#fff0d8', short: 'GBC' },
+  away: { city: 'saltmere', kinds: ['kobold', 'vampire', 'gorgon', 'spider', 'golem', 'harpy', 'skeleton'], color: '#3a6fb0', light: '#e2eeff', short: 'SBC' },
+};
+const wCourtMins = () => wBK.rules.minsAt.includes(SET.courtMins) ? SET.courtMins : wBK.rules.mins;
+// the game on the court: plain data, never saved
+let WBK = null;
+
+$('v-court').insertAdjacentHTML('beforebegin', `<div id="wCourtBar" class="wdbar" hidden>
+  <b id="wCourtTitle">A scrimmage at the Charter Court</b><span id="wCourtNote" class="hint"></span>
+  <label class="hint" title="How long a game is on the game clock: four quarters of a quarter of it each. The shot clock is 14 seconds whatever the length. Also on the Settings panel.">Length <select id="wCourtMins">${wBK.rules.minsAt.map(m => `<option value="${m}">${m} min</option>`).join('')}</select></label>
+  <button class="ghost" id="wCourtAgain">Another game</button>
+  <button class="ghost" id="wCourtBack">Back to the world</button></div>`);
+$('wCourtBar').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'wCourtAgain') wCourtGame();
+  else if (b.id === 'wCourtBack') wLeaveCourt();
+});
+$('wCourtMins').addEventListener('change', e => { SET.courtMins = +e.target.value; saveSettings(); wCourtBarNote(); });
+// under the court: the box score, and How basketball works
+$('v-court').insertAdjacentHTML('beforeend', `<div id="wCourtBox" class="wcbox"></div>
+  <p class="hint wghowlink">How basketball works: the clocks, shots, rebounds and fouls. <button class="ghost" id="wCourtHowBtn">How to play basketball</button> <small>The game waits while you read.</small></p>`);
+$('wCourtHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wCourtHow'); if (h) h.scrollIntoView({ block: 'start' }); });
+
+function wCourtTeams() {
+  const g = W_GRDS.find(x => x.id === 'g_court'), H = W_COURT.home, A = W_COURT.away, used = new Set();
+  return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.basketball} Club` }, A)].map(t => ({
+    name: t.name, short: t.short, color: t.color, light: t.light, roster: t.kinds.map((kind, i) => ({ n: wCourtName(kind, used), kind, num: 2 + i * 6 })),
+  }));
+}
+// a player's name from the free agents' names for their kind, one nobody else in the game has (used: the names taken)
+function wCourtName(kind, used) {
+  const base = kind[0].toUpperCase() + kind.slice(1), L = (FA_NAMES[kind] || []).filter(n => !used.has(n));
+  let n = L.length ? L[(Math.random() * L.length) | 0] : base;
+  for (let k = 2; used.has(n); k++) n = `${base} ${k}`;
+  used.add(n); return n;
+}
+/* one game on the court. opts: { teams, mins, seed } (the two clubs and the length setting when not given) */
+function wCourtGame(opts) {
+  const o = opts || {};
+  WBK = { over: null };
+  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed });
+  showView('court');
+  wCourtBarNote(); wCourtBox();
+}
+function wCourtBarNote() {
+  if (!WBK) return;
+  const ck = wBK.clock(), G = wBK.G;
+  $('wCourtNote').textContent = WBK.over ? wBK.msg : ck ? `${G.teams[0].name} against ${G.teams[1].name}: ${G.mins} minutes, four quarters, a ${wBK.rules.shot}-second shot clock. A scrimmage: nothing is won or lost.` : '';
+  $('wCourtMins').value = String(wCourtMins());
+}
+// the box score under the court: each side's players with their lines
+function wCourtBox() {
+  const B = wBK.box(); if (!B) { $('wCourtBox').innerHTML = ''; return; }
+  const pct = (m, a) => a ? `${m}/${a}` : '–', mins = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+  $('wCourtBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Minutes on the floor">Min</th><th>Pts</th><th title="Rebounds (offensive)">Reb</th><th>Ast</th><th>Stl</th><th>Blk</th><th title="Field goals made of tried">FG</th><th title="Threes made of tried">3PT</th><th title="Free throws made of tried">FT</th><th title="Personal fouls">PF</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${esc(wKindName(r.kind))}</small>${r.out ? ' <small>(fouled out)</small>' : ''}</td><td>${mins(r.sec)}</td><td>${r.pts}</td><td>${r.reb}${r.oreb ? ` <small>(${r.oreb})</small>` : ''}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td><td>${pct(r.fgm, r.fga)}</td><td>${pct(r.tpm, r.tpa)}</td><td>${pct(r.ftm, r.fta)}</td><td>${r.pf}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td><b>${b.tot.pts}</b></td><td>${b.tot.reb}</td><td>${b.tot.ast}</td><td>${b.tot.stl}</td><td>${b.tot.blk}</td><td>${pct(b.tot.fgm, b.tot.fga)}</td><td>${pct(b.tot.tpm, b.tot.tpa)}</td><td>${pct(b.tot.ftm, b.tot.fta)}</td><td>${b.tot.pf}</td></tr></table>`).join('');
+}
+function wLeaveCourt() {
+  WBK = null; wBK.pause(false);
+  if (WG) showView('world');
+  else { wBK.hide(); showScreen('title'); renderTitle(); }
+}
+// the box score keeps up at each break in play, not every frame
+wBK.onPhase = ph => { if (WBK && UI.view === 'court' && ['dead', 'break', 'ft', 'over'].includes(ph)) wCourtBox(); };
+wBK.onOver = s => { if (WBK) { WBK.over = s; wCourtBarNote(); wCourtBox(); $('wCourtAgain').focus(); } };
+
+const wW77ShowView = showView;
+showView = function (v) {
+  wW77ShowView(v);
+  $('wCourtBar').hidden = v !== 'court';
+  if (v === 'court') $('runbar').hidden = true;
+};
+const wW77OpenPause = openPause;
+openPause = function () { if (UI.view === 'court') return; return wW77OpenPause.apply(this, arguments); };
+const wW77ShowPage = showPage;
+showPage = function (p) {
+  wW77ShowPage(p);
+  if (WBK && UI.view === 'court') wBK.pause(p !== 'play');
+};
+
+// Nim Hoopwright at the Charter Court puts on a scrimmage (not BASKETBALL or GAME: those are how card-game basketball
+// scores, and the match)
+(() => {
+  const K = DB.chars.gk_court; if (!K) return;
+  K.topics.job.t += ' And we play it for real now, five on five on these boards: ask me for a SCRIMMAGE.';
+  K.topics.scrimmage = { t: 'Five of ours against five from Saltmere, four quarters, a fourteen-second shot clock. Watch from the wall. Mind the boards.', act: 'scrimmage' };
+})();
+const wW77RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'scrimmage') return wCourtGame(); return wW77RunAct.apply(this, arguments); };
+
+// the Settings panel: the game length, under the rest (the panel draws itself again on some changes, so an observer on
+// the modal puts the row back whenever it does; it does nothing in any other modal)
+function wCourtSetRow() {
+  const g = document.querySelector('#modalBox .setgrid'); if (!g || $('sCourtMins')) return;
+  g.insertAdjacentHTML('beforeend', `<label class="rng"><span>Basketball game length</span><select id="sCourtMins">${wBK.rules.minsAt.map(m => `<option value="${m}" ${wCourtMins() === m ? 'selected' : ''}>${m} minutes</option>`).join('')}</select></label>`);
+  $('sCourtMins').onchange = e => { SET.courtMins = +e.target.value; saveSettings(); if (WBK) wCourtBarNote(); };
+}
+new MutationObserver(wCourtSetRow).observe($('modalBox'), { childList: true });
+
+// How to play: Basketball, how it works
+function wCourtHowHTML() {
+  const R = wBK.rules;
+  return `<p class="hint">A game is five on five on a full court, four quarters on the game clock (${R.mins} minutes in all unless you change it in Settings: ${R.minsAt.join(', ')}). Each trip down the floor is one possession against a <b>shot clock</b> of ${R.shot} seconds. A shot that hits the rim resets it, and a clock that runs out turns the ball over. After a basket the other side brings it up; the walk up the floor is sped through.</p>
+  <p class="hint"><b>Shots.</b> A basket is 2, or 3 from beyond the arc, and a free throw is 1. How likely a shot goes in comes from the distance, the shooter's touch, and the <b>contest</b>: how close the nearest defender is, and how good. At the rim size and hops count, and a big leaper dunks. A defender close to the shot can block it, or foul.</p>
+  <p class="hint"><b>The player with the ball</b> weighs what's on: a good look gets shot, a defender in the lane gets beaten off the dribble (handle and speed against defense and speed) or the ball gets moved to the teammate with the best look. A pass thrown into a defender's lane can be stolen, and a defender up close can pick the dribble. After a steal or a defensive rebound the play goes straight the other way: a side slow to get back gives up a fast break.</p>
+  <p class="hint"><b>Rebounds.</b> A miss comes off the rim, further on a three. Whoever is nearest where it comes down has the best of it, with size and hops, and the defense has inside position.</p>
+  <p class="hint"><b>Fouls.</b> A foul on a shot gives two free throws, three on a three-point try, and one more if it went in anyway (an and-one). Past ${R.limit} team fouls in a quarter a side is in the <b>bonus</b>: every foul gives two. ${R.out} personal fouls and a player is out of the game, and the best player on the bench comes on; with nobody left to come on, they stay in, but every foul after that gives one free throw more. A free throw is touch alone.</p>
+  <p class="hint"><b>Ratings.</b> Six for each player: speed, size (height and reach), hops, touch (shooting), handle and defense. Size counts, but it is one of six: a goblin handles the ball like it's on a string, an ogre is all size and no handle, and a harpy is all hops and no size. Level after four quarters, it goes to overtime.</p>
+  <p class="hint"><b>The spots.</b> Two guards handle it, a wing shoots, and two bigs work inside: they rebound and block. The five line up from their ratings for now.</p>`;
+}
+const wW77RenderHelp = renderHelp;
+renderHelp = function () {
+  wW77RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpCourt') || !$('wHelpGrounds')) return;
+  const G = [...h.querySelectorAll('[id^="wHelpG"], #wHelpRing')], after = G[G.length - 1];
+  h.insertAdjacentHTML('beforeend', `<section id="wCourtHow" class="wghelp"><h3>Basketball: how it works</h3>${wCourtHowHTML()}</section>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourt"><b>Real basketball.</b> The Charter Court is trying out basketball on the boards themselves, five on five. Ask Nim Hoopwright for a SCRIMMAGE: four quarters on the game clock (five minutes in all, or set the length in Settings) and a ${wBK.rules.shot}-second shot clock. Watch the two clubs run it end to end: shots, drives, passes, rebounds, steals, blocks, fouls and free throws, with a box score under the court (see Basketball: how it works). A SCRIMMAGE is an exhibition: nothing is won or lost.</p>`);
 };
 </script>
 </body></html>

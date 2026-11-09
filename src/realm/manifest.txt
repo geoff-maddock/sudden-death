@@ -40,6 +40,8 @@ scope wBD src/realm/diamond/manifest.txt src/realm/diamond/exports.js
 scope wGF src/realm/gridiron/manifest.txt src/realm/gridiron/exports.js
 # The Anvil Ring, the boxing engine, in its own scope (issue #23): src/realm/ring/manifest.txt
 scope wBX src/realm/ring/manifest.txt src/realm/ring/exports.js
+# The Charter Court, the basketball engine, in its own scope (issue #77): src/realm/court/manifest.txt
+scope wBK src/realm/court/manifest.txt src/realm/court/exports.js
 # the engines, by id (W_ENGINES)
 src/realm/w19b-engines.js
 src/realm/w20-diamond.js
@@ -106,3 +108,4 @@ src/realm/w73-ringkit.js
 src/realm/w74-gridkit.js
 src/realm/w75-ringpowers.js
 src/realm/w76-gfpowers2.js
+src/realm/w77-court.js

@@ -380,3 +380,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wstmeet>img,.wstmeet>.wstsil{flex:none;width:112px;height:112px;border-radius:8px}
 .wstbuy{gap:8px;flex-wrap:wrap}
 @media (max-width:520px){.wstmeet{flex-direction:column}}
+/* the court's box score (w77) */
+.wcbox{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:960px;margin:8px auto}
+.wcbox caption{text-align:left;font-weight:700;padding:2px 6px}
+.wcboxt td small{opacity:.7}
+@media (max-width:760px){.wcbox{grid-template-columns:1fr}}

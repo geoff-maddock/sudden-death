@@ -7,7 +7,14 @@
 # round 10-9 (10-10 when even); a knockdown decides the round by the pro rule (10-8 for one, or 10-9 when the fighter who
 # went down was winning it on work; a point more for each knockdown more); three knockdowns stop the bout, and failing to beat the count is a knockout; the decision is
 # unanimous, split or majority, or a draw; a card of bouts goes to the side with more bouts won, then more knockdowns
-# scored, then more points. Asserts; exits nonzero on failure.
+# scored, then more points.
+# The Charter Court (issue #77, phase 0) builds in its own scope too (wBK), five a side. Its rules: a game of 5 minutes by
+# default (3, 5, 8 or 12), four quarters; a 14-second shot clock that runs out into a turnover, holds while a shot is up
+# and is off when the period has less left; 2 inside the arc and 3 beyond it; a shooting foul is two free throws, three
+# on a three, one on an and-one; past four team fouls in a quarter every foul is two; five personal fouls and a player
+# is out, or, with nobody to come in, stays on and gives a free throw more for every foul after; team fouls start again
+# each quarter; the ball after a break goes by the arrow; the sides swap ends at halftime; level after four quarters is
+# overtime, up to three, then a tie. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -42,8 +49,10 @@ async def main():
           showView('diamond'); const shown = wBD.on && UI.view === 'diamond';
           showView('world'); const hidden = !wBD.on;
           return { ids: Object.keys(W_ENGINES), api: D.api === wBD, view: D.view, sport: D.sport, shown, hidden }; })()""")
-        check(r == {'ids': ['diamond', 'gridiron', 'ring'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
-              'W_ENGINES has the diamond, the gridiron and the ring: the diamond\'s view shows it, and another view hides it', r)
+        check(r == {'ids': ['diamond', 'gridiron', 'ring', 'court'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
+              'W_ENGINES has the diamond, the gridiron, the ring and the court: the diamond\'s view shows it, and another view hides it', r)
+        ct = await pg.evaluate("({ api: W_ENGINES.court.api === wBK, view: W_ENGINES.court.view, sport: W_ENGINES.court.sport })")
+        check(ct == {'api': True, 'view': 'court', 'sport': 'basketball'}, 'the court is basketball, in the court view', ct)
         rg = await pg.evaluate("({ api: W_ENGINES.ring.api === wBX, view: W_ENGINES.ring.view, sport: W_ENGINES.ring.sport })")
         check(rg == {'api': True, 'view': 'ring', 'sport': 'boxing'}, 'the ring is boxing, in the ring view', rg)
 
@@ -107,6 +116,52 @@ async def main():
         check(cr['kds']['win'] == 1 and cr['kds']['by'] == 'knockdowns' and cr['kds']['kd'] == [0, 2], 'level on bouts: more knockdowns scored wins it', cr)
         check(cr['pts']['win'] == 1 and cr['pts']['by'] == 'points' and cr['pts']['pts'] == [84, 86], 'level on knockdowns too: more points on the cards', cr)
         check(cr['draw']['win'] is None and cr['draw']['by'] == 'draw', 'level on everything, the card is a draw', cr)
+
+        # ---------- the court's scope and rules ----------
+        s = await pg.evaluate("""(() => ({ api: typeof wBK === 'object' && typeof wBK.newGame === 'function' && typeof wBK.foul === 'function',
+          leaks: ['BK_RULES', 'bkNewGame', 'bkScore', 'bkFoul', 'bkRun', 'bkPeriodEnd', 'bkShotValue', 'bkDir', 'BK_KIND', 'bkTick', 'bkDraw', 'L', 'GD', 'BKP', 'BKT'].filter(n => (0, eval)('typeof ' + n) !== 'undefined'), r: wBK.rules }))()""")
+        check(s['api'] and not s['leaks'] and s['r']['side'] == 5 and s['r']['shot'] == 14 and s['r']['mins'] == 5 and s['r']['quarters'] == 4 and s['r']['minsAt'] == [3, 5, 8, 12],
+              'the Charter Court builds in its own scope (wBK): five a side, a 14-second shot clock, 5 minutes in four quarters by default; none of its names reach the page', s)
+        g = await pg.evaluate("""(() => { const G = wBK.newGame(); const d = { q: G.q, clock: G.clock, shot: G.shot, score: G.score.slice() };
+          const lens = [3, 5, 8, 12, 7].map(m => wBK.newGame({ mins: m }).qlen);
+          return { d, lens, two: wBK.shotValue(6.7, 2), three: wBK.shotValue(6.75), far: wBK.shotValue(9), corner: wBK.shotValue(6.7, 6.6), inCorner: wBK.shotValue(6.7, 6.5) }; })()""")
+        check(g['d'] == {'q': 1, 'clock': 75, 'shot': 14, 'score': [0, 0]}, 'a game starts in the first quarter, 1:15 on the clock (5 minutes over four), 14 on the shot clock, 0 to 0', g)
+        check(g['lens'] == [45, 75, 120, 180, 75], 'the length is 3, 5, 8 or 12 minutes, four quarters of a quarter of it; anything else is 5', g)
+        check([g['two'], g['three'], g['far'], g['corner'], g['inCorner']] == [2, 3, 3, 3, 2], 'a basket is 2 inside the arc and 3 from 6.75 metres out, or from 6.6 metres out from the middle in the corners', g)
+        c = await pg.evaluate("""(() => { const G = wBK.newGame({ poss: 0 });
+          const a = [wBK.run(5), G.shot, G.clock]; const hold = [wBK.run(3, true), G.shot, G.clock];
+          G.shot = 0.5; const viol = wBK.run(1); wBK.violation(); const after = [G.poss, G.shot];
+          G.clock = 6; G.shot = 9; const off = [wBK.run(2), G.shot]; G.shot = 9; const end = wBK.run(10);
+          return { a, hold, viol, after, off, end, clock: G.clock }; })()""")
+        check(c['a'] == ['', 9, 70] and c['hold'] == ['', 9, 67], 'both clocks run; the shot clock holds while a shot is up or the ball is loose', c)
+        check(c['viol'] == 'shot' and c['after'] == [1, 14], 'the shot clock running out turns the ball over, on a full shot clock', c)
+        check(c['off'] == ['', 9] and c['end'] == 'end' and c['clock'] == 0, 'with less left in the period than on the shot clock, the shot clock is off; the period ends at 0', c)
+        f = await pg.evaluate("""(() => { wBK.newGame();
+          const two = wBK.foul(1, 0, { shooting: true }), three = wBK.foul(1, 1, { shooting: true, three: true }), and1 = wBK.foul(1, 2, { shooting: true, made: true, three: true });
+          const reach = wBK.foul(1, 3, {}), bonus = wBK.foul(1, 3, {});
+          return { two: two.shots, three: three.shots, and1: and1.shots, reach: [reach.shots, reach.bonus, reach.tf], bonus: [bonus.shots, bonus.bonus, bonus.tf] }; })()""")
+        check([f['two'], f['three'], f['and1']] == [2, 3, 1], 'a shooting foul is two free throws, three on a three-point try, one if it went in (and one)', f)
+        check(f['reach'] == [0, False, 4] and f['bonus'] == [2, True, 5], 'away from the shot a foul gives nothing until the bonus: past four team fouls in a quarter it is two', f)
+        o = await pg.evaluate("""(() => { const G = wBK.newGame(); const r = [];
+          for (let i = 0; i < 5; i++) r.push(wBK.foul(0, 2, { benchLeft: 2 }));
+          wBK.newGame(); const s = [];
+          for (let i = 0; i < 7; i++) s.push(wBK.foul(0, 2, { benchLeft: 0 }));
+          return { out: r.map(x => x.out), stay: s.map(x => [x.out, x.extra, x.shots]) }; })()""")
+        check(o['out'] == [False, False, False, False, True], 'the fifth personal foul puts a player out when someone can come in', o)
+        check([x[0] for x in o['stay']] == [False] * 7 and [x[1] for x in o['stay']] == [False] * 5 + [True, True] and o['stay'][5][2] == 3 and o['stay'][6][2] == 3,
+              'with nobody to come in they stay on, and every foul after the fifth gives one free throw more (two in the bonus, plus one)', o)
+        q = await pg.evaluate("""(() => { const G = wBK.newGame({ poss: 0 }); G.arrow = 1; const dir = [wBK.dir(0), wBK.dir(1)];
+          G.tf = [3, 5]; const r1 = wBK.periodEnd(); const a1 = [G.q, G.tf.slice(), G.poss, G.clock];
+          const r2 = wBK.periodEnd(); const half = [G.q, wBK.dir(0), wBK.dir(1), G.poss, wBK.periodName(G.q)];
+          wBK.periodEnd(); G.score = [20, 20]; const ot = [wBK.periodEnd(), G.q, G.clock, wBK.periodName(G.q)];
+          G.score = [22, 20]; const over = [wBK.periodEnd(), Object.assign({}, G.over)];
+          const H = wBK.newGame(); H.q = 4; H.score = [9, 9]; const ots = [wBK.periodEnd(), wBK.periodEnd(), wBK.periodEnd(), wBK.periodEnd(), H.over ? H.over.win : 'x', H.over ? H.over.ot : -1];
+          return { dir, r1, a1, r2, half, ot, over, ots }; })()""")
+        check(q['dir'] == [1, -1] and q['r1'] == 'quarter' and q['a1'] == [2, [0, 0], 1, 75], 'a quarter ends: team fouls start again, the ball goes by the arrow, the clock is full', q)
+        check(q['r2'] == 'half' and q['half'] == [3, -1, 1, 0, '3rd'], 'at halftime the sides swap ends, and the arrow has swapped', q)
+        check(q['ot'] == ['ot', 5, 30, 'OT'] and q['over'][0] == 'over' and q['over'][1] == {'win': 0, 'score': [22, 20], 'ot': 1},
+              'level after the fourth is a 30-second overtime; ahead at the end of it wins', q)
+        check(q['ots'] == ['ot', 'ot', 'ot', 'over', None, 3], 'still level after three overtimes, the game is a tie', q)
 
         check(not errs, 'no page errors', errs)
         await br.close()
