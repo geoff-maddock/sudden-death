@@ -7,7 +7,8 @@
    where off and def map each position to a roster index. A team sent with its own off and def (the Realm's lineup,
    phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12.
    A roster may be longer than seven: the first seven start (unless off and def say otherwise), and the rest, up to
-   GF_RULES.bench, sit on the bench to come on for a tired player (15-bench.js). */
+   GF_RULES.bench, sit on the bench to come on for a tired player (15-bench.js). A roster player's gear ({ gear: { id, name, fx } })
+   stays with them as gear (its name), gid and gx (its effects, 17-kit.js). */
 const GF_OFF_POS = ['QB', 'RB', 'C', 'LG', 'RG', 'X', 'Z'], GF_DEF_POS = ['DT', 'DL', 'DR', 'CL', 'CR', 'LB', 'S'];
 // a position map that names every position once, each to a different player in the roster
 const gfMapOk = (m, pos, n) => !!m && pos.every(k => Number.isInteger(m[k]) && m[k] >= 0 && m[k] < n) && new Set(pos.map(k => m[k])).size === pos.length;
@@ -30,7 +31,7 @@ const GF_CLUBS = {
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
 function gfTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side + GF_RULES.bench)
-    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }));
+    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: gfGx(p.gear.fx) } : {}));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   const starters = roster.slice(0, GF_RULES.side).map((_, i) => i), free = new Set(starters), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
   T.off = {}; T.off.QB = by(r => r.arm * 2 + r.hnd * .3, 1)[0]; T.off.RB = by(r => r.spd + r.str * .8, 1)[0];

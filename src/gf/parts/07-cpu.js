@@ -11,10 +11,10 @@ function gfCpuDefense() {
   const d = G.down, tg = G.togo;
   return wpick(gfCounterDefense({ blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 }));
 }
-// GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call
+// GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call (a kicking tee adds to both, 17-kit.js)
 const GF_FG_RANGE = 52, GF_FG_MAX = 62;
 function gfFourth() {
-  if (gfKickDist() <= GF_FG_RANGE) return 'fg';
+  if (gfKickDist() <= GF_FG_RANGE + gfTee(G.poss)) return 'fg';
   if (G.togo <= 2 && G.ball >= 40) return gfFourthWary(G.poss) && !(G.togo <= 1 && G.ball >= 50) ? 'punt' : 'go';
   return 'punt';
 }
@@ -24,6 +24,6 @@ function gfFourthWary(side) {
   const r = gfFumbleRisk(side); return r.x >= GF_FUM.wary ? r.why || 'the back could fumble' : '';
 }
 const gfKicker = () => G.teams[G.poss].roster[G.teams[G.poss].kicker];
-function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03 + gfZoneSum('kick'), .05, .99); }
+function gfKickChance(k) { return clamp(.99 - (gfKickDist() - (k ? gfGxOf(k).kick || 0 : gfTee(G.poss)) - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03 + gfZoneSum('kick'), .05, .99); }
 function gfKickGood(k) { return R() < gfKickChance(k); }
-function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
+function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + (gfGxOf(k).punt || 0) + gauss() * 5); }

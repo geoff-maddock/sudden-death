@@ -9,6 +9,7 @@
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
    GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..2, 0..2]).
    Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
+   opts.bags: each side's potions ([bag or null, ...], 17-kit.js); a CPU coach with a bag uses it at the call, after its swaps.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
@@ -25,6 +26,7 @@ function gfStart(opts) {
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
   gfStanceStart(o.stance);
+  gfKitStart(o.bags);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null, wary: '' };
@@ -40,14 +42,16 @@ function gfCall(oc) {
 const gfYours = () => GD.mode !== 'watch' && G.poss === GD.you;
 function gfCanCall(oc) {
   if (GD.mode !== 'watch' && G.poss !== GD.you) return !!GF_DEFS[oc];
-  return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX);
+  return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX + gfTee(G.poss));
 }
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
   // a new call: the coaches make their swaps first (before the save point and the page hear of it), for the CPU's
   // side, and for yours when they call it (15-bench.js); a play, a kick or a new drive: a potion may be given again
   if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
-  if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) GD.item = false;
+  // (and a coach with a bag gives a potion when it is worth it, 17-kit.js)
+  if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuPotion(s, (G.skill || [1, 1])[s]);
+  if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) { GD.item = false; GD.cItem = [false, false]; }
   // (a kick isn't played in a stance)
   if (['kick', 'kickoff', 'half'].includes(ph)) GD.stc = null;
   // each call is a point to save the game at (13-box.js)
@@ -181,7 +185,7 @@ function gfKick() {
   gfRunClock(G.drive.end, 5);
   gfPowersAfter();
 }
-function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name) }; }
+function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name), pots: (G.pots || []).slice(), bags: G.bags ? JSON.parse(JSON.stringify(G.bags)) : null }; }
 // a whole drive at once, CPU against CPU, through the same flow
 function gfSim(opts) {
   const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;

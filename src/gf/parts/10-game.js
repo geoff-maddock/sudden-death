@@ -69,7 +69,8 @@ function gfFinalLine() {
 function gfGameSummary() {
   const all = G.drives.flatMap(d => d.plays);
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), drives: G.drives.length, plays: all.length, half: G.half,
-    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}), stance: [gfStanceMost(0), gfStanceMost(1)] };
+    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}), stance: [gfStanceMost(0), gfStanceMost(1)],
+    pots: (G.pots || []).slice(), bags: G.bags ? JSON.parse(JSON.stringify(G.bags)) : null };
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 // (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)

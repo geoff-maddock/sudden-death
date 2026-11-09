@@ -14,7 +14,7 @@ return {
   // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
   box: () => gfBox(), snapshot: () => GD ? gfSnapshot() : null, resume: sn => { gfResume(sn); gfShow(); return G; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
-  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth(), wary: G.down === GF_RULES.downs ? gfFourthWary(G.poss) : '' } : null,
+  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX + gfTee(G.poss), tee: gfTee(G.poss), coach: gfFourth(), wary: G.down === GF_RULES.downs ? gfFourthWary(G.poss) : '' } : null,
   // who is on the field: the drive's offense by position, and the other side's defense (r: the ratings they play on
   // now, worn when tired; base: their own)
   lineup: () => G ? [['off', G.drive.side], ['def', 1 - G.drive.side]].map(([m, s]) => ({ side: m === 'off' ? 0 : 1, team: G.teams[s].name, color: G.teams[s].color,
@@ -28,6 +28,12 @@ return {
   // notes waiting for the next play's log line
   bench: () => G && GD ? { on: gfOnField(GD.you).map(i => gfBenchRow(GD.you, i)), bench: gfBench(GD.you).map(i => gfBenchRow(GD.you, i)), between: gfBetween(), item: !!GD.item, stam: !!G.stam } : null,
   swap: (out, inn) => G && GD ? gfSwapYours(out, inn) : '', useItem: (ri, n, name) => G && GD ? gfUseItem(ri, n, name) : '',
+  // gear and potions (17-kit.js): your potion (id, ri for one player; returns what happened, or ''), why one can't be
+  // given now ('' when it can), what your sideline would give from bag ({ id, ri, why } or null), every potion, each
+  // side's bag (null: the page keeps it) and the potions used so far ([{ side, id, ri, play }])
+  potion: (id, ri) => gfPotion(id, ri), potionWhy: (id, ri) => G && GD ? gfPotionWhy(GD.you, id, ri) : 'No game on.', advice: bag => gfPotionAdvice(bag),
+  potions: JSON.parse(JSON.stringify(GF_POTIONS)), bags: () => G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : null, pots: () => G && G.pots ? JSON.parse(JSON.stringify(G.pots)) : [],
+  get fog() { return G ? G.fog : null; }, haste: GF_HASTE,
   notes: () => GD && GD.notes ? JSON.parse(JSON.stringify(GD.notes)) : [], swapRules: Object.assign({}, GF_SWAP, { lim: GF_SWAP.lim.slice() }), stamRules: Object.assign({}, GF_STAM),
   // stances (16-stance.js): yours for each side of the ball ({ off, def }, they stay until changed), the side of the ball
   // you are on, both sides' stances on the play on show, setting one, S's step, a stance's tips, and the rules

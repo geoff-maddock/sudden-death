@@ -16,3 +16,4 @@ src/gf/parts/13-box.js
 src/gf/parts/14-powers.js
 src/gf/parts/15-bench.js
 src/gf/parts/16-stance.js
+src/gf/parts/17-kit.js

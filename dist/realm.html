@@ -829,6 +829,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wglog span.wgnotepow{color:#c8b4ff}
 .wglog span.wgnoteswap{color:#bfe8a8}
 .wglog span.wgnoterest{color:#9fd8e8}
+.wglog span.wgnotepot{color:#ffc98a}
+.wggear{color:#ffd08a;margin-left:4px}
 .wglog li.wgnote{border-color:#a88cff}
 .wgbench{margin:4px 0 10px}
 .wgbench td:first-child,.wgbench th:first-child{text-align:left}
@@ -22278,7 +22280,8 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    where off and def map each position to a roster index. A team sent with its own off and def (the Realm's lineup,
    phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12.
    A roster may be longer than seven: the first seven start (unless off and def say otherwise), and the rest, up to
-   GF_RULES.bench, sit on the bench to come on for a tired player (15-bench.js). */
+   GF_RULES.bench, sit on the bench to come on for a tired player (15-bench.js). A roster player's gear ({ gear: { id, name, fx } })
+   stays with them as gear (its name), gid and gx (its effects, 17-kit.js). */
 const GF_OFF_POS = ['QB', 'RB', 'C', 'LG', 'RG', 'X', 'Z'], GF_DEF_POS = ['DT', 'DL', 'DR', 'CL', 'CR', 'LB', 'S'];
 // a position map that names every position once, each to a different player in the roster
 const gfMapOk = (m, pos, n) => !!m && pos.every(k => Number.isInteger(m[k]) && m[k] >= 0 && m[k] < n) && new Set(pos.map(k => m[k])).size === pos.length;
@@ -22301,7 +22304,7 @@ const GF_CLUBS = {
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
 function gfTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side + GF_RULES.bench)
-    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }));
+    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: gfGx(p.gear.fx) } : {}));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   const starters = roster.slice(0, GF_RULES.side).map((_, i) => i), free = new Set(starters), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
   T.off = {}; T.off.QB = by(r => r.arm * 2 + r.hnd * .3, 1)[0]; T.off.RB = by(r => r.spd + r.str * .8, 1)[0];
@@ -22373,10 +22376,10 @@ const gfDefSet = dc => Object.assign({}, GF_DEF_SET, (GF_DEFS[dc] || {}).set);
 const GF_DT = 1 / 30, GF_HALF = 26.65, GF_MAXT = 20, GF_READ = .35, GF_REACH = 1.7;
 let L = null;
 // (a defender who knows the play is coming gets a jump on it; one whose defense is read, a step slow)
-// (and the powers and zones on the field, 14-powers.js: by side, job and where they are)
+// (and the powers and zones on the field, 14-powers.js: by side, job and where they are; and gear and the Speed Elixir: p.sm, p.tn, 17-kit.js)
 function gfSpeed(p) {
   const F = L.fx || GF_FX0, held = L.ball.st === 'held' && L.ball.h === L.pl.indexOf(p);
-  let m = (6 + p.r.spd * .2) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1);
+  let m = (6 + p.r.spd * .2) * (p.slow > 0 ? .55 : 1) * (p.stun > 0 ? .2 : 1) * (p.sm || 1);
   if (p.side === 1) { m *= (1 + .08 * L.read - .05 * L.tell) * F.dSpd; if (p.job === 'rush') m *= F.rushSpd; else if (p.job === 'man' || p.job === 'zone') m *= F.coverSpd; return m; }
   m *= F.oSpd;
   if (held) m *= .94 * F.cSpd; else if (p.job === 'route') m *= F.rSpd * (p.x > 8 ? F.deepSpd : 1);
@@ -22388,8 +22391,8 @@ function gfSpeed(p) {
 function gfSnap(oc, dc, st) {
   const OT = G.teams[G.poss], DT = G.teams[1 - G.poss], P = GF_PLAYS[oc], D = GF_DEFS[dc], pl = [], id = {}, did = {};
   const add = (T, side, pos, at) => {
-    const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri];
-    pl.push({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: gfWorn(side ? 1 - G.poss : G.poss, ri, m.r), x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 });
+    const ri = side ? T.def[pos] : T.off[pos], m = T.roster[ri], tm = side ? 1 - G.poss : G.poss;
+    pl.push(Object.assign({ side, pos, ri, kind: m.kind, n: m.n, num: m.num, r: gfWorn(tm, ri, m.r), gx: m.gx || null }, gfKitMove(tm, ri, m), { x: at[0], y: at[1], vx: 0, vy: 0, eng: -1, push: 0, stun: 0, slow: 0, cd: 0, job: '', mark: -1, spot: null, route: null, wp: 0 }));
     return pl.length - 1;
   };
   const set = gfSet(oc);
@@ -22470,7 +22473,7 @@ function gfStep(dt) {
 // turn: how quickly a player changes direction (7 a second; a defender in coverage turns slower, so a cut gains room)
 function gfMove(p, tx, ty, dt, turn) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(gfSpeed(p), d / .25);
-  const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0, k = Math.min(1, dt * (turn || 7));
+  const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0, k = Math.min(1, dt * (turn || 7) * (p.tn || 1));
   p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k; p.x += p.vx * dt; p.y += p.vy * dt;
 }
 
@@ -22609,7 +22612,7 @@ function gfBall(dt) {
   }
   // a long ball is a harder catch
   const far = Math.max(0, hyp(B.tx - B.fx, B.ty - B.fy) - 15) * .012;
-  const pc = (d && dd < 1.4 && !sure ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - (sure ? 0 : Math.max(0, 1.6 - dd) * .3), .15, .97)) - far + F.catch;
+  const pc = (d && dd < 1.4 && !sure ? .35 + rc.r.hnd * .03 : clamp(.62 + rc.r.hnd * .035 - (sure ? 0 : Math.max(0, 1.6 - dd) * .3), .15, .97)) - far + F.catch + (gfGxOf(rc).catch || 0);
   if (sure && d && dd < 1.4) gfEv('pow', L.src.sure || '', `${L.src.sure}: ${rc.n} rose over ${d.n}.`);
   if (R() < pc) { B.st = 'held'; B.h = B.tgt; L.carrier = B.tgt; rc.slow = Math.max(rc.slow, .15); gfEv('catch', rc.n); gfGotBall(B.tgt); }
   else { B.st = 'dead'; gfDead('inc', 'dropped'); }
@@ -22635,7 +22638,7 @@ function gfBlocks(dt) {
   for (const o of L.pl) {
     if (o.side !== 0 || o.eng < 0) continue;
     // run blocking drives forward: the blockers know the snap count and where the play goes
-    const d = L.pl[o.eng], F = L.fx || GF_FX0, dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5 + F.blk - F.dStr;
+    const d = L.pl[o.eng], F = L.fx || GF_FX0, dif = o.r.str - d.r.str + (P.kind === 'run' ? 1.5 : 0) + (L.tell - L.read) * 1.5 + F.blk - F.dStr + (gfGxOf(o).blk || 0) - (gfGxOf(d).blk || 0);
     // the pair moves the way the stronger one drives
     d.push = lerp(d.push, dif + gauss() * 1.5, Math.min(1, dt * 3));
     const mv = clamp(d.push, -4, 4) * .22 * dt; o.x += mv; d.x += mv;
@@ -22699,10 +22702,10 @@ function gfCpuDefense() {
   const d = G.down, tg = G.togo;
   return wpick(gfCounterDefense({ blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 }));
 }
-// GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call
+// GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call (a kicking tee adds to both, 17-kit.js)
 const GF_FG_RANGE = 52, GF_FG_MAX = 62;
 function gfFourth() {
-  if (gfKickDist() <= GF_FG_RANGE) return 'fg';
+  if (gfKickDist() <= GF_FG_RANGE + gfTee(G.poss)) return 'fg';
   if (G.togo <= 2 && G.ball >= 40) return gfFourthWary(G.poss) && !(G.togo <= 1 && G.ball >= 50) ? 'punt' : 'go';
   return 'punt';
 }
@@ -22712,9 +22715,9 @@ function gfFourthWary(side) {
   const r = gfFumbleRisk(side); return r.x >= GF_FUM.wary ? r.why || 'the back could fumble' : '';
 }
 const gfKicker = () => G.teams[G.poss].roster[G.teams[G.poss].kicker];
-function gfKickChance(k) { return clamp(.99 - (gfKickDist() - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03 + gfZoneSum('kick'), .05, .99); }
+function gfKickChance(k) { return clamp(.99 - (gfKickDist() - (k ? gfGxOf(k).kick || 0 : gfTee(G.poss)) - 20) * .017 + ((k || gfKicker()).r.kck - 5) * .03 + gfZoneSum('kick'), .05, .99); }
 function gfKickGood(k) { return R() < gfKickChance(k); }
-function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
+function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + (gfGxOf(k).punt || 0) + gauss() * 5); }
 /* Cinder Gridiron: one drive (issue #9, phase 1). The first side has the ball on its own 25 and drives until it
    scores, kicks, punts or gives the ball up. Each down goes call → pre (both calls shown) → live (the play) → post
    (the result) → the next call. On fourth down the coach decides (07-cpu.js), and a kick is its own beat.
@@ -22726,6 +22729,7 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + gauss() * 5); }
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
    GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..2, 0..2]).
    Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
+   opts.bags: each side's potions ([bag or null, ...], 17-kit.js); a CPU coach with a bag uses it at the call, after its swaps.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
    The headless drive (gfSim) runs this same flow with big steps, so the view and the bot can't drift apart. */
 const GF_PACE = { call: .4, pre: 1.3, post: 1.8, postCall: 2.8, kick: 1.6, half: 2.6 };
@@ -22742,6 +22746,7 @@ function gfStart(opts) {
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
   gfStanceStart(o.stance);
+  gfKitStart(o.bags);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null, wary: '' };
@@ -22757,14 +22762,16 @@ function gfCall(oc) {
 const gfYours = () => GD.mode !== 'watch' && G.poss === GD.you;
 function gfCanCall(oc) {
   if (GD.mode !== 'watch' && G.poss !== GD.you) return !!GF_DEFS[oc];
-  return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX);
+  return !!GF_PLAYS[oc] || oc === 'punt' || (oc === 'fg' && gfKickDist() <= GF_FG_MAX + gfTee(G.poss));
 }
 function gfGo(ph) {
   GD.ph = ph; GD.t = 0;
   // a new call: the coaches make their swaps first (before the save point and the page hear of it), for the CPU's
   // side, and for yours when they call it (15-bench.js); a play, a kick or a new drive: a potion may be given again
   if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuSwaps(s, (G.skill || [1, 1])[s]);
-  if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) GD.item = false;
+  // (and a coach with a bag gives a potion when it is worth it, 17-kit.js)
+  if (ph === 'call') for (const s of [0, 1]) if (GD.mode === 'watch' || s !== GD.you) gfCpuPotion(s, (G.skill || [1, 1])[s]);
+  if (['pre', 'kick', 'kickoff', 'half'].includes(ph)) { GD.item = false; GD.cItem = [false, false]; }
   // (a kick isn't played in a stance)
   if (['kick', 'kickoff', 'half'].includes(ph)) GD.stc = null;
   // each call is a point to save the game at (13-box.js)
@@ -22898,7 +22905,7 @@ function gfKick() {
   gfRunClock(G.drive.end, 5);
   gfPowersAfter();
 }
-function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name) }; }
+function gfSummary() { return { end: G.drive.end, plays: G.drive.plays.length, yards: G.drive.yards, score: G.score.slice(), teams: G.teams.map(t => t.name), pots: (G.pots || []).slice(), bags: G.bags ? JSON.parse(JSON.stringify(G.bags)) : null }; }
 // a whole drive at once, CPU against CPU, through the same flow
 function gfSim(opts) {
   const hooks = Object.assign({}, GF_HOOK); GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
@@ -23254,7 +23261,8 @@ function gfFinalLine() {
 function gfGameSummary() {
   const all = G.drives.flatMap(d => d.plays);
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), drives: G.drives.length, plays: all.length, half: G.half,
-    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}), stance: [gfStanceMost(0), gfStanceMost(1)] };
+    ends: G.drives.reduce((m, d) => (m[d.end] = (m[d.end] || 0) + 1, m), {}), stance: [gfStanceMost(0), gfStanceMost(1)],
+    pots: (G.pots || []).slice(), bags: G.bags ? JSON.parse(JSON.stringify(G.bags)) : null };
 }
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 // (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)
@@ -23338,9 +23346,9 @@ function gfMeterTap() {
 }
 // what the meter says: a field goal is good or not, a punt goes so far
 function gfFgWindow(k) { return clamp(.1 + k.r.kck * .022 - (gfKickDist() - 20) * .003, .05, .32); }
-function gfFgReach(k) { return 34 + k.r.kck * 2.6; }
+function gfFgReach(k) { return 34 + k.r.kck * 2.6 + (gfGxOf(k).kick || 0); }
 function gfMeterFg(k) { const M = GD.meter; return M.pw * gfFgReach(k) >= gfKickDist() && Math.abs(M.aim) <= gfFgWindow(k); }
-function gfMeterPunt(k) { const M = GD.meter; return Math.max(8, Math.round((22 + M.pw * (22 + k.r.kck * 2.2)) * (1 - Math.abs(M.aim) * .35))); }
+function gfMeterPunt(k) { const M = GD.meter; return Math.max(8, Math.round((22 + M.pw * (22 + k.r.kck * 2.2) + (gfGxOf(k).punt || 0)) * (1 - Math.abs(M.aim) * .35))); }
 /* Cinder Gridiron: the playbook (issue #9, phase 4). Plays tire with use and recover (question 4); nothing is spent.
    Every side has a freshness for each of its plays and each of its defenses, 0 to 1 (G.fresh). Calling one costs
    GF_TIRE; every other one recovers GF_REST each down that side's offense (or defense) is on the field, and the half
@@ -23367,9 +23375,11 @@ function gfTire(side, kind, id) {
 // (a play cast on is remembered: it counts half again in what the other coach has seen)
 function gfCallsMade(oc, dc, cast) {
   const off = G.poss, def = 1 - G.poss;
-  const st = { read: 1 - gfFresh(off, 'off', oc), tell: 1 - gfFresh(def, 'def', dc) };
+  const st = { read: G.fog === off ? 0 : 1 - gfFresh(off, 'off', oc), tell: G.fog === def ? 0 : 1 - gfFresh(def, 'def', dc) };
   gfTire(off, 'off', oc); gfTire(def, 'def', dc);
-  if (G.seen) { G.seen[off].push(cast && cast.off ? { oc, pw: 1 } : { oc }); G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
+  // (a Fog Vial, 17-kit.js: the other coach sees nothing of that side's call, and the fog lifts)
+  const fog = G.fog; G.fog = null;
+  if (G.seen) { if (fog !== off) G.seen[off].push(cast && cast.off ? { oc, pw: 1 } : { oc }); if (fog !== def) G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
   return st;
 }
 function gfHalfRest() { if (G.fresh) G.fresh = [gfFreshAll(), gfFreshAll()]; }
@@ -23382,12 +23392,12 @@ function gfTendency(side, kind) {
 }
 // the counter-call: weight up the defenses that beat what this offense keeps calling, down the ones it beats
 function gfCounterDefense(w) {
-  const T = gfTendency(G.poss, 'off');
+  const T = G.fog === G.poss ? {} : gfTendency(G.poss, 'off');
   for (const dc in w) { for (const oc in T) w[dc] += -gfEdge(oc, dc)[0] * T[oc] * 2.5; w[dc] = Math.max(.15, w[dc]) * (.3 + .7 * gfFresh(1 - G.poss, 'def', dc)); }
   return w;
 }
 function gfCounterOffense(w) {
-  const T = gfTendency(1 - G.poss, 'def');
+  const T = G.fog === 1 - G.poss ? {} : gfTendency(1 - G.poss, 'def');
   for (const oc in w) { for (const dc in T) w[oc] += gfEdge(oc, dc)[0] * T[dc] * 2.5; w[oc] = Math.max(.15, w[oc]) * (.3 + .7 * gfFresh(G.poss, 'off', oc)); }
   return w;
 }
@@ -23542,7 +23552,7 @@ const gfMana = s => G.mana ? G.mana[s] : 0;
 function gfManaAdd(s, n) { if (G.mana) G.mana[s] = clamp(G.mana[s] + n, 0, GF_MANA.max); }
 // a worn player's ratings: below half stamina, down to 80% at none
 function gfWorn(side, ri, r) {
-  const st = G.stam ? G.stam[side][ri] : 100; if (st >= 50) return r;
+  const st = G.stam ? G.stam[side][ri] : 100; if (st >= 50 || gfSalved(side, ri)) return r;
   const f = .8 + .2 * st / 50, o = Object.assign({}, r);
   for (const k of ['spd', 'str', 'hnd', 'arm', 'tkl']) o[k] = r[k] * f;
   return o;
@@ -23662,7 +23672,7 @@ function gfPowersAfter() {
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
-function gfPowersHalf() { if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
+function gfPowersHalf() { if (G.salve) G.salve = [[], []]; if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
 // a new drive: mana for both sides
 function gfPowersDrive() { if (G.mana) for (const s of [0, 1]) gfManaAdd(s, GF_MANA.drive); }
 // a score: the side scored on gets mana back
@@ -23934,14 +23944,14 @@ function gfFumbleRisk(side) {
   const T = G.teams[side], D = G.teams[1 - side], ri = T.off.RB, c = gfWorn(side, ri, T.roster[ri].r);
   const tk = Object.values(D.def).reduce((a, j) => a + gfWorn(1 - side, j, D.roster[j].r).tkl, 0) / Object.keys(D.def).length;
   const dst = (G.skill || [1, 1])[1 - side] ? gfStanceSit(1 - side, 'def') : null, df = dst ? GF_STANCE[dst].def.fum || 1 : 1.1;
-  const worn = gfStamOf(side, ri) < 50, x = df * (worn ? 1.4 : 1) * clamp(1 + (tk - c.str) * .06 + (6 - c.hnd) * .05, .4, 2);
-  const why = [worn && `${T.roster[ri].n} is tired`, c.hnd <= 4 && `${T.roster[ri].n} has loose hands`, dst === 'risky' && 'their defense will go for the ball'].filter(Boolean);
+  const worn = gfStamOf(side, ri) < 50, x = gfFumMul(side, T.roster[ri]) * df * (worn ? 1.4 : 1) * clamp(1 + (tk - c.str) * .06 + (6 - c.hnd) * .05, .4, 2);
+  const why = !x ? [] : [worn && `${T.roster[ri].n} is tired`, c.hnd <= 4 && `${T.roster[ri].n} has loose hands`, dst === 'risky' && 'their defense will go for the ball'].filter(Boolean);
   return { x, why: why.join(', and ') };
 }
 // does this tackle knock the ball loose: c the carrier, d the tackler
 function gfFumbleRoll(c, d) {
   const F = L.fx || GF_FX0, worn = gfStamOf(G.poss, c.ri) < 50 ? 1.4 : 1;
-  const p = GF_FUM.base * F.fum * worn * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2);
+  const p = GF_FUM.base * F.fum * worn * gfFumMul(G.poss, G.teams[G.poss].roster[c.ri]) * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2);
   return R() < p;
 }
 // the ball is out: the nearest players go for it, the defense likelier to come up with it; a defender may run it back
@@ -23994,6 +24004,141 @@ function gfStanceTip(id) {
   if (off && GD.mode === 'play') T.note.push('Playing by hand, your throws and runs take about half the stance\'s effect; the blocking and the energy take all of it.');
   T.note.push('It stays until you change it.');
   return T;
+}
+/* Cinder Gridiron: gear and potions (issue #61, phase 3). The engine's side; the Realm's is src/realm/w74-gridkit.js.
+   Gear: a player may wear one piece. A roster player sent with { gear: { id, name, fx } } keeps its name (gear) and
+   the effects the engine reads (gx: fx without r; fx.r is laid on the ratings before the engine sees them), from
+   gfTeam (04-teams.js). What gx may hold:
+     spd: speed ×, turn: how sharply they change direction ×, fum: their fumbles as the carrier ×, catch: added to
+     their catch chance, kick: yards off a field goal's distance (and onto the range), punt: yards onto a punt,
+     blk: strength added in every block they are in (as the blocker or the one blocked).
+   Potions (GF_POTIONS): one a play per side, between plays (gfBetween). G.bags = [bag or null, ...] by side: a null bag
+   is kept by the page (the Realm keeps yours, and checks it), and a bag here ({ id: n }) is the CPU's, used by its
+   coach at its skill (gfCpuPotion) at each call, after its swaps. Every use goes in the next play's log line with its
+   reason (GD.notes), and in G.pots ({ side, id, ri, play }). What each one does, all plain data in G (so it is saved):
+     draught, secondwind: stamina back (15-bench.js gfRestore); gfresin: G.drive.resin, no fumbles by that side for
+     the drive; gfhaste: G.drive.haste [{ s, ri }], faster for the drive; gffog: G.fog, the other side reads nothing of
+     the next call (12-playbook.js); gfsalve: G.salve[side] [ri], full ratings for the half (gfWorn), some stamina back. */
+const GF_POTIONS = {
+  draught: { n: 'Stamina Draught', one: true, rest: 40, desc: 'One tired player gets 40 stamina back.' },
+  secondwind: { n: 'Second Wind', all: true, rest: 15, desc: 'The whole seven get 15 stamina back.' },
+  gfresin: { n: 'Fumble Resin', desc: 'Pine resin on every hand: your side can\'t fumble for the rest of this drive. Only when you have the ball.' },
+  gfhaste: { n: 'Speed Elixir', one: true, desc: 'One player runs 6% faster for the rest of this drive, on either side of the ball.' },
+  gffog: { n: 'Fog Vial', desc: 'Smoke over your sideline: the other side can\'t read your next call. Their coach calls blind, and however often you have called it, they don\'t see it coming.' },
+  gfsalve: { n: 'Mending Balm', one: true, rest: 15, desc: 'For a worn-down player: full ratings for the rest of the half, however tired, and 15 stamina back.' },
+};
+const GF_HASTE = 1.06;
+// a CPU coach takes a potion worth this much (Knight, Archmage); a Squire, now and then, whatever comes first
+const GF_KIT = { take: [99, 4.5, 3.5], squire: .25 };
+const GF_GX0 = Object.freeze({});
+// gear's effects, without the ratings (those are on r already)
+function gfGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
+const gfGxOf = p => (p && p.gx) || GF_GX0;
+// a player's speed and turn at the snap: their cleats, and a Speed Elixir this drive (team: their side of the game)
+function gfKitMove(team, ri, m) {
+  const g = gfGxOf(m), haste = G.drive && G.drive.haste && G.drive.haste.some(h => h.s === team && h.ri === ri);
+  return { sm: (g.spd || 1) * (haste ? GF_HASTE : 1), tn: g.turn || 1 };
+}
+// the kicking tee: the kicker's yards off a field goal (side: the kicking side)
+const gfTee = side => gfGxOf(G.teams[side].roster[G.teams[side].kicker]).kick || 0;
+const gfTeePunt = side => gfGxOf(G.teams[side].roster[G.teams[side].kicker]).punt || 0;
+// the carrier's fumbles: their helmet, and the side's Fumble Resin this drive (0: none)
+function gfFumMul(side, m) { if (G.drive && G.drive.resin === side) return 0; return gfGxOf(m).fum != null ? gfGxOf(m).fum : 1; }
+// G.salve: who plays on full ratings this half
+const gfSalved = (side, ri) => !!(G.salve && G.salve[side] && G.salve[side].includes(ri));
+
+function gfKitStart(bags) {
+  G.bags = [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null);
+  G.pots = []; G.fog = null; G.salve = [[], []];
+}
+const gfPotUsed = s => !!(GD && (s === GD.you && GD.mode !== 'watch' ? GD.item : GD.cItem && GD.cItem[s]));
+// whether side s may give potion id (to ri, for one player) now: '' when it may, or why not
+function gfPotionWhy(s, id, ri) {
+  const P = GF_POTIONS[id]; if (!P || !G || !GD) return 'That is not a football potion.';
+  const bag = G.bags && G.bags[s];
+  if (bag && !(bag[id] > 0)) return `No ${P.n} left.`;
+  if (!gfBetween()) return 'Potions are given between plays, and not after the last one.';
+  if (gfPotUsed(s)) return 'One potion a play.';
+  if (P.one && !gfOnField(s).includes(ri)) return 'That player is not on the field.';
+  if ((P.rest || id === 'gfsalve') && !G.stam) return 'There is no stamina in this game.';
+  if (id === 'gfresin') { if (G.poss !== s) return 'Resin is for when you have the ball.'; if (G.drive.resin === s) return 'The resin is on already this drive.'; }
+  if (id === 'gfhaste' && G.drive.haste && G.drive.haste.some(h => h.s === s && h.ri === ri)) return 'They have had one this drive.';
+  if (id === 'gffog' && G.fog === s) return 'The fog is already out for the next call.';
+  if (id === 'gfsalve' && gfSalved(s, ri)) return 'They are on the balm already this half.';
+  return '';
+}
+// give it: the effect, the bag, the log; why: the coach's reason (the CPU's)
+function gfPotionGive(s, id, ri, why) {
+  const P = GF_POTIONS[id], T = G.teams[s], who = ri != null && T.roster[ri] ? T.roster[ri].n : '';
+  // (a game saved before there were potions)
+  if (!G.pots) { G.bags = G.bags || [null, null]; G.pots = []; G.salve = G.salve || [[], []]; }
+  if (G.bags[s]) G.bags[s][id]--;
+  if (s === GD.you && GD.mode !== 'watch') GD.item = true; else (GD.cItem = GD.cItem || [false, false])[s] = true;
+  G.pots.push({ side: s, id, ri: ri != null ? ri : null, play: G.plays });
+  let msg;
+  if (id === 'draught') msg = gfRestore(s, ri, P.rest, P.n);
+  else if (id === 'secondwind') msg = gfRestore(s, null, P.rest, P.n);
+  else {
+    if (id === 'gfresin') { G.drive.resin = s; msg = `${P.n}: no fumbles for the rest of the drive.`; }
+    else if (id === 'gfhaste') { (G.drive.haste = G.drive.haste || []).push({ s, ri }); msg = `${P.n}: ${who} is faster for the rest of the drive.`; }
+    else if (id === 'gffog') { G.fog = s; msg = `${P.n}: the next call is hidden from the other side.`; }
+    else if (id === 'gfsalve') { G.salve[s].push(ri); G.stam[s][ri] = Math.min(100, G.stam[s][ri] + P.rest); msg = `${P.n}: ${who} plays on full ratings for the rest of the half, and gets ${P.rest} stamina back.`; }
+    gfNote(s, 'pot', msg);
+  }
+  // (the coach's reason goes on the note it made)
+  if (why && GD.notes && GD.notes.length) { const n = GD.notes[GD.notes.length - 1]; n.k = 'pot'; n.msg = n.msg.replace(/\.$/, '') + ` (${why}).`; }
+  return msg;
+}
+// your potion: returns what happened, or '' when it can't (gfPotionWhy says why)
+function gfPotion(id, ri) {
+  if (!G || !GD) return '';
+  const s = GD.you, one = GF_POTIONS[id] && GF_POTIONS[id].one;
+  if (gfPotionWhy(s, id, one ? ri : null)) return '';
+  return gfPotionGive(s, id, one ? ri : null, '');
+}
+
+/* what suits the moment for side s: [{ id, ri, v (how much it would help), why }], best first */
+function gfPotionNeeds(s) {
+  const bag = G.bags[s] || {};
+  const T = G.teams[s], on = gfOnField(s), st = i => gfStamOf(s, i), out = [], role = gfRole(s);
+  const m = G.score[s] - G.score[1 - s], late = !!GD.game && (G.half === 3 || (G.half === 2 && G.clock < 150));
+  const ok = (id, ri) => bag[id] > 0 && !gfPotionWhy(s, id, ri);
+  if (G.stam) {
+    const tired = on.slice().sort((a, b) => st(a) - st(b)), t = tired[0], avg = on.reduce((a, i) => a + st(i), 0) / on.length;
+    if (ok('draught', t) && st(t) < 40) out.push({ id: 'draught', ri: t, v: (50 - st(t)) / 4, why: `${T.roster[t].n} is out on their feet` });
+    if (ok('secondwind', null) && avg < 62) out.push({ id: 'secondwind', ri: null, v: (72 - avg) / 3, why: 'the seven are tiring' });
+    const key = [T.off.QB, T.off.RB].find(i => on.includes(i) && st(i) < 45 && ok('gfsalve', i));
+    if (key != null && (!GD.game || G.half >= 2 || G.clock < 150)) out.push({ id: 'gfsalve', ri: key, v: 4 + (45 - st(key)) / 15, why: `${T.roster[key].n} is worn down, and they need them` });
+  }
+  if (role === 'off') {
+    const fr = gfFumbleRisk(s);
+    if (ok('gfresin', null) && (fr.x >= 1.6 || (late && m > 0))) out.push({ id: 'gfresin', ri: null, v: late && m > 0 ? 5 : 2 + fr.x, why: late && m > 0 ? 'holding on to a lead' : fr.why || 'the back could fumble' });
+    if (!G.drive.plays.length) {
+      const fast = [T.off.RB, T.off.X, T.off.Z].filter(i => on.includes(i) && ok('gfhaste', i)).sort((a, b) => T.roster[b].r.spd - T.roster[a].r.spd)[0];
+      if (fast != null) out.push({ id: 'gfhaste', ri: fast, v: 3.6 + (late && m < 0 ? 2 : 0), why: late && m < 0 ? 'behind late, and they need a quick score' : `a new drive, and ${T.roster[fast].n} is their fastest` });
+    }
+    if (ok('gffog', null) && ((G.down >= 3 && G.togo >= 4) || G.ball >= 80)) out.push({ id: 'gffog', ri: null, v: G.ball >= 80 ? 4 : 3.6 + (late ? 1.5 : 0), why: G.ball >= 80 ? 'close to the goal line' : `${GF_ORD[G.down]} and long` });
+  }
+  return out.sort((a, b) => b.v - a.v);
+}
+// the CPU coach's potion at the call, by skill
+function gfCpuPotion(s, skill) {
+  const bag = G.bags && G.bags[s]; if (!bag || gfPotUsed(s) || !gfBetween()) return;
+  if (!skill) {
+    if (R() > GF_KIT.squire) return;
+    const on = gfOnField(s);
+    for (const id of Object.keys(bag)) { if (!(bag[id] > 0) || !GF_POTIONS[id]) continue; const ri = GF_POTIONS[id].one ? pick(on) : null; if (!gfPotionWhy(s, id, ri)) return void gfPotionGive(s, id, ri, 'their sideline reaches for the bag'); }
+    return;
+  }
+  const top = gfPotionNeeds(s)[0];
+  if (top && top.v >= GF_KIT.take[skill]) gfPotionGive(s, top.id, top.ri, top.why);
+}
+// what your sideline would give now from bag (the page's, for yours): { id, ri, why } or null
+function gfPotionAdvice(bag) {
+  if (!G || !GD || !G.bags) return null;
+  const s = GD.you, save = G.bags[s];
+  G.bags[s] = Object.assign({}, bag || save || {});
+  try { const top = gfPotionNeeds(s)[0]; return top && top.v >= GF_KIT.take[1] ? { id: top.id, ri: top.ri, why: top.why } : null; } finally { G.bags[s] = save; }
 }
 /* Cinder Gridiron's superstars (issue #24, phase 2), inside the wGF scope: each superstar's ratings and powers, added
    to the engine's own tables after its parts load. Plain assignments, nothing declared.
@@ -24361,7 +24506,7 @@ return {
   // box scores and saving (phase 5): the game's box lines, a snapshot between plays, and putting one back on the field
   box: () => gfBox(), snapshot: () => GD ? gfSnapshot() : null, resume: sn => { gfResume(sn); gfShow(); return G; },
   // the calls you may make now ('punt', 'fg' too), the field-goal try from here, and what the coach would do on fourth
-  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX, coach: gfFourth(), wary: G.down === GF_RULES.downs ? gfFourthWary(G.poss) : '' } : null,
+  canCall: oc => !!GD && gfCanCall(oc), kick: () => G ? { dist: gfKickDist(), chance: gfKickChance(), inRange: gfKickDist() <= GF_FG_MAX + gfTee(G.poss), tee: gfTee(G.poss), coach: gfFourth(), wary: G.down === GF_RULES.downs ? gfFourthWary(G.poss) : '' } : null,
   // who is on the field: the drive's offense by position, and the other side's defense (r: the ratings they play on
   // now, worn when tired; base: their own)
   lineup: () => G ? [['off', G.drive.side], ['def', 1 - G.drive.side]].map(([m, s]) => ({ side: m === 'off' ? 0 : 1, team: G.teams[s].name, color: G.teams[s].color,
@@ -24375,6 +24520,12 @@ return {
   // notes waiting for the next play's log line
   bench: () => G && GD ? { on: gfOnField(GD.you).map(i => gfBenchRow(GD.you, i)), bench: gfBench(GD.you).map(i => gfBenchRow(GD.you, i)), between: gfBetween(), item: !!GD.item, stam: !!G.stam } : null,
   swap: (out, inn) => G && GD ? gfSwapYours(out, inn) : '', useItem: (ri, n, name) => G && GD ? gfUseItem(ri, n, name) : '',
+  // gear and potions (17-kit.js): your potion (id, ri for one player; returns what happened, or ''), why one can't be
+  // given now ('' when it can), what your sideline would give from bag ({ id, ri, why } or null), every potion, each
+  // side's bag (null: the page keeps it) and the potions used so far ([{ side, id, ri, play }])
+  potion: (id, ri) => gfPotion(id, ri), potionWhy: (id, ri) => G && GD ? gfPotionWhy(GD.you, id, ri) : 'No game on.', advice: bag => gfPotionAdvice(bag),
+  potions: JSON.parse(JSON.stringify(GF_POTIONS)), bags: () => G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : null, pots: () => G && G.pots ? JSON.parse(JSON.stringify(G.pots)) : [],
+  get fog() { return G ? G.fog : null; }, haste: GF_HASTE,
   notes: () => GD && GD.notes ? JSON.parse(JSON.stringify(GD.notes)) : [], swapRules: Object.assign({}, GF_SWAP, { lim: GF_SWAP.lim.slice() }), stamRules: Object.assign({}, GF_STAM),
   // stances (16-stance.js): yours for each side of the ball ({ off, def }, they stay until changed), the side of the ball
   // you are on, both sides' stances on the play on show, setting one, S's step, a stance's tips, and the rules
@@ -31213,7 +31364,7 @@ function wGridLineup() {
     <thead><tr><th>Pos</th><th>Player</th>${st.map(k => `<th title="${esc(W_GRID_STAT[k][1])}">${W_GRID_STAT[k][0]}</th>`).join('')}<th title="Stamina: every play costs a little and casting a power a lot; below half a player is slower and weaker. The half gives plenty back.">Sta</th></tr></thead>
     <tbody>${t.players.map(p => { const P = W_GRID_POS[p.pos] || [p.pos, []], B = wGF.powerBook[p.kind] || {};
       const pw = [B.off && `${B.off.n} (offense)`, B.def && `${B.def.n} (defense)`, B.ult && `★ ${B.ult.n} (once a game)`].filter(Boolean).join(', ');
-      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td title="${esc('Powers: ' + pw)}">${esc(p.n)} <small>#${p.num}</small></td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}<td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td></tr>`; }).join('')}</tbody></table>
+      return `<tr data-gside="${t.side}" data-gpos="${p.pos}"><td title="${esc(P[0])}"><b>${p.pos}</b></td><td title="${esc('Powers: ' + pw)}">${esc(p.n)} <small>#${p.num}</small>${typeof wGridGearTag === 'function' ? wGridGearTag(p) : ''}</td>${st.map(k => `<td class="${P[1].includes(k) ? 'wgkey' : ''}">${p.r[k]}</td>`).join('')}<td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td></tr>`; }).join('')}</tbody></table>
     ${t.side ? '' : `<p class="hint">Kicker: ${esc(t.kicker)}. The bold ratings matter most in each position. Point at a name for that player's powers.</p>`}</div>`).join('');
 }
 const W_GRID_ORD = ['', '1st', '2nd', '3rd', '4th'];
@@ -31253,7 +31404,7 @@ function wGridLog() {
 function wGridNotesLine(notes, head) {
   const G = wGF.G; if (!G || !notes || !notes.length) return '';
   const who = s => esc(G.teams[s] ? G.teams[s].short || G.teams[s].name : '');
-  const ico = { swap: '⇄', rest: '✚', pow: '◆' };
+  const ico = { swap: '⇄', rest: '✚', pow: '◆', pot: '⚗' };
   return (head ? `<li class="wgnote"><small>${esc(head)}</small>` : '') + notes.map(n => `<span class="wgnote${n.k}">${ico[n.k] || ''} <b>${who(n.side)}</b> ${esc(n.msg)}</span>`).join('') + (head ? '</li>' : '');
 }
 const W_GRID_END = { clock: 'the clock ran out', td: 'Touchdown', fg: 'Field goal', miss: 'Missed field goal', punt: 'Punt', downs: 'Turnover on downs', int: 'Interception', safety: 'Safety', fum: 'Fumble', fumtd: 'Fumble, run back for a touchdown' };
@@ -32388,6 +32539,7 @@ renderHelp = function () {
    - Powers: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth give stamina back.
    Every swap, potion and power goes in the play log, with its team (w42 wGridNotesLine).
    wGridSwap(out, inn), wGridPotion(id, ri) return a message for the player, or '' when it worked.
+   More gear and potions (issue #61, phase 3): w74 (the Resin, the Elixir, the Fog, the Balm, and their bag for the other side).
    Wrapped: wGridBar (wW48GridBar: the bench panel), renderHelp (wW48RenderHelp: #wHelpGfBench). */
 
 // msg: why the last swap or potion didn't happen, shown until the next call or game (at, G: when it was shown)
@@ -35988,7 +36140,7 @@ renderHelp = function () {
    the engine's ratings ({ pow: 1 }); phases 2 and 3 add the effects only one sport has (cuts, fumbles...), read by the
    engines from the fighter's or player's gear. Every piece is also an item (DB.items[id], with gear: sport), so shops,
    chests and the Bag carry it like anything else; while a player wears it, it is out of the bag.
-   W_POTIONS: id -> { sport (or sports: [...]), ... }: the potions each sport uses in a match (football's two from w48; boxing's in phase 2).
+   W_POTIONS: id -> { sport (or sports: [...]), ... }: the potions each sport uses in a match (football's two from w48 and four from w74; boxing's from w73).
    wMatchBag(sport) lists the ones in your bag.
 
    State: p.gear = { ring?: id, grid?: id } on a roster player (plain JSON, in the save). A released player's gear goes
@@ -36270,6 +36422,139 @@ renderHelp = function () {
   const G = Object.values(W_RING_GEAR).map(g => `<b>${esc(g.name)}</b> (${esc(g.desc.charAt(0).toLowerCase() + g.desc.slice(1).replace(/\.$/, ''))})`).join('; ');
   const P = Object.values(wBX.potions).map(p => `<b>${esc(p.n)}</b> (${esc(p.desc.charAt(0).toLowerCase() + p.desc.slice(1).replace(/\.$/, ''))})`).join('; ');
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpRingKit"><b>Boxing gear and potions.</b> Each boxer can wear one piece of boxing gear: ${G}. Hand Wraps, the Mouthguard and Lucky Trunks are sold in Cinderhold; the rest are found, and the Anvil Belt adds a piece you don't have. Between rounds your corner can give one potion a round from your bag: ${P}. Cut Salve and Smelling Salts are in every general store, the Rage Tonic in Cinderhold's. In Play and Manage the potions are on the ring bar in the corner, and your corner says which suits the moment; Simulate leaves your bag alone. The other corner brings potions too (more at a harder tier) and uses them; the log says when, and why. The pairing says what each corner brings, and the tale of the tape shows each fighter's gear.</p>`);
+};
+/* w74: football gear and potions (issue #61, phase 3), end to end. The engine's side is src/gf/parts/17-kit.js; the
+   plumbing (W_GEAR, W_POTIONS, slots, the Bag) is w72, and the bench and the first two potions are w48.
+   Gear (W_GRID_GEAR, one piece a player): Ash Cleats, a Reinforced Helmet and a Kicking Tee from the Cinderhold store;
+   Sticky Gloves and Shoulder Pads from chests; the Cinder Cup adds the first piece you don't have yet. It shows on the
+   stats card, the Seven tab and the lineup on the field.
+   Potions (one a play, between plays, as w48's): Fumble Resin and the Mending Balm in every general store, the Speed
+   Elixir and the Fog Vial in Cinderhold's. You give them from Your bench under the field, in a real game, and your
+   sideline says which suits the moment; each comes out of your bag when it is given (as w48's). The coaches never open
+   your bag, and Simulate leaves it alone. The other side's sideline brings W_GRID_KIT.opp[tier] and uses it at its
+   skill; every use is in the play log with its reason, and the game card says what each club brings.
+   Wraps: wStartGrid (wW74StartGrid: their bag goes in), wGridPotion (wW74GridPotion: the new potions), wGridBenchHTML
+   (wW74GridBenchHTML: the new potions and the advice on Your bench), wSevenRow (wW74SevenRow: gear on the Seven tab),
+   wOpenGridCard (wW74OpenGridCard: the bags on the card), wGcupWon (wW74GcupWon: the Cup's gear), renderHelp
+   (wW74RenderHelp: #wHelpGridKit); and wGF.game and wGF.simGame (the bags go in). wGridGearTag is w42's lineup hook. */
+
+const W_GRID_GEAR = {
+  gf_cleats: { sport: 'grid', name: 'Ash Cleats', price: 60, desc: 'Spiked for the ash: 1% faster, and they cut a fifth sharper.', fx: { spd: 1.01, turn: 1.2 } },
+  gf_helmet: { sport: 'grid', name: 'Reinforced Helmet', price: 55, desc: 'With the ball, they fumble less than half as often.', fx: { fum: .4 } },
+  gf_gloves: { sport: 'grid', name: 'Sticky Gloves', price: 65, desc: '7% likelier to hold on to a catch, contested or not.', fx: { catch: .07 } },
+  gf_tee: { sport: 'grid', name: 'Kicking Tee', price: 50, desc: 'As the kicker: field goals go as if from 6 yards closer and can be tried from 6 yards further out, and punts go 4 yards longer.', fx: { kick: 6, punt: 4 } },
+  gf_pads: { sport: 'grid', name: 'Shoulder Pads', price: 70, desc: 'Every block they are in, on offense or defense, goes as if they were a point stronger.', fx: { blk: 1 } },
+};
+for (const id of Object.keys(W_GRID_GEAR)) wGearAdd(id, W_GRID_GEAR[id]);
+// (a full set of seven of one piece, against no gear, over 80 games under the coaches: cleats +3.5 points a game, pads
+// +1.8, the tee +1.5, gloves +1.3, the helmet +1.1 and a quarter of the fumbles; a tier-3 bag +2 points. Cleats at
+// 3% faster were +9: speed is worth the most)
+const W_GRID_KIT = {
+  potions: { gfresin: 30, gfhaste: 35, gffog: 40, gfsalve: 35 }, // prices
+  store: ['gf_cleats', 'gf_helmet', 'gf_tee'], // Cinderhold's gear
+  cup: ['gf_pads', 'gf_gloves', 'gf_cleats', 'gf_helmet', 'gf_tee'], cupGold: 60,
+  opp: { 1: { draught: 1 }, 2: { draught: 1, secondwind: 1, gfresin: 1 }, 3: { draught: 2, secondwind: 1, gfresin: 1, gfhaste: 1, gffog: 1, gfsalve: 1 } },
+};
+// the new potions: the engine's words, sold where they belong
+for (const id of Object.keys(W_GRID_KIT.potions)) {
+  const P = wGF.potions[id];
+  wPotionAdd(id, { sport: 'grid' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a football game, between plays: Potions, under your lineup. One potion a play.', price: W_GRID_KIT.potions[id] };
+}
+for (const k in DB.shops) { DB.shops[k].gfresin = W_GRID_KIT.potions.gfresin; DB.shops[k].gfsalve = W_GRID_KIT.potions.gfsalve; }
+if (DB.shops.cind) { DB.shops.cind.gfhaste = W_GRID_KIT.potions.gfhaste; DB.shops.cind.gffog = W_GRID_KIT.potions.gffog; for (const id of W_GRID_KIT.store) DB.shops.cind[id] = W_GRID_GEAR[id].price; }
+for (const [c, it] of [['hatchery_prize', 'gf_gloves'], ['genevault_prize', 'gf_pads'], ['genevault_c3', 'gffog'], ['deepseam_c3', 'gfresin']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wGridKitIds = () => Object.keys(wGF.potions);
+const wGridBagMine = () => { const o = {}; if (WG && WG.items) for (const id of wGridKitIds()) if ((WG.items[id] || 0) > 0) o[id] = WG.items[id]; return o; };
+const wGridBagTheirs = tier => Object.assign({}, W_GRID_KIT.opp[tier] || {});
+const wGridBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wGF.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wGF.potions[id].n}`).join(', ') : 'nothing'; };
+
+/* ---------- the bags go in ---------- */
+const WGK = { next: null };
+const wW74StartGrid = wStartGrid;
+wStartGrid = function (o) {
+  WGK.next = [null, wGridBagTheirs((o && o.tier) || (o && o.club ? wBallTier(o.club) : 1))];
+  try { return wW74StartGrid(o); } finally { WGK.next = null; }
+};
+// (only the game that wStartGrid starts: an exhibition, a practice or a cup game between clubs brings none)
+const wW74Game = wGF.game, wW74SimGame = wGF.simGame;
+wGF.game = o => wW74Game(WGK.next ? Object.assign({}, o, { bags: WGK.next }) : o);
+wGF.simGame = o => wW74SimGame(WGK.next && !(o && o.keep) ? Object.assign({}, o, { bags: WGK.next }) : o);
+
+/* ---------- your potions ---------- */
+const wW74GridPotion = wGridPotion;
+wGridPotion = function (id, ri) {
+  if (!W_GRID_KIT.potions[id]) return wW74GridPotion(id, ri);
+  const P = wGF.potions[id], b = wGF.bench();
+  if (!P || !b) return '';
+  if (!wGridWorld()) return 'Potions are for real games, not practice.';
+  if (!wHas(id)) return `You have no ${P.n}.`;
+  const why = wGF.potionWhy(id, ri); if (why) return why;
+  if (!wGF.potion(id, ri)) return 'That potion can\'t be given now.';
+  wAddItem(id, -1); wGridResnap(); wGridBar(); return '';
+};
+// Your bench: the new potions you have, beside w48's two, and what your sideline would give now
+const wW74GridBenchHTML = wGridBenchHTML;
+wGridBenchHTML = function () {
+  const h = wW74GridBenchHTML(), b = wGF.bench(); if (!h || !b) return h;
+  const world = wGridWorld(), on = b.on.slice().sort((x, y) => x.stam - y.stam), mine = wGridBagMine();
+  const opt = p => `<option value="${p.ri}">${esc(p.n)} (${[p.off, p.def].filter(Boolean).join('/')}), ${p.stam}%</option>`;
+  const extra = Object.keys(W_GRID_KIT.potions).filter(id => mine[id] > 0).map(id => {
+    const P = wGF.potions[id], can = world && b.between && !b.item;
+    return P.one ? `<select data-gpot="${id}" aria-label="Give a ${esc(P.n)} to" title="${esc(P.desc)}"${can ? '' : ' disabled'}><option value="">${esc(P.n)} ×${mine[id]}: give to…</option>${on.map(opt).join('')}</select>`
+      : (why => `<button class="ghost" data-gpot="${id}" title="${esc(P.desc + (can && why ? ' ' + why : ''))}"${can && !why ? '' : ' disabled'}>${esc(P.n)} ×${mine[id]}</button>`)(wGF.potionWhy(id, null));
+  }).join('');
+  const adv = world && b.between && !b.item ? wGF.advice(mine) : null;
+  const say = adv ? `<small class="hint" data-gkadv="${adv.id}">Your sideline says: the ${esc(wGF.potions[adv.id].n)} (${esc(adv.why)}).</small>` : '';
+  return h.replace('<div class="wgpots"><b>Potions</b>', `<div class="wgpots"><b>Potions</b>${extra}`).replace(/(<div class="wgpots">[\s\S]*?)(<\/div>)/, `$1${say}$2`);
+};
+
+/* ---------- gear on screen ---------- */
+// the lineup on the field (w42): the piece a player wears
+function wGridGearTag(p) { return p && p.gear ? ` <small class="wggear" data-ggear="${esc(p.gid || '')}" title="${esc(((W_GEAR[p.gid] || {}).desc) || '')}">⚙ ${esc(p.gear)}</small>` : ''; }
+// the Seven tab: the same
+const wW74SevenRow = wSevenRow;
+wSevenRow = function (k, out) {
+  const h = wW74SevenRow(k, out), p = typeof k === 'number' ? wPlayer(k) : null, G = p && wGearOf(p, 'grid');
+  return G ? h.replace('<small class="wnst">', `<small class="wggear" data-sgear="${G.id}" title="${esc(G.desc)}">⚙ ${esc(G.name)}</small> <small class="wnst">`) : h;
+};
+// the game card: what each club's sideline brings, and your bag
+const wW74OpenGridCard = wOpenGridCard;
+wOpenGridCard = function () {
+  wW74OpenGridCard();
+  const box = $('modalBox'); if (!box) return;
+  box.querySelectorAll('.wbcl').forEach(li => {
+    const b = li.querySelector('[data-gfclub]'); if (!b) return;
+    const sm = li.querySelector('small'); if (sm) sm.insertAdjacentHTML('beforeend', ` <span data-gkbags>Their sideline brings ${esc(wGridBagWords(wGridBagTheirs(wBallTier(b.dataset.gfclub))))}.</span>`);
+  });
+  const ul = box.querySelector('.wbclubs');
+  if (ul) ul.insertAdjacentHTML('beforebegin', `<p class="hint" data-gkmine>Your bag for the game: <b>${esc(wGridBagWords(wGridBagMine()))}</b>. Give potions between plays from Your bench (Play and Manage); Simulate leaves the bag alone.</p>`);
+};
+// the Cinder Cup: the first piece of football gear you don't have yet
+const wW74GcupWon = wGcupWon;
+wGcupWon = function () {
+  wW74GcupWon();
+  const have = id => (WG.items[id] || 0) > 0 || wRoster().some(p => p.gear && p.gear.grid === id);
+  const id = W_GRID_KIT.cup.find(x => !have(x));
+  if (id) { wAddItem(id, 1); wLog(`The Cup comes with gear: the ${W_GRID_GEAR[id].name}. ${W_GRID_GEAR[id].desc}`, 'g'); }
+  else { RUN.gold += W_GRID_KIT.cupGold; wLog(`You have every piece of football gear, so the Cup pays ${W_GRID_KIT.cupGold} gold more instead.`, 'g'); }
+};
+
+/* ---------- How to play ---------- */
+const wW74HelpText = () => {
+  const low = s => s.charAt(0).toLowerCase() + s.slice(1).replace(/\.$/, '');
+  const G = Object.values(W_GRID_GEAR).map(g => `<b>${esc(g.name)}</b> (${esc(low(g.desc))})`).join('; ');
+  const P = Object.keys(W_GRID_KIT.potions).map(id => `<b>${esc(wGF.potions[id].n)}</b> (${esc(low(wGF.potions[id].desc))})`).join('; ');
+  return `<b>Football gear and potions.</b> Each of your players can wear one piece of football gear: ${G}. Cleats, the Helmet and the Tee are sold in Cinderhold; the rest are found, and the Cinder Cup adds a piece you don't have. Beside the Stamina Draught and Second Wind, four more potions, one a play between plays: ${P}. Resin and the Balm are in every general store, the Elixir and the Fog in Cinderhold's. Give them from Your bench under the field; your sideline says which suits the moment. The coaches never open your bag, and Simulate leaves it alone. The other side brings potions too (more at a harder tier) and uses them; the play log says when, and why (⚗). The game card says what each club brings, and gear shows on the Seven tab and in the lineup (⚙).`;
+};
+W_GRID_HOW.push(() => `<p class="hint">${wW74HelpText()}</p>`);
+const wW74RenderHelp = renderHelp;
+renderHelp = function () {
+  wW74RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpGridKit')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGridKit">${wW74HelpText()}</p>`);
 };
 </script>
 </body></html>

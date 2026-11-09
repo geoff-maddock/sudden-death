@@ -113,14 +113,14 @@ function gfFumbleRisk(side) {
   const T = G.teams[side], D = G.teams[1 - side], ri = T.off.RB, c = gfWorn(side, ri, T.roster[ri].r);
   const tk = Object.values(D.def).reduce((a, j) => a + gfWorn(1 - side, j, D.roster[j].r).tkl, 0) / Object.keys(D.def).length;
   const dst = (G.skill || [1, 1])[1 - side] ? gfStanceSit(1 - side, 'def') : null, df = dst ? GF_STANCE[dst].def.fum || 1 : 1.1;
-  const worn = gfStamOf(side, ri) < 50, x = df * (worn ? 1.4 : 1) * clamp(1 + (tk - c.str) * .06 + (6 - c.hnd) * .05, .4, 2);
-  const why = [worn && `${T.roster[ri].n} is tired`, c.hnd <= 4 && `${T.roster[ri].n} has loose hands`, dst === 'risky' && 'their defense will go for the ball'].filter(Boolean);
+  const worn = gfStamOf(side, ri) < 50, x = gfFumMul(side, T.roster[ri]) * df * (worn ? 1.4 : 1) * clamp(1 + (tk - c.str) * .06 + (6 - c.hnd) * .05, .4, 2);
+  const why = !x ? [] : [worn && `${T.roster[ri].n} is tired`, c.hnd <= 4 && `${T.roster[ri].n} has loose hands`, dst === 'risky' && 'their defense will go for the ball'].filter(Boolean);
   return { x, why: why.join(', and ') };
 }
 // does this tackle knock the ball loose: c the carrier, d the tackler
 function gfFumbleRoll(c, d) {
   const F = L.fx || GF_FX0, worn = gfStamOf(G.poss, c.ri) < 50 ? 1.4 : 1;
-  const p = GF_FUM.base * F.fum * worn * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2);
+  const p = GF_FUM.base * F.fum * worn * gfFumMul(G.poss, G.teams[G.poss].roster[c.ri]) * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2);
   return R() < p;
 }
 // the ball is out: the nearest players go for it, the defense likelier to come up with it; a defender may run it back

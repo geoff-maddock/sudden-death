@@ -24,9 +24,11 @@ function gfTire(side, kind, id) {
 // (a play cast on is remembered: it counts half again in what the other coach has seen)
 function gfCallsMade(oc, dc, cast) {
   const off = G.poss, def = 1 - G.poss;
-  const st = { read: 1 - gfFresh(off, 'off', oc), tell: 1 - gfFresh(def, 'def', dc) };
+  const st = { read: G.fog === off ? 0 : 1 - gfFresh(off, 'off', oc), tell: G.fog === def ? 0 : 1 - gfFresh(def, 'def', dc) };
   gfTire(off, 'off', oc); gfTire(def, 'def', dc);
-  if (G.seen) { G.seen[off].push(cast && cast.off ? { oc, pw: 1 } : { oc }); G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
+  // (a Fog Vial, 17-kit.js: the other coach sees nothing of that side's call, and the fog lifts)
+  const fog = G.fog; G.fog = null;
+  if (G.seen) { if (fog !== off) G.seen[off].push(cast && cast.off ? { oc, pw: 1 } : { oc }); if (fog !== def) G.seen[def].push({ dc }); for (const s of G.seen) if (s.length > GF_SEEN * 2) s.splice(0, s.length - GF_SEEN * 2); }
   return st;
 }
 function gfHalfRest() { if (G.fresh) G.fresh = [gfFreshAll(), gfFreshAll()]; }
@@ -39,12 +41,12 @@ function gfTendency(side, kind) {
 }
 // the counter-call: weight up the defenses that beat what this offense keeps calling, down the ones it beats
 function gfCounterDefense(w) {
-  const T = gfTendency(G.poss, 'off');
+  const T = G.fog === G.poss ? {} : gfTendency(G.poss, 'off');
   for (const dc in w) { for (const oc in T) w[dc] += -gfEdge(oc, dc)[0] * T[oc] * 2.5; w[dc] = Math.max(.15, w[dc]) * (.3 + .7 * gfFresh(1 - G.poss, 'def', dc)); }
   return w;
 }
 function gfCounterOffense(w) {
-  const T = gfTendency(1 - G.poss, 'def');
+  const T = G.fog === 1 - G.poss ? {} : gfTendency(1 - G.poss, 'def');
   for (const oc in w) { for (const dc in T) w[oc] += gfEdge(oc, dc)[0] * T[dc] * 2.5; w[oc] = Math.max(.15, w[oc]) * (.3 + .7 * gfFresh(G.poss, 'off', oc)); }
   return w;
 }
