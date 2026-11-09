@@ -177,6 +177,10 @@ function bxBarSide(c, f, right) {
   c.fillStyle = g; c.fillRect(right ? hx - bw * hp : hx, 52, bw * hp, 10);
   c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 66, bw, 6);
   c.fillStyle = '#5ab8d8'; c.fillRect(right ? hx - bw * bxFrac(f) : hx, 66, bw * bxFrac(f), 6);
+  // spirit (11-powers.js): violet, with ticks where a special and an ultimate can go
+  if (bxPowOn()) { const sp = bxSpirit(f) / BX_SPIRIT.max; c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 75, bw, 4);
+    c.fillStyle = '#a77cf0'; c.fillRect(right ? hx - bw * sp : hx, 75, bw * sp, 4);
+    c.fillStyle = '#e8dcc0'; for (const k of ['sp', 'ult']) { const v = bw * BX_SPIRIT[k] / BX_SPIRIT.max; c.fillRect(right ? hx - v - 1 : hx + v - 1, 74, 2, 6); } }
   // knockdowns taken, and the cut-man's patches left
   for (let i = 0; i < BX_RULES.kd; i++) { c.beginPath(); c.arc(at(bw + 26 + i * 14, 0), 57, 4.5, 0, Math.PI * 2); c.fillStyle = i < G.kd[f.side] ? '#ff6a4a' : '#2a1d17'; c.fill(); }
   for (let i = 0; i < BX_RULES.patches; i++) { c.fillStyle = i < f.patches ? '#e8dcc0' : '#2a1d17'; c.fillRect(at(bw + 20 + i * 14, 8), 66, 8, 6); }
@@ -241,7 +245,7 @@ const BX_STAT_WORD = { reach: 'reach', pow: 'power', spd: 'speed', chin: 'chin',
 function bxIntroTape() {
   const one = f => { const L = f.rec, P = bxPowOn() && BX_POW[f.kind], T = bxTrait(f);
     return { n: f.n, sub: [f.lvl ? `level ${f.lvl}` : '', T ? T.n : ''].filter(Boolean).join(', '), r: Object.assign({}, f.r),
-      pow: P ? `${P.sp.n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
+      pow: P ? `${bxPowOf(f, 'sp').n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
   return G.F.map(one);
 }
 function bxDrawIntro(c) {

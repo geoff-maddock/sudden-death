@@ -322,7 +322,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
 .wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
 .wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
-.wrpow{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
+/* (.wrsp2: the second specials' table, w75) */
+.wrpow,.wrsp2{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td,.wrsp2 th,.wrsp2 td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
 .wring .wnst span{white-space:nowrap}
 /* w52: the tale of the tape (issue #62): yours on the left, theirs on the right, the better of each pair marked */
 .wrtape td{border-top:0;padding-top:0}.wrtape summary{cursor:pointer;color:var(--dim);font-size:.92em}

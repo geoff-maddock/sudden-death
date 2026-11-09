@@ -5,6 +5,7 @@
 # Drain heals on what lands, Undying stays up on 1, Grave Hands roots them. The limits: once a round and once a bout,
 # the stamina, never down, stunned, clinched, mid-punch or outside a round, none with powers off; statuses wear off and
 # end at the bell. The CPU casts in its bouts (none with powers off), and no kind always wins or loses with them. In the
+# (spirit, issue #61 phase 4: the checks that cast at once fill each fighter's meter first; test/realm_ring_spirit.py tests the meter)
 # Realm: Q and R (and the pad's buttons, named for your fighter's powers) cast in You box; in You corner your fighter
 # casts by themselves; How to play has every kind's powers. Asserts; exits nonzero on failure.
 # Screenshots: /tmp/realm-ring-powers-*.png.
@@ -24,7 +25,7 @@ def check(ok, what, detail=None):
 SETUP = """(d, kinds, o) => { wBX.start(Object.assign({ fighters: (kinds || ['vampire', 'vampire']).map((k, i) => ({ n: 'F' + i, kind: k })), seed: 7 }, o || {}));
   for (let i = 0; i < 100 && wBX.phase === 'intro'; i++) wBX.step();
   const G = wBX.G; G.F[0].x = -d / 2; G.F[1].x = d / 2; G.F[0].y = G.F[1].y = 0;
-  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.mv = [0, 0]; f.think = 99; f.r.chin = 60; } return G; }"""
+  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.mv = [0, 0]; f.think = 99; f.r.chin = 60; f.spirit = 100; } return G; }"""
 
 async def main():
     subprocess.run(REALM_BUILD, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
@@ -155,7 +156,7 @@ async def main():
           // a new round brings the special back; the ultimate stays spent; statuses end at the bell
           G = __setup(2, ['golem', 'elf']); wBX.cast(0, 'sp'); wBX.cast(0, 'ult'); out.fxOn = G.F[0].fx.length;
           for (const x of G.F) x.r.chin = 60; let n = 0; while (wBX.phase !== 'corner' && n++ < 4000) wBX.step(); out.fxBell = G.F[0].fx.length;
-          n = 0; while (wBX.phase !== 'round' && n++ < 400) wBX.step(); for (const x of G.F) x.a = { k: 'idle', t: 0, dur: 0, id: 0 };
+          n = 0; while (wBX.phase !== 'round' && n++ < 400) wBX.step(); for (const x of G.F) { x.a = { k: 'idle', t: 0, dur: 0, id: 0 }; x.spirit = 100; }
           out.next = [wBX.powers(0).sp.ok, wBX.powers(0).ult.ok, wBX.powers(0).ult.why];
           G = __setup(2, ['werewolf', 'elf']); wBX.cast(0, 'ult'); const t0 = G.F[0].fx[0].t; for (let i = 0; i < 20; i++) wBX.step(); out.wear = [t0, G.F[0].fx.length ? G.F[0].fx[0].t : 0];
           for (let i = 0; i < 160; i++) wBX.step(); out.gone = G.F[0].fx.length;
@@ -188,7 +189,7 @@ async def main():
         await pg.wait_for_function("UI.view === 'ring' && !!wBX.wait")
         await pg.click('[data-rplan="press"]')
         await pg.wait_for_function("wBX.phase === 'round'")
-        await pg.evaluate("wBX.pause(true); (() => { const G = wBX.G; G.F[0].x = -1; G.F[1].x = 1; G.F[0].y = G.F[1].y = 0; for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.think = 99; } })()")
+        await pg.evaluate("wBX.pause(true); (() => { const G = wBX.G; G.F[0].x = -1; G.F[1].x = 1; G.F[0].y = G.F[1].y = 0; for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.think = 99; f.spirit = 100; } wRingBarNote(); })()")
         pad = await pg.evaluate("(() => { const b = k => document.querySelector(`[data-rpad=\"${k}\"]`); return { sp: [b('sp').textContent, b('sp').hidden, b('sp').disabled], ult: [b('ult').textContent, b('ult').hidden] }; })()")
         check(pad == {'sp': ['Petrify', False, False], 'ult': ['Stone Garden', False]}, 'the pad has your fighter\'s special and ultimate, by name', pad)
         await pg.keyboard.press('q')
@@ -205,7 +206,7 @@ async def main():
         check(u == {'used': True, 'stone': True}, 'the pad\'s ultimate button casts it (Stone Garden: stone)', u)
         # You corner: your fighter casts by themselves
         await pg.click('[data-rmode="call"]')
-        yc = await pg.evaluate("(() => { const G = wBX.G; for (const f of G.F) { f.r.chin = 60; f.think = 0; } let n = 0; const c0 = G.F[0].rs.pw; while (wBX.phase !== 'over' && n++ < 6000) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); } return G.F[0].bs.pw - c0 + G.F[0].rs.pw; })()")
+        yc = await pg.evaluate("(() => { const G = wBX.G; for (const f of G.F) { f.r.chin = 60; f.think = 0; f.spirit = 100; } let n = 0; const c0 = G.F[0].rs.pw; while (wBX.phase !== 'over' && n++ < 6000) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); } return G.F[0].bs.pw - c0 + G.F[0].rs.pw; })()")
         check(yc >= 1, 'in You corner your fighter casts powers by themselves', yc)
         await pg.evaluate("wBX.pause(false)")
         await pg.evaluate("showPage('help')")

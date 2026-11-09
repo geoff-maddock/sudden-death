@@ -850,7 +850,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
 .wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
 .wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
-.wrpow{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
+/* (.wrsp2: the second specials' table, w75) */
+.wrpow,.wrsp2{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td,.wrsp2 th,.wrsp2 td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
 .wring .wnst span{white-space:nowrap}
 /* w52: the tale of the tape (issue #62): yours on the left, theirs on the right, the better of each pair marked */
 .wrtape td{border-top:0;padding-top:0}.wrtape summary{cursor:pointer;color:var(--dim);font-size:.92em}
@@ -25641,7 +25642,7 @@ function bxFighter(p, side) {
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
     // gear (13-kit.js): its name, and what it does beyond the ratings (already laid on r)
     gear: p.gear && p.gear.name ? p.gear.name : null, gx: p.gear && p.gear.fx ? JSON.parse(JSON.stringify(Object.assign({}, p.gear.fx, { r: undefined }))) : null,
-    a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false,
+    a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false, spPick: p.sp === 'sp2' ? 'sp2' : 'sp', spirit: BX_SPIRIT.start,
     rs: bxStatsZero(), bs: bxStatsZero() };
 }
 // a round's (rs) or bout's (bs) work: punches thrown and landed, power punches landed, damage done, defense as the
@@ -25769,7 +25770,7 @@ function bxLand(a, b, k) {
   if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1) * (Ga.cut || 1));
   if (P.drain && !Tb.hollow) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
-  bxHurt(a, b, dmg, !blocked);
+  bxSpiritGain(a, b, dmg, blocked); bxHurt(a, b, dmg, !blocked);
   if (G.down != null) return;
   // a spider's jab stops a fighter coming forward
   if (!blocked && k === 'jab' && Ta.stick) b.halt = Ta.stick;
@@ -26292,6 +26293,10 @@ function bxBarSide(c, f, right) {
   c.fillStyle = g; c.fillRect(right ? hx - bw * hp : hx, 52, bw * hp, 10);
   c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 66, bw, 6);
   c.fillStyle = '#5ab8d8'; c.fillRect(right ? hx - bw * bxFrac(f) : hx, 66, bw * bxFrac(f), 6);
+  // spirit (11-powers.js): violet, with ticks where a special and an ultimate can go
+  if (bxPowOn()) { const sp = bxSpirit(f) / BX_SPIRIT.max; c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 75, bw, 4);
+    c.fillStyle = '#a77cf0'; c.fillRect(right ? hx - bw * sp : hx, 75, bw * sp, 4);
+    c.fillStyle = '#e8dcc0'; for (const k of ['sp', 'ult']) { const v = bw * BX_SPIRIT[k] / BX_SPIRIT.max; c.fillRect(right ? hx - v - 1 : hx + v - 1, 74, 2, 6); } }
   // knockdowns taken, and the cut-man's patches left
   for (let i = 0; i < BX_RULES.kd; i++) { c.beginPath(); c.arc(at(bw + 26 + i * 14, 0), 57, 4.5, 0, Math.PI * 2); c.fillStyle = i < G.kd[f.side] ? '#ff6a4a' : '#2a1d17'; c.fill(); }
   for (let i = 0; i < BX_RULES.patches; i++) { c.fillStyle = i < f.patches ? '#e8dcc0' : '#2a1d17'; c.fillRect(at(bw + 20 + i * 14, 8), 66, 8, 6); }
@@ -26356,7 +26361,7 @@ const BX_STAT_WORD = { reach: 'reach', pow: 'power', spd: 'speed', chin: 'chin',
 function bxIntroTape() {
   const one = f => { const L = f.rec, P = bxPowOn() && BX_POW[f.kind], T = bxTrait(f);
     return { n: f.n, sub: [f.lvl ? `level ${f.lvl}` : '', T ? T.n : ''].filter(Boolean).join(', '), r: Object.assign({}, f.r),
-      pow: P ? `${P.sp.n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
+      pow: P ? `${bxPowOf(f, 'sp').n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
   return G.F.map(one);
 }
 function bxDrawIntro(c) {
@@ -26550,45 +26555,72 @@ function bxCardVerdict() {
    stay up on 1), nextMul (their next power punch that lands does this much more), air (body shots at them miss).
    The CPU casts by its skill and the moment (bxCpuCast): a special when it suits (in range, hurt, tired), an ultimate
    when the bout turns (badly hurt, the other fighter hurt, or late in the last round). Your fighter: in You box with Q
-   (special) and R (ultimate) or the pad; in You corner they cast as a CPU fighter would. G.powers false boxes without. */
+   (special) and R (ultimate) or the pad; in You corner they cast as a CPU fighter would. G.powers false boxes without.
+   Two specials (issue #61, phase 4): every kind has sp and sp2, and a fighter brings one (f.spPick, from { sp: 'sp2' }
+   on the fighter it is given); bxPowOf(f, 'sp') is the one it brought. now.mySta is stamina back for the caster, and a
+   negative push pulls them in.
+   Spirit (BX_SPIRIT): a meter from 0 to max, filled by landing clean punches and by taking punishment (blocked punches
+   count a little), never by powers. A special needs BX_SPIRIT.sp of it and an ultimate BX_SPIRIT.ult, spent when cast,
+   as well as the stamina; each fighter starts a bout with BX_SPIRIT.start. f.spirit, plain data. */
 const BX_POW_STA = { sp: 8, ult: 15 };
+// (a fighter deals and takes about 50 damage a round, so a round of work fills about 35: a special most rounds, or an
+// ultimate saved for)
+const BX_SPIRIT = { max: 100, start: 10, sp: 25, ult: 60, land: .3, take: .4, block: .12 };
 const BX_POW = {
   goblin:   { sp: { id: 'shadowstep', n: 'Shadowstep', when: 'close', desc: 'Blinks to their open side: the next punch is a counter, and for 2 seconds punches find them more often.', now: { ctr: 1.2 }, fx: { who: 'self', t: 2, acc: .2 } },
-              ult: { id: 'flurry', n: 'Flurry', when: 'close', desc: 'Four quick jabs that all land, and a counter after.', now: { hits: 4, ctr: .8 } } },
+              ult: { id: 'flurry', n: 'Flurry', when: 'close', desc: 'Four quick jabs that all land, and a counter after.', now: { hits: 4, ctr: .8 } },
+              sp2: { id: 'dirtytrick', n: 'Dirty Trick', when: 'close', desc: 'A thumb to the eye: for 3 seconds their punches find you 20% less often.', fx: { who: 'them', t: 3, acc: -.2 } } },
   kobold:   { sp: { id: 'firebreath', n: 'Fire Breath', when: 'close', desc: 'A burst of flame through the guard (7), and their guard leaks for 4 seconds.', now: { dmg: 7 }, fx: { who: 'them', t: 4, leaky: 1 } },
-              ult: { id: 'inferno', n: 'Inferno', when: 'any', desc: 'The canvas burns under them: 3 health a second for 5 seconds, and their guard leaks.', fx: { who: 'them', t: 5, regHp: -3, leaky: 1 } } },
+              ult: { id: 'inferno', n: 'Inferno', when: 'any', desc: 'The canvas burns under them: 3 health a second for 5 seconds, and their guard leaks.', fx: { who: 'them', t: 5, regHp: -3, leaky: 1 } },
+              sp2: { id: 'emberdance', n: 'Ember Dance', when: 'mid', desc: 'Hot coals underfoot: for 4 seconds, 20% quicker to punch and to move.', fx: { who: 'self', t: 4, spd: 1.2, move: 1.2 } } },
   werewolf: { sp: { id: 'pounce', n: 'Pounce', when: 'mid', desc: 'Leaps in and knocks them off balance: in close, they stagger, and the next punch is a counter.', now: { dash: 2.5, stun: .6, ctr: .8 } },
-              ult: { id: 'bloodmoon', n: 'Blood Moon', when: 'any', desc: 'For 7 seconds: 35% quicker and 35% harder.', fx: { who: 'self', t: 7, spd: 1.35, dmgOut: 1.35 } } },
+              ult: { id: 'bloodmoon', n: 'Blood Moon', when: 'any', desc: 'For 7 seconds: 35% quicker and 35% harder.', fx: { who: 'self', t: 7, spd: 1.35, dmgOut: 1.35 } },
+              sp2: { id: 'howl', n: 'Howl', when: 'mid', desc: 'A howl that chills them: 6 stamina off, and for 3 seconds their punches do 20% less.', now: { sta: 6 }, fx: { who: 'them', t: 3, dmgOut: .8 } } },
   dwarf:    { sp: { id: 'axe', n: 'Battle Axe', when: 'close', desc: 'Winds up the axe arm: the next power punch that lands does 80% more.', fx: { who: 'self', t: 5, nextMul: 1.8 } },
-              ult: { id: 'earthshatter', n: 'Earthshatter', when: 'close', desc: 'Stamps the canvas: they stumble for over a second.', now: { stun: 1.2 } } },
+              ult: { id: 'earthshatter', n: 'Earthshatter', when: 'close', desc: 'Stamps the canvas: they stumble for over a second.', now: { stun: 1.2 } },
+              sp2: { id: 'stoutale', n: 'Stout Ale', when: 'tired', desc: 'A swig from the flask: 14 stamina and 5 health back.', now: { mySta: 14, hp: 5 } } },
   ogre:     { sp: { id: 'crush', n: 'Club Crush', when: 'close', desc: 'A clubbing blow through the guard (6).', now: { dmg: 6 } },
-              ult: { id: 'bellyflop', n: 'Belly Flop', when: 'close', desc: 'Falls on them: 13 through the guard, and they stagger.', now: { dmg: 13, stun: .5 } } },
+              ult: { id: 'bellyflop', n: 'Belly Flop', when: 'close', desc: 'Falls on them: 13 through the guard, and they stagger.', now: { dmg: 13, stun: .5 } },
+              sp2: { id: 'bearhug', n: 'Bear Hug', when: 'close', desc: 'Squeezes the breath out of them: 12 stamina off, and they stagger.', now: { sta: 12, stun: .4 } } },
   minotaur: { sp: { id: 'bullrush', n: 'Bull Rush', when: 'mid', desc: 'Charges them back toward the ropes, and they stagger.', now: { dash: 2, push: 3, stun: .5 } },
-              ult: { id: 'stampede', n: 'Stampede', when: 'mid', desc: 'Runs them over: 12 through the guard, and pinned on the ropes.', now: { dash: 3, push: 5, dmg: 12, stun: .8 } } },
+              ult: { id: 'stampede', n: 'Stampede', when: 'mid', desc: 'Runs them over: 12 through the guard, and pinned on the ropes.', now: { dash: 3, push: 5, dmg: 12, stun: .8 } },
+              sp2: { id: 'gore', n: 'Gore', when: 'close', desc: 'The horns: 5 through the guard, and their guard leaks for 3 seconds.', now: { dmg: 5 }, fx: { who: 'them', t: 3, leaky: 1 } } },
   troll:    { sp: { id: 'regen', n: 'Troll Blood', when: 'hurt', desc: '15 health back.', now: { hp: 15 } },
-              ult: { id: 'bog', n: 'Bog Tide', when: 'any', desc: 'The canvas turns to bog under them: they move at 40% for 6 seconds.', fx: { who: 'them', t: 6, move: .4 } } },
+              ult: { id: 'bog', n: 'Bog Tide', when: 'any', desc: 'The canvas turns to bog under them: they move at 40% for 6 seconds.', fx: { who: 'them', t: 6, move: .4 } },
+              sp2: { id: 'groundsmash', n: 'Ground Smash', when: 'mid', desc: 'Pounds the canvas: they stumble, and their feet are slow (60%) for 3 seconds.', now: { stun: .6 }, fx: { who: 'them', t: 3, move: .6 } } },
   golem:    { sp: { id: 'stoneskin', n: 'Stone Skin', when: 'close', desc: 'For 4 seconds, punches do 60% less.', fx: { who: 'self', t: 4, dmgIn: .4 } },
-              ult: { id: 'rampart', n: 'Rampart', when: 'any', desc: 'For 6 seconds, head punches do nothing and body shots half.', fx: { who: 'self', t: 6, rampart: 1 } } },
+              ult: { id: 'rampart', n: 'Rampart', when: 'any', desc: 'For 6 seconds, head punches do nothing and body shots half.', fx: { who: 'self', t: 6, rampart: 1 } },
+              sp2: { id: 'lodestone', n: 'Lodestone', when: 'mid', desc: 'Drags them in close, and the next power punch that lands does 50% more.', now: { push: -2.5 }, fx: { who: 'self', t: 4, nextMul: 1.5 } } },
   harpy:    { sp: { id: 'flight', n: 'Take Flight', when: 'close', desc: 'For 3 seconds: up off the canvas, so body shots miss, and 30% quicker on the wing.', fx: { who: 'self', t: 3, air: 1, move: 1.3 } },
-              ult: { id: 'tempest', n: 'Tempest', when: 'any', desc: 'A gale blows them onto the ropes and takes 15 stamina.', now: { push: 6, sta: 15 } } },
+              ult: { id: 'tempest', n: 'Tempest', when: 'any', desc: 'A gale blows them onto the ropes and takes 15 stamina.', now: { push: 6, sta: 15 } },
+              sp2: { id: 'shriek', n: 'Shriek', when: 'mid', desc: 'A scream that rattles them: they flinch, and lose 8 stamina.', now: { stun: .5, sta: 8 } } },
   elf:      { sp: { id: 'eagle', n: 'Eagle Eye', when: 'close', desc: 'For 3 seconds they see every punch coming.', fx: { who: 'self', t: 3, sight: 1 } },
-              ult: { id: 'overgrowth', n: 'Overgrowth', when: 'tired', desc: 'For 5 seconds: 6 stamina and 1.5 health back a second.', fx: { who: 'self', t: 5, regSta: 6, regHp: 1.5 } } },
+              ult: { id: 'overgrowth', n: 'Overgrowth', when: 'tired', desc: 'For 5 seconds: 6 stamina and 1.5 health back a second.', fx: { who: 'self', t: 5, regSta: 6, regHp: 1.5 } },
+              sp2: { id: 'swiftarrow', n: 'Swift Arrow', when: 'any', desc: 'A shot from anywhere in the ring: 6 through the guard.', now: { dmg: 6 } } },
   wraith:   { sp: { id: 'vanish', n: 'Vanish', when: 'close', desc: 'For 1.2 seconds, punches pass straight through.', fx: { who: 'self', t: 1.2, miss: 1 } },
-              ult: { id: 'fog', n: 'Fog of the Dead', when: 'any', desc: 'For 4 seconds their punches find you far less often.', fx: { who: 'them', t: 4, acc: -.25 } } },
+              ult: { id: 'fog', n: 'Fog of the Dead', when: 'any', desc: 'For 4 seconds their punches find you far less often.', fx: { who: 'them', t: 4, acc: -.25 } },
+              sp2: { id: 'soulsiphon', n: 'Soul Siphon', when: 'close', desc: 'Drinks their breath: 8 stamina off them, and 8 back for you.', now: { sta: 8, mySta: 8 } } },
   vampire:  { sp: { id: 'drain', n: 'Drain', when: 'close', desc: 'For 5 seconds, 60% of what lands comes back as health.', fx: { who: 'self', t: 5, heal: .6 } },
-              ult: { id: 'eclipse', n: 'Eclipse', when: 'any', desc: 'For 6 seconds: all of what lands comes back as health, and punches find them more often.', fx: { who: 'self', t: 6, heal: 1, acc: .2 } } },
+              ult: { id: 'eclipse', n: 'Eclipse', when: 'any', desc: 'For 6 seconds: all of what lands comes back as health, and punches find them more often.', fx: { who: 'self', t: 6, heal: 1, acc: .2 } },
+              sp2: { id: 'batswarm', n: 'Bat Swarm', when: 'mid', desc: 'Bats round their head for 3 seconds: their punches find you less often, and their feet slow.', fx: { who: 'them', t: 3, acc: -.15, move: .7 } } },
   lich:     { sp: { id: 'weakness', n: 'Hex of Weakness', when: 'close', desc: 'For 5 seconds their punches do half.', fx: { who: 'them', t: 5, dmgOut: .5 } },
-              ult: { id: 'gravehands', n: 'Grave Hands', when: 'any', desc: 'Hands from the canvas hold them for 5 seconds: rooted, and slow to punch.', fx: { who: 'them', t: 5, root: 1, spd: .6 } } },
+              ult: { id: 'gravehands', n: 'Grave Hands', when: 'any', desc: 'Hands from the canvas hold them for 5 seconds: rooted, and slow to punch.', fx: { who: 'them', t: 5, root: 1, spd: .6 } },
+              sp2: { id: 'soulbolt', n: 'Soul Bolt', when: 'any', desc: 'A bolt from anywhere in the ring: 7 through the guard.', now: { dmg: 7 } } },
   zombie:   { sp: { id: 'undying', n: 'Undying', when: 'hurt', desc: 'The next knockdown this round, they stay up on 1 health.', fx: { who: 'self', t: 40, undying: 1 } },
-              ult: { id: 'plague', n: 'Plague Cloud', when: 'any', desc: 'Grave gas: for 6 seconds they lose 2 health and 4 stamina a second.', fx: { who: 'them', t: 6, regHp: -2, regSta: -4 } } },
+              ult: { id: 'plague', n: 'Plague Cloud', when: 'any', desc: 'Grave gas: for 6 seconds they lose 2 health and 4 stamina a second.', fx: { who: 'them', t: 6, regHp: -2, regSta: -4 } },
+              sp2: { id: 'rotgrip', n: 'Rotting Grip', when: 'close', desc: 'Grabs hold: for 2 seconds they can\'t move, and lose 2 health a second.', fx: { who: 'them', t: 2, root: 1, regHp: -2 } } },
   gorgon:   { sp: { id: 'petrify', n: 'Petrify', when: 'mid', desc: 'A stony stare: they freeze for a second.', now: { stun: 1 } },
-              ult: { id: 'garden', n: 'Stone Garden', when: 'any', desc: 'They turn to stone for over two seconds.', now: { stun: 2.2 } } },
+              ult: { id: 'garden', n: 'Stone Garden', when: 'any', desc: 'They turn to stone for over two seconds.', now: { stun: 2.2 } },
+              sp2: { id: 'serpenthair', n: 'Serpent Hair', when: 'close', desc: 'The snakes strike: two quick hits that land, and their guard leaks for 2 seconds.', now: { hits: 2 }, fx: { who: 'them', t: 2, leaky: 1 } } },
   spider:   { sp: { id: 'web', n: 'Web', when: 'mid', desc: 'Webs their feet for 4 seconds: they move at a third of their speed and can\'t back away.', fx: { who: 'them', t: 4, move: .35, noBack: 1 } },
-              ult: { id: 'webburst', n: 'Web Burst', when: 'any', desc: 'Wrapped up for 6 seconds: rooted, and punching at half speed.', fx: { who: 'them', t: 6, root: 1, spd: .5 } } },
+              ult: { id: 'webburst', n: 'Web Burst', when: 'any', desc: 'Wrapped up for 6 seconds: rooted, and punching at half speed.', fx: { who: 'them', t: 6, root: 1, spd: .5 } },
+              sp2: { id: 'venom', n: 'Venom Bite', when: 'close', desc: 'A bite through the guard (4), and venom: 1.5 health a second for 5 seconds.', now: { dmg: 4 }, fx: { who: 'them', t: 5, regHp: -1.5 } } },
   skeleton: { sp: { id: 'rattle', n: 'Rattle', when: 'close', desc: 'Clatters apart and back: punches miss for a second, and the next is a counter.', now: { ctr: .9 }, fx: { who: 'self', t: 1, miss: 1 } },
-              ult: { id: 'bonestorm', n: 'Bone Storm', when: 'any', desc: 'Bursts into a storm of bones: punches miss for 4 seconds.', fx: { who: 'self', t: 4, miss: 1 } } },
+              ult: { id: 'bonestorm', n: 'Bone Storm', when: 'any', desc: 'Bursts into a storm of bones: punches miss for 4 seconds.', fx: { who: 'self', t: 4, miss: 1 } },
+              sp2: { id: 'bonethrow', n: 'Bone Throw', when: 'any', desc: 'Throws a rib from anywhere in the ring: 5 through the guard, and they flinch.', now: { dmg: 5, stun: .3 } } },
   witch:    { sp: { id: 'hex', n: 'Hex', when: 'mid', desc: 'A drain on their breath: 8 stamina off, and none back for 2 seconds.', now: { sta: 8 }, fx: { who: 'them', t: 2, noReg: 1 } },
-              ult: { id: 'blizzard', n: 'Blizzard', when: 'any', desc: 'Snow on them: 20% slower at everything for 3 seconds.', fx: { who: 'them', t: 3, spd: .8, move: .8 } } },
+              ult: { id: 'blizzard', n: 'Blizzard', when: 'any', desc: 'Snow on them: 20% slower at everything for 3 seconds.', fx: { who: 'them', t: 3, spd: .8, move: .8 } },
+              sp2: { id: 'brew', n: 'Witch\'s Brew', when: 'tired', desc: 'A swig from the cauldron: 12 stamina back, and 2 more a second for 4 seconds.', now: { mySta: 12 }, fx: { who: 'self', t: 4, regSta: 2 } } },
 };
 const BX_FX_MUL = ['spd', 'move', 'dmgIn', 'dmgOut', 'nextMul'], BX_FX_ADD = ['acc', 'regSta', 'regHp', 'heal'], BX_FX_FLAG = ['root', 'noBack', 'miss', 'rampart', 'leaky', 'noReg', 'sight', 'undying', 'air'];
 // a fighter's statuses, combined (most of the time there are none: the same no-effect answer, built once)
@@ -26600,7 +26632,15 @@ function bxFx(f) {
   return o;
 }
 const bxPowOn = () => !G || G.powers !== false;
-const bxPowOf = (f, which) => bxPowOn() && BX_POW[f.kind] ? BX_POW[f.kind][which] : null;
+const bxPowOf = (f, which) => { const P = bxPowOn() && BX_POW[f.kind]; if (!P) return null; return which === 'sp' && f.spPick === 'sp2' && P.sp2 ? P.sp2 : P[which] || null; };
+// spirit (a bout saved before there was any has a full meter)
+const bxSpirit = f => f.spirit == null ? BX_SPIRIT.max : f.spirit;
+// a punch landed (a: who threw it, b: who took it; blocked or clean): spirit for both
+function bxSpiritGain(a, b, dmg, blocked) {
+  if (!bxPowOn()) return;
+  if (!blocked) a.spirit = Math.min(BX_SPIRIT.max, bxSpirit(a) + dmg * BX_SPIRIT.land);
+  b.spirit = Math.min(BX_SPIRIT.max, bxSpirit(b) + dmg * BX_SPIRIT.take * (blocked ? BX_SPIRIT.block / BX_SPIRIT.take : 1));
+}
 /* whether f can cast its special ('sp') or ultimate ('ult') now: { ok, why } */
 function bxCanCast(f, which) {
   const P = bxPowOf(f, which), o = G.F[1 - f.side];
@@ -26610,6 +26650,7 @@ function bxCanCast(f, which) {
   if (['down', 'stun', 'clinch', 'grab'].includes(f.a.k) || bxPunching(f)) return { ok: false, why: 'busy' };
   if (o.a.k === 'down') return { ok: false, why: 'they are down' };
   if (f.sta < BX_POW_STA[which]) return { ok: false, why: 'no breath' };
+  if (bxSpirit(f) < BX_SPIRIT[which]) return { ok: false, why: 'needs spirit' };
   return { ok: true, why: '' };
 }
 // a power with wishes (a superstar's: the Djinn's Three Wishes) grants the first that suits the moment: { when: 'hurt'
@@ -26623,11 +26664,12 @@ function bxWish(f, o, P) {
 function bxCast(f, which) {
   if (!bxCanCast(f, which).ok) return false;
   const o = G.F[1 - f.side], P = bxWish(f, o, bxPowOf(f, which)), N = P.now || {};
-  f.sta -= BX_POW_STA[which]; if (which === 'sp') f.spUsed = G.round; else f.ultUsed = true;
+  f.sta -= BX_POW_STA[which]; f.spirit = bxSpirit(f) - BX_SPIRIT[which]; if (which === 'sp') f.spUsed = G.round; else f.ultUsed = true;
   f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
   const d = bxDist(f, o), ux = (o.x - f.x) / (d || 1), uy = (o.y - f.y) / (d || 1);
   if (N.dash) { const step = Math.max(0, Math.min(N.dash, d - BX_RING.body)); f.x += ux * step; f.y += uy * step; }
-  if (N.push) { o.x = clamp(o.x + ux * N.push, -BX_RING.rope, BX_RING.rope); o.y = clamp(o.y + uy * N.push, -BX_RING.rope, BX_RING.rope); }
+  if (N.push) { const pu = Math.max(N.push, -Math.max(0, bxDist(f, o) - BX_RING.body)); o.x = clamp(o.x + ux * pu, -BX_RING.rope, BX_RING.rope); o.y = clamp(o.y + uy * pu, -BX_RING.rope, BX_RING.rope); }
+  if (N.mySta) f.sta = Math.min(f.staMax, f.sta + N.mySta);
   if (N.hp) f.hp = Math.min(f.hpMax, f.hp + N.hp);
   if (N.sta) o.sta = Math.max(0, o.sta - N.sta);
   if (N.ctr) f.ctr = Math.max(f.ctr, N.ctr);
@@ -26678,6 +26720,8 @@ function bxCpuCast(f, o) {
     const P = bxPowOf(f, which); if (!P || !bxCanCast(f, which).ok) continue;
     const late = G.round === G.rounds && G.clock < 15, turn = hurt || o.hp < o.hpMax * .4 || late;
     if (which === 'ult' && !turn && skill > 0) continue;
+    // (a Knight or better keeps the spirit for its ultimate in the last round, unless the special would turn it)
+    if (which === 'sp' && skill > 0 && !f.ultUsed && G.round === G.rounds && bxSpirit(f) - BX_SPIRIT.sp < BX_SPIRIT.ult && !hurt) continue;
     const p = suits(P.when) ? .05 + skill * .04 : skill === 0 ? .02 : 0;
     if (R() < p) return bxCast(f, which);
   }
@@ -26686,7 +26730,8 @@ function bxCpuCast(f, o) {
 // what the page shows of a fighter's powers: { sp, ult } with name, description and whether it can go now
 function bxPowState(f) {
   const one = which => { const P = bxPowOf(f, which); if (!P) return null; const c = bxCanCast(f, which); return { id: P.id, n: P.n, desc: P.desc, ok: c.ok, why: c.why, used: which === 'sp' ? f.spUsed === G.round : !!f.ultUsed }; };
-  return { sp: one('sp'), ult: one('ult'), fx: (f.fx || []).map(s => ({ id: s.id, n: s.n, t: Math.round(s.t * 10) / 10 })) };
+  return { sp: one('sp'), ult: one('ult'), pick: f.spPick || 'sp', spirit: Math.round(bxSpirit(f)), need: Object.assign({}, { sp: BX_SPIRIT.sp, ult: BX_SPIRIT.ult }), max: BX_SPIRIT.max,
+    fx: (f.fx || []).map(s => ({ id: s.id, n: s.n, t: Math.round(s.t * 10) / 10 })) };
 }
 /* The Anvil Ring: save points (issue #23, phase 5). A bout (and the card it is on) can be kept and put back at three
    moments: the start of a bout on a card, each corner between rounds, and the end of a bout on a card (between bouts).
@@ -27144,7 +27189,9 @@ return {
   // powers (phase 4): a side's special and ultimate now ({ sp, ult, fx }), casting one (the tests' handle; in play, Q and R
   // or the pad through input), every kind's powers (for How to play), the stamina they cost, and a fighter's statuses
   powers: side => G && G.F ? bxPowState(G.F[side == null ? BD.you : side]) : null, cast: (side, which) => bxCast(G.F[side], which),
-  powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, { sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }])),
+  powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, Object.assign({ sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }, P.sp2 ? { sp2: { n: P.sp2.n, desc: P.sp2.desc } } : {})])),
+  // spirit (issue #61, phase 4): the meter's rules
+  spirit: Object.assign({}, BX_SPIRIT),
   // each kind's nature in the ring (a trait for some, none for the rest): { kind: { n, desc } }
   traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],
@@ -37116,6 +37163,95 @@ renderHelp = function () {
   wW74RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGridKit')) return;
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGridKit">${wW74HelpText()}</p>`);
+};
+/* w75: boxing powers, phase 4 of issue #61. The engine's side is src/bx/parts/11-powers.js (sp2 for every kind, the
+   spirit meter); this is the Realm's.
+   Settled with Geoff: the choice is set on the Team screen and kept until you change it (not picked per card), and
+   powers run on a new spirit meter as well as stamina.
+   p.bxSp: 'sp' or 'sp2', the special a boxer brings (plain JSON on the roster player; 'sp' when unset). The Ring tab
+   has a Special list on each boxer whose kind has two (the superstars get their second in phase 6); it can't change
+   while a card is on. A club's boxers bring one too, the same one each time (by their name), and the pairing and the
+   tale of the tape show which.
+   wRingSetSp(pid, which) returns '' when it worked, or why not.
+   Wraps: wBxFighter (wW75BxFighter: the pick goes in), wRingOpp (wW75RingOpp: theirs), wRingTapeOf (wW75RingTapeOf:
+   the special they bring), wRingPairing (wW75RingPairing: their specials on the pairing), wRingTabRow and
+   wRenderCamp (wW75RingTabRow, wW75RenderCamp: the Special list), wBxCard (wW75BxCard: the special on the stats card),
+   renderHelp (wW75RenderHelp: #wHelpRingSpirit). */
+
+const W_RING_SP = { ids: ['sp', 'sp2'] };
+const wRingHasTwo = kind => !!(wBX.powerBook[kind] && wBX.powerBook[kind].sp2);
+const wRingSpOf = p => p && p.bxSp === 'sp2' && wRingHasTwo(p.kind) ? 'sp2' : 'sp';
+// the special a fighter brings, from the book: { n, desc }
+const wRingSpPow = f => { const B = wBX.powerBook[f.kind]; return B ? B[f.sp === 'sp2' && B.sp2 ? 'sp2' : 'sp'] : null; };
+function wRingSetSp(pid, which) {
+  const p = wPlayer(pid);
+  if (!p) return 'Nobody by that name.';
+  if (!W_RING_SP.ids.includes(which)) return '';
+  if (!wRingHasTwo(p.kind)) return `${p.n} has only the one special.`;
+  if (wRingLive()) return 'Not while a card is on: finish it first.';
+  p.bxSp = which; wSave(); return '';
+}
+
+/* ---------- into the ring ---------- */
+const wW75BxFighter = wBxFighter;
+wBxFighter = function (p) { const f = wW75BxFighter(p); f.sp = wRingSpOf(p); return f; };
+// a club's boxer: the same special every time, picked by their name
+const wW75RingOpp = wRingOpp;
+wRingOpp = function (club, tier, taken) {
+  const side = wW75RingOpp(club, tier, taken);
+  for (const f of side.fighters) f.sp = wRingHasTwo(f.kind) && seedHash(0x5b2, f.n + ':' + f.kind) % 2 ? 'sp2' : 'sp';
+  return side;
+};
+
+/* ---------- on screen ---------- */
+// the tape: the special they bring
+const wW75RingTapeOf = wRingTapeOf;
+wRingTapeOf = function (f) {
+  const t = wW75RingTapeOf(f), sp = wRingSpPow(f);
+  if (t.P && sp) t.P = Object.assign({}, t.P, { sp });
+  return t;
+};
+// the pairing: the special each of theirs brings
+const wW75RingPairing = wRingPairing;
+wRingPairing = function (o) {
+  const r = wW75RingPairing(o), T = $('wRingPairT');
+  if (T && o && o.theirs) T.querySelectorAll('tr').forEach((tr, i) => { const f = o.theirs.fighters[i], sp = f && wRingSpPow(f), td = tr.querySelector('td');
+    if (sp && td) td.insertAdjacentHTML('beforeend', `<br><small data-rsppair title="${esc(sp.desc)}">Special: <b>${esc(sp.n)}</b></small>`); });
+  return r;
+};
+// the Ring tab: the Special list on each boxer whose kind has two
+const wW75RingTabRow = wRingTabRow;
+wRingTabRow = function (p) {
+  const h = wW75RingTabRow(p); if (!wRingHasTwo(p.kind)) return h;
+  const B = wBX.powerBook[p.kind], cur = wRingSpOf(p), live = wRingLive();
+  const sel = `<label class="wsvl wrsp">Special <select data-rsp="${p.id}" aria-label="${esc(p.n)}'s special"${live ? ' disabled title="Not while a card is on"' : ''}>${W_RING_SP.ids.map(k => `<option value="${k}"${k === cur ? ' selected' : ''} title="${esc(B[k].desc)}">${esc(B[k].n)}</option>`).join('')}</select></label><small class="wrspd">${esc(B[cur].desc)}</small>`;
+  return h.replace(/<\/div><\/li>\s*$/, `${sel}</div></li>`);
+};
+const wW75RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW75RenderCamp();
+  if (WCAMP.tab !== 'ring') return;
+  const body = $('wCampBody'); if (!body) return;
+  body.querySelectorAll('[data-rsp]').forEach(s => s.onchange = () => { WCAMP.msg = wRingSetSp(+s.dataset.rsp, s.value); wRenderCamp(); });
+  if (WCAMP.msg && !body.querySelector('.wcmsg')) body.insertAdjacentHTML('afterbegin', `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>`);
+  WCAMP.msg = '';
+};
+// the stats card's Boxing block: the special they bring
+const wW75BxCard = wBxCard;
+wBxCard = function (p) {
+  const h = wW75BxCard(p), B = wBX.powerBook[p.kind]; if (!h || !B) return h;
+  const sp = B[wRingSpOf(p)];
+  return h.replace('<div class="wbdbars">', `<p class="wbdpos" data-rspcard>Special: <b>${esc(sp.n)}</b>. ${esc(sp.desc)}${wRingHasTwo(p.kind) ? ' (Change it on the Ring tab.)' : ''}</p><div class="wbdbars">`);
+};
+
+/* ---------- How to play ---------- */
+const wW75RenderHelp = renderHelp;
+renderHelp = function () {
+  wW75RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpRingSpirit')) return;
+  const S = wBX.spirit, rows = Object.entries(wBX.powerBook).filter(([, P]) => P.sp2).map(([k, P]) => `<tr><td>${esc(wKindName(k))}</td><td><b>${esc(P.sp.n)}</b>: ${esc(P.sp.desc)}</td><td><b>${esc(P.sp2.n)}</b>: ${esc(P.sp2.desc)}</td></tr>`).join('');
+  h.insertAdjacentHTML('beforeend', `<div id="wHelpRingSpirit"><p class="hint"><b>Spirit, and a choice of special.</b> Every boxer has a spirit meter (the violet bar under their breath). It fills as they land clean punches and as they take punishment (a blocked punch counts a little), never from powers. A special needs ${S.sp} spirit and an ultimate ${S.ult}, spent when cast, as well as the stamina; each boxer starts a bout with ${S.start}. A round of hard work fills about a third of the bar, so a special most rounds, or save up for the ultimate. Every league kind has two specials: pick the one each boxer brings on the Ring tab of the Team screen, and it stays until you change it. The other club's boxers bring one too; the pairing and the tale of the tape say which.</p>
+    <table class="wrsp2"><tr><th>Kind</th><th>First special</th><th>Second special</th></tr>${rows}</table></div>`);
 };
 </script>
 </body></html>

@@ -119,7 +119,7 @@ function bxLand(a, b, k) {
   if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1) * (Ga.cut || 1));
   if (P.drain && !Tb.hollow) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
-  bxHurt(a, b, dmg, !blocked);
+  bxSpiritGain(a, b, dmg, blocked); bxHurt(a, b, dmg, !blocked);
   if (G.down != null) return;
   // a spider's jab stops a fighter coming forward
   if (!blocked && k === 'jab' && Ta.stick) b.halt = Ta.stick;

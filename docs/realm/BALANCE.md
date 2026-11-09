@@ -479,6 +479,8 @@ Part 1 boxes a fresh three-player journey at level 3 against a rival's three at 
 
 Close to the gridiron's 49%, 44% and 25%. The two settings for tier 3 at 1 and 2 points come out the same (26%) on cards; the final of a Belt, played more rarely, falls from 37% to 24% with 2. A simulated Belt pays about 46 XP across the team and costs about 16 gold, as a Cinder Cup does. Draws of a whole card are rare (under 1%): level on bouts, a card goes to the knockdowns and then the points. Powers at an even level: 51% with them, 45% without (100 a row: inside the noise). A player who boxes by hand or works the corner does better than the CPU's corner; nobody has measured that yet.
 
+**Spirit and two specials (issue #61, phase 4).** Powers now need spirit as well as stamina (`BX_SPIRIT`: clean punches landed and punishment taken fill it; a special needs 25, an ultimate 60). The first try filled it from every point of damage at full rate (about 125 a round) and changed nothing: 5.3 specials and 2.0 ultimates a bout before, 5.2 and 2.0 after. At a third of that rate (about 35 a round), and with a Knight saving for its ultimate in the last round: 4.4 specials and 0.9 ultimates a bout (200 bouts). The Realm lab after (60 a row, so about ±6 points): tier 1 55%, tier 2 38%, tier 3 32%, Belts won 5%; powers on 50%, off 52%. Inside the noise of the numbers above. Phase 7 measures it finer.
+
 ## Superstars: the Phoenix in the ring (issue #24, phase 2)
 
 A superstar should be strong but not win a journey alone. Round robin, the Phoenix against every league kind at its

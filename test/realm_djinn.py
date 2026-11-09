@@ -79,7 +79,7 @@ async def main():
         # ---------- the ring: the wish the moment needs ----------
         rg = await pg.evaluate("""(() => { const wish = set => { W_RING_MODE = 'watch'; wRingBout({ kinds: ['djinn', 'ogre'], seed: 6 }); wBX.pause(true); let n = 0;
             while (wBX.phase !== 'round' && n++ < 200) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); }
-            const G = wBX.G, f = G.F[0], o = G.F[1]; for (const x of G.F) { x.a = { k: 'idle', t: 0, dur: 0, id: 0 }; x.think = 99; x.fx = []; } f.sta = f.staMax; set(f, o);
+            const G = wBX.G, f = G.F[0], o = G.F[1]; for (const x of G.F) { x.a = { k: 'idle', t: 0, dur: 0, id: 0 }; x.think = 99; x.fx = []; x.spirit = 100; } f.sta = f.staMax; set(f, o);
             const hp = [f.hp, o.hp]; wBX.cast(0, 'ult'); const r = { me: Math.round(f.hp - hp[0]), them: Math.round(hp[1] - o.hp), quick: f.fx.some(x => x.spd > 1) }; wBX.pause(false); wLeaveRing(); return r; };
           return { hurt: wish((f, o) => { f.hp = 30; }), theyHurt: wish((f, o) => { o.hp = 30; }), fine: wish(() => {}) }; })()""")
         check(rg['hurt']['me'] >= 20 and rg['theyHurt']['them'] >= 10 and rg['fine']['quick'] and not rg['fine']['me'] and not rg['fine']['them'],

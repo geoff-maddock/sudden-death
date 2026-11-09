@@ -76,7 +76,8 @@ async def main():
                 if sorted(X['v']) != sorted(stats + ['stamax']) or not all(1 <= X['v'][s] <= 12 for s in stats): bad.append((i, side, 'ratings', X['v']))
                 if X['v']['stamax'] != int(68 + X['v']['sta'] * 4.5 + .5): bad.append((i, side, 'breath'))
                 P = info['book'][kind]
-                if not (X['words']['sp'].startswith(P['sp']['n']) and P['sp']['desc'] in X['words']['sp'] and X['words']['ult'].startswith(P['ult']['n']) and P['ult']['desc'] in X['words']['ult']): bad.append((i, side, 'powers', X['words']))
+                SP = next((P[k] for k in ('sp', 'sp2') if k in P and X['words']['sp'].startswith(P[k]['n'])), P['sp'])  # (the special they bring: issue #61, phase 4)
+                if not (X['words']['sp'].startswith(SP['n']) and SP['desc'] in X['words']['sp'] and X['words']['ult'].startswith(P['ult']['n']) and P['ult']['desc'] in X['words']['ult']): bad.append((i, side, 'powers', X['words']))
                 T = info['traits'].get(kind)
                 if (T and not X['words']['nature'].startswith(T['n'] + '. ' + T['desc'])) or (not T and not X['words']['nature'].startswith('None')): bad.append((i, side, 'nature', X['words']['nature']))
                 st = await pg.evaluate("r => wBX.plans[wBX.styleOf(r)].n", {s: X['v'][s] for s in stats})
