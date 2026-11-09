@@ -24420,11 +24420,12 @@ const GF_POTIONS = {
   draught: { n: 'Stamina Draught', one: true, rest: 40, desc: 'One tired player gets 40 stamina back.' },
   secondwind: { n: 'Second Wind', all: true, rest: 15, desc: 'The whole seven get 15 stamina back.' },
   gfresin: { n: 'Fumble Resin', desc: 'Pine resin on every hand: your side can\'t fumble for the rest of this drive. Only when you have the ball.' },
-  gfhaste: { n: 'Speed Elixir', one: true, desc: 'One player runs 6% faster for the rest of this drive, on either side of the ball.' },
+  gfhaste: { n: 'Speed Elixir', one: true, desc: 'One player runs 10% faster for the rest of this drive, on either side of the ball.' },
   gffog: { n: 'Fog Vial', desc: 'Smoke over your sideline: the other side can\'t read your next call. Their coach calls blind, and however often you have called it, they don\'t see it coming.' },
-  gfsalve: { n: 'Mending Balm', one: true, rest: 15, desc: 'For a worn-down player: full ratings for the rest of the half, however tired, and 15 stamina back.' },
+  gfsalve: { n: 'Mending Balm', one: true, rest: 25, desc: 'For a worn-down player: full ratings for the rest of the half, however tired, and 25 stamina back.' },
 };
-const GF_HASTE = 1.06;
+// (issue #61, phase 7: at 1.06 a full bag was worth about nothing; speed is worth the most on the field)
+const GF_HASTE = 1.1;
 // a CPU coach takes a potion worth this much (Knight, Archmage); a Squire, now and then, whatever comes first
 const GF_KIT = { take: [99, 4.5, 3.5], squire: .25 };
 const GF_GX0 = Object.freeze({});

@@ -11,7 +11,11 @@ Part 2, powers: the same at an even level with powers off for both sides, to see
 Part 2b, stances (issue #29): the same with your side forced to play Safe, Balanced or Risky on every down (theirs
 picked by their coach): win rate, turnovers, plays of 20+ yards and stamina at the end.
 Part 3, whole cups: a fresh journey at level 3, Simulate every round; how far it gets, how often it wins, what it
-earns. Writes /tmp/realm_gridiron_lab.json."""
+earns.
+Part 4, gear and potions (issue #61, phase 7): by tier (gap 0), four ways: plain (no gear, no potions); their bag only
+(W_GRID_KIT.opp[tier], as Simulate plays it now); both bags (yours a full one, KIT_MINE, given by your coach as a
+Knight would: a stand-in for giving them by hand in Play and Manage); and the full kit (both bags, and your five own
+players in gear, KIT_GEAR). Writes /tmp/realm_gridiron_lab.json."""
 import asyncio, json, sys, os, time, collections
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -34,13 +38,16 @@ window.GLAB = {
   game(lvl, gap, tier, o) {
     o = o || {};
     GLAB.journey(lvl);
+    // (gear: one piece each, round your own players; it goes in through wSevenPlayer as a player's own)
+    if (o.gear) wRoster().forEach((p, i) => { p.gear = { grid: o.gear[i % o.gear.length] }; });
     const club = Object.values(WG.rivals)[0], keep = wBallOppLvl;
     wBallOppLvl = () => Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + gap));
     let opp; try { wGfg().opp = {}; opp = wGridOpp(club, tier); } finally { wBallOppLvl = keep; }
     const sk = wGridSkill(tier); if (o.skill != null) sk[1] = o.skill;
     const t0 = performance.now();
-    const g = wGF.simGame({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false, stance: o.stance ? [o.stance, null] : null });
-    const out = { gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
+    const bags = o.kit ? [o.kit === 'theirs' ? null : Object.assign({}, KIT_MINE), Object.assign({}, W_GRID_KIT.opp[tier] || {})] : null;
+    const g = wGF.simGame(Object.assign({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false, stance: o.stance ? [o.stance, null] : null }, bags ? { bags } : {}));
+    const out = { kit: o.kit || 'plain', used: [0, 1].map(s => (g.pots || []).filter(x => x.side === s).length), gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
     if (o.stance) {
       const G = wGF.G, mine = g.box.filter(b => b.side === 0), sum = k => mine.reduce((a, b) => a + (b.line[k] || 0), 0), on = [...new Set(Object.values(G.teams[0].off).concat(Object.values(G.teams[0].def)))];
       Object.assign(out, { stance: o.stance, to: sum('fuml') + sum('pint'), take: sum('ints') + sum('fr'), sacked: g.box.filter(b => b.side === 1).reduce((a, b) => a + (b.line.sk || 0), 0),
@@ -65,6 +72,9 @@ window.GLAB = {
   }
 };
 // XP to date, levels included
+// your full bag, and the gear your own players wear in the full kit
+window.KIT_MINE = { draught: 2, secondwind: 1, gfresin: 1, gfhaste: 1, gffog: 1, gfsalve: 1 };
+window.KIT_GEAR = ['gf_cleats', 'gf_pads', 'gf_gloves', 'gf_helmet', 'gf_tee'];
 window.wXpTotal = p => { let n = p.xp; for (let l = 1; l < p.lvl; l++) n += wXpNeed(l); return n; };
 """
 
@@ -101,8 +111,14 @@ async def main():
         for st in ('safe', 'bal', 'risky'):
             stances += await batch(pg, N, f"GLAB.game(3, 0, 2, {{ skill: 1, stance: '{st}' }})")
         cups = await batch(pg, N, "GLAB.cup(3)", per=5)
+        kits = []
+        for t in (1, 2, 3):
+            for kit, opt in (('plain', '{}'), ('theirs', "{ kit: 'theirs' }"), ('both', "{ kit: 'both' }"), ('full', "{ kit: 'both', gear: KIT_GEAR }")):
+                rows = await batch(pg, N, f"GLAB.game(3, 0, {t}, {opt})")
+                for g in rows: g['kit'] = kit
+                kits += rows
         await br.close()
-    json.dump({'games': games, 'skills': skills, 'nopow': nopow, 'stances': stances, 'cups': cups}, open('/tmp/realm_gridiron_lab.json', 'w'))
+    json.dump({'games': games, 'skills': skills, 'nopow': nopow, 'stances': stances, 'cups': cups, 'kits': kits}, open('/tmp/realm_gridiron_lab.json', 'w'))
     allg = games + skills + nopow
     print('override', PRE or '(none)', f' {time.time() - t0:.0f}s, {sum(g["ms"] for g in allg) / len(allg):.0f} ms a game')
     print('page errors', len(errs), errs[:2])
@@ -133,5 +149,14 @@ async def main():
     yd = sum(1 for c in cups for r in c['rounds'] if r['yd'])
     champ = sum(c['champ'] for c in cups)
     print(f"  champion {pct(champ, len(cups))} of {len(cups)} cups; {yd} of your games settled on yards; XP a cup {sum(c['xp'] for c in cups) / len(cups):.0f}, gold a cup {sum(c['gold'] for c in cups) / len(cups):+.0f} (fee and prize included)")
+
+    print('\ngear and potions, by tier at an even level (your coach gives your potions as a Knight would)')
+    print('                                 n    win    tie   points for-against   potions used, yours-theirs')
+    for t in (1, 2, 3):
+        for kit, name in (('plain', 'plain'), ('theirs', 'their bag only'), ('both', 'both bags'), ('full', 'both bags, you in gear')):
+            rs = [g for g in kits if g['tier'] == t and g['kit'] == kit]
+            if not rs: continue
+            w = sum(g['win'] for g in rs); tt = sum(g['tie'] for g in rs); u = [sum(g['used'][s] for g in rs) / len(rs) for s in (0, 1)]
+            print(f"  {'tier ' + str(t) + ': ' + name:26s} {len(rs):5d}  {pct(w, len(rs))}  {pct(tt, len(rs))}   {sum(g['us'] for g in rs) / len(rs):.1f}-{sum(g['them'] for g in rs) / len(rs):.1f}            {u[0]:.1f}-{u[1]:.1f}")
 
 asyncio.run(main())

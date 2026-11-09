@@ -655,3 +655,44 @@ already spends what it earns.
 **Football: second powers and situation powers (issue #61, phase 5).** The Realm lab after (60 a row, 100 a tier, so about ±6 to ±10 points): tier 1 51%, tier 2 42%, tier 3 24%, Cups won 5%; Squire, Knight and Archmage at an even level 60%, 47% and 40%; powers on 47%, off 50%. All inside the noise of the runs above. Phase 7 measures it finer.
 
 **The superstars' second powers (issue #61, phase 6).** In the ring, each superstar against six league kinds over 150 seeded bouts, first special against second: the first try had the second ahead for four of them (Hydra 68% → 82%, Kraken 68% → 77%, Phoenix 57% → 66%, Djinn 64% → 71%), so Venom Spit, Ink Cloud, Wall of Heat and Lamp Smoke were softened. After: Phoenix 57/61, Kraken 66/66, Behemoth 68/60, Djinn 64/64, Hydra 70/70, Frost Wyrm 68/66. On the gridiron (the superstar in an ordinary six, 40 games each, first powers against second, points a game): Phoenix +8.2/+5.0, Kraken −3.6/−1.8, Behemoth +0.6/−1.7, Djinn +0.1/+2.0, Hydra +0.2/−1.9, Frost Wyrm +0.3/+1.9; inside the noise (about ±2 at 40 games, the Phoenix aside).
+
+## Gear and potions in boxing and football (issue #61, phase 7)
+
+Both labs gained a part that plays each tier, as the world sets it, four ways: **plain** (no gear, no potions);
+**their bag only** (`W_RING_KIT.opp` / `W_GRID_KIT.opp` by tier: how Simulate plays now, since it leaves your bag
+alone); **both bags** (yours a full one, `KIT_MINE` in each lab, given by your corner or coach as a Knight would: a
+stand-in for giving them by hand in Play and Manage); and **the full kit** (both bags, and your players in gear,
+`KIT_GEAR`). 150 a row, so a difference needs about 8 points to stand out.
+
+**Boxing** (`python3 test/realm_ring_lab.py 150`; card win rate, potions used a card yours–theirs):
+
+| tier | plain | their bag only | both bags | both bags, you in gear |
+|---|---|---|---|---|
+| 1 | 57.3% | 50.0% (0–0.9) | 49.3% (1.7–0.9) | 54.7% (1.7–0.9) |
+| 2 | 39.3% | 40.7% (0–0.4) | 40.7% (1.8–0.4) | 49.3% (1.7–0.6) |
+| 3 | 23.3% | 20.7% (0–2.0) | 26.0% (2.3–2.0) | 25.3% (2.0–2.0) |
+
+**Football** (`python3 test/realm_gridiron_lab.py 150`; even level, game win rate, potions used a game yours–theirs):
+
+| tier | plain | their bag only | both bags | both bags, you in gear |
+|---|---|---|---|---|
+| 1 | 66.7% | 70.0% (0–1.0) | 62.0% (2.7–1.0) | 69.3% (2.8–1.0) |
+| 2 | 49.3% | 56.0% (0–1.3) | 55.3% (3.0–1.2) | 56.7% (2.9–1.3) |
+| 3 | 25.3% | 35.3% (0–4.4) | 28.7% (2.9–4.4) | 30.7% (3.2–4.6) |
+
+Football read backwards at first (their bag seemed to help you, yours to hurt you), so each potion was tested alone:
+a CPU side with three of one potion against none, the same 200 seeds (`B`'s points a game against `A`'s): none −1.18;
+draught −1.55, secondwind −1.03, resin −1.11, haste −0.77, fog −0.76, salve −0.96. No potion hurts the side that
+drinks it; each moves a game by at most about 0.4 points, inside the noise (about ±1). The backwards rows were noise.
+A whole bag (`draught 2, secondwind, resin, haste, fog, salve`) against none, 300 seeds: +0.6 points a game and +2.6
+points of win rate. The Speed Elixir went from 6% to 10% and the Mending Balm from 15 to 25 stamina; after, +0.4 points
+and +4.1 points of win rate, still inside the noise. A coach gives about 3.3 a game, and each touches one play or one
+drive of 60 or more, so a football potion is a small edge by nature.
+
+**What it comes to.** A full bag helps a little and never wins a match on its own (the issue's aim): boxing about 0 to
++5 points of card win rate, football about +3. Gear does more (a full set +5 to +10 in boxing; in football a set of
+seven of one piece +1 to +3.5 points a game, measured in phase 3), and still doesn't turn a tier: tier 3 stays at
+20–31% however you're equipped. A player who picks the moments by hand will do better than the Knight stand-in;
+nobody has measured that yet. The rest of each lab is unchanged from the runs above: boxing tiers 51/42/28%, Belts won
+3.3%; football tiers 57/45/27%, Cups won 3.3%.
+

@@ -11,7 +11,11 @@ Win rate by gap, and by tier (their rating bonus and CPU skill).
 Part 2, their CPU skill at an even level with tier 2 ratings.
 Part 3, powers: the same at an even level with powers off for both sides.
 Part 4, whole Anvil Belts: a fresh journey at level 3, Simulate every round; how far it gets, how often it wins, what
-it earns. Writes /tmp/realm_ring_lab.json."""
+it earns.
+Part 5, gear and potions (issue #61, phase 7): by tier, as the world sets it, four ways: plain (no gear, no potions);
+their bag only (W_RING_KIT.opp[tier], as Simulate boxes it now); both bags (yours a full one, KIT_MINE, used by your
+corner as a Knight's would: a stand-in for giving them by hand in Play and Manage); and the full kit (both bags, and
+your three in gear, KIT_GEAR). Writes /tmp/realm_ring_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -33,14 +37,18 @@ window.BLAB = {
   card(lvl, gap, tier, o) {
     o = o || {};
     BLAB.journey(lvl);
+    // (gear: one piece each, round the three; it goes in through wBxFighter as a player's own)
+    if (o.gear) wRoster().forEach((p, i) => { p.gear = { ring: o.gear[i % o.gear.length] }; });
     const club = Object.values(WG.rivals)[0], keep = wBallOppLvl, taken = new Set(), mine = wRingSide(taken);
     wBallOppLvl = () => Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + gap));
     let opp; try { wBxg().opp = {}; opp = wRingOpp(club, tier, taken); } finally { wBallOppLvl = keep; }
     const sk = wRingSkill(tier); if (o.skill != null) sk[1] = o.skill;
     const t0 = performance.now();
-    const r = wBX.simCard({ sides: [mine, opp], skill: sk, powers: o.powers !== false });
+    const bags = o.kit ? [o.kit === 'theirs' ? {} : Object.assign({}, KIT_MINE), Object.assign({}, W_RING_KIT.opp[tier] || {})] : null;
+    const r = wBX.simCard(Object.assign({ sides: [mine, opp], skill: sk, powers: o.powers !== false }, bags ? { bags } : {}));
     const R = r.result, bouts = r.bouts;
-    return { gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
+    const used = r.bags && bags ? [0, 1].map(s => Object.keys(bags[s]).reduce((n, id) => n + bags[s][id] - ((r.bags[s] || {})[id] || 0), 0)) : [0, 0];
+    return { kit: o.kit || 'plain', used, gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
       boutWins: bouts.filter(b => b.over.win === 0).length, stops: bouts.filter(b => b.over.how !== 'dec').length, myKos: bouts.filter(b => b.over.win === 1 && b.over.how !== 'dec').length, ms: performance.now() - t0 };
   },
   belt(lvl) {
@@ -60,6 +68,9 @@ window.BLAB = {
   }
 };
 // XP to date, levels included
+// your full bag, and the gear your three wear in the full kit
+window.KIT_MINE = { draught: 2, cutsalve: 2, smellsalts: 2, ragetonic: 2 };
+window.KIT_GEAR = ['bx_wraps', 'bx_guard', 'bx_robe'];
 window.wXpTotal = p => { let n = p.xp; for (let l = 1; l < p.lvl; l++) n += wXpNeed(l); return n; };
 """
 
@@ -72,10 +83,10 @@ async def batch(pg, n, expr, per=10):
         out += await pg.evaluate(f"(() => {{ const o = []; for (let j = 0; j < {k}; j++) {{ const i = {i} + j; o.push({expr}); }} return o; }})()")
     return out
 
-def row(label, rows):
+def row(label, rows, extra=''):
     if not rows: return
     w = sum(g['win'] for g in rows); t = sum(g['tie'] for g in rows); n = len(rows)
-    print(f"  {label:28s} {n:5d}  {pct(w, n)}  {pct(t, n)}   bouts {sum(g['us'] for g in rows) / n:.2f}-{sum(g['them'] for g in rows) / n:.2f}   stopped {sum(g['stops'] for g in rows) / (3 * n):4.0%}   your KOs {sum(g['myKos'] for g in rows) / n:.2f}")
+    print(f"  {label:28s} {n:5d}  {pct(w, n)}  {pct(t, n)}   bouts {sum(g['us'] for g in rows) / n:.2f}-{sum(g['them'] for g in rows) / n:.2f}   stopped {sum(g['stops'] for g in rows) / (3 * n):4.0%}   your KOs {sum(g['myKos'] for g in rows) / n:.2f}{extra}")
 
 async def main():
     async with async_playwright() as p:
@@ -97,8 +108,14 @@ async def main():
             skills += await batch(pg, N, f"BLAB.card(3, 0, 2, {{ skill: {sk} }})")
         nopow = await batch(pg, N, "BLAB.card(3, 0, 2, { skill: 1, powers: false })")
         belts = await batch(pg, N, "BLAB.belt(3)", per=5)
+        kits = []
+        for t in (1, 2, 3):
+            for kit, extra in (('plain', ''), ('theirs', ", kit: 'theirs'"), ('both', ", kit: 'both'"), ('full', ", kit: 'both', gear: KIT_GEAR")):
+                rows = await batch(pg, N, f"BLAB.card(3, {t - 1}, {t}, {{ {extra[2:]} }})" if extra else f"BLAB.card(3, {t - 1}, {t})")
+                for g in rows: g['kit'] = kit
+                kits += rows
         await br.close()
-    json.dump({'cards': cards, 'tiers': tiers, 'skills': skills, 'nopow': nopow, 'belts': belts}, open('/tmp/realm_ring_lab.json', 'w'))
+    json.dump({'cards': cards, 'tiers': tiers, 'skills': skills, 'nopow': nopow, 'belts': belts, 'kits': kits}, open('/tmp/realm_ring_lab.json', 'w'))
     allc = cards + tiers + skills + nopow
     print('override', PRE or '(none)', f' {time.time() - t0:.0f}s, {sum(g["ms"] for g in allc) / len(allc):.0f} ms a card')
     print('page errors', len(errs), errs[:2])
@@ -121,5 +138,14 @@ async def main():
         played = [b['rounds'][r] for b in belts if len(b['rounds']) > r]
         print(f"  {name:28s} played {len(played):4d}  won {pct(sum(x['win'] for x in played), len(played))}")
     print(f"  Belts won {pct(sum(b['champ'] for b in belts), n)}   XP {sum(b['xp'] for b in belts) / n:.0f} a Belt across the team   gold {sum(b['gold'] for b in belts) / n:+.0f} a Belt")
+
+    print('\ngear and potions, by tier as the world sets it (your corner uses your bag as a Knight would)')
+    print('                                   n    win   draw   (potions: used a card, yours-theirs)')
+    for t in (1, 2, 3):
+        for kit, name in (('plain', 'plain'), ('theirs', 'their bag only'), ('both', 'both bags'), ('full', 'both bags, you in gear')):
+            rs = [g for g in kits if g['tier'] == t and g['kit'] == kit]
+            if not rs: continue
+            u = [sum(g['used'][s] for g in rs) / len(rs) for s in (0, 1)]
+            row(f"tier {t}: {name}", rs, f"   potions {u[0]:.1f}-{u[1]:.1f}")
 
 asyncio.run(main())
