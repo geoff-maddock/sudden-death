@@ -8,7 +8,8 @@
    line first. Called-up players at your level fill the five when your roster is short. Left alone, the coach picks the
    five and the spots from the ratings (the best handler at the point, the biggest inside, the best shooter on the wing)
    and puts the bench in order of who's best. Practice game plays your five against the Saltmere Basketball Club at the
-   Charter Court; nothing is won or lost.
+   Charter Court; nothing is won or lost. The Stats tab's Basketball view shows the ratings and where each plays; games
+   from the world (w80) turn it into their box lines.
 
    p.bk       { spd, siz, hop, tch, hnd, def, lv, got: { stat: points from levels } }
    WG.court   { five: { PG: key, SG, SF, PF, C }, bench: [keys, in order], cu: [call-ups], seq, mine?: true once you've

@@ -140,7 +140,7 @@ async def main():
         await pg.evaluate("WSTAT.view = 'basketball'; wOpenCamp('stats')")
         await pg.wait_for_selector('#modalBox [data-wsview="basketball"]')
         sv = await pg.evaluate("""(() => { const p = wRoster()[0]; return { rows: document.querySelectorAll('#modalBox table.wstats tbody tr').length, head: [...document.querySelectorAll('#modalBox table.wstats thead th')].map(t => t.textContent.trim()), card: wStatsCard(p).includes('<h5>Basketball</h5>') }; })()""")
-        check(sv['rows'] == 8 and 'Spot' in sv['head'] and 'Tch' in sv['head'] and sv['card'], 'the Stats tab has a Basketball view (ratings and spots), and a player\'s stats a Basketball block', sv)
+        check(sv['rows'] == 8 and 'Spot' in sv['head'] and 'Pts' in sv['head'] and sv['card'], 'the Stats tab has a Basketball view (spots and box lines), and a player\'s stats a Basketball block with the ratings', sv)
         await pg.evaluate("WCAMP.close && WCAMP.close(); showPage('help')")
         hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpCourtTab'); return !!h && /Court tab/.test(h.textContent) && /stamina/.test(h.textContent); })()")
         check(hp, 'How to play explains the ratings, the Court tab and stamina', hp)

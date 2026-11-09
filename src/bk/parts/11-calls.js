@@ -122,7 +122,8 @@ function bkTimeout(side) {
   const hot = G.hot[1 - side], cooled = Object.keys(hot).filter(ri => hot[ri] >= BK_FIRE.n);
   for (const ri of cooled) hot[ri] = 0;
   GD.toWas = { ph: GD.ph, side, live: GD.ph === 'live' };
-  GD.msg = `Timeout, ${G.teams[side].name}.${cooled.length ? ` ${cooled.map(ri => G.teams[1 - side].roster[ri].n).join(' and ')} cool${cooled.length === 1 ? 's' : ''} off.` : ''}`;
+  const rehung = bkRehang();
+  GD.msg = `Timeout, ${G.teams[side].name}.${rehung ? ' Nim re-hangs the rim.' : ''}${cooled.length ? ` ${cooled.map(ri => G.teams[1 - side].roster[ri].n).join(' and ')} cool${cooled.length === 1 ? 's' : ''} off.` : ''}`;
   bkInputClear(); bkEv('timeout', G.teams[side].name);
   bkGo('timeout');
   for (const s of [0, 1]) bkCoachSubs(s, false);

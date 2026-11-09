@@ -8,6 +8,8 @@
    Phase 2: by hand, the player you play has a marker over them, and the release meter rises beside your shooter (the
    window in green, its heart, the swish, brighter); after a shot the meter stays a moment with where you let go. A
    player on fire has flames at their feet. A pick shows the screener's spot.
+   Phase 5, the Charter Court's own: a shine on the waxed patches, a bent rim hanging down, the crowd on its feet in a
+   roar.
    Court space is metres (05-live.js); bkScr turns it into canvas pixels. */
 const BKT = { t: 0, box: null, boxKey: '', bg: null, bgKey: '' };
 const BK_PX = 30, BK_PY = 22, BK_X0 = 60, BK_Y0 = 318, BK_PZ = 15;
@@ -40,6 +42,8 @@ function bkDrawBack(c) {
   }
   c.drawImage(BKT.bg, 0, 0, 960, 600);
   bkDrawCrowd(c);
+  // the waxed boards (phase 5): a shine on each slick patch, slowly moving
+  if (G.court) for (const w of G.court.wax) { const s = bkScr(w.x, w.y); c.save(); c.globalAlpha = .22 + .08 * Math.sin(BKT.t * 1.5 + w.x); const g = c.createRadialGradient(s.x, s.y, 2, s.x, s.y, w.r * BK_PX); g.addColorStop(0, 'rgba(255,250,230,.95)'); g.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(s.x, s.y, w.r * BK_PX, w.r * BK_PY, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
 }
 // the walled yard: brick walls close on every side
 function bkDrawYard(c) {
@@ -51,7 +55,9 @@ function bkDrawYard(c) {
 }
 // a row of heads along the top wall, bobbing a little
 function bkDrawCrowd(c) {
-  for (let i = 0; i < 46; i++) { const x = 22 + i * 20.5, b = Math.sin(BKT.t * 2 + i * 1.3) * 1.5; c.fillStyle = ['#6b4a3a', '#8a6a4a', '#4a3a3a', '#a07a5a'][i % 4]; c.beginPath(); c.arc(x, 92 + b + (i % 3) * 2, 7, 0, Math.PI * 2); c.fill(); c.fillStyle = i % 5 ? '#2c1d17' : '#e0742a'; c.fillRect(x - 8, 99 + b + (i % 3) * 2, 16, 10); }
+  // (a roar: the side's crowd on its feet, bouncing)
+  const roar = G.court && G.court.roar;
+  for (let i = 0; i < 46; i++) { const x = 22 + i * 20.5, b = Math.sin(BKT.t * (roar ? 9 : 2) + i * 1.3) * (roar ? 5 : 1.5); c.fillStyle = ['#6b4a3a', '#8a6a4a', '#4a3a3a', '#a07a5a'][i % 4]; c.beginPath(); c.arc(x, 92 + b + (i % 3) * 2, 7, 0, Math.PI * 2); c.fill(); c.fillStyle = i % 5 ? '#2c1d17' : '#e0742a'; c.fillRect(x - 8, 99 + b + (i % 3) * 2, 16, 10); }
 }
 function bkDrawFloor(c) {
   const a = bkScr(0, -BK_RULES.wid / 2), b = bkScr(BK_RULES.len, BK_RULES.wid / 2), W = b.x - a.x, H = b.y - a.y;
@@ -102,7 +108,9 @@ function bkDrawHoop(c, s, back) {
     const sw = N ? Math.max(0, 1 - (BKT.t - N.at) * 1.5) : 0;
     c.strokeStyle = '#9aa0a6'; c.lineWidth = 1.2;
     for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(R0.x + k * 2.6, R0.y); c.lineTo(R0.x + k * 1.6 + Math.sin(BKT.t * 18 + k) * sw * 3, R0.y + 16); c.stroke(); }
-    c.strokeStyle = '#e0742a'; c.lineWidth = 3; c.beginPath(); c.ellipse(R0.x, R0.y, 9, 3.5, 0, 0, Math.PI * 2); c.stroke();
+    // (a bent rim hangs down at the front, tilted)
+    const bent = G.court && G.court.bent[s];
+    c.strokeStyle = '#e0742a'; c.lineWidth = 3; c.beginPath(); c.ellipse(R0.x, R0.y + (bent ? 3 : 0), 9, 3.5, bent ? .35 * (s ? -1 : 1) : 0, 0, Math.PI * 2); c.stroke();
   }
   c.restore();
 }
@@ -135,7 +143,7 @@ function bkDrawBall(c) {
   c.restore();
 }
 // a big moment in big letters on the floor, for a moment; and at the end, the final
-const BK_BIG = { swish: ['SWISH', '#bfe8a8'], alley: ['ALLEY-OOP', '#ffd08a'], goaltend: ['GOALTENDING', '#ff8a6a'], fire: ['ON FIRE', '#ffb02e'], break: ['FAST BREAK', '#bfe8a8'], dunk: ['SLAM DUNK', '#ffd08a'], three: ['FROM THREE', '#ffd08a'], block: ['BLOCKED', '#ff8a6a'], andone: ['AND ONE', '#ffd08a'], clock: ['SHOT CLOCK', '#ff8a6a'] };
+const BK_BIG = { bent: ['RIM BENT', '#ffb070'], roar: ['THE YARD ROARS', '#ffd08a'], swish: ['SWISH', '#bfe8a8'], alley: ['ALLEY-OOP', '#ffd08a'], goaltend: ['GOALTENDING', '#ff8a6a'], fire: ['ON FIRE', '#ffb02e'], break: ['FAST BREAK', '#bfe8a8'], dunk: ['SLAM DUNK', '#ffd08a'], three: ['FROM THREE', '#ffd08a'], block: ['BLOCKED', '#ff8a6a'], andone: ['AND ONE', '#ffd08a'], clock: ['SHOT CLOCK', '#ff8a6a'] };
 function bkDrawBig(c) {
   let word = null, col = '#ffd08a', sub = '', al = 1, sc = 1;
   if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}`; }

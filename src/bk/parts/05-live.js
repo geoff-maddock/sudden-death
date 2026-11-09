@@ -91,7 +91,7 @@ function bkStep(dt) {
 }
 function bkMove(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(bkSpeed(p, i), d / .2);
-  const wx = d > .03 ? dx / d * sp : 0, wy = d > .03 ? dy / d * sp : 0, k = Math.min(1, dt * 7);
+  const wx = d > .03 ? dx / d * sp : 0, wy = d > .03 ? dy / d * sp : 0, k = Math.min(1, dt * 7 * (bkOnWax(p) ? BK_WAX.turn : 1));
   p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k;
   p.x = clamp(p.x + p.vx * dt, .3, BK_RULES.len - .3); p.y = clamp(p.y + p.vy * dt, -BK_RULES.wid / 2 + .3, BK_RULES.wid / 2 - .3);
 }
@@ -226,7 +226,7 @@ function bkShotP(p, x, y) {
   else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
   if (bkOnFire(p)) pr += BK_FIRE.p;
   pr -= .1 * bkTired(p);
-  pr += bkCallMod(p, dist);
+  pr += bkCallMod(p, dist) + bkCourtMod(p);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
 }
 /* the shot: settled at the release. A defender close enough may block it (it comes off loose) or foul (free throws:
@@ -268,7 +268,7 @@ function bkShotLands() {
 }
 // the ball comes off loose from (x, y) at height z0, landing r metres away on average, back toward the floor
 function bkLoose(x, y, z0, r) {
-  const back = bkDir(G.poss), a = Math.PI + (R() - .5) * 2.4, rr = r * (.55 + R() * .7);
+  const wild = z0 > 3 && bkBent(G.poss) ? BK_RIM.wild : 1, back = bkDir(G.poss), a = Math.PI + (R() - .5) * 2.4 * wild, rr = r * (.55 + R() * .7) * wild;
   let tx = x + Math.cos(a) * rr * back, ty = y + Math.sin(a) * rr;
   tx = clamp(tx, .5, BK_RULES.len - .5); ty = clamp(ty, -BK_RULES.wid / 2 + .5, BK_RULES.wid / 2 - .5);
   Object.assign(L.ball, { st: 'loose', h: -1, fx: x, fy: y, tx, ty, t: 0, T: .55 + rr * .08, z0 });

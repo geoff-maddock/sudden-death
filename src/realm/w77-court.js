@@ -94,13 +94,14 @@ function wCourtName(kind, used) {
   for (let k = 2; used.has(n); k++) n = `${base} ${k}`;
   used.add(n); return n;
 }
-/* one game on the court. opts: { teams, mins, seed, mode, title, how ('practice': Another game plays another, w78),
-   ordered (sides whose coach follows the bench order) } (the two clubs and the length setting when not given) */
+/* one game on the court. opts: { teams, mins, seed, mode, title, how ('practice': Another game plays another, w78;
+   'world', w80), ordered (sides whose coach follows the bench order), skill, court (false: without the Charter Court's
+   own ways; every game here has them, phase 5) } (the two clubs and the length setting when not given) */
 function wCourtGame(opts) {
   const o = opts || {};
   WBK = { over: null, how: o.how || 'scrimmage' }; wCourtTick(true);
   $('wCourtTitle').textContent = o.title || 'A scrimmage at the Charter Court';
-  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered, skill: o.skill });
+  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered, skill: o.skill, court: o.court !== false });
   showView('court');
   wCourtBarNote(); wCourtBox();
 }

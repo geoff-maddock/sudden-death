@@ -35,6 +35,11 @@ return {
   edge: (o, d) => bkEdge(o, d).slice(), call: (kind, id, side) => G && G.call ? bkCall(side == null ? GD.you : side, kind, id) : 'No game on.',
   calls: () => G && G.call ? JSON.parse(JSON.stringify({ call: G.call, cur: G.cur, scout: G.scout, to: G.to, sets: G.setLog, skill: G.skill })) : null,
   timeout: side => G && G.to ? bkTimeout(side == null ? GD.you : side) : 'No game on.', skills: BK_SKILL.slice(), toRules: Object.assign({}, BK_TO),
+  // save points and the ground (phase 5): a snapshot now, putting one back on the court, the hooks for each stoppage's
+  // snapshot, and the Charter Court's state ({ wax, bent, roar }, or null away from it)
+  snapshot: () => G && GD && G.teams ? bkSnapshot() : null, resume: sn => { BKP.paused = false; bkResume(sn); bkShow(); return G; },
+  set wantSnap(f) { BK_HOOK.wantSnap = f; }, set onSnap(f) { BK_HOOK.onSnap = f; }, court: () => G && G.court ? JSON.parse(JSON.stringify(G.court)) : null,
+  courtRules: { wax: Object.assign({}, BK_WAX), rim: Object.assign({}, BK_RIM), roar: Object.assign({}, BK_ROAR) },
   // stamina and the bench (phase 3): each side's stamina by roster index, who's on (roster indices in spot order) and
   // on the bench (in order), a swap by hand at a stoppage ('' or why not), how tired a player in the play is, the rules
   stam: () => G && G.stam ? JSON.parse(JSON.stringify(G.stam)) : null, onFloor: () => G && G.on ? JSON.parse(JSON.stringify(G.on)) : null, bench: side => G && G.on ? bkBench(side) : [],

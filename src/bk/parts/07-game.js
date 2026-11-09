@@ -19,7 +19,7 @@
    GD is the game on show (not saved). The headless game (bkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const BK_PACE = { intro: 1.4, dead: .9, walk: .9, walkSecs: 3, ft: 1.05, break: 2.2, half: 3.4 };
-const BK_HOOK = { onOver: null, onPhase: null };
+const BK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
 let GD = null;
 
 function bkStart(opts) {
@@ -30,11 +30,12 @@ function bkStart(opts) {
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
   bkCallsStart(o);
+  bkCourtStart(!!o.court);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
-  // how often the big plays came up (from the play's events): fast breaks, players on fire, picks set, lobs, moves that beat a man, goaltending, alley-oops made
-  G.tally = { break: 0, fire: 0, screen: 0, lob: 0, beat: 0, goaltend: 0, alley: 0 };
+  // how often the big plays came up (from the play's events): fast breaks, players on fire, picks set, lobs, moves that beat a man, goaltending, alley-oops made, and the Charter Court's slips, bent rims and roars
+  G.tally = { break: 0, fire: 0, screen: 0, lob: 0, beat: 0, goaltend: 0, alley: 0, slip: 0, bent: 0, roar: 0 };
   bkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: 0, meter: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
   bkInputClear(); bkTipSet();
@@ -51,6 +52,8 @@ function bkGo(ph) {
   if (ph === 'break' && GD.half) G.to = [BK_TO.n, BK_TO.n];
   if (ph === 'break' && G.q > BK_RULES.quarters) G.to = G.to.map(n => n + BK_TO.ot);
   if (ph === 'dead') GD.toAsk = true;
+  // (and each stoppage is a point to save the game at, 12-save.js)
+  bkSnapHook(ph);
   if (BK_HOOK.onPhase) try { BK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 function bkBoxAdd(side, ri, k, n) {
@@ -59,6 +62,7 @@ function bkBoxAdd(side, ri, k, n) {
 }
 // the line in the bar under the court: what just happened (GD.msg), from the play's events
 const BK_SAY = {
+  bent: () => { GD.big = { k: 'bent' }; return GD.msg; }, roar: () => { if (!GD.big) GD.big = { k: 'roar' }; return GD.msg; },
   steal: e => `${e.s} steals it from ${e.o}.`, block: e => `${e.s} blocks ${e.o}!`,
   reb: e => e.o === 'off' ? `${e.s} gets the offensive rebound.` : `${e.s} with the rebound.`,
 };
@@ -88,7 +92,7 @@ function bkTick(dt) {
       bkMeterStep(BK_DT); if (GD.ph !== 'live') break;
       // (a shot in the air when the clock runs out still counts: the period ends when it comes down)
       if (L.buzzer) continue;
-      bkMinutes(Math.min(BK_DT, G.clock)); bkStamStep(BK_DT);
+      bkMinutes(Math.min(BK_DT, G.clock)); bkStamStep(BK_DT); bkCourtStep(BK_DT);
       const B = L.ball, r = bkRun(BK_DT, B.st === 'shot' || B.st === 'loose' || B.st === 'free');
       if (r === 'shot') { bkViolationNow(); break; }
       if (r === 'end') { if (B.st === 'shot') L.buzzer = true; else { bkPeriodOver(); break; } }
@@ -163,6 +167,7 @@ function bkShotDone(S) {
     GD.big = S.goaltend ? { k: 'goaltend' } : S.alley ? { k: 'alley' } : S.dunk ? { k: 'dunk' } : S.swish ? { k: 'swish' } : three ? { k: 'three' } : null; GD.net = { hoop: bkHoopX(S.side) > BK_RULES.len / 2 ? 1 : 0 };
   } else if (S.block) { GD.big = { k: 'block' }; }
   else GD.msg = `${p.n} misses${three ? ' from three' : S.rim ? ' at the rim' : ''}.`;
+  bkCourtShot(S, p);
   // the hot hand: makes in a row; the third sets them on fire, and a miss puts it out
   const hot = G.hot[S.side], was = bkOnFire(p);
   if (S.made) { hot[p.ri] = (hot[p.ri] || 0) + 1; if (hot[p.ri] === BK_FIRE.n) { GD.msg += ` ${p.n} is on fire!`; GD.big = { k: 'fire' }; bkEv('fire', p.n); } }
@@ -272,7 +277,7 @@ function bkBox() {
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function bkSimGame(opts) {
   const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: bkRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
-  BK_HOOK.onOver = BK_HOOK.onPhase = null;
+  BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = null;
   let watch = 0, out;
   try {
     bkStart(Object.assign({}, opts, { mode: 'watch' }));
