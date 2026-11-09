@@ -26,6 +26,14 @@ return {
   // the tests' handles on phase 2's plays: a hand shot let go e from the top, a pass (lob), a pick, a move, a jump, a swipe
   shootAt: e => bkHand() >= 0 ? (bkShoot({ e }), L.shot) : null, pass: (j, lob) => bkHand() >= 0 ? (bkPass(j, lob), true) : false, pick: i => bkPick(i == null ? bkHand() : i),
   move: k => bkMoveTry(bkHand(), k), freeThrows: (side, i, n) => bkFreeThrows(side, i, n), shot: () => L && L.shot ? Object.assign({}, L.shot) : null,
+  // the call (phase 4): the sets, defenses, paces and pressures (by id: { n, desc }), a set against a defense ([+1|0|-1,
+  // why]), your call (kind 'off' | 'def' | 'pace' | 'press'; '' or why not), both sides' calls and the possession's,
+  // the scout, timeouts left and a timeout for your side ('' or why not), and the skill names
+  sets: Object.fromEntries(Object.entries(BK_SETS).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), defs: Object.fromEntries(Object.entries(BK_DEFS).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  paces: Object.fromEntries(Object.entries(BK_PACES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), presses: Object.fromEntries(Object.entries(BK_PRESSES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  edge: (o, d) => bkEdge(o, d).slice(), call: (kind, id, side) => G && G.call ? bkCall(side == null ? GD.you : side, kind, id) : 'No game on.',
+  calls: () => G && G.call ? JSON.parse(JSON.stringify({ call: G.call, cur: G.cur, scout: G.scout, to: G.to, sets: G.setLog, skill: G.skill })) : null,
+  timeout: side => G && G.to ? bkTimeout(side == null ? GD.you : side) : 'No game on.', skills: BK_SKILL.slice(), toRules: Object.assign({}, BK_TO),
   // stamina and the bench (phase 3): each side's stamina by roster index, who's on (roster indices in spot order) and
   // on the bench (in order), a swap by hand at a stoppage ('' or why not), how tired a player in the play is, the rules
   stam: () => G && G.stam ? JSON.parse(JSON.stringify(G.stam)) : null, onFloor: () => G && G.on ? JSON.parse(JSON.stringify(G.on)) : null, bench: side => G && G.on ? bkBench(side) : [],

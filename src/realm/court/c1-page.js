@@ -3,7 +3,7 @@
    don't touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
    In You play (phase 2) it hears the keys: WASD or the arrows to steer, Space to shoot (hold, let go at the top) or
    jump, J to pass (hold to lob) or swipe, E for the pick or to switch players, Q a crossover, R a spin, Shift held to
-   box out; only while the court is on screen (not under How to play), in a live play or at the line, in the capture
+   box out, T a timeout (phase 4); only while the court is on screen (not under How to play), in a live play or at the line, in the capture
    phase so nothing else on the page takes them. A key taken stays taken until it's let go; releases are always heard. */
 // speed: steps a frame, 1 to watch; the tests raise it (wBK.speed)
 const BKP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1 };
@@ -34,7 +34,7 @@ const BKK = new Set(), BKHELD = new Set();
 function bkKeySteer() { let x = 0, y = 0; for (const k of BKK) if (BK_KEYS[k]) { x += BK_KEYS[k][0]; y += BK_KEYS[k][1]; } return [x, y]; }
 function bkKey(e, down) {
   if (!BKP.on || !GD) return;
-  const k = e.key.toLowerCase(), ours = !!BK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || !!BK_KEY_ACT[k];
+  const k = e.key.toLowerCase(), ours = !!BK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || k === 't' || !!BK_KEY_ACT[k];
   if (!ours) return;
   const swallow = () => { e.preventDefault(); e.stopPropagation(); };
   if (!down) {
@@ -43,6 +43,10 @@ function bkKey(e, down) {
     if (held) swallow(); return;
   }
   if (BKHELD.has(k)) { swallow(); return; }
+  // T: a timeout, whatever is happening (it says why not, when it can't)
+  if (k === 't' && GD.mode === 'play' && BKP.cv.offsetParent !== null && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target.closest && e.target.closest('input,textarea,select'))) {
+    BKHELD.add(k); const r = bkTimeout(GD.you); if (r) GD.msg = r; swallow(); return;
+  }
   const live = GD.mode === 'play' && BKP.cv.offsetParent !== null && (GD.ph === 'live' || GD.ph === 'ft');
   if (!live || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest && e.target.closest('input,textarea,select')) return;

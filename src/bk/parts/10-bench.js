@@ -23,8 +23,8 @@ function bkStamStep(dt, walk) {
   const k = bkStamK();
   for (const s of [0, 1]) for (const ri of bkBench(s)) G.stam[s][ri] = Math.min(100, G.stam[s][ri] + BK_STAM.rest * dt * k);
   for (const p of L.pl) {
-    const fast = !walk && hyp(p.vx, p.vy) > BK_STAM.runAt, st = G.stam[p.side];
-    st[p.ri] = Math.max(0, st[p.ri] - (BK_STAM.drain + (fast ? BK_STAM.run : 0)) * dt * k * (1 + (p.r.siz - 5) * BK_STAM.big));
+    const fast = !walk && hyp(p.vx, p.vy) > BK_STAM.runAt, st = G.stam[p.side], call = !G.cur ? 1 : p.side === G.cur.side ? bkPace(p.side).tire : bkDefNow().tire || 1;
+    st[p.ri] = Math.max(0, st[p.ri] - (BK_STAM.drain + (fast ? BK_STAM.run : 0)) * dt * k * (1 + (p.r.siz - 5) * BK_STAM.big) * call);
   }
 }
 // a stoppage of dt seconds: everyone gets a little back (the bench at its usual rate)
@@ -32,7 +32,7 @@ function bkStamStop(dt) { if (!G.stam) return; const k = bkStamK(); for (const s
 function bkStamBreak(half) { if (!G.stam) return; for (const s of [0, 1]) G.stam[s] = G.stam[s].map(v => Math.min(100, v + (half ? BK_STAM.half : BK_STAM.quarter))); }
 function bkStamCost(p, n) { if (G.stam) G.stam[p.side][p.ri] = Math.max(0, G.stam[p.side][p.ri] - n); }
 // does side's coach follow its bench order (yours, from the Court tab: G.ordered, or the side you play by hand)
-const bkOrdered = side => !!(G.ordered && G.ordered[side]) || (GD.mode === 'play' && side === GD.you);
+const bkOrdered = side => !!(G.ordered && G.ordered[side]) || (GD.mode !== 'watch' && side === GD.you);
 /* the coach's subs for side at a stoppage (brk: a break between periods, when rested starters come back) */
 function bkCoachSubs(side, brk) {
   if (!G.stam) return;
@@ -55,6 +55,7 @@ function bkSubDo(side, out, inn, why) {
   const k = G.on[side].indexOf(out), T = G.teams[side], m = T.roster[inn], p = L.pl.find(q => q.side === side && q.ri === out);
   if (k < 0 || !m) return false;
   G.on[side][k] = inn; G.subs[side]++;
+  if (G.cur && G.cur.side === side && G.cur.star === out) G.cur.star = bkStar(side);
   GD.notes = (GD.notes || []).concat(`${m.n} on for ${T.roster[out].n}${why === 'tired' ? ', who needs a breather' : why === 'back' ? ', rested' : ''}.`);
   if (p) Object.assign(p, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
   return true;
@@ -62,7 +63,7 @@ function bkSubDo(side, out, inn, why) {
 // a swap by hand: at a dead ball or a break, out (on the floor) for inn (on the bench, not fouled out); '' when it
 // worked, or why not
 function bkSub(side, out, inn) {
-  if (!GD || !['dead', 'break', 'intro'].includes(GD.ph)) return 'Only at a stoppage.';
+  if (!GD || !['dead', 'break', 'intro', 'timeout'].includes(GD.ph)) return 'Only at a stoppage.';
   if (!G.on[side].includes(out)) return 'They aren\'t on the floor.';
   if (!bkBench(side).includes(inn)) return 'They can\'t come on.';
   bkSubDo(side, out, inn, 'hand');

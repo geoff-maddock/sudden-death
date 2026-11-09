@@ -100,7 +100,7 @@ function wCourtGame(opts) {
   const o = opts || {};
   WBK = { over: null, how: o.how || 'scrimmage' }; wCourtTick(true);
   $('wCourtTitle').textContent = o.title || 'A scrimmage at the Charter Court';
-  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered });
+  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered, skill: o.skill });
   showView('court');
   wCourtBarNote(); wCourtBox();
 }

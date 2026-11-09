@@ -19,7 +19,8 @@
    Court metres: x along the court from the left baseline (0 to 28), y across from the middle (-7.5 to 7.5).
    L is the play, plain JSON (players by index, no references): { pl, ball, t, ev, think, last, shot }. */
 const BK_DT = 1 / 30, BK_BODY = .55, BK_PASS_V = 12, BK_LOB_V = 7.5;
-// spots in the half a side attacks: [metres from that baseline, across] (mirrored at the other end)
+// spots in the half a side attacks: [metres from that baseline, across] (mirrored at the other end; a set may move
+// some, bkSpot in 11-calls.js)
 const BK_SPOT = { PG: [8.6, .6], SG: [5.0, -4.6], SF: [1.1, 6.8], PF: [5.6, 2.7], C: [2.3, -2.1] };
 // the defense's set at the start of a possession: each defender between their man and the rim
 let L = null;
@@ -54,7 +55,7 @@ function bkNearest(x, y, list) { let b = null, bd = 1e9; for (const p of list) {
 function bkSetSpots(side) {
   const at = {};
   for (const p of L.pl) {
-    if (p.side === side) at[L.pl.indexOf(p)] = bkAt(side, ...BK_SPOT[p.pos]);
+    if (p.side === side) at[L.pl.indexOf(p)] = bkAt(side, ...bkSpot(p.side, p.pos));
   }
   for (const p of L.pl) {
     if (p.side === side) continue;
@@ -82,7 +83,7 @@ function bkStep(dt) {
   const h = bkHand();
   if (L.pick) bkPickStep();
   // (the player you play doesn't think, but a defender up close still pressures their dribble)
-  if (h >= 0 && L.pl[h].side === G.poss && !L.shot) { L.think -= dt; if (L.think <= 0) { L.think = .28 + R() * .22; if (bkYoursNow(h)) bkPressure(h); else bkThink(h); } }
+  if (h >= 0 && L.pl[h].side === G.poss && !L.shot) { L.think -= dt; if (L.think <= 0) { L.think = (.28 + R() * .22) * bkPace(L.pl[h].side).think; if (bkYoursNow(h)) bkPressure(h); else bkThink(h); } }
   if (h >= 0 && !L.brk) bkBreakCheck(h);
   L.pl.forEach((p, i) => { const tg = bkAim(p, i); if (tg) bkMove(p, i, tg[0], tg[1], dt); else { p.vx *= .8; p.vy *= .8; p.x += p.vx * dt; p.y += p.vy * dt; } p.run += hyp(p.vx, p.vy) * dt * 2.2; });
   bkSeparate();
@@ -115,7 +116,7 @@ function bkAim(p, i) {
       if (!off && B.st === 'loose' && L.pl[p.mark]) { const m = L.pl[p.mark]; return [lerp(B.tx, m.x, .25), lerp(B.ty, m.y, .25)]; }
       return [B.tx, B.ty];
     }
-    return off ? bkAt(p.side, ...BK_SPOT[p.pos]) : bkGuardSpot(p);
+    return off ? bkAt(p.side, ...bkSpot(p.side, p.pos)) : bkGuardSpot(p);
   }
   if (B.st === 'pass' && B.to === i) return [B.tx, B.ty];
   // the player you play, steered (09-hands.js); let go and they play on their own
@@ -126,24 +127,29 @@ function bkAim(p, i) {
     if (i === h) return L.drive ? [bkHoopX(p.side), 0] : bkHandlerSpot(p);
     // a cutter goes to the rim; the others hold their spot (with a drift, so the defense has to move)
     if (p.cut) return p.cut;
-    if (p.cd <= 0 && L.t > 1.5 && h >= 0 && bkU(p.side, L.pl[h].x) < 11 && R() < .006) { const u = 1.6 + R() * 1.2; p.cut = bkAt(p.side, u, (R() - .5) * 2.4); p.cutT = 1.4; p.cd = 3 + R() * 2; }
-    const s = bkAt(p.side, ...BK_SPOT[p.pos]), w = Math.sin(L.t * .9 + i * 1.7) * .8;
+    if (p.cd <= 0 && L.t > 1.5 && h >= 0 && bkU(p.side, L.pl[h].x) < 11 && R() < .006 * (bkSetNow().cut || 1) * (bkDefNow().cut || 1)) { const u = 1.6 + R() * 1.2; p.cut = bkAt(p.side, u, (R() - .5) * 2.4); p.cutT = 1.4; p.cd = 3 + R() * 2; }
+    const s = bkAt(p.side, ...bkSpot(p.side, p.pos)), w = Math.sin(L.t * .9 + i * 1.7) * .8;
     return [s[0] + w * .4, s[1] + w];
   }
   return bkGuardSpot(p);
 }
 // the handler brings it up to the point, then works around it
 function bkHandlerSpot(p) {
-  const s = bkAt(p.side, ...BK_SPOT[p.pos]);
+  const s = bkAt(p.side, ...bkSpot(p.side, p.pos));
   return [s[0] + Math.sin(L.t * .7) * .9, s[1] + Math.sin(L.t * 1.1) * 1.6];
 }
 // a defender between their man and the rim: tight on the ball, sagging off it
 function bkGuardSpot(p) {
+  const Df = bkDefNow();
+  if (Df.zone && G.cur && p.side !== G.cur.side && bkHand() >= 0 && bkU(G.cur.side, L.pl[bkHand()].x) < 14) return bkZoneSpot(p);
   const m = L.pl[p.mark], hx = bkHoopX(m.side), dx = hx - m.x, dy = -m.y, d = hyp(dx, dy) || 1;
   // (a trap: the screener's defender leaves his man and goes at the ball too)
   if (L.trap && L.t < L.trap.t && L.pl.indexOf(p) === L.trap.i && bkHand() >= 0) { const hb = L.pl[bkHand()]; return [hb.x + (bkHoopX(hb.side) - hb.x) * .08, hb.y * .9]; }
   const onBall = L.pl.indexOf(m) === bkHand() || (L.ball.st === 'pass' && L.ball.to === L.pl.indexOf(m));
-  const gap = onBall ? Math.min(d * .5, .95) : clamp(d * .32, .9, 3.2);
+  // (the press: tight all over the backcourt; packing the paint: well off anyone out past five metres, and off the ball
+  // handler too once they're out past the arc)
+  const press = Df.back && bkHand() >= 0 && bkU(m.side, L.pl[bkHand()].x) > 14;
+  const gap = press ? (onBall ? .7 : 1) : onBall ? Math.min(d * .5, Df.sag && d > 6.2 ? 1.6 : .95) : clamp(d * .32, .9, 3.2) + (Df.sag && d > 5 ? Df.sag : 0);
   let x = m.x + dx / d * gap, y = m.y + dy / d * gap;
   // off the ball, help toward a driver
   if (!onBall && L.drive && bkHand() >= 0) { const hb = L.pl[bkHand()]; x = lerp(x, hb.x, .25); y = lerp(y, hb.y, .25); }
@@ -202,7 +208,7 @@ function bkPass(j, lob) {
     if (s < (lob ? .8 : .15) || s > .95) continue;
     const off = Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len;
     if (off > .95 || d.stun > 0) continue;
-    const ch = (.95 - off) / .95 * (.07 + d.r.def * .022 + d.r.spd * .006) * (1.25 - p.r.hnd * .04) * (lob ? .5 + d.r.hop * .03 : 1);
+    const ch = (.95 - off) / .95 * (.07 + d.r.def * .022 + d.r.spd * .006) * (1.25 - p.r.hnd * .04) * (lob ? .5 + d.r.hop * .03 : 1) * bkPress(d.side).steal * bkPace(p.side).risk * (bkDefNow().lanes || 1);
     if (R() < ch) { stl = L.pl.indexOf(d); tx = lerp(p.x, tx, s); ty = lerp(p.y, ty, s); T *= s; break; }
   }
   Object.assign(L.ball, { st: 'pass', h: -1, fx: p.x, fy: p.y, tx, ty, t: 0, T, to: j, from: h, stl, lob: !!lob });
@@ -213,13 +219,14 @@ function bkPass(j, lob) {
 // to 1 smothered), rim (at the rim), dunk }
 function bkShotP(p, x, y) {
   const dist = bkRimDist(p.side, x, y), [d, dd] = bkNearest(x, y, L.pl.filter(q => q.side !== p.side && q.stun <= 0));
-  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
+  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) * bkPress(d.side).con : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
   const rim = dist < 1.5, dunk = rim && p.r.siz + p.r.hop >= 13 && con < .7;
   let pr;
   if (rim) pr = .68 + (p.r.siz + p.r.hop - 12) * .016 - con * (.24 - (p.r.siz - (d ? d.r.siz : 5)) * .01) + (dunk ? .18 : 0);
   else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
   if (bkOnFire(p)) pr += BK_FIRE.p;
   pr -= .1 * bkTired(p);
+  pr += bkCallMod(p, dist);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
 }
 /* the shot: settled at the release. A defender close enough may block it (it comes off loose) or foul (free throws:
@@ -237,9 +244,9 @@ function bkShoot(o) {
     // the jump: a defender already up as the shot goes up (just before it) blocks far more; one you play who didn't jump, far less
     jumped = d.act === 'jump' && d.jumpAt != null && L.t - d.jumpAt < BK_JUMP.window;
     const mine = bkYoursNow(S.d) && !jumped;
-    const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1);
+    const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1) * bkPress(d.side).block;
     block = R() < pb;
-    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05);
+    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul;
     if (!mine && !jumped) { d.act = 'jump'; d.actT = .5; d.jumpAt = L.t; }
   }
   const pm = f.e != null ? bkHandMake(S.p, f.e, p) : S.p * (jumped ? .85 : 1);
@@ -271,7 +278,7 @@ function bkRebound() {
   const B = L.ball, c = [];
   for (const p of L.pl) {
     const d = hyp(p.x - B.tx, p.y - B.ty); if (d > 2.2 || p.stun > 0) continue;
-    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 : 1) * bkBoxOut(p)]);
+    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) : 1) * bkBoxOut(p)]);
   }
   if (!c.length) { B.st = 'free'; return; }
   let s = c.reduce((a, [, w]) => a + w, 0) * R(), win = c[0][0];
@@ -319,9 +326,13 @@ function bkPickStep() {
 }
 const BK_PICK_REACT = { switch: 'They switch', over: 'Over the top', trap: 'They trap' };
 function bkPickRes() {
-  const P = L.pick, D = L.pl[P.d], H = L.pl[P.h], Bg = L.pl[P.big], bi = L.pl.findIndex(q => q.side !== H.side && q.mark === P.big), BD = bi >= 0 ? L.pl[bi] : null;
+  const P = L.pick, D = L.pl[P.d], H = L.pl[P.h], Bg = L.pl[P.big];
+  // (the big's defender; or, after an earlier switch has left nobody on the big, whoever is nearest them)
+  let bi = L.pl.findIndex(q => q.side !== H.side && q.mark === P.big);
+  if (bi < 0) { const [q] = bkNearest(Bg.x, Bg.y, L.pl.filter(q => q.side !== H.side && q !== D)); bi = q ? L.pl.indexOf(q) : -1; }
+  const BD = bi >= 0 ? L.pl[bi] : null;
   L.pick = null;
-  const k = !BD ? 'over' : wpick({ switch: 1.1, over: .8 + (D.r.def + D.r.spd - 12) * .08, trap: .55 });
+  const k = !BD ? 'over' : bkDefNow().allSwitch ? 'switch' : wpick({ switch: 1.1, over: .8 + (D.r.def + D.r.spd - 12) * .08, trap: .55 });
   if (k === 'switch') { D.mark = P.big; BD.mark = P.h; GD.msg = `Pick and roll: they switch, and ${BD.n} the ${BD.kind} has ${H.n} now.`; }
   else if (k === 'over') { D.stun = .6; GD.msg = `Pick and roll: ${D.n} goes over the screen, and ${H.n} has a step.`; }
   else { L.trap = { i: bi, t: L.t + 1.6 }; GD.msg = `Pick and roll: they trap ${H.n}, and ${Bg.n} rolls free.`; }

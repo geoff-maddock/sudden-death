@@ -913,6 +913,12 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wcbox caption{text-align:left;font-weight:700;padding:2px 6px}
 .wcboxt td small{opacity:.7}
 @media (max-width:760px){.wcbox{grid-template-columns:1fr}}
+/* the court's calls panel (w79) */
+.wccalls{max-width:960px;margin:8px auto;display:flex;flex-direction:column;gap:6px}
+.wccrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.wccrow .wccl{min-width:80px;font-weight:700}
+.wccrow button.on{background:var(--gold,#ffb02e);color:#17100e}
+.wcedge td,.wcedge th{text-align:center}.wcedge td:first-child{text-align:left}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -27324,6 +27330,8 @@ const R = () => bkRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
+// (seeded, as everything here is: a name the page also has would otherwise be its own, unseeded one)
+const pick = a => a[(R() * a.length) | 0];
 // a weighted pick: { key: weight }
 function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
@@ -28058,7 +28066,8 @@ function bkTeam(t) {
    Court metres: x along the court from the left baseline (0 to 28), y across from the middle (-7.5 to 7.5).
    L is the play, plain JSON (players by index, no references): { pl, ball, t, ev, think, last, shot }. */
 const BK_DT = 1 / 30, BK_BODY = .55, BK_PASS_V = 12, BK_LOB_V = 7.5;
-// spots in the half a side attacks: [metres from that baseline, across] (mirrored at the other end)
+// spots in the half a side attacks: [metres from that baseline, across] (mirrored at the other end; a set may move
+// some, bkSpot in 11-calls.js)
 const BK_SPOT = { PG: [8.6, .6], SG: [5.0, -4.6], SF: [1.1, 6.8], PF: [5.6, 2.7], C: [2.3, -2.1] };
 // the defense's set at the start of a possession: each defender between their man and the rim
 let L = null;
@@ -28093,7 +28102,7 @@ function bkNearest(x, y, list) { let b = null, bd = 1e9; for (const p of list) {
 function bkSetSpots(side) {
   const at = {};
   for (const p of L.pl) {
-    if (p.side === side) at[L.pl.indexOf(p)] = bkAt(side, ...BK_SPOT[p.pos]);
+    if (p.side === side) at[L.pl.indexOf(p)] = bkAt(side, ...bkSpot(p.side, p.pos));
   }
   for (const p of L.pl) {
     if (p.side === side) continue;
@@ -28121,7 +28130,7 @@ function bkStep(dt) {
   const h = bkHand();
   if (L.pick) bkPickStep();
   // (the player you play doesn't think, but a defender up close still pressures their dribble)
-  if (h >= 0 && L.pl[h].side === G.poss && !L.shot) { L.think -= dt; if (L.think <= 0) { L.think = .28 + R() * .22; if (bkYoursNow(h)) bkPressure(h); else bkThink(h); } }
+  if (h >= 0 && L.pl[h].side === G.poss && !L.shot) { L.think -= dt; if (L.think <= 0) { L.think = (.28 + R() * .22) * bkPace(L.pl[h].side).think; if (bkYoursNow(h)) bkPressure(h); else bkThink(h); } }
   if (h >= 0 && !L.brk) bkBreakCheck(h);
   L.pl.forEach((p, i) => { const tg = bkAim(p, i); if (tg) bkMove(p, i, tg[0], tg[1], dt); else { p.vx *= .8; p.vy *= .8; p.x += p.vx * dt; p.y += p.vy * dt; } p.run += hyp(p.vx, p.vy) * dt * 2.2; });
   bkSeparate();
@@ -28154,7 +28163,7 @@ function bkAim(p, i) {
       if (!off && B.st === 'loose' && L.pl[p.mark]) { const m = L.pl[p.mark]; return [lerp(B.tx, m.x, .25), lerp(B.ty, m.y, .25)]; }
       return [B.tx, B.ty];
     }
-    return off ? bkAt(p.side, ...BK_SPOT[p.pos]) : bkGuardSpot(p);
+    return off ? bkAt(p.side, ...bkSpot(p.side, p.pos)) : bkGuardSpot(p);
   }
   if (B.st === 'pass' && B.to === i) return [B.tx, B.ty];
   // the player you play, steered (09-hands.js); let go and they play on their own
@@ -28165,24 +28174,29 @@ function bkAim(p, i) {
     if (i === h) return L.drive ? [bkHoopX(p.side), 0] : bkHandlerSpot(p);
     // a cutter goes to the rim; the others hold their spot (with a drift, so the defense has to move)
     if (p.cut) return p.cut;
-    if (p.cd <= 0 && L.t > 1.5 && h >= 0 && bkU(p.side, L.pl[h].x) < 11 && R() < .006) { const u = 1.6 + R() * 1.2; p.cut = bkAt(p.side, u, (R() - .5) * 2.4); p.cutT = 1.4; p.cd = 3 + R() * 2; }
-    const s = bkAt(p.side, ...BK_SPOT[p.pos]), w = Math.sin(L.t * .9 + i * 1.7) * .8;
+    if (p.cd <= 0 && L.t > 1.5 && h >= 0 && bkU(p.side, L.pl[h].x) < 11 && R() < .006 * (bkSetNow().cut || 1) * (bkDefNow().cut || 1)) { const u = 1.6 + R() * 1.2; p.cut = bkAt(p.side, u, (R() - .5) * 2.4); p.cutT = 1.4; p.cd = 3 + R() * 2; }
+    const s = bkAt(p.side, ...bkSpot(p.side, p.pos)), w = Math.sin(L.t * .9 + i * 1.7) * .8;
     return [s[0] + w * .4, s[1] + w];
   }
   return bkGuardSpot(p);
 }
 // the handler brings it up to the point, then works around it
 function bkHandlerSpot(p) {
-  const s = bkAt(p.side, ...BK_SPOT[p.pos]);
+  const s = bkAt(p.side, ...bkSpot(p.side, p.pos));
   return [s[0] + Math.sin(L.t * .7) * .9, s[1] + Math.sin(L.t * 1.1) * 1.6];
 }
 // a defender between their man and the rim: tight on the ball, sagging off it
 function bkGuardSpot(p) {
+  const Df = bkDefNow();
+  if (Df.zone && G.cur && p.side !== G.cur.side && bkHand() >= 0 && bkU(G.cur.side, L.pl[bkHand()].x) < 14) return bkZoneSpot(p);
   const m = L.pl[p.mark], hx = bkHoopX(m.side), dx = hx - m.x, dy = -m.y, d = hyp(dx, dy) || 1;
   // (a trap: the screener's defender leaves his man and goes at the ball too)
   if (L.trap && L.t < L.trap.t && L.pl.indexOf(p) === L.trap.i && bkHand() >= 0) { const hb = L.pl[bkHand()]; return [hb.x + (bkHoopX(hb.side) - hb.x) * .08, hb.y * .9]; }
   const onBall = L.pl.indexOf(m) === bkHand() || (L.ball.st === 'pass' && L.ball.to === L.pl.indexOf(m));
-  const gap = onBall ? Math.min(d * .5, .95) : clamp(d * .32, .9, 3.2);
+  // (the press: tight all over the backcourt; packing the paint: well off anyone out past five metres, and off the ball
+  // handler too once they're out past the arc)
+  const press = Df.back && bkHand() >= 0 && bkU(m.side, L.pl[bkHand()].x) > 14;
+  const gap = press ? (onBall ? .7 : 1) : onBall ? Math.min(d * .5, Df.sag && d > 6.2 ? 1.6 : .95) : clamp(d * .32, .9, 3.2) + (Df.sag && d > 5 ? Df.sag : 0);
   let x = m.x + dx / d * gap, y = m.y + dy / d * gap;
   // off the ball, help toward a driver
   if (!onBall && L.drive && bkHand() >= 0) { const hb = L.pl[bkHand()]; x = lerp(x, hb.x, .25); y = lerp(y, hb.y, .25); }
@@ -28241,7 +28255,7 @@ function bkPass(j, lob) {
     if (s < (lob ? .8 : .15) || s > .95) continue;
     const off = Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len;
     if (off > .95 || d.stun > 0) continue;
-    const ch = (.95 - off) / .95 * (.07 + d.r.def * .022 + d.r.spd * .006) * (1.25 - p.r.hnd * .04) * (lob ? .5 + d.r.hop * .03 : 1);
+    const ch = (.95 - off) / .95 * (.07 + d.r.def * .022 + d.r.spd * .006) * (1.25 - p.r.hnd * .04) * (lob ? .5 + d.r.hop * .03 : 1) * bkPress(d.side).steal * bkPace(p.side).risk * (bkDefNow().lanes || 1);
     if (R() < ch) { stl = L.pl.indexOf(d); tx = lerp(p.x, tx, s); ty = lerp(p.y, ty, s); T *= s; break; }
   }
   Object.assign(L.ball, { st: 'pass', h: -1, fx: p.x, fy: p.y, tx, ty, t: 0, T, to: j, from: h, stl, lob: !!lob });
@@ -28252,13 +28266,14 @@ function bkPass(j, lob) {
 // to 1 smothered), rim (at the rim), dunk }
 function bkShotP(p, x, y) {
   const dist = bkRimDist(p.side, x, y), [d, dd] = bkNearest(x, y, L.pl.filter(q => q.side !== p.side && q.stun <= 0));
-  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
+  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) * bkPress(d.side).con : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
   const rim = dist < 1.5, dunk = rim && p.r.siz + p.r.hop >= 13 && con < .7;
   let pr;
   if (rim) pr = .68 + (p.r.siz + p.r.hop - 12) * .016 - con * (.24 - (p.r.siz - (d ? d.r.siz : 5)) * .01) + (dunk ? .18 : 0);
   else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
   if (bkOnFire(p)) pr += BK_FIRE.p;
   pr -= .1 * bkTired(p);
+  pr += bkCallMod(p, dist);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
 }
 /* the shot: settled at the release. A defender close enough may block it (it comes off loose) or foul (free throws:
@@ -28276,9 +28291,9 @@ function bkShoot(o) {
     // the jump: a defender already up as the shot goes up (just before it) blocks far more; one you play who didn't jump, far less
     jumped = d.act === 'jump' && d.jumpAt != null && L.t - d.jumpAt < BK_JUMP.window;
     const mine = bkYoursNow(S.d) && !jumped;
-    const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1);
+    const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1) * bkPress(d.side).block;
     block = R() < pb;
-    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05);
+    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul;
     if (!mine && !jumped) { d.act = 'jump'; d.actT = .5; d.jumpAt = L.t; }
   }
   const pm = f.e != null ? bkHandMake(S.p, f.e, p) : S.p * (jumped ? .85 : 1);
@@ -28310,7 +28325,7 @@ function bkRebound() {
   const B = L.ball, c = [];
   for (const p of L.pl) {
     const d = hyp(p.x - B.tx, p.y - B.ty); if (d > 2.2 || p.stun > 0) continue;
-    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 : 1) * bkBoxOut(p)]);
+    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) : 1) * bkBoxOut(p)]);
   }
   if (!c.length) { B.st = 'free'; return; }
   let s = c.reduce((a, [, w]) => a + w, 0) * R(), win = c[0][0];
@@ -28358,9 +28373,13 @@ function bkPickStep() {
 }
 const BK_PICK_REACT = { switch: 'They switch', over: 'Over the top', trap: 'They trap' };
 function bkPickRes() {
-  const P = L.pick, D = L.pl[P.d], H = L.pl[P.h], Bg = L.pl[P.big], bi = L.pl.findIndex(q => q.side !== H.side && q.mark === P.big), BD = bi >= 0 ? L.pl[bi] : null;
+  const P = L.pick, D = L.pl[P.d], H = L.pl[P.h], Bg = L.pl[P.big];
+  // (the big's defender; or, after an earlier switch has left nobody on the big, whoever is nearest them)
+  let bi = L.pl.findIndex(q => q.side !== H.side && q.mark === P.big);
+  if (bi < 0) { const [q] = bkNearest(Bg.x, Bg.y, L.pl.filter(q => q.side !== H.side && q !== D)); bi = q ? L.pl.indexOf(q) : -1; }
+  const BD = bi >= 0 ? L.pl[bi] : null;
   L.pick = null;
-  const k = !BD ? 'over' : wpick({ switch: 1.1, over: .8 + (D.r.def + D.r.spd - 12) * .08, trap: .55 });
+  const k = !BD ? 'over' : bkDefNow().allSwitch ? 'switch' : wpick({ switch: 1.1, over: .8 + (D.r.def + D.r.spd - 12) * .08, trap: .55 });
   if (k === 'switch') { D.mark = P.big; BD.mark = P.h; GD.msg = `Pick and roll: they switch, and ${BD.n} the ${BD.kind} has ${H.n} now.`; }
   else if (k === 'over') { D.stun = .6; GD.msg = `Pick and roll: ${D.n} goes over the screen, and ${H.n} has a step.`; }
   else { L.trap = { i: bi, t: L.t + 1.6 }; GD.msg = `Pick and roll: they trap ${H.n}, and ${Bg.n} rolls free.`; }
@@ -28401,15 +28420,26 @@ function bkPassValue(h, j) {
     const off = Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len;
     if (off < .95) risk += (.95 - off) * .4;
   }
-  return S.p * (S.three ? 3 : 2) - risk - (len2(p, q) > 14 ? .3 : 0);
+  return S.p * (S.three ? 3 : 2) - risk - (len2(p, q) > 14 ? .3 : 0) + bkFeed(q, S);
 }
 const len2 = (a, b) => hyp(a.x - b.x, a.y - b.y);
+// the set wants the ball with someone: the bigs inside (Post up), the star (Isolation), whoever's on fire or else the
+// best shooter (Feed the hot hand)
+function bkFeed(q, S) {
+  const f = bkSetNow().feed; if (!f || !G.cur) return 0;
+  if (f === 'big') return BK_ROLE[q.pos] === 'big' && S.dist < 3.6 ? .8 : 0;
+  if (f === 'star') return q.ri === G.cur.star ? .7 : -.15;
+  const fire = bkOffense().filter(bkOnFire);
+  if (fire.length) return bkOnFire(q) ? 1 : -.1;
+  return q === bkOffense().reduce((b, x) => x.r.tch > b.r.tch ? x : b) ? .45 : 0;
+}
 // on the dribble a defender up close may pick it, or reach in for a foul (whoever plays the handler): true if they did
 function bkPressure(h) {
   const p = L.pl[h], [nd, ndd] = bkNearest(p.x, p.y, bkDefense());
   if (!nd || ndd >= 1 || nd.stun > 0) return false;
-  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02)) { bkPicked(nd); return true; }
-  if (R() < BK_THINK.reach) { bkReach(nd); return true; }
+  const Pr = bkPress(nd.side), Df = bkDefNow(), press = Df.back ? (bkU(p.side, p.x) > 14 ? Df.back : Df.front) : 1;
+  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02) * press * Pr.steal * bkPace(p.side).risk) { bkPicked(nd); return true; }
+  if (R() < BK_THINK.reach * Pr.foul) { bkReach(nd); return true; }
   return false;
 }
 // the defender standing in the lane to the rim (within about a metre of the line from the handler to it), or null
@@ -28419,7 +28449,7 @@ function bkLaneBlock(p) {
   for (const d of bkDefense()) {
     if (d.stun > 0) continue;
     const s = ((d.x - p.x) * ax + (d.y - p.y) * ay) / (len * len); if (s < .05 || s > 1) continue;
-    if (Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len < .9 + (d.r.siz - 5) * .04 && s < bs) { bs = s; best = d; }
+    if (Math.abs((d.x - p.x) * ay - (d.y - p.y) * ax) / len < .9 + (d.r.siz - 5) * .04 + (bkDefNow().lane || 0) && s < bs) { bs = s; best = d; }
   }
   return best;
 }
@@ -28444,18 +28474,18 @@ function bkThink(h) {
   if (u > 14) {
     const ahead = bkOffense().filter(q => q !== p && bkU(q.side, q.x) < u - 4), behind = bkDefense().filter(d => bkU(p.side, d.x) < u).length;
     if (ahead.length && R() < .35) { const best = ahead.map(q => [L.pl.indexOf(q), bkPassValue(h, L.pl.indexOf(q))]).sort((a, b) => b[1] - a[1])[0]; if (best[1] > .9) return bkPass(best[0]); }
-    if (behind <= 2 && bkLaneOpen(p)) L.drive = true;
+    if (behind <= bkPace(p.side).behind && bkLaneOpen(p)) L.drive = true;
     return;
   }
-  const S = bkShotP(p, p.x, p.y), sv = S.p * (S.three ? 3 : 2);
+  const S = bkShotP(p, p.x, p.y), sv = S.p * (S.three ? 3 : 2), Set = bkSetNow(), Pc = bkPace(p.side), at = BK_THINK.shootAt + Pc.shootAt - (S.three ? Set.three || 0 : 0);
   const mates = bkOffense().filter(q => q !== p).map(q => [L.pl.indexOf(q), bkPassValue(h, L.pl.indexOf(q))]).sort((a, b) => b[1] - a[1]);
   // (the longer one player has had it, the more the others want it)
   const best = mates[0], lane = dist > 2 && bkLaneOpen(p), held = Math.max(0, L.t - (L.got || 0));
   const w = {
-    shoot: (sv > BK_THINK.shootAt ? (sv - .6) * 5 : .04) + (urgent || late ? 6 : 0) + (S.rim ? 2 : 0),
+    shoot: (sv > at ? (sv - .6) * 5 : .04) + (urgent || late ? 6 : 0) + (S.rim ? 2 : 0),
     drive: dist > 2 ? (lane ? 1 : .35) + (p.r.spd + p.r.hnd - 11) * .12 + (urgent ? 1 : 0) + (BK_ROLE[p.pos] === 'big' && dist < 3.6 ? 1.6 + (p.r.siz - 5) * .2 : 0) : .05,
     pass: best ? Math.max(.05, (best[1] - sv * .8) * 3 + .7) * (1 + held * .7) * (urgent && G.shot < 1.2 ? .2 : 1) : 0,
-    hold: Math.max(.05, 1.4 * (G.shot - 4) / 10),
+    hold: Math.max(.05, 1.4 * (G.shot - 4) / 10) * (G.shot > 5 ? Pc.hold || 1 : 1),
   };
   // the pick, a move on the defender in the lane, and the lob to a leaper near the rim
   const bigNear = !L.pick && L.pl.some((q, i) => i !== h && q.side === p.side && BK_ROLE[q.pos] === 'big' && hyp(q.x - p.x, q.y - p.y) < 7);
@@ -28463,6 +28493,9 @@ function bkThink(h) {
   w.move = nd && ndd < 1.3 && !lane && dist > 2.2 && !(L.moveCd > 0) ? .4 + (p.r.hnd - 6) * .08 : 0;
   const oop = bkOffense().map(q => L.pl.indexOf(q)).filter(j => j !== h && bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < 2.4 && bkLeaper(L.pl[j]))[0];
   w.lob = oop != null ? 1.1 : 0;
+  // the set's own leanings (Pick and roll picks, Isolation's star goes one on one)
+  for (const k in Set.w || {}) w[k] *= Set.w[k];
+  if (Set.feed === 'star' && G.cur && p.ri === G.cur.star) { w.drive *= 1.5; w.move *= 1.5; w.pass *= .5; }
   const k = wpick(w);
   if (k === 'pick') return bkPick(h);
   if (k === 'move') return bkMoveTry(h, R() < .65 ? 'cross' : 'spin');
@@ -28501,13 +28534,15 @@ function bkStart(opts) {
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
+  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
+  bkCallsStart(o);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
   // how often the big plays came up (from the play's events): fast breaks, players on fire, picks set, lobs, moves that beat a man, goaltending, alley-oops made
   G.tally = { break: 0, fire: 0, screen: 0, lob: 0, beat: 0, goaltend: 0, alley: 0 };
   bkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: o.mode === 'play' ? 'play' : 'watch', you: 0, meter: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: 0, meter: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
   bkInputClear(); bkTipSet();
   return G;
 }
@@ -28518,6 +28553,10 @@ function bkGo(ph) {
   // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
   if (ph === 'break') bkStamBreak(GD.half);
   if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
+  // a new half: timeouts again (one more in each overtime); a stoppage: the CPU's coaches may call one
+  if (ph === 'break' && GD.half) G.to = [BK_TO.n, BK_TO.n];
+  if (ph === 'break' && G.q > BK_RULES.quarters) G.to = G.to.map(n => n + BK_TO.ot);
+  if (ph === 'dead') GD.toAsk = true;
   if (BK_HOOK.onPhase) try { BK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 function bkBoxAdd(side, ri, k, n) {
@@ -28541,7 +28580,7 @@ function bkTip() {
   bkGive(win); G.arrow = 1 - win;
   const pg = L.pl[win * 5 + BK_POS.indexOf('PG')];
   Object.assign(L.ball, { st: 'held', h: L.pl.indexOf(pg) });
-  GD.msg = `${c[win].n} wins the tip for ${G.teams[win].name}.`; G.poss0[win]++;
+  GD.msg = `${c[win].n} wins the tip for ${G.teams[win].name}.`; G.poss0[win]++; bkPossStart(win);
   bkGo('live');
 }
 function bkTick(dt) {
@@ -28564,6 +28603,8 @@ function bkTick(dt) {
   }
   // (after a reach the offense keeps it where it was, the ball with the player fouled: no walk up the floor)
   if (GD.ph === 'dead' || GD.ph === 'break') bkStamStop(dt);
+  // (the CPU's coaches may call a timeout at a dead ball: asked once, on its first tick)
+  if (GD.ph === 'dead' && GD.toAsk) { GD.toAsk = false; for (const s of [0, 1]) if (bkCpuTimeout(s)) return; }
   if (GD.ph === 'dead') { if (GD.t >= BK_PACE.dead) { if (GD.keep) { GD.keep = false; for (const p of L.pl) { p.vx = p.vy = 0; p.stun = 0; } L.drive = false; L.think = .4; bkGo('live'); } else bkWalk(true); } return; }
   if (GD.ph === 'walk') {
     const W = GD.walk, u = Math.min(1, GD.t / BK_PACE.walk), e = u * u * (3 - 2 * u);
@@ -28583,26 +28624,30 @@ function bkTick(dt) {
     if (GD.t >= BK_PACE.ft) bkFreeThrow();
     return;
   }
-  if (GD.ph === 'break') { if (GD.t >= (GD.half ? BK_PACE.half : BK_PACE.break)) bkWalk(false); }
+  if (GD.ph === 'break') { if (GD.t >= (GD.half ? BK_PACE.half : BK_PACE.break)) bkWalk(false); return; }
+  if (GD.ph === 'timeout') { if (GD.t >= BK_TO.secs) bkTimeoutOver(); }
 }
 function bkMinutes(s) { for (const p of L.pl) G.box[p.side][p.ri].sec += s; G.secs += s; }
 // the ball to side's point guard, and everyone to the set: the walk up the floor (clock: the clocks run through it)
 function bkWalk(clock) {
-  const side = G.poss, at = bkSetSpots(side), pg = L.pl.findIndex(p => p.side === side && p.pos === 'PG');
+  const side = G.poss, pg = L.pl.findIndex(p => p.side === side && p.pos === 'PG');
+  // (a walk back after a timeout is the same possession, on the same shot clock; otherwise a new one, whose set the
+  // five line up in)
+  if (GD.keepClock) GD.keepClock = false; else { G.poss0[side]++; bkPossStart(side); }
+  const at = bkSetSpots(side);
   // the set starts from wherever they are now; the inbound starts under the other basket
   GD.walk = { from: L.pl.map(p => [p.x, p.y]), to: L.pl.map((_, i) => at[i]), clock };
   Object.assign(L, { shot: null, drive: false, buzzer: false, last: null, pick: null, brk: true });
   for (const p of L.pl) { p.stun = 0; p.act = ''; p.cut = null; }
   bkMarks(); GD.meter = null;
   Object.assign(L.ball, { st: 'held', h: pg, to: -1 });
-  G.poss0[side]++;
   bkGo('walk');
 }
 // a change of possession in the play (a steal, a defensive rebound, a loose ball): the play goes on the other way
 function bkPossession(how) {
   const lost = 1 - G.poss;
   if (how === 'steal' && L.lost >= 0) { bkBoxAdd(lost, L.pl[L.lost].ri, 'tov'); L.lost = -1; }
-  G.poss0[G.poss]++;
+  G.poss0[G.poss]++; bkPossStart(G.poss);
 }
 function bkViolationNow() {
   const side = G.poss, h = bkHand() >= 0 ? bkHand() : L.ball.st === 'pass' ? L.ball.from : -1;
@@ -28617,7 +28662,7 @@ function bkShotDone(S) {
   // (a miss when fouled is no attempt: it's the free throws)
   if (S.made || !S.foul) { bkBoxAdd(S.side, p.ri, 'fga'); if (three) bkBoxAdd(S.side, p.ri, 'tpa'); }
   if (S.made) {
-    bkScore(S.side, S.pts); bkBoxAdd(S.side, p.ri, 'fgm'); bkBoxAdd(S.side, p.ri, 'pts', S.pts); if (three) bkBoxAdd(S.side, p.ri, 'tpm');
+    bkScore(S.side, S.pts); bkRunAdd(S.side, S.pts); bkBoxAdd(S.side, p.ri, 'fgm'); bkBoxAdd(S.side, p.ri, 'pts', S.pts); if (three) bkBoxAdd(S.side, p.ri, 'tpm');
     const a = S.ast >= 0 ? L.pl[S.ast] : null; if (a) bkBoxAdd(S.side, a.ri, 'ast');
     G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: S.side, pts: S.pts, who: p.n, ri: p.ri, k: S.dunk ? 'dunk' : three ? 'three' : S.rim ? 'layup' : 'jumper', ast: a ? a.n : '' });
     GD.msg = (S.dunk ? `${p.n} throws it down!` : three ? `${p.n} for three: good!` : S.rim ? `${p.n} lays it in.` : `${p.n} hits from ${S.dist} metres.`) + (a ? ` ${a.n} with the pass.` : '');
@@ -28689,7 +28734,7 @@ function bkFreeThrow(o) {
   const F = GD.ft, p = L.pl[F.i], ch = bkFtChance(p), e = o && o.e;
   const good = R() < (e == null ? ch : bkTimed(ch, e, bkFtWindow(p), BK_FT_TIMED));
   F.n--; bkBoxAdd(F.side, p.ri, 'fta');
-  if (good) { F.made++; bkScore(F.side, 1); bkBoxAdd(F.side, p.ri, 'ftm'); bkBoxAdd(F.side, p.ri, 'pts'); G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: F.side, pts: 1, who: p.n, ri: p.ri, k: 'ft', ast: '' }); }
+  if (good) { F.made++; bkScore(F.side, 1); bkRunAdd(F.side, 1); bkBoxAdd(F.side, p.ri, 'ftm'); bkBoxAdd(F.side, p.ri, 'pts'); G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: F.side, pts: 1, who: p.n, ri: p.ri, k: 'ft', ast: '' }); }
   GD.msg = `${p.n} at the line: ${good ? 'good' : 'no good'} (${F.made} of ${F.of - F.n}).`; if (good) GD.net = { hoop: bkHoopX(F.side) > BK_RULES.len / 2 ? 1 : 0 };
   if (F.n > 0) { GD.t = 0; return; }
   GD.ft = null;
@@ -28701,11 +28746,13 @@ function bkFreeThrow(o) {
 const bkFtChance = p => clamp(.5 + p.r.tch * .04, .3, .95);
 const bkFtWindow = p => BK_WIN.min + BK_WIN.per * bkFtChance(p);
 // who plays it: the CPU both sides ('watch'), or you play your side by hand ('play'); the same game goes on
-function bkSetMode(m) { if (!GD) return; GD.mode = m === 'play' ? 'play' : 'watch'; bkInputClear(); if (L) L.me = -1; }
+// (Manage: your calls and your bench, the CPU plays your five)
+function bkSetMode(m) { if (!GD) return; GD.mode = ['play', 'manage'].includes(m) ? m : 'watch'; bkInputClear(); if (L) L.me = -1; }
 function bkPeriodOver() {
   const was = G.q, r = bkPeriodEnd();
   L.buzzer = false;
   if (r === 'over') {
+    bkPossEnd();
     const [a, b] = G.score, w = G.over.win;
     GD.msg = w == null ? `Final: a tie, ${a} all.` : `Final: ${G.teams[w].name} win ${Math.max(a, b)} to ${Math.min(a, b)}${G.over.ot ? ` in ${bkPeriodName(was)}` : ''}.`;
     bkGo('over');
@@ -28721,7 +28768,7 @@ function bkPeriodOver() {
 function bkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function bkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, q: G.q, ot: G.over ? G.over.ot : 0, mins: G.mins,
-    poss: G.poss0.slice(), secs: Math.round(G.secs), box: bkBox(), log: G.log.slice(), tally: Object.assign({}, G.tally), subs: (G.subs || [0, 0]).slice() };
+    poss: G.poss0.slice(), secs: Math.round(G.secs), box: bkBox(), log: G.log.slice(), tally: Object.assign({}, G.tally), subs: (G.subs || [0, 0]).slice(), sets: JSON.parse(JSON.stringify(G.setLog || [{}, {}])), timeouts: (G.toUsed || [0, 0]).slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function bkBox() {
@@ -28908,6 +28955,9 @@ function bkDrawHud(c) {
   }
   txt(c, `${bkPeriodName(G.q)}  ${bkClockText()}`, 480, 30, `800 20px ${BK_FONT}`, '#f3ead6', 'center');
   const sc = Math.ceil(G.shot), off = G.clock < G.shot;
+  // the calls on this possession (the offense's set against the defense), and each side's timeouts
+  if (G.cur && GD.ph !== 'over') { const C = G.cur, e = bkEdge(C.off, C.def)[0]; txt(c, `${BK_SETS[C.off].n} vs ${BK_DEFS[C.def].n}${C.stale ? ` · scouted${C.stale > 1 ? ' twice' : ''}` : ''}`, C.side ? 640 : 320, 60, `600 11px ${BK_FONT}`, e > 0 ? '#bfe8a8' : e < 0 ? '#ff9a7a' : 'rgba(243,234,214,.7)', 'center'); }
+  if (G.to) for (const s of [0, 1]) txt(c, `TO ${G.to[s]}`, s ? 600 : 360, 22, `600 11px ${BK_FONT}`, 'rgba(243,234,214,.6)', 'center');
   txt(c, off ? '–' : String(sc), 480, 54, `900 18px ${BK_FONT}`, !off && sc <= 4 ? '#ff6a4a' : '#ffd08a', 'center');
 }
 function bkDrawMsg(c) {
@@ -29142,8 +29192,8 @@ function bkStamStep(dt, walk) {
   const k = bkStamK();
   for (const s of [0, 1]) for (const ri of bkBench(s)) G.stam[s][ri] = Math.min(100, G.stam[s][ri] + BK_STAM.rest * dt * k);
   for (const p of L.pl) {
-    const fast = !walk && hyp(p.vx, p.vy) > BK_STAM.runAt, st = G.stam[p.side];
-    st[p.ri] = Math.max(0, st[p.ri] - (BK_STAM.drain + (fast ? BK_STAM.run : 0)) * dt * k * (1 + (p.r.siz - 5) * BK_STAM.big));
+    const fast = !walk && hyp(p.vx, p.vy) > BK_STAM.runAt, st = G.stam[p.side], call = !G.cur ? 1 : p.side === G.cur.side ? bkPace(p.side).tire : bkDefNow().tire || 1;
+    st[p.ri] = Math.max(0, st[p.ri] - (BK_STAM.drain + (fast ? BK_STAM.run : 0)) * dt * k * (1 + (p.r.siz - 5) * BK_STAM.big) * call);
   }
 }
 // a stoppage of dt seconds: everyone gets a little back (the bench at its usual rate)
@@ -29151,7 +29201,7 @@ function bkStamStop(dt) { if (!G.stam) return; const k = bkStamK(); for (const s
 function bkStamBreak(half) { if (!G.stam) return; for (const s of [0, 1]) G.stam[s] = G.stam[s].map(v => Math.min(100, v + (half ? BK_STAM.half : BK_STAM.quarter))); }
 function bkStamCost(p, n) { if (G.stam) G.stam[p.side][p.ri] = Math.max(0, G.stam[p.side][p.ri] - n); }
 // does side's coach follow its bench order (yours, from the Court tab: G.ordered, or the side you play by hand)
-const bkOrdered = side => !!(G.ordered && G.ordered[side]) || (GD.mode === 'play' && side === GD.you);
+const bkOrdered = side => !!(G.ordered && G.ordered[side]) || (GD.mode !== 'watch' && side === GD.you);
 /* the coach's subs for side at a stoppage (brk: a break between periods, when rested starters come back) */
 function bkCoachSubs(side, brk) {
   if (!G.stam) return;
@@ -29174,6 +29224,7 @@ function bkSubDo(side, out, inn, why) {
   const k = G.on[side].indexOf(out), T = G.teams[side], m = T.roster[inn], p = L.pl.find(q => q.side === side && q.ri === out);
   if (k < 0 || !m) return false;
   G.on[side][k] = inn; G.subs[side]++;
+  if (G.cur && G.cur.side === side && G.cur.star === out) G.cur.star = bkStar(side);
   GD.notes = (GD.notes || []).concat(`${m.n} on for ${T.roster[out].n}${why === 'tired' ? ', who needs a breather' : why === 'back' ? ', rested' : ''}.`);
   if (p) Object.assign(p, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
   return true;
@@ -29181,7 +29232,7 @@ function bkSubDo(side, out, inn, why) {
 // a swap by hand: at a dead ball or a break, out (on the floor) for inn (on the bench, not fouled out); '' when it
 // worked, or why not
 function bkSub(side, out, inn) {
-  if (!GD || !['dead', 'break', 'intro'].includes(GD.ph)) return 'Only at a stoppage.';
+  if (!GD || !['dead', 'break', 'intro', 'timeout'].includes(GD.ph)) return 'Only at a stoppage.';
   if (!G.on[side].includes(out)) return 'They aren\'t on the floor.';
   if (!bkBench(side).includes(inn)) return 'They can\'t come on.';
   bkSubDo(side, out, inn, 'hand');
@@ -29189,12 +29240,204 @@ function bkSub(side, out, inn) {
   G.starters[side][G.on[side].indexOf(inn)] = inn;
   return '';
 }
+/* The Charter Court: the call (issue #77, phase 4). Each side has a standing call: an offense set, a defense, and two
+   stances, Pace on offense and Pressure on defense (G.call[side]: { off, def, pace, press }). It stays until it's
+   changed: yours by you (in Manage and You play), the CPU's at the start of each of its possessions (and each of yours,
+   for its defense), by its coach's skill (G.skill: 0 Squire, at random, stances too; 1 Knight; 2 Archmage).
+   Each possession is played in the calls on at its start (G.cur: { off, def, side, stale, star }).
+   - The sets move the five and steer the player with the ball (BK_SETS): Pick and roll (picks early and often), Post up
+     (the bigs deep on the blocks, fed inside), Motion (cuts and passes), Isolation (the best scorer, the rest cleared
+     out), Spread for three (four outside the arc) and Feed the hot hand (to whoever's on fire, or the best shooter).
+   - The defenses (BK_DEFS): Man; Zone (areas, a 2-3: strong inside, soft on the perimeter); Press (full court: steals in
+     the backcourt, a step lost if it's broken, and tiring); Switch everything (every pick is a switch: a mismatch to
+     find); Pack the paint (sag off the shooters into the lane).
+   - BK_EDGE is the rock, paper, scissors: how a set does against a defense, +1, 0 or -1, a few points on every shot,
+     with the ratings on top.
+   - The scout: a set run again on the next possession is guarded better, more again the third time (G.scout).
+   - Pace: Push (quick shots, more fast breaks, more turnovers, more tiring), Balanced, Grind (work the clock: fewer,
+     better shots, less tiring). Pressure: Gamble (more steals and blocks, more fouls), Balanced, Sit back (fewer
+     fouls, more open shots).
+   - Timeouts: BK_TO.n a half (and one in each overtime), at a stoppage or with your ball. Five seconds of rest: breath
+     back for everyone, the other side's hot hand cools, and the play restarts with the ball where it was.
+   G.setLog[side][set]: { n: possessions, pts } (how each set is going). opts.calls fixes both sides' calls for the
+   lab ([{ off, def, pace, press } | null, ...]: a fixed side never changes its call). */
+const BK_SETS = {
+  pick: { n: 'Pick and roll', desc: 'A big screens for the player with the ball, again and again: they switch, go over or trap, and the big rolls.', w: { pick: 3.5 } },
+  post: { n: 'Post up', desc: 'The bigs set up deep on the blocks and the ball goes inside to them.', w: { drive: 1.2 }, feed: 'big', inside: .07, spot: { C: [1.9, -1.5], PF: [2.3, 2.1] } },
+  motion: { n: 'Motion', desc: 'Everyone moves: cuts to the rim, passes, and the open player shoots.', w: { pass: 1.3 }, cut: 2.4 },
+  iso: { n: 'Isolation', desc: 'Clear out for your best scorer: one on one, the others spaced wide.', w: { pass: .6, move: 2 }, feed: 'star', cut: .3,
+    spot: { SG: [1.0, -6.9], SF: [1.0, 6.9], PF: [5.6, 6.4], C: [5.6, -6.4] } },
+  spread: { n: 'Spread for three', desc: 'Four outside the arc and one inside: the floor opens, and the threes fly.', w: { drive: 1.15 }, three: .12, spot: { SG: [7.7, -3.4], PF: [7.3, 3.9] } },
+  hot: { n: 'Feed the hot hand', desc: 'Get it to whoever is on fire, or the best shooter: they shoot.', feed: 'hot' },
+};
+const BK_DEFS = {
+  man: { n: 'Man', desc: 'Each player takes one man.' },
+  zone: { n: 'Zone', desc: 'A 2-3 zone: each guards an area. Strong inside and on the boards, soft out at the arc.', zone: { PG: [6.3, 2.2], SG: [6.3, -2.2], SF: [2.6, 4.1], PF: [2.6, -4.1], C: [1.6, 0] }, reb: 1.15, lane: .5, inside: -.09 },
+  press: { n: 'Press', desc: 'Pick them up full court: steals in the backcourt, layups if it is broken, and it tires your five.', back: 3, front: 1.6, lanes: 1.3, tire: 1.3 },
+  switch: { n: 'Switch everything', desc: 'Every pick is a switch, and nobody gets lost: but a switch can leave a mismatch.', allSwitch: true, cut: .5 },
+  pack: { n: 'Pack the paint', desc: 'Sag off the shooters into the lane: no room inside, but open threes.', sag: 1.2, lane: .4, inside: -.04 },
+};
+// a set against a defense: [+1 | 0 | -1, why]
+const BK_EDGE = {
+  'pick/man': [1, 'Two on two against man, the pick and roll gets someone open.'], 'pick/switch': [-1, 'They switch every pick, so nobody is ever open.'],
+  'post/zone': [-1, 'The zone sits three deep in the paint.'], 'post/press': [1, 'The press leaves the bigs alone inside.'], 'post/switch': [1, 'A switch leaves a small guarding a big on the block.'], 'post/pack': [-1, 'The lane is packed.'],
+  'motion/zone': [1, 'Cutters find the seams between the zone\'s areas.'], 'motion/press': [-1, 'The press jumps the passing lanes.'], 'motion/switch': [1, 'Constant cuts run the switchers ragged.'],
+  'iso/man': [1, 'One on one against man is what Isolation wants.'], 'iso/zone': [-1, 'The zone shows a second defender on every drive.'], 'iso/press': [1, 'Beat the press one on one and it\'s a layup.'], 'iso/switch': [-1, 'They switch the best defender onto your scorer.'], 'iso/pack': [-1, 'Every drive runs into the packed paint.'],
+  'spread/man': [-1, 'Man stays home on the shooters.'], 'spread/zone': [1, 'The zone is soft at the arc.'], 'spread/press': [-1, 'The press runs the shooters off the line.'], 'spread/pack': [1, 'Packing the paint leaves the shooters open.'],
+};
+const bkEdge = (o, d) => BK_EDGE[o + '/' + d] || [0, ''];
+const BK_PACES = { push: { n: 'Push', desc: 'Quick shots and more fast breaks, but more turnovers, and it tires your five.', think: .7, shootAt: -.14, behind: 3, risk: 1.25, tire: 1.15 },
+  bal: { n: 'Balanced', desc: 'The usual.', think: 1, shootAt: 0, behind: 2, risk: 1, tire: 1 },
+  grind: { n: 'Grind', desc: 'Work the clock: fewer but better shots, and less tiring.', think: 1.25, shootAt: .14, behind: 1, risk: .9, tire: .9, look: .025, hold: 1.7 } };
+const BK_PRESSES = { gamble: { n: 'Gamble', desc: 'More steals and blocks, and more fouls.', steal: 1.45, block: 1.3, foul: 1.6, con: 1 },
+  bal: { n: 'Balanced', desc: 'The usual.', steal: 1, block: 1, foul: 1, con: 1 },
+  sit: { n: 'Sit back', desc: 'Fewer fouls, but more open shots.', steal: .6, block: .85, foul: .55, con: .82 } };
+const BK_TO = { n: 3, ot: 1, secs: 5, sta: 6 };
+const BK_SKILL = ['Squire', 'Knight', 'Archmage'];
+const BK_SET_IDS = Object.keys(BK_SETS), BK_DEF_IDS = Object.keys(BK_DEFS);
+
+function bkCallsStart(o) {
+  G.call = [0, 1].map(s => Object.assign({ off: 'motion', def: 'man', pace: 'bal', press: 'bal' }, (o.calls && o.calls[s]) || {}));
+  G.fixed = [0, 1].map(s => !!(o.calls && o.calls[s]));
+  G.scout = [{ last: '', n: 0 }, { last: '', n: 0 }]; G.seen = [[], []]; G.cur = null;
+  G.setLog = [{}, {}]; G.to = [BK_TO.n, BK_TO.n]; G.toUsed = [0, 0]; G.toAt = [-9, -9]; G.run = { side: -1, pts: 0 };
+  G.possScore = null;
+}
+const bkCpuSide = side => !G.fixed[side] && !(GD.mode !== 'watch' && side === GD.you);
+const bkPace = side => BK_PACES[G.call ? G.call[side].pace : 'bal'] || BK_PACES.bal;
+const bkPress = side => BK_PRESSES[G.call ? G.call[side].press : 'bal'] || BK_PRESSES.bal;
+// the possession's set and defense (the calls on when it started)
+const bkSetNow = () => (G.cur && BK_SETS[G.cur.off]) || BK_SETS.motion;
+const bkDefNow = () => (G.cur && BK_DEFS[G.cur.def]) || BK_DEFS.man;
+/* a possession starts for side: the CPU calls (by skill), the scout counts the set, and its points are credited to
+   the last possession's set */
+function bkPossStart(side) {
+  bkPossEnd();
+  // (the defense sets first, and the offense sees it: an Archmage runs what beats it)
+  if (bkCpuSide(1 - side)) G.call[1 - side].def = bkCpuDef(1 - side);
+  if (bkCpuSide(side)) G.call[side].off = bkCpuSet(side);
+  for (const s of [0, 1]) if (bkCpuSide(s)) Object.assign(G.call[s], bkCpuStance(s));
+  const off = G.call[side].off, sc = G.scout[side];
+  if (sc.last === off) sc.n++; else { sc.last = off; sc.n = 1; }
+  G.seen[side].push(off); if (G.seen[side].length > 8) G.seen[side].shift();
+  G.cur = { side, off, def: G.call[1 - side].def, stale: Math.min(2, sc.n - 1), star: bkStar(side) };
+  G.possScore = G.score[side];
+}
+function bkPossEnd() {
+  const C = G.cur; if (!C || G.possScore == null) return;
+  const L0 = G.setLog[C.side][C.off] || (G.setLog[C.side][C.off] = { n: 0, pts: 0 });
+  L0.n++; L0.pts += G.score[C.side] - G.possScore; G.possScore = null;
+}
+// the offense's best scorer (Isolation's star): handle, touch and speed
+function bkStar(side) { const on = G.on[side], T = G.teams[side]; return on.reduce((b, ri) => { const r = T.roster[ri].r, v = r.hnd + r.tch + r.spd * .5; return v > b[1] ? [ri, v] : b; }, [on[0], -1])[0]; }
+// what the calls are worth on a shot by the offense: the matchup and the scout
+function bkCallMod(p, dist) {
+  const C = G.cur; if (!C || p.side !== C.side) return 0;
+  const inside = dist != null && dist < 3 ? ((BK_SETS[C.off].inside && BK_ROLE[p.pos] === 'big' ? BK_SETS[C.off].inside : 0) + (BK_DEFS[C.def].inside || 0)) : 0;
+  return bkEdge(C.off, C.def)[0] * .045 - C.stale * .03 + (bkPace(p.side).look || 0) + inside;
+}
+// where a player lines up in the set (the default spots, or the set's own)
+function bkSpot(side, pos) { const S = G.cur && G.cur.side === side ? BK_SETS[G.cur.off] : null; return (S && S.spot && S.spot[pos]) || BK_SPOT[pos]; }
+// a defender's spot in a zone: their area, leaning toward an attacker in it (tight on the ball)
+function bkZoneSpot(p) {
+  const D = bkDefNow(), side = 1 - p.side, at = bkAt(side, ...D.zone[p.pos]);
+  const [a, ad] = bkNearest(at[0], at[1], bkOffense()); if (!a || ad > 3) return at;
+  const onBall = L.pl.indexOf(a) === bkHand(), hx = bkHoopX(side), k = onBall ? 1 : .55, tx = lerp(at[0], a.x, k), ty = lerp(at[1], a.y, k);
+  const d = hyp(hx - tx, ty) || 1; return [tx + (hx - tx) / d * .7, ty - ty / d * .7];
+}
+/* ---------- timeouts ---------- */
+// side calls one: '' or why not. At a stoppage, or with their own ball in a live play
+function bkTimeout(side) {
+  if (!G.to || G.to[side] <= 0) return 'No timeouts left.';
+  const ok = ['dead', 'walk'].includes(GD.ph) || (GD.ph === 'live' && G.poss === side && L.ball.st === 'held' && !L.shot);
+  if (!ok) return GD.ph === 'live' ? 'Only with the ball in your hands.' : 'Not now.';
+  G.to[side]--; G.toUsed[side]++; G.toAt[side] = G.poss0[0] + G.poss0[1];
+  // (the run that may have brought it on is over as far as the coaches are concerned)
+  if (G.run.side === 1 - side) G.run = { side: -1, pts: 0 };
+  // breath back, the other side's hot hand cooled, and the bench gets a word in
+  if (G.stam) { const k = Math.min(1, bkStamK()); for (const s of [0, 1]) G.stam[s] = G.stam[s].map(v => Math.min(100, v + BK_TO.sta * k)); }
+  const hot = G.hot[1 - side], cooled = Object.keys(hot).filter(ri => hot[ri] >= BK_FIRE.n);
+  for (const ri of cooled) hot[ri] = 0;
+  GD.toWas = { ph: GD.ph, side, live: GD.ph === 'live' };
+  GD.msg = `Timeout, ${G.teams[side].name}.${cooled.length ? ` ${cooled.map(ri => G.teams[1 - side].roster[ri].n).join(' and ')} cool${cooled.length === 1 ? 's' : ''} off.` : ''}`;
+  bkInputClear(); bkEv('timeout', G.teams[side].name);
+  bkGo('timeout');
+  for (const s of [0, 1]) bkCoachSubs(s, false);
+  return '';
+}
+// after a timeout: play restarts
+function bkTimeoutOver() {
+  const W = GD.toWas; GD.toWas = null;
+  // (with the ball in a live play, or mid-walk, or after a reach: the same possession, the five walked back to the set
+  // with the clocks stopped; after any other dead ball, the walk up the floor that was coming)
+  if (W && (W.live || W.ph === 'walk' || GD.keep)) { GD.keep = false; GD.keepClock = true; return bkWalk(false); }
+  bkWalk(true);
+}
+// the CPU's coach calls one: a Knight or better when the other side is on a run, or the five is spent with nobody fresh
+// on the bench, or someone of theirs on the floor is on fire (never twice inside four possessions); an Archmage keeps one
+// for the last minute
+function bkCpuTimeout(side) {
+  const sk = G.skill[side]; if (!sk || !G.to[side] || !bkCpuSide(side) || G.poss0[0] + G.poss0[1] - G.toAt[side] < 4) return false;
+  // (tired: the five is spent and the bench has nobody fresh to bring on)
+  const run = G.run.side === 1 - side ? G.run.pts : 0, tired = G.on[side].reduce((a, ri) => a + G.stam[side][ri], 0) / 5 < 45 && !bkBench(side).some(ri => G.stam[side][ri] >= BK_STAM.fresh);
+  const fire = G.on[1 - side].some(ri => (G.hot[1 - side][ri] || 0) >= BK_FIRE.n), lastMin = G.q >= 4 && G.clock < 30;
+  if (sk >= 2 && G.to[side] === 1 && !lastMin && G.q >= 3) return false;
+  if (run >= 7 || tired || fire || (sk >= 2 && lastMin && Math.abs(G.score[0] - G.score[1]) <= 3 && G.poss === side)) return !bkTimeout(side);
+  return false;
+}
+/* ---------- the CPU's calls by skill ---------- */
+// mean of a rating over side's five, or over its players in some roles
+function bkMean(side, k, roles) { const T = G.teams[side], on = G.on[side].filter((ri, i) => !roles || roles.includes(BK_ROLE[BK_POS[i]])); return on.reduce((a, ri) => a + T.roster[ri].r[k], 0) / Math.max(1, on.length); }
+function bkCpuSet(side) {
+  const sk = G.skill[side], them = 1 - side;
+  if (!sk) return pick(BK_SET_IDS);
+  const late = G.q >= 4 && G.clock < G.qlen * .4, diff = G.score[side] - G.score[them];
+  const w = { pick: 1.2, post: .6 + Math.max(0, bkMean(side, 'siz', ['big']) + bkMean(side, 'hop', ['big']) - bkMean(them, 'siz', ['big']) - bkMean(them, 'hop', ['big'])) * .3,
+    motion: 1, iso: .4 + Math.max(0, Math.max(...G.on[side].map(ri => G.teams[side].roster[ri].r.hnd)) - 7) * .4, spread: .5 + Math.max(0, bkMean(side, 'tch') - 6) * .5 + (late && diff < -5 ? 1.5 : 0),
+    hot: Object.values(G.hot[side]).some(v => v >= BK_FIRE.n) ? 3 : .2 };
+  // the scout: a set run twice is worth less a third time
+  const sc = G.scout[side]; if (sc.last && sc.n >= 2) w[sc.last] *= .35;
+  // a Knight leans to what beats the defense on the floor; an Archmage runs it
+  { const d = G.call[them].def, k0 = sk >= 2 ? .9 : .45; for (const k in w) w[k] *= 1 + k0 * bkEdge(k, d)[0]; }
+  return wpick(w);
+}
+function bkCpuDef(side) {
+  const sk = G.skill[side], them = 1 - side;
+  if (!sk) return pick(BK_DEF_IDS);
+  const late = G.q >= 4 && G.clock < G.qlen * .4, diff = G.score[side] - G.score[them];
+  const w = { man: 1.4, zone: .6 + Math.max(0, bkMean(them, 'siz', ['big']) - 6) * .4 + Math.max(0, 6 - bkMean(them, 'tch')) * .3,
+    press: .3 + (late && diff < -5 ? 2 : 0) + Math.max(0, 6 - bkMean(them, 'hnd', ['guard'])) * .4, switch: .6, pack: .5 + Math.max(0, 6 - bkMean(them, 'tch')) * .5 };
+  // an Archmage reads your habits: the set you run most, and the defense that beats it
+  if (sk >= 2 && G.seen[them].length >= 3) {
+    const n = {}; for (const s of G.seen[them]) n[s] = (n[s] || 0) + 1;
+    const fav = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+    for (const k in w) w[k] *= 1 - .8 * bkEdge(fav, k)[0];
+  }
+  return wpick(w);
+}
+function bkCpuStance(side) {
+  // (a Squire's stances are as random as its calls)
+  if (!G.skill[side]) return { pace: pick(Object.keys(BK_PACES)), press: pick(Object.keys(BK_PRESSES)) };
+  const late = G.q >= 4 && G.clock < G.qlen * .5, diff = G.score[side] - G.score[1 - side];
+  return { pace: late && diff < -4 ? 'push' : late && diff > 4 ? 'grind' : 'bal', press: late && diff < -4 ? 'gamble' : G.tf[side] > BK_RULES.limit ? 'sit' : 'bal' };
+}
+// your call: kind 'off' | 'def' | 'pace' | 'press', and its id; '' when it took
+function bkCall(side, kind, id) {
+  const T = { off: BK_SETS, def: BK_DEFS, pace: BK_PACES, press: BK_PRESSES }[kind];
+  if (!T || !T[id] || !G.call) return 'No such call.';
+  G.call[side][kind] = id;
+  // a defense or a pressure change takes hold at once; a set from the next possession
+  if (G.cur && kind === 'def' && G.cur.side !== side) G.cur.def = id;
+  return '';
+}
+// a run: points scored by one side since the other last scored
+function bkRunAdd(side, pts) { if (G.run.side === side) G.run.pts += pts; else G.run = { side, pts }; }
 /* The court's page in the Realm (issue #77, phase 1). A canvas in #v-court, after the ring's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (bkTick) and draws it (bkDraw). The engine's parts
    don't touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
    In You play (phase 2) it hears the keys: WASD or the arrows to steer, Space to shoot (hold, let go at the top) or
    jump, J to pass (hold to lob) or swipe, E for the pick or to switch players, Q a crossover, R a spin, Shift held to
-   box out; only while the court is on screen (not under How to play), in a live play or at the line, in the capture
+   box out, T a timeout (phase 4); only while the court is on screen (not under How to play), in a live play or at the line, in the capture
    phase so nothing else on the page takes them. A key taken stays taken until it's let go; releases are always heard. */
 // speed: steps a frame, 1 to watch; the tests raise it (wBK.speed)
 const BKP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1 };
@@ -29225,7 +29468,7 @@ const BKK = new Set(), BKHELD = new Set();
 function bkKeySteer() { let x = 0, y = 0; for (const k of BKK) if (BK_KEYS[k]) { x += BK_KEYS[k][0]; y += BK_KEYS[k][1]; } return [x, y]; }
 function bkKey(e, down) {
   if (!BKP.on || !GD) return;
-  const k = e.key.toLowerCase(), ours = !!BK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || !!BK_KEY_ACT[k];
+  const k = e.key.toLowerCase(), ours = !!BK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || k === 't' || !!BK_KEY_ACT[k];
   if (!ours) return;
   const swallow = () => { e.preventDefault(); e.stopPropagation(); };
   if (!down) {
@@ -29234,6 +29477,10 @@ function bkKey(e, down) {
     if (held) swallow(); return;
   }
   if (BKHELD.has(k)) { swallow(); return; }
+  // T: a timeout, whatever is happening (it says why not, when it can't)
+  if (k === 't' && GD.mode === 'play' && BKP.cv.offsetParent !== null && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target.closest && e.target.closest('input,textarea,select'))) {
+    BKHELD.add(k); const r = bkTimeout(GD.you); if (r) GD.msg = r; swallow(); return;
+  }
   const live = GD.mode === 'play' && BKP.cv.offsetParent !== null && (GD.ph === 'live' || GD.ph === 'ft');
   if (!live || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest && e.target.closest('input,textarea,select')) return;
@@ -29280,6 +29527,14 @@ return {
   // the tests' handles on phase 2's plays: a hand shot let go e from the top, a pass (lob), a pick, a move, a jump, a swipe
   shootAt: e => bkHand() >= 0 ? (bkShoot({ e }), L.shot) : null, pass: (j, lob) => bkHand() >= 0 ? (bkPass(j, lob), true) : false, pick: i => bkPick(i == null ? bkHand() : i),
   move: k => bkMoveTry(bkHand(), k), freeThrows: (side, i, n) => bkFreeThrows(side, i, n), shot: () => L && L.shot ? Object.assign({}, L.shot) : null,
+  // the call (phase 4): the sets, defenses, paces and pressures (by id: { n, desc }), a set against a defense ([+1|0|-1,
+  // why]), your call (kind 'off' | 'def' | 'pace' | 'press'; '' or why not), both sides' calls and the possession's,
+  // the scout, timeouts left and a timeout for your side ('' or why not), and the skill names
+  sets: Object.fromEntries(Object.entries(BK_SETS).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), defs: Object.fromEntries(Object.entries(BK_DEFS).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  paces: Object.fromEntries(Object.entries(BK_PACES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), presses: Object.fromEntries(Object.entries(BK_PRESSES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  edge: (o, d) => bkEdge(o, d).slice(), call: (kind, id, side) => G && G.call ? bkCall(side == null ? GD.you : side, kind, id) : 'No game on.',
+  calls: () => G && G.call ? JSON.parse(JSON.stringify({ call: G.call, cur: G.cur, scout: G.scout, to: G.to, sets: G.setLog, skill: G.skill })) : null,
+  timeout: side => G && G.to ? bkTimeout(side == null ? GD.you : side) : 'No game on.', skills: BK_SKILL.slice(), toRules: Object.assign({}, BK_TO),
   // stamina and the bench (phase 3): each side's stamina by roster index, who's on (roster indices in spot order) and
   // on the bench (in order), a swap by hand at a stoppage ('' or why not), how tired a player in the play is, the rules
   stam: () => G && G.stam ? JSON.parse(JSON.stringify(G.stam)) : null, onFloor: () => G && G.on ? JSON.parse(JSON.stringify(G.on)) : null, bench: side => G && G.on ? bkBench(side) : [],
@@ -39510,7 +39765,7 @@ function wCourtGame(opts) {
   const o = opts || {};
   WBK = { over: null, how: o.how || 'scrimmage' }; wCourtTick(true);
   $('wCourtTitle').textContent = o.title || 'A scrimmage at the Charter Court';
-  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered });
+  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered, skill: o.skill });
   showView('court');
   wCourtBarNote(); wCourtBox();
 }
@@ -39836,6 +40091,111 @@ renderHelp = function () {
   wW78RenderHelp();
   const after = $('wHelpCourt'); if (!after || $('wHelpCourtTab')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtTab"><b>Basketball ratings and the five.</b> Every player also has basketball ratings: speed, size, hops, touch, handle and defense (1 to ${W_BKR.cap}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Basketball view. The Court tab on the Team screen sets your five (who plays point guard, shooting guard, small forward, power forward and center) and the order of your bench. In a game stamina runs down; tired players are slower and shoot worse, and the coach brings on the first fresh player on your bench, and the next in line if someone fouls out. Called-up players at your level fill the five when your roster is short. Practice game there plays your five against the Saltmere Basketball Club; nothing is won or lost.</p>`);
+};
+/* w79: the call (issue #77, phase 4). The bar gains a third way to play, Manage (W_COURT_MODES: Watch, Manage, You
+   play): you call the sets, the defense, the stances, timeouts and subs, and the CPU plays your five. In Manage and
+   You play the calls panel under the court (#wCourtCalls) has:
+   - your offense set and your defense (each button's tip says what it beats and what beats it), and Pace and Pressure;
+     a call stays until you change it (a defense takes hold at once, a set from your next possession);
+   - this possession's matchup and why, the scout (a set run again is guarded better), and how each of your sets has
+     gone (points a trip);
+   - Timeout, with how many are left (T in You play; at a dead ball or with the ball in your hands), and Subs: at a
+     stoppage (a dead ball, a break or a timeout), who comes off for whom.
+   A CPU picker on the bar sets the other coach's skill (Squire, Knight or Archmage; not saved); games from the world
+   set it by tier (phase 5). How to play gains the sets, the defenses and their matchups, the scout, the stances,
+   timeouts and the coaches.
+   Wraps: wCourtGame (wW79CourtGame: the skill), wCourtPad (wW79CourtPad: the panel on the ticker), wCourtBarNote (wW79CourtBarNote: the panel), wCourtHowHTML
+   (wW79CourtHowHTML: the call), renderHelp (wW79RenderHelp: #wHelpCourtCall). */
+
+// Manage between Watch and You play
+(() => {
+  const play = W_COURT_MODES.play; delete W_COURT_MODES.play;
+  W_COURT_MODES.manage = { n: 'Manage', title: 'You call the sets, the defense, the stances, timeouts and subs from the panel under the court; your five play them.' };
+  W_COURT_MODES.play = play;
+  $('wCourtModes').innerHTML = Object.entries(W_COURT_MODES).map(([k, m]) => `<button class="ghost" data-cmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('');
+})();
+let W_COURT_SKILL = 1;
+$('wCourtModes').insertAdjacentHTML('afterend', `<label class="hint" title="How good the other coach is: a Squire calls at random and never reads you, a Knight reads the score, the clock and the matchups, an Archmage also reads your habits and runs what beats your defense.">CPU <select id="wCourtSkill">${wBK.skills.map((n, i) => `<option value="${i}"${i === W_COURT_SKILL ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`);
+$('wCourtSkill').addEventListener('change', e => { W_COURT_SKILL = +e.target.value; });
+const wW79CourtGame = wCourtGame;
+wCourtGame = function (opts) { const o = Object.assign({}, opts); if (!o.skill) o.skill = [W_COURT_SKILL, W_COURT_SKILL]; return wW79CourtGame(o); };
+
+// what a set beats and what beats it, and the same for a defense, in words
+function wCourtEdgeLine(kind, id) {
+  const ids = Object.keys(kind === 'off' ? wBK.defs : wBK.sets), good = [], bad = [];
+  for (const o of ids) { const e = kind === 'off' ? wBK.edge(id, o)[0] : -wBK.edge(o, id)[0]; (e > 0 ? good : e < 0 ? bad : []).push((kind === 'off' ? wBK.defs : wBK.sets)[o].n); }
+  const list = a => a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0];
+  return [good.length ? `${kind === 'off' ? 'Good against' : 'Stops'} ${list(good)}.` : '', bad.length ? `${kind === 'off' ? 'Struggles against' : 'Gives up to'} ${list(bad)}.` : ''].filter(Boolean).join(' ');
+}
+$('wCourtPad').insertAdjacentHTML('beforebegin', `<div id="wCourtCalls" class="wccalls" hidden></div>`);
+$('wCourtCalls').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.ccall) wBK.call(b.dataset.ccall, b.dataset.cid);
+  else if (b.id === 'wCourtTO') { const r = wBK.timeout(); if (r) wCourtCallSay(r); }
+  else if (b.id === 'wCourtSubGo') { const out = +$('wCourtSubOut').value, inn = +$('wCourtSubIn').value, r = wBK.sub(wBK.you, out, inn); wCourtCallSay(r); }
+  wCourtCalls(true);
+});
+let W_COURT_CALLMSG = '', W_COURT_ROWKEY = '', W_COURT_NOWKEY = '', W_COURT_DOWN = false;
+function wCourtCallSay(m) { W_COURT_CALLMSG = m || ''; }
+// (a press in the panel isn't redrawn out from under the pointer)
+$('wCourtCalls').addEventListener('pointerdown', () => { W_COURT_DOWN = true; });
+window.addEventListener('pointerup', () => { W_COURT_DOWN = false; });
+// the four rows of calls: built again only when one of your calls changes
+function wCourtCallRows(mine) {
+  const row = (kind, T, lab) => `<div class="wccrow"><span class="wccl">${lab}</span>${Object.entries(T).map(([k, v]) => `<button class="ghost${mine[kind] === k ? ' on' : ''}" aria-pressed="${mine[kind] === k}" data-ccall="${kind}" data-cid="${k}" title="${esc(v.desc + (kind === 'off' || kind === 'def' ? ' ' + wCourtEdgeLine(kind, k) : ''))}">${esc(v.n)}</button>`).join('')}</div>`;
+  return `${row('off', wBK.sets, 'Offense')}${row('def', wBK.defs, 'Defense')}${row('pace', wBK.paces, 'Pace')}${row('press', wBK.presses, 'Pressure')}`;
+}
+/* the panel: the call rows when your calls change; the rest (the matchup, timeouts, subs, how your sets are going) when
+   any of it changes, keyed without the stamina numbers that move every frame at a stoppage (they're read fresh each
+   time it is drawn) */
+function wCourtCalls(force) {
+  const box = $('wCourtCalls'), C = WBK && !WBK.over && wBK.mode !== 'watch' ? wBK.calls() : null;
+  box.hidden = !C; if (!C) { W_COURT_ROWKEY = W_COURT_NOWKEY = ''; return; }
+  if (!force && (W_COURT_DOWN || (box.contains(document.activeElement) && document.activeElement.tagName === 'SELECT'))) return;
+  if (!box.querySelector('.wccrows')) box.innerHTML = '<div class="wccrows"></div><div class="wccnowbox"></div>';
+  const you = wBK.you, mine = C.call[you], cur = C.cur, G = wBK.G, ph = wBK.phase;
+  const rk = JSON.stringify(mine);
+  if (force || rk !== W_COURT_ROWKEY) { W_COURT_ROWKEY = rk; box.querySelector('.wccrows').innerHTML = wCourtCallRows(mine); }
+  const stop = ['dead', 'timeout', 'intro', 'break'].includes(ph), on = wBK.onFloor()[you], bench = wBK.bench(you), sets = C.sets[you] || {};
+  const nk = JSON.stringify([cur, C.to, stop, on, bench, sets, W_COURT_CALLMSG, wBK.mode]);
+  if (!force && nk === W_COURT_NOWKEY) return;
+  W_COURT_NOWKEY = nk;
+  const ours = cur && cur.side === you, e = cur ? wBK.edge(cur.off, cur.def) : [0, ''], R = G.teams[you].roster, st = ri => Math.round(G.stam[you][ri]);
+  const match = cur ? `${ours ? 'Your' : 'Their'} ${wBK.sets[cur.off].n} against ${ours ? 'their' : 'your'} ${wBK.defs[cur.def].n}: ${e[0] ? (e[0] > 0 === ours ? 'good for you. ' : 'good for them. ') + e[1] : 'an even matchup.'}${cur.stale ? ` ${ours ? 'They' : 'You'}'ve seen ${wBK.sets[cur.off].n} ${cur.stale + 1} times running, and guard it better.` : ''}` : '';
+  const log = Object.entries(sets).filter(([, v]) => v.n).map(([k, v]) => `${wBK.sets[k].n} ${(v.pts / v.n).toFixed(2)} a trip (${v.n})`).join(', ');
+  const subs = stop && bench.length ? `<div class="wccrow"><span class="wccl">Subs</span><select id="wCourtSubOut" aria-label="Who comes off">${on.map(ri => `<option value="${ri}">${esc(R[ri].n)} (${st(ri)})</option>`).join('')}</select> for <select id="wCourtSubIn" aria-label="Who comes on">${bench.map(ri => `<option value="${ri}">${esc(R[ri].n)} (${st(ri)})</option>`).join('')}</select><button class="ghost" id="wCourtSubGo">Swap</button></div>`
+    : `<div class="wccrow"><span class="wccl">Subs</span><small class="hint">${bench.length ? 'At a stoppage: a dead ball, a break or a timeout.' : 'Nobody on the bench.'}</small></div>`;
+  box.querySelector('.wccnowbox').innerHTML = `<div class="wccrow"><span class="wccl">Timeouts</span><button class="ghost" id="wCourtTO" ${C.to[you] ? '' : 'disabled'} title="Five seconds: breath back for everyone, their hot hand cools, and you can sub. At a dead ball or with the ball in your hands.${wBK.mode === 'play' ? ' T on the keyboard.' : ''}">Timeout (${C.to[you]} left)</button><small class="hint">Theirs: ${C.to[1 - you]} left.</small></div>${subs}
+    <p class="hint wccnow">${esc(match)}</p>${log ? `<p class="hint">Your sets so far: ${esc(log)}.</p>` : ''}${W_COURT_CALLMSG ? `<p class="wbad">${esc(W_COURT_CALLMSG)}</p>` : ''}`;
+}
+// (kept up by the court's ticker, which runs only while a game is on: w77's wCourtPad)
+const wW79CourtPad = wCourtPad;
+wCourtPad = function () { wW79CourtPad(); wCourtCalls(false); };
+const wW79CourtBarNote = wCourtBarNote;
+wCourtBarNote = function () {
+  wW79CourtBarNote();
+  if (WBK && !WBK.over && (wBK.mode || W_COURT_MODE) === 'manage') $('wCourtNote').textContent = 'You manage: call the sets, the defense and the stances below the court, take timeouts, and sub at stoppages. Your five play it.';
+  W_COURT_CALLMSG = ''; wCourtCalls(true);
+};
+
+// How to play: the call
+const wW79CourtHowHTML = wCourtHowHTML;
+wCourtHowHTML = function () {
+  const S = wBK.sets, D = wBK.defs, cell = (o, d) => { const e = wBK.edge(o, d)[0]; return `<td title="${esc(wBK.edge(o, d)[1])}">${e > 0 ? '<b class="wgood">+</b>' : e < 0 ? '<b class="wbad">&minus;</b>' : '&middot;'}</td>`; };
+  return wW79CourtHowHTML() + `<p class="hint"><b>The call.</b> Each side has an offense set and a defense, and they stay until changed. The sets: ${Object.values(S).map(s => `<b>${esc(s.n)}</b> (${esc(s.desc.toLowerCase().replace(/\.$/, ''))})`).join('; ')}. The defenses: ${Object.values(D).map(d => `<b>${esc(d.n)}</b> (${esc(d.desc.toLowerCase().replace(/\.$/, ''))})`).join('; ')}.</p>
+  <p class="hint">Some sets beat some defenses, a few points on every shot, with the ratings on top: + is good for the offense, &minus; good for the defense (hover a mark for why).</p>
+  <table class="wrpow wcedge"><tr><th>Set</th>${Object.values(D).map(d => `<th>${esc(d.n)}</th>`).join('')}</tr>${Object.keys(S).map(o => `<tr><td>${esc(S[o].n)}</td>${Object.keys(D).map(d => cell(o, d)).join('')}</tr>`).join('')}</table>
+  <p class="hint"><b>The scout.</b> The other coach reads your habits: a set run again on the next possession is guarded better, and better again a third time. Mix it up.</p>
+  <p class="hint"><b>Stances.</b> Pace on offense: ${Object.values(wBK.paces).map(p => `<b>${esc(p.n)}</b> (${esc(p.desc.toLowerCase().replace(/\.$/, ''))})`).join(', ')}. Pressure on defense: ${Object.values(wBK.presses).map(p => `<b>${esc(p.n)}</b> (${esc(p.desc.toLowerCase().replace(/\.$/, ''))})`).join(', ')}.</p>
+  <p class="hint"><b>Timeouts.</b> ${wBK.toRules.n} a half, and one more in overtime, at a dead ball or with the ball in your hands. A timeout gives everyone some breath back, cools the other side's hot hand, and lets you sub; play restarts with the ball where it was.</p>
+  <p class="hint"><b>The other coach.</b> A <b>Squire</b> calls at random and never reads you. A <b>Knight</b> reads the score, the clock and the matchups, and leans to what beats your defense. An <b>Archmage</b> also reads your habits, defends the set you run most, and runs what beats your defense.</p>
+  <p class="hint"><b>Manage.</b> Pick Manage on the bar to call it from the bench: the panel under the court has your set, your defense, Pace, Pressure, timeouts and subs, the matchup on each possession and how your sets are going. Your five play it. In You play the same panel is there while you play.</p>`;
+};
+const wW79RenderHelp = renderHelp;
+renderHelp = function () {
+  wW79RenderHelp();
+  const after = $('wHelpCourtTab'); if (!after || $('wHelpCourtCall')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtCall"><b>Calling a basketball game.</b> On the court you can Watch, Manage (call the sets, the defense, Pace, Pressure, timeouts and subs, and your five play it) or play it yourself. Six offense sets and five defenses beat and lose to each other, a set run again is guarded better, and timeouts give breath back and cool a hot hand (see Basketball: how it works). The other coach is a Squire, a Knight or an Archmage.</p>`);
 };
 </script>
 </body></html>

@@ -163,6 +163,9 @@ function bkDrawHud(c) {
   }
   txt(c, `${bkPeriodName(G.q)}  ${bkClockText()}`, 480, 30, `800 20px ${BK_FONT}`, '#f3ead6', 'center');
   const sc = Math.ceil(G.shot), off = G.clock < G.shot;
+  // the calls on this possession (the offense's set against the defense), and each side's timeouts
+  if (G.cur && GD.ph !== 'over') { const C = G.cur, e = bkEdge(C.off, C.def)[0]; txt(c, `${BK_SETS[C.off].n} vs ${BK_DEFS[C.def].n}${C.stale ? ` · scouted${C.stale > 1 ? ' twice' : ''}` : ''}`, C.side ? 640 : 320, 60, `600 11px ${BK_FONT}`, e > 0 ? '#bfe8a8' : e < 0 ? '#ff9a7a' : 'rgba(243,234,214,.7)', 'center'); }
+  if (G.to) for (const s of [0, 1]) txt(c, `TO ${G.to[s]}`, s ? 600 : 360, 22, `600 11px ${BK_FONT}`, 'rgba(243,234,214,.6)', 'center');
   txt(c, off ? '–' : String(sc), 480, 54, `900 18px ${BK_FONT}`, !off && sc <= 4 ? '#ff6a4a' : '#ffd08a', 'center');
 }
 function bkDrawMsg(c) {
