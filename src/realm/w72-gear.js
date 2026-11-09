@@ -8,7 +8,7 @@
    the engine's ratings ({ pow: 1 }); phases 2 and 3 add the effects only one sport has (cuts, fumbles...), read by the
    engines from the fighter's or player's gear. Every piece is also an item (DB.items[id], with gear: sport), so shops,
    chests and the Bag carry it like anything else; while a player wears it, it is out of the bag.
-   W_POTIONS: id -> { sport, ... }: the potions each sport uses in a match (football's two from w48; boxing's in phase 2).
+   W_POTIONS: id -> { sport (or sports: [...]), ... }: the potions each sport uses in a match (football's two from w48; boxing's in phase 2).
    wMatchBag(sport) lists the ones in your bag.
 
    State: p.gear = { ring?: id, grid?: id } on a roster player (plain JSON, in the save). A released player's gear goes
@@ -31,6 +31,8 @@ function wGearAdd(id, def) {
   return def;
 }
 function wPotionAdd(id, def) { W_POTIONS[id] = def; return def; }
+// the sports a potion is for (sport, or sports when it serves more than one)
+const wPotionSports = id => { const P = W_POTIONS[id]; return P ? P.sports || [P.sport] : []; };
 // football's potions, from w48
 for (const id of Object.keys(W_GF_POTIONS)) wPotionAdd(id, Object.assign({ sport: 'grid' }, W_GF_POTIONS[id]));
 
@@ -101,7 +103,7 @@ wSevenPlayer = function (p) {
 // the potions in your bag that this sport uses in a match: [{ id, n, name, desc }]
 function wMatchBag(sport) {
   if (!WG || !WG.items) return [];
-  return Object.keys(W_POTIONS).filter(id => W_POTIONS[id].sport === sport && (WG.items[id] || 0) > 0 && DB.items[id])
+  return Object.keys(W_POTIONS).filter(id => wPotionSports(id).includes(sport) && (WG.items[id] || 0) > 0 && DB.items[id])
     .map(id => ({ id, n: WG.items[id], name: DB.items[id].name, desc: DB.items[id].desc }));
 }
 

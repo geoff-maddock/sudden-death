@@ -112,9 +112,11 @@ function bxLand(a, b, k) {
   if (blocked) { dmg *= (P.power ? BX_GUARD.power : BX_GUARD.head) * (Fb.leaky ? 2 : 1); b.rs.def += .5; b.rs.blocks++; }
   else { a.rs.landed++; if (P.power) a.rs.power++; }
   dmg *= (.85 + R() * .3) * Fa.dmgOut * Fb.dmgIn;
+  // gear (13-kit.js): hand wraps hit harder; a mouthguard takes some off a head punch
+  const Ga = bxGx(a), Gb = bxGx(b); if (Ga.dmg) dmg *= Ga.dmg; if (P.head && Gb.headIn) dmg *= Gb.headIn;
   if (Fb.rampart) dmg *= .5;
   if (!blocked && P.power && Fa.nextMul !== 1) { dmg *= Fa.nextMul; a.fx = a.fx.filter(s => s.nextMul == null); }
-  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1));
+  if (!blocked && P.power) b.hpMax = Math.max(35, b.hpMax - dmg * .2 * (Tb.rot || 1) * (Ga.cut || 1));
   if (P.drain && !Tb.hollow) b.sta = Math.max(0, b.sta - P.drain * (.6 + a.r.pow * .06));
   bxEv(blocked ? 'block' : 'land', a.side, { p: k, n: Math.round(dmg * 10) / 10, ctr });
   bxHurt(a, b, dmg, !blocked);

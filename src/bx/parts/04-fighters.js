@@ -50,6 +50,8 @@ function bxFighter(p, side) {
   const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = bxStaMax(r), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
   return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
+    // gear (13-kit.js): its name, and what it does beyond the ratings (already laid on r)
+    gear: p.gear && p.gear.name ? p.gear.name : null, gx: p.gear && p.gear.fx ? JSON.parse(JSON.stringify(Object.assign({}, p.gear.fx, { r: undefined }))) : null,
     a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false,
     rs: bxStatsZero(), bs: bxStatsZero() };
 }

@@ -38,7 +38,10 @@ function bxStart(opts) {
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
-  Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0 });
+  Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0,
+    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] });
+  // gear with a status at the opening bell (13-kit.js)
+  for (const f of G.F) { const op = bxGx(f).open; if (op) f.fx.push(Object.assign({ id: 'g_open' }, op)); }
   BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
   G.wait = null; bxInputClear();
   bxCornerSpots();
@@ -97,7 +100,9 @@ function bxDown() {
   bxLog(`${f.n} is down!`, true);
   if (bxKnockdown(s) === 'tko') { bxLog(`Three knockdowns: the referee stops it.`, true); bxOver(); return; }
   const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
-  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0), 2, BX_RULES.count); BD.count = 1;
+  // gear's seconds off the count, and smelling salts (once: 13-kit.js)
+  const quick = (bxGx(f).rise || 0) + (f.salts || 0); if (f.salts) { f.salts = 0; bxLog(`The smelling salts clear ${f.n}'s head.`); }
+  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0) - quick, 2, BX_RULES.count); BD.count = 1;
   // Rebirth (a superstar's nature): once a bout, a count it would not beat, it beats at nine, and rises with most of its health
   if (BD.getUp >= BX_RULES.count && (bxTrait(f) || {}).reborn && !f.reborn) { f.reborn = 1; BD.getUp = BX_RULES.count - 1; }
   bxPh('kd');
@@ -138,6 +143,8 @@ function bxCorner() {
   G.plans.push(G.F.map(f => f.plan));
   bxCornerSpots();
   bxPh('corner');
+  // the CPU corners' potions (13-kit.js), now that the break has begun
+  for (const f of G.F) if (!(bxYourCorner() && f.side === BD.you)) bxCornerPotion(f);
   if (bxYourCorner()) bxAsk();
   bxSnapNow();
 }
@@ -145,7 +152,7 @@ function bxCorner() {
 const bxYourCorner = () => !!BD && BD.mode !== 'watch' && !BD.headless;
 function bxAsk() {
   const f = G.F[BD.you], c = bxCornerCpu(f);
-  G.wait = { plan: c.plan, patch: c.patch && G.cards.length > 0 && f.patched !== G.round, why: c.why };
+  G.wait = { plan: c.plan, patch: c.patch && G.cards.length > 0 && f.patched !== G.round, why: c.why, pot: BD.ph === 'corner' ? bxPotionAdvice(f) : null };
   G.plans[G.plans.length - 1][BD.you] = f.plan;
   if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
 }
@@ -170,7 +177,7 @@ function bxPatch() {
 function bxSetMode(m) {
   if (!BD || !BX_MODES.includes(m) || BD.headless) return;
   BD.mode = m; if (CD) CD.mode = m; bxInputClear();
-  if (m === 'watch' && G.wait) { const w = G.wait; if (w.patch) bxPatch(); bxCall(w.plan); }
+  if (m === 'watch' && G.wait) { const w = G.wait; if (w.patch) bxPatch(); if (w.pot) bxPotion(w.pot.id); bxCall(w.plan); }
   // (asked once a break: not again if you've already called it)
   else if (m !== 'watch' && !G.wait && (BD.ph === 'intro' || BD.ph === 'corner') && G.called !== BD.ph + G.round) bxAsk();
 }
@@ -187,7 +194,8 @@ function bxVerdict(over) {
 function bxSummary() {
   return { over: Object.assign({}, G.over), verdict: bxVerdict(), cards: JSON.parse(JSON.stringify(G.cards)), totals: bxTotals(), work: G.work.slice(),
     rounds: JSON.parse(JSON.stringify(G.rstats)), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice(), plans: JSON.parse(JSON.stringify(G.plans)),
-    fighters: G.F.map(f => ({ n: f.n, kind: f.kind, style: f.style, hp: Math.round(f.hp), hpMax: Math.round(f.hpMax) })), secs: Math.round(G.secs * 10) / 10, log: G.log.slice() };
+    fighters: G.F.map(f => ({ n: f.n, kind: f.kind, style: f.style, hp: Math.round(f.hp), hpMax: Math.round(f.hpMax) })), secs: Math.round(G.secs * 10) / 10, log: G.log.slice(),
+    bags: JSON.parse(JSON.stringify(G.bags || [{}, {}])), pots: (G.pots || []).slice() };
 }
 /* a whole bout headless and silent, seeded; the bout on the page (if any) is left as it was */
 function bxSimBout(opts) {
