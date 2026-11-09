@@ -46,8 +46,8 @@ python3 test/daily_lab.py twists 300           # daily balance: each twist again
 python3 test/realm_smoke.py                   # one realm check (realm_*.py; all of them are in ./test/all.sh)
 python3 test/realm_lab.py 140 '{}'            # Realm balance: champion rate, where runs end, per-match cost (docs/realm/BALANCE.md)
 python3 test/realm_diamond_lab.py 120          # Realm baseball balance: win rate by level gap and tier, Diamond Cups (Simulate)
-python3 test/realm_gridiron_lab.py 120         # Realm football balance: win rate by level gap, tier and CPU skill, powers on and off, stances, Cinder Cups
-python3 test/realm_ring_lab.py 120             # Realm boxing balance: card win rate by level gap, tier and CPU skill, powers on and off, Anvil Belts
+python3 test/realm_gridiron_lab.py 120         # Realm football balance: win rate by level gap, tier and CPU skill, powers on and off, stances, Cinder Cups, gear and potions by tier
+python3 test/realm_ring_lab.py 120             # Realm boxing balance: card win rate by level gap, tier and CPU skill, powers on and off, Anvil Belts, gear and potions by tier
 python3 test/realm_stars_lab.py 200            # Realm superstar balance: what each superstar adds in the card game, football and baseball, against an ordinary player
 ```
 
@@ -82,6 +82,8 @@ Champions of the Realm (the Realm for short; `src/realm/`, `dist/realm.html`) la
 - **Every realm system gets a `test/realm_*.py`** with real asserts, a line in `test/all.sh` and in the realm list in `.github/workflows/ci.yml`. Wait on state in tests, not fixed sleeps.
 - **Realm words.** The world was ported from Terra Chimera; it is now a monster sports league. Your party is a team of players, rivals are clubs, fights are matches. No chimeras, snares, handlers or gene labs (`test/realm_polish.py` checks). A renamed talk keyword must be renamed in every topic, `need`, quest hint and test.
 - **How to play** for the realm is `#wHelp`; each part adds its section in load order and keeps its id.
+- **The boxing and football engines are scoped.** `src/bx/` and `src/gf/` load inside `scope wBX` and `scope wGF` (the Realm's `ring/` and `gridiron/` manifests); the Realm reaches them only through `exports.js`. Superstar data for them sits in `ring/r0-stars.js` and `gridiron/g0-stars.js`, at the foot.
+- **Gear, potions and powers (issue #61).** Gear is one piece a player per sport (`p.gear = { ring, grid }`, w72); it reaches the engines through `wBxFighter` / `wSevenPlayer`, never by changing the player's own ratings. A new piece is `wGearAdd`, a new potion `wPotionAdd` and its engine table (`BX_POTIONS`, `GF_POTIONS`). The CPU uses its bag at its skill and logs every use with a reason; your coaches never open your bag in football, and Simulate leaves it alone in both sports. Each league kind has two boxing specials (picked on the Ring tab, `p.bxSp`) and two football powers each way (Seven tab, `p.gfPw`); a new kind or superstar needs both. Boxing powers spend spirit as well as stamina (`BX_SPIRIT`). An engine id must be unique across the engine and its star file (a clash silently replaces the other power).
 
 ## Current balance (bot, after the last retune)
 
