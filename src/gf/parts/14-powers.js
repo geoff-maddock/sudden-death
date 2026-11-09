@@ -17,7 +17,11 @@
    - On the field every power is one set of effects (GF_FX0), merged into L.fx at the snap from both sides' powers and
      the zones (gfFx): multipliers multiply, the rest add. 06-live.js reads L.fx; what a power did goes in the play's
      events, and so in the reason after it.
-   - Power tips (gfPowerTip): the pros and cons of a power for the down, the distance and the field. */
+   - Power tips (gfPowerTip): the pros and cons of a power for the down, the distance and the field.
+   - Issue #61, phase 5: every kind has a second offense and defense power (GF_POW2); a player brings one of each pair
+     (m.pw, gfPowFor). And the situation powers (GF_SIT): the team's, once a game each, when the moment fits (a
+     Goal-line Wall inside your 10, which leaves a zone at the goal line; a Two-minute Drill late and not ahead, with no
+     runoff before the next play, fx.hurry; a Fourth-down Gamble). G.sitUsed: which a side has used. */
 const GF_MANA = { start: 3, max: 6, scored: 1, drive: 1 }, GF_STAM = { min: 20, per: 6, base: 14, ult: 30, play: 1, half: 50, bench: 4 };
 const GF_ULT_COST = 3, GF_ULT_PLAYS = 3;
 const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
@@ -36,7 +40,7 @@ const GF_UNDEAD = ['zombie', 'skeleton', 'lich', 'wraith', 'vampire', 'golem'];
 // before the blocking back slips out as a checkdown; 0 never).
 const GF_FX0 = { oSpd: 1, dSpd: 1, cSpd: 1, rSpd: 1, rushSpd: 1, coverSpd: 1, backSpd: 1, midSpd: 1, deepSpd: 1, shed: 1, int: 1, errM: 1, ballV: 1,
   blk: 0, dStr: 0, tkl: 0, cStr: 0, breakN: 0, untag: 0, nolose: 0, read: 0, errA: 0, catch: 0, sure: 0, kick: 0, punt: 0,
-  snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0,
+  snapStun: 0, snapAll: 0, blkStun: 0, coverSlow: 0, safetySlow: 0, gas: 0, pounce: 0, cStun: 0, cStunP: 0, cSlow: 0, freezeNear: 0, tgtSlow: 0, stand: 0, hurry: 0,
   qbT: 1, away: 0, deepW: 0, fum: 1, cush: 0, jump: 0, valve: 0 };
 const GF_FX_MUL = new Set(['oSpd', 'dSpd', 'cSpd', 'rSpd', 'rushSpd', 'coverSpd', 'backSpd', 'midSpd', 'deepSpd', 'shed', 'int', 'errM', 'ballV', 'qbT', 'fum']);
 // everyday powers by kind: [offense, defense]. fits: the call it helps ('run', 'pass' or 'any')
@@ -78,6 +82,56 @@ const GF_POW = {
   witch: [{ id: 'hex', n: 'Hex', cost: 1, fits: 'pass', rest: { team: 8 }, desc: 'Hexes their deep safety: nearly half speed for the first four seconds, and a draught from the cauldron: the seven get 8 stamina back.', fx: { safetySlow: 4 } },
     { id: 'frost', n: 'Frost Hex', cost: 2, fits: 'any', desc: 'A chill over the field: their whole offense 12% slower.', fx: { oSpd: .88 } }],
 };
+// second everyday powers (issue #61, phase 5): [offense, defense] by kind; a player brings one of each pair (m.pw:
+// { off: 0 | 1, def: 0 | 1 }, 1 for these)
+const GF_POW2 = {
+  goblin: [{ id: 'trickplay', n: 'Trick Play', cost: 1, fits: 'pass', desc: 'A goblin trick at the snap: the coverage bites, and is a step slow off the line.', fx: { coverSlow: .8 } },
+    { id: 'ambush', n: 'Ambush', cost: 1, fits: 'pass', desc: 'They come from nowhere: the rushers 8% faster.', fx: { rushSpd: 1.08 } }],
+  kobold: [{ id: 'tunnel', n: 'Tunnel Run', cost: 1, fits: 'run', desc: 'Kobold tunnels behind the line: the offense 15% faster back there.', fx: { backSpd: 1.15 } },
+    { id: 'trapline', n: 'Trap Line', cost: 1, fits: 'any', desc: 'Traps along the line: the blockers stumble at the snap.', fx: { blkStun: .5 } }],
+  werewolf: [{ id: 'frenzy', n: 'Frenzy', cost: 1, fits: 'any', desc: 'The line goes wild: +1.5 blocking strength.', fx: { blk: 1.5 } },
+    { id: 'hunt', n: 'The Hunt', cost: 1, fits: 'pass', desc: 'The coverage runs them down: 8% faster.', fx: { coverSpd: 1.08 } }],
+  dwarf: [{ id: 'shieldline', n: 'Shield Line', cost: 1, fits: 'pass', desc: 'Shields up round the quarterback: blocks hold twice as long.', fx: { shed: .5 } },
+    { id: 'anvil', n: 'Anvil Drop', cost: 1, fits: 'run', desc: 'Whoever takes the ball has an anvil to carry: slowed for 1.2 seconds.', fx: { cSlow: 1.2 } }],
+  ogre: [{ id: 'trample', n: 'Trample', cost: 1, fits: 'run', desc: 'The carrier tramples: +3 strength against tackles, a little slower.', fx: { cStr: 3, cSpd: .95 } },
+    { id: 'roar', n: 'Roar', cost: 1, fits: 'pass', desc: 'A roar that shakes the thrower: the throw goes off line.', fx: { errA: .8 } }],
+  minotaur: [{ id: 'labyrinth', n: 'Labyrinth', cost: 1, fits: 'pass', desc: 'Routes like a maze: receivers past 8 yards 12% faster.', fx: { deepSpd: 1.12 } },
+    { id: 'horncharge', n: 'Horn Charge', cost: 1, fits: 'pass', desc: 'The rush lowers its horns: 12% faster.', fx: { rushSpd: 1.12 } }],
+  troll: [{ id: 'trollhide', n: 'Troll Hide', cost: 1, fits: 'run', rest: { tired: [2, 12] }, desc: 'Thick hide: the carrier +1 strength against tackles, and the two most tired on the field get 12 stamina back.', fx: { cStr: 1 } },
+    { id: 'rockthrow', n: 'Rock Throw', cost: 1, fits: 'pass', desc: 'A rock at the receiver as the ball comes: they lose a step.', fx: { tgtSlow: .3 } }],
+  golem: [{ id: 'ironmarch', n: 'Iron March', cost: 1, fits: 'run', desc: 'The line marches as one: +2.5 blocking strength, the offense a little slower.', fx: { blk: 2.5, oSpd: .96 } },
+    { id: 'stonewall', n: 'Stone Wall', cost: 1, fits: 'run', desc: 'A wall of stone at the line: +2.5 strength against blocks.', fx: { dStr: 2.5 } }],
+  harpy: [{ id: 'dive', n: 'Dive', cost: 1, fits: 'pass', desc: 'The ball dives from the sky: 20% faster through the air, and the deep men 5% faster.', fx: { ballV: 1.2, deepSpd: 1.05 } },
+    { id: 'screech', n: 'Screech', cost: 2, fits: 'any', desc: 'A screech at the snap: every one of them staggers.', fx: { snapAll: .8 } }],
+  elf: [{ id: 'arrowpass', n: 'Arrow Pass', cost: 1, fits: 'pass', desc: 'A throw like an arrow: it flies twice as true.', fx: { errM: .5 } },
+    { id: 'thornhedge', n: 'Thorn Hedge', cost: 1, fits: 'run', desc: 'Thorns in the middle of the field: their players there 20% slower.', fx: { midSpd: .8 } }],
+  wraith: [{ id: 'phasethrough', n: 'Phase Through', cost: 2, fits: 'run', desc: 'The carrier turns to mist: no tackle holds for nearly a second after taking the ball.', fx: { untag: .9 } },
+    { id: 'gravechill', n: 'Grave Chill', cost: 1, fits: 'run', desc: 'A chill on the carrier: 12% slower.', fx: { cSpd: .88 } }],
+  vampire: [{ id: 'nightfall', n: 'Nightfall', cost: 1, fits: 'pass', desc: 'Dark comes down: the coverage loses the receivers for a second.', fx: { coverSlow: 1 } },
+    { id: 'thrall', n: 'Thrall', cost: 1, fits: 'pass', desc: 'The thrower is half in thrall: more throws picked off.', fx: { int: 1.8 } }],
+  lich: [{ id: 'soulbind', n: 'Soul Bind', cost: 1, fits: 'pass', desc: 'The defense hesitates: they break on the throw a third of a second late, and it lands softer.', fx: { read: .3, catch: .06 } },
+    { id: 'wither', n: 'Wither', cost: 1, fits: 'any', desc: 'Their legs wither: their offense 7% slower.', fx: { oSpd: .93 } }],
+  zombie: [{ id: 'pileup', n: 'Pile Up', cost: 1, fits: 'run', desc: 'Bodies everywhere: +1.5 blocking strength, and the carrier +1 against tackles.', fx: { blk: 1.5, cStr: 1 } },
+    { id: 'gravegrasp', n: 'Grasping Dead', cost: 1, fits: 'pass', desc: 'Hands from the ground: blocks are shed 40% more often.', fx: { shed: 1.4 } }],
+  gorgon: [{ id: 'hiss', n: 'Hiss', cost: 1, fits: 'pass', desc: 'The snakes hiss: the coverage freezes off the line for a moment.', fx: { coverSlow: .6 } },
+    { id: 'stoneline', n: 'Stone Line', cost: 1, fits: 'run', desc: 'Half to stone: +2 strength against blocks, and tackles a little likelier.', fx: { dStr: 2, tkl: .06 } }],
+  spider: [{ id: 'silkline', n: 'Silk Line', cost: 1, fits: 'pass', desc: 'A silk line to the receiver: the ball 15% faster, and a little likelier caught.', fx: { ballV: 1.15, catch: .05 } },
+    { id: 'trapdoor', n: 'Trapdoor', cost: 1, fits: 'run', desc: 'When someone takes the ball, the nearest defender springs 3 yards at them.', fx: { pounce: 3 } }],
+  skeleton: [{ id: 'rattlebones', n: 'Rattle Bones', cost: 1, fits: 'run', desc: 'The carrier falls apart and back together: through the first tackle.', fx: { breakN: 1 } },
+    { id: 'boneyard', n: 'Bone Yard', cost: 1, fits: 'pass', desc: 'Bones litter the deep field: receivers past 8 yards 15% slower.', fx: { deepSpd: .85 } }],
+  witch: [{ id: 'broomstick', n: 'Broomstick', cost: 1, fits: 'pass', desc: 'Receivers on broomsticks: 6% faster on their routes, and the ball 10% faster.', fx: { rSpd: 1.06, ballV: 1.1 } },
+    { id: 'curse', n: 'Curse', cost: 1, fits: 'run', desc: 'A curse on the carrier: −2 strength against tackles.', fx: { cStr: -2 } }],
+};
+/* situation powers (issue #61, phase 5): the team's, not a player's, once a game each, and only when the moment fits
+   (ok(side)); no stamina, only mana. A zone, if it has one, lasts GF_ULT_PLAYS plays or the drive, as an ultimate's. */
+const GF_SIT = {
+  goalwall: { id: 'goalwall', n: 'Goal-line Wall', role: 'def', cost: 2, desc: 'On defense, with your goal line inside 10 yards: a wall at the goal line for 3 plays or the drive, tackles likelier and +1.5 strength against blocks.', zone: { tkl: .15, dStr: 1.5 }, vis: ['#d8b070', 'goal'],
+    ok: s => G.poss !== s && G.ball >= 90, when: 'with your goal line inside 10 yards' },
+  twominute: { id: 'twominute', n: 'Two-minute Drill', role: 'off', cost: 2, desc: 'Late in the game and not ahead: the offense hurries (5% faster, throws truer), and no clock runs off before the next play.', fx: { oSpd: 1.05, errM: .85, hurry: 1 },
+    ok: s => G.poss === s && !!GD.game && G.half >= 2 && G.clock <= 120 && G.score[s] <= G.score[1 - s], when: 'in the last two minutes, not ahead' },
+  gamble: { id: 'gamble', n: 'Fourth-down Gamble', role: 'off', cost: 2, desc: 'Going for it on fourth down: the carrier breaks the first tackle and is +1.5 strength, and catches are likelier.', fx: { breakN: 1, cStr: 1.5, catch: .08 },
+    ok: s => G.poss === s && G.down === GF_RULES.downs, when: 'on fourth down' },
+};
 // ultimates by kind: role 'off' or 'def' (when it can be cast), zone: the effects the zone leaves for 3 plays or the
 // drive, now: on the play it is cast only; vis: how the zone looks (09-draw.js)
 const GF_ULT = {
@@ -101,11 +155,16 @@ const GF_ULT = {
   witch: { id: 'blizzard', n: 'Blizzard', role: 'def', desc: 'Snow: their offense slips (15% slower), and throws fly off line.', zone: { oSpd: .85, errA: .4 }, vis: ['#e8f4ff', 'all'] },
 };
 const GF_POW_BY = {}; for (const k in GF_POW) for (const p of GF_POW[k]) GF_POW_BY[p.id] = p;
+for (const k in GF_POW2) for (const p of GF_POW2[k]) GF_POW_BY[p.id] = p;
 const GF_ULT_BY = {}; for (const k in GF_ULT) GF_ULT_BY[GF_ULT[k].id] = GF_ULT[k];
+// (a situation power's zone is drawn and read as an ultimate's)
+for (const k in GF_SIT) { GF_POW_BY[k] = GF_SIT[k]; if (GF_SIT[k].zone) GF_ULT_BY[k] = GF_SIT[k]; }
+// the everyday power a player brings for a role: the first of their kind's, or the second (m.pw)
+const gfPowFor = (m, role) => { const i = role === 'off' ? 0 : 1, two = GF_POW2[m.kind]; return two && m.pw && m.pw[role] === 1 ? two[i] : GF_POW[m.kind] && GF_POW[m.kind][i]; };
 const gfPowName = id => (GF_POW_BY[id] || GF_ULT_BY[id] || {}).n || id;
 
 function gfPowersStart() {
-  G.mana = [GF_MANA.start, GF_MANA.start]; G.stam = G.teams.map(t => t.roster.map(() => 100)); G.zones = []; G.ultUsed = [{}, {}];
+  G.mana = [GF_MANA.start, GF_MANA.start]; G.stam = G.teams.map(t => t.roster.map(() => 100)); G.zones = []; G.ultUsed = [{}, {}]; G.sitUsed = [{}, {}];
 }
 const gfMana = s => G.mana ? G.mana[s] : 0;
 function gfManaAdd(s, n) { if (G.mana) G.mana[s] = clamp(G.mana[s] + n, 0, GF_MANA.max); }
@@ -139,14 +198,20 @@ function gfPowerOptions(side) {
       const why = used ? 'used this game' : gfMana(side) < cost ? 'needs mana' : st < GF_STAM.min ? 'winded' : '';
       out.push({ key: ri + ':' + p.id, id: p.id, ri, n: m.n, kind: m.kind, name: p.n, cost, ult: !!ult, fits: ult ? 'any' : p.fits, desc: p.desc, ok: !why, why, stam: Math.round(st), stamCost: gfStamCost(cost, ult) });
     };
-    if (pw) add(pw[role === 'off' ? 0 : 1], false);
+    if (pw) add(gfPowFor(m, role), false);
     if (u && u.role === role) add(u, true);
   });
+  // the situation powers that fit the moment (the team's: ri null)
+  G.sitUsed = G.sitUsed || [{}, {}];
+  for (const id in GF_SIT) { const P = GF_SIT[id]; if (P.role !== role || !P.ok(side)) continue;
+    const why = G.sitUsed[side][id] ? 'used this game' : gfMana(side) < P.cost ? 'needs mana' : '';
+    out.push({ key: 'sit:' + id, id, ri: null, n: 'The team', kind: null, name: P.n, cost: P.cost, ult: false, sit: true, fits: 'any', desc: P.desc, ok: !why, why, stam: 100, stamCost: 0 }); }
   return out;
 }
 // a power is cast: mana, stamina, the ultimate used, its zone on the field. Returns what the play needs: { id, ri, n, name, ult }
 function gfCast(side, o) {
-  G.mana[side] -= o.cost; G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - o.stamCost);
+  G.mana[side] -= o.cost; if (o.ri != null) G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - o.stamCost);
+  if (o.sit) { G.sitUsed[side][o.id] = true; if (GF_SIT[o.id].zone) { G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); } return { id: o.id, ri: null, n: o.n, name: o.name, ult: false, sit: true, side }; }
   if (o.ult) { G.ultUsed[side][o.kind] = true; G.zones = G.zones.filter(z => z.id !== o.id); G.zones.push({ id: o.id, n: o.name, side, left: GF_ULT_PLAYS }); }
   const P = GF_POW_BY[o.id]; if (P && P.rest) gfPowRest(side, P.rest, `${o.name} (${o.n})`);
   return { id: o.id, ri: o.ri, n: o.n, name: o.name, ult: o.ult, side };
@@ -179,10 +244,12 @@ function gfCpuPower(side, call, skill) {
   if (role === 'def' && skill === 2) { const T = gfTendency(G.poss, 'off'), run = T.run || 0; if (Object.keys(T).length) kind = run >= .5 ? 'run' : run <= .2 ? 'pass' : kind; }
   // how often: a Squire now and then, a Knight more, an Archmage saves its mana for the downs that matter
   const p = skill === 2 ? (lever || full ? .85 : .2) : [.25, .4][skill] + lever + (gfMana(side) >= 5 ? .2 : 0);
-  if (R() > p) return null;
+  if (R() > p && !(skill >= 1 && opts.some(o => o.sit))) return null;
   const fit = o => o.fits === 'any' || kind === 'any' || o.fits === kind;
   const w = {};
-  for (const o of opts) w[o.key] = skill === 0 ? (o.ult ? .3 : 1)
+  // (a situation power that fits the moment: a Knight or Archmage takes it most of the time)
+  for (const o of opts) w[o.key] = o.sit ? [1, 6, 8][skill]
+    : skill === 0 ? (o.ult ? .3 : 1)
     : skill === 1 ? (fit(o) ? 3 : 1) * (o.ult ? (lever ? 3 : 1.5) : 1)
     : (fit(o) ? 1 : 0) * o.cost * (o.ult ? (lever ? 3 : .15) : 1) * o.stam / 100;
   // a power that gives stamina back is worth more to a tired side (a Knight and an Archmage see it)
@@ -269,8 +336,9 @@ function gfPowerTip(key) {
   const rs = (GF_POW_BY[o.id] || {}).rest, rz = (GF_ULT_BY[o.id] || {}).restZ, tired = gfTired(side);
   if ((rs || rz) && tired > .25) T.pro.push(`Your seven are tired (${Math.round((1 - tired) * 100)}% stamina on average): this one gives some back.`);
   const after = o.stam - o.stamCost;
-  T.con.push(`${o.n} spends ${o.stamCost} stamina (now ${o.stam}%)${after < 50 ? ': then slower and weaker until rested' : ''}.`);
-  if (o.ult) {
+  if (o.sit) T.note.push(`The team's, not a player's: once a game, ${GF_SIT[o.id].when}. No stamina.`);
+  else T.con.push(`${o.n} spends ${o.stamCost} stamina (now ${o.stam}%)${after < 50 ? ': then slower and weaker until rested' : ''}.`);
+  if (o.ult || (o.sit && GF_SIT[o.id].zone)) {
     T.note.push(`Once a game. The zone lasts ${GF_ULT_PLAYS} plays or the drive, whichever ends first.`);
     if (G.down === GF_RULES.downs) T.con.push('Fourth down: if the drive ends here, the zone goes with it.');
   }
@@ -289,5 +357,6 @@ function gfPowWhy(pw) {
 }
 // the book of powers by kind, for How to play
 function gfPowerBook() {
-  return Object.fromEntries(Object.keys(GF_KIND).map(k => [k, { off: GF_POW[k] && GF_POW[k][0], def: GF_POW[k] && GF_POW[k][1], ult: GF_ULT[k] }]));
+  return Object.fromEntries(Object.keys(GF_KIND).map(k => [k, Object.assign({ off: GF_POW[k] && GF_POW[k][0], def: GF_POW[k] && GF_POW[k][1], ult: GF_ULT[k] },
+    GF_POW2[k] ? { off2: GF_POW2[k][0], def2: GF_POW2[k][1] } : {})]));
 }

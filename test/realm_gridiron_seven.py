@@ -80,7 +80,7 @@ async def main():
         # ---------- in the Realm ----------
         await pg.evaluate("wOpenCamp('seven')"); await pg.wait_for_selector('#modalBox .wseven')
         ui = await pg.evaluate("""(() => { const rows = [...document.querySelectorAll('#modalBox .wseven > li')];
-          return { rows: rows.length, sel: rows[0].querySelectorAll('select').length, tab: !!document.querySelector('#modalBox [data-ctab="seven"][aria-selected="true"]'),
+          return { rows: rows.length, sel: rows[0].querySelectorAll('select[data-gpos]').length, tab: !!document.querySelector('#modalBox [data-ctab="seven"][aria-selected="true"]'),
             practice: !!document.querySelector('[data-gpractice]') }; })()""")
         check(ui == {'rows': 7, 'sel': 2, 'tab': True, 'practice': True}, 'the Seven tab: seven rows, an offense and a defense position each, and Practice game', ui)
         await pg.screenshot(path='/tmp/realm-gridiron-seven.png')

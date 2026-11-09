@@ -105,3 +105,4 @@ src/realm/w72-gear.js
 src/realm/w73-ringkit.js
 src/realm/w74-gridkit.js
 src/realm/w75-ringpowers.js
+src/realm/w76-gfpowers2.js

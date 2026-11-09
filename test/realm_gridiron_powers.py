@@ -51,7 +51,9 @@ async def main():
         check(fx['stampede'] > 20 and fx['glideBreak'] == 0, 'Stampede knocks over a tackler on most runs, and Glide is never broken up or picked off', fx)
 
         # ---------- headless games: mana, casts, the reason, stamina, CPU skill ----------
-        g = await pg.evaluate("""(() => { const B = wGF.powerBook, fits = {}; for (const k in B) for (const r of ['off', 'def']) fits[B[k][r].n] = B[k][r].fits;
+        g = await pg.evaluate("""(() => { const B = wGF.powerBook, fits = {}; for (const k in B) for (const r of ['off', 'def', 'off2', 'def2']) if (B[k][r]) fits[B[k][r].n] = B[k][r].fits;
+          // (the situation powers, issue #61 phase 5, are the team's and fit any call)
+          for (const s of Object.values(wGF.situations)) fits[s.n] = 'any';
           const out = { casts: [0, 0], ults: 0, why: 0, castPlays: 0, mismatch: [0, 0], fitCasts: [0, 0], manaOk: true, stamDown: true, json: true };
           for (let i = 0; i < 16; i++) { wGF.simGame({ seed: 40 + i, skill: [2, 0] }); const G = wGF.G;
             out.manaOk = out.manaOk && G.mana.every(m => m >= 0 && m <= 6);
