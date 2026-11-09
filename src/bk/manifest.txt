@@ -9,3 +9,4 @@ src/bk/parts/06-cpu.js
 src/bk/parts/07-game.js
 src/bk/parts/08-draw.js
 src/bk/parts/09-hands.js
+src/bk/parts/10-bench.js

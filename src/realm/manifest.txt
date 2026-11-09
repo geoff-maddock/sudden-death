@@ -109,3 +109,4 @@ src/realm/w74-gridkit.js
 src/realm/w75-ringpowers.js
 src/realm/w76-gfpowers2.js
 src/realm/w77-court.js
+src/realm/w78-courtfive.js

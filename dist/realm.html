@@ -28104,7 +28104,7 @@ function bkSetSpots(side) {
 }
 // a player's speed now: metres a second
 function bkSpeed(p, i) {
-  let m = 4.2 + p.r.spd * .38;
+  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p));
   if (i === bkHand()) m *= .9;
   if (p.stun > 0) m *= .25;
   return m;
@@ -28252,12 +28252,13 @@ function bkPass(j, lob) {
 // to 1 smothered), rim (at the rim), dunk }
 function bkShotP(p, x, y) {
   const dist = bkRimDist(p.side, x, y), [d, dd] = bkNearest(x, y, L.pl.filter(q => q.side !== p.side && q.stun <= 0));
-  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
+  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
   const rim = dist < 1.5, dunk = rim && p.r.siz + p.r.hop >= 13 && con < .7;
   let pr;
   if (rim) pr = .68 + (p.r.siz + p.r.hop - 12) * .016 - con * (.24 - (p.r.siz - (d ? d.r.siz : 5)) * .01) + (dunk ? .18 : 0);
   else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
   if (bkOnFire(p)) pr += BK_FIRE.p;
+  pr -= .1 * bkTired(p);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
 }
 /* the shot: settled at the release. A defender close enough may block it (it comes off loose) or foul (free throws:
@@ -28407,7 +28408,7 @@ const len2 = (a, b) => hyp(a.x - b.x, a.y - b.y);
 function bkPressure(h) {
   const p = L.pl[h], [nd, ndd] = bkNearest(p.x, p.y, bkDefense());
   if (!nd || ndd >= 1 || nd.stun > 0) return false;
-  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd) * .0018, .001, .02)) { bkPicked(nd); return true; }
+  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02)) { bkPicked(nd); return true; }
   if (R() < BK_THINK.reach) { bkReach(nd); return true; }
   return false;
 }
@@ -28486,6 +28487,8 @@ function bkThink(h) {
    Phase 2: GD.mode 'watch' (the CPU plays both sides) or 'play' (you play side GD.you by hand, 09-hands.js); the release
    meter (GD.meter) moves with the play, and your free throws wait for it. The hot hand: G.hot, each player's makes in
    a row (three and they're on fire, until a miss).
+   Phase 3: stamina and the bench (10-bench.js): the five drain through live play and the walk, everyone breathes at
+   stoppages, and the coaches sub at each dead ball and break.
    GD is the game on show (not saved). The headless game (bkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const BK_PACE = { intro: 1.4, dead: .9, walk: .9, walkSecs: 3, ft: 1.05, break: 2.2, half: 3.4 };
@@ -28498,6 +28501,7 @@ function bkStart(opts) {
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
+  bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
   // how often the big plays came up (from the play's events): fast breaks, players on fire, picks set, lobs, moves that beat a man, goaltending, alley-oops made
@@ -28509,8 +28513,11 @@ function bkStart(opts) {
 }
 function bkGo(ph) {
   GD.ph = ph; GD.t = 0;
-  // (a note, a foul-out, is for the stop in play it came with)
+  // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
+  // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
+  if (ph === 'break') bkStamBreak(GD.half);
+  if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
   if (BK_HOOK.onPhase) try { BK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 function bkBoxAdd(side, ri, k, n) {
@@ -28548,7 +28555,7 @@ function bkTick(dt) {
       bkMeterStep(BK_DT); if (GD.ph !== 'live') break;
       // (a shot in the air when the clock runs out still counts: the period ends when it comes down)
       if (L.buzzer) continue;
-      bkMinutes(Math.min(BK_DT, G.clock));
+      bkMinutes(Math.min(BK_DT, G.clock)); bkStamStep(BK_DT);
       const B = L.ball, r = bkRun(BK_DT, B.st === 'shot' || B.st === 'loose' || B.st === 'free');
       if (r === 'shot') { bkViolationNow(); break; }
       if (r === 'end') { if (B.st === 'shot') L.buzzer = true; else { bkPeriodOver(); break; } }
@@ -28556,12 +28563,13 @@ function bkTick(dt) {
     return;
   }
   // (after a reach the offense keeps it where it was, the ball with the player fouled: no walk up the floor)
+  if (GD.ph === 'dead' || GD.ph === 'break') bkStamStop(dt);
   if (GD.ph === 'dead') { if (GD.t >= BK_PACE.dead) { if (GD.keep) { GD.keep = false; for (const p of L.pl) { p.vx = p.vy = 0; p.stun = 0; } L.drive = false; L.think = .4; bkGo('live'); } else bkWalk(true); } return; }
   if (GD.ph === 'walk') {
     const W = GD.walk, u = Math.min(1, GD.t / BK_PACE.walk), e = u * u * (3 - 2 * u);
     L.pl.forEach((p, i) => { const a = W.from[i], b = W.to[i]; const px = p.x, py = p.y; p.x = lerp(a[0], b[0], e); p.y = lerp(a[1], b[1], e); p.vx = (p.x - px) / Math.max(dt, 1e-3); p.vy = (p.y - py) / Math.max(dt, 1e-3); p.run += hyp(p.x - px, p.y - py) * 2.2; });
     bkBall(dt);
-    if (W.clock) { const s = Math.min(G.clock, BK_PACE.walkSecs * e - (W.ran || 0)); W.ran = BK_PACE.walkSecs * e; bkMinutes(s); if (bkRun(s) === 'end') { bkPeriodOver(); return; } }
+    if (W.clock) { const s = Math.min(G.clock, BK_PACE.walkSecs * e - (W.ran || 0)); W.ran = BK_PACE.walkSecs * e; bkMinutes(s); bkStamStep(s, true); if (bkRun(s) === 'end') { bkPeriodOver(); return; } }
     if (u >= 1) { for (const p of L.pl) { p.vx = p.vy = 0; } L.t = 0; L.got = 0; L.think = .4; bkGo('live'); }
     return;
   }
@@ -28570,6 +28578,8 @@ function bkTick(dt) {
     const mine = bkHandsOn() && GD.ft && GD.ft.side === GD.you;
     if (GD.meter) { bkMeterStep(dt); return; }
     if (mine && BKI.now - BKI.last < BK_HANDS.ftWait + BK_PACE.ft && GD.t < BK_HANDS.ftWait) return;
+    // (the usual beat at the line is a stoppage like any other; the time it waits for you isn't rest)
+    if (GD.t <= BK_PACE.ft) bkStamStop(dt);
     if (GD.t >= BK_PACE.ft) bkFreeThrow();
     return;
   }
@@ -28641,7 +28651,8 @@ function bkFoulOn(side, d, o) {
 // side's bench: roster indices not on the floor and not fouled out
 function bkBench(side) { return G.teams[side].roster.map((_, i) => i).filter(i => !G.on[side].includes(i) && !bkFouledOut(side, i)); }
 function bkFoulOut(side, d, bench) {
-  const T = G.teams[side], inn = bench.slice().sort((a, b) => bkFit(T.roster[b].r, d.pos) - bkFit(T.roster[a].r, d.pos))[0], m = T.roster[inn];
+  // (yours: the next on your bench; the CPU's: whoever suits the spot)
+  const T = G.teams[side], inn = bkOrdered(side) ? bench[0] : bench.slice().sort((a, b) => bkFit(T.roster[b].r, d.pos) - bkFit(T.roster[a].r, d.pos))[0], m = T.roster[inn];
   G.on[side][BK_POS.indexOf(d.pos)] = inn;
   GD.notes = (GD.notes || []).concat(`${d.n} fouls out; ${m.n} comes on.`);
   Object.assign(d, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
@@ -28710,12 +28721,12 @@ function bkPeriodOver() {
 function bkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function bkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, q: G.q, ot: G.over ? G.over.ot : 0, mins: G.mins,
-    poss: G.poss0.slice(), secs: Math.round(G.secs), box: bkBox(), log: G.log.slice(), tally: Object.assign({}, G.tally) };
+    poss: G.poss0.slice(), secs: Math.round(G.secs), box: bkBox(), log: G.log.slice(), tally: Object.assign({}, G.tally), subs: (G.subs || [0, 0]).slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function bkBox() {
   return G.teams.map((T, s) => {
-    const rows = T.roster.map((m, i) => Object.assign({ n: m.n, kind: m.kind, num: m.num, ri: i, out: bkFouledOut(s, i) && !G.on[s].includes(i) }, G.box[s][i], { sec: Math.round(G.box[s][i].sec) })).filter(r => r.sec > 0 || r.pf > 0 || G.on[s].includes(r.ri));
+    const rows = T.roster.map((m, i) => Object.assign({ n: m.n, kind: m.kind, num: m.num, ri: i, out: bkFouledOut(s, i) && !G.on[s].includes(i) }, G.box[s][i], { sec: Math.round(G.box[s][i].sec) }));
     const tot = {}; for (const k of ['pts', 'reb', 'oreb', 'dreb', 'ast', 'stl', 'blk', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'pf', 'tov']) tot[k] = rows.reduce((a, r) => a + r[k], 0);
     return { team: T.name, rows, tot };
   });
@@ -28846,6 +28857,8 @@ function bkDrawPlayers(c) {
     const s = bkScr(p.x, p.y), T = G.teams[p.side], mv = hyp(p.vx, p.vy) > .5;
     if (i === h) { c.save(); c.strokeStyle = T.light || '#fff'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(s.x, s.y, 15, 5, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
     const face = mv ? p.vx < 0 : bkDir(p.side) < 0, lift = p.act === 'shoot' ? 9 : p.act === 'jump' ? 11 : 0;
+    // (tired: a short bar of what breath is left, under their feet)
+    if (bkTired(p) > 0) { const v = bkSta(p) / 100; c.save(); c.fillStyle = 'rgba(12,10,9,.7)'; c.fillRect(s.x - 12, s.y + 6, 24, 3); c.fillStyle = v < BK_STAM.sub / 100 ? '#ff6a4a' : '#ffb070'; c.fillRect(s.x - 12, s.y + 6, 24 * v, 3); c.restore(); }
     if (bkOnFire(p)) for (let k = 0; k < 5; k++) { const a = BKT.t * 9 + k * 1.3; c.save(); c.globalAlpha = .75; c.fillStyle = k % 2 ? '#ffb02e' : '#ff5a1e'; c.beginPath(); c.ellipse(s.x - 10 + k * 5, s.y - 4 - Math.abs(Math.sin(a)) * 7, 3, 6 + Math.abs(Math.sin(a)) * 4, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
     drawFig(c, p.kind, s.x, s.y, 50, T, { num: p.num, run: mv ? p.run : 0, flip: face, throwK: p.act === 'shoot' || p.act === 'rise' ? 1 : 0, lift: p.act === 'rise' ? 4 : lift, alpha: p.stun > 0 ? .75 : 1 });
     // the player you play: a marker over their head
@@ -29074,7 +29087,8 @@ function bkMoveTry(h, k) {
   L.moveCd = BK_HANDS.moveCd;
   const [d, dd] = bkNearest(p.x, p.y, bkDefense().filter(q => q.stun <= 0));
   if (!d || dd > 1.6) return '';
-  if (R() < clamp(M.beat + (p.r.hnd - d.r.def) * .06, .1, .88)) { d.stun = M.stun; bkEv('beat', p.n, d.n); GD.msg = `${p.n}'s ${M.n} leaves ${d.n} behind.`; L.drive = true; return 'beat'; }
+  bkStamCost(p, BK_STAM.move);
+  if (R() < clamp(M.beat + (p.r.hnd - 2 * bkTired(p) - d.r.def) * .06, .1, .88)) { d.stun = M.stun; bkEv('beat', p.n, d.n); GD.msg = `${p.n}'s ${M.n} leaves ${d.n} behind.`; L.drive = true; return 'beat'; }
   if (R() < M.strip * clamp(1 + (d.r.def - p.r.hnd) * .1, .4, 2)) { GD.msg = `${p.n} tries a ${M.n}, and ${d.n} picks it.`; bkPicked(d); return 'stripped'; }
   p.stun = .25; GD.msg = `${p.n}'s ${M.n} doesn't fool ${d.n}.`; return 'stumble';
 }
@@ -29102,6 +29116,78 @@ function bkJump() {
     bkEv('goaltend', d.n); return 'goaltend';
   }
   return 'jump';
+}
+/* The Charter Court: stamina and the bench (issue #77, phase 3). Every player is on the floor at both ends, so stamina
+   (G.stam, by side and roster index, 0 to 100) drains every second they're on it, more when they run hard (a fast
+   break, a cut, a drive) and for each move (a crossover or a spin), and more for the big bodies. The drain is scaled to
+   the game's length, so a starter who plays it all ends it tired whatever the length. On the bench, and at stoppages,
+   it comes back, at the length's pace too; a quarter break gives some back to everyone, halftime more.
+   A tired player (below BK_STAM.tired) is slower, shoots worse, contests less and handles worse, more so the lower they
+   go (bkTired: 0 fresh to 1 spent).
+   The bench: at each dead ball and break, each side's coach takes off a player below BK_STAM.sub for a fresh one
+   (BK_STAM.fresh or more) from the bench: your side in your bench order (the roster after the five: the Court tab sets
+   it; G.ordered[side], or the side you play by hand), the CPU's by who suits the spot best. A starter rested back to BK_STAM.back comes back in at a break for whoever
+   took their spot. A sub goes in the box score's minutes and the line under the court. bkSub(side, out, inn) is a swap
+   by hand (at a dead ball or a break; phase 4's Manage uses it). */
+const BK_STAM = { drain: .3, run: .2, runAt: 5.5, move: 4, big: .04, rest: 2.2, stop: .35, quarter: 6, half: 10, tired: 55, sub: 42, fresh: 72, back: 80 };
+const bkSta = p => G.stam ? G.stam[p.side][p.ri] : 100;
+const bkTired = p => clamp((BK_STAM.tired - bkSta(p)) / BK_STAM.tired, 0, 1);
+function bkStamStart() { G.stam = G.teams.map(t => t.roster.map(() => 100)); G.subs = [0, 0]; G.starters = G.on.map(a => a.slice()); }
+// the pace of play: drain and rest per second scale with the length, so a game takes the same out of a player whatever it
+// is (the three breaks between periods are the same in any game, so what they give back doesn't scale)
+const bkStamK = () => BK_RULES.mins / G.mins;
+// dt seconds of play: the five drain, the bench rests
+function bkStamStep(dt, walk) {
+  if (!G.stam) return;
+  const k = bkStamK();
+  for (const s of [0, 1]) for (const ri of bkBench(s)) G.stam[s][ri] = Math.min(100, G.stam[s][ri] + BK_STAM.rest * dt * k);
+  for (const p of L.pl) {
+    const fast = !walk && hyp(p.vx, p.vy) > BK_STAM.runAt, st = G.stam[p.side];
+    st[p.ri] = Math.max(0, st[p.ri] - (BK_STAM.drain + (fast ? BK_STAM.run : 0)) * dt * k * (1 + (p.r.siz - 5) * BK_STAM.big));
+  }
+}
+// a stoppage of dt seconds: everyone gets a little back (the bench at its usual rate)
+function bkStamStop(dt) { if (!G.stam) return; const k = bkStamK(); for (const s of [0, 1]) G.stam[s].forEach((v, ri) => { G.stam[s][ri] = Math.min(100, v + (G.on[s].includes(ri) ? BK_STAM.stop : BK_STAM.rest) * dt * k); }); }
+function bkStamBreak(half) { if (!G.stam) return; for (const s of [0, 1]) G.stam[s] = G.stam[s].map(v => Math.min(100, v + (half ? BK_STAM.half : BK_STAM.quarter))); }
+function bkStamCost(p, n) { if (G.stam) G.stam[p.side][p.ri] = Math.max(0, G.stam[p.side][p.ri] - n); }
+// does side's coach follow its bench order (yours, from the Court tab: G.ordered, or the side you play by hand)
+const bkOrdered = side => !!(G.ordered && G.ordered[side]) || (GD.mode === 'play' && side === GD.you);
+/* the coach's subs for side at a stoppage (brk: a break between periods, when rested starters come back) */
+function bkCoachSubs(side, brk) {
+  if (!G.stam) return;
+  const T = G.teams[side], mine = bkOrdered(side);
+  BK_POS.forEach((pos, k) => {
+    const out = G.on[side][k], bench = bkBench(side);
+    if (!bench.length) return;
+    // a rested starter back in at a break
+    const st0 = G.starters[side][k];
+    if (brk && out !== st0 && bench.includes(st0) && G.stam[side][st0] >= BK_STAM.back) return bkSubDo(side, out, st0, 'back');
+    if (G.stam[side][out] >= BK_STAM.sub) return;
+    const fresh = bench.filter(i => G.stam[side][i] >= BK_STAM.fresh);
+    if (!fresh.length) return;
+    const inn = mine ? fresh[0] : fresh.sort((a, b) => bkFit(T.roster[b].r, pos) - bkFit(T.roster[a].r, pos))[0];
+    bkSubDo(side, out, inn, 'tired');
+  });
+}
+// out comes off, inn goes on in their spot (the play's player takes inn's name, kind and ratings)
+function bkSubDo(side, out, inn, why) {
+  const k = G.on[side].indexOf(out), T = G.teams[side], m = T.roster[inn], p = L.pl.find(q => q.side === side && q.ri === out);
+  if (k < 0 || !m) return false;
+  G.on[side][k] = inn; G.subs[side]++;
+  GD.notes = (GD.notes || []).concat(`${m.n} on for ${T.roster[out].n}${why === 'tired' ? ', who needs a breather' : why === 'back' ? ', rested' : ''}.`);
+  if (p) Object.assign(p, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
+  return true;
+}
+// a swap by hand: at a dead ball or a break, out (on the floor) for inn (on the bench, not fouled out); '' when it
+// worked, or why not
+function bkSub(side, out, inn) {
+  if (!GD || !['dead', 'break', 'intro'].includes(GD.ph)) return 'Only at a stoppage.';
+  if (!G.on[side].includes(out)) return 'They aren\'t on the floor.';
+  if (!bkBench(side).includes(inn)) return 'They can\'t come on.';
+  bkSubDo(side, out, inn, 'hand');
+  // (yours by hand: they're the one who starts that spot now, so the coach doesn't undo it at the next break)
+  G.starters[side][G.on[side].indexOf(inn)] = inn;
+  return '';
 }
 /* The court's page in the Realm (issue #77, phase 1). A canvas in #v-court, after the ring's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (bkTick) and draws it (bkDraw). The engine's parts
@@ -29180,7 +29266,7 @@ return {
   pause: on => { BKP.paused = !!on; }, get paused() { return BKP.paused; },
   set onOver(f) { BK_HOOK.onOver = f; }, get onOver() { return BK_HOOK.onOver; }, set onPhase(f) { BK_HOOK.onPhase = f; }, get onPhase() { return BK_HOOK.onPhase; },
   // the ratings, the spots and the clubs, for the page and How to play
-  rate: kind => bkRate(kind), kinds: Object.keys(BK_KIND), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),
+  rate: kind => bkRate(kind), fit: (r, pos) => bkFit(Object.assign(bkRate('goblin'), r), pos), kinds: Object.keys(BK_KIND), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),
   ftChance: r => bkFtChance({ r: Object.assign(bkRate('goblin'), r) }),
   // by hand (phase 2): who plays it ('watch' or 'play'), your keys (input: { steer, shoot, pass, box, act }; returns
   // what happened), whether you have the ball, the player you play, the release meter ({ t, T, now (0 to late), w, ft }),
@@ -29194,6 +29280,10 @@ return {
   // the tests' handles on phase 2's plays: a hand shot let go e from the top, a pass (lob), a pick, a move, a jump, a swipe
   shootAt: e => bkHand() >= 0 ? (bkShoot({ e }), L.shot) : null, pass: (j, lob) => bkHand() >= 0 ? (bkPass(j, lob), true) : false, pick: i => bkPick(i == null ? bkHand() : i),
   move: k => bkMoveTry(bkHand(), k), freeThrows: (side, i, n) => bkFreeThrows(side, i, n), shot: () => L && L.shot ? Object.assign({}, L.shot) : null,
+  // stamina and the bench (phase 3): each side's stamina by roster index, who's on (roster indices in spot order) and
+  // on the bench (in order), a swap by hand at a stoppage ('' or why not), how tired a player in the play is, the rules
+  stam: () => G && G.stam ? JSON.parse(JSON.stringify(G.stam)) : null, onFloor: () => G && G.on ? JSON.parse(JSON.stringify(G.on)) : null, bench: side => G && G.on ? bkBench(side) : [],
+  sub: (side, out, inn) => G && G.on ? bkSub(side, out, inn) : 'No game on.', tired: i => L ? bkTired(L.pl[i]) : 0, stamRules: Object.assign({}, BK_STAM),
   // the test's handle on the court: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
   step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) bkTick(BK_DT); return GD ? GD.ph : null; },
   get play() { return L; }, get ev() { return L ? L.ev : []; }, shotP: (i, x, y) => L ? bkShotP(L.pl[i], x == null ? L.pl[i].x : x, y == null ? L.pl[i].y : y) : null,
@@ -39363,7 +39453,7 @@ $('v-court').insertAdjacentHTML('beforebegin', `<div id="wCourtBar" class="wdbar
 $('wCourtBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.cmode) { W_COURT_MODE = b.dataset.cmode; if (WBK && !WBK.over) wBK.setMode(W_COURT_MODE); wCourtBarNote(); }
-  else if (b.id === 'wCourtAgain') wCourtGame();
+  else if (b.id === 'wCourtAgain') { if (WBK && WBK.how === 'practice') wCourtPractice(); else wCourtGame(); }
   else if (b.id === 'wCourtBack') wLeaveCourt();
 });
 $('wCourtMins').addEventListener('change', e => { SET.courtMins = +e.target.value; saveSettings(); wCourtBarNote(); });
@@ -39414,11 +39504,13 @@ function wCourtName(kind, used) {
   for (let k = 2; used.has(n); k++) n = `${base} ${k}`;
   used.add(n); return n;
 }
-/* one game on the court. opts: { teams, mins, seed } (the two clubs and the length setting when not given) */
+/* one game on the court. opts: { teams, mins, seed, mode, title, how ('practice': Another game plays another, w78),
+   ordered (sides whose coach follows the bench order) } (the two clubs and the length setting when not given) */
 function wCourtGame(opts) {
   const o = opts || {};
-  WBK = { over: null }; wCourtTick(true);
-  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE });
+  WBK = { over: null, how: o.how || 'scrimmage' }; wCourtTick(true);
+  $('wCourtTitle').textContent = o.title || 'A scrimmage at the Charter Court';
+  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered });
   showView('court');
   wCourtBarNote(); wCourtBox();
 }
@@ -39436,8 +39528,10 @@ function wCourtBarNote() {
 // the box score under the court: each side's players with their lines
 function wCourtBox() {
   const B = wBK.box(); if (!B) { $('wCourtBox').innerHTML = ''; return; }
+  // (stamina now, phase 3; on the floor marked)
+  const ST = wBK.stam(), ON = wBK.onFloor(), sta = (s, ri) => ST ? `<td class="${ST[s][ri] < wBK.stamRules.sub ? 'wbad' : ''}">${Math.round(ST[s][ri])}</td>` : '<td></td>';
   const pct = (m, a) => a ? `${m}/${a}` : '–', mins = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
-  $('wCourtBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Minutes on the floor">Min</th><th>Pts</th><th title="Rebounds (offensive)">Reb</th><th>Ast</th><th>Stl</th><th>Blk</th><th title="Field goals made of tried">FG</th><th title="Threes made of tried">3PT</th><th title="Free throws made of tried">FT</th><th title="Personal fouls">PF</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${esc(wKindName(r.kind))}</small>${r.out ? ' <small>(fouled out)</small>' : ''}</td><td>${mins(r.sec)}</td><td>${r.pts}</td><td>${r.reb}${r.oreb ? ` <small>(${r.oreb})</small>` : ''}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td><td>${pct(r.fgm, r.fga)}</td><td>${pct(r.tpm, r.tpa)}</td><td>${pct(r.ftm, r.fta)}</td><td>${r.pf}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td><b>${b.tot.pts}</b></td><td>${b.tot.reb}</td><td>${b.tot.ast}</td><td>${b.tot.stl}</td><td>${b.tot.blk}</td><td>${pct(b.tot.fgm, b.tot.fga)}</td><td>${pct(b.tot.tpm, b.tot.tpa)}</td><td>${pct(b.tot.ftm, b.tot.fta)}</td><td>${b.tot.pf}</td></tr></table>`).join('');
+  $('wCourtBox').innerHTML = B.map((b, s) => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Minutes on the floor">Min</th><th title="Stamina now, out of 100: tired below ${wBK.stamRules.tired}, the coach looks for a sub below ${wBK.stamRules.sub}">Sta</th><th>Pts</th><th title="Rebounds (offensive)">Reb</th><th>Ast</th><th>Stl</th><th>Blk</th><th title="Field goals made of tried">FG</th><th title="Threes made of tried">3PT</th><th title="Free throws made of tried">FT</th><th title="Personal fouls">PF</th></tr>${b.rows.map(r => `<tr><td>${ON && ON[s].includes(r.ri) && !WBK.over ? '<b title="On the floor">&bull;</b> ' : ''}${esc(r.n)} <small>${esc(wKindName(r.kind))}</small>${r.out ? ' <small>(fouled out)</small>' : ''}</td><td>${mins(r.sec)}</td>${sta(s, r.ri)}<td>${r.pts}</td><td>${r.reb}${r.oreb ? ` <small>(${r.oreb})</small>` : ''}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td><td>${pct(r.fgm, r.fga)}</td><td>${pct(r.tpm, r.tpa)}</td><td>${pct(r.ftm, r.fta)}</td><td>${r.pf}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td></td><td><b>${b.tot.pts}</b></td><td>${b.tot.reb}</td><td>${b.tot.ast}</td><td>${b.tot.stl}</td><td>${b.tot.blk}</td><td>${pct(b.tot.fgm, b.tot.fga)}</td><td>${pct(b.tot.tpm, b.tot.tpa)}</td><td>${pct(b.tot.ftm, b.tot.fta)}</td><td>${b.tot.pf}</td></tr></table>`).join('');
 }
 function wLeaveCourt() {
   wCourtPadRelease(); wCourtTick(false);
@@ -39506,6 +39600,242 @@ renderHelp = function () {
   const G = [...h.querySelectorAll('[id^="wHelpG"], #wHelpRing')], after = G[G.length - 1];
   h.insertAdjacentHTML('beforeend', `<section id="wCourtHow" class="wghelp"><h3>Basketball: how it works</h3>${wCourtHowHTML()}</section>`);
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourt"><b>Real basketball.</b> The Charter Court is trying out basketball on the boards themselves, five on five. Ask Nim Hoopwright for a SCRIMMAGE: four quarters on the game clock (five minutes in all, or set the length in Settings) and a ${wBK.rules.shot}-second shot clock. Play Graftonbury by hand, or watch the two clubs run it end to end: shots, drives, passes, rebounds, steals, blocks, fouls and free throws, with a box score under the court (see Basketball: how it works). A SCRIMMAGE is an exhibition: nothing is won or lost.</p>`);
+};
+/* w78: basketball ratings and the five (issue #77, phase 3). Every Realm player has Charter Court ratings, p.bk, as
+   they have football's p.gf (w43) and boxing's p.bx (w53): speed, size, hops, touch, handle and defense, 1 to 12. They
+   are seeded from the kind's basketball ratings (wBK.rate), each moved by up to 1, and every level above 1 adds a point
+   to one of them, weighted by what the kind is good at; an older save's players get theirs when it loads.
+   The five: basketball is five a side, and a Realm squad for it is five (W_GRD_SQUAD.basketball), the whole squad on the
+   floor at once. The Court tab on the Team screen sets who plays which spot (PG, SG, SF, PF, C) and the order of the
+   bench: the rest of your roster, who come on as the coach subs tired players and when a player fouls out, first in
+   line first. Called-up players at your level fill the five when your roster is short. Left alone, the coach picks the
+   five and the spots from the ratings (the best handler at the point, the biggest inside, the best shooter on the wing)
+   and puts the bench in order of who's best. Practice game plays your five against the Saltmere Basketball Club at the
+   Charter Court; nothing is won or lost.
+
+   p.bk       { spd, siz, hop, tch, hnd, def, lv, got: { stat: points from levels } }
+   WG.court   { five: { PG: key, SG, SF, PF, C }, bench: [keys, in order], cu: [call-ups], seq, mine?: true once you've
+                changed something (until then the coach picks again whenever the squad changes) }; a player who joins takes a
+                call-up's spot, or the end of the bench, the next time it syncs
+              a key is a roster id, or a call-up's cid ('k1', 'k2', ...)
+   wBkOf(p)          p's ratings, made or caught up first
+   wCourtSync()      makes the five, or brings it up to date with the roster; returns WG.court
+   wCourtMine()      your five and bench as the Charter Court takes a team
+   wCourtSetSpot(key, spot), wCourtMove(key, dir), wCourtAuto()   changes; each returns a message, or '' when it worked
+   Wrapped: wMakePlayer (wW78MakePlayer), wGiveXp (wW78GiveXp), wStart (wW78Start),
+   wStatsCard (wW78StatsCard: a Basketball block), wCampStats (wW78CampStats: the Basketball view), wOpenCamp
+   (wW78OpenCamp: the Court tab), wRenderCamp (wW78RenderCamp), renderHelp (wW78RenderHelp: #wHelpCourtTab). */
+
+const W_BKR = {
+  cap: 12, cuKinds: ['goblin', 'troll', 'elf', 'werewolf', 'minotaur'],
+  stat: { spd: ['Spd', 'Speed: getting up the floor, cutting, chasing'], siz: ['Siz', 'Size: height and reach, for blocks, rebounds and shots at the rim'],
+    hop: ['Hop', 'Hops: jumping, for rebounds, blocks, dunks and lobs'], tch: ['Tch', 'Touch: shooting, and free throws'],
+    hnd: ['Hnd', 'Handle: dribbling, passing and moves'], def: ['Def', 'Defense: staying in front, contesting, steals'] },
+  pos: { PG: 'point guard', SG: 'shooting guard', SF: 'small forward', PF: 'power forward', C: 'center' },
+};
+
+/* ---------- ratings ---------- */
+function wBkOf(p) {
+  if (!p || !p.kind) return null;
+  if (!p.bk) { const r = wBK.rate(p.kind); p.bk = { lv: 1, got: {} }; for (const s of wBK.stats) p.bk[s] = Math.max(1, Math.min(W_BKR.cap, r[s] + Math.floor(Math.random() * 3) - 1)); }
+  const b = p.bk, lvl = p.lvl || 1;
+  while (b.lv < lvl) { b.lv++; const s = wBkGrowStat(p); if (s) { b[s]++; b.got[s] = (b.got[s] || 0) + 1; } }
+  return b;
+}
+// a level's point: any rating below the cap, weighted by the kind's own
+function wBkGrowStat(p) {
+  const K = wBK.rate(p.kind), open = wBK.stats.filter(s => p.bk[s] < W_BKR.cap);
+  if (!open.length) return null;
+  let r = Math.random() * open.reduce((a, s) => a + K[s], 0);
+  for (const s of open) { r -= K[s]; if (r < 0) return s; }
+  return open[open.length - 1];
+}
+function wBkAll() { if (!WG) return; for (const p of WG.roster || []) wBkOf(p); for (const p of WG.wwait || []) wBkOf(p); for (const c of (WG.court && WG.court.cu) || []) wBkOf(c); }
+const wBkSum = p => { const b = wBkOf(p); return wBK.stats.reduce((a, s) => a + b[s], 0); };
+
+const wW78MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW78MakePlayer(spec, from); wBkOf(p); return p; };
+const wW78GiveXp = wGiveXp;
+wGiveXp = function (p, n) { const r = wW78GiveXp(p, n); wBkOf(p); return r; };
+const wW78Start = wStart;
+wStart = function (save, opts) { const r = wW78Start(save, opts); wBkAll(); if (save) wSave(); return r; };
+
+/* ---------- the five ---------- */
+function wCourtWho(k) {
+  if (typeof k === 'string') return ((WG.court && WG.court.cu) || []).find(c => c.cid === k) || null;
+  return wPlayer(k);
+}
+const wCourtKeys = C => wBK.pos.map(pos => C.five[pos]).filter(k => k != null).concat(C.bench);
+function wCourtCallUp(C) {
+  const used = new Set(wCourtKeys(C).map(k => (wCourtWho(k) || {}).kind));
+  const kind = W_BKR.cuKinds.find(k => !used.has(k)) || pick(W_BKR.cuKinds);
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'k' + (C.seq++) });
+  C.cu.push(c);
+  return c;
+}
+// the coach's pick: the five who suit the spots best (the scarcest spots first), then the bench by who's best
+function wCourtAutoPick(C) {
+  const all = wRoster().map(p => p.id).concat(C.cu.map(c => c.cid)), left = new Set(all), five = {};
+  for (const pos of ['C', 'PG', 'PF', 'SF', 'SG']) {
+    const best = [...left].sort((a, b) => wBK.fit(wBkOf(wCourtWho(b)), pos) - wBK.fit(wBkOf(wCourtWho(a)), pos))[0];
+    if (best == null) break;
+    five[pos] = best; left.delete(best);
+  }
+  C.five = five;
+  C.bench = [...left].filter(k => typeof k !== 'string').sort((a, b) => wBkSum(wCourtWho(b)) - wBkSum(wCourtWho(a)));
+  C.cu = C.cu.filter(c => Object.values(five).includes(c.cid));
+}
+function wCourtSync() {
+  if (!WG) return null;
+  let fresh = false;
+  if (!WG.court || !WG.court.five) { WG.court = { five: {}, bench: [], cu: [], seq: 1 }; fresh = true; }
+  const C = WG.court, before = JSON.stringify([C.five, C.bench]);
+  for (const pos of wBK.pos) if (C.five[pos] != null && !wCourtWho(C.five[pos])) delete C.five[pos];
+  const inFive = new Set(Object.values(C.five));
+  C.bench = C.bench.filter((k, i) => typeof k !== 'string' && wCourtWho(k) && !inFive.has(k) && C.bench.indexOf(k) === i);
+  C.cu = C.cu.filter(c => inFive.has(c.cid));
+  const tier = wNineTier();
+  for (const c of C.cu) if (c.lvl < tier) { c.lvl = tier; wBkOf(c); }
+  // anyone missing: a call-up's spot if there is one, else the end of the bench
+  for (const p of wRoster()) {
+    if (wCourtKeys(C).includes(p.id)) continue;
+    const cuPos = wBK.pos.find(pos => typeof C.five[pos] === 'string');
+    if (cuPos) { const old = C.five[cuPos]; C.five[cuPos] = p.id; C.cu = C.cu.filter(c => c.cid !== old); }
+    else C.bench.push(p.id);
+  }
+  // a gap in the five: the first on the bench, or a call-up
+  for (const pos of wBK.pos) if (C.five[pos] == null) C.five[pos] = C.bench.length ? C.bench.shift() : wCourtCallUp(C).cid;
+  if (fresh || (!C.mine && JSON.stringify([C.five, C.bench]) !== before)) wCourtAutoPick(C);
+  for (const pos of wBK.pos) if (C.five[pos] == null) C.five[pos] = wCourtCallUp(C).cid;
+  return C;
+}
+// a player as the Charter Court takes one
+function wCourtPlayer(p) { return { n: p.n, kind: p.kind, num: p.num, r: Object.fromEntries(wBK.stats.map(s => [s, wBkOf(p)[s]])) }; }
+function wCourtMine() {
+  const C = wCourtSync(), t = wPartyTeam(), keys = wCourtKeys(C);
+  return { name: t.name, short: t.short, color: t.color, light: t.light, roster: keys.map(k => wCourtPlayer(wCourtWho(k))),
+    spot: Object.fromEntries(wBK.pos.map((pos, i) => [pos, i])) };
+}
+// where a player plays: a spot, 'bench' (with their place in line), or null (C: the court, synced once by the caller)
+function wCourtSpotOf(k, C) {
+  C = C || wCourtSync(); const pos = wBK.pos.find(x => C.five[x] === k);
+  if (pos) return { spot: pos };
+  const i = C.bench.indexOf(k); return i >= 0 ? { spot: 'bench', n: i + 1 } : null;
+}
+
+/* ---------- changes ---------- */
+function wCourtDone() { WG.court.mine = true; wSave(); return ''; }
+// k to a spot (whoever was there takes k's old place) or to the bench (the first on the bench takes their spot)
+function wCourtSetSpot(k, spot) {
+  const C = wCourtSync(), at = wCourtSpotOf(k, C); if (!at || at.spot === spot) return '';
+  if (spot === 'bench') {
+    if (!C.bench.length) return 'Nobody on the bench to take their spot.';
+    if (typeof k === 'string') return 'A call-up only plays in the five.';
+    C.five[at.spot] = C.bench.shift(); C.bench.unshift(k);
+    return wCourtDone();
+  }
+  if (!wBK.pos.includes(spot)) return '';
+  const other = C.five[spot];
+  if (at.spot === 'bench') {
+    const i = C.bench.indexOf(k); C.five[spot] = k;
+    if (typeof other === 'string') { C.bench.splice(i, 1); C.cu = C.cu.filter(c => c.cid !== other); } else C.bench[i] = other;
+  } else { C.five[spot] = k; C.five[at.spot] = other; }
+  return wCourtDone();
+}
+// a bench player up (-1) or down (+1) the order
+function wCourtMove(k, dir) {
+  const C = wCourtSync(), i = C.bench.indexOf(k), j = i + dir;
+  if (i < 0 || j < 0 || j >= C.bench.length) return '';
+  [C.bench[i], C.bench[j]] = [C.bench[j], C.bench[i]];
+  return wCourtDone();
+}
+function wCourtAuto() { WG.court = null; wCourtSync(); wSave(); return ''; }
+// a practice game: your five against the Saltmere Basketball Club, nothing riding on it
+function wCourtPractice() {
+  if (WCAMP.close) WCAMP.close();
+  wCourtGame({ teams: [wCourtMine(), wCourtTeams()[1]], title: 'A practice game at the Charter Court', how: 'practice', ordered: [true, false] });
+}
+
+/* ---------- the Basketball block on a player's stats ---------- */
+function wBkCard(p) {
+  const b = wBkOf(p); if (!b) return '';
+  const bars = wBK.stats.map(s => { const [ab, what] = W_BKR.stat[s], got = b.got[s] || 0;
+    return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / W_BKR.cap)}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
+  const at = WG && WG.court ? wCourtSpotOf(p.cid || p.id, WG.court) : null;
+  return `<div class="wbd wbkc"><h5>Basketball</h5><p class="wbdpos">${!at ? 'Not in your squad.' : at.spot === 'bench' ? `On your bench, ${wOrd(at.n)} in line.` : `In your five at ${esc(W_BKR.pos[at.spot])}.`}</p>
+    <div class="wbdbars">${bars}</div><p class="hint">Each level adds a point to one rating (shown as +), mostly to what their kind is good at. Ratings run from 1 to ${W_BKR.cap}.</p></div>`;
+}
+const wW78StatsCard = wStatsCard;
+wStatsCard = function (p) { return wW78StatsCard(p).replace(/<\/section>\s*$/, wBkCard(p) + '</section>'); };
+
+/* ---------- the Court tab ---------- */
+function wCourtRow(k, C) {
+  const p = wCourtWho(k), b = wBkOf(p), cu = typeof k === 'string', at = wCourtSpotOf(k, C), key = esc(String(k));
+  const opts = wBK.pos.map(pos => `<option value="${pos}"${at.spot === pos ? ' selected' : ''}>${pos}: ${esc(W_BKR.pos[pos])}</option>`).join('') + (cu ? '' : `<option value="bench"${at.spot === 'bench' ? ' selected' : ''}>Bench</option>`);
+  const i = at.spot === 'bench' ? at.n - 1 : -1;
+  return `<li class="wpr wnr wcrt${cu ? ' wcu' : ''}" data-kid="${key}">
+    <span class="wno">${at.spot === 'bench' ? at.n : esc(at.spot)}</span><img src="${wPlayerPort(p, 64)}" alt="">
+    <div class="wpi"><div class="wpn"><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}</span>${cu ? '<span class="wtag wb">Call-up</span>' : ''}</div>
+      <small class="wnst">${wBK.stats.map(s => `<span title="${esc(W_BKR.stat[s][1])}">${W_BKR.stat[s][0]} <b>${b[s]}</b></span>`).join(' ')}</small></div>
+    <div class="wpa"><label class="wsvl">Spot <select data-kspot aria-label="${esc(p.n)}'s spot">${opts}</select></label>
+      ${i >= 0 ? `<button class="ghost" data-kmove="-1" ${i === 0 ? 'disabled' : ''} aria-label="Up the bench">&uarr;</button><button class="ghost" data-kmove="1" ${i === C.bench.length - 1 ? 'disabled' : ''} aria-label="Down the bench">&darr;</button>` : ''}</div>
+  </li>`;
+}
+function wCampCourt(C) {
+  return `<p class="hint">Your basketball five, and the bench. Five a side, the whole five on the floor at both ends, so stamina runs down: when a player tires the coach brings on the first fresh player on your bench, and the next in line comes on if someone fouls out. Change a spot and whoever had it swaps with them; send a player to the bench and the first on the bench takes their spot. Called-up players at your level fill the five when your roster is short. Until you change something, the coach picks the five again whenever your squad changes: the best handler at the point, the biggest inside, the best shooter on the wing.</p>
+    <h4>The five</h4><ol class="wroster wnine wcourt">${wBK.pos.map(pos => wCourtRow(C.five[pos], C)).join('')}</ol>
+    <h4>The bench</h4>${C.bench.length ? `<ol class="wroster wnine wcourtb">${C.bench.map(k => wCourtRow(k, C)).join('')}</ol>` : '<p class="hint">Nobody: every player you have is in the five. A tired five plays on tired.</p>'}
+    <div class="row wnbtn"><button class="ghost" data-kauto>The coach's pick</button><button class="btn" data-kpractice>Practice game</button></div>`;
+}
+const wW78OpenCamp = wOpenCamp;
+wOpenCamp = function (tab) {
+  const want = tab || WCAMP.tab;
+  wW78OpenCamp(want === 'court' ? 'team' : tab);
+  const tabs = document.querySelector('#modalBox .wctabs');
+  if (!tabs || tabs.querySelector('[data-ctab="court"]')) return;
+  tabs.lastElementChild.insertAdjacentHTML('afterend', '<button role="tab" data-ctab="court">Court</button>');
+  tabs.querySelector('[data-ctab="court"]').onclick = () => { WCAMP.tab = 'court'; WCAMP.swap = null; WCAMP.msg = ''; wRenderCamp(); };
+  if (want === 'court') { WCAMP.tab = 'court'; wRenderCamp(); }
+};
+const wW78RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  if (WCAMP.tab !== 'court') return wW78RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  if (!$('modalBox').querySelector('[data-ctab="court"]')) { WCAMP.tab = 'team'; return wRenderCamp(); }
+  $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'court'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  // (synced once for the whole tab, and saved if that changed anything: a call-up, a new player placed)
+  const before = JSON.stringify(WG.court), C = wCourtSync(); if (JSON.stringify(C) !== before) wSave();
+  body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
+    ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampCourt(C);
+  const keyOf = el => { const k = el.closest('[data-kid]').dataset.kid; return /^k\d+$/.test(k) ? k : +k; };
+  body.querySelectorAll('[data-kspot]').forEach(s => s.onchange = () => wCampSay(wCourtSetSpot(keyOf(s), s.value)));
+  body.querySelectorAll('[data-kmove]').forEach(b => b.onclick = () => wCampSay(wCourtMove(keyOf(b), +b.dataset.kmove)));
+  const auto = body.querySelector('[data-kauto]'); if (auto) auto.onclick = () => wCampSay(wCourtAuto());
+  const pr = body.querySelector('[data-kpractice]'); if (pr) pr.onclick = () => wCourtPractice();
+};
+
+/* ---------- the Basketball view on the Stats tab: ratings now; games from the world add their lines (phase 5) ---------- */
+const W_BK_COLS = () => wBK.stats.map(s => [s, W_BKR.stat[s][0], W_BKR.stat[s][1]]);
+const wW78CampStats = wCampStats;
+wCampStats = function () {
+  const html = wW78CampStats().replace(/(<button data-wsview="career"[^>]*>Career<\/button>)/, `$1<button data-wsview="basketball" aria-pressed="${WSTAT.view === 'basketball'}">Basketball</button>`);
+  if (WSTAT.view !== 'basketball') return html;
+  const cols = W_BK_COLS(), k = WSTAT.sort && cols.some(c => c[0] === WSTAT.sort) ? WSTAT.sort : null;
+  const C = wCourtSync(), rows = wRoster().map((p, i) => ({ p, i, b: wBkOf(p), at: wCourtSpotOf(p.id, C) }));
+  if (k) rows.sort((a, b) => (b.b[k] - a.b[k]) || a.i - b.i);
+  const head = `<th scope="col"><button class="wsth" data-wsort="" aria-pressed="${!k}">Player</button></th><th scope="col">Spot</th>` + cols.map(([c, s, l]) => `<th scope="col"><button class="wsth" data-wsort="${c}" title="${esc(l)}" aria-pressed="${k === c}">${s}</button></th>`).join('');
+  const body = rows.map(({ p, b, at }) => `<tr data-wsp="${p.id}"${WSTAT.pid === p.id ? ' class="wsel"' : ''}><th scope="row"><button class="wsname" data-wsp-open aria-expanded="${WSTAT.pid === p.id}"><img src="${wPlayerPort(p, 40)}" alt=""><span><b>${esc(p.n)}</b><small>${esc(wKindName(p.kind))}</small></span></button></th>
+    <td>${!at ? '&ndash;' : at.spot === 'bench' ? `Bench ${at.n}` : at.spot}</td>${cols.map(([c]) => `<td>${b[c]}</td>`).join('')}</tr>`).join('');
+  const sel = WSTAT.pid != null && wPlayer(WSTAT.pid);
+  return html.replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every player\'s basketball ratings and where they play (set on the Court tab). Pick a heading to sort, a player to see more.</small>')
+    .replace(/<div class="tablewrap">[\s\S]*$/, `<div class="tablewrap"><table class="wstats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${sel ? wStatsCard(sel) : ''}`);
+};
+
+const wW78RenderHelp = renderHelp;
+renderHelp = function () {
+  wW78RenderHelp();
+  const after = $('wHelpCourt'); if (!after || $('wHelpCourtTab')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtTab"><b>Basketball ratings and the five.</b> Every player also has basketball ratings: speed, size, hops, touch, handle and defense (1 to ${W_BKR.cap}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Basketball view. The Court tab on the Team screen sets your five (who plays point guard, shooting guard, small forward, power forward and center) and the order of your bench. In a game stamina runs down; tired players are slower and shoot worse, and the coach brings on the first fresh player on your bench, and the next in line if someone fouls out. Called-up players at your level fill the five when your roster is short. Practice game there plays your five against the Saltmere Basketball Club; nothing is won or lost.</p>`);
 };
 </script>
 </body></html>

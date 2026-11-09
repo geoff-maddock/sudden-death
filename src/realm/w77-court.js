@@ -43,7 +43,7 @@ $('v-court').insertAdjacentHTML('beforebegin', `<div id="wCourtBar" class="wdbar
 $('wCourtBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.cmode) { W_COURT_MODE = b.dataset.cmode; if (WBK && !WBK.over) wBK.setMode(W_COURT_MODE); wCourtBarNote(); }
-  else if (b.id === 'wCourtAgain') wCourtGame();
+  else if (b.id === 'wCourtAgain') { if (WBK && WBK.how === 'practice') wCourtPractice(); else wCourtGame(); }
   else if (b.id === 'wCourtBack') wLeaveCourt();
 });
 $('wCourtMins').addEventListener('change', e => { SET.courtMins = +e.target.value; saveSettings(); wCourtBarNote(); });
@@ -94,11 +94,13 @@ function wCourtName(kind, used) {
   for (let k = 2; used.has(n); k++) n = `${base} ${k}`;
   used.add(n); return n;
 }
-/* one game on the court. opts: { teams, mins, seed } (the two clubs and the length setting when not given) */
+/* one game on the court. opts: { teams, mins, seed, mode, title, how ('practice': Another game plays another, w78),
+   ordered (sides whose coach follows the bench order) } (the two clubs and the length setting when not given) */
 function wCourtGame(opts) {
   const o = opts || {};
-  WBK = { over: null }; wCourtTick(true);
-  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE });
+  WBK = { over: null, how: o.how || 'scrimmage' }; wCourtTick(true);
+  $('wCourtTitle').textContent = o.title || 'A scrimmage at the Charter Court';
+  wBK.start({ teams: o.teams || wCourtTeams(), mins: o.mins || wCourtMins(), seed: o.seed, mode: o.mode || W_COURT_MODE, ordered: o.ordered });
   showView('court');
   wCourtBarNote(); wCourtBox();
 }
@@ -116,8 +118,10 @@ function wCourtBarNote() {
 // the box score under the court: each side's players with their lines
 function wCourtBox() {
   const B = wBK.box(); if (!B) { $('wCourtBox').innerHTML = ''; return; }
+  // (stamina now, phase 3; on the floor marked)
+  const ST = wBK.stam(), ON = wBK.onFloor(), sta = (s, ri) => ST ? `<td class="${ST[s][ri] < wBK.stamRules.sub ? 'wbad' : ''}">${Math.round(ST[s][ri])}</td>` : '<td></td>';
   const pct = (m, a) => a ? `${m}/${a}` : '–', mins = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
-  $('wCourtBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Minutes on the floor">Min</th><th>Pts</th><th title="Rebounds (offensive)">Reb</th><th>Ast</th><th>Stl</th><th>Blk</th><th title="Field goals made of tried">FG</th><th title="Threes made of tried">3PT</th><th title="Free throws made of tried">FT</th><th title="Personal fouls">PF</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${esc(wKindName(r.kind))}</small>${r.out ? ' <small>(fouled out)</small>' : ''}</td><td>${mins(r.sec)}</td><td>${r.pts}</td><td>${r.reb}${r.oreb ? ` <small>(${r.oreb})</small>` : ''}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td><td>${pct(r.fgm, r.fga)}</td><td>${pct(r.tpm, r.tpa)}</td><td>${pct(r.ftm, r.fta)}</td><td>${r.pf}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td><b>${b.tot.pts}</b></td><td>${b.tot.reb}</td><td>${b.tot.ast}</td><td>${b.tot.stl}</td><td>${b.tot.blk}</td><td>${pct(b.tot.fgm, b.tot.fga)}</td><td>${pct(b.tot.tpm, b.tot.tpa)}</td><td>${pct(b.tot.ftm, b.tot.fta)}</td><td>${b.tot.pf}</td></tr></table>`).join('');
+  $('wCourtBox').innerHTML = B.map((b, s) => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Minutes on the floor">Min</th><th title="Stamina now, out of 100: tired below ${wBK.stamRules.tired}, the coach looks for a sub below ${wBK.stamRules.sub}">Sta</th><th>Pts</th><th title="Rebounds (offensive)">Reb</th><th>Ast</th><th>Stl</th><th>Blk</th><th title="Field goals made of tried">FG</th><th title="Threes made of tried">3PT</th><th title="Free throws made of tried">FT</th><th title="Personal fouls">PF</th></tr>${b.rows.map(r => `<tr><td>${ON && ON[s].includes(r.ri) && !WBK.over ? '<b title="On the floor">&bull;</b> ' : ''}${esc(r.n)} <small>${esc(wKindName(r.kind))}</small>${r.out ? ' <small>(fouled out)</small>' : ''}</td><td>${mins(r.sec)}</td>${sta(s, r.ri)}<td>${r.pts}</td><td>${r.reb}${r.oreb ? ` <small>(${r.oreb})</small>` : ''}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td><td>${pct(r.fgm, r.fga)}</td><td>${pct(r.tpm, r.tpa)}</td><td>${pct(r.ftm, r.fta)}</td><td>${r.pf}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td></td><td><b>${b.tot.pts}</b></td><td>${b.tot.reb}</td><td>${b.tot.ast}</td><td>${b.tot.stl}</td><td>${b.tot.blk}</td><td>${pct(b.tot.fgm, b.tot.fga)}</td><td>${pct(b.tot.tpm, b.tot.tpa)}</td><td>${pct(b.tot.ftm, b.tot.fta)}</td><td>${b.tot.pf}</td></tr></table>`).join('');
 }
 function wLeaveCourt() {
   wCourtPadRelease(); wCourtTick(false);

@@ -14,6 +14,8 @@
    Phase 2: GD.mode 'watch' (the CPU plays both sides) or 'play' (you play side GD.you by hand, 09-hands.js); the release
    meter (GD.meter) moves with the play, and your free throws wait for it. The hot hand: G.hot, each player's makes in
    a row (three and they're on fire, until a miss).
+   Phase 3: stamina and the bench (10-bench.js): the five drain through live play and the walk, everyone breathes at
+   stoppages, and the coaches sub at each dead ball and break.
    GD is the game on show (not saved). The headless game (bkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const BK_PACE = { intro: 1.4, dead: .9, walk: .9, walkSecs: 3, ft: 1.05, break: 2.2, half: 3.4 };
@@ -26,6 +28,7 @@ function bkStart(opts) {
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
+  bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
   // how often the big plays came up (from the play's events): fast breaks, players on fire, picks set, lobs, moves that beat a man, goaltending, alley-oops made
@@ -37,8 +40,11 @@ function bkStart(opts) {
 }
 function bkGo(ph) {
   GD.ph = ph; GD.t = 0;
-  // (a note, a foul-out, is for the stop in play it came with)
+  // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
+  // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
+  if (ph === 'break') bkStamBreak(GD.half);
+  if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
   if (BK_HOOK.onPhase) try { BK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 function bkBoxAdd(side, ri, k, n) {
@@ -76,7 +82,7 @@ function bkTick(dt) {
       bkMeterStep(BK_DT); if (GD.ph !== 'live') break;
       // (a shot in the air when the clock runs out still counts: the period ends when it comes down)
       if (L.buzzer) continue;
-      bkMinutes(Math.min(BK_DT, G.clock));
+      bkMinutes(Math.min(BK_DT, G.clock)); bkStamStep(BK_DT);
       const B = L.ball, r = bkRun(BK_DT, B.st === 'shot' || B.st === 'loose' || B.st === 'free');
       if (r === 'shot') { bkViolationNow(); break; }
       if (r === 'end') { if (B.st === 'shot') L.buzzer = true; else { bkPeriodOver(); break; } }
@@ -84,12 +90,13 @@ function bkTick(dt) {
     return;
   }
   // (after a reach the offense keeps it where it was, the ball with the player fouled: no walk up the floor)
+  if (GD.ph === 'dead' || GD.ph === 'break') bkStamStop(dt);
   if (GD.ph === 'dead') { if (GD.t >= BK_PACE.dead) { if (GD.keep) { GD.keep = false; for (const p of L.pl) { p.vx = p.vy = 0; p.stun = 0; } L.drive = false; L.think = .4; bkGo('live'); } else bkWalk(true); } return; }
   if (GD.ph === 'walk') {
     const W = GD.walk, u = Math.min(1, GD.t / BK_PACE.walk), e = u * u * (3 - 2 * u);
     L.pl.forEach((p, i) => { const a = W.from[i], b = W.to[i]; const px = p.x, py = p.y; p.x = lerp(a[0], b[0], e); p.y = lerp(a[1], b[1], e); p.vx = (p.x - px) / Math.max(dt, 1e-3); p.vy = (p.y - py) / Math.max(dt, 1e-3); p.run += hyp(p.x - px, p.y - py) * 2.2; });
     bkBall(dt);
-    if (W.clock) { const s = Math.min(G.clock, BK_PACE.walkSecs * e - (W.ran || 0)); W.ran = BK_PACE.walkSecs * e; bkMinutes(s); if (bkRun(s) === 'end') { bkPeriodOver(); return; } }
+    if (W.clock) { const s = Math.min(G.clock, BK_PACE.walkSecs * e - (W.ran || 0)); W.ran = BK_PACE.walkSecs * e; bkMinutes(s); bkStamStep(s, true); if (bkRun(s) === 'end') { bkPeriodOver(); return; } }
     if (u >= 1) { for (const p of L.pl) { p.vx = p.vy = 0; } L.t = 0; L.got = 0; L.think = .4; bkGo('live'); }
     return;
   }
@@ -98,6 +105,8 @@ function bkTick(dt) {
     const mine = bkHandsOn() && GD.ft && GD.ft.side === GD.you;
     if (GD.meter) { bkMeterStep(dt); return; }
     if (mine && BKI.now - BKI.last < BK_HANDS.ftWait + BK_PACE.ft && GD.t < BK_HANDS.ftWait) return;
+    // (the usual beat at the line is a stoppage like any other; the time it waits for you isn't rest)
+    if (GD.t <= BK_PACE.ft) bkStamStop(dt);
     if (GD.t >= BK_PACE.ft) bkFreeThrow();
     return;
   }
@@ -169,7 +178,8 @@ function bkFoulOn(side, d, o) {
 // side's bench: roster indices not on the floor and not fouled out
 function bkBench(side) { return G.teams[side].roster.map((_, i) => i).filter(i => !G.on[side].includes(i) && !bkFouledOut(side, i)); }
 function bkFoulOut(side, d, bench) {
-  const T = G.teams[side], inn = bench.slice().sort((a, b) => bkFit(T.roster[b].r, d.pos) - bkFit(T.roster[a].r, d.pos))[0], m = T.roster[inn];
+  // (yours: the next on your bench; the CPU's: whoever suits the spot)
+  const T = G.teams[side], inn = bkOrdered(side) ? bench[0] : bench.slice().sort((a, b) => bkFit(T.roster[b].r, d.pos) - bkFit(T.roster[a].r, d.pos))[0], m = T.roster[inn];
   G.on[side][BK_POS.indexOf(d.pos)] = inn;
   GD.notes = (GD.notes || []).concat(`${d.n} fouls out; ${m.n} comes on.`);
   Object.assign(d, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
@@ -238,12 +248,12 @@ function bkPeriodOver() {
 function bkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function bkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, q: G.q, ot: G.over ? G.over.ot : 0, mins: G.mins,
-    poss: G.poss0.slice(), secs: Math.round(G.secs), box: bkBox(), log: G.log.slice(), tally: Object.assign({}, G.tally) };
+    poss: G.poss0.slice(), secs: Math.round(G.secs), box: bkBox(), log: G.log.slice(), tally: Object.assign({}, G.tally), subs: (G.subs || [0, 0]).slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function bkBox() {
   return G.teams.map((T, s) => {
-    const rows = T.roster.map((m, i) => Object.assign({ n: m.n, kind: m.kind, num: m.num, ri: i, out: bkFouledOut(s, i) && !G.on[s].includes(i) }, G.box[s][i], { sec: Math.round(G.box[s][i].sec) })).filter(r => r.sec > 0 || r.pf > 0 || G.on[s].includes(r.ri));
+    const rows = T.roster.map((m, i) => Object.assign({ n: m.n, kind: m.kind, num: m.num, ri: i, out: bkFouledOut(s, i) && !G.on[s].includes(i) }, G.box[s][i], { sec: Math.round(G.box[s][i].sec) }));
     const tot = {}; for (const k of ['pts', 'reb', 'oreb', 'dreb', 'ast', 'stl', 'blk', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'pf', 'tov']) tot[k] = rows.reduce((a, r) => a + r[k], 0);
     return { team: T.name, rows, tot };
   });

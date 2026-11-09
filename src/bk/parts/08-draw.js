@@ -112,6 +112,8 @@ function bkDrawPlayers(c) {
     const s = bkScr(p.x, p.y), T = G.teams[p.side], mv = hyp(p.vx, p.vy) > .5;
     if (i === h) { c.save(); c.strokeStyle = T.light || '#fff'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(s.x, s.y, 15, 5, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
     const face = mv ? p.vx < 0 : bkDir(p.side) < 0, lift = p.act === 'shoot' ? 9 : p.act === 'jump' ? 11 : 0;
+    // (tired: a short bar of what breath is left, under their feet)
+    if (bkTired(p) > 0) { const v = bkSta(p) / 100; c.save(); c.fillStyle = 'rgba(12,10,9,.7)'; c.fillRect(s.x - 12, s.y + 6, 24, 3); c.fillStyle = v < BK_STAM.sub / 100 ? '#ff6a4a' : '#ffb070'; c.fillRect(s.x - 12, s.y + 6, 24 * v, 3); c.restore(); }
     if (bkOnFire(p)) for (let k = 0; k < 5; k++) { const a = BKT.t * 9 + k * 1.3; c.save(); c.globalAlpha = .75; c.fillStyle = k % 2 ? '#ffb02e' : '#ff5a1e'; c.beginPath(); c.ellipse(s.x - 10 + k * 5, s.y - 4 - Math.abs(Math.sin(a)) * 7, 3, 6 + Math.abs(Math.sin(a)) * 4, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
     drawFig(c, p.kind, s.x, s.y, 50, T, { num: p.num, run: mv ? p.run : 0, flip: face, throwK: p.act === 'shoot' || p.act === 'rise' ? 1 : 0, lift: p.act === 'rise' ? 4 : lift, alpha: p.stun > 0 ? .75 : 1 });
     // the player you play: a marker over their head

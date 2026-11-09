@@ -148,7 +148,8 @@ function bkMoveTry(h, k) {
   L.moveCd = BK_HANDS.moveCd;
   const [d, dd] = bkNearest(p.x, p.y, bkDefense().filter(q => q.stun <= 0));
   if (!d || dd > 1.6) return '';
-  if (R() < clamp(M.beat + (p.r.hnd - d.r.def) * .06, .1, .88)) { d.stun = M.stun; bkEv('beat', p.n, d.n); GD.msg = `${p.n}'s ${M.n} leaves ${d.n} behind.`; L.drive = true; return 'beat'; }
+  bkStamCost(p, BK_STAM.move);
+  if (R() < clamp(M.beat + (p.r.hnd - 2 * bkTired(p) - d.r.def) * .06, .1, .88)) { d.stun = M.stun; bkEv('beat', p.n, d.n); GD.msg = `${p.n}'s ${M.n} leaves ${d.n} behind.`; L.drive = true; return 'beat'; }
   if (R() < M.strip * clamp(1 + (d.r.def - p.r.hnd) * .1, .4, 2)) { GD.msg = `${p.n} tries a ${M.n}, and ${d.n} picks it.`; bkPicked(d); return 'stripped'; }
   p.stun = .25; GD.msg = `${p.n}'s ${M.n} doesn't fool ${d.n}.`; return 'stumble';
 }

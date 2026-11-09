@@ -65,7 +65,7 @@ function bkSetSpots(side) {
 }
 // a player's speed now: metres a second
 function bkSpeed(p, i) {
-  let m = 4.2 + p.r.spd * .38;
+  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p));
   if (i === bkHand()) m *= .9;
   if (p.stun > 0) m *= .25;
   return m;
@@ -213,12 +213,13 @@ function bkPass(j, lob) {
 // to 1 smothered), rim (at the rim), dunk }
 function bkShotP(p, x, y) {
   const dist = bkRimDist(p.side, x, y), [d, dd] = bkNearest(x, y, L.pl.filter(q => q.side !== p.side && q.stun <= 0));
-  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
+  const cs = d ? (d.r.def * .5 + d.r.hop * .25 + d.r.siz * .25) / 6.5 * (1 - .3 * bkTired(d)) : 0, con = d ? clamp((1.7 - dd) / 1.3, 0, 1) * cs : 0;
   const rim = dist < 1.5, dunk = rim && p.r.siz + p.r.hop >= 13 && con < .7;
   let pr;
   if (rim) pr = .68 + (p.r.siz + p.r.hop - 12) * .016 - con * (.24 - (p.r.siz - (d ? d.r.siz : 5)) * .01) + (dunk ? .18 : 0);
   else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
   if (bkOnFire(p)) pr += BK_FIRE.p;
+  pr -= .1 * bkTired(p);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
 }
 /* the shot: settled at the release. A defender close enough may block it (it comes off loose) or foul (free throws:

@@ -30,7 +30,7 @@ const len2 = (a, b) => hyp(a.x - b.x, a.y - b.y);
 function bkPressure(h) {
   const p = L.pl[h], [nd, ndd] = bkNearest(p.x, p.y, bkDefense());
   if (!nd || ndd >= 1 || nd.stun > 0) return false;
-  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd) * .0018, .001, .02)) { bkPicked(nd); return true; }
+  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02)) { bkPicked(nd); return true; }
   if (R() < BK_THINK.reach) { bkReach(nd); return true; }
   return false;
 }
