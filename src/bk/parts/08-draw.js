@@ -5,6 +5,9 @@
    The bar at the top has the score, the period, the game clock and the shot clock, and each side's team fouls (lit in
    the bonus). Under the court, what just happened (GD.msg). A big moment (a dunk, a three, a block, an and-one, the
    shot clock running out) puts a word on the floor for a moment; at the end, the final score.
+   Phase 2: by hand, the player you play has a marker over them, and the release meter rises beside your shooter (the
+   window in green, its heart, the swish, brighter); after a shot the meter stays a moment with where you let go. A
+   player on fire has flames at their feet. A pick shows the screener's spot.
    Court space is metres (05-live.js); bkScr turns it into canvas pixels. */
 const BKT = { t: 0, box: null, boxKey: '', bg: null, bgKey: '' };
 const BK_PX = 30, BK_PY = 22, BK_X0 = 60, BK_Y0 = 318, BK_PZ = 15;
@@ -21,6 +24,7 @@ function bkDraw(c) {
   bkDrawHoop(c, 0, false);
   bkDrawHoop(c, 1, false);
   bkDrawBall(c);
+  bkDrawMeter(c);
   bkDrawBig(c);
   bkDrawHud(c);
   bkDrawMsg(c);
@@ -108,8 +112,12 @@ function bkDrawPlayers(c) {
     const s = bkScr(p.x, p.y), T = G.teams[p.side], mv = hyp(p.vx, p.vy) > .5;
     if (i === h) { c.save(); c.strokeStyle = T.light || '#fff'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(s.x, s.y, 15, 5, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
     const face = mv ? p.vx < 0 : bkDir(p.side) < 0, lift = p.act === 'shoot' ? 9 : p.act === 'jump' ? 11 : 0;
-    drawFig(c, p.kind, s.x, s.y, 50, T, { num: p.num, run: mv ? p.run : 0, flip: face, throwK: p.act === 'shoot' ? 1 : 0, lift, alpha: p.stun > 0 ? .75 : 1 });
+    if (bkOnFire(p)) for (let k = 0; k < 5; k++) { const a = BKT.t * 9 + k * 1.3; c.save(); c.globalAlpha = .75; c.fillStyle = k % 2 ? '#ffb02e' : '#ff5a1e'; c.beginPath(); c.ellipse(s.x - 10 + k * 5, s.y - 4 - Math.abs(Math.sin(a)) * 7, 3, 6 + Math.abs(Math.sin(a)) * 4, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+    drawFig(c, p.kind, s.x, s.y, 50, T, { num: p.num, run: mv ? p.run : 0, flip: face, throwK: p.act === 'shoot' || p.act === 'rise' ? 1 : 0, lift: p.act === 'rise' ? 4 : lift, alpha: p.stun > 0 ? .75 : 1 });
+    // the player you play: a marker over their head
+    if (i === bkMe()) { const y = s.y - 50 * (KIND[p.kind] || KIND.goblin).h - 12; c.save(); c.fillStyle = '#ffe04a'; c.strokeStyle = '#17100e'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(s.x - 6, y - 8); c.lineTo(s.x + 6, y - 8); c.lineTo(s.x, y); c.closePath(); c.fill(); c.stroke(); c.restore(); }
   }
+  if (L.pick) { const [x, y] = bkScreenSpot(), q = bkScr(x, y); c.save(); c.strokeStyle = 'rgba(255,224,74,.7)'; c.setLineDash([4, 3]); c.beginPath(); c.ellipse(q.x, q.y, 12, 4, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
 }
 function bkDrawBall(c) {
   const B = L.ball; if (GD.ph === 'over' || GD.ph === 'break') return;
@@ -125,7 +133,7 @@ function bkDrawBall(c) {
   c.restore();
 }
 // a big moment in big letters on the floor, for a moment; and at the end, the final
-const BK_BIG = { dunk: ['SLAM DUNK', '#ffd08a'], three: ['FROM THREE', '#ffd08a'], block: ['BLOCKED', '#ff8a6a'], andone: ['AND ONE', '#ffd08a'], clock: ['SHOT CLOCK', '#ff8a6a'] };
+const BK_BIG = { swish: ['SWISH', '#bfe8a8'], alley: ['ALLEY-OOP', '#ffd08a'], goaltend: ['GOALTENDING', '#ff8a6a'], fire: ['ON FIRE', '#ffb02e'], break: ['FAST BREAK', '#bfe8a8'], dunk: ['SLAM DUNK', '#ffd08a'], three: ['FROM THREE', '#ffd08a'], block: ['BLOCKED', '#ff8a6a'], andone: ['AND ONE', '#ffd08a'], clock: ['SHOT CLOCK', '#ff8a6a'] };
 function bkDrawBig(c) {
   let word = null, col = '#ffd08a', sub = '', al = 1, sc = 1;
   if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}`; }
@@ -162,4 +170,23 @@ function bkDrawMsg(c) {
   const key = `${L.evN || 0}|${G.log.length}|${GD.ph}|${G.score}|${GD.ft ? GD.ft.n : ''}`;
   if (BKT.boxKey !== key) { BKT.boxKey = key; BKT.box = bkBox(); }
   BKT.box.forEach((b, s) => { const t = b.tot; txt(c, `${b.team}: FG ${t.fgm}/${t.fga} · 3PT ${t.tpm}/${t.tpa} · FT ${t.ftm}/${t.fta} · Reb ${t.reb} · Ast ${t.ast} · Stl ${t.stl} · Blk ${t.blk}`, 480, 552 + s * 22, `500 13px ${BK_FONT}`, 'rgba(243,234,214,.65)', 'center'); });
+}
+// the release meter: beside your shooter while they rise (or at the line), and a moment after with where you let go
+function bkDrawMeter(c) {
+  const M = GD.meter, R0 = GD.rel;
+  if (R0 && R0.at == null) R0.at = BKT.t;
+  const after = !M && R0 && BKT.t - R0.at < .9;
+  if (!M && !after) return;
+  const i = M ? (M.ft ? GD.ft && GD.ft.i : M.i) : bkMe(), p = L.pl[i]; if (!p) return;
+  const w = M ? (M.ft ? bkFtWindow(p) : bkWindow(M.pr, p)) : R0.w, s = bkScr(p.x, p.y), x = s.x + 22, y0 = s.y - 6, H = 64;
+  // the bar runs from 0 (the floor) to the late end; the top of the jump is at 1
+  const yAt = v => y0 - H * clamp(v, 0, BK_HANDS.late) / BK_HANDS.late;
+  c.save();
+  c.fillStyle = 'rgba(12,10,9,.8)'; c.fillRect(x - 5, yAt(BK_HANDS.late) - 2, 10, H + 4);
+  c.fillStyle = 'rgba(120,200,110,.55)'; c.fillRect(x - 4, yAt(1 + w / 2), 8, yAt(1 - w / 2) - yAt(1 + w / 2));
+  c.fillStyle = 'rgba(190,255,170,.95)'; c.fillRect(x - 4, yAt(1 + w * BK_WIN.perfect), 8, yAt(1 - w * BK_WIN.perfect) - yAt(1 + w * BK_WIN.perfect));
+  c.strokeStyle = '#f3ead6'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 7, yAt(1)); c.lineTo(x + 7, yAt(1)); c.stroke();
+  if (M) { c.fillStyle = '#ffd08a'; c.fillRect(x - 7, yAt(M.t / M.T) - 1.5, 14, 3); }
+  else { const e = R0.e, good = e <= w / 2; txt(c, e <= w * BK_WIN.perfect ? 'Perfect' : good ? 'Good' : e <= w ? 'Off' : 'Way off', x + 10, yAt(1) + 4, `700 12px ${BK_FONT}`, good ? '#bfe8a8' : '#ff8a6a'); }
+  c.restore();
 }

@@ -14,6 +14,18 @@ return {
   // the ratings, the spots and the clubs, for the page and How to play
   rate: kind => bkRate(kind), kinds: Object.keys(BK_KIND), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),
   ftChance: r => bkFtChance({ r: Object.assign(bkRate('goblin'), r) }),
+  // by hand (phase 2): who plays it ('watch' or 'play'), your keys (input: { steer, shoot, pass, box, act }; returns
+  // what happened), whether you have the ball, the player you play, the release meter ({ t, T, now (0 to late), w, ft }),
+  // the last release ({ e, w }), the hands' and the window's rules, a move's numbers, and whose hand is hot
+  setMode: m => bkSetMode(m), get mode() { return GD ? GD.mode : null; }, get you() { return GD ? GD.you : 0; }, input: o => bkInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(BKI)); },
+  get offense() { return !!GD && !!L && bkOffenseMine(); }, get me() { return L && GD ? bkMe() : -1; },
+  get meter() { const M = GD && GD.meter; if (!M) return null; const p = L.pl[M.ft ? GD.ft.i : M.i]; return { t: M.t, T: M.T, now: M.t / M.T, ft: !!M.ft, w: M.ft ? bkFtWindow(p) : bkWindow(M.pr, p) }; },
+  get release() { return GD && GD.rel ? { e: GD.rel.e, w: GD.rel.w } : null; }, hands: Object.assign({}, BK_HANDS), win: Object.assign({}, BK_WIN), moves: JSON.parse(JSON.stringify(BK_MOVES)),
+  fire: Object.assign({}, BK_FIRE), jump: Object.assign({}, BK_JUMP), hot: () => G && G.hot ? JSON.parse(JSON.stringify(G.hot)) : null, onFire: i => !!L && bkOnFire(L.pl[i]),
+  handMake: (pr, e) => bkHandMake(pr, e, null), window: pr => bkWindow(pr, null),
+  // the tests' handles on phase 2's plays: a hand shot let go e from the top, a pass (lob), a pick, a move, a jump, a swipe
+  shootAt: e => bkHand() >= 0 ? (bkShoot({ e }), L.shot) : null, pass: (j, lob) => bkHand() >= 0 ? (bkPass(j, lob), true) : false, pick: i => bkPick(i == null ? bkHand() : i),
+  move: k => bkMoveTry(bkHand(), k), freeThrows: (side, i, n) => bkFreeThrows(side, i, n), shot: () => L && L.shot ? Object.assign({}, L.shot) : null,
   // the test's handle on the court: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
   step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) bkTick(BK_DT); return GD ? GD.ph : null; },
   get play() { return L; }, get ev() { return L ? L.ev : []; }, shotP: (i, x, y) => L ? bkShotP(L.pl[i], x == null ? L.pl[i].x : x, y == null ? L.pl[i].y : y) : null,

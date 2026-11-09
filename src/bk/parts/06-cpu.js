@@ -6,7 +6,9 @@
    - pass: to the teammate with the best look, less the risk of a defender in the lane;
    - keep the dribble: work toward the spot, and let the offense set up.
    In the backcourt the handler brings it up (or pushes it, with defenders behind the ball: a fast break). A defender
-   up close may pick the dribble or reach in and foul (bkReach, 07-game.js takes the foul). */
+   up close may pick the dribble or reach in and foul (bkReach, 07-game.js takes the foul).
+   Phase 2: it may also call a pick (a big nearby), try a crossover or a spin on a defender in the lane, or lob it to a
+   leaper near the rim for an alley-oop. */
 const BK_THINK = { shootAt: .92, urgent: 3.2, pick: .0045, reach: .006 };
 // what a pass to j would be worth: their look, less the chance it's picked off
 // (a big inside is worth a post move to the rim, not only the shot from where they stand)
@@ -24,6 +26,14 @@ function bkPassValue(h, j) {
   return S.p * (S.three ? 3 : 2) - risk - (len2(p, q) > 14 ? .3 : 0);
 }
 const len2 = (a, b) => hyp(a.x - b.x, a.y - b.y);
+// on the dribble a defender up close may pick it, or reach in for a foul (whoever plays the handler): true if they did
+function bkPressure(h) {
+  const p = L.pl[h], [nd, ndd] = bkNearest(p.x, p.y, bkDefense());
+  if (!nd || ndd >= 1 || nd.stun > 0) return false;
+  if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd) * .0018, .001, .02)) { bkPicked(nd); return true; }
+  if (R() < BK_THINK.reach) { bkReach(nd); return true; }
+  return false;
+}
 // the defender standing in the lane to the rim (within about a metre of the line from the handler to it), or null
 function bkLaneBlock(p) {
   const hx = bkHoopX(p.side), ax = hx - p.x, ay = -p.y, len = hyp(ax, ay) || 1;
@@ -38,11 +48,7 @@ function bkLaneBlock(p) {
 const bkLaneOpen = p => !bkLaneBlock(p);
 function bkThink(h) {
   const p = L.pl[h], dist = bkRimDist(p.side, p.x, p.y), u = bkU(p.side, p.x), [nd, ndd] = bkNearest(p.x, p.y, bkDefense());
-  // on the dribble a defender up close may pick it, or reach in for a foul
-  if (nd && ndd < 1 && nd.stun <= 0) {
-    if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd) * .0018, .001, .02)) return bkPicked(nd);
-    if (R() < BK_THINK.reach) return bkReach(nd);
-  }
+  if (bkPressure(h)) return;
   // driving: at the rim, it's a layup or a dunk. A defender in the lane: beat them (handle and speed against defense
   // and speed: they're left a step behind), pull up for the shot, or pull it back out
   if (L.drive) {
@@ -73,7 +79,16 @@ function bkThink(h) {
     pass: best ? Math.max(.05, (best[1] - sv * .8) * 3 + .7) * (1 + held * .7) * (urgent && G.shot < 1.2 ? .2 : 1) : 0,
     hold: Math.max(.05, 1.4 * (G.shot - 4) / 10),
   };
+  // the pick, a move on the defender in the lane, and the lob to a leaper near the rim
+  const bigNear = !L.pick && L.pl.some((q, i) => i !== h && q.side === p.side && BK_ROLE[q.pos] === 'big' && hyp(q.x - p.x, q.y - p.y) < 7);
+  w.pick = bigNear && dist > 4.5 && !urgent ? .55 : 0;
+  w.move = nd && ndd < 1.3 && !lane && dist > 2.2 && !(L.moveCd > 0) ? .4 + (p.r.hnd - 6) * .08 : 0;
+  const oop = bkOffense().map(q => L.pl.indexOf(q)).filter(j => j !== h && bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < 2.4 && bkLeaper(L.pl[j]))[0];
+  w.lob = oop != null ? 1.1 : 0;
   const k = wpick(w);
+  if (k === 'pick') return bkPick(h);
+  if (k === 'move') return bkMoveTry(h, R() < .65 ? 'cross' : 'spin');
+  if (k === 'lob') return bkPass(oop, true);
   if (k === 'shoot') return bkShoot();
   if (k === 'drive') { L.drive = true; bkEv('drive', p.n); return; }
   if (k === 'pass' && best) return bkPass(best[0]);
