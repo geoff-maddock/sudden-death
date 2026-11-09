@@ -52,7 +52,7 @@ function bxFighter(p, side) {
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
     // gear (13-kit.js): its name, and what it does beyond the ratings (already laid on r)
     gear: p.gear && p.gear.name ? p.gear.name : null, gx: p.gear && p.gear.fx ? JSON.parse(JSON.stringify(Object.assign({}, p.gear.fx, { r: undefined }))) : null,
-    a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false,
+    a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false, spPick: p.sp === 'sp2' ? 'sp2' : 'sp', spirit: BX_SPIRIT.start,
     rs: bxStatsZero(), bs: bxStatsZero() };
 }
 // a round's (rs) or bout's (bs) work: punches thrown and landed, power punches landed, damage done, defense as the

@@ -44,7 +44,7 @@ async def main():
         await pg.evaluate("SET.sfx = true; W_RING_MODE = 'play'; wRingBout({ kinds: ['gorgon', 'ogre'], seed: 9 }); wBX.pause(true)")
         s1 = await pg.evaluate("""(() => { __snd.length = 0; if (wBX.wait) wBX.call(wBX.wait.plan); let n = 0; while (wBX.phase !== 'round' && n++ < 100) wBX.step();
           const bell = __n('bell'); const G = wBX.G; G.F[0].x = -1; G.F[1].x = 1; G.F[0].y = G.F[1].y = 0;
-          for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.think = 99; }
+          for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: 0 }; f.think = 99; f.spirit = 100; }
           // a jab and a big hook that land, a block, a slip
           G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; let L = 0; while (__n('hit') + __n('crunch') < 2 && L++ < 80) { G.F[0].r.pow = L % 2 ? 1 : 12; wBX.land(0, L % 2 ? 'jab' : 'hook'); }
           G.F[1].a = { k: 'guard', t: 0, dur: 9, id: 0 }; L = 0; while (!__n('block') && L++ < 40) wBX.land(0, 'jab');

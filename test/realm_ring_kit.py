@@ -66,8 +66,14 @@ async def main():
         # (stats[1].dmg is what side 1 did; what side 1 TAKES is side 0's damage)
         m = await pg.evaluate("""(() => { const mk = (kind, g) => Object.assign({ n: kind, kind, num: 1, r: wBX.rate(kind) }, g ? { gear: { id: 'x', name: 'X', fx: g } } : {});
           let off = 0, on = 0; for (let i = 0; i < 60; i++) { off += wBX.simBout({ fighters: [mk('ogre'), mk('minotaur')], seed: 7000 + i }).stats[0].dmg; on += wBX.simBout({ fighters: [mk('ogre'), mk('minotaur', { headIn: .95 })], seed: 7000 + i }).stats[0].dmg; }
-          return { off: off / 60, on: on / 60 }; })()""")
-        check(m['on'] < m['off'], 'a Mouthguard: the fighter wearing it takes less (60 seeded bouts each way)', m)
+          // (and punch by punch: the same hooks into a stunned fighter with and without it, the same seed)
+          const per = g => { wBX.start({ fighters: [mk('ogre'), mk('minotaur', g)], seed: 11 }); for (let i = 0; i < 100 && wBX.phase === 'intro'; i++) wBX.step();
+            const G = wBX.G; G.F[0].x = -1; G.F[1].x = 1; G.F[0].y = G.F[1].y = 0; G.F[1].r.chin = 60; let t = 0, n = 0;
+            for (let i = 0; i < 40; i++) { G.F[0].a = { k: 'idle', t: 0, dur: 0, id: 0 }; G.F[1].a = { k: 'stun', t: 0, dur: 9, id: 0 }; const h = G.F[1].hp, e0 = wBX.ev.length; wBX.land(0, 'hook'); if (wBX.ev.slice(e0).some(e => e.k === 'land')) { t += h - G.F[1].hp; n++; } G.F[1].hp = 100; }
+            return t / Math.max(1, n); };
+          return { off: off / 60, on: on / 60, hookOff: per(null), hookOn: per({ headIn: .95 }) }; })()""")
+        # (over whole bouts its 5% is lost in how bouts go once spirit changes them, so this weighs it punch by punch)
+        check(m['hookOn'] < m['hookOff'] * .97, 'a Mouthguard: the fighter wearing it takes less from each head punch', m)
         t = await pg.evaluate(PAIR + "({ rise: 1 }, 60, ['harpy', 'ogre'])")
         check(t['on']['riseAvg'] is not None and t['off']['riseAvg'] is not None and t['on']['riseAvg'] <= t['off']['riseAvg'] - .5, 'Lucky Trunks: up from a knockdown sooner', {'on': t['on']['riseAvg'], 'off': t['off']['riseAvg'], 'n': [len(t['on']['rise']), len(t['off']['rise'])]})
         r = await pg.evaluate("""(() => { wBX.start({ fighters: [{ n: 'A', kind: 'ogre', gear: { id: 'bx_robe', name: 'Ember Robe', fx: W_RING_GEAR.bx_robe.fx } }, { n: 'B', kind: 'elf' }], mode: 'watch', seed: 5 });
