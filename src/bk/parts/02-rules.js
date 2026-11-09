@@ -26,8 +26,8 @@ const bkShotValue = (d, y) => d >= BK_RULES.arc || Math.abs(y || 0) >= BK_RULES.
 function bkScore(side, pts) { G.score[side] += pts; return G.score[side]; }
 // the shot clock: full again (a new possession, or a shot off the rim)
 function bkShotReset() { G.shot = BK_RULES.shot; }
-// side has the ball now, on a full shot clock
-function bkGive(side) { G.poss = side; bkShotReset(); }
+// side has the ball now, on a full shot clock: a new possession (in a game, 11-calls.js counts it and makes the calls)
+function bkGive(side) { G.poss = side; bkShotReset(); if (G.call) bkPossNew(side); }
 /* the clocks run dt seconds: 'shot' when the shot clock runs out (the ball goes over, bkViolation), 'end' when the
    period's clock does, '' otherwise. The shot clock holds while a shot is in the air or the ball is loose (hold),
    and is off when the period has less time left than it: no violation. */

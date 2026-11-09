@@ -76,6 +76,18 @@ async def main():
           return { stales, fresh, stale }; })()""")
         check(sc['stales'][:3] == [0, 1, 2] and max(sc['stales']) == 2 and sc['stale'] < sc['fresh'] - .05, 'the scout: the same set again is guarded better (stale 0, 1, then 2 and no more), a few points off every shot', sc)
 
+        # a defense changed mid-possession waits for the next one; a timeout can't stop a shot already rising; bad ids don't crash
+        nx = await pg.evaluate("""(() => { wBK.start({ seed: 15, skill: [0, 0], mode: 'manage' }); const G = wBK.G; let n = 0;
+          while (!(wBK.phase === 'live' && G.poss === 1) && n++ < 30 * 120) wBK.step(); const before = G.cur.def, pick = before === 'zone' ? 'pack' : 'zone';
+          wBK.call('def', pick); const during = G.cur.def; n = 0; while (G.poss === 1 && n++ < 30 * 60) wBK.step(); n = 0; while (G.poss === 0 && n++ < 30 * 60) wBK.step();
+          const next = G.cur.side === 1 ? G.cur.def : null;
+          wBK.start({ seed: 16, skill: [0, 0], mode: 'play' }); n = 0; while (!(wBK.phase === 'live' && wBK.G.poss === 0 && wBK.play.ball.st === 'held' && wBK.play.ball.h === wBK.me) && n++ < 30 * 120) wBK.step();
+          wBK.input({ shoot: true }); const rising = !!wBK.meter, to = wBK.timeout(), still = !!wBK.meter; wBK.input({ shoot: false });
+          let bad = 'ok'; try { wBK.simGame({ seed: 3, calls: [{ off: 'spred', def: 'nope' }, null] }); } catch (e) { bad = String(e); }
+          return { before, during, next, pick, rising, to, still, bad }; })()""")
+        check(nx['during'] == nx['before'] and nx['next'] == nx['pick'], 'a defense changed during their possession takes hold from the next one, not this one', nx)
+        check(nx['rising'] and nx['to'] != '' and nx['still'] and nx['bad'] == 'ok', 'no timeout while your shooter is rising; unknown call ids are ignored, not a crash', nx)
+
         # ---------- stances ----------
         ss = await pg.evaluate("""(() => { const n = 8; return { push: __lab('motion', 'man', n, [{ pace: 'push' }, null]), bal: __lab('motion', 'man', n), grind: __lab('motion', 'man', n, [{ pace: 'grind' }, null]),
           gamble: __lab('motion', 'man', n, [null, { press: 'gamble' }]), sit: __lab('motion', 'man', n, [null, { press: 'sit' }]) }; })()""")

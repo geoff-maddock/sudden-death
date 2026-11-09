@@ -44,7 +44,7 @@ function bkKey(e, down) {
   }
   if (BKHELD.has(k)) { swallow(); return; }
   // T: a timeout, whatever is happening (it says why not, when it can't)
-  if (k === 't' && GD.mode === 'play' && BKP.cv.offsetParent !== null && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target.closest && e.target.closest('input,textarea,select'))) {
+  if (k === 't' && GD.mode === 'play' && BKP.cv.offsetParent !== null && (!document.getElementById('modal') || document.getElementById('modal').hidden) && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target.closest && e.target.closest('input,textarea,select'))) {
     BKHELD.add(k); const r = bkTimeout(GD.you); if (r) GD.msg = r; swallow(); return;
   }
   const live = GD.mode === 'play' && BKP.cv.offsetParent !== null && (GD.ph === 'live' || GD.ph === 'ft');

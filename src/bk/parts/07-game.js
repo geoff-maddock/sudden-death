@@ -41,7 +41,7 @@ function bkStart(opts) {
   return G;
 }
 function bkGo(ph) {
-  GD.ph = ph; GD.t = 0;
+  GD.ph = ph; GD.t = 0; if (G.ver != null) G.ver++;
   // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
   // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
@@ -74,7 +74,7 @@ function bkTip() {
   bkGive(win); G.arrow = 1 - win;
   const pg = L.pl[win * 5 + BK_POS.indexOf('PG')];
   Object.assign(L.ball, { st: 'held', h: L.pl.indexOf(pg) });
-  GD.msg = `${c[win].n} wins the tip for ${G.teams[win].name}.`; G.poss0[win]++; bkPossStart(win);
+  GD.msg = `${c[win].n} wins the tip for ${G.teams[win].name}.`;
   bkGo('live');
 }
 function bkTick(dt) {
@@ -125,9 +125,7 @@ function bkMinutes(s) { for (const p of L.pl) G.box[p.side][p.ri].sec += s; G.se
 // the ball to side's point guard, and everyone to the set: the walk up the floor (clock: the clocks run through it)
 function bkWalk(clock) {
   const side = G.poss, pg = L.pl.findIndex(p => p.side === side && p.pos === 'PG');
-  // (a walk back after a timeout is the same possession, on the same shot clock; otherwise a new one, whose set the
-  // five line up in)
-  if (GD.keepClock) GD.keepClock = false; else { G.poss0[side]++; bkPossStart(side); }
+  // (the possession and its calls were set when the ball changed hands: bkGive)
   const at = bkSetSpots(side);
   // the set starts from wherever they are now; the inbound starts under the other basket
   GD.walk = { from: L.pl.map(p => [p.x, p.y]), to: L.pl.map((_, i) => at[i]), clock };
@@ -141,7 +139,6 @@ function bkWalk(clock) {
 function bkPossession(how) {
   const lost = 1 - G.poss;
   if (how === 'steal' && L.lost >= 0) { bkBoxAdd(lost, L.pl[L.lost].ri, 'tov'); L.lost = -1; }
-  G.poss0[G.poss]++; bkPossStart(G.poss);
 }
 function bkViolationNow() {
   const side = G.poss, h = bkHand() >= 0 ? bkHand() : L.ball.st === 'pass' ? L.ball.from : -1;

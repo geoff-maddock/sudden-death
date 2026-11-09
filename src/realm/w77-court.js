@@ -130,7 +130,7 @@ function wLeaveCourt() {
   else { wBK.hide(); showScreen('title'); renderTitle(); }
 }
 // the box score keeps up at each break in play, not every frame
-wBK.onPhase = ph => { if (WBK && UI.view === 'court' && ['dead', 'break', 'ft', 'over'].includes(ph)) wCourtBox(); };
+wBK.onPhase = ph => { if (WBK && UI.view === 'court' && ['dead', 'break', 'ft', 'timeout', 'walk', 'over'].includes(ph)) wCourtBox(); };
 wBK.onOver = s => { if (WBK) { WBK.over = s; wCourtBarNote(); wCourtBox(); $('wCourtAgain').focus(); } };
 
 const wW77ShowView = showView;

@@ -3,6 +3,8 @@
    plays one headless and returns its summary ({ score, teams, win, q, ot, mins, poss, secs, box, log, watch }); onPhase
    hears each beat (intro, live, dead, walk, ft, break, over) and onOver the end, with the summary. The tests' handles:
    G, the rules and the pure rule functions, step (one beat of the play), play (the live play, L), ev (its events). */
+// a table's names and descriptions, by id
+function bkNameDesc(T) { return Object.fromEntries(Object.entries(T).map(([k, v]) => [k, { n: v.n, desc: v.desc }])); }
 return {
   newGame: bkNewGame, score: bkScore, shotValue: bkShotValue, run: (dt, hold) => bkRun(dt, hold), give: bkGive, violation: bkViolation, foul: bkFoul,
   periodEnd: bkPeriodEnd, dir: bkDir, hoopX: bkHoopX, periodName: bkPeriodName, get G() { return G; }, rules: JSON.parse(JSON.stringify(BK_RULES)),
@@ -29,8 +31,7 @@ return {
   // the call (phase 4): the sets, defenses, paces and pressures (by id: { n, desc }), a set against a defense ([+1|0|-1,
   // why]), your call (kind 'off' | 'def' | 'pace' | 'press'; '' or why not), both sides' calls and the possession's,
   // the scout, timeouts left and a timeout for your side ('' or why not), and the skill names
-  sets: Object.fromEntries(Object.entries(BK_SETS).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), defs: Object.fromEntries(Object.entries(BK_DEFS).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
-  paces: Object.fromEntries(Object.entries(BK_PACES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), presses: Object.fromEntries(Object.entries(BK_PRESSES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  sets: bkNameDesc(BK_SETS), defs: bkNameDesc(BK_DEFS), paces: bkNameDesc(BK_PACES), presses: bkNameDesc(BK_PRESSES), get ver() { return G && G.ver != null ? G.ver : -1; },
   edge: (o, d) => bkEdge(o, d).slice(), call: (kind, id, side) => G && G.call ? bkCall(side == null ? GD.you : side, kind, id) : 'No game on.',
   calls: () => G && G.call ? JSON.parse(JSON.stringify({ call: G.call, cur: G.cur, scout: G.scout, to: G.to, sets: G.setLog, skill: G.skill })) : null,
   timeout: side => G && G.to ? bkTimeout(side == null ? GD.you : side) : 'No game on.', skills: BK_SKILL.slice(), toRules: Object.assign({}, BK_TO),

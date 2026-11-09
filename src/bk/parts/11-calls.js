@@ -1,6 +1,6 @@
 /* The Charter Court: the call (issue #77, phase 4). Each side has a standing call: an offense set, a defense, and two
    stances, Pace on offense and Pressure on defense (G.call[side]: { off, def, pace, press }). It stays until it's
-   changed: yours by you (in Manage and You play), the CPU's at the start of each of its possessions (and each of yours,
+   changed (a set or a defense from the next possession): yours by you (in Manage and You play), the CPU's at the start of each of its possessions (and each of yours,
    for its defense), by its coach's skill (G.skill: 0 Squire, at random, stances too; 1 Knight; 2 Archmage).
    Each possession is played in the calls on at its start (G.cur: { off, def, side, stale, star }).
    - The sets move the five and steer the player with the ball (BK_SETS): Pick and roll (picks early and often), Post up
@@ -55,7 +55,10 @@ const BK_SKILL = ['Squire', 'Knight', 'Archmage'];
 const BK_SET_IDS = Object.keys(BK_SETS), BK_DEF_IDS = Object.keys(BK_DEFS);
 
 function bkCallsStart(o) {
-  G.call = [0, 1].map(s => Object.assign({ off: 'motion', def: 'man', pace: 'bal', press: 'bal' }, (o.calls && o.calls[s]) || {}));
+  // (a fixed call takes only the ids that exist; anything else keeps the default)
+  const T = { off: BK_SETS, def: BK_DEFS, pace: BK_PACES, press: BK_PRESSES }, ok = c => Object.fromEntries(Object.entries(c || {}).filter(([k, v]) => T[k] && T[k][v]));
+  G.call = [0, 1].map(s => Object.assign({ off: 'motion', def: 'man', pace: 'bal', press: 'bal' }, ok(o.calls && o.calls[s])));
+  G.ver = 0;
   G.fixed = [0, 1].map(s => !!(o.calls && o.calls[s]));
   G.scout = [{ last: '', n: 0 }, { last: '', n: 0 }]; G.seen = [[], []]; G.cur = null;
   G.setLog = [{}, {}]; G.to = [BK_TO.n, BK_TO.n]; G.toUsed = [0, 0]; G.toAt = [-9, -9]; G.run = { side: -1, pts: 0 };
@@ -69,8 +72,10 @@ const bkSetNow = () => (G.cur && BK_SETS[G.cur.off]) || BK_SETS.motion;
 const bkDefNow = () => (G.cur && BK_DEFS[G.cur.def]) || BK_DEFS.man;
 /* a possession starts for side: the CPU calls (by skill), the scout counts the set, and its points are credited to
    the last possession's set */
+// a new possession for side (from bkGive): counted, and its calls made
+function bkPossNew(side) { G.poss0[side]++; bkPossStart(side); }
 function bkPossStart(side) {
-  bkPossEnd();
+  bkPossEnd(); G.ver++;
   // (the defense sets first, and the offense sees it: an Archmage runs what beats it)
   if (bkCpuSide(1 - side)) G.call[1 - side].def = bkCpuDef(1 - side);
   if (bkCpuSide(side)) G.call[side].off = bkCpuSet(side);
@@ -107,9 +112,9 @@ function bkZoneSpot(p) {
 // side calls one: '' or why not. At a stoppage, or with their own ball in a live play
 function bkTimeout(side) {
   if (!G.to || G.to[side] <= 0) return 'No timeouts left.';
-  const ok = ['dead', 'walk'].includes(GD.ph) || (GD.ph === 'live' && G.poss === side && L.ball.st === 'held' && !L.shot);
+  const ok = ['dead', 'walk'].includes(GD.ph) || (GD.ph === 'live' && G.poss === side && L.ball.st === 'held' && !L.shot && !GD.meter && L.pl[L.ball.h].act !== 'rise');
   if (!ok) return GD.ph === 'live' ? 'Only with the ball in your hands.' : 'Not now.';
-  G.to[side]--; G.toUsed[side]++; G.toAt[side] = G.poss0[0] + G.poss0[1];
+  G.to[side]--; G.toUsed[side]++; G.ver++; G.toAt[side] = G.poss0[0] + G.poss0[1];
   // (the run that may have brought it on is over as far as the coaches are concerned)
   if (G.run.side === 1 - side) G.run = { side: -1, pts: 0 };
   // breath back, the other side's hot hand cooled, and the bench gets a word in
@@ -128,7 +133,7 @@ function bkTimeoutOver() {
   const W = GD.toWas; GD.toWas = null;
   // (with the ball in a live play, or mid-walk, or after a reach: the same possession, the five walked back to the set
   // with the clocks stopped; after any other dead ball, the walk up the floor that was coming)
-  if (W && (W.live || W.ph === 'walk' || GD.keep)) { GD.keep = false; GD.keepClock = true; return bkWalk(false); }
+  if (W && (W.live || W.ph === 'walk' || GD.keep)) { GD.keep = false; return bkWalk(false); }
   bkWalk(true);
 }
 // the CPU's coach calls one: a Knight or better when the other side is on a run, or the five is spent with nobody fresh
@@ -146,13 +151,15 @@ function bkCpuTimeout(side) {
 /* ---------- the CPU's calls by skill ---------- */
 // mean of a rating over side's five, or over its players in some roles
 function bkMean(side, k, roles) { const T = G.teams[side], on = G.on[side].filter((ri, i) => !roles || roles.includes(BK_ROLE[BK_POS[i]])); return on.reduce((a, ri) => a + T.roster[ri].r[k], 0) / Math.max(1, on.length); }
+// late in the game (the fourth quarter's last share), and side's lead
+const bkLate = share => G.q >= 4 && G.clock < G.qlen * share, bkLead = side => G.score[side] - G.score[1 - side];
 function bkCpuSet(side) {
   const sk = G.skill[side], them = 1 - side;
   if (!sk) return pick(BK_SET_IDS);
-  const late = G.q >= 4 && G.clock < G.qlen * .4, diff = G.score[side] - G.score[them];
+  const late = bkLate(.4), diff = bkLead(side);
   const w = { pick: 1.2, post: .6 + Math.max(0, bkMean(side, 'siz', ['big']) + bkMean(side, 'hop', ['big']) - bkMean(them, 'siz', ['big']) - bkMean(them, 'hop', ['big'])) * .3,
     motion: 1, iso: .4 + Math.max(0, Math.max(...G.on[side].map(ri => G.teams[side].roster[ri].r.hnd)) - 7) * .4, spread: .5 + Math.max(0, bkMean(side, 'tch') - 6) * .5 + (late && diff < -5 ? 1.5 : 0),
-    hot: Object.values(G.hot[side]).some(v => v >= BK_FIRE.n) ? 3 : .2 };
+    hot: G.on[side].some(ri => (G.hot[side][ri] || 0) >= BK_FIRE.n) ? 3 : .2 };
   // the scout: a set run twice is worth less a third time
   const sc = G.scout[side]; if (sc.last && sc.n >= 2) w[sc.last] *= .35;
   // a Knight leans to what beats the defense on the floor; an Archmage runs it
@@ -162,7 +169,7 @@ function bkCpuSet(side) {
 function bkCpuDef(side) {
   const sk = G.skill[side], them = 1 - side;
   if (!sk) return pick(BK_DEF_IDS);
-  const late = G.q >= 4 && G.clock < G.qlen * .4, diff = G.score[side] - G.score[them];
+  const late = bkLate(.4), diff = bkLead(side);
   const w = { man: 1.4, zone: .6 + Math.max(0, bkMean(them, 'siz', ['big']) - 6) * .4 + Math.max(0, 6 - bkMean(them, 'tch')) * .3,
     press: .3 + (late && diff < -5 ? 2 : 0) + Math.max(0, 6 - bkMean(them, 'hnd', ['guard'])) * .4, switch: .6, pack: .5 + Math.max(0, 6 - bkMean(them, 'tch')) * .5 };
   // an Archmage reads your habits: the set you run most, and the defense that beats it
@@ -176,16 +183,16 @@ function bkCpuDef(side) {
 function bkCpuStance(side) {
   // (a Squire's stances are as random as its calls)
   if (!G.skill[side]) return { pace: pick(Object.keys(BK_PACES)), press: pick(Object.keys(BK_PRESSES)) };
-  const late = G.q >= 4 && G.clock < G.qlen * .5, diff = G.score[side] - G.score[1 - side];
+  const late = bkLate(.5), diff = bkLead(side);
   return { pace: late && diff < -4 ? 'push' : late && diff > 4 ? 'grind' : 'bal', press: late && diff < -4 ? 'gamble' : G.tf[side] > BK_RULES.limit ? 'sit' : 'bal' };
 }
 // your call: kind 'off' | 'def' | 'pace' | 'press', and its id; '' when it took
 function bkCall(side, kind, id) {
   const T = { off: BK_SETS, def: BK_DEFS, pace: BK_PACES, press: BK_PRESSES }[kind];
   if (!T || !T[id] || !G.call) return 'No such call.';
-  G.call[side][kind] = id;
-  // a defense or a pressure change takes hold at once; a set from the next possession
-  if (G.cur && kind === 'def' && G.cur.side !== side) G.cur.def = id;
+  // (a set or a defense from the next possession: the possession on the floor was set up against what was called then,
+  // so nobody changes theirs once they've seen the other side's; Pace and Pressure are read as play goes)
+  G.call[side][kind] = id; G.ver++;
   return '';
 }
 // a run: points scored by one side since the other last scored

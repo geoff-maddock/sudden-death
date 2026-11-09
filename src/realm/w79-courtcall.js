@@ -2,7 +2,8 @@
    play): you call the sets, the defense, the stances, timeouts and subs, and the CPU plays your five. In Manage and
    You play the calls panel under the court (#wCourtCalls) has:
    - your offense set and your defense (each button's tip says what it beats and what beats it), and Pace and Pressure;
-     a call stays until you change it (a defense takes hold at once, a set from your next possession);
+     a call stays until you change it (a set or a defense from the next possession: nobody switches once they've seen
+     the other side's);
    - this possession's matchup and why, the scout (a set run again is guarded better), and how each of your sets has
      gone (points a trip);
    - Timeout, with how many are left (T in You play; at a dead ball or with the ball in your hands), and Subs: at a
@@ -38,11 +39,12 @@ $('wCourtCalls').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.ccall) wBK.call(b.dataset.ccall, b.dataset.cid);
   else if (b.id === 'wCourtTO') { const r = wBK.timeout(); if (r) wCourtCallSay(r); }
-  else if (b.id === 'wCourtSubGo') { const out = +$('wCourtSubOut').value, inn = +$('wCourtSubIn').value, r = wBK.sub(wBK.you, out, inn); wCourtCallSay(r); }
+  else if (b.id === 'wCourtSubGo') { const out = +$('wCourtSubOut').value, inn = +$('wCourtSubIn').value, r = wBK.sub(wBK.you, out, inn); if (r) wCourtCallSay(r); }
   wCourtCalls(true);
 });
-let W_COURT_CALLMSG = '', W_COURT_ROWKEY = '', W_COURT_NOWKEY = '', W_COURT_DOWN = false;
-function wCourtCallSay(m) { W_COURT_CALLMSG = m || ''; }
+let W_COURT_CALLMSG = '', W_COURT_MSGVER = -1, W_COURT_ROWKEY = '', W_COURT_NOWKEY = '', W_COURT_DOWN = false;
+// a word for you in the panel (why a timeout or a sub can't happen): it stays until play moves on (the engine's version)
+function wCourtCallSay(m) { W_COURT_CALLMSG = m || ''; W_COURT_MSGVER = wBK.ver; }
 // (a press in the panel isn't redrawn out from under the pointer)
 $('wCourtCalls').addEventListener('pointerdown', () => { W_COURT_DOWN = true; });
 window.addEventListener('pointerup', () => { W_COURT_DOWN = false; });
@@ -55,7 +57,8 @@ function wCourtCallRows(mine) {
    any of it changes, keyed without the stamina numbers that move every frame at a stoppage (they're read fresh each
    time it is drawn) */
 function wCourtCalls(force) {
-  const box = $('wCourtCalls'), C = WBK && !WBK.over && wBK.mode !== 'watch' ? wBK.calls() : null;
+  // (read live, not copied: the panel only reads; the engine's version says when anything in it may have changed)
+  const G0 = wBK.G, C = WBK && !WBK.over && wBK.mode !== 'watch' && G0 && G0.call ? { call: G0.call, cur: G0.cur, to: G0.to, sets: G0.setLog } : null, box = $('wCourtCalls');
   box.hidden = !C; if (!C) { W_COURT_ROWKEY = W_COURT_NOWKEY = ''; return; }
   if (!force && (W_COURT_DOWN || (box.contains(document.activeElement) && document.activeElement.tagName === 'SELECT'))) return;
   if (!box.querySelector('.wccrows')) box.innerHTML = '<div class="wccrows"></div><div class="wccnowbox"></div>';
@@ -63,7 +66,9 @@ function wCourtCalls(force) {
   const rk = JSON.stringify(mine);
   if (force || rk !== W_COURT_ROWKEY) { W_COURT_ROWKEY = rk; box.querySelector('.wccrows').innerHTML = wCourtCallRows(mine); }
   const stop = ['dead', 'timeout', 'intro', 'break'].includes(ph), on = wBK.onFloor()[you], bench = wBK.bench(you), sets = C.sets[you] || {};
-  const nk = JSON.stringify([cur, C.to, stop, on, bench, sets, W_COURT_CALLMSG, wBK.mode]);
+  if (W_COURT_CALLMSG && wBK.ver > W_COURT_MSGVER + 1) W_COURT_CALLMSG = '';
+  // (at a stoppage the subs show stamina, which comes back every frame: it's in the key, whole numbers, then)
+  const nk = `${wBK.ver}|${wBK.mode}|${W_COURT_CALLMSG}|${stop ? on.concat(bench).map(ri => Math.round(G.stam[you][ri])).join() : ''}`;
   if (!force && nk === W_COURT_NOWKEY) return;
   W_COURT_NOWKEY = nk;
   const ours = cur && cur.side === you, e = cur ? wBK.edge(cur.off, cur.def) : [0, ''], R = G.teams[you].roster, st = ri => Math.round(G.stam[you][ri]);
@@ -88,7 +93,7 @@ wCourtBarNote = function () {
 const wW79CourtHowHTML = wCourtHowHTML;
 wCourtHowHTML = function () {
   const S = wBK.sets, D = wBK.defs, cell = (o, d) => { const e = wBK.edge(o, d)[0]; return `<td title="${esc(wBK.edge(o, d)[1])}">${e > 0 ? '<b class="wgood">+</b>' : e < 0 ? '<b class="wbad">&minus;</b>' : '&middot;'}</td>`; };
-  return wW79CourtHowHTML() + `<p class="hint"><b>The call.</b> Each side has an offense set and a defense, and they stay until changed. The sets: ${Object.values(S).map(s => `<b>${esc(s.n)}</b> (${esc(s.desc.toLowerCase().replace(/\.$/, ''))})`).join('; ')}. The defenses: ${Object.values(D).map(d => `<b>${esc(d.n)}</b> (${esc(d.desc.toLowerCase().replace(/\.$/, ''))})`).join('; ')}.</p>
+  return wW79CourtHowHTML() + `<p class="hint"><b>The call.</b> Each side has an offense set and a defense, and they stay until changed; a new set or defense takes hold from the next possession, so nobody can switch once they've seen the other side's. The sets: ${Object.values(S).map(s => `<b>${esc(s.n)}</b> (${esc(s.desc.toLowerCase().replace(/\.$/, ''))})`).join('; ')}. The defenses: ${Object.values(D).map(d => `<b>${esc(d.n)}</b> (${esc(d.desc.toLowerCase().replace(/\.$/, ''))})`).join('; ')}.</p>
   <p class="hint">Some sets beat some defenses, a few points on every shot, with the ratings on top: + is good for the offense, &minus; good for the defense (hover a mark for why).</p>
   <table class="wrpow wcedge"><tr><th>Set</th>${Object.values(D).map(d => `<th>${esc(d.n)}</th>`).join('')}</tr>${Object.keys(S).map(o => `<tr><td>${esc(S[o].n)}</td>${Object.keys(D).map(d => cell(o, d)).join('')}</tr>`).join('')}</table>
   <p class="hint"><b>The scout.</b> The other coach reads your habits: a set run again on the next possession is guarded better, and better again a third time. Mix it up.</p>

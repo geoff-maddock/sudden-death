@@ -54,7 +54,7 @@ function bkCoachSubs(side, brk) {
 function bkSubDo(side, out, inn, why) {
   const k = G.on[side].indexOf(out), T = G.teams[side], m = T.roster[inn], p = L.pl.find(q => q.side === side && q.ri === out);
   if (k < 0 || !m) return false;
-  G.on[side][k] = inn; G.subs[side]++;
+  G.on[side][k] = inn; G.subs[side]++; if (G.ver != null) G.ver++;
   if (G.cur && G.cur.side === side && G.cur.star === out) G.cur.star = bkStar(side);
   GD.notes = (GD.notes || []).concat(`${m.n} on for ${T.roster[out].n}${why === 'tired' ? ', who needs a breather' : why === 'back' ? ', rested' : ''}.`);
   if (p) Object.assign(p, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
