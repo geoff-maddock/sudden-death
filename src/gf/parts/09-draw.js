@@ -130,7 +130,8 @@ function gfDrawZones(c) {
   c.save();
   Z.forEach((z, k) => {
     const u = GF_ULT_BY[z.id]; if (!u) return;
-    const [col, shape] = u.vis, [x0, x1, w] = GF_ZONE_AREA[shape] || GF_ZONE_AREA.all;
+    // (a goal-line zone, the Goal-line Wall: the last yards before the goal line the offense is driving at, and into the end zone)
+    const [col, shape] = u.vis, to = GF_RULES.field - G.ball, [x0, x1, w] = shape === 'goal' ? [to - 4, to + 3, 27] : GF_ZONE_AREA[shape] || GF_ZONE_AREA.all;
     const a = gfScr(...gfAbs(x0, -w)), b = gfScr(...gfAbs(x1, w));
     c.globalAlpha = .16 + .05 * Math.sin(GFT.t * 2 + k); c.fillStyle = col;
     c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));

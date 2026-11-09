@@ -651,3 +651,5 @@ nothing measurable in hardcore (whose baseline moved from 15.7% to 22.3% between
 reward players, Bosun Gale and Rook Halloran, are an ordinary troll and werewolf at the team's level, as a tavern
 recruit would be, so they add a body, not a power. The ending pay (gold and fans, once) was not measured: the bot
 already spends what it earns.
+
+**Football: second powers and situation powers (issue #61, phase 5).** The Realm lab after (60 a row, 100 a tier, so about ±6 to ±10 points): tier 1 51%, tier 2 42%, tier 3 24%, Cups won 5%; Squire, Knight and Archmage at an even level 60%, 47% and 40%; powers on 47%, off 50%. All inside the noise of the runs above. Phase 7 measures it finer.

@@ -21,7 +21,8 @@ function gfStartGame(opts) {
 // the clock after a play: the play's own time, and the runoff unless the clock stopped
 function gfRunClock(what, t) {
   if (!GD || !GD.game) return;
-  const stop = ['inc', 'out', 'td', 'int', 'safety'].includes(what) || G.drive.end;
+  // (a Two-minute Drill hurries: no runoff after its play, 14-powers.js)
+  const stop = ['inc', 'out', 'td', 'int', 'safety'].includes(what) || G.drive.end || !!(L && L.fx && L.fx.hurry);
   G.clock = Math.max(0, G.clock - Math.round(t + (stop ? 0 : GF_GAME.runoff)));
 }
 function gfClockText() { const s = Math.max(0, Math.ceil(G.clock)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }

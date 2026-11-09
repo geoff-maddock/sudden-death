@@ -58,6 +58,8 @@ return {
   pickPower: key => gfPickPower(key), cyclePower: () => gfCyclePower(), setAuto: on => { if (GD) { GD.auto = !!on; GD.pow = on ? null : GD.pow; } return GD ? GD.auto : false; },
   tip: key => G && GD ? gfPowerTip(key) : null, zones: () => (G && G.zones || []).map(z => ({ id: z.id, n: z.n, left: z.left, side: z.side, team: G.teams[z.side].name, desc: GF_ULT_BY[z.id].desc })),
   powerBook: gfPowerBook(), ultPlays: GF_ULT_PLAYS, ultCost: GF_ULT_COST, mana: Object.assign({}, GF_MANA),
+  // the situation powers (issue #61, phase 5): { id: { n, role, cost, desc, when } }, and which a side has used
+  situations: Object.fromEntries(Object.entries(GF_SIT).map(([k, P]) => [k, { n: P.n, role: P.role, cost: P.cost, desc: P.desc, when: P.when, zone: !!P.zone }])), sitUsed: side => G && G.sitUsed ? Object.assign({}, G.sitUsed[side]) : {},
   rate: kind => gfRate(kind), kinds: Object.keys(GF_KIND), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),
   auto: roster => { const T = gfTeam({ name: '', roster }); return { off: T.off, def: T.def, kicker: T.kicker }; },
   plays: Object.fromEntries(GF_OFF_IDS.map(k => [k, { n: GF_PLAYS[k].n, desc: GF_PLAYS[k].desc }])),
