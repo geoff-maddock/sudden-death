@@ -40,6 +40,7 @@ python3 test/lab.py 200                       # balance: win rate, deaths by act
 python3 test/difficulty.py 120 '{}' diff=1 dumb   # skilled vs careless bot on a difficulty
 python3 test/policy.py 200                    # routing policies
 python3 test/clubs.py ironmaw,frostfang 60    # per-club win rates
+python3 test/daily_lab.py twists 300           # daily balance: each twist against none on the same days (paired); `week 52` for win rate by weekday
 ./build.sh src/realm/manifest.txt             # Realm build: writes dist/realm.html
 ./build.sh src/bd/manifest.txt                # Brimstone Diamond, standalone, into build/ (the Realm's baseball engine; src/bd/README.md)
 python3 test/realm_smoke.py                   # one realm check (realm_*.py; all of them are in ./test/all.sh)
