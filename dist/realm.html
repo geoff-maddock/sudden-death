@@ -961,6 +961,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
   <nav class="nav" aria-label="Pages">
     <div class="tabs" role="tablist">
       <button class="tab" data-pg="play" aria-current="page">Play</button>
+      <button class="tab" data-pg="daily">Daily</button>
       <button class="tab" data-pg="help">How to play</button>
       <button class="tab" data-pg="best">Bestiary</button>
       <button class="tab" data-pg="rec">Records</button>
@@ -977,7 +978,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
           <h2>Three monsters. Three acts. One sport per brawl.</h2>
           <p>Draft three monsters from a Brimstone League club, build a deck from their powers, and fight down through three acts of a dungeon where every brawl is played under one sport’s rules. At the bottom waits the Commissioner of the Pit.</p>
           <div id="resumeRow" class="resume" hidden></div>
-          <div class="row"><button class="btn" id="bNew">Draft a line</button><button class="ghost" data-goto="help">How to play</button></div>
+          <div class="row"><button class="btn" id="bNew">Draft a line</button><button class="ghost" id="bDaily">The Daily</button><button class="ghost" data-goto="help">How to play</button></div>
         </div>
       </div>
     </div>
@@ -997,6 +998,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
     </div>
     <div id="scr-end" hidden></div>
   </section>
+  <section id="pg-daily" class="doc" hidden></section>
   <section id="pg-help" class="doc" hidden></section>
   <section id="pg-best" class="doc" hidden></section>
   <section id="pg-rec" class="doc" hidden></section>
@@ -4242,6 +4244,85 @@ function settleStakes() {
   return { id: B.stakes, won, what };
 }
 onHook('fightStart', () => { rollPerks(); if (B.stakes) { const S = STAKES[B.stakes]; fx({ k: 'banner', t: `High stakes: ${S.n}`, sub: S.desc, small: 1 }); log(`High stakes: ${S.desc}`, 'bad'); } });
+/* p5f: the daily challenge (issue #60, phase 2). One seeded run a day, the same for everyone who plays it: the club,
+   the line, the difficulty and a twist all come from the local date. Difficulty rises through the week, from Rookie on
+   Sunday to Hall of Fame on Saturday. One attempt a day: starting the daily uses the day up, and a missed day can't be
+   played later. Results are kept per profile in pkey('sd-daily') as { days: { 'YYYY-MM-DD': entry } }, where an entry's
+   st is 'on' (started), 'win' or 'lose'. A daily started before midnight can still be finished after it.
+   Wraps recordRun (saves-records.js) to write the day's result. */
+const DAILY_DIFF = [0, 0, 1, 1, 2, 2, 3]; // Sunday to Saturday: Rookie, Rookie, Contender, Contender, All-Star, All-Star, Hall of Fame
+// each twist runs once, at the start of the run, on its own seeded stream ('twist'), so it lands the same for everyone
+const DAILY_TWISTS = {
+  purse: { n: 'Deep Pockets', d: 'Start with 250 gold.', go: () => { RUN.gold = 250; } },
+  heirloom: { n: 'Heirloom', d: 'Start with a second trophy, an uncommon one.', go: () => { const p = relicPool('u'); if (p.length) gainRelic(pick(p)); } },
+  lean: { n: 'Lean Roster', d: 'Start with two fewer Check cards, so your best cards come round sooner.', go: () => { for (let k = 0; k < 2; k++) { const i = RUN.deck.findIndex(c => c.id === 'check'); if (i >= 0) RUN.deck.splice(i, 1); } } },
+  glass: { n: 'Glass Cannon', d: 'Start with 15 less max HP and a rare attack.', go: () => { RUN.maxhp -= 15; RUN.hp = Math.min(RUN.hp, RUN.maxhp); const p = cardPool('r').filter(c => c.type === 'atk'); if (p.length) RUN.deck.push(mkCard(pick(p).id)); } },
+  iron: { n: 'Iron Lungs', d: 'Start with 15 more max HP, and an Ejection Notice in your deck.', go: () => { RUN.maxhp += 15; RUN.hp += 15; RUN.deck.push(mkCard('penalty')); } },
+  // (all three signature cards upgraded more than doubled the bot's wins: +22 points over no twist, test/daily_lab.py)
+  scouted: { n: 'Well Scouted', d: 'One of your players’ signature cards starts upgraded.', go: () => { const sig = SIG[pick(RUN.party).kind], c = RUN.deck.find(c => c.id === sig); if (c) c.up = true; } },
+  medicine: { n: 'Medicine Bag', d: 'Start with both tonic slots full.', go: () => { const k = Object.keys(TONICS); gainTonic(pick(k)); gainTonic(pick(k)); } },
+  free: { n: 'Free Agents', d: 'Your line comes from the open draft class, not a club, and brings a club’s trophy.' },
+};
+const pad2 = n => String(n).padStart(2, '0');
+function dayKey(d = new Date()) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function dayDate(key) { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); }
+function dayBefore(key) { const d = dayDate(key); d.setDate(d.getDate() - 1); return dayKey(d); }
+function dayName(key, long) { return dayDate(key).toLocaleDateString(undefined, long ? { weekday: 'long', day: 'numeric', month: 'long' } : { weekday: 'short', day: 'numeric', month: 'short' }); }
+// the day's challenge, from the date alone. Never touches the live run's streams: it draws on its own, and for the Free
+// Agents twist builds the draft class under a stand-in RUN (with B set aside), then puts both back.
+// tw: another twist in place of the day's ('none' for none), for the balance bots (test/daily_lab.py); the club, the line
+// and everything else stay the day's
+function dailyOf(key = dayKey(), tw) {
+  const date = dayDate(key), seed = seedHash(0x5d0d, 'daily:' + key);
+  const s = { rng: seedHash(seed, 'setup') }, r = () => rngStep(s, 'rng'), at = a => a[(r() * a.length) | 0];
+  const dayTwist = at(Object.keys(DAILY_TWISTS)), twist = tw || dayTwist, club = at(CLUB_IDS), free = twist === 'free';
+  const idx = [...Array(free ? Object.keys(KIND_NAME).length : CLUBS[club].roster.length).keys()];
+  for (let i = idx.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  let roster = CLUBS[club].roster;
+  if (free) { const r0 = RUN, b0 = B; RUN = { seed, act: 0, pos: 'draft' }; B = null; try { roster = genDraftClass(); } finally { RUN = r0; B = b0; } }
+  const picks = idx.slice(0, 3);
+  return { key, date, dow: date.getDay(), diff: DAILY_DIFF[date.getDay()], seed, twist, club, free, roster, picks, line: picks.map(i => roster[i]) };
+}
+// a new run for the day (used by the Daily tab, and by the bots without the record)
+function newDailyRun(key = dayKey(), tw) {
+  const D = dailyOf(key, tw);
+  if (D.free) newRun('free', D.picks, D.roster, CLUBS[D.club].relic, D.seed); else newRun(D.club, D.picks, undefined, undefined, D.seed);
+  RUN.path = []; RUN.diff = D.diff; RUN.daily = key; RUN.twist = D.twist;
+  rngWith('twist', () => { const T = DAILY_TWISTS[D.twist]; if (T && T.go) T.go(); });
+  saveRun();
+  return RUN;
+}
+function loadDaily() { try { const d = JSON.parse(localStorage.getItem(pkey('sd-daily')) || 'null'); return d && d.days ? d : { days: {} }; } catch (e) { return { days: {} }; } }
+function saveDaily(d) { if (LAB) return; try { localStorage.setItem(pkey('sd-daily'), JSON.stringify(d)); } catch (e) { } }
+// start today's daily, once: false if the day is already used
+function dailyStart(key = dayKey()) {
+  const rec = loadDaily(); if (rec.days[key]) return false;
+  const D = dailyOf(key); newDailyRun(key);
+  rec.days[key] = { st: 'on', diff: D.diff, twist: D.twist, club: D.free ? 'free' : D.club, line: D.line.map(p => p[0]), t: Date.now() };
+  saveDaily(rec);
+  return true;
+}
+// days in a row with a daily played, up to today (or up to yesterday, while today's is still to play)
+function dailyStreak(days, today = dayKey()) {
+  let k = days[today] ? today : dayBefore(today), n = 0;
+  while (days[k]) { n++; k = dayBefore(k); }
+  return n;
+}
+// what became of a day: still on (its run is the saved one), won, lost, or abandoned (started, then the save was replaced)
+function dailyState(key, e, saved = loadRun()) {
+  if (!e) return 'none';
+  if (e.st === 'win' || e.st === 'lose') return e.st;
+  return saved && saved.daily === key ? 'on' : 'gone';
+}
+const recordRunNoDaily = recordRun;
+recordRun = function (result) {
+  const key = RUN && RUN.daily;
+  recordRunNoDaily(result);
+  if (!key || LAB) return;
+  const rec = loadDaily(), e = rec.days[key] || (rec.days[key] = { diff: RUN.diff, twist: RUN.twist, club: RUN.club });
+  Object.assign(e, { st: result, act: RUN.act, floor: RUN.floor, score: runScore(RUN), sw: RUN.stats.sportsWins || 0 });
+  saveDaily(rec);
+};
 /* p6: the interface — icons, cards, the run bar and the map */
 
 /* ---------- small SVG icon set (trophies, tonics, map nodes) ---------- */
@@ -5542,8 +5623,8 @@ function showView(v) {
 }
 function showPage(p) {
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-current', t.dataset.pg === p ? 'page' : 'false'));
-  for (const k of ['play', 'help', 'best', 'rec']) $('pg-' + k).hidden = k !== p;
-  if (p === 'help') renderHelp(); if (p === 'best') renderBestiary(); if (p === 'rec') renderRecords();
+  for (const k of ['play', 'daily', 'help', 'best', 'rec']) $('pg-' + k).hidden = k !== p;
+  if (p === 'daily') renderDaily(); if (p === 'help') renderHelp(); if (p === 'best') renderBestiary(); if (p === 'rec') renderRecords();
   hideTip();
 }
 
@@ -6366,6 +6447,250 @@ function askConfirm(title, body, okLabel, onYes, onNo) {
   $('cfYes').onclick = () => { close(); onYes && onYes(); };
   $('cfNo').onclick = () => { close(); onNo && onNo(); };
 }
+/* p9b: the Daily tab, the title screen's Daily button, and How to play's section (issue #60, phase 2). The daily
+   itself is in run/daily.js. Wraps renderTitle and renderHelp. */
+const DAILY_RES = { win: 'Won the Cup', on: 'In progress', gone: 'Abandoned' };
+function dailyResult(key, e, saved) {
+  const s = dailyState(key, e, saved);
+  if (s === 'lose') return `Lost in act ${(e.act || 0) + 1}, floor ${(e.floor || 0) + 1}`;
+  return DAILY_RES[s] || '';
+}
+function renderDaily() {
+  const el = $('pg-daily'); if (!el) return;
+  const key = dayKey(), D = dailyOf(key), rec = loadDaily(), e = rec.days[key], saved = loadRun(), st = dailyState(key, e, saved);
+  const club = D.free ? CLUBS.free : CLUBS[D.club], T = DAILY_TWISTS[D.twist], Df = DIFFS[D.diff];
+  const keys = Object.keys(rec.days).sort().reverse(), done = keys.filter(k => ['win', 'lose'].includes(rec.days[k].st));
+  const best = done.reduce((m, k) => Math.max(m, rec.days[k].score || 0), 0), wins = done.filter(k => rec.days[k].st === 'win').length;
+  const action = st === 'none' ? `<button class="btn" id="bDailyGo">Play today’s game</button>`
+    : st === 'on' ? `<button class="btn" id="bDailyGo">Continue today’s game</button>`
+    : `<p class="hint" id="dailyDone"><b>${esc(dailyResult(key, e, saved))}${e.score ? `, ${e.score} points` : ''}.</b> That’s today’s game played. A new one starts at midnight.</p>`;
+  el.innerHTML = `<h2 class="pgh">The Daily <small style="font-size:.4em;color:var(--dim)">${esc(profileName())}</small></h2>
+  <p class="lede">One game a day, the same for everyone: the same club and line, the same twist, and the same dungeon, rewards and fights. You get one go. It gets harder through the week, from Rookie on Sunday to Hall of Fame on Saturday.</p>
+  <div class="daily" style="--cc:${club.color}">
+    <div class="dhead"><h3>${esc(dayName(key, true))}</h3><span class="ddiff" data-tip="${esc(`<span class="t">${Df.n}</span>${Df.desc}`)}">${esc(Df.n)}</span></div>
+    <p class="dclub"><b>${esc(D.free ? 'The Free Agents' : club.name)}</b>${D.free ? `, with the ${esc(CLUBS[D.club].name)}’ trophy` : ''}</p>
+    <div class="dline">${D.line.map(([n, kind, num]) => `<div><img src="${portraitURL(kind, club, num, 64)}" alt=""><span><b>${esc(n)}</b><small>${KIND_NAME[kind]}</small></span></div>`).join('')}</div>
+    <p class="dtwist"><b>Twist: ${esc(T.n)}.</b> ${esc(T.d)}</p>
+    ${action}
+  </div>
+  <div class="endstats" style="margin:18px 0"><div><b id="dStreak">${dailyStreak(rec.days, key)}</b>day streak</div><div><b>${keys.length}</b>dailies played</div><div><b>${wins}</b>Cups won</div><div><b>${best}</b>best score</div></div>
+  ${keys.length ? `<div class="tablewrap"><table id="dTable"><thead><tr><th>Day</th><th>Difficulty</th><th>Club</th><th>Twist</th><th>Result</th><th>Score</th></tr></thead><tbody>${keys.slice(0, 60).map(k => { const x = rec.days[k], c = CLUBS[x.club] || CLUBS.free, tw = DAILY_TWISTS[x.twist]; return `<tr><td>${esc(dayName(k))}</td><td>${esc((DIFFS[x.diff] || DIFFS[1]).n)}</td><td><b style="color:${c.color}">${esc(x.club === 'free' ? 'Free Agents' : c.name)}</b></td><td>${esc(tw ? tw.n : '')}</td><td>${esc(dailyResult(k, x, saved))}</td><td>${x.score != null ? x.score : '–'}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="hint">No dailies played yet on this profile.</p>'}`;
+  const go = $('bDailyGo');
+  if (go) go.onclick = () => {
+    if (st === 'on') { showPage('play'); resumeRun(loadRun()); return; }
+    const start = () => { if (!dailyStart(key)) return renderDaily(); DR.cls = null; showPage('play'); showView('map'); renderMap(); };
+    if (saved) askConfirm('Start the daily?', `You have a run in progress (${esc(CLUBS[saved.club].name)}, act ${saved.act + 1}). Starting the daily replaces it.`, 'Start the daily', start);
+    else start();
+  };
+}
+(() => {
+  const css = document.createElement('style');
+  css.textContent = `.daily{border:1px solid var(--seam);border-left:4px solid var(--cc);border-radius:8px;padding:14px 16px;background:var(--stone);display:grid;gap:10px;max-width:720px}
+.daily .dhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.daily h3{margin:0}
+.daily .ddiff{font-family:var(--hud);font-size:20px;color:var(--torch)}.daily p{margin:0}
+.daily .dline{display:flex;gap:14px;flex-wrap:wrap}.daily .dline div{display:flex;gap:8px;align-items:center}
+.daily .dline img{width:48px;height:48px;border-radius:6px}.daily .dline span{display:grid}.daily .dline small{color:var(--dim)}
+.daily .btn{justify-self:start}`;
+  document.head.appendChild(css);
+  const rt = renderTitle;
+  renderTitle = function () { rt(); const b = $('bDaily'); if (b) { const st = dailyState(dayKey(), loadDaily().days[dayKey()]); b.textContent = st === 'none' ? `Today’s daily: ${dayDate(dayKey()).toLocaleDateString(undefined, { weekday: 'long' })}` : 'The Daily'; } };
+  const b = $('bDaily'); if (b) b.onclick = () => showPage('daily');
+  const rh = renderHelp;
+  renderHelp = function () {
+    rh();
+    if (window.__SD_REALM || !$('pg-help') || $('helpDaily')) return; // the Realm has its own How to play
+    $('pg-help').insertAdjacentHTML('beforeend', `<section id="helpDaily"><h3>The Daily</h3>
+      <p class="hint">Once a day there is a daily game, the same for everyone: the same club and three players, the same dungeon, and the same rewards, shops, events and fights, so you can compare how you did. Each day also has a twist, such as more gold, a second trophy or a thinner deck.</p>
+      <p class="hint">It gets harder through the week: Rookie on Sunday and Monday, Contender on Tuesday and Wednesday, All-Star on Thursday and Friday, and Hall of Fame on Saturday. A new daily starts at midnight, your time.</p>
+      <p class="hint">You get one go. Starting it uses up the day, and a day you miss can’t be played later. You can save and quit and come back to it, as with any run. The Daily tab shows today’s game, your streak of days in a row, and how every daily went.</p>
+      <p class="hint" id="helpBoard">Played on claude.ai, the Daily tab also has today’s board and yesterday’s: everyone’s result for the day, by score, with yours marked. A daily goes on the board when it ends, won or lost. Anywhere else, your own record is all there is.</p></section>`);
+  };
+  if (UI.screen === 'title') renderTitle();
+})();
+/* p9c: the daily's shared board (issue #60, phase 5). When the game is published as a claude.ai artifact with the db
+   and user capabilities, each player's daily result goes to the artifact's shared store, and the Daily page shows
+   everyone's for the day. Anywhere else (a saved copy, another host, signed out) the board stays off and the local
+   record (run/daily.js) is all there is; a viewer who may read but not write (a Viewer or Commenter on the artifact)
+   sees the board without a place on it.
+
+   Store: boards/<viewer id> = { v: 1, '<game>_<yyyymmdd>': rank, <game>: { 'YYYY-MM-DD': shown } }: one document per
+   viewer, written only by that viewer (and tidied by the owner), pruned to BOARD_CFG.keep days. The rank is a number,
+   so the board can be one ordered query on a top-level field; shown is what a row says. game: 'sd' (Sudden Death's
+   daily: rank = the run's score) or 'rd' (the Realm daily, w71: rank from the result, then the margin). Each build is
+   its own artifact with its own store. Only ids are stored: names come from user.profiles() each time a board draws.
+
+   Publish with
+     capabilities: { db: { rules: [{ path: 'boards', read: 'view', write: 'owner' }, { path: 'boards/{self}', read: 'view', write: 'interact' }] },
+                     user: { scopes: ['profile'] } }
+
+   A day's first result stands. Results in this device's record that never reached the board are posted on the next load.
+   Wraps recordRun (a daily's result posted, a forfeit too) and renderDaily (Sudden Death's page: today's board and yesterday's). The
+   Realm's daily posts and draws through the same functions (w71). LAB never touches the board. */
+const BOARD_CFG = { keep: 30, top: 10, wait: 10000, fetch: 200 };
+// st: 'off' (no runtime here), 'wait' (asking it), 'on', 'ro' (on, but this viewer's writes are refused)
+// mine: your own document as last read or written; names: names resolved so far (by id, for drawing only, never stored);
+// local[game]() -> [[key, rank, shown]]: the finished days in this device's record, posted on load when your document
+// lacks them (a post that never landed: a network blip, or a runtime that answered late)
+const BOARD = { st: 'off', db: null, user: null, uid: null, subs: {}, rows: {}, late: {}, timer: {}, queue: [], busy: Promise.resolve(), fmt: {}, local: {},
+  mine: null, names: {}, full: false };
+const boardDay = key => key.replace(/-/g, '');
+const boardField = (game, key) => game + '_' + boardDay(key);
+function boardInit() {
+  if (LAB || BOARD.st !== 'off' || typeof window === 'undefined' || !window.claude || typeof window.claude.use !== 'function') return;
+  BOARD.st = 'wait';
+  Promise.all([window.claude.use('db'), window.claude.use('user')]).then(async ([db, user]) => {
+    const uid = user ? await user.id() : null;
+    if (!db || !uid) { BOARD.st = 'off'; BOARD.queue = []; boardRedraw(); return; }
+    Object.assign(BOARD, { db, user, uid, st: (await user.can('data.write')) === false ? 'ro' : 'on' });
+    for (const f of BOARD.queue.splice(0)) f();
+    if (BOARD.st === 'on') boardWrite(boardLocal());
+    boardRedraw();
+  }).catch(e => { console.warn('daily board', e); BOARD.st = 'off'; boardRedraw(); });
+}
+// the first day the board keeps: BOARD_CFG.keep days before today
+function boardCut() { const d = dayDate(dayKey()); d.setDate(d.getDate() - BOARD_CFG.keep); return dayKey(d); }
+function boardLocal() {
+  const out = [], cut = boardCut();
+  for (const g of Object.keys(BOARD.local)) { try { out.push(...BOARD.local[g]().filter(x => x[0] >= cut).map(x => [g].concat(x))); } catch (e) { console.warn('daily board', e); } }
+  return out;
+}
+
+/* ---------- posting: one write at a time to your own document ---------- */
+function boardPost(game, key, rank, shown) {
+  if (LAB) return;
+  const go = () => { if (BOARD.st === 'on') boardWrite([[game, key, rank, shown]]); };
+  if (BOARD.st === 'wait') BOARD.queue.push(go); else go();
+}
+// items: [[game, key, rank, shown]]. The first result for a day stands: the daily is one attempt, and a second profile,
+// device or cleared record playing it again doesn't replace it.
+function boardWrite(items, tries = 0) {
+  BOARD.busy = BOARD.busy.then(async () => {
+    const ref = BOARD.db.doc('boards/' + BOARD.uid), snap = await ref.get();
+    const cur = snap.exists ? JSON.parse(JSON.stringify(snap.data())) : {};
+    let changed = false;
+    for (const [game, key, rank, shown] of items) {
+      const f = boardField(game, key);
+      if (cur[f] != null) continue;
+      cur[f] = rank; cur[game] = Object.assign({}, cur[game], { [key]: shown }); changed = true;
+    }
+    // keep the last BOARD_CFG.keep days (counted from today, and never a day posted now)
+    const cut = boardCut(), now = new Set(items.map(x => x[1]));
+    for (const k of Object.keys(cur)) { const m = /^[a-z]+_(\d{4})(\d\d)(\d\d)$/.exec(k), day = m && `${m[1]}-${m[2]}-${m[3]}`; if (day && day < cut && !now.has(day)) { delete cur[k]; changed = true; } }
+    for (const g of Object.keys(cur)) if (cur[g] && typeof cur[g] === 'object') for (const k of Object.keys(cur[g])) if (/^\d{4}-\d\d-\d\d$/.test(k) && k < cut && !now.has(k)) { delete cur[g][k]; changed = true; }
+    if (changed) { cur.v = 1; await ref.set(cur); }
+    BOARD.mine = cur;
+    if (changed) boardRedraw();
+  }).catch(e => {
+    const code = e && e.code;
+    if (code === 'invalid_argument') BOARD.st = 'ro'; // a viewer who may read but not write: the board stays, without their place on it
+    else if (code === 'quota_exceeded') BOARD.full = true;
+    else if (!tries) setTimeout(() => boardWrite(items, 1), 400 + Math.random() * 800); // transient: once more (and on the next load from the record)
+    console.warn('daily board', e); boardRedraw();
+  });
+  return BOARD.busy;
+}
+
+/* ---------- reading: one subscription per day's board ---------- */
+function boardWatch(game, key) {
+  const id = boardField(game, key);
+  if ((BOARD.st !== 'on' && BOARD.st !== 'ro') || BOARD.subs[id]) return;
+  BOARD.subs[id] = 'opening'; // before onSnapshot: a snapshot delivered during the call redraws, and must not subscribe again
+  // late: null while fetching or answered, 'late' when nothing came in BOARD_CFG.wait, 'err' when it failed
+  BOARD.late[id] = null;
+  BOARD.timer[id] = setTimeout(() => { BOARD.late[id] = 'late'; boardRedraw(); }, BOARD_CFG.wait);
+  const done = how => { clearTimeout(BOARD.timer[id]); BOARD.late[id] = how; };
+  const fail = e => {
+    console.warn('daily board', e); done('err');
+    // the listener is dead: a fresh one is the only way back, after a while (never for a query the store refuses)
+    if (!e || e.code !== 'invalid_argument') setTimeout(() => { delete BOARD.subs[id]; boardRedraw(); }, 30000);
+    boardRedraw();
+  };
+  try {
+    const un = BOARD.db.collection('boards').where(id, '>', -1e12).orderBy(id, 'desc').limit(BOARD_CFG.fetch).onSnapshot(s => {
+      BOARD.rows[id] = s.docs.map(d => { const x = d.data() || {}; return { uid: d.id, rank: x[id], shown: (x[game] || {})[key] || {} }; });
+      if (!s.metadata || !s.metadata.fromCache) done(null);
+      boardRedraw();
+    }, fail);
+    if (BOARD.subs[id] === 'opening') BOARD.subs[id] = un;
+  } catch (e) { fail(e); }
+}
+
+/* ---------- drawing ---------- */
+// fmt(shown) -> what a row says; title: the board's heading. Draws what it has, and redraws itself as rows come in.
+function boardHTML(game, key, title) {
+  if (BOARD.st === 'off') return '';
+  return `<div class="dboard" data-board="${game}" data-bkey="${key}" data-btitle="${esc(title)}">${boardInner(game, key, title)}</div>`;
+}
+function boardInner(game, key, title) {
+  boardWatch(game, key); // (once the runtime has answered: a board drawn while asking starts its subscription on the redraw)
+  const id = boardField(game, key), rows = BOARD.rows[id], late = BOARD.late[id], fmt = BOARD.fmt[game] || (s => String(s.st || ''));
+  let body;
+  if (BOARD.st === 'wait' || (!rows && !late)) body = '<p class="hint">Fetching the board…</p>';
+  else if (!rows && late === 'late') body = '<p class="hint">The board can’t be reached yet.</p>';
+  else if (!rows) body = '<p class="hint">The board isn’t available here.</p>';
+  else if (!rows.length) body = `<p class="hint" data-bempty>Nobody has a result on the board yet.</p>`;
+  else {
+    const me = rows.findIndex(r => r.uid === BOARD.uid), show = rows.slice(0, BOARD_CFG.top).map((r, i) => [r, i + 1]);
+    if (me >= BOARD_CFG.top) show.push([rows[me], me + 1]);
+    // your result is on the board but below the rows fetched
+    else if (me < 0 && BOARD.mine && BOARD.mine[id] != null) show.push([{ uid: BOARD.uid, shown: (BOARD.mine[game] || {})[key] || {} }, `${BOARD_CFG.fetch}+`]);
+    const nm = r => r.uid === BOARD.uid ? 'You' : BOARD.names[r.uid] || '…';
+    const many = rows.length >= BOARD_CFG.fetch ? `More than ${BOARD_CFG.fetch}` : rows.length;
+    body = `<ol class="dbrows">${show.map(([r, pos]) => `<li class="${r.uid === BOARD.uid ? 'dbme' : ''}" data-buid="${esc(r.uid)}"><span class="dbp">${pos}</span><span class="dbn" data-bname="${esc(r.uid)}">${esc(nm(r))}</span><span class="dbr">${esc(fmt(r.shown))}</span></li>`).join('')}</ol>
+      ${rows.length > BOARD_CFG.top ? `<p class="hint">${many} on the board.</p>` : ''}${late === 'late' || late === 'err' ? '<p class="hint">This may be out of date.</p>' : ''}`;
+  }
+  const note = BOARD.st === 'ro' ? '<p class="hint" data-bro>You can see the board, but your results can’t go on it from here.</p>'
+    : BOARD.full ? '<p class="hint" data-bfull>The board is full, so your result couldn’t go on it.</p>' : '';
+  return `<h4 class="dbh">${esc(title)}</h4>${body}${note}`;
+}
+function boardRedraw() {
+  if (typeof document === 'undefined') return;
+  for (const el of document.querySelectorAll('[data-board]')) {
+    if (BOARD.st === 'off') { el.remove(); continue; }
+    el.innerHTML = boardInner(el.dataset.board, el.dataset.bkey, el.dataset.btitle);
+  }
+  boardNames();
+}
+// names, resolved each time a board draws (only ids are stored), and kept for the next draw so rows don't flicker; set as
+// text, since they are other people's input
+function boardNames() {
+  const els = [...document.querySelectorAll('[data-bname]')].filter(e => e.dataset.bname !== BOARD.uid);
+  if (!els.length || !BOARD.user) return;
+  BOARD.user.profiles([...new Set(els.map(e => e.dataset.bname))]).then(ps => {
+    for (const e of els) { const id = e.dataset.bname, p = ps[id]; BOARD.names[id] = (p && p.name) || 'Someone'; e.textContent = BOARD.names[id]; }
+  }).catch(() => { });
+}
+
+/* ---------- Sudden Death's daily on the board ---------- */
+const BOARD_SD_FIN = { win: 1, lose: 1, quit: 1 };
+BOARD.fmt.sd = s => `${s.st === 'win' ? 'Won the Cup' : `${s.st === 'quit' ? 'Forfeited' : 'Lost'} in act ${(s.act || 0) + 1}, floor ${(s.floor || 0) + 1}`}: ${s.score || 0} points`;
+// a finished day in the local record, as a row (a forfeit counts, as a loss does)
+BOARD.local.sd = () => { const days = loadDaily().days; return Object.keys(days).filter(k => BOARD_SD_FIN[days[k].st]).map(k => { const e = days[k];
+  return [k, e.score || 0, { st: e.st, score: e.score || 0, act: e.act || 0, floor: e.floor || 0, sw: e.sw || 0 }]; }); };
+const recordRunNoBoard = recordRun;
+recordRun = function (result) {
+  const key = RUN && RUN.daily;
+  recordRunNoBoard(result);
+  if (!key || LAB || !BOARD_SD_FIN[result] || !RUN) return;
+  // from the run itself, as run/daily.js writes the record (which a full localStorage could have missed)
+  const score = runScore(RUN);
+  boardPost('sd', key, score, { st: result, score, act: RUN.act || 0, floor: RUN.floor || 0, sw: (RUN.stats && RUN.stats.sportsWins) || 0 });
+};
+const renderDailyNoBoard = renderDaily;
+renderDaily = function () {
+  renderDailyNoBoard();
+  const el = $('pg-daily'), d = el && el.querySelector('.daily'); if (!d || window.__SD_REALM) return;
+  const key = dayKey();
+  d.insertAdjacentHTML('afterend', boardHTML('sd', key, 'Today’s board') + boardHTML('sd', dayBefore(key), 'Yesterday’s board'));
+  boardNames();
+};
+(() => {
+  const css = document.createElement('style');
+  css.textContent = `.dboard{max-width:720px;margin:14px 0}.dboard .dbh{margin:0 0 6px}.dbrows{margin:0;padding:0;list-style:none;display:grid;gap:3px}
+.dbrows li{display:grid;grid-template-columns:2.2em 1fr auto;gap:12px}.dbrows .dbp{color:var(--dim);text-align:right}.dbrows .dbn{font-weight:700}.dbrows .dbr{color:var(--dim)}.dbrows .dbme .dbn,.dbrows .dbme .dbr{color:var(--torch)}`;
+  document.head.appendChild(css);
+})();
+boardInit();
 /* w1: Realm data, ported from Terra Chimera's DB: regions, tiles, locations, towns, dungeons, NPCs, events, cups, recipes */
 /* Not ported: species, parts, uniques, muts, trees, moves, rare, rumours, the type tables (MT ST LK PT UT), dmgTypes, passRules,
    battleRange, encounters, encountersNight, the geneticist, and TC's editor DEFAULTS. dropped everywhere: research data
@@ -35977,6 +36302,242 @@ renderHelp = function () {
   const h = $('wHelpAdventures'); if (!h || h.dataset.marks) return;
   h.dataset.marks = 1;
   h.insertAdjacentHTML('beforeend', ' If you lose the thread, turn on Adventure markers in Settings: the map marks where each one goes next.');
+};
+/* w71: the Realm daily (issue #60, phase 4). One match a day, the same for everyone: the game (the card game, baseball,
+   football or boxing), the club you face, and for the card game the sport and the side they put out, all from the local
+   date. Not a journey: your own team plays it, on the journey you have on. Difficulty rises through the week, as
+   Sudden Death's daily does: tier 1 on Sunday and Monday, 2 from Tuesday to Thursday, 3 on Friday and Saturday (the
+   engines scale a tier to your level; the card game's tier is the act's foes).
+
+   One attempt a day, per profile and across journeys: the day is used at kickoff (the card game's first hand, a ball or
+   football game's first pitch or play, a card at the Ring once its pairing is boxed), and written at once, so loading an
+   older journey save can't give it back. Calling the Ring's pairing off before it starts isn't an attempt. A missed day
+   can't be played later. A daily started before midnight can be finished after it.
+   A win pays the engine's usual pay plus W_RDAILY.gold and .fans times the tier.
+
+   Storage: pkey('sd-realm-daily') = { days: { 'YYYY-MM-DD': { st: 'on'|'win'|'lose'|'tie', eng, club, sport, tier, us?,
+   them?, t } } }. Nothing is stored in LAB.
+   Matches start with kind 'rdaily' and ref the day's key; W_ON_END.rdaily writes the result.
+
+   Wraps: wRingGo (wW71RingGo: a card at the Ring is the attempt once its pairing is boxed), wMatchLost (wW71MatchLost:
+   a Hardcore loss, which ends the journey without the usual dispatch), wStart (wW71Start: the day's daily in the log),
+   wOpenCamp and wRenderCamp (wW71OpenCamp, wW71RenderCamp: the Daily tab), renderHelp (wW71RenderHelp: #wHelpRDaily).
+   Replaces renderDaily (Sudden Death's Daily page, ui/screens/daily.js): in the Realm the top bar's Daily is this daily.
+   The shared board (phase 5, ui/screens/daily-board.js): results posted as game 'rd' (rank: the result, then the
+   margin), today's board on the tab and the page. */
+
+const W_RDAILY = {
+  key: 'sd-realm-daily',
+  tiers: [1, 1, 2, 2, 2, 3, 3], // Sunday to Saturday
+  engines: ['card', 'ball', 'grid', 'ring'],
+  names: { card: 'the card game', ball: 'baseball', grid: 'football', ring: 'boxing' },
+  how: { card: [['play', 'Play']], ball: [['play', 'Play'], ['manage', 'Manage'], ['sim', 'Simulate']], grid: [['play', 'Play'], ['manage', 'Manage'], ['sim', 'Simulate']], ring: [['play', 'Play']] },
+  gold: 25, fans: 5, // a win's extra, times the tier
+  shown: 14,         // past days on the tab
+};
+const W_RDAILY_TIER = { 1: 'an easy game', 2: 'a tough game', 3: 'a very hard game' };
+
+// today, by the local date (a function of its own, so the test can move the day)
+function wRdailyToday() { return dayKey(); }
+// the day's match, from the date alone. mine: your club, which never faces itself (the day's second club stands in)
+function wRdailyOf(key = wRdailyToday(), mine) {
+  const s = { rng: seedHash(0x5d0d, 'realm-daily:' + key) }, r = () => rngStep(s, 'rng'), at = a => a[(r() * a.length) | 0];
+  const dow = dayDate(key).getDay(), tier = W_RDAILY.tiers[dow], eng = at(W_RDAILY.engines);
+  const first = at(CLUB_IDS), others = CLUB_IDS.filter(c => c !== first), second = at(others);
+  const club = mine && first === mine ? second : first;
+  let sport = { ball: 'baseball', grid: 'football', ring: 'boxing' }[eng] || null, ids = null;
+  if (eng === 'card') {
+    // the club's side, as a rival game is: one of the tier's elite sides that plays the day's sport
+    const want = at(Object.keys(SPORTS)), pool = ENCOUNTERS[tier - 1].elite;
+    const fits = pool.filter(p => !ENEMIES[p[0]].sport || ENEMIES[p[0]].sport === want);
+    ids = at(fits.length ? fits : pool).slice();
+    sport = ENEMIES[ids[0]].sport || want;
+  }
+  return { key, dow, tier, eng, club, sport, ids };
+}
+function wRdailyMine() { return (RUN && RUN.club) || (WG && WG.club) || null; }
+function wRdailyDay(key = wRdailyToday()) { return wRdailyOf(key, wRdailyMine()); }
+
+/* ---------- the record ---------- */
+function wRdailyAll() { try { const d = JSON.parse(localStorage.getItem(pkey(W_RDAILY.key)) || 'null'); return d && d.days ? d : { days: {} }; } catch (e) { return { days: {} }; } }
+function wRdailySave(d) { if (LAB) return; try { localStorage.setItem(pkey(W_RDAILY.key), JSON.stringify(d)); } catch (e) { } }
+function wRdailyMark(D) {
+  const rec = wRdailyAll(); if (rec.days[D.key]) return;
+  rec.days[D.key] = { st: 'on', eng: D.eng, club: D.club, sport: D.sport, tier: D.tier, t: Date.now() };
+  wRdailySave(rec);
+}
+// days in a row with a daily played, up to today (or up to yesterday, while today's is still to play)
+function wRdailyStreak(days, today = wRdailyToday()) {
+  let k = days[today] ? today : dayBefore(today), n = 0;
+  while (days[k]) { n++; k = dayBefore(k); }
+  return n;
+}
+
+/* ---------- the match ---------- */
+function wRdailyWhat(D) {
+  const club = wBallName(D.club);
+  if (D.eng === 'card') return `${SPORT_NAME[D.sport]} in the card game against ${club}: ${wClubCaptain(D.club)} and ${D.ids.map(id => ENEMIES[id].n).join(', ')}`;
+  return `${wCap(W_RDAILY.names[D.eng])} against ${club}`;
+}
+function wRdailyProblems(D) {
+  if (!WG || !RUN) return ['Start a journey first.'];
+  if (D.eng === 'ball') return wBallProblems();
+  if (D.eng === 'grid') return wGridProblems();
+  if (D.eng === 'ring') return wRingProblems();
+  return [];
+}
+// the engine whose game is waiting, if it's today's daily
+function wRdailyLive(key) {
+  const L = [WG.ball, WG.gfg, WG.bxg].map(S => S && S.live).find(L => L && L.world && L.world.kind === 'rdaily');
+  return L && (!key || L.world.ref === key) ? L : null;
+}
+function wRdailyStart(how) {
+  if (!WG || !RUN) return 'Start a journey first.';
+  const D = wRdailyDay();
+  if (wRdailyAll().days[D.key]) return 'You have played today’s daily. Come back tomorrow.';
+  const probs = wRdailyProblems(D); if (probs.length) return probs.join(' ');
+  if (D.eng === 'card') {
+    if (RUN.pending) return 'Finish the match you are in first.';
+    wRdailyMark(D);
+    startMatch({ type: 'rival', tier: D.tier, ids: D.ids, sport: D.sport, card: false, name: wClubCaptain(D.club), world: { kind: 'rdaily', ref: D.key } });
+    return '';
+  }
+  const St = { ball: wBall, grid: wGfg, ring: wBxg }[D.eng]();
+  // the daily is on whatever else you've played today (an engine otherwise turns away a second game with a club in a day)
+  delete St.met[D.club];
+  const o = { club: D.club, how: how || 'play', tier: D.tier, kind: 'rdaily', ref: D.key };
+  const why = ({ ball: wStartBall, grid: wStartGrid, ring: wStartRing }[D.eng])(o) || '';
+  // baseball and football are on now; the Ring marks the day when its pairing is boxed (wRingGo)
+  if (!why && D.eng !== 'ring' && St.live && St.live.world.kind === 'rdaily') wRdailyMark(D);
+  return why;
+}
+const wW71RingGo = wRingGo;
+wRingGo = function (o, mine, theirs, picks) {
+  if (o && o.kind === 'rdaily' && !wBxg().live) { const D = wRdailyOf(o.ref, wRdailyMine()); wRdailyMark(D); }
+  return wW71RingGo(o, mine, theirs, picks);
+};
+W_ON_END.rdaily = function (r, ref, W) {
+  // (a simulated game settles inside its start, before the day is marked: the day's facts come from the date)
+  const rec = wRdailyAll(), D = wRdailyOf(ref, wRdailyMine());
+  const e = rec.days[ref] || (rec.days[ref] = { eng: D.eng, club: D.club, sport: D.sport, tier: D.tier, t: Date.now() });
+  if (e.st && e.st !== 'on') return; // written once
+  const f = wAdvMatchFacts(r, W);
+  e.st = r === 'win' ? 'win' : r === 'tie' ? 'tie' : 'lose'; e.us = f.us; e.them = f.them;
+  if (W && W.tier) e.tier = W.tier;
+  wRdailySave(rec);
+  // the shared board (issue #60, phase 5; ui/screens/daily-board.js): the result first, then the margin
+  try { boardPost('rd', ref, wRdailyRank(e), { st: e.st, us: e.us || 0, them: e.them || 0, eng: e.eng }); } catch (er) { console.error(er); }
+  let line;
+  if (e.st === 'win' && !WG.advDead) {
+    const t = e.tier || 1, g = W_RDAILY.gold * t, fa = W_RDAILY.fans * t;
+    RUN.gold += g; RUN.fans = (RUN.fans || 0) + fa;
+    line = [`You win the daily! +${g} gold and +${fa} fans on top of the usual pay.`, 'g'];
+  } else line = [e.st === 'tie' ? 'The daily ends level. Come back tomorrow for the next one.' : 'You lose the daily. Come back tomorrow for the next one.', 'd'];
+  // after the engine's own final line, which it logs once this returns
+  Promise.resolve().then(() => wLog(line[0], line[1]));
+};
+/* Hardcore: a lost card match ends the journey without the usual dispatch, so the daily hears of it here */
+const wW71MatchLost = wMatchLost;
+wMatchLost = function (result) {
+  const W = RUN && RUN.pending && RUN.pending.world;
+  // (the score from the match itself: the season log doesn't have this game yet, so the facts would be the last game's)
+  const S = B && B.sc, sc = S ? (B.sport === 'boxing' && S.rounds ? { us: S.rounds[0], them: S.rounds[1] } : { us: S.us, them: S.them }) : {};
+  if (WG && WG.hardcore && W && W.kind === 'rdaily') { WG.advDead = 1; try { W_ON_END.rdaily('lose', W.ref, Object.assign({}, W, sc)); } catch (e) { console.error(e); } finally { delete WG.advDead; } }
+  return wW71MatchLost(result);
+};
+const wW71Start = wStart;
+wStart = function (save, opts) {
+  const r = wW71Start(save, opts);
+  try { if (WG && !LAB && !wRdailyAll().days[wRdailyToday()]) wLog(`Today’s daily: ${wRdailyWhat(wRdailyDay())}. Play it from the Team screen’s Daily tab.`); } catch (e) { console.error(e); }
+  return r;
+};
+
+/* ---------- the shared board ---------- */
+const wRdailyRank = e => (e.st === 'win' ? 2 : e.st === 'tie' ? 1 : 0) * 1000 + 500 + clamp((e.us || 0) - (e.them || 0), -499, 499);
+BOARD.local.rd = () => { const days = wRdailyAll().days; return Object.keys(days).filter(k => days[k].st && days[k].st !== 'on').map(k => { const e = days[k];
+  return [k, wRdailyRank(e), { st: e.st, us: e.us || 0, them: e.them || 0, eng: e.eng }]; }); };
+BOARD.fmt.rd = s => `${s.st === 'win' ? 'Won' : s.st === 'tie' ? 'Drew' : 'Lost'} ${s.us || 0}–${s.them || 0}`;
+
+/* ---------- the Daily tab on the Team screen ---------- */
+function wRdailyResult(e) {
+  if (!e || e.st === 'on') return 'Started';
+  const sc = e.us != null && e.them != null && (e.us || e.them) ? ` ${e.us}–${e.them}` : '';
+  return (e.st === 'win' ? 'Won' : e.st === 'tie' ? 'Drew' : 'Lost') + sc;
+}
+function wCampDaily() {
+  const D = wRdailyDay(), rec = wRdailyAll(), e = rec.days[D.key], live = wRdailyLive(D.key), probs = e ? [] : wRdailyProblems(D);
+  const head = `<h5 class="wbrh">${esc(dayName(D.key, true))}: tier ${D.tier}, ${W_RDAILY_TIER[D.tier]}</h5>
+    <p class="wrdwhat" data-rdwhat><b>${esc(wRdailyWhat(D))}.</b></p>`;
+  let act;
+  if (live) act = `<p class="hint">Your daily is waiting.</p><div class="row wnbtn"><button class="btn" data-rdresume>Resume the daily</button></div>`;
+  else if (e) act = `<p class="hint" data-rdst="${e.st}">${e.st === 'on' ? 'You have started today’s daily.' : `Today’s daily: <b class="${e.st === 'win' ? 'wgood' : 'wbad'}">${esc(wRdailyResult(e))}</b>.`} The next one is tomorrow.</p>`;
+  else act = `${probs.length ? `<p class="hint wball">${esc(probs[0])}</p>` : ''}<p class="hint">One attempt: the day is used once the game starts. A win pays the usual, plus ${W_RDAILY.gold * D.tier} gold and ${W_RDAILY.fans * D.tier} fans.</p>
+    <div class="row wnbtn">${W_RDAILY.how[D.eng].map(([h, n], i) => `<button class="${i ? 'ghost' : 'btn'}" data-rdgo="${h}" ${probs.length ? 'disabled' : ''}>${n}</button>`).join('')}</div>`;
+  const keys = Object.keys(rec.days).filter(k => k !== D.key).sort().reverse().slice(0, W_RDAILY.shown);
+  const past = keys.length ? `<h5 class="wbrh">Past days</h5><ol class="wstlog" data-rdpast>${keys.map(k => { const x = rec.days[k];
+    return `<li><b class="${x.st === 'win' ? 'wgood' : 'wbad'}">${esc(wRdailyResult(x))}</b> ${esc(dayName(k))}: ${esc(x.eng === 'card' && x.sport ? SPORT_NAME[x.sport].toLowerCase() : W_RDAILY.names[x.eng] || '')} against ${esc(x.club ? wBallName(x.club) : '')}, tier ${x.tier || 1}</li>`; }).join('')}</ol>` : '';
+  return `<p class="hint">One match a day, the same for everyone: the game, the club and the difficulty come from the date. It gets harder through the week, from Sunday to Saturday. Your own team plays it, once.</p>${head}${act}${boardHTML('rd', D.key, 'Today’s board')}${past}`;
+}
+const wW71OpenCamp = wOpenCamp;
+wOpenCamp = function (tab) {
+  const want = tab || WCAMP.tab;
+  wW71OpenCamp(want === 'daily' ? 'team' : tab);
+  const tabs = document.querySelector('#modalBox .wctabs');
+  if (!tabs || tabs.querySelector('[data-ctab="daily"]')) return;
+  tabs.lastElementChild.insertAdjacentHTML('afterend', '<button role="tab" data-ctab="daily">Daily</button>');
+  tabs.querySelector('[data-ctab="daily"]').onclick = () => { WCAMP.tab = 'daily'; WCAMP.swap = null; WCAMP.msg = ''; wRenderCamp(); };
+  if (want === 'daily') { WCAMP.tab = 'daily'; wRenderCamp(); }
+};
+const wW71RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  if (WCAMP.tab !== 'daily') return wW71RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  if (!$('modalBox').querySelector('[data-ctab="daily"]')) { WCAMP.tab = 'team'; return wRenderCamp(); }
+  $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'daily'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  body.innerHTML = wRdailySum() + (WCAMP.msg ? `<p class="hint wball">${esc(WCAMP.msg)}</p>` : '') + wCampDaily();
+  wRdailyWire(body, () => WCAMP.close(), why => { WCAMP.msg = why; wOpenCamp('daily'); });
+  boardNames();
+};
+function wRdailySum() {
+  const rec = wRdailyAll();
+  return `<div class="wcsum"><span>Streak <b data-rdstreak>${wRdailyStreak(rec.days)}</b></span><span>Dailies won <b>${Object.values(rec.days).filter(x => x.st === 'win').length}</b></span></div>`;
+}
+// the buttons, on the Team screen's tab or the Daily page: leave() first, then the game; refused(why) if it won't start
+function wRdailyWire(root, leave, refused) {
+  root.querySelectorAll('[data-rdgo]').forEach(b => b.onclick = () => {
+    leave();
+    const why = wRdailyStart(b.dataset.rdgo);
+    if (why) refused(why);
+  });
+  const r = root.querySelector('[data-rdresume]'); if (r) r.onclick = () => {
+    const L = wRdailyLive(); leave();
+    if (L === (WG.ball && WG.ball.live)) wResumeBall(); else if (L === (WG.gfg && WG.gfg.live)) wResumeGrid(); else wResumeRing();
+  };
+}
+
+/* ---------- the Daily page (the top bar's Daily: Sudden Death's daily run has no place in the Realm) ---------- */
+const WRDP = { msg: '' };
+renderDaily = function () {
+  const el = $('pg-daily'); if (!el) return;
+  const head = `<h2 class="pgh">The Daily <small style="font-size:.4em;color:var(--dim)">${esc(profileName())}</small></h2>`;
+  if (!WG || !RUN) {
+    const D = wRdailyOf();
+    el.innerHTML = `${head}<p class="lede">One match a day, the same for everyone. Your own team plays it, so start or continue a journey first (Play).</p>
+      <p class="hint" data-rdwhat>Today: <b>${esc(wCap(D.eng === 'card' ? SPORT_NAME[D.sport] + ' in the card game' : W_RDAILY.names[D.eng]))}</b>, tier ${D.tier}.</p>${wRdailySum()}`;
+    return;
+  }
+  el.innerHTML = `${head}<div class="wrdpage">${wRdailySum()}${WRDP.msg ? `<p class="hint wball">${esc(WRDP.msg)}</p>` : ''}${wCampDaily()}</div>`;
+  WRDP.msg = '';
+  wRdailyWire(el, () => showPage('play'), why => { WRDP.msg = why; showPage('daily'); });
+  boardNames();
+};
+
+/* ---------- How to play ---------- */
+const wW71RenderHelp = renderHelp;
+renderHelp = function () {
+  wW71RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpRDaily')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpRDaily"><b>The daily.</b> One match a day, the same for everyone who plays that day: the game (the card game, baseball, football or boxing), the club you face and, for the card game, the sport and their side all come from the date. It gets harder through the week: tier 1 on Sunday and Monday, tier 2 from Tuesday to Thursday, tier 3 on Friday and Saturday. Your own team plays it, from the Daily tab on the Team screen or the Daily page in the top bar. You get one attempt: the day is used once the game starts, even on another journey, and a missed day can't be played later. A win pays the usual, plus ${W_RDAILY.gold} gold and ${W_RDAILY.fans} fans a tier. The tab keeps your streak and your past days and, when the game is played on claude.ai, today’s board: everyone’s result, wins first, then by the margin.</p>`);
 };
 /* w72: match gear and the match bag, phase 1 (issue #61): the plumbing. Boxing (the Anvil Ring) and football (Cinder
    Gridiron) get equipment a player wears into a match, and potions kept in the bag for use during one.

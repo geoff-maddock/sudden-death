@@ -48,8 +48,10 @@ window.LABRUN = function (opts = {}) {
   RUN = seed != null ? { seed, act: 0, pos: 'draft' } : null; B = null;
   const clubs = opts.club ? [opts.club] : CLUB_IDS;
   const club = pick(clubs), picks = opts.picks || shuffle([0, 1, 2, 3, 4, 5]).slice(0, 3);
-  if (opts.free) newRun('free', shuffle([...Array(18).keys()]).slice(0, 3), genDraftClass(), CLUBS[pick(CLUB_IDS)].relic, seed); else newRun(club, picks, undefined, undefined, seed); RUN.path = []; if (opts.hard) RUN.diff = 3; if (opts.diff != null) RUN.diff = opts.diff;
-  const log = { club, party: RUN.party.map(p => p.kind), fights: [], result: null, act: 0, floor: 0, death: null };
+  if (opts.free) newRun('free', shuffle([...Array(18).keys()]).slice(0, 3), genDraftClass(), CLUBS[pick(CLUB_IDS)].relic, seed); else if (opts.daily) newDailyRun(opts.daily, opts.twist); else newRun(club, picks, undefined, undefined, seed); RUN.path = []; if (opts.hard) RUN.diff = 3; if (opts.diff != null) RUN.diff = opts.diff;
+  // opts.daily: play that day's daily ('YYYY-MM-DD'), at its difficulty unless opts.diff says otherwise; opts.twist: another
+  // twist in its place ('none' for none)
+  const log = { club: opts.daily ? RUN.club : club, daily: opts.daily, twist: RUN.twist, party: RUN.party.map(p => p.kind), fights: [], result: null, act: 0, floor: 0, death: null };
   outer: for (let act = 0; act < 3; act++) {
     while (true) {
       const opts2 = nextNodes();
@@ -91,5 +93,6 @@ window.LABRUN = function (opts = {}) {
     }
   }
   log.hp = RUN.hp; log.deck = RUN.deck.length; log.relics = RUN.relics.length; log.maxhp = RUN.maxhp; log.route = opts.route || 'balanced'; log.style = RUN.style || 0;
+  log.score = runScore(RUN); log.won = log.fights.filter(f => f.res === "win").length;
   return log;
 };

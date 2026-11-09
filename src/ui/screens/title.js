@@ -13,8 +13,8 @@ function showView(v) {
 }
 function showPage(p) {
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-current', t.dataset.pg === p ? 'page' : 'false'));
-  for (const k of ['play', 'help', 'best', 'rec']) $('pg-' + k).hidden = k !== p;
-  if (p === 'help') renderHelp(); if (p === 'best') renderBestiary(); if (p === 'rec') renderRecords();
+  for (const k of ['play', 'daily', 'help', 'best', 'rec']) $('pg-' + k).hidden = k !== p;
+  if (p === 'daily') renderDaily(); if (p === 'help') renderHelp(); if (p === 'best') renderBestiary(); if (p === 'rec') renderRecords();
   hideTip();
 }
 
