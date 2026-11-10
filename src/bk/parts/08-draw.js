@@ -215,12 +215,14 @@ function bkDrawMeter(c) {
 function bkDrawZones(c) {
   if (!G.zones || !G.zones.length) return;
   G.zones.forEach((z, k) => {
-    // (drawn at the end the play is at: the basket the offense attacks)
-    const U0 = BK_ULT_BY[z.id], vis = U0 ? U0.vis : ['#ffd08a', 'all'], end = G.cur ? G.cur.side : z.side;
-    c.save(); c.globalAlpha = .12 + .04 * Math.sin(BKT.t * 2 + k); c.fillStyle = vis[0];
+    // (drawn at the basket where it acts: its side's attack for an offense zone, the other side's for a defense one;
+    // faint while it waits for its end)
+    const U0 = BK_ULT_BY[z.id] || BK_SIT[z.id], vis = (U0 && U0.vis) || ['#ffd08a', 'all'], o = U0 && U0.o && Object.keys(U0.o).length, d = U0 && U0.d && Object.keys(U0.d).length;
+    const ours = G.cur && G.cur.side === z.side, active = ours ? o : d, end = active ? G.cur.side : o ? z.side : 1 - z.side;
+    c.save(); c.globalAlpha = (active ? .12 : .05) + .04 * Math.sin(BKT.t * 2 + k); c.fillStyle = vis[0];
     const r = (u0, v0, u1, v1) => { const a = bkScr(...bkAt(end, u0, v0)), b = bkScr(...bkAt(end, u1, v1)); c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y)); };
     if (vis[1] === 'paint') r(0, -2.45, 5.8, 2.45); else if (vis[1] === 'arc') { r(0, -7.5, 9, -3); r(0, 3, 9, 7.5); r(7, -3, 9.5, 3); } else if (vis[1] === 'half') r(0, -7.5, 14, 7.5); else r(0, -7.5, 28, 7.5);
     c.restore();
-    txt(c, `${z.n} · ${z.left - 1} more`, 20 + k * 230, 500, `700 12px ${BK_FONT}`, tint(vis[0], .3), 'left');
+    txt(c, `${z.n} · ${z.left > 50 ? 'to the end' : `${z.left} possession${z.left === 1 ? '' : 's'} left`}`, 20 + k * 230, 500, `700 12px ${BK_FONT}`, tint(vis[0], .3), 'left');
   });
 }

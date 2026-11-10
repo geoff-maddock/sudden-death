@@ -94,7 +94,8 @@ function bkThink(h) {
   const bigNear = !L.pick && L.pl.some((q, i) => i !== h && q.side === p.side && BK_ROLE[q.pos] === 'big' && hyp(q.x - p.x, q.y - p.y) < 7);
   w.pick = bigNear && dist > 4.5 && !urgent ? .55 : 0;
   w.move = nd && ndd < 1.3 && !lane && dist > 2.2 && !(L.moveCd > 0) ? .4 + (p.r.hnd - 6) * .08 : 0;
-  const oop = bkOffense().map(q => L.pl.indexOf(q)).filter(j => j !== h && bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < 2.4 && bkLeaper(L.pl[j]))[0];
+  // (a lob for an alley-oop: a leaper near the rim; with Skyhook on, anyone inside the arc with a step on their man)
+  const sky = bkFx('oop') > 0, oop = bkOffense().map(q => L.pl.indexOf(q)).filter(j => j !== h && (sky ? bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < BK_RULES.arc - .3 && bkNearest(L.pl[j].x, L.pl[j].y, bkDefense())[1] > 1.4 : bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < 2.4 && bkLeaper(L.pl[j])))[0];
   w.lob = oop != null ? 1.1 : 0;
   // the set's own leanings (Pick and roll picks, Isolation's star goes one on one)
   for (const k in Set.w || {}) w[k] *= Set.w[k];

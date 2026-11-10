@@ -37,6 +37,8 @@ function wCourtEdgeLine(kind, id) {
 $('wCourtPad').insertAdjacentHTML('beforebegin', `<div id="wCourtCalls" class="wccalls" hidden></div>`);
 $('wCourtCalls').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
+  // (an ultimate or a situation power is w81's to handle, and draw)
+  if (b.dataset.cult != null || b.dataset.csit) return;
   if (b.dataset.ccall) wBK.call(b.dataset.ccall, b.dataset.cid);
   else if (b.id === 'wCourtTO') { const r = wBK.timeout(); if (r) wCourtCallSay(r); }
   else if (b.id === 'wCourtSubGo') { const out = +$('wCourtSubOut').value, inn = +$('wCourtSubIn').value, r = wBK.sub(wBK.you, out, inn); if (r) wCourtCallSay(r); }

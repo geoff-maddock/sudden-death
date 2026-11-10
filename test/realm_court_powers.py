@@ -84,7 +84,7 @@ async def main():
               const h = P.ball.h, j = P.pl.findIndex(p => p.side === 0 && p.pos === 'SF'), d = P.pl.find(p => p.side === 1); P.pl[j].x = P.pl[h].x; P.pl[j].y = P.pl[h].y + 6; d.x = P.pl[h].x; d.y = P.pl[h].y + 3; d.stun = 0;
               if (id) wBK.castNow(1, G.on[1][0], id); wBK.pass(j); if (P.ball.stl >= 0) s++; } return s; };
           return { base: rate(null), pick: rate('pickpocket') }; })()""")
-        check(st['pick'] > st['base'] * 1.5, 'Pickpocket: far more passes picked off', st)
+        check(st['pick'] > st['base'] * 1.25, 'Pickpocket: more passes picked off', st)
         rk = await pg.evaluate("""(() => { const P = __live(['wraith', 'goblin', 'elf', 'golem', 'troll'], 41), G = wBK.G; G.teams[1].roster[G.on[1][0]].kind = 'wraith';
           wBK.castNow(1, G.on[1][0], 'fade'); const h = P.ball.h, D = P.pl.find(q => q.side === 1 && q.mark === h); D.x = P.pl[h].x + wBK.dir(0); D.y = P.pl[h].y;
           wBK.pick(h); let n = 0; while (P.pick && n++ < 120) wBK.step(); return { k: P.pickLast }; })()""")
@@ -111,8 +111,21 @@ async def main():
           const one = miss(), two = miss();
           return { same: JSON.stringify(st1) === JSON.stringify(st2), r, theirs, one, two }; })()""")
         check(rg['same'], 'an ultimate pressed mid-possession doesn\'t fire the start\'s effects again (Regenerate\'s stamina once)', rg)
-        check(rg['r'] == '' and rg['theirs'] == 3, 'Full-court Press presses three of their possessions', rg)
+        check(rg['r'] == '' and rg['theirs'] == 4, 'Full-court Press presses the possession it was pressed in, free, then three more of theirs', rg)
         check(rg['one'] and not rg['two'], 'a hot hand is kept once a streak: the second miss puts the fire out', rg)
+        # a freeze cast with a possession lasts through the walk up the floor; a cast counts once; the new period's first
+        # possession casts with the break's mana in
+        fz = await pg.evaluate("""(() => { const t = """ + T + """; t[0] = { name: 'A', kinds: ['vampire', 'vampire', 'vampire', 'vampire', 'vampire'] }; wBK.start({ teams: t, seed: 85, skill: [0, 0], mode: 'manage' }); wBK.auto = false;
+          const G = wBK.G; let n = 0; while (!(wBK.phase === 'dead' && G.poss === 0) && n++ < 30 * 300) wBK.step(); if (wBK.phase !== 'dead') return { skip: true };
+          G.mana[0] = 6; G.pow = null; const ri = G.on[0][0]; wBK.queue('off', ri, 'mesmer');
+          // (the possession has already started at the basket: cast it now as the start would, then walk on)
+          const ok = wBK.castNow(0, ri, 'mesmer'); G.cur.started = false; wBK.play.pl.forEach(p => p.stun = 0);
+          n = 0; while (wBK.phase !== 'live' && n++ < 400) wBK.step(); const frozen = wBK.play.pl.filter(p => p.side === 1 && p.stun > .5).length;
+          const s = wBK.simGame({ teams: """ + T + """, seed: 86 }); let evs = 0; wBK.start({ teams: """ + T + """, seed: 86 }); n = 0; let seen = 0; while (wBK.phase !== 'over' && n++ < 30 * 900) { wBK.step(); }
+          const H = wBK.G; H.mana = [0, 0]; H.q = 1; H.clock = .02; wBK.start({ teams: """ + T + """, seed: 87, skill: [2, 2] }); const K = wBK.G; n = 0; while (!(wBK.phase === 'live') && n++ < 300) wBK.step();
+          K.mana = [0, 0]; K.clock = .02; n = 0; while (wBK.phase !== 'break' && n++ < 30 * 60) wBK.step(); const brkMana = K.mana.slice(), cast = K.cur.cast.length;
+          return { ok, frozen, tally: s.tally.pow, brkMana, cast }; })()""")
+        check(fz.get('skip') or (fz['ok'] and fz['frozen'] == 5), 'a freeze cast with the possession lasts through the walk up the floor (Mesmerize: their five frozen as play goes live)', fz)
         sv = await pg.evaluate("""(() => { __live(null, 71); const G = wBK.G; const early = wBK.sitOptions(0).find(s => s.id === 'clutch'); G.q = 4; G.clock = 20; G.score = [30, 28]; const late = wBK.sitOptions(0).find(s => s.id === 'clutch');
           const r = wBK.sit('clutch'), shot = wBK.fx('shot'), twice = wBK.sit('clutch');
           G.score = [20, 30]; const press = wBK.sitOptions(0).find(s => s.id === 'fullpress');

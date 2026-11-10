@@ -45,9 +45,13 @@ function bkGo(ph) {
   GD.ph = ph; GD.t = 0; if (G.ver != null) G.ver++;
   // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
+  // the possession's start: its powers' freezes and stamina, as play goes live (14-powers.js)
+  if (ph === 'live' && G.cur && G.cur.started === false) { bkFxStart(); G.cur.started = true; }
   // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
   if (ph === 'break') { bkStamBreak(GD.half); bkManaAdd(0, BK_MANA.brk); bkManaAdd(1, BK_MANA.brk); }
   if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
+  // (the next period's first possession: its calls and powers now, with the break's mana in)
+  if (ph === 'break' && G.pendingPoss != null) { const s = G.pendingPoss; G.pendingPoss = null; bkPossNew(s); }
   // a new half: timeouts again (one more in each overtime); a stoppage: the CPU's coaches may call one
   if (ph === 'break' && GD.half) G.to = [BK_TO.n, BK_TO.n];
   if (ph === 'break' && G.q > BK_RULES.quarters) G.to = G.to.map(n => n + BK_TO.ot);

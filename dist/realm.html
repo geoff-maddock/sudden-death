@@ -27367,7 +27367,7 @@ function bkScore(side, pts) { G.score[side] += pts; return G.score[side]; }
 // the shot clock: full again (a new possession, or a shot off the rim)
 function bkShotReset() { G.shot = BK_RULES.shot; }
 // side has the ball now, on a full shot clock: a new possession (in a game, 11-calls.js counts it and makes the calls)
-function bkGive(side) { G.poss = side; bkShotReset(); if (G.call) bkPossNew(side); }
+function bkGive(side) { G.poss = side; bkShotReset(); if (G.call) { if (G.holdPoss) G.pendingPoss = side; else bkPossNew(side); } }
 /* the clocks run dt seconds: 'shot' when the shot clock runs out (the ball goes over, bkViolation), 'end' when the
    period's clock does, '' otherwise. The shot clock holds while a shot is in the air or the ball is loose (hold),
    and is off when the period has less time left than it: no violation. */
@@ -27405,7 +27405,8 @@ function bkPeriodEnd() {
     return 'over';
   }
   G.q++; G.tf = [0, 0]; G.clock = G.q > BK_RULES.quarters ? BK_RULES.ot : G.qlen;
-  bkGive(G.arrow); G.arrow = 1 - G.arrow;
+  // (in a game, the new period's first possession starts once the break has had its say: 07-game.js)
+  G.holdPoss = true; bkGive(G.arrow); G.holdPoss = false; G.arrow = 1 - G.arrow;
   return G.q > BK_RULES.quarters ? 'ot' : G.q === 3 ? 'half' : 'quarter';
 }
 // the basket side attacks: +1 the right-hand one, -1 the left; the sides swap ends at halftime
@@ -28501,7 +28502,8 @@ function bkThink(h) {
   const bigNear = !L.pick && L.pl.some((q, i) => i !== h && q.side === p.side && BK_ROLE[q.pos] === 'big' && hyp(q.x - p.x, q.y - p.y) < 7);
   w.pick = bigNear && dist > 4.5 && !urgent ? .55 : 0;
   w.move = nd && ndd < 1.3 && !lane && dist > 2.2 && !(L.moveCd > 0) ? .4 + (p.r.hnd - 6) * .08 : 0;
-  const oop = bkOffense().map(q => L.pl.indexOf(q)).filter(j => j !== h && bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < 2.4 && bkLeaper(L.pl[j]))[0];
+  // (a lob for an alley-oop: a leaper near the rim; with Skyhook on, anyone inside the arc with a step on their man)
+  const sky = bkFx('oop') > 0, oop = bkOffense().map(q => L.pl.indexOf(q)).filter(j => j !== h && (sky ? bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < BK_RULES.arc - .3 && bkNearest(L.pl[j].x, L.pl[j].y, bkDefense())[1] > 1.4 : bkRimDist(p.side, L.pl[j].x, L.pl[j].y) < 2.4 && bkLeaper(L.pl[j])))[0];
   w.lob = oop != null ? 1.1 : 0;
   // the set's own leanings (Pick and roll picks, Isolation's star goes one on one)
   for (const k in Set.w || {}) w[k] *= Set.w[k];
@@ -28561,9 +28563,13 @@ function bkGo(ph) {
   GD.ph = ph; GD.t = 0; if (G.ver != null) G.ver++;
   // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
+  // the possession's start: its powers' freezes and stamina, as play goes live (14-powers.js)
+  if (ph === 'live' && G.cur && G.cur.started === false) { bkFxStart(); G.cur.started = true; }
   // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
   if (ph === 'break') { bkStamBreak(GD.half); bkManaAdd(0, BK_MANA.brk); bkManaAdd(1, BK_MANA.brk); }
   if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
+  // (the next period's first possession: its calls and powers now, with the break's mana in)
+  if (ph === 'break' && G.pendingPoss != null) { const s = G.pendingPoss; G.pendingPoss = null; bkPossNew(s); }
   // a new half: timeouts again (one more in each overtime); a stoppage: the CPU's coaches may call one
   if (ph === 'break' && GD.half) G.to = [BK_TO.n, BK_TO.n];
   if (ph === 'break' && G.q > BK_RULES.quarters) G.to = G.to.map(n => n + BK_TO.ot);
@@ -29023,13 +29029,15 @@ function bkDrawMeter(c) {
 function bkDrawZones(c) {
   if (!G.zones || !G.zones.length) return;
   G.zones.forEach((z, k) => {
-    // (drawn at the end the play is at: the basket the offense attacks)
-    const U0 = BK_ULT_BY[z.id], vis = U0 ? U0.vis : ['#ffd08a', 'all'], end = G.cur ? G.cur.side : z.side;
-    c.save(); c.globalAlpha = .12 + .04 * Math.sin(BKT.t * 2 + k); c.fillStyle = vis[0];
+    // (drawn at the basket where it acts: its side's attack for an offense zone, the other side's for a defense one;
+    // faint while it waits for its end)
+    const U0 = BK_ULT_BY[z.id] || BK_SIT[z.id], vis = (U0 && U0.vis) || ['#ffd08a', 'all'], o = U0 && U0.o && Object.keys(U0.o).length, d = U0 && U0.d && Object.keys(U0.d).length;
+    const ours = G.cur && G.cur.side === z.side, active = ours ? o : d, end = active ? G.cur.side : o ? z.side : 1 - z.side;
+    c.save(); c.globalAlpha = (active ? .12 : .05) + .04 * Math.sin(BKT.t * 2 + k); c.fillStyle = vis[0];
     const r = (u0, v0, u1, v1) => { const a = bkScr(...bkAt(end, u0, v0)), b = bkScr(...bkAt(end, u1, v1)); c.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y)); };
     if (vis[1] === 'paint') r(0, -2.45, 5.8, 2.45); else if (vis[1] === 'arc') { r(0, -7.5, 9, -3); r(0, 3, 9, 7.5); r(7, -3, 9.5, 3); } else if (vis[1] === 'half') r(0, -7.5, 14, 7.5); else r(0, -7.5, 28, 7.5);
     c.restore();
-    txt(c, `${z.n} · ${z.left - 1} more`, 20 + k * 230, 500, `700 12px ${BK_FONT}`, tint(vis[0], .3), 'left');
+    txt(c, `${z.n} · ${z.left > 50 ? 'to the end' : `${z.left} possession${z.left === 1 ? '' : 's'} left`}`, 20 + k * 230, 500, `700 12px ${BK_FONT}`, tint(vis[0], .3), 'left');
   });
 }
 /* The Charter Court: by hand (issue #77, phase 2). In 'play' (GD.mode) you play your side (GD.you): on offense
@@ -29270,6 +29278,8 @@ function bkSubDo(side, out, inn, why) {
   if (k < 0 || !m) return false;
   G.on[side][k] = inn; G.subs[side]++; if (G.ver != null) G.ver++;
   if (G.cur && G.cur.side === side && G.cur.star === out) G.cur.star = bkStar(side);
+  // (a power you queued from the player coming off goes with them)
+  if (GD.pow && GD.mode !== 'watch' && side === GD.you) for (const r of ['off', 'def']) if (GD.pow[r] && GD.pow[r].ri === out) GD.pow[r] = null;
   GD.notes = (GD.notes || []).concat(`${m.n} on for ${T.roster[out].n}${why === 'tired' ? ', who needs a breather' : why === 'back' ? ', rested' : ''}.`);
   if (p) Object.assign(p, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r) });
   return true;
@@ -29580,7 +29590,8 @@ function bkRehang() { if (G.court && G.court.bent.some(Boolean)) { G.court.bent 
    - Situation powers (BK_SIT), the team's, once a game each, for mana, when the moment fits: Clutch (the last 30
      seconds of a close game: every shot a little better to the end), Full-court press (behind by 8 or more: a zone of
      pressure for three possessions), Ice it (their free throws, once: every one less likely). G.sitUsed by side.
-   - Who casts: the CPU by its skill (a Squire now and then at random, a Knight what suits its set, an Archmage only
+   - Who casts: the CPU by its skill (a Squire now and then at random, a Knight what suits its set, or anything with
+     mana to spare, keeping a mana back early; an Archmage only
      that, saving spirit for a close finish or a run against it); your side the same way under Auto powers (GD.auto, on
      unless you turn it off), or the power you queue (GD.pow, for your next possession at that end), and your ultimate
      when you press it.
@@ -29605,8 +29616,8 @@ const bkP = (id, n, cost, fits, desc, fx) => ({ id, n, cost, fits, desc, fx });
 const BK_FITS = { shot: ['spread', 'motion', 'hot'], drive: ['iso', 'post', 'pick'], pass: ['motion', 'pick'], any: null };
 // everyday powers by kind: [offense, defense]
 const BK_POW = {
-  goblin: [bkP('sleight', 'Sleight of Hand', 1, 'drive', 'The dribble on a string: half as likely to be picked, and moves beat a man more often.', { stl: .5, beat: .12 }), bkP('pickpocket', 'Pickpocket', 1, 'any', 'Quick fingers: twice the steals, off passes and the dribble.', { stl: 2 })],
-  kobold: [bkP('sling', 'Sling Pass', 1, 'pass', 'Passes zip: half as many are picked off.', { stl: .5 }), bkP('firebreath', 'Fire Breath', 1, 'any', 'A breath of fire on every shooter: the contest is a quarter stronger.', { con: 1.25 })],
+  goblin: [bkP('sleight', 'Sleight of Hand', 1, 'drive', 'The dribble on a string: half as likely to be picked, and moves beat a man more often.', { stl: .5, beat: .12 }), bkP('pickpocket', 'Pickpocket', 1, 'any', 'Quick fingers: 70% more steals, off passes and the dribble.', { stl: 1.7 })],
+  kobold: [bkP('sling', 'Sling Pass', 1, 'pass', 'Passes zip: half as many are picked off.', { stl: .5 }), bkP('firebreath', 'Fire Breath', 1, 'shot', 'A breath of fire on every shooter: the contest a fifth stronger.', { con: 1.2 })],
   werewolf: [bkP('sprint', 'Wolf Sprint', 1, 'drive', 'On all fours: the offense is 10% faster.', { oSpd: 1.1 }), bkP('pounce', 'Pounce', 1, 'any', 'The defense springs: 10% faster, and more steals.', { dSpd: 1.1, stl: 1.3 })],
   dwarf: [bkP('deeprange', 'Deep Range', 1, 'shot', 'Hard hands, true aim: threes 6 points likelier.', { three: .06 }), bkP('shieldline', 'Shield Line', 1, 'drive', 'Shields across the lane: drives run into a defender far more.', { lane: .5 })],
   ogre: [bkP('bulldoze', 'Bulldoze', 2, 'drive', 'Through the lane like a cart: shots at the rim 10 points likelier.', { rim: .1 }), bkP('smother', 'Smother', 2, 'any', 'A wall of ogre on every shot: the contest a third stronger.', { con: 1.33 })],
@@ -29719,6 +29730,7 @@ function bkPowersPoss() {
     const mine = GD.mode !== 'watch' && side === GD.you;
     // your queued power (it waits for a possession at its end), or the coach's choice
     const role = side === C.side ? 'off' : 'def', q = mine && GD.pow && GD.pow[role];
+    if (q && !G.on[side].includes(q.ri)) GD.pow[role] = null;
     if (q) { const o = bkPowerOptions(side).find(x => x.id === q.id && x.ri === q.ri && x.ok); if (o) { bkCast(side, o); GD.pow[role] = null; continue; } }
     if (mine && !GD.auto) continue;
     const sk = mine ? 1 : G.skill[side];
@@ -29726,7 +29738,9 @@ function bkPowersPoss() {
     const u = bkCpuUlt(side, sk); if (u) bkCastUlt(side, u);
     const o = bkCpuPower(side, sk); if (o) bkCast(side, o);
   }
-  bkFxNow(); bkFxStart();
+  bkFxNow();
+  // (the start's freezes and stamina: now if play is already live, a steal or a rebound; else when it goes live)
+  if (GD.ph === 'live') { bkFxStart(); C.started = true; } else C.started = false;
 }
 // the possession's effects again (pure: a cast mid-possession merges again, nothing fires twice): both casts, then every
 // zone at the end its side is at
@@ -29746,7 +29760,6 @@ function bkCast(side, o) {
   const p = BK_POW_BY[o.id]; if (!p) return false;
   G.mana[side] -= p.cost; if (G.stam) G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - (BK_POW_STA.base + BK_POW_STA.per * p.cost));
   G.cur.cast.push({ side, ri: o.ri, id: p.id, n: p.n, who: G.teams[side].roster[o.ri].n });
-  if (G.tally) G.tally.pow++;
   bkEv('pow', p.n, G.teams[side].roster[o.ri].n);
   return true;
 }
@@ -29755,8 +29768,8 @@ function bkCastUlt(side, o) {
   G.spirit[side] -= BK_SPIRIT.ult; G.ultUsed[side] = true;
   if (G.stam) G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - BK_POW_STA.ult);
   G.zones.push({ id: u.id, side, left: BK_ULT_POSS, n: u.n, acted: false });
-  G.cur.cast.push({ side, ri: o.ri, id: u.id, n: u.n, who: G.teams[side].roster[o.ri].n, ult: true }); if (G.tally) G.tally.ult++;
-  GD.msg = `${G.teams[side].roster[o.ri].n}: ${u.n}! ${u.desc}`; GD.big = { k: 'ult' };
+  G.cur.cast.push({ side, ri: o.ri, id: u.id, n: u.n, who: G.teams[side].roster[o.ri].n, ult: true })
+  GD.msg = `${GD.msg ? GD.msg + ' ' : ''}${G.teams[side].roster[o.ri].n}: ${u.n}! ${u.desc}`; if (!GD.big) GD.big = { k: 'ult' };
   bkEv('ult', u.n, G.teams[side].name);
   return true;
 }
@@ -29765,11 +29778,13 @@ function bkCastSit(side, id) {
   G.mana[side] -= s.cost; G.sitUsed[side][id] = true;
   if (s.o || s.d) G.zones.push({ id, side, left: s.poss, n: s.n, acted: false });
   if (s.ft && GD.ft) GD.ft.ice = s.ft;
-  if (G.cur) G.cur.cast.push({ side, id, n: s.n, who: G.teams[side].name, sit: true }); if (G.tally) G.tally.sit++;
-  GD.msg = `${G.teams[side].name}: ${s.n}. ${s.desc}`;
+  if (G.cur) G.cur.cast.push({ side, id, n: s.n, who: G.teams[side].name, sit: true })
+  GD.msg = `${GD.msg ? GD.msg + ' ' : ''}${G.teams[side].name}: ${s.n}. ${s.desc}`;
   bkEv('sit', s.n, G.teams[side].name);
   return true;
 }
+// (a zone cast mid-possession: it acts at once, but the rest of this possession isn't one of its three)
+function bkFreshZone() { const z = G.zones[G.zones.length - 1]; if (z) z.acted = false; }
 // your side, by hand: queue a power for the next possession at its end (ri and id from bkPowerOptions), cast your
 // ultimate now (it starts with the next possession), or a situation power now ('' or why not)
 function bkPowQueue(role, ri, id) {
@@ -29787,12 +29802,12 @@ function bkPowerList(side, role) {
 function bkUltNow(side, ri) {
   const o = bkUltOptions(side).find(x => x.ri === ri) || bkUltOptions(side)[0]; if (!o) return 'No ultimate.';
   if (!o.ok) return o.why;
-  bkCastUlt(side, o); bkFxNow(); return '';
+  bkCastUlt(side, o); bkFxNow(); bkFreshZone(); return '';
 }
 function bkSitNow(side, id) {
   const o = bkSitOptions(side).find(x => x.id === id); if (!o) return 'No such power.';
   if (!o.ok) return o.why;
-  bkCastSit(side, id); bkFxNow(); return '';
+  bkCastSit(side, id); bkFxNow(); bkFreshZone(); return '';
 }
 /* ---------- the coaches cast ---------- */
 const bkFits = (p, set) => !BK_FITS[p.fits] || BK_FITS[p.fits].includes(set);
@@ -29801,10 +29816,11 @@ function bkCpuPower(side, sk) {
   // (a defense power suits the set it defends against; an offense power the set it runs)
   const set = G.cur.off;
   if (!sk) return R() < .3 ? pick(opts) : null;
-  // a Knight casts what suits the set (and keeps a mana back early); an Archmage only that, when it can afford it twice
-  const fit = opts.filter(o => bkFits(o, set)), pool = sk >= 2 ? fit : fit.length ? fit : opts;
+  // a Knight casts what suits the set, or anything when it has mana to spare, keeping a mana back early; an Archmage
+  // only what suits it, keeping enough back to cast it again
+  const fit = opts.filter(o => bkFits(o, set)), pool = sk >= 2 ? fit : fit.length ? fit : opts.filter(o => G.mana[side] - o.cost >= 2);
   if (!pool.length) return null;
-  const keep = sk >= 2 ? Math.min(...pool.map(o => o.cost)) : 0;
+  const keep = sk >= 2 ? Math.min(...pool.map(o => o.cost)) : 1;
   const can = pool.filter(o => G.mana[side] - o.cost >= (bkLate(.5) ? 0 : keep));
   if (!can.length || R() < (sk >= 2 ? .15 : .35)) return null;
   return can.sort((a, b) => b.cost - a.cost)[0];
@@ -40568,6 +40584,8 @@ function wCourtEdgeLine(kind, id) {
 $('wCourtPad').insertAdjacentHTML('beforebegin', `<div id="wCourtCalls" class="wccalls" hidden></div>`);
 $('wCourtCalls').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
+  // (an ultimate or a situation power is w81's to handle, and draw)
+  if (b.dataset.cult != null || b.dataset.csit) return;
   if (b.dataset.ccall) wBK.call(b.dataset.ccall, b.dataset.cid);
   else if (b.id === 'wCourtTO') { const r = wBK.timeout(); if (r) wCourtCallSay(r); }
   else if (b.id === 'wCourtSubGo') { const out = +$('wCourtSubOut').value, inn = +$('wCourtSubIn').value, r = wBK.sub(wBK.you, out, inn); if (r) wCourtCallSay(r); }
@@ -41073,7 +41091,7 @@ wCourtHowHTML = function () {
   return wW81CourtHowHTML() + `<section id="wCourtPowHow"><p class="hint"><b>Powers.</b> Every kind has an offense power and a defense power, and a second of each: each player brings one of each pair, picked on the Court tab. A side casts at most one power a possession, at its start: the offense from its five's offense powers, the defense from theirs. A power costs team <b>mana</b> (shown as pips under the score: ${R.mana.start} to start, up to ${R.mana.max}, half a point each time the other side scores, and one at each break) and stamina from whoever casts it (${R.sta.base} plus ${R.sta.per} a mana; nobody below ${R.sta.min} can cast).</p>
   <p class="hint"><b>The roar and the ultimate.</b> The crowd's <b>spirit</b> (the bar under the score) fills on big plays: a dunk, a three, a block, a steal, a run, and the Charter Court's roar. At ${R.spirit.ult} it pays for your side's <b>ultimate</b>, once a game: the kind's own, which leaves a zone on the floor for ${R.ultPoss} possessions. And when someone on fire misses, ${R.spirit.keep} spirit keeps them on fire one miss longer, by itself, once a streak (not when it would cost an ultimate you could pay for).</p>
   <p class="hint"><b>Situation powers.</b> The team's, once a game each, for mana, when the moment fits: ${Object.values(S).map(s => `<b>${esc(s.n)}</b> (${esc(s.desc.replace(/\.$/, ''))}; ${s.cost} mana)`).join(', ')}.</p>
-  <p class="hint"><b>Who casts.</b> The other coach by skill: a Squire now and then at random, a Knight what suits its set, an Archmage only that, keeping its spirit for a close finish or to stop a run. In Manage and You play, the calls panel has your powers: with <b>Auto powers</b> on, your coach casts as a Knight would; you can also pick the power for your next possession at each end yourself (the tip says what it does and whether it suits your set), press your ultimate, and use a situation power when it lights up.</p>
+  <p class="hint"><b>Who casts.</b> The other coach by skill: a Squire now and then at random, a Knight what suits its set (anything else only with mana to spare), an Archmage only what suits it, keeping its spirit for a close finish or to stop a run. In Manage and You play, the calls panel has your powers: with <b>Auto powers</b> on, your coach casts as a Knight would; you can also pick the power for your next possession at each end yourself (the tip says what it does and whether it suits your set), press your ultimate, and use a situation power when it lights up.</p>
   <table class="wrpow wcpow"><tr><th>Kind</th><th>Offense</th><th>Second offense</th><th>Defense</th><th>Second defense</th><th>Ultimate</th></tr>${Object.entries(wBK.powerBook).map(([k, B]) => row(k, B)).join('')}</table></section>`;
 };
 const wW81RenderHelp = renderHelp;

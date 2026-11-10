@@ -27,7 +27,7 @@ function bkScore(side, pts) { G.score[side] += pts; return G.score[side]; }
 // the shot clock: full again (a new possession, or a shot off the rim)
 function bkShotReset() { G.shot = BK_RULES.shot; }
 // side has the ball now, on a full shot clock: a new possession (in a game, 11-calls.js counts it and makes the calls)
-function bkGive(side) { G.poss = side; bkShotReset(); if (G.call) bkPossNew(side); }
+function bkGive(side) { G.poss = side; bkShotReset(); if (G.call) { if (G.holdPoss) G.pendingPoss = side; else bkPossNew(side); } }
 /* the clocks run dt seconds: 'shot' when the shot clock runs out (the ball goes over, bkViolation), 'end' when the
    period's clock does, '' otherwise. The shot clock holds while a shot is in the air or the ball is loose (hold),
    and is off when the period has less time left than it: no violation. */
@@ -65,7 +65,8 @@ function bkPeriodEnd() {
     return 'over';
   }
   G.q++; G.tf = [0, 0]; G.clock = G.q > BK_RULES.quarters ? BK_RULES.ot : G.qlen;
-  bkGive(G.arrow); G.arrow = 1 - G.arrow;
+  // (in a game, the new period's first possession starts once the break has had its say: 07-game.js)
+  G.holdPoss = true; bkGive(G.arrow); G.holdPoss = false; G.arrow = 1 - G.arrow;
   return G.q > BK_RULES.quarters ? 'ot' : G.q === 3 ? 'half' : 'quarter';
 }
 // the basket side attacks: +1 the right-hand one, -1 the left; the sides swap ends at halftime

@@ -15,7 +15,8 @@
    - Situation powers (BK_SIT), the team's, once a game each, for mana, when the moment fits: Clutch (the last 30
      seconds of a close game: every shot a little better to the end), Full-court press (behind by 8 or more: a zone of
      pressure for three possessions), Ice it (their free throws, once: every one less likely). G.sitUsed by side.
-   - Who casts: the CPU by its skill (a Squire now and then at random, a Knight what suits its set, an Archmage only
+   - Who casts: the CPU by its skill (a Squire now and then at random, a Knight what suits its set, or anything with
+     mana to spare, keeping a mana back early; an Archmage only
      that, saving spirit for a close finish or a run against it); your side the same way under Auto powers (GD.auto, on
      unless you turn it off), or the power you queue (GD.pow, for your next possession at that end), and your ultimate
      when you press it.
@@ -40,8 +41,8 @@ const bkP = (id, n, cost, fits, desc, fx) => ({ id, n, cost, fits, desc, fx });
 const BK_FITS = { shot: ['spread', 'motion', 'hot'], drive: ['iso', 'post', 'pick'], pass: ['motion', 'pick'], any: null };
 // everyday powers by kind: [offense, defense]
 const BK_POW = {
-  goblin: [bkP('sleight', 'Sleight of Hand', 1, 'drive', 'The dribble on a string: half as likely to be picked, and moves beat a man more often.', { stl: .5, beat: .12 }), bkP('pickpocket', 'Pickpocket', 1, 'any', 'Quick fingers: twice the steals, off passes and the dribble.', { stl: 2 })],
-  kobold: [bkP('sling', 'Sling Pass', 1, 'pass', 'Passes zip: half as many are picked off.', { stl: .5 }), bkP('firebreath', 'Fire Breath', 1, 'any', 'A breath of fire on every shooter: the contest is a quarter stronger.', { con: 1.25 })],
+  goblin: [bkP('sleight', 'Sleight of Hand', 1, 'drive', 'The dribble on a string: half as likely to be picked, and moves beat a man more often.', { stl: .5, beat: .12 }), bkP('pickpocket', 'Pickpocket', 1, 'any', 'Quick fingers: 70% more steals, off passes and the dribble.', { stl: 1.7 })],
+  kobold: [bkP('sling', 'Sling Pass', 1, 'pass', 'Passes zip: half as many are picked off.', { stl: .5 }), bkP('firebreath', 'Fire Breath', 1, 'shot', 'A breath of fire on every shooter: the contest a fifth stronger.', { con: 1.2 })],
   werewolf: [bkP('sprint', 'Wolf Sprint', 1, 'drive', 'On all fours: the offense is 10% faster.', { oSpd: 1.1 }), bkP('pounce', 'Pounce', 1, 'any', 'The defense springs: 10% faster, and more steals.', { dSpd: 1.1, stl: 1.3 })],
   dwarf: [bkP('deeprange', 'Deep Range', 1, 'shot', 'Hard hands, true aim: threes 6 points likelier.', { three: .06 }), bkP('shieldline', 'Shield Line', 1, 'drive', 'Shields across the lane: drives run into a defender far more.', { lane: .5 })],
   ogre: [bkP('bulldoze', 'Bulldoze', 2, 'drive', 'Through the lane like a cart: shots at the rim 10 points likelier.', { rim: .1 }), bkP('smother', 'Smother', 2, 'any', 'A wall of ogre on every shot: the contest a third stronger.', { con: 1.33 })],
@@ -154,6 +155,7 @@ function bkPowersPoss() {
     const mine = GD.mode !== 'watch' && side === GD.you;
     // your queued power (it waits for a possession at its end), or the coach's choice
     const role = side === C.side ? 'off' : 'def', q = mine && GD.pow && GD.pow[role];
+    if (q && !G.on[side].includes(q.ri)) GD.pow[role] = null;
     if (q) { const o = bkPowerOptions(side).find(x => x.id === q.id && x.ri === q.ri && x.ok); if (o) { bkCast(side, o); GD.pow[role] = null; continue; } }
     if (mine && !GD.auto) continue;
     const sk = mine ? 1 : G.skill[side];
@@ -161,7 +163,9 @@ function bkPowersPoss() {
     const u = bkCpuUlt(side, sk); if (u) bkCastUlt(side, u);
     const o = bkCpuPower(side, sk); if (o) bkCast(side, o);
   }
-  bkFxNow(); bkFxStart();
+  bkFxNow();
+  // (the start's freezes and stamina: now if play is already live, a steal or a rebound; else when it goes live)
+  if (GD.ph === 'live') { bkFxStart(); C.started = true; } else C.started = false;
 }
 // the possession's effects again (pure: a cast mid-possession merges again, nothing fires twice): both casts, then every
 // zone at the end its side is at
@@ -181,7 +185,6 @@ function bkCast(side, o) {
   const p = BK_POW_BY[o.id]; if (!p) return false;
   G.mana[side] -= p.cost; if (G.stam) G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - (BK_POW_STA.base + BK_POW_STA.per * p.cost));
   G.cur.cast.push({ side, ri: o.ri, id: p.id, n: p.n, who: G.teams[side].roster[o.ri].n });
-  if (G.tally) G.tally.pow++;
   bkEv('pow', p.n, G.teams[side].roster[o.ri].n);
   return true;
 }
@@ -190,8 +193,8 @@ function bkCastUlt(side, o) {
   G.spirit[side] -= BK_SPIRIT.ult; G.ultUsed[side] = true;
   if (G.stam) G.stam[side][o.ri] = Math.max(0, G.stam[side][o.ri] - BK_POW_STA.ult);
   G.zones.push({ id: u.id, side, left: BK_ULT_POSS, n: u.n, acted: false });
-  G.cur.cast.push({ side, ri: o.ri, id: u.id, n: u.n, who: G.teams[side].roster[o.ri].n, ult: true }); if (G.tally) G.tally.ult++;
-  GD.msg = `${G.teams[side].roster[o.ri].n}: ${u.n}! ${u.desc}`; GD.big = { k: 'ult' };
+  G.cur.cast.push({ side, ri: o.ri, id: u.id, n: u.n, who: G.teams[side].roster[o.ri].n, ult: true })
+  GD.msg = `${GD.msg ? GD.msg + ' ' : ''}${G.teams[side].roster[o.ri].n}: ${u.n}! ${u.desc}`; if (!GD.big) GD.big = { k: 'ult' };
   bkEv('ult', u.n, G.teams[side].name);
   return true;
 }
@@ -200,11 +203,13 @@ function bkCastSit(side, id) {
   G.mana[side] -= s.cost; G.sitUsed[side][id] = true;
   if (s.o || s.d) G.zones.push({ id, side, left: s.poss, n: s.n, acted: false });
   if (s.ft && GD.ft) GD.ft.ice = s.ft;
-  if (G.cur) G.cur.cast.push({ side, id, n: s.n, who: G.teams[side].name, sit: true }); if (G.tally) G.tally.sit++;
-  GD.msg = `${G.teams[side].name}: ${s.n}. ${s.desc}`;
+  if (G.cur) G.cur.cast.push({ side, id, n: s.n, who: G.teams[side].name, sit: true })
+  GD.msg = `${GD.msg ? GD.msg + ' ' : ''}${G.teams[side].name}: ${s.n}. ${s.desc}`;
   bkEv('sit', s.n, G.teams[side].name);
   return true;
 }
+// (a zone cast mid-possession: it acts at once, but the rest of this possession isn't one of its three)
+function bkFreshZone() { const z = G.zones[G.zones.length - 1]; if (z) z.acted = false; }
 // your side, by hand: queue a power for the next possession at its end (ri and id from bkPowerOptions), cast your
 // ultimate now (it starts with the next possession), or a situation power now ('' or why not)
 function bkPowQueue(role, ri, id) {
@@ -222,12 +227,12 @@ function bkPowerList(side, role) {
 function bkUltNow(side, ri) {
   const o = bkUltOptions(side).find(x => x.ri === ri) || bkUltOptions(side)[0]; if (!o) return 'No ultimate.';
   if (!o.ok) return o.why;
-  bkCastUlt(side, o); bkFxNow(); return '';
+  bkCastUlt(side, o); bkFxNow(); bkFreshZone(); return '';
 }
 function bkSitNow(side, id) {
   const o = bkSitOptions(side).find(x => x.id === id); if (!o) return 'No such power.';
   if (!o.ok) return o.why;
-  bkCastSit(side, id); bkFxNow(); return '';
+  bkCastSit(side, id); bkFxNow(); bkFreshZone(); return '';
 }
 /* ---------- the coaches cast ---------- */
 const bkFits = (p, set) => !BK_FITS[p.fits] || BK_FITS[p.fits].includes(set);
@@ -236,10 +241,11 @@ function bkCpuPower(side, sk) {
   // (a defense power suits the set it defends against; an offense power the set it runs)
   const set = G.cur.off;
   if (!sk) return R() < .3 ? pick(opts) : null;
-  // a Knight casts what suits the set (and keeps a mana back early); an Archmage only that, when it can afford it twice
-  const fit = opts.filter(o => bkFits(o, set)), pool = sk >= 2 ? fit : fit.length ? fit : opts;
+  // a Knight casts what suits the set, or anything when it has mana to spare, keeping a mana back early; an Archmage
+  // only what suits it, keeping enough back to cast it again
+  const fit = opts.filter(o => bkFits(o, set)), pool = sk >= 2 ? fit : fit.length ? fit : opts.filter(o => G.mana[side] - o.cost >= 2);
   if (!pool.length) return null;
-  const keep = sk >= 2 ? Math.min(...pool.map(o => o.cost)) : 0;
+  const keep = sk >= 2 ? Math.min(...pool.map(o => o.cost)) : 1;
   const can = pool.filter(o => G.mana[side] - o.cost >= (bkLate(.5) ? 0 : keep));
   if (!can.length || R() < (sk >= 2 ? .15 : .35)) return null;
   return can.sort((a, b) => b.cost - a.cost)[0];
