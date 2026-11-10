@@ -56,7 +56,7 @@ async def main():
           everyStore: Object.values(DB.shops).every(S => S.cutsalve && S.smellsalts), cind: ['ragetonic', 'bx_wraps', 'bx_guard', 'bx_trunks'].every(id => DB.shops.cind[id]),
           elsewhereRage: Object.keys(DB.shops).filter(k => k !== 'cind' && DB.shops[k].ragetonic), chests: ['bx_gloves', 'bx_robe'].map(id => Object.keys(DB.chests).filter(c => (DB.chests[c].items || {})[id])) }))()""")
         check(len(r['gear']) == 5 and all(g[1] == 'ring' and g[2] for g in r['gear']), 'five pieces of boxing gear, each an item with what it does', r['gear'])
-        check(all(x[1] and x[2] == 'ring' for x in r['pots']) and sorted(r['draught']) == ['grid', 'ring'], "boxing's potions are items; the Stamina Draught serves both sports", r)
+        check(all(x[1] and x[2] == 'ring' for x in r['pots']) and {'grid', 'ring'} <= set(r['draught']), "boxing's potions are items; the Stamina Draught serves boxing and football (and basketball)", r)
         check(r['everyStore'] and r['cind'] and not r['elsewhereRage'], "Cut Salve and Smelling Salts in every store; the Rage Tonic and three pieces in Cinderhold's", r)
         check(all(len(c) >= 1 for c in r['chests']), 'the Weighted Gloves and the Ember Robe are in chests', r['chests'])
 

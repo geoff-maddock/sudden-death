@@ -121,7 +121,7 @@ function wGearCard(p) {
     const G = wGearOf(p, sp);
     return `<li data-gearrow="${sp}"><span>${wCap(W_GEAR_CFG.sports[sp])}:</span> ${G ? `<b>${esc(G.name)}</b> <small>${esc(G.desc)}</small> <button class="ghost" data-gearoff="${sp}" data-gearpid="${p.id}">Take off</button>` : '<span class="dim">nothing</span>'}</li>`;
   }).join('');
-  return `<div class="wbd wgearc"><h5>Gear</h5><ul class="wgearl">${rows}</ul><p class="hint">One piece for boxing and one for football. Put gear on from the Bag.</p></div>`;
+  return `<div class="wbd wgearc"><h5>Gear</h5><ul class="wgearl">${rows}</ul><p class="hint">One piece for each sport: ${Object.values(W_GEAR_CFG.sports).join(', ').replace(/, ([^,]*)$/, ' and $1')}. Put gear on from the Bag.</p></div>`;
 }
 const wW72StatsCard = wStatsCard;
 wStatsCard = function (p) { return wW72StatsCard(p).replace(/<\/section>\s*$/, wGearCard(p) + '</section>'); };
@@ -150,5 +150,5 @@ const wW72RenderHelp = renderHelp;
 renderHelp = function () {
   wW72RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGear')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Boxers and football players can wear one piece of gear each in their sport: one for boxing and one for football. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Players can wear one piece of gear in each sport that has its own game: one for boxing, one for football, one for basketball. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
 };

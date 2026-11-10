@@ -3,7 +3,7 @@
    (GD trimmed to what play needs to go on from there). bkResume puts one back at the same beat, on fresh random
    numbers and with no keys held. */
 const BK_SNAP_AT = ['dead', 'break', 'ft', 'timeout'];
-const BK_GD_KEEP = ['ph', 't', 'mode', 'you', 'msg', 'walk', 'ft', 'half', 'keep', 'notes', 'toAsk', 'toWas', 'auto', 'pow'];
+const BK_GD_KEEP = ['ph', 't', 'mode', 'you', 'msg', 'walk', 'ft', 'half', 'keep', 'notes', 'toAsk', 'toWas', 'auto', 'pow', 'potUsed'];
 function bkSnapshot() {
   const gd = {}; for (const k of BK_GD_KEEP) if (GD[k] !== undefined) gd[k] = GD[k];
   return JSON.parse(JSON.stringify({ G, L, GD: gd }));
@@ -16,6 +16,9 @@ function bkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
   bkSeed(null);
   G = s.G; L = s.L;
+  // (a save point from before powers, gear and potions: none of them, so play goes on as it was)
+  if (!G.mana) Object.assign(G, { powers: false, mana: [0, 0], spirit: [0, 0], zones: [], ultUsed: [false, false], sitUsed: [{}, {}], kept: [{}, {}] });
+  if (!G.bags) Object.assign(G, { bags: [null, null], pots: [], steady: [false, false] });
   GD = Object.assign({ acc: 0, meter: null, big: null, net: null, rel: null }, s.GD);
   bkInputClear();
   return G;

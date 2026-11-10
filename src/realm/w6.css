@@ -394,3 +394,5 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 /* powers on the court (w81) */
 .wcpow{font-size:.88em}.wcpow td{min-width:110px}
 .wccpow{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
+/* basketball potions (w82) */
+.wcckit{border-top:1px solid var(--seam);padding-top:6px}.wcpot{display:inline-flex;gap:4px;align-items:center;margin-right:8px}

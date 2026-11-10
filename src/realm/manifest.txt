@@ -113,3 +113,4 @@ src/realm/w78-courtfive.js
 src/realm/w79-courtcall.js
 src/realm/w80-courtgame.js
 src/realm/w81-courtpowers.js
+src/realm/w82-courtkit.js

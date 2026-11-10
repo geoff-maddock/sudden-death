@@ -922,6 +922,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 /* powers on the court (w81) */
 .wcpow{font-size:.88em}.wcpow td{min-width:110px}
 .wccpow{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
+/* basketball potions (w82) */
+.wcckit{border-top:1px solid var(--seam);padding-top:6px}.wcpot{display:inline-flex;gap:4px;align-items:center;margin-right:8px}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -28019,7 +28021,8 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    block). Any player can play anywhere; phase 1 picks the five's spots from the ratings, and phase 3 lets you set them.
    A team: { name, short, color, light, roster: [{ n, kind, num, r }], spot: { PG: ri, ... } }. A roster may be longer
    than five: the first five start, and the rest (up to BK_RULES.bench) sit on the bench. A player may bring pw ({ off,
-   def }: which of their kind's two powers for each end, 14-powers.js). */
+   def }: which of their kind's two powers for each end, 14-powers.js), and gear ({ id, name, fx }: kept as gear, gid and
+   gx, 15-kit.js). */
 const BK_POS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const BK_ROLE = { PG: 'guard', SG: 'guard', SF: 'wing', PF: 'big', C: 'big' };
 const BK_STATS = ['spd', 'siz', 'hop', 'tch', 'hnd', 'def'];
@@ -28041,7 +28044,7 @@ const bkSpotOk = (m, n) => !!m && BK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [5 or more kinds] }
 function bkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 3 + i * 7 }))).slice(0, BK_RULES.side + BK_RULES.bench)
-    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}));
+    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: bkGx(p.gear.fx) } : {}));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the five's spots: the best handler at the point, the two biggest inside, then the better shooter on the wing
   const free = new Set(roster.slice(0, BK_RULES.side).map((_, i) => i)), by = f => { const i = [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r))[0]; free.delete(i); return i; };
@@ -28118,7 +28121,7 @@ function bkSetSpots(side) {
 }
 // a player's speed now: metres a second
 function bkSpeed(p, i) {
-  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p)) * (G.cur ? (p.side === G.cur.side ? bkFx('oSpd') : bkFx('dSpd')) : 1);
+  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p)) * (bkGxOf(p).spd || 1) * (G.cur ? (p.side === G.cur.side ? bkFx('oSpd') : bkFx('dSpd')) : 1);
   if (i === bkHand()) m *= .9;
   if (p.stun > 0) m *= .25;
   return m;
@@ -28143,7 +28146,7 @@ function bkStep(dt) {
 }
 function bkMove(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(bkSpeed(p, i), d / .2);
-  const wx = d > .03 ? dx / d * sp : 0, wy = d > .03 ? dy / d * sp : 0, k = Math.min(1, dt * 7 * (bkOnWax(p) ? BK_WAX.turn : 1));
+  const wx = d > .03 ? dx / d * sp : 0, wy = d > .03 ? dy / d * sp : 0, k = Math.min(1, dt * 7 * (bkOnWax(p) ? BK_WAX.turn : 1) * (bkGxOf(p).turn || 1));
   p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k;
   p.x = clamp(p.x + p.vx * dt, .3, BK_RULES.len - .3); p.y = clamp(p.y + p.vy * dt, -BK_RULES.wid / 2 + .3, BK_RULES.wid / 2 - .3);
 }
@@ -28305,7 +28308,8 @@ function bkShoot(o) {
     foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul;
     if (!mine && !jumped) { d.act = 'jump'; d.actT = .5; d.jumpAt = L.t; }
   }
-  const pm = f.e != null ? bkHandMake(S.p, f.e, p) : S.p * (jumped ? .85 : 1);
+  // (Wrist Bands: your shots get the wider window, bkWindow; the CPU's a touch more likely)
+  const pm = f.e != null ? bkHandMake(S.p, f.e, p) : (S.p + (bkGxOf(p).win || 0) * .5) * (jumped ? .85 : 1);
   const made = !block && R() < pm * (foul ? .45 : 1), swish = made && f.e != null && f.e <= bkWindow(S.p, p) * BK_WIN.perfect;
   p.act = 'shoot'; p.actT = .35;
   L.shot = { i: h, side: p.side, pts, made, block, foul, swish, alley: !!f.alley, hand: f.e != null, by: d ? S.d : -1, dist: Math.round(S.dist * 10) / 10, rim: S.rim, dunk: S.dunk && !block, p: Math.round(S.p * 100) / 100, con: Math.round(S.con * 100) / 100, ast: L.last && L.last.i !== h && L.t - L.last.t < 3.5 && L.pl[L.last.i].side === p.side ? L.last.i : -1 };
@@ -28334,7 +28338,7 @@ function bkRebound() {
   const B = L.ball, c = [];
   for (const p of L.pl) {
     const d = hyp(p.x - B.tx, p.y - B.ty); if (d > 2.2 || p.stun > 0) continue;
-    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) * bkFx('dreb') : bkFx('reb')) * bkBoxOut(p)]);
+    c.push([p, (2.2 - d) ** 2 * (1 + (p.r.siz + (bkGxOf(p).reb || 0)) * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) * bkFx('dreb') : bkFx('reb')) * bkBoxOut(p)]);
   }
   if (!c.length) { B.st = 'free'; return; }
   let s = c.reduce((a, [, w]) => a + w, 0) * R(), win = c[0][0];
@@ -28548,7 +28552,7 @@ function bkStart(opts) {
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
   bkCallsStart(o);
-  bkCourtStart(!!o.court); bkPowersStart(o.powers);
+  bkCourtStart(!!o.court); bkPowersStart(o.powers); bkKitStart(o.bags);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
@@ -28560,6 +28564,7 @@ function bkStart(opts) {
   return G;
 }
 function bkGo(ph) {
+  const prev = GD.ph;
   GD.ph = ph; GD.t = 0; if (G.ver != null) G.ver++;
   // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
@@ -28568,6 +28573,11 @@ function bkGo(ph) {
   // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
   if (ph === 'break') { bkStamBreak(GD.half); bkManaAdd(0, BK_MANA.brk); bkManaAdd(1, BK_MANA.brk); }
   if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
+  // potions: one a side at each stoppage, the CPU's coaches first (15-kit.js); Steady Drops last the half
+  if (ph === 'break' && (GD.half || G.q > BK_RULES.quarters)) G.steady = [false, false];
+  // (a new stoppage, from play: one going on into another, a timeout at a dead ball or free throws then the dead ball, is
+  // still the one stoppage)
+  if (BK_POT_AT.includes(ph) && !BK_POT_AT.includes(prev)) { GD.potUsed = [false, false]; for (const s of [0, 1]) bkCpuPotion(s, G.skill[s]); }
   // (the next period's first possession: its calls and powers now, with the break's mana in)
   if (ph === 'break' && G.pendingPoss != null) { const s = G.pendingPoss; G.pendingPoss = null; bkPossNew(s); }
   // a new half: timeouts again (one more in each overtime); a stoppage: the CPU's coaches may call one
@@ -28753,7 +28763,7 @@ function bkFreeThrows(side, i, n) {
 }
 // one free throw: touch, nothing else (nerve comes later); yours on the meter (o.e: how far from the top you let go)
 function bkFreeThrow(o) {
-  const F = GD.ft, p = L.pl[F.i], ch = clamp(bkFtChance(p) + (G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + (F.ice || 0), .05, .98), e = o && o.e;
+  const F = GD.ft, p = L.pl[F.i], ch = bkFtNow(p), e = o && o.e;
   const good = R() < (e == null ? ch : bkTimed(ch, e, bkFtWindow(p), BK_FT_TIMED));
   F.n--; bkBoxAdd(F.side, p.ri, 'fta');
   if (good) { F.made++; bkScore(F.side, 1); bkRunAdd(F.side, 1); bkBoxAdd(F.side, p.ri, 'ftm'); bkBoxAdd(F.side, p.ri, 'pts'); G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: F.side, pts: 1, who: p.n, ri: p.ri, k: 'ft', ast: '' }); }
@@ -28766,7 +28776,10 @@ function bkFreeThrow(o) {
   bkShotReset(); bkLoose(bkHoopX(F.side), 0, 3.05, 1.8); L.t = 0; bkGo('live');
 }
 const bkFtChance = p => clamp(.5 + p.r.tch * .04, .3, .95);
-const bkFtWindow = p => BK_WIN.min + BK_WIN.per * bkFtChance(p);
+// a free throw's chance now: touch, Lucky Socks, the nerve, the powers on the floor, an icing
+function bkFtNow(p) { const F = GD && GD.ft; return clamp(bkFtChance(p) + (bkGxOf(p).ft || 0) - (F ? bkNerve(F.side) : 0) + (F && G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + ((F && F.ice) || 0), .05, .98); }
+// the meter's window at the line: from that chance, so nerves narrow it and the socks widen it
+const bkFtWindow = p => BK_WIN.min + BK_WIN.per * bkFtNow(p);
 // who plays it: the CPU both sides ('watch'), or you play your side by hand ('play'); the same game goes on
 // (Manage: your calls and your bench, the CPU plays your five)
 function bkSetMode(m) { if (!GD) return; GD.mode = ['play', 'manage'].includes(m) ? m : 'watch'; bkInputClear(); if (L) L.me = -1; }
@@ -29088,7 +29101,7 @@ function bkSteerAim(p, i) {
   const [sx, sy] = BKI.steer, n = hyp(sx, sy); if (!n) return null;
   return [p.x + sx / n * 2.5, p.y + sy / n * 2.5];
 }
-const bkWindow = (pr, p) => BK_WIN.min + BK_WIN.per * pr + (p && bkOnFire(p) ? BK_WIN.fire : 0);
+const bkWindow = (pr, p) => BK_WIN.min + BK_WIN.per * pr + (p && bkOnFire(p) ? BK_WIN.fire : 0) + (p ? bkGxOf(p).win || 0 : 0);
 // a shot let go e from the top (a share of the rise): dead on is a swish, in the window better than the CPU's look,
 // just outside it might drop off the rim, well off it won't
 // a release e from the top with window w: the tiers, by { perfect: [add, cap], good: [add, cap], off: share, way: odds }
@@ -29190,7 +29203,7 @@ function bkMoveTry(h, k) {
   L.moveCd = BK_HANDS.moveCd;
   const [d, dd] = bkNearest(p.x, p.y, bkDefense().filter(q => q.stun <= 0));
   if (!d || dd > 1.6) return '';
-  bkStamCost(p, BK_STAM.move);
+  bkStamCost(p, BK_STAM.move * (bkGxOf(p).move || 1));
   if (R() < clamp(M.beat + (p.r.hnd - 2 * bkTired(p) - d.r.def) * .06, .1, .88) + bkFx('beat')) { d.stun = M.stun; bkEv('beat', p.n, d.n); GD.msg = `${p.n}'s ${M.n} leaves ${d.n} behind.`; L.drive = true; return 'beat'; }
   if (R() < M.strip * clamp(1 + (d.r.def - p.r.hnd) * .1, .4, 2)) { GD.msg = `${p.n} tries a ${M.n}, and ${d.n} picks it.`; bkPicked(d); return 'stripped'; }
   p.stun = .25; GD.msg = `${p.n}'s ${M.n} doesn't fool ${d.n}.`; return 'stumble';
@@ -29505,7 +29518,7 @@ function bkRunAdd(side, pts) { if (G.run.side === side) G.run.pts += pts; else G
    (GD trimmed to what play needs to go on from there). bkResume puts one back at the same beat, on fresh random
    numbers and with no keys held. */
 const BK_SNAP_AT = ['dead', 'break', 'ft', 'timeout'];
-const BK_GD_KEEP = ['ph', 't', 'mode', 'you', 'msg', 'walk', 'ft', 'half', 'keep', 'notes', 'toAsk', 'toWas', 'auto', 'pow'];
+const BK_GD_KEEP = ['ph', 't', 'mode', 'you', 'msg', 'walk', 'ft', 'half', 'keep', 'notes', 'toAsk', 'toWas', 'auto', 'pow', 'potUsed'];
 function bkSnapshot() {
   const gd = {}; for (const k of BK_GD_KEEP) if (GD[k] !== undefined) gd[k] = GD[k];
   return JSON.parse(JSON.stringify({ G, L, GD: gd }));
@@ -29518,6 +29531,9 @@ function bkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
   bkSeed(null);
   G = s.G; L = s.L;
+  // (a save point from before powers, gear and potions: none of them, so play goes on as it was)
+  if (!G.mana) Object.assign(G, { powers: false, mana: [0, 0], spirit: [0, 0], zones: [], ultUsed: [false, false], sitUsed: [{}, {}], kept: [{}, {}] });
+  if (!G.bags) Object.assign(G, { bags: [null, null], pots: [], steady: [false, false] });
   GD = Object.assign({ acc: 0, meter: null, big: null, net: null, rel: null }, s.GD);
   bkInputClear();
   return G;
@@ -29863,6 +29879,98 @@ function bkSpiritKeep(p) {
   if (!G.ultUsed[s] && sp >= BK_SPIRIT.ult && sp - BK_SPIRIT.keep < BK_SPIRIT.ult) return false;
   G.spirit[s] -= BK_SPIRIT.keep; G.kept[s][p.ri] = true; bkEv('keep', p.n); return true;
 }
+/* The Charter Court: gear and potions (issue #77, phase 7), by #61's conventions; the Realm's side is w82-courtkit.js.
+   Gear: a player may wear one piece. A roster player sent with { gear: { id, name, fx } } keeps its name (gear) and the
+   effects the engine reads (gx: fx without r; fx.r is laid on the ratings before the engine sees them, by the Realm).
+   What gx may hold: spd (speed ×), turn (how sharply they change direction ×), win (their release window wider by
+   this, and the CPU's shots by them half as much likelier), reb (rebound as if this much bigger), move (what a move
+   costs them in stamina ×), ft (added to their free throws).
+   Nerve: in the last BK_NERVE.secs of the fourth quarter or overtime, within BK_NERVE.close points, free throws are
+   BK_NERVE.p less likely (and a hand's window narrower with them), unless the side took Steady Drops this half.
+   Potions (BK_POTIONS): at a stoppage (a dead ball, a break, a timeout, the start of free throws), one per side per
+   stoppage (GD.potUsed). G.bags = [bag or null, ...] by side: a null bag is kept by the page (the Realm keeps yours and
+   takes each one out as you give it), and a bag here ({ id: n }) is the CPU's, given by its coach at its skill at each
+   stoppage (bkCpuPotion). Every use goes in the line under the court with its reason (GD.notes) and in G.pots
+   ({ side, id, ri, q, why }). What each does, all plain data in G: draught: one player 40 stamina back; bkhot: one
+   player starts on fire (G.hot); bksteady: G.steady[side] set for the half (no nerve; from the second half on, and an
+   overtime is a half of its own); secondwind: the whole five 20
+   stamina back, at a timeout only. */
+const BK_POTIONS = {
+  draught: { n: 'Stamina Draught', one: true, rest: 40, desc: 'One tired player gets 40 stamina back.' },
+  bkhot: { n: 'Hot Hand Elixir', one: true, desc: 'One player starts on fire: every look better until they miss.' },
+  bksteady: { n: 'Steady Drops', desc: 'No nerves at the free-throw line for the rest of this half, however close the finish.' },
+  secondwind: { n: 'Second Wind', all: true, rest: 20, desc: 'At a timeout: the whole five get 20 stamina back.' },
+};
+const BK_NERVE = { secs: 60, close: 5, p: .07 };
+// a CPU coach gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
+const BK_KIT = { take: [99, 4, 3], squire: .25 };
+const BK_GX0 = Object.freeze({});
+function bkGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
+const bkGxOf = p => { if (!p) return BK_GX0; const m = G.teams[p.side] && G.teams[p.side].roster[p.ri]; return (m && m.gx) || BK_GX0; };
+// the nerve a side's free throws carry now
+function bkNerve(side) {
+  if (G.steady && G.steady[side]) return 0;
+  return G.q >= BK_RULES.quarters && G.clock <= BK_NERVE.secs && Math.abs(G.score[0] - G.score[1]) <= BK_NERVE.close ? BK_NERVE.p : 0;
+}
+function bkKitStart(bags) {
+  G.bags = [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null);
+  G.pots = []; G.steady = [false, false];
+}
+const BK_POT_AT = ['dead', 'break', 'timeout', 'ft'];
+// why side can't give potion id (to player ri) now, or '' when it can
+function bkPotionWhy(side, id, ri) {
+  const P = BK_POTIONS[id]; if (!P) return 'No such potion.';
+  if (!GD || !BK_POT_AT.includes(GD.ph)) return 'Only at a stoppage: a dead ball, a break, a timeout or free throws.';
+  if (GD.potUsed && GD.potUsed[side]) return 'One potion a stoppage.';
+  if (id === 'secondwind' && GD.ph !== 'timeout') return 'Second Wind is for a timeout.';
+  if (P.one) {
+    if (!G.teams[side].roster[ri]) return 'Pick a player.';
+    if (id === 'bkhot' && !G.on[side].includes(ri)) return 'Only for someone on the floor.';
+    if (id === 'bkhot' && (G.hot[side][ri] || 0) >= BK_FIRE.n) return 'They\'re already on fire.';
+    if (id === 'draught' && G.stam[side][ri] >= 95) return 'They\'re fresh.';
+    if (!G.on[side].includes(ri) && bkFouledOut(side, ri)) return 'They\'ve fouled out.';
+  }
+  if (id === 'bksteady' && G.steady[side]) return 'Already steady this half.';
+  if (id === 'bksteady' && G.q < 3) return 'Steady Drops are for the second half: the nerves come at the end.';
+  return '';
+}
+// side gives potion id (to ri): its effect, the note and the record; the CPU's comes out of its bag here (yours, the page's)
+function bkPotionGive(side, id, ri, why) {
+  const P = BK_POTIONS[id], T = G.teams[side], m = P.one ? T.roster[ri] : null;
+  if (id === 'draught') G.stam[side][ri] = Math.min(100, G.stam[side][ri] + P.rest);
+  if (id === 'secondwind') for (const r of G.on[side]) G.stam[side][r] = Math.min(100, G.stam[side][r] + P.rest);
+  if (id === 'bkhot') { G.hot[side][ri] = BK_FIRE.n; if (G.kept) G.kept[side][ri] = false; }
+  if (id === 'bksteady') G.steady[side] = true;
+  if (G.bags[side]) { G.bags[side][id]--; if (G.bags[side][id] <= 0) delete G.bags[side][id]; }
+  GD.potUsed = GD.potUsed || [false, false]; GD.potUsed[side] = true;
+  G.pots.push({ side, id, ri: P.one ? ri : -1, q: G.q, why: why || '' });
+  GD.notes = (GD.notes || []).concat(`${T.name}: ${P.n}${m ? ` for ${m.n}` : ''}${why ? ` (${why})` : ''}.`);
+  bkEv('potion', P.n, T.name);
+}
+// your potion now: '' when given (the page takes it out of your bag), or why not
+function bkPotion(id, ri) { const why = bkPotionWhy(GD.you, id, ri); if (why) return why; bkPotionGive(GD.you, id, ri); return ''; }
+/* what a potion would be worth now, and to whom: [{ id, ri, v, why }] for the potions in bag (a CPU's, or the advice for
+   yours). Stamina for the most tired on the floor; Second Wind at a timeout for a tired five; the Hot Hand Elixir for
+   the best shooter late in a close game; Steady Drops before free throws in a close finish */
+function bkPotionValues(side, bag) {
+  const out = [], on = G.on[side], st = G.stam[side], T = G.teams[side], lead = bkLead(side), close = Math.abs(lead) <= 6, late = bkLate(.6);
+  const tired = on.slice().sort((a, b) => st[a] - st[b])[0];
+  if (bag.draught && st[tired] < 50) out.push({ id: 'draught', ri: tired, v: (60 - st[tired]) / 6, why: `${T.roster[tired].n} is down to ${Math.round(st[tired])}` });
+  if (bag.secondwind && GD.ph === 'timeout') { const avg = on.reduce((a, r) => a + st[r], 0) / on.length; if (avg < 65) out.push({ id: 'secondwind', ri: -1, v: (75 - avg) / 3, why: `the five average ${Math.round(avg)}` }); }
+  if (bag.bkhot && late && close) { const best = on.filter(r => (G.hot[side][r] || 0) < BK_FIRE.n).sort((a, b) => T.roster[b].r.tch - T.roster[a].r.tch)[0]; if (best != null) out.push({ id: 'bkhot', ri: best, v: 5, why: `a close finish, and ${T.roster[best].n} shoots best` }); }
+  if (bag.bksteady && !G.steady[side] && G.q >= BK_RULES.quarters && close) out.push({ id: 'bksteady', ri: -1, v: GD.ph === 'ft' && GD.ft && GD.ft.side === side ? 6 : 3.5, why: 'a close finish, and free throws to come' });
+  return out.filter(o => !bkPotionWhy(side, o.id, o.ri)).sort((a, b) => b.v - a.v);
+}
+// your bench's advice: the potion from your bag worth most now ({ id, ri, why }), or null
+function bkPotionAdvice(bag) { const o = G && GD ? bkPotionValues(GD.you, bag || {})[0] : null; return o && o.v >= BK_KIT.take[1] ? { id: o.id, ri: o.ri, why: o.why } : null; }
+// the CPU's coach at a stoppage: a Squire now and then whatever comes first; a Knight or an Archmage what's worth it
+function bkCpuPotion(side, sk) {
+  const bag = G.bags && G.bags[side]; if (!bag || !Object.keys(bag).length || (GD.potUsed && GD.potUsed[side])) return;
+  if (GD.mode !== 'watch' && side === GD.you) return;
+  const vals = bkPotionValues(side, bag); if (!vals.length) return;
+  if (!sk) { if (R() < BK_KIT.squire) bkPotionGive(side, vals[0].id, vals[0].ri, vals[0].why); return; }
+  if (vals[0].v >= BK_KIT.take[sk]) bkPotionGive(side, vals[0].id, vals[0].ri, vals[0].why);
+}
 /* The court's page in the Realm (issue #77, phase 1). A canvas in #v-court, after the ring's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (bkTick) and draws it (bkDraw). The engine's parts
    don't touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
@@ -29981,6 +30089,12 @@ return {
   powerRules: { mana: Object.assign({}, BK_MANA), sta: Object.assign({}, BK_POW_STA), spirit: Object.assign({}, BK_SPIRIT), ultPoss: BK_ULT_POSS },
   powerBook: Object.fromEntries(Object.keys(BK_POW).map(k => [k, { off: bkNameP(BK_POW[k][0]), def: bkNameP(BK_POW[k][1]), off2: bkNameP(BK_POW2[k][0]), def2: bkNameP(BK_POW2[k][1]), ult: bkNameP(BK_ULT[k]) }])),
   sits: JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(BK_SIT).map(([k, v]) => [k, { n: v.n, desc: v.desc, cost: v.cost, when: v.when }])))), powerData: JSON.parse(JSON.stringify({ pow: BK_POW, pow2: BK_POW2, ult: BK_ULT })),
+  // gear and potions (phase 7): your potion (id, ri; '' or why not; the page takes it out of your bag), why one can't be
+  // given now, your bench's advice from bag ({ id, ri, why } or null), every potion, each side's bag (null: the page
+  // keeps it), the potions given so far, the nerve on a side's free throws now, and the rules
+  potion: (id, ri) => G && GD ? bkPotion(id, ri) : 'No game on.', potionWhy: (id, ri) => G && GD ? bkPotionWhy(GD.you, id, ri) : 'No game on.', advice: bag => bkPotionAdvice(bag),
+  potions: JSON.parse(JSON.stringify(BK_POTIONS)), bags: () => G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : null, pots: () => G && G.pots ? JSON.parse(JSON.stringify(G.pots)) : [],
+  nerve: side => G ? bkNerve(side) : 0, kitRules: { nerve: Object.assign({}, BK_NERVE), take: BK_KIT.take.slice() }, gearOf: i => L && L.pl[i] ? Object.assign({}, bkGxOf(L.pl[i])) : null,
   // save points and the ground (phase 5): a snapshot now, putting one back on the court, the hooks for each stoppage's
   // snapshot, and the Charter Court's state ({ wax, bent, roar }, or null away from it)
   snapshot: () => G && GD && G.teams ? bkSnapshot() : null, resume: sn => { BKP.paused = false; bkResume(sn); bkShow(); return G; },
@@ -39650,7 +39764,7 @@ function wGearCard(p) {
     const G = wGearOf(p, sp);
     return `<li data-gearrow="${sp}"><span>${wCap(W_GEAR_CFG.sports[sp])}:</span> ${G ? `<b>${esc(G.name)}</b> <small>${esc(G.desc)}</small> <button class="ghost" data-gearoff="${sp}" data-gearpid="${p.id}">Take off</button>` : '<span class="dim">nothing</span>'}</li>`;
   }).join('');
-  return `<div class="wbd wgearc"><h5>Gear</h5><ul class="wgearl">${rows}</ul><p class="hint">One piece for boxing and one for football. Put gear on from the Bag.</p></div>`;
+  return `<div class="wbd wgearc"><h5>Gear</h5><ul class="wgearl">${rows}</ul><p class="hint">One piece for each sport: ${Object.values(W_GEAR_CFG.sports).join(', ').replace(/, ([^,]*)$/, ' and $1')}. Put gear on from the Bag.</p></div>`;
 }
 const wW72StatsCard = wStatsCard;
 wStatsCard = function (p) { return wW72StatsCard(p).replace(/<\/section>\s*$/, wGearCard(p) + '</section>'); };
@@ -39679,7 +39793,7 @@ const wW72RenderHelp = renderHelp;
 renderHelp = function () {
   wW72RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGear')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Boxers and football players can wear one piece of gear each in their sport: one for boxing and one for football. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Players can wear one piece of gear in each sport that has its own game: one for boxing, one for football, one for basketball. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
 };
 /* w73: boxing gear and potions (issue #61, phase 2), end to end. The engine's side is src/bx/parts/13-kit.js; the
    plumbing (W_GEAR, W_POTIONS, slots, the Bag) is w72.
@@ -41099,6 +41213,131 @@ renderHelp = function () {
   wW81RenderHelp();
   const after = $('wHelpCourtGame'); if (!after || $('wHelpCourtPow')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtPow"><b>Powers on the court.</b> Every kind has two offense and two defense powers on the court; pick each player's on the Court tab. Each side casts at most one a possession, for team mana and the caster's stamina. The crowd's spirit, filled by dunks, threes, blocks, steals and runs, pays for one ultimate a game (a zone on the floor for three possessions) and keeps a hot hand burning one miss longer. Clutch, Full-court Press and Ice It are the team's, once a game, when the moment fits (see Basketball: how it works).</p>`);
+};
+/* w82: basketball gear and potions (issue #77, phase 7), by #61's conventions; the engine's side is
+   src/bk/parts/15-kit.js, the plumbing (W_GEAR, W_POTIONS, the slot, the Bag) is w72.
+   Gear (W_COURT_GEAR, one piece a player, p.gear.court): Court Shoes, Wrist Bands and Lucky Socks from the Graftonbury
+   store; Knee Pads and Ankle Braces from chests; the Charter Net (phase 9) adds a piece you don't have yet. Small
+   effects (measured in phase 10's lab). It reaches the engine through wCourtPlayer, never by changing the player's own
+   ratings, and shows on the stats card's Gear block and the Court tab.
+   Potions: the Stamina Draught and Second Wind (football's items, serving the court too: the general stores sell them)
+   and Steady Drops and the Hot Hand Elixir from the Graftonbury store. In a real game, at a stoppage, from the calls panel's Bag (one a stoppage), with your
+   bench's advice; each comes out of your bag when given. Your coaches never open your bag (Watch and Auto powers
+   don't), and Simulate leaves it alone. The other side's bench brings W_COURT_KIT.opp[tier] and gives at its skill;
+   every use is in the line under the court with its reason, and the game card says what each club brings.
+   Wraps: wGearLive (wW82GearLive: the court), wCourtPlayer (wW82CourtPlayer: gear's ratings and the piece), wStartCourt
+   (wW82StartCourt: their bag goes in), wCourtCalls (wW82CourtCalls: the Bag block), wCourtRow (wW82CourtRow: the gear
+   on the Court tab), wOpenCourtCard (wW82OpenCourtCard: the bags on the card), renderHelp (wW82RenderHelp:
+   #wHelpCourtKit); and wBK.start and wBK.simGame (the bags go in). */
+
+W_GEAR_CFG.sports.court = 'basketball';
+W_GEAR_STATN.court = { spd: 'speed', siz: 'size', hop: 'hops', tch: 'touch', hnd: 'handle', def: 'defense' };
+const W_COURT_GEAR = {
+  bk_shoes: { sport: 'court', name: 'Court Shoes', price: 60, desc: 'Grippy soles: 2% faster, and they cut a quarter sharper (on the wax too).', fx: { spd: 1.02, turn: 1.25 } },
+  bk_bands: { sport: 'court', name: 'Wrist Bands', price: 50, desc: 'A steadier wrist: the release window a little wider, and their shots a touch likelier.', fx: { win: .03 } },
+  bk_pads: { sport: 'court', name: 'Knee Pads', price: 55, desc: 'They box out as if a point bigger.', fx: { reb: 1 } },
+  bk_braces: { sport: 'court', name: 'Ankle Braces', price: 45, desc: 'Crossovers and spins cost them half the stamina.', fx: { move: .5 } },
+  bk_socks: { sport: 'court', name: 'Lucky Socks', price: 40, desc: 'Free throws 5 points likelier.', fx: { ft: .05 } },
+};
+for (const id of Object.keys(W_COURT_GEAR)) wGearAdd(id, W_COURT_GEAR[id]);
+const W_COURT_KIT = {
+  potions: { bkhot: 40, bksteady: 30 }, // prices (the Stamina Draught's and Second Wind's are football's: one item each, every sport)
+  store: ['bk_shoes', 'bk_bands', 'bk_socks'], // Graftonbury's gear (its store is the hq shop)
+  cup: ['bk_pads', 'bk_braces', 'bk_shoes', 'bk_bands', 'bk_socks'], cupGold: 60,
+  opp: { 1: { draught: 1 }, 2: { draught: 1, secondwind: 1 }, 3: { draught: 2, secondwind: 1, bksteady: 1, bkhot: 1 } },
+};
+for (const id of Object.keys(wBK.potions)) {
+  const P = wBK.potions[id];
+  // (the Stamina Draught and Second Wind are football's items, and serve the court too)
+  if (id === 'draught' || id === 'secondwind') {
+    W_POTIONS[id].sports = (W_POTIONS[id].sports || ['grid']).concat('court');
+    DB.items[id].desc += ` On the court: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items[id].use += ` Or in a basketball game, at a stoppage${id === 'secondwind' ? ' (a timeout)' : ''}, one a stoppage.`;
+    continue;
+  }
+  wPotionAdd(id, { sport: 'court' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a basketball game, at a stoppage: the Bag under the court. One potion a stoppage.', price: W_COURT_KIT.potions[id] };
+}
+if (DB.shops.hq) { for (const id of Object.keys(W_COURT_KIT.potions)) DB.shops.hq[id] = W_COURT_KIT.potions[id]; for (const id of W_COURT_KIT.store) DB.shops.hq[id] = W_COURT_GEAR[id].price; }
+for (const [c, it] of [['hatchery_prize', 'bk_pads'], ['deepseam_prize', 'bk_braces'], ['genevault_c3', 'bksteady'], ['emberdeep_c6', 'bkhot']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wW82GearLive = wGearLive;
+wGearLive = function (sport) { return sport === 'court' ? wCourtLive() : wW82GearLive(sport); };
+// a roster player's court gear: its ratings (past the cap by W_GEAR_CFG.over at most) and the piece
+const wW82CourtPlayer = wCourtPlayer;
+wCourtPlayer = function (p) {
+  const t = wW82CourtPlayer(p), G = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'court') : null;
+  if (G) { t.r = wGearRate(t.r, G, W_BKR.cap); t.gear = wGearTag(G); }
+  return t;
+};
+
+/* ---------- the bags go in ---------- */
+const WCK = { next: null };
+const wCourtBagMine = () => Object.fromEntries(wMatchBag('court').filter(x => wBK.potions[x.id]).map(x => [x.id, x.n]));
+const wCourtBagTheirs = tier => Object.assign({}, W_COURT_KIT.opp[tier] || {});
+const wCourtBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wBK.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wBK.potions[id].n}`).join(', ') : 'nothing'; };
+const wW82StartCourt = wStartCourt;
+wStartCourt = function (o) {
+  WCK.next = [null, wCourtBagTheirs((o && o.tier) || (o && o.club ? wBallTier(o.club) : 1))];
+  try { return wW82StartCourt(o); } finally { WCK.next = null; }
+};
+// (only the game wStartCourt starts: a scrimmage, a practice or a cup game between clubs brings none)
+const wW82Start = wBK.start, wW82SimGame = wBK.simGame;
+wBK.start = o => wW82Start(WCK.next ? Object.assign({}, o, { bags: WCK.next }) : o);
+wBK.simGame = o => wW82SimGame(WCK.next && !(o && o.keep) ? Object.assign({}, o, { bags: WCK.next }) : o);
+
+/* ---------- your Bag, in a real game ---------- */
+function wCourtPotion(id, ri) {
+  if (!wCourtWorld()) return 'Potions are for real games, not practice.';
+  if (!wHas(id)) return `You have no ${(wBK.potions[id] || {}).n || 'such potion'}.`;
+  const r = wBK.potion(id, ri); if (r) return r;
+  // (the save point is the game as it is now, with the potion given: a reload can't lose it, or give it back)
+  wAddItem(id, -1); if (WG.bkg && WG.bkg.live) WG.bkg.live.snap = wBK.snapshot(); wSave(); return '';
+}
+let W_COURT_KITKEY = '';
+const wW82CourtCalls = wCourtCalls;
+wCourtCalls = function (force) {
+  wW82CourtCalls(force);
+  const box = $('wCourtCalls'); if (box.hidden || !box.querySelector('.wccrows')) { W_COURT_KITKEY = ''; return; }
+  if (!wCourtWorld()) { const k = box.querySelector('.wcckit'); if (k) k.remove(); return; }
+  if (!box.querySelector('.wcckit')) box.insertAdjacentHTML('beforeend', '<div class="wcckit"></div>');
+  const bag = wCourtBagMine(), G = wBK.G, you = wBK.you, ph = wBK.phase;
+  const key = `${wBK.ver}|${ph}|${JSON.stringify(bag)}|${G.stam[you].map(v => Math.round(v / 5)).join()}`;
+  if (!force && key === W_COURT_KITKEY) return;
+  if (!force && (W_COURT_DOWN || (box.contains(document.activeElement) && document.activeElement.tagName === 'SELECT'))) return;
+  W_COURT_KITKEY = key;
+  const ids = Object.keys(bag), R = G.teams[you].roster, adv = wBK.advice(bag);
+  const who = id => { const P = wBK.potions[id]; if (!P.one) return ''; const list = id === 'bkhot' ? G.on[you] : R.map((_, i) => i).filter(i => G.on[you].includes(i) || !((G.pf[you][i] || 0) >= wBK.rules.out));
+    return `<select data-ckwho="${id}" aria-label="Who gets the ${esc(P.n)}">${list.map(ri => `<option value="${ri}"${adv && adv.id === id && adv.ri === ri ? ' selected' : ''}>${esc(R[ri].n)} (${Math.round(G.stam[you][ri])})</option>`).join('')}</select>`; };
+  box.querySelector('.wcckit').innerHTML = `<div class="wccrow"><span class="wccl">Bag</span>${ids.length ? ids.map(id => { const P = wBK.potions[id], why = wBK.potionWhy(id, P.one ? (adv && adv.id === id ? adv.ri : G.on[you][0]) : -1);
+      return `<span class="wcpot">${who(id)}<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-ckuse="${id}" title="${esc(P.desc + (why && !/Pick|fresh|already on fire|floor/.test(why) ? ` Not now: ${why}` : ''))}">${esc(P.n)} (${bag[id]})</button></span>`; }).join('') : '<small class="hint">No basketball potions in your bag. The Graftonbury store sells them.</small>'}</div>
+    ${adv ? `<p class="hint">Your bench says: <b>${esc(wBK.potions[adv.id].n)}</b>${adv.ri >= 0 ? ` for ${esc(R[adv.ri].n)}` : ''}, ${esc(adv.why)}.</p>` : ''}`;
+};
+$('wCourtCalls').addEventListener('click', e => {
+  const b = e.target.closest('[data-ckuse]'); if (!b) return;
+  const id = b.dataset.ckuse, sel = document.querySelector(`[data-ckwho="${id}"]`), r = wCourtPotion(id, sel ? +sel.value : -1);
+  if (r) wCourtCallSay(r); wCourtCalls(true);
+});
+
+/* ---------- the Court tab and the card ---------- */
+const wW82CourtRow = wCourtRow;
+wCourtRow = function (k, C) {
+  const html = wW82CourtRow(k, C), p = wCourtWho(k), g = p && typeof k === 'number' ? wGearOf(p, 'court') : null;
+  return g ? html.replace('<small class="wnst">', `<small class="wnst" title="${esc(g.desc)}">Wears the <b>${esc(g.name)}</b>.</small><small class="wnst">`) : html;
+};
+const wW82OpenCourtCard = wOpenCourtCard;
+wOpenCourtCard = function () {
+  wW82OpenCourtCard();
+  const ul = document.querySelector('#modalBox .wbclubs'); if (!ul) return;
+  ul.insertAdjacentHTML('afterend', `<p class="hint">What their benches bring: ${[1, 2, 3].map(t => `tier ${t}, ${esc(wCourtBagWords(W_COURT_KIT.opp[t]))}`).join('; ')}. Yours is your bag: give from it at a stoppage, in the Bag under the court.</p>`);
+};
+
+const wW82RenderHelp = renderHelp;
+renderHelp = function () {
+  wW82RenderHelp();
+  const after = $('wHelpCourtPow'); if (!after || $('wHelpCourtKit')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtKit"><b>Basketball gear and potions.</b> Each player can wear one piece for the court: Court Shoes, Wrist Bands and Lucky Socks from the Graftonbury store, Knee Pads and Ankle Braces from chests. Put it on from the Bag on the Team screen. In a real game, at a stoppage (a dead ball, a break, a timeout or free throws), give one potion from the Bag under the court: a Stamina Draught, Second Wind (at a timeout, the whole five), Steady Drops (no nerves at the line for the half: in the last minute of a close game, free throws are harder) or the Hot Hand Elixir (start a player on fire). Your bench says which suits the moment. The other side's bench brings potions by tier and uses them; every use is in the line under the court.</p>`);
 };
 </script>
 </body></html>

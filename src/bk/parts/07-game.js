@@ -30,7 +30,7 @@ function bkStart(opts) {
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
   bkCallsStart(o);
-  bkCourtStart(!!o.court); bkPowersStart(o.powers);
+  bkCourtStart(!!o.court); bkPowersStart(o.powers); bkKitStart(o.bags);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
@@ -42,6 +42,7 @@ function bkStart(opts) {
   return G;
 }
 function bkGo(ph) {
+  const prev = GD.ph;
   GD.ph = ph; GD.t = 0; if (G.ver != null) G.ver++;
   // (a note, a foul-out or a sub, is for the stop in play it came with)
   if (ph === 'live') GD.notes = [];
@@ -50,6 +51,11 @@ function bkGo(ph) {
   // the coaches' subs at each stoppage (10-bench.js); a break gives everyone some breath back first
   if (ph === 'break') { bkStamBreak(GD.half); bkManaAdd(0, BK_MANA.brk); bkManaAdd(1, BK_MANA.brk); }
   if (ph === 'dead' || ph === 'break') for (const s of [0, 1]) bkCoachSubs(s, ph === 'break');
+  // potions: one a side at each stoppage, the CPU's coaches first (15-kit.js); Steady Drops last the half
+  if (ph === 'break' && (GD.half || G.q > BK_RULES.quarters)) G.steady = [false, false];
+  // (a new stoppage, from play: one going on into another, a timeout at a dead ball or free throws then the dead ball, is
+  // still the one stoppage)
+  if (BK_POT_AT.includes(ph) && !BK_POT_AT.includes(prev)) { GD.potUsed = [false, false]; for (const s of [0, 1]) bkCpuPotion(s, G.skill[s]); }
   // (the next period's first possession: its calls and powers now, with the break's mana in)
   if (ph === 'break' && G.pendingPoss != null) { const s = G.pendingPoss; G.pendingPoss = null; bkPossNew(s); }
   // a new half: timeouts again (one more in each overtime); a stoppage: the CPU's coaches may call one
@@ -235,7 +241,7 @@ function bkFreeThrows(side, i, n) {
 }
 // one free throw: touch, nothing else (nerve comes later); yours on the meter (o.e: how far from the top you let go)
 function bkFreeThrow(o) {
-  const F = GD.ft, p = L.pl[F.i], ch = clamp(bkFtChance(p) + (G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + (F.ice || 0), .05, .98), e = o && o.e;
+  const F = GD.ft, p = L.pl[F.i], ch = bkFtNow(p), e = o && o.e;
   const good = R() < (e == null ? ch : bkTimed(ch, e, bkFtWindow(p), BK_FT_TIMED));
   F.n--; bkBoxAdd(F.side, p.ri, 'fta');
   if (good) { F.made++; bkScore(F.side, 1); bkRunAdd(F.side, 1); bkBoxAdd(F.side, p.ri, 'ftm'); bkBoxAdd(F.side, p.ri, 'pts'); G.log.push({ q: G.q, clock: Math.round(G.clock * 10) / 10, side: F.side, pts: 1, who: p.n, ri: p.ri, k: 'ft', ast: '' }); }
@@ -248,7 +254,10 @@ function bkFreeThrow(o) {
   bkShotReset(); bkLoose(bkHoopX(F.side), 0, 3.05, 1.8); L.t = 0; bkGo('live');
 }
 const bkFtChance = p => clamp(.5 + p.r.tch * .04, .3, .95);
-const bkFtWindow = p => BK_WIN.min + BK_WIN.per * bkFtChance(p);
+// a free throw's chance now: touch, Lucky Socks, the nerve, the powers on the floor, an icing
+function bkFtNow(p) { const F = GD && GD.ft; return clamp(bkFtChance(p) + (bkGxOf(p).ft || 0) - (F ? bkNerve(F.side) : 0) + (F && G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + ((F && F.ice) || 0), .05, .98); }
+// the meter's window at the line: from that chance, so nerves narrow it and the socks widen it
+const bkFtWindow = p => BK_WIN.min + BK_WIN.per * bkFtNow(p);
 // who plays it: the CPU both sides ('watch'), or you play your side by hand ('play'); the same game goes on
 // (Manage: your calls and your bench, the CPU plays your five)
 function bkSetMode(m) { if (!GD) return; GD.mode = ['play', 'manage'].includes(m) ? m : 'watch'; bkInputClear(); if (L) L.me = -1; }

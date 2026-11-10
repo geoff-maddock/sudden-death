@@ -49,6 +49,12 @@ return {
   powerRules: { mana: Object.assign({}, BK_MANA), sta: Object.assign({}, BK_POW_STA), spirit: Object.assign({}, BK_SPIRIT), ultPoss: BK_ULT_POSS },
   powerBook: Object.fromEntries(Object.keys(BK_POW).map(k => [k, { off: bkNameP(BK_POW[k][0]), def: bkNameP(BK_POW[k][1]), off2: bkNameP(BK_POW2[k][0]), def2: bkNameP(BK_POW2[k][1]), ult: bkNameP(BK_ULT[k]) }])),
   sits: JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(BK_SIT).map(([k, v]) => [k, { n: v.n, desc: v.desc, cost: v.cost, when: v.when }])))), powerData: JSON.parse(JSON.stringify({ pow: BK_POW, pow2: BK_POW2, ult: BK_ULT })),
+  // gear and potions (phase 7): your potion (id, ri; '' or why not; the page takes it out of your bag), why one can't be
+  // given now, your bench's advice from bag ({ id, ri, why } or null), every potion, each side's bag (null: the page
+  // keeps it), the potions given so far, the nerve on a side's free throws now, and the rules
+  potion: (id, ri) => G && GD ? bkPotion(id, ri) : 'No game on.', potionWhy: (id, ri) => G && GD ? bkPotionWhy(GD.you, id, ri) : 'No game on.', advice: bag => bkPotionAdvice(bag),
+  potions: JSON.parse(JSON.stringify(BK_POTIONS)), bags: () => G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : null, pots: () => G && G.pots ? JSON.parse(JSON.stringify(G.pots)) : [],
+  nerve: side => G ? bkNerve(side) : 0, kitRules: { nerve: Object.assign({}, BK_NERVE), take: BK_KIT.take.slice() }, gearOf: i => L && L.pl[i] ? Object.assign({}, bkGxOf(L.pl[i])) : null,
   // save points and the ground (phase 5): a snapshot now, putting one back on the court, the hooks for each stoppage's
   // snapshot, and the Charter Court's state ({ wax, bent, roar }, or null away from it)
   snapshot: () => G && GD && G.teams ? bkSnapshot() : null, resume: sn => { BKP.paused = false; bkResume(sn); bkShow(); return G; },

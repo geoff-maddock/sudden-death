@@ -66,7 +66,7 @@ function bkSetSpots(side) {
 }
 // a player's speed now: metres a second
 function bkSpeed(p, i) {
-  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p)) * (G.cur ? (p.side === G.cur.side ? bkFx('oSpd') : bkFx('dSpd')) : 1);
+  let m = (4.2 + p.r.spd * .38) * (1 - .15 * bkTired(p)) * (bkGxOf(p).spd || 1) * (G.cur ? (p.side === G.cur.side ? bkFx('oSpd') : bkFx('dSpd')) : 1);
   if (i === bkHand()) m *= .9;
   if (p.stun > 0) m *= .25;
   return m;
@@ -91,7 +91,7 @@ function bkStep(dt) {
 }
 function bkMove(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(bkSpeed(p, i), d / .2);
-  const wx = d > .03 ? dx / d * sp : 0, wy = d > .03 ? dy / d * sp : 0, k = Math.min(1, dt * 7 * (bkOnWax(p) ? BK_WAX.turn : 1));
+  const wx = d > .03 ? dx / d * sp : 0, wy = d > .03 ? dy / d * sp : 0, k = Math.min(1, dt * 7 * (bkOnWax(p) ? BK_WAX.turn : 1) * (bkGxOf(p).turn || 1));
   p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k;
   p.x = clamp(p.x + p.vx * dt, .3, BK_RULES.len - .3); p.y = clamp(p.y + p.vy * dt, -BK_RULES.wid / 2 + .3, BK_RULES.wid / 2 - .3);
 }
@@ -253,7 +253,8 @@ function bkShoot(o) {
     foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul;
     if (!mine && !jumped) { d.act = 'jump'; d.actT = .5; d.jumpAt = L.t; }
   }
-  const pm = f.e != null ? bkHandMake(S.p, f.e, p) : S.p * (jumped ? .85 : 1);
+  // (Wrist Bands: your shots get the wider window, bkWindow; the CPU's a touch more likely)
+  const pm = f.e != null ? bkHandMake(S.p, f.e, p) : (S.p + (bkGxOf(p).win || 0) * .5) * (jumped ? .85 : 1);
   const made = !block && R() < pm * (foul ? .45 : 1), swish = made && f.e != null && f.e <= bkWindow(S.p, p) * BK_WIN.perfect;
   p.act = 'shoot'; p.actT = .35;
   L.shot = { i: h, side: p.side, pts, made, block, foul, swish, alley: !!f.alley, hand: f.e != null, by: d ? S.d : -1, dist: Math.round(S.dist * 10) / 10, rim: S.rim, dunk: S.dunk && !block, p: Math.round(S.p * 100) / 100, con: Math.round(S.con * 100) / 100, ast: L.last && L.last.i !== h && L.t - L.last.t < 3.5 && L.pl[L.last.i].side === p.side ? L.last.i : -1 };
@@ -282,7 +283,7 @@ function bkRebound() {
   const B = L.ball, c = [];
   for (const p of L.pl) {
     const d = hyp(p.x - B.tx, p.y - B.ty); if (d > 2.2 || p.stun > 0) continue;
-    c.push([p, (2.2 - d) ** 2 * (1 + p.r.siz * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) * bkFx('dreb') : bkFx('reb')) * bkBoxOut(p)]);
+    c.push([p, (2.2 - d) ** 2 * (1 + (p.r.siz + (bkGxOf(p).reb || 0)) * .1 + p.r.hop * .07) * (p.side !== G.poss ? 1.7 * (bkDefNow().reb || 1) * bkFx('dreb') : bkFx('reb')) * bkBoxOut(p)]);
   }
   if (!c.length) { B.st = 'free'; return; }
   let s = c.reduce((a, [, w]) => a + w, 0) * R(), win = c[0][0];
