@@ -1,5 +1,7 @@
 # The Realm's court scope: ./build.sh src/realm/manifest.txt takes this through `scope wBK ...`.
 # The engine's parts first (they don't touch the page), then its page in the Realm: a canvas in #v-court.
-# (Superstars on the court, with their figures, come in phase 8.)
+# Then the superstars (phase 8): their ratings and powers, and their figures (the file every engine's scope loads).
 include src/bk/manifest.txt
+src/realm/court/c0-stars.js
+src/realm/stars/s1-figures.js
 src/realm/court/c1-page.js

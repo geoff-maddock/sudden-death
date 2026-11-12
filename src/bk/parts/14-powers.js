@@ -23,7 +23,7 @@
    - On the floor every power is one set of effects (BK_FX0), merged at the start of each possession into G.cur.fx (from
      both sides' casts and the zones): multipliers multiply, the rest add. bkFx(k) reads it.
    G.cur.cast: [{ side, ri, id, n, ult?, sit? }, ...] what was cast on this possession, for the line and the panel.
-   Superstar kinds have no court powers yet (phase 8 gives them theirs). */
+   The superstars' ratings and powers are added after these parts load (src/realm/court/c0-stars.js). */
 const BK_MANA = { start: 2, max: 6, scored: .5, brk: 1 };
 const BK_POW_STA = { min: 20, base: 10, per: 5, ult: 25 };
 const BK_SPIRIT = { max: 100, ult: 60, keep: 25, dunk: 12, three: 8, block: 10, steal: 5, run: 2, runAt: 5, roar: 12 };

@@ -177,8 +177,8 @@ async def main():
         check(q['q'] and q['q']['def'] and f"{q['q']['def']['ri']}:{q['q']['def']['id']}" == q['want'], 'picking a power in the block queues it for that end', q)
         await pg.screenshot(path='/tmp/realm-court-powers.png', full_page=True)
         await pg.evaluate("showPage('help')")
-        hp = await pg.evaluate("(() => { const h = document.getElementById('wCourtPowHow'); return { rows: h ? h.querySelectorAll('tr').length : 0, words: !!h && /spirit/.test(h.textContent) && /Clutch/.test(h.textContent) && /Auto powers/.test(h.textContent), help: !!document.getElementById('wHelpCourtPow') }; })()")
-        check(hp['rows'] == 19 and hp['words'] and hp['help'], 'How to play: powers, spirit and the ultimate, situation powers, and every kind\'s in a table', hp)
+        hp = await pg.evaluate("(() => { const h = document.getElementById('wCourtPowHow'); return { rows: h ? h.querySelectorAll('tr').length : 0, want: wBK.kinds.length + 1, words: !!h && /spirit/.test(h.textContent) && /Clutch/.test(h.textContent) && /Auto powers/.test(h.textContent), help: !!document.getElementById('wHelpCourtPow') }; })()")
+        check(hp['rows'] == hp['want'] and hp['words'] and hp['help'], 'How to play: powers, spirit and the ultimate, situation powers, and every kind\'s in a table', hp)
 
         check(not errs, 'no page errors', errs)
         await br.close()

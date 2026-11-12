@@ -338,7 +338,7 @@ function bkPickRes() {
   const BD = bi >= 0 ? L.pl[bi] : null;
   L.pick = null;
   const k = bkFx('fade') ? 'fade' : bkFx('wall') ? 'wall' : !BD ? 'over' : bkDefNow().allSwitch ? 'switch' : wpick({ switch: 1.1, over: .8 + (D.r.def + D.r.spd - 12) * .08, trap: .55 });
-  if (k === 'switch') { D.mark = P.big; BD.mark = P.h; GD.msg = `Pick and roll: they switch, and ${BD.n} the ${BD.kind} has ${H.n} now.`; }
+  if (k === 'switch') { D.mark = P.big; BD.mark = P.h; GD.msg = `Pick and roll: they switch, and ${BD.n} the ${bkKindN(BD.kind)} has ${H.n} now.`; }
   else if (k === 'fade') { GD.msg = `Pick and roll: ${D.n} fades through the screen like smoke.`; }
   else if (k === 'wall') { D.stun = 1.3; GD.msg = `Pick and roll: ${D.n} can't get over the screen, and ${H.n} is free.`; }
   else if (k === 'over') { D.stun = .6; GD.msg = `Pick and roll: ${D.n} goes over the screen, and ${H.n} has a step.`; }

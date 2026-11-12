@@ -15,8 +15,9 @@ return {
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { q: G.q, name: bkPeriodName(G.q), text: bkClockText(), shot: Math.ceil(G.shot) } : null,
   pause: on => { BKP.paused = !!on; }, get paused() { return BKP.paused; },
   set onOver(f) { BK_HOOK.onOver = f; }, get onOver() { return BK_HOOK.onOver; }, set onPhase(f) { BK_HOOK.onPhase = f; }, get onPhase() { return BK_HOOK.onPhase; },
-  // the ratings, the spots and the clubs, for the page and How to play
-  rate: kind => bkRate(kind), fit: (r, pos) => bkFit(Object.assign(bkRate('goblin'), r), pos), kinds: Object.keys(BK_KIND), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),
+  // the ratings, the spots and the clubs, for the page and How to play (kinds: every kind with ratings, the superstars
+  // among them; figs: every kind the court can draw as itself)
+  rate: kind => bkRate(kind), fit: (r, pos) => bkFit(Object.assign(bkRate('goblin'), r), pos), kinds: Object.keys(BK_KIND), figs: Object.keys(KIND).filter(k => HEAD[k]), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),
   ftChance: r => bkFtChance({ r: Object.assign(bkRate('goblin'), r) }),
   // by hand (phase 2): who plays it ('watch' or 'play'), your keys (input: { steer, shoot, pass, box, act }; returns
   // what happened), whether you have the ball, the player you play, the release meter ({ t, T, now (0 to late), w, ft }),

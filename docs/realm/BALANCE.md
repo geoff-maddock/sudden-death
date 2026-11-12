@@ -617,6 +617,29 @@ Phoenix 7, 8, 9, 6, 8; Kraken 9, 7, 5, 7, 10; Behemoth 10, 8, 4, 9, 8; Djinn 9, 
 football and 3–6 in baseball.
 
 
+### Basketball (issue #77, phase 8)
+
+`python3 test/realm_stars_lab.py 1000 '' bk`: four of your own and one more player as your five (the coach picks the
+spots), level 3, Simulate against a tier 2 club coached by a Knight. Court ratings are spd, siz, hop, tch, hnd, def
+(league kinds total 26 to 41).
+
+| Superstar | First try (400) | Shipped (1,000) | Shipped ratings |
+|---|---|---|---|
+| Control | 36.0% | 36.6% | |
+| Phoenix | 50.2% | 42.0% | 9, 4, 9, 8, 7, 5 |
+| Kraken | 42.5% | 45.6% | 5, 10, 5, 7, 7, 10 |
+| Behemoth | 36.5% | 40.5% | 5, 10, 6, 5, 3, 10 |
+| Djinn | 41.0% | 44.6% | 9, 5, 7, 8, 10, 6 |
+| Hydra | 39.2% | 41.7% | 7, 8, 6, 6, 6, 9 |
+| Frost Wyrm | 45.8% | 42.8% | 7, 8, 7, 7, 6, 7 |
+
+One player in five adds 4 to 9 points, as in football. The first Phoenix (9, 5, 9, 9, 7, 5) added 14 and was cut
+back; the first Behemoth (3, 10, 4, 4, 3, 10) added nothing, since slow feet cost more on a full court than size
+gives, so it got a little speed and hops. The Djinn is worth its points only at the point: with a handle of 9 it lost
+the spot to a goblin in a fixed five and added nothing (53% against a league mean of 54%), and with 10 it takes the
+ball (66%). Run to run the control moved between 33.6% and 37.1%, so a difference under about 4 points is noise.
+The full court balance (tiers, level gaps, skills, sets) is phase 10.
+
 ## Adventure rewards (issue #47, phase 5)
 
 The three adventures' kept rewards are handed over again at the start of every later journey, so a profile that has

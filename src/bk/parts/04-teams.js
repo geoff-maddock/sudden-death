@@ -18,6 +18,8 @@ const BK_KIND = {
   lich: [4, 6, 4, 9, 5, 5], zombie: [3, 7, 4, 3, 3, 6], gorgon: [6, 6, 5, 7, 6, 7], spider: [7, 6, 6, 5, 7, 9],
   skeleton: [6, 5, 5, 8, 5, 4], witch: [6, 4, 5, 8, 6, 4],
 };
+// a kind as a line names it (a kind whose id isn't its name sets it here: the superstars, c0-stars.js)
+const BK_KIND_N = {}, bkKindN = k => BK_KIND_N[k] || k;
 function bkRate(kind) { const k = BK_KIND[kind] || BK_KIND.goblin; return Object.fromEntries(BK_STATS.map((s, i) => [s, k[i]])); }
 // the two clubs a game uses when the Realm doesn't send its own: about even under the CPU
 const BK_CLUBS = {
