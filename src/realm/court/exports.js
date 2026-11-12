@@ -69,5 +69,7 @@ return {
   sub: (side, out, inn) => G && G.on ? bkSub(side, out, inn) : 'No game on.', tired: i => L ? bkTired(L.pl[i]) : 0, stamRules: Object.assign({}, BK_STAM),
   // the test's handle on the court: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
   step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) bkTick(BK_DT); return GD ? GD.ph : null; },
+  // the camera (drawing only): how far it has pushed in (u, 0 to 1), on which half (end), and where a court point is drawn
+  cam: () => ({ u: BKT.cam.u, end: BKT.cam.end, sx: BKC.sx, sy: BKC.sy }), scr: (x, y, z) => bkScr(x, y, z || 0),
   get play() { return L; }, get ev() { return L ? L.ev : []; }, shotP: (i, x, y) => L ? bkShotP(L.pl[i], x == null ? L.pl[i].x : x, y == null ? L.pl[i].y : y) : null,
 };

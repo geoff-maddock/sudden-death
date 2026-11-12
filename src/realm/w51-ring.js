@@ -45,7 +45,7 @@ $('wRingBar').addEventListener('click', e => {
   else if (b.id === 'wRingBack') wLeaveRing();
 });
 // under the ring: the pad (You box), and How boxing works
-$('v-ring').insertAdjacentHTML('beforeend', `<div id="wRingPad" class="wrpad" hidden role="group" aria-label="Box">${W_RING_PAD.map(([k, n, key]) => `<button class="ghost" data-rpad="${k}" title="${esc(key)}">${esc(n)}</button>`).join('')}</div>
+$('v-ring').insertAdjacentHTML('beforeend', `<div id="wRingPad" class="wrpad" hidden role="group" aria-label="Box">${W_RING_PAD.map(([k, n, key]) => `<button class="ghost" data-rpad="${k}" data-key="${esc(key.split(/[,:]/)[0])}" title="${esc(key)}">${esc(n)}</button>`).join('')}</div>
   <p class="hint wghowlink">How boxing works: the punches, defending, the plans and the judges. <button class="ghost" id="wRingHowBtn">How to play boxing</button> <small>The bout waits while you read.</small></p>`);
 $('wRingHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wRingHow'); if (h) h.scrollIntoView({ block: 'start' }); });
 // a punch on the press, the guard while it's held down

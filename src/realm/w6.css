@@ -321,6 +321,9 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 #wRingCall button.on{border-color:var(--torch);box-shadow:0 0 0 1px var(--torch) inset}
 .wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
 .wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
+/* each pad button's key, under its name (keyboards only: a phone has no keys to show) */
+.wrpad button[data-key]::after{content:attr(data-key);display:block;margin-top:1px;font:600 11px/1.1 var(--body,"Alegreya Sans",sans-serif);letter-spacing:.3px;color:var(--dim);opacity:.85}
+@media (hover:none){.wrpad button[data-key]::after{display:none}}
 .wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
 /* (.wrsp2: the second specials' table, w75) */
 .wrpow,.wrsp2{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td,.wrsp2 th,.wrsp2 td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
@@ -396,3 +399,49 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wccpow{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
 /* basketball potions (w82) */
 .wcckit{border-top:1px solid var(--seam);padding-top:6px}.wcpot{display:inline-flex;gap:4px;align-items:center;margin-right:8px}
+/* the phone scoreboard over football, boxing and basketball (w86-sportbar.js): real text where the canvas's own bar is too small to read */
+.wsb{display:none}
+@media (max-width:640px){
+  .wsb:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;margin:6px 0;padding:8px 10px;background:#0d0907;border:1px solid var(--seam);border-radius:8px}
+  .wsbside{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:center;border-left:4px solid var(--c);padding-left:8px;min-width:0}
+  .wsbside b{font-size:14px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wsbside strong{font-family:var(--hud);font-weight:400;font-size:30px;line-height:1;color:#f3ead6;border-bottom:3px solid transparent}
+  .wsbside.has strong{color:#ffd08a;border-bottom-color:var(--c)}
+  .wsbside:last-child{border-left:0;border-right:4px solid var(--c);padding:0 8px 0 0;grid-template-columns:auto minmax(0,1fr);text-align:right}
+  .wsbside:last-child strong{order:-1}
+  .wsbside small{grid-column:1/-1;font-size:11px;line-height:1;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .wsbside .wsbbar{grid-column:1/-1}
+  .wsbbar{display:block;height:7px;background:#2a1d17;border-radius:3px;overflow:hidden}
+  .wsbbar>i{display:block;height:100%}
+  .wsbside:last-child .wsbbar>i{margin-left:auto}
+  .wsbmid{text-align:center;display:grid;gap:2px}
+  .wsbmid b{font-size:14px;white-space:nowrap}
+  .wsbmid small{font-size:13px;color:var(--torch);white-space:nowrap}
+  /* football's powers: the chips wrap across the page under Mana, not down a narrow column beside it */
+  .wgpows{flex-wrap:wrap}
+  .wgpows #wGridPowList{flex-basis:100%;order:3}
+  /* the box score tables scroll inside their own box rather than widening the page */
+  .wcbox{overflow-x:auto}
+  .wcboxt{min-width:400px}
+}
+/* the same page around football and basketball (w87-sportpage.js) */
+.wdbar .wsnote{flex:1 1 100%;order:9;margin:0;max-width:none;border-left:3px solid var(--torch);padding:2px 0 2px 10px;line-height:1.35}
+.wscoach{max-width:none;margin:10px 0;padding:10px 12px;border:1px solid var(--seam);border-radius:8px}
+#v-court .wccalls{padding:10px 12px;border:1px solid var(--seam);border-radius:8px}
+.wccrow .wccl{flex:none;width:84px;font-family:var(--hud);font-weight:400;color:var(--dim)}
+.wccrow>.wgpows{flex:1 1 0;min-width:0;flex-wrap:wrap}
+.wccrow>.wgpows #wGridPowList{flex-basis:100%;order:3}
+.wccrow #wGridCalls,.wccrow #wGridDefs{display:flex;flex-wrap:wrap;gap:6px}
+.wccrow #wGridCalls[hidden],.wccrow #wGridDefs[hidden]{display:none}
+.wscoach .wgstance b{display:none}
+.wscoach .wgtip{margin-left:90px;min-height:0}
+.wscoach .wgbench{margin:0;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
+.wscoach .wgbench .wgpots{margin:0}.wscoach .wgbench .wgpots>b{display:none}
+.wscoach .wgbench>p{margin:0 0 0 90px}
+.wgsub{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--seam);border-radius:6px;font-size:15px}
+.wgsub small{color:var(--dim)}.wgsub b{font-family:var(--hud);font-weight:400}.wgsub b.wgbad,.wgbench p.wgbad{color:#e8a08f}
+.wgp{grid-template-columns:minmax(0,1fr)}
+#wGridLineup{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 24px;align-items:start}
+.wsh{max-width:960px;margin:14px auto 6px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wslog{max-width:960px;margin:0 auto 10px;max-height:260px}
+@media (max-width:760px){#wGridLineup{grid-template-columns:minmax(0,1fr)}.wscoach .wgtip,.wscoach .wgbench>p{margin-left:0}.wccrow .wccl{width:100%}}
