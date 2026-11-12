@@ -617,6 +617,125 @@ Phoenix 7, 8, 9, 6, 8; Kraken 9, 7, 5, 7, 10; Behemoth 10, 8, 4, 9, 8; Djinn 9, 
 football and 3–6 in baseball.
 
 
+### Basketball (issue #77, phase 8)
+
+`python3 test/realm_stars_lab.py 1000 '' bk`: four of your own and one more player as your five (the coach picks the
+spots), level 3, Simulate against a tier 2 club coached by a Knight. Court ratings are spd, siz, hop, tch, hnd, def
+(league kinds total 26 to 41).
+
+| Superstar | First try (400) | Shipped (1,000) | Shipped ratings |
+|---|---|---|---|
+| Control | 36.0% | 36.6% | |
+| Phoenix | 50.2% | 42.0% | 9, 4, 9, 8, 7, 5 |
+| Kraken | 42.5% | 45.6% | 5, 10, 5, 7, 7, 10 |
+| Behemoth | 36.5% | 40.5% | 5, 10, 6, 5, 3, 10 |
+| Djinn | 41.0% | 44.6% | 9, 5, 7, 8, 10, 6 |
+| Hydra | 39.2% | 41.7% | 7, 8, 6, 6, 6, 9 |
+| Frost Wyrm | 45.8% | 42.8% | 7, 8, 7, 7, 6, 7 |
+
+One player in five adds 4 to 9 points, as in football. The first Phoenix (9, 5, 9, 9, 7, 5) added 14 and was cut
+back; the first Behemoth (3, 10, 4, 4, 3, 10) added nothing, since slow feet cost more on a full court than size
+gives, so it got a little speed and hops. The Djinn is worth its points only at the point: with a handle of 9 it lost
+the spot to a goblin in a fixed five and added nothing (53% against a league mean of 54%), and with 10 it takes the
+ball (66%). Run to run the control moved between 33.6% and 37.1%, so a difference under about 4 points is noise.
+After phase 10's retune (the tier bonus and the stances, below) the same lab reads: control 33.5%, Phoenix 40.7%,
+Kraken 37.4%, Behemoth 37.2%, Djinn 40.2%, Hydra 40.6%, Frost Wyrm 38.8%: 4 to 7 points each, the Kraken's and the
+Behemoth's 4 at the edge of the noise.
+
+## Basketball at the Charter Court (issue #77, phase 10)
+
+`python3 test/realm_court_lab.py N`: every game is the court engine played to a final, headless, as Simulate plays it
+(five minutes, the Charter Court's ways on). A fresh journey with seven players at level 3 (a five and a bench of two,
+as theirs), your coach a Knight, theirs at the tier's skill. A cell of 200 games is good to about 3.5 points either
+way, one of 600 to about 2; the same cell moved by up to 5 points between runs, so differences under about 5 are
+noise. About 14 ms a game; 5% go to overtime.
+
+**Tiers, as the world sets them** (500 games each): a tier is their level (yours plus the tier, less one), extra
+rating points on each of their five (`W_BKG.oppBonus`), and their coach.
+
+| Bonus by tier | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| 0, 1, 3 (as built) | 59.6% | 45.0% | 32.0% |
+| 0, 1, 2 | 65.0% | 43.8% | 36.4% |
+| **0, 2, 5 (shipped)** | 56.6% | 44.0% | 26.0% |
+
+Tier 3 was a little kind as built; shipped, the three sit by boxing's (51/42/28%, measured the same way). Tier 1 has
+no bonus in any row, so its 57 to 65% is the run-to-run noise. Tier 2 reads the same at a bonus of 1 or 2.
+At an even level instead (600 each, the first way this was measured, and not a game the world offers past tier 1):
+0, 1, 3 gave 58.2/48.5/39.2%, and 0, 2, 5 gave 57.8/47.3/33.0%. A level counts for little, so the two ways agree.
+
+**Level gap** (200 games each, tiers mixed, before the tier 2 change): their level a point below yours 51.5%, even
+48.0%, +1 38.0%, +2 34.5%, +3 36.0%. A level is one rating point a player, so a gap counts for less than a tier does.
+
+**Their coach** (even level, tier 2 ratings, 200 each): Squire 60.5%, Knight 43.5%, Archmage 42.5% (an earlier 150
+read 58.7/54.0/49.3). A Squire is clearly easier; Knight and Archmage are within the noise of each other.
+
+**Powers** (even level, both Knights, 800 each): on 49.5%, off 47.4%, at the same scores (28.8–28.7 and 28.7–29.0).
+Powers add colour and don't tilt a game between sides that both have them.
+
+**Your call, fixed all game** (even level, both Knights, theirs picked by their coach; 200 each, the rest Motion, Man
+and Balanced). With your coach calling it you won 43.5% in this run, and 45 to 54% in others.
+
+| Offense set | Win | Points | Turnovers |
+|---|---|---|---|
+| Pick and roll | 43.0% | 24.9–26.3 | 2.9 |
+| Post up | 20.0% | 22.0–29.6 | 6.9 |
+| Motion | 41.5% | 25.3–26.6 | 3.0 |
+| Isolation | 27.0% | 23.5–28.4 | 3.2 |
+| Spread for three | 34.5% | 24.3–26.8 | 2.9 |
+| Feed the hot hand | 42.0% | 24.1–25.9 | 3.5 |
+
+| Defense | Win | Points |
+|---|---|---|
+| Man | 41.5% | 25.3–26.6 |
+| Zone | 36.5% | 25.8–28.2 |
+| Press | 51.0% | 25.8–25.8 |
+| Switch everything | 42.5% | 25.3–26.9 |
+| Pack the paint | 37.0% | 24.7–27.4 |
+
+No set called every time beats your coach mixing them (43.5% in the same run), and three do clearly worse, which is the
+scout doing its job (the issue's fifth decision); Pick and roll, Motion and Feed the hot hand lose nothing by it here.
+**Post up is the weak one**: it loses the ball nearly seven times a game, twice any other set, with a random
+five that may have no real big; it is left as it is for now and is the first thing to look at next. Isolation is also
+poor with no star to give it to. The Press did best of the defenses in both runs (48.0% and 51.0%).
+
+**Pace and Pressure** (your stance fixed all game, 600 to 800 each):
+
+| | As built (600) | Shipped (800) |
+|---|---|---|
+| Push | 35.8% | 38.2% |
+| Balanced | 39.3% | 42.0% |
+| Grind | 49.2% | 45.1% |
+| Gamble | 46.0% | 43.6% |
+| Balanced | 39.3% | 42.0% |
+| Sit back | 34.8% | 40.2% |
+
+As built, Grind and Gamble were simply better (10 and 7 points over Balanced) and Push and Sit back simply worse.
+Shipped: Push `shootAt` −.14 → −.04 and `risk` 1.25 → 1.06; Grind `look` .025 → .012; Gamble `foul` 1.6 → 1.8 (4.3
+fouls a game against 2.5); Sit back `steal` .6 → .8, `block` .85 → .9, `con` .82 → .95, `foul` .55 → .45. Pressure is
+now a matter of taste (within 3.4 points). Pace still leans to Grind by 7 points over Push; Push is for when you're
+behind and need possessions, which a fixed stance can't show. A middle try made Gamble worst (38.3% at `foul` 2).
+
+**The Charter Net** (300 cups, Simulate every round): quarter-final won 56.3%, semi-final 45.6%, final 16.9%;
+champion 4.3% (the Cinder Cup 3.3%, the Anvil Belt 3.3%). The final is the hardest game there is: tier 3, against a
+side that has won twice. No game of yours went to the rebounds. A cup is worth about
+139 XP and costs 15 gold on average, fee and prize included.
+
+**Gear and potions** (even level, 200 each, before the tier 2 change; your bench gives your potions as a Knight would):
+
+| tier | plain | their bag only | both bags | both bags, you in gear |
+|---|---|---|---|---|
+| 1 | 63.5% | 54.0% (0–0.9) | 53.5% (1.2–0.9) | 67.5% (1.0–0.9) |
+| 2 | 52.0% | 55.5% (0–0.2) | 54.5% (1.2–0.2) | 52.5% (1.0–0.1) |
+| 3 | 31.5% | 34.5% (0–2.0) | 29.5% (1.0–1.9) | 31.0% (0.9–1.7) |
+
+No column moves the same way at all three tiers, so nothing here is a measured effect: tier 1 swings by 14 points
+between columns that differ only by gear (53.5% and 67.5%) while tiers 2 and 3 don't move, which says these cells are
+noisier than the 3.5 points their size suggests. A bench gives about one potion a game and each touches one player or
+one stoppage, and one piece of gear a player is worth a point or two a game at most (phase 7). As in football, a bag and a kit are a
+small edge and never turn a tier. Bot numbers are relative: a player who shoots the release meter well, and mixes
+calls, will do better than the Knight stand-in.
+
 ## Adventure rewards (issue #47, phase 5)
 
 The three adventures' kept rewards are handed over again at the start of every later journey, so a profile that has

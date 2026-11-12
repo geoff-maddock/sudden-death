@@ -380,3 +380,19 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wstmeet>img,.wstmeet>.wstsil{flex:none;width:112px;height:112px;border-radius:8px}
 .wstbuy{gap:8px;flex-wrap:wrap}
 @media (max-width:520px){.wstmeet{flex-direction:column}}
+/* the court's box score (w77) */
+.wcbox{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:960px;margin:8px auto}
+.wcbox caption{text-align:left;font-weight:700;padding:2px 6px}
+.wcboxt td small{opacity:.7}
+@media (max-width:760px){.wcbox{grid-template-columns:1fr}}
+/* the court's calls panel (w79) */
+.wccalls{max-width:960px;margin:8px auto;display:flex;flex-direction:column;gap:6px}
+.wccrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.wccrow .wccl{min-width:80px;font-weight:700}
+.wccrow button.on{background:var(--gold,#ffb02e);color:#17100e}
+.wcedge td,.wcedge th{text-align:center}.wcedge td:first-child{text-align:left}
+/* powers on the court (w81) */
+.wcpow{font-size:.88em}.wcpow td{min-width:110px}
+.wccpow{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
+/* basketball potions (w82) */
+.wcckit{border-top:1px solid var(--seam);padding-top:6px}.wcpot{display:inline-flex;gap:4px;align-items:center;margin-right:8px}

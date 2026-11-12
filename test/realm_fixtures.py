@@ -78,9 +78,10 @@ async def main():
         # ---------- your fixture ----------
         await pg.evaluate("(() => { const K = ['troll', 'harpy', 'golem', 'wraith', 'spider']; let i = 0; while (wRoster().length < 7 && i < 10) wRecruit({ kind: K[i++ % K.length], lvl: 3 }, 'tavern'); })()")
         await pg.evaluate(CLOSE_ALL)
-        # (a card match: a fixture drawn at the Ash Bowl is a football game, in test/realm_gridiron_cup.py, and one at the
-        # Anvil Ring a boxing card, in test/realm_ring_cup.py; each has its own engine and its own card)
-        OWN = "['g_bowl', 'g_ring']"
+        # (a card match: a fixture drawn at the Ash Bowl is a football game, in test/realm_gridiron_cup.py, one at the
+        # Anvil Ring a boxing card, in test/realm_ring_cup.py, and one at the Charter Court a basketball game, in
+        # test/realm_court_cup.py; each has its own engine and its own card)
+        OWN = "['g_bowl', 'g_ring', 'g_court']"
         mine = await pg.evaluate(f"""(() => {{ const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me'), own = {OWN};
           if (own.includes(f.g)) f.g = W_GRDS.find(g => !own.includes(g.id) && g.sport !== 'baseball').id; return wMyFixture(); }})()""")
         other = await pg.evaluate(f"W_GRDS.find(g => g.id !== '{mine['g']}' && !{OWN}.includes(g.id) && g.sport !== 'baseball').id")

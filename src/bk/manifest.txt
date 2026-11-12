@@ -1,0 +1,17 @@
+# The Charter Court, the basketball engine (issue #77). Its parts, in load order. The Realm takes them inside a scope
+# (src/realm/court/manifest.txt, through `scope wBK ...`), so none of their names reach the page.
+src/bk/parts/01-util.js
+src/bk/parts/02-rules.js
+src/bk/parts/03-figures.js
+src/bk/parts/04-teams.js
+src/bk/parts/05-live.js
+src/bk/parts/06-cpu.js
+src/bk/parts/07-game.js
+src/bk/parts/08-draw.js
+src/bk/parts/09-hands.js
+src/bk/parts/10-bench.js
+src/bk/parts/11-calls.js
+src/bk/parts/12-save.js
+src/bk/parts/13-court.js
+src/bk/parts/14-powers.js
+src/bk/parts/15-kit.js
