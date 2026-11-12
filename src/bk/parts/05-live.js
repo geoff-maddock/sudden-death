@@ -30,7 +30,7 @@ function bkAt(side, u, v) { const d = bkDir(side); return [d > 0 ? BK_RULES.len 
 // how far a court point is from the baseline side attacks (more is further up the floor)
 const bkU = (side, x) => bkDir(side) > 0 ? BK_RULES.len - x : x;
 const bkRimDist = (side, x, y) => hyp(x - bkHoopX(side), y);
-function bkEv(k, s, o) { const e = { k, s: s || '', o: o || '', t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (G.tally && k in G.tally) G.tally[k]++; if (L.ev.length > 60) L.ev.shift(); bkSayEv(e); }
+function bkEv(k, s, o) { const e = { k, s: s || '', o: o || '', t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (G.tally && k in G.tally) G.tally[k]++; if (L.ev.length > 60) L.ev.shift(); bkSayEv(e); if (BK_HOOK.onEv) try { BK_HOOK.onEv(e); } catch (er) { console.error(er); } }
 
 // the play at the start: both fives at the spots they line up on (plain data); ball to pl index h
 function bkNewPlay() {

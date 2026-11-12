@@ -28,8 +28,10 @@
 
 const W_BKG = {
   minOwn: 3, xp: 12, gold: 15, fans: 3, lossShare: .25, tieShare: .5, benchShare: .5, mvpXp: 5,
-  // extra rating points for each of their five, by tier, spread over the six (6 is +1 to every one); measured in phase 10
-  oppBonus: { 1: 0, 2: 1, 3: 3 },
+  // extra rating points for each of their five, by tier, spread over the six (6 is +1 to every one); measured with
+  // test/realm_court_lab.py (docs/realm/BALANCE.md): as the world sets the tiers (their level yours plus the tier less
+  // one) you win about 57%, 44% and 26%
+  oppBonus: { 1: 0, 2: 2, 3: 5 },
   minutes: 90, keep: 10, saveMs: 12000, bench: 2,
 };
 const W_BKG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };

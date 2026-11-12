@@ -15,6 +15,8 @@ return {
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { q: G.q, name: bkPeriodName(G.q), text: bkClockText(), shot: Math.ceil(G.shot) } : null,
   pause: on => { BKP.paused = !!on; }, get paused() { return BKP.paused; },
   set onOver(f) { BK_HOOK.onOver = f; }, get onOver() { return BK_HOOK.onOver; }, set onPhase(f) { BK_HOOK.onPhase = f; }, get onPhase() { return BK_HOOK.onPhase; },
+  // each event of the play as it happens ({ k, s, o, t }: a shot, a basket, a miss, a block, a steal, a power...), for the page's sounds
+  set onEv(f) { BK_HOOK.onEv = f; }, get onEv() { return BK_HOOK.onEv; },
   // the ratings, the spots and the clubs, for the page and How to play (kinds: every kind with ratings, the superstars
   // among them; figs: every kind the court can draw as itself)
   rate: kind => bkRate(kind), fit: (r, pos) => bkFit(Object.assign(bkRate('goblin'), r), pos), kinds: Object.keys(BK_KIND), figs: Object.keys(KIND).filter(k => HEAD[k]), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),

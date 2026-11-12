@@ -44,12 +44,12 @@ const BK_EDGE = {
   'spread/man': [-1, 'Man stays home on the shooters.'], 'spread/zone': [1, 'The zone is soft at the arc.'], 'spread/press': [-1, 'The press runs the shooters off the line.'], 'spread/pack': [1, 'Packing the paint leaves the shooters open.'],
 };
 const bkEdge = (o, d) => BK_EDGE[o + '/' + d] || [0, ''];
-const BK_PACES = { push: { n: 'Push', desc: 'Quick shots and more fast breaks, but more turnovers, and it tires your five.', think: .7, shootAt: -.14, behind: 3, risk: 1.25, tire: 1.15 },
+const BK_PACES = { push: { n: 'Push', desc: 'Quick shots and more fast breaks, but more turnovers, and it tires your five.', think: .7, shootAt: -.04, behind: 3, risk: 1.06, tire: 1.15 },
   bal: { n: 'Balanced', desc: 'The usual.', think: 1, shootAt: 0, behind: 2, risk: 1, tire: 1 },
-  grind: { n: 'Grind', desc: 'Work the clock: fewer but better shots, and less tiring.', think: 1.25, shootAt: .14, behind: 1, risk: .9, tire: .9, look: .025, hold: 1.7 } };
-const BK_PRESSES = { gamble: { n: 'Gamble', desc: 'More steals and blocks, and more fouls.', steal: 1.45, block: 1.3, foul: 1.6, con: 1 },
+  grind: { n: 'Grind', desc: 'Work the clock: fewer but better shots, and less tiring.', think: 1.25, shootAt: .14, behind: 1, risk: .9, tire: .9, look: .012, hold: 1.7 } };
+const BK_PRESSES = { gamble: { n: 'Gamble', desc: 'More steals and blocks, and more fouls.', steal: 1.45, block: 1.3, foul: 1.8, con: 1 },
   bal: { n: 'Balanced', desc: 'The usual.', steal: 1, block: 1, foul: 1, con: 1 },
-  sit: { n: 'Sit back', desc: 'Fewer fouls, but more open shots.', steal: .6, block: .85, foul: .55, con: .82 } };
+  sit: { n: 'Sit back', desc: 'Fewer fouls, but more open shots.', steal: .8, block: .9, foul: .45, con: .95 } };
 const BK_TO = { n: 3, ot: 1, secs: 5, sta: 6 };
 const BK_SKILL = ['Squire', 'Knight', 'Archmage'];
 const BK_SET_IDS = Object.keys(BK_SETS), BK_DEF_IDS = Object.keys(BK_DEFS);

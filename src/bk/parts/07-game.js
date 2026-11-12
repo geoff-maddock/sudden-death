@@ -19,7 +19,7 @@
    GD is the game on show (not saved). The headless game (bkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const BK_PACE = { intro: 1.4, dead: .9, walk: .9, walkSecs: 3, ft: 1.05, break: 2.2, half: 3.4 };
-const BK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
+const BK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 let GD = null;
 
 function bkStart(opts) {
@@ -294,7 +294,7 @@ function bkBox() {
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function bkSimGame(opts) {
   const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: bkRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
-  BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = null;
+  BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = BK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     bkStart(Object.assign({}, opts, { mode: 'watch' }));

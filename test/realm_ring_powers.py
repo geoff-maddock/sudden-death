@@ -210,7 +210,7 @@ async def main():
         check(yc >= 1, 'in You corner your fighter casts powers by themselves', yc)
         await pg.evaluate("wBX.pause(false)")
         await pg.evaluate("showPage('help')")
-        hp = await pg.evaluate("({ rows: document.querySelectorAll('.wrpow tr').length, text: (document.getElementById('wRingHow') || {}).textContent || '' })")
+        hp = await pg.evaluate("({ rows: document.querySelectorAll('#wRingHow .wrpow tr').length, text: (document.getElementById('wRingHow') || {}).textContent || '' })")
         check(hp['rows'] == 19 + STARS and 'once a round' in hp['text'] and 'Q your special' in hp['text'] and 'Petrify' in hp['text'] and 'Long Arms' in hp['text'] and 'Nature' in hp['text'], 'How to play explains powers and each kind\'s nature, with every kind\'s', hp['rows'])
         await pg.evaluate("showPage('play')")
 

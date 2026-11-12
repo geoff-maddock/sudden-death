@@ -28087,7 +28087,7 @@ function bkAt(side, u, v) { const d = bkDir(side); return [d > 0 ? BK_RULES.len 
 // how far a court point is from the baseline side attacks (more is further up the floor)
 const bkU = (side, x) => bkDir(side) > 0 ? BK_RULES.len - x : x;
 const bkRimDist = (side, x, y) => hyp(x - bkHoopX(side), y);
-function bkEv(k, s, o) { const e = { k, s: s || '', o: o || '', t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (G.tally && k in G.tally) G.tally[k]++; if (L.ev.length > 60) L.ev.shift(); bkSayEv(e); }
+function bkEv(k, s, o) { const e = { k, s: s || '', o: o || '', t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (G.tally && k in G.tally) G.tally[k]++; if (L.ev.length > 60) L.ev.shift(); bkSayEv(e); if (BK_HOOK.onEv) try { BK_HOOK.onEv(e); } catch (er) { console.error(er); } }
 
 // the play at the start: both fives at the spots they line up on (plain data); ball to pl index h
 function bkNewPlay() {
@@ -28543,7 +28543,7 @@ function bkThink(h) {
    GD is the game on show (not saved). The headless game (bkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const BK_PACE = { intro: 1.4, dead: .9, walk: .9, walkSecs: 3, ft: 1.05, break: 2.2, half: 3.4 };
-const BK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
+const BK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 let GD = null;
 
 function bkStart(opts) {
@@ -28818,7 +28818,7 @@ function bkBox() {
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function bkSimGame(opts) {
   const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: bkRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
-  BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = null;
+  BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = BK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     bkStart(Object.assign({}, opts, { mode: 'watch' }));
@@ -29356,12 +29356,12 @@ const BK_EDGE = {
   'spread/man': [-1, 'Man stays home on the shooters.'], 'spread/zone': [1, 'The zone is soft at the arc.'], 'spread/press': [-1, 'The press runs the shooters off the line.'], 'spread/pack': [1, 'Packing the paint leaves the shooters open.'],
 };
 const bkEdge = (o, d) => BK_EDGE[o + '/' + d] || [0, ''];
-const BK_PACES = { push: { n: 'Push', desc: 'Quick shots and more fast breaks, but more turnovers, and it tires your five.', think: .7, shootAt: -.14, behind: 3, risk: 1.25, tire: 1.15 },
+const BK_PACES = { push: { n: 'Push', desc: 'Quick shots and more fast breaks, but more turnovers, and it tires your five.', think: .7, shootAt: -.04, behind: 3, risk: 1.06, tire: 1.15 },
   bal: { n: 'Balanced', desc: 'The usual.', think: 1, shootAt: 0, behind: 2, risk: 1, tire: 1 },
-  grind: { n: 'Grind', desc: 'Work the clock: fewer but better shots, and less tiring.', think: 1.25, shootAt: .14, behind: 1, risk: .9, tire: .9, look: .025, hold: 1.7 } };
-const BK_PRESSES = { gamble: { n: 'Gamble', desc: 'More steals and blocks, and more fouls.', steal: 1.45, block: 1.3, foul: 1.6, con: 1 },
+  grind: { n: 'Grind', desc: 'Work the clock: fewer but better shots, and less tiring.', think: 1.25, shootAt: .14, behind: 1, risk: .9, tire: .9, look: .012, hold: 1.7 } };
+const BK_PRESSES = { gamble: { n: 'Gamble', desc: 'More steals and blocks, and more fouls.', steal: 1.45, block: 1.3, foul: 1.8, con: 1 },
   bal: { n: 'Balanced', desc: 'The usual.', steal: 1, block: 1, foul: 1, con: 1 },
-  sit: { n: 'Sit back', desc: 'Fewer fouls, but more open shots.', steal: .6, block: .85, foul: .55, con: .82 } };
+  sit: { n: 'Sit back', desc: 'Fewer fouls, but more open shots.', steal: .8, block: .9, foul: .45, con: .95 } };
 const BK_TO = { n: 3, ot: 1, secs: 5, sta: 6 };
 const BK_SKILL = ['Squire', 'Knight', 'Archmage'];
 const BK_SET_IDS = Object.keys(BK_SETS), BK_DEF_IDS = Object.keys(BK_DEFS);
@@ -30344,6 +30344,8 @@ return {
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { q: G.q, name: bkPeriodName(G.q), text: bkClockText(), shot: Math.ceil(G.shot) } : null,
   pause: on => { BKP.paused = !!on; }, get paused() { return BKP.paused; },
   set onOver(f) { BK_HOOK.onOver = f; }, get onOver() { return BK_HOOK.onOver; }, set onPhase(f) { BK_HOOK.onPhase = f; }, get onPhase() { return BK_HOOK.onPhase; },
+  // each event of the play as it happens ({ k, s, o, t }: a shot, a basket, a miss, a block, a steal, a power...), for the page's sounds
+  set onEv(f) { BK_HOOK.onEv = f; }, get onEv() { return BK_HOOK.onEv; },
   // the ratings, the spots and the clubs, for the page and How to play (kinds: every kind with ratings, the superstars
   // among them; figs: every kind the court can draw as itself)
   rate: kind => bkRate(kind), fit: (r, pos) => bkFit(Object.assign(bkRate('goblin'), r), pos), kinds: Object.keys(BK_KIND), figs: Object.keys(KIND).filter(k => HEAD[k]), stats: BK_STATS.slice(), pos: BK_POS.slice(), roles: Object.assign({}, BK_ROLE), team: t => JSON.parse(JSON.stringify(bkTeam(t))),
@@ -41091,8 +41093,10 @@ renderHelp = function () {
 
 const W_BKG = {
   minOwn: 3, xp: 12, gold: 15, fans: 3, lossShare: .25, tieShare: .5, benchShare: .5, mvpXp: 5,
-  // extra rating points for each of their five, by tier, spread over the six (6 is +1 to every one); measured in phase 10
-  oppBonus: { 1: 0, 2: 1, 3: 3 },
+  // extra rating points for each of their five, by tier, spread over the six (6 is +1 to every one); measured with
+  // test/realm_court_lab.py (docs/realm/BALANCE.md): as the world sets the tiers (their level yours plus the tier less
+  // one) you win about 57%, 44% and 26%
+  oppBonus: { 1: 0, 2: 2, 3: 5 },
   minutes: 90, keep: 10, saveMs: 12000, bench: 2,
 };
 const W_BKG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
@@ -41935,6 +41939,96 @@ renderHelp = function () {
   wW84RenderHelp();
   const g = $('wHelpCourtStars') || $('wHelpCourtKit') || $('wHelpCourtGame'); if (!g || $('wHelpCourtNet')) return;
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtNet"><b>The Charter Net.</b> Basketball's cup, every week at the Charter Court: ask Nim Hoopwright about the NET, or use the Charter Net button on the Court tab. ${W_NET.fee} gold to enter. Eight fives in a bracket, three rounds, each harder than the last; you play your own games and the rest are played out on the court once yours is done. A game still level after three overtimes goes to the side with more rebounds. Lose and you're out. Win the final and your five cut down the net and keep it: ${W_NET.prize.gold} gold, ${W_NET.prize.fans} fans, a pick of basketball cards, a piece of court gear and a place on the Wall of Awards. League fixtures at the Charter Court are basketball games on the court too: Play, Manage or Simulate, a win is two points on the table, and a tie none.</p>`);
+};
+/* w85: the feel of basketball (issue #77, phase 11), as w47 is for football and w55 for boxing. Sound on the court,
+   coach's notes and medals.
+
+   Sound. Sudden Death's own effects (sfx), following your Sound effects setting, from the court's events (wBK.onEv)
+   and beats (wBK.onPhase): the rim for a miss, a thud for a block, a quick slap for a steal, the crowd for your
+   baskets (louder for a three, loudest for a dunk or an alley-oop), a click for theirs, a chime for a power and a
+   bigger one for an ultimate (either side's), the whistle for a foul's free throws, a timeout and goaltending, the buzzer at each
+   break, the yard's roar and a hot hand (either side's: the yard cheers a show), and a horn and the crowd when you
+   win. In a game you only watch, the first side (the home one) is yours for the crowd. Only while the court is on screen. The realm's music
+   plays on, as it does at any ground.
+   Tips. TIPS.w_court once your team can play basketball (W_BKG.minOwn players), TIPS.w_net once you have won a
+   basketball game, from a watcher like w47's.
+   Achievements. Basketball games won (realmCourtWins) and Charter Nets (realmNets), on SD's ACH.
+
+   Wraps: wBK.onEv (wW85OnEv: the sounds), wBK.onPhase (wW85OnPhase: the whistle and the buzzer), wBK.onOver
+   (wW85OnOver: the end), wCourtSettle (wW85CourtSettle), wNetWon (wW85NetWon), renderHelp (wW85RenderHelp:
+   #wHelpCourtFeel after #wHelpCourtNet). */
+
+const WCSND = { shot: '' };
+const wCourtSoundOn = () => !LAB && SET.sfx !== false && UI.view === 'court' && !!wBK.G;
+// whose play it was: the side with the ball (a basket, a miss), or the side defending (a steal, a block)
+const wCourtSndMine = off => { const G = wBK.G, c = G && G.cur; return !!c && (c.side === wBK.you) === !!off; };
+function wCourtEvSound(e) {
+  if (!wCourtSoundOn()) return;
+  if (e.k === 'shot') { WCSND.shot = e.o; return; }
+  if (e.k === 'made') {
+    const big = WCSND.shot === 'dunk' || WCSND.shot === 'alley';
+    if (!wCourtSndMine(true)) { sfx.card(); return; }
+    if (big) sfx.crunch(); else sfx.coin();
+    sfx.crowd(big ? 1.6 : e.o === 3 ? 1.2 : .7);
+  }
+  else if (e.k === 'miss') sfx.block();
+  else if (e.k === 'block') { sfx.hit(.4); if (wCourtSndMine(false)) sfx.crowd(1.1); }
+  else if (e.k === 'steal') { sfx.card(); if (wCourtSndMine(false)) sfx.crowd(.7); }
+  else if (e.k === 'pow' || e.k === 'sit' || e.k === 'potion') sfx.magic();
+  else if (e.k === 'ult') sfx.crit();
+  else if (e.k === 'fire') { sfx.crit(); sfx.crowd(1.4); }
+  else if (e.k === 'roar') sfx.crowd(2);
+  else if (e.k === 'bent') sfx.crunch();
+  else if (e.k === 'timeout' || e.k === 'goaltend') sfx.whistle();
+}
+function wCourtPhSound(ph) {
+  if (!wCourtSoundOn()) return;
+  if (ph === 'ft') sfx.whistle();
+  else if (ph === 'break') sfx.horn();
+}
+function wCourtEndSound(s) {
+  if (!wCourtSoundOn() || !s) return;
+  // (a game you only watch, a scrimmage, ends with the buzzer and the crowd)
+  if (wBK.mode === 'watch' && !(WBK && WBK.world)) { sfx.horn(); sfx.crowd(1.4); return; }
+  const you = wBK.you;
+  if (s.score[you] > s.score[1 - you]) { sfx.horn(); sfx.crowd(2); } else if (s.score[you] < s.score[1 - you]) sfx.bad(); else sfx.whistle();
+}
+const wW85OnEv = wBK.onEv;
+wBK.onEv = e => { if (wW85OnEv) wW85OnEv(e); try { wCourtEvSound(e); } catch (er) { console.error(er); } };
+const wW85OnPhase = wBK.onPhase;
+wBK.onPhase = ph => { if (wW85OnPhase) wW85OnPhase(ph); try { wCourtPhSound(ph); } catch (er) { console.error(er); } };
+const wW85OnOver = wBK.onOver;
+wBK.onOver = s => { if (wW85OnOver) wW85OnOver(s); try { wCourtEndSound(s); } catch (er) { console.error(er); } };
+
+Object.assign(TIPS, {
+  w_court: ['Basketball', 'Your team is big enough for basketball. Open the Team screen (C), then the Court tab: set your five, then Play a game against the local side or a rival club. Nim Hoopwright at the Charter Court books games too: ask for HOOPS.'],
+  w_net: ['The Charter Net', 'Basketball has its own cup, every week. Ask Nim Hoopwright at the Charter Court about the NET, or use the Charter Net button on the Court tab. Win it and your five cut the net down.'],
+});
+function wCourtTips() {
+  if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
+  if (wRoster().length >= W_BKG.minOwn) tip('w_court');
+  if (WG.bkg && WG.bkg.w > 0) tip('w_net');
+}
+setInterval(wCourtTips, 700);
+
+ACH.push(
+  { id: 'w_court', n: 'Court Vision', d: 'Win basketball games at the Charter Court', stat: 'realmCourtWins', at: [1, 10, 30] },
+  { id: 'w_net', n: 'Net Cutters', d: 'Win the Charter Net', stat: 'realmNets', at: [1, 3, 8] },
+);
+const wW85CourtSettle = wCourtSettle;
+wCourtSettle = function (r, us, them, box, ot) {
+  const m = wW85CourtSettle.apply(this, arguments);
+  if (!LAB && r === 'win') achAdd('realmCourtWins', 1);
+  return m;
+};
+const wW85NetWon = wNetWon;
+wNetWon = function () { wW85NetWon(); if (!LAB) achAdd('realmNets', 1); };
+
+const wW85RenderHelp = renderHelp;
+renderHelp = function () {
+  wW85RenderHelp();
+  const d = $('wHelpCourtNet'); if (!d || $('wHelpCourtFeel')) return;
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtFeel"><b>On the court</b> you hear the rim, the blocks and steals, the crowd for your baskets (loudest for a dunk), the whistle for free throws and timeouts, the buzzer at each break and the walled yard's roar; sounds follow your Sound effects setting, and the realm's music plays on. Basketball games won and Charter Nets have medals in the record book.</p>`);
 };
 </script>
 </body></html>

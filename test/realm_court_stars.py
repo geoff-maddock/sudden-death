@@ -115,7 +115,9 @@ async def main():
           const league = wBK.kinds.filter(k => !K.includes(k)).map(k => rate(k, null));
           return { lo: Math.min(...league), hi: Math.max(...league), mean: Math.round(league.reduce((a, b) => a + b, 0) / league.length), star: Object.fromEntries(K.map(k => [k, [rate(k, { off: 0, def: 0 }), rate(k, { off: 1, def: 1 })]])) }; })""", stars)
         print('     the league', bal['lo'], 'to', bal['hi'], '(mean', str(bal['mean']) + '); superstars, first and second powers:', bal['star'])
-        check(all(bal['lo'] - 6 <= v <= bal['hi'] + 12 for pair in bal['star'].values() for v in pair), 'in the same five, no superstar is far stronger than the best league kind, or weaker than the league (80 seeded games each)', bal)
+        # (80 games a cell is about 5.5 points either way, so the bounds are two of those outside the league's own range;
+        # what a superstar adds in the Realm is measured over 1,000 games in test/realm_stars_lab.py)
+        check(all(bal['lo'] - 11 <= v <= bal['hi'] + 11 for pair in bal['star'].values() for v in pair), 'in the same five, no superstar is far outside the league kinds\' own range (80 seeded games each)', bal)
         check(all(abs(a - b) <= 18 for a, b in bal['star'].values()), 'and each wins about as often with either pair of powers (within 18 points)', bal['star'])
 
         # ---------- the Realm ----------
