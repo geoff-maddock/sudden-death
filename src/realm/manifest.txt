@@ -115,3 +115,4 @@ src/realm/w80-courtgame.js
 src/realm/w81-courtpowers.js
 src/realm/w82-courtkit.js
 src/realm/w83-courtstars.js
+src/realm/w84-courtnet.js

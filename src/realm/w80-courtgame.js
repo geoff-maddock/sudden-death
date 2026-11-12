@@ -15,7 +15,8 @@
 
    WG.bkg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_BKG.keep], w, l, t }
               world = { kind: 'bkgame', ref, club, tier, how, day, name, ids, cup }, plain data; the end dispatches
-              W_ON_END[kind]. ids: your squad's roster ids at tip-off (the five, then the bench; null for a call-up)
+              W_ON_END[kind] (which also gets us, them and reb: [yours, theirs] rebounds). ids: your squad's roster
+              ids at tip-off (the five, then the bench; null for a call-up)
    WG.bkstats { pid: { gg, sec, pts, reb, ast, stl, blk, fgm, fga, tpm, tpa, ftm, fta, pf, tov } }, this journey
    wCourtProblems(), wStartCourt({ club, how, tier?, kind?, ref?, cup? }), wResumeCourt(), wCourtLeaveGame(),
    wCourtConcede(), wOpenCourtCard()
@@ -198,7 +199,7 @@ function wCourtSettle(r, us, them, box, ot) {
   B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, ot: ot || 0, mvp, line });
   B.games.length = Math.min(B.games.length, W_BKG.keep);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
-  W.us = us; W.them = them;
+  W.us = us; W.them = them; W.reb = box && box[0] && box[1] ? [box[0].tot.reb, box[1].tot.reb] : [0, 0];
   const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
   wAdvance(W_BKG.minutes);
   const who = mvp != null && wPlayer(mvp);
