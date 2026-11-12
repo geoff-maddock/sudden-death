@@ -4650,7 +4650,8 @@ function renderMap() {
   $('v-map').querySelectorAll('.mnode.can').forEach(g => { g.addEventListener('mouseenter', () => dim(reach(g.dataset.node))); g.addEventListener('focus', () => dim(reach(g.dataset.node))); g.addEventListener('mouseleave', () => dim(null)); g.addEventListener('blur', () => dim(null)); });
   $('v-map').querySelectorAll('.mnode.can').forEach(g => { const go = () => enterNode(g.dataset.node); g.addEventListener('click', go); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }); });
   // scroll so the next choices are in view
-  requestAnimationFrame(() => { const sc = $('mapScroll'); if (!sc) return; const nx = nextNodes()[0]; if (!nx) return; const svg = sc.querySelector('svg'); const k = svg.clientHeight / H; sc.scrollTop = Math.max(0, nodeXY(nx).y * k - sc.clientHeight * .6); });
+  // (a frame later: the run may have ended or been replaced by then, and its map with it)
+  requestAnimationFrame(() => { const sc = $('mapScroll'); if (!sc || !RUN || RUN.map !== M) return; const nx = nextNodes()[0]; if (!nx) return; const svg = sc.querySelector('svg'); const k = svg.clientHeight / H; sc.scrollTop = Math.max(0, nodeXY(nx).y * k - sc.clientHeight * .6); });
 }
 /* p7: sound, the arena scene, and the fight screen */
 const SND = { on: true, ctx: null };
