@@ -70,5 +70,5 @@ const wW49RenderHelp = renderHelp;
 renderHelp = function () {
   wW49RenderHelp();
   const g = $('wHelpGfBench') || $('wHelpGfPowers') || $('wHelpGridiron'); if (!g || $('wHelpGfStance')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfStance"><b>Stances on the gridiron.</b> Beside each call your side plays Safe, Balanced or Risky, on offense and on defense (the buttons on the bar, or S). Risky chases big plays and risks sacks, interceptions and fumbles, and tires your seven faster; Safe gives up the big play to avoid them, and saves stamina. It stays until you change it. Fumbles are rare, and likelier the riskier either side plays. Win games playing mostly Risky for the Gunslinger medal, or mostly Safe for the Grinder.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfStance"><b>Stances on the gridiron.</b> Beside each call your side plays Safe, Balanced or Risky, on offense and on defense (the buttons under the field, or S). Risky chases big plays and risks sacks, interceptions and fumbles, and tires your seven faster; Safe gives up the big play to avoid them, and saves stamina. It stays until you change it. Fumbles are rare, and likelier the riskier either side plays. Win games playing mostly Risky for the Gunslinger medal, or mostly Safe for the Grinder.</p>`);
 };

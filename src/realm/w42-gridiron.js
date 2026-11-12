@@ -16,7 +16,7 @@
 // who plays it: the coaches, you calling the plays, or you calling them and playing your offense by hand
 const W_GRID_MODES = {
   watch: { n: 'Coaches', title: 'The coaches call every play, both sides. Switching goes on with the same game.' },
-  call: { n: 'You call', title: 'You call your side\'s plays from the bar, and its defense in a game. Your players run them.' },
+  call: { n: 'You call', title: 'You call your side\'s plays under the field, and its defense in a game. Your players run them.' },
   play: { n: 'You play', title: 'You call the plays, then play your offense by hand: Space to throw or stiff-arm, WASD to run, Space twice to kick. On defense you call and watch.' },
 };
 // a position's name and the ratings that matter most there
@@ -89,7 +89,7 @@ function wGridHowHTML() {
   return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points, and the extra point makes 7). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
   <p class="hint"><b>A game</b> is two halves on the clock. The clock runs through each play and between plays, and stops on an incompletion, out of bounds, a score or a change of possession. After a score the side that scored kicks off. Tied at the end, it goes to <b>Sudden Death</b>: the first score wins.</p>
   <p class="hint"><b>Your calls.</b> Pick a play each down; the other coach picks a defense at the same moment, and you see both at the snap.</p>
-  <p class="hint"><b>Who plays it.</b> <b>Coaches</b>: they call every play. <b>You call</b>: you pick your side's plays from the bar (and its defense, in a game), and your players run them. <b>You play</b>: you call them, then play your offense by hand. Switch any time; the game goes on.</p>
+  <p class="hint"><b>Who plays it.</b> <b>Watch</b>: the coaches call every play. <b>Manage</b>: you pick your side's plays under the field (and its defense, in a game), and your players run them. <b>You play</b>: you call them, then play your offense by hand. Switch any time; the game goes on.</p>
   <p class="hint"><b>Playing it by hand.</b> On a pass the quarterback waits for you. The dashed ring is your receiver (the one with the most room, or press Q or E for another). Hold <b>Space</b> and a marker runs out ahead of them, further the longer you hold, while the rush keeps coming; let go to throw there. With the ball, <b>WASD</b> or the arrows steer (let go and they find their own lane), and <b>Space</b> once a play is a stiff-arm that shrugs off the next tackle. The quarterback can scramble too, but can't throw once past the line. Your punts and field goals are a meter: tap <b>Space</b> for the power (a field goal needs the white mark), then again for the aim (inside the green). On defense you call the defense and watch.</p>
   <p class="hint"><b>The bar.</b> <b>Start over</b> begins again, and <b>Back to the world</b> leaves; in the middle of a game both ask first, because leaving forfeits it.</p>
   <ul class="wghow">${Object.keys(wGF.plays).map(k => li(wGF.plays[k].n, wGF.plays[k].desc, wGridEdgeLine(k))).join('')}

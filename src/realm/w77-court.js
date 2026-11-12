@@ -76,7 +76,7 @@ function wCourtPad() {
   if (pad.dataset.side === side) return;
   wCourtPadRelease();
   pad.dataset.side = side;
-  pad.innerHTML = W_COURT_PAD[side].map(([k, n, key, hold]) => `<button class="ghost" data-cpad="${k}" ${hold ? 'data-hold="1"' : ''} title="${esc(key)}">${esc(n)}</button>`).join('');
+  pad.innerHTML = W_COURT_PAD[side].map(([k, n, key, hold]) => `<button class="ghost" data-cpad="${k}" ${hold ? 'data-hold="1"' : ''} data-key="${esc(key.split(/[,:]/)[0])}" title="${esc(key)}">${esc(n)}</button>`).join('');
 }
 // (kept up a few times a second while a game is on the court, and stopped when it's left)
 let W_COURT_TICK = 0;
@@ -170,7 +170,7 @@ new MutationObserver(wCourtSetRow).observe($('modalBox'), { childList: true });
 // How to play: Basketball, how it works
 function wCourtHowHTML() {
   const R = wBK.rules;
-  return `<p class="hint">A game is five on five on a full court, four quarters on the game clock (${R.mins} minutes in all unless you change it in Settings: ${R.minsAt.join(', ')}). Each trip down the floor is one possession against a <b>shot clock</b> of ${R.shot} seconds. A shot that hits the rim resets it, and a clock that runs out turns the ball over. After a basket the other side brings it up; the walk up the floor is sped through.</p>
+  return `<p class="hint">A game is five on five on a full court, four quarters on the game clock (${R.mins} minutes in all unless you change it in Settings: ${R.minsAt.join(', ')}). Each trip down the floor is one possession against a <b>shot clock</b> of ${R.shot} seconds. A shot that hits the rim resets it, and a clock that runs out turns the ball over. After a basket the other side brings it up; the walk up the floor is sped through. The picture shows the whole court while the play crosses it, and moves in on one half once everyone is there.</p>
   <p class="hint"><b>Shots.</b> A basket is 2, or 3 from beyond the arc, and a free throw is 1. How likely a shot goes in comes from the distance, the shooter's touch, and the <b>contest</b>: how close the nearest defender is, and how good. At the rim size and hops count, and a big leaper dunks. A defender close to the shot can block it, or foul.</p>
   <p class="hint"><b>The player with the ball</b> weighs what's on: a good look gets shot, a defender in the lane gets beaten off the dribble (handle and speed against defense and speed) or the ball gets moved to the teammate with the best look. A pass thrown into a defender's lane can be stolen, and a defender up close can pick the dribble. After a steal or a defensive rebound the play goes straight the other way: a side slow to get back gives up a fast break.</p>
   <p class="hint"><b>Rebounds.</b> A miss comes off the rim, further on a three. Whoever is nearest where it comes down has the best of it, with size and hops, and the defense has inside position.</p>

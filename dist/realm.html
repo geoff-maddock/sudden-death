@@ -849,6 +849,9 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 #wRingCall button.on{border-color:var(--torch);box-shadow:0 0 0 1px var(--torch) inset}
 .wrpad{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
 .wrpad button{min-width:68px;touch-action:none;user-select:none;-webkit-user-select:none}
+/* each pad button's key, under its name (keyboards only: a phone has no keys to show) */
+.wrpad button[data-key]::after{content:attr(data-key);display:block;margin-top:1px;font:600 11px/1.1 var(--body,"Alegreya Sans",sans-serif);letter-spacing:.3px;color:var(--dim);opacity:.85}
+@media (hover:none){.wrpad button[data-key]::after{display:none}}
 .wrcard{width:100%;border-collapse:collapse;margin:8px 0}.wrcard th,.wrcard td{padding:6px 8px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.15)}.wrcard select{max-width:100%}
 /* (.wrsp2: the second specials' table, w75) */
 .wrpow,.wrsp2{width:100%;border-collapse:collapse;font-size:.92em;margin:6px 0 10px}.wrpow th,.wrpow td,.wrsp2 th,.wrsp2 td{padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid rgba(255,208,160,.12)}
@@ -924,6 +927,52 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wccpow{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
 /* basketball potions (w82) */
 .wcckit{border-top:1px solid var(--seam);padding-top:6px}.wcpot{display:inline-flex;gap:4px;align-items:center;margin-right:8px}
+/* the phone scoreboard over football, boxing and basketball (w86-sportbar.js): real text where the canvas's own bar is too small to read */
+.wsb{display:none}
+@media (max-width:640px){
+  .wsb:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;margin:6px 0;padding:8px 10px;background:#0d0907;border:1px solid var(--seam);border-radius:8px}
+  .wsbside{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:center;border-left:4px solid var(--c);padding-left:8px;min-width:0}
+  .wsbside b{font-size:14px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wsbside strong{font-family:var(--hud);font-weight:400;font-size:30px;line-height:1;color:#f3ead6;border-bottom:3px solid transparent}
+  .wsbside.has strong{color:#ffd08a;border-bottom-color:var(--c)}
+  .wsbside:last-child{border-left:0;border-right:4px solid var(--c);padding:0 8px 0 0;grid-template-columns:auto minmax(0,1fr);text-align:right}
+  .wsbside:last-child strong{order:-1}
+  .wsbside small{grid-column:1/-1;font-size:11px;line-height:1;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .wsbside .wsbbar{grid-column:1/-1}
+  .wsbbar{display:block;height:7px;background:#2a1d17;border-radius:3px;overflow:hidden}
+  .wsbbar>i{display:block;height:100%}
+  .wsbside:last-child .wsbbar>i{margin-left:auto}
+  .wsbmid{text-align:center;display:grid;gap:2px}
+  .wsbmid b{font-size:14px;white-space:nowrap}
+  .wsbmid small{font-size:13px;color:var(--torch);white-space:nowrap}
+  /* football's powers: the chips wrap across the page under Mana, not down a narrow column beside it */
+  .wgpows{flex-wrap:wrap}
+  .wgpows #wGridPowList{flex-basis:100%;order:3}
+  /* the box score tables scroll inside their own box rather than widening the page */
+  .wcbox{overflow-x:auto}
+  .wcboxt{min-width:400px}
+}
+/* the same page around football and basketball (w87-sportpage.js) */
+.wdbar .wsnote{flex:1 1 100%;order:9;margin:0;max-width:none;border-left:3px solid var(--torch);padding:2px 0 2px 10px;line-height:1.35}
+.wscoach{max-width:none;margin:10px 0;padding:10px 12px;border:1px solid var(--seam);border-radius:8px}
+#v-court .wccalls{padding:10px 12px;border:1px solid var(--seam);border-radius:8px}
+.wccrow .wccl{flex:none;width:84px;font-family:var(--hud);font-weight:400;color:var(--dim)}
+.wccrow>.wgpows{flex:1 1 0;min-width:0;flex-wrap:wrap}
+.wccrow>.wgpows #wGridPowList{flex-basis:100%;order:3}
+.wccrow #wGridCalls,.wccrow #wGridDefs{display:flex;flex-wrap:wrap;gap:6px}
+.wccrow #wGridCalls[hidden],.wccrow #wGridDefs[hidden]{display:none}
+.wscoach .wgstance b{display:none}
+.wscoach .wgtip{margin-left:90px;min-height:0}
+.wscoach .wgbench{margin:0;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
+.wscoach .wgbench .wgpots{margin:0}.wscoach .wgbench .wgpots>b{display:none}
+.wscoach .wgbench>p{margin:0 0 0 90px}
+.wgsub{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--seam);border-radius:6px;font-size:15px}
+.wgsub small{color:var(--dim)}.wgsub b{font-family:var(--hud);font-weight:400}.wgsub b.wgbad,.wgbench p.wgbad{color:#e8a08f}
+.wgp{grid-template-columns:minmax(0,1fr)}
+#wGridLineup{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 24px;align-items:start}
+.wsh{max-width:960px;margin:14px auto 6px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
+.wslog{max-width:960px;margin:0 auto 10px;max-height:260px}
+@media (max-width:760px){#wGridLineup{grid-template-columns:minmax(0,1fr)}.wscoach .wgtip,.wscoach .wgbench>p{margin-left:0}.wccrow .wccl{width:100%}}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -23257,7 +23306,7 @@ function gfSim(opts) {
   return Object.assign(gfSummary(), { log: G.drive.plays });
 }
 /* Cinder Gridiron: the field, drawn (issue #9, phase 1). The Ash Bowl from above and a little to one side: green grass
-   in a bowl of black basalt, the goalposts scorched at the top. The camera follows the ball. Yard lines every five, the
+   in a bowl of black basalt with its crowd and braziers (gfDrawStands), the goalposts scorched at the top. The camera follows the ball. Yard lines every five, the
    line of scrimmage in blue and the line to gain in ember orange. Players are the inked figures (03-figures.js),
    sorted so the nearer ones stand in front. A block shows as a spark between the two: white when it holds, red when the
    defender is winning. The bar at the top has the score, the down, both calls at the snap, and each result with why.
@@ -23347,7 +23396,7 @@ function gfDrawField(c) {
   const g = c.createLinearGradient(0, 0, 0, 600); g.addColorStop(0, '#2a0f08'); g.addColorStop(.18, '#120c0a'); g.addColorStop(1, '#070605');
   c.fillStyle = g; c.fillRect(0, 0, 960, 600);
   const top = gfScr(0, -GF_HALF).y, bot = gfScr(0, GF_HALF).y;
-  for (let i = 0; i < 26; i++) { const x = (i * 41 - GD.cam * 6) % 1000 - 20; c.fillStyle = i % 3 ? '#16110e' : '#1c1511'; c.fillRect(x, top - 40, 34, 30); c.fillRect(x + 12, bot + 14, 34, 30); }
+  gfDrawStands(c, top, bot);
   // the grass, in five-yard stripes, and the end zones in the teams' colours
   for (let a = -10; a < 110; a += 5) {
     const p0 = gfScr(a, 0), p1 = gfScr(a + 5, 0);
@@ -23380,6 +23429,29 @@ function gfDrawField(c) {
     c.fillStyle = 'rgba(90,150,255,.8)'; c.fillRect(los - 1.5, top, 3, bot - top);
     c.fillStyle = 'rgba(255,150,40,.85)'; c.fillRect(gain - 1.5, top, 3, bot - top);
   }
+}
+// the bowl's crowd: two rows on the far side behind a basalt wall, braziers every ten yards, and the near side's heads
+// in the dark at the bottom. Each end sits in its club's colours. It stays put with the field as the camera moves.
+const GF_SKIN = ['#6b4a3a', '#8a6a4a', '#4a3a3a', '#a07a5a', '#5a6a4a', '#7a5a6a'];
+function gfDrawStands(c, top, bot) {
+  const a0 = Math.floor(GD.cam - 28), a1 = Math.ceil(GD.cam + 28);
+  c.save();
+  // the far wall, and the tier behind it
+  c.fillStyle = '#1a1310'; c.fillRect(0, top - 64, 960, 58); c.fillStyle = '#0e0a08'; c.fillRect(0, top - 14, 960, 8); c.fillStyle = 'rgba(255,170,90,.16)'; c.fillRect(0, top - 14, 960, 1);
+  for (let row = 0; row < 2; row++) { const r = row ? 6 : 4.8, y0 = top - (row ? 26 : 42);
+    for (let i = a0 * 2; i <= a1 * 2; i++) { const ax = i / 2 + (row ? .25 : 0), x = gfScr(ax, 0).x, h = ((i * 7 + row * 3) % 11 + 11) % 11, y = y0 + (h % 3) * 2 + Math.sin(GFT.t * 2 + i * 1.7 + row) * 1.1;
+      c.fillStyle = h % 4 ? (row ? '#2e2019' : '#231813') : tint(G.teams[ax < 50 ? 0 : 1].color, row ? -.15 : -.4);
+      c.beginPath(); c.moveTo(x - r - 2, y + r + 12); c.lineTo(x - r - 1, y + r - 1); c.quadraticCurveTo(x, y + r - 5, x + r + 1, y + r - 1); c.lineTo(x + r + 2, y + r + 12); c.closePath(); c.fill();
+      c.fillStyle = row ? GF_SKIN[h % 6] : tint(GF_SKIN[(h + 2) % 6], -.3); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); } }
+  c.fillStyle = '#0e0a08'; c.fillRect(0, top - 14, 960, 8);
+  // braziers on the wall
+  for (let a = Math.ceil(a0 / 10) * 10 - 5; a <= a1; a += 10) { const x = gfScr(a, 0).x, f = Math.sin(GFT.t * 7 + a);
+    const g = c.createRadialGradient(x, top - 20, 2, x, top - 20, 60); g.addColorStop(0, 'rgba(255,160,70,.3)'); g.addColorStop(1, 'rgba(255,160,70,0)'); c.fillStyle = g; c.fillRect(x - 60, top - 80, 120, 80);
+    c.fillStyle = '#2a1a12'; c.fillRect(x - 5, top - 17, 10, 5); c.fillStyle = '#ff9a3a'; c.beginPath(); c.ellipse(x, top - 22 - f, 4, 7 + f, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe08a'; c.beginPath(); c.ellipse(x, top - 20, 1.8, 3.2, 0, 0, Math.PI * 2); c.fill(); }
+  // the near side: big dark heads along the bottom edge
+  for (let i = a0; i <= a1; i++) { const x = gfScr(i * 1.6 % 1 ? i : i + .4, 0).x, h = ((i * 5) % 7 + 7) % 7, y = bot + 26 + (h % 3) * 3 + Math.sin(GFT.t * 2 + i) * 1;
+    c.fillStyle = h % 3 ? `rgb(${20 + h * 2},${15 + h},${12 + h})` : tint(G.teams[i < 50 ? 0 : 1].color, -.62); c.beginPath(); c.arc(x, y, 11, Math.PI, 0); c.fill(); c.fillRect(x - 11, y, 22, 30); }
+  c.restore();
 }
 // a zone on the grass: where it acts, from the line of scrimmage (x) and across (y), by its look
 const GF_ZONE_AREA = { line: [-3, 3, 27], back: [-10, 0, 27], mid: [0, 18, 6], deep: [8, 35, 27], all: [-12, 40, 27] };
@@ -23457,10 +23529,11 @@ function gfDrawHud(c) {
     const x = s ? 940 : 20, al = s ? 'right' : 'left';
     c.fillStyle = t.color; c.fillRect(s ? 946 : 8, 10, 6, 38);
     txt(c, t.name + (G.poss === s && GD.ph !== 'over' ? '  ●' : ''), x, 26, F(17, 800), '#f3ead6', al);
-    txt(c, String(G.score[s]), x, 50, F(22, 800), '#ffd08a', al);
+    txt(c, String(G.score[s]), x, 52, F(28, 900), '#ffd08a', al);
+    if (G.mana) txt(c, 'MANA', s ? 940 - 62 : 20 + 62, 48, F(10, 800), 'rgba(168,140,255,.8)', al);
     // mana, as diamonds beside the score
     if (G.mana) for (let i = 0; i < GF_MANA.max; i++) {
-      const px = s ? 940 - 44 - i * 13 : 20 + 44 + i * 13, py = 44;
+      const px = s ? 940 - 104 - i * 13 : 20 + 104 + i * 13, py = 44;
       c.beginPath(); c.moveTo(px, py - 5); c.lineTo(px + 4.5, py); c.lineTo(px, py + 5); c.lineTo(px - 4.5, py); c.closePath();
       c.fillStyle = i < G.mana[s] ? '#a88cff' : 'rgba(168,140,255,.15)'; c.fill();
     }
@@ -26225,8 +26298,8 @@ function bxSimBout(opts) {
    its platform, the canvas scorched at the edges, red, white and blue ropes, the red corner at the back left and the blue
    at the front right, and the crowd in the dark around it. The fighters are the inked figures (03-figures.js) in
    gloves, posed by what they're doing (bxPose), the nearer one in front, each turned to face the other.
-   The bar at the top has both fighters: health (the dark part is what big shots have taken off their most), stamina,
-   knockdowns, the cut-man's patches and the plan; the round and the clock are in the middle. Under the ring, the last
+   The bar at the top has both fighters: health (the dark part is what big shots have taken off their most), stamina
+   and spirit, each bar with its name, knockdowns (DOWN), the cut-man's patches (CUTS) and the plan; the round and the clock are in the middle. Under the ring, the last
    lines of the log. Punches that land show a word (BXT.fx, from BXE). After a knockdown the count is over the fighter;
    between rounds a card has each judge's score for the round and the plans for the next; at the end, the verdict and
    the three cards round by round, with the punch stats.
@@ -26269,16 +26342,27 @@ function bxDraw(c) {
   if (BD.ph === 'over') bxDrawOver(c);
 }
 function bxDrawHall(c) {
+  // the hall's back wall, warm where the forge light reaches it
+  const w = c.createLinearGradient(0, 90, 0, 330); w.addColorStop(0, '#1d130f'); w.addColorStop(1, '#0d0908'); c.fillStyle = w; c.fillRect(0, 90, 960, 240);
   // a cone of forge light on the ring, and the crowd's heads in the dark
-  const g = c.createRadialGradient(480, 300, 40, 480, 300, 520); g.addColorStop(0, 'rgba(255,170,90,.16)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  const g = c.createRadialGradient(480, 300, 40, 480, 300, 520); g.addColorStop(0, 'rgba(255,170,90,.2)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = g; c.fillRect(0, 90, 960, 510);
+  // the far crowd: lit from the ring, so the ones nearer the middle are brighter; a few in each corner's colour
   for (const [x, row, v] of BX_CROWD) {
-    const y = 150 + row * 13, s = 6 + row * .8;
-    c.fillStyle = `rgb(${24 + v * 3},${17 + v * 2},${14 + v})`; c.beginPath(); c.arc(x, y, s, Math.PI, 0); c.fill(); c.fillRect(x - s, y, 2 * s, 14);
+    const y = 150 + row * 13 + Math.sin(BXT.t * 2 + x) * .8, s = 6 + row * .8, lit = 1 - Math.min(1, Math.abs(x - 480) / 560) * .55, m = (26 + v * 5) * lit;
+    c.fillStyle = v === 3 ? tint(G.corners[x < 480 ? 0 : 1].color, -.55 - (1 - lit) * .3) : `rgb(${m * 1.5 | 0},${m * 1.05 | 0},${m * .85 | 0})`;
+    c.beginPath(); c.arc(x, y, s, Math.PI, 0); c.fill(); c.fillRect(x - s, y, 2 * s, 14);
+    c.fillStyle = `rgba(255,190,130,${.1 * lit})`; c.beginPath(); c.arc(x, y, s, Math.PI * 1.15, Math.PI * 1.85); c.fill();
   }
+  // two beams from the lamps over the ring
+  c.save();
+  for (const lx of [330, 630]) {
+    c.globalAlpha = .07; c.fillStyle = '#ffd9a0'; c.beginPath(); c.moveTo(lx - 12, 90); c.lineTo(lx + 12, 90); c.lineTo(lx + 170, 470); c.lineTo(lx - 170, 470); c.closePath(); c.fill();
+  }
+  c.restore();
   for (const [x, row, v] of BX_CROWD.slice(0, 60)) {
     const y = 560 + row * 10, s = 13 + row;
-    c.fillStyle = `rgb(${14 + v * 2},${10 + v},${9 + v})`; c.beginPath(); c.arc((x * 1.3) % 980, y, s, Math.PI, 0); c.fill(); c.fillRect((x * 1.3) % 980 - s, y, 2 * s, 40);
+    c.fillStyle = `rgb(${20 + v * 3},${14 + v * 2},${12 + v})`; c.beginPath(); c.arc((x * 1.3) % 980, y, s, Math.PI, 0); c.fill(); c.fillRect((x * 1.3) % 980 - s, y, 2 * s, 40);
   }
 }
 const BX_POSTS = [[-9, -9, 'red'], [9, -9, 'white'], [-9, 9, 'white'], [9, 9, 'blue']];
@@ -26394,19 +26478,26 @@ function bxBarSide(c, f, right) {
   txt(c, `${f.kind} · ${BX_PLAN[f.plan].n}${pw}${S && S.fx.length ? '  · ' + S.fx.map(x => x.n).join(', ') : ''}`, x0 + dir * 14, 46, '13px "Alegreya Sans", sans-serif', '#b8aa94', right ? 'right' : 'left');
   // health: lost from the most is dark, the rest red to gold
   const hx = x0 + dir * 14, bw = W;
-  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 52, bw, 10);
-  c.fillStyle = '#4a2a24'; c.fillRect(right ? hx - bw * f.hpMax / 100 : hx, 52, bw * f.hpMax / 100, 10);
+  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 51, bw, 11);
+  c.fillStyle = '#4a2a24'; c.fillRect(right ? hx - bw * f.hpMax / 100 : hx, 51, bw * f.hpMax / 100, 11);
   const hp = Math.max(0, f.hp) / 100, g = c.createLinearGradient(hx, 0, hx + dir * bw, 0); g.addColorStop(0, '#c8352a'); g.addColorStop(1, '#f2c14a');
-  c.fillStyle = g; c.fillRect(right ? hx - bw * hp : hx, 52, bw * hp, 10);
-  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 66, bw, 6);
-  c.fillStyle = '#5ab8d8'; c.fillRect(right ? hx - bw * bxFrac(f) : hx, 66, bw * bxFrac(f), 6);
+  c.fillStyle = g; c.fillRect(right ? hx - bw * hp : hx, 51, bw * hp, 11);
+  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 64, bw, 9);
+  c.fillStyle = '#5ab8d8'; c.fillRect(right ? hx - bw * bxFrac(f) : hx, 64, bw * bxFrac(f), 9);
   // spirit (11-powers.js): violet, with ticks where a special and an ultimate can go
-  if (bxPowOn()) { const sp = bxSpirit(f) / BX_SPIRIT.max; c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 75, bw, 4);
-    c.fillStyle = '#a77cf0'; c.fillRect(right ? hx - bw * sp : hx, 75, bw * sp, 4);
-    c.fillStyle = '#e8dcc0'; for (const k of ['sp', 'ult']) { const v = bw * BX_SPIRIT[k] / BX_SPIRIT.max; c.fillRect(right ? hx - v - 1 : hx + v - 1, 74, 2, 6); } }
-  // knockdowns taken, and the cut-man's patches left
-  for (let i = 0; i < BX_RULES.kd; i++) { c.beginPath(); c.arc(at(bw + 26 + i * 14, 0), 57, 4.5, 0, Math.PI * 2); c.fillStyle = i < G.kd[f.side] ? '#ff6a4a' : '#2a1d17'; c.fill(); }
-  for (let i = 0; i < BX_RULES.patches; i++) { c.fillStyle = i < f.patches ? '#e8dcc0' : '#2a1d17'; c.fillRect(at(bw + 20 + i * 14, 8), 66, 8, 6); }
+  const pow = bxPowOn();
+  if (pow) { const sp = bxSpirit(f) / BX_SPIRIT.max; c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 75, bw, 9);
+    c.fillStyle = '#a77cf0'; c.fillRect(right ? hx - bw * sp : hx, 75, bw * sp, 9);
+    c.fillStyle = '#e8dcc0'; for (const k of ['sp', 'ult']) { const v = bw * BX_SPIRIT[k] / BX_SPIRIT.max; c.fillRect(right ? hx - v - 1 : hx + v - 1, 74, 2, 11); } }
+  // each bar's name at its outer end, inked so it reads on the bar and off it
+  c.save(); c.font = '800 8px "Alegreya Sans", sans-serif'; c.textAlign = right ? 'right' : 'left'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round'; c.lineWidth = 2.5; c.strokeStyle = 'rgba(20,12,8,.85)'; c.fillStyle = '#fff4dc';
+  for (const [w, y] of [['HEALTH', 60], ['STAMINA', 71.5]].concat(pow ? [['SPIRIT', 82.5]] : [])) { c.strokeText(w, hx + dir * 4, y); c.fillText(w, hx + dir * 4, y); }
+  c.restore();
+  // knockdowns taken, and the cut-man's patches left, each with its name
+  for (let i = 0; i < BX_RULES.kd; i++) { c.beginPath(); c.arc(at(bw + 26 + i * 14, 0), 56, 4.5, 0, Math.PI * 2); c.fillStyle = i < G.kd[f.side] ? '#ff6a4a' : '#2a1d17'; c.fill(); }
+  for (let i = 0; i < BX_RULES.patches; i++) { c.fillStyle = i < f.patches ? '#e8dcc0' : '#2a1d17'; c.fillRect(at(bw + 20 + i * 14, 8), 67, 8, 6); }
+  txt(c, 'DOWN', x0 + dir * (bw + 74), 59, '800 8px "Alegreya Sans", sans-serif', G.kd[f.side] ? '#ff9a7a' : '#8a7c68', right ? 'right' : 'left');
+  txt(c, 'CUTS', x0 + dir * (bw + 60), 73, '800 8px "Alegreya Sans", sans-serif', '#8a7c68', right ? 'right' : 'left');
 }
 function bxDrawBar(c) {
   c.fillStyle = 'rgba(14,10,9,.92)'; c.fillRect(0, 0, 960, 90);
@@ -27341,6 +27432,7 @@ const pick = a => a[(R() * a.length) | 0];
 // a weighted pick: { key: weight }
 function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 /* The Charter Court: the rules (issue #77, phases 0 and 1). Plain data and pure functions, no page: the score, the
    quarters and the game clock, the shot clock, fouls and free throws, and which basket each side attacks.
    Five a side. A game is BK_RULES.mins minutes (5 by default; the Realm's settings offer 3, 5, 8 or 12), four quarters
@@ -28830,10 +28922,12 @@ function bkSimGame(opts) {
 }
 /* The Charter Court: the court, drawn (issue #77, phase 1). The Charter Court from above and a little to one side: a
    boarded floor in a walled yard, keys painted in the club's orange, chain nets on both hoops. The whole court is in
-   view, so there's no camera. Players are the inked figures (03-figures.js), sorted so the nearer ones stand in front;
+   view while the play crosses it; once the ball and every player are in one half the camera pushes in on that half
+   and drops a little lower (bkCamStep), and pulls back out when the play leaves. It is drawing only: BKT.cam, never G. Players are the inked figures (03-figures.js), sorted so the nearer ones stand in front;
    the ball handler has a ring in their side's colour under them, and the ball has its shadow on the floor.
-   The bar at the top has the score, the period, the game clock and the shot clock, and each side's team fouls (lit in
-   the bonus). Under the court, what just happened (GD.msg). A big moment (a dunk, a three, a block, an and-one, the
+   The bar at the top has the score (underlined for the side with the ball), the period, the game clock and the shot
+   clock in its box, and each side's team fouls (lit in the bonus) and timeouts left. Under the court, what just happened
+   (GD.msg) and the calls on this possession with who they favour. A big moment (a dunk, a three, a block, an and-one, the
    shot clock running out) puts a word on the floor for a moment; at the end, the final score.
    Phase 2: by hand, the player you play has a marker over them, and the release meter rises beside your shooter (the
    window in green, its heart, the swish, brighter); after a shot the meter stays a moment with where you let go. A
@@ -28843,14 +28937,45 @@ function bkSimGame(opts) {
    Phase 5, the Charter Court's own: a shine on the waxed patches, a bent rim hanging down, the crowd on its feet in a
    roar.
    Court space is metres (05-live.js); bkScr turns it into canvas pixels. */
-const BKT = { t: 0, box: null, boxKey: '', bg: null, bgKey: '' };
+const BKT = { t: 0, bg: null, bgKey: '', cam: { u: 0, end: 0, x: 480, t: 0, g: null } };
 const BK_PX = 30, BK_PY = 22, BK_X0 = 60, BK_Y0 = 318, BK_PZ = 15;
-const bkScr = (x, y, z = 0) => ({ x: BK_X0 + x * BK_PX, y: BK_Y0 + y * BK_PY - z * BK_PZ });
+// the camera: pushed in on one half, the floor is 1.5 times as wide and 1.1 times as deep (a lower seat), and figures
+// 1.5 times the size. It holds the near apron where it is and the half's own baseline at the edge of the picture
+// (edge: how much of the yard past the baseline stays in view). It goes in once the ball is within in[0] metres of a
+// baseline and every player within in[1], and stays to out[]; pulling back, it swings to follow the ball (pan).
+const BK_CAM = { sx: 1.5, sy: 1.1, edge: 12, fy: 497, rate: 1.7, pan: 5, in: [12, 17], out: [16.5, 19.4] };
+// (left: the whole-court picture's x at the left edge of what is drawn)
+const BKC = { sx: 1, sy: 1, left: 0 };
+// a point of the whole-court picture, where the camera puts it
+const bkPx = (x, y) => ({ x: (x - BKC.left) * BKC.sx, y: BK_CAM.fy + (y - BK_CAM.fy) * BKC.sy });
+const bkScr = (x, y, z = 0) => { const p = bkPx(BK_X0 + x * BK_PX, BK_Y0 + y * BK_PY); p.y -= z * BK_PZ * BKC.sx; return p; };
+// draw what follows at the camera's size about p (inside a save/restore)
+function bkZoomAt(c, p) { const k = BKC.sx; if (k !== 1) { c.translate(p.x, p.y); c.scale(k, k); c.translate(-p.x, -p.y); } }
+// which half the camera should be on (0 the left, 1 the right), or null for the whole court
+function bkCamAim() {
+  const ph = GD.ph, len = BK_RULES.len, C = BKT.cam;
+  if (ph === 'intro' || ph === 'break' || ph === 'over' || ph === 'timeout') return null;
+  if (ph === 'ft' && GD.ft && L.pl[GD.ft.i]) return L.pl[GD.ft.i].x < len / 2 ? 0 : 1;
+  for (const e of [0, 1]) { const th = C.u > 0 && C.end === e ? BK_CAM.out : BK_CAM.in, d = x => e ? len - x : x;
+    if (d(L.ball.x) < th[0] && L.pl.every(p => d(p.x) < th[1])) return e; }
+  return null;
+}
+// move the camera on by the time since the last frame (the play's clock, so a paused game holds its picture)
+function bkCamStep() {
+  const C = BKT.cam; if (C.g !== G) { C.g = G; C.u = 0; C.x = 480; C.t = BKT.t; }
+  const dt = clamp(BKT.t - C.t, 0, .25), aim = bkCamAim(); C.t = BKT.t;
+  if (aim != null) { C.end = aim; C.u = Math.min(1, C.u + dt * BK_CAM.rate); } else C.u = Math.max(0, C.u - dt * BK_CAM.rate);
+  // where it looks: the half's end while it is on a half, the ball otherwise
+  const to = aim != null ? aim * 960 : BK_X0 + L.ball.x * BK_PX; C.x += (to - C.x) * Math.min(1, dt * BK_CAM.pan);
+  const e = C.u * C.u * (3 - 2 * C.u), sx = 1 + (BK_CAM.sx - 1) * e, w = 960 / sx;
+  BKC.sx = sx; BKC.sy = 1 + (BK_CAM.sy - 1) * e; BKC.left = clamp(C.x - w / 2, BK_CAM.edge * e, 960 - w - BK_CAM.edge * e);
+}
 const BK_FONT = '"Alegreya Sans", system-ui, sans-serif';
 
 function bkDraw(c) {
   c.fillStyle = '#120d0a'; c.fillRect(0, 0, 960, 600);
   if (!G || !GD || !L) return;
+  bkCamStep();
   bkDrawBack(c);
   bkDrawHoop(c, 0, true);
   bkDrawHoop(c, 1, true);
@@ -28867,16 +28992,16 @@ function bkDraw(c) {
 // what never moves (the yard's bricks, the floor, the lines) is drawn once into a canvas of its own at the density the
 // court is drawn at, and copied each frame; the crowd on the wall is drawn live over it
 function bkDrawBack(c) {
-  const k = c.getTransform().a || 1, key = `${k}|${G.teams[0].color}`;
+  const k = Math.min(2.6, (c.getTransform().a || 1) * 1.35), key = `${k}|${G.teams[0].color}`;
   if (BKT.bgKey !== key) {
     const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(Math.round(960 * k), Math.round(600 * k)) : Object.assign(document.createElement('canvas'), { width: Math.round(960 * k), height: Math.round(600 * k) });
-    const b = cv.getContext('2d'); b.setTransform(k, 0, 0, k, 0, 0); bkDrawYard(b); bkDrawFloor(b);
+    const b = cv.getContext('2d'); b.setTransform(k, 0, 0, k, 0, 0); const was = [BKC.sx, BKC.sy]; BKC.sx = BKC.sy = 1; bkDrawYard(b); bkDrawFloor(b); [BKC.sx, BKC.sy] = was;
     BKT.bg = cv; BKT.bgKey = key;
   }
-  c.drawImage(BKT.bg, 0, 0, 960, 600);
+  const o = bkPx(0, 0); c.save(); c.translate(o.x, o.y); c.scale(BKC.sx, BKC.sy); c.drawImage(BKT.bg, 0, 0, 960, 600); c.restore();
   bkDrawCrowd(c);
   // the waxed boards (phase 5): a shine on each slick patch, slowly moving
-  if (G.court) for (const w of G.court.wax) { const s = bkScr(w.x, w.y); c.save(); c.globalAlpha = .22 + .08 * Math.sin(BKT.t * 1.5 + w.x); const g = c.createRadialGradient(s.x, s.y, 2, s.x, s.y, w.r * BK_PX); g.addColorStop(0, 'rgba(255,250,230,.95)'); g.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(s.x, s.y, w.r * BK_PX, w.r * BK_PY, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+  if (G.court) for (const w of G.court.wax) { const s = bkScr(w.x, w.y); c.save(); c.globalAlpha = .22 + .08 * Math.sin(BKT.t * 1.5 + w.x); const rx = w.r * BK_PX * BKC.sx; const g = c.createRadialGradient(s.x, s.y, 2, s.x, s.y, rx); g.addColorStop(0, 'rgba(255,250,230,.95)'); g.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(s.x, s.y, rx, w.r * BK_PY * BKC.sy, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
 }
 // the walled yard: brick walls close on every side
 function bkDrawYard(c) {
@@ -28887,10 +29012,24 @@ function bkDrawYard(c) {
   c.restore();
 }
 // a row of heads along the top wall, bobbing a little
+// (someone on the wall at (x, y) of the whole-court picture: where the camera puts them, at its size)
+function bkCrowdAt(c, x, y) { const p = bkPx(x, y); c.translate(p.x, p.y); c.scale(BKC.sx, BKC.sx); c.translate(-x, -y); }
 function bkDrawCrowd(c) {
   // (a roar: the side's crowd on its feet, bouncing)
-  const roar = G.court && G.court.roar;
-  for (let i = 0; i < 46; i++) { const x = 22 + i * 20.5, b = Math.sin(BKT.t * (roar ? 9 : 2) + i * 1.3) * (roar ? 5 : 1.5); c.fillStyle = ['#6b4a3a', '#8a6a4a', '#4a3a3a', '#a07a5a'][i % 4]; c.beginPath(); c.arc(x, 92 + b + (i % 3) * 2, 7, 0, Math.PI * 2); c.fill(); c.fillStyle = i % 5 ? '#2c1d17' : '#e0742a'; c.fillRect(x - 8, 99 + b + (i % 3) * 2, 16, 10); }
+  const roar = G.court && G.court.roar, skin = ['#6b4a3a', '#8a6a4a', '#4a3a3a', '#a07a5a', '#5a6a4a', '#7a5a6a'], home = G.teams[0].color, away = G.teams[1].color;
+  // torches on the wall, each with its glow
+  for (let i = 0; i < 6; i++) { const x = 80 + i * 160, f = Math.sin(BKT.t * 7 + i * 2.1);
+    c.save(); bkCrowdAt(c, x, 76); const g = c.createRadialGradient(x, 76, 2, x, 76, 70); g.addColorStop(0, 'rgba(255,170,80,.34)'); g.addColorStop(1, 'rgba(255,170,80,0)'); c.fillStyle = g; c.fillRect(x - 70, 64, 140, 80);
+    c.fillStyle = '#2a1a12'; c.fillRect(x - 2, 78, 4, 12); c.fillStyle = '#ff9a3a'; c.beginPath(); c.ellipse(x, 74 - f, 3.5, 6 + f, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe08a'; c.beginPath(); c.ellipse(x, 76, 1.6, 3, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+  // two rows of the yard's crowd, the back one smaller and darker; the home half in the club's colour, the far end in the visitors'
+  for (let row = 0; row < 2; row++) { const n = row ? 44 : 48, r = row ? 7 : 5.5, y0 = row ? 112 : 97;
+    for (let i = 0; i < n; i++) { const x = (row ? 26 : 16) + i * (row ? 21 : 19.6), b = Math.sin(BKT.t * (roar ? 9 : 2) + i * 1.3 + row) * (roar ? 5 : 1.2), y = y0 + b + ((i * 7 + row) % 3) * 2;
+      const shirt = (i * 5 + row * 3) % 4 ? (row ? '#33221a' : '#261914') : tint(x < 480 ? home : away, row ? -.1 : -.35);
+      c.save(); bkCrowdAt(c, x, y);
+      c.fillStyle = shirt; c.beginPath(); c.moveTo(x - r - 2, y + r + 12); c.lineTo(x - r - 1, y + r - 1); c.quadraticCurveTo(x, y + r - 5, x + r + 1, y + r - 1); c.lineTo(x + r + 2, y + r + 12); c.closePath(); c.fill();
+      c.fillStyle = row ? skin[(i * 3) % 6] : tint(skin[(i * 5 + 2) % 6], -.25); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.restore(); } }
+  // the rail in front of them
+  const r0 = bkPx(0, 126).y, r1 = bkPx(0, 140).y; c.fillStyle = '#1c120d'; c.fillRect(0, r0, 960, r1 - r0); c.fillStyle = 'rgba(255,200,140,.18)'; c.fillRect(0, r0, 960, 1);
 }
 function bkDrawFloor(c) {
   const a = bkScr(0, -BK_RULES.wid / 2), b = bkScr(BK_RULES.len, BK_RULES.wid / 2), W = b.x - a.x, H = b.y - a.y;
@@ -28924,21 +29063,28 @@ function bkDrawFloor(c) {
     for (let k = 0; k <= 40; k++) { const ang = a0 + (-2 * a0) * k / 40, q = bkScr(rim + dir * Math.cos(ang) * BK_RULES.arc, Math.sin(ang) * BK_RULES.arc); c.lineTo(q.x, q.y); }
     p = bkScr(bx, yc); c.lineTo(p.x, p.y); c.stroke();
   }
-  // the club's name at centre court
-  txt(c, 'THE CHARTER COURT', m.x, m.y + 6, `800 15px ${BK_FONT}`, 'rgba(122,74,42,.55)', 'center');
   c.restore();
+  // centre court: the circle stained in the club's colour, a ball's seams in it
+  c.save(); c.globalAlpha = .32; c.fillStyle = G.teams[0].color; c.beginPath(); c.ellipse(m.x, m.y, 1.8 * BK_PX - 2, 1.8 * BK_PY - 2, 0, 0, Math.PI * 2); c.fill();
+  c.globalAlpha = .3; c.strokeStyle = '#fff4dc'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(m.x, m.y, 1.1 * BK_PX, 1.1 * BK_PY, 0, 0, Math.PI * 2); c.moveTo(m.x - 1.1 * BK_PX, m.y); c.lineTo(m.x + 1.1 * BK_PX, m.y); c.stroke(); c.restore();
+  // the court's name on the near apron, out from under the players
+  c.save(); c.font = `800 10px ${BK_FONT}`; c.textAlign = 'center'; c.fillStyle = 'rgba(255,224,180,.6)'; try { c.letterSpacing = '3px'; } catch (e) {} c.fillText('THE CHARTER COURT', m.x, b.y + 11); c.restore();
+  // the floor falls into shade at its edges
+  c.save(); const vg = c.createRadialGradient(m.x, m.y, H * .5, m.x, m.y, W * .62); vg.addColorStop(0, 'rgba(40,20,8,0)'); vg.addColorStop(1, 'rgba(40,20,8,.26)'); c.fillStyle = vg; c.fillRect(a.x, a.y, W, H); c.restore();
 }
 // a hoop: the pole and the backboard behind (back), or the rim and its chain net in front (front)
 function bkDrawHoop(c, s, back) {
   const dir = s ? -1 : 1, bx = s ? BK_RULES.len : 0, rim = bx + dir * BK_RULES.rim, R0 = bkScr(rim, 0, 3.05), bb = bkScr(bx + dir * 1.2, 0, 3.4);
   c.save();
   if (back) {
-    const pole = bkScr(bx - dir * .6, 0); c.strokeStyle = '#2a201a'; c.lineWidth = 5; c.beginPath(); c.moveTo(pole.x, pole.y); c.lineTo(pole.x, bb.y); c.lineTo(bb.x, bb.y); c.stroke();
+    const pole = bkScr(bx - dir * .6, 0); c.strokeStyle = '#2a201a'; c.lineWidth = 5 * BKC.sx; c.beginPath(); c.moveTo(pole.x, pole.y); c.lineTo(pole.x, bb.y); c.lineTo(bb.x, bb.y); c.stroke();
+    bkZoomAt(c, bb);
     c.fillStyle = 'rgba(240,236,224,.92)'; c.strokeStyle = '#17100e'; c.lineWidth = 2; c.fillRect(bb.x - 3, bb.y - 26, 6, 44); c.strokeRect(bb.x - 3, bb.y - 26, 6, 44);
   } else {
     // the rim: bent after a big dunk comes later (phase 5); the net is chain, and it swings when a shot goes through
     const N = GD.net && GD.net.hoop === s ? GD.net : null; if (N && N.at == null) N.at = BKT.t;
     const sw = N ? Math.max(0, 1 - (BKT.t - N.at) * 1.5) : 0;
+    bkZoomAt(c, R0);
     c.strokeStyle = '#9aa0a6'; c.lineWidth = 1.2;
     for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(R0.x + k * 2.6, R0.y); c.lineTo(R0.x + k * 1.6 + Math.sin(BKT.t * 18 + k) * sw * 3, R0.y + 16); c.stroke(); }
     // (a bent rim hangs down at the front, tilted)
@@ -28951,6 +29097,8 @@ function bkDrawPlayers(c) {
   const h = L.ball.st === 'held' ? L.ball.h : -1, list = L.pl.map((p, i) => ({ p, i })).sort((a, b) => a.p.y - b.p.y);
   for (const { p, i } of list) {
     const s = bkScr(p.x, p.y), T = G.teams[p.side], mv = hyp(p.vx, p.vy) > .5;
+    c.save(); bkZoomAt(c, s);
+    c.save(); c.fillStyle = 'rgba(40,20,8,.28)'; c.beginPath(); c.ellipse(s.x, s.y + 1, 14, 4.5, 0, 0, Math.PI * 2); c.fill(); c.restore();
     if (i === h) { c.save(); c.strokeStyle = T.light || '#fff'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(s.x, s.y, 15, 5, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
     const face = mv ? p.vx < 0 : bkDir(p.side) < 0, lift = p.act === 'shoot' ? 9 : p.act === 'jump' ? 11 : 0;
     // (tired: a short bar of what breath is left, under their feet)
@@ -28959,8 +29107,9 @@ function bkDrawPlayers(c) {
     drawFig(c, p.kind, s.x, s.y, 50, T, { num: p.num, run: mv ? p.run : 0, flip: face, throwK: p.act === 'shoot' || p.act === 'rise' ? 1 : 0, lift: p.act === 'rise' ? 4 : lift, alpha: p.stun > 0 ? .75 : 1 });
     // the player you play: a marker over their head
     if (i === bkMe()) { const y = s.y - 50 * (KIND[p.kind] || KIND.goblin).h - 12; c.save(); c.fillStyle = '#ffe04a'; c.strokeStyle = '#17100e'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(s.x - 6, y - 8); c.lineTo(s.x + 6, y - 8); c.lineTo(s.x, y); c.closePath(); c.fill(); c.stroke(); c.restore(); }
+    c.restore();
   }
-  if (L.pick) { const [x, y] = bkScreenSpot(), q = bkScr(x, y); c.save(); c.strokeStyle = 'rgba(255,224,74,.7)'; c.setLineDash([4, 3]); c.beginPath(); c.ellipse(q.x, q.y, 12, 4, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
+  if (L.pick) { const [x, y] = bkScreenSpot(), q = bkScr(x, y); c.save(); bkZoomAt(c, q); c.strokeStyle = 'rgba(255,224,74,.7)'; c.setLineDash([4, 3]); c.beginPath(); c.ellipse(q.x, q.y, 12, 4, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
 }
 function bkDrawBall(c) {
   const B = L.ball; if (GD.ph === 'over' || GD.ph === 'break') return;
@@ -28969,8 +29118,9 @@ function bkDrawBall(c) {
   if (GD.ph === 'ft' && GD.ft) { const p = L.pl[GD.ft.i], u = clamp((GD.t - .45) / .5, 0, 1); if (u > 0) { const hx = bkHoopX(GD.ft.side); x = lerp(p.x, hx, u); y = lerp(p.y, 0, u); z = lerp(2.3, 3.05, u) + 2.5 * 4 * u * (1 - u); } }
   if (GD.ph === 'intro') z = 2.4 + Math.min(GD.t, 1.2) * 1.5;
   const g = bkScr(x, y), b = bkScr(x, y, z);
-  c.save();
+  c.save(); bkZoomAt(c, g);
   c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(g.x, g.y, 5, 2, 0, 0, Math.PI * 2); c.fill();
+  c.restore(); c.save(); bkZoomAt(c, b);
   c.fillStyle = '#e0742a'; c.strokeStyle = '#17100e'; c.lineWidth = 1.5; c.beginPath(); c.arc(b.x, b.y, 5.5, 0, Math.PI * 2); c.fill(); c.stroke();
   c.lineWidth = 1; c.beginPath(); c.moveTo(b.x - 5.5, b.y); c.lineTo(b.x + 5.5, b.y); c.moveTo(b.x, b.y - 5.5); c.lineTo(b.x, b.y + 5.5); c.stroke();
   c.restore();
@@ -28993,34 +29143,49 @@ function bkDrawBig(c) {
   c.restore();
 }
 function bkDrawHud(c) {
-  c.fillStyle = '#0d0907'; c.fillRect(0, 0, 960, 64);
+  c.fillStyle = '#0d0907'; c.fillRect(0, 0, 960, 64); c.fillStyle = 'rgba(255,150,40,.45)'; c.fillRect(0, 63, 960, 1.5);
+  const F = (px, w = 700) => `${w} ${px}px ${BK_FONT}`, dim = 'rgba(243,234,214,.6)', over = GD.ph === 'over';
   for (const s of [0, 1]) {
-    const T = G.teams[s], al = s ? 'right' : 'left';
-    c.fillStyle = T.color; c.fillRect(s ? 930 : 20, 12, 10, 40);
-    txt(c, T.name, s ? 920 : 40, 30, `800 20px ${BK_FONT}`, '#f3ead6', al);
+    const T = G.teams[s], al = s ? 'right' : 'left', X = v => s ? 960 - v : v, bonus = G.tf[1 - s] > BK_RULES.limit;
+    c.fillStyle = T.color; c.fillRect(s ? 930 : 20, 10, 10, 44);
+    // the name, cut short if it would run into the marks beside it
+    let name = T.name; c.font = F(19, 800); while (name.length > 4 && c.measureText(name).width > 196) name = name.slice(0, -2).trimEnd() + '…';
+    txt(c, name, X(40), 28, F(19, 800), '#f3ead6', al);
+    // team fouls, and the timeouts left as pips
+    txt(c, `Fouls ${G.tf[s]}${bonus ? ' · bonus' : ''}`, X(40), 49, F(13, 600), bonus ? '#ffb070' : dim, al);
+    if (G.to) { txt(c, 'Timeouts', X(132), 49, F(11, 600), dim, al); const n = Math.max(BK_TO.n, G.to[s]);
+      for (let k = 0; k < n; k++) { c.fillStyle = k < G.to[s] ? '#f3ead6' : 'rgba(243,234,214,.18)'; c.fillRect(s ? 960 - 182 - k * 9 - 6 : 182 + k * 9, 41, 6, 9); } }
     // mana (whole points, as pips) and spirit (a bar, gold once it can pay for the ultimate), phase 6
-    if (G.powers && G.mana) { const m = Math.floor(G.mana[s] + 1e-9), x0 = s ? 760 : 200;
-      for (let k = 0; k < BK_MANA.max; k++) { c.fillStyle = k < m ? '#7fd4ff' : 'rgba(127,212,255,.18)'; c.beginPath(); c.arc(x0 + (s ? -k : k) * 9, 50, 3.2, 0, Math.PI * 2); c.fill(); }
-      const sp = G.spirit[s] / BK_SPIRIT.max, bx = s ? 700 : 200, w = 56; c.fillStyle = 'rgba(255,208,138,.18)'; c.fillRect(s ? bx - w + 60 : bx, 56, w, 4);
-      c.fillStyle = G.spirit[s] >= BK_SPIRIT.ult && !G.ultUsed[s] ? '#ffd08a' : '#c98a4a'; c.fillRect(s ? bx - w + 60 : bx, 56, w * sp, 4); }
-    txt(c, `Fouls ${G.tf[s]}${G.tf[1 - s] > BK_RULES.limit ? ' · in the bonus' : ''}`, s ? 920 : 40, 50, `600 13px ${BK_FONT}`, G.tf[1 - s] > BK_RULES.limit ? '#ffb070' : 'rgba(243,234,214,.6)', al);
-    txt(c, String(G.score[s]), s ? 640 : 320, 46, `900 38px ${BK_FONT}`, G.poss === s && GD.ph !== 'over' ? T.light || '#fff' : '#f3ead6', 'center');
-    if (G.poss === s && GD.ph !== 'over') txt(c, '●', s ? 600 : 360, 40, `14px ${BK_FONT}`, T.color, 'center');
+    if (G.powers && G.mana) { const m = Math.floor(G.mana[s] + 1e-9), w = 62, ready = G.spirit[s] >= BK_SPIRIT.ult && !G.ultUsed[s];
+      txt(c, 'MANA', X(252), 26, F(10, 800), 'rgba(127,212,255,.75)', al);
+      for (let k = 0; k < BK_MANA.max; k++) { c.fillStyle = k < m ? '#7fd4ff' : 'rgba(127,212,255,.18)'; c.beginPath(); c.arc(X(296 + k * 10), 22.5, 3.4, 0, Math.PI * 2); c.fill(); }
+      txt(c, 'SPIRIT', X(252), 47, F(10, 800), ready ? '#ffd08a' : 'rgba(255,208,138,.7)', al);
+      const bx = s ? 960 - 292 - w : 292; c.fillStyle = 'rgba(255,208,138,.18)'; c.fillRect(bx, 40, w, 6);
+      const sp = G.spirit[s] / BK_SPIRIT.max; c.fillStyle = ready ? '#ffd08a' : '#c98a4a'; c.fillRect(s ? bx + w * (1 - sp) : bx, 40, w * sp, 6);
+      // (the mark where the ultimate can be paid for)
+      const u = w * BK_SPIRIT.ult / BK_SPIRIT.max; c.fillStyle = '#f3ead6'; c.fillRect(s ? bx + w - u - 1 : bx + u - 1, 38.5, 1.5, 9); }
+    // the score, lit and underlined in the side's colour while it has the ball
+    const has = G.poss === s && !over;
+    txt(c, String(G.score[s]), X(398), 47, F(40, 900), has ? T.light || '#fff' : '#f3ead6', 'center');
+    if (has) { c.fillStyle = T.color; c.fillRect(X(398) - 20, 54, 40, 4); }
   }
-  txt(c, `${bkPeriodName(G.q)}  ${bkClockText()}`, 480, 30, `800 20px ${BK_FONT}`, '#f3ead6', 'center');
-  const sc = Math.ceil(G.shot), off = G.clock < G.shot;
-  // the calls on this possession (the offense's set against the defense), and each side's timeouts
-  if (G.cur && GD.ph !== 'over') { const C = G.cur, e = bkEdge(C.off, C.def)[0]; txt(c, `${BK_SETS[C.off].n} vs ${BK_DEFS[C.def].n}${C.stale ? ` · scouted${C.stale > 1 ? ' twice' : ''}` : ''}`, C.side ? 640 : 320, 60, `600 11px ${BK_FONT}`, e > 0 ? '#bfe8a8' : e < 0 ? '#ff9a7a' : 'rgba(243,234,214,.7)', 'center'); }
-  if (G.to) for (const s of [0, 1]) txt(c, `TO ${G.to[s]}`, s ? 600 : 360, 22, `600 11px ${BK_FONT}`, 'rgba(243,234,214,.6)', 'center');
-  txt(c, off ? '–' : String(sc), 480, 54, `900 18px ${BK_FONT}`, !off && sc <= 4 ? '#ff6a4a' : '#ffd08a', 'center');
+  txt(c, `${bkPeriodName(G.q)}  ${bkClockText()}`, 480, 27, F(19, 800), '#f3ead6', 'center');
+  // the shot clock, in its own box
+  const sc = Math.ceil(G.shot), off = G.clock < G.shot, low = !off && sc <= 4;
+  c.fillStyle = '#1e0d08'; rr(c, 461, 35, 38, 22, 4); c.fill(); c.strokeStyle = low ? '#ff6a4a' : 'rgba(255,208,138,.4)'; c.lineWidth = 1; c.stroke();
+  txt(c, off ? '–' : String(sc), 480, 52, F(17, 900), low ? '#ff6a4a' : '#ffd08a', 'center');
 }
 function bkDrawMsg(c) {
   const notes = GD.notes && GD.notes.length ? ' ' + GD.notes.join(' ') : '';
-  txt(c, (GD.msg || '') + notes, 480, 520, `600 17px ${BK_FONT}`, '#f3ead6', 'center');
-  // under it, the box line for the game so far: field goals, threes, free throws and rebounds, each side
-  const key = `${L.evN || 0}|${G.log.length}|${GD.ph}|${G.score}|${GD.ft ? GD.ft.n : ''}`;
-  if (BKT.boxKey !== key) { BKT.boxKey = key; BKT.box = bkBox(); }
-  BKT.box.forEach((b, s) => { const t = b.tot; txt(c, `${b.team}: FG ${t.fgm}/${t.fga} · 3PT ${t.tpm}/${t.tpa} · FT ${t.ftm}/${t.fta} · Reb ${t.reb} · Ast ${t.ast} · Stl ${t.stl} · Blk ${t.blk}`, 480, 552 + s * 22, `500 13px ${BK_FONT}`, 'rgba(243,234,214,.65)', 'center'); });
+  // what just happened, on a plate of its own under the court
+  c.save(); c.fillStyle = 'rgba(13,9,7,.72)'; rr(c, 150, 506, 660, 34, 8); c.fill(); c.restore();
+  let m = (GD.msg || '') + notes; c.font = `600 17px ${BK_FONT}`; while (m.length > 8 && c.measureText(m).width > 636) m = m.slice(0, -2).trimEnd() + '…';
+  txt(c, m, 480, 529, `600 17px ${BK_FONT}`, '#f3ead6', 'center');
+  // under it, the calls on this possession: the offense's set against the defense, and who it favours
+  if (G.cur && GD.ph !== 'over') { const C = G.cur, e = bkEdge(C.off, C.def)[0], T = G.teams[C.side], D = G.teams[1 - C.side];
+    const edge = e > 0 ? 'the set has the edge' : e < 0 ? 'the defense has the edge' : 'an even matchup';
+    const line = `${T.name}: ${BK_SETS[C.off].n}  against  ${D.name}: ${BK_DEFS[C.def].n}  ·  ${edge}${C.stale ? `  ·  scouted${C.stale > 1 ? ' twice' : ''}` : ''}`;
+    txt(c, line, 480, 566, `600 14px ${BK_FONT}`, e > 0 ? '#bfe8a8' : e < 0 ? '#ff9a7a' : 'rgba(243,234,214,.75)', 'center'); }
 }
 // the release meter: beside your shooter while they rise (or at the line), and a moment after with where you let go
 function bkDrawMeter(c) {
@@ -29032,7 +29197,7 @@ function bkDrawMeter(c) {
   const w = M ? (M.ft ? bkFtWindow(p) : bkWindow(M.pr, p)) : R0.w, s = bkScr(p.x, p.y), x = s.x + 22, y0 = s.y - 6, H = 64;
   // the bar runs from 0 (the floor) to the late end; the top of the jump is at 1
   const yAt = v => y0 - H * clamp(v, 0, BK_HANDS.late) / BK_HANDS.late;
-  c.save();
+  c.save(); bkZoomAt(c, s);
   c.fillStyle = 'rgba(12,10,9,.8)'; c.fillRect(x - 5, yAt(BK_HANDS.late) - 2, 10, H + 4);
   c.fillStyle = 'rgba(120,200,110,.55)'; c.fillRect(x - 4, yAt(1 + w / 2), 8, yAt(1 - w / 2) - yAt(1 + w / 2));
   c.fillStyle = 'rgba(190,255,170,.95)'; c.fillRect(x - 4, yAt(1 + w * BK_WIN.perfect), 8, yAt(1 - w * BK_WIN.perfect) - yAt(1 + w * BK_WIN.perfect));
@@ -30399,6 +30564,8 @@ return {
   sub: (side, out, inn) => G && G.on ? bkSub(side, out, inn) : 'No game on.', tired: i => L ? bkTired(L.pl[i]) : 0, stamRules: Object.assign({}, BK_STAM),
   // the test's handle on the court: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
   step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) bkTick(BK_DT); return GD ? GD.ph : null; },
+  // the camera (drawing only): how far it has pushed in (u, 0 to 1), on which half (end), and where a court point is drawn
+  cam: () => ({ u: BKT.cam.u, end: BKT.cam.end, sx: BKC.sx, sy: BKC.sy }), scr: (x, y, z) => bkScr(x, y, z || 0),
   get play() { return L; }, get ev() { return L ? L.ev : []; }, shotP: (i, x, y) => L ? bkShotP(L.pl[i], x == null ? L.pl[i].x : x, y == null ? L.pl[i].y : y) : null,
 };
 
@@ -34842,7 +35009,7 @@ renderHelp = function () {
 // who plays it: the coaches, you calling the plays, or you calling them and playing your offense by hand
 const W_GRID_MODES = {
   watch: { n: 'Coaches', title: 'The coaches call every play, both sides. Switching goes on with the same game.' },
-  call: { n: 'You call', title: 'You call your side\'s plays from the bar, and its defense in a game. Your players run them.' },
+  call: { n: 'You call', title: 'You call your side\'s plays under the field, and its defense in a game. Your players run them.' },
   play: { n: 'You play', title: 'You call the plays, then play your offense by hand: Space to throw or stiff-arm, WASD to run, Space twice to kick. On defense you call and watch.' },
 };
 // a position's name and the ratings that matter most there
@@ -34915,7 +35082,7 @@ function wGridHowHTML() {
   return `<p class="hint">You have four downs to gain 10 yards. Make them and the downs start over; reach the end zone for a touchdown (6 points, and the extra point makes 7). If you're stuck, punt the ball away or kick a field goal (3 points). Seven a side, and the same seven play offense and defense.</p>
   <p class="hint"><b>A game</b> is two halves on the clock. The clock runs through each play and between plays, and stops on an incompletion, out of bounds, a score or a change of possession. After a score the side that scored kicks off. Tied at the end, it goes to <b>Sudden Death</b>: the first score wins.</p>
   <p class="hint"><b>Your calls.</b> Pick a play each down; the other coach picks a defense at the same moment, and you see both at the snap.</p>
-  <p class="hint"><b>Who plays it.</b> <b>Coaches</b>: they call every play. <b>You call</b>: you pick your side's plays from the bar (and its defense, in a game), and your players run them. <b>You play</b>: you call them, then play your offense by hand. Switch any time; the game goes on.</p>
+  <p class="hint"><b>Who plays it.</b> <b>Watch</b>: the coaches call every play. <b>Manage</b>: you pick your side's plays under the field (and its defense, in a game), and your players run them. <b>You play</b>: you call them, then play your offense by hand. Switch any time; the game goes on.</p>
   <p class="hint"><b>Playing it by hand.</b> On a pass the quarterback waits for you. The dashed ring is your receiver (the one with the most room, or press Q or E for another). Hold <b>Space</b> and a marker runs out ahead of them, further the longer you hold, while the rush keeps coming; let go to throw there. With the ball, <b>WASD</b> or the arrows steer (let go and they find their own lane), and <b>Space</b> once a play is a stiff-arm that shrugs off the next tackle. The quarterback can scramble too, but can't throw once past the line. Your punts and field goals are a meter: tap <b>Space</b> for the power (a field goal needs the white mark), then again for the aim (inside the green). On defense you call the defense and watch.</p>
   <p class="hint"><b>The bar.</b> <b>Start over</b> begins again, and <b>Back to the world</b> leaves; in the middle of a game both ask first, because leaving forfeits it.</p>
   <ul class="wghow">${Object.keys(wGF.plays).map(k => li(wGF.plays[k].n, wGF.plays[k].desc, wGridEdgeLine(k))).join('')}
@@ -35760,7 +35927,7 @@ wGridBar = function () {
 // Football: how it works (How to play): powers, and every kind's
 function wGridPowersHowHTML() {
   const B = wGF.powerBook, row = (k, b) => `<tr><td>${esc(wCap(k))}</td><td>${b.off ? `<b>${esc(b.off.n)}</b> <small>${b.off.cost}◆</small>: ${esc(b.off.desc)}` : ''}</td><td>${b.def ? `<b>${esc(b.def.n)}</b> <small>${b.def.cost}◆</small>: ${esc(b.def.desc)}` : ''}</td><td>${b.ult ? `<b>★ ${esc(b.ult.n)}</b> <small>${b.ult.role === 'off' ? 'on offense' : 'on defense'}</small>: ${esc(b.ult.desc)}` : ''}</td></tr>`;
-  return `<p class="hint"><b>Powers.</b> Every player has two powers by kind: one on offense and one on defense. With each call your side may cast one, paid for with team mana (the diamonds beside each score): 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores on you, up to 6. Pick one on the bar (or press <b>G</b> to go through them) before you pick the play, or leave <b>Auto powers</b> on and your players cast their own (<b>T</b> switches it). Each kind also has an <b>ultimate</b> (★): once a game, ${wGF.ultCost} mana, and it leaves a zone on the field for ${wGF.ultPlays} plays or the drive, whichever ends first. Zones show on the grass with the plays they have left.</p>
+  return `<p class="hint"><b>Powers.</b> Every player has two powers by kind: one on offense and one on defense. With each call your side may cast one, paid for with team mana (the diamonds beside each score): 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores on you, up to 6. Pick one under the field (or press <b>G</b> to go through them) before you pick the play, or leave <b>Auto powers</b> on and your players cast their own (<b>T</b> switches it). Each kind also has an <b>ultimate</b> (★): once a game, ${wGF.ultCost} mana, and it leaves a zone on the field for ${wGF.ultPlays} plays or the drive, whichever ends first. Zones show on the grass with the plays they have left.</p>
   <p class="hint"><b>Stamina.</b> The same seven play both ways, so every play costs everyone a little, and casting costs a lot more (the undead and golems tire at half the rate). Below half, a player is slower and weaker until rested; the half gives plenty back, and a winded player can't cast. The <b>Sta</b> column under the field shows it. The tip box beside the powers gives the pros and cons of the one you point at, for this down. After each play the reason says what was cast and what it did. Their coach casts too, better at higher tiers, and remembers the plays you cast on.</p>
   <details class="wghow"><summary>Every kind's powers</summary><div class="tablewrap"><table class="wgline wgbook"><thead><tr><th>Kind</th><th>Offense</th><th>Defense</th><th>Ultimate</th></tr></thead><tbody>${Object.keys(B).map(k => row(k, B[k])).join('')}</tbody></table></div></details>`;
 }
@@ -36151,17 +36318,17 @@ function wGridBenchHTML() {
   const b = wGF.bench(); if (!b || !b.stam) return '';
   const pos = p => [p.off, p.def].filter(Boolean).join('/'), opt = p => `<option value="${p.ri}">${esc(p.n)} (${pos(p)}), ${p.stam}%</option>`;
   const tired = b.on.slice().sort((x, y) => x.stam - y.stam), off = !b.between ? ' disabled' : '';
-  const rows = b.bench.map(p => `<tr><td>${esc(p.n)} <small>#${p.num} ${esc(wCap(p.kind))}</small></td><td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td>
-    <td><select data-gin="${p.ri}" aria-label="Put ${esc(p.n)} on for"${off}><option value="">Put on for…</option>${tired.map(opt).join('')}</select></td></tr>`).join('');
+  const rows = b.bench.map(p => `<label class="wgsub">${esc(p.n)} <small>#${p.num} ${esc(wCap(p.kind))}</small> <b class="${p.stam < 50 ? 'wgbad' : ''}" title="Stamina: on the bench they rest, ${wGF.stamRules.bench} a play">${p.stam}</b>
+    <select data-gin="${p.ri}" aria-label="Put ${esc(p.n)} on for"${off}><option value="">Put on for…</option>${tired.map(opt).join('')}</select></label>`).join('');
   const world = wGridWorld(), pots = Object.keys(W_GF_POTIONS).map(id => {
     const n = WG && WG.items ? WG.items[id] || 0 : 0, P = W_GF_POTIONS[id], it = DB.items[id], can = world && n && b.between && !b.item;
     return P.all ? `<button class="ghost" data-gpot="${id}" title="${esc(it.desc)}"${can ? '' : ' disabled'}>${esc(it.name)} ×${n}</button>`
       : `<select data-gpot="${id}" aria-label="Give a ${esc(it.name)} to" title="${esc(it.desc)}"${can ? '' : ' disabled'}><option value="">${esc(it.name)} ×${n}: give to…</option>${tired.map(opt).join('')}</select>`;
   }).join('');
-  return `<div class="wgbench"><div class="tablewrap"><table class="wgline"><caption>Your bench</caption><thead><tr><th>Player</th><th title="Stamina: on the bench they rest, ${wGF.stamRules.bench} a play">Sta</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="3" class="hint">Nobody on the bench.</td></tr>'}</tbody></table></div>
-    <div class="wgpots"><b>Potions</b>${pots}${b.item ? '<small class="hint">One given this play.</small>' : ''}</div>
-    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : ['post', 'over'].includes(wGF.phase) ? 'That was the last play: no more swaps or potions.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Coaches, they make the swaps.' : ''}</p></div>`;
+  // (two rows of the coach's panel under the field, w87: Subs and Bag, as on the court)
+  return `<div class="wgbench"><div class="wccrow"><span class="wccl">Subs</span>${rows || '<small class="hint">Nobody on the bench.</small>'}</div>
+    <div class="wccrow"><span class="wccl">Bag</span><div class="wgpots"><b>Potions</b>${pots}${b.item ? '<small class="hint">One given this play.</small>' : ''}</div></div>
+    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : ['post', 'over'].includes(wGF.phase) ? 'That was the last play: no more swaps or potions.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Watch, they make the swaps.' : ''}</p></div>`;
 }
 $('wGridLineup').insertAdjacentHTML('afterend', '<div id="wGridBench"></div>');
 $('wGridBench').addEventListener('change', e => {
@@ -36183,7 +36350,7 @@ wGridBar = function () {
   if (WGB.html !== h) { WGB.html = h; $('wGridBench').innerHTML = h; }
 };
 
-W_GRID_HOW.push(() => `<p class="hint"><b>Tired players.</b> Under the field, with your lineup: <b>Your bench</b>. Between plays, put a bench player on for a tired one; they take every place the tired one had, on offense and on defense, and the one who comes off rests (${wGF.stamRules.bench} stamina a play) and may go back on. <b>Potions</b>: a Stamina Draught gives one player ${W_GF_POTIONS.draught.n} stamina back, and a Second Wind gives the whole seven ${W_GF_POTIONS.secondwind.n}; one a play, in a real game. The general stores sell them. Some powers give stamina back too: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth. The other side's coach swaps too, and so do yours under Coaches. Every swap, potion and power goes in the play log.</p>`);
+W_GRID_HOW.push(() => `<p class="hint"><b>Tired players.</b> Under the field: <b>Subs</b>. Between plays, put a bench player on for a tired one; they take every place the tired one had, on offense and on defense, and the one who comes off rests (${wGF.stamRules.bench} stamina a play) and may go back on. <b>Bag</b>: a Stamina Draught gives one player ${W_GF_POTIONS.draught.n} stamina back, and a Second Wind gives the whole seven ${W_GF_POTIONS.secondwind.n}; one a play, in a real game. The general stores sell them. Some powers give stamina back too: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth. The other side's coach swaps too, and so do yours under Watch. Every swap, potion and power goes in the play log.</p>`);
 
 const wW48RenderHelp = renderHelp;
 renderHelp = function () {
@@ -36263,7 +36430,7 @@ const wW49RenderHelp = renderHelp;
 renderHelp = function () {
   wW49RenderHelp();
   const g = $('wHelpGfBench') || $('wHelpGfPowers') || $('wHelpGridiron'); if (!g || $('wHelpGfStance')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfStance"><b>Stances on the gridiron.</b> Beside each call your side plays Safe, Balanced or Risky, on offense and on defense (the buttons on the bar, or S). Risky chases big plays and risks sacks, interceptions and fumbles, and tires your seven faster; Safe gives up the big play to avoid them, and saves stamina. It stays until you change it. Fumbles are rare, and likelier the riskier either side plays. Win games playing mostly Risky for the Gunslinger medal, or mostly Safe for the Grinder.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfStance"><b>Stances on the gridiron.</b> Beside each call your side plays Safe, Balanced or Risky, on offense and on defense (the buttons under the field, or S). Risky chases big plays and risks sacks, interceptions and fumbles, and tires your seven faster; Safe gives up the big play to avoid them, and saves stamina. It stays until you change it. Fumbles are rare, and likelier the riskier either side plays. Win games playing mostly Risky for the Gunslinger medal, or mostly Safe for the Grinder.</p>`);
 };
 /* w50: ambient music out in the world (issue #28, phases 1 to 4). Beside Sudden Death's sequencer (app/music.js, left
    alone for matches, the title and the other places), a generative engine plays slow layers for where you stand:
@@ -36916,7 +37083,7 @@ $('wRingBar').addEventListener('click', e => {
   else if (b.id === 'wRingBack') wLeaveRing();
 });
 // under the ring: the pad (You box), and How boxing works
-$('v-ring').insertAdjacentHTML('beforeend', `<div id="wRingPad" class="wrpad" hidden role="group" aria-label="Box">${W_RING_PAD.map(([k, n, key]) => `<button class="ghost" data-rpad="${k}" title="${esc(key)}">${esc(n)}</button>`).join('')}</div>
+$('v-ring').insertAdjacentHTML('beforeend', `<div id="wRingPad" class="wrpad" hidden role="group" aria-label="Box">${W_RING_PAD.map(([k, n, key]) => `<button class="ghost" data-rpad="${k}" data-key="${esc(key.split(/[,:]/)[0])}" title="${esc(key)}">${esc(n)}</button>`).join('')}</div>
   <p class="hint wghowlink">How boxing works: the punches, defending, the plans and the judges. <button class="ghost" id="wRingHowBtn">How to play boxing</button> <small>The bout waits while you read.</small></p>`);
 $('wRingHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wRingHow'); if (h) h.scrollIntoView({ block: 'start' }); });
 // a punch on the press, the guard while it's held down
@@ -40599,7 +40766,7 @@ function wCourtPad() {
   if (pad.dataset.side === side) return;
   wCourtPadRelease();
   pad.dataset.side = side;
-  pad.innerHTML = W_COURT_PAD[side].map(([k, n, key, hold]) => `<button class="ghost" data-cpad="${k}" ${hold ? 'data-hold="1"' : ''} title="${esc(key)}">${esc(n)}</button>`).join('');
+  pad.innerHTML = W_COURT_PAD[side].map(([k, n, key, hold]) => `<button class="ghost" data-cpad="${k}" ${hold ? 'data-hold="1"' : ''} data-key="${esc(key.split(/[,:]/)[0])}" title="${esc(key)}">${esc(n)}</button>`).join('');
 }
 // (kept up a few times a second while a game is on the court, and stopped when it's left)
 let W_COURT_TICK = 0;
@@ -40693,7 +40860,7 @@ new MutationObserver(wCourtSetRow).observe($('modalBox'), { childList: true });
 // How to play: Basketball, how it works
 function wCourtHowHTML() {
   const R = wBK.rules;
-  return `<p class="hint">A game is five on five on a full court, four quarters on the game clock (${R.mins} minutes in all unless you change it in Settings: ${R.minsAt.join(', ')}). Each trip down the floor is one possession against a <b>shot clock</b> of ${R.shot} seconds. A shot that hits the rim resets it, and a clock that runs out turns the ball over. After a basket the other side brings it up; the walk up the floor is sped through.</p>
+  return `<p class="hint">A game is five on five on a full court, four quarters on the game clock (${R.mins} minutes in all unless you change it in Settings: ${R.minsAt.join(', ')}). Each trip down the floor is one possession against a <b>shot clock</b> of ${R.shot} seconds. A shot that hits the rim resets it, and a clock that runs out turns the ball over. After a basket the other side brings it up; the walk up the floor is sped through. The picture shows the whole court while the play crosses it, and moves in on one half once everyone is there.</p>
   <p class="hint"><b>Shots.</b> A basket is 2, or 3 from beyond the arc, and a free throw is 1. How likely a shot goes in comes from the distance, the shooter's touch, and the <b>contest</b>: how close the nearest defender is, and how good. At the rim size and hops count, and a big leaper dunks. A defender close to the shot can block it, or foul.</p>
   <p class="hint"><b>The player with the ball</b> weighs what's on: a good look gets shot, a defender in the lane gets beaten off the dribble (handle and speed against defense and speed) or the ball gets moved to the teammate with the best look. A pass thrown into a defender's lane can be stolen, and a defender up close can pick the dribble. After a steal or a defensive rebound the play goes straight the other way: a side slow to get back gives up a fast break.</p>
   <p class="hint"><b>Rebounds.</b> A miss comes off the rim, further on a three. Whoever is nearest where it comes down has the best of it, with size and hops, and the defense has inside position.</p>
@@ -42030,6 +42197,115 @@ renderHelp = function () {
   wW85RenderHelp();
   const d = $('wHelpCourtNet'); if (!d || $('wHelpCourtFeel')) return;
   d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtFeel"><b>On the court</b> you hear the rim, the blocks and steals, the crowd for your baskets (loudest for a dunk), the whistle for free throws and timeouts, the buzzer at each break and the walled yard's roar; sounds follow your Sound effects setting, and the realm's music plays on. Basketball games won and Charter Nets have medals in the record book.</p>`);
+};
+/* Champions of the Realm: a scoreboard you can read on a phone (issue #80). Football, boxing and basketball draw their
+   score bar inside the canvas, 960 wide; on a phone the canvas is 370 wide and the bar's letters are a few pixels tall.
+   So at narrow widths (W_SB_MAX and under; w6.css hides it above) each of the three has a strip of real text over its
+   canvas: both sides and the score (the side with the ball marked), and the line that says where the game is (the
+   down and the spot, the round and its clock, the period with the game and shot clocks). Boxing has each fighter's
+   health and stamina as bars. It reads the engines' own state (wGF.G, wBX.G, wBK.G) four times a second while one of
+   the three is on show, and changes nothing in them. Baseball has its own panel (bd 33-phone-panel.js).
+   The pad buttons under the ring and the court also show their keys (w51-ring.js, w77-court.js, w6.css). */
+const W_SB_MAX = 640, W_SB_VIEWS = { gridiron: 'wSbGrid', ring: 'wSbRing', court: 'wSbCourt' };
+const wSbState = { timer: 0, last: '' };
+const wSbBar = (v, col) => `<i class="wsbbar"><i style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%;background:${col}"></i></i>`;
+// one side of the strip: its colour, its name, the big number, and a line under the name
+const wSbSide = (name, col, big, has, sub) => `<div class="wsbside${has ? ' has' : ''}" style="--c:${esc(col)}"><b>${esc(name)}</b>${big == null ? '' : `<strong>${esc(String(big))}</strong>`}${sub || ''}</div>`;
+function wSbGridHTML() {
+  const G = wGF.G; if (!G || !G.teams) return '';
+  const C = wGF.clock(), over = wGF.phase === 'over', togo = G.togo >= 100 - G.ball ? 'goal' : G.togo, spot = G.ball < 50 ? 'own ' + G.ball : G.ball === 50 ? 'midfield' : 'their ' + (100 - G.ball);
+  const mid = over ? 'Final' : `${['', '1st', '2nd', '3rd', '4th'][G.down] || ''} & ${togo} · ${spot}`;
+  return wSbSide(G.teams[0].name, G.teams[0].color, G.score[0], !over && G.poss === 0) + `<div class="wsbmid"><b>${esc(mid)}</b>${C ? `<small>${esc(C.name)} ${esc(C.text)}</small>` : ''}</div>` + wSbSide(G.teams[1].name, G.teams[1].color, G.score[1], !over && G.poss === 1);
+}
+function wSbRingHTML() {
+  const G = wBX.G; if (!G || !G.F) return '';
+  const over = wBX.phase === 'over', side = s => { const f = G.F[s]; return wSbSide(f.n, G.corners[s].color, null, false, `<small>Health</small>${wSbBar(f.hp / 100, '#e0703a')}<small>Stamina</small>${wSbBar(f.staMax ? f.sta / f.staMax : 0, '#5ab8d8')}`); };
+  return side(0) + `<div class="wsbmid"><b>${over ? 'Final' : `Round ${G.round} of ${G.rounds}`}</b><small>${over ? '' : `0:${String(Math.max(0, Math.ceil(G.clock))).padStart(2, '0')}`}</small></div>` + side(1);
+}
+function wSbCourtHTML() {
+  const G = wBK.G; if (!G || !G.teams) return '';
+  const C = wBK.clock(), over = wBK.phase === 'over', shot = C && G.clock >= G.shot ? ` · shot ${C.shot}` : '';
+  return wSbSide(G.teams[0].name, G.teams[0].color, G.score[0], !over && G.poss === 0) + `<div class="wsbmid"><b>${over ? 'Final' : C ? esc(`${C.name} ${C.text}`) : ''}</b><small>${over ? '' : esc(shot.slice(3))}</small></div>` + wSbSide(G.teams[1].name, G.teams[1].color, G.score[1], !over && G.poss === 1);
+}
+const W_SB_HTML = { gridiron: wSbGridHTML, ring: wSbRingHTML, court: wSbCourtHTML };
+// the strip for a view, made the first time it's wanted: just above that view's canvas
+function wSbEl(v) {
+  let el = $(W_SB_VIEWS[v]); if (el) return el;
+  const cv = document.querySelector(`#v-${v} canvas`); if (!cv) return null;
+  cv.insertAdjacentHTML('beforebegin', `<div id="${W_SB_VIEWS[v]}" class="wsb" role="status" aria-label="Score"></div>`);
+  return $(W_SB_VIEWS[v]);
+}
+function wSbNarrow() { return innerWidth <= W_SB_MAX; }
+// draw the strip for the view on show, if it's a sport and the page is narrow; only touches the page when the words change
+function wSbRender() {
+  const v = UI.view; if (!W_SB_HTML[v] || !wSbNarrow()) return;
+  const el = wSbEl(v); if (!el) return;
+  let h = ''; try { h = W_SB_HTML[v](); } catch (e) { h = ''; }
+  if (h !== wSbState.last || !el.firstChild) { el.innerHTML = h; wSbState.last = h; }
+  el.hidden = !h;
+}
+const wW86ShowView = showView;
+showView = function (v) {
+  wW86ShowView(v);
+  clearInterval(wSbState.timer); wSbState.timer = 0; wSbState.last = '';
+  if (W_SB_HTML[v] && !LAB) { wSbState.timer = setInterval(wSbRender, 250); wSbRender(); }
+};
+/* The same page around football and basketball (issue #80). Both screens are laid out alike, top to bottom:
+     the bar: the game's title, who plays it (Watch, Manage, You play), and leaving;
+     the status line under it (.wsnote): what is asked of you now, and the keys;
+     the picture;
+     the coach's rows (.wccalls: a label, then its buttons): the call, the stance, Powers, Subs, Bag;
+     the two sides' tables side by side, then This game: what has happened so far.
+   Basketball was already most of this (w77 to w82); here football's calls, stance and powers come off its bar into
+   rows under the field (#wGridCoach; w48 writes Subs and Bag as rows), its lineups sit side by side, and basketball
+   gets a log of the scoring (#wCourtLog, from the engine's G.log). Nothing here changes a game: the same buttons,
+   ids and keys, in new places.
+   Wraps: wGridBar (wW87GridBar: which rows show, and the call row's label), wCourtBox (wW87CourtBox: the log). */
+
+/* ---------- football: the coach's rows under the field ---------- */
+$('wGridPanel').insertAdjacentHTML('beforebegin', `<div id="wGridCoach" class="wccalls wscoach">
+  <div class="wccrow" id="wGridRowCall"><span class="wccl" id="wGridCallL">Play</span></div>
+  <div class="wccrow" id="wGridRowStance"><span class="wccl">Stance</span></div>
+  <div class="wccrow" id="wGridRowPow"><span class="wccl">Powers</span></div>
+  <p class="hint" id="wGridCoachNone" hidden>The coaches call both sides. Pick Manage or You play to call your own.</p></div>`);
+$('wGridRowCall').append($('wGridCalls'), $('wGridDefs'));
+$('wGridRowStance').append($('wGridStance'));
+$('wGridRowPow').append($('wGridPows'));
+$('wGridRowPow').after($('wGridTip'), $('wGridBench'));
+// (the calls were heard on the bar they have left)
+$('wGridRowCall').addEventListener('click', e => {
+  const b = e.target.closest('button'), k = b && (b.dataset.gcall || b.dataset.gkick || b.dataset.gdef); if (!k) return;
+  wGF.call(k); wGridBar();
+});
+$('wGridNote').classList.add('wsnote'); $('wCourtNote').classList.add('wsnote');
+for (const [k, n] of [['watch', 'Watch'], ['call', 'Manage']]) { W_GRID_MODES[k].n = n; const b = $('wGridModes').querySelector(`[data-gmode="${k}"]`); if (b) b.textContent = n; }
+
+const wW87GridBar = wGridBar;
+wGridBar = function () {
+  wW87GridBar.apply(this, arguments);
+  if (!WGF) return;
+  const offs = !$('wGridCalls').hidden, defs = !$('wGridDefs').hidden;
+  $('wGridCallL').textContent = defs ? 'Defense' : 'Play';
+  $('wGridRowCall').hidden = !offs && !defs; $('wGridRowStance').hidden = $('wGridStance').hidden; $('wGridRowPow').hidden = $('wGridPows').hidden;
+  $('wGridCoachNone').hidden = WGF.mode !== 'watch' || !!WGF.over;
+};
+
+/* ---------- basketball: the box score's heading, and This game ---------- */
+$('wCourtBox').insertAdjacentHTML('beforebegin', '<h4 class="wsh">Box score</h4>');
+$('wCourtBox').insertAdjacentHTML('afterend', '<h4 class="wsh">This game</h4><ol id="wCourtLog" class="wglog wslog"></ol>');
+const W_COURT_SHOT = { dunk: 'dunks', three: 'hits a three', layup: 'lays it in', jumper: 'hits a jumper', ft: 'makes a free throw' };
+// every score so far, oldest first: when, the score after it, who and how
+function wCourtLogHTML() {
+  const G = wBK.G, log = G && G.log; if (!log || !log.length) return '<li class="hint">No baskets yet.</li>';
+  const sc = [0, 0], t = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  return log.map(e => { sc[e.side] += e.pts; const T = G.teams[e.side];
+    return `<li style="border-left-color:${T.color}"><small>${esc(wBK.periodName(e.q))} ${t(e.clock)} · ${sc[0]}–${sc[1]}</small> <b>${esc(e.who)}</b> ${W_COURT_SHOT[e.k] || 'scores'} for ${esc(T.name)}${e.ast ? `, from ${esc(e.ast)}` : ''}.</li>`; }).join('');
+}
+const wW87CourtBox = wCourtBox;
+wCourtBox = function () {
+  wW87CourtBox.apply(this, arguments);
+  const h = wBK.box() ? wCourtLogHTML() : '', L = $('wCourtLog');
+  if (L.dataset.h !== h) { L.dataset.h = h; L.innerHTML = h; L.scrollTop = L.scrollHeight; }
 };
 </script>
 </body></html>

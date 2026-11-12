@@ -117,3 +117,5 @@ src/realm/w82-courtkit.js
 src/realm/w83-courtstars.js
 src/realm/w84-courtnet.js
 src/realm/w85-courtfeel.js
+src/realm/w86-sportbar.js
+src/realm/w87-sportpage.js

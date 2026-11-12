@@ -51,17 +51,17 @@ function wGridBenchHTML() {
   const b = wGF.bench(); if (!b || !b.stam) return '';
   const pos = p => [p.off, p.def].filter(Boolean).join('/'), opt = p => `<option value="${p.ri}">${esc(p.n)} (${pos(p)}), ${p.stam}%</option>`;
   const tired = b.on.slice().sort((x, y) => x.stam - y.stam), off = !b.between ? ' disabled' : '';
-  const rows = b.bench.map(p => `<tr><td>${esc(p.n)} <small>#${p.num} ${esc(wCap(p.kind))}</small></td><td class="${p.stam < 50 ? 'wgbad' : ''}">${p.stam}</td>
-    <td><select data-gin="${p.ri}" aria-label="Put ${esc(p.n)} on for"${off}><option value="">Put on for…</option>${tired.map(opt).join('')}</select></td></tr>`).join('');
+  const rows = b.bench.map(p => `<label class="wgsub">${esc(p.n)} <small>#${p.num} ${esc(wCap(p.kind))}</small> <b class="${p.stam < 50 ? 'wgbad' : ''}" title="Stamina: on the bench they rest, ${wGF.stamRules.bench} a play">${p.stam}</b>
+    <select data-gin="${p.ri}" aria-label="Put ${esc(p.n)} on for"${off}><option value="">Put on for…</option>${tired.map(opt).join('')}</select></label>`).join('');
   const world = wGridWorld(), pots = Object.keys(W_GF_POTIONS).map(id => {
     const n = WG && WG.items ? WG.items[id] || 0 : 0, P = W_GF_POTIONS[id], it = DB.items[id], can = world && n && b.between && !b.item;
     return P.all ? `<button class="ghost" data-gpot="${id}" title="${esc(it.desc)}"${can ? '' : ' disabled'}>${esc(it.name)} ×${n}</button>`
       : `<select data-gpot="${id}" aria-label="Give a ${esc(it.name)} to" title="${esc(it.desc)}"${can ? '' : ' disabled'}><option value="">${esc(it.name)} ×${n}: give to…</option>${tired.map(opt).join('')}</select>`;
   }).join('');
-  return `<div class="wgbench"><div class="tablewrap"><table class="wgline"><caption>Your bench</caption><thead><tr><th>Player</th><th title="Stamina: on the bench they rest, ${wGF.stamRules.bench} a play">Sta</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="3" class="hint">Nobody on the bench.</td></tr>'}</tbody></table></div>
-    <div class="wgpots"><b>Potions</b>${pots}${b.item ? '<small class="hint">One given this play.</small>' : ''}</div>
-    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : ['post', 'over'].includes(wGF.phase) ? 'That was the last play: no more swaps or potions.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Coaches, they make the swaps.' : ''}</p></div>`;
+  // (two rows of the coach's panel under the field, w87: Subs and Bag, as on the court)
+  return `<div class="wgbench"><div class="wccrow"><span class="wccl">Subs</span>${rows || '<small class="hint">Nobody on the bench.</small>'}</div>
+    <div class="wccrow"><span class="wccl">Bag</span><div class="wgpots"><b>Potions</b>${pots}${b.item ? '<small class="hint">One given this play.</small>' : ''}</div></div>
+    ${WGB.msg ? `<p class="wgbad">${esc(WGB.msg)}</p>` : ''}<p class="hint">${b.between ? 'Between plays: put a fresh player on for a tired one (they take every place the tired one had), or give out a potion, one a play.' : ['post', 'over'].includes(wGF.phase) ? 'That was the last play: no more swaps or potions.' : 'Swaps and potions wait until the play is over.'}${world ? '' : ' Potions are for real games.'}${WGF && WGF.mode === 'watch' ? ' Under Watch, they make the swaps.' : ''}</p></div>`;
 }
 $('wGridLineup').insertAdjacentHTML('afterend', '<div id="wGridBench"></div>');
 $('wGridBench').addEventListener('change', e => {
@@ -83,7 +83,7 @@ wGridBar = function () {
   if (WGB.html !== h) { WGB.html = h; $('wGridBench').innerHTML = h; }
 };
 
-W_GRID_HOW.push(() => `<p class="hint"><b>Tired players.</b> Under the field, with your lineup: <b>Your bench</b>. Between plays, put a bench player on for a tired one; they take every place the tired one had, on offense and on defense, and the one who comes off rests (${wGF.stamRules.bench} stamina a play) and may go back on. <b>Potions</b>: a Stamina Draught gives one player ${W_GF_POTIONS.draught.n} stamina back, and a Second Wind gives the whole seven ${W_GF_POTIONS.secondwind.n}; one a play, in a real game. The general stores sell them. Some powers give stamina back too: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth. The other side's coach swaps too, and so do yours under Coaches. Every swap, potion and power goes in the play log.</p>`);
+W_GRID_HOW.push(() => `<p class="hint"><b>Tired players.</b> Under the field: <b>Subs</b>. Between plays, put a bench player on for a tired one; they take every place the tired one had, on offense and on defense, and the one who comes off rests (${wGF.stamRules.bench} stamina a play) and may go back on. <b>Bag</b>: a Stamina Draught gives one player ${W_GF_POTIONS.draught.n} stamina back, and a Second Wind gives the whole seven ${W_GF_POTIONS.secondwind.n}; one a play, in a real game. The general stores sell them. Some powers give stamina back too: the troll's Boulder, the vampire's Mesmerize, the witch's Hex and the elf's Overgrowth. The other side's coach swaps too, and so do yours under Watch. Every swap, potion and power goes in the play log.</p>`);
 
 const wW48RenderHelp = renderHelp;
 renderHelp = function () {

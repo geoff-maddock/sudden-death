@@ -2,8 +2,8 @@
    its platform, the canvas scorched at the edges, red, white and blue ropes, the red corner at the back left and the blue
    at the front right, and the crowd in the dark around it. The fighters are the inked figures (03-figures.js) in
    gloves, posed by what they're doing (bxPose), the nearer one in front, each turned to face the other.
-   The bar at the top has both fighters: health (the dark part is what big shots have taken off their most), stamina,
-   knockdowns, the cut-man's patches and the plan; the round and the clock are in the middle. Under the ring, the last
+   The bar at the top has both fighters: health (the dark part is what big shots have taken off their most), stamina
+   and spirit, each bar with its name, knockdowns (DOWN), the cut-man's patches (CUTS) and the plan; the round and the clock are in the middle. Under the ring, the last
    lines of the log. Punches that land show a word (BXT.fx, from BXE). After a knockdown the count is over the fighter;
    between rounds a card has each judge's score for the round and the plans for the next; at the end, the verdict and
    the three cards round by round, with the punch stats.
@@ -46,16 +46,27 @@ function bxDraw(c) {
   if (BD.ph === 'over') bxDrawOver(c);
 }
 function bxDrawHall(c) {
+  // the hall's back wall, warm where the forge light reaches it
+  const w = c.createLinearGradient(0, 90, 0, 330); w.addColorStop(0, '#1d130f'); w.addColorStop(1, '#0d0908'); c.fillStyle = w; c.fillRect(0, 90, 960, 240);
   // a cone of forge light on the ring, and the crowd's heads in the dark
-  const g = c.createRadialGradient(480, 300, 40, 480, 300, 520); g.addColorStop(0, 'rgba(255,170,90,.16)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  const g = c.createRadialGradient(480, 300, 40, 480, 300, 520); g.addColorStop(0, 'rgba(255,170,90,.2)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = g; c.fillRect(0, 90, 960, 510);
+  // the far crowd: lit from the ring, so the ones nearer the middle are brighter; a few in each corner's colour
   for (const [x, row, v] of BX_CROWD) {
-    const y = 150 + row * 13, s = 6 + row * .8;
-    c.fillStyle = `rgb(${24 + v * 3},${17 + v * 2},${14 + v})`; c.beginPath(); c.arc(x, y, s, Math.PI, 0); c.fill(); c.fillRect(x - s, y, 2 * s, 14);
+    const y = 150 + row * 13 + Math.sin(BXT.t * 2 + x) * .8, s = 6 + row * .8, lit = 1 - Math.min(1, Math.abs(x - 480) / 560) * .55, m = (26 + v * 5) * lit;
+    c.fillStyle = v === 3 ? tint(G.corners[x < 480 ? 0 : 1].color, -.55 - (1 - lit) * .3) : `rgb(${m * 1.5 | 0},${m * 1.05 | 0},${m * .85 | 0})`;
+    c.beginPath(); c.arc(x, y, s, Math.PI, 0); c.fill(); c.fillRect(x - s, y, 2 * s, 14);
+    c.fillStyle = `rgba(255,190,130,${.1 * lit})`; c.beginPath(); c.arc(x, y, s, Math.PI * 1.15, Math.PI * 1.85); c.fill();
   }
+  // two beams from the lamps over the ring
+  c.save();
+  for (const lx of [330, 630]) {
+    c.globalAlpha = .07; c.fillStyle = '#ffd9a0'; c.beginPath(); c.moveTo(lx - 12, 90); c.lineTo(lx + 12, 90); c.lineTo(lx + 170, 470); c.lineTo(lx - 170, 470); c.closePath(); c.fill();
+  }
+  c.restore();
   for (const [x, row, v] of BX_CROWD.slice(0, 60)) {
     const y = 560 + row * 10, s = 13 + row;
-    c.fillStyle = `rgb(${14 + v * 2},${10 + v},${9 + v})`; c.beginPath(); c.arc((x * 1.3) % 980, y, s, Math.PI, 0); c.fill(); c.fillRect((x * 1.3) % 980 - s, y, 2 * s, 40);
+    c.fillStyle = `rgb(${20 + v * 3},${14 + v * 2},${12 + v})`; c.beginPath(); c.arc((x * 1.3) % 980, y, s, Math.PI, 0); c.fill(); c.fillRect((x * 1.3) % 980 - s, y, 2 * s, 40);
   }
 }
 const BX_POSTS = [[-9, -9, 'red'], [9, -9, 'white'], [-9, 9, 'white'], [9, 9, 'blue']];
@@ -171,19 +182,26 @@ function bxBarSide(c, f, right) {
   txt(c, `${f.kind} · ${BX_PLAN[f.plan].n}${pw}${S && S.fx.length ? '  · ' + S.fx.map(x => x.n).join(', ') : ''}`, x0 + dir * 14, 46, '13px "Alegreya Sans", sans-serif', '#b8aa94', right ? 'right' : 'left');
   // health: lost from the most is dark, the rest red to gold
   const hx = x0 + dir * 14, bw = W;
-  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 52, bw, 10);
-  c.fillStyle = '#4a2a24'; c.fillRect(right ? hx - bw * f.hpMax / 100 : hx, 52, bw * f.hpMax / 100, 10);
+  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 51, bw, 11);
+  c.fillStyle = '#4a2a24'; c.fillRect(right ? hx - bw * f.hpMax / 100 : hx, 51, bw * f.hpMax / 100, 11);
   const hp = Math.max(0, f.hp) / 100, g = c.createLinearGradient(hx, 0, hx + dir * bw, 0); g.addColorStop(0, '#c8352a'); g.addColorStop(1, '#f2c14a');
-  c.fillStyle = g; c.fillRect(right ? hx - bw * hp : hx, 52, bw * hp, 10);
-  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 66, bw, 6);
-  c.fillStyle = '#5ab8d8'; c.fillRect(right ? hx - bw * bxFrac(f) : hx, 66, bw * bxFrac(f), 6);
+  c.fillStyle = g; c.fillRect(right ? hx - bw * hp : hx, 51, bw * hp, 11);
+  c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 64, bw, 9);
+  c.fillStyle = '#5ab8d8'; c.fillRect(right ? hx - bw * bxFrac(f) : hx, 64, bw * bxFrac(f), 9);
   // spirit (11-powers.js): violet, with ticks where a special and an ultimate can go
-  if (bxPowOn()) { const sp = bxSpirit(f) / BX_SPIRIT.max; c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 75, bw, 4);
-    c.fillStyle = '#a77cf0'; c.fillRect(right ? hx - bw * sp : hx, 75, bw * sp, 4);
-    c.fillStyle = '#e8dcc0'; for (const k of ['sp', 'ult']) { const v = bw * BX_SPIRIT[k] / BX_SPIRIT.max; c.fillRect(right ? hx - v - 1 : hx + v - 1, 74, 2, 6); } }
-  // knockdowns taken, and the cut-man's patches left
-  for (let i = 0; i < BX_RULES.kd; i++) { c.beginPath(); c.arc(at(bw + 26 + i * 14, 0), 57, 4.5, 0, Math.PI * 2); c.fillStyle = i < G.kd[f.side] ? '#ff6a4a' : '#2a1d17'; c.fill(); }
-  for (let i = 0; i < BX_RULES.patches; i++) { c.fillStyle = i < f.patches ? '#e8dcc0' : '#2a1d17'; c.fillRect(at(bw + 20 + i * 14, 8), 66, 8, 6); }
+  const pow = bxPowOn();
+  if (pow) { const sp = bxSpirit(f) / BX_SPIRIT.max; c.fillStyle = '#1a1210'; c.fillRect(right ? hx - bw : hx, 75, bw, 9);
+    c.fillStyle = '#a77cf0'; c.fillRect(right ? hx - bw * sp : hx, 75, bw * sp, 9);
+    c.fillStyle = '#e8dcc0'; for (const k of ['sp', 'ult']) { const v = bw * BX_SPIRIT[k] / BX_SPIRIT.max; c.fillRect(right ? hx - v - 1 : hx + v - 1, 74, 2, 11); } }
+  // each bar's name at its outer end, inked so it reads on the bar and off it
+  c.save(); c.font = '800 8px "Alegreya Sans", sans-serif'; c.textAlign = right ? 'right' : 'left'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round'; c.lineWidth = 2.5; c.strokeStyle = 'rgba(20,12,8,.85)'; c.fillStyle = '#fff4dc';
+  for (const [w, y] of [['HEALTH', 60], ['STAMINA', 71.5]].concat(pow ? [['SPIRIT', 82.5]] : [])) { c.strokeText(w, hx + dir * 4, y); c.fillText(w, hx + dir * 4, y); }
+  c.restore();
+  // knockdowns taken, and the cut-man's patches left, each with its name
+  for (let i = 0; i < BX_RULES.kd; i++) { c.beginPath(); c.arc(at(bw + 26 + i * 14, 0), 56, 4.5, 0, Math.PI * 2); c.fillStyle = i < G.kd[f.side] ? '#ff6a4a' : '#2a1d17'; c.fill(); }
+  for (let i = 0; i < BX_RULES.patches; i++) { c.fillStyle = i < f.patches ? '#e8dcc0' : '#2a1d17'; c.fillRect(at(bw + 20 + i * 14, 8), 67, 8, 6); }
+  txt(c, 'DOWN', x0 + dir * (bw + 74), 59, '800 8px "Alegreya Sans", sans-serif', G.kd[f.side] ? '#ff9a7a' : '#8a7c68', right ? 'right' : 'left');
+  txt(c, 'CUTS', x0 + dir * (bw + 60), 73, '800 8px "Alegreya Sans", sans-serif', '#8a7c68', right ? 'right' : 'left');
 }
 function bxDrawBar(c) {
   c.fillStyle = 'rgba(14,10,9,.92)'; c.fillRect(0, 0, 960, 90);

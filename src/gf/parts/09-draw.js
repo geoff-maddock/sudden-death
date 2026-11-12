@@ -1,5 +1,5 @@
 /* Cinder Gridiron: the field, drawn (issue #9, phase 1). The Ash Bowl from above and a little to one side: green grass
-   in a bowl of black basalt, the goalposts scorched at the top. The camera follows the ball. Yard lines every five, the
+   in a bowl of black basalt with its crowd and braziers (gfDrawStands), the goalposts scorched at the top. The camera follows the ball. Yard lines every five, the
    line of scrimmage in blue and the line to gain in ember orange. Players are the inked figures (03-figures.js),
    sorted so the nearer ones stand in front. A block shows as a spark between the two: white when it holds, red when the
    defender is winning. The bar at the top has the score, the down, both calls at the snap, and each result with why.
@@ -89,7 +89,7 @@ function gfDrawField(c) {
   const g = c.createLinearGradient(0, 0, 0, 600); g.addColorStop(0, '#2a0f08'); g.addColorStop(.18, '#120c0a'); g.addColorStop(1, '#070605');
   c.fillStyle = g; c.fillRect(0, 0, 960, 600);
   const top = gfScr(0, -GF_HALF).y, bot = gfScr(0, GF_HALF).y;
-  for (let i = 0; i < 26; i++) { const x = (i * 41 - GD.cam * 6) % 1000 - 20; c.fillStyle = i % 3 ? '#16110e' : '#1c1511'; c.fillRect(x, top - 40, 34, 30); c.fillRect(x + 12, bot + 14, 34, 30); }
+  gfDrawStands(c, top, bot);
   // the grass, in five-yard stripes, and the end zones in the teams' colours
   for (let a = -10; a < 110; a += 5) {
     const p0 = gfScr(a, 0), p1 = gfScr(a + 5, 0);
@@ -122,6 +122,29 @@ function gfDrawField(c) {
     c.fillStyle = 'rgba(90,150,255,.8)'; c.fillRect(los - 1.5, top, 3, bot - top);
     c.fillStyle = 'rgba(255,150,40,.85)'; c.fillRect(gain - 1.5, top, 3, bot - top);
   }
+}
+// the bowl's crowd: two rows on the far side behind a basalt wall, braziers every ten yards, and the near side's heads
+// in the dark at the bottom. Each end sits in its club's colours. It stays put with the field as the camera moves.
+const GF_SKIN = ['#6b4a3a', '#8a6a4a', '#4a3a3a', '#a07a5a', '#5a6a4a', '#7a5a6a'];
+function gfDrawStands(c, top, bot) {
+  const a0 = Math.floor(GD.cam - 28), a1 = Math.ceil(GD.cam + 28);
+  c.save();
+  // the far wall, and the tier behind it
+  c.fillStyle = '#1a1310'; c.fillRect(0, top - 64, 960, 58); c.fillStyle = '#0e0a08'; c.fillRect(0, top - 14, 960, 8); c.fillStyle = 'rgba(255,170,90,.16)'; c.fillRect(0, top - 14, 960, 1);
+  for (let row = 0; row < 2; row++) { const r = row ? 6 : 4.8, y0 = top - (row ? 26 : 42);
+    for (let i = a0 * 2; i <= a1 * 2; i++) { const ax = i / 2 + (row ? .25 : 0), x = gfScr(ax, 0).x, h = ((i * 7 + row * 3) % 11 + 11) % 11, y = y0 + (h % 3) * 2 + Math.sin(GFT.t * 2 + i * 1.7 + row) * 1.1;
+      c.fillStyle = h % 4 ? (row ? '#2e2019' : '#231813') : tint(G.teams[ax < 50 ? 0 : 1].color, row ? -.15 : -.4);
+      c.beginPath(); c.moveTo(x - r - 2, y + r + 12); c.lineTo(x - r - 1, y + r - 1); c.quadraticCurveTo(x, y + r - 5, x + r + 1, y + r - 1); c.lineTo(x + r + 2, y + r + 12); c.closePath(); c.fill();
+      c.fillStyle = row ? GF_SKIN[h % 6] : tint(GF_SKIN[(h + 2) % 6], -.3); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); } }
+  c.fillStyle = '#0e0a08'; c.fillRect(0, top - 14, 960, 8);
+  // braziers on the wall
+  for (let a = Math.ceil(a0 / 10) * 10 - 5; a <= a1; a += 10) { const x = gfScr(a, 0).x, f = Math.sin(GFT.t * 7 + a);
+    const g = c.createRadialGradient(x, top - 20, 2, x, top - 20, 60); g.addColorStop(0, 'rgba(255,160,70,.3)'); g.addColorStop(1, 'rgba(255,160,70,0)'); c.fillStyle = g; c.fillRect(x - 60, top - 80, 120, 80);
+    c.fillStyle = '#2a1a12'; c.fillRect(x - 5, top - 17, 10, 5); c.fillStyle = '#ff9a3a'; c.beginPath(); c.ellipse(x, top - 22 - f, 4, 7 + f, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe08a'; c.beginPath(); c.ellipse(x, top - 20, 1.8, 3.2, 0, 0, Math.PI * 2); c.fill(); }
+  // the near side: big dark heads along the bottom edge
+  for (let i = a0; i <= a1; i++) { const x = gfScr(i * 1.6 % 1 ? i : i + .4, 0).x, h = ((i * 5) % 7 + 7) % 7, y = bot + 26 + (h % 3) * 3 + Math.sin(GFT.t * 2 + i) * 1;
+    c.fillStyle = h % 3 ? `rgb(${20 + h * 2},${15 + h},${12 + h})` : tint(G.teams[i < 50 ? 0 : 1].color, -.62); c.beginPath(); c.arc(x, y, 11, Math.PI, 0); c.fill(); c.fillRect(x - 11, y, 22, 30); }
+  c.restore();
 }
 // a zone on the grass: where it acts, from the line of scrimmage (x) and across (y), by its look
 const GF_ZONE_AREA = { line: [-3, 3, 27], back: [-10, 0, 27], mid: [0, 18, 6], deep: [8, 35, 27], all: [-12, 40, 27] };
@@ -199,10 +222,11 @@ function gfDrawHud(c) {
     const x = s ? 940 : 20, al = s ? 'right' : 'left';
     c.fillStyle = t.color; c.fillRect(s ? 946 : 8, 10, 6, 38);
     txt(c, t.name + (G.poss === s && GD.ph !== 'over' ? '  ●' : ''), x, 26, F(17, 800), '#f3ead6', al);
-    txt(c, String(G.score[s]), x, 50, F(22, 800), '#ffd08a', al);
+    txt(c, String(G.score[s]), x, 52, F(28, 900), '#ffd08a', al);
+    if (G.mana) txt(c, 'MANA', s ? 940 - 62 : 20 + 62, 48, F(10, 800), 'rgba(168,140,255,.8)', al);
     // mana, as diamonds beside the score
     if (G.mana) for (let i = 0; i < GF_MANA.max; i++) {
-      const px = s ? 940 - 44 - i * 13 : 20 + 44 + i * 13, py = 44;
+      const px = s ? 940 - 104 - i * 13 : 20 + 104 + i * 13, py = 44;
       c.beginPath(); c.moveTo(px, py - 5); c.lineTo(px + 4.5, py); c.lineTo(px, py + 5); c.lineTo(px - 4.5, py); c.closePath();
       c.fillStyle = i < G.mana[s] ? '#a88cff' : 'rgba(168,140,255,.15)'; c.fill();
     }
