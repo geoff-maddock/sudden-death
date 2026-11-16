@@ -12,7 +12,7 @@
 # a game of 6 minutes by default (3, 6, 9 or 12) in three periods; a minor is a sixth of a period and leaves a side a
 # skater short, never below three (a third penalty waits); a goal against a short-handed side ends its earliest penalty;
 # icing counts from a side's own half and never against a short-handed side; the sides swap ends each period; level
-# after three is sudden death at three a side, then a shootout that gives the winner one goal.
+# after three is sudden death at three a side for half a period, then a shootout that gives the winner one goal.
 # The Charter Court (issue #77, phase 0) builds in its own scope too (wBK), five a side. Its rules: a game of 5 minutes by
 # default (3, 5, 8 or 12), four quarters; a 14-second shot clock that runs out into a turnover, holds while a shot is up
 # and is off when the period has less left; 2 inside the arc and 3 beyond it; a shooting foul is two free throws, three
@@ -209,8 +209,8 @@ async def main():
           for (let i = 0; i < 3; i++) { long.push(wHK.soShot(0, false)); long.push(wHK.soShot(1, false)); } long.push(wHK.soShot(0, false)); long.push(wHK.soShot(1, true));
           return { d1, p2, ot, otpen, sudden, reg, so, tries, soOver, long, longOver: Object.assign({}, G.over) }; })()""")
         check(pe['d1'] == [1, -1, 37, 3, 10, 30] and pe['p2'] == ['period', 2, 120, -1, 1], 'the sides attack opposite goals, and swap ends each period', pe)
-        check(pe['ot'] == ['period', 'ot', 4, 120, 'OT', [3, 3]] and pe['otpen'] == [3, 4] and pe['sudden'] == [True, {'win': 1, 'score': [2, 3], 'ot': 1, 'so': False}],
-              'level after three periods is sudden death at three skaters a side (a penalty there gives the other side a fourth), and the next goal wins', pe)
+        check(pe['ot'] == ['period', 'ot', 4, 60, 'OT', [3, 3]] and pe['otpen'] == [3, 4] and pe['sudden'] == [True, {'win': 1, 'score': [2, 3], 'ot': 1, 'so': False}],
+              'level after three periods is sudden death, half a period at three skaters a side (a penalty there gives the other side a fourth), and the next goal wins', pe)
         check(pe['reg'] == ['over', {'win': 0, 'score': [3, 1], 'ot': 0, 'so': False}], 'ahead after three periods wins', pe)
         check(pe['so'] == ['shootout', [0, 0], 0] and pe['tries'] == [None, 1, None, None, 0] and pe['soOver'] == {'win': 0, 'score': [2, 1], 'ot': 1, 'so': True},
               'still level after sudden death is a shootout, taken in turns: it ends as soon as one side can\'t be caught, and the winner gets one goal', pe)

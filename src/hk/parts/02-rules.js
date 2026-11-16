@@ -8,12 +8,12 @@
    Penalties: a minor is a sixth of a period (20 seconds at the default length). The player sits in the box and their
    side skates one short until the time is up, or until the other side scores while it has more skaters (then the
    earliest minor ends). A side is never below HK_RULES.minSk skaters: a further penalty waits its turn (G.wait).
-   Level after the third period, one more period of sudden death at HK_RULES.otSk skaters a side: the next goal wins.
+   Level after the third period, sudden death at HK_RULES.otSk skaters a side, half a period long: the next goal wins.
    Still level, a shootout: HK_RULES.so shooters each, then one each until one side scores and the other doesn't; the
    winner gets one goal on the score. A game never ends level.
    G is the game, plain JSON (so a snapshot can be saved): { mins, plen, p, clock, score, sog, box, wait, so, over }.
    box: the penalties being served, [{ side, ri, t, k }]. 07-game.js adds the teams and the rest. */
-const HK_RULES = { skaters: 5, side: 6, bench: 6, mins: 6, minsAt: [3, 6, 9, 12], periods: 3, minorOf: 6, minSk: 3, otSk: 3, so: 3,
+const HK_RULES = { skaters: 5, side: 6, bench: 6, mins: 6, minsAt: [3, 6, 9, 12], periods: 3, minorOf: 6, otOf: 2, minSk: 3, otSk: 3, so: 3,
   len: 40, wid: 20, corner: 4, goal: 3, net: 1.1, deep: 1, blue: 14, crease: 1.5 };
 let G = null;
 
@@ -84,7 +84,7 @@ function hkPeriodEnd() {
     return 'over';
   }
   if (G.p > HK_RULES.periods) { G.so = { tries: [0, 0], goals: [0, 0], first: 0 }; G.clock = 0; return 'shootout'; }
-  G.p++; G.clock = G.plen;
+  G.p++; G.clock = G.p > HK_RULES.periods ? G.plen / HK_RULES.otOf : G.plen;
   return G.p > HK_RULES.periods ? 'ot' : 'period';
 }
 // whose shot is next in the shootout (the sides take turns, G.so.first first)

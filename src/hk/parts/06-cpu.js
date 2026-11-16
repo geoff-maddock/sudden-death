@@ -7,7 +7,7 @@
    - carry: up the ice through the open side, and in the other end toward the slot.
    - dump: in the middle of the ice with a checker on them and nobody open, send it into the corner and chase.
    A goalie holding the puck freezes it when a forechecker is on them, or moves it to an open defender. */
-const HK_THINK = { shootAt: .06, press: 2.2 };
+const HK_THINK = { shootAt: .06, ppAt: .085, press: 2.2 };
 // the sticks in the lane from (x, y) to (tx, ty): 0 clear, more for each opponent near it
 function hkLaneRisk(side, x, y, tx, ty) {
   const ax = tx - x, ay = ty - y, len = hyp(ax, ay) || 1; let risk = 0;
@@ -28,7 +28,8 @@ function hkPassValue(h, j) {
 }
 function hkThink(h) {
   const p = L.pl[h], s = p.side;
-  if (p.pos === 'G') return hkGoalieThink(h);
+  if (GD.ph === 'so') return hkSoThink(h);
+  if (hkIsGk(p)) return hkGoalieThink(h);
   if (p.stun > 0) return;
   const Lz = HK_RULES.len, up = hkUp(s, p.x), dir = hkDir(s), gx = hkGoalX(s), [nd, ndd] = hkNearest(p.x, p.y, hkSk(1 - s).filter(d => d.stun <= 0));
   const press = ndd < HK_THINK.press, inZone = up > Lz - HK_RULES.blue, held = Math.max(0, L.t - L.got);
@@ -38,14 +39,18 @@ function hkThink(h) {
   // the best pass
   const mates = hkSk(s).filter(q => q !== p && q.stun <= 0).map(q => [L.pl.indexOf(q), hkPassValue(h, L.pl.indexOf(q))]).sort((a, b) => b[1] - a[1]), best = mates[0];
   const late = G.clock < 2.5 && O.ok && dist < 18;
+  // an empty net is shot at from anywhere with a clear lane; a side a skater short clears it and doesn't mind the icing
+  const empty = !hkInNet(1 - s) && O.ok && !O.block && dist < 20, short = hkShort(s);
+  // with a skater more, a side waits for the good look and moves the puck; with one fewer, it doesn't carry it up the ice
+  const up1 = hkShort(1 - s), at = up1 ? HK_THINK.ppAt : HK_THINK.shootAt;
   const w = {
-    shoot: !inZone ? (late ? 5 : 0) : (ev > HK_THINK.shootAt ? (ev - .03) * 42 : O.ok && dist < 11 ? .12 + held * .15 : 0) + (one && ev > .04 ? 2 : 0) + (late ? 5 : 0),
-    pass: best ? Math.max(.03, (best[1] - ev) * 6 + .12 + (press ? .7 : 0)) * (.25 + held * .7) : 0,
-    carry: (press ? .6 : 1.6) + (inZone ? 0 : .6),
-    dump: !inZone && up > Lz / 2 && press && (!best || best[1] < .08) ? .7 : up < HK_RULES.blue && ndd < 1.4 && (!best || best[1] < 0) ? .3 : 0,
+    shoot: empty ? 8 : !inZone ? (late ? 5 : 0) : (ev > at ? (ev - .03) * 42 : O.ok && dist < 11 && !up1 ? .12 + held * .15 : 0) + (one && ev > .04 ? 2 : 0) + (late ? 5 : 0),
+    pass: best ? Math.max(.03, (best[1] - ev) * 6 + .12 + (press ? .7 : 0)) * (.25 + held * .7) * (up1 ? 1.6 : 1) : 0,
+    carry: short && !inZone && up > HK_RULES.blue ? .3 : (press ? .6 : 1.6) + (inZone ? 0 : .6),
+    dump: short && !inZone ? (press ? 4 : up < HK_RULES.blue ? .8 : 5) : !inZone && up > Lz / 2 && press && (!best || best[1] < .08) ? .7 : up < HK_RULES.blue && ndd < 1.4 && (!best || best[1] < 0) ? .3 : 0,
   };
   const k = wpick(w);
-  if (k === 'shoot') return hkShoot(kind);
+  if (k === 'shoot') return hkShoot(empty ? 'wrist' : kind);
   if (k === 'pass' && best) return hkPass(best[0]);
   if (k === 'dump') return hkDump(p.y * dir < 0 ? -1 : 1);
   // carry: away from the nearest checker in front, toward the slot once in the other end
@@ -66,4 +71,26 @@ function hkGoalieThink(h) {
   const mates = hkSk(s).map(q => [L.pl.indexOf(q), -hkLaneRisk(s, g.x, g.y, q.x, q.y) - hyp(q.x - g.x, q.y - g.y) * .02 + (HK_ROLE[q.pos] === 'defender' ? .15 : 0)]).sort((a, b) => b[1] - a[1]);
   if (!mates.length || (fd < 3.5 && R() < .6) || mates[0][1] < -.5 || L.t - L.got > 2) return hkFreeze(h);
   hkPass(mates[0][0]);
+}
+/* a try in the shootout: in on the goalie on one side, then a cut across the front (the goalie follows a moment late)
+   and the shot */
+function hkSoThink(h) {
+  const p = L.pl[h], C = GD.so.cur, gx = hkGoalX(p.side), dir = hkDir(p.side), dist = hyp(gx - p.x, p.y);
+  if (!C.cut) {
+    if (dist > C.shotAt + 1.5) { L.carry = [gx - dir * C.shotAt, -C.deke * 1.6]; return; }
+    C.cut = L.t; L.carry = [gx - dir * 3.2, C.deke * 2];
+    return;
+  }
+  if (L.t - C.cut > C.wait || dist < 3.6) hkShoot('wrist');
+}
+/* the goalie comes off late in the third when a side is a goal or two behind and has the puck up the ice (HK_PULL), and
+   goes back when that's no longer so. Not for a side you play: that goalie is yours to pull (G). */
+const HK_PULL = { at: .1, by: 2, up: .5 };
+function hkPullThink() {
+  for (const s of [0, 1]) {
+    if (hkHandsOn() && s === GD.you) continue;
+    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at && diff >= 1 && diff <= HK_PULL.by;
+    if (g.pulled === 'late' && !want) { g.pulled = false; continue; }
+    if (!g.pulled && want && G.poss === s && hkUp(s, L.puck.x) > HK_RULES.len * HK_PULL.up) hkPull(s, 'late');
+  }
 }

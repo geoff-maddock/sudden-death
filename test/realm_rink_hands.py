@@ -116,7 +116,7 @@ async def main():
         check(ps['hard']['r3'] == 'dump' and ps['hard']['k'] == 'dump' and ps['hard']['to'] == -1 and ps['hard']['vx'] > 15 and abs(ps['hard']['vy']) < 1, 'held, J sends the puck hard the way you steer', ps)
 
         # ---------- without the puck: the poke, the check, the lift ----------
-        d = await pg.evaluate("""(() => { const P = __play(9); let pokes = 0, misses = 0, again = '', far = ''; P.pl[1].r.def = 7; P.pl[1].r.siz = 6; P.pl[6].r.hnd = 6; P.pl[6].r.siz = 5;
+        d = await pg.evaluate("""(() => { const P = __play(9); let pokes = 0, misses = 0, again = '', far = ''; const fouls = wHK.fouls; wHK.setFouls({ trip: 0, hook: 0, board: 0, rough: 0, interfere: 0 }); P.pl[1].r.def = 7; P.pl[1].r.siz = 6; P.pl[6].r.hnd = 6; P.pl[6].r.siz = 5;
           for (let t = 0; t < 60; t++) { __clear(P); __away(P, [1, 6]); __put(P, 6, 20, 0); __put(P, 1, 20.9, 0); wHK.give(6); P.me = 1; const r = wHK.input({ pass: true }); if (t === 0) again = wHK.input({ pass: false }) + wHK.input({ pass: true }); wHK.input({ pass: false }); if (r === 'poke') pokes++; else if (r === 'miss') misses++; }
           __clear(P); __put(P, 6, 20, 0); __put(P, 1, 23.5, 0); wHK.give(6); P.me = 1; far = wHK.input({ pass: true }); wHK.input({ pass: false });
           let hits = 0, lunged = 0, v0 = 0;
@@ -127,7 +127,7 @@ async def main():
           const long = { hit: __since(P, n1).some(e => e.k === 'hit'), stun: me.stun > 0 };
           const lane = lift => { let got = 0; for (let t = 0; t < 40; t++) { __clear(P); __away(P, [1, 6, 7]); __put(P, 6, 15, 0); __put(P, 7, 25, 0); __put(P, 1, 20, 1.1); wHK.give(6); P.me = 1; wHK.passTo(7); wHK.input(lift ? { lift: true } : { steer: [0, 0] });
             let n = 0; while (P.puck.st === 'free' && P.puck.k === 'pass' && n++ < 40) wHK.step(); if (P.puck.st === 'held' && P.puck.h === 1) got++; } wHK.input({ lift: false }); return got; };
-          return { pokes, misses, again, far, hits, lunged, v0, long, plain: lane(false), lifted: lane(true) }; })()""")
+          const out = { pokes, misses, again, far, hits, lunged, v0, long, plain: lane(false), lifted: lane(true) }; wHK.setFouls(fouls); return out; })()""")
         check(6 <= d['pokes'] <= 45 and d['pokes'] + d['misses'] == 60 and d['again'] == '' and d['far'] == 'miss', 'J pokes at the puck: up close it comes off sometimes, from too far never, and there is a rest between pokes', d)
         check(d['lunged'] == 40 and d['v0'] < -5 and d['hits'] >= 8 and not d['long']['hit'] and d['long']['stun'], 'Space lunges at the carrier: reach them and it is a hit; from too far you miss, and are out of the play for a moment', d)
         check(d['plain'] == 0 and d['lifted'] >= 8, 'Shift held lifts your stick into the lane: passes going by just out of reach are picked off', d)
@@ -165,7 +165,7 @@ async def main():
           sb.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 })); const up = { meter: wHK.meter, shot: !!wHK.shot() };
           wHK.give(1); document.querySelector('#wRinkPad [data-kpad="shoot"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 2 })); const held = !!wHK.meter; wHK.give(6); await tick();
           return { none, puck, keys, down, up, held, after: { meter: wHK.meter, shoot: wHK.inputState.shoot, labels: [...document.querySelectorAll('#wRinkPad button')].map(x => x.textContent) } }; })()""")
-        check(pad['none'] == ['Check', 'Poke', 'Lift stick', 'Switch'] and pad['puck'] == ['Shoot', 'Pass'] and pad['keys'] == ['Space', 'J'], 'the pad under the rink follows the puck: Shoot and Pass with it, Check, Poke, Lift stick and Switch without, each with its key', pad)
+        check(pad['none'] == ['Check', 'Poke', 'Lift stick', 'Switch', 'Goalie'] and pad['puck'] == ['Shoot', 'Pass', 'Goalie'] and pad['keys'] == ['Space', 'J', 'G'], 'the pad under the rink follows the puck: Shoot and Pass with it, Check, Poke, Lift stick and Switch without, Goalie either way, each with its key', pad)
         check(pad['down'] and pad['up'] == {'meter': None, 'shot': True} and pad['held'] and pad['after']['meter'] is None and pad['after']['shoot'] is False and pad['after']['labels'][0] == 'Check',
               'the pad\'s Shoot winds up while held and shoots when let go; a button held when the puck changes hands is let go', pad)
         await pg.click('#wRinkModes [data-kmode="watch"]')

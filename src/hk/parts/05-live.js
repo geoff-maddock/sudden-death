@@ -13,6 +13,8 @@
      A save is held or comes loose in front (a rebound).
    - Without the puck: the skater nearest the carrier goes at them, and up close pokes at the puck (defense against
      hands) or, closing fast, throws a body check (size and speed): the carrier is knocked off it.
+   - Fouls: a poke that misses up close can trip, a beaten checker reaching back can hook, a hit from behind into
+     the boards is boarding and a hit now and then is roughing (HK_FOUL; 07-game.js gives the penalty).
    - Icing: a pass or a dump from a side's own half that crosses the far goal line untouched (07-game.js whistles it).
    - Each side keeps a shape around the puck (hkForm): in the other end the wings low, the centre in the slot and the
      defenders at the points; in its own end the defenders low, the centre in front and the wings out high.
@@ -22,6 +24,9 @@
    lunge }.
    A player with off set is not on the ice (the box, or the extra skaters in sudden death). */
 const HK_DT = 1 / 30, HK_BODY = .7, HK_REACH = .85;
+// how often a check is a foul: a missed poke up close, a reach from behind, a hit from behind into the boards, any hit;
+// and by hand, a lunge that lands on a player who doesn't have the puck
+const HK_FOUL = { trip: .035, hook: .04, board: .3, rough: .02, interfere: .6 };
 const HK_V = { pass: 15, wrist: 24, slap: 32, one: 28, dump: 20 };
 let L = null;
 
@@ -44,8 +49,12 @@ function hkNewPlay() {
 }
 const hkHand = () => L.puck.st === 'held' ? L.puck.h : -1;
 const hkGk = side => side * HK_POS.length + HK_POS.indexOf('G');
-// side's skaters on the ice (not the goalie)
-const hkSk = side => L.pl.filter(p => p.side === side && p.pos !== 'G' && !p.off);
+// side's skaters on the ice: not the goalie, unless they have been pulled and skate as the extra one
+const hkSk = side => L.pl.filter(p => p.side === side && !p.off && (p.pos !== 'G' || p.pulled));
+// is side's goalie in its net: on the ice, and not pulled for an extra skater
+const hkInNet = side => { const g = L.pl[hkGk(side)]; return !g.off && !g.pulled; };
+// a goalie in their net (not one skating as the extra skater)
+const hkIsGk = p => p.pos === 'G' && !p.pulled;
 function hkNearest(x, y, list) { let b = null, bd = 1e9; for (const p of list) { const d = hyp(p.x - x, p.y - y); if (d < bd) { bd = d; b = p; } } return [b, bd]; }
 
 /* ---------- the boards and the nets ---------- */
@@ -118,7 +127,9 @@ function hkGoalSpot(side, px, py) {
 function hkGoalie(g, dt) {
   const P = L.puck, E = L.eye[g.side], lag = .34 - g.r.ref * .017;
   E[0] += (P.x - E[0]) * Math.min(1, dt / lag); E[1] += (P.y - E[1]) * Math.min(1, dt / lag);
-  const [tx, ty] = hkGoalSpot(g.side, E[0], E[1]), dx = tx - g.x, dy = ty - g.y, d = hyp(dx, dy), sp = (1.7 + g.r.ref * .16) * (g.stun > 0 ? .3 : 1), st = Math.min(d, sp * dt);
+  const hand = hkGoalieHand(g), [tx, ty] = hand || hkGoalSpot(g.side, E[0], E[1]), dx = tx - g.x, dy = ty - g.y, d = hyp(dx, dy);
+  // (a goalie a long way from the net, coming back from being the extra skater, skates there)
+  const sp = d > 3 ? hkTop(g, -1) : (1.7 + g.r.ref * .16) * (g.stun > 0 ? .3 : 1), st = Math.min(d, sp * dt);
   if (d > 1e-4) { g.vx = dx / d * st / dt; g.vy = dy / d * st / dt; g.x += dx / d * st; g.y += dy / d * st; } else g.vx = g.vy = 0;
   g.fx = Math.sign(HK_RULES.len / 2 - g.x) || 1; g.fy = 0;
 }
@@ -137,7 +148,7 @@ function hkStep(dt) {
   hkChase();
   L.pl.forEach((p, i) => {
     if (p.off) return;
-    if (p.pos === 'G') return hkGoalie(p, dt);
+    if (hkIsGk(p)) return hkGoalie(p, dt);
     if (p.act === 'wind' || p.act === 'down') { p.vx *= 1 - Math.min(1, dt * (p.act === 'down' ? 3 : .6)); p.vy *= 1 - Math.min(1, dt * (p.act === 'down' ? 3 : .6)); return hkGlide(p, dt); }
     if (hkYoursNow(i)) { const st = p.act === 'hit' ? null : hkSteerAim(p); if (st) return hkSkate(p, i, st[0], st[1], dt); p.vx *= 1 - Math.min(1, dt * .25); p.vy *= 1 - Math.min(1, dt * .25); return hkGlide(p, dt); }
     const tg = hkAim(p, i); hkSkate(p, i, tg[0], tg[1], dt);
@@ -169,7 +180,8 @@ function hkAim(p, i) {
   }
   const c = L.pl[h];
   // without the puck: the nearest skater goes at the carrier (not at a goalie holding it)
-  if (c.side !== p.side && c.pos !== 'G' && hkPresser(p.side) === i) return [c.x + c.vx * .22, c.y + c.vy * .22];
+  // (a side a skater short sits back in its box: it goes at the carrier only down low in its own end)
+  if (c.side !== p.side && !hkIsGk(c) && (!hkShort(p.side) || hkUp(p.side, c.x) < 10) && hkPresser(p.side) === i) return [c.x + c.vx * .22, c.y + c.vy * .22];
   return hkForm(p);
 }
 // the skater of side who presses the carrier: the nearest, with a lean to whoever was already doing it
@@ -183,6 +195,10 @@ function hkForm(p) {
   const P = L.puck, s = p.side, Lz = HK_RULES.len, pu = hkUp(s, P.x), pv = P.y * hkDir(s), att = G.poss === s, i = L.pl.indexOf(p);
   const wing = p.pos === 'LW' ? -1 : p.pos === 'RW' ? 1 : 0, ds = p.pos === 'LD' ? -1 : 1, drift = Math.sin(L.t * .8 + i * 1.9);
   let u, v;
+  // the extra skater (a pulled goalie): high in the slot with the puck, and straight back without it
+  if (p.pos === 'G') return att ? hkAt(s, pu > Lz - HK_RULES.blue - 1 ? Lz - 11.5 + drift : clamp(pu - 2, 5, Lz - 12), clamp(-pv * .4, -3, 3)) : hkAt(s, clamp(pu - 7, 3, Lz - 8), pv * .3);
+  // a skater short, a side doesn't send anybody ahead of the puck: it gets it out, and gets back
+  if (att && hkShort(s)) return hkAt(s, clamp(pu - (p.pos === 'C' ? 1.5 : wing ? 3 : 7), 4, Lz - 14), wing ? wing * 5 : p.pos === 'C' ? pv * .4 : ds * 3);
   if (att) {
     if (pu > Lz - HK_RULES.blue - 1) {
       if (p.pos === 'C') { u = Lz - 8.5 + drift; v = clamp(-pv * .35, -3, 3) + drift * .9; }
@@ -194,7 +210,7 @@ function hkForm(p) {
     }
   } else if (pu < HK_RULES.blue + 2) {
     if (p.pos === 'C') { u = clamp(pu + 1.5, 5, 10); v = pv * .45; }
-    else if (wing) { u = HK_RULES.blue - 2.5; v = wing * 5 + pv * .25; }
+    else if (wing) { const box = hkShort(s); u = HK_RULES.blue - (box ? 5 : 2.5); v = wing * (box ? 3.2 : 5) + pv * .25; }
     else { const strong = Math.abs(pv) < 1 ? ds > 0 : ds * pv > 0; u = strong ? clamp(pu + .8, 3.8, 10) : 4.8; v = strong ? pv * .8 : ds * 1.1; }
   } else {
     if (p.pos === 'C') { u = pu - 3; v = pv * .5; } else if (wing) { u = pu - 1.5; v = wing * 6; } else { u = pu - 9; v = ds * 3.5 + pv * .15; }
@@ -206,12 +222,14 @@ function hkForm(p) {
 /* ---------- checks ---------- */
 function hkChecks() {
   const h = hkHand(); if (h < 0) return;
-  const c = L.pl[h]; if (c.pos === 'G') return;
+  const c = L.pl[h]; if (hkIsGk(c)) return;
   for (const d of hkSk(1 - c.side)) {
     if (d.cd > 0 || d.stun > 0 || hkYoursNow(L.pl.indexOf(d))) continue;
     const dx = c.x - d.x, dy = c.y - d.y, dist = hyp(dx, dy); if (dist > 1.15) continue;
     d.cd = .8 + R() * .4;
     const closing = ((d.vx - c.vx) * dx + (d.vy - c.vy) * dy) / (dist || 1);
+    // beaten, and reaching from behind: a hook
+    if (closing < -.5 && R() < HK_FOUL.hook) return hkFoul(d, 'hooking', c);
     if (closing > 3.5 && R() < clamp(.4 + (d.r.siz - 5) * .06, .1, .85)) return hkHit(d, c, closing);
     return hkPoke(d, c);
   }
@@ -220,7 +238,12 @@ function hkChecks() {
 // checker's stick. True when it worked
 function hkPoke(d, c, edge) {
   d.act = 'poke'; d.actT = .25;
-  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0), .04, .6)) { hkEv('pokemiss', d.n, c.n); return false; }
+  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0), .04, .6)) {
+    hkEv('pokemiss', d.n, c.n);
+    // a miss up close can take their skates out: a trip
+    if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip) hkFoul(d, 'tripping', c);
+    return false;
+  }
   hkBoxAdd(d.side, d.ri, 'take'); hkBoxAdd(c.side, c.ri, 'give'); hkEv('poke', d.n, c.n);
   c.stun = .25;
   if (R() < .4) hkGain(L.pl.indexOf(d), 'take');
@@ -230,11 +253,15 @@ function hkPoke(d, c, edge) {
 // a body check: size and how fast they close. The carrier is knocked off the puck, or the checker bounces off
 function hkHit(d, c, closing) {
   d.act = 'hit'; d.actT = .3;
+  // from behind into the boards is boarding; now and then a hit is just too much (roughing)
+  const dv = hyp(d.vx, d.vy) || 1, behind = (d.vx * c.fx + d.vy * c.fy) / dv > .5, wall = Math.abs(c.y) > HK_RULES.wid / 2 - 2 || c.x < 2.5 || c.x > HK_RULES.len - 2.5;
+  const foul = behind && wall ? (R() < HK_FOUL.board ? 'boarding' : '') : R() < HK_FOUL.rough ? 'roughing' : '';
   if (R() < clamp(.34 + (d.r.siz - c.r.siz) * .045 + (closing - 3) * .04, .08, .8)) {
     hkBoxAdd(d.side, d.ri, 'hit'); hkEv('hit', d.n, c.n);
     c.stun = .7; c.act = 'down'; c.actT = .55; c.vx = c.vx * .3 + d.vx * .4; c.vy = c.vy * .3 + d.vy * .4;
     hkLoose(c.x, c.y, Math.atan2(d.vy, d.vx) + (R() - .5) * 1.6, 3 + R() * 4);
   } else { d.stun = .4; hkEv('hitmiss', d.n, c.n); }
+  if (foul) hkFoul(d, foul, c);
 }
 
 /* ---------- the puck ---------- */
@@ -288,9 +315,9 @@ function hkPickup() {
   const no = P.go < 1.5 ? P.skip : -1;
   const sp = hyp(P.vx, P.vy);
   // a goalie smothers anything that comes to them
-  for (const s of [0, 1]) { const g = L.pl[hkGk(s)]; if (!g.off && hkGk(s) !== no && hyp(g.x - P.x, g.y - P.y) < 1 && sp < 16 && (P.k !== 'pass' || L.pl[P.from].side !== s || P.to === hkGk(s))) { hkEv('cover', g.n); hkGain(hkGk(s), 'cover'); return true; } }
+  for (const s of [0, 1]) { const g = L.pl[hkGk(s)]; if (hkInNet(s) && hkGk(s) !== no && hyp(g.x - P.x, g.y - P.y) < 1 && sp < 16 && (P.k !== 'pass' || L.pl[P.from].side !== s || P.to === hkGk(s))) { hkEv('cover', g.n); hkGain(hkGk(s), 'cover'); return true; } }
   const near = [];
-  for (let i = 0; i < L.pl.length; i++) { const p = L.pl[i]; if (p.off || p.pos === 'G' || p.stun > 0 || i === no) continue; const d = hyp(p.x - P.x, p.y - P.y), lift = HKI.lift && hkYoursNow(i); if (d < (i === P.to ? 1.05 : lift ? 1.3 : HK_REACH)) near.push([i, d]); }
+  for (let i = 0; i < L.pl.length; i++) { const p = L.pl[i]; if (p.off || hkIsGk(p) || p.stun > 0 || i === no) continue; const d = hyp(p.x - P.x, p.y - P.y), lift = HKI.lift && hkYoursNow(i); if (d < (i === P.to ? 1.05 : lift ? 1.3 : HK_REACH)) near.push([i, d]); }
   if (!near.length) return false;
   if (P.k === 'pass') {
     const from = L.pl[P.from];
@@ -318,6 +345,8 @@ function hkGain(i, how) {
   if (how !== 'pass') L.oneT = null;
   if (p.side !== G.poss) { G.poss = p.side; L.touch = []; hkEv('change', how, p.n); }
   if (L.touch[L.touch.length - 1] !== i) { L.touch.push(i); if (L.touch.length > 3) L.touch.shift(); }
+  // (a side with a penalty coming has touched it: the whistle, 07-game.js)
+  hkTouched(p.side);
 }
 // the pass: from the carrier to teammate j, led to where they're going
 function hkPass(j) {
@@ -352,7 +381,7 @@ function hkSend(ux, uy) {
 function hkShotOdds(p, kind, x, y) {
   const gx = hkGoalX(p.side), dir = hkDir(p.side), dx = (gx - x) * dir, dist = hyp(dx, y), ang = Math.atan2(Math.abs(y), Math.max(.01, dx));
   if (dx < .4) return { ok: false, dist, ang, miss: 1, q: 0, set: 1, screen: false, block: null, blockP: 0 };
-  const g = L.pl[hkGk(1 - p.side)], inNet = !g.off, set = inNet ? hkSet(g, x, y) : 0, sh = p.r.sht;
+  const g = L.pl[hkGk(1 - p.side)], inNet = hkInNet(1 - p.side), set = inNet ? hkSet(g, x, y) : 0, sh = p.r.sht;
   // a teammate standing in front of the goalie hides it
   const screen = inNet && hkSk(p.side).some(q => q !== p && hyp(q.x - g.x, q.y - g.y) < 2.2 && (q.x - g.x) * dir < 0);
   let block = null, blockP = 0;
@@ -374,7 +403,7 @@ function hkShoot(kind) {
 }
 // the release: settled now (blocked, wide, saved and held, saved and loose, or in), and the flight shows it
 function hkRelease(i, kind, o) {
-  const H = o || {}, p = L.pl[i], O = hkShotOdds(p, kind, p.x, p.y), gx = hkGoalX(p.side), dir = hkDir(p.side), g = L.pl[hkGk(1 - p.side)];
+  const H = o || {}, p = L.pl[i], O = hkShotOdds(p, kind, p.x, p.y), gx = hkGoalX(p.side), dir = hkDir(p.side), g = L.pl[hkGk(1 - p.side)], inNet = hkInNet(1 - p.side);
   /* by hand (09-hands.js): the target against where the goalie is, how hard a slap shot was wound up (a soft one is
      nearer a wrist shot), and a one-timer pressed too early (a fan: weak, and wild) */
   const A = hkAimFx(1 - p.side, H.aim), pow = H.pow == null ? 1 : H.pow, W = kind === 'slap' && pow < 1 ? hkShotOdds(p, 'wrist', p.x, p.y) : null;
@@ -384,13 +413,14 @@ function hkRelease(i, kind, o) {
   if (O.block && R() < O.blockP) res = 'block';
   else if (R() < miss) res = 'miss';
   else if (R() < q) res = 'goal';
+  else if (!inNet) res = 'miss';
   else res = R() < clamp(.5 + (kind === 'slap' ? .1 : 0) - g.r.ref * .02, .15, .8) ? 'reb' : 'hold';
   // where on the goal line it is going: inside the posts, or just wide of one
   const T = H.aim && H.aim !== 'five' ? H.aim : null, wide = (T ? T.y : R() < .5 ? -1 : 1) * (HK_RULES.net + .35 + R() * 1.2);
-  const ty = res === 'miss' ? wide : res === 'goal' ? (T ? T.y * .85 : H.aim === 'five' ? clamp(g.y, -.5, .5) : g.off ? 0 : clamp(-g.y * 1.5, -.9, .9) || (R() - .5)) : clamp(g.off ? 0 : g.y + (R() - .5) * .5, -.9, .9);
+  const ty = res === 'miss' ? wide : res === 'goal' ? (T ? T.y * .85 : H.aim === 'five' ? clamp(g.y, -.5, .5) : !inNet ? 0 : clamp(-g.y * 1.5, -.9, .9) || (R() - .5)) : clamp(!inNet ? 0 : g.y + (R() - .5) * .5, -.9, .9);
   const d = hyp(gx - p.x, ty - p.y) || 1, V = W ? lerp(HK_V.wrist, HK_V.slap, pow) : HK_V[kind];
   Object.assign(L.puck, { st: 'free', h: -1, x: p.x, y: p.y, vx: (gx - p.x) / d * V, vy: (ty - p.y) / d * V, k: 'shot', from: i, to: -1, ice: -1, tried: [], go: 0,
-    shot: { i, side: p.side, kind, res, gx, dir, by: O.block ? O.block[0] : -1, blockD: O.block ? O.block[1] : 0, dist: Math.round(O.dist * 10) / 10, q: Math.round(q * 100) / 100, miss: Math.round(miss * 100) / 100, aim: H.aim || null, set: Math.round(O.set * 100) / 100, screen: O.screen, touch: L.touch.slice() } });
+    shot: { i, side: p.side, kind, res, gx, dir, by: O.block ? O.block[0] : -1, blockD: O.block ? O.block[1] : 0, dist: Math.round(O.dist * 10) / 10, q: Math.round(q * 100) / 100, miss: Math.round(miss * 100) / 100, aim: H.aim || null, set: Math.round(O.set * 100) / 100, screen: O.screen, en: !inNet, touch: L.touch.slice() } });
   p.act = 'shoot'; p.actT = .3; L.carry = null; L.wind = null; L.oneT = null;
   hkEv('shot', p.n, kind);
 }
@@ -403,9 +433,12 @@ function hkShotBlocked() {
 // the shot reaches the goal line: in, wide, held or loose in front (07-game.js scores a goal)
 function hkShotLands() {
   const P = L.puck, S = P.shot, p = L.pl[S.i], gi = hkGk(1 - S.side), g = L.pl[gi];
-  S.done = true; hkBoxAdd(p.side, p.ri, 'att');
+  S.done = true;
+  // (a try in the shootout is settled by the game, and is in nobody's stats)
+  if (GD.ph === 'so') return hkSoLanded(S);
+  hkBoxAdd(p.side, p.ri, 'att');
   if (S.res === 'miss') { hkEv('wide', p.n); P.k = 'loose'; P.shot = null; return; }
-  G.sog[S.side]++; hkBoxAdd(p.side, p.ri, 'sog'); if (!g.off) hkBoxAdd(g.side, g.ri, 'sa');
+  G.sog[S.side]++; hkBoxAdd(p.side, p.ri, 'sog'); if (!S.en) hkBoxAdd(g.side, g.ri, 'sa');
   if (S.res === 'goal') return hkGoalScored(S);
   hkBoxAdd(g.side, g.ri, 'sv'); g.act = 'save'; g.actT = .35;
   if (S.res === 'hold') { hkEv('save', g.n, p.n); return hkGain(gi, 'save'); }

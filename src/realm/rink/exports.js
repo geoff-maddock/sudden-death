@@ -1,7 +1,7 @@
 /* the end of the wHK scope: what the Realm may call (w19b-engines.js, w88-rink.js). Phase 0 is the rules; phase 1
    plays one game, CPU against CPU. start(opts) puts a game on the rink ({ teams: [2], mins, seed }), never paused;
    simGame(opts) plays one headless and returns its summary ({ score, teams, win, p, ot, so, mins, shots, drops, secs,
-   box, log, watch }); onPhase hears each beat (intro, set, drop, live, dead, break, so, over) and onOver the end, with
+   box, log, pens, watch }); onPhase hears each beat (intro, set, drop, live, dead, break, so, over) and onOver the end, with
    the summary. The tests' handles: G, the rules and the pure rule functions, step (one beat of the play), play (the
    live play, L), ev (its events), shotOdds, goalSet, goalSpot and scr (where a rink point is drawn),
    and skate, goalieStep, puckStep and loose, which move one thing on its own. */
@@ -23,6 +23,14 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // penalties and the goalie (phase 3): the fouls' odds, the penalty that is coming, whether a goalie is in their net and
+  // why not, who takes a side's face-offs, the shootout's try now; the tests' handles: a foul by player i, the fouls' odds
+  // changed, a goal by player i, a pull, the lines set again
+  fouls: Object.assign({}, HK_FOUL), pullRules: Object.assign({}, HK_PULL), get delay() { return GD && GD.delay ? Object.assign({}, GD.delay) : null; },
+  inNet: side => !!L && hkInNet(side), pulled: side => L ? L.pl[hkGk(side)].pulled || '' : '', taker: side => L ? hkTaker(side) : -1,
+  get soTry() { const U = GD && GD.so && GD.so.cur; return U ? { side: U.side, i: U.i, gi: U.gi, st: U.st, scored: U.scored, win: U.win } : null; },
+  foul: (i, k) => { if (L) hkFoul(L.pl[i], k || 'tripping', null); }, setFouls: o => Object.assign(HK_FOUL, o || {}),
+  goalBy: i => { if (!L) return; const p = L.pl[i]; hkGoalScored({ i, side: p.side, kind: 'wrist', gx: hkGoalX(p.side), dir: hkDir(p.side), dist: 5, touch: [], en: !hkInNet(1 - p.side) }); }, pull: (side, why) => !!L && hkPull(side, why || 'hand'), lines: () => { if (L) hkLines(); },
   // the ratings, the spots and the clubs, for the page and How to play
   rate: kind => hkRate(kind), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
   // the test's handle on the rink: one step of the play (or of whatever beat is on), the play, its events, a shot's odds

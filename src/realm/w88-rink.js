@@ -22,6 +22,7 @@ const W_RINK = {
   away: { city: 'cinderhold', kinds: ['elf', 'goblin', 'kobold', 'minotaur', 'golem', 'gorgon', 'dwarf', 'ogre'], color: '#b8443a', light: '#ffe6e0', short: 'CHC' },
 };
 const W_RINK_SHOT = { wrist: 'scores', slap: 'scores with a slap shot', one: 'one-times it in', so: 'wins the shootout' };
+const W_RINK_GOALIE = ['pull', 'Goalie', 'G: pull your goalie for an extra skater, or send them back', 0];
 const W_RINK_STR = { pp: ' on the power play', sh: ' short-handed', even: '', so: '' };
 // who plays it: the CPU both sides, or you play your skaters by hand
 const W_RINK_MODES = {
@@ -31,8 +32,8 @@ const W_RINK_MODES = {
 let W_RINK_MODE = 'play';
 // the pad under the rink: with the puck and without it, [key for wHK.input, label, the key it stands for, held?]
 const W_RINK_PAD = {
-  puck: [['shoot', 'Shoot', 'Space: tap for a wrist shot, hold to wind up', 1], ['pass', 'Pass', 'J: tap to pass, hold to send it hard', 1]],
-  none: [['shoot', 'Check', 'Space: lunge at the carrier, or take the face-off', 1], ['pass', 'Poke', 'J: go for the puck', 1], ['lift', 'Lift stick', 'Shift, held: into the passing lane', 1], ['switch', 'Switch', 'E: play the next skater nearest the puck', 0]],
+  puck: [['shoot', 'Shoot', 'Space: tap for a wrist shot, hold to wind up', 1], ['pass', 'Pass', 'J: tap to pass, hold to send it hard', 1], W_RINK_GOALIE],
+  none: [['shoot', 'Check', 'Space: lunge at the carrier, or take the face-off', 1], ['pass', 'Poke', 'J: go for the puck', 1], ['lift', 'Lift stick', 'Shift, held: into the passing lane', 1], ['switch', 'Switch', 'E: play the next skater nearest the puck', 0], W_RINK_GOALIE],
 };
 const wRinkMins = () => wHK.rules.minsAt.includes(SET.rinkMins) ? SET.rinkMins : wHK.rules.mins;
 // the game on the rink: plain data, never saved
@@ -54,6 +55,7 @@ $('wRinkMins').addEventListener('change', e => { SET.rinkMins = +e.target.value;
 // under the rink: the box score, every goal, and How hockey works
 $('v-rink').insertAdjacentHTML('beforeend', `<div id="wRinkPad" class="wrpad" hidden role="group" aria-label="Play"></div><h4 class="wsh">Box score</h4><div id="wRinkBox" class="wcbox"></div>
   <h4 class="wsh">This game</h4><ol id="wRinkLog" class="wglog wslog"></ol>
+  <h4 class="wsh">Penalties</h4><ol id="wRinkPens" class="wglog wslog"></ol>
   <p class="hint wghowlink">How hockey works: skating, shots and saves, checks, face-offs and icing. <button class="ghost" id="wRinkHowBtn">How to play hockey</button> <small>The game waits while you read.</small></p>`);
 $('wRinkHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wRinkHow'); if (h) h.scrollIntoView({ block: 'start' }); });
 
@@ -123,14 +125,21 @@ function wRinkLogHTML() {
   const G = wHK.G, log = G && G.log; if (!log || !log.length) return '<li class="hint">No goals yet.</li>';
   const sc = [0, 0], t = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   return log.map(e => { sc[e.side]++; const T = G.teams[e.side];
-    return `<li style="border-left-color:${T.color}"><small>${e.k === 'so' ? 'Shootout' : `${esc(wHK.periodName(e.p))} ${t(e.clock)}`} · ${sc[0]}–${sc[1]}</small> <b>${esc(e.who)}</b> ${W_RINK_SHOT[e.k] || 'scores'} for ${esc(T.name)}${W_RINK_STR[e.str] || ''}${e.a && e.a.length ? `, from ${e.a.map(esc).join(' and ')}` : ''}.</li>`; }).join('');
+    return `<li style="border-left-color:${T.color}"><small>${e.k === 'so' ? 'Shootout' : `${esc(wHK.periodName(e.p))} ${t(e.clock)}`} · ${sc[0]}–${sc[1]}</small> <b>${esc(e.who)}</b> ${e.en ? 'scores into the empty net' : W_RINK_SHOT[e.k] || 'scores'} for ${esc(T.name)}${W_RINK_STR[e.str] || ''}${e.a && e.a.length ? `, from ${e.a.map(esc).join(' and ')}` : ''}.</li>`; }).join('');
 }
 // the box score under the rink: each side's skaters with their lines, and the goalie's saves
 function wRinkBox() {
-  const B = wHK.box(); if (!B) { $('wRinkBox').innerHTML = ''; $('wRinkLog').innerHTML = ''; return; }
+  const B = wHK.box(); if (!B) { $('wRinkBox').innerHTML = ''; $('wRinkLog').innerHTML = ''; $('wRinkPens').innerHTML = ''; return; }
   const mins = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`, of = (m, a) => a ? `${m}/${a}` : '–';
-  $('wRinkBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Time on the ice">TOI</th><th title="Goals">G</th><th title="Assists">A</th><th title="Shots on goal">SOG</th><th>Hits</th><th title="Shots blocked">Blk</th><th title="Takeaways">Tk</th><th title="Face-offs won of taken">FO</th><th title="A goalie's saves of shots faced">Sv</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${esc(r.pos)} · ${esc(wKindName(r.kind))}</small></td><td>${mins(r.sec)}</td><td>${r.g}</td><td>${r.a}</td><td>${r.sog}</td><td>${r.hit}</td><td>${r.blk}</td><td>${r.take}</td><td>${of(r.fow, r.fot)}</td><td>${r.pos === 'G' ? of(r.sv, r.sa) : ''}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td><b>${b.tot.g}</b></td><td>${b.tot.a}</td><td>${b.tot.sog}</td><td>${b.tot.hit}</td><td>${b.tot.blk}</td><td>${b.tot.take}</td><td>${of(b.tot.fow, b.tot.fot)}</td><td>${of(b.tot.sv, b.tot.sa)}</td></tr></table>`).join('');
+  $('wRinkBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Time on the ice">TOI</th><th title="Goals">G</th><th title="Assists">A</th><th title="Shots on goal">SOG</th><th>Hits</th><th title="Shots blocked">Blk</th><th title="Takeaways">Tk</th><th title="Penalty minutes: two for each minor">PIM</th><th title="Face-offs won of taken">FO</th><th title="A goalie's saves of shots faced">Sv</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${esc(r.pos)} · ${esc(wKindName(r.kind))}</small></td><td>${mins(r.sec)}</td><td>${r.g}</td><td>${r.a}</td><td>${r.sog}</td><td>${r.hit}</td><td>${r.blk}</td><td>${r.take}</td><td>${r.pim}</td><td>${of(r.fow, r.fot)}</td><td>${r.pos === 'G' ? of(r.sv, r.sa) : ''}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td><b>${b.tot.g}</b></td><td>${b.tot.a}</td><td>${b.tot.sog}</td><td>${b.tot.hit}</td><td>${b.tot.blk}</td><td>${b.tot.take}</td><td>${b.tot.pim}</td><td>${of(b.tot.fow, b.tot.fot)}</td><td>${of(b.tot.sv, b.tot.sa)}</td></tr></table>`).join('');
   $('wRinkLog').innerHTML = wRinkLogHTML();
+  $('wRinkPens').innerHTML = wRinkPensHTML();
+}
+// every penalty so far
+function wRinkPensHTML() {
+  const G = wHK.G, P = G && G.pens; if (!P || !P.length) return '<li class="hint">No penalties yet.</li>';
+  const t = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  return P.map(e => `<li style="border-left-color:${G.teams[e.side].color}"><small>${esc(wHK.periodName(e.p))} ${t(e.clock)}</small> <b>${esc(e.who)}</b> (${esc(G.teams[e.side].name)}), ${esc(e.k)}${e.on ? ` on ${esc(e.on)}` : ''}.</li>`).join('');
 }
 function wLeaveRink() {
   wRinkPadRelease(); wRinkTick(false);
@@ -192,7 +201,10 @@ function wRinkHowHTML() {
   <p class="hint"><b>The goalie</b> stands on the line between the puck and the net, but follows the puck a moment late. A shot from where they are set is hard to score on. A pass <b>across the front of the net</b> and a quick shot finds them out of place, and that is how most goals come. A teammate standing in front of the goalie hides the shot.</p>
   <p class="hint"><b>Checks.</b> The skater nearest the puck carrier goes at them. Up close they poke at the puck (defense against hands), or, closing fast, throw a body check (size and speed) that knocks the carrier off it.</p>
   <p class="hint"><b>Icing.</b> A puck sent from a side's own half that crosses the far goal line untouched comes back for a face-off in that side's end. There is no offside.</p>
-  <p class="hint"><b>Level after three periods,</b> it goes to sudden death at three skaters a side: the next goal wins. Still level, a shootout: ${R.so} shooters each, then one each until it is settled. A hockey game never ends level.</p>
+  <p class="hint"><b>Penalties.</b> A poke that misses up close can trip. A beaten checker reaching back can hook. A hit from behind into the boards is boarding, and now and then a hit is just too much (roughing). The player goes to the <b>box</b> behind the far boards for a minor (${Math.round(R.mins * 60 / R.periods / R.minorOf)} seconds at this length), and their side skates one short: the other side is on the <b>power play</b>. The penalty ends early if the power play scores. A side is never below ${R.minSk} skaters: a third penalty waits its turn. A side that is short may ice the puck freely, and sits back in a box in front of its net.</p>
+  <p class="hint"><b>The delayed penalty.</b> When the side that was fouled has the puck, play goes on until the fouling side touches it. Meanwhile the fouled side's goalie comes off for an extra skater: the whistle will go before anyone can shoot at the empty net. A goal in that time wipes the penalty out.</p>
+  <p class="hint"><b>Pulling the goalie.</b> Late in the third period, a goal or two behind, a side takes its goalie off for an extra skater when it has the puck up the ice. The net is empty until a face-off in its own half sends the goalie back. By hand, <b>G</b> pulls your goalie or sends them back, at any time.</p>
+  <p class="hint"><b>Level after three periods,</b> it goes to sudden death at three skaters a side, half a period long: the next goal wins. Still level, a <b>shootout</b>: ${R.so} tries each, then one each until it is settled. Each try starts at centre: the shooter alone on the goalie. By hand you skate in, aim and shoot your side's tries, and against theirs you may take your goalie: steer up and down the screen to move them along the line, or leave them to it. A hockey game never ends level.</p>
   <p class="hint"><b>Playing it by hand.</b> Pick <b>You play</b> on the bar to play Rimewatch. With the puck you play whoever has it: WASD or the arrows to skate (let go and they glide on). <b>Space</b> shoots: a tap is a wrist shot; hold it to wind up a slap shot (the bar beside your shooter fills, and the shot gets harder), then let go. A checker can take the puck off a wind-up. <b>J</b> passes to the teammate you're skating toward (or the best one if you aren't steering); hold it to send the puck hard the way you steer, into a corner or out of your end. Without the puck you play the skater nearest it (marked): <b>J</b> pokes at the puck, <b>Space</b> lunges at the carrier (a hit if you reach them, and out of the play for a moment if you don't), <b>Shift</b> held lifts your stick into the passing lane, and <b>E</b> switches to the next skater. The goalie is never yours. Let go of the keys for ${wHK.hands.idle} seconds and your skater plays on by themselves. On a phone, the buttons under the rink do the same.</p>
   <p class="hint"><b>Aiming.</b> The way you steer as you let a shot go picks the target, marked on the net while you wind up: up or down the screen for that post, with the way to the goal held as well for the top corner, and nothing held for between the pads. The goalie covers what they can reach: the post they have moved away from is open and the one they stand at is shut. The top corners score more and miss more. Between the pads is good on a goalie who is sliding across.</p>
   <p class="hint"><b>The one-timer by hand.</b> Press Space while a pass is on its way to you. Inside the last ${Math.round(wHK.hands.oneT * 100) / 100} seconds before it arrives, it is shot as it lands. Earlier than that and you fan on it.</p>

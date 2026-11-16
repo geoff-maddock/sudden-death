@@ -17,6 +17,8 @@
      the carrier, a hit if you reach them, and out of the play for a moment if you don't; hold Shift to lift your
      stick into the passing lane (more passes picked off, a little slower); E switches you to the next skater nearest
      the puck.
+   G pulls your goalie for an extra skater, or sends them back. In the shootout you shoot your own tries (skate in,
+   aim, shoot), and may take your goalie against theirs by steering up and down the screen (hkGoalieHand).
    The face-off: press Space as the puck drops. In the last HK_HANDS.drop seconds before it lands you win more of
    them, more the closer you are; earlier than that and you've jumped it, and win fewer. Don't press and it's the
    centres' ratings alone.
@@ -49,8 +51,10 @@ function hkSteerAim(p) {
   const [sx, sy] = HKI.steer, n = hyp(sx, sy); if (!n) return null;
   return [p.x + sx / n * 4, p.y + sy / n * 4];
 }
-// you have the puck, in a live play
-const hkPuckMine = () => GD.ph === 'live' && hkHand() >= 0 && hkHand() === hkMe();
+// the puck is in play: a live play, or a try in the shootout under way
+const hkInPlay = () => GD.ph === 'live' || (GD.ph === 'so' && !!GD.so.cur && GD.so.cur.st === 'go');
+// you have the puck, in play
+const hkPuckMine = () => hkInPlay() && hkHand() >= 0 && hkHand() === hkMe();
 /* the target from the way you steer (or last steered, a moment ago): { y: -1 | 1 (which post), hi } or 'five'
    (between the pads). dir: the way the shooter's side attacks */
 function hkAimTarget(dir) {
@@ -61,7 +65,7 @@ function hkAimTarget(dir) {
 /* what aiming at t does against the goalie of `side`, as it stands: { f (times the odds of beating them), miss (added
    to the odds of missing the net) }. No target (the CPU, the headless game) is the plain roll: f 1, miss 0. */
 function hkAimFx(side, t) {
-  const g = L.pl[hkGk(side)]; if (!t || g.off) return { f: 1, miss: 0 };
+  const g = L.pl[hkGk(side)]; if (!t || !hkInNet(side)) return { f: 1, miss: 0 };
   if (t === 'five') return { f: .75 + Math.min(1, hyp(g.vx, g.vy) / 2.5) * .8, miss: -.06 };
   const open = clamp(Math.abs(t.y * HK_RULES.net - g.y) / (2 * HK_RULES.net), 0, 1);
   return { f: (.55 + open * .9) * (t.hi ? 1.15 : .95), miss: t.hi ? .09 : .02 };
@@ -83,6 +87,7 @@ function hkInput(o) {
     else if (!o.pass && HKI.pass) { HKI.pass = false; if (hkPuckMine() && !GD.meter) r = hkHandPass(HKI.now - HKI.passAt >= HK_HANDS.dump); }
   }
   if (o.act === 'switch') { if (GD.ph === 'live' && !hkPuckMine()) { L.me = hkNearMine(hkMe()); r = 'switch'; } }
+  if (o.act === 'pull') r = hkHandPull();
   return r;
 }
 function hkInputClear() {
@@ -93,18 +98,18 @@ function hkInputClear() {
 function hkSpaceDown() {
   if (GD.meter) return '';
   if (GD.ph === 'drop') { if (GD.press == null) GD.press = GD.t; return 'draw'; }
-  if (GD.ph !== 'live') return '';
+  if (!hkInPlay()) return '';
   const P = L.puck, me = hkMe();
   if (hkPuckMine()) { const p = L.pl[me]; GD.meter = { i: me, t: 0 }; p.act = 'wind'; p.actT = 9; return 'wind'; }
   if (P.st === 'free' && P.k === 'pass' && P.to === me) { HKI.oneAt = HKI.now; return 'ready'; }
   const h = hkHand();
-  if (h >= 0 && L.pl[h].side !== GD.you) return hkHandCheck();
+  if (GD.ph === 'live' && h >= 0 && L.pl[h].side !== GD.you) return hkHandCheck();
   return '';
 }
 // the wind-up moves on (07-game.js calls this each step of a live play); held too long, it goes on its own
 function hkMeterStep(dt) {
   const M = GD.meter; if (!M) return;
-  if (GD.ph !== 'live' || hkHand() !== M.i) { GD.meter = null; const p = L.pl[M.i]; if (p && p.act === 'wind') { p.act = ''; p.actT = 0; } return; }
+  if (!hkInPlay() || hkHand() !== M.i) { GD.meter = null; const p = L.pl[M.i]; if (p && p.act === 'wind') { p.act = ''; p.actT = 0; } return; }
   M.t += dt;
   if (M.t >= HK_HANDS.late) hkLetGo();
 }
@@ -113,7 +118,7 @@ const hkPower = t => clamp(t / HK_HANDS.full, .35, 1);
 function hkLetGo() {
   const M = GD.meter; GD.meter = null; if (!M) return '';
   const p = L.pl[M.i]; if (p.act === 'wind') { p.act = ''; p.actT = 0; }
-  if (GD.ph !== 'live' || hkHand() !== M.i) return '';
+  if (!hkInPlay() || hkHand() !== M.i) return '';
   const kind = M.t < HK_HANDS.tap ? 'wrist' : 'slap', aim = hkAimTarget(hkDir(p.side));
   hkRelease(M.i, kind, { aim, pow: kind === 'slap' ? hkPower(M.t) : 1 });
   GD.rel = { kind, aim, pow: kind === 'slap' ? Math.round(hkPower(M.t) * 100) / 100 : 1, t: Math.round(M.t * 1000) / 1000 };
@@ -147,7 +152,7 @@ function hkHandPoke() {
   if (GD.ph !== 'live') return '';
   const me = hkMe(), d = L.pl[me], h = hkHand(); if (!d || d.stun > 0 || (L.pokeAt != null && HKI.now - L.pokeAt < HK_HANDS.pokeCd)) return '';
   L.pokeAt = HKI.now; d.act = 'poke'; d.actT = .25;
-  if (h < 0 || L.pl[h].side === d.side || L.pl[h].pos === 'G') return 'miss';
+  if (h < 0 || L.pl[h].side === d.side || hkIsGk(L.pl[h])) return 'miss';
   const c = L.pl[h]; if (hyp(c.x - d.x, c.y - d.y) > 1.4) return 'miss';
   d.cd = .5;
   return hkPoke(d, c, .08) ? 'poke' : 'miss';
@@ -155,7 +160,7 @@ function hkHandPoke() {
 // your check: a lunge at the carrier. Reach them inside HK_HANDS.lunge seconds and it's a hit (05-live.js: hkLunge)
 function hkHandCheck() {
   const me = hkMe(), d = L.pl[me], h = hkHand(); if (!d || d.stun > 0 || L.lunge || (L.hitAt != null && HKI.now - L.hitAt < HK_HANDS.hitCd)) return '';
-  const c = L.pl[h]; if (c.pos === 'G') return '';
+  const c = L.pl[h]; if (hkIsGk(c)) return '';
   L.hitAt = HKI.now;
   // (straight at where the carrier is going, at a little over top speed)
   const dx = c.x + c.vx * .15 - d.x, dy = c.y + c.vy * .15 - d.y, dist = hyp(dx, dy) || 1, v = hkTop(d, -1) * 1.15;
@@ -168,11 +173,15 @@ function hkHandCheck() {
 function hkLunge(dt) {
   const U = L.lunge; if (!U) return;
   const d = L.pl[U.i], h = hkHand(), c = h >= 0 ? L.pl[h] : null;
-  if (c && c.side !== d.side && c.pos !== 'G') {
+  if (c && c.side !== d.side && !hkIsGk(c)) {
     const dx = c.x - d.x, dy = c.y - d.y, dist = hyp(dx, dy);
     if (dist < 1.05) { L.lunge = null; const closing = ((d.vx - c.vx) * dx + (d.vy - c.vy) * dy) / (dist || 1); return hkHit(d, c, Math.max(closing, 3.5) + 1); }
   }
-  if ((U.t -= dt) <= 0) { L.lunge = null; d.stun = .3; hkEv('hitmiss', d.n, c ? c.n : ''); }
+  if ((U.t -= dt) > 0) return;
+  L.lunge = null; d.stun = .3; hkEv('hitmiss', d.n, c ? c.n : '');
+  // you ran into somebody who doesn't have the puck: interference, more often than not
+  const [o, od] = hkNearest(d.x, d.y, hkSk(1 - d.side).filter(q => L.pl.indexOf(q) !== h));
+  if (o && od < .9 && R() < HK_FOUL.interfere) hkFoul(d, 'interference', o);
 }
 /* your press at the face-off, as an edge on the roll: in the last HK_HANDS.drop seconds before the puck lands, up to
    +.3 (the closer the better); earlier, you've jumped it: -.15. No press: 0. */
@@ -180,6 +189,21 @@ function hkDrawEdge() {
   if (!hkHandsOn() || GD.press == null) return 0;
   const e = HK_PACE.drop - GD.press;
   return e <= HK_HANDS.drop ? .08 + (1 - e / HK_HANDS.drop) * .22 : -.15;
+}
+// your goalie, pulled for an extra skater or sent back (G): only in a live play, and not while they hold the puck
+function hkHandPull() {
+  if (GD.ph !== 'live') return '';
+  const g = L.pl[hkGk(GD.you)];
+  if (g.pulled) { if (g.pulled === 'delay') return ''; g.pulled = false; hkEv('back', g.n); GD.msg = `${g.n} is back in the net.`; return 'back'; }
+  return hkPull(GD.you, 'hand') ? 'pull' : '';
+}
+/* in the shootout, with the CPU shooting, the goalie is yours while you steer them: up and down the screen along the
+   goal line, as fast as they can move, with no moment's lag. Let go and they play it themselves. Returns where they
+   are going, or null */
+function hkGoalieHand(g) {
+  if (GD.ph !== 'so' || !hkHandsOn() || g.side !== GD.you || !hkActive() || !HKI.steer[1]) return null;
+  const [x] = hkGoalSpot(g.side, L.puck.x, L.puck.y);
+  return [x, clamp(g.y + HKI.steer[1] * 2, -HK_RULES.net, HK_RULES.net)];
 }
 function hkSetMode(m) {
   if (!GD || !['watch', 'play'].includes(m)) return GD ? GD.mode : null;

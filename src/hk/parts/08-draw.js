@@ -21,7 +21,9 @@ const hkScr = (x, y) => ({ x: HK_X0 + x * HK_PX, y: HK_Y0 + y * HK_PY });
 const hkScrCam = (x, y) => { const p = hkScr(x, y); return { x: (p.x - HKC.left) * HKC.k, y: HK_CAM.fy + (p.y - HK_CAM.fy) * HKC.k }; };
 // the end the play is set in (0 the left, 1 the right), or null for the whole sheet
 function hkCamAim() {
-  const ph = GD.ph; if (ph === 'intro' || ph === 'break' || ph === 'over' || ph === 'so') return null;
+  const ph = GD.ph; if (ph === 'intro' || ph === 'break' || ph === 'over') return null;
+  // (in the shootout: the end the try is at, once it's under way)
+  if (ph === 'so') { const U = GD.so.cur; return U && U.st !== 'ready' ? (hkGoalX(U.side) > HK_RULES.len / 2 ? 1 : 0) : null; }
   const C = HKT.cam, x = ph === 'set' || ph === 'drop' ? GD.fo.x : L.puck.x;
   for (const e of [0, 1]) { const d = e ? HK_RULES.len - x : x; if (d < (C.u > 0 && C.end === e ? HK_CAM.out : HK_CAM.in)) return e; }
   return null;
@@ -147,6 +149,18 @@ function hkDrawNets(c) {
     c.restore();
   }
 }
+// the penalty box, behind the far boards at centre: whoever is serving, with the seconds they have left
+function hkDrawBox(c) {
+  const n = [0, 0];
+  for (const b of G.box) {
+    const p = L.pl.find(q => q.side === b.side && q.ri === b.ri); if (!p) continue;
+    const k = n[b.side]++, s = hkScr(HK_RULES.len / 2 + (b.side ? 1 : -1) * (1.5 + k * 1.5), -HK_RULES.wid / 2 - .55), T = G.teams[b.side];
+    c.save(); c.fillStyle = 'rgba(13,9,7,.75)'; rr(c, s.x - 14, s.y - 34, 28, 38, 4); c.fill(); c.restore();
+    drawFig(c, p.kind, s.x, s.y, 30, T, { num: p.num, flip: b.side === 1, noShadow: true });
+    c.save(); rr(c, s.x - 13, s.y - 47, 26, 13, 3); c.fillStyle = T.color; c.fill(); c.restore();
+    txt(c, `0:${String(Math.max(0, Math.ceil(b.t))).padStart(2, '0')}`, s.x, s.y - 37, `700 10px ${HK_FONT}`, '#fff', 'center');
+  }
+}
 // a stick: from the hands down to a blade on the ice, out the way the player faces
 function hkDrawStick(c, p, s, goalie) {
   const bx = s.x + p.fx * (goalie ? .6 : .78) * HK_PX, by = s.y + p.fy * .78 * HK_PY + 1, swing = p.act === 'wind' ? -14 : p.act === 'shoot' || p.act === 'pass' ? 4 : 0;
@@ -158,10 +172,12 @@ function hkDrawStick(c, p, s, goalie) {
 // knocked off their skates: leaning over, legs apart
 const HK_DOWN = { drop: 2, lean: .95, legL: { a: .9, lift: .2 }, legR: { a: -.6, lift: 0 } };
 function hkDrawPlayers(c) {
-  const h = hkHand(), me = hkHandsOn() && (GD.ph === 'live' || GD.ph === 'drop') ? (GD.ph === 'drop' ? GD.you * HK_POS.length : hkMe()) : -1;
+  const U = GD.ph === 'so' ? GD.so.cur : null, h = hkHand();
+  const me = !hkHandsOn() ? -1 : GD.ph === 'drop' ? hkTaker(GD.you) : GD.ph === 'live' ? hkMe() : U && U.st !== 'done' ? (U.side === GD.you ? U.i : U.gi) : -1;
+  hkDrawBox(c);
   const list = L.pl.map((p, i) => ({ p, i })).filter(o => !o.p.off).sort((a, b) => a.p.y - b.p.y);
   for (const { p, i } of list) {
-    const s = hkScr(p.x, p.y), T = G.teams[p.side], sp = hyp(p.vx, p.vy), mv = sp > .8, goalie = p.pos === 'G';
+    const s = hkScr(p.x, p.y), T = G.teams[p.side], sp = hyp(p.vx, p.vy), mv = sp > .8, goalie = hkIsGk(p);
     if (i === h) { c.save(); c.strokeStyle = T.color; c.lineWidth = 3; c.beginPath(); c.ellipse(s.x, s.y, 16, 6, 0, 0, Math.PI * 2); c.stroke(); c.strokeStyle = T.light || '#fff'; c.lineWidth = 1.2; c.stroke(); c.restore(); }
     // the skater you play: a dashed ring, and a mark over their head
     if (i === me) { c.save(); c.strokeStyle = '#ffe04a'; c.lineWidth = 2; c.setLineDash([5, 4]); c.beginPath(); c.ellipse(s.x, s.y, 20, 8, 0, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); c.fillStyle = '#ffe04a'; c.strokeStyle = '#17100e'; c.lineWidth = 1.2; const y = s.y - 56 + Math.sin(HKT.t * 5) * 2; c.beginPath(); c.moveTo(s.x - 6, y); c.lineTo(s.x + 6, y); c.lineTo(s.x, y + 8); c.closePath(); c.fill(); c.stroke(); c.restore(); }
@@ -176,7 +192,7 @@ function hkDrawPlayers(c) {
 }
 function hkDrawPuck(c) {
   const P = L.puck, s = hkScr(P.x, P.y), v = hyp(P.vx, P.vy);
-  if (GD.ph === 'over' || GD.ph === 'break' || GD.ph === 'so') return;
+  if (GD.ph === 'over' || GD.ph === 'break' || (GD.ph === 'so' && !GD.so.cur)) return;
   c.save();
   // a fast puck leaves a streak
   if (P.st === 'free' && v > 12) { c.strokeStyle = 'rgba(20,24,30,.3)'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(s.x, s.y); c.lineTo(s.x - P.vx * HK_PX * .035, s.y - P.vy * HK_PY * .035); c.stroke(); }
@@ -211,11 +227,11 @@ function hkDrawCues(c) {
   }
 }
 // a big moment in big letters on the ice, for a moment; and at the end, the final
-const HK_BIG = { goal: ['GOAL!', '#ffd08a', 1.8], icing: ['ICING', '#ff8a6a', 1.2], hit: ['BIG HIT', '#ffd08a', .9] };
+const HK_BIG = { goal: ['GOAL!', '#ffd08a', 1.8], icing: ['ICING', '#ff8a6a', 1.2], hit: ['BIG HIT', '#ffd08a', .9], penalty: ['PENALTY', '#ff8a6a', 1.4], nogoal: ['NO GOAL', '#ff8a6a', 1] };
 function hkDrawBig(c) {
   let word = null, col = '#ffd08a', sub = '', al = 1, sc = 1;
   if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}${G.over && G.over.so ? ' (shootout)' : G.over && G.over.ot ? ' (sudden death)' : ''}`; }
-  else if (GD.ph === 'so') { word = 'SHOOTOUT'; sub = `${G.teams[0].name} ${G.so.goals[0]}, ${G.teams[1].name} ${G.so.goals[1]}`; }
+  else if (GD.ph === 'so' && !GD.so.cur && !G.so.tries[0] && !G.so.tries[1]) { word = 'SHOOTOUT'; sub = `${HK_RULES.so} tries each, then one each until it's settled.`; }
   else if (GD.ph === 'break') { word = hkOt() ? 'SUDDEN DEATH' : `END OF THE ${hkPeriodName(G.p - 1).toUpperCase()}`; if (hkOt()) sub = 'Three skaters a side. The next goal wins.'; }
   else if (GD.big && HK_BIG[GD.big.k]) {
     if (GD.big.at == null) GD.big.at = HKT.t;
@@ -237,13 +253,21 @@ function hkDrawHud(c) {
     c.fillStyle = T.color; c.fillRect(s ? 930 : 20, 10, 10, 44);
     let name = T.name; c.font = F(19, 800); while (name.length > 4 && c.measureText(name).width > 250) name = name.slice(0, -2).trimEnd() + '…';
     txt(c, name, X(40), 28, F(19, 800), '#f3ead6', al);
-    txt(c, `Shots ${G.sog[s]}`, X(40), 49, F(12, 600), dim, al);
+    const empty = live && GD.ph !== 'so' && !hkInNet(s);
+    txt(c, `Shots ${G.sog[s]}${empty ? ' · empty net' : ''}`, X(40), 49, F(12, 600), empty ? '#ffb070' : dim, al);
     txt(c, String(G.score[s]), X(398), 47, F(40, 900), has ? T.light || '#fff' : '#f3ead6', 'center');
     if (has) { c.fillStyle = T.color; c.fillRect(X(398) - 16, 53, 32, 4); }
   }
   c.save(); rr(c, 436, 8, 88, 48, 6); c.fillStyle = '#1c1512'; c.fill(); c.restore();
   txt(c, GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), 480, 25, F(12, 700), dim, 'center');
   txt(c, GD.ph === 'so' ? `${G.so.goals[0]}–${G.so.goals[1]}` : hkClockText(), 480, 48, F(22, 900), G.clock < 10 && live ? '#ff8a6a' : '#ffd08a', 'center');
+  // under the clock: the man advantage and how long is left of it, or a penalty that is coming
+  if (!live || GD.ph === 'so') return;
+  const n = hkStrength(), D = GD.delay, up = n[0] > n[1] ? 0 : n[1] > n[0] ? 1 : -1, first = G.box.length ? Math.min(...G.box.map(b => b.t)) : 0;
+  const pill = D ? ['PENALTY COMING', G.teams[D.side].color] : up >= 0 ? [`POWER PLAY  ${n[up]} on ${n[1 - up]}  0:${String(Math.ceil(first)).padStart(2, '0')}`, G.teams[up].color] : G.box.length ? [`${n[0]} ON ${n[1]}  0:${String(Math.ceil(first)).padStart(2, '0')}`, '#5a5048'] : null;
+  if (!pill) return;
+  c.save(); c.font = F(12, 800); const w = c.measureText(pill[0]).width + 22; rr(c, 480 - w / 2, 66, w, 20, 5); c.fillStyle = pill[1]; c.fill(); c.lineWidth = 1.5; c.strokeStyle = '#0d0907'; c.stroke(); c.restore();
+  txt(c, pill[0], 480, 80, F(12, 800), '#fff', 'center');
 }
 function hkDrawMsg(c) {
   c.save(); rr(c, 150, 508, 660, 30, 6); c.fillStyle = 'rgba(13,9,7,.82)'; c.fill(); c.restore();
