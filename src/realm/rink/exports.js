@@ -22,7 +22,7 @@ return {
   get release() { return GD && GD.rel ? JSON.parse(JSON.stringify(GD.rel)) : null; }, get drew() { return GD && GD.drew ? Object.assign({}, GD.drew) : null; }, get press() { return GD ? GD.press : null; },
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
-  cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  cam: () => ({ u: HKT.cam.u, m: HKT.cam.m || 0, end: HKT.cam.end, k: HKC.k, left: HKC.left, top: HKC.top }), camRules: Object.assign({}, HK_CAM),
   // gear and potions (phase 8): a roster player's gear ({ id, name, fx }), start({ bags: [yours or null, theirs] }); the
   // potions, why one can't be given now, yours given ('' when it took: the page takes it from your bag), the bench's
   // advice for a bag, what the CPU's coach would give, and what was given
@@ -36,7 +36,7 @@ return {
   powerOptions: side => hkPowerOptions(side), ultOptions: side => hkUltOptions(side), sitOptions: side => hkSitOptions(side), cast: (side, i) => hkCast(side, i), castUlt: (side, i) => hkCastUlt(side, i), castSit: (side, id) => hkCastSit(side, id),
   fx: (side, k) => hkFx(side, k), fx0: Object.assign({}, HK_FX0), get autoPow() { return GD ? GD.autoPow !== false : true; }, get powersOn() { return !!(G && G.powers); },
   pows: JSON.parse(JSON.stringify(Object.fromEntries(Object.keys(HK_POW).map(k => [k, { one: HK_POW[k], two: HK_POW2[k], ult: { id: HK_ULT[k].id, n: HK_ULT[k].n, desc: HK_ULT[k].desc, o: HK_ULT[k].o, d: HK_ULT[k].d } }])))),
-  sits: Object.fromEntries(Object.entries(HK_SIT).map(([k, v]) => [k, { n: v.n, cost: v.cost, desc: v.desc }])), powRules: { mana: Object.assign({}, HK_MANA), sta: Object.assign({}, HK_POW_STA), secs: HK_POW_SECS, ultSecs: HK_ULT_SECS, spirit: Object.assign({}, HK_SPIRIT) },
+  sits: Object.fromEntries(Object.entries(HK_SIT).map(([k, v]) => [k, { n: v.n, cost: v.cost, desc: v.desc }])), powRules: { k: HK_POW_K, mana: Object.assign({}, HK_MANA), sta: Object.assign({}, HK_POW_STA), secs: HK_POW_SECS, ultSecs: HK_ULT_SECS, spirit: Object.assign({}, HK_SPIRIT) },
   powerIds: () => Object.keys(HK_POW_BY).concat(Object.keys(HK_ULT_BY)), cpuPowers: dt => { if (L) { L.powT = 0; hkCpuPowers(dt || .5); } }, spiritAdd: (s, n) => hkSpiritAdd(s, n), manaAdd: (s, n) => hkManaAdd(s, n),
   // from the world (phase 6): a save point at each whistle and break (wantSnap says when; onSnap hears { G, L, GD }),
   // resume(snap) puts one back, snapshot() takes one now; the Pond Rink's ways (start({ pond, snow })), and its rules

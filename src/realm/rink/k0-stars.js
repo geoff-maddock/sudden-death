@@ -11,7 +11,7 @@ HK_KIND.phoenix = [9, 4, 7, 9, 5, 6];
 HK_POW.phoenix = [hkP('hkblaze', 'Blaze', 1, 'rush', 'The puck leaves the stick alight: every shot truer, and harder to stop.', { shot: .035, miss: -.02 }),
   hkP('ashcloud', 'Ash Cloud', 1, 'any', 'Ash in their eyes: their shots miss more, and their passes are picked off more.', { wild: .06, pick: 1.2 })];
 HK_POW2.phoenix = [hkP('firetrail', 'Fire Trail', 1, 'rush', 'On wings of flame: faster, and hard to check.', { spd: 1.08, wall: .6 }),
-  hkP('scorchedice', 'Scorched Ice', 1, 'fore', 'The ice melts under them: they are a tenth slower, and easier to poke.', { slow: .9, poke: .03 })];
+  hkP('scorchedice', 'Scorched Ice', 1, 'fore', 'The ice melts under them: they are clearly slower, and easier to poke.', { slow: .9, poke: .03 })];
 HK_ULT.phoenix = hkU0('rebirthice', 'Rebirth', 'The phoenix\'s line rises from the ashes: it barely tires, and with the puck its shots are harder to stop.', { tire: .3, shot: .03 }, { tire: .3 });
 
 /* The Kraken: the longest reach on the ice, slow feet, the best goalie there is, and a defender no pass gets round.
@@ -53,11 +53,11 @@ HK_ULT.hydra = hkU0('regrowline', 'Regrow', 'Cut one head off and two grow back:
 /* The Frost Wyrm (kind frostwyrm): at home on the ice, and good at everything on it. Ice Path skates past them,
    Frostbite numbs them, and Whiteout: a blizzard over the whole pond. */
 HK_KIND.frostwyrm = [9, 8, 7, 8, 7, 7];
-HK_POW.frostwyrm = [hkP('icepathrink', 'Ice Path', 1, 'rush', 'The ice runs smooth ahead of your skaters: an eighth faster, and harder to check.', { spd: 1.12, wall: .7 }),
-  hkP('frostbiterink', 'Frostbite', 1, 'any', 'Numb hands and slow feet: they are a tenth slower, and their shots miss more.', { slow: .9, wild: .04 })];
+HK_POW.frostwyrm = [hkP('icepathrink', 'Ice Path', 1, 'rush', 'The ice runs smooth ahead of your skaters: much faster, and harder to check.', { spd: 1.12, wall: .7 }),
+  hkP('frostbiterink', 'Frostbite', 1, 'any', 'Numb hands and slow feet: they are clearly slower, and their shots miss more.', { slow: .9, wild: .04 })];
 HK_POW2.frostwyrm = [hkP('glare', 'Glare Ice', 1, 'cycle', 'The ice shines in their goalie\'s eyes: set late for every shot.', { blind: .7, shot: .01 }),
-  hkP('rimefrost', 'Rime', 1, 'trap', 'Rime on their blades: an eighth slower.', { slow: .86 })];
-HK_ULT.frostwyrm = hkU0('whiteoutrink', 'Whiteout', 'A blizzard over the whole pond: without the puck they are a fifth slower and their shots go astray; with it their goalie can\'t see yours.', { blind: .7 }, { slow: .8, wild: .06 });
+  hkP('rimefrost', 'Rime', 1, 'trap', 'Rime on their blades: much slower.', { slow: .86 })];
+HK_ULT.frostwyrm = hkU0('whiteoutrink', 'Whiteout', 'A blizzard over the whole pond: without the puck they are far slower and their shots go astray; with it their goalie can\'t see yours.', { blind: .7 }, { slow: .8, wild: .06 });
 
 for (const k of ['phoenix', 'kraken', 'behemoth', 'djinn', 'hydra', 'frostwyrm']) {
   for (const p of HK_POW[k].concat(HK_POW2[k])) HK_POW_BY[p.id] = p;

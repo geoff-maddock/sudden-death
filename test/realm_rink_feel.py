@@ -90,6 +90,27 @@ async def main():
         check(await pg.evaluate("ACHS.stats.realmKettles || 0") == d0 + 1 and await pg.evaluate("['w_rink', 'w_kettle', 'w_hattrick', 'w_shutout'].every(id => ACH.some(a => a.id === id))"), 'a won Pond Kettle counts for its medal; all four medals are in the book')
         await pg.evaluate(CLOSE_ALL)
 
+        # ---------- speed in Watch and Manage; the face-off line; mana comes back; how strong powers are ----------
+        await pg.evaluate("showPage('play'); wRinkGame({ seed: 12, mode: 'watch' })")
+        await pg.wait_for_function("wHK.phase === 'intro' || wHK.phase === 'live'")
+        sp = await pg.evaluate("""(() => { const sel = document.getElementById('wRinkSpeed'), L = document.getElementById('wRinkSpeedL'); const shown = !L.hidden;
+          sel.value = '4'; sel.dispatchEvent(new Event('change')); const at4 = wHK.speed;
+          document.querySelector('#wRinkModes [data-kmode="play"]').click(); const play = [wHK.speed, L.hidden];
+          document.querySelector('#wRinkModes [data-kmode="manage"]').click(); const man = [wHK.speed, L.hidden];
+          sel.value = '1'; sel.dispatchEvent(new Event('change')); return { shown, at4, play, man, back: wHK.speed }; })()""")
+        check(sp == {'shown': True, 'at4': 4, 'play': [1, True], 'man': [4, False], 'back': 1}, 'Speed runs a watched or managed game at up to 8 times; You play is always at 1', sp)
+        await pg.evaluate("wRinkGame({ seed: 13, mode: 'play' })")
+        await pg.wait_for_function("wHK.phase === 'live'")
+        fo = await pg.evaluate("wHK.msg")
+        check("didn't press" in fo, 'a face-off you did not press at says so', fo)
+        mn = await pg.evaluate("""(() => { const R = wHK.powRules; wHK.start({ seed: 5, powers: true, mode: 'watch' }); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step();
+          let d = null; for (let i = 0; i < 200 && d == null; i++) { const m = wHK.G.mana.slice(), f = (wHK.G.fxs || []).length; wHK.step(); if (wHK.phase === 'live' && (wHK.G.fxs || []).length === f && wHK.G.mana[0] > m[0]) d = wHK.G.mana[0] - m[0]; }
+          return { k: R.k, mana: R.mana, d }; })()""")
+        check(mn['k'] == 1.5 and mn['mana']['start'] == 4 and mn['mana']['max'] == 8 and mn['mana']['every'] == 30 and mn['d'] is not None and 0 < mn['d'] < .01, 'mana starts at 4 of 8 and comes back as play goes on; powers are one and a half times as strong', mn)
+        hw = await pg.evaluate("(() => { showPage('help'); const t = document.getElementById('wRinkHow').textContent; showPage('play'); return t; })()")
+        check('Speed.' in hw and '2, 4 or 8 times' in hw and 'how your timing was' in hw, 'How to play explains Speed and the face-off line', None)
+        await pg.evaluate(CLOSE_ALL)
+
         help_ = await pg.evaluate("(() => { renderHelp(); const h = document.getElementById('wHelpRinkFeel'); return h ? h.textContent : ''; })()")
         check('Sound effects' in help_ and 'medals' in help_ and 'hat trick' in help_, 'How to play mentions the sound and the medals', help_)
         check(await pg.evaluate("wAudit().length === 0"), 'the audit is clean', await pg.evaluate("wAudit()"))

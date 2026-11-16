@@ -24,7 +24,7 @@
    (saves). G.log has every goal.
    GD is the game on show (not saved). The headless game (hkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
-const HK_PACE = { intro: 1.3, set: .85, drop: .5, dead: 1, goal: 1.9, pen: 1.5, break: 2.4, so: 1.1, soGap: .5, soReady: .8, soMax: 7 };
+const HK_PACE = { intro: 1.3, set: .85, drop: .9, dead: 1, goal: 1.9, pen: 1.5, break: 2.4, so: 1.1, soGap: .5, soReady: .8, soMax: 7 };
 const HK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 const HK_DOTS = { x: [8.5, HK_RULES.len - 8.5], y: 5.5 };
 let GD = null;
@@ -166,7 +166,8 @@ function hkDrop() {
   const back = hkSk(win).filter(p => p !== w).sort((a, b) => hkUp(win, a.x) - hkUp(win, b.x))[0];
   hkEv('faceoff', w.n, c[1 - win].n);
   G.poss = 1 - win; hkGain(L.pl.indexOf(w), 'faceoff');
-  GD.msg = `${w.n} wins the face-off for ${G.teams[win].name}.`; GD.drew = { edge: Math.round(edge * 100) / 100, win };
+  const mine = hkHandsOn() ? (GD.press == null ? ' You didn\'t press: Space as the puck lands.' : hkDrawEdge() > 0 ? (hkDrawEdge() > .2 ? ' Your timing: dead on.' : ' Your timing: good.') : ' You pressed too early.') : '';
+  GD.msg = `${w.n} wins the face-off for ${G.teams[win].name}.${mine}`; GD.drew = { edge: Math.round(edge * 100) / 100, win };
   hkGo('live');
   if (back) hkPass(L.pl.indexOf(back));
 }

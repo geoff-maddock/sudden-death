@@ -93,12 +93,12 @@ function hkNetOut(o, m, e) {
 }
 
 /* ---------- skating ---------- */
-const hkTop = (p, i) => (5.4 + p.r.spd * .42) * hkStaK(p) * hkFx(p.side, 'spd') * hkFx(1 - p.side, 'slow') * (hkOnCrack(p.x, p.y) ? HK_POND.slow : 1) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
+const hkTop = (p, i) => (5 + p.r.spd * .52) * hkStaK(p) * hkFx(p.side, 'spd') * hkFx(1 - p.side, 'slow') * (hkOnCrack(p.x, p.y) ? HK_POND.slow : 1) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
 function hkSkate(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(hkTop(p, i), d / .4);
   const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0;
   let ax = wx - p.vx, ay = wy - p.vy;
-  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * hkStaK(p) * (hkGxOf(p).accel || 1) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
+  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (5.5 + p.r.spd * .85) * hkStaK(p) * (hkGxOf(p).accel || 1) * (braking ? 1.8 : 1) * (p.stun > 0 ? .4 : 1) * dt;
   if (need > mx) { ax *= mx / need; ay *= mx / need; }
   p.vx += ax; p.vy += ay;
   hkGlide(p, dt);

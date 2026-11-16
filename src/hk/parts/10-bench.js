@@ -34,7 +34,7 @@ function hkNextOn(side, pos) {
 function hkStaStep(dt) {
   for (const p of L.pl) {
     if (p.off || (p.pos === 'G' && !p.pulled)) continue;
-    const top = 5.4 + p.r.spd * .42, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
+    const top = 5 + p.r.spd * .52, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
     // (a pushed Tempo tires them, and so does a system that chases, while they are without the puck)
     const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire') * hkAnti(p.side);
     G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * tire * dt);

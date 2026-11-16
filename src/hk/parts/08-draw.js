@@ -10,15 +10,16 @@
    side's shots on goal. Under the rink, what just happened (GD.msg), and a line of the game so far. A goal or an icing
    puts a word on the ice for a moment; at the end, the final score.
    Rink space is metres (05-live.js); hkScr turns it into canvas pixels. */
-const HKT = { t: 0, box: null, boxKey: '', bg: null, bgKey: '', cam: { u: 0, end: 0, x: 480, t: 0, g: null } };
-/* the camera: k times the size on an end, the near boards held at about the same line (fy), in on an end once the puck
-   is within `in` metres of that end's boards and out again past `out` (so it doesn't flicker at the blue line) */
-const HK_CAM = { k: 1.32, fy: 457, rate: 1.6, pan: 4.5, in: 12.5, out: 16.5 };
-const HKC = { k: 1, left: 0 };
+const HKT = { t: 0, box: null, boxKey: '', bg: null, bgKey: '', cam: { u: 0, m: 0, end: 0, x: 480, y: 328, t: 0, g: null } };
+/* the camera: the whole sheet at a face-off at centre and at a break; in a live play `mid` times the size, following the
+   puck across and up and down; and k times the size once the puck is within `in` metres of an end's boards (out again
+   past `out`, so it doesn't flicker at the blue line). The picture is the canvas under the bar: top, h */
+const HK_CAM = { k: 1.75, mid: 1.3, rate: 1.6, pan: 4.5, in: 12.5, out: 16.5, top: 64, h: 536 };
+const HKC = { k: 1, left: 0, top: 64 };
 const HK_PX = 21, HK_PY = 16, HK_X0 = 60, HK_Y0 = 328;
 const hkScr = (x, y) => ({ x: HK_X0 + x * HK_PX, y: HK_Y0 + y * HK_PY });
 // where a rink point is on the canvas, through the camera (the tests' handle)
-const hkScrCam = (x, y) => { const p = hkScr(x, y); return { x: (p.x - HKC.left) * HKC.k, y: HK_CAM.fy + (p.y - HK_CAM.fy) * HKC.k }; };
+const hkScrCam = (x, y) => { const p = hkScr(x, y); return { x: (p.x - HKC.left) * HKC.k, y: HK_CAM.top + (p.y - HKC.top) * HKC.k }; };
 // the end the play is set in (0 the left, 1 the right), or null for the whole sheet
 function hkCamAim() {
   const ph = GD.ph; if (ph === 'intro' || ph === 'break' || ph === 'over') return null;
@@ -29,13 +30,17 @@ function hkCamAim() {
   return null;
 }
 function hkCamStep() {
-  const C = HKT.cam; if (C.g !== G) { C.g = G; C.u = 0; C.x = 480; C.t = HKT.t; }
-  const dt = clamp(HKT.t - C.t, 0, .25), aim = hkCamAim(); C.t = HKT.t;
+  const C = HKT.cam; if (C.g !== G) { C.g = G; C.u = 0; C.m = 0; C.x = 480; C.y = HK_Y0; C.t = HKT.t; }
+  const dt = clamp(HKT.t - C.t, 0, .25), aim = hkCamAim(), ph = GD.ph; C.t = HKT.t;
   if (aim != null) { C.end = aim; C.u = Math.min(1, C.u + dt * HK_CAM.rate); } else C.u = Math.max(0, C.u - dt * HK_CAM.rate);
-  // across: to that end while it's in, and with the puck on the way out, so nobody is cut off at the edge
-  const to = aim != null ? aim * 960 : HK_X0 + L.puck.x * HK_PX; C.x += (to - C.x) * Math.min(1, dt * HK_CAM.pan);
-  const e = C.u * C.u * (3 - 2 * C.u), k = 1 + (HK_CAM.k - 1) * e, w = 960 / k;
-  HKC.k = k; HKC.left = clamp(C.x - w / 2, 0, 960 - w);
+  // in closer whenever the puck is in play (m), and closer again on an end (u)
+  const near = ph === 'live' || ph === 'dead' || ((ph === 'set' || ph === 'drop') && GD.fo && GD.fo.x !== HK_RULES.len / 2) || aim != null;
+  C.m = near ? Math.min(1, (C.m || 0) + dt * HK_CAM.rate) : Math.max(0, (C.m || 0) - dt * HK_CAM.rate);
+  // it follows the puck (the face-off dot while they line up), so nobody is cut off at the edge
+  const fo = (ph === 'set' || ph === 'drop') && GD.fo, at = hkScr(fo ? GD.fo.x : L.puck.x, fo ? GD.fo.y : L.puck.y);
+  C.x += (at.x - C.x) * Math.min(1, dt * HK_CAM.pan); C.y += (at.y - C.y) * Math.min(1, dt * HK_CAM.pan);
+  const sm = v => v * v * (3 - 2 * v), k = 1 + (HK_CAM.mid - 1) * sm(C.m || 0) + (HK_CAM.k - HK_CAM.mid) * sm(C.u), w = 960 / k, h = HK_CAM.h / k;
+  HKC.k = k; HKC.left = clamp(C.x - w / 2, 0, 960 - w); HKC.top = clamp(C.y - h / 2, HK_CAM.top, HK_CAM.top + HK_CAM.h - h);
 }
 const HK_FONT = '"Alegreya Sans", system-ui, sans-serif';
 
@@ -45,7 +50,7 @@ function hkDraw(c) {
   const dens = c.getTransform().a || 1;
   hkCamStep();
   c.save(); c.beginPath(); c.rect(0, 64, 960, 536); c.clip();
-  c.translate(-HKC.left * HKC.k, HK_CAM.fy * (1 - HKC.k)); c.scale(HKC.k, HKC.k);
+  c.translate(-HKC.left * HKC.k, HK_CAM.top - HKC.top * HKC.k); c.scale(HKC.k, HKC.k);
   hkDrawBack(c, dens);
   hkDrawPond(c);
   hkDrawMarks(c);
@@ -72,7 +77,7 @@ function hkRinkPath(c, m) {
 // density it needs, and copied each frame; the crowd on the bank is drawn live over it
 function hkDrawBack(c, dens) {
   // (a little denser than the canvas, so it stays sharp when the camera is in)
-  const k = Math.min(2.6, dens * 1.35), key = `${k}|${G.teams[0].color}`;
+  const k = Math.min(3, dens * 1.6), key = `${k}|${G.teams[0].color}`;
   if (HKT.bgKey !== key) {
     const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(Math.round(960 * k), Math.round(600 * k)) : Object.assign(document.createElement('canvas'), { width: Math.round(960 * k), height: Math.round(600 * k) });
     const b = cv.getContext('2d'); b.setTransform(k, 0, 0, k, 0, 0); hkDrawBank(b); hkDrawIce(b);
@@ -207,6 +212,9 @@ function hkDrawPlayers(c) {
   for (const { p, i } of list) {
     const s = hkScr(p.x, p.y), T = G.teams[p.side], sp = hyp(p.vx, p.vy), mv = sp > .8, goalie = hkIsGk(p);
     if (i === h) { c.save(); c.strokeStyle = T.color; c.lineWidth = 3; c.beginPath(); c.ellipse(s.x, s.y, 16, 6, 0, 0, Math.PI * 2); c.stroke(); c.strokeStyle = T.light || '#fff'; c.lineWidth = 1.2; c.stroke(); c.restore(); }
+    // a power going for their side: a glow under them (gold for an ultimate), brighter under whoever cast it
+    const fxOn = (G.fxs || []).filter(e => e.side === p.side && e.k !== 'sit'); if (fxOn.length && !goalie) { const ult = fxOn.some(e => e.k === 'ult'), mineCast = fxOn.some(e => e.ri === p.ri), a = .28 + Math.sin(HKT.t * 7 + i) * .1 + (mineCast ? .25 : 0);
+      c.save(); const g = c.createRadialGradient(s.x, s.y, 2, s.x, s.y, 24); g.addColorStop(0, ult ? `rgba(255,200,90,${a})` : `rgba(110,200,255,${a})`); g.addColorStop(1, 'rgba(110,200,255,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(s.x, s.y, 24, 10, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
     // the skater you play: a dashed ring, and a mark over their head
     if (i === me) { c.save(); c.strokeStyle = '#ffe04a'; c.lineWidth = 2; c.setLineDash([5, 4]); c.beginPath(); c.ellipse(s.x, s.y, 20, 8, 0, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); c.fillStyle = '#ffe04a'; c.strokeStyle = '#17100e'; c.lineWidth = 1.2; const y = s.y - 56 + Math.sin(HKT.t * 5) * 2; c.beginPath(); c.moveTo(s.x - 6, y); c.lineTo(s.x + 6, y); c.lineTo(s.x, y + 8); c.closePath(); c.fill(); c.stroke(); c.restore(); }
     // skate cuts behind a fast skater
@@ -253,7 +261,10 @@ function hkDrawCues(c) {
   }
   if (GD.ph === 'drop' && GD.fo) {
     const q = hkScr(GD.fo.x, GD.fo.y), left = Math.max(0, HK_PACE.drop - GD.t), now = left <= HK_HANDS.drop, r = 8 + left * 60;
-    c.save(); c.strokeStyle = GD.press != null ? 'rgba(243,234,214,.5)' : now ? '#8fe07a' : '#ffe04a'; c.lineWidth = 3; c.beginPath(); c.ellipse(q.x, q.y, r, r * .76, 0, 0, Math.PI * 2); c.stroke(); c.restore();
+    c.save(); c.strokeStyle = GD.press != null ? 'rgba(243,234,214,.5)' : now ? '#8fe07a' : '#ffe04a'; c.lineWidth = 3; c.beginPath(); c.ellipse(q.x, q.y, r, r * .76, 0, 0, Math.PI * 2); c.stroke();
+    // (and the words, so it's plain what to do and when)
+    const say = GD.press != null ? 'Pressed' : now ? 'SPACE now!' : 'Space when the ring closes';
+    c.font = `800 13px ${HK_FONT}`; c.textAlign = 'center'; c.lineWidth = 4; c.strokeStyle = 'rgba(13,9,7,.85)'; c.strokeText(say, q.x, q.y + 46); c.fillStyle = now && GD.press == null ? '#8fe07a' : '#f3ead6'; c.fillText(say, q.x, q.y + 46); c.restore();
   }
 }
 // a big moment in big letters on the ice, for a moment; and at the end, the final
@@ -291,7 +302,7 @@ function hkDrawHud(c) {
     // mana (a diamond each, whole ones lit) and the roar (the bank's spirit, gold when it will pay for an ultimate)
     if (G.powers) {
       txt(c, 'Mana', X(150), 49, F(11, 600), dim, al);
-      for (let i = 0; i < HK_MANA.max; i++) { const x = X(186 + i * 11) + (s ? -4 : 0), on = i < Math.floor(G.mana[s] + 1e-9); c.save(); c.translate(x + 4, 45); c.rotate(Math.PI / 4); c.fillStyle = on ? '#7fd4ff' : '#2a2420'; c.fillRect(-3.2, -3.2, 6.4, 6.4); c.restore(); }
+      for (let i = 0; i < HK_MANA.max; i++) { const x = X(184 + i * 9) + (s ? -4 : 0), on = i < Math.floor(G.mana[s] + 1e-9); c.save(); c.translate(x + 4, 45); c.rotate(Math.PI / 4); c.fillStyle = on ? '#7fd4ff' : '#2a2420'; c.fillRect(-3.2, -3.2, 6.4, 6.4); c.restore(); }
       txt(c, 'Roar', X(262), 49, F(11, 600), dim, al);
       const bx = s ? 960 - 292 - 56 : 292, w = 56 * clamp(G.spirit[s] / HK_SPIRIT.max, 0, 1);
       c.fillStyle = '#2a2420'; c.fillRect(bx, 41, 56, 7); c.fillStyle = G.spirit[s] >= HK_SPIRIT.ult && !G.ultUsed[s] ? '#ffd08a' : '#c98a4a'; c.fillRect(s ? bx + 56 - w : bx, 41, w, 7);

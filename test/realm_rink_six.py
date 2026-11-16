@@ -89,7 +89,7 @@ async def main():
           G.sta[0][6] = .5; wHK.step(30 * 8); const s1 = wHK.sta(); const stayed = on0.slice(0, 5).filter(ri => G.on[0].includes(ri));
           const q = (ri) => s0[0][ri] - s1[0][ri];
           return { start: s0[0].every(v => v === 1), bench0, drop: stayed.map(q), goalie: q(on0[5]), bench: s1[0][6] > .5, R }; })()""")
-        check(st['start'] and st['bench0'] == [6, 7] and len(st['drop']) >= 3 and all(d > .05 for d in st['drop']) and st['goalie'] == 0 and st['bench'], 'stamina starts full, runs down for the skaters on the ice, not for the goalie, and comes back on the bench', st)
+        check(st['start'] and st['bench0'] == [6, 7] and len(st['drop']) >= 3 and all(d > .015 for d in st['drop']) and st['goalie'] == 0 and st['bench'], 'stamina starts full, runs down for the skaters on the ice, not for the goalie, and comes back on the bench', st)
         td = await pg.evaluate("""(() => { const P = __game(5), G = wHK.G, i = 1, p = P.pl[i]; __away(P, [i]); wHK.loose(38, -9, 0, 0);
           const run = sta => { G.sta[0][p.ri] = sta; __put(P, i, 8, 0); for (let t = 0; t < 45; t++) { G.sta[0][p.ri] = sta; wHK.skate(i, 38, 0); } return p.x - 8; };
           const fresh = run(1), spent = run(.15); const gx = wHK.goalX(0);

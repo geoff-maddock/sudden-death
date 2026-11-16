@@ -3,6 +3,7 @@
 Milestones from development, newest first. The game was built in claude.ai and published as an artifact after each step; this is the record of what landed when.
 
 ## Hockey at the Pond Rink (the Realm's fifth engine)
+- **After the first games by hand:** quicker skating that follows a player's speed more; a closer camera that follows the puck, and a larger picture; a longer face-off with the words on the ring and a line saying how your timing was; stronger powers with more mana, a glow under a side with one going; Speed (1, 2, 4 or 8 times) in Watch and Manage.
 - **Black Ice:** real hockey on the pond at Rimewatch, five skaters and a goalie a side. Skating with glide, a puck that is loose a lot, wrist shots, slap shots and one-timers, a goalie who follows the puck a moment late, pokes and body checks, face-offs and icing. Nobody goes home level: sudden death at three a side, then a shootout played out on the ice.
 - **Penalties and power plays:** the box, the delayed penalty, five on three, and pulling the goalie for an extra skater.
 - **By hand, managed or simulated:** skate your six yourself (aim by the way you steer), or coach them: systems with and without the puck, power-play and penalty-kill setups, Tempo and Edge, line changes, the timeout.

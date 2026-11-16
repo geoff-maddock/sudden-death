@@ -134,7 +134,7 @@ async def main():
 
         # ---------- the face-off ----------
         f = await pg.evaluate("""(() => { const run = how => { let wins = 0, edge = 0; for (let s = 1; s <= 40; s++) { wHK.start({ seed: 500 + s, mode: 'play' }); let n = 0; while (wHK.phase !== 'drop' && n++ < 400) wHK.step();
-            let r = ''; if (how === 'jump') r = wHK.input({ shoot: true }); if (how === 'good') { wHK.step(12); r = wHK.input({ shoot: true }); }
+            let r = ''; if (how === 'jump') r = wHK.input({ shoot: true }); if (how === 'good') { wHK.step(24); r = wHK.input({ shoot: true }); }
             n = 0; while (wHK.phase === 'drop' && n++ < 40) wHK.step(); wHK.input({ shoot: false }); const D = wHK.drew; edge = D.edge; if (D.win === 0) wins++; }
             return { wins, edge }; };
           return { good: run('good'), none: run('none'), jump: run('jump') }; })()""")
@@ -176,23 +176,23 @@ async def main():
         check('Playing it by hand' in hp and 'Aiming' in hp and 'one-timer by hand' in hp and 'face-off by hand' in hp, 'How to play explains playing by hand, aiming, the one-timer and the face-off', None)
         # the camera
         await pg.evaluate("wRinkGame({ seed: 4, mode: 'watch' })")
-        await pg.wait_for_function("wHK.phase === 'intro' || wHK.phase === 'drop'")
+        await pg.wait_for_function("wHK.phase === 'intro'")
         c0 = await pg.evaluate("({ cam: wHK.cam(), o: wHK.scr(0, -10), far: wHK.scr(40, 10) })")
-        check(c0['cam']['u'] == 0 and c0['cam']['k'] == 1 and c0['o'] == {'x': 60, 'y': 168} and c0['far'] == {'x': 900, 'y': 488}, 'the game opens on the whole sheet', c0)
+        check(c0['cam']['u'] == 0 and c0['cam']['k'] < 1.01 and abs(c0['o']['x'] - 60) < 3 and abs(c0['o']['y'] - 168) < 3 and abs(c0['far']['x'] - 900) < 3 and abs(c0['far']['y'] - 488) < 3, 'the game opens on the whole sheet', c0)
         await pg.evaluate("wHK.speed = 3")
         LOOK = "(() => { const P = wHK.play.puck, cam = wHK.cam(), s = wHK.scr(P.x, P.y); return { cam, far: Math.round((cam.end ? 40 - P.x : P.x) * 10) / 10, s, state: JSON.stringify(wHK.G).includes('\"cam\"') }; })()"
         seen = []
         for end in (0, 1):
             h = await pg.wait_for_function(f"wHK.cam().u === 1 && wHK.cam().end === {end} && wHK.phase === 'live' && {LOOK}", timeout=180000)
             v = await h.json_value(); seen.append(v)
-            check(abs(v['cam']['k'] - 1.32) < 1e-6 and 0 <= v['far'] <= 16.5 and 0 <= v['s']['x'] <= 960 and 64 <= v['s']['y'] <= 600, f'the camera pushes in on the end the puck is in, and the puck is in the picture (end {end})', v)
+            check(abs(v['cam']['k'] - 1.75) < 1e-6 and 0 <= v['far'] <= 16.5 and 0 <= v['s']['x'] <= 960 and 64 <= v['s']['y'] <= 600, f'the camera pushes in on the end the puck is in, and the puck is in the picture (end {end})', v)
             await pg.evaluate("wHK.pause(true)"); u0 = await pg.evaluate("JSON.stringify(wHK.cam())")
             await pg.evaluate("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))))")
             u1 = await pg.evaluate("JSON.stringify(wHK.cam())"); await pg.evaluate("wHK.pause(false)")
             check(u0 == u1, f'paused, the picture holds (end {end})', [u0, u1])
             await pg.wait_for_function("wHK.cam().u === 0", timeout=180000)
-            z = await pg.evaluate("({ o: wHK.scr(0, -10), k: wHK.cam().k })")
-            check(z['o'] == {'x': 60, 'y': 168} and z['k'] == 1, f'and pulls back to the whole sheet when the play leaves (end {end})', z)
+            z = await pg.evaluate("({ k: wHK.cam().k, mid: wHK.camRules.mid })")
+            check(z['k'] <= z['mid'] + 1e-6, f'and pulls back to follow the puck when the play leaves (end {end})', z)
         check(not any(v['state'] for v in seen), 'the camera is not in the game\'s state', None)
 
         check(not errs, 'no page errors', errs)

@@ -39,7 +39,7 @@ const HKP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, l
 (() => {
   const h = document.createElement('div'); h.id = 'v-rink'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
-  cv.style.cssText = 'display:block;width:100%;max-width:960px;margin:0 auto;aspect-ratio:960/600;background:#0b1016;border-radius:6px';
+  cv.style.cssText = 'display:block;width:100%;max-width:1180px;margin:0 auto;aspect-ratio:960/600;background:#0b1016;border-radius:6px';
   h.appendChild(cv);
   (document.getElementById('v-court') || document.getElementById('v-ring') || document.getElementById('v-gridiron') || document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
   Object.assign(HKP, { host: h, cv, c: cv.getContext('2d') });

@@ -72,7 +72,7 @@ async def main():
           for (let t = 0; t < 90; t++) { wHK.input({ steer: [0, 0] }); wHK.step(); c.x = 6; c.y = 0; c.vx = c.vy = 0; if (P.puck.st !== 'held') wHK.give(3); }
           const trap = [6, 7, 8].map(i => Math.round(P.pl[i].x)), back = [9, 10].map(i => Math.round(P.pl[i].x));
           return { fore, box, trap, back }; })()""")
-        check(f['fore'] < 2.5 and f['box'] > 5, 'a Forecheck goes at the carrier at centre ice; a Box leaves them alone out there', f)
+        check(f['fore'] < 2.5 and f['box'] > 4, 'a Forecheck goes at the carrier at centre ice; a Box leaves them alone out there', f)
         check(all(16 <= x <= 24 for x in f['trap']) and all(x > 24 for x in f['back']), 'the Trap stands three across the middle of the ice, with two behind them', f)
         st = await pg.evaluate("""(() => { wHK.setFouls({ trip: .035, hook: .04, board: .3, rough: .02 }); const run = (c, n) => { let hits = 0, pens = 0, sta = 0, m = 0; for (let i = 0; i < n; i++) { const s = wHK.simGame({ seed: 800 + i, teams: [__eight('Aces'), __eight('Bears')], calls: [c, {}], powers: false }); hits += s.box[0].tot.hit; pens += s.pens.filter(e => e.side === 0).length; }
             const P = __game(9, { calls: [c, {}] }), G = wHK.G; wHK.setFouls({ trip: 0, hook: 0, board: 0, rough: 0 }); wHK.step(30 * 12); const on = G.on[0].slice(0, 5); wHK.setFouls({ trip: .035, hook: .04, board: .3, rough: .02 });

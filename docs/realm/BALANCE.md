@@ -919,3 +919,11 @@ player won 43%): Kraken 53% (in goal in 88% of games, and the only one with a po
 Phoenix 43%, Frost Wyrm 42%, Behemoth 37%. At 60 games a cell is good to about 6.5 points, so only the Kraken and the
 Djinn are clearly worth more than an ordinary player, and the Behemoth (slow feet on a long sheet, as on the court)
 may be worth less.
+
+**After the first games by hand** (the same lab, 100 a cell). Skating is quicker and follows a player's speed more
+(top speed 5 + 0.52 a point of speed, from 5.4 + 0.42; getting to it 5.5 + 0.85 a point, from 4.5 + 0.5). Powers are
+one and a half times as strong (`HK_POW_K`), mana starts at 4 of 8 and one comes back every 30 seconds of play, and an
+ultimate takes 50 of the roar. Powers on one side only are now worth 1.19 goals a game and 69 wins in 100 (from 0.24
+and 54), with about 22 casts a game. As the world sets tiers: 73%, 37%, 19% (from 59/40/21); tiers 2 and 3 are inside
+the noise, and tier 1 may now be easier (a Squire spends his mana worse), though the mixed-gap cell beside it read
+54%. The systems, special teams, cups and kits above were not measured again.

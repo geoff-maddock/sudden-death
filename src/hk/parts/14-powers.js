@@ -1,6 +1,6 @@
 /* Black Ice: monster powers (issue #83, phase 7), as on the court, adapted to play that never stops.
-   - Team mana (G.mana, by side): HK_MANA.start to begin, up to HK_MANA.max; a side gets HK_MANA.scored each time it
-     is scored on, and both get HK_MANA.brk at each break between periods.
+   - Team mana (G.mana, by side): HK_MANA.start to begin, up to HK_MANA.max; one comes back every HK_MANA.every
+     seconds of play, a side gets HK_MANA.scored each time it is scored on, and both get HK_MANA.brk at each break.
    - Everyday powers: every kind has a puck power and a checking power (HK_POW), and a second of each (HK_POW2); a
      player brings one of each pair (m.pw: { puck, chk }, 0 or 1; picked on the Rink tab). A skater on the ice casts
      theirs in live play: the puck power while their side has the puck, the checking power while it doesn't. It costs
@@ -23,10 +23,13 @@
      multipliers multiply, the rest add). hkFx(side, k) reads it.
    G.fxs: [{ side, k: 'pow' | 'ult' | 'sit', id, n, ri, t, role }], what is going now. G.casts: every cast, for the
    line and the lab. The superstars' ratings and powers are added after these parts load (src/realm/rink/k0-stars.js). */
-const HK_MANA = { start: 3, max: 6, scored: 1, brk: 2 };
+const HK_MANA = { start: 4, max: 8, scored: 1, brk: 2, every: 30 };
+// how strong every power is: each effect is this many times as far from doing nothing as its table says (1.5 since
+// the first games by hand: powers were worth too little to notice)
+const HK_POW_K = 1.5;
 const HK_POW_STA = { min: .25, base: .06, per: .04, ult: .18 };
 const HK_POW_SECS = 10, HK_ULT_SECS = 16;
-const HK_SPIRIT = { max: 100, ult: 60, lift: 25, liftSta: .3, sog: 4, hit: 6, save: 3, goal: 15, roar: 12 };
+const HK_SPIRIT = { max: 100, ult: 50, lift: 25, liftSta: .3, sog: 5, hit: 7, save: 4, goal: 18, roar: 14 };
 /* the effects at none. Added: shot (this side's shots beat the goalie more), miss (they miss the net more: negative is
    truer), one (its one-timers), save (their shots beat this side's goalie less), wild (their shots miss more), guard
    (pokes at this side's carrier: negative is safer), poke (this side's pokes). Multiplied: spd (this side's speed),
@@ -41,7 +44,7 @@ const hkP = (id, n, cost, fits, desc, fx) => ({ id, n, cost, fits, desc, fx });
 const HK_POW = {
   goblin: [hkP('string', 'Puck on a String', 1, 'cycle', 'Quick hands: the puck is much harder to poke away, and passes get through.', { guard: -.08, safe: .6 }), hkP('pickpocket', 'Pickpocket', 1, 'fore', 'Quick fingers: pokes come off far more often.', { poke: .08 })],
   kobold: [hkP('ember', 'Ember Shot', 1, 'point', 'A puck with a coal in it: every shot a little harder to stop.', { shot: .03 }), hkP('firebreath', 'Fire Breath', 1, 'fore', 'A breath of fire in their faces: they are slower, and easier to poke.', { slow: .93, poke: .03 })],
-  werewolf: [hkP('stride', 'Wolf Stride', 1, 'rush', 'On all fours: your skaters are a tenth faster.', { spd: 1.1 }), hkP('pounce', 'Pounce', 1, 'fore', 'The pack closes: faster, and their checks land more.', { spd: 1.07, hit: 1.3 })],
+  werewolf: [hkP('stride', 'Wolf Stride', 1, 'rush', 'On all fours: your skaters are clearly faster.', { spd: 1.1 }), hkP('pounce', 'Pounce', 1, 'fore', 'The pack closes: faster, and their checks land more.', { spd: 1.07, hit: 1.3 })],
   dwarf: [hkP('hammer', 'Hammer Shot', 1, 'point', 'Hard hands, true aim: shots miss the net less, and beat the goalie a little more.', { miss: -.04, shot: .02 }), hkP('shieldline', 'Shield Line', 1, 'box', 'Shields in the shooting lanes: half again the blocks.', { block: 1.5 })],
   ogre: [hkP('bulldoze', 'Bulldoze', 1, 'crash', 'Through them like a cart: checks bounce off your carrier, and loose pucks in front are yours.', { wall: .4, reb: 1.3 }), hkP('smother', 'Smother', 2, 'collapse', 'A wall of ogre in front of your net: their shots stopped more, and blocked more.', { save: .03, block: 1.25 })],
   minotaur: [hkP('bullrush', 'Bull Rush', 1, 'rush', 'Horns down: faster, and hard to knock off the puck.', { spd: 1.07, wall: .5 }), hkP('gore', 'Gore', 1, 'man', 'Horns up: body checks land far more often.', { hit: 1.6 })],
@@ -49,14 +52,14 @@ const HK_POW = {
   golem: [hkP('standing', 'Standing Stone', 1, 'point', 'A boulder in front of their goalie: they cannot see the shot.', { blind: .75 }), hkP('crease', 'Stand in the Crease', 2, 'box', 'The golem fills the net: their shots are stopped far more.', { save: .05 })],
   harpy: [hkP('endtoend', 'End to End', 1, 'rush', 'Nobody catches her: your skaters are much faster.', { spd: 1.15 }), hkP('swoop', 'Swoop', 1, 'trap', 'Down on every pass from above: far more are picked off.', { pick: 1.6 })],
   elf: [hkP('trueaim', 'True Aim', 1, 'cycle', 'Every shot on the net, and a little better.', { miss: -.06, shot: .02 }), hkP('eagleeye', 'Eagle Eye', 1, 'trap', 'Reads every pass: half again as many picked off.', { pick: 1.5 })],
-  wraith: [hkP('phase', 'Phase', 1, 'rush', 'Through a check like smoke: body checks hardly ever land, and pokes miss more.', { wall: .2, guard: -.04 }), hkP('chill', 'Chill Touch', 1, 'trap', 'A cold hand on every skater: they are a tenth slower.', { slow: .9 })],
+  wraith: [hkP('phase', 'Phase', 1, 'rush', 'Through a check like smoke: body checks hardly ever land, and pokes miss more.', { wall: .2, guard: -.04 }), hkP('chill', 'Chill Touch', 1, 'trap', 'A cold hand on every skater: they are clearly slower.', { slow: .9 })],
   vampire: [hkP('mesmer', 'Mesmerize', 1, 'cycle', 'Their goalie follows the wrong thing: set late for every shot.', { blind: .7 }), hkP('drain', 'Drain', 1, 'man', 'Feeds on them: they are a little slower, and yours tire slower.', { slow: .94, tire: .7 })],
-  lich: [hkP('telekinesis', 'Telekinesis', 1, 'cycle', 'The puck is guided: passes are hardly picked off, and one-timers are better.', { safe: .4, one: .03 }), hkP('frost', 'Frost', 1, 'collapse', 'A frost on the ice: they are an eighth slower.', { slow: .88 })],
+  lich: [hkP('telekinesis', 'Telekinesis', 1, 'cycle', 'The puck is guided: passes are hardly picked off, and one-timers are better.', { safe: .4, one: .03 }), hkP('frost', 'Frost', 1, 'collapse', 'A frost on the ice: they are much slower.', { slow: .88 })],
   zombie: [hkP('relentless', 'Relentless', 1, 'dump', 'They keep coming: loose pucks are theirs, and they hardly tire.', { reb: 1.4, tire: .6 }), hkP('horde', 'Horde', 1, 'collapse', 'Bodies everywhere: more blocks, and more checks land.', { block: 1.3, hit: 1.2 })],
   gorgon: [hkP('stare', 'Stare', 2, 'any', 'Their goalie freezes for the length of a wind-up: hardly set at all.', { blind: .5 }), hkP('glance', 'Stone Glance', 1, 'box', 'A look that stiffens the shooter: their shots beat your goalie less.', { save: .04 })],
   spider: [hkP('silk', 'Silk Pass', 1, 'cycle', 'A thread on every pass: almost none are picked off.', { safe: .3 }), hkP('web', 'Web', 1, 'trap', 'Threads across the ice: they are slower, and passes stick.', { slow: .92, pick: 1.3 })],
   skeleton: [hkP('rattle', 'Rattle Shot', 1, 'crash', 'It rattles in off anything: shots are truer and a little harder to stop.', { shot: .025, miss: -.03 }), hkP('boneblock', 'Bone Block', 1, 'box', 'Rattling shins in every lane: far more blocks.', { block: 1.7 })],
-  witch: [hkP('blackice', 'Black Ice', 1, 'rush', 'A patch with no grip at all under their skates: they are an eighth slower.', { slow: .88 }), hkP('hex', 'Hex', 1, 'any', 'A word on their sticks: their shots miss the net more.', { wild: .06 })],
+  witch: [hkP('blackice', 'Black Ice', 1, 'rush', 'A patch with no grip at all under their skates: they are much slower.', { slow: .88 }), hkP('hex', 'Hex', 1, 'any', 'A word on their sticks: their shots miss the net more.', { wild: .06 })],
 };
 // the second of each: [puck, checking]
 const HK_POW2 = {
@@ -67,14 +70,14 @@ const HK_POW2 = {
   ogre: [hkP('cannon', 'Cannon', 2, 'point', 'The hardest shot on the pond: every shot beats the goalie more.', { shot: .05 }), hkP('crush', 'Crush', 1, 'man', 'Every check is a wall falling on them.', { hit: 1.7 })],
   minotaur: [hkP('charge', 'Charge', 1, 'crash', 'Head down to the net: nothing knocks them off it, and the rebound is theirs.', { wall: .3, reb: 1.2 }), hkP('pin', 'Pin', 1, 'box', 'Pinned on the boards: they are slower, and blocks come easier.', { slow: .94, block: 1.2 })],
   troll: [hkP('club', 'Club Shot', 1, 'point', 'A swing like a falling tree: shots beat the goalie more, and miss a little more.', { shot: .045, miss: .03 }), hkP('bridge', 'Bridge Toll', 1, 'trap', 'Nothing crosses the middle free: more picked off, more checks.', { pick: 1.3, hit: 1.2 })],
-  golem: [hkP('roll', 'Rolling Stone', 1, 'dump', 'Slow to start and impossible to stop: checks bounce off.', { wall: .2 }), hkP('gravel', 'Gravel', 1, 'trap', 'Grit thrown on the ice: they are a tenth slower.', { slow: .9 })],
+  golem: [hkP('roll', 'Rolling Stone', 1, 'dump', 'Slow to start and impossible to stop: checks bounce off.', { wall: .2 }), hkP('gravel', 'Gravel', 1, 'trap', 'Grit thrown on the ice: they are clearly slower.', { slow: .9 })],
   harpy: [hkP('dive', 'Dive', 1, 'crash', 'In from above: one-timers are much better.', { one: .05 }), hkP('shriek', 'Shriek', 1, 'fore', 'A cry in the carrier\'s ear: pokes come off more, and their shots miss more.', { poke: .05, wild: .03 })],
   elf: [hkP('threadneedle', 'Thread the Needle', 1, 'cycle', 'A pass through anything, onto the tape: fewer picked off, better one-timers.', { safe: .5, one: .04 }), hkP('longstick', 'Long Stick', 1, 'box', 'A reach into every lane: more blocks, more pokes.', { block: 1.3, poke: .03 })],
   wraith: [hkP('haunt', 'Haunt', 1, 'cycle', 'Their goalie keeps looking behind him: set late.', { blind: .75 }), hkP('fade', 'Fade', 1, 'collapse', 'There and not there: their shots miss more, and yours tire slower.', { wild: .04, tire: .8 })],
   vampire: [hkP('bat', 'Bat Wing', 1, 'rush', 'A glide nobody matches: faster, and harder to check.', { spd: 1.08, wall: .7 }), hkP('thrall', 'Thrall', 2, 'man', 'The shooter hesitates: their shots beat your goalie much less.', { save: .05 })],
   lich: [hkP('curse', 'Cursed Puck', 1, 'point', 'It swerves late: the goalie is set for where it was.', { blind: .78, shot: .01 }), hkP('ward', 'Ward', 1, 'box', 'A circle round your net: their shots are stopped more.', { save: .035 })],
   zombie: [hkP('shamble', 'Shamble', 1, 'dump', 'Slow, and never off the puck: pokes and checks both fail more.', { guard: -.05, wall: .6 }), hkP('grasp', 'Grasp', 1, 'man', 'Hands on everything: more pokes come off, more passes stick.', { poke: .05, pick: 1.2 })],
-  gorgon: [hkP('serpent', 'Serpent Shot', 1, 'cycle', 'It finds the gap: shots are truer and beat the goalie more.', { miss: -.03, shot: .03 }), hkP('petrifypuck', 'Stone Legs', 1, 'trap', 'Their legs go heavy: an eighth slower.', { slow: .88 })],
+  gorgon: [hkP('serpent', 'Serpent Shot', 1, 'cycle', 'It finds the gap: shots are truer and beat the goalie more.', { miss: -.03, shot: .03 }), hkP('petrifypuck', 'Stone Legs', 1, 'trap', 'Their legs go heavy: much slower.', { slow: .88 })],
   spider: [hkP('eightarms', 'Eight Arms', 1, 'crash', 'A hand for every loose puck: rebounds are yours, and nothing pokes it away.', { reb: 1.5, guard: -.04 }), hkP('snare', 'Snare', 1, 'box', 'A net in front of the net: more blocks, and their shots are stopped more.', { block: 1.4, save: .02 })],
   skeleton: [hkP('quickrelease', 'Quick Release', 1, 'rush', 'Gone before the goalie moves: set late for it.', { blind: .8, shot: .015 }), hkP('scatter', 'Scatter', 1, 'fore', 'Falls apart under a check and gets up behind it: pokes come off more, and they hardly tire.', { poke: .04, tire: .75 })],
   witch: [hkP('broom', 'Broomstick', 1, 'cycle', 'A stick with ideas of its own: passes and one-timers both better.', { safe: .6, one: .035 }), hkP('fog', 'Fog', 1, 'collapse', 'They cannot see the net: their shots miss much more.', { wild: .08 })],
@@ -84,8 +87,8 @@ const hkU0 = (id, n, desc, o, d, at) => ({ id, n, desc, o: o || {}, d: d || {}, 
 const HK_ULT = {
   goblin: hkU0('swarm', 'Swarm', 'Goblins everywhere: nobody takes the puck off you, and you take it off everybody.', { guard: -.1, safe: .5 }, { poke: .1 }),
   kobold: hkU0('bonfire', 'Bonfire', 'A fire at centre ice: they skate round it slowly, and your shots carry its heat.', { shot: .03 }, { slow: .86 }),
-  werewolf: hkU0('fullmoon', 'Full Moon', 'The moon comes out: your skaters are an eighth faster, with or without the puck.', { spd: 1.12 }, { spd: 1.12, hit: 1.3 }),
-  dwarf: hkU0('forgewall', 'Forge Wall', 'An iron wall across your slot: blocks nearly doubled, and what gets through is stopped more.', {}, { block: 1.8, save: .03 }, 'crease'),
+  werewolf: hkU0('fullmoon', 'Full Moon', 'The moon comes out: your skaters are much faster, with or without the puck.', { spd: 1.12 }, { spd: 1.12, hit: 1.3 }),
+  dwarf: hkU0('forgewall', 'Forge Wall', 'An iron wall across your slot: far more blocks, and what gets through is stopped more.', {}, { block: 1.8, save: .03 }, 'crease'),
   ogre: hkU0('earthshaker', 'Earthshaker', 'The pond shakes: your checks flatten everything, and nothing moves your carrier.', { wall: .3 }, { hit: 2 }),
   minotaur: hkU0('stampede', 'Stampede', 'The whole line with its head down: faster and unstoppable going in, heavy coming back.', { spd: 1.1, wall: .3 }, { hit: 1.5 }),
   troll: hkU0('thickhide', 'Thick Hide', 'Nothing hurts and nothing tires: your skaters barely tire, and win every loose puck.', { tire: .4, reb: 1.5 }, { tire: .4, reb: 1.5 }),
@@ -94,7 +97,7 @@ const HK_ULT = {
   elf: hkU0('moonlit', 'Moonlit Ice', 'Every line on the ice is clear to you: shots on the net, and better.', { miss: -.08, shot: .03 }, { pick: 1.3 }, 'slot'),
   wraith: hkU0('fogbank', 'Fog Bank', 'Fog rolls over their end: their goalie can\'t find the puck, and their own shots go astray.', { blind: .6 }, { wild: .06 }, 'slot'),
   vampire: hkU0('eclipse', 'Eclipse', 'The light goes: their goalie is set late for everything.', { blind: .5 }, { slow: .94 }, 'slot'),
-  lich: hkU0('deepfreeze', 'Deep Freeze', 'The cold comes down: they are a fifth slower.', {}, { slow: .8 }),
+  lich: hkU0('deepfreeze', 'Deep Freeze', 'The cold comes down: they are far slower.', {}, { slow: .8 }),
   zombie: hkU0('risingtide', 'Rising Tide', 'More of them every second: they never tire, and every loose puck is theirs.', { tire: .3, reb: 1.6 }, { tire: .3, reb: 1.6 }),
   gorgon: hkU0('petrify', 'Petrify', 'Their goalie turns to stone where they stand.', { blind: .4 }, { save: .03 }, 'slot'),
   spider: hkU0('greatweb', 'Great Web', 'A web from board to board: they are slower, and their passes stick in it.', {}, { slow: .86, pick: 1.6 }),
@@ -123,7 +126,7 @@ function hkPowersStart(on) {
 }
 const hkManaAdd = (s, n) => { if (G.mana && G.powers && G.powOn[s]) G.mana[s] = clamp(G.mana[s] + n, 0, HK_MANA.max); };
 function hkSpiritAdd(s, n) { if (G.spirit && G.powers && G.powOn[s]) G.spirit[s] = clamp(G.spirit[s] + n, 0, HK_SPIRIT.max); }
-function hkFxMerge(F, fx) { for (const k in fx || {}) { if (!(k in HK_FX0)) continue; F[k] = HK_FX_MUL.has(k) ? F[k] * fx[k] : F[k] + fx[k]; } return F; }
+function hkFxMerge(F, fx) { for (const k in fx || {}) { if (!(k in HK_FX0)) continue; F[k] = HK_FX_MUL.has(k) ? F[k] * Math.max(.05, 1 + (fx[k] - 1) * HK_POW_K) : F[k] + fx[k] * HK_POW_K; } return F; }
 // the effects of what is going now, for each side: an ultimate's by whether its side has the puck
 function hkFxNow() {
   HK_FXNOW = [0, 1].map(s => {
@@ -136,6 +139,8 @@ const hkFx = (side, k) => HK_FXNOW[side][k];
 // play goes on dt seconds: what is going runs down (a situation power for a penalty ends with it), and spirit lifts a spent line
 function hkPowersStep(dt) {
   if (!G.powers) return;
+  // mana comes back as the game goes on: one every HK_MANA.every seconds of play
+  for (const s of [0, 1]) hkManaAdd(s, dt / HK_MANA.every);
   let ch = false;
   for (const e of G.fxs.slice()) {
     e.t -= dt;

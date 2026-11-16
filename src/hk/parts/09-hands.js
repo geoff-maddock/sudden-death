@@ -23,7 +23,7 @@
    them, more the closer you are; earlier than that and you've jumped it, and win fewer. Don't press and it's the
    centres' ratings alone.
    HKI is your keys (not saved). */
-const HK_HANDS = { idle: 2, tap: .18, full: .5, late: 1.3, dump: .28, oneT: .35, fan: .8, pokeCd: .6, hitCd: .9, lunge: .4, drop: .25, aimHold: .4 };
+const HK_HANDS = { idle: 2, tap: .18, full: .5, late: 1.3, dump: .28, oneT: .35, fan: .8, pokeCd: .6, hitCd: .9, lunge: .4, drop: .3, aimHold: .4 };
 const HKI = { steer: [0, 0], aim: [0, 0], aimAt: -99, shoot: false, shootAt: 0, pass: false, passAt: 0, lift: false, last: -99, now: 0, oneAt: -99 };
 const hkHandsOn = () => !!GD && GD.mode === 'play';
 // you're at the keys: something pressed or held in the last few seconds

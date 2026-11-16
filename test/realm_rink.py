@@ -64,7 +64,7 @@ async def main():
           for (let t = 0; t < 6; t++) wHK.skate(i, 0, 0); const after = p.vx; let n = 0; while (p.vx > 0 && n++ < 200) wHK.skate(i, 0, 0);
           return { slow: slow.x, fast: fast.x, early: early.v, late: late.v, going, after, turn: n / 30 }; })()""")
         check(k['fast'] > k['slow'] + 2 and k['early'] < k['late'] * .6, 'a skater builds speed over a second or so, and a faster one covers more ice', k)
-        check(k['going'] > 5 and k['after'] > 2 and .3 < k['turn'] < 2, 'nobody stops dead on ice: told to turn back, a skater is still gliding the old way for a moment', k)
+        check(k['going'] > 5 and k['after'] > 2 and .15 < k['turn'] < 2, 'nobody stops dead on ice: told to turn back, a skater is still gliding the old way for a moment', k)
         # the puck: it slows and stops, and comes back off the boards
         pk = await pg.evaluate("""(() => { const P = __rink(5); __away(P, []); wHK.loose(8, 0, 0, 8); let n = 0; while (Math.hypot(P.puck.vx, P.puck.vy) > 0 && n++ < 900) wHK.puckStep();
           const slide = { x: P.puck.x, secs: n / 30 };

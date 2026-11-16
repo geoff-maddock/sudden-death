@@ -44,6 +44,7 @@ $('v-rink').insertAdjacentHTML('beforebegin', `<div id="wRinkBar" class="wdbar" 
   <b id="wRinkTitle">A scrimmage at the Pond Rink</b><span id="wRinkNote" class="hint wsnote"></span>
   <span id="wRinkModes" class="wgmodes" role="group" aria-label="Who plays it">${Object.entries(W_RINK_MODES).map(([k, m]) => `<button class="ghost" data-kmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <label class="hint" title="How long a game is on the game clock: three periods of a third of it each. The clock stops at every whistle. Also on the Settings panel.">Length <select id="wRinkMins">${wHK.rules.minsAt.map(m => `<option value="${m}">${m} min</option>`).join('')}</select></label>
+  <label class="hint" id="wRinkSpeedL" title="How fast the game runs while you watch or manage. In You play it is always 1.">Speed <select id="wRinkSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
   <button class="ghost" id="wRinkAgain">Another game</button>
   <button class="ghost" id="wRinkBack">Back to the world</button></div>`);
 $('wRinkBar').addEventListener('click', e => {
@@ -52,6 +53,10 @@ $('wRinkBar').addEventListener('click', e => {
   else if (b.id === 'wRinkAgain') wRinkGame();
   else if (b.id === 'wRinkBack') wLeaveRink();
 });
+// the speed you picked for watching and managing (kept for the next game, not saved); You play is always 1
+let W_RINK_SPEED = 1;
+function wRinkSpeedSet() { const play = wHK.mode === 'play'; wHK.speed = play ? 1 : W_RINK_SPEED; $('wRinkSpeedL').hidden = play || !WHK || !!WHK.over; $('wRinkSpeed').value = String(W_RINK_SPEED); }
+$('wRinkSpeed').addEventListener('change', e => { W_RINK_SPEED = +e.target.value || 1; wRinkSpeedSet(); });
 $('wRinkMins').addEventListener('change', e => { SET.rinkMins = +e.target.value; saveSettings(); wRinkBarNote(); });
 // under the rink: the box score, every goal, and How hockey works
 $('v-rink').insertAdjacentHTML('beforeend', `<div id="wRinkPad" class="wrpad" hidden role="group" aria-label="Play"></div><h4 class="wsh">Box score</h4><div id="wRinkBox" class="wcbox"></div>
@@ -118,7 +123,7 @@ function wRinkBarNote() {
   if (!WHK) return;
   const G = wHK.G, mode = wHK.mode || W_RINK_MODE;
   for (const b of $('wRinkModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.kmode === mode); b.setAttribute('aria-pressed', b.dataset.kmode === mode); }
-  $('wRinkPad').dataset.side = ''; wRinkPad();
+  $('wRinkPad').dataset.side = ''; wRinkPad(); wRinkSpeedSet();
   $('wRinkNote').textContent = WHK.over ? wHK.msg : !G ? '' : mode === 'play'
     ? `You play ${G.teams[0].name}: WASD to skate, Space to shoot (tap, or hold to wind up) or check, J to pass (hold to send it hard) or poke, E to switch, Shift to lift your stick. At a face-off, Space as the puck drops.`
     : `${G.teams[0].name} against ${G.teams[1].name}: ${G.mins} minutes in three periods. Level at the end, it goes to sudden death and then a shootout. A scrimmage: nothing is won or lost.`;
@@ -213,8 +218,9 @@ function wRinkHowHTML() {
   <p class="hint"><b>Playing it by hand.</b> Pick <b>You play</b> on the bar to play Rimewatch. With the puck you play whoever has it: WASD or the arrows to skate (let go and they glide on). <b>Space</b> shoots: a tap is a wrist shot; hold it to wind up a slap shot (the bar beside your shooter fills, and the shot gets harder), then let go. A checker can take the puck off a wind-up. <b>J</b> passes to the teammate you're skating toward (or the best one if you aren't steering); hold it to send the puck hard the way you steer, into a corner or out of your end. Without the puck you play the skater nearest it (marked): <b>J</b> pokes at the puck, <b>Space</b> lunges at the carrier (a hit if you reach them, and out of the play for a moment if you don't), <b>Shift</b> held lifts your stick into the passing lane, and <b>E</b> switches to the next skater. The goalie is never yours. Let go of the keys for ${wHK.hands.idle} seconds and your skater plays on by themselves. On a phone, the buttons under the rink do the same.</p>
   <p class="hint"><b>Aiming.</b> The way you steer as you let a shot go picks the target, marked on the net while you wind up: up or down the screen for that post, with the way to the goal held as well for the top corner, and nothing held for between the pads. The goalie covers what they can reach: the post they have moved away from is open and the one they stand at is shut. The top corners score more and miss more. Between the pads is good on a goalie who is sliding across.</p>
   <p class="hint"><b>The one-timer by hand.</b> Press Space while a pass is on its way to you. Inside the last ${Math.round(wHK.hands.oneT * 100) / 100} seconds before it arrives, it is shot as it lands. Earlier than that and you fan on it.</p>
-  <p class="hint"><b>The face-off by hand.</b> Press Space as the puck drops: a ring closes on the dot and turns green in the moment to press. Close to the drop wins more of them; too early and you've jumped it, and win fewer.</p>
-  <p class="hint"><b>The camera.</b> The picture shows the whole sheet through the middle, and pushes in on an end once the puck is in it.</p>
+  <p class="hint"><b>The face-off by hand.</b> Press Space as the puck drops: a ring closes on the dot and turns green in the moment to press. Close to the drop wins more of them; too early and you've jumped it, and win fewer. The line under the rink says how your timing was. Don't press and it is your centre's hands and size against theirs.</p>
+  <p class="hint"><b>The camera.</b> The picture follows the puck, and pushes in closer once it is in an end. The whole sheet shows at a face-off at centre and at a break.</p>
+  <p class="hint"><b>Speed.</b> In Watch and Manage, Speed on the bar runs the game at 2, 4 or 8 times; You play is always at 1.</p>
   <p class="hint"><b>Ratings.</b> Six for each player: speed, size, hands, shot, defense and reflexes. An ogre hits like a wall and skates like one, a harpy is the fastest thing on the ice, and a spider in goal has eight ways to stop a puck. <b>The spots:</b> a centre, two wings, two defenders and the goalie, picked from the ratings for now.</p>`;
 }
 const wW88RenderHelp = renderHelp;

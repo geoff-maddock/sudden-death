@@ -54,7 +54,7 @@ async def main():
             for (let t = 0; t < 300; t++) { __away(P, [2, 7]); __put(P, 2, 20, 0); __put(P, 7, 20.9, 0); wHK.give(2); const n0 = P.evN; wHK.setMode('play'); wHK.G; P.me = null; wHK.setMode('watch');
               P.pl[7].cd = 0; P.pl[7].vx = 0; wHK.step(1); if (P.ev.slice(-Math.max(1, P.evN - n0)).some(e => e.k === 'poke')) n++; if (wHK.phase !== 'live') { let k = 0; while (wHK.phase !== 'live' && k++ < 400) wHK.step(); } }
             return n; };
-          const fo = gearOn => { let w = 0; for (let s = 1; s <= 200; s++) { wHK.start({ seed: 900 + s, teams: [__team('Aces', gearOn ? [gear('hk_puck')] : null), __team('Bears')], powers: false }); let n = 0; while (wHK.phase !== 'live' && n++ < 60) wHK.step(); if (wHK.drew.win === 0) w++; } return w; };
+          const fo = gearOn => { let w = 0; for (let s = 1; s <= 200; s++) { wHK.start({ seed: 900 + s, teams: [__team('Aces', gearOn ? [gear('hk_puck')] : null), __team('Bears')], powers: false }); let n = 0; while (wHK.phase !== 'live' && n++ < 200) wHK.step(); if (wHK.drew.win === 0) w++; } return w; };
           return { read: read(), fast: go(0, true), slow: go(0, false), stick: [q(1, true), q(1, false)], mask: [q(7, true), q(7, false)], pads: [blk(true), blk(false)], pokes: [pokes(true), pokes(false)], fo: [fo(true), fo(false)], R: wHK.kitRules }; })()""")
         rd = g['read']
         check(rd['names'] == ['Sharp Skates', 'Ash Stick', 'Soft Gloves', 'Shin Pads', '', 'Bone Mask'] and rd['gx'][0] == {'accel': 1.12} and rd['gx'][4] == {} and rd['gx'][5] == {'save': .012} and rd['r'] == rd['base'],
