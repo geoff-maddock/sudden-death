@@ -2,6 +2,15 @@
 
 Milestones from development, newest first. The game was built in claude.ai and published as an artifact after each step; this is the record of what landed when.
 
+## Hockey at the Pond Rink (the Realm's fifth engine)
+- **Black Ice:** real hockey on the pond at Rimewatch, five skaters and a goalie a side. Skating with glide, a puck that is loose a lot, wrist shots, slap shots and one-timers, a goalie who follows the puck a moment late, pokes and body checks, face-offs and icing. Nobody goes home level: sudden death at three a side, then a shootout played out on the ice.
+- **Penalties and power plays:** the box, the delayed penalty, five on three, and pulling the goalie for an extra skater.
+- **By hand, managed or simulated:** skate your six yourself (aim by the way you steer), or coach them: systems with and without the puck, power-play and penalty-kill setups, Tempo and Edge, line changes, the timeout.
+- **Your six:** hockey ratings for every player, the Rink tab, stamina and shifts, a bench that comes over the boards.
+- **Powers, gear and potions:** a puck power and a checking power for every kind, ultimates that mark the ice, the bank's roar; Sharp Skates to a Bone Mask; Antifreeze, Hot Cider and Tove's Liniment.
+- **The pond's own ways:** snow that builds through a period, old boards that are dead or lively, ice that cracks under a big hit.
+- **The Pond Kettle:** a weekly cup, and league fixtures at the Rink played on the ice.
+
 ## Soccer, the tenth sport
 - **Pass and move:** every card you play is a pass. An Attack with 3+ passes behind it is a shot, +1 damage per pass (up to 6), and 10+ on one enemy is a goal. An enemy hit with 5+ through your Block is their goal; block every hit in their turn and it is a goal prevented, and your next turn starts with a pass.
 - **Highlights:** golazo, clean sheet, brick wall (three saves), and the hat trick.

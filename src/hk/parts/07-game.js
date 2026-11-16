@@ -25,7 +25,7 @@
    GD is the game on show (not saved). The headless game (hkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const HK_PACE = { intro: 1.3, set: .85, drop: .5, dead: 1, goal: 1.9, pen: 1.5, break: 2.4, so: 1.1, soGap: .5, soReady: .8, soMax: 7 };
-const HK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
+const HK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 const HK_DOTS = { x: [8.5, HK_RULES.len - 8.5], y: 5.5 };
 let GD = null;
 
@@ -320,7 +320,7 @@ function hkBox() {
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function hkSimGame(opts) {
   const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: hkRand } : null;
-  HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = null;
+  HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = HK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     hkStart(opts);

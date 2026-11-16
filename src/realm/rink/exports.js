@@ -12,7 +12,7 @@ return {
   get on() { return HKP.on; }, get speed() { return HKP.speed; }, set speed(n) { HKP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); },
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { p: G.p, name: GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), text: hkClockText() } : null,
   pause: on => { HKP.paused = !!on; }, get paused() { return HKP.paused; },
-  set onOver(f) { HK_HOOK.onOver = f; }, get onOver() { return HK_HOOK.onOver; }, set onPhase(f) { HK_HOOK.onPhase = f; }, get onPhase() { return HK_HOOK.onPhase; },
+  set onOver(f) { HK_HOOK.onOver = f; }, get onOver() { return HK_HOOK.onOver; }, set onEv(f) { HK_HOOK.onEv = f; }, get onEv() { return HK_HOOK.onEv; }, set onPhase(f) { HK_HOOK.onPhase = f; }, get onPhase() { return HK_HOOK.onPhase; },
   // by hand (phase 2): who plays it ('watch' or 'play'), your keys (input: { steer, shoot, pass, lift, act }; returns
   // what happened), whether you have the puck, the skater you play, the wind-up ({ t, kind, pow }), the last release
   // ({ kind, aim, pow, t }), the last face-off ({ edge, win }), the hands' rules, what aiming at a target does, and the camera

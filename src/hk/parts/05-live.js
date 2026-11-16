@@ -32,7 +32,9 @@ let L = null;
 
 // a point for side from [metres up the ice from its own end, across (left wing negative)], to rink metres
 function hkAt(side, u, v) { const d = hkDir(side); return [d > 0 ? u : HK_RULES.len - u, v * d]; }
-function hkEv(k, s, o) { const e = { k, s: s || '', o: o == null ? '' : o, t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (L.ev.length > 60) L.ev.shift(); hkSayEv(e); }
+function hkEv(k, s, o) { const e = { k, s: s || '', o: o == null ? '' : o, t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (L.ev.length > 60) L.ev.shift(); hkSayEv(e);
+  // (the page hears each one, with the side it was for: the sounds)
+  if (HK_HOOK.onEv) try { HK_HOOK.onEv(Object.assign({ side: G.poss }, e)); } catch (er) { console.error(er); } }
 
 function hkNewPlay() {
   const pl = [];

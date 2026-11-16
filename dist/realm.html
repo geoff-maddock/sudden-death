@@ -31374,7 +31374,9 @@ let L = null;
 
 // a point for side from [metres up the ice from its own end, across (left wing negative)], to rink metres
 function hkAt(side, u, v) { const d = hkDir(side); return [d > 0 ? u : HK_RULES.len - u, v * d]; }
-function hkEv(k, s, o) { const e = { k, s: s || '', o: o == null ? '' : o, t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (L.ev.length > 60) L.ev.shift(); hkSayEv(e); }
+function hkEv(k, s, o) { const e = { k, s: s || '', o: o == null ? '' : o, t: Math.round(L.t * 100) / 100 }; L.ev.push(e); L.evN = (L.evN || 0) + 1; if (L.ev.length > 60) L.ev.shift(); hkSayEv(e);
+  // (the page hears each one, with the side it was for: the sounds)
+  if (HK_HOOK.onEv) try { HK_HOOK.onEv(Object.assign({ side: G.poss }, e)); } catch (er) { console.error(er); } }
 
 function hkNewPlay() {
   const pl = [];
@@ -31938,7 +31940,7 @@ function hkPullThink() {
    GD is the game on show (not saved). The headless game (hkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const HK_PACE = { intro: 1.3, set: .85, drop: .5, dead: 1, goal: 1.9, pen: 1.5, break: 2.4, so: 1.1, soGap: .5, soReady: .8, soMax: 7 };
-const HK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
+const HK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 const HK_DOTS = { x: [8.5, HK_RULES.len - 8.5], y: 5.5 };
 let GD = null;
 
@@ -32233,7 +32235,7 @@ function hkBox() {
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function hkSimGame(opts) {
   const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: hkRand } : null;
-  HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = null;
+  HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = HK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     hkStart(opts);
@@ -33851,7 +33853,7 @@ return {
   get on() { return HKP.on; }, get speed() { return HKP.speed; }, set speed(n) { HKP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); },
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { p: G.p, name: GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), text: hkClockText() } : null,
   pause: on => { HKP.paused = !!on; }, get paused() { return HKP.paused; },
-  set onOver(f) { HK_HOOK.onOver = f; }, get onOver() { return HK_HOOK.onOver; }, set onPhase(f) { HK_HOOK.onPhase = f; }, get onPhase() { return HK_HOOK.onPhase; },
+  set onOver(f) { HK_HOOK.onOver = f; }, get onOver() { return HK_HOOK.onOver; }, set onEv(f) { HK_HOOK.onEv = f; }, get onEv() { return HK_HOOK.onEv; }, set onPhase(f) { HK_HOOK.onPhase = f; }, get onPhase() { return HK_HOOK.onPhase; },
   // by hand (phase 2): who plays it ('watch' or 'play'), your keys (input: { steer, shoot, pass, lift, act }; returns
   // what happened), whether you have the puck, the skater you play, the wind-up ({ t, kind, pow }), the last release
   // ({ kind, aim, pow, t }), the last face-off ({ edge, win }), the hands' rules, what aiming at a target does, and the camera
@@ -47056,6 +47058,96 @@ renderHelp = function () {
   wW95RenderHelp();
   const g = $('wHelpRinkStars') || $('wHelpRinkKit') || $('wHelpRinkGame'); if (!g || $('wHelpRinkKettle')) return;
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkKettle"><b>The Pond Kettle.</b> Hockey's cup, every week at the Pond Rink: ask Old Tove about the KETTLE, or use the Pond Kettle button on the Rink tab. ${W_KETTLE.fee} gold to enter. Eight sixes in a bracket, three rounds, each harder than the last; you play your own games and the rest are played out on the ice once yours is done. Nobody goes home level. Lose and you're out. Win the final and your six drink from Old Tove's kettle and keep it for the week: ${W_KETTLE.prize.gold} gold, ${W_KETTLE.prize.fans} fans, a pick of hockey cards, a piece of rink gear and a place on the Wall of Awards. League fixtures at the Pond Rink are hockey games on the ice too: Play, Manage or Simulate, and a win is two points on the table.</p>`);
+};
+/* w96: the feel of hockey (issue #83, phase 12), as w85 is for basketball. Sound on the ice, coach's notes and medals.
+
+   Sound. Sudden Death's own effects (sfx), following your Sound effects setting, from the rink's events (wHK.onEv,
+   each with the side that had the puck) and beats (wHK.onPhase): the horn and the bank for your goals (a click for
+   theirs), a thud for a save or a shot off the pads, a duller one for a block, a crunch for a hit (and the bank for
+   yours) and for the ice cracking, a quick slap for a poke or a pass picked off, a chime for a power or a potion and a
+   bigger one for an ultimate (either side's), the whistle for a penalty, icing, a covered puck and a timeout, the
+   bank's roar, the horn at each break, and the horn and the bank when you win. In a game you only watch, the first
+   side (the home one) is yours for the bank. Only while the rink is on screen. The realm's music plays on, as it does
+   at any ground.
+   Tips. TIPS.w_rink once your team can play hockey (W_HKG.minOwn players), TIPS.w_kettle once you have won a hockey
+   game, from a watcher like w85's.
+   Achievements, on SD's ACH: hockey games won (realmRinkWins), Pond Kettles (realmKettles), a hat trick by one of
+   your own players in a game from the world (realmHatTricks) and a win without conceding (realmShutouts).
+
+   Wraps: wHK.onEv (wW96OnEv: the sounds), wHK.onPhase (wW96OnPhase: the horn), wHK.onOver (wW96OnOver: the end),
+   wRinkSettle (wW96RinkSettle), wKettleWon (wW96KettleWon), renderHelp (wW96RenderHelp: #wHelpRinkFeel after
+   #wHelpRinkKettle). */
+
+const wRinkSoundOn = () => !LAB && SET.sfx !== false && UI.view === 'rink' && !!wHK.G;
+// was it your side's doing: for a goal or a shot, the side with the puck; for a check or a save, the other one
+const wRinkSndMine = (e, has) => (e.side === wHK.you) === !!has;
+function wRinkEvSound(e) {
+  if (!wRinkSoundOn()) return;
+  if (e.k === 'goal') { if (wRinkSndMine(e, true)) { sfx.horn(); sfx.crowd(1.6); } else sfx.card(); }
+  else if (e.k === 'save' || e.k === 'rebound') { sfx.block(); if (wRinkSndMine(e, false)) sfx.crowd(.6); }
+  else if (e.k === 'block') sfx.hit(.3);
+  else if (e.k === 'hit') { sfx.crunch(); if (wRinkSndMine(e, false)) sfx.crowd(1); }
+  else if (e.k === 'crack') sfx.crunch();
+  else if (e.k === 'poke' || e.k === 'pick') sfx.card();
+  else if (e.k === 'power' || e.k === 'sit' || e.k === 'potion') sfx.magic();
+  else if (e.k === 'ult') sfx.crit();
+  else if (e.k === 'roar' || e.k === 'lift') sfx.crowd(2);
+  else if (e.k === 'foul' || e.k === 'icing' || e.k === 'freeze' || e.k === 'timeout') sfx.whistle();
+  else if (e.k === 'sogoal') { sfx.coin(); sfx.crowd(1.2); }
+  else if (e.k === 'sosave') sfx.block();
+}
+function wRinkPhSound(ph) {
+  if (!wRinkSoundOn()) return;
+  if (ph === 'break') sfx.horn();
+}
+function wRinkEndSound(s) {
+  if (!wRinkSoundOn() || !s) return;
+  // (a game you only watch, a scrimmage, ends with the horn and the bank)
+  if (wHK.mode === 'watch' && !(WHK && WHK.world)) { sfx.horn(); sfx.crowd(1.4); return; }
+  const you = wHK.you;
+  if (s.score[you] > s.score[1 - you]) { sfx.horn(); sfx.crowd(2); } else sfx.bad();
+}
+const wW96OnEv = wHK.onEv;
+wHK.onEv = e => { if (wW96OnEv) wW96OnEv(e); try { wRinkEvSound(e); } catch (er) { console.error(er); } };
+const wW96OnPhase = wHK.onPhase;
+wHK.onPhase = ph => { if (wW96OnPhase) wW96OnPhase(ph); try { wRinkPhSound(ph); } catch (er) { console.error(er); } };
+const wW96OnOver = wHK.onOver;
+wHK.onOver = s => { if (wW96OnOver) wW96OnOver(s); try { wRinkEndSound(s); } catch (er) { console.error(er); } };
+
+Object.assign(TIPS, {
+  w_rink: ['Hockey', 'Your team is big enough for hockey. Open the Team screen (C), then the Rink tab: set your six and your goalie, then Play a game against the local side or a rival club. Old Tove at the Pond Rink in Rimewatch books games too: ask for SHINNY.'],
+  w_kettle: ['The Pond Kettle', 'Hockey has its own cup, every week. Ask Old Tove at the Pond Rink about the KETTLE, or use the Pond Kettle button on the Rink tab. Win it and your six drink from her kettle.'],
+});
+function wRinkTips() {
+  if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
+  if (wRoster().length >= W_HKG.minOwn) tip('w_rink');
+  if (WG.hkg && WG.hkg.w > 0) tip('w_kettle');
+}
+setInterval(wRinkTips, 700);
+
+ACH.push(
+  { id: 'w_rink', n: 'Pond Legs', d: 'Win hockey games at the Pond Rink', stat: 'realmRinkWins', at: [1, 10, 30] },
+  { id: 'w_kettle', n: 'Kettle Drinkers', d: 'Win the Pond Kettle', stat: 'realmKettles', at: [1, 3, 8] },
+  { id: 'w_hattrick', n: 'Hat Trick', d: 'One of your players scores three goals in a hockey game', stat: 'realmHatTricks', at: [1, 3, 10] },
+  { id: 'w_shutout', n: 'Shut the Door', d: 'Win a hockey game without letting one in', stat: 'realmShutouts', at: [1, 3, 10] },
+);
+const wW96RinkSettle = wRinkSettle;
+wRinkSettle = function (r, us, them, box, sum) {
+  const m = wW96RinkSettle.apply(this, arguments);
+  if (LAB) return m;
+  if (r === 'win') { achAdd('realmRinkWins', 1); if (them === 0) achAdd('realmShutouts', 1); }
+  const g = WG.hkg && WG.hkg.games[0], hat = g && g.line ? Object.values(g.line).filter(x => (x.g || 0) >= 3).length : 0;
+  if (hat) achAdd('realmHatTricks', hat);
+  return m;
+};
+const wW96KettleWon = wKettleWon;
+wKettleWon = function () { wW96KettleWon(); if (!LAB) achAdd('realmKettles', 1); };
+
+const wW96RenderHelp = renderHelp;
+renderHelp = function () {
+  wW96RenderHelp();
+  const d = $('wHelpRinkKettle'); if (!d || $('wHelpRinkFeel')) return;
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkFeel"><b>On the ice</b> you hear the horn and the bank for your goals, the pads for a save, the boards for a hit, the whistle for a penalty, icing and a covered puck, the bank's roar and the horn at each break; sounds follow your Sound effects setting, and the realm's music plays on. Hockey games won, Pond Kettles, a hat trick by one of your players and a win without conceding have medals in the record book.</p>`);
 };
 </script>
 </body></html>
