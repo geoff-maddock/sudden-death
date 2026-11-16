@@ -50,28 +50,27 @@ async def main():
         g = await pg.evaluate(GRID)
         check(g['modes'] == ['Watch', 'Manage', 'You play'] and g['on'] == 1, 'football: Watch, Manage, You play on the bar, one lit', g)
         check(g['noteIn'] and g['noteText'] and g['noteUnder'], 'football: the status line is under the bar\'s buttons', g)
-        check(g['labels'] == ['Play', 'Stance', 'Powers', 'Subs', 'Bag'] and g['coachUnder'], 'football: the coach\'s rows are under the field: Play, Stance, Powers, Subs, Bag', g)
+        # who has the ball first is the toss: the first row is Play with it, Defense without
+        mine = await pg.evaluate("wGF.yourBall"); first = 'Play' if mine else 'Defense'
+        check(g['labels'] == [first, 'Stance', 'Powers', 'Subs', 'Bag'] and g['coachUnder'], f"football: the coach's rows are under the field: {first}, Stance, Powers, Subs, Bag", g)
         check(g['tablesUnder'] and g['sideBySide'], 'football: the two lineups sit side by side under the rows', g)
         check(not await pg.evaluate("!!document.querySelector('#wGridBar [data-gcall], #wGridBar [data-gstance], #wGridBar [data-gpow]')"), 'football: the bar has no calls left on it')
-        # a call from its new place is heard
-        n0 = await pg.evaluate("wGF.G.plays ? wGF.G.plays.length : -1")
-        await pg.click('#wGridRowCall [data-gcall]:not([disabled])')
-        await pg.wait_for_function("wGF.phase !== 'call'", timeout=10000)
-        check(True, 'football: a play called from the row under the field is run', n0)
-        # their ball: the row is Defense
+        # a call from its new place is heard, with the ball and without it
+        CALL = {True: '#wGridRowCall [data-gcall]:not([disabled])', False: '#wGridRowCall [data-gdef]:not([disabled])'}
+        ROW = "({ lab: document.getElementById('wGridCallL').textContent, calls: !document.getElementById('wGridCalls').hidden, defs: !document.getElementById('wGridDefs').hidden, ph: wGF.phase, mine: wGF.yourBall })"
+        await pg.click(CALL[mine]); await pg.wait_for_function("wGF.phase !== 'call'", timeout=10000)
+        check(True, f'football: a call from the {first} row under the field is run')
+        # play on (punting when we can) until the ball changes hands: the row turns over with it
         await pg.evaluate("wGF.speed = 8")
-        try:
-            await pg.wait_for_function("wGF.phase === 'call' && !wGF.yourBall || !wGF.live", timeout=5000)
-        except Exception: pass
-        for _ in range(60):
+        for _ in range(80):
             st = await pg.evaluate("({ ph: wGF.phase, mine: wGF.yourBall, live: wGF.live })")
-            if not st['live'] or (st['ph'] == 'call' and not st['mine']): break
-            if st['ph'] == 'call': await pg.evaluate("(() => { const b = document.querySelector('#wGridRowCall [data-gkick=\"punt\"]:not([disabled]), #wGridRowCall [data-gcall]:not([disabled])'); if (b) b.click(); })()")
+            if not st['live'] or (st['ph'] == 'call' and st['mine'] != mine): break
+            if st['ph'] == 'call': await pg.evaluate("(() => { const b = document.querySelector('#wGridRowCall [data-gkick=\"punt\"]:not([disabled]), #wGridRowCall [data-gcall]:not([disabled]), #wGridRowCall [data-gdef]:not([disabled])'); if (b) b.click(); })()")
             await pg.wait_for_function(f"wGF.phase !== '{st['ph']}' || !wGF.live || (wGF.phase === 'call' && wGF.yourBall !== {json.dumps(st['mine'])})", timeout=60000)
-        d = await pg.evaluate("({ lab: document.getElementById('wGridCallL').textContent, defs: !document.getElementById('wGridDefs').hidden, ph: wGF.phase, mine: wGF.yourBall })")
-        check(d['lab'] == 'Defense' and d['defs'], 'football: when they have the ball the row is Defense', d)
-        await pg.click('#wGridRowCall [data-gdef]:not([disabled])'); await pg.wait_for_function("wGF.phase !== 'call'", timeout=10000)
-        check(True, 'football: a defense called from the row is run')
+        d = await pg.evaluate(ROW); other = 'Defense' if mine else 'Play'
+        check(d['ph'] == 'call' and d['mine'] != mine and d['lab'] == other and d['defs'] == mine and d['calls'] != mine, f'football: when the ball changes hands the row is {other}', d)
+        await pg.click(CALL[not mine]); await pg.wait_for_function("wGF.phase !== 'call'", timeout=10000)
+        check(True, f'football: a call from the {other} row is run')
         # Watch: the rows go, a line says why
         await pg.click('#wGridModes [data-gmode="watch"]')
         w = await pg.evaluate("({ rows: ['wGridRowCall', 'wGridRowStance', 'wGridRowPow'].map(i => document.getElementById(i).hidden), none: !document.getElementById('wGridCoachNone').hidden })")

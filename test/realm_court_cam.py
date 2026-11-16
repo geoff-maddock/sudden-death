@@ -18,7 +18,8 @@ CLOSE_ALL = """(() => { for (let i = 0; i < 12 && !document.getElementById('moda
   const b = document.querySelector('#modalBox [data-close], #modalBox .btn, #modalBox button'); if (!b) break; b.click(); }
   WG.cardOffer = null; })()"""
 # the picture now: the camera, the ball's half, and where each player's feet are drawn
-LOOK = """(() => { const L = wBK.play, len = wBK.rules.len; return { cam: wBK.cam(), ball: L.ball.x < len / 2 ? 0 : 1,
+# (far: how far the ball is from the baseline of the end the camera is on, in metres)
+LOOK = """(() => { const L = wBK.play, len = wBK.rules.len, cam = wBK.cam(); return { cam, far: Math.round((cam.end ? len - L.ball.x : L.ball.x) * 10) / 10,
   xs: L.pl.map(p => Math.round(wBK.scr(p.x, p.y).x)), ys: L.pl.map(p => Math.round(wBK.scr(p.x, p.y).y)), state: JSON.stringify(wBK.G).includes('"cam"') }; })()"""
 
 async def main():
@@ -47,9 +48,11 @@ async def main():
         await pg.evaluate("wBK.setMode('watch')")
         seen = []
         for end in (0, 1):
-            await pg.wait_for_function(f"wBK.cam().u === 1 && wBK.cam().end === {end} && wBK.phase === 'live'", timeout=120000)
-            v = await pg.evaluate(LOOK); seen.append(v)
-            check(v['cam']['sx'] == 1.5 and v['ball'] == end, f'the camera pushes in on the half the play is in (end {end})', v)
+            # the look is taken in the same frame the camera is seen all the way in, so the play can't move on between
+            h = await pg.wait_for_function(f"wBK.cam().u === 1 && wBK.cam().end === {end} && wBK.phase === 'live' && {LOOK}", timeout=120000)
+            v = await h.json_value(); seen.append(v)
+            # it lets go once the ball is 16.5 m from that end (BK_CAM.out), a little past half court, so it does not flicker
+            check(v['cam']['sx'] == 1.5 and 0 <= v['far'] <= 16.5, f'the camera pushes in on the half the play is in (end {end})', v)
             check(all(0 <= x <= 960 for x in v['xs']) and all(64 < y < 506 for y in v['ys']), f'pushed in, every player is still in the picture (end {end})', v)
             # a paused game holds its picture
             await pg.evaluate("wBK.pause(true)"); u0 = await pg.evaluate("JSON.stringify(wBK.cam())")
