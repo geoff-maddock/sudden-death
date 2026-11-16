@@ -815,3 +815,107 @@ seven of one piece +1 to +3.5 points a game, measured in phase 3), and still doe
 nobody has measured that yet. The rest of each lab is unchanged from the runs above: boxing tiers 51/42/28%, Belts won
 3.3%; football tiers 57/45/27%, Cups won 3.3%.
 
+
+## Hockey at the Pond Rink (issue #83, phase 11)
+
+`python3 test/realm_rink_lab.py N`: every game is the rink engine played to a final, headless, as Simulate plays it
+(six minutes, the Pond Rink's ways on). A fresh journey with eight players at level 3 (a six and a bench of two, as
+theirs), your coach a Knight, theirs at the tier's skill. Hockey is low scoring (about 2.7 goals a side), so one game
+is mostly luck: a cell of 100 games is good to about 5 points either way, one of 150 to about 4, and the same cell
+moved by up to 8 points between runs. Differences under about 8 are noise. About 90 ms a game; 16% go past the third
+period and 5 to 7% to a shootout. No game ends level.
+
+**Tiers, as the world sets them** (100 games each): a tier is their level (yours plus the tier, less one), extra
+rating points on each of their six (`W_HKG.oppBonus`: 0, 2, 5, the court's), and their coach.
+
+| | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Win | 59.0% | 40.0% | 21.0% |
+| Goals | 2.79–2.31 | 2.62–3.31 | 2.00–4.01 |
+
+These sit by basketball's (57/44/26%) and boxing's (51/42/28%), so the court's bonus is kept. Tier 3 reads a little
+hard; it is inside the noise of basketball's, and is the first number to look at if it feels unfair by hand.
+
+**Level gap** (100 each, tiers mixed): their level a point below yours 46%, even 47%, +1 43%, +2 34%, +3 28%. A level
+is one rating point a player, so a gap counts for less than a tier does.
+
+**Their coach** (even level, tier 2 ratings, 100 each): Squire 50%, Knight 43%, Archmage 33%. In order, and each step
+is about the size of the noise. Coach against coach with the same skaters (300 each, phase 5): a Knight beats a Squire
+56 in 100, an Archmage a Knight 59, an Archmage a Squire 62. A Squire's first handicaps (a second skater chasing the
+puck, slower decisions) measured at nothing; what he has now is what did: guessed passes, worse shots, drift out of
+shape, and late line changes.
+
+**Powers.** Both sides with powers 43%, neither 51% (100 each): powers don't tilt a game between sides that both have
+them. One side only, the same seeds both ways (600 games, phase 7): +0.24 goals a game and 54 wins in 100. As first
+written (two mana to start, half a mana when scored on, seven-second powers) they were worth about half that, so the
+mana was raised (three to start, one when scored on, two at a break) and powers last ten seconds. About 10.5 casts a
+side a game.
+
+**Your call, fixed all game** (even level, both Knights, theirs picked by their coach; 150 each, the rest Cycle, Man
+and Balanced, after the retune below).
+
+| With the puck | Win | Goals | Shots |
+|---|---|---|---|
+| Cycle | 48.0% | 3.00–3.00 | 16.9 |
+| Rush | 36.7% | 2.44–3.23 | 17.3 |
+| Dump and chase | 31.3% | 2.11–3.16 | 13.7 |
+| Point shots | 49.3% | 3.19–3.30 | 19.0 |
+| Crash the net | 49.3% | 3.06–3.29 | 18.6 |
+
+| Without it | Win | Goals | Their shots |
+|---|---|---|---|
+| Man | 48.0% | 3.00–3.00 | 18.4 |
+| Forecheck | 38.0% | 2.47–3.25 | 18.6 |
+| Trap | 34.0% | 2.48–3.37 | 18.2 |
+| Box | 40.0% | 2.44–3.09 | 17.9 |
+| Collapse | 46.0% | 2.20–2.63 | 17.4 |
+
+No system called every time beats mixing them by more than the noise, which is the scout and their coach's answer
+doing their job. **Dump and chase is the weak one**: three fewer shots a game than anything else, and it read 33% and
+31% in two runs. Lowering how often it dumps and making the puck safer in it (this phase) did not move it. It is left
+as it is, and is the first thing to look at next: the chase does not win the puck back often enough. The Collapse
+gives up the fewest goals (2.63) and scores the fewest (2.20). A run before the retune had Point shots at 54% and
+Forecheck at 50%; in this one they are 49% and 38%, which is the size of the noise.
+
+| Tempo | Win | Shots | Stamina at the end |
+|---|---|---|---|
+| Push | 39.3% | 16.1 | 71 |
+| Balanced | 48.0% | 16.9 | 72 |
+| Sit on it | 46.0% | 15.0 | 75 |
+
+| Edge | Win | Hits | Penalties |
+|---|---|---|---|
+| Rough | 39.3% | 9.1 | 1.44 |
+| Balanced | 48.0% | 6.5 | 0.89 |
+| Clean | 40.0% | 3.8 | 0.50 |
+
+Rough was penalised 2.0 times a game and won 35% as first built; its fouls were cut (1.5 times a balanced side's,
+now 1.3) and it takes 1.4. Push does not yet produce more shots than Balanced, which it should: also for next time.
+
+**Special teams** (100 each, your setup fixed). A power play scores on 14 to 27% of penalties (Umbrella 13.6%,
+Overload 18.3%, Net front 27.1%); a penalty kill gives up 16 to 22% (Box 15.8%, Pressure 20.0%, Diamond 21.7%). A side
+takes about one penalty a game. Per minute a power play outscores even strength only a little (0.66 goals a minute
+against 0.58, phase 3): a minor is a sixth of a period, and a side that is short clears the puck and makes the power
+play fetch it. A short-handed side scores a twelfth as often as an even one.
+
+**The Pond Kettle** (100 cups, level 3, Simulate every round): the quarter-final won 61%, the semi-final 36%, the
+final 18%; champion in 4 cups of 100, 158 XP and 16 gold down a cup with the fee and the prize. A level 3 six is not
+expected to win a final against tier 3: it is a cup to come back to.
+
+**Gear and potions** (100 each, even level; your bench gives your potions as a Knight would):
+
+| | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Plain | 56% | 38% | 28% |
+| Their bag only | 55% | 38% | 29% |
+| Both bags | 61% | 44% | 32% |
+| Both bags, you in gear | 58% | 50% | 40% |
+
+Their bag alone changes nothing you can measure. Your bag is worth about 5 points, and a full set of gear on top about
+5 more at tiers 2 and 3: together, most of a tier. No single piece or potion was measured on its own.
+
+**Superstars** (`python3 test/realm_stars_lab.py 60 '' hk`, 60 games each, even level, tier 2; an ordinary sixth
+player won 43%): Kraken 53% (in goal in 88% of games, and the only one with a positive margin), Djinn 53%, Hydra 48%,
+Phoenix 43%, Frost Wyrm 42%, Behemoth 37%. At 60 games a cell is good to about 6.5 points, so only the Kraken and the
+Djinn are clearly worth more than an ordinary player, and the Behemoth (slow feet on a long sheet, as on the court)
+may be worth less.

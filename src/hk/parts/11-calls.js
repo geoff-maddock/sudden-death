@@ -21,7 +21,7 @@
 const HK_ATT = {
   cycle: { n: 'Cycle', desc: 'Work the puck low along the boards and wait for the look.', w: { pass: 1.5, carry: .8 }, at: .015 },
   rush: { n: 'Rush', desc: 'Carry it in at speed and shoot before they are set.', w: { carry: 1.7, pass: .8, dump: .3 }, at: -.012 },
-  dump: { n: 'Dump and chase', desc: 'Send it into their corner and go and get it. Safe, and hard on their defenders.', w: { dump: 1.5, carry: .9 }, deep: 2, give: -.03 },
+  dump: { n: 'Dump and chase', desc: 'Send it into their corner and go and get it. Safe, and hard on their defenders.', w: { dump: 1.2, carry: 1 }, deep: 2, give: -.04 },
   point: { n: 'Point shots', desc: 'Feed the defenders at the blue line, with a body in front of the goalie.', w: { pass: 1.3 }, point: .6, front: 1 },
   crash: { n: 'Crash the net', desc: 'Shoot early and send everybody to the rebound.', w: { shoot: 1.3 }, at: -.012, front: 2, reb: 1.4, q: -.012 },
 };
@@ -58,7 +58,7 @@ const HK_EDGE_PP = {
 const HK_TEMPO = { push: { n: 'Push', desc: 'Quicker and more direct: more shots, more giveaways, and it tires your skaters.', think: .75, at: -.02, give: .025, tire: 1.15, carry: 1.3 },
   bal: { n: 'Balanced', desc: 'The usual.', think: 1, at: 0, give: 0, tire: 1, carry: 1 },
   sit: { n: 'Sit on it', desc: 'Slower and safer: fewer shots either way, and less tiring. For protecting a lead.', think: 1.2, at: .03, give: -.02, tire: .9, carry: .8, safe: 1 } };
-const HK_EDGES = { rough: { n: 'Rough', desc: 'Finish every check: more hits and more pucks won, and more penalties.', hit: 1.5, battle: 1.3, foul: 1.5 },
+const HK_EDGES = { rough: { n: 'Rough', desc: 'Finish every check: more hits and more pucks won, and more penalties.', hit: 1.5, battle: 1.35, foul: 1.3 },
   bal: { n: 'Balanced', desc: 'The usual.', hit: 1, battle: 1, foul: 1 },
   clean: { n: 'Clean', desc: 'Sticks down and skate: fewer penalties, fewer hits.', hit: .6, battle: .9, foul: .4 } };
 const HK_TO = { n: 1, sta: .4, secs: 1.6 }, HK_SCOUT = { max: 2, q: .008 }, HK_CALL_Q = .016, HK_CALL_POKE = .02;
