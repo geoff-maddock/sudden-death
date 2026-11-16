@@ -45,8 +45,8 @@ async def main():
           const all = kinds.flatMap(k => P[k].one.concat(P[k].two)), fxOk = all.every(p => Object.keys(p.fx).length > 0 && Object.keys(p.fx).every(k => keys.has(k))) && kinds.every(k => Object.keys(P[k].ult.o).concat(Object.keys(P[k].ult.d)).every(x => keys.has(x)));
           return { kinds: kinds.length, same: JSON.stringify(kinds.slice().sort()) === JSON.stringify(wHK.kinds.slice().sort()), pairs: kinds.every(k => P[k].one.length === 2 && P[k].two.length === 2 && P[k].ult.n), ids: ids.length, uniq: new Set(ids).size,
             costs: all.every(p => p.cost === 1 || p.cost === 2), desc: all.every(p => p.desc.length > 15 && p.n), fxOk, sits: Object.keys(wHK.sits), R: wHK.powRules }; })()""")
-        check(t['kinds'] == 18 and t['same'] and t['pairs'] and t['ids'] == 90 and t['uniq'] == 90 and t['costs'] and t['desc'] and t['fxOk'] and t['sits'] == ['manup', 'killit', 'empty', 'sudden'],
-              'every kind has two puck powers, two checking powers and an ultimate, each named and explained, with effects the play knows and ids no two share; and four situation powers', t)
+        check(t['kinds'] == 24 and t['same'] and t['pairs'] and t['ids'] == 120 and t['uniq'] == 120 and t['costs'] and t['desc'] and t['fxOk'] and t['sits'] == ['manup', 'killit', 'empty', 'sudden'],
+              'every kind (the six superstars too, phase 9) has two puck powers, two checking powers and an ultimate, each named and explained, with effects the play knows and ids no two share; and four situation powers', t)
 
         # ---------- casting ----------
         c = await pg.evaluate("""(() => { const P = __game(3), G = wHK.G, R = wHK.powRules; __away(P, [0]); __put(P, 0, 30, 0); wHK.give(0);
