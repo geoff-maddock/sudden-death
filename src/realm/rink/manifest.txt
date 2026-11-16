@@ -1,0 +1,4 @@
+# The Realm's rink scope: ./build.sh src/realm/manifest.txt takes this through `scope wHK ...`.
+# The engine's parts first (they don't touch the page), then its page in the Realm: a canvas in #v-rink.
+include src/hk/manifest.txt
+src/realm/rink/k1-page.js
