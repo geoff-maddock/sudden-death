@@ -30,13 +30,16 @@ function hkStart(opts) {
   G.stat = G.teams.map(t => t.roster.map(() => ({ g: 0, a: 0, sog: 0, att: 0, hit: 0, blk: 0, give: 0, take: 0, fow: 0, fot: 0, pim: 0, sec: 0, sa: 0, sv: 0 })));
   G.log = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: o.mode === 'play' ? 'play' : 'watch', you: o.you === 1 ? 1 : 0, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null };
+  hkInputClear();
   hkLines(); hkFaceoffSpots(HK_RULES.len / 2, 0).forEach(([x, y], i) => { const p = L.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; });
   GD.fo = { x: HK_RULES.len / 2, y: 0 }; hkPuckAt(GD.fo.x, GD.fo.y);
   return G;
 }
 function hkGo(ph) {
   GD.ph = ph; GD.t = 0;
+  // (a new drop waits for a new press)
+  if (ph === 'drop') GD.press = null;
   if (HK_HOOK.onPhase) try { HK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 function hkBoxAdd(side, ri, k, n) { const b = G.stat[side][ri]; if (b) b[k] += n == null ? 1 : n; }
@@ -77,9 +80,10 @@ function hkFaceoffAt(x, y) {
   hkPuckAt(x, y); L.touch = []; L.oneT = null; L.press = -1;
   hkGo('set');
 }
-// the drop: hands and size against hands and size; the winner draws it back to whoever is furthest back
+// the drop: hands and size against hands and size, and by hand your press (09-hands.js); the winner draws it back to
+// whoever is furthest back
 function hkDrop() {
-  const c = [0, 1].map(s => L.pl[s * HK_POS.length]), val = p => p.r.hnd * .7 + p.r.siz * .3, win = R() < clamp(.5 + (val(c[0]) - val(c[1])) * .05, .2, .8) ? 0 : 1, w = c[win];
+  const c = [0, 1].map(s => L.pl[s * HK_POS.length]), val = p => p.r.hnd * .7 + p.r.siz * .3, edge = hkDrawEdge() * (GD.you === 0 ? 1 : -1), win = R() < clamp(.5 + (val(c[0]) - val(c[1])) * .05 + edge, .1, .9) ? 0 : 1, w = c[win];
   for (const s of [0, 1]) { hkBoxAdd(s, c[s].ri, 'fot'); if (s === win) hkBoxAdd(s, c[s].ri, 'fow'); }
   G.drops++;
   for (const p of L.pl) { p.vx = p.vy = 0; }
@@ -87,13 +91,13 @@ function hkDrop() {
   const back = hkSk(win).filter(p => p !== w).sort((a, b) => hkUp(win, a.x) - hkUp(win, b.x))[0];
   hkEv('faceoff', w.n, c[1 - win].n);
   G.poss = 1 - win; hkGain(L.pl.indexOf(w), 'faceoff');
-  GD.msg = `${w.n} wins the face-off for ${G.teams[win].name}.`;
+  GD.msg = `${w.n} wins the face-off for ${G.teams[win].name}.`; GD.drew = { edge: Math.round(edge * 100) / 100, win };
   hkGo('live');
   if (back) hkPass(L.pl.indexOf(back));
 }
 function hkTick(dt) {
   if (!GD || GD.ph === 'over') return;
-  GD.t += dt;
+  GD.t += dt; HKI.now += dt;
   if (GD.ph === 'intro') { if (GD.t >= HK_PACE.intro) hkGo('drop'); return; }
   if (GD.ph === 'live') {
     GD.acc += dt;

@@ -5,7 +5,11 @@
    Phase 1 plays one game, CPU against CPU: the Rimewatch Hockey Club against a visiting six from Cinderhold, three
    periods on the game clock, face-offs, icing, sudden death and a shootout. Ask Old Tove at the Pond Rink for a
    SCRIMMAGE (GAME and HOCKEY stay the card-game match and how it scores). Nothing is won or lost, and nothing is
-   saved. Playing it by hand, penalties, the six and the calls come in later phases.
+   saved. Penalties, the six and the calls come in later phases.
+   Phase 2, by hand: two modes on the bar (W_RINK_MODES): Watch (the CPU plays both sides) and You play (you play the
+   Rimewatch skaters: the keys are in k1-page.js, and under the rink a pad of buttons does the same on a phone, its
+   labels following whether you have the puck). Switching goes on with the same game; the last one picked is kept for
+   the next (not saved). How to play adds the controls, aiming, the one-timer and the face-off.
    The game length is a setting (SET.rinkMins: 3, 6, 9 or 12 minutes; 6 by default), on the Settings panel and on the
    bar.
    On a phone the scoreboard strip (w86) covers the rink too: W_SB_VIEWS.rink and W_SB_HTML.rink are added here.
@@ -19,26 +23,68 @@ const W_RINK = {
 };
 const W_RINK_SHOT = { wrist: 'scores', slap: 'scores with a slap shot', one: 'one-times it in', so: 'wins the shootout' };
 const W_RINK_STR = { pp: ' on the power play', sh: ' short-handed', even: '', so: '' };
+// who plays it: the CPU both sides, or you play your skaters by hand
+const W_RINK_MODES = {
+  watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
+  play: { n: 'You play', title: 'You play Rimewatch by hand: WASD to skate, Space to shoot (tap, or hold to wind up a slap shot) or check, J to pass (hold to send it hard) or poke, E to switch skaters, Shift to lift your stick. Let go of the keys and your skater plays on.' },
+};
+let W_RINK_MODE = 'play';
+// the pad under the rink: with the puck and without it, [key for wHK.input, label, the key it stands for, held?]
+const W_RINK_PAD = {
+  puck: [['shoot', 'Shoot', 'Space: tap for a wrist shot, hold to wind up', 1], ['pass', 'Pass', 'J: tap to pass, hold to send it hard', 1]],
+  none: [['shoot', 'Check', 'Space: lunge at the carrier, or take the face-off', 1], ['pass', 'Poke', 'J: go for the puck', 1], ['lift', 'Lift stick', 'Shift, held: into the passing lane', 1], ['switch', 'Switch', 'E: play the next skater nearest the puck', 0]],
+};
 const wRinkMins = () => wHK.rules.minsAt.includes(SET.rinkMins) ? SET.rinkMins : wHK.rules.mins;
 // the game on the rink: plain data, never saved
 let WHK = null;
 
 $('v-rink').insertAdjacentHTML('beforebegin', `<div id="wRinkBar" class="wdbar" hidden>
   <b id="wRinkTitle">A scrimmage at the Pond Rink</b><span id="wRinkNote" class="hint wsnote"></span>
+  <span id="wRinkModes" class="wgmodes" role="group" aria-label="Who plays it">${Object.entries(W_RINK_MODES).map(([k, m]) => `<button class="ghost" data-kmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <label class="hint" title="How long a game is on the game clock: three periods of a third of it each. The clock stops at every whistle. Also on the Settings panel.">Length <select id="wRinkMins">${wHK.rules.minsAt.map(m => `<option value="${m}">${m} min</option>`).join('')}</select></label>
   <button class="ghost" id="wRinkAgain">Another game</button>
   <button class="ghost" id="wRinkBack">Back to the world</button></div>`);
 $('wRinkBar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.id === 'wRinkAgain') wRinkGame();
+  if (b.dataset.kmode) { W_RINK_MODE = b.dataset.kmode; if (WHK && !WHK.over) wHK.setMode(W_RINK_MODE); wRinkBarNote(); }
+  else if (b.id === 'wRinkAgain') wRinkGame();
   else if (b.id === 'wRinkBack') wLeaveRink();
 });
 $('wRinkMins').addEventListener('change', e => { SET.rinkMins = +e.target.value; saveSettings(); wRinkBarNote(); });
 // under the rink: the box score, every goal, and How hockey works
-$('v-rink').insertAdjacentHTML('beforeend', `<h4 class="wsh">Box score</h4><div id="wRinkBox" class="wcbox"></div>
+$('v-rink').insertAdjacentHTML('beforeend', `<div id="wRinkPad" class="wrpad" hidden role="group" aria-label="Play"></div><h4 class="wsh">Box score</h4><div id="wRinkBox" class="wcbox"></div>
   <h4 class="wsh">This game</h4><ol id="wRinkLog" class="wglog wslog"></ol>
   <p class="hint wghowlink">How hockey works: skating, shots and saves, checks, face-offs and icing. <button class="ghost" id="wRinkHowBtn">How to play hockey</button> <small>The game waits while you read.</small></p>`);
 $('wRinkHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wRinkHow'); if (h) h.scrollIntoView({ block: 'start' }); });
+
+// the pad: held buttons (shoot, pass, lift) send down and up; Switch is a tap
+const W_RINK_HELD = new Set();
+function wRinkPadUp(k) { if (W_RINK_HELD.delete(k)) wHK.input({ [k]: false }); }
+function wRinkPadRelease() { for (const k of [...W_RINK_HELD]) wRinkPadUp(k); }
+$('wRinkPad').addEventListener('pointerdown', e => {
+  const b = e.target.closest('[data-kpad]'); if (!b) return;
+  e.preventDefault();
+  const k = b.dataset.kpad;
+  if (b.dataset.hold) { wHK.input({ [k]: true }); W_RINK_HELD.add(k); try { b.setPointerCapture(e.pointerId); } catch (er) { /* no live pointer (a synthetic press) */ } }
+  else wHK.input({ act: k });
+});
+// (a release heard twice, pointerup then lostpointercapture, does nothing the second time)
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) $('wRinkPad').addEventListener(ev, e => { const b = e.target.closest('[data-kpad]'); if (b && b.dataset.hold) wRinkPadUp(b.dataset.kpad); });
+// the pad's buttons for whether you have the puck (a pass of yours on its way counts). Drawn again only when that
+// changes, letting go of any held button first, so a redraw never strands one
+function wRinkPad() {
+  const pad = $('wRinkPad'), show = !!WHK && !WHK.over && wHK.mode === 'play';
+  if (!show) wRinkPadRelease();
+  pad.hidden = !show; if (!show) return;
+  const P = wHK.play && wHK.play.puck, side = wHK.puckMine || (P && P.st === 'free' && P.k === 'pass' && P.to === wHK.me) ? 'puck' : 'none';
+  if (pad.dataset.side === side) return;
+  wRinkPadRelease();
+  pad.dataset.side = side;
+  pad.innerHTML = W_RINK_PAD[side].map(([k, n, key, hold]) => `<button class="ghost" data-kpad="${k}" ${hold ? 'data-hold="1"' : ''} data-key="${esc(key.split(/[,:]/)[0])}" title="${esc(key)}">${esc(n)}</button>`).join('');
+}
+// (kept up a few times a second while a game is on the rink, and stopped when it's left)
+let W_RINK_TICK = 0;
+function wRinkTick(on) { clearInterval(W_RINK_TICK); W_RINK_TICK = on ? setInterval(() => { if (WHK && UI.view === 'rink') wRinkPad(); }, 120) : 0; }
 
 // a player's name from the free agents' names for their kind, one nobody else in the game has (used: the names taken)
 function wRinkName(kind, used) {
@@ -53,18 +99,23 @@ function wRinkTeams() {
     name: t.name, short: t.short, color: t.color, light: t.light, roster: t.kinds.map((kind, i) => ({ n: wRinkName(kind, used), kind, num: 2 + i * 7 })),
   }));
 }
-/* one game on the rink. opts: { teams, mins, seed } (the two clubs and the length setting when not given) */
+/* one game on the rink. opts: { teams, mins, seed, mode } (the two clubs, the length setting and the mode on the bar
+   when not given) */
 function wRinkGame(opts) {
   const o = opts || {};
-  WHK = { over: null };
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed });
+  WHK = { over: null }; wRinkTick(true);
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }
 function wRinkBarNote() {
   if (!WHK) return;
-  const G = wHK.G;
-  $('wRinkNote').textContent = WHK.over ? wHK.msg : G ? `${G.teams[0].name} against ${G.teams[1].name}: ${G.mins} minutes in three periods. Level at the end, it goes to sudden death and then a shootout. A scrimmage: nothing is won or lost.` : '';
+  const G = wHK.G, mode = wHK.mode || W_RINK_MODE;
+  for (const b of $('wRinkModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.kmode === mode); b.setAttribute('aria-pressed', b.dataset.kmode === mode); }
+  $('wRinkPad').dataset.side = ''; wRinkPad();
+  $('wRinkNote').textContent = WHK.over ? wHK.msg : !G ? '' : mode === 'play'
+    ? `You play ${G.teams[0].name}: WASD to skate, Space to shoot (tap, or hold to wind up) or check, J to pass (hold to send it hard) or poke, E to switch, Shift to lift your stick. At a face-off, Space as the puck drops.`
+    : `${G.teams[0].name} against ${G.teams[1].name}: ${G.mins} minutes in three periods. Level at the end, it goes to sudden death and then a shootout. A scrimmage: nothing is won or lost.`;
   $('wRinkMins').value = String(wRinkMins());
 }
 // every goal so far, oldest first, with the score after it
@@ -82,13 +133,14 @@ function wRinkBox() {
   $('wRinkLog').innerHTML = wRinkLogHTML();
 }
 function wLeaveRink() {
+  wRinkPadRelease(); wRinkTick(false);
   WHK = null; wHK.pause(false);
   if (WG) showView('world');
   else { wHK.hide(); showScreen('title'); renderTitle(); }
 }
 // the box score keeps up at each whistle, not every frame
 wHK.onPhase = ph => { if (WHK && UI.view === 'rink' && ['dead', 'break', 'so', 'over'].includes(ph)) wRinkBox(); };
-wHK.onOver = s => { if (WHK) { WHK.over = s; wRinkBarNote(); wRinkBox(); $('wRinkAgain').focus(); } };
+wHK.onOver = s => { if (WHK) { WHK.over = s; wRinkBarNote(); wRinkBox(); wRinkPad(); $('wRinkAgain').focus(); } };
 
 // the scoreboard strip on a phone (w86): both sides and the score, the period and the clock, and shots on goal
 W_SB_VIEWS.rink = 'wSbRink';
@@ -141,6 +193,11 @@ function wRinkHowHTML() {
   <p class="hint"><b>Checks.</b> The skater nearest the puck carrier goes at them. Up close they poke at the puck (defense against hands), or, closing fast, throw a body check (size and speed) that knocks the carrier off it.</p>
   <p class="hint"><b>Icing.</b> A puck sent from a side's own half that crosses the far goal line untouched comes back for a face-off in that side's end. There is no offside.</p>
   <p class="hint"><b>Level after three periods,</b> it goes to sudden death at three skaters a side: the next goal wins. Still level, a shootout: ${R.so} shooters each, then one each until it is settled. A hockey game never ends level.</p>
+  <p class="hint"><b>Playing it by hand.</b> Pick <b>You play</b> on the bar to play Rimewatch. With the puck you play whoever has it: WASD or the arrows to skate (let go and they glide on). <b>Space</b> shoots: a tap is a wrist shot; hold it to wind up a slap shot (the bar beside your shooter fills, and the shot gets harder), then let go. A checker can take the puck off a wind-up. <b>J</b> passes to the teammate you're skating toward (or the best one if you aren't steering); hold it to send the puck hard the way you steer, into a corner or out of your end. Without the puck you play the skater nearest it (marked): <b>J</b> pokes at the puck, <b>Space</b> lunges at the carrier (a hit if you reach them, and out of the play for a moment if you don't), <b>Shift</b> held lifts your stick into the passing lane, and <b>E</b> switches to the next skater. The goalie is never yours. Let go of the keys for ${wHK.hands.idle} seconds and your skater plays on by themselves. On a phone, the buttons under the rink do the same.</p>
+  <p class="hint"><b>Aiming.</b> The way you steer as you let a shot go picks the target, marked on the net while you wind up: up or down the screen for that post, with the way to the goal held as well for the top corner, and nothing held for between the pads. The goalie covers what they can reach: the post they have moved away from is open and the one they stand at is shut. The top corners score more and miss more. Between the pads is good on a goalie who is sliding across.</p>
+  <p class="hint"><b>The one-timer by hand.</b> Press Space while a pass is on its way to you. Inside the last ${Math.round(wHK.hands.oneT * 100) / 100} seconds before it arrives, it is shot as it lands. Earlier than that and you fan on it.</p>
+  <p class="hint"><b>The face-off by hand.</b> Press Space as the puck drops: a ring closes on the dot and turns green in the moment to press. Close to the drop wins more of them; too early and you've jumped it, and win fewer.</p>
+  <p class="hint"><b>The camera.</b> The picture shows the whole sheet through the middle, and pushes in on an end once the puck is in it.</p>
   <p class="hint"><b>Ratings.</b> Six for each player: speed, size, hands, shot, defense and reflexes. An ogre hits like a wall and skates like one, a harpy is the fastest thing on the ice, and a spider in goal has eight ways to stop a puck. <b>The spots:</b> a centre, two wings, two defenders and the goalie, picked from the ratings for now.</p>`;
 }
 const wW88RenderHelp = renderHelp;
@@ -149,5 +206,5 @@ renderHelp = function () {
   const h = $('wHelp'); if (!h || $('wHelpRink') || !$('wHelpGrounds')) return;
   const after = $('wHelpCourt') || [...h.querySelectorAll('[id^="wHelpG"], #wHelpRing')].pop();
   h.insertAdjacentHTML('beforeend', `<section id="wRinkHow" class="wghelp"><h3>Hockey: how it works</h3>${wRinkHowHTML()}</section>`);
-  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRink"><b>Real hockey.</b> The Pond Rink is trying out hockey on the ice itself, five skaters and a goalie a side. Ask Old Tove for a SCRIMMAGE: three periods on the game clock (six minutes in all, or set the length in Settings). Watch the two clubs skate it end to end: passes, shots and saves, rebounds, checks, face-offs and icing, with a box score under the rink (see Hockey: how it works). A SCRIMMAGE is an exhibition: nothing is won or lost.</p>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRink"><b>Real hockey.</b> The Pond Rink is trying out hockey on the ice itself, five skaters and a goalie a side. Ask Old Tove for a SCRIMMAGE: three periods on the game clock (six minutes in all, or set the length in Settings). Play Rimewatch by hand, or watch the two clubs skate it end to end: passes, shots and saves, rebounds, checks, face-offs and icing, with a box score under the rink (see Hockey: how it works). A SCRIMMAGE is an exhibition: nothing is won or lost.</p>`);
 };

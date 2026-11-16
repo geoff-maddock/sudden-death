@@ -13,11 +13,21 @@ return {
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { p: G.p, name: GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), text: hkClockText() } : null,
   pause: on => { HKP.paused = !!on; }, get paused() { return HKP.paused; },
   set onOver(f) { HK_HOOK.onOver = f; }, get onOver() { return HK_HOOK.onOver; }, set onPhase(f) { HK_HOOK.onPhase = f; }, get onPhase() { return HK_HOOK.onPhase; },
+  // by hand (phase 2): who plays it ('watch' or 'play'), your keys (input: { steer, shoot, pass, lift, act }; returns
+  // what happened), whether you have the puck, the skater you play, the wind-up ({ t, kind, pow }), the last release
+  // ({ kind, aim, pow, t }), the last face-off ({ edge, win }), the hands' rules, what aiming at a target does, and the camera
+  setMode: m => hkSetMode(m), get mode() { return GD ? GD.mode : null; }, get you() { return GD ? GD.you : 0; }, input: o => hkInput(o || {}), get inputState() { return JSON.parse(JSON.stringify(HKI)); },
+  get puckMine() { return !!GD && !!L && hkPuckMine(); }, get me() { return L && GD ? hkMe() : -1; },
+  get meter() { const M = GD && GD.meter; return M ? { i: M.i, t: M.t, kind: M.t < HK_HANDS.tap ? 'wrist' : 'slap', pow: hkPower(M.t) } : null; },
+  get release() { return GD && GD.rel ? JSON.parse(JSON.stringify(GD.rel)) : null; }, get drew() { return GD && GD.drew ? Object.assign({}, GD.drew) : null; }, get press() { return GD ? GD.press : null; },
+  hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
+  shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
+  cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
   // the ratings, the spots and the clubs, for the page and How to play
   rate: kind => hkRate(kind), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
   // the test's handle on the rink: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
   step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) hkTick(HK_DT); return GD ? GD.ph : null; },
-  get play() { return L; }, get ev() { return L ? L.ev : []; }, scr: (x, y) => hkScr(x, y),
+  get play() { return L; }, get ev() { return L ? L.ev : []; }, scr: (x, y) => hkScrCam(x, y),
   shotOdds: (i, kind, x, y) => L ? hkShotOdds(L.pl[i], kind || 'wrist', x == null ? L.pl[i].x : x, y == null ? L.pl[i].y : y) : null,
   goalSet: (side, x, y) => L ? hkSet(L.pl[hkGk(side)], x, y) : null, goalSpot: (side, x, y) => hkGoalSpot(side, x, y), goalieStep: (side, dt) => { if (L) hkGoalie(L.pl[hkGk(side)], dt || HK_DT); },
   skate: (i, x, y, dt) => { if (L) hkSkate(L.pl[i], i, x, y, dt || HK_DT); }, puckStep: dt => { if (L) hkPuck(dt || HK_DT); }, loose: (x, y, a, v) => { if (L) hkLoose(x, y, a, v); },
