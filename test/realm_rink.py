@@ -109,7 +109,8 @@ async def main():
             t, other = b['tot'], a['box'][1 - s]['tot']
             ok.append(t['g'] + (1 if a['so'] and a['win'] == s else 0) == a['score'][s] == sum(1 for l in a['log'] if l['side'] == s))
             ok.append(t['sog'] == a['shots'][s] and t['g'] <= t['sog'] <= t['att'] and t['a'] <= 2 * t['g'])
-            ok.append(t['sa'] == other['sog'] and t['sv'] == t['sa'] - other['g'] and t['fot'] == a['drops'])
+            en = sum(1 for l in a['log'] if l['side'] != s and l.get('en'))   # (a goal into an empty net is a shot on goal the goalie never faced)
+            ok.append(t['sa'] == other['sog'] - en and t['sv'] == t['sa'] - (other['g'] - en) and t['fot'] == a['drops'])
             ok.append(all(r_['sa'] == 0 for r_ in b['rows'] if r_['pos'] != 'G') and abs(next(r_['sec'] for r_ in b['rows'] if r_['pos'] == 'G') - a['secs']) <= 1)
         check(all(ok) and a['box'][0]['tot']['fow'] + a['box'][1]['tot']['fow'] == a['drops'], 'the box score adds up: the team\'s goals are the score and the log; saves are shots faced less goals against; every face-off has a winner; the goalie is on all game', a['box'])
         check(all(l['side'] in (0, 1) and l['k'] in ('wrist', 'slap', 'one', 'so') and len(l['a']) <= 2 for l in a['log']), 'every goal is in the log, by side, with how it was scored and up to two assists', a['log'][:4])

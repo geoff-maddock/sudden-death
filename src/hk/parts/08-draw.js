@@ -48,6 +48,7 @@ function hkDraw(c) {
   c.translate(-HKC.left * HKC.k, HK_CAM.fy * (1 - HKC.k)); c.scale(HKC.k, HKC.k);
   hkDrawBack(c, dens);
   hkDrawPond(c);
+  hkDrawMarks(c);
   hkDrawNets(c);
   hkDrawPlayers(c);
   hkDrawPuck(c);
@@ -152,6 +153,15 @@ function hkDrawPond(c) {
     c.fillStyle = 'rgba(30,60,80,.25)'; c.beginPath(); c.ellipse(p.x, p.y, r * .3, r * .22, 0, 0, Math.PI * 2); c.fill(); }
   c.restore();
 }
+// the marks ultimates leave on the ice: a ring in the caster's colour, pulsing, with the power's name
+function hkDrawMarks(c) {
+  for (const m of G.marks || []) {
+    const p = hkScr(m.x, m.y), T = G.teams[m.side], k = 1 + Math.sin(HKT.t * 4) * .06;
+    c.save(); c.globalAlpha = .22; c.fillStyle = T.color; c.beginPath(); c.ellipse(p.x, p.y, m.r * HK_PX * k, m.r * HK_PY * k, 0, 0, Math.PI * 2); c.fill();
+    c.globalAlpha = .9; c.strokeStyle = T.light || '#fff'; c.lineWidth = 2; c.setLineDash([6, 5]); c.lineDashOffset = -HKT.t * 20; c.stroke(); c.restore();
+    txt(c, m.n, p.x, p.y + 4, `800 11px ${HK_FONT}`, 'rgba(20,34,46,.85)', 'center');
+  }
+}
 // the nets: red posts and a white mesh, from each goal line back
 function hkDrawNets(c) {
   for (const [x0, x1, y0, y1] of hkNets()) {
@@ -253,9 +263,10 @@ function hkDrawBig(c) {
   if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}${G.over && G.over.so ? ' (shootout)' : G.over && G.over.ot ? ' (sudden death)' : ''}`; }
   else if (GD.ph === 'so' && !GD.so.cur && !G.so.tries[0] && !G.so.tries[1]) { word = 'SHOOTOUT'; sub = `${HK_RULES.so} tries each, then one each until it's settled.`; }
   else if (GD.ph === 'break') { word = hkOt() ? 'SUDDEN DEATH' : `END OF THE ${hkPeriodName(G.p - 1).toUpperCase()}`; if (hkOt()) sub = 'Three skaters a side. The next goal wins.'; }
-  else if (GD.big && HK_BIG[GD.big.k]) {
+  else if (GD.big && (HK_BIG[GD.big.k] || GD.big.w)) {
     if (GD.big.at == null) GD.big.at = HKT.t;
-    const [w, cl, len] = HK_BIG[GD.big.k], a = HKT.t - GD.big.at; if (a > len) { GD.big = null; return; }
+    // (a power's own name, in its colour: an ultimate in gold)
+    const [w, cl, len] = GD.big.w ? [GD.big.w.toUpperCase(), GD.big.k === 'ult' ? '#ffd08a' : '#bfe0ff', GD.big.k === 'ult' ? 1.6 : 1.1] : HK_BIG[GD.big.k], a = HKT.t - GD.big.at; if (a > len) { GD.big = null; return; }
     word = w; col = cl; al = Math.min(1, a * 5, (len - a) * 2.5); sc = 1 + Math.max(0, .25 - a) * 1.6;
   }
   if (!word) return;
@@ -277,7 +288,18 @@ function hkDrawHud(c) {
     txt(c, `Shots ${G.sog[s]}${empty ? ' · empty net' : ''}`, X(40), 49, F(12, 600), empty ? '#ffb070' : dim, al);
     txt(c, String(G.score[s]), X(398), 47, F(40, 900), has ? T.light || '#fff' : '#f3ead6', 'center');
     if (has) { c.fillStyle = T.color; c.fillRect(X(398) - 16, 53, 32, 4); }
+    // mana (a diamond each, whole ones lit) and the roar (the bank's spirit, gold when it will pay for an ultimate)
+    if (G.powers) {
+      txt(c, 'Mana', X(150), 49, F(11, 600), dim, al);
+      for (let i = 0; i < HK_MANA.max; i++) { const x = X(186 + i * 11) + (s ? -4 : 0), on = i < Math.floor(G.mana[s] + 1e-9); c.save(); c.translate(x + 4, 45); c.rotate(Math.PI / 4); c.fillStyle = on ? '#7fd4ff' : '#2a2420'; c.fillRect(-3.2, -3.2, 6.4, 6.4); c.restore(); }
+      txt(c, 'Roar', X(262), 49, F(11, 600), dim, al);
+      const bx = s ? 960 - 292 - 56 : 292, w = 56 * clamp(G.spirit[s] / HK_SPIRIT.max, 0, 1);
+      c.fillStyle = '#2a2420'; c.fillRect(bx, 41, 56, 7); c.fillStyle = G.spirit[s] >= HK_SPIRIT.ult && !G.ultUsed[s] ? '#ffd08a' : '#c98a4a'; c.fillRect(s ? bx + 56 - w : bx, 41, w, 7);
+    }
   }
+  // what each side has going: a power's name and the seconds it has left, under its end of the bar
+  for (const s of [0, 1]) { let k = 0; for (const e of G.fxs || []) { if (e.side !== s) continue; const t = `${e.n} ${e.id === 'manup' || e.id === 'killit' ? '' : Math.ceil(e.t)}`.trim(); c.save(); c.font = F(11, 700); const w = c.measureText(t).width + 14, x = s ? 960 - 20 - w : 20, y = 66 + k * 20;
+    rr(c, x, y, w, 17, 4); c.fillStyle = e.k === 'ult' ? '#8a6420' : '#23425e'; c.fill(); c.restore(); txt(c, t, x + w / 2, y + 12.5, F(11, 700), '#fff', 'center'); k++; } }
   c.save(); rr(c, 436, 8, 88, 48, 6); c.fillStyle = '#1c1512'; c.fill(); c.restore();
   txt(c, GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), 480, 25, F(12, 700), dim, 'center');
   txt(c, GD.ph === 'so' ? `${G.so.goals[0]}–${G.so.goals[1]}` : hkClockText(), 480, 48, F(22, 900), G.clock < 10 && live ? '#ff8a6a' : '#ffd08a', 'center');

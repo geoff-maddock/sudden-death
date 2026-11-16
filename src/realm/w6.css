@@ -449,3 +449,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wccrow button.wgood:not(.on){border-color:#6fae5a}.wccrow button.wpoor:not(.on){border-color:#b8553a}
 .wscoach .wrnow{margin:2px 0 4px 90px;line-height:1.35}
 @media (max-width:640px){.wscoach .wrnow{margin-left:0}}
+/* the rink's powers (w92): the pickers on the Rink tab, and the rows in a game */
+.whpow select{max-width:150px}.whult{display:block;opacity:.8}
+.wrpowbox{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
+.wrpowbox button small{opacity:.75;margin-left:4px}

@@ -5,7 +5,8 @@
    The spots: a centre (C: face-offs and passes), two wings (LW, RW: they shoot), two defenders (LD, RD: they check,
    and shoot from the point) and the goalie (G: reflexes and little else). Any player can play anywhere; phase 1 picks
    the six's spots from the ratings, and phase 4 lets you set them.
-   A team: { name, short, color, light, roster: [{ n, kind, num, r }], spot: { C: ri, ... } }. A roster may be longer
+   A team: { name, short, color, light, roster: [{ n, kind, num, r, pw }], spot: { C: ri, ... } } (pw: which of their
+   kind's two puck powers and two checking powers they bring, 14-powers.js). A roster may be longer
    than six: the rest (up to HK_RULES.bench) sit on the bench. */
 const HK_POS = ['C', 'LW', 'RW', 'LD', 'RD', 'G'];
 const HK_ROLE = { C: 'centre', LW: 'wing', RW: 'wing', LD: 'defender', RD: 'defender', G: 'goalie' };
@@ -31,7 +32,7 @@ const hkSpotOk = (m, n) => !!m && HK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [6 or more kinds] }
 function hkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 4 + i * 9 }))).slice(0, HK_RULES.side + HK_RULES.bench)
-    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}) }));
+    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 } }));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the six's spots: the best reflexes in goal, then the two best defenders, the centre, and the wings
   const free = new Set(roster.slice(0, HK_RULES.side).map((_, i) => i)), by = pos => { const i = [...free].sort((a, b) => hkFit(roster[b].r, pos) - hkFit(roster[a].r, pos))[0]; free.delete(i); return i; };

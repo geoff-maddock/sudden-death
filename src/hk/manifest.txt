@@ -13,3 +13,4 @@ src/hk/parts/10-bench.js
 src/hk/parts/11-calls.js
 src/hk/parts/12-save.js
 src/hk/parts/13-pond.js
+src/hk/parts/14-powers.js

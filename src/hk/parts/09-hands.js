@@ -87,7 +87,10 @@ function hkInput(o) {
     else if (!o.pass && HKI.pass) { HKI.pass = false; if (hkPuckMine() && !GD.meter) r = hkHandPass(HKI.now - HKI.passAt >= HK_HANDS.dump); }
   }
   if (o.act === 'switch') { if (GD.ph === 'live' && !hkPuckMine()) { L.me = hkNearMine(hkMe()); r = 'switch'; } }
-  if (['pull', 'change', 'auto', 'timeout'].includes(o.act)) r = hkBenchAct(o.act);
+  if (['pull', 'change', 'auto', 'timeout', 'autopow'].includes(o.act)) r = hkBenchAct(o.act);
+  // Q: the power of the skater you play, for the moment; R: their ultimate
+  if (o.act === 'power') r = GD.ph === 'live' && !hkCast(GD.you, hkMe()) ? 'power' : '';
+  if (o.act === 'ult') r = GD.ph === 'live' && !hkCastUlt(GD.you, hkMe()) ? 'ult' : '';
   return r;
 }
 function hkInputClear() {
@@ -199,6 +202,7 @@ function hkBenchAct(act) {
   if (act === 'change') return GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
   if (act === 'auto') { GD.auto = !GD.auto; return GD.auto ? 'auto' : 'manual'; }
   if (act === 'timeout') return hkTimeout(GD.you) ? '' : 'timeout';
+  if (act === 'autopow') { GD.autoPow = !GD.autoPow; return GD.autoPow ? 'autopow' : 'handpow'; }
   return '';
 }
 // your goalie, pulled for an extra skater or sent back (G): only in a live play, and not while they hold the puck

@@ -63,5 +63,5 @@ function hkPondShot(side, goal) {
   if (D.run.side === side) D.run.n++; else D.run = { side, n: 1 };
   if (goal || D.run.n >= HK_POND.roar.run) { hkRoar(side); D.run.n = 0; }
 }
-function hkRoar(side) { const D = G.pond; if (!D || D.roar) return; D.roar = { side, t: HK_POND.roar.secs }; hkEv('roar', G.teams[side].name); }
+function hkRoar(side) { const D = G.pond; if (!D || D.roar) return; D.roar = { side, t: HK_POND.roar.secs }; hkEv('roar', G.teams[side].name); hkSpiritEv(side, 'roar'); }
 const hkRoaring = side => !!(G && G.pond && G.pond.roar && G.pond.roar.side === side);

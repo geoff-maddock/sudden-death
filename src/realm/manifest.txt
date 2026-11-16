@@ -125,3 +125,4 @@ src/realm/w88-rink.js
 src/realm/w89-rinksix.js
 src/realm/w90-rinkcall.js
 src/realm/w91-rinkgame.js
+src/realm/w92-rinkpowers.js

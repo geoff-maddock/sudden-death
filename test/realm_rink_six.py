@@ -24,7 +24,7 @@ def check(ok, what, detail=None):
 
 # two clubs of eight: six and two on the bench (roster indices 6 and 7)
 SETUP = """window.__eight = name => ({ name, short: name[0], color: '#3a6ab8', light: '#fff', kinds: ['vampire', 'harpy', 'witch', 'werewolf', 'troll', 'wraith', 'skeleton', 'lich'] });
-window.__game = (seed, o) => { wHK.start(Object.assign({ seed, teams: [__eight('Aces'), __eight('Bears')] }, o || {})); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step(); return wHK.play; };
+window.__game = (seed, o) => { wHK.start(Object.assign({ seed, teams: [__eight('Aces'), __eight('Bears')], powers: false }, o || {})); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step(); return wHK.play; };
 window.__away = (P, keep) => { P.pl.forEach((p, i) => { if (!keep.includes(i)) { p.x = 2.5; p.y = 8.5 - (i % 6) * .2; p.vx = p.vy = 0; } }); };
 window.__put = (P, i, x, y) => { const p = P.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; p.stun = 0; p.cd = 0; p.act = ''; return p; }; 0"""
 

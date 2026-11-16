@@ -110,7 +110,7 @@ function wRinkGame(opts) {
   const o = opts || {};
   WHK = { over: null, how: o.how || 'scrimmage' }; wRinkTick(true);
   $('wRinkTitle').textContent = o.title || 'A scrimmage at the Pond Rink';
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls, pond: o.pond !== false, snow: o.snow == null ? wRinkSnowing() : !!o.snow });
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls, powers: o.powers, autoPow: o.autoPow, auto: o.auto, pond: o.pond !== false, snow: o.snow == null ? wRinkSnowing() : !!o.snow });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }

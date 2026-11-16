@@ -3,7 +3,7 @@
    there). hkResume puts one back at the same beat, on fresh random numbers and with no keys held. There is no save
    point inside the shootout: a game left there comes back at the last whistle before it. */
 const HK_SNAP_AT = ['dead', 'break'];
-const HK_GD_KEEP = ['ph', 't', 'mode', 'you', 'auto', 'msg', 'fo', 'set', 'next', 'deadT', 'delay', 'noChange', 'drew'];
+const HK_GD_KEEP = ['ph', 't', 'mode', 'you', 'auto', 'msg', 'fo', 'set', 'next', 'deadT', 'delay', 'noChange', 'drew', 'autoPow'];
 function hkSnapshot() {
   const gd = {}; for (const k of HK_GD_KEEP) if (GD[k] !== undefined) gd[k] = GD[k];
   return JSON.parse(JSON.stringify({ G, L, GD: gd }));
@@ -16,7 +16,10 @@ function hkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
   hkSeed(null);
   G = s.G; L = s.L;
-  GD = Object.assign({ acc: 0, meter: null, rel: null, press: null, big: null, net: null, so: null, delay: null, noChange: -1 }, s.GD);
+  // (a save point from before powers: none of them, so play goes on as it was)
+  if (!G.mana) Object.assign(G, { powers: false, powOn: [false, false], mana: [0, 0], spirit: [0, 0], fxs: [], marks: [], ultUsed: [false, false], sitUsed: [{}, {}], casts: [] });
+  hkFxNow();
+  GD = Object.assign({ acc: 0, autoPow: true, meter: null, rel: null, press: null, big: null, net: null, so: null, delay: null, noChange: -1 }, s.GD);
   hkInputClear();
   return G;
 }

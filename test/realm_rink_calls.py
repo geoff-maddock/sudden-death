@@ -23,7 +23,7 @@ def check(ok, what, detail=None):
     return ok
 
 SETUP = """window.__eight = name => ({ name, short: name[0], color: '#3a6ab8', light: '#fff', kinds: ['vampire', 'harpy', 'witch', 'werewolf', 'troll', 'wraith', 'skeleton', 'gorgon'] });
-window.__game = (seed, o) => { wHK.start(Object.assign({ seed, teams: [__eight('Aces'), __eight('Bears')] }, o || {})); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step(); return wHK.play; };
+window.__game = (seed, o) => { wHK.start(Object.assign({ seed, teams: [__eight('Aces'), __eight('Bears')], powers: false }, o || {})); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step(); return wHK.play; };
 window.__away = (P, keep) => { P.pl.forEach((p, i) => { if (!keep.includes(i)) { p.x = 2.5; p.y = 8.5 - (i % 6) * .2; p.vx = p.vy = 0; } }); };
 window.__put = (P, i, x, y) => { const p = P.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; p.stun = 0; p.cd = 0; p.act = ''; return p; }; 0"""
 
@@ -74,7 +74,7 @@ async def main():
           return { fore, box, trap, back }; })()""")
         check(f['fore'] < 2.5 and f['box'] > 5, 'a Forecheck goes at the carrier at centre ice; a Box leaves them alone out there', f)
         check(all(16 <= x <= 24 for x in f['trap']) and all(x > 24 for x in f['back']), 'the Trap stands three across the middle of the ice, with two behind them', f)
-        st = await pg.evaluate("""(() => { wHK.setFouls({ trip: .035, hook: .04, board: .3, rough: .02 }); const run = (c, n) => { let hits = 0, pens = 0, sta = 0, m = 0; for (let i = 0; i < n; i++) { const s = wHK.simGame({ seed: 800 + i, teams: [__eight('Aces'), __eight('Bears')], calls: [c, {}] }); hits += s.box[0].tot.hit; pens += s.pens.filter(e => e.side === 0).length; }
+        st = await pg.evaluate("""(() => { wHK.setFouls({ trip: .035, hook: .04, board: .3, rough: .02 }); const run = (c, n) => { let hits = 0, pens = 0, sta = 0, m = 0; for (let i = 0; i < n; i++) { const s = wHK.simGame({ seed: 800 + i, teams: [__eight('Aces'), __eight('Bears')], calls: [c, {}], powers: false }); hits += s.box[0].tot.hit; pens += s.pens.filter(e => e.side === 0).length; }
             const P = __game(9, { calls: [c, {}] }), G = wHK.G; wHK.setFouls({ trip: 0, hook: 0, board: 0, rough: 0 }); wHK.step(30 * 12); const on = G.on[0].slice(0, 5); wHK.setFouls({ trip: .035, hook: .04, board: .3, rough: .02 });
             return { hits, pens, sta: on.reduce((a, i) => a + G.sta[0][i], 0) / 5 }; };
           const s = wHK.simGame({ seed: 3, teams: [__eight('Aces'), __eight('Bears')], calls: [{ att: 'dump', def: 'trap', tempo: 'sit', edge: 'clean' }, {}] });
@@ -132,11 +132,11 @@ async def main():
           return { mode: wHK.mode, on: [...document.querySelectorAll('#wRinkModes button.on')].map(x => x.textContent), pad: document.getElementById('wRinkPad').hidden, labels: rows.map(r => r.querySelector('.wccl').textContent),
             lit: rows.slice(0, 6).map(r => [...r.querySelectorAll('button.on')].map(b => b.textContent)), counts: rows.slice(0, 6).map(r => r.querySelectorAll('button').length), under: top(box) >= document.querySelector('#v-rink canvas').getBoundingClientRect().bottom - 1, above: top(box) < top(document.getElementById('wRinkBox')),
             note: document.getElementById('wRinkNote').textContent, now: document.getElementById('wRinkNow').textContent, rushTip: box.querySelector('[data-rcall="att"][data-rid="rush"]').title, rushCls: box.querySelector('[data-rcall="att"][data-rid="rush"]').className, dumpCls: box.querySelector('[data-rcall="att"][data-rid="dump"]').className,
-            bench: [...rows[6].querySelectorAll('button')].map(b => [b.textContent.trim(), b.disabled]), coach: rows[6].textContent.includes('Their coach: Knight') }; })()""")
+            bench: [...rows[rows.length - 1].querySelectorAll('button')].map(b => [b.textContent.trim(), b.disabled]), coach: rows[rows.length - 1].textContent.includes('Their coach: Knight') }; })()""")
         check(pl == {'rows': True, 'pad': True, 'none': True} and u['mode'] == 'manage' and u['on'] == ['Manage'] and u['pad'] and u['under'] and u['above'] and 'manage' in u['note'],
               'Manage on the bar: the pad goes, and the coach\'s rows sit under the rink, above the box scores (they are there in You play too)', [pl, u])
-        check(u['labels'] == ['With the puck', 'Without it', 'Power play', 'Penalty kill', 'Tempo', 'Edge', 'Bench'] and u['counts'] == [5, 5, 3, 3, 3, 3] and u['lit'] == [['Cycle'], ['Man'], ['Umbrella'], ['Box'], ['Balanced'], ['Balanced']],
-              'the rows: with the puck, without it, power play, penalty kill, Tempo, Edge and the bench, with what is on lit', u)
+        check(u['labels'] == ['With the puck', 'Without it', 'Power play', 'Penalty kill', 'Tempo', 'Edge', 'Powers', 'The big ones', 'Bench'] and u['counts'] == [5, 5, 3, 3, 3, 3] and u['lit'] == [['Cycle'], ['Man'], ['Umbrella'], ['Box'], ['Balanced'], ['Balanced']],
+              'the rows: with the puck, without it, power play, penalty kill, Tempo, Edge, the powers (w92) and the bench, with what is on lit', u)
         check('trap' in u['rushTip'] and 'Poor' in u['rushTip'] and 'wpoor' in u['rushCls'] and 'wgood' in u['dumpCls'] and 'Your Cycle against their Trap' in u['now'] and 'Their Rush against your Man' in u['now'],
               'each button says how it would do against what they are in, and a line says how yours is doing now', u)
         check([b[0] for b in u['bench']] == ['Change now', 'Lines: the coach', 'Timeout (1 left)', 'Pull goalie'] and u['bench'][0][1] is False and u['bench'][2][1] is True and u['coach'], 'the bench row: Change now, who changes your lines, the timeout (at a whistle only) and the goalie, and who their coach is', u)

@@ -977,6 +977,10 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wccrow button.wgood:not(.on){border-color:#6fae5a}.wccrow button.wpoor:not(.on){border-color:#b8553a}
 .wscoach .wrnow{margin:2px 0 4px 90px;line-height:1.35}
 @media (max-width:640px){.wscoach .wrnow{margin-left:0}}
+/* the rink's powers (w92): the pickers on the Rink tab, and the rows in a game */
+.whpow select{max-width:150px}.whult{display:block;opacity:.8}
+.wrpowbox{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
+.wrpowbox button small{opacity:.75;margin-left:4px}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -31301,7 +31305,8 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    The spots: a centre (C: face-offs and passes), two wings (LW, RW: they shoot), two defenders (LD, RD: they check,
    and shoot from the point) and the goalie (G: reflexes and little else). Any player can play anywhere; phase 1 picks
    the six's spots from the ratings, and phase 4 lets you set them.
-   A team: { name, short, color, light, roster: [{ n, kind, num, r }], spot: { C: ri, ... } }. A roster may be longer
+   A team: { name, short, color, light, roster: [{ n, kind, num, r, pw }], spot: { C: ri, ... } } (pw: which of their
+   kind's two puck powers and two checking powers they bring, 14-powers.js). A roster may be longer
    than six: the rest (up to HK_RULES.bench) sit on the bench. */
 const HK_POS = ['C', 'LW', 'RW', 'LD', 'RD', 'G'];
 const HK_ROLE = { C: 'centre', LW: 'wing', RW: 'wing', LD: 'defender', RD: 'defender', G: 'goalie' };
@@ -31327,7 +31332,7 @@ const hkSpotOk = (m, n) => !!m && HK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [6 or more kinds] }
 function hkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 4 + i * 9 }))).slice(0, HK_RULES.side + HK_RULES.bench)
-    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}) }));
+    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 } }));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the six's spots: the best reflexes in goal, then the two best defenders, the centre, and the wings
   const free = new Set(roster.slice(0, HK_RULES.side).map((_, i) => i)), by = pos => { const i = [...free].sort((a, b) => hkFit(roster[b].r, pos) - hkFit(roster[a].r, pos))[0]; free.delete(i); return i; };
@@ -31428,7 +31433,7 @@ function hkNetOut(o, m, e) {
 }
 
 /* ---------- skating ---------- */
-const hkTop = (p, i) => (5.4 + p.r.spd * .42) * hkStaK(p) * (hkOnCrack(p.x, p.y) ? HK_POND.slow : 1) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
+const hkTop = (p, i) => (5.4 + p.r.spd * .42) * hkStaK(p) * hkFx(p.side, 'spd') * hkFx(1 - p.side, 'slow') * (hkOnCrack(p.x, p.y) ? HK_POND.slow : 1) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
 function hkSkate(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(hkTop(p, i), d / .4);
   const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0;
@@ -31482,7 +31487,7 @@ function hkStep(dt) {
   // (the CPU keeps its hands off a skater you are playing)
   else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = (.2 + R() * .2) * hkTempo(L.pl[h].side).think * (hkDim(L.pl[h].side) ? HK_DIM.think : 1); hkThink(h); } }
   hkMeterStep(dt); hkLunge(dt);
-  if (GD.ph === 'live') { hkStaStep(dt); hkCoach(dt); hkChangeStep(); hkPondStep(dt); }
+  if (GD.ph === 'live') { hkStaStep(dt); hkCoach(dt); hkChangeStep(); hkPondStep(dt); hkPowersStep(dt); hkCpuPowers(dt); }
   hkChase();
   L.pl.forEach((p, i) => {
     if (p.off) return;
@@ -31580,7 +31585,7 @@ function hkChecks() {
     const closing = ((d.vx - c.vx) * dx + (d.vy - c.vy) * dy) / (dist || 1);
     // beaten, and reaching from behind: a hook
     if (closing < -.5 && R() < HK_FOUL.hook * hkEdgeSt(d.side).foul) return hkFoul(d, 'hooking', c);
-    if (closing > 3.5 && R() < clamp((.4 + (d.r.siz - 5) * .06) * hkEdgeSt(d.side).hit, .05, .95)) return hkHit(d, c, closing);
+    if (closing > 3.5 && R() < clamp((.4 + (d.r.siz - 5) * .06) * hkEdgeSt(d.side).hit * hkFx(d.side, 'hit') * hkFx(c.side, 'wall'), .03, .97)) return hkHit(d, c, closing);
     return hkPoke(d, c);
   }
 }
@@ -31588,7 +31593,7 @@ function hkChecks() {
 // checker's stick. True when it worked
 function hkPoke(d, c, edge) {
   d.act = 'poke'; d.actT = .25;
-  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side), .04, .6)) {
+  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side) + hkFx(d.side, 'poke') + hkFx(c.side, 'guard'), .03, .65)) {
     hkEv('pokemiss', d.n, c.n);
     // a miss up close can take their skates out: a trip
     if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip * hkEdgeSt(d.side).foul) hkFoul(d, 'tripping', c);
@@ -31607,7 +31612,7 @@ function hkHit(d, c, closing) {
   const dv = hyp(d.vx, d.vy) || 1, behind = (d.vx * c.fx + d.vy * c.fy) / dv > .5, wall = Math.abs(c.y) > HK_RULES.wid / 2 - 2 || c.x < 2.5 || c.x > HK_RULES.len - 2.5;
   const fk = hkEdgeSt(d.side).foul, foul = behind && wall ? (R() < Math.min(.9, HK_FOUL.board * fk) ? 'boarding' : '') : R() < HK_FOUL.rough * fk ? 'roughing' : '';
   if (R() < clamp(.34 + (d.r.siz - c.r.siz) * .045 + (closing - 3) * .04, .08, .8)) {
-    hkBoxAdd(d.side, d.ri, 'hit'); hkEv('hit', d.n, c.n); hkPondHit(d, c, closing);
+    hkBoxAdd(d.side, d.ri, 'hit'); hkEv('hit', d.n, c.n); hkPondHit(d, c, closing); hkSpiritEv(d.side, 'hit');
     c.stun = .7; c.act = 'down'; c.actT = .55; c.vx = c.vx * .3 + d.vx * .4; c.vy = c.vy * .3 + d.vy * .4;
     hkLoose(c.x, c.y, Math.atan2(d.vy, d.vx) + (R() - .5) * 1.6, 3 + R() * 4);
   } else { d.stun = .4; hkEv('hitmiss', d.n, c.n); }
@@ -31677,7 +31682,7 @@ function hkPickup() {
       if (p.side === from.side) { if (i === P.from && P.go < 2) continue; if (i === P.to && P.go > 4) L.oneT = { i, t: L.t }; hkEv('catch', p.n, from.n); hkGain(i, 'pass'); hkHandOneTimer(i); return true; }
       if (P.tried.includes(i)) continue;
       P.tried.push(i);
-      if (R() < clamp((.1 + p.r.def * .03 - (sp - 10) * .012) * (P.x > HK_RULES.blue && P.x < HK_RULES.len - HK_RULES.blue ? hkDefNow(p.side).pick || 1 : 1) + (HKI.lift && hkYoursNow(i) ? .25 : 0), .05, .75)) { hkBoxAdd(p.side, p.ri, 'take'); hkBoxAdd(from.side, from.ri, 'give'); hkEv('pick', p.n, from.n); hkGain(i, 'take'); return true; }
+      if (R() < clamp((.1 + p.r.def * .03 - (sp - 10) * .012) * (P.x > HK_RULES.blue && P.x < HK_RULES.len - HK_RULES.blue ? hkDefNow(p.side).pick || 1 : 1) * hkFx(p.side, 'pick') * hkFx(from.side, 'safe') + (HKI.lift && hkYoursNow(i) ? .25 : 0), .05, .75)) { hkBoxAdd(p.side, p.ri, 'take'); hkBoxAdd(from.side, from.ri, 'give'); hkEv('pick', p.n, from.n); hkGain(i, 'take'); return true; }
     }
     return false;
   }
@@ -31685,7 +31690,7 @@ function hkPickup() {
   if (sp > 15) return false;
   const sides = new Set(near.map(([i]) => L.pl[i].side));
   let win = near.sort((a, b) => a[1] - b[1])[0][0];
-  if (sides.size > 1) { const w = {}; for (const [i, d] of near) { const p = L.pl[i]; w[i] = (p.r.hnd + p.r.siz * .5 + 3) * (1.3 - d) * hkEdgeSt(p.side).battle * (hyp(hkGoalX(p.side) - P.x, P.y) < 6 ? hkAttNow(p.side).reb || 1 : 1); } win = +wpick(w); hkEv('battle', L.pl[win].n); }
+  if (sides.size > 1) { const w = {}; for (const [i, d] of near) { const p = L.pl[i]; w[i] = (p.r.hnd + p.r.siz * .5 + 3) * (1.3 - d) * hkEdgeSt(p.side).battle * hkFx(p.side, 'reb') * (hyp(hkGoalX(p.side) - P.x, P.y) < 6 ? hkAttNow(p.side).reb || 1 : 1); } win = +wpick(w); hkEv('battle', L.pl[win].n); }
   hkGain(win, 'loose'); return true;
 }
 // player i has the puck. A change of sides starts a new line of passes (for the assists)
@@ -31694,7 +31699,7 @@ function hkGain(i, how) {
   Object.assign(P, { st: 'held', h: i, k: '', to: -1, ice: -1, shot: null, tried: [], go: 0, skip: -1 });
   L.wind = null; L.carry = null; L.got = L.t; L.think = .12 + R() * .15;
   if (how !== 'pass') L.oneT = null;
-  if (p.side !== G.poss) { G.poss = p.side; L.touch = []; hkEv('change', how, p.n); }
+  if (p.side !== G.poss) { G.poss = p.side; L.touch = []; hkEv('change', how, p.n); hkFxNow(); }
   if (L.touch[L.touch.length - 1] !== i) { L.touch.push(i); if (L.touch.length > 3) L.touch.shift(); }
   // (a side with a penalty coming has touched it: the whistle, 07-game.js)
   hkTouched(p.side);
@@ -31732,20 +31737,21 @@ function hkSend(ux, uy) {
 function hkShotOdds(p, kind, x, y) {
   const gx = hkGoalX(p.side), dir = hkDir(p.side), dx = (gx - x) * dir, dist = hyp(dx, y), ang = Math.atan2(Math.abs(y), Math.max(.01, dx));
   if (dx < .4) return { ok: false, dist, ang, miss: 1, q: 0, set: 1, screen: false, block: null, blockP: 0 };
-  const g = L.pl[hkGk(1 - p.side)], inNet = hkInNet(1 - p.side), set = inNet ? hkSet(g, x, y) : 0, sh = p.r.sht;
+  // (a power can hide the shot from their goalie: set, but for somewhere else)
+  const g = L.pl[hkGk(1 - p.side)], inNet = hkInNet(1 - p.side), set = inNet ? hkSet(g, x, y) * hkFx(p.side, 'blind') : 0, sh = p.r.sht;
   // a teammate standing in front of the goalie hides it
   const screen = inNet && hkSk(p.side).some(q => q !== p && hyp(q.x - g.x, q.y - g.y) < 2.2 && (q.x - g.x) * dir < 0);
   let block = null, blockP = 0;
   for (const d of hkSk(1 - p.side)) {
     if (d.stun > 0) continue;
     const ax = gx - x, ay = -y, len = hyp(ax, ay) || 1, s = ((d.x - x) * ax + (d.y - y) * ay) / (len * len); if (s < .08 || s > .88) continue;
-    if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp((.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0)) * (hkDefNow(d.side).block || 1), .1, .7); }
+    if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp((.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0)) * (hkDefNow(d.side).block || 1) * hkFx(d.side, 'block'), .1, .8); }
   }
   const tired = clamp(1 - hkSta(p) / .6, 0, 1);
-  const miss = clamp(.2 + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
+  const miss = clamp(.2 + hkFx(p.side, 'miss') + hkFx(1 - p.side, 'wild') + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
   let q = .09 - tired * .025 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
   // (the calls: this side's system against theirs, less what their scout has read; a one-timer in the Overload)
-  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? hkAttNow(p.side).one || 0 : 0) + (hkRoaring(p.side) ? HK_POND.roar.q : 0); else q = .97;
+  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? (hkAttNow(p.side).one || 0) + hkFx(p.side, 'one') : 0) + (hkRoaring(p.side) ? HK_POND.roar.q : 0) + hkFx(p.side, 'shot') - hkFx(1 - p.side, 'save'); else q = .97;
   return { ok: true, dist, ang, miss, q: clamp(q, .02, .97), set, screen, block, blockP };
 }
 // the carrier shoots: a slap shot winds up first (and can be poked off it), the others go now
@@ -31792,9 +31798,9 @@ function hkShotLands() {
   hkBoxAdd(p.side, p.ri, 'att');
   if (S.res === 'miss') { hkEv('wide', p.n); P.k = 'loose'; P.shot = null; return; }
   G.sog[S.side]++; hkBoxAdd(p.side, p.ri, 'sog'); if (!hkShort(S.side) && !hkShort(1 - S.side)) G.sysLog[S.side][G.call[S.side].att].sog++; if (!S.en) hkBoxAdd(g.side, g.ri, 'sa');
-  hkPondShot(S.side, S.res === 'goal');
+  hkPondShot(S.side, S.res === 'goal'); hkSpiritEv(S.side, S.res === 'goal' ? 'goal' : 'sog');
   if (S.res === 'goal') return hkGoalScored(S);
-  hkBoxAdd(g.side, g.ri, 'sv'); g.act = 'save'; g.actT = .35;
+  hkBoxAdd(g.side, g.ri, 'sv'); hkSpiritEv(g.side, 'save'); g.act = 'save'; g.actT = .35;
   if (S.res === 'hold') { hkEv('save', g.n, p.n); return hkGain(gi, 'save'); }
   hkEv('rebound', g.n, p.n);
   // off the pads and out in front, somewhere across the slot
@@ -31944,10 +31950,10 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
   hkInputClear();
   hkLines(); hkFaceoffSpots(HK_RULES.len / 2, 0).forEach(([x, y], i) => { const p = L.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; });
   GD.fo = { x: HK_RULES.len / 2, y: 0 }; hkPuckAt(GD.fo.x, GD.fo.y);
@@ -32109,6 +32115,7 @@ function hkGoalScored(S) {
   const r = hkGoal(S.side), as = S.touch.filter(i => i !== S.i && L.pl[i].side === S.side).reverse().slice(0, 2).map(i => L.pl[i]);
   hkBoxAdd(S.side, p.ri, 'g'); for (const a of as) hkBoxAdd(S.side, a.ri, 'a');
   if (str === 'even') G.sysLog[S.side][G.call[S.side].att].g++;
+  hkManaAdd(1 - S.side, HK_MANA.scored);
   G.log.push({ p: G.p, clock: Math.round(G.clock * 10) / 10, side: S.side, who: p.n, ri: p.ri, k: S.kind, a: as.map(a => a.n), str, en: !!S.en });
   hkEv('goal', p.n, S.kind);
   const how = S.en ? 'scores into the empty net' : S.kind === 'one' ? 'one-times it in' : S.kind === 'slap' ? `scores with a slap shot from ${S.dist} metres` : 'scores';
@@ -32145,8 +32152,8 @@ function hkPeriodOver() {
   GD.msg = r === 'ot' ? `Level at ${G.score[0]} after three periods. Sudden death: the next goal wins.` : `End of the ${hkPeriodName(was)}: ${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}.`;
   // (a penalty that was coming when the period ended is served from the start of the next)
   if (GD.delay) hkPenaltyCall(true);
-  // everyone rests between periods, and the ice is scraped
-  hkChangeWhistle(-1, true); hkPondBreak();
+  // everyone rests between periods, the ice is scraped, and both sides get a mana
+  hkChangeWhistle(-1, true); hkPondBreak(); for (const s of [0, 1]) hkManaAdd(s, HK_MANA.brk);
   hkGo('break');
 }
 /* ---------- the shootout ---------- */
@@ -32207,7 +32214,7 @@ function hkEnd() {
 function hkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function hkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, p: G.p, ot: G.over ? G.over.ot : 0, so: !!(G.over && G.over.so), mins: G.mins,
-    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
+    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), casts: (G.casts || []).slice(), mana: (G.mana || [0, 0]).slice(), spirit: (G.spirit || [0, 0]).map(Math.round), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function hkBox() {
@@ -32280,6 +32287,7 @@ function hkDraw(c) {
   c.translate(-HKC.left * HKC.k, HK_CAM.fy * (1 - HKC.k)); c.scale(HKC.k, HKC.k);
   hkDrawBack(c, dens);
   hkDrawPond(c);
+  hkDrawMarks(c);
   hkDrawNets(c);
   hkDrawPlayers(c);
   hkDrawPuck(c);
@@ -32384,6 +32392,15 @@ function hkDrawPond(c) {
     c.fillStyle = 'rgba(30,60,80,.25)'; c.beginPath(); c.ellipse(p.x, p.y, r * .3, r * .22, 0, 0, Math.PI * 2); c.fill(); }
   c.restore();
 }
+// the marks ultimates leave on the ice: a ring in the caster's colour, pulsing, with the power's name
+function hkDrawMarks(c) {
+  for (const m of G.marks || []) {
+    const p = hkScr(m.x, m.y), T = G.teams[m.side], k = 1 + Math.sin(HKT.t * 4) * .06;
+    c.save(); c.globalAlpha = .22; c.fillStyle = T.color; c.beginPath(); c.ellipse(p.x, p.y, m.r * HK_PX * k, m.r * HK_PY * k, 0, 0, Math.PI * 2); c.fill();
+    c.globalAlpha = .9; c.strokeStyle = T.light || '#fff'; c.lineWidth = 2; c.setLineDash([6, 5]); c.lineDashOffset = -HKT.t * 20; c.stroke(); c.restore();
+    txt(c, m.n, p.x, p.y + 4, `800 11px ${HK_FONT}`, 'rgba(20,34,46,.85)', 'center');
+  }
+}
 // the nets: red posts and a white mesh, from each goal line back
 function hkDrawNets(c) {
   for (const [x0, x1, y0, y1] of hkNets()) {
@@ -32485,9 +32502,10 @@ function hkDrawBig(c) {
   if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}${G.over && G.over.so ? ' (shootout)' : G.over && G.over.ot ? ' (sudden death)' : ''}`; }
   else if (GD.ph === 'so' && !GD.so.cur && !G.so.tries[0] && !G.so.tries[1]) { word = 'SHOOTOUT'; sub = `${HK_RULES.so} tries each, then one each until it's settled.`; }
   else if (GD.ph === 'break') { word = hkOt() ? 'SUDDEN DEATH' : `END OF THE ${hkPeriodName(G.p - 1).toUpperCase()}`; if (hkOt()) sub = 'Three skaters a side. The next goal wins.'; }
-  else if (GD.big && HK_BIG[GD.big.k]) {
+  else if (GD.big && (HK_BIG[GD.big.k] || GD.big.w)) {
     if (GD.big.at == null) GD.big.at = HKT.t;
-    const [w, cl, len] = HK_BIG[GD.big.k], a = HKT.t - GD.big.at; if (a > len) { GD.big = null; return; }
+    // (a power's own name, in its colour: an ultimate in gold)
+    const [w, cl, len] = GD.big.w ? [GD.big.w.toUpperCase(), GD.big.k === 'ult' ? '#ffd08a' : '#bfe0ff', GD.big.k === 'ult' ? 1.6 : 1.1] : HK_BIG[GD.big.k], a = HKT.t - GD.big.at; if (a > len) { GD.big = null; return; }
     word = w; col = cl; al = Math.min(1, a * 5, (len - a) * 2.5); sc = 1 + Math.max(0, .25 - a) * 1.6;
   }
   if (!word) return;
@@ -32509,7 +32527,18 @@ function hkDrawHud(c) {
     txt(c, `Shots ${G.sog[s]}${empty ? ' · empty net' : ''}`, X(40), 49, F(12, 600), empty ? '#ffb070' : dim, al);
     txt(c, String(G.score[s]), X(398), 47, F(40, 900), has ? T.light || '#fff' : '#f3ead6', 'center');
     if (has) { c.fillStyle = T.color; c.fillRect(X(398) - 16, 53, 32, 4); }
+    // mana (a diamond each, whole ones lit) and the roar (the bank's spirit, gold when it will pay for an ultimate)
+    if (G.powers) {
+      txt(c, 'Mana', X(150), 49, F(11, 600), dim, al);
+      for (let i = 0; i < HK_MANA.max; i++) { const x = X(186 + i * 11) + (s ? -4 : 0), on = i < Math.floor(G.mana[s] + 1e-9); c.save(); c.translate(x + 4, 45); c.rotate(Math.PI / 4); c.fillStyle = on ? '#7fd4ff' : '#2a2420'; c.fillRect(-3.2, -3.2, 6.4, 6.4); c.restore(); }
+      txt(c, 'Roar', X(262), 49, F(11, 600), dim, al);
+      const bx = s ? 960 - 292 - 56 : 292, w = 56 * clamp(G.spirit[s] / HK_SPIRIT.max, 0, 1);
+      c.fillStyle = '#2a2420'; c.fillRect(bx, 41, 56, 7); c.fillStyle = G.spirit[s] >= HK_SPIRIT.ult && !G.ultUsed[s] ? '#ffd08a' : '#c98a4a'; c.fillRect(s ? bx + 56 - w : bx, 41, w, 7);
+    }
   }
+  // what each side has going: a power's name and the seconds it has left, under its end of the bar
+  for (const s of [0, 1]) { let k = 0; for (const e of G.fxs || []) { if (e.side !== s) continue; const t = `${e.n} ${e.id === 'manup' || e.id === 'killit' ? '' : Math.ceil(e.t)}`.trim(); c.save(); c.font = F(11, 700); const w = c.measureText(t).width + 14, x = s ? 960 - 20 - w : 20, y = 66 + k * 20;
+    rr(c, x, y, w, 17, 4); c.fillStyle = e.k === 'ult' ? '#8a6420' : '#23425e'; c.fill(); c.restore(); txt(c, t, x + w / 2, y + 12.5, F(11, 700), '#fff', 'center'); k++; } }
   c.save(); rr(c, 436, 8, 88, 48, 6); c.fillStyle = '#1c1512'; c.fill(); c.restore();
   txt(c, GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), 480, 25, F(12, 700), dim, 'center');
   txt(c, GD.ph === 'so' ? `${G.so.goals[0]}–${G.so.goals[1]}` : hkClockText(), 480, 48, F(22, 900), G.clock < 10 && live ? '#ff8a6a' : '#ffd08a', 'center');
@@ -32627,7 +32656,10 @@ function hkInput(o) {
     else if (!o.pass && HKI.pass) { HKI.pass = false; if (hkPuckMine() && !GD.meter) r = hkHandPass(HKI.now - HKI.passAt >= HK_HANDS.dump); }
   }
   if (o.act === 'switch') { if (GD.ph === 'live' && !hkPuckMine()) { L.me = hkNearMine(hkMe()); r = 'switch'; } }
-  if (['pull', 'change', 'auto', 'timeout'].includes(o.act)) r = hkBenchAct(o.act);
+  if (['pull', 'change', 'auto', 'timeout', 'autopow'].includes(o.act)) r = hkBenchAct(o.act);
+  // Q: the power of the skater you play, for the moment; R: their ultimate
+  if (o.act === 'power') r = GD.ph === 'live' && !hkCast(GD.you, hkMe()) ? 'power' : '';
+  if (o.act === 'ult') r = GD.ph === 'live' && !hkCastUlt(GD.you, hkMe()) ? 'ult' : '';
   return r;
 }
 function hkInputClear() {
@@ -32739,6 +32771,7 @@ function hkBenchAct(act) {
   if (act === 'change') return GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
   if (act === 'auto') { GD.auto = !GD.auto; return GD.auto ? 'auto' : 'manual'; }
   if (act === 'timeout') return hkTimeout(GD.you) ? '' : 'timeout';
+  if (act === 'autopow') { GD.autoPow = !GD.autoPow; return GD.autoPow ? 'autopow' : 'handpow'; }
   return '';
 }
 // your goalie, pulled for an extra skater or sent back (G): only in a live play, and not while they hold the puck
@@ -32799,7 +32832,7 @@ function hkStaStep(dt) {
     if (p.off || (p.pos === 'G' && !p.pulled)) continue;
     const top = 5.4 + p.r.spd * .42, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
     // (a pushed Tempo tires them, and so does a system that chases, while they are without the puck)
-    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1);
+    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire');
     G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * tire * dt);
   }
   if (!hkShort(0) && !hkShort(1)) G.sysLog[G.poss][G.call[G.poss].att].t += dt;
@@ -33028,7 +33061,7 @@ function hkCpuTimeout() {
    there). hkResume puts one back at the same beat, on fresh random numbers and with no keys held. There is no save
    point inside the shootout: a game left there comes back at the last whistle before it. */
 const HK_SNAP_AT = ['dead', 'break'];
-const HK_GD_KEEP = ['ph', 't', 'mode', 'you', 'auto', 'msg', 'fo', 'set', 'next', 'deadT', 'delay', 'noChange', 'drew'];
+const HK_GD_KEEP = ['ph', 't', 'mode', 'you', 'auto', 'msg', 'fo', 'set', 'next', 'deadT', 'delay', 'noChange', 'drew', 'autoPow'];
 function hkSnapshot() {
   const gd = {}; for (const k of HK_GD_KEEP) if (GD[k] !== undefined) gd[k] = GD[k];
   return JSON.parse(JSON.stringify({ G, L, GD: gd }));
@@ -33041,7 +33074,10 @@ function hkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
   hkSeed(null);
   G = s.G; L = s.L;
-  GD = Object.assign({ acc: 0, meter: null, rel: null, press: null, big: null, net: null, so: null, delay: null, noChange: -1 }, s.GD);
+  // (a save point from before powers: none of them, so play goes on as it was)
+  if (!G.mana) Object.assign(G, { powers: false, powOn: [false, false], mana: [0, 0], spirit: [0, 0], fxs: [], marks: [], ultUsed: [false, false], sitUsed: [{}, {}], casts: [] });
+  hkFxNow();
+  GD = Object.assign({ acc: 0, autoPow: true, meter: null, rel: null, press: null, big: null, net: null, so: null, delay: null, noChange: -1 }, s.GD);
   hkInputClear();
   return G;
 }
@@ -33110,21 +33146,262 @@ function hkPondShot(side, goal) {
   if (D.run.side === side) D.run.n++; else D.run = { side, n: 1 };
   if (goal || D.run.n >= HK_POND.roar.run) { hkRoar(side); D.run.n = 0; }
 }
-function hkRoar(side) { const D = G.pond; if (!D || D.roar) return; D.roar = { side, t: HK_POND.roar.secs }; hkEv('roar', G.teams[side].name); }
+function hkRoar(side) { const D = G.pond; if (!D || D.roar) return; D.roar = { side, t: HK_POND.roar.secs }; hkEv('roar', G.teams[side].name); hkSpiritEv(side, 'roar'); }
 const hkRoaring = side => !!(G && G.pond && G.pond.roar && G.pond.roar.side === side);
+/* Black Ice: monster powers (issue #83, phase 7), as on the court, adapted to play that never stops.
+   - Team mana (G.mana, by side): HK_MANA.start to begin, up to HK_MANA.max; a side gets HK_MANA.scored each time it
+     is scored on, and both get HK_MANA.brk at each break between periods.
+   - Everyday powers: every kind has a puck power and a checking power (HK_POW), and a second of each (HK_POW2); a
+     player brings one of each pair (m.pw: { puck, chk }, 0 or 1; picked on the Rink tab). A skater on the ice casts
+     theirs in live play: the puck power while their side has the puck, the checking power while it doesn't. It costs
+     mana, and stamina from the caster (HK_POW_STA; a skater below HK_POW_STA.min can't), and lasts HK_POW_SECS seconds
+     of play. A side has one everyday power going at a time.
+   - Spirit (G.spirit, by side, 0 to HK_SPIRIT.max): the bank's roar fills it on shots on goal, hits, saves and goals,
+     and on the Pond Rink's own roar. It pays for the ultimate (HK_SPIRIT.ult), or lifts a spent line for one more
+     shift (HK_SPIRIT.lift, spent by itself when the skaters on the ice are spent and nobody fresh is waiting).
+   - The ultimate: one per kind (HK_ULT), once a game per side, for spirit, no mana. It leaves a mark on the ice
+     (G.marks) for HK_ULT_SECS seconds of play; while it lasts its side has one set of effects with the puck (o) and
+     another without it (d).
+   - Situation powers (HK_SIT), the team's, once a game each, for mana, when the moment fits: Man up (on the power
+     play), Kill it (a skater short), Empty net (your goalie pulled: the skaters on the ice get their legs back) and
+     Sudden death (overtime: everyone fresh).
+   - Who casts: the CPU by its skill (a Squire now and then at random; a Knight when the puck is in the right end,
+     what suits its system first, keeping a mana back early; an Archmage only then, and saving spirit for a close
+     finish or when behind); your side the same way under Auto powers (GD.autoPow, on unless you turn it off), or the
+     power you press.
+   - On the ice every power is one set of effects (HK_FX0), merged for each side from what it has going (hkFxMerge:
+     multipliers multiply, the rest add). hkFx(side, k) reads it.
+   G.fxs: [{ side, k: 'pow' | 'ult' | 'sit', id, n, ri, t, role }], what is going now. G.casts: every cast, for the
+   line and the lab. The superstars' ratings and powers are added after these parts load (src/realm/rink/k0-stars.js). */
+const HK_MANA = { start: 3, max: 6, scored: 1, brk: 2 };
+const HK_POW_STA = { min: .25, base: .06, per: .04, ult: .18 };
+const HK_POW_SECS = 10, HK_ULT_SECS = 16;
+const HK_SPIRIT = { max: 100, ult: 60, lift: 25, liftSta: .3, sog: 4, hit: 6, save: 3, goal: 15, roar: 12 };
+/* the effects at none. Added: shot (this side's shots beat the goalie more), miss (they miss the net more: negative is
+   truer), one (its one-timers), save (their shots beat this side's goalie less), wild (their shots miss more), guard
+   (pokes at this side's carrier: negative is safer), poke (this side's pokes). Multiplied: spd (this side's speed),
+   slow (theirs), safe (how often this side's passes are picked off), pick (how often it picks theirs off), hit (its
+   body checks land), wall (theirs land on its carrier), block (its shot blocks), reb (loose pucks it wins), tire (how
+   fast it tires), blind (how well their goalie is set for its shots). */
+const HK_FX0 = { shot: 0, miss: 0, one: 0, save: 0, wild: 0, guard: 0, poke: 0, spd: 1, slow: 1, safe: 1, pick: 1, hit: 1, wall: 1, block: 1, reb: 1, tire: 1, blind: 1 };
+const HK_FX_MUL = new Set(['spd', 'slow', 'safe', 'pick', 'hit', 'wall', 'block', 'reb', 'tire', 'blind']);
+const hkP = (id, n, cost, fits, desc, fx) => ({ id, n, cost, fits, desc, fx });
+// fits: the systems a power suits (with the puck: an HK_ATT id; without it: an HK_DEF id; 'any')
+// everyday powers by kind: [puck, checking]
+const HK_POW = {
+  goblin: [hkP('string', 'Puck on a String', 1, 'cycle', 'Quick hands: the puck is much harder to poke away, and passes get through.', { guard: -.08, safe: .6 }), hkP('pickpocket', 'Pickpocket', 1, 'fore', 'Quick fingers: pokes come off far more often.', { poke: .08 })],
+  kobold: [hkP('ember', 'Ember Shot', 1, 'point', 'A puck with a coal in it: every shot a little harder to stop.', { shot: .03 }), hkP('firebreath', 'Fire Breath', 1, 'fore', 'A breath of fire in their faces: they are slower, and easier to poke.', { slow: .93, poke: .03 })],
+  werewolf: [hkP('stride', 'Wolf Stride', 1, 'rush', 'On all fours: your skaters are a tenth faster.', { spd: 1.1 }), hkP('pounce', 'Pounce', 1, 'fore', 'The pack closes: faster, and their checks land more.', { spd: 1.07, hit: 1.3 })],
+  dwarf: [hkP('hammer', 'Hammer Shot', 1, 'point', 'Hard hands, true aim: shots miss the net less, and beat the goalie a little more.', { miss: -.04, shot: .02 }), hkP('shieldline', 'Shield Line', 1, 'box', 'Shields in the shooting lanes: half again the blocks.', { block: 1.5 })],
+  ogre: [hkP('bulldoze', 'Bulldoze', 1, 'crash', 'Through them like a cart: checks bounce off your carrier, and loose pucks in front are yours.', { wall: .4, reb: 1.3 }), hkP('smother', 'Smother', 2, 'collapse', 'A wall of ogre in front of your net: their shots stopped more, and blocked more.', { save: .03, block: 1.25 })],
+  minotaur: [hkP('bullrush', 'Bull Rush', 1, 'rush', 'Horns down: faster, and hard to knock off the puck.', { spd: 1.07, wall: .5 }), hkP('gore', 'Gore', 1, 'man', 'Horns up: body checks land far more often.', { hit: 1.6 })],
+  troll: [hkP('longreach', 'Long Reach', 1, 'crash', 'Arms like oars: loose pucks and rebounds are yours.', { reb: 1.6 }), hkP('regen', 'Regenerate', 1, 'any', 'Troll blood: your skaters tire much slower.', { tire: .5 })],
+  golem: [hkP('standing', 'Standing Stone', 1, 'point', 'A boulder in front of their goalie: they cannot see the shot.', { blind: .75 }), hkP('crease', 'Stand in the Crease', 2, 'box', 'The golem fills the net: their shots are stopped far more.', { save: .05 })],
+  harpy: [hkP('endtoend', 'End to End', 1, 'rush', 'Nobody catches her: your skaters are much faster.', { spd: 1.15 }), hkP('swoop', 'Swoop', 1, 'trap', 'Down on every pass from above: far more are picked off.', { pick: 1.6 })],
+  elf: [hkP('trueaim', 'True Aim', 1, 'cycle', 'Every shot on the net, and a little better.', { miss: -.06, shot: .02 }), hkP('eagleeye', 'Eagle Eye', 1, 'trap', 'Reads every pass: half again as many picked off.', { pick: 1.5 })],
+  wraith: [hkP('phase', 'Phase', 1, 'rush', 'Through a check like smoke: body checks hardly ever land, and pokes miss more.', { wall: .2, guard: -.04 }), hkP('chill', 'Chill Touch', 1, 'trap', 'A cold hand on every skater: they are a tenth slower.', { slow: .9 })],
+  vampire: [hkP('mesmer', 'Mesmerize', 1, 'cycle', 'Their goalie follows the wrong thing: set late for every shot.', { blind: .7 }), hkP('drain', 'Drain', 1, 'man', 'Feeds on them: they are a little slower, and yours tire slower.', { slow: .94, tire: .7 })],
+  lich: [hkP('telekinesis', 'Telekinesis', 1, 'cycle', 'The puck is guided: passes are hardly picked off, and one-timers are better.', { safe: .4, one: .03 }), hkP('frost', 'Frost', 1, 'collapse', 'A frost on the ice: they are an eighth slower.', { slow: .88 })],
+  zombie: [hkP('relentless', 'Relentless', 1, 'dump', 'They keep coming: loose pucks are theirs, and they hardly tire.', { reb: 1.4, tire: .6 }), hkP('horde', 'Horde', 1, 'collapse', 'Bodies everywhere: more blocks, and more checks land.', { block: 1.3, hit: 1.2 })],
+  gorgon: [hkP('stare', 'Stare', 2, 'any', 'Their goalie freezes for the length of a wind-up: hardly set at all.', { blind: .5 }), hkP('glance', 'Stone Glance', 1, 'box', 'A look that stiffens the shooter: their shots beat your goalie less.', { save: .04 })],
+  spider: [hkP('silk', 'Silk Pass', 1, 'cycle', 'A thread on every pass: almost none are picked off.', { safe: .3 }), hkP('web', 'Web', 1, 'trap', 'Threads across the ice: they are slower, and passes stick.', { slow: .92, pick: 1.3 })],
+  skeleton: [hkP('rattle', 'Rattle Shot', 1, 'crash', 'It rattles in off anything: shots are truer and a little harder to stop.', { shot: .025, miss: -.03 }), hkP('boneblock', 'Bone Block', 1, 'box', 'Rattling shins in every lane: far more blocks.', { block: 1.7 })],
+  witch: [hkP('blackice', 'Black Ice', 1, 'rush', 'A patch with no grip at all under their skates: they are an eighth slower.', { slow: .88 }), hkP('hex', 'Hex', 1, 'any', 'A word on their sticks: their shots miss the net more.', { wild: .06 })],
+};
+// the second of each: [puck, checking]
+const HK_POW2 = {
+  goblin: [hkP('scamper', 'Scamper', 1, 'rush', 'Under everybody\'s reach: faster, and safer on the puck.', { spd: 1.06, guard: -.04 }), hkP('anklebite', 'Ankle Biter', 1, 'man', 'Underfoot everywhere: they are slower, and pokes come off more.', { slow: .95, poke: .04 })],
+  kobold: [hkP('sling', 'Sling Pass', 1, 'cycle', 'Passes zip: half as many are picked off.', { safe: .5 }), hkP('smoke', 'Smoke', 1, 'collapse', 'Smoke in front of your net: their shots miss more.', { wild: .05 })],
+  werewolf: [hkP('howl', 'Howl', 1, 'crash', 'The pack answers: loose pucks are yours, and your skaters tire slower.', { reb: 1.3, tire: .75 }), hkP('hunt', 'Hunt', 1, 'trap', 'They read where it is going: more passes picked off, more pokes.', { pick: 1.3, poke: .03 })],
+  dwarf: [hkP('anvil', 'Anvil', 1, 'crash', 'Planted in front: cannot be moved off the puck, and wins what comes loose.', { wall: .4, reb: 1.25 }), hkP('ironwall', 'Iron Wall', 2, 'collapse', 'A dwarf in every lane and one in the crease: blocks and saves both.', { block: 1.3, save: .03 })],
+  ogre: [hkP('cannon', 'Cannon', 2, 'point', 'The hardest shot on the pond: every shot beats the goalie more.', { shot: .05 }), hkP('crush', 'Crush', 1, 'man', 'Every check is a wall falling on them.', { hit: 1.7 })],
+  minotaur: [hkP('charge', 'Charge', 1, 'crash', 'Head down to the net: nothing knocks them off it, and the rebound is theirs.', { wall: .3, reb: 1.2 }), hkP('pin', 'Pin', 1, 'box', 'Pinned on the boards: they are slower, and blocks come easier.', { slow: .94, block: 1.2 })],
+  troll: [hkP('club', 'Club Shot', 1, 'point', 'A swing like a falling tree: shots beat the goalie more, and miss a little more.', { shot: .045, miss: .03 }), hkP('bridge', 'Bridge Toll', 1, 'trap', 'Nothing crosses the middle free: more picked off, more checks.', { pick: 1.3, hit: 1.2 })],
+  golem: [hkP('roll', 'Rolling Stone', 1, 'dump', 'Slow to start and impossible to stop: checks bounce off.', { wall: .2 }), hkP('gravel', 'Gravel', 1, 'trap', 'Grit thrown on the ice: they are a tenth slower.', { slow: .9 })],
+  harpy: [hkP('dive', 'Dive', 1, 'crash', 'In from above: one-timers are much better.', { one: .05 }), hkP('shriek', 'Shriek', 1, 'fore', 'A cry in the carrier\'s ear: pokes come off more, and their shots miss more.', { poke: .05, wild: .03 })],
+  elf: [hkP('threadneedle', 'Thread the Needle', 1, 'cycle', 'A pass through anything, onto the tape: fewer picked off, better one-timers.', { safe: .5, one: .04 }), hkP('longstick', 'Long Stick', 1, 'box', 'A reach into every lane: more blocks, more pokes.', { block: 1.3, poke: .03 })],
+  wraith: [hkP('haunt', 'Haunt', 1, 'cycle', 'Their goalie keeps looking behind him: set late.', { blind: .75 }), hkP('fade', 'Fade', 1, 'collapse', 'There and not there: their shots miss more, and yours tire slower.', { wild: .04, tire: .8 })],
+  vampire: [hkP('bat', 'Bat Wing', 1, 'rush', 'A glide nobody matches: faster, and harder to check.', { spd: 1.08, wall: .7 }), hkP('thrall', 'Thrall', 2, 'man', 'The shooter hesitates: their shots beat your goalie much less.', { save: .05 })],
+  lich: [hkP('curse', 'Cursed Puck', 1, 'point', 'It swerves late: the goalie is set for where it was.', { blind: .78, shot: .01 }), hkP('ward', 'Ward', 1, 'box', 'A circle round your net: their shots are stopped more.', { save: .035 })],
+  zombie: [hkP('shamble', 'Shamble', 1, 'dump', 'Slow, and never off the puck: pokes and checks both fail more.', { guard: -.05, wall: .6 }), hkP('grasp', 'Grasp', 1, 'man', 'Hands on everything: more pokes come off, more passes stick.', { poke: .05, pick: 1.2 })],
+  gorgon: [hkP('serpent', 'Serpent Shot', 1, 'cycle', 'It finds the gap: shots are truer and beat the goalie more.', { miss: -.03, shot: .03 }), hkP('petrifypuck', 'Stone Legs', 1, 'trap', 'Their legs go heavy: an eighth slower.', { slow: .88 })],
+  spider: [hkP('eightarms', 'Eight Arms', 1, 'crash', 'A hand for every loose puck: rebounds are yours, and nothing pokes it away.', { reb: 1.5, guard: -.04 }), hkP('snare', 'Snare', 1, 'box', 'A net in front of the net: more blocks, and their shots are stopped more.', { block: 1.4, save: .02 })],
+  skeleton: [hkP('quickrelease', 'Quick Release', 1, 'rush', 'Gone before the goalie moves: set late for it.', { blind: .8, shot: .015 }), hkP('scatter', 'Scatter', 1, 'fore', 'Falls apart under a check and gets up behind it: pokes come off more, and they hardly tire.', { poke: .04, tire: .75 })],
+  witch: [hkP('broom', 'Broomstick', 1, 'cycle', 'A stick with ideas of its own: passes and one-timers both better.', { safe: .6, one: .035 }), hkP('fog', 'Fog', 1, 'collapse', 'They cannot see the net: their shots miss much more.', { wild: .08 })],
+};
+// the ultimates: { id, n, desc, o (with the puck), d (without it), at: where the mark goes ('crease': your net, 'slot': their slot, 'mid') }
+const hkU0 = (id, n, desc, o, d, at) => ({ id, n, desc, o: o || {}, d: d || {}, at: at || 'mid' });
+const HK_ULT = {
+  goblin: hkU0('swarm', 'Swarm', 'Goblins everywhere: nobody takes the puck off you, and you take it off everybody.', { guard: -.1, safe: .5 }, { poke: .1 }),
+  kobold: hkU0('bonfire', 'Bonfire', 'A fire at centre ice: they skate round it slowly, and your shots carry its heat.', { shot: .03 }, { slow: .86 }),
+  werewolf: hkU0('fullmoon', 'Full Moon', 'The moon comes out: your skaters are an eighth faster, with or without the puck.', { spd: 1.12 }, { spd: 1.12, hit: 1.3 }),
+  dwarf: hkU0('forgewall', 'Forge Wall', 'An iron wall across your slot: blocks nearly doubled, and what gets through is stopped more.', {}, { block: 1.8, save: .03 }, 'crease'),
+  ogre: hkU0('earthshaker', 'Earthshaker', 'The pond shakes: your checks flatten everything, and nothing moves your carrier.', { wall: .3 }, { hit: 2 }),
+  minotaur: hkU0('stampede', 'Stampede', 'The whole line with its head down: faster and unstoppable going in, heavy coming back.', { spd: 1.1, wall: .3 }, { hit: 1.5 }),
+  troll: hkU0('thickhide', 'Thick Hide', 'Nothing hurts and nothing tires: your skaters barely tire, and win every loose puck.', { tire: .4, reb: 1.5 }, { tire: .4, reb: 1.5 }),
+  golem: hkU0('rampart', 'Rampart', 'A rampart of stone in your crease: their shots are stopped far more.', {}, { save: .08 }, 'crease'),
+  harpy: hkU0('tailwind', 'Tailwind', 'A wind at your backs: much faster with the puck, and passes ride it.', { spd: 1.18, safe: .7 }, { spd: 1.06 }),
+  elf: hkU0('moonlit', 'Moonlit Ice', 'Every line on the ice is clear to you: shots on the net, and better.', { miss: -.08, shot: .03 }, { pick: 1.3 }, 'slot'),
+  wraith: hkU0('fogbank', 'Fog Bank', 'Fog rolls over their end: their goalie can\'t find the puck, and their own shots go astray.', { blind: .6 }, { wild: .06 }, 'slot'),
+  vampire: hkU0('eclipse', 'Eclipse', 'The light goes: their goalie is set late for everything.', { blind: .5 }, { slow: .94 }, 'slot'),
+  lich: hkU0('deepfreeze', 'Deep Freeze', 'The cold comes down: they are a fifth slower.', {}, { slow: .8 }),
+  zombie: hkU0('risingtide', 'Rising Tide', 'More of them every second: they never tire, and every loose puck is theirs.', { tire: .3, reb: 1.6 }, { tire: .3, reb: 1.6 }),
+  gorgon: hkU0('petrify', 'Petrify', 'Their goalie turns to stone where they stand.', { blind: .4 }, { save: .03 }, 'slot'),
+  spider: hkU0('greatweb', 'Great Web', 'A web from board to board: they are slower, and their passes stick in it.', {}, { slow: .86, pick: 1.6 }),
+  skeleton: hkU0('bonestorm', 'Bone Storm', 'Bones in the air: your shots are harder to stop, and theirs hit shins.', { shot: .04 }, { block: 1.6 }),
+  witch: hkU0('greathex', 'Great Hex', 'Black ice under them and a word on their sticks: slower, and wild.', {}, { slow: .82, wild: .05 }),
+};
+// the team's situation powers: { n, cost, desc, fx (while it lasts), secs, sta (stamina back for the skaters on the ice), when(side) }
+const HK_SIT = {
+  manup: { n: 'Man up', cost: 1, desc: 'On the power play: the puck moves faster. Passes get through, and shots are better, until the penalty ends.', fx: { safe: .6, shot: .03 }, when: s => hkShort(1 - s) },
+  killit: { n: 'Kill it', cost: 1, desc: 'A skater short: quicker sticks. More pokes come off and more shots are blocked, until the penalty ends.', fx: { poke: .06, block: 1.4 }, when: s => hkShort(s) },
+  empty: { n: 'Empty net', cost: 1, desc: 'Your goalie pulled: the skaters on the ice get their legs back, and skate a little faster.', fx: { spd: 1.06 }, secs: 12, sta: .3, when: s => !hkInNet(s) && !L.pl[hkGk(s)].off },
+  sudden: { n: 'Sudden death', cost: 2, desc: 'In overtime: everyone on your side is fresh.', fx: {}, secs: 1, sta: 1, when: () => hkOt() },
+};
+const HK_POW_BY = {}; for (const T of [HK_POW, HK_POW2]) for (const k in T) for (const p of T[k]) HK_POW_BY[p.id] = p;
+const HK_ULT_BY = {}; for (const k in HK_ULT) HK_ULT_BY[HK_ULT[k].id] = HK_ULT[k];
+// the power a player brings: role 'puck' or 'chk'
+const hkPowFor = (m, role) => { const i = role === 'puck' ? 0 : 1, two = HK_POW2[m.kind]; return two && m.pw && m.pw[role] === 1 ? two[i] : HK_POW[m.kind] && HK_POW[m.kind][i]; };
+let HK_FXNOW = [Object.assign({}, HK_FX0), Object.assign({}, HK_FX0)];
+
+// on: false for none; [yours, theirs] to give them to one side only (the lab's powers on and off)
+function hkPowersStart(on) {
+  G.powOn = Array.isArray(on) ? [!!on[0], !!on[1]] : [on !== false, on !== false];
+  G.powers = G.powOn[0] || G.powOn[1];
+  G.mana = [HK_MANA.start, HK_MANA.start]; G.spirit = [0, 0]; G.fxs = []; G.marks = []; G.ultUsed = [false, false]; G.sitUsed = [{}, {}]; G.casts = [];
+  hkFxNow();
+}
+const hkManaAdd = (s, n) => { if (G.mana && G.powers && G.powOn[s]) G.mana[s] = clamp(G.mana[s] + n, 0, HK_MANA.max); };
+function hkSpiritAdd(s, n) { if (G.spirit && G.powers && G.powOn[s]) G.spirit[s] = clamp(G.spirit[s] + n, 0, HK_SPIRIT.max); }
+function hkFxMerge(F, fx) { for (const k in fx || {}) { if (!(k in HK_FX0)) continue; F[k] = HK_FX_MUL.has(k) ? F[k] * fx[k] : F[k] + fx[k]; } return F; }
+// the effects of what is going now, for each side: an ultimate's by whether its side has the puck
+function hkFxNow() {
+  HK_FXNOW = [0, 1].map(s => {
+    const F = Object.assign({}, HK_FX0);
+    for (const e of (G && G.fxs) || []) { if (e.side !== s) continue; const U = e.k === 'ult' && HK_ULT_BY[e.id]; hkFxMerge(F, U ? (G.poss === s ? U.o : U.d) : e.k === 'sit' ? HK_SIT[e.id].fx : (HK_POW_BY[e.id] || {}).fx); }
+    return F;
+  });
+}
+const hkFx = (side, k) => HK_FXNOW[side][k];
+// play goes on dt seconds: what is going runs down (a situation power for a penalty ends with it), and spirit lifts a spent line
+function hkPowersStep(dt) {
+  if (!G.powers) return;
+  let ch = false;
+  for (const e of G.fxs.slice()) {
+    e.t -= dt;
+    const done = e.t <= 0 || (e.id === 'manup' && !hkShort(1 - e.side)) || (e.id === 'killit' && !hkShort(e.side));
+    if (done) { G.fxs.splice(G.fxs.indexOf(e), 1); if (e.k === 'ult') G.marks = G.marks.filter(m => m.id !== e.id || m.side !== e.side); ch = true; }
+  }
+  if (ch || G.fxs.some(e => e.k === 'ult')) hkFxNow();
+  for (const s of [0, 1]) {
+    if (G.spirit[s] < HK_SPIRIT.lift) continue;
+    const sk = hkSk(s).filter(p => p.pos !== 'G'); if (!sk.length) continue;
+    const avg = sk.reduce((a, p) => a + hkSta(p), 0) / sk.length, fresh = hkBench(s).some(i => G.sta[s][i] >= HK_STA.fresh);
+    if (avg < .32 && !fresh) { G.spirit[s] -= HK_SPIRIT.lift; for (const p of sk) G.sta[s][p.ri] = Math.min(1, hkSta(p) + HK_SPIRIT.liftSta); hkEv('lift', G.teams[s].name); GD.msg = `The bank lifts ${G.teams[s].name}: their line finds one more shift.`; }
+  }
+}
+// spirit from the play (05-live.js, 07-game.js)
+function hkSpiritEv(side, k) { hkSpiritAdd(side, HK_SPIRIT[k] || 0); }
+// which power a side's skaters could cast now: [{ i (in L.pl), ri, n (the player), role, id, name, cost, desc, fits, ok, why }]
+function hkPowerOptions(side) {
+  if (!G.powers || !G.powOn[side] || !L) return [];
+  const role = G.poss === side ? 'puck' : 'chk', busy = G.fxs.some(e => e.side === side && e.k === 'pow'), live = GD.ph === 'live';
+  return hkSk(side).filter(p => p.pos !== 'G').map(p => {
+    const m = G.teams[side].roster[p.ri], P = hkPowFor(m, role); if (!P) return null;
+    const why = !live ? 'Only in live play.' : busy ? 'One power at a time.' : G.mana[side] < P.cost ? 'Not enough mana.' : hkSta(p) < HK_POW_STA.min ? `${p.n} is too tired.` : '';
+    return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, role, id: P.id, name: P.n, cost: P.cost, desc: P.desc, fits: P.fits, ok: !why, why };
+  }).filter(Boolean);
+}
+function hkUltOptions(side) {
+  if (!G.powers || !G.powOn[side] || !L) return [];
+  const live = GD.ph === 'live';
+  return hkSk(side).filter(p => p.pos !== 'G').map(p => {
+    const U = HK_ULT[p.kind]; if (!U) return null;
+    const why = !live ? 'Only in live play.' : G.ultUsed[side] ? 'One ultimate a game.' : G.spirit[side] < HK_SPIRIT.ult ? 'Not enough spirit.' : hkSta(p) < HK_POW_STA.min ? `${p.n} is too tired.` : '';
+    return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, id: U.id, name: U.n, desc: U.desc, ok: !why, why };
+  }).filter(Boolean);
+}
+function hkSitOptions(side) {
+  if (!G.powers || !G.powOn[side] || !L) return [];
+  return Object.entries(HK_SIT).map(([id, S]) => {
+    const why = GD.ph !== 'live' ? 'Only in live play.' : G.sitUsed[side][id] ? 'Once a game.' : !S.when(side) ? 'Not the moment for it.' : G.mana[side] < S.cost ? 'Not enough mana.' : '';
+    return { id, name: S.n, cost: S.cost, desc: S.desc, ok: !why, why };
+  });
+}
+// a side's skater (index in L.pl) casts their power for the moment. '' when cast, or why not
+function hkCast(side, i) {
+  const o = hkPowerOptions(side).find(x => x.i === i); if (!o) return 'No power to cast.'; if (!o.ok) return o.why;
+  const p = L.pl[i];
+  G.mana[side] -= o.cost; G.sta[side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - HK_POW_STA.base - HK_POW_STA.per * o.cost);
+  G.fxs.push({ side, k: 'pow', id: o.id, n: o.name, ri: p.ri, t: HK_POW_SECS, role: o.role });
+  G.casts.push({ p: G.p, clock: Math.round(G.clock), side, id: o.id, k: 'pow' });
+  hkFxNow(); hkEv('power', p.n, o.name);
+  GD.msg = `${p.n} casts ${o.name}.`; GD.big = { k: 'power', w: o.name };
+  return '';
+}
+function hkCastUlt(side, i) {
+  const o = hkUltOptions(side).find(x => x.i === i); if (!o) return 'No ultimate to cast.'; if (!o.ok) return o.why;
+  const p = L.pl[i], U = HK_ULT_BY[o.id];
+  G.spirit[side] -= HK_SPIRIT.ult; G.ultUsed[side] = true; G.sta[side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - HK_POW_STA.ult);
+  G.fxs.push({ side, k: 'ult', id: o.id, n: o.name, ri: p.ri, t: HK_ULT_SECS });
+  // the mark: in your crease, in their slot, or at centre ice
+  const own = hkGoalX(1 - side), x = U.at === 'crease' ? own + hkDir(side) * 1.5 : U.at === 'slot' ? hkGoalX(side) - hkDir(side) * 6 : HK_RULES.len / 2;
+  G.marks.push({ side, id: o.id, n: o.name, x, y: 0, r: U.at === 'mid' ? 4.5 : 3 });
+  G.casts.push({ p: G.p, clock: Math.round(G.clock), side, id: o.id, k: 'ult' });
+  hkFxNow(); hkEv('ult', p.n, o.name);
+  GD.msg = `${p.n} casts ${o.name}!`; GD.big = { k: 'ult', w: o.name };
+  return '';
+}
+function hkCastSit(side, id) {
+  const o = hkSitOptions(side).find(x => x.id === id); if (!o) return 'No such power.'; if (!o.ok) return o.why;
+  const S = HK_SIT[id];
+  G.mana[side] -= S.cost; G.sitUsed[side][id] = true;
+  if (S.sta) for (const p of (id === 'sudden' ? L.pl.filter(q => q.side === side) : hkSk(side))) G.sta[side][p.ri] = Math.min(1, G.sta[side][p.ri] + S.sta);
+  if (id === 'sudden') G.sta[side] = G.sta[side].map(() => 1);
+  G.fxs.push({ side, k: 'sit', id, n: S.n, ri: -1, t: S.secs || 99 });
+  G.casts.push({ p: G.p, clock: Math.round(G.clock), side, id, k: 'sit' });
+  hkFxNow(); hkEv('sit', G.teams[side].name, S.n);
+  GD.msg = `${G.teams[side].name}: ${S.n}.`; GD.big = { k: 'power', w: S.n };
+  return '';
+}
+// does a power suit the system its side is in now
+const hkFits = (P, side, role) => P.fits === 'any' || P.fits === (role === 'puck' ? G.call[side].att : G.call[side].def);
+/* a side's casting, a couple of times a second: the CPU's by its skill, and yours under Auto powers. sk: 0 a Squire
+   (now and then, anything), 1 a Knight (when the puck is in the right end, what suits the system first, a mana kept
+   back before the third), 2 an Archmage (only what suits, or with mana to spare; spirit saved for a close finish) */
+function hkCpuPowers(dt) {
+  if (!G.powers || GD.ph !== 'live') return;
+  L.powT = (L.powT || 0) - dt; if (L.powT > 0) return; L.powT = .5;
+  for (const s of [0, 1]) {
+    const mine = GD.mode !== 'watch' && s === GD.you; if (mine && !GD.autoPow) continue;
+    const sk = mine ? 1 : G.skill[s], up = hkUp(s, L.puck.x), has = G.poss === s, role = has ? 'puck' : 'chk';
+    // situation powers: when the moment is there
+    for (const o of hkSitOptions(s)) if (o.ok && (sk > 0 || R() < .2)) { hkCastSit(s, o.id); break; }
+    // the ultimate: a Knight when it has the spirit and the puck is in the right end; an Archmage in a close third, or behind
+    const right = has ? up > HK_RULES.len - HK_RULES.blue : up < HK_RULES.blue + 2;
+    const us = hkUltOptions(s).filter(o => o.ok);
+    if (us.length && right && (sk === 0 ? R() < .1 : sk === 1 ? true : (G.p >= HK_RULES.periods && Math.abs(hkLead(s)) <= 1) || hkLead(s) < 0 || hkOt())) { hkCastUlt(s, pick(us).i); continue; }
+    const os = hkPowerOptions(s).filter(o => o.ok); if (!os.length) continue;
+    if (sk === 0) { if (R() < .06) hkCast(s, pick(os).i); continue; }
+    if (!right) continue;
+    const keep = G.p < HK_RULES.periods ? 1 : 0, fit = os.filter(o => hkFits(HK_POW_BY[o.id], s, role) && G.mana[s] - o.cost >= keep);
+    const any = sk === 1 ? os.filter(o => G.mana[s] - o.cost >= keep + 1) : os.filter(o => G.mana[s] >= HK_MANA.max - 1);
+    const from = fit.length ? fit : any; if (from.length && R() < (fit.length ? .7 : .35)) hkCast(s, pick(from).i);
+  }
+}
 /* The rink's page in the Realm (issue #83, phase 1). A canvas in #v-rink, after the court's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (hkTick) and draws it (hkDraw). The engine's parts
    don't touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
    In You play (phase 2) it hears the keys: WASD or the arrows to steer, Space to shoot (a tap, or hold to wind up) or
    check or take the face-off, J to pass (hold to send it hard) or poke, E to switch skaters, Shift held to lift your
-   stick, G to pull your goalie or send them back, C to change your tired skaters; only while the rink is on screen (not under How to play), in a live play or at a face-off, in the capture
+   stick, G to pull your goalie or send them back, C to change your tired skaters, Q for your skater's power and R for their ultimate; only while the rink is on screen (not under How to play), in a live play or at a face-off, in the capture
    phase so nothing else on the page takes them. A key taken stays taken until it's let go; releases are always heard. */
 const HK_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
 const HKK = new Set(), HKHELD = new Set();
 function hkKeySteer() { let x = 0, y = 0; for (const k of HKK) if (HK_KEYS[k]) { x += HK_KEYS[k][0]; y += HK_KEYS[k][1]; } return [x, y]; }
 function hkKey(e, down) {
   if (!HKP.on || !GD) return;
-  const k = e.key.toLowerCase(), ours = !!HK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || k === 'e' || k === 'g' || k === 'c';
+  const k = e.key.toLowerCase(), ours = !!HK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || k === 'e' || k === 'g' || k === 'c' || k === 'q' || k === 'r';
   if (!ours) return;
   const swallow = () => { e.preventDefault(); e.stopPropagation(); };
   if (!down) {
@@ -33142,7 +33419,7 @@ function hkKey(e, down) {
   else if (k === ' ') hkInput({ shoot: true });
   else if (k === 'j') hkInput({ pass: true });
   else if (k === 'shift') hkInput({ lift: true });
-  else hkInput({ act: k === 'g' ? 'pull' : k === 'c' ? 'change' : 'switch' });
+  else hkInput({ act: k === 'g' ? 'pull' : k === 'c' ? 'change' : k === 'q' ? 'power' : k === 'r' ? 'ult' : 'switch' });
   swallow();
 }
 window.addEventListener('keydown', e => hkKey(e, true), true);
@@ -33199,6 +33476,15 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // powers (phase 7): start({ powers: false }) turns them off; a roster player's pw ({ puck, chk }: 0 or 1) picks which
+  // of their kind's two they bring. mana and spirit by side, what is going (fxs) and the marks on the ice, the options
+  // a side has now, the casts ('' when it took, or why not), the effects in play for a side, the tables for the page
+  get mana() { return G && G.mana ? G.mana.slice() : [0, 0]; }, get spirit() { return G && G.spirit ? G.spirit.slice() : [0, 0]; }, get fxs() { return G && G.fxs ? JSON.parse(JSON.stringify(G.fxs)) : []; }, get marks() { return G && G.marks ? JSON.parse(JSON.stringify(G.marks)) : []; },
+  powerOptions: side => hkPowerOptions(side), ultOptions: side => hkUltOptions(side), sitOptions: side => hkSitOptions(side), cast: (side, i) => hkCast(side, i), castUlt: (side, i) => hkCastUlt(side, i), castSit: (side, id) => hkCastSit(side, id),
+  fx: (side, k) => hkFx(side, k), fx0: Object.assign({}, HK_FX0), get autoPow() { return GD ? GD.autoPow !== false : true; }, get powersOn() { return !!(G && G.powers); },
+  pows: JSON.parse(JSON.stringify(Object.fromEntries(Object.keys(HK_POW).map(k => [k, { one: HK_POW[k], two: HK_POW2[k], ult: { id: HK_ULT[k].id, n: HK_ULT[k].n, desc: HK_ULT[k].desc, o: HK_ULT[k].o, d: HK_ULT[k].d } }])))),
+  sits: Object.fromEntries(Object.entries(HK_SIT).map(([k, v]) => [k, { n: v.n, cost: v.cost, desc: v.desc }])), powRules: { mana: Object.assign({}, HK_MANA), sta: Object.assign({}, HK_POW_STA), secs: HK_POW_SECS, ultSecs: HK_ULT_SECS, spirit: Object.assign({}, HK_SPIRIT) },
+  powerIds: () => Object.keys(HK_POW_BY).concat(Object.keys(HK_ULT_BY)), cpuPowers: dt => { if (L) { L.powT = 0; hkCpuPowers(dt || .5); } }, spiritAdd: (s, n) => hkSpiritAdd(s, n), manaAdd: (s, n) => hkManaAdd(s, n),
   // from the world (phase 6): a save point at each whistle and break (wantSnap says when; onSnap hears { G, L, GD }),
   // resume(snap) puts one back, snapshot() takes one now; the Pond Rink's ways (start({ pond, snow })), and its rules
   snapshot: () => G && GD ? hkSnapshot() : null, resume: sn => { HKP.paused = false; return hkResume(sn); },
@@ -45091,7 +45377,7 @@ function wRinkGame(opts) {
   const o = opts || {};
   WHK = { over: null, how: o.how || 'scrimmage' }; wRinkTick(true);
   $('wRinkTitle').textContent = o.title || 'A scrimmage at the Pond Rink';
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls, pond: o.pond !== false, snow: o.snow == null ? wRinkSnowing() : !!o.snow });
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls, powers: o.powers, autoPow: o.autoPow, auto: o.auto, pond: o.pond !== false, snow: o.snow == null ? wRinkSnowing() : !!o.snow });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }
@@ -45882,6 +46168,78 @@ renderHelp = function () {
   wW91RenderHelp();
   const after = $('wHelpRinkTab'); if (!after || $('wHelpRinkGame')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkGame"><b>Hockey games.</b> Once you have ${W_HKG.minOwn} players of your own, your six can play hockey for real: Play a game on the Rink tab, or ask Old Tove at the Pond Rink for SHINNY. Take on the local side or a rival club, once a day each. Play (you skate your six by hand, and call it), Manage (you call it, your six play) or Simulate. There is no Team HP on the ice. A win pays XP to everyone who played (half to the rest), gold and fans, and a little more to the player of the game; a loss pays a quarter of the XP. Nobody goes home level. Save and leave keeps a game at its last whistle. The Pond Rink has its own ways: it is a real pond, so snow builds on the ice through a period and slows the puck in the worst patches until Old Tove scrapes it at the break, faster when it is snowing; a few stretches of the old boards are dead, or lively; a big enough hit by the boards cracks the ice there, and skaters and the puck go badly over it until the break; and the town on the bank roars for a run of shots, a big hit or a goal, which lifts that side for a few seconds. The Stats tab's Hockey view has every player's line.</p>`);
+};
+/* w92: powers at the rink (issue #83, phase 7). Each kind has two puck powers and two checking powers and an ultimate
+   (src/hk/parts/14-powers.js); a player brings one of each pair: p.hkPw ({ puck, chk }: 0 or 1), picked on the Rink
+   tab, and it reaches the engine through wRinkPlayer (their own ratings are never changed). In a game, in Manage and
+   You play, the coach's rows (w90) gain Powers (the power each of your skaters on the ice has for the moment, with
+   its cost in mana), The big ones (an ultimate each, for the roar, once a game; and the team's situation powers, once
+   each), and Auto powers (the coach casts for you, on unless you turn it off). In You play, Q casts the power of the
+   skater you are playing and R their ultimate.
+   Wraps: wRinkPlayer (wW92RinkPlayer: pw), wSixRow (wW92SixRow: the two pickers), wRenderCamp (wW92RenderCamp),
+   wRinkCalls (wW92RinkCalls: the power rows), renderHelp (wW92RenderHelp: #wRinkHowPow). */
+function wHkPw(p) { if (!p.hkPw || typeof p.hkPw !== 'object') p.hkPw = { puck: 0, chk: 0 }; p.hkPw.puck = p.hkPw.puck === 1 ? 1 : 0; p.hkPw.chk = p.hkPw.chk === 1 ? 1 : 0; return p.hkPw; }
+const wW92RinkPlayer = wRinkPlayer;
+wRinkPlayer = function (p) { const o = wW92RinkPlayer(p), w = wHkPw(p); o.pw = { puck: w.puck, chk: w.chk }; return o; };
+// a player's pick: role 'puck' or 'chk' to the first (0) or second (1) of their kind's pair
+function wRinkSetPow(k, role, i) {
+  const p = wSixWho(k); if (!p || !['puck', 'chk'].includes(role)) return '';
+  wHkPw(p)[role] = +i === 1 ? 1 : 0; wSave(); return '';
+}
+// the pair for a kind and role: [first, second]
+const wRinkPowPair = (kind, role) => { const K = wHK.pows[kind]; if (!K) return []; const i = role === 'puck' ? 0 : 1; return [K.one[i], K.two[i]]; };
+const wW92SixRow = wSixRow;
+wSixRow = function (k, C) {
+  const html = wW92SixRow(k, C), p = wSixWho(k), w = wHkPw(p), K = wHK.pows[p.kind]; if (!K) return html;
+  const sel = (role, lab) => { const pair = wRinkPowPair(p.kind, role); return `<label class="wsvl whpow" title="${esc(pair[w[role]].desc)}">${lab} <select data-hpow="${role}" aria-label="${esc(p.n)}'s ${lab.toLowerCase()} power">${pair.map((P, i) => `<option value="${i}"${w[role] === i ? ' selected' : ''}>${esc(P.n)} (${P.cost})</option>`).join('')}</select></label>`; };
+  return html.replace('<div class="wpa">', `<div class="wpa">${sel('puck', 'Puck')}${sel('chk', 'Checking')}`).replace('</small></div>', `</small><small class="whult" title="${esc(K.ult.desc)}">Ultimate: <b>${esc(K.ult.n)}</b></small></div>`);
+};
+const wW92RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW92RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'rink') return;
+  body.querySelectorAll('[data-hpow]').forEach(s => s.onchange = () => { const k = s.closest('[data-hid]').dataset.hid; wCampSay(wRinkSetPow(/^h\d+$/.test(k) ? k : +k, s.dataset.hpow, s.value)); });
+};
+
+/* ---------- the rows in a game ---------- */
+function wRinkPowRows() {
+  const you = wHK.you, mana = Math.floor(wHK.mana[you] + 1e-9), sp = Math.round(wHK.spirit[you]), R = wHK.powRules;
+  const pows = wHK.powerOptions(you), ults = wHK.ultOptions(you), sits = wHK.sitOptions(you), going = wHK.fxs.filter(e => e.side === you);
+  const btn = (attr, o, label, cost) => `<button class="ghost" ${attr} ${o.ok ? '' : 'disabled'} title="${esc(o.desc + (o.ok ? '' : ' ' + o.why))}">${esc(label)}${cost}</button>`;
+  return `<div class="wccrow"><span class="wccl">Powers</span>${pows.length ? pows.map(o => btn(`data-rpow="${o.i}"`, o, `${o.name}`, ` <small>${esc(o.n)} · ${o.cost}</small>`)).join('') : '<small class="hint">Nobody on the ice has one for this.</small>'}
+      <small class="hint">Mana <b>${mana}</b> of ${R.mana.max}.${going.length ? ` Going now: ${going.map(e => esc(e.n)).join(', ')}.` : ''} ${pows.length && pows[0].role === 'puck' ? 'You have the puck: puck powers.' : 'They have the puck: checking powers.'}</small></div>
+    <div class="wccrow"><span class="wccl">The big ones</span>${ults.map(o => btn(`data-rult="${o.i}"`, o, o.name, ` <small>${esc(o.n)}</small>`)).join('')}${sits.map(o => btn(`data-rsit="${o.id}"`, o, o.name, ` <small>${o.cost}</small>`)).join('')}
+      <small class="hint">Roar <b>${sp}</b> of ${R.spirit.max}: an ultimate takes ${R.spirit.ult}, once a game.</small>
+      <button class="ghost${wHK.autoPow ? ' on' : ''}" data-rbench="autopow" aria-pressed="${wHK.autoPow}" title="The coach casts your powers for you when the moment fits, or leaves them all to you.">Auto powers: ${wHK.autoPow ? 'on' : 'off'}</button></div>`;
+}
+const wW92RinkCalls = wRinkCalls;
+wRinkCalls = function (force) {
+  wW92RinkCalls(force);
+  const box = $('wRinkCalls'); if (box.hidden || !wHK.powersOn) { const old = box.querySelector('.wrpowbox'); if (old) old.remove(); return; }
+  let pb = box.querySelector('.wrpowbox'); if (!pb) { box.querySelector('.wccrows').insertAdjacentHTML('afterend', '<div class="wrpowbox"></div>'); pb = box.querySelector('.wrpowbox'); }
+  const you = wHK.you, key = JSON.stringify([wHK.powerOptions(you).map(o => [o.i, o.id, o.ok]), wHK.ultOptions(you).map(o => [o.i, o.ok]), wHK.sitOptions(you).map(o => o.ok), Math.floor(wHK.mana[you] + 1e-9), Math.round(wHK.spirit[you] / 5), wHK.fxs.length, wHK.autoPow]);
+  if (force || key !== pb.dataset.key) { pb.dataset.key = key; pb.innerHTML = wRinkPowRows(); }
+};
+$('wRinkCalls').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || !WHK) return;
+  const you = wHK.you;
+  if (b.dataset.rpow != null) wHK.cast(you, +b.dataset.rpow); else if (b.dataset.rult != null) wHK.castUlt(you, +b.dataset.rult); else if (b.dataset.rsit) wHK.castSit(you, b.dataset.rsit); else return;
+  wRinkCalls(true);
+});
+
+function wRinkHowPowHTML() {
+  const R = wHK.powRules, ex = (kind, role, i) => { const P = wRinkPowPair(kind, role)[i]; return `<b>${esc(P.n)}</b> (${esc(wKindName(kind))}): ${esc(P.desc)}`; };
+  return `<p class="hint"><b>Powers.</b> Every kind has a <b>puck power</b>, for when your side has the puck, and a <b>checking power</b>, for when it doesn't. A skater on the ice casts theirs in live play. It costs <b>mana</b> (your side starts with ${R.mana.start}, holds up to ${R.mana.max}, and gets ${R.mana.scored} each time it is scored on and ${R.mana.brk} at each break) and some of the caster's stamina, and it lasts ${R.secs} seconds of play. One at a time a side. For example: ${ex('harpy', 'puck', 0)} ${ex('golem', 'chk', 0)} ${ex('spider', 'chk', 0)} ${ex('witch', 'puck', 0)}</p>
+  <p class="hint"><b>The choice.</b> Each kind has a second puck power and a second checking power. Pick which of each pair a player brings on the Rink tab.</p>
+  <p class="hint"><b>The roar and the ultimate.</b> The bank's roar fills your meter on shots on goal, hits, saves and goals. At ${R.spirit.ult} it pays for one <b>ultimate</b> a game, which leaves its mark on the ice for ${R.ultSecs} seconds: one set of effects while you have the puck and another while you don't. Left unspent, ${R.spirit.lift} of it lifts a spent line with nobody fresh behind it for one more shift.</p>
+  <p class="hint"><b>Situation powers</b> are the team's, once a game each: ${Object.values(wHK.sits).map(S => `<b>${esc(S.n)}</b> (${S.cost} mana): ${esc(S.desc)}`).join(' ')}</p>
+  <p class="hint"><b>Who casts.</b> With <b>Auto powers</b> on, your coach casts when the moment fits: the puck in the right end, and a power that suits the system you are in first. Turn it off and they are all yours: the buttons under the rink in Manage and You play, and in You play <b>Q</b> for the power of the skater you are playing and <b>R</b> for their ultimate. Their coach casts by his skill.</p>`;
+}
+const wW92RenderHelp = renderHelp;
+renderHelp = function () {
+  wW92RenderHelp();
+  const h = $('wRinkHow'); if (!h || $('wRinkHowPow')) return;
+  h.insertAdjacentHTML('beforeend', `<div id="wRinkHowPow">${wRinkHowPowHTML()}</div>`);
 };
 </script>
 </body></html>
