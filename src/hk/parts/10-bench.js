@@ -3,6 +3,7 @@
    the bench. A tired skater is slower, turns wider and takes longer to get going (hkStaK), and shoots a little worse.
    So a line is good for a short shift, and then needs the bench.
    The bench is the rest of the roster after the six (up to HK_RULES.bench), in order. Changes:
+   (a Squire's coach is late with it: his skaters are spent before he sends them, HK_STA.late)
    - on the fly: a tired skater heads for their bench's door on the far boards and, there, the next fresh player comes
      over the boards in their spot (hkChangeStep). While they skate off their side is short around the puck, so the
      coach sends them only when their side has the puck or it is in the other half (hkCoach). By hand, one key sends
@@ -12,7 +13,7 @@
    otherwise the fresh player who suits the spot best. The goalie stays in all game.
    With nobody on the bench the six play on: they get a breather at each whistle and a rest between periods.
    Each time on is a shift (G.stat sh). */
-const HK_STA = { drain: .011, fast: .013, bench: .05, box: .05, whistle: .06, tired: .45, fresh: .8, floor: .15, slow: .2, door: 1.4 };
+const HK_STA = { drain: .011, fast: .013, bench: .05, box: .05, whistle: .06, tired: .45, late: .28, fresh: .8, floor: .15, slow: .2, door: 1.4 };
 // the bench doors, on the far boards either side of centre: [x, y] by side
 const hkDoor = side => [HK_RULES.len / 2 + (side ? 5 : -5), -HK_RULES.wid / 2 + .7];
 const hkSta = p => G.sta[p.side][p.ri];
@@ -34,8 +35,11 @@ function hkStaStep(dt) {
   for (const p of L.pl) {
     if (p.off || (p.pos === 'G' && !p.pulled)) continue;
     const top = 5.4 + p.r.spd * .42, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
-    G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * dt);
+    // (a pushed Tempo tires them, and so does a system that chases, while they are without the puck)
+    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1);
+    G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * tire * dt);
   }
+  if (!hkShort(0) && !hkShort(1)) G.sysLog[G.poss][G.call[G.poss].att].t += dt;
   for (const s of [0, 1]) {
     for (const i of hkBench(s)) G.sta[s][i] = Math.min(1, G.sta[s][i] + HK_STA.bench * dt);
     for (const b of G.box) if (b.side === s) G.sta[s][b.ri] = Math.min(1, G.sta[s][b.ri] + HK_STA.box * dt);
@@ -54,11 +58,11 @@ function hkSwap(p, inn) {
 function hkCoach(dt) {
   L.coachT = (L.coachT || 0) - dt; if (L.coachT > 0) return; L.coachT = .4;
   for (const s of [0, 1]) {
-    if (hkHandsOn() && s === GD.you && !GD.auto) continue;
+    if (GD.mode !== 'watch' && s === GD.you && !GD.auto) continue;
     const safe = G.poss === s || hkUp(s, L.puck.x) > HK_RULES.len / 2 + 2;
     if (!safe) continue;
     const going = hkSk(s).filter(p => p.chg).length; if (going >= 2) continue;
-    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < HK_STA.tired && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
+    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < (hkCpuSide(s) && G.skill[s] === 0 ? HK_STA.late : HK_STA.tired) && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
     for (const p of tired.slice(0, 2 - going)) { const inn = hkNextOn(s, p.pos); if (inn >= 0 && !hkSk(s).some(q => q.chg && q.chg.to === inn)) p.chg = { to: inn }; }
   }
 }

@@ -275,9 +275,16 @@ function hkDrawMsg(c) {
   c.save(); rr(c, 150, 508, 660, 30, 6); c.fillStyle = 'rgba(13,9,7,.82)'; c.fill(); c.restore();
   let m = GD.msg || ''; c.font = `600 17px ${HK_FONT}`; while (m.length > 12 && c.measureText(m).width > 640) m = m.slice(0, -2).trimEnd() + '…';
   txt(c, m, 480, 529, `600 17px ${HK_FONT}`, '#f3ead6', 'center');
-  // under it, who is on the power play (phase 3); for now each side's hits and face-offs
   const key = `${L.evN || 0}|${G.log.length}|${GD.ph}`;
   if (HKT.boxKey !== key) { HKT.boxKey = key; HKT.box = hkBox(); }
+  // under it: the system of the side with the puck against the other side's, green when it suits and red when it doesn't
+  if (G.call && GD.ph !== 'so' && GD.ph !== 'over') {
+    const s = G.poss, n = hkStrength(), e = hkEdgeNow(s), stale = n[0] === n[1] ? G.scout[s].n : 0;
+    const line = `${G.teams[s].short}: ${hkAttNow(s).n} against ${hkDefNow(1 - s).n}${stale ? ` · scouted${stale > 1 ? ' twice' : ''}` : ''}`;
+    c.save(); c.font = `600 13px ${HK_FONT}`; const w = c.measureText(line).width + 20; rr(c, 480 - w / 2, 551, w, 21, 5); c.fillStyle = 'rgba(13,9,7,.78)'; c.fill(); c.restore();
+    txt(c, line, 480, 566, `600 13px ${HK_FONT}`, e[0] > 0 ? '#bfe8a8' : e[0] < 0 ? '#ff9a7a' : '#f3ead6', 'center');
+    return;
+  }
   const line = HKT.box.map(b => `${b.team}: ${b.tot.hit} hits · ${b.tot.fow} of ${b.tot.fot} face-offs · ${b.tot.blk} blocks`).join('     ');
   txt(c, line, 480, 566, `600 13px ${HK_FONT}`, '#1c2c3a', 'center');
 }

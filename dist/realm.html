@@ -973,6 +973,10 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wsh{max-width:960px;margin:14px auto 6px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
 .wslog{max-width:960px;margin:0 auto 10px;max-height:260px}
 @media (max-width:760px){#wGridLineup{grid-template-columns:minmax(0,1fr)}.wscoach .wgtip,.wscoach .wgbench>p{margin-left:0}.wccrow .wccl{width:100%}}
+/* the rink's calls (w90): a call that suits what they are in, or doesn't; the line under the rows */
+.wccrow button.wgood:not(.on){border-color:#6fae5a}.wccrow button.wpoor:not(.on){border-color:#b8553a}
+.wscoach .wrnow{margin:2px 0 4px 90px;line-height:1.35}
+@media (max-width:640px){.wscoach .wrnow{margin-left:0}}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -31476,7 +31480,7 @@ function hkStep(dt) {
   const h = hkHand();
   if (L.wind) { L.wind.t -= dt; if (h !== L.wind.i) L.wind = null; else if (L.wind.t <= 0) { const w = L.wind; L.wind = null; hkRelease(w.i, w.kind); } }
   // (the CPU keeps its hands off a skater you are playing)
-  else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = .2 + R() * .2; hkThink(h); } }
+  else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = (.2 + R() * .2) * hkTempo(L.pl[h].side).think * (hkDim(L.pl[h].side) ? HK_DIM.think : 1); hkThink(h); } }
   hkMeterStep(dt); hkLunge(dt);
   if (GD.ph === 'live') { hkStaStep(dt); hkCoach(dt); hkChangeStep(); }
   hkChase();
@@ -31516,9 +31520,12 @@ function hkAim(p, i) {
   }
   const c = L.pl[h];
   // without the puck: the nearest skater goes at the carrier (not at a goalie holding it)
-  // (a side a skater short sits back in its box: it goes at the carrier only down low in its own end)
-  if (c.side !== p.side && !hkIsGk(c) && (!hkShort(p.side) || hkUp(p.side, c.x) < 10) && hkPresser(p.side) === i) return [c.x + c.vx * .22, c.y + c.vy * .22];
-  return hkForm(p);
+  // (how far up the ice a side goes at the carrier is its system's: a Forecheck anywhere, a Box only in front of its net)
+  if (c.side !== p.side && !hkIsGk(c) && hkUp(p.side, c.x) < hkDefNow(p.side).high && (hkPresser(p.side) === i || (HK_DIM.chase && hkDim(p.side) && hkSecond(p.side, c) === i))) return [c.x + c.vx * .22, c.y + c.vy * .22];
+  const f = hkForm(p);
+  // (a Squire's skaters drift toward the puck, out of their shape)
+  if (HK_DIM.drift && hkDim(p.side) && c.side !== p.side) return [lerp(f[0], c.x, HK_DIM.drift), lerp(f[1], c.y, HK_DIM.drift)];
+  return f;
 }
 // the skater of side who presses the carrier: the nearest, with a lean to whoever was already doing it
 function hkPresser(side) {
@@ -31526,6 +31533,8 @@ function hkPresser(side) {
   for (const p of hkSk(side)) { if (p.stun > 0 || p.chg) continue; const i = L.pl.indexOf(p), d = hyp(p.x - c.x, p.y - c.y) - (L.press === i ? 1.2 : 0); if (d < bd) { bd = d; b = i; } }
   L.press = b; return b;
 }
+// a Squire's side sends a second skater at the carrier: the next nearest, leaving their place in the shape
+function hkSecond(side, c) { let b = -1, bd = 1e9; for (const p of hkSk(side)) { const i = L.pl.indexOf(p); if (i === L.press || p.stun > 0 || p.chg) continue; const d = hyp(p.x - c.x, p.y - c.y); if (d < bd) { bd = d; b = i; } } return bd < 9 ? b : -1; }
 // the shape: where p stands by spot, by which side has the puck and where it is
 function hkForm(p) {
   const P = L.puck, s = p.side, Lz = HK_RULES.len, pu = hkUp(s, P.x), pv = P.y * hkDir(s), att = G.poss === s, i = L.pl.indexOf(p);
@@ -31536,18 +31545,23 @@ function hkForm(p) {
   // a skater short, a side doesn't send anybody ahead of the puck: it gets it out, and gets back
   if (att && hkShort(s)) return hkAt(s, clamp(pu - (p.pos === 'C' ? 1.5 : wing ? 3 : 7), 4, Lz - 14), wing ? wing * 5 : p.pos === 'C' ? pv * .4 : ds * 3);
   if (att) {
+    const A = hkAttNow(s);
     if (pu > Lz - HK_RULES.blue - 1) {
-      if (p.pos === 'C') { u = Lz - 8.5 + drift; v = clamp(-pv * .35, -3, 3) + drift * .9; }
-      else if (wing) { const strong = wing * pv > 0; u = strong ? Lz - 5.5 + drift * .5 : Lz - 6 + drift * .7; v = strong ? wing * 6.5 : wing * 2.4; }
+      // (a system that wants a body in front puts the centre on the goalie's doorstep, and the far wing too when it wants two)
+      if (p.pos === 'C') { if (A.front) { u = Lz - 4.7; v = clamp(-pv * .12, -.7, .7); } else { u = Lz - 8.5 + drift; v = clamp(-pv * .35, -3, 3) + drift * .9; } }
+      else if (wing) { const strong = wing * pv > 0; u = strong ? Lz - 5.5 + drift * .5 : A.front > 1 ? Lz - 4.9 : Lz - 6 + drift * .7; v = strong ? wing * 6.5 : A.front > 1 ? wing * 1.3 : wing * 2.4; }
       else { u = Lz - HK_RULES.blue + 1.2; v = ds * 5 + pv * .2; }
     } else {
-      if (p.pos === 'C') { u = pu + 3.5; v = pv * .4 + drift; } else if (wing) { u = pu + 7; v = wing * 7; } else { u = pu - 5; v = ds * 4 + pv * .2; }
+      if (p.pos === 'C') { u = pu + 3.5; v = pv * .4 + drift; } else if (wing) { u = pu + 7 + (A.deep || 0); v = wing * 7; } else { u = pu - 5; v = ds * 4 + pv * .2; }
       u = clamp(u, 5, Lz - 5);
     }
   } else if (pu < HK_RULES.blue + 2) {
     if (p.pos === 'C') { u = clamp(pu + 1.5, 5, 10); v = pv * .45; }
-    else if (wing) { const box = hkShort(s); u = HK_RULES.blue - (box ? 5 : 2.5); v = wing * (box ? 3.2 : 5) + pv * .25; }
+    else if (wing) { const [back, wide] = hkDefNow(s).wing; u = HK_RULES.blue - back; v = wing * wide + pv * .25; }
     else { const strong = Math.abs(pv) < 1 ? ds > 0 : ds * pv > 0; u = strong ? clamp(pu + .8, 3.8, 10) : 4.8; v = strong ? pv * .8 : ds * 1.1; }
+  } else if (hkDefNow(s).high === 26 && pu > Lz / 2) {
+    // the Trap: three across the middle of the ice, two behind them, and wait
+    if (p.pos === 'C') { u = Lz / 2 + 1; v = pv * .5; } else if (wing) { u = Lz / 2 - 1; v = wing * 5; } else { u = HK_RULES.blue - 1; v = ds * 3.5 + pv * .15; }
   } else {
     if (p.pos === 'C') { u = pu - 3; v = pv * .5; } else if (wing) { u = pu - 1.5; v = wing * 6; } else { u = pu - 9; v = ds * 3.5 + pv * .15; }
     u = clamp(u, 6, Lz - 8);
@@ -31565,8 +31579,8 @@ function hkChecks() {
     d.cd = .8 + R() * .4;
     const closing = ((d.vx - c.vx) * dx + (d.vy - c.vy) * dy) / (dist || 1);
     // beaten, and reaching from behind: a hook
-    if (closing < -.5 && R() < HK_FOUL.hook) return hkFoul(d, 'hooking', c);
-    if (closing > 3.5 && R() < clamp(.4 + (d.r.siz - 5) * .06, .1, .85)) return hkHit(d, c, closing);
+    if (closing < -.5 && R() < HK_FOUL.hook * hkEdgeSt(d.side).foul) return hkFoul(d, 'hooking', c);
+    if (closing > 3.5 && R() < clamp((.4 + (d.r.siz - 5) * .06) * hkEdgeSt(d.side).hit, .05, .95)) return hkHit(d, c, closing);
     return hkPoke(d, c);
   }
 }
@@ -31574,10 +31588,10 @@ function hkChecks() {
 // checker's stick. True when it worked
 function hkPoke(d, c, edge) {
   d.act = 'poke'; d.actT = .25;
-  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0), .04, .6)) {
+  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side), .04, .6)) {
     hkEv('pokemiss', d.n, c.n);
     // a miss up close can take their skates out: a trip
-    if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip) hkFoul(d, 'tripping', c);
+    if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip * hkEdgeSt(d.side).foul) hkFoul(d, 'tripping', c);
     return false;
   }
   hkBoxAdd(d.side, d.ri, 'take'); hkBoxAdd(c.side, c.ri, 'give'); hkEv('poke', d.n, c.n);
@@ -31591,7 +31605,7 @@ function hkHit(d, c, closing) {
   d.act = 'hit'; d.actT = .3;
   // from behind into the boards is boarding; now and then a hit is just too much (roughing)
   const dv = hyp(d.vx, d.vy) || 1, behind = (d.vx * c.fx + d.vy * c.fy) / dv > .5, wall = Math.abs(c.y) > HK_RULES.wid / 2 - 2 || c.x < 2.5 || c.x > HK_RULES.len - 2.5;
-  const foul = behind && wall ? (R() < HK_FOUL.board ? 'boarding' : '') : R() < HK_FOUL.rough ? 'roughing' : '';
+  const fk = hkEdgeSt(d.side).foul, foul = behind && wall ? (R() < Math.min(.9, HK_FOUL.board * fk) ? 'boarding' : '') : R() < HK_FOUL.rough * fk ? 'roughing' : '';
   if (R() < clamp(.34 + (d.r.siz - c.r.siz) * .045 + (closing - 3) * .04, .08, .8)) {
     hkBoxAdd(d.side, d.ri, 'hit'); hkEv('hit', d.n, c.n);
     c.stun = .7; c.act = 'down'; c.actT = .55; c.vx = c.vx * .3 + d.vx * .4; c.vy = c.vy * .3 + d.vy * .4;
@@ -31662,7 +31676,7 @@ function hkPickup() {
       if (p.side === from.side) { if (i === P.from && P.go < 2) continue; if (i === P.to && P.go > 4) L.oneT = { i, t: L.t }; hkEv('catch', p.n, from.n); hkGain(i, 'pass'); hkHandOneTimer(i); return true; }
       if (P.tried.includes(i)) continue;
       P.tried.push(i);
-      if (R() < clamp(.1 + p.r.def * .03 - (sp - 10) * .012 + (HKI.lift && hkYoursNow(i) ? .25 : 0), .05, .75)) { hkBoxAdd(p.side, p.ri, 'take'); hkBoxAdd(from.side, from.ri, 'give'); hkEv('pick', p.n, from.n); hkGain(i, 'take'); return true; }
+      if (R() < clamp((.1 + p.r.def * .03 - (sp - 10) * .012) * (P.x > HK_RULES.blue && P.x < HK_RULES.len - HK_RULES.blue ? hkDefNow(p.side).pick || 1 : 1) + (HKI.lift && hkYoursNow(i) ? .25 : 0), .05, .75)) { hkBoxAdd(p.side, p.ri, 'take'); hkBoxAdd(from.side, from.ri, 'give'); hkEv('pick', p.n, from.n); hkGain(i, 'take'); return true; }
     }
     return false;
   }
@@ -31670,7 +31684,7 @@ function hkPickup() {
   if (sp > 15) return false;
   const sides = new Set(near.map(([i]) => L.pl[i].side));
   let win = near.sort((a, b) => a[1] - b[1])[0][0];
-  if (sides.size > 1) { const w = {}; for (const [i, d] of near) { const p = L.pl[i]; w[i] = (p.r.hnd + p.r.siz * .5 + 3) * (1.3 - d); } win = +wpick(w); hkEv('battle', L.pl[win].n); }
+  if (sides.size > 1) { const w = {}; for (const [i, d] of near) { const p = L.pl[i]; w[i] = (p.r.hnd + p.r.siz * .5 + 3) * (1.3 - d) * hkEdgeSt(p.side).battle * (hyp(hkGoalX(p.side) - P.x, P.y) < 6 ? hkAttNow(p.side).reb || 1 : 1); } win = +wpick(w); hkEv('battle', L.pl[win].n); }
   hkGain(win, 'loose'); return true;
 }
 // player i has the puck. A change of sides starts a new line of passes (for the assists)
@@ -31724,12 +31738,13 @@ function hkShotOdds(p, kind, x, y) {
   for (const d of hkSk(1 - p.side)) {
     if (d.stun > 0) continue;
     const ax = gx - x, ay = -y, len = hyp(ax, ay) || 1, s = ((d.x - x) * ax + (d.y - y) * ay) / (len * len); if (s < .08 || s > .88) continue;
-    if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp(.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0), .1, .6); }
+    if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp((.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0)) * (hkDefNow(d.side).block || 1), .1, .7); }
   }
   const tired = clamp(1 - hkSta(p) / .6, 0, 1);
   const miss = clamp(.2 + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
   let q = .09 - tired * .025 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
-  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0); else q = .97;
+  // (the calls: this side's system against theirs, less what their scout has read; a one-timer in the Overload)
+  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? hkAttNow(p.side).one || 0 : 0); else q = .97;
   return { ok: true, dist, ang, miss, q: clamp(q, .02, .97), set, screen, block, blockP };
 }
 // the carrier shoots: a slap shot winds up first (and can be poked off it), the others go now
@@ -31775,7 +31790,7 @@ function hkShotLands() {
   if (GD.ph === 'so') return hkSoLanded(S);
   hkBoxAdd(p.side, p.ri, 'att');
   if (S.res === 'miss') { hkEv('wide', p.n); P.k = 'loose'; P.shot = null; return; }
-  G.sog[S.side]++; hkBoxAdd(p.side, p.ri, 'sog'); if (!S.en) hkBoxAdd(g.side, g.ri, 'sa');
+  G.sog[S.side]++; hkBoxAdd(p.side, p.ri, 'sog'); if (!hkShort(S.side) && !hkShort(1 - S.side)) G.sysLog[S.side][G.call[S.side].att].sog++; if (!S.en) hkBoxAdd(g.side, g.ri, 'sa');
   if (S.res === 'goal') return hkGoalScored(S);
   hkBoxAdd(g.side, g.ri, 'sv'); g.act = 'save'; g.actT = .35;
   if (S.res === 'hold') { hkEv('save', g.n, p.n); return hkGain(gi, 'save'); }
@@ -31808,9 +31823,11 @@ function hkLaneRisk(side, x, y, tx, ty) {
 function hkPassValue(h, j) {
   const p = L.pl[h], q = L.pl[j], s = p.side, d = hyp(q.x - p.x, q.y - p.y);
   const O = hkShotOdds(q, 'one', q.x, q.y), look = O.ok && O.dist < 13 ? (1 - O.miss) * O.q * (O.block ? .75 : 1) : 0;
-  const across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? .06 : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
+  // (an Archmage's side looks harder for the pass across the front; Point shots and the Umbrella want it at the point)
+  const A = hkAttNow(s), across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? (hkCpuSide(s) && G.skill[s] >= 2 ? .1 : .06) : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
+  const point = A.point && HK_ROLE[q.pos] === 'defender' && hkUp(s, q.x) > HK_RULES.len - HK_RULES.blue - 1 ? A.point * .08 : 0;
   const [, md] = hkNearest(q.x, q.y, hkSk(1 - s));
-  return look + across + prog * .4 - hkLaneRisk(s, p.x, p.y, q.x, q.y) - (d > 18 ? .15 : 0) - (d < 2.5 ? .2 : 0) - (md < 1.3 ? .08 : 0);
+  return look + across + point + (hkDim(s) ? (R() - .5) * HK_DIM.noise : 0) + prog * .4 - hkLaneRisk(s, p.x, p.y, q.x, q.y) - (d > 18 ? .15 : 0) - (d < 2.5 ? .2 : 0) - (md < 1.3 ? .08 : 0);
 }
 function hkThink(h) {
   const p = L.pl[h], s = p.side;
@@ -31828,12 +31845,15 @@ function hkThink(h) {
   // an empty net is shot at from anywhere with a clear lane; a side a skater short clears it and doesn't mind the icing
   const empty = !hkInNet(1 - s) && O.ok && !O.block && dist < 20, short = hkShort(s);
   // with a skater more, a side waits for the good look and moves the puck; with one fewer, it doesn't carry it up the ice
-  const up1 = hkShort(1 - s), at = up1 ? HK_THINK.ppAt : HK_THINK.shootAt;
+  const up1 = hkShort(1 - s), A = hkAttNow(s), TP = hkTempo(s), W = A.w || {};
+  // (the system and the Tempo move the look a shooter waits for; from the point, a defender in Point shots lets it go)
+  const at = (up1 ? HK_THINK.ppAt : HK_THINK.shootAt) + (A.at || 0) + TP.at - (A.point && HK_ROLE[p.pos] === 'defender' ? .02 : 0) - (hkDim(s) ? HK_DIM.at : 0);
   const w = {
-    shoot: empty ? 8 : !inZone ? (late ? 5 : 0) : (ev > at ? (ev - .03) * 42 : O.ok && dist < 11 && !up1 ? .12 + held * .15 : 0) + (one && ev > .04 ? 2 : 0) + (late ? 5 : 0),
-    pass: best ? Math.max(.03, (best[1] - ev) * 6 + .12 + (press ? .7 : 0)) * (.25 + held * .7) * (up1 ? 1.6 : 1) : 0,
-    carry: short && !inZone && up > HK_RULES.blue ? .3 : (press ? .6 : 1.6) + (inZone ? 0 : .6),
-    dump: short && !inZone ? (press ? 4 : up < HK_RULES.blue ? .8 : 5) : !inZone && up > Lz / 2 && press && (!best || best[1] < .08) ? .7 : up < HK_RULES.blue && ndd < 1.4 && (!best || best[1] < 0) ? .3 : 0,
+    shoot: empty ? 8 : !inZone ? (late ? 5 : 0) : ((ev > at ? (ev - .03) * 42 : O.ok && dist < 11 && !up1 ? .12 + held * .15 : 0) + (one && ev > .04 ? 2 : 0)) * (W.shoot || 1) + (late ? 5 : 0),
+    pass: best ? Math.max(.03, (best[1] - ev) * 6 + .12 + (press ? .7 : 0)) * (.25 + held * .7) * (up1 ? 1.6 : 1) * (W.pass || 1) : 0,
+    carry: short && !inZone && up > HK_RULES.blue ? .3 : ((press ? .6 : 1.6) + (inZone ? 0 : .6)) * (W.carry || 1) * TP.carry,
+    dump: short && !inZone ? (press ? 4 : up < HK_RULES.blue ? .8 : 5) : ((!inZone && up > Lz / 2 && press && (!best || best[1] < .08) ? .7 : up < HK_RULES.blue && ndd < 1.4 && (!best || best[1] < 0) ? .3 : 0)
+      + (!inZone && up > Lz / 2 - 1 ? (W.dump > 1 ? W.dump * .5 : 0) + (TP.safe && hkLead(s) > 0 ? 1 : 0) : 0)) * (W.dump && W.dump < 1 ? W.dump : 1),
   };
   const k = wpick(w);
   if (k === 'shoot') return hkShoot(empty ? 'wrist' : kind);
@@ -31874,8 +31894,9 @@ function hkSoThink(h) {
 const HK_PULL = { at: .1, by: 2, up: .5 };
 function hkPullThink() {
   for (const s of [0, 1]) {
-    if (hkHandsOn() && s === GD.you) continue;
-    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at && diff >= 1 && diff <= HK_PULL.by;
+    // (yours is your own call, in Manage as in You play; a Squire never thinks of it, and an Archmage does a little sooner)
+    if ((GD.mode !== 'watch' && s === GD.you) || G.skill[s] < 1) continue;
+    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at * (G.skill[s] >= 2 ? 1.3 : 1) && diff >= 1 && diff <= HK_PULL.by;
     if (g.pulled === 'late' && !want) { g.pulled = false; continue; }
     if (!g.pulled && want && G.poss === s && hkUp(s, L.puck.x) > HK_RULES.len * HK_PULL.up) hkPull(s, 'late');
   }
@@ -31920,9 +31941,11 @@ function hkStart(opts) {
   G.stat = G.teams.map(t => t.roster.map(() => ({ g: 0, a: 0, sog: 0, att: 0, hit: 0, blk: 0, give: 0, take: 0, fow: 0, fot: 0, pim: 0, sec: 0, sa: 0, sv: 0, sh: 0 })));
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
+  GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
+  hkCallsStart(o);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: o.mode === 'play' ? 'play' : 'watch', you: o.you === 1 ? 1 : 0, auto: o.auto !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
   hkInputClear();
   hkLines(); hkFaceoffSpots(HK_RULES.len / 2, 0).forEach(([x, y], i) => { const p = L.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; });
   GD.fo = { x: HK_RULES.len / 2, y: 0 }; hkPuckAt(GD.fo.x, GD.fo.y);
@@ -32018,12 +32041,14 @@ function hkWhistle(x, y, msg, big, deadT, noChange) {
   GD.next = { x, y }; GD.deadT = deadT || HK_PACE.dead; if (msg) GD.msg = msg; if (big) GD.big = { k: big };
   for (const p of L.pl) { p.act = ''; p.actT = 0; }
   hkGo('dead');
+  hkCpuTimeout();
 }
 function hkFaceoffAt(x, y) {
   // a goalie pulled for an extra skater stays off for a face-off in the other half, and goes back for one in their own
   for (const s of [0, 1]) { const g = L.pl[hkGk(s)]; if (g.pulled && (g.pulled === 'delay' || hkUp(s, x) < HK_RULES.len / 2)) g.pulled = false; }
   hkLines();
-  // the lines change at the whistle (not the side that iced it)
+  // the coaches make their calls, and the lines change at the whistle (not the side that iced it)
+  hkCallsFaceoff();
   if (GD.ph !== 'break') hkChangeWhistle(GD.noChange == null ? -1 : GD.noChange); GD.noChange = -1;
   GD.fo = { x, y }; GD.set = { from: L.pl.map(p => [p.x, p.y]), to: hkFaceoffSpots(x, y) };
   for (const p of L.pl) { p.stun = 0; p.cd = 0; p.act = ''; }
@@ -32080,6 +32105,7 @@ function hkGoalScored(S) {
   const wiped = GD.delay && GD.delay.side !== S.side ? L.pl[GD.delay.i].n : ''; if (wiped) { hkPullBack(S.side, 'delay'); GD.delay = null; }
   const r = hkGoal(S.side), as = S.touch.filter(i => i !== S.i && L.pl[i].side === S.side).reverse().slice(0, 2).map(i => L.pl[i]);
   hkBoxAdd(S.side, p.ri, 'g'); for (const a of as) hkBoxAdd(S.side, a.ri, 'a');
+  if (str === 'even') G.sysLog[S.side][G.call[S.side].att].g++;
   G.log.push({ p: G.p, clock: Math.round(G.clock * 10) / 10, side: S.side, who: p.n, ri: p.ri, k: S.kind, a: as.map(a => a.n), str, en: !!S.en });
   hkEv('goal', p.n, S.kind);
   const how = S.en ? 'scores into the empty net' : S.kind === 'one' ? 'one-times it in' : S.kind === 'slap' ? `scores with a slap shot from ${S.dist} metres` : 'scores';
@@ -32178,7 +32204,7 @@ function hkEnd() {
 function hkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function hkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, p: G.p, ot: G.over ? G.over.ot : 0, so: !!(G.over && G.over.so), mins: G.mins,
-    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
+    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function hkBox() {
@@ -32478,9 +32504,16 @@ function hkDrawMsg(c) {
   c.save(); rr(c, 150, 508, 660, 30, 6); c.fillStyle = 'rgba(13,9,7,.82)'; c.fill(); c.restore();
   let m = GD.msg || ''; c.font = `600 17px ${HK_FONT}`; while (m.length > 12 && c.measureText(m).width > 640) m = m.slice(0, -2).trimEnd() + '…';
   txt(c, m, 480, 529, `600 17px ${HK_FONT}`, '#f3ead6', 'center');
-  // under it, who is on the power play (phase 3); for now each side's hits and face-offs
   const key = `${L.evN || 0}|${G.log.length}|${GD.ph}`;
   if (HKT.boxKey !== key) { HKT.boxKey = key; HKT.box = hkBox(); }
+  // under it: the system of the side with the puck against the other side's, green when it suits and red when it doesn't
+  if (G.call && GD.ph !== 'so' && GD.ph !== 'over') {
+    const s = G.poss, n = hkStrength(), e = hkEdgeNow(s), stale = n[0] === n[1] ? G.scout[s].n : 0;
+    const line = `${G.teams[s].short}: ${hkAttNow(s).n} against ${hkDefNow(1 - s).n}${stale ? ` · scouted${stale > 1 ? ' twice' : ''}` : ''}`;
+    c.save(); c.font = `600 13px ${HK_FONT}`; const w = c.measureText(line).width + 20; rr(c, 480 - w / 2, 551, w, 21, 5); c.fillStyle = 'rgba(13,9,7,.78)'; c.fill(); c.restore();
+    txt(c, line, 480, 566, `600 13px ${HK_FONT}`, e[0] > 0 ? '#bfe8a8' : e[0] < 0 ? '#ff9a7a' : '#f3ead6', 'center');
+    return;
+  }
   const line = HKT.box.map(b => `${b.team}: ${b.tot.hit} hits · ${b.tot.fow} of ${b.tot.fot} face-offs · ${b.tot.blk} blocks`).join('     ');
   txt(c, line, 480, 566, `600 13px ${HK_FONT}`, '#1c2c3a', 'center');
 }
@@ -32573,9 +32606,7 @@ function hkInput(o) {
     else if (!o.pass && HKI.pass) { HKI.pass = false; if (hkPuckMine() && !GD.meter) r = hkHandPass(HKI.now - HKI.passAt >= HK_HANDS.dump); }
   }
   if (o.act === 'switch') { if (GD.ph === 'live' && !hkPuckMine()) { L.me = hkNearMine(hkMe()); r = 'switch'; } }
-  if (o.act === 'pull') r = hkHandPull();
-  if (o.act === 'change') r = GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
-  if (o.act === 'auto') { GD.auto = !GD.auto; r = GD.auto ? 'auto' : 'manual'; }
+  if (['pull', 'change', 'auto', 'timeout'].includes(o.act)) r = hkBenchAct(o.act);
   return r;
 }
 function hkInputClear() {
@@ -32678,6 +32709,17 @@ function hkDrawEdge() {
   const e = HK_PACE.drop - GD.press;
   return e <= HK_HANDS.drop ? .08 + (1 - e / HK_HANDS.drop) * .22 : -.15;
 }
+/* the bench's calls, yours in Manage as in You play: 'pull' (the goalie off for an extra skater, or back), 'change'
+   (your tired skaters off now), 'auto' (the coach changes your lines, or leaves them to you), 'timeout'. Returns what
+   happened, or '' */
+function hkBenchAct(act) {
+  if (!GD || GD.mode === 'watch') return '';
+  if (act === 'pull') return hkHandPull();
+  if (act === 'change') return GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
+  if (act === 'auto') { GD.auto = !GD.auto; return GD.auto ? 'auto' : 'manual'; }
+  if (act === 'timeout') return hkTimeout(GD.you) ? '' : 'timeout';
+  return '';
+}
 // your goalie, pulled for an extra skater or sent back (G): only in a live play, and not while they hold the puck
 function hkHandPull() {
   if (GD.ph !== 'live') return '';
@@ -32694,7 +32736,7 @@ function hkGoalieHand(g) {
   return [x, clamp(g.y + HKI.steer[1] * 2, -HK_RULES.net, HK_RULES.net)];
 }
 function hkSetMode(m) {
-  if (!GD || !['watch', 'play'].includes(m)) return GD ? GD.mode : null;
+  if (!GD || !['watch', 'manage', 'play'].includes(m)) return GD ? GD.mode : null;
   GD.mode = m; hkInputClear();
   return m;
 }
@@ -32703,6 +32745,7 @@ function hkSetMode(m) {
    the bench. A tired skater is slower, turns wider and takes longer to get going (hkStaK), and shoots a little worse.
    So a line is good for a short shift, and then needs the bench.
    The bench is the rest of the roster after the six (up to HK_RULES.bench), in order. Changes:
+   (a Squire's coach is late with it: his skaters are spent before he sends them, HK_STA.late)
    - on the fly: a tired skater heads for their bench's door on the far boards and, there, the next fresh player comes
      over the boards in their spot (hkChangeStep). While they skate off their side is short around the puck, so the
      coach sends them only when their side has the puck or it is in the other half (hkCoach). By hand, one key sends
@@ -32712,7 +32755,7 @@ function hkSetMode(m) {
    otherwise the fresh player who suits the spot best. The goalie stays in all game.
    With nobody on the bench the six play on: they get a breather at each whistle and a rest between periods.
    Each time on is a shift (G.stat sh). */
-const HK_STA = { drain: .011, fast: .013, bench: .05, box: .05, whistle: .06, tired: .45, fresh: .8, floor: .15, slow: .2, door: 1.4 };
+const HK_STA = { drain: .011, fast: .013, bench: .05, box: .05, whistle: .06, tired: .45, late: .28, fresh: .8, floor: .15, slow: .2, door: 1.4 };
 // the bench doors, on the far boards either side of centre: [x, y] by side
 const hkDoor = side => [HK_RULES.len / 2 + (side ? 5 : -5), -HK_RULES.wid / 2 + .7];
 const hkSta = p => G.sta[p.side][p.ri];
@@ -32734,8 +32777,11 @@ function hkStaStep(dt) {
   for (const p of L.pl) {
     if (p.off || (p.pos === 'G' && !p.pulled)) continue;
     const top = 5.4 + p.r.spd * .42, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
-    G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * dt);
+    // (a pushed Tempo tires them, and so does a system that chases, while they are without the puck)
+    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1);
+    G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * tire * dt);
   }
+  if (!hkShort(0) && !hkShort(1)) G.sysLog[G.poss][G.call[G.poss].att].t += dt;
   for (const s of [0, 1]) {
     for (const i of hkBench(s)) G.sta[s][i] = Math.min(1, G.sta[s][i] + HK_STA.bench * dt);
     for (const b of G.box) if (b.side === s) G.sta[s][b.ri] = Math.min(1, G.sta[s][b.ri] + HK_STA.box * dt);
@@ -32754,11 +32800,11 @@ function hkSwap(p, inn) {
 function hkCoach(dt) {
   L.coachT = (L.coachT || 0) - dt; if (L.coachT > 0) return; L.coachT = .4;
   for (const s of [0, 1]) {
-    if (hkHandsOn() && s === GD.you && !GD.auto) continue;
+    if (GD.mode !== 'watch' && s === GD.you && !GD.auto) continue;
     const safe = G.poss === s || hkUp(s, L.puck.x) > HK_RULES.len / 2 + 2;
     if (!safe) continue;
     const going = hkSk(s).filter(p => p.chg).length; if (going >= 2) continue;
-    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < HK_STA.tired && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
+    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < (hkCpuSide(s) && G.skill[s] === 0 ? HK_STA.late : HK_STA.tired) && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
     for (const p of tired.slice(0, 2 - going)) { const inn = hkNextOn(s, p.pos); if (inn >= 0 && !hkSk(s).some(q => q.chg && q.chg.to === inn)) p.chg = { to: inn }; }
   }
 }
@@ -32790,6 +32836,170 @@ function hkChangeWhistle(not, rest) {
     for (const p of hkSk(s)) G.sta[s][p.ri] = Math.min(1, hkSta(p) + HK_STA.whistle);
     if (s === not) continue;
     for (const p of hkSk(s).filter(q => q.pos !== 'G' && hkSta(q) < .7).sort((a, b) => hkSta(a) - hkSta(b))) { const inn = hkNextOn(s, p.pos); if (inn >= 0) hkSwap(p, inn); }
+  }
+}
+/* Black Ice: the call (issue #83, phase 5). Each side has a standing call (G.call[side]): a system with the puck
+   (att), a system without it (def), a power-play and a penalty-kill setup (pp, pk), and two stances, Tempo and Edge.
+   It stays until it's changed: yours by you (in Manage and You play), the CPU's by its coach at each face-off, by its
+   skill (G.skill: 0 Squire, at random, whose skaters also chase the puck and pass on a guess; 1 Knight, who reads the
+   score, the clock and the ratings; 2 Archmage, who also reads your call and answers it).
+   - With the puck (HK_ATT): Cycle (work it low and wait for the look), Rush (carry it in at speed and shoot),
+     Dump and chase (send it into the corner and go and get it), Point shots (feed the defenders, with a body in
+     front) and Crash the net (shoot early, and everybody to the rebound).
+   - Without it (HK_DEF): Forecheck (go at them in their own end), Trap (clog the middle of the ice), Box (guard the
+     front of the net), Collapse (everyone low) and Man (each takes one).
+   - HK_EDGE is the rock, paper, scissors: how a system does against the other side's, +1, 0 or -1: a little on every
+     shot and every poke, with the ratings on top. hkEdgeNow(side) is the one in play for the side with the puck: the
+     power-play and penalty-kill setups when a side is short (HK_PP against HK_PK).
+   - The scout: a system kept on after a face-off is read a little better each time (G.scout, up to HK_SCOUT.max).
+   - Tempo: Push (quicker, more shots, more giveaways, more tiring), Balanced, Sit on it (slower and safer, fewer
+     shots, less tiring). Edge: Rough (more hits and pucks won, more penalties), Balanced, Clean.
+   - The timeout: HK_TO.n a game, at a whistle. The skaters on the ice get their breath back: most use after an icing,
+     when a tired line may not change.
+   G.sysLog[side][att]: { t (seconds with the puck in it), sog, g } (how each system is going). opts.calls fixes both
+   sides' calls for the lab ([{ att, def, pp, pk, tempo, edge } | null, ...]: a fixed side never changes its call). */
+const HK_ATT = {
+  cycle: { n: 'Cycle', desc: 'Work the puck low along the boards and wait for the look.', w: { pass: 1.5, carry: .8 }, at: .015 },
+  rush: { n: 'Rush', desc: 'Carry it in at speed and shoot before they are set.', w: { carry: 1.7, pass: .8, dump: .3 }, at: -.012 },
+  dump: { n: 'Dump and chase', desc: 'Send it into their corner and go and get it. Safe, and hard on their defenders.', w: { dump: 1.5, carry: .9 }, deep: 2, give: -.03 },
+  point: { n: 'Point shots', desc: 'Feed the defenders at the blue line, with a body in front of the goalie.', w: { pass: 1.3 }, point: .6, front: 1 },
+  crash: { n: 'Crash the net', desc: 'Shoot early and send everybody to the rebound.', w: { shoot: 1.3 }, at: -.012, front: 2, reb: 1.4, q: -.012 },
+};
+const HK_DEF = {
+  fore: { n: 'Forecheck', desc: 'Go at them in their own end: pucks won high up the ice, and a rush given up if they get through. Tiring.', high: 99, tire: 1.12, wing: [2.5, 5] },
+  trap: { n: 'Trap', desc: 'Clog the middle of the ice and wait: few rushes get through, but nobody goes and gets the puck.', high: 26, pick: 1.35, wing: [2.5, 5] },
+  box: { n: 'Box', desc: 'Four in a box in front of the net: the front is safe, the points are open.', high: 13, block: 1.25, wing: [5, 3.2] },
+  collapse: { n: 'Collapse', desc: 'Everyone low around the net: no room in close, and nobody near the points.', high: 11, block: 1.1, wing: [7.5, 2.4], slot: .02 },
+  man: { n: 'Man', desc: 'Each skater takes one of theirs, everywhere.', high: 99, wing: [2.5, 5] },
+};
+const HK_PP = {
+  umbrella: { n: 'Umbrella', desc: 'Three across the top: shots from the point and the half boards.', point: .9, w: { pass: 1.3 } },
+  overload: { n: 'Overload', desc: 'Stack one side and move it fast: quick passes for the one-timer.', w: { pass: 1.8 }, one: .03 },
+  front: { n: 'Net front', desc: 'A body in front of the goalie and everything at the net.', front: 2, w: { shoot: 1.3 }, reb: 1.3 },
+};
+const HK_PK = {
+  box: { n: 'Box', desc: 'Four in a box in front: the front is safe, the top is open.', high: 10, block: 1.2, wing: [5, 3.2] },
+  diamond: { n: 'Diamond', desc: 'One out high on the point man: point shots blocked, the slot a little softer.', high: 15, block: 1.35, slot: -.015, wing: [3.5, 4] },
+  press: { n: 'Pressure', desc: 'Go at the puck everywhere: more pucks won, more open looks if it fails, and tiring.', high: 99, tire: 1.2, slot: -.02, poke: .04, wing: [2.5, 5] },
+};
+// a system against a system: [+1 | 0 | -1, why] for the side with the puck
+const HK_EDGE = {
+  'cycle/man': [1, 'The cycle drags man coverage round after it.'], 'cycle/collapse': [-1, 'With everyone collapsed there is no room down low.'], 'cycle/trap': [1, 'The trap has nobody down low to stop the cycle.'],
+  'rush/fore': [1, 'A forecheck that is beaten gives up a rush.'], 'rush/trap': [-1, 'The trap clogs the middle the rush wants.'],
+  'dump/trap': [1, 'A trap does nothing against a dump.'], 'dump/collapse': [-1, 'A collapse is already back to get the puck first.'], 'dump/fore': [-1, 'Their forecheckers are up the ice: their defenders get to the dump in peace.'],
+  'point/collapse': [1, 'A collapse leaves the point open.'], 'point/box': [1, 'The box leaves the points alone.'], 'point/man': [-1, 'Man stays on the point men.'], 'point/fore': [-1, 'A forecheck never lets it get set at the point.'],
+  'crash/man': [1, 'Man loses bodies in the scramble in front.'], 'crash/box': [-1, 'The box owns the front of the net.'], 'crash/collapse': [-1, 'A collapse has everyone at the net already.'],
+};
+const HK_EDGE_PP = {
+  'umbrella/box': [1, 'The box leaves the top of the umbrella open.'], 'umbrella/diamond': [-1, 'The diamond\'s top man takes away the point.'],
+  'overload/diamond': [1, 'The overload pulls the diamond apart.'], 'overload/press': [-1, 'Pressure jumps the quick passes.'],
+  'front/box': [-1, 'The box clears the front of the net.'], 'front/press': [1, 'Pressure up high leaves the front of the net alone.'],
+};
+const HK_TEMPO = { push: { n: 'Push', desc: 'Quicker and more direct: more shots, more giveaways, and it tires your skaters.', think: .75, at: -.02, give: .025, tire: 1.15, carry: 1.3 },
+  bal: { n: 'Balanced', desc: 'The usual.', think: 1, at: 0, give: 0, tire: 1, carry: 1 },
+  sit: { n: 'Sit on it', desc: 'Slower and safer: fewer shots either way, and less tiring. For protecting a lead.', think: 1.2, at: .03, give: -.02, tire: .9, carry: .8, safe: 1 } };
+const HK_EDGES = { rough: { n: 'Rough', desc: 'Finish every check: more hits and more pucks won, and more penalties.', hit: 1.5, battle: 1.3, foul: 1.5 },
+  bal: { n: 'Balanced', desc: 'The usual.', hit: 1, battle: 1, foul: 1 },
+  clean: { n: 'Clean', desc: 'Sticks down and skate: fewer penalties, fewer hits.', hit: .6, battle: .9, foul: .4 } };
+const HK_TO = { n: 1, sta: .4, secs: 1.6 }, HK_SCOUT = { max: 2, q: .008 }, HK_CALL_Q = .016, HK_CALL_POKE = .02;
+const HK_SKILL = ['Squire', 'Knight', 'Archmage'];
+const HK_CALL_T = { att: HK_ATT, def: HK_DEF, pp: HK_PP, pk: HK_PK, tempo: HK_TEMPO, edge: HK_EDGES };
+const HK_CALL0 = { att: 'cycle', def: 'man', pp: 'umbrella', pk: 'box', tempo: 'bal', edge: 'bal' };
+
+function hkCallsStart(o) {
+  // (a fixed call takes only the ids that exist; anything else keeps the default)
+  const ok = c => Object.fromEntries(Object.entries(c || {}).filter(([k, v]) => HK_CALL_T[k] && HK_CALL_T[k][v]));
+  G.call = [0, 1].map(s => Object.assign({}, HK_CALL0, ok(o.calls && o.calls[s])));
+  G.fixed = [0, 1].map(s => !!(o.calls && o.calls[s]));
+  G.skill = [0, 1].map(s => { const k = Array.isArray(o.skill) ? o.skill[s] : o.skill; return [0, 1, 2].includes(k) ? k : 1; });
+  G.scout = G.call.map(c => ({ att: c.att, n: 0 })); G.to = [HK_TO.n, HK_TO.n];
+  G.sysLog = [0, 1].map(() => Object.fromEntries(Object.keys(HK_ATT).map(k => [k, { t: 0, sog: 0, g: 0 }])));
+}
+// the CPU's coach makes side's calls: not a fixed side, and not yours unless you only watch
+const hkCpuSide = side => !G.fixed[side] && !(GD.mode !== 'watch' && side === GD.you);
+// a Squire's side: its skaters drift after the puck, and its passes are guesses (05-live.js, 06-cpu.js)
+const hkDim = side => hkCpuSide(side) && G.skill[side] === 0;
+// what that costs it: slower decisions (think), shots from worse looks (at), passes valued with this much guesswork
+// (noise), and everyone drifting toward the puck out of their shape (drift). chase: a second skater at the carrier
+// (off: measured, it helped them as often as it hurt)
+const HK_DIM = { chase: 0, think: 1.2, at: .05, noise: .9, drift: .2 };
+const hkTempo = side => HK_TEMPO[G.call[side].tempo] || HK_TEMPO.bal;
+const hkEdgeSt = side => HK_EDGES[G.call[side].edge] || HK_EDGES.bal;
+// the system side is in with the puck, and without it, as the strengths stand: the power-play and penalty-kill setups when one side is short
+const hkAttNow = side => hkShort(1 - side) ? HK_PP[G.call[side].pp] : HK_ATT[G.call[side].att];
+const hkDefNow = side => hkShort(side) ? HK_PK[G.call[side].pk] : HK_DEF[G.call[side].def];
+// for the side with the puck: [+1 | 0 | -1, why], its system against theirs
+function hkEdgeNow(side) {
+  const A = G.call[side], D = G.call[1 - side];
+  if (hkShort(1 - side)) return HK_EDGE_PP[A.pp + '/' + D.pk] || [0, ''];
+  if (hkShort(side)) return [0, ''];
+  return HK_EDGE[A.att + '/' + D.def] || [0, ''];
+}
+// what the calls add to the odds of a shot by side beating the goalie: the edge, less what the scout has read
+const hkCallQ = side => hkEdgeNow(side)[0] * HK_CALL_Q + (hkAttNow(side).q || 0) - (hkShort(1 - side) || hkShort(side) ? 0 : G.scout[side].n * HK_SCOUT.q) - (hkDefNow(1 - side).slot || 0);
+// and to a poke at side's carrier (their Tempo, the other side's setup, the edge the other way)
+const hkCallPoke = side => hkTempo(side).give + (hkAttNow(side).give || 0) + (hkDefNow(1 - side).poke || 0) - hkEdgeNow(side)[0] * HK_CALL_POKE;
+/* a face-off: the scout looks again (the same system as last time is read a little better), and each CPU coach makes
+   its calls */
+function hkCallsFaceoff() {
+  // (the less skilled coach calls first, so the better one answers what is actually on)
+  for (const s of G.skill[0] <= G.skill[1] ? [0, 1] : [1, 0]) { if (hkCpuSide(s)) hkCpuCall(s); }
+  for (const s of [0, 1]) { const S = G.scout[s], a = G.call[s].att; if (S.att === a) S.n = Math.min(HK_SCOUT.max, S.n + 1); else { S.att = a; S.n = 0; } }
+}
+// your call, or the lab's: side's kind (att, def, pp, pk, tempo, edge) to id. '' when it took, or why not
+function hkCall(side, kind, id) {
+  if (!G || !G.call || !HK_CALL_T[kind] || !HK_CALL_T[kind][id]) return 'No such call.';
+  G.call[side][kind] = id;
+  if (kind === 'att' && G.scout[side].att !== id) G.scout[side] = { att: id, n: 0 };
+  return '';
+}
+const hkMean = (side, k, roles) => { const T = G.teams[side], on = G.on[side].filter((ri, i) => HK_POS[i] !== 'G' && (!roles || roles.includes(HK_ROLE[HK_POS[i]]))); return on.reduce((a, ri) => a + T.roster[ri].r[k], 0) / Math.max(1, on.length); };
+const hkLate = share => G.p >= HK_RULES.periods && G.clock < G.plen * share, hkLead = side => G.score[side] - G.score[1 - side];
+/* the CPU coach's call. A Squire picks at random. A Knight picks by its skaters (fast ones rush, big ones crash, good
+   shots at the back shoot from the point), and by the score and the clock (behind late: push and get it to the net;
+   ahead late: sit on it and clog the ice). An Archmage also looks at the other side's call and answers it. */
+function hkCpuCall(side) {
+  const C = G.call[side], O = G.call[1 - side], sk = G.skill[side];
+  if (sk === 0) {
+    if (R() < .35) for (const k of Object.keys(HK_CALL_T)) C[k] = pick(Object.keys(HK_CALL_T[k]));
+    return;
+  }
+  const spd = hkMean(side, 'spd'), siz = hkMean(side, 'siz'), hnd = hkMean(side, 'hnd'), dSht = hkMean(side, 'sht', ['defender']), def = hkMean(side, 'def');
+  const lead = hkLead(side), late = hkLate(.35);
+  const wa = { cycle: 1 + (hnd - 6) * .4, rush: 1 + (spd - 6) * .45, dump: .4 + (siz - 6) * .2, point: .6 + (dSht - 6) * .45, crash: .8 + (siz - 6) * .4 };
+  const wd = { fore: 1 + (spd - 6) * .35, trap: .9, box: .8 + (siz - 6) * .2, collapse: .7, man: 1 + (def - 6) * .35 };
+  if (late && lead < 0) { wa.rush *= 2; wa.crash *= 2.5; wa.dump *= .4; wd.fore *= 3; wd.trap *= .2; wd.collapse *= .3; }
+  if (late && lead > 0) { wa.cycle *= 1.5; wd.trap *= 2; wd.fore *= .5; }
+  // the Archmage: what beats their call is worth much more, and what loses to it much less
+  if (sk >= 2) {
+    for (const a of Object.keys(wa)) { const e = (HK_EDGE[a + '/' + O.def] || [0])[0]; wa[a] = Math.max(.05, wa[a]) * (e > 0 ? 3.5 : e < 0 ? .2 : 1); }
+    for (const d of Object.keys(wd)) { const e = (HK_EDGE[O.att + '/' + d] || [0])[0]; wd[d] = Math.max(.05, wd[d]) * (e < 0 ? 3.5 : e > 0 ? .2 : 1); }
+    const pp = Object.keys(HK_PP).map(k => [k, (HK_EDGE_PP[k + '/' + O.pk] || [0])[0]]).sort((a, b) => b[1] - a[1])[0], pk = Object.keys(HK_PK).map(k => [k, (HK_EDGE_PP[O.pp + '/' + k] || [0])[0]]).sort((a, b) => a[1] - b[1])[0];
+    C.pp = pp[0]; C.pk = pk[0];
+  } else { C.pp = dSht >= 7 ? 'umbrella' : siz >= 7 ? 'front' : 'overload'; C.pk = def >= 7 ? 'press' : 'box'; }
+  // (it keeps what it has most of the time: a system needs a few shifts)
+  if (R() < (sk >= 2 ? .6 : .4) || late) { C.att = wpick(wa); C.def = wpick(wd); }
+  C.tempo = late && lead < 0 ? 'push' : hkLate(.12) && lead > 0 ? 'sit' : 'bal';
+  C.edge = late && lead > 0 ? 'clean' : 'bal';
+}
+/* a timeout for side: at a whistle (a face-off pending), once a game. The skaters on the ice get their breath back.
+   '' when it's taken, or why not */
+function hkTimeout(side) {
+  if (!G.to || G.to[side] <= 0) return 'No timeout left.';
+  if (!['dead', 'set', 'drop'].includes(GD.ph)) return 'Only at a whistle.';
+  G.to[side]--;
+  for (const p of hkSk(side)) G.sta[side][p.ri] = Math.min(1, hkSta(p) + HK_TO.sta);
+  GD.msg = `Timeout, ${G.teams[side].name}. Their skaters get their breath back.`;
+  if (GD.ph === 'dead') GD.deadT = Math.max(GD.deadT, GD.t + HK_TO.secs); else { GD.ph = 'dead'; GD.t = 0; GD.deadT = HK_TO.secs; GD.next = { x: GD.fo.x, y: GD.fo.y }; }
+  hkEv('timeout', G.teams[side].name);
+  return '';
+}
+// the CPU's: a Knight or better, when its line is spent and may not change (it iced the puck), or late and a goal behind
+function hkCpuTimeout() {
+  for (const s of [0, 1]) {
+    if (!hkCpuSide(s) || G.skill[s] < 1 || G.to[s] <= 0) continue;
+    const sk = hkSk(s), tired = sk.length ? sk.reduce((a, p) => a + hkSta(p), 0) / sk.length : 1;
+    if ((GD.noChange === s && tired < .45) || (hkLate(.12) && hkLead(s) === -1 && tired < .5)) hkTimeout(s);
   }
 }
 /* The rink's page in the Realm (issue #83, phase 1). A canvas in #v-rink, after the court's, and a frame loop that
@@ -32879,6 +33089,17 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // the call (phase 5): the tables (id: { n, desc }), a system against a system ([+1 | 0 | -1, why]), each side's call
+  // now, the edge in play for a side with the puck, your call (call(side, kind, id): '' when it took), the bench's
+  // calls in Manage and You play (benchAct: 'change', 'auto', 'timeout', 'pull'), timeouts left, the scout, the coaches
+  atts: JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(HK_ATT).map(([k, v]) => [k, { n: v.n, desc: v.desc }])))), defs: Object.fromEntries(Object.entries(HK_DEF).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  pps: Object.fromEntries(Object.entries(HK_PP).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), pks: Object.fromEntries(Object.entries(HK_PK).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  tempos: Object.fromEntries(Object.entries(HK_TEMPO).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), edges: Object.fromEntries(Object.entries(HK_EDGES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  edge: (a, d) => (HK_EDGE[a + '/' + d] || [0, '']).slice(), edgePP: (a, d) => (HK_EDGE_PP[a + '/' + d] || [0, '']).slice(), edgeNow: side => G && G.call ? hkEdgeNow(side).slice() : [0, ''],
+  get calls() { return G && G.call ? G.call.map(c => Object.assign({}, c)) : null; }, call: (side, kind, id) => hkCall(side, kind, id), callQ: side => hkCallQ(side), callPoke: side => hkCallPoke(side),
+  benchAct: act => hkBenchAct(act), timeout: side => hkTimeout(side), get to() { return G && G.to ? G.to.slice() : [0, 0]; }, get scout() { return G && G.scout ? G.scout.map(x => Object.assign({}, x)) : null; },
+  skillNames: HK_SKILL.slice(), callRules: { q: HK_CALL_Q, poke: HK_CALL_POKE, scout: Object.assign({}, HK_SCOUT), to: Object.assign({}, HK_TO), dim: Object.assign({}, HK_DIM) }, faceoffCalls: () => { if (G && G.call) hkCallsFaceoff(); },
+  cpuCall: side => { if (G && G.call) hkCpuCall(side); }, defNow: side => G && G.call ? Object.assign({}, hkDefNow(side)) : null, attNow: side => G && G.call ? Object.assign({}, hkAttNow(side)) : null,
   // stamina and the bench (phase 4): the rules, each side's stamina by roster index, its bench in order, who is on the
   // way off; start() takes ordered: [yours, theirs] (the bench comes on in the roster's order) and auto (the coach
   // changes your lines: on unless false); input({ act: 'change' }) sends your tired skaters off now
@@ -44668,9 +44889,10 @@ const W_RINK = {
 const W_RINK_SHOT = { wrist: 'scores', slap: 'scores with a slap shot', one: 'one-times it in', so: 'wins the shootout' };
 const W_RINK_GOALIE = ['pull', 'Goalie', 'G: pull your goalie for an extra skater, or send them back', 0], W_RINK_CHANGE = ['change', 'Change', 'C: send your tired skaters off for fresh ones', 0];
 const W_RINK_STR = { pp: ' on the power play', sh: ' short-handed', even: '', so: '' };
-// who plays it: the CPU both sides, or you play your skaters by hand
+// who plays it: the CPU both sides, you coach (Manage, w90), or you play your skaters by hand
 const W_RINK_MODES = {
   watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
+  manage: { n: 'Manage', title: 'The skaters play, and you coach: the systems, the special teams, Tempo and Edge, the lines, the timeout and the goalie, under the rink.' },
   play: { n: 'You play', title: 'You play Rimewatch by hand: WASD to skate, Space to shoot (tap, or hold to wind up a slap shot) or check, J to pass (hold to send it hard) or poke, E to switch skaters, Shift to lift your stick. Let go of the keys and your skater plays on.' },
 };
 let W_RINK_MODE = 'play';
@@ -44751,7 +44973,7 @@ function wRinkGame(opts) {
   const o = opts || {};
   WHK = { over: null, how: o.how || 'scrimmage' }; wRinkTick(true);
   $('wRinkTitle').textContent = o.title || 'A scrimmage at the Pond Rink';
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered });
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }
@@ -45103,6 +45325,94 @@ renderHelp = function () {
   wW89RenderHelp();
   const after = $('wHelpRink'); if (!after || $('wHelpRinkTab')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkTab"><b>Hockey ratings, the six and the lines.</b> Every player also has hockey ratings: speed, size, hands, shot, defense and reflexes (1 to ${W_HKR.cap}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Hockey view. The Rink tab on the Team screen sets your six (centre, left and right wing, left and right defender, and the goalie) and the order of your bench. In a game stamina runs down fast: a tired skater is slower and shoots worse, so skaters play short shifts, and the first fresh player on your bench comes over the boards for a tired one. The goalie plays the whole game. Called-up players at your level fill the six when your roster is short. Practice game there plays your six against the Cinderhold Hockey Club; nothing is won or lost.</p>`);
+};
+/* w90: the call at the rink (issue #83, phase 5). Manage joins Watch and You play on the rink's bar (w88): the CPU
+   skates both sides and the calls are yours. Under the rink, in Manage and in You play, the coach's rows (#wRinkCalls,
+   laid out as the court's and the gridiron's are, w87): your system with the puck and without it, your power-play and
+   penalty-kill setups, Tempo and Edge, each button lit when it is on and its tooltip saying what it does and how it
+   does against their call now; then the bench: Change now, who changes your lines (the coach, or you), the timeout and
+   the goalie. A line under the rows says how your system is doing against theirs right now. In Watch the rows go and
+   a line says the coaches make the calls.
+   The other coach's skill is opts.skill (0 Squire, 1 Knight, 2 Archmage); a scrimmage's is a Knight.
+   Wraps: wRinkBarNote (wW90RinkBarNote: the rows kept up, the status line in Manage), wLeaveRink (wW90LeaveRink),
+   renderHelp (wW90RenderHelp: #wRinkHowCall). */
+const W_RINK_CALLS = [['att', 'With the puck', 'atts'], ['def', 'Without it', 'defs'], ['pp', 'Power play', 'pps'], ['pk', 'Penalty kill', 'pks'], ['tempo', 'Tempo', 'tempos'], ['edge', 'Edge', 'edges']];
+let W_RINK_ROWKEY = '';
+$('wRinkPad').insertAdjacentHTML('afterend', '<div id="wRinkCalls" class="wccalls wscoach" hidden></div><p id="wRinkCallsNone" class="hint" hidden>Watch: the coaches make the calls. Pick Manage to make yours, or You play to skate as well.</p>');
+
+// how a call of yours does against theirs now: a sentence, or ''
+function wRinkEdgeLine(kind, id) {
+  const you = wHK.you, C = wHK.calls, mine = C[you], theirs = C[1 - you];
+  const e = kind === 'att' ? wHK.edge(id, theirs.def) : kind === 'def' ? wHK.edge(theirs.att, id) : kind === 'pp' ? wHK.edgePP(id, theirs.pk) : kind === 'pk' ? wHK.edgePP(theirs.pp, id) : [0, ''];
+  if (!e[0]) return '';
+  const good = kind === 'att' || kind === 'pp' ? e[0] > 0 : e[0] < 0;
+  return `${good ? 'Good' : 'Poor'} against what they are in now: ${e[1]}`;
+}
+function wRinkCallRows() {
+  const you = wHK.you, mine = wHK.calls[you];
+  return W_RINK_CALLS.map(([kind, lab, table]) => `<div class="wccrow"><span class="wccl">${lab}</span>${Object.entries(wHK[table]).map(([k, v]) => { const edge = wRinkEdgeLine(kind, k);
+    return `<button class="ghost${mine[kind] === k ? ' on' : ''}${edge.startsWith('Good') ? ' wgood' : edge.startsWith('Poor') ? ' wpoor' : ''}" aria-pressed="${mine[kind] === k}" data-rcall="${kind}" data-rid="${k}" title="${esc(v.desc + (edge ? ' ' + edge : ''))}">${esc(v.n)}</button>`; }).join('')}</div>`).join('');
+}
+// the line under the rows: your system against theirs, both ways, as the strengths stand
+function wRinkNowLine() {
+  const you = wHK.you, C = wHK.calls, mine = C[you], theirs = C[1 - you], n = wHK.strength();
+  const part = (e, a, d, yours) => `${yours ? 'Your' : 'Their'} ${a} against ${yours ? 'their' : 'your'} ${d}${e[0] ? `: ${e[1]}` : ': even.'}`;
+  if (n[you] > n[1 - you]) return part(wHK.edgePP(mine.pp, theirs.pk), wHK.pps[mine.pp].n, wHK.pks[theirs.pk].n, true);
+  if (n[you] < n[1 - you]) return part(wHK.edgePP(theirs.pp, mine.pk), wHK.pps[theirs.pp].n, wHK.pks[mine.pk].n, false);
+  return `${part(wHK.edge(mine.att, theirs.def), wHK.atts[mine.att].n, wHK.defs[theirs.def].n, true)} ${part(wHK.edge(theirs.att, mine.def), wHK.atts[theirs.att].n, wHK.defs[mine.def].n, false)}`;
+}
+function wRinkCalls(force) {
+  const box = $('wRinkCalls'), mode = wHK.mode, show = !!WHK && !WHK.over && !!wHK.calls && mode !== 'watch';
+  box.hidden = !show; $('wRinkCallsNone').hidden = !WHK || !!WHK.over || mode !== 'watch';
+  if (!show) { W_RINK_ROWKEY = ''; return; }
+  if (!box.querySelector('.wccrows')) box.innerHTML = '<div class="wccrows"></div><p class="hint wrnow" id="wRinkNow"></p><div class="wccnowbox"></div>';
+  const you = wHK.you, C = wHK.calls, rk = JSON.stringify([C, wHK.strength()]);
+  if (force || rk !== W_RINK_ROWKEY) { W_RINK_ROWKEY = rk; box.querySelector('.wccrows').innerHTML = wRinkCallRows(); $('wRinkNow').textContent = wRinkNowLine(); }
+  const to = wHK.to[you], pulled = wHK.pulled(you), ph = wHK.phase, whistle = ['dead', 'set', 'drop'].includes(ph), nk = [to, pulled, wHK.auto, whistle, ph === 'live', wHK.skillNames[wHK.G.skill[1 - you]]].join('|');
+  if (force || nk !== box.dataset.now) {
+    box.dataset.now = nk;
+    box.querySelector('.wccnowbox').innerHTML = `<div class="wccrow"><span class="wccl">Bench</span>
+      <button class="ghost" data-rbench="change" ${ph === 'live' ? '' : 'disabled'} title="Send your tired skaters off for fresh ones now. At the wrong moment it gives up a rush.">Change now</button>
+      <button class="ghost${wHK.auto ? ' on' : ''}" data-rbench="auto" aria-pressed="${wHK.auto}" title="Who changes your lines: the coach (when it is safe), or only you.">Lines: ${wHK.auto ? 'the coach' : 'you'}</button>
+      <button class="ghost" data-rbench="timeout" ${to && whistle ? '' : 'disabled'} title="One a game, at a whistle: your skaters on the ice get their breath back. Most use after an icing, when a tired line may not change.">Timeout (${to} left)</button>
+      <button class="ghost${pulled ? ' on' : ''}" data-rbench="pull" ${ph === 'live' ? '' : 'disabled'} aria-pressed="${!!pulled}" title="Take your goalie off for an extra skater, or send them back. The net is empty while they are off.">${pulled ? 'Goalie back' : 'Pull goalie'}</button>
+      <small class="hint">Their coach: ${esc(wHK.skillNames[wHK.G.skill[1 - you]])}.</small></div>`;
+  }
+}
+$('wRinkCalls').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || !WHK) return;
+  if (b.dataset.rcall) { wHK.call(wHK.you, b.dataset.rcall, b.dataset.rid); wRinkCalls(true); }
+  else if (b.dataset.rbench) { wHK.benchAct(b.dataset.rbench); wRinkCalls(true); }
+});
+
+const wW90RinkBarNote = wRinkBarNote;
+wRinkBarNote = function () {
+  wW90RinkBarNote();
+  if (WHK && !WHK.over && wHK.mode === 'manage') { const G = wHK.G; $('wRinkNote').textContent = `You manage ${G.teams[0].name}: the calls under the rink are yours (systems, special teams, Tempo, Edge, the lines, the timeout and the goalie), and the skaters play them.`; }
+  wRinkCalls(true);
+};
+// (kept up with the pad, a few times a second)
+const wW90RinkPad = wRinkPad;
+wRinkPad = function () { wW90RinkPad(); if (WHK && UI.view === 'rink') wRinkCalls(false); };
+const wW90LeaveRink = wLeaveRink;
+wLeaveRink = function () { W_RINK_ROWKEY = ''; $('wRinkCalls').hidden = true; $('wRinkCallsNone').hidden = true; return wW90LeaveRink(); };
+
+function wRinkHowCallHTML() {
+  const list = T => Object.values(T).map(v => `<b>${esc(v.n)}</b> (${esc(v.desc.replace(/\.$/, ''))})`).join('; ');
+  return `<p class="hint"><b>The call.</b> Each side has a system with the puck, a system without it, a power-play and a penalty-kill setup, and two stances. Yours are under the rink in <b>Manage</b> (the skaters play, you coach) and in You play; they stand until you change them.</p>
+  <p class="hint"><b>With the puck:</b> ${list(wHK.atts)}. <b>Without it:</b> ${list(wHK.defs)}.</p>
+  <p class="hint">They work like rock, paper, scissors, with the ratings on top: a Forecheck that is beaten gives up a Rush, the Trap stops a Rush and does nothing against a Dump, a Collapse leaves the Point open and smothers a Cycle, and a Box owns the front of the net against a Crash. A system that suits what they are in is worth a little on every shot and every poke. The line under the rows says how yours is doing against theirs now, and each button's tooltip says how it would do.</p>
+  <p class="hint"><b>Power play:</b> ${list(wHK.pps)}. <b>Penalty kill:</b> ${list(wHK.pks)}. These take over when a side is a skater short.</p>
+  <p class="hint"><b>The scout.</b> A system kept on from one face-off to the next is read a little better each time. Change it now and then.</p>
+  <p class="hint"><b>Tempo:</b> ${list(wHK.tempos)}. <b>Edge:</b> ${list(wHK.edges)}.</p>
+  <p class="hint"><b>The bench.</b> Change now sends your tired skaters off; Lines sets whether the coach changes them for you. One <b>timeout</b> a game, at a whistle: the skaters on the ice get their breath back, which matters most after you ice the puck, when your tired line may not change. Pull goalie takes yours off for an extra skater.</p>
+  <p class="hint"><b>Their coach</b> is a Squire, a Knight or an Archmage. A Squire calls at random, is late changing lines, and his skaters drift after the puck and pass on a guess. A Knight reads the score and the clock and plays to his skaters. An Archmage also reads your call and answers it.</p>`;
+}
+const wW90RenderHelp = renderHelp;
+renderHelp = function () {
+  wW90RenderHelp();
+  const h = $('wRinkHow'); if (!h || $('wRinkHowCall')) return;
+  h.insertAdjacentHTML('beforeend', `<div id="wRinkHowCall">${wRinkHowCallHTML()}</div>`);
 };
 </script>
 </body></html>

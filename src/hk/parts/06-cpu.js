@@ -22,9 +22,11 @@ function hkLaneRisk(side, x, y, tx, ty) {
 function hkPassValue(h, j) {
   const p = L.pl[h], q = L.pl[j], s = p.side, d = hyp(q.x - p.x, q.y - p.y);
   const O = hkShotOdds(q, 'one', q.x, q.y), look = O.ok && O.dist < 13 ? (1 - O.miss) * O.q * (O.block ? .75 : 1) : 0;
-  const across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? .06 : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
+  // (an Archmage's side looks harder for the pass across the front; Point shots and the Umbrella want it at the point)
+  const A = hkAttNow(s), across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? (hkCpuSide(s) && G.skill[s] >= 2 ? .1 : .06) : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
+  const point = A.point && HK_ROLE[q.pos] === 'defender' && hkUp(s, q.x) > HK_RULES.len - HK_RULES.blue - 1 ? A.point * .08 : 0;
   const [, md] = hkNearest(q.x, q.y, hkSk(1 - s));
-  return look + across + prog * .4 - hkLaneRisk(s, p.x, p.y, q.x, q.y) - (d > 18 ? .15 : 0) - (d < 2.5 ? .2 : 0) - (md < 1.3 ? .08 : 0);
+  return look + across + point + (hkDim(s) ? (R() - .5) * HK_DIM.noise : 0) + prog * .4 - hkLaneRisk(s, p.x, p.y, q.x, q.y) - (d > 18 ? .15 : 0) - (d < 2.5 ? .2 : 0) - (md < 1.3 ? .08 : 0);
 }
 function hkThink(h) {
   const p = L.pl[h], s = p.side;
@@ -42,12 +44,15 @@ function hkThink(h) {
   // an empty net is shot at from anywhere with a clear lane; a side a skater short clears it and doesn't mind the icing
   const empty = !hkInNet(1 - s) && O.ok && !O.block && dist < 20, short = hkShort(s);
   // with a skater more, a side waits for the good look and moves the puck; with one fewer, it doesn't carry it up the ice
-  const up1 = hkShort(1 - s), at = up1 ? HK_THINK.ppAt : HK_THINK.shootAt;
+  const up1 = hkShort(1 - s), A = hkAttNow(s), TP = hkTempo(s), W = A.w || {};
+  // (the system and the Tempo move the look a shooter waits for; from the point, a defender in Point shots lets it go)
+  const at = (up1 ? HK_THINK.ppAt : HK_THINK.shootAt) + (A.at || 0) + TP.at - (A.point && HK_ROLE[p.pos] === 'defender' ? .02 : 0) - (hkDim(s) ? HK_DIM.at : 0);
   const w = {
-    shoot: empty ? 8 : !inZone ? (late ? 5 : 0) : (ev > at ? (ev - .03) * 42 : O.ok && dist < 11 && !up1 ? .12 + held * .15 : 0) + (one && ev > .04 ? 2 : 0) + (late ? 5 : 0),
-    pass: best ? Math.max(.03, (best[1] - ev) * 6 + .12 + (press ? .7 : 0)) * (.25 + held * .7) * (up1 ? 1.6 : 1) : 0,
-    carry: short && !inZone && up > HK_RULES.blue ? .3 : (press ? .6 : 1.6) + (inZone ? 0 : .6),
-    dump: short && !inZone ? (press ? 4 : up < HK_RULES.blue ? .8 : 5) : !inZone && up > Lz / 2 && press && (!best || best[1] < .08) ? .7 : up < HK_RULES.blue && ndd < 1.4 && (!best || best[1] < 0) ? .3 : 0,
+    shoot: empty ? 8 : !inZone ? (late ? 5 : 0) : ((ev > at ? (ev - .03) * 42 : O.ok && dist < 11 && !up1 ? .12 + held * .15 : 0) + (one && ev > .04 ? 2 : 0)) * (W.shoot || 1) + (late ? 5 : 0),
+    pass: best ? Math.max(.03, (best[1] - ev) * 6 + .12 + (press ? .7 : 0)) * (.25 + held * .7) * (up1 ? 1.6 : 1) * (W.pass || 1) : 0,
+    carry: short && !inZone && up > HK_RULES.blue ? .3 : ((press ? .6 : 1.6) + (inZone ? 0 : .6)) * (W.carry || 1) * TP.carry,
+    dump: short && !inZone ? (press ? 4 : up < HK_RULES.blue ? .8 : 5) : ((!inZone && up > Lz / 2 && press && (!best || best[1] < .08) ? .7 : up < HK_RULES.blue && ndd < 1.4 && (!best || best[1] < 0) ? .3 : 0)
+      + (!inZone && up > Lz / 2 - 1 ? (W.dump > 1 ? W.dump * .5 : 0) + (TP.safe && hkLead(s) > 0 ? 1 : 0) : 0)) * (W.dump && W.dump < 1 ? W.dump : 1),
   };
   const k = wpick(w);
   if (k === 'shoot') return hkShoot(empty ? 'wrist' : kind);
@@ -88,8 +93,9 @@ function hkSoThink(h) {
 const HK_PULL = { at: .1, by: 2, up: .5 };
 function hkPullThink() {
   for (const s of [0, 1]) {
-    if (hkHandsOn() && s === GD.you) continue;
-    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at && diff >= 1 && diff <= HK_PULL.by;
+    // (yours is your own call, in Manage as in You play; a Squire never thinks of it, and an Archmage does a little sooner)
+    if ((GD.mode !== 'watch' && s === GD.you) || G.skill[s] < 1) continue;
+    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at * (G.skill[s] >= 2 ? 1.3 : 1) && diff >= 1 && diff <= HK_PULL.by;
     if (g.pulled === 'late' && !want) { g.pulled = false; continue; }
     if (!g.pulled && want && G.poss === s && hkUp(s, L.puck.x) > HK_RULES.len * HK_PULL.up) hkPull(s, 'late');
   }

@@ -87,9 +87,7 @@ function hkInput(o) {
     else if (!o.pass && HKI.pass) { HKI.pass = false; if (hkPuckMine() && !GD.meter) r = hkHandPass(HKI.now - HKI.passAt >= HK_HANDS.dump); }
   }
   if (o.act === 'switch') { if (GD.ph === 'live' && !hkPuckMine()) { L.me = hkNearMine(hkMe()); r = 'switch'; } }
-  if (o.act === 'pull') r = hkHandPull();
-  if (o.act === 'change') r = GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
-  if (o.act === 'auto') { GD.auto = !GD.auto; r = GD.auto ? 'auto' : 'manual'; }
+  if (['pull', 'change', 'auto', 'timeout'].includes(o.act)) r = hkBenchAct(o.act);
   return r;
 }
 function hkInputClear() {
@@ -192,6 +190,17 @@ function hkDrawEdge() {
   const e = HK_PACE.drop - GD.press;
   return e <= HK_HANDS.drop ? .08 + (1 - e / HK_HANDS.drop) * .22 : -.15;
 }
+/* the bench's calls, yours in Manage as in You play: 'pull' (the goalie off for an extra skater, or back), 'change'
+   (your tired skaters off now), 'auto' (the coach changes your lines, or leaves them to you), 'timeout'. Returns what
+   happened, or '' */
+function hkBenchAct(act) {
+  if (!GD || GD.mode === 'watch') return '';
+  if (act === 'pull') return hkHandPull();
+  if (act === 'change') return GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
+  if (act === 'auto') { GD.auto = !GD.auto; return GD.auto ? 'auto' : 'manual'; }
+  if (act === 'timeout') return hkTimeout(GD.you) ? '' : 'timeout';
+  return '';
+}
 // your goalie, pulled for an extra skater or sent back (G): only in a live play, and not while they hold the puck
 function hkHandPull() {
   if (GD.ph !== 'live') return '';
@@ -208,7 +217,7 @@ function hkGoalieHand(g) {
   return [x, clamp(g.y + HKI.steer[1] * 2, -HK_RULES.net, HK_RULES.net)];
 }
 function hkSetMode(m) {
-  if (!GD || !['watch', 'play'].includes(m)) return GD ? GD.mode : null;
+  if (!GD || !['watch', 'manage', 'play'].includes(m)) return GD ? GD.mode : null;
   GD.mode = m; hkInputClear();
   return m;
 }

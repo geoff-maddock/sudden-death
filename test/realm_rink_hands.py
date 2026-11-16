@@ -151,7 +151,7 @@ async def main():
         await pg.evaluate("wRinkGame({ seed: 7 })")
         await pg.wait_for_function("UI.view === 'rink' && wHK.phase === 'live' && !document.getElementById('wRinkPad').hidden")
         b = await pg.evaluate("({ modes: [...document.querySelectorAll('#wRinkModes button')].map(x => x.textContent), on: [...document.querySelectorAll('#wRinkModes button.on')].map(x => x.textContent), mode: wHK.mode, note: document.getElementById('wRinkNote').textContent })")
-        check(b['modes'] == ['Watch', 'You play'] and b['on'] == ['You play'] and b['mode'] == 'play' and 'WASD' in b['note'], 'the bar has Watch and You play, You play to begin with, and the status line has the keys', b)
+        check(b['modes'] == ['Watch', 'Manage', 'You play'] and b['on'] == ['You play'] and b['mode'] == 'play' and 'WASD' in b['note'], 'the bar has Watch, Manage and You play, You play to begin with, and the status line has the keys', b)
         await pg.evaluate("wHK.pause(true)")
         await pg.keyboard.down('d'); k1 = await pg.evaluate("wHK.inputState.steer"); await pg.keyboard.down('w'); k2 = await pg.evaluate("wHK.inputState.steer")
         await pg.keyboard.up('d'); await pg.keyboard.up('w'); k3 = await pg.evaluate("wHK.inputState.steer")

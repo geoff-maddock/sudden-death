@@ -445,3 +445,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wsh{max-width:960px;margin:14px auto 6px;font-family:var(--hud);font-size:17px;font-weight:400;color:var(--dim)}
 .wslog{max-width:960px;margin:0 auto 10px;max-height:260px}
 @media (max-width:760px){#wGridLineup{grid-template-columns:minmax(0,1fr)}.wscoach .wgtip,.wscoach .wgbench>p{margin-left:0}.wccrow .wccl{width:100%}}
+/* the rink's calls (w90): a call that suits what they are in, or doesn't; the line under the rows */
+.wccrow button.wgood:not(.on){border-color:#6fae5a}.wccrow button.wpoor:not(.on){border-color:#b8553a}
+.wscoach .wrnow{margin:2px 0 4px 90px;line-height:1.35}
+@media (max-width:640px){.wscoach .wrnow{margin-left:0}}

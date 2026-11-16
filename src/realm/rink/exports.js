@@ -23,6 +23,17 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // the call (phase 5): the tables (id: { n, desc }), a system against a system ([+1 | 0 | -1, why]), each side's call
+  // now, the edge in play for a side with the puck, your call (call(side, kind, id): '' when it took), the bench's
+  // calls in Manage and You play (benchAct: 'change', 'auto', 'timeout', 'pull'), timeouts left, the scout, the coaches
+  atts: JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(HK_ATT).map(([k, v]) => [k, { n: v.n, desc: v.desc }])))), defs: Object.fromEntries(Object.entries(HK_DEF).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  pps: Object.fromEntries(Object.entries(HK_PP).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), pks: Object.fromEntries(Object.entries(HK_PK).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  tempos: Object.fromEntries(Object.entries(HK_TEMPO).map(([k, v]) => [k, { n: v.n, desc: v.desc }])), edges: Object.fromEntries(Object.entries(HK_EDGES).map(([k, v]) => [k, { n: v.n, desc: v.desc }])),
+  edge: (a, d) => (HK_EDGE[a + '/' + d] || [0, '']).slice(), edgePP: (a, d) => (HK_EDGE_PP[a + '/' + d] || [0, '']).slice(), edgeNow: side => G && G.call ? hkEdgeNow(side).slice() : [0, ''],
+  get calls() { return G && G.call ? G.call.map(c => Object.assign({}, c)) : null; }, call: (side, kind, id) => hkCall(side, kind, id), callQ: side => hkCallQ(side), callPoke: side => hkCallPoke(side),
+  benchAct: act => hkBenchAct(act), timeout: side => hkTimeout(side), get to() { return G && G.to ? G.to.slice() : [0, 0]; }, get scout() { return G && G.scout ? G.scout.map(x => Object.assign({}, x)) : null; },
+  skillNames: HK_SKILL.slice(), callRules: { q: HK_CALL_Q, poke: HK_CALL_POKE, scout: Object.assign({}, HK_SCOUT), to: Object.assign({}, HK_TO), dim: Object.assign({}, HK_DIM) }, faceoffCalls: () => { if (G && G.call) hkCallsFaceoff(); },
+  cpuCall: side => { if (G && G.call) hkCpuCall(side); }, defNow: side => G && G.call ? Object.assign({}, hkDefNow(side)) : null, attNow: side => G && G.call ? Object.assign({}, hkAttNow(side)) : null,
   // stamina and the bench (phase 4): the rules, each side's stamina by roster index, its bench in order, who is on the
   // way off; start() takes ordered: [yours, theirs] (the bench comes on in the roster's order) and auto (the coach
   // changes your lines: on unless false); input({ act: 'change' }) sends your tired skaters off now

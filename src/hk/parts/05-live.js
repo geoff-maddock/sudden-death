@@ -143,7 +143,7 @@ function hkStep(dt) {
   const h = hkHand();
   if (L.wind) { L.wind.t -= dt; if (h !== L.wind.i) L.wind = null; else if (L.wind.t <= 0) { const w = L.wind; L.wind = null; hkRelease(w.i, w.kind); } }
   // (the CPU keeps its hands off a skater you are playing)
-  else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = .2 + R() * .2; hkThink(h); } }
+  else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = (.2 + R() * .2) * hkTempo(L.pl[h].side).think * (hkDim(L.pl[h].side) ? HK_DIM.think : 1); hkThink(h); } }
   hkMeterStep(dt); hkLunge(dt);
   if (GD.ph === 'live') { hkStaStep(dt); hkCoach(dt); hkChangeStep(); }
   hkChase();
@@ -183,9 +183,12 @@ function hkAim(p, i) {
   }
   const c = L.pl[h];
   // without the puck: the nearest skater goes at the carrier (not at a goalie holding it)
-  // (a side a skater short sits back in its box: it goes at the carrier only down low in its own end)
-  if (c.side !== p.side && !hkIsGk(c) && (!hkShort(p.side) || hkUp(p.side, c.x) < 10) && hkPresser(p.side) === i) return [c.x + c.vx * .22, c.y + c.vy * .22];
-  return hkForm(p);
+  // (how far up the ice a side goes at the carrier is its system's: a Forecheck anywhere, a Box only in front of its net)
+  if (c.side !== p.side && !hkIsGk(c) && hkUp(p.side, c.x) < hkDefNow(p.side).high && (hkPresser(p.side) === i || (HK_DIM.chase && hkDim(p.side) && hkSecond(p.side, c) === i))) return [c.x + c.vx * .22, c.y + c.vy * .22];
+  const f = hkForm(p);
+  // (a Squire's skaters drift toward the puck, out of their shape)
+  if (HK_DIM.drift && hkDim(p.side) && c.side !== p.side) return [lerp(f[0], c.x, HK_DIM.drift), lerp(f[1], c.y, HK_DIM.drift)];
+  return f;
 }
 // the skater of side who presses the carrier: the nearest, with a lean to whoever was already doing it
 function hkPresser(side) {
@@ -193,6 +196,8 @@ function hkPresser(side) {
   for (const p of hkSk(side)) { if (p.stun > 0 || p.chg) continue; const i = L.pl.indexOf(p), d = hyp(p.x - c.x, p.y - c.y) - (L.press === i ? 1.2 : 0); if (d < bd) { bd = d; b = i; } }
   L.press = b; return b;
 }
+// a Squire's side sends a second skater at the carrier: the next nearest, leaving their place in the shape
+function hkSecond(side, c) { let b = -1, bd = 1e9; for (const p of hkSk(side)) { const i = L.pl.indexOf(p); if (i === L.press || p.stun > 0 || p.chg) continue; const d = hyp(p.x - c.x, p.y - c.y); if (d < bd) { bd = d; b = i; } } return bd < 9 ? b : -1; }
 // the shape: where p stands by spot, by which side has the puck and where it is
 function hkForm(p) {
   const P = L.puck, s = p.side, Lz = HK_RULES.len, pu = hkUp(s, P.x), pv = P.y * hkDir(s), att = G.poss === s, i = L.pl.indexOf(p);
@@ -203,18 +208,23 @@ function hkForm(p) {
   // a skater short, a side doesn't send anybody ahead of the puck: it gets it out, and gets back
   if (att && hkShort(s)) return hkAt(s, clamp(pu - (p.pos === 'C' ? 1.5 : wing ? 3 : 7), 4, Lz - 14), wing ? wing * 5 : p.pos === 'C' ? pv * .4 : ds * 3);
   if (att) {
+    const A = hkAttNow(s);
     if (pu > Lz - HK_RULES.blue - 1) {
-      if (p.pos === 'C') { u = Lz - 8.5 + drift; v = clamp(-pv * .35, -3, 3) + drift * .9; }
-      else if (wing) { const strong = wing * pv > 0; u = strong ? Lz - 5.5 + drift * .5 : Lz - 6 + drift * .7; v = strong ? wing * 6.5 : wing * 2.4; }
+      // (a system that wants a body in front puts the centre on the goalie's doorstep, and the far wing too when it wants two)
+      if (p.pos === 'C') { if (A.front) { u = Lz - 4.7; v = clamp(-pv * .12, -.7, .7); } else { u = Lz - 8.5 + drift; v = clamp(-pv * .35, -3, 3) + drift * .9; } }
+      else if (wing) { const strong = wing * pv > 0; u = strong ? Lz - 5.5 + drift * .5 : A.front > 1 ? Lz - 4.9 : Lz - 6 + drift * .7; v = strong ? wing * 6.5 : A.front > 1 ? wing * 1.3 : wing * 2.4; }
       else { u = Lz - HK_RULES.blue + 1.2; v = ds * 5 + pv * .2; }
     } else {
-      if (p.pos === 'C') { u = pu + 3.5; v = pv * .4 + drift; } else if (wing) { u = pu + 7; v = wing * 7; } else { u = pu - 5; v = ds * 4 + pv * .2; }
+      if (p.pos === 'C') { u = pu + 3.5; v = pv * .4 + drift; } else if (wing) { u = pu + 7 + (A.deep || 0); v = wing * 7; } else { u = pu - 5; v = ds * 4 + pv * .2; }
       u = clamp(u, 5, Lz - 5);
     }
   } else if (pu < HK_RULES.blue + 2) {
     if (p.pos === 'C') { u = clamp(pu + 1.5, 5, 10); v = pv * .45; }
-    else if (wing) { const box = hkShort(s); u = HK_RULES.blue - (box ? 5 : 2.5); v = wing * (box ? 3.2 : 5) + pv * .25; }
+    else if (wing) { const [back, wide] = hkDefNow(s).wing; u = HK_RULES.blue - back; v = wing * wide + pv * .25; }
     else { const strong = Math.abs(pv) < 1 ? ds > 0 : ds * pv > 0; u = strong ? clamp(pu + .8, 3.8, 10) : 4.8; v = strong ? pv * .8 : ds * 1.1; }
+  } else if (hkDefNow(s).high === 26 && pu > Lz / 2) {
+    // the Trap: three across the middle of the ice, two behind them, and wait
+    if (p.pos === 'C') { u = Lz / 2 + 1; v = pv * .5; } else if (wing) { u = Lz / 2 - 1; v = wing * 5; } else { u = HK_RULES.blue - 1; v = ds * 3.5 + pv * .15; }
   } else {
     if (p.pos === 'C') { u = pu - 3; v = pv * .5; } else if (wing) { u = pu - 1.5; v = wing * 6; } else { u = pu - 9; v = ds * 3.5 + pv * .15; }
     u = clamp(u, 6, Lz - 8);
@@ -232,8 +242,8 @@ function hkChecks() {
     d.cd = .8 + R() * .4;
     const closing = ((d.vx - c.vx) * dx + (d.vy - c.vy) * dy) / (dist || 1);
     // beaten, and reaching from behind: a hook
-    if (closing < -.5 && R() < HK_FOUL.hook) return hkFoul(d, 'hooking', c);
-    if (closing > 3.5 && R() < clamp(.4 + (d.r.siz - 5) * .06, .1, .85)) return hkHit(d, c, closing);
+    if (closing < -.5 && R() < HK_FOUL.hook * hkEdgeSt(d.side).foul) return hkFoul(d, 'hooking', c);
+    if (closing > 3.5 && R() < clamp((.4 + (d.r.siz - 5) * .06) * hkEdgeSt(d.side).hit, .05, .95)) return hkHit(d, c, closing);
     return hkPoke(d, c);
   }
 }
@@ -241,10 +251,10 @@ function hkChecks() {
 // checker's stick. True when it worked
 function hkPoke(d, c, edge) {
   d.act = 'poke'; d.actT = .25;
-  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0), .04, .6)) {
+  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side), .04, .6)) {
     hkEv('pokemiss', d.n, c.n);
     // a miss up close can take their skates out: a trip
-    if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip) hkFoul(d, 'tripping', c);
+    if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip * hkEdgeSt(d.side).foul) hkFoul(d, 'tripping', c);
     return false;
   }
   hkBoxAdd(d.side, d.ri, 'take'); hkBoxAdd(c.side, c.ri, 'give'); hkEv('poke', d.n, c.n);
@@ -258,7 +268,7 @@ function hkHit(d, c, closing) {
   d.act = 'hit'; d.actT = .3;
   // from behind into the boards is boarding; now and then a hit is just too much (roughing)
   const dv = hyp(d.vx, d.vy) || 1, behind = (d.vx * c.fx + d.vy * c.fy) / dv > .5, wall = Math.abs(c.y) > HK_RULES.wid / 2 - 2 || c.x < 2.5 || c.x > HK_RULES.len - 2.5;
-  const foul = behind && wall ? (R() < HK_FOUL.board ? 'boarding' : '') : R() < HK_FOUL.rough ? 'roughing' : '';
+  const fk = hkEdgeSt(d.side).foul, foul = behind && wall ? (R() < Math.min(.9, HK_FOUL.board * fk) ? 'boarding' : '') : R() < HK_FOUL.rough * fk ? 'roughing' : '';
   if (R() < clamp(.34 + (d.r.siz - c.r.siz) * .045 + (closing - 3) * .04, .08, .8)) {
     hkBoxAdd(d.side, d.ri, 'hit'); hkEv('hit', d.n, c.n);
     c.stun = .7; c.act = 'down'; c.actT = .55; c.vx = c.vx * .3 + d.vx * .4; c.vy = c.vy * .3 + d.vy * .4;
@@ -329,7 +339,7 @@ function hkPickup() {
       if (p.side === from.side) { if (i === P.from && P.go < 2) continue; if (i === P.to && P.go > 4) L.oneT = { i, t: L.t }; hkEv('catch', p.n, from.n); hkGain(i, 'pass'); hkHandOneTimer(i); return true; }
       if (P.tried.includes(i)) continue;
       P.tried.push(i);
-      if (R() < clamp(.1 + p.r.def * .03 - (sp - 10) * .012 + (HKI.lift && hkYoursNow(i) ? .25 : 0), .05, .75)) { hkBoxAdd(p.side, p.ri, 'take'); hkBoxAdd(from.side, from.ri, 'give'); hkEv('pick', p.n, from.n); hkGain(i, 'take'); return true; }
+      if (R() < clamp((.1 + p.r.def * .03 - (sp - 10) * .012) * (P.x > HK_RULES.blue && P.x < HK_RULES.len - HK_RULES.blue ? hkDefNow(p.side).pick || 1 : 1) + (HKI.lift && hkYoursNow(i) ? .25 : 0), .05, .75)) { hkBoxAdd(p.side, p.ri, 'take'); hkBoxAdd(from.side, from.ri, 'give'); hkEv('pick', p.n, from.n); hkGain(i, 'take'); return true; }
     }
     return false;
   }
@@ -337,7 +347,7 @@ function hkPickup() {
   if (sp > 15) return false;
   const sides = new Set(near.map(([i]) => L.pl[i].side));
   let win = near.sort((a, b) => a[1] - b[1])[0][0];
-  if (sides.size > 1) { const w = {}; for (const [i, d] of near) { const p = L.pl[i]; w[i] = (p.r.hnd + p.r.siz * .5 + 3) * (1.3 - d); } win = +wpick(w); hkEv('battle', L.pl[win].n); }
+  if (sides.size > 1) { const w = {}; for (const [i, d] of near) { const p = L.pl[i]; w[i] = (p.r.hnd + p.r.siz * .5 + 3) * (1.3 - d) * hkEdgeSt(p.side).battle * (hyp(hkGoalX(p.side) - P.x, P.y) < 6 ? hkAttNow(p.side).reb || 1 : 1); } win = +wpick(w); hkEv('battle', L.pl[win].n); }
   hkGain(win, 'loose'); return true;
 }
 // player i has the puck. A change of sides starts a new line of passes (for the assists)
@@ -391,12 +401,13 @@ function hkShotOdds(p, kind, x, y) {
   for (const d of hkSk(1 - p.side)) {
     if (d.stun > 0) continue;
     const ax = gx - x, ay = -y, len = hyp(ax, ay) || 1, s = ((d.x - x) * ax + (d.y - y) * ay) / (len * len); if (s < .08 || s > .88) continue;
-    if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp(.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0), .1, .6); }
+    if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp((.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0)) * (hkDefNow(d.side).block || 1), .1, .7); }
   }
   const tired = clamp(1 - hkSta(p) / .6, 0, 1);
   const miss = clamp(.2 + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
   let q = .09 - tired * .025 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
-  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0); else q = .97;
+  // (the calls: this side's system against theirs, less what their scout has read; a one-timer in the Overload)
+  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? hkAttNow(p.side).one || 0 : 0); else q = .97;
   return { ok: true, dist, ang, miss, q: clamp(q, .02, .97), set, screen, block, blockP };
 }
 // the carrier shoots: a slap shot winds up first (and can be poked off it), the others go now
@@ -442,7 +453,7 @@ function hkShotLands() {
   if (GD.ph === 'so') return hkSoLanded(S);
   hkBoxAdd(p.side, p.ri, 'att');
   if (S.res === 'miss') { hkEv('wide', p.n); P.k = 'loose'; P.shot = null; return; }
-  G.sog[S.side]++; hkBoxAdd(p.side, p.ri, 'sog'); if (!S.en) hkBoxAdd(g.side, g.ri, 'sa');
+  G.sog[S.side]++; hkBoxAdd(p.side, p.ri, 'sog'); if (!hkShort(S.side) && !hkShort(1 - S.side)) G.sysLog[S.side][G.call[S.side].att].sog++; if (!S.en) hkBoxAdd(g.side, g.ri, 'sa');
   if (S.res === 'goal') return hkGoalScored(S);
   hkBoxAdd(g.side, g.ri, 'sv'); g.act = 'save'; g.actT = .35;
   if (S.res === 'hold') { hkEv('save', g.n, p.n); return hkGain(gi, 'save'); }

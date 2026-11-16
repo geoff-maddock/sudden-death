@@ -24,9 +24,10 @@ const W_RINK = {
 const W_RINK_SHOT = { wrist: 'scores', slap: 'scores with a slap shot', one: 'one-times it in', so: 'wins the shootout' };
 const W_RINK_GOALIE = ['pull', 'Goalie', 'G: pull your goalie for an extra skater, or send them back', 0], W_RINK_CHANGE = ['change', 'Change', 'C: send your tired skaters off for fresh ones', 0];
 const W_RINK_STR = { pp: ' on the power play', sh: ' short-handed', even: '', so: '' };
-// who plays it: the CPU both sides, or you play your skaters by hand
+// who plays it: the CPU both sides, you coach (Manage, w90), or you play your skaters by hand
 const W_RINK_MODES = {
   watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
+  manage: { n: 'Manage', title: 'The skaters play, and you coach: the systems, the special teams, Tempo and Edge, the lines, the timeout and the goalie, under the rink.' },
   play: { n: 'You play', title: 'You play Rimewatch by hand: WASD to skate, Space to shoot (tap, or hold to wind up a slap shot) or check, J to pass (hold to send it hard) or poke, E to switch skaters, Shift to lift your stick. Let go of the keys and your skater plays on.' },
 };
 let W_RINK_MODE = 'play';
@@ -107,7 +108,7 @@ function wRinkGame(opts) {
   const o = opts || {};
   WHK = { over: null, how: o.how || 'scrimmage' }; wRinkTick(true);
   $('wRinkTitle').textContent = o.title || 'A scrimmage at the Pond Rink';
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered });
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }

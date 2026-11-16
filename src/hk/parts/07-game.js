@@ -38,9 +38,11 @@ function hkStart(opts) {
   G.stat = G.teams.map(t => t.roster.map(() => ({ g: 0, a: 0, sog: 0, att: 0, hit: 0, blk: 0, give: 0, take: 0, fow: 0, fot: 0, pim: 0, sec: 0, sa: 0, sv: 0, sh: 0 })));
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
+  GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
+  hkCallsStart(o);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: o.mode === 'play' ? 'play' : 'watch', you: o.you === 1 ? 1 : 0, auto: o.auto !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
   hkInputClear();
   hkLines(); hkFaceoffSpots(HK_RULES.len / 2, 0).forEach(([x, y], i) => { const p = L.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; });
   GD.fo = { x: HK_RULES.len / 2, y: 0 }; hkPuckAt(GD.fo.x, GD.fo.y);
@@ -136,12 +138,14 @@ function hkWhistle(x, y, msg, big, deadT, noChange) {
   GD.next = { x, y }; GD.deadT = deadT || HK_PACE.dead; if (msg) GD.msg = msg; if (big) GD.big = { k: big };
   for (const p of L.pl) { p.act = ''; p.actT = 0; }
   hkGo('dead');
+  hkCpuTimeout();
 }
 function hkFaceoffAt(x, y) {
   // a goalie pulled for an extra skater stays off for a face-off in the other half, and goes back for one in their own
   for (const s of [0, 1]) { const g = L.pl[hkGk(s)]; if (g.pulled && (g.pulled === 'delay' || hkUp(s, x) < HK_RULES.len / 2)) g.pulled = false; }
   hkLines();
-  // the lines change at the whistle (not the side that iced it)
+  // the coaches make their calls, and the lines change at the whistle (not the side that iced it)
+  hkCallsFaceoff();
   if (GD.ph !== 'break') hkChangeWhistle(GD.noChange == null ? -1 : GD.noChange); GD.noChange = -1;
   GD.fo = { x, y }; GD.set = { from: L.pl.map(p => [p.x, p.y]), to: hkFaceoffSpots(x, y) };
   for (const p of L.pl) { p.stun = 0; p.cd = 0; p.act = ''; }
@@ -198,6 +202,7 @@ function hkGoalScored(S) {
   const wiped = GD.delay && GD.delay.side !== S.side ? L.pl[GD.delay.i].n : ''; if (wiped) { hkPullBack(S.side, 'delay'); GD.delay = null; }
   const r = hkGoal(S.side), as = S.touch.filter(i => i !== S.i && L.pl[i].side === S.side).reverse().slice(0, 2).map(i => L.pl[i]);
   hkBoxAdd(S.side, p.ri, 'g'); for (const a of as) hkBoxAdd(S.side, a.ri, 'a');
+  if (str === 'even') G.sysLog[S.side][G.call[S.side].att].g++;
   G.log.push({ p: G.p, clock: Math.round(G.clock * 10) / 10, side: S.side, who: p.n, ri: p.ri, k: S.kind, a: as.map(a => a.n), str, en: !!S.en });
   hkEv('goal', p.n, S.kind);
   const how = S.en ? 'scores into the empty net' : S.kind === 'one' ? 'one-times it in' : S.kind === 'slap' ? `scores with a slap shot from ${S.dist} metres` : 'scores';
@@ -296,7 +301,7 @@ function hkEnd() {
 function hkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function hkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, p: G.p, ot: G.over ? G.over.ot : 0, so: !!(G.over && G.over.so), mins: G.mins,
-    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
+    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function hkBox() {
