@@ -102,13 +102,15 @@ function wRinkTeams() {
     name: t.name, short: t.short, color: t.color, light: t.light, roster: t.kinds.map((kind, i) => ({ n: wRinkName(kind, used), kind, num: 2 + i * 7 })),
   }));
 }
+// is it snowing at Rimewatch today (a blizzard in the Frostspire): the pond's snow builds faster
+function wRinkSnowing() { try { return !!WG && wWeather('rime') === 'blizzard'; } catch (e) { return false; } }
 /* one game on the rink. opts: { teams, mins, seed, mode, title, how, ordered } (the two clubs, the length setting and
    the mode on the bar when not given; ordered: whose bench comes on in its own order) */
 function wRinkGame(opts) {
   const o = opts || {};
   WHK = { over: null, how: o.how || 'scrimmage' }; wRinkTick(true);
   $('wRinkTitle').textContent = o.title || 'A scrimmage at the Pond Rink';
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls });
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered, skill: o.skill, calls: o.calls, pond: o.pond !== false, snow: o.snow == null ? wRinkSnowing() : !!o.snow });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }

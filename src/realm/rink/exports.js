@@ -23,6 +23,12 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // from the world (phase 6): a save point at each whistle and break (wantSnap says when; onSnap hears { G, L, GD }),
+  // resume(snap) puts one back, snapshot() takes one now; the Pond Rink's ways (start({ pond, snow })), and its rules
+  snapshot: () => G && GD ? hkSnapshot() : null, resume: sn => { HKP.paused = false; return hkResume(sn); },
+  set onSnap(f) { HK_HOOK.onSnap = f; }, get onSnap() { return HK_HOOK.onSnap; }, set wantSnap(f) { HK_HOOK.wantSnap = f; }, get wantSnap() { return HK_HOOK.wantSnap; },
+  get pond() { return G && G.pond ? JSON.parse(JSON.stringify(G.pond)) : null; }, pondRules: JSON.parse(JSON.stringify(HK_POND)), pondDrag: (x, y) => hkPondDrag(x, y), pondBounce: (x, y) => hkPondBounce(x, y, .55), roaring: side => hkRoaring(side),
+  pondHit: (di, ci, closing) => { if (L) hkPondHit(L.pl[di], L.pl[ci], closing); }, pondShot: (side, goal) => { if (G) hkPondShot(side, !!goal); }, pondBreak: () => { if (G) hkPondBreak(); },
   // the call (phase 5): the tables (id: { n, desc }), a system against a system ([+1 | 0 | -1, why]), each side's call
   // now, the edge in play for a side with the puck, your call (call(side, kind, id): '' when it took), the bench's
   // calls in Manage and You play (benchAct: 'change', 'auto', 'timeout', 'pull'), timeouts left, the scout, the coaches

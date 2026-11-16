@@ -146,7 +146,7 @@ async def main():
         sv = await pg.evaluate("({ heads: [...document.querySelectorAll('#wCampBody table.wstats thead th')].map(x => x.textContent.trim()), rows: document.querySelectorAll('#wCampBody table.wstats tbody tr').length })")
         await pg.click('#wCampBody [data-wsp-open]')
         card = await pg.evaluate("({ hk: !!document.querySelector('#wCampBody .whkc'), text: (document.querySelector('#wCampBody .whkc') || {}).textContent || '' })")
-        check(sv['heads'] == ['Player', 'Spot', 'Spd', 'Siz', 'Hnd', 'Sht', 'Def', 'Ref'] and sv['rows'] == 8 and card['hk'] and 'Hockey' in card['text'], 'the Stats tab has a Hockey view, and a player\'s card a Hockey block', [sv, card])
+        check(sv['heads'] == ['Player', 'Spot', 'GP', 'Min', 'G', 'A', 'Pts', 'SOG', 'Hits', 'Blk', 'PIM', 'FO', 'Sv'] and sv['rows'] == 8 and card['hk'] and 'Hockey' in card['text'] and 'Spd' in card['text'], 'the Stats tab has a Hockey view (each player\'s line from games in the world, w91), and a player\'s card a Hockey block with their ratings', [sv, card])
         await pg.click('[data-ctab="rink"]'); await pg.click('[data-hpractice]')
         await pg.wait_for_function("UI.view === 'rink' && wHK.on && document.getElementById('modal').hidden")
         pr = await pg.evaluate("({ title: document.getElementById('wRinkTitle').textContent, mine: wHK.G.teams[0].name === wPartyTeam().name, n: wHK.G.teams[0].roster.length, ordered: wHK.G.ordered, other: wHK.G.teams[1].name, c: wHK.G.teams[0].roster[0].n === wSixWho(WG.rink.six.C).n })")

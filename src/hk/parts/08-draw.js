@@ -47,6 +47,7 @@ function hkDraw(c) {
   c.save(); c.beginPath(); c.rect(0, 64, 960, 536); c.clip();
   c.translate(-HKC.left * HKC.k, HK_CAM.fy * (1 - HKC.k)); c.scale(HKC.k, HKC.k);
   hkDrawBack(c, dens);
+  hkDrawPond(c);
   hkDrawNets(c);
   hkDrawPlayers(c);
   hkDrawPuck(c);
@@ -102,7 +103,8 @@ function hkDrawBank(c) {
 // a row of townsfolk on the bank, in scarves, bobbing a little
 function hkDrawCrowd(c) {
   for (let i = 0; i < 44; i++) {
-    const x = 34 + i * 20.6, b = Math.sin(HKT.t * 2 + i * 1.3) * 1.4, y = 158 + (i % 3) * 3 + b;
+    // (they bob a little, and jump when the bank roars)
+    const roar = G.pond && G.pond.roar ? 1 : 0, x = 34 + i * 20.6, b = Math.sin(HKT.t * (roar ? 9 : 2) + i * 1.3) * (roar ? 3.5 : 1.4), y = 158 + (i % 3) * 3 + b;
     c.fillStyle = ['#3c4a5a', '#5a4a3c', '#4a3c52', '#2f4a44'][i % 4]; rr(c, x - 8, y, 16, 15, 4); c.fill();
     c.fillStyle = ['#d9b79a', '#b8c8d8', '#9fb89a', '#e0c8b0'][i % 4]; c.beginPath(); c.arc(x, y - 4, 6, 0, Math.PI * 2); c.fill();
     c.fillStyle = i % 5 === 0 ? G.teams[1].color : G.teams[0].color; c.fillRect(x - 7, y + 1, 14, 3);
@@ -133,6 +135,22 @@ function hkDrawIce(c) {
   // the kick plate along the near boards, and the rink's name on it
   hkRinkPath(c, 0); c.lineWidth = 2.5; c.strokeStyle = '#c9a23a'; c.stroke();
   c.save(); c.font = `800 10px ${HK_FONT}`; c.textAlign = 'center'; c.fillStyle = 'rgba(40,60,76,.75)'; try { c.letterSpacing = '3px'; } catch (e) {} c.fillText('THE POND RINK', m.x, b.y + 17); c.restore();
+}
+/* the Pond Rink's own ways (13-pond.js), on the ice: the snow that has built up in its patches, the old stretches of
+   boards (dull where a puck dies, pale where it jumps), and the crack a big hit left */
+function hkDrawPond(c) {
+  const D = G.pond; if (!D) return;
+  c.save();
+  for (const s of D.snow) { if (s.d < .04) continue; const p = hkScr(s.x, s.y), g = c.createRadialGradient(p.x, p.y, 2, p.x, p.y, s.r * HK_PX);
+    g.addColorStop(0, `rgba(255,255,255,${.25 + s.d * .65})`); g.addColorStop(.7, `rgba(250,252,255,${.15 + s.d * .45})`); g.addColorStop(1, 'rgba(250,252,255,0)');
+    c.fillStyle = g; c.beginPath(); c.ellipse(p.x, p.y, s.r * HK_PX, s.r * HK_PY, 0, 0, Math.PI * 2); c.fill(); }
+  for (const b of D.boards) { const y = (b.wall === 'top' ? -1 : 1) * HK_RULES.wid / 2, a = hkScr(b.x - b.w / 2, y), z = hkScr(b.x + b.w / 2, y);
+    c.strokeStyle = b.e < .5 ? '#6b5a48' : '#fff6d8'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(a.x, a.y + (b.wall === 'top' ? -3 : 3)); c.lineTo(z.x, z.y + (b.wall === 'top' ? -3 : 3)); c.stroke(); }
+  if (D.crack) { const p = hkScr(D.crack.x, D.crack.y), r = D.crack.r * HK_PX;
+    c.strokeStyle = 'rgba(30,60,80,.75)'; c.lineWidth = 1.6; c.lineJoin = 'round';
+    for (let k = 0; k < 7; k++) { const a = k * .9 + .3; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x + Math.cos(a) * r * .45, p.y + Math.sin(a) * r * .34); c.lineTo(p.x + Math.cos(a + .35) * r * (.7 + (k % 3) * .12), p.y + Math.sin(a + .35) * r * .62); c.stroke(); }
+    c.fillStyle = 'rgba(30,60,80,.25)'; c.beginPath(); c.ellipse(p.x, p.y, r * .3, r * .22, 0, 0, Math.PI * 2); c.fill(); }
+  c.restore();
 }
 // the nets: red posts and a white mesh, from each goal line back
 function hkDrawNets(c) {

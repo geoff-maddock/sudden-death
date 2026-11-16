@@ -25,7 +25,7 @@
    GD is the game on show (not saved). The headless game (hkSimGame) runs this same flow with bigger steps, so the
    view and the bot can't drift apart. */
 const HK_PACE = { intro: 1.3, set: .85, drop: .5, dead: 1, goal: 1.9, pen: 1.5, break: 2.4, so: 1.1, soGap: .5, soReady: .8, soMax: 7 };
-const HK_HOOK = { onOver: null, onPhase: null };
+const HK_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null };
 const HK_DOTS = { x: [8.5, HK_RULES.len - 8.5], y: 5.5 };
 let GD = null;
 
@@ -39,7 +39,7 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
@@ -53,6 +53,7 @@ function hkGo(ph) {
   // (a new drop waits for a new press)
   if (ph === 'drop') GD.press = null;
   if (HK_HOOK.onPhase) try { HK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
+  hkSnapHook(ph);
 }
 function hkBoxAdd(side, ri, k, n) { const b = G.stat[side][ri]; if (b) b[k] += n == null ? 1 : n; }
 // the line under the rink: what just happened (GD.msg), from the play's events
@@ -239,8 +240,8 @@ function hkPeriodOver() {
   GD.msg = r === 'ot' ? `Level at ${G.score[0]} after three periods. Sudden death: the next goal wins.` : `End of the ${hkPeriodName(was)}: ${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}.`;
   // (a penalty that was coming when the period ended is served from the start of the next)
   if (GD.delay) hkPenaltyCall(true);
-  // everyone rests between periods
-  hkChangeWhistle(-1, true);
+  // everyone rests between periods, and the ice is scraped
+  hkChangeWhistle(-1, true); hkPondBreak();
   hkGo('break');
 }
 /* ---------- the shootout ---------- */
@@ -315,7 +316,7 @@ function hkBox() {
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function hkSimGame(opts) {
   const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: hkRand } : null;
-  HK_HOOK.onOver = HK_HOOK.onPhase = null;
+  HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = null;
   let watch = 0, out;
   try {
     hkStart(opts);
