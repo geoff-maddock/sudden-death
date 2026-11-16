@@ -128,3 +128,4 @@ src/realm/w91-rinkgame.js
 src/realm/w92-rinkpowers.js
 src/realm/w93-rinkkit.js
 src/realm/w94-rinkstars.js
+src/realm/w95-rinkkettle.js
