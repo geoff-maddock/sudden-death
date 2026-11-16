@@ -32,7 +32,7 @@ const hkSpotOk = (m, n) => !!m && HK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [6 or more kinds] }
 function hkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 4 + i * 9 }))).slice(0, HK_RULES.side + HK_RULES.bench)
-    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 } }));
+    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 }, gear: p.gear ? p.gear.name || '' : '', gx: hkGx(p.gear && p.gear.fx) }));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the six's spots: the best reflexes in goal, then the two best defenders, the centre, and the wings
   const free = new Set(roster.slice(0, HK_RULES.side).map((_, i) => i)), by = pos => { const i = [...free].sort((a, b) => hkFit(roster[b].r, pos) - hkFit(roster[a].r, pos))[0]; free.delete(i); return i; };

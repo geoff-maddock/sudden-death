@@ -23,6 +23,12 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // gear and potions (phase 8): a roster player's gear ({ id, name, fx }), start({ bags: [yours or null, theirs] }); the
+  // potions, why one can't be given now, yours given ('' when it took: the page takes it from your bag), the bench's
+  // advice for a bag, what the CPU's coach would give, and what was given
+  potions: JSON.parse(JSON.stringify(HK_POTIONS)), potionWhy: (id, ri) => GD ? hkPotionWhy(GD.you, id, ri) : 'No game.', potion: (id, ri) => hkPotion(id, ri), advice: bag => hkPotionAdvice(bag),
+  potionValues: (side, bag) => G && GD ? hkPotionValues(side, bag) : [], cpuPotion: () => { if (G && GD) hkCpuPotion(); }, get pots() { return G && G.pots ? G.pots.slice() : []; }, get bags() { return G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : [null, null]; },
+  gxOf: i => L ? Object.assign({}, hkGxOf(L.pl[i])) : {}, kitRules: { block: HK_BLOCK_STA, take: HK_KIT.take.slice() }, blockNow: () => { if (L && L.puck.shot) hkShotBlocked(); },
   // powers (phase 7): start({ powers: false }) turns them off; a roster player's pw ({ puck, chk }: 0 or 1) picks which
   // of their kind's two they bring. mana and spirit by side, what is going (fxs) and the marks on the ice, the options
   // a side has now, the casts ('' when it took, or why not), the effects in play for a side, the tables for the page

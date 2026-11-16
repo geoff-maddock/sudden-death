@@ -39,7 +39,7 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkKitStart(o.bags);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
@@ -52,6 +52,8 @@ function hkGo(ph) {
   GD.ph = ph; GD.t = 0;
   // (a new drop waits for a new press)
   if (ph === 'drop') GD.press = null;
+  // (one potion a side a whistle: a new whistle, a new one)
+  if (ph === 'dead' || ph === 'break') GD.potUsed = [false, false];
   if (HK_HOOK.onPhase) try { HK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
   hkSnapHook(ph);
 }
@@ -139,7 +141,7 @@ function hkWhistle(x, y, msg, big, deadT, noChange) {
   GD.next = { x, y }; GD.deadT = deadT || HK_PACE.dead; if (msg) GD.msg = msg; if (big) GD.big = { k: big };
   for (const p of L.pl) { p.act = ''; p.actT = 0; }
   hkGo('dead');
-  hkCpuTimeout();
+  hkCpuTimeout(); hkCpuPotion();
 }
 function hkFaceoffAt(x, y) {
   // a goalie pulled for an extra skater stays off for a face-off in the other half, and goes back for one in their own
@@ -156,7 +158,7 @@ function hkFaceoffAt(x, y) {
 // the drop: hands and size against hands and size, and by hand your press (09-hands.js); the winner draws it back to
 // whoever is furthest back
 function hkDrop() {
-  const c = [0, 1].map(s => L.pl[hkTaker(s)]), val = p => p.r.hnd * .7 + p.r.siz * .3, edge = hkDrawEdge() * (GD.you === 0 ? 1 : -1), win = R() < clamp(.5 + (val(c[0]) - val(c[1])) * .05 + edge, .1, .9) ? 0 : 1, w = c[win];
+  const c = [0, 1].map(s => L.pl[hkTaker(s)]), val = p => p.r.hnd * .7 + p.r.siz * .3, edge = hkDrawEdge() * (GD.you === 0 ? 1 : -1) + (hkGxOf(c[0]).fo || 0) - (hkGxOf(c[1]).fo || 0), win = R() < clamp(.5 + (val(c[0]) - val(c[1])) * .05 + edge, .1, .9) ? 0 : 1, w = c[win];
   for (const s of [0, 1]) { hkBoxAdd(s, c[s].ri, 'fot'); if (s === win) hkBoxAdd(s, c[s].ri, 'fow'); }
   G.drops++;
   for (const p of L.pl) { p.vx = p.vy = 0; }
@@ -244,6 +246,7 @@ function hkPeriodOver() {
   // everyone rests between periods, the ice is scraped, and both sides get a mana
   hkChangeWhistle(-1, true); hkPondBreak(); for (const s of [0, 1]) hkManaAdd(s, HK_MANA.brk);
   hkGo('break');
+  hkCpuPotion();
 }
 /* ---------- the shootout ---------- */
 // the next try: the shooter at centre with the puck, the goalie in the net, everyone else off
@@ -303,7 +306,7 @@ function hkEnd() {
 function hkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function hkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, p: G.p, ot: G.over ? G.over.ot : 0, so: !!(G.over && G.over.so), mins: G.mins,
-    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), casts: (G.casts || []).slice(), mana: (G.mana || [0, 0]).slice(), spirit: (G.spirit || [0, 0]).map(Math.round), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
+    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), mana: (G.mana || [0, 0]).slice(), spirit: (G.spirit || [0, 0]).map(Math.round), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function hkBox() {

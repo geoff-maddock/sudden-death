@@ -96,7 +96,7 @@ function hkSkate(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(hkTop(p, i), d / .4);
   const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0;
   let ax = wx - p.vx, ay = wy - p.vy;
-  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * hkStaK(p) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
+  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * hkStaK(p) * (hkGxOf(p).accel || 1) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
   if (need > mx) { ax *= mx / need; ay *= mx / need; }
   p.vx += ax; p.vy += ay;
   hkGlide(p, dt);
@@ -251,7 +251,7 @@ function hkChecks() {
 // checker's stick. True when it worked
 function hkPoke(d, c, edge) {
   d.act = 'poke'; d.actT = .25;
-  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side) + hkFx(d.side, 'poke') + hkFx(c.side, 'guard'), .03, .65)) {
+  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side) + hkFx(d.side, 'poke') + hkFx(c.side, 'guard') + (hkGxOf(c).guard || 0), .03, .65)) {
     hkEv('pokemiss', d.n, c.n);
     // a miss up close can take their skates out: a trip
     if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip * hkEdgeSt(d.side).foul) hkFoul(d, 'tripping', c);
@@ -409,7 +409,7 @@ function hkShotOdds(p, kind, x, y) {
   const miss = clamp(.2 + hkFx(p.side, 'miss') + hkFx(1 - p.side, 'wild') + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
   let q = .09 - tired * .025 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
   // (the calls: this side's system against theirs, less what their scout has read; a one-timer in the Overload)
-  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? (hkAttNow(p.side).one || 0) + hkFx(p.side, 'one') : 0) + (hkRoaring(p.side) ? HK_POND.roar.q : 0) + hkFx(p.side, 'shot') - hkFx(1 - p.side, 'save'); else q = .97;
+  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? (hkAttNow(p.side).one || 0) + hkFx(p.side, 'one') : 0) + (hkRoaring(p.side) ? HK_POND.roar.q : 0) + hkFx(p.side, 'shot') - hkFx(1 - p.side, 'save') + (hkGxOf(p).shot || 0) + hkCider(p) - (hkGxOf(g).save || 0); else q = .97;
   return { ok: true, dist, ang, miss, q: clamp(q, .02, .97), set, screen, block, blockP };
 }
 // the carrier shoots: a slap shot winds up first (and can be poked off it), the others go now
@@ -444,6 +444,8 @@ function hkRelease(i, kind, o) {
 function hkShotBlocked() {
   const P = L.puck, S = P.shot, d = L.pl[S.by], p = L.pl[S.i];
   hkBoxAdd(d.side, d.ri, 'blk'); hkBoxAdd(p.side, p.ri, 'att'); hkEv('block', d.n, p.n);
+  // (a blocked shot hurts: some of the blocker's stamina, less in Shin Pads)
+  G.sta[d.side][d.ri] = Math.max(HK_STA.floor, hkSta(d) - HK_BLOCK_STA * (hkGxOf(d).blkSta == null ? 1 : hkGxOf(d).blkSta));
   d.act = 'block'; d.actT = .3;
   hkLoose(P.x, P.y, Math.atan2(-P.vy, -P.vx) + (R() - .5) * 2.2, 3 + R() * 5);
 }

@@ -31332,7 +31332,7 @@ const hkSpotOk = (m, n) => !!m && HK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [6 or more kinds] }
 function hkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 4 + i * 9 }))).slice(0, HK_RULES.side + HK_RULES.bench)
-    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 } }));
+    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 }, gear: p.gear ? p.gear.name || '' : '', gx: hkGx(p.gear && p.gear.fx) }));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the six's spots: the best reflexes in goal, then the two best defenders, the centre, and the wings
   const free = new Set(roster.slice(0, HK_RULES.side).map((_, i) => i)), by = pos => { const i = [...free].sort((a, b) => hkFit(roster[b].r, pos) - hkFit(roster[a].r, pos))[0]; free.delete(i); return i; };
@@ -31438,7 +31438,7 @@ function hkSkate(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(hkTop(p, i), d / .4);
   const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0;
   let ax = wx - p.vx, ay = wy - p.vy;
-  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * hkStaK(p) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
+  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * hkStaK(p) * (hkGxOf(p).accel || 1) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
   if (need > mx) { ax *= mx / need; ay *= mx / need; }
   p.vx += ax; p.vy += ay;
   hkGlide(p, dt);
@@ -31593,7 +31593,7 @@ function hkChecks() {
 // checker's stick. True when it worked
 function hkPoke(d, c, edge) {
   d.act = 'poke'; d.actT = .25;
-  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side) + hkFx(d.side, 'poke') + hkFx(c.side, 'guard'), .03, .65)) {
+  if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side) + hkFx(d.side, 'poke') + hkFx(c.side, 'guard') + (hkGxOf(c).guard || 0), .03, .65)) {
     hkEv('pokemiss', d.n, c.n);
     // a miss up close can take their skates out: a trip
     if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip * hkEdgeSt(d.side).foul) hkFoul(d, 'tripping', c);
@@ -31751,7 +31751,7 @@ function hkShotOdds(p, kind, x, y) {
   const miss = clamp(.2 + hkFx(p.side, 'miss') + hkFx(1 - p.side, 'wild') + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
   let q = .09 - tired * .025 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
   // (the calls: this side's system against theirs, less what their scout has read; a one-timer in the Overload)
-  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? (hkAttNow(p.side).one || 0) + hkFx(p.side, 'one') : 0) + (hkRoaring(p.side) ? HK_POND.roar.q : 0) + hkFx(p.side, 'shot') - hkFx(1 - p.side, 'save'); else q = .97;
+  if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0) + hkCallQ(p.side) + (kind === 'one' ? (hkAttNow(p.side).one || 0) + hkFx(p.side, 'one') : 0) + (hkRoaring(p.side) ? HK_POND.roar.q : 0) + hkFx(p.side, 'shot') - hkFx(1 - p.side, 'save') + (hkGxOf(p).shot || 0) + hkCider(p) - (hkGxOf(g).save || 0); else q = .97;
   return { ok: true, dist, ang, miss, q: clamp(q, .02, .97), set, screen, block, blockP };
 }
 // the carrier shoots: a slap shot winds up first (and can be poked off it), the others go now
@@ -31786,6 +31786,8 @@ function hkRelease(i, kind, o) {
 function hkShotBlocked() {
   const P = L.puck, S = P.shot, d = L.pl[S.by], p = L.pl[S.i];
   hkBoxAdd(d.side, d.ri, 'blk'); hkBoxAdd(p.side, p.ri, 'att'); hkEv('block', d.n, p.n);
+  // (a blocked shot hurts: some of the blocker's stamina, less in Shin Pads)
+  G.sta[d.side][d.ri] = Math.max(HK_STA.floor, hkSta(d) - HK_BLOCK_STA * (hkGxOf(d).blkSta == null ? 1 : hkGxOf(d).blkSta));
   d.act = 'block'; d.actT = .3;
   hkLoose(P.x, P.y, Math.atan2(-P.vy, -P.vx) + (R() - .5) * 2.2, 3 + R() * 5);
 }
@@ -31950,7 +31952,7 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkKitStart(o.bags);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
@@ -31963,6 +31965,8 @@ function hkGo(ph) {
   GD.ph = ph; GD.t = 0;
   // (a new drop waits for a new press)
   if (ph === 'drop') GD.press = null;
+  // (one potion a side a whistle: a new whistle, a new one)
+  if (ph === 'dead' || ph === 'break') GD.potUsed = [false, false];
   if (HK_HOOK.onPhase) try { HK_HOOK.onPhase(ph); } catch (e) { console.error(e); }
   hkSnapHook(ph);
 }
@@ -32050,7 +32054,7 @@ function hkWhistle(x, y, msg, big, deadT, noChange) {
   GD.next = { x, y }; GD.deadT = deadT || HK_PACE.dead; if (msg) GD.msg = msg; if (big) GD.big = { k: big };
   for (const p of L.pl) { p.act = ''; p.actT = 0; }
   hkGo('dead');
-  hkCpuTimeout();
+  hkCpuTimeout(); hkCpuPotion();
 }
 function hkFaceoffAt(x, y) {
   // a goalie pulled for an extra skater stays off for a face-off in the other half, and goes back for one in their own
@@ -32067,7 +32071,7 @@ function hkFaceoffAt(x, y) {
 // the drop: hands and size against hands and size, and by hand your press (09-hands.js); the winner draws it back to
 // whoever is furthest back
 function hkDrop() {
-  const c = [0, 1].map(s => L.pl[hkTaker(s)]), val = p => p.r.hnd * .7 + p.r.siz * .3, edge = hkDrawEdge() * (GD.you === 0 ? 1 : -1), win = R() < clamp(.5 + (val(c[0]) - val(c[1])) * .05 + edge, .1, .9) ? 0 : 1, w = c[win];
+  const c = [0, 1].map(s => L.pl[hkTaker(s)]), val = p => p.r.hnd * .7 + p.r.siz * .3, edge = hkDrawEdge() * (GD.you === 0 ? 1 : -1) + (hkGxOf(c[0]).fo || 0) - (hkGxOf(c[1]).fo || 0), win = R() < clamp(.5 + (val(c[0]) - val(c[1])) * .05 + edge, .1, .9) ? 0 : 1, w = c[win];
   for (const s of [0, 1]) { hkBoxAdd(s, c[s].ri, 'fot'); if (s === win) hkBoxAdd(s, c[s].ri, 'fow'); }
   G.drops++;
   for (const p of L.pl) { p.vx = p.vy = 0; }
@@ -32155,6 +32159,7 @@ function hkPeriodOver() {
   // everyone rests between periods, the ice is scraped, and both sides get a mana
   hkChangeWhistle(-1, true); hkPondBreak(); for (const s of [0, 1]) hkManaAdd(s, HK_MANA.brk);
   hkGo('break');
+  hkCpuPotion();
 }
 /* ---------- the shootout ---------- */
 // the next try: the shooter at centre with the puck, the goalie in the net, everyone else off
@@ -32214,7 +32219,7 @@ function hkEnd() {
 function hkClockText() { const t = Math.max(0, G.clock); if (t < 10) return t.toFixed(1); const s = Math.ceil(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function hkSummary() {
   return { score: G.score.slice(), teams: G.teams.map(t => t.name), win: G.over ? G.over.win : null, p: G.p, ot: G.over ? G.over.ot : 0, so: !!(G.over && G.over.so), mins: G.mins,
-    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), casts: (G.casts || []).slice(), mana: (G.mana || [0, 0]).slice(), spirit: (G.spirit || [0, 0]).map(Math.round), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
+    shots: G.sog.slice(), drops: G.drops, icings: G.icings, pens: G.pens.slice(), calls: G.call.map(c => Object.assign({}, c)), skill: G.skill.slice(), sysLog: JSON.parse(JSON.stringify(G.sysLog)), to: G.to.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), mana: (G.mana || [0, 0]).slice(), spirit: (G.spirit || [0, 0]).map(Math.round), secs: Math.round(G.secs), box: hkBox(), log: G.log.slice() };
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function hkBox() {
@@ -32832,7 +32837,7 @@ function hkStaStep(dt) {
     if (p.off || (p.pos === 'G' && !p.pulled)) continue;
     const top = 5.4 + p.r.spd * .42, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
     // (a pushed Tempo tires them, and so does a system that chases, while they are without the puck)
-    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire');
+    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire') * hkAnti(p.side);
     G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * tire * dt);
   }
   if (!hkShort(0) && !hkShort(1)) G.sysLog[G.poss][G.call[G.poss].att].t += dt;
@@ -33061,7 +33066,7 @@ function hkCpuTimeout() {
    there). hkResume puts one back at the same beat, on fresh random numbers and with no keys held. There is no save
    point inside the shootout: a game left there comes back at the last whistle before it. */
 const HK_SNAP_AT = ['dead', 'break'];
-const HK_GD_KEEP = ['ph', 't', 'mode', 'you', 'auto', 'msg', 'fo', 'set', 'next', 'deadT', 'delay', 'noChange', 'drew', 'autoPow'];
+const HK_GD_KEEP = ['ph', 't', 'mode', 'you', 'auto', 'msg', 'fo', 'set', 'next', 'deadT', 'delay', 'noChange', 'drew', 'autoPow', 'potUsed'];
 function hkSnapshot() {
   const gd = {}; for (const k of HK_GD_KEEP) if (GD[k] !== undefined) gd[k] = GD[k];
   return JSON.parse(JSON.stringify({ G, L, GD: gd }));
@@ -33076,6 +33081,7 @@ function hkResume(sn) {
   G = s.G; L = s.L;
   // (a save point from before powers: none of them, so play goes on as it was)
   if (!G.mana) Object.assign(G, { powers: false, powOn: [false, false], mana: [0, 0], spirit: [0, 0], fxs: [], marks: [], ultUsed: [false, false], sitUsed: [{}, {}], casts: [] });
+  if (!G.bags) Object.assign(G, { bags: [null, null], pots: [], anti: [0, 0], cider: [null, null] });
   hkFxNow();
   GD = Object.assign({ acc: 0, autoPow: true, meter: null, rel: null, press: null, big: null, net: null, so: null, delay: null, noChange: -1 }, s.GD);
   hkInputClear();
@@ -33389,6 +33395,101 @@ function hkCpuPowers(dt) {
     const from = fit.length ? fit : any; if (from.length && R() < (fit.length ? .7 : .35)) hkCast(s, pick(from).i);
   }
 }
+/* Black Ice: gear and potions (issue #83, phase 8), by #61's conventions; the Realm's side is w93-rinkkit.js.
+   Gear: a player may wear one piece. A roster player sent with { gear: { id, name, fx } } keeps its name (gear) and the
+   effects the engine reads (gx: fx without r; fx.r is laid on the ratings before the engine sees them, by the Realm).
+   What gx may hold: accel (how fast they get going ×), shot (added to the odds of their shots beating the goalie),
+   guard (added to the odds of a poke at them: negative is safer), blkSta (what blocking a shot costs them in stamina
+   ×), save (in goal only: taken off the odds of a shot beating them), fo (added to their odds at a face-off).
+   Blocking a shot hurts: it costs the blocker HK_BLOCK_STA of their stamina (less in Shin Pads).
+   Potions (HK_POTIONS): at a whistle or a break (HK_POT_AT), one per side per whistle (GD.potUsed). G.bags = [bag or
+   null, ...] by side: a null bag is kept by the page (the Realm keeps yours and takes each one out as you give it),
+   and a bag here ({ id: n }) is the CPU's, given by its coach at its skill at each whistle (hkCpuPotion). Every use
+   goes in the line under the rink with its reason and in G.pots ({ side, id, ri, p, why }). What each does, all plain
+   data in G: draught: one skater HK_POTIONS.draught.rest of their stamina back; hkanti (Antifreeze): the side's
+   skaters tire HK_POTIONS.hkanti.tire as fast for the rest of this period (G.anti[side]: the period); hkcider (Hot
+   Cider): one player's shots are HK_POTIONS.hkcider.shot likelier for the rest of this period (G.cider[side]: { ri,
+   p }); hkliniment (Tove's Liniment): the side's earliest penalty ends now. */
+const HK_POTIONS = {
+  draught: { n: 'Stamina Draught', one: true, rest: .4, desc: 'One tired skater gets two fifths of their stamina back.' },
+  hkanti: { n: 'Antifreeze', tire: .6, desc: 'Your skaters tire much slower for the rest of this period: every shift lasts longer.' },
+  hkcider: { n: 'Hot Cider', one: true, shot: .04, desc: 'One player\'s shots are harder to stop for the rest of this period.' },
+  hkliniment: { n: 'Tove\'s Liniment', desc: 'A player in the box comes out now: your earliest penalty is over.' },
+};
+const HK_BLOCK_STA = .06;
+// a CPU coach gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
+const HK_KIT = { take: [99, 4, 3], squire: .25 };
+const HK_GX0 = Object.freeze({});
+function hkGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
+const hkGxOf = p => { if (!p || !G || !G.teams) return HK_GX0; const m = G.teams[p.side] && G.teams[p.side].roster[p.ri]; return (m && m.gx) || HK_GX0; };
+function hkKitStart(bags) {
+  G.bags = [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null);
+  G.pots = []; G.anti = [0, 0]; G.cider = [null, null];
+}
+// a side's skaters tire this much as fast on Antifreeze, this period
+const hkAnti = side => G.anti && G.anti[side] === G.p ? HK_POTIONS.hkanti.tire : 1;
+// what Hot Cider adds to this player's shots, this period
+const hkCider = p => { const C = G.cider && G.cider[p.side]; return C && C.ri === p.ri && C.p === G.p ? HK_POTIONS.hkcider.shot : 0; };
+const HK_POT_AT = ['dead', 'break'];
+// why side can't give potion id (to player ri) now, or '' when it can
+function hkPotionWhy(side, id, ri) {
+  const P = HK_POTIONS[id]; if (!P) return 'No such potion.';
+  if (!GD || !HK_POT_AT.includes(GD.ph)) return 'Only at a whistle, or a break between periods.';
+  if (GD.potUsed && GD.potUsed[side]) return 'One potion a whistle.';
+  if (P.one) {
+    if (!G.teams[side].roster[ri]) return 'Pick a player.';
+    if (id === 'draught' && G.sta[side][ri] >= .95) return 'They\'re fresh.';
+    if (id === 'hkcider' && G.cider[side] && G.cider[side].p === G.p) return 'Somebody has had the cider this period.';
+    if (id === 'hkcider' && ri === G.on[side][HK_POS.indexOf('G')]) return 'Not for the goalie.';
+  }
+  if (id === 'hkanti' && G.anti[side] === G.p) return 'Already on it this period.';
+  if (id === 'hkanti' && hkOt()) return 'Not in sudden death: it is over too soon.';
+  if (id === 'hkliniment' && !G.box.some(b => b.side === side)) return 'Nobody of yours is in the box.';
+  return '';
+}
+// side gives potion id (to ri): its effect, the line and the record; the CPU's comes out of its bag here (yours, the page's)
+function hkPotionGive(side, id, ri, why) {
+  const P = HK_POTIONS[id], T = G.teams[side], m = P.one ? T.roster[ri] : null;
+  if (id === 'draught') G.sta[side][ri] = Math.min(1, G.sta[side][ri] + P.rest);
+  if (id === 'hkanti') G.anti[side] = G.p;
+  if (id === 'hkcider') G.cider[side] = { ri, p: G.p };
+  let who = '';
+  if (id === 'hkliniment') { const b = G.box.find(x => x.side === side); if (b) { who = T.roster[b.ri].n; hkBoxOut(b); hkLines(); } }
+  if (G.bags[side]) { G.bags[side][id]--; if (G.bags[side][id] <= 0) delete G.bags[side][id]; }
+  GD.potUsed = GD.potUsed || [false, false]; GD.potUsed[side] = true;
+  G.pots.push({ side, id, ri: P.one ? ri : -1, p: G.p, why: why || '' });
+  GD.msg = `${T.name}: ${P.n}${m ? ` for ${m.n}` : who ? `, and ${who} is out of the box` : ''}${why ? ` (${why})` : ''}.`;
+  hkEv('potion', P.n, T.name);
+}
+// your potion now: '' when given (the page takes it out of your bag), or why not
+function hkPotion(id, ri) { const why = hkPotionWhy(GD.you, id, ri); if (why) return why; hkPotionGive(GD.you, id, ri); return ''; }
+/* what a potion would be worth now, and to whom: [{ id, ri, v, why }] for the potions in bag (a CPU's, or the advice
+   for yours). Stamina for the most tired skater; Antifreeze early in a period for a tired side with nobody fresh;
+   Hot Cider for the best shot in a close game from the second period on; the Liniment whenever somebody is boxed */
+function hkPotionValues(side, bag) {
+  const out = [], T = G.teams[side], st = G.sta[side], on = G.on[side].slice(0, HK_POS.length - 1), close = Math.abs(hkLead(side)) <= 1;
+  const tired = on.slice().sort((a, b) => st[a] - st[b])[0];
+  if (bag.draught && st[tired] < .5) out.push({ id: 'draught', ri: tired, v: (.6 - st[tired]) * 12, why: `${T.roster[tired].n} is down to ${Math.round(st[tired] * 100)}%` });
+  const avg = on.reduce((a, r) => a + st[r], 0) / on.length, fresh = hkBench(side).some(i => st[i] >= HK_STA.fresh);
+  if (bag.hkanti && G.clock > G.plen * .5 && (avg < .6 || !hkBench(side).length)) out.push({ id: 'hkanti', ri: -1, v: (fresh ? 3 : 4.5) + (hkBench(side).length ? 0 : 1), why: hkBench(side).length ? `the line averages ${Math.round(avg * 100)}%` : 'nobody on the bench to change with' });
+  if (bag.hkcider && G.p >= 2 && close && G.clock > G.plen * .4) { const best = on.slice().sort((a, b) => T.roster[b].r.sht - T.roster[a].r.sht)[0]; out.push({ id: 'hkcider', ri: best, v: G.p >= HK_RULES.periods ? 5 : 3.5, why: `a close game, and ${T.roster[best].n} has the best shot` }); }
+  if (bag.hkliniment && G.box.some(b => b.side === side)) { const b = G.box.find(x => x.side === side); out.push({ id: 'hkliniment', ri: -1, v: 3 + b.t / hkMinor() * 3 + (close ? 1 : 0), why: `${T.roster[b.ri].n} has ${Math.ceil(b.t)} seconds left in the box` }); }
+  return out.filter(o => !hkPotionWhy(side, o.id, o.ri)).sort((a, b) => b.v - a.v);
+}
+// your bench's advice: the potion from your bag worth most now ({ id, ri, why }), or null
+function hkPotionAdvice(bag) { const o = G && GD ? hkPotionValues(GD.you, bag || {})[0] : null; return o && o.v >= HK_KIT.take[1] ? { id: o.id, ri: o.ri, why: o.why } : null; }
+// the CPU's coach at a whistle: a Squire now and then whatever comes first; a Knight or an Archmage what's worth it.
+// Never yours: your bag is your own, in Manage and You play (and the page's in Watch)
+function hkCpuPotion() {
+  for (const side of [0, 1]) {
+    const bag = G.bags && G.bags[side]; if (!bag || !Object.keys(bag).length || (GD.potUsed && GD.potUsed[side])) continue;
+    if (GD.mode !== 'watch' && side === GD.you) continue;
+    const vals = hkPotionValues(side, bag); if (!vals.length) continue;
+    const sk = G.skill[side];
+    if (!sk) { if (R() < HK_KIT.squire) hkPotionGive(side, vals[0].id, vals[0].ri, vals[0].why); continue; }
+    if (vals[0].v >= HK_KIT.take[sk]) hkPotionGive(side, vals[0].id, vals[0].ri, vals[0].why);
+  }
+}
 /* The rink's page in the Realm (issue #83, phase 1). A canvas in #v-rink, after the court's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (hkTick) and draws it (hkDraw). The engine's parts
    don't touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
@@ -33476,6 +33577,12 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // gear and potions (phase 8): a roster player's gear ({ id, name, fx }), start({ bags: [yours or null, theirs] }); the
+  // potions, why one can't be given now, yours given ('' when it took: the page takes it from your bag), the bench's
+  // advice for a bag, what the CPU's coach would give, and what was given
+  potions: JSON.parse(JSON.stringify(HK_POTIONS)), potionWhy: (id, ri) => GD ? hkPotionWhy(GD.you, id, ri) : 'No game.', potion: (id, ri) => hkPotion(id, ri), advice: bag => hkPotionAdvice(bag),
+  potionValues: (side, bag) => G && GD ? hkPotionValues(side, bag) : [], cpuPotion: () => { if (G && GD) hkCpuPotion(); }, get pots() { return G && G.pots ? G.pots.slice() : []; }, get bags() { return G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : [null, null]; },
+  gxOf: i => L ? Object.assign({}, hkGxOf(L.pl[i])) : {}, kitRules: { block: HK_BLOCK_STA, take: HK_KIT.take.slice() }, blockNow: () => { if (L && L.puck.shot) hkShotBlocked(); },
   // powers (phase 7): start({ powers: false }) turns them off; a roster player's pw ({ puck, chk }: 0 or 1) picks which
   // of their kind's two they bring. mana and spirit by side, what is going (fxs) and the marks on the ice, the options
   // a side has now, the casts ('' when it took, or why not), the effects in play for a side, the tables for the page
@@ -46240,6 +46347,133 @@ renderHelp = function () {
   wW92RenderHelp();
   const h = $('wRinkHow'); if (!h || $('wRinkHowPow')) return;
   h.insertAdjacentHTML('beforeend', `<div id="wRinkHowPow">${wRinkHowPowHTML()}</div>`);
+};
+/* w93: hockey gear and potions (issue #83, phase 8), by #61's conventions; the engine's side is
+   src/hk/parts/15-kit.js, the plumbing (W_GEAR, W_POTIONS, the slot, the Bag) is w72.
+   Gear (W_RINK_GEAR, one piece a player, p.gear.rink): Skates, an Ash Stick and a Lucky Puck from the Rimewatch store;
+   Gloves, Shin Pads and a Mask from chests; the Pond Kettle (phase 10) adds a piece you don't have yet. Small effects
+   (measured in phase 11's lab). It reaches the engine through wRinkPlayer, never by changing the player's own
+   ratings, and shows on the stats card's Gear block and the Rink tab.
+   Potions: the Stamina Draught (football's item, serving the rink too: the general stores sell it), and Antifreeze,
+   Hot Cider and Tove's Liniment from the Rimewatch store. In a real game, at a whistle or a break, from the Bag under
+   the rink (one a whistle), with your bench's advice; each comes out of your bag when given. Your coaches never open
+   your bag (Watch and Auto powers don't), and Simulate leaves it alone. The other side's bench brings
+   W_RINK_KIT.opp[tier] and gives at its skill; every use is in the line under the rink with its reason, and the game
+   card says what each club brings.
+   Wraps: wGearLive (wW93GearLive: the rink), wRinkPlayer (wW93RinkPlayer: gear's ratings and the piece), wStartRink
+   (wW93StartRink: their bag goes in), wRinkCalls (wW93RinkCalls: the Bag block), wSixRow (wW93SixRow: the gear on the
+   Rink tab), wOpenRinkCard (wW93OpenRinkCard: the bags on the card), renderHelp (wW93RenderHelp: #wHelpRinkKit); and
+   wHK.start and wHK.simGame (the bags go in). */
+
+W_GEAR_CFG.sports.rink = 'hockey';
+W_GEAR_STATN.rink = { spd: 'speed', siz: 'size', hnd: 'hands', sht: 'shot', def: 'defense', ref: 'reflexes' };
+const W_RINK_GEAR = {
+  hk_skates: { sport: 'rink', name: 'Sharp Skates', price: 60, desc: 'A fresh edge: they get going an eighth quicker.', fx: { accel: 1.12 } },
+  hk_stick: { sport: 'rink', name: 'Ash Stick', price: 55, desc: 'A stiffer stick: their shots are a little harder to stop.', fx: { shot: .012 } },
+  hk_gloves: { sport: 'rink', name: 'Soft Gloves', price: 50, desc: 'A better feel for the puck: it is harder to poke off them.', fx: { guard: -.03 } },
+  hk_pads: { sport: 'rink', name: 'Shin Pads', price: 45, desc: 'A blocked shot hurts much less: it costs them a third of the stamina.', fx: { blkSta: .33 } },
+  hk_mask: { sport: 'rink', name: 'Bone Mask', price: 60, desc: 'In goal only: they see it all the way, and stop a little more.', fx: { save: .012 } },
+  hk_puck: { sport: 'rink', name: 'Lucky Puck', price: 40, desc: 'Kept in a pocket: they win more face-offs.', fx: { fo: .08 } },
+};
+for (const id of Object.keys(W_RINK_GEAR)) wGearAdd(id, W_RINK_GEAR[id]);
+const W_RINK_KIT = {
+  potions: { hkanti: 35, hkcider: 40, hkliniment: 45 }, // prices (the Stamina Draught's is football's: one item, every sport)
+  store: ['hk_skates', 'hk_stick', 'hk_puck'], // Rimewatch's gear (its store is the rime shop)
+  cup: ['hk_mask', 'hk_pads', 'hk_gloves', 'hk_skates', 'hk_stick', 'hk_puck'], cupGold: 60,
+  opp: { 1: { draught: 1 }, 2: { draught: 1, hkanti: 1 }, 3: { draught: 2, hkanti: 1, hkcider: 1, hkliniment: 1 } },
+};
+for (const id of Object.keys(wHK.potions)) {
+  const P = wHK.potions[id];
+  // (the Stamina Draught is football's item, and serves the rink too)
+  if (id === 'draught') {
+    W_POTIONS[id].sports = (W_POTIONS[id].sports || ['grid']).concat('rink');
+    DB.items[id].desc += ` On the ice: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items[id].use += ' Or in a hockey game, at a whistle, one a whistle.';
+    continue;
+  }
+  wPotionAdd(id, { sport: 'rink' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a hockey game, at a whistle or a break: the Bag under the rink. One potion a whistle.', price: W_RINK_KIT.potions[id] };
+}
+if (DB.shops.rime) { for (const id of Object.keys(W_RINK_KIT.potions)) DB.shops.rime[id] = W_RINK_KIT.potions[id]; for (const id of W_RINK_KIT.store) DB.shops.rime[id] = W_RINK_GEAR[id].price; }
+for (const [c, it] of [['chapel_chest', 'hk_gloves'], ['genevault_c6', 'hk_pads'], ['emberdeep_c3', 'hk_mask'], ['hatchery_c6', 'hkliniment'], ['deepseam_c3', 'hkcider']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wW93GearLive = wGearLive;
+wGearLive = function (sport) { return sport === 'rink' ? wRinkLive() : wW93GearLive(sport); };
+// a roster player's rink gear: its ratings (past the cap by W_GEAR_CFG.over at most) and the piece
+const wW93RinkPlayer = wRinkPlayer;
+wRinkPlayer = function (p) {
+  const t = wW93RinkPlayer(p), G = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'rink') : null;
+  if (G) { t.r = wGearRate(t.r, G, W_HKR.cap); t.gear = wGearTag(G); }
+  return t;
+};
+
+/* ---------- the bags go in ---------- */
+const WHKK = { next: null };
+const wRinkBagMine = () => Object.fromEntries(wMatchBag('rink').filter(x => wHK.potions[x.id]).map(x => [x.id, x.n]));
+const wRinkBagTheirs = tier => Object.assign({}, W_RINK_KIT.opp[tier] || {});
+const wRinkBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wHK.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wHK.potions[id].n}`).join(', ') : 'nothing'; };
+const wW93StartRink = wStartRink;
+wStartRink = function (o) {
+  WHKK.next = [null, wRinkBagTheirs((o && o.tier) || (o && o.club ? wBallTier(o.club) : 1))];
+  try { return wW93StartRink(o); } finally { WHKK.next = null; }
+};
+// (only the game wStartRink starts: a scrimmage, a practice or a cup game between clubs brings none)
+const wW93Start = wHK.start, wW93SimGame = wHK.simGame;
+wHK.start = o => wW93Start(WHKK.next ? Object.assign({}, o, { bags: WHKK.next }) : o);
+wHK.simGame = o => wW93SimGame(WHKK.next && !(o && o.keep) ? Object.assign({}, o, { bags: WHKK.next }) : o);
+
+/* ---------- your Bag, in a real game ---------- */
+function wRinkPotion(id, ri) {
+  if (!wRinkWorld()) return 'Potions are for real games, not practice.';
+  if (!wHas(id)) return `You have no ${(wHK.potions[id] || {}).n || 'such potion'}.`;
+  const r = wHK.potion(id, ri); if (r) return r;
+  // (the save point is the game as it is now, with the potion given: a reload can't lose it, or give it back)
+  wAddItem(id, -1); if (WG.hkg && WG.hkg.live) WG.hkg.live.snap = wHK.snapshot(); wSave(); return '';
+}
+let W_RINK_KITKEY = '', W_RINK_KITMSG = '';
+const wW93RinkCalls = wRinkCalls;
+wRinkCalls = function (force) {
+  wW93RinkCalls(force);
+  const box = $('wRinkCalls'); if (box.hidden || !box.querySelector('.wccrows')) { W_RINK_KITKEY = ''; return; }
+  if (!wRinkWorld()) { const k = box.querySelector('.wcckit'); if (k) k.remove(); return; }
+  if (!box.querySelector('.wcckit')) box.insertAdjacentHTML('beforeend', '<div class="wcckit"></div>');
+  const bag = wRinkBagMine(), G = wHK.G, you = wHK.you, ph = wHK.phase;
+  const key = `${ph}|${JSON.stringify(bag)}|${G.sta[you].map(v => Math.round(v * 20)).join()}|${G.box.length}|${W_RINK_KITMSG}|${wHK.pots.length}`;
+  if (!force && key === W_RINK_KITKEY) return;
+  if (!force && box.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;
+  W_RINK_KITKEY = key;
+  const ids = Object.keys(bag), R = G.teams[you].roster, adv = wHK.advice(bag), gk = G.on[you][wHK.pos.indexOf('G')];
+  const who = id => { const P = wHK.potions[id]; if (!P.one) return ''; const list = R.map((_, i) => i).filter(i => id !== 'hkcider' || i !== gk);
+    return `<select data-hkwho="${id}" aria-label="Who gets the ${esc(P.n)}">${list.map(ri => `<option value="${ri}"${adv && adv.id === id && adv.ri === ri ? ' selected' : ''}>${esc(R[ri].n)} (${Math.round(G.sta[you][ri] * 100)}%)</option>`).join('')}</select>`; };
+  box.querySelector('.wcckit').innerHTML = `<div class="wccrow"><span class="wccl">Bag</span>${ids.length ? ids.map(id => { const P = wHK.potions[id], why = wHK.potionWhy(id, P.one ? (adv && adv.id === id ? adv.ri : G.on[you][0]) : -1);
+      return `<span class="wcpot">${who(id)}<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-hkuse="${id}" title="${esc(P.desc + (why && !/Pick|fresh/.test(why) ? ` Not now: ${why}` : ''))}">${esc(P.n)} (${bag[id]})</button></span>`; }).join('') : '<small class="hint">No hockey potions in your bag. The Rimewatch store sells them.</small>'}</div>
+    ${W_RINK_KITMSG ? `<p class="wbad wcmsg" role="alert">${esc(W_RINK_KITMSG)}</p>` : ''}${adv ? `<p class="hint">Your bench says: <b>${esc(wHK.potions[adv.id].n)}</b>${adv.ri >= 0 ? ` for ${esc(R[adv.ri].n)}` : ''}, ${esc(adv.why)}.</p>` : ''}`;
+};
+$('wRinkCalls').addEventListener('click', e => {
+  const b = e.target.closest('[data-hkuse]'); if (!b) return;
+  const id = b.dataset.hkuse, sel = document.querySelector(`[data-hkwho="${id}"]`);
+  W_RINK_KITMSG = wRinkPotion(id, sel ? +sel.value : -1); wRinkCalls(true);
+});
+
+/* ---------- the Rink tab and the card ---------- */
+const wW93SixRow = wSixRow;
+wSixRow = function (k, C) {
+  const html = wW93SixRow(k, C), p = wSixWho(k), g = p && typeof k === 'number' ? wGearOf(p, 'rink') : null;
+  return g ? html.replace('<small class="wnst">', `<small class="wnst" title="${esc(g.desc)}">Wears the <b>${esc(g.name)}</b>.</small><small class="wnst">`) : html;
+};
+const wW93OpenRinkCard = wOpenRinkCard;
+wOpenRinkCard = function () {
+  wW93OpenRinkCard();
+  const ul = document.querySelector('#modalBox .wbclubs'); if (!ul) return;
+  ul.insertAdjacentHTML('afterend', `<p class="hint">What their benches bring: ${[1, 2, 3].map(t => `tier ${t}, ${esc(wRinkBagWords(W_RINK_KIT.opp[t]))}`).join('; ')}. Yours is your bag: give from it at a whistle, in the Bag under the rink.</p>`);
+};
+
+const wW93RenderHelp = renderHelp;
+renderHelp = function () {
+  wW93RenderHelp();
+  const after = $('wHelpRinkGame'); if (!after || $('wHelpRinkKit')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkKit"><b>Hockey gear and potions.</b> Each player can wear one piece for the rink: Sharp Skates, an Ash Stick and a Lucky Puck from the Rimewatch store; Soft Gloves, Shin Pads and a Bone Mask (for your goalie) from chests. Put it on from the Bag on the Team screen. In a real game, at a whistle or a break, give one potion from the Bag under the rink: a Stamina Draught (one skater), Antifreeze (your skaters tire slower for the rest of the period), Hot Cider (one player's shots are harder to stop for the rest of the period) or Tove's Liniment (your earliest penalty ends). Your bench says which suits the moment. The other side's bench brings potions by tier and uses them; every use is in the line under the rink. Blocking a shot costs a skater some stamina, less in Shin Pads.</p>`);
 };
 </script>
 </body></html>
