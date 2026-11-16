@@ -122,3 +122,4 @@ src/realm/w85-courtfeel.js
 src/realm/w86-sportbar.js
 src/realm/w87-sportpage.js
 src/realm/w88-rink.js
+src/realm/w89-rinksix.js

@@ -23,6 +23,11 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // stamina and the bench (phase 4): the rules, each side's stamina by roster index, its bench in order, who is on the
+  // way off; start() takes ordered: [yours, theirs] (the bench comes on in the roster's order) and auto (the coach
+  // changes your lines: on unless false); input({ act: 'change' }) sends your tired skaters off now
+  staRules: Object.assign({}, HK_STA), sta: () => G && G.sta ? G.sta.map(a => a.slice()) : null, bench: side => G && G.teams ? hkBench(side) : [], door: side => hkDoor(side),
+  changing: () => L ? L.pl.map((p, i) => p.chg ? [i, p.chg.to] : null).filter(Boolean) : [], changeNow: side => L ? hkChangeNow(side) : 0, get auto() { return GD ? GD.auto : true; },
   // penalties and the goalie (phase 3): the fouls' odds, the penalty that is coming, whether a goalie is in their net and
   // why not, who takes a side's face-offs, the shootout's try now; the tests' handles: a foul by player i, the fouls' odds
   // changed, a goal by player i, a pull, the lines set again
@@ -32,7 +37,7 @@ return {
   foul: (i, k) => { if (L) hkFoul(L.pl[i], k || 'tripping', null); }, setFouls: o => Object.assign(HK_FOUL, o || {}),
   goalBy: i => { if (!L) return; const p = L.pl[i]; hkGoalScored({ i, side: p.side, kind: 'wrist', gx: hkGoalX(p.side), dir: hkDir(p.side), dist: 5, touch: [], en: !hkInNet(1 - p.side) }); }, pull: (side, why) => !!L && hkPull(side, why || 'hand'), lines: () => { if (L) hkLines(); },
   // the ratings, the spots and the clubs, for the page and How to play
-  rate: kind => hkRate(kind), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
+  rate: kind => hkRate(kind), fit: (r, pos) => hkFit(r, pos), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
   // the test's handle on the rink: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
   step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) hkTick(HK_DT); return GD ? GD.ph : null; },
   get play() { return L; }, get ev() { return L ? L.ev : []; }, scr: (x, y) => hkScrCam(x, y),

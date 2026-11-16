@@ -31424,12 +31424,12 @@ function hkNetOut(o, m, e) {
 }
 
 /* ---------- skating ---------- */
-const hkTop = (p, i) => (5.4 + p.r.spd * .42) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
+const hkTop = (p, i) => (5.4 + p.r.spd * .42) * hkStaK(p) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
 function hkSkate(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(hkTop(p, i), d / .4);
   const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0;
   let ax = wx - p.vx, ay = wy - p.vy;
-  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
+  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * hkStaK(p) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
   if (need > mx) { ax *= mx / need; ay *= mx / need; }
   p.vx += ax; p.vy += ay;
   hkGlide(p, dt);
@@ -31478,6 +31478,7 @@ function hkStep(dt) {
   // (the CPU keeps its hands off a skater you are playing)
   else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = .2 + R() * .2; hkThink(h); } }
   hkMeterStep(dt); hkLunge(dt);
+  if (GD.ph === 'live') { hkStaStep(dt); hkCoach(dt); hkChangeStep(); }
   hkChase();
   L.pl.forEach((p, i) => {
     if (p.off) return;
@@ -31499,7 +31500,7 @@ function hkChase() {
   for (const s of [0, 1]) {
     if (P.k === 'pass' && P.to >= 0 && L.pl[P.to].side === s) { L.chase[s] = P.to; continue; }
     let b = -1, bt = 1e9;
-    for (const p of hkSk(s)) { if (p.stun > 0) continue; const t = hkMeet(p)[2] - (L.chase0 && L.chase0[s] === L.pl.indexOf(p) ? .25 : 0); if (t < bt) { bt = t; b = L.pl.indexOf(p); } }
+    for (const p of hkSk(s)) { if (p.stun > 0 || p.chg) continue; const t = hkMeet(p)[2] - (L.chase0 && L.chase0[s] === L.pl.indexOf(p) ? .25 : 0); if (t < bt) { bt = t; b = L.pl.indexOf(p); } }
     L.chase[s] = b;
   }
   L.chase0 = L.chase.slice();
@@ -31507,6 +31508,8 @@ function hkChase() {
 function hkAim(p, i) {
   const P = L.puck, h = hkHand();
   if (i === h) return L.carry || [hkGoalX(p.side), 0];
+  // (on their way off for a change: to the bench door)
+  if (p.chg) return hkDoor(p.side);
   if (h < 0) {
     if (L.chase[p.side] === i) { const m = hkMeet(p); return [m[0], m[1]]; }
     return hkForm(p);
@@ -31520,7 +31523,7 @@ function hkAim(p, i) {
 // the skater of side who presses the carrier: the nearest, with a lean to whoever was already doing it
 function hkPresser(side) {
   const c = L.pl[hkHand()]; let b = -1, bd = 1e9;
-  for (const p of hkSk(side)) { if (p.stun > 0) continue; const i = L.pl.indexOf(p), d = hyp(p.x - c.x, p.y - c.y) - (L.press === i ? 1.2 : 0); if (d < bd) { bd = d; b = i; } }
+  for (const p of hkSk(side)) { if (p.stun > 0 || p.chg) continue; const i = L.pl.indexOf(p), d = hyp(p.x - c.x, p.y - c.y) - (L.press === i ? 1.2 : 0); if (d < bd) { bd = d; b = i; } }
   L.press = b; return b;
 }
 // the shape: where p stands by spot, by which side has the puck and where it is
@@ -31723,8 +31726,9 @@ function hkShotOdds(p, kind, x, y) {
     const ax = gx - x, ay = -y, len = hyp(ax, ay) || 1, s = ((d.x - x) * ax + (d.y - y) * ay) / (len * len); if (s < .08 || s > .88) continue;
     if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp(.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0), .1, .6); }
   }
-  const miss = clamp(.2 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
-  let q = .09 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
+  const tired = clamp(1 - hkSta(p) / .6, 0, 1);
+  const miss = clamp(.2 + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
+  let q = .09 - tired * .025 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
   if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0); else q = .97;
   return { ok: true, dist, ang, miss, q: clamp(q, .02, .97), set, screen, block, blockP };
 }
@@ -31913,10 +31917,12 @@ function hkStart(opts) {
   hkNewGame({ mins: o.mins });
   G.teams = [hkTeam(T[0] || HK_CLUBS.home), hkTeam(T[1] || HK_CLUBS.away)];
   G.on = G.teams.map(t => HK_POS.map(k => t.spot[k]));
-  G.stat = G.teams.map(t => t.roster.map(() => ({ g: 0, a: 0, sog: 0, att: 0, hit: 0, blk: 0, give: 0, take: 0, fow: 0, fot: 0, pim: 0, sec: 0, sa: 0, sv: 0 })));
+  G.stat = G.teams.map(t => t.roster.map(() => ({ g: 0, a: 0, sog: 0, att: 0, hit: 0, blk: 0, give: 0, take: 0, fow: 0, fot: 0, pim: 0, sec: 0, sa: 0, sv: 0, sh: 0 })));
+  G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
+  for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: o.mode === 'play' ? 'play' : 'watch', you: o.you === 1 ? 1 : 0, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: o.mode === 'play' ? 'play' : 'watch', you: o.you === 1 ? 1 : 0, auto: o.auto !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
   hkInputClear();
   hkLines(); hkFaceoffSpots(HK_RULES.len / 2, 0).forEach(([x, y], i) => { const p = L.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; });
   GD.fo = { x: HK_RULES.len / 2, y: 0 }; hkPuckAt(GD.fo.x, GD.fo.y);
@@ -32006,8 +32012,9 @@ function hkFaceoffSpots(x, y) {
   });
 }
 // play stops, and a face-off follows at (x, y)
-function hkWhistle(x, y, msg, big, deadT) {
+function hkWhistle(x, y, msg, big, deadT, noChange) {
   const P = L.puck; P.vx = P.vy = 0; if (P.st === 'held') hkPuckAt(P.x, P.y); else P.k = 'in';
+  GD.noChange = noChange == null ? -1 : noChange;
   GD.next = { x, y }; GD.deadT = deadT || HK_PACE.dead; if (msg) GD.msg = msg; if (big) GD.big = { k: big };
   for (const p of L.pl) { p.act = ''; p.actT = 0; }
   hkGo('dead');
@@ -32016,6 +32023,8 @@ function hkFaceoffAt(x, y) {
   // a goalie pulled for an extra skater stays off for a face-off in the other half, and goes back for one in their own
   for (const s of [0, 1]) { const g = L.pl[hkGk(s)]; if (g.pulled && (g.pulled === 'delay' || hkUp(s, x) < HK_RULES.len / 2)) g.pulled = false; }
   hkLines();
+  // the lines change at the whistle (not the side that iced it)
+  if (GD.ph !== 'break') hkChangeWhistle(GD.noChange == null ? -1 : GD.noChange); GD.noChange = -1;
   GD.fo = { x, y }; GD.set = { from: L.pl.map(p => [p.x, p.y]), to: hkFaceoffSpots(x, y) };
   for (const p of L.pl) { p.stun = 0; p.cd = 0; p.act = ''; }
   hkPuckAt(x, y); L.touch = []; L.oneT = null; L.press = -1;
@@ -32083,7 +32092,7 @@ function hkGoalScored(S) {
 function hkIcing(side) {
   const [x] = hkAt(side, HK_DOTS.x[0], 0);
   hkEv('icing', G.teams[side].name); G.icings++;
-  hkWhistle(x, (L.puck.y < 0 ? -1 : 1) * HK_DOTS.y, `Icing on ${G.teams[side].name}. The face-off comes back to their end.`, 'icing');
+  hkWhistle(x, (L.puck.y < 0 ? -1 : 1) * HK_DOTS.y, `Icing on ${G.teams[side].name}. The face-off comes back to their end, and they may not change.`, 'icing', 0, side);
   return true;
 }
 // the goalie covers the puck (06-cpu.js): a face-off beside that net
@@ -32107,6 +32116,8 @@ function hkPeriodOver() {
   GD.msg = r === 'ot' ? `Level at ${G.score[0]} after three periods. Sudden death: the next goal wins.` : `End of the ${hkPeriodName(was)}: ${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}.`;
   // (a penalty that was coming when the period ended is served from the start of the next)
   if (GD.delay) hkPenaltyCall(true);
+  // everyone rests between periods
+  hkChangeWhistle(-1, true);
   hkGo('break');
 }
 /* ---------- the shootout ---------- */
@@ -32171,9 +32182,9 @@ function hkSummary() {
 }
 // the box score: by side, each player who played, with their line, and the team's totals
 function hkBox() {
-  const keys = ['g', 'a', 'sog', 'att', 'hit', 'blk', 'give', 'take', 'fow', 'fot', 'pim', 'sa', 'sv'];
+  const keys = ['g', 'a', 'sog', 'att', 'hit', 'blk', 'give', 'take', 'fow', 'fot', 'pim', 'sa', 'sv', 'sh'];
   return G.teams.map((T, s) => {
-    const rows = T.roster.map((m, i) => { const at = G.on[s].indexOf(i); return Object.assign({ n: m.n, kind: m.kind, num: m.num, ri: i, pos: at >= 0 ? HK_POS[at] : '' }, G.stat[s][i], { sec: Math.round(G.stat[s][i].sec) }); }).filter(r => r.sec > 0 || G.on[s].includes(r.ri));
+    const rows = T.roster.map((m, i) => { const at = G.on[s].indexOf(i); return Object.assign({ n: m.n, kind: m.kind, num: m.num, ri: i, pos: at >= 0 ? HK_POS[at] : '' }, G.stat[s][i], { sec: Math.round(G.stat[s][i].sec), sta: Math.round(G.sta[s][i] * 100) / 100, on: at >= 0 }); }).filter(r => r.sec > 0 || G.on[s].includes(r.ri));
     const tot = {}; for (const k of keys) tot[k] = rows.reduce((a, r) => a + r[k], 0);
     return { team: T.name, rows, tot };
   });
@@ -32380,6 +32391,8 @@ function hkDrawPlayers(c) {
     const down = p.act === 'down';
     drawFig(c, p.kind, s.x, s.y, goalie ? 46 : 44, T, { num: p.num, run: mv && !goalie ? p.run : 0, flip: p.fx < 0, throwK: p.act === 'shoot' || p.act === 'wind' ? 1 : 0, lift: p.act === 'save' ? 4 : 0, alpha: p.stun > 0 && !down ? .8 : 1, pose: down ? HK_DOWN : undefined });
     if (!behind) hkDrawStick(c, p, s, goalie);
+    // by hand: how much each of your skaters has left, under their feet (red when they need the bench)
+    if (hkHandsOn() && p.side === GD.you && !goalie && GD.ph !== 'so') { const st = hkSta(p); c.save(); c.fillStyle = 'rgba(13,9,7,.7)'; c.fillRect(s.x - 11, s.y + 8, 22, 4); c.fillStyle = st < HK_STA.tired ? '#ff6a4a' : st < .7 ? '#ffd08a' : '#8fe07a'; c.fillRect(s.x - 10, s.y + 9, 20 * st, 2); c.restore(); }
   }
 }
 function hkDrawPuck(c) {
@@ -32561,6 +32574,8 @@ function hkInput(o) {
   }
   if (o.act === 'switch') { if (GD.ph === 'live' && !hkPuckMine()) { L.me = hkNearMine(hkMe()); r = 'switch'; } }
   if (o.act === 'pull') r = hkHandPull();
+  if (o.act === 'change') r = GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
+  if (o.act === 'auto') { GD.auto = !GD.auto; r = GD.auto ? 'auto' : 'manual'; }
   return r;
 }
 function hkInputClear() {
@@ -32683,19 +32698,113 @@ function hkSetMode(m) {
   GD.mode = m; hkInputClear();
   return m;
 }
+/* Black Ice: stamina, shifts and the bench (issue #83, phase 4). Skating is hard work. Every skater has stamina
+   (G.sta, by side and roster index, 0 to 1): it runs down on the ice, faster the faster they skate, and comes back on
+   the bench. A tired skater is slower, turns wider and takes longer to get going (hkStaK), and shoots a little worse.
+   So a line is good for a short shift, and then needs the bench.
+   The bench is the rest of the roster after the six (up to HK_RULES.bench), in order. Changes:
+   - on the fly: a tired skater heads for their bench's door on the far boards and, there, the next fresh player comes
+     over the boards in their spot (hkChangeStep). While they skate off their side is short around the puck, so the
+     coach sends them only when their side has the puck or it is in the other half (hkCoach). By hand, one key sends
+     everybody who is tired now (hkChangeNow): do it at the wrong moment and you give up a rush.
+   - at a whistle: everybody tired changes at once (hkChangeWhistle), except the side that iced the puck, which may not.
+   Who comes on: for a side in the order it was given (opts.ordered: yours), the first fresh player on the bench;
+   otherwise the fresh player who suits the spot best. The goalie stays in all game.
+   With nobody on the bench the six play on: they get a breather at each whistle and a rest between periods.
+   Each time on is a shift (G.stat sh). */
+const HK_STA = { drain: .011, fast: .013, bench: .05, box: .05, whistle: .06, tired: .45, fresh: .8, floor: .15, slow: .2, door: 1.4 };
+// the bench doors, on the far boards either side of centre: [x, y] by side
+const hkDoor = side => [HK_RULES.len / 2 + (side ? 5 : -5), -HK_RULES.wid / 2 + .7];
+const hkSta = p => G.sta[p.side][p.ri];
+// how much of their speed and push a skater has left: 1 fresh, down to 1 - HK_STA.slow when spent
+const hkStaK = p => p.pos === 'G' && !p.pulled ? 1 : 1 - HK_STA.slow * clamp(1 - hkSta(p) / .6, 0, 1);
+// side's bench: roster indices not on the ice and not in the box, in order
+function hkBench(side) {
+  const boxed = new Set(G.box.concat(G.wait).filter(b => b.side === side).map(b => b.ri));
+  return G.teams[side].roster.map((_, i) => i).filter(i => !G.on[side].includes(i) && !boxed.has(i));
+}
+// who comes on for the skater at pos: the first fresh player in a side's own order, or the fresh one who fits best
+function hkNextOn(side, pos) {
+  const fresh = hkBench(side).filter(i => G.sta[side][i] >= HK_STA.fresh); if (!fresh.length) return -1;
+  if (G.ordered[side]) return fresh[0];
+  const T = G.teams[side]; return fresh.slice().sort((a, b) => hkFit(T.roster[b].r, pos) - hkFit(T.roster[a].r, pos))[0];
+}
+// stamina moves on dt seconds of play
+function hkStaStep(dt) {
+  for (const p of L.pl) {
+    if (p.off || (p.pos === 'G' && !p.pulled)) continue;
+    const top = 5.4 + p.r.spd * .42, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
+    G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * dt);
+  }
+  for (const s of [0, 1]) {
+    for (const i of hkBench(s)) G.sta[s][i] = Math.min(1, G.sta[s][i] + HK_STA.bench * dt);
+    for (const b of G.box) if (b.side === s) G.sta[s][b.ri] = Math.min(1, G.sta[s][b.ri] + HK_STA.box * dt);
+  }
+}
+// the swap: the player in spot p goes off and roster index inn comes on in their place, where p stands
+function hkSwap(p, inn) {
+  const T = G.teams[p.side], m = T.roster[inn], at = HK_POS.indexOf(p.pos);
+  G.on[p.side][at] = inn;
+  hkBoxAdd(p.side, inn, 'sh');
+  hkEv('change', 'line', m.n);
+  Object.assign(p, { ri: inn, kind: m.kind, n: m.n, num: m.num, r: Object.assign({}, m.r), chg: null, stun: 0, cd: 0 });
+}
+/* the coach, a few times a second: a tired skater with a fresh player waiting is sent off, when it's safe (their side
+   has the puck, or it is in the other half), one or two at a time. Not a side you are changing by hand (auto off). */
+function hkCoach(dt) {
+  L.coachT = (L.coachT || 0) - dt; if (L.coachT > 0) return; L.coachT = .4;
+  for (const s of [0, 1]) {
+    if (hkHandsOn() && s === GD.you && !GD.auto) continue;
+    const safe = G.poss === s || hkUp(s, L.puck.x) > HK_RULES.len / 2 + 2;
+    if (!safe) continue;
+    const going = hkSk(s).filter(p => p.chg).length; if (going >= 2) continue;
+    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < HK_STA.tired && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
+    for (const p of tired.slice(0, 2 - going)) { const inn = hkNextOn(s, p.pos); if (inn >= 0 && !hkSk(s).some(q => q.chg && q.chg.to === inn)) p.chg = { to: inn }; }
+  }
+}
+// by hand: everybody on your side who is tired, and has a fresh player to come on, goes now. Returns how many
+function hkChangeNow(side) {
+  let n = 0; const taken = new Set(hkSk(side).filter(p => p.chg).map(p => p.chg.to));
+  for (const p of hkSk(side).filter(q => q.pos !== 'G' && !q.chg && hkSta(q) < .7).sort((a, b) => hkSta(a) - hkSta(b))) {
+    const fresh = hkBench(side).filter(i => G.sta[side][i] >= HK_STA.fresh && !taken.has(i)); if (!fresh.length) break;
+    const inn = G.ordered[side] ? fresh[0] : fresh.slice().sort((a, b) => hkFit(G.teams[side].roster[b].r, p.pos) - hkFit(G.teams[side].roster[a].r, p.pos))[0];
+    p.chg = { to: inn }; taken.add(inn); n++;
+  }
+  return n;
+}
+// a skater on their way off: at the door, the swap. With the puck they keep it and stay on
+function hkChangeStep() {
+  for (const p of L.pl) {
+    if (!p.chg || p.off) continue;
+    if (L.pl.indexOf(p) === hkHand() || G.on[p.side].includes(p.chg.to) || G.sta[p.side][p.chg.to] == null) { p.chg = null; continue; }
+    const [x, y] = hkDoor(p.side);
+    if (hyp(p.x - x, p.y - y) < HK_STA.door) hkSwap(p, p.chg.to);
+  }
+}
+/* a whistle: everybody tired changes at once, the freshest on (not: the side that iced the puck, which may not change).
+   Everyone on the ice gets a breather. rest: a break between periods, when everyone is fresh again */
+function hkChangeWhistle(not, rest) {
+  for (const p of L.pl) p.chg = null;
+  if (rest) { for (const s of [0, 1]) G.sta[s] = G.sta[s].map(() => 1); return; }
+  for (const s of [0, 1]) {
+    for (const p of hkSk(s)) G.sta[s][p.ri] = Math.min(1, hkSta(p) + HK_STA.whistle);
+    if (s === not) continue;
+    for (const p of hkSk(s).filter(q => q.pos !== 'G' && hkSta(q) < .7).sort((a, b) => hkSta(a) - hkSta(b))) { const inn = hkNextOn(s, p.pos); if (inn >= 0) hkSwap(p, inn); }
+  }
+}
 /* The rink's page in the Realm (issue #83, phase 1). A canvas in #v-rink, after the court's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (hkTick) and draws it (hkDraw). The engine's parts
    don't touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
    In You play (phase 2) it hears the keys: WASD or the arrows to steer, Space to shoot (a tap, or hold to wind up) or
    check or take the face-off, J to pass (hold to send it hard) or poke, E to switch skaters, Shift held to lift your
-   stick, G to pull your goalie or send them back; only while the rink is on screen (not under How to play), in a live play or at a face-off, in the capture
+   stick, G to pull your goalie or send them back, C to change your tired skaters; only while the rink is on screen (not under How to play), in a live play or at a face-off, in the capture
    phase so nothing else on the page takes them. A key taken stays taken until it's let go; releases are always heard. */
 const HK_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
 const HKK = new Set(), HKHELD = new Set();
 function hkKeySteer() { let x = 0, y = 0; for (const k of HKK) if (HK_KEYS[k]) { x += HK_KEYS[k][0]; y += HK_KEYS[k][1]; } return [x, y]; }
 function hkKey(e, down) {
   if (!HKP.on || !GD) return;
-  const k = e.key.toLowerCase(), ours = !!HK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || k === 'e' || k === 'g';
+  const k = e.key.toLowerCase(), ours = !!HK_KEYS[k] || k === ' ' || k === 'j' || k === 'shift' || k === 'e' || k === 'g' || k === 'c';
   if (!ours) return;
   const swallow = () => { e.preventDefault(); e.stopPropagation(); };
   if (!down) {
@@ -32713,7 +32822,7 @@ function hkKey(e, down) {
   else if (k === ' ') hkInput({ shoot: true });
   else if (k === 'j') hkInput({ pass: true });
   else if (k === 'shift') hkInput({ lift: true });
-  else hkInput({ act: k === 'g' ? 'pull' : 'switch' });
+  else hkInput({ act: k === 'g' ? 'pull' : k === 'c' ? 'change' : 'switch' });
   swallow();
 }
 window.addEventListener('keydown', e => hkKey(e, true), true);
@@ -32770,6 +32879,11 @@ return {
   hands: Object.assign({}, HK_HANDS), pace: Object.assign({}, HK_PACE), aimFx: (side, t) => L ? hkAimFx(side, t) : null, aimTarget: dir => hkAimTarget(dir), power: t => hkPower(t),
   shot: () => L && L.puck.shot ? JSON.parse(JSON.stringify(L.puck.shot)) : null, give: i => { if (L) hkGain(i, 'test'); }, passTo: j => { if (L && hkHand() >= 0) hkPass(j); },
   cam: () => ({ u: HKT.cam.u, end: HKT.cam.end, k: HKC.k, left: HKC.left }), camRules: Object.assign({}, HK_CAM),
+  // stamina and the bench (phase 4): the rules, each side's stamina by roster index, its bench in order, who is on the
+  // way off; start() takes ordered: [yours, theirs] (the bench comes on in the roster's order) and auto (the coach
+  // changes your lines: on unless false); input({ act: 'change' }) sends your tired skaters off now
+  staRules: Object.assign({}, HK_STA), sta: () => G && G.sta ? G.sta.map(a => a.slice()) : null, bench: side => G && G.teams ? hkBench(side) : [], door: side => hkDoor(side),
+  changing: () => L ? L.pl.map((p, i) => p.chg ? [i, p.chg.to] : null).filter(Boolean) : [], changeNow: side => L ? hkChangeNow(side) : 0, get auto() { return GD ? GD.auto : true; },
   // penalties and the goalie (phase 3): the fouls' odds, the penalty that is coming, whether a goalie is in their net and
   // why not, who takes a side's face-offs, the shootout's try now; the tests' handles: a foul by player i, the fouls' odds
   // changed, a goal by player i, a pull, the lines set again
@@ -32779,7 +32893,7 @@ return {
   foul: (i, k) => { if (L) hkFoul(L.pl[i], k || 'tripping', null); }, setFouls: o => Object.assign(HK_FOUL, o || {}),
   goalBy: i => { if (!L) return; const p = L.pl[i]; hkGoalScored({ i, side: p.side, kind: 'wrist', gx: hkGoalX(p.side), dir: hkDir(p.side), dist: 5, touch: [], en: !hkInNet(1 - p.side) }); }, pull: (side, why) => !!L && hkPull(side, why || 'hand'), lines: () => { if (L) hkLines(); },
   // the ratings, the spots and the clubs, for the page and How to play
-  rate: kind => hkRate(kind), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
+  rate: kind => hkRate(kind), fit: (r, pos) => hkFit(r, pos), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
   // the test's handle on the rink: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
   step: n => { for (let i = 0; i < (n || 1) && GD && GD.ph !== 'over'; i++) hkTick(HK_DT); return GD ? GD.ph : null; },
   get play() { return L; }, get ev() { return L ? L.ev : []; }, scr: (x, y) => hkScrCam(x, y),
@@ -44552,7 +44666,7 @@ const W_RINK = {
   away: { city: 'cinderhold', kinds: ['elf', 'goblin', 'kobold', 'minotaur', 'golem', 'gorgon', 'dwarf', 'ogre'], color: '#b8443a', light: '#ffe6e0', short: 'CHC' },
 };
 const W_RINK_SHOT = { wrist: 'scores', slap: 'scores with a slap shot', one: 'one-times it in', so: 'wins the shootout' };
-const W_RINK_GOALIE = ['pull', 'Goalie', 'G: pull your goalie for an extra skater, or send them back', 0];
+const W_RINK_GOALIE = ['pull', 'Goalie', 'G: pull your goalie for an extra skater, or send them back', 0], W_RINK_CHANGE = ['change', 'Change', 'C: send your tired skaters off for fresh ones', 0];
 const W_RINK_STR = { pp: ' on the power play', sh: ' short-handed', even: '', so: '' };
 // who plays it: the CPU both sides, or you play your skaters by hand
 const W_RINK_MODES = {
@@ -44562,8 +44676,8 @@ const W_RINK_MODES = {
 let W_RINK_MODE = 'play';
 // the pad under the rink: with the puck and without it, [key for wHK.input, label, the key it stands for, held?]
 const W_RINK_PAD = {
-  puck: [['shoot', 'Shoot', 'Space: tap for a wrist shot, hold to wind up', 1], ['pass', 'Pass', 'J: tap to pass, hold to send it hard', 1], W_RINK_GOALIE],
-  none: [['shoot', 'Check', 'Space: lunge at the carrier, or take the face-off', 1], ['pass', 'Poke', 'J: go for the puck', 1], ['lift', 'Lift stick', 'Shift, held: into the passing lane', 1], ['switch', 'Switch', 'E: play the next skater nearest the puck', 0], W_RINK_GOALIE],
+  puck: [['shoot', 'Shoot', 'Space: tap for a wrist shot, hold to wind up', 1], ['pass', 'Pass', 'J: tap to pass, hold to send it hard', 1], W_RINK_CHANGE, W_RINK_GOALIE],
+  none: [['shoot', 'Check', 'Space: lunge at the carrier, or take the face-off', 1], ['pass', 'Poke', 'J: go for the puck', 1], ['lift', 'Lift stick', 'Shift, held: into the passing lane', 1], ['switch', 'Switch', 'E: play the next skater nearest the puck', 0], W_RINK_CHANGE, W_RINK_GOALIE],
 };
 const wRinkMins = () => wHK.rules.minsAt.includes(SET.rinkMins) ? SET.rinkMins : wHK.rules.mins;
 // the game on the rink: plain data, never saved
@@ -44631,12 +44745,13 @@ function wRinkTeams() {
     name: t.name, short: t.short, color: t.color, light: t.light, roster: t.kinds.map((kind, i) => ({ n: wRinkName(kind, used), kind, num: 2 + i * 7 })),
   }));
 }
-/* one game on the rink. opts: { teams, mins, seed, mode } (the two clubs, the length setting and the mode on the bar
-   when not given) */
+/* one game on the rink. opts: { teams, mins, seed, mode, title, how, ordered } (the two clubs, the length setting and
+   the mode on the bar when not given; ordered: whose bench comes on in its own order) */
 function wRinkGame(opts) {
   const o = opts || {};
-  WHK = { over: null }; wRinkTick(true);
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE });
+  WHK = { over: null, how: o.how || 'scrimmage' }; wRinkTick(true);
+  $('wRinkTitle').textContent = o.title || 'A scrimmage at the Pond Rink';
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }
@@ -44661,7 +44776,7 @@ function wRinkLogHTML() {
 function wRinkBox() {
   const B = wHK.box(); if (!B) { $('wRinkBox').innerHTML = ''; $('wRinkLog').innerHTML = ''; $('wRinkPens').innerHTML = ''; return; }
   const mins = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`, of = (m, a) => a ? `${m}/${a}` : '–';
-  $('wRinkBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Time on the ice">TOI</th><th title="Goals">G</th><th title="Assists">A</th><th title="Shots on goal">SOG</th><th>Hits</th><th title="Shots blocked">Blk</th><th title="Takeaways">Tk</th><th title="Penalty minutes: two for each minor">PIM</th><th title="Face-offs won of taken">FO</th><th title="A goalie's saves of shots faced">Sv</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${esc(r.pos)} · ${esc(wKindName(r.kind))}</small></td><td>${mins(r.sec)}</td><td>${r.g}</td><td>${r.a}</td><td>${r.sog}</td><td>${r.hit}</td><td>${r.blk}</td><td>${r.take}</td><td>${r.pim}</td><td>${of(r.fow, r.fot)}</td><td>${r.pos === 'G' ? of(r.sv, r.sa) : ''}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td><b>${b.tot.g}</b></td><td>${b.tot.a}</td><td>${b.tot.sog}</td><td>${b.tot.hit}</td><td>${b.tot.blk}</td><td>${b.tot.take}</td><td>${b.tot.pim}</td><td>${of(b.tot.fow, b.tot.fot)}</td><td>${of(b.tot.sv, b.tot.sa)}</td></tr></table>`).join('');
+  $('wRinkBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Time on the ice">TOI</th><th title="Shifts: times over the boards">Sh</th><th title="Goals">G</th><th title="Assists">A</th><th title="Shots on goal">SOG</th><th>Hits</th><th title="Shots blocked">Blk</th><th title="Takeaways">Tk</th><th title="Penalty minutes: two for each minor">PIM</th><th title="Face-offs won of taken">FO</th><th title="A goalie's saves of shots faced">Sv</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${r.on ? esc(r.pos) : 'bench'} · ${esc(wKindName(r.kind))}</small></td><td>${mins(r.sec)}</td><td>${r.sh}</td><td>${r.g}</td><td>${r.a}</td><td>${r.sog}</td><td>${r.hit}</td><td>${r.blk}</td><td>${r.take}</td><td>${r.pim}</td><td>${of(r.fow, r.fot)}</td><td>${r.pos === 'G' ? of(r.sv, r.sa) : ''}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td></td><td><b>${b.tot.g}</b></td><td>${b.tot.a}</td><td>${b.tot.sog}</td><td>${b.tot.hit}</td><td>${b.tot.blk}</td><td>${b.tot.take}</td><td>${b.tot.pim}</td><td>${of(b.tot.fow, b.tot.fot)}</td><td>${of(b.tot.sv, b.tot.sa)}</td></tr></table>`).join('');
   $('wRinkLog').innerHTML = wRinkLogHTML();
   $('wRinkPens').innerHTML = wRinkPensHTML();
 }
@@ -44731,6 +44846,7 @@ function wRinkHowHTML() {
   <p class="hint"><b>The goalie</b> stands on the line between the puck and the net, but follows the puck a moment late. A shot from where they are set is hard to score on. A pass <b>across the front of the net</b> and a quick shot finds them out of place, and that is how most goals come. A teammate standing in front of the goalie hides the shot.</p>
   <p class="hint"><b>Checks.</b> The skater nearest the puck carrier goes at them. Up close they poke at the puck (defense against hands), or, closing fast, throw a body check (size and speed) that knocks the carrier off it.</p>
   <p class="hint"><b>Icing.</b> A puck sent from a side's own half that crosses the far goal line untouched comes back for a face-off in that side's end. There is no offside.</p>
+  <p class="hint"><b>Stamina and shifts.</b> Skating is hard work: stamina runs down fast on the ice and comes back on the bench. A tired skater is slower, turns wider and shoots a little worse. So skaters play short shifts. A tired one heads for the bench door on the far boards, and the next fresh player comes over the boards in their spot: a change <b>on the fly</b>. The coach sends them when it is safe (their side has the puck, or it is in the other half). At a whistle everybody tired changes at once, except the side that iced the puck, which may not. By hand, <b>C</b> sends your tired skaters off now; at the wrong moment that gives up a rush. With nobody on the bench the six play on, with a breather at each whistle and a rest between periods. The goalie plays the whole game.</p>
   <p class="hint"><b>Penalties.</b> A poke that misses up close can trip. A beaten checker reaching back can hook. A hit from behind into the boards is boarding, and now and then a hit is just too much (roughing). The player goes to the <b>box</b> behind the far boards for a minor (${Math.round(R.mins * 60 / R.periods / R.minorOf)} seconds at this length), and their side skates one short: the other side is on the <b>power play</b>. The penalty ends early if the power play scores. A side is never below ${R.minSk} skaters: a third penalty waits its turn. A side that is short may ice the puck freely, and sits back in a box in front of its net.</p>
   <p class="hint"><b>The delayed penalty.</b> When the side that was fouled has the puck, play goes on until the fouling side touches it. Meanwhile the fouled side's goalie comes off for an extra skater: the whistle will go before anyone can shoot at the empty net. A goal in that time wipes the penalty out.</p>
   <p class="hint"><b>Pulling the goalie.</b> Late in the third period, a goal or two behind, a side takes its goalie off for an extra skater when it has the puck up the ice. The net is empty until a face-off in its own half sends the goalie back. By hand, <b>G</b> pulls your goalie or sends them back, at any time.</p>
@@ -44749,6 +44865,244 @@ renderHelp = function () {
   const after = $('wHelpCourt') || [...h.querySelectorAll('[id^="wHelpG"], #wHelpRing')].pop();
   h.insertAdjacentHTML('beforeend', `<section id="wRinkHow" class="wghelp"><h3>Hockey: how it works</h3>${wRinkHowHTML()}</section>`);
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRink"><b>Real hockey.</b> The Pond Rink is trying out hockey on the ice itself, five skaters and a goalie a side. Ask Old Tove for a SCRIMMAGE: three periods on the game clock (six minutes in all, or set the length in Settings). Play Rimewatch by hand, or watch the two clubs skate it end to end: passes, shots and saves, rebounds, checks, face-offs and icing, with a box score under the rink (see Hockey: how it works). A SCRIMMAGE is an exhibition: nothing is won or lost.</p>`);
+};
+/* w89: hockey ratings, the six and the lines (issue #83, phase 4). Every Realm player has Black Ice ratings, p.hk, as
+   they have basketball's p.bk (w78), football's p.gf (w43) and boxing's p.bx (w53): speed, size, hands, shot, defense
+   and reflexes, 1 to 12. They are seeded from the kind's hockey ratings (wHK.rate), each moved by up to 1, and every
+   level above 1 adds a point to one of them, weighted by what the kind is good at; an older save's players get theirs
+   when it loads.
+   The six: hockey is five skaters and a goalie, and a Realm squad for it is six (W_GRD_SQUAD.hockey). The Rink tab on
+   the Team screen sets who plays which spot (C, LW, RW, LD, RD, G) and the order of the bench: the rest of your roster,
+   who come over the boards as your skaters tire, first in line first. The goalie plays the whole game. Called-up
+   players at your level fill the six when your roster is short. Left alone, the coach picks the six and the spots from
+   the ratings (the best reflexes in goal, the best defenders at the back, the best hands at centre, the best shots on
+   the wings) and puts the bench in order of who's best. Practice game plays your six against the Cinderhold Hockey
+   Club at the Pond Rink; nothing is won or lost. The Stats tab's Hockey view shows the ratings and where each plays.
+
+   p.hk       { spd, siz, hnd, sht, def, ref, lv, got: { stat: points from levels } }
+   WG.rink    { six: { C: key, LW, RW, LD, RD, G }, bench: [keys, in order], cu: [call-ups], seq, mine?: true once
+                you've changed something (until then the coach picks again whenever the squad changes) }; a player who
+                joins takes a call-up's spot, or the end of the bench, the next time it syncs
+              a key is a roster id, or a call-up's cid ('h1', 'h2', ...)
+   wHkOf(p)          p's ratings, made or caught up first
+   wSixSync()        makes the six, or brings it up to date with the roster; returns WG.rink
+   wSixMine()        your six and bench as Black Ice takes a team (through wRinkPlayer)
+   wSixSetSpot(key, spot), wSixMove(key, dir), wSixAuto()   changes; each returns a message, or '' when it worked
+   Wrapped: wMakePlayer (wW89MakePlayer), wGiveXp (wW89GiveXp), wStart (wW89Start), wStatsCard (wW89StatsCard: a Hockey
+   block), wCampStats (wW89CampStats: the Hockey view), wOpenCamp (wW89OpenCamp: the Rink tab), wRenderCamp
+   (wW89RenderCamp), renderHelp (wW89RenderHelp: #wHelpRinkTab). */
+
+const W_HKR = {
+  cap: 12, cuKinds: ['skeleton', 'witch', 'vampire', 'harpy', 'troll', 'lich'],
+  stat: { spd: ['Spd', 'Speed: top speed on the ice, and getting to it'], siz: ['Siz', 'Size: checks given and taken, screens, battles on the boards'],
+    hnd: ['Hnd', 'Hands: keeping the puck, passing, and face-offs'], sht: ['Sht', 'Shot: how hard and how true'],
+    def: ['Def', 'Defense: pokes, picking off passes, blocking shots'], ref: ['Ref', 'Reflexes: stopping the puck in goal'] },
+  pos: { C: 'centre', LW: 'left wing', RW: 'right wing', LD: 'left defender', RD: 'right defender', G: 'goalie' },
+};
+
+/* ---------- ratings ---------- */
+function wHkOf(p) {
+  if (!p || !p.kind) return null;
+  if (!p.hk) { const r = wHK.rate(p.kind); p.hk = { lv: 1, got: {} }; for (const s of wHK.stats) p.hk[s] = Math.max(1, Math.min(W_HKR.cap, r[s] + Math.floor(Math.random() * 3) - 1)); }
+  const b = p.hk, lvl = p.lvl || 1;
+  while (b.lv < lvl) { b.lv++; const s = wHkGrowStat(p); if (s) { b[s]++; b.got[s] = (b.got[s] || 0) + 1; } }
+  return b;
+}
+// a level's point: any rating below the cap, weighted by the kind's own
+function wHkGrowStat(p) {
+  const K = wHK.rate(p.kind), open = wHK.stats.filter(s => p.hk[s] < W_HKR.cap);
+  if (!open.length) return null;
+  let r = Math.random() * open.reduce((a, s) => a + K[s], 0);
+  for (const s of open) { r -= K[s]; if (r < 0) return s; }
+  return open[open.length - 1];
+}
+function wHkAll() { if (!WG) return; for (const p of WG.roster || []) wHkOf(p); for (const p of WG.wwait || []) wHkOf(p); for (const c of (WG.rink && WG.rink.cu) || []) wHkOf(c); }
+const wHkSum = p => { const b = wHkOf(p); return wHK.stats.reduce((a, s) => a + b[s], 0); };
+
+const wW89MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW89MakePlayer(spec, from); wHkOf(p); return p; };
+const wW89GiveXp = wGiveXp;
+wGiveXp = function (p, n) { const r = wW89GiveXp(p, n); wHkOf(p); return r; };
+const wW89Start = wStart;
+wStart = function (save, opts) { const r = wW89Start(save, opts); wHkAll(); if (save) wSave(); return r; };
+
+/* ---------- the six ---------- */
+const wSixCu = k => typeof k === 'string';
+function wSixWho(k) {
+  if (wSixCu(k)) return ((WG.rink && WG.rink.cu) || []).find(c => c.cid === k) || null;
+  return wPlayer(k);
+}
+const wSixKeys = C => wHK.pos.map(pos => C.six[pos]).filter(k => k != null).concat(C.bench);
+function wSixCallUp(C) {
+  const used = new Set(wSixKeys(C).map(k => (wSixWho(k) || {}).kind));
+  const kind = W_HKR.cuKinds.find(k => !used.has(k)) || pick(W_HKR.cuKinds);
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'h' + (C.seq++) });
+  C.cu.push(c);
+  return c;
+}
+// the coach's pick: the six who suit the spots best (the goalie and the defenders first), then the bench by who's best
+function wSixAutoPick(C) {
+  const all = wRoster().map(p => p.id).concat(C.cu.map(c => c.cid)), left = new Set(all), six = {};
+  for (const pos of ['G', 'LD', 'RD', 'C', 'LW', 'RW']) {
+    const best = [...left].sort((a, b) => wHK.fit(wHkOf(wSixWho(b)), pos) - wHK.fit(wHkOf(wSixWho(a)), pos))[0];
+    if (best == null) break;
+    six[pos] = best; left.delete(best);
+  }
+  C.six = six;
+  C.bench = [...left].filter(k => !wSixCu(k)).sort((a, b) => wHkSum(wSixWho(b)) - wHkSum(wSixWho(a)));
+  C.cu = C.cu.filter(c => Object.values(six).includes(c.cid));
+}
+function wSixSync() {
+  if (!WG) return null;
+  let fresh = false;
+  if (!WG.rink || !WG.rink.six) { WG.rink = { six: {}, bench: [], cu: [], seq: 1 }; fresh = true; }
+  const C = WG.rink, before = JSON.stringify([C.six, C.bench]);
+  for (const pos of wHK.pos) if (C.six[pos] != null && !wSixWho(C.six[pos])) delete C.six[pos];
+  const inSix = new Set(Object.values(C.six));
+  C.bench = C.bench.filter((k, i) => !wSixCu(k) && wSixWho(k) && !inSix.has(k) && C.bench.indexOf(k) === i);
+  C.cu = C.cu.filter(c => inSix.has(c.cid));
+  const tier = wNineTier();
+  for (const c of C.cu) if (c.lvl < tier) { c.lvl = tier; wHkOf(c); }
+  // anyone missing: a call-up's spot if there is one, else the end of the bench
+  for (const p of wRoster()) {
+    if (wSixKeys(C).includes(p.id)) continue;
+    const cuPos = wHK.pos.find(pos => wSixCu(C.six[pos]));
+    if (cuPos) { const old = C.six[cuPos]; C.six[cuPos] = p.id; C.cu = C.cu.filter(c => c.cid !== old); }
+    else C.bench.push(p.id);
+  }
+  // a gap in the six: the first on the bench, or a call-up
+  for (const pos of wHK.pos) if (C.six[pos] == null) C.six[pos] = C.bench.length ? C.bench.shift() : wSixCallUp(C).cid;
+  if (fresh || (!C.mine && JSON.stringify([C.six, C.bench]) !== before)) wSixAutoPick(C);
+  for (const pos of wHK.pos) if (C.six[pos] == null) C.six[pos] = wSixCallUp(C).cid;
+  return C;
+}
+// a player as Black Ice takes one
+function wRinkPlayer(p) { return { n: p.n, kind: p.kind, num: p.num, r: Object.fromEntries(wHK.stats.map(s => [s, wHkOf(p)[s]])) }; }
+function wSixMine() {
+  const C = wSixSync(), t = wPartyTeam(), keys = wSixKeys(C);
+  return { name: t.name, short: t.short, color: t.color, light: t.light, roster: keys.map(k => wRinkPlayer(wSixWho(k))),
+    spot: Object.fromEntries(wHK.pos.map((pos, i) => [pos, i])) };
+}
+// where a player plays: a spot, 'bench' (with their place in line), or null (C: the rink, synced once by the caller)
+function wSixSpotOf(k, C) {
+  C = C || wSixSync(); const pos = wHK.pos.find(x => C.six[x] === k);
+  if (pos) return { spot: pos };
+  const i = C.bench.indexOf(k); return i >= 0 ? { spot: 'bench', n: i + 1 } : null;
+}
+
+/* ---------- changes ---------- */
+function wSixDone() { WG.rink.mine = true; wSave(); return ''; }
+// k to a spot (whoever was there takes k's old place) or to the bench (the first on the bench takes their spot)
+function wSixSetSpot(k, spot) {
+  const C = wSixSync(), at = wSixSpotOf(k, C); if (!at || at.spot === spot) return '';
+  if (spot === 'bench') {
+    if (!C.bench.length) return 'Nobody on the bench to take their spot.';
+    if (wSixCu(k)) return 'A call-up only plays in the six.';
+    C.six[at.spot] = C.bench.shift(); C.bench.unshift(k);
+    return wSixDone();
+  }
+  if (!wHK.pos.includes(spot)) return '';
+  const other = C.six[spot];
+  if (at.spot === 'bench') {
+    const i = C.bench.indexOf(k); C.six[spot] = k;
+    if (wSixCu(other)) { C.bench.splice(i, 1); C.cu = C.cu.filter(c => c.cid !== other); } else C.bench[i] = other;
+  } else { C.six[spot] = k; C.six[at.spot] = other; }
+  return wSixDone();
+}
+// a bench player up (-1) or down (+1) the order
+function wSixMove(k, dir) {
+  const C = wSixSync(), i = C.bench.indexOf(k), j = i + dir;
+  if (i < 0 || j < 0 || j >= C.bench.length) return '';
+  [C.bench[i], C.bench[j]] = [C.bench[j], C.bench[i]];
+  return wSixDone();
+}
+function wSixAuto() { WG.rink = null; wSixSync(); wSave(); return ''; }
+// a practice game: your six against the Cinderhold Hockey Club, nothing riding on it
+function wSixPractice() {
+  if (WCAMP.close) WCAMP.close();
+  wRinkGame({ teams: [wSixMine(), wRinkTeams()[1]], title: 'A practice game at the Pond Rink', how: 'practice', ordered: [true, false] });
+}
+
+/* ---------- the Hockey block on a player's stats ---------- */
+function wHkCard(p) {
+  const b = wHkOf(p); if (!b) return '';
+  const bars = wHK.stats.map(s => { const [ab, what] = W_HKR.stat[s], got = b.got[s] || 0;
+    return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / W_HKR.cap)}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
+  const at = WG && WG.rink ? wSixSpotOf(p.cid || p.id, WG.rink) : null;
+  return `<div class="wbd wbkc whkc"><h5>Hockey</h5><p class="wbdpos">${!at ? 'Not in your squad.' : at.spot === 'bench' ? `On your bench, ${wOrd(at.n)} in line.` : at.spot === 'G' ? 'Your goalie.' : `In your six at ${esc(W_HKR.pos[at.spot])}.`}</p>
+    <div class="wbdbars">${bars}</div><p class="hint">Each level adds a point to one rating (shown as +), mostly to what their kind is good at. Ratings run from 1 to ${W_HKR.cap}.</p></div>`;
+}
+const wW89StatsCard = wStatsCard;
+wStatsCard = function (p) { return wW89StatsCard(p).replace(/<\/section>\s*$/, wHkCard(p) + '</section>'); };
+
+/* ---------- the Rink tab ---------- */
+function wSixRow(k, C) {
+  const p = wSixWho(k), b = wHkOf(p), cu = wSixCu(k), at = wSixSpotOf(k, C), key = esc(String(k));
+  const opts = wHK.pos.map(pos => `<option value="${pos}"${at.spot === pos ? ' selected' : ''}>${pos}: ${esc(W_HKR.pos[pos])}</option>`).join('') + (cu ? '' : `<option value="bench"${at.spot === 'bench' ? ' selected' : ''}>Bench</option>`);
+  const i = at.spot === 'bench' ? at.n - 1 : -1;
+  return `<li class="wpr wnr wcrt${cu ? ' wcu' : ''}" data-hid="${key}">
+    <span class="wno">${at.spot === 'bench' ? at.n : esc(at.spot)}</span><img src="${wPlayerPort(p, 64)}" alt="">
+    <div class="wpi"><div class="wpn"><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}</span>${cu ? '<span class="wtag wb">Call-up</span>' : ''}</div>
+      <small class="wnst">${wHK.stats.map(s => `<span title="${esc(W_HKR.stat[s][1])}">${W_HKR.stat[s][0]} <b>${b[s]}</b></span>`).join(' ')}</small></div>
+    <div class="wpa"><label class="wsvl">Spot <select data-hspot aria-label="${esc(p.n)}'s spot">${opts}</select></label>
+      ${i >= 0 ? `<button class="ghost" data-hmove="-1" ${i === 0 ? 'disabled' : ''} aria-label="Up the bench">&uarr;</button><button class="ghost" data-hmove="1" ${i === C.bench.length - 1 ? 'disabled' : ''} aria-label="Down the bench">&darr;</button>` : ''}</div>
+  </li>`;
+}
+function wCampRink(C) {
+  return `<p class="hint">Your hockey six, and the bench. Five skaters and a goalie. Skating is hard work, so a skater is good for a short shift: when one tires, the first fresh player on your bench comes over the boards in their spot, and they rest. The goalie plays the whole game, so reflexes matter there and little else. Change a spot and whoever had it swaps with them; send a player to the bench and the first on the bench takes their spot. Called-up players at your level fill the six when your roster is short. Until you change something, the coach picks the six again whenever your squad changes: the best reflexes in goal, the best defenders at the back, the best hands at centre, the best shots on the wings.</p>
+    <h4>The six</h4><ol class="wroster wnine wcourt wrinksix">${wHK.pos.map(pos => wSixRow(C.six[pos], C)).join('')}</ol>
+    <h4>The bench</h4>${C.bench.length ? `<ol class="wroster wnine wcourtb wrinkbench">${C.bench.map(k => wSixRow(k, C)).join('')}</ol>` : '<p class="hint">Nobody: every player you have is in the six. With nobody to change with, your skaters play on tired, with a breather at each whistle.</p>'}
+    <div class="row wnbtn"><button class="ghost" data-hauto>The coach's pick</button><button class="btn" data-hpractice>Practice game</button></div>`;
+}
+const wW89OpenCamp = wOpenCamp;
+wOpenCamp = function (tab) {
+  const want = tab || WCAMP.tab;
+  wW89OpenCamp(want === 'rink' ? 'team' : tab);
+  const tabs = document.querySelector('#modalBox .wctabs');
+  if (!tabs || tabs.querySelector('[data-ctab="rink"]')) return;
+  tabs.lastElementChild.insertAdjacentHTML('afterend', '<button role="tab" data-ctab="rink">Rink</button>');
+  tabs.querySelector('[data-ctab="rink"]').onclick = () => { WCAMP.tab = 'rink'; WCAMP.swap = null; WCAMP.msg = ''; wRenderCamp(); };
+  if (want === 'rink') { WCAMP.tab = 'rink'; wRenderCamp(); }
+};
+const wW89RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  if (WCAMP.tab !== 'rink') return wW89RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  if (!$('modalBox').querySelector('[data-ctab="rink"]')) { WCAMP.tab = 'team'; return wRenderCamp(); }
+  $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'rink'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  // (synced once for the whole tab, and saved if that changed anything: a call-up, a new player placed)
+  const before = JSON.stringify(WG.rink), C = wSixSync(); if (JSON.stringify(C) !== before) wSave();
+  body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
+    ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampRink(C);
+  const keyOf = el => { const k = el.closest('[data-hid]').dataset.hid; return /^h\d+$/.test(k) ? k : +k; };
+  body.querySelectorAll('[data-hspot]').forEach(s => s.onchange = () => wCampSay(wSixSetSpot(keyOf(s), s.value)));
+  body.querySelectorAll('[data-hmove]').forEach(b => b.onclick = () => wCampSay(wSixMove(keyOf(b), +b.dataset.hmove)));
+  const auto = body.querySelector('[data-hauto]'); if (auto) auto.onclick = () => wCampSay(wSixAuto());
+  const pr = body.querySelector('[data-hpractice]'); if (pr) pr.onclick = () => wSixPractice();
+};
+
+/* ---------- the Hockey view on the Stats tab: ratings now; games from the world add their lines (phase 6) ---------- */
+const W_HK_COLS = () => wHK.stats.map(s => [s, W_HKR.stat[s][0], W_HKR.stat[s][1]]);
+const wW89CampStats = wCampStats;
+wCampStats = function () {
+  const html = wW89CampStats().replace(/(<button data-wsview="career"[^>]*>Career<\/button>)/, `$1<button data-wsview="hockey" aria-pressed="${WSTAT.view === 'hockey'}">Hockey</button>`);
+  if (WSTAT.view !== 'hockey') return html;
+  const cols = W_HK_COLS(), k = WSTAT.sort && cols.some(c => c[0] === WSTAT.sort) ? WSTAT.sort : null;
+  const C = wSixSync(), rows = wRoster().map((p, i) => ({ p, i, b: wHkOf(p), at: wSixSpotOf(p.id, C) }));
+  if (k) rows.sort((a, b) => (b.b[k] - a.b[k]) || a.i - b.i);
+  const head = `<th scope="col"><button class="wsth" data-wsort="" aria-pressed="${!k}">Player</button></th><th scope="col">Spot</th>` + cols.map(([c, s, l]) => `<th scope="col"><button class="wsth" data-wsort="${c}" title="${esc(l)}" aria-pressed="${k === c}">${s}</button></th>`).join('');
+  const body = rows.map(({ p, b, at }) => `<tr data-wsp="${p.id}"${WSTAT.pid === p.id ? ' class="wsel"' : ''}><th scope="row"><button class="wsname" data-wsp-open aria-expanded="${WSTAT.pid === p.id}"><img src="${wPlayerPort(p, 40)}" alt=""><span><b>${esc(p.n)}</b><small>${esc(wKindName(p.kind))}</small></span></button></th>
+    <td>${!at ? '&ndash;' : at.spot === 'bench' ? `Bench ${at.n}` : at.spot}</td>${cols.map(([c]) => `<td>${b[c]}</td>`).join('')}</tr>`).join('');
+  const sel = WSTAT.pid != null && wPlayer(WSTAT.pid);
+  return html.replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every player\'s hockey ratings and where they play (set on the Rink tab). Pick a heading to sort, a player to see more.</small>')
+    .replace(/<div class="tablewrap">[\s\S]*$/, `<div class="tablewrap"><table class="wstats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${sel ? wStatsCard(sel) : ''}`);
+};
+
+const wW89RenderHelp = renderHelp;
+renderHelp = function () {
+  wW89RenderHelp();
+  const after = $('wHelpRink'); if (!after || $('wHelpRinkTab')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkTab"><b>Hockey ratings, the six and the lines.</b> Every player also has hockey ratings: speed, size, hands, shot, defense and reflexes (1 to ${W_HKR.cap}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Hockey view. The Rink tab on the Team screen sets your six (centre, left and right wing, left and right defender, and the goalie) and the order of your bench. In a game stamina runs down fast: a tired skater is slower and shoots worse, so skaters play short shifts, and the first fresh player on your bench comes over the boards for a tired one. The goalie plays the whole game. Called-up players at your level fill the six when your roster is short. Practice game there plays your six against the Cinderhold Hockey Club; nothing is won or lost.</p>`);
 };
 </script>
 </body></html>

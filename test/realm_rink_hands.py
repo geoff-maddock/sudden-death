@@ -165,7 +165,7 @@ async def main():
           sb.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 })); const up = { meter: wHK.meter, shot: !!wHK.shot() };
           wHK.give(1); document.querySelector('#wRinkPad [data-kpad="shoot"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 2 })); const held = !!wHK.meter; wHK.give(6); await tick();
           return { none, puck, keys, down, up, held, after: { meter: wHK.meter, shoot: wHK.inputState.shoot, labels: [...document.querySelectorAll('#wRinkPad button')].map(x => x.textContent) } }; })()""")
-        check(pad['none'] == ['Check', 'Poke', 'Lift stick', 'Switch', 'Goalie'] and pad['puck'] == ['Shoot', 'Pass', 'Goalie'] and pad['keys'] == ['Space', 'J', 'G'], 'the pad under the rink follows the puck: Shoot and Pass with it, Check, Poke, Lift stick and Switch without, Goalie either way, each with its key', pad)
+        check(pad['none'] == ['Check', 'Poke', 'Lift stick', 'Switch', 'Change', 'Goalie'] and pad['puck'] == ['Shoot', 'Pass', 'Change', 'Goalie'] and pad['keys'] == ['Space', 'J', 'C', 'G'], 'the pad under the rink follows the puck: Shoot and Pass with it, Check, Poke, Lift stick and Switch without, Change and Goalie either way, each with its key', pad)
         check(pad['down'] and pad['up'] == {'meter': None, 'shot': True} and pad['held'] and pad['after']['meter'] is None and pad['after']['shoot'] is False and pad['after']['labels'][0] == 'Check',
               'the pad\'s Shoot winds up while held and shoots when let go; a button held when the puck changes hands is let go', pad)
         await pg.click('#wRinkModes [data-kmode="watch"]')

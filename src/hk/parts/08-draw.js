@@ -188,6 +188,8 @@ function hkDrawPlayers(c) {
     const down = p.act === 'down';
     drawFig(c, p.kind, s.x, s.y, goalie ? 46 : 44, T, { num: p.num, run: mv && !goalie ? p.run : 0, flip: p.fx < 0, throwK: p.act === 'shoot' || p.act === 'wind' ? 1 : 0, lift: p.act === 'save' ? 4 : 0, alpha: p.stun > 0 && !down ? .8 : 1, pose: down ? HK_DOWN : undefined });
     if (!behind) hkDrawStick(c, p, s, goalie);
+    // by hand: how much each of your skaters has left, under their feet (red when they need the bench)
+    if (hkHandsOn() && p.side === GD.you && !goalie && GD.ph !== 'so') { const st = hkSta(p); c.save(); c.fillStyle = 'rgba(13,9,7,.7)'; c.fillRect(s.x - 11, s.y + 8, 22, 4); c.fillStyle = st < HK_STA.tired ? '#ff6a4a' : st < .7 ? '#ffd08a' : '#8fe07a'; c.fillRect(s.x - 10, s.y + 9, 20 * st, 2); c.restore(); }
   }
 }
 function hkDrawPuck(c) {

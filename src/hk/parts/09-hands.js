@@ -88,6 +88,8 @@ function hkInput(o) {
   }
   if (o.act === 'switch') { if (GD.ph === 'live' && !hkPuckMine()) { L.me = hkNearMine(hkMe()); r = 'switch'; } }
   if (o.act === 'pull') r = hkHandPull();
+  if (o.act === 'change') r = GD.ph === 'live' && hkChangeNow(GD.you) ? 'change' : '';
+  if (o.act === 'auto') { GD.auto = !GD.auto; r = GD.auto ? 'auto' : 'manual'; }
   return r;
 }
 function hkInputClear() {

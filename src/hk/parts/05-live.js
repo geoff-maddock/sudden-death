@@ -91,12 +91,12 @@ function hkNetOut(o, m, e) {
 }
 
 /* ---------- skating ---------- */
-const hkTop = (p, i) => (5.4 + p.r.spd * .42) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
+const hkTop = (p, i) => (5.4 + p.r.spd * .42) * hkStaK(p) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
 function hkSkate(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(hkTop(p, i), d / .4);
   const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0;
   let ax = wx - p.vx, ay = wy - p.vy;
-  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
+  const need = hyp(ax, ay), braking = ax * p.vx + ay * p.vy < 0, mx = (4.5 + p.r.spd * .5) * hkStaK(p) * (braking ? 1.5 : 1) * (p.stun > 0 ? .4 : 1) * dt;
   if (need > mx) { ax *= mx / need; ay *= mx / need; }
   p.vx += ax; p.vy += ay;
   hkGlide(p, dt);
@@ -145,6 +145,7 @@ function hkStep(dt) {
   // (the CPU keeps its hands off a skater you are playing)
   else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = .2 + R() * .2; hkThink(h); } }
   hkMeterStep(dt); hkLunge(dt);
+  if (GD.ph === 'live') { hkStaStep(dt); hkCoach(dt); hkChangeStep(); }
   hkChase();
   L.pl.forEach((p, i) => {
     if (p.off) return;
@@ -166,7 +167,7 @@ function hkChase() {
   for (const s of [0, 1]) {
     if (P.k === 'pass' && P.to >= 0 && L.pl[P.to].side === s) { L.chase[s] = P.to; continue; }
     let b = -1, bt = 1e9;
-    for (const p of hkSk(s)) { if (p.stun > 0) continue; const t = hkMeet(p)[2] - (L.chase0 && L.chase0[s] === L.pl.indexOf(p) ? .25 : 0); if (t < bt) { bt = t; b = L.pl.indexOf(p); } }
+    for (const p of hkSk(s)) { if (p.stun > 0 || p.chg) continue; const t = hkMeet(p)[2] - (L.chase0 && L.chase0[s] === L.pl.indexOf(p) ? .25 : 0); if (t < bt) { bt = t; b = L.pl.indexOf(p); } }
     L.chase[s] = b;
   }
   L.chase0 = L.chase.slice();
@@ -174,6 +175,8 @@ function hkChase() {
 function hkAim(p, i) {
   const P = L.puck, h = hkHand();
   if (i === h) return L.carry || [hkGoalX(p.side), 0];
+  // (on their way off for a change: to the bench door)
+  if (p.chg) return hkDoor(p.side);
   if (h < 0) {
     if (L.chase[p.side] === i) { const m = hkMeet(p); return [m[0], m[1]]; }
     return hkForm(p);
@@ -187,7 +190,7 @@ function hkAim(p, i) {
 // the skater of side who presses the carrier: the nearest, with a lean to whoever was already doing it
 function hkPresser(side) {
   const c = L.pl[hkHand()]; let b = -1, bd = 1e9;
-  for (const p of hkSk(side)) { if (p.stun > 0) continue; const i = L.pl.indexOf(p), d = hyp(p.x - c.x, p.y - c.y) - (L.press === i ? 1.2 : 0); if (d < bd) { bd = d; b = i; } }
+  for (const p of hkSk(side)) { if (p.stun > 0 || p.chg) continue; const i = L.pl.indexOf(p), d = hyp(p.x - c.x, p.y - c.y) - (L.press === i ? 1.2 : 0); if (d < bd) { bd = d; b = i; } }
   L.press = b; return b;
 }
 // the shape: where p stands by spot, by which side has the puck and where it is
@@ -390,8 +393,9 @@ function hkShotOdds(p, kind, x, y) {
     const ax = gx - x, ay = -y, len = hyp(ax, ay) || 1, s = ((d.x - x) * ax + (d.y - y) * ay) / (len * len); if (s < .08 || s > .88) continue;
     if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp(.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0), .1, .6); }
   }
-  const miss = clamp(.2 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
-  let q = .09 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
+  const tired = clamp(1 - hkSta(p) / .6, 0, 1);
+  const miss = clamp(.2 + tired * .05 + dist * .008 + ang * .1 - sh * .012 + (kind === 'slap' ? .07 : kind === 'one' ? .1 : 0), .05, .6);
+  let q = .09 - tired * .025 + (sh - 5) * .012 + (kind === 'slap' ? .04 + (dist > 9 ? .03 : 0) : kind === 'one' ? .06 : 0) + clamp(9 - dist, -7, 9) * .011 - ang * .1;
   if (inNet) q += -(g.r.ref - 5) * .014 + (1 - set) * .36 + (screen ? .07 : 0); else q = .97;
   return { ok: true, dist, ang, miss, q: clamp(q, .02, .97), set, screen, block, blockP };
 }

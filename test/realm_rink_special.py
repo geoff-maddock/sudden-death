@@ -169,7 +169,7 @@ async def main():
         check('No penalties yet' in e0 and [g1, g2, g3] == ['hand', '', 'hand'], 'the G key and the pad\'s Goalie button pull your goalie and send them back', [e0, g1, g2, g3])
         await pg.evaluate("(() => { wHK.give(0); wHK.foul(1, 'hooking'); wHK.pause(false); })()")
         await pg.wait_for_function("document.querySelectorAll('#wRinkPens li[style]').length === 1")
-        pe = await pg.evaluate("({ pens: document.getElementById('wRinkPens').textContent, pim: [...document.querySelectorAll('#wRinkBox th')].some(x => x.textContent === 'PIM'), row: [...document.querySelectorAll('#wRinkBox tr')].some(r => r.children.length > 8 && r.children[0].textContent.includes(wHK.G.pens[0].who) && r.children[8].textContent === '2') })")
+        pe = await pg.evaluate("({ pens: document.getElementById('wRinkPens').textContent, pim: [...document.querySelectorAll('#wRinkBox th')].some(x => x.textContent === 'PIM'), row: (() => { const col = [...document.querySelector('#wRinkBox tr').children].findIndex(x => x.textContent === 'PIM'); return [...document.querySelectorAll('#wRinkBox tr')].some(r => r.children[0].textContent.includes(wHK.G.pens[0].who) && r.children[col].textContent === '2'); })() })")
         check('hooking' in pe['pens'] and pe['pim'] and pe['row'], 'a penalty is listed under the rink, and its two minutes are in the box score', pe)
         await pg.evaluate("showPage('help')"); hp2 = await pg.evaluate("document.getElementById('wRinkHow').textContent"); await pg.evaluate("showPage('play')")
         check('Penalties.' in hp2 and 'delayed penalty' in hp2 and 'Pulling the goalie' in hp2 and 'shootout' in hp2, 'How to play explains penalties, the delayed penalty, pulling the goalie and the shootout', None)

@@ -9,3 +9,4 @@ src/hk/parts/06-cpu.js
 src/hk/parts/07-game.js
 src/hk/parts/08-draw.js
 src/hk/parts/09-hands.js
+src/hk/parts/10-bench.js

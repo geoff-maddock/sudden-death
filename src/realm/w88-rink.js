@@ -22,7 +22,7 @@ const W_RINK = {
   away: { city: 'cinderhold', kinds: ['elf', 'goblin', 'kobold', 'minotaur', 'golem', 'gorgon', 'dwarf', 'ogre'], color: '#b8443a', light: '#ffe6e0', short: 'CHC' },
 };
 const W_RINK_SHOT = { wrist: 'scores', slap: 'scores with a slap shot', one: 'one-times it in', so: 'wins the shootout' };
-const W_RINK_GOALIE = ['pull', 'Goalie', 'G: pull your goalie for an extra skater, or send them back', 0];
+const W_RINK_GOALIE = ['pull', 'Goalie', 'G: pull your goalie for an extra skater, or send them back', 0], W_RINK_CHANGE = ['change', 'Change', 'C: send your tired skaters off for fresh ones', 0];
 const W_RINK_STR = { pp: ' on the power play', sh: ' short-handed', even: '', so: '' };
 // who plays it: the CPU both sides, or you play your skaters by hand
 const W_RINK_MODES = {
@@ -32,8 +32,8 @@ const W_RINK_MODES = {
 let W_RINK_MODE = 'play';
 // the pad under the rink: with the puck and without it, [key for wHK.input, label, the key it stands for, held?]
 const W_RINK_PAD = {
-  puck: [['shoot', 'Shoot', 'Space: tap for a wrist shot, hold to wind up', 1], ['pass', 'Pass', 'J: tap to pass, hold to send it hard', 1], W_RINK_GOALIE],
-  none: [['shoot', 'Check', 'Space: lunge at the carrier, or take the face-off', 1], ['pass', 'Poke', 'J: go for the puck', 1], ['lift', 'Lift stick', 'Shift, held: into the passing lane', 1], ['switch', 'Switch', 'E: play the next skater nearest the puck', 0], W_RINK_GOALIE],
+  puck: [['shoot', 'Shoot', 'Space: tap for a wrist shot, hold to wind up', 1], ['pass', 'Pass', 'J: tap to pass, hold to send it hard', 1], W_RINK_CHANGE, W_RINK_GOALIE],
+  none: [['shoot', 'Check', 'Space: lunge at the carrier, or take the face-off', 1], ['pass', 'Poke', 'J: go for the puck', 1], ['lift', 'Lift stick', 'Shift, held: into the passing lane', 1], ['switch', 'Switch', 'E: play the next skater nearest the puck', 0], W_RINK_CHANGE, W_RINK_GOALIE],
 };
 const wRinkMins = () => wHK.rules.minsAt.includes(SET.rinkMins) ? SET.rinkMins : wHK.rules.mins;
 // the game on the rink: plain data, never saved
@@ -101,12 +101,13 @@ function wRinkTeams() {
     name: t.name, short: t.short, color: t.color, light: t.light, roster: t.kinds.map((kind, i) => ({ n: wRinkName(kind, used), kind, num: 2 + i * 7 })),
   }));
 }
-/* one game on the rink. opts: { teams, mins, seed, mode } (the two clubs, the length setting and the mode on the bar
-   when not given) */
+/* one game on the rink. opts: { teams, mins, seed, mode, title, how, ordered } (the two clubs, the length setting and
+   the mode on the bar when not given; ordered: whose bench comes on in its own order) */
 function wRinkGame(opts) {
   const o = opts || {};
-  WHK = { over: null }; wRinkTick(true);
-  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE });
+  WHK = { over: null, how: o.how || 'scrimmage' }; wRinkTick(true);
+  $('wRinkTitle').textContent = o.title || 'A scrimmage at the Pond Rink';
+  wHK.start({ teams: o.teams || wRinkTeams(), mins: o.mins || wRinkMins(), seed: o.seed, mode: o.mode || W_RINK_MODE, ordered: o.ordered });
   showView('rink');
   wRinkBarNote(); wRinkBox();
 }
@@ -131,7 +132,7 @@ function wRinkLogHTML() {
 function wRinkBox() {
   const B = wHK.box(); if (!B) { $('wRinkBox').innerHTML = ''; $('wRinkLog').innerHTML = ''; $('wRinkPens').innerHTML = ''; return; }
   const mins = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`, of = (m, a) => a ? `${m}/${a}` : '–';
-  $('wRinkBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Time on the ice">TOI</th><th title="Goals">G</th><th title="Assists">A</th><th title="Shots on goal">SOG</th><th>Hits</th><th title="Shots blocked">Blk</th><th title="Takeaways">Tk</th><th title="Penalty minutes: two for each minor">PIM</th><th title="Face-offs won of taken">FO</th><th title="A goalie's saves of shots faced">Sv</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${esc(r.pos)} · ${esc(wKindName(r.kind))}</small></td><td>${mins(r.sec)}</td><td>${r.g}</td><td>${r.a}</td><td>${r.sog}</td><td>${r.hit}</td><td>${r.blk}</td><td>${r.take}</td><td>${r.pim}</td><td>${of(r.fow, r.fot)}</td><td>${r.pos === 'G' ? of(r.sv, r.sa) : ''}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td><b>${b.tot.g}</b></td><td>${b.tot.a}</td><td>${b.tot.sog}</td><td>${b.tot.hit}</td><td>${b.tot.blk}</td><td>${b.tot.take}</td><td>${b.tot.pim}</td><td>${of(b.tot.fow, b.tot.fot)}</td><td>${of(b.tot.sv, b.tot.sa)}</td></tr></table>`).join('');
+  $('wRinkBox').innerHTML = B.map(b => `<table class="wrpow wcboxt"><caption>${esc(b.team)}</caption><tr><th>Player</th><th title="Time on the ice">TOI</th><th title="Shifts: times over the boards">Sh</th><th title="Goals">G</th><th title="Assists">A</th><th title="Shots on goal">SOG</th><th>Hits</th><th title="Shots blocked">Blk</th><th title="Takeaways">Tk</th><th title="Penalty minutes: two for each minor">PIM</th><th title="Face-offs won of taken">FO</th><th title="A goalie's saves of shots faced">Sv</th></tr>${b.rows.map(r => `<tr><td>${esc(r.n)} <small>${r.on ? esc(r.pos) : 'bench'} · ${esc(wKindName(r.kind))}</small></td><td>${mins(r.sec)}</td><td>${r.sh}</td><td>${r.g}</td><td>${r.a}</td><td>${r.sog}</td><td>${r.hit}</td><td>${r.blk}</td><td>${r.take}</td><td>${r.pim}</td><td>${of(r.fow, r.fot)}</td><td>${r.pos === 'G' ? of(r.sv, r.sa) : ''}</td></tr>`).join('')}<tr><td><b>Team</b></td><td></td><td></td><td><b>${b.tot.g}</b></td><td>${b.tot.a}</td><td>${b.tot.sog}</td><td>${b.tot.hit}</td><td>${b.tot.blk}</td><td>${b.tot.take}</td><td>${b.tot.pim}</td><td>${of(b.tot.fow, b.tot.fot)}</td><td>${of(b.tot.sv, b.tot.sa)}</td></tr></table>`).join('');
   $('wRinkLog').innerHTML = wRinkLogHTML();
   $('wRinkPens').innerHTML = wRinkPensHTML();
 }
@@ -201,6 +202,7 @@ function wRinkHowHTML() {
   <p class="hint"><b>The goalie</b> stands on the line between the puck and the net, but follows the puck a moment late. A shot from where they are set is hard to score on. A pass <b>across the front of the net</b> and a quick shot finds them out of place, and that is how most goals come. A teammate standing in front of the goalie hides the shot.</p>
   <p class="hint"><b>Checks.</b> The skater nearest the puck carrier goes at them. Up close they poke at the puck (defense against hands), or, closing fast, throw a body check (size and speed) that knocks the carrier off it.</p>
   <p class="hint"><b>Icing.</b> A puck sent from a side's own half that crosses the far goal line untouched comes back for a face-off in that side's end. There is no offside.</p>
+  <p class="hint"><b>Stamina and shifts.</b> Skating is hard work: stamina runs down fast on the ice and comes back on the bench. A tired skater is slower, turns wider and shoots a little worse. So skaters play short shifts. A tired one heads for the bench door on the far boards, and the next fresh player comes over the boards in their spot: a change <b>on the fly</b>. The coach sends them when it is safe (their side has the puck, or it is in the other half). At a whistle everybody tired changes at once, except the side that iced the puck, which may not. By hand, <b>C</b> sends your tired skaters off now; at the wrong moment that gives up a rush. With nobody on the bench the six play on, with a breather at each whistle and a rest between periods. The goalie plays the whole game.</p>
   <p class="hint"><b>Penalties.</b> A poke that misses up close can trip. A beaten checker reaching back can hook. A hit from behind into the boards is boarding, and now and then a hit is just too much (roughing). The player goes to the <b>box</b> behind the far boards for a minor (${Math.round(R.mins * 60 / R.periods / R.minorOf)} seconds at this length), and their side skates one short: the other side is on the <b>power play</b>. The penalty ends early if the power play scores. A side is never below ${R.minSk} skaters: a third penalty waits its turn. A side that is short may ice the puck freely, and sits back in a box in front of its net.</p>
   <p class="hint"><b>The delayed penalty.</b> When the side that was fouled has the puck, play goes on until the fouling side touches it. Meanwhile the fouled side's goalie comes off for an extra skater: the whistle will go before anyone can shoot at the empty net. A goal in that time wipes the penalty out.</p>
   <p class="hint"><b>Pulling the goalie.</b> Late in the third period, a goal or two behind, a side takes its goalie off for an extra skater when it has the puck up the ice. The net is empty until a face-off in its own half sends the goalie back. By hand, <b>G</b> pulls your goalie or sends them back, at any time.</p>
