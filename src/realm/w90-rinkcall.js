@@ -6,7 +6,8 @@
    the goalie. A line under the rows says how your system is doing against theirs right now. In Watch the rows go and
    a line says the coaches make the calls.
    The other coach's skill is opts.skill (0 Squire, 1 Knight, 2 Archmage); a scrimmage's is a Knight.
-   Wraps: wRinkBarNote (wW90RinkBarNote: the rows kept up, the status line in Manage), wLeaveRink (wW90LeaveRink),
+   Wraps: wRinkBarNote (wW90RinkBarNote: the rows kept up, the status line in Manage), wRinkPad (wW90RinkPad: the
+   rows kept up on the pad's tick), wLeaveRink (wW90LeaveRink),
    renderHelp (wW90RenderHelp: #wRinkHowCall). */
 const W_RINK_CALLS = [['att', 'With the puck', 'atts'], ['def', 'Without it', 'defs'], ['pp', 'Power play', 'pps'], ['pk', 'Penalty kill', 'pks'], ['tempo', 'Tempo', 'tempos'], ['edge', 'Edge', 'edges']];
 let W_RINK_ROWKEY = '';

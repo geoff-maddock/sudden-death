@@ -93,7 +93,7 @@ function hkNetOut(o, m, e) {
 }
 
 /* ---------- skating ---------- */
-const hkTop = (p, i) => (5 + p.r.spd * .52) * hkStaK(p) * hkFx(p.side, 'spd') * hkFx(1 - p.side, 'slow') * (hkOnCrack(p.x, p.y) ? HK_POND.slow : 1) * (i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
+const hkTop = (p, i) => (5 + p.r.spd * .52) * hkStaK(p) * hkFx(p.side, 'spd') * hkFx(1 - p.side, 'slow') * (hkOnCrack(p.x, p.y) ? HK_POND.slow : 1) * (i >= 0 && i === hkHand() ? .93 : 1) * (p.stun > 0 ? .3 : 1) * (HKI.lift && i >= 0 && hkYoursNow(i) ? .85 : 1);
 function hkSkate(p, i, tx, ty, dt) {
   const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy), sp = Math.min(hkTop(p, i), d / .4);
   const wx = d > .05 ? dx / d * sp : 0, wy = d > .05 ? dy / d * sp : 0;
@@ -224,7 +224,7 @@ function hkForm(p) {
     if (p.pos === 'C') { u = clamp(pu + 1.5, 5, 10); v = pv * .45; }
     else if (wing) { const [back, wide] = hkDefNow(s).wing; u = HK_RULES.blue - back; v = wing * wide + pv * .25; }
     else { const strong = Math.abs(pv) < 1 ? ds > 0 : ds * pv > 0; u = strong ? clamp(pu + .8, 3.8, 10) : 4.8; v = strong ? pv * .8 : ds * 1.1; }
-  } else if (hkDefNow(s).high === 26 && pu > Lz / 2) {
+  } else if (hkDefNow(s).trap && pu > Lz / 2) {
     // the Trap: three across the middle of the ice, two behind them, and wait
     if (p.pos === 'C') { u = Lz / 2 + 1; v = pv * .5; } else if (wing) { u = Lz / 2 - 1; v = wing * 5; } else { u = HK_RULES.blue - 1; v = ds * 3.5 + pv * .15; }
   } else {

@@ -21,6 +21,8 @@ function hkResume(sn) {
   if (!G.bags) Object.assign(G, { bags: [null, null], pots: [], anti: [0, 0], cider: [null, null] });
   hkFxNow();
   GD = Object.assign({ acc: 0, autoPow: true, meter: null, rel: null, press: null, big: null, net: null, so: null, delay: null, noChange: -1 }, s.GD);
+  // (the by-hand cooldowns are stamped on the hands' clock, which starts again: clear them)
+  L.pokeAt = null; L.hitAt = null;
   hkInputClear();
   return G;
 }

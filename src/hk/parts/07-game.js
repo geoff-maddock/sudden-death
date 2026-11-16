@@ -92,7 +92,8 @@ function hkTaker(side) { for (const pos of ['C', 'LW', 'RW', 'LD', 'RD']) { cons
 /* a foul by d (k: what for; on: who it was on). Their side has the puck: the whistle now. Otherwise it's delayed: play
    on until they touch it, and the other side's goalie comes off for an extra skater. One penalty at a time. */
 function hkFoul(d, k, on) {
-  if (!GD || GD.ph !== 'live' || GD.delay || d.box) return;
+  // (a goalie skating as the extra man takes no penalty: they have a net to go back to, not a box)
+  if (!GD || GD.ph !== 'live' || GD.delay || d.box || L.pl.indexOf(d) === hkGk(d.side)) return;
   const h = hkHand();
   GD.delay = { side: d.side, i: L.pl.indexOf(d), ri: d.ri, k, on: on ? on.n : '' };
   hkEv('foul', d.n, k);
@@ -148,8 +149,9 @@ function hkFaceoffAt(x, y) {
   for (const s of [0, 1]) { const g = L.pl[hkGk(s)]; if (g.pulled && (g.pulled === 'delay' || hkUp(s, x) < HK_RULES.len / 2)) g.pulled = false; }
   hkLines();
   // the coaches make their calls, and the lines change at the whistle (not the side that iced it)
-  hkCallsFaceoff();
-  if (GD.ph !== 'break') hkChangeWhistle(GD.noChange == null ? -1 : GD.noChange); GD.noChange = -1;
+  // (not a second time for the same whistle, after a timeout taken while they lined up: GD.again)
+  const again = GD.again; GD.again = false;
+  if (!again) { hkCallsFaceoff(); if (GD.ph !== 'break') hkChangeWhistle(GD.noChange == null ? -1 : GD.noChange); } GD.noChange = -1;
   GD.fo = { x, y }; GD.set = { from: L.pl.map(p => [p.x, p.y]), to: hkFaceoffSpots(x, y) };
   for (const p of L.pl) { p.stun = 0; p.cd = 0; p.act = ''; }
   hkPuckAt(x, y); L.touch = []; L.oneT = null; L.press = -1;
@@ -218,6 +220,8 @@ function hkGoalScored(S) {
 }
 // icing on side (05-live.js saw it cross): back to a face-off in that side's own end. True: play has stopped
 function hkIcing(side) {
+  // a penalty that was waiting is called at any whistle: its face-off, not this one
+  if (GD.delay) { hkPenaltyCall(); return true; }
   const [x] = hkAt(side, HK_DOTS.x[0], 0);
   hkEv('icing', G.teams[side].name); G.icings++;
   hkWhistle(x, (L.puck.y < 0 ? -1 : 1) * HK_DOTS.y, `Icing on ${G.teams[side].name}. The face-off comes back to their end, and they may not change.`, 'icing', 0, side);
@@ -225,6 +229,7 @@ function hkIcing(side) {
 }
 // the goalie covers the puck (06-cpu.js): a face-off beside that net
 function hkFreeze(h) {
+  if (GD.delay) return hkPenaltyCall();
   const g = L.pl[h], x = g.x < HK_RULES.len / 2 ? HK_DOTS.x[0] : HK_DOTS.x[1];
   hkEv('freeze', g.n);
   hkWhistle(x, (L.eye[g.side][1] < 0 ? -1 : 1) * HK_DOTS.y, `${g.n} covers the puck. Face-off.`);
@@ -288,13 +293,13 @@ function hkSoLanded(S) {
 function hkSoResult(scored, how) {
   const C = GD.so.cur, p = L.pl[C.i];
   C.st = 'done'; C.scored = scored; GD.t = 0; GD.meter = null;
-  if (scored) { GD.so.last = { side: C.side, who: p.n, ri: p.ri }; hkPuckAt(hkGoalX(C.side) + hkDir(C.side) * .5, clamp(L.puck.y, -.8, .8)); GD.net = { end: hkGoalX(C.side) > HK_RULES.len / 2 ? 1 : 0 }; }
+  if (scored) { GD.so.last = { side: C.side, who: p.n, ri: p.ri }; (GD.so.lasts = GD.so.lasts || {})[C.side] = GD.so.last; hkPuckAt(hkGoalX(C.side) + hkDir(C.side) * .5, clamp(L.puck.y, -.8, .8)); GD.net = { end: hkGoalX(C.side) > HK_RULES.len / 2 ? 1 : 0 }; }
   else hkPuckAt(L.puck.x, L.puck.y);
   hkEv(scored ? 'sogoal' : 'sosave', p.n);
   C.win = hkSoShot(C.side, scored);
   GD.big = { k: scored ? 'goal' : 'nogoal' };
   GD.msg = `Shootout: ${p.n} ${scored ? 'scores' : how}. ${G.teams[0].name} ${G.so.goals[0]}, ${G.teams[1].name} ${G.so.goals[1]}.`;
-  if (C.win != null) { const l = GD.so.last; G.log.push({ p: G.p, clock: 0, side: C.win, who: l.who, ri: l.ri, k: 'so', a: [], str: 'so', en: false }); }
+  if (C.win != null) { const l = (GD.so.lasts || {})[C.win] || GD.so.last; G.log.push({ p: G.p, clock: 0, side: C.win, who: l.who, ri: l.ri, k: 'so', a: [], str: 'so', en: false }); }
   if (HK_HOOK.onPhase) try { HK_HOOK.onPhase('so'); } catch (e) { console.error(e); }
 }
 function hkEnd() {

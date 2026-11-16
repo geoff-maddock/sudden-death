@@ -27,7 +27,7 @@ const HK_ATT = {
 };
 const HK_DEF = {
   fore: { n: 'Forecheck', desc: 'Go at them in their own end: pucks won high up the ice, and a rush given up if they get through. Tiring.', high: 99, tire: 1.12, wing: [2.5, 5] },
-  trap: { n: 'Trap', desc: 'Clog the middle of the ice and wait: few rushes get through, but nobody goes and gets the puck.', high: 26, pick: 1.35, wing: [2.5, 5] },
+  trap: { n: 'Trap', desc: 'Clog the middle of the ice and wait: few rushes get through, but nobody goes and gets the puck.', high: 26, trap: true, pick: 1.35, wing: [2.5, 5] },
   box: { n: 'Box', desc: 'Four in a box in front of the net: the front is safe, the points are open.', high: 13, block: 1.25, wing: [5, 3.2] },
   collapse: { n: 'Collapse', desc: 'Everyone low around the net: no room in close, and nobody near the points.', high: 11, block: 1.1, wing: [7.5, 2.4], slot: .02 },
   man: { n: 'Man', desc: 'Each skater takes one of theirs, everywhere.', high: 99, wing: [2.5, 5] },
@@ -150,7 +150,7 @@ function hkTimeout(side) {
   G.to[side]--;
   for (const p of hkSk(side)) G.sta[side][p.ri] = Math.min(1, hkSta(p) + HK_TO.sta);
   GD.msg = `Timeout, ${G.teams[side].name}. Their skaters get their breath back.`;
-  if (GD.ph === 'dead') GD.deadT = Math.max(GD.deadT, GD.t + HK_TO.secs); else { GD.ph = 'dead'; GD.t = 0; GD.deadT = HK_TO.secs; GD.next = { x: GD.fo.x, y: GD.fo.y }; }
+  if (GD.ph === 'dead') GD.deadT = Math.max(GD.deadT, GD.t + HK_TO.secs); else { GD.ph = 'dead'; GD.t = 0; GD.deadT = HK_TO.secs; GD.next = { x: GD.fo.x, y: GD.fo.y }; GD.again = true; }
   hkEv('timeout', G.teams[side].name);
   return '';
 }

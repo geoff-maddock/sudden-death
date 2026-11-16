@@ -174,6 +174,23 @@ async def main():
         await pg.evaluate("showPage('help')"); hp2 = await pg.evaluate("document.getElementById('wRinkHow').textContent"); await pg.evaluate("showPage('play')")
         check('Penalties.' in hp2 and 'delayed penalty' in hp2 and 'Pulling the goalie' in hp2 and 'shootout' in hp2, 'How to play explains penalties, the delayed penalty, pulling the goalie and the shootout', None)
 
+        # ---------- found in review: a delayed penalty and another whistle; a timeout while they line up; a save point and the poke ----------
+        await pg.evaluate("""window.__tm = () => [{ name: 'A', short: 'A', color: '#36a', light: '#fff', kinds: ['vampire','harpy','witch','werewolf','troll','wraith','skeleton','lich'] }, { name: 'B', short: 'B', color: '#a43', light: '#fff', kinds: ['elf','goblin','kobold','minotaur','golem','gorgon','dwarf','ogre'] }];
+          window.__go = () => { let n = 0; while (wHK.phase !== 'live' && n++ < 4000) wHK.step(); };
+          window.__ice = side => { const P = wHK.play.puck, G = wHK.G, d = ((G.p % 2 === 1) === (side === 0)) ? 1 : -1, gx = d > 0 ? 37 : 3;
+            Object.assign(P, { st: 'free', h: -1, k: 'dump', ice: side, x: gx - d * 1, y: 6, vx: d * 18, vy: 0, go: 9, from: side * 6, to: -1, skip: -1, tried: [], shot: null }); let n = 0; while (wHK.phase === 'live' && n++ < 200) wHK.step(); return wHK.phase; }; 0""")
+        dl = await pg.evaluate("""(() => { wHK.start({ seed: 3, mode: 'watch', teams: __tm(), powers: false }); __go();
+          wHK.give(6); wHK.foul(1, 'tripping'); const was = !!wHK.delay; __ice(1);
+          return { was, delay: wHK.delay, box: wHK.G.box.length, pulled: wHK.pulled(1), msg: wHK.msg }; })()""")
+        check(dl['was'] and dl['delay'] is None and dl['box'] == 1 and not dl['pulled'] and 'goes to the box' in dl['msg'], 'a delayed penalty is called at the next whistle, whatever it is for (an icing by the other side)', dl)
+        tm = await pg.evaluate("""(() => { const run = when => { wHK.start({ seed: 3, mode: 'manage', teams: __tm(), powers: false }); __go(); const G = wHK.G; __ice(0);
+            if (when === 'dead') wHK.timeout(0); let n = 0; while (wHK.phase !== 'set' && n++ < 4000) wHK.step(); if (when === 'set') wHK.timeout(0); __go();
+            return { to: G.to.slice(), scout: G.scout.map(s => s.n) }; }; return { dead: run('dead'), set: run('set') }; })()""")
+        check(tm['dead'] == tm['set'] and tm['set']['to'][0] == 0, 'a timeout taken while they line up does what one taken at the whistle does: no second call or line change', tm)
+        sv = await pg.evaluate("""(() => { wHK.start({ seed: 5, mode: 'play', teams: __tm() }); __go(); wHK.step(600); __go();
+          wHK.play.pokeAt = 500; wHK.play.hitAt = 500; const sn = wHK.snapshot(); wHK.resume(sn); __go();
+          return { poke: wHK.play.pokeAt, hit: wHK.play.hitAt }; })()""")
+        check(sv['poke'] is None and sv['hit'] is None, 'a resumed game starts with the poke and the check ready (their cooldowns are not carried over)', sv)
         check(not errs, 'no page errors', errs)
         await br.close()
     print('errors:', FAILS)
