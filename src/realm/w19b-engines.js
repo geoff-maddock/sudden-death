@@ -3,11 +3,12 @@
    onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
    Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/), the Anvil Ring (wBX, boxing; src/bx/,
    issue #23), the Charter Court (wBK, basketball; src/bk/, issue #77) and Black Ice at the Pond Rink (wHK, hockey;
-   src/hk/, issue #83). Nothing here is saved. */
+   src/hk/, issue #83) and Mossgate Links (wGL, golf; src/gl/, issue #92: the rules only so far, no view). Nothing
+   here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' },
-  rink: { api: wHK, view: 'rink', sport: 'hockey' } };
+  rink: { api: wHK, view: 'rink', sport: 'hockey' }, links: { api: wGL, view: 'links', sport: 'golf' } };
 /* an engine's question (Concede?) holds the game still until it closes: askConfirm hears only its two buttons, so this
    runs fn once the box closes however it closes (a button, Escape, a click outside) */
 function wAfterAsk(fn) { const t = setInterval(() => { if (!$('modal').hidden) return; clearInterval(t); try { fn(); } catch (e) { console.error(e); } }, 100); }

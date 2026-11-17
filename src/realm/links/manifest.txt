@@ -1,0 +1,4 @@
+# The Realm's links scope: ./build.sh src/realm/manifest.txt takes this through `scope wGL ...`.
+# The engine's parts (they don't touch the page). Its page in the Realm (a canvas in #v-links), the superstars and
+# their figures come with the later phases, as the rink's did.
+include src/gl/manifest.txt
