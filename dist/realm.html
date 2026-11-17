@@ -22015,15 +22015,17 @@ return {
 
 })();
 const wGF = (function () {
-/* Cinder Gridiron: utilities (issue #9). R is the engine's random number: Math.random, or seeded (gfSeed) so a
-   headless drive can be played again exactly. */
-let gfRand = Math.random;
-function gfSeed(n) {
-  if (n == null) { gfRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  gfRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => gfRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -23147,7 +23149,7 @@ let GD = null;
 
 function gfStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  gfSeed(o.seed);
+  engSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
@@ -23704,13 +23706,13 @@ function gfGameSummary() {
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 // (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: gfRand } : null;
+  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand } : null;
   GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   let secs = 0, out;
   try {
     gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; }
     out = Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
-  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; gfRand = was.rand; } }
+  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; } }
   return out;
 }
 /* Cinder Gridiron: Play mode (issue #9, phase 2). In 'play' you call your side's plays as in 'call', and then play the
@@ -23873,7 +23875,7 @@ function gfSnapshot() {
 }
 function gfResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  G = s.G; GD = s.GD; L = null; gfSeed(null);
+  G = s.G; GD = s.GD; L = null; engSeed(null);
   return G;
 }
 /* Cinder Gridiron: monster powers (issue #9, phase 6). They work as they do on Brimstone Diamond, adapted to downs:
@@ -25086,16 +25088,17 @@ return {
 
 })();
 const wBX = (function () {
-/* The Anvil Ring: utilities (issue #23). Copied from Cinder Gridiron's (src/gf/parts/01-util.js) and adapted, not
-   shared. R is the engine's random number: Math.random, or seeded (bxSeed) so a headless bout can be boxed again
-   exactly. */
-let bxRand = Math.random;
-function bxSeed(n) {
-  if (n == null) { bxRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  bxRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => bxRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -26146,7 +26149,7 @@ const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onE
 const BX_MODES = ['watch', 'call', 'play'];
 function bxStart(opts) {
   const o = opts || {};
-  bxSeed(o.seed); bxNewBout(o); BXE = [];
+  engSeed(o.seed); bxNewBout(o); BXE = [];
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
@@ -26311,12 +26314,12 @@ function bxSummary() {
 }
 /* a whole bout headless and silent, seeded; the bout on the page (if any) is left as it was */
 function bxSimBout(opts) {
-  const keep = [G, BD, BXE, bxRand];
+  const keep = [G, BD, BXE, engRand];
   try {
     bxStart(Object.assign({}, opts, { headless: true }));
     for (let n = 0; BD.ph !== 'over' && n < 400000; n++) bxBeat(BX_DT);
     return bxSummary();
-  } finally { [G, BD, BXE, bxRand] = keep; }
+  } finally { [G, BD, BXE, engRand] = keep; }
 }
 /* The Anvil Ring: the ring, drawn (issue #23, phase 1). The forge hall from the side and a little above: the ring on
    its platform, the canvas scorched at the edges, red, white and blue ropes, the red corner at the back left and the blue
@@ -26968,7 +26971,7 @@ function bxSnapshot() {
 function bxResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
   G = s.G; CD = s.CD || null; BD = Object.assign({ acc: 0, headless: false }, s.BD); BXE = [];
-  bxSeed(null); bxInputClear();
+  engSeed(null); bxInputClear();
   return G;
 }
 function bxSnapNow() {
@@ -27441,22 +27444,24 @@ return {
 
 })();
 const wBK = (function () {
-/* The Charter Court: utilities (issue #77). R is the engine's random number: Math.random, or seeded (bkSeed) so a
-   headless game can be played again exactly. */
-let bkRand = Math.random;
-function bkSeed(n) {
-  if (n == null) { bkRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  bkRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => bkRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
-// (seeded, as everything here is: a name the page also has would otherwise be its own, unseeded one)
 const pick = a => a[(R() * a.length) | 0];
 // a weighted pick: { key: weight }
 function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
+function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 /* The Charter Court: the rules (issue #77, phases 0 and 1). Plain data and pure functions, no page: the score, the
@@ -28677,7 +28682,7 @@ let GD = null;
 
 function bkStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  bkSeed(o.seed);
+  engSeed(o.seed);
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
@@ -28946,14 +28951,14 @@ function bkBox() {
 }
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function bkSimGame(opts) {
-  const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: bkRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
+  const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
   BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = BK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     bkStart(Object.assign({}, opts, { mode: 'watch' }));
     for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { bkTick(BK_DT * 4); watch += BK_DT * 4; }
     out = Object.assign(bkSummary(), { watch: Math.round(watch) });
-  } finally { Object.assign(BK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; bkRand = was.rand; Object.assign(BKI, was.keys); } }
+  } finally { Object.assign(BK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; Object.assign(BKI, was.keys); } }
   return out;
 }
 /* The Charter Court: the court, drawn (issue #77, phase 1). The Charter Court from above and a little to one side: a
@@ -29735,7 +29740,7 @@ function bkSnapHook(ph) {
 }
 function bkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  bkSeed(null);
+  engSeed(null);
   G = s.G; L = s.L;
   // (a save point from before powers, gear and potions: none of them, so play goes on as it was)
   if (!G.mana) Object.assign(G, { powers: false, mana: [0, 0], spirit: [0, 0], zones: [], ultUsed: [false, false], sitUsed: [{}, {}], kept: [{}, {}] });
@@ -30609,22 +30614,24 @@ return {
 
 })();
 const wHK = (function () {
-/* Black Ice: utilities (issue #83). R is the engine's random number: Math.random, or seeded (hkSeed) so a headless
-   game can be played again exactly. */
-let hkRand = Math.random;
-function hkSeed(n) {
-  if (n == null) { hkRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  hkRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => hkRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
-// (seeded, as everything here is: a name the page also has would otherwise be its own, unseeded one)
 const pick = a => a[(R() * a.length) | 0];
 // a weighted pick: { key: weight }
 function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
+function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 /* Black Ice: the rules (issue #83, phase 0). Plain data and pure functions, no page: the score, the periods and the
@@ -31985,7 +31992,7 @@ let GD = null;
 
 function hkStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  hkSeed(o.seed);
+  engSeed(o.seed);
   hkNewGame({ mins: o.mins });
   G.teams = [hkTeam(T[0] || HK_CLUBS.home), hkTeam(T[1] || HK_CLUBS.away)];
   G.on = G.teams.map(t => HK_POS.map(k => t.spot[k]));
@@ -32279,14 +32286,14 @@ function hkBox() {
 }
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function hkSimGame(opts) {
-  const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: hkRand } : null;
+  const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand } : null;
   HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = HK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     hkStart(opts);
     for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { hkTick(HK_DT * 4); watch += HK_DT * 4; }
     out = Object.assign(hkSummary(), { watch: Math.round(watch) });
-  } finally { Object.assign(HK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; hkRand = was.rand; } }
+  } finally { Object.assign(HK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; } }
   return out;
 }
 /* Black Ice: the rink, drawn (issue #83, phase 1). The Pond Rink from above and a little to one side: a frozen pond
@@ -33137,7 +33144,7 @@ function hkSnapHook(ph) {
 }
 function hkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  hkSeed(null);
+  engSeed(null);
   G = s.G; L = s.L;
   // (a save point from before powers: none of them, so play goes on as it was)
   if (!G.mana) Object.assign(G, { powers: false, powOn: [false, false], mana: [0, 0], spirit: [0, 0], fxs: [], marks: [], ultUsed: [false, false], sitUsed: [{}, {}], casts: [] });

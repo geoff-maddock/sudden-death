@@ -76,12 +76,12 @@ function gfGameSummary() {
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 // (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: gfRand } : null;
+  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand } : null;
   GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   let secs = 0, out;
   try {
     gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; }
     out = Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
-  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; gfRand = was.rand; } }
+  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; } }
   return out;
 }

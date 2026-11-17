@@ -24,7 +24,7 @@ let GD = null;
 
 function bkStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  bkSeed(o.seed);
+  engSeed(o.seed);
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
@@ -293,13 +293,13 @@ function bkBox() {
 }
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function bkSimGame(opts) {
-  const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: bkRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
+  const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
   BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = BK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     bkStart(Object.assign({}, opts, { mode: 'watch' }));
     for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { bkTick(BK_DT * 4); watch += BK_DT * 4; }
     out = Object.assign(bkSummary(), { watch: Math.round(watch) });
-  } finally { Object.assign(BK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; bkRand = was.rand; Object.assign(BKI, was.keys); } }
+  } finally { Object.assign(BK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; Object.assign(BKI, was.keys); } }
   return out;
 }

@@ -31,7 +31,7 @@ let GD = null;
 
 function hkStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  hkSeed(o.seed);
+  engSeed(o.seed);
   hkNewGame({ mins: o.mins });
   G.teams = [hkTeam(T[0] || HK_CLUBS.home), hkTeam(T[1] || HK_CLUBS.away)];
   G.on = G.teams.map(t => HK_POS.map(k => t.spot[k]));
@@ -325,13 +325,13 @@ function hkBox() {
 }
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function hkSimGame(opts) {
-  const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: hkRand } : null;
+  const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand } : null;
   HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = HK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     hkStart(opts);
     for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { hkTick(HK_DT * 4); watch += HK_DT * 4; }
     out = Object.assign(hkSummary(), { watch: Math.round(watch) });
-  } finally { Object.assign(HK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; hkRand = was.rand; } }
+  } finally { Object.assign(HK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; } }
   return out;
 }

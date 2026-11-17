@@ -33,6 +33,6 @@ function gfSnapshot() {
 }
 function gfResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  G = s.G; GD = s.GD; L = null; gfSeed(null);
+  G = s.G; GD = s.GD; L = null; engSeed(null);
   return G;
 }
