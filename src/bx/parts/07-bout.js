@@ -34,7 +34,7 @@ const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onE
 const BX_MODES = ['watch', 'call', 'play'];
 function bxStart(opts) {
   const o = opts || {};
-  bxSeed(o.seed); bxNewBout(o); BXE = [];
+  engSeed(o.seed); bxNewBout(o); BXE = [];
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
@@ -199,10 +199,10 @@ function bxSummary() {
 }
 /* a whole bout headless and silent, seeded; the bout on the page (if any) is left as it was */
 function bxSimBout(opts) {
-  const keep = [G, BD, BXE, bxRand];
+  const keep = [G, BD, BXE, engRand];
   try {
     bxStart(Object.assign({}, opts, { headless: true }));
     for (let n = 0; BD.ph !== 'over' && n < 400000; n++) bxBeat(BX_DT);
     return bxSummary();
-  } finally { [G, BD, BXE, bxRand] = keep; }
+  } finally { [G, BD, BXE, engRand] = keep; }
 }

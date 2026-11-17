@@ -1,12 +1,14 @@
-/* Cinder Gridiron: utilities (issue #9). R is the engine's random number: Math.random, or seeded (gfSeed) so a
-   headless drive can be played again exactly. */
-let gfRand = Math.random;
-function gfSeed(n) {
-  if (n == null) { gfRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  gfRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => gfRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;

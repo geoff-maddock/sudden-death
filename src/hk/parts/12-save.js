@@ -14,7 +14,7 @@ function hkSnapHook(ph) {
 }
 function hkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  hkSeed(null);
+  engSeed(null);
   G = s.G; L = s.L;
   // (a save point from before powers: none of them, so play goes on as it was)
   if (!G.mana) Object.assign(G, { powers: false, powOn: [false, false], mana: [0, 0], spirit: [0, 0], fxs: [], marks: [], ultUsed: [false, false], sitUsed: [{}, {}], casts: [] });

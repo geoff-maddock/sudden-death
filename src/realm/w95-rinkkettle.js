@@ -32,41 +32,24 @@ const W_KETTLE = {
 };
 const W_HKFIX = { rink: 'g_rink', tier: 2 };
 
-function wKettle() { return (WG && WG.hkcup) || null; }
-function wKettleOn() { const D = wKettle(); return !!(D && !D.done); }
-function wKettleName(id) { return id === 'me' ? 'your six' : wBallName(id); }
-function wKettleTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wKettlePairs(r) {
-  const D = wKettle(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.games[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wKettleGame(r, a, b) { return ((wKettle().games[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wKettleMine() { const D = wKettle(); if (!D || D.out || D.done) return null; const p = wKettlePairs(D.round).find(x => x.includes('me')); return p && !wKettleGame(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.hkcup = { K: W_KETTLE, name: 'Pond Kettle', me: 'your six', store: 'games', view: 'rink', verb: 'held', busy: 'Finish the hockey game you started first.',
+  live: () => wRinkLive(), base: () => wRinkProblems(), sim: (a, b, tier) => wKettleSim(a, b, tier), won: () => wKettleWon(),
+  mark: g => g.end === 'so' ? '*' : g.end === 'ot' ? '†' : '', hint: '† Won in sudden death. * Won in a shootout.' };
+function wKettle() { return wBrk('hkcup'); }
+function wKettleOn() { return wBrkOn('hkcup'); }
+function wKettleName(id) { return wBrkName('hkcup', id); }
+function wKettleTeamName(id) { return wBrkTeamName(id); }
+function wKettlePairs(r) { return wBrkPairs('hkcup', r); }
+function wKettleGame(r, a, b) { return wBrkGame('hkcup', r, a, b); }
+function wKettleMine() { return wBrkMine('hkcup'); }
+function wKettleProblems() { return wBrkProblems('hkcup'); }
+function wKettleEnter() { return wBrkEnter('hkcup'); }
+function wKettleCatchUp() { return wBrkCatchUp('hkcup'); }
+function wKettleBracket() { return wBrkBracket('hkcup'); }
+
 const wKettleLive = () => wRinkLive() && WG.hkg.live.world.kind === 'hkcup';
 
-function wKettleProblems() {
-  const D = wKettle(), out = wRinkProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Pond Kettle is held once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_KETTLE.fee) out.push(`The entry fee is ${W_KETTLE.fee} gold, and you have ${RUN.gold}.`);
-  if (wRinkLive()) out.push('Finish the hockey game you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wKettleEnter() {
-  const probs = wKettleProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_KETTLE.size - 1));
-  RUN.gold -= W_KETTLE.fee;
-  WG.hkcup = { week: wWeek(), field: ['me'].concat(others), round: 0, games: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Pond Kettle (${W_KETTLE.fee} gold). ${W_KETTLE.rounds[0]}: ${wKettleName(wKettleMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wKettlePlay(how) {
   const D = wKettle(), opp = wKettleMine(); if (!opp) return '';
   return wStartRink({ club: opp, how, tier: W_KETTLE.tiers[D.round], kind: 'hkcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -92,22 +75,6 @@ function wRinkSimClubs(a, b, tier) {
   return { ra: s.score[0], rb: s.score[1], w: s.win === 0 ? a : b, end: s.so ? 'so' : s.ot ? 'ot' : '' };
 }
 function wKettleSim(a, b, tier) { const s = wRinkSimClubs(a, b, tier); return { a, b, ra: s.ra, rb: s.rb, w: s.w, end: s.end }; }
-// the rest of the round: every game without a result; then the next round, and on to the final if you are out
-function wKettleCatchUp() {
-  const D = wKettle(); if (!D || !D.pending || wRinkLive() || UI.view === 'rink') return false;
-  for (;;) {
-    for (const [a, b] of wKettlePairs(D.round)) if (!wKettleGame(D.round, a, b)) D.games[D.round].push(wKettleSim(a, b, W_KETTLE.tiers[D.round]));
-    if (D.round === W_KETTLE.rounds.length - 1) { D.done = true; D.champ = D.games[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wKettleWon();
-  else if (D.done) wLog(`${wCap(wKettleName(D.champ))} win the Pond Kettle.`, 'd');
-  else wLog(`The ${W_KETTLE.rounds[D.round - 1].toLowerCase()}s are in. ${W_KETTLE.rounds[D.round]}: ${wKettleName(wKettleMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wKettleWon() {
   const P = W_KETTLE.prize, D = wKettle(), f = D.games[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -125,16 +92,6 @@ function wKettleWon() {
 }
 
 /* ---------- the card: entry, the bracket, your next game ---------- */
-function wKettleBracket() {
-  const D = wKettle();
-  const cell = (r, a, b) => {
-    const g = wKettleGame(r, a, b), mark = g && g.end === 'so' ? '*' : g && g.end === 'ot' ? '†' : '';
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wKettleTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${g && g.w === id ? mark : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_KETTLE.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wKettlePairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.games.some(R => R.some(g => g.end)) ? '<p class="hint">† Won in sudden death. * Won in a shootout.</p>' : ''}`;
-}
 function wOpenKettle(msg) {
   if (LAB || !WG) return;
   wKettleCatchUp();

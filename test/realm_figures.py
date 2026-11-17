@@ -1,4 +1,4 @@
-"""The shared figures (issue #85): boxing, football, basketball and hockey draw their players with one file,
+"""The shared figures (issue #85) and utilities (issue #86): boxing, football, basketball and hockey draw their players with one file,
 src/figures/figures.js, loaded inside each engine's scope. It names no engine, each engine gives it a clock
 (figClock), no engine keeps a copy, and it draws every kind in every option without throwing."""
 import asyncio, os, re, sys
@@ -25,19 +25,22 @@ DRAW = """
 """
 async def main():
     fig = open(f'{ROOT}/src/figures/figures.js').read()
+    util = open(f'{ROOT}/src/scoped/util.js').read()
+    check(not re.search(r'\b(bx|gf|bk|hk)(Seed|Rand)\b|\b(BXT|GFT|BKT|HKT)\b', util.split('*/', 1)[1]) and 'function engSeed' in util, 'the shared utilities (issue #86) name no engine')
     check(not re.search(r'\b(BXT|GFT|BKT|HKT|BDT)\b', fig.split('*/', 1)[1]) and 'figClock()' in fig, 'the shared figures name no engine, and read the clock through figClock()')
     for e, T in ENGINES.items():
         man = open(f'{ROOT}/src/{e}/manifest.txt').read().split('\n')
         parts = ''.join(open(f'{ROOT}/{l}').read() for l in man if l.startswith(f'src/{e}/parts/'))
         check(man.count('src/figures/figures.js') == 1 and not os.path.exists(f'{ROOT}/src/{e}/parts/03-figures.js') and not re.search(r'^function drawFig\b', parts, re.M),
               f'{e}: loads the shared figures once and keeps no copy of its own')
+        check(man.count('src/scoped/util.js') == 1 and not os.path.exists(f'{ROOT}/src/{e}/parts/01-util.js') and not re.search(r'^function \w*Seed\b', parts, re.M), f'{e}: loads the shared utilities once and keeps no copy of its own')
         check(len(re.findall(r'^function figClock\(\) \{ return ' + T + r'\.t; \}', parts, re.M)) == 1, f'{e}: defines figClock on its own drawing clock ({T}.t)')
     async with async_playwright() as p:
         br = await p.chromium.launch(); pg = await br.new_page(); errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
         for e in ENGINES:
             await pg.goto('about:blank')
-            await pg.add_script_tag(content=open(f'{ROOT}/src/{e}/parts/01-util.js').read() + '\nfunction figClock() { return 1.234; }\n' + fig)
+            await pg.add_script_tag(content=util + '\nfunction figClock() { return 1.234; }\n' + fig)
             r = await pg.evaluate(DRAW)
             check(r['kinds'] >= 18 and not r['threw'] and not r['blank'] and r['gloves'], f"{e}: every kind draws in every option ({r['n']} pictures), and gloves show", r)
         check(not errs, 'no page errors', errs)

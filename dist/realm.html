@@ -22015,15 +22015,17 @@ return {
 
 })();
 const wGF = (function () {
-/* Cinder Gridiron: utilities (issue #9). R is the engine's random number: Math.random, or seeded (gfSeed) so a
-   headless drive can be played again exactly. */
-let gfRand = Math.random;
-function gfSeed(n) {
-  if (n == null) { gfRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  gfRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => gfRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -23147,7 +23149,7 @@ let GD = null;
 
 function gfStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  gfSeed(o.seed);
+  engSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
@@ -23704,13 +23706,13 @@ function gfGameSummary() {
 // a whole game at once, CPU against CPU, through the same flow; secs is the time it would take to watch
 // (opts.keep: put the game that was on the field back afterwards, for a game simulated while another is being played)
 function gfSimGame(opts) {
-  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: gfRand } : null;
+  const hooks = Object.assign({}, GF_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand } : null;
   GF_HOOK.onOver = GF_HOOK.onPhase = GF_HOOK.onSnap = null;
   let secs = 0, out;
   try {
     gfStartGame(Object.assign({}, opts, { mode: 'watch' })); for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { gfTick(GF_DT * 10); secs += GF_DT * 10; }
     out = Object.assign(gfGameSummary(), { secs: Math.round(secs), box: gfBox() });
-  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; gfRand = was.rand; } }
+  } finally { Object.assign(GF_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; } }
   return out;
 }
 /* Cinder Gridiron: Play mode (issue #9, phase 2). In 'play' you call your side's plays as in 'call', and then play the
@@ -23873,7 +23875,7 @@ function gfSnapshot() {
 }
 function gfResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  G = s.G; GD = s.GD; L = null; gfSeed(null);
+  G = s.G; GD = s.GD; L = null; engSeed(null);
   return G;
 }
 /* Cinder Gridiron: monster powers (issue #9, phase 6). They work as they do on Brimstone Diamond, adapted to downs:
@@ -25086,16 +25088,17 @@ return {
 
 })();
 const wBX = (function () {
-/* The Anvil Ring: utilities (issue #23). Copied from Cinder Gridiron's (src/gf/parts/01-util.js) and adapted, not
-   shared. R is the engine's random number: Math.random, or seeded (bxSeed) so a headless bout can be boxed again
-   exactly. */
-let bxRand = Math.random;
-function bxSeed(n) {
-  if (n == null) { bxRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  bxRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => bxRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -26146,7 +26149,7 @@ const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onE
 const BX_MODES = ['watch', 'call', 'play'];
 function bxStart(opts) {
   const o = opts || {};
-  bxSeed(o.seed); bxNewBout(o); BXE = [];
+  engSeed(o.seed); bxNewBout(o); BXE = [];
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
@@ -26311,12 +26314,12 @@ function bxSummary() {
 }
 /* a whole bout headless and silent, seeded; the bout on the page (if any) is left as it was */
 function bxSimBout(opts) {
-  const keep = [G, BD, BXE, bxRand];
+  const keep = [G, BD, BXE, engRand];
   try {
     bxStart(Object.assign({}, opts, { headless: true }));
     for (let n = 0; BD.ph !== 'over' && n < 400000; n++) bxBeat(BX_DT);
     return bxSummary();
-  } finally { [G, BD, BXE, bxRand] = keep; }
+  } finally { [G, BD, BXE, engRand] = keep; }
 }
 /* The Anvil Ring: the ring, drawn (issue #23, phase 1). The forge hall from the side and a little above: the ring on
    its platform, the canvas scorched at the edges, red, white and blue ropes, the red corner at the back left and the blue
@@ -26968,7 +26971,7 @@ function bxSnapshot() {
 function bxResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
   G = s.G; CD = s.CD || null; BD = Object.assign({ acc: 0, headless: false }, s.BD); BXE = [];
-  bxSeed(null); bxInputClear();
+  engSeed(null); bxInputClear();
   return G;
 }
 function bxSnapNow() {
@@ -27441,22 +27444,24 @@ return {
 
 })();
 const wBK = (function () {
-/* The Charter Court: utilities (issue #77). R is the engine's random number: Math.random, or seeded (bkSeed) so a
-   headless game can be played again exactly. */
-let bkRand = Math.random;
-function bkSeed(n) {
-  if (n == null) { bkRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  bkRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => bkRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
-// (seeded, as everything here is: a name the page also has would otherwise be its own, unseeded one)
 const pick = a => a[(R() * a.length) | 0];
 // a weighted pick: { key: weight }
 function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
+function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 /* The Charter Court: the rules (issue #77, phases 0 and 1). Plain data and pure functions, no page: the score, the
@@ -28677,7 +28682,7 @@ let GD = null;
 
 function bkStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  bkSeed(o.seed);
+  engSeed(o.seed);
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
@@ -28946,14 +28951,14 @@ function bkBox() {
 }
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function bkSimGame(opts) {
-  const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: bkRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
+  const hooks = Object.assign({}, BK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand, keys: JSON.parse(JSON.stringify(BKI)) } : null;
   BK_HOOK.onOver = BK_HOOK.onPhase = BK_HOOK.onSnap = BK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     bkStart(Object.assign({}, opts, { mode: 'watch' }));
     for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { bkTick(BK_DT * 4); watch += BK_DT * 4; }
     out = Object.assign(bkSummary(), { watch: Math.round(watch) });
-  } finally { Object.assign(BK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; bkRand = was.rand; Object.assign(BKI, was.keys); } }
+  } finally { Object.assign(BK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; Object.assign(BKI, was.keys); } }
   return out;
 }
 /* The Charter Court: the court, drawn (issue #77, phase 1). The Charter Court from above and a little to one side: a
@@ -29735,7 +29740,7 @@ function bkSnapHook(ph) {
 }
 function bkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  bkSeed(null);
+  engSeed(null);
   G = s.G; L = s.L;
   // (a save point from before powers, gear and potions: none of them, so play goes on as it was)
   if (!G.mana) Object.assign(G, { powers: false, mana: [0, 0], spirit: [0, 0], zones: [], ultUsed: [false, false], sitUsed: [{}, {}], kept: [{}, {}] });
@@ -30609,22 +30614,24 @@ return {
 
 })();
 const wHK = (function () {
-/* Black Ice: utilities (issue #83). R is the engine's random number: Math.random, or seeded (hkSeed) so a headless
-   game can be played again exactly. */
-let hkRand = Math.random;
-function hkSeed(n) {
-  if (n == null) { hkRand = Math.random; return; }
+/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
+   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
   let a = n >>> 0;
-  hkRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const R = () => hkRand();
+const R = () => engRand();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
-// (seeded, as everything here is: a name the page also has would otherwise be its own, unseeded one)
 const pick = a => a[(R() * a.length) | 0];
 // a weighted pick: { key: weight }
 function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
+function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 /* Black Ice: the rules (issue #83, phase 0). Plain data and pure functions, no page: the score, the periods and the
@@ -31985,7 +31992,7 @@ let GD = null;
 
 function hkStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  hkSeed(o.seed);
+  engSeed(o.seed);
   hkNewGame({ mins: o.mins });
   G.teams = [hkTeam(T[0] || HK_CLUBS.home), hkTeam(T[1] || HK_CLUBS.away)];
   G.on = G.teams.map(t => HK_POS.map(k => t.spot[k]));
@@ -32279,14 +32286,14 @@ function hkBox() {
 }
 // a whole game at once, CPU against CPU, through the same flow; watch is the time it would take to watch
 function hkSimGame(opts) {
-  const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: hkRand } : null;
+  const hooks = Object.assign({}, HK_HOOK), was = opts && opts.keep ? { G, GD, L, rand: engRand } : null;
   HK_HOOK.onOver = HK_HOOK.onPhase = HK_HOOK.onSnap = HK_HOOK.onEv = null;
   let watch = 0, out;
   try {
     hkStart(opts);
     for (let i = 0; i < 400000 && GD.ph !== 'over'; i++) { hkTick(HK_DT * 4); watch += HK_DT * 4; }
     out = Object.assign(hkSummary(), { watch: Math.round(watch) });
-  } finally { Object.assign(HK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; hkRand = was.rand; } }
+  } finally { Object.assign(HK_HOOK, hooks); if (was) { G = was.G; GD = was.GD; L = was.L; engRand = was.rand; } }
   return out;
 }
 /* Black Ice: the rink, drawn (issue #83, phase 1). The Pond Rink from above and a little to one side: a frozen pond
@@ -33137,7 +33144,7 @@ function hkSnapHook(ph) {
 }
 function hkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  hkSeed(null);
+  engSeed(null);
   G = s.G; L = s.L;
   // (a save point from before powers: none of them, so play goes on as it was)
   if (!G.mana) Object.assign(G, { powers: false, powOn: [false, false], mana: [0, 0], spirit: [0, 0], fxs: [], marks: [], ultUsed: [false, false], sitUsed: [{}, {}], casts: [] });
@@ -39356,6 +39363,89 @@ renderHelp = function () {
   const g = $('wHelpGridiron'); if (!g || $('wHelpGfPowers')) return;
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfPowers"><b>Powers on the gridiron.</b> They work as they do on the diamond. Your side has team mana: 3 at the start of each half, 1 more for both sides at every new drive, and 1 each time the other side scores, up to 6. With each call you may cast one power: every kind has one for offense and one for defense (Wolf Sprint speeds up the ball carrier, Web slows whoever takes the ball). Pick it on the bar or press G; with Auto powers on, your players cast their own (T switches it, and it starts on when you manage). Each kind also has an ultimate, once a game per kind for 3 mana (two goblins share one Smoke Bomb), that leaves a zone on the field for 3 plays or the drive (Rampart walls the line, Bog Tide turns their backfield to swamp). Casting costs stamina, and so does every play, because the same seven play both ways: a tired player is slower and weaker until the half. The tip box gives each power's pros and cons for the down, and the reason after each play says what it did. The other side casts too, better at higher tiers. How it works, under the field, lists every kind's powers.</p>`);
 };
+/* w45b: the weekly cup bracket, once (issue #86). The Cinder Cup (w46, football), the Anvil Belt (w54, boxing), the
+   Charter Net (w84, basketball) and the Pond Kettle (w95, hockey) are the same cup in four sports: eight sides in a
+   bracket, 'me' first, three rounds, your own game played and the rest of each round simulated, one cup a week. Each
+   of those files keeps its numbers, its words, its game's result (W_ON_END), its prize and its card; the bracket
+   itself is here, and their own functions (wGcupEnter, wBcupPairs, wNetCatchUp, wKettleBracket, ...) call it.
+
+   W_BRACKETS[key], set by each cup's file (key is the cup's field on WG and its world-game kind: 'gcup', 'bcup',
+   'bkcup', 'hkcup'):
+     K        the cup's numbers: { fee, size, tiers, rounds, prize, force }
+     name     'Pond Kettle'        me     'your six'
+     store    the field the results are kept in, by round: 'games' ('cards' in boxing). Saves are as they were.
+     view     the engine's view (UI.view), so the round isn't finished behind a game on screen
+     verb     'held' ('boxed')     busy   'Finish the hockey game you started first.'
+     live()   a game of this sport is on        base()  the sport's own reasons you can't play (a list)
+     sim(a, b, tier)   one game between two others: a result row { a, b, ra, rb, w, ... }
+     won()    you won the final: the prize
+     mark(g)  what goes after the winner's score ('' | '*' | '†')      hint   the line that explains the marks
+   Nothing here is stored: W_BRACKETS holds functions, WG holds only the cup's plain data. */
+const W_BRACKETS = {};
+
+function wBrk(key) { return (WG && WG[key]) || null; }
+function wBrkOn(key) { const D = wBrk(key); return !!(D && !D.done); }
+function wBrkName(key, id) { return id === 'me' ? W_BRACKETS[key].me : wBallName(id); }
+function wBrkTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
+// who meets whom in round r: the field in pairs, then the winners of the round before, in order
+function wBrkPairs(key, r) {
+  const D = wBrk(key), S = W_BRACKETS[key].store; let ids = D.field.slice();
+  for (let i = 0; i < r; i++) ids = (D[S][i] || []).map(g => g.w);
+  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
+  return out;
+}
+function wBrkGame(key, r, a, b) { return ((wBrk(key)[W_BRACKETS[key].store][r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
+// who you play next (null when you're out, it's over, or your game this round is played)
+function wBrkMine(key) { const D = wBrk(key); if (!D || D.out || D.done) return null; const p = wBrkPairs(key, D.round).find(x => x.includes('me')); return p && !wBrkGame(key, D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+function wBrkProblems(key) {
+  const C = W_BRACKETS[key], D = wBrk(key), out = C.base();
+  if (D && !D.done) return out;
+  const left = 7 - ((WG.dayAbs - 1) % 7);
+  if (D && D.week === wWeek()) out.push(`The ${C.name} is ${C.verb} once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
+  if (RUN.gold < C.K.fee) out.push(`The entry fee is ${C.K.fee} gold, and you have ${RUN.gold}.`);
+  if (C.live()) out.push(C.busy);
+  return out;
+}
+// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
+function wBrkEnter(key) {
+  const C = W_BRACKETS[key], probs = wBrkProblems(key); if (probs.length) return probs.join(' ');
+  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
+  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
+  const others = shuffle(rivals.concat(wild).slice(0, C.K.size - 1));
+  RUN.gold -= C.K.fee;
+  WG[key] = { week: wWeek(), field: ['me'].concat(others), round: 0, [C.store]: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
+  wLog(`You enter the ${C.name} (${C.K.fee} gold). ${C.K.rounds[0]}: ${wBrkName(key, wBrkMine(key))}.`, 'g');
+  wSave();
+  return '';
+}
+// the rest of the round: every game without a result; then the next round, and on to the final if you are out
+function wBrkCatchUp(key) {
+  const C = W_BRACKETS[key], D = wBrk(key); if (!D || !D.pending || C.live() || UI.view === C.view) return false;
+  const S = C.store;
+  for (;;) {
+    for (const [a, b] of wBrkPairs(key, D.round)) if (!wBrkGame(key, D.round, a, b)) D[S][D.round].push(C.sim(a, b, C.K.tiers[D.round]));
+    if (D.round === C.K.rounds.length - 1) { D.done = true; D.champ = D[S][D.round][0].w; break; }
+    D.round++;
+    if (!D.out) break;
+  }
+  D.pending = false; D.show = true;
+  if (D.done && D.champ === 'me') C.won();
+  else if (D.done) wLog(`${wCap(wBrkName(key, D.champ))} win the ${C.name}.`, 'd');
+  else wLog(`The ${C.K.rounds[D.round - 1].toLowerCase()}s are in. ${C.K.rounds[D.round]}: ${wBrkName(key, wBrkMine(key))}.`, 'g');
+  wSave();
+  return true;
+}
+// the bracket, a column a round
+function wBrkBracket(key) {
+  const C = W_BRACKETS[key], D = wBrk(key);
+  const cell = (r, a, b) => {
+    const g = wBrkGame(key, r, a, b), mark = g ? C.mark(g) : '';
+    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wBrkTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${g && g.w === id ? mark : ''}</b></li>`;
+    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
+  };
+  return `<div class="wdcb">${C.K.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wBrkPairs(key, Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
+    ${D[C.store].some(R => R.some(g => C.mark(g))) ? `<p class="hint">${C.hint}</p>` : ''}`;
+}
 /* w46: the Cinder Cup, and league fixtures at the Ash Bowl on the gridiron (issue #9, phase 7).
    The Cinder Cup is football's own cup, as the Diamond Cup (w20e) is baseball's: every week at the Ash Bowl (ask
    Clinker Dunn about the CINDER cup, or use the button on the Seven tab or the game card). Eight sevens in a bracket:
@@ -39386,41 +39476,24 @@ const W_GCUP = {
 };
 const W_GFIX = { bowl: 'g_bowl', tier: 2 };
 
-function wGcup() { return (WG && WG.gcup) || null; }
-function wGcupOn() { const D = wGcup(); return !!(D && !D.done); }
-function wGcupName(id) { return id === 'me' ? 'your seven' : wBallName(id); }
-function wGcupTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wGcupPairs(r) {
-  const D = wGcup(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.games[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wGcupGame(r, a, b) { return ((wGcup().games[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wGcupMine() { const D = wGcup(); if (!D || D.out || D.done) return null; const p = wGcupPairs(D.round).find(x => x.includes('me')); return p && !wGcupGame(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.gcup = { K: W_GCUP, name: 'Cinder Cup', me: 'your seven', store: 'games', view: 'gridiron', verb: 'held', busy: 'Finish the football game you started first.',
+  live: () => wGridLive(), base: () => wGridProblems(), sim: (a, b, tier) => wGcupSim(a, b, tier), won: () => wGcupWon(),
+  mark: g => g.yd ? '*' : '', hint: '* Tied after Sudden Death: through on yards from scrimmage.' };
+function wGcup() { return wBrk('gcup'); }
+function wGcupOn() { return wBrkOn('gcup'); }
+function wGcupName(id) { return wBrkName('gcup', id); }
+function wGcupTeamName(id) { return wBrkTeamName(id); }
+function wGcupPairs(r) { return wBrkPairs('gcup', r); }
+function wGcupGame(r, a, b) { return wBrkGame('gcup', r, a, b); }
+function wGcupMine() { return wBrkMine('gcup'); }
+function wGcupProblems() { return wBrkProblems('gcup'); }
+function wGcupEnter() { return wBrkEnter('gcup'); }
+function wGcupCatchUp() { return wBrkCatchUp('gcup'); }
+function wGcupBracket() { return wBrkBracket('gcup'); }
+
 const wGcupLive = () => wGridLive() && WG.gfg.live.world.kind === 'gcup';
 
-function wGcupProblems() {
-  const D = wGcup(), out = wGridProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Cinder Cup is held once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_GCUP.fee) out.push(`The entry fee is ${W_GCUP.fee} gold, and you have ${RUN.gold}.`);
-  if (wGridLive()) out.push('Finish the football game you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wGcupEnter() {
-  const probs = wGcupProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_GCUP.size - 1));
-  RUN.gold -= W_GCUP.fee;
-  WG.gcup = { week: wWeek(), field: ['me'].concat(others), round: 0, games: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Cinder Cup (${W_GCUP.fee} gold). ${W_GCUP.rounds[0]}: ${wGcupName(wGcupMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wGcupPlay(how) {
   const D = wGcup(), opp = wGcupMine(); if (!opp) return '';
   return wStartGrid({ club: opp, how, tier: W_GCUP.tiers[D.round], kind: 'gcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -39451,22 +39524,6 @@ function wGcupSim(a, b, tier) {
   const s = wGridSimClubs(a, b, tier);
   return { a, b, ra: s.ra, rb: s.rb, ya: s.ya, yb: s.yb, w: wGcupWinner(a, b, s.ra, s.rb, s.ya, s.yb), yd: s.ra === s.rb };
 }
-// the rest of the round: every game without a result; then the next round, and on to the final if you are out
-function wGcupCatchUp() {
-  const D = wGcup(); if (!D || !D.pending || wGridLive() || UI.view === 'gridiron') return false;
-  for (;;) {
-    for (const [a, b] of wGcupPairs(D.round)) if (!wGcupGame(D.round, a, b)) D.games[D.round].push(wGcupSim(a, b, W_GCUP.tiers[D.round]));
-    if (D.round === W_GCUP.rounds.length - 1) { D.done = true; D.champ = D.games[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wGcupWon();
-  else if (D.done) wLog(`${wCap(wGcupName(D.champ))} win the Cinder Cup.`, 'd');
-  else wLog(`The ${W_GCUP.rounds[D.round - 1].toLowerCase()}s are in. ${W_GCUP.rounds[D.round]}: ${wGcupName(wGcupMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wGcupWon() {
   const P = W_GCUP.prize, D = wGcup(), f = D.games[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -39479,16 +39536,6 @@ function wGcupWon() {
 }
 
 /* ---------- the card: entry, the bracket, your next game ---------- */
-function wGcupBracket() {
-  const D = wGcup();
-  const cell = (r, a, b) => {
-    const g = wGcupGame(r, a, b), tie = g && g.yd;
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wGcupTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${tie && g.w === id ? '*' : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_GCUP.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wGcupPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.games.some(R => R.some(g => g.yd)) ? '<p class="hint">* Tied after Sudden Death: through on yards from scrimmage.</p>' : ''}`;
-}
 function wOpenGcup(msg) {
   if (LAB || !WG) return;
   wGcupCatchUp();
@@ -41126,41 +41173,24 @@ const W_BCUP = {
 };
 const W_BFIX = { ring: 'g_ring', tier: 2 };
 
-function wBcup() { return (WG && WG.bcup) || null; }
-function wBcupOn() { const D = wBcup(); return !!(D && !D.done); }
-function wBcupName(id) { return id === 'me' ? 'your team' : wBallName(id); }
-function wBcupTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wBcupPairs(r) {
-  const D = wBcup(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.cards[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wBcupCard(r, a, b) { return ((wBcup().cards[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wBcupMine() { const D = wBcup(); if (!D || D.out || D.done) return null; const p = wBcupPairs(D.round).find(x => x.includes('me')); return p && !wBcupCard(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.bcup = { K: W_BCUP, name: 'Anvil Belt', me: 'your team', store: 'cards', view: 'ring', verb: 'boxed', busy: 'Finish the card you started first.',
+  live: () => wRingLive(), base: () => wRingProblems(), sim: (a, b, tier) => wBcupSim(a, b, tier), won: () => wBcupWon(),
+  mark: g => g.toss ? '*' : '', hint: '* A drawn card: through on the toss of a coin.' };
+function wBcup() { return wBrk('bcup'); }
+function wBcupOn() { return wBrkOn('bcup'); }
+function wBcupName(id) { return wBrkName('bcup', id); }
+function wBcupTeamName(id) { return wBrkTeamName(id); }
+function wBcupPairs(r) { return wBrkPairs('bcup', r); }
+function wBcupCard(r, a, b) { return wBrkGame('bcup', r, a, b); }
+function wBcupMine() { return wBrkMine('bcup'); }
+function wBcupProblems() { return wBrkProblems('bcup'); }
+function wBcupEnter() { return wBrkEnter('bcup'); }
+function wBcupCatchUp() { return wBrkCatchUp('bcup'); }
+function wBcupBracket() { return wBrkBracket('bcup'); }
+
 const wBcupLive = () => wRingLive() && WG.bxg.live.world.kind === 'bcup';
 
-function wBcupProblems() {
-  const D = wBcup(), out = wRingProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Anvil Belt is boxed once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_BCUP.fee) out.push(`The entry fee is ${W_BCUP.fee} gold, and you have ${RUN.gold}.`);
-  if (wRingLive()) out.push('Finish the card you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wBcupEnter() {
-  const probs = wBcupProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_BCUP.size - 1));
-  RUN.gold -= W_BCUP.fee;
-  WG.bcup = { week: wWeek(), field: ['me'].concat(others), round: 0, cards: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Anvil Belt (${W_BCUP.fee} gold). ${W_BCUP.rounds[0]}: ${wBcupName(wBcupMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wBcupPlay(how) {
   const D = wBcup(), opp = wBcupMine(); if (!opp) return '';
   return wStartRing({ club: opp, how, tier: W_BCUP.tiers[D.round], kind: 'bcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -41189,22 +41219,6 @@ function wBcupSim(a, b, tier) {
   const s = wRingSimClubs(a, b, tier);
   return { a, b, ra: s.ra, rb: s.rb, w: wBcupWinner(a, b, s.result), toss: s.result.win == null };
 }
-// the rest of the round: every card without a result; then the next round, and on to the final if you are out
-function wBcupCatchUp() {
-  const D = wBcup(); if (!D || !D.pending || wRingLive() || UI.view === 'ring') return false;
-  for (;;) {
-    for (const [a, b] of wBcupPairs(D.round)) if (!wBcupCard(D.round, a, b)) D.cards[D.round].push(wBcupSim(a, b, W_BCUP.tiers[D.round]));
-    if (D.round === W_BCUP.rounds.length - 1) { D.done = true; D.champ = D.cards[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wBcupWon();
-  else if (D.done) wLog(`${wCap(wBcupName(D.champ))} win the Anvil Belt.`, 'd');
-  else wLog(`The ${W_BCUP.rounds[D.round - 1].toLowerCase()}s are in. ${W_BCUP.rounds[D.round]}: ${wBcupName(wBcupMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wBcupWon() {
   const P = W_BCUP.prize, D = wBcup(), f = D.cards[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -41217,16 +41231,6 @@ function wBcupWon() {
 }
 
 /* ---------- the Belt's card: entry, the bracket, your next card ---------- */
-function wBcupBracket() {
-  const D = wBcup();
-  const cell = (r, a, b) => {
-    const g = wBcupCard(r, a, b), toss = g && g.toss;
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wBcupTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${toss && g.w === id ? '*' : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_BCUP.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wBcupPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.cards.some(R => R.some(g => g.toss)) ? '<p class="hint">* A drawn card: through on the toss of a coin.</p>' : ''}`;
-}
 function wOpenBcup(msg) {
   if (LAB || !WG) return;
   wBcupCatchUp();
@@ -45292,41 +45296,24 @@ const W_NET = {
 };
 const W_BKFIX = { court: 'g_court', tier: 2 };
 
-function wNet() { return (WG && WG.bkcup) || null; }
-function wNetOn() { const D = wNet(); return !!(D && !D.done); }
-function wNetName(id) { return id === 'me' ? 'your five' : wBallName(id); }
-function wNetTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wNetPairs(r) {
-  const D = wNet(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.games[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wNetGame(r, a, b) { return ((wNet().games[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wNetMine() { const D = wNet(); if (!D || D.out || D.done) return null; const p = wNetPairs(D.round).find(x => x.includes('me')); return p && !wNetGame(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.bkcup = { K: W_NET, name: 'Charter Net', me: 'your five', store: 'games', view: 'court', verb: 'held', busy: 'Finish the basketball game you started first.',
+  live: () => wCourtLive(), base: () => wCourtProblems(), sim: (a, b, tier) => wNetSim(a, b, tier), won: () => wNetWon(),
+  mark: g => g.tb ? '*' : '', hint: '* Level after three overtimes: through on rebounds.' };
+function wNet() { return wBrk('bkcup'); }
+function wNetOn() { return wBrkOn('bkcup'); }
+function wNetName(id) { return wBrkName('bkcup', id); }
+function wNetTeamName(id) { return wBrkTeamName(id); }
+function wNetPairs(r) { return wBrkPairs('bkcup', r); }
+function wNetGame(r, a, b) { return wBrkGame('bkcup', r, a, b); }
+function wNetMine() { return wBrkMine('bkcup'); }
+function wNetProblems() { return wBrkProblems('bkcup'); }
+function wNetEnter() { return wBrkEnter('bkcup'); }
+function wNetCatchUp() { return wBrkCatchUp('bkcup'); }
+function wNetBracket() { return wBrkBracket('bkcup'); }
+
 const wNetLive = () => wCourtLive() && WG.bkg.live.world.kind === 'bkcup';
 
-function wNetProblems() {
-  const D = wNet(), out = wCourtProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Charter Net is held once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_NET.fee) out.push(`The entry fee is ${W_NET.fee} gold, and you have ${RUN.gold}.`);
-  if (wCourtLive()) out.push('Finish the basketball game you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wNetEnter() {
-  const probs = wNetProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_NET.size - 1));
-  RUN.gold -= W_NET.fee;
-  WG.bkcup = { week: wWeek(), field: ['me'].concat(others), round: 0, games: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Charter Net (${W_NET.fee} gold). ${W_NET.rounds[0]}: ${wNetName(wNetMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wNetPlay(how) {
   const D = wNet(), opp = wNetMine(); if (!opp) return '';
   return wStartCourt({ club: opp, how, tier: W_NET.tiers[D.round], kind: 'bkcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -45359,22 +45346,6 @@ function wNetSim(a, b, tier) {
   const s = wCourtSimClubs(a, b, tier);
   return { a, b, ra: s.ra, rb: s.rb, ba: s.ba, bb: s.bb, w: wNetWinner(a, b, s.ra, s.rb, s.ba, s.bb), tb: s.ra === s.rb };
 }
-// the rest of the round: every game without a result; then the next round, and on to the final if you are out
-function wNetCatchUp() {
-  const D = wNet(); if (!D || !D.pending || wCourtLive() || UI.view === 'court') return false;
-  for (;;) {
-    for (const [a, b] of wNetPairs(D.round)) if (!wNetGame(D.round, a, b)) D.games[D.round].push(wNetSim(a, b, W_NET.tiers[D.round]));
-    if (D.round === W_NET.rounds.length - 1) { D.done = true; D.champ = D.games[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wNetWon();
-  else if (D.done) wLog(`${wCap(wNetName(D.champ))} win the Charter Net.`, 'd');
-  else wLog(`The ${W_NET.rounds[D.round - 1].toLowerCase()}s are in. ${W_NET.rounds[D.round]}: ${wNetName(wNetMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wNetWon() {
   const P = W_NET.prize, D = wNet(), f = D.games[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -45392,16 +45363,6 @@ function wNetWon() {
 }
 
 /* ---------- the card: entry, the bracket, your next game ---------- */
-function wNetBracket() {
-  const D = wNet();
-  const cell = (r, a, b) => {
-    const g = wNetGame(r, a, b), tie = g && g.tb;
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wNetTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${tie && g.w === id ? '*' : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_NET.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wNetPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.games.some(R => R.some(g => g.tb)) ? '<p class="hint">* Level after three overtimes: through on rebounds.</p>' : ''}`;
-}
 function wOpenNet(msg) {
   if (LAB || !WG) return;
   wNetCatchUp();
@@ -46906,41 +46867,24 @@ const W_KETTLE = {
 };
 const W_HKFIX = { rink: 'g_rink', tier: 2 };
 
-function wKettle() { return (WG && WG.hkcup) || null; }
-function wKettleOn() { const D = wKettle(); return !!(D && !D.done); }
-function wKettleName(id) { return id === 'me' ? 'your six' : wBallName(id); }
-function wKettleTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wKettlePairs(r) {
-  const D = wKettle(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.games[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wKettleGame(r, a, b) { return ((wKettle().games[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wKettleMine() { const D = wKettle(); if (!D || D.out || D.done) return null; const p = wKettlePairs(D.round).find(x => x.includes('me')); return p && !wKettleGame(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.hkcup = { K: W_KETTLE, name: 'Pond Kettle', me: 'your six', store: 'games', view: 'rink', verb: 'held', busy: 'Finish the hockey game you started first.',
+  live: () => wRinkLive(), base: () => wRinkProblems(), sim: (a, b, tier) => wKettleSim(a, b, tier), won: () => wKettleWon(),
+  mark: g => g.end === 'so' ? '*' : g.end === 'ot' ? '†' : '', hint: '† Won in sudden death. * Won in a shootout.' };
+function wKettle() { return wBrk('hkcup'); }
+function wKettleOn() { return wBrkOn('hkcup'); }
+function wKettleName(id) { return wBrkName('hkcup', id); }
+function wKettleTeamName(id) { return wBrkTeamName(id); }
+function wKettlePairs(r) { return wBrkPairs('hkcup', r); }
+function wKettleGame(r, a, b) { return wBrkGame('hkcup', r, a, b); }
+function wKettleMine() { return wBrkMine('hkcup'); }
+function wKettleProblems() { return wBrkProblems('hkcup'); }
+function wKettleEnter() { return wBrkEnter('hkcup'); }
+function wKettleCatchUp() { return wBrkCatchUp('hkcup'); }
+function wKettleBracket() { return wBrkBracket('hkcup'); }
+
 const wKettleLive = () => wRinkLive() && WG.hkg.live.world.kind === 'hkcup';
 
-function wKettleProblems() {
-  const D = wKettle(), out = wRinkProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Pond Kettle is held once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_KETTLE.fee) out.push(`The entry fee is ${W_KETTLE.fee} gold, and you have ${RUN.gold}.`);
-  if (wRinkLive()) out.push('Finish the hockey game you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wKettleEnter() {
-  const probs = wKettleProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_KETTLE.size - 1));
-  RUN.gold -= W_KETTLE.fee;
-  WG.hkcup = { week: wWeek(), field: ['me'].concat(others), round: 0, games: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Pond Kettle (${W_KETTLE.fee} gold). ${W_KETTLE.rounds[0]}: ${wKettleName(wKettleMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wKettlePlay(how) {
   const D = wKettle(), opp = wKettleMine(); if (!opp) return '';
   return wStartRink({ club: opp, how, tier: W_KETTLE.tiers[D.round], kind: 'hkcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -46966,22 +46910,6 @@ function wRinkSimClubs(a, b, tier) {
   return { ra: s.score[0], rb: s.score[1], w: s.win === 0 ? a : b, end: s.so ? 'so' : s.ot ? 'ot' : '' };
 }
 function wKettleSim(a, b, tier) { const s = wRinkSimClubs(a, b, tier); return { a, b, ra: s.ra, rb: s.rb, w: s.w, end: s.end }; }
-// the rest of the round: every game without a result; then the next round, and on to the final if you are out
-function wKettleCatchUp() {
-  const D = wKettle(); if (!D || !D.pending || wRinkLive() || UI.view === 'rink') return false;
-  for (;;) {
-    for (const [a, b] of wKettlePairs(D.round)) if (!wKettleGame(D.round, a, b)) D.games[D.round].push(wKettleSim(a, b, W_KETTLE.tiers[D.round]));
-    if (D.round === W_KETTLE.rounds.length - 1) { D.done = true; D.champ = D.games[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wKettleWon();
-  else if (D.done) wLog(`${wCap(wKettleName(D.champ))} win the Pond Kettle.`, 'd');
-  else wLog(`The ${W_KETTLE.rounds[D.round - 1].toLowerCase()}s are in. ${W_KETTLE.rounds[D.round]}: ${wKettleName(wKettleMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wKettleWon() {
   const P = W_KETTLE.prize, D = wKettle(), f = D.games[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -46999,16 +46927,6 @@ function wKettleWon() {
 }
 
 /* ---------- the card: entry, the bracket, your next game ---------- */
-function wKettleBracket() {
-  const D = wKettle();
-  const cell = (r, a, b) => {
-    const g = wKettleGame(r, a, b), mark = g && g.end === 'so' ? '*' : g && g.end === 'ot' ? '†' : '';
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wKettleTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${g && g.w === id ? mark : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_KETTLE.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wKettlePairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.games.some(R => R.some(g => g.end)) ? '<p class="hint">† Won in sudden death. * Won in a shootout.</p>' : ''}`;
-}
 function wOpenKettle(msg) {
   if (LAB || !WG) return;
   wKettleCatchUp();

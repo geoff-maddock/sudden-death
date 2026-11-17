@@ -14,7 +14,7 @@ function bkSnapHook(ph) {
 }
 function bkResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
-  bkSeed(null);
+  engSeed(null);
   G = s.G; L = s.L;
   // (a save point from before powers, gear and potions: none of them, so play goes on as it was)
   if (!G.mana) Object.assign(G, { powers: false, mana: [0, 0], spirit: [0, 0], zones: [], ultUsed: [false, false], sitUsed: [{}, {}], kept: [{}, {}] });

@@ -18,7 +18,7 @@ let GD = null;
 
 function gfStart(opts) {
   const o = opts || {}, T = o.teams || [];
-  gfSeed(o.seed);
+  engSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];

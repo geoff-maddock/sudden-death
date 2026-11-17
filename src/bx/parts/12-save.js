@@ -9,7 +9,7 @@ function bxSnapshot() {
 function bxResume(sn) {
   const s = JSON.parse(JSON.stringify(sn));
   G = s.G; CD = s.CD || null; BD = Object.assign({ acc: 0, headless: false }, s.BD); BXE = [];
-  bxSeed(null); bxInputClear();
+  engSeed(null); bxInputClear();
   return G;
 }
 function bxSnapNow() {
