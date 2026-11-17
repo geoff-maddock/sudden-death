@@ -102,7 +102,7 @@ function glFlight(s) {
       // on the green it rolls as a putt does, with whatever speed is left
       const v = Math.sqrt(2 * GL_PUTT.fric * budget);
       const P = glPutt({ hole: H, from: { x, y }, a: rdir, v });
-      return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, { x, y }) : {});
+      return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, P.end) : {});
     }
     const f = GL_ROLLF[here];
     if (!f) break;
@@ -117,9 +117,13 @@ function glWaterDrop(H, from, wet) {
   const d = hyp(wet.x - from.x, wet.y - from.y), ux = (wet.x - from.x) / (d || 1), uy = (wet.y - from.y) / (d || 1);
   let t = d;
   while (t > 0 && glLie(H, from.x + ux * t, from.y + uy * t) === 'W') t -= 1;
+  // three yards back from the edge, or the edge itself if that would be in more water (a ball by the green drops by
+  // the green, even on it); only with no dry ground on the line at all does it go back where it was hit
+  const t0 = t;
   t = Math.max(0, t - 3);
   let x = from.x + ux * t, y = from.y + uy * t, lie = glLie(H, x, y);
-  if (lie === 'W' || lie === 'G') { x = from.x; y = from.y; lie = glLie(H, x, y); if (lie === 'T') lie = 'F'; }
+  if (lie === 'W') { x = from.x + ux * t0; y = from.y + uy * t0; lie = glLie(H, x, y); }
+  if (lie === 'W') { x = from.x; y = from.y; lie = glLie(H, x, y); if (lie === 'T') lie = 'F'; }
   return { end: { x, y }, lie: lie === 'T' ? 'r' : lie, drop: true };
 }
 

@@ -108,6 +108,9 @@ async def main():
           let worst = 0; for (let s = 1; s < 400; s++) { const P = wGL.built(s * 7919, 5); let L = 0; for (let i = 0; i < P.path.length - 1; i++) L += Math.hypot(P.path[i + 1].x - P.path[i].x, P.path[i + 1].y - P.path[i].y); worst = Math.max(worst, L - P.len); }
           return { sand, want: Math.round(want), got, worst }; })()""")
         check(rv['sand'] == 'we' and abs(rv['want'] - rv['got']) <= 1 and rv['worst'] < 1, 'the caddie takes the wedge out of sand; a scrambler\'s carry from deep rough is the one planned; a par 5 is as long as its card says', rv)
+        wd = await pg.evaluate("""(() => { const H = __flat((x, y) => y > 414 && y < 440 ? 'W' : 'F'), r = __shot(H, { lie: 'F', club: 'si', aim: { x: 100, y: 395 }, from: { x: 100, y: 280 }, pow: 1.02 });
+          return { water: r.water, y: Math.round(r.end.y), lie: r.lie }; })()""")
+        check(wd['water'] and wd['y'] > 400 and wd['lie'] != 'W', 'a ball that runs across the green into the water is dropped by where it went in, past the green', wd)
         kp = await pg.evaluate("""(() => { wGL.start({ seed: 21 }); for (let i = 0; i < 6; i++) wGL.turn(); const before = JSON.stringify(wGL.G);
           const r = wGL.simGame({ seed: 4 }); return { same: before === JSON.stringify(wGL.G), sim: r.played > 0 }; })()""")
         check(kp['same'] and kp['sim'], 'a headless game leaves the game on the course as it was', kp)

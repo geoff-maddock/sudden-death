@@ -97,7 +97,11 @@ function glFire(s, plan, r) {
 function glAnimDone() {
   const ev = GD.last, end = ev && ev.res != null;
   if (!end) glDispSync();
-  else { GD.disp.balls = GD.disp.balls.map(b => Object.assign({}, b)); }
+  else {
+    // the hole is over and G has moved to the next tee: the ball just played stays where it finished
+    const A = GD.anim, H = GD.disp.hole, last = A.drop || (A.holed ? H.pin : A.run.length ? A.run[A.run.length - 1] : A.path[A.path.length - 1]);
+    if (last) GD.disp.balls[A.side] = Object.assign({}, GD.disp.balls[A.side], { x: last.x, y: last.y });
+  }
   glGo('rest', end ? GL_PACE.hole : GL_PACE.rest);
   if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
 }
@@ -154,7 +158,7 @@ function glClubsNow() {
   const H = glHoleNow(), b = G.ball[GD.you];
   if (b.lie === 'G') return ['pt'];
   const out = glClubsFrom(b.lie, glRat(GD.you, GD.sel ? GD.sel.ri : 0));
-  if (b.lie === 'F' && glPuttable(H, b)) out.push('pt');
+  if (glShotKind(H, GD.you) === 'putt') out.push('pt');
   return out;
 }
 // keep the choice legal and the aim inside the club's reach
@@ -168,7 +172,7 @@ function glSelFix() {
   const dx = S.aim.x - b.x, dy = S.aim.y - b.y, d = hyp(dx, dy) || 1;
   const max = S.putt ? 60 : glReach(S.club, b.lie, rat, 1).carry * (GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1);
   if (d > max) { S.aim = { x: b.x + dx / d * max, y: b.y + dy / d * max }; }
-  if (d < 1) S.aim = { x: b.x + dx / d, y: b.y + dy / d };
+  if (d < (S.putt ? 0.05 : 1)) { const m = S.putt ? 0.05 : 1; S.aim = { x: b.x + dx / d * m, y: b.y + dy / d * m }; }
   S.tick = glTickPow();
 }
 // the meter's tick: the power that lands a perfect swing on the aim point (a putt: the weight to roll there, flat)
@@ -256,7 +260,7 @@ function glMeterTick(dt) {
     if (M.p >= 1) { M.p = 1; M.dir = -1; } else if (M.p <= 0) { M.p = 0; M.dir = 1; }
     return;
   }
-  if (M.st === 'up') { M.p += dt / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; } }
+  if (M.st === 'up') { M.p += dt / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
   else if (M.st === 'down') { M.p -= dt / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p; glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri))); } }
 }
 // the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook)
@@ -297,4 +301,5 @@ function glSetMode(m) {
   GD.mode = m === 'play' ? 'play' : 'watch';
   // your shot waiting, or their putt to give, goes back to the top: in Watch the CPU takes it
   if (GD.ph === 'aim' || GD.ph === 'offer' || (GD.ph === 'swing' && GD.mode !== 'play')) { GD.sel = null; GD.meter = null; glGo('next'); }
+  else if (GD.ph === 'addr' && GD.cpu && glYours(GD.cpu.side)) { GD.cpu = null; glGo('next'); }
 }

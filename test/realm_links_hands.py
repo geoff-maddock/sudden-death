@@ -152,6 +152,42 @@ async def main():
           wLinksCard(); const t = document.querySelector('#wLinksCard table'); return { cols: t.rows[0].cells.length - 1, live: [...t.rows[2].cells].pop().textContent }; })()""")
         check(po == {'cols': 4, 'live': '2'}, 'a playoff hole has its column on the scorecard, with the strokes so far', po)
 
+        # (from the second review of #93)
+        r2 = await pg.evaluate("""(() => { const out = {};
+          // the ball that ends a hole stays in the cup through the rest beat
+          __mine(81); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x, y: H.pin.y - 1.2, lie: 'G' }; G.ball[1] = { x: H.pin.x + 1, y: H.pin.y, lie: 'G' }; G.hole.st = [3, 5]; G.hole.done[1] = false;
+          wGL.setMode('play'); __to('aim'); wGL.aimAt(H.pin.x, H.pin.y); const sel = wGL.view.sel; wGL.drag(sel.tick, 0); let holed = wGL.view.last.holed, n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05);
+          out.end = { holed, ph: wGL.phase, res: wGL.view.last.res, drawnAway: (() => { const c = wGL.cam(); return wGL.G.h; })() };
+          // the putter is not offered from far out on the fairway
+          __mine(82); G.ball = wGL.G.ball; const H2 = wGL.course(0); const p = H2.line.find(q => wGL.lie(H2, q.x, q.y) === 'F' && Math.hypot(q.x - H2.pin.x, q.y - H2.pin.y) > 60);
+          wGL.G.ball[0] = { x: p.x, y: p.y, lie: 'F' }; wGL.G.hole.st = [1, 1]; wGL.G.ball[1] = { x: H2.tee.x, y: H2.tee.y, lie: 'F' }; wGL.setMode('play'); __to('aim'); out.farClubs = wGL.view.clubs;
+          // a 2-foot putt's aim stays on the cup
+          __mine(83); const H3 = wGL.course(0); wGL.G.ball[0] = { x: H3.pin.x - .6, y: H3.pin.y, lie: 'G' }; wGL.G.ball[1] = { x: H3.tee.x, y: H3.tee.y, lie: 'T' }; wGL.G.hole.st = [2, 0]; wGL.setMode('play'); __to('aim');
+          const a = wGL.view.sel.aim; out.shortAim = Math.hypot(a.x - H3.pin.x, a.y - H3.pin.y);
+          // You play during your side's address: the shot is yours
+          wLinksGame({ seed: 84, mode: 'watch' }); wGL.pause(true); __to('addr'); const side = wGL.view.cpu.side; wGL.setMode('play'); wGL.tick(0.05); out.addr = { side, ph: wGL.phase };
+          // the meter turning at the top is heard
+          __mine(85); let picks = 0; const was = wGL.onPick; wGL.onPick = () => { picks++; was && was(); }; wGL.press(); wGL.tick(1.2); out.turn = { st: wGL.view.meter.st, picks }; wGL.onPick = was;
+          return out; })()""")
+        check(r2['end']['holed'] and r2['end']['res'] == 0 and r2['end']['ph'] == 'rest', 'the putt that wins the hole drops, and the rest beat follows', r2['end'])
+        dball = await pg.evaluate("(() => { const H = wGL.course(0), b = wGL.animBall(); return { anim: b, ph: wGL.phase }; })()")
+        check('pt' not in r2['farClubs'] and len(r2['farClubs']) > 2, 'the putter is not offered from far out on the fairway', r2['farClubs'])
+        check(r2['shortAim'] < 0.01, 'a 2-foot putt is aimed at the cup, not past it', r2['shortAim'])
+        check(r2['addr']['ph'] == 'aim' if r2['addr']['side'] == 0 else r2['addr']['ph'] in ('addr', 'fly'), 'switching to You play while your ball is addressed gives you the shot', r2['addr'])
+        check(r2['turn'] == {'st': 'down', 'picks': 1}, 'when the meter turns at the top by itself the rows hear it (the button says Mark)', r2['turn'])
+        # the drawn ball after the holing putt: the hole on show keeps it in the cup (not back where it was struck)
+        cup = await pg.evaluate("""(() => { __mine(86); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x, y: H.pin.y - 1.2, lie: 'G' }; G.ball[1] = { x: H.pin.x + 1, y: H.pin.y, lie: 'G' }; G.hole.st = [3, 5];
+          wGL.setMode('play'); __to('aim'); wGL.aimAt(H.pin.x, H.pin.y); wGL.drag(wGL.view.sel.tick, 0); let n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05);
+          wGL.render(); const px = wGL.scr(H.pin.x, H.pin.y - 1.2), cv = document.querySelector('#v-links canvas'), d = cv.width / 960, x = cv.getContext('2d').getImageData(Math.round(px[0] * d), Math.round(px[1] * d), 1, 1).data;
+          return { holed: wGL.view.last.holed, ph: wGL.phase, white: x[0] > 235 && x[1] > 235 && x[2] > 225 }; })()""")
+        check(cup['holed'] and not cup['white'], 'after the hole is won, the holed ball is not drawn back where it was struck', cup)
+        # Space during their offer is the course's: it never presses the focused button
+        sp = await pg.evaluate("""(() => { __mine(87); wGL.pause(false); const set = () => { const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x + .2, y: H.pin.y, lie: 'G' }; G.ball[1] = { x: H.pin.x, y: H.pin.y - .5, lie: 'G' }; G.hole.st = [3, 3]; wGL.setMode('play'); __to('offer', 5); }; set();
+          const b = document.getElementById('wLinksAgain'); let clicked = 0; const f = () => clicked++; b.addEventListener('click', f); b.focus();
+          const e = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }); b.dispatchEvent(e); b.removeEventListener('click', f); wGL.pause(true);
+          return { ph: wGL.phase, prevented: e.defaultPrevented }; })()""")
+        check(sp['ph'] == 'offer' and sp['prevented'], 'Space during their offer is taken by the course, not the focused button', sp)
+
         # ---------- How to play, Settings, leaving ----------
         await pg.evaluate("wLinksGame({ seed: 61, mode: 'play' }); wGL.pause(false)")
         await pg.click('#wLinksHowBtn')

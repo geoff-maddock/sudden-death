@@ -34458,7 +34458,7 @@ function glFlight(s) {
       // on the green it rolls as a putt does, with whatever speed is left
       const v = Math.sqrt(2 * GL_PUTT.fric * budget);
       const P = glPutt({ hole: H, from: { x, y }, a: rdir, v });
-      return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, { x, y }) : {});
+      return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, P.end) : {});
     }
     const f = GL_ROLLF[here];
     if (!f) break;
@@ -34473,9 +34473,13 @@ function glWaterDrop(H, from, wet) {
   const d = hyp(wet.x - from.x, wet.y - from.y), ux = (wet.x - from.x) / (d || 1), uy = (wet.y - from.y) / (d || 1);
   let t = d;
   while (t > 0 && glLie(H, from.x + ux * t, from.y + uy * t) === 'W') t -= 1;
+  // three yards back from the edge, or the edge itself if that would be in more water (a ball by the green drops by
+  // the green, even on it); only with no dry ground on the line at all does it go back where it was hit
+  const t0 = t;
   t = Math.max(0, t - 3);
   let x = from.x + ux * t, y = from.y + uy * t, lie = glLie(H, x, y);
-  if (lie === 'W' || lie === 'G') { x = from.x; y = from.y; lie = glLie(H, x, y); if (lie === 'T') lie = 'F'; }
+  if (lie === 'W') { x = from.x + ux * t0; y = from.y + uy * t0; lie = glLie(H, x, y); }
+  if (lie === 'W') { x = from.x; y = from.y; lie = glLie(H, x, y); if (lie === 'T') lie = 'F'; }
   return { end: { x, y }, lie: lie === 'T' ? 'r' : lie, drop: true };
 }
 
@@ -34872,7 +34876,11 @@ function glFire(s, plan, r) {
 function glAnimDone() {
   const ev = GD.last, end = ev && ev.res != null;
   if (!end) glDispSync();
-  else { GD.disp.balls = GD.disp.balls.map(b => Object.assign({}, b)); }
+  else {
+    // the hole is over and G has moved to the next tee: the ball just played stays where it finished
+    const A = GD.anim, H = GD.disp.hole, last = A.drop || (A.holed ? H.pin : A.run.length ? A.run[A.run.length - 1] : A.path[A.path.length - 1]);
+    if (last) GD.disp.balls[A.side] = Object.assign({}, GD.disp.balls[A.side], { x: last.x, y: last.y });
+  }
   glGo('rest', end ? GL_PACE.hole : GL_PACE.rest);
   if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
 }
@@ -34929,7 +34937,7 @@ function glClubsNow() {
   const H = glHoleNow(), b = G.ball[GD.you];
   if (b.lie === 'G') return ['pt'];
   const out = glClubsFrom(b.lie, glRat(GD.you, GD.sel ? GD.sel.ri : 0));
-  if (b.lie === 'F' && glPuttable(H, b)) out.push('pt');
+  if (glShotKind(H, GD.you) === 'putt') out.push('pt');
   return out;
 }
 // keep the choice legal and the aim inside the club's reach
@@ -34943,7 +34951,7 @@ function glSelFix() {
   const dx = S.aim.x - b.x, dy = S.aim.y - b.y, d = hyp(dx, dy) || 1;
   const max = S.putt ? 60 : glReach(S.club, b.lie, rat, 1).carry * (GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1);
   if (d > max) { S.aim = { x: b.x + dx / d * max, y: b.y + dy / d * max }; }
-  if (d < 1) S.aim = { x: b.x + dx / d, y: b.y + dy / d };
+  if (d < (S.putt ? 0.05 : 1)) { const m = S.putt ? 0.05 : 1; S.aim = { x: b.x + dx / d * m, y: b.y + dy / d * m }; }
   S.tick = glTickPow();
 }
 // the meter's tick: the power that lands a perfect swing on the aim point (a putt: the weight to roll there, flat)
@@ -35031,7 +35039,7 @@ function glMeterTick(dt) {
     if (M.p >= 1) { M.p = 1; M.dir = -1; } else if (M.p <= 0) { M.p = 0; M.dir = 1; }
     return;
   }
-  if (M.st === 'up') { M.p += dt / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; } }
+  if (M.st === 'up') { M.p += dt / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
   else if (M.st === 'down') { M.p -= dt / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p; glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri))); } }
 }
 // the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook)
@@ -35072,6 +35080,7 @@ function glSetMode(m) {
   GD.mode = m === 'play' ? 'play' : 'watch';
   // your shot waiting, or their putt to give, goes back to the top: in Watch the CPU takes it
   if (GD.ph === 'aim' || GD.ph === 'offer' || (GD.ph === 'swing' && GD.mode !== 'play')) { GD.sel = null; GD.meter = null; glGo('next'); }
+  else if (GD.ph === 'addr' && GD.cpu && glYours(GD.cpu.side)) { GD.cpu = null; glGo('next'); }
 }
 /* Mossgate Links: the picture (issue #92, phase 2). The hole from above, played left to right: along the hole (its y)
    runs across the screen, across the hole (x) down it, so a ball that misses right of the aim goes down the screen.
@@ -35100,6 +35109,11 @@ function glGround(H) {
   // the fairway, mown in bands across the hole
   for (let row = 0; row < H.h; row++) { c.fillStyle = (row >> 1) % 2 ? C.F : C.F2; for (let i = 0; i < H.w; i++) if (H.grid[row][i] === 'F') { c.beginPath(); c.arc((row + 0.5) * cs * S, (i + 0.5) * cs * S, cs * S * 0.78, 0, Math.PI * 2); c.fill(); } }
   blob('T', C.T, 0.72);
+  // the green and its fringe, under the hazards: a bunker or a pond by the green is drawn as the ground has it
+  const g = H.green;
+  c.fillStyle = C.F; c.beginPath(); c.ellipse(g.y * S, g.x * S, (g.ry + 2.5) * S, (g.rx + 2.5) * S, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = C.G; c.beginPath(); c.ellipse(g.y * S, g.x * S, g.ry * S, g.rx * S, 0, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(40,70,20,.35)'; c.lineWidth = 1.5; c.stroke();
   blob('S', C.S, 0.78);
   blob('B', C.B, 0.8);
   // the bog's dark pools
@@ -35108,11 +35122,6 @@ function glGround(H) {
   blob('W', C.W, 0.8);
   c.strokeStyle = 'rgba(220,240,255,.35)'; c.lineWidth = 1;
   for (let row = 0; row < H.h; row++) for (let i = 0; i < H.w; i++) if (H.grid[row][i] === 'W' && q() < 0.35) { const x = (row + q()) * cs * S, y = (i + q()) * cs * S; c.beginPath(); c.moveTo(x - 4, y); c.quadraticCurveTo(x, y - 2, x + 4, y); c.stroke(); }
-  // the green, with its fringe
-  const g = H.green;
-  c.fillStyle = C.F; c.beginPath(); c.ellipse(g.y * S, g.x * S, (g.ry + 2.5) * S, (g.rx + 2.5) * S, 0, 0, Math.PI * 2); c.fill();
-  c.fillStyle = C.G; c.beginPath(); c.ellipse(g.y * S, g.x * S, g.ry * S, g.rx * S, 0, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(40,70,20,.35)'; c.lineWidth = 1.5; c.stroke();
   // the trees: a shadow, then a canopy of a few greens
   const trees = [];
   for (let row = 0; row < H.h; row++) for (let i = 0; i < H.w; i++) if (H.grid[row][i] === 'O') trees.push([(row + 0.3 + q() * 0.4) * cs * S, (i + 0.3 + q() * 0.4) * cs * S, cs * S * (0.62 + q() * 0.35), q()]);
@@ -35178,6 +35187,10 @@ function glDrawGreen(c, H) {
   c.fillStyle = C.F; c.beginPath(); c.ellipse(x, y, (g.ry + 2.5) * k, (g.rx + 2.5) * k, 0, 0, Math.PI * 2); c.fill();
   c.fillStyle = C.G; c.beginPath(); c.ellipse(x, y, g.ry * k, g.rx * k, 0, 0, Math.PI * 2); c.fill();
   c.strokeStyle = 'rgba(40,70,20,.35)'; c.lineWidth = 2; c.stroke();
+  // and the sand and water cells round it, over the fringe, as the ground has them
+  const cs = H.cell, r0 = Math.max(0, Math.floor((g.y - g.ry - 6) / cs)), r1 = Math.min(H.h - 1, Math.ceil((g.y + g.ry + 6) / cs)), c0 = Math.max(0, Math.floor((g.x - g.rx - 6) / cs)), c1 = Math.min(H.w - 1, Math.ceil((g.x + g.rx + 6) / cs));
+  for (let row = r0; row <= r1; row++) for (let i = c0; i <= c1; i++) { const ch = H.grid[row][i]; if (ch !== 'S' && ch !== 'W' && ch !== 'B') continue;
+    const [sx, sy] = glScr((i + 0.5) * cs, (row + 0.5) * cs); c.fillStyle = C[ch]; c.beginPath(); c.arc(sx, sy, cs * 0.78 * k, 0, Math.PI * 2); c.fill(); }
   c.restore();
 }
 // the green's grain: arrows downhill, drifting
@@ -35297,7 +35310,7 @@ function glDrawMeter(c) {
    touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
    In You play it hears the keys, only while the course is on screen (not under How to play) and it is your shot or your
    choice, in the capture phase so nothing else on the page takes them: Space swings (each press: start, power, the
-   mark; on a putt start, then the weight); the arrows aim (left and right turn it, up and down move the ring further
+   mark; on a putt start, then the weight; it is always the course's, so it never presses a focused button); the arrows aim (left and right turn it, up and down move the ring further
    or nearer); 1 to 4 pick the hitter; Q and E a longer or shorter club; Z the shape, X the height, C the spin; Y gives
    their putt and N makes them hole it.
    The mouse or a finger: a click or a drag on the course moves the aim; a drag that starts on your ball is a swing
@@ -35338,7 +35351,7 @@ function glKey(e) {
   if (!glKeyOk(e)) return;
   const k = e.key.toLowerCase(), S = GD.sel, putt = S && S.putt;
   let took = true;
-  if (k === ' ') { if (!glPress()) took = GD.ph === 'aim' || GD.ph === 'swing'; }
+  if (k === ' ') glPress();
   else if (GD.ph === 'offer' && (k === 'y' || k === 'n')) glOffer(k === 'y');
   else if (GD.ph !== 'aim') took = false;
   else if (k === 'arrowleft') glAimTurn(putt ? 0.6 : 1.5);
@@ -50278,7 +50291,7 @@ function wLinksRows() {
   $('wLinksClub').innerHTML = (aim ? V.clubs : [S.club]).map(c => `<button class="ghost${on(c, S.club)}" data-lclub="${c}" ${aim ? '' : 'disabled'} title="Q and E: a longer or a shorter club. ${esc(wGL.clubs[c].n)}${c === 'pt' ? '' : `: about ${Math.round(wGL.reach(c, G.ball[V.you].lie, G.teams[V.you].roster[S.ri].r, 1).carry)} yards carried from here`}">${esc(wGL.clubs[c].n)}</button>`).join(' ');
   $('wLinksRowShot').hidden = S.putt;
   const lie = G.ball[V.you].lie, punchOnly = lie === 'O';
-  $('wLinksShot').innerHTML = [['lshape', '', 'Straight'], ['lshape', 'draw', 'Draw', 'Swings left in the air and runs out more'], ['lshape', 'fade', 'Fade', 'Swings right in the air and stops sooner']].map(([k, v, n, t]) => `<button class="ghost${on(v, S.shape)}" data-${k}="${v}" ${aim ? '' : 'disabled'} title="Z: the shape. ${esc(t || 'No shape')}">${n}</button>`).join(' ') + ' · '
+  $('wLinksShot').innerHTML = [['lshape', '', 'Straight'], ['lshape', 'draw', 'Draw', 'Starts right and curves back to the ring, then runs out more'], ['lshape', 'fade', 'Fade', 'Starts left and curves back to the ring, then stops sooner']].map(([k, v, n, t]) => `<button class="ghost${on(v, S.shape)}" data-${k}="${v}" ${aim ? '' : 'disabled'} title="Z: the shape. ${esc(t || 'No shape')}">${n}</button>`).join(' ') + ' · '
     + [['', 'Normal'], ['punch', 'Punch', 'Low under the wind and the branches, and runs'], ['lob', 'Lob', 'High: drifts in the wind, and sits down where it lands']].map(([v, n, t]) => `<button class="ghost${on(v, S.traj)}" data-ltraj="${v}" ${aim && (!punchOnly || v === 'punch') ? '' : 'disabled'} title="X: the height. ${esc(punchOnly ? 'From the trees, only a punch' : t || 'A full shot')}">${n}</button>`).join(' ') + ' · '
     + [[-1, 'Backspin', 'Stops it sooner'], [0, 'No spin', ''], [1, 'Topspin', 'Runs it out']].map(([v, n, t]) => `<button class="ghost${on(v, S.spin)}" data-lspin="${v}" ${aim ? '' : 'disabled'} title="C: the spin. ${esc(t)}">${n}</button>`).join(' ');
   const M = V.meter, st = V.ph !== 'swing' || !M ? 'Start' : S.putt ? 'Weight' : M.st === 'up' ? 'Power' : 'Mark';
@@ -50380,7 +50393,7 @@ function wLinksHowHTML() {
   <p class="hint"><b>Match play.</b> Each hole goes to the side that holes out in fewer strokes, or is halved. The game is won once a side is more holes up than there are holes left ("3 and 2"), or "1 up" at the last. Level after the last hole, it goes to a playoff: the 1st again, then the 2nd, until a side wins a hole. A ball still out after par and ${R.cap} more is picked up. A golf game never ends level.</p>
   <p class="hint"><b>Giving a putt.</b> A side may give the other its next short putt: it counts as holed in one more stroke. Their short putts are yours to give or not (<b>Give it</b> or <b>Make them putt</b>; Y or N). Theirs are given by the CPU's caddie, by skill, and not always.</p>
   <p class="hint"><b>The swing.</b> Space three times: once to start, once at the top for the <b>power</b>, and once on the way back on the green <b>mark</b>. The gold tick is the power that lands a perfect swing on the ring. Past the end of the bar is a <b>power shot</b>: longer, and the mark is smaller. On the mark the ball flies nearly straight. Early, it hooks left; late, it slices right, by how far you missed. Miss the mark altogether and the swing goes off at the bottom, very late. A more accurate player has a wider mark. On a phone, drag back from your ball away from the target and let go: how far you pull is the power, and a pull off the line hooks or slices it.</p>
-  <p class="hint"><b>Aiming.</b> The ring is where a perfect swing at the tick lands, without the wind. Click or drag on the course to move it, or the arrows: left and right turn it, up and down move it further or nearer. Pick the club (Q and E), the hitter (1 to 4), the shape (Z: a <b>draw</b> swings left and runs out, a <b>fade</b> swings right and stops sooner), the height (X: a <b>punch</b> flies low under the wind and runs, a <b>lob</b> climbs and sits down where it lands) and the spin (C: <b>backspin</b> stops it sooner, <b>topspin</b> runs it out).</p>
+  <p class="hint"><b>Aiming.</b> The ring is where a perfect swing at the tick lands, without the wind. Click or drag on the course to move it, or the arrows: left and right turn it, up and down move it further or nearer. Pick the club (Q and E), the hitter (1 to 4), the shape (Z: a <b>draw</b> starts right and curves back to the ring, then runs out more; a <b>fade</b> starts left, curves back and stops sooner), the height (X: a <b>punch</b> flies low under the wind and runs, a <b>lob</b> climbs and sits down where it lands) and the spin (C: <b>backspin</b> stops it sooner, <b>topspin</b> runs it out).</p>
   <p class="hint"><b>The wind</b> blows a strength and a way for each hole, shown on the arrow at the top right. It moves a high ball far more than a low one, and a headwind costs more than a tailwind gives.</p>
   <p class="hint"><b>The lie.</b> The driver is for the tee only. The rough costs distance and the ball runs (no spin), deep rough more. Sand takes the wedge: anything else barely moves it. A ball in the moss bog plugs and comes out short. In the trees it lies on a root, and only a punch will do. The water is a drop on the line, back where it went in, and a stroke.</p>
   <p class="hint"><b>The green.</b> A putt is two presses: start, then stop the bar at the weight (the gold tick rolls it to your aim on a flat green). The green slopes: the grain arrows drift downhill, and the <b>read line</b> shows the first few yards of your putt as you would strike it now, longer for a better putter, so you can see the break and aim off for it. Too fast and it lips out or runs past; short never drops.</p>

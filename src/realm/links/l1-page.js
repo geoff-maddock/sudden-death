@@ -3,7 +3,7 @@
    touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
    In You play it hears the keys, only while the course is on screen (not under How to play) and it is your shot or your
    choice, in the capture phase so nothing else on the page takes them: Space swings (each press: start, power, the
-   mark; on a putt start, then the weight); the arrows aim (left and right turn it, up and down move the ring further
+   mark; on a putt start, then the weight; it is always the course's, so it never presses a focused button); the arrows aim (left and right turn it, up and down move the ring further
    or nearer); 1 to 4 pick the hitter; Q and E a longer or shorter club; Z the shape, X the height, C the spin; Y gives
    their putt and N makes them hole it.
    The mouse or a finger: a click or a drag on the course moves the aim; a drag that starts on your ball is a swing
@@ -44,7 +44,7 @@ function glKey(e) {
   if (!glKeyOk(e)) return;
   const k = e.key.toLowerCase(), S = GD.sel, putt = S && S.putt;
   let took = true;
-  if (k === ' ') { if (!glPress()) took = GD.ph === 'aim' || GD.ph === 'swing'; }
+  if (k === ' ') glPress();
   else if (GD.ph === 'offer' && (k === 'y' || k === 'n')) glOffer(k === 'y');
   else if (GD.ph !== 'aim') took = false;
   else if (k === 'arrowleft') glAimTurn(putt ? 0.6 : 1.5);

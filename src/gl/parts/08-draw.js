@@ -25,6 +25,11 @@ function glGround(H) {
   // the fairway, mown in bands across the hole
   for (let row = 0; row < H.h; row++) { c.fillStyle = (row >> 1) % 2 ? C.F : C.F2; for (let i = 0; i < H.w; i++) if (H.grid[row][i] === 'F') { c.beginPath(); c.arc((row + 0.5) * cs * S, (i + 0.5) * cs * S, cs * S * 0.78, 0, Math.PI * 2); c.fill(); } }
   blob('T', C.T, 0.72);
+  // the green and its fringe, under the hazards: a bunker or a pond by the green is drawn as the ground has it
+  const g = H.green;
+  c.fillStyle = C.F; c.beginPath(); c.ellipse(g.y * S, g.x * S, (g.ry + 2.5) * S, (g.rx + 2.5) * S, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = C.G; c.beginPath(); c.ellipse(g.y * S, g.x * S, g.ry * S, g.rx * S, 0, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(40,70,20,.35)'; c.lineWidth = 1.5; c.stroke();
   blob('S', C.S, 0.78);
   blob('B', C.B, 0.8);
   // the bog's dark pools
@@ -33,11 +38,6 @@ function glGround(H) {
   blob('W', C.W, 0.8);
   c.strokeStyle = 'rgba(220,240,255,.35)'; c.lineWidth = 1;
   for (let row = 0; row < H.h; row++) for (let i = 0; i < H.w; i++) if (H.grid[row][i] === 'W' && q() < 0.35) { const x = (row + q()) * cs * S, y = (i + q()) * cs * S; c.beginPath(); c.moveTo(x - 4, y); c.quadraticCurveTo(x, y - 2, x + 4, y); c.stroke(); }
-  // the green, with its fringe
-  const g = H.green;
-  c.fillStyle = C.F; c.beginPath(); c.ellipse(g.y * S, g.x * S, (g.ry + 2.5) * S, (g.rx + 2.5) * S, 0, 0, Math.PI * 2); c.fill();
-  c.fillStyle = C.G; c.beginPath(); c.ellipse(g.y * S, g.x * S, g.ry * S, g.rx * S, 0, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(40,70,20,.35)'; c.lineWidth = 1.5; c.stroke();
   // the trees: a shadow, then a canopy of a few greens
   const trees = [];
   for (let row = 0; row < H.h; row++) for (let i = 0; i < H.w; i++) if (H.grid[row][i] === 'O') trees.push([(row + 0.3 + q() * 0.4) * cs * S, (i + 0.3 + q() * 0.4) * cs * S, cs * S * (0.62 + q() * 0.35), q()]);
@@ -103,6 +103,10 @@ function glDrawGreen(c, H) {
   c.fillStyle = C.F; c.beginPath(); c.ellipse(x, y, (g.ry + 2.5) * k, (g.rx + 2.5) * k, 0, 0, Math.PI * 2); c.fill();
   c.fillStyle = C.G; c.beginPath(); c.ellipse(x, y, g.ry * k, g.rx * k, 0, 0, Math.PI * 2); c.fill();
   c.strokeStyle = 'rgba(40,70,20,.35)'; c.lineWidth = 2; c.stroke();
+  // and the sand and water cells round it, over the fringe, as the ground has them
+  const cs = H.cell, r0 = Math.max(0, Math.floor((g.y - g.ry - 6) / cs)), r1 = Math.min(H.h - 1, Math.ceil((g.y + g.ry + 6) / cs)), c0 = Math.max(0, Math.floor((g.x - g.rx - 6) / cs)), c1 = Math.min(H.w - 1, Math.ceil((g.x + g.rx + 6) / cs));
+  for (let row = r0; row <= r1; row++) for (let i = c0; i <= c1; i++) { const ch = H.grid[row][i]; if (ch !== 'S' && ch !== 'W' && ch !== 'B') continue;
+    const [sx, sy] = glScr((i + 0.5) * cs, (row + 0.5) * cs); c.fillStyle = C[ch]; c.beginPath(); c.arc(sx, sy, cs * 0.78 * k, 0, Math.PI * 2); c.fill(); }
   c.restore();
 }
 // the green's grain: arrows downhill, drifting
