@@ -43,8 +43,8 @@ $('wLinksBar').addEventListener('click', e => {
   else if (b.id === 'wLinksBack') wLeaveLinks();
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
-$('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); });
-$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
+$('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); e.target.blur(); });
+$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
 
 // under the course: your shot's rows, the scorecard and the players, this game, and How golf works
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>

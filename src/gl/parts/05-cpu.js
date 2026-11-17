@@ -83,13 +83,15 @@ function glPlan(s, riIn) {
   let land = { x: target.x - Math.cos(dir0) * R1.roll, y: target.y - Math.sin(dir0) * R1.roll }, aim = land;
   const wk = GL_SKILL.wind[sk];
   if (wk && G.wind && G.wind.s) {
-    for (let i = 0; i < 3; i++) {
-      const dir = Math.atan2(aim.y - b.y, aim.x - b.x), carry = hyp(aim.x - b.x, aim.y - b.y), push = glWindPush(club, carry, G.wind, dir);
-      aim = { x: land.x - push[0] * wk, y: land.y - push[1] * wk };
+    const windAim = () => { let a = land; for (let i = 0; i < 3; i++) { const dir = Math.atan2(a.y - b.y, a.x - b.x), carry = hyp(a.x - b.x, a.y - b.y), push = glWindPush(club, carry, G.wind, dir); a = { x: land.x - push[0] * wk, y: land.y - push[1] * wk }; } return a; };
+    aim = windAim();
+    let need = hyp(aim.x - b.x, aim.y - b.y);
+    // club up into the wind if the club can't carry it; the longer club rolls its own way, so its landing spot and
+    // its aim off for the wind are worked out again
+    if (glReach(club, b.lie, rat, 1).carry < need) {
+      const up = clubs.slice().reverse().find(c => glReach(c, b.lie, rat, 1).carry >= need);
+      if (up) { club = up; R1 = glReach(club, b.lie, rat, glPowFor(club, b.lie, rat, dist)); land = { x: target.x - Math.cos(dir0) * R1.roll, y: target.y - Math.sin(dir0) * R1.roll }; aim = windAim(); need = hyp(aim.x - b.x, aim.y - b.y); }
     }
-    const need = hyp(aim.x - b.x, aim.y - b.y);
-    // club up into the wind if the club can't carry it
-    if (glReach(club, b.lie, rat, 1).carry < need) { const up = clubs.slice().reverse().find(c => glReach(c, b.lie, rat, 1).carry >= need); if (up) club = up; }
     pow = glPowFor(club, b.lie, rat, need, true);
   } else pow = glPowFor(club, b.lie, rat, hyp(land.x - b.x, land.y - b.y), true);
   return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow, spin: 0 };

@@ -148,7 +148,7 @@ function glMatchCheck() {
   if (Math.abs(up) > left) { G.over = { win: up > 0 ? 0 : 1, text: left ? Math.abs(up) + ' and ' + left : Math.abs(up) + ' up' }; return; }
   if (left === 0 && up === 0) G.playoff = 1;
 }
-function glOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+const glOrd = n => engOrd(n);
 // the match as said from a side's point of view: "2 up with 3 to play", "All square", "Dormie 2", "Won 3 and 2", "Won at the 19th"
 function glMatchText(side) {
   const s = side === 1 ? 1 : 0;

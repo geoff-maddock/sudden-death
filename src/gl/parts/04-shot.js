@@ -153,7 +153,8 @@ function glPutt(p) {
       const off = hyp(x + dx * u - pin.x, y + dy * u - pin.y);
       if (off < P.cup) {
         if (sp <= P.cap * Math.sqrt(1 - (off / P.cup) ** 2)) return res({ end: { x: pin.x, y: pin.y }, lie: 'G', holed: true, lip, path: path.concat([{ x: pin.x, y: pin.y }]), t });
-        if (!lip) { lip = true; const turn = (off / P.cup - 0.5) * 0.6; const c = Math.cos(turn), s = Math.sin(turn); [vx, vy] = [(vx * c - vy * s) * 0.7, (vx * s + vy * c) * 0.7]; }
+        // a lip-out: the cup's edge turns the ball away from the side it caught (more the closer to the edge)
+        if (!lip) { lip = true; const side = Math.sign(vx * (pin.y - y) - vy * (pin.x - x)) || 1, turn = -side * (0.15 + 0.35 * off / P.cup), c = Math.cos(turn), s = Math.sin(turn); [vx, vy] = [(vx * c - vy * s) * 0.7, (vx * s + vy * c) * 0.7]; }
       }
     }
     x = nx; y = ny;

@@ -22039,6 +22039,8 @@ const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
 const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
 const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -25126,6 +25128,8 @@ const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
 const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
 const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -27502,6 +27506,8 @@ const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
 const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
 const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -30685,6 +30691,8 @@ const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
 const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
 const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -34079,6 +34087,8 @@ const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
 const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
 const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -34238,7 +34248,7 @@ function glMatchCheck() {
   if (Math.abs(up) > left) { G.over = { win: up > 0 ? 0 : 1, text: left ? Math.abs(up) + ' and ' + left : Math.abs(up) + ' up' }; return; }
   if (left === 0 && up === 0) G.playoff = 1;
 }
-function glOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+const glOrd = n => engOrd(n);
 // the match as said from a side's point of view: "2 up with 3 to play", "All square", "Dormie 2", "Won 3 and 2", "Won at the 19th"
 function glMatchText(side) {
   const s = side === 1 ? 1 : 0;
@@ -34517,7 +34527,8 @@ function glPutt(p) {
       const off = hyp(x + dx * u - pin.x, y + dy * u - pin.y);
       if (off < P.cup) {
         if (sp <= P.cap * Math.sqrt(1 - (off / P.cup) ** 2)) return res({ end: { x: pin.x, y: pin.y }, lie: 'G', holed: true, lip, path: path.concat([{ x: pin.x, y: pin.y }]), t });
-        if (!lip) { lip = true; const turn = (off / P.cup - 0.5) * 0.6; const c = Math.cos(turn), s = Math.sin(turn); [vx, vy] = [(vx * c - vy * s) * 0.7, (vx * s + vy * c) * 0.7]; }
+        // a lip-out: the cup's edge turns the ball away from the side it caught (more the closer to the edge)
+        if (!lip) { lip = true; const side = Math.sign(vx * (pin.y - y) - vy * (pin.x - x)) || 1, turn = -side * (0.15 + 0.35 * off / P.cup), c = Math.cos(turn), s = Math.sin(turn); [vx, vy] = [(vx * c - vy * s) * 0.7, (vx * s + vy * c) * 0.7]; }
       }
     }
     x = nx; y = ny;
@@ -34614,13 +34625,15 @@ function glPlan(s, riIn) {
   let land = { x: target.x - Math.cos(dir0) * R1.roll, y: target.y - Math.sin(dir0) * R1.roll }, aim = land;
   const wk = GL_SKILL.wind[sk];
   if (wk && G.wind && G.wind.s) {
-    for (let i = 0; i < 3; i++) {
-      const dir = Math.atan2(aim.y - b.y, aim.x - b.x), carry = hyp(aim.x - b.x, aim.y - b.y), push = glWindPush(club, carry, G.wind, dir);
-      aim = { x: land.x - push[0] * wk, y: land.y - push[1] * wk };
+    const windAim = () => { let a = land; for (let i = 0; i < 3; i++) { const dir = Math.atan2(a.y - b.y, a.x - b.x), carry = hyp(a.x - b.x, a.y - b.y), push = glWindPush(club, carry, G.wind, dir); a = { x: land.x - push[0] * wk, y: land.y - push[1] * wk }; } return a; };
+    aim = windAim();
+    let need = hyp(aim.x - b.x, aim.y - b.y);
+    // club up into the wind if the club can't carry it; the longer club rolls its own way, so its landing spot and
+    // its aim off for the wind are worked out again
+    if (glReach(club, b.lie, rat, 1).carry < need) {
+      const up = clubs.slice().reverse().find(c => glReach(c, b.lie, rat, 1).carry >= need);
+      if (up) { club = up; R1 = glReach(club, b.lie, rat, glPowFor(club, b.lie, rat, dist)); land = { x: target.x - Math.cos(dir0) * R1.roll, y: target.y - Math.sin(dir0) * R1.roll }; aim = windAim(); need = hyp(aim.x - b.x, aim.y - b.y); }
     }
-    const need = hyp(aim.x - b.x, aim.y - b.y);
-    // club up into the wind if the club can't carry it
-    if (glReach(club, b.lie, rat, 1).carry < need) { const up = clubs.slice().reverse().find(c => glReach(c, b.lie, rat, 1).carry >= need); if (up) club = up; }
     pow = glPowFor(club, b.lie, rat, need, true);
   } else pow = glPowFor(club, b.lie, rat, hyp(land.x - b.x, land.y - b.y), true);
   return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow, spin: 0 };
@@ -34818,7 +34831,7 @@ let GD = null;
 
 function glPlayStart(o) {
   GLC.h = -1;
-  GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, phN: 0, drag: null, swung: null };
+  GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, drag: null, swung: null };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
@@ -34829,7 +34842,7 @@ function glDispMatch() { if (GD && GD.disp) { GD.disp.match = glMatchText(0); GD
 // a new beat: msg (when given) is said first, so the page's status line, redrawn on the beat, shows it
 function glGo(ph, wait, msg) {
   if (msg != null) GD.msg = msg;
-  GD.ph = ph; GD.t = 0; GD.wait = wait || 0; GD.phN++;
+  GD.ph = ph; GD.t = 0; GD.wait = wait || 0;
   if (GL_HOOK.onPhase) try { GL_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 const glName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
@@ -34865,6 +34878,7 @@ function glPlayNext() {
 function glGiven(by) {
   const s = 1 - by;
   const ev = glGive(by);
+  if (!ev) { glGo('next'); return; }
   GD.last = ev;
   glGo('given', ev && ev.res != null ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
   if (ev && ev.res != null) glDispMatch();
@@ -34884,6 +34898,7 @@ function glFire(s, plan, r) {
   const rT = plan.putt ? clamp(r.t || 1, 0.6, 5) * 0.75 : run.length > 2 ? clamp(hyp(r.end.x - r.land.x, r.end.y - r.land.y) / 3, 0.6, 3) : run.length ? GL_PACE.roll : 0.2;
   GD.anim = { side: s, path: plan.putt ? [] : r.path, run, fT, rT, t: 0, water: !!r.water, drop: r.drop ? { x: r.end.x, y: r.end.y } : null, holed: !!r.holed, uniform: plan.putt || run.length > 2 };
   const ev = glShoot(s, plan, r);
+  if (!ev || ev.k !== 'shot') { GD.anim = null; glDispSync(); if (glYours(s)) { glSelReset(); glGo('aim', 0, (ev && ev.why) || 'That shot can\'t be played.'); } else glGo('next'); return; }
   GD.last = ev; GD.said = glEvSay(ev, r);
   glGo('fly', 0, plan.putt ? `${glName(s, plan.ri)} putts…` : `${glName(s, plan.ri)} hits the ${GL_CLUBS[plan.club].n.toLowerCase()}…`);
 }
@@ -50271,8 +50286,8 @@ $('wLinksBar').addEventListener('click', e => {
   else if (b.id === 'wLinksBack') wLeaveLinks();
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
-$('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); });
-$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
+$('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); e.target.blur(); });
+$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
 
 // under the course: your shot's rows, the scorecard and the players, this game, and How golf works
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>

@@ -16,6 +16,8 @@ const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
 const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
 const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;

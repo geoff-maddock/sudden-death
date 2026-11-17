@@ -25,7 +25,7 @@ let GD = null;
 
 function glPlayStart(o) {
   GLC.h = -1;
-  GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, phN: 0, drag: null, swung: null };
+  GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, drag: null, swung: null };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
@@ -36,7 +36,7 @@ function glDispMatch() { if (GD && GD.disp) { GD.disp.match = glMatchText(0); GD
 // a new beat: msg (when given) is said first, so the page's status line, redrawn on the beat, shows it
 function glGo(ph, wait, msg) {
   if (msg != null) GD.msg = msg;
-  GD.ph = ph; GD.t = 0; GD.wait = wait || 0; GD.phN++;
+  GD.ph = ph; GD.t = 0; GD.wait = wait || 0;
   if (GL_HOOK.onPhase) try { GL_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
 const glName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
@@ -72,6 +72,7 @@ function glPlayNext() {
 function glGiven(by) {
   const s = 1 - by;
   const ev = glGive(by);
+  if (!ev) { glGo('next'); return; }
   GD.last = ev;
   glGo('given', ev && ev.res != null ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
   if (ev && ev.res != null) glDispMatch();
@@ -91,6 +92,7 @@ function glFire(s, plan, r) {
   const rT = plan.putt ? clamp(r.t || 1, 0.6, 5) * 0.75 : run.length > 2 ? clamp(hyp(r.end.x - r.land.x, r.end.y - r.land.y) / 3, 0.6, 3) : run.length ? GL_PACE.roll : 0.2;
   GD.anim = { side: s, path: plan.putt ? [] : r.path, run, fT, rT, t: 0, water: !!r.water, drop: r.drop ? { x: r.end.x, y: r.end.y } : null, holed: !!r.holed, uniform: plan.putt || run.length > 2 };
   const ev = glShoot(s, plan, r);
+  if (!ev || ev.k !== 'shot') { GD.anim = null; glDispSync(); if (glYours(s)) { glSelReset(); glGo('aim', 0, (ev && ev.why) || 'That shot can\'t be played.'); } else glGo('next'); return; }
   GD.last = ev; GD.said = glEvSay(ev, r);
   glGo('fly', 0, plan.putt ? `${glName(s, plan.ri)} putts…` : `${glName(s, plan.ri)} hits the ${GL_CLUBS[plan.club].n.toLowerCase()}…`);
 }
