@@ -47656,7 +47656,9 @@ wStandBuy = function (id, arg) { const r = wW102StandBuy(id, arg); if (!r && !LA
      Saltmere     a fishing spot off the pier end (a catch, once a day), lobster pots
      Cinderhold   the forge stack (warm up: rests tired legs, once a day), ore carts
      Rimewatch    an ice statue of the champion, snowmen
-   and street life: washing lines and haystacks.
+   and street life: washing lines and haystacks, and by the buildings themselves (wStreetLife) barrels, a signpost by
+   the way in that points to the nearest doors, and lamps and a market stall where a city has none of its own. The
+   market stalls sell one bargain a day per city: the city's own food at half the shop price (W_STALL, wStallUse).
 
    The world map draws each city's own icon (WOBJ.O) and each dungeon's own door (WOBJ.D).
 
@@ -47991,7 +47993,11 @@ Object.assign(DB.tiles, {
   'ö': { name: 'snowman', walk: 0, look: 'A snowman in a scarf of the Frostspire colours, with a puck for a nose.' },
   'å': { name: 'washing line', walk: 0, look: 'A washing line, heavy with jerseys. Nobody has asked whose.' },
   'ï': { name: 'haystack', walk: 0, look: 'A haystack. Something small is asleep in it and snoring.' },
+  'À': { name: 'barrels', walk: 0, look: 'Barrels, stacked by the door: cider, nails, or salt, by the smell of them.' },
+  'Á': { name: 'signpost', walk: 0, use: 'feature', look: 'A signpost, its arms painted with the names of the town\'s doors.' },
 });
+// the market stalls ('m', already in the towns) sell one bargain a day in each city: see wStallUse
+DB.tiles.m = Object.assign({}, DB.tiles.m, { use: 'feature' });
 // each landmark: where it wants to stand, what it can stand on
 const W_LANDMARKS = {
   graftonbury: [['æ', 26, 9], ['ø', 43, 14], ['å', 17, 26], ['ï', 6, 30], ['ï', 9, 31]],
@@ -48024,7 +48030,46 @@ function wPlaceLandmarks() {
   for (const id in W_LANDMARKS) {
     const m = MAPS[id]; if (!m) continue;
     for (const [ch, x, y, on] of W_LANDMARKS[id]) wPutNear(m, ch, x, y, on || [wGroundCh(m)], { feature: ch });
+    wStreetLife(m, DB.towns.find(t => t.id === id));
   }
+}
+/* street life, placed by the buildings themselves: a signpost by the way in, barrels by inns, shops, smithies,
+   canteens and warehouses; a market stall by the first shop and lamps in front of the buildings, where the city has
+   none of its own (the stall 'm' and the lamp 'l' are the towns' own tiles) */
+const W_STALL = { graftonbury: 'grain', mossgate: 'honeydrop', saltmere: 'saltfish', cinderhold: 'jerky', rimewatch: 'hardtack' };
+const W_STREET_N = { barrels: 4, lamps: 4, lampsHave: 3 };
+function wStreetLife(m, def) {
+  if (!def || !def.buildings) return;
+  const on = [wGroundCh(m)], has = ch => m.t.reduce((n, row) => n + row.filter(c => c === ch).length, 0);
+  wPutNear(m, 'Á', m.spawn[0] + 2, m.spawn[1] - 1, on, { feature: 'Á' });
+  const blds = def.buildings.map(b => ({ b, kind: wBldKind(b), dx: b.x + (b.w >> 1), fy: b.door === 'n' ? b.y - 1 : b.y + b.h }));
+  const shop = blds.find(o => o.kind === 'shop');
+  if (shop && W_STALL[m.id] && !has('m')) wPutNear(m, 'm', shop.dx + 3, shop.fy + 2, on, { feature: 'm' });
+  let nb = 0;
+  for (const o of blds) if (nb < W_STREET_N.barrels && ['inn', 'shop', 'smithy', 'canteen', 'warehouse'].includes(o.kind) && wPutNear(m, 'À', o.b.x + o.b.w, o.fy, on, { feature: 'À' })) nb++;
+  if (has('l') >= W_STREET_N.lampsHave) return;
+  let nl = 0;
+  blds.forEach((o, i) => {
+    if (nl >= W_STREET_N.lamps || i % 2) return;
+    const at = wPutNear(m, 'l', o.b.x - 1, o.fy + 1, on, { feature: 'l' });
+    if (at) { nl++; m.light.push([at[0], at[1], 2.2]); }
+  });
+}
+// which way a building lies from (x, y), as a compass point
+function wCompass(dx, dy) {
+  const a = Math.atan2(dy, dx) * 180 / Math.PI;
+  return ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'][((Math.round(a / 45) % 8) + 8) % 8];
+}
+// a sign's name for a signpost arm: its first sentence, in title case ('THE SPECKLED HEN. Beds.' -> 'The Speckled Hen')
+function wSignName(sign) {
+  return String(sign).split('.')[0].toLowerCase().split(' ').map((w, i) => i && ['of', 'the', 'and'].includes(w) ? w : wCap(w)).join(' ');
+}
+function wSignpostText(m, x, y) {
+  const def = DB.towns.find(t => t.id === m.id);
+  const arms = ((def && def.buildings) || []).filter(b => b.sign).map(b => { const bx = b.x + (b.w >> 1), by = b.y + (b.h >> 1); return { name: wSignName(b.sign), way: wCompass(bx - x, by - y), d: Math.abs(bx - x) + Math.abs(by - y) }; })
+    .sort((a, b) => a.d - b.d).slice(0, 6);
+  if (!arms.length) return 'The signpost\'s arms are blank. Somebody has painted them over.';
+  return 'The signpost points: ' + arms.map(a => a.name + ', ' + a.way + ' (' + a.d + ' paces)').join('; ') + '.';
 }
 
 /* the once-a-day features: their uses, and how a used one looks */
@@ -48034,6 +48079,16 @@ const W_FEATURE = {
   'ñ': { days: 1, use: (x, y) => { if (typeof wRestLegs === 'function') wRestLegs(1); wAdvance(30); return 'The team sits on the forge benches with their boots off for half an hour. Tired legs ease.'; } },
 };
 const W_FORTUNES = ['A coin goes down. Somewhere below, something says: "Play the long ball."', 'The coin rings on the others. You feel a cup coming, though maybe not this year.', 'Splash. A voice in the well: "Your keeper should drink more water." It is probably right.', 'The coin spins a long time before it sinks. Lucky, the old women say.', 'Down it goes. A frog surfaces, looks at you, and goes back down unimpressed.'];
+// one bargain a day per city, whichever of its stalls you ask: the city's own food at half the shop price
+function wStallUse(m) {
+  const it = W_STALL[m.id], item = DB.items[it], key = 'stall_' + m.id;
+  if (!item) return wLog(DB.tiles.m.look, 'd');
+  if (WG.harv[key] != null && WG.dayAbs - WG.harv[key] < 1) return wLog('Today\'s bargain has sold out. The stallholders say: back tomorrow.', 'd');
+  const price = Math.max(1, Math.round(item.price / 2));
+  if ((RUN.gold || 0) < price) return wLog('Today\'s bargain: ' + item.name + ' at ' + price + ' gold, half the shop price. You cannot afford it.', 'd');
+  RUN.gold -= price; wAddItem(it, 1); WG.harv[key] = WG.dayAbs;
+  return wLog('Today\'s bargain: ' + item.name + ', half price. You pay ' + price + ' gold.', 'm');
+}
 function wFeatureUse(x, y) {
   const m = wCurMap(), ch = wTileAt(m, x, y), F = W_FEATURE[ch];
   if (F) {
@@ -48048,6 +48103,8 @@ function wFeatureUse(x, y) {
     if ((RUN.gold || 0) < 1) return wLog('You have no coin to wish with.', 'd');
     RUN.gold -= 1; return wLog(pick(W_FORTUNES), 'g');
   }
+  if (ch === 'Á') return wLog(wSignpostText(m, x, y), 'g');
+  if (ch === 'm') return wStallUse(m);
   if (ch === 'é') {
     if (wFlag('champion')) return wLog('The statue is of your team, holding the crown up. The novices have got your captain\'s nose wrong, and they will not be told.', 'g');
     return wLog('The statue is of last year\'s champions, the Apex, crown held high. There is a smooth block beside it, waiting for the next one.', 'd');
@@ -48153,7 +48210,25 @@ Object.assign(WOBJ, {
     for (let i = 0; i < 14; i++) { const x = 6 + r() * 20, y = 10 + r() * 17; wLine(c, [[x, y], [x + (r() - .5) * 4, y + 3]], .6, 'rgba(120,90,30,.6)'); }
   },
 });
-Object.assign(W_MAP_COL, { 'æ': '#a9533c', 'ø': '#8a857e', 'ð': '#9a8a9a', 'þ': '#b4875a', 'ß': '#8a6a3a', 'ñ': '#3b3437', 'ü': '#6a6a72', 'é': '#cfeaf4', 'ö': '#f4f8fa', 'å': '#c94a3a', 'ï': '#d8b860' });
+Object.assign(WOBJ, {
+  'À': (c, P, r) => { // three barrels, two down and one on top
+    wShadow(c, 16, 30, 13, 3, .3);
+    for (const [x, y, s] of [[9, 20, 1], [23, 20, 1], [16, 9, .9]]) {
+      const b = pRR(x - 6 * s, y - 8 * s, 12 * s, 17 * s, 4 * s); wCel(c, b, '#8a5a30', 1, 1.1);
+      for (const k of [-.55, .55]) wLine(c, [[x - 6 * s, y + k * 8 * s], [x + 6 * s, y + k * 8 * s]], 1.1, '#4a4a50');
+      c.fillStyle = 'rgba(255,230,180,.25)'; c.fillRect(x - 3.5 * s, y - 6 * s, 1.4, 12 * s);
+    }
+  },
+  'Á': (c, P, r) => { // a post with three painted arms
+    wShadow(c, 16, 30, 6, 2, .3);
+    wLine(c, [[16, 30], [16, -12]], 2.2, '#5a3e26'); wLine(c, [[16, 30], [16, -12]], .8, '#8a6a42');
+    for (const [y, dir, col] of [[-9, 1, '#efe3c8'], [-2, -1, '#d8c89a'], [5, 1, '#e8dcb4']]) {
+      const x0 = 16, x1 = 16 + dir * 13, arm = pPoly([[x0, y], [x1, y], [x1 + dir * 3, y + 2.5], [x1, y + 5], [x0, y + 5]]);
+      wCel(c, arm, col, .8, 1); wLine(c, [[x0 + dir * 3, y + 2.5], [x1 - dir * 1, y + 2.5]], .6, 'rgba(29,20,15,.55)');
+    }
+  },
+});
+Object.assign(W_MAP_COL, { 'À': '#8a5a30', 'Á': '#8a6a42', 'æ': '#a9533c', 'ø': '#8a857e', 'ð': '#9a8a9a', 'þ': '#b4875a', 'ß': '#8a6a3a', 'ñ': '#3b3437', 'ü': '#6a6a72', 'é': '#cfeaf4', 'ö': '#f4f8fa', 'å': '#c94a3a', 'ï': '#d8b860' });
 
 /* ---------- the world map: each city's own icon, each dungeon's own door ---------- */
 function wW103LocAt(e) { const mt = wMeta(e.m, e.x, e.y); return mt && mt.loc; }
@@ -48244,7 +48319,7 @@ const wW103RenderHelp = renderHelp;
 renderHelp = function () {
   wW103RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpPlaces')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpPlaces"><b>Places.</b> Each city builds in its own stone: Graftonbury in brick and slate, Mossgate in log and thatch, Saltmere in white boards and red tile, Cinderhold in black basalt, Rimewatch in pale stone under snow. A building's front says what it is: a tankard over an inn, a purse over a shop, an anvil over the smithy, a bell over a chapel, a ball over an arena. Every city has a landmark worth walking up to: Graftonbury's Charter Clock and wishing well, Mossgate's mushroom ring (rest, once a day), Saltmere's pier-end fishing spot (once a day), Cinderhold's forge stack (warm tired legs, once a day) and Rimewatch's ice statue of the champion.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpPlaces"><b>Places.</b> Each city builds in its own stone: Graftonbury in brick and slate, Mossgate in log and thatch, Saltmere in white boards and red tile, Cinderhold in black basalt, Rimewatch in pale stone under snow. A building's front says what it is: a tankard over an inn, a purse over a shop, an anvil over the smithy, a bell over a chapel, a ball over an arena. Every city has a landmark worth walking up to: Graftonbury's Charter Clock and wishing well, Mossgate's mushroom ring (rest, once a day), Saltmere's pier-end fishing spot (once a day), Cinderhold's forge stack (warm tired legs, once a day) and Rimewatch's ice statue of the champion. A signpost by the way into each city points to its doors, and its market stalls sell one bargain a day: the city's own food at half the shop price.</p>`);
 };
 /* w104: places, the dungeons (issue #90). Loads after w103-places.js; changes earlier parts only by reassignment
    (saved originals carry the wW104 prefix).

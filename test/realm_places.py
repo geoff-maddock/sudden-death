@@ -108,6 +108,24 @@ async def main():
         # the next day it works again
         r = await pg.evaluate("(() => { wAdvance(1440); __at('mossgate', c => c === 'ð'); RUN.hp = Math.max(1, RUN.maxhp - 30); const h0 = RUN.hp; wInteract(); return [h0, RUN.hp]; })()")
         check(r[1] > r[0], 'a day later the mushroom ring works again', r)
+        # street life: barrels and a signpost in every city; a market stall and lamps (lit) in every city, its own or added
+        st = await pg.evaluate("""(() => { const out = {};
+          for (const id in W_LANDMARKS) { const m = MAPS[id], seen = __reach(id), n = { 'À': 0, 'Á': 0, 'l': 0, 'm': 0 }; let reach = true;
+            for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) { const c = m.t[y][x]; if (c in n) { n[c]++; if (c !== 'l' && c !== 'm') reach = reach && __near(id, seen, x, y); } }
+            const added = Object.keys(m.meta).filter(k => m.meta[k].feature === 'l'), lit = added.every(k => m.light.some(l => l[0] + ',' + l[1] === k));
+            out[id] = { n, reach, lit, added: added.length }; }
+          return out; })()""")
+        for c, r in st.items():
+            n = r['n']
+            check(n['À'] >= 1 and n['Á'] == 1 and n['l'] >= 3 and n['m'] >= 1 and r['reach'] and r['lit'], f'{c}: barrels, a signpost, lamps and a market stall', r)
+        check(st['cinderhold']['added'] >= 2 and st['graftonbury']['added'] == 0, 'lamps are added only where a city had none of its own', [st['cinderhold'], st['graftonbury']])
+        r = await pg.evaluate("(() => { __at('graftonbury', c => c === 'Á'); wInteract(); return __last(); })()")
+        check(r.startswith('The signpost points:') and r.count('paces') >= 3 and 'The Speckled Hen' in r and any(w in r for w in ['north', 'south', 'east', 'west']), 'the signpost points the way to the doors of the town', r)
+        r = await pg.evaluate("""(() => { const xy = __at('saltmere', c => c === 'm'); RUN.gold = 100; const n0 = WG.items.saltfish || 0; wInteract(); const g1 = RUN.gold, n1 = WG.items.saltfish || 0;
+          __at('saltmere', (c, x, y) => c === 'm' && (x !== xy[0] || y !== xy[1])); wInteract(); return [g1, n1 - n0, RUN.gold, (WG.items.saltfish || 0) - n1, Math.round(DB.items.saltfish.price / 2), __last()]; })()""")
+        check(r[0] == 100 - r[4] and r[1] == 1 and r[2] == r[0] and r[3] == 0, 'the market stalls sell their city\'s food at half price, one bargain a day per city', r)
+        r = await pg.evaluate("(() => { __at('rimewatch', c => c === 'm'); RUN.gold = 0; const n0 = WG.items.hardtack || 0; wInteract(); return [(WG.items.hardtack || 0) - n0, __last()]; })()")
+        check(r[0] == 0 and 'afford' in r[1], 'no gold, no bargain', r)
         await pg.evaluate("__at('rimewatch', c => c === 'é'); wInteract()")
         check('statue' in await pg.evaluate("__last()"), 'the ice statue says who it is of', await pg.evaluate("__last()"))
 
