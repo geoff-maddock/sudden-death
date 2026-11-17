@@ -34136,6 +34136,14 @@ function glHitters(side) {
   return all.filter(i => i !== H.last[side]);
 }
 const glCanHit = (side, ri) => glHitters(side).includes(ri);
+// why player ri may not hit for side now ('' if they may): the words glStroke refuses with
+function glWhyNot(side, ri) {
+  const H = G.hole;
+  if (G.over) return 'The game is over.';
+  if (H.done[side]) return 'That side is done with this hole.';
+  if (glCanHit(side, ri)) return '';
+  return H.last[side] === ri ? 'Nobody hits twice running.' : 'Everyone hits once before anyone hits twice.';
+}
 
 /* ---------- who is away ---------- */
 // dist: [side 0's distance to the hole, side 1's]; on the tee (no strokes yet) the side with the honour goes first.
@@ -34160,7 +34168,7 @@ function glStroke(side, ri) {
   const H = G.hole;
   if (G.over) return { ok: false, why: 'The game is over.' };
   if (H.done[side]) return { ok: false, why: 'That side is done with this hole.' };
-  if (!glCanHit(side, ri)) return { ok: false, why: H.last[side] === ri ? 'Nobody hits twice running.' : 'Everyone hits once before anyone hits twice.' };
+  if (!glCanHit(side, ri)) return { ok: false, why: glWhyNot(side, ri) };
   H.st[side]++; H.last[side] = ri; H.hit[side].push(ri);
   return { ok: true, picked: glCapCheck(side) };
 }
@@ -34407,7 +34415,7 @@ function glReach(club, lie, rat, pow) {
   let carry = c.carry * (0.85 + 0.3 * p) * distL * (L.sand && club !== 'we' ? L.sand : 1) * pow;
   if (L.punch) carry = Math.min(carry, L.punch);
   // a short shot runs more: a chip is mostly roll
-  const rollK = (c.roll + Math.max(0, 0.55 - pow) * 1.1) * L.roll;
+  const rollK = (c.roll + Math.max(0, 0.55 - pow) * 1.1) * L.roll * (L.punch ? GL_TRAJ.punch.roll : 1);
   return { carry, roll: carry * rollK };
 }
 const glClubOk = (club, lie) => !!GL_CLUBS[club] && !(GL_LIES[lie] || GL_LIES.F).no.includes(club);
@@ -34451,7 +34459,8 @@ function glFlight(s) {
   if (ll === 'S' || ll === 'B' || ll === 'O') return Object.assign(out, { end: land, lie: ll, roll: 0 });
   // the roll: the club and the spin, along the line it came in on
   const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
-  let budget = R0.roll * (1 + 0.6 * spin) * (T ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
+  // (a forced punch's run is already in glReach)
+  let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
   const rdir = rd;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
@@ -34598,7 +34607,7 @@ function glPlan(s, riIn) {
   let club, target;
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }
   else if (d > tot(longest) * 0.98) { club = longest; target = glLayTarget(H, b, tot(longest), sk > 0); }
-  else { club = clubs.slice().reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
+  else { club = GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
   // the landing spot: short of the target by the roll; then aim off for the wind
   const dir0 = Math.atan2(target.y - b.y, target.x - b.x), dist = hyp(target.x - b.x, target.y - b.y);
   let pow = glPowFor(club, b.lie, rat, dist), R1 = glReach(club, b.lie, rat, pow);
@@ -34636,6 +34645,8 @@ function glRead(H, from, slopeK) {
 function glCpuConcede(by, s, d) {
   const H = G.hole;
   if (d > GL_SKILL.giveIn || H.done[by] || H.done[s]) return false;
+  // never the putt that hands over the hole: given, s is holed in one more, and by, already on as many, is beaten
+  if (H.st[by] >= H.st[s] + 1) return false;
   return R() < GL_SKILL.give[G.skill[by]];
 }
 /* Mossgate Links: a game (issue #92, phase 1). A turn loop, not a frame loop: glTurn plays the next shot, whoever is
@@ -34806,6 +34817,7 @@ const GL_HANDS = { drag: 170, dragAcc: 12 };
 let GD = null;
 
 function glPlayStart(o) {
+  GLC.h = -1;
   GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, phN: 0, drag: null, swung: null };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
@@ -34868,7 +34880,7 @@ function glShotSay(s, plan, d) {
 /* ---------- a shot struck: the ball flies, then the picture catches up ---------- */
 function glFire(s, plan, r) {
   const fT = plan.putt || !r.path || !r.path.length ? 0 : GL_PACE.fly * clamp(r.carry / 200, 0.45, 1.15);
-  const run = plan.putt ? r.path.concat([r.end]) : r.run || [];
+  const run = plan.putt ? (r.water ? r.path.slice() : r.path.concat([r.end])) : r.run || [];
   const rT = plan.putt ? clamp(r.t || 1, 0.6, 5) * 0.75 : run.length > 2 ? clamp(hyp(r.end.x - r.land.x, r.end.y - r.land.y) / 3, 0.6, 3) : run.length ? GL_PACE.roll : 0.2;
   GD.anim = { side: s, path: plan.putt ? [] : r.path, run, fT, rT, t: 0, water: !!r.water, drop: r.drop ? { x: r.end.x, y: r.end.y } : null, holed: !!r.holed, uniform: plan.putt || run.length > 2 };
   const ev = glShoot(s, plan, r);
@@ -34976,7 +34988,8 @@ function glSelect(o) {
   if (o.ri != null && glHitters(GD.you).includes(o.ri)) S.ri = o.ri;
   if (o.club && glClubsNow().includes(o.club)) {
     const wasPutt = S.putt; S.club = o.club; S.putt = o.club === 'pt';
-    if (S.putt !== wasPutt) { const H = glHoleNow(); S.aim = S.putt || glShotKind(H, GD.you) === 'putt' ? { x: H.pin.x, y: H.pin.y } : glPlan(GD.you, S.ri).aim; }
+    // (the putter is offered only for a putt, so a switch either way starts from the pin)
+    if (S.putt !== wasPutt) { const H = glHoleNow(); S.aim = { x: H.pin.x, y: H.pin.y }; }
   }
   if (o.shape != null) S.shape = GL_SHAPES[o.shape] ? o.shape : '';
   if (o.traj != null) S.traj = GL_TRAJ[o.traj] ? o.traj : '';
@@ -35001,7 +35014,7 @@ function glReadLen() { return GD && GD.sel ? 1.5 + glRat(GD.you, GD.sel.ri).put 
 const GLRL = { key: '', line: [] };
 function glReadLine() {
   const S = GD && GD.sel; if (!S || !S.putt || (GD.ph !== 'aim' && GD.ph !== 'swing')) return [];
-  const b = G.ball[GD.you], key = [G.h, b.x, b.y, S.aim.x, S.aim.y, S.tick, S.ri, glReadLen()].join(',');
+  const b = G.ball[GD.you], key = [G.cs, glHoleNow().seed, G.h, b.x, b.y, S.aim.x, S.aim.y, S.tick, S.ri, glReadLen()].join(',');
   if (GLRL.key === key) return GLRL.line;
   GLRL.key = key; GLRL.line = glReadCalc(S, b);
   return GLRL.line;
@@ -35431,7 +35444,7 @@ for (const ev of ['pointerup', 'pointercancel']) GLP.cv.addEventListener(ev, glP
 return {
   rules: JSON.parse(JSON.stringify(GL_RULES)), get G() { return G; },
   newGame: o => glNewGame(o), pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
-  hitters: s => glHitters(s), canHit: (s, ri) => glCanHit(s, ri), away: d => glAway(d),
+  hitters: s => glHitters(s), canHit: (s, ri) => glCanHit(s, ri), whyNot: (s, ri) => glWhyNot(s, ri), away: d => glAway(d),
   stroke: (s, ri) => glStroke(s, ri), drop: s => glDrop(s), holed: s => glHoled(s), concede: s => glConcede(s),
   holeState: () => glHoleState(), up: () => glUp(), left: () => glLeft(), matchText: s => glMatchText(s),
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
@@ -50286,11 +50299,7 @@ $('wLinksRows').addEventListener('click', e => {
 });
 
 // why a player can't hit now
-function wLinksWhyNot(V, ri) {
-  const H = wGL.G.hole, side = V.you;
-  if (H.last[side] === ri) return 'Hit the last shot: nobody hits twice running.';
-  return 'Everyone hits once before anyone hits twice.';
-}
+const wLinksWhyNot = (V, ri) => wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';

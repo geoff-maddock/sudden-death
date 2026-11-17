@@ -18,7 +18,7 @@
 return {
   rules: JSON.parse(JSON.stringify(GL_RULES)), get G() { return G; },
   newGame: o => glNewGame(o), pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
-  hitters: s => glHitters(s), canHit: (s, ri) => glCanHit(s, ri), away: d => glAway(d),
+  hitters: s => glHitters(s), canHit: (s, ri) => glCanHit(s, ri), whyNot: (s, ri) => glWhyNot(s, ri), away: d => glAway(d),
   stroke: (s, ri) => glStroke(s, ri), drop: s => glDrop(s), holed: s => glHoled(s), concede: s => glConcede(s),
   holeState: () => glHoleState(), up: () => glUp(), left: () => glLeft(), matchText: s => glMatchText(s),
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),

@@ -46,6 +46,14 @@ function glHitters(side) {
   return all.filter(i => i !== H.last[side]);
 }
 const glCanHit = (side, ri) => glHitters(side).includes(ri);
+// why player ri may not hit for side now ('' if they may): the words glStroke refuses with
+function glWhyNot(side, ri) {
+  const H = G.hole;
+  if (G.over) return 'The game is over.';
+  if (H.done[side]) return 'That side is done with this hole.';
+  if (glCanHit(side, ri)) return '';
+  return H.last[side] === ri ? 'Nobody hits twice running.' : 'Everyone hits once before anyone hits twice.';
+}
 
 /* ---------- who is away ---------- */
 // dist: [side 0's distance to the hole, side 1's]; on the tee (no strokes yet) the side with the honour goes first.
@@ -70,7 +78,7 @@ function glStroke(side, ri) {
   const H = G.hole;
   if (G.over) return { ok: false, why: 'The game is over.' };
   if (H.done[side]) return { ok: false, why: 'That side is done with this hole.' };
-  if (!glCanHit(side, ri)) return { ok: false, why: H.last[side] === ri ? 'Nobody hits twice running.' : 'Everyone hits once before anyone hits twice.' };
+  if (!glCanHit(side, ri)) return { ok: false, why: glWhyNot(side, ri) };
   H.st[side]++; H.last[side] = ri; H.hit[side].push(ri);
   return { ok: true, picked: glCapCheck(side) };
 }

@@ -24,6 +24,7 @@ const GL_HANDS = { drag: 170, dragAcc: 12 };
 let GD = null;
 
 function glPlayStart(o) {
+  GLC.h = -1;
   GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, phN: 0, drag: null, swung: null };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
@@ -86,7 +87,7 @@ function glShotSay(s, plan, d) {
 /* ---------- a shot struck: the ball flies, then the picture catches up ---------- */
 function glFire(s, plan, r) {
   const fT = plan.putt || !r.path || !r.path.length ? 0 : GL_PACE.fly * clamp(r.carry / 200, 0.45, 1.15);
-  const run = plan.putt ? r.path.concat([r.end]) : r.run || [];
+  const run = plan.putt ? (r.water ? r.path.slice() : r.path.concat([r.end])) : r.run || [];
   const rT = plan.putt ? clamp(r.t || 1, 0.6, 5) * 0.75 : run.length > 2 ? clamp(hyp(r.end.x - r.land.x, r.end.y - r.land.y) / 3, 0.6, 3) : run.length ? GL_PACE.roll : 0.2;
   GD.anim = { side: s, path: plan.putt ? [] : r.path, run, fT, rT, t: 0, water: !!r.water, drop: r.drop ? { x: r.end.x, y: r.end.y } : null, holed: !!r.holed, uniform: plan.putt || run.length > 2 };
   const ev = glShoot(s, plan, r);
@@ -194,7 +195,8 @@ function glSelect(o) {
   if (o.ri != null && glHitters(GD.you).includes(o.ri)) S.ri = o.ri;
   if (o.club && glClubsNow().includes(o.club)) {
     const wasPutt = S.putt; S.club = o.club; S.putt = o.club === 'pt';
-    if (S.putt !== wasPutt) { const H = glHoleNow(); S.aim = S.putt || glShotKind(H, GD.you) === 'putt' ? { x: H.pin.x, y: H.pin.y } : glPlan(GD.you, S.ri).aim; }
+    // (the putter is offered only for a putt, so a switch either way starts from the pin)
+    if (S.putt !== wasPutt) { const H = glHoleNow(); S.aim = { x: H.pin.x, y: H.pin.y }; }
   }
   if (o.shape != null) S.shape = GL_SHAPES[o.shape] ? o.shape : '';
   if (o.traj != null) S.traj = GL_TRAJ[o.traj] ? o.traj : '';
@@ -219,7 +221,7 @@ function glReadLen() { return GD && GD.sel ? 1.5 + glRat(GD.you, GD.sel.ri).put 
 const GLRL = { key: '', line: [] };
 function glReadLine() {
   const S = GD && GD.sel; if (!S || !S.putt || (GD.ph !== 'aim' && GD.ph !== 'swing')) return [];
-  const b = G.ball[GD.you], key = [G.h, b.x, b.y, S.aim.x, S.aim.y, S.tick, S.ri, glReadLen()].join(',');
+  const b = G.ball[GD.you], key = [G.cs, glHoleNow().seed, G.h, b.x, b.y, S.aim.x, S.aim.y, S.tick, S.ri, glReadLen()].join(',');
   if (GLRL.key === key) return GLRL.line;
   GLRL.key = key; GLRL.line = glReadCalc(S, b);
   return GLRL.line;

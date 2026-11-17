@@ -76,7 +76,7 @@ function glPlan(s, riIn) {
   let club, target;
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }
   else if (d > tot(longest) * 0.98) { club = longest; target = glLayTarget(H, b, tot(longest), sk > 0); }
-  else { club = clubs.slice().reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
+  else { club = GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
   // the landing spot: short of the target by the roll; then aim off for the wind
   const dir0 = Math.atan2(target.y - b.y, target.x - b.x), dist = hyp(target.x - b.x, target.y - b.y);
   let pow = glPowFor(club, b.lie, rat, dist), R1 = glReach(club, b.lie, rat, pow);
@@ -114,5 +114,7 @@ function glRead(H, from, slopeK) {
 function glCpuConcede(by, s, d) {
   const H = G.hole;
   if (d > GL_SKILL.giveIn || H.done[by] || H.done[s]) return false;
+  // never the putt that hands over the hole: given, s is holed in one more, and by, already on as many, is beaten
+  if (H.st[by] >= H.st[s] + 1) return false;
   return R() < GL_SKILL.give[G.skill[by]];
 }

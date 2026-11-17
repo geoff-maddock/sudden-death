@@ -71,11 +71,7 @@ $('wLinksRows').addEventListener('click', e => {
 });
 
 // why a player can't hit now
-function wLinksWhyNot(V, ri) {
-  const H = wGL.G.hole, side = V.you;
-  if (H.last[side] === ri) return 'Hit the last shot: nobody hits twice running.';
-  return 'Everyone hits once before anyone hits twice.';
-}
+const wLinksWhyNot = (V, ri) => wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';

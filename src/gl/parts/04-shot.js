@@ -51,7 +51,7 @@ function glReach(club, lie, rat, pow) {
   let carry = c.carry * (0.85 + 0.3 * p) * distL * (L.sand && club !== 'we' ? L.sand : 1) * pow;
   if (L.punch) carry = Math.min(carry, L.punch);
   // a short shot runs more: a chip is mostly roll
-  const rollK = (c.roll + Math.max(0, 0.55 - pow) * 1.1) * L.roll;
+  const rollK = (c.roll + Math.max(0, 0.55 - pow) * 1.1) * L.roll * (L.punch ? GL_TRAJ.punch.roll : 1);
   return { carry, roll: carry * rollK };
 }
 const glClubOk = (club, lie) => !!GL_CLUBS[club] && !(GL_LIES[lie] || GL_LIES.F).no.includes(club);
@@ -95,7 +95,8 @@ function glFlight(s) {
   if (ll === 'S' || ll === 'B' || ll === 'O') return Object.assign(out, { end: land, lie: ll, roll: 0 });
   // the roll: the club and the spin, along the line it came in on
   const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
-  let budget = R0.roll * (1 + 0.6 * spin) * (T ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
+  // (a forced punch's run is already in glReach)
+  let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
   const rdir = rd;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {

@@ -111,6 +111,22 @@ async def main():
         wd = await pg.evaluate("""(() => { const H = __flat((x, y) => y > 414 && y < 440 ? 'W' : 'F'), r = __shot(H, { lie: 'F', club: 'si', aim: { x: 100, y: 395 }, from: { x: 100, y: 280 }, pow: 1.02 });
           return { water: r.water, y: Math.round(r.end.y), lie: r.lie }; })()""")
         check(wd['water'] and wd['y'] > 400 and wd['lie'] != 'W', 'a ball that runs across the green into the water is dropped by where it went in, past the green', wd)
+        # (from the sixth review of #93) the CPU never gives away the hole; a greenside bunker takes the wedge; a punch
+        # from the trees finishes where it was planned
+        r6 = await pg.evaluate("""(() => { const out = {}; wGL.start({ seed: 5, skill: [0, 0] }); const G = wGL.G, H = wGL.course(0);
+          // you on 3 with a 1-foot putt, a Squire (who gives every short putt it may) on 4 and not holed: giving it hands
+          // over the hole, so it is never given; with the Squire on 3 it is
+          const once = (stBy) => { wGL.start({ seed: 5, skill: [1, 0] }); const G = wGL.G, H = wGL.course(0); G.hole.st = [3, stBy];
+            G.ball[0] = { x: H.pin.x, y: H.pin.y - .4, lie: 'G' }; G.ball[1] = { x: H.pin.x, y: H.pin.y + .2, lie: 'G' }; return wGL.turn().k; };
+          out.losing = [0, 1, 2, 3, 4].map(() => once(4)); out.even = once(3);
+          wGL.start({ seed: 6 }); const G2 = wGL.G, H2 = wGL.course(0); G2.ball[0] = { x: H2.pin.x, y: H2.pin.y - 20, lie: 'S' }; G2.hole.st = [2, 2]; G2.ball[1] = { x: H2.pin.x, y: H2.pin.y - 60, lie: 'F' };
+          out.sand = wGL.plan(0).club;
+          const F = __flat((x, y) => y < 30 ? 'O' : 'F'), rat = { pow: .5, scr: .5 }, R = wGL.reach('mi', 'O', rat, .8), f = wGL.flight({ hole: F, from: { x: 100, y: 10 }, lie: 'O', club: 'mi', aim: { x: 100, y: 300 }, pow: .8, err: 0, rat });
+          out.punch = { planned: Math.round(R.carry + R.roll), flew: Math.round(f.end.y - 10) };
+          return out; })()""")
+        check(all(k == 'shot' for k in r6['losing']) and r6['even'] == 'given', 'the CPU never gives the putt that hands over the hole (a Squire gives it when it doesn\'t)', r6)
+        check(r6['sand'] == 'we', 'from a greenside bunker 20 yards out the caddie takes the wedge', r6)
+        check(abs(r6['punch']['planned'] - r6['punch']['flew']) <= 2, 'a punch from the trees finishes where it was planned (the punch\'s run is in the plan)', r6['punch'])
         kp = await pg.evaluate("""(() => { wGL.start({ seed: 21 }); for (let i = 0; i < 6; i++) wGL.turn(); const before = JSON.stringify(wGL.G);
           const r = wGL.simGame({ seed: 4 }); return { same: before === JSON.stringify(wGL.G), sim: r.played > 0 }; })()""")
         check(kp['same'] and kp['sim'], 'a headless game leaves the game on the course as it was', kp)
