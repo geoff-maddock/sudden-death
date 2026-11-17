@@ -9,7 +9,7 @@ function bkNameP(p) { return p ? { id: p.id, n: p.n, cost: p.cost, fits: p.fits,
 function bkNameDesc(T) { return Object.fromEntries(Object.entries(T).map(([k, v]) => [k, { n: v.n, desc: v.desc }])); }
 return {
   newGame: bkNewGame, score: bkScore, shotValue: bkShotValue, run: (dt, hold) => bkRun(dt, hold), give: bkGive, violation: bkViolation, foul: bkFoul,
-  periodEnd: bkPeriodEnd, dir: bkDir, hoopX: bkHoopX, periodName: bkPeriodName, get G() { return G; }, rules: JSON.parse(JSON.stringify(BK_RULES)),
+  periodEnd: bkPeriodEnd, dir: bkDir, hoopX: bkHoopX, periodName: bkPeriodName, get G() { return G; }, fansRules: Object.assign({}, BK_FANS), fansLate: () => bkFansLate(), rules: JSON.parse(JSON.stringify(BK_RULES)),
   start: o => { BKP.paused = false; return bkStart(o); }, simGame: o => bkSimGame(o), show: bkShow, hide: bkHide, render: bkRender, summary: () => G && G.teams ? bkSummary() : null, box: () => G && G.teams ? bkBox() : null,
   get on() { return BKP.on; }, get speed() { return BKP.speed; }, set speed(n) { BKP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); },
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { q: G.q, name: bkPeriodName(G.q), text: bkClockText(), shot: Math.ceil(G.shot) } : null,

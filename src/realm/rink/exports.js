@@ -36,7 +36,7 @@ return {
   powerOptions: side => hkPowerOptions(side), ultOptions: side => hkUltOptions(side), sitOptions: side => hkSitOptions(side), cast: (side, i) => hkCast(side, i), castUlt: (side, i) => hkCastUlt(side, i), castSit: (side, id) => hkCastSit(side, id),
   fx: (side, k) => hkFx(side, k), fx0: Object.assign({}, HK_FX0), get autoPow() { return GD ? GD.autoPow !== false : true; }, get powersOn() { return !!(G && G.powers); },
   pows: JSON.parse(JSON.stringify(Object.fromEntries(Object.keys(HK_POW).map(k => [k, { one: HK_POW[k], two: HK_POW2[k], ult: { id: HK_ULT[k].id, n: HK_ULT[k].n, desc: HK_ULT[k].desc, o: HK_ULT[k].o, d: HK_ULT[k].d } }])))),
-  sits: Object.fromEntries(Object.entries(HK_SIT).map(([k, v]) => [k, { n: v.n, cost: v.cost, desc: v.desc }])), powRules: { k: HK_POW_K, mana: Object.assign({}, HK_MANA), sta: Object.assign({}, HK_POW_STA), secs: HK_POW_SECS, ultSecs: HK_ULT_SECS, spirit: Object.assign({}, HK_SPIRIT) },
+  sits: Object.fromEntries(Object.entries(HK_SIT).map(([k, v]) => [k, { n: v.n, cost: v.cost, desc: v.desc }])), fansRules: Object.assign({}, HK_FANS), fansLate: () => hkFansLate(), powRules: { k: HK_POW_K, mana: Object.assign({}, HK_MANA), sta: Object.assign({}, HK_POW_STA), secs: HK_POW_SECS, ultSecs: HK_ULT_SECS, spirit: Object.assign({}, HK_SPIRIT) },
   powerIds: () => Object.keys(HK_POW_BY).concat(Object.keys(HK_ULT_BY)), cpuPowers: dt => { if (L) { L.powT = 0; hkCpuPowers(dt || .5); } }, spiritAdd: (s, n) => hkSpiritAdd(s, n), manaAdd: (s, n) => hkManaAdd(s, n),
   // from the world (phase 6): a save point at each whistle and break (wantSnap says when; onSnap hears { G, L, GD }),
   // resume(snap) puts one back, snapshot() takes one now; the Pond Rink's ways (start({ pond, snow })), and its rules

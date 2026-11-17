@@ -954,3 +954,39 @@ gold earned a journey 2,908 and 2,883. No difference you can measure (250 journe
 plays few matches at grounds, so the gate (at most 20 gold a match, 30 with a travelling army, doubled at home) is
 hardly seen in these numbers, and 3 Block at kickoff away from home is small beside a deck. That is the aim: felt, and
 never the reason a match is won.
+
+**Phase 3, the lift in the engines** (300 seeded headless games a cell, even clubs, both coaches Knights, the fans on
+your side only; a cell is good to about 6 points, and one changed start value changes every game after it, so the
+cells are independent draws). The away end is 10 spirit to start (a mana in football); a travelling army gives the
+same again, once, when you are behind going into the last period.
+
+| | No fans | The away end | And the late lift |
+|---|---|---|---|
+| Hockey | 53.7% | 50.0% | 51.0% |
+| Basketball | 52.7% | 56.7% | 56.7% |
+| Football | 48.3% | 46.7% | 47.5% |
+| Boxing (a bout) | 54.7% | 51.8% | 50.8% |
+
+Nothing outside the noise in any sport, which is the aim (decision 3: felt, and never the reason a game is won). The
+size is small beside what a side earns in play: an ultimate costs 50 to 60 spirit, and a hockey goal alone is worth 18.
+Football's lift was first half a mana, which bought nothing at all (every cost and gain there is whole, and the two
+runs came out identical), so it is one.
+
+**Phase 4, the Supporters' Stand** (300 journeys each, the following's effects on). The lab's bot spends fans when
+told what following to keep (`'{"spend": 400}'`): above it, a mascot once, then a fan favourite for its lowest
+starter, then a whip-round. It does not walk to the Stand. Prices are three times Sudden Death's fan stand: Open
+training 350, Whip-round 150 (for 50 gold), Fan favourite 450, Mascot 750, the coach 250, a testimonial 600.
+
+| The bot keeps | Champion | Fans at the end | Favours a journey |
+|---|---|---|---|
+| Everything (never spends) | 78.3% | 1,397 | 0 |
+| A travelling army (900) | 82.0% | 1,272 | 1.4 |
+| A supporters' club (400) | 82.0% | 898 | 3.5 |
+| Nothing | 83.7% | 601 | 4.8 |
+
+Spending is worth about 4 points of champion rate (a cell is good to about 5, and all three spending rows sit
+together above the row that never spends), nearly all of it from the first favour, the mascot: an uncommon trophy.
+Favours after it add little. **Holding looks like it is worth nothing here, and that is the bot, not the game**: its
+journey is the card game on the road, with few matches at grounds and none in the engines, so it never sees the gate
+or the lift. Whether holding a big following is a real rival to spending it has to be judged by hand; if it isn't,
+the mascot's price is the first number to raise.

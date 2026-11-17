@@ -125,6 +125,12 @@ function hkPowersStart(on) {
   hkFxNow();
 }
 const hkManaAdd = (s, n) => { if (G.mana && G.powers && G.powOn[s]) G.mana[s] = clamp(G.mana[s] + n, 0, HK_MANA.max); };
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last period. It is spirit, so it does nothing without powers. */
+const HK_FANS = { spirit: 10 };
+function hkFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; for (const s of [0, 1]) if (G.fans[s]) hkSpiritAdd(s, HK_FANS.spirit); }
+// going into the last period: the sides whose fans lift them again (behind, and not already)
+function hkFansLate() { const out = []; for (const s of [0, 1]) if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && G.score[s] < G.score[1 - s]) { G.fanLate[s] = true; hkSpiritAdd(s, HK_FANS.spirit); out.push(s); } return out; }
 function hkSpiritAdd(s, n) { if (G.spirit && G.powers && G.powOn[s]) G.spirit[s] = clamp(G.spirit[s] + n, 0, HK_SPIRIT.max); }
 function hkFxMerge(F, fx) { for (const k in fx || {}) { if (!(k in HK_FX0)) continue; F[k] = HK_FX_MUL.has(k) ? F[k] * Math.max(.05, 1 + (fx[k] - 1) * HK_POW_K) : F[k] + fx[k] * HK_POW_K; } return F; }
 // the effects of what is going now, for each side: an ultimate's by whether its side has the puck

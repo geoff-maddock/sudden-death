@@ -120,6 +120,11 @@ function bkPowersStart(on) {
 }
 const bkManaAdd = (s, n) => { if (G.mana && G.powers) G.mana[s] = clamp(G.mana[s] + n, 0, BK_MANA.max); };
 // (spirit belongs to powers: a game without them has none)
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last quarter. It is spirit, so it does nothing without powers. */
+const BK_FANS = { spirit: 10 };
+function bkFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; for (const s of [0, 1]) if (G.fans[s]) bkSpiritAdd(s, BK_FANS.spirit); }
+function bkFansLate() { const out = []; for (const s of [0, 1]) if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && G.score[s] < G.score[1 - s]) { G.fanLate[s] = true; bkSpiritAdd(s, BK_FANS.spirit); out.push(s); } return out; }
 function bkSpiritAdd(s, n) { if (G.spirit && G.powers) G.spirit[s] = clamp(G.spirit[s] + n, 0, BK_SPIRIT.max); }
 // the merged effects for this possession (G.cur.fx), or one of them
 function bkFx(k) { const F = G.cur && G.cur.fx; return F && F[k] != null ? F[k] : BK_FX0[k]; }

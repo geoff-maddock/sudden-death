@@ -334,8 +334,24 @@ window.REALMLAB = function (opts = {}) {
     ['wild', 'rime', 2], ['cup', 'rime'], ['dungeon', 'deepseam'],
     ['cup', 'crown'],
   ];
+  /* the Supporters' Stand (issue #79): opts.spend is the following the bot keeps (a number of fans; 0 spends them all).
+     Above it, it does what a player would: a mascot once, then a fan favourite for its lowest starter, then a whip-round.
+     It does not walk to the Stand: the question is what spending is worth, not the trip. */
+  const spend = () => {
+    if (opts.spend == null || typeof wStandBuy !== 'function') return;
+    for (let i = 0; i < 12; i++) {
+      const have = (RUN.fans || 0) - opts.spend, F = W_STAND.favours;
+      if (have >= F.mascot.cost && !log.mascot && relicPool('u').length) { if (wStandBuy('mascot')) break; log.mascot = 1; log.favours = (log.favours || 0) + 1; continue; }
+      const ch = have >= F.favourite.cost ? wStarters().filter(p => p.lvl < W_PARTY.maxLvl).sort((x, y) => x.lvl - y.lvl) : [];
+      if (ch.length) { if (wStandBuy('favourite', ch[0].id)) break; log.favours = (log.favours || 0) + 1; continue; }
+      // (nobody left to favour: the hat goes round)
+      if (have >= F.favourite.cost && have >= F.whip.cost) { if (wStandBuy('whip')) break; log.favours = (log.favours || 0) + 1; continue; }
+      break;
+    }
+  };
   for (const [k, a, n] of ROUTE) {
     stage = k + ' ' + a;
+    spend();
     const before = { stage, day: WG.dayAbs, hp: RUN.hp, maxhp: RUN.maxhp, gold: RUN.gold, fans: RUN.fans || 0, deck: RUN.deck.length, lvls: wStarters().map(p => p.lvl), roster: wRoster().length, relics: RUN.relics.length };
     let ok = true;
     if (k === 'wild') wild(a, n);

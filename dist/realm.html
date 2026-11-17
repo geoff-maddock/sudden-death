@@ -23159,6 +23159,7 @@ function gfStart(opts) {
   gfPlaybookStart(); gfBoxStart();
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
+  gfFansStart(o.fans);
   gfStanceStart(o.stance);
   gfKitStart(o.bags);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
@@ -23685,7 +23686,7 @@ function gfGameNext() {
   // Sudden Death: the first score wins
   if (G.half === 3 && scored) return false;
   if (G.clock <= 0) {
-    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); gfPowersHalf(); GD.msg = `Halftime: ${gfScoreLine()}.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
+    if (G.half === 1) { G.half = 2; G.clock = GF_GAME.half; gfHalfRest(); gfPowersHalf(); GD.msg = `Halftime: ${gfScoreLine()}.`; for (const s of gfFansLate()) GD.msg += ` ${G.teams[s].name}'s fans are still singing.`; GD.why = ''; GD.next = 1 - G.recv; gfGo('half'); return true; }
     if (G.score[0] !== G.score[1] || G.half === 3) return false;
     G.half = 3; G.clock = GF_GAME.ot; gfPowersHalf(); GD.msg = `Tied at ${G.score[0]}: Sudden Death. The first score wins.`; GD.why = ''; GD.next = G.recv; gfGo('half'); return true;
   }
@@ -24181,6 +24182,12 @@ function gfPowersAfter() {
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last half. It is mana, so it does nothing without powers. */
+// (a whole mana: every cost and gain in football is whole, so half of one never bought anything)
+const GF_FANS = { mana: 1 };
+function gfFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; if (G.mana) for (const s of [0, 1]) if (G.fans[s]) G.mana[s] = Math.min(GF_MANA.max, G.mana[s] + GF_FANS.mana); }
+function gfFansLate() { const out = []; if (G.mana) for (const s of [0, 1]) if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && G.score[s] < G.score[1 - s]) { G.fanLate[s] = true; G.mana[s] = Math.min(GF_MANA.max, G.mana[s] + GF_FANS.mana); out.push(s); } return out; }
 function gfPowersHalf() { if (G.salve) G.salve = [[], []]; if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
 // a new drive: mana for both sides
 function gfPowersDrive() { if (G.mana) for (const s of [0, 1]) gfManaAdd(s, GF_MANA.drive); }
@@ -25025,7 +25032,7 @@ function gfHide() { GFK.clear(); GFP.host.hidden = true; GFP.on = false; cancelA
    lineup() is who is on the field, kick() the field-goal try from here, why the last result's reason.
    box, audio, onQuit and onSnap come with the full game (phases 2 and 5). */
 return {
-  newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES),
+  newGame: gfNewGame, spot: gfSpot, get G() { return G; }, fansRules: Object.assign({}, GF_FANS), fansLate: () => gfFansLate(), rules: Object.assign({}, GF_RULES),
   start: gfStart, game: gfStartGame, simGame: gfSimGame, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
   get on() { return GFP.on; }, get speed() { return GFP.speed; }, set speed(n) { GFP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
   get play() { return L; }, pause: on => { GFP.paused = !!on; }, get paused() { return GFP.paused; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },
@@ -26158,6 +26165,7 @@ function bxStart(opts) {
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
   Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0,
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] });
+  bxFansStart(o.fans);
   // gear with a status at the opening bell (13-kit.js)
   for (const f of G.F) { const op = bxGx(f).open; if (op) f.fx.push(Object.assign({ id: 'g_open' }, op)); }
   BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
@@ -26248,7 +26256,7 @@ function bxRoundEnd() {
   for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); }
   const r = bxBell(work), sc = G.cards[G.cards.length - 1];
   bxLog(`End of round ${n}: ${sc.map((s, j) => `${BX_JUDGES[j].n} ${s[0]}-${s[1]}`).join(', ')}.`);
-  if (r === 'over') { bxLog(bxVerdict(), true); bxOver(); } else bxCorner();
+  if (r === 'over') { bxLog(bxVerdict(), true); bxOver(); } else { for (const s of bxFansLate()) bxLog(`${G.corners[s].name}'s fans are still singing.`); bxCorner(); }
 }
 function bxCorner() {
   for (const f of G.F) {
@@ -26718,7 +26726,7 @@ function bxCardStart(opts) {
   const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
   const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
   CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null,
-    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] };
+    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [], fans: (o.fans || [0, 0]).slice() };
   bxCardBout();
   return CD;
 }
@@ -26726,7 +26734,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}] });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
@@ -26864,6 +26872,17 @@ function bxFx(f) {
 const bxPowOn = () => !G || G.powers !== false;
 const bxPowOf = (f, which) => { const P = bxPowOn() && BX_POW[f.kind]; if (!P) return null; return which === 'sp' && f.spPick === 'sp2' && P.sp2 ? P.sp2 : P[which] || null; };
 // spirit (a bout saved before there was any has a full meter)
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last round. It is spirit, so it does nothing without powers. */
+const BX_FANS = { spirit: 10 };
+function bxFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; if (G.powers) for (const x of G.F) if (G.fans[x.side]) x.spirit = Math.min(BX_SPIRIT.max, bxSpirit(x) + BX_FANS.spirit); }
+function bxFansLate() {
+  const out = []; if (!G.powers || G.round !== G.rounds) return out;
+  const T = bxTotals();
+  for (const x of G.F) { const s = x.side, lead = T.reduce((n, t) => n + Math.sign(s ? t[1] - t[0] : t[0] - t[1]), 0);
+    if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && lead < 0) { G.fanLate[s] = true; x.spirit = Math.min(BX_SPIRIT.max, bxSpirit(x) + BX_FANS.spirit); out.push(s); } }
+  return out;
+}
 const bxSpirit = f => f.spirit == null ? BX_SPIRIT.max : f.spirit;
 // a punch landed (a: who threw it, b: who took it; blocked or clean): spirit for both
 function bxSpiritGain(a, b, dmg, blocked) {
@@ -27406,7 +27425,7 @@ function bxHide() { BXK.clear(); BXHELD.clear(); bxInputClear(); BXP.host.hidden
    (one beat), and act/clinch (a fighter's move, by side). */
 return {
   newBout: bxNewBout, knockdown: bxKnockdown, countOut: bxCountOut, bell: bxBell, roundScore: bxRoundScore, decision: bxDecision,
-  totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, rules: Object.assign({}, BX_RULES),
+  totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, fansRules: Object.assign({}, BX_FANS), fansLate: () => bxFansLate(), rules: Object.assign({}, BX_RULES),
   start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
   get on() { return BXP.on; }, get speed() { return BXP.speed; }, set speed(n) { BXP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
   pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '', intro: () => G && G.F ? bxIntroTape() : null, live: () => G && G.F && BD ? bxLive() : null,
@@ -28691,7 +28710,7 @@ function bkStart(opts) {
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
   bkCallsStart(o);
-  bkCourtStart(!!o.court); bkPowersStart(o.powers); bkKitStart(o.bags);
+  bkCourtStart(!!o.court); bkPowersStart(o.powers); bkFansStart(o.fans); bkKitStart(o.bags);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
@@ -28935,6 +28954,7 @@ function bkPeriodOver() {
   }
   GD.half = r === 'half';
   GD.msg = r === 'ot' ? `Level at ${G.score[0]}: overtime.` : `End of the ${bkPeriodName(was)}: ${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}.`;
+  if (r !== 'ot' && G.q === BK_RULES.quarters) for (const s of bkFansLate()) GD.msg += ` ${G.teams[s].name}'s fans are still singing.`;
   Object.assign(L, { shot: null, drive: false });
   bkGo('break');
 }
@@ -29925,6 +29945,11 @@ function bkPowersStart(on) {
 }
 const bkManaAdd = (s, n) => { if (G.mana && G.powers) G.mana[s] = clamp(G.mana[s] + n, 0, BK_MANA.max); };
 // (spirit belongs to powers: a game without them has none)
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last quarter. It is spirit, so it does nothing without powers. */
+const BK_FANS = { spirit: 10 };
+function bkFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; for (const s of [0, 1]) if (G.fans[s]) bkSpiritAdd(s, BK_FANS.spirit); }
+function bkFansLate() { const out = []; for (const s of [0, 1]) if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && G.score[s] < G.score[1 - s]) { G.fanLate[s] = true; bkSpiritAdd(s, BK_FANS.spirit); out.push(s); } return out; }
 function bkSpiritAdd(s, n) { if (G.spirit && G.powers) G.spirit[s] = clamp(G.spirit[s] + n, 0, BK_SPIRIT.max); }
 // the merged effects for this possession (G.cur.fx), or one of them
 function bkFx(k) { const F = G.cur && G.cur.fx; return F && F[k] != null ? F[k] : BK_FX0[k]; }
@@ -30550,7 +30575,7 @@ function bkNameP(p) { return p ? { id: p.id, n: p.n, cost: p.cost, fits: p.fits,
 function bkNameDesc(T) { return Object.fromEntries(Object.entries(T).map(([k, v]) => [k, { n: v.n, desc: v.desc }])); }
 return {
   newGame: bkNewGame, score: bkScore, shotValue: bkShotValue, run: (dt, hold) => bkRun(dt, hold), give: bkGive, violation: bkViolation, foul: bkFoul,
-  periodEnd: bkPeriodEnd, dir: bkDir, hoopX: bkHoopX, periodName: bkPeriodName, get G() { return G; }, rules: JSON.parse(JSON.stringify(BK_RULES)),
+  periodEnd: bkPeriodEnd, dir: bkDir, hoopX: bkHoopX, periodName: bkPeriodName, get G() { return G; }, fansRules: Object.assign({}, BK_FANS), fansLate: () => bkFansLate(), rules: JSON.parse(JSON.stringify(BK_RULES)),
   start: o => { BKP.paused = false; return bkStart(o); }, simGame: o => bkSimGame(o), show: bkShow, hide: bkHide, render: bkRender, summary: () => G && G.teams ? bkSummary() : null, box: () => G && G.teams ? bkBox() : null,
   get on() { return BKP.on; }, get speed() { return BKP.speed; }, set speed(n) { BKP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); },
   get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, clock: () => G && GD ? { q: G.q, name: bkPeriodName(G.q), text: bkClockText(), shot: Math.ceil(G.shot) } : null,
@@ -32003,7 +32028,7 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkKitStart(o.bags);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkFansStart(o.fans); hkKitStart(o.bags);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
@@ -32211,6 +32236,7 @@ function hkPeriodOver() {
     return hkGo('so');
   }
   GD.msg = r === 'ot' ? `Level at ${G.score[0]} after three periods. Sudden death: the next goal wins.` : `End of the ${hkPeriodName(was)}: ${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}.`;
+  if (r === 'period' && G.p === HK_RULES.periods) for (const s of hkFansLate()) GD.msg += ` ${G.teams[s].name}'s fans are still singing.`;
   // (a penalty that was coming when the period ended is served from the start of the next)
   if (GD.delay) hkPenaltyCall(true);
   // everyone rests between periods, the ice is scraped, and both sides get a mana
@@ -33353,6 +33379,12 @@ function hkPowersStart(on) {
   hkFxNow();
 }
 const hkManaAdd = (s, n) => { if (G.mana && G.powers && G.powOn[s]) G.mana[s] = clamp(G.mana[s] + n, 0, HK_MANA.max); };
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last period. It is spirit, so it does nothing without powers. */
+const HK_FANS = { spirit: 10 };
+function hkFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; for (const s of [0, 1]) if (G.fans[s]) hkSpiritAdd(s, HK_FANS.spirit); }
+// going into the last period: the sides whose fans lift them again (behind, and not already)
+function hkFansLate() { const out = []; for (const s of [0, 1]) if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && G.score[s] < G.score[1 - s]) { G.fanLate[s] = true; hkSpiritAdd(s, HK_FANS.spirit); out.push(s); } return out; }
 function hkSpiritAdd(s, n) { if (G.spirit && G.powers && G.powOn[s]) G.spirit[s] = clamp(G.spirit[s] + n, 0, HK_SPIRIT.max); }
 function hkFxMerge(F, fx) { for (const k in fx || {}) { if (!(k in HK_FX0)) continue; F[k] = HK_FX_MUL.has(k) ? F[k] * Math.max(.05, 1 + (fx[k] - 1) * HK_POW_K) : F[k] + fx[k] * HK_POW_K; } return F; }
 // the effects of what is going now, for each side: an ultimate's by whether its side has the puck
@@ -33952,7 +33984,7 @@ return {
   powerOptions: side => hkPowerOptions(side), ultOptions: side => hkUltOptions(side), sitOptions: side => hkSitOptions(side), cast: (side, i) => hkCast(side, i), castUlt: (side, i) => hkCastUlt(side, i), castSit: (side, id) => hkCastSit(side, id),
   fx: (side, k) => hkFx(side, k), fx0: Object.assign({}, HK_FX0), get autoPow() { return GD ? GD.autoPow !== false : true; }, get powersOn() { return !!(G && G.powers); },
   pows: JSON.parse(JSON.stringify(Object.fromEntries(Object.keys(HK_POW).map(k => [k, { one: HK_POW[k], two: HK_POW2[k], ult: { id: HK_ULT[k].id, n: HK_ULT[k].n, desc: HK_ULT[k].desc, o: HK_ULT[k].o, d: HK_ULT[k].d } }])))),
-  sits: Object.fromEntries(Object.entries(HK_SIT).map(([k, v]) => [k, { n: v.n, cost: v.cost, desc: v.desc }])), powRules: { k: HK_POW_K, mana: Object.assign({}, HK_MANA), sta: Object.assign({}, HK_POW_STA), secs: HK_POW_SECS, ultSecs: HK_ULT_SECS, spirit: Object.assign({}, HK_SPIRIT) },
+  sits: Object.fromEntries(Object.entries(HK_SIT).map(([k, v]) => [k, { n: v.n, cost: v.cost, desc: v.desc }])), fansRules: Object.assign({}, HK_FANS), fansLate: () => hkFansLate(), powRules: { k: HK_POW_K, mana: Object.assign({}, HK_MANA), sta: Object.assign({}, HK_POW_STA), secs: HK_POW_SECS, ultSecs: HK_ULT_SECS, spirit: Object.assign({}, HK_SPIRIT) },
   powerIds: () => Object.keys(HK_POW_BY).concat(Object.keys(HK_ULT_BY)), cpuPowers: dt => { if (L) { L.powT = 0; hkCpuPowers(dt || .5); } }, spiritAdd: (s, n) => hkSpiritAdd(s, n), manaAdd: (s, n) => hkManaAdd(s, n),
   // from the world (phase 6): a save point at each whistle and break (wantSnap says when; onSnap hears { G, L, GD }),
   // resume(snap) puts one back, snapshot() takes one now; the Pond Rink's ways (start({ pond, snow })), and its rules
@@ -47283,6 +47315,207 @@ renderHelp = function () {
   wW98RenderHelp();
   const h = $('wHelpFollow'); if (!h || $('wHelpFanGate')) return;
   h.insertAdjacentHTML('beforeend', ` <span id="wHelpFanGate"><b>The gate</b> (${W_FOLLOW.at[0]} fans): at every card match at a ground your fans pay in 1 gold for every ${W_FANS.per} of them, up to ${W_FANS.cap} a match, half as much again with a travelling army, doubled at home, win or lose. <b>The away end</b> (${W_FOLLOW.at[1]} fans): ${W_FANS.block} Block at kickoff in any card match away from home, unless the crowd there is already yours.</span>`);
+};
+/* w99: what a following does in the engines (issue #79, phase 3): the away end and the late lift on the ice, the court,
+   the gridiron and in the ring. Loads after w98-fangate.js; changes earlier parts only by reassignment (saved
+   originals carry the wW99 prefix).
+
+   A supporters' club travels: at a game away from home your side starts with a little more (10 spirit in hockey,
+   basketball and boxing, a mana in football; each engine's own number, its *_FANS table). A travelling army
+   sings all game: the same again, once, if you are behind going into the last period, quarter or round (the second
+   half in football). It goes to the engine as a plain start value, opts.fans [yours, 0]: nobody's ratings change,
+   the other side gets none, and Simulate gets it too. It needs the engine's powers to be on (it is spirit and mana).
+
+   A game is away unless its ground is in your home ground's region. Each engine has one ground: the Pond Rink, the
+   Charter Court, the Ash Bowl and the Anvil Ring (W_FAN_GRD).
+
+   The world's start functions build their own options, so this part does what the kit parts do (w73): it marks that a
+   world game is being started (W_FAN_NEXT) and the engine's start and simulate calls made meanwhile take the value.
+   W_FAN_GRD, wFanLift(sport) (0, 1 or 2)
+   Wrapped: wStartRink, wStartCourt, wStartGrid and wRingGo (wW99…: the mark), wHK.start and simGame, wBK.start and
+   simGame, wGF.start, game and simGame, wBX.cardStart and simCard (the value goes in), renderHelp (wW99RenderHelp:
+   #wHelpFanLift). */
+
+const W_FAN_GRD = { hockey: 'g_rink', basketball: 'g_court', football: 'g_bowl', boxing: 'g_ring' };
+let W_FAN_NEXT = null;
+W_FOLLOW.live[3] = true;
+// what your fans bring to a game of this sport today: 0 nothing, 1 the away end, 2 and the late lift
+function wFanLift(sport) {
+  const g = wGrd(W_FAN_GRD[sport]); if (!g) return 0;
+  if (wIsHome({ kind: 'ground', region: W_GRD_REG[g.city] })) return 0;
+  return wFollowOn(3) ? 2 : wFollowOn(2) ? 1 : 0;
+}
+function wFanMark(sport, fn) {
+  const n = wFanLift(sport);
+  if (!n) return fn();
+  W_FAN_NEXT = { fans: [n, 0], said: false };
+  try { return fn(); } finally { W_FAN_NEXT = null; }
+}
+// the engine call takes the value (once said, the log has it)
+function wFanOpts(o) {
+  if (!W_FAN_NEXT) return o;
+  if (!W_FAN_NEXT.said) { W_FAN_NEXT.said = true; wLog(W_FAN_NEXT.fans[0] >= 2 ? 'Your travelling army is in the away end, and will sing all game.' : 'Your supporters\' club is in the away end.', 'g'); }
+  return Object.assign({}, o, { fans: W_FAN_NEXT.fans.slice() });
+}
+
+const wW99StartRink = wStartRink; wStartRink = function (o) { return wFanMark('hockey', () => wW99StartRink.call(this, o)); };
+const wW99StartCourt = wStartCourt; wStartCourt = function (o) { return wFanMark('basketball', () => wW99StartCourt.call(this, o)); };
+const wW99StartGrid = wStartGrid; wStartGrid = function (o) { return wFanMark('football', () => wW99StartGrid.call(this, o)); };
+const wW99RingGo = wRingGo; wRingGo = function (o, mine, theirs, picks) { return wFanMark('boxing', () => wW99RingGo.call(this, o, mine, theirs, picks)); };
+
+const wW99HkStart = wHK.start, wW99HkSim = wHK.simGame; wHK.start = o => wW99HkStart(wFanOpts(o)); wHK.simGame = o => wW99HkSim(wFanOpts(o));
+const wW99BkStart = wBK.start, wW99BkSim = wBK.simGame; wBK.start = o => wW99BkStart(wFanOpts(o)); wBK.simGame = o => wW99BkSim(wFanOpts(o));
+const wW99GfStart = wGF.start, wW99GfGame = wGF.game, wW99GfSim = wGF.simGame; wGF.start = o => wW99GfStart(wFanOpts(o)); wGF.game = o => wW99GfGame(wFanOpts(o)); wGF.simGame = o => wW99GfSim(wFanOpts(o));
+const wW99BxCard = wBX.cardStart, wW99BxSim = wBX.simCard; wBX.cardStart = o => wW99BxCard(wFanOpts(o)); wBX.simCard = o => wW99BxSim(wFanOpts(o));
+
+const wW99RenderHelp = renderHelp;
+renderHelp = function () {
+  wW99RenderHelp();
+  const h = $('wHelpFollow'); if (!h || $('wHelpFanLift')) return;
+  h.insertAdjacentHTML('beforeend', ` <span id="wHelpFanLift"><b>In hockey, basketball, football and boxing</b> the away end is a little more to start a game away from home: ${wHK.fansRules.spirit} spirit (${wGF.fansRules.mana} mana in football). <b>They sing all game</b> (${W_FOLLOW.at[2]} fans): the same again, once, if you are behind going into the last period, quarter or round (the second half in football). Simulate gets both.</span>`);
+};
+/* w100: the Supporters' Stand (issue #79, phase 4). Loads after w99-fanlift.js; changes earlier parts only by
+   reassignment (saved originals carry the wW100 prefix).
+
+   Fans can be spent as well as held. At your home ground (a button on its screen), or with Imelda Foss at the League
+   office until you have one (ask her about SUPPORTERS), the Supporters' Stand does favours. A favour sends those fans
+   home happy: they leave your total, so your following may drop a step, and what that step gave goes with it until
+   you win them back. That is the choice: hold a big following for the steady lift, or spend it for something now.
+
+     Open training          practice a card (★), as a drill on the training pitch does
+     Whip-round             gold now
+     Fan favourite          one player gets a level's worth of XP
+     Mascot                 a random uncommon trophy
+     The supporters' coach  ride to any city you have visited
+     A testimonial          a friendly at your home ground against a rival club of your choice, with a full house:
+                            twice your fans' gate at home, as it stood when you called it, win or lose
+
+   Prices are in fans (W_STAND.favours; three times Sudden Death's fan stand, as a journey here wins about three times
+   the fans). wStandBuy is the favour itself, with no screen, so the bot can do it too; where you may open the Stand
+   is the screens' business (wStandWhere).
+
+   W_STAND, wStandWhere(), wStandProblems(id), wStandChoices(id), wStandBuy(id, arg), wOpenStand(msg),
+   W_ON_END.testimonial
+   Wrapped: wOpenGround (wW100OpenGround: the Stand's button), wRunAct (wW100RunAct: 'stand'), renderHelp
+   (wW100RenderHelp: #wHelpStand). Imelda Foss gains the topic SUPPORTERS. */
+
+const W_STAND = {
+  favours: {
+    training: { n: 'Open training', cost: 350, d: 'Practice a card in front of the fans: it gains Practice ★.', pick: 'card' },
+    whip: { n: 'Whip-round', cost: 150, gold: 50, d: 'The fans pass a hat: 50 gold now.' },
+    favourite: { n: 'Fan favourite', cost: 450, d: 'The fans take to one of your players: a level\'s worth of XP.', pick: 'player' },
+    mascot: { n: 'Mascot', cost: 750, d: 'A random uncommon trophy.' },
+    coach: { n: 'The supporters\' coach', cost: 250, mins: 180, d: 'Ride with the fans to any city you have visited.', pick: 'city' },
+    testimonial: { n: 'A testimonial', cost: 600, d: 'A friendly at your home ground against a rival club of your choice, with a full house: twice your fans\' gate, win or lose.', pick: 'club' },
+  },
+  mult: 2,   // a testimonial's gate, times your fans' gate at home
+};
+// where the Stand is open to you now: 'ground' at your home ground, 'office' at the League office while you have none, or ''
+function wStandWhere() {
+  if (!WG) return '';
+  if (wHomeGround()) return WG.map === WG.ground.town ? 'ground' : '';
+  return 'office';
+}
+// what you can pick for a favour that needs a choice: [{ id, n }] (cards are the cards themselves)
+function wStandChoices(id) {
+  const F = W_STAND.favours[id]; if (!F || !F.pick) return [];
+  if (F.pick === 'card') return RUN.deck.filter(practicable);
+  if (F.pick === 'player') return wRoster().filter(p => p.lvl < W_PARTY.maxLvl).map(p => ({ id: p.id, n: `${p.n}, level ${p.lvl}` }));
+  if (F.pick === 'city') return DB.locs.filter(L => L.map && MAPS[L.map] && MAPS[L.map].kind === 'town' && L.map !== WG.map && (WG.flags || {})['seen_' + L.id]).map(L => ({ id: L.map, n: MAPS[L.map].name || L.map }));
+  if (F.pick === 'club') return Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i).map(c => ({ id: c, n: CLUBS[c].name }));
+  return [];
+}
+// why you can't have this favour now (a list; empty when you can)
+function wStandProblems(id) {
+  const F = W_STAND.favours[id], out = []; if (!F) return ['No such favour.'];
+  if (wFans() < F.cost) out.push(`It takes ${F.cost} fans, and you have ${wFans()}.`);
+  if (id === 'mascot' && !relicPool('u').length) out.push('You have every uncommon trophy.');
+  if (id === 'testimonial' && !wHomeGround()) out.push('A testimonial needs a home ground.');
+  else if (id === 'testimonial' && WG.map !== WG.ground.town) out.push('A testimonial is played at your home ground.');
+  if (F.pick && !wStandChoices(id).length) out.push({ card: 'No card of yours can take Practice.', player: 'Every player is at the top level.', city: 'You have visited no other city.', club: 'No rival club to invite.' }[F.pick]);
+  return out;
+}
+/* the favour itself: the fans leave your total and it is done. arg is the card, the player's id, the city's map or the
+   club. Returns '' or why not. */
+function wStandBuy(id, arg) {
+  const F = W_STAND.favours[id], probs = wStandProblems(id); if (probs.length) return probs.join(' ');
+  let said = '';
+  if (F.pick) {
+    const ch = wStandChoices(id), ok = F.pick === 'card' ? ch.includes(arg) : ch.some(c => c.id === arg);
+    if (!ok) return 'Pick one first.';
+  }
+  const s0 = wFollowStep(), gate = id === 'testimonial' ? wFanGate({ kind: 'ground', region: wHomeRegion() }) * W_STAND.mult : 0;
+  RUN.fans = wFans() - F.cost;
+  if (id === 'training') { arg.sk = 1; achAdd('practice', 1); said = `Open training: your team practises ${wCardName(arg.id, arg.up)} in front of the fans (★).`; }
+  else if (id === 'whip') said = `A whip-round: the fans pass a hat, and ${gainGold(F.gold)} gold comes back in it.`;
+  else if (id === 'favourite') { const p = wRoster().find(x => x.id === arg); said = `${p.n} is the fans' favourite.`; wLog(said, 'g'); said = ''; wGiveXp(p, wXpNeed(p.lvl)); }
+  else if (id === 'mascot') { const r = pick(relicPool('u')); gainRelic(r); said = `The fans bring a mascot, and with it a trophy: ${RELICS[r].n}. ${RELICS[r].desc || ''}`.trim(); }
+  else if (id === 'coach') { const L = DB.locs.find(l => l.map === arg); wAdvance(F.mins); wEnterMap('world', L.x, L.y + 1); said = `The supporters' coach drops you at the gates of ${MAPS[arg].name || arg}.`; }
+  if (said) wLog(said, 'g');
+  const s1 = wFollowStep();
+  if (s1 < s0) wLog(`Your following is down to ${wFollowName(s1).toLowerCase()} until you win them back.`, 'b');
+  wSave();
+  if (id === 'testimonial') {
+    wLog(`A testimonial against ${CLUBS[arg].name}: the ground is full.`, 'g');
+    startMatch({ type: 'rival', tier: wTierHere(), ambush: false, name: wClubCaptain(arg), world: { kind: 'testimonial', ref: { club: arg, gate }, region: wHomeRegion() } });
+  }
+  return '';
+}
+// a testimonial is over: the full house pays, win or lose
+W_ON_END.testimonial = function (r, ref, W) {
+  const g = ref && ref.gate ? gainGold(ref.gate) : 0;
+  wLog(`The testimonial is ${r === 'win' ? 'won' : 'lost'}, and the full house pays ${g} gold.`, r === 'win' ? 'g' : 'd');
+};
+
+/* ---------- the screen ---------- */
+function wOpenStand(msg) {
+  if (LAB || !WG) return;
+  const where = wStandWhere(), s = wFollowStep(), next = W_FOLLOW.at[s];
+  const rows = Object.keys(W_STAND.favours).map(id => {
+    const F = W_STAND.favours[id], probs = wStandProblems(id), drop = !probs.length && W_FOLLOW.at.filter(a => wFans() - F.cost >= a).length < s;
+    return `<tr><td><b>${esc(F.n)}</b><small>${esc(F.d)}${probs.length ? ` <span class="wbad">${probs.map(esc).join(' ')}</span>` : drop ? ` <span class="wbad">Takes you below ${esc(wFollowName(s).toLowerCase())}.</span>` : ''}</small></td><td class="wnum">${F.cost} fans</td><td><button class="ghost" data-favour="${id}" ${probs.length ? 'disabled' : ''}>Ask</button></td></tr>`;
+  }).join('');
+  const body = !where ? `<p>The Supporters' Stand is at your home ground, in ${esc(wTownName(WG.ground.town))}.</p>`
+    : `<p class="hint" id="wStandNow"><b>${esc(wFollowName(s))}</b>: ${wFans()} fans${next != null ? `, ${next - wFans()} more for ${esc(W_FOLLOW.names[s + 1].toLowerCase())}` : ''}. A favour sends those fans home happy: they leave your total, and a step you drop below stops giving what it gave until you win them back.</p>
+      <table class="wshop"><tbody>${rows}</tbody></table>`;
+  const close = modal(`<header><h3>The Supporters' Stand</h3><button class="ghost" data-close>Done</button></header>${msg ? `<p class="wbad" role="alert">${esc(msg)}</p>` : ''}${body}`, () => wDrain());
+  const done = r => { wDrain(); if (UI.view !== 'world') return; wOpenStand(r); };
+  $('modalBox').querySelectorAll('[data-favour]').forEach(b => b.onclick = () => {
+    const id = b.dataset.favour, F = W_STAND.favours[id];
+    close();
+    if (!F.pick) return done(wStandBuy(id));
+    if (F.pick === 'card') return wPickCard(wStandChoices(id), F.n, `${F.d} ${F.cost} fans.`, card => done(card ? wStandBuy(id, card) : ''));
+    const ch = wStandChoices(id);
+    const c2 = modal(`<header><h3>${esc(F.n)}</h3><button class="ghost" data-close>Back</button></header><p class="hint">${esc(F.d)} ${F.cost} fans.</p><div class="row wstandpick">${ch.map(c => `<button class="ghost" data-pick="${esc(String(c.id))}">${esc(c.n)}</button>`).join('')}</div>`, () => { if ($('modal').hidden) done(''); });
+    $('modalBox').querySelectorAll('[data-pick]').forEach(x => x.onclick = () => { const v = x.dataset.pick, arg = F.pick === 'player' ? ch.find(c => String(c.id) === v).id : v; c2(); const r = wStandBuy(id, arg); if (id === 'coach' && !r) { wDrain(); return; } if (id === 'testimonial' && !r) return; done(r); });
+  });
+}
+
+/* ---------- where it opens ---------- */
+const wW100OpenGround = wOpenGround;
+wOpenGround = function (town, msg) {
+  wW100OpenGround(town, msg);
+  const row = $('wGroundSleep') && $('wGroundSleep').parentNode; if (!row || $('wGroundStand') || W_FOLLOW.off) return;
+  row.insertAdjacentHTML('beforeend', `<button class="ghost" id="wGroundStand">The Supporters' Stand (${wFans()} fans)</button>`);
+  $('wGroundStand').onclick = () => { const x = document.querySelector('#modalBox [data-close]'); if (x) x.click(); wOpenStand(); };
+};
+if (DB.chars.clerk) {
+  DB.chars.clerk.topics.supporters = { t: 'The Supporters\' Stand. Until a team has a ground of its own, its fans leave their favours with me. Once you have one, they will be there.', act: 'stand' };
+  DB.chars.clerk.greet += ' Your SUPPORTERS leave word here.';
+}
+const wW100RunAct = wRunAct;
+wRunAct = function (act, id) {
+  if (act === 'stand') return wStandWhere() === 'office' ? wOpenStand() : wLog(`"Your fans have a stand of their own now, at your ground in ${wTownName(WG.ground.town)}."`, 'd');
+  return wW100RunAct.apply(this, arguments);
+};
+
+/* ---------- How to play ---------- */
+const wW100RenderHelp = renderHelp;
+renderHelp = function () {
+  wW100RenderHelp();
+  const h = $('wHelpFollow'); if (!h || $('wHelpStand')) return;
+  const F = W_STAND.favours;
+  h.insertAdjacentHTML('beforeend', ` <span id="wHelpStand"><b>The Supporters' Stand</b> spends fans: at your home ground, or with Imelda Foss at the League office until you have one (ask about SUPPORTERS). ${Object.keys(F).map(k => `${F[k].n} (${F[k].cost})`).join(', ')}. The fans you spend leave your total, so a favour can drop your following a step, and what that step gave stops until you win them back.</span>`);
 };
 </script>
 </body></html>
