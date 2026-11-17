@@ -3,7 +3,7 @@
    watching. The rink is long, so there's a camera (phase 2): the whole sheet through the middle, and once the puck is
    in an end the picture pushes in on that end (hkCamStep) and swings back out with the puck when the play leaves. It
    is drawing only: HKT.cam, never G, and it stands still while the game is paused. Players are the inked figures
-   (03-figures.js) with a stick, sorted so the nearer ones stand in front; the puck carrier has a ring in their side's
+   (src/figures/figures.js) with a stick, sorted so the nearer ones stand in front; the puck carrier has a ring in their side's
    colour under them. By hand, your skater has a marker over them, a wind-up shows its bar and the target on the net,
    and a ring closes on the dot as the puck drops (hkDrawCues).
    The bar at the top has the score (underlined for the side with the puck), the period and the game clock, and each
@@ -11,6 +11,8 @@
    puts a word on the ice for a moment; at the end, the final score.
    Rink space is metres (05-live.js); hkScr turns it into canvas pixels. */
 const HKT = { t: 0, box: null, boxKey: '', bg: null, bgKey: '', cam: { u: 0, m: 0, end: 0, x: 480, y: 328, t: 0, g: null } };
+// the figures' animation clock (src/figures/figures.js, the file every engine's scope loads)
+function figClock() { return HKT.t; }
 /* the camera: the whole sheet at a face-off at centre and at a break; in a live play `mid` times the size, following the
    puck across and up and down; and k times the size once the puck is within `in` metres of an end's boards (out again
    past `out`, so it doesn't flicker at the blue line). The picture is the canvas under the bar: top, h */
