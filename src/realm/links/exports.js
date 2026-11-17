@@ -6,7 +6,8 @@
    standing nine, with no game), built(seed, par) any hole; lie and slope read a hole; clubs, lies and swing are the
    tables; reach, flight, putt and read are the pure shot model; plan is the caddie's shot for a side; start(opts) puts a
    game on the first tee ({ holes, wild, course, seed, skill: [2], teams: [2], honour }), turn() plays the next shot and
-   says what happened, summary() is the game so far, and simGame(opts) plays a whole one headless and returns it.
+   says what happened, summary() is the game so far, and simGame(opts) plays a whole one headless and returns it,
+   leaving the game on the course as it was.
    onShot and onOver hear each shot and the end.
    Phase 2 is the page and playing by hand: start(opts) also puts the game on show ({ mode: 'watch' or 'play' }), and
    show, hide, on, pause, paused, speed and render drive the canvas (l1-page.js). The beat: phase, msg, view (a copy of

@@ -119,7 +119,7 @@ function glAnimBall() {
 /* ---------- what happened, said plainly ---------- */
 function glEvSay(ev, r) {
   if (!ev || ev.k !== 'shot') return ev && ev.why ? ev.why : '';
-  const who = glName(ev.side, ev.ri), H = glHoleNow();
+  const who = glName(ev.side, ev.ri);
   let t;
   if (ev.club === 'pt') t = ev.holed ? `${who} holes the putt from ${glYards(ev.d0)}!` : `${who} putts from ${glYards(ev.d0)}${ev.lip ? ': it lips out' : ''}. ${glYards(ev.d1)} left.`;
   else {
@@ -127,7 +127,7 @@ function glEvSay(ev, r) {
     t = ev.holed ? `${who}'s ${c} drops into the cup!` : ev.water ? `${who}'s ${c} finds the water. A drop, and a stroke.` : `${who} hits a ${c} ${carry} yards, into the ${GL_TER[ev.lie]}. ${glYards(ev.d1)} to the pin.`;
   }
   if (ev.up) t += ' That is par and four more: the ball is picked up.';
-  return t + glHoleSay(ev, H);
+  return t + glHoleSay(ev);
 }
 function glHoleSay(ev) {
   if (!ev || ev.res == null) return '';
@@ -143,7 +143,9 @@ function glAimMsg() {
 
 /* ---------- your shot: the choice ---------- */
 function glSelReset() {
-  const s = GD.you, plan = glPlan(s), H = glHoleNow();
+  const s = GD.you, H = glHoleNow(), kind = glShotKind(H, s);
+  // (a putt is set up without the caddie's read: that would draw from R and throw the result away)
+  const plan = kind === 'putt' ? { ri: glPickHitter(s, 'putt'), club: 'pt', putt: true, kind } : glPlan(s);
   GD.sel = { ri: plan.ri, club: plan.club, aim: plan.putt ? { x: H.pin.x, y: H.pin.y } : { x: plan.aim.x, y: plan.aim.y }, shape: '', traj: '', spin: 0, putt: !!plan.putt, kind: plan.kind };
   glSelFix();
 }
@@ -151,7 +153,7 @@ function glSelReset() {
 function glClubsNow() {
   const H = glHoleNow(), b = G.ball[GD.you];
   if (b.lie === 'G') return ['pt'];
-  const out = GL_BAG.filter(c => c !== 'pt' && glClubOk(c, b.lie));
+  const out = glClubsFrom(b.lie, glRat(GD.you, GD.sel ? GD.sel.ri : 0));
   if (b.lie === 'F' && glPuttable(H, b)) out.push('pt');
   return out;
 }
@@ -209,9 +211,16 @@ function glAimPush(yd) {
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
 function glReadLen() { return GD && GD.sel ? 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5 : 0; }
+const GLRL = { key: '', line: [] };
 function glReadLine() {
   const S = GD && GD.sel; if (!S || !S.putt || (GD.ph !== 'aim' && GD.ph !== 'swing')) return [];
-  const b = G.ball[GD.you], H = glHoleNow(), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), v = glPuttSpeed(S.tick);
+  const b = G.ball[GD.you], key = [G.h, b.x, b.y, S.aim.x, S.aim.y, S.tick, S.ri, glReadLen()].join(',');
+  if (GLRL.key === key) return GLRL.line;
+  GLRL.key = key; GLRL.line = glReadCalc(S, b);
+  return GLRL.line;
+}
+function glReadCalc(S, b) {
+  const H = glHoleNow(), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), v = glPuttSpeed(S.tick);
   const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, noCup: true }), L = glReadLen(), out = [{ x: b.x, y: b.y }];
   let run = 0;
   for (let i = 1; i < P.path.length && run < L; i++) { run += hyp(P.path[i].x - P.path[i - 1].x, P.path[i].y - P.path[i - 1].y); out.push(P.path[i]); }

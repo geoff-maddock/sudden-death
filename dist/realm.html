@@ -22026,10 +22026,14 @@ const wGF = (function () {
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 function engSeed(n) {
   if (n == null) { engRand = Math.random; return; }
-  let a = n >>> 0;
-  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = engRng(n);
 }
 const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
@@ -25109,10 +25113,14 @@ const wBX = (function () {
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 function engSeed(n) {
   if (n == null) { engRand = Math.random; return; }
-  let a = n >>> 0;
-  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = engRng(n);
 }
 const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
@@ -27481,10 +27489,14 @@ const wBK = (function () {
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 function engSeed(n) {
   if (n == null) { engRand = Math.random; return; }
-  let a = n >>> 0;
-  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = engRng(n);
 }
 const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
@@ -30660,10 +30672,14 @@ const wHK = (function () {
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 function engSeed(n) {
   if (n == null) { engRand = Math.random; return; }
-  let a = n >>> 0;
-  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = engRng(n);
 }
 const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
@@ -34050,10 +34066,14 @@ const wGL = (function () {
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 function engSeed(n) {
   if (n == null) { engRand = Math.random; return; }
-  let a = n >>> 0;
-  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = engRng(n);
 }
 const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
@@ -34236,10 +34256,7 @@ const GL_LEN = { 3: [135, 200], 4: [325, 425], 5: [470, 545] };
 const GL_TER = { T: 'tee', F: 'fairway', r: 'rough', R: 'deep rough', S: 'sand', B: 'moss bog', W: 'water', O: 'trees', G: 'green' };
 const GLK = {};
 
-function glRng(n) {
-  let a = n >>> 0;
-  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
+const glRng = n => engRng(n);
 // hole i of the course with seed cs
 const glHoleSeed = (cs, i) => (Math.imul((cs >>> 0) + 1, 2654435761) ^ Math.imul(i + 1, 40503)) >>> 0;
 // a wild nine's pars: the standing nine's, shuffled by its seed (so a nine is par 36), repeated for eighteen
@@ -34273,7 +34290,7 @@ function glBuildHole(seed, par) {
   if (par !== 3) legs.push(len - legs.reduce((a, b) => a + b, 0));
   let cur = tee;
   legs.forEach((L, k) => {
-    const sw = par === 3 ? rn(-22, 22) : k === 0 ? rn(-12, 12) : rn(-38, 38);
+    const sw = clamp(par === 3 ? rn(-22, 22) : k === 0 ? rn(-12, 12) : rn(-38, 38), -L * 0.6, L * 0.6);
     const nx = clamp(cur.x + sw, 45, GL_W * GL_CELL - 45), dx = nx - cur.x;
     cur = { x: nx, y: cur.y + Math.sqrt(Math.max(1, L * L - dx * dx)) }; pts.push(cur);
   });
@@ -34337,7 +34354,6 @@ function glSlope(H, x, y) {
   const s = H.slope;
   return [s.g * Math.cos(s.a) + s.w * Math.sin(s.k * x + s.p), s.g * Math.sin(s.a) + s.w * Math.cos(s.k * y + s.p * 1.3)];
 }
-const glOnGreen = (H, x, y) => glLie(H, x, y) === 'G';
 /* Mossgate Links: the shot model (issue #92, phase 1). Pure: the same inputs give the same ball, so Play, the CPU and
    the headless sim all hit through it. Nothing here draws a random number; the swing's errors come in from outside.
    A full shot (glFlight): the club's carry (GL_CLUBS) by the hitter's power and the lie (GL_LIES), times the swing's
@@ -34384,15 +34400,22 @@ const GL_PUTT = { fric: 0.62, fringe: 2.2, rough: 5, g: 7.6, cup: 0.06, cap: 1.7
 
 // how a club plays from a lie for a hitter, before the wind: { carry, roll } at swing power pow
 function glReach(club, lie, rat, pow) {
-  const c = GL_CLUBS[club], L = GL_LIES[lie] || GL_LIES.F, p = rat && rat.pow != null ? rat.pow : 0.5;
+  const c = GL_CLUBS[club], L = GL_LIES[lie] || GL_LIES.F, p = rat && rat.pow != null ? rat.pow : 0.5, scr = rat && rat.scr != null ? rat.scr : 0.5;
   if (!c || club === 'pt') return { carry: 0, roll: 0 };
-  let carry = c.carry * (0.85 + 0.3 * p) * L.dist * (L.sand && club !== 'we' ? L.sand : 1) * pow;
+  // a bad lie costs less to a good scrambler (at 0.5, exactly the lie's own number)
+  const distL = 1 - (1 - L.dist) * (1.3 - 0.6 * scr);
+  let carry = c.carry * (0.85 + 0.3 * p) * distL * (L.sand && club !== 'we' ? L.sand : 1) * pow;
   if (L.punch) carry = Math.min(carry, L.punch);
   // a short shot runs more: a chip is mostly roll
   const rollK = (c.roll + Math.max(0, 0.55 - pow) * 1.1) * L.roll;
   return { carry, roll: carry * rollK };
 }
 const glClubOk = (club, lie) => !!GL_CLUBS[club] && !(GL_LIES[lie] || GL_LIES.F).no.includes(club);
+// the clubs a lie allows (no putter), longest first as they go from there (out of sand the wedge is the longest)
+function glClubsFrom(lie, rat) {
+  const tot = c => { const r = glReach(c, lie, rat, 1); return r.carry + r.roll; };
+  return GL_BAG.filter(c => c !== 'pt' && glClubOk(c, lie)).sort((a, b) => tot(b) - tot(a));
+}
 // the wind's push on a ball of club that carries carry yards, as [x, y] yards
 function glWindPush(club, carry, wind, dir) {
   if (!wind || !wind.s) return [0, 0];
@@ -34408,10 +34431,9 @@ function glWindPush(club, carry, wind, dir) {
 function glFlight(s) {
   const H = s.hole, from = s.from, lie = s.lie || 'F', club = glClubOk(s.club, lie) ? s.club : 'we', c = GL_CLUBS[club], L = GL_LIES[lie] || GL_LIES.F;
   const scr = s.rat && s.rat.scr != null ? s.rat.scr : 0.5, spreadL = 1 + (L.spread - 1) * (1.3 - 0.6 * scr);
-  const distL = 1 - (1 - L.dist) * (1.3 - 0.6 * scr);
   const R0 = glReach(club, lie, s.rat, clamp(s.pow, 0, 1.12));
   const T = L.punch ? GL_TRAJ.punch : GL_TRAJ[s.traj] || null, Sh = GL_SHAPES[s.shape] || null;
-  const carry = R0.carry * (L.dist ? distL / L.dist : 1) * (T && !L.punch ? T.carry : 1);
+  const carry = R0.carry * (T && !L.punch ? T.carry : 1);
   const dir = Math.atan2(s.aim.y - from.y, s.aim.x - from.x);
   const off = -(s.err || 0) * 8 * c.spread * spreadL * Math.PI / 180;
   const h = T ? (L.punch ? T.h : c.h * T.h) : c.h, bend = Sh ? Sh.bend * carry * 0.05 : 0;
@@ -34512,7 +34534,6 @@ const GL_SKILL = { names: ['Squire', 'Knight', 'Archmage'], err: [1.25, 1, 0.85]
 const GL_DEF_RAT = { pow: 0.5, acc: 0.5, tch: 0.5, put: 0.5, nrv: 0.5, scr: 0.5 };
 
 const glRat = (side, ri) => (G.teams[side].roster[ri] || {}).r || GL_DEF_RAT;
-const glPin = H => H.pin;
 const glDistOf = (H, s) => hyp(G.ball[s].x - H.pin.x, G.ball[s].y - H.pin.y);
 // what kind of shot a side faces: tee, approach, short (a chip) or putt
 function glShotKind(H, s) {
@@ -34568,7 +34589,7 @@ function glPlan(s, riIn) {
     const readK = 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
     return Object.assign({ ri, kind, club: 'pt', putt: true }, glRead(H, b, readK));
   }
-  const clubs = GL_BAG.filter(c => c !== 'pt' && glClubOk(c, b.lie)), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
+  const clubs = glClubsFrom(b.lie, rat), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
   const d = glDistOf(H, s), longest = clubs[0];
   let club, target;
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }
@@ -34684,6 +34705,7 @@ function glNext() {
 function glGive(by) {
   const s = 1 - by, h0 = G.res.length, Hs = G.hole, d = glDistOf(glHoleNow(), s);
   if (!glConcede(by).ok) return null;
+  G.stat[s].putts++; G.stat[s].given = (G.stat[s].given || 0) + 1;
   return glLogEv({ k: 'given', no: h0 + 1, side: s, by, d0: +d.toFixed(2) }, h0, Hs);
 }
 // side s hits plan; r is where the ball went (glHit's for the CPU, or a swing by hand: glStrike). Counts it
@@ -34738,16 +34760,17 @@ function glSummary() {
     teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), pst: JSON.parse(JSON.stringify(G.pst)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(),
   };
 }
-// a whole game at once, CPU against CPU, through glTurn
+// a whole game at once, CPU against CPU, through glTurn. It always leaves the game on the course (G, GD and the random
+// stream) as it was, so a lab or a test can sim while a game is on show
 function glSimGame(opts) {
-  const hooks = Object.assign({}, GL_HOOK), was = { G, GD, rand: engRand }, keep = !!(opts && opts.keep);
+  const hooks = Object.assign({}, GL_HOOK), was = { G, GD, rand: engRand };
   GL_HOOK.onOver = GL_HOOK.onShot = GL_HOOK.onPhase = null; GD = null;
   let out;
   try {
     glStart(opts);
     for (let i = 0; i < 5000 && !G.over; i++) if (!glTurn()) break;
     out = glSummary();
-  } finally { Object.assign(GL_HOOK, hooks); GD = was.GD; if (keep) { G = was.G; engRand = was.rand; } }
+  } finally { Object.assign(GL_HOOK, hooks); G = was.G; GD = was.GD; engRand = was.rand; }
   return out;
 }
 /* Mossgate Links: the game on show, and playing it by hand (issue #92, phase 2). GD is the game on the page (not saved;
@@ -34871,7 +34894,7 @@ function glAnimBall() {
 /* ---------- what happened, said plainly ---------- */
 function glEvSay(ev, r) {
   if (!ev || ev.k !== 'shot') return ev && ev.why ? ev.why : '';
-  const who = glName(ev.side, ev.ri), H = glHoleNow();
+  const who = glName(ev.side, ev.ri);
   let t;
   if (ev.club === 'pt') t = ev.holed ? `${who} holes the putt from ${glYards(ev.d0)}!` : `${who} putts from ${glYards(ev.d0)}${ev.lip ? ': it lips out' : ''}. ${glYards(ev.d1)} left.`;
   else {
@@ -34879,7 +34902,7 @@ function glEvSay(ev, r) {
     t = ev.holed ? `${who}'s ${c} drops into the cup!` : ev.water ? `${who}'s ${c} finds the water. A drop, and a stroke.` : `${who} hits a ${c} ${carry} yards, into the ${GL_TER[ev.lie]}. ${glYards(ev.d1)} to the pin.`;
   }
   if (ev.up) t += ' That is par and four more: the ball is picked up.';
-  return t + glHoleSay(ev, H);
+  return t + glHoleSay(ev);
 }
 function glHoleSay(ev) {
   if (!ev || ev.res == null) return '';
@@ -34895,7 +34918,9 @@ function glAimMsg() {
 
 /* ---------- your shot: the choice ---------- */
 function glSelReset() {
-  const s = GD.you, plan = glPlan(s), H = glHoleNow();
+  const s = GD.you, H = glHoleNow(), kind = glShotKind(H, s);
+  // (a putt is set up without the caddie's read: that would draw from R and throw the result away)
+  const plan = kind === 'putt' ? { ri: glPickHitter(s, 'putt'), club: 'pt', putt: true, kind } : glPlan(s);
   GD.sel = { ri: plan.ri, club: plan.club, aim: plan.putt ? { x: H.pin.x, y: H.pin.y } : { x: plan.aim.x, y: plan.aim.y }, shape: '', traj: '', spin: 0, putt: !!plan.putt, kind: plan.kind };
   glSelFix();
 }
@@ -34903,7 +34928,7 @@ function glSelReset() {
 function glClubsNow() {
   const H = glHoleNow(), b = G.ball[GD.you];
   if (b.lie === 'G') return ['pt'];
-  const out = GL_BAG.filter(c => c !== 'pt' && glClubOk(c, b.lie));
+  const out = glClubsFrom(b.lie, glRat(GD.you, GD.sel ? GD.sel.ri : 0));
   if (b.lie === 'F' && glPuttable(H, b)) out.push('pt');
   return out;
 }
@@ -34961,9 +34986,16 @@ function glAimPush(yd) {
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
 function glReadLen() { return GD && GD.sel ? 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5 : 0; }
+const GLRL = { key: '', line: [] };
 function glReadLine() {
   const S = GD && GD.sel; if (!S || !S.putt || (GD.ph !== 'aim' && GD.ph !== 'swing')) return [];
-  const b = G.ball[GD.you], H = glHoleNow(), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), v = glPuttSpeed(S.tick);
+  const b = G.ball[GD.you], key = [G.h, b.x, b.y, S.aim.x, S.aim.y, S.tick, S.ri, glReadLen()].join(',');
+  if (GLRL.key === key) return GLRL.line;
+  GLRL.key = key; GLRL.line = glReadCalc(S, b);
+  return GLRL.line;
+}
+function glReadCalc(S, b) {
+  const H = glHoleNow(), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), v = glPuttSpeed(S.tick);
   const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, noCup: true }), L = glReadLen(), out = [{ x: b.x, y: b.y }];
   let run = 0;
   for (let i = 1; i < P.path.length && run < L; i++) { run += hyp(P.path[i].x - P.path[i - 1].x, P.path[i].y - P.path[i - 1].y); out.push(P.path[i]); }
@@ -35057,6 +35089,8 @@ const GL_SIDE = ['#d8a03a', '#7a5ad0'];
 function glGround(H) {
   const key = H.seed + ':' + H.par;
   if (GLGC[key]) return GLGC[key];
+  // (one hole's ground at a time: a canvas each is a few megabytes)
+  for (const k in GLGC) delete GLGC[k];
   const S = GL_GROUND.S, C = GL_GROUND.cols, cs = H.cell, cv = document.createElement('canvas');
   cv.width = Math.ceil(H.h * cs * S); cv.height = Math.ceil(H.w * cs * S);
   const c = cv.getContext('2d'), q = glRng(H.seed ^ 0x51ed);
@@ -35202,9 +35236,8 @@ function glDrawAim(c) {
     const r = Math.max(7, 4 * GLC.k);
     c.strokeStyle = '#fff6b0'; c.lineWidth = 2; c.beginPath(); c.arc(ax, ay, r, 0, Math.PI * 2); c.stroke();
     c.fillStyle = 'rgba(255,246,176,.15)'; c.fill();
-    const H = glHoleNow(), d = hyp(S.aim.x - b.x, S.aim.y - b.y);
+    const d = hyp(S.aim.x - b.x, S.aim.y - b.y);
     txt(c, `${Math.round(d)} yd`, ax + r + 4, ay, '600 12px system-ui, sans-serif', '#fff6b0', 'left', 'middle');
-    void H;
   }
   // a drag back from the ball: the pull (the power) and its line
   if (GD.drag) {
@@ -35359,7 +35392,8 @@ for (const ev of ['pointerup', 'pointercancel']) GLP.cv.addEventListener(ev, glP
    standing nine, with no game), built(seed, par) any hole; lie and slope read a hole; clubs, lies and swing are the
    tables; reach, flight, putt and read are the pure shot model; plan is the caddie's shot for a side; start(opts) puts a
    game on the first tee ({ holes, wild, course, seed, skill: [2], teams: [2], honour }), turn() plays the next shot and
-   says what happened, summary() is the game so far, and simGame(opts) plays a whole one headless and returns it.
+   says what happened, summary() is the game so far, and simGame(opts) plays a whole one headless and returns it,
+   leaving the game on the course as it was.
    onShot and onOver hear each shot and the end.
    Phase 2 is the page and playing by hand: start(opts) also puts the game on show ({ mode: 'watch' or 'play' }), and
    show, hide, on, pause, paused, speed and render drive the canvas (l1-page.js). The beat: phase, msg, view (a copy of
@@ -50223,7 +50257,6 @@ $('wLinksRows').addEventListener('click', e => {
   wLinksRows(); wLinksBarNote();
 });
 
-const W_LINKS_ROLE = ['tee', 'approach', 'short', 'putt'];
 // why a player can't hit now
 function wLinksWhyNot(V, ri) {
   const H = wGL.G.hole, side = V.you;
@@ -50277,7 +50310,7 @@ function wLinksBarNote() {
 // the scorecard (a column a hole: par, each side's strokes, who won it) and each side's players
 function wLinksCard() {
   const G = wGL.G; if (!G || !G.teams) { $('wLinksCard').innerHTML = ''; $('wLinksLog').innerHTML = ''; return; }
-  const n = Math.max(G.holes, G.card.length), cols = []; for (let i = 0; i < n; i++) cols.push(i);
+  const n = Math.max(G.holes, G.card.length + (G.over ? 0 : 1)), cols = []; for (let i = 0; i < n; i++) cols.push(i);
   const cell = (i, s) => { const c = G.card[i]; if (!c) return i === G.h ? `<td>${G.hole.st[s] || ''}</td>` : '<td></td>'; const t = c.up[s] ? '×' : c.done[s] ? c.st[s] : c.st[s] + '+'; return `<td${c.res === s ? ' style="font-weight:700;color:var(--gold,#ffb02e)"' : ''}>${t}</td>`; };
   const pars = cols.map(i => `<td>${wGL.parOf(i)}</td>`).join('');
   const card = `<table class="wrpow wcboxt"><caption>${esc(G.teams[0].name)}: ${esc(wGL.matchText(0))}</caption><tr><th>Hole</th>${cols.map(i => `<th>${i + 1}</th>`).join('')}</tr><tr><td>Par</td>${pars}</tr>${[0, 1].map(s => `<tr><td style="border-left:4px solid ${G.teams[s].color || '#888'}">${esc(G.teams[s].name)}</td>${cols.map(i => cell(i, s)).join('')}</tr>`).join('')}</table>`;

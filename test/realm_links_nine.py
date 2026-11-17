@@ -100,6 +100,22 @@ async def main():
         check(pt['fast'] == [False, True, True] and pt['slow'] == [False, True], 'too fast lips out and runs past; too slow never drops', pt)
         check(pt['bend'] > 0.1 and pt['ra'] and pt['fixed'], 'a slope bends a putt downhill, and the read aims above the hole and holes it', pt)
 
+        # (from the review of #93) the caddie plans with the model it hits with: out of sand it takes the wedge, and a
+        # scrambler's carry from a bad lie is the one it planned; a par 5 is as long as its card says
+        rv = await pg.evaluate("""(() => { const H = __flat((x, y) => y < 60 ? 'S' : 'F');
+          wGL.start({ seed: 3 }); const G = wGL.G, Hc = wGL.course(0); G.ball[0] = { x: Hc.pin.x, y: Hc.pin.y - 90, lie: 'S' }; G.hole.st = [1, 1]; const sand = wGL.plan(0).club;
+          const rat = { pow: .5, scr: .1 }, want = wGL.reach('mi', 'R', rat, 1).carry, got = wGL.flight({ hole: __flat(), from: { x: 100, y: 10 }, lie: 'R', club: 'mi', aim: { x: 100, y: 300 }, pow: 1, err: 0, rat }).carry;
+          let worst = 0; for (let s = 1; s < 400; s++) { const P = wGL.built(s * 7919, 5); let L = 0; for (let i = 0; i < P.path.length - 1; i++) L += Math.hypot(P.path[i + 1].x - P.path[i].x, P.path[i + 1].y - P.path[i].y); worst = Math.max(worst, L - P.len); }
+          return { sand, want: Math.round(want), got, worst }; })()""")
+        check(rv['sand'] == 'we' and abs(rv['want'] - rv['got']) <= 1 and rv['worst'] < 1, 'the caddie takes the wedge out of sand; a scrambler\'s carry from deep rough is the one planned; a par 5 is as long as its card says', rv)
+        kp = await pg.evaluate("""(() => { wGL.start({ seed: 21 }); for (let i = 0; i < 6; i++) wGL.turn(); const before = JSON.stringify(wGL.G);
+          const r = wGL.simGame({ seed: 4 }); return { same: before === JSON.stringify(wGL.G), sim: r.played > 0 }; })()""")
+        check(kp['same'] and kp['sim'], 'a headless game leaves the game on the course as it was', kp)
+        gv = await pg.evaluate("""(() => { let ok = true, n = 0; for (let i = 0; i < 40; i++) { const r = wGL.simGame({ seed: 700 + i });
+            for (const s of [0, 1]) { const given = r.log.filter(e => e.k === 'given' && e.side === s).length, putts = r.log.filter(e => e.k === 'shot' && e.side === s && e.club === 'pt').length; n += given; if (r.stat[s].putts !== putts + given) ok = false; } }
+          return { ok, n }; })()""")
+        check(gv['ok'] and gv['n'] > 0, 'a given putt counts as a putt in the stats', gv)
+
         # ---------- one game ----------
         g = await pg.evaluate("""(() => { const a = wGL.simGame({ seed: 7 }), b = wGL.simGame({ seed: 7 }), c = wGL.simGame({ seed: 8 });
           const shots = []; wGL.onShot = e => shots.push(e.k); wGL.start({ seed: 11 }); const evs = []; for (let i = 0; i < 12; i++) evs.push(wGL.turn());

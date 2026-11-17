@@ -69,6 +69,7 @@ function glNext() {
 function glGive(by) {
   const s = 1 - by, h0 = G.res.length, Hs = G.hole, d = glDistOf(glHoleNow(), s);
   if (!glConcede(by).ok) return null;
+  G.stat[s].putts++; G.stat[s].given = (G.stat[s].given || 0) + 1;
   return glLogEv({ k: 'given', no: h0 + 1, side: s, by, d0: +d.toFixed(2) }, h0, Hs);
 }
 // side s hits plan; r is where the ball went (glHit's for the CPU, or a swing by hand: glStrike). Counts it
@@ -123,15 +124,16 @@ function glSummary() {
     teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), pst: JSON.parse(JSON.stringify(G.pst)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(),
   };
 }
-// a whole game at once, CPU against CPU, through glTurn
+// a whole game at once, CPU against CPU, through glTurn. It always leaves the game on the course (G, GD and the random
+// stream) as it was, so a lab or a test can sim while a game is on show
 function glSimGame(opts) {
-  const hooks = Object.assign({}, GL_HOOK), was = { G, GD, rand: engRand }, keep = !!(opts && opts.keep);
+  const hooks = Object.assign({}, GL_HOOK), was = { G, GD, rand: engRand };
   GL_HOOK.onOver = GL_HOOK.onShot = GL_HOOK.onPhase = null; GD = null;
   let out;
   try {
     glStart(opts);
     for (let i = 0; i < 5000 && !G.over; i++) if (!glTurn()) break;
     out = glSummary();
-  } finally { Object.assign(GL_HOOK, hooks); GD = was.GD; if (keep) { G = was.G; engRand = was.rand; } }
+  } finally { Object.assign(GL_HOOK, hooks); G = was.G; GD = was.GD; engRand = was.rand; }
   return out;
 }

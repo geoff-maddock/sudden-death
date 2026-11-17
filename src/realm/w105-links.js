@@ -70,7 +70,6 @@ $('wLinksRows').addEventListener('click', e => {
   wLinksRows(); wLinksBarNote();
 });
 
-const W_LINKS_ROLE = ['tee', 'approach', 'short', 'putt'];
 // why a player can't hit now
 function wLinksWhyNot(V, ri) {
   const H = wGL.G.hole, side = V.you;
@@ -124,7 +123,7 @@ function wLinksBarNote() {
 // the scorecard (a column a hole: par, each side's strokes, who won it) and each side's players
 function wLinksCard() {
   const G = wGL.G; if (!G || !G.teams) { $('wLinksCard').innerHTML = ''; $('wLinksLog').innerHTML = ''; return; }
-  const n = Math.max(G.holes, G.card.length), cols = []; for (let i = 0; i < n; i++) cols.push(i);
+  const n = Math.max(G.holes, G.card.length + (G.over ? 0 : 1)), cols = []; for (let i = 0; i < n; i++) cols.push(i);
   const cell = (i, s) => { const c = G.card[i]; if (!c) return i === G.h ? `<td>${G.hole.st[s] || ''}</td>` : '<td></td>'; const t = c.up[s] ? '×' : c.done[s] ? c.st[s] : c.st[s] + '+'; return `<td${c.res === s ? ' style="font-weight:700;color:var(--gold,#ffb02e)"' : ''}>${t}</td>`; };
   const pars = cols.map(i => `<td>${wGL.parOf(i)}</td>`).join('');
   const card = `<table class="wrpow wcboxt"><caption>${esc(G.teams[0].name)}: ${esc(wGL.matchText(0))}</caption><tr><th>Hole</th>${cols.map(i => `<th>${i + 1}</th>`).join('')}</tr><tr><td>Par</td>${pars}</tr>${[0, 1].map(s => `<tr><td style="border-left:4px solid ${G.teams[s].color || '#888'}">${esc(G.teams[s].name)}</td>${cols.map(i => cell(i, s)).join('')}</tr>`).join('')}</table>`;

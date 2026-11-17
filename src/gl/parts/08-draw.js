@@ -14,6 +14,8 @@ const GL_SIDE = ['#d8a03a', '#7a5ad0'];
 function glGround(H) {
   const key = H.seed + ':' + H.par;
   if (GLGC[key]) return GLGC[key];
+  // (one hole's ground at a time: a canvas each is a few megabytes)
+  for (const k in GLGC) delete GLGC[k];
   const S = GL_GROUND.S, C = GL_GROUND.cols, cs = H.cell, cv = document.createElement('canvas');
   cv.width = Math.ceil(H.h * cs * S); cv.height = Math.ceil(H.w * cs * S);
   const c = cv.getContext('2d'), q = glRng(H.seed ^ 0x51ed);
@@ -159,9 +161,8 @@ function glDrawAim(c) {
     const r = Math.max(7, 4 * GLC.k);
     c.strokeStyle = '#fff6b0'; c.lineWidth = 2; c.beginPath(); c.arc(ax, ay, r, 0, Math.PI * 2); c.stroke();
     c.fillStyle = 'rgba(255,246,176,.15)'; c.fill();
-    const H = glHoleNow(), d = hyp(S.aim.x - b.x, S.aim.y - b.y);
+    const d = hyp(S.aim.x - b.x, S.aim.y - b.y);
     txt(c, `${Math.round(d)} yd`, ax + r + 4, ay, '600 12px system-ui, sans-serif', '#fff6b0', 'left', 'middle');
-    void H;
   }
   // a drag back from the ball: the pull (the power) and its line
   if (GD.drag) {

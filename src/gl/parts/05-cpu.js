@@ -16,7 +16,6 @@ const GL_SKILL = { names: ['Squire', 'Knight', 'Archmage'], err: [1.25, 1, 0.85]
 const GL_DEF_RAT = { pow: 0.5, acc: 0.5, tch: 0.5, put: 0.5, nrv: 0.5, scr: 0.5 };
 
 const glRat = (side, ri) => (G.teams[side].roster[ri] || {}).r || GL_DEF_RAT;
-const glPin = H => H.pin;
 const glDistOf = (H, s) => hyp(G.ball[s].x - H.pin.x, G.ball[s].y - H.pin.y);
 // what kind of shot a side faces: tee, approach, short (a chip) or putt
 function glShotKind(H, s) {
@@ -72,7 +71,7 @@ function glPlan(s, riIn) {
     const readK = 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
     return Object.assign({ ri, kind, club: 'pt', putt: true }, glRead(H, b, readK));
   }
-  const clubs = GL_BAG.filter(c => c !== 'pt' && glClubOk(c, b.lie)), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
+  const clubs = glClubsFrom(b.lie, rat), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
   const d = glDistOf(H, s), longest = clubs[0];
   let club, target;
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }

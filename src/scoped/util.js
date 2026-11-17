@@ -3,10 +3,14 @@
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 function engSeed(n) {
   if (n == null) { engRand = Math.random; return; }
-  let a = n >>> 0;
-  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = engRng(n);
 }
 const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only

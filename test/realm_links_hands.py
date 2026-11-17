@@ -146,6 +146,12 @@ async def main():
         check(w['over'] and w['ph'] in ('rest', 'over') and w['card'] == w['played'] >= 2 and w['rows'] == w['card'] and w['shots'] > 4, 'Watch plays it out to the end: a card for every hole and a line in This game', w)
         check(w['js'] and ('Won' in w['text'] or 'Lost' in w['text']) and w['text'] in w['sb'] and ('Won' in w['note'] or 'win the match' in w['note']), 'the game stays plain JSON, the match text is the result, and the phone strip shows it', w)
 
+        # (from the review of #93) a playoff hole has its column on the scorecard while it is played
+        po = await pg.evaluate("""(() => { wLinksGame({ seed: 71, mode: 'watch', holes: 3 }); wGL.pause(true); const G = wGL.G;
+          G.res = [-1, -1, -1]; G.card = [0, 1, 2].map(i => ({ no: i + 1, par: G.pars[i], st: [4, 4], done: [true, true], up: [false, false], res: -1 })); G.h = 3; G.playoff = 1; G.hole.st = [2, 1];
+          wLinksCard(); const t = document.querySelector('#wLinksCard table'); return { cols: t.rows[0].cells.length - 1, live: [...t.rows[2].cells].pop().textContent }; })()""")
+        check(po == {'cols': 4, 'live': '2'}, 'a playoff hole has its column on the scorecard, with the strokes so far', po)
+
         # ---------- How to play, Settings, leaving ----------
         await pg.evaluate("wLinksGame({ seed: 61, mode: 'play' }); wGL.pause(false)")
         await pg.click('#wLinksHowBtn')

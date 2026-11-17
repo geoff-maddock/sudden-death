@@ -13,10 +13,7 @@ const GL_LEN = { 3: [135, 200], 4: [325, 425], 5: [470, 545] };
 const GL_TER = { T: 'tee', F: 'fairway', r: 'rough', R: 'deep rough', S: 'sand', B: 'moss bog', W: 'water', O: 'trees', G: 'green' };
 const GLK = {};
 
-function glRng(n) {
-  let a = n >>> 0;
-  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
+const glRng = n => engRng(n);
 // hole i of the course with seed cs
 const glHoleSeed = (cs, i) => (Math.imul((cs >>> 0) + 1, 2654435761) ^ Math.imul(i + 1, 40503)) >>> 0;
 // a wild nine's pars: the standing nine's, shuffled by its seed (so a nine is par 36), repeated for eighteen
@@ -50,7 +47,7 @@ function glBuildHole(seed, par) {
   if (par !== 3) legs.push(len - legs.reduce((a, b) => a + b, 0));
   let cur = tee;
   legs.forEach((L, k) => {
-    const sw = par === 3 ? rn(-22, 22) : k === 0 ? rn(-12, 12) : rn(-38, 38);
+    const sw = clamp(par === 3 ? rn(-22, 22) : k === 0 ? rn(-12, 12) : rn(-38, 38), -L * 0.6, L * 0.6);
     const nx = clamp(cur.x + sw, 45, GL_W * GL_CELL - 45), dx = nx - cur.x;
     cur = { x: nx, y: cur.y + Math.sqrt(Math.max(1, L * L - dx * dx)) }; pts.push(cur);
   });
@@ -114,4 +111,3 @@ function glSlope(H, x, y) {
   const s = H.slope;
   return [s.g * Math.cos(s.a) + s.w * Math.sin(s.k * x + s.p), s.g * Math.sin(s.a) + s.w * Math.cos(s.k * y + s.p * 1.3)];
 }
-const glOnGreen = (H, x, y) => glLie(H, x, y) === 'G';

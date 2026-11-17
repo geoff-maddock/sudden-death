@@ -44,15 +44,22 @@ const GL_PUTT = { fric: 0.62, fringe: 2.2, rough: 5, g: 7.6, cup: 0.06, cap: 1.7
 
 // how a club plays from a lie for a hitter, before the wind: { carry, roll } at swing power pow
 function glReach(club, lie, rat, pow) {
-  const c = GL_CLUBS[club], L = GL_LIES[lie] || GL_LIES.F, p = rat && rat.pow != null ? rat.pow : 0.5;
+  const c = GL_CLUBS[club], L = GL_LIES[lie] || GL_LIES.F, p = rat && rat.pow != null ? rat.pow : 0.5, scr = rat && rat.scr != null ? rat.scr : 0.5;
   if (!c || club === 'pt') return { carry: 0, roll: 0 };
-  let carry = c.carry * (0.85 + 0.3 * p) * L.dist * (L.sand && club !== 'we' ? L.sand : 1) * pow;
+  // a bad lie costs less to a good scrambler (at 0.5, exactly the lie's own number)
+  const distL = 1 - (1 - L.dist) * (1.3 - 0.6 * scr);
+  let carry = c.carry * (0.85 + 0.3 * p) * distL * (L.sand && club !== 'we' ? L.sand : 1) * pow;
   if (L.punch) carry = Math.min(carry, L.punch);
   // a short shot runs more: a chip is mostly roll
   const rollK = (c.roll + Math.max(0, 0.55 - pow) * 1.1) * L.roll;
   return { carry, roll: carry * rollK };
 }
 const glClubOk = (club, lie) => !!GL_CLUBS[club] && !(GL_LIES[lie] || GL_LIES.F).no.includes(club);
+// the clubs a lie allows (no putter), longest first as they go from there (out of sand the wedge is the longest)
+function glClubsFrom(lie, rat) {
+  const tot = c => { const r = glReach(c, lie, rat, 1); return r.carry + r.roll; };
+  return GL_BAG.filter(c => c !== 'pt' && glClubOk(c, lie)).sort((a, b) => tot(b) - tot(a));
+}
 // the wind's push on a ball of club that carries carry yards, as [x, y] yards
 function glWindPush(club, carry, wind, dir) {
   if (!wind || !wind.s) return [0, 0];
@@ -68,10 +75,9 @@ function glWindPush(club, carry, wind, dir) {
 function glFlight(s) {
   const H = s.hole, from = s.from, lie = s.lie || 'F', club = glClubOk(s.club, lie) ? s.club : 'we', c = GL_CLUBS[club], L = GL_LIES[lie] || GL_LIES.F;
   const scr = s.rat && s.rat.scr != null ? s.rat.scr : 0.5, spreadL = 1 + (L.spread - 1) * (1.3 - 0.6 * scr);
-  const distL = 1 - (1 - L.dist) * (1.3 - 0.6 * scr);
   const R0 = glReach(club, lie, s.rat, clamp(s.pow, 0, 1.12));
   const T = L.punch ? GL_TRAJ.punch : GL_TRAJ[s.traj] || null, Sh = GL_SHAPES[s.shape] || null;
-  const carry = R0.carry * (L.dist ? distL / L.dist : 1) * (T && !L.punch ? T.carry : 1);
+  const carry = R0.carry * (T && !L.punch ? T.carry : 1);
   const dir = Math.atan2(s.aim.y - from.y, s.aim.x - from.x);
   const off = -(s.err || 0) * 8 * c.spread * spreadL * Math.PI / 180;
   const h = T ? (L.punch ? T.h : c.h * T.h) : c.h, bend = Sh ? Sh.bend * carry * 0.05 : 0;
