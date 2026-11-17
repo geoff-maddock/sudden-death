@@ -1,6 +1,6 @@
 /* The Anvil Ring: the ring, drawn (issue #23, phase 1). The forge hall from the side and a little above: the ring on
    its platform, the canvas scorched at the edges, red, white and blue ropes, the red corner at the back left and the blue
-   at the front right, and the crowd in the dark around it. The fighters are the inked figures (03-figures.js) in
+   at the front right, and the crowd in the dark around it. The fighters are the inked figures (src/figures/figures.js) in
    gloves, posed by what they're doing (bxPose), the nearer one in front, each turned to face the other.
    The bar at the top has both fighters: health (the dark part is what big shots have taken off their most), stamina
    and spirit, each bar with its name, knockdowns (DOWN), the cut-man's patches (CUTS) and the plan; the round and the clock are in the middle. Under the ring, the last
@@ -20,6 +20,8 @@
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
+// the figures' animation clock (src/figures/figures.js, the file every engine's scope loads)
+function figClock() { return BXT.t; }
 const BX_PX = 34, BX_PY = 16, BX_MIDY = 328;
 function bxProj(x, y, z = 0) { const k = 1 + y * .02; return { x: 480 + x * BX_PX * k, y: BX_MIDY + y * BX_PY - z * k, k }; }
 const BX_CROWD = Array.from({ length: 140 }, (_, i) => [((i * 61.7) % 1000) - 20, i % 4, (i * 13) % 7]);

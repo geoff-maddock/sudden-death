@@ -2,7 +2,7 @@
 # (src/realm/ring/manifest.txt, through `scope wBX ...`), so none of their names reach the page.
 src/bx/parts/01-util.js
 src/bx/parts/02-rules.js
-src/bx/parts/03-figures.js
+src/figures/figures.js
 src/bx/parts/04-fighters.js
 src/bx/parts/05-ring.js
 src/bx/parts/06-cpu.js

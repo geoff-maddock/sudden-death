@@ -1,7 +1,7 @@
 /* The Charter Court: the court, drawn (issue #77, phase 1). The Charter Court from above and a little to one side: a
    boarded floor in a walled yard, keys painted in the club's orange, chain nets on both hoops. The whole court is in
    view while the play crosses it; once the ball and every player are in one half the camera pushes in on that half
-   and drops a little lower (bkCamStep), and pulls back out when the play leaves. It is drawing only: BKT.cam, never G. Players are the inked figures (03-figures.js), sorted so the nearer ones stand in front;
+   and drops a little lower (bkCamStep), and pulls back out when the play leaves. It is drawing only: BKT.cam, never G. Players are the inked figures (src/figures/figures.js), sorted so the nearer ones stand in front;
    the ball handler has a ring in their side's colour under them, and the ball has its shadow on the floor.
    The bar at the top has the score (underlined for the side with the ball), the period, the game clock and the shot
    clock in its box, and each side's team fouls (lit in the bonus) and timeouts left. Under the court, what just happened
@@ -16,6 +16,8 @@
    roar.
    Court space is metres (05-live.js); bkScr turns it into canvas pixels. */
 const BKT = { t: 0, bg: null, bgKey: '', cam: { u: 0, end: 0, x: 480, t: 0, g: null } };
+// the figures' animation clock (src/figures/figures.js, the file every engine's scope loads)
+function figClock() { return BKT.t; }
 const BK_PX = 30, BK_PY = 22, BK_X0 = 60, BK_Y0 = 318, BK_PZ = 15;
 // the camera: pushed in on one half, the floor is 1.5 times as wide and 1.1 times as deep (a lower seat), and figures
 // 1.5 times the size. It holds the near apron where it is and the half's own baseline at the edge of the picture

@@ -1,6 +1,6 @@
 /* Cinder Gridiron: the field, drawn (issue #9, phase 1). The Ash Bowl from above and a little to one side: green grass
    in a bowl of black basalt with its crowd and braziers (gfDrawStands), the goalposts scorched at the top. The camera follows the ball. Yard lines every five, the
-   line of scrimmage in blue and the line to gain in ember orange. Players are the inked figures (03-figures.js),
+   line of scrimmage in blue and the line to gain in ember orange. Players are the inked figures (src/figures/figures.js),
    sorted so the nearer ones stand in front. A block shows as a spark between the two: white when it holds, red when the
    defender is winning. The bar at the top has the score, the down, both calls at the snap, and each result with why.
    Between plays each player's position is under them, and GFT.hl ({ side, pos }, set by the page) rings one.
@@ -12,6 +12,8 @@
    Field space: absolute yards from the left goal line (0 to 100; the end zones run to -10 and 110) and across from the
    middle (y); the side with the ball on poss 0 drives to the right. */
 const GFT = { t: 0, hl: null, zoom: 1, fx: 480, fy: 345, hold: 0, why: '', last: 0 };
+// the figures' animation clock (src/figures/figures.js, the file every engine's scope loads)
+function figClock() { return GFT.t; }
 const GF_ZOOM = 1.65;
 const GF_PX = 19, GF_PY = 8.2, GF_MIDY = 345, GF_ASH = Array.from({ length: 260 }, (_, i) => [((i * 37.7) % 125) - 12, ((i * 23.3) % 53) - 26.5, (i % 5) * .25 + .6]);
 const gfAbs = (x, y) => G.poss === 0 ? [G.ball + x, y] : [GF_RULES.field - G.ball - x, -y];

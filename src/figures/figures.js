@@ -1,8 +1,14 @@
-/* Black Ice: the players, drawn (issue #83, phase 1). Copied from the Charter Court's figures
-   (src/bk/parts/03-figures.js, itself from Cinder Gridiron's and Brimstone Diamond's) and adapted, not shared: the
-   animation clock is HKT.t (08-draw.js). drawFig(c, kind, x, y, hpx, team, o): an inked, cel-shaded player standing at
-   (x, y), hpx tall; team { color, light, short }; o { num, run (a stride phase), flip, alpha, throwK (0..1, the
-   shooting arm), lift, noShadow }. The stick is drawn by 08-draw.js. */
+/* The players, drawn: one file for the four scoped engines (issue #85). Boxing (src/bx), football (src/gf), basketball
+   (src/bk) and hockey (src/hk) each load this inside their own scope, so its names (KIND, BACK, HEAD, BODY, ink,
+   drawFig, ...) are that engine's own; it names no engine. It came from Brimstone Diamond's figures
+   (src/bd/parts/14-rendering.js), which keeps its own.
+   The animation clock is figClock(): seconds, a function each engine defines beside its drawing clock (BXT.t, GFT.t,
+   BKT.t, HKT.t).
+   drawFig(c, kind, x, y, hpx, team, o): an inked, cel-shaded player standing at (x, y), hpx tall, facing right (o.flip
+   faces left); team { color, light, short }; o { num, run (a stride phase), flip, alpha, throwK (0..1, the throwing or
+   shooting arm), lift, noShadow, stone, pose, glove }. A pose moves the arms (armL, the rear hand, and armR, the
+   lead), the legs (legL, legR), and lean, shift, drop and scale. o.glove (boxing): gloves in that colour, and no mitt
+   or ember in the hands. What a player holds (a stick, a ball) is drawn by the engine. */
 const INK = '#17100e';
 const KIND = {
   goblin:   { skin: '#7fae4e', h: .8,  w: .9,  cap: true, eye: '#ffe04a' },
@@ -65,7 +71,7 @@ function cap(c, d, tilt = 0, scale = 1) {
 /* things drawn behind the body */
 const BACK = {
   harpy(c, d) {
-    const f = d.o.fly ? Math.sin(HKT.t * 18) * 12 : Math.sin(HKT.t * 2) * 2, col = d.C('#6b567c'), col2 = d.C('#8b76a0');
+    const f = d.o.fly ? Math.sin(figClock() * 18) * 12 : Math.sin(figClock() * 2) * 2, col = d.C('#6b567c'), col2 = d.C('#8b76a0');
     for (const s of [-1, 1]) {
       const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 40, d.shY - 34 - f, s * 64, d.shY - 26 - f);
       p.lineTo(s * 56, d.shY - 10 - f * .6); p.lineTo(s * 62, d.shY + 2 - f * .3); p.lineTo(s * 50, d.shY + 12); p.lineTo(s * 54, d.shY + 26); p.lineTo(s * 38, d.shY + 26); p.lineTo(s * 36, d.shY + 36); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
@@ -83,7 +89,7 @@ const BACK = {
     ink(c, pPoly([[9, d.shY + 1], [22, d.hy - 14], [12, d.hy + 4]]), d.C('#8e1426'));
   },
   spider(c, d) {
-    const k = d.o.run ? Math.sin(d.o.run) * 6 : Math.sin(HKT.t * 3) * 1.5;
+    const k = d.o.run ? Math.sin(d.o.run) * 6 : Math.sin(figClock() * 3) * 1.5;
     ink(c, pEl(0, -30, 20, 17), d.C('#2c1a34'));
     ink(c, pPoly([[-4, -40], [4, -40], [0, -32], [4, -24], [-4, -24], [0, -32]]), d.C('#d83a4a'), 0, true);
     for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
@@ -99,14 +105,14 @@ const BACK = {
 };
 function robeBody(c, d, col, tattered) {
   const p = new Path2D(); p.moveTo(-d.shw + 2, d.shY); p.lineTo(-d.shw - 7, -4);
-  if (tattered) { for (let i = 0; i <= 8; i++) { const x = -d.shw - 7 + i * (2 * d.shw + 14) / 8; p.lineTo(x, i % 2 ? -10 - Math.sin(HKT.t * 4 + i) * 2 : -1); } }
+  if (tattered) { for (let i = 0; i <= 8; i++) { const x = -d.shw - 7 + i * (2 * d.shw + 14) / 8; p.lineTo(x, i % 2 ? -10 - Math.sin(figClock() * 4 + i) * 2 : -1); } }
   else p.lineTo(d.shw + 7, -4);
   p.lineTo(d.shw - 2, d.shY); p.closePath();
   ink(c, p, col);
   if (!tattered) { c.fillStyle = d.C('#d8b64a'); c.fillRect(-d.shw - 6, -8, 2 * d.shw + 12, 2.4); }
 }
 function snake(c, d, a, len, i) {
-  const wv = Math.sin(HKT.t * 5 + i * 1.7) * 4, x0 = Math.cos(a) * 10, y0 = d.hy + Math.sin(a) * 10;
+  const wv = Math.sin(figClock() * 5 + i * 1.7) * 4, x0 = Math.cos(a) * 10, y0 = d.hy + Math.sin(a) * 10;
   const x1 = Math.cos(a) * len + wv, y1 = d.hy + Math.sin(a) * len - 2;
   const body = [[x0, y0], [(x0 + x1) / 2 - wv, (y0 + y1) / 2 + 3], [x1, y1]];
   inkLine(c, body, INK, 3.4); inkLine(c, body, d.C('#3f8a4f'), 2);
@@ -192,7 +198,7 @@ const HEAD = {
   },
   troll(c, d) {
     const { hy, C, skin } = d;
-    for (let i = -3; i <= 3; i++) inkLine(c, [[i * 3, hy - 10], [i * 6 + Math.sin(HKT.t * 2 + i) * 1.5, hy - 22 - Math.abs(i)]], C('#3f5a2a'), 1.8);
+    for (let i = -3; i <= 3; i++) inkLine(c, [[i * 3, hy - 10], [i * 6 + Math.sin(figClock() * 2 + i) * 1.5, hy - 22 - Math.abs(i)]], C('#3f5a2a'), 1.8);
     ink(c, pEl(0, hy, 13, 12), skin);
     ink(c, pPoly([[-3, hy - 3], [3, hy - 3], [4, hy + 12], [0, hy + 15], [-2, hy + 11]]), tint(skin, -.1));
     for (const s of [-1, 1]) ink(c, pPoly([[s * 4, hy + 9], [s * 6, hy + 4], [s * 2.5, hy + 9]]), C('#f0e6cc'), 0, true);
@@ -235,7 +241,7 @@ const HEAD = {
     ink(c, pPoly([[0, hy - 22], [14, hy - 8], [17, hy + 14], [0, hy + 12], [-17, hy + 14], [-14, hy - 8]]), C('#2b2442'));
     ink(c, pEl(0, hy + 2, 9.5, 10.5), '#05040a', 0, true);
     glowEye(c, -3.8, hy + 1, 2.2, d.eye, d.st); glowEye(c, 3.8, hy + 1, 2.2, d.eye, d.st);
-    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { c.globalAlpha *= .5; circ(c, Math.sin(HKT.t * 2 + i * 2) * 8, hy - 26 - ((HKT.t * 10 + i * 6) % 18), 1.6, '#9ff6ff'); c.globalAlpha *= 2; }
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { c.globalAlpha *= .5; circ(c, Math.sin(figClock() * 2 + i * 2) * 8, hy - 26 - ((figClock() * 10 + i * 6) % 18), 1.6, '#9ff6ff'); c.globalAlpha *= 2; }
   },
   vampire(c, d) {
     const { hy, C, skin } = d;
@@ -311,7 +317,7 @@ const HEAD = {
     ink(c, pRR(-2.5, hy - 14.5, 5, 5, 1), C('#d8b64a'), 0, true);
     glowEye(c, -4.3, hy + 2, 2, d.eye, d.st); glowEye(c, 4.3, hy + 2, 2, d.eye, d.st);
     inkLine(c, [[-2.5, hy + 8.5], [2.5, hy + 8.5]], C('#4a7aa8'), .8);
-    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { const a = HKT.t * 1.5 + i * 2.1; txt(c, '✦', Math.cos(a) * 20, hy - 18 + Math.sin(a) * 6, '6px sans-serif', 'rgba(200,240,255,.8)', 'center'); }
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { const a = figClock() * 1.5 + i * 2.1; txt(c, '✦', Math.cos(a) * 20, hy - 18 + Math.sin(a) * 6, '6px sans-serif', 'rgba(200,240,255,.8)', 'center'); }
   },
 };
 
@@ -432,18 +438,21 @@ function arm(c, sx, sy, hx, hy, d, opt = {}) {
     if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
     if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
     // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
+    if (!opt.glove) {
     const sEnd = lerpP(S, el, .55);
     const sl = capsule(S.x, S.y - 1, aw * .7, sEnd.x, sEnd.y, aw * .62, aw * .05, aw * .05);
     ink(c, sl, d.jer);
     if (det) { const ang = Math.atan2(el.y - S.y, el.x - S.x) + Math.PI / 2, cx = Math.cos(ang) * aw * .6, cy = Math.sin(ang) * aw * .6, t2 = lerpP(S, el, .44);
       if (B.torn) { const pts = []; for (let i = 0; i <= 4; i++) { const k = i / 4 - .5; pts.push([sEnd.x + cx * 2 * k + (i % 2 ? (el.x - S.x) * .08 : 0), sEnd.y + cy * 2 * k + (i % 2 ? (el.y - S.y) * .08 : 0)]); } inkLine(c, pts, INK, .6); }
       else inkLine(c, [[t2.x - cx, t2.y - cy], [t2.x + cx, t2.y + cy]], d.trimL, 1.3); }
+    }
     if (B.lace && det) { const p = lerpP(el, H, .9); for (let i = -1; i <= 1; i++) circ(c, p.x + i * aw * .32, p.y + 1.2, aw * .2, '#f2eee6'); }
   }
   // hand, turned along the forearm
   const ang = Math.atan2(-(H.x - el.x), H.y - el.y);
   c.save(); c.translate(H.x, H.y); c.rotate(ang);
-  if (opt.mitt) { ink(c, pEl(0, 2.5, aw * .95, aw * 1.1), d.C('#8a5530')); inkLine(c, [[-aw * .5, 1.5], [aw * .5, 1.5]], d.C('#5a3218'), .6); if (det) inkLine(c, [[-aw * .3, 4.2], [0, 5.4], [aw * .3, 4.2]], d.C('#5a3218'), .5); }
+  if (opt.glove) { ink(c, pEl(0, 3, aw * 1.08, aw * 1.2), d.C(opt.glove)); if (det) { ink(c, pEl(-out * aw * .55, 1.5, aw * .38, aw * .55, out * .4), d.C(tint(opt.glove, -.18)), 0, true); circ(c, out * aw * .3, 1, aw * .22, 'rgba(255,255,255,.35)'); } ink(c, pRR(-aw * .62, -2.2, aw * 1.24, 3, 1), d.C('#efe6d4'), 0, true); }
+  else if (opt.mitt) { ink(c, pEl(0, 2.5, aw * .95, aw * 1.1), d.C('#8a5530')); inkLine(c, [[-aw * .5, 1.5], [aw * .5, 1.5]], d.C('#5a3218'), .6); if (det) inkLine(c, [[-aw * .3, 4.2], [0, 5.4], [aw * .3, 4.2]], d.C('#5a3218'), .5); }
   else if (!opt.noHand) {
     ink(c, pEl(0, 1.2, aw * .6, aw * .64), bony ? tint(skin, -.05) : skin);
     if (det && !opt.ball) ink(c, pEl(-out * aw * .5, .2, aw * .22, aw * .36, out * .5), skin, 0, true);
@@ -451,7 +460,7 @@ function arm(c, sx, sy, hx, hy, d, opt = {}) {
     if ((B.clawHand || B.fur) && det) for (const fx of [-.32, 0, .32]) ink(c, pPoly([[fx * aw - 1, aw * .55], [fx * aw + 1, aw * .55], [fx * aw * 1.25, aw * .55 + 3.2]]), d.C('#efe6cf'), 0, true);
   }
   if (opt.ball) ink(c, pEl(0, 3, 3.4, 3.4), '#f6f0e0', 0, true);
-  if (opt.ember && !d.st) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = Math.max(2, 8 * FSC); circ(c, 0, 4, 2.2 + Math.sin(HKT.t * 20) * .5, '#ffcf5a'); c.restore(); }
+  if (opt.ember && !d.st) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = Math.max(2, 8 * FSC); circ(c, 0, 4, 2.2 + Math.sin(figClock() * 20) * .5, '#ffcf5a'); c.restore(); }
   c.restore();
   // shoulder pieces sit on top of the sleeve
   if (B.armor) { ink(c, pEl(S.x + out * 1.5, S.y - 1, aw * .95, aw * .72, out * .3), d.C('#8a929c')); if (det) inkLine(c, [[S.x - aw * .6 + out * 1.5, S.y + 1], [S.x + aw * .6 + out * 1.5, S.y + 1]], d.C('#b8c0ca'), .6); }
@@ -464,23 +473,23 @@ function tailChain(c, pts, col, tipCol) {
   for (let i = 0; i < pts.length - 1; i++) ink(c, capsule(pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2]), i === pts.length - 2 && tipCol ? tipCol : col, 0, true);
 }
 BACK.werewolf = (c, d) => {
-  const s = Math.sin(HKT.t * 3 + (d.o.run || 0)) * 4, x = d.shw;
+  const s = Math.sin(figClock() * 3 + (d.o.run || 0)) * 4, x = d.shw;
   const p = new Path2D(); p.moveTo(4, -42); p.bezierCurveTo(x + 6, -46, x + 22 + s, -34, x + 18 + s, -10); p.bezierCurveTo(x + 14 + s, -18, x + 8, -30, 2, -34); p.closePath();
   ink(c, p, d.C('#5d4a3a')); if (FSC > .45) ink(c, pEl(x + 17 + s, -13, 3.5, 5), d.C('#d8cbb4'), 0, true);
 };
 BACK.minotaur = (c, d) => {
-  const s = Math.sin(HKT.t * 2.4 + (d.o.run || 0)) * 5, x = d.shw;
+  const s = Math.sin(figClock() * 2.4 + (d.o.run || 0)) * 5, x = d.shw;
   const tl = [[4, -40], [x + 6, -38], [x + 13 + s, -30], [x + 15 + s * 1.3, -22]];
   inkLine(c, tl, INK, 2.6); inkLine(c, tl, d.skin, 1.4);
   ink(c, pEl(x + 15 + s * 1.3, -19, 2.8, 4.6, s * .05), d.C('#2a1a10'));
 };
 BACK.kobold = (c, d) => {
-  const s = Math.sin(HKT.t * 3.4 + (d.o.run || 0)) * 4, x = d.shw;
+  const s = Math.sin(figClock() * 3.4 + (d.o.run || 0)) * 4, x = d.shw;
   tailChain(c, [[2, -38, 5], [x + 6, -26, 4], [x + 16 + s, -10, 2.4], [x + 24 + s * 1.4, -12, .8]], d.skin);
-  if (!d.st && FSC > .3) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = 8 * FSC; const f = Math.sin(HKT.t * 18) * .8; ink(c, pPoly([[x + 21 + s * 1.4, -13], [x + 27 + s * 1.4, -13], [x + 24 + s * 1.4 + f, -21]]), '#ffb03a', 0, true); c.restore(); }
+  if (!d.st && FSC > .3) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = 8 * FSC; const f = Math.sin(figClock() * 18) * .8; ink(c, pPoly([[x + 21 + s * 1.4, -13], [x + 27 + s * 1.4, -13], [x + 24 + s * 1.4 + f, -21]]), '#ffb03a', 0, true); c.restore(); }
 };
 BACK.elf = (c, d) => {
-  const fl = Math.sin(HKT.t * 2.2 + (d.o.run || 0)) * (d.o.run ? 5 : 1.5), col = d.C(d.B.cloak);
+  const fl = Math.sin(figClock() * 2.2 + (d.o.run || 0)) * (d.o.run ? 5 : 1.5), col = d.C(d.B.cloak);
   const p = new Path2D(); p.moveTo(-d.shw + 1, d.shY); p.quadraticCurveTo(-d.shw - 9, -30, -d.shw - 7 - fl, -10); p.quadraticCurveTo(0, -4 + fl, d.shw + 7 + fl, -10); p.quadraticCurveTo(d.shw + 9, -30, d.shw - 1, d.shY); p.closePath();
   ink(c, p, col); if (FSC > .45) inkLine(c, [[-d.shw - 5, -12], [-d.shw + 4, -24]], tint(d.B.cloak, -.3), .5);
 };
@@ -564,13 +573,13 @@ function drawFig(c, kind, x, y, hpx, team, o = {}) {
   // arms
   const swing = run ? sw * 7 : 0;
   if (pose && pose.armR) {
-    arm(c, -shw + 2, shY + 3, pose.armL.x, pose.armL.y, d, { mitt: true });
+    arm(c, -shw + 2, shY + 3, pose.armL.x, pose.armL.y, d, { mitt: !o.glove, glove: o.glove });
     if (pose.trailR && pose.trailR.length > 1 && !st) {
       c.save(); c.lineCap = 'round';
       for (let i = pose.trailR.length - 1; i > 0; i--) { const a = pose.trailR[i], b = pose.trailR[i - 1]; c.strokeStyle = `rgba(255,248,230,${.32 * (1 - i / pose.trailR.length)})`; c.lineWidth = 7 * (1 - i / pose.trailR.length) + 1; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
       c.restore();
     }
-    arm(c, shw - 2, shY + 3, pose.armR.x, pose.armR.y, d, { ball: pose.ball, ember: kind === 'kobold' });
+    arm(c, shw - 2, shY + 3, pose.armR.x, pose.armR.y, d, { ball: pose.ball, ember: kind === 'kobold' && !o.glove, glove: o.glove });
   } else if (o.throwK != null) {
     const k = clamp(o.throwK, 0, 1), th = lerp(2.5, -.25, k), hx2 = shw + 27 * Math.sin(th), hy2 = shY + 2 - 27 * Math.cos(th);
     arm(c, -shw + 2, shY + 3, -shw - 5, shY + 22, d, { mitt: true });

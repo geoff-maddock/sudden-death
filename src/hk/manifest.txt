@@ -2,7 +2,7 @@
 # scope (src/realm/rink/manifest.txt, through `scope wHK ...`), so none of their names reach the page.
 src/hk/parts/01-util.js
 src/hk/parts/02-rules.js
-src/hk/parts/03-figures.js
+src/figures/figures.js
 src/hk/parts/04-teams.js
 src/hk/parts/05-live.js
 src/hk/parts/06-cpu.js

@@ -2,7 +2,7 @@
 # (src/realm/court/manifest.txt, through `scope wBK ...`), so none of their names reach the page.
 src/bk/parts/01-util.js
 src/bk/parts/02-rules.js
-src/bk/parts/03-figures.js
+src/figures/figures.js
 src/bk/parts/04-teams.js
 src/bk/parts/05-live.js
 src/bk/parts/06-cpu.js

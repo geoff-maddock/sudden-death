@@ -2,7 +2,7 @@
 # (src/realm/gridiron/manifest.txt, through `scope wGF ...`), so none of their names reach the page.
 src/gf/parts/01-util.js
 src/gf/parts/02-rules.js
-src/gf/parts/03-figures.js
+src/figures/figures.js
 src/gf/parts/04-teams.js
 src/gf/parts/05-plays.js
 src/gf/parts/06-live.js
