@@ -1,5 +1,5 @@
-/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
-   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+/* Utilities for the scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk), hockey
+   (src/hk) and golf (src/gl, issue #92; engRng seeds its course) each load this inside their own scope, so each has its own random stream. R is the engine's random
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;

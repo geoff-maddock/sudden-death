@@ -25,6 +25,8 @@ def check(ok, what, detail=None):
 # a game of yours, paused, at your first shot; __to(ph) ticks until that beat; __lat: how far right (+) of the aim line (looking along it)
 HELP = r"""
 window.__mine = (seed, o) => { wLinksGame(Object.assign({ seed, mode: 'play' }, o || {})); wGL.pause(true); __to('aim'); return wGL.view; };
+// after moving a ball by hand: back to the top of the turn (Watch and back; the same mode again changes nothing)
+window.__replan = () => { wGL.setMode('watch'); wGL.setMode('play'); };
 window.__to = (ph, n) => { let i = 0; while (wGL.phase !== ph && i++ < (n || 4000)) wGL.tick(0.05); return wGL.phase === ph; };
 window.__lat = (from, aim, p) => { const ax = aim.x - from.x, ay = aim.y - from.y, L = Math.hypot(ax, ay); return ((p.x - from.x) * ay - (p.y - from.y) * ax) / L; };
 window.__swing = (pow, m) => { const v0 = wGL.view, from = Object.assign({}, wGL.G.ball[v0.you]), aim = v0.sel.aim;
@@ -111,7 +113,7 @@ async def main():
 
         # ---------- a putt ----------
         pu = await pg.evaluate("""(() => { __mine(21); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x - 4, y: H.pin.y - 3, lie: 'G' }; G.ball[1] = { x: H.tee.x, y: H.tee.y, lie: 'T' }; G.hole.st = [2, 0];
-          wGL.setMode('play'); __to('aim'); const V = wGL.view, L = wGL.readLine(), len = L.reduce((a, p, i) => i ? a + Math.hypot(p.x - L[i - 1].x, p.y - L[i - 1].y) : 0, 0), rl = wGL.readLen();
+          __replan(); __to('aim'); const V = wGL.view, L = wGL.readLine(), len = L.reduce((a, p, i) => i ? a + Math.hypot(p.x - L[i - 1].x, p.y - L[i - 1].y) : 0, 0), rl = wGL.readLen();
           G.teams[0].roster[V.sel.ri].r.put = 1; const rl2 = wGL.readLen(); G.teams[0].roster[V.sel.ri].r.put = .5;
           wGL.press(); wGL.tick(V.sel.tick * wGL.meterRules.puttUp); wGL.press(); const after = wGL.view;
           return { putt: V.sel.putt, clubs: V.clubs, rows: document.getElementById('wLinksRowShot').hidden, len, rl, rl2, sw: after.swung, ev: after.last && after.last.club, ph: after.ph, tick: V.sel.tick }; })()""")
@@ -120,7 +122,7 @@ async def main():
         check(abs(pu['sw']['pow'] - pu['tick']) < 0.03 and pu['ev'] == 'pt' and pu['ph'] == 'fly', 'a putt is two presses: start, then the weight; stopped on the tick it is struck at that weight', pu)
 
         # ---------- their short putt ----------
-        of = await pg.evaluate("""(() => { const set = () => { const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x + .2, y: H.pin.y, lie: 'G' }; G.ball[1] = { x: H.pin.x, y: H.pin.y - .5, lie: 'G' }; G.hole.st = [3, 3]; wGL.setMode('play'); __to('offer', 5); };
+        of = await pg.evaluate("""(() => { const set = () => { const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x + .2, y: H.pin.y, lie: 'G' }; G.ball[1] = { x: H.pin.x, y: H.pin.y - .5, lie: 'G' }; G.hole.st = [3, 3]; __replan(); __to('offer', 5); };
           __mine(31); set(); const ph = wGL.phase, row = !document.getElementById('wLinksRowGive').hidden; document.querySelector('[data-lgive="1"]').click();
           const g = wGL.G.log[wGL.G.log.length - 1], st = wGL.G.hole.st.slice(), done = wGL.G.hole.done.slice();
           __mine(31); set(); wGL.offer(false); const v = wGL.view;
@@ -156,13 +158,13 @@ async def main():
         r2 = await pg.evaluate("""(() => { const out = {};
           // the ball that ends a hole stays in the cup through the rest beat
           __mine(81); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x, y: H.pin.y - 1.2, lie: 'G' }; G.ball[1] = { x: H.pin.x + 1, y: H.pin.y, lie: 'G' }; G.hole.st = [3, 5]; G.hole.done[1] = false;
-          wGL.setMode('play'); __to('aim'); wGL.aimAt(H.pin.x, H.pin.y); const sel = wGL.view.sel; wGL.drag(sel.tick, 0); let holed = wGL.view.last.holed, n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05);
+          __replan(); __to('aim'); wGL.aimAt(H.pin.x, H.pin.y); const sel = wGL.view.sel; wGL.drag(sel.tick, 0); let holed = wGL.view.last.holed, n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05);
           out.end = { holed, ph: wGL.phase, res: wGL.view.last.res, drawnAway: (() => { const c = wGL.cam(); return wGL.G.h; })() };
           // the putter is not offered from far out on the fairway
           __mine(82); G.ball = wGL.G.ball; const H2 = wGL.course(0); const p = H2.line.find(q => wGL.lie(H2, q.x, q.y) === 'F' && Math.hypot(q.x - H2.pin.x, q.y - H2.pin.y) > 60);
-          wGL.G.ball[0] = { x: p.x, y: p.y, lie: 'F' }; wGL.G.hole.st = [1, 1]; wGL.G.ball[1] = { x: H2.tee.x, y: H2.tee.y, lie: 'F' }; wGL.setMode('play'); __to('aim'); out.farClubs = wGL.view.clubs;
+          wGL.G.ball[0] = { x: p.x, y: p.y, lie: 'F' }; wGL.G.hole.st = [1, 1]; wGL.G.ball[1] = { x: H2.tee.x, y: H2.tee.y, lie: 'F' }; __replan(); __to('aim'); out.farClubs = wGL.view.clubs;
           // a 2-foot putt's aim stays on the cup
-          __mine(83); const H3 = wGL.course(0); wGL.G.ball[0] = { x: H3.pin.x - .6, y: H3.pin.y, lie: 'G' }; wGL.G.ball[1] = { x: H3.tee.x, y: H3.tee.y, lie: 'T' }; wGL.G.hole.st = [2, 0]; wGL.setMode('play'); __to('aim');
+          __mine(83); const H3 = wGL.course(0); wGL.G.ball[0] = { x: H3.pin.x - .6, y: H3.pin.y, lie: 'G' }; wGL.G.ball[1] = { x: H3.tee.x, y: H3.tee.y, lie: 'T' }; wGL.G.hole.st = [2, 0]; __replan(); __to('aim');
           const a = wGL.view.sel.aim; out.shortAim = Math.hypot(a.x - H3.pin.x, a.y - H3.pin.y);
           // You play during your side's address: the shot is yours
           wLinksGame({ seed: 84, mode: 'watch' }); wGL.pause(true); __to('addr'); const side = wGL.view.cpu.side; wGL.setMode('play'); wGL.tick(0.05); out.addr = { side, ph: wGL.phase };
@@ -177,12 +179,12 @@ async def main():
         check(r2['turn'] == {'st': 'down', 'picks': 1}, 'when the meter turns at the top by itself the rows hear it (the button says Mark)', r2['turn'])
         # the drawn ball after the holing putt: the hole on show keeps it in the cup (not back where it was struck)
         cup = await pg.evaluate("""(() => { __mine(86); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x, y: H.pin.y - 1.2, lie: 'G' }; G.ball[1] = { x: H.pin.x + 1, y: H.pin.y, lie: 'G' }; G.hole.st = [3, 5];
-          wGL.setMode('play'); __to('aim'); wGL.aimAt(H.pin.x, H.pin.y); wGL.drag(wGL.view.sel.tick, 0); let n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05);
+          __replan(); __to('aim'); wGL.aimAt(H.pin.x, H.pin.y); wGL.drag(wGL.view.sel.tick, 0); let n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05);
           wGL.render(); const px = wGL.scr(H.pin.x, H.pin.y - 1.2), cv = document.querySelector('#v-links canvas'), d = cv.width / 960, x = cv.getContext('2d').getImageData(Math.round(px[0] * d), Math.round(px[1] * d), 1, 1).data;
           return { holed: wGL.view.last.holed, ph: wGL.phase, white: x[0] > 235 && x[1] > 235 && x[2] > 225 }; })()""")
         check(cup['holed'] and not cup['white'], 'after the hole is won, the holed ball is not drawn back where it was struck', cup)
         # Space during their offer is the course's: it never presses the focused button
-        sp = await pg.evaluate("""(() => { __mine(87); wGL.pause(false); const set = () => { const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x + .2, y: H.pin.y, lie: 'G' }; G.ball[1] = { x: H.pin.x, y: H.pin.y - .5, lie: 'G' }; G.hole.st = [3, 3]; wGL.setMode('play'); __to('offer', 5); }; set();
+        sp = await pg.evaluate("""(() => { __mine(87); wGL.pause(false); const set = () => { const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x + .2, y: H.pin.y, lie: 'G' }; G.ball[1] = { x: H.pin.x, y: H.pin.y - .5, lie: 'G' }; G.hole.st = [3, 3]; __replan(); __to('offer', 5); }; set();
           const b = document.getElementById('wLinksAgain'); let clicked = 0; const f = () => clicked++; b.addEventListener('click', f); b.focus();
           const e = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }); b.dispatchEvent(e); b.removeEventListener('click', f); wGL.pause(true);
           return { ph: wGL.phase, prevented: e.defaultPrevented }; })()""")
@@ -201,6 +203,18 @@ async def main():
         check('Space to start the swing' in r3['aim'], 'the status line says your shot as the beat comes (not the shot before)', r3)
         check(r3['flyMsg'].endswith('…') and r3['rest'] != r3['flyMsg'] and ('yards' in r3['rest'] or 'water' in r3['rest']), 'while the ball flies the line says only who hit what; where it went comes once it stops', r3)
         check(not r3['overSpace'], 'after the game Space is the page\'s again (the focused button works)', r3)
+
+        # (from the fourth review of #93) a held Space's repeats, a cancelled touch, and the same mode clicked again
+        r4 = await pg.evaluate("""(() => { const out = {}, key = (k, rep) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, repeat: !!rep, bubbles: true, cancelable: true }));
+          __mine(95); wGL.pause(false); key(' '); key(' ', 1); key(' ', 1); out.repeat = { ph: wGL.phase, st: wGL.view.meter.st }; wGL.pause(true);
+          __mine(96); wGL.pause(false); const cv = document.querySelector('#v-links canvas'), send = (type, sx, sy) => { const r = cv.getBoundingClientRect(), f = r.width / 960; cv.dispatchEvent(new PointerEvent(type, { clientX: r.left + sx * f, clientY: r.top + sy * f, pointerId: 9, bubbles: true, cancelable: true })); };
+          const b = wGL.G.ball[0], [bx, by] = wGL.scr(b.x, b.y); send('pointerdown', bx, by); send('pointermove', bx - 100, by); send('pointercancel', bx - 100, by); out.cancel = { ph: wGL.phase, strokes: wGL.G.hole.st[0] }; wGL.pause(true);
+          __mine(97); wGL.select({ club: 'mi', shape: 'fade' }); const before = JSON.stringify(wGL.view.sel); document.querySelector('[data-lmode="play"]').click(); wGL.tick(0.05);
+          out.same = { ph: wGL.phase, kept: JSON.stringify(wGL.view.sel) === before };
+          return out; })()""")
+        check(r4['repeat'] == {'ph': 'swing', 'st': 'up'}, 'a held Space\'s repeats are not more presses (the swing waits for the next real one)', r4)
+        check(r4['cancel'] == {'ph': 'aim', 'strokes': 0}, 'a cancelled touch calls the drag off: no swing, no stroke', r4)
+        check(r4['same'] == {'ph': 'aim', 'kept': True}, 'clicking You play again changes nothing: your shot and its choices stay', r4)
 
         # ---------- How to play, Settings, leaving ----------
         await pg.evaluate("wLinksGame({ seed: 61, mode: 'play' }); wGL.pause(false)")

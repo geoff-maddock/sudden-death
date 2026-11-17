@@ -58,12 +58,12 @@ function glPlayNext() {
   if (!n) { glGo('over'); return; }
   const s = n.side, o = 1 - s;
   if (glYours(s)) {
-    if (n.give && glCpuConcede(o, s, n.d)) { glGiven(o); return; }
+    if (glCpuGives(n)) { glGiven(o); return; }
     glSelReset(); glGo('aim', 0, glAimMsg());
     return;
   }
   if (n.give && glYours(o)) { glGo('offer', 0, `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`); return; }
-  if (n.give && glCpuConcede(o, s, n.d)) { glGiven(o); return; }
+  if (glCpuGives(n)) { glGiven(o); return; }
   const plan = glPlan(s);
   GD.cpu = { side: s, plan };
   glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`);
@@ -299,7 +299,9 @@ function glOffer(give) {
 }
 function glSetMode(m) {
   if (!GD) return;
-  GD.mode = m === 'play' ? 'play' : 'watch';
+  const want = m === 'play' ? 'play' : 'watch';
+  if (want === GD.mode) return;
+  GD.mode = want;
   // your shot waiting, or their putt to give, goes back to the top: in Watch the CPU takes it
   if (GD.ph === 'aim' || GD.ph === 'offer' || (GD.ph === 'swing' && GD.mode !== 'play')) { GD.sel = null; GD.meter = null; glGo('next'); }
   else if (GD.ph === 'addr' && GD.cpu && glYours(GD.cpu.side)) { GD.cpu = null; glGo('next'); }

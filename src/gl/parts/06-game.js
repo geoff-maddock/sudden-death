@@ -66,6 +66,8 @@ function glNext() {
   const putt = glShotKind(H, s) === 'putt';
   return { side: s, d: d[s], putt, give: G.ball[s].lie === 'G' && d[s] <= GL_SKILL.giveIn && !G.hole.done[1 - s] };
 }
+// does the CPU on the other side give this putt (n from glNext)? The one rule, for the sim and the game on show
+const glCpuGives = n => G.ball[n.side].lie === 'G' && glCpuConcede(1 - n.side, n.side, n.d);
 // side by gives the other side its next putt
 function glGive(by) {
   const s = 1 - by, h0 = G.res.length, Hs = G.hole, d = glDistOf(glHoleNow(), s);
@@ -101,8 +103,8 @@ function glLogEv(ev, h0, Hs) {
 // one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
 function glTurn() {
   const n = glNext(); if (!n) return null;
+  if (glCpuGives(n)) return glGive(1 - n.side);
   const s = n.side;
-  if (G.ball[s].lie === 'G' && glCpuConcede(1 - s, s, n.d)) return glGive(1 - s);
   const plan = glPlan(s);
   return glShoot(s, plan, glHit(s, plan));
 }

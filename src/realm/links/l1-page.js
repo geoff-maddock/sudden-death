@@ -43,6 +43,8 @@ function glKeyOk(e) {
 }
 function glKey(e) {
   if (!glKeyOk(e)) return;
+  // (a held Space repeats: those are not more presses, or the swing would go off by itself)
+  if (e.repeat) { if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); } return; }
   const k = e.key.toLowerCase(), S = GD.sel, putt = S && S.putt;
   let took = true;
   if (k === ' ') glPress();
@@ -80,6 +82,7 @@ GLP.cv.addEventListener('pointermove', e => {
 });
 function glPtrUp(e) {
   const P = GLP.ptr; GLP.ptr = null; if (!P || !GD) return;
+  if (e.type === 'pointercancel') { GD.drag = null; return; }
   if (P.swing && GD.ph === 'aim' && GD.drag) {
     const b = G.ball[GD.you], S = GD.sel, q = GD.drag, [bx, by] = glScr(b.x, b.y), [qx, qy] = glScr(q.x, q.y);
     const pull = hyp(qx - bx, qy - by) / GL_HANDS.drag, launch = Math.atan2(b.y - q.y, b.x - q.x), aim = Math.atan2(S.aim.y - b.y, S.aim.x - b.x);

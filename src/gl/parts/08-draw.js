@@ -18,7 +18,7 @@ function glGround(H) {
   for (const k in GLGC) delete GLGC[k];
   const S = GL_GROUND.S, C = GL_GROUND.cols, cs = H.cell, cv = document.createElement('canvas');
   cv.width = Math.ceil(H.h * cs * S); cv.height = Math.ceil(H.w * cs * S);
-  const c = cv.getContext('2d'), q = glRng(H.seed ^ 0x51ed);
+  const c = cv.getContext('2d'), q = engRng(H.seed ^ 0x51ed);
   c.fillStyle = C.R; c.fillRect(0, 0, cv.width, cv.height);
   const blob = (ch, col, r) => { c.fillStyle = col; for (let row = 0; row < H.h; row++) for (let i = 0; i < H.w; i++) if (H.grid[row][i] === ch) { c.beginPath(); c.arc((row + 0.5) * cs * S, (i + 0.5) * cs * S, cs * S * r, 0, Math.PI * 2); c.fill(); } };
   blob('r', C.r, 0.8);
@@ -62,7 +62,7 @@ function glCamWant(H) {
   let a, b, putt = false;
   if (A) { a = A; b = A; putt = GD.anim.path.length === 0; }
   else {
-    const n = GD.cpu ? GD.cpu.side : mine ? GD.you : glAwaySide();
+    const n = GD.cpu ? GD.cpu.side : mine ? GD.you : GD.disp.h !== G.h && GD.anim ? GD.anim.side : glAwaySide();
     a = D.balls[n] || D.balls[0];
     if (mine) { b = S.aim; putt = S.putt; }
     else if (GD.cpu && !GD.cpu.plan.putt) b = GD.cpu.plan.aim;

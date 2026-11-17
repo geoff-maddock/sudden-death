@@ -142,7 +142,14 @@ function wLeaveLinks() {
   if (WG) showView('world');
   else { wGL.hide(); showScreen('title'); renderTitle(); }
 }
-wGL.onPhase = ph => { if (!WGL) return; wLinksBarNote(); wLinksRows(); if (ph === 'rest' || ph === 'given' || ph === 'over' || ph === 'next') wLinksCard(); };
+// the scorecard is drawn again only when a stroke or a hole has changed it, and never while the ball is moving
+let W_LINKS_CARDKEY = '';
+wGL.onPhase = ph => {
+  if (!WGL) return; wLinksBarNote(); wLinksRows();
+  if (ph === 'fly') return;   // (the card waits for the ball to stop, as the status line does)
+  const G = wGL.G, key = G ? [G.card.length, G.h, G.hole.st.join('-'), !!G.over].join('|') : '';
+  if (key !== W_LINKS_CARDKEY) { W_LINKS_CARDKEY = key; wLinksCard(); }
+};
 wGL.onPick = () => { if (WGL) { wLinksRows(); wLinksBarNote(); } };
 wGL.onOver = s => { if (WGL) { WGL.over = s; wLinksBarNote(); wLinksRows(); wLinksCard(); $('wLinksAgain').focus(); } };
 

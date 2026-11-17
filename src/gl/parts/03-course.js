@@ -4,7 +4,7 @@
    with t, the yards from the tee) and the green's slope (glSlope).
    Terrain, one letter a cell (GL_TER): T tee, F fairway (and the apron round the green), r rough, R deep rough,
    S sand, B moss bog, W water, O the trees (a ball in there lies on a root), G green.
-   A hole is built from a seed and its par by its own random stream (glRng), never R, so a hole is the same on a reload,
+   A hole is built from a seed and its par by its own random stream (engRng, src/scoped/util.js), never R, so a hole is the same on a reload,
    in the sim and in the cup, whatever else has been drawn. The standing nine is GL_STAND's nine holes, the same every
    week; a wild nine is another seed's (glCourse). Built holes are kept in GLK, never in G: G keeps only the seed. */
 const GL_CELL = 5, GL_W = 40;
@@ -13,12 +13,11 @@ const GL_LEN = { 3: [135, 200], 4: [325, 425], 5: [470, 545] };
 const GL_TER = { T: 'tee', F: 'fairway', r: 'rough', R: 'deep rough', S: 'sand', B: 'moss bog', W: 'water', O: 'trees', G: 'green' };
 const GLK = {};
 
-const glRng = n => engRng(n);
 // hole i of the course with seed cs
 const glHoleSeed = (cs, i) => (Math.imul((cs >>> 0) + 1, 2654435761) ^ Math.imul(i + 1, 40503)) >>> 0;
 // a wild nine's pars: the standing nine's, shuffled by its seed (so a nine is par 36), repeated for eighteen
 function glWildPars(cs, n) {
-  const q = glRng(cs ^ 0x9e37), p = GL_RULES.par9.slice();
+  const q = engRng(cs ^ 0x9e37), p = GL_RULES.par9.slice();
   for (let i = p.length - 1; i > 0; i--) { const j = (q() * (i + 1)) | 0; [p[i], p[j]] = [p[j], p[i]]; }
   const out = []; for (let i = 0; i < n; i++) out.push(p[i % p.length]); return out;
 }
@@ -41,7 +40,7 @@ function glBuildHole(seed, par) {
   const key = seed + ':' + par;
   if (GLK[key]) return GLK[key];
   if (Object.keys(GLK).length >= 40) for (const k in GLK) delete GLK[k];
-  const q = glRng(seed), rn = (a, b) => a + (b - a) * q(), [l0, l1] = GL_LEN[par] || GL_LEN[4];
+  const q = engRng(seed), rn = (a, b) => a + (b - a) * q(), [l0, l1] = GL_LEN[par] || GL_LEN[4];
   const len = Math.round(rn(l0, l1)), mid = GL_W * GL_CELL / 2;
   // the centre line: the tee, a bend (two on a par 5), the green; each leg's lateral swing keeps its length
   const tee = { x: mid, y: 12 }, pts = [tee], legs = par === 3 ? [len] : par === 4 ? [rn(215, 265)] : [rn(200, 240), rn(150, 200)];
