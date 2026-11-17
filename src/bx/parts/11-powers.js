@@ -93,6 +93,17 @@ function bxFx(f) {
 const bxPowOn = () => !G || G.powers !== false;
 const bxPowOf = (f, which) => { const P = bxPowOn() && BX_POW[f.kind]; if (!P) return null; return which === 'sp' && f.spPick === 'sp2' && P.sp2 ? P.sp2 : P[which] || null; };
 // spirit (a bout saved before there was any has a full meter)
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last round. It is spirit, so it does nothing without powers. */
+const BX_FANS = { spirit: 10 };
+function bxFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; if (G.powers) for (const x of G.F) if (G.fans[x.side]) x.spirit = Math.min(BX_SPIRIT.max, bxSpirit(x) + BX_FANS.spirit); }
+function bxFansLate() {
+  const out = []; if (!G.powers || G.round !== G.rounds) return out;
+  const T = bxTotals();
+  for (const x of G.F) { const s = x.side, lead = T.reduce((n, t) => n + Math.sign(s ? t[1] - t[0] : t[0] - t[1]), 0);
+    if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && lead < 0) { G.fanLate[s] = true; x.spirit = Math.min(BX_SPIRIT.max, bxSpirit(x) + BX_FANS.spirit); out.push(s); } }
+  return out;
+}
 const bxSpirit = f => f.spirit == null ? BX_SPIRIT.max : f.spirit;
 // a punch landed (a: who threw it, b: who took it; blocked or clean): spirit for both
 function bxSpiritGain(a, b, dmg, blocked) {

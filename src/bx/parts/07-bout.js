@@ -40,6 +40,7 @@ function bxStart(opts) {
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
   Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0,
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] });
+  bxFansStart(o.fans); G.crowd = engCrowd(o);
   // gear with a status at the opening bell (13-kit.js)
   for (const f of G.F) { const op = bxGx(f).open; if (op) f.fx.push(Object.assign({ id: 'g_open' }, op)); }
   BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
@@ -130,7 +131,7 @@ function bxRoundEnd() {
   for (const f of G.F) { for (const k in f.rs) f.bs[k] += f.rs[k]; f.rs = bxStatsZero(); }
   const r = bxBell(work), sc = G.cards[G.cards.length - 1];
   bxLog(`End of round ${n}: ${sc.map((s, j) => `${BX_JUDGES[j].n} ${s[0]}-${s[1]}`).join(', ')}.`);
-  if (r === 'over') { bxLog(bxVerdict(), true); bxOver(); } else bxCorner();
+  if (r === 'over') { bxLog(bxVerdict(), true); bxOver(); } else { for (const s of bxFansLate()) bxLog(`${G.corners[s].name}'s fans are still singing.`); bxCorner(); }
 }
 function bxCorner() {
   for (const f of G.F) {

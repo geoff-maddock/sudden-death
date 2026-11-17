@@ -5,7 +5,7 @@
    lineup() is who is on the field, kick() the field-goal try from here, why the last result's reason.
    box, audio, onQuit and onSnap come with the full game (phases 2 and 5). */
 return {
-  newGame: gfNewGame, spot: gfSpot, get G() { return G; }, rules: Object.assign({}, GF_RULES),
+  newGame: gfNewGame, spot: gfSpot, get G() { return G; }, fansRules: Object.assign({}, GF_FANS), fansLate: () => gfFansLate(), rules: Object.assign({}, GF_RULES),
   start: gfStart, game: gfStartGame, simGame: gfSimGame, call: gfCall, sim: gfSim, show: gfShow, hide: gfHide, render: gfRender,
   get on() { return GFP.on; }, get speed() { return GFP.speed; }, set speed(n) { GFP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!GD && GD.ph !== 'over'; }, get phase() { return GD ? GD.ph : null; },
   get play() { return L; }, pause: on => { GFP.paused = !!on; }, get paused() { return GFP.paused; }, setMode: m => { if (GD) { GD.mode = ['call', 'play'].includes(m) ? m : 'watch'; GD.pick = null; GD.pow = null; GD.auto = GD.mode === 'call'; } },

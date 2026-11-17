@@ -25,6 +25,7 @@ function gfStart(opts) {
   gfPlaybookStart(); gfBoxStart();
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
+  gfFansStart(o.fans); G.crowd = engCrowd(o);
   gfStanceStart(o.stance);
   gfKitStart(o.bags);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };

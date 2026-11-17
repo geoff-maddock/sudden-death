@@ -42,7 +42,7 @@ async def main():
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
         if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')
         await pg.wait_for_selector('#wGo'); await pg.click('#wGo'); await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
-        await pg.evaluate("(() => { const ks = ['ogre','elf','goblin','troll','harpy','dwarf','vampire','golem']; while (wRoster().length < 8) { if (!wAddPlayer(ks[wRoster().length], 3)) break; } })()")
+        await pg.evaluate("(() => { const kinds = ['troll', 'harpy', 'spider', 'lich', 'witch', 'vampire', 'werewolf']; let i = 0; while (wRoster().length < W_PARTY.max) wAddPlayer(wMakePlayer({ kind: kinds[i++], lvl: 2 }, 'tavern')); })()")
         for key, P, store, f, name in CUPS:
             r = await pg.evaluate(JS, [key, P, store, name])
             check(r['cfg'], f'{name}: its table has its numbers, words and hooks', r)

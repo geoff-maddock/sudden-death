@@ -2,6 +2,12 @@
 
 Milestones from development, newest first. The game was built in claude.ai and published as an artifact after each step; this is the record of what landed when.
 
+## Your following (the Realm)
+- **Fans do something.** They are your following, in four steps: a few regulars (100 fans), a supporters' club (400), a travelling army (900) and a household name (1,500). The Team screen shows where you stand; the log and the journal note each step.
+- **Hold them:** a gate at every card match at a ground, win or lose; a lift at the start of any match away from home (Block in the card game; spirit or mana in hockey, basketball, football and boxing), and again when you are behind late; cheaper free agents, no cup entry fees and bigger bids at the top. The stands are as full as your following.
+- **Or spend them** at the Supporters' Stand (your home ground, or Imelda Foss until you have one): Open training, a Whip-round, a Fan favourite, a Mascot, the supporters' coach and a testimonial. The fans you spend leave your total.
+- Two coach's notes and two medals.
+
 ## Hockey at the Pond Rink (the Realm's fifth engine)
 - **After the first games by hand:** quicker skating that follows a player's speed more; a closer camera that follows the puck, and a larger picture; a longer face-off with the words on the ring and a line saying how your timing was; stronger powers with more mana, a glow under a side with one going; Speed (1, 2, 4 or 8 times) in Watch and Manage.
 - **Black Ice:** real hockey on the pond at Rimewatch, five skaters and a goalie a side. Skating with glide, a puck that is loose a lot, wrist shots, slap shots and one-timers, a goalie who follows the puck a moment late, pokes and body checks, face-offs and icing. Nobody goes home level: sudden death at three a side, then a shootout played out on the ice.

@@ -111,6 +111,7 @@ function hkDrawBank(c) {
 // a row of townsfolk on the bank, in scarves, bobbing a little
 function hkDrawCrowd(c) {
   for (let i = 0; i < 44; i++) {
+    if (!engSeat(i)) continue;
     // (they bob a little, and jump when the bank roars)
     const roar = G.pond && G.pond.roar ? 1 : 0, x = 34 + i * 20.6, b = Math.sin(HKT.t * (roar ? 9 : 2) + i * 1.3) * (roar ? 3.5 : 1.4), y = 158 + (i % 3) * 3 + b;
     c.fillStyle = ['#3c4a5a', '#5a4a3c', '#4a3c52', '#2f4a44'][i % 4]; rr(c, x - 8, y, 16, 15, 4); c.fill();

@@ -131,3 +131,9 @@ src/realm/w93-rinkkit.js
 src/realm/w94-rinkstars.js
 src/realm/w95-rinkkettle.js
 src/realm/w96-rinkfeel.js
+src/realm/w97-following.js
+src/realm/w98-fangate.js
+src/realm/w99-fanlift.js
+src/realm/w100-stand.js
+src/realm/w101-fame.js
+src/realm/w102-fanfeel.js

@@ -18,11 +18,14 @@ function sportFx(f) {
   }
 }
 // the gallery: heads that bob, jump when you score, slump when they do
+// how full the stands are, 0 to 1 (the Realm sets it by your following; here they are always full)
+const CROWD = { fill: 1 };
 function drawCrowd(c) {
   const team = clubTeam(), foe = (B.enemies[0] && B.enemies[0].team) || ACTS[RUN.act].team;
   const t = A.t, cr = A.crowd, k = cr ? A.t - cr.t : 9, tier = B.sc ? momTier() : 0;
   const share = .5 + tier * .15; // more of your colours in the stands when you lead
   for (let i = 0, x = 12; x < SW; x += 22, i++) {
+    if (((i * 61) % 100) / 100 >= CROWD.fill) continue;
     const mine = ((i * 37) % 100) / 100 < share;
     let y = 30 + Math.sin(t * 2 + i) * (Math.abs(tier) ? 1.5 : .6);
     if (k < 1.1) { const happy = (cr.side === 0) === mine; y += happy ? -Math.abs(Math.sin((k * 9) + i * .5)) * 7 * (1 - k / 1.1) : 2 * (1 - k / 1.1); }

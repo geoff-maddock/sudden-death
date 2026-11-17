@@ -298,6 +298,12 @@ function gfPowersAfter() {
   else { for (const z of G.zones) z.left--; G.zones = G.zones.filter(z => z.left > 0); }
 }
 // a new half (or Sudden Death): mana for the half, and a long rest
+/* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
+   and the same again, once, when behind going into the last half. It is mana, so it does nothing without powers. */
+// (a whole mana: every cost and gain in football is whole, so half of one never bought anything)
+const GF_FANS = { mana: 1 };
+function gfFansStart(f) { G.fans = [0, 1].map(s => clamp((f && f[s]) | 0, 0, 2)); G.fanLate = [false, false]; if (G.mana) for (const s of [0, 1]) if (G.fans[s]) G.mana[s] = Math.min(GF_MANA.max, G.mana[s] + GF_FANS.mana); }
+function gfFansLate() { const out = []; if (G.mana) for (const s of [0, 1]) if ((G.fans || [])[s] >= 2 && !G.fanLate[s] && G.score[s] < G.score[1 - s]) { G.fanLate[s] = true; G.mana[s] = Math.min(GF_MANA.max, G.mana[s] + GF_FANS.mana); out.push(s); } return out; }
 function gfPowersHalf() { if (G.salve) G.salve = [[], []]; if (!G.mana) return; G.mana = G.mana.map(m => Math.max(m, GF_MANA.start)); gfRest(GF_STAM.half); }
 // a new drive: mana for both sides
 function gfPowersDrive() { if (G.mana) for (const s of [0, 1]) gfManaAdd(s, GF_MANA.drive); }
