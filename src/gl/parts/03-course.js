@@ -23,7 +23,7 @@ function glWildPars(cs, n) {
   const out = []; for (let i = 0; i < n; i++) out.push(p[i % p.length]); return out;
 }
 // the course's hole i (0-based; playoff holes go round again)
-function glCourseHole(cs, i, par) { return glBuildHole(glHoleSeed(cs, i % 18), par); }
+function glCourseHole(cs, i, par) { return glBuildHole(glHoleSeed(cs, i), par); }
 
 // distance from (x, y) to the polyline pts, and how far along it (yards) the nearest point is
 function glNear(pts, x, y) {
@@ -40,6 +40,7 @@ function glNear(pts, x, y) {
 function glBuildHole(seed, par) {
   const key = seed + ':' + par;
   if (GLK[key]) return GLK[key];
+  if (Object.keys(GLK).length >= 40) for (const k in GLK) delete GLK[k];
   const q = glRng(seed), rn = (a, b) => a + (b - a) * q(), [l0, l1] = GL_LEN[par] || GL_LEN[4];
   const len = Math.round(rn(l0, l1)), mid = GL_W * GL_CELL / 2;
   // the centre line: the tee, a bend (two on a par 5), the green; each leg's lateral swing keeps its length

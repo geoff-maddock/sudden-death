@@ -3,7 +3,7 @@
    touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
    In You play it hears the keys, only while the course is on screen (not under How to play) and it is your shot or your
    choice, in the capture phase so nothing else on the page takes them: Space swings (each press: start, power, the
-   mark; on a putt start, then the weight; it is always the course's, so it never presses a focused button); the arrows aim (left and right turn it, up and down move the ring further
+   mark; on a putt start, then the weight; while it is your shot or their putt to give it is the course's, so it never presses a focused button); the arrows aim (left and right turn it, up and down move the ring further
    or nearer); 1 to 4 pick the hitter; Q and E a longer or shorter club; Z the shape, X the height, C the spin; Y gives
    their putt and N makes them hole it.
    The mouse or a finger: a click or a drag on the course moves the aim; a drag that starts on your ball is a swing
@@ -35,6 +35,7 @@ function glHide() { GLP.ptr = null; if (GD) GD.drag = null; GLP.host.hidden = tr
 /* ---------- the keys ---------- */
 function glKeyOk(e) {
   if (!GLP.on || !GD || GD.mode !== 'play' || GLP.paused || GLP.cv.offsetParent === null) return false;
+  if (GD.ph !== 'aim' && GD.ph !== 'swing' && GD.ph !== 'offer') return false;
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return false;
   const m = document.getElementById('modal'); if (m && !m.hidden) return false;

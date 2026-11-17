@@ -177,8 +177,8 @@ function glDrawAim(c) {
   c.restore();
 }
 function glDrawCard(c, H) {
-  const no = GD.disp.h + 1, lines = [`Hole ${no}${no > G.holes ? ' (playoff)' : ''} · Par ${H.par} · ${H.len} yards`, `${G.teams[0].name}: ${glMatchText(0)}`];
-  const st = G.h === GD.disp.h ? G.hole.st : (G.card[GD.disp.h] || { st: [0, 0] }).st;
+  const no = GD.disp.h + 1, lines = [`Hole ${no}${no > G.holes ? ' (playoff)' : ''} · Par ${H.par} · ${H.len} yards`, `${G.teams[0].name}: ${GD.disp.match}`];
+  const st = GD.disp.st;
   lines.push(`Strokes this hole: ${G.teams[0].name} ${st[0]}, ${G.teams[1].name} ${st[1]}`);
   c.save();
   c.save(); c.font = '13px system-ui, sans-serif'; const w = Math.max(...lines.map(t => c.measureText(t).width)) + 26; c.restore();
@@ -187,7 +187,7 @@ function glDrawCard(c, H) {
   c.restore();
 }
 function glDrawWind(c) {
-  const w = G.wind || { s: 0, d: 0 }, cx = 905, cy = 52;
+  const w = GD.disp.wind || { s: 0, d: 0 }, cx = 905, cy = 52;
   c.save();
   c.fillStyle = 'rgba(16,26,12,.72)'; c.beginPath(); c.arc(cx, cy, 38, 0, Math.PI * 2); c.fill();
   if (w.s) {

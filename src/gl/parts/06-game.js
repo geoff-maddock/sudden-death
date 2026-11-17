@@ -23,7 +23,8 @@ function glTeam(t, side) {
   return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster: ro.map((m, i) => ({ n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.assign({}, GL_DEF_RAT, m.r || {}) })) };
 }
 // the hole being played, built from the course's seed (playoff holes go round again)
-function glHoleNow() { return glCourseHole(G.cs, (G.h % G.holes) % 9, glParOf(G.h)); }
+function glHoleAt(i) { return glCourseHole(G.cs, (i % G.holes) % 9, glParOf(i)); }
+function glHoleNow() { return glHoleAt(G.h); }
 
 function glStart(opts) {
   const o = opts || {}, T = o.teams || [];
@@ -80,8 +81,8 @@ function glShoot(s, plan, r) {
   G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
   if (plan.putt) S.putts++;
   G.pst[s][plan.ri].shots++; if (plan.putt) G.pst[s][plan.ri].putts++; if (r.holed) G.pst[s][plan.ri].holed++;
-  if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F') S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
-  if ((r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
+  if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F' && !r.water) S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
+  if (!r.water && (r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
   const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
   if (r.water) { S.water++; glDrop(s); }
   // holed on the stroke that reached the cap: it still counts
@@ -114,8 +115,8 @@ function glAfterHole(h0, Hs) {
     // a birdie or better is a ball in the hole (or given) in under par
     if (Hs.done[s] && !Hs.up[s]) { const u = Hs.par - Hs.st[s]; if (u === 1) G.stat[s].birdies++; else if (u >= 2) G.stat[s].eagles++; }
   }
-  // (on the page the end is heard once the ball has stopped: 07-play.js)
-  if (G.over) { if (GL_HOOK.onOver && !(GD && GD.firing)) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); } }
+  // (with a game on show the page says when it is over, once the last ball has stopped: 07-play.js)
+  if (G.over) { if (GL_HOOK.onOver && !GD) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); } }
   else glHoleStart();
 }
 function glSummary() {

@@ -188,6 +188,20 @@ async def main():
           return { ph: wGL.phase, prevented: e.defaultPrevented }; })()""")
         check(sp['ph'] == 'offer' and sp['prevented'], 'Space during their offer is taken by the course, not the focused button', sp)
 
+        # (from the third review of #93) the status line says the beat as it comes, and the result once the ball stops
+        r3 = await pg.evaluate("""(() => { const out = {}; wLinksGame({ seed: 91, mode: 'play' }); wGL.pause(true); const seen = []; const was = wGL.onPhase;
+          wGL.onPhase = ph => { was && was(ph); seen.push([ph, document.getElementById('wLinksNote').textContent]); }; __to('aim');
+          out.aim = (seen.find(x => x[0] === 'aim') || [])[1] || ''; const sel = wGL.view.sel; wGL.drag(.9, 0);
+          out.fly = document.getElementById('wLinksNote').textContent; out.flyMsg = wGL.msg; let n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05);
+          out.rest = wGL.msg; wGL.onPhase = was;
+          // after the game, Space is the page's again (the focused Another game works)
+          wLinksGame({ seed: 92, mode: 'play', holes: 3 }); wGL.pause(true); wGL.setMode('watch'); let i = 0; while (!WGL.over && i++ < 40000) wGL.tick(0.05); wGL.setMode('play'); wGL.pause(false);
+          const e = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }); document.getElementById('wLinksAgain').dispatchEvent(e); out.overSpace = e.defaultPrevented; wGL.pause(true);
+          return out; })()""")
+        check('Space to start the swing' in r3['aim'], 'the status line says your shot as the beat comes (not the shot before)', r3)
+        check(r3['flyMsg'].endswith('…') and r3['rest'] != r3['flyMsg'] and ('yards' in r3['rest'] or 'water' in r3['rest']), 'while the ball flies the line says only who hit what; where it went comes once it stops', r3)
+        check(not r3['overSpace'], 'after the game Space is the page\'s again (the focused button works)', r3)
+
         # ---------- How to play, Settings, leaving ----------
         await pg.evaluate("wLinksGame({ seed: 61, mode: 'play' }); wGL.pause(false)")
         await pg.click('#wLinksHowBtn')

@@ -29,8 +29,12 @@ function glPlayStart(o) {
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
 // what is drawn: the hole and both balls, as they were before the shot in the air
-function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow() }; }
-function glGo(ph, wait) {
+function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow(), wind: Object.assign({}, G.wind), match: glMatchText(0), st: G.hole.st.slice() }; }
+// the match as drawn catches up once a hole's last ball has stopped
+function glDispMatch() { if (GD && GD.disp) { GD.disp.match = glMatchText(0); const c = G.card[G.card.length - 1]; if (c && c.no === GD.disp.h + 1) GD.disp.st = c.st.slice(); } }
+// a new beat: msg (when given) is said first, so the page's status line, redrawn on the beat, shows it
+function glGo(ph, wait, msg) {
+  if (msg != null) GD.msg = msg;
   GD.ph = ph; GD.t = 0; GD.wait = wait || 0; GD.phN++;
   if (GL_HOOK.onPhase) try { GL_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
@@ -55,25 +59,22 @@ function glPlayNext() {
   const s = n.side, o = 1 - s;
   if (glYours(s)) {
     if (n.give && glCpuConcede(o, s, n.d)) { glGiven(o); return; }
-    glSelReset(); glGo('aim');
-    GD.msg = glAimMsg();
+    glSelReset(); glGo('aim', 0, glAimMsg());
     return;
   }
-  if (n.give && glYours(o)) { glGo('offer'); GD.msg = `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`; return; }
+  if (n.give && glYours(o)) { glGo('offer', 0, `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`); return; }
   if (n.give && glCpuConcede(o, s, n.d)) { glGiven(o); return; }
   const plan = glPlan(s);
   GD.cpu = { side: s, plan };
-  glGo('addr');
-  GD.msg = `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`;
+  glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`);
 }
 function glGiven(by) {
   const s = 1 - by;
-  GD.firing = true;
-  let ev; try { ev = glGive(by); } finally { GD.firing = false; }
-  if (ev && ev.res != null && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  const ev = glGive(by);
   GD.last = ev;
-  GD.msg = `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev);
-  glGo('given', ev && ev.res != null ? GL_PACE.hole : GL_PACE.given);
+  glGo('given', ev && ev.res != null ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
+  if (ev && ev.res != null) glDispMatch();
+  if (ev && ev.res != null && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
 }
 const glFeet = n => `${n} ${n === 1 ? 'foot' : 'feet'}`;
 const glYards = d => d < 1 ? glFeet(Math.max(1, Math.round(d * 3))) : `${Math.round(d)} ${Math.round(d) === 1 ? 'yard' : 'yards'}`;
@@ -88,14 +89,14 @@ function glFire(s, plan, r) {
   const run = plan.putt ? r.path.concat([r.end]) : r.run || [];
   const rT = plan.putt ? clamp(r.t || 1, 0.6, 5) * 0.75 : run.length > 2 ? clamp(hyp(r.end.x - r.land.x, r.end.y - r.land.y) / 3, 0.6, 3) : run.length ? GL_PACE.roll : 0.2;
   GD.anim = { side: s, path: plan.putt ? [] : r.path, run, fT, rT, t: 0, water: !!r.water, drop: r.drop ? { x: r.end.x, y: r.end.y } : null, holed: !!r.holed, uniform: plan.putt || run.length > 2 };
-  GD.firing = true;
-  let ev; try { ev = glShoot(s, plan, r); } finally { GD.firing = false; }
-  GD.last = ev;
-  GD.msg = glEvSay(ev, r);
-  glGo('fly');
+  const ev = glShoot(s, plan, r);
+  GD.last = ev; GD.said = glEvSay(ev, r);
+  glGo('fly', 0, plan.putt ? `${glName(s, plan.ri)} putts…` : `${glName(s, plan.ri)} hits the ${GL_CLUBS[plan.club].n.toLowerCase()}…`);
 }
 function glAnimDone() {
   const ev = GD.last, end = ev && ev.res != null;
+  GD.msg = GD.said || GD.msg;
+  glDispMatch();
   if (!end) glDispSync();
   else {
     // the hole is over and G has moved to the next tee: the ball just played stays where it finished
@@ -193,7 +194,7 @@ function glSelect(o) {
   if (o.ri != null && glHitters(GD.you).includes(o.ri)) S.ri = o.ri;
   if (o.club && glClubsNow().includes(o.club)) {
     const wasPutt = S.putt; S.club = o.club; S.putt = o.club === 'pt';
-    if (S.putt !== wasPutt) { const H = glHoleNow(); if (S.putt) S.aim = { x: H.pin.x, y: H.pin.y }; else { const p = glPlan(GD.you, S.ri); S.aim = p.putt ? { x: H.pin.x, y: H.pin.y } : p.aim; } }
+    if (S.putt !== wasPutt) { const H = glHoleNow(); S.aim = S.putt || glShotKind(H, GD.you) === 'putt' ? { x: H.pin.x, y: H.pin.y } : glPlan(GD.you, S.ri).aim; }
   }
   if (o.shape != null) S.shape = GL_SHAPES[o.shape] ? o.shape : '';
   if (o.traj != null) S.traj = GL_TRAJ[o.traj] ? o.traj : '';
@@ -292,8 +293,8 @@ function glOffer(give) {
   if (!GD || GD.ph !== 'offer') return false;
   const n = glNext(); if (!n) return false;
   if (give) { glGiven(GD.you); return true; }
-  const plan = glPlan(n.side); GD.cpu = { side: n.side, plan }; glGo('addr');
-  GD.msg = `Make them putt it. ${glName(n.side, plan.ri)} to putt from ${glYards(n.d)}.`;
+  const plan = glPlan(n.side); GD.cpu = { side: n.side, plan };
+  glGo('addr', 0, `Make them putt it. ${glName(n.side, plan.ri)} to putt from ${glYards(n.d)}.`);
   return true;
 }
 function glSetMode(m) {
