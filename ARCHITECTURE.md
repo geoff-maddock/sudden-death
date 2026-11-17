@@ -287,7 +287,7 @@ The football engine for issue #9, played at the Ash Bowl. Unlike Brimstone Diamo
 
 ### The Anvil Ring (`src/bx/`)
 
-The boxing engine for issue #23, played at the Anvil Ring in Cinderhold. New code like the gridiron, in its own scope (`scope wBX …`, `src/realm/ring/manifest.txt`); what it needs from the gridiron is copied and adapted, not shared. Unlike the two team engines it has no plays: a bout runs on a clock in steps of `BX_DT`, one fighter against one. The parts, in load order:
+The boxing engine for issue #23, played at the Anvil Ring in Cinderhold. New code like the gridiron, in its own scope (`scope wBX …`, `src/realm/ring/manifest.txt`); what it needs from the gridiron is copied and adapted, not shared, except the figures (`src/figures/figures.js`, shared). Unlike the two team engines it has no plays: a bout runs on a clock in steps of `BX_DT`, one fighter against one. The parts, in load order:
 
 - `01-util.js`: the seeded random number (`bxSeed`), so a headless bout boxes the same twice, and small helpers.
 - `02-rules.js`: `G` (plain JSON: `{ round, rounds, clock, kd, rkd, cards, over }`), knockdowns, the count, the ten-point must (`bxRoundScore`: 10-9 to whoever did more, 10-10 when even; a knockdown decides the round by the pro rule, 10-8, or 10-9 when the fighter who went down was winning it), the decision (unanimous, split, majority or a draw) and how a card of bouts is settled (`bxCardResult`: bouts won, then knockdowns scored, then points).
@@ -307,7 +307,7 @@ The boxing engine for issue #23, played at the Anvil Ring in Cinderhold. New cod
 
 ### The Charter Court (`src/bk/`)
 
-The basketball engine for issue #77, played at the Charter Court in Graftonbury. New code like the ring, in its own scope (`scope wBK …`, `src/realm/court/manifest.txt`); what it needs from the gridiron (live movement, the figures) is copied and adapted, not shared. Five a side on a full court, continuous: the ball moves on a fixed step (`BK_DT`), and every trip down the floor is one possession against the shot clock. The parts, in load order:
+The basketball engine for issue #77, played at the Charter Court in Graftonbury. New code like the ring, in its own scope (`scope wBK …`, `src/realm/court/manifest.txt`); what it needs from the gridiron (live movement) is copied and adapted, not shared; the figures are the shared file (`src/figures/figures.js`). Five a side on a full court, continuous: the ball moves on a fixed step (`BK_DT`), and every trip down the floor is one possession against the shot clock. The parts, in load order:
 
 - `01-util.js`: the seeded random number (`bkSeed`), so a headless game plays the same twice, and small helpers.
 - `02-rules.js`: `G` (plain JSON: `{ mins, qlen, q, clock, shot, poss, score, tf, pf, arrow, over }`), the game length (`BK_RULES.minsAt`: 3, 5, 8 or 12 minutes, four quarters), the clocks (`bkRun`: the shot clock holds while a shot is up or the ball is loose, and is off when the period has less left), 2s and 3s (`bkShotValue`, the arc at 6.75 metres), fouls (`bkFoul`: shooting fouls, the and-one, the bonus past four team fouls in a quarter, five personal fouls out, or a free throw more for each foul after that when nobody can come in), the end of a period (`bkPeriodEnd`: the arrow, halftime, up to three 30-second overtimes, then a tie) and which basket each side attacks (`bkDir`, swapping at halftime).
@@ -334,7 +334,7 @@ The basketball engine for issue #77, played at the Charter Court in Graftonbury.
 
 ### Black Ice (`src/hk/`)
 
-The hockey engine for issue #83, played at the Pond Rink in Rimewatch. New code like the court, in its own scope (`scope wHK …`, `src/realm/rink/manifest.txt`); what it needs from the court (the figures, the page's frame loop, the shape of a game in beats) is copied and adapted, not shared.
+The hockey engine for issue #83, played at the Pond Rink in Rimewatch. New code like the court, in its own scope (`scope wHK …`, `src/realm/rink/manifest.txt`); what it needs from the court (the page's frame loop, the shape of a game in beats) is copied and adapted, not shared; the figures are the shared file (`src/figures/figures.js`).
 
 - `01-util.js`: the seeded random number (`hkSeed`, `R`), `clamp`, `lerp`, `wpick`, `txt`, `rr`.
 - `02-rules.js`: the rules as pure functions on `G` (phase 0): `hkNewGame`, the clock and the penalty clocks (`hkRun`), penalties and the box (`hkPenalty`, `hkBoxOut`, `G.box`, `G.wait`), skaters a side (`hkStrength`, `hkShort`), goals (`hkGoal`: a goal against a short-handed side ends its earliest penalty; in sudden death it ends the game), icing (`hkIcingOn`), periods (`hkPeriodEnd`: `'period'`, `'ot'`, `'shootout'`, `'over'`), the shootout (`hkSoTurn`, `hkSoShot`), ends (`hkDir`, `hkGoalX`, `hkUp`).
