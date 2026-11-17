@@ -137,3 +137,5 @@ src/realm/w99-fanlift.js
 src/realm/w100-stand.js
 src/realm/w101-fame.js
 src/realm/w102-fanfeel.js
+src/realm/w103-places.js
+src/realm/w104-delves.js

@@ -36,9 +36,11 @@ window.__wend = function () { consumeFx(); renderFightHUD(); finishFight(); };
 // stand just outside a room, on a walkable tile, and return the step that walks in
 window.__doorOf = function (R) { const m = MAPS[R.dg];
   for (let y = R.y; y < R.y + R.h; y++) for (let x = R.x; x < R.x + R.w; x++) {
-    if (wTileAt(m, x, y) !== 'g') continue;
+    // any open floor (issue #90 gave each dungeon its own: rune tiles, ash, shallows, rails), but never a vent
+    const fl = c => c && c !== '>' && DB.tiles[c] && DB.tiles[c].walk && !DB.tiles[c].enter;
+    if (!fl(wTileAt(m, x, y))) continue;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ox = x + dx, oy = y + dy, c = wTileAt(m, ox, oy);
-      if (c === 'g' && !wRoomAt(R.dg, ox, oy)) { wEnterMap(R.dg, ox, oy); WG.grace = 0; return [-dx, -dy]; } } }
+      if (fl(c) && !wRoomAt(R.dg, ox, oy)) { wEnterMap(R.dg, ox, oy); WG.grace = 0; return [-dx, -dy]; } } }
   return null; };
 // stand next to a tile of a map and return its position
 window.__beside = function (mapId, pred) { const m = MAPS[mapId];
