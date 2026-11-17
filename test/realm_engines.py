@@ -8,6 +8,11 @@
 # went down was winning it on work; a point more for each knockdown more); three knockdowns stop the bout, and failing to beat the count is a knockout; the decision is
 # unanimous, split or majority, or a draw; a card of bouts goes to the side with more bouts won, then more knockdowns
 # scored, then more points.
+# Black Ice at the Pond Rink (issue #83, phase 0) builds in its own scope too (wHK), five skaters and a goalie. Its rules:
+# a game of 6 minutes by default (3, 6, 9 or 12) in three periods; a minor is a sixth of a period and leaves a side a
+# skater short, never below three (a third penalty waits); a goal against a short-handed side ends its earliest penalty;
+# icing counts from a side's own half and never against a short-handed side; the sides swap ends each period; level
+# after three is sudden death at three a side for half a period, then a shootout that gives the winner one goal.
 # The Charter Court (issue #77, phase 0) builds in its own scope too (wBK), five a side. Its rules: a game of 5 minutes by
 # default (3, 5, 8 or 12), four quarters; a 14-second shot clock that runs out into a turnover, holds while a shot is up
 # and is off when the period has less left; 2 inside the arc and 3 beyond it; a shooting foul is two free throws, three
@@ -49,8 +54,10 @@ async def main():
           showView('diamond'); const shown = wBD.on && UI.view === 'diamond';
           showView('world'); const hidden = !wBD.on;
           return { ids: Object.keys(W_ENGINES), api: D.api === wBD, view: D.view, sport: D.sport, shown, hidden }; })()""")
-        check(r == {'ids': ['diamond', 'gridiron', 'ring', 'court'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
-              'W_ENGINES has the diamond, the gridiron, the ring and the court: the diamond\'s view shows it, and another view hides it', r)
+        check(r == {'ids': ['diamond', 'gridiron', 'ring', 'court', 'rink'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
+              'W_ENGINES has the diamond, the gridiron, the ring, the court and the rink: the diamond\'s view shows it, and another view hides it', r)
+        rk = await pg.evaluate("({ api: W_ENGINES.rink.api === wHK, view: W_ENGINES.rink.view, sport: W_ENGINES.rink.sport })")
+        check(rk == {'api': True, 'view': 'rink', 'sport': 'hockey'}, 'the rink is hockey, in the rink view', rk)
         ct = await pg.evaluate("({ api: W_ENGINES.court.api === wBK, view: W_ENGINES.court.view, sport: W_ENGINES.court.sport })")
         check(ct == {'api': True, 'view': 'court', 'sport': 'basketball'}, 'the court is basketball, in the court view', ct)
         rg = await pg.evaluate("({ api: W_ENGINES.ring.api === wBX, view: W_ENGINES.ring.view, sport: W_ENGINES.ring.sport })")
@@ -162,6 +169,52 @@ async def main():
         check(q['ot'] == ['ot', 5, 30, 'OT'] and q['over'][0] == 'over' and q['over'][1] == {'win': 0, 'score': [22, 20], 'ot': 1},
               'level after the fourth is a 30-second overtime; ahead at the end of it wins', q)
         check(q['ots'] == ['ot', 'ot', 'ot', 'over', None, 3], 'still level after three overtimes, the game is a tie', q)
+
+        # ---------- the rink's scope and rules ----------
+        s = await pg.evaluate("""(() => ({ api: typeof wHK === 'object' && typeof wHK.newGame === 'function' && typeof wHK.penalty === 'function',
+          leaks: ['HK_RULES', 'hkNewGame', 'hkGoal', 'hkPenalty', 'hkRun', 'hkPeriodEnd', 'hkStrength', 'hkDir', 'HK_KIND', 'hkTick', 'hkDraw', 'HKP', 'HKT', 'hkSoShot'].filter(n => (0, eval)('typeof ' + n) !== 'undefined'), r: wHK.rules }))()""")
+        check(s['api'] and not s['leaks'] and s['r']['skaters'] == 5 and s['r']['side'] == 6 and s['r']['mins'] == 6 and s['r']['periods'] == 3 and s['r']['minsAt'] == [3, 6, 9, 12],
+              'Black Ice builds in its own scope (wHK): five skaters and a goalie, 6 minutes in three periods by default; none of its names reach the page', s)
+        g = await pg.evaluate("""(() => { const G = wHK.newGame(); const d = { p: G.p, clock: G.clock, score: G.score.slice(), minor: wHK.minor(), str: wHK.strength() };
+          const lens = [3, 6, 9, 12, 7].map(m => wHK.newGame({ mins: m }).plen); const H = wHK.newGame();
+          const a = [wHK.run(5).end, H.clock]; H.clock = .5; const end = [wHK.run(1).end, H.clock];
+          return { d, lens, a, end }; })()""")
+        check(g['d'] == {'p': 1, 'clock': 120, 'score': [0, 0], 'minor': 20, 'str': [5, 5]} and g['lens'] == [60, 120, 180, 240, 120] and g['a'] == [False, 115] and g['end'] == [True, 0],
+              'a hockey game is three periods of a third of its length (6 minutes unless it is 3, 9 or 12); a minor is a sixth of a period; the clock runs down to the end of the period', g)
+        pn = await pg.evaluate("""(() => { const G = wHK.newGame(); const a = wHK.penalty(0, 2, 'trip'); const one = { t: a.t, waits: a.waits, str: wHK.strength(), short: [wHK.short(0), wHK.short(1)] };
+          const ice = [wHK.icingOn(0, 10), wHK.icingOn(1, 30), wHK.icingOn(1, 10)];
+          wHK.run(5); wHK.penalty(0, 3); const c = wHK.penalty(0, 4); const three = { waits: c.waits, str: wHK.strength(), box: G.box.length, wait: G.wait.length };
+          const r1 = wHK.run(15); const after1 = { out: r1.out.map(e => e.ri), str: wHK.strength(), box: G.box.map(e => [e.ri, Math.round(e.t)]), wait: G.wait.length };
+          const r2 = wHK.run(5); const after2 = { out: r2.out.map(e => e.ri), str: wHK.strength(), box: G.box.map(e => [e.ri, Math.round(e.t)]) };
+          return { one, ice, three, after1, after2 }; })()""")
+        check(pn['one'] == {'t': 20, 'waits': False, 'str': [4, 5], 'short': [True, False]}, 'a penalty puts a side a skater short for the length of a minor', pn)
+        check(pn['ice'] == [False, True, False], 'icing counts from a side\'s own half only, and never against a side that is short-handed', pn)
+        check(pn['three'] == {'waits': True, 'str': [3, 5], 'box': 2, 'wait': 1}, 'a side is never below three skaters: a third penalty waits its turn', pn)
+        check(pn['after1'] == {'out': [2], 'str': [3, 5], 'box': [[3, 5], [4, 20]], 'wait': 0} and pn['after2'] == {'out': [3], 'str': [4, 5], 'box': [[4, 15]]},
+              'when a penalty runs out the player comes back, and the one that was waiting starts', pn)
+        gl = await pg.evaluate("""(() => { let G = wHK.newGame(); wHK.penalty(1, 0); const pp = wHK.goal(0); const a = { score: G.score.slice(), freed: pp.freed && pp.freed.ri, str: wHK.strength(), over: pp.over };
+          G = wHK.newGame(); wHK.penalty(1, 0); const sh = wHK.goal(1); const b = { score: G.score.slice(), freed: sh.freed, str: wHK.strength() };
+          G = wHK.newGame(); wHK.penalty(0, 1); wHK.penalty(1, 1); const ev = wHK.goal(0); const c = { freed: ev.freed, str: wHK.strength() };
+          return { a, b, c }; })()""")
+        check(gl['a'] == {'score': [1, 0], 'freed': 0, 'str': [5, 5], 'over': False} and gl['b'] == {'score': [0, 1], 'freed': None, 'str': [5, 4]} and gl['c'] == {'freed': None, 'str': [4, 4]},
+              'a goal against a short-handed side ends its earliest penalty; a goal by the short side, or with the sides even, ends none', gl)
+        pe = await pg.evaluate("""(() => { let G = wHK.newGame(); const d1 = [wHK.dir(0), wHK.dir(1), wHK.goalX(0), wHK.goalX(1), wHK.up(0, 10), wHK.up(1, 10)];
+          const r1 = wHK.periodEnd(); const p2 = [r1, G.p, G.clock, wHK.dir(0), wHK.dir(1)]; const r2 = wHK.periodEnd();
+          G.score = [2, 2]; const r3 = wHK.periodEnd(); const ot = [r2, r3, G.p, G.clock, wHK.periodName(G.p), wHK.strength()];
+          wHK.penalty(0, 1); const otpen = wHK.strength(); const w = wHK.goal(1); const sudden = [w.over, Object.assign({}, G.over)];
+          G = wHK.newGame(); G.p = 3; G.score = [3, 1]; const reg = [wHK.periodEnd(), Object.assign({}, G.over)];
+          G = wHK.newGame(); G.p = 4; G.score = [1, 1]; const so = [wHK.periodEnd(), G.so.tries.slice(), wHK.soTurn()];
+          const tries = [wHK.soShot(0, true), wHK.soTurn(), wHK.soShot(1, false), wHK.soShot(0, true), wHK.soShot(1, false)]; const soOver = Object.assign({}, G.over);
+          G = wHK.newGame(); G.p = 4; G.score = [0, 0]; wHK.periodEnd(); const long = [];
+          for (let i = 0; i < 3; i++) { long.push(wHK.soShot(0, false)); long.push(wHK.soShot(1, false)); } long.push(wHK.soShot(0, false)); long.push(wHK.soShot(1, true));
+          return { d1, p2, ot, otpen, sudden, reg, so, tries, soOver, long, longOver: Object.assign({}, G.over) }; })()""")
+        check(pe['d1'] == [1, -1, 37, 3, 10, 30] and pe['p2'] == ['period', 2, 120, -1, 1], 'the sides attack opposite goals, and swap ends each period', pe)
+        check(pe['ot'] == ['period', 'ot', 4, 60, 'OT', [3, 3]] and pe['otpen'] == [3, 4] and pe['sudden'] == [True, {'win': 1, 'score': [2, 3], 'ot': 1, 'so': False}],
+              'level after three periods is sudden death, half a period at three skaters a side (a penalty there gives the other side a fourth), and the next goal wins', pe)
+        check(pe['reg'] == ['over', {'win': 0, 'score': [3, 1], 'ot': 0, 'so': False}], 'ahead after three periods wins', pe)
+        check(pe['so'] == ['shootout', [0, 0], 0] and pe['tries'] == [None, 1, None, None, 0] and pe['soOver'] == {'win': 0, 'score': [2, 1], 'ot': 1, 'so': True},
+              'still level after sudden death is a shootout, taken in turns: it ends as soon as one side can\'t be caught, and the winner gets one goal', pe)
+        check(pe['long'] == [None] * 7 + [1] and pe['longOver']['score'] == [0, 1], 'level after three tries each, the shootout goes on a round at a time until one scores and the other doesn\'t', pe)
 
         check(not errs, 'no page errors', errs)
         await br.close()
