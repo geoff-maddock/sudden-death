@@ -36,7 +36,7 @@ async def main():
         f = await pg.evaluate("""(() => { RUN.fans = 460; const ch = wStandChoices('favourite'), p = wRoster().find(x => x.id === ch[0].id), l0 = p.lvl, x0 = p.xp; const r = wStandBuy('favourite', p.id);
           return { n: ch.length, r, up: p.lvl - l0, xp: [x0, p.xp], fans: RUN.fans }; })()""")
         check(f['n'] > 0 and f['r'] == '' and f['up'] == 1 and f['xp'][0] == f['xp'][1] and f['fans'] == 10, 'a fan favourite gets a level’s worth of XP', f)
-        m = await pg.evaluate("""(() => { RUN.fans = 800; const n0 = RUN.relics.length; const r = wStandBuy('mascot'), id = RUN.relics[RUN.relics.length - 1]; return { r, got: RUN.relics.length - n0, rar: RELICS[id].rar, fans: RUN.fans }; })()""")
+        m = await pg.evaluate("""(() => { RUN.fans = 950; const n0 = RUN.relics.length; const r = wStandBuy('mascot'), id = RUN.relics[RUN.relics.length - 1]; return { r, got: RUN.relics.length - n0, rar: RELICS[id].rar, fans: RUN.fans }; })()""")
         check(m['r'] == '' and m['got'] == 1 and m['rar'] == 'u' and m['fans'] == 50, 'a mascot is an uncommon trophy', m)
         k = await pg.evaluate("""(() => { RUN.fans = 300; const none = wStandProblems('coach').join(' ');
           const towns = DB.locs.filter(L => L.map && MAPS[L.map] && MAPS[L.map].kind === 'town'); for (const L of towns.slice(0, 3)) WG.flags['seen_' + L.id] = 1;
@@ -47,7 +47,7 @@ async def main():
         # ---------- a testimonial, at your home ground ----------
         g = await pg.evaluate("""(() => { RUN.fans = 1200; WG.ground = { town: 'mossgate', parts: { stands: 0, pitch: 0, kitchen: 0, scout: 0 }, drill: { n: 0, week: 0 } }; const away = [wStandWhere(), wStandProblems('testimonial').join(' ')];
           const L = DB.locs.find(l => l.map === 'mossgate'); wEnterMap('mossgate', 5, 5); const here = wStandWhere(), clubs = wStandChoices('testimonial');
-          const gate = wFanGate({ kind: 'ground', region: wHomeRegion() }); const keep = wPreGame; let W = null; wPreGame = enc => { W = JSON.parse(JSON.stringify(enc.world)); }; let r; try { r = wStandBuy('testimonial', clubs[0].id); } finally { wPreGame = keep; }
+          const gate = wFanGate({ kind: 'ground', region: wHomeRegion() }); const keep = wKickoff, kp = wPreGame; let W = null, card = false; wKickoff = enc => { W = JSON.parse(JSON.stringify(enc.world)); }; wPreGame = () => { card = true; }; let r; try { r = wStandBuy('testimonial', clubs[0].id); } finally { wKickoff = keep; wPreGame = kp; } if (card) W = null;
           return { away, here, clubs: clubs.length, gate, r, W, fans: RUN.fans }; })()""")
         check(g['away'][0] == '' and 'at your home ground' in g['away'][1] and g['here'] == 'ground' and g['clubs'] >= 1, 'with a ground the Stand is there, and a testimonial is played there against a rival', g)
         check(g['r'] == '' and g['W'] and g['W']['kind'] == 'testimonial' and g['W']['ref']['gate'] == g['gate'] * 2 and g['gate'] == 60 and g['fans'] == 600, 'it starts a match with a full house: twice your fans’ gate at home, fixed when you called it', g)

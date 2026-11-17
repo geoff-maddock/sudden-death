@@ -17,7 +17,9 @@
    (W_FAN_CROWD by step: three seats in ten with no following, all of them for a household name). It goes to the
    engines as opts.crowd with every world game and is drawing only.
    W_FAN_GRD, W_FAN_CROWD, wFanLift(sport) (0, 1 or 2), wFanCrowd()
-   Wrapped: wStartRink, wStartCourt, wStartGrid and wRingGo (wW99…: the mark), wHK.start and simGame, wBK.start and
+   The gate is paid at these games too (wFanGateAt), as at a card match at a ground.
+   Wrapped: wStartRink, wStartCourt, wStartGrid and wRingGo (wW99…: the mark), wRinkSettle, wCourtSettle,
+   wGridSettle and wRingSettle (the gate), wHK.start and simGame, wBK.start and
    simGame, wGF.start, game and simGame, wBX.cardStart and simCard (the value goes in), renderHelp (wW99RenderHelp:
    #wHelpFanLift). */
 
@@ -50,6 +52,18 @@ const wW99StartRink = wStartRink; wStartRink = function (o) { return wFanMark('h
 const wW99StartCourt = wStartCourt; wStartCourt = function (o) { return wFanMark('basketball', () => wW99StartCourt.call(this, o)); };
 const wW99StartGrid = wStartGrid; wStartGrid = function (o) { return wFanMark('football', () => wW99StartGrid.call(this, o)); };
 const wW99RingGo = wRingGo; wRingGo = function (o, mine, theirs, picks) { return wFanMark('boxing', () => wW99RingGo.call(this, o, mine, theirs, picks)); };
+
+// the gate at the engines' grounds: your fans pay in at a hockey, basketball or football game and a boxing card as
+// they do at a card match there (wFanGate), win or lose; worked out before the result adds fans
+function wFanGateAt(sport, fn) {
+  const g = wGrd(W_FAN_GRD[sport]), W = g ? { kind: 'ground', region: W_GRD_REG[g.city] } : null, gold = wFanGate(W), r = fn();
+  if (gold) wLog(`Your fans at the gate: ${gainGold(gold)} gold${wIsHome(W) ? ', a home crowd' : ''}.`, 'g');
+  return r;
+}
+const wW99RinkSettle = wRinkSettle; wRinkSettle = function () { return wFanGateAt('hockey', () => wW99RinkSettle.apply(this, arguments)); };
+const wW99CourtSettle = wCourtSettle; wCourtSettle = function () { return wFanGateAt('basketball', () => wW99CourtSettle.apply(this, arguments)); };
+const wW99GridSettle = wGridSettle; wGridSettle = function () { return wFanGateAt('football', () => wW99GridSettle.apply(this, arguments)); };
+const wW99RingSettle = wRingSettle; wRingSettle = function () { return wFanGateAt('boxing', () => wW99RingSettle.apply(this, arguments)); };
 
 const wW99HkStart = wHK.start, wW99HkSim = wHK.simGame; wHK.start = o => wW99HkStart(wFanOpts(o)); wHK.simGame = o => wW99HkSim(wFanOpts(o));
 const wW99BkStart = wBK.start, wW99BkSim = wBK.simGame; wBK.start = o => wW99BkStart(wFanOpts(o)); wBK.simGame = o => wW99BkSim(wFanOpts(o));

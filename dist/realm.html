@@ -47331,7 +47331,7 @@ const wW98RenderHelp = renderHelp;
 renderHelp = function () {
   wW98RenderHelp();
   const h = $('wHelpFollow'); if (!h || $('wHelpFanGate')) return;
-  h.insertAdjacentHTML('beforeend', ` <span id="wHelpFanGate"><b>The gate</b> (${W_FOLLOW.at[0]} fans): at every card match at a ground your fans pay in 1 gold for every ${W_FANS.per} of them, up to ${W_FANS.cap} a match, half as much again with a travelling army, doubled at home, win or lose. <b>The away end</b> (${W_FOLLOW.at[1]} fans): ${W_FANS.block} Block at kickoff in any card match away from home, unless the crowd there is already yours.</span>`);
+  h.insertAdjacentHTML('beforeend', ` <span id="wHelpFanGate"><b>The gate</b> (${W_FOLLOW.at[0]} fans): at every match at a ground (a card match there, or a hockey, basketball or football game or a boxing card) your fans pay in 1 gold for every ${W_FANS.per} of them, up to ${W_FANS.cap} a match, half as much again with a travelling army, doubled at home, win or lose. <b>The away end</b> (${W_FOLLOW.at[1]} fans): ${W_FANS.block} Block at kickoff in any card match away from home, unless the crowd there is already yours.</span>`);
 };
 /* w99: what a following does in the engines (issue #79, phase 3): the away end and the late lift on the ice, the court,
    the gridiron and in the ring. Loads after w98-fangate.js; changes earlier parts only by reassignment (saved
@@ -47352,7 +47352,9 @@ renderHelp = function () {
    (W_FAN_CROWD by step: three seats in ten with no following, all of them for a household name). It goes to the
    engines as opts.crowd with every world game and is drawing only.
    W_FAN_GRD, W_FAN_CROWD, wFanLift(sport) (0, 1 or 2), wFanCrowd()
-   Wrapped: wStartRink, wStartCourt, wStartGrid and wRingGo (wW99…: the mark), wHK.start and simGame, wBK.start and
+   The gate is paid at these games too (wFanGateAt), as at a card match at a ground.
+   Wrapped: wStartRink, wStartCourt, wStartGrid and wRingGo (wW99…: the mark), wRinkSettle, wCourtSettle,
+   wGridSettle and wRingSettle (the gate), wHK.start and simGame, wBK.start and
    simGame, wGF.start, game and simGame, wBX.cardStart and simCard (the value goes in), renderHelp (wW99RenderHelp:
    #wHelpFanLift). */
 
@@ -47385,6 +47387,18 @@ const wW99StartRink = wStartRink; wStartRink = function (o) { return wFanMark('h
 const wW99StartCourt = wStartCourt; wStartCourt = function (o) { return wFanMark('basketball', () => wW99StartCourt.call(this, o)); };
 const wW99StartGrid = wStartGrid; wStartGrid = function (o) { return wFanMark('football', () => wW99StartGrid.call(this, o)); };
 const wW99RingGo = wRingGo; wRingGo = function (o, mine, theirs, picks) { return wFanMark('boxing', () => wW99RingGo.call(this, o, mine, theirs, picks)); };
+
+// the gate at the engines' grounds: your fans pay in at a hockey, basketball or football game and a boxing card as
+// they do at a card match there (wFanGate), win or lose; worked out before the result adds fans
+function wFanGateAt(sport, fn) {
+  const g = wGrd(W_FAN_GRD[sport]), W = g ? { kind: 'ground', region: W_GRD_REG[g.city] } : null, gold = wFanGate(W), r = fn();
+  if (gold) wLog(`Your fans at the gate: ${gainGold(gold)} gold${wIsHome(W) ? ', a home crowd' : ''}.`, 'g');
+  return r;
+}
+const wW99RinkSettle = wRinkSettle; wRinkSettle = function () { return wFanGateAt('hockey', () => wW99RinkSettle.apply(this, arguments)); };
+const wW99CourtSettle = wCourtSettle; wCourtSettle = function () { return wFanGateAt('basketball', () => wW99CourtSettle.apply(this, arguments)); };
+const wW99GridSettle = wGridSettle; wGridSettle = function () { return wFanGateAt('football', () => wW99GridSettle.apply(this, arguments)); };
+const wW99RingSettle = wRingSettle; wRingSettle = function () { return wFanGateAt('boxing', () => wW99RingSettle.apply(this, arguments)); };
 
 const wW99HkStart = wHK.start, wW99HkSim = wHK.simGame; wHK.start = o => wW99HkStart(wFanOpts(o)); wHK.simGame = o => wW99HkSim(wFanOpts(o));
 const wW99BkStart = wBK.start, wW99BkSim = wBK.simGame; wBK.start = o => wW99BkStart(wFanOpts(o)); wBK.simGame = o => wW99BkSim(wFanOpts(o));
@@ -47427,7 +47441,7 @@ const W_STAND = {
     training: { n: 'Open training', cost: 350, d: 'Practice a card in front of the fans: it gains Practice ★.', pick: 'card' },
     whip: { n: 'Whip-round', cost: 150, gold: 50, d: 'The fans pass a hat: 50 gold now.' },
     favourite: { n: 'Fan favourite', cost: 450, d: 'The fans take to one of your players: a level\'s worth of XP.', pick: 'player' },
-    mascot: { n: 'Mascot', cost: 750, d: 'A random uncommon trophy.' },
+    mascot: { n: 'Mascot', cost: 900, d: 'A random uncommon trophy.' },
     coach: { n: 'The supporters\' coach', cost: 250, mins: 180, d: 'Ride with the fans to any city you have visited.', pick: 'city' },
     testimonial: { n: 'A testimonial', cost: 600, d: 'A friendly at your home ground against a rival club of your choice, with a full house: twice your fans\' gate, win or lose.', pick: 'club' },
   },
@@ -47480,7 +47494,8 @@ function wStandBuy(id, arg) {
   wSave();
   if (id === 'testimonial') {
     wLog(`A testimonial against ${CLUBS[arg].name}: the ground is full.`, 'g');
-    startMatch({ type: 'rival', tier: wTierHere(), ambush: false, name: wClubCaptain(arg), world: { kind: 'testimonial', ref: { club: arg, gate }, region: wHomeRegion() } });
+    // (straight to kickoff: the fans are already spent, so there is no "Not yet")
+    startMatch({ type: 'rival', tier: wTierHere(), ambush: false, card: false, name: wClubCaptain(arg), world: { kind: 'testimonial', ref: { club: arg, gate }, region: wHomeRegion() } });
   }
   return '';
 }

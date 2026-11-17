@@ -28,7 +28,7 @@ const W_STAND = {
     training: { n: 'Open training', cost: 350, d: 'Practice a card in front of the fans: it gains Practice ★.', pick: 'card' },
     whip: { n: 'Whip-round', cost: 150, gold: 50, d: 'The fans pass a hat: 50 gold now.' },
     favourite: { n: 'Fan favourite', cost: 450, d: 'The fans take to one of your players: a level\'s worth of XP.', pick: 'player' },
-    mascot: { n: 'Mascot', cost: 750, d: 'A random uncommon trophy.' },
+    mascot: { n: 'Mascot', cost: 900, d: 'A random uncommon trophy.' },
     coach: { n: 'The supporters\' coach', cost: 250, mins: 180, d: 'Ride with the fans to any city you have visited.', pick: 'city' },
     testimonial: { n: 'A testimonial', cost: 600, d: 'A friendly at your home ground against a rival club of your choice, with a full house: twice your fans\' gate, win or lose.', pick: 'club' },
   },
@@ -81,7 +81,8 @@ function wStandBuy(id, arg) {
   wSave();
   if (id === 'testimonial') {
     wLog(`A testimonial against ${CLUBS[arg].name}: the ground is full.`, 'g');
-    startMatch({ type: 'rival', tier: wTierHere(), ambush: false, name: wClubCaptain(arg), world: { kind: 'testimonial', ref: { club: arg, gate }, region: wHomeRegion() } });
+    // (straight to kickoff: the fans are already spent, so there is no "Not yet")
+    startMatch({ type: 'rival', tier: wTierHere(), ambush: false, card: false, name: wClubCaptain(arg), world: { kind: 'testimonial', ref: { club: arg, gate }, region: wHomeRegion() } });
   }
   return '';
 }

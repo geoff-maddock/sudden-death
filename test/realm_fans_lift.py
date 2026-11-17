@@ -57,10 +57,11 @@ async def main():
           RUN.fans = 950; WG.ground = null; const club = Object.values(WG.rivals)[0], n0 = WLOG.length, seen = [];
           const keep = wW99HkSim; const spy = wHK.simGame; wHK.simGame = o => { seen.push((o.fans || []).slice()); return spy(o); };
           let r; try { r = wStartRink({ club, how: 'sim' }); } finally { wHK.simGame = spy; }
-          const line = WLOG.slice(n0).map(l => l[0]).find(t => t.includes('away end')) || '';
+          const line = WLOG.slice(n0).map(l => l[0]).find(t => t.includes('away end')) || '', gate = WLOG.slice(n0).map(l => l[0]).find(t => t.includes('Your fans at the gate')) || '';
           // a game between two other clubs gets none
           const other = []; const spy2 = wW99HkSim; wRinkSimClubs(club, Object.values(WG.rivals)[1] || club, 1);
-          return { r, seen, line, next: W_FAN_NEXT }; })()""")
+          return { r, seen, line, gate, next: W_FAN_NEXT }; })()""")
+        check('30 gold' in s['gate'], 'and your fans pay at the gate of an engine game too (950 fans: 20, half as much again)', s)
         check(s['r'] == '' and s['next'] is None and 'travelling army' in s['line'], 'a simulated world game is played with your fans in the away end, and says so', s)
         fans_in = await pg.evaluate("""(() => { RUN.fans = 950; WG.ground = null; WG.hkg.met = {}; WG.hkg.live = null; const club = Object.values(WG.rivals)[0]; const r = wStartRink({ club, how: 'manage' });
           const f = wHK.G && wHK.G.fans, sp = wHK.G && wHK.G.spirit.slice(); return { r, f, sp, plain: JSON.stringify(wHK.G.fans) }; })()""")

@@ -975,7 +975,8 @@ runs came out identical), so it is one.
 **Phase 4, the Supporters' Stand** (300 journeys each, the following's effects on). The lab's bot spends fans when
 told what following to keep (`'{"spend": 400}'`): above it, a mascot once, then a fan favourite for its lowest
 starter, then a whip-round. It does not walk to the Stand. Prices are three times Sudden Death's fan stand: Open
-training 350, Whip-round 150 (for 50 gold), Fan favourite 450, Mascot 750, the coach 250, a testimonial 600.
+training 350, Whip-round 150 (for 50 gold), Fan favourite 450, Mascot 750 (900 since the second pass, below), the coach
+250, a testimonial 600.
 
 | The bot keeps | Champion | Fans at the end | Favours a journey |
 |---|---|---|---|
@@ -990,3 +991,11 @@ Favours after it add little. **Holding looks like it is worth nothing here, and 
 journey is the card game on the road, with few matches at grounds and none in the engines, so it never sees the gate
 or the lift. Whether holding a big following is a real rival to spending it has to be judged by hand; if it isn't,
 the mascot's price is the first number to raise.
+
+**A second pass** (300 journeys each, the effects on). The mascot was the one favour that showed, so its price went
+from 750 to 900 fans, and the three rows were run again: never spending 80.7%, keeping a supporters' club 79.3%,
+keeping nothing 79.3%. Set beside the first run (78.3%, 82.0%, 83.7%), the honest reading is that **spending and
+holding cannot be told apart by this bot at 300 journeys**: the first run's four points were mostly noise, and the
+never-spending row alone moved 2.4 points between the two runs. The mascot stays at 900. The fans' gate is now paid at
+hockey, basketball and football games and boxing cards as well as card matches at grounds; the bot plays none of
+those from the world, so that is not in these numbers either.

@@ -64,5 +64,5 @@ const wW98RenderHelp = renderHelp;
 renderHelp = function () {
   wW98RenderHelp();
   const h = $('wHelpFollow'); if (!h || $('wHelpFanGate')) return;
-  h.insertAdjacentHTML('beforeend', ` <span id="wHelpFanGate"><b>The gate</b> (${W_FOLLOW.at[0]} fans): at every card match at a ground your fans pay in 1 gold for every ${W_FANS.per} of them, up to ${W_FANS.cap} a match, half as much again with a travelling army, doubled at home, win or lose. <b>The away end</b> (${W_FOLLOW.at[1]} fans): ${W_FANS.block} Block at kickoff in any card match away from home, unless the crowd there is already yours.</span>`);
+  h.insertAdjacentHTML('beforeend', ` <span id="wHelpFanGate"><b>The gate</b> (${W_FOLLOW.at[0]} fans): at every match at a ground (a card match there, or a hockey, basketball or football game or a boxing card) your fans pay in 1 gold for every ${W_FANS.per} of them, up to ${W_FANS.cap} a match, half as much again with a travelling army, doubled at home, win or lose. <b>The away end</b> (${W_FOLLOW.at[1]} fans): ${W_FANS.block} Block at kickoff in any card match away from home, unless the crowd there is already yours.</span>`);
 };
