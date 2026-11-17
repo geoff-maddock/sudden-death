@@ -46,6 +46,7 @@ async def main():
     print('stalls', stalls, [(m['what'], m['ids'], m['lv']) for l in ok for m in l['matches'] if m['stall']][:5])
     res = collections.Counter(l['result'] for l in ok)
     print('results', dict(res), ' champion rate', pct(res['champion'], len(ok)))
+    if ok and 'fans' in ok[0]: print(f"fans at the end {sum(l['fans'] for l in ok) / len(ok):.0f} (most {max(l['fans'] for l in ok)}), gold earned a journey {sum(l['goldAll'] for l in ok) / len(ok):.0f}")
     if ok and 'quests' in ok[0]: print(f"quests done {sum(l['quests'] for l in ok) / len(ok):.2f}, combo cards {sum(l['combos'] for l in ok) / len(ok):.2f}, grudge matches {sum(l.get('grudges', 0) for l in ok) / len(ok):.2f} a journey")
     ends = collections.Counter(l['stage'] for l in ok if l['result'] != 'champion')
     print('ended at', ends.most_common())

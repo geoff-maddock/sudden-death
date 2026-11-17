@@ -927,3 +927,30 @@ ultimate takes 50 of the roar. Powers on one side only are now worth 1.19 goals 
 and 54), with about 22 casts a game. As the world sets tiers: 73%, 37%, 19% (from 59/40/21); tiers 2 and 3 are inside
 the noise, and tier 1 may now be easier (a Squire spends his mana worse), though the mixed-gap cell beside it read
 54%. The systems, special teams, cups and kits above were not measured again.
+
+## Your following (issue #79)
+
+`python3 test/realm_lab.py N '{}' 'W_FOLLOW.lab = true'` runs the journeys with the following's effects on; without the
+override the bots play as before (the effects are off in LAB mode), so every other number in this file is unchanged.
+
+**How many fans a journey holds** (150 journeys, a bot that never spends them). The issue guessed 300 to 600 at the end.
+It is about three times that: the card game pays fans for every win.
+
+| Stage | Day | Fans, median | 10th to 90th |
+|---|---|---|---|
+| The first cup (Moss) | 2 | 97 | 44 to 170 |
+| The first dungeon | 3 | 226 | 150 to 302 |
+| The second cup (Salt) | 8 | 342 | 217 to 472 |
+| The third cup (Cinder) | 13 | 692 | 498 to 852 |
+| The fourth cup (Rime) | 17 | 1,138 | 868 to 1,357 |
+| The Crown | 22 | 1,515 | 1,074 to 1,763 |
+
+So the steps are **100, 400, 900 and 1,500** (the issue's first guess was 25, 100, 300, 750, which a journey passed by
+day 12): a few regulars in the first region, a supporters' club in the second, a travelling army in the third, and a
+household name only for a team that reaches the Crown having kept its fans.
+
+**Phase 2, the gate and the away end in the card game** (250 journeys each way): champion 78.0% without, 76.0% with;
+gold earned a journey 2,908 and 2,883. No difference you can measure (250 journeys is good to about 5 points). The bot
+plays few matches at grounds, so the gate (at most 20 gold a match, 30 with a travelling army, doubled at home) is
+hardly seen in these numbers, and 3 Block at kickoff away from home is small beside a deck. That is the aim: felt, and
+never the reason a match is won.

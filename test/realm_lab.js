@@ -336,7 +336,7 @@ window.REALMLAB = function (opts = {}) {
   ];
   for (const [k, a, n] of ROUTE) {
     stage = k + ' ' + a;
-    const before = { stage, day: WG.dayAbs, hp: RUN.hp, maxhp: RUN.maxhp, gold: RUN.gold, deck: RUN.deck.length, lvls: wStarters().map(p => p.lvl), roster: wRoster().length, relics: RUN.relics.length };
+    const before = { stage, day: WG.dayAbs, hp: RUN.hp, maxhp: RUN.maxhp, gold: RUN.gold, fans: RUN.fans || 0, deck: RUN.deck.length, lvls: wStarters().map(p => p.lvl), roster: wRoster().length, relics: RUN.relics.length };
     let ok = true;
     if (k === 'wild') wild(a, n);
     else if (k === 'cup') ok = cup(a);
@@ -351,7 +351,7 @@ window.REALMLAB = function (opts = {}) {
   log.grudges = log.matches.filter(m => m.what === 'grudge').length;
   log.tour = WG.tour ? WG.tour.beat.length : 0; log.take = log.take || 0;
   log.notices = WG.notice ? WG.notice.done : 0; log.lapsed = WG.notice ? WG.notice.lapsed : 0;
-  log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length;
+  log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length; log.fans = RUN.fans || 0; log.goldAll = RUN.stats.gold || 0;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;
   return log;
 };

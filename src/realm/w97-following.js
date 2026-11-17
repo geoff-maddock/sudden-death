@@ -4,10 +4,10 @@
    Fans (RUN.fans) were a number nothing used. They are now your following: the more you hold, the more it is worth.
    Four steps (W_FOLLOW.at):
 
-     A few regulars      25    the gate
-     A supporters' club  100   the away end
-     A travelling army   300   they sing all game
-     A household name    750   doors open
+     A few regulars      100    the gate
+     A supporters' club  400    the away end
+     A travelling army   900    they sing all game
+     A household name    1500   doors open
 
    This part is the steps themselves: the Team screen, the top bar's tooltip, a line in the log each time you reach a
    step (and a note in the journal the first time), and How to play. What each step does comes in the parts after
@@ -22,7 +22,8 @@
    above your name in the regions), renderHelp (wW97RenderHelp: #wHelpFollow). */
 
 const W_FOLLOW = {
-  at: [25, 100, 300, 750],
+  // (a journey that keeps every fan it wins holds about 100 by day 2, 400 by day 9, 900 by day 14 and 1,500 at the Crown: docs/realm/BALANCE.md)
+  at: [100, 400, 900, 1500],
   names: ['No following yet', 'A few regulars', 'A supporters\' club', 'A travelling army', 'A household name'],
   said: ['', 'A few regulars have started turning up.', 'A supporters\' club has formed. They have a banner.', 'A travelling army follows you now. They sing all game.', 'You are a household name. Doors open.'],
   does: ['', 'The gate: a cut of the takings at every match at a ground.', 'The away end: your fans travel, and lift you at the start of a match away from home.',
