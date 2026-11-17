@@ -18,7 +18,7 @@
 
 const W_LINKS = {
   home: { kinds: ['elf', 'spider', 'witch', 'gorgon'], color: '#d8a03a', short: 'MGL' },
-  away: { city: 'saltmere', kinds: ['ogre', 'harpy', 'golem', 'lich'], color: '#7a5ad0', short: 'SGC' },
+  away: { city: 'saltmere', kinds: ['minotaur', 'spider', 'elf', 'lich'], color: '#7a5ad0', short: 'SGC' },
 };
 const W_LINKS_MODES = {
   watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
@@ -74,15 +74,18 @@ $('wLinksRows').addEventListener('click', e => {
 const wLinksWhyNot = (V, ri) => V.ph === 'swing' ? 'The swing is under way: the hitter is picked.' : wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
-  const box = $('wLinksRows'), V = WGL && !WGL.over ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
+  const box = $('wLinksRows'), V = WGL && !WGL.over && wGL.G && wGL.G.teams ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
   box.hidden = !mine && !offer;
   $('wLinksRowGive').hidden = !offer;
   for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowShot', 'wLinksRowGo']) $(id).hidden = !mine;
   if (!mine) return;
   const S = V.sel, G = wGL.G, T = G.teams[V.you], aim = V.ph === 'aim', on = (a, b) => a === b ? ' on' : '';
   $('wLinksWho').innerHTML = T.roster.map((m, i) => {
-    const ok = V.hitters.includes(i) || i === S.ri, why = ok ? `${i + 1}: ${m.n} (${wKindName(m.kind)})` : wLinksWhyNot(V, i);
-    return `<button class="ghost${on(i, S.ri)}" data-lri="${i}" ${ok && aim ? '' : 'disabled'} title="${esc(why)}">${esc(m.n)}</button>`;
+    // the player's role (if they have one), their focus, and their ratings on 1 to 12
+    const role = Object.keys(T.roles || {}).find(k => T.roles[k] === i), f = wGL.focus ? Math.round(wGL.focus[V.you][i] * 100) : 100;
+    const r12 = wGL.stats.map(s => `${s} ${Math.round(1 + m.r[s] * (wGL.cap - 1))}`).join(', ');
+    const ok = V.hitters.includes(i) || i === S.ri, why = ok ? `${i + 1}: ${m.n} (${wKindName(m.kind)})${role ? ', for ' + ({ tee: 'the tee', approach: 'the approach', short: 'the short game', putt: 'the green' })[role] : ''}. Focus ${f}%. ${r12}` : wLinksWhyNot(V, i);
+    return `<button class="ghost${on(i, S.ri)}" data-lri="${i}" ${ok && aim ? '' : 'disabled'} title="${esc(why)}">${esc(m.n)} <small>${f}%</small></button>`;
   }).join(' ');
   $('wLinksClub').innerHTML = (aim ? V.clubs : [S.club]).map(c => `<button class="ghost${on(c, S.club)}" data-lclub="${c}" ${aim ? '' : 'disabled'} title="Q and E: a longer or a shorter club. ${esc(wGL.clubs[c].n)}${c === 'pt' ? '' : `: about ${Math.round(wGL.reach(c, G.ball[V.you].lie, G.teams[V.you].roster[S.ri].r, 1).carry)} yards carried from here`}">${esc(wGL.clubs[c].n)}</button>`).join(' ');
   $('wLinksRowShot').hidden = S.putt;
@@ -93,8 +96,9 @@ function wLinksRows() {
   const M = V.meter, st = V.ph !== 'swing' || !M ? 'Start' : S.putt ? 'Weight' : M.st === 'up' ? 'Power' : 'Mark';
   $('wLinksGo').innerHTML = `<button class="ghost on" data-lgo="1" title="Space">${st}</button> <small class="hint">${S.putt ? 'Two presses: start, then stop the bar at the weight (the gold tick rolls it to your aim on a flat green).' : 'Three presses: start, the power (the gold tick lands it on the ring), then the green mark.'} Or drag back from the ball and let go.</small>`;
 }
-function wLinksTeams() {
-  const g = W_GRDS.find(x => x.id === 'g_links'), H = W_LINKS.home, A = W_LINKS.away, used = new Set();
+// the two clubs; taken: names already in the game (your four's, in a practice round), so nobody shares one
+function wLinksTeams(taken) {
+  const g = W_GRDS.find(x => x.id === 'g_links'), H = W_LINKS.home, A = W_LINKS.away, used = new Set(taken || []);
   return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.golf} Club` }, A)].map(t => ({
     name: t.name, short: t.short, color: t.color, roster: t.kinds.map(kind => ({ n: wRinkName(kind, used), kind })),
   }));
@@ -124,7 +128,7 @@ function wLinksCard() {
   const cell = (i, s) => { const c = G.card[i]; if (!c) return i === G.h ? `<td>${G.hole.st[s] || ''}</td>` : '<td></td>'; const t = c.up[s] ? '×' : c.done[s] ? c.st[s] : c.st[s] + '+'; return `<td${c.res === s ? ' style="font-weight:700;color:var(--gold,#ffb02e)"' : ''}>${t}</td>`; };
   const pars = cols.map(i => `<td>${wGL.parOf(i)}</td>`).join('');
   const card = `<table class="wrpow wcboxt"><caption>${esc(G.teams[0].name)}: ${esc(wGL.matchText(0))}</caption><tr><th>Hole</th>${cols.map(i => `<th>${i + 1}</th>`).join('')}</tr><tr><td>Par</td>${pars}</tr>${[0, 1].map(s => `<tr><td style="border-left:4px solid ${G.teams[s].color || '#888'}">${esc(G.teams[s].name)}</td>${cols.map(i => cell(i, s)).join('')}</tr>`).join('')}</table>`;
-  const players = [0, 1].map(s => `<table class="wrpow wcboxt"><caption>${esc(G.teams[s].name)}</caption><tr><th>Player</th><th title="Shots hit">Shots</th><th title="Putts">Putts</th><th title="Holed: the shot that dropped">In</th></tr>${G.teams[s].roster.map((m, i) => `<tr><td>${esc(m.n)} <small>${esc(wKindName(m.kind))}</small></td><td>${G.pst[s][i].shots}</td><td>${G.pst[s][i].putts}</td><td>${G.pst[s][i].holed}</td></tr>`).join('')}<tr><td><b>Side</b></td><td>${G.pst[s].reduce((a, p) => a + p.shots, 0)}</td><td title="The players' putts, and the putts given">${G.stat[s].putts - (G.stat[s].given || 0)}${G.stat[s].given ? ` <small>+${G.stat[s].given} given</small>` : ''}</td><td></td></tr></table>`).join('');
+  const players = [0, 1].map(s => `<table class="wrpow wcboxt"><caption>${esc(G.teams[s].name)}</caption><tr><th>Player</th><th title="Shots hit">Shots</th><th title="Putts">Putts</th><th title="Holed: the shot that dropped">In</th><th title="Focus now: each shot costs some, and it comes back while the others hit">Focus</th></tr>${G.teams[s].roster.map((m, i) => `<tr><td>${esc(m.n)} <small>${esc(wKindName(m.kind))}</small></td><td>${G.pst[s][i].shots}</td><td>${G.pst[s][i].putts}</td><td>${G.pst[s][i].holed}</td><td>${G.focus ? Math.round(G.focus[s][i] * 100) + '%' : ''}</td></tr>`).join('')}<tr><td><b>Side</b></td><td>${G.pst[s].reduce((a, p) => a + p.shots, 0)}</td><td title="The players' putts, and the putts given">${G.stat[s].putts - (G.stat[s].given || 0)}${G.stat[s].given ? ` <small>+${G.stat[s].given} given</small>` : ''}</td><td></td><td></td></tr></table>`).join('');
   $('wLinksCard').innerHTML = `<div style="overflow-x:auto;max-width:100%">${card}</div><div class="wcbox">${players}</div>`;
   $('wLinksLog').innerHTML = wLinksLogHTML();
 }
@@ -202,6 +206,9 @@ function wLinksHowHTML() {
   <p class="hint"><b>The wind</b> blows a strength and a way for each hole, shown on the arrow at the top right. It moves a high ball far more than a low one, and a headwind costs more than a tailwind gives.</p>
   <p class="hint"><b>The lie.</b> The driver is for the tee only. The rough costs distance and the ball runs (no spin), deep rough more. Sand takes the wedge: anything else barely moves it. A ball in the moss bog plugs and comes out short. In the trees it lies on a root, and only a punch will do. The water is a drop on the line, back where it went in, and a stroke.</p>
   <p class="hint"><b>The green.</b> A putt is two presses: start, then stop the bar at the weight (the gold tick rolls it to your aim on a flat green). The green slopes: the grain arrows drift downhill, and the <b>read line</b> shows the first few yards of your putt as you would strike it now, longer for a better putter, so you can see the break and aim off for it. Too fast and it lips out or runs past; short never drops.</p>
+  <p class="hint"><b>Ratings and roles.</b> Each player has six ratings: <b>power</b> (distance), <b>accuracy</b> (the size of the mark, and how far a miss strays), <b>touch</b> (chips and pitches), <b>putting</b> (the read line's length, and putts that drop), <b>nerve</b> and <b>scrambling</b> (out of the rough, sand, bog and trees). Your four's roles (the tee, the approach, the short game, the green) are set on the Links tab: the caddie gives each shot to its role's player when the rule allows, and in You play the hitter row starts on them.</p>
+  <p class="hint"><b>Focus.</b> Every shot costs the hitter some focus, a hard one more (a power shot, or out of the rough, sand, bog or trees). It comes back while the others hit, and a little at each new hole. A tired player's mark is smaller and their misses wider: share the shots. The hitter row shows each player's focus.</p>
+  <p class="hint"><b>Nerve.</b> On a stroke that wins or halves the hole (more on the last hole, dormie, or in a playoff), the meter runs quicker and the mark shakes (a putt's weight wobbles), less for a player with nerve. The CPU's players feel it too.</p>
   <p class="hint"><b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it at 2 or 4 times. The CPU's caddie picks the hitter by the shot (power off the tee, accuracy for an approach, touch for a chip, the best putter on the green), the club for the distance, aims off for the wind (a Knight or an Archmage), and lays up short of trouble.</p>`;
 }
 const wW105RenderHelp = renderHelp;

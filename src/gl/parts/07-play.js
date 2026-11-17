@@ -18,7 +18,7 @@
    - offer: their short putt: give it (glOffer(true)) or make them putt.
    - given, rest: a beat to read it; over: the end.
    In Watch the CPU plays both sides. GD.msg is the last thing that happened, said plainly. */
-const GL_METER = { up: 1.0, top: 1.1, down: 1.15, low: -0.18, win: [0.035, 0.065], pshot: 0.6, puttUp: 1.5, inErr: 0.25, outErr: 7 };
+const GL_METER = { up: 1.0, top: 1.1, down: 1.15, low: -0.18, win: [0.035, 0.065], pshot: 0.6, puttUp: 1.5, inErr: 0.25, outErr: 7, pSpd: 0.3, pShake: 0.035, pWob: 0.06 };
 const GL_PACE = { addr: 0.7, rest: 0.9, hole: 2.4, given: 1.3, fly: 1.7, roll: 0.8 };
 const GL_HANDS = { drag: 170, dragAcc: 12, puttDeg: 0.1 };
 let GD = null;
@@ -44,7 +44,7 @@ const glYours = s => GD && GD.mode === 'play' && s === GD.you;
 
 /* ---------- the beat ---------- */
 function glTick(dt) {
-  if (!GD || !G) return;
+  if (!GD || !G || !G.teams) return;
   GD.t += dt;
   const P = GD.ph;
   if (P === 'next') glPlayNext();
@@ -145,9 +145,10 @@ function glHoleSay(ev) {
 }
 function glAimMsg() {
   const S = GD.sel; if (!S) return '';
-  const d = glDistOf(glHoleNow(), GD.you), who = glName(GD.you, S.ri);
-  return S.putt ? `${who} to putt, ${glYards(d)}. Aim with the arrows or a click on the green, then Space to start the stroke and Space again for the weight.`
-    : `${who} to hit, ${GL_CLUBS[S.club].n.toLowerCase()}, ${glYards(d)} to the pin. Space to start the swing, again for the power, again on the mark.`;
+  const d = glDistOf(glHoleNow(), GD.you), who = glName(GD.you, S.ri), p = glPressure(GD.you);
+  const big = p ? `A stroke ${G.hole.st[GD.you] + 1 < G.hole.st[1 - GD.you] ? 'to win' : 'to halve'} the hole${p > 1 ? ', and a big one' : ''}: the ${S.putt ? 'bar runs quicker and wobbles' : 'meter runs quicker and the mark shakes'}, less for a steady nerve. ` : '';
+  return big + (S.putt ? `${who} to putt, ${glYards(d)}. Aim with the arrows or a click on the green, then Space to start the stroke and Space again for the weight.`
+    : `${who} to hit, ${GL_CLUBS[S.club].n.toLowerCase()}, ${glYards(d)} to the pin. Space to start the swing, again for the power, again on the mark.`);
 }
 
 /* ---------- your shot: the choice ---------- */
@@ -240,43 +241,55 @@ function glReadCalc(S, b) {
 const glPuttSpeed = p => Math.sqrt(2 * GL_PUTT.fric * glPuttScale() * clamp(p, 0, 1.05)) * (G.ball[GD.you].lie === 'G' ? 1 : 1.3);
 
 /* ---------- the swing ---------- */
-// the mark's half-width for a hitter: wider for a more accurate one, smaller on a power shot
-function glWin(rat, pow) { const W = GL_METER.win; return (W[0] + (W[1] - W[0]) * clamp(rat.acc, 0, 1)) * (pow > 1 ? GL_METER.pshot : 1); }
+// the mark's half-width for a hitter: wider for a more accurate one, smaller on a power shot, and smaller for a tired one
+// (focus f, 0 to 1)
+function glWin(rat, pow, f) { const W = GL_METER.win; return (W[0] + (W[1] - W[0]) * clamp(rat.acc, 0, 1)) * (pow > 1 ? GL_METER.pshot : 1) * (0.55 + 0.45 * clamp(f == null ? 1 : f, 0, 1)); }
 // power and the miss (m: where on the meter the mark was hit, + early, - late) to the swing's numbers
-function glSwingNums(pow, m, rat) {
-  const w = glWin(rat, pow), a = Math.abs(m), e = a <= w ? a / w * GL_METER.inErr : GL_METER.inErr + (a - w) * GL_METER.outErr;
+function glSwingNums(pow, m, rat, f) {
+  const w = glWin(rat, pow, f), a = Math.abs(m), e = a <= w ? a / w * GL_METER.inErr : GL_METER.inErr + (a - w) * GL_METER.outErr;
   return { pow: clamp(pow, 0, GL_METER.top), err: m > 0 ? -e : e, inside: a <= w };
 }
+// your hitter now: their ratings, their focus, and what the moment does to them (the meter runs quicker by spd, the mark
+// shakes by shake, a putt's weight wobbles by wob, all less for a steady nerve)
+function glMine() {
+  const s = GD.you, ri = GD.sel.ri, rat = glRat(s, ri), f = G.focus ? G.focus[s][ri] : 1, p = glPressure(s), n = p * (1 - clamp(rat.nrv, 0, 1));
+  return { rat, f, p, spd: 1 + GL_METER.pSpd * n, shake: GL_METER.pShake * n, wob: GL_METER.pWob * n };
+}
+// where the shaking mark is now (meter units), and a putt's wobble
+const glShake = M => M.shake ? M.shake * Math.sin(M.t * 9) : 0;
+const glWobble = M => M.wob ? M.wob * Math.sin(M.t * 7.3) : 0;
 function glPress() {
   if (!GD) return false;
-  if (GD.ph === 'aim') { GD.meter = { k: GD.sel.putt ? 'putt' : 'full', st: 'up', p: 0, dir: 1, pow: null, m: null }; glGo('swing'); return true; }
+  if (GD.ph === 'aim') { const me = glMine(); GD.meter = { k: GD.sel.putt ? 'putt' : 'full', st: 'up', p: 0, dir: 1, pow: null, m: null, t: 0, f: me.f, press: me.p, spd: me.spd, shake: me.shake, wob: me.wob }; glGo('swing'); return true; }
   if (GD.ph !== 'swing') return false;
   const M = GD.meter;
   if (M.st === 'up') {
     M.pow = M.p;
-    if (M.k === 'putt') { glStrikeMine({ pow: M.pow }); return true; }
+    if (M.k === 'putt') { glStrikeMine({ pow: clamp(M.pow * (1 + glWobble(M)), 0, 1.05) }); return true; }
     M.st = 'down'; return true;
   }
-  if (M.st === 'down') { M.m = M.p; glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri))); return true; }
+  if (M.st === 'down') { M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f)); return true; }
   return false;
 }
 function glMeterTick(dt) {
   const M = GD.meter; if (!M) return;
+  M.t += dt; const step = dt * (M.spd || 1);
   if (M.k === 'putt') {
-    M.p += M.dir * dt / GL_METER.puttUp;
+    M.p += M.dir * step / GL_METER.puttUp;
     if (M.p >= 1) { M.p = 1; M.dir = -1; } else if (M.p <= 0) { M.p = 0; M.dir = 1; }
     return;
   }
-  if (M.st === 'up') { M.p += dt / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
-  else if (M.st === 'down') { M.p -= dt / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p; glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri))); } }
+  if (M.st === 'up') { M.p += step / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
+  else if (M.st === 'down') { M.p -= step / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f)); } }
 }
-// the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook)
+// the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook). The
+// moment and focus count as on the meter: the mark is where it has shaken to as you let go
 function glDrag(pull, deg) {
   if (!GD || GD.ph !== 'aim') return false;
-  const S = GD.sel, rat = glRat(GD.you, S.ri), pow = clamp(pull, 0, GL_METER.top);
-  GD.meter = { k: S.putt ? 'putt' : 'full', st: 'done', p: pow, pow, m: 0, drag: true };
-  if (S.putt) glStrikeMine({ pow: Math.min(1, pow), deg: deg || 0 });
-  else { const w = glWin(rat, pow); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w; glStrikeMine(glSwingNums(pow, GD.meter.m, rat)); }
+  const S = GD.sel, me = glMine(), rat = me.rat, pow = clamp(pull, 0, GL_METER.top);
+  GD.meter = { k: S.putt ? 'putt' : 'full', st: 'done', p: pow, pow, m: 0, drag: true, t: GD.t, f: me.f, press: me.p, spd: me.spd, shake: me.shake, wob: me.wob };
+  if (S.putt) glStrikeMine({ pow: clamp(Math.min(1, pow) * (1 + glWobble(GD.meter)), 0, 1.05), deg: deg || 0 });
+  else { const w = glWin(rat, pow, me.f); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w - glShake(GD.meter); glStrikeMine(glSwingNums(pow, GD.meter.m, rat, me.f)); }
   return true;
 }
 // your swing goes off: the ball where those numbers send it
@@ -293,7 +306,7 @@ function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
   if (GD.meter) { GD.meter.st = 'done'; GD.meter.sw = sw; }
   GD.swung = Object.assign({ putt: S.putt }, sw);
-  glFire(s, { ri: S.ri, kind: S.putt ? 'putt' : S.kind === 'putt' ? 'short' : S.kind, club: S.putt ? 'pt' : S.club, putt: S.putt }, glStrike(s, S, sw));
+  glFire(s, { ri: S.ri, kind: S.putt ? 'putt' : S.kind === 'putt' ? 'short' : S.kind, club: S.putt ? 'pt' : S.club, putt: S.putt, pow: sw.pow }, glStrike(s, S, sw));
 }
 // their short putt: give it, or make them putt
 function glOffer(give) {

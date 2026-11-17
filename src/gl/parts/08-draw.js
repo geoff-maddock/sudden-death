@@ -78,7 +78,8 @@ function glAwaySide() { const H = GD.disp.hole, d = GD.disp.balls.map(b => hyp(b
 function glDraw(c, dt) {
   c.save();
   c.fillStyle = GL_GROUND.cols.out; c.fillRect(0, 0, 960, 600);
-  if (!G || !GD || !GD.disp) { txt(c, 'Mossgate Links', 480, 300, '600 22px Georgia, serif', '#cfe3b0', 'center', 'middle'); c.restore(); return; }
+  // (nothing on show, or a bare rules game with no teams or balls: the title only)
+  if (!G || !GD || !GD.disp || !G.teams || !G.ball) { txt(c, 'Mossgate Links', 480, 300, '600 22px Georgia, serif', '#cfe3b0', 'center', 'middle'); c.restore(); return; }
   const H = GD.disp.hole, W = glCamWant(H);
   GLC.t += dt || 0;
   if (GLC.h !== GD.disp.h) { GLC.h = GD.disp.h; Object.assign(GLC, W); }
@@ -208,8 +209,8 @@ function glDrawMeter(c) {
   c.fillStyle = '#2b3a22'; rr(c, x0, y - 9, x1 - x0, 18, 4); c.fill();
   if (!putt) {
     c.fillStyle = 'rgba(208,64,47,.45)'; c.fillRect(X(1), y - 9, X(hi) - X(1), 18);
-    const w = glWin(glRat(GD.you, S.ri), M && M.pow != null ? M.pow : S.tick);
-    c.fillStyle = '#6fcf6a'; c.fillRect(X(-w), y - 11, X(w) - X(-w), 22);
+    const me = M || glMine(), w = glWin(glRat(GD.you, S.ri), M && M.pow != null ? M.pow : S.tick, me.f), sh = M ? glShake(M) : 0;
+    c.fillStyle = me.p ? '#e8c34a' : '#6fcf6a'; c.fillRect(X(sh - w), y - 11, X(sh + w) - X(sh - w), 22);
   }
   const g = c.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, 'rgba(255,255,255,.05)'); g.addColorStop(1, 'rgba(255,240,170,.35)');
   c.fillStyle = g; c.fillRect(X(Math.max(0, lo)), y - 9, X(Math.min(1, hi)) - X(Math.max(0, lo)), 18);

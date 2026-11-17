@@ -17,10 +17,15 @@ const GL_HOOK = { onOver: null, onShot: null, onPhase: null, onPick: null };
 const GL_SWING = { p: 0.07, e: 0.8, sp: 0.17, se: 0.6, pa: 0.02, pv: 0.12 };
 const GL_TEAMS = [{ name: 'Mossgate' }, { name: 'The visitors' }];
 
+// a team from { name, short, color, roster: [{ n, kind, r?: ratings 1 to 12 }], roles?: { tee, approach, short, putt } }
+// (or kinds: [4 kinds]). Ratings are the kind's unless given; the game keeps them as 0 to 1. Roles are a player each;
+// left out (or not a player each), they are picked from the ratings
 function glTeam(t, side) {
-  const T = t || GL_TEAMS[side], ro = (T.roster || []).slice(0, GL_RULES.side);
+  const T = t || GL_TEAMS[side], ro = (T.roster || (T.kinds || []).map(kind => ({ n: kind[0].toUpperCase() + kind.slice(1), kind }))).slice(0, GL_RULES.side);
   while (ro.length < GL_RULES.side) ro.push({ n: 'Player ' + (ro.length + 1) });
-  return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster: ro.map((m, i) => ({ n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.assign({}, GL_DEF_RAT, m.r || {}) })) };
+  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return { n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])) }; });
+  const R = T.roles, ok = R && ['tee', 'approach', 'short', 'putt'].every(k => Number.isInteger(R[k]) && R[k] >= 0 && R[k] < roster.length) && new Set(['tee', 'approach', 'short', 'putt'].map(k => R[k])).size === 4;
+  return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster, roles: ok ? Object.assign({}, R) : glAutoRoles(roster) };
 }
 // the hole being played, built from the course's seed (playoff holes go round again)
 function glHoleAt(i) { return glCourseHole(G.cs, (i % G.holes) % 9, glParOf(i)); }
@@ -34,7 +39,7 @@ function glStart(opts) {
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
-    card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
+    focus: [0, 1].map(() => [1, 1, 1, 1]), card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
   glHoleStart();
   return G;
@@ -42,13 +47,16 @@ function glStart(opts) {
 function glHoleStart() {
   const H = glHoleNow();
   G.ball = [0, 1].map(() => ({ x: H.tee.x, y: H.tee.y, lie: 'T' }));
+  // a new hole: a little focus back for everyone
+  if (G.focus && G.res.length) G.focus = G.focus.map(f => f.map(v => Math.min(1, v + GL_FOCUS.hole)));
   G.wind = { s: Math.round(R() * 14), d: Math.round(R() * 628) / 100 };
   G.gir = [false, false];
 }
 
 // the swing goes off: the plan, with the hitter's errors. Returns the ball's flight or roll
 function glHit(s, plan) {
-  const H = glHoleNow(), b = G.ball[s], rat = glRat(s, plan.ri), em = GL_SKILL.err[G.skill[s]];
+  // the skill's errors, made worse by a tired hitter and by a big moment for a nervy one
+  const H = glHoleNow(), b = G.ball[s], rat = glRat(s, plan.ri), em = GL_SKILL.err[G.skill[s]] * glFocusK(G.focus ? G.focus[s][plan.ri] : 1) * glNerveK(glPressure(s), rat.nrv);
   if (plan.putt) {
     const k = 1.5 - rat.put, a = plan.a + gauss() * GL_SWING.pa * k * em, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em);
     const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v });
@@ -82,6 +90,8 @@ function glShoot(s, plan, r) {
   const S = G.stat[s];
   G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
   if (plan.putt) S.putts++;
+  // focus: the hitter spends some (a hard shot more), the other three get a little back
+  if (G.focus) { const hard = (plan.pow || 0) > 1 || ['r', 'R', 'S', 'B', 'O'].includes(lie0); G.focus[s] = G.focus[s].map((v, i) => i === plan.ri ? Math.max(0, v - (hard ? GL_FOCUS.hard : GL_FOCUS.shot)) : Math.min(1, v + GL_FOCUS.back)); }
   G.pst[s][plan.ri].shots++; if (plan.putt) G.pst[s][plan.ri].putts++; if (r.holed) G.pst[s][plan.ri].holed++;
   if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F' && !r.water) S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
   if (!r.water && (r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }

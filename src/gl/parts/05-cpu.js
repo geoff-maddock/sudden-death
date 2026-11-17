@@ -11,9 +11,52 @@
    - The concede (glCpuConcede): a short putt for the other side, by skill. A Squire always gives it; an Archmage makes
      you putt more often. Never when the putt would decide the hole against it (it has holed out already).
    The swing's errors (glHit, 06-game.js) are the hitter's and the skill's (GL_SKILL.err), drawn from R, so a seeded
-   game plays the same. */
+   game plays the same.
+   Ratings, roles, focus and nerve (phase 3). A player's six ratings (GL_STATS: power, accuracy, touch, putting, nerve,
+   scrambling) run 1 to 12, seeded by kind (GL_KIND, glRate); the game works on them as 0 to 1 (glScale). A team may name
+   its roles (tee, approach, short, putt: a player each): the caddie gives a shot to its role's player when the hitter
+   rule allows, else to the best fit for it who may hit (glFit). Focus (G.focus, 0 to 1 a player): each shot costs the
+   hitter some (a hard one more: a power shot, or out of the rough, sand, bog or trees), and it comes back while the
+   others hit and at a new hole; low focus makes the swing less true (glFocusK). Pressure (glPressure, 0 to 2): a stroke
+   to win or halve the hole, and more on the last hole, dormie or in a playoff; nerve takes it off (glNerveK). */
 const GL_SKILL = { names: ['Squire', 'Knight', 'Archmage'], err: [1.25, 1, 0.85], read: [0.5, 0.25, 0.12], wind: [0, 0.85, 1], give: [1, 0.75, 0.6], giveIn: 0.6 };
 const GL_DEF_RAT = { pow: 0.5, acc: 0.5, tch: 0.5, put: 0.5, nrv: 0.5, scr: 0.5 };
+const GL_STATS = ['pow', 'acc', 'tch', 'put', 'nrv', 'scr'];
+// by kind, 1 to 12: power, accuracy, touch, putting, nerve, scrambling. An ogre hits it a mile and nobody knows where;
+// an elf threads it through the trees; a spider putts with eight legs braced; a lich has no nerves left to lose
+const GL_KIND = {
+  goblin: [5, 6, 7, 6, 5, 8], kobold: [5, 6, 6, 6, 5, 7], werewolf: [8, 5, 5, 5, 6, 7], dwarf: [6, 7, 6, 7, 7, 6],
+  ogre: [11, 2, 3, 4, 5, 6], minotaur: [9, 4, 4, 5, 6, 6], troll: [9, 3, 3, 4, 6, 7], golem: [10, 4, 3, 5, 9, 4],
+  harpy: [7, 6, 6, 5, 4, 6], elf: [6, 10, 8, 7, 6, 6], wraith: [6, 7, 7, 7, 8, 7], vampire: [7, 7, 7, 7, 7, 6],
+  lich: [5, 7, 7, 8, 12, 5], zombie: [6, 3, 3, 4, 10, 5], gorgon: [6, 7, 6, 8, 8, 6], spider: [5, 6, 8, 11, 7, 8],
+  skeleton: [5, 6, 6, 6, 9, 6], witch: [6, 6, 9, 7, 6, 7],
+};
+const GL_RCAP = 12;
+function glRate(kind) { const k = GL_KIND[kind]; return Object.fromEntries(GL_STATS.map((s, i) => [s, k ? k[i] : 6.5])); }
+// 1 to 12 as the game works on it, 0 to 1
+const glScale = v => clamp((v - 1) / (GL_RCAP - 1), 0, 1);
+// how well ratings (0 to 1) suit a role
+const glFit = (r, role) => role === 'tee' ? r.pow * 0.7 + r.acc * 0.3 : role === 'approach' ? r.acc * 0.6 + r.pow * 0.2 + r.scr * 0.2
+  : role === 'short' ? r.tch * 0.7 + r.scr * 0.3 : r.put * 0.8 + r.nrv * 0.2;
+// the roles for a roster by the ratings: the best putter on the green first, then the tee, the short game, the approach
+function glAutoRoles(roster) {
+  const left = new Set(roster.map((_, i) => i)), out = {};
+  for (const role of ['putt', 'tee', 'short', 'approach']) { const i = [...left].sort((a, b) => glFit(roster[b].r, role) - glFit(roster[a].r, role) || a - b)[0]; out[role] = i; left.delete(i); }
+  return out;
+}
+const GL_FOCUS = { shot: 0.12, hard: 0.22, back: 0.06, hole: 0.1, k: 0.8 };
+// how much less true a swing is at this focus (1 at full)
+const glFocusK = f => 1 + (1 - clamp(f, 0, 1)) * GL_FOCUS.k;
+// how big the moment is for side s's next stroke: 1 if holing it wins or halves the hole, and half as much again on the
+// last hole, dormie, or in a playoff (0 when it decides nothing)
+function glPressure(s) {
+  const H = G.hole, o = 1 - s;
+  if (!H || H.done[s] || !H.done[o] || H.up[o] || H.st[s] + 1 > H.st[o]) return 0;
+  const left = glLeft(), late = G.res.length >= G.holes || left <= 1 || Math.abs(glUp()) === left;
+  return 1 + (late ? 0.5 : 0);
+}
+// what a moment does to a hitter of nerve nrv (0 to 1): 1 is nothing
+const glNerveK = (p, nrv) => 1 + 0.6 * p * (1 - clamp(nrv, 0, 1));
 
 const glRat = (side, ri) => (G.teams[side].roster[ri] || {}).r || GL_DEF_RAT;
 const glDistOf = (H, s) => hyp(G.ball[s].x - H.pin.x, G.ball[s].y - H.pin.y);
@@ -32,9 +75,11 @@ function glPuttable(H, b) {
 }
 const GL_ROLE_KEY = { tee: 'pow', approach: 'acc', short: 'tch', putt: 'put' };
 function glPickHitter(side, kind) {
-  const can = glHitters(side), k = GL_ROLE_KEY[kind] || 'acc';
+  const can = glHitters(side), T = G.teams[side], role = T.roles && T.roles[kind];
+  // the role's player, if the hitter rule allows; else the best fit who may hit (focus counts)
+  if (role != null && can.includes(role)) return role;
   let best = can[0], bv = -1;
-  for (const ri of can) { const v = glRat(side, ri)[k]; if (v > bv + 1e-9) { bv = v; best = ri; } }
+  for (const ri of can) { const f = G.focus ? G.focus[side][ri] : 1, v = glFit(glRat(side, ri), kind === 'putt' ? 'putt' : kind) * (0.7 + 0.3 * f); if (v > bv + 1e-9) { bv = v; best = ri; } }
   return best;
 }
 

@@ -17,10 +17,15 @@
    behind the meter and the read; scr and unscr map the picture; shown is the match as drawn (it waits for the ball, as the picture does). onPhase and onPick hear a new beat and a new choice. */
 return {
   rules: JSON.parse(JSON.stringify(GL_RULES)), get G() { return G; },
-  newGame: o => glNewGame(o), pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
+  newGame: o => { GD = null; return glNewGame(o); }, pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
   hitters: s => glHitters(s), canHit: (s, ri) => glCanHit(s, ri), whyNot: (s, ri) => glWhyNot(s, ri), away: d => glAway(d),
   stroke: (s, ri) => glStroke(s, ri), drop: s => glDrop(s), holed: s => glHoled(s), concede: s => glConcede(s),
   holeState: () => glHoleState(), up: () => glUp(), left: () => glLeft(), matchText: s => glMatchText(s),
+  // ratings, roles, focus and nerve (phase 3): stats (the six, in order), rate(kind) (1 to 12), cap, fit(r, role) (r 1 to
+  // 12), autoRoles(roster), focus (G.focus), pressure(side), and the tables behind them
+  stats: GL_STATS.slice(), rate: k => glRate(k), cap: GL_RCAP, roles: ['tee', 'approach', 'short', 'putt'],
+  fit: (r, role) => glFit(Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), role), autoRoles: ro => glAutoRoles(ro.map(m => ({ r: Object.fromEntries(GL_STATS.map(s => [s, glScale(m.r[s])])) }))),
+  get focus() { return G && G.focus ? G.focus.map(f => f.slice()) : null; }, pressure: s => G && G.hole ? glPressure(s) : 0, focusRules: Object.assign({}, GL_FOCUS),
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),
@@ -36,7 +41,7 @@ return {
   get view() { return GD ? JSON.parse(JSON.stringify({ ph: GD.ph, mode: GD.mode, you: GD.you, sel: GD.sel, meter: GD.meter, swung: GD.swung, last: GD.last, cpu: GD.cpu, hitters: GD.ph === 'aim' ? glHitters(GD.you) : [], clubs: GD.ph === 'aim' ? glClubsNow() : [], h: GD.disp ? GD.disp.h : 0 })) : null; },
   tick: dt => glTick(dt == null ? 0.05 : dt), select: o => glSelect(o), aimAt: (x, y) => glAimAt(x, y), aimTurn: d => glAimTurn(d), aimPush: y => glAimPush(y),
   press: () => glPress(), drag: (p, d) => glDrag(p, d), offer: g => glOffer(!!g), setMode: m => glSetMode(m),
-  swingNums: (pow, m, rat) => glSwingNums(pow, m, rat || GL_DEF_RAT), win: (rat, pow) => glWin(rat || GL_DEF_RAT, pow || 1), readLine: () => glReadLine(), readLen: () => glReadLen(),
+  swingNums: (pow, m, rat) => glSwingNums(pow, m, rat || GL_DEF_RAT), win: (rat, pow, f) => glWin(rat || GL_DEF_RAT, pow || 1, f), readLine: () => glReadLine(), readLen: () => glReadLen(),
   meterRules: Object.assign({}, GL_METER), pace: Object.assign({}, GL_PACE), hands: Object.assign({}, GL_HANDS), shapes: JSON.parse(JSON.stringify(GL_SHAPES)), trajs: JSON.parse(JSON.stringify(GL_TRAJ)),
   scr: (x, y) => glScr(x, y), unscr: (sx, sy) => glUnscr(sx, sy), cam: () => Object.assign({}, GLC), animBall: () => glAnimBall(),
   set onPhase(f) { GL_HOOK.onPhase = f; }, get onPhase() { return GL_HOOK.onPhase; }, set onPick(f) { GL_HOOK.onPick = f; }, get onPick() { return GL_HOOK.onPick; },

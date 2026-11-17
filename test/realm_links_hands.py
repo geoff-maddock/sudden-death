@@ -113,8 +113,9 @@ async def main():
 
         # ---------- a putt ----------
         pu = await pg.evaluate("""(() => { __mine(21); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x - 4, y: H.pin.y - 3, lie: 'G' }; G.ball[1] = { x: H.tee.x, y: H.tee.y, lie: 'T' }; G.hole.st = [2, 0];
-          __replan(); __to('aim'); const V = wGL.view, L = wGL.readLine(), len = L.reduce((a, p, i) => i ? a + Math.hypot(p.x - L[i - 1].x, p.y - L[i - 1].y) : 0, 0), rl = wGL.readLen();
-          G.teams[0].roster[V.sel.ri].r.put = 1; const rl2 = wGL.readLen(); G.teams[0].roster[V.sel.ri].r.put = .5;
+          __replan(); __to('aim'); const V = wGL.view, me = G.teams[0].roster[V.sel.ri].r, was = me.put; me.put = 0; wGL.aimPush(0);
+          const L = wGL.readLine(), len = L.reduce((a, p, i) => i ? a + Math.hypot(p.x - L[i - 1].x, p.y - L[i - 1].y) : 0, 0), rl = wGL.readLen();
+          me.put = 1; const rl2 = wGL.readLen(); me.put = was;
           wGL.press(); wGL.tick(V.sel.tick * wGL.meterRules.puttUp); wGL.press(); const after = wGL.view;
           return { putt: V.sel.putt, clubs: V.clubs, rows: document.getElementById('wLinksRowShot').hidden, len, rl, rl2, sw: after.swung, ev: after.last && after.last.club, ph: after.ph, tick: V.sel.tick }; })()""")
         check(pu['putt'] and pu['clubs'] == ['pt'] and pu['rows'], 'on the green: the putter only, and no shape, height or spin', pu)
@@ -243,10 +244,13 @@ async def main():
           out.offLine = ang[1] - ang[0];
           wLinksGame({ seed: 113, holes: 3, mode: 'watch' }); wGL.pause(true); let heard = 0; const was = wGL.onOver; wGL.onOver = s => { heard++; was && was(s); }; let i = 0; while (wGL.turn() && i++ < 3000); wGL.onOver = was; out.heard = heard;
           out.frac = wGL.newGame({ holes: 3, pars: [3.5, 4, 4] }).pars;
+          // a bare rules game (no teams, no balls) is not on show: a frame drawn now draws the title, not a crash
+          try { wGL.render(); wGL.tick(0.05); out.bare = { ok: true, view: wGL.view }; } catch (e) { out.bare = { ok: false, err: String(e) }; }
           return out; })()""")
         check(r8['nearer'][1] < r8['nearer'][0], 'on a foot-long putt the down arrow brings the aim nearer', r8)
         check(abs(r8['offLine']) > 0.02, 'a phone putt pulled off the line starts off line', r8)
         check(r8['heard'] == 1, 'a game on show played out with turn() still says it is over, once', r8)
+        check(r8['bare'] == {'ok': True, 'view': None}, 'a bare rules game started over a round is taken off show: a frame then draws, nothing breaks', r8['bare'])
         check(r8['frac'] == [4, 3, 5], 'a fraction of a par is refused (the standing pars instead)', r8)
 
         # ---------- How to play, Settings, leaving ----------

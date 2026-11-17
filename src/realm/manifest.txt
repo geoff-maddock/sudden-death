@@ -142,3 +142,4 @@ src/realm/w102-fanfeel.js
 src/realm/w103-places.js
 src/realm/w104-delves.js
 src/realm/w105-links.js
+src/realm/w106-linksfour.js
