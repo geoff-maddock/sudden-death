@@ -60,11 +60,12 @@ function glPlayNext() {
   const s = n.side, o = 1 - s;
   if (glYours(s)) {
     if (glCpuGives(n)) { glGiven(o); return; }
-    glSelReset(); glGo('aim', 0, glAimMsg());
+    glSelReset(); glGo('aim', 0, (G.turnNow && G.hole.st[0] + G.hole.st[1] === 0 ? 'The turn: everyone\'s focus is back. ' : '') + glAimMsg());
     return;
   }
   if (n.give && glYours(o)) { glGo('offer', 0, `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`); return; }
   if (glCpuGives(n)) { glGiven(o); return; }
+  glCpuCall(s);
   const plan = glPlan(s);
   GD.cpu = { side: s, plan };
   glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`);
@@ -155,8 +156,9 @@ function glAimMsg() {
 function glSelReset() {
   const s = GD.you, H = glHoleNow(), kind = glShotKind(H, s);
   // (a putt is set up without the caddie's read: that would draw from R and throw the result away)
-  const plan = kind === 'putt' ? { ri: glPickHitter(s, 'putt'), club: 'pt', putt: true, kind } : glPlan(s);
-  GD.sel = { ri: plan.ri, club: plan.club, aim: plan.putt ? { x: H.pin.x, y: H.pin.y } : { x: plan.aim.x, y: plan.aim.y }, shape: '', traj: '', spin: 0, putt: !!plan.putt, kind: plan.kind };
+  const line = kind === 'putt' ? 'pct' : GD.line || 'pct';
+  const plan = kind === 'putt' ? { ri: glPickHitter(s, 'putt'), club: 'pt', putt: true, kind } : glPlan(s, null, line);
+  GD.sel = { ri: plan.ri, club: plan.club, aim: plan.putt ? { x: H.pin.x, y: H.pin.y } : { x: plan.aim.x, y: plan.aim.y }, shape: '', traj: '', spin: 0, putt: !!plan.putt, kind: plan.kind, line };
   glSelFix();
 }
 // the clubs your ball may take from where it lies (the putter on or close by the green)
@@ -184,9 +186,9 @@ function glSelFix() {
 // the meter's tick: the power that lands a perfect swing on the aim point (a putt: the weight to roll there, flat)
 function glTickPow() {
   const S = GD.sel, s = GD.you, b = G.ball[s], d = hyp(S.aim.x - b.x, S.aim.y - b.y);
-  if (S.putt) return clamp((d + 0.35) / glPuttScale(), 0.02, 1);
-  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1;
-  return glPowFor(S.club, b.lie, glRat(s, S.ri), d / T, true);
+  if (S.putt) return clamp((d + GL_LINES[S.line || 'pct'].putt) / glPuttScale(), 0.02, 1);
+  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist;
+  return glPowFor(S.club, b.lie, glRat(s, S.ri), d / T / B, true);
 }
 // a putt's bar runs to this many yards (on a flat green, at full weight)
 function glPuttScale() {
@@ -206,6 +208,14 @@ function glSelect(o) {
   if (o.shape != null) S.shape = GL_SHAPES[o.shape] ? o.shape : '';
   if (o.traj != null) S.traj = GL_TRAJ[o.traj] ? o.traj : '';
   if (o.spin != null) S.spin = clamp(Math.round(o.spin), -1, 1);
+  if (o.line && GL_LINES[o.line] && o.line !== S.line) {
+    S.line = o.line;
+    // a full shot is planned again for the line (the club and the aim); a putt's line only changes its weight's tick
+    if (!S.putt) { GD.line = o.line; const p = glPlan(GD.you, S.ri, o.line); if (glClubsNow().includes(p.club)) S.club = p.club; S.aim = { x: p.aim.x, y: p.aim.y }; }
+  }
+  if (o.tempo && GL_STANCE[o.tempo] && (o.tempo === 'quick' || o.tempo === 'steady')) G.stance[GD.you].tempo = o.tempo;
+  if (o.mood && (o.mood === 'bold' || o.mood === 'careful')) G.stance[GD.you].mood = o.mood;
+  if (o.word && G.word[GD.you] > 0 && !G.wordOn[GD.you]) { G.word[GD.you]--; G.wordOn[GD.you] = true; }
   glSelFix();
   GD.msg = glAimMsg();
   return true;
@@ -222,7 +232,13 @@ function glAimPush(yd) {
   S.aim = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d }; glSelFix(); return true;
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
-function glReadLen() { return GD && GD.sel ? 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5 : 0; }
+function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) : 0; }
+// the wind as you see it: roughly (to 5 mph and 8 ways), or exactly with the caddie's word (or in Watch)
+function glWindShown(w) {
+  if (!w || !w.s) return { s: 0, d: 0, exact: true };
+  if (!GD || GD.mode !== 'play' || (G.wordOn && G.wordOn[GD.you])) return { s: w.s, d: w.d, exact: true };
+  return { s: Math.max(5, Math.round(w.s / 5) * 5), d: Math.round(w.d / (Math.PI / 4)) * (Math.PI / 4), exact: false };
+}
 const GLRL = { key: '', line: [] };
 function glReadLine() {
   const S = GD && GD.sel; if (!S || !S.putt || (GD.ph !== 'aim' && GD.ph !== 'swing')) return [];
@@ -253,7 +269,8 @@ function glSwingNums(pow, m, rat, f) {
 // shakes by shake, a putt's weight wobbles by wob, all less for a steady nerve)
 function glMine() {
   const s = GD.you, ri = GD.sel.ri, rat = glRat(s, ri), f = G.focus ? G.focus[s][ri] : 1, p = glPressure(s), n = p * (1 - clamp(rat.nrv, 0, 1));
-  return { rat, f, p, spd: 1 + GL_METER.pSpd * n, shake: GL_METER.pShake * n, wob: GL_METER.pWob * n };
+  const st = glStanceOf(s);
+  return { rat, f: f / GL_STANCE[st.mood].err, p, spd: (1 + GL_METER.pSpd * n) * GL_STANCE[st.tempo].meter, shake: GL_METER.pShake * n, wob: GL_METER.pWob * n };
 }
 // where the shaking mark is now (meter units), and a putt's wobble
 const glShake = M => M.shake ? M.shake * Math.sin(M.t * 9) : 0;
@@ -300,13 +317,14 @@ function glStrike(s, S, sw) {
     const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow, err: sw.err, wind: G.wind, spin: S.spin, shape: S.shape, traj: S.traj, rat });
+  const M = GL_STANCE[glStanceOf(s).mood];
+  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist, err: sw.err, wind: G.wind, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat });
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
   if (GD.meter) { GD.meter.st = 'done'; GD.meter.sw = sw; }
   GD.swung = Object.assign({ putt: S.putt }, sw);
-  glFire(s, { ri: S.ri, kind: S.putt ? 'putt' : S.kind === 'putt' ? 'short' : S.kind, club: S.putt ? 'pt' : S.club, putt: S.putt, pow: sw.pow }, glStrike(s, S, sw));
+  glFire(s, { ri: S.ri, kind: S.putt ? 'putt' : S.kind === 'putt' ? 'short' : S.kind, club: S.putt ? 'pt' : S.club, putt: S.putt, pow: sw.pow, line: S.line }, glStrike(s, S, sw));
 }
 // their short putt: give it, or make them putt
 function glOffer(give) {

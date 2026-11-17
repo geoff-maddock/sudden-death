@@ -188,7 +188,8 @@ function glDrawCard(c, H) {
   c.restore();
 }
 function glDrawWind(c) {
-  const w = GD.disp.wind || { s: 0, d: 0 }, cx = 905, cy = 52;
+  // (as you see it: roughly, unless your caddie's word is on the shot)
+  const w = glWindShown(GD.disp.wind || { s: 0, d: 0 }), cx = 905, cy = 52;
   c.save();
   c.fillStyle = 'rgba(16,26,12,.72)'; c.beginPath(); c.arc(cx, cy, 38, 0, Math.PI * 2); c.fill();
   if (w.s) {
@@ -197,7 +198,7 @@ function glDrawWind(c) {
     c.beginPath(); c.moveTo(cx - dx * L, cy - dy * L); c.lineTo(cx + dx * L, cy + dy * L); c.stroke();
     const a = Math.atan2(dy, dx); c.beginPath(); c.moveTo(cx + dx * (L + 6), cy + dy * (L + 6)); c.lineTo(cx + dx * L + Math.cos(a + 2.2) * 9, cy + dy * L + Math.sin(a + 2.2) * 9); c.lineTo(cx + dx * L + Math.cos(a - 2.2) * 9, cy + dy * L + Math.sin(a - 2.2) * 9); c.closePath(); c.fill();
   }
-  txt(c, w.s ? `${w.s} mph` : 'Still', cx, cy + 52, '600 12px system-ui, sans-serif', '#e8f3ff', 'center', 'middle');
+  txt(c, w.s ? `${w.exact ? '' : 'about '}${w.s} mph` : 'Still', cx, cy + 52, '600 12px system-ui, sans-serif', '#e8f3ff', 'center', 'middle');
   c.restore();
 }
 // the meter: a full swing from GL_METER.low to top, the mark at 0 and the tick; a putt's bar 0 to 1 with its tick

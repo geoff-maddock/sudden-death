@@ -80,7 +80,7 @@ function glFlight(s) {
   const carry = R0.carry * (T && !L.punch ? T.carry : 1);
   const dir = Math.atan2(s.aim.y - from.y, s.aim.x - from.x);
   const off = -(s.err || 0) * 8 * c.spread * spreadL * Math.PI / 180;
-  const h = T ? (L.punch ? T.h : c.h * T.h) : c.h, bend = Sh ? Sh.bend * carry * 0.05 : 0;
+  const h = T ? (L.punch ? T.h : c.h * T.h) : c.h, bend = Sh ? Sh.bend * carry * 0.05 * (s.shapeK || 1) : 0;
   const push = glWindPush(club, carry, s.wind, dir).map(v => v * (T ? T.wind : 1));
   // the curve: straight out along the aim, bending by off, then the wind's drift by the end
   const ex = from.x + Math.cos(dir + off) * carry + push[0], ey = from.y + Math.sin(dir + off) * carry + push[1];
@@ -94,9 +94,10 @@ function glFlight(s) {
   if (ll === 'W') return Object.assign(out, glWaterDrop(H, from, land), { water: true, roll: 0 });
   if (ll === 'S' || ll === 'B' || ll === 'O') return Object.assign(out, { end: land, lie: ll, roll: 0 });
   // the roll: the club and the spin, along the line it came in on
-  const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
+  const spin = clamp(s.spin || 0, -1.5, 1.5), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
-  let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
+  const shR = Sh ? 1 + (Sh.roll - 1) * (s.shapeK || 1) : 1;
+  let budget = Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left

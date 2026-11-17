@@ -24,7 +24,8 @@ const W_LINKS_MODES = {
   watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
   play: { n: 'You play', title: 'You play Mossgate: pick the hitter, the club and the shot, aim, and swing (Space three times, or drag back from the ball). Their short putts are yours to give.' },
 };
-let W_LINKS_MODE = 'play', W_LINKS_SPEED = 1;
+let W_LINKS_MODE = 'play', W_LINKS_SPEED = 1, W_LINKS_SKILL = 1;
+const wLinksSkillNames = () => wGL.skills.names;
 const wLinksHoles = () => wGL.rules.holesAt.includes(SET.linksHoles) ? SET.linksHoles : wGL.rules.holes;
 // the game on the course: plain data, never saved
 let WGL = null;
@@ -33,6 +34,7 @@ $('v-links').insertAdjacentHTML('beforebegin', `<div id="wLinksBar" class="wdbar
   <b id="wLinksTitle">A round at Mossgate Links</b><span id="wLinksNote" class="hint wsnote"></span>
   <span id="wLinksModes" class="wgmodes" role="group" aria-label="Who plays it">${Object.entries(W_LINKS_MODES).map(([k, m]) => `<button class="ghost" data-lmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <label class="hint" title="How many holes a game is: the standing nine, cut short or played twice. Also on the Settings panel.">Holes <select id="wLinksHoles">${wGL.rules.holesAt.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label>
+ <label class="hint" title="How well the other side's caddie plays: a Squire misses the meter often, ignores the wind and takes the driver; a Knight reads the wind, the lie and the match; an Archmage also reads greens, lays up when it should and reads your habits.">Their caddie <select id="wLinksSkill">${wLinksSkillNames().map((n, i) => `<option value="${i}">${n}</option>`).join('')}</select></label>
   <label class="hint" id="wLinksSpeedL" title="How fast the game runs while you watch. In You play it is always 1.">Speed <select id="wLinksSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
   <button class="ghost" id="wLinksAgain">Another game</button>
   <button class="ghost" id="wLinksBack">Back to the world</button></div>`);
@@ -43,6 +45,7 @@ $('wLinksBar').addEventListener('click', e => {
   else if (b.id === 'wLinksBack') wLeaveLinks();
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
+$('wLinksSkill').addEventListener('change', e => { W_LINKS_SKILL = +e.target.value; e.target.blur(); $('wLinksNote').textContent = `Their caddie: a ${wLinksSkillNames()[W_LINKS_SKILL]}, from the next game.`; });
 $('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); e.target.blur(); });
 $('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); });
 
@@ -50,7 +53,9 @@ $('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.va
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>
   <div class="wccrow" id="wLinksRowWho"><span class="wccl">Hitter</span><span id="wLinksWho"></span></div>
   <div class="wccrow" id="wLinksRowClub"><span class="wccl">Club</span><span id="wLinksClub"></span></div>
+  <div class="wccrow" id="wLinksRowLine"><span class="wccl">Line</span><span id="wLinksLine"></span></div>
   <div class="wccrow" id="wLinksRowShot"><span class="wccl">Shot</span><span id="wLinksShot"></span></div>
+  <div class="wccrow" id="wLinksRowStance"><span class="wccl">Stance</span><span id="wLinksStance"></span></div>
   <div class="wccrow" id="wLinksRowGo"><span class="wccl">Swing</span><span id="wLinksGo"></span></div>
   <div class="wccrow" id="wLinksRowGive" hidden><span class="wccl">Their putt</span><span><button class="ghost" data-lgive="1" title="Y: it counts as holed in one more">Give it</button> <button class="ghost" data-lgive="0" title="N: they must hole it">Make them putt</button></span></div></div>
   <h4 class="wsh">Scorecard</h4><div id="wLinksCard" class="wcbox"></div>
@@ -66,6 +71,10 @@ $('wLinksRows').addEventListener('click', e => {
   else if (d.ltraj != null) wGL.select({ traj: d.ltraj });
   else if (d.lspin != null) wGL.select({ spin: +d.lspin });
   else if (d.lgo) wGL.press();
+  else if (d.lline) wGL.select({ line: d.lline });
+  else if (d.ltempo) wGL.select({ tempo: d.ltempo });
+  else if (d.lmood) wGL.select({ mood: d.lmood });
+  else if (d.lword) wGL.select({ word: true });
   else if (d.lgive != null) wGL.offer(d.lgive === '1');
   wLinksRows(); wLinksBarNote();
 });
@@ -77,7 +86,7 @@ function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over && wGL.G && wGL.G.teams ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
   box.hidden = !mine && !offer;
   $('wLinksRowGive').hidden = !offer;
-  for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowShot', 'wLinksRowGo']) $(id).hidden = !mine;
+  for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowLine', 'wLinksRowShot', 'wLinksRowStance', 'wLinksRowGo']) $(id).hidden = !mine;
   if (!mine) return;
   const S = V.sel, G = wGL.G, T = G.teams[V.you], aim = V.ph === 'aim', on = (a, b) => a === b ? ' on' : '';
   $('wLinksWho').innerHTML = T.roster.map((m, i) => {
@@ -93,6 +102,13 @@ function wLinksRows() {
   $('wLinksShot').innerHTML = [['lshape', '', 'Straight'], ['lshape', 'draw', 'Draw', 'Starts right and curves back to the ring, then runs out more'], ['lshape', 'fade', 'Fade', 'Starts left and curves back to the ring, then stops sooner']].map(([k, v, n, t]) => `<button class="ghost${on(v, S.shape)}" data-${k}="${v}" ${aim ? '' : 'disabled'} title="Z: the shape. ${esc(t || 'No shape')}">${n}</button>`).join(' ') + ' · '
     + [['', 'Normal'], ['punch', 'Punch', 'Low under the wind and the branches, and runs'], ['lob', 'Lob', 'High: drifts in the wind, and sits down where it lands']].map(([v, n, t]) => `<button class="ghost${on(v, S.traj)}" data-ltraj="${v}" ${aim && (!punchOnly || v === 'punch') ? '' : 'disabled'} title="X: the height. ${esc(punchOnly ? 'From the trees, only a punch' : t || 'A full shot')}">${n}</button>`).join(' ') + ' · '
     + [[-1, 'Backspin', 'Stops it sooner'], [0, 'No spin', ''], [1, 'Topspin', 'Runs it out']].map(([v, n, t]) => `<button class="ghost${on(v, S.spin)}" data-lspin="${v}" ${aim ? '' : 'disabled'} title="C: the spin. ${esc(t)}">${n}</button>`).join(' ');
+  // the line, the stance (the side's, kept from shot to shot) and the caddie's word
+  const L = wGL.lines, lineT = { go: S.putt ? 'Charge it: past the hole if it misses' : 'The pin, over the trouble (out of reach: straight at it)', pct: S.putt ? 'Finish it a little past the hole' : 'The fat of the green, or the safe fairway', lay: S.putt ? 'Die it at the hole: it won\'t lip out, and short never drops' : 'Short of the trouble, leaving a full wedge' };
+  $('wLinksLine').innerHTML = Object.keys(L).map(k => `<button class="ghost${on(k, S.line)}" data-lline="${k}" ${aim ? '' : 'disabled'} title="L: the line. ${esc(lineT[k])}">${esc(L[k].n)}</button>`).join(' ');
+  const stc = G.stance[V.you], wl = G.word[V.you], won = G.wordOn[V.you];
+  $('wLinksStance').innerHTML = [['quick', 'Quick', 'T: a quicker meter and less focus spent, a touch less true'], ['steady', 'Steady', 'T: the meter at its own pace']].map(([k, n, t]) => `<button class="ghost${on(k, stc.tempo)}" data-ltempo="${k}" ${aim ? '' : 'disabled'} title="${esc(t)}">${n}</button>`).join(' ') + ' · '
+    + [['bold', 'Bold', 'M: a little longer, more shape and spin, and a bigger miss'], ['careful', 'Careful', 'M: as it comes']].map(([k, n, t]) => `<button class="ghost${on(k, stc.mood)}" data-lmood="${k}" ${aim ? '' : 'disabled'} title="${esc(t)}">${n}</button>`).join(' ') + ' · '
+    + `<button class="ghost${won ? ' on' : ''}" data-lword="1" ${aim && wl > 0 && !won ? '' : 'disabled'} title="W: once a game. The next stroke read in full: a putt's read line all the way, and the wind exactly">${won ? 'Caddie\'s word: on' : `Caddie's word (${wl} left)`}</button>`;
   const M = V.meter, st = V.ph !== 'swing' || !M ? 'Start' : S.putt ? 'Weight' : M.st === 'up' ? 'Power' : 'Mark';
   $('wLinksGo').innerHTML = `<button class="ghost on" data-lgo="1" title="Space">${st}</button> <small class="hint">${S.putt ? 'Two presses: start, then stop the bar at the weight (the gold tick rolls it to your aim on a flat green).' : 'Three presses: start, the power (the gold tick lands it on the ring), then the green mark.'} Or drag back from the ball and let go.</small>`;
 }
@@ -108,7 +124,7 @@ function wLinksGame(opts) {
   const o = opts || {};
   WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
-  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill });
+  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill || [1, W_LINKS_SKILL] });
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }
@@ -120,6 +136,7 @@ function wLinksBarNote() {
   const G = wGL.G, later = !WGL.over && G && G.holes !== wLinksHoles();
   $('wLinksNote').textContent = (wGL.msg || '') + (later ? ` (Holes: ${wLinksHoles()} from the next game; this one is ${G.holes}.)` : '');
   $('wLinksHoles').value = String(wLinksHoles());
+  $('wLinksSkill').value = String(W_LINKS_SKILL);
 }
 // the scorecard (a column a hole: par, each side's strokes, who won it) and each side's players
 function wLinksCard() {
@@ -209,6 +226,10 @@ function wLinksHowHTML() {
   <p class="hint"><b>Ratings and roles.</b> Each player has six ratings: <b>power</b> (distance), <b>accuracy</b> (the size of the mark, and how far a miss strays), <b>touch</b> (chips and pitches), <b>putting</b> (the read line's length, and putts that drop), <b>nerve</b> and <b>scrambling</b> (out of the rough, sand, bog and trees). Your four's roles (the tee, the approach, the short game, the green) are set on the Links tab: the caddie gives each shot to its role's player when the rule allows, and in You play the hitter row starts on them.</p>
   <p class="hint"><b>Focus.</b> Every shot costs the hitter some focus, a hard one more (a power shot, or out of the rough, sand, bog or trees). It comes back while the others hit, and a little at each new hole. A tired player's mark is smaller and their misses wider: share the shots. The hitter row shows each player's focus.</p>
   <p class="hint"><b>Nerve.</b> On a stroke that wins or halves the hole (more on the last hole, dormie, or in a playoff), the meter runs quicker and the mark shakes (a putt's weight wobbles), less for a player with nerve. The CPU's players feel it too.</p>
+  <p class="hint"><b>The line</b> (L), before every shot. <b>Go for it</b>: at the pin, over the trouble (out of reach, straight at it). <b>Percentages</b>: the fat of the green when the pin is tucked by sand or water, or the safe fairway. <b>Lay up</b>: short of the trouble, leaving a full wedge in. On a putt the line is the weight: charge it, finish it a little past, or die it at the hole (it won't lip out, but short never drops). Picking a line plans the shot again: the club and the ring move.</p>
+  <p class="hint"><b>Stances</b>, your side's, kept from shot to shot. <b>Tempo</b> (T): Quick runs the meter quicker and spends less focus, a touch less true; Steady is the meter's own pace. <b>Mood</b> (M): Bold goes a little longer with more shape and spin, and the mark is smaller; Careful plays it as it comes.</p>
+  <p class="hint"><b>The turn.</b> After the ${Math.max(1, Math.round(R.holes * 5 / 9))}th hole of ${R.holes} (and halfway through other lengths) everyone's focus comes back. <b>The caddie's word</b> (W), once a game: the next stroke is read in full: a putt's read line runs all the way, and the wind shows exactly. Otherwise the wind on the arrow is rough (to 5 mph, and 8 ways).</p>
+  <p class="hint"><b>Their caddie</b> (on the bar): a <b>Squire</b> misses the meter often, ignores the wind, takes the driver and goes for everything; a <b>Knight</b> reads the wind, the lie and the match (behind late, it goes for everything; well up, it lays up short of trouble); an <b>Archmage</b> also reads greens well, lays up short of water and reads your habits: go for it and find trouble twice and it plays safe and lets you.</p>
   <p class="hint"><b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it at 2 or 4 times. The CPU's caddie picks the hitter by the shot (power off the tee, accuracy for an approach, touch for a chip, the best putter on the green), the club for the distance, aims off for the wind (a Knight or an Archmage), and lays up short of trouble.</p>`;
 }
 const wW105RenderHelp = renderHelp;

@@ -18,7 +18,16 @@
    rule allows, else to the best fit for it who may hit (glFit). Focus (G.focus, 0 to 1 a player): each shot costs the
    hitter some (a hard one more: a power shot, or out of the rough, sand, bog or trees), and it comes back while the
    others hit and at a new hole; low focus makes the swing less true (glFocusK). Pressure (glPressure, 0 to 2): a stroke
-   to win or halve the hole, and more on the last hole, dormie or in a playoff; nerve takes it off (glNerveK). */
+   to win or halve the hole, and more on the last hole, dormie or in a playoff; nerve takes it off (glNerveK).
+   The call (phase 4). The line (GL_LINES), before every shot: go (the pin, over the trouble; out of reach, straight at
+   it), pct (the fat of the green; out of reach, the safe fairway) or lay (short of the trouble, to the side's wedge
+   range). On a putt: go charges it, pct finishes a little past, lay dies it at the hole. The CPU's line (glCpuLine): a
+   Squire always goes for it; a Knight reads the match (behind late, it goes for everything; well up, it lays up short
+   of trouble); an Archmage also lays up when the way to the green crosses the water, and reads you (the scout,
+   G.scout: when you keep going for it and finding trouble, it plays safe and lets you). Stances (G.stance, a side's):
+   tempo quick (a quicker meter and swing, less focus spent, a touch less true) or steady; mood bold (a little longer,
+   more shape and spin, a bigger miss) or careful. The caddie's word (G.word, once a game a side): the next stroke is
+   read in full (the putt's read line to the cup, the wind exactly; the CPU reads it without error). */
 const GL_SKILL = { names: ['Squire', 'Knight', 'Archmage'], err: [1.25, 1, 0.85], read: [0.5, 0.25, 0.12], wind: [0, 0.85, 1], give: [1, 0.75, 0.6], giveIn: 0.6 };
 const GL_DEF_RAT = { pow: 0.5, acc: 0.5, tch: 0.5, put: 0.5, nrv: 0.5, scr: 0.5 };
 const GL_STATS = ['pow', 'acc', 'tch', 'put', 'nrv', 'scr'];
@@ -43,6 +52,42 @@ function glAutoRoles(roster) {
   const left = new Set(roster.map((_, i) => i)), out = {};
   for (const role of ['putt', 'tee', 'short', 'approach']) { const i = [...left].sort((a, b) => glFit(roster[b].r, role) - glFit(roster[a].r, role) || a - b)[0]; out[role] = i; left.delete(i); }
   return out;
+}
+const GL_LINES = { go: { n: 'Go for it', putt: 0.6 }, pct: { n: 'Percentages', putt: 0.35 }, lay: { n: 'Lay up', putt: 0.12 } };
+const GL_STANCE = { quick: { meter: 1.2, focus: 0.75, err: 1.06 }, steady: { meter: 1, focus: 1, err: 1 }, bold: { dist: 1.03, err: 1.15, shape: 1.5 }, careful: { dist: 1, err: 1, shape: 1 } };
+const glStanceOf = s => (G.stance && G.stance[s]) || { tempo: 'steady', mood: 'careful' };
+// a side's error from its stance (1 is none)
+const glStanceErr = s => { const st = glStanceOf(s); return GL_STANCE[st.tempo].err * GL_STANCE[st.mood].err; };
+// does the way from b to a point cross water (or a carry over sand by the green)?
+function glTrouble(H, b, p) {
+  const d = hyp(p.x - b.x, p.y - b.y), n = Math.ceil(d / 3);
+  for (let i = 1; i < n; i++) { const l = glLie(H, b.x + (p.x - b.x) * i / n, b.y + (p.y - b.y) * i / n); if (l === 'W') return true; }
+  return false;
+}
+// the CPU's line for side s now
+function glCpuLine(s) {
+  const sk = G.skill[s], H = glHoleNow(), b = G.ball[s], kind = glShotKind(H, s);
+  if (sk === 0) return 'go';
+  const up = s === 0 ? glUp() : -glUp(), left = glLeft(), Hs = G.hole, o = 1 - s;
+  const trouble = kind === 'approach' && glTrouble(H, b, H.pin) && hyp(b.x - H.pin.x, b.y - H.pin.y) > 120;
+  // the scout: an Archmage that has seen you go for it and find trouble twice plays safe and lets you (unless it is
+  // three down or worse)
+  if (sk >= 2 && kind !== 'putt' && G.scout && G.scout[o].bad >= 2 && up > -3) return trouble ? 'lay' : 'pct';
+  // behind late: everything at the pin; on a putt, charge it when only holing it will do
+  if ((up <= -2 && left <= 4) || (up < 0 && left <= 2) || G.res.length >= G.holes) return kind === 'putt' ? (Hs.done[o] ? 'go' : 'pct') : 'go';
+  if (kind === 'putt') return Hs.done[o] || hyp(b.x - H.pin.x, b.y - H.pin.y) < 6 ? 'pct' : up >= 2 ? 'lay' : 'pct';
+  if (up >= 2 && trouble) return 'lay';
+  if (sk >= 2 && trouble) return 'lay';
+  return 'pct';
+}
+// the green's fat: the pin itself, unless it is tucked by trouble (sand or water within 8 yards of it), then a point
+// halfway back toward the middle of the green
+function glFat(H) {
+  const g = H.green, p = H.pin;
+  let tucked = false;
+  for (let a = 0; a < Math.PI * 2 && !tucked; a += Math.PI / 8) for (const r of [4, 8]) { const l = glLie(H, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r); if (l === 'S' || l === 'W') { tucked = true; break; } }
+  if (!tucked) return { x: p.x, y: p.y };
+  return { x: p.x + (g.x - p.x) * 0.5, y: p.y + (g.y - p.y) * 0.5 };
 }
 const GL_FOCUS = { shot: 0.12, hard: 0.22, back: 0.06, hole: 0.1, k: 0.8 };
 // how much less true a swing is at this focus (1 at full)
@@ -115,23 +160,38 @@ function glLayTarget(H, b, reach, careful, rollFrac) {
 }
 
 // the shot for side s, hit by ri: { ri, kind, club, aim, pow, spin } or a putt { ri, kind, putt: true, a, v }
-function glPlan(s, riIn) {
+function glPlan(s, riIn, lineIn) {
   const H = glHoleNow(), b = G.ball[s], sk = G.skill[s], kind = glShotKind(H, s), ri = riIn == null ? glPickHitter(s, kind) : riIn, rat = glRat(s, ri);
+  const line = GL_LINES[lineIn] ? lineIn : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
   if (kind === 'putt') {
-    const readK = 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
-    return Object.assign({ ri, kind, club: 'pt', putt: true }, glRead(H, b, readK));
+    // (the caddie's word: read without error)
+    const readK = word ? 1 : 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
+    return Object.assign({ ri, kind, club: 'pt', putt: true, line }, glRead(H, b, readK, GL_LINES[line].putt));
   }
   const clubs = glClubsFrom(b.lie, rat), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
   const d = glDistOf(H, s), longest = clubs[0];
   let club, target;
+  const shortest = dd => GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= dd) || longest, wedge = tot(clubs.includes('we') ? 'we' : clubs[clubs.length - 1]);
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }
-  else if (d > tot(longest) * 0.98) { club = longest; const R = glReach(club, b.lie, rat, 1); target = glLayTarget(H, b, tot(longest), sk > 0, R.roll / (R.carry + R.roll || 1)); }
-  else { club = GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
+  else if (d > tot(longest) * 0.98) {
+    club = longest; const R = glReach(club, b.lie, rat, 1), rf = R.roll / (R.carry + R.roll || 1);
+    if (line === 'go') { const a = Math.atan2(H.pin.y - b.y, H.pin.x - b.x), L = tot(longest); target = { x: b.x + Math.cos(a) * L, y: b.y + Math.sin(a) * L }; }
+    // lay up: safe ground that leaves a full wedge in, if that is a real shot short of the longest club's reach
+    else if (line === 'lay' && d - wedge > 60) { const L = Math.min(tot(longest), d - wedge); target = glLayTarget(H, b, L, true, rf); club = shortest(hyp(target.x - b.x, target.y - b.y)); }
+    else target = glLayTarget(H, b, tot(longest), sk > 0, rf);
+  }
+  else if (line === 'lay' && glTrouble(H, b, H.pin) && d - wedge > 40) {
+    // short of the trouble, leaving the wedge in; if there is no safe spot it plays the percentages
+    const T = glLayTarget(H, b, d - wedge, true, 0.15);
+    if (glTrouble(H, b, T) || hyp(T.x - b.x, T.y - b.y) < 30) { target = glFat(H); club = shortest(hyp(target.x - b.x, target.y - b.y)); }
+    else { target = T; club = shortest(hyp(T.x - b.x, T.y - b.y)); }
+  }
+  else { target = line === 'go' ? H.pin : glFat(H); club = shortest(hyp(target.x - b.x, target.y - b.y)); }
   // the landing spot: short of the target by the roll; then aim off for the wind
   const dir0 = Math.atan2(target.y - b.y, target.x - b.x), dist = hyp(target.x - b.x, target.y - b.y);
   let pow = glPowFor(club, b.lie, rat, dist), R1 = glReach(club, b.lie, rat, pow);
   let land = { x: target.x - Math.cos(dir0) * R1.roll, y: target.y - Math.sin(dir0) * R1.roll }, aim = land;
-  const wk = GL_SKILL.wind[sk];
+  const wk = word ? 1 : GL_SKILL.wind[sk];
   if (wk && G.wind && G.wind.s) {
     const windAim = () => { let a = land; for (let i = 0; i < 3; i++) { const dir = Math.atan2(a.y - b.y, a.x - b.x), carry = hyp(a.x - b.x, a.y - b.y), push = glWindPush(club, carry, G.wind, dir); a = { x: land.x - push[0] * wk, y: land.y - push[1] * wk }; } return a; };
     aim = windAim();
@@ -144,13 +204,13 @@ function glPlan(s, riIn) {
     }
     pow = glPowFor(club, b.lie, rat, need, true);
   } else pow = glPowFor(club, b.lie, rat, hyp(land.x - b.x, land.y - b.y), true);
-  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow, spin: 0 };
+  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow, spin: 0, line };
 }
 
 // read a putt: the angle and speed that finish it just past the cup, on the green as read (slopeK)
-function glRead(H, from, slopeK) {
+function glRead(H, from, slopeK, past) {
   const pin = H.pin, d = hyp(pin.x - from.x, pin.y - from.y), ux = (pin.x - from.x) / (d || 1), uy = (pin.y - from.y) / (d || 1);
-  const want = d + 0.35;
+  const want = d + (past == null ? 0.35 : past);
   let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
   for (let i = 0; i < 10; i++) {
     const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true });

@@ -34454,7 +34454,7 @@ function glFlight(s) {
   const carry = R0.carry * (T && !L.punch ? T.carry : 1);
   const dir = Math.atan2(s.aim.y - from.y, s.aim.x - from.x);
   const off = -(s.err || 0) * 8 * c.spread * spreadL * Math.PI / 180;
-  const h = T ? (L.punch ? T.h : c.h * T.h) : c.h, bend = Sh ? Sh.bend * carry * 0.05 : 0;
+  const h = T ? (L.punch ? T.h : c.h * T.h) : c.h, bend = Sh ? Sh.bend * carry * 0.05 * (s.shapeK || 1) : 0;
   const push = glWindPush(club, carry, s.wind, dir).map(v => v * (T ? T.wind : 1));
   // the curve: straight out along the aim, bending by off, then the wind's drift by the end
   const ex = from.x + Math.cos(dir + off) * carry + push[0], ey = from.y + Math.sin(dir + off) * carry + push[1];
@@ -34468,9 +34468,10 @@ function glFlight(s) {
   if (ll === 'W') return Object.assign(out, glWaterDrop(H, from, land), { water: true, roll: 0 });
   if (ll === 'S' || ll === 'B' || ll === 'O') return Object.assign(out, { end: land, lie: ll, roll: 0 });
   // the roll: the club and the spin, along the line it came in on
-  const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
+  const spin = clamp(s.spin || 0, -1.5, 1.5), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
-  let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
+  const shR = Sh ? 1 + (Sh.roll - 1) * (s.shapeK || 1) : 1;
+  let budget = Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
@@ -34559,7 +34560,16 @@ function glPutt(p) {
    rule allows, else to the best fit for it who may hit (glFit). Focus (G.focus, 0 to 1 a player): each shot costs the
    hitter some (a hard one more: a power shot, or out of the rough, sand, bog or trees), and it comes back while the
    others hit and at a new hole; low focus makes the swing less true (glFocusK). Pressure (glPressure, 0 to 2): a stroke
-   to win or halve the hole, and more on the last hole, dormie or in a playoff; nerve takes it off (glNerveK). */
+   to win or halve the hole, and more on the last hole, dormie or in a playoff; nerve takes it off (glNerveK).
+   The call (phase 4). The line (GL_LINES), before every shot: go (the pin, over the trouble; out of reach, straight at
+   it), pct (the fat of the green; out of reach, the safe fairway) or lay (short of the trouble, to the side's wedge
+   range). On a putt: go charges it, pct finishes a little past, lay dies it at the hole. The CPU's line (glCpuLine): a
+   Squire always goes for it; a Knight reads the match (behind late, it goes for everything; well up, it lays up short
+   of trouble); an Archmage also lays up when the way to the green crosses the water, and reads you (the scout,
+   G.scout: when you keep going for it and finding trouble, it plays safe and lets you). Stances (G.stance, a side's):
+   tempo quick (a quicker meter and swing, less focus spent, a touch less true) or steady; mood bold (a little longer,
+   more shape and spin, a bigger miss) or careful. The caddie's word (G.word, once a game a side): the next stroke is
+   read in full (the putt's read line to the cup, the wind exactly; the CPU reads it without error). */
 const GL_SKILL = { names: ['Squire', 'Knight', 'Archmage'], err: [1.25, 1, 0.85], read: [0.5, 0.25, 0.12], wind: [0, 0.85, 1], give: [1, 0.75, 0.6], giveIn: 0.6 };
 const GL_DEF_RAT = { pow: 0.5, acc: 0.5, tch: 0.5, put: 0.5, nrv: 0.5, scr: 0.5 };
 const GL_STATS = ['pow', 'acc', 'tch', 'put', 'nrv', 'scr'];
@@ -34584,6 +34594,42 @@ function glAutoRoles(roster) {
   const left = new Set(roster.map((_, i) => i)), out = {};
   for (const role of ['putt', 'tee', 'short', 'approach']) { const i = [...left].sort((a, b) => glFit(roster[b].r, role) - glFit(roster[a].r, role) || a - b)[0]; out[role] = i; left.delete(i); }
   return out;
+}
+const GL_LINES = { go: { n: 'Go for it', putt: 0.6 }, pct: { n: 'Percentages', putt: 0.35 }, lay: { n: 'Lay up', putt: 0.12 } };
+const GL_STANCE = { quick: { meter: 1.2, focus: 0.75, err: 1.06 }, steady: { meter: 1, focus: 1, err: 1 }, bold: { dist: 1.03, err: 1.15, shape: 1.5 }, careful: { dist: 1, err: 1, shape: 1 } };
+const glStanceOf = s => (G.stance && G.stance[s]) || { tempo: 'steady', mood: 'careful' };
+// a side's error from its stance (1 is none)
+const glStanceErr = s => { const st = glStanceOf(s); return GL_STANCE[st.tempo].err * GL_STANCE[st.mood].err; };
+// does the way from b to a point cross water (or a carry over sand by the green)?
+function glTrouble(H, b, p) {
+  const d = hyp(p.x - b.x, p.y - b.y), n = Math.ceil(d / 3);
+  for (let i = 1; i < n; i++) { const l = glLie(H, b.x + (p.x - b.x) * i / n, b.y + (p.y - b.y) * i / n); if (l === 'W') return true; }
+  return false;
+}
+// the CPU's line for side s now
+function glCpuLine(s) {
+  const sk = G.skill[s], H = glHoleNow(), b = G.ball[s], kind = glShotKind(H, s);
+  if (sk === 0) return 'go';
+  const up = s === 0 ? glUp() : -glUp(), left = glLeft(), Hs = G.hole, o = 1 - s;
+  const trouble = kind === 'approach' && glTrouble(H, b, H.pin) && hyp(b.x - H.pin.x, b.y - H.pin.y) > 120;
+  // the scout: an Archmage that has seen you go for it and find trouble twice plays safe and lets you (unless it is
+  // three down or worse)
+  if (sk >= 2 && kind !== 'putt' && G.scout && G.scout[o].bad >= 2 && up > -3) return trouble ? 'lay' : 'pct';
+  // behind late: everything at the pin; on a putt, charge it when only holing it will do
+  if ((up <= -2 && left <= 4) || (up < 0 && left <= 2) || G.res.length >= G.holes) return kind === 'putt' ? (Hs.done[o] ? 'go' : 'pct') : 'go';
+  if (kind === 'putt') return Hs.done[o] || hyp(b.x - H.pin.x, b.y - H.pin.y) < 6 ? 'pct' : up >= 2 ? 'lay' : 'pct';
+  if (up >= 2 && trouble) return 'lay';
+  if (sk >= 2 && trouble) return 'lay';
+  return 'pct';
+}
+// the green's fat: the pin itself, unless it is tucked by trouble (sand or water within 8 yards of it), then a point
+// halfway back toward the middle of the green
+function glFat(H) {
+  const g = H.green, p = H.pin;
+  let tucked = false;
+  for (let a = 0; a < Math.PI * 2 && !tucked; a += Math.PI / 8) for (const r of [4, 8]) { const l = glLie(H, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r); if (l === 'S' || l === 'W') { tucked = true; break; } }
+  if (!tucked) return { x: p.x, y: p.y };
+  return { x: p.x + (g.x - p.x) * 0.5, y: p.y + (g.y - p.y) * 0.5 };
 }
 const GL_FOCUS = { shot: 0.12, hard: 0.22, back: 0.06, hole: 0.1, k: 0.8 };
 // how much less true a swing is at this focus (1 at full)
@@ -34656,23 +34702,38 @@ function glLayTarget(H, b, reach, careful, rollFrac) {
 }
 
 // the shot for side s, hit by ri: { ri, kind, club, aim, pow, spin } or a putt { ri, kind, putt: true, a, v }
-function glPlan(s, riIn) {
+function glPlan(s, riIn, lineIn) {
   const H = glHoleNow(), b = G.ball[s], sk = G.skill[s], kind = glShotKind(H, s), ri = riIn == null ? glPickHitter(s, kind) : riIn, rat = glRat(s, ri);
+  const line = GL_LINES[lineIn] ? lineIn : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
   if (kind === 'putt') {
-    const readK = 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
-    return Object.assign({ ri, kind, club: 'pt', putt: true }, glRead(H, b, readK));
+    // (the caddie's word: read without error)
+    const readK = word ? 1 : 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
+    return Object.assign({ ri, kind, club: 'pt', putt: true, line }, glRead(H, b, readK, GL_LINES[line].putt));
   }
   const clubs = glClubsFrom(b.lie, rat), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
   const d = glDistOf(H, s), longest = clubs[0];
   let club, target;
+  const shortest = dd => GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= dd) || longest, wedge = tot(clubs.includes('we') ? 'we' : clubs[clubs.length - 1]);
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }
-  else if (d > tot(longest) * 0.98) { club = longest; const R = glReach(club, b.lie, rat, 1); target = glLayTarget(H, b, tot(longest), sk > 0, R.roll / (R.carry + R.roll || 1)); }
-  else { club = GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
+  else if (d > tot(longest) * 0.98) {
+    club = longest; const R = glReach(club, b.lie, rat, 1), rf = R.roll / (R.carry + R.roll || 1);
+    if (line === 'go') { const a = Math.atan2(H.pin.y - b.y, H.pin.x - b.x), L = tot(longest); target = { x: b.x + Math.cos(a) * L, y: b.y + Math.sin(a) * L }; }
+    // lay up: safe ground that leaves a full wedge in, if that is a real shot short of the longest club's reach
+    else if (line === 'lay' && d - wedge > 60) { const L = Math.min(tot(longest), d - wedge); target = glLayTarget(H, b, L, true, rf); club = shortest(hyp(target.x - b.x, target.y - b.y)); }
+    else target = glLayTarget(H, b, tot(longest), sk > 0, rf);
+  }
+  else if (line === 'lay' && glTrouble(H, b, H.pin) && d - wedge > 40) {
+    // short of the trouble, leaving the wedge in; if there is no safe spot it plays the percentages
+    const T = glLayTarget(H, b, d - wedge, true, 0.15);
+    if (glTrouble(H, b, T) || hyp(T.x - b.x, T.y - b.y) < 30) { target = glFat(H); club = shortest(hyp(target.x - b.x, target.y - b.y)); }
+    else { target = T; club = shortest(hyp(T.x - b.x, T.y - b.y)); }
+  }
+  else { target = line === 'go' ? H.pin : glFat(H); club = shortest(hyp(target.x - b.x, target.y - b.y)); }
   // the landing spot: short of the target by the roll; then aim off for the wind
   const dir0 = Math.atan2(target.y - b.y, target.x - b.x), dist = hyp(target.x - b.x, target.y - b.y);
   let pow = glPowFor(club, b.lie, rat, dist), R1 = glReach(club, b.lie, rat, pow);
   let land = { x: target.x - Math.cos(dir0) * R1.roll, y: target.y - Math.sin(dir0) * R1.roll }, aim = land;
-  const wk = GL_SKILL.wind[sk];
+  const wk = word ? 1 : GL_SKILL.wind[sk];
   if (wk && G.wind && G.wind.s) {
     const windAim = () => { let a = land; for (let i = 0; i < 3; i++) { const dir = Math.atan2(a.y - b.y, a.x - b.x), carry = hyp(a.x - b.x, a.y - b.y), push = glWindPush(club, carry, G.wind, dir); a = { x: land.x - push[0] * wk, y: land.y - push[1] * wk }; } return a; };
     aim = windAim();
@@ -34685,13 +34746,13 @@ function glPlan(s, riIn) {
     }
     pow = glPowFor(club, b.lie, rat, need, true);
   } else pow = glPowFor(club, b.lie, rat, hyp(land.x - b.x, land.y - b.y), true);
-  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow, spin: 0 };
+  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow, spin: 0, line };
 }
 
 // read a putt: the angle and speed that finish it just past the cup, on the green as read (slopeK)
-function glRead(H, from, slopeK) {
+function glRead(H, from, slopeK, past) {
   const pin = H.pin, d = hyp(pin.x - from.x, pin.y - from.y), ux = (pin.x - from.x) / (d || 1), uy = (pin.y - from.y) / (d || 1);
-  const want = d + 0.35;
+  const want = d + (past == null ? 0.35 : past);
   let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
   for (let i = 0; i < 10; i++) {
     const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true });
@@ -34756,16 +34817,29 @@ function glStart(opts) {
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
-    focus: [0, 1].map(() => [1, 1, 1, 1]), card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
+    focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
+    scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
   glHoleStart();
   return G;
 }
+// the turn: after this many holes (5 of 9, 10 of 18, 3 of 6, 2 of 3)
+const glTurnAt = () => Math.max(1, Math.round(G.holes * 5 / 9));
+// the CPU's call before its shot: the stance for the moment, and the caddie's word on a big putt (a Knight on the last
+// hole or in a playoff, an Archmage on any stroke that wins or halves the hole). A Squire stays as it is
+function glCpuCall(s) {
+  const sk = G.skill[s]; if (!sk) return;
+  const up = s === 0 ? glUp() : -glUp(), left = glLeft(), f = G.focus ? G.focus[s].reduce((a, v) => a + v, 0) / 4 : 1;
+  G.stance[s] = { tempo: f < 0.6 ? 'quick' : 'steady', mood: (up <= -2 && left <= 4) || (up < 0 && left <= 2) ? 'bold' : 'careful' };
+  const H = glHoleNow(), p = glPressure(s);
+  if (G.word[s] > 0 && glShotKind(H, s) === 'putt' && p > 0 && (sk >= 2 || p > 1)) { G.word[s]--; G.wordOn[s] = true; }
+}
 function glHoleStart() {
   const H = glHoleNow();
   G.ball = [0, 1].map(() => ({ x: H.tee.x, y: H.tee.y, lie: 'T' }));
-  // a new hole: a little focus back for everyone
+  // a new hole: a little focus back for everyone; at the turn (after the 5th of 9), all of it
   if (G.focus && G.res.length) G.focus = G.focus.map(f => f.map(v => Math.min(1, v + GL_FOCUS.hole)));
+  if (G.focus && !G.turned && G.res.length === glTurnAt()) { G.turned = true; G.focus = G.focus.map(f => f.map(() => 1)); G.turnNow = true; } else G.turnNow = false;
   G.wind = { s: Math.round(R() * 14), d: Math.round(R() * 628) / 100 };
   G.gir = [false, false];
 }
@@ -34773,14 +34847,15 @@ function glHoleStart() {
 // the swing goes off: the plan, with the hitter's errors. Returns the ball's flight or roll
 function glHit(s, plan) {
   // the skill's errors, made worse by a tired hitter and by a big moment for a nervy one
-  const H = glHoleNow(), b = G.ball[s], rat = glRat(s, plan.ri), em = GL_SKILL.err[G.skill[s]] * glFocusK(G.focus ? G.focus[s][plan.ri] : 1) * glNerveK(glPressure(s), rat.nrv);
+  const H = glHoleNow(), b = G.ball[s], rat = glRat(s, plan.ri), em = GL_SKILL.err[G.skill[s]] * glFocusK(G.focus ? G.focus[s][plan.ri] : 1) * glNerveK(glPressure(s), rat.nrv) * glStanceErr(s);
+  const dist = GL_STANCE[glStanceOf(s).mood].dist;
   if (plan.putt) {
     const k = 1.5 - rat.put, a = plan.a + gauss() * GL_SWING.pa * k * em, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em);
     const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
   const key = plan.kind === 'short' ? rat.tch : rat.acc, k = 1.4 - key;
-  return glFlight({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, wind: G.wind, spin: plan.spin, rat });
+  return glFlight({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, wind: G.wind, spin: plan.spin, rat });
 }
 
 // who plays next: { side, d (yards to the pin), putt, give (the other side may give this putt) }, or null when it's over
@@ -34808,11 +34883,14 @@ function glShoot(s, plan, r) {
   G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
   if (plan.putt) S.putts++;
   // focus: the hitter spends some (a hard shot more), the other three get a little back
-  if (G.focus) { const hard = (plan.pow || 0) > 1 || ['r', 'R', 'S', 'B', 'O'].includes(lie0); G.focus[s] = G.focus[s].map((v, i) => i === plan.ri ? Math.max(0, v - (hard ? GL_FOCUS.hard : GL_FOCUS.shot)) : Math.min(1, v + GL_FOCUS.back)); }
+  if (G.focus) { const hard = (plan.pow || 0) > 1 || ['r', 'R', 'S', 'B', 'O'].includes(lie0), cost = (hard ? GL_FOCUS.hard : GL_FOCUS.shot) * GL_STANCE[glStanceOf(s).tempo].focus; G.focus[s] = G.focus[s].map((v, i) => i === plan.ri ? Math.max(0, v - cost) : Math.min(1, v + GL_FOCUS.back)); }
+  // the scout: who goes for it, and how often it finds trouble
+  if (G.scout && plan.line === 'go' && !plan.putt) { G.scout[s].go++; if (r.water || ['S', 'B', 'O', 'R'].includes(r.lie)) G.scout[s].bad++; }
+  if (G.wordOn) G.wordOn[s] = false;
   G.pst[s][plan.ri].shots++; if (plan.putt) G.pst[s][plan.ri].putts++; if (r.holed) G.pst[s][plan.ri].holed++;
   if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F' && !r.water) S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
   if (!r.water && (r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
-  const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
+  const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, line: plan.line || '', club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
   if (r.water) { S.water++; glDrop(s); }
   // holed on the stroke that reached the cap: it still counts
   if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
@@ -34830,7 +34908,7 @@ function glLogEv(ev, h0, Hs) {
 // one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
 function glTurn() {
   const n = glNext(); if (!n) return null;
-  const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { const plan = glPlan(s); return glShoot(s, plan, glHit(s, plan)); })();
+  const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { glCpuCall(s); const plan = glPlan(s); return glShoot(s, plan, glHit(s, plan)); })();
   // (glAfterHole leaves the end to the page when a game is on show; turn() is not the page, so it says it here)
   if (GD && G.over && ev && ev.res != null && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
   return ev;
@@ -34929,11 +35007,12 @@ function glPlayNext() {
   const s = n.side, o = 1 - s;
   if (glYours(s)) {
     if (glCpuGives(n)) { glGiven(o); return; }
-    glSelReset(); glGo('aim', 0, glAimMsg());
+    glSelReset(); glGo('aim', 0, (G.turnNow && G.hole.st[0] + G.hole.st[1] === 0 ? 'The turn: everyone\'s focus is back. ' : '') + glAimMsg());
     return;
   }
   if (n.give && glYours(o)) { glGo('offer', 0, `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`); return; }
   if (glCpuGives(n)) { glGiven(o); return; }
+  glCpuCall(s);
   const plan = glPlan(s);
   GD.cpu = { side: s, plan };
   glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`);
@@ -35024,8 +35103,9 @@ function glAimMsg() {
 function glSelReset() {
   const s = GD.you, H = glHoleNow(), kind = glShotKind(H, s);
   // (a putt is set up without the caddie's read: that would draw from R and throw the result away)
-  const plan = kind === 'putt' ? { ri: glPickHitter(s, 'putt'), club: 'pt', putt: true, kind } : glPlan(s);
-  GD.sel = { ri: plan.ri, club: plan.club, aim: plan.putt ? { x: H.pin.x, y: H.pin.y } : { x: plan.aim.x, y: plan.aim.y }, shape: '', traj: '', spin: 0, putt: !!plan.putt, kind: plan.kind };
+  const line = kind === 'putt' ? 'pct' : GD.line || 'pct';
+  const plan = kind === 'putt' ? { ri: glPickHitter(s, 'putt'), club: 'pt', putt: true, kind } : glPlan(s, null, line);
+  GD.sel = { ri: plan.ri, club: plan.club, aim: plan.putt ? { x: H.pin.x, y: H.pin.y } : { x: plan.aim.x, y: plan.aim.y }, shape: '', traj: '', spin: 0, putt: !!plan.putt, kind: plan.kind, line };
   glSelFix();
 }
 // the clubs your ball may take from where it lies (the putter on or close by the green)
@@ -35053,9 +35133,9 @@ function glSelFix() {
 // the meter's tick: the power that lands a perfect swing on the aim point (a putt: the weight to roll there, flat)
 function glTickPow() {
   const S = GD.sel, s = GD.you, b = G.ball[s], d = hyp(S.aim.x - b.x, S.aim.y - b.y);
-  if (S.putt) return clamp((d + 0.35) / glPuttScale(), 0.02, 1);
-  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1;
-  return glPowFor(S.club, b.lie, glRat(s, S.ri), d / T, true);
+  if (S.putt) return clamp((d + GL_LINES[S.line || 'pct'].putt) / glPuttScale(), 0.02, 1);
+  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist;
+  return glPowFor(S.club, b.lie, glRat(s, S.ri), d / T / B, true);
 }
 // a putt's bar runs to this many yards (on a flat green, at full weight)
 function glPuttScale() {
@@ -35075,6 +35155,14 @@ function glSelect(o) {
   if (o.shape != null) S.shape = GL_SHAPES[o.shape] ? o.shape : '';
   if (o.traj != null) S.traj = GL_TRAJ[o.traj] ? o.traj : '';
   if (o.spin != null) S.spin = clamp(Math.round(o.spin), -1, 1);
+  if (o.line && GL_LINES[o.line] && o.line !== S.line) {
+    S.line = o.line;
+    // a full shot is planned again for the line (the club and the aim); a putt's line only changes its weight's tick
+    if (!S.putt) { GD.line = o.line; const p = glPlan(GD.you, S.ri, o.line); if (glClubsNow().includes(p.club)) S.club = p.club; S.aim = { x: p.aim.x, y: p.aim.y }; }
+  }
+  if (o.tempo && GL_STANCE[o.tempo] && (o.tempo === 'quick' || o.tempo === 'steady')) G.stance[GD.you].tempo = o.tempo;
+  if (o.mood && (o.mood === 'bold' || o.mood === 'careful')) G.stance[GD.you].mood = o.mood;
+  if (o.word && G.word[GD.you] > 0 && !G.wordOn[GD.you]) { G.word[GD.you]--; G.wordOn[GD.you] = true; }
   glSelFix();
   GD.msg = glAimMsg();
   return true;
@@ -35091,7 +35179,13 @@ function glAimPush(yd) {
   S.aim = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d }; glSelFix(); return true;
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
-function glReadLen() { return GD && GD.sel ? 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5 : 0; }
+function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) : 0; }
+// the wind as you see it: roughly (to 5 mph and 8 ways), or exactly with the caddie's word (or in Watch)
+function glWindShown(w) {
+  if (!w || !w.s) return { s: 0, d: 0, exact: true };
+  if (!GD || GD.mode !== 'play' || (G.wordOn && G.wordOn[GD.you])) return { s: w.s, d: w.d, exact: true };
+  return { s: Math.max(5, Math.round(w.s / 5) * 5), d: Math.round(w.d / (Math.PI / 4)) * (Math.PI / 4), exact: false };
+}
 const GLRL = { key: '', line: [] };
 function glReadLine() {
   const S = GD && GD.sel; if (!S || !S.putt || (GD.ph !== 'aim' && GD.ph !== 'swing')) return [];
@@ -35122,7 +35216,8 @@ function glSwingNums(pow, m, rat, f) {
 // shakes by shake, a putt's weight wobbles by wob, all less for a steady nerve)
 function glMine() {
   const s = GD.you, ri = GD.sel.ri, rat = glRat(s, ri), f = G.focus ? G.focus[s][ri] : 1, p = glPressure(s), n = p * (1 - clamp(rat.nrv, 0, 1));
-  return { rat, f, p, spd: 1 + GL_METER.pSpd * n, shake: GL_METER.pShake * n, wob: GL_METER.pWob * n };
+  const st = glStanceOf(s);
+  return { rat, f: f / GL_STANCE[st.mood].err, p, spd: (1 + GL_METER.pSpd * n) * GL_STANCE[st.tempo].meter, shake: GL_METER.pShake * n, wob: GL_METER.pWob * n };
 }
 // where the shaking mark is now (meter units), and a putt's wobble
 const glShake = M => M.shake ? M.shake * Math.sin(M.t * 9) : 0;
@@ -35169,13 +35264,14 @@ function glStrike(s, S, sw) {
     const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow, err: sw.err, wind: G.wind, spin: S.spin, shape: S.shape, traj: S.traj, rat });
+  const M = GL_STANCE[glStanceOf(s).mood];
+  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist, err: sw.err, wind: G.wind, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat });
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
   if (GD.meter) { GD.meter.st = 'done'; GD.meter.sw = sw; }
   GD.swung = Object.assign({ putt: S.putt }, sw);
-  glFire(s, { ri: S.ri, kind: S.putt ? 'putt' : S.kind === 'putt' ? 'short' : S.kind, club: S.putt ? 'pt' : S.club, putt: S.putt, pow: sw.pow }, glStrike(s, S, sw));
+  glFire(s, { ri: S.ri, kind: S.putt ? 'putt' : S.kind === 'putt' ? 'short' : S.kind, club: S.putt ? 'pt' : S.club, putt: S.putt, pow: sw.pow, line: S.line }, glStrike(s, S, sw));
 }
 // their short putt: give it, or make them putt
 function glOffer(give) {
@@ -35385,7 +35481,8 @@ function glDrawCard(c, H) {
   c.restore();
 }
 function glDrawWind(c) {
-  const w = GD.disp.wind || { s: 0, d: 0 }, cx = 905, cy = 52;
+  // (as you see it: roughly, unless your caddie's word is on the shot)
+  const w = glWindShown(GD.disp.wind || { s: 0, d: 0 }), cx = 905, cy = 52;
   c.save();
   c.fillStyle = 'rgba(16,26,12,.72)'; c.beginPath(); c.arc(cx, cy, 38, 0, Math.PI * 2); c.fill();
   if (w.s) {
@@ -35394,7 +35491,7 @@ function glDrawWind(c) {
     c.beginPath(); c.moveTo(cx - dx * L, cy - dy * L); c.lineTo(cx + dx * L, cy + dy * L); c.stroke();
     const a = Math.atan2(dy, dx); c.beginPath(); c.moveTo(cx + dx * (L + 6), cy + dy * (L + 6)); c.lineTo(cx + dx * L + Math.cos(a + 2.2) * 9, cy + dy * L + Math.sin(a + 2.2) * 9); c.lineTo(cx + dx * L + Math.cos(a - 2.2) * 9, cy + dy * L + Math.sin(a - 2.2) * 9); c.closePath(); c.fill();
   }
-  txt(c, w.s ? `${w.s} mph` : 'Still', cx, cy + 52, '600 12px system-ui, sans-serif', '#e8f3ff', 'center', 'middle');
+  txt(c, w.s ? `${w.exact ? '' : 'about '}${w.s} mph` : 'Still', cx, cy + 52, '600 12px system-ui, sans-serif', '#e8f3ff', 'center', 'middle');
   c.restore();
 }
 // the meter: a full swing from GL_METER.low to top, the mark at 0 and the tick; a putt's bar 0 to 1 with its tick
@@ -35425,8 +35522,8 @@ function glDrawMeter(c) {
    In You play it hears the keys, only while the course is on screen (not under How to play) and it is your shot or your
    choice, in the capture phase so nothing else on the page takes them: Space swings (each press: start, power, the
    mark; on a putt start, then the weight; while it is your shot or their putt to give it is the course's, so it never presses a focused button); the arrows aim (left and right turn it, up and down move the ring further
-   or nearer); 1 to 4 pick the hitter; Q and E a longer or shorter club; Z the shape, X the height, C the spin; Y gives
-   their putt and N makes them hole it.
+   or nearer); 1 to 4 pick the hitter; Q and E a longer or shorter club; Z the shape, X the height, C the spin; L the
+   line, T the tempo, M the mood, W the caddie's word; Y gives their putt and N makes them hole it.
    The mouse or a finger: a click or a drag on the course moves the aim; a drag that starts on your ball is a swing
    (pull back away from the target and let go: the pull is the power, a pull off the line a hook or a slice). */
 const GLP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null };
@@ -35484,6 +35581,10 @@ function glKey(e) {
   else if (k === 'z') glSelect({ shape: S.shape === '' ? 'draw' : S.shape === 'draw' ? 'fade' : '' });
   else if (k === 'x') glSelect({ traj: S.traj === '' ? 'punch' : S.traj === 'punch' ? 'lob' : '' });
   else if (k === 'c') glSelect({ spin: S.spin === 0 ? -1 : S.spin < 0 ? 1 : 0 });
+  else if (k === 'l') glSelect({ line: S.line === 'go' ? 'pct' : S.line === 'pct' ? 'lay' : 'go' });
+  else if (k === 't') glSelect({ tempo: G.stance[GD.you].tempo === 'quick' ? 'steady' : 'quick' });
+  else if (k === 'm') glSelect({ mood: G.stance[GD.you].mood === 'bold' ? 'careful' : 'bold' });
+  else if (k === 'w') glSelect({ word: true });
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (er) { console.error(er); } }
 }
@@ -35547,12 +35648,16 @@ return {
   stats: GL_STATS.slice(), rate: k => glRate(k), cap: GL_RCAP, roles: ['tee', 'approach', 'short', 'putt'],
   fit: (r, role) => glFit(Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), role), autoRoles: ro => glAutoRoles(ro.map(m => ({ r: Object.fromEntries(GL_STATS.map(s => [s, glScale(m.r[s])])) }))),
   get focus() { return G && G.focus ? G.focus.map(f => f.slice()) : null; }, pressure: s => G && G.hole ? glPressure(s) : 0, focusRules: Object.assign({}, GL_FOCUS),
+  // the call (phase 4): the lines, a side's stance, the caddie's word, the scout, the CPU's line, the turn, the wind as seen
+  lines: JSON.parse(JSON.stringify(GL_LINES)), stanceRules: JSON.parse(JSON.stringify(GL_STANCE)), stance: s => G && G.stance ? Object.assign({}, G.stance[s]) : null,
+  get word() { return G && G.word ? G.word.slice() : null; }, get wordOn() { return G && G.wordOn ? G.wordOn.slice() : null; }, get scout() { return G && G.scout ? JSON.parse(JSON.stringify(G.scout)) : null; },
+  cpuLine: s => glCpuLine(s), cpuCall: s => glCpuCall(s), turnAt: () => glTurnAt(), windShown: () => G && G.wind ? glWindShown(G.wind) : null, fat: H => glFat(H),
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),
   built: (seed, par) => glBuildHole(seed, par), wildPars: (cs, n) => glWildPars(cs, n), lie: (H, x, y) => glLie(H, x, y), slope: (H, x, y) => glSlope(H, x, y),
   reach: (club, lie, rat, pow) => glReach(club, lie, rat, pow), flight: s => glFlight(s), putt: p => glPutt(p), read: (H, from, k) => glRead(H, from, k == null ? 1 : k),
-  plan: s => glPlan(s), turn: () => glTurn(), summary: () => G && G.teams ? glSummary() : null, simGame: o => glSimGame(o),
+  plan: (s, line) => glPlan(s, null, line), turn: () => glTurn(), summary: () => G && G.teams ? glSummary() : null, simGame: o => glSimGame(o),
   set onShot(f) { GL_HOOK.onShot = f; }, get onShot() { return GL_HOOK.onShot; }, set onOver(f) { GL_HOOK.onOver = f; }, get onOver() { return GL_HOOK.onOver; },
   start: o => { glStart(o); glPlayStart(o || {}); return G; },
   show: () => glShow(), hide: () => glHide(), get on() { return GLP.on; }, render: () => glRender(0),
@@ -50352,7 +50457,8 @@ const W_LINKS_MODES = {
   watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
   play: { n: 'You play', title: 'You play Mossgate: pick the hitter, the club and the shot, aim, and swing (Space three times, or drag back from the ball). Their short putts are yours to give.' },
 };
-let W_LINKS_MODE = 'play', W_LINKS_SPEED = 1;
+let W_LINKS_MODE = 'play', W_LINKS_SPEED = 1, W_LINKS_SKILL = 1;
+const wLinksSkillNames = () => wGL.skills.names;
 const wLinksHoles = () => wGL.rules.holesAt.includes(SET.linksHoles) ? SET.linksHoles : wGL.rules.holes;
 // the game on the course: plain data, never saved
 let WGL = null;
@@ -50361,6 +50467,7 @@ $('v-links').insertAdjacentHTML('beforebegin', `<div id="wLinksBar" class="wdbar
   <b id="wLinksTitle">A round at Mossgate Links</b><span id="wLinksNote" class="hint wsnote"></span>
   <span id="wLinksModes" class="wgmodes" role="group" aria-label="Who plays it">${Object.entries(W_LINKS_MODES).map(([k, m]) => `<button class="ghost" data-lmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <label class="hint" title="How many holes a game is: the standing nine, cut short or played twice. Also on the Settings panel.">Holes <select id="wLinksHoles">${wGL.rules.holesAt.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label>
+ <label class="hint" title="How well the other side's caddie plays: a Squire misses the meter often, ignores the wind and takes the driver; a Knight reads the wind, the lie and the match; an Archmage also reads greens, lays up when it should and reads your habits.">Their caddie <select id="wLinksSkill">${wLinksSkillNames().map((n, i) => `<option value="${i}">${n}</option>`).join('')}</select></label>
   <label class="hint" id="wLinksSpeedL" title="How fast the game runs while you watch. In You play it is always 1.">Speed <select id="wLinksSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
   <button class="ghost" id="wLinksAgain">Another game</button>
   <button class="ghost" id="wLinksBack">Back to the world</button></div>`);
@@ -50371,6 +50478,7 @@ $('wLinksBar').addEventListener('click', e => {
   else if (b.id === 'wLinksBack') wLeaveLinks();
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
+$('wLinksSkill').addEventListener('change', e => { W_LINKS_SKILL = +e.target.value; e.target.blur(); $('wLinksNote').textContent = `Their caddie: a ${wLinksSkillNames()[W_LINKS_SKILL]}, from the next game.`; });
 $('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); e.target.blur(); });
 $('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); });
 
@@ -50378,7 +50486,9 @@ $('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.va
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>
   <div class="wccrow" id="wLinksRowWho"><span class="wccl">Hitter</span><span id="wLinksWho"></span></div>
   <div class="wccrow" id="wLinksRowClub"><span class="wccl">Club</span><span id="wLinksClub"></span></div>
+  <div class="wccrow" id="wLinksRowLine"><span class="wccl">Line</span><span id="wLinksLine"></span></div>
   <div class="wccrow" id="wLinksRowShot"><span class="wccl">Shot</span><span id="wLinksShot"></span></div>
+  <div class="wccrow" id="wLinksRowStance"><span class="wccl">Stance</span><span id="wLinksStance"></span></div>
   <div class="wccrow" id="wLinksRowGo"><span class="wccl">Swing</span><span id="wLinksGo"></span></div>
   <div class="wccrow" id="wLinksRowGive" hidden><span class="wccl">Their putt</span><span><button class="ghost" data-lgive="1" title="Y: it counts as holed in one more">Give it</button> <button class="ghost" data-lgive="0" title="N: they must hole it">Make them putt</button></span></div></div>
   <h4 class="wsh">Scorecard</h4><div id="wLinksCard" class="wcbox"></div>
@@ -50394,6 +50504,10 @@ $('wLinksRows').addEventListener('click', e => {
   else if (d.ltraj != null) wGL.select({ traj: d.ltraj });
   else if (d.lspin != null) wGL.select({ spin: +d.lspin });
   else if (d.lgo) wGL.press();
+  else if (d.lline) wGL.select({ line: d.lline });
+  else if (d.ltempo) wGL.select({ tempo: d.ltempo });
+  else if (d.lmood) wGL.select({ mood: d.lmood });
+  else if (d.lword) wGL.select({ word: true });
   else if (d.lgive != null) wGL.offer(d.lgive === '1');
   wLinksRows(); wLinksBarNote();
 });
@@ -50405,7 +50519,7 @@ function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over && wGL.G && wGL.G.teams ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
   box.hidden = !mine && !offer;
   $('wLinksRowGive').hidden = !offer;
-  for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowShot', 'wLinksRowGo']) $(id).hidden = !mine;
+  for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowLine', 'wLinksRowShot', 'wLinksRowStance', 'wLinksRowGo']) $(id).hidden = !mine;
   if (!mine) return;
   const S = V.sel, G = wGL.G, T = G.teams[V.you], aim = V.ph === 'aim', on = (a, b) => a === b ? ' on' : '';
   $('wLinksWho').innerHTML = T.roster.map((m, i) => {
@@ -50421,6 +50535,13 @@ function wLinksRows() {
   $('wLinksShot').innerHTML = [['lshape', '', 'Straight'], ['lshape', 'draw', 'Draw', 'Starts right and curves back to the ring, then runs out more'], ['lshape', 'fade', 'Fade', 'Starts left and curves back to the ring, then stops sooner']].map(([k, v, n, t]) => `<button class="ghost${on(v, S.shape)}" data-${k}="${v}" ${aim ? '' : 'disabled'} title="Z: the shape. ${esc(t || 'No shape')}">${n}</button>`).join(' ') + ' · '
     + [['', 'Normal'], ['punch', 'Punch', 'Low under the wind and the branches, and runs'], ['lob', 'Lob', 'High: drifts in the wind, and sits down where it lands']].map(([v, n, t]) => `<button class="ghost${on(v, S.traj)}" data-ltraj="${v}" ${aim && (!punchOnly || v === 'punch') ? '' : 'disabled'} title="X: the height. ${esc(punchOnly ? 'From the trees, only a punch' : t || 'A full shot')}">${n}</button>`).join(' ') + ' · '
     + [[-1, 'Backspin', 'Stops it sooner'], [0, 'No spin', ''], [1, 'Topspin', 'Runs it out']].map(([v, n, t]) => `<button class="ghost${on(v, S.spin)}" data-lspin="${v}" ${aim ? '' : 'disabled'} title="C: the spin. ${esc(t)}">${n}</button>`).join(' ');
+  // the line, the stance (the side's, kept from shot to shot) and the caddie's word
+  const L = wGL.lines, lineT = { go: S.putt ? 'Charge it: past the hole if it misses' : 'The pin, over the trouble (out of reach: straight at it)', pct: S.putt ? 'Finish it a little past the hole' : 'The fat of the green, or the safe fairway', lay: S.putt ? 'Die it at the hole: it won\'t lip out, and short never drops' : 'Short of the trouble, leaving a full wedge' };
+  $('wLinksLine').innerHTML = Object.keys(L).map(k => `<button class="ghost${on(k, S.line)}" data-lline="${k}" ${aim ? '' : 'disabled'} title="L: the line. ${esc(lineT[k])}">${esc(L[k].n)}</button>`).join(' ');
+  const stc = G.stance[V.you], wl = G.word[V.you], won = G.wordOn[V.you];
+  $('wLinksStance').innerHTML = [['quick', 'Quick', 'T: a quicker meter and less focus spent, a touch less true'], ['steady', 'Steady', 'T: the meter at its own pace']].map(([k, n, t]) => `<button class="ghost${on(k, stc.tempo)}" data-ltempo="${k}" ${aim ? '' : 'disabled'} title="${esc(t)}">${n}</button>`).join(' ') + ' · '
+    + [['bold', 'Bold', 'M: a little longer, more shape and spin, and a bigger miss'], ['careful', 'Careful', 'M: as it comes']].map(([k, n, t]) => `<button class="ghost${on(k, stc.mood)}" data-lmood="${k}" ${aim ? '' : 'disabled'} title="${esc(t)}">${n}</button>`).join(' ') + ' · '
+    + `<button class="ghost${won ? ' on' : ''}" data-lword="1" ${aim && wl > 0 && !won ? '' : 'disabled'} title="W: once a game. The next stroke read in full: a putt's read line all the way, and the wind exactly">${won ? 'Caddie\'s word: on' : `Caddie's word (${wl} left)`}</button>`;
   const M = V.meter, st = V.ph !== 'swing' || !M ? 'Start' : S.putt ? 'Weight' : M.st === 'up' ? 'Power' : 'Mark';
   $('wLinksGo').innerHTML = `<button class="ghost on" data-lgo="1" title="Space">${st}</button> <small class="hint">${S.putt ? 'Two presses: start, then stop the bar at the weight (the gold tick rolls it to your aim on a flat green).' : 'Three presses: start, the power (the gold tick lands it on the ring), then the green mark.'} Or drag back from the ball and let go.</small>`;
 }
@@ -50436,7 +50557,7 @@ function wLinksGame(opts) {
   const o = opts || {};
   WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
-  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill });
+  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill || [1, W_LINKS_SKILL] });
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }
@@ -50448,6 +50569,7 @@ function wLinksBarNote() {
   const G = wGL.G, later = !WGL.over && G && G.holes !== wLinksHoles();
   $('wLinksNote').textContent = (wGL.msg || '') + (later ? ` (Holes: ${wLinksHoles()} from the next game; this one is ${G.holes}.)` : '');
   $('wLinksHoles').value = String(wLinksHoles());
+  $('wLinksSkill').value = String(W_LINKS_SKILL);
 }
 // the scorecard (a column a hole: par, each side's strokes, who won it) and each side's players
 function wLinksCard() {
@@ -50537,6 +50659,10 @@ function wLinksHowHTML() {
   <p class="hint"><b>Ratings and roles.</b> Each player has six ratings: <b>power</b> (distance), <b>accuracy</b> (the size of the mark, and how far a miss strays), <b>touch</b> (chips and pitches), <b>putting</b> (the read line's length, and putts that drop), <b>nerve</b> and <b>scrambling</b> (out of the rough, sand, bog and trees). Your four's roles (the tee, the approach, the short game, the green) are set on the Links tab: the caddie gives each shot to its role's player when the rule allows, and in You play the hitter row starts on them.</p>
   <p class="hint"><b>Focus.</b> Every shot costs the hitter some focus, a hard one more (a power shot, or out of the rough, sand, bog or trees). It comes back while the others hit, and a little at each new hole. A tired player's mark is smaller and their misses wider: share the shots. The hitter row shows each player's focus.</p>
   <p class="hint"><b>Nerve.</b> On a stroke that wins or halves the hole (more on the last hole, dormie, or in a playoff), the meter runs quicker and the mark shakes (a putt's weight wobbles), less for a player with nerve. The CPU's players feel it too.</p>
+  <p class="hint"><b>The line</b> (L), before every shot. <b>Go for it</b>: at the pin, over the trouble (out of reach, straight at it). <b>Percentages</b>: the fat of the green when the pin is tucked by sand or water, or the safe fairway. <b>Lay up</b>: short of the trouble, leaving a full wedge in. On a putt the line is the weight: charge it, finish it a little past, or die it at the hole (it won't lip out, but short never drops). Picking a line plans the shot again: the club and the ring move.</p>
+  <p class="hint"><b>Stances</b>, your side's, kept from shot to shot. <b>Tempo</b> (T): Quick runs the meter quicker and spends less focus, a touch less true; Steady is the meter's own pace. <b>Mood</b> (M): Bold goes a little longer with more shape and spin, and the mark is smaller; Careful plays it as it comes.</p>
+  <p class="hint"><b>The turn.</b> After the ${Math.max(1, Math.round(R.holes * 5 / 9))}th hole of ${R.holes} (and halfway through other lengths) everyone's focus comes back. <b>The caddie's word</b> (W), once a game: the next stroke is read in full: a putt's read line runs all the way, and the wind shows exactly. Otherwise the wind on the arrow is rough (to 5 mph, and 8 ways).</p>
+  <p class="hint"><b>Their caddie</b> (on the bar): a <b>Squire</b> misses the meter often, ignores the wind, takes the driver and goes for everything; a <b>Knight</b> reads the wind, the lie and the match (behind late, it goes for everything; well up, it lays up short of trouble); an <b>Archmage</b> also reads greens well, lays up short of water and reads your habits: go for it and find trouble twice and it plays safe and lets you.</p>
   <p class="hint"><b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it at 2 or 4 times. The CPU's caddie picks the hitter by the shot (power off the tee, accuracy for an approach, touch for a chip, the best putter on the green), the club for the distance, aims off for the wind (a Knight or an Archmage), and lays up short of trouble.</p>`;
 }
 const wW105RenderHelp = renderHelp;
