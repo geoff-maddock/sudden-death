@@ -30,6 +30,9 @@ return {
   lines: JSON.parse(JSON.stringify(GL_LINES)), stanceRules: JSON.parse(JSON.stringify(GL_STANCE)), stance: s => G && G.stance ? Object.assign({}, G.stance[s]) : null,
   get word() { return G && G.word ? G.word.slice() : null; }, get wordOn() { return G && G.wordOn ? G.wordOn.slice() : null; }, get scout() { return G && G.scout ? JSON.parse(JSON.stringify(G.scout)) : null; },
   cpuLine: s => glCpuLine(s), cpuCall: s => glCpuCall(s), turnAt: () => glTurnAt(), windShown: () => G && G.wind ? glWindShown(G.wind) : null, fat: H => glFat(H),
+  // games from the world (phase 5): Manage's call, the game between shots, the weather and the wood
+  modes: GL_MODES.slice(), manage: o => glManage(o), get mgr() { return GD ? Object.assign({}, GD.mgr) : null; }, snapshot: () => glSnapshot(), resume: sn => glResume(sn),
+  weathers: JSON.parse(JSON.stringify(GL_WEATHER)), wood: H => glWood(H), woodAfter: (s, ri) => { const ev = { k: 'shot', holed: false, water: false }; const t = glWoodAfter(s, ri, ev); return { t, ev }; }, wetK: () => glWetK(), hazeK: () => glHazeK(), woodRules: Object.assign({}, GL_WOOD), get weather() { return G ? G.weather : null; },
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),

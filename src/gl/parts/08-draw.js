@@ -88,13 +88,44 @@ function glDraw(c, dt) {
   c.imageSmoothingEnabled = true;
   c.drawImage(cv, ox, oy, cv.width / S * k, cv.height / S * k);
   if (k >= 7) { glDrawGreen(c, H); glDrawGrain(c, H); }
+  if (G.wood) glDrawWood(c, H);
   glDrawPin(c, H);
   const mine = (GD.ph === 'aim' || GD.ph === 'swing') && GD.sel && GD.mode === 'play';
   if (mine) glDrawAim(c);
   glDrawBalls(c, H);
+  if (G.weather) glDrawWeather(c);
   glDrawCard(c, H);
   glDrawWind(c);
   if (mine) glDrawMeter(c);
+  c.restore();
+}
+// the wood's own: the bees' hive (bees about it) and the Gloomcap on its stump
+function glDrawWood(c, H) {
+  const W = glWood(H), k = GLC.k;
+  c.save();
+  const [hx, hy] = glScr(W.bees.x, W.bees.y), r = Math.max(4, 1.6 * k);
+  c.fillStyle = '#b8862e'; c.strokeStyle = '#5a3c10'; c.lineWidth = 1.2; c.beginPath(); c.ellipse(hx, hy, r, r * 1.25, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(90,60,16,.7)'; for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(hx - r * 0.9, hy + i * r * 0.45); c.lineTo(hx + r * 0.9, hy + i * r * 0.45); c.stroke(); }
+  c.fillStyle = '#f5d54a'; for (let i = 0; i < 6; i++) { const a = GLC.t * (1.7 + i * 0.31) + i, d = r * (1.8 + Math.sin(GLC.t * 2 + i) * 0.6); c.beginPath(); c.arc(hx + Math.cos(a) * d, hy + Math.sin(a) * d * 0.8, 1.4, 0, Math.PI * 2); c.fill(); }
+  if (W.cap) {
+    const [sx, sy] = glScr(W.cap.x, W.cap.y), q = Math.max(4, 1.4 * k);
+    c.fillStyle = '#6b4a2a'; c.beginPath(); c.ellipse(sx, sy + q * 0.4, q * 1.1, q * 0.55, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#4a5a7a'; c.beginPath(); c.ellipse(sx, sy - q * 0.2, q * 0.8, q * 0.5, 0, Math.PI, 0); c.fill();
+    c.fillStyle = '#c9d6ef'; c.beginPath(); c.arc(sx - q * 0.25, sy - q * 0.35, q * 0.12, 0, Math.PI * 2); c.arc(sx + q * 0.2, sy - q * 0.4, q * 0.1, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+}
+// the weather over the course: drizzle (streaks) or a spore haze (a green veil, drifting motes)
+function glDrawWeather(c) {
+  c.save();
+  if (G.weather === 'drizzle') {
+    c.strokeStyle = 'rgba(200,220,240,.28)'; c.lineWidth = 1;
+    for (let i = 0; i < 90; i++) { const x = (i * 97 + GLC.t * 260) % 1000 - 20, y = (i * 53 + GLC.t * 420) % 640 - 20; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 5, y + 13); c.stroke(); }
+  } else if (G.weather === 'haze') {
+    c.fillStyle = 'rgba(170,200,140,.16)'; c.fillRect(0, 0, 960, 600);
+    c.fillStyle = 'rgba(230,240,190,.35)';
+    for (let i = 0; i < 40; i++) { const x = (i * 131 + Math.sin(GLC.t * 0.3 + i) * 40 + GLC.t * 12) % 960, y = (i * 71 + Math.cos(GLC.t * 0.25 + i) * 30) % 600; c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill(); }
+  }
   c.restore();
 }
 // up close, the green and its fringe drawn again sharp over the ground
@@ -178,7 +209,7 @@ function glDrawAim(c) {
   c.restore();
 }
 function glDrawCard(c, H) {
-  const no = GD.disp.h + 1, lines = [`Hole ${no}${no > G.holes ? ' (playoff)' : ''} · Par ${H.par} · ${H.len} yards`, `${G.teams[0].name}: ${GD.disp.match}`];
+  const no = GD.disp.h + 1, lines = [`Hole ${no}${no > G.holes ? ' (playoff)' : ''} · Par ${H.par} · ${H.len} yards${G.weather ? ' · ' + GL_WEATHER[G.weather].n.split(':')[0] : ''}`, `${G.teams[0].name}: ${GD.disp.match}`];
   const st = GD.disp.st;
   lines.push(`Strokes this hole: ${G.teams[0].name} ${st[0]}, ${G.teams[1].name} ${st[1]}`);
   c.save();

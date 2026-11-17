@@ -34471,12 +34471,13 @@ function glFlight(s) {
   const spin = clamp(s.spin || 0, -1.5, 1.5), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
   const shR = Sh ? 1 + (Sh.roll - 1) * (s.shapeK || 1) : 1;
-  let budget = Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
+  // (soft ground after rain: the ball sits down where it lands)
+  let budget = (s.fk > 1 ? 0.6 : 1) * Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
-      const v = Math.sqrt(2 * GL_PUTT.fric * budget);
-      const P = glPutt({ hole: H, from: { x, y }, a: rd, v });
+      const v = Math.sqrt(2 * GL_PUTT.fric * (s.fk || 1) * budget);
+      const P = glPutt({ hole: H, from: { x, y }, a: rd, v, fk: s.fk });
       return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, P.end) : {});
     }
     const f = GL_ROLLF[here];
@@ -34503,7 +34504,7 @@ function glWaterDrop(H, from, wet) {
 }
 
 /* a putt (or the run of a ball on the green). p: { hole, from, a (angle), v (yards a second), slopeK (a read: 1 is
-   the true slope), noCup }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
+   the true slope), noCup, fk (the green's friction: 1 dry, more when soft) }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
    it passed, on the line through the cup square to the putt; null if it never got there) */
 function glPutt(p) {
   const H = p.hole, pin = H.pin, P = GL_PUTT, k = p.slopeK == null ? 1 : p.slopeK;
@@ -34512,7 +34513,7 @@ function glPutt(p) {
   let cross = null;
   const res = o => Object.assign(o, { cross });
   for (let i = 0, t = 0; i < 3000; i++, t += P.dt) {
-    const sp = hyp(vx, vy), fr = lie === 'G' ? P.fric : lie === 'F' || lie === 'T' ? P.fric * P.fringe : P.fric * P.rough;
+    const sp = hyp(vx, vy), fr = (p.fk || 1) * (lie === 'G' ? P.fric : lie === 'F' || lie === 'T' ? P.fric * P.fringe : P.fric * P.rough);
     const sl = lie === 'G' ? glSlope(H, x, y) : [0, 0], gx = sl[0] * P.g * k, gy = sl[1] * P.g * k;
     if (sp < 0.03 && hyp(gx, gy) < fr) return res({ end: { x, y }, lie, holed: false, lip, path, t });
     const ax = gx - (sp ? vx / sp : 0) * fr, ay = gy - (sp ? vy / sp : 0) * fr;
@@ -34707,7 +34708,8 @@ function glPlan(s, riIn, lineIn) {
   const line = GL_LINES[lineIn] ? lineIn : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
   if (kind === 'putt') {
     // (the caddie's word: read without error)
-    const readK = word ? 1 : 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
+    // (in a spore haze the greens read worse)
+    const readK = word ? 1 : 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put) / glHazeK();
     return Object.assign({ ri, kind, club: 'pt', putt: true, line }, glRead(H, b, readK, GL_LINES[line].putt));
   }
   const clubs = glClubsFrom(b.lie, rat), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
@@ -34753,9 +34755,10 @@ function glPlan(s, riIn, lineIn) {
 function glRead(H, from, slopeK, past) {
   const pin = H.pin, d = hyp(pin.x - from.x, pin.y - from.y), ux = (pin.x - from.x) / (d || 1), uy = (pin.y - from.y) / (d || 1);
   const want = d + (past == null ? 0.35 : past);
-  let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
+  const fk = glWetK();
+  let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * fk * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
   for (let i = 0; i < 10; i++) {
-    const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true });
+    const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true, fk });
     // (the trial roll stopped in sand, bog or the trees: more pace would only smash it on, so the read keeps what it has)
     if (P.lie !== 'G' && P.lie !== 'F' && P.lie !== 'T') break;
     const ex = P.end.x - from.x, ey = P.end.y - from.y, al = ex * ux + ey * uy, lat = P.cross != null ? P.cross : -ex * uy + ey * ux;
@@ -34817,6 +34820,7 @@ function glStart(opts) {
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
+    wood: !!o.wood, weather: GL_WEATHER[o.weather] ? o.weather : null,
     focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
@@ -34840,7 +34844,9 @@ function glHoleStart() {
   // a new hole: a little focus back for everyone; at the turn (after the 5th of 9), all of it
   if (G.focus && G.res.length) G.focus = G.focus.map(f => f.map(v => Math.min(1, v + GL_FOCUS.hole)));
   if (G.focus && !G.turned && G.res.length === glTurnAt()) { G.turned = true; G.focus = G.focus.map(f => f.map(() => 1)); G.turnNow = true; } else G.turnNow = false;
-  G.wind = { s: Math.round(R() * 14), d: Math.round(R() * 628) / 100 };
+  // the wind: the weather's range when there is weather, else anything up to 14 mph
+  const Wx = G.weather && GL_WEATHER[G.weather], s = Wx ? Wx.wind[0] + R() * (Wx.wind[1] - Wx.wind[0]) : R() * 14;
+  G.wind = { s: Math.round(s), d: Math.round(R() * 628) / 100 };
   G.gir = [false, false];
 }
 
@@ -34851,11 +34857,11 @@ function glHit(s, plan) {
   const dist = GL_STANCE[glStanceOf(s).mood].dist;
   if (plan.putt) {
     const k = 1.5 - rat.put, a = plan.a + gauss() * GL_SWING.pa * k * em, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em);
-    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v });
+    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK() });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
   const key = plan.kind === 'short' ? rat.tch : rat.acc, k = 1.4 - key;
-  return glFlight({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, wind: G.wind, spin: plan.spin, rat });
+  return glFlight({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, wind: G.wind, spin: plan.spin, rat, fk: glWetK() });
 }
 
 // who plays next: { side, d (yards to the pin), putt, give (the other side may give this putt) }, or null when it's over
@@ -34892,6 +34898,8 @@ function glShoot(s, plan, r) {
   if (!r.water && (r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
   const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, line: plan.line || '', club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
   if (r.water) { S.water++; glDrop(s); }
+  // the wood's own ways on a ball that has stopped: the bees, the Gloomcap
+  ev.wood = glWoodAfter(s, plan.ri, ev);
   // holed on the stroke that reached the cap: it still counts
   if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
   ev.up = !!Hs.up[s] && !r.holed;
@@ -34970,9 +34978,12 @@ const GL_PACE = { addr: 0.7, rest: 0.9, hole: 2.4, given: 1.3, fly: 1.7, roll: 0
 const GL_HANDS = { drag: 170, dragAcc: 12, puttDeg: 0.1 };
 let GD = null;
 
+// the modes: watch (the CPU plays both sides), manage (your caddie plays your side by your call: GD.mgr), play (by hand)
+const GL_MODES = ['watch', 'manage', 'play'];
 function glPlayStart(o) {
   GLC.h = -1;
-  GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, drag: null, swung: null };
+  GD = { mode: o && GL_MODES.includes(o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, drag: null, swung: null,
+    mgr: { line: 'auto', ri: null }, line: o && o.line || null };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
@@ -35012,8 +35023,11 @@ function glPlayNext() {
   }
   if (n.give && glYours(o)) { glGo('offer', 0, `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`); return; }
   if (glCpuGives(n)) { glGiven(o); return; }
-  glCpuCall(s);
-  const plan = glPlan(s);
+  let plan;
+  if (GD.mode === 'manage' && s === GD.you) {
+    const M = GD.mgr, ri = M.ri != null && glCanHit(s, M.ri) ? M.ri : null;
+    plan = glPlan(s, ri, M.line === 'auto' ? null : M.line); M.ri = null;
+  } else { glCpuCall(s); plan = glPlan(s); }
   GD.cpu = { side: s, plan };
   glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`);
 }
@@ -35084,6 +35098,7 @@ function glEvSay(ev, r) {
     t = ev.holed ? `${who}'s ${c} drops into the cup!` : ev.water ? `${who}'s ${c} finds the water. A drop, and a stroke.` : `${who} hits a ${c} ${carry} yards, into the ${GL_TER[ev.lie]}. ${glYards(ev.d1)} to the pin.`;
   }
   if (ev.up) t += ' That is par and four more: the ball is picked up.';
+  t += (ev.wood || '') + glGallery(ev);
   return t + glHoleSay(ev);
 }
 function glHoleSay(ev) {
@@ -35179,7 +35194,7 @@ function glAimPush(yd) {
   S.aim = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d }; glSelFix(); return true;
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
-function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) : 0; }
+function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : (1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) * glHazeK()) : 0; }
 // the wind as you see it: roughly (to 5 mph and 8 ways), or exactly with the caddie's word (or in Watch)
 function glWindShown(w) {
   if (!w || !w.s) return { s: 0, d: 0, exact: true };
@@ -35196,12 +35211,12 @@ function glReadLine() {
 }
 function glReadCalc(S, b) {
   const H = glHoleNow(), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), v = glPuttSpeed(S.tick);
-  const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, noCup: true }), L = glReadLen(), out = [{ x: b.x, y: b.y }];
+  const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, noCup: true, fk: glWetK() }), L = glReadLen(), out = [{ x: b.x, y: b.y }];
   let run = 0;
   for (let i = 1; i < P.path.length && run < L; i++) { run += hyp(P.path[i].x - P.path[i - 1].x, P.path[i].y - P.path[i - 1].y); out.push(P.path[i]); }
   return out;
 }
-const glPuttSpeed = p => Math.sqrt(2 * GL_PUTT.fric * glPuttScale() * clamp(p, 0, 1.05)) * (G.ball[GD.you].lie === 'G' ? 1 : 1.3);
+const glPuttSpeed = p => Math.sqrt(2 * GL_PUTT.fric * glWetK() * glPuttScale() * clamp(p, 0, 1.05)) * (G.ball[GD.you].lie === 'G' ? 1 : 1.3);
 
 /* ---------- the swing ---------- */
 // the mark's half-width for a hitter: wider for a more accurate one, smaller on a power shot, and smaller for a tired one
@@ -35261,11 +35276,11 @@ function glStrike(s, S, sw) {
   const H = glHoleNow(), b = G.ball[s], rat = glRat(s, S.ri), from = { x: b.x, y: b.y };
   if (S.putt) {
     // (a drag pulled off the line starts the putt off line: + is left, as a hook; GL_HANDS.puttDeg of a degree a degree)
-    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
+    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK() });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
   const M = GL_STANCE[glStanceOf(s).mood];
-  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist, err: sw.err, wind: G.wind, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat });
+  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist, err: sw.err, wind: G.wind, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() });
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
@@ -35284,13 +35299,38 @@ function glOffer(give) {
 }
 function glSetMode(m) {
   if (!GD) return;
-  const want = m === 'play' ? 'play' : 'watch';
+  const want = GL_MODES.includes(m) ? m : 'watch';
   if (want === GD.mode) return;
   GD.mode = want;
   // your shot waiting, or their putt to give, goes back to the top: in Watch the CPU takes it
-  if (GD.ph === 'aim' || GD.ph === 'offer' || (GD.ph === 'swing' && GD.mode !== 'play')) { GD.sel = null; GD.meter = null; glGo('next'); }
+  if (GD.ph === 'aim' || GD.ph === 'offer' || GD.ph === 'swing') { GD.sel = null; GD.meter = null; glGo('next'); }
   else if (GD.ph === 'addr' && GD.cpu && glYours(GD.cpu.side)) { GD.cpu = null; glGo('next'); }
 }
+
+/* ---------- Manage: your call for the caddie, and the game kept between shots ---------- */
+// your call in Manage: { line: 'auto' or a line, ri: the next hitter (once; null for the caddie's), tempo, mood, word }
+function glManage(o) {
+  if (!GD || !o) return false;
+  const M = GD.mgr, s = GD.you;
+  if (o.line && (o.line === 'auto' || GL_LINES[o.line])) M.line = o.line;
+  if (o.ri !== undefined) M.ri = o.ri == null ? null : (Number.isInteger(o.ri) && o.ri >= 0 && o.ri < GL_RULES.side ? o.ri : null);
+  if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
+  if (o.mood === 'bold' || o.mood === 'careful') G.stance[s].mood = o.mood;
+  if (o.word && G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; }
+  return true;
+}
+// the game between shots, to keep (plain JSON): the game, the mode and your call
+function glSnapshot() { return G && GD ? JSON.parse(JSON.stringify({ G, mode: GD.mode, mgr: GD.mgr, line: GD.line })) : null; }
+// back to a kept game: the next shot
+function glResume(sn) {
+  if (!sn || !sn.G) return false;
+  G = JSON.parse(JSON.stringify(sn.G));
+  glPlayStart({ mode: sn.mode, line: sn.line });
+  if (sn.mgr) GD.mgr = Object.assign({ line: 'auto', ri: null }, sn.mgr);
+  GD.msg = `Back at hole ${G.h + 1}: ${G.teams[0].name} ${glMatchText(0).toLowerCase()}.`;
+  return true;
+}
+
 /* Mossgate Links: the picture (issue #92, phase 2). The hole from above, played left to right: along the hole (its y)
    runs across the screen, across the hole (x) down it, so a ball that misses right of the aim goes down the screen.
    The camera (GLC) follows the shot: it frames the ball and where it is going, follows a ball in the air, and pushes in
@@ -35381,13 +35421,44 @@ function glDraw(c, dt) {
   c.imageSmoothingEnabled = true;
   c.drawImage(cv, ox, oy, cv.width / S * k, cv.height / S * k);
   if (k >= 7) { glDrawGreen(c, H); glDrawGrain(c, H); }
+  if (G.wood) glDrawWood(c, H);
   glDrawPin(c, H);
   const mine = (GD.ph === 'aim' || GD.ph === 'swing') && GD.sel && GD.mode === 'play';
   if (mine) glDrawAim(c);
   glDrawBalls(c, H);
+  if (G.weather) glDrawWeather(c);
   glDrawCard(c, H);
   glDrawWind(c);
   if (mine) glDrawMeter(c);
+  c.restore();
+}
+// the wood's own: the bees' hive (bees about it) and the Gloomcap on its stump
+function glDrawWood(c, H) {
+  const W = glWood(H), k = GLC.k;
+  c.save();
+  const [hx, hy] = glScr(W.bees.x, W.bees.y), r = Math.max(4, 1.6 * k);
+  c.fillStyle = '#b8862e'; c.strokeStyle = '#5a3c10'; c.lineWidth = 1.2; c.beginPath(); c.ellipse(hx, hy, r, r * 1.25, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(90,60,16,.7)'; for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(hx - r * 0.9, hy + i * r * 0.45); c.lineTo(hx + r * 0.9, hy + i * r * 0.45); c.stroke(); }
+  c.fillStyle = '#f5d54a'; for (let i = 0; i < 6; i++) { const a = GLC.t * (1.7 + i * 0.31) + i, d = r * (1.8 + Math.sin(GLC.t * 2 + i) * 0.6); c.beginPath(); c.arc(hx + Math.cos(a) * d, hy + Math.sin(a) * d * 0.8, 1.4, 0, Math.PI * 2); c.fill(); }
+  if (W.cap) {
+    const [sx, sy] = glScr(W.cap.x, W.cap.y), q = Math.max(4, 1.4 * k);
+    c.fillStyle = '#6b4a2a'; c.beginPath(); c.ellipse(sx, sy + q * 0.4, q * 1.1, q * 0.55, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#4a5a7a'; c.beginPath(); c.ellipse(sx, sy - q * 0.2, q * 0.8, q * 0.5, 0, Math.PI, 0); c.fill();
+    c.fillStyle = '#c9d6ef'; c.beginPath(); c.arc(sx - q * 0.25, sy - q * 0.35, q * 0.12, 0, Math.PI * 2); c.arc(sx + q * 0.2, sy - q * 0.4, q * 0.1, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+}
+// the weather over the course: drizzle (streaks) or a spore haze (a green veil, drifting motes)
+function glDrawWeather(c) {
+  c.save();
+  if (G.weather === 'drizzle') {
+    c.strokeStyle = 'rgba(200,220,240,.28)'; c.lineWidth = 1;
+    for (let i = 0; i < 90; i++) { const x = (i * 97 + GLC.t * 260) % 1000 - 20, y = (i * 53 + GLC.t * 420) % 640 - 20; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 5, y + 13); c.stroke(); }
+  } else if (G.weather === 'haze') {
+    c.fillStyle = 'rgba(170,200,140,.16)'; c.fillRect(0, 0, 960, 600);
+    c.fillStyle = 'rgba(230,240,190,.35)';
+    for (let i = 0; i < 40; i++) { const x = (i * 131 + Math.sin(GLC.t * 0.3 + i) * 40 + GLC.t * 12) % 960, y = (i * 71 + Math.cos(GLC.t * 0.25 + i) * 30) % 600; c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill(); }
+  }
   c.restore();
 }
 // up close, the green and its fringe drawn again sharp over the ground
@@ -35471,7 +35542,7 @@ function glDrawAim(c) {
   c.restore();
 }
 function glDrawCard(c, H) {
-  const no = GD.disp.h + 1, lines = [`Hole ${no}${no > G.holes ? ' (playoff)' : ''} · Par ${H.par} · ${H.len} yards`, `${G.teams[0].name}: ${GD.disp.match}`];
+  const no = GD.disp.h + 1, lines = [`Hole ${no}${no > G.holes ? ' (playoff)' : ''} · Par ${H.par} · ${H.len} yards${G.weather ? ' · ' + GL_WEATHER[G.weather].n.split(':')[0] : ''}`, `${G.teams[0].name}: ${GD.disp.match}`];
   const st = GD.disp.st;
   lines.push(`Strokes this hole: ${G.teams[0].name} ${st[0]}, ${G.teams[1].name} ${st[1]}`);
   c.save();
@@ -35515,6 +35586,65 @@ function glDrawMeter(c) {
   txt(c, `${glName(GD.you, S.ri)} · ${club}${extra ? ' · ' + extra : ''}`, x0, y - 19, '600 12px system-ui, sans-serif', '#fff6d8', 'left', 'middle');
   txt(c, putt ? 'Space: start, then the weight' : !M ? 'Space: start the swing' : M.st === 'up' ? 'Space: the power' : 'Space: on the mark', x1, y - 19, '12px system-ui, sans-serif', '#dfe9cf', 'right', 'middle');
   c.restore();
+}
+/* Mossgate Links: the wood's own ways (issue #92, phase 5). Only Mossgate Links has these; a game has them when it is
+   started with { wood: true } (the Realm's games do; the bare engine and its tests don't), and its weather when it is
+   given one ({ weather }).
+   - The weather of the wood (GL_WEATHER, G.weather): a still morning (barely a breath), a breeze (the wind up), a
+     drizzle (soft greens: the ball sits down where it lands and putts run slower, glWetK), or a spore haze (the read
+     line is half as long, and the CPU reads greens worse).
+   - The bees (glWood: a hive in the rough by every fairway): a ball that stops within GL_WOOD.bees yards of the hive
+     comes back with a sting, and its hitter loses GL_WOOD.sting focus.
+   - The Gloomcap (on a stump by some holes): it never moves, so of course it moved your ball: one that stops within
+     GL_WOOD.cap yards of the stump is nudged a few yards, never into the water.
+   - The gallery: a hush on the tee, polite applause for a ball close to the pin, a roar for a long putt or a chip that
+     drops (glGallery: words for the line under the bar; the roar's meter comes with the powers).
+   The hive and the stump come from the hole's seed by a stream of their own, so the course's own holes are unchanged. */
+const GL_WEATHER = {
+  still: { n: 'A still morning', wind: [0, 3] }, breeze: { n: 'A breeze', wind: [6, 16] },
+  drizzle: { n: 'A drizzle: the greens are soft', wind: [0, 8], wet: 1.25 }, haze: { n: 'A spore haze: the reads are short', wind: [0, 6], haze: 0.5 },
+};
+const GL_WOOD = { bees: 14, sting: 0.2, cap: 12, nudge: [3, 6] };
+const GLWD = {};
+// the hole's hive and stump (stump: about half the holes), from the hole's seed
+function glWood(H) {
+  const key = H.seed + ':' + H.par; if (GLWD[key]) return GLWD[key];
+  const q = engRng(H.seed ^ 0xbee5), cand = H.line.filter(p => p.t > 60 && p.t < H.len - 40);
+  const spot = (off0, off1) => { const p = cand[(q() * cand.length) | 0] || H.line[(H.line.length / 2) | 0], s = q() < 0.5 ? -1 : 1, o = off0 + q() * (off1 - off0);
+    for (let k = 0; k < 12; k++) { const x = p.x + s * (o + k), l = glLie(H, x, p.y); if (l === 'r' || l === 'R') return { x, y: p.y }; } return { x: p.x + s * o, y: p.y }; };
+  const W = { bees: spot(15, 22), cap: q() < 0.5 ? spot(12, 18) : null };
+  if (Object.keys(GLWD).length > 60) for (const k in GLWD) delete GLWD[k];
+  GLWD[key] = W;
+  return W;
+}
+// the greens' friction now (1 dry; a drizzle makes them soft)
+const glWetK = () => (G && G.weather && GL_WEATHER[G.weather] && GL_WEATHER[G.weather].wet) || 1;
+// the read line's share in the haze
+const glHazeK = () => (G && G.weather && GL_WEATHER[G.weather] && GL_WEATHER[G.weather].haze) || 1;
+// after a shot: the bees and the Gloomcap, on a ball that has stopped (not holed, not in the water). Returns words, or ''
+function glWoodAfter(s, ri, ev) {
+  if (!G.wood || ev.holed || ev.water) return '';
+  const H = glHoleNow(), W = glWood(H), b = G.ball[s];
+  if (hyp(b.x - W.bees.x, b.y - W.bees.y) < GL_WOOD.bees) {
+    if (G.focus) G.focus[s][ri] = Math.max(0, G.focus[s][ri] - GL_WOOD.sting);
+    ev.bees = true; return ` It stops by the bees, and ${glName(s, ri)} comes back with a sting.`;
+  }
+  if (W.cap && hyp(b.x - W.cap.x, b.y - W.cap.y) < GL_WOOD.cap) {
+    for (let k = 0; k < 8; k++) {
+      const a = R() * Math.PI * 2, d = GL_WOOD.nudge[0] + R() * (GL_WOOD.nudge[1] - GL_WOOD.nudge[0]), x = b.x + Math.cos(a) * d, y = b.y + Math.sin(a) * d, l = glLie(H, x, y);
+      if (l !== 'W' && l !== 'G') { G.ball[s] = { x: +x.toFixed(2), y: +y.toFixed(2), lie: l === 'T' ? 'r' : l }; ev.cap = true; ev.lie = G.ball[s].lie; return ' The Gloomcap on the stump never moves. Your ball did.'; }
+    }
+  }
+  return '';
+}
+// the gallery's words for a shot (on show only)
+function glGallery(ev) {
+  if (!ev || ev.k !== 'shot') return '';
+  if (ev.holed && (ev.club !== 'pt' || ev.d0 >= 5)) return ' A roar from the gallery!';
+  if (ev.holed) return ' Applause.';
+  if (ev.lie0 === 'T' && ev.lie === 'F') return ' A murmur from the tee.';
+  if (ev.lie === 'G' && ev.d1 <= 3 && ev.club !== 'pt') return ' Polite applause from the gallery.';
+  return '';
 }
 /* The Links' page in the Realm (issue #92, phase 2). A canvas in #v-links, after the rink's, and a frame loop that runs
    only while it is on screen (show/hide): it moves the game on (glTick) and draws it (glDraw). The engine's parts don't
@@ -35652,6 +35782,9 @@ return {
   lines: JSON.parse(JSON.stringify(GL_LINES)), stanceRules: JSON.parse(JSON.stringify(GL_STANCE)), stance: s => G && G.stance ? Object.assign({}, G.stance[s]) : null,
   get word() { return G && G.word ? G.word.slice() : null; }, get wordOn() { return G && G.wordOn ? G.wordOn.slice() : null; }, get scout() { return G && G.scout ? JSON.parse(JSON.stringify(G.scout)) : null; },
   cpuLine: s => glCpuLine(s), cpuCall: s => glCpuCall(s), turnAt: () => glTurnAt(), windShown: () => G && G.wind ? glWindShown(G.wind) : null, fat: H => glFat(H),
+  // games from the world (phase 5): Manage's call, the game between shots, the weather and the wood
+  modes: GL_MODES.slice(), manage: o => glManage(o), get mgr() { return GD ? Object.assign({}, GD.mgr) : null; }, snapshot: () => glSnapshot(), resume: sn => glResume(sn),
+  weathers: JSON.parse(JSON.stringify(GL_WEATHER)), wood: H => glWood(H), woodAfter: (s, ri) => { const ev = { k: 'shot', holed: false, water: false }; const t = glWoodAfter(s, ri, ev); return { t, ev }; }, wetK: () => glWetK(), hazeK: () => glHazeK(), woodRules: Object.assign({}, GL_WOOD), get weather() { return G ? G.weather : null; },
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),
@@ -50455,6 +50588,7 @@ const W_LINKS = {
 };
 const W_LINKS_MODES = {
   watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
+  manage: { n: 'Manage', title: 'Your caddie plays your side by your call: the line, the stances, the caddie\'s word, and the next hitter if you like, in the rows under the course. Your four swing on their ratings.' },
   play: { n: 'You play', title: 'You play Mossgate: pick the hitter, the club and the shot, aim, and swing (Space three times, or drag back from the ball). Their short putts are yours to give.' },
 };
 let W_LINKS_MODE = 'play', W_LINKS_SPEED = 1, W_LINKS_SKILL = 1;
@@ -50490,6 +50624,8 @@ $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccall
   <div class="wccrow" id="wLinksRowShot"><span class="wccl">Shot</span><span id="wLinksShot"></span></div>
   <div class="wccrow" id="wLinksRowStance"><span class="wccl">Stance</span><span id="wLinksStance"></span></div>
   <div class="wccrow" id="wLinksRowGo"><span class="wccl">Swing</span><span id="wLinksGo"></span></div>
+  <div class="wccrow" id="wLinksRowMgr" hidden><span class="wccl">Your call</span><span id="wLinksMgr"></span></div>
+  <div class="wccrow" id="wLinksRowNext" hidden><span class="wccl">Next hitter</span><span id="wLinksNext"></span></div>
   <div class="wccrow" id="wLinksRowGive" hidden><span class="wccl">Their putt</span><span><button class="ghost" data-lgive="1" title="Y: it counts as holed in one more">Give it</button> <button class="ghost" data-lgive="0" title="N: they must hole it">Make them putt</button></span></div></div>
   <h4 class="wsh">Scorecard</h4><div id="wLinksCard" class="wcbox"></div>
   <h4 class="wsh">This game</h4><ol id="wLinksLog" class="wglog wslog"></ol>
@@ -50509,16 +50645,35 @@ $('wLinksRows').addEventListener('click', e => {
   else if (d.lmood) wGL.select({ mood: d.lmood });
   else if (d.lword) wGL.select({ word: true });
   else if (d.lgive != null) wGL.offer(d.lgive === '1');
+  else if (d.mline) wGL.manage({ line: d.mline });
+  else if (d.mtempo) wGL.manage({ tempo: d.mtempo });
+  else if (d.mmood) wGL.manage({ mood: d.mmood });
+  else if (d.mword) wGL.manage({ word: true });
+  else if (d.mnext != null) wGL.manage({ ri: d.mnext === '' ? null : +d.mnext });
   wLinksRows(); wLinksBarNote();
 });
 
 // why a player can't hit now
+ // Manage's rows: your call (the line, with Auto for the caddie's own; the stances; the caddie's word) and the next
+// hitter (the caddie's pick, or one of your four, once, if the rule allows)
+function wLinksMgrRows(V) {
+  const G = wGL.G, M = wGL.mgr, st = G.stance[V.you], on = (a, b) => a === b ? ' on' : '', L = wGL.lines, wl = G.word[V.you], won = G.wordOn[V.you];
+  $('wLinksMgr').innerHTML = [['auto', 'Auto', 'The caddie reads the match and picks the line']].concat(Object.keys(L).map(k => [k, L[k].n, ''])).map(([k, n, t]) => `<button class="ghost${on(k, M.line)}" data-mline="${k}" title="${esc(t || 'Every shot on this line until you change it')}">${esc(n)}</button>`).join(' ') + ' · '
+    + [['quick', 'Quick'], ['steady', 'Steady']].map(([k, n]) => `<button class="ghost${on(k, st.tempo)}" data-mtempo="${k}">${n}</button>`).join(' ') + ' · '
+    + [['bold', 'Bold'], ['careful', 'Careful']].map(([k, n]) => `<button class="ghost${on(k, st.mood)}" data-mmood="${k}">${n}</button>`).join(' ') + ' · '
+    + `<button class="ghost${won ? ' on' : ''}" data-mword="1" ${wl > 0 && !won ? '' : 'disabled'} title="Once a game: the next stroke read in full">${won ? 'Caddie\'s word: on' : `Caddie's word (${wl} left)`}</button>`;
+  const T = G.teams[V.you];
+  $('wLinksNext').innerHTML = `<button class="ghost${on(null, M.ri)}" data-mnext="">The caddie's pick</button> ` + T.roster.map((m, i) => `<button class="ghost${on(i, M.ri)}" data-mnext="${i}" title="Takes the next shot if the rule allows (then back to the caddie's pick)">${esc(m.n)} <small>${wGL.focus ? Math.round(wGL.focus[V.you][i] * 100) : 100}%</small></button>`).join(' ');
+}
 const wLinksWhyNot = (V, ri) => V.ph === 'swing' ? 'The swing is under way: the hitter is picked.' : wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over && wGL.G && wGL.G.teams ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
-  box.hidden = !mine && !offer;
+  const mgr = !!V && V.mode === 'manage';
+  box.hidden = !mine && !offer && !mgr;
   $('wLinksRowGive').hidden = !offer;
+  $('wLinksRowMgr').hidden = $('wLinksRowNext').hidden = !mgr;
+  if (mgr) wLinksMgrRows(V);
   for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowLine', 'wLinksRowShot', 'wLinksRowStance', 'wLinksRowGo']) $(id).hidden = !mine;
   if (!mine) return;
   const S = V.sel, G = wGL.G, T = G.teams[V.you], aim = V.ph === 'aim', on = (a, b) => a === b ? ' on' : '';
@@ -50557,7 +50712,7 @@ function wLinksGame(opts) {
   const o = opts || {};
   WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
-  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill || [1, W_LINKS_SKILL] });
+  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, course: o.course, weather: o.weather, wood: !!o.wood, skill: o.skill || [1, W_LINKS_SKILL] });
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }
@@ -50897,6 +51052,339 @@ renderHelp = function () {
   wW106RenderHelp();
   const after = $('wHelpLinks'); if (!after || $('wHelpLinksTab')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksTab"><b>Golf ratings, the four and their roles.</b> Every player also has golf ratings: power, accuracy, touch, putting, nerve and scrambling (1 to ${wGlCap()}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Golf view. The Links tab on the Team screen sets your four and a role for each (the tee, the approach, the short game, the green): the caddie gives each shot to its role's player when the hitter rule allows. A shot costs the hitter focus, and a tired player's mark is smaller; they get it back while the others hit. On a stroke to win or halve a hole the meter runs quicker and the mark shakes, less for a steady nerve. Called-up players at your level fill the four when your roster is short. Practice round there plays your four against the Saltmere Golf Club; nothing is won or lost.</p>`);
+};
+/* w107: golf from the world (issue #92, phase 5). Your four plays a rival club, or the local side, at Mossgate Links,
+   as hockey is played (w91): Play (you swing it), Manage (you call the line, the stances and the caddie's word, and
+   pick the next hitter if you like; your four swing on their ratings) or Simulate (the result at once). Agatha Divot's
+   MATCH and the Links tab open the match card: the clubs at your tier, each once a day, the round and the practice as
+   before. A match needs W_LKG.minOwn players of your own; call-ups fill the four. Every game at the Links has the
+   wood's own ways (09-wood.js): the day's weather (wLinksWeather), the bees and the Gloomcap.
+   The standing nine plays every match unless you tick Wild nine on the card (a new course, seeded by the day and the
+   club: the same for every match against that club today).
+   Their four: at your level plus the tier, with W_LKG.oppBonus points spread over each; a rival keeps the same four
+   until it would be a different level. Their caddie by tier (a Squire, a Knight, an Archmage), as on the diamond.
+   The result: a win pays XP to everyone who played (half to the rest of the team), gold and fans by tier, and the
+   player of the match a little more; a loss a quarter of the XP and costs nothing else (no Team HP on the course). A
+   golf match never ends level. Every match adds your players' lines to WG.lkstats, and goes in the head to head and the
+   league table. Save and leave keeps the match between shots, and it is waiting when you come back, after a reload too.
+   Concede counts as a loss.
+
+   WG.lkg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_LKG.keep], w, l }
+              world = { kind: 'lkgame', ref, club, tier, how, day, name, ids, wild, weather }, plain data; the end
+              dispatches W_ON_END[kind] (which also gets us and them: holes won, and text: "3 and 2"). ids: your four's
+              roster ids in role order (null for a call-up)
+   WG.lkstats { pid: { rd, shots, putts, holed } }, this journey
+   wLinksProblems(), wStartLinks({ club, how, tier?, kind?, ref?, wild? }), wResumeLinks(), wLinksLeaveGame(),
+   wLinksConcede(), wOpenLinksCard(), wLinksWeather()
+   Wraps: wLinksBarNote (wW107LinksBarNote: Save and leave and Concede in a real match), wLeaveLinks (wW107LeaveLinks),
+   wGL.onOver and wGL.onPhase (a real match settles, and is kept between shots), wLinksGame (wW107LinksGame: the day's
+   weather and the wood), wRunAct (wW107RunAct: MATCH opens the card), wNextPrompt (wW107NextPrompt: a match waiting
+   after a reload), wCampLinks and wRenderCamp (wW107CampLinks, wW107RenderCamp: Play a match and Resume on the Links
+   tab), wCampStats (wW107CampStats: the Golf view's lines), wStatsCard (wW107StatsCard: the lines in words),
+   renderHelp (wW107RenderHelp: #wHelpLinksGame). */
+
+const W_LKG = {
+  minOwn: 2, xp: 12, gold: 15, fans: 3, lossShare: .25, benchShare: .5, mvpXp: 5,
+  // extra rating points for each of their four, by tier; first guesses until the lab measures them (phase 10)
+  oppBonus: { 1: 0, 2: 2, 3: 5 },
+  minutes: 120, keep: 10, saveMs: 12000,
+};
+const W_LKG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
+const WLKG = { saved: 0, asked: false, msg: '', wild: false };
+
+function wLkg() {
+  const B = WG.lkg = WG.lkg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0 };
+  B.met = B.met || {}; B.opp = B.opp || {}; B.games = B.games || [];
+  return B;
+}
+function wLinksLive() { return !!(WG && WG.lkg && WG.lkg.live); }
+// a real match is on the course (not a round or a practice)
+function wLinksWorld() { return !!(WGL && WGL.world && wLinksLive()); }
+function wLinksProblems() {
+  const n = wRoster().length;
+  return n < W_LKG.minOwn ? [`Recruit ${W_LKG.minOwn - n} more player${W_LKG.minOwn - n === 1 ? '' : 's'}: a golf match needs ${W_LKG.minOwn} of your own, and call-ups fill the rest of the four.`] : [];
+}
+const wLinksSkill = tier => [1, W_BALL.diff[tier] != null ? W_BALL.diff[tier] : 1];
+// the weather of the wood today: the same all day, a new one tomorrow
+function wLinksWeather() {
+  const d = WG ? WG.dayAbs || 0 : 0, h = ((Math.imul(d + 11, 2654435761) >>> 0) % 100) / 100;
+  return h < 0.3 ? 'still' : h < 0.65 ? 'breeze' : h < 0.83 ? 'drizzle' : 'haze';
+}
+// a wild nine's seed for a club today (the same for every match against them today)
+const wLinksWildSeed = club => (Math.imul((WG.dayAbs || 0) + 1, 40503) ^ [...String(club)].reduce((a, ch) => Math.imul(a, 31) + ch.charCodeAt(0) | 0, 7)) >>> 0;
+
+/* a club's four: its own kinds first, at your level plus the tier with the bonus. A rival keeps the same four (the same
+   names and ratings) until it would be a different level */
+function wLinksOpp(club, tier) {
+  const B = wLkg(), lvl = wBallOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_LKG.oppBonus[tier] || 0;
+  const cached = club !== 'local' && B.opp[club];
+  let team;
+  if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
+  else {
+    const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
+    const all = own.filter(x => wGL.stats.some(s => wGL.rate(x)[s] !== 6.5)).concat(W_GLR.cuKinds).filter((x, i, a) => a.indexOf(x) === i);
+    const names = new Set(), mk = kind => {
+      const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(x => !names.has(x));
+      const p = wMakePlayer({ kind, lvl, n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined }, 'opp');
+      names.add(p.n);
+      return wLinksPlayer(p);
+    };
+    team = { name: C.name, short: C.short, color: C.color, roster: all.slice(0, 4).map(mk) };
+    if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
+  }
+  // the bonus, in a fixed order over the ratings, so a rival plays the same each time
+  if (k) team.roster.forEach((p, j) => { const st = wGL.stats; for (let i = 0; i < k; i++) { const s = st[(i * 5 + j) % st.length]; p.r[s] = Math.min(wGL.cap, p.r[s] + 1); } });
+  return team;
+}
+// your four for a match, named apart from theirs; ids: roster ids in role order (null for a call-up)
+function wLinksSquad(vs) {
+  const C = wFourSync(), team = wFourMine(), ids = W_GL_ROLES.map(r => typeof C.four[r] === 'number' ? C.four[r] : null), theirs = new Set(vs ? vs.roster.map(p => p.n) : []);
+  team.roster.forEach((p, i) => { if (ids[i] == null && theirs.has(p.n)) p.n += ' II'; });
+  return { team, ids };
+}
+
+/* ---------- starting, leaving, coming back ---------- */
+function wStartLinks(o) {
+  if (!WG || !RUN) return '';
+  const probs = wLinksProblems(); if (probs.length) return probs.join(' ');
+  const B = wLkg(), club = o.club;
+  if (B.live) return 'Finish the golf match you started first.';
+  if (!wBallRegion(club) && !CLUBS[club] && club !== 'apex') return '';
+  if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already played you at golf today. Come back tomorrow.`;
+  const how = W_LKG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club), weather = wLinksWeather();
+  const opp = wLinksOpp(club, tier), sq = wLinksSquad(opp), mine = sq.team, wild = !!o.wild;
+  const world = { kind: o.kind || 'lkgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, wild, weather, cup: !!o.cup };
+  if (!o.cup) B.met[club] = WG.dayAbs;
+  B.live = { world, snap: null };
+  const opts = { teams: [mine, opp], skill: wLinksSkill(tier), holes: wLinksHoles(), wild, course: wild ? wLinksWildSeed(club) : undefined, weather, wood: true };
+  if (how === 'sim') { const s = wGL.simGame(opts); wLinksResultCard(wLinksSettle(s)); return ''; }
+  wLinksGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
+  WGL.world = true;
+  wLinksBarNote();
+  wSave();
+  return '';
+}
+function wResumeLinks() {
+  const L = wLinksLive() && WG.lkg.live; if (!L) return;
+  if (!L.snap) { wLinksCallOff('The match had not reached its first shot, so it is called off.'); return; }
+  WGL = { over: null, world: true };
+  wGL.resume(L.snap);
+  $('wLinksTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
+  showView('links');
+  wLinksBarNote(); wLinksRows(); wLinksCard();
+}
+// Save and leave: the match as it was before the shot under way (kept at every shot)
+function wLinksLeaveGame() {
+  const L = wLinksLive() && WG.lkg.live; if (!L) return wLeaveLinks();
+  const sn = L.snap;
+  WLKG.asked = true;
+  WGL = null; wW107LeaveLinks();
+  if (!sn) return wLinksCallOff(`You leave before the first shot, so the match against ${wBallName(L.world.club)} is called off.`);
+  wLog(`Your golf match against ${wBallName(L.world.club)} is saved: ${wLinksScore(sn)}. Resume it from the Links tab on the Team screen.`, 'd');
+  wSave();
+}
+function wLinksCallOff(why) {
+  const B = wLkg(), L = B.live; if (!L) return;
+  B.live = null; if (!L.world.cup) delete B.met[L.world.club];
+  wLog(why || `The golf match against ${wBallName(L.world.club)} is called off. No result.`, 'd');
+  wSave();
+}
+function wLinksConcede() {
+  if (!wLinksWorld()) return;
+  wGL.pause(true);
+  askConfirm('Concede this match?', 'It counts as a loss. A loss on the course costs nothing, but you only get a quarter of the XP.', 'Concede', () => {
+    if (!wLinksLive()) return;
+    const s = wGL.summary() || {}; s.win = 1; s.text = 'conceded';
+    wLinksSettle(s);
+    WGL = null; wW107LeaveLinks();
+  }, () => { if (WGL) wGL.pause(false); });
+  wAfterAsk(() => { if (WGL) wGL.pause(false); });
+}
+function wLinksScore(sn) { const G = sn.G, up = G.won[0] - G.won[1], left = Math.max(0, G.holes - G.res.length); return `${up === 0 ? 'all square' : `${Math.abs(up)} ${up > 0 ? 'up' : 'down'}`}${left ? ` with ${left} to play` : ', a playoff'}, on the ${wOrd(G.h + 1)}`; }
+
+/* ---------- kept between shots, and settled at the end ---------- */
+const wW107OnPhase = wGL.onPhase;
+wGL.onPhase = ph => {
+  if (wW107OnPhase) wW107OnPhase(ph);
+  if (ph !== 'next' || !wLinksWorld() || wGL.G.over) return;
+  const L = WG.lkg.live, first = !L.snap; L.snap = wGL.snapshot();
+  // (saved at most every W_LKG.saveMs, so a reload can come back a few shots early; the first one always)
+  const now = Date.now(); if (first || now - WLKG.saved > W_LKG.saveMs) { WLKG.saved = now; wSave(); }
+};
+const wW107OnOver = wGL.onOver;
+wGL.onOver = s => {
+  if (WGL && WGL.world && wLinksLive()) WGL.msg = wLinksSettle(s);
+  wW107OnOver(s);
+  wLinksBarNote();
+};
+function wLinksSettle(sum) {
+  const B = wLkg(), L = B.live, W = L.world, win = sum.win === 0, S0 = sum || {};
+  B.live = null;
+  const r = win ? 'win' : 'lose', us = (S0.won || [0, 0])[0], them = (S0.won || [0, 0])[1], text = S0.text || '';
+  if (win) { B.w++; fire('matchWon', { engine: 'links' }); } else B.l++;
+  // lines for your own players (call-ups have no roster id); everyone in the four played
+  const S = WG.lkstats = WG.lkstats || {}, line = {}, played = new Set(), pst = (S0.pst || [[]])[0] || [];
+  W.ids.forEach((id, ri) => {
+    if (typeof id !== 'number' || !wPlayer(id)) return;
+    played.add(id);
+    const p = pst[ri] || { shots: 0, putts: 0, holed: 0 }, T = S[id] = S[id] || { rd: 0, shots: 0, putts: 0, holed: 0 };
+    T.rd++; T.shots += p.shots; T.putts += p.putts; T.holed += p.holed;
+    line[id] = { shots: p.shots, putts: p.putts, holed: p.holed };
+  });
+  const mvp = wLinksMvp(line);
+  const base = Math.round(W_LKG.xp * W.tier * (win ? 1 : W_LKG.lossShare));
+  for (const p of wRoster()) { const n = played.has(p.id) ? base + (win && mvp === p.id ? W_LKG.mvpXp : 0) : Math.round(base * W_LKG.benchShare); if (n > 0) wGiveXp(p, n); }
+  const bits = `XP +${base} for everyone who played${wRoster().some(p => !played.has(p.id)) ? `, +${Math.round(base * W_LKG.benchShare)} for those who didn't` : ''}`;
+  let pay = '';
+  if (win) { const g = W_LKG.gold * W.tier, f = W_LKG.fans * W.tier; RUN.gold += g; RUN.fans = (RUN.fans || 0) + f; pay = ` +${g} gold, +${f} fans.`; }
+  if (CLUBS[W.club]) {
+    const H = wH2h(), h = H[W.club] = H[W.club] || { w: 0, l: 0 };
+    if (win) h.w++; else h.l++;
+    h.last = { r, us, them, sport: 'golf', day: WG.dayAbs, text };
+    try { if (wIsRival(W.club)) wLeagueMine(r); } catch (e) { console.error(e); }
+  }
+  B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, text, wild: W.wild, weather: W.weather, mvp, line });
+  B.games.length = Math.min(B.games.length, W_LKG.keep);
+  WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
+  W.us = us; W.them = them; W.text = text;
+  const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
+  wAdvance(W_LKG.minutes);
+  const who = mvp != null && wPlayer(mvp), how = text === 'conceded' ? ', conceded' : text ? ` ${text}` : '';
+  const msg = `Final: ${win ? 'you win' : 'you lose'}${how} against ${wBallName(W.club)}.${pay} ${bits}${win && who ? `, and +${W_LKG.mvpXp} for ${who.n}, player of the match` : ''}.`;
+  wLog(msg, win ? 'g' : 'b');
+  wSave();
+  return msg;
+}
+// player of the match: the most holed (the shot that dropped), then the most shots carried
+function wLinksMvp(lines) {
+  let best = null, bs = -1;
+  for (const id in lines) { const s = lines[id], v = s.holed * 3 + s.shots * 0.2; if (v > bs) { bs = v; best = +id; } }
+  return best;
+}
+W_ON_END.lkgame = function () { }; // the log line and the rewards are paid in wLinksSettle; kinds built on it add theirs
+function wLinksResultCard(msg) {
+  if (LAB) return;
+  const close = modal(`<header><h3>Final</h3></header><div class="wmsg"><p>${esc(msg)}</p></div><div class="row"><button class="btn" id="wLinksOk">Done</button></div>`, () => wDrain());
+  $('wLinksOk').focus(); $('wLinksOk').onclick = () => close();
+}
+
+/* ---------- the bar in a real match ---------- */
+$('wLinksBack').insertAdjacentHTML('beforebegin', '<button class="ghost" id="wLinksSave" hidden>Save and leave</button><button class="ghost" id="wLinksGive" hidden>Concede</button>');
+$('wLinksSave').onclick = () => wLinksLeaveGame();
+$('wLinksGive').onclick = () => wLinksConcede();
+const wW107LinksBarNote = wLinksBarNote;
+wLinksBarNote = function () {
+  wW107LinksBarNote();
+  const real = !!(WGL && WGL.world), live = real && wLinksLive();
+  $('wLinksSave').hidden = $('wLinksGive').hidden = !live;
+  $('wLinksAgain').hidden = real; $('wLinksBack').hidden = live; $('wLinksHoles').parentElement.hidden = real; $('wLinksSkill').parentElement.hidden = real;
+  if (real && !live && WGL.msg) $('wLinksNote').textContent = WGL.msg;
+};
+const wW107LeaveLinks = wLeaveLinks;
+wLeaveLinks = function () { if (wLinksWorld()) return wLinksLeaveGame(); wW107LeaveLinks(); if (WG) { wSave(); wDrain(); } };
+// every game at the Links has the day's weather and the wood
+const wW107LinksGame = wLinksGame;
+wLinksGame = function (opts) { const o = Object.assign({ wood: true }, opts || {}); if (o.weather === undefined && WG) o.weather = wLinksWeather(); return wW107LinksGame(o); };
+
+/* ---------- picking a match ---------- */
+function wLinksH2h(club) { const L = ((WG.h2h || {})[club] || {}).last; return L && L.sport === 'golf' ? L : null; }
+function wOpenLinksCard() {
+  const probs = wLinksProblems(), B = wLkg(), live = wLinksLive(), wx = wGL.weathers[wLinksWeather()];
+  const rows = wBallClubs().map(c => {
+    const T = wBallTeam(c), tier = wBallTier(c), met = B.met[c] === WG.dayAbs, last = wLinksH2h(c);
+    const btns = Object.keys(W_LKG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-lkclub="${c}" data-lkhow="${how}" ${probs.length || met || live ? 'disabled' : ''}>${W_LKG_HOW[how]}</button>`).join('');
+    return `<li class="wbcl"><span class="wbsw" style="background:${T.color}"></span><div><b>${esc(T.name)}</b>
+      <small>Tier ${tier}: their players are level ${wBallOppLvl(tier)}, their caddie a ${W_BALL_SKILL[wLinksSkill(tier)[1]]}.${last ? ` Last golf match: ${last.r === 'win' ? 'won' : 'lost'}${last.text ? ' ' + esc(last.text) : ''}.` : ''}${met ? ' <b>Played you today.</b>' : ''}</small></div>
+      <div class="row">${btns}</div></li>`;
+  }).join('');
+  const close = modal(`<header><h3>Play a golf match</h3><button class="ghost" data-close>Done</button></header>
+    ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}${WLKG.msg ? `<p class="wbad">${esc(WLKG.msg)}</p>` : ''}
+    ${live ? `<p class="wbad">You have a golf match waiting. <button class="btn" id="wLkResume">Resume it</button></p>` : ''}
+    <p class="hint">A match at Mossgate Links with your four: captain's choice match play over ${wLinksHoles()} holes (Settings has the length). <b>Play</b>: you swing every shot. <b>Manage</b>: you call the line, the stances and the caddie's word, and pick the next hitter if you like; your four swing. <b>Simulate</b>: the result now. A win pays ${W_LKG.xp} XP to everyone who played, ${W_LKG.gold} gold and ${W_LKG.fans} fans, times the tier; a loss pays a quarter of the XP and costs nothing else. Nobody goes home level: a playoff round the course. Each club plays you once a day, and a match takes a couple of hours.</p>
+    <p class="hint"><b>Today in the wood:</b> ${esc(wx.n)}. <label><input type="checkbox" id="wLkWild" ${WLKG.wild ? 'checked' : ''}> Play a wild nine (a new course) instead of the standing nine</label></p>
+    <ul class="wbclubs">${rows}</ul>
+    <p class="hint">Or watch a round: <button class="ghost" id="wLkExhib">Mossgate against Saltmere</button></p>`);
+  WLKG.msg = '';
+  $('wLkWild').onchange = e => { WLKG.wild = e.target.checked; };
+  $('modalBox').querySelectorAll('[data-lkclub]').forEach(b => b.onclick = () => {
+    close();
+    const r = wStartLinks({ club: b.dataset.lkclub, how: b.dataset.lkhow, wild: WLKG.wild });
+    if (r) { WLKG.msg = r; wOpenLinksCard(); }
+  });
+  const ex = $('wLkExhib'); if (ex) ex.onclick = () => { close(); wLinksGame(); };
+  const rs = $('wLkResume'); if (rs) rs.onclick = () => { close(); wResumeLinks(); };
+}
+// Agatha Divot's MATCH opens the card (ROUND stays the exhibition; GAME the card-game match)
+(() => {
+  const K = DB.chars.gk_links; if (!K) return;
+  K.topics.job.t += ' Bring your four for a MATCH and I will find you a club to play for real.';
+  K.topics.match = { t: 'Real golf, your four against a club at your tier, one ball a side. Mind the bees by the fairway, and leave the Gloomcap on its stump alone. It never moves.', act: 'lkcard' };
+})();
+const wW107RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'lkcard') return wOpenLinksCard(); return wW107RunAct.apply(this, arguments); };
+
+/* after a reload, a saved match is waiting: ask once */
+const wW107NextPrompt = wNextPrompt;
+wNextPrompt = function () {
+  if (!LAB && wLinksLive() && !WLKG.asked && !WGL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    WLKG.asked = true;
+    const L = WG.lkg.live, sn = L.snap;
+    const close = modal(`<header><h3>A golf match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wLinksScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Links tab on the Team screen.</p></div>
+      <div class="row"><button class="btn" id="wLkRes">Resume</button><button class="ghost" id="wLkLater">Later</button></div>`, () => wDrain());
+    $('wLkRes').focus();
+    $('wLkRes').onclick = () => { close(); wResumeLinks(); };
+    $('wLkLater').onclick = () => close();
+    return true;
+  }
+  return wW107NextPrompt();
+};
+
+/* ---------- the Links tab: Play a match, Resume, and the last matches ---------- */
+const wW107CampLinks = wCampLinks;
+wCampLinks = function (C) {
+  const html = wW107CampLinks(C), probs = wLinksProblems(), live = wLinksLive();
+  const play = live ? `<button class="btn" data-lkresume>Resume the match</button>` : `<button class="btn" data-lkplay ${probs.length ? 'disabled' : ''}>Play a match</button>`;
+  const gate = !live && probs.length ? `<p class="hint wball">${esc(probs[0])}</p>` : '';
+  return html.replace('<button class="btn" data-gpractice', `${play}<button class="ghost" data-gpractice`).replace(/<\/div>\s*$/, `</div>${gate}${wLinksRecent()}`);
+};
+function wLinksRecent() {
+  const B = WG.lkg; if (!B || !B.games.length) return '';
+  return `<h5 class="wbrh">Last golf matches: ${B.w}&ndash;${B.l}</h5><ol class="wstlog">${B.games.slice(0, 5).map(g => `<li><b class="${g.r === 'win' ? 'wgood' : 'wbad'}">${g.r === 'win' ? 'Won' : 'Lost'}</b>${g.text ? ' ' + esc(g.text) : ''} against ${esc(g.name)}${g.wild ? ' (a wild nine)' : ''}<small>day ${g.day}${g.mvp != null && wPlayer(g.mvp) ? `, player of the match ${esc(wPlayer(g.mvp).n)}` : ''}</small></li>`).join('')}</ol>`;
+}
+const wW107RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW107RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'links') return;
+  const p = body.querySelector('[data-lkplay]'); if (p) p.onclick = () => { WCAMP.close(); wOpenLinksCard(); };
+  const r = body.querySelector('[data-lkresume]'); if (r) r.onclick = () => { WCAMP.close(); wResumeLinks(); };
+};
+
+/* ---------- lines: the Stats tab's Golf view adds them after the ratings; a player's card says them in words ---------- */
+function wLinksLine(pid) { return (WG.lkstats || {})[pid] || null; }
+const W_LK_LCOLS = [['rd', 'Rds', 'Golf matches played'], ['shots', 'Shots', 'Shots hit'], ['putts', 'Putts', 'Putts'], ['holed', 'In', 'Holed: the shot that dropped']];
+const wW107CampStats = wCampStats;
+wCampStats = function () {
+  const html = wW107CampStats();
+  if (WSTAT.view !== 'golf') return html;
+  // (each row gets the line's cells after the ratings; a player with no match yet shows dashes)
+  const head = W_LK_LCOLS.map(([c, s, l]) => `<th scope="col" title="${esc(l)}">${s}</th>`).join('');
+  return html.replace(/(<thead><tr>[\s\S]*?)(<\/tr><\/thead>)/, `$1${head}$2`)
+    .replace(/(<tr data-wsp="(\d+)"[^>]*>[\s\S]*?)(<\/tr>)/g, (m, a, id, end) => { const L = wLinksLine(+id); return a + W_LK_LCOLS.map(([c]) => `<td>${L ? L[c] || 0 : '<span class="dim">&ndash;</span>'}</td>`).join('') + end; })
+    .replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every player\'s golf ratings, their role in your four (set on the Links tab), and every golf match they played from the world on this journey (rounds and practice are not counted). Pick a heading to sort, a player to see more.</small>');
+};
+const wW107StatsCard = wStatsCard;
+wStatsCard = function (p) {
+  const L = wLinksLine(p.id), html = wW107StatsCard(p);
+  if (!L || !L.rd) return html;
+  const bits = `${L.rd} golf match${L.rd === 1 ? '' : 'es'}: ${L.shots} shot${L.shots === 1 ? '' : 's'}, ${L.putts} putt${L.putts === 1 ? '' : 's'}, ${L.holed} holed`;
+  return html.replace('<div class="wbd wbkc wglc"><h5>Golf</h5>', `<div class="wbd wbkc wglc"><h5>Golf</h5><p class="wbdbox">${bits}.</p>`);
+};
+
+const wW107RenderHelp = renderHelp;
+renderHelp = function () {
+  wW107RenderHelp();
+  const after = $('wHelpLinksTab'); if (!after || $('wHelpLinksGame')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksGame"><b>Golf matches.</b> Once you have ${W_LKG.minOwn} players of your own, your four can play golf for real: Play a match on the Links tab, or ask Agatha Divot at Mossgate Links for a MATCH. Take on the local side or a rival club, once a day each, on the standing nine (or tick Wild nine for a new course). Play (you swing every shot), Manage (you call the line, the stances and the caddie's word, and pick the next hitter if you like; your four swing) or Simulate. There is no Team HP on the course. A win pays XP to everyone who played (half to the rest), gold and fans, and a little more to the player of the match; a loss pays a quarter of the XP. Nobody goes home level. Save and leave keeps a match between shots. The Links has its own ways: the weather of the wood changes by the day (a still morning, a breeze, a drizzle that softens the greens, or a spore haze that shortens your reads); a ball that stops by the bees' hive comes back with a sting (its hitter loses focus); and the Gloomcap on its stump never moves, so of course it moved your ball. The Stats tab's Golf view has every player's line.</p>`);
 };
 </script>
 </body></html>

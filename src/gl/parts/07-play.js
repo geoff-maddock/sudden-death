@@ -23,9 +23,12 @@ const GL_PACE = { addr: 0.7, rest: 0.9, hole: 2.4, given: 1.3, fly: 1.7, roll: 0
 const GL_HANDS = { drag: 170, dragAcc: 12, puttDeg: 0.1 };
 let GD = null;
 
+// the modes: watch (the CPU plays both sides), manage (your caddie plays your side by your call: GD.mgr), play (by hand)
+const GL_MODES = ['watch', 'manage', 'play'];
 function glPlayStart(o) {
   GLC.h = -1;
-  GD = { mode: o && o.mode === 'play' ? 'play' : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, drag: null, swung: null };
+  GD = { mode: o && GL_MODES.includes(o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, drag: null, swung: null,
+    mgr: { line: 'auto', ri: null }, line: o && o.line || null };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
@@ -65,8 +68,11 @@ function glPlayNext() {
   }
   if (n.give && glYours(o)) { glGo('offer', 0, `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`); return; }
   if (glCpuGives(n)) { glGiven(o); return; }
-  glCpuCall(s);
-  const plan = glPlan(s);
+  let plan;
+  if (GD.mode === 'manage' && s === GD.you) {
+    const M = GD.mgr, ri = M.ri != null && glCanHit(s, M.ri) ? M.ri : null;
+    plan = glPlan(s, ri, M.line === 'auto' ? null : M.line); M.ri = null;
+  } else { glCpuCall(s); plan = glPlan(s); }
   GD.cpu = { side: s, plan };
   glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`);
 }
@@ -137,6 +143,7 @@ function glEvSay(ev, r) {
     t = ev.holed ? `${who}'s ${c} drops into the cup!` : ev.water ? `${who}'s ${c} finds the water. A drop, and a stroke.` : `${who} hits a ${c} ${carry} yards, into the ${GL_TER[ev.lie]}. ${glYards(ev.d1)} to the pin.`;
   }
   if (ev.up) t += ' That is par and four more: the ball is picked up.';
+  t += (ev.wood || '') + glGallery(ev);
   return t + glHoleSay(ev);
 }
 function glHoleSay(ev) {
@@ -232,7 +239,7 @@ function glAimPush(yd) {
   S.aim = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d }; glSelFix(); return true;
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
-function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : 1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) : 0; }
+function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : (1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) * glHazeK()) : 0; }
 // the wind as you see it: roughly (to 5 mph and 8 ways), or exactly with the caddie's word (or in Watch)
 function glWindShown(w) {
   if (!w || !w.s) return { s: 0, d: 0, exact: true };
@@ -249,12 +256,12 @@ function glReadLine() {
 }
 function glReadCalc(S, b) {
   const H = glHoleNow(), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), v = glPuttSpeed(S.tick);
-  const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, noCup: true }), L = glReadLen(), out = [{ x: b.x, y: b.y }];
+  const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, noCup: true, fk: glWetK() }), L = glReadLen(), out = [{ x: b.x, y: b.y }];
   let run = 0;
   for (let i = 1; i < P.path.length && run < L; i++) { run += hyp(P.path[i].x - P.path[i - 1].x, P.path[i].y - P.path[i - 1].y); out.push(P.path[i]); }
   return out;
 }
-const glPuttSpeed = p => Math.sqrt(2 * GL_PUTT.fric * glPuttScale() * clamp(p, 0, 1.05)) * (G.ball[GD.you].lie === 'G' ? 1 : 1.3);
+const glPuttSpeed = p => Math.sqrt(2 * GL_PUTT.fric * glWetK() * glPuttScale() * clamp(p, 0, 1.05)) * (G.ball[GD.you].lie === 'G' ? 1 : 1.3);
 
 /* ---------- the swing ---------- */
 // the mark's half-width for a hitter: wider for a more accurate one, smaller on a power shot, and smaller for a tired one
@@ -314,11 +321,11 @@ function glStrike(s, S, sw) {
   const H = glHoleNow(), b = G.ball[s], rat = glRat(s, S.ri), from = { x: b.x, y: b.y };
   if (S.putt) {
     // (a drag pulled off the line starts the putt off line: + is left, as a hook; GL_HANDS.puttDeg of a degree a degree)
-    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
+    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK() });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
   const M = GL_STANCE[glStanceOf(s).mood];
-  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist, err: sw.err, wind: G.wind, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat });
+  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist, err: sw.err, wind: G.wind, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() });
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
@@ -337,10 +344,35 @@ function glOffer(give) {
 }
 function glSetMode(m) {
   if (!GD) return;
-  const want = m === 'play' ? 'play' : 'watch';
+  const want = GL_MODES.includes(m) ? m : 'watch';
   if (want === GD.mode) return;
   GD.mode = want;
   // your shot waiting, or their putt to give, goes back to the top: in Watch the CPU takes it
-  if (GD.ph === 'aim' || GD.ph === 'offer' || (GD.ph === 'swing' && GD.mode !== 'play')) { GD.sel = null; GD.meter = null; glGo('next'); }
+  if (GD.ph === 'aim' || GD.ph === 'offer' || GD.ph === 'swing') { GD.sel = null; GD.meter = null; glGo('next'); }
   else if (GD.ph === 'addr' && GD.cpu && glYours(GD.cpu.side)) { GD.cpu = null; glGo('next'); }
 }
+
+/* ---------- Manage: your call for the caddie, and the game kept between shots ---------- */
+// your call in Manage: { line: 'auto' or a line, ri: the next hitter (once; null for the caddie's), tempo, mood, word }
+function glManage(o) {
+  if (!GD || !o) return false;
+  const M = GD.mgr, s = GD.you;
+  if (o.line && (o.line === 'auto' || GL_LINES[o.line])) M.line = o.line;
+  if (o.ri !== undefined) M.ri = o.ri == null ? null : (Number.isInteger(o.ri) && o.ri >= 0 && o.ri < GL_RULES.side ? o.ri : null);
+  if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
+  if (o.mood === 'bold' || o.mood === 'careful') G.stance[s].mood = o.mood;
+  if (o.word && G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; }
+  return true;
+}
+// the game between shots, to keep (plain JSON): the game, the mode and your call
+function glSnapshot() { return G && GD ? JSON.parse(JSON.stringify({ G, mode: GD.mode, mgr: GD.mgr, line: GD.line })) : null; }
+// back to a kept game: the next shot
+function glResume(sn) {
+  if (!sn || !sn.G) return false;
+  G = JSON.parse(JSON.stringify(sn.G));
+  glPlayStart({ mode: sn.mode, line: sn.line });
+  if (sn.mgr) GD.mgr = Object.assign({ line: 'auto', ri: null }, sn.mgr);
+  GD.msg = `Back at hole ${G.h + 1}: ${G.teams[0].name} ${glMatchText(0).toLowerCase()}.`;
+  return true;
+}
+

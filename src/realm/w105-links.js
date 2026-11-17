@@ -22,6 +22,7 @@ const W_LINKS = {
 };
 const W_LINKS_MODES = {
   watch: { n: 'Watch', title: 'The CPU plays both sides. Switching goes on with the same game.' },
+  manage: { n: 'Manage', title: 'Your caddie plays your side by your call: the line, the stances, the caddie\'s word, and the next hitter if you like, in the rows under the course. Your four swing on their ratings.' },
   play: { n: 'You play', title: 'You play Mossgate: pick the hitter, the club and the shot, aim, and swing (Space three times, or drag back from the ball). Their short putts are yours to give.' },
 };
 let W_LINKS_MODE = 'play', W_LINKS_SPEED = 1, W_LINKS_SKILL = 1;
@@ -57,6 +58,8 @@ $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccall
   <div class="wccrow" id="wLinksRowShot"><span class="wccl">Shot</span><span id="wLinksShot"></span></div>
   <div class="wccrow" id="wLinksRowStance"><span class="wccl">Stance</span><span id="wLinksStance"></span></div>
   <div class="wccrow" id="wLinksRowGo"><span class="wccl">Swing</span><span id="wLinksGo"></span></div>
+  <div class="wccrow" id="wLinksRowMgr" hidden><span class="wccl">Your call</span><span id="wLinksMgr"></span></div>
+  <div class="wccrow" id="wLinksRowNext" hidden><span class="wccl">Next hitter</span><span id="wLinksNext"></span></div>
   <div class="wccrow" id="wLinksRowGive" hidden><span class="wccl">Their putt</span><span><button class="ghost" data-lgive="1" title="Y: it counts as holed in one more">Give it</button> <button class="ghost" data-lgive="0" title="N: they must hole it">Make them putt</button></span></div></div>
   <h4 class="wsh">Scorecard</h4><div id="wLinksCard" class="wcbox"></div>
   <h4 class="wsh">This game</h4><ol id="wLinksLog" class="wglog wslog"></ol>
@@ -76,16 +79,35 @@ $('wLinksRows').addEventListener('click', e => {
   else if (d.lmood) wGL.select({ mood: d.lmood });
   else if (d.lword) wGL.select({ word: true });
   else if (d.lgive != null) wGL.offer(d.lgive === '1');
+  else if (d.mline) wGL.manage({ line: d.mline });
+  else if (d.mtempo) wGL.manage({ tempo: d.mtempo });
+  else if (d.mmood) wGL.manage({ mood: d.mmood });
+  else if (d.mword) wGL.manage({ word: true });
+  else if (d.mnext != null) wGL.manage({ ri: d.mnext === '' ? null : +d.mnext });
   wLinksRows(); wLinksBarNote();
 });
 
 // why a player can't hit now
+ // Manage's rows: your call (the line, with Auto for the caddie's own; the stances; the caddie's word) and the next
+// hitter (the caddie's pick, or one of your four, once, if the rule allows)
+function wLinksMgrRows(V) {
+  const G = wGL.G, M = wGL.mgr, st = G.stance[V.you], on = (a, b) => a === b ? ' on' : '', L = wGL.lines, wl = G.word[V.you], won = G.wordOn[V.you];
+  $('wLinksMgr').innerHTML = [['auto', 'Auto', 'The caddie reads the match and picks the line']].concat(Object.keys(L).map(k => [k, L[k].n, ''])).map(([k, n, t]) => `<button class="ghost${on(k, M.line)}" data-mline="${k}" title="${esc(t || 'Every shot on this line until you change it')}">${esc(n)}</button>`).join(' ') + ' · '
+    + [['quick', 'Quick'], ['steady', 'Steady']].map(([k, n]) => `<button class="ghost${on(k, st.tempo)}" data-mtempo="${k}">${n}</button>`).join(' ') + ' · '
+    + [['bold', 'Bold'], ['careful', 'Careful']].map(([k, n]) => `<button class="ghost${on(k, st.mood)}" data-mmood="${k}">${n}</button>`).join(' ') + ' · '
+    + `<button class="ghost${won ? ' on' : ''}" data-mword="1" ${wl > 0 && !won ? '' : 'disabled'} title="Once a game: the next stroke read in full">${won ? 'Caddie\'s word: on' : `Caddie's word (${wl} left)`}</button>`;
+  const T = G.teams[V.you];
+  $('wLinksNext').innerHTML = `<button class="ghost${on(null, M.ri)}" data-mnext="">The caddie's pick</button> ` + T.roster.map((m, i) => `<button class="ghost${on(i, M.ri)}" data-mnext="${i}" title="Takes the next shot if the rule allows (then back to the caddie's pick)">${esc(m.n)} <small>${wGL.focus ? Math.round(wGL.focus[V.you][i] * 100) : 100}%</small></button>`).join(' ');
+}
 const wLinksWhyNot = (V, ri) => V.ph === 'swing' ? 'The swing is under way: the hitter is picked.' : wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over && wGL.G && wGL.G.teams ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
-  box.hidden = !mine && !offer;
+  const mgr = !!V && V.mode === 'manage';
+  box.hidden = !mine && !offer && !mgr;
   $('wLinksRowGive').hidden = !offer;
+  $('wLinksRowMgr').hidden = $('wLinksRowNext').hidden = !mgr;
+  if (mgr) wLinksMgrRows(V);
   for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowLine', 'wLinksRowShot', 'wLinksRowStance', 'wLinksRowGo']) $(id).hidden = !mine;
   if (!mine) return;
   const S = V.sel, G = wGL.G, T = G.teams[V.you], aim = V.ph === 'aim', on = (a, b) => a === b ? ' on' : '';
@@ -124,7 +146,7 @@ function wLinksGame(opts) {
   const o = opts || {};
   WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
-  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill || [1, W_LINKS_SKILL] });
+  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, course: o.course, weather: o.weather, wood: !!o.wood, skill: o.skill || [1, W_LINKS_SKILL] });
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }

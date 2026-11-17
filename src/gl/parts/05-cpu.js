@@ -165,7 +165,8 @@ function glPlan(s, riIn, lineIn) {
   const line = GL_LINES[lineIn] ? lineIn : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
   if (kind === 'putt') {
     // (the caddie's word: read without error)
-    const readK = word ? 1 : 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put);
+    // (in a spore haze the greens read worse)
+    const readK = word ? 1 : 1 + gauss() * GL_SKILL.read[sk] * (1.4 - rat.put) / glHazeK();
     return Object.assign({ ri, kind, club: 'pt', putt: true, line }, glRead(H, b, readK, GL_LINES[line].putt));
   }
   const clubs = glClubsFrom(b.lie, rat), tot = c => { const r = glReach(c, b.lie, rat, 1); return r.carry + r.roll; };
@@ -211,9 +212,10 @@ function glPlan(s, riIn, lineIn) {
 function glRead(H, from, slopeK, past) {
   const pin = H.pin, d = hyp(pin.x - from.x, pin.y - from.y), ux = (pin.x - from.x) / (d || 1), uy = (pin.y - from.y) / (d || 1);
   const want = d + (past == null ? 0.35 : past);
-  let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
+  const fk = glWetK();
+  let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * fk * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
   for (let i = 0; i < 10; i++) {
-    const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true });
+    const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true, fk });
     // (the trial roll stopped in sand, bog or the trees: more pace would only smash it on, so the read keeps what it has)
     if (P.lie !== 'G' && P.lie !== 'F' && P.lie !== 'T') break;
     const ex = P.end.x - from.x, ey = P.end.y - from.y, al = ex * ux + ey * uy, lat = P.cross != null ? P.cross : -ex * uy + ey * ux;

@@ -97,12 +97,13 @@ function glFlight(s) {
   const spin = clamp(s.spin || 0, -1.5, 1.5), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
   const shR = Sh ? 1 + (Sh.roll - 1) * (s.shapeK || 1) : 1;
-  let budget = Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
+  // (soft ground after rain: the ball sits down where it lands)
+  let budget = (s.fk > 1 ? 0.6 : 1) * Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
-      const v = Math.sqrt(2 * GL_PUTT.fric * budget);
-      const P = glPutt({ hole: H, from: { x, y }, a: rd, v });
+      const v = Math.sqrt(2 * GL_PUTT.fric * (s.fk || 1) * budget);
+      const P = glPutt({ hole: H, from: { x, y }, a: rd, v, fk: s.fk });
       return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, P.end) : {});
     }
     const f = GL_ROLLF[here];
@@ -129,7 +130,7 @@ function glWaterDrop(H, from, wet) {
 }
 
 /* a putt (or the run of a ball on the green). p: { hole, from, a (angle), v (yards a second), slopeK (a read: 1 is
-   the true slope), noCup }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
+   the true slope), noCup, fk (the green's friction: 1 dry, more when soft) }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
    it passed, on the line through the cup square to the putt; null if it never got there) */
 function glPutt(p) {
   const H = p.hole, pin = H.pin, P = GL_PUTT, k = p.slopeK == null ? 1 : p.slopeK;
@@ -138,7 +139,7 @@ function glPutt(p) {
   let cross = null;
   const res = o => Object.assign(o, { cross });
   for (let i = 0, t = 0; i < 3000; i++, t += P.dt) {
-    const sp = hyp(vx, vy), fr = lie === 'G' ? P.fric : lie === 'F' || lie === 'T' ? P.fric * P.fringe : P.fric * P.rough;
+    const sp = hyp(vx, vy), fr = (p.fk || 1) * (lie === 'G' ? P.fric : lie === 'F' || lie === 'T' ? P.fric * P.fringe : P.fric * P.rough);
     const sl = lie === 'G' ? glSlope(H, x, y) : [0, 0], gx = sl[0] * P.g * k, gy = sl[1] * P.g * k;
     if (sp < 0.03 && hyp(gx, gy) < fr) return res({ end: { x, y }, lie, holed: false, lip, path, t });
     const ax = gx - (sp ? vx / sp : 0) * fr, ay = gy - (sp ? vy / sp : 0) * fr;

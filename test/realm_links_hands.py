@@ -63,7 +63,7 @@ async def main():
         await pg.wait_for_function("(() => { const c = document.querySelector('#v-links canvas'), x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const s = new Set(); for (let i = 0; i < x.length; i += 4000) s.add(x[i] >> 4 << 8 | x[i + 1] >> 4); return s.size > 12; })()")
         v = await pg.evaluate("""(() => ({ bar: !document.getElementById('wLinksBar').hidden, host: !document.getElementById('v-links').hidden, others: ['rink', 'court'].map(k => W_ENGINES[k].api.on),
           modes: [...document.querySelectorAll('#wLinksModes button')].map(b => b.textContent), holes: document.getElementById('wLinksHoles').value, card: !!document.querySelector('#wLinksCard table'), how: !!document.getElementById('wLinksHowBtn') }))()""")
-        check(v['bar'] and v['host'] and v['others'] == [False, False] and v['modes'] == ['Watch', 'You play'] and v['holes'] == '9' and v['card'] and v['how'], 'a ROUND opens the Links view: the bar (Watch, You play, 9 holes), the course drawn, the scorecard; the other engines off', v)
+        check(v['bar'] and v['host'] and v['others'] == [False, False] and v['modes'] == ['Watch', 'Manage', 'You play'] and v['holes'] == '9' and v['card'] and v['how'], 'a ROUND opens the Links view: the bar (Watch, Manage, You play, 9 holes), the course drawn, the scorecard; the other engines off', v)
 
         # ---------- your shot: the caddie's pick, then yours ----------
         a = await pg.evaluate("""(() => { const V = __mine(3), G = wGL.G, rows = document.getElementById('wLinksRows');

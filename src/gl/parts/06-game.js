@@ -39,6 +39,7 @@ function glStart(opts) {
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
+    wood: !!o.wood, weather: GL_WEATHER[o.weather] ? o.weather : null,
     focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
@@ -62,7 +63,9 @@ function glHoleStart() {
   // a new hole: a little focus back for everyone; at the turn (after the 5th of 9), all of it
   if (G.focus && G.res.length) G.focus = G.focus.map(f => f.map(v => Math.min(1, v + GL_FOCUS.hole)));
   if (G.focus && !G.turned && G.res.length === glTurnAt()) { G.turned = true; G.focus = G.focus.map(f => f.map(() => 1)); G.turnNow = true; } else G.turnNow = false;
-  G.wind = { s: Math.round(R() * 14), d: Math.round(R() * 628) / 100 };
+  // the wind: the weather's range when there is weather, else anything up to 14 mph
+  const Wx = G.weather && GL_WEATHER[G.weather], s = Wx ? Wx.wind[0] + R() * (Wx.wind[1] - Wx.wind[0]) : R() * 14;
+  G.wind = { s: Math.round(s), d: Math.round(R() * 628) / 100 };
   G.gir = [false, false];
 }
 
@@ -73,11 +76,11 @@ function glHit(s, plan) {
   const dist = GL_STANCE[glStanceOf(s).mood].dist;
   if (plan.putt) {
     const k = 1.5 - rat.put, a = plan.a + gauss() * GL_SWING.pa * k * em, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em);
-    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v });
+    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK() });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
   const key = plan.kind === 'short' ? rat.tch : rat.acc, k = 1.4 - key;
-  return glFlight({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, wind: G.wind, spin: plan.spin, rat });
+  return glFlight({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, wind: G.wind, spin: plan.spin, rat, fk: glWetK() });
 }
 
 // who plays next: { side, d (yards to the pin), putt, give (the other side may give this putt) }, or null when it's over
@@ -114,6 +117,8 @@ function glShoot(s, plan, r) {
   if (!r.water && (r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
   const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, line: plan.line || '', club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
   if (r.water) { S.water++; glDrop(s); }
+  // the wood's own ways on a ball that has stopped: the bees, the Gloomcap
+  ev.wood = glWoodAfter(s, plan.ri, ev);
   // holed on the stroke that reached the cap: it still counts
   if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
   ev.up = !!Hs.up[s] && !r.holed;
