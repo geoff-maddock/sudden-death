@@ -129,7 +129,8 @@ async def main():
                   const c = wLeagueClubs()[0]; WG.grudge = { club: c, day: WG.dayAbs, n: 1 };
                   wDispatchEnd({ kind: 'event', ref: { rival: c, grudge: 1 } }, 'win'); __clear();
                   wDispatchEnd({ kind: 'cup', ref: { cup: 'salt', round: 0, club: null }, name: 'Dab Finch' }, 'lose'); })()""")
-                w = await pg.evaluate("WG.journal.wins")
+                # (a step in your following is noted there too, w97: not one of these)
+                w = await pg.evaluate("WG.journal.wins.filter(e => e.k !== 'fans')")
                 ks = [e['k'] for e in w]
                 check(ks == ['cup', 'title', 'boss', 'grudge'], 'cup round, title, lair boss and grudge go in; a wild win and a loss do not', ks)
                 check(w[0]['t'] == 'Mosswold Cup, round 3 of 3' and w[0]['where'] == 'Mossgate' and w[0]['sport'] and w[0]['score'] and w[1]['t'] == 'Won the Mosswold Cup',
@@ -147,7 +148,7 @@ async def main():
                 check(pv['regs'] >= 2 and pv['rules'] >= 3 and 'Elder Grove' in pv['txt'], 'Places groups by region, with Rules boxes', {k: pv[k] for k in ['regs', 'rules']})
                 await pg.screenshot(path='/tmp/realm-journal-places.png')
                 await pg.click('#modalBox [data-jtab="wins"]')
-                check(await pg.evaluate("document.querySelectorAll('#wJBody .wjwins li').length") == 4, 'Victories lists the four wins')
+                check(await pg.evaluate("[...document.querySelectorAll('#wJBody .wjwins li')].filter(l => !l.querySelector('.wjk-fans')).length") == 4, 'Victories lists the four wins')
                 await pg.click('#modalBox [data-jtab="quests"]')
                 qt = await pg.evaluate("document.getElementById('wJBody').textContent")
                 check("The diver's knees" in qt and 'Active' in qt, 'Quests lists the active side quest', qt[:200])
@@ -178,7 +179,7 @@ async def main():
                 await pg.evaluate("__close()")
 
                 # saving, and an older save
-                sv = await pg.evaluate("(() => { wSave(); const s = JSON.parse(localStorage.getItem(wSaveKey())); return { people: Object.keys(s.WG.journal.people), wins: s.WG.journal.wins.length }; })()")
+                sv = await pg.evaluate("(() => { wSave(); const s = JSON.parse(localStorage.getItem(wSaveKey())); return { people: Object.keys(s.WG.journal.people), wins: s.WG.journal.wins.filter(e => e.k !== 'fans').length }; })()")
                 check('diver' in sv['people'] and sv['wins'] == 4, 'the journal is in the save', sv)
                 await pg.reload(); await pg.wait_for_function("typeof wStart === 'function'"); await pg.add_script_tag(content=HELP)
                 await pg.evaluate("""(() => { const s = JSON.parse(localStorage.getItem(wSaveKey())); delete s.WG.journal; s.WG.flags.seen_emberdeep = 1; s.WG.flags.alpha_aurora = 1;

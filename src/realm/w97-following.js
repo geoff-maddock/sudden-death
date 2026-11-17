@@ -54,7 +54,7 @@ wSave = function () { wFollowCheck(); return wW97Save.apply(this, arguments); };
 function wFollowHtml() {
   const n = wFans(), s = wFollowStep(), next = W_FOLLOW.at[s];
   const rows = W_FOLLOW.at.map((a, i) => `<li class="${i < s ? 'wfhave' : ''}"><b>${esc(W_FOLLOW.names[i + 1])}</b> <span class="wtag wrep-${i < s ? Math.min(3, i + 1) : 0}">${a} fans</span> <small>${esc(wFollowDoes(i + 1))}</small></li>`).join('');
-  return `<h4>Your following</h4><p class="hint" id="wFollowNow"><b>${esc(W_FOLLOW.names[s])}</b>: ${n} fan${n === 1 ? '' : 's'}${next != null ? `, ${next - n} more for ${esc(W_FOLLOW.names[s + 1].toLowerCase())}` : ''}. Fans come from wins in the sports, cups, fixtures and adventures; a blackout loses a quarter of them.</p><ul class="wreplist wfollow">${rows}</ul>`;
+  return `<h4>Your following</h4><p class="hint" id="wFollowNow"><b>${esc(W_FOLLOW.names[s])}</b>: ${n} fan${n === 1 ? '' : 's'}${next != null ? `, ${next - n} more for ${esc(W_FOLLOW.names[s + 1].toLowerCase())}` : ''}. Fans come from wins in the sports, cups, fixtures and adventures; a blackout loses a quarter of them.</p><ul class="wfollow">${rows}</ul>`;
 }
 const wW97CampTeam = wCampTeam;
 wCampTeam = function () {

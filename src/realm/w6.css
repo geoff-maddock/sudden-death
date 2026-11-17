@@ -259,6 +259,8 @@
 /* w31: your name, region by region */
 .wreplist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
 .wreplist small{color:var(--dim)}
+.wfollow{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.wfollow small{color:var(--dim)}
 .wfollow li:not(.wfhave) b{color:var(--dim)}
 .wtag.wrep-0{background:var(--seam);color:var(--dim)}
 .wtag.wrep-1{background:#8a6a3a;color:#fbeee6}
