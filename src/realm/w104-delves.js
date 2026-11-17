@@ -178,7 +178,9 @@ function wDelveVault(m, T, fam, r) {
         spots.sort((a, b) => (Math.abs(a[0] - L.cx) + Math.abs(a[1] - L.cy)) - (Math.abs(b[0] - L.cx) + Math.abs(b[1] - L.cy)));
         for (const [x, y] of spots) if (wDelveBlock(m, x, y, ']', { lever: flag })) return true;
       }
-      return true;
+      // no room would take the lever: fill the pocket back in, so there is never a vault nobody can open
+      for (const [x, y] of pocket) { m.t[y][x] = 'X'; delete m.meta[x + ',' + y]; }
+      m.t[gy][gx] = 'X'; delete m.meta[gx + ',' + gy]; delete m.ovr[gx + ',' + gy];
     }
   }
   return false;

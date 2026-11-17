@@ -394,7 +394,7 @@ function wPlaceLandmarks() {
 /* the once-a-day features: their uses, and how a used one looks */
 const W_FEATURE = {
   'ð': { days: 1, use: (x, y) => { const h = wCampHeal(.15); wAdvance(30); return 'You lie back inside the mushroom ring for half an hour. The team gets up lighter' + (h ? ' (+' + h + ' HP).' : ', though nobody was hurt.'); } },
-  'þ': { days: 1, use: (x, y) => { const fish = Math.random() < .6, it = fish ? 'saltfish' : 'brinekelp', n = ri(1, 2); if (DB.items[it]) wAddItem(it, n); wAdvance(45); return fish ? 'You fish off the pier end for most of an hour, and land ' + n + ' ' + DB.items[it].name + '.' : 'The fish are not biting, but the line comes up wrapped in ' + n + ' ' + DB.items[it].name + '.'; } },
+  'þ': { days: 1, use: (x, y) => { const fish = Math.random() < .6, it = fish ? 'saltfish' : 'brinekelp', n = ri(1, 2), nm = (DB.items[it] || {}).name || it; if (DB.items[it]) wAddItem(it, n); wAdvance(45); return fish ? 'You fish off the pier end for most of an hour, and land ' + n + ' ' + nm + '.' : 'The fish are not biting, but the line comes up wrapped in ' + n + ' ' + nm + '.'; } },
   'ñ': { days: 1, use: (x, y) => { if (typeof wRestLegs === 'function') wRestLegs(1); wAdvance(30); return 'The team sits on the forge benches with their boots off for half an hour. Tired legs ease.'; } },
 };
 const W_FORTUNES = ['A coin goes down. Somewhere below, something says: "Play the long ball."', 'The coin rings on the others. You feel a cup coming, though maybe not this year.', 'Splash. A voice in the well: "Your keeper should drink more water." It is probably right.', 'The coin spins a long time before it sinks. Lucky, the old women say.', 'Down it goes. A frog surfaces, looks at you, and goes back down unimpressed.'];
