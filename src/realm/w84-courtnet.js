@@ -33,41 +33,24 @@ const W_NET = {
 };
 const W_BKFIX = { court: 'g_court', tier: 2 };
 
-function wNet() { return (WG && WG.bkcup) || null; }
-function wNetOn() { const D = wNet(); return !!(D && !D.done); }
-function wNetName(id) { return id === 'me' ? 'your five' : wBallName(id); }
-function wNetTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wNetPairs(r) {
-  const D = wNet(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.games[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wNetGame(r, a, b) { return ((wNet().games[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wNetMine() { const D = wNet(); if (!D || D.out || D.done) return null; const p = wNetPairs(D.round).find(x => x.includes('me')); return p && !wNetGame(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.bkcup = { K: W_NET, name: 'Charter Net', me: 'your five', store: 'games', view: 'court', verb: 'held', busy: 'Finish the basketball game you started first.',
+  live: () => wCourtLive(), base: () => wCourtProblems(), sim: (a, b, tier) => wNetSim(a, b, tier), won: () => wNetWon(),
+  mark: g => g.tb ? '*' : '', hint: '* Level after three overtimes: through on rebounds.' };
+function wNet() { return wBrk('bkcup'); }
+function wNetOn() { return wBrkOn('bkcup'); }
+function wNetName(id) { return wBrkName('bkcup', id); }
+function wNetTeamName(id) { return wBrkTeamName(id); }
+function wNetPairs(r) { return wBrkPairs('bkcup', r); }
+function wNetGame(r, a, b) { return wBrkGame('bkcup', r, a, b); }
+function wNetMine() { return wBrkMine('bkcup'); }
+function wNetProblems() { return wBrkProblems('bkcup'); }
+function wNetEnter() { return wBrkEnter('bkcup'); }
+function wNetCatchUp() { return wBrkCatchUp('bkcup'); }
+function wNetBracket() { return wBrkBracket('bkcup'); }
+
 const wNetLive = () => wCourtLive() && WG.bkg.live.world.kind === 'bkcup';
 
-function wNetProblems() {
-  const D = wNet(), out = wCourtProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Charter Net is held once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_NET.fee) out.push(`The entry fee is ${W_NET.fee} gold, and you have ${RUN.gold}.`);
-  if (wCourtLive()) out.push('Finish the basketball game you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wNetEnter() {
-  const probs = wNetProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_NET.size - 1));
-  RUN.gold -= W_NET.fee;
-  WG.bkcup = { week: wWeek(), field: ['me'].concat(others), round: 0, games: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Charter Net (${W_NET.fee} gold). ${W_NET.rounds[0]}: ${wNetName(wNetMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wNetPlay(how) {
   const D = wNet(), opp = wNetMine(); if (!opp) return '';
   return wStartCourt({ club: opp, how, tier: W_NET.tiers[D.round], kind: 'bkcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -100,22 +83,6 @@ function wNetSim(a, b, tier) {
   const s = wCourtSimClubs(a, b, tier);
   return { a, b, ra: s.ra, rb: s.rb, ba: s.ba, bb: s.bb, w: wNetWinner(a, b, s.ra, s.rb, s.ba, s.bb), tb: s.ra === s.rb };
 }
-// the rest of the round: every game without a result; then the next round, and on to the final if you are out
-function wNetCatchUp() {
-  const D = wNet(); if (!D || !D.pending || wCourtLive() || UI.view === 'court') return false;
-  for (;;) {
-    for (const [a, b] of wNetPairs(D.round)) if (!wNetGame(D.round, a, b)) D.games[D.round].push(wNetSim(a, b, W_NET.tiers[D.round]));
-    if (D.round === W_NET.rounds.length - 1) { D.done = true; D.champ = D.games[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wNetWon();
-  else if (D.done) wLog(`${wCap(wNetName(D.champ))} win the Charter Net.`, 'd');
-  else wLog(`The ${W_NET.rounds[D.round - 1].toLowerCase()}s are in. ${W_NET.rounds[D.round]}: ${wNetName(wNetMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wNetWon() {
   const P = W_NET.prize, D = wNet(), f = D.games[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -133,16 +100,6 @@ function wNetWon() {
 }
 
 /* ---------- the card: entry, the bracket, your next game ---------- */
-function wNetBracket() {
-  const D = wNet();
-  const cell = (r, a, b) => {
-    const g = wNetGame(r, a, b), tie = g && g.tb;
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wNetTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${tie && g.w === id ? '*' : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_NET.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wNetPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.games.some(R => R.some(g => g.tb)) ? '<p class="hint">* Level after three overtimes: through on rebounds.</p>' : ''}`;
-}
 function wOpenNet(msg) {
   if (LAB || !WG) return;
   wNetCatchUp();

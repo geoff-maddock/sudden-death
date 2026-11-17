@@ -28,41 +28,24 @@ const W_GCUP = {
 };
 const W_GFIX = { bowl: 'g_bowl', tier: 2 };
 
-function wGcup() { return (WG && WG.gcup) || null; }
-function wGcupOn() { const D = wGcup(); return !!(D && !D.done); }
-function wGcupName(id) { return id === 'me' ? 'your seven' : wBallName(id); }
-function wGcupTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wGcupPairs(r) {
-  const D = wGcup(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.games[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wGcupGame(r, a, b) { return ((wGcup().games[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wGcupMine() { const D = wGcup(); if (!D || D.out || D.done) return null; const p = wGcupPairs(D.round).find(x => x.includes('me')); return p && !wGcupGame(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.gcup = { K: W_GCUP, name: 'Cinder Cup', me: 'your seven', store: 'games', view: 'gridiron', verb: 'held', busy: 'Finish the football game you started first.',
+  live: () => wGridLive(), base: () => wGridProblems(), sim: (a, b, tier) => wGcupSim(a, b, tier), won: () => wGcupWon(),
+  mark: g => g.yd ? '*' : '', hint: '* Tied after Sudden Death: through on yards from scrimmage.' };
+function wGcup() { return wBrk('gcup'); }
+function wGcupOn() { return wBrkOn('gcup'); }
+function wGcupName(id) { return wBrkName('gcup', id); }
+function wGcupTeamName(id) { return wBrkTeamName(id); }
+function wGcupPairs(r) { return wBrkPairs('gcup', r); }
+function wGcupGame(r, a, b) { return wBrkGame('gcup', r, a, b); }
+function wGcupMine() { return wBrkMine('gcup'); }
+function wGcupProblems() { return wBrkProblems('gcup'); }
+function wGcupEnter() { return wBrkEnter('gcup'); }
+function wGcupCatchUp() { return wBrkCatchUp('gcup'); }
+function wGcupBracket() { return wBrkBracket('gcup'); }
+
 const wGcupLive = () => wGridLive() && WG.gfg.live.world.kind === 'gcup';
 
-function wGcupProblems() {
-  const D = wGcup(), out = wGridProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Cinder Cup is held once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_GCUP.fee) out.push(`The entry fee is ${W_GCUP.fee} gold, and you have ${RUN.gold}.`);
-  if (wGridLive()) out.push('Finish the football game you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wGcupEnter() {
-  const probs = wGcupProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_GCUP.size - 1));
-  RUN.gold -= W_GCUP.fee;
-  WG.gcup = { week: wWeek(), field: ['me'].concat(others), round: 0, games: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Cinder Cup (${W_GCUP.fee} gold). ${W_GCUP.rounds[0]}: ${wGcupName(wGcupMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wGcupPlay(how) {
   const D = wGcup(), opp = wGcupMine(); if (!opp) return '';
   return wStartGrid({ club: opp, how, tier: W_GCUP.tiers[D.round], kind: 'gcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -93,22 +76,6 @@ function wGcupSim(a, b, tier) {
   const s = wGridSimClubs(a, b, tier);
   return { a, b, ra: s.ra, rb: s.rb, ya: s.ya, yb: s.yb, w: wGcupWinner(a, b, s.ra, s.rb, s.ya, s.yb), yd: s.ra === s.rb };
 }
-// the rest of the round: every game without a result; then the next round, and on to the final if you are out
-function wGcupCatchUp() {
-  const D = wGcup(); if (!D || !D.pending || wGridLive() || UI.view === 'gridiron') return false;
-  for (;;) {
-    for (const [a, b] of wGcupPairs(D.round)) if (!wGcupGame(D.round, a, b)) D.games[D.round].push(wGcupSim(a, b, W_GCUP.tiers[D.round]));
-    if (D.round === W_GCUP.rounds.length - 1) { D.done = true; D.champ = D.games[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wGcupWon();
-  else if (D.done) wLog(`${wCap(wGcupName(D.champ))} win the Cinder Cup.`, 'd');
-  else wLog(`The ${W_GCUP.rounds[D.round - 1].toLowerCase()}s are in. ${W_GCUP.rounds[D.round]}: ${wGcupName(wGcupMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wGcupWon() {
   const P = W_GCUP.prize, D = wGcup(), f = D.games[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -121,16 +88,6 @@ function wGcupWon() {
 }
 
 /* ---------- the card: entry, the bracket, your next game ---------- */
-function wGcupBracket() {
-  const D = wGcup();
-  const cell = (r, a, b) => {
-    const g = wGcupGame(r, a, b), tie = g && g.yd;
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wGcupTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${tie && g.w === id ? '*' : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_GCUP.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wGcupPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.games.some(R => R.some(g => g.yd)) ? '<p class="hint">* Tied after Sudden Death: through on yards from scrimmage.</p>' : ''}`;
-}
 function wOpenGcup(msg) {
   if (LAB || !WG) return;
   wGcupCatchUp();

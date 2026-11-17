@@ -28,41 +28,24 @@ const W_BCUP = {
 };
 const W_BFIX = { ring: 'g_ring', tier: 2 };
 
-function wBcup() { return (WG && WG.bcup) || null; }
-function wBcupOn() { const D = wBcup(); return !!(D && !D.done); }
-function wBcupName(id) { return id === 'me' ? 'your team' : wBallName(id); }
-function wBcupTeamName(id) { return id === 'me' ? wPartyTeam().name : (wBallTeam(id) || {}).name || id; }
-function wBcupPairs(r) {
-  const D = wBcup(); let ids = D.field.slice();
-  for (let i = 0; i < r; i++) ids = (D.cards[i] || []).map(g => g.w);
-  const out = []; for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
-  return out;
-}
-function wBcupCard(r, a, b) { return ((wBcup().cards[r]) || []).find(g => (g.a === a && g.b === b) || (g.a === b && g.b === a)) || null; }
-function wBcupMine() { const D = wBcup(); if (!D || D.out || D.done) return null; const p = wBcupPairs(D.round).find(x => x.includes('me')); return p && !wBcupCard(D.round, p[0], p[1]) ? p.find(x => x !== 'me') : null; }
+// the bracket itself is w45b's (issue #86): this cup's numbers and words, and its own names for the bracket's parts
+W_BRACKETS.bcup = { K: W_BCUP, name: 'Anvil Belt', me: 'your team', store: 'cards', view: 'ring', verb: 'boxed', busy: 'Finish the card you started first.',
+  live: () => wRingLive(), base: () => wRingProblems(), sim: (a, b, tier) => wBcupSim(a, b, tier), won: () => wBcupWon(),
+  mark: g => g.toss ? '*' : '', hint: '* A drawn card: through on the toss of a coin.' };
+function wBcup() { return wBrk('bcup'); }
+function wBcupOn() { return wBrkOn('bcup'); }
+function wBcupName(id) { return wBrkName('bcup', id); }
+function wBcupTeamName(id) { return wBrkTeamName(id); }
+function wBcupPairs(r) { return wBrkPairs('bcup', r); }
+function wBcupCard(r, a, b) { return wBrkGame('bcup', r, a, b); }
+function wBcupMine() { return wBrkMine('bcup'); }
+function wBcupProblems() { return wBrkProblems('bcup'); }
+function wBcupEnter() { return wBrkEnter('bcup'); }
+function wBcupCatchUp() { return wBrkCatchUp('bcup'); }
+function wBcupBracket() { return wBrkBracket('bcup'); }
+
 const wBcupLive = () => wRingLive() && WG.bxg.live.world.kind === 'bcup';
 
-function wBcupProblems() {
-  const D = wBcup(), out = wRingProblems();
-  if (D && !D.done) return out;
-  const left = 7 - ((WG.dayAbs - 1) % 7);
-  if (D && D.week === wWeek()) out.push(`The Anvil Belt is boxed once a week. The next one opens in ${left} day${left === 1 ? '' : 's'}.`);
-  if (RUN.gold < W_BCUP.fee) out.push(`The entry fee is ${W_BCUP.fee} gold, and you have ${RUN.gold}.`);
-  if (wRingLive()) out.push('Finish the card you started first.');
-  return out;
-}
-// the field: your rivals (four at most), then the regions' own sides, in a random draw with you at the top
-function wBcupEnter() {
-  const probs = wBcupProblems(); if (probs.length) return probs.join(' ');
-  const rivals = shuffle(Object.values(WG.rivals || {}).filter((c, i, a) => CLUBS[c] && a.indexOf(c) === i)).slice(0, 4);
-  const wild = shuffle(Object.keys(W_WILD_TEAM).map(r => 'wild:' + r));
-  const others = shuffle(rivals.concat(wild).slice(0, W_BCUP.size - 1));
-  RUN.gold -= W_BCUP.fee;
-  WG.bcup = { week: wWeek(), field: ['me'].concat(others), round: 0, cards: [[], [], []], pending: false, show: false, out: false, done: false, champ: null };
-  wLog(`You enter the Anvil Belt (${W_BCUP.fee} gold). ${W_BCUP.rounds[0]}: ${wBcupName(wBcupMine())}.`, 'g');
-  wSave();
-  return '';
-}
 function wBcupPlay(how) {
   const D = wBcup(), opp = wBcupMine(); if (!opp) return '';
   return wStartRing({ club: opp, how, tier: W_BCUP.tiers[D.round], kind: 'bcup', ref: { week: D.week, round: D.round }, cup: true });
@@ -91,22 +74,6 @@ function wBcupSim(a, b, tier) {
   const s = wRingSimClubs(a, b, tier);
   return { a, b, ra: s.ra, rb: s.rb, w: wBcupWinner(a, b, s.result), toss: s.result.win == null };
 }
-// the rest of the round: every card without a result; then the next round, and on to the final if you are out
-function wBcupCatchUp() {
-  const D = wBcup(); if (!D || !D.pending || wRingLive() || UI.view === 'ring') return false;
-  for (;;) {
-    for (const [a, b] of wBcupPairs(D.round)) if (!wBcupCard(D.round, a, b)) D.cards[D.round].push(wBcupSim(a, b, W_BCUP.tiers[D.round]));
-    if (D.round === W_BCUP.rounds.length - 1) { D.done = true; D.champ = D.cards[D.round][0].w; break; }
-    D.round++;
-    if (!D.out) break;
-  }
-  D.pending = false; D.show = true;
-  if (D.done && D.champ === 'me') wBcupWon();
-  else if (D.done) wLog(`${wCap(wBcupName(D.champ))} win the Anvil Belt.`, 'd');
-  else wLog(`The ${W_BCUP.rounds[D.round - 1].toLowerCase()}s are in. ${W_BCUP.rounds[D.round]}: ${wBcupName(wBcupMine())}.`, 'g');
-  wSave();
-  return true;
-}
 function wBcupWon() {
   const P = W_BCUP.prize, D = wBcup(), f = D.cards[2][0];
   RUN.gold += P.gold; RUN.fans = (RUN.fans || 0) + P.fans;
@@ -119,16 +86,6 @@ function wBcupWon() {
 }
 
 /* ---------- the Belt's card: entry, the bracket, your next card ---------- */
-function wBcupBracket() {
-  const D = wBcup();
-  const cell = (r, a, b) => {
-    const g = wBcupCard(r, a, b), toss = g && g.toss;
-    const row = id => `<li class="${id === 'me' ? 'wme' : ''}${g && g.w === id ? ' wwon' : g ? ' wlost' : ''}"><span>${esc(wBcupTeamName(id))}</span><b>${g ? (g.a === id ? g.ra : g.rb) : ''}${toss && g.w === id ? '*' : ''}</b></li>`;
-    return `<ol class="wdcg">${row(a)}${row(b)}</ol>`;
-  };
-  return `<div class="wdcb">${W_BCUP.rounds.map((n, r) => `<div><h5>${n}</h5>${r <= D.round || D.done ? wBcupPairs(Math.min(r, 2)).map(([a, b]) => cell(r, a, b)).join('') : '<p class="dim">To come.</p>'}</div>`).join('')}</div>
-    ${D.cards.some(R => R.some(g => g.toss)) ? '<p class="hint">* A drawn card: through on the toss of a coin.</p>' : ''}`;
-}
 function wOpenBcup(msg) {
   if (LAB || !WG) return;
   wBcupCatchUp();
