@@ -13,11 +13,18 @@
 
    The world's start functions build their own options, so this part does what the kit parts do (w73): it marks that a
    world game is being started (W_FAN_NEXT) and the engine's start and simulate calls made meanwhile take the value.
-   W_FAN_GRD, wFanLift(sport) (0, 1 or 2)
+   The stands fill (phase 5): the crowd drawn in a card match and in the four engines is as thick as your following
+   (W_FAN_CROWD by step: three seats in ten with no following, all of them for a household name). It goes to the
+   engines as opts.crowd with every world game and is drawing only.
+   W_FAN_GRD, W_FAN_CROWD, wFanLift(sport) (0, 1 or 2), wFanCrowd()
    Wrapped: wStartRink, wStartCourt, wStartGrid and wRingGo (wW99…: the mark), wHK.start and simGame, wBK.start and
    simGame, wGF.start, game and simGame, wBX.cardStart and simCard (the value goes in), renderHelp (wW99RenderHelp:
    #wHelpFanLift). */
 
+// how full the stands are, by your following (phase 5): empty seats until you have fans. Drawing only
+const W_FAN_CROWD = [.3, .5, .7, .85, 1];
+function wFanCrowd() { return W_FOLLOW.off ? 1 : W_FAN_CROWD[wFollowStep()]; }
+onHook('fightStart', () => { if (WG) CROWD.fill = wFanCrowd(); });
 const W_FAN_GRD = { hockey: 'g_rink', basketball: 'g_court', football: 'g_bowl', boxing: 'g_ring' };
 let W_FAN_NEXT = null;
 W_FOLLOW.live[3] = true;
@@ -29,15 +36,14 @@ function wFanLift(sport) {
 }
 function wFanMark(sport, fn) {
   const n = wFanLift(sport);
-  if (!n) return fn();
-  W_FAN_NEXT = { fans: [n, 0], said: false };
+  W_FAN_NEXT = { fans: [n, 0], said: !n, crowd: wFanCrowd() };
   try { return fn(); } finally { W_FAN_NEXT = null; }
 }
 // the engine call takes the value (once said, the log has it)
 function wFanOpts(o) {
   if (!W_FAN_NEXT) return o;
   if (!W_FAN_NEXT.said) { W_FAN_NEXT.said = true; wLog(W_FAN_NEXT.fans[0] >= 2 ? 'Your travelling army is in the away end, and will sing all game.' : 'Your supporters\' club is in the away end.', 'g'); }
-  return Object.assign({}, o, { fans: W_FAN_NEXT.fans.slice() });
+  return Object.assign({}, o, { fans: W_FAN_NEXT.fans.slice(), crowd: W_FAN_NEXT.crowd });
 }
 
 const wW99StartRink = wStartRink; wStartRink = function (o) { return wFanMark('hockey', () => wW99StartRink.call(this, o)); };

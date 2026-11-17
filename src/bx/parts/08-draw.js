@@ -55,6 +55,7 @@ function bxDrawHall(c) {
   c.fillStyle = g; c.fillRect(0, 90, 960, 510);
   // the far crowd: lit from the ring, so the ones nearer the middle are brighter; a few in each corner's colour
   for (const [x, row, v] of BX_CROWD) {
+    if (!engSeat(x + row * 101)) continue;
     const y = 150 + row * 13 + Math.sin(BXT.t * 2 + x) * .8, s = 6 + row * .8, lit = 1 - Math.min(1, Math.abs(x - 480) / 560) * .55, m = (26 + v * 5) * lit;
     c.fillStyle = v === 3 ? tint(G.corners[x < 480 ? 0 : 1].color, -.55 - (1 - lit) * .3) : `rgb(${m * 1.5 | 0},${m * 1.05 | 0},${m * .85 | 0})`;
     c.beginPath(); c.arc(x, y, s, Math.PI, 0); c.fill(); c.fillRect(x - s, y, 2 * s, 14);

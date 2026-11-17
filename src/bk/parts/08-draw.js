@@ -103,7 +103,7 @@ function bkDrawCrowd(c) {
     c.fillStyle = '#2a1a12'; c.fillRect(x - 2, 78, 4, 12); c.fillStyle = '#ff9a3a'; c.beginPath(); c.ellipse(x, 74 - f, 3.5, 6 + f, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe08a'; c.beginPath(); c.ellipse(x, 76, 1.6, 3, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
   // two rows of the yard's crowd, the back one smaller and darker; the home half in the club's colour, the far end in the visitors'
   for (let row = 0; row < 2; row++) { const n = row ? 44 : 48, r = row ? 7 : 5.5, y0 = row ? 112 : 97;
-    for (let i = 0; i < n; i++) { const x = (row ? 26 : 16) + i * (row ? 21 : 19.6), b = Math.sin(BKT.t * (roar ? 9 : 2) + i * 1.3 + row) * (roar ? 5 : 1.2), y = y0 + b + ((i * 7 + row) % 3) * 2;
+    for (let i = 0; i < n; i++) { if (!engSeat(i + row * 101)) continue; const x = (row ? 26 : 16) + i * (row ? 21 : 19.6), b = Math.sin(BKT.t * (roar ? 9 : 2) + i * 1.3 + row) * (roar ? 5 : 1.2), y = y0 + b + ((i * 7 + row) % 3) * 2;
       const shirt = (i * 5 + row * 3) % 4 ? (row ? '#33221a' : '#261914') : tint(x < 480 ? home : away, row ? -.1 : -.35);
       c.save(); bkCrowdAt(c, x, y);
       c.fillStyle = shirt; c.beginPath(); c.moveTo(x - r - 2, y + r + 12); c.lineTo(x - r - 1, y + r - 1); c.quadraticCurveTo(x, y + r - 5, x + r + 1, y + r - 1); c.lineTo(x + r + 2, y + r + 12); c.closePath(); c.fill();

@@ -5457,11 +5457,14 @@ function sportFx(f) {
   }
 }
 // the gallery: heads that bob, jump when you score, slump when they do
+// how full the stands are, 0 to 1 (the Realm sets it by your following; here they are always full)
+const CROWD = { fill: 1 };
 function drawCrowd(c) {
   const team = clubTeam(), foe = (B.enemies[0] && B.enemies[0].team) || ACTS[RUN.act].team;
   const t = A.t, cr = A.crowd, k = cr ? A.t - cr.t : 9, tier = B.sc ? momTier() : 0;
   const share = .5 + tier * .15; // more of your colours in the stands when you lead
   for (let i = 0, x = 12; x < SW; x += 22, i++) {
+    if (((i * 61) % 100) / 100 >= CROWD.fill) continue;
     const mine = ((i * 37) % 100) / 100 < share;
     let y = 30 + Math.sin(t * 2 + i) * (Math.abs(tier) ? 1.5 : .6);
     if (k < 1.1) { const happy = (cr.side === 0) === mine; y += happy ? -Math.abs(Math.sin((k * 9) + i * .5)) * 7 * (1 - k / 1.1) : 2 * (1 - k / 1.1); }
@@ -22029,6 +22032,9 @@ function engSeed(n) {
   engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const R = () => engRand();
+// is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
+const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
+const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -23159,7 +23165,7 @@ function gfStart(opts) {
   gfPlaybookStart(); gfBoxStart();
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
-  gfFansStart(o.fans);
+  gfFansStart(o.fans); G.crowd = engCrowd(o);
   gfStanceStart(o.stance);
   gfKitStart(o.bags);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
@@ -23464,7 +23470,7 @@ function gfDrawStands(c, top, bot) {
   // the far wall, and the tier behind it
   c.fillStyle = '#1a1310'; c.fillRect(0, top - 64, 960, 58); c.fillStyle = '#0e0a08'; c.fillRect(0, top - 14, 960, 8); c.fillStyle = 'rgba(255,170,90,.16)'; c.fillRect(0, top - 14, 960, 1);
   for (let row = 0; row < 2; row++) { const r = row ? 6 : 4.8, y0 = top - (row ? 26 : 42);
-    for (let i = a0 * 2; i <= a1 * 2; i++) { const ax = i / 2 + (row ? .25 : 0), x = gfScr(ax, 0).x, h = ((i * 7 + row * 3) % 11 + 11) % 11, y = y0 + (h % 3) * 2 + Math.sin(GFT.t * 2 + i * 1.7 + row) * 1.1;
+    for (let i = a0 * 2; i <= a1 * 2; i++) { if (!engSeat(i + row * 101)) continue; const ax = i / 2 + (row ? .25 : 0), x = gfScr(ax, 0).x, h = ((i * 7 + row * 3) % 11 + 11) % 11, y = y0 + (h % 3) * 2 + Math.sin(GFT.t * 2 + i * 1.7 + row) * 1.1;
       c.fillStyle = h % 4 ? (row ? '#2e2019' : '#231813') : tint(G.teams[ax < 50 ? 0 : 1].color, row ? -.15 : -.4);
       c.beginPath(); c.moveTo(x - r - 2, y + r + 12); c.lineTo(x - r - 1, y + r - 1); c.quadraticCurveTo(x, y + r - 5, x + r + 1, y + r - 1); c.lineTo(x + r + 2, y + r + 12); c.closePath(); c.fill();
       c.fillStyle = row ? GF_SKIN[h % 6] : tint(GF_SKIN[(h + 2) % 6], -.3); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); } }
@@ -25109,6 +25115,9 @@ function engSeed(n) {
   engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const R = () => engRand();
+// is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
+const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
+const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -26165,7 +26174,7 @@ function bxStart(opts) {
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
   Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0,
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] });
-  bxFansStart(o.fans);
+  bxFansStart(o.fans); G.crowd = engCrowd(o);
   // gear with a status at the opening bell (13-kit.js)
   for (const f of G.F) { const op = bxGx(f).open; if (op) f.fx.push(Object.assign({ id: 'g_open' }, op)); }
   BD = { ph: 'intro', t: 0, acc: 0, mode: !o.headless && BX_MODES.includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0, headless: !!o.headless, count: 0, getUp: 0 };
@@ -26389,6 +26398,7 @@ function bxDrawHall(c) {
   c.fillStyle = g; c.fillRect(0, 90, 960, 510);
   // the far crowd: lit from the ring, so the ones nearer the middle are brighter; a few in each corner's colour
   for (const [x, row, v] of BX_CROWD) {
+    if (!engSeat(x + row * 101)) continue;
     const y = 150 + row * 13 + Math.sin(BXT.t * 2 + x) * .8, s = 6 + row * .8, lit = 1 - Math.min(1, Math.abs(x - 480) / 560) * .55, m = (26 + v * 5) * lit;
     c.fillStyle = v === 3 ? tint(G.corners[x < 480 ? 0 : 1].color, -.55 - (1 - lit) * .3) : `rgb(${m * 1.5 | 0},${m * 1.05 | 0},${m * .85 | 0})`;
     c.beginPath(); c.arc(x, y, s, Math.PI, 0); c.fill(); c.fillRect(x - s, y, 2 * s, 14);
@@ -26726,7 +26736,7 @@ function bxCardStart(opts) {
   const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
   const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
   CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null,
-    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [], fans: (o.fans || [0, 0]).slice() };
+    bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [], fans: (o.fans || [0, 0]).slice(), crowd: o.crowd == null ? null : o.crowd };
   bxCardBout();
   return CD;
 }
@@ -26734,7 +26744,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
@@ -27477,6 +27487,9 @@ function engSeed(n) {
   engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const R = () => engRand();
+// is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
+const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
+const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -28710,7 +28723,7 @@ function bkStart(opts) {
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
   G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
   bkCallsStart(o);
-  bkCourtStart(!!o.court); bkPowersStart(o.powers); bkFansStart(o.fans); bkKitStart(o.bags);
+  bkCourtStart(!!o.court); bkPowersStart(o.powers); bkFansStart(o.fans); G.crowd = engCrowd(o); bkKitStart(o.bags);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
@@ -29089,7 +29102,7 @@ function bkDrawCrowd(c) {
     c.fillStyle = '#2a1a12'; c.fillRect(x - 2, 78, 4, 12); c.fillStyle = '#ff9a3a'; c.beginPath(); c.ellipse(x, 74 - f, 3.5, 6 + f, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe08a'; c.beginPath(); c.ellipse(x, 76, 1.6, 3, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
   // two rows of the yard's crowd, the back one smaller and darker; the home half in the club's colour, the far end in the visitors'
   for (let row = 0; row < 2; row++) { const n = row ? 44 : 48, r = row ? 7 : 5.5, y0 = row ? 112 : 97;
-    for (let i = 0; i < n; i++) { const x = (row ? 26 : 16) + i * (row ? 21 : 19.6), b = Math.sin(BKT.t * (roar ? 9 : 2) + i * 1.3 + row) * (roar ? 5 : 1.2), y = y0 + b + ((i * 7 + row) % 3) * 2;
+    for (let i = 0; i < n; i++) { if (!engSeat(i + row * 101)) continue; const x = (row ? 26 : 16) + i * (row ? 21 : 19.6), b = Math.sin(BKT.t * (roar ? 9 : 2) + i * 1.3 + row) * (roar ? 5 : 1.2), y = y0 + b + ((i * 7 + row) % 3) * 2;
       const shirt = (i * 5 + row * 3) % 4 ? (row ? '#33221a' : '#261914') : tint(x < 480 ? home : away, row ? -.1 : -.35);
       c.save(); bkCrowdAt(c, x, y);
       c.fillStyle = shirt; c.beginPath(); c.moveTo(x - r - 2, y + r + 12); c.lineTo(x - r - 1, y + r - 1); c.quadraticCurveTo(x, y + r - 5, x + r + 1, y + r - 1); c.lineTo(x + r + 2, y + r + 12); c.closePath(); c.fill();
@@ -30653,6 +30666,9 @@ function engSeed(n) {
   engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const R = () => engRand();
+// is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
+const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
+const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;
@@ -32028,7 +32044,7 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkFansStart(o.fans); hkKitStart(o.bags);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkFansStart(o.fans); G.crowd = engCrowd(o); hkKitStart(o.bags);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
@@ -32438,6 +32454,7 @@ function hkDrawBank(c) {
 // a row of townsfolk on the bank, in scarves, bobbing a little
 function hkDrawCrowd(c) {
   for (let i = 0; i < 44; i++) {
+    if (!engSeat(i)) continue;
     // (they bob a little, and jump when the bank roars)
     const roar = G.pond && G.pond.roar ? 1 : 0, x = 34 + i * 20.6, b = Math.sin(HKT.t * (roar ? 9 : 2) + i * 1.3) * (roar ? 3.5 : 1.4), y = 158 + (i % 3) * 3 + b;
     c.fillStyle = ['#3c4a5a', '#5a4a3c', '#4a3c52', '#2f4a44'][i % 4]; rr(c, x - 8, y, 16, 15, 4); c.fill();
@@ -47331,11 +47348,18 @@ renderHelp = function () {
 
    The world's start functions build their own options, so this part does what the kit parts do (w73): it marks that a
    world game is being started (W_FAN_NEXT) and the engine's start and simulate calls made meanwhile take the value.
-   W_FAN_GRD, wFanLift(sport) (0, 1 or 2)
+   The stands fill (phase 5): the crowd drawn in a card match and in the four engines is as thick as your following
+   (W_FAN_CROWD by step: three seats in ten with no following, all of them for a household name). It goes to the
+   engines as opts.crowd with every world game and is drawing only.
+   W_FAN_GRD, W_FAN_CROWD, wFanLift(sport) (0, 1 or 2), wFanCrowd()
    Wrapped: wStartRink, wStartCourt, wStartGrid and wRingGo (wW99…: the mark), wHK.start and simGame, wBK.start and
    simGame, wGF.start, game and simGame, wBX.cardStart and simCard (the value goes in), renderHelp (wW99RenderHelp:
    #wHelpFanLift). */
 
+// how full the stands are, by your following (phase 5): empty seats until you have fans. Drawing only
+const W_FAN_CROWD = [.3, .5, .7, .85, 1];
+function wFanCrowd() { return W_FOLLOW.off ? 1 : W_FAN_CROWD[wFollowStep()]; }
+onHook('fightStart', () => { if (WG) CROWD.fill = wFanCrowd(); });
 const W_FAN_GRD = { hockey: 'g_rink', basketball: 'g_court', football: 'g_bowl', boxing: 'g_ring' };
 let W_FAN_NEXT = null;
 W_FOLLOW.live[3] = true;
@@ -47347,15 +47371,14 @@ function wFanLift(sport) {
 }
 function wFanMark(sport, fn) {
   const n = wFanLift(sport);
-  if (!n) return fn();
-  W_FAN_NEXT = { fans: [n, 0], said: false };
+  W_FAN_NEXT = { fans: [n, 0], said: !n, crowd: wFanCrowd() };
   try { return fn(); } finally { W_FAN_NEXT = null; }
 }
 // the engine call takes the value (once said, the log has it)
 function wFanOpts(o) {
   if (!W_FAN_NEXT) return o;
   if (!W_FAN_NEXT.said) { W_FAN_NEXT.said = true; wLog(W_FAN_NEXT.fans[0] >= 2 ? 'Your travelling army is in the away end, and will sing all game.' : 'Your supporters\' club is in the away end.', 'g'); }
-  return Object.assign({}, o, { fans: W_FAN_NEXT.fans.slice() });
+  return Object.assign({}, o, { fans: W_FAN_NEXT.fans.slice(), crowd: W_FAN_NEXT.crowd });
 }
 
 const wW99StartRink = wStartRink; wStartRink = function (o) { return wFanMark('hockey', () => wW99StartRink.call(this, o)); };
@@ -47517,5 +47540,84 @@ renderHelp = function () {
   const F = W_STAND.favours;
   h.insertAdjacentHTML('beforeend', ` <span id="wHelpStand"><b>The Supporters' Stand</b> spends fans: at your home ground, or with Imelda Foss at the League office until you have one (ask about SUPPORTERS). ${Object.keys(F).map(k => `${F[k].n} (${F[k].cost})`).join(', ')}. The fans you spend leave your total, so a favour can drop your following a step, and what that step gave stops until you win them back.</span>`);
 };
+/* w101: a household name (issue #79, phase 6). Loads after w100-stand.js; changes earlier parts only by reassignment
+   (saved originals carry the wW101 prefix).
+
+   The top step of your following (W_FOLLOW.at[3] fans) opens doors:
+     - the taverns' free agents ask W_FAME.agent of their fee (a quarter off), for the agents on this week's list;
+     - cup entry fees are waived: the town cups (w11), the Diamond Cup (w20e) and the four engine cups (w45b);
+     - a rival club that bids for one of your players offers W_FAME.bid times as much (half as much again).
+   Spend your fans back under the step and the fees and bids are as they were (a tavern's list keeps its price for
+   the week it was drawn).
+
+   The cups read their fee from their own table wherever they show or charge it, so the waiver is made there once:
+   each table's `fee` is read through W_FAME (0 while you are a household name, its own number otherwise; setting it
+   still sets the number). Not in LAB mode unless the lab asks.
+   W_FAME, wFameOn()
+   Wrapped: wTavern (wW101Tavern), W_LEAGUE.fee (wW101BidFee), renderHelp (wW101RenderHelp: #wHelpFame). */
+
+const W_FAME = { agent: .75, bid: 1.5, cups: [W_CUP, W_DCUP, W_GCUP, W_BCUP, W_NET, W_KETTLE] };
+W_FOLLOW.live[4] = true;
+function wFameOn() { return wFollowOn(4); }
+for (const T of W_FAME.cups) {
+  let fee = T.fee;
+  Object.defineProperty(T, 'fee', { enumerable: true, configurable: true, get: () => wFameOn() ? 0 : fee, set: v => { fee = v; } });
+}
+const wW101Tavern = wTavern;
+wTavern = function (town) {
+  const T = wW101Tavern(town);
+  if (T.wfame || !wFameOn()) return T;
+  T.wfame = 1;
+  for (const a of T.list) a.fee = Math.round(a.fee * W_FAME.agent);
+  return T;
+};
+const wW101BidFee = W_LEAGUE.fee;
+W_LEAGUE.fee = lvl => Math.round(wW101BidFee(lvl) * (wFameOn() ? W_FAME.bid : 1));
+
+const wW101RenderHelp = renderHelp;
+renderHelp = function () {
+  wW101RenderHelp();
+  const h = $('wHelpFollow'); if (!h || $('wHelpFame')) return;
+  h.insertAdjacentHTML('beforeend', ` <span id="wHelpFame"><b>A household name</b> (${W_FOLLOW.at[3]} fans): free agents at the taverns ask a quarter less, cup entry fees are waived, and a rival club that bids for one of your players offers half as much again.</span>`);
+};
+/* w102: the following's feel (issue #79, phase 7): a coach's note, medals, and the crowd when you reach a step. Loads
+   after w101-fame.js; changes earlier parts only by reassignment (saved originals carry the wW102 prefix).
+
+   Coach's notes: w_follow once you have a few regulars (what a following is, and the Team screen), w_stand once you
+   have a supporters' club (the Supporters' Stand, and what spending costs).
+   Medals: w_follow (a supporters' club, a travelling army, a household name: the highest step a journey reaches) and
+   w_favour (favours asked at the Stand).
+   A step reached is heard: the crowd, louder the higher the step. Nothing in LAB mode.
+   wFollowTips()
+   Wrapped: wFollowCheck (wW102FollowCheck: the sound, and the medal), wStandBuy (wW102StandBuy: the medal). */
+
+Object.assign(TIPS, {
+  w_follow: ['Your following', 'A few regulars have started turning up. Fans are your following: the more you hold, the more they are worth, from a gate at every match at a ground to a lift when you play away. Open the Team screen (C) to see where you stand and what the next step gives.'],
+  w_stand: ['The Supporters\' Stand', 'You have a supporters\' club. Fans can be spent as well as held: at your home ground, or with Imelda Foss at the League office until you have one (ask about SUPPORTERS). A favour takes the fans out of your total, so spending can drop your following a step.'],
+});
+function wFollowTips() {
+  if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world' || W_FOLLOW.off) return;
+  if (wFollowStep() >= 1) tip('w_follow');
+  if (wFollowStep() >= 2) tip('w_stand');
+}
+setInterval(wFollowTips, 900);
+
+ACH.push(
+  { id: 'w_follow', n: 'Known Everywhere', d: 'Build a following: a supporters\' club, then a travelling army, then a household name', stat: 'realmFollowTop', at: [2, 3, 4] },
+  { id: 'w_favour', n: 'Give Them Something Back', d: 'Ask favours at the Supporters\' Stand', stat: 'realmFavours', at: [1, 10, 30] },
+);
+const wW102FollowCheck = wFollowCheck;
+wFollowCheck = function () {
+  const top0 = WG && WG.follow ? WG.follow.top : 0, up = wW102FollowCheck();
+  if (!up || LAB) return up;
+  const s = wFollowStep();
+  try { sfx.crowd(1 + s * .35); } catch (e) { console.error(e); }
+  // (the medal counts the highest step: only what is new on this journey is added, and only past the best so far)
+  const best = (ACHS.stats.realmFollowTop || 0), top = WG.follow.top;
+  if (top > top0 && top > best) achAdd('realmFollowTop', top - best);
+  return up;
+};
+const wW102StandBuy = wStandBuy;
+wStandBuy = function (id, arg) { const r = wW102StandBuy(id, arg); if (!r && !LAB) achAdd('realmFavours', 1); return r; };
 </script>
 </body></html>

@@ -9,6 +9,9 @@ function engSeed(n) {
   engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const R = () => engRand();
+// is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
+const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
+const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;

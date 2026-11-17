@@ -47,6 +47,16 @@ async def main():
         check('Your following.' in hp and 'at 100 a few regulars' in hp and 'household name' in hp and 'counted separately' in hp, 'How to play explains the following', hp)
         lab = await pg.evaluate("(() => { const n = WLOG.length; WG.follow = null; RUN.fans = 1800; LAB = true; let r; try { r = wFollowCheck(); } finally { LAB = false; } return [r, WLOG.length - n]; })()")
         check(lab == [False, 0], 'nothing is announced in LAB mode', lab)
+        # ---------- phase 7: the coach's notes, the medals, the crowd ----------
+        fe = await pg.evaluate("""(() => { const heard = []; const keep = sfx.crowd; sfx.crowd = v => heard.push(v);
+          ACHS.stats.realmFollowTop = 0; ACHS.stats.realmFavours = 0; WG.follow = null; RUN.fans = 0; wSave();
+          try { RUN.fans = 450; wSave(); const two = ACHS.stats.realmFollowTop; RUN.fans = 50; wSave(); RUN.fans = 450; wSave(); const again = ACHS.stats.realmFollowTop;
+            RUN.fans = 1600; wSave(); const four = ACHS.stats.realmFollowTop; const n = heard.length;
+            RUN.fans = 500; const r = wStandBuy('whip');
+            return { two, again, four, n, louder: heard[heard.length - 1] > heard[0], r, fav: ACHS.stats.realmFavours, tips: ['w_follow', 'w_stand'].every(k => TIPS[k] && TIPS[k].length === 2), ach: ['w_follow', 'w_favour'].every(id => ACH.some(a => a.id === id)) };
+          } finally { sfx.crowd = keep; } })()""")
+        check(fe['two'] == 2 and fe['again'] == 2 and fe['four'] == 4 and fe['ach'], 'the medal counts the highest step a journey reaches, once', fe)
+        check(fe['n'] == 3 and fe['louder'] and fe['r'] == '' and fe['fav'] == 1 and fe['tips'], 'a step reached is heard, louder the higher; a favour counts for its medal; two coach’s notes', fe)
         check(await pg.evaluate("wAudit().length === 0"), 'the audit is clean', await pg.evaluate("wAudit()"))
         check(not errs and await pg.evaluate("window.__sdErrs.length === 0"), 'no page errors', errs)
         await br.close()

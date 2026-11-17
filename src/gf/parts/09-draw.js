@@ -134,7 +134,7 @@ function gfDrawStands(c, top, bot) {
   // the far wall, and the tier behind it
   c.fillStyle = '#1a1310'; c.fillRect(0, top - 64, 960, 58); c.fillStyle = '#0e0a08'; c.fillRect(0, top - 14, 960, 8); c.fillStyle = 'rgba(255,170,90,.16)'; c.fillRect(0, top - 14, 960, 1);
   for (let row = 0; row < 2; row++) { const r = row ? 6 : 4.8, y0 = top - (row ? 26 : 42);
-    for (let i = a0 * 2; i <= a1 * 2; i++) { const ax = i / 2 + (row ? .25 : 0), x = gfScr(ax, 0).x, h = ((i * 7 + row * 3) % 11 + 11) % 11, y = y0 + (h % 3) * 2 + Math.sin(GFT.t * 2 + i * 1.7 + row) * 1.1;
+    for (let i = a0 * 2; i <= a1 * 2; i++) { if (!engSeat(i + row * 101)) continue; const ax = i / 2 + (row ? .25 : 0), x = gfScr(ax, 0).x, h = ((i * 7 + row * 3) % 11 + 11) % 11, y = y0 + (h % 3) * 2 + Math.sin(GFT.t * 2 + i * 1.7 + row) * 1.1;
       c.fillStyle = h % 4 ? (row ? '#2e2019' : '#231813') : tint(G.teams[ax < 50 ? 0 : 1].color, row ? -.15 : -.4);
       c.beginPath(); c.moveTo(x - r - 2, y + r + 12); c.lineTo(x - r - 1, y + r - 1); c.quadraticCurveTo(x, y + r - 5, x + r + 1, y + r - 1); c.lineTo(x + r + 2, y + r + 12); c.closePath(); c.fill();
       c.fillStyle = row ? GF_SKIN[h % 6] : tint(GF_SKIN[(h + 2) % 6], -.3); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); } }

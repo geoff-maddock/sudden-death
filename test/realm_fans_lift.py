@@ -66,6 +66,20 @@ async def main():
           const f = wHK.G && wHK.G.fans, sp = wHK.G && wHK.G.spirit.slice(); return { r, f, sp, plain: JSON.stringify(wHK.G.fans) }; })()""")
         check(fans_in['r'] == '' and fans_in['f'] == [2, 0] and fans_in['sp'] == [10, 0], 'a world game you manage starts with the lift for your side only', fans_in)
         await pg.evaluate("(() => { try { wLeaveRink && wLeaveRink(); } catch (e) {} })()")
+        # ---------- the stands fill (phase 5) ----------
+        cr = await pg.evaluate("""(() => { const at = n => { RUN.fans = n; return wFanCrowd(); }; const steps = [0, 100, 400, 900, 1500].map(at);
+          wHK.start({ seed: 2 }); const full = wHK.G.crowd; wHK.start({ seed: 2, crowd: .3 }); const thin = wHK.G.crowd; wBK.start({ seed: 2, crowd: .5 }); const bk = wBK.G.crowd; wGF.start({ seed: 2, crowd: 2 }); const gf = wGF.G.crowd;
+          wBX.start({ fighters: [{ n: 'A', kind: 'goblin' }, { n: 'B', kind: 'ogre' }], seed: 2, crowd: 0 }); const bx = wBX.G.crowd;
+          RUN.fans = 0; WG.ground = null; WG.hkg.met = {}; WG.hkg.live = null; const r = wStartRink({ club: Object.values(WG.rivals)[0], how: 'manage' }); const world = [wHK.G.crowd, wHK.G.fans];
+          return { steps, full, thin, bk, gf, bx, r, world, sd: CROWD.fill }; })()""")
+        check(cr['steps'] == [.3, .5, .7, .85, 1] and cr['full'] == 1 and cr['thin'] == .3 and cr['bk'] == .5 and cr['gf'] == 1 and cr['bx'] == 0, 'the stands are as full as your following; each engine takes it as a start value (full when not given)', cr)
+        check(cr['r'] == '' and cr['world'] == [.3, [0, 0]], 'a world game with no following is played to three seats in ten, and no lift', cr)
+        px = await pg.evaluate("""async () => { const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+          const count = () => { const cv = document.querySelector('#v-rink canvas'), d = cv.getContext('2d').getImageData(0, Math.round(cv.height * 150 / 600), cv.width, Math.round(cv.height * 30 / 600)).data; let n = 0;
+            for (let i = 0; i < d.length; i += 4) { const k = `${d[i]},${d[i + 1]},${d[i + 2]}`; if (k === '217,183,154' || k === '184,200,216' || k === '159,184,154' || k === '224,200,176') n++; } return n; };
+          wHK.start({ seed: 2, crowd: 1, mode: 'watch' }); await frame(); const full = count(); wHK.start({ seed: 2, crowd: .3, mode: 'watch' }); await frame(); const thin = count(); wHK.start({ seed: 2, crowd: 0, mode: 'watch' }); await frame(); const none = count();
+          return { full, thin, none }; }""")
+        check(px['full'] > 0 and px['none'] == 0 and 0 < px['thin'] < px['full'] * .6, 'on the ice the bank is drawn that full: heads counted at full, at three in ten, and empty', px)
         hp = await pg.evaluate("(() => { showPage('help'); renderHelp(); const h = document.getElementById('wHelpFanLift'); const t = h ? h.textContent : ''; showPage('play'); return t; })()")
         check('10 spirit' in hp and '1 mana in football' in hp and 'sing all game' in hp and 'Simulate' in hp, 'How to play explains the lift in the engines', hp)
         check(await pg.evaluate("W_FOLLOW.live[3]"), 'the third step is marked as in the game')
