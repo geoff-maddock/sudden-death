@@ -6,9 +6,12 @@
    G gains (all plain JSON): cs (the course's seed; GL_STAND for the standing nine) and wild; teams ({ name, roster:
    [{ n, kind, r: ratings }] }, four a side); skill (0 Squire, 1 Knight, 2 Archmage, a side); ball ([{ x, y, lie }]);
    wind ({ s: mph, d: the direction it blows to }); card (each hole played: { no, par, st, up, res }); stat (a side's
-   putts, fairways hit and tried, greens in regulation, longest drive, birdies, eagles, water); log (every shot).
+   putts, fairways hit and tried, greens in regulation, longest drive, birdies, eagles, water); pst (each player's
+   shots, putts and holes holed); log (every shot and every putt given).
+   A turn is in parts so a shot can be struck by hand (07-play.js): glNext (who plays, and may their putt be given),
+   glGive, glPlan, then glHit (the CPU's swing) or glStrike (yours), and glShoot counts it.
    glSimGame plays a whole game at once through glTurn, so the sim and the game on show can't drift apart. */
-const GL_HOOK = { onOver: null, onShot: null };
+const GL_HOOK = { onOver: null, onShot: null, onPhase: null, onPick: null };
 // the swing's spread, before the hitter's rating (k: 1.4 less it; 1.5 less it on the green) and the skill's: power (p) and
 // accuracy (e) on a full shot, the same for a chip (sp, se), and a putt's angle (pa, radians) and pace (pv)
 const GL_SWING = { p: 0.07, e: 0.8, sp: 0.17, se: 0.6, pa: 0.02, pv: 0.12 };
@@ -17,7 +20,7 @@ const GL_TEAMS = [{ name: 'Mossgate' }, { name: 'The visitors' }];
 function glTeam(t, side) {
   const T = t || GL_TEAMS[side], ro = (T.roster || []).slice(0, GL_RULES.side);
   while (ro.length < GL_RULES.side) ro.push({ n: 'Player ' + (ro.length + 1) });
-  return { name: T.name || GL_TEAMS[side].name, roster: ro.map((m, i) => ({ n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.assign({}, GL_DEF_RAT, m.r || {}) })) };
+  return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster: ro.map((m, i) => ({ n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.assign({}, GL_DEF_RAT, m.r || {}) })) };
 }
 // the hole being played, built from the course's seed (playoff holes go round again)
 function glHoleNow() { return glCourseHole(G.cs, (G.h % G.holes) % 9, glParOf(G.h)); }
@@ -30,7 +33,7 @@ function glStart(opts) {
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
-    card: [], log: [], stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
+    card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
   glHoleStart();
   return G;
@@ -54,34 +57,52 @@ function glHit(s, plan) {
   return glFlight({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, wind: G.wind, spin: plan.spin, rat });
 }
 
-// one shot (or a putt given). Returns what happened, or null when the game is over
-function glTurn() {
+// who plays next: { side, d (yards to the pin), putt, give (the other side may give this putt) }, or null when it's over
+function glNext() {
   if (!G || G.over) return null;
   const H = glHoleNow(), d = [0, 1].map(s => glDistOf(H, s)), s = glAway(d);
   if (s < 0) return null;
-  const o = 1 - s, h0 = G.res.length, Hs = G.hole, no = glHoleNo();
-  let ev;
-  if (G.ball[s].lie === 'G' && glCpuConcede(o, s, d[s])) {
-    glConcede(o);
-    ev = { k: 'given', no, side: s, by: o, d0: +d[s].toFixed(2) };
-  } else {
-    const plan = glPlan(s), lie0 = G.ball[s].lie, st = glStroke(s, plan.ri);
-    if (!st.ok) { ev = { k: 'refused', why: st.why }; glAfterHole(h0, Hs); return ev; }
-    const r = glHit(s, plan), S = G.stat[s];
-    G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
-    if (plan.putt) S.putts++;
-    if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F') S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
-    if ((r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
-    ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, club: r.club || plan.club, lie0, d0: +d[s].toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip };
-    if (r.water) { S.water++; glDrop(s); }
-    // holed on the stroke that reached the cap: it still counts
-    if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
-    if (r.holed && !r.water && !Hs.done[s]) glHoled(s); else glDecide();
-  }
+  const putt = glShotKind(H, s) === 'putt';
+  return { side: s, d: d[s], putt, give: G.ball[s].lie === 'G' && d[s] <= GL_SKILL.giveIn && !G.hole.done[1 - s] };
+}
+// side by gives the other side its next putt
+function glGive(by) {
+  const s = 1 - by, h0 = G.res.length, Hs = G.hole, d = glDistOf(glHoleNow(), s);
+  if (!glConcede(by).ok) return null;
+  return glLogEv({ k: 'given', no: h0 + 1, side: s, by, d0: +d.toFixed(2) }, h0, Hs);
+}
+// side s hits plan; r is where the ball went (glHit's for the CPU, or a swing by hand: glStrike). Counts it
+function glShoot(s, plan, r) {
+  const H = glHoleNow(), h0 = G.res.length, Hs = G.hole, no = h0 + 1, d0 = glDistOf(H, s), lie0 = G.ball[s].lie, st = glStroke(s, plan.ri);
+  if (!st.ok) return { k: 'refused', why: st.why };
+  const S = G.stat[s];
+  G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
+  if (plan.putt) S.putts++;
+  G.pst[s][plan.ri].shots++; if (plan.putt) G.pst[s][plan.ri].putts++; if (r.holed) G.pst[s][plan.ri].holed++;
+  if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F') S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
+  if ((r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
+  const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
+  if (r.water) { S.water++; glDrop(s); }
+  // holed on the stroke that reached the cap: it still counts
+  if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
+  ev.up = !!Hs.up[s] && !r.holed;
+  if (r.holed && !r.water && !Hs.done[s]) glHoled(s); else glDecide();
+  return glLogEv(ev, h0, Hs);
+}
+function glLogEv(ev, h0, Hs) {
+  if (G.res.length > h0) ev.res = G.res[G.res.length - 1];
   G.log.push(ev);
   if (GL_HOOK.onShot) try { GL_HOOK.onShot(ev); } catch (e) { console.error(e); }
   glAfterHole(h0, Hs);
   return ev;
+}
+// one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
+function glTurn() {
+  const n = glNext(); if (!n) return null;
+  const s = n.side;
+  if (G.ball[s].lie === 'G' && glCpuConcede(1 - s, s, n.d)) return glGive(1 - s);
+  const plan = glPlan(s);
+  return glShoot(s, plan, glHit(s, plan));
 }
 // a hole just ended: its card and stats, then the next tee (or the end)
 function glAfterHole(h0, Hs) {
@@ -92,24 +113,25 @@ function glAfterHole(h0, Hs) {
     // a birdie or better is a ball in the hole (or given) in under par
     if (Hs.done[s] && !Hs.up[s]) { const u = Hs.par - Hs.st[s]; if (u === 1) G.stat[s].birdies++; else if (u >= 2) G.stat[s].eagles++; }
   }
-  if (G.over) { if (GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); } }
+  // (on the page the end is heard once the ball has stopped: 07-play.js)
+  if (G.over) { if (GL_HOOK.onOver && !(GD && GD.firing)) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); } }
   else glHoleStart();
 }
 function glSummary() {
   return {
     win: G.over ? G.over.win : -1, text: G.over ? G.over.text : '', holes: G.holes, played: G.res.length, res: G.res.slice(), won: G.won.slice(),
-    teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(),
+    teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), pst: JSON.parse(JSON.stringify(G.pst)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(),
   };
 }
 // a whole game at once, CPU against CPU, through glTurn
 function glSimGame(opts) {
-  const hooks = Object.assign({}, GL_HOOK), was = opts && opts.keep ? { G, rand: engRand } : null;
-  GL_HOOK.onOver = GL_HOOK.onShot = null;
+  const hooks = Object.assign({}, GL_HOOK), was = { G, GD, rand: engRand }, keep = !!(opts && opts.keep);
+  GL_HOOK.onOver = GL_HOOK.onShot = GL_HOOK.onPhase = null; GD = null;
   let out;
   try {
     glStart(opts);
     for (let i = 0; i < 5000 && !G.over; i++) if (!glTurn()) break;
     out = glSummary();
-  } finally { Object.assign(GL_HOOK, hooks); if (was) { G = was.G; engRand = was.rand; } }
+  } finally { Object.assign(GL_HOOK, hooks); GD = was.GD; if (keep) { G = was.G; engRand = was.rand; } }
   return out;
 }

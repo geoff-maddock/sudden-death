@@ -6,3 +6,5 @@ src/gl/parts/03-course.js
 src/gl/parts/04-shot.js
 src/gl/parts/05-cpu.js
 src/gl/parts/06-game.js
+src/gl/parts/07-play.js
+src/gl/parts/08-draw.js

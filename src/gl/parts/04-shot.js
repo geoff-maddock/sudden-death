@@ -36,6 +36,10 @@ const GL_LIES = {
 };
 // how far a ball runs over each ground (yards of roll a yard), 0: it stops in it
 const GL_ROLLF = { T: 1, F: 1, G: 1, r: 0.32, R: 0.12, S: 0, B: 0, O: 0.15, W: 0 };
+// the shot's shape and height (phase 2), asked for by hand: a draw runs out more, a fade stops sooner (bend: which way
+// it swings in the air, + to the right first); a punch flies low under the wind and runs, a lob climbs, drifts and sits
+const GL_SHAPES = { draw: { roll: 1.25, bend: 1, n: 'Draw' }, fade: { roll: 0.75, bend: -1, n: 'Fade' } };
+const GL_TRAJ = { punch: { carry: 0.8, h: 0.3, wind: 0.35, roll: 1.6, n: 'Punch' }, lob: { carry: 0.85, h: 1.5, wind: 1.3, roll: 0.3, n: 'Lob' } };
 const GL_PUTT = { fric: 0.62, fringe: 2.2, rough: 5, g: 7.6, cup: 0.06, cap: 1.7, dt: 0.02 };
 
 // how a club plays from a lie for a hitter, before the wind: { carry, roll } at swing power pow
@@ -59,45 +63,48 @@ function glWindPush(club, carry, wind, dir) {
 }
 
 /* a full shot. s: { hole, from: { x, y }, lie, club, aim: { x, y }, pow, err, wind: { s, d }, spin (-1 back to 1 top),
-   rat: { pow, scr } }. Returns { end, lie, water, drop, carry, roll, land, path: [{ x, y, z }], holed, lip } */
+   rat: { pow, scr }, shape: 'draw' or 'fade', traj: 'punch' or 'lob' }. Returns { end, lie, water, drop, carry, roll,
+   land, path: [{ x, y, z }] (the flight), run: [{ x, y }] (the roll after it), holed, lip } */
 function glFlight(s) {
   const H = s.hole, from = s.from, lie = s.lie || 'F', club = glClubOk(s.club, lie) ? s.club : 'we', c = GL_CLUBS[club], L = GL_LIES[lie] || GL_LIES.F;
   const scr = s.rat && s.rat.scr != null ? s.rat.scr : 0.5, spreadL = 1 + (L.spread - 1) * (1.3 - 0.6 * scr);
   const distL = 1 - (1 - L.dist) * (1.3 - 0.6 * scr);
   const R0 = glReach(club, lie, s.rat, clamp(s.pow, 0, 1.12));
-  const carry = R0.carry * (L.dist ? distL / L.dist : 1);
+  const T = L.punch ? GL_TRAJ.punch : GL_TRAJ[s.traj] || null, Sh = GL_SHAPES[s.shape] || null;
+  const carry = R0.carry * (L.dist ? distL / L.dist : 1) * (T && !L.punch ? T.carry : 1);
   const dir = Math.atan2(s.aim.y - from.y, s.aim.x - from.x);
   const off = -(s.err || 0) * 8 * c.spread * spreadL * Math.PI / 180;
-  const h = L.punch ? 0.3 : c.h;
-  const push = glWindPush(club, carry, s.wind, dir).map(v => v * (L.punch ? 0.35 : 1));
+  const h = T ? (L.punch ? T.h : c.h * T.h) : c.h, bend = Sh ? Sh.bend * carry * 0.05 : 0;
+  const push = glWindPush(club, carry, s.wind, dir).map(v => v * (T ? T.wind : 1));
   // the curve: straight out along the aim, bending by off, then the wind's drift by the end
   const ex = from.x + Math.cos(dir + off) * carry + push[0], ey = from.y + Math.sin(dir + off) * carry + push[1];
   const path = [], apex = carry * 0.11 * h;
   for (let i = 0; i <= 12; i++) {
     const f = i / 12, al = f * carry * Math.cos(off), lat = f * f * carry * Math.sin(off);
-    path.push({ x: from.x + Math.cos(dir) * al - Math.sin(dir) * lat + push[0] * f * f, y: from.y + Math.sin(dir) * al + Math.cos(dir) * lat + push[1] * f * f, z: 4 * apex * f * (1 - f) });
+    const b = bend * Math.sin(Math.PI * f);
+    path.push({ x: from.x + Math.cos(dir) * al - Math.sin(dir) * lat + push[0] * f * f + Math.sin(dir) * b, y: from.y + Math.sin(dir) * al + Math.cos(dir) * lat + push[1] * f * f - Math.cos(dir) * b, z: 4 * apex * f * (1 - f) });
   }
-  const land = { x: ex, y: ey }, ll = glLie(H, ex, ey), out = { club, carry: Math.round(hyp(ex - from.x, ey - from.y)), land, path, water: false, holed: false, lip: false };
+  const land = { x: ex, y: ey }, ll = glLie(H, ex, ey), out = { club, run: [], carry: Math.round(hyp(ex - from.x, ey - from.y)), land, path, water: false, holed: false, lip: false };
   if (ll === 'W') return Object.assign(out, glWaterDrop(H, from, land), { water: true, roll: 0 });
   if (ll === 'S' || ll === 'B' || ll === 'O') return Object.assign(out, { end: land, lie: ll, roll: 0 });
   // the roll: the club and the spin, along the line it came in on
   const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
-  let budget = R0.roll * (1 + 0.6 * spin), x = ex, y = ey, here = ll;
+  let budget = R0.roll * (1 + 0.6 * spin) * (T ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
   const rdir = rd;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
       const v = Math.sqrt(2 * GL_PUTT.fric * budget);
       const P = glPutt({ hole: H, from: { x, y }, a: rdir, v });
-      return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)) }, P.water ? glWaterDrop(H, from, { x, y }) : {});
+      return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, { x, y }) : {});
     }
     const f = GL_ROLLF[here];
     if (!f) break;
     const nx = x + Math.cos(rdir), ny = y + Math.sin(rdir), nl = glLie(H, nx, ny);
-    if (nl === 'W') return Object.assign(out, glWaterDrop(H, from, { x: nx, y: ny }), { water: true, roll: Math.round(hyp(nx - ex, ny - ey)) });
+    if (nl === 'W') return Object.assign(out, glWaterDrop(H, from, { x: nx, y: ny }), { water: true, roll: Math.round(hyp(nx - ex, ny - ey)), run: [{ x: ex, y: ey }, { x: nx, y: ny }] });
     budget -= 1 / f; x = nx; y = ny; here = nl;
   }
-  return Object.assign(out, { end: { x, y }, lie: here, roll: Math.round(hyp(x - ex, y - ey)) });
+  return Object.assign(out, { end: { x, y }, lie: here, roll: Math.round(hyp(x - ex, y - ey)), run: [{ x: ex, y: ey }, { x, y }] });
 }
 // into the water: the drop is back on the line from where it was hit, at the last dry ground before where it went in
 function glWaterDrop(H, from, wet) {

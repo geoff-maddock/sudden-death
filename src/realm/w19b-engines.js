@@ -3,7 +3,7 @@
    onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
    Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/), the Anvil Ring (wBX, boxing; src/bx/,
    issue #23), the Charter Court (wBK, basketball; src/bk/, issue #77) and Black Ice at the Pond Rink (wHK, hockey;
-   src/hk/, issue #83) and Mossgate Links (wGL, golf; src/gl/, issue #92: the rules only so far, no view). Nothing
+   src/hk/, issue #83) and Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play). Nothing
    here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
