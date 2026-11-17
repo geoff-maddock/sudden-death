@@ -131,3 +131,4 @@ src/realm/w93-rinkkit.js
 src/realm/w94-rinkstars.js
 src/realm/w95-rinkkettle.js
 src/realm/w96-rinkfeel.js
+src/realm/w97-following.js

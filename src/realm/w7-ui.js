@@ -119,7 +119,7 @@ function wRenderHud() {
     <div class="stat"><small>Year ${WG.year}</small><b class="wcrown">${crown}</b></div>
     <div class="stat hp${low ? ' wlow' : ''}" title="Your team's health. It carries from match to match; a night at an inn restores it."><small>Team HP</small><b>${RUN.hp}/${RUN.maxhp}</b></div>
     <div class="stat gold"><small>Gold</small><b>${RUN.gold}</b></div>
-    <div class="stat wfans" title="Fans: earned by sports wins"><small>Fans</small><b>${RUN.fans || 0}</b></div>
+    <div class="stat wfans" title="Fans: your following. The Team screen shows what it is worth."><small>Fans</small><b>${RUN.fans || 0}</b></div>
     <div class="party wparty" title="${esc(team.name)}">${party}</div>`;
 }
 function wRenderLog() {
