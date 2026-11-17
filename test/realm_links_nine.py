@@ -127,6 +127,12 @@ async def main():
         check(all(k == 'shot' for k in r6['losing']) and r6['even'] == 'given', 'the CPU never gives the putt that hands over the hole (a Squire gives it when it doesn\'t)', r6)
         check(r6['sand'] == 'we', 'from a greenside bunker 20 yards out the caddie takes the wedge', r6)
         check(abs(r6['punch']['planned'] - r6['punch']['flew']) <= 2, 'a punch from the trees finishes where it was planned (the punch\'s run is in the plan)', r6['punch'])
+        # (from the ninth review of #93) the caddie's read never smashes a putt: seed 105's fringe putt by a bunker's corner
+        # went 50 yards into the trees
+        sm = await pg.evaluate("""(() => { let worst = 0, at = null; for (let i = 0; i < 200; i++) { const r = wGL.simGame({ seed: 1 + i });
+            for (const e of r.log) if (e.k === 'shot' && e.club === 'pt' && !e.water) { const over = e.d1 - e.d0; if (over > worst) { worst = over; at = [1 + i, e.no, e.d0, e.d1, e.lie]; } } }
+          return { worst, at }; })()""")
+        check(sm['worst'] < 12, 'no putt ever runs far past where it started from the cup (the read never smashes one off the course)', sm)
         kp = await pg.evaluate("""(() => { wGL.start({ seed: 21 }); for (let i = 0; i < 6; i++) wGL.turn(); const before = JSON.stringify(wGL.G);
           const r = wGL.simGame({ seed: 4 }); return { same: before === JSON.stringify(wGL.G), sim: r.played > 0 }; })()""")
         check(kp['same'] and kp['sim'], 'a headless game leaves the game on the course as it was', kp)

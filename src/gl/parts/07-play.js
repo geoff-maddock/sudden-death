@@ -117,12 +117,12 @@ function glAnimBall() {
     const f = clamp(A.t / A.fT, 0, 1) * (A.path.length - 1), i = Math.min(A.path.length - 2, Math.floor(f)), u = f - i, a = A.path[i], b = A.path[i + 1];
     return { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u) };
   }
-  const R = A.run; if (!R.length) return A.path.length ? Object.assign({}, A.path[A.path.length - 1], { z: 0 }) : null;
+  const run = A.run; if (!run.length) return A.path.length ? Object.assign({}, A.path[A.path.length - 1], { z: 0 }) : null;
   let f = clamp((A.t - A.fT) / (A.rT || 1), 0, 1);
   if (!A.uniform) f = 1 - (1 - f) * (1 - f);
-  const g = f * (R.length - 1), i = Math.min(R.length - 2, Math.floor(g)), u = g - i;
-  if (R.length < 2) return { x: R[0].x, y: R[0].y, z: 0 };
-  return { x: lerp(R[i].x, R[i + 1].x, u), y: lerp(R[i].y, R[i + 1].y, u), z: 0 };
+  const g = f * (run.length - 1), i = Math.min(run.length - 2, Math.floor(g)), u = g - i;
+  if (run.length < 2) return { x: run[0].x, y: run[0].y, z: 0 };
+  return { x: lerp(run[i].x, run[i + 1].x, u), y: lerp(run[i].y, run[i + 1].y, u), z: 0 };
 }
 
 /* ---------- what happened, said plainly ---------- */
@@ -189,8 +189,9 @@ function glTickPow() {
 }
 // a putt's bar runs to this many yards (on a flat green, at full weight)
 function glPuttScale() {
-  const b = G.ball[GD.you], H = glHoleNow(), d = hyp(H.pin.x - b.x, H.pin.y - b.y);
-  return Math.max(3, d * 1.7 + 1);
+  const b = G.ball[GD.you], H = glHoleNow(), d = hyp(H.pin.x - b.x, H.pin.y - b.y), S = GD.sel, a = S ? hyp(S.aim.x - b.x, S.aim.y - b.y) : 0;
+  // (long enough for the pin and for your aim, however far past it you aim: the tick always rolls it there, flat)
+  return Math.max(3, d * 1.7 + 1, a * 1.25 + 1);
 }
 function glSelect(o) {
   if (!GD || GD.ph !== 'aim' || !o) return false;

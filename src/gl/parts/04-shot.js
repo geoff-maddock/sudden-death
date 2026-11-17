@@ -97,17 +97,16 @@ function glFlight(s) {
   const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
   let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
-  const rdir = rd; // (the roll runs on the line the ball came in on)
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
       const v = Math.sqrt(2 * GL_PUTT.fric * budget);
-      const P = glPutt({ hole: H, from: { x, y }, a: rdir, v });
+      const P = glPutt({ hole: H, from: { x, y }, a: rd, v });
       return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, P.end) : {});
     }
     const f = GL_ROLLF[here];
     if (!f) break;
-    const nx = x + Math.cos(rdir), ny = y + Math.sin(rdir), nl = glLie(H, nx, ny);
+    const nx = x + Math.cos(rd), ny = y + Math.sin(rd), nl = glLie(H, nx, ny);
     if (nl === 'W') return Object.assign(out, glWaterDrop(H, from, { x: nx, y: ny }), { water: true, roll: Math.round(hyp(nx - ex, ny - ey)), run: [{ x: ex, y: ey }, { x: nx, y: ny }] });
     budget -= 1 / f; x = nx; y = ny; here = nl;
   }

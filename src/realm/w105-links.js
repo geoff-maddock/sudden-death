@@ -44,7 +44,7 @@ $('wLinksBar').addEventListener('click', e => {
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
 $('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); e.target.blur(); });
-$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
+$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); });
 
 // under the course: your shot's rows, the scorecard and the players, this game, and How golf works
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>
@@ -71,7 +71,7 @@ $('wLinksRows').addEventListener('click', e => {
 });
 
 // why a player can't hit now
-const wLinksWhyNot = (V, ri) => wGL.whyNot(V.you, ri) || 'May hit.';
+const wLinksWhyNot = (V, ri) => V.ph === 'swing' ? 'The swing is under way: the hitter is picked.' : wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
@@ -102,7 +102,7 @@ function wLinksTeams() {
 /* one game at the Links. opts: { teams, holes, seed, mode, title, how, wild } */
 function wLinksGame(opts) {
   const o = opts || {};
-  WGL = { over: null, how: o.how || 'round' };
+  WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
   wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill });
   showView('links');
@@ -113,7 +113,8 @@ function wLinksBarNote() {
   const mode = WGL.over ? W_LINKS_MODE : wGL.mode || W_LINKS_MODE;
   for (const b of $('wLinksModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.lmode === mode); b.setAttribute('aria-pressed', b.dataset.lmode === mode); }
   wLinksSpeedSet();
-  $('wLinksNote').textContent = wGL.msg || '';
+  const G = wGL.G, later = !WGL.over && G && G.holes !== wLinksHoles();
+  $('wLinksNote').textContent = (wGL.msg || '') + (later ? ` (Holes: ${wLinksHoles()} from the next game; this one is ${G.holes}.)` : '');
   $('wLinksHoles').value = String(wLinksHoles());
 }
 // the scorecard (a column a hole: par, each side's strokes, who won it) and each side's players

@@ -34471,17 +34471,16 @@ function glFlight(s) {
   const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
   let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
-  const rdir = rd; // (the roll runs on the line the ball came in on)
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
       const v = Math.sqrt(2 * GL_PUTT.fric * budget);
-      const P = glPutt({ hole: H, from: { x, y }, a: rdir, v });
+      const P = glPutt({ hole: H, from: { x, y }, a: rd, v });
       return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, P.end) : {});
     }
     const f = GL_ROLLF[here];
     if (!f) break;
-    const nx = x + Math.cos(rdir), ny = y + Math.sin(rdir), nl = glLie(H, nx, ny);
+    const nx = x + Math.cos(rd), ny = y + Math.sin(rd), nl = glLie(H, nx, ny);
     if (nl === 'W') return Object.assign(out, glWaterDrop(H, from, { x: nx, y: ny }), { water: true, roll: Math.round(hyp(nx - ex, ny - ey)), run: [{ x: ex, y: ey }, { x: nx, y: ny }] });
     budget -= 1 / f; x = nx; y = ny; here = nl;
   }
@@ -34568,7 +34567,7 @@ function glShotKind(H, s) {
 }
 // a putt from off the green only when the way to the cup is short grass
 function glPuttable(H, b) {
-  const d = hyp(H.pin.x - b.x, H.pin.y - b.y), n = Math.ceil(d);
+  const d = hyp(H.pin.x - b.x, H.pin.y - b.y), n = Math.ceil(d * 2);
   for (let i = 1; i < n; i++) { const l = glLie(H, b.x + (H.pin.x - b.x) * i / n, b.y + (H.pin.y - b.y) * i / n); if (l !== 'G' && l !== 'F') return false; }
   return true;
 }
@@ -34651,6 +34650,8 @@ function glRead(H, from, slopeK) {
   let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
   for (let i = 0; i < 10; i++) {
     const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true });
+    // (the trial roll stopped in sand, bog or the trees: more pace would only smash it on, so the read keeps what it has)
+    if (P.lie !== 'G' && P.lie !== 'F' && P.lie !== 'T') break;
     const ex = P.end.x - from.x, ey = P.end.y - from.y, al = ex * ux + ey * uy, lat = P.cross != null ? P.cross : -ex * uy + ey * ux;
     a -= Math.atan2(lat, Math.max(0.5, d)) * 0.9;
     v *= Math.sqrt(want / Math.max(0.15, al));
@@ -34930,12 +34931,12 @@ function glAnimBall() {
     const f = clamp(A.t / A.fT, 0, 1) * (A.path.length - 1), i = Math.min(A.path.length - 2, Math.floor(f)), u = f - i, a = A.path[i], b = A.path[i + 1];
     return { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u) };
   }
-  const R = A.run; if (!R.length) return A.path.length ? Object.assign({}, A.path[A.path.length - 1], { z: 0 }) : null;
+  const run = A.run; if (!run.length) return A.path.length ? Object.assign({}, A.path[A.path.length - 1], { z: 0 }) : null;
   let f = clamp((A.t - A.fT) / (A.rT || 1), 0, 1);
   if (!A.uniform) f = 1 - (1 - f) * (1 - f);
-  const g = f * (R.length - 1), i = Math.min(R.length - 2, Math.floor(g)), u = g - i;
-  if (R.length < 2) return { x: R[0].x, y: R[0].y, z: 0 };
-  return { x: lerp(R[i].x, R[i + 1].x, u), y: lerp(R[i].y, R[i + 1].y, u), z: 0 };
+  const g = f * (run.length - 1), i = Math.min(run.length - 2, Math.floor(g)), u = g - i;
+  if (run.length < 2) return { x: run[0].x, y: run[0].y, z: 0 };
+  return { x: lerp(run[i].x, run[i + 1].x, u), y: lerp(run[i].y, run[i + 1].y, u), z: 0 };
 }
 
 /* ---------- what happened, said plainly ---------- */
@@ -35002,8 +35003,9 @@ function glTickPow() {
 }
 // a putt's bar runs to this many yards (on a flat green, at full weight)
 function glPuttScale() {
-  const b = G.ball[GD.you], H = glHoleNow(), d = hyp(H.pin.x - b.x, H.pin.y - b.y);
-  return Math.max(3, d * 1.7 + 1);
+  const b = G.ball[GD.you], H = glHoleNow(), d = hyp(H.pin.x - b.x, H.pin.y - b.y), S = GD.sel, a = S ? hyp(S.aim.x - b.x, S.aim.y - b.y) : 0;
+  // (long enough for the pin and for your aim, however far past it you aim: the tick always rolls it there, flat)
+  return Math.max(3, d * 1.7 + 1, a * 1.25 + 1);
 }
 function glSelect(o) {
   if (!GD || GD.ph !== 'aim' || !o) return false;
@@ -50296,7 +50298,7 @@ $('wLinksBar').addEventListener('click', e => {
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
 $('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); e.target.blur(); });
-$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
+$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); e.target.blur(); });
 
 // under the course: your shot's rows, the scorecard and the players, this game, and How golf works
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>
@@ -50323,7 +50325,7 @@ $('wLinksRows').addEventListener('click', e => {
 });
 
 // why a player can't hit now
-const wLinksWhyNot = (V, ri) => wGL.whyNot(V.you, ri) || 'May hit.';
+const wLinksWhyNot = (V, ri) => V.ph === 'swing' ? 'The swing is under way: the hitter is picked.' : wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
   const box = $('wLinksRows'), V = WGL && !WGL.over ? wGL.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel, offer = V && V.ph === 'offer';
@@ -50354,7 +50356,7 @@ function wLinksTeams() {
 /* one game at the Links. opts: { teams, holes, seed, mode, title, how, wild } */
 function wLinksGame(opts) {
   const o = opts || {};
-  WGL = { over: null, how: o.how || 'round' };
+  WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
   wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, skill: o.skill });
   showView('links');
@@ -50365,7 +50367,8 @@ function wLinksBarNote() {
   const mode = WGL.over ? W_LINKS_MODE : wGL.mode || W_LINKS_MODE;
   for (const b of $('wLinksModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.lmode === mode); b.setAttribute('aria-pressed', b.dataset.lmode === mode); }
   wLinksSpeedSet();
-  $('wLinksNote').textContent = wGL.msg || '';
+  const G = wGL.G, later = !WGL.over && G && G.holes !== wLinksHoles();
+  $('wLinksNote').textContent = (wGL.msg || '') + (later ? ` (Holes: ${wLinksHoles()} from the next game; this one is ${G.holes}.)` : '');
   $('wLinksHoles').value = String(wLinksHoles());
 }
 // the scorecard (a column a hole: par, each side's strokes, who won it) and each side's players

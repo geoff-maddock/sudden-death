@@ -26,7 +26,7 @@ function glShotKind(H, s) {
 }
 // a putt from off the green only when the way to the cup is short grass
 function glPuttable(H, b) {
-  const d = hyp(H.pin.x - b.x, H.pin.y - b.y), n = Math.ceil(d);
+  const d = hyp(H.pin.x - b.x, H.pin.y - b.y), n = Math.ceil(d * 2);
   for (let i = 1; i < n; i++) { const l = glLie(H, b.x + (H.pin.x - b.x) * i / n, b.y + (H.pin.y - b.y) * i / n); if (l !== 'G' && l !== 'F') return false; }
   return true;
 }
@@ -109,6 +109,8 @@ function glRead(H, from, slopeK) {
   let a = Math.atan2(uy, ux), v = Math.sqrt(2 * GL_PUTT.fric * want) * (glLie(H, from.x, from.y) === 'G' ? 1 : 1.3);
   for (let i = 0; i < 10; i++) {
     const P = glPutt({ hole: H, from, a, v, slopeK, noCup: true });
+    // (the trial roll stopped in sand, bog or the trees: more pace would only smash it on, so the read keeps what it has)
+    if (P.lie !== 'G' && P.lie !== 'F' && P.lie !== 'T') break;
     const ex = P.end.x - from.x, ey = P.end.y - from.y, al = ex * ux + ey * uy, lat = P.cross != null ? P.cross : -ex * uy + ey * ux;
     a -= Math.atan2(lat, Math.max(0.5, d)) * 0.9;
     v *= Math.sqrt(want / Math.max(0.15, al));
