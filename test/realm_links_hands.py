@@ -216,6 +216,24 @@ async def main():
         check(r4['cancel'] == {'ph': 'aim', 'strokes': 0}, 'a cancelled touch calls the drag off: no swing, no stroke', r4)
         check(r4['same'] == {'ph': 'aim', 'kept': True}, 'clicking You play again changes nothing: your shot and its choices stay', r4)
 
+        # (from the fifth review of #93) Space mid-round never presses a bar button; a box over the course holds the
+        # meter; the phone strip waits for the ball
+        r5 = await pg.evaluate("""(() => { const out = {}; __mine(101); wGL.pause(false); wGL.drag(.9, 0);
+          const b = document.getElementById('wLinksAgain'); let clicked = 0; const f = () => clicked++; b.addEventListener('click', f); b.focus();
+          const e = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }); b.dispatchEvent(e); b.removeEventListener('click', f); out.fly = { ph: wGL.phase, prevented: e.defaultPrevented }; wGL.pause(true);
+          // the phone strip: while the putt that wins a hole rolls, it still shows the hole being played
+          __mine(102); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x, y: H.pin.y - 1.2, lie: 'G' }; G.ball[1] = { x: H.pin.x + 1, y: H.pin.y, lie: 'G' }; G.hole.st = [3, 5];
+          __replan(); __to('aim'); wGL.aimAt(H.pin.x, H.pin.y); wGL.drag(wGL.view.sel.tick, 0); out.strip = { holed: wGL.view.last.holed, ph: wGL.phase, html: W_SB_HTML.links(), live: wGL.G.h };
+          return out; })()""")
+        check(r5['fly']['prevented'] and r5['fly']['ph'] in ('fly', 'rest', 'next', 'addr', 'aim'), 'Space mid-round, the ball in the air, is the course\'s: it never presses a focused bar button', r5['fly'])
+        check(r5['strip']['holed'] and r5['strip']['ph'] == 'fly' and 'Hole 1' in r5['strip']['html'] and r5['strip']['live'] == 1, 'while the putt that wins the hole rolls, the phone strip still shows the hole being played', r5['strip'])
+        await pg.evaluate("__mine(103); wGL.pause(false); wGL.press(); showSettings()")
+        await pg.wait_for_selector('#sLinksHoles')
+        p0 = await pg.evaluate("wGL.view.meter.p")
+        await pg.wait_for_function("new Promise(r => { let n = 0; const f = () => ++n >= 20 ? r(true) : requestAnimationFrame(f); requestAnimationFrame(f); })")
+        mb = await pg.evaluate("(() => { const v = { p: wGL.view.meter.p, ph: wGL.phase }; document.getElementById('modal').hidden = true; wGL.pause(true); return v; })()")
+        check(mb['ph'] == 'swing' and abs(mb['p'] - p0) < 1e-9, 'a box open over the course holds a swing in progress (it doesn\'t run out and go off)', [p0, mb])
+
         # ---------- How to play, Settings, leaving ----------
         await pg.evaluate("wLinksGame({ seed: 61, mode: 'play' }); wGL.pause(false)")
         await pg.click('#wLinksHowBtn')

@@ -25,7 +25,8 @@ function glRender(dt) {
 function glFrame(now) {
   if (!GLP.on) return;
   const dt = Math.min(0.05, Math.max(0, (now - GLP.last) / 1000)); GLP.last = now;
-  if (!GLP.paused) for (let i = 0; i < GLP.speed && !GLP.paused; i++) glTick(dt);
+  const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
+  if (!GLP.paused && !boxed) for (let i = 0; i < GLP.speed && !GLP.paused; i++) glTick(dt);
   glRender(GLP.paused ? 0 : dt);
   GLP.raf = requestAnimationFrame(glFrame);
 }
@@ -35,7 +36,10 @@ function glHide() { GLP.ptr = null; if (GD) GD.drag = null; GLP.host.hidden = tr
 /* ---------- the keys ---------- */
 function glKeyOk(e) {
   if (!GLP.on || !GD || GD.mode !== 'play' || GLP.paused || GLP.cv.offsetParent === null) return false;
-  if (GD.ph !== 'aim' && GD.ph !== 'swing' && GD.ph !== 'offer') return false;
+  // Space belongs to the course for the whole of a live round (until the last ball of the game has stopped), so it never
+  // presses a focused bar button mid-round; after the game it is the page's again. The other keys: only on your beat
+  const live = !G.over || GD.ph === 'fly';
+  if (e.key === ' ' ? !live : GD.ph !== 'aim' && GD.ph !== 'swing' && GD.ph !== 'offer') return false;
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return false;
   const m = document.getElementById('modal'); if (m && !m.hidden) return false;

@@ -29,9 +29,9 @@ function glPlayStart(o) {
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
 // what is drawn: the hole and both balls, as they were before the shot in the air
-function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow(), wind: Object.assign({}, G.wind), match: glMatchText(0), st: G.hole.st.slice() }; }
+function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow(), wind: Object.assign({}, G.wind), match: glMatchText(0), st: G.hole.st.slice(), won: G.won.slice(), over: !!G.over }; }
 // the match as drawn catches up once a hole's last ball has stopped
-function glDispMatch() { if (GD && GD.disp) { GD.disp.match = glMatchText(0); const c = G.card[G.card.length - 1]; if (c && c.no === GD.disp.h + 1) GD.disp.st = c.st.slice(); } }
+function glDispMatch() { if (GD && GD.disp) { GD.disp.match = glMatchText(0); GD.disp.won = G.won.slice(); GD.disp.over = !!G.over; const c = G.card[G.card.length - 1]; if (c && c.no === GD.disp.h + 1) GD.disp.st = c.st.slice(); } }
 // a new beat: msg (when given) is said first, so the page's status line, redrawn on the beat, shows it
 function glGo(ph, wait, msg) {
   if (msg != null) GD.msg = msg;

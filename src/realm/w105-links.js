@@ -44,7 +44,7 @@ $('wLinksBar').addEventListener('click', e => {
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
 $('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); });
-$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); });
+$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
 
 // under the course: your shot's rows, the scorecard and the players, this game, and How golf works
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>
@@ -114,7 +114,7 @@ function wLinksGame(opts) {
 }
 function wLinksBarNote() {
   if (!WGL) return;
-  const mode = wGL.mode || W_LINKS_MODE;
+  const mode = WGL.over ? W_LINKS_MODE : wGL.mode || W_LINKS_MODE;
   for (const b of $('wLinksModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.lmode === mode); b.setAttribute('aria-pressed', b.dataset.lmode === mode); }
   wLinksSpeedSet();
   $('wLinksNote').textContent = wGL.msg || '';
@@ -156,8 +156,9 @@ wGL.onOver = s => { if (WGL) { WGL.over = s; wLinksBarNote(); wLinksRows(); wLin
 // the scoreboard strip on a phone (w86): both sides, holes won, and the match
 W_SB_VIEWS.links = 'wSbLinks';
 W_SB_HTML.links = function () {
-  const G = wGL.G; if (!G || !G.teams) return '';
-  return wSbSide(G.teams[0].name, G.teams[0].color, G.won[0], false, '<small>holes</small>') + `<div class="wsbmid"><b>${G.over ? 'Final' : 'Hole ' + (G.h + 1)}</b><small>${esc(wGL.matchText(0))}</small></div>` + wSbSide(G.teams[1].name, G.teams[1].color, G.won[1], false, '<small>holes</small>');
+  // (the match as drawn: it waits for the ball to stop, as the picture and the card do)
+  const G = wGL.G, D = wGL.shown; if (!G || !G.teams || !D) return '';
+  return wSbSide(G.teams[0].name, G.teams[0].color, D.won[0], false, '<small>holes</small>') + `<div class="wsbmid"><b>${D.over ? 'Final' : 'Hole ' + (D.h + 1)}</b><small>${esc(D.match)}</small></div>` + wSbSide(G.teams[1].name, G.teams[1].color, D.won[1], false, '<small>holes</small>');
 };
 
 const wW105ShowView = showView;

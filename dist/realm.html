@@ -34811,9 +34811,9 @@ function glPlayStart(o) {
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
 // what is drawn: the hole and both balls, as they were before the shot in the air
-function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow(), wind: Object.assign({}, G.wind), match: glMatchText(0), st: G.hole.st.slice() }; }
+function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow(), wind: Object.assign({}, G.wind), match: glMatchText(0), st: G.hole.st.slice(), won: G.won.slice(), over: !!G.over }; }
 // the match as drawn catches up once a hole's last ball has stopped
-function glDispMatch() { if (GD && GD.disp) { GD.disp.match = glMatchText(0); const c = G.card[G.card.length - 1]; if (c && c.no === GD.disp.h + 1) GD.disp.st = c.st.slice(); } }
+function glDispMatch() { if (GD && GD.disp) { GD.disp.match = glMatchText(0); GD.disp.won = G.won.slice(); GD.disp.over = !!G.over; const c = G.card[G.card.length - 1]; if (c && c.no === GD.disp.h + 1) GD.disp.st = c.st.slice(); } }
 // a new beat: msg (when given) is said first, so the page's status line, redrawn on the beat, shows it
 function glGo(ph, wait, msg) {
   if (msg != null) GD.msg = msg;
@@ -35338,7 +35338,8 @@ function glRender(dt) {
 function glFrame(now) {
   if (!GLP.on) return;
   const dt = Math.min(0.05, Math.max(0, (now - GLP.last) / 1000)); GLP.last = now;
-  if (!GLP.paused) for (let i = 0; i < GLP.speed && !GLP.paused; i++) glTick(dt);
+  const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
+  if (!GLP.paused && !boxed) for (let i = 0; i < GLP.speed && !GLP.paused; i++) glTick(dt);
   glRender(GLP.paused ? 0 : dt);
   GLP.raf = requestAnimationFrame(glFrame);
 }
@@ -35348,7 +35349,10 @@ function glHide() { GLP.ptr = null; if (GD) GD.drag = null; GLP.host.hidden = tr
 /* ---------- the keys ---------- */
 function glKeyOk(e) {
   if (!GLP.on || !GD || GD.mode !== 'play' || GLP.paused || GLP.cv.offsetParent === null) return false;
-  if (GD.ph !== 'aim' && GD.ph !== 'swing' && GD.ph !== 'offer') return false;
+  // Space belongs to the course for the whole of a live round (until the last ball of the game has stopped), so it never
+  // presses a focused bar button mid-round; after the game it is the page's again. The other keys: only on your beat
+  const live = !G.over || GD.ph === 'fly';
+  if (e.key === ' ' ? !live : GD.ph !== 'aim' && GD.ph !== 'swing' && GD.ph !== 'offer') return false;
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return false;
   const m = document.getElementById('modal'); if (m && !m.hidden) return false;
@@ -35423,7 +35427,7 @@ for (const ev of ['pointerup', 'pointercancel']) GLP.cv.addEventListener(ev, glP
    what the page needs: the phase, whose shot, your choice, the clubs and hitters you may pick, the meter), tick(dt)
    (the tests move the game on by hand). Your shot: select({ ri, club, shape, traj, spin }), aimAt, aimTurn, aimPush,
    press (Space), drag(pull, deg) (the phone's swing), offer(give), setMode; swingNums, win and readLine are the numbers
-   behind the meter and the read; scr and unscr map the picture. onPhase and onPick hear a new beat and a new choice. */
+   behind the meter and the read; scr and unscr map the picture; shown is the match as drawn (it waits for the ball, as the picture does). onPhase and onPick hear a new beat and a new choice. */
 return {
   rules: JSON.parse(JSON.stringify(GL_RULES)), get G() { return G; },
   newGame: o => glNewGame(o), pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
@@ -35440,6 +35444,7 @@ return {
   start: o => { glStart(o); glPlayStart(o || {}); return G; },
   show: () => glShow(), hide: () => glHide(), get on() { return GLP.on; }, render: () => glRender(0),
   pause: on => { GLP.paused = !!on; }, get paused() { return GLP.paused; }, get speed() { return GLP.speed; }, set speed(n) { GLP.speed = clamp(Math.round(n) || 1, 1, 8); },
+  get shown() { return GD && GD.disp ? { h: GD.disp.h, match: GD.disp.match, won: GD.disp.won.slice(), over: GD.disp.over } : null; },
   get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, get mode() { return GD ? GD.mode : null; }, get you() { return GD ? GD.you : 0; },
   get view() { return GD ? JSON.parse(JSON.stringify({ ph: GD.ph, mode: GD.mode, you: GD.you, sel: GD.sel, meter: GD.meter, swung: GD.swung, last: GD.last, cpu: GD.cpu, hitters: GD.ph === 'aim' ? glHitters(GD.you) : [], clubs: GD.ph === 'aim' ? glClubsNow() : [], h: GD.disp ? GD.disp.h : 0 })) : null; },
   tick: dt => glTick(dt == null ? 0.05 : dt), select: o => glSelect(o), aimAt: (x, y) => glAimAt(x, y), aimTurn: d => glAimTurn(d), aimPush: y => glAimPush(y),
@@ -50254,7 +50259,7 @@ $('wLinksBar').addEventListener('click', e => {
 });
 function wLinksSpeedSet() { const play = wGL.mode === 'play'; wGL.speed = play ? 1 : W_LINKS_SPEED; $('wLinksSpeedL').hidden = play || !WGL || !!WGL.over; $('wLinksSpeed').value = String(W_LINKS_SPEED); }
 $('wLinksSpeed').addEventListener('change', e => { W_LINKS_SPEED = +e.target.value || 1; wLinksSpeedSet(); });
-$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); });
+$('wLinksHoles').addEventListener('change', e => { SET.linksHoles = +e.target.value; saveSettings(); wLinksBarNote(); if (WGL && !WGL.over && wGL.G && wGL.G.holes !== SET.linksHoles) $('wLinksNote').textContent = `${SET.linksHoles} holes from the next game; this one stays ${wGL.G.holes}.`; });
 
 // under the course: your shot's rows, the scorecard and the players, this game, and How golf works
 $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccalls wscoach" hidden>
@@ -50324,7 +50329,7 @@ function wLinksGame(opts) {
 }
 function wLinksBarNote() {
   if (!WGL) return;
-  const mode = wGL.mode || W_LINKS_MODE;
+  const mode = WGL.over ? W_LINKS_MODE : wGL.mode || W_LINKS_MODE;
   for (const b of $('wLinksModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.lmode === mode); b.setAttribute('aria-pressed', b.dataset.lmode === mode); }
   wLinksSpeedSet();
   $('wLinksNote').textContent = wGL.msg || '';
@@ -50366,8 +50371,9 @@ wGL.onOver = s => { if (WGL) { WGL.over = s; wLinksBarNote(); wLinksRows(); wLin
 // the scoreboard strip on a phone (w86): both sides, holes won, and the match
 W_SB_VIEWS.links = 'wSbLinks';
 W_SB_HTML.links = function () {
-  const G = wGL.G; if (!G || !G.teams) return '';
-  return wSbSide(G.teams[0].name, G.teams[0].color, G.won[0], false, '<small>holes</small>') + `<div class="wsbmid"><b>${G.over ? 'Final' : 'Hole ' + (G.h + 1)}</b><small>${esc(wGL.matchText(0))}</small></div>` + wSbSide(G.teams[1].name, G.teams[1].color, G.won[1], false, '<small>holes</small>');
+  // (the match as drawn: it waits for the ball to stop, as the picture and the card do)
+  const G = wGL.G, D = wGL.shown; if (!G || !G.teams || !D) return '';
+  return wSbSide(G.teams[0].name, G.teams[0].color, D.won[0], false, '<small>holes</small>') + `<div class="wsbmid"><b>${D.over ? 'Final' : 'Hole ' + (D.h + 1)}</b><small>${esc(D.match)}</small></div>` + wSbSide(G.teams[1].name, G.teams[1].color, D.won[1], false, '<small>holes</small>');
 };
 
 const wW105ShowView = showView;

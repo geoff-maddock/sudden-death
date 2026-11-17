@@ -14,7 +14,7 @@
    what the page needs: the phase, whose shot, your choice, the clubs and hitters you may pick, the meter), tick(dt)
    (the tests move the game on by hand). Your shot: select({ ri, club, shape, traj, spin }), aimAt, aimTurn, aimPush,
    press (Space), drag(pull, deg) (the phone's swing), offer(give), setMode; swingNums, win and readLine are the numbers
-   behind the meter and the read; scr and unscr map the picture. onPhase and onPick hear a new beat and a new choice. */
+   behind the meter and the read; scr and unscr map the picture; shown is the match as drawn (it waits for the ball, as the picture does). onPhase and onPick hear a new beat and a new choice. */
 return {
   rules: JSON.parse(JSON.stringify(GL_RULES)), get G() { return G; },
   newGame: o => glNewGame(o), pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
@@ -31,6 +31,7 @@ return {
   start: o => { glStart(o); glPlayStart(o || {}); return G; },
   show: () => glShow(), hide: () => glHide(), get on() { return GLP.on; }, render: () => glRender(0),
   pause: on => { GLP.paused = !!on; }, get paused() { return GLP.paused; }, get speed() { return GLP.speed; }, set speed(n) { GLP.speed = clamp(Math.round(n) || 1, 1, 8); },
+  get shown() { return GD && GD.disp ? { h: GD.disp.h, match: GD.disp.match, won: GD.disp.won.slice(), over: GD.disp.over } : null; },
   get phase() { return GD ? GD.ph : null; }, get msg() { return GD ? GD.msg : ''; }, get mode() { return GD ? GD.mode : null; }, get you() { return GD ? GD.you : 0; },
   get view() { return GD ? JSON.parse(JSON.stringify({ ph: GD.ph, mode: GD.mode, you: GD.you, sel: GD.sel, meter: GD.meter, swung: GD.swung, last: GD.last, cpu: GD.cpu, hitters: GD.ph === 'aim' ? glHitters(GD.you) : [], clubs: GD.ph === 'aim' ? glClubsNow() : [], h: GD.disp ? GD.disp.h : 0 })) : null; },
   tick: dt => glTick(dt == null ? 0.05 : dt), select: o => glSelect(o), aimAt: (x, y) => glAimAt(x, y), aimTurn: d => glAimTurn(d), aimPush: y => glAimPush(y),
