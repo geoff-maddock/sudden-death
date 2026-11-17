@@ -97,7 +97,7 @@ function glFlight(s) {
   const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
   let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
-  const rdir = rd;
+  const rdir = rd; // (the roll runs on the line the ball came in on)
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left

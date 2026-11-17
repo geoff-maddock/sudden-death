@@ -34128,7 +34128,7 @@ function glPars(n) { const out = []; for (let i = 0; i < n; i++) out.push(GL_RUL
 function glHole(par) { return { par, st: [0, 0], done: [false, false], up: [false, false], last: [-1, -1], hit: [[], []] }; }
 function glNewGame(opts) {
   const o = opts || {}, holes = GL_RULES.holesAt.includes(o.holes) ? o.holes : GL_RULES.holes;
-  const pars = Array.isArray(o.pars) && o.pars.length === holes && o.pars.every(p => p >= 3 && p <= 5) ? o.pars.slice() : glPars(holes);
+  const pars = Array.isArray(o.pars) && o.pars.length === holes && o.pars.every(p => Number.isInteger(p) && p >= 3 && p <= 5) ? o.pars.slice() : glPars(holes);
   G = { holes, pars, h: 0, won: [0, 0], res: [], hole: glHole(pars[0]), honour: o.honour === 1 ? 1 : 0, playoff: 0, over: null };
   return G;
 }
@@ -34471,7 +34471,7 @@ function glFlight(s) {
   const spin = clamp(s.spin || 0, -1, 1), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
   let budget = R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * (Sh ? Sh.roll : 1), x = ex, y = ey, here = ll;
-  const rdir = rd;
+  const rdir = rd; // (the roll runs on the line the ball came in on)
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
@@ -34582,20 +34582,25 @@ function glPickHitter(side, kind) {
 
 // the power that sends club from lie dist yards (carry and roll together), or the carry alone; capped at full
 function glPowFor(club, lie, rat, dist, carryOnly) {
-  let lo = 0.03, hi = 1;
+  // (carry and roll together need not rise with power: from the trees the punch's carry is capped while a softer swing
+  // runs further. So the nearest on a fine sweep, then a closer look round it)
   const f = p => { const r = glReach(club, lie, rat, p); return carryOnly ? r.carry : r.carry + r.roll; };
-  if (f(hi) <= dist) return hi;
-  for (let i = 0; i < 22; i++) { const m = (lo + hi) / 2; if (f(m) < dist) lo = m; else hi = m; }
-  return (lo + hi) / 2;
+  let best = 1, be = Math.abs(f(1) - dist);
+  for (let p = 0.03; p < 1; p += 0.01) { const e = Math.abs(f(p) - dist); if (e < be - 1e-9) { be = e; best = p; } }
+  for (let p = Math.max(0.03, best - 0.01); p <= Math.min(1, best + 0.01); p += 0.0005) { const e = Math.abs(f(p) - dist); if (e < be - 1e-9) { be = e; best = p; } }
+  return best;
 }
 // out of reach: the spot down the hole's line, at most reach yards away, to play to
-function glLayTarget(H, b, reach, careful) {
+function glLayTarget(H, b, reach, careful, rollFrac) {
   let best = null, bestF = null;
+  const bad = l => l === 'W' || l === 'S' || l === 'B' || l === 'O';
   for (const p of H.line) {
     const d = hyp(p.x - b.x, p.y - b.y);
     if (d > reach || p.y < b.y - 5) continue;
     const l = glLie(H, p.x, p.y);
-    if (careful && (l === 'W' || l === 'S' || l === 'B' || l === 'O')) continue;
+    if (careful && bad(l)) continue;
+    // (careful: where it lands, short of the spot by the roll, and every yard it runs over to get there, are clear too)
+    if (careful && rollFrac) { const run = d * rollFrac, ux = (p.x - b.x) / (d || 1), uy = (p.y - b.y) / (d || 1); let ok = true; for (let t = 0; t <= run && ok; t += 2) if (bad(glLie(H, p.x - ux * t, p.y - uy * t))) ok = false; if (!ok) continue; }
     if (!best || p.t > best.t) best = p;
     if (l === 'F' && (!bestF || p.t > bestF.t)) bestF = p;
   }
@@ -34617,7 +34622,7 @@ function glPlan(s, riIn) {
   const d = glDistOf(H, s), longest = clubs[0];
   let club, target;
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }
-  else if (d > tot(longest) * 0.98) { club = longest; target = glLayTarget(H, b, tot(longest), sk > 0); }
+  else if (d > tot(longest) * 0.98) { club = longest; const R = glReach(club, b.lie, rat, 1); target = glLayTarget(H, b, tot(longest), sk > 0, R.roll / (R.carry + R.roll || 1)); }
   else { club = GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
   // the landing spot: short of the target by the roll; then aim off for the wind
   const dir0 = Math.atan2(target.y - b.y, target.x - b.x), dist = hyp(target.x - b.x, target.y - b.y);
@@ -34655,9 +34660,11 @@ function glRead(H, from, slopeK) {
 }
 
 // does side by (the CPU) give side s its next putt, d yards long?
+// may side by give side s its next putt, d yards long? (on the green, short, and neither side done with the hole)
+function glMayGive(by, s, d) { const H = G.hole; return G.ball[s].lie === 'G' && d <= GL_SKILL.giveIn && !H.done[by] && !H.done[s]; }
 function glCpuConcede(by, s, d) {
   const H = G.hole;
-  if (d > GL_SKILL.giveIn || H.done[by] || H.done[s]) return false;
+  if (!glMayGive(by, s, d)) return false;
   // never the putt that hands over the hole: given, s is holed in one more, and by, already on as many, is beaten
   if (H.st[by] >= H.st[s] + 1) return false;
   return R() < GL_SKILL.give[G.skill[by]];
@@ -34728,10 +34735,10 @@ function glNext() {
   const H = glHoleNow(), d = [0, 1].map(s => glDistOf(H, s)), s = glAway(d);
   if (s < 0) return null;
   const putt = glShotKind(H, s) === 'putt';
-  return { side: s, d: d[s], putt, give: G.ball[s].lie === 'G' && d[s] <= GL_SKILL.giveIn && !G.hole.done[1 - s] };
+  return { side: s, d: d[s], putt, give: glMayGive(1 - s, s, d[s]) };
 }
 // does the CPU on the other side give this putt (n from glNext)? The one rule, for the sim and the game on show
-const glCpuGives = n => G.ball[n.side].lie === 'G' && glCpuConcede(1 - n.side, n.side, n.d);
+const glCpuGives = n => glCpuConcede(1 - n.side, n.side, n.d);
 // side by gives the other side its next putt
 function glGive(by) {
   const s = 1 - by, h0 = G.res.length, Hs = G.hole, d = glDistOf(glHoleNow(), s);
@@ -34767,10 +34774,10 @@ function glLogEv(ev, h0, Hs) {
 // one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
 function glTurn() {
   const n = glNext(); if (!n) return null;
-  if (glCpuGives(n)) return glGive(1 - n.side);
-  const s = n.side;
-  const plan = glPlan(s);
-  return glShoot(s, plan, glHit(s, plan));
+  const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { const plan = glPlan(s); return glShoot(s, plan, glHit(s, plan)); })();
+  // (glAfterHole leaves the end to the page when a game is on show; turn() is not the page, so it says it here)
+  if (GD && G.over && ev && ev.res != null && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  return ev;
 }
 // a hole just ended: its card and stats, then the next tee (or the end)
 function glAfterHole(h0, Hs) {
@@ -34826,7 +34833,7 @@ function glSimGame(opts) {
    In Watch the CPU plays both sides. GD.msg is the last thing that happened, said plainly. */
 const GL_METER = { up: 1.0, top: 1.1, down: 1.15, low: -0.18, win: [0.035, 0.065], pshot: 0.6, puttUp: 1.5, inErr: 0.25, outErr: 7 };
 const GL_PACE = { addr: 0.7, rest: 0.9, hole: 2.4, given: 1.3, fly: 1.7, roll: 0.8 };
-const GL_HANDS = { drag: 170, dragAcc: 12 };
+const GL_HANDS = { drag: 170, dragAcc: 12, puttDeg: 0.1 };
 let GD = null;
 
 function glPlayStart(o) {
@@ -34880,9 +34887,10 @@ function glGiven(by) {
   const ev = glGive(by);
   if (!ev) { glGo('next'); return; }
   GD.last = ev;
-  glGo('given', ev && ev.res != null ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
-  if (ev && ev.res != null) glDispMatch();
-  if (ev && ev.res != null && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  const end = ev.res != null;
+  glGo('given', end ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
+  if (end) glDispMatch();
+  if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
 }
 const glFeet = n => `${n} ${n === 1 ? 'foot' : 'feet'}`;
 const glYards = d => d < 1 ? glFeet(Math.max(1, Math.round(d * 3))) : `${Math.round(d)} ${Math.round(d) === 1 ? 'yard' : 'yards'}`;
@@ -35021,7 +35029,7 @@ function glAimTurn(deg) {
 }
 function glAimPush(yd) {
   if (!GD || GD.ph !== 'aim') return false;
-  const S = GD.sel, b = G.ball[GD.you], a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), d = Math.max(0.5, hyp(S.aim.x - b.x, S.aim.y - b.y) + yd);
+  const S = GD.sel, b = G.ball[GD.you], a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), d = Math.max(S.putt ? 0.05 : 0.5, hyp(S.aim.x - b.x, S.aim.y - b.y) + yd);
   S.aim = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d }; glSelFix(); return true;
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
@@ -35079,7 +35087,7 @@ function glDrag(pull, deg) {
   if (!GD || GD.ph !== 'aim') return false;
   const S = GD.sel, rat = glRat(GD.you, S.ri), pow = clamp(pull, 0, GL_METER.top);
   GD.meter = { k: S.putt ? 'putt' : 'full', st: 'done', p: pow, pow, m: 0, drag: true };
-  if (S.putt) glStrikeMine({ pow: Math.min(1, pow) });
+  if (S.putt) glStrikeMine({ pow: Math.min(1, pow), deg: deg || 0 });
   else { const w = glWin(rat, pow); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w; glStrikeMine(glSwingNums(pow, GD.meter.m, rat)); }
   return true;
 }
@@ -35087,7 +35095,8 @@ function glDrag(pull, deg) {
 function glStrike(s, S, sw) {
   const H = glHoleNow(), b = G.ball[s], rat = glRat(s, S.ri), from = { x: b.x, y: b.y };
   if (S.putt) {
-    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
+    // (a drag pulled off the line starts the putt off line: + is left, as a hook; GL_HANDS.puttDeg of a degree a degree)
+    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
   return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow, err: sw.err, wind: G.wind, spin: S.spin, shape: S.shape, traj: S.traj, rat });

@@ -234,6 +234,21 @@ async def main():
         mb = await pg.evaluate("(() => { const v = { p: wGL.view.meter.p, ph: wGL.phase }; document.getElementById('modal').hidden = true; wGL.pause(true); return v; })()")
         check(mb['ph'] == 'swing' and abs(mb['p'] - p0) < 1e-9, 'a box open over the course holds a swing in progress (it doesn\'t run out and go off)', [p0, mb])
 
+        # (from the eighth review of #93) a foot-long putt can be aimed nearer; a phone putt pulled off the line starts off
+        # line; a game on show played out by turn() still says it is over
+        r8 = await pg.evaluate("""(() => { const out = {}; __mine(111); const G = wGL.G, H = wGL.course(0); G.ball[0] = { x: H.pin.x - .3, y: H.pin.y, lie: 'G' }; G.ball[1] = { x: H.tee.x, y: H.tee.y, lie: 'T' }; G.hole.st = [2, 0];
+          __replan(); __to('aim'); const d = () => { const a = wGL.view.sel.aim, b = wGL.G.ball[0]; return Math.hypot(a.x - b.x, a.y - b.y); }; const d0 = d(); wGL.aimPush(-0.2); out.nearer = [d0, d()];
+          const ang = []; for (const deg of [0, 30]) { __mine(112); const G2 = wGL.G, H2 = wGL.course(0); G2.ball[0] = { x: H2.pin.x - 6, y: H2.pin.y, lie: 'G' }; G2.ball[1] = { x: H2.tee.x, y: H2.tee.y, lie: 'T' }; G2.hole.st = [2, 0]; __replan(); __to('aim');
+            const b = Object.assign({}, wGL.G.ball[0]); wGL.drag(.5, deg); let n = 0; while (wGL.phase === 'fly' && n++ < 400) wGL.tick(0.05); const e = wGL.G.ball[0]; ang.push(Math.atan2(e.y - b.y, e.x - b.x)); }
+          out.offLine = ang[1] - ang[0];
+          wLinksGame({ seed: 113, holes: 3, mode: 'watch' }); wGL.pause(true); let heard = 0; const was = wGL.onOver; wGL.onOver = s => { heard++; was && was(s); }; let i = 0; while (wGL.turn() && i++ < 3000); wGL.onOver = was; out.heard = heard;
+          out.frac = wGL.newGame({ holes: 3, pars: [3.5, 4, 4] }).pars;
+          return out; })()""")
+        check(r8['nearer'][1] < r8['nearer'][0], 'on a foot-long putt the down arrow brings the aim nearer', r8)
+        check(abs(r8['offLine']) > 0.02, 'a phone putt pulled off the line starts off line', r8)
+        check(r8['heard'] == 1, 'a game on show played out with turn() still says it is over, once', r8)
+        check(r8['frac'] == [4, 3, 5], 'a fraction of a par is refused (the standing pars instead)', r8)
+
         # ---------- How to play, Settings, leaving ----------
         await pg.evaluate("wLinksGame({ seed: 61, mode: 'play' }); wGL.pause(false)")
         await pg.click('#wLinksHowBtn')

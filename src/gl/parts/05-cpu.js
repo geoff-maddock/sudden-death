@@ -40,20 +40,25 @@ function glPickHitter(side, kind) {
 
 // the power that sends club from lie dist yards (carry and roll together), or the carry alone; capped at full
 function glPowFor(club, lie, rat, dist, carryOnly) {
-  let lo = 0.03, hi = 1;
+  // (carry and roll together need not rise with power: from the trees the punch's carry is capped while a softer swing
+  // runs further. So the nearest on a fine sweep, then a closer look round it)
   const f = p => { const r = glReach(club, lie, rat, p); return carryOnly ? r.carry : r.carry + r.roll; };
-  if (f(hi) <= dist) return hi;
-  for (let i = 0; i < 22; i++) { const m = (lo + hi) / 2; if (f(m) < dist) lo = m; else hi = m; }
-  return (lo + hi) / 2;
+  let best = 1, be = Math.abs(f(1) - dist);
+  for (let p = 0.03; p < 1; p += 0.01) { const e = Math.abs(f(p) - dist); if (e < be - 1e-9) { be = e; best = p; } }
+  for (let p = Math.max(0.03, best - 0.01); p <= Math.min(1, best + 0.01); p += 0.0005) { const e = Math.abs(f(p) - dist); if (e < be - 1e-9) { be = e; best = p; } }
+  return best;
 }
 // out of reach: the spot down the hole's line, at most reach yards away, to play to
-function glLayTarget(H, b, reach, careful) {
+function glLayTarget(H, b, reach, careful, rollFrac) {
   let best = null, bestF = null;
+  const bad = l => l === 'W' || l === 'S' || l === 'B' || l === 'O';
   for (const p of H.line) {
     const d = hyp(p.x - b.x, p.y - b.y);
     if (d > reach || p.y < b.y - 5) continue;
     const l = glLie(H, p.x, p.y);
-    if (careful && (l === 'W' || l === 'S' || l === 'B' || l === 'O')) continue;
+    if (careful && bad(l)) continue;
+    // (careful: where it lands, short of the spot by the roll, and every yard it runs over to get there, are clear too)
+    if (careful && rollFrac) { const run = d * rollFrac, ux = (p.x - b.x) / (d || 1), uy = (p.y - b.y) / (d || 1); let ok = true; for (let t = 0; t <= run && ok; t += 2) if (bad(glLie(H, p.x - ux * t, p.y - uy * t))) ok = false; if (!ok) continue; }
     if (!best || p.t > best.t) best = p;
     if (l === 'F' && (!bestF || p.t > bestF.t)) bestF = p;
   }
@@ -75,7 +80,7 @@ function glPlan(s, riIn) {
   const d = glDistOf(H, s), longest = clubs[0];
   let club, target;
   if (sk === 0 && b.lie === 'T' && glClubOk('dr', 'T') && d > tot('dr') * 0.6) { club = 'dr'; target = d > tot('dr') ? glLayTarget(H, b, tot('dr'), false) : H.pin; }
-  else if (d > tot(longest) * 0.98) { club = longest; target = glLayTarget(H, b, tot(longest), sk > 0); }
+  else if (d > tot(longest) * 0.98) { club = longest; const R = glReach(club, b.lie, rat, 1); target = glLayTarget(H, b, tot(longest), sk > 0, R.roll / (R.carry + R.roll || 1)); }
   else { club = GL_BAG.filter(c => clubs.includes(c)).reverse().find(c => tot(c) >= d) || longest; target = H.pin; }
   // the landing spot: short of the target by the roll; then aim off for the wind
   const dir0 = Math.atan2(target.y - b.y, target.x - b.x), dist = hyp(target.x - b.x, target.y - b.y);
@@ -113,9 +118,11 @@ function glRead(H, from, slopeK) {
 }
 
 // does side by (the CPU) give side s its next putt, d yards long?
+// may side by give side s its next putt, d yards long? (on the green, short, and neither side done with the hole)
+function glMayGive(by, s, d) { const H = G.hole; return G.ball[s].lie === 'G' && d <= GL_SKILL.giveIn && !H.done[by] && !H.done[s]; }
 function glCpuConcede(by, s, d) {
   const H = G.hole;
-  if (d > GL_SKILL.giveIn || H.done[by] || H.done[s]) return false;
+  if (!glMayGive(by, s, d)) return false;
   // never the putt that hands over the hole: given, s is holed in one more, and by, already on as many, is beaten
   if (H.st[by] >= H.st[s] + 1) return false;
   return R() < GL_SKILL.give[G.skill[by]];

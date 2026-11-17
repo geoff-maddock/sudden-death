@@ -20,7 +20,7 @@
    In Watch the CPU plays both sides. GD.msg is the last thing that happened, said plainly. */
 const GL_METER = { up: 1.0, top: 1.1, down: 1.15, low: -0.18, win: [0.035, 0.065], pshot: 0.6, puttUp: 1.5, inErr: 0.25, outErr: 7 };
 const GL_PACE = { addr: 0.7, rest: 0.9, hole: 2.4, given: 1.3, fly: 1.7, roll: 0.8 };
-const GL_HANDS = { drag: 170, dragAcc: 12 };
+const GL_HANDS = { drag: 170, dragAcc: 12, puttDeg: 0.1 };
 let GD = null;
 
 function glPlayStart(o) {
@@ -74,9 +74,10 @@ function glGiven(by) {
   const ev = glGive(by);
   if (!ev) { glGo('next'); return; }
   GD.last = ev;
-  glGo('given', ev && ev.res != null ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
-  if (ev && ev.res != null) glDispMatch();
-  if (ev && ev.res != null && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  const end = ev.res != null;
+  glGo('given', end ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
+  if (end) glDispMatch();
+  if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
 }
 const glFeet = n => `${n} ${n === 1 ? 'foot' : 'feet'}`;
 const glYards = d => d < 1 ? glFeet(Math.max(1, Math.round(d * 3))) : `${Math.round(d)} ${Math.round(d) === 1 ? 'yard' : 'yards'}`;
@@ -215,7 +216,7 @@ function glAimTurn(deg) {
 }
 function glAimPush(yd) {
   if (!GD || GD.ph !== 'aim') return false;
-  const S = GD.sel, b = G.ball[GD.you], a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), d = Math.max(0.5, hyp(S.aim.x - b.x, S.aim.y - b.y) + yd);
+  const S = GD.sel, b = G.ball[GD.you], a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), d = Math.max(S.putt ? 0.05 : 0.5, hyp(S.aim.x - b.x, S.aim.y - b.y) + yd);
   S.aim = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d }; glSelFix(); return true;
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
@@ -273,7 +274,7 @@ function glDrag(pull, deg) {
   if (!GD || GD.ph !== 'aim') return false;
   const S = GD.sel, rat = glRat(GD.you, S.ri), pow = clamp(pull, 0, GL_METER.top);
   GD.meter = { k: S.putt ? 'putt' : 'full', st: 'done', p: pow, pow, m: 0, drag: true };
-  if (S.putt) glStrikeMine({ pow: Math.min(1, pow) });
+  if (S.putt) glStrikeMine({ pow: Math.min(1, pow), deg: deg || 0 });
   else { const w = glWin(rat, pow); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w; glStrikeMine(glSwingNums(pow, GD.meter.m, rat)); }
   return true;
 }
@@ -281,7 +282,8 @@ function glDrag(pull, deg) {
 function glStrike(s, S, sw) {
   const H = glHoleNow(), b = G.ball[s], rat = glRat(s, S.ri), from = { x: b.x, y: b.y };
   if (S.putt) {
-    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x), P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
+    // (a drag pulled off the line starts the putt off line: + is left, as a hook; GL_HANDS.puttDeg of a degree a degree)
+    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow) });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
   return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow, err: sw.err, wind: G.wind, spin: S.spin, shape: S.shape, traj: S.traj, rat });

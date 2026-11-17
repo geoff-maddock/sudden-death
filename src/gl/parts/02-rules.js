@@ -28,7 +28,7 @@ function glPars(n) { const out = []; for (let i = 0; i < n; i++) out.push(GL_RUL
 function glHole(par) { return { par, st: [0, 0], done: [false, false], up: [false, false], last: [-1, -1], hit: [[], []] }; }
 function glNewGame(opts) {
   const o = opts || {}, holes = GL_RULES.holesAt.includes(o.holes) ? o.holes : GL_RULES.holes;
-  const pars = Array.isArray(o.pars) && o.pars.length === holes && o.pars.every(p => p >= 3 && p <= 5) ? o.pars.slice() : glPars(holes);
+  const pars = Array.isArray(o.pars) && o.pars.length === holes && o.pars.every(p => Number.isInteger(p) && p >= 3 && p <= 5) ? o.pars.slice() : glPars(holes);
   G = { holes, pars, h: 0, won: [0, 0], res: [], hole: glHole(pars[0]), honour: o.honour === 1 ? 1 : 0, playoff: 0, over: null };
   return G;
 }
