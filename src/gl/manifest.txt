@@ -2,3 +2,7 @@
 # scope (src/realm/links/manifest.txt, through `scope wGL ...`), so none of their names reach the page.
 src/scoped/util.js
 src/gl/parts/02-rules.js
+src/gl/parts/03-course.js
+src/gl/parts/04-shot.js
+src/gl/parts/05-cpu.js
+src/gl/parts/06-game.js
