@@ -1,17 +1,23 @@
-/* Utilities for the four scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk) and
-   hockey (src/hk) each load this inside their own scope, so each has its own random stream. R is the engine's random
+/* Utilities for the scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk), hockey
+   (src/hk) and golf (src/gl, issue #92; engRng seeds its course) each load this inside their own scope, so each has its own random stream. R is the engine's random
    number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
    pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
 let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 function engSeed(n) {
   if (n == null) { engRand = Math.random; return; }
-  let a = n >>> 0;
-  engRand = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  engRand = engRng(n);
 }
 const R = () => engRand();
 // is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
 const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
 const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const hyp = Math.hypot;

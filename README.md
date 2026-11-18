@@ -44,6 +44,8 @@ Progress (runs in progress, the record book, careers, achievements, settings) is
 
 **The same game, on the road.** Champions of the Realm is a second build of Sudden Death: an open-world RPG where you walk a realm of towns, wilds and dungeons with your team, and every fight is a Sudden Death match. Its world (regions, towns, people, road events, cups) is ported from an earlier game, *Terra Chimera*, and redrawn in Sudden Death's ink style.
 
+Six sports also have real games of their own at their grounds, beside the card game: baseball at the Ballpark, football at the Ash Bowl, boxing at the Anvil Ring, basketball at the Charter Court, hockey at the Pond Rink and golf at Mossgate Links (captain's choice match play on an enchanted course, with a swing meter, the wind and the green's slope to read).
+
 It is one self-contained file too: `dist/realm.html`. Open it in a browser. It keeps its own save, per profile, beside the standalone game's.
 
 ### How to play, briefly

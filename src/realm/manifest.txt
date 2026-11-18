@@ -44,6 +44,8 @@ scope wBX src/realm/ring/manifest.txt src/realm/ring/exports.js
 scope wBK src/realm/court/manifest.txt src/realm/court/exports.js
 # Black Ice at the Pond Rink, the hockey engine, in its own scope (issue #83): src/realm/rink/manifest.txt
 scope wHK src/realm/rink/manifest.txt src/realm/rink/exports.js
+# Mossgate Links, the golf engine, in its own scope (issue #92): src/realm/links/manifest.txt
+scope wGL src/realm/links/manifest.txt src/realm/links/exports.js
 # the engines, by id (W_ENGINES)
 src/realm/w19b-engines.js
 src/realm/w20-diamond.js
@@ -139,3 +141,10 @@ src/realm/w101-fame.js
 src/realm/w102-fanfeel.js
 src/realm/w103-places.js
 src/realm/w104-delves.js
+src/realm/w105-links.js
+src/realm/w106-linksfour.js
+src/realm/w107-linksgame.js
+src/realm/w108-linkskit.js
+src/realm/w109-linksstars.js
+src/realm/w110-linkscup.js
+src/realm/w111-linksfeel.js

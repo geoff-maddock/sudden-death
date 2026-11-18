@@ -59,8 +59,9 @@ async def main():
             await pg.evaluate("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))))")
             u1 = await pg.evaluate("JSON.stringify(wBK.cam())"); await pg.evaluate("wBK.pause(false)")
             check(u0 == u1, f'paused, the picture holds (end {end})', [u0, u1])
-            await pg.wait_for_function("wBK.cam().u === 0", timeout=120000)
-            w = await pg.evaluate("({ o: wBK.scr(0, 0), sx: wBK.cam().sx })")
+            # (read in the same frame it is waited on: the play can push the camera in again a moment later)
+            h = await pg.wait_for_function("wBK.cam().u === 0 ? { o: wBK.scr(0, 0), sx: wBK.cam().sx } : null", timeout=120000)
+            w = await h.json_value()
             check(w['o'] == {'x': 60, 'y': 318} and w['sx'] == 1, f'and pulls back to the whole court when the play leaves (end {end})', w)
         check(not any(v['state'] for v in seen), 'the camera is not in the game\'s state', None)
 

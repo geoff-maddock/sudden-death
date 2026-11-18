@@ -999,3 +999,71 @@ holding cannot be told apart by this bot at 300 journeys**: the first run's four
 never-spending row alone moved 2.4 points between the two runs. The mascot stays at 900. The fans' gate is now paid at
 hockey, basketball and football games and boxing cards as well as card matches at grounds; the bot plays none of
 those from the world, so that is not in these numbers either.
+
+## Golf at Mossgate Links (issue #92, phase 10)
+
+`python3 test/realm_links_lab.py N`: every match is the golf engine played to a final, headless, as Simulate plays it
+(nine holes of captain's choice match play on the standing nine, a breeze, the wood and the enchanted course on, powers
+on), your four caddied as a Knight, theirs at the tier's skill. A player's six ratings are rolled a point either way,
+so **every match draws both fours afresh** (your kinds at your level, and theirs): one draw is luck, and the lab's first
+version, which drew them once, read 26% and 73% for the same "even" match on two runs. Match play is noisy: a cell of
+400 matches is good to about 2.5 points either way. About 3 ms a match; 14% go to a playoff, and about half are settled
+before the 9th. No match ends level.
+
+**Tiers, as the world sets them** (400 each; their level yours plus the tier less one, extra rating points on each of
+their four, `W_LKG.oppBonus`, and their caddie by tier). A journey's rival clubs are drawn afresh, and a club's own kinds
+swing a match more than the tier does (one run met an ogre, minotaur, troll and golem four and read nothing like the
+next), so the cells go round every club, a match each. Over three journeys:
+
+| | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Win | 66 to 79% | 46 to 54% | 20 to 24% |
+
+Beside hockey's 59/40/21% and basketball's 57/44/26%. The bonus was raised from the court's 0/2/5 to 2/4/7: at 0/2/5
+tier 1 read 78% (a Squire's four of local kinds against your elf and spider). Tier 1 is still a little generous; it is
+the first number to look at if golf feels easy by hand.
+
+**Level gap** (even kinds, both Knights, no bonus): a level below 58%, even 50.5%, +1 43%, +2 42%, +3 37%. A level is a
+rating point a player spread over six ratings, so it counts for less than in hockey (+3 there is 28%).
+
+**Their caddie** (even level and kinds): Squire 69%, Knight 48%, Archmage 32%. Caddie against caddie with the same four
+(150 to 300 each): a Knight beats a Squire about 59 in 100, an Archmage a Knight about 70. The Squire was retuned: as first
+written (a third more swing error, no wind read at all) your side beat one 95% of the time; now its swing error is
+1.05 times a Knight's and it reads 40% of the wind, and it still takes the driver everywhere and goes for everything.
+
+**Powers** (even): both 48%, neither 49%, yours only 59%, theirs only 42.5%: powers don't tilt a match between sides that
+both have them, and a side with them gains about 8 to 10 points. About six everyday powers a side a match.
+
+**Your line, fixed all game** (theirs their caddie's): Go for it 53%, Percentages 48.5%, the caddie's own (Auto) 48%,
+Lay up 31.5%. No line called every time beats the caddie by more than the noise. Laying up every shot is a bad way to
+play, as it should be: it is for the shots with water on the line.
+
+**Your stance, fixed all game** (600 each; and 2,000 in the bare engine, without powers or the course's ways):
+Steady and Careful 54% (50%), Steady and Bold 43% (46%), Quick and Careful 44% (46%). Fixed all game, Bold and Quick each
+cost a few points: Bold is for when you need the variance (behind late), Quick for when focus runs low. Two things were
+fixed on the way: the CPU's planner did not allow for Bold's extra distance (every bold CPU shot flew 5% past where it
+aimed), nor for a webbed ball's half-length shot; and Bold's miss and Quick's were made smaller (from 1.15 and 1.06 to
+1.03 each).
+
+**Gear and potions** (by tier, 400 each): plain; their bag only (`W_LINKS_KIT.opp`, as Simulate plays it); both bags
+(yours a full one, given by your caddie as a Knight would); the full kit (both bags, and your four in gear, a +1 piece
+each on their key rating).
+
+| | Plain | Their bag | Both bags | Full kit |
+|---|---|---|---|---|
+| Tier 1 | 73% | 80% | 81.5% | 87% |
+| Tier 2 | 56% | 54% | 57.5% | 64.5% |
+| Tier 3 | 25% | 23% | 24% | 37% |
+
+Potions are worth little, inside the noise: the CPU's caddie at first never gave one (its thresholds were out of reach),
+and was lowered to give at value 2.5 (a Knight) and 2 (an Archmage). Gear is worth 7 to 12 points for four pieces, about
+3 a piece: no single piece decides a match.
+
+**The enchanted course** (even, 400 each): on 46%, off 52%; a side a level down wins 51% with it on and 44% with it off.
+The traps fall on both sides alike, and add a little luck that helps the weaker side, which is the point of them.
+
+**The hitter rule** moves about 20% of a side's shots off their role's player (the rule: the first four shots of a hole
+four different players, then nobody twice running).
+
+**Divot Cups** (400, Simulate every round): won 14.5%, out in the quarter-final 25%, the semi-final 30%, the final 31%.
+
