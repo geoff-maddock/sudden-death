@@ -94,8 +94,9 @@ async def main():
         check(again == [False, 'used this game'], 'once a game', again)
         # the Wall: its zone at the goal line
         await pg.evaluate(RES)
-        # (the field's other zones cleared first: one the CPU cast earlier, a plague say, would change the play's tackle odds)
-        await pg.evaluate("(() => { const G = wGF.G; G.zones = []; G.poss = 1; G.ball = 93; G.down = 1; G.togo = 7; G.mana[0] = 4; wGF.setMode('call'); wGridBar(); wGF.pickPower('sit:goalwall'); wGF.call('man'); wGF.pause(false); })()")
+        # (the field's other zones cleared first, and the CPU's side given no mana for the play: a zone it cast earlier, or an
+        # ultimate at this snap, would change the play's tackle odds)
+        await pg.evaluate("(() => { const G = wGF.G; G.zones = []; G.poss = 1; G.ball = 93; G.down = 1; G.togo = 7; G.mana[0] = 4; G.mana[1] = 0; wGF.setMode('call'); wGridBar(); wGF.pickPower('sit:goalwall'); wGF.call('man'); wGF.pause(false); })()")
         await pg.wait_for_function("wGF.phase === 'live'", timeout=20000)
         wl = await pg.evaluate("({ zones: wGF.zones().map(z => [z.id, z.left, z.desc]), tkl: wGF.play.fx.tkl, dStr: wGF.play.fx.dStr })")
         await pg.evaluate("wGF.pause(true)")
