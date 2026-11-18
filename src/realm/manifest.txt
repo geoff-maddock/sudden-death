@@ -148,3 +148,5 @@ src/realm/w108-linkskit.js
 src/realm/w109-linksstars.js
 src/realm/w110-linkscup.js
 src/realm/w111-linksfeel.js
+src/realm/w112a-quickshots.js
+src/realm/w112-quickstart.js

@@ -234,12 +234,14 @@ function gfDrawHud(c) {
     }
   });
   let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
-  if (GD.ph === 'call') sub = GD.mode !== 'call' ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
+  // (you call in You call and in You play; only Coaches has the coaches call it)
+  const youCall = GD.mode === 'call' || GD.mode === 'play';
+  if (GD.ph === 'call') sub = !youCall ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
   // (with each side's stance when it isn't Balanced, 16-stance.js)
   const stn = k => GD.stc && GD.stc[k] && GD.stc[k] !== 'bal' ? ` (${GF_STANCE[GD.stc[k]].n})` : '';
   if ((GD.ph === 'pre' || GD.ph === 'live') && GD.oc) sub = `${GF_PLAYS[GD.oc].n}${stn('off')}  vs  ${GF_DEFS[GD.dc].n}${stn('def')}`;
   if (GD.game) mid += `  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`;
-  if (GD.ph === 'call' && GD.mode === 'call' && G.poss !== GD.you) sub = 'Your call: pick a defense';
+  if (GD.ph === 'call' && youCall && G.poss !== GD.you) sub = 'Your call: pick a defense';
   if (GD.ph === 'kick') sub = (GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt') + (GD.meter ? ': tap Space twice, for power and aim' : '');
   if (GD.ph === 'kickoff') { mid = `Kickoff  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`; sub = `${G.teams[1 - GD.kickoff].name} kick to ${G.teams[GD.kickoff].name}`; }
   if (GD.ph === 'half') { mid = GD.msg; sub = ''; }

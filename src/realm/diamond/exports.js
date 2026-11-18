@@ -57,6 +57,9 @@ function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPe
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
   get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; }, set onAuto(f) { BDX.onAuto = f; },
+  // where a point of the field is drawn, in the canvas's own pixels (x across, d out from the plate, h up): read only, as golf's
+  // wGL.scr (the Quick start's screenshots label things by it)
+  scr: (x, d, h) => { const p = proj(x, d || 0, h); return [p.x, p.y]; },
   get live() { return gameOn(); }, audio: (music, sfx) => { if (MUS.on !== !!music) setMusic(!!music, true); SND.on = !!sfx; }, get sound() { return { music: !!MUS.on, sfx: !!SND.on }; }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
   teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
   kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice()
