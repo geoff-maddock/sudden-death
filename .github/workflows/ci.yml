@@ -1,10 +1,12 @@
 name: CI
 # Pull requests only (a merge to main was already checked as its pull request), and not drafts: mark a PR ready for
 # review when you want it checked. Docs-only changes don't run it. A new push to a PR cancels that PR's run in progress.
-# It's one job: test/all.sh runs the checks side by side on the runner's cores, which uses about half the runner minutes
-# of splitting them across shards (each job is counted by the minute, rounded up). Actions minutes are free while the
-# repo is public; if it ever goes private again, that's what keeps it inside the free allowance. Run it by hand from
-# the Actions tab (workflow_dispatch) when you want to check main.
+# The quick checks run on 4 shards side by side (issue #94): test/shard.py splits CHECKS by each check's time in CI
+# (test/ci-times.txt), so each shard has about the same work, and each shard runs its part on its runner's cores. About
+# 7 minutes a run, against 25 for one job. It uses about twice the runner minutes of one job (each job is counted by the
+# minute, rounded up), which costs nothing while the repo is public. IF THE REPO GOES PRIVATE, go back to one job (set
+# SHARDS to 1 and the matrix to [0]) to stay inside the free allowance. The build, the stale-file checks and the bot
+# sanity run once, in their own job alongside. Run it by hand from the Actions tab (workflow_dispatch) to check main.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -26,12 +28,11 @@ env:
     realm_spots realm_fixtures realm_home realm_gfeel realm_notices realm_legs realm_captain realm_weather
     realm_name realm_tour realm_sinks realm_defend realm_legends realm_gate realm_settings realm_map soccer realm_soccer realm_retire indeck realm_eggs realm_prospects realm_engines realm_gridiron realm_gridiron_game realm_gridiron_play realm_gridiron_seven realm_gridiron_playbook realm_gridiron_world realm_gridiron_powers realm_gridiron_cup realm_gridiron_fixes realm_gridiron_feel realm_gridiron_view realm_gridiron_bench realm_gridiron_stance realm_music realm_ring realm_ring_hands realm_ring_card realm_ring_powers realm_ring_game realm_ring_cup realm_ring_feel realm_ring_tab realm_ring_tape realm_court realm_court_hands realm_court_five realm_court_calls realm_court_world realm_court_powers realm_court_kit realm_court_stars realm_court_cup realm_court_feel realm_court_cam realm_sportbar realm_sportpage realm_rink realm_rink_hands realm_rink_special realm_rink_six realm_rink_calls realm_rink_world realm_rink_powers realm_rink_kit realm_rink_stars realm_rink_kettle realm_rink_feel realm_figures realm_bracket realm_fans realm_fans_gate realm_fans_lift realm_fans_stand realm_fans_fame realm_stars realm_phoenix realm_kraken realm_behemoth realm_djinn realm_hydra realm_frostwyrm realm_adventure realm_adventure_charter realm_adventure_crew realm_adventure_fixed realm_daily realm_gear realm_ring_kit realm_grid_kit realm_ring_spirit realm_grid_powers2 realm_star_powers2 realm_places realm_links realm_links_nine realm_links_hands realm_links_four realm_links_call realm_links_world realm_links_powers realm_links_enchant realm_links_kit realm_links_stars realm_links_cup realm_links_feel realm_links_look realm_quickstart
 jobs:
-  ci:
-    name: Build, stale files, bot sanity and quick checks
+  build:
+    name: Build, stale files and bot sanity
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    # a stuck run stops here rather than burning minutes until GitHub's six-hour limit
-    timeout-minutes: 40
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,9 +52,36 @@ jobs:
       - uses: ./.github/actions/playwright
       - name: Bot sanity (no errors or stalls in 30 runs)
         run: python test/lab.py 30 | tee lab.txt && grep -q "run errors 0" lab.txt && grep -q "stalls 0" lab.txt
-      - name: Quick checks
-        # one check per core at a time
-        run: JOBS=$(nproc) ./test/all.sh $CHECKS
+
+  checks:
+    name: Quick checks (shard ${{ matrix.shard }} of 4)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    # a stuck run stops here rather than burning minutes until GitHub's six-hour limit
+    timeout-minutes: 25
+    strategy:
+      # every shard runs to the end, so one run shows every failure
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      SHARDS: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/playwright
+      - name: Quick checks, this shard's part
+        # one check per core at a time; the shard's checks from test/shard.py (its time on stderr, in the log)
+        run: |
+          MINE=$(python test/shard.py ${{ matrix.shard }} $SHARDS $CHECKS)
+          # (all.sh starts the slowest first, from its times file: seed it with CI's own times)
+          mkdir -p build && cp test/ci-times.txt build/test-times.txt
+          JOBS=$(nproc) ./test/all.sh $MINE
       - name: Logs of the failed checks
         if: failure()
         run: |

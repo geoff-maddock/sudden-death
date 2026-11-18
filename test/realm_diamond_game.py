@@ -58,7 +58,7 @@ async def main():
         await close_modal(pg)
 
         await pg.evaluate("wRecruit({ kind: 'troll', lvl: 2 }, 'tavern'); wRecruit({ kind: 'harpy', lvl: 2 }, 'tavern'); wDrain()")
-        await pg.wait_for_timeout(200); await pg.evaluate("WG.cardOffer = null; document.getElementById('modal').hidden || document.querySelector('#modalBox [data-close], #modalBox button') && null")
+        await pg.evaluate("WG.cardOffer = null")
         await pg.evaluate("while (!document.getElementById('modal').hidden) { const b = document.querySelector('#modalBox .btn, #modalBox button'); if (!b) break; b.click(); }")
         check(await pg.evaluate("wRoster().length === 5 && wBallProblems().length === 0"), 'five players: nothing in the way')
 
@@ -103,11 +103,17 @@ async def main():
         t2 = await pg.evaluate("({ note: document.getElementById('wDiamondNote').textContent, how: WG.ball.live.world.how })")
         check(t1['note'].startswith('Managing') and t1['how'] == 'manage' and t2['note'].startswith('You play every pitch') and t2['how'] == 'play',
               'T switches Auto powers mid-game, and the bar and the record say so', [t1, t2])
-        pitches = 0
-        for i in range(14):
-            await pg.keyboard.press('Space'); await pg.wait_for_timeout(500)
-        cnt = await pg.evaluate("({ b: wBD.G.balls, s: wBD.G.strikes, o: wBD.G.outs, h: wBD.G.teams[0].H })")
-        check(cnt['b'] + cnt['s'] + cnt['o'] + cnt['h'] > 0, 'your keys play: the count moves', cnt)
+        # (Space on a pitch in flight swings: each press waits for one, and the swing is seen in the game itself. The count
+        # was the old test, and could read all zeros after real play: balls and strikes go back to 0 after every batter,
+        # and a walk adds no out and no hit)
+        swings = []
+        for i in range(6):
+            await pg.wait_for_function("wBD.G.phase === 'plate' && wBD.G.half === 0 && wBD.G.P && wBD.G.P.stage === 'flight' && !wBD.G.P.swing", timeout=30000)
+            await pg.keyboard.press('Space')
+            h = await pg.wait_for_function("wBD.G.P && wBD.G.P.swing ? 'swing' : !(wBD.G.P && wBD.G.P.stage === 'flight') ? 'gone' : null", timeout=5000)
+            swings.append(await h.json_value())
+            if swings.count('swing') >= 2: break
+        check(swings.count('swing') >= 2, 'your keys play: Space swings at the pitch', swings)
         await pg.wait_for_function("WG.ball.live && !!WG.ball.live.snap")
         await pg.screenshot(path='/tmp/realm-ball-play.png')
         await pg.click('#wBallSave'); await pg.wait_for_function("UI.view === 'world'")
@@ -174,8 +180,8 @@ async def main():
         await pg.evaluate(f"wStartBall({{ club: {json.dumps(clubs[1])}, how: 'play' }})")
         await pg.wait_for_function("UI.view === 'diamond' && wBD.G.phase !== 'menu'", timeout=15000)
         n0 = await pg.evaluate("WG.ball.games.length")
-        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(150)
-        await pg.evaluate(SR + ".getElementById('bQuit').click()"); await pg.wait_for_timeout(150)
+        await pg.keyboard.press('Escape'); await pg.wait_for_function(SR + ".getElementById('bQuit') && " + SR + ".getElementById('bQuit').offsetParent !== null")
+        await pg.evaluate(SR + ".getElementById('bQuit').click()"); await pg.wait_for_function("!!" + SR + ".querySelector('[data-end=\"wipe\"]') && " + SR + ".querySelector('[data-end=\"wipe\"]').offsetParent !== null")
         await pg.evaluate(SR + ".querySelector('[data-end=\"wipe\"]').click()")
         await pg.wait_for_function("UI.view === 'world'")
         off = await pg.evaluate(f"({{ live: !!WG.ball.live, games: WG.ball.games.length, met: WG.ball.met[{json.dumps(clubs[1])}] }})")
@@ -195,8 +201,7 @@ async def main():
         await pg.set_viewport_size({'width': 390, 'height': 800})
         clubs2 = await pg.evaluate("wBallClubs().filter(c => WG.ball.met[c] !== WG.dayAbs)")
         await pg.evaluate(f"wStartBall({{ club: {json.dumps(clubs2[0])}, how: 'play' }})")
-        await pg.wait_for_function("UI.view === 'diamond' && wBD.G.phase !== 'menu'", timeout=15000)
-        await pg.wait_for_timeout(300)
+        await pg.wait_for_function("UI.view === 'diamond' && wBD.G.phase !== 'menu' && document.getElementById('wDiamondBar').offsetParent !== null", timeout=15000)
         bfit = await pg.evaluate("(() => { const b = document.getElementById('wDiamondBar').getBoundingClientRect(); return document.documentElement.scrollWidth <= window.innerWidth + 1 && b.right <= window.innerWidth + 1; })()")
         await pg.screenshot(path='/tmp/realm-ball-phone-bar.png')
         check(bfit, 'the bar fits a phone during a game')
