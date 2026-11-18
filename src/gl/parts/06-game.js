@@ -23,7 +23,7 @@ const GL_TEAMS = [{ name: 'Mossgate' }, { name: 'The visitors' }];
 function glTeam(t, side) {
   const T = t || GL_TEAMS[side], ro = (T.roster || (T.kinds || []).map(kind => ({ n: kind[0].toUpperCase() + kind.slice(1), kind }))).slice(0, GL_RULES.side);
   while (ro.length < GL_RULES.side) ro.push({ n: 'Player ' + (ro.length + 1) });
-  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return { n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 } }; });
+  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return { n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 }, gear: m.gear ? m.gear.name || '' : '', gx: glGx(m.gear && m.gear.fx) }; });
   const R = T.roles, ok = R && ['tee', 'approach', 'short', 'putt'].every(k => Number.isInteger(R[k]) && R[k] >= 0 && R[k] < roster.length) && new Set(['tee', 'approach', 'short', 'putt'].map(k => R[k])).size === 4;
   return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster, roles: ok ? Object.assign({}, R) : glAutoRoles(roster) };
 }
@@ -44,6 +44,7 @@ function glStart(opts) {
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
   glPowersStart(o);
+  glKitStart(o.bags);
   glHoleStart();
   return G;
 }
@@ -112,7 +113,7 @@ function glShoot(s, plan, r) {
   G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
   if (plan.putt) S.putts++;
   // focus: the hitter spends some (a hard shot more), the other three get a little back
-  if (G.focus) { const hard = (plan.pow || 0) > 1 || ['r', 'R', 'S', 'B', 'O'].includes(lie0), cost = (hard ? GL_FOCUS.hard : GL_FOCUS.shot) * GL_STANCE[glStanceOf(s).tempo].focus * fx.focus; G.focus[s] = G.focus[s].map((v, i) => i === plan.ri ? Math.max(0, v - cost) : Math.min(1, v + GL_FOCUS.back)); }
+  if (G.focus) { const hard = (plan.pow || 0) > 1 || ['r', 'R', 'S', 'B', 'O'].includes(lie0), cost = (hard ? GL_FOCUS.hard : GL_FOCUS.shot) * GL_STANCE[glStanceOf(s).tempo].focus * fx.focus * (glGxOf(s, plan.ri).focus || 1); G.focus[s] = G.focus[s].map((v, i) => i === plan.ri ? Math.max(0, v - cost) : Math.min(1, v + GL_FOCUS.back)); }
   // the scout: who goes for it, and how often it finds trouble
   if (G.scout && plan.line === 'go' && !plan.putt) { G.scout[s].go++; if (r.water || ['S', 'B', 'O', 'R'].includes(r.lie)) G.scout[s].bad++; }
   if (G.wordOn) G.wordOn[s] = false;
@@ -128,6 +129,7 @@ function glShoot(s, plan, r) {
   if (r.saved) ev.saved = true;
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);
+  glKitAfter(s, plan);
   // holed on the stroke that reached the cap: it still counts
   if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
   ev.up = !!Hs.up[s] && !r.holed;
@@ -144,7 +146,7 @@ function glLogEv(ev, h0, Hs) {
 // one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
 function glTurn() {
   const n = glNext(); if (!n) return null;
-  const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { glCpuCall(s); const ri = glPickHitter(s, glShotKind(glHoleNow(), s)); glCpuPower(s, ri); const plan = glPlan(s, ri); return glShoot(s, plan, glHit(s, plan)); })();
+  const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { glCpuCall(s); const ri = glPickHitter(s, glShotKind(glHoleNow(), s)); glCpuPotion(s, ri); glCpuPower(s, ri); const plan = glPlan(s, ri); return glShoot(s, plan, glHit(s, plan)); })();
   // (glAfterHole leaves the end to the page when a game is on show; turn() is not the page, so it says it here)
   if (GD && G.over && ev && ev.res != null && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
   return ev;
@@ -165,7 +167,7 @@ function glAfterHole(h0, Hs) {
 function glSummary() {
   return {
     win: G.over ? G.over.win : -1, text: G.over ? G.over.text : '', holes: G.holes, played: G.res.length, res: G.res.slice(), won: G.won.slice(),
-    teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), pst: JSON.parse(JSON.stringify(G.pst)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(), casts: G.casts ? JSON.parse(JSON.stringify(G.casts)) : [],
+    teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), pst: JSON.parse(JSON.stringify(G.pst)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(), casts: G.casts ? JSON.parse(JSON.stringify(G.casts)) : [], pots: G.pots ? JSON.parse(JSON.stringify(G.pots)) : [],
   };
 }
 // a whole game at once, CPU against CPU, through glTurn. It always leaves the game on the course (G, GD and the random

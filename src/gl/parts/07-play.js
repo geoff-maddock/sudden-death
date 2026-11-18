@@ -75,7 +75,7 @@ function glPlayNext() {
     const M = GD.mgr, ri = M.ri != null && glCanHit(s, M.ri) ? M.ri : glPickHitter(s, kind);
     if (GD.autoPow) cast = glCpuPower(s, ri);
     plan = glPlan(s, ri, M.line === 'auto' ? null : M.line); M.ri = null;
-  } else { glCpuCall(s); const ri = glPickHitter(s, kind); cast = glCpuPower(s, ri); plan = glPlan(s, ri); }
+  } else { glCpuCall(s); const ri = glPickHitter(s, kind); const pot = glCpuPotion(s, ri); if (pot) cast.push(pot.replace(/\.$/, '')); cast = cast.concat(glCpuPower(s, ri)); plan = glPlan(s, ri); }
   GD.cpu = { side: s, plan };
   glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.${cast.length ? ` ${cast.filter(Boolean).join(', ')}!` : ''}`);
 }
@@ -269,10 +269,11 @@ const glPuttSpeed = p => Math.sqrt(2 * GL_PUTT.fric * glWetK() * glPuttScale() *
 /* ---------- the swing ---------- */
 // the mark's half-width for a hitter: wider for a more accurate one, smaller on a power shot, and smaller for a tired one
 // (focus f, 0 to 1)
-function glWin(rat, pow, f) { const W = GL_METER.win; return (W[0] + (W[1] - W[0]) * clamp(rat.acc, 0, 1)) * (pow > 1 ? GL_METER.pshot : 1) * (0.55 + 0.45 * clamp(f == null ? 1 : f, 0, 1)); }
+// (ps: gear that makes a power shot's mark shrink less, 1 for none)
+function glWin(rat, pow, f, ps) { const W = GL_METER.win, shrink = 1 - (1 - GL_METER.pshot) / (ps || 1); return (W[0] + (W[1] - W[0]) * clamp(rat.acc, 0, 1)) * (pow > 1 ? shrink : 1) * (0.55 + 0.45 * clamp(f == null ? 1 : f, 0, 1)); }
 // power and the miss (m: where on the meter the mark was hit, + early, - late) to the swing's numbers
-function glSwingNums(pow, m, rat, f) {
-  const w = glWin(rat, pow, f), a = Math.abs(m), e = a <= w ? a / w * GL_METER.inErr : GL_METER.inErr + (a - w) * GL_METER.outErr;
+function glSwingNums(pow, m, rat, f, ps) {
+  const w = glWin(rat, pow, f, ps), a = Math.abs(m), e = a <= w ? a / w * GL_METER.inErr : GL_METER.inErr + (a - w) * GL_METER.outErr;
   return { pow: clamp(pow, 0, GL_METER.top), err: m > 0 ? -e : e, inside: a <= w };
 }
 // your hitter now: their ratings, their focus, and what the moment does to them (the meter runs quicker by spd, the mark
@@ -295,7 +296,7 @@ function glPress() {
     if (M.k === 'putt') { glStrikeMine({ pow: clamp(M.pow * (1 + glWobble(M)), 0, 1.05) }); return true; }
     M.st = 'down'; return true;
   }
-  if (M.st === 'down') { M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f)); return true; }
+  if (M.st === 'down') { M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); return true; }
   return false;
 }
 function glMeterTick(dt) {
@@ -307,7 +308,7 @@ function glMeterTick(dt) {
     return;
   }
   if (M.st === 'up') { M.p += step / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
-  else if (M.st === 'down') { M.p -= step / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f)); } }
+  else if (M.st === 'down') { M.p -= step / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); } }
 }
 // the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook). The
 // moment and focus count as on the meter: the mark is where it has shaken to as you let go
@@ -316,7 +317,7 @@ function glDrag(pull, deg) {
   const S = GD.sel, me = glMine(), rat = me.rat, pow = clamp(pull, 0, GL_METER.top);
   GD.meter = { k: S.putt ? 'putt' : 'full', st: 'done', p: pow, pow, m: 0, drag: true, t: GD.t, f: me.f, press: me.p, spd: me.spd, shake: me.shake, wob: me.wob };
   if (S.putt) glStrikeMine({ pow: clamp(Math.min(1, pow) * (1 + glWobble(GD.meter)), 0, 1.05), deg: deg || 0 });
-  else { const w = glWin(rat, pow, me.f); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w - glShake(GD.meter); glStrikeMine(glSwingNums(pow, GD.meter.m, rat, me.f)); }
+  else { const ps = glGxOf(GD.you, S.ri).pshot, w = glWin(rat, pow, me.f, ps); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w - glShake(GD.meter); glStrikeMine(glSwingNums(pow, GD.meter.m, rat, me.f, ps)); }
   return true;
 }
 // your swing goes off: the ball where those numbers send it

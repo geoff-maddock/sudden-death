@@ -157,7 +157,10 @@ function glCast(s, k, ri) {
 // what side s's next stroke has: its power, the hole's mark, a curse on it, a situation power, the roar's steadying
 function glFxFor(s) {
   const f = Object.assign({}, GL_FX0);
-  if (!G || !G.powers) return f;
+  if (!G) return f;
+  // (a side's potions count with powers or without: Still Water, the Oil)
+  glKitFx(s, f);
+  if (!G.powers) return f;
   const add = x => { if (!x) return; for (const k in x) { if (!(k in GL_FX0)) continue; if (GL_FX_MUL.has(k)) f[k] *= x[k]; else f[k] = Math.max(f[k], x[k]); } };
   add(G.fx[s]); add(G.curse[s]);
   if (G.mark && G.mark.h === G.h) add(G.mark.side === s ? G.mark.own : G.mark.rival);

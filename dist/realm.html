@@ -34652,7 +34652,11 @@ function glPressure(s) {
 // what a moment does to a hitter of nerve nrv (0 to 1): 1 is nothing
 const glNerveK = (p, nrv) => 1 + 0.6 * p * (1 - clamp(nrv, 0, 1));
 
-const glRat = (side, ri) => (G.teams[side].roster[ri] || {}).r || GL_DEF_RAT;
+// a player's ratings (0 to 1) as they play now: their own, and a Moss Tonic's scrambling this hole
+function glRat(side, ri) {
+  const r = (G.teams[side].roster[ri] || {}).r || GL_DEF_RAT, M = G.moss && G.moss[side];
+  return M && M.ri === ri && M.h === G.h ? Object.assign({}, r, { scr: Math.min(1, r.scr + GL_POTIONS.glmoss.scr) }) : r;
+}
 const glDistOf = (H, s) => hyp(G.ball[s].x - H.pin.x, G.ball[s].y - H.pin.y);
 // what kind of shot a side faces: tee, approach, short (a chip) or putt
 function glShotKind(H, s) {
@@ -34811,7 +34815,7 @@ const GL_TEAMS = [{ name: 'Mossgate' }, { name: 'The visitors' }];
 function glTeam(t, side) {
   const T = t || GL_TEAMS[side], ro = (T.roster || (T.kinds || []).map(kind => ({ n: kind[0].toUpperCase() + kind.slice(1), kind }))).slice(0, GL_RULES.side);
   while (ro.length < GL_RULES.side) ro.push({ n: 'Player ' + (ro.length + 1) });
-  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return { n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 } }; });
+  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return { n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 }, gear: m.gear ? m.gear.name || '' : '', gx: glGx(m.gear && m.gear.fx) }; });
   const R = T.roles, ok = R && ['tee', 'approach', 'short', 'putt'].every(k => Number.isInteger(R[k]) && R[k] >= 0 && R[k] < roster.length) && new Set(['tee', 'approach', 'short', 'putt'].map(k => R[k])).size === 4;
   return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster, roles: ok ? Object.assign({}, R) : glAutoRoles(roster) };
 }
@@ -34832,6 +34836,7 @@ function glStart(opts) {
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
   glPowersStart(o);
+  glKitStart(o.bags);
   glHoleStart();
   return G;
 }
@@ -34900,7 +34905,7 @@ function glShoot(s, plan, r) {
   G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
   if (plan.putt) S.putts++;
   // focus: the hitter spends some (a hard shot more), the other three get a little back
-  if (G.focus) { const hard = (plan.pow || 0) > 1 || ['r', 'R', 'S', 'B', 'O'].includes(lie0), cost = (hard ? GL_FOCUS.hard : GL_FOCUS.shot) * GL_STANCE[glStanceOf(s).tempo].focus * fx.focus; G.focus[s] = G.focus[s].map((v, i) => i === plan.ri ? Math.max(0, v - cost) : Math.min(1, v + GL_FOCUS.back)); }
+  if (G.focus) { const hard = (plan.pow || 0) > 1 || ['r', 'R', 'S', 'B', 'O'].includes(lie0), cost = (hard ? GL_FOCUS.hard : GL_FOCUS.shot) * GL_STANCE[glStanceOf(s).tempo].focus * fx.focus * (glGxOf(s, plan.ri).focus || 1); G.focus[s] = G.focus[s].map((v, i) => i === plan.ri ? Math.max(0, v - cost) : Math.min(1, v + GL_FOCUS.back)); }
   // the scout: who goes for it, and how often it finds trouble
   if (G.scout && plan.line === 'go' && !plan.putt) { G.scout[s].go++; if (r.water || ['S', 'B', 'O', 'R'].includes(r.lie)) G.scout[s].bad++; }
   if (G.wordOn) G.wordOn[s] = false;
@@ -34916,6 +34921,7 @@ function glShoot(s, plan, r) {
   if (r.saved) ev.saved = true;
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);
+  glKitAfter(s, plan);
   // holed on the stroke that reached the cap: it still counts
   if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
   ev.up = !!Hs.up[s] && !r.holed;
@@ -34932,7 +34938,7 @@ function glLogEv(ev, h0, Hs) {
 // one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
 function glTurn() {
   const n = glNext(); if (!n) return null;
-  const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { glCpuCall(s); const ri = glPickHitter(s, glShotKind(glHoleNow(), s)); glCpuPower(s, ri); const plan = glPlan(s, ri); return glShoot(s, plan, glHit(s, plan)); })();
+  const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { glCpuCall(s); const ri = glPickHitter(s, glShotKind(glHoleNow(), s)); glCpuPotion(s, ri); glCpuPower(s, ri); const plan = glPlan(s, ri); return glShoot(s, plan, glHit(s, plan)); })();
   // (glAfterHole leaves the end to the page when a game is on show; turn() is not the page, so it says it here)
   if (GD && G.over && ev && ev.res != null && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
   return ev;
@@ -34953,7 +34959,7 @@ function glAfterHole(h0, Hs) {
 function glSummary() {
   return {
     win: G.over ? G.over.win : -1, text: G.over ? G.over.text : '', holes: G.holes, played: G.res.length, res: G.res.slice(), won: G.won.slice(),
-    teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), pst: JSON.parse(JSON.stringify(G.pst)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(), casts: G.casts ? JSON.parse(JSON.stringify(G.casts)) : [],
+    teams: G.teams.map(t => t.name), skill: G.skill.slice(), cs: G.cs, wild: G.wild, card: JSON.parse(JSON.stringify(G.card)), stat: JSON.parse(JSON.stringify(G.stat)), pst: JSON.parse(JSON.stringify(G.pst)), shots: G.log.filter(e => e.k === 'shot').length, log: G.log.slice(), casts: G.casts ? JSON.parse(JSON.stringify(G.casts)) : [], pots: G.pots ? JSON.parse(JSON.stringify(G.pots)) : [],
   };
 }
 // a whole game at once, CPU against CPU, through glTurn. It always leaves the game on the course (G, GD and the random
@@ -35046,7 +35052,7 @@ function glPlayNext() {
     const M = GD.mgr, ri = M.ri != null && glCanHit(s, M.ri) ? M.ri : glPickHitter(s, kind);
     if (GD.autoPow) cast = glCpuPower(s, ri);
     plan = glPlan(s, ri, M.line === 'auto' ? null : M.line); M.ri = null;
-  } else { glCpuCall(s); const ri = glPickHitter(s, kind); cast = glCpuPower(s, ri); plan = glPlan(s, ri); }
+  } else { glCpuCall(s); const ri = glPickHitter(s, kind); const pot = glCpuPotion(s, ri); if (pot) cast.push(pot.replace(/\.$/, '')); cast = cast.concat(glCpuPower(s, ri)); plan = glPlan(s, ri); }
   GD.cpu = { side: s, plan };
   glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.${cast.length ? ` ${cast.filter(Boolean).join(', ')}!` : ''}`);
 }
@@ -35240,10 +35246,11 @@ const glPuttSpeed = p => Math.sqrt(2 * GL_PUTT.fric * glWetK() * glPuttScale() *
 /* ---------- the swing ---------- */
 // the mark's half-width for a hitter: wider for a more accurate one, smaller on a power shot, and smaller for a tired one
 // (focus f, 0 to 1)
-function glWin(rat, pow, f) { const W = GL_METER.win; return (W[0] + (W[1] - W[0]) * clamp(rat.acc, 0, 1)) * (pow > 1 ? GL_METER.pshot : 1) * (0.55 + 0.45 * clamp(f == null ? 1 : f, 0, 1)); }
+// (ps: gear that makes a power shot's mark shrink less, 1 for none)
+function glWin(rat, pow, f, ps) { const W = GL_METER.win, shrink = 1 - (1 - GL_METER.pshot) / (ps || 1); return (W[0] + (W[1] - W[0]) * clamp(rat.acc, 0, 1)) * (pow > 1 ? shrink : 1) * (0.55 + 0.45 * clamp(f == null ? 1 : f, 0, 1)); }
 // power and the miss (m: where on the meter the mark was hit, + early, - late) to the swing's numbers
-function glSwingNums(pow, m, rat, f) {
-  const w = glWin(rat, pow, f), a = Math.abs(m), e = a <= w ? a / w * GL_METER.inErr : GL_METER.inErr + (a - w) * GL_METER.outErr;
+function glSwingNums(pow, m, rat, f, ps) {
+  const w = glWin(rat, pow, f, ps), a = Math.abs(m), e = a <= w ? a / w * GL_METER.inErr : GL_METER.inErr + (a - w) * GL_METER.outErr;
   return { pow: clamp(pow, 0, GL_METER.top), err: m > 0 ? -e : e, inside: a <= w };
 }
 // your hitter now: their ratings, their focus, and what the moment does to them (the meter runs quicker by spd, the mark
@@ -35266,7 +35273,7 @@ function glPress() {
     if (M.k === 'putt') { glStrikeMine({ pow: clamp(M.pow * (1 + glWobble(M)), 0, 1.05) }); return true; }
     M.st = 'down'; return true;
   }
-  if (M.st === 'down') { M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f)); return true; }
+  if (M.st === 'down') { M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); return true; }
   return false;
 }
 function glMeterTick(dt) {
@@ -35278,7 +35285,7 @@ function glMeterTick(dt) {
     return;
   }
   if (M.st === 'up') { M.p += step / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
-  else if (M.st === 'down') { M.p -= step / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f)); } }
+  else if (M.st === 'down') { M.p -= step / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); } }
 }
 // the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook). The
 // moment and focus count as on the meter: the mark is where it has shaken to as you let go
@@ -35287,7 +35294,7 @@ function glDrag(pull, deg) {
   const S = GD.sel, me = glMine(), rat = me.rat, pow = clamp(pull, 0, GL_METER.top);
   GD.meter = { k: S.putt ? 'putt' : 'full', st: 'done', p: pow, pow, m: 0, drag: true, t: GD.t, f: me.f, press: me.p, spd: me.spd, shake: me.shake, wob: me.wob };
   if (S.putt) glStrikeMine({ pow: clamp(Math.min(1, pow) * (1 + glWobble(GD.meter)), 0, 1.05), deg: deg || 0 });
-  else { const w = glWin(rat, pow, me.f); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w - glShake(GD.meter); glStrikeMine(glSwingNums(pow, GD.meter.m, rat, me.f)); }
+  else { const ps = glGxOf(GD.you, S.ri).pshot, w = glWin(rat, pow, me.f, ps); GD.meter.m = (deg || 0) / GL_HANDS.dragAcc * w - glShake(GD.meter); glStrikeMine(glSwingNums(pow, GD.meter.m, rat, me.f, ps)); }
   return true;
 }
 // your swing goes off: the ball where those numbers send it
@@ -35853,7 +35860,10 @@ function glCast(s, k, ri) {
 // what side s's next stroke has: its power, the hole's mark, a curse on it, a situation power, the roar's steadying
 function glFxFor(s) {
   const f = Object.assign({}, GL_FX0);
-  if (!G || !G.powers) return f;
+  if (!G) return f;
+  // (a side's potions count with powers or without: Still Water, the Oil)
+  glKitFx(s, f);
+  if (!G.powers) return f;
   const add = x => { if (!x) return; for (const k in x) { if (!(k in GL_FX0)) continue; if (GL_FX_MUL.has(k)) f[k] *= x[k]; else f[k] = Math.max(f[k], x[k]); } };
   add(G.fx[s]); add(G.curse[s]);
   if (G.mark && G.mark.h === G.h) add(G.mark.side === s ? G.mark.own : G.mark.rival);
@@ -36054,6 +36064,97 @@ function glEnchantAfter(s, ri, ev, r, plan) {
   }
   return out.join('');
 }
+/* Mossgate Links: gear and potions (issue #92, phase 7), by #61's conventions; the Realm's side is w108-linkskit.js.
+   Gear: a player may wear one piece. A roster player sent with { gear: { id, name, fx } } keeps its name (gear) and the
+   effects the engine reads (gx: fx without r; fx.r is laid on the ratings by the Realm before the engine sees them).
+   What gx may hold: focus (what a stroke costs them in focus, ×) and pshot (how much a power shot shrinks their mark, ×
+   towards none: 1.3 is a third less shrink).
+   Potions (GL_POTIONS): one a side a hole (G.potHole), before a stroke of that side's. G.bags = [bag or null, ...] by
+   side: a null bag is kept by the page (the Realm keeps yours and takes each one out as you give it), and a bag here
+   ({ id: n }) is the CPU's, given by its caddie at its skill before its strokes (glCpuPotion). Every use goes in the line
+   under the bar with its reason and in G.pots ({ side, id, ri, h, why }). What each does, all plain data in G:
+   draught: one player GL_POTIONS.draught.focus of their focus back; glstill (Still Water): no pressure on the side's
+   next stroke (G.still); glmoss (Moss Tonic): one player scrambles GL_POTIONS.glmoss.scr better for the rest of this
+   hole (G.moss: { ri, h }); gloil (Agatha's Oil): the side's next putt GL_POTIONS.gloil.putt as shaky, its read line
+   half again as long (G.oil). */
+const GL_POTIONS = {
+  draught: { n: 'Stamina Draught', one: true, focus: 0.4, desc: 'One player gets two fifths of their focus back.' },
+  glstill: { n: 'Still Water', desc: 'Your next stroke has no pressure on it, whatever rides on it.' },
+  glmoss: { n: 'Moss Tonic', one: true, scr: 0.3, desc: 'One player scrambles much better for the rest of this hole: out of the rough, sand, bog and trees.' },
+  gloil: { n: 'Agatha\'s Oil', putt: 0.6, read: 1.5, desc: 'Your next putt runs truer, and its read line is half again as long.' },
+};
+// a CPU caddie gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
+const GL_KIT = { take: [99, 4, 3], squire: 0.25 };
+function glGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
+const glGxOf = (s, ri) => (G && G.teams && G.teams[s].roster[ri] && G.teams[s].roster[ri].gx) || {};
+function glKitStart(bags) {
+  G.bags = [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null);
+  G.pots = []; G.potHole = [-1, -1]; G.still = [false, false]; G.oil = [false, false]; G.moss = [null, null];
+}
+// why side can't give potion id (to player ri) now, or '' when it can
+function glPotionWhy(s, id, ri) {
+  const P = GL_POTIONS[id]; if (!P) return 'No such potion.';
+  if (!G || G.over) return 'The game is over.';
+  if (G.hole.done[s]) return 'Your side is done with this hole.';
+  if (G.potHole[s] === G.h) return 'One potion a hole.';
+  if (P.one && !G.teams[s].roster[ri]) return 'Pick a player.';
+  if (id === 'draught' && G.focus[s][ri] >= 0.95) return 'They\'re fresh.';
+  if (id === 'glstill' && G.still[s]) return 'Already still.';
+  if (id === 'gloil' && G.oil[s]) return 'Already oiled.';
+  if (id === 'glmoss' && G.moss[s] && G.moss[s].h === G.h) return 'Somebody has had the tonic this hole.';
+  return '';
+}
+// side gives potion id (to ri): its effect, the line and the record; the CPU's comes out of its bag here (yours, the page's)
+function glPotionGive(s, id, ri, why) {
+  const P = GL_POTIONS[id], T = G.teams[s], m = P.one ? T.roster[ri] : null;
+  if (id === 'draught') G.focus[s][ri] = Math.min(1, G.focus[s][ri] + P.focus);
+  if (id === 'glstill') G.still[s] = true;
+  if (id === 'gloil') G.oil[s] = true;
+  if (id === 'glmoss') G.moss[s] = { ri, h: G.h };
+  if (G.bags[s]) { G.bags[s][id]--; if (G.bags[s][id] <= 0) delete G.bags[s][id]; }
+  G.potHole[s] = G.h;
+  G.pots.push({ side: s, id, ri: P.one ? ri : -1, h: G.h, why: why || '' });
+  return `${T.name}: ${P.n}${m ? ` for ${m.n}` : ''}${why ? ` (${why})` : ''}.`;
+}
+// your potion now: '' when given (the page takes it out of your bag), or why not
+function glPotion(id, ri) {
+  if (!GD) return 'No game.';
+  const s = GD.you, why = glPotionWhy(s, id, ri); if (why) return why;
+  GD.msg = glPotionGive(s, id, ri) + (GD.sel ? ' ' + glAimMsg() : '');
+  if (GD.sel) glSelFix();
+  return '';
+}
+/* what a potion would be worth now, and to whom: [{ id, ri, v, why }] for the potions in bag (a CPU's, or the advice for
+   yours). ri: who hits next. A draught for the most tired player; Still Water on a stroke that wins or halves for a
+   nervy hitter; Moss Tonic for a poor scrambler in a bad lie; the Oil on a putt that matters */
+function glPotionValues(s, bag, ri) {
+  const out = [], T = G.teams[s], f = G.focus[s], H = glHoleNow(), b = G.ball[s], kind = glShotKind(H, s), p = glPressure(s), d = glDistOf(H, s), late = glLeft() <= 3;
+  const tired = [0, 1, 2, 3].sort((a, c) => f[a] - f[c])[0];
+  if (bag.draught && f[tired] < 0.55) out.push({ id: 'draught', ri: tired, v: (0.65 - f[tired]) * 12, why: `${T.roster[tired].n} is down to ${Math.round(f[tired] * 100)}% focus` });
+  if (bag.glstill && p && T.roster[ri]) { const nrv = T.roster[ri].r.nrv; if (nrv < 0.75) out.push({ id: 'glstill', ri: -1, v: 3 + p * 2 * (1 - nrv), why: `${T.roster[ri].n} has a stroke to ${G.hole.st[s] + 1 < G.hole.st[1 - s] ? 'win' : 'halve'} the hole` }); }
+  if (bag.glmoss && ['r', 'R', 'S', 'B', 'O'].includes(b.lie) && T.roster[ri] && T.roster[ri].r.scr < 0.65) out.push({ id: 'glmoss', ri, v: 2.5 + (0.65 - T.roster[ri].r.scr) * 6 + (late ? 1 : 0), why: `${T.roster[ri].n} is in the ${GL_TER[b.lie]}` });
+  if (bag.gloil && kind === 'putt' && d >= 1.5 && d <= 10 && (p || late)) out.push({ id: 'gloil', ri: -1, v: 3 + (p ? 1.5 : 0) + (late ? 0.5 : 0), why: `a ${glYards(d)} putt that matters` });
+  return out.filter(o => !glPotionWhy(s, o.id, o.ri)).sort((a, c) => c.v - a.v);
+}
+// your caddie's advice: the potion from your bag worth most now ({ id, ri, why }), or null
+function glPotionAdvice(bag, ri) { if (!G || !GD) return null; const o = glPotionValues(GD.you, bag || {}, ri)[0]; return o && o.v >= GL_KIT.take[1] ? { id: o.id, ri: o.ri, why: o.why } : null; }
+// the CPU's caddie before its stroke: a Squire now and then whatever comes first; a Knight or an Archmage what's worth
+// it. Never yours: your bag is your own (a null bag here). Returns the line's words, or ''
+function glCpuPotion(s, ri) {
+  const bag = G.bags && G.bags[s]; if (!bag || !Object.keys(bag).length) return '';
+  const vals = glPotionValues(s, bag, ri); if (!vals.length) return '';
+  const sk = G.skill[s];
+  if (!sk) return R() < GL_KIT.squire ? glPotionGive(s, vals[0].id, vals[0].ri, vals[0].why) : '';
+  return vals[0].v >= GL_KIT.take[sk] ? glPotionGive(s, vals[0].id, vals[0].ri, vals[0].why) : '';
+}
+// what a side's potions put on its next stroke (glFxFor adds it): Still Water's nerve, the Oil on a putt
+function glKitFx(s, f) {
+  if (!G || !G.still) return;
+  if (G.still[s]) f.nerve = 1;
+  if (G.oil[s] && glShotKind(glHoleNow(), s) === 'putt') { f.putt *= GL_POTIONS.gloil.putt; f.read *= GL_POTIONS.gloil.read; }
+}
+// after side s's stroke: Still Water is spent, and the Oil on a putt
+function glKitAfter(s, plan) { if (!G || !G.still) return; G.still[s] = false; if (plan.putt) G.oil[s] = false; }
 /* The Links' page in the Realm (issue #92, phase 2). A canvas in #v-links, after the rink's, and a frame loop that runs
    only while it is on screen (show/hide): it moves the game on (glTick) and draws it (glDraw). The engine's parts don't
    touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
@@ -36204,6 +36305,12 @@ return {
   // the enchanted course (phase 6b): start({ enchant: true }), a hole's enchantments, and their rules
   enchant: H => glEnchant(H), enchRules: Object.assign({}, GL_ENCH), enchantAfter: (s, ri, r, plan) => { const ev = { k: 'shot', holed: false, water: false }; const t = glEnchantAfter(s, ri, ev, r || null, plan || { putt: !r }); return { t, ev }; },
   bogReach: H => glBogReach(glEnchant(H)), wispAt: (w, k) => glWispAt(w, k), entAt: (e, k) => glEntAt(e, k), get webbed() { return G && G.webbed ? G.webbed.slice() : null; },
+  // gear and potions (phase 7): start({ bags: [yours or null, theirs] }); a roster player's gear ({ id, name, fx });
+  // the potions, why one can't be given now, yours given ('' when it took: the page takes it out of your bag), the
+  // caddie's advice for a bag, the CPU's, and what was given
+  potions: JSON.parse(JSON.stringify(GL_POTIONS)), potionWhy: (id, ri) => GD ? glPotionWhy(GD.you, id, ri) : 'No game.', potion: (id, ri) => glPotion(id, ri),
+  advice: (bag, ri) => glPotionAdvice(bag, ri), cpuPotion: (s, ri) => G ? glCpuPotion(s, ri) : '', get pots() { return G && G.pots ? G.pots.slice() : []; }, get bags() { return G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : [null, null]; },
+  gxOf: (s, ri) => G ? Object.assign({}, glGxOf(s, ri)) : {}, kitRules: Object.assign({}, GL_KIT),
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),
@@ -51830,6 +51937,129 @@ renderHelp = function () {
   wW107RenderHelp();
   const after = $('wHelpLinksTab'); if (!after || $('wHelpLinksGame')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksGame"><b>Golf matches.</b> Once you have ${W_LKG.minOwn} players of your own, your four can play golf for real: Play a match on the Links tab, or ask Agatha Divot at Mossgate Links for a MATCH. Take on the local side or a rival club, once a day each, on the standing nine (or tick Wild nine for a new course). Play (you swing every shot), Manage (you call the line, the stances and the caddie's word, and pick the next hitter if you like; your four swing) or Simulate. There is no Team HP on the course. A win pays XP to everyone who played (half to the rest), gold and fans, and a little more to the player of the match; a loss pays a quarter of the XP. Nobody goes home level. Save and leave keeps a match between shots. The Links has its own ways: the weather of the wood changes by the day (a still morning, a breeze, a drizzle that softens the greens, or a spore haze that shortens your reads); a ball that stops by the bees' hive comes back with a sting (its hitter loses focus); and the Gloomcap on its stump never moves, so of course it moved your ball. The Stats tab's Golf view has every player's line.</p>`);
+};
+/* w108: golf gear and potions (issue #92, phase 7), by #61's conventions; the engine's side is src/gl/parts/12-kit.js,
+   the plumbing (W_GEAR, W_POTIONS, the slot, the Bag) is w72.
+   Gear (W_LINKS_GEAR, one piece a player, p.gear.links): a Mossgate Driver, True Irons and a Lucky Tee from the Mossgate
+   grocer's (Fenn sells everything); a Soft Wedge, an Old Putter and a Calfskin Glove from chests. Small effects (to be
+   measured in phase 10's lab). It reaches the engine through wLinksPlayer, never by changing the player's own ratings,
+   and shows on the stats card's Gear block and the Links tab.
+   Potions: the Stamina Draught (football's item, serving the Links too: here it gives focus back), and Still Water,
+   Moss Tonic and Agatha's Oil from the Mossgate grocer's. In a real match, before one of your strokes, from the Bag
+   row under the course (one a hole), with your caddie's advice; each comes out of your bag when given. Your caddies
+   never open your bag (Watch, Manage and Auto powers don't), and Simulate leaves it alone. The other side's caddie
+   brings W_LINKS_KIT.opp[tier] and gives at its skill; every use is in the line under the bar with its reason, and the
+   match card says what each club brings.
+   Wraps: wGearLive (wW108GearLive: the Links), wLinksPlayer (wW108LinksPlayer: gear's ratings and the piece),
+   wStartLinks (wW108StartLinks: their bag goes in), wLinksRows (wW108LinksRows: the Bag row), wFourRow (wW108FourRow:
+   the gear on the Links tab), wOpenLinksCard (wW108OpenLinksCard: the bags on the card), renderHelp (wW108RenderHelp:
+   #wHelpLinksKit); and wGL.start and wGL.simGame (the bags go in). */
+
+W_GEAR_CFG.sports.links = 'golf';
+W_GEAR_STATN.links = { pow: 'power', acc: 'accuracy', tch: 'touch', put: 'putting', nrv: 'nerve', scr: 'scrambling' };
+const W_LINKS_GEAR = {
+  gl_driver: { sport: 'links', name: 'Mossgate Driver', price: 60, desc: 'A heavier head: +1 power.', fx: { r: { pow: 1 } } },
+  gl_irons: { sport: 'links', name: 'True Irons', price: 60, desc: 'A set that sits square: +1 accuracy.', fx: { r: { acc: 1 } } },
+  gl_tee: { sport: 'links', name: 'Lucky Tee', price: 40, desc: 'Kept behind an ear: a power shot\'s mark shrinks a third less.', fx: { pshot: 1.5 } },
+  gl_wedge: { sport: 'links', name: 'Soft Wedge', price: 55, desc: 'Grooves like a spider\'s: +1 touch.', fx: { r: { tch: 1 } } },
+  gl_putter: { sport: 'links', name: 'Old Putter', price: 55, desc: 'Agatha\'s own, from a drawer: +1 putting.', fx: { r: { put: 1 } } },
+  gl_glove: { sport: 'links', name: 'Calfskin Glove', price: 45, desc: 'A sure grip: every stroke costs them a fifth less focus.', fx: { focus: 0.8 } },
+};
+for (const id of Object.keys(W_LINKS_GEAR)) wGearAdd(id, W_LINKS_GEAR[id]);
+const W_LINKS_KIT = {
+  potions: { glstill: 35, glmoss: 40, gloil: 45 }, // prices (the Stamina Draught's is football's: one item, every sport)
+  store: ['gl_driver', 'gl_irons', 'gl_tee'], // Mossgate's gear (its store is the grocer's)
+  opp: { 1: { draught: 1 }, 2: { draught: 1, glstill: 1 }, 3: { draught: 2, glstill: 1, glmoss: 1, gloil: 1 } },
+};
+for (const id of Object.keys(wGL.potions)) {
+  const P = wGL.potions[id];
+  // (the Stamina Draught is football's item, and serves the Links too: focus back for one player)
+  if (id === 'draught') {
+    W_POTIONS[id].sports = (W_POTIONS[id].sports || ['grid']).concat('links');
+    DB.items[id].desc += ` On the course: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items[id].use += ' Or in a golf match, before a stroke, one a hole.';
+    continue;
+  }
+  wPotionAdd(id, { sport: 'links' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a golf match, before one of your strokes: the Bag row under the course. One potion a hole.', price: W_LINKS_KIT.potions[id] };
+}
+if (DB.shops.moss) { for (const id of Object.keys(W_LINKS_KIT.potions)) DB.shops.moss[id] = W_LINKS_KIT.potions[id]; for (const id of W_LINKS_KIT.store) DB.shops.moss[id] = W_LINKS_GEAR[id].price; }
+for (const [c, it] of [['marigold_chest', 'gl_wedge'], ['cottage_chest', 'gl_putter'], ['genevault_c3', 'gl_glove'], ['shrine_chest', 'gloil'], ['hatchery_c3', 'glmoss']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wW108GearLive = wGearLive;
+wGearLive = function (sport) { return sport === 'links' ? wLinksLive() : wW108GearLive(sport); };
+// a roster player's golf gear: its ratings (past the cap by W_GEAR_CFG.over at most) and the piece
+const wW108LinksPlayer = wLinksPlayer;
+wLinksPlayer = function (p) {
+  const t = wW108LinksPlayer(p), G = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'links') : null;
+  if (G) { t.r = wGearRate(t.r, G, wGL.cap); t.gear = wGearTag(G); }
+  return t;
+};
+
+/* ---------- the bags go in ---------- */
+const WLKK = { next: null };
+const wLinksBagMine = () => Object.fromEntries(wMatchBag('links').filter(x => wGL.potions[x.id]).map(x => [x.id, x.n]));
+const wLinksBagTheirs = tier => Object.assign({}, W_LINKS_KIT.opp[tier] || {});
+const wLinksBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wGL.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wGL.potions[id].n}`).join(', ') : 'nothing'; };
+const wW108StartLinks = wStartLinks;
+wStartLinks = function (o) {
+  WLKK.next = [null, wLinksBagTheirs((o && o.tier) || (o && o.club ? wBallTier(o.club) : 1))];
+  try { return wW108StartLinks(o); } finally { WLKK.next = null; }
+};
+// (only the match wStartLinks starts: a round, a practice or a cup match between clubs brings none)
+const wW108Start = wGL.start, wW108SimGame = wGL.simGame;
+wGL.start = o => wW108Start(WLKK.next ? Object.assign({}, o, { bags: WLKK.next }) : o);
+wGL.simGame = o => wW108SimGame(WLKK.next ? Object.assign({}, o, { bags: WLKK.next }) : o);
+
+/* ---------- your Bag, in a real match ---------- */
+function wLinksPotion(id, ri) {
+  if (!wLinksWorld()) return 'Potions are for real matches, not rounds or practice.';
+  if (!wHas(id)) return `You have no ${(wGL.potions[id] || {}).n || 'such potion'}.`;
+  const r = wGL.potion(id, ri); if (r) return r;
+  // (the save point is the match as it is now, with the potion given: a reload can't lose it, or give it back)
+  wAddItem(id, -1); if (WG.lkg && WG.lkg.live) WG.lkg.live.snap = wGL.snapshot(); wSave(); return '';
+}
+let W_LINKS_KITMSG = '';
+$('wLinksRowPow').insertAdjacentHTML('afterend', '<div class="wccrow" id="wLinksRowBag" hidden><span class="wccl">Bag</span><span id="wLinksBag"></span></div>');
+const wW108LinksRows = wLinksRows;
+wLinksRows = function () {
+  wW108LinksRows();
+  const row = $('wLinksRowBag'), V = WGL && !WGL.over && wGL.G && wGL.G.teams ? wGL.view : null;
+  const show = !!V && wLinksWorld() && ((V.mode === 'play' && V.ph === 'aim') || V.mode === 'manage');
+  row.hidden = !show; if (!show) return;
+  if (row.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;
+  const G = wGL.G, s = V.you, R = G.teams[s].roster, bag = wLinksBagMine(), ids = Object.keys(bag), next = V.sel ? V.sel.ri : 0, adv = wGL.advice(bag, next);
+  const who = id => { const P = wGL.potions[id]; if (!P.one) return '';
+    return `<select data-lkwho="${id}" aria-label="Who gets the ${esc(P.n)}">${R.map((m, ri) => `<option value="${ri}"${adv && adv.id === id && adv.ri === ri ? ' selected' : ''}>${esc(m.n)} (${Math.round(G.focus[s][ri] * 100)}%)</option>`).join('')}</select>`; };
+  $('wLinksBag').innerHTML = (ids.length ? ids.map(id => { const P = wGL.potions[id], why = wGL.potionWhy(id, P.one ? (adv && adv.id === id ? adv.ri : next) : -1);
+      return `<span class="wcpot">${who(id)}<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-lkuse="${id}" title="${esc(P.desc + (why && !/Pick|fresh/.test(why) ? ` Not now: ${why}` : ''))}">${esc(P.n)} (${bag[id]})</button></span>`; }).join(' ') : '<small class="hint">No golf potions in your bag. The Mossgate grocer sells them.</small>')
+    + (W_LINKS_KITMSG ? ` <small class="wbad">${esc(W_LINKS_KITMSG)}</small>` : '') + (adv ? ` <small class="hint">Your caddie says: <b>${esc(wGL.potions[adv.id].n)}</b>${adv.ri >= 0 ? ` for ${esc(R[adv.ri].n)}` : ''}, ${esc(adv.why)}.</small>` : '');
+};
+$('wLinksRows').addEventListener('click', e => {
+  const b = e.target.closest('[data-lkuse]'); if (!b) return;
+  const id = b.dataset.lkuse, sel = document.querySelector(`[data-lkwho="${id}"]`);
+  W_LINKS_KITMSG = wLinksPotion(id, sel ? +sel.value : -1); wLinksRows(); wLinksBarNote();
+});
+
+/* ---------- the Links tab and the card ---------- */
+const wW108FourRow = wFourRow;
+wFourRow = function (k, C) {
+  const html = wW108FourRow(k, C), p = wFourWho(k), g = p && typeof k === 'number' ? wGearOf(p, 'links') : null;
+  return g ? html.replace('<small class="wnst"', `<small class="wnst" title="${esc(g.desc)}">Wears the <b>${esc(g.name)}</b>.</small><small class="wnst"`) : html;
+};
+const wW108OpenLinksCard = wOpenLinksCard;
+wOpenLinksCard = function () {
+  wW108OpenLinksCard();
+  const ul = document.querySelector('#modalBox .wbclubs'); if (!ul) return;
+  ul.insertAdjacentHTML('afterend', `<p class="hint">What their caddies bring: ${[1, 2, 3].map(t => `tier ${t}, ${esc(wLinksBagWords(W_LINKS_KIT.opp[t]))}`).join('; ')}. Yours is your bag: give from it before a stroke, in the Bag row under the course.</p>`);
+};
+
+const wW108RenderHelp = renderHelp;
+renderHelp = function () {
+  wW108RenderHelp();
+  const after = $('wHelpLinksGame'); if (!after || $('wHelpLinksKit')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksKit"><b>Golf gear and potions.</b> Each player can carry one piece for the Links: a Mossgate Driver (+1 power), True Irons (+1 accuracy) and a Lucky Tee (a power shot's mark shrinks less) from the Mossgate grocer's; a Soft Wedge (+1 touch), an Old Putter (+1 putting) and a Calfskin Glove (strokes cost less focus) from chests. Put it on from the Bag on the Team screen. In a real match, before one of your strokes, give one potion a hole from the Bag row under the course: a Stamina Draught (one player's focus back), Still Water (no pressure on your next stroke), Moss Tonic (one player scrambles better this hole) or Agatha's Oil (your next putt runs truer, and reads longer). Your caddie says which suits the moment. The other side's caddie brings potions by tier and uses them; every use is in the line under the bar.</p>`);
 };
 </script>
 </body></html>

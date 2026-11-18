@@ -103,7 +103,11 @@ function glPressure(s) {
 // what a moment does to a hitter of nerve nrv (0 to 1): 1 is nothing
 const glNerveK = (p, nrv) => 1 + 0.6 * p * (1 - clamp(nrv, 0, 1));
 
-const glRat = (side, ri) => (G.teams[side].roster[ri] || {}).r || GL_DEF_RAT;
+// a player's ratings (0 to 1) as they play now: their own, and a Moss Tonic's scrambling this hole
+function glRat(side, ri) {
+  const r = (G.teams[side].roster[ri] || {}).r || GL_DEF_RAT, M = G.moss && G.moss[side];
+  return M && M.ri === ri && M.h === G.h ? Object.assign({}, r, { scr: Math.min(1, r.scr + GL_POTIONS.glmoss.scr) }) : r;
+}
 const glDistOf = (H, s) => hyp(G.ball[s].x - H.pin.x, G.ball[s].y - H.pin.y);
 // what kind of shot a side faces: tee, approach, short (a chip) or putt
 function glShotKind(H, s) {

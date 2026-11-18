@@ -41,6 +41,12 @@ return {
   // the enchanted course (phase 6b): start({ enchant: true }), a hole's enchantments, and their rules
   enchant: H => glEnchant(H), enchRules: Object.assign({}, GL_ENCH), enchantAfter: (s, ri, r, plan) => { const ev = { k: 'shot', holed: false, water: false }; const t = glEnchantAfter(s, ri, ev, r || null, plan || { putt: !r }); return { t, ev }; },
   bogReach: H => glBogReach(glEnchant(H)), wispAt: (w, k) => glWispAt(w, k), entAt: (e, k) => glEntAt(e, k), get webbed() { return G && G.webbed ? G.webbed.slice() : null; },
+  // gear and potions (phase 7): start({ bags: [yours or null, theirs] }); a roster player's gear ({ id, name, fx });
+  // the potions, why one can't be given now, yours given ('' when it took: the page takes it out of your bag), the
+  // caddie's advice for a bag, the CPU's, and what was given
+  potions: JSON.parse(JSON.stringify(GL_POTIONS)), potionWhy: (id, ri) => GD ? glPotionWhy(GD.you, id, ri) : 'No game.', potion: (id, ri) => glPotion(id, ri),
+  advice: (bag, ri) => glPotionAdvice(bag, ri), cpuPotion: (s, ri) => G ? glCpuPotion(s, ri) : '', get pots() { return G && G.pots ? G.pots.slice() : []; }, get bags() { return G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : [null, null]; },
+  gxOf: (s, ri) => G ? Object.assign({}, glGxOf(s, ri)) : {}, kitRules: Object.assign({}, GL_KIT),
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),
