@@ -188,7 +188,9 @@ function wLinksSettle(sum) {
     h.last = { r, us, them, sport: 'golf', day: WG.dayAbs, text };
     try { if (wIsRival(W.club)) wLeagueMine(r); } catch (e) { console.error(e); }
   }
-  B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, text, wild: W.wild, weather: W.weather, mvp, line });
+  // (end: 'po' when it went to a playoff)
+  const end = S0.played > S0.holes ? 'po' : '';
+  B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, text, end, wild: W.wild, weather: W.weather, mvp, line });
   B.games.length = Math.min(B.games.length, W_LKG.keep);
   WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
   W.us = us; W.them = them; W.text = text;

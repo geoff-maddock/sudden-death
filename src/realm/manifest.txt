@@ -146,3 +146,4 @@ src/realm/w106-linksfour.js
 src/realm/w107-linksgame.js
 src/realm/w108-linkskit.js
 src/realm/w109-linksstars.js
+src/realm/w110-linkscup.js
