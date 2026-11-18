@@ -102,7 +102,8 @@ async def main():
           wGL.cpuCall(1); return { word: G.word[1], on: G.wordOn[1] }; })()""")
         check(cw == {'word': 0, 'on': True}, 'an Archmage spends its caddie\'s word on a putt to halve the hole', cw)
         sk = await pg.evaluate("""(() => { const p = (a, b) => { let w = 0; for (let i = 0; i < 150; i++) if (wGL.simGame({ seed: 600 + i, skill: [a, b] }).win === 1) w++; return w / 150; }; return { ks: p(0, 1), ak: p(1, 2) }; })()""")
-        check(sk['ks'] > 0.6 and sk['ak'] > 0.6, 'a better caddie wins more: a Knight over a Squire, an Archmage over a Knight', sk)
+        # (a Squire was made less helpless in phase 10's balance pass: a Knight beats one about 60% of the time)
+        check(sk['ks'] > 0.55 and sk['ak'] > 0.55, 'a better caddie wins more: a Knight over a Squire, an Archmage over a Knight', sk)
 
         # ---------- the page ----------
         ui = await pg.evaluate("""(() => { __mine(51); const rows = { line: document.querySelectorAll('#wLinksLine [data-lline]').length, stance: document.querySelectorAll('#wLinksStance [data-ltempo], #wLinksStance [data-lmood]').length, word: !!document.querySelector('#wLinksStance [data-lword]') };

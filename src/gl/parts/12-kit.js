@@ -18,7 +18,7 @@ const GL_POTIONS = {
   gloil: { n: 'Agatha\'s Oil', putt: 0.6, read: 1.5, desc: 'Your next putt runs truer, and its read line is half again as long.' },
 };
 // a CPU caddie gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
-const GL_KIT = { take: [99, 4, 3], squire: 0.25 };
+const GL_KIT = { take: [99, 2.5, 2], squire: 0.25 };
 function glGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
 const glGxOf = (s, ri) => (G && G.teams && G.teams[s].roster[ri] && G.teams[s].roster[ri].gx) || {};
 function glKitStart(bags) {

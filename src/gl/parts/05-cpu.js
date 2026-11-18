@@ -28,7 +28,7 @@
    tempo quick (a quicker meter and swing, less focus spent, a touch less true) or steady; mood bold (a little longer,
    more shape and spin, a bigger miss) or careful. The caddie's word (G.word, once a game a side): the next stroke is
    read in full (the putt's read line to the cup, the wind exactly; the CPU reads it without error). */
-const GL_SKILL = { names: ['Squire', 'Knight', 'Archmage'], err: [1.25, 1, 0.85], read: [0.5, 0.25, 0.12], wind: [0, 0.85, 1], give: [1, 0.75, 0.6], giveIn: 0.6 };
+const GL_SKILL = { names: ['Squire', 'Knight', 'Archmage'], err: [1.05, 1, 0.85], read: [0.5, 0.25, 0.12], wind: [0.4, 0.85, 1], give: [1, 0.75, 0.6], giveIn: 0.6 };
 const GL_DEF_RAT = { pow: 0.5, acc: 0.5, tch: 0.5, put: 0.5, nrv: 0.5, scr: 0.5 };
 const GL_STATS = ['pow', 'acc', 'tch', 'put', 'nrv', 'scr'];
 // by kind, 1 to 12: power, accuracy, touch, putting, nerve, scrambling. An ogre hits it a mile and nobody knows where;
@@ -54,7 +54,7 @@ function glAutoRoles(roster) {
   return out;
 }
 const GL_LINES = { go: { n: 'Go for it', putt: 0.6 }, pct: { n: 'Percentages', putt: 0.35 }, lay: { n: 'Lay up', putt: 0.12 } };
-const GL_STANCE = { quick: { meter: 1.2, focus: 0.75, err: 1.06 }, steady: { meter: 1, focus: 1, err: 1 }, bold: { dist: 1.03, err: 1.15, shape: 1.5 }, careful: { dist: 1, err: 1, shape: 1 } };
+const GL_STANCE = { quick: { meter: 1.2, focus: 0.75, err: 1.03 }, steady: { meter: 1, focus: 1, err: 1 }, bold: { dist: 1.05, err: 1.03, shape: 1.5 }, careful: { dist: 1, err: 1, shape: 1 } };
 const glStanceOf = s => (G.stance && G.stance[s]) || { tempo: 'steady', mood: 'careful' };
 // a side's error from its stance (1 is none)
 const glStanceErr = s => { const st = glStanceOf(s); return GL_STANCE[st.tempo].err * GL_STANCE[st.mood].err; };
@@ -166,7 +166,7 @@ function glLayTarget(H, b, reach, careful, rollFrac) {
 // the shot for side s, hit by ri: { ri, kind, club, aim, pow, spin } or a putt { ri, kind, putt: true, a, v }
 function glPlan(s, riIn, lineIn) {
   const H = glHoleNow(), b = G.ball[s], sk = G.skill[s], kind = glShotKind(H, s), ri = riIn == null ? glPickHitter(s, kind) : riIn, rat = glRat(s, ri);
-  const line = GL_LINES[lineIn] ? lineIn : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
+  const line = GL_LINES[lineIn] ? lineIn : G.fixLine && G.fixLine[s] ? G.fixLine[s] : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
   if (kind === 'putt') {
     // (the caddie's word: read without error)
     // (in a spore haze the greens read worse)
@@ -210,7 +210,9 @@ function glPlan(s, riIn, lineIn) {
     }
     pow = glPowFor(club, b.lie, rat, need, true);
   } else pow = glPowFor(club, b.lie, rat, hyp(land.x - b.x, land.y - b.y), true);
-  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow: Math.min(1, pow / fxp.dist), spin: 0, line };
+  // (its swing goes as far as its powers, its mood and a web say: Bold a little further, a webbed ball half as far)
+  const goes = fxp.dist * GL_STANCE[glStanceOf(s).mood].dist * (G.webbed && G.webbed[s] ? GL_ENCH.webK : 1);
+  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow: Math.min(1, pow / goes), spin: 0, line };
 }
 
 // read a putt: the angle and speed that finish it just past the cup, on the green as read (slopeK)

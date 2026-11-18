@@ -41,7 +41,9 @@ function glStart(opts) {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
     wood: !!o.wood, enchant: !!o.enchant, webbed: [false, false], weather: GL_WEATHER[o.weather] ? o.weather : null,
     focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
-    scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
+    scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false,
+    // (the lab's: a side's line or stance fixed for the whole game, [side 0's or null, side 1's or null])
+    fixLine: [0, 1].map(s => o.line && GL_LINES[o.line[s]] ? o.line[s] : null), fixStance: [0, 1].map(s => o.stance && o.stance[s] ? Object.assign({ tempo: 'steady', mood: 'careful' }, o.stance[s]) : null), card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
   glPowersStart(o);
   glKitStart(o.bags);
@@ -53,6 +55,7 @@ const glTurnAt = () => Math.max(1, Math.round(G.holes * 5 / 9));
 // the CPU's call before its shot: the stance for the moment, and the caddie's word on a big putt (a Knight on the last
 // hole or in a playoff, an Archmage on any stroke that wins or halves the hole). A Squire stays as it is
 function glCpuCall(s) {
+  if (G.fixStance && G.fixStance[s]) { G.stance[s] = Object.assign({}, G.fixStance[s]); return; }
   const sk = G.skill[s]; if (!sk) return;
   const up = s === 0 ? glUp() : -glUp(), left = glLeft(), f = G.focus ? G.focus[s].reduce((a, v) => a + v, 0) / 4 : 1;
   G.stance[s] = { tempo: f < 0.6 ? 'quick' : 'steady', mood: (up <= -2 && left <= 4) || (up < 0 && left <= 2) ? 'bold' : 'careful' };

@@ -31,7 +31,7 @@
 const W_LKG = {
   minOwn: 2, xp: 12, gold: 15, fans: 3, lossShare: .25, benchShare: .5, mvpXp: 5,
   // extra rating points for each of their four, by tier; first guesses until the lab measures them (phase 10)
-  oppBonus: { 1: 0, 2: 2, 3: 5 },
+  oppBonus: { 1: 2, 2: 4, 3: 7 },
   minutes: 120, keep: 10, saveMs: 12000,
 };
 const W_LKG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };

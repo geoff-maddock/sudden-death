@@ -165,7 +165,8 @@ async def main():
         check(0.2 <= st['half'] <= 0.5, 'a few holes halved (a fifth to a half of them)', st)
         check(st['early'] >= 0.45 and st['won'] and 0 < st['po'] < 0.3 and st['poText'], 'about half of even matches or more settled before the 9th; every game won, a playoff when level ("at the 10th")', st)
         check(1.2 <= st['putts'] <= 2.2, 'putts a hole, given ones aside, between 1.2 and 2.2', st['putts'])
-        check(st['k_s'] > 0.6 and st['a_k'] > 0.55, 'a better caddie wins more: Knight over Squire, Archmage over Knight', st)
+        # (a Squire was made less helpless in phase 10's balance pass: a Knight beats one about 60% of the time, as hockey's do)
+        check(st['k_s'] > 0.55 and st['a_k'] > 0.55, 'a better caddie wins more: Knight over Squire, Archmage over Knight', st)
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()
