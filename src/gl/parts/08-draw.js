@@ -260,7 +260,8 @@ function glDrawMeter(c) {
   if (!putt) {
     c.fillStyle = 'rgba(208,64,47,.45)'; c.fillRect(X(1), y - 9, X(hi) - X(1), 18);
     const me = M || glMine(), w = glWin(glRat(GD.you, S.ri), M && M.pow != null ? M.pow : S.tick, me.f), sh = M ? glShake(M) : 0;
-    c.fillStyle = me.p ? '#e8c34a' : '#6fcf6a'; c.fillRect(X(sh - w), y - 11, X(sh + w) - X(sh - w), 22);
+    // (gold when the stroke is under pressure: the meter's own press, or glMine's p before the swing; M.p is where the arrow is)
+    c.fillStyle = (M ? M.press : me.p) ? '#e8c34a' : '#6fcf6a'; c.fillRect(X(sh - w), y - 11, X(sh + w) - X(sh - w), 22);
   }
   const g = c.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, 'rgba(255,255,255,.05)'); g.addColorStop(1, 'rgba(255,240,170,.35)');
   c.fillStyle = g; c.fillRect(X(Math.max(0, lo)), y - 9, X(Math.min(1, hi)) - X(Math.max(0, lo)), 18);
@@ -269,6 +270,7 @@ function glDrawMeter(c) {
   if (M) { const nx = X(clamp(M.p, lo, hi)); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(nx, y - 13); c.lineTo(nx - 6, y - 22); c.lineTo(nx + 6, y - 22); c.closePath(); c.fill(); c.fillRect(nx - 1, y - 13, 2, 26); }
   const club = putt ? 'Putter' : GL_CLUBS[S.club].n, extra = [GL_SHAPES[S.shape] && GL_SHAPES[S.shape].n, GL_TRAJ[S.traj] && GL_TRAJ[S.traj].n, S.spin < 0 ? 'Backspin' : S.spin > 0 ? 'Topspin' : ''].filter(Boolean).join(', ');
   txt(c, `${glName(GD.you, S.ri)} · ${club}${extra ? ' · ' + extra : ''}`, x0, y - 19, '600 12px system-ui, sans-serif', '#fff6d8', 'left', 'middle');
-  txt(c, putt ? 'Space: start, then the weight' : !M ? 'Space: start the swing' : M.st === 'up' ? 'Space: the power' : 'Space: on the mark', x1, y - 19, '12px system-ui, sans-serif', '#dfe9cf', 'right', 'middle');
+  // (plain words: the yellow line is the power, or a putt's weight; the green block is where to stop it to hit it straight)
+  txt(c, !M ? (putt ? 'Space: start the putt' : 'Space: start the swing') : putt ? 'Space at the yellow line' : M.st === 'up' ? 'Space at the yellow line: power' : 'Space in the green: straight', x1, y - 19, '12px system-ui, sans-serif', '#dfe9cf', 'right', 'middle');
   c.restore();
 }

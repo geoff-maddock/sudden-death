@@ -53,6 +53,8 @@ return {
   built: (seed, par) => glBuildHole(seed, par), wildPars: (cs, n) => glWildPars(cs, n), lie: (H, x, y) => glLie(H, x, y), slope: (H, x, y) => glSlope(H, x, y),
   reach: (club, lie, rat, pow) => glReach(club, lie, rat, pow), flight: s => glFlight(s), putt: p => glPutt(p), read: (H, from, k) => glRead(H, from, k == null ? 1 : k),
   plan: (s, line) => glPlan(s, null, line), turn: () => glTurn(), summary: () => G && G.teams ? glSummary() : null, simGame: o => glSimGame(o),
+  // the hole inspector (13-inspect.js): what is at a point of the hole, and everything on it, in plain words
+  look: (x, y) => glLookAt(x, y), holeGuide: () => glHoleGuide(), spots: () => glLookSpots().map(o => Object.assign({}, o)),
   set onShot(f) { GL_HOOK.onShot = f; }, get onShot() { return GL_HOOK.onShot; }, set onOver(f) { GL_HOOK.onOver = f; }, get onOver() { return GL_HOOK.onOver; },
   start: o => { glStart(o); glPlayStart(o || {}); return G; },
   show: () => glShow(), hide: () => glHide(), get on() { return GLP.on; }, render: () => glRender(0),

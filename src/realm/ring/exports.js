@@ -6,7 +6,7 @@
 return {
   newBout: bxNewBout, knockdown: bxKnockdown, countOut: bxCountOut, bell: bxBell, roundScore: bxRoundScore, decision: bxDecision,
   totals: c => bxTotals(c), cardResult: bxCardResult, get G() { return G; }, fansRules: Object.assign({}, BX_FANS), fansLate: () => bxFansLate(), rules: Object.assign({}, BX_RULES),
-  start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, summary: () => G && G.F ? bxSummary() : null,
+  start: o => { CD = null; return bxStart(o); }, simBout: bxSimBout, show: bxShow, hide: bxHide, render: bxRender, scr: (x, y, z) => { const p = bxProj(x, y, z || 0); return [p.x, p.y]; } /* where a ring point is drawn (read only; the Quick start's screenshots) */, summary: () => G && G.F ? bxSummary() : null,
   get on() { return BXP.on; }, get speed() { return BXP.speed; }, set speed(n) { BXP.speed = Math.max(1, Math.min(8, Math.round(n) || 1)); }, get live() { return !!BD && BD.ph !== 'over'; }, get phase() { return BD ? BD.ph : null; }, get count() { return BD && BD.ph === 'kd' ? BD.count : 0; },
   pause: on => { BXP.paused = !!on; }, get paused() { return BXP.paused; }, verdict: () => G && G.over ? bxVerdict() : '', intro: () => G && G.F ? bxIntroTape() : null, live: () => G && G.F && BD ? bxLive() : null,
   set onOver(f) { BX_HOOK.onOver = f; }, get onOver() { return BX_HOOK.onOver; }, set onSnap(f) { BX_HOOK.onSnap = f; }, set wantSnap(f) { BX_HOOK.wantSnap = f; }, set onEv(f) { BX_HOOK.onEv = f; }, get onEv() { return BX_HOOK.onEv; },

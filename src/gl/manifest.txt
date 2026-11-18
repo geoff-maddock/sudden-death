@@ -12,3 +12,4 @@ src/gl/parts/09-wood.js
 src/gl/parts/10-powers.js
 src/gl/parts/11-enchant.js
 src/gl/parts/12-kit.js
+src/gl/parts/13-inspect.js

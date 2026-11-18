@@ -31,7 +31,7 @@ function glFrame(now) {
   GLP.raf = requestAnimationFrame(glFrame);
 }
 function glShow() { GLP.host.hidden = false; if (GLP.on) return; GLP.on = true; GLP.last = performance.now(); GLP.raf = requestAnimationFrame(glFrame); }
-function glHide() { GLP.ptr = null; if (GD) GD.drag = null; GLP.host.hidden = true; GLP.on = false; cancelAnimationFrame(GLP.raf); }
+function glHide() { GLP.ptr = null; if (GD) GD.drag = null; glLookHide(); GLP.host.hidden = true; GLP.on = false; cancelAnimationFrame(GLP.raf); }
 
 /* ---------- the keys ---------- */
 function glKeyOk(e) {
@@ -91,6 +91,32 @@ GLP.cv.addEventListener('pointermove', e => {
   const p = glPtrAt(e), q = glUnscr(p.sx, p.sy);
   if (GLP.ptr.swing) GD.drag = q; else glAimAt(q.x, q.y);
 });
+/* ---------- the hole inspector: a mouse over the course says what is there (13-inspect.js) ----------
+   Only a mouse (a touch aims; a phone has the This hole list instead), and only with no button held. */
+const GLLOOK = { el: null, key: '' };
+function glLookHide() { if (GLLOOK.el) GLLOOK.el.hidden = true; GLLOOK.key = ''; }
+GLP.cv.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || GLP.ptr || e.buttons || !GD || !G || !G.teams) { if (!GLP.ptr) glLookHide(); return; }
+  const p = glPtrAt(e), q = glUnscr(p.sx, p.sy), items = glLookAt(q.x, q.y);
+  if (!items.length) { glLookHide(); return; }
+  if (!GLLOOK.el) {
+    GLLOOK.el = document.createElement('div'); GLLOOK.el.className = 'gllook'; GLLOOK.el.setAttribute('role', 'tooltip');
+    Object.assign(GLLOOK.el.style, { position: 'fixed', zIndex: 50, maxWidth: '300px', pointerEvents: 'none', background: 'rgba(16,26,12,.94)', color: '#fff6d8', border: '1px solid rgba(255,240,170,.35)', borderRadius: '8px', padding: '6px 9px', font: '13px/1.35 system-ui, sans-serif', boxShadow: '0 3px 10px rgba(0,0,0,.45)' });
+    document.body.appendChild(GLLOOK.el);
+  }
+  const key = items.map(i => i.k).join(',');
+  if (key !== GLLOOK.key) {
+    const mark = g => g === true ? '<span style="color:#8fe07a">Helps.</span> ' : g === false ? '<span style="color:#ff9a7a">Trouble.</span> ' : '';
+    GLLOOK.el.innerHTML = items.map(i => `<div style="margin:2px 0"><b>${i.n}</b><br>${mark(i.good)}${i.t}</div>`).join('');
+    GLLOOK.key = key;
+  }
+  GLLOOK.el.hidden = false;
+  const w = GLLOOK.el.offsetWidth, h = GLLOOK.el.offsetHeight;
+  GLLOOK.el.style.left = Math.min(innerWidth - w - 8, e.clientX + 16) + 'px';
+  GLLOOK.el.style.top = Math.min(innerHeight - h - 8, e.clientY + 16) + 'px';
+});
+GLP.cv.addEventListener('pointerleave', glLookHide);
+GLP.cv.addEventListener('pointerdown', glLookHide);
 function glPtrUp(e) {
   const P = GLP.ptr; GLP.ptr = null; if (!P || !GD) return;
   if (e.type === 'pointercancel') { GD.drag = null; return; }
