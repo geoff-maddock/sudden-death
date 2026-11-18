@@ -9,8 +9,9 @@ The longest check goes first, each to the shard with the least work so far; a ch
 median. Every shard computes the same split from the same list and file, so the shards share nothing at run time.
 
 To refresh the times after the suite changes a lot:
-  gh run view <run id> --log | python3 test/shard.py --from-log > test/ci-times.txt
-(the log of every shard of a run, or of the one job before the split: each check's "== name (Ns)" line).
+  (gh run view <run id> --log; gh run view <another run id> --log) | python3 test/shard.py --from-log > test/ci-times.txt
+(the logs of one or more runs, every shard of each, or the one job before the split: each check's "== name (Ns)" line;
+a check's time is its average over them).
 """
 import os, re, sys
 
@@ -36,11 +37,13 @@ def split(checks, n, times):
 
 def main(argv):
     if argv[:1] == ['--from-log']:
+        # (several runs' logs may be given at once: a check's time is its average over them, as one run's times swing a
+        # lot, a check sometimes taking three times as long as the run before)
         seen = {}
         for line in sys.stdin:
             m = re.search(r'== ([a-z0-9_]+) \((\d+)s\)', line)
-            if m: seen[m.group(1)] = int(m.group(2))
-        for c in sorted(seen): print(c, seen[c])
+            if m: seen.setdefault(m.group(1), []).append(int(m.group(2)))
+        for c in sorted(seen): print(c, round(sum(seen[c]) / len(seen[c])))
         return 0
     if len(argv) < 3 or not argv[0].isdigit() or not argv[1].isdigit():
         print(__doc__, file=sys.stderr); return 2

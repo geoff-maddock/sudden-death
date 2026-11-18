@@ -173,7 +173,9 @@ async def main():
     assert not sd_errs, f'__sdErrs: {sd_errs}'
     assert not bad, f'tiles that drew nothing useful: {bad}'
     assert same, 'world rendering depends on the order chunks were cached in'
-    assert perf['avg'] < 8, f"cached world repaint too slow: {perf['avg']:.2f} ms"
+    # (the median frame, not the average: on a shared CI runner a few slow frames, a collection or a neighbour, lift the
+    # average past the bar with the cache working; a lost cache slows every frame, so the median still catches it)
+    assert perf['median'] < 8, f"cached world repaint too slow: median {perf['median']:.2f} ms (avg {perf['avg']:.2f})"
     print('OK')
 
 asyncio.run(main())
