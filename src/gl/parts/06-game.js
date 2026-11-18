@@ -39,7 +39,7 @@ function glStart(opts) {
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
-    wood: !!o.wood, weather: GL_WEATHER[o.weather] ? o.weather : null,
+    wood: !!o.wood, enchant: !!o.enchant, webbed: [false, false], weather: GL_WEATHER[o.weather] ? o.weather : null,
     focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
@@ -75,7 +75,8 @@ function glHit(s, plan) {
   // the skill's errors, made worse by a tired hitter and by a big moment for a nervy one
   // (and by the stroke's powers, the hole's mark and any curse on it: glFxFor)
   const fx = glFxFor(s), H = glHoleNow(), b = G.ball[s], rat = glRat(s, plan.ri), em = GL_SKILL.err[G.skill[s]] * glFocusK(G.focus ? G.focus[s][plan.ri] : 1) * glNerveK(glPressFx(s), rat.nrv) * glStanceErr(s) * fx.err;
-  const dist = GL_STANCE[glStanceOf(s).mood].dist;
+  // (a ball caught in a web goes half as far)
+  const dist = GL_STANCE[glStanceOf(s).mood].dist * (G.webbed && G.webbed[s] ? GL_ENCH.webK : 1);
   if (plan.putt) {
     const k = (1.5 - rat.put) * fx.putt, a = plan.a + gauss() * GL_SWING.pa * k * em / fx.err, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em / fx.err);
     const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK(), lip: fx.lip });
@@ -105,6 +106,7 @@ function glGive(by) {
 // side s hits plan; r is where the ball went (glHit's for the CPU, or a swing by hand: glStrike). Counts it
 function glShoot(s, plan, r) {
   const H = glHoleNow(), h0 = G.res.length, Hs = G.hole, no = h0 + 1, d0 = glDistOf(H, s), lie0 = G.ball[s].lie, fx = glFxFor(s), st = glStroke(s, plan.ri);
+  if (st.ok && G.webbed) G.webbed[s] = false;
   if (!st.ok) return { k: 'refused', why: st.why };
   const S = G.stat[s];
   G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
@@ -121,6 +123,8 @@ function glShoot(s, plan, r) {
   if (r.water) { S.water++; glDrop(s); }
   // the wood's own ways on a ball that has stopped: the bees, the Gloomcap
   ev.wood = glWoodAfter(s, plan.ri, ev);
+  // the enchanted course: the wyvern, the wisps, the troll's toll, the mimic, the rings, the walking trees, the bog, webs, runes
+  ev.enchT = glEnchantAfter(s, plan.ri, ev, r, plan);
   if (r.saved) ev.saved = true;
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);

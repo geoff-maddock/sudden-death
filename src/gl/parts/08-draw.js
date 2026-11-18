@@ -89,6 +89,7 @@ function glDraw(c, dt) {
   c.drawImage(cv, ox, oy, cv.width / S * k, cv.height / S * k);
   if (k >= 7) { glDrawGreen(c, H); glDrawGrain(c, H); }
   if (G.wood) glDrawWood(c, H);
+  if (G.enchant) glDrawEnchant(c, H);
   glDrawPin(c, H);
   const mine = (GD.ph === 'aim' || GD.ph === 'swing') && GD.sel && GD.mode === 'play';
   if (mine) glDrawAim(c);
@@ -113,6 +114,22 @@ function glDrawWood(c, H) {
     c.fillStyle = '#4a5a7a'; c.beginPath(); c.ellipse(sx, sy - q * 0.2, q * 0.8, q * 0.5, 0, Math.PI, 0); c.fill();
     c.fillStyle = '#c9d6ef'; c.beginPath(); c.arc(sx - q * 0.25, sy - q * 0.35, q * 0.12, 0, Math.PI * 2); c.arc(sx + q * 0.2, sy - q * 0.4, q * 0.1, 0, Math.PI * 2); c.fill();
   }
+  c.restore();
+}
+// the enchanted course: fairy rings, the mimic's eyes in its bunker, the troll bridge, the creeping bog's reach, the
+// walking trees, a web, the runestone and the wisps (where they are now)
+function glDrawEnchant(c, H) {
+  const E = glEnchant(H), k = GLC.k, K = glEnchK(), S = (p) => glScr(p.x, p.y);
+  c.save();
+  if (E.bog) { const [x, y] = S(E.bog), r = glBogReach(E) * k; c.strokeStyle = 'rgba(70,80,30,.6)'; c.setLineDash([4, 4]); c.lineWidth = 2; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+  if (E.rings) for (const R0 of E.rings) { const [x, y] = S(R0), r = GL_ENCH.ring * k; c.strokeStyle = 'rgba(230,200,255,.55)'; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#e8dcc0'; for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; c.beginPath(); c.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, Math.max(1.5, k * 0.5), 0, Math.PI * 2); c.fill(); } }
+  if (E.mimic) { const [x, y] = S(E.mimic), q = Math.max(3, k * 0.9), blink = Math.sin(GLC.t * 0.7) > 0.95; c.fillStyle = blink ? 'rgba(0,0,0,0)' : '#d8452f'; c.beginPath(); c.arc(x - q, y, q * 0.45, 0, Math.PI * 2); c.arc(x + q, y, q * 0.45, 0, Math.PI * 2); c.fill(); }
+  if (E.bridge) { const [x, y] = S(E.bridge), w = Math.max(10, 6 * k), h = Math.max(5, 2.4 * k); c.fillStyle = '#7a5530'; c.fillRect(x - w / 2, y - h / 2, w, h); c.strokeStyle = 'rgba(40,25,10,.8)'; c.lineWidth = 1; for (let i = 1; i < 6; i++) { c.beginPath(); c.moveTo(x - w / 2 + i * w / 6, y - h / 2); c.lineTo(x - w / 2 + i * w / 6, y + h / 2); c.stroke(); } }
+  for (const e of E.ents) { const p = glEntAt(e, K), [x, y] = S(p), r = Math.max(5, GL_ENCH.ent * k * 0.7); c.fillStyle = '#26381f'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.fillStyle = '#f2e27a'; c.beginPath(); c.arc(x - r * 0.3, y - r * 0.2, Math.max(1, r * 0.12), 0, Math.PI * 2); c.arc(x + r * 0.3, y - r * 0.2, Math.max(1, r * 0.12), 0, Math.PI * 2); c.fill(); }
+  { const [x, y] = S(E.web), r = Math.max(5, GL_ENCH.web * k * 0.7); c.strokeStyle = 'rgba(240,240,240,.55)'; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); c.stroke(); } for (const f of [0.4, 0.75]) { c.beginPath(); c.arc(x, y, r * f, 0, Math.PI * 2); c.stroke(); } }
+  { const [x, y] = S(E.rune), q = Math.max(6, k * 1.8); c.fillStyle = '#8a8d94'; c.beginPath(); c.ellipse(x, y, q * 0.7, q, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = `rgba(120,220,255,${0.5 + Math.sin(GLC.t * 2) * 0.3})`; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, y - q * 0.6); c.lineTo(x, y + q * 0.6); c.moveTo(x - q * 0.35, y - q * 0.2); c.lineTo(x + q * 0.35, y + q * 0.15); c.stroke(); }
+  for (const w of E.wisps) { const p = glWispAt(w, K), [x, y] = S(p), r = Math.max(3, k * 0.9), g = c.createRadialGradient(x, y, 0, x, y, r * 3); g.addColorStop(0, 'rgba(210,255,200,.9)'); g.addColorStop(1, 'rgba(210,255,200,0)'); c.fillStyle = g; c.beginPath(); c.arc(x + Math.sin(GLC.t * 2 + w.ph) * 2, y + Math.cos(GLC.t * 1.7 + w.ph) * 2, r * 3, 0, Math.PI * 2); c.fill(); }
   c.restore();
 }
 // the weather over the course: drizzle (streaks) or a spore haze (a green veil, drifting motes)

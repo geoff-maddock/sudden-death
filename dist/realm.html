@@ -34827,7 +34827,7 @@ function glStart(opts) {
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
     cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
-    wood: !!o.wood, weather: GL_WEATHER[o.weather] ? o.weather : null,
+    wood: !!o.wood, enchant: !!o.enchant, webbed: [false, false], weather: GL_WEATHER[o.weather] ? o.weather : null,
     focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false, card: [], log: [], pst: [0, 1].map(() => [0, 1, 2, 3].map(() => ({ shots: 0, putts: 0, holed: 0 }))), stat: [0, 1].map(() => ({ putts: 0, fw: 0, fwTry: 0, gir: 0, drive: 0, birdies: 0, eagles: 0, water: 0 })),
   });
@@ -34863,7 +34863,8 @@ function glHit(s, plan) {
   // the skill's errors, made worse by a tired hitter and by a big moment for a nervy one
   // (and by the stroke's powers, the hole's mark and any curse on it: glFxFor)
   const fx = glFxFor(s), H = glHoleNow(), b = G.ball[s], rat = glRat(s, plan.ri), em = GL_SKILL.err[G.skill[s]] * glFocusK(G.focus ? G.focus[s][plan.ri] : 1) * glNerveK(glPressFx(s), rat.nrv) * glStanceErr(s) * fx.err;
-  const dist = GL_STANCE[glStanceOf(s).mood].dist;
+  // (a ball caught in a web goes half as far)
+  const dist = GL_STANCE[glStanceOf(s).mood].dist * (G.webbed && G.webbed[s] ? GL_ENCH.webK : 1);
   if (plan.putt) {
     const k = (1.5 - rat.put) * fx.putt, a = plan.a + gauss() * GL_SWING.pa * k * em / fx.err, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em / fx.err);
     const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK(), lip: fx.lip });
@@ -34893,6 +34894,7 @@ function glGive(by) {
 // side s hits plan; r is where the ball went (glHit's for the CPU, or a swing by hand: glStrike). Counts it
 function glShoot(s, plan, r) {
   const H = glHoleNow(), h0 = G.res.length, Hs = G.hole, no = h0 + 1, d0 = glDistOf(H, s), lie0 = G.ball[s].lie, fx = glFxFor(s), st = glStroke(s, plan.ri);
+  if (st.ok && G.webbed) G.webbed[s] = false;
   if (!st.ok) return { k: 'refused', why: st.why };
   const S = G.stat[s];
   G.ball[s] = { x: +r.end.x.toFixed(2), y: +r.end.y.toFixed(2), lie: r.holed ? 'G' : r.lie };
@@ -34909,6 +34911,8 @@ function glShoot(s, plan, r) {
   if (r.water) { S.water++; glDrop(s); }
   // the wood's own ways on a ball that has stopped: the bees, the Gloomcap
   ev.wood = glWoodAfter(s, plan.ri, ev);
+  // the enchanted course: the wyvern, the wisps, the troll's toll, the mimic, the rings, the walking trees, the bog, webs, runes
+  ev.enchT = glEnchantAfter(s, plan.ri, ev, r, plan);
   if (r.saved) ev.saved = true;
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);
@@ -35113,7 +35117,7 @@ function glEvSay(ev, r) {
     t = ev.holed ? `${who}'s ${c} drops into the cup!` : ev.water ? `${who}'s ${c} finds the water. A drop, and a stroke.` : `${who} hits a ${c} ${carry} yards, into the ${GL_TER[ev.lie]}. ${glYards(ev.d1)} to the pin.`;
   }
   if (ev.up) t += ' That is par and four more: the ball is picked up.';
-  t += (ev.wood || '') + glGallery(ev);
+  t += (ev.wood || '') + (ev.enchT || '') + glGallery(ev);
   return t + glHoleSay(ev);
 }
 function glHoleSay(ev) {
@@ -35164,7 +35168,7 @@ function glSelFix() {
 function glTickPow() {
   const S = GD.sel, s = GD.you, b = G.ball[s], d = hyp(S.aim.x - b.x, S.aim.y - b.y);
   if (S.putt) return clamp((d + GL_LINES[S.line || 'pct'].putt) / glPuttScale(), 0.02, 1);
-  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist * glFxFor(s).dist;
+  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist * glFxFor(s).dist * (G.webbed && G.webbed[s] ? GL_ENCH.webK : 1);
   return glPowFor(S.club, b.lie, glRat(s, S.ri), d / T / B, true);
 }
 // a putt's bar runs to this many yards (on a flat green, at full weight)
@@ -35294,8 +35298,8 @@ function glStrike(s, S, sw) {
     const fx = glFxFor(s), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK(), lip: fx.lip });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s);
-  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, glFxFlight(fx, S.aim, b)));
+  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s), web = G.webbed && G.webbed[s] ? GL_ENCH.webK : 1;
+  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist * web, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, glFxFlight(fx, S.aim, b)));
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
@@ -35448,6 +35452,7 @@ function glDraw(c, dt) {
   c.drawImage(cv, ox, oy, cv.width / S * k, cv.height / S * k);
   if (k >= 7) { glDrawGreen(c, H); glDrawGrain(c, H); }
   if (G.wood) glDrawWood(c, H);
+  if (G.enchant) glDrawEnchant(c, H);
   glDrawPin(c, H);
   const mine = (GD.ph === 'aim' || GD.ph === 'swing') && GD.sel && GD.mode === 'play';
   if (mine) glDrawAim(c);
@@ -35472,6 +35477,22 @@ function glDrawWood(c, H) {
     c.fillStyle = '#4a5a7a'; c.beginPath(); c.ellipse(sx, sy - q * 0.2, q * 0.8, q * 0.5, 0, Math.PI, 0); c.fill();
     c.fillStyle = '#c9d6ef'; c.beginPath(); c.arc(sx - q * 0.25, sy - q * 0.35, q * 0.12, 0, Math.PI * 2); c.arc(sx + q * 0.2, sy - q * 0.4, q * 0.1, 0, Math.PI * 2); c.fill();
   }
+  c.restore();
+}
+// the enchanted course: fairy rings, the mimic's eyes in its bunker, the troll bridge, the creeping bog's reach, the
+// walking trees, a web, the runestone and the wisps (where they are now)
+function glDrawEnchant(c, H) {
+  const E = glEnchant(H), k = GLC.k, K = glEnchK(), S = (p) => glScr(p.x, p.y);
+  c.save();
+  if (E.bog) { const [x, y] = S(E.bog), r = glBogReach(E) * k; c.strokeStyle = 'rgba(70,80,30,.6)'; c.setLineDash([4, 4]); c.lineWidth = 2; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+  if (E.rings) for (const R0 of E.rings) { const [x, y] = S(R0), r = GL_ENCH.ring * k; c.strokeStyle = 'rgba(230,200,255,.55)'; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#e8dcc0'; for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; c.beginPath(); c.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, Math.max(1.5, k * 0.5), 0, Math.PI * 2); c.fill(); } }
+  if (E.mimic) { const [x, y] = S(E.mimic), q = Math.max(3, k * 0.9), blink = Math.sin(GLC.t * 0.7) > 0.95; c.fillStyle = blink ? 'rgba(0,0,0,0)' : '#d8452f'; c.beginPath(); c.arc(x - q, y, q * 0.45, 0, Math.PI * 2); c.arc(x + q, y, q * 0.45, 0, Math.PI * 2); c.fill(); }
+  if (E.bridge) { const [x, y] = S(E.bridge), w = Math.max(10, 6 * k), h = Math.max(5, 2.4 * k); c.fillStyle = '#7a5530'; c.fillRect(x - w / 2, y - h / 2, w, h); c.strokeStyle = 'rgba(40,25,10,.8)'; c.lineWidth = 1; for (let i = 1; i < 6; i++) { c.beginPath(); c.moveTo(x - w / 2 + i * w / 6, y - h / 2); c.lineTo(x - w / 2 + i * w / 6, y + h / 2); c.stroke(); } }
+  for (const e of E.ents) { const p = glEntAt(e, K), [x, y] = S(p), r = Math.max(5, GL_ENCH.ent * k * 0.7); c.fillStyle = '#26381f'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.fillStyle = '#f2e27a'; c.beginPath(); c.arc(x - r * 0.3, y - r * 0.2, Math.max(1, r * 0.12), 0, Math.PI * 2); c.arc(x + r * 0.3, y - r * 0.2, Math.max(1, r * 0.12), 0, Math.PI * 2); c.fill(); }
+  { const [x, y] = S(E.web), r = Math.max(5, GL_ENCH.web * k * 0.7); c.strokeStyle = 'rgba(240,240,240,.55)'; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); c.stroke(); } for (const f of [0.4, 0.75]) { c.beginPath(); c.arc(x, y, r * f, 0, Math.PI * 2); c.stroke(); } }
+  { const [x, y] = S(E.rune), q = Math.max(6, k * 1.8); c.fillStyle = '#8a8d94'; c.beginPath(); c.ellipse(x, y, q * 0.7, q, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = `rgba(120,220,255,${0.5 + Math.sin(GLC.t * 2) * 0.3})`; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, y - q * 0.6); c.lineTo(x, y + q * 0.6); c.moveTo(x - q * 0.35, y - q * 0.2); c.lineTo(x + q * 0.35, y + q * 0.15); c.stroke(); }
+  for (const w of E.wisps) { const p = glWispAt(w, K), [x, y] = S(p), r = Math.max(3, k * 0.9), g = c.createRadialGradient(x, y, 0, x, y, r * 3); g.addColorStop(0, 'rgba(210,255,200,.9)'); g.addColorStop(1, 'rgba(210,255,200,0)'); c.fillStyle = g; c.beginPath(); c.arc(x + Math.sin(GLC.t * 2 + w.ph) * 2, y + Math.cos(GLC.t * 1.7 + w.ph) * 2, r * 3, 0, Math.PI * 2); c.fill(); }
   c.restore();
 }
 // the weather over the course: drizzle (streaks) or a spore haze (a green veil, drifting motes)
@@ -35905,6 +35926,134 @@ function glFxFlight(fx, aim, b) {
   return { wind, rollK: fx.roll, trees: fx.trees, water: fx.water, lip: fx.lip };
 }
 
+/* Mossgate Links: the enchanted course (issue #92, phase 6b), a second layer of traps and fantasy on top of the wood's
+   (09-wood.js). A game has it when started with { enchant: true } (the Realm's games do; the bare engine doesn't).
+   Every hole's enchantments come from its seed by a stream of their own (glEnchant), so the standing nine's can be
+   learned and the course's own holes are unchanged; a wild nine has new ones. After a shot (glEnchantAfter), in order:
+   - The wyvern (rarely, GL_ENCH.wyvern of the shots in the air): it swoops and carries the ball off, 20 to 40 yards.
+     A gorgon's ball it won't touch (it knows that stare).
+   - Will-o'-wisps (two a hole, drifting a little with every stroke): a ball that comes down near one is carried off a
+     few yards the way it drifts. Never a harpy's (she flies with them).
+   - The troll bridge: on some holes with a stream the troll is home under the bridge, and takes a toll from the first
+     ball each side carries over the water: a mana (with powers; else a little of the hitter's focus). With no mana to
+     pay, the ball is batted back to the near bank (no stroke). A troll pays no toll.
+   - The mimic bunker (on some holes, one of the bunkers): a ball that stops in it is swallowed (a drop at the edge and
+     a stroke) or spat out somewhere near. An ogre's ball it always spits out (it tried once).
+   - Fairy rings (two on some holes): a ball that stops in one is sent to the other. An elf's ball only when that helps
+     (elves read them).
+   - Walking trees (two a hole, moving between strokes): a ball that stops among one lies in the trees. A wraith's ball
+     passes through them.
+   - The creeping bog: on a hole with a moss bog, it creeps out a little more with every hole played (GL_ENCH.creep
+     yards a hole); a ball that stops in its reach lies in the bog. A zombie's ball it lets go (it knows its own).
+   - Webs (one a hole, at the tree line): a ball that stops in one is held: the next shot from it goes half as far. A
+     spider walks out of a web.
+   - The runestone (one a hole): a ball that stops beside it gives its side a mana (with powers; else focus back for
+     the four). A dwarf reads it twice.
+   Each gives words for the line under the bar, and the log entry says which (ev.ench). Drawn on the course (08-draw.js). */
+const GL_ENCH = { wyvern: 0.01, wyvernFar: [20, 40], wisp: 7, wispCarry: [6, 12], ring: 6.5, mimicR: 8, swallow: 0.5, spit: [10, 20], ent: 7, creep: 1.5, web: 9, webK: 0.5, rune: 10, toll: 1, tollFocus: 0.15, trollHome: 0.3, bridgeNear: 30 };
+const GLEN = {};
+function glEnchant(H) {
+  const key = H.seed + ':' + H.par; if (GLEN[key]) return GLEN[key];
+  const q = engRng(H.seed ^ 0xe7c4), cand = H.line.filter(p => p.t > 50 && p.t < H.len - 35);
+  const at = () => cand[(q() * cand.length) | 0] || H.line[(H.line.length / 2) | 0];
+  const side = (p, off, want) => { const s = q() < 0.5 ? -1 : 1; for (let k = 0; k < 14; k++) { const x = p.x + s * (off + k * 1.5), l = glLie(H, x, p.y); if (!want || want.includes(l)) return { x, y: p.y }; } return { x: p.x + s * off, y: p.y }; };
+  const cells = ch => { const out = []; for (let r = 0; r < H.h; r++) for (let c = 0; c < H.w; c++) if (H.grid[r][c] === ch) out.push({ x: (c + 0.5) * H.cell, y: (r + 0.5) * H.cell }); return out; };
+  const E = {};
+  // fairy rings: two, apart, on short grass or rough (about half the holes)
+  if (q() < 0.55) { const a = side(at(), q() * 10, ['F', 'r']); let b = null; for (let k = 0; k < 12 && !b; k++) { const c = side(at(), q() * 10, ['F', 'r']); if (hyp(c.x - a.x, c.y - a.y) > 45) b = c; } if (b) E.rings = [a, b]; }
+  // the mimic: one of the bunkers (about half the holes that have sand)
+  const sand = cells('S'); if (sand.length && q() < 0.5) E.mimic = sand[(q() * sand.length) | 0];
+  // the troll bridge: where the hole's line crosses the stream
+  const wetLine = H.line.find((p, i) => i && glLie(H, p.x, p.y) === 'W' && H.line[i - 1] && glLie(H, H.line[i - 1].x, H.line[i - 1].y) !== 'W');
+  // (the troll is home under it on some holes only)
+  if (wetLine && q() < GL_ENCH.trollHome) E.bridge = { x: wetLine.x, y: wetLine.y };
+  // will-o'-wisps, walking trees, a web and the runestone: on every hole
+  E.wisps = [0, 1].map(() => { const p = at(); return { x: p.x + (q() - 0.5) * 20, y: p.y, ph: q() * 6 }; });
+  E.ents = [0, 1].map(() => Object.assign(side(at(), 18 + q() * 8, ['r', 'R']), { ph: q() * 6 }));
+  // (the web and the runestone by the drive zone, where tee shots come down; on a par 3, by the green)
+  const zone = H.line.filter(p => H.par > 3 ? p.t > 200 && p.t < 270 : p.t > H.len - 50), atZ = () => zone[(q() * zone.length) | 0] || at();
+  E.web = side(atZ(), 16 + q() * 6, ['R', 'r']);
+  E.rune = side(atZ(), 4 + q() * 8, ['r', 'F']);
+  // the creeping bog: from the middle of the hole's moss bog, as wide as it is
+  const bog = cells('B'); if (bog.length) { const cx = bog.reduce((a, c) => a + c.x, 0) / bog.length, cy = bog.reduce((a, c) => a + c.y, 0) / bog.length; E.bog = { x: cx, y: cy, r: Math.sqrt(bog.length) * H.cell * 0.55 }; }
+  if (Object.keys(GLEN).length > 60) for (const k in GLEN) delete GLEN[k];
+  GLEN[key] = E;
+  return E;
+}
+// where the wisps and the walking trees are now: they move a little with every stroke of the hole (k: strokes so far)
+const glEnchK = () => (G && G.hole ? G.hole.st[0] + G.hole.st[1] : 0);
+const glWispAt = (w, k) => ({ x: w.x + Math.sin(k * 1.3 + w.ph) * 12, y: w.y + Math.cos(k * 0.9 + w.ph) * 9 });
+const glEntAt = (e, k) => ({ x: e.x + Math.sin(k * 0.8 + e.ph) * 9, y: e.y + Math.cos(k * 0.6 + e.ph) * 6 });
+const glBogReach = E => E.bog ? E.bog.r + GL_ENCH.creep * (G ? G.res.length : 0) : 0;
+// a dry spot about d yards from p (never water, never the green), for a ball that is carried, spat out or batted
+function glDrySpot(H, p, d0, d1) {
+  for (let k = 0; k < 12; k++) { const a = R() * Math.PI * 2, d = d0 + R() * (d1 - d0), x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d, l = glLie(H, x, y); if (l !== 'W' && l !== 'G') return { x, y, lie: l === 'T' ? 'r' : l }; }
+  return null;
+}
+// after a shot by side s, hitter ri: the enchantments on the ball. r: the flight or the roll. Returns words, or ''
+function glEnchantAfter(s, ri, ev, r, plan) {
+  if (!G.enchant || ev.holed) return '';
+  const H = glHoleNow(), E = glEnchant(H), kind = (G.teams[s].roster[ri] || {}).kind, put = (x, y, lie) => { G.ball[s] = { x: +x.toFixed(2), y: +y.toFixed(2), lie }; ev.lie = lie; };
+  const air = !plan.putt && r && r.path && r.path.length, out = [];
+  // the wyvern, now and then, on a ball in the air
+  if (air && !ev.water && kind !== 'gorgon' && R() < GL_ENCH.wyvern) {
+    const p = glDrySpot(H, G.ball[s], GL_ENCH.wyvernFar[0], GL_ENCH.wyvernFar[1]);
+    if (p) { put(p.x, p.y, p.lie); ev.ench = 'wyvern'; return ' A wyvern swoops out of the wood and carries the ball off!'; }
+  }
+  // the troll's toll on a ball that carried the stream
+  // (once a side a hole: paid, the troll lets that side by for the rest of it)
+  if (air && E.bridge && !ev.water && kind !== 'troll' && !(G.tolled && G.tolled[s] === G.h)) {
+    const from = r.path[0], land = r.land, n = Math.ceil(hyp(land.x - from.x, land.y - from.y) / 3);
+    // (over the water within GL_ENCH.bridgeNear yards of the bridge: the troll's own stretch of the stream)
+    let crossed = false; for (let i = 1; i < n && !crossed; i++) { const x = from.x + (land.x - from.x) * i / n, y = from.y + (land.y - from.y) * i / n; if (glLie(H, x, y) === 'W' && hyp(x - E.bridge.x, y - E.bridge.y) < GL_ENCH.bridgeNear) crossed = true; }
+    if (crossed && glLie(H, land.x, land.y) !== 'W') {
+      G.tolled = G.tolled || [-1, -1]; G.tolled[s] = G.h;
+      if (G.powers && G.mana && G.mana[s] >= GL_ENCH.toll) { G.mana[s] -= GL_ENCH.toll; out.push(' The troll under the bridge takes his toll: a mana.'); ev.ench = 'toll'; }
+      else if (!G.powers) { if (G.focus) G.focus[s][ri] = Math.max(0, G.focus[s][ri] - GL_ENCH.tollFocus); out.push(` The troll under the bridge takes his toll from ${glName(s, ri)}.`); ev.ench = 'toll'; }
+      else {
+        // back to the near bank: three yards short of where the line first meets the water, on the side it was hit from
+        const d = hyp(land.x - from.x, land.y - from.y), ux = (land.x - from.x) / (d || 1), uy = (land.y - from.y) / (d || 1);
+        let t = 0; while (t < d && glLie(H, from.x + ux * t, from.y + uy * t) !== 'W') t += 1;
+        t = Math.max(0, t - 3); const x = from.x + ux * t, y = from.y + uy * t, l = glLie(H, x, y);
+        put(x, y, l === 'W' || l === 'G' ? 'r' : l === 'T' ? 'r' : l); ev.ench = 'troll'; return ' No mana for the troll: he bats the ball back to the near bank.';
+      }
+    }
+  }
+  // the wisps on a ball coming down
+  if (air && !ev.water && kind !== 'harpy') {
+    const k = glEnchK(), b = G.ball[s];
+    for (const w of E.wisps) { const at = glWispAt(w, k); if (hyp(b.x - at.x, b.y - at.y) < GL_ENCH.wisp) {
+      const a = Math.atan2(Math.cos((k + 1) * 0.9 + w.ph) * 9 - Math.cos(k * 0.9 + w.ph) * 9, Math.sin((k + 1) * 1.3 + w.ph) * 12 - Math.sin(k * 1.3 + w.ph) * 12), d = GL_ENCH.wispCarry[0] + R() * (GL_ENCH.wispCarry[1] - GL_ENCH.wispCarry[0]);
+      const x = b.x + Math.cos(a) * d, y = b.y + Math.sin(a) * d, l = glLie(H, x, y);
+      if (l !== 'W') { put(x, y, l === 'T' ? 'r' : l); out.push(' A will-o\'-wisp carries it off a little.'); ev.ench = 'wisp'; }
+      break; } }
+  }
+  if (ev.water) return out.join('');
+  const b = G.ball[s];
+  // the mimic: a ball in its sand
+  if (E.mimic && b.lie === 'S' && hyp(b.x - E.mimic.x, b.y - E.mimic.y) < GL_ENCH.mimicR) {
+    if (kind !== 'ogre' && R() < GL_ENCH.swallow) { const D = glWaterDrop(H, r && r.path ? r.path[0] : b, b); put(D.end.x, D.end.y, D.lie === 'S' ? 'r' : D.lie); glDrop(s); ev.ench = 'mimic'; return out.join('') + ' The bunker has teeth: it swallows the ball. A drop, and a stroke.'; }
+    const p = glDrySpot(H, b, GL_ENCH.spit[0], GL_ENCH.spit[1]); if (p) { put(p.x, p.y, p.lie); ev.ench = 'spat'; return out.join('') + ' The bunker has teeth, and it spits the ball out.'; }
+  }
+  // fairy rings
+  if (E.rings) for (let i = 0; i < 2; i++) { const A = E.rings[i], B = E.rings[1 - i]; if (hyp(b.x - A.x, b.y - A.y) < GL_ENCH.ring) {
+    const helps = hyp(B.x - H.pin.x, B.y - H.pin.y) < hyp(b.x - H.pin.x, b.y - H.pin.y);
+    if (kind === 'elf' && !helps) { out.push(` ${glName(s, ri)} reads the fairy ring and steps out of it.`); break; }
+    put(B.x, B.y, glLie(H, B.x, B.y)); ev.ench = 'ring'; return out.join('') + ' A fairy ring! The ball comes up in the other one.'; } }
+  // walking trees
+  if (kind !== 'wraith') { const k = glEnchK(); for (const e of E.ents) { const at = glEntAt(e, k); if (hyp(b.x - at.x, b.y - at.y) < GL_ENCH.ent) { put(b.x, b.y, 'O'); ev.ench = 'ent'; return out.join('') + ' The trees have walked: the ball is among them.'; } } }
+  // the creeping bog
+  if (E.bog && kind !== 'zombie' && b.lie !== 'B' && b.lie !== 'G' && hyp(b.x - E.bog.x, b.y - E.bog.y) < glBogReach(E)) { put(b.x, b.y, 'B'); ev.ench = 'bog'; return out.join('') + ' The bog has crept out this far: the ball sits in moss.'; }
+  // a web
+  if (kind !== 'spider' && hyp(b.x - E.web.x, b.y - E.web.y) < GL_ENCH.web) { G.webbed[s] = true; ev.ench = 'web'; return out.join('') + ' Caught in a web: the next shot goes half as far.'; }
+  // the runestone
+  if (hyp(b.x - E.rune.x, b.y - E.rune.y) < GL_ENCH.rune) {
+    const n = kind === 'dwarf' ? 2 : 1; ev.ench = 'rune';
+    if (G.powers && G.mana) { G.mana[s] = Math.min(GL_MANA.max, G.mana[s] + n); return out.join('') + ` A runestone glows: +${n} mana.`; }
+    if (G.focus) G.focus[s] = G.focus[s].map(v => Math.min(1, v + 0.1 * n)); return out.join('') + ' A runestone glows: the four feel sharper.';
+  }
+  return out.join('');
+}
 /* The Links' page in the Realm (issue #92, phase 2). A canvas in #v-links, after the rink's, and a frame loop that runs
    only while it is on screen (show/hide): it moves the game on (glTick) and draws it (glDraw). The engine's parts don't
    touch the page; this file is the only one that does. It draws at the screen's density, so it stays sharp.
@@ -36052,6 +36201,9 @@ return {
   get mana() { return G && G.mana ? G.mana.slice() : null; }, get roar() { return G && G.roar ? G.roar.slice() : null; }, get mark() { return G && G.mark ? JSON.parse(JSON.stringify(G.mark)) : null; }, get casts() { return G && G.casts ? JSON.parse(JSON.stringify(G.casts)) : []; },
   fxFor: s => G ? glFxFor(s) : null, powNow: (s, ri) => G ? glPowNow(s, ri) : null, powWhy: (s, k, ri) => G ? glPowWhy(s, k, ri) : 'No game.', cast: (s, k, ri) => glCast(s, k, ri), castMine: k => glCastMine(k), cpuPower: (s, ri) => glCpuPower(s, ri), tip: (s, ri) => G ? glPowerTip(s, ri) : '',
   get autoPow() { return GD ? GD.autoPow : true; }, set autoPow(v) { if (GD) GD.autoPow = !!v; },
+  // the enchanted course (phase 6b): start({ enchant: true }), a hole's enchantments, and their rules
+  enchant: H => glEnchant(H), enchRules: Object.assign({}, GL_ENCH), enchantAfter: (s, ri, r, plan) => { const ev = { k: 'shot', holed: false, water: false }; const t = glEnchantAfter(s, ri, ev, r || null, plan || { putt: !r }); return { t, ev }; },
+  bogReach: H => glBogReach(glEnchant(H)), wispAt: (w, k) => glWispAt(w, k), entAt: (e, k) => glEntAt(e, k), get webbed() { return G && G.webbed ? G.webbed.slice() : null; },
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),
@@ -50998,7 +51150,7 @@ function wLinksGame(opts) {
   const o = opts || {};
   WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
-  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, course: o.course, weather: o.weather, wood: !!o.wood, powers: o.powers, autoPow: o.autoPow, skill: o.skill || [1, W_LINKS_SKILL] });
+  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, course: o.course, weather: o.weather, wood: !!o.wood, enchant: !!o.enchant, powers: o.powers, autoPow: o.autoPow, skill: o.skill || [1, W_LINKS_SKILL] });
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }
@@ -51104,6 +51256,7 @@ function wLinksHowHTML() {
   <p class="hint"><b>Stances</b>, your side's, kept from shot to shot. <b>Tempo</b> (T): Quick runs the meter quicker and spends less focus, a touch less true; Steady is the meter's own pace. <b>Mood</b> (M): Bold goes a little longer with more shape and spin, and the mark is smaller; Careful plays it as it comes.</p>
   <p class="hint"><b>The turn.</b> After the ${Math.max(1, Math.round(R.holes * 5 / 9))}th hole of ${R.holes} (and halfway through other lengths) everyone's focus comes back. <b>The caddie's word</b> (W), once a game: the next stroke is read in full: a putt's read line runs all the way, and the wind shows exactly. Otherwise the wind on the arrow is rough (to 5 mph, and 8 ways).</p>
   <p class="hint"><b>Powers.</b> Every kind has its own magic: a long-game power (for a full shot) and a short-game power (a chip or a putt), and a second of each to pick on the Links tab. The hitter casts theirs before their stroke (P) for team <b>mana</b>, which good shots fill: a tee shot on the fairway, the green in regulation, a long putt or a chip that drops. Some powers are curses on the other side's next stroke. The gallery's <b>roar</b> fills on long drives, close approaches, long putts and birdies: ${wGL.roarRules.ult} of it pays for the hitter's kind's <b>ultimate</b> (U, once a game), which marks the hole for the rest of it, and ${wGL.roarRules.steady} steadies a stroke that wins or halves (K: no pressure on it). <b>Situation powers</b>, once a game each: Dormie (one down with one to play: everyone's focus back), Playoff (the next swing's mark twice the size) and Up and down (the next chip and putt truer). In Manage, <b>Auto powers</b> lets your caddie cast for you. The tip on the Powers row says what is worth casting now.</p>
+  <p class="hint"><b>The enchanted course.</b> The Links is an old wood, and not all of it sits still. <b>Fairy rings</b>: a ball that stops in one comes up in the other (an elf's only when that helps). <b>The mimic</b>: one bunker on some holes has teeth; it swallows the ball (a drop and a stroke) or spits it out (an ogre's it always spits out). <b>The troll bridge</b>: when the troll is home, the first ball each side carries over the stream pays him a mana, or with none to pay it is batted back to the near bank (a troll pays no toll). <b>Will-o'-wisps</b> drift over the fairway and carry off a ball that comes down near one (never a harpy's). <b>Walking trees</b> move between strokes, and a ball among them lies in the trees (a wraith's passes through). <b>The bog creeps</b> out a little with every hole played (a zombie's ball it lets go). <b>Webs</b> at the tree line hold a ball: the next shot goes half as far (a spider walks out). <b>A runestone</b> by every fairway gives a mana to a ball that stops beside it (a dwarf's, two). And now and then <b>a wyvern</b> swoops and carries a ball off (never a gorgon's). Each hole's are always the same on the standing nine, so they can be learned.</p>
   <p class="hint"><b>Their caddie</b> (on the bar): a <b>Squire</b> misses the meter often, ignores the wind, takes the driver and goes for everything; a <b>Knight</b> reads the wind, the lie and the match (behind late, it goes for everything; well up, it lays up short of trouble); an <b>Archmage</b> also reads greens well, lays up short of water and reads your habits: go for it and find trouble twice and it plays safe and lets you.</p>
   <p class="hint"><b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it at 2 or 4 times. The CPU's caddie picks the hitter by the shot (power off the tee, accuracy for an approach, touch for a chip, the best putter on the green), the club for the distance, aims off for the wind (a Knight or an Archmage), and lays up short of trouble.</p>`;
 }
@@ -51448,7 +51601,7 @@ function wStartLinks(o) {
   const world = { kind: o.kind || 'lkgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, wild, weather, cup: !!o.cup };
   if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
-  const opts = { teams: [mine, opp], skill: wLinksSkill(tier), holes: wLinksHoles(), wild, course: wild ? wLinksWildSeed(club) : undefined, weather, wood: true, powers: true };
+  const opts = { teams: [mine, opp], skill: wLinksSkill(tier), holes: wLinksHoles(), wild, course: wild ? wLinksWildSeed(club) : undefined, weather, wood: true, powers: true, enchant: true };
   if (how === 'sim') { const s = wGL.simGame(opts); wLinksResultCard(wLinksSettle(s)); return ''; }
   wLinksGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WGL.world = true;
@@ -51576,7 +51729,7 @@ const wW107LeaveLinks = wLeaveLinks;
 wLeaveLinks = function () { if (wLinksWorld()) return wLinksLeaveGame(); wW107LeaveLinks(); if (WG) { wSave(); wDrain(); } };
 // every game at the Links has the day's weather and the wood
 const wW107LinksGame = wLinksGame;
-wLinksGame = function (opts) { const o = Object.assign({ wood: true, powers: true }, opts || {}); if (o.weather === undefined && WG) o.weather = wLinksWeather(); return wW107LinksGame(o); };
+wLinksGame = function (opts) { const o = Object.assign({ wood: true, powers: true, enchant: true }, opts || {}); if (o.weather === undefined && WG) o.weather = wLinksWeather(); return wW107LinksGame(o); };
 
 /* ---------- picking a match ---------- */
 function wLinksH2h(club) { const L = ((WG.h2h || {})[club] || {}).last; return L && L.sport === 'golf' ? L : null; }

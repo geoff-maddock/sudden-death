@@ -38,6 +38,9 @@ return {
   get mana() { return G && G.mana ? G.mana.slice() : null; }, get roar() { return G && G.roar ? G.roar.slice() : null; }, get mark() { return G && G.mark ? JSON.parse(JSON.stringify(G.mark)) : null; }, get casts() { return G && G.casts ? JSON.parse(JSON.stringify(G.casts)) : []; },
   fxFor: s => G ? glFxFor(s) : null, powNow: (s, ri) => G ? glPowNow(s, ri) : null, powWhy: (s, k, ri) => G ? glPowWhy(s, k, ri) : 'No game.', cast: (s, k, ri) => glCast(s, k, ri), castMine: k => glCastMine(k), cpuPower: (s, ri) => glCpuPower(s, ri), tip: (s, ri) => G ? glPowerTip(s, ri) : '',
   get autoPow() { return GD ? GD.autoPow : true; }, set autoPow(v) { if (GD) GD.autoPow = !!v; },
+  // the enchanted course (phase 6b): start({ enchant: true }), a hole's enchantments, and their rules
+  enchant: H => glEnchant(H), enchRules: Object.assign({}, GL_ENCH), enchantAfter: (s, ri, r, plan) => { const ev = { k: 'shot', holed: false, water: false }; const t = glEnchantAfter(s, ri, ev, r || null, plan || { putt: !r }); return { t, ev }; },
+  bogReach: H => glBogReach(glEnchant(H)), wispAt: (w, k) => glWispAt(w, k), entAt: (e, k) => glEntAt(e, k), get webbed() { return G && G.webbed ? G.webbed.slice() : null; },
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),

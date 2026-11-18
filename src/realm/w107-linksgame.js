@@ -101,7 +101,7 @@ function wStartLinks(o) {
   const world = { kind: o.kind || 'lkgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, wild, weather, cup: !!o.cup };
   if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
-  const opts = { teams: [mine, opp], skill: wLinksSkill(tier), holes: wLinksHoles(), wild, course: wild ? wLinksWildSeed(club) : undefined, weather, wood: true, powers: true };
+  const opts = { teams: [mine, opp], skill: wLinksSkill(tier), holes: wLinksHoles(), wild, course: wild ? wLinksWildSeed(club) : undefined, weather, wood: true, powers: true, enchant: true };
   if (how === 'sim') { const s = wGL.simGame(opts); wLinksResultCard(wLinksSettle(s)); return ''; }
   wLinksGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WGL.world = true;
@@ -229,7 +229,7 @@ const wW107LeaveLinks = wLeaveLinks;
 wLeaveLinks = function () { if (wLinksWorld()) return wLinksLeaveGame(); wW107LeaveLinks(); if (WG) { wSave(); wDrain(); } };
 // every game at the Links has the day's weather and the wood
 const wW107LinksGame = wLinksGame;
-wLinksGame = function (opts) { const o = Object.assign({ wood: true, powers: true }, opts || {}); if (o.weather === undefined && WG) o.weather = wLinksWeather(); return wW107LinksGame(o); };
+wLinksGame = function (opts) { const o = Object.assign({ wood: true, powers: true, enchant: true }, opts || {}); if (o.weather === undefined && WG) o.weather = wLinksWeather(); return wW107LinksGame(o); };
 
 /* ---------- picking a match ---------- */
 function wLinksH2h(club) { const L = ((WG.h2h || {})[club] || {}).last; return L && L.sport === 'golf' ? L : null; }

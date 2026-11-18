@@ -146,7 +146,7 @@ function glEvSay(ev, r) {
     t = ev.holed ? `${who}'s ${c} drops into the cup!` : ev.water ? `${who}'s ${c} finds the water. A drop, and a stroke.` : `${who} hits a ${c} ${carry} yards, into the ${GL_TER[ev.lie]}. ${glYards(ev.d1)} to the pin.`;
   }
   if (ev.up) t += ' That is par and four more: the ball is picked up.';
-  t += (ev.wood || '') + glGallery(ev);
+  t += (ev.wood || '') + (ev.enchT || '') + glGallery(ev);
   return t + glHoleSay(ev);
 }
 function glHoleSay(ev) {
@@ -197,7 +197,7 @@ function glSelFix() {
 function glTickPow() {
   const S = GD.sel, s = GD.you, b = G.ball[s], d = hyp(S.aim.x - b.x, S.aim.y - b.y);
   if (S.putt) return clamp((d + GL_LINES[S.line || 'pct'].putt) / glPuttScale(), 0.02, 1);
-  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist * glFxFor(s).dist;
+  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist * glFxFor(s).dist * (G.webbed && G.webbed[s] ? GL_ENCH.webK : 1);
   return glPowFor(S.club, b.lie, glRat(s, S.ri), d / T / B, true);
 }
 // a putt's bar runs to this many yards (on a flat green, at full weight)
@@ -327,8 +327,8 @@ function glStrike(s, S, sw) {
     const fx = glFxFor(s), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK(), lip: fx.lip });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s);
-  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, glFxFlight(fx, S.aim, b)));
+  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s), web = G.webbed && G.webbed[s] ? GL_ENCH.webK : 1;
+  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist * web, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, glFxFlight(fx, S.aim, b)));
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
