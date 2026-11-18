@@ -56,6 +56,10 @@ async def main():
         check('hit' in sd['strike'], 'a strike for a full shot', sd)
         check(sd['holed'] and 'card' in sd['putt'] and 'coin' in sd['putt'] and 'crowd' in sd['putt'], 'a tap for a putt, and the ball in the cup and the gallery for yours', sd)
         check('magic' in sd['cast'], 'a chime for a power cast', sd)
+        # a new match's first cast chimes, though the last match had more casts (the count is set afresh at the start)
+        nx = await pg.evaluate("""(() => { wLinksGame({ seed: 8, mode: 'play' }); wGL.pause(true); __to('aim'); wGL.G.mana[0] = 5; __snd.length = 0; wGL.castMine('pow'); wGL.drag(.8, 0);
+          return { snd: __snd.slice(), casts: wGL.casts.length }; })()""")
+        check(nx['casts'] >= 1 and 'magic' in nx['snd'], 'a new match\'s first cast chimes', nx)
         check(sd['off'] == [], 'no sound with sound effects off', sd)
         en = await pg.evaluate("""(() => { wLinksGame({ seed: 6, mode: 'watch', holes: 3 }); wGL.pause(true); __snd.length = 0; let i = 0; while (!WGL.over && i++ < 40000) wGL.tick(0.05);
           const watched = __snd.slice(-3); wLeaveLinks(); __snd.length = 0; wGL.simGame({ seed: 7 }); return { watched, away: __snd.length }; })()""")

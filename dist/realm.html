@@ -52391,19 +52391,23 @@ renderHelp = function () {
    Achievements, on SD's ACH: golf matches won (realmLinksWins), Divot Cups (realmDivots), a hole in one by your side in
    a match from the world (realmAces), an eagle (realmEagles) and a win by 5 and 4 or more (realmRouts).
 
-   Wraps: wGL.onShot (wW111OnShot: the sounds), wGL.onOver (wW111OnOver: the end), wLinksSettle (wW111LinksSettle),
+   Wraps: wGL.onShot (wW111OnShot: the sounds), wGL.start and wGL.resume (wW111Start, wW111Resume: the chime's count), wGL.onOver (wW111OnOver: the end), wLinksSettle (wW111LinksSettle),
    wDivotWon (wW111DivotWon), renderHelp (wW111RenderHelp: #wHelpLinksFeel after #wHelpLinksCup). */
 
 const wLinksSoundOn = () => !LAB && SET.sfx !== false && UI.view === 'links' && !!wGL.G && !!wGL.G.teams;
+// the casts and potions already chimed for: counted on every shot (sound on or off) and set afresh when a game starts
+// or resumes, so a new game's first cast chimes and a resumed game's old ones don't
 const WLKS = { casts: 0, pots: 0 };
+const wLinksSoundSync = () => { WLKS.casts = wGL.casts.length; WLKS.pots = wGL.pots.length; };
 function wLinksShotSound(e) {
-  if (!wLinksSoundOn() || !e) return;
+  if (!e) return;
+  const C = wGL.casts, P = wGL.pots, newC = C.slice(WLKS.casts), newP = P.length > WLKS.pots;
+  WLKS.casts = C.length; WLKS.pots = P.length;
+  if (!wLinksSoundOn()) return;
   const mine = e.side === wGL.you;
   // the casts and potions since the last shot: a chime (a bigger one for an ultimate)
-  const C = wGL.casts, P = wGL.pots;
-  if (C.length > WLKS.casts) { if (C.slice(WLKS.casts).some(c => c.k === 'ult')) sfx.crit(); else sfx.magic(); }
-  if (P.length > WLKS.pots) sfx.magic();
-  WLKS.casts = C.length; WLKS.pots = P.length;
+  if (newC.length) { if (newC.some(c => c.k === 'ult')) sfx.crit(); else sfx.magic(); }
+  if (newP) sfx.magic();
   if (e.k === 'given') { sfx.card(); return; }
   if (e.k !== 'shot') return;
   if (e.club === 'pt') sfx.card(); else sfx.hit(0.45);
@@ -52421,6 +52425,9 @@ function wLinksEndSound(s) {
 }
 const wW111OnShot = wGL.onShot;
 wGL.onShot = e => { if (wW111OnShot) wW111OnShot(e); try { wLinksShotSound(e); } catch (er) { console.error(er); } };
+const wW111Start = wGL.start, wW111Resume = wGL.resume;
+wGL.start = function () { const r = wW111Start.apply(this, arguments); wLinksSoundSync(); return r; };
+wGL.resume = function () { const r = wW111Resume.apply(this, arguments); wLinksSoundSync(); return r; };
 const wW111OnOver = wGL.onOver;
 wGL.onOver = s => { if (wW111OnOver) wW111OnOver(s); try { wLinksEndSound(s); } catch (er) { console.error(er); } };
 
