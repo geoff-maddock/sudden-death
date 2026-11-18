@@ -28,7 +28,7 @@ const GL_MODES = ['watch', 'manage', 'play'];
 function glPlayStart(o) {
   GLC.h = -1;
   GD = { mode: o && GL_MODES.includes(o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, last: null, disp: null, drag: null, swung: null,
-    mgr: { line: 'auto', ri: null }, line: o && o.line || null };
+    mgr: { line: 'auto', ri: null }, line: o && o.line || null, autoPow: !(o && o.autoPow === false) };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
 }
@@ -69,12 +69,15 @@ function glPlayNext() {
   if (n.give && glYours(o)) { glGo('offer', 0, `${G.teams[s].name} have ${glYards(n.d)} left. Give them the putt, or make them hole it?`); return; }
   if (glCpuGives(n)) { glGiven(o); return; }
   let plan;
+  const kind = glShotKind(glHoleNow(), s);
+  let cast = [];
   if (GD.mode === 'manage' && s === GD.you) {
-    const M = GD.mgr, ri = M.ri != null && glCanHit(s, M.ri) ? M.ri : null;
+    const M = GD.mgr, ri = M.ri != null && glCanHit(s, M.ri) ? M.ri : glPickHitter(s, kind);
+    if (GD.autoPow) cast = glCpuPower(s, ri);
     plan = glPlan(s, ri, M.line === 'auto' ? null : M.line); M.ri = null;
-  } else { glCpuCall(s); plan = glPlan(s); }
+  } else { glCpuCall(s); const ri = glPickHitter(s, kind); cast = glCpuPower(s, ri); plan = glPlan(s, ri); }
   GD.cpu = { side: s, plan };
-  glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.`);
+  glGo('addr', 0, `${glName(s, plan.ri)} (${G.teams[s].name}) to play: ${glShotSay(s, plan, n.d)}.${cast.length ? ` ${cast.filter(Boolean).join(', ')}!` : ''}`);
 }
 function glGiven(by) {
   const s = 1 - by;
@@ -194,7 +197,7 @@ function glSelFix() {
 function glTickPow() {
   const S = GD.sel, s = GD.you, b = G.ball[s], d = hyp(S.aim.x - b.x, S.aim.y - b.y);
   if (S.putt) return clamp((d + GL_LINES[S.line || 'pct'].putt) / glPuttScale(), 0.02, 1);
-  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist;
+  const T = GL_TRAJ[S.traj] && b.lie !== 'O' ? GL_TRAJ[S.traj].carry : 1, B = GL_STANCE[glStanceOf(s).mood].dist * glFxFor(s).dist;
   return glPowFor(S.club, b.lie, glRat(s, S.ri), d / T / B, true);
 }
 // a putt's bar runs to this many yards (on a flat green, at full weight)
@@ -239,7 +242,7 @@ function glAimPush(yd) {
   S.aim = { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d }; glSelFix(); return true;
 }
 // the read line: the putt's first yards as struck now at the tick's weight (longer for a better putter)
-function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : (1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) * glHazeK()) : 0; }
+function glReadLen() { return GD && GD.sel ? (G.wordOn && G.wordOn[GD.you] ? 99 : (1.5 + glRat(GD.you, GD.sel.ri).put * 5.5) * glHazeK() * glFxFor(GD.you).read) : 0; }
 // the wind as you see it: roughly (to 5 mph and 8 ways), or exactly with the caddie's word (or in Watch)
 function glWindShown(w) {
   if (!w || !w.s) return { s: 0, d: 0, exact: true };
@@ -276,8 +279,8 @@ function glSwingNums(pow, m, rat, f) {
 // shakes by shake, a putt's weight wobbles by wob, all less for a steady nerve)
 function glMine() {
   const s = GD.you, ri = GD.sel.ri, rat = glRat(s, ri), f = G.focus ? G.focus[s][ri] : 1, p = glPressure(s), n = p * (1 - clamp(rat.nrv, 0, 1));
-  const st = glStanceOf(s);
-  return { rat, f: f / GL_STANCE[st.mood].err, p, spd: (1 + GL_METER.pSpd * n) * GL_STANCE[st.tempo].meter, shake: GL_METER.pShake * n, wob: GL_METER.pWob * n };
+  const st = glStanceOf(s), fx = glFxFor(s);
+  return { rat, f: f / GL_STANCE[st.mood].err / fx.err, p: fx.nerve ? 0 : p, spd: (1 + GL_METER.pSpd * n) * GL_STANCE[st.tempo].meter, shake: GL_METER.pShake * n, wob: GL_METER.pWob * n };
 }
 // where the shaking mark is now (meter units), and a putt's wobble
 const glShake = M => M.shake ? M.shake * Math.sin(M.t * 9) : 0;
@@ -321,11 +324,11 @@ function glStrike(s, S, sw) {
   const H = glHoleNow(), b = G.ball[s], rat = glRat(s, S.ri), from = { x: b.x, y: b.y };
   if (S.putt) {
     // (a drag pulled off the line starts the putt off line: + is left, as a hook; GL_HANDS.puttDeg of a degree a degree)
-    const a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK() });
+    const fx = glFxFor(s), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK(), lip: fx.lip });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  const M = GL_STANCE[glStanceOf(s).mood];
-  return glFlight({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist, err: sw.err, wind: G.wind, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() });
+  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s);
+  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, glFxFlight(fx, S.aim, b)));
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
@@ -374,5 +377,16 @@ function glResume(sn) {
   if (sn.mgr) GD.mgr = Object.assign({ line: 'auto', ri: null }, sn.mgr);
   GD.msg = `Back at hole ${G.h + 1}: ${G.teams[0].name} ${glMatchText(0).toLowerCase()}.`;
   return true;
+}
+// your power: k 'pow' (the hitter's), 'ult', 'steady' or a situation power, cast for your stroke (in You play on your
+// shot; in Manage for the next). Returns '' or why not
+function glCastMine(k) {
+  if (!GD) return 'No game.';
+  const s = GD.you, ri = GD.sel ? GD.sel.ri : glPickHitter(s, glShotKind(glHoleNow(), s));
+  if (GD.mode === 'play' && GD.ph !== 'aim') return 'Only before your swing.';
+  const why = glCast(s, k, ri); if (why) return why;
+  if (GD.sel) glSelFix();
+  GD.msg = `${G.casts[G.casts.length - 1].n}! ` + (GD.sel ? glAimMsg() : '');
+  return '';
 }
 

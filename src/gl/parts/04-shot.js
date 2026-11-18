@@ -90,26 +90,31 @@ function glFlight(s) {
     const b = bend * Math.sin(Math.PI * f);
     path.push({ x: from.x + Math.cos(dir) * al - Math.sin(dir) * lat + push[0] * f * f + Math.sin(dir) * b, y: from.y + Math.sin(dir) * al + Math.cos(dir) * lat + push[1] * f * f - Math.cos(dir) * b, z: 4 * apex * f * (1 - f) });
   }
-  const land = { x: ex, y: ey }, ll = glLie(H, ex, ey), out = { club, run: [], carry: Math.round(hyp(ex - from.x, ey - from.y)), land, path, water: false, holed: false, lip: false };
-  if (ll === 'W') return Object.assign(out, glWaterDrop(H, from, land), { water: true, roll: 0 });
-  if (ll === 'S' || ll === 'B' || ll === 'O') return Object.assign(out, { end: land, lie: ll, roll: 0 });
+  // (a power that goes through the branches: a ball landing in the trees drops into the deep rough)
+  const ll0 = glLie(H, ex, ey), through = !!s.trees && ll0 === 'O';
+  const land = { x: ex, y: ey }, ll = through ? 'R' : ll0, out = { club, run: [], carry: Math.round(hyp(ex - from.x, ey - from.y)), land, path, water: false, holed: false, lip: false };
+  // (a power that brings a wet ball back: out to the water's edge, and no stroke)
+  if (ll === 'W') return Object.assign(out, glWaterDrop(H, from, land), s.water ? { saved: true, roll: 0 } : { water: true, roll: 0 });
+  // (plugged in sand or bog, on a root in the trees, or dropped dead through the branches into the rough beneath)
+  if (ll === 'S' || ll === 'B' || ll === 'O' || through) return Object.assign(out, { end: land, lie: ll, roll: 0 });
   // the roll: the club and the spin, along the line it came in on
   const spin = clamp(s.spin || 0, -1.5, 1.5), rd = Math.atan2(ey - path[11].y, ex - path[11].x);
   // (a forced punch's run is already in glReach)
   const shR = Sh ? 1 + (Sh.roll - 1) * (s.shapeK || 1) : 1;
   // (soft ground after rain: the ball sits down where it lands)
-  let budget = (s.fk > 1 ? 0.6 : 1) * Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
+  let budget = (s.rollK == null ? 1 : s.rollK) * (s.fk > 1 ? 0.6 : 1) * Math.max(0, R0.roll * (1 + 0.6 * spin) * (T && !L.punch ? T.roll : 1) * shR), x = ex, y = ey, here = ll;
   for (let n = 0; n < 400 && budget > 0; n++) {
     if (here === 'G') {
       // on the green it rolls as a putt does, with whatever speed is left
       const v = Math.sqrt(2 * GL_PUTT.fric * (s.fk || 1) * budget);
       const P = glPutt({ hole: H, from: { x, y }, a: rd, v, fk: s.fk });
+      if (P.water && s.water) return Object.assign(out, glWaterDrop(H, from, P.end), { saved: true, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path) });
       return Object.assign(out, { end: P.end, lie: P.lie, water: P.water, holed: P.holed, lip: P.lip, roll: Math.round(hyp(P.end.x - ex, P.end.y - ey)), run: [{ x: ex, y: ey }].concat(P.path, [P.end]) }, P.water ? glWaterDrop(H, from, P.end) : {});
     }
     const f = GL_ROLLF[here];
     if (!f) break;
     const nx = x + Math.cos(rd), ny = y + Math.sin(rd), nl = glLie(H, nx, ny);
-    if (nl === 'W') return Object.assign(out, glWaterDrop(H, from, { x: nx, y: ny }), { water: true, roll: Math.round(hyp(nx - ex, ny - ey)), run: [{ x: ex, y: ey }, { x: nx, y: ny }] });
+    if (nl === 'W') return Object.assign(out, glWaterDrop(H, from, { x: nx, y: ny }), s.water ? { saved: true } : { water: true }, { roll: Math.round(hyp(nx - ex, ny - ey)), run: [{ x: ex, y: ey }, { x: nx, y: ny }] });
     budget -= 1 / f; x = nx; y = ny; here = nl;
   }
   return Object.assign(out, { end: { x, y }, lie: here, roll: Math.round(hyp(x - ex, y - ey)), run: [{ x: ex, y: ey }, { x, y }] });
@@ -134,6 +139,7 @@ function glWaterDrop(H, from, wet) {
    it passed, on the line through the cup square to the putt; null if it never got there) */
 function glPutt(p) {
   const H = p.hole, pin = H.pin, P = GL_PUTT, k = p.slopeK == null ? 1 : p.slopeK;
+  const lipFree = p.lip && hyp(pin.x - p.from.x, pin.y - p.from.y) <= p.lip;
   let x = p.from.x, y = p.from.y, vx = Math.cos(p.a) * p.v, vy = Math.sin(p.a) * p.v, lie = glLie(H, x, y), lip = false;
   const path = [{ x, y }], D = hyp(pin.x - x, pin.y - y) || 1, ux = (pin.x - x) / D, uy = (pin.y - y) / D, x0 = x, y0 = y;
   let cross = null;
@@ -153,7 +159,7 @@ function glPutt(p) {
       const dx = nx - x, dy = ny - y, L2 = dx * dx + dy * dy, u = clamp(((pin.x - x) * dx + (pin.y - y) * dy) / (L2 || 1), 0, 1);
       const off = hyp(x + dx * u - pin.x, y + dy * u - pin.y);
       if (off < P.cup) {
-        if (sp <= P.cap * Math.sqrt(1 - (off / P.cup) ** 2)) return res({ end: { x: pin.x, y: pin.y }, lie: 'G', holed: true, lip, path: path.concat([{ x: pin.x, y: pin.y }]), t });
+        if (sp <= P.cap * (lipFree ? 2.5 : 1) * Math.sqrt(1 - (off / P.cup) ** 2)) return res({ end: { x: pin.x, y: pin.y }, lie: 'G', holed: true, lip, path: path.concat([{ x: pin.x, y: pin.y }]), t });
         // a lip-out: the cup's edge turns the ball away from the side it caught (more the closer to the edge)
         if (!lip) { lip = true; const side = Math.sign(vx * (pin.y - y) - vy * (pin.x - x)) || 1, turn = -side * (0.15 + 0.35 * off / P.cup), c = Math.cos(turn), s = Math.sin(turn); [vx, vy] = [(vx * c - vy * s) * 0.7, (vx * s + vy * c) * 0.7]; }
       }

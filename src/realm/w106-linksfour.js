@@ -110,7 +110,9 @@ function wFourSync() {
   return C;
 }
 // a player as Mossgate Links takes one (ratings 1 to 12)
-function wLinksPlayer(p) { return { n: p.n, kind: p.kind, r: Object.fromEntries(wGL.stats.map(s => [s, wGlOf(p)[s]])) }; }
+function wLinksPlayer(p) { return { n: p.n, kind: p.kind, r: Object.fromEntries(wGL.stats.map(s => [s, wGlOf(p)[s]])), pw: { long: p.glPw && p.glPw.long === 1 ? 1 : 0, short: p.glPw && p.glPw.short === 1 ? 1 : 0 } }; }
+// a player's two powers on the course, picked on the Links tab: p.glPw { long: 0 or 1, short: 0 or 1 }
+function wGlSetPw(k, which, v) { const p = wFourWho(k); if (!p || (which !== 'long' && which !== 'short')) return ''; p.glPw = Object.assign({ long: 0, short: 0 }, p.glPw, { [which]: v === 1 ? 1 : 0 }); wSave(); return ''; }
 function wFourMine() {
   const C = wFourSync(), t = wPartyTeam();
   return { name: t.name, short: t.short, color: t.color, roster: W_GL_ROLES.map(role => wLinksPlayer(wFourWho(C.four[role]))), roles: { tee: 0, approach: 1, short: 2, putt: 3 } };
@@ -165,7 +167,9 @@ function wFourRow(k, C) {
     <span class="wno">${at ? esc({ tee: 'Tee', approach: 'App', short: 'Shrt', putt: 'Grn' }[at]) : '&ndash;'}</span><img src="${wPlayerPort(p, 64)}" alt="">
     <div class="wpi"><div class="wpn"><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}</span>${cu ? '<span class="wtag wb">Call-up</span>' : ''}</div>
       <small class="wnst" title="How well they suit each role: ${esc(fits)}">${wGL.stats.map(s => `<span title="${esc(W_GLR.stat[s][1])}">${W_GLR.stat[s][0]} <b>${b[s]}</b></span>`).join(' ')}</small></div>
-    <div class="wpa"><label class="wsvl">Role <select data-grole aria-label="${esc(p.n)}'s role">${opts}</select></label></div>
+    <div class="wpa"><label class="wsvl">Role <select data-grole aria-label="${esc(p.n)}'s role">${opts}</select></label>
+      ${['long', 'short'].map(w => { const a = (wGL.pow[p.kind] || wGL.pow.goblin)[w === 'long' ? 0 : 1], b = (wGL.pow2[p.kind] || wGL.pow2.goblin)[w === 'long' ? 0 : 1], cur = p.glPw && p.glPw[w] === 1 ? 1 : 0;
+        return `<label class="wsvl" title="${esc(`${a.n}: ${a.desc} / ${b.n}: ${b.desc}`)}">${w === 'long' ? 'Long game' : 'Short game'} <select data-gpw="${w}" aria-label="${esc(p.n)}'s ${w} power"><option value="0"${cur ? '' : ' selected'}>${esc(a.n)}</option><option value="1"${cur ? ' selected' : ''}>${esc(b.n)}</option></select></label>`; }).join('')}</div>
   </li>`;
 }
 function wCampLinks(C) {
@@ -196,6 +200,7 @@ wRenderCamp = function () {
     ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampLinks(C);
   const keyOf = el => { const k = el.closest('[data-gid]').dataset.gid; return /^g\d+$/.test(k) ? k : +k; };
   body.querySelectorAll('[data-grole]').forEach(s => s.onchange = () => wCampSay(wFourSetRole(keyOf(s), s.value)));
+  body.querySelectorAll('[data-gpw]').forEach(s => s.onchange = () => wCampSay(wGlSetPw(keyOf(s), s.dataset.gpw, +s.value)));
   const auto = body.querySelector('[data-gauto]'); if (auto) auto.onclick = () => wCampSay(wFourAuto());
   const pr = body.querySelector('[data-gpractice]'); if (pr) pr.onclick = () => wFourPractice();
 };

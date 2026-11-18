@@ -5,7 +5,7 @@
    choice, in the capture phase so nothing else on the page takes them: Space swings (each press: start, power, the
    mark; on a putt start, then the weight; while it is your shot or their putt to give it is the course's, so it never presses a focused button); the arrows aim (left and right turn it, up and down move the ring further
    or nearer); 1 to 4 pick the hitter; Q and E a longer or shorter club; Z the shape, X the height, C the spin; L the
-   line, T the tempo, M the mood, W the caddie's word; Y gives their putt and N makes them hole it.
+   line, T the tempo, M the mood, W the caddie's word; P the hitter's power, U the ultimate, K steady (with powers); Y gives their putt and N makes them hole it.
    The mouse or a finger: a click or a drag on the course moves the aim; a drag that starts on your ball is a swing
    (pull back away from the target and let go: the pull is the power, a pull off the line a hook or a slice). */
 const GLP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null };
@@ -67,6 +67,9 @@ function glKey(e) {
   else if (k === 't') glSelect({ tempo: G.stance[GD.you].tempo === 'quick' ? 'steady' : 'quick' });
   else if (k === 'm') glSelect({ mood: G.stance[GD.you].mood === 'bold' ? 'careful' : 'bold' });
   else if (k === 'w') glSelect({ word: true });
+  else if (k === 'p') glCastMine('pow');
+  else if (k === 'u') glCastMine('ult');
+  else if (k === 'k') glCastMine('steady');
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (er) { console.error(er); } }
 }

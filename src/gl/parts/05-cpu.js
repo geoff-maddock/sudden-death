@@ -192,7 +192,8 @@ function glPlan(s, riIn, lineIn) {
   const dir0 = Math.atan2(target.y - b.y, target.x - b.x), dist = hyp(target.x - b.x, target.y - b.y);
   let pow = glPowFor(club, b.lie, rat, dist), R1 = glReach(club, b.lie, rat, pow);
   let land = { x: target.x - Math.cos(dir0) * R1.roll, y: target.y - Math.sin(dir0) * R1.roll }, aim = land;
-  const wk = word ? 1 : GL_SKILL.wind[sk];
+  // (its own powers: a shot that flies further needs less, one the wind moves less needs less aiming off)
+  const fxp = glFxFor(s), wk = (word ? 1 : GL_SKILL.wind[sk]) * fxp.wind;
   if (wk && G.wind && G.wind.s) {
     const windAim = () => { let a = land; for (let i = 0; i < 3; i++) { const dir = Math.atan2(a.y - b.y, a.x - b.x), carry = hyp(a.x - b.x, a.y - b.y), push = glWindPush(club, carry, G.wind, dir); a = { x: land.x - push[0] * wk, y: land.y - push[1] * wk }; } return a; };
     aim = windAim();
@@ -205,7 +206,7 @@ function glPlan(s, riIn, lineIn) {
     }
     pow = glPowFor(club, b.lie, rat, need, true);
   } else pow = glPowFor(club, b.lie, rat, hyp(land.x - b.x, land.y - b.y), true);
-  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow, spin: 0, line };
+  return { ri, kind, club, aim: { x: aim.x, y: aim.y }, pow: Math.min(1, pow / fxp.dist), spin: 0, line };
 }
 
 // read a putt: the angle and speed that finish it just past the cup, on the green as read (slopeK)

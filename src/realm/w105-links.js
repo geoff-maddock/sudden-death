@@ -57,6 +57,7 @@ $('v-links').insertAdjacentHTML('beforeend', `<div id="wLinksRows" class="wccall
   <div class="wccrow" id="wLinksRowLine"><span class="wccl">Line</span><span id="wLinksLine"></span></div>
   <div class="wccrow" id="wLinksRowShot"><span class="wccl">Shot</span><span id="wLinksShot"></span></div>
   <div class="wccrow" id="wLinksRowStance"><span class="wccl">Stance</span><span id="wLinksStance"></span></div>
+  <div class="wccrow" id="wLinksRowPow" hidden><span class="wccl">Powers</span><span id="wLinksPow"></span></div>
   <div class="wccrow" id="wLinksRowGo"><span class="wccl">Swing</span><span id="wLinksGo"></span></div>
   <div class="wccrow" id="wLinksRowMgr" hidden><span class="wccl">Your call</span><span id="wLinksMgr"></span></div>
   <div class="wccrow" id="wLinksRowNext" hidden><span class="wccl">Next hitter</span><span id="wLinksNext"></span></div>
@@ -78,6 +79,8 @@ $('wLinksRows').addEventListener('click', e => {
   else if (d.ltempo) wGL.select({ tempo: d.ltempo });
   else if (d.lmood) wGL.select({ mood: d.lmood });
   else if (d.lword) wGL.select({ word: true });
+  else if (d.lpow) { const why = wGL.castMine(d.lpow); if (why) $('wLinksNote').textContent = why; }
+  else if (d.lauto) wGL.autoPow = !wGL.autoPow;
   else if (d.lgive != null) wGL.offer(d.lgive === '1');
   else if (d.mline) wGL.manage({ line: d.mline });
   else if (d.mtempo) wGL.manage({ tempo: d.mtempo });
@@ -99,6 +102,21 @@ function wLinksMgrRows(V) {
   const T = G.teams[V.you];
   $('wLinksNext').innerHTML = `<button class="ghost${on(null, M.ri)}" data-mnext="">The caddie's pick</button> ` + T.roster.map((m, i) => `<button class="ghost${on(i, M.ri)}" data-mnext="${i}" title="Takes the next shot if the rule allows (then back to the caddie's pick)">${esc(m.n)} <small>${wGL.focus ? Math.round(wGL.focus[V.you][i] * 100) : 100}%</small></button>`).join(' ');
 }
+// the Powers row: mana and the roar, the hitter's power (or the caddie's pick's, in Manage), the ultimate, Steady, the
+// situation powers that fit, Auto powers in Manage, and the bench's tip
+function wLinksPowRow(V, show) {
+  const G = wGL.G, row = $('wLinksRowPow');
+  row.hidden = !show || !G || !G.powers;
+  if (row.hidden) return;
+  const s = V.you, ri = V.sel ? V.sel.ri : 0, P = wGL.powNow(s, ri), btn = (k, label, title) => { const why = wGL.powWhy(s, k, ri); return `<button class="ghost" data-lpow="${k}" ${why ? 'disabled' : ''} title="${esc(why ? `${title} (${why})` : title)}">${esc(label)}</button>`; };
+  const U = wGL.ult[(G.teams[s].roster[ri] || {}).kind] || wGL.ult.goblin, sits = Object.keys(wGL.sit).filter(k => !wGL.powWhy(s, k, ri)); // (a situation power shows only when it can be cast)
+  const tip = wGL.tip(s, ri);
+  $('wLinksPow').innerHTML = `<small class="hint" title="Mana: good shots fill it. The roar: the gallery fills it.">Mana <b>${G.mana[s]}</b>/${wGL.manaRules.max} · Roar <b>${G.roar[s]}</b></small> `
+    + (P ? btn('pow', `${P.n} (${P.cost})`, `P: ${P.desc}`) : '') + ' ' + btn('ult', `${U.n} (ultimate)`, `U: ${U.desc} Takes ${wGL.roarRules.ult} roar, once a game.`) + ' ' + btn('steady', 'Steady', `K: ${wGL.roarRules.steady} roar: no pressure on this stroke.`)
+    + sits.map(k => ' ' + btn(k, wGL.sit[k].n, wGL.sit[k].desc)).join('')
+    + (V.mode === 'manage' ? ` <button class="ghost${wGL.autoPow ? ' on' : ''}" data-lauto="1" title="Your caddie casts your side's powers by the moment, as a Knight would">Auto powers</button>` : '')
+    + (tip ? ` <small class="hint">${esc(tip)}</small>` : '');
+}
 const wLinksWhyNot = (V, ri) => V.ph === 'swing' ? 'The swing is under way: the hitter is picked.' : wGL.whyNot(V.you, ri) || 'May hit.';
 // the rows: drawn for the beat (your shot, their putt, or nothing to do)
 function wLinksRows() {
@@ -108,6 +126,7 @@ function wLinksRows() {
   $('wLinksRowGive').hidden = !offer;
   $('wLinksRowMgr').hidden = $('wLinksRowNext').hidden = !mgr;
   if (mgr) wLinksMgrRows(V);
+  wLinksPowRow(V, mine || mgr);
   for (const id of ['wLinksRowWho', 'wLinksRowClub', 'wLinksRowLine', 'wLinksRowShot', 'wLinksRowStance', 'wLinksRowGo']) $(id).hidden = !mine;
   if (!mine) return;
   const S = V.sel, G = wGL.G, T = G.teams[V.you], aim = V.ph === 'aim', on = (a, b) => a === b ? ' on' : '';
@@ -146,7 +165,7 @@ function wLinksGame(opts) {
   const o = opts || {};
   WGL = { over: null };
   $('wLinksTitle').textContent = o.title || 'A round at Mossgate Links';
-  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, course: o.course, weather: o.weather, wood: !!o.wood, skill: o.skill || [1, W_LINKS_SKILL] });
+  wGL.start({ teams: o.teams || wLinksTeams(), holes: o.holes || wLinksHoles(), seed: o.seed, mode: o.mode || W_LINKS_MODE, wild: !!o.wild, course: o.course, weather: o.weather, wood: !!o.wood, powers: o.powers, autoPow: o.autoPow, skill: o.skill || [1, W_LINKS_SKILL] });
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }
@@ -251,6 +270,7 @@ function wLinksHowHTML() {
   <p class="hint"><b>The line</b> (L), before every shot. <b>Go for it</b>: at the pin, over the trouble (out of reach, straight at it). <b>Percentages</b>: the fat of the green when the pin is tucked by sand or water, or the safe fairway. <b>Lay up</b>: short of the trouble, leaving a full wedge in. On a putt the line is the weight: charge it, finish it a little past, or die it at the hole (it won't lip out, but short never drops). Picking a line plans the shot again: the club and the ring move.</p>
   <p class="hint"><b>Stances</b>, your side's, kept from shot to shot. <b>Tempo</b> (T): Quick runs the meter quicker and spends less focus, a touch less true; Steady is the meter's own pace. <b>Mood</b> (M): Bold goes a little longer with more shape and spin, and the mark is smaller; Careful plays it as it comes.</p>
   <p class="hint"><b>The turn.</b> After the ${Math.max(1, Math.round(R.holes * 5 / 9))}th hole of ${R.holes} (and halfway through other lengths) everyone's focus comes back. <b>The caddie's word</b> (W), once a game: the next stroke is read in full: a putt's read line runs all the way, and the wind shows exactly. Otherwise the wind on the arrow is rough (to 5 mph, and 8 ways).</p>
+  <p class="hint"><b>Powers.</b> Every kind has its own magic: a long-game power (for a full shot) and a short-game power (a chip or a putt), and a second of each to pick on the Links tab. The hitter casts theirs before their stroke (P) for team <b>mana</b>, which good shots fill: a tee shot on the fairway, the green in regulation, a long putt or a chip that drops. Some powers are curses on the other side's next stroke. The gallery's <b>roar</b> fills on long drives, close approaches, long putts and birdies: ${wGL.roarRules.ult} of it pays for the hitter's kind's <b>ultimate</b> (U, once a game), which marks the hole for the rest of it, and ${wGL.roarRules.steady} steadies a stroke that wins or halves (K: no pressure on it). <b>Situation powers</b>, once a game each: Dormie (one down with one to play: everyone's focus back), Playoff (the next swing's mark twice the size) and Up and down (the next chip and putt truer). In Manage, <b>Auto powers</b> lets your caddie cast for you. The tip on the Powers row says what is worth casting now.</p>
   <p class="hint"><b>Their caddie</b> (on the bar): a <b>Squire</b> misses the meter often, ignores the wind, takes the driver and goes for everything; a <b>Knight</b> reads the wind, the lie and the match (behind late, it goes for everything; well up, it lays up short of trouble); an <b>Archmage</b> also reads greens well, lays up short of water and reads your habits: go for it and find trouble twice and it plays safe and lets you.</p>
   <p class="hint"><b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it at 2 or 4 times. The CPU's caddie picks the hitter by the shot (power off the tee, accuracy for an approach, touch for a chip, the best putter on the green), the club for the distance, aims off for the wind (a Knight or an Archmage), and lays up short of trouble.</p>`;
 }

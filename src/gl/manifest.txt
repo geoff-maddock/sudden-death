@@ -9,3 +9,4 @@ src/gl/parts/06-game.js
 src/gl/parts/07-play.js
 src/gl/parts/08-draw.js
 src/gl/parts/09-wood.js
+src/gl/parts/10-powers.js

@@ -212,9 +212,10 @@ function glDrawCard(c, H) {
   const no = GD.disp.h + 1, lines = [`Hole ${no}${no > G.holes ? ' (playoff)' : ''} · Par ${H.par} · ${H.len} yards${G.weather ? ' · ' + GL_WEATHER[G.weather].n.split(':')[0] : ''}`, `${G.teams[0].name}: ${GD.disp.match}`];
   const st = GD.disp.st;
   lines.push(`Strokes this hole: ${G.teams[0].name} ${st[0]}, ${G.teams[1].name} ${st[1]}`);
+  if (G.powers) lines.push(`Mana ${G.mana[0]}–${G.mana[1]} · Roar ${G.roar[0]}–${G.roar[1]}${G.mark && G.mark.h === GD.disp.h ? ` · ${G.mark.n} (${G.teams[G.mark.side].name})` : ''}`);
   c.save();
   c.save(); c.font = '13px system-ui, sans-serif'; const w = Math.max(...lines.map(t => c.measureText(t).width)) + 26; c.restore();
-  c.fillStyle = 'rgba(16,26,12,.72)'; rr(c, 10, 10, Math.min(820, w), 66, 7); c.fill();
+  c.fillStyle = 'rgba(16,26,12,.72)'; rr(c, 10, 10, Math.min(820, w), 28 + lines.length * 19, 7); c.fill();
   lines.forEach((t, i) => txt(c, t, 22, 30 + i * 19, (i ? '' : '600 ') + '13px system-ui, sans-serif', i ? '#dfe9cf' : '#fff6d8', 'left', 'middle'));
   c.restore();
 }

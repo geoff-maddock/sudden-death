@@ -33,6 +33,11 @@ return {
   // games from the world (phase 5): Manage's call, the game between shots, the weather and the wood
   modes: GL_MODES.slice(), manage: o => glManage(o), get mgr() { return GD ? Object.assign({}, GD.mgr) : null; }, snapshot: () => glSnapshot(), resume: sn => glResume(sn),
   weathers: JSON.parse(JSON.stringify(GL_WEATHER)), wood: H => glWood(H), woodAfter: (s, ri) => { const ev = { k: 'shot', holed: false, water: false }; const t = glWoodAfter(s, ri, ev); return { t, ev }; }, wetK: () => glWetK(), hazeK: () => glHazeK(), woodRules: Object.assign({}, GL_WOOD), get weather() { return G ? G.weather : null; },
+  // powers (phase 6): start({ powers: true, autoPow }), the tables, what a side's next stroke has, and casting
+  pow: JSON.parse(JSON.stringify(GL_POW)), pow2: JSON.parse(JSON.stringify(GL_POW2)), ult: JSON.parse(JSON.stringify(GL_ULT)), sit: JSON.parse(JSON.stringify(GL_SIT)), manaRules: Object.assign({}, GL_MANA), roarRules: Object.assign({}, GL_ROAR),
+  get mana() { return G && G.mana ? G.mana.slice() : null; }, get roar() { return G && G.roar ? G.roar.slice() : null; }, get mark() { return G && G.mark ? JSON.parse(JSON.stringify(G.mark)) : null; }, get casts() { return G && G.casts ? JSON.parse(JSON.stringify(G.casts)) : []; },
+  fxFor: s => G ? glFxFor(s) : null, powNow: (s, ri) => G ? glPowNow(s, ri) : null, powWhy: (s, k, ri) => G ? glPowWhy(s, k, ri) : 'No game.', cast: (s, k, ri) => glCast(s, k, ri), castMine: k => glCastMine(k), cpuPower: (s, ri) => glCpuPower(s, ri), tip: (s, ri) => G ? glPowerTip(s, ri) : '',
+  get autoPow() { return GD ? GD.autoPow : true; }, set autoPow(v) { if (GD) GD.autoPow = !!v; },
   stand: GL_STAND, clubs: JSON.parse(JSON.stringify(GL_CLUBS)), lies: JSON.parse(JSON.stringify(GL_LIES)), swing: Object.assign({}, GL_SWING), skills: JSON.parse(JSON.stringify(GL_SKILL)),
   putting: Object.assign({}, GL_PUTT), cell: GL_CELL,
   course: i => G && G.cs != null ? glHoleAt(i) : glCourseHole(GL_STAND, i % 9, GL_RULES.par9[i % 9]),
