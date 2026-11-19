@@ -1233,3 +1233,12 @@ either way; all five cast it, so these are upper bounds). Most powers sit inside
 the skid change: the witch's Hex 51% (none 40%), the Frost Wyrm's Iced Lane 83% (none 68%, before the last trim to
 1.04), the Djinn's Wish Ball 77% (none 62%), the wraith's Ghost Ball 58% (none 51%). The situation powers and Steady,
 each piece of gear on all five, and each potion two in the bag are all within the noise of none.
+
+### Superstars on the lanes (issue #100, phase 11)
+
+`python3 test/realm_stars_lab.py 200 '' bl`: four of your own and one more player as your five (the order set by the
+ratings), a whole game Simulated at an even level against a Knight's five (tier 2), the hall and powers on. Against the
+control (a league kind the team lacks), 52%: the Phoenix 52%, the Kraken 51%, the Djinn 51.5%, the Hydra 63.5%, the
+Frost Wyrm 56%, and the Behemoth 40.5%. One bowler of five bowls two frames, so a superstar moves a game less than in
+the other sports. The Behemoth's 4s in revs, accuracy, spare and read cost more than its 12 in power earned, so they
+are 7, 7, 6 and 6 now (nerve 10): 53% against the control's 49% (300 each).

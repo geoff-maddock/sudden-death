@@ -83,6 +83,8 @@ return {
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
   drag: (pull, deg) => blDrag(pull, deg), guide: () => blGuide(), swingNums: () => blSwingNums(), scr: (x, y) => blScr(x, y), unscr: (sx, sy) => blUnscr(sx, sy), ovScr: (x, y) => [blOvX(x), blOvY(y)],
   get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
+  // the ball in play as the page shows it (phase 11's sounds): how long it takes down the lane and in the pins, and whose
+  get anim() { return GP && GP.anim ? { s: GP.anim.s, tLane: GP.anim.tLane, tDeck: GP.anim.tDeck, gutter: GP.anim.gutter } : null; },
   // the look (phase 8)
   screen: () => GP && GP.last && GP.anim ? blScreenFor(GP.last, GP.anim.s, GP.anim.before) : null, screenRules: JSON.parse(JSON.stringify(BL_SCREEN)),
   atLine: () => { const B = blBowlerNow(); return B ? Object.assign({}, B, { kind: (G.teams[B.s].roster[B.ri] || {}).kind }) : null; },

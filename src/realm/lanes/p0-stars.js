@@ -23,9 +23,10 @@ BL_POW2.kraken = [blP('inkbl', 'Ink Cloud', 'A curse: a cloud of ink over their 
   blP('undertowbl', 'Undertow', 'The tide pulls a gutter ball back onto the lane, and the miss is smaller.', { web: 1, err: .85 })];
 BL_ULT.kraken = blU('depthsbl', 'From the Depths', 'Tentacles rise from the pit: your balls this frame drive harder, and pins left beside a fallen one are dragged down.', { carry: 1.12, wobble: .3 });
 
-// The Behemoth: the biggest ball in the realm and no touch at all. Earthshaker goes through anything; Great Quake
+// The Behemoth: the biggest ball in the realm and little touch (raised in phase 11: with 4s it cost a five more than an
+// ordinary bowler did). Earthshaker goes through anything; Great Quake
 // heaves the lanes under the other side.
-BL_KIND.behemoth = [12, 4, 4, 4, 9, 4];
+BL_KIND.behemoth = [12, 7, 7, 6, 10, 6];
 BL_POW.behemoth = [blP('shakerbl', 'Earthshaker', 'The floor shakes when it lets go: much harder through the pins, and wilder.', { carry: 1.3, err: 1.15 }),
   blP('mountainbl', 'Mountain Roll', 'Unmoved as a mountain: it barely deflects, and it is truer.', { nodefl: 1, err: .85 })];
 BL_POW2.behemoth = [blP('stompbl', 'Stomp', 'A curse: a stomp as they release (a wilder miss).', null, { err: 1.3 }),
