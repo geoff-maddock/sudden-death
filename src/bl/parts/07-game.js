@@ -5,7 +5,8 @@
    start(opts) puts a game on the lanes: { frames, teams: [2 × { name, short, color, roster: [{ n, kind, style? }] }],
    order, skill: [2], tide, seed, lead }. A bowler's style is { hand, mph, rpm }; a roster without one gets one from
    the seed. G gains: teams, skill, tide, oil (the pair of lanes' oil, as it is now), oil0 (as it was at the start),
-   bias (a Knight's correction, a side, a bowler and a lane), st (each side's box score) and log (every ball, short).
+   bias (a Knight's correction, a side, a bowler and a lane), the call (line, split, stance, word, wordOn, scout:
+   11-call.js), st (each side's box score) and log (every ball, short).
    turn() bowls the next ball and says what happened. simGame(opts) plays a whole game headless and returns its
    sheet, score and box score, leaving any game on the lanes as it was. */
 let GB = null;   // the ball in play between turn() and the page's drawing (phase 2): not saved
@@ -32,7 +33,9 @@ function blStart(opts) {
   const oil = blHouse();
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
     oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0,
-    arm: teams.map(T => T.roster.map(() => 1)) });
+    arm: teams.map(T => T.roster.map(() => 1)),
+    line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
+    word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }] });
   GB = null;
   return G;
 }
@@ -40,6 +43,7 @@ function blStart(opts) {
 // down, roll } or null when the game is over
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
+  blCpuCall(s);
   const plan = blPlan(s);
   return blBowlBall(s, plan, blRelease(plan, s));
 }
@@ -49,13 +53,16 @@ function blBowlBall(s, plan, rel) {
   const ball = blBall(rel, G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
-  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow);
+  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass;
   const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed) : { down: [], trace: [], ball: null };
   G.oil[lane] = blWear(G.oil[lane], ball.path);
   // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader
   if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
   // the arm: this ball costs the bowler some (a power ball more)
-  G.arm[s][ri] = Math.max(0, +(G.arm[s][ri] - (rel.power ? BL_ARM.power : BL_ARM.ball)).toFixed(3));
+  G.arm[s][ri] = Math.max(0, +(G.arm[s][ri] - blArmCost(s, rel.power)).toFixed(3));
+  // the scout sees a strike ball's stand; the coach's word is spent on this ball
+  if (fresh && plan.ball === 'strike') blScoutSee(s, lane, rel.x0);
+  if (G.wordOn[s]) G.wordOn[s] = false;
   const roll = blRoll(s, deck.down);
   // a frame finished: the rest of the side got their breath back while it was bowled
   if (roll.done) G.arm[s] = G.arm[s].map((a, i) => i === ri ? a : Math.min(1, +(a + BL_ARM.back).toFixed(3)));
@@ -63,6 +70,8 @@ function blBowlBall(s, plan, rel) {
   G.n++;
   G.log.push([s, ri, roll.frame, deck.down.length, roll.strike ? 'X' : roll.spare ? '/' : roll.split ? 'o' : '']);
   GB = { s, ri, lane, stand, plan, rel, ball, deck, roll };
+  // every ball's track this game, by lane, for the lane chart (a point every other foot; the page's, not saved)
+  if (GP && GP.tracks) GP.tracks[lane].push({ s, frame: roll.frame, ri, path: ball.path.filter((_, i) => i % 2 === 0), gutter: ball.gutter });
   return { side: s, ri, frame: roll.frame, plan, release: rel, ball: { x: ball.x, entry: ball.entry, gutter: ball.gutter, skid: ball.skid, roll: ball.roll }, down: deck.down, roll };
 }
 // the box score: strikes on full racks, spares and single pins made, splits left and made, the 7-10, the leaves

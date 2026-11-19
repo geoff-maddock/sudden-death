@@ -37035,15 +37035,17 @@ function blSpareTarget(pins) {
 /* the side's plan for its next ball: { x0, ang, mph, rpm, ball, hand, aim: { x, y }, why } (what it means to throw,
    before the release strays) */
 function blPlan(s) {
-  const sk = BL_SKILL[G.skill[s]], st = blStyleOf(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
-  const oil = sk.read ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
+  const sk = BL_SKILL[G.skill[s]], st = blStyleNow(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
+  // the oil as the side reads it: as it was at the start, or as it is (an Archmage, or anyone with the coach's word)
+  const oil = sk.read || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
+  const lineX = fresh ? st.hand * BL_LINES[blLineOf(s)].off * BL_LANE.bw : 0;
   const base = { mph: st.mph, rpm: st.rpm, hand: st.hand };
   if (fresh || !sk.spare) {
     // the strike ball: at the pocket on a full rack; at the spare's front pin from the strike line otherwise
     let target = fresh ? st.hand * BL_POCKET : blSpareTarget(stand).x, why = fresh ? 'the pocket' : 'the spare, with the strike ball';
     if (fresh && sk.learn) target += blBiasOf(s, lane);
     const stands = [];
-    for (let i = 0; i < sk.stands; i++) stands.push(blStand(st) + st.hand * (i - (sk.stands - 1) / 2) * 2.2);
+    for (let i = 0; i < sk.stands; i++) stands.push(blStand(st) + lineX + st.hand * (i - (sk.stands - 1) / 2) * 2.2);
     let best = null;
     for (const x0 of stands) {
       const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide);
@@ -37059,22 +37061,24 @@ function blPlan(s) {
       const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide); if (ang !== null) best = { x0, ang };
     }
     if (!best) best = { x0: blStand(st), ang: 0 };
+    if (fresh && blLineOf(s) !== 'pocket') why += ', ' + BL_LINES[blLineOf(s)].n.toLowerCase();
     return Object.assign({ x0: best.x0, ang: best.ang, ball: 'strike', aim: { x: target, y: BL_LANE.len }, why }, base);
   }
-  // the spare ball: on a split, a Knight or an Archmage takes the bigger group (the one nearer the middle on a tie)
+  // the spare ball: on a split, the bigger group (the one nearer the middle on a tie), or all of it to convert
   const groups = blGroups(stand).sort((a, b) => b.length - a.length || Math.min(...a.map(p => Math.abs(BL_SPOT[p][0]))) - Math.min(...b.map(p => Math.abs(BL_SPOT[p][0]))));
-  const T = blSpareTarget(groups[0]), x0 = clamp(-T.x * .7, -14, 14);
+  const conv = groups.length > 1 && G.split && G.split[s] === 'convert';
+  const T = blSpareTarget(conv ? stand : groups[0]), x0 = clamp(-T.x * .7, -14, 14);
   const t = Object.assign({ x0, ball: 'spare' }, base);
   // aim through the pin's spot: a straight ball's x at the headpin line is close to its x at the pin
   let ang = blAimAt(t, T.x, oil, G.tide);
   if (ang !== null) { const r = blBall(Object.assign({ ang }, t), oil, G.tide); const a2 = blAimAt(t, T.x - r.m * (T.y - BL_LANE.len), oil, G.tide); if (a2 !== null) ang = a2; }
-  return Object.assign({ x0, ang: ang === null ? 0 : ang, ball: 'spare', aim: { x: T.x, y: T.y }, why: groups.length > 1 ? 'the safe side of the split' : 'the spare' }, base);
+  return Object.assign({ x0, ang: ang === null ? 0 : ang, ball: 'spare', aim: { x: T.x, y: T.y }, why: conv ? 'the split, to convert it' : groups.length > 1 ? 'the safe side of the split' : 'the spare' }, base);
 }
 // a Knight's correction for this bowler on this lane (what it has learned from their strike balls there)
 const blBiasOf = (s, lane) => (G.bias[s][blBowler(s)] || [0, 0])[lane];
 // the release: the plan, strayed by the skill and by the bowler (accuracy or spare, the arm, the moment's nerve)
 function blRelease(plan, s) {
-  const sk = BL_SKILL[G.skill[s]], k = blErrK(s, blBowler(s), G.stand[s].length < 10);
+  const sk = BL_SKILL[G.skill[s]], k = blErrK(s, blBowler(s), G.stand[s].length < 10) * blCallErr(s);
   return Object.assign({}, plan, { ang: plan.ang + gauss() * sk.ang * k, mph: +(plan.mph + gauss() * sk.mph * k).toFixed(2), rpm: Math.max(120, Math.round(plan.rpm + gauss() * sk.rpm * k)) });
 }
 
@@ -37085,7 +37089,8 @@ function blRelease(plan, s) {
    start(opts) puts a game on the lanes: { frames, teams: [2 × { name, short, color, roster: [{ n, kind, style? }] }],
    order, skill: [2], tide, seed, lead }. A bowler's style is { hand, mph, rpm }; a roster without one gets one from
    the seed. G gains: teams, skill, tide, oil (the pair of lanes' oil, as it is now), oil0 (as it was at the start),
-   bias (a Knight's correction, a side, a bowler and a lane), st (each side's box score) and log (every ball, short).
+   bias (a Knight's correction, a side, a bowler and a lane), the call (line, split, stance, word, wordOn, scout:
+   11-call.js), st (each side's box score) and log (every ball, short).
    turn() bowls the next ball and says what happened. simGame(opts) plays a whole game headless and returns its
    sheet, score and box score, leaving any game on the lanes as it was. */
 let GB = null;   // the ball in play between turn() and the page's drawing (phase 2): not saved
@@ -37112,7 +37117,9 @@ function blStart(opts) {
   const oil = blHouse();
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
     oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0,
-    arm: teams.map(T => T.roster.map(() => 1)) });
+    arm: teams.map(T => T.roster.map(() => 1)),
+    line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
+    word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }] });
   GB = null;
   return G;
 }
@@ -37120,6 +37127,7 @@ function blStart(opts) {
 // down, roll } or null when the game is over
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
+  blCpuCall(s);
   const plan = blPlan(s);
   return blBowlBall(s, plan, blRelease(plan, s));
 }
@@ -37129,13 +37137,16 @@ function blBowlBall(s, plan, rel) {
   const ball = blBall(rel, G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
-  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow);
+  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass;
   const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed) : { down: [], trace: [], ball: null };
   G.oil[lane] = blWear(G.oil[lane], ball.path);
   // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader
   if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
   // the arm: this ball costs the bowler some (a power ball more)
-  G.arm[s][ri] = Math.max(0, +(G.arm[s][ri] - (rel.power ? BL_ARM.power : BL_ARM.ball)).toFixed(3));
+  G.arm[s][ri] = Math.max(0, +(G.arm[s][ri] - blArmCost(s, rel.power)).toFixed(3));
+  // the scout sees a strike ball's stand; the coach's word is spent on this ball
+  if (fresh && plan.ball === 'strike') blScoutSee(s, lane, rel.x0);
+  if (G.wordOn[s]) G.wordOn[s] = false;
   const roll = blRoll(s, deck.down);
   // a frame finished: the rest of the side got their breath back while it was bowled
   if (roll.done) G.arm[s] = G.arm[s].map((a, i) => i === ri ? a : Math.min(1, +(a + BL_ARM.back).toFixed(3)));
@@ -37143,6 +37154,8 @@ function blBowlBall(s, plan, rel) {
   G.n++;
   G.log.push([s, ri, roll.frame, deck.down.length, roll.strike ? 'X' : roll.spare ? '/' : roll.split ? 'o' : '']);
   GB = { s, ri, lane, stand, plan, rel, ball, deck, roll };
+  // every ball's track this game, by lane, for the lane chart (a point every other foot; the page's, not saved)
+  if (GP && GP.tracks) GP.tracks[lane].push({ s, frame: roll.frame, ri, path: ball.path.filter((_, i) => i % 2 === 0), gutter: ball.gutter });
   return { side: s, ri, frame: roll.frame, plan, release: rel, ball: { x: ball.x, entry: ball.entry, gutter: ball.gutter, skid: ball.skid, roll: ball.roll }, down: deck.down, roll };
 }
 // the box score: strikes on full racks, spares and single pins made, splits left and made, the 7-10, the leaves
@@ -37193,14 +37206,14 @@ function blSimGame(opts) {
 const BL_METER = { rise: .95, top: 1.1, fall: 1.25, low: -.22, win: .045, pwin: .6, inDeg: .14, outDeg: 2.6 };
 const BL_PACE = { addr: .8, rest: 1.1, strike: 1.8, lane: 2.3, over: 2.5 };
 const BL_REVS = { less: .8, normal: 1, more: 1.2 };
-const BL_HANDS = { drag: 220, dragDeg: 10 };
-const BL_HOOK = { onPhase: null, onPick: null, onOver: null };
+const BL_HANDS = { drag: 220, dragDeg: 10, bend: 14 };
+const BL_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
 const BL_MODES = ['watch', 'play'];
 let GP = null;
 
 function blPlayStart(o) {
   GP = { mode: o && BL_MODES.includes(o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, streak: [0, 0], said: '' };
-  BLC.tracks = [[], []]; BLC.camY = -40;
+  BLC.tracks = [[], []]; BLC.camY = -40; GP.tracks = [[], []];
   GP.msg = `${G.teams[0].name} against ${G.teams[1].name}: ${G.frames} frames, the Baker format. ${G.teams[G.lead].name} bowl first.`;
 }
 function blGo(ph, wait, msg) {
@@ -37218,17 +37231,28 @@ function blSelFromPlan(plan) {
 }
 function blSuggest(s) { const k = G.skill[s]; G.skill[s] = 1; const p = blPlan(s); G.skill[s] = k; return p; }
 function blSelReset() { GP.sel = blSelFromPlan(blSuggest(GP.you)); GP.meter = null; }
-// change your setup: { stand, arrow, ball, revs } (boards are kept on the lane, to a tenth)
+// change your setup: { stand, arrow, ball, revs } (boards are kept on the lane, to a tenth); and the call: { line,
+// split, tempo, weight: 'heavy' | 'light', word: true, pinch: ri } (a new line, split or word puts the coach's
+// suggestion for it on your setup; the word and the pinch bowler are once a game, before a frame's first ball for the
+// pinch). Returns false, or a reason a part of it couldn't be done (a string), or true
 function blSelect(o) {
   if (!GP || GP.ph !== 'aim' || !GP.sel) return false;
-  const S = GP.sel, b = v => clamp(Math.round(v * 10) / 10, 1, BL_LANE.boards);
+  const S = GP.sel, b = v => clamp(Math.round(v * 10) / 10, 1, BL_LANE.boards), s = GP.you;
+  let why = '', again = false;
   if (o.stand != null) S.stand = b(o.stand);
   if (o.arrow != null) S.arrow = b(o.arrow);
   if (o.ball === 'strike' || o.ball === 'spare') S.ball = o.ball;
   if (BL_REVS[o.revs]) S.revs = o.revs;
-  if (o.suggest) GP.sel = blSelFromPlan(blSuggest(GP.you));
+  if (BL_LINES[o.line] && G.stand[s].length === 10) { G.line[s] = o.line; again = true; }
+  if (o.split === 'safe' || o.split === 'convert') { G.split[s] = o.split; again = true; }
+  if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
+  if (o.weight === 'heavy' || o.weight === 'light') { G.stance[s].ball = o.weight; again = true; }
+  if (o.word) { if (G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; again = true; } else why = G.wordOn[s] ? 'The coach\'s word is on for this ball.' : 'One coach\'s word a game.'; }
+  if (o.pinch != null) { const r = blPinch(s, o.pinch); if (r.ok) { again = true; GP.msg = `${blName(s, o.pinch)} bowls this frame for ${blName(s, r.for)}.`; } else why = r.why; }
+  if (o.suggest) GP.sel = blSelFromPlan(blSuggest(s));
+  else if (again) GP.sel = Object.assign(blSelFromPlan(blSuggest(s)), { revs: S.revs });
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
-  return true;
+  return why || true;
 }
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
 // (win: the mark's half-width for this bowler now, before a power ball shrinks it)
@@ -37243,8 +37267,8 @@ function blSelThrow(S, st, p, err, win0) {
 // the guide: where a perfect ball from this setup goes on a fresh lane
 function blGuide() {
   if (!GP || !GP.sel) return null;
-  const s = GP.you, st = blStyleOf(s, blBowler(s));
-  return blBall(blSelThrow(GP.sel, st, 1, 0), G.oil0, G.tide);
+  const s = GP.you, st = blStyleNow(s, blBowler(s));
+  return blBall(blSelThrow(GP.sel, st, 1, 0), G.wordOn[s] ? G.oil[blLane(s)] : G.oil0, G.tide);
 }
 
 /* ---------- the meter ---------- */
@@ -37253,7 +37277,8 @@ function blGuide() {
 function blMeterFor(s) {
   const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, pr = blPressure(s);
   const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
-  return { win: +win.toFixed(4), fall: BL_METER.fall * (1 + .25 * pr), shake: pr * (1 - r.nrv) };
+  const tm = BL_STANCE[blStanceOf(s).tempo].meter;
+  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
 }
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
@@ -37266,7 +37291,7 @@ function blPress() {
 }
 function blMeterTick(dt) {
   const M = GP.meter, K = BL_METER; if (!M) return;
-  if (M.st === 'up') { M.v += K.rise * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
+  if (M.st === 'up') { M.v += (M.rise || K.rise) * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
   else if (M.st === 'down') { M.v -= (M.fall || K.fall) * dt; if (M.v <= K.low) blRelease3(K.low); }
 }
 // the third press (or the bottom of the meter): the ball leaves the hand
@@ -37286,7 +37311,7 @@ function blDrag(pull, deg) {
 // the two numbers behind your release: { p, err, win }
 function blSwingNums() { const M = GP && GP.meter; if (!M) return null; const p = M.p == null ? M.v : M.p; return { p, err: M.err == null ? null : M.err, win: (M.win || BL_METER.win) * (p > 1 ? BL_METER.pwin : 1) }; }
 function blFireMine(p, err) {
-  const s = GP.you, st = blStyleOf(s, blBowler(s)), S = GP.sel, win = GP.meter && GP.meter.win, rel = blSelThrow(S, st, p, err, win);
+  const s = GP.you, st = blStyleNow(s, blBowler(s)), S = GP.sel, win = GP.meter && GP.meter.win, rel = blSelThrow(S, st, p, err, win);
   const plan = { x0: rel.x0, ang: blSelThrow(S, st, p, 0, win).ang, ball: S.ball, aim: { x: blBoardX(S.arrow), y: BL_LANE.arrows }, why: 'yours' };
   blFire(s, plan, rel);
 }
@@ -37346,10 +37371,10 @@ function blPlayNext() {
   const s = blUp();
   if (s < 0) { blGo('over'); return; }
   const ri = blBowler(s), fr = blFrameNo(s), ball = G.rb[s] ? 'second ball' : G.stand[s].length < 10 ? 'fill ball' : 'first ball';
-  if (blYours(s)) { blSelReset(); blGo('aim', 0, `Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
-  const plan = blPlan(s), rel = blRelease(plan, s);
+  if (blYours(s)) { blSelReset(); blGo('aim', 0, `${blTurnBall(s) ? 'The turn: the lanes are re-read, and the chart shows all the oil for this ball. ' : ''}Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
+  const said = blCpuCall(s), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
   GP.cpu = { s, plan, rel };
-  blGo('addr', 0, `Frame ${fr}: ${blName(s, ri)} (${G.teams[s].name}), ${ball}, going for ${plan.why}.`);
+  blGo('addr', 0, `Frame ${fr}: ${blName(s, who)} (${G.teams[s].name}), ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`);
 }
 function blAnimDone() {
   const over = !!G.over, R = GP.last && GP.last.roll;
@@ -37496,7 +37521,10 @@ function blOverDraw(c) {
   c.fillStyle = '#1a120d'; c.fillRect(V.ovX - 10, V.ovTop - 18, V.ovW + 20, V.ovBot - V.ovTop + 30);
   c.fillStyle = '#d9b27c'; c.fillRect(V.ovX, blOvY(L.len + 40), V.ovW, blOvY(0) - blOvY(L.len + 40));
   const cw = V.ovW / L.boards, ch = blOvY(0) - blOvY(12);
-  for (let b = 0; b < L.boards; b++) for (let f = 0; f < 40 + 12; f++) { const o = oil[b * L.ft + f]; if (o < .02) continue; c.fillStyle = `rgba(110,170,240,${Math.min(.6, o * .5)})`; c.fillRect(V.ovX + V.ovW - (b + 1) * cw, blOvY((f + 1) * 12), cw + .2, ch + .2); }
+  // on your ball, the oil only as far as your bowler reads it
+  const mine = GP && GP.mode === 'play' && (GP.ph === 'aim' || GP.ph === 'swing') && s === GP.you, readFt = mine ? blReadFt(s) : L.ft;
+  for (let b = 0; b < L.boards; b++) for (let f = 0; f < Math.min(readFt, 40 + 12); f++) { const o = oil[b * L.ft + f]; if (o < .02) continue; c.fillStyle = `rgba(110,170,240,${Math.min(.6, o * .5)})`; c.fillRect(V.ovX + V.ovW - (b + 1) * cw, blOvY((f + 1) * 12), cw + .2, ch + .2); }
+  if (readFt < L.ft) { c.fillStyle = 'rgba(40,30,25,.55)'; c.fillRect(V.ovX, blOvY(L.len + 40), V.ovW, blOvY(readFt * 12) - blOvY(L.len + 40)); c.strokeStyle = 'rgba(255,211,74,.7)'; c.beginPath(); c.moveTo(V.ovX - 4, blOvY(readFt * 12)); c.lineTo(V.ovX + V.ovW + 4, blOvY(readFt * 12)); c.stroke(); }
   c.fillStyle = 'rgba(60,30,15,.8)'; for (const b of [5, 10, 15, 20, 25, 30, 35]) c.fillRect(blOvX(blBoardX(b)) - 1, blOvY(L.arrows) - 2, 2, 4);
   // the last balls' tracks on this lane, then the one rolling
   const tr = BLC.tracks[lane || 0] || [];
@@ -37563,6 +37591,29 @@ function blDraw(c, dt) {
 }
 // a ball's track is kept for the overhead strip once it has rolled (the last four on each lane)
 function blTrackKeep() { if (!GB) return; const t = BLC.tracks[GB.lane]; t.push(GB.ball.path); if (t.length > 4) t.shift(); }
+
+/* the lane chart: the lane on its side (the foul line on the left, the pins on the right), the oil as far as side s's
+   bowler reads it (the rest hatched), the boards counted up the left edge, and every ball's track this game on the
+   lane side s bowls next, each side in its colour (the last one bold). w by h, drawn on its own canvas */
+function blChart(c, s, w, h) {
+  const L = BL_LANE, lane = blLane(s), oil = G.oil[lane], readFt = blReadFt(s), padL = 34, padT = 16, padB = 22, W = w - padL - 10, H = h - padT - padB;
+  const X = y => padL + y / (L.len + 40) * W, Y = x => padT + H / 2 - x / L.w * H;
+  c.save(); c.fillStyle = '#1a120d'; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#d9b27c'; c.fillRect(X(0), Y(L.edge), X(L.len + 40) - X(0), Y(-L.edge) - Y(L.edge));
+  const cw = X(12) - X(0), ch = H / L.boards;
+  for (let b = 0; b < L.boards; b++) for (let f = 0; f < Math.min(readFt, L.ft); f++) { const o = oil[b * L.ft + f]; if (o < .02) continue; c.fillStyle = `rgba(110,170,240,${Math.min(.75, o * .6)})`; c.fillRect(X(f * 12), Y(blBoardX(b + 1) + L.bw / 2), cw + .3, ch + .3); }
+  if (readFt < L.ft) { c.fillStyle = 'rgba(40,30,25,.62)'; c.fillRect(X(readFt * 12), Y(L.edge), X(L.len + 40) - X(readFt * 12), Y(-L.edge) - Y(L.edge));
+    c.fillStyle = '#efe4cc'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(`not read past ${readFt} feet`, (X(readFt * 12) + X(L.len + 40)) / 2, padT + H / 2 + 4); }
+  c.strokeStyle = 'rgba(60,30,15,.6)'; c.lineWidth = 1; for (const b of [5, 10, 15, 20, 25, 30, 35]) { c.beginPath(); c.moveTo(X(L.arrows) - 4, Y(blBoardX(b))); c.lineTo(X(L.arrows) + 4, Y(blBoardX(b))); c.stroke(); }
+  c.fillStyle = '#efe4cc'; c.font = '10px system-ui, sans-serif'; c.textAlign = 'right'; for (const b of [1, 5, 10, 15, 20, 25, 30, 35, 39]) c.fillText(String(b), padL - 4, Y(blBoardX(b)) + 3);
+  c.textAlign = 'center'; for (const ft of [0, 15, 40, 60]) c.fillText(ft ? `${ft} ft` : 'foul line', X(ft * 12), h - 6);
+  const T = (GP && GP.tracks && GP.tracks[lane]) || [];
+  T.forEach((t, i) => { const last = i === T.length - 1; c.strokeStyle = G.teams[t.s].color || '#888'; c.globalAlpha = last ? 1 : .55; c.lineWidth = last ? 2.4 : 1.2;
+    c.beginPath(); t.path.forEach(([x, y], j) => j ? c.lineTo(X(y), Y(x)) : c.moveTo(X(y), Y(x))); c.stroke(); });
+  c.globalAlpha = 1;
+  for (let n = 1; n <= 10; n++) { const [x, y] = BL_SPOT[n]; c.fillStyle = '#fff'; c.beginPath(); c.arc(X(y), Y(x), 2.2, 0, Math.PI * 2); c.fill(); }
+  c.restore();
+}
 /* The Saltmere Lanes: ratings, the order's roles, arm and nerve (issue #100, phase 3).
 
    A bowler's six ratings (BL_STATS) run 1 to 12, seeded by kind (BL_KIND, blRate); the game works on them as 0 to 1
@@ -37635,7 +37686,98 @@ const blNerveK = (p, nrv) => 1 + .6 * p * (1 - clamp(nrv, 0, 1));
 // all that makes side s's bowler ri less true now: the skill's spread is multiplied by this (spare: a ball at a spare)
 function blErrK(s, ri, spare) {
   const r = blRat(s, ri), a = G.arm ? G.arm[s][ri] : 1;
-  return (1.3 - .6 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(blPressure(s), r.nrv);
+  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(blPressure(s), r.nrv);
+}
+/* The Saltmere Lanes: the call and the read (issue #100, phase 4).
+
+   The line (BL_LINES, G.line a side), before every first ball: deep inside (stand further in for more angle into the
+   pocket: more carry, a bigger miss), the pocket (the standard line) or up the boards (stand further out and play it
+   straighter: safer on a dry lane, less angle). It moves where the side's bowler stands; the angle is found as ever.
+   On a split, convert or safe (G.split a side): convert goes at the front pin to slide it into the rest, safe takes the
+   bigger group and the sure count.
+   Stances (G.stance a side, kept from ball to ball): tempo quick (a quicker meter, less arm spent, a touch less true)
+   or steady; ball heavy (more carry, more arm, a few less revs) or light (more revs, deflects more).
+   The coach's word (G.word, once a game a side): the next ball is read on the lane as it is now (your guide line
+   follows the oil, and a CPU bowler reads it exactly). The turn: a side's first ball after the halfway frame re-reads
+   the lanes, so the lane chart shows all of the oil for that ball.
+   The read: the lane chart (and the overhead strip on your ball) shows the oil only as far down the lane as the
+   bowler's read rating allows (blReadFt: 25 feet, to all 60 for the best reader), and every ball's track this game.
+   The CPU's call (blCpuCall), before each ball:
+   - a Squire plays the pocket, steady and heavy, and never splits a hair;
+   - a Knight plays the pocket, deep inside when it needs strikes late (behind by 20 or more from the 7th frame), up
+     the boards when well ahead; it plays a split safe unless it needs the pins; it takes the coach's word for the
+     tenth frame's first ball;
+   - an Archmage reads the sheet as a Knight does, and the lane: when the track has dried it moves deep, past the
+     burned boards, and so too when it has seen a rival keep throwing the same line on it (the scout, G.scout); it
+     goes for a baby split it can make; it turns to a quick tempo and a light ball when its bowler's arm is low, and
+     sends in a fresher pinch bowler in the last frame when the anchor is spent. */
+const BL_LINES = { deep: { n: 'Deep inside', off: 3, err: 1.08 }, pocket: { n: 'The pocket', off: 0, err: 1 }, boards: { n: 'Up the boards', off: -3, err: .95 } };
+const BL_STANCE = { quick: { meter: 1.2, arm: .75, err: 1.03 }, steady: { meter: 1, arm: 1, err: 1 }, heavy: { mass: 1.04, rpm: .96, arm: 1.15 }, light: { mass: .96, rpm: 1.04, arm: .9 } };
+const BL_SCOUT = { same: 3, board: 1.5 };
+
+const blStanceOf = s => (G.stance && G.stance[s]) || { tempo: 'steady', ball: 'heavy' };
+const blLineOf = s => (G.line && G.line[s]) || 'pocket';
+// a bowler's style as they bowl now: the ball stance moves the revs
+function blStyleNow(s, ri) { const st = blStyleOf(s, ri), B = BL_STANCE[blStanceOf(s).ball]; return Object.assign({}, st, { rpm: Math.round(st.rpm * B.rpm) }); }
+// the line's and the stance's part in how true a release is
+const blCallErr = s => BL_LINES[blLineOf(s)].err * BL_STANCE[blStanceOf(s).tempo].err;
+// what a ball costs the arm with the stance
+const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm;
+// how far down the lane (feet) the bowler reads the oil now
+function blReadFt(s, ri) {
+  if (G.wordOn && G.wordOn[s]) return BL_LANE.ft;
+  if (blTurnBall(s)) return BL_LANE.ft;
+  return Math.round(25 + 35 * blRat(s, ri == null ? blBowler(s) : ri).red);
+}
+// is this side's next ball the turn: its first ball after the halfway frame?
+function blTurnBall(s) { if (!G || G.ro) return false; return blCur(s) === Math.ceil(G.frames / 2) && G.rb[s] === 0 && !(G.fr[s][blCur(s)] || []).length; }
+// could this split be made: two groups whose nearest pins are one pin's gap apart, one behind the other (the baby
+// splits, the 2-7 and the 3-10, and the 5-7 or 5-10), not side by side across a row (the 4-6, the 7-10)
+function blSplitMakeable(stand) {
+  const g = blGroups(stand); if (g.length !== 2) return false;
+  let best = null; for (const a of g[0]) for (const b of g[1]) { const d = Math.hypot(BL_SPOT[a][0] - BL_SPOT[b][0], BL_SPOT[a][1] - BL_SPOT[b][1]); if (!best || d < best.d) best = { d, dy: Math.abs(BL_SPOT[a][1] - BL_SPOT[b][1]) }; }
+  return best.d <= 24.5 && best.dy > 5;
+}
+// has the strike track on this lane dried (the oil left on the boards a hook ball rolls over, out at 20 to 35 feet)?
+function blTrackDry(lane, hand) {
+  const L = BL_LANE, oil = G.oil[lane], h = hand === -1 ? -1 : 1; let now = 0, was = 0;
+  for (let b = 6; b <= 12; b++) for (let f = 20; f < 35; f++) { const bb = h > 0 ? b : L.boards + 1 - b, i = (bb - 1) * L.ft + f; now += oil[i]; was += G.oil0[i]; }
+  return was > 0 && now / was < .8;
+}
+// the CPU's call for side s's next ball: the line, the split, the stance, the word and a pinch bowler. Says what it
+// chose, short, for the status line (or '')
+function blCpuCall(s) {
+  const sk = G.skill[s], o = 1 - s, ri = blBowler(s), lane = blLane(s), st = blStyleOf(s, ri);
+  const f = blCur(s), late = G.ro || f >= Math.min(6, G.frames - 3), gap = blTotal(o) - blTotal(s), out = [];
+  let line = 'pocket', split = 'safe';
+  if (sk >= 1) {
+    if (late && gap >= 20) line = 'deep';
+    else if (late && gap <= -30) line = 'boards';
+    if (late && gap >= 20) split = 'convert';
+  }
+  if (sk >= 2) {
+    if (line === 'pocket' && (blTrackDry(lane, st.hand) || (G.scout[s] && G.scout[s].same >= BL_SCOUT.same && G.scout[s].lane === lane))) line = 'deep';
+    if (blIsSplit(G.stand[s]) && blSplitMakeable(G.stand[s])) split = 'convert';
+    const arm = G.arm[s][ri];
+    G.stance[s] = { tempo: arm < .7 ? 'quick' : 'steady', ball: arm < .6 ? 'light' : 'heavy' };
+    // the last frame and a spent anchor: a fresher bowler, if one is clearly fresher
+    if (f === blSheetN() - 1 && G.rb[s] === 0 && !G.pinched[s] && arm < .55) {
+      const fresh = G.arm[s].map((a, i) => [a, i]).filter(([a, i]) => i !== ri && a > arm + .3).sort((a, b) => b[0] - a[0])[0];
+      if (fresh && blPinch(s, fresh[1]).ok) out.push(`${blNameOf(s, fresh[1])} bowls for ${blNameOf(s, ri)}`);
+    }
+  }
+  // a Knight takes the coach's word for the tenth's first ball
+  if (sk === 1 && G.word[s] > 0 && f === blSheetN() - 1 && G.rb[s] === 0 && !G.ro) { G.word[s]--; G.wordOn[s] = true; out.push('the coach\'s word'); }
+  if (line !== blLineOf(s) && G.stand[s].length === 10) out.push(BL_LINES[line].n.toLowerCase());
+  G.line[s] = line; G.split[s] = split;
+  return out.join(', ');
+}
+const blNameOf = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
+// the scout: side s watches the other side's strike balls on each lane: the same stand, ball after ball
+function blScoutSee(sBowled, lane, x0) {
+  const o = 1 - sBowled, S = G.scout[o], b = blXBoard(x0);
+  if (S.lane === lane && S.board != null && Math.abs(S.board - b) <= BL_SCOUT.board) S.same++; else { S.same = 1; S.lane = lane; }
+  S.board = +b.toFixed(1);
 }
 /* The Lanes' page in the Realm (issue #100, phase 2). A canvas in #v-lanes, after the Links', and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (blTick) and draws it (blDraw), at the screen's
@@ -37646,7 +37788,9 @@ function blErrK(s, ri, spare) {
    spare), R the revs (less, normal, more), G the coach's suggestion again.
    The mouse or a finger: a click on the lane sets your arrow (or your feet, near the foul line), on either view; a
    drag that starts at the bowler and goes up the lane is a throw (the pull is the speed, a pull off straight the
-   miss). */
+   miss, and a swipe that bends at the end the way the ball hooks puts on more revs, the other way less).
+   Phase 4's keys: L the line, S convert or safe on a split, T the tempo, H heavy or light, W the coach's word, C the
+   lane chart (the page opens it). */
 const BLP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null };
 (() => {
   const h = document.createElement('div'); h.id = 'v-lanes'; h.hidden = true;
@@ -37698,6 +37842,12 @@ function blKeyDown(e) {
   else if (k === 'b') blSelect({ ball: S.ball === 'strike' ? 'spare' : 'strike' });
   else if (k === 'r') blSelect({ revs: S.revs === 'less' ? 'normal' : S.revs === 'normal' ? 'more' : 'less' });
   else if (k === 'g') blSelect({ suggest: true });
+  else if (k === 'l') { const L = Object.keys(BL_LINES), i = L.indexOf(blLineOf(GP.you)); blSelect({ line: L[(i + 1) % L.length] }); }
+  else if (k === 's') blSelect({ split: G.split[GP.you] === 'safe' ? 'convert' : 'safe' });
+  else if (k === 't') blSelect({ tempo: blStanceOf(GP.you).tempo === 'quick' ? 'steady' : 'quick' });
+  else if (k === 'h') blSelect({ weight: blStanceOf(GP.you).ball === 'heavy' ? 'light' : 'heavy' });
+  else if (k === 'w') blSelect({ word: true });
+  else if (k === 'c') { if (BL_HOOK.onChart) try { BL_HOOK.onChart(); } catch (er) { console.error(er); } }
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
 }
@@ -37719,20 +37869,24 @@ function blPointSet(q) {
 BLP.cv.addEventListener('pointerdown', e => {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || BLP.paused || !GP.sel) return;
   const p = blPtrAt(e), [bx, by] = blScr(blBoardX(GP.sel.stand), -26);
-  BLP.ptr = { throw: p.sx < 640 && Math.abs(p.sx - bx) < 40 && p.sy > by - 70, x: p.sx, y: p.sy, id: e.pointerId, cur: p };
+  BLP.ptr = { throw: p.sx < 640 && Math.abs(p.sx - bx) < 40 && p.sy > by - 70, x: p.sx, y: p.sy, id: e.pointerId, cur: p, pts: [p] };
   try { BLP.cv.setPointerCapture(e.pointerId); } catch (er) { /* a synthetic press */ }
   if (!BLP.ptr.throw) blPointSet(blLaneAt(p.sx, p.sy));
   e.preventDefault();
 });
 BLP.cv.addEventListener('pointermove', e => {
   if (!BLP.ptr || !GP || GP.ph !== 'aim') return;
-  const p = blPtrAt(e); BLP.ptr.cur = p;
+  const p = blPtrAt(e); BLP.ptr.cur = p; BLP.ptr.pts.push(p);
   if (!BLP.ptr.throw) blPointSet(blLaneAt(p.sx, p.sy));
 });
 function blPtrUp(e) {
   const P = BLP.ptr; BLP.ptr = null; if (!P || !GP) return;
   if (e.type === 'pointercancel' || !P.throw || GP.ph !== 'aim') return;
   const q = P.cur, dx = q.sx - P.x, dy = P.y - q.sy, pull = Math.hypot(dx, dy) / BL_HANDS.drag;
+  // the spin: a swipe that bends at the end, the way the bowler's ball hooks, puts on more revs; bent the other way, less
+  const pts = P.pts, mid = pts[Math.floor(pts.length / 2)], a1 = Math.atan2(mid.sx - P.x, P.y - mid.sy), a2 = Math.atan2(q.sx - mid.sx, mid.sy - q.sy);
+  const bend = ((a2 - a1) * 180 / Math.PI), hand = blStyleOf(GP.you, blBowler(GP.you)).hand, hookWay = -hand;   // a right-hander's ball hooks left: a bend to the left on screen
+  if (pts.length >= 4 && GP.sel) { const b = bend * Math.sign(hookWay); if (b > BL_HANDS.bend) GP.sel.revs = 'more'; else if (b < -BL_HANDS.bend) GP.sel.revs = 'less'; }
   // up the lane is straight; off to the side is the miss (to the left is early, as a pull is)
   if (dy > 20 && pull > .2) blDrag(pull, Math.atan2(-dx, dy) * 180 / Math.PI);
 }
@@ -37760,7 +37914,11 @@ for (const ev of ['pointerup', 'pointercancel']) BLP.cv.addEventListener(ev, blP
    back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end.
    Phase 3 is ratings, the order's roles, arm and nerve: stats (the six, in order), rate(kind) (1 to 12), cap, roles
    (each slot of the order's role), fit(r, role) (r 0 to 1), autoOrder(roster), arm (G.arm), pressure(side),
-   armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order. */
+   armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order.
+   Phase 4 is the call and the read: lines, stanceRules, line(s), split(s), stance(s), word, wordOn, scout, cpuCall(s),
+   readFt(s) (how far down the lane side s's bowler reads the oil now), turnBall(s), splitMakeable(standing),
+   trackDry(lane, hand), tracks (every ball's track this game, by lane), chart(canvas, side) (draws the lane chart on a
+   canvas of its own). select also takes { line, split, tempo, weight, word, pinch }; onChart hears C. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -37779,6 +37937,12 @@ return {
   stats: BL_STATS.slice(), rate: k => blRate(k), cap: BL_RCAP, roles: BL_ROLES.slice(), fit: (r, role) => blFit(r, role), armRules: Object.assign({}, BL_ARM),
   autoOrder: ro => blAutoOrder(ro.map(m => ({ rs: Object.fromEntries(BL_STATS.map(k => [k, blScale((m.r || blRate(m.kind))[k])])) }))),
   get arm() { return G && G.arm ? G.arm.map(a => a.slice()) : null; }, pressure: s => G && G.arm ? blPressure(s) : 0,
+  // the call and the read (phase 4)
+  lines: JSON.parse(JSON.stringify(BL_LINES)), stanceRules: JSON.parse(JSON.stringify(BL_STANCE)), line: s => G && G.line ? G.line[s] : null, split: s => G && G.split ? G.split[s] : null,
+  stance: s => G && G.stance ? Object.assign({}, G.stance[s]) : null, get word() { return G && G.word ? G.word.slice() : null; }, get wordOn() { return G && G.wordOn ? G.wordOn.slice() : null; },
+  get scout() { return G && G.scout ? JSON.parse(JSON.stringify(G.scout)) : null; }, cpuCall: s => blCpuCall(s), readFt: s => G && G.arm ? blReadFt(s) : 0, turnBall: s => G && G.arm ? blTurnBall(s) : false,
+  splitMakeable: st => blSplitMakeable(st), trackDry: (lane, hand) => blTrackDry(lane, hand), get tracks() { return GP && GP.tracks ? JSON.parse(JSON.stringify(GP.tracks)) : [[], []]; },
+  chart: (cv, s) => { const c = cv.getContext('2d'), w = cv.width, h = cv.height; blChart(c, s == null ? (GP ? GP.you : 0) : s, w, h); }, set onChart(f) { BL_HOOK.onChart = f; },
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
@@ -54344,6 +54508,80 @@ renderHelp = function () {
   wW114RenderHelp();
   const after = $('wHelpLanes'); if (!after || $('wHelpLanesTab')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesTab"><b>Bowling ratings, the five and their order.</b> Every player also has bowling ratings: power, revs, accuracy, spare, nerve and read (1 to ${wBlCap()}), and a bowling hand. Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Bowling view. The Lanes tab on the Team screen sets your five and their order (the leadoff, the 2nd, 3rd and 4th, and the anchor). Every ball costs some arm, and a tired bowler's mark is smaller. In the last frame the meter falls quicker and the mark shakes, less for a steady nerve. Called-up players at your level fill the five when your roster is short. Practice game there plays your five against Saltmere's; nothing is won or lost.</p>`);
+};
+/* w115: the call and the read at the Lanes (issue #100, phase 4). Your ball's rows gain the call:
+   - Line (L): deep inside, the pocket, up the boards, for a first ball; picking one puts the coach's setup for it on
+     your feet and arrow;
+   - Split (S), when the rack is a split: convert (at the front pin, to slide it into the rest) or safe (the bigger
+     group, the sure count);
+   - Stance: tempo (T: quick or steady) and ball (H: heavy or light), kept from ball to ball; and the coach's word (W,
+     once a game: this ball's guide line, and the chart, follow the oil as it is now);
+   - Pinch (once a game, before a frame's first ball): another of your five bowls this frame, by their arm.
+   The lane chart (C, or Lane chart on the bar and the rows): the oil on the lane your side bowls next, as far down as
+   your bowler reads it (all of it at the turn and with the coach's word), and every ball's track on it this game.
+   The game waits while it is open.
+   Wraps: wLanesRows (wW115LanesRows: the call's rows), wLanesHowHTML (wW115LanesHow: the call and the read). */
+
+$('wLanesRows').insertAdjacentHTML('beforeend', `<div class="wccrow" id="wLanesRowLine"><span class="wccl">Line</span><span id="wLanesLine"></span></div>
+  <div class="wccrow" id="wLanesRowSplit" hidden><span class="wccl">Split</span><span id="wLanesSplit"></span></div>
+  <div class="wccrow" id="wLanesRowStance"><span class="wccl">Stance</span><span id="wLanesStance"></span></div>
+  <div class="wccrow" id="wLanesRowPinch"><span class="wccl">Pinch</span><span id="wLanesPinch"></span></div>`);
+$('wLanesAgain').insertAdjacentHTML('beforebegin', '<button class="ghost" id="wLanesChartBtn" title="C: the oil on the lane, as far as your bowler reads it, and every ball\'s track this game">Lane chart</button>');
+$('wLanesChartBtn').addEventListener('click', () => wLanesChart());
+$('wLanesRows').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const d = b.dataset; let r = null;
+  if (d.nline) r = wBL.select({ line: d.nline });
+  else if (d.nsplit) r = wBL.select({ split: d.nsplit });
+  else if (d.ntempo) r = wBL.select({ tempo: d.ntempo });
+  else if (d.nweight) r = wBL.select({ weight: d.nweight });
+  else if (d.nword) r = wBL.select({ word: true });
+  else if (d.npinch != null) r = wBL.select({ pinch: +d.npinch });
+  else if (d.nchart) { wLanesChart(); return; }
+  else return;
+  if (typeof r === 'string') $('wLanesNote').textContent = r;
+  wLanesRows();
+});
+
+const wW115LanesRows = wLanesRows;
+wLanesRows = function () {
+  wW115LanesRows();
+  const V = WBL && !WBL.over && wBL.G && wBL.G.teams ? wBL.view : null; if (!V || V.mode !== 'play' || !V.sel || V.up !== V.you) return;
+  const G = wBL.G, s = V.you, aim = V.ph === 'aim', dis = aim ? '' : 'disabled', on = (a, b) => a === b ? ' on' : '', first = G.stand[s].length === 10, fresh = G.rb[s] === 0;
+  const L = wBL.lines, line = wBL.line(s), tip = { deep: 'Stand further in: more angle into the pocket and more carry, and a bigger miss', pocket: 'The standard line', boards: 'Stand further out and play it straighter: safer when the lane has dried, less angle' };
+  $('wLanesRowLine').hidden = !first;
+  $('wLanesLine').innerHTML = Object.keys(L).map(k => `<button class="ghost${on(k, line)}" data-nline="${k}" ${dis} title="L: ${esc(tip[k])}">${esc(L[k].n)}</button>`).join(' ') + ` <button class="ghost" data-nchart="1" title="C">Lane chart</button>`;
+  const split = !first && wBL.isSplit(G.stand[s]);
+  $('wLanesRowSplit').hidden = !split;
+  if (split) $('wLanesSplit').innerHTML = [['convert', 'Convert', 'At the front pin, to slide it into the rest: both, or neither'], ['safe', 'Safe', 'The bigger group: the sure count']].map(([k, n, t]) => `<button class="ghost${on(k, wBL.split(s))}" data-nsplit="${k}" ${dis} title="S: ${esc(t)}">${n}</button>`).join(' ') + (wBL.splitMakeable(G.stand[s]) ? ' <small class="hint">This one can be made.</small>' : ' <small class="hint">A long way apart.</small>');
+  const st = wBL.stance(s), wl = wBL.word[s], won = wBL.wordOn[s];
+  $('wLanesStance').innerHTML = [['quick', 'Quick', 'T: a quicker meter and less arm spent, a touch less true'], ['steady', 'Steady', 'T: the meter at its own pace']].map(([k, n, t]) => `<button class="ghost${on(k, st.tempo)}" data-ntempo="${k}" ${dis} title="${esc(t)}">${n}</button>`).join(' ') + ' · '
+    + [['heavy', 'Heavy ball', 'H: more carry through the pins, more arm, a few less revs'], ['light', 'Light ball', 'H: more revs, and it deflects more']].map(([k, n, t]) => `<button class="ghost${on(k, st.ball)}" data-nweight="${k}" ${dis} title="${esc(t)}">${n}</button>`).join(' ') + ' · '
+    + `<button class="ghost${won ? ' on' : ''}" data-nword="1" ${aim && wl > 0 && !won ? '' : 'disabled'} title="W: once a game. This ball's guide line and the chart follow the oil as it is now">${won ? 'Coach\'s word: on' : `Coach's word (${wl} left)`}</button>`;
+  const used = G.pinched[s], arm = wBL.arm, T = G.teams[s];
+  $('wLanesRowPinch').hidden = !fresh || !G.stand[s].length || G.stand[s].length < 10;
+  $('wLanesPinch').innerHTML = used ? '<small class="hint">Used this game.</small>' : T.roster.map((m, i) => i === V.bowler ? '' : `<button class="ghost" data-npinch="${i}" ${dis} title="Once a game: ${esc(m.n)} bowls this frame instead">${esc(m.n)} <small>${Math.round(arm[s][i] * 100)}%</small></button>`).join(' ') + ' <small class="hint">Once a game: another of your five bowls this frame.</small>';
+};
+
+// the lane chart, in a box; the game waits while it is open
+function wLanesChart() {
+  if (!WBL || !wBL.G || !wBL.G.teams) return;
+  const s = wBL.view && wBL.view.up >= 0 ? wBL.view.up : 0, ft = wBL.readFt(s), G = wBL.G, lane = wBL.lane(s);
+  modal(`<header><h3>Lane ${lane + 1}: the oil, and every ball on it</h3><button class="ghost" data-close>Done</button></header>
+    <div class="wmsg"><canvas id="wLanesChartCv" width="720" height="260" style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:6px"></canvas>
+    <p class="hint">The foul line is on the left and the pins on the right; the boards count up from the right edge (1) to the left (39). Blue is oil: the ball skids on it and hooks where it is dry. ${ft < 60 ? `${esc(G.teams[s].roster[wBL.bowler(s)].n)} reads it ${ft} feet down; the rest is hatched (all of it at the turn, or with the coach's word).` : 'All of the oil is read for this ball.'} Every ball on this lane this game is drawn in its side's colour, the last one bold: where the tracks bunch, the oil is going.</p></div>`);
+  const cv = $('wLanesChartCv'); if (cv) wBL.chart(cv, s);
+}
+wBL.onChart = () => wLanesChart();
+
+const wW115LanesHow = wLanesHowHTML;
+wLanesHowHTML = function () {
+  return wW115LanesHow() + `<p class="hint"><b>The line</b> (L), before a first ball. <b>Deep inside</b>: stand further in for more angle into the pocket; more carry, and a bigger miss. <b>The pocket</b>: the standard line. <b>Up the boards</b>: stand further out and play it straighter; safer once the lane has dried, with less angle. Picking a line puts the coach's setup for it on your feet and arrow.</p>
+  <p class="hint"><b>Splits</b> (S): <b>Convert</b> goes at the front pin to slide it into the rest (both, or neither); <b>Safe</b> takes the bigger group for the sure count. The row says whether this one can be made.</p>
+  <p class="hint"><b>Stances</b>, kept from ball to ball. <b>Tempo</b> (T): Quick runs the meter quicker and spends less arm, a touch less true. <b>Ball</b> (H): Heavy drives through the pins harder and costs more arm; Light spins more and deflects more.</p>
+  <p class="hint"><b>The lane chart</b> (C) shows the oil on the lane you bowl next, but only as far down as your bowler <b>reads</b> it (25 feet, to all 60 for the best reader), and every ball's track on it this game. The overhead strip does the same on your ball. <b>The turn</b>: your first ball after the halfway frame, the lanes are re-read and the chart shows all of it. <b>The coach's word</b> (W), once a game: this ball's guide line and the chart follow the oil as it is now.</p>
+  <p class="hint"><b>Pinch</b>, once a game, before a frame's first ball: another of your five bowls the frame instead. Their arm is on the button: a fresh arm for a tired anchor.</p>
+  <p class="hint"><b>Their call.</b> A Squire plays the pocket every ball. A Knight goes deep when it needs strikes late and up the boards when well ahead, plays splits safe unless it needs the pins, and takes the coach's word for the tenth. An Archmage also moves deep once the track has dried, or once it has seen you keep throwing the same line on a lane; it goes for splits it can make, eases its tempo and ball when its bowler tires, and sends in a fresher pinch bowler for a spent anchor.</p>`;
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, baseball, football, boxing,
    basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

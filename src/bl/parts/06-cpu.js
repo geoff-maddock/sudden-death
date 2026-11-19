@@ -47,15 +47,17 @@ function blSpareTarget(pins) {
 /* the side's plan for its next ball: { x0, ang, mph, rpm, ball, hand, aim: { x, y }, why } (what it means to throw,
    before the release strays) */
 function blPlan(s) {
-  const sk = BL_SKILL[G.skill[s]], st = blStyleOf(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
-  const oil = sk.read ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
+  const sk = BL_SKILL[G.skill[s]], st = blStyleNow(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
+  // the oil as the side reads it: as it was at the start, or as it is (an Archmage, or anyone with the coach's word)
+  const oil = sk.read || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
+  const lineX = fresh ? st.hand * BL_LINES[blLineOf(s)].off * BL_LANE.bw : 0;
   const base = { mph: st.mph, rpm: st.rpm, hand: st.hand };
   if (fresh || !sk.spare) {
     // the strike ball: at the pocket on a full rack; at the spare's front pin from the strike line otherwise
     let target = fresh ? st.hand * BL_POCKET : blSpareTarget(stand).x, why = fresh ? 'the pocket' : 'the spare, with the strike ball';
     if (fresh && sk.learn) target += blBiasOf(s, lane);
     const stands = [];
-    for (let i = 0; i < sk.stands; i++) stands.push(blStand(st) + st.hand * (i - (sk.stands - 1) / 2) * 2.2);
+    for (let i = 0; i < sk.stands; i++) stands.push(blStand(st) + lineX + st.hand * (i - (sk.stands - 1) / 2) * 2.2);
     let best = null;
     for (const x0 of stands) {
       const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide);
@@ -71,22 +73,24 @@ function blPlan(s) {
       const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide); if (ang !== null) best = { x0, ang };
     }
     if (!best) best = { x0: blStand(st), ang: 0 };
+    if (fresh && blLineOf(s) !== 'pocket') why += ', ' + BL_LINES[blLineOf(s)].n.toLowerCase();
     return Object.assign({ x0: best.x0, ang: best.ang, ball: 'strike', aim: { x: target, y: BL_LANE.len }, why }, base);
   }
-  // the spare ball: on a split, a Knight or an Archmage takes the bigger group (the one nearer the middle on a tie)
+  // the spare ball: on a split, the bigger group (the one nearer the middle on a tie), or all of it to convert
   const groups = blGroups(stand).sort((a, b) => b.length - a.length || Math.min(...a.map(p => Math.abs(BL_SPOT[p][0]))) - Math.min(...b.map(p => Math.abs(BL_SPOT[p][0]))));
-  const T = blSpareTarget(groups[0]), x0 = clamp(-T.x * .7, -14, 14);
+  const conv = groups.length > 1 && G.split && G.split[s] === 'convert';
+  const T = blSpareTarget(conv ? stand : groups[0]), x0 = clamp(-T.x * .7, -14, 14);
   const t = Object.assign({ x0, ball: 'spare' }, base);
   // aim through the pin's spot: a straight ball's x at the headpin line is close to its x at the pin
   let ang = blAimAt(t, T.x, oil, G.tide);
   if (ang !== null) { const r = blBall(Object.assign({ ang }, t), oil, G.tide); const a2 = blAimAt(t, T.x - r.m * (T.y - BL_LANE.len), oil, G.tide); if (a2 !== null) ang = a2; }
-  return Object.assign({ x0, ang: ang === null ? 0 : ang, ball: 'spare', aim: { x: T.x, y: T.y }, why: groups.length > 1 ? 'the safe side of the split' : 'the spare' }, base);
+  return Object.assign({ x0, ang: ang === null ? 0 : ang, ball: 'spare', aim: { x: T.x, y: T.y }, why: conv ? 'the split, to convert it' : groups.length > 1 ? 'the safe side of the split' : 'the spare' }, base);
 }
 // a Knight's correction for this bowler on this lane (what it has learned from their strike balls there)
 const blBiasOf = (s, lane) => (G.bias[s][blBowler(s)] || [0, 0])[lane];
 // the release: the plan, strayed by the skill and by the bowler (accuracy or spare, the arm, the moment's nerve)
 function blRelease(plan, s) {
-  const sk = BL_SKILL[G.skill[s]], k = blErrK(s, blBowler(s), G.stand[s].length < 10);
+  const sk = BL_SKILL[G.skill[s]], k = blErrK(s, blBowler(s), G.stand[s].length < 10) * blCallErr(s);
   return Object.assign({}, plan, { ang: plan.ang + gauss() * sk.ang * k, mph: +(plan.mph + gauss() * sk.mph * k).toFixed(2), rpm: Math.max(120, Math.round(plan.rpm + gauss() * sk.rpm * k)) });
 }
 

@@ -20,7 +20,11 @@
    back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end.
    Phase 3 is ratings, the order's roles, arm and nerve: stats (the six, in order), rate(kind) (1 to 12), cap, roles
    (each slot of the order's role), fit(r, role) (r 0 to 1), autoOrder(roster), arm (G.arm), pressure(side),
-   armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order. */
+   armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order.
+   Phase 4 is the call and the read: lines, stanceRules, line(s), split(s), stance(s), word, wordOn, scout, cpuCall(s),
+   readFt(s) (how far down the lane side s's bowler reads the oil now), turnBall(s), splitMakeable(standing),
+   trackDry(lane, hand), tracks (every ball's track this game, by lane), chart(canvas, side) (draws the lane chart on a
+   canvas of its own). select also takes { line, split, tempo, weight, word, pinch }; onChart hears C. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -39,6 +43,12 @@ return {
   stats: BL_STATS.slice(), rate: k => blRate(k), cap: BL_RCAP, roles: BL_ROLES.slice(), fit: (r, role) => blFit(r, role), armRules: Object.assign({}, BL_ARM),
   autoOrder: ro => blAutoOrder(ro.map(m => ({ rs: Object.fromEntries(BL_STATS.map(k => [k, blScale((m.r || blRate(m.kind))[k])])) }))),
   get arm() { return G && G.arm ? G.arm.map(a => a.slice()) : null; }, pressure: s => G && G.arm ? blPressure(s) : 0,
+  // the call and the read (phase 4)
+  lines: JSON.parse(JSON.stringify(BL_LINES)), stanceRules: JSON.parse(JSON.stringify(BL_STANCE)), line: s => G && G.line ? G.line[s] : null, split: s => G && G.split ? G.split[s] : null,
+  stance: s => G && G.stance ? Object.assign({}, G.stance[s]) : null, get word() { return G && G.word ? G.word.slice() : null; }, get wordOn() { return G && G.wordOn ? G.wordOn.slice() : null; },
+  get scout() { return G && G.scout ? JSON.parse(JSON.stringify(G.scout)) : null; }, cpuCall: s => blCpuCall(s), readFt: s => G && G.arm ? blReadFt(s) : 0, turnBall: s => G && G.arm ? blTurnBall(s) : false,
+  splitMakeable: st => blSplitMakeable(st), trackDry: (lane, hand) => blTrackDry(lane, hand), get tracks() { return GP && GP.tracks ? JSON.parse(JSON.stringify(GP.tracks)) : [[], []]; },
+  chart: (cv, s) => { const c = cv.getContext('2d'), w = cv.width, h = cv.height; blChart(c, s == null ? (GP ? GP.you : 0) : s, w, h); }, set onChart(f) { BL_HOOK.onChart = f; },
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),

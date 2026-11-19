@@ -19,14 +19,14 @@
 const BL_METER = { rise: .95, top: 1.1, fall: 1.25, low: -.22, win: .045, pwin: .6, inDeg: .14, outDeg: 2.6 };
 const BL_PACE = { addr: .8, rest: 1.1, strike: 1.8, lane: 2.3, over: 2.5 };
 const BL_REVS = { less: .8, normal: 1, more: 1.2 };
-const BL_HANDS = { drag: 220, dragDeg: 10 };
-const BL_HOOK = { onPhase: null, onPick: null, onOver: null };
+const BL_HANDS = { drag: 220, dragDeg: 10, bend: 14 };
+const BL_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
 const BL_MODES = ['watch', 'play'];
 let GP = null;
 
 function blPlayStart(o) {
   GP = { mode: o && BL_MODES.includes(o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, streak: [0, 0], said: '' };
-  BLC.tracks = [[], []]; BLC.camY = -40;
+  BLC.tracks = [[], []]; BLC.camY = -40; GP.tracks = [[], []];
   GP.msg = `${G.teams[0].name} against ${G.teams[1].name}: ${G.frames} frames, the Baker format. ${G.teams[G.lead].name} bowl first.`;
 }
 function blGo(ph, wait, msg) {
@@ -44,17 +44,28 @@ function blSelFromPlan(plan) {
 }
 function blSuggest(s) { const k = G.skill[s]; G.skill[s] = 1; const p = blPlan(s); G.skill[s] = k; return p; }
 function blSelReset() { GP.sel = blSelFromPlan(blSuggest(GP.you)); GP.meter = null; }
-// change your setup: { stand, arrow, ball, revs } (boards are kept on the lane, to a tenth)
+// change your setup: { stand, arrow, ball, revs } (boards are kept on the lane, to a tenth); and the call: { line,
+// split, tempo, weight: 'heavy' | 'light', word: true, pinch: ri } (a new line, split or word puts the coach's
+// suggestion for it on your setup; the word and the pinch bowler are once a game, before a frame's first ball for the
+// pinch). Returns false, or a reason a part of it couldn't be done (a string), or true
 function blSelect(o) {
   if (!GP || GP.ph !== 'aim' || !GP.sel) return false;
-  const S = GP.sel, b = v => clamp(Math.round(v * 10) / 10, 1, BL_LANE.boards);
+  const S = GP.sel, b = v => clamp(Math.round(v * 10) / 10, 1, BL_LANE.boards), s = GP.you;
+  let why = '', again = false;
   if (o.stand != null) S.stand = b(o.stand);
   if (o.arrow != null) S.arrow = b(o.arrow);
   if (o.ball === 'strike' || o.ball === 'spare') S.ball = o.ball;
   if (BL_REVS[o.revs]) S.revs = o.revs;
-  if (o.suggest) GP.sel = blSelFromPlan(blSuggest(GP.you));
+  if (BL_LINES[o.line] && G.stand[s].length === 10) { G.line[s] = o.line; again = true; }
+  if (o.split === 'safe' || o.split === 'convert') { G.split[s] = o.split; again = true; }
+  if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
+  if (o.weight === 'heavy' || o.weight === 'light') { G.stance[s].ball = o.weight; again = true; }
+  if (o.word) { if (G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; again = true; } else why = G.wordOn[s] ? 'The coach\'s word is on for this ball.' : 'One coach\'s word a game.'; }
+  if (o.pinch != null) { const r = blPinch(s, o.pinch); if (r.ok) { again = true; GP.msg = `${blName(s, o.pinch)} bowls this frame for ${blName(s, r.for)}.`; } else why = r.why; }
+  if (o.suggest) GP.sel = blSelFromPlan(blSuggest(s));
+  else if (again) GP.sel = Object.assign(blSelFromPlan(blSuggest(s)), { revs: S.revs });
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
-  return true;
+  return why || true;
 }
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
 // (win: the mark's half-width for this bowler now, before a power ball shrinks it)
@@ -69,8 +80,8 @@ function blSelThrow(S, st, p, err, win0) {
 // the guide: where a perfect ball from this setup goes on a fresh lane
 function blGuide() {
   if (!GP || !GP.sel) return null;
-  const s = GP.you, st = blStyleOf(s, blBowler(s));
-  return blBall(blSelThrow(GP.sel, st, 1, 0), G.oil0, G.tide);
+  const s = GP.you, st = blStyleNow(s, blBowler(s));
+  return blBall(blSelThrow(GP.sel, st, 1, 0), G.wordOn[s] ? G.oil[blLane(s)] : G.oil0, G.tide);
 }
 
 /* ---------- the meter ---------- */
@@ -79,7 +90,8 @@ function blGuide() {
 function blMeterFor(s) {
   const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, pr = blPressure(s);
   const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
-  return { win: +win.toFixed(4), fall: BL_METER.fall * (1 + .25 * pr), shake: pr * (1 - r.nrv) };
+  const tm = BL_STANCE[blStanceOf(s).tempo].meter;
+  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
 }
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
@@ -92,7 +104,7 @@ function blPress() {
 }
 function blMeterTick(dt) {
   const M = GP.meter, K = BL_METER; if (!M) return;
-  if (M.st === 'up') { M.v += K.rise * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
+  if (M.st === 'up') { M.v += (M.rise || K.rise) * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
   else if (M.st === 'down') { M.v -= (M.fall || K.fall) * dt; if (M.v <= K.low) blRelease3(K.low); }
 }
 // the third press (or the bottom of the meter): the ball leaves the hand
@@ -112,7 +124,7 @@ function blDrag(pull, deg) {
 // the two numbers behind your release: { p, err, win }
 function blSwingNums() { const M = GP && GP.meter; if (!M) return null; const p = M.p == null ? M.v : M.p; return { p, err: M.err == null ? null : M.err, win: (M.win || BL_METER.win) * (p > 1 ? BL_METER.pwin : 1) }; }
 function blFireMine(p, err) {
-  const s = GP.you, st = blStyleOf(s, blBowler(s)), S = GP.sel, win = GP.meter && GP.meter.win, rel = blSelThrow(S, st, p, err, win);
+  const s = GP.you, st = blStyleNow(s, blBowler(s)), S = GP.sel, win = GP.meter && GP.meter.win, rel = blSelThrow(S, st, p, err, win);
   const plan = { x0: rel.x0, ang: blSelThrow(S, st, p, 0, win).ang, ball: S.ball, aim: { x: blBoardX(S.arrow), y: BL_LANE.arrows }, why: 'yours' };
   blFire(s, plan, rel);
 }
@@ -172,10 +184,10 @@ function blPlayNext() {
   const s = blUp();
   if (s < 0) { blGo('over'); return; }
   const ri = blBowler(s), fr = blFrameNo(s), ball = G.rb[s] ? 'second ball' : G.stand[s].length < 10 ? 'fill ball' : 'first ball';
-  if (blYours(s)) { blSelReset(); blGo('aim', 0, `Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
-  const plan = blPlan(s), rel = blRelease(plan, s);
+  if (blYours(s)) { blSelReset(); blGo('aim', 0, `${blTurnBall(s) ? 'The turn: the lanes are re-read, and the chart shows all the oil for this ball. ' : ''}Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
+  const said = blCpuCall(s), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
   GP.cpu = { s, plan, rel };
-  blGo('addr', 0, `Frame ${fr}: ${blName(s, ri)} (${G.teams[s].name}), ${ball}, going for ${plan.why}.`);
+  blGo('addr', 0, `Frame ${fr}: ${blName(s, who)} (${G.teams[s].name}), ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`);
 }
 function blAnimDone() {
   const over = !!G.over, R = GP.last && GP.last.roll;

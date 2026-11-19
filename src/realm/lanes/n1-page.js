@@ -7,7 +7,9 @@
    spare), R the revs (less, normal, more), G the coach's suggestion again.
    The mouse or a finger: a click on the lane sets your arrow (or your feet, near the foul line), on either view; a
    drag that starts at the bowler and goes up the lane is a throw (the pull is the speed, a pull off straight the
-   miss). */
+   miss, and a swipe that bends at the end the way the ball hooks puts on more revs, the other way less).
+   Phase 4's keys: L the line, S convert or safe on a split, T the tempo, H heavy or light, W the coach's word, C the
+   lane chart (the page opens it). */
 const BLP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null };
 (() => {
   const h = document.createElement('div'); h.id = 'v-lanes'; h.hidden = true;
@@ -59,6 +61,12 @@ function blKeyDown(e) {
   else if (k === 'b') blSelect({ ball: S.ball === 'strike' ? 'spare' : 'strike' });
   else if (k === 'r') blSelect({ revs: S.revs === 'less' ? 'normal' : S.revs === 'normal' ? 'more' : 'less' });
   else if (k === 'g') blSelect({ suggest: true });
+  else if (k === 'l') { const L = Object.keys(BL_LINES), i = L.indexOf(blLineOf(GP.you)); blSelect({ line: L[(i + 1) % L.length] }); }
+  else if (k === 's') blSelect({ split: G.split[GP.you] === 'safe' ? 'convert' : 'safe' });
+  else if (k === 't') blSelect({ tempo: blStanceOf(GP.you).tempo === 'quick' ? 'steady' : 'quick' });
+  else if (k === 'h') blSelect({ weight: blStanceOf(GP.you).ball === 'heavy' ? 'light' : 'heavy' });
+  else if (k === 'w') blSelect({ word: true });
+  else if (k === 'c') { if (BL_HOOK.onChart) try { BL_HOOK.onChart(); } catch (er) { console.error(er); } }
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
 }
@@ -80,20 +88,24 @@ function blPointSet(q) {
 BLP.cv.addEventListener('pointerdown', e => {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || BLP.paused || !GP.sel) return;
   const p = blPtrAt(e), [bx, by] = blScr(blBoardX(GP.sel.stand), -26);
-  BLP.ptr = { throw: p.sx < 640 && Math.abs(p.sx - bx) < 40 && p.sy > by - 70, x: p.sx, y: p.sy, id: e.pointerId, cur: p };
+  BLP.ptr = { throw: p.sx < 640 && Math.abs(p.sx - bx) < 40 && p.sy > by - 70, x: p.sx, y: p.sy, id: e.pointerId, cur: p, pts: [p] };
   try { BLP.cv.setPointerCapture(e.pointerId); } catch (er) { /* a synthetic press */ }
   if (!BLP.ptr.throw) blPointSet(blLaneAt(p.sx, p.sy));
   e.preventDefault();
 });
 BLP.cv.addEventListener('pointermove', e => {
   if (!BLP.ptr || !GP || GP.ph !== 'aim') return;
-  const p = blPtrAt(e); BLP.ptr.cur = p;
+  const p = blPtrAt(e); BLP.ptr.cur = p; BLP.ptr.pts.push(p);
   if (!BLP.ptr.throw) blPointSet(blLaneAt(p.sx, p.sy));
 });
 function blPtrUp(e) {
   const P = BLP.ptr; BLP.ptr = null; if (!P || !GP) return;
   if (e.type === 'pointercancel' || !P.throw || GP.ph !== 'aim') return;
   const q = P.cur, dx = q.sx - P.x, dy = P.y - q.sy, pull = Math.hypot(dx, dy) / BL_HANDS.drag;
+  // the spin: a swipe that bends at the end, the way the bowler's ball hooks, puts on more revs; bent the other way, less
+  const pts = P.pts, mid = pts[Math.floor(pts.length / 2)], a1 = Math.atan2(mid.sx - P.x, P.y - mid.sy), a2 = Math.atan2(q.sx - mid.sx, mid.sy - q.sy);
+  const bend = ((a2 - a1) * 180 / Math.PI), hand = blStyleOf(GP.you, blBowler(GP.you)).hand, hookWay = -hand;   // a right-hander's ball hooks left: a bend to the left on screen
+  if (pts.length >= 4 && GP.sel) { const b = bend * Math.sign(hookWay); if (b > BL_HANDS.bend) GP.sel.revs = 'more'; else if (b < -BL_HANDS.bend) GP.sel.revs = 'less'; }
   // up the lane is straight; off to the side is the miss (to the left is early, as a pull is)
   if (dy > 20 && pull > .2) blDrag(pull, Math.atan2(-dx, dy) * 180 / Math.PI);
 }

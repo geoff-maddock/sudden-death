@@ -123,7 +123,10 @@ function blOverDraw(c) {
   c.fillStyle = '#1a120d'; c.fillRect(V.ovX - 10, V.ovTop - 18, V.ovW + 20, V.ovBot - V.ovTop + 30);
   c.fillStyle = '#d9b27c'; c.fillRect(V.ovX, blOvY(L.len + 40), V.ovW, blOvY(0) - blOvY(L.len + 40));
   const cw = V.ovW / L.boards, ch = blOvY(0) - blOvY(12);
-  for (let b = 0; b < L.boards; b++) for (let f = 0; f < 40 + 12; f++) { const o = oil[b * L.ft + f]; if (o < .02) continue; c.fillStyle = `rgba(110,170,240,${Math.min(.6, o * .5)})`; c.fillRect(V.ovX + V.ovW - (b + 1) * cw, blOvY((f + 1) * 12), cw + .2, ch + .2); }
+  // on your ball, the oil only as far as your bowler reads it
+  const mine = GP && GP.mode === 'play' && (GP.ph === 'aim' || GP.ph === 'swing') && s === GP.you, readFt = mine ? blReadFt(s) : L.ft;
+  for (let b = 0; b < L.boards; b++) for (let f = 0; f < Math.min(readFt, 40 + 12); f++) { const o = oil[b * L.ft + f]; if (o < .02) continue; c.fillStyle = `rgba(110,170,240,${Math.min(.6, o * .5)})`; c.fillRect(V.ovX + V.ovW - (b + 1) * cw, blOvY((f + 1) * 12), cw + .2, ch + .2); }
+  if (readFt < L.ft) { c.fillStyle = 'rgba(40,30,25,.55)'; c.fillRect(V.ovX, blOvY(L.len + 40), V.ovW, blOvY(readFt * 12) - blOvY(L.len + 40)); c.strokeStyle = 'rgba(255,211,74,.7)'; c.beginPath(); c.moveTo(V.ovX - 4, blOvY(readFt * 12)); c.lineTo(V.ovX + V.ovW + 4, blOvY(readFt * 12)); c.stroke(); }
   c.fillStyle = 'rgba(60,30,15,.8)'; for (const b of [5, 10, 15, 20, 25, 30, 35]) c.fillRect(blOvX(blBoardX(b)) - 1, blOvY(L.arrows) - 2, 2, 4);
   // the last balls' tracks on this lane, then the one rolling
   const tr = BLC.tracks[lane || 0] || [];
@@ -190,3 +193,26 @@ function blDraw(c, dt) {
 }
 // a ball's track is kept for the overhead strip once it has rolled (the last four on each lane)
 function blTrackKeep() { if (!GB) return; const t = BLC.tracks[GB.lane]; t.push(GB.ball.path); if (t.length > 4) t.shift(); }
+
+/* the lane chart: the lane on its side (the foul line on the left, the pins on the right), the oil as far as side s's
+   bowler reads it (the rest hatched), the boards counted up the left edge, and every ball's track this game on the
+   lane side s bowls next, each side in its colour (the last one bold). w by h, drawn on its own canvas */
+function blChart(c, s, w, h) {
+  const L = BL_LANE, lane = blLane(s), oil = G.oil[lane], readFt = blReadFt(s), padL = 34, padT = 16, padB = 22, W = w - padL - 10, H = h - padT - padB;
+  const X = y => padL + y / (L.len + 40) * W, Y = x => padT + H / 2 - x / L.w * H;
+  c.save(); c.fillStyle = '#1a120d'; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#d9b27c'; c.fillRect(X(0), Y(L.edge), X(L.len + 40) - X(0), Y(-L.edge) - Y(L.edge));
+  const cw = X(12) - X(0), ch = H / L.boards;
+  for (let b = 0; b < L.boards; b++) for (let f = 0; f < Math.min(readFt, L.ft); f++) { const o = oil[b * L.ft + f]; if (o < .02) continue; c.fillStyle = `rgba(110,170,240,${Math.min(.75, o * .6)})`; c.fillRect(X(f * 12), Y(blBoardX(b + 1) + L.bw / 2), cw + .3, ch + .3); }
+  if (readFt < L.ft) { c.fillStyle = 'rgba(40,30,25,.62)'; c.fillRect(X(readFt * 12), Y(L.edge), X(L.len + 40) - X(readFt * 12), Y(-L.edge) - Y(L.edge));
+    c.fillStyle = '#efe4cc'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(`not read past ${readFt} feet`, (X(readFt * 12) + X(L.len + 40)) / 2, padT + H / 2 + 4); }
+  c.strokeStyle = 'rgba(60,30,15,.6)'; c.lineWidth = 1; for (const b of [5, 10, 15, 20, 25, 30, 35]) { c.beginPath(); c.moveTo(X(L.arrows) - 4, Y(blBoardX(b))); c.lineTo(X(L.arrows) + 4, Y(blBoardX(b))); c.stroke(); }
+  c.fillStyle = '#efe4cc'; c.font = '10px system-ui, sans-serif'; c.textAlign = 'right'; for (const b of [1, 5, 10, 15, 20, 25, 30, 35, 39]) c.fillText(String(b), padL - 4, Y(blBoardX(b)) + 3);
+  c.textAlign = 'center'; for (const ft of [0, 15, 40, 60]) c.fillText(ft ? `${ft} ft` : 'foul line', X(ft * 12), h - 6);
+  const T = (GP && GP.tracks && GP.tracks[lane]) || [];
+  T.forEach((t, i) => { const last = i === T.length - 1; c.strokeStyle = G.teams[t.s].color || '#888'; c.globalAlpha = last ? 1 : .55; c.lineWidth = last ? 2.4 : 1.2;
+    c.beginPath(); t.path.forEach(([x, y], j) => j ? c.lineTo(X(y), Y(x)) : c.moveTo(X(y), Y(x))); c.stroke(); });
+  c.globalAlpha = 1;
+  for (let n = 1; n <= 10; n++) { const [x, y] = BL_SPOT[n]; c.fillStyle = '#fff'; c.beginPath(); c.arc(X(y), Y(x), 2.2, 0, Math.PI * 2); c.fill(); }
+  c.restore();
+}

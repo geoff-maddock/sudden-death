@@ -52,11 +52,12 @@ async def main():
           for (let i = 0; i < 80; i++) if (wBL.simGame({ seed: 200 + i, teams: [__team(['dwarf', 'gorgon', 'wraith', 'vampire', 'goblin']), __team(['dwarf', 'gorgon', 'wraith', 'vampire', 'goblin'])] }).win === 0) e++;
           return { acc: a / 40, even: e / 80 }; })()""")
         check(w['acc'] >= .8 and .3 < w['even'] < .7, 'the ratings decide games: accurate bowlers beat wild ones, and two sides alike split them', w)
-        ar = await pg.evaluate("""(() => { const G = wBL.start({ seed: 8, teams: [__team(['dwarf', 'elf', 'witch', 'troll', 'zombie']), __team(['dwarf', 'elf', 'witch', 'troll', 'zombie'])] }), A = wBL.armRules;
+        ar = await pg.evaluate("""(() => { const G = wBL.start({ seed: 8, teams: [__team(['dwarf', 'elf', 'witch', 'troll', 'zombie']), __team(['dwarf', 'elf', 'witch', 'troll', 'zombie'])] }), A = Object.assign({}, wBL.armRules), S = wBL.stanceRules;
+          A.ball *= S[wBL.stance(0).tempo].arm * S[wBL.stance(0).ball].arm;   // (the side's stance, phase 4, weighs it)
           const ri = wBL.bowler(0); wBL.turn(); const one = wBL.arm[0][ri]; G.arm[0] = [.5, .5, .5, .5, .5]; G.arm[0][ri] = one;
           let n = 0; while (wBL.up() === 0 && n++ < 3) wBL.turn(); const after = wBL.arm[0];
           return { one, A, others: after.filter((v, i) => i !== ri), me: after[ri] }; })()""")
-        check(abs(ar['one'] - (1 - ar['A']['ball'])) < 1e-9, 'a ball costs the bowler arm', ar)
+        check(abs(ar['one'] - (1 - ar['A']['ball'])) < 1e-3, 'a ball costs the bowler arm (as the side\'s stance weighs it)', ar)
         check(all(abs(v - (.5 + ar['A']['back'])) < 1e-9 for v in ar['others']) and ar['me'] < ar['one'], 'when the frame is done the rest of the side gets some back; the bowler does not', ar)
         pr = await pg.evaluate("""(() => { const G = wBL.start({ seed: 9, frames: 5 }); const early = wBL.pressure(0);
           for (let i = 0; i < 8; i++) { wBL.roll(wBL.up(), 3); wBL.roll(wBL.up(), 4); } const last = wBL.pressure(0);
