@@ -145,6 +145,32 @@ async def main():
         pj = await pg.evaluate("""(() => { wGL.newGame(); __holes([[4, 5], [3, 3]]); wGL.stroke(0, 1); const a = JSON.stringify(wGL.G); return a === JSON.stringify(JSON.parse(a)) && !/function/.test(a); })()""")
         check(pj, 'the game is plain JSON', pj)
 
+        # ---------- issue #95's review notes ----------
+        # the cap: a ball holed on the stroke that reaches par + 4 counts; one that stays out is picked up there
+        cp = await pg.evaluate("""(() => { const out = { holed: null, out: null };
+          for (let seed = 1; seed < 60 && !(out.holed && out.out); seed++) {
+            wGL.start({ seed, holes: 9 }); const G = wGL.G, H = wGL.course(G.h), cap = H.par + 3, far = !out.out;
+            G.hole.st = [cap, cap]; G.ball[1] = { x: H.pin.x - 0.4, y: H.pin.y, lie: 'G' };
+            G.ball[0] = far ? { x: H.pin.x - 60, y: H.pin.y, lie: 'R' } : { x: H.pin.x - 2.2, y: H.pin.y, lie: 'G' };
+            const ev = wGL.turn(); if (!ev || ev.k !== 'shot' || ev.side !== 0) continue;
+            const card = wGL.G.card.find(c => c.no === 1), up = card ? card.up[0] : wGL.G.hole.up[0];
+            if (ev.holed && !out.holed) out.holed = { st: ev.st, par: H.par, up };
+            if (!ev.holed && far && !out.out) out.out = { st: ev.st, par: H.par, up, done: card ? card.done[0] : wGL.G.hole.done[0] }; }
+          return out; })()""")
+        check(cp['holed'] and cp['holed']['st'] == cp['holed']['par'] + 4 and not cp['holed']['up'], 'a ball holed on the stroke that reaches the cap counts (no pickup)', cp)
+        check(cp['out'] and cp['out']['up'] and cp['out']['done'], 'one that stays out on that stroke is picked up', cp)
+        # the bare rules: stroke doesn't close a decided hole; decide does
+        dc = await pg.evaluate("""(() => { wGL.newGame({ holes: 9 }); const go = s => wGL.stroke(s, wGL.hitters(s)[0]);
+          go(0); go(0); go(0); wGL.holed(0); go(1); go(1); go(1);
+          const before = { st: wGL.holeState(), res: wGL.G.res.length }; const d = wGL.decide();
+          return { end: before.st.end, before: before.res, d, after: wGL.G.res.length, won: wGL.G.won.slice() }; })()""")
+        check(dc['end'] and dc['before'] == 0 and dc['d']['end'] and dc['after'] == 1 and dc['won'] == [1, 0], 'a hole decided by a stroke waits for decide(), which closes it', dc)
+        # the end is said once, however many of its four places reach it
+        ov = await pg.evaluate("""(() => { let n = 0; const was = wGL.onOver; wGL.onOver = s => { n++; if (was) was(s); };
+          wLinksGame({ seed: 4, mode: 'watch', holes: 3 }); wGL.pause(true); let i = 0; while (!(WGL && WGL.over) && i++ < 40000) wGL.tick(0.05);
+          for (let k = 0; k < 400; k++) wGL.tick(0.05); const r = { n, over: !!(WGL && WGL.over) }; wGL.onOver = was; wLeaveLinks(); return r; })()""")
+        check(ov['over'] and ov['n'] == 1, 'a game on show says its end once', ov)
+
         check(not errs, 'no page errors', errs)
         await br.close()
     print('errors:', FAILS)

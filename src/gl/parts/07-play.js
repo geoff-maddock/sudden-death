@@ -87,7 +87,7 @@ function glGiven(by) {
   const end = ev.res != null;
   glGo('given', end ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
   if (end) glDispMatch();
-  if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  if (end) glSayOver();
 }
 const glFeet = n => `${n} ${n === 1 ? 'foot' : 'feet'}`;
 const glYards = d => d < 1 ? glFeet(Math.max(1, Math.round(d * 3))) : `${Math.round(d)} ${Math.round(d) === 1 ? 'yard' : 'yards'}`;
@@ -118,7 +118,7 @@ function glAnimDone() {
     if (last) GD.disp.balls[A.side] = Object.assign({}, GD.disp.balls[A.side], { x: last.x, y: last.y });
   }
   glGo('rest', end ? GL_PACE.hole : GL_PACE.rest);
-  if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  if (end) glSayOver();
 }
 // where the moving ball is drawn now: { x, y, z } (or null with nothing moving)
 function glAnimBall() {

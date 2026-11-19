@@ -109,7 +109,7 @@ function glGive(by) {
 }
 // side s hits plan; r is where the ball went (glHit's for the CPU, or a swing by hand: glStrike). Counts it
 function glShoot(s, plan, r) {
-  const H = glHoleNow(), h0 = G.res.length, Hs = G.hole, no = h0 + 1, d0 = glDistOf(H, s), lie0 = G.ball[s].lie, fx = glFxFor(s), st = glStroke(s, plan.ri);
+  const H = glHoleNow(), h0 = G.res.length, Hs = G.hole, no = h0 + 1, d0 = glDistOf(H, s), lie0 = G.ball[s].lie, fx = glFxFor(s), st = glStroke(s, plan.ri, true);
   if (st.ok && G.webbed) G.webbed[s] = false;
   if (!st.ok) return { k: 'refused', why: st.why };
   const S = G.stat[s];
@@ -124,6 +124,9 @@ function glShoot(s, plan, r) {
   if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F' && !r.water) S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
   if (!r.water && (r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
   const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, line: plan.line || '', club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
+  // the cap, now the stroke's end is known: a ball holed on the stroke that reaches it counts (glHoled closes the hole);
+  // any other ball is lifted there, before a water drop (which then adds nothing, as the side is done)
+  if (!(r.holed && !r.water)) glCapCheck(s);
   if (r.water) { S.water++; glDrop(s); }
   // the wood's own ways on a ball that has stopped: the bees, the Gloomcap
   ev.wood = glWoodAfter(s, plan.ri, ev);
@@ -133,8 +136,6 @@ function glShoot(s, plan, r) {
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);
   glKitAfter(s, plan);
-  // holed on the stroke that reached the cap: it still counts
-  if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
   ev.up = !!Hs.up[s] && !r.holed;
   if (r.holed && !r.water && !Hs.done[s]) glHoled(s); else glDecide();
   return glLogEv(ev, h0, Hs);
@@ -146,12 +147,20 @@ function glLogEv(ev, h0, Hs) {
   glAfterHole(h0, Hs);
   return ev;
 }
+// the end of the game, said once: onOver with the summary. Four places reach the end (a CPU turn on show, a hole closed
+// with no page, your putt given, a ball come to rest), each when its own moment is right; this keeps it to one call
+// (G.overSaid, plain data, so a kept game says it once too)
+function glSayOver() {
+  if (!G || !G.over || G.overSaid || !GL_HOOK.onOver) return;
+  G.overSaid = true;
+  try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+}
 // one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
 function glTurn() {
   const n = glNext(); if (!n) return null;
   const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { glCpuCall(s); const ri = glPickHitter(s, glShotKind(glHoleNow(), s)); glCpuPotion(s, ri); glCpuPower(s, ri); const plan = glPlan(s, ri); return glShoot(s, plan, glHit(s, plan)); })();
   // (glAfterHole leaves the end to the page when a game is on show; turn() is not the page, so it says it here)
-  if (GD && G.over && ev && ev.res != null && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  if (GD && ev && ev.res != null) glSayOver();
   return ev;
 }
 // a hole just ended: its card and stats, then the next tee (or the end)
@@ -164,7 +173,7 @@ function glAfterHole(h0, Hs) {
     if (Hs.done[s] && !Hs.up[s]) { const u = Hs.par - Hs.st[s]; if (u === 1) G.stat[s].birdies++; else if (u >= 2) G.stat[s].eagles++; }
   }
   // (with a game on show the page says when it is over, once the last ball has stopped: 07-play.js)
-  if (G.over) { if (GL_HOOK.onOver && !GD) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); } }
+  if (G.over) { if (!GD) glSayOver(); }
   else glHoleStart();
 }
 function glSummary() {
