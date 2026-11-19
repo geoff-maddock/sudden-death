@@ -100,7 +100,7 @@ async def main():
         await pg.evaluate(CLOSE_ALL)
 
         # a final you are not in is a best of three too
-        o = await pg.evaluate("(() => { const s = wGutterSim('wild:' + Object.keys(W_WILD_TEAM)[0], 'wild:' + Object.keys(W_WILD_TEAM)[1], 3), q = wGutterSim('wild:' + Object.keys(W_WILD_TEAM)[0], 'wild:' + Object.keys(W_WILD_TEAM)[1], 1); return { s, q }; })()")
+        o = await pg.evaluate("(() => { const s = wGutterSim('wild:' + Object.keys(W_WILD_TEAM)[0], 'wild:' + Object.keys(W_WILD_TEAM)[1], 2, 2), q = wGutterSim('wild:' + Object.keys(W_WILD_TEAM)[0], 'wild:' + Object.keys(W_WILD_TEAM)[1], 2, 1); return { s, q }; })()")
         check(max(o['s']['ra'], o['s']['rb']) == 2 and len(o['s']['gs']) in (2, 3) and o['q']['ra'] > 50 and 'gs' not in o['q'], 'a final between two others is best of three; an earlier round is one game, in pins', o)
 
         # a new week: won outright

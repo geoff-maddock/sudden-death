@@ -52,6 +52,7 @@ python3 test/realm_court_lab.py 120            # Realm basketball balance: win r
 python3 test/realm_rink_lab.py 120              # Realm hockey balance: win rate by level gap, tier and CPU skill, powers on, off and one side's, each system, special-teams setup and stance, Pond Kettles, gear and potions by tier
 python3 test/realm_quick_shots.py              # retake the Quick start screenshots (all sports, or name some: links ball grid ring court rink), then rebuild
 python3 test/realm_links_lab.py 400            # Realm golf balance: win rate by tier, level gap and caddie, powers on, off and one side's, each line and stance, gear and potions by tier, the enchanted course, the hitter rule, Divot Cups
+python3 test/realm_lanes_lab.py 200            # Realm bowling balance: win rate by tier, level gap and skill, powers on, off and one side's, each line and stance, gear and potions by tier, the hall and the tide, Gutter Cups, each power alone (single)
 python3 test/realm_stars_lab.py 200            # Realm superstar balance: what each superstar adds in the card game, football, baseball, basketball and hockey, against an ordinary player
 ```
 

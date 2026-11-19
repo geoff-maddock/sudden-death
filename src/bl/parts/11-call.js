@@ -15,13 +15,17 @@
    The CPU's call (blCpuCall), before each ball:
    - a Squire plays the pocket, steady and heavy, and never splits a hair;
    - a Knight plays the pocket, deep inside when it needs strikes late (behind by 20 or more from the 7th frame), up
-     the boards when well ahead; it plays a split safe unless it needs the pins; it takes the coach's word for the
-     tenth frame's first ball;
-   - an Archmage reads the sheet as a Knight does, and the lane: when the track has dried it moves deep, past the
-     burned boards, and so too when it has seen a rival keep throwing the same line on it (the scout, G.scout); it
+     the boards when well ahead, or once its track has dried (fresher oil off the worn line); it plays a split safe
+     unless it needs the pins; it takes the coach's word for the tenth frame's first ball;
+   - an Archmage reads the sheet as a Knight does, and the lane: it moves up the boards too when it has seen a rival
+     keep throwing the same line on it (the scout, G.scout), off the track they are wearing; it
      goes for a baby split it can make; it turns to a quick tempo and a light ball when its bowler's arm is low, and
      sends in a fresher pinch bowler in the last frame when the anchor is spent. */
-const BL_LINES = { deep: { n: 'Deep inside', off: 3, err: 1.08 }, pocket: { n: 'The pocket', off: 0, err: 1 }, boards: { n: 'Up the boards', off: -3, err: .95 } };
+// (phase 10: the lab found strikes level from the stand blStand gives out to 4.5 boards further out, then falling off
+// fast. The bowler's best stand is looked for round a point BL_LINE_BASE boards out from blStand; the line then moves
+// the feet off that stand by off boards (deep two in, up the boards two out), each with its own miss)
+const BL_LINE_BASE = -2;
+const BL_LINES = { deep: { n: 'Deep inside', off: 2, err: 1.06 }, pocket: { n: 'The pocket', off: 0, err: 1 }, boards: { n: 'Up the boards', off: -2, err: .97 } };
 const BL_STANCE = { quick: { meter: 1.2, arm: .75, err: 1.03 }, steady: { meter: 1, arm: 1, err: 1 }, heavy: { mass: 1.04, rpm: .96, arm: 1.15 }, light: { mass: .96, rpm: 1.04, arm: .9 } };
 const BL_SCOUT = { same: 3, board: 1.5 };
 
@@ -61,13 +65,17 @@ function blCpuCall(s) {
   const f = blCur(s), late = G.ro || f >= Math.min(6, G.frames - 3), gap = blTotal(o) - blTotal(s), out = [];
   const rr = blHallRerackCall(s); if (rr) out.push(rr);
   let line = 'pocket', split = 'safe';
+  // (phase 10: the lab found the pocket's track wears for both sides, so a line off it keeps fresh oil: a Knight moves
+  // up the boards once its track has dried, an Archmage too when the other side keeps to one stand; deep is the gamble
+  // when behind late)
   if (sk >= 1) {
     if (late && gap >= 20) line = 'deep';
     else if (late && gap <= -30) line = 'boards';
+    else if (blTrackDry(lane, st.hand)) line = 'boards';
     if (late && gap >= 20) split = 'convert';
   }
   if (sk >= 2) {
-    if (line === 'pocket' && (blTrackDry(lane, st.hand) || (G.scout[s] && G.scout[s].same >= BL_SCOUT.same && G.scout[s].lane === lane))) line = 'deep';
+    if (line === 'pocket' && G.scout[s] && G.scout[s].same >= BL_SCOUT.same && G.scout[s].lane === lane) line = 'boards';
     if (blIsSplit(G.stand[s]) && blSplitMakeable(G.stand[s])) split = 'convert';
     const arm = G.arm[s][ri];
     G.stance[s] = { tempo: arm < .7 ? 'quick' : 'steady', ball: arm < .6 ? 'light' : 'heavy' };
@@ -79,6 +87,9 @@ function blCpuCall(s) {
   }
   // a Knight takes the coach's word for the tenth's first ball
   if (sk === 1 && G.word[s] > 0 && f === blSheetN() - 1 && G.rb[s] === 0 && !G.ro) { G.word[s]--; G.wordOn[s] = true; out.push('the coach\'s word'); }
+  // a side's call fixed for the game (start({ fix: [{ line, tempo, ball } | null, ...] }): the balance lab's)
+  const F = G.fix && G.fix[s];
+  if (F) { if (BL_LINES[F.line]) line = F.line; if (F.split) split = F.split; G.stance[s] = { tempo: F.tempo || G.stance[s].tempo, ball: F.ball || G.stance[s].ball }; }
   if (line !== blLineOf(s) && G.stand[s].length === 10) out.push(BL_LINES[line].n.toLowerCase());
   // (the line is for a first ball: a spare keeps the line the frame began on)
   if (G.stand[s].length === 10) G.line[s] = line;

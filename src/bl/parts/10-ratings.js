@@ -35,6 +35,13 @@ const BL_KIND = {
 const BL_RCAP = 12;
 const BL_ROLES = ['lead', 'mid', 'mid', 'mid', 'anchor'];
 const BL_ARM = { ball: .07, power: .12, back: .05, k: .8 };
+// how far the ratings reach (phase 10): the release's miss runs from 1 + acc / 2 (a rating of 1) down to 1 - acc / 2 (12)
+// (spr for a ball at a spare); on a strike ball, power and revs widen the pocket (the miss less by up to pocket / 2: a
+// strong, spinning ball strikes from further off the line); the ball's drive (how hard it goes through the pins) from 1 - (pow + rev) / 2 to 1 + (pow + rev) / 2; an average
+// bowler (6.5) is 1 either way. Power and revs set the speed and the revs only within a narrow band (mph, rpm: the
+// least, and the spread) round the lane's sweet spot, about 16.8 mph and 350 rpm: further out a ball strikes less
+// (the lab found +3 power or revs cost a game, when they set the whole style), so the ratings pay in drive instead
+const BL_REACH = { acc: .9, spr: 1.6, pocket: .9, pow: .4, rev: .3, nrv: .8, mph: [16.1, 1.4], rpm: [315, 70] };
 const BL_DEF_RAT = { pow: .5, rev: .5, acc: .5, spr: .5, nrv: .5, red: .5 };
 function blRate(kind) { const k = BL_KIND[kind]; return Object.fromEntries(BL_STATS.map((s, i) => [s, k ? k[i] : 6.5])); }
 const blScale = v => clamp((v - 1) / (BL_RCAP - 1), 0, 1);
@@ -54,7 +61,7 @@ function blStyleFor(m, rnd) {
   if (m.style) return Object.assign({}, m.style);
   if (!m.r) return blStyle(rnd);
   const r = m.rs, hand = m.hand === -1 || m.hand === 1 ? m.hand : (rnd() < .15 ? -1 : 1);
-  return { hand, mph: +(15.2 + 3.2 * r.pow).toFixed(1), rpm: Math.round(230 + 240 * r.rev) };
+  return { hand, mph: +(BL_REACH.mph[0] + BL_REACH.mph[1] * r.pow).toFixed(1), rpm: Math.round(BL_REACH.rpm[0] + BL_REACH.rpm[1] * r.rev) };
 }
 // how much less true a release is with this much arm left (1 at full)
 const blArmK = a => 1 + (1 - clamp(a, 0, 1)) * BL_ARM.k;
@@ -66,11 +73,16 @@ function blPressure(s) {
   return 1 + (done && gap >= -10 && gap <= 30 ? .5 : 0);
 }
 // what a moment does to a bowler of nerve nrv (0 to 1): 1 is nothing
-const blNerveK = (p, nrv) => 1 + .6 * p * (1 - clamp(nrv, 0, 1));
+const blNerveK = (p, nrv) => 1 + BL_REACH.nrv * p * (1 - clamp(nrv, 0, 1));
+// the ratings' part in how true a release is (1 for an average bowler): accuracy (spare at a spare), and on a strike
+// ball the pocket that power and revs open
+function blRateErr(r, spare) {
+  return spare ? 1 + BL_REACH.spr * (.5 - r.spr) : (1 + BL_REACH.acc * (.5 - r.acc)) * (1 - BL_REACH.pocket * ((r.pow + r.rev) / 2 - .5));
+}
 // all that makes side s's bowler ri less true now: the skill's spread is multiplied by this (spare: a ball at a spare)
 function blErrK(s, ri, spare) {
   const r = blRat(s, ri), a = G.arm ? G.arm[s][ri] : 1;
   const fx = typeof blFxFor === 'function' ? blFxFor(s) : null;
   const kit = typeof blKitErr === 'function' && G.bags ? [blKitErr(s, ri), blKitPress(s, ri)] : [1, 1];
-  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s) * kit[1], r.nrv) * (fx ? fx.err : 1) * kit[0];
+  return blRateErr(r, spare) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s) * kit[1], r.nrv) * (fx ? fx.err : 1) * kit[0];
 }

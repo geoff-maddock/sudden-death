@@ -5,7 +5,7 @@
 # quicker. The coach's word: once a game, this ball's guide follows the oil as it is, and it is spent on the ball. The
 # turn: the first ball after the halfway frame reads all the oil; otherwise a bowler reads as far as their read
 # rating allows (a witch further than a troll). The CPU's call: a Squire always the pocket; a Knight deep when behind
-# late, up the boards when well ahead, the word for the tenth; an Archmage deep once the track has dried or once it
+# late, up the boards when well ahead, the word for the tenth; an Archmage up the boards once the track has dried or once it
 # has scouted the same line, converts a baby split but not the 7-10, and pinches a spent anchor in the last frame.
 # The page: the Line, Split, Stance and Pinch rows and their keys; the lane chart opens in a box and the game waits; a
 # swipe that bends the way the ball hooks puts on more revs. How to play explains it. Asserts; exits nonzero on failure.
@@ -84,8 +84,8 @@ async def main():
           for (let i = 0; i < 40; i++) G.oil[lane] = wBL.wear(G.oil[lane], path); out.dry = wBL.trackDry(lane, 1); wBL.cpuCall(0); out.dryLine = G.line[0];
           G.stand[0] = [3, 10]; G.rb[0] = 1; G.fr[0] = [[8]]; wBL.cpuCall(0); out.baby = G.split[0]; G.stand[0] = [7, 10]; wBL.cpuCall(0); out.big = G.split[0];
           return out; })()""")
-        check(am['fresh'] == 'pocket' and am['scout'] == 'deep', 'an Archmage plays the pocket on a fresh lane, and goes deep once it has scouted the same line on it', am)
-        check(am['dry'] and am['dryLine'] == 'deep', 'an Archmage goes deep once the track has dried', am)
+        check(am['fresh'] == 'pocket' and am['scout'] == 'boards', 'an Archmage plays the pocket on a fresh lane, and moves up the boards once it has scouted the same line on it (off the track they wear)', am)
+        check(am['dry'] and am['dryLine'] == 'boards', 'once the track has dried it moves up the boards, onto fresher oil (phase 10)', am)
         check(am['baby'] == 'convert' and am['big'] == 'safe', 'an Archmage converts the 3-10, and plays the 7-10 safe', am)
         pn = await pg.evaluate("""(() => { const G = wBL.start({ seed: 9, skill: [2, 1], teams: [__five(), __five()] }); for (let i = 0; i < 36; i++) wBL.roll(wBL.up(), 4 - (i % 2) * 4);
           const ri = wBL.bowler(0); G.arm[0] = [1, 1, 1, 1, 1]; G.arm[0][ri] = .3; const said = wBL.cpuCall(0); return { was: ri, now: wBL.bowler(0), said, used: G.pinched[0] }; })()""")

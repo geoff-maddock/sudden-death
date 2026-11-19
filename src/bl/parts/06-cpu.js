@@ -13,9 +13,9 @@
    side that drives that pin into the rest.
    Then the release strays by the skill (BL_SKILL: the angle, the speed and the revs), seeded through R. */
 const BL_SKILL = [
-  { n: 'Squire', ang: .28, mph: .45, rpm: 28, read: 0, spare: false, learn: 0, stands: 1 },
-  { n: 'Knight', ang: .15, mph: .25, rpm: 15, read: 0, spare: true, learn: .5, stands: 3 },
-  { n: 'Archmage', ang: .11, mph: .18, rpm: 10, read: 1, spare: true, learn: 0, stands: 5 }];
+  { n: 'Squire', ang: .24, mph: .38, rpm: 22, read: 0, spare: true, learn: 0, stands: 2 },
+  { n: 'Knight', ang: .18, mph: .25, rpm: 15, read: 0, spare: true, learn: .5, stands: 3 },
+  { n: 'Archmage', ang: .132, mph: .18, rpm: 10, read: 1, spare: true, learn: 0, stands: 5 }];
 const BL_POCKET = blBoardX(17.5);   // a right-hander's pocket at the pins (the left-hander's is its mirror)
 
 // a bowler's style: their hand, speed and revs (a team that brings none gets them from the seed)
@@ -57,7 +57,8 @@ function blPlan(s) {
     let target = fresh ? st.hand * BL_POCKET : blSpareTarget(stand).x, why = fresh ? 'the pocket' : 'the spare, with the strike ball';
     if (fresh && sk.learn) target += blBiasOf(s, lane);
     const stands = [];
-    for (let i = 0; i < sk.stands; i++) stands.push(blStand(st) + lineX + st.hand * (i - (sk.stands - 1) / 2) * 2.2);
+    const base0 = blStand(st) + st.hand * BL_LINE_BASE * BL_LANE.bw;
+    for (let i = 0; i < sk.stands; i++) stands.push(base0 + st.hand * (i - (sk.stands - 1) / 2) * 2.2);
     let best = null;
     for (const x0 of stands) {
       const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide);
@@ -73,6 +74,8 @@ function blPlan(s) {
       const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide); if (ang !== null) best = { x0, ang };
     }
     if (!best) best = { x0: blStand(st), ang: 0 };
+    // the line: the feet off the best stand, if a ball from there still reaches the pocket
+    if (lineX) { const x1 = best.x0 + lineX, t = Object.assign({ x0: x1, ball: 'strike' }, base), a1 = Math.abs(x1) < BL_LANE.edge - 2 ? blAimAt(t, target, oil, G.tide) : null; if (a1 !== null) best = { x0: x1, ang: a1 }; }
     if (fresh && blLineOf(s) !== 'pocket') why += ', ' + BL_LINES[blLineOf(s)].n.toLowerCase();
     return Object.assign({ x0: best.x0, ang: best.ang, ball: 'strike', aim: { x: target, y: BL_LANE.len }, why }, base);
   }

@@ -40,7 +40,7 @@ const BL_POW = {
   minotaur: [blP('bullball', 'Bull Ball', 'Head down through it: harder through the pins.', { carry: 1.12 }), blP('horned', 'Horned Aim', 'Lowers its horns at the pin: the miss a fifth smaller.', { err: .8 })],
   troll: [blP('boulder', 'Boulder', 'A cannonball: it drives a quarter harder, and costs a third more arm.', { carry: 1.25, arm: 1.3 }), blP('mossy', 'Mossy Touch', 'Moss on the fingers: the miss a quarter smaller.', { err: .75 })],
   golem: [blP('stoneball', 'Stone Ball', 'A thrown rock: a fifth harder through the pins.', { carry: 1.2 }), blP('granite', 'Granite', 'Unmoving: no pressure on it, and truer.', { nerve: 1, err: .85 })],
-  harpy: [blP('gust', 'Gust', 'A gust over the deck: every pin left standing beside one that fell may go.', { wobble: .3 }), blP('talon', 'Talon', 'Plucked and placed: the miss a third smaller.', { err: .7 })],
+  harpy: [blP('gust', 'Gust', 'A gust over the deck: every pin left standing beside one that fell may go.', { wobble: .18 }), blP('talon', 'Talon', 'Plucked and placed: the miss a third smaller.', { err: .7 })],
   elf: [blP('arrowline', 'Arrow Line', 'Like an arrow: the miss much smaller.', { err: .6 }), blP('elveneye', 'Elven Eye', 'Sees every board: the miss a third smaller.', { err: .65 })],
   wraith: [blP('ghostball', 'Ghost Ball', 'A light ball passes through the headpin like smoke, and the pin falls as if it had been hit in the pocket.', { ghost: 1 }), blP('coldhand', 'Cold Hand', 'Nothing to lose: no pressure on it, and truer.', { nerve: 1, err: .85 })],
   vampire: [blP('drain', 'Drain', 'Drinks the other side\'s gallery: 20 of their roar, now.', null, null, { drain: 20 }), blP('bloodread', 'Blood Read', 'Smells the line: the miss a quarter smaller.', { err: .75 })],
@@ -49,7 +49,7 @@ const BL_POW = {
   gorgon: [blP('serpent', 'Serpent Line', 'Snakes to the pocket: the miss a fifth smaller.', { err: .8 }), blP('stare', 'Stare', 'A curse: the front pin of their next rack turns to stone.', null, { stone: 1 })],
   spider: [blP('silkline', 'Silk Line', 'On a thread: the miss a fifth smaller.', { err: .8 }), blP('gutterweb', 'Gutter Web', 'A web in the gutters: a gutter ball is caught and set back on the lane, and the miss is smaller.', { web: 1, err: .9 })],
   skeleton: [blP('rattle', 'Rattle', 'The pins rattle: one left beside a fallen one may go.', { wobble: .2 }), blP('bonedry', 'Bone Dry', 'A dry, true ball: the miss a fifth smaller.', { err: .8 })],
-  witch: [blP('broom', 'Broomstick', 'A broom\'s twist: more hook.', { hook: 1.12 }), blP('hex', 'Hex', 'A curse: the oil plays heavy for their next ball, and it skids long.', null, { skid: 1.35 })],
+  witch: [blP('broom', 'Broomstick', 'A broom\'s twist: more hook.', { hook: 1.12 }), blP('hex', 'Hex', 'A curse: the oil plays heavy for their next ball, and it skids long.', null, { skid: 1.06 })],
 };
 // the second of each, picked on the Lanes tab: [strike, spare]
 const BL_POW2 = {
@@ -63,7 +63,7 @@ const BL_POW2 = {
   golem: [blP('monoroll', 'Monolith Roll', 'It barely deflects, and drives on through.', { nodefl: 1 }), blP('unmoved', 'Unmoved', 'No pressure on it.', { nerve: 1 })],
   harpy: [blP('shriek', 'Shriek', 'A curse: a shriek as they release (a wilder miss).', null, { err: 1.3 }), blP('feather', 'Feather', 'The miss a fifth smaller.', { err: .8 })],
   elf: [blP('leafcurve', 'Leaf Curve', 'A late, sweeping hook, and truer.', { hook: 1.12, err: .9 }), blP('starlight', 'Starlight', 'The miss a third smaller.', { err: .7 })],
-  wraith: [blP('fade', 'Fade', 'The miss a fifth smaller.', { err: .8 }), blP('chill', 'Chill', 'A curse: a chill on their next ball (wilder, and the oil plays heavier).', null, { err: 1.2, skid: 1.15 })],
+  wraith: [blP('fade', 'Fade', 'The miss a fifth smaller.', { err: .8 }), blP('chill', 'Chill', 'A curse: a chill on their next ball (wilder, and the oil plays heavier).', null, { err: 1.15, skid: 1.03 })],
   vampire: [blP('batflight', 'Bat Flight', 'More hook, and a little harder.', { hook: 1.1, carry: 1.05 }), blP('thirst', 'Thirst', 'The miss a fifth smaller.', { err: .8 })],
   lich: [blP('wither', 'Wither', 'A curse: their next ball withers (a wilder miss).', null, { err: 1.3 }), blP('boneread', 'Bone Read', 'The miss a quarter smaller.', { err: .75 })],
   zombie: [blP('rotroll', 'Rot Roll', 'Slow and steady: a little truer, and half the arm spent.', { err: .9, arm: .5 }), blP('groan', 'Groan', 'The miss a little smaller.', { err: .85 })],
@@ -92,7 +92,7 @@ const BL_ULT = {
   gorgon: blU('medusa', 'Medusa', 'Her gaze lies on the deck: the front pin of every rack they face this frame turns to stone.', null, { stone: 1 }),
   spider: blU('greatweb', 'Great Web', 'Webs in every gutter this frame: yours come back, and your balls are truer.', { web: 1, err: .85 }),
   skeleton: blU('bonepile', 'Bone Pile', 'Bones on the deck: their balls this frame carry less, and go wilder.', null, { carry: .85, err: 1.15 }),
-  witch: blU('coven', 'Coven', 'Thirteen witches over the oil: it plays heavy for them this frame, and your balls are truer.', { err: .9 }, { skid: 1.3 }),
+  witch: blU('coven', 'Coven', 'Thirteen witches over the oil: it plays heavy for them this frame, and your balls are truer.', { err: .9 }, { skid: 1.06 }),
 };
 // situation powers: the team's, once a game each, for mana
 const BL_SIT = {

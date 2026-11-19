@@ -101,7 +101,7 @@ function blGuide() {
 // and the meter falls quicker under pressure
 function blMeterFor(s) {
   const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, fx = blFxFor(s), pr = fx.nerve ? 0 : blPressure(s) * blKitPress(s, ri);
-  const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
+  const win = BL_METER.win / Math.sqrt(blRateErr(r, spare)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
   const tm = BL_STANCE[blStanceOf(s).tempo].meter;
   return { win: +(win / blCallErr(s) / fx.err / blKitErr(s, ri)).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
 }

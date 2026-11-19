@@ -36,7 +36,7 @@ BL_ULT.behemoth = blU('quakebl', 'Great Quake', 'The lanes heave under the other
 BL_KIND.djinn = [6, 8, 10, 11, 8, 10];
 BL_POW.djinn = [blP('wishbl', 'Wish Ball', 'It goes where it was wished: the miss much smaller.', { err: .6 }),
   blP('grantedbl', 'Granted', 'The spare is granted: the miss halved.', { err: .5 })];
-BL_POW2.djinn = [blP('miragebl', 'Mirage', 'A curse: a mirage of oil over their next ball (wilder, and it skids long).', null, { err: 1.2, skid: 1.15 }),
+BL_POW2.djinn = [blP('miragebl', 'Mirage', 'A curse: a mirage of oil over their next ball (wilder, and it skids long).', null, { err: 1.15, skid: 1.02 }),
   blP('smokebl', 'Smoke Hand', 'The ball floats off a hand of smoke: no pressure on it, and truer.', { nerve: 1, err: .8 })];
 BL_ULT.djinn = blU('wishesbl', 'Three Wishes', 'Three wishes this frame: every ball truer, steadier, and driving harder.', { err: .8, nerve: 1, carry: 1.08 });
 
@@ -53,6 +53,6 @@ BL_ULT.hydra = blU('regrowbl', 'Regrow', 'Cut one head off and two grow back: yo
 BL_KIND.frostwyrm = [10, 7, 8, 8, 9, 8];
 BL_POW.frostwyrm = [blP('glacierbl', 'Glacier Ball', 'A ball of ice: it drives a sixth harder and barely deflects.', { carry: 1.15, nodefl: 1 }),
   blP('coldbl', 'Cold Blood', 'No pressure on it, and truer.', { nerve: 1, err: .85 })];
-BL_POW2.frostwyrm = [blP('icedbl', 'Iced Lane', 'A curse: the oil freezes slick for their next ball, and it skids long.', null, { skid: 1.35 }),
+BL_POW2.frostwyrm = [blP('icedbl', 'Iced Lane', 'A curse: the oil freezes slick for their next ball, and it skids long.', null, { skid: 1.04 }),
   blP('frostwingbl', 'Frost Wing', 'A breath of cold air steadies the ball: the miss a third smaller.', { err: .7 })];
-BL_ULT.frostwyrm = blU('whiteoutbl', 'Whiteout', 'A blizzard over the lanes for the other side: their balls this frame a third wilder, and they skid long.', null, { err: 1.3, skid: 1.15 });
+BL_ULT.frostwyrm = blU('whiteoutbl', 'Whiteout', 'A blizzard over the lanes for the other side: their balls this frame a third wilder, and they skid long.', null, { err: 1.25, skid: 1.04 });

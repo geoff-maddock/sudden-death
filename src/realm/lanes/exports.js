@@ -55,7 +55,7 @@ return {
   deck: (st, b, seed, spots) => blDeck(st, b, seed, spots), groups: st => blGroups(st), spareTarget: p => blSpareTarget(p), style: () => blStyle(),
   plan: s => G && G.oil ? blPlan(s) : null, start: o => { blStart(o); blPlayStart(o); return G; }, turn: () => blTurn(), summary: () => blSummary(), simGame: o => blSimGame(o),
   // ratings, the order's roles, arm and nerve (phase 3)
-  stats: BL_STATS.slice(), rate: k => blRate(k), cap: BL_RCAP, roles: BL_ROLES.slice(), fit: (r, role) => blFit(r, role), armRules: Object.assign({}, BL_ARM),
+  stats: BL_STATS.slice(), rate: k => blRate(k), cap: BL_RCAP, roles: BL_ROLES.slice(), fit: (r, role) => blFit(r, role), armRules: Object.assign({}, BL_ARM), reach: BL_REACH, skillRules: BL_SKILL, lineRules: BL_LINES,
   autoOrder: ro => blAutoOrder(ro.map(m => ({ rs: Object.fromEntries(BL_STATS.map(k => [k, blScale((m.r || blRate(m.kind))[k])])) }))),
   get arm() { return G && G.arm ? G.arm.map(a => a.slice()) : null; }, pressure: s => G && G.arm ? blPressure(s) : 0,
   // the call and the read (phase 4)

@@ -86,9 +86,9 @@ async def main():
             return { avg: A.reduce((a, b) => a + b, 0) / A.length, strike: st.strikes / st.firsts, single: st.singles / st.singleTries, sevenTen: [st.sevenTenMade, st.sevenTen], top: singles[0] && singles[0][0], wins, ro: st.ro }; };
           return { kk: sum([1, 1], 100, 3000), sk: sum([0, 1], 50, 4000), ka: sum([1, 2], 50, 5000) }; })()""")
         kk = lab['kk']
-        check(180 <= kk['avg'] <= 210 and .35 <= kk['strike'] <= .48, 'Knight against Knight: games of about 190, with 35 to 48% strikes', kk)
+        check(180 <= kk['avg'] <= 210 and .35 <= kk['strike'] <= .52, 'Knight against Knight: games of about 195, with 35 to 52% strikes (the phase 10 lab moved the pocket line onto the lane\'s best stand)', kk)
         check(kk['single'] >= .85 and kk['sevenTen'][0] <= max(1, kk['sevenTen'][1] // 50) and kk['top'] == '10', 'most single-pin spares are made, the 7-10 almost never, and the 10-pin is the most common single-pin leave', kk)
-        check(lab['sk']['wins'][1] >= 38 and lab['ka']['wins'][1] >= 32, 'Knights beat Squires, and Archmages beat Knights', [lab['sk']['wins'], lab['ka']['wins']])
+        check(lab['sk']['wins'][1] >= 31 and lab['ka']['wins'][1] >= 32, 'Knights beat Squires (about 3 in 4 since the phase 10 lab), and Archmages beat Knights', [lab['sk']['wins'], lab['ka']['wins']])
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()

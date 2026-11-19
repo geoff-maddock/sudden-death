@@ -1,7 +1,8 @@
 /* w120: the Gutter Cup, and league fixtures at the Saltmere Lanes on the lanes (issue #100, phase 9), as w110 is golf's.
    The Gutter Cup is bowling's own cup: every week at the Saltmere Lanes (ask Moll Gutter about the CUP, or use the button
    on the Lanes tab or the match card). Eight fives in a bracket: you, rival clubs and the regions' own sides. Three
-   rounds, each one harder (the tier, so their level and how well they bowl, goes up with the round). The quarter- and
+   rounds: a weaker side in the quarter-final, then sides at your own level (the tier: their level and how well they
+   bowl), the final best of three (the phase 10 lab: at tier 3 a best of three was won 8% of the time). The quarter- and
    semi-finals are one team game; the final is best of three games. You bowl your own games (Play, Manage or Simulate,
    as any bowling match) and the rest of each round is simulated on the same engine once yours is done. Nobody goes home
    level: a roll-off. Lose and you're out; the rest of the bracket is played to a champion. Win the final and Moll hands
@@ -28,7 +29,7 @@
 
 const W_GUTTER = {
   fee: 40, size: 8,
-  tiers: [1, 2, 3],               // the tier of each round: they bowl like a Squire, a Knight, an Archmage
+  tiers: [1, 2, 2],               // the tier of each round: they bowl like a Squire, then a Knight (the final is best of three)
   rounds: ['Quarter-final', 'Semi-final', 'Final'],
   bestOf: [1, 1, 3],
   prize: { gold: 150, fans: 20, pick: 3 },
@@ -102,8 +103,9 @@ function wLanesSimClubs(a, b, tier, games) {
   const one = games > 1 ? null : gs[0];
   return { ra: one ? one[0] : wa, rb: one ? one[1] : wb, w: wa > wb ? a : b, end: one && ro ? 'ro' : '', gs };
 }
-function wGutterSim(a, b, tier) {
-  const r = W_GUTTER.tiers.indexOf(tier), n = wGutterBest(r < 0 ? 0 : r), s = wLanesSimClubs(a, b, tier, n);
+// (the round is the bracket's own, as it plays the round out: two rounds share a tier, so the tier can't say which)
+function wGutterSim(a, b, tier, round) {
+  const D = wGutter(), r = round != null ? round : D && !D.done ? D.round : 0, n = wGutterBest(r), s = wLanesSimClubs(a, b, tier, n);
   return Object.assign({ a, b, ra: s.ra, rb: s.rb, w: s.w, end: s.end }, n > 1 ? { gs: s.gs } : {});
 }
 function wGutterWon() {
@@ -130,7 +132,7 @@ function wOpenGutter(msg) {
   const D = wGutter(), on = wGutterOn(), probs = wGutterProblems(), opp = on && wGutterMine(), live = wGutterLive();
   let body;
   if (!on) {
-    body = `<p>Eight fives, three rounds: the quarter-finals and the semi-finals are one team game each, and the final is best of three. Rival clubs and the regions' own sides enter. Each round is harder than the last. Lose once and you're out; nobody goes home level, so a tied game goes to a roll-off.</p>
+    body = `<p>Eight fives, three rounds: the quarter-finals and the semi-finals are one team game each, and the final is best of three. Rival clubs and the regions' own sides enter. A weaker side in the quarter-final, then sides at your own level, and they bring their best to the final. Lose once and you're out; nobody goes home level, so a tied game goes to a roll-off.</p>
       <p class="hint">Entry ${W_GUTTER.fee} gold. Win it and Moll hands over her Gutter Cup for the week: ${W_GUTTER.prize.gold} gold, ${W_GUTTER.prize.fans} fans, a pick of ${W_GUTTER.prize.pick} cards, a piece of bowling gear and a place on the Wall of Awards. Every game also pays as a bowling match does. One cup a week.${WG.lncupWins ? ` You have won it ${WG.lncupWins} time${WG.lncupWins === 1 ? '' : 's'}.` : ''}</p>
       ${D && D.done ? `<h5>Last week's bracket</h5>${wGutterBracket()}` : ''}
       ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}
@@ -239,5 +241,5 @@ const wW120RenderHelp = renderHelp;
 renderHelp = function () {
   wW120RenderHelp();
   const g = $('wHelpLanesStars') || $('wHelpLanesKit') || $('wHelpLanesGame'); if (!g || $('wHelpLanesCup')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesCup"><b>The Gutter Cup.</b> Bowling's cup, every week at the Saltmere Lanes: ask Moll Gutter about the CUP, or use the Gutter Cup button on the Lanes tab. ${W_GUTTER.fee} gold to enter. Eight fives in a bracket, three rounds, each harder than the last: one team game in the quarter- and semi-finals, and the final best of three. You bowl your own games and the rest are played out once yours is done. Nobody goes home level: a roll-off settles a tied game. Lose and you're out. Win the final and Moll hands over the Gutter Cup for the week: ${W_GUTTER.prize.gold} gold, ${W_GUTTER.prize.fans} fans, a pick of cards, a piece of bowling gear and a place on the Wall of Awards. League fixtures at the Saltmere Lanes are bowling matches too: Play, Manage or Simulate, and a win is two points on the table.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesCup"><b>The Gutter Cup.</b> Bowling's cup, every week at the Saltmere Lanes: ask Moll Gutter about the CUP, or use the Gutter Cup button on the Lanes tab. ${W_GUTTER.fee} gold to enter. Eight fives in a bracket, three rounds, a weaker side first and then sides at your own level: one team game in the quarter- and semi-finals, and the final best of three. You bowl your own games and the rest are played out once yours is done. Nobody goes home level: a roll-off settles a tied game. Lose and you're out. Win the final and Moll hands over the Gutter Cup for the week: ${W_GUTTER.prize.gold} gold, ${W_GUTTER.prize.fans} fans, a pick of cards, a piece of bowling gear and a place on the Wall of Awards. League fixtures at the Saltmere Lanes are bowling matches too: Play, Manage or Simulate, and a win is two points on the table.</p>`);
 };

@@ -39,7 +39,7 @@ function blStart(opts) {
     line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
     word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }],
     pst: teams.map(T => T.roster.map(() => ({ frames: 0, balls: 0, strikes: 0, spares: 0, pins: 0, splits: 0 }))) });
-  G.streak = [0, 0];
+  G.streak = [0, 0]; G.fix = Array.isArray(o.fix) ? o.fix.map(f => f || null) : null;
   blHallStart(o);
   blPowersStart(o);
   blKitStart(o.bags);
@@ -62,7 +62,7 @@ function blBowlBall(s, plan, rel) {
   const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid }), G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
-  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1) * (blGxOf(s, ri).carry || 1);
+  const mass = BL_PIN.mBall * (1 + BL_REACH.pow * (blRat(s, ri).pow - .5) + BL_REACH.rev * (blRat(s, ri).rev - .5)) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1) * (blGxOf(s, ri).carry || 1);
   const front = stand.slice().sort((a, b) => BL_SPOT[a][1] - BL_SPOT[b][1] || Math.abs(BL_SPOT[a][0]) - Math.abs(BL_SPOT[b][0]))[0];
   const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
   // a wobble (a harpy's Gust): a pin left standing beside one that fell may go
@@ -110,7 +110,7 @@ function blCount(s, stand, first, ball, roll) {
 function blSummary() {
   if (!G) return null;
   return { over: G.over, pst: JSON.parse(JSON.stringify(G.pst || [[], []])), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })), order: G.order.map(o => o.slice()), tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
-    marks: [blMarks(0), blMarks(1)], st: JSON.parse(JSON.stringify(G.st)), skill: G.skill.slice(), tide: G.tide, balls: G.n };
+    marks: [blMarks(0), blMarks(1)], st: JSON.parse(JSON.stringify(G.st)), skill: G.skill.slice(), tide: G.tide, balls: G.n, casts: JSON.parse(JSON.stringify(G.casts || [])), pots: JSON.parse(JSON.stringify(G.pots || [])) };
 }
 // a whole game headless: leaves the game on the lanes (and the engine's random stream) as they were
 function blSimGame(opts) {

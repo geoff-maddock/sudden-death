@@ -29,8 +29,8 @@
 
 const W_LNG = {
   minOwn: 2, xp: 12, gold: 15, fans: 3, lossShare: .25, benchShare: .5, mvpXp: 5,
-  // extra rating points for each of their five, by tier; first guesses until the lab measures them (phase 10)
-  oppBonus: { 1: 2, 2: 4, 3: 7 },
+  // extra rating points for each of their five, by tier (measured in phase 10: docs/realm/BALANCE.md)
+  oppBonus: { 1: 1, 2: 1, 3: 1 },
   minutes: 120, keep: 10, saveMs: 12000,
 };
 const W_LNG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
