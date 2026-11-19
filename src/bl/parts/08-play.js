@@ -17,7 +17,7 @@
    In Watch the CPU bowls both sides. GP.msg is the last thing that happened, said plainly. BL_HOOK's onPhase, onPick
    and onOver hear a new beat, a change to your ball and the end. */
 const BL_METER = { rise: .95, top: 1.1, fall: 1.25, low: -.22, win: .045, pwin: .6, inDeg: .14, outDeg: 2.6 };
-const BL_PACE = { addr: .8, rest: 1.1, strike: 1.8, lane: 2.3, over: 2.5 };
+const BL_PACE = { addr: .8, rest: 1.1, mark: 1.9, strike: 2.3, lane: 2.3, over: 2.6 };
 const BL_REVS = { less: .8, normal: 1, more: 1.2 };
 const BL_HANDS = { drag: 220, dragDeg: 10, bend: 14 };
 const BL_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
@@ -209,7 +209,9 @@ function blAnimDone() {
   const over = !!G.over, R = GP.last && GP.last.roll;
   GP.msg = GP.said || GP.msg;
   blTrackKeep();
-  blGo('rest', over ? BL_PACE.over : R && R.strike ? BL_PACE.strike : BL_PACE.rest);
+  // Moll's glass plays a cartoon of a mark (15-screen.js): a strike's longest, a spare, a split or the gutter a little less
+  const mark = R && (R.spare || R.split || (GP.last.ball && GP.last.ball.gutter != null));
+  blGo('rest', over ? BL_PACE.over : R && R.strike ? BL_PACE.strike : mark ? BL_PACE.mark : BL_PACE.rest);
   if (over && BL_HOOK.onOver) try { BL_HOOK.onOver(blSummary()); } catch (e) { console.error(e); }
 }
 // Manage: your captain bowls your side by your call (GP.mgr: the line, the tempo and the ball, each 'auto' for the

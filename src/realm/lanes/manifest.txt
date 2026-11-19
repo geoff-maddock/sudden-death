@@ -1,5 +1,7 @@
 # The Realm's lanes scope: ./build.sh src/realm/manifest.txt takes this through `scope wBL ...`.
-# The engine's parts first (they don't touch the page); its page in the Realm comes with phase 2, and the superstars'
-# bowling kinds with phase 8, as golf's did.
+# The engine's parts first (they don't touch the page), then the superstars' bowling kinds and powers (phase 8) and
+# their figures (the file every engine's scope loads), then its page in the Realm: a canvas in #v-lanes.
 include src/bl/manifest.txt
+src/realm/lanes/p0-stars.js
+src/realm/stars/s1-figures.js
 src/realm/lanes/n1-page.js

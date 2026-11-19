@@ -1,6 +1,8 @@
 # The Saltmere Lanes, the bowling engine at the Saltmere Lanes (issue #100). Its parts, in load order. The Realm takes
 # them inside a scope (src/realm/lanes/manifest.txt, through `scope wBL ...`), so none of their names reach the page.
 src/scoped/util.js
+# the players, drawn (the four scoped engines' one file): the bowler at the foul line is their own kind
+src/figures/figures.js
 src/bl/parts/02-rules.js
 src/bl/parts/03-lane.js
 src/bl/parts/04-ball.js
@@ -14,3 +16,4 @@ src/bl/parts/11-call.js
 src/bl/parts/12-hall.js
 src/bl/parts/13-powers.js
 src/bl/parts/14-kit.js
+src/bl/parts/15-screen.js

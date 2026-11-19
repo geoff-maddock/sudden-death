@@ -35,7 +35,11 @@
    (yours, while you set up), cpuPower(s), fxFor(s), tip(s); autoPow (Manage). A roster bowler may bring pw.
    Phase 7 is gear and potions: a roster bowler may bring gear ({ id, name, fx }); start({ bags: [bag | null, bag |
    null] }); potions (the table), potionWhy(id, ri), potion(id, ri) (yours), advice(bag, ri), cpuPotion(s), pots, bags,
-   still, chalk, kitRules. */
+   still, chalk, kitRules.
+   Phase 8 is the superstars (p0-stars.js: their kinds in rate, pow, pow2 and ult) and the look: the bowler drawn as
+   their own kind (atLine(): who is at the foul line and how, or null), the hall's fantasy dressing, and Moll's glass
+   (screen(): the cartoon for the last ball, { k, text, n, left }, or null; screenRules). render(dt) moves the
+   drawing's clock on by dt. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -79,7 +83,10 @@ return {
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
   drag: (pull, deg) => blDrag(pull, deg), guide: () => blGuide(), swingNums: () => blSwingNums(), scr: (x, y) => blScr(x, y), unscr: (sx, sy) => blUnscr(sx, sy), ovScr: (x, y) => [blOvX(x), blOvY(y)],
   get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
+  // the look (phase 8)
+  screen: () => GP && GP.last && GP.anim ? blScreenFor(GP.last, GP.anim.s, GP.anim.before) : null, screenRules: JSON.parse(JSON.stringify(BL_SCREEN)),
+  atLine: () => { const B = blBowlerNow(); return B ? Object.assign({}, B, { kind: (G.teams[B.s].roster[B.ri] || {}).kind }) : null; },
   set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; }, get onPhase() { return BL_HOOK.onPhase; }, get onPick() { return BL_HOOK.onPick; }, get onOver() { return BL_HOOK.onOver; },
-  show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: () => blRender(0),
+  show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: dt => blRender(dt || 0),
   pause: on => { BLP.paused = !!on; }, get paused() { return BLP.paused; }, get speed() { return BLP.speed; }, set speed(n) { BLP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };

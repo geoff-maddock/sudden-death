@@ -9,7 +9,7 @@
    Drawing only: nothing here is in the game's state. blScr and blUnscr map the lane to the picture and back (the tests
    and the pointer use them). */
 const BL_VIEW = { cx: 320, hor: 110, base: 585, px: 6.5, d0: 160, ovX: 668, ovW: 64, ovTop: 36, ovBot: 576 };
-const BLC = { camY: -40, tracks: [[], []], flash: 0 };
+const BLC = { camY: -40, tracks: [[], []], flash: 0, t: 0, scr: null, scrFor: null };
 
 // the camera's place down the lane: at the foul line while you set up, following the ball, then over the deck
 function blCamTarget() {
@@ -57,15 +57,43 @@ function blBallDraw(c, x, y, col) {
   const g = c.createRadialGradient(sx - r * .35, sy - r * 1.35, r * .1, sx, sy - r, r * 1.05); g.addColorStop(0, '#fff'); g.addColorStop(.25, col || '#3a5a9a'); g.addColorStop(1, '#0d0a14');
   c.fillStyle = g; c.beginPath(); c.arc(sx, sy - r, r, 0, Math.PI * 2); c.fill(); c.restore();
 }
-// the bowler at the foul line: their side's colour, the arm swinging with the meter
-function blBowlerDraw(c, x, col) {
-  const [sx, sy, s] = blScr(x, -26), k = s * BL_VIEW.px * .8, M = GP && GP.meter;
-  const arm = M ? (M.st === 'up' ? -M.v * 2.4 : M.st === 'down' ? (M.v - .2) * 2.4 : 0) : 0;
-  c.save(); c.translate(sx, sy); c.strokeStyle = '#1d140f'; c.lineWidth = Math.max(1, k * .9); c.lineCap = 'round';
-  c.beginPath(); c.moveTo(-k * 2, 0); c.lineTo(-k * .6, -k * 9); c.moveTo(k * 2.2, 0); c.lineTo(k * .6, -k * 9); c.stroke();
-  c.fillStyle = col; c.beginPath(); c.ellipse(0, -k * 13, k * 3.4, k * 5, 0, 0, Math.PI * 2); c.fill();
-  c.fillStyle = '#e3c6a0'; c.beginPath(); c.arc(0, -k * 20, k * 2.4, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = col; c.lineWidth = Math.max(1, k * 1.4); c.beginPath(); c.moveTo(-k * 2.6, -k * 15); c.lineTo(-k * 2.6 + Math.sin(arm) * k * 8, -k * 15 + Math.cos(arm) * k * 8); c.stroke();
+// the clock the figures animate on (src/figures/figures.js asks every engine for one)
+function figClock() { return BLC.t; }
+/* the bowler at the foul line, drawn as their own kind (the figures every scoped engine shares), in their side's
+   colours and side on, the throwing arm a pendulum: th 0 hangs straight down, back is negative, forward positive.
+   While you swing, the meter drives it; a CPU bowler (and your captain) swings through the address; after the release
+   the bowler holds the follow-through and slides, until the camera leaves them behind */
+function blBowlerPose(th, slide, hold) {
+  const L = 31, sh = { x: 15, y: -67 };
+  const hand = hold ? { x: sh.x + 8, y: sh.y + 16 } : { x: sh.x + Math.sin(th) * L, y: sh.y + Math.cos(th) * L };
+  return { armR: hand, armL: hold ? { x: sh.x + 4, y: sh.y + 22 } : { x: -26 - slide * 6, y: -60 + slide * 8 },
+    legL: { a: -.75 * slide, lift: .15 * slide }, legR: { a: .5 * slide, lift: 0 }, lean: .28 * slide, drop: 6 * slide, ball: false };
+}
+function blBowlerNow() {
+  const P = GP && GP.ph; if (!P) return null;
+  if (P === 'addr' && GP.cpu) { const u = clamp(GP.t / BL_PACE.addr, 0, 1), th = u < .55 ? -1.9 * Math.sin(u / .55 * Math.PI / 2) : -1.9 + (u - .55) / .45 * 1.9;
+    return { s: GP.cpu.s, ri: blBowler(GP.cpu.s), x: GP.cpu.plan.x0, th, slide: clamp((u - .45) / .55, 0, 1), ball: true }; }
+  if (P === 'aim' && GP.sel) return { s: GP.you, ri: blBowler(GP.you), x: blBoardX(GP.sel.stand), hold: true, ball: true };
+  if (P === 'swing' && GP.sel) { const M = GP.meter || {}, gone = M.st === 'gone', th = gone ? 1.3 : clamp(-(M.v || 0) * 1.9, -2.1, 1.3);
+    return { s: GP.you, ri: blBowler(GP.you), x: blBoardX(GP.sel.stand), th, slide: M.st === 'down' ? clamp(1 - (M.v || 0), 0, 1) : gone ? 1 : 0, ball: !gone }; }
+  if (P === 'roll' && GP.anim && GP.last && GP.anim.path.length) return { s: GP.anim.s, ri: GP.last.ri, x: GP.anim.path[0][0], th: 1.3, slide: 1, ball: false };
+  return null;
+}
+function blBowlerDraw(c) {
+  const B = blBowlerNow(); if (!B || !G.teams[B.s]) return;
+  const T = G.teams[B.s], m = T.roster[B.ri] || {}, st = blStyleOf(B.s, B.ri), flip = st.hand < 0;
+  const [sx, sy, s] = blScr(B.x, -26); if (sy > 760) return;
+  const hpx = s * BL_VIEW.px * 19, kind = KIND[m.kind] ? m.kind : 'goblin', K = KIND[kind], k = hpx * K.h / 100;
+  const pose = blBowlerPose(B.th || 0, B.slide || 0, !!B.hold), team = { color: T.color || '#888', light: T.light || '#f2ead8', short: T.short || T.name || '?' };
+  c.save();
+  drawFig(c, kind, sx, sy, hpx, team, { pose, flip, num: B.ri + 1, bare: true });
+  if (B.ball) {
+    // the ball in the hand: the pose's hand, leaned with the body, in the picture
+    const hipY = -36, a = pose.lean, hx = pose.armR.x, hy = pose.armR.y - hipY, lx = hx * Math.cos(a) - hy * Math.sin(a), ly = hx * Math.sin(a) + hy * Math.cos(a) + hipY + pose.drop;
+    const bx = sx + (flip ? -1 : 1) * lx * k, by = sy + (ly + 4) * k, r = 7.4 * k;
+    const g = c.createRadialGradient(bx - r * .35, by - r * .35, r * .1, bx, by, r); g.addColorStop(0, '#fff'); g.addColorStop(.3, T.color || '#3a5a9a'); g.addColorStop(1, '#0d0a14');
+    c.fillStyle = g; c.strokeStyle = '#17100e'; c.lineWidth = Math.max(1, k * 1.2); c.beginPath(); c.arc(bx, by, r, 0, Math.PI * 2); c.fill(); c.stroke();
+  }
   c.restore();
 }
 function blMeterDraw(c) {
@@ -104,6 +132,67 @@ function blLaneDraw(c) {
     if (s > .05) { c.beginPath(); c.moveTo(ax, ay - h); c.lineTo(ax - w, ay + h * .3); c.lineTo(ax + w, ay + h * .3); c.fill(); }
     const [dx, dy, s2] = blScr(x, 84); if (s2 > .05 && b % 10 === 5) { c.beginPath(); c.arc(dx, dy, .9 * s2 * BL_VIEW.px, 0, Math.PI * 2); c.fill(); }
   }
+  c.restore();
+}
+/* the Saltmere Lanes' fantasy hall, around a lane that still reads as a lane: brine in the gutters (it ripples), witch-
+   light lanterns along the kickbacks, the arrows glowing faintly like runes, a carved sea-serpent masking panel over the
+   pit with the lane's number in it, a rune circle on the approach, and motes of light drifting in the air. Pure
+   decoration, timed on BLC.t */
+const BL_HALLART = { lamps: [40, 220, 400, 580], lampH: 34, mask: 34, motes: 16 };
+function blHallBack(c) {
+  // the far wall over the pit: dark timbers and a net of hanging lights
+  const L = BL_LANE, [lx, ly, s] = blScr(L.kick + 30, L.pit + 8), [rx] = blScr(-L.kick - 30, L.pit + 8);
+  if (s < .02) return;
+  c.save(); c.fillStyle = '#1a2226'; c.fillRect(0, 0, 640, ly);
+  c.strokeStyle = 'rgba(80,60,40,.5)'; c.lineWidth = 2; for (let x = -40; x < 680; x += 64) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x + 20, ly); c.stroke(); }
+  for (let i = 0; i < 9; i++) { const x = 40 + i * 70, y = 26 + (i % 3) * 14 + Math.sin(BLC.t * 1.3 + i) * 2, f = .6 + .4 * Math.sin(BLC.t * 3 + i * 2);
+    c.strokeStyle = 'rgba(40,30,25,.8)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, y); c.stroke();
+    const g = c.createRadialGradient(x, y + 4, 1, x, y + 4, 16); g.addColorStop(0, `rgba(140,255,220,${.55 * f})`); g.addColorStop(1, 'rgba(140,255,220,0)'); c.fillStyle = g; c.beginPath(); c.arc(x, y + 4, 16, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#bff8e6'; c.fillRect(x - 2, y, 4, 7); }
+  c.restore();
+  void lx; void rx;
+}
+function blHallArt(c) {
+  const L = BL_LANE, t = BLC.t, y0 = Math.max(-60, BLC.camY - BL_VIEW.d0 * .7), yEnd = L.len + 40;
+  c.save();
+  // brine in the gutters: dark sea-green, with ripples running toward the pins
+  for (const side of [1, -1]) {
+    const xa = side * L.edge, xb = side * (L.edge + L.gutter), q = (x, y) => blScr(x, y).slice(0, 2);
+    blPoly(c, [q(xa, y0), q(xb, y0), q(xb, yEnd), q(xa, yEnd)], 'rgba(28,74,80,.85)');
+    c.strokeStyle = 'rgba(150,230,225,.45)'; c.lineWidth = 1;
+    for (let k = 0; k < 16; k++) { const y = ((k * 52 + t * 48) % (yEnd - y0)) + y0, xm = side * (L.edge + L.gutter * (.3 + .4 * ((k * 7) % 3) / 2)), [a1, a2] = q(xm, y), [b1, b2] = q(xm, Math.min(yEnd, y + 16)); if (a2 - b2 < .5) continue; c.beginPath(); c.moveTo(a1, a2); c.lineTo(b1, b2); c.stroke(); }
+  }
+  // the arrows glow like runes
+  for (const b of [5, 10, 15, 20, 25, 30, 35]) { const [ax, ay, s] = blScr(blBoardX(b), L.arrows); if (s < .05) continue; const r = 7 * s * BL_VIEW.px * .5, f = .25 + .15 * Math.sin(t * 2 + b);
+    const g = c.createRadialGradient(ax, ay, 0, ax, ay, r * 2.4); g.addColorStop(0, `rgba(120,240,255,${f})`); g.addColorStop(1, 'rgba(120,240,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(ax, ay, r * 2.4, 0, Math.PI * 2); c.fill(); }
+  // a rune circle on the approach
+  if (y0 < -20) { const [cx, cy, s] = blScr(0, -40), rx = 12 * s * BL_VIEW.px, ry = rx * .28; c.strokeStyle = `rgba(120,240,255,${.25 + .1 * Math.sin(t * 1.7)})`; c.lineWidth = Math.max(1, s * 2); c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.ellipse(cx, cy, rx * .7, ry * .7, 0, 0, Math.PI * 2); c.stroke();
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + t * .2; c.fillStyle = 'rgba(120,240,255,.35)'; c.fillRect(cx + Math.cos(a) * rx * .85 - 1.5, cy + Math.sin(a) * ry * .85 - 1.5, 3, 3); } }
+  // the masking panel over the pit: a carved sea serpent along it, the lane's number in a glowing roundel
+  { const [lx, ly, s] = blScr(L.kick + 4, L.pit + 6), [rx] = blScr(-L.kick - 4, L.pit + 6), h = BL_HALLART.mask * s * BL_VIEW.px;
+    if (s > .02 && ly > 0) { c.fillStyle = '#20343a'; c.fillRect(lx, ly - h, rx - lx, h); c.fillStyle = '#5a3a22'; c.fillRect(lx, ly - h, rx - lx, Math.max(1, h * .1)); c.fillRect(lx, ly - Math.max(1, h * .08), rx - lx, Math.max(1, h * .08));
+      c.strokeStyle = '#3f8a7a'; c.lineWidth = Math.max(1, h * .09); c.beginPath(); const w = rx - lx;
+      for (let i = 0; i <= 40; i++) { const u = i / 40, x = lx + u * w, y = ly - h * .5 + Math.sin(u * Math.PI * 4 + t * .8) * h * .22; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+      const hx = lx + w * .97, hy = ly - h * .5 + Math.sin(Math.PI * 4 * .97 + t * .8) * h * .22; c.fillStyle = '#3f8a7a'; c.beginPath(); c.arc(hx, hy, h * .13, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ff6a4a'; c.fillRect(hx - 1, hy - 1, 2, 2);
+      const lane = (GP && GP.anim && GP.ph !== 'aim' && GP.ph !== 'swing' && GB ? GB.lane : blLane(Math.max(0, blUp()))) + 1, mx = (lx + rx) / 2, my = ly - h * .5;
+      c.fillStyle = '#12201f'; c.beginPath(); c.arc(mx, my, h * .32, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#c9a24a'; c.lineWidth = Math.max(1, h * .05); c.stroke();
+      c.fillStyle = '#9ff6e0'; c.font = `700 ${Math.max(6, Math.round(h * .36))}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(lane), mx, my + 1); c.textBaseline = 'alphabetic'; } }
+  // witch-light lanterns on posts along both kickbacks
+  for (const y of BL_HALLART.lamps) for (const side of [1, -1]) {
+    if (y < y0 + 4) continue;
+    const [px, py, s] = blScr(side * (L.kick + 2), y), h = BL_HALLART.lampH * s * BL_VIEW.px * .5; if (s < .03 || px < -40 || px > 680) continue;
+    const f = .7 + .3 * Math.sin(t * 7 + y + side) * Math.sin(t * 3.1 + y), w = Math.max(1, s * 3);
+    c.fillStyle = '#1a120d'; c.fillRect(px - w / 2, py - h, w, h);
+    const g = c.createRadialGradient(px, py - h, 0, px, py - h, h * .7); g.addColorStop(0, `rgba(150,255,200,${.5 * f})`); g.addColorStop(1, 'rgba(150,255,200,0)'); c.fillStyle = g; c.beginPath(); c.arc(px, py - h, h * .7, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#c9a24a'; c.fillRect(px - w * 1.6, py - h - w * 2.4, w * 3.2, w * 3.6); c.fillStyle = `rgba(200,255,220,${f})`; c.fillRect(px - w, py - h - w * 1.8, w * 2, w * 2.4);
+  }
+  c.restore();
+}
+// motes of witch-light drifting up through the hall
+function blMotes(c) {
+  const t = BLC.t; c.save();
+  for (let i = 0; i < BL_HALLART.motes; i++) { const x = (i * 131 + Math.sin(t * .5 + i) * 30) % 640, y = 600 - ((t * (12 + i % 5 * 4) + i * 97) % 640), a = .25 + .25 * Math.sin(t * 2 + i * 1.7);
+    c.fillStyle = `rgba(170,255,230,${a})`; c.fillRect(x, y, 2, 2); }
   c.restore();
 }
 function blGuideDraw(c) {
@@ -171,29 +260,26 @@ function blHudDraw(c) {
   if (G.powers) { c.font = '11px system-ui, sans-serif'; [0, 1].forEach(k => { c.fillStyle = 'rgba(15,10,8,.7)'; c.fillRect(244, 12 + k * 26, 104, 22); c.fillStyle = '#9fc6e8'; c.textAlign = 'left'; c.fillText(`mana ${G.mana[k]} · roar ${G.roar[k]}`, 250, 27 + k * 26); }); }
   if (G.powers && G.mark) { c.font = '600 12px system-ui, sans-serif'; c.fillStyle = '#e8b0ff'; c.textAlign = 'left'; c.fillText(`${G.mark.n} marks frame ${G.mark.f + 1} (${G.teams[G.mark.side].short || G.teams[G.mark.side].name})`, 18, 122); }
   if (G.tide && G.tide !== 'mid') { c.fillStyle = '#9fc6e8'; c.font = '12px system-ui, sans-serif'; c.fillText(G.tide === 'high' ? 'High tide: the lanes play heavy' : 'Low tide: the lanes play dry', 18, 104); }
-  // a strike, a spare, a split, said big
-  const R = GP && GP.last && GP.ph === 'rest' ? GP.last.roll : null;
-  if (R && (R.strike || R.spare || R.split)) { const w = R.strike ? (GP.streak[GP.last.side] >= 3 ? 'TURKEY!' : GP.streak[GP.last.side] === 2 ? 'DOUBLE!' : 'STRIKE!') : R.spare ? 'SPARE' : 'SPLIT';
-    c.font = '800 54px system-ui, sans-serif'; c.textAlign = 'center'; c.fillStyle = 'rgba(0,0,0,.45)'; c.fillText(w, 323, 263); c.fillStyle = R.split ? '#ff9a7a' : '#ffd34a'; c.fillText(w, 320, 260); }
   c.restore();
 }
 function blDraw(c, dt) {
   if (!G || !G.teams || !GP) { c.fillStyle = '#2e2420'; c.fillRect(0, 0, 960, 600); return; }
   // the camera eases toward where it should be
+  BLC.t += dt || 0;
   const want = blCamTarget(); BLC.camY += (want - BLC.camY) * Math.min(1, (dt || 0) * 5 + (dt ? 0 : 1));
   c.fillStyle = '#2e2420'; c.fillRect(0, 0, 960, 600);
   const g = c.createLinearGradient(0, 0, 0, BL_VIEW.hor + 40); g.addColorStop(0, '#120c09'); g.addColorStop(1, '#3a2a20'); c.fillStyle = g; c.fillRect(0, 0, 640, BL_VIEW.hor + 40);
   c.save(); c.beginPath(); c.rect(0, 0, 640, 600); c.clip();
-  blLaneDraw(c); blGuideDraw(c);
+  blHallBack(c); blLaneDraw(c); blHallArt(c); blGuideDraw(c);
   const s = blUp(), pins = blPinsNow(s >= 0 ? s : 0).slice().sort((a, b) => b[2] - a[2]);
   const A = GP.ph === 'roll' ? blAnimNow() : null, col = GP.anim ? G.teams[GP.anim.s].color : '#3a5a9a';
   // the ball goes in among the pins in depth order
   const items = pins.map(p => ({ y: p[2], f: () => blPinDraw(c, p[1], p[2], !!p[3], p[0] % 2 ? .45 : -.45) }));
   if (A && A.ball) items.push({ y: A.ball.y, f: () => blBallDraw(c, A.ball.x, A.ball.y, col) });
   items.sort((a, b) => b.y - a.y).forEach(i => i.f());
-  if (GP.ph === 'aim' || GP.ph === 'swing' || GP.ph === 'addr') { const who = GP.ph === 'addr' && GP.cpu ? GP.cpu.s : GP.you, x = GP.ph === 'addr' && GP.cpu ? GP.cpu.plan.x0 : GP.sel ? blBoardX(GP.sel.stand) : 0; blBowlerDraw(c, x, G.teams[who].color || '#888'); }
+  blBowlerDraw(c);
   blMeterDraw(c);
-  blHudDraw(c);
+  blHudDraw(c); blMotes(c); blScreenDraw(c);
   c.restore();
   blOverDraw(c); blRackDraw(c, s >= 0 ? s : 0);
 }

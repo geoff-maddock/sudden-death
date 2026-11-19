@@ -1,14 +1,14 @@
-/* The players, drawn: one file for the four scoped engines (issue #85). Boxing (src/bx), football (src/gf), basketball
-   (src/bk) and hockey (src/hk) each load this inside their own scope, so its names (KIND, BACK, HEAD, BODY, ink,
+/* The players, drawn: one file for the scoped engines (issue #85). Boxing (src/bx), football (src/gf), basketball
+   (src/bk), hockey (src/hk) and bowling (src/bl, issue #100) each load this inside their own scope, so its names (KIND, BACK, HEAD, BODY, ink,
    drawFig, ...) are that engine's own; it names no engine. It came from Brimstone Diamond's figures
    (src/bd/parts/14-rendering.js), which keeps its own.
    The animation clock is figClock(): seconds, a function each engine defines beside its drawing clock (BXT.t, GFT.t,
-   BKT.t, HKT.t).
+   BKT.t, HKT.t, BLC.t).
    drawFig(c, kind, x, y, hpx, team, o): an inked, cel-shaded player standing at (x, y), hpx tall, facing right (o.flip
    faces left); team { color, light, short }; o { num, run (a stride phase), flip, alpha, throwK (0..1, the throwing or
-   shooting arm), lift, noShadow, stone, pose, glove }. A pose moves the arms (armL, the rear hand, and armR, the
+   shooting arm), lift, noShadow, stone, pose, glove, bare }. A pose moves the arms (armL, the rear hand, and armR, the
    lead), the legs (legL, legR), and lean, shift, drop and scale. o.glove (boxing): gloves in that colour, and no mitt
-   or ember in the hands. What a player holds (a stick, a ball) is drawn by the engine. */
+   or ember in the hands; o.bare (bowling): no mitt on a pose's rear hand. What a player holds (a stick, a ball) is drawn by the engine. */
 const INK = '#17100e';
 const KIND = {
   goblin:   { skin: '#7fae4e', h: .8,  w: .9,  cap: true, eye: '#ffe04a' },
@@ -573,7 +573,7 @@ function drawFig(c, kind, x, y, hpx, team, o = {}) {
   // arms
   const swing = run ? sw * 7 : 0;
   if (pose && pose.armR) {
-    arm(c, -shw + 2, shY + 3, pose.armL.x, pose.armL.y, d, { mitt: !o.glove, glove: o.glove });
+    arm(c, -shw + 2, shY + 3, pose.armL.x, pose.armL.y, d, { mitt: !o.glove && !o.bare, glove: o.glove });
     if (pose.trailR && pose.trailR.length > 1 && !st) {
       c.save(); c.lineCap = 'round';
       for (let i = pose.trailR.length - 1; i > 0; i--) { const a = pose.trailR[i], b = pose.trailR[i - 1]; c.strokeStyle = `rgba(255,248,230,${.32 * (1 - i / pose.trailR.length)})`; c.lineWidth = 7 * (1 - i / pose.trailR.length) + 1; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
