@@ -7,3 +7,5 @@ src/bl/parts/04-ball.js
 src/bl/parts/05-pins.js
 src/bl/parts/06-cpu.js
 src/bl/parts/07-game.js
+src/bl/parts/08-play.js
+src/bl/parts/09-draw.js

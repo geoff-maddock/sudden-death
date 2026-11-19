@@ -2,3 +2,4 @@
 # The engine's parts first (they don't touch the page); its page in the Realm comes with phase 2, and the superstars'
 # bowling kinds with phase 8, as golf's did.
 include src/bl/manifest.txt
+src/realm/lanes/n1-page.js

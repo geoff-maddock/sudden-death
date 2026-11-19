@@ -4,15 +4,20 @@
    happened, and whether the frame and the game are decided), whyNot; score(frames, n) and done(frame, tenth) are
    ten-pin's scoring on any sheet, isSplit(standing) the split rule and adj the pins that touch; total, marks (the
    sheet), lane (the lane of a frame), frameNo, rerack and pinch (once a game each, before a frame's first ball), and
-   matchText (the game from a side's point of view). G is the game, plain JSON. The page comes in phase 2: until then
-   the lanes are never on.
+   matchText (the game from a side's point of view). G is the game, plain JSON.
    Phase 1 is the lane, the ball, the pins and one game, CPU against CPU: geo (the lane's geometry), spots (each pin's),
    house() a fresh oil pattern, oilAt, mu and wear(oil, path) the oil and how a ball moves it, tides; ball(throw, oil,
    tide) the pure ball model and aimAt(throw, x, oil, tide) the angle that reaches x at the pins; deck(standing,
    ball, seed) the pure, seeded pins; groups(standing), spareTarget(pins), skills, style() and plan(side) the CPU's
    ball; start(opts) puts a game on the lanes ({ frames, teams, order, skill: [2], tide, seed, lead }), turn() bowls
    the next ball, summary() is the game so far, and simGame(opts) plays a whole one headless, leaving the game on the
-   lanes as it was. */
+   lanes as it was.
+   Phase 2 is the page and bowling by hand: start(opts) also puts the game on show ({ mode: 'watch' | 'play' }), and
+   show, hide, on, pause, paused, speed and render drive the canvas (n1-page.js). The beat: phase, msg, view (a copy of
+   what the page needs), tick(dt) (the tests move the game on by hand). Your ball: select({ stand, arrow, ball, revs,
+   suggest }), press (Space), drag(pull, deg) (the phone's throw), setMode; guide (a perfect ball's path on a fresh
+   lane), swingNums and meterRules are the numbers behind the meter; scr and unscr map the lane to the picture and
+   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -26,6 +31,13 @@ return {
   house: n => blHouse(n), oilAt: (oil, x, y) => blOilAt(oil, x, y), mu: (oil, x, y, tide) => blMu(oil, x, y, tide), wear: (oil, path) => blWear(oil, path),
   boardX: b => blBoardX(b), xBoard: x => blXBoard(x), ball: (t, oil, tide) => blBall(t, oil, tide), aimAt: (t, x, oil, tide) => blAimAt(t, x, oil, tide),
   deck: (st, b, seed, spots) => blDeck(st, b, seed, spots), groups: st => blGroups(st), spareTarget: p => blSpareTarget(p), style: () => blStyle(),
-  plan: s => G && G.oil ? blPlan(s) : null, start: o => blStart(o), turn: () => blTurn(), summary: () => blSummary(), simGame: o => blSimGame(o),
-  show: () => {}, hide: () => {}, get on() { return false; }
+  plan: s => G && G.oil ? blPlan(s) : null, start: o => { blStart(o); blPlayStart(o); return G; }, turn: () => blTurn(), summary: () => blSummary(), simGame: o => blSimGame(o),
+  // the page and bowling by hand (phase 2)
+  modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
+  get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
+  drag: (pull, deg) => blDrag(pull, deg), guide: () => blGuide(), swingNums: () => blSwingNums(), scr: (x, y) => blScr(x, y), unscr: (sx, sy) => blUnscr(sx, sy), ovScr: (x, y) => [blOvX(x), blOvY(y)],
+  get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
+  set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; },
+  show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: () => blRender(0),
+  pause: on => { BLP.paused = !!on; }, get paused() { return BLP.paused; }, get speed() { return BLP.speed; }, set speed(n) { BLP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };

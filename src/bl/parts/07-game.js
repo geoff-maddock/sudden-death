@@ -34,11 +34,15 @@ function blStart(opts) {
 // down, roll } or null when the game is over
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
+  const plan = blPlan(s);
+  return blBowlBall(s, plan, blRelease(plan, G.skill[s]));
+}
+// a ball as released (yours from the page, or the CPU's): down the lane, into the pins, the oil worn, the sheet kept
+function blBowlBall(s, plan, rel) {
   const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
-  const plan = blPlan(s), rel = blRelease(plan, G.skill[s]);
   const ball = blBall(rel, G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand }, seed) : { down: [], trace: [] };
+  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand }, seed) : { down: [], trace: [], ball: null };
   G.oil[lane] = blWear(G.oil[lane], ball.path);
   // a Knight learns from its strike balls: half of how far it missed the pocket, on that lane
   if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (plan.aim.x - ball.x);
@@ -46,7 +50,7 @@ function blTurn() {
   blCount(s, stand, first, ball, roll);
   G.n++;
   G.log.push([s, ri, roll.frame, deck.down.length, roll.strike ? 'X' : roll.spare ? '/' : roll.split ? 'o' : '']);
-  GB = { s, ri, lane, plan, rel, ball, deck };
+  GB = { s, ri, lane, stand, plan, rel, ball, deck, roll };
   return { side: s, ri, frame: roll.frame, plan, release: rel, ball: { x: ball.x, entry: ball.entry, gutter: ball.gutter, skid: ball.skid, roll: ball.roll }, down: deck.down, roll };
 }
 // the box score: strikes on full racks, spares and single pins made, splits left and made, the 7-10, the leaves
