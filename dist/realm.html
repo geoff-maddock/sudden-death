@@ -37124,6 +37124,8 @@ function blStart(opts) {
     const roster = (T.roster && T.roster.length >= BL_RULES.side ? T.roster : [0, 1, 2, 3, 4].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
       .map(p => { const r = p.r || (BL_KIND[p.kind] ? blRate(p.kind) : null), m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
         m.rs = r ? Object.fromEntries(BL_STATS.map(k => [k, blScale(r[k])])) : Object.assign({}, BL_DEF_RAT);
+        // gear: its name, and the effects the engine reads (its ratings the Realm has laid on r already)
+        if (p.gear && p.gear.fx) { m.gx = blGx(p.gear.fx); m.gear = p.gear.name || p.gear.id; } else if (p.gear) delete m.gear;
         m.style = blStyleFor(m, style); return m; });
     return Object.assign({}, T, { roster }); });
   // an order: the game's, the team's own, or set by the ratings
@@ -37139,6 +37141,7 @@ function blStart(opts) {
   G.streak = [0, 0];
   blHallStart(o);
   blPowersStart(o);
+  blKitStart(o.bags);
   GB = null;
   return G;
 }
@@ -37146,7 +37149,7 @@ function blStart(opts) {
 // down, roll } or null when the game is over
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
-  blCpuCall(s); blCpuPower(s);
+  blCpuCall(s); blCpuPotion(s); blCpuPower(s);
   const plan = blPlan(s);
   return blBowlBall(s, plan, blRelease(plan, s));
 }
@@ -37158,7 +37161,7 @@ function blBowlBall(s, plan, rel) {
   const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid }), G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
-  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1);
+  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1) * (blGxOf(s, ri).carry || 1);
   const front = stand.slice().sort((a, b) => BL_SPOT[a][1] - BL_SPOT[b][1] || Math.abs(BL_SPOT[a][0]) - Math.abs(BL_SPOT[b][0]))[0];
   const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
   // a wobble (a harpy's Gust): a pin left standing beside one that fell may go
@@ -37175,7 +37178,7 @@ function blBowlBall(s, plan, rel) {
   if (G.wordOn[s]) G.wordOn[s] = false;
   const roll = blRoll(s, deck.down);
   G.streak[s] = roll.strike ? G.streak[s] + 1 : 0;
-  blPowersAfter(s, roll, stand, G.streak[s]);
+  blPowersAfter(s, roll, stand, G.streak[s]); blKitAfter(s);
   // a fresh rack in front of the side: Moll's hand; and the tide may turn
   if (G.rb[s] === 0 && G.stand[s].length === 10 && !roll.over) blHallRack(s);
   const tide = blHallTide();
@@ -37329,10 +37332,10 @@ function blGuide() {
 // your mark now: wider for an accurate bowler (a spare bowler, at a spare), narrower for a tired arm or a big moment;
 // and the meter falls quicker under pressure
 function blMeterFor(s) {
-  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, fx = blFxFor(s), pr = fx.nerve ? 0 : blPressure(s);
+  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, fx = blFxFor(s), pr = fx.nerve ? 0 : blPressure(s) * blKitPress(s, ri);
   const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
   const tm = BL_STANCE[blStanceOf(s).tempo].meter;
-  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err / fx.err).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
+  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err / fx.err / blKitErr(s, ri)).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
 }
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
@@ -37430,7 +37433,7 @@ function blPlayNext() {
   if (GP.mode === 'manage' && s === GP.you) { const said = [blManageCall(s)].concat(GP.autoPow ? blCpuPower(s) : []).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
     GP.cpu = { s, plan, rel }; blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)}, ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`); return; }
   if (blYours(s)) { blSelReset(); blGo('aim', 0, `${chant}${off}${blTurnBall(s) ? 'The turn: the lanes are re-read, and the chart shows all the oil for this ball. ' : ''}Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
-  const said = [blCpuCall(s)].concat(blCpuPower(s)).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
+  const said = [blCpuCall(s), blCpuPotion(s)].concat(blCpuPower(s)).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
   GP.cpu = { s, plan, rel };
   blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)} (${G.teams[s].name}), ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`);
 }
@@ -37769,7 +37772,8 @@ const blNerveK = (p, nrv) => 1 + .6 * p * (1 - clamp(nrv, 0, 1));
 function blErrK(s, ri, spare) {
   const r = blRat(s, ri), a = G.arm ? G.arm[s][ri] : 1;
   const fx = typeof blFxFor === 'function' ? blFxFor(s) : null;
-  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s), r.nrv) * (fx ? fx.err : 1);
+  const kit = typeof blKitErr === 'function' && G.bags ? [blKitErr(s, ri), blKitPress(s, ri)] : [1, 1];
+  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s) * kit[1], r.nrv) * (fx ? fx.err : 1) * kit[0];
 }
 /* The Saltmere Lanes: the call and the read (issue #100, phase 4).
 
@@ -37805,7 +37809,7 @@ function blStyleNow(s, ri) { const st = blStyleOf(s, ri), B = BL_STANCE[blStance
 // the line's and the stance's part in how true a release is
 const blCallErr = s => BL_LINES[blLineOf(s)].err * BL_STANCE[blStanceOf(s).tempo].err;
 // what a ball costs the arm with the stance
-const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm * blFxFor(s).arm;
+const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm * blFxFor(s).arm * (blGxOf(s, blBowler(s)).arm != null ? blGxOf(s, blBowler(s)).arm : 1);
 // how far down the lane (feet) the bowler reads the oil now
 function blReadFt(s, ri) {
   if (G.wordOn && G.wordOn[s]) return BL_LANE.ft;
@@ -38152,6 +38156,93 @@ function blPowerTip(s) {
   if (!blPowWhy(s, 'ult', ri)) { const U = BL_ULT[G.teams[s].roster[ri].kind] || BL_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this frame.`; }
   return '';
 }
+/* The Saltmere Lanes: gear and potions (issue #100, phase 7), by #61's conventions; the Realm's side is
+   w118-laneskit.js.
+   Gear: a bowler may wear one piece. A roster bowler sent with { gear: { id, name, fx } } keeps its name (gear) and the
+   effects the engine reads (gx: fx without r; fx.r is laid on the ratings by the Realm before the engine sees them).
+   What gx may hold: arm (what a ball costs them, ×), carry (how hard their ball drives through the pins, ×), press (how
+   much a big moment weighs on them, ×) and err (their release's miss, ×).
+   Potions (BL_POTIONS): one a side a frame (G.potFrame), before a ball of that side's. G.bags = [bag or null, ...] by
+   side: a null bag is kept by the page (the Realm keeps yours and takes each one out as you give it), and a bag here
+   ({ id: n }) is the CPU's, given at its skill before its balls (blCpuPotion). Every use goes in G.pots ({ side, id,
+   ri, frame, why }). What each does, all plain data in G:
+   draught (the Stamina Draught): one bowler BL_POTIONS.draught.arm of their arm back; blsteady (Steady Hand): no
+   pressure on the side's next ball (G.still); blchalk (Grip Chalk): one bowler's release BL_POTIONS.blchalk.err as
+   wide for the rest of this frame (G.chalk: { ri, f }); bloil (Moll's Lane Oil): a fresh stripe on the lane the side
+   bowls next, the house pattern laid again (the transition starts over there, for both sides). */
+const BL_POTIONS = {
+  draught: { n: 'Stamina Draught', one: true, arm: .4, desc: 'One bowler gets two fifths of their arm back.' },
+  blsteady: { n: 'Steady Hand', desc: 'Your next ball has no pressure on it, whatever rides on it.' },
+  blchalk: { n: 'Grip Chalk', one: true, err: .75, desc: 'One bowler\'s release a quarter truer for the rest of this frame.' },
+  bloil: { n: 'Moll\'s Lane Oil', desc: 'Moll lays a fresh stripe on the lane you bowl next: the house pattern again, the dry track gone (for both sides).' },
+};
+// a CPU gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
+const BL_KIT = { take: [99, 2.5, 2], squire: .25 };
+function blGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
+const blGxOf = (s, ri) => (G && G.teams && G.teams[s].roster[ri] && G.teams[s].roster[ri].gx) || {};
+function blKitStart(bags) {
+  G.bags = [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null);
+  G.pots = []; G.potFrame = ['', '']; G.still = [false, false]; G.chalk = [null, null];
+}
+const blFrameKey = s => (G.ro ? 'r' + G.ro + ':' : '') + blCur(s);
+// the kit's part in how true side s's bowler ri is now (gear's err, the chalk), and how a moment weighs on them
+function blKitErr(s, ri) { const C = G.chalk && G.chalk[s]; return (blGxOf(s, ri).err || 1) * (C && C.ri === ri && C.f === blFrameKey(s) ? BL_POTIONS.blchalk.err : 1); }
+const blKitPress = (s, ri) => (G.still && G.still[s] ? 0 : 1) * (blGxOf(s, ri).press || 1);
+function blPotionWhy(s, id, ri) {
+  const P = BL_POTIONS[id]; if (!P) return 'No such potion.';
+  if (!G || G.over) return 'The game is over.';
+  if (blUp() !== s) return 'Not your ball.';
+  if (G.potFrame[s] === blFrameKey(s)) return 'One potion a frame.';
+  if (P.one && !G.teams[s].roster[ri]) return 'Pick a bowler.';
+  if (id === 'draught' && G.arm[s][ri] >= .95) return 'Their arm is fresh.';
+  if (id === 'blsteady' && G.still[s]) return 'Already steady.';
+  if (id === 'blchalk' && G.chalk[s] && G.chalk[s].f === blFrameKey(s)) return 'Chalked already this frame.';
+  return '';
+}
+function blPotionGive(s, id, ri, why) {
+  const P = BL_POTIONS[id], T = G.teams[s], m = P.one ? T.roster[ri] : null;
+  if (id === 'draught') G.arm[s][ri] = Math.min(1, +(G.arm[s][ri] + P.arm).toFixed(3));
+  if (id === 'blsteady') G.still[s] = true;
+  if (id === 'blchalk') G.chalk[s] = { ri, f: blFrameKey(s) };
+  if (id === 'bloil') G.oil[blLane(s)] = G.oil0.slice();
+  if (G.bags[s]) { G.bags[s][id]--; if (G.bags[s][id] <= 0) delete G.bags[s][id]; }
+  G.potFrame[s] = blFrameKey(s);
+  G.pots.push({ side: s, id, ri: P.one ? ri : -1, frame: blFrameNo(s), why: why || '' });
+  return `${T.name}: ${P.n}${m ? ` for ${m.n}` : ''}${why ? ` (${why})` : ''}.`;
+}
+// your potion now: '' when given (the page takes it out of your bag), or why not
+function blPotion(id, ri) {
+  if (!GP) return 'No game.';
+  const s = GP.you, why = blPotionWhy(s, id, ri); if (why) return why;
+  GP.msg = blPotionGive(s, id, ri);
+  if (GP.sel) GP.sel = Object.assign(blSelFromPlan(blSuggest(s)), { revs: GP.sel.revs });
+  if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
+  return '';
+}
+/* what a potion would be worth now, and to whom: [{ id, ri, v, why }] for the potions in bag. ri: who bowls next. A
+   draught for a tired arm; Steady Hand in the last frame for a nervy bowler; chalk at a split or a big spare; the oil
+   when the track on the lane has dried */
+function blPotionValues(s, bag, ri) {
+  const out = [], T = G.teams[s], A = G.arm[s], st = G.stand[s], p = blPressure(s), m = T.roster[ri];
+  const tired = A.map((a, i) => [a, i]).sort((x, y) => x[0] - y[0])[0];
+  if (bag.draught && A[ri] < .6) out.push({ id: 'draught', ri, v: (.7 - A[ri]) * 10 + (p ? 1 : 0), why: `${m.n} is down to ${Math.round(A[ri] * 100)}% arm` });
+  else if (bag.draught && tired[0] < .45) out.push({ id: 'draught', ri: tired[1], v: (.6 - tired[0]) * 8, why: `${T.roster[tired[1]].n} is down to ${Math.round(tired[0] * 100)}% arm` });
+  if (bag.blsteady && p && m && m.rs.nrv < .75) out.push({ id: 'blsteady', ri: -1, v: 3 + p * 2 * (1 - m.rs.nrv), why: `${m.n} bowls the last frame` });
+  if (bag.blchalk && st.length < 10 && st.length && (blIsSplit(st) || p || st.length >= 3)) out.push({ id: 'blchalk', ri, v: 2.4 + (p ? 1.2 : 0) + (blIsSplit(st) ? .6 : 0), why: `${m.n} has the ${st.join('-')} to pick up` });
+  if (bag.bloil && st.length === 10 && blTrackDry(blLane(s), blStyleOf(s, ri).hand)) out.push({ id: 'bloil', ri: -1, v: 2.8 + (p ? 1 : 0), why: 'the track on this lane has dried' });
+  return out.filter(o => !blPotionWhy(s, o.id, o.ri)).sort((a, c) => c.v - a.v);
+}
+function blPotionAdvice(bag, ri) { if (!G || !GP) return null; const o = blPotionValues(GP.you, bag || {}, ri == null ? blBowler(GP.you) : ri)[0]; return o && o.v >= BL_KIT.take[1] ? { id: o.id, ri: o.ri, why: o.why } : null; }
+// the CPU before its ball. Never yours: your bag is your own (a null bag here). Returns the words, or ''
+function blCpuPotion(s) {
+  const bag = G.bags && G.bags[s]; if (!bag || !Object.keys(bag).length || G.over) return '';
+  const vals = blPotionValues(s, bag, blBowler(s)); if (!vals.length) return '';
+  const sk = G.skill[s];
+  if (!sk) return R() < BL_KIT.squire ? blPotionGive(s, vals[0].id, vals[0].ri, vals[0].why) : '';
+  return vals[0].v >= BL_KIT.take[sk] ? blPotionGive(s, vals[0].id, vals[0].ri, vals[0].why) : '';
+}
+// after side s's ball: Steady Hand is spent
+function blKitAfter(s) { if (G && G.still) G.still[s] = false; }
 /* The Lanes' page in the Realm (issue #100, phase 2). A canvas in #v-lanes, after the Links', and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (blTick) and draws it (blDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -38302,7 +38393,10 @@ for (const ev of ['pointerup', 'pointercancel']) BLP.cv.addEventListener(ev, blP
    select also takes { rerack: true }).
    Phase 6 is powers: start({ powers: true | [yours, theirs], autoPow, powOnly }); pow, pow2, ult, sit, manaRules,
    roarRules, fx0 (the tables); mana, roar, mark, casts; powNow(s, ri), powWhy(s, k, ri), cast(s, k, ri), castMine(k)
-   (yours, while you set up), cpuPower(s), fxFor(s), tip(s); autoPow (Manage). A roster bowler may bring pw. */
+   (yours, while you set up), cpuPower(s), fxFor(s), tip(s); autoPow (Manage). A roster bowler may bring pw.
+   Phase 7 is gear and potions: a roster bowler may bring gear ({ id, name, fx }); start({ bags: [bag | null, bag |
+   null] }); potions (the table), potionWhy(id, ri), potion(id, ri) (yours), advice(bag, ri), cpuPotion(s), pots, bags,
+   still, chalk, kitRules. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -38337,6 +38431,10 @@ return {
   get mana() { return G && G.mana ? G.mana.slice() : null; }, get roar() { return G && G.roar ? G.roar.slice() : null; }, get mark() { return G && G.mark ? JSON.parse(JSON.stringify(G.mark)) : null; }, get casts() { return G && G.casts ? JSON.parse(JSON.stringify(G.casts)) : []; },
   powNow: (s, ri) => G && G.powers ? blPowNow(s, ri) : null, powWhy: (s, k, ri) => blPowWhy(s, k, ri), cast: (s, k, ri) => blCast(s, k, ri), castMine: k => blCastMine(k), cpuPower: s => blCpuPower(s),
   fxFor: s => blFxFor(s), powersAfter: (s, roll, stand, streak) => blPowersAfter(s, roll, stand, streak), tip: s => G && G.powers ? blPowerTip(s) : '', get autoPow() { return GP ? GP.autoPow : false; }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // gear and potions (phase 7)
+  potions: JSON.parse(JSON.stringify(BL_POTIONS)), kitRules: JSON.parse(JSON.stringify(BL_KIT)), potionWhy: (id, ri) => GP ? blPotionWhy(GP.you, id, ri) : 'No game.', potion: (id, ri) => blPotion(id, ri),
+  advice: (bag, ri) => blPotionAdvice(bag, ri), cpuPotion: s => blCpuPotion(s), get pots() { return G && G.pots ? G.pots.slice() : []; }, get bags() { return G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : [null, null]; },
+  get still() { return G && G.still ? G.still.slice() : null; }, get chalk() { return G && G.chalk ? JSON.parse(JSON.stringify(G.chalk)) : null; },
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
@@ -54526,6 +54624,7 @@ $('wLanesRows').addEventListener('click', e => {
   else if (d.nrevs) wBL.select({ revs: d.nrevs });
   else if (d.nsuggest) wBL.select({ suggest: true });
   else if (d.ngo) wBL.press();
+  else return;   // (another row's button: its own handler draws the rows)
   wLanesRows(); wLanesBarNote();
 });
 // the rows: shown on your ball in You play
@@ -54552,7 +54651,7 @@ function wLanesGame(opts) {
   const o = opts || {};
   WBL = { over: null };
   $('wLanesTitle').textContent = o.title || 'A game at the Saltmere Lanes';
-  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL], hall: !!o.hall, powers: o.powers, autoPow: o.autoPow });
+  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL], hall: !!o.hall, powers: o.powers, autoPow: o.autoPow, bags: o.bags });
   showView('lanes');
   wLanesBarNote(); wLanesRows(); wLanesSheet();
 }
@@ -55394,6 +55493,123 @@ wLanesRows = function () {
 const wW117LanesHow = wLanesHowHTML;
 wLanesHowHTML = function () {
   return wW117LanesHow() + `<p class="hint"><b>Powers.</b> Every kind has its own magic: a <b>strike power</b> (for a ball at a full rack) and a <b>spare power</b> (for what is left), and a second of each to pick on the Lanes tab. The bowler casts theirs before their ball (P) for team <b>mana</b>, which strikes, spares and splits made fill. Some are curses on the other side's next ball: a gorgon's Stare turns their front pin to stone, a witch's Hex makes the oil play heavy. The gallery's <b>roar</b> fills on doubles, turkeys and splits made: ${wBL.roarRules.ult} of it pays for the bowler's kind's <b>ultimate</b> (U, once a game, before a frame's first ball), which marks the frame for both sides, and ${wBL.roarRules.steady} steadies a ball in the last frame (K). <b>Situation powers</b>, once a game each: the Fill (the bowler's arm back for the tenth's fill balls), Clean Game (from the 8th with no open frame yet: the next ball truer) and Roll-off. In Manage, <b>Auto powers</b> lets your captain cast for you.</p>`;
+};
+/* w118: bowling gear and potions (issue #100, phase 7), by #61's conventions; the engine's side is
+   src/bl/parts/14-kit.js, the plumbing (W_GEAR, W_POTIONS, the slot, the Bag) is w72.
+   Gear (W_LANES_GEAR, one piece a player, p.gear.lanes): a Reactive Ball, a Wrist Brace and a Rosin Bag from Saltmere's
+   store; a Urethane Ball, Slide Shoes and a Lucky Pin from chests. Small effects (to be measured in phase 10's lab). It
+   reaches the engine through wLanesPlayer, never by changing the player's own ratings, and shows on the stats card's
+   Gear block and the Lanes tab.
+   Potions: the Stamina Draught (football's item, serving the Lanes too: here it gives arm back), and Steady Hand, Grip
+   Chalk and Moll's Lane Oil from Saltmere's store. In a real match, before one of your balls, from the Bag row under the
+   lanes (one a frame), with your captain's advice; each comes out of your bag when given. Your captain never opens your
+   bag (Watch, Manage and Auto powers don't), and Simulate leaves it alone. The other side brings W_LANES_KIT.opp[tier]
+   and gives at its skill; the match card says what each club brings.
+   Wraps: wGearLive (wW118GearLive: the Lanes), wLanesPlayer (wW118LanesPlayer: gear's ratings and the piece),
+   wStartLanes (wW118StartLanes: their bag goes in), wLanesRows (wW118LanesRows: the Bag row), wFiveRow (wW118FiveRow:
+   the gear on the Lanes tab), wOpenLanesCard (wW118OpenLanesCard: the bags on the card), renderHelp (wW118RenderHelp:
+   #wHelpLanesKit); and wBL.start and wBL.simGame (the bags go in). */
+
+W_GEAR_CFG.sports.lanes = 'bowling';
+W_GEAR_STATN.lanes = { pow: 'power', rev: 'revs', acc: 'accuracy', spr: 'spare', nrv: 'nerve', red: 'read' };
+const W_LANES_GEAR = {
+  bl_reactive: { sport: 'lanes', name: 'Reactive Ball', price: 60, desc: 'A resin shell that grabs the dry boards: +1 revs.', fx: { r: { rev: 1 } } },
+  bl_brace: { sport: 'lanes', name: 'Wrist Brace', price: 55, desc: 'Holds the wrist square at the release: +1 accuracy.', fx: { r: { acc: 1 } } },
+  bl_rosin: { sport: 'lanes', name: 'Rosin Bag', price: 40, desc: 'A dry grip: every ball costs them a fifth less arm.', fx: { arm: .8 } },
+  bl_urethane: { sport: 'lanes', name: 'Urethane Ball', price: 55, desc: 'An old, honest ball: their release strays a tenth less.', fx: { err: .9 } },
+  bl_shoes: { sport: 'lanes', name: 'Slide Shoes', price: 50, desc: 'A sure slide to the line: a big moment weighs a third less on them.', fx: { press: .65 } },
+  bl_luckypin: { sport: 'lanes', name: 'Lucky Pin', price: 45, desc: 'A pin from the 300 game, kept in the bag: their ball carries a little better.', fx: { carry: 1.05 } },
+};
+for (const id of Object.keys(W_LANES_GEAR)) wGearAdd(id, W_LANES_GEAR[id]);
+const W_LANES_KIT = {
+  potions: { blsteady: 35, blchalk: 35, bloil: 45 },
+  store: ['bl_reactive', 'bl_brace', 'bl_rosin'],
+  opp: { 1: { draught: 1 }, 2: { draught: 1, blsteady: 1 }, 3: { draught: 2, blsteady: 1, blchalk: 1, bloil: 1 } },
+};
+for (const id of Object.keys(wBL.potions)) {
+  const P = wBL.potions[id];
+  if (id === 'draught') {
+    W_POTIONS[id].sports = (W_POTIONS[id].sports || ['grid']).concat('lanes');
+    DB.items[id].desc += ` At the lanes: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items[id].use += ' Or in a bowling match, before a ball, one a frame.';
+    continue;
+  }
+  wPotionAdd(id, { sport: 'lanes' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a bowling match, before one of your balls: the Bag row under the lanes. One potion a frame.', price: W_LANES_KIT.potions[id] };
+}
+if (DB.shops.salt) { for (const id of Object.keys(W_LANES_KIT.potions)) DB.shops.salt[id] = W_LANES_KIT.potions[id]; for (const id of W_LANES_KIT.store) DB.shops.salt[id] = W_LANES_GEAR[id].price; }
+for (const [c, it] of [['marigold_chest', 'bl_urethane'], ['chapel_chest', 'bl_shoes'], ['deepseam_c3', 'bl_luckypin'], ['hatchery_c6', 'bloil'], ['emberdeep_c6', 'blchalk']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wW118GearLive = wGearLive;
+wGearLive = function (sport) { return sport === 'lanes' ? wLanesLive() : wW118GearLive(sport); };
+const wW118LanesPlayer = wLanesPlayer;
+wLanesPlayer = function (p) {
+  const t = wW118LanesPlayer(p), G = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'lanes') : null;
+  if (G) { t.r = wGearRate(t.r, G, wBL.cap); t.gear = wGearTag(G); }
+  return t;
+};
+
+/* ---------- the bags go in ---------- */
+const WLNK = { next: null };
+const wLanesBagMine = () => Object.fromEntries(wMatchBag('lanes').filter(x => wBL.potions[x.id]).map(x => [x.id, x.n]));
+const wLanesBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wBL.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wBL.potions[id].n}`).join(', ') : 'nothing'; };
+const wW118StartLanes = wStartLanes;
+wStartLanes = function (o) {
+  WLNK.next = [null, Object.assign({}, W_LANES_KIT.opp[(o && o.tier) || (o && o.club ? wBallTier(o.club) : 1)] || {})];
+  try { return wW118StartLanes(o); } finally { WLNK.next = null; }
+};
+const wW118Start = wBL.start, wW118SimGame = wBL.simGame;
+wBL.start = o => wW118Start(WLNK.next ? Object.assign({}, o, { bags: WLNK.next }) : o);
+wBL.simGame = o => wW118SimGame(WLNK.next ? Object.assign({}, o, { bags: WLNK.next }) : o);
+
+/* ---------- your Bag, in a real match ---------- */
+function wLanesPotion(id, ri) {
+  if (!wLanesWorld()) return 'Potions are for real matches, not exhibitions or practice.';
+  if (!wHas(id)) return `You have no ${(wBL.potions[id] || {}).n || 'such potion'}.`;
+  const r = wBL.potion(id, ri); if (r) return r;
+  wAddItem(id, -1); if (WG.lng && WG.lng.live) WG.lng.live.snap = wBL.snapshot(); wSave(); return '';
+}
+let W_LANES_KITMSG = '';
+$('wLanesRows').insertAdjacentHTML('beforeend', '<div class="wccrow" id="wLanesRowBag" hidden><span class="wccl">Bag</span><span id="wLanesBag"></span></div>');
+const wW118LanesRows = wLanesRows;
+wLanesRows = function () {
+  wW118LanesRows();
+  const row = $('wLanesRowBag'), V = WBL && !WBL.over && wBL.G && wBL.G.teams ? wBL.view : null;
+  const show = !!V && wLanesWorld() && ((V.mode === 'play' && V.ph === 'aim' && V.up === V.you) || V.mode === 'manage');
+  row.hidden = !show; if (!show) return;
+  if (row.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;
+  const G = wBL.G, s = V.you, Ro = G.teams[s].roster, bag = wLanesBagMine(), ids = Object.keys(bag), next = V.up === s ? V.bowler : 0, adv = V.up === s ? wBL.advice(bag, next) : null;
+  const who = id => { const P = wBL.potions[id]; if (!P.one) return '';
+    return `<select data-nkwho="${id}" aria-label="Who gets the ${esc(P.n)}">${Ro.map((m, ri) => `<option value="${ri}"${(adv && adv.id === id ? adv.ri === ri : ri === next) ? ' selected' : ''}>${esc(m.n)} (${Math.round(G.arm[s][ri] * 100)}%)</option>`).join('')}</select>`; };
+  $('wLanesBag').innerHTML = (ids.length ? ids.map(id => { const P = wBL.potions[id];
+      return `<span class="wcpot">${who(id)}<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-nkuse="${id}" ${V.mode === 'play' ? '' : 'disabled'} title="${esc(P.desc)}">${esc(P.n)} (${bag[id]})</button></span>`; }).join(' ') : '<small class="hint">No bowling potions in your bag. Saltmere\'s store sells them.</small>')
+    + (W_LANES_KITMSG ? ` <small class="wbad">${esc(W_LANES_KITMSG)}</small>` : '') + (adv ? ` <small class="hint">Your captain says: <b>${esc(wBL.potions[adv.id].n)}</b>${adv.ri >= 0 ? ` for ${esc(Ro[adv.ri].n)}` : ''}, ${esc(adv.why)}.</small>` : '');
+};
+$('wLanesRows').addEventListener('click', e => {
+  const b = e.target.closest('[data-nkuse]'); if (!b || b.disabled) return;
+  const id = b.dataset.nkuse, sel = document.querySelector(`[data-nkwho="${id}"]`);
+  W_LANES_KITMSG = wLanesPotion(id, sel ? +sel.value : -1); wLanesRows(); wLanesBarNote();
+});
+
+/* ---------- the Lanes tab and the card ---------- */
+const wW118FiveRow = wFiveRow;
+wFiveRow = function (k, C) {
+  const html = wW118FiveRow(k, C), p = wFiveWho(k), g = p && typeof k === 'number' ? wGearOf(p, 'lanes') : null;
+  return g ? html.replace('<small class="wnst"', `<small class="wnst" title="${esc(g.desc)}">Bowls with the <b>${esc(g.name)}</b>.</small><small class="wnst"`) : html;
+};
+const wW118OpenLanesCard = wOpenLanesCard;
+wOpenLanesCard = function () {
+  wW118OpenLanesCard();
+  const ul = document.querySelector('#modalBox .wbclubs'); if (!ul) return;
+  ul.insertAdjacentHTML('afterend', `<p class="hint">What their bowlers bring: ${[1, 2, 3].map(t => `tier ${t}, ${esc(wLanesBagWords(W_LANES_KIT.opp[t]))}`).join('; ')}. Yours is your bag: give from it before a ball, in the Bag row under the lanes.</p>`);
+};
+
+const wW118RenderHelp = renderHelp;
+renderHelp = function () {
+  wW118RenderHelp();
+  const after = $('wHelpLanesGame'); if (!after || $('wHelpLanesKit')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesKit"><b>Bowling gear and potions.</b> Each player can carry one piece for the Lanes: a Reactive Ball (+1 revs), a Wrist Brace (+1 accuracy) and a Rosin Bag (balls cost less arm) from Saltmere's store; a Urethane Ball (a truer release), Slide Shoes (a big moment weighs less) and a Lucky Pin (a little more carry) from chests. Put it on from the Bag on the Team screen. In a real match, before one of your balls, give one potion a frame from the Bag row under the lanes: a Stamina Draught (one bowler's arm back), Steady Hand (no pressure on your next ball), Grip Chalk (one bowler truer this frame) or Moll's Lane Oil (a fresh stripe on the lane you bowl next, the dry track gone). Your captain says which suits the moment. The other side brings potions by tier and uses them.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, baseball, football, boxing,
    basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

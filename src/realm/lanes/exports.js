@@ -32,7 +32,10 @@
    select also takes { rerack: true }).
    Phase 6 is powers: start({ powers: true | [yours, theirs], autoPow, powOnly }); pow, pow2, ult, sit, manaRules,
    roarRules, fx0 (the tables); mana, roar, mark, casts; powNow(s, ri), powWhy(s, k, ri), cast(s, k, ri), castMine(k)
-   (yours, while you set up), cpuPower(s), fxFor(s), tip(s); autoPow (Manage). A roster bowler may bring pw. */
+   (yours, while you set up), cpuPower(s), fxFor(s), tip(s); autoPow (Manage). A roster bowler may bring pw.
+   Phase 7 is gear and potions: a roster bowler may bring gear ({ id, name, fx }); start({ bags: [bag | null, bag |
+   null] }); potions (the table), potionWhy(id, ri), potion(id, ri) (yours), advice(bag, ri), cpuPotion(s), pots, bags,
+   still, chalk, kitRules. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -67,6 +70,10 @@ return {
   get mana() { return G && G.mana ? G.mana.slice() : null; }, get roar() { return G && G.roar ? G.roar.slice() : null; }, get mark() { return G && G.mark ? JSON.parse(JSON.stringify(G.mark)) : null; }, get casts() { return G && G.casts ? JSON.parse(JSON.stringify(G.casts)) : []; },
   powNow: (s, ri) => G && G.powers ? blPowNow(s, ri) : null, powWhy: (s, k, ri) => blPowWhy(s, k, ri), cast: (s, k, ri) => blCast(s, k, ri), castMine: k => blCastMine(k), cpuPower: s => blCpuPower(s),
   fxFor: s => blFxFor(s), powersAfter: (s, roll, stand, streak) => blPowersAfter(s, roll, stand, streak), tip: s => G && G.powers ? blPowerTip(s) : '', get autoPow() { return GP ? GP.autoPow : false; }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // gear and potions (phase 7)
+  potions: JSON.parse(JSON.stringify(BL_POTIONS)), kitRules: JSON.parse(JSON.stringify(BL_KIT)), potionWhy: (id, ri) => GP ? blPotionWhy(GP.you, id, ri) : 'No game.', potion: (id, ri) => blPotion(id, ri),
+  advice: (bag, ri) => blPotionAdvice(bag, ri), cpuPotion: s => blCpuPotion(s), get pots() { return G && G.pots ? G.pots.slice() : []; }, get bags() { return G && G.bags ? JSON.parse(JSON.stringify(G.bags)) : [null, null]; },
+  get still() { return G && G.still ? G.still.slice() : null; }, get chalk() { return G && G.chalk ? JSON.parse(JSON.stringify(G.chalk)) : null; },
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),

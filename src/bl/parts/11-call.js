@@ -32,7 +32,7 @@ function blStyleNow(s, ri) { const st = blStyleOf(s, ri), B = BL_STANCE[blStance
 // the line's and the stance's part in how true a release is
 const blCallErr = s => BL_LINES[blLineOf(s)].err * BL_STANCE[blStanceOf(s).tempo].err;
 // what a ball costs the arm with the stance
-const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm * blFxFor(s).arm;
+const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm * blFxFor(s).arm * (blGxOf(s, blBowler(s)).arm != null ? blGxOf(s, blBowler(s)).arm : 1);
 // how far down the lane (feet) the bowler reads the oil now
 function blReadFt(s, ri) {
   if (G.wordOn && G.wordOn[s]) return BL_LANE.ft;

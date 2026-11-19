@@ -68,6 +68,7 @@ $('wLanesRows').addEventListener('click', e => {
   else if (d.nrevs) wBL.select({ revs: d.nrevs });
   else if (d.nsuggest) wBL.select({ suggest: true });
   else if (d.ngo) wBL.press();
+  else return;   // (another row's button: its own handler draws the rows)
   wLanesRows(); wLanesBarNote();
 });
 // the rows: shown on your ball in You play
@@ -94,7 +95,7 @@ function wLanesGame(opts) {
   const o = opts || {};
   WBL = { over: null };
   $('wLanesTitle').textContent = o.title || 'A game at the Saltmere Lanes';
-  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL], hall: !!o.hall, powers: o.powers, autoPow: o.autoPow });
+  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL], hall: !!o.hall, powers: o.powers, autoPow: o.autoPow, bags: o.bags });
   showView('lanes');
   wLanesBarNote(); wLanesRows(); wLanesSheet();
 }

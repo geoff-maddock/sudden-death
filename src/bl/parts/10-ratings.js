@@ -71,5 +71,6 @@ const blNerveK = (p, nrv) => 1 + .6 * p * (1 - clamp(nrv, 0, 1));
 function blErrK(s, ri, spare) {
   const r = blRat(s, ri), a = G.arm ? G.arm[s][ri] : 1;
   const fx = typeof blFxFor === 'function' ? blFxFor(s) : null;
-  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s), r.nrv) * (fx ? fx.err : 1);
+  const kit = typeof blKitErr === 'function' && G.bags ? [blKitErr(s, ri), blKitPress(s, ri)] : [1, 1];
+  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s) * kit[1], r.nrv) * (fx ? fx.err : 1) * kit[0];
 }
