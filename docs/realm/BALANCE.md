@@ -1114,3 +1114,23 @@ Water 52%, Moss Tonic 48.3%, Stamina Draught 45%. All small.
 is a power cast, `k: 'pow'`, the other `k: 'steady'`), but anything keyed on a cast's id alone, like the lab's `powOnly`,
 treats them as one.
 
+### The other engines, before and after golf (issue #95)
+
+#92 asked that the card game and the other five engines read the same before and after it. No code of theirs
+changed (the shared seeded random function was refactored to give the same numbers). Their labs after golf, at 120 to
+200 a row, against their last recorded tiers:
+
+| Sport | Recorded (tiers 1/2/3) | After golf |
+|---|---|---|
+| Baseball | 49 / 56 / 32 | 50 / 51 / 26.5 |
+| Football | 51 / 41 / 19 | 55.5 / 44 / 24.5 |
+| Boxing | 53 / 39 / 26 | 48 / 46 / 23 |
+| Basketball | 57 / 44 / 26 | 68 / 47.5 / 30, and 66 / 41 / 24 |
+| Hockey | 73 / 37 / 19 | 53 / 30 / 18, and 55 / 39 / 25 |
+
+Basketball's and hockey's tier 1 moved, in opposite directions, so both were run on the build just before golf (the
+commit before #93's merge, same lab): basketball 62 / 45 / 24, hockey 59 / 38 / 22.5. After golf is inside the noise of
+those (two 120-match runs are good to about 6 points), so the engines read the same; the recorded numbers above are
+older than later changes, and these labs draw each journey's rival clubs once, which swings a tier cell (as phase 10
+found in golf).
+
