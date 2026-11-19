@@ -36780,6 +36780,381 @@ function blMatchText(s) {
   if (!d && !G.ro) return 'Nothing down yet';
   return (a === b ? 'Level' : a > b ? `Up ${a - b}` : `Down ${b - a}`) + (when ? ' ' + when : '');
 }
+/* The Saltmere Lanes: the lane and its oil (issue #100, phase 1). Plain data and pure functions.
+
+   Units are inches. x runs across the lane, 0 the middle and plus to the left as the bowler sees it (so the boards,
+   counted from the right as a right-hander does, run from board 1 at the right edge to board 39 at the left); y runs
+   down the lane from the foul line (0) to the headpin (720, sixty feet). The arrows are at 15 feet.
+   The pins stand 12 inches apart in rows 10.39 inches deep: the 2, 4 and 7 on the left, the 3, 6 and 10 on the right.
+
+   The oil is a grid of cells, one a board across and a foot down (39 by 60), each holding how much oil is on it. A
+   fresh house pattern is 40 feet long, heavier in the middle boards than on the outside, so a ball that misses
+   outside finds friction and hooks back (the house shot's "wall"), and the last 20 feet are dry. Every ball moves oil
+   (blWear): it picks some up from the boards it skids over, and carries a little of that down past the pattern. So
+   the track dries and the backend gets slicker as a game goes on: the transition both sides bowl on.
+   The tide is under the floor: at high tide the lanes sweat and the oil plays heavier, at low tide drier
+   (BL_TIDE, read by blMu). */
+const BL_LANE = { w: 41.5, len: 720, boards: 39, arrows: 180, ballR: 4.25, pinR: 2.383, gutter: 9.25, row: 10.392, gap: 12, ft: 60, oilFt: 40 };
+BL_LANE.bw = BL_LANE.w / BL_LANE.boards;
+BL_LANE.edge = BL_LANE.w / 2;
+// the kickbacks (the deck's side walls) and the pit behind the back row
+BL_LANE.kick = BL_LANE.edge + BL_LANE.gutter;
+BL_LANE.pit = BL_LANE.len + 3 * BL_LANE.row + 14;
+// each pin's spot, by number
+const BL_SPOT = (() => { const L = BL_LANE, g = L.gap / 2, r = L.row, y = L.len;
+  return { 1: [0, y], 2: [g, y + r], 3: [-g, y + r], 4: [2 * g, y + 2 * r], 5: [0, y + 2 * r], 6: [-2 * g, y + 2 * r],
+    7: [3 * g, y + 3 * r], 8: [g, y + 3 * r], 9: [-g, y + 3 * r], 10: [-3 * g, y + 3 * r] }; })();
+// friction: on oil, on a dry board; the tide's weight on the oil; how much of a cell's oil a ball takes, and carries on
+const BL_OIL = { muOil: .045, muDry: .2, full: 1, take: .022, carry: .35, width: 2 };
+const BL_TIDE = { high: 1.18, mid: 1, low: .84 };
+
+// a board (1 to 39) and its middle's x, and back
+const blBoardX = b => (b - 20) * BL_LANE.bw;
+const blXBoard = x => x / BL_LANE.bw + 20;
+// the fresh house pattern: [board index 0..38][foot 0..59], flattened row by row (index b * 60 + f)
+function blHouse(len) {
+  const L = BL_LANE, n = len || L.oilFt, out = new Array(L.boards * L.ft).fill(0);
+  for (let b = 0; b < L.boards; b++) {
+    const fromEdge = Math.min(b, L.boards - 1 - b);   // 0 at either edge, 19 in the middle
+    const across = fromEdge >= 9 ? 1 : .32 + .68 * fromEdge / 9;
+    for (let f = 0; f < n; f++) out[b * L.ft + f] = +(across * (1.1 - .25 * f / n)).toFixed(3);
+  }
+  return out;
+}
+// the oil at a point (0 off the lane)
+function blOilAt(oil, x, y) {
+  const L = BL_LANE, b = Math.round(blXBoard(x)), f = Math.floor(y / 12);
+  if (b < 1 || b > L.boards || f < 0 || f >= L.ft) return 0;
+  return oil[(b - 1) * L.ft + f];
+}
+// friction at a point: dry boards grip, oiled ones slide; the tide weighs the oil
+function blMu(oil, x, y, tide) {
+  const o = blOilAt(oil, x, y) * (BL_TIDE[tide] || 1), k = Math.min(1, o / BL_OIL.full);
+  return BL_OIL.muDry - (BL_OIL.muDry - BL_OIL.muOil) * Math.pow(k, .7);
+}
+// a ball's path moves oil: it picks some up from the cells it skids over (and the board each side), and lays a
+// share of that down on the dry cells past the pattern on the same boards. Returns a new grid
+function blWear(oil, path) {
+  const L = BL_LANE, out = oil.slice(), w = BL_OIL.width;
+  let carried = 0;
+  for (const [x, y] of path) {
+    const b = Math.round(blXBoard(x)), f = Math.floor(y / 12);
+    if (f < 0 || f >= L.ft) continue;
+    for (let d = -w; d <= w; d++) {
+      const bb = b + d; if (bb < 1 || bb > L.boards) continue;
+      const i = (bb - 1) * L.ft + f, share = d ? .5 / w : 1, o = out[i];
+      if (o > .02) { const t = o * BL_OIL.take * share; out[i] = o - t; carried += t; }
+      else if (carried > 0 && f >= L.oilFt) { const lay = carried * BL_OIL.carry * share * .08; out[i] = o + lay; carried -= lay; }
+    }
+  }
+  for (let i = 0; i < out.length; i++) out[i] = Math.round(out[i] * 1000) / 1000;
+  return out;
+}
+/* The Saltmere Lanes: the ball on the lane (issue #100, phase 1). A pure model, shared by Play, the CPU and the sim.
+
+   A throw is where the ball leaves the hand (x0, at the foul line), its angle (degrees; plus to the left), its speed
+   (mph), its revs (rpm), the ball (strike: reactive, it hooks; spare: plastic, it barely does) and the bowler's hand
+   (1 right, -1 left). Down the lane the ball goes through three phases:
+   - skid: through the oil, where there is little friction, so it barely turns;
+   - hook: once it finds friction its side spin bites, and it turns toward the pocket (a right-hander's ball to the
+     left), the more so the more revs it has and the slower it goes;
+   - roll: when the side spin is used up it rolls straight on, wherever it is pointing.
+   The model steps down the lane an inch or three at a time: the friction under the ball (blMu) turns its line by its
+   spin, and wears the spin down. It gives the path, where the ball meets the pins and at what angle (the entry
+   angle: 4 to 6 degrees carries best), and where it skidded, hooked and rolled. A ball whose middle leaves the lane
+   before the pins is in the gutter.
+   Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
+   the mirrored boards (so the left side of the lane, fresh, is theirs). */
+const BL_BALL = { step: 3, hook: .004, decay: .012, mu0: .043, rollAt: .045, spareSpin: .08, v0: 17, rpm0: 350, drag: .012 };
+const BL_MPH = 17.6;   // inches a second in a mile an hour
+
+// the path of a throw: { path: [[x, y]] every foot, x, m (dx/dy at the pins), entry (degrees, toward the pocket for
+// the hand), v (inches a second), spin (side spin left, 0 to 1), gutter (the y it went in, or null), skid, roll
+// (where the hook began and ended, or null) }
+function blBall(t, oil, tide) {
+  const L = BL_LANE, B = BL_BALL, h = t.hand === -1 ? -1 : 1;
+  let x = h * t.x0, m = Math.tan(h * (t.ang || 0) * Math.PI / 180), y = 0;
+  const m0 = m;
+  let v = (t.mph || B.v0) * BL_MPH;
+  let S = ((t.rpm || B.rpm0) / B.rpm0) * (t.ball === 'spare' ? B.spareSpin : 1);
+  const path = [[h * x, 0]]; let gutter = null, skid = null, roll = null, nextRec = 12;
+  while (y < L.len) {
+    const dy = Math.min(B.step, L.len - y), mu = blMu(oil, h * x, y, tide);
+    if (S > B.rollAt) {
+      const turn = B.hook * Math.max(0, mu - B.mu0) * S * dy * Math.pow(B.v0 * BL_MPH / v, 2);
+      m += turn;
+      // the skid ends where the ball has turned half a degree
+      if (skid === null && m - m0 > .009) skid = y; S -= B.decay * mu * S * dy;
+      if (S <= B.rollAt && roll === null) roll = y;
+    }
+    v = Math.max(8 * BL_MPH, v - B.drag * mu * v * dy / 12);
+    x += m * dy; y += dy;
+    if (Math.abs(x) > L.edge) { gutter = y; break; }
+    if (y >= nextRec || y >= L.len) { path.push([+(h * x).toFixed(2), +y.toFixed(1)]); nextRec += 12; }
+  }
+  return { path, x: +(h * x).toFixed(3), m: h * m, entry: +(Math.atan(m) * 180 / Math.PI).toFixed(2), v, spin: Math.max(0, S), gutter, skid, roll, hand: h };
+}
+// the throw that sends a ball from x0 to the target x at the pins (tx), by its angle: the angle found by bisection
+// (a bigger angle always ends further left). null if no angle in reach does it
+function blAimAt(t, tx, oil, tide) {
+  let lo = -6, hi = 6;
+  const at = a => { const r = blBall(Object.assign({}, t, { ang: a }), oil, tide); return r.gutter !== null ? (r.path[r.path.length - 1][0] > 0 ? 99 : -99) : r.x; };
+  if (at(lo) > tx || at(hi) < tx) return null;
+  for (let i = 0; i < 28; i++) { const mid = (lo + hi) / 2; if (at(mid) < tx) lo = mid; else hi = mid; }
+  // a ball that either gutters or hooks past the target has no angle that gets there: the bisection lands on the jump
+  const a = +((lo + hi) / 2).toFixed(4);
+  return Math.abs(at(a) - tx) < 1 ? a : null;
+}
+/* The Saltmere Lanes: the pins (issue #100, phase 1). A pure, seeded 2D model of the ball and the pins on the deck,
+   shared by Play, the CPU and the sim.
+
+   The ball arrives at the pins where the lane model left it (its x, its line, its speed and the side spin it still
+   has) and the standing pins are circles on their spots. Time steps a millisecond at a time:
+   - bodies that touch trade momentum (a 15-pound ball against 3.5-pound pins, so the ball deflects a little at each
+     pin it meets, and the less its entry angle the more it is pushed off line);
+   - a standing pin hit hard enough is knocked: it slides and tumbles, and while it tumbles it sweeps a wider circle
+     than a standing one (a falling pin is fifteen inches long), so it takes out its neighbours, the messengers;
+   - a knocked pin falls over the way it is going, and its fifteen inches land on any pin standing there, which falls
+     on in turn (the domino that carries a 4 into the 7);
+   - a pin hit too softly only wobbles and stays up;
+   - the kickbacks (the side walls of the deck) throw sliding pins back across it, and the pit swallows whatever goes
+     off the back;
+   - the ball keeps hooking on the dry deck by the spin it has left, which is what drives through the pocket.
+   A pin's knock has a little seeded scatter in its direction (pins spin and bounce in three dimensions, which this
+   model doesn't), so the same throw can carry or leave a pin; with the same seed, it always does the same.
+   It gives the pins that fell, and a trace of every body for the page to draw. */
+const BL_PIN = { dt: .001, steps: 1600, mBall: 15, mPin: 3.5, eBall: .6, ePin: .55, eKick: .45, knock: 15, fallR: 3, fallT: .04,
+  slide: 260, ballDeck: 60, scatter: .12, still: 6, traceEvery: 10, len: 15, reach: 5, pass: .4 };
+
+// a seeded stream of its own (so the pins never touch the engine's R)
+function blPinRng(seed) { return engRng((seed >>> 0) ^ 0x5bd1e995); }
+/* run the deck: standing (pin numbers), the ball at the pins { x, m, v, spin, hand }, a seed, and spots (a pin's spot
+   if it isn't on its own: Moll's rack can be off, phase 5). Returns { down: [pins], trace: [[t, ball [x, y], pins
+   { n: [x, y, up] }]], ball: [x, y] where it left } */
+function blDeck(standing, ball, seed, spots) {
+  const L = BL_LANE, P = BL_PIN, rnd = blPinRng(seed), h = ball.hand === -1 ? -1 : 1;
+  const ang = Math.atan(ball.m), y0 = L.len - 30;
+  const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: P.mBall, live: true };
+  const pins = standing.map(n => { const sp = (spots && spots[n]) || BL_SPOT[n];
+    return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin, up: true, hit: false, t: 0, gone: false }; });
+  const trace = [];
+  const snap = t => trace.push([+t.toFixed(3), [+B.x.toFixed(1), +B.y.toFixed(1)], pins.map(p => [p.n, +p.x.toFixed(1), +p.y.toFixed(1), p.hit ? 0 : 1, p.gone ? 1 : 0])]);
+  const hitSpin = (ball.spin || 0) + .25;
+  for (let k = 0; k < P.steps; k++) {
+    const t = k * P.dt;
+    // the ball: its remaining spin hooks it on the dry deck, toward its pocket side
+    if (B.live) { B.vx += h * P.ballDeck * hitSpin * P.dt; B.x += B.vx * P.dt; B.y += B.vy * P.dt; if (B.y > L.pit + 10 || Math.abs(B.x) > L.kick) B.live = false; }
+    // the pins: a knocked pin slides (and slows), tumbles wider for a moment, and goes into the pit off the back
+    for (const p of pins) {
+      if (p.gone || !p.hit) continue;
+      p.t += P.dt; if (p.t > P.fallT) p.r = P.fallR;
+      // the pin falls over the way it is going, and its length lands on whatever stands there (the domino)
+      if (p.t > P.fallT && !p.fell) { p.fell = true; const sp = Math.hypot(p.vx, p.vy);
+        if (sp > P.knock) { const ux = p.vx / sp, uy = p.vy / sp;
+          for (const q of pins) { if (q === p || q.gone || q.hit) continue; const dx = q.x - p.x, dy = q.y - p.y, along = dx * ux + dy * uy, perp = Math.abs(dx * uy - dy * ux);
+            if (along > 0 && along < P.len && perp < P.reach) { q.hit = true; q.vx = ux * sp * P.pass; q.vy = uy * sp * P.pass; } } } }
+      const s = Math.hypot(p.vx, p.vy); if (s > 0) { const ns = Math.max(0, s - P.slide * P.dt); p.vx *= ns / s; p.vy *= ns / s; }
+      p.x += p.vx * P.dt; p.y += p.vy * P.dt;
+      if (Math.abs(p.x) > L.kick - p.r && p.y > L.len - 12) { p.x = Math.sign(p.x) * (L.kick - p.r); p.vx = -p.vx * P.eKick; }
+      if (p.y > L.pit) p.gone = true;
+      if (p.y < L.len - 40 || Math.abs(p.x) > L.kick + 2) p.gone = true;
+    }
+    // contacts: the ball with each pin, and each pin with each other
+    const bodies = B.live ? [B, ...pins.filter(p => !p.gone)] : pins.filter(p => !p.gone);
+    for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++) {
+      const a = bodies[i], b = bodies[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), rr = a.r + b.r;
+      if (d >= rr || d === 0) continue;
+      const aStill = a.up && !a.hit, bStill = b.up && !b.hit;
+      if (aStill && bStill) continue;
+      let nx = dx / d, ny = dy / d;
+      const rot = (rnd() - .5) * 2 * P.scatter, c = Math.cos(rot), s = Math.sin(rot);
+      [nx, ny] = [nx * c - ny * s, nx * s + ny * c];
+      const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+      // push them apart either way, so nothing sits inside another
+      const over = (rr - d) / 2; if (a !== B && !aStill) { a.x -= nx * over; a.y -= ny * over; } if (b !== B && !bStill) { b.x += nx * over; b.y += ny * over; }
+      if (rv >= 0) continue;
+      const e = a === B || b === B ? P.eBall : P.ePin, J = -(1 + e) * rv / (1 / a.m + 1 / b.m);
+      const kick = (q, sgn) => {
+        const dv = J / q.m;
+        if (q.up && !q.hit) { if (dv < P.knock) return; q.hit = true; }
+        q.vx += sgn * nx * dv; q.vy += sgn * ny * dv;
+      };
+      kick(a, -1); kick(b, 1);
+    }
+    if (k % P.traceEvery === 0) snap(t);
+    if (!B.live && k > 200 && pins.every(p => p.gone || !p.hit || Math.hypot(p.vx, p.vy) < P.still)) { snap(t); break; }
+  }
+  return { down: pins.filter(p => p.hit).map(p => p.n).sort((a, b) => a - b), trace, ball: [+B.x.toFixed(1), +B.y.toFixed(1)] };
+}
+/* The Saltmere Lanes: the CPU's ball (issue #100, phase 1). How a side picks its line and its ball, and how far its
+   bowler's release strays, by skill: 0 a Squire, 1 a Knight, 2 an Archmage.
+
+   A strike ball aims for the pocket (the 1-3 for a right-hander, board 17.5; the 1-2 for a left-hander). The side
+   reads the lane to find the angle that gets there from where its bowler stands:
+   - a Squire reads it as it was when the game began, never moves, and throws the strike ball at every spare;
+   - a Knight reads it as it was too, but corrects by what it saw: after each of a bowler's strike balls it moves that
+     bowler's aim on that lane by half of how far they missed. It uses the spare ball, and on a split it takes the
+     bigger group;
+   - an Archmage reads the lane as it is now, and stands where the angle into the pocket is best (4 to 6 degrees).
+   Knights and Archmages try a few places to stand, and keep off a line that brushes the gutter.
+   A spare ball (plastic, it rolls straight) goes across the lane at the front pin of what is left, a touch to the
+   side that drives that pin into the rest.
+   Then the release strays by the skill (BL_SKILL: the angle, the speed and the revs), seeded through R. */
+const BL_SKILL = [
+  { n: 'Squire', ang: .28, mph: .45, rpm: 28, read: 0, spare: false, learn: 0, stands: 1 },
+  { n: 'Knight', ang: .15, mph: .25, rpm: 15, read: 0, spare: true, learn: .5, stands: 3 },
+  { n: 'Archmage', ang: .11, mph: .18, rpm: 10, read: 1, spare: true, learn: 0, stands: 5 }];
+const BL_POCKET = blBoardX(17.5);   // a right-hander's pocket at the pins (the left-hander's is its mirror)
+
+// a bowler's style: their hand, speed and revs (a team that brings none gets them from the seed)
+function blStyle(rnd) {
+  const r = rnd || R;
+  return { hand: r() < .15 ? -1 : 1, mph: +(15.5 + r() * 3).toFixed(1), rpm: Math.round(260 + r() * 180) };
+}
+// where a bowler stands for the strike ball: a hook ball from inside the pocket's line, more revs deeper inside
+const blStand = st => st.hand * blBoardX(18 + (st.rpm - 350) / 25);
+
+// the groups of standing pins that no standing pin joins (a split leaves two or more)
+function blGroups(standing) {
+  const left = standing.slice(), out = [];
+  while (left.length) {
+    const g = [left.shift()], todo = [g[0]];
+    while (todo.length) { const p = todo.pop(); for (const [a, b] of BL_ADJ) { const q = a === p ? b : b === p ? a : 0; const i = q ? left.indexOf(q) : -1; if (i >= 0) { left.splice(i, 1); g.push(q); todo.push(q); } } }
+    out.push(g.sort((a, b) => a - b));
+  }
+  return out;
+}
+// what a spare ball goes at: the front pin of the pins aimed at, hit on the side that drives it into the rest
+function blSpareTarget(pins) {
+  const key = pins.slice().sort((a, b) => BL_SPOT[a][1] - BL_SPOT[b][1] || Math.abs(BL_SPOT[a][0]) - Math.abs(BL_SPOT[b][0]))[0];
+  const [kx, ky] = BL_SPOT[key], rest = pins.filter(p => p !== key);
+  if (!rest.length) return { x: kx, y: ky, key };
+  const mx = rest.reduce((s, p) => s + BL_SPOT[p][0], 0) / rest.length, d = mx - kx;
+  return { x: kx - Math.sign(d) * Math.min(2.5, Math.abs(d) / 3), y: ky, key };
+}
+/* the side's plan for its next ball: { x0, ang, mph, rpm, ball, hand, aim: { x, y }, why } (what it means to throw,
+   before the release strays) */
+function blPlan(s) {
+  const sk = BL_SKILL[G.skill[s]], st = blStyleOf(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
+  const oil = sk.read ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
+  const base = { mph: st.mph, rpm: st.rpm, hand: st.hand };
+  if (fresh || !sk.spare) {
+    // the strike ball: at the pocket on a full rack; at the spare's front pin from the strike line otherwise
+    let target = fresh ? st.hand * BL_POCKET : blSpareTarget(stand).x, why = fresh ? 'the pocket' : 'the spare, with the strike ball';
+    if (fresh && sk.learn) target += blBiasOf(s, lane);
+    const stands = [];
+    for (let i = 0; i < sk.stands; i++) stands.push(blStand(st) + st.hand * (i - (sk.stands - 1) / 2) * 2.2);
+    let best = null;
+    for (const x0 of stands) {
+      const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide);
+      if (ang === null) continue;
+      // the best angle into the pocket, but not a line that brushes the gutter on the way
+      const r = blBall(Object.assign({ ang }, t), oil, G.tide), room = Math.min(...r.path.map(q => BL_LANE.edge - Math.abs(q[0])));
+      const score = -Math.abs(r.entry - 5.2) - (room < 6 ? (6 - room) * .8 : 0);
+      if (!best || score > best.score) best = { x0, ang, score };
+    }
+    // nothing reaches the pocket from there: walk the stand across the lane until something does
+    for (let d = 1; !best && d <= 12; d++) for (const x0 of [blStand(st) + st.hand * d * 1.6, blStand(st) - st.hand * d * 1.6]) {
+      if (best || Math.abs(x0) > BL_LANE.edge - 2) continue;
+      const t = Object.assign({ x0, ball: 'strike' }, base), ang = blAimAt(t, target, oil, G.tide); if (ang !== null) best = { x0, ang };
+    }
+    if (!best) best = { x0: blStand(st), ang: 0 };
+    return Object.assign({ x0: best.x0, ang: best.ang, ball: 'strike', aim: { x: target, y: BL_LANE.len }, why }, base);
+  }
+  // the spare ball: on a split, a Knight or an Archmage takes the bigger group (the one nearer the middle on a tie)
+  const groups = blGroups(stand).sort((a, b) => b.length - a.length || Math.min(...a.map(p => Math.abs(BL_SPOT[p][0]))) - Math.min(...b.map(p => Math.abs(BL_SPOT[p][0]))));
+  const T = blSpareTarget(groups[0]), x0 = clamp(-T.x * .7, -14, 14);
+  const t = Object.assign({ x0, ball: 'spare' }, base);
+  // aim through the pin's spot: a straight ball's x at the headpin line is close to its x at the pin
+  let ang = blAimAt(t, T.x, oil, G.tide);
+  if (ang !== null) { const r = blBall(Object.assign({ ang }, t), oil, G.tide); const a2 = blAimAt(t, T.x - r.m * (T.y - BL_LANE.len), oil, G.tide); if (a2 !== null) ang = a2; }
+  return Object.assign({ x0, ang: ang === null ? 0 : ang, ball: 'spare', aim: { x: T.x, y: T.y }, why: groups.length > 1 ? 'the safe side of the split' : 'the spare' }, base);
+}
+// a Knight's correction for this bowler on this lane (what it has learned from their strike balls there)
+const blBiasOf = (s, lane) => (G.bias[s][blBowler(s)] || [0, 0])[lane];
+// the release: the plan, strayed by the skill
+function blRelease(plan, skill) {
+  const sk = BL_SKILL[skill];
+  return Object.assign({}, plan, { ang: plan.ang + gauss() * sk.ang, mph: +(plan.mph + gauss() * sk.mph).toFixed(2), rpm: Math.max(120, Math.round(plan.rpm + gauss() * sk.rpm)) });
+}
+/* The Saltmere Lanes: a game, CPU against CPU (issue #100, phase 1). A turn loop like golf's: whose ball it is, the
+   side's plan, the release, the ball down the lane, the pins, the ball's wear on the oil, and the sheet. The page
+   (phase 2) plays the same loop with your ball in it.
+
+   start(opts) puts a game on the lanes: { frames, teams: [2 × { name, short, color, roster: [{ n, kind, style? }] }],
+   order, skill: [2], tide, seed, lead }. A bowler's style is { hand, mph, rpm }; a roster without one gets one from
+   the seed. G gains: teams, skill, tide, oil (the pair of lanes' oil, as it is now), oil0 (as it was at the start),
+   bias (a Knight's correction, a side, a bowler and a lane), st (each side's box score) and log (every ball, short).
+   turn() bowls the next ball and says what happened. simGame(opts) plays a whole game headless and returns its
+   sheet, score and box score, leaving any game on the lanes as it was. */
+let GB = null;   // the ball in play between turn() and the page's drawing (phase 2): not saved
+
+function blBox() { return { balls: 0, strikes: 0, firsts: 0, spares: 0, spareTries: 0, singles: 0, singleTries: 0, splits: 0, splitsMade: 0, sevenTen: 0, sevenTenMade: 0, opens: 0, gutters: 0, leaves: {}, pins: 0 }; }
+function blStyleOf(s, ri) {
+  const T = G.teams && G.teams[s], p = T && T.roster[ri];
+  return p && p.style ? p.style : { hand: 1, mph: 17, rpm: 350 };
+}
+function blStart(opts) {
+  const o = opts || {};
+  if (o.seed != null) engSeed(o.seed);
+  const style = engRng((o.seed == null ? 1 : o.seed) * 31 + 7);
+  const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#9b3a7a' };
+    const roster = (T.roster && T.roster.length >= BL_RULES.side ? T.roster : [0, 1, 2, 3, 4].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: 'zombie' })))
+      .map(p => Object.assign({}, p, { style: p.style ? Object.assign({}, p.style) : blStyle(style) }));
+    return Object.assign({}, T, { roster }); });
+  blNewGame({ frames: o.frames, order: o.order, lead: o.lead, roster: teams.map(T => T.roster.length) });
+  const oil = blHouse();
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
+    oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0 });
+  GB = null;
+  return G;
+}
+// bowl the next ball: the plan, the release, the lane, the pins. Returns { side, ri, frame, plan, release, ball,
+// down, roll } or null when the game is over
+function blTurn() {
+  const s = blUp(); if (s < 0) return null;
+  const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
+  const plan = blPlan(s), rel = blRelease(plan, G.skill[s]);
+  const ball = blBall(rel, G.oil[lane], G.tide);
+  const seed = Math.floor(R() * 2147483647);
+  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand }, seed) : { down: [], trace: [] };
+  G.oil[lane] = blWear(G.oil[lane], ball.path);
+  // a Knight learns from its strike balls: half of how far it missed the pocket, on that lane
+  if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (plan.aim.x - ball.x);
+  const roll = blRoll(s, deck.down);
+  blCount(s, stand, first, ball, roll);
+  G.n++;
+  G.log.push([s, ri, roll.frame, deck.down.length, roll.strike ? 'X' : roll.spare ? '/' : roll.split ? 'o' : '']);
+  GB = { s, ri, lane, plan, rel, ball, deck };
+  return { side: s, ri, frame: roll.frame, plan, release: rel, ball: { x: ball.x, entry: ball.entry, gutter: ball.gutter, skid: ball.skid, roll: ball.roll }, down: deck.down, roll };
+}
+// the box score: strikes on full racks, spares and single pins made, splits left and made, the 7-10, the leaves
+function blCount(s, stand, first, ball, roll) {
+  const B = G.st[s]; B.balls++; B.pins += roll.n; if (ball.gutter !== null) B.gutters++;
+  if (stand.length === 10 && first) { B.firsts++; if (roll.strike) B.strikes++; else { const left = G.rb[s] ? G.stand[s].slice() : stand.filter(p => !roll.pins.includes(p)); const k = left.join('-'); B.leaves[k] = (B.leaves[k] || 0) + 1; if (roll.split) { B.splits++; if (left.length === 2 && left[0] === 7 && left[1] === 10) B.sevenTen++; } } }
+  else if (!first) {
+    B.spareTries++; if (roll.spare) B.spares++;
+    if (stand.length === 1) { B.singleTries++; if (roll.spare) B.singles++; }
+    if (blIsSplit(stand) && stand.length < 10) { if (roll.spare) B.splitsMade++; if (stand.length === 2 && stand[0] === 7 && stand[1] === 10 && roll.spare) B.sevenTenMade++; }
+    if (!roll.spare) B.opens++;
+  }
+}
+// the game so far, short
+function blSummary() {
+  if (!G) return null;
+  return { over: G.over, tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
+    marks: [blMarks(0), blMarks(1)], st: JSON.parse(JSON.stringify(G.st)), skill: G.skill.slice(), tide: G.tide, balls: G.n };
+}
+// a whole game headless: leaves the game on the lanes (and the engine's random stream) as they were
+function blSimGame(opts) {
+  const keep = G, keepB = GB;
+  blStart(opts);
+  let n = 0; while (!G.over && n++ < 400) blTurn();
+  const out = Object.assign({ win: G.over ? G.over.win : -1 }, blSummary());
+  if (opts && opts.seed != null) engSeed(null);
+  G = keep; GB = keepB;
+  return out;
+}
 
 /* the end of the wBL scope: what the Realm may call (w19b-engines.js). Phase 0 is the rules: newGame(opts) starts a
    game ({ frames, order: [two orders of five], roster: [two roster sizes], lead }); up (whose ball it is), bowler (who
@@ -36788,7 +37163,14 @@ function blMatchText(s) {
    ten-pin's scoring on any sheet, isSplit(standing) the split rule and adj the pins that touch; total, marks (the
    sheet), lane (the lane of a frame), frameNo, rerack and pinch (once a game each, before a frame's first ball), and
    matchText (the game from a side's point of view). G is the game, plain JSON. The page comes in phase 2: until then
-   the lanes are never on. */
+   the lanes are never on.
+   Phase 1 is the lane, the ball, the pins and one game, CPU against CPU: geo (the lane's geometry), spots (each pin's),
+   house() a fresh oil pattern, oilAt, mu and wear(oil, path) the oil and how a ball moves it, tides; ball(throw, oil,
+   tide) the pure ball model and aimAt(throw, x, oil, tide) the angle that reaches x at the pins; deck(standing,
+   ball, seed) the pure, seeded pins; groups(standing), spareTarget(pins), skills, style() and plan(side) the CPU's
+   ball; start(opts) puts a game on the lanes ({ frames, teams, order, skill: [2], tide, seed, lead }), turn() bowls
+   the next ball, summary() is the game so far, and simGame(opts) plays a whole one headless, leaving the game on the
+   lanes as it was. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -36796,6 +37178,13 @@ return {
   score: (frames, n) => blScore(frames, n), done: (fr, tenth) => blFrameDone(fr, !!tenth), isSplit: st => blIsSplit(st), frameMarks: fr => blFrameMarks(fr),
   total: s => blTotal(s), marks: s => blMarks(s), lane: (s, f) => blLane(s, f), frameNo: s => blFrameNo(s),
   rerack: s => blRerack(s), pinch: (s, ri) => blPinch(s, ri), matchText: s => blMatchText(s),
+  // the lane, the ball, the pins and one game (phase 1)
+  geo: JSON.parse(JSON.stringify(BL_LANE)), spots: JSON.parse(JSON.stringify(BL_SPOT)), tides: Object.assign({}, BL_TIDE), oilRules: Object.assign({}, BL_OIL),
+  ballRules: Object.assign({}, BL_BALL), pinRules: Object.assign({}, BL_PIN), skills: JSON.parse(JSON.stringify(BL_SKILL)), pocket: BL_POCKET,
+  house: n => blHouse(n), oilAt: (oil, x, y) => blOilAt(oil, x, y), mu: (oil, x, y, tide) => blMu(oil, x, y, tide), wear: (oil, path) => blWear(oil, path),
+  boardX: b => blBoardX(b), xBoard: x => blXBoard(x), ball: (t, oil, tide) => blBall(t, oil, tide), aimAt: (t, x, oil, tide) => blAimAt(t, x, oil, tide),
+  deck: (st, b, seed, spots) => blDeck(st, b, seed, spots), groups: st => blGroups(st), spareTarget: p => blSpareTarget(p), style: () => blStyle(),
+  plan: s => G && G.oil ? blPlan(s) : null, start: o => blStart(o), turn: () => blTurn(), summary: () => blSummary(), simGame: o => blSimGame(o),
   show: () => {}, hide: () => {}, get on() { return false; }
 };
 
