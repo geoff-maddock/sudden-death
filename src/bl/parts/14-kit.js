@@ -26,7 +26,7 @@ function blKitStart(bags) {
   G.bags = [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null);
   G.pots = []; G.potFrame = ['', '']; G.still = [false, false]; G.chalk = [null, null];
 }
-const blFrameKey = s => (G.ro ? 'r' + G.ro + ':' : '') + blCur(s);
+const blFrameKey = blKey;
 // the kit's part in how true side s's bowler ri is now (gear's err, the chalk), and how a moment weighs on them
 function blKitErr(s, ri) { const C = G.chalk && G.chalk[s]; return (blGxOf(s, ri).err || 1) * (C && C.ri === ri && C.f === blFrameKey(s) ? BL_POTIONS.blchalk.err : 1); }
 const blKitPress = (s, ri) => (G.still && G.still[s] ? 0 : 1) * (blGxOf(s, ri).press || 1);

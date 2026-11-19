@@ -103,7 +103,7 @@ function blMeterFor(s) {
   const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, fx = blFxFor(s), pr = fx.nerve ? 0 : blPressure(s) * blKitPress(s, ri);
   const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
   const tm = BL_STANCE[blStanceOf(s).tempo].meter;
-  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err / fx.err / blKitErr(s, ri)).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
+  return { win: +(win / blCallErr(s) / fx.err / blKitErr(s, ri)).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
 }
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
@@ -195,7 +195,8 @@ function blTick(dt) {
 function blPlayNext() {
   const s = blUp();
   if (s < 0) { blGo('over'); return; }
-  const ri = blBowler(s), fr = blFrameNo(s), ball = G.rb[s] ? 'second ball' : G.stand[s].length < 10 ? 'fill ball' : 'first ball';
+  const ri = blBowler(s), fr = blFrameNo(s), now = blSheet(s)[blCur(s)] || [], tenth = blCur(s) === blSheetN() - 1;
+  const ball = !now.length ? 'first ball' : tenth && (now.length === 2 || now[0] === 10) ? 'fill ball' : 'second ball';
   const chant = G.rb[s] === 0 && G.stand[s].length === 10 && GP.streak[s] === 2 ? 'The gallery chants: TUR-KEY! TUR-KEY! ' : '';
   const off = G.hall && G.offspot && G.offspot[s] && G.rb[s] === 0 && G.stand[s].length === 10 ? `Moll has set the ${G.offspot[s].n} a touch off its spot. ` : '';
   if (GP.mode === 'manage' && s === GP.you) { const said = [blManageCall(s)].concat(GP.autoPow ? blCpuPower(s) : []).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);

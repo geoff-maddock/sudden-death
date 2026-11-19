@@ -70,8 +70,9 @@ function blBowlBall(s, plan, rel) {
   // the hall: a gutter crab, a swell, the gull (12-hall.js)
   const H = blHallAfter(s, stand, ball, deck.down); deck.down = H.down;
   G.oil[lane] = blWear(G.oil[lane], ball.path);
-  // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader
-  if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
+  // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader.
+  // Only a plan aimed at the pins (the CPU's, the captain's): a ball you bowl by hand aims at your arrow, 15 feet down
+  if (fresh && plan.ball === 'strike' && plan.why !== 'yours' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
   // the arm: this ball costs the bowler some (a power ball more)
   G.arm[s][ri] = Math.max(0, +(G.arm[s][ri] - blArmCost(s, rel.power)).toFixed(3));
   // the scout sees a strike ball's stand; the coach's word is spent on this ball
@@ -113,13 +114,16 @@ function blSummary() {
 }
 // a whole game headless: leaves the game on the lanes (and the engine's random stream) as they were
 function blSimGame(opts) {
-  const keep = G, keepB = GB;
-  blStart(opts);
-  let n = 0; while (!G.over && n++ < 400) blTurn();
-  const out = Object.assign({ win: G.over ? G.over.win : -1 }, blSummary());
-  if (opts && opts.seed != null) engSeed(null);
-  G = keep; GB = keepB;
-  return out;
+  // (the page's game is set aside, so the sim's balls never reach its tracks; the random stream is put back as it was)
+  const keep = G, keepB = GB, keepP = GP, keepR = engRand;
+  GP = null;
+  // (unseeded, a stream of its own, so a seeded game on the lanes draws the same numbers after it as without it)
+  if (!opts || opts.seed == null) engRand = engRng((Math.random() * 4294967296) >>> 0);
+  try {
+    blStart(opts);
+    let n = 0; while (!G.over && n++ < 400) blTurn();
+    return Object.assign({ win: G.over ? G.over.win : -1 }, blSummary());
+  } finally { G = keep; GB = keepB; GP = keepP; engRand = keepR; }
 }
 
 // the game as it stands between balls, plain JSON (a match saved and left); and back

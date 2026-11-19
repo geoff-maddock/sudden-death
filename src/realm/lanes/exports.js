@@ -46,7 +46,7 @@ return {
   roll: (s, p) => blRoll(s, p), whyNot: s => blWhyNot(s),
   score: (frames, n) => blScore(frames, n), done: (fr, tenth) => blFrameDone(fr, !!tenth), isSplit: st => blIsSplit(st), frameMarks: fr => blFrameMarks(fr),
   total: s => blTotal(s), marks: s => blMarks(s), lane: (s, f) => blLane(s, f), frameNo: s => blFrameNo(s),
-  rerack: s => blRerack(s), pinch: (s, ri) => blPinch(s, ri), matchText: s => blMatchText(s),
+  rerack: s => blRerack(s), pinch: (s, ri) => blPinch(s, ri), beforeFrame: s => blBeforeFrame(s), matchText: s => blMatchText(s),
   // the lane, the ball, the pins and one game (phase 1)
   geo: JSON.parse(JSON.stringify(BL_LANE)), spots: JSON.parse(JSON.stringify(BL_SPOT)), tides: Object.assign({}, BL_TIDE), oilRules: Object.assign({}, BL_OIL),
   ballRules: Object.assign({}, BL_BALL), pinRules: Object.assign({}, BL_PIN), skills: JSON.parse(JSON.stringify(BL_SKILL)), pocket: BL_POCKET,

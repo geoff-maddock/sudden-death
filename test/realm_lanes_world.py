@@ -130,6 +130,31 @@ async def main():
         hp = await pg.evaluate("({ game: !!$('wHelpLanesGame'), how: ['Matches.', 'The hall.'].every(w => ($('wLanesHow') || {}).textContent.includes(w)) })")
         check(hp == {'game': True, 'how': True}, 'How to play explains matches and the hall', hp)
 
+        # ---------- found in review ----------
+        # a sim leaves the page's game alone: its tracks, and its seeded stream
+        sm = await pg.evaluate("""(() => { const run = sim => { wBL.start({ seed: 21, mode: 'watch', teams: [__five(), __five()] }); wBL.pause(true); let n = 0; while (wBL.G.n < 4 && n++ < 3000) wBL.tick(0.05); __to('next');
+            const tr = JSON.stringify(wBL.tracks); if (sim) { wBL.simGame({ teams: [__five(), __five()] }); wBL.simGame({ seed: 3, teams: [__five(), __five()] }); } const same = JSON.stringify(wBL.tracks) === tr;
+            n = 0; while (wBL.G.n < 9 && n++ < 3000) wBL.tick(0.05); return { same, log: JSON.stringify(wBL.G.log) }; };
+          const a = run(false), b = run(true); return { tracks: b.same, stream: a.log === b.log }; })()""")
+        check(sm == {'tracks': True, 'stream': True}, 'a simulated game never touches the game on the lanes: not its tracks, nor its seeded stream', sm)
+        # your own ball never teaches the coach a wrong line; your mark carries the line's miss
+        cb = await pg.evaluate("""(() => { const go = line => { wBL.start({ seed: 5, mode: 'play', teams: [__five(), __five()] }); wBL.pause(true); __to('aim'); if (line) wBL.select({ line }); const b0 = JSON.stringify(wBL.G.bias[0]);
+            wBL.press(); const win = wBL.view.meter.win; wBL.press(); let n = 0; while (wBL.view.meter && wBL.view.meter.st !== 'gone' && n++ < 400) wBL.tick(0.005); wBL.press(); __to('rest');
+            return { win, same: JSON.stringify(wBL.G.bias[0]) === b0 }; };
+          const p = go(null), d = go('deep'); return { bias: p.same && d.same, ratio: +(p.win / d.win).toFixed(3), want: wBL.lines.deep.err }; })()""")
+        check(cb['bias'] and abs(cb['ratio'] - cb['want']) < .01, 'a ball you bowl by hand leaves the coach\'s read alone, and Deep inside narrows your mark as it widens the CPU\'s miss', cb)
+        # the tenth: a fill ball is called one, and the pinch and re-rack are gone after the frame's first ball
+        fl = await pg.evaluate("""(() => { wLanesGame({ seed: 4, mode: 'play' }); wBL.pause(true); __to('aim'); let k = 0; while (!(wBL.up() === 0 && wBL.frameNo(0) === wBL.G.frames) && k++ < 200) wBL.roll(wBL.up(), 0); wBL.roll(0, 10); wBL.setMode('watch'); wBL.setMode('play'); __to('aim');
+          wLanesRows(); return { msg: wBL.msg, pinch: $('wLanesRowPinch').hidden, why: wBL.beforeFrame(0) }; })()""")
+        check('fill ball' in fl['msg'] and fl['pinch'] and fl['why'], 'the tenth after a strike: the next ball is a fill ball, and the pinch row is gone', fl)
+        # Save and leave while your ball rolls: the ball counts, and is never bowled again
+        await pg.evaluate("(() => { if (WBL) wLeaveLanes(); WG.lng.met = {}; WG.lng.live = null; })()")
+        sl = await pg.evaluate("""(() => { wStartLanes({ club: 'local', how: 'play' }); wBL.pause(true); __to('aim'); const n0 = wBL.G.n;
+          wBL.press(); wBL.press(); let n = 0; while (wBL.view.meter && wBL.view.meter.st !== 'gone' && n++ < 400) wBL.tick(0.005); wBL.press(); __to('roll');
+          const ph = wBL.phase; wLanesLeaveGame(); const L = WG.lng.live; return { ph, n0, kept: L && L.snap.G.n, live: !!L }; })()""")
+        check(sl['ph'] == 'roll' and sl['live'] and sl['kept'] == sl['n0'] + 1, 'Save and leave while your ball rolls keeps the match after that ball', sl)
+        await pg.evaluate("(() => { wResumeLanes(); wBL.pause(true); WG.lng.live && wLanesCallOff('test'); if (WBL) { WBL = null; } showView('world'); })()")
+
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

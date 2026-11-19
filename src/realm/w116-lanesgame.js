@@ -112,6 +112,12 @@ function wResumeLanes() {
 }
 function wLanesLeaveGame() {
   const L = wLanesLive() && WG.lng.live; if (!L) return wLeaveLanes();
+  // a ball bowled and still rolling (or resting) counts: a game it decided is played out and settled, and any other is
+  // kept as it stands after that ball, so leaving can never bowl it again
+  if (wLanesWorld() && (wBL.phase === 'roll' || wBL.phase === 'rest')) {
+    if (wBL.G.over) { let n = 0; while (wLanesLive() && wBL.phase !== 'over' && n++ < 4000) wBL.tick(0.1); if (!wLanesLive()) { WBL = null; wW116LeaveLanes(); wSave(); return; } }
+    else L.snap = wBL.snapshot();
+  }
   const sn = L.snap;
   WLNG.asked = true;
   WBL = null; wW116LeaveLanes();
@@ -251,7 +257,7 @@ const wW116LanesRows2 = wLanesRows;
 wLanesRows = function () {
   wW116LanesRows2();
   const V = WBL && !WBL.over && wBL.G && wBL.G.teams ? wBL.view : null; if (!V || V.mode !== 'play' || V.up !== V.you || !V.sel) return;
-  const O = wBL.offspot && wBL.offspot[V.you], G = wBL.G; if (!O || G.rb[V.you] || G.stand[V.you].length < 10) return;
+  const O = wBL.offspot && wBL.offspot[V.you], G = wBL.G; if (!O || G.rb[V.you] || G.stand[V.you].length < 10 || wBL.beforeFrame(V.you)) return;
   $('wLanesRowPinch').hidden = false;
   $('wLanesPinch').insertAdjacentHTML('beforeend', ` · <button class="ghost" data-nrerack="1" ${G.rerack[V.you] || V.ph !== 'aim' ? 'disabled' : ''} title="Once a game, before the frame's first ball: Moll sets the rack again">Re-rack (the ${O.n} is off its spot)</button>`);
 };

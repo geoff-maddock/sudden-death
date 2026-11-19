@@ -48,7 +48,7 @@ wLanesRows = function () {
     + [['heavy', 'Heavy ball', 'H: more carry through the pins, more arm, a few less revs'], ['light', 'Light ball', 'H: more revs, and it deflects more']].map(([k, n, t]) => `<button class="ghost${on(k, st.ball)}" data-nweight="${k}" ${dis} title="${esc(t)}">${n}</button>`).join(' ') + ' · '
     + `<button class="ghost${won ? ' on' : ''}" data-nword="1" ${aim && wl > 0 && !won ? '' : 'disabled'} title="W: once a game. This ball's guide line and the chart follow the oil as it is now">${won ? 'Coach\'s word: on' : `Coach's word (${wl} left)`}</button>`;
   const used = G.pinched[s], arm = wBL.arm, T = G.teams[s];
-  $('wLanesRowPinch').hidden = !fresh || !G.stand[s].length || G.stand[s].length < 10;
+  $('wLanesRowPinch').hidden = !fresh || !G.stand[s].length || G.stand[s].length < 10 || !!wBL.beforeFrame(s);
   $('wLanesPinch').innerHTML = used ? '<small class="hint">Used this game.</small>' : T.roster.map((m, i) => i === V.bowler ? '' : `<button class="ghost" data-npinch="${i}" ${dis} title="Once a game: ${esc(m.n)} bowls this frame instead">${esc(m.n)} <small>${Math.round(arm[s][i] * 100)}%</small></button>`).join(' ') + ' <small class="hint">Once a game: another of your five bowls this frame.</small>';
 };
 

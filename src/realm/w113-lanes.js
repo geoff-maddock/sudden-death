@@ -127,7 +127,7 @@ function wLanesSheet() {
 function wLanesLogHTML() {
   const G = wBL.G, out = [];
   for (const s of [0, 1]) wBL.marks(s).game.forEach((f, i) => { if (f.score == null && !(f.b.length && (f.b[0] === 'X' || f.b.length >= 2))) return;
-    const ri = G.order[s][i % wBL.rules.side], m = G.teams[s].roster[ri];
+    const L = G.log.find(e => e[0] === s && e[2] === i + 1), ri = L ? L[1] : G.order[s][i % wBL.rules.side], m = G.teams[s].roster[ri];
     out.push({ i, s, h: `<li style="border-left-color:${G.teams[s].color}"><small>Frame ${i + 1}</small> ${esc(G.teams[s].name)}: ${esc(m ? m.n : '')} <b>${esc(f.b.join(' '))}</b>${f.split ? ' <small>(split)</small>' : ''}${f.score != null ? `, ${f.score}` : ''}</li>` }); });
   if (!out.length) return '<li class="hint">No frames bowled yet.</li>';
   return out.sort((a, b) => b.i - a.i || b.s - a.s).map(o => o.h).join('');
