@@ -164,8 +164,9 @@ async def main():
           for (let i = 0; i < 30; i++) wDrawMap(c, 'world', cx + i / 15, cy, 1200, 800, i / 60, { night: .8, lights: [[48, 38, 4], [50, 36, 3]] });
           c.getImageData(0, 0, 1, 1);
           const night = (performance.now() - t1) / 30;
-          // the same frames with the chunk cache cleared before each: what a repaint costs without it, on this machine
-          const U = []; for (let i = 0; i < 12; i++) { wInvalidate('world'); const a = performance.now(); wDrawMap(c, 'world', cx + (i % 30) / 15, cy, 1200, 800, i / 60, {}); U.push(performance.now() - a); }
+          // the same frames with the chunk cache cleared before each: what a repaint costs without it, on this machine (three:
+          // each rebuilds every chunk in view, and on CI's runners one takes many seconds)
+          const U = []; for (let i = 0; i < 3; i++) { wInvalidate('world'); const a = performance.now(); wDrawMap(c, 'world', cx + (i % 30) / 15, cy, 1200, 800, i / 60, {}); U.push(performance.now() - a); }
           c.getImageData(0, 0, 1, 1); U.sort((a, b) => a - b);
           return { avg: total, median: T[N >> 1], p95: T[Math.floor(N * .95)], night, dpr: devicePixelRatio, uncached: U[U.length >> 1] };
         })()""")
