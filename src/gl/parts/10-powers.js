@@ -107,6 +107,15 @@ function glPowersStart(o) {
   G.powSides = Array.isArray(o.powers) ? o.powers.map(Boolean) : [G.powers, G.powers];
   G.mana = [GL_MANA.start, GL_MANA.start]; G.roar = [0, 0]; G.fx = [null, null]; G.curse = [null, null]; G.mark = null;
   G.ultUsed = [false, false]; G.sitUsed = [{}, {}]; G.sitOn = [null, null]; G.steadyOn = [false, false]; G.casts = [];
+  // (powOnly: [id or null, id or null], the lab's: a side may cast only the power with that id, so one power can be
+  // measured on its own; null for no limit)
+  G.powOnly = Array.isArray(o.powOnly) ? o.powOnly.map(x => x || null) : null;
+}
+// the id of the power a cast of k by (s, ri) would be: a player's everyday power, their ultimate, or k itself
+function glPowIdOf(s, k, ri) {
+  if (k === 'pow') { const P = glPowNow(s, ri); return P ? P.id : null; }
+  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? 0 : ri]; return (GL_ULT[m && m.kind] || GL_ULT.goblin).id; }
+  return k;
 }
 // the everyday power player ri of side s would cast for their next stroke: long or short by the shot
 function glPowNow(s, ri) {
@@ -120,6 +129,7 @@ function glPowNow(s, ri) {
 function glPowWhy(s, k, ri) {
   if (!G.powers || !G.powSides[s]) return 'No powers in this game.';
   if (G.hole.done[s]) return 'Your side is done with this hole.';
+  if (G.powOnly && G.powOnly[s] && glPowIdOf(s, k, ri) !== G.powOnly[s]) return 'Not in this game.';
   if (k === 'pow') { const P = glPowNow(s, ri); if (!P) return ''; if (G.fx[s]) return 'One power a stroke.'; return G.mana[s] < P.cost ? `It costs ${P.cost} mana.` : ''; }
   if (k === 'ult') { if (G.ultUsed[s]) return 'Once a game.'; if (G.mark && G.mark.h === G.h) return 'This hole already bears a mark.'; return G.roar[s] < GL_ROAR.ult ? `It takes ${GL_ROAR.ult} roar.` : ''; }
   if (k === 'steady') { if (G.steadyOn[s]) return 'Already steady.'; if (!glPressure(s)) return 'Nothing riding on this stroke.'; return G.roar[s] < GL_ROAR.steady ? `It takes ${GL_ROAR.steady} roar.` : ''; }

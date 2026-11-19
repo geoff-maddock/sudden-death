@@ -34178,14 +34178,16 @@ function glAway(dist) {
 }
 
 /* ---------- strokes ---------- */
-// a stroke by player ri of a side. Returns { ok, why, picked } (picked: this stroke reached the cap and the ball is lifted)
-function glStroke(side, ri) {
+// a stroke by player ri of a side. Returns { ok, why, picked } (picked: this stroke reached the cap and the ball is lifted).
+// later: the caller checks the cap itself once it knows how the stroke ended (glShoot: a ball holed on the stroke that
+// reaches the cap still counts), so picked is false
+function glStroke(side, ri, later) {
   const H = G.hole;
   if (G.over) return { ok: false, why: 'The game is over.' };
   if (H.done[side]) return { ok: false, why: 'That side is done with this hole.' };
   if (!glCanHit(side, ri)) return { ok: false, why: glWhyNot(side, ri) };
   H.st[side]++; H.last[side] = ri; H.hit[side].push(ri);
-  return { ok: true, picked: glCapCheck(side) };
+  return { ok: true, picked: later ? false : glCapCheck(side) };
 }
 // a penalty drop: one more stroke, nobody's swing
 function glDrop(side) {
@@ -34908,7 +34910,7 @@ function glGive(by) {
 }
 // side s hits plan; r is where the ball went (glHit's for the CPU, or a swing by hand: glStrike). Counts it
 function glShoot(s, plan, r) {
-  const H = glHoleNow(), h0 = G.res.length, Hs = G.hole, no = h0 + 1, d0 = glDistOf(H, s), lie0 = G.ball[s].lie, fx = glFxFor(s), st = glStroke(s, plan.ri);
+  const H = glHoleNow(), h0 = G.res.length, Hs = G.hole, no = h0 + 1, d0 = glDistOf(H, s), lie0 = G.ball[s].lie, fx = glFxFor(s), st = glStroke(s, plan.ri, true);
   if (st.ok && G.webbed) G.webbed[s] = false;
   if (!st.ok) return { k: 'refused', why: st.why };
   const S = G.stat[s];
@@ -34923,6 +34925,9 @@ function glShoot(s, plan, r) {
   if (lie0 === 'T' && Hs.par > 3 && Hs.st[s] === 1) { S.fwTry++; if (r.lie === 'F' && !r.water) S.fw++; if (plan.club === 'dr' && !r.water) S.drive = Math.max(S.drive, Math.round(hyp(r.end.x - H.tee.x, r.end.y - H.tee.y))); }
   if (!r.water && (r.holed || G.ball[s].lie === 'G') && !G.gir[s] && Hs.st[s] <= Hs.par - 2) { G.gir[s] = true; S.gir++; }
   const ev = { k: 'shot', no, side: s, ri: plan.ri, kind: plan.kind, line: plan.line || '', club: r.club || plan.club, lie0, d0: +d0.toFixed(1), lie: G.ball[s].lie, d1: +glDistOf(H, s).toFixed(1), water: !!r.water, holed: !!r.holed, lip: !!r.lip, st: Hs.st[s] };
+  // the cap, now the stroke's end is known: a ball holed on the stroke that reaches it counts (glHoled closes the hole);
+  // any other ball is lifted there, before a water drop (which then adds nothing, as the side is done)
+  if (!(r.holed && !r.water)) glCapCheck(s);
   if (r.water) { S.water++; glDrop(s); }
   // the wood's own ways on a ball that has stopped: the bees, the Gloomcap
   ev.wood = glWoodAfter(s, plan.ri, ev);
@@ -34932,8 +34937,6 @@ function glShoot(s, plan, r) {
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);
   glKitAfter(s, plan);
-  // holed on the stroke that reached the cap: it still counts
-  if (r.holed && Hs.up[s] && !r.water) { Hs.up[s] = false; Hs.done[s] = false; }
   ev.up = !!Hs.up[s] && !r.holed;
   if (r.holed && !r.water && !Hs.done[s]) glHoled(s); else glDecide();
   return glLogEv(ev, h0, Hs);
@@ -34945,12 +34948,20 @@ function glLogEv(ev, h0, Hs) {
   glAfterHole(h0, Hs);
   return ev;
 }
+// the end of the game, said once: onOver with the summary. Four places reach the end (a CPU turn on show, a hole closed
+// with no page, your putt given, a ball come to rest), each when its own moment is right; this keeps it to one call
+// (G.overSaid, plain data, so a kept game says it once too)
+function glSayOver() {
+  if (!G || !G.over || G.overSaid || !GL_HOOK.onOver) return;
+  G.overSaid = true;
+  try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+}
 // one shot by the CPU (or a putt given). Returns what happened, or null when the game is over
 function glTurn() {
   const n = glNext(); if (!n) return null;
   const s = n.side, ev = glCpuGives(n) ? glGive(1 - s) : (() => { glCpuCall(s); const ri = glPickHitter(s, glShotKind(glHoleNow(), s)); glCpuPotion(s, ri); glCpuPower(s, ri); const plan = glPlan(s, ri); return glShoot(s, plan, glHit(s, plan)); })();
   // (glAfterHole leaves the end to the page when a game is on show; turn() is not the page, so it says it here)
-  if (GD && G.over && ev && ev.res != null && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  if (GD && ev && ev.res != null) glSayOver();
   return ev;
 }
 // a hole just ended: its card and stats, then the next tee (or the end)
@@ -34963,7 +34974,7 @@ function glAfterHole(h0, Hs) {
     if (Hs.done[s] && !Hs.up[s]) { const u = Hs.par - Hs.st[s]; if (u === 1) G.stat[s].birdies++; else if (u >= 2) G.stat[s].eagles++; }
   }
   // (with a game on show the page says when it is over, once the last ball has stopped: 07-play.js)
-  if (G.over) { if (GL_HOOK.onOver && !GD) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); } }
+  if (G.over) { if (!GD) glSayOver(); }
   else glHoleStart();
 }
 function glSummary() {
@@ -35074,7 +35085,7 @@ function glGiven(by) {
   const end = ev.res != null;
   glGo('given', end ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
   if (end) glDispMatch();
-  if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  if (end) glSayOver();
 }
 const glFeet = n => `${n} ${n === 1 ? 'foot' : 'feet'}`;
 const glYards = d => d < 1 ? glFeet(Math.max(1, Math.round(d * 3))) : `${Math.round(d)} ${Math.round(d) === 1 ? 'yard' : 'yards'}`;
@@ -35105,7 +35116,7 @@ function glAnimDone() {
     if (last) GD.disp.balls[A.side] = Object.assign({}, GD.disp.balls[A.side], { x: last.x, y: last.y });
   }
   glGo('rest', end ? GL_PACE.hole : GL_PACE.rest);
-  if (end && G.over && GL_HOOK.onOver) try { GL_HOOK.onOver(glSummary()); } catch (e) { console.error(e); }
+  if (end) glSayOver();
 }
 // where the moving ball is drawn now: { x, y, z } (or null with nothing moving)
 function glAnimBall() {
@@ -35822,6 +35833,15 @@ function glPowersStart(o) {
   G.powSides = Array.isArray(o.powers) ? o.powers.map(Boolean) : [G.powers, G.powers];
   G.mana = [GL_MANA.start, GL_MANA.start]; G.roar = [0, 0]; G.fx = [null, null]; G.curse = [null, null]; G.mark = null;
   G.ultUsed = [false, false]; G.sitUsed = [{}, {}]; G.sitOn = [null, null]; G.steadyOn = [false, false]; G.casts = [];
+  // (powOnly: [id or null, id or null], the lab's: a side may cast only the power with that id, so one power can be
+  // measured on its own; null for no limit)
+  G.powOnly = Array.isArray(o.powOnly) ? o.powOnly.map(x => x || null) : null;
+}
+// the id of the power a cast of k by (s, ri) would be: a player's everyday power, their ultimate, or k itself
+function glPowIdOf(s, k, ri) {
+  if (k === 'pow') { const P = glPowNow(s, ri); return P ? P.id : null; }
+  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? 0 : ri]; return (GL_ULT[m && m.kind] || GL_ULT.goblin).id; }
+  return k;
 }
 // the everyday power player ri of side s would cast for their next stroke: long or short by the shot
 function glPowNow(s, ri) {
@@ -35835,6 +35855,7 @@ function glPowNow(s, ri) {
 function glPowWhy(s, k, ri) {
   if (!G.powers || !G.powSides[s]) return 'No powers in this game.';
   if (G.hole.done[s]) return 'Your side is done with this hole.';
+  if (G.powOnly && G.powOnly[s] && glPowIdOf(s, k, ri) !== G.powOnly[s]) return 'Not in this game.';
   if (k === 'pow') { const P = glPowNow(s, ri); if (!P) return ''; if (G.fx[s]) return 'One power a stroke.'; return G.mana[s] < P.cost ? `It costs ${P.cost} mana.` : ''; }
   if (k === 'ult') { if (G.ultUsed[s]) return 'Once a game.'; if (G.mark && G.mark.h === G.h) return 'This hole already bears a mark.'; return G.roar[s] < GL_ROAR.ult ? `It takes ${GL_ROAR.ult} roar.` : ''; }
   if (k === 'steady') { if (G.steadyOn[s]) return 'Already steady.'; if (!glPressure(s)) return 'Nothing riding on this stroke.'; return G.roar[s] < GL_ROAR.steady ? `It takes ${GL_ROAR.steady} roar.` : ''; }
@@ -36443,7 +36464,8 @@ for (const ev of ['pointerup', 'pointercancel']) GLP.cv.addEventListener(ev, glP
 /* the end of the wGL scope: what the Realm may call (w19b-engines.js). Phase 0 is the rules: newGame(opts) starts a
    game ({ holes, pars, honour }); hitters and canHit (who may hit for a side), away (who plays next, from the two
    distances to the hole), stroke, drop, holed and concede (each returns what happened, and whether the hole and the
-   match are decided), matchText (the match from a side's point of view), parOf and holeNo. G is the game, plain JSON.
+   match are decided), decide (close the hole when it is decided: stroke and drop don't, as the caller may still mean
+   to hole the ball; holeState says whether it is, and the game's own shot calls decide itself), matchText (the match from a side's point of view), parOf and holeNo. G is the game, plain JSON.
    Phase 1 is the course, the shot and one game, CPU against CPU: course(i) is hole i of the game's course (or of the
    standing nine, with no game), built(seed, par) any hole; lie and slope read a hole; clubs, lies and swing are the
    tables; reach, flight, putt and read are the pure shot model; plan is the caddie's shot for a side; start(opts) puts a
@@ -36462,7 +36484,7 @@ return {
   newGame: o => { GD = null; return glNewGame(o); }, pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
   hitters: s => glHitters(s), canHit: (s, ri) => glCanHit(s, ri), whyNot: (s, ri) => glWhyNot(s, ri), away: d => glAway(d),
   stroke: (s, ri) => glStroke(s, ri), drop: s => glDrop(s), holed: s => glHoled(s), concede: s => glConcede(s),
-  holeState: () => glHoleState(), up: () => glUp(), left: () => glLeft(), matchText: s => glMatchText(s),
+  holeState: () => glHoleState(), decide: () => glDecide(), up: () => glUp(), left: () => glLeft(), matchText: s => glMatchText(s),
   // ratings, roles, focus and nerve (phase 3): stats (the six, in order), rate(kind) (1 to 12), cap, fit(r, role) (r 1 to
   // 12), autoRoles(roster), focus (G.focus), pressure(side), and the tables behind them
   stats: GL_STATS.slice(), rate: k => glRate(k), cap: GL_RCAP, roles: ['tee', 'approach', 'short', 'putt'],

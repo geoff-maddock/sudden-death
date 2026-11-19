@@ -23,6 +23,11 @@ Your four: a fresh journey with five players at level 3, the caddie's four in th
   (a level down) wins.
 - rule: how often the hitter rule moves a shot off its role's player.
 - cups: a fresh journey at level 3, Simulate every round: how far it gets, how often it wins.
+- single (issue #95): each thing on its own, even level, both Knights, against the same match without it.
+  Powers: for every kind, a four of that kind, with only that one power castable by your side (powOnly; the other
+  side has none), against the four with no powers; each everyday power, second power and ultimate, with how often it
+  was cast a match; and the situation powers and Steady with your own four. Gear: each piece on the player whose role
+  uses it. Potions: a bag of two of that one, given by your caddie as a Knight would.
 Writes /tmp/realm_links_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
@@ -31,7 +36,7 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 120
 OVR = sys.argv[2] if len(sys.argv) > 2 else ''
-PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,enchant,rule,cups').split(','))
+PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,enchant,rule,cups,single').split(','))
 
 SETUP = r"""
 window.__lab = {};
@@ -49,6 +54,13 @@ __lab.four = (lvl, bonus) => { const kinds = __lab.kinds || wFourMine().roster.m
 // a rival as the world sets it at a tier, its kept four drawn again each match
 __lab.opp = (club, t) => { delete wLkg().opp[club]; return wLinksOpp(club, t); };
 __lab.base = { holes: 9, weather: 'breeze', wood: true, powers: true, enchant: true };
+// play n matches and count side 0's casts of one power id: { win, casts (a match) }
+__lab.playCast = (n, o, id) => { let w = 0, c = 0;
+  for (let i = 0; i < n; i++) { const r = wGL.simGame(Object.assign({ seed: 1000 + i }, __lab.base, o(i))); if (r.win === 0) w++; c += r.casts.filter(x => x.side === 0 && x.id === id).length; }
+  return { win: +(100 * w / n).toFixed(1), casts: +(c / n).toFixed(2) }; };
+// a four of one kind at level 3 (pw: { long, short } 1 for a player's second power), in your roles' order
+__lab.fourOf = (kind, pw) => { const roster = [0, 1, 2, 3].map(() => Object.assign(wLinksPlayer(wMakePlayer({ kind, lvl: 3 }, 'opp')), pw ? { pw } : {}));
+  return { name: 'Us', roster, roles: { tee: 0, approach: 1, short: 2, putt: 3 } }; };
 // play n matches; o(i) gives the options; returns { win, over, holes, upW }
 __lab.play = (n, o) => { let w = 0, over = 0, k = 0, po = 0, early = 0;
   for (let i = 0; i < n; i++) { const r = wGL.simGame(Object.assign({ seed: 1000 + i }, __lab.base, o(i))); if (r.win === 0) w++; if (r.played > r.holes) po++; if (r.played < r.holes) early++;
@@ -105,6 +117,33 @@ async def main():
                   both: __lab.play({N}, i => ({{ teams: [__lab.mine(), opp(i)], skill: sk, bags: [mineBag, theirs] }})), full: __lab.play({N}, i => ({{ teams: [geared(), opp(i)], skill: sk, bags: [mineBag, theirs] }})) }}; }}
               return o; }})()""")
             print('Gear and potions:', json.dumps(out['kits']))
+        if 'single' in PARTS:
+            out['single'] = await pg.evaluate(f"""(() => {{ const pw = {{}}, gear = {{}}, pots = {{}}, sit = {{}};
+              for (const kind of Object.keys(wGL.pow)) {{
+                try {{ __lab.fourOf(kind); }} catch (e) {{ continue; }}
+                const opp = () => __lab.four(3, 0), base = __lab.play({N}, () => ({{ teams: [__lab.fourOf(kind), opp()], skill: [1, 1], powers: false }})).win, row = {{ base }};
+                const one = (id, alt) => __lab.playCast({N}, () => ({{ teams: [__lab.fourOf(kind, alt ? {{ long: 1, short: 1 }} : null), opp()], skill: [1, 1], powers: [true, false], powOnly: [id, null] }}), id);
+                const P = wGL.pow[kind], P2 = wGL.pow2[kind], U = wGL.ult[kind];
+                if (P) {{ row[P[0].id] = one(P[0].id); row[P[1].id] = one(P[1].id); }}
+                if (P2) {{ row[P2[0].id] = one(P2[0].id, true); row[P2[1].id] = one(P2[1].id, true); }}
+                if (U) row[U.id] = one(U.id);
+                pw[kind] = row; }}
+              const mineBase = __lab.play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 1], powers: false }})).win;
+              sit.base = mineBase;
+              for (const id of [...Object.keys(wGL.sit), 'steady']) sit[id] = __lab.playCast({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 1], powers: [true, false], powOnly: [id, null] }}), id);
+              const roleOf = {{ gl_driver: 0, gl_tee: 0, gl_irons: 1, gl_glove: 1, gl_wedge: 2, gl_putter: 3 }};
+              gear.base = __lab.play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 1] }})).win;
+              for (const id of Object.keys(roleOf)) gear[id] = __lab.play({N}, () => {{ const T = __lab.mine(), i = roleOf[id], G = Object.assign({{ id }}, W_GEAR[id]); T.roster[i] = Object.assign({{}}, T.roster[i], {{ r: wGearRate(T.roster[i].r, G, wGL.cap), gear: wGearTag(G) }}); return {{ teams: [T, __lab.four(3, 0)], skill: [1, 1] }}; }}).win;
+              pots.base = gear.base;
+              for (const id of Object.keys(wGL.potions)) pots[id] = __lab.play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 1], bags: [{{ [id]: 2 }}, null] }})).win;
+              return {{ powers: pw, situation: sit, gear, potions: pots }}; }})()""")
+            S = out['single']
+            print('One power at a time (your side only; win against the same four with none):')
+            for kind, row in S['powers'].items():
+                print(f"  {kind} (none {row['base']}%): " + ', '.join(f"{k} {v['win']}% ({v['casts']}/match)" for k, v in row.items() if k != 'base'))
+            print('Situation powers and Steady (none ' + str(S['situation']['base']) + '%):', ', '.join(f"{k} {v['win']}% ({v['casts']})" for k, v in S['situation'].items() if k != 'base'))
+            print('One piece of gear (none ' + str(S['gear']['base']) + '%):', ', '.join(f"{k} {v}%" for k, v in S['gear'].items() if k != 'base'))
+            print('One potion, two in the bag (none ' + str(S['potions']['base']) + '%):', ', '.join(f"{k} {v}%" for k, v in S['potions'].items() if k != 'base'))
         if 'enchant' in PARTS:
             out['enchant'] = await pg.evaluate(f"""(() => {{ const go = (lv, x) => __lab.play({N}, () => Object.assign({{ teams: [__lab.mine(), __lab.four(lv, 0)], skill: [1, 1] }}, x));
               return {{ on: go(3, {{}}), off: go(3, {{ enchant: false, wood: false }}), upOn: go(4, {{}}), upOff: go(4, {{ enchant: false, wood: false }}) }}; }})()""")

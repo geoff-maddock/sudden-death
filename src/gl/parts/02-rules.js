@@ -73,14 +73,16 @@ function glAway(dist) {
 }
 
 /* ---------- strokes ---------- */
-// a stroke by player ri of a side. Returns { ok, why, picked } (picked: this stroke reached the cap and the ball is lifted)
-function glStroke(side, ri) {
+// a stroke by player ri of a side. Returns { ok, why, picked } (picked: this stroke reached the cap and the ball is lifted).
+// later: the caller checks the cap itself once it knows how the stroke ended (glShoot: a ball holed on the stroke that
+// reaches the cap still counts), so picked is false
+function glStroke(side, ri, later) {
   const H = G.hole;
   if (G.over) return { ok: false, why: 'The game is over.' };
   if (H.done[side]) return { ok: false, why: 'That side is done with this hole.' };
   if (!glCanHit(side, ri)) return { ok: false, why: glWhyNot(side, ri) };
   H.st[side]++; H.last[side] = ri; H.hit[side].push(ri);
-  return { ok: true, picked: glCapCheck(side) };
+  return { ok: true, picked: later ? false : glCapCheck(side) };
 }
 // a penalty drop: one more stroke, nobody's swing
 function glDrop(side) {

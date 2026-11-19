@@ -1067,3 +1067,70 @@ four different players, then nobody twice running).
 
 **Divot Cups** (400, Simulate every round): won 14.5%, out in the quarter-final 25%, the semi-final 30%, the final 31%.
 
+### One thing at a time (issue #95)
+
+`python3 test/realm_links_lab.py 300 '' single`: each power, piece of gear and potion on its own, even level, both
+Knights, against the same match without it (300 a cell: about 2 to 3 points either way).
+
+**Powers.** For each kind, a four of that kind, with only that one power castable by your side (the engine's lab-only
+`powOnly`) and none for the other side, against the same four with no powers. All four players cast it, so these are
+upper bounds: in a real four only one player has the kind. Most powers move a match by less than 5 points. The ones
+that stand out:
+
+| Power | With it | Without | Casts a match |
+|---|---|---|---|
+| Elf: Starlight (short) | 61.7% | 43.7% | 8.1 |
+| Elf: Arrow (long) | 60.0% | 43.7% | 5.0 |
+| Kraken: Eight Arms (short) | 61.7% | 47.3% | 6.4 |
+| Goblin: Sticky (short) | 26.0% | 13.0% | 5.9 |
+| Gorgon: Scaled (second short) | 42.7% | 29.3% | 6.4 |
+| Frost Wyrm: Cold Blood (second short) | 65.3% | 54.7% | 7.6 |
+| Phoenix: Ember Putt (short) | 38.0% | 28.0% | 7.1 |
+| Wraith: Cold Putt (short) | 33.7% | 23.7% | 6.8 |
+
+The biggest, spread over a mixed four, is worth less than one side's whole set of powers (about +9 to +10). No single
+power decides games. Starlight and Arrow are the first to look at if the elf feels strong by hand. The situation powers
+(dormie, playoff, up and down) and Steady are all inside the noise: 47% without, 50 to 52% with each.
+
+**Gear,** one piece on the player whose role uses it (none 49%):
+
+| Piece | Win |
+|---|---|
+| True Irons (+1 accuracy, approach) | 60.0% |
+| Mossgate Driver (+1 power, tee) | 54.7% |
+| Old Putter (+1 putting) | 52.7% |
+| Soft Wedge (+1 touch) | 51.3% |
+| Calfskin Glove (a fifth less focus) | 50.7% |
+| Lucky Tee (a power shot's mark shrinks less) | 49.3% |
+
+This corrects phase 10's "about 3 points a piece": accuracy is the strongest rating in the shot model (the mark's width
+and how far a miss strays), so the Irons are worth about 11 points on their own, the rest 0 to 6. The Irons are the piece
+to watch; no piece decides a match.
+
+**Potions,** two of one kind in your bag, given by your caddie as a Knight would (none 49%): Agatha's Oil 55.7%, Still
+Water 52%, Moss Tonic 48.3%, Stamina Draught 45%. All small.
+
+**A note on ids:** the dwarf's short-game power is `steady`, the same id as the roar's Steady. Play tells them apart (one
+is a power cast, `k: 'pow'`, the other `k: 'steady'`), but anything keyed on a cast's id alone, like the lab's `powOnly`,
+treats them as one.
+
+### The other engines, before and after golf (issue #95)
+
+#92 asked that the card game and the other five engines read the same before and after it. No code of theirs
+changed (the shared seeded random function was refactored to give the same numbers). Their labs after golf, at 120 to
+200 a row, against their last recorded tiers:
+
+| Sport | Recorded (tiers 1/2/3) | After golf |
+|---|---|---|
+| Baseball | 49 / 56 / 32 | 50 / 51 / 26.5 |
+| Football | 51 / 41 / 19 | 55.5 / 44 / 24.5 |
+| Boxing | 53 / 39 / 26 | 48 / 46 / 23 |
+| Basketball | 57 / 44 / 26 | 68 / 47.5 / 30, and 66 / 41 / 24 |
+| Hockey | 73 / 37 / 19 | 53 / 30 / 18, and 55 / 39 / 25 |
+
+Basketball's and hockey's tier 1 moved, in opposite directions, so both were run on the build just before golf (the
+commit before #93's merge, same lab): basketball 62 / 45 / 24, hockey 59 / 38 / 22.5. After golf is inside the noise of
+those (two 120-match runs are good to about 6 points), so the engines read the same; the recorded numbers above are
+older than later changes, and these labs draw each journey's rival clubs once, which swings a tier cell (as phase 10
+found in golf).
+
