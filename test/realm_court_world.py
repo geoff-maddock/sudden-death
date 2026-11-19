@@ -104,9 +104,12 @@ async def main():
         check(rv.get('skip') or (rv['r'] == '' and rv['view'] == 'court' and rv['world'] and rv['save'] and rv['give'] and rv['again'] and rv['court']), 'Manage puts the game on the court, at the Charter Court\'s own boards, with Save and leave and Concede on the bar (no Another game)', rv)
         if not rv.get('skip'):
             await pg.evaluate("wBK.speed = 6")
-            await pg.wait_for_function("!!WG.bkg.live.snap && wBK.phase === 'live'", timeout=60000)
+            # (held still in the frame it is seen live, so the stoppage can't come and go between the click and the read: at
+            # speed 6 on a slow runner it did, and the game had already left)
+            await pg.wait_for_function("!!WG.bkg.live.snap && wBK.phase === 'live' ? (wBK.pause(true), true) : false", timeout=60000)
             await pg.click('#wCourtSave')
             lv = await pg.evaluate("({ leaving: document.getElementById('wCourtSave').textContent, view: UI.view })")
+            await pg.evaluate("wBK.pause(false)")
             await pg.wait_for_function("UI.view === 'world'", timeout=60000)
             sn = await pg.evaluate("({ live: !!WG.bkg.live, snap: !!WG.bkg.live.snap, score: WG.bkg.live.snap.G.score, ph: WG.bkg.live.snap.GD.ph, saved: !!JSON.parse(localStorage.getItem(pkey('sd-realm'))).WG.bkg.live })")
             check('next stoppage' in lv['leaving'] and lv['view'] == 'court' and sn['live'] and sn['snap'] and sn['saved'], 'Save and leave in live play waits for the next stoppage, then leaves; the game is in the save', {**lv, **sn})
