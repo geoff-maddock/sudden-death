@@ -3,7 +3,7 @@
   python3 test/realm_lanes_lab.py 200            200 games for every cell, and 200 cups
   python3 test/realm_lanes_lab.py 200 'W_LNG.oppBonus = { 1: 0, 2: 2, 3: 5 }'    a tuning override, run in the page first
   python3 test/realm_lanes_lab.py 300 '' tiers,gaps    only some parts (tiers, gaps, skills, powers, lines, stances,
-                                                       kits, hall, cups, single)
+                                                       kits, hall, cups, read, single)
 
 Every game is the bowling engine played to a final, headless (wBL.simGame), as Simulate plays it: one Baker game of ten
 frames, the hall on (the tide mid), powers on, your five bowling as a Knight would, the other side at the skill of the
@@ -21,6 +21,10 @@ level 3, in the order their ratings suggest.
   gear, a piece each).
 - hall: the hall on and off; the tide high, mid and low; and how often the weaker side (a level down) wins with each.
 - cups: Simulate every round (the final best of three): how far it gets, how often it wins.
+- read: reading the transition. An Archmage that moves (reads the oil as it is and changes its line) against one that
+  doesn't (plans on the fresh lane, the pocket every ball); the same with the transition off (the lanes kept as
+  dressed), where reading should be worth nothing; Knight against Knight with it on and off (the scores); and the
+  order: your five in the order the ratings suggest, in the reverse of it, and shuffled.
 - single: each thing on its own, even level, both Knights, against the same game without it. Powers: for every kind, a
   five of that kind, with only that one power castable by your side (powOnly; the other side has none), against the five
   with no powers; each strike power, spare power, second power and ultimate, with how often it was cast a game; and the
@@ -34,7 +38,7 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 200
 OVR = sys.argv[2] if len(sys.argv) > 2 else ''
-PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,hall,cups,single').split(','))
+PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,hall,cups,read,single').split(','))
 
 SETUP = r"""
 window.__lab = {};
@@ -126,6 +130,13 @@ async def main():
                 far[r]++; }}
               return {{ out_qf: far[0], out_sf: far[1], out_final: far[2], won: far[3], win: +(100 * far[3] / {N}).toFixed(1), finals_to_three: finals ? +(100 * three / finals).toFixed(1) : null }}; }})()""")
             print('Gutter Cups:', json.dumps(out['cups']))
+        if 'read' in PARTS:
+            out['read'] = await pg.evaluate(f"""(() => {{ const am = x => __lab.play({N}, () => Object.assign({{ teams: [__lab.mine(), __lab.five(3, 0)], skill: [2, 2], noRead: [false, true], fix: [null, {{ line: 'pocket' }}] }}, x));
+              const kk = x => __lab.play({N}, () => Object.assign({{ teams: [__lab.mine(), __lab.five(3, 0)], skill: [1, 1] }}, x));
+              const ord = f => __lab.play({N}, () => {{ const T = __lab.mine(), o = wBL.autoOrder(T.roster.map(m => Object.assign({{}}, m, {{ rs: Object.fromEntries(wBL.stats.map(k => [k, (m.r[k] - 1) / 11])) }}))); T.order = f(o); return {{ teams: [T, __lab.five(3, 0)], skill: [1, 1] }}; }});
+              return {{ moves: am({{}}), movesNoTransition: am({{ wear: false }}), knights: kk({{}}), knightsNoTransition: kk({{ wear: false }}),
+                order: {{ auto: ord(o => o), reverse: ord(o => o.slice().reverse()), shuffled: ord(o => shuffle(o.slice())) }} }}; }})()""")
+            print('Reading the transition, and the order:', json.dumps(out['read']))
         if 'single' in PARTS:
             out['single'] = await pg.evaluate(f"""(() => {{ const pw = {{}}, gear = {{}}, pots = {{}}, sit = {{}};
               for (const kind of Object.keys(wBL.pow)) {{

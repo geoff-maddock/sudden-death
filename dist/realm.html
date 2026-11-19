@@ -37659,7 +37659,7 @@ function blSpareTarget(pins) {
 function blPlan(s) {
   const sk = BL_SKILL[G.skill[s]], st = blStyleNow(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
   // the oil as the side reads it: as it was at the start, or as it is (an Archmage, or anyone with the coach's word)
-  const oil = sk.read || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
+  const oil = (sk.read && !(G.noRead && G.noRead[s])) || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
   const lineX = fresh ? st.hand * BL_LINES[blLineOf(s)].off * BL_LANE.bw : 0;
   const base = { mph: st.mph, rpm: st.rpm, hand: st.hand };
   if (fresh || !sk.spare) {
@@ -37748,7 +37748,10 @@ function blStart(opts) {
     line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
     word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }],
     pst: teams.map(T => T.roster.map(() => ({ frames: 0, balls: 0, strikes: 0, spares: 0, pins: 0, splits: 0 }))) });
+  // (the balance lab's: a side's call fixed for the game; a side that plans on the fresh lane whatever it has become;
+  // and the lanes kept as dressed, no transition)
   G.streak = [0, 0]; G.fix = Array.isArray(o.fix) ? o.fix.map(f => f || null) : null;
+  G.noRead = Array.isArray(o.noRead) ? o.noRead.map(Boolean) : null; G.wear = o.wear !== false;
   blHallStart(o);
   blPowersStart(o);
   blKitStart(o.bags);
@@ -37778,7 +37781,7 @@ function blBowlBall(s, plan, rel) {
   if (fx.wobble && ball.gutter === null) { const left = stand.filter(p => !deck.down.includes(p)); for (const p of left) if (BL_ADJ.some(([a, b]) => (a === p && deck.down.includes(b)) || (b === p && deck.down.includes(a))) && R() < fx.wobble) deck.down.push(p); deck.down.sort((a, b) => a - b); }
   // the hall: a gutter crab, a swell, the gull (12-hall.js)
   const H = blHallAfter(s, stand, ball, deck.down); deck.down = H.down;
-  G.oil[lane] = blWear(G.oil[lane], ball.path);
+  if (G.wear !== false) G.oil[lane] = blWear(G.oil[lane], ball.path);
   // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader.
   // Only a plan aimed at the pins (the CPU's, the captain's): a ball you bowl by hand aims at your arrow, 15 feet down
   if (fresh && plan.ball === 'strike' && plan.why !== 'yours' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);

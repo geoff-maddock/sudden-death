@@ -49,7 +49,7 @@ function blSpareTarget(pins) {
 function blPlan(s) {
   const sk = BL_SKILL[G.skill[s]], st = blStyleNow(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
   // the oil as the side reads it: as it was at the start, or as it is (an Archmage, or anyone with the coach's word)
-  const oil = sk.read || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
+  const oil = (sk.read && !(G.noRead && G.noRead[s])) || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
   const lineX = fresh ? st.hand * BL_LINES[blLineOf(s)].off * BL_LANE.bw : 0;
   const base = { mph: st.mph, rpm: st.rpm, hand: st.hand };
   if (fresh || !sk.spare) {

@@ -1225,6 +1225,18 @@ scores (low tide about 10 pins down for both sides), not who wins.
 Golf's Divot Cup is won 14.5%. The Gutter Cup is set at 1, 2, 2 (a weaker side first, then two at your level), which is
 generous; `W_GUTTER.tiers = [2, 2, 2]` is the lever if the cup comes too easily by hand.
 
+**Reading the transition** (`read`, 400 each; lab-only switches: `noRead` plans a side's balls on the fresh lane whatever
+it has become, `wear: false` keeps the lanes as dressed). An Archmage that moves (reads the oil as it is and changes its
+line) against one that doesn't (plans on the fresh lane, the pocket every ball): 63%. With the transition off, 46.5%:
+reading is worth about 13 to 15 points, and only because the lanes change. Knight against Knight scores 206 with the
+transition on and 211.5 with it off (54 and 58% strikes): the worn lanes cost both sides about 6 pins. (Archmage
+against Archmage averages about 238, 70% strikes.)
+
+**The order** (your five in the order the ratings suggest, in its reverse, and shuffled; 400 each): 50%, 52%, 50%. The
+order hardly changes a result: the anchor's nerve counts only in the tenth, and every bowler bowls two frames. It is
+there for the feel of a lineup more than for the score; giving it teeth (a lead-off's strike setting up the next
+bowler, say) would be its own change.
+
 ### One thing at a time
 
 `python3 test/realm_lanes_lab.py 150 '' single`: for each kind, a five of that kind with only that one power castable
