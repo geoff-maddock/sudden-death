@@ -36934,7 +36934,7 @@ function blPinRng(seed) { return engRng((seed >>> 0) ^ 0x5bd1e995); }
 function blDeck(standing, ball, seed, spots) {
   const L = BL_LANE, P = BL_PIN, rnd = blPinRng(seed), h = ball.hand === -1 ? -1 : 1;
   const ang = Math.atan(ball.m), y0 = L.len - 30;
-  const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: P.mBall, live: true };
+  const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: ball.mass || P.mBall, live: true };
   const pins = standing.map(n => { const sp = (spots && spots[n]) || BL_SPOT[n];
     return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin, up: true, hit: false, t: 0, gone: false }; });
   const trace = [];
@@ -37072,11 +37072,12 @@ function blPlan(s) {
 }
 // a Knight's correction for this bowler on this lane (what it has learned from their strike balls there)
 const blBiasOf = (s, lane) => (G.bias[s][blBowler(s)] || [0, 0])[lane];
-// the release: the plan, strayed by the skill
-function blRelease(plan, skill) {
-  const sk = BL_SKILL[skill];
-  return Object.assign({}, plan, { ang: plan.ang + gauss() * sk.ang, mph: +(plan.mph + gauss() * sk.mph).toFixed(2), rpm: Math.max(120, Math.round(plan.rpm + gauss() * sk.rpm)) });
+// the release: the plan, strayed by the skill and by the bowler (accuracy or spare, the arm, the moment's nerve)
+function blRelease(plan, s) {
+  const sk = BL_SKILL[G.skill[s]], k = blErrK(s, blBowler(s), G.stand[s].length < 10);
+  return Object.assign({}, plan, { ang: plan.ang + gauss() * sk.ang * k, mph: +(plan.mph + gauss() * sk.mph * k).toFixed(2), rpm: Math.max(120, Math.round(plan.rpm + gauss() * sk.rpm * k)) });
 }
+
 /* The Saltmere Lanes: a game, CPU against CPU (issue #100, phase 1). A turn loop like golf's: whose ball it is, the
    side's plan, the release, the ball down the lane, the pins, the ball's wear on the oil, and the sheet. The page
    (phase 2) plays the same loop with your ball in it.
@@ -37099,13 +37100,19 @@ function blStart(opts) {
   if (o.seed != null) engSeed(o.seed);
   const style = engRng((o.seed == null ? 1 : o.seed) * 31 + 7);
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#9b3a7a' };
-    const roster = (T.roster && T.roster.length >= BL_RULES.side ? T.roster : [0, 1, 2, 3, 4].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: 'zombie' })))
-      .map(p => Object.assign({}, p, { style: p.style ? Object.assign({}, p.style) : blStyle(style) }));
+    // a bowler with a kind the engine knows gets that kind's ratings (or their own); one with none keeps a seeded style
+    const roster = (T.roster && T.roster.length >= BL_RULES.side ? T.roster : [0, 1, 2, 3, 4].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
+      .map(p => { const r = p.r || (BL_KIND[p.kind] ? blRate(p.kind) : null), m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
+        m.rs = r ? Object.fromEntries(BL_STATS.map(k => [k, blScale(r[k])])) : Object.assign({}, BL_DEF_RAT);
+        m.style = blStyleFor(m, style); return m; });
     return Object.assign({}, T, { roster }); });
-  blNewGame({ frames: o.frames, order: o.order, lead: o.lead, roster: teams.map(T => T.roster.length) });
+  // an order: the game's, the team's own, or set by the ratings
+  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? blAutoOrder(teams[s].roster) : null));
+  blNewGame({ frames: o.frames, order, lead: o.lead, roster: teams.map(T => T.roster.length) });
   const oil = blHouse();
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
-    oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0 });
+    oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0,
+    arm: teams.map(T => T.roster.map(() => 1)) });
   GB = null;
   return G;
 }
@@ -37114,18 +37121,24 @@ function blStart(opts) {
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
   const plan = blPlan(s);
-  return blBowlBall(s, plan, blRelease(plan, G.skill[s]));
+  return blBowlBall(s, plan, blRelease(plan, s));
 }
 // a ball as released (yours from the page, or the CPU's): down the lane, into the pins, the oil worn, the sheet kept
 function blBowlBall(s, plan, rel) {
   const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
   const ball = blBall(rel, G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand }, seed) : { down: [], trace: [], ball: null };
+  // power: the ball drives through the pins like a heavier one
+  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow);
+  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed) : { down: [], trace: [], ball: null };
   G.oil[lane] = blWear(G.oil[lane], ball.path);
-  // a Knight learns from its strike balls: half of how far it missed the pocket, on that lane
-  if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (plan.aim.x - ball.x);
+  // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader
+  if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
+  // the arm: this ball costs the bowler some (a power ball more)
+  G.arm[s][ri] = Math.max(0, +(G.arm[s][ri] - (rel.power ? BL_ARM.power : BL_ARM.ball)).toFixed(3));
   const roll = blRoll(s, deck.down);
+  // a frame finished: the rest of the side got their breath back while it was bowled
+  if (roll.done) G.arm[s] = G.arm[s].map((a, i) => i === ri ? a : Math.min(1, +(a + BL_ARM.back).toFixed(3)));
   blCount(s, stand, first, ball, roll);
   G.n++;
   G.log.push([s, ri, roll.frame, deck.down.length, roll.strike ? 'X' : roll.spare ? '/' : roll.split ? 'o' : '']);
@@ -37218,13 +37231,14 @@ function blSelect(o) {
   return true;
 }
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
-function blSelThrow(S, st, p, err) {
+// (win: the mark's half-width for this bowler now, before a power ball shrinks it)
+function blSelThrow(S, st, p, err, win0) {
   const x0 = blBoardX(S.stand), ax = blBoardX(S.arrow);
   let ang = Math.atan((ax - x0) / BL_LANE.arrows) * 180 / Math.PI;
-  const power = Math.max(0, p - 1), M = BL_METER, win = M.win * (power > 0 ? M.pwin : 1);
+  const power = Math.max(0, p - 1), M = BL_METER, win = (win0 || M.win) * (power > 0 ? M.pwin : 1);
   if (err) { const a = Math.abs(err), deg = a <= win ? a / win * M.inDeg : M.inDeg + (a - win) * M.outDeg; ang += Math.sign(err) * st.hand * deg; }
   const mph = st.mph * (.8 + .2 * Math.min(1, p)) * (1 + power * 1.2), rpm = Math.round(st.rpm * BL_REVS[S.revs] * (1 + power * .5));
-  return { x0, ang: +ang.toFixed(4), mph: +mph.toFixed(2), rpm, ball: S.ball, hand: st.hand };
+  return { x0, ang: +ang.toFixed(4), mph: +mph.toFixed(2), rpm, ball: S.ball, hand: st.hand, power: power > 0 };
 }
 // the guide: where a perfect ball from this setup goes on a fresh lane
 function blGuide() {
@@ -37234,9 +37248,16 @@ function blGuide() {
 }
 
 /* ---------- the meter ---------- */
+// your mark now: wider for an accurate bowler (a spare bowler, at a spare), narrower for a tired arm or a big moment;
+// and the meter falls quicker under pressure
+function blMeterFor(s) {
+  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, pr = blPressure(s);
+  const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
+  return { win: +win.toFixed(4), fall: BL_METER.fall * (1 + .25 * pr), shake: pr * (1 - r.nrv) };
+}
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
-  if (GP.ph === 'aim') { GP.meter = { st: 'up', v: 0, p: null }; blGo('swing', 0, `${blName(GP.you, blBowler(GP.you))} on the approach…`); return true; }
+  if (GP.ph === 'aim') { GP.meter = Object.assign({ st: 'up', v: 0, p: null }, blMeterFor(GP.you)); blGo('swing', 0, `${blName(GP.you, blBowler(GP.you))} on the approach…`); return true; }
   if (GP.ph !== 'swing' || !GP.meter) return false;
   const M = GP.meter;
   if (M.st === 'up') { M.p = M.v; M.st = 'down'; return true; }
@@ -37246,7 +37267,7 @@ function blPress() {
 function blMeterTick(dt) {
   const M = GP.meter, K = BL_METER; if (!M) return;
   if (M.st === 'up') { M.v += K.rise * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
-  else if (M.st === 'down') { M.v -= K.fall * dt; if (M.v <= K.low) blRelease3(K.low); }
+  else if (M.st === 'down') { M.v -= (M.fall || K.fall) * dt; if (M.v <= K.low) blRelease3(K.low); }
 }
 // the third press (or the bottom of the meter): the ball leaves the hand
 function blRelease3(v) {
@@ -37257,16 +37278,16 @@ function blRelease3(v) {
 // a phone's throw: pull is the speed (1 the bowler's own), deg how far off straight the pull went (plus is early)
 function blDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim') return false;
-  const p = clamp(pull, .3, BL_METER.top), err = deg / BL_HANDS.dragDeg * BL_METER.win;
-  GP.meter = { st: 'gone', v: err, p, err };
+  const F = blMeterFor(GP.you), p = clamp(pull, .3, BL_METER.top), err = deg / BL_HANDS.dragDeg * BL_METER.win;
+  GP.meter = Object.assign(F, { st: 'gone', v: err, p, err });
   blFireMine(p, err);
   return true;
 }
 // the two numbers behind your release: { p, err, win }
-function blSwingNums() { const M = GP && GP.meter; if (!M) return null; const p = M.p == null ? M.v : M.p; return { p, err: M.err == null ? null : M.err, win: BL_METER.win * (p > 1 ? BL_METER.pwin : 1) }; }
+function blSwingNums() { const M = GP && GP.meter; if (!M) return null; const p = M.p == null ? M.v : M.p; return { p, err: M.err == null ? null : M.err, win: (M.win || BL_METER.win) * (p > 1 ? BL_METER.pwin : 1) }; }
 function blFireMine(p, err) {
-  const s = GP.you, st = blStyleOf(s, blBowler(s)), S = GP.sel, rel = blSelThrow(S, st, p, err);
-  const plan = { x0: rel.x0, ang: blSelThrow(S, st, p, 0).ang, ball: S.ball, aim: { x: blBoardX(S.arrow), y: BL_LANE.arrows }, why: 'yours' };
+  const s = GP.you, st = blStyleOf(s, blBowler(s)), S = GP.sel, win = GP.meter && GP.meter.win, rel = blSelThrow(S, st, p, err, win);
+  const plan = { x0: rel.x0, ang: blSelThrow(S, st, p, 0, win).ang, ball: S.ball, aim: { x: blBoardX(S.arrow), y: BL_LANE.arrows }, why: 'yours' };
   blFire(s, plan, rel);
 }
 
@@ -37326,7 +37347,7 @@ function blPlayNext() {
   if (s < 0) { blGo('over'); return; }
   const ri = blBowler(s), fr = blFrameNo(s), ball = G.rb[s] ? 'second ball' : G.stand[s].length < 10 ? 'fill ball' : 'first ball';
   if (blYours(s)) { blSelReset(); blGo('aim', 0, `Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
-  const plan = blPlan(s), rel = blRelease(plan, G.skill[s]);
+  const plan = blPlan(s), rel = blRelease(plan, s);
   GP.cpu = { s, plan, rel };
   blGo('addr', 0, `Frame ${fr}: ${blName(s, ri)} (${G.teams[s].name}), ${ball}, going for ${plan.why}.`);
 }
@@ -37423,11 +37444,13 @@ function blBowlerDraw(c, x, col) {
 function blMeterDraw(c) {
   const M = GP && GP.meter; if (!M || GP.ph !== 'swing') return;
   const K = BL_METER, x = 590, top = 150, bot = 470, Y = v => bot - (v - K.low) / (K.top - K.low) * (bot - top);
-  const p = M.p == null ? (M.st === 'up' ? M.v : 1) : M.p, win = K.win * (p > 1 ? K.pwin : 1);
+  const p = M.p == null ? (M.st === 'up' ? M.v : 1) : M.p, win = (M.win || K.win) * (p > 1 ? K.pwin : 1);
+  // a big moment shakes the mark (a steady nerve, less)
+  const jit = M.shake ? Math.sin(performance.now() / 45) * M.shake * 6 : 0;
   c.save(); c.fillStyle = 'rgba(15,10,8,.78)'; c.fillRect(x - 16, top - 10, 32, bot - top + 20);
   c.fillStyle = '#4a3a30'; c.fillRect(x - 8, top, 16, bot - top);
   c.fillStyle = '#b8402a'; c.fillRect(x - 8, Y(K.top), 16, Y(1) - Y(K.top));
-  c.fillStyle = '#4caa48'; c.fillRect(x - 8, Y(win), 16, Y(-win) - Y(win));
+  c.fillStyle = '#4caa48'; c.fillRect(x - 8, Y(win) + jit, 16, Y(-win) - Y(win));
   c.strokeStyle = '#ffd34a'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 12, Y(1)); c.lineTo(x + 12, Y(1)); c.stroke();
   if (M.p != null) { c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 14, Y(M.p)); c.lineTo(x + 14, Y(M.p)); c.stroke(); }
   c.fillStyle = '#fff'; c.beginPath(); c.moveTo(x + 10, Y(M.v)); c.lineTo(x + 20, Y(M.v) - 6); c.lineTo(x + 20, Y(M.v) + 6); c.fill();
@@ -37540,6 +37563,80 @@ function blDraw(c, dt) {
 }
 // a ball's track is kept for the overhead strip once it has rolled (the last four on each lane)
 function blTrackKeep() { if (!GB) return; const t = BLC.tracks[GB.lane]; t.push(GB.ball.path); if (t.length > 4) t.shift(); }
+/* The Saltmere Lanes: ratings, the order's roles, arm and nerve (issue #100, phase 3).
+
+   A bowler's six ratings (BL_STATS) run 1 to 12, seeded by kind (BL_KIND, blRate); the game works on them as 0 to 1
+   (blScale):
+   - power (pow): the speed of the ball, and how hard it drives through the pins (the ball hits like a heavier one);
+   - revs (rev): side spin, so hook and entry angle;
+   - accuracy (acc): how true the strike ball's release is (a CPU bowler strays less; your mark on the meter is wider);
+   - spare (spr): the same for a ball at a spare;
+   - nerve (nrv): how little a big moment shakes them (see pressure);
+   - read (red): how well they read the lane as it changes (a Knight bowler corrects faster; phase 4's lane chart
+     shows more of the oil).
+   A bowler's style (hand, speed, revs) follows from the ratings: power is the speed, revs the revs. A bowler with no
+   kind the engine knows keeps a style from the seed, as phase 1's games had.
+   The order's roles: the leadoff (the first, who bowls the 1st and the 6th: a striker), the middle three, and the
+   anchor (the fifth, who bowls the 5th and the 10th, where close games are decided: nerve and spares). blFit says how
+   well ratings suit a role, and blAutoOrder sets an order by them: the anchor first, then the leadoff, then the
+   middle.
+   Arm (G.arm, 0 to 1 a bowler): each ball costs the bowler some (a power ball more), and it comes back while the rest
+   of the side bowls its frames, so it tells mostly in the tenth (three balls) and a roll-off. A tired arm is less true
+   (blArmK).
+   Pressure (blPressure, 0 to 1.5): a side's last frame (the tenth, or a roll-off's), and half as much again when the
+   other side has finished and the game hangs on these balls. Nerve takes it off (blNerveK): a CPU bowler strays more,
+   and your meter falls quicker with a smaller mark. */
+const BL_STATS = ['pow', 'rev', 'acc', 'spr', 'nrv', 'red'];
+// by kind, 1 to 12: power, revs, accuracy, spare, nerve, read. A troll throws a cannonball nobody can steer; a spider's
+// eight-legged release puts on revs the others can't; a zombie rolls it dead straight and never panics; a witch reads
+// the oil like tea leaves
+const BL_KIND = {
+  goblin: [5, 7, 6, 7, 5, 6], kobold: [5, 6, 6, 7, 5, 7], werewolf: [8, 8, 5, 5, 6, 5], dwarf: [7, 6, 8, 7, 7, 7],
+  ogre: [11, 4, 3, 3, 5, 4], minotaur: [10, 6, 4, 4, 6, 5], troll: [11, 5, 3, 4, 7, 4], golem: [10, 3, 6, 5, 9, 5],
+  harpy: [6, 8, 6, 6, 4, 7], elf: [5, 6, 10, 8, 6, 8], wraith: [6, 7, 7, 8, 8, 8], vampire: [7, 8, 7, 7, 7, 7],
+  lich: [5, 6, 7, 8, 12, 9], zombie: [7, 3, 7, 6, 10, 4], gorgon: [6, 6, 8, 8, 9, 7], spider: [6, 12, 7, 7, 7, 7],
+  skeleton: [5, 6, 7, 7, 9, 6], witch: [5, 7, 6, 9, 6, 10],
+};
+const BL_RCAP = 12;
+const BL_ROLES = ['lead', 'mid', 'mid', 'mid', 'anchor'];
+const BL_ARM = { ball: .07, power: .12, back: .05, k: .8 };
+const BL_DEF_RAT = { pow: .5, rev: .5, acc: .5, spr: .5, nrv: .5, red: .5 };
+function blRate(kind) { const k = BL_KIND[kind]; return Object.fromEntries(BL_STATS.map((s, i) => [s, k ? k[i] : 6.5])); }
+const blScale = v => clamp((v - 1) / (BL_RCAP - 1), 0, 1);
+// a bowler's ratings as the game works on them (0 to 1)
+function blRat(s, ri) { const m = G && G.teams && G.teams[s].roster[ri]; return (m && m.rs) || BL_DEF_RAT; }
+// how well ratings (0 to 1) suit a role
+const blFit = (r, role) => role === 'lead' ? r.pow * .35 + r.rev * .35 + r.acc * .3 : role === 'anchor' ? r.nrv * .5 + r.spr * .25 + r.acc * .25 : r.acc * .4 + r.spr * .4 + r.red * .2;
+// an order for a roster (each with rs, 0 to 1) by the ratings: the anchor, then the leadoff, then the middle three
+// (the best of them nearest the anchor). Returns five roster indexes
+function blAutoOrder(roster) {
+  const left = new Set(roster.map((_, i) => i)), best = role => { const i = [...left].sort((a, b) => blFit(roster[b].rs, role) - blFit(roster[a].rs, role) || a - b)[0]; left.delete(i); return i; };
+  const anchor = best('anchor'), lead = best('lead'), mid = [best('mid'), best('mid'), best('mid')];
+  return [lead, mid[2], mid[1], mid[0], anchor];
+}
+// a bowler's style from their ratings: power the speed, revs the revs; the hand is their own (or the seed's)
+function blStyleFor(m, rnd) {
+  if (m.style) return Object.assign({}, m.style);
+  if (!m.r) return blStyle(rnd);
+  const r = m.rs, hand = m.hand === -1 || m.hand === 1 ? m.hand : (rnd() < .15 ? -1 : 1);
+  return { hand, mph: +(15.2 + 3.2 * r.pow).toFixed(1), rpm: Math.round(230 + 240 * r.rev) };
+}
+// how much less true a release is with this much arm left (1 at full)
+const blArmK = a => 1 + (1 - clamp(a, 0, 1)) * BL_ARM.k;
+// how big the moment is for side s's next ball
+function blPressure(s) {
+  if (!G || G.over) return 0;
+  const n = blSheetN(), f = blCur(s); if (f !== n - 1) return 0;
+  const o = 1 - s, done = blDone(o) >= n, gap = blTotal(o) - blTotal(s);
+  return 1 + (done && gap >= -10 && gap <= 30 ? .5 : 0);
+}
+// what a moment does to a bowler of nerve nrv (0 to 1): 1 is nothing
+const blNerveK = (p, nrv) => 1 + .6 * p * (1 - clamp(nrv, 0, 1));
+// all that makes side s's bowler ri less true now: the skill's spread is multiplied by this (spare: a ball at a spare)
+function blErrK(s, ri, spare) {
+  const r = blRat(s, ri), a = G.arm ? G.arm[s][ri] : 1;
+  return (1.3 - .6 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(blPressure(s), r.nrv);
+}
 /* The Lanes' page in the Realm (issue #100, phase 2). A canvas in #v-lanes, after the Links', and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (blTick) and draws it (blDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -37660,7 +37757,10 @@ for (const ev of ['pointerup', 'pointercancel']) BLP.cv.addEventListener(ev, blP
    what the page needs), tick(dt) (the tests move the game on by hand). Your ball: select({ stand, arrow, ball, revs,
    suggest }), press (Space), drag(pull, deg) (the phone's throw), setMode; guide (a perfect ball's path on a fresh
    lane), swingNums and meterRules are the numbers behind the meter; scr and unscr map the lane to the picture and
-   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end. */
+   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end.
+   Phase 3 is ratings, the order's roles, arm and nerve: stats (the six, in order), rate(kind) (1 to 12), cap, roles
+   (each slot of the order's role), fit(r, role) (r 0 to 1), autoOrder(roster), arm (G.arm), pressure(side),
+   armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -37675,6 +37775,10 @@ return {
   boardX: b => blBoardX(b), xBoard: x => blXBoard(x), ball: (t, oil, tide) => blBall(t, oil, tide), aimAt: (t, x, oil, tide) => blAimAt(t, x, oil, tide),
   deck: (st, b, seed, spots) => blDeck(st, b, seed, spots), groups: st => blGroups(st), spareTarget: p => blSpareTarget(p), style: () => blStyle(),
   plan: s => G && G.oil ? blPlan(s) : null, start: o => { blStart(o); blPlayStart(o); return G; }, turn: () => blTurn(), summary: () => blSummary(), simGame: o => blSimGame(o),
+  // ratings, the order's roles, arm and nerve (phase 3)
+  stats: BL_STATS.slice(), rate: k => blRate(k), cap: BL_RCAP, roles: BL_ROLES.slice(), fit: (r, role) => blFit(r, role), armRules: Object.assign({}, BL_ARM),
+  autoOrder: ro => blAutoOrder(ro.map(m => ({ rs: Object.fromEntries(BL_STATS.map(k => [k, blScale((m.r || blRate(m.kind))[k])])) }))),
+  get arm() { return G && G.arm ? G.arm.map(a => a.slice()) : null; }, pressure: s => G && G.arm ? blPressure(s) : 0,
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
@@ -54004,6 +54108,242 @@ renderHelp = function () {
   const after = $('wHelpLinks') || $('wHelpRink') || [...h.querySelectorAll('[id^="wHelpG"]')].pop();
   h.insertAdjacentHTML('beforeend', `<section id="wLanesHow" class="wghelp"><h3>Bowling: how it works</h3>${wLanesHowHTML()}</section>`);
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanes"><b>Real bowling.</b> The Saltmere Lanes are trying out bowling on the lanes themselves, five a side. Ask Moll Gutter to BOWL: one team game in the Baker format. Set your feet and your arrow, pick the ball, and bowl, or watch the two clubs bowl it out, with the sheet under the lanes (see Bowling: how it works). It is an exhibition: nothing is won or lost.</p>`);
+};
+/* w114: bowling ratings, the five and their order (issue #100, phase 3). Every Realm player has Saltmere Lanes ratings,
+   p.bl, as they have golf's p.gl (w106): power, revs, accuracy, spare, nerve and read, 1 to 12, and a bowling hand.
+   They are seeded from the kind's (wBL.rate), each moved by up to 1, and every level above 1 adds a point to one of
+   them, weighted by what the kind is good at; an older save's players get theirs when it loads.
+   The five: a bowling side is five (W_GRD_SQUAD.bowling), one team game in the Baker format, the five taking the
+   frames in turn. The Lanes tab on the Team screen sets your five and their order: the leadoff (the 1st and the 6th),
+   the 2nd, 3rd and 4th, and the anchor (the 5th and the 10th). The rest of your roster are reserves. Called-up players
+   at your level fill the five when your roster is short. Left alone, the captain sets the five and the order from the
+   ratings (the anchor first: nerve and spares; then the leadoff: power, revs and accuracy). Practice game plays your
+   five against Saltmere's at the Lanes; nothing is won or lost. The Stats tab's Bowling view shows the ratings and the
+   order.
+
+   p.bl       { pow, rev, acc, spr, nrv, red, hand: 1 | -1, lv, got: { stat: points from levels } }
+   WG.lanes   { five: [5 keys, in order], cu: [call-ups], seq, mine?: true once you've changed something }
+              a key is a roster id, or a call-up's cid ('n1', 'n2', ...)
+   wBlOf(p)           p's ratings, made or caught up first
+   wFiveSync()        makes the five, or brings it up to date with the roster; returns WG.lanes
+   wFiveMine()        your five as the Saltmere Lanes takes a team (roster in order, and the order)
+   wFiveSetSlot(key, slot), wFiveAuto()    changes; each returns a message, or '' when it worked (slot 0 to 4, or
+                      'reserve': the best reserve for that slot takes it)
+   Wrapped: wMakePlayer (wW114MakePlayer), wGiveXp (wW114GiveXp), wStart (wW114Start), wStatsCard (wW114StatsCard: a
+   Bowling block), wCampStats (wW114CampStats: the Bowling view), wOpenCamp (wW114OpenCamp: the Lanes tab), wRenderCamp
+   (wW114RenderCamp), wLanesRows (wW114LanesRows: the bowler, their arm, the moment), renderHelp (wW114RenderHelp: #wHelpLanesTab), wLanesHowHTML (wW114LanesHow: ratings, the order, arm and nerve). */
+
+const W_BLR = {
+  cuKinds: ['zombie', 'gorgon', 'wraith', 'spider', 'troll', 'dwarf'],
+  stat: { pow: ['Pow', 'Power: the ball\'s speed, and how hard it drives through the pins'], rev: ['Rev', 'Revs: side spin, so hook and the angle into the pocket'],
+    acc: ['Acc', 'Accuracy: how true the strike ball goes (the mark on the meter is wider)'], spr: ['Spr', 'Spare: how true a ball at a spare goes'],
+    nrv: ['Nrv', 'Nerve: steady in the last frame, when the game hangs on it'], red: ['Red', 'Read: how soon they see the oil change and move'] },
+  slot: ['the leadoff', 'the 2nd', 'the 3rd', 'the 4th', 'the anchor'],
+  short: ['Lead', '2nd', '3rd', '4th', 'Anch'],
+};
+const wBlCap = () => wBL.cap;
+const wBlRole = i => wBL.roles[i];
+
+/* ---------- ratings ---------- */
+function wBlOf(p) {
+  if (!p || !p.kind) return null;
+  if (!p.bl) { const r = wBL.rate(p.kind); p.bl = { lv: 1, got: {}, hand: Math.random() < .15 ? -1 : 1 }; for (const s of wBL.stats) p.bl[s] = Math.max(1, Math.min(wBlCap(), Math.round(r[s]) + Math.floor(Math.random() * 3) - 1)); }
+  const b = p.bl, lvl = p.lvl || 1;
+  if (b.hand !== 1 && b.hand !== -1) b.hand = 1;
+  while (b.lv < lvl) { b.lv++; const s = wBlGrowStat(p); if (s) { b[s]++; b.got[s] = (b.got[s] || 0) + 1; } }
+  return b;
+}
+function wBlGrowStat(p) {
+  const K = wBL.rate(p.kind), open = wBL.stats.filter(s => p.bl[s] < wBlCap());
+  if (!open.length) return null;
+  let r = Math.random() * open.reduce((a, s) => a + K[s], 0);
+  for (const s of open) { r -= K[s]; if (r < 0) return s; }
+  return open[open.length - 1];
+}
+function wBlAll() { if (!WG) return; for (const p of WG.roster || []) wBlOf(p); for (const p of WG.wwait || []) wBlOf(p); for (const c of (WG.lanes && WG.lanes.cu) || []) wBlOf(c); }
+// how well a player suits a slot of the order, 0 to 1
+const wBlFit = (p, slot) => wBL.fit(Object.fromEntries(wBL.stats.map(s => [s, (wBlOf(p)[s] - 1) / (wBlCap() - 1)])), wBlRole(slot));
+
+const wW114MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW114MakePlayer(spec, from); wBlOf(p); return p; };
+const wW114GiveXp = wGiveXp;
+wGiveXp = function (p, n) { const r = wW114GiveXp(p, n); wBlOf(p); return r; };
+const wW114Start = wStart;
+wStart = function (save, opts) { const r = wW114Start(save, opts); wBlAll(); if (save) wSave(); return r; };
+
+/* ---------- the five ---------- */
+const wFiveCu = k => typeof k === 'string';
+function wFiveWho(k) { if (wFiveCu(k)) return ((WG.lanes && WG.lanes.cu) || []).find(c => c.cid === k) || null; return wPlayer(k); }
+function wFiveCallUp(C) {
+  const used = new Set(C.five.filter(k => k != null).map(k => (wFiveWho(k) || {}).kind));
+  const kind = W_BLR.cuKinds.find(k => !used.has(k)) || pick(W_BLR.cuKinds);
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'n' + (C.seq++) });
+  wBlOf(c); C.cu.push(c);
+  return c;
+}
+// the captain's pick: the anchor first, then the leadoff, then the middle three, each the best of those left
+function wFiveAutoPick(C) {
+  const left = new Set(wRoster().map(p => p.id)), five = [null, null, null, null, null];
+  for (const slot of [4, 0, 3, 2, 1]) {
+    const best = [...left].sort((a, b) => wBlFit(wFiveWho(b), slot) - wBlFit(wFiveWho(a), slot))[0];
+    if (best == null) break;
+    five[slot] = best; left.delete(best);
+  }
+  C.five = five;
+  C.cu = C.cu.filter(c => five.includes(c.cid));
+}
+function wFiveSync() {
+  if (!WG) return null;
+  let fresh = false;
+  if (!WG.lanes || !Array.isArray(WG.lanes.five)) { WG.lanes = { five: [null, null, null, null, null], cu: [], seq: 1 }; fresh = true; }
+  const C = WG.lanes, before = JSON.stringify(C.five);
+  C.five = C.five.map(k => k != null && wFiveWho(k) ? k : null);
+  C.cu = C.cu.filter(c => C.five.includes(c.cid));
+  const tier = wNineTier();
+  for (const c of C.cu) if (c.lvl < tier) { c.lvl = tier; wBlOf(c); }
+  // a roster player not in the five takes a call-up's slot
+  for (const p of wRoster()) {
+    if (C.five.includes(p.id)) continue;
+    const at = C.five.findIndex(k => wFiveCu(k)); if (at < 0) break;
+    const old = C.five[at]; C.five[at] = p.id; C.cu = C.cu.filter(c => c.cid !== old);
+  }
+  // a gap: the best reserve for the slot, or a call-up
+  for (let i = 0; i < 5; i++) if (C.five[i] == null) {
+    const res = wRoster().map(p => p.id).filter(id => !C.five.includes(id)).sort((a, b) => wBlFit(wPlayer(b), i) - wBlFit(wPlayer(a), i))[0];
+    C.five[i] = res != null ? res : wFiveCallUp(C).cid;
+  }
+  if (fresh || (!C.mine && JSON.stringify(C.five) !== before)) wFiveAutoPick(C);
+  for (let i = 0; i < 5; i++) if (C.five[i] == null) C.five[i] = wFiveCallUp(C).cid;
+  return C;
+}
+// a player as the Saltmere Lanes takes one (ratings 1 to 12, and their hand)
+function wLanesPlayer(p) { const b = wBlOf(p); return { n: p.n, kind: p.kind, r: Object.fromEntries(wBL.stats.map(s => [s, b[s]])), hand: b.hand }; }
+function wFiveMine() {
+  const C = wFiveSync(), t = wPartyTeam();
+  return { name: t.name, short: t.short, color: t.color, roster: C.five.map(k => wLanesPlayer(wFiveWho(k))), order: [0, 1, 2, 3, 4] };
+}
+const wFiveSlotOf = (k, C) => { const i = (C || wFiveSync()).five.indexOf(k); return i < 0 ? null : i; };
+const wFiveReserves = C => wRoster().map(p => p.id).filter(id => !C.five.includes(id));
+
+/* ---------- changes ---------- */
+function wFiveDone() { WG.lanes.mine = true; wSave(); return ''; }
+function wFiveSetSlot(k, slot) {
+  const C = wFiveSync(), at = wFiveSlotOf(k, C);
+  if (slot === 'reserve') {
+    if (at == null) return '';
+    const res = wFiveReserves(C).sort((a, b) => wBlFit(wPlayer(b), at) - wBlFit(wPlayer(a), at))[0];
+    if (res == null) return 'No reserve to take their place.';
+    C.five[at] = res; if (wFiveCu(k)) C.cu = C.cu.filter(c => c.cid !== k);
+    return wFiveDone();
+  }
+  slot = +slot; if (!(slot >= 0 && slot < 5) || at === slot) return '';
+  const other = C.five[slot];
+  C.five[slot] = k;
+  if (at != null) C.five[at] = other; else if (wFiveCu(other)) C.cu = C.cu.filter(c => c.cid !== other);
+  return wFiveDone();
+}
+function wFiveAuto() { WG.lanes = null; wFiveSync(); wSave(); return ''; }
+function wFivePractice() {
+  if (WCAMP.close) WCAMP.close();
+  const mine = wFiveMine(), home = wLanesTeams(mine.roster.map(m => m.n))[0];
+  wLanesGame({ teams: [mine, home], title: 'A practice game at the Saltmere Lanes' });
+}
+
+/* ---------- the Bowling block on a player's stats ---------- */
+function wBlCard(p) {
+  const b = wBlOf(p); if (!b) return '';
+  const bars = wBL.stats.map(s => { const [ab, what] = W_BLR.stat[s], got = b.got[s] || 0;
+    return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wBlCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
+  const slot = WG && WG.lanes ? wFiveSlotOf(p.cid || p.id, WG.lanes) : null;
+  return `<div class="wbd wbkc wblc"><h5>Bowling</h5><p class="wbdpos">${slot != null ? `In your five, ${esc(W_BLR.slot[slot])}.` : WG && WG.lanes ? 'A reserve for your five.' : 'Not in your squad.'} ${b.hand < 0 ? 'Left-handed.' : 'Right-handed.'}</p>
+    <div class="wbdbars">${bars}</div><p class="hint">Each level adds a point to one rating (shown as +), mostly to what their kind is good at. Ratings run from 1 to ${wBlCap()}.</p></div>`;
+}
+const wW114StatsCard = wStatsCard;
+wStatsCard = function (p) { return wW114StatsCard(p).replace(/<\/section>\s*$/, wBlCard(p) + '</section>'); };
+
+/* ---------- the Lanes tab ---------- */
+function wFiveRow(k, C) {
+  const p = wFiveWho(k), b = wBlOf(p), cu = wFiveCu(k), at = wFiveSlotOf(k, C), key = esc(String(k));
+  const opts = W_BLR.slot.map((n, i) => `<option value="${i}"${at === i ? ' selected' : ''}>${esc(n[4].toUpperCase() + n.slice(5))}</option>`).join('') + `<option value="reserve"${at == null ? ' selected' : ''}>Reserve</option>`;
+  const fits = [0, 2, 4].map(i => `${W_BLR.slot[i].replace('the ', '')} ${Math.round(wBlFit(p, i) * 100)}`).join(', ');
+  return `<li class="wpr wnr wcrt${cu ? ' wcu' : ''}" data-nid="${key}">
+    <span class="wno">${at != null ? esc(W_BLR.short[at]) : '&ndash;'}</span><img src="${wPlayerPort(p, 64)}" alt="">
+    <div class="wpi"><div class="wpn"><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}, ${b.hand < 0 ? 'left' : 'right'}-handed</span>${cu ? '<span class="wtag wb">Call-up</span>' : ''}</div>
+      <small class="wnst" title="How well they suit the order: ${esc(fits)}">${wBL.stats.map(s => `<span title="${esc(W_BLR.stat[s][1])}">${W_BLR.stat[s][0]} <b>${b[s]}</b></span>`).join(' ')}</small></div>
+    <div class="wpa"><label class="wsvl">Order <select data-nslot aria-label="${esc(p.n)}'s place in the order">${opts}</select></label></div>
+  </li>`;
+}
+function wCampLanes(C) {
+  const res = wFiveReserves(C);
+  return `<p class="hint">Your bowling five, in their order. One team game: the five take the frames in turn, so the leadoff bowls the 1st and the 6th and the anchor the 5th and the 10th, where close games are won. A leadoff wants power, revs and accuracy; an anchor wants nerve and spares. Every ball costs the bowler some arm, and they get it back while the others bowl, so it tells in the tenth frame. Until you change something, the captain sets the five and the order again whenever your squad changes.</p>
+    <h4>The five</h4><ol class="wroster wnine wcourt wlanesfive">${C.five.map(k => wFiveRow(k, C)).join('')}</ol>
+    <h4>Reserves</h4>${res.length ? `<ol class="wroster wnine wcourtb wlanesres">${res.map(k => wFiveRow(k, C)).join('')}</ol>` : '<p class="hint">Nobody: every player you have is in the five.</p>'}
+    <div class="row wnbtn"><button class="ghost" data-nauto>The captain's pick</button><button class="btn" data-npractice>Practice game</button></div>`;
+}
+const wW114OpenCamp = wOpenCamp;
+wOpenCamp = function (tab) {
+  const want = tab || WCAMP.tab;
+  wW114OpenCamp(want === 'lanes' ? 'team' : tab);
+  const tabs = document.querySelector('#modalBox .wctabs');
+  if (!tabs || tabs.querySelector('[data-ctab="lanes"]')) return;
+  tabs.lastElementChild.insertAdjacentHTML('afterend', '<button role="tab" data-ctab="lanes">Lanes</button>');
+  tabs.querySelector('[data-ctab="lanes"]').onclick = () => { WCAMP.tab = 'lanes'; WCAMP.swap = null; WCAMP.msg = ''; wRenderCamp(); };
+  if (want === 'lanes') { WCAMP.tab = 'lanes'; wRenderCamp(); }
+};
+const wW114RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  if (WCAMP.tab !== 'lanes') return wW114RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  if (!$('modalBox').querySelector('[data-ctab="lanes"]')) { WCAMP.tab = 'team'; return wRenderCamp(); }
+  $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'lanes'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  const before = JSON.stringify(WG.lanes), C = wFiveSync(); if (JSON.stringify(C) !== before) wSave();
+  body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
+    ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampLanes(C);
+  const keyOf = el => { const k = el.closest('[data-nid]').dataset.nid; return /^n\d+$/.test(k) ? k : +k; };
+  body.querySelectorAll('[data-nslot]').forEach(s => s.onchange = () => wCampSay(wFiveSetSlot(keyOf(s), s.value)));
+  const auto = body.querySelector('[data-nauto]'); if (auto) auto.onclick = () => wCampSay(wFiveAuto());
+  const pr = body.querySelector('[data-npractice]'); if (pr) pr.onclick = () => wFivePractice();
+};
+
+/* ---------- the Bowling view on the Stats tab ---------- */
+const W_BL_COLS = () => wBL.stats.map(s => [s, W_BLR.stat[s][0], W_BLR.stat[s][1]]);
+const wW114CampStats = wCampStats;
+wCampStats = function () {
+  const html = wW114CampStats().replace(/(<button data-wsview="career"[^>]*>Career<\/button>)/, `$1<button data-wsview="bowling" aria-pressed="${WSTAT.view === 'bowling'}">Bowling</button>`);
+  if (WSTAT.view !== 'bowling') return html;
+  const cols = W_BL_COLS(), k = WSTAT.sort && cols.some(c => c[0] === WSTAT.sort) ? WSTAT.sort : null;
+  const C = wFiveSync(), rows = wRoster().map((p, i) => ({ p, i, b: wBlOf(p), slot: wFiveSlotOf(p.id, C) }));
+  if (k) rows.sort((a, b) => (b.b[k] - a.b[k]) || a.i - b.i);
+  const head = `<th scope="col"><button class="wsth" data-wsort="" aria-pressed="${!k}">Player</button></th><th scope="col">Order</th><th scope="col" title="Bowling hand">Hand</th>` + cols.map(([c, s, l]) => `<th scope="col"><button class="wsth" data-wsort="${c}" title="${esc(l)}" aria-pressed="${k === c}">${s}</button></th>`).join('');
+  const body = rows.map(({ p, b, slot }) => `<tr data-wsp="${p.id}"${WSTAT.pid === p.id ? ' class="wsel"' : ''}><th scope="row"><button class="wsname" data-wsp-open aria-expanded="${WSTAT.pid === p.id}"><img src="${wPlayerPort(p, 40)}" alt=""><span><b>${esc(p.n)}</b><small>${esc(wKindName(p.kind))}</small></span></button></th>
+    <td>${slot != null ? esc(W_BLR.slot[slot].replace(/^the /, '')) : 'Reserve'}</td><td>${b.hand < 0 ? 'L' : 'R'}</td>${cols.map(([c]) => `<td>${b[c]}</td>`).join('')}</tr>`).join('');
+  const sel = WSTAT.pid != null && wPlayer(WSTAT.pid);
+  return html.replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every player\'s bowling ratings and their place in your five (set on the Lanes tab). Pick a heading to sort, a player to see more.</small>')
+    .replace(/<div class="tablewrap">[\s\S]*$/, `<div class="tablewrap"><table class="wstats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${sel ? wStatsCard(sel) : ''}`);
+};
+
+// your ball's rows gain a line for the bowler up: their arm, and the moment
+$('wLanesRows').insertAdjacentHTML('afterbegin', '<div class="wccrow" id="wLanesRowUp"><span class="wccl">Bowler</span><span id="wLanesUp"></span></div>');
+const wW114LanesRows = wLanesRows;
+wLanesRows = function () {
+  wW114LanesRows();
+  const V = WBL && !WBL.over && wBL.G && wBL.G.teams ? wBL.view : null; if (!V || V.up !== V.you || !V.sel) return;
+  const m = wBL.G.teams[V.you].roster[V.bowler], arm = wBL.arm ? Math.round(wBL.arm[V.you][V.bowler] * 100) : 100, pr = wBL.pressure(V.you);
+  $('wLanesUp').innerHTML = `<b>${esc(m.n)}</b> <small>${esc(wKindName(m.kind) || '')}, ${m.style.hand < 0 ? 'left' : 'right'}-handed, ${m.style.mph} mph</small> · <span title="Each ball costs some arm; it comes back while the others bowl. A tired arm's mark is smaller.">Arm <b>${arm}%</b></span>${pr ? ` · <b class="wbad" title="The last frame: the meter falls quicker and the mark shakes, less for a steady nerve">${pr > 1 ? 'The game hangs on it' : 'The last frame'}</b>` : ''}`;
+};
+// Bowling: how it works gains the ratings, the order, arm and nerve
+const wW114LanesHow = wLanesHowHTML;
+wLanesHowHTML = function () {
+  return wW114LanesHow() + `<p class="hint"><b>Ratings.</b> Each bowler has six: <b>power</b> (the ball's speed, and how hard it drives through the pins), <b>revs</b> (side spin: hook and the angle into the pocket), <b>accuracy</b> (how true the strike ball goes: your mark on the meter is wider), <b>spare</b> (the same at a spare), <b>nerve</b> and <b>read</b> (how soon they see the oil change). A bowler's speed and revs follow their power and revs, and each has their own hand.</p>
+  <p class="hint"><b>The order.</b> Your five are set on the Lanes tab: the leadoff bowls the 1st and the 6th, the anchor the 5th and the 10th. A leadoff wants power, revs and accuracy; an anchor nerve and spares.</p>
+  <p class="hint"><b>Arm.</b> Every ball costs the bowler some arm, a power ball more, and they get it back while the rest of the side bowls. A tired arm is less true: it tells in the tenth frame, with its three balls, and in a roll-off.</p>
+  <p class="hint"><b>Nerve.</b> In a side's last frame, and more when the other side has finished and the game hangs on it, the meter falls quicker and the mark is smaller and shakes, less for a steady nerve. The CPU's bowlers feel it too.</p>`;
+};
+const wW114RenderHelp = renderHelp;
+renderHelp = function () {
+  wW114RenderHelp();
+  const after = $('wHelpLanes'); if (!after || $('wHelpLanesTab')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesTab"><b>Bowling ratings, the five and their order.</b> Every player also has bowling ratings: power, revs, accuracy, spare, nerve and read (1 to ${wBlCap()}), and a bowling hand. Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Bowling view. The Lanes tab on the Team screen sets your five and their order (the leadoff, the 2nd, 3rd and 4th, and the anchor). Every ball costs some arm, and a tired bowler's mark is smaller. In the last frame the meter falls quicker and the mark shakes, less for a steady nerve. Called-up players at your level fill the five when your roster is short. Practice game there plays your five against Saltmere's; nothing is won or lost.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, baseball, football, boxing,
    basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

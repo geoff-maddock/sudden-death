@@ -57,13 +57,14 @@ function blSelect(o) {
   return true;
 }
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
-function blSelThrow(S, st, p, err) {
+// (win: the mark's half-width for this bowler now, before a power ball shrinks it)
+function blSelThrow(S, st, p, err, win0) {
   const x0 = blBoardX(S.stand), ax = blBoardX(S.arrow);
   let ang = Math.atan((ax - x0) / BL_LANE.arrows) * 180 / Math.PI;
-  const power = Math.max(0, p - 1), M = BL_METER, win = M.win * (power > 0 ? M.pwin : 1);
+  const power = Math.max(0, p - 1), M = BL_METER, win = (win0 || M.win) * (power > 0 ? M.pwin : 1);
   if (err) { const a = Math.abs(err), deg = a <= win ? a / win * M.inDeg : M.inDeg + (a - win) * M.outDeg; ang += Math.sign(err) * st.hand * deg; }
   const mph = st.mph * (.8 + .2 * Math.min(1, p)) * (1 + power * 1.2), rpm = Math.round(st.rpm * BL_REVS[S.revs] * (1 + power * .5));
-  return { x0, ang: +ang.toFixed(4), mph: +mph.toFixed(2), rpm, ball: S.ball, hand: st.hand };
+  return { x0, ang: +ang.toFixed(4), mph: +mph.toFixed(2), rpm, ball: S.ball, hand: st.hand, power: power > 0 };
 }
 // the guide: where a perfect ball from this setup goes on a fresh lane
 function blGuide() {
@@ -73,9 +74,16 @@ function blGuide() {
 }
 
 /* ---------- the meter ---------- */
+// your mark now: wider for an accurate bowler (a spare bowler, at a spare), narrower for a tired arm or a big moment;
+// and the meter falls quicker under pressure
+function blMeterFor(s) {
+  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, pr = blPressure(s);
+  const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
+  return { win: +win.toFixed(4), fall: BL_METER.fall * (1 + .25 * pr), shake: pr * (1 - r.nrv) };
+}
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
-  if (GP.ph === 'aim') { GP.meter = { st: 'up', v: 0, p: null }; blGo('swing', 0, `${blName(GP.you, blBowler(GP.you))} on the approach…`); return true; }
+  if (GP.ph === 'aim') { GP.meter = Object.assign({ st: 'up', v: 0, p: null }, blMeterFor(GP.you)); blGo('swing', 0, `${blName(GP.you, blBowler(GP.you))} on the approach…`); return true; }
   if (GP.ph !== 'swing' || !GP.meter) return false;
   const M = GP.meter;
   if (M.st === 'up') { M.p = M.v; M.st = 'down'; return true; }
@@ -85,7 +93,7 @@ function blPress() {
 function blMeterTick(dt) {
   const M = GP.meter, K = BL_METER; if (!M) return;
   if (M.st === 'up') { M.v += K.rise * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
-  else if (M.st === 'down') { M.v -= K.fall * dt; if (M.v <= K.low) blRelease3(K.low); }
+  else if (M.st === 'down') { M.v -= (M.fall || K.fall) * dt; if (M.v <= K.low) blRelease3(K.low); }
 }
 // the third press (or the bottom of the meter): the ball leaves the hand
 function blRelease3(v) {
@@ -96,16 +104,16 @@ function blRelease3(v) {
 // a phone's throw: pull is the speed (1 the bowler's own), deg how far off straight the pull went (plus is early)
 function blDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim') return false;
-  const p = clamp(pull, .3, BL_METER.top), err = deg / BL_HANDS.dragDeg * BL_METER.win;
-  GP.meter = { st: 'gone', v: err, p, err };
+  const F = blMeterFor(GP.you), p = clamp(pull, .3, BL_METER.top), err = deg / BL_HANDS.dragDeg * BL_METER.win;
+  GP.meter = Object.assign(F, { st: 'gone', v: err, p, err });
   blFireMine(p, err);
   return true;
 }
 // the two numbers behind your release: { p, err, win }
-function blSwingNums() { const M = GP && GP.meter; if (!M) return null; const p = M.p == null ? M.v : M.p; return { p, err: M.err == null ? null : M.err, win: BL_METER.win * (p > 1 ? BL_METER.pwin : 1) }; }
+function blSwingNums() { const M = GP && GP.meter; if (!M) return null; const p = M.p == null ? M.v : M.p; return { p, err: M.err == null ? null : M.err, win: (M.win || BL_METER.win) * (p > 1 ? BL_METER.pwin : 1) }; }
 function blFireMine(p, err) {
-  const s = GP.you, st = blStyleOf(s, blBowler(s)), S = GP.sel, rel = blSelThrow(S, st, p, err);
-  const plan = { x0: rel.x0, ang: blSelThrow(S, st, p, 0).ang, ball: S.ball, aim: { x: blBoardX(S.arrow), y: BL_LANE.arrows }, why: 'yours' };
+  const s = GP.you, st = blStyleOf(s, blBowler(s)), S = GP.sel, win = GP.meter && GP.meter.win, rel = blSelThrow(S, st, p, err, win);
+  const plan = { x0: rel.x0, ang: blSelThrow(S, st, p, 0, win).ang, ball: S.ball, aim: { x: blBoardX(S.arrow), y: BL_LANE.arrows }, why: 'yours' };
   blFire(s, plan, rel);
 }
 
@@ -165,7 +173,7 @@ function blPlayNext() {
   if (s < 0) { blGo('over'); return; }
   const ri = blBowler(s), fr = blFrameNo(s), ball = G.rb[s] ? 'second ball' : G.stand[s].length < 10 ? 'fill ball' : 'first ball';
   if (blYours(s)) { blSelReset(); blGo('aim', 0, `Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
-  const plan = blPlan(s), rel = blRelease(plan, G.skill[s]);
+  const plan = blPlan(s), rel = blRelease(plan, s);
   GP.cpu = { s, plan, rel };
   blGo('addr', 0, `Frame ${fr}: ${blName(s, ri)} (${G.teams[s].name}), ${ball}, going for ${plan.why}.`);
 }

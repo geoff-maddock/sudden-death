@@ -84,8 +84,9 @@ function blPlan(s) {
 }
 // a Knight's correction for this bowler on this lane (what it has learned from their strike balls there)
 const blBiasOf = (s, lane) => (G.bias[s][blBowler(s)] || [0, 0])[lane];
-// the release: the plan, strayed by the skill
-function blRelease(plan, skill) {
-  const sk = BL_SKILL[skill];
-  return Object.assign({}, plan, { ang: plan.ang + gauss() * sk.ang, mph: +(plan.mph + gauss() * sk.mph).toFixed(2), rpm: Math.max(120, Math.round(plan.rpm + gauss() * sk.rpm)) });
+// the release: the plan, strayed by the skill and by the bowler (accuracy or spare, the arm, the moment's nerve)
+function blRelease(plan, s) {
+  const sk = BL_SKILL[G.skill[s]], k = blErrK(s, blBowler(s), G.stand[s].length < 10);
+  return Object.assign({}, plan, { ang: plan.ang + gauss() * sk.ang * k, mph: +(plan.mph + gauss() * sk.mph * k).toFixed(2), rpm: Math.max(120, Math.round(plan.rpm + gauss() * sk.rpm * k)) });
 }
+

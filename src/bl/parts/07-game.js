@@ -20,13 +20,19 @@ function blStart(opts) {
   if (o.seed != null) engSeed(o.seed);
   const style = engRng((o.seed == null ? 1 : o.seed) * 31 + 7);
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#9b3a7a' };
-    const roster = (T.roster && T.roster.length >= BL_RULES.side ? T.roster : [0, 1, 2, 3, 4].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: 'zombie' })))
-      .map(p => Object.assign({}, p, { style: p.style ? Object.assign({}, p.style) : blStyle(style) }));
+    // a bowler with a kind the engine knows gets that kind's ratings (or their own); one with none keeps a seeded style
+    const roster = (T.roster && T.roster.length >= BL_RULES.side ? T.roster : [0, 1, 2, 3, 4].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
+      .map(p => { const r = p.r || (BL_KIND[p.kind] ? blRate(p.kind) : null), m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
+        m.rs = r ? Object.fromEntries(BL_STATS.map(k => [k, blScale(r[k])])) : Object.assign({}, BL_DEF_RAT);
+        m.style = blStyleFor(m, style); return m; });
     return Object.assign({}, T, { roster }); });
-  blNewGame({ frames: o.frames, order: o.order, lead: o.lead, roster: teams.map(T => T.roster.length) });
+  // an order: the game's, the team's own, or set by the ratings
+  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? blAutoOrder(teams[s].roster) : null));
+  blNewGame({ frames: o.frames, order, lead: o.lead, roster: teams.map(T => T.roster.length) });
   const oil = blHouse();
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
-    oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0 });
+    oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0,
+    arm: teams.map(T => T.roster.map(() => 1)) });
   GB = null;
   return G;
 }
@@ -35,18 +41,24 @@ function blStart(opts) {
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
   const plan = blPlan(s);
-  return blBowlBall(s, plan, blRelease(plan, G.skill[s]));
+  return blBowlBall(s, plan, blRelease(plan, s));
 }
 // a ball as released (yours from the page, or the CPU's): down the lane, into the pins, the oil worn, the sheet kept
 function blBowlBall(s, plan, rel) {
   const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
   const ball = blBall(rel, G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand }, seed) : { down: [], trace: [], ball: null };
+  // power: the ball drives through the pins like a heavier one
+  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow);
+  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed) : { down: [], trace: [], ball: null };
   G.oil[lane] = blWear(G.oil[lane], ball.path);
-  // a Knight learns from its strike balls: half of how far it missed the pocket, on that lane
-  if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (plan.aim.x - ball.x);
+  // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader
+  if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
+  // the arm: this ball costs the bowler some (a power ball more)
+  G.arm[s][ri] = Math.max(0, +(G.arm[s][ri] - (rel.power ? BL_ARM.power : BL_ARM.ball)).toFixed(3));
   const roll = blRoll(s, deck.down);
+  // a frame finished: the rest of the side got their breath back while it was bowled
+  if (roll.done) G.arm[s] = G.arm[s].map((a, i) => i === ri ? a : Math.min(1, +(a + BL_ARM.back).toFixed(3)));
   blCount(s, stand, first, ball, roll);
   G.n++;
   G.log.push([s, ri, roll.frame, deck.down.length, roll.strike ? 'X' : roll.spare ? '/' : roll.split ? 'o' : '']);

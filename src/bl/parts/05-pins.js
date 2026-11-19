@@ -27,7 +27,7 @@ function blPinRng(seed) { return engRng((seed >>> 0) ^ 0x5bd1e995); }
 function blDeck(standing, ball, seed, spots) {
   const L = BL_LANE, P = BL_PIN, rnd = blPinRng(seed), h = ball.hand === -1 ? -1 : 1;
   const ang = Math.atan(ball.m), y0 = L.len - 30;
-  const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: P.mBall, live: true };
+  const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: ball.mass || P.mBall, live: true };
   const pins = standing.map(n => { const sp = (spots && spots[n]) || BL_SPOT[n];
     return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin, up: true, hit: false, t: 0, gone: false }; });
   const trace = [];

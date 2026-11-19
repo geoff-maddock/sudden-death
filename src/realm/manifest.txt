@@ -152,4 +152,5 @@ src/realm/w110-linkscup.js
 src/realm/w111-linksfeel.js
 src/realm/w112a-quickshots.js
 src/realm/w113-lanes.js
+src/realm/w114-lanesfive.js
 src/realm/w112-quickstart.js

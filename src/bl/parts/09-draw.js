@@ -71,11 +71,13 @@ function blBowlerDraw(c, x, col) {
 function blMeterDraw(c) {
   const M = GP && GP.meter; if (!M || GP.ph !== 'swing') return;
   const K = BL_METER, x = 590, top = 150, bot = 470, Y = v => bot - (v - K.low) / (K.top - K.low) * (bot - top);
-  const p = M.p == null ? (M.st === 'up' ? M.v : 1) : M.p, win = K.win * (p > 1 ? K.pwin : 1);
+  const p = M.p == null ? (M.st === 'up' ? M.v : 1) : M.p, win = (M.win || K.win) * (p > 1 ? K.pwin : 1);
+  // a big moment shakes the mark (a steady nerve, less)
+  const jit = M.shake ? Math.sin(performance.now() / 45) * M.shake * 6 : 0;
   c.save(); c.fillStyle = 'rgba(15,10,8,.78)'; c.fillRect(x - 16, top - 10, 32, bot - top + 20);
   c.fillStyle = '#4a3a30'; c.fillRect(x - 8, top, 16, bot - top);
   c.fillStyle = '#b8402a'; c.fillRect(x - 8, Y(K.top), 16, Y(1) - Y(K.top));
-  c.fillStyle = '#4caa48'; c.fillRect(x - 8, Y(win), 16, Y(-win) - Y(win));
+  c.fillStyle = '#4caa48'; c.fillRect(x - 8, Y(win) + jit, 16, Y(-win) - Y(win));
   c.strokeStyle = '#ffd34a'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 12, Y(1)); c.lineTo(x + 12, Y(1)); c.stroke();
   if (M.p != null) { c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 14, Y(M.p)); c.lineTo(x + 14, Y(M.p)); c.stroke(); }
   c.fillStyle = '#fff'; c.beginPath(); c.moveTo(x + 10, Y(M.v)); c.lineTo(x + 20, Y(M.v) - 6); c.lineTo(x + 20, Y(M.v) + 6); c.fill();

@@ -17,7 +17,10 @@
    what the page needs), tick(dt) (the tests move the game on by hand). Your ball: select({ stand, arrow, ball, revs,
    suggest }), press (Space), drag(pull, deg) (the phone's throw), setMode; guide (a perfect ball's path on a fresh
    lane), swingNums and meterRules are the numbers behind the meter; scr and unscr map the lane to the picture and
-   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end. */
+   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end.
+   Phase 3 is ratings, the order's roles, arm and nerve: stats (the six, in order), rate(kind) (1 to 12), cap, roles
+   (each slot of the order's role), fit(r, role) (r 0 to 1), autoOrder(roster), arm (G.arm), pressure(side),
+   armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -32,6 +35,10 @@ return {
   boardX: b => blBoardX(b), xBoard: x => blXBoard(x), ball: (t, oil, tide) => blBall(t, oil, tide), aimAt: (t, x, oil, tide) => blAimAt(t, x, oil, tide),
   deck: (st, b, seed, spots) => blDeck(st, b, seed, spots), groups: st => blGroups(st), spareTarget: p => blSpareTarget(p), style: () => blStyle(),
   plan: s => G && G.oil ? blPlan(s) : null, start: o => { blStart(o); blPlayStart(o); return G; }, turn: () => blTurn(), summary: () => blSummary(), simGame: o => blSimGame(o),
+  // ratings, the order's roles, arm and nerve (phase 3)
+  stats: BL_STATS.slice(), rate: k => blRate(k), cap: BL_RCAP, roles: BL_ROLES.slice(), fit: (r, role) => blFit(r, role), armRules: Object.assign({}, BL_ARM),
+  autoOrder: ro => blAutoOrder(ro.map(m => ({ rs: Object.fromEntries(BL_STATS.map(k => [k, blScale((m.r || blRate(m.kind))[k])])) }))),
+  get arm() { return G && G.arm ? G.arm.map(a => a.slice()) : null; }, pressure: s => G && G.arm ? blPressure(s) : 0,
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
