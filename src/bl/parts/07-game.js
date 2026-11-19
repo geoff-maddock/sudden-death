@@ -37,7 +37,9 @@ function blStart(opts) {
     line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
     word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }],
     pst: teams.map(T => T.roster.map(() => ({ frames: 0, balls: 0, strikes: 0, spares: 0, pins: 0, splits: 0 }))) });
+  G.streak = [0, 0];
   blHallStart(o);
+  blPowersStart(o);
   GB = null;
   return G;
 }
@@ -45,18 +47,23 @@ function blStart(opts) {
 // down, roll } or null when the game is over
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
-  blCpuCall(s);
+  blCpuCall(s); blCpuPower(s);
   const plan = blPlan(s);
   return blBowlBall(s, plan, blRelease(plan, s));
 }
 // a ball as released (yours from the page, or the CPU's): down the lane, into the pins, the oil worn, the sheet kept
 function blBowlBall(s, plan, rel) {
   const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
-  const ball = blBall(rel, G.oil[lane], G.tide);
+  // the powers on this ball (13-powers.js): the web and a Hex's oil go into the ball, the rest below
+  const fx = blFxFor(s);
+  const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid }), G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
-  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass;
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
+  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1);
+  const front = stand.slice().sort((a, b) => BL_SPOT[a][1] - BL_SPOT[b][1] || Math.abs(BL_SPOT[a][0]) - Math.abs(BL_SPOT[b][0]))[0];
+  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
+  // a wobble (a harpy's Gust): a pin left standing beside one that fell may go
+  if (fx.wobble && ball.gutter === null) { const left = stand.filter(p => !deck.down.includes(p)); for (const p of left) if (BL_ADJ.some(([a, b]) => (a === p && deck.down.includes(b)) || (b === p && deck.down.includes(a))) && R() < fx.wobble) deck.down.push(p); deck.down.sort((a, b) => a - b); }
   // the hall: a gutter crab, a swell, the gull (12-hall.js)
   const H = blHallAfter(s, stand, ball, deck.down); deck.down = H.down;
   G.oil[lane] = blWear(G.oil[lane], ball.path);
@@ -68,6 +75,8 @@ function blBowlBall(s, plan, rel) {
   if (fresh && plan.ball === 'strike') blScoutSee(s, lane, rel.x0);
   if (G.wordOn[s]) G.wordOn[s] = false;
   const roll = blRoll(s, deck.down);
+  G.streak[s] = roll.strike ? G.streak[s] + 1 : 0;
+  blPowersAfter(s, roll, stand, G.streak[s]);
   // a fresh rack in front of the side: Moll's hand; and the tide may turn
   if (G.rb[s] === 0 && G.stand[s].length === 10 && !roll.over) blHallRack(s);
   const tide = blHallTide();

@@ -29,7 +29,10 @@
    snapshot() and resume(sn) (a match between balls, plain JSON), the box score (G.pst: each bowler's frames, balls,
    strikes, spares, pins and splits; summary() carries it), and the hall (start({ hall: true }); hallRules, offspot,
    tideTurn: the tide under the floor, Moll's off-spot racks, the swell, the gutter crabs, the gull and the Brinepup;
-   select also takes { rerack: true }). */
+   select also takes { rerack: true }).
+   Phase 6 is powers: start({ powers: true | [yours, theirs], autoPow, powOnly }); pow, pow2, ult, sit, manaRules,
+   roarRules, fx0 (the tables); mana, roar, mark, casts; powNow(s, ri), powWhy(s, k, ri), cast(s, k, ri), castMine(k)
+   (yours, while you set up), cpuPower(s), fxFor(s), tip(s); autoPow (Manage). A roster bowler may bring pw. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -58,6 +61,12 @@ return {
   manage: o => blManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; }, snapshot: () => blSnapshot(), resume: sn => blResume(sn),
   hallRules: Object.assign({}, BL_HALL), get offspot() { return G && G.offspot ? JSON.parse(JSON.stringify(G.offspot)) : null; }, get tideTurn() { return G && G.tideTurn ? Object.assign({}, G.tideTurn) : null; },
   get tide() { return G ? G.tide : null; }, hallAfter: (s, stand, ball, down) => blHallAfter(s, stand, ball, down),
+  // powers (phase 6)
+  pow: JSON.parse(JSON.stringify(BL_POW)), pow2: JSON.parse(JSON.stringify(BL_POW2)), ult: JSON.parse(JSON.stringify(BL_ULT)), sit: JSON.parse(JSON.stringify(BL_SIT)),
+  manaRules: Object.assign({}, BL_MANA), roarRules: Object.assign({}, BL_ROAR), fx0: Object.assign({}, BL_FX0),
+  get mana() { return G && G.mana ? G.mana.slice() : null; }, get roar() { return G && G.roar ? G.roar.slice() : null; }, get mark() { return G && G.mark ? JSON.parse(JSON.stringify(G.mark)) : null; }, get casts() { return G && G.casts ? JSON.parse(JSON.stringify(G.casts)) : []; },
+  powNow: (s, ri) => G && G.powers ? blPowNow(s, ri) : null, powWhy: (s, k, ri) => blPowWhy(s, k, ri), cast: (s, k, ri) => blCast(s, k, ri), castMine: k => blCastMine(k), cpuPower: s => blCpuPower(s),
+  fxFor: s => blFxFor(s), powersAfter: (s, roll, stand, streak) => blPowersAfter(s, roll, stand, streak), tip: s => G && G.powers ? blPowerTip(s) : '', get autoPow() { return GP ? GP.autoPow : false; }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),

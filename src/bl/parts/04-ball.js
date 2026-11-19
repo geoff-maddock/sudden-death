@@ -11,7 +11,8 @@
    spin, and wears the spin down. It gives the path, where the ball meets the pins and at what angle (the entry
    angle: 4 to 6 degrees carries best), and where it skidded, hooked and rolled. A ball whose middle leaves the lane
    before the pins is in the gutter.
-   Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
+   A throw may carry web (a gutter ball is caught and set back on the lane, once) and oilK (the oil plays heavier:
+   a Hex). Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
    the mirrored boards (so the left side of the lane, fresh, is theirs). */
 const BL_BALL = { step: 3, hook: .004, decay: .012, mu0: .043, rollAt: .045, spareSpin: .08, v0: 17, rpm0: 350, drag: .012 };
 const BL_MPH = 17.6;   // inches a second in a mile an hour
@@ -25,9 +26,9 @@ function blBall(t, oil, tide) {
   const m0 = m;
   let v = (t.mph || B.v0) * BL_MPH;
   let S = ((t.rpm || B.rpm0) / B.rpm0) * (t.ball === 'spare' ? B.spareSpin : 1);
-  const path = [[h * x, 0]]; let gutter = null, skid = null, roll = null, nextRec = 12;
+  const path = [[h * x, 0]]; let gutter = null, skid = null, roll = null, nextRec = 12, web = !!t.web, webbed = false;
   while (y < L.len) {
-    const dy = Math.min(B.step, L.len - y), mu = blMu(oil, h * x, y, tide);
+    const dy = Math.min(B.step, L.len - y), mu = blMu(oil, h * x, y, tide, t.oilK);
     if (S > B.rollAt) {
       const turn = B.hook * Math.max(0, mu - B.mu0) * S * dy * Math.pow(B.v0 * BL_MPH / v, 2);
       m += turn;
@@ -37,10 +38,12 @@ function blBall(t, oil, tide) {
     }
     v = Math.max(8 * BL_MPH, v - B.drag * mu * v * dy / 12);
     x += m * dy; y += dy;
+    // a web in the gutter (a spider's) catches the ball once and sets it back on the lane, rolling straight
+    if (Math.abs(x) > L.edge && web) { web = false; webbed = true; x = Math.sign(x) * (L.edge - L.ballR); m = 0; S = 0; }
     if (Math.abs(x) > L.edge) { gutter = y; break; }
     if (y >= nextRec || y >= L.len) { path.push([+(h * x).toFixed(2), +y.toFixed(1)]); nextRec += 12; }
   }
-  return { path, x: +(h * x).toFixed(3), m: h * m, entry: +(Math.atan(m) * 180 / Math.PI).toFixed(2), v, spin: Math.max(0, S), gutter, skid, roll, hand: h };
+  return { path, x: +(h * x).toFixed(3), m: h * m, entry: +(Math.atan(m) * 180 / Math.PI).toFixed(2), v, spin: Math.max(0, S), gutter, skid, roll, hand: h, webbed };
 }
 // the throw that sends a ball from x0 to the target x at the pins (tx), by its angle: the angle found by bisection
 // (a bigger angle always ends further left). null if no angle in reach does it

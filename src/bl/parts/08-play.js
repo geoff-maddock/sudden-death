@@ -26,7 +26,7 @@ let GP = null;
 
 function blPlayStart(o) {
   GP = { mode: o && BL_MODES.includes(o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, streak: [0, 0], said: '',
-    mgr: { line: 'auto', tempo: 'auto', weight: 'auto' } };
+    mgr: { line: 'auto', tempo: 'auto', weight: 'auto' }, autoPow: !(o && o.autoPow === false) };
   BLC.tracks = [[], []]; BLC.camY = -40; GP.tracks = [[], []];
   GP.msg = `${G.teams[0].name} against ${G.teams[1].name}: ${G.frames} frames, the Baker format. ${G.teams[G.lead].name} bowl first.`;
 }
@@ -69,6 +69,16 @@ function blSelect(o) {
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
   return why || true;
 }
+// cast one of your side's powers before your ball: k 'pow', 'ult', 'steady' or a situation power. '' or why not
+function blCastMine(k) {
+  if (!GP || GP.mode !== 'play' || GP.ph !== 'aim') return 'Only while you set up your ball.';
+  const why = blCast(GP.you, k); if (why) return why;
+  const c = G.casts[G.casts.length - 1]; GP.msg = `${c.n}!` + (k === 'ult' ? ` ${G.mark.n} marks this frame.` : '');
+  // a power that changes the ball (more hook) changes the coach's setup too
+  GP.sel = Object.assign(blSelFromPlan(blSuggest(GP.you)), { revs: GP.sel.revs });
+  if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
+  return '';
+}
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
 // (win: the mark's half-width for this bowler now, before a power ball shrinks it)
 function blSelThrow(S, st, p, err, win0) {
@@ -90,10 +100,10 @@ function blGuide() {
 // your mark now: wider for an accurate bowler (a spare bowler, at a spare), narrower for a tired arm or a big moment;
 // and the meter falls quicker under pressure
 function blMeterFor(s) {
-  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, pr = blPressure(s);
+  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, fx = blFxFor(s), pr = fx.nerve ? 0 : blPressure(s);
   const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
   const tm = BL_STANCE[blStanceOf(s).tempo].meter;
-  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
+  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err / fx.err).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
 }
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
@@ -188,10 +198,10 @@ function blPlayNext() {
   const ri = blBowler(s), fr = blFrameNo(s), ball = G.rb[s] ? 'second ball' : G.stand[s].length < 10 ? 'fill ball' : 'first ball';
   const chant = G.rb[s] === 0 && G.stand[s].length === 10 && GP.streak[s] === 2 ? 'The gallery chants: TUR-KEY! TUR-KEY! ' : '';
   const off = G.hall && G.offspot && G.offspot[s] && G.rb[s] === 0 && G.stand[s].length === 10 ? `Moll has set the ${G.offspot[s].n} a touch off its spot. ` : '';
-  if (GP.mode === 'manage' && s === GP.you) { const said = blManageCall(s), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
+  if (GP.mode === 'manage' && s === GP.you) { const said = [blManageCall(s)].concat(GP.autoPow ? blCpuPower(s) : []).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
     GP.cpu = { s, plan, rel }; blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)}, ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`); return; }
   if (blYours(s)) { blSelReset(); blGo('aim', 0, `${chant}${off}${blTurnBall(s) ? 'The turn: the lanes are re-read, and the chart shows all the oil for this ball. ' : ''}Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
-  const said = blCpuCall(s), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
+  const said = [blCpuCall(s)].concat(blCpuPower(s)).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
   GP.cpu = { s, plan, rel };
   blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)} (${G.teams[s].name}), ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`);
 }

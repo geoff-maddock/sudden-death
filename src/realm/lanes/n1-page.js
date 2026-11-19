@@ -9,7 +9,7 @@
    drag that starts at the bowler and goes up the lane is a throw (the pull is the speed, a pull off straight the
    miss, and a swipe that bends at the end the way the ball hooks puts on more revs, the other way less).
    Phase 4's keys: L the line, S convert or safe on a split, T the tempo, H heavy or light, W the coach's word, C the
-   lane chart (the page opens it). */
+   lane chart (the page opens it). Phase 6's: P the bowler's power, U the ultimate, K steady. */
 const BLP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null };
 (() => {
   const h = document.createElement('div'); h.id = 'v-lanes'; h.hidden = true;
@@ -66,6 +66,9 @@ function blKeyDown(e) {
   else if (k === 't') blSelect({ tempo: blStanceOf(GP.you).tempo === 'quick' ? 'steady' : 'quick' });
   else if (k === 'h') blSelect({ weight: blStanceOf(GP.you).ball === 'heavy' ? 'light' : 'heavy' });
   else if (k === 'w') blSelect({ word: true });
+  else if (k === 'p') blCastMine('pow');
+  else if (k === 'u') blCastMine('ult');
+  else if (k === 'k') blCastMine('steady');
   else if (k === 'c') { if (BL_HOOK.onChart) try { BL_HOOK.onChart(); } catch (er) { console.error(er); } }
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }

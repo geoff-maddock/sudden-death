@@ -28,11 +28,11 @@ const BL_SCOUT = { same: 3, board: 1.5 };
 const blStanceOf = s => (G.stance && G.stance[s]) || { tempo: 'steady', ball: 'heavy' };
 const blLineOf = s => (G.line && G.line[s]) || 'pocket';
 // a bowler's style as they bowl now: the ball stance moves the revs
-function blStyleNow(s, ri) { const st = blStyleOf(s, ri), B = BL_STANCE[blStanceOf(s).ball]; return Object.assign({}, st, { rpm: Math.round(st.rpm * B.rpm) }); }
+function blStyleNow(s, ri) { const st = blStyleOf(s, ri), B = BL_STANCE[blStanceOf(s).ball]; return Object.assign({}, st, { rpm: Math.round(st.rpm * B.rpm * blFxFor(s).hook) }); }
 // the line's and the stance's part in how true a release is
 const blCallErr = s => BL_LINES[blLineOf(s)].err * BL_STANCE[blStanceOf(s).tempo].err;
 // what a ball costs the arm with the stance
-const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm;
+const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm * blFxFor(s).arm;
 // how far down the lane (feet) the bowler reads the oil now
 function blReadFt(s, ri) {
   if (G.wordOn && G.wordOn[s]) return BL_LANE.ft;

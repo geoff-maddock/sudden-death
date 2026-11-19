@@ -155,4 +155,5 @@ src/realm/w113-lanes.js
 src/realm/w114-lanesfive.js
 src/realm/w115-lanescall.js
 src/realm/w116-lanesgame.js
+src/realm/w117-lanespowers.js
 src/realm/w112-quickstart.js

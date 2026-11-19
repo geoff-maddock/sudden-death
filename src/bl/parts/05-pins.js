@@ -15,6 +15,7 @@
    - the ball keeps hooking on the dry deck by the spin it has left, which is what drives through the pocket.
    A pin's knock has a little seeded scatter in its direction (pins spin and bounce in three dimensions, which this
    model doesn't), so the same throw can carry or leave a pin; with the same seed, it always does the same.
+   The ball may carry mass (how hard it drives), ghost (pins it passes through) and stone (a pin turned to stone).
    It gives the pins that fell, and a trace of every body for the page to draw. */
 const BL_PIN = { dt: .001, steps: 1600, mBall: 15, mPin: 3.5, eBall: .6, ePin: .55, eKick: .45, knock: 15, fallR: 3, fallT: .04,
   slide: 260, ballDeck: 60, scatter: .12, still: 6, traceEvery: 10, len: 15, reach: 5, pass: .4 };
@@ -29,7 +30,10 @@ function blDeck(standing, ball, seed, spots) {
   const ang = Math.atan(ball.m), y0 = L.len - 30;
   const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: ball.mass || P.mBall, live: true };
   const pins = standing.map(n => { const sp = (spots && spots[n]) || BL_SPOT[n];
-    return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin, up: true, hit: false, t: 0, gone: false }; });
+    // a stone pin (a gorgon's Stare) is three times as heavy and as hard to topple
+    const stone = ball.stone === n;
+    return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin * (stone ? 3 : 1), knock: P.knock * (stone ? 3 : 1), up: true, hit: false, t: 0, gone: false }; });
+  const ghost = new Set(ball.ghost || []);
   const trace = [];
   const snap = t => trace.push([+t.toFixed(3), [+B.x.toFixed(1), +B.y.toFixed(1)], pins.map(p => [p.n, +p.x.toFixed(1), +p.y.toFixed(1), p.hit ? 0 : 1, p.gone ? 1 : 0])]);
   const hitSpin = (ball.spin || 0) + .25;
@@ -59,6 +63,14 @@ function blDeck(standing, ball, seed, spots) {
       if (d >= rr || d === 0) continue;
       const aStill = a.up && !a.hit, bStill = b.up && !b.hit;
       if (aStill && bStill) continue;
+      // a ghost ball passes through the pins it haunts (a wraith's: the headpin): the pin takes the knock it would have
+      // taken, but the ball doesn't slow or turn
+      if ((a === B && ghost.has(b.n)) || (b === B && ghost.has(a.n))) {
+        const q = a === B ? b : a; if (q.hit) continue;
+        const ux = (q.x - B.x) / d, uy = (q.y - B.y) / d, rvn = B.vx * ux + B.vy * uy;
+        if (rvn > 0) { const dv = (1 + P.eBall) * rvn * B.m / (B.m + q.m); q.hit = true; q.vx += ux * dv; q.vy += uy * dv; }
+        continue;
+      }
       let nx = dx / d, ny = dy / d;
       const rot = (rnd() - .5) * 2 * P.scatter, c = Math.cos(rot), s = Math.sin(rot);
       [nx, ny] = [nx * c - ny * s, nx * s + ny * c];
@@ -69,7 +81,7 @@ function blDeck(standing, ball, seed, spots) {
       const e = a === B || b === B ? P.eBall : P.ePin, J = -(1 + e) * rv / (1 / a.m + 1 / b.m);
       const kick = (q, sgn) => {
         const dv = J / q.m;
-        if (q.up && !q.hit) { if (dv < P.knock) return; q.hit = true; }
+        if (q.up && !q.hit) { if (dv < (q.knock || P.knock)) return; q.hit = true; }
         q.vx += sgn * nx * dv; q.vy += sgn * ny * dv;
       };
       kick(a, -1); kick(b, 1);

@@ -167,6 +167,9 @@ function blHudDraw(c) {
     c.fillStyle = '#efe4cc'; c.fillText(`${T[k].name}`, 24, 28 + k * 26); c.textAlign = 'right'; c.fillText(String(blTotal(k)), 236, 28 + k * 26); c.textAlign = 'left'; });
   if (V && V.up >= 0) { c.font = '13px system-ui, sans-serif'; c.fillStyle = 'rgba(15,10,8,.7)'; c.fillRect(12, 66, 300, 20); c.fillStyle = '#efe4cc';
     const st = blStyleOf(V.up, V.bowler); c.fillText(`Frame ${V.frame} · ${blName(V.up, V.bowler)} · ${st.hand < 0 ? 'left' : 'right'}-handed, ${st.mph} mph`, 18, 81); }
+  // the powers: each side's mana and roar, and the frame's mark
+  if (G.powers) { c.font = '11px system-ui, sans-serif'; [0, 1].forEach(k => { c.fillStyle = 'rgba(15,10,8,.7)'; c.fillRect(244, 12 + k * 26, 104, 22); c.fillStyle = '#9fc6e8'; c.textAlign = 'left'; c.fillText(`mana ${G.mana[k]} · roar ${G.roar[k]}`, 250, 27 + k * 26); }); }
+  if (G.powers && G.mark) { c.font = '600 12px system-ui, sans-serif'; c.fillStyle = '#e8b0ff'; c.textAlign = 'left'; c.fillText(`${G.mark.n} marks frame ${G.mark.f + 1} (${G.teams[G.mark.side].short || G.teams[G.mark.side].name})`, 18, 122); }
   if (G.tide && G.tide !== 'mid') { c.fillStyle = '#9fc6e8'; c.font = '12px system-ui, sans-serif'; c.fillText(G.tide === 'high' ? 'High tide: the lanes play heavy' : 'Low tide: the lanes play dry', 18, 104); }
   // a strike, a spare, a split, said big
   const R = GP && GP.last && GP.ph === 'rest' ? GP.last.roll : null;

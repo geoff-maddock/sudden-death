@@ -45,9 +45,9 @@ function blOilAt(oil, x, y) {
   if (b < 1 || b > L.boards || f < 0 || f >= L.ft) return 0;
   return oil[(b - 1) * L.ft + f];
 }
-// friction at a point: dry boards grip, oiled ones slide; the tide weighs the oil
-function blMu(oil, x, y, tide) {
-  const o = blOilAt(oil, x, y) * (BL_TIDE[tide] || 1), k = Math.min(1, o / BL_OIL.full);
+// friction at a point: dry boards grip, oiled ones slide; the tide weighs the oil (and heavy, a Hex's heavy oil)
+function blMu(oil, x, y, tide, heavy) {
+  const o = blOilAt(oil, x, y) * (BL_TIDE[tide] || 1) * (heavy || 1), k = Math.min(1, o / BL_OIL.full);
   return BL_OIL.muDry - (BL_OIL.muDry - BL_OIL.muOil) * Math.pow(k, .7);
 }
 // a ball's path moves oil: it picks some up from the cells it skids over (and the board each side), and lays a

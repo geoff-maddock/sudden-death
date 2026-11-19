@@ -93,7 +93,7 @@ function wStartLanes(o) {
   const world = { kind: o.kind || 'lngame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, tide, cup: !!o.cup };
   if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
-  const opts = { teams: [mine, opp], skill: wLanesSkillOf(tier), frames: wLanesFrames(), tide, hall: true };
+  const opts = { teams: [mine, opp], skill: wLanesSkillOf(tier), frames: wLanesFrames(), tide, hall: true, powers: true };
   if (how === 'sim') { const s = wBL.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts)); wLanesResultCard(wLanesSettle(s)); return ''; }
   wLanesGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WBL.world = true;

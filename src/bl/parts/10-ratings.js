@@ -70,5 +70,6 @@ const blNerveK = (p, nrv) => 1 + .6 * p * (1 - clamp(nrv, 0, 1));
 // all that makes side s's bowler ri less true now: the skill's spread is multiplied by this (spare: a ball at a spare)
 function blErrK(s, ri, spare) {
   const r = blRat(s, ri), a = G.arm ? G.arm[s][ri] : 1;
-  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(blPressure(s), r.nrv);
+  const fx = typeof blFxFor === 'function' ? blFxFor(s) : null;
+  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s), r.nrv) * (fx ? fx.err : 1);
 }

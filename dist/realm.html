@@ -36827,9 +36827,9 @@ function blOilAt(oil, x, y) {
   if (b < 1 || b > L.boards || f < 0 || f >= L.ft) return 0;
   return oil[(b - 1) * L.ft + f];
 }
-// friction at a point: dry boards grip, oiled ones slide; the tide weighs the oil
-function blMu(oil, x, y, tide) {
-  const o = blOilAt(oil, x, y) * (BL_TIDE[tide] || 1), k = Math.min(1, o / BL_OIL.full);
+// friction at a point: dry boards grip, oiled ones slide; the tide weighs the oil (and heavy, a Hex's heavy oil)
+function blMu(oil, x, y, tide, heavy) {
+  const o = blOilAt(oil, x, y) * (BL_TIDE[tide] || 1) * (heavy || 1), k = Math.min(1, o / BL_OIL.full);
   return BL_OIL.muDry - (BL_OIL.muDry - BL_OIL.muOil) * Math.pow(k, .7);
 }
 // a ball's path moves oil: it picks some up from the cells it skids over (and the board each side), and lays a
@@ -36863,7 +36863,8 @@ function blWear(oil, path) {
    spin, and wears the spin down. It gives the path, where the ball meets the pins and at what angle (the entry
    angle: 4 to 6 degrees carries best), and where it skidded, hooked and rolled. A ball whose middle leaves the lane
    before the pins is in the gutter.
-   Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
+   A throw may carry web (a gutter ball is caught and set back on the lane, once) and oilK (the oil plays heavier:
+   a Hex). Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
    the mirrored boards (so the left side of the lane, fresh, is theirs). */
 const BL_BALL = { step: 3, hook: .004, decay: .012, mu0: .043, rollAt: .045, spareSpin: .08, v0: 17, rpm0: 350, drag: .012 };
 const BL_MPH = 17.6;   // inches a second in a mile an hour
@@ -36877,9 +36878,9 @@ function blBall(t, oil, tide) {
   const m0 = m;
   let v = (t.mph || B.v0) * BL_MPH;
   let S = ((t.rpm || B.rpm0) / B.rpm0) * (t.ball === 'spare' ? B.spareSpin : 1);
-  const path = [[h * x, 0]]; let gutter = null, skid = null, roll = null, nextRec = 12;
+  const path = [[h * x, 0]]; let gutter = null, skid = null, roll = null, nextRec = 12, web = !!t.web, webbed = false;
   while (y < L.len) {
-    const dy = Math.min(B.step, L.len - y), mu = blMu(oil, h * x, y, tide);
+    const dy = Math.min(B.step, L.len - y), mu = blMu(oil, h * x, y, tide, t.oilK);
     if (S > B.rollAt) {
       const turn = B.hook * Math.max(0, mu - B.mu0) * S * dy * Math.pow(B.v0 * BL_MPH / v, 2);
       m += turn;
@@ -36889,10 +36890,12 @@ function blBall(t, oil, tide) {
     }
     v = Math.max(8 * BL_MPH, v - B.drag * mu * v * dy / 12);
     x += m * dy; y += dy;
+    // a web in the gutter (a spider's) catches the ball once and sets it back on the lane, rolling straight
+    if (Math.abs(x) > L.edge && web) { web = false; webbed = true; x = Math.sign(x) * (L.edge - L.ballR); m = 0; S = 0; }
     if (Math.abs(x) > L.edge) { gutter = y; break; }
     if (y >= nextRec || y >= L.len) { path.push([+(h * x).toFixed(2), +y.toFixed(1)]); nextRec += 12; }
   }
-  return { path, x: +(h * x).toFixed(3), m: h * m, entry: +(Math.atan(m) * 180 / Math.PI).toFixed(2), v, spin: Math.max(0, S), gutter, skid, roll, hand: h };
+  return { path, x: +(h * x).toFixed(3), m: h * m, entry: +(Math.atan(m) * 180 / Math.PI).toFixed(2), v, spin: Math.max(0, S), gutter, skid, roll, hand: h, webbed };
 }
 // the throw that sends a ball from x0 to the target x at the pins (tx), by its angle: the angle found by bisection
 // (a bigger angle always ends further left). null if no angle in reach does it
@@ -36922,6 +36925,7 @@ function blAimAt(t, tx, oil, tide) {
    - the ball keeps hooking on the dry deck by the spin it has left, which is what drives through the pocket.
    A pin's knock has a little seeded scatter in its direction (pins spin and bounce in three dimensions, which this
    model doesn't), so the same throw can carry or leave a pin; with the same seed, it always does the same.
+   The ball may carry mass (how hard it drives), ghost (pins it passes through) and stone (a pin turned to stone).
    It gives the pins that fell, and a trace of every body for the page to draw. */
 const BL_PIN = { dt: .001, steps: 1600, mBall: 15, mPin: 3.5, eBall: .6, ePin: .55, eKick: .45, knock: 15, fallR: 3, fallT: .04,
   slide: 260, ballDeck: 60, scatter: .12, still: 6, traceEvery: 10, len: 15, reach: 5, pass: .4 };
@@ -36936,7 +36940,10 @@ function blDeck(standing, ball, seed, spots) {
   const ang = Math.atan(ball.m), y0 = L.len - 30;
   const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: ball.mass || P.mBall, live: true };
   const pins = standing.map(n => { const sp = (spots && spots[n]) || BL_SPOT[n];
-    return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin, up: true, hit: false, t: 0, gone: false }; });
+    // a stone pin (a gorgon's Stare) is three times as heavy and as hard to topple
+    const stone = ball.stone === n;
+    return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin * (stone ? 3 : 1), knock: P.knock * (stone ? 3 : 1), up: true, hit: false, t: 0, gone: false }; });
+  const ghost = new Set(ball.ghost || []);
   const trace = [];
   const snap = t => trace.push([+t.toFixed(3), [+B.x.toFixed(1), +B.y.toFixed(1)], pins.map(p => [p.n, +p.x.toFixed(1), +p.y.toFixed(1), p.hit ? 0 : 1, p.gone ? 1 : 0])]);
   const hitSpin = (ball.spin || 0) + .25;
@@ -36966,6 +36973,14 @@ function blDeck(standing, ball, seed, spots) {
       if (d >= rr || d === 0) continue;
       const aStill = a.up && !a.hit, bStill = b.up && !b.hit;
       if (aStill && bStill) continue;
+      // a ghost ball passes through the pins it haunts (a wraith's: the headpin): the pin takes the knock it would have
+      // taken, but the ball doesn't slow or turn
+      if ((a === B && ghost.has(b.n)) || (b === B && ghost.has(a.n))) {
+        const q = a === B ? b : a; if (q.hit) continue;
+        const ux = (q.x - B.x) / d, uy = (q.y - B.y) / d, rvn = B.vx * ux + B.vy * uy;
+        if (rvn > 0) { const dv = (1 + P.eBall) * rvn * B.m / (B.m + q.m); q.hit = true; q.vx += ux * dv; q.vy += uy * dv; }
+        continue;
+      }
       let nx = dx / d, ny = dy / d;
       const rot = (rnd() - .5) * 2 * P.scatter, c = Math.cos(rot), s = Math.sin(rot);
       [nx, ny] = [nx * c - ny * s, nx * s + ny * c];
@@ -36976,7 +36991,7 @@ function blDeck(standing, ball, seed, spots) {
       const e = a === B || b === B ? P.eBall : P.ePin, J = -(1 + e) * rv / (1 / a.m + 1 / b.m);
       const kick = (q, sgn) => {
         const dv = J / q.m;
-        if (q.up && !q.hit) { if (dv < P.knock) return; q.hit = true; }
+        if (q.up && !q.hit) { if (dv < (q.knock || P.knock)) return; q.hit = true; }
         q.vx += sgn * nx * dv; q.vy += sgn * ny * dv;
       };
       kick(a, -1); kick(b, 1);
@@ -37121,7 +37136,9 @@ function blStart(opts) {
     line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
     word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }],
     pst: teams.map(T => T.roster.map(() => ({ frames: 0, balls: 0, strikes: 0, spares: 0, pins: 0, splits: 0 }))) });
+  G.streak = [0, 0];
   blHallStart(o);
+  blPowersStart(o);
   GB = null;
   return G;
 }
@@ -37129,18 +37146,23 @@ function blStart(opts) {
 // down, roll } or null when the game is over
 function blTurn() {
   const s = blUp(); if (s < 0) return null;
-  blCpuCall(s);
+  blCpuCall(s); blCpuPower(s);
   const plan = blPlan(s);
   return blBowlBall(s, plan, blRelease(plan, s));
 }
 // a ball as released (yours from the page, or the CPU's): down the lane, into the pins, the oil worn, the sheet kept
 function blBowlBall(s, plan, rel) {
   const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
-  const ball = blBall(rel, G.oil[lane], G.tide);
+  // the powers on this ball (13-powers.js): the web and a Hex's oil go into the ball, the rest below
+  const fx = blFxFor(s);
+  const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid }), G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
-  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass;
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
+  const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1);
+  const front = stand.slice().sort((a, b) => BL_SPOT[a][1] - BL_SPOT[b][1] || Math.abs(BL_SPOT[a][0]) - Math.abs(BL_SPOT[b][0]))[0];
+  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
+  // a wobble (a harpy's Gust): a pin left standing beside one that fell may go
+  if (fx.wobble && ball.gutter === null) { const left = stand.filter(p => !deck.down.includes(p)); for (const p of left) if (BL_ADJ.some(([a, b]) => (a === p && deck.down.includes(b)) || (b === p && deck.down.includes(a))) && R() < fx.wobble) deck.down.push(p); deck.down.sort((a, b) => a - b); }
   // the hall: a gutter crab, a swell, the gull (12-hall.js)
   const H = blHallAfter(s, stand, ball, deck.down); deck.down = H.down;
   G.oil[lane] = blWear(G.oil[lane], ball.path);
@@ -37152,6 +37174,8 @@ function blBowlBall(s, plan, rel) {
   if (fresh && plan.ball === 'strike') blScoutSee(s, lane, rel.x0);
   if (G.wordOn[s]) G.wordOn[s] = false;
   const roll = blRoll(s, deck.down);
+  G.streak[s] = roll.strike ? G.streak[s] + 1 : 0;
+  blPowersAfter(s, roll, stand, G.streak[s]);
   // a fresh rack in front of the side: Moll's hand; and the tide may turn
   if (G.rb[s] === 0 && G.stand[s].length === 10 && !roll.over) blHallRack(s);
   const tide = blHallTide();
@@ -37231,7 +37255,7 @@ let GP = null;
 
 function blPlayStart(o) {
   GP = { mode: o && BL_MODES.includes(o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, anim: null, cpu: null, streak: [0, 0], said: '',
-    mgr: { line: 'auto', tempo: 'auto', weight: 'auto' } };
+    mgr: { line: 'auto', tempo: 'auto', weight: 'auto' }, autoPow: !(o && o.autoPow === false) };
   BLC.tracks = [[], []]; BLC.camY = -40; GP.tracks = [[], []];
   GP.msg = `${G.teams[0].name} against ${G.teams[1].name}: ${G.frames} frames, the Baker format. ${G.teams[G.lead].name} bowl first.`;
 }
@@ -37274,6 +37298,16 @@ function blSelect(o) {
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
   return why || true;
 }
+// cast one of your side's powers before your ball: k 'pow', 'ult', 'steady' or a situation power. '' or why not
+function blCastMine(k) {
+  if (!GP || GP.mode !== 'play' || GP.ph !== 'aim') return 'Only while you set up your ball.';
+  const why = blCast(GP.you, k); if (why) return why;
+  const c = G.casts[G.casts.length - 1]; GP.msg = `${c.n}!` + (k === 'ult' ? ` ${G.mark.n} marks this frame.` : '');
+  // a power that changes the ball (more hook) changes the coach's setup too
+  GP.sel = Object.assign(blSelFromPlan(blSuggest(GP.you)), { revs: GP.sel.revs });
+  if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
+  return '';
+}
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
 // (win: the mark's half-width for this bowler now, before a power ball shrinks it)
 function blSelThrow(S, st, p, err, win0) {
@@ -37295,10 +37329,10 @@ function blGuide() {
 // your mark now: wider for an accurate bowler (a spare bowler, at a spare), narrower for a tired arm or a big moment;
 // and the meter falls quicker under pressure
 function blMeterFor(s) {
-  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, pr = blPressure(s);
+  const ri = blBowler(s), r = blRat(s, ri), spare = G.stand[s].length < 10, fx = blFxFor(s), pr = fx.nerve ? 0 : blPressure(s);
   const win = BL_METER.win * (.7 + .6 * (spare ? r.spr : r.acc)) / blArmK(G.arm ? G.arm[s][ri] : 1) / blNerveK(pr, r.nrv);
   const tm = BL_STANCE[blStanceOf(s).tempo].meter;
-  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
+  return { win: +(win / BL_STANCE[blStanceOf(s).tempo].err / fx.err).toFixed(4), fall: BL_METER.fall * (1 + .25 * pr) * tm, rise: BL_METER.rise * tm, shake: pr * (1 - r.nrv) };
 }
 function blPress() {
   if (!GP || GP.mode !== 'play') return false;
@@ -37393,10 +37427,10 @@ function blPlayNext() {
   const ri = blBowler(s), fr = blFrameNo(s), ball = G.rb[s] ? 'second ball' : G.stand[s].length < 10 ? 'fill ball' : 'first ball';
   const chant = G.rb[s] === 0 && G.stand[s].length === 10 && GP.streak[s] === 2 ? 'The gallery chants: TUR-KEY! TUR-KEY! ' : '';
   const off = G.hall && G.offspot && G.offspot[s] && G.rb[s] === 0 && G.stand[s].length === 10 ? `Moll has set the ${G.offspot[s].n} a touch off its spot. ` : '';
-  if (GP.mode === 'manage' && s === GP.you) { const said = blManageCall(s), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
+  if (GP.mode === 'manage' && s === GP.you) { const said = [blManageCall(s)].concat(GP.autoPow ? blCpuPower(s) : []).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
     GP.cpu = { s, plan, rel }; blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)}, ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`); return; }
   if (blYours(s)) { blSelReset(); blGo('aim', 0, `${chant}${off}${blTurnBall(s) ? 'The turn: the lanes are re-read, and the chart shows all the oil for this ball. ' : ''}Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
-  const said = blCpuCall(s), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
+  const said = [blCpuCall(s)].concat(blCpuPower(s)).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
   GP.cpu = { s, plan, rel };
   blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)} (${G.teams[s].name}), ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`);
 }
@@ -37607,6 +37641,9 @@ function blHudDraw(c) {
     c.fillStyle = '#efe4cc'; c.fillText(`${T[k].name}`, 24, 28 + k * 26); c.textAlign = 'right'; c.fillText(String(blTotal(k)), 236, 28 + k * 26); c.textAlign = 'left'; });
   if (V && V.up >= 0) { c.font = '13px system-ui, sans-serif'; c.fillStyle = 'rgba(15,10,8,.7)'; c.fillRect(12, 66, 300, 20); c.fillStyle = '#efe4cc';
     const st = blStyleOf(V.up, V.bowler); c.fillText(`Frame ${V.frame} · ${blName(V.up, V.bowler)} · ${st.hand < 0 ? 'left' : 'right'}-handed, ${st.mph} mph`, 18, 81); }
+  // the powers: each side's mana and roar, and the frame's mark
+  if (G.powers) { c.font = '11px system-ui, sans-serif'; [0, 1].forEach(k => { c.fillStyle = 'rgba(15,10,8,.7)'; c.fillRect(244, 12 + k * 26, 104, 22); c.fillStyle = '#9fc6e8'; c.textAlign = 'left'; c.fillText(`mana ${G.mana[k]} · roar ${G.roar[k]}`, 250, 27 + k * 26); }); }
+  if (G.powers && G.mark) { c.font = '600 12px system-ui, sans-serif'; c.fillStyle = '#e8b0ff'; c.textAlign = 'left'; c.fillText(`${G.mark.n} marks frame ${G.mark.f + 1} (${G.teams[G.mark.side].short || G.teams[G.mark.side].name})`, 18, 122); }
   if (G.tide && G.tide !== 'mid') { c.fillStyle = '#9fc6e8'; c.font = '12px system-ui, sans-serif'; c.fillText(G.tide === 'high' ? 'High tide: the lanes play heavy' : 'Low tide: the lanes play dry', 18, 104); }
   // a strike, a spare, a split, said big
   const R = GP && GP.last && GP.ph === 'rest' ? GP.last.roll : null;
@@ -37731,7 +37768,8 @@ const blNerveK = (p, nrv) => 1 + .6 * p * (1 - clamp(nrv, 0, 1));
 // all that makes side s's bowler ri less true now: the skill's spread is multiplied by this (spare: a ball at a spare)
 function blErrK(s, ri, spare) {
   const r = blRat(s, ri), a = G.arm ? G.arm[s][ri] : 1;
-  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(blPressure(s), r.nrv);
+  const fx = typeof blFxFor === 'function' ? blFxFor(s) : null;
+  return (1.45 - .9 * (spare ? r.spr : r.acc)) * blArmK(a) * blNerveK(fx && fx.nerve ? 0 : blPressure(s), r.nrv) * (fx ? fx.err : 1);
 }
 /* The Saltmere Lanes: the call and the read (issue #100, phase 4).
 
@@ -37763,11 +37801,11 @@ const BL_SCOUT = { same: 3, board: 1.5 };
 const blStanceOf = s => (G.stance && G.stance[s]) || { tempo: 'steady', ball: 'heavy' };
 const blLineOf = s => (G.line && G.line[s]) || 'pocket';
 // a bowler's style as they bowl now: the ball stance moves the revs
-function blStyleNow(s, ri) { const st = blStyleOf(s, ri), B = BL_STANCE[blStanceOf(s).ball]; return Object.assign({}, st, { rpm: Math.round(st.rpm * B.rpm) }); }
+function blStyleNow(s, ri) { const st = blStyleOf(s, ri), B = BL_STANCE[blStanceOf(s).ball]; return Object.assign({}, st, { rpm: Math.round(st.rpm * B.rpm * blFxFor(s).hook) }); }
 // the line's and the stance's part in how true a release is
 const blCallErr = s => BL_LINES[blLineOf(s)].err * BL_STANCE[blStanceOf(s).tempo].err;
 // what a ball costs the arm with the stance
-const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm;
+const blArmCost = (s, power) => (power ? BL_ARM.power : BL_ARM.ball) * BL_STANCE[blStanceOf(s).tempo].arm * BL_STANCE[blStanceOf(s).ball].arm * blFxFor(s).arm;
 // how far down the lane (feet) the bowler reads the oil now
 function blReadFt(s, ri) {
   if (G.wordOn && G.wordOn[s]) return BL_LANE.ft;
@@ -37901,6 +37939,219 @@ function blHallRerackCall(s) {
   if (blRerack(s).ok) { G.offspot[s] = null; return `a re-rack (the ${O.n} was off its spot)`; }
   return '';
 }
+/* The Saltmere Lanes: monster powers (issue #100, phase 6), as on the Links, for a game of single balls. A game has them
+   when started with { powers: true } (the Realm's games do; the bare engine, its tests and the labs don't, unless asked;
+   powers: [yours, theirs] gives one side only).
+   - Team mana (G.mana, by side): BL_MANA.start to begin, up to BL_MANA.max. A strike fills it, a spare too, and a split
+     converted twice over. A strike power costs BL_MANA.strike, a spare power BL_MANA.spare, a curse BL_MANA.curse.
+   - Everyday powers: every kind has a strike power (for a ball at a full rack) and a spare power (for a ball at what is
+     left), and a second of each (BL_POW, BL_POW2); a bowler brings one of each pair (m.pw: { strike, spare }, 0 or 1;
+     picked on the Lanes tab). The bowler casts theirs before their ball, for mana; it works on that ball. A curse works
+     on the other side's next ball instead. One everyday power a ball. A Drain works at once.
+   - The roar (G.roar, by side, 0 to BL_ROAR.max): the gallery fills it on a double, more on a turkey, a little on every
+     strike, and most on a split made. It pays for the ultimate (BL_ROAR.ult), or steadies a ball in the last frame
+     (BL_ROAR.steady: no pressure on it).
+   - The ultimate: one per kind (BL_ULT), once a game per side, for the roar, cast before a frame's first ball. It marks
+     the lanes for that frame (G.mark): one set of effects on its side's balls (own), another on the other side's
+     (rival), until both sides have bowled the frame.
+   - Situation powers (BL_SIT), the team's, once a game each, for mana, when the moment fits: the Fill (in the last frame
+     after a strike or a spare: the bowler's arm back), Clean Game (from the 8th frame with no open frame yet: the next
+     ball a third truer) and Roll-off (in a roll-off: the next ball's miss halved).
+   - Who casts (blCpuPower): the CPU by its skill (a Squire now and then at random; a Knight on the balls that matter,
+     keeping a mana back; an Archmage when it is behind, late, or the moment is big, saving the roar for the
+     ultimate); your side the same way under Auto powers in Manage, or what you press.
+   Effects (BL_FX0): err (the release's miss), carry (how hard the ball drives through the pins), hook (the revs) and arm
+   (what the ball costs the arm) multiply; skid (a curse: the oil plays heavier, so the ball skids long) multiplies the
+   oil; nodefl (the ball barely deflects: it drives through like a heavier one), ghost (the ball passes through the
+   headpin when it comes in light, and the pin takes the pocket's knock), web (a gutter ball is caught and set back on the lane, once), stone (a curse:
+   the front pin of their rack turns to stone, three times as heavy and as hard to topple), wobble (after the ball, each
+   pin left standing beside one that fell may go, by this chance) and nerve (no pressure) are the rest. */
+const BL_MANA = { start: 2, max: 6, strike: 1, spare: 1, split: 1, costStrike: 2, costSpare: 1, curse: 2 };
+const BL_ROAR = { max: 100, ult: 60, steady: 25, strike: 4, double: 15, turkey: 25, splitMade: 30 };
+const BL_FX0 = { err: 1, carry: 1, hook: 1, arm: 1, skid: 1, nodefl: 0, ghost: 0, web: 0, stone: 0, wobble: 0, nerve: 0 };
+const BL_FX_MUL = new Set(['err', 'carry', 'hook', 'arm', 'skid']);
+const blP = (id, n, desc, fx, curse, now) => ({ id, n, desc, fx: fx || null, curse: curse || null, now: now || null });
+// everyday powers by kind: [strike, spare]
+const BL_POW = {
+  goblin: [blP('scamper', 'Scamper Ball', 'A sly spin: a tenth more hook.', { hook: 1.1 }), blP('sticky', 'Sticky Fingers', 'Soft hands at a spare: the miss a third smaller.', { err: .65 })],
+  kobold: [blP('emberball', 'Ember Ball', 'A coal in the ball: it drives a tenth harder.', { carry: 1.1 }), blP('fireread', 'Fire Read', 'The heat shows the line: the miss a quarter smaller.', { err: .75 })],
+  werewolf: [blP('howl', 'Howl', 'Thrown with a howl: harder through the pins, and a little wilder.', { carry: 1.15, err: 1.1 }), blP('nose', 'Keen Nose', 'Smells the spare: the miss a quarter smaller.', { err: .75 })],
+  dwarf: [blP('forged', 'Forged Ball', 'Hammered true: the miss a third smaller.', { err: .7 }), blP('stoneread', 'Stone Read', 'Reads the boards like rock: the miss a third smaller.', { err: .7 })],
+  ogre: [blP('bigthrow', 'Big Throw', 'All of it: much harder through the pins, and wilder.', { carry: 1.2, err: 1.2 }), blP('thump', 'Thump', 'Thumped dead at the pin: the miss a quarter smaller.', { err: .75 })],
+  minotaur: [blP('bullball', 'Bull Ball', 'Head down through it: harder through the pins.', { carry: 1.12 }), blP('horned', 'Horned Aim', 'Lowers its horns at the pin: the miss a fifth smaller.', { err: .8 })],
+  troll: [blP('boulder', 'Boulder', 'A cannonball: it drives a quarter harder, and costs a third more arm.', { carry: 1.25, arm: 1.3 }), blP('mossy', 'Mossy Touch', 'Moss on the fingers: the miss a quarter smaller.', { err: .75 })],
+  golem: [blP('stoneball', 'Stone Ball', 'A thrown rock: a fifth harder through the pins.', { carry: 1.2 }), blP('granite', 'Granite', 'Unmoving: no pressure on it, and truer.', { nerve: 1, err: .85 })],
+  harpy: [blP('gust', 'Gust', 'A gust over the deck: every pin left standing beside one that fell may go.', { wobble: .3 }), blP('talon', 'Talon', 'Plucked and placed: the miss a third smaller.', { err: .7 })],
+  elf: [blP('arrowline', 'Arrow Line', 'Like an arrow: the miss much smaller.', { err: .6 }), blP('elveneye', 'Elven Eye', 'Sees every board: the miss a third smaller.', { err: .65 })],
+  wraith: [blP('ghostball', 'Ghost Ball', 'A light ball passes through the headpin like smoke, and the pin falls as if it had been hit in the pocket.', { ghost: 1 }), blP('coldhand', 'Cold Hand', 'Nothing to lose: no pressure on it, and truer.', { nerve: 1, err: .85 })],
+  vampire: [blP('drain', 'Drain', 'Drinks the other side\'s gallery: 20 of their roar, now.', null, null, { drain: 20 }), blP('bloodread', 'Blood Read', 'Smells the line: the miss a quarter smaller.', { err: .75 })],
+  lich: [blP('graveline', 'Grave Line', 'Cold and certain: the miss a quarter smaller.', { err: .75 }), blP('deadcalm', 'Dead Calm', 'No pressure on it, and truer.', { nerve: 1, err: .85 })],
+  zombie: [blP('deadroll', 'Dead Roll', 'A dead ball: it barely deflects off the headpin and drives on through.', { nodefl: 1 }), blP('shamble', 'Shamble', 'Slow and sure: the miss a fifth smaller.', { err: .8 })],
+  gorgon: [blP('serpent', 'Serpent Line', 'Snakes to the pocket: the miss a fifth smaller.', { err: .8 }), blP('stare', 'Stare', 'A curse: the front pin of their next rack turns to stone.', null, { stone: 1 })],
+  spider: [blP('silkline', 'Silk Line', 'On a thread: the miss a fifth smaller.', { err: .8 }), blP('gutterweb', 'Gutter Web', 'A web in the gutters: a gutter ball is caught and set back on the lane, and the miss is smaller.', { web: 1, err: .9 })],
+  skeleton: [blP('rattle', 'Rattle', 'The pins rattle: one left beside a fallen one may go.', { wobble: .2 }), blP('bonedry', 'Bone Dry', 'A dry, true ball: the miss a fifth smaller.', { err: .8 })],
+  witch: [blP('broom', 'Broomstick', 'A broom\'s twist: more hook.', { hook: 1.12 }), blP('hex', 'Hex', 'A curse: the oil plays heavy for their next ball, and it skids long.', null, { skid: 1.35 })],
+};
+// the second of each, picked on the Lanes tab: [strike, spare]
+const BL_POW2 = {
+  goblin: [blP('sneak', 'Sneak Line', 'The miss a fifth smaller.', { err: .8 }), blP('pickpin', 'Pocket Pick', 'The miss a third smaller.', { err: .7 })],
+  kobold: [blP('smoke', 'Smoke Screen', 'A curse: smoke over their next ball (a wilder miss).', null, { err: 1.3 }), blP('hothand', 'Hot Hand', 'The miss a fifth smaller.', { err: .8 })],
+  werewolf: [blP('packhunt', 'Pack Hunt', 'Harder through the pins, and a little truer.', { carry: 1.1, err: .9 }), blP('moonlit', 'Moonlit', 'The miss a quarter smaller.', { err: .75 })],
+  dwarf: [blP('lowroller', 'Low Roller', 'A straighter, truer roll.', { hook: .85, err: .8 }), blP('steadyhands', 'Steady Hands', 'No pressure on it.', { nerve: 1 })],
+  ogre: [blP('clubthrow', 'Club Throw', 'Harder through the pins.', { carry: 1.15 }), blP('groundshake', 'Ground Shake', 'A curse: the floor shakes under their next ball (a wilder miss).', null, { err: 1.25 })],
+  minotaur: [blP('labyrinth', 'Labyrinth', 'Knows the way: the miss a fifth smaller.', { err: .8 }), blP('charge', 'Charge', 'Charged at the pin: harder and truer.', { carry: 1.2, err: .85 })],
+  troll: [blP('regrow', 'Regrow', 'A throw that hardly tires: no arm spent.', { arm: 0 }), blP('grumble', 'Grumble', 'The miss a little smaller.', { err: .85 })],
+  golem: [blP('monoroll', 'Monolith Roll', 'It barely deflects, and drives on through.', { nodefl: 1 }), blP('unmoved', 'Unmoved', 'No pressure on it.', { nerve: 1 })],
+  harpy: [blP('shriek', 'Shriek', 'A curse: a shriek as they release (a wilder miss).', null, { err: 1.3 }), blP('feather', 'Feather', 'The miss a fifth smaller.', { err: .8 })],
+  elf: [blP('leafcurve', 'Leaf Curve', 'A late, sweeping hook, and truer.', { hook: 1.12, err: .9 }), blP('starlight', 'Starlight', 'The miss a third smaller.', { err: .7 })],
+  wraith: [blP('fade', 'Fade', 'The miss a fifth smaller.', { err: .8 }), blP('chill', 'Chill', 'A curse: a chill on their next ball (wilder, and the oil plays heavier).', null, { err: 1.2, skid: 1.15 })],
+  vampire: [blP('batflight', 'Bat Flight', 'More hook, and a little harder.', { hook: 1.1, carry: 1.05 }), blP('thirst', 'Thirst', 'The miss a fifth smaller.', { err: .8 })],
+  lich: [blP('wither', 'Wither', 'A curse: their next ball withers (a wilder miss).', null, { err: 1.3 }), blP('boneread', 'Bone Read', 'The miss a quarter smaller.', { err: .75 })],
+  zombie: [blP('rotroll', 'Rot Roll', 'Slow and steady: a little truer, and half the arm spent.', { err: .9, arm: .5 }), blP('groan', 'Groan', 'The miss a little smaller.', { err: .85 })],
+  gorgon: [blP('hiss', 'Hiss', 'A curse: a hiss as they release (a wilder miss).', null, { err: 1.25 }), blP('scaled', 'Scaled', 'The miss a fifth smaller.', { err: .8 })],
+  spider: [blP('eightarms', 'Eight Arms', 'Eight arms on the release: much more hook.', { hook: 1.15 }), blP('dropline', 'Drop Line', 'Lowered on a thread: the miss a third smaller.', { err: .7 })],
+  skeleton: [blP('hollow', 'Hollow Line', 'The miss a little smaller.', { err: .85 }), blP('grin', 'Grin', 'Nothing to lose: no pressure on it.', { nerve: 1 })],
+  witch: [blP('charm', 'Charm', 'The miss a fifth smaller.', { err: .8 }), blP('brew', 'Brew', 'A brew that shows the line: the miss a quarter smaller.', { err: .75 })],
+};
+// the ultimate by kind: a mark on the lanes for the frame (own: its side's balls; rival: the other side's)
+const blU = (id, n, desc, own, rival) => ({ id, n, desc, own: own || null, rival: rival || null });
+const BL_ULT = {
+  goblin: blU('mischief', 'Mischief', 'Goblins in the pit: their every ball this frame a third wilder.', null, { err: 1.3 }),
+  kobold: blU('wildfire', 'Wildfire', 'The lanes run hot: your balls this frame hook more and drive harder.', { hook: 1.1, carry: 1.08 }),
+  werewolf: blU('fullmoon', 'Full Moon', 'Under the full moon: your balls this frame a fifth truer.', { err: .8 }),
+  dwarf: blU('mountainhall', 'Mountain Hall', 'Your five dig in: truer, and half the arm spent, this frame.', { err: .85, arm: .5 }),
+  ogre: blU('earthquake', 'Earthquake', 'The floor heaves: their balls this frame a third wilder.', null, { err: 1.3 }),
+  minotaur: blU('stampede', 'Stampede', 'The herd runs: your balls this frame drive much harder.', { carry: 1.15 }),
+  troll: blU('trollbridge', 'Troll Bridge', 'A troll under every gutter: your balls this frame drive harder, and a gutter ball comes back.', { carry: 1.2, web: 1 }),
+  golem: blU('monolith', 'Monolith', 'Set like stone: your balls this frame a fifth truer, and steady.', { err: .8, nerve: 1 }),
+  harpy: blU('stormwing', 'Storm Wing', 'She owns the air: pins wobble over for you this frame, and their balls go wild.', { wobble: .3 }, { err: 1.15 }),
+  elf: blU('feylane', 'Fey Lane', 'The lanes favour you: your balls this frame a quarter truer.', { err: .75 }),
+  wraith: blU('haunting', 'Haunting', 'The hall is haunted: their balls this frame a quarter wilder.', null, { err: 1.25 }),
+  vampire: blU('eternalnight', 'Eternal Night', 'Night falls: your five spend no arm this frame, and throw truer.', { arm: 0, err: .9 }),
+  lich: blU('phylactery', 'Phylactery', 'Death has no pressure: your balls this frame steady, and truer.', { nerve: 1, err: .8 }),
+  zombie: blU('undying', 'Undying', 'The dead don\'t tire: no arm spent this frame, and the ball drives through.', { arm: 0, nodefl: 1 }),
+  gorgon: blU('medusa', 'Medusa', 'Her gaze lies on the deck: the front pin of every rack they face this frame turns to stone.', null, { stone: 1 }),
+  spider: blU('greatweb', 'Great Web', 'Webs in every gutter this frame: yours come back, and your balls are truer.', { web: 1, err: .85 }),
+  skeleton: blU('bonepile', 'Bone Pile', 'Bones on the deck: their balls this frame carry less, and go wilder.', null, { carry: .85, err: 1.15 }),
+  witch: blU('coven', 'Coven', 'Thirteen witches over the oil: it plays heavy for them this frame, and your balls are truer.', { err: .9 }, { skid: 1.3 }),
+};
+// situation powers: the team's, once a game each, for mana
+const BL_SIT = {
+  fill: { id: 'fill', n: 'The Fill', cost: 1, desc: 'In the last frame after a strike or a spare: the bowler\'s arm back for the fill balls.' },
+  clean: { id: 'clean', n: 'Clean Game', cost: 1, desc: 'From the 8th frame, with no open frame yet: the next ball a third truer.' },
+  rolloff: { id: 'rolloff', n: 'Roll-off', cost: 1, desc: 'In a roll-off: the next ball\'s miss halved.' },
+};
+const blPowOf = (kind, which, alt) => { const T = (alt ? BL_POW2 : BL_POW)[kind] || BL_POW.goblin; return T[which === 'strike' ? 0 : 1]; };
+
+function blPowersStart(o) {
+  G.powers = Array.isArray(o.powers) ? o.powers.some(Boolean) : !!o.powers;
+  G.powSides = Array.isArray(o.powers) ? o.powers.map(Boolean) : [G.powers, G.powers];
+  G.mana = [BL_MANA.start, BL_MANA.start]; G.roar = [0, 0]; G.fx = [null, null]; G.curse = [null, null]; G.mark = null;
+  G.ultUsed = [false, false]; G.sitUsed = [{}, {}]; G.sitOn = [null, null]; G.steadyOn = [false, false]; G.casts = []; G.powBall = [-1, -1];
+  G.powOnly = Array.isArray(o.powOnly) ? o.powOnly.map(x => x || null) : null;
+}
+const blRackFresh = s => G.stand[s].length === 10;
+// the everyday power bowler ri of side s would cast for their next ball: the strike power at a full rack, else the spare
+function blPowNow(s, ri) {
+  const m = G.teams[s].roster[ri]; if (!m || !G.powers) return null;
+  const which = blRackFresh(s) ? 'strike' : 'spare', pw = m.pw || {}, P = blPowOf(m.kind, which, pw[which] === 1);
+  return Object.assign({ which }, P, { cost: P.curse ? BL_MANA.curse : which === 'strike' ? BL_MANA.costStrike : BL_MANA.costSpare });
+}
+function blPowIdOf(s, k, ri) {
+  if (k === 'pow') { const P = blPowNow(s, ri); return P ? P.id : null; }
+  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? blBowler(s) : ri]; return (BL_ULT[m && m.kind] || BL_ULT.goblin).id; }
+  return k;
+}
+// the last frame's index on the sheet in play, and whether a side's frames so far are all marks
+const blOpenSoFar = s => G.fr[s].some((fr, i) => blFrameDone(fr, i === G.frames - 1) && fr[0] !== 10 && fr[0] + (fr[1] || 0) < 10);
+// why a power can't be cast now ('' if it can)
+function blPowWhy(s, k, ri) {
+  if (!G || !G.powers || !G.powSides[s]) return 'No powers in this game.';
+  if (G.over) return 'The game is over.';
+  if (blUp() !== s) return 'Not your ball.';
+  if (G.powOnly && G.powOnly[s] && blPowIdOf(s, k, ri) !== G.powOnly[s]) return 'Not in this game.';
+  if (k === 'pow') { const P = blPowNow(s, ri == null ? blBowler(s) : ri); if (!P) return 'No power.'; if (G.powBall[s] === G.n) return 'One power a ball.'; return G.mana[s] < P.cost ? `It costs ${P.cost} mana.` : ''; }
+  if (k === 'ult') { if (G.ultUsed[s]) return 'Once a game.'; if (!blRackFresh(s) || G.rb[s] || (blSheet(s)[blCur(s)] || []).length) return 'Only before a frame\'s first ball.'; if (G.mark && G.mark.f === blSlot(s, blCur(s)) && G.mark.ro === G.ro) return 'This frame already bears a mark.'; return G.roar[s] < BL_ROAR.ult ? `It takes ${BL_ROAR.ult} roar.` : ''; }
+  if (k === 'steady') { if (G.steadyOn[s]) return 'Already steady.'; if (!blPressure(s)) return 'Only in the last frame.'; return G.roar[s] < BL_ROAR.steady ? `It takes ${BL_ROAR.steady} roar.` : ''; }
+  const S = BL_SIT[k]; if (!S) return 'No such power.';
+  if (G.sitUsed[s][k]) return 'Once a game.'; if (G.mana[s] < S.cost) return `It costs ${S.cost} mana.`;
+  const f = blCur(s), n = blSheetN(), sh = blSheet(s)[f] || [];
+  if (k === 'fill') return f === n - 1 && sh.length && blRackFresh(s) ? '' : 'Only in the last frame, after a strike or a spare.';
+  if (k === 'clean') return !G.ro && f >= 7 && !blOpenSoFar(s) ? '' : 'Only from the 8th frame, with no open frame yet.';
+  if (k === 'rolloff') return G.ro ? '' : 'Only in a roll-off.';
+  return '';
+}
+// cast: k 'pow' (the bowler's), 'ult', 'steady' or a situation power. Returns '' or why not
+function blCast(s, k, ri) {
+  const r = ri == null ? blBowler(s) : ri, why = blPowWhy(s, k, r); if (why) return why;
+  const name = (G.teams[s].roster[r] || {}).n || 'Someone', rec = (id, n) => G.casts.push({ side: s, k, id, n, ri: r, frame: blFrameNo(s), ball: G.n });
+  if (k === 'pow') {
+    const P = blPowNow(s, r); G.mana[s] -= P.cost; G.powBall[s] = G.n;
+    if (P.curse) G.curse[1 - s] = Object.assign({}, P.curse, { by: P.n });
+    else if (P.now && P.now.drain) { const d = Math.min(G.roar[1 - s], P.now.drain); G.roar[1 - s] -= d; G.roar[s] = Math.min(BL_ROAR.max, G.roar[s] + d); }
+    else G.fx[s] = Object.assign({}, P.fx, { n: P.n });
+    rec(P.id, P.n); return '';
+  }
+  if (k === 'ult') {
+    const m = G.teams[s].roster[r], U = BL_ULT[m.kind] || BL_ULT.goblin;
+    G.roar[s] -= BL_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, f: blSlot(s, blCur(s)), ro: G.ro, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
+    rec(U.id, U.n); return '';
+  }
+  if (k === 'steady') { G.roar[s] -= BL_ROAR.steady; G.steadyOn[s] = true; rec('steady', 'Steady'); return ''; }
+  const S = BL_SIT[k]; G.mana[s] -= S.cost; G.sitUsed[s][k] = true;
+  if (k === 'fill') G.arm[s][r] = 1; else G.sitOn[s] = { id: k };
+  rec(k, S.n); return '';
+}
+// what side s's next ball has: its power, the frame's mark, a curse on it, a situation power, the roar's steadying
+function blFxFor(s) {
+  const f = Object.assign({}, BL_FX0);
+  if (!G || !G.powers) return f;
+  const add = x => { if (!x) return; for (const k in x) { if (!(k in BL_FX0)) continue; if (BL_FX_MUL.has(k)) f[k] *= x[k]; else f[k] = Math.max(f[k], x[k]); } };
+  add(G.fx[s]); add(G.curse[s]);
+  const M = G.mark; if (M && M.f === blSlot(s, blCur(s)) && M.ro === G.ro) add(M.side === s ? M.own : M.rival);
+  const si = G.sitOn[s]; if (si) add(si.id === 'rolloff' ? { err: .5 } : { err: .67 });
+  if (G.steadyOn[s]) f.nerve = 1;
+  return f;
+}
+// after side s's ball: what it spent goes; the mana and the roar it earned come in; a mark ends when both have bowled
+function blPowersAfter(s, roll, stand, streak) {
+  if (!G.powers) return;
+  G.fx[s] = null; G.curse[s] = null; G.steadyOn[s] = false; G.sitOn[s] = null;
+  const mana = n => { G.mana[s] = Math.min(BL_MANA.max, G.mana[s] + n); }, roar = n => { G.roar[s] = Math.min(BL_ROAR.max, G.roar[s] + n); };
+  if (roll.strike) { mana(BL_MANA.strike); roar(BL_ROAR.strike + (streak >= 3 ? BL_ROAR.turkey : streak === 2 ? BL_ROAR.double : 0)); }
+  if (roll.spare) { mana(BL_MANA.spare); if (blIsSplit(stand) && stand.length < 10) { mana(BL_MANA.split); roar(BL_ROAR.splitMade); } }
+  const M = G.mark; if (M && (M.ro !== G.ro || [0, 1].every(k => blSlot(k, blCur(k)) > M.f || G.over))) G.mark = null;
+}
+// the CPU's powers before its ball (and yours under Auto in Manage), by skill. Returns the casts' names, or []
+function blCpuPower(s) {
+  if (!G.powers || !G.powSides[s] || G.over) return [];
+  const sk = G.skill[s], ri = blBowler(s), o = 1 - s, f = blCur(s), late = G.ro || f >= G.frames - 3, gap = blTotal(o) - blTotal(s), p = blPressure(s), out = [];
+  const tryCast = k => { if (!blCast(s, k, ri)) out.push(G.casts[G.casts.length - 1].n); };
+  if (sk >= 1) { for (const k of ['rolloff', 'clean']) if (!blPowWhy(s, k)) tryCast(k); if (!blPowWhy(s, 'fill') && G.arm[s][ri] < .75) tryCast('fill'); }
+  if (!blPowWhy(s, 'ult', ri) && (sk === 0 ? R() < .5 : sk === 1 ? gap > 0 || late : (gap > 0 && late) || f === blSheetN() - 1)) tryCast('ult');
+  if (sk >= 1 && p && !blPowWhy(s, 'steady') && blRat(s, ri).nrv < .7 && G.roar[s] >= BL_ROAR.steady + (sk >= 2 && !G.ultUsed[s] ? BL_ROAR.ult : 0)) tryCast('steady');
+  const P = blPowNow(s, ri); if (!P || blPowWhy(s, 'pow', ri)) return out;
+  const st = G.stand[s], worth = P.which === 'strike' ? true : st.length <= 3 || blIsSplit(st);
+  const go = sk === 0 ? R() < .3 : sk === 1 ? worth && G.mana[s] >= P.cost + 1 : worth && (p > 0 || late || gap > 0) && G.mana[s] >= P.cost;
+  if (go) tryCast('pow');
+  return out;
+}
+// the bench's tip for your ball ('' when nothing stands out)
+function blPowerTip(s) {
+  if (!G.powers) return '';
+  const ri = blBowler(s), P = blPowNow(s, ri), st = G.stand[s];
+  if (!blPowWhy(s, 'fill') && G.arm[s][ri] < .75) return 'Tip: the Fill gives your bowler their arm back for the fill balls.';
+  if (!blPowWhy(s, 'clean')) return 'Tip: no open frame yet; Clean Game makes this ball a third truer.';
+  if (blPressure(s) && !blPowWhy(s, 'steady') && blRat(s, ri).nrv < .6) return `Tip: the game hangs on this frame; ${BL_ROAR.steady} roar steadies the ball.`;
+  if (P && !blPowWhy(s, 'pow', ri)) {
+    if (P.fx && P.fx.ghost && blRackFresh(s)) return `Tip: ${P.n} saves a light ball: it goes through the headpin.`;
+    if (P.fx && P.fx.wobble && st.length >= 4) return `Tip: ${P.n} can shake over what the ball leaves.`;
+    if (P.curse) return `Tip: ${P.n} works on their next ball.`;
+    if (blIsSplit(st)) return `Tip: a split; ${P.n} helps (${P.desc.toLowerCase()})`;
+  }
+  if (!blPowWhy(s, 'ult', ri)) { const U = BL_ULT[G.teams[s].roster[ri].kind] || BL_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this frame.`; }
+  return '';
+}
 /* The Lanes' page in the Realm (issue #100, phase 2). A canvas in #v-lanes, after the Links', and a frame loop that
    runs only while it is on screen (show/hide): it moves the game on (blTick) and draws it (blDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -37912,7 +38163,7 @@ function blHallRerackCall(s) {
    drag that starts at the bowler and goes up the lane is a throw (the pull is the speed, a pull off straight the
    miss, and a swipe that bends at the end the way the ball hooks puts on more revs, the other way less).
    Phase 4's keys: L the line, S convert or safe on a split, T the tempo, H heavy or light, W the coach's word, C the
-   lane chart (the page opens it). */
+   lane chart (the page opens it). Phase 6's: P the bowler's power, U the ultimate, K steady. */
 const BLP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null };
 (() => {
   const h = document.createElement('div'); h.id = 'v-lanes'; h.hidden = true;
@@ -37969,6 +38220,9 @@ function blKeyDown(e) {
   else if (k === 't') blSelect({ tempo: blStanceOf(GP.you).tempo === 'quick' ? 'steady' : 'quick' });
   else if (k === 'h') blSelect({ weight: blStanceOf(GP.you).ball === 'heavy' ? 'light' : 'heavy' });
   else if (k === 'w') blSelect({ word: true });
+  else if (k === 'p') blCastMine('pow');
+  else if (k === 'u') blCastMine('ult');
+  else if (k === 'k') blCastMine('steady');
   else if (k === 'c') { if (BL_HOOK.onChart) try { BL_HOOK.onChart(); } catch (er) { console.error(er); } }
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
@@ -38045,7 +38299,10 @@ for (const ev of ['pointerup', 'pointercancel']) BLP.cv.addEventListener(ev, blP
    snapshot() and resume(sn) (a match between balls, plain JSON), the box score (G.pst: each bowler's frames, balls,
    strikes, spares, pins and splits; summary() carries it), and the hall (start({ hall: true }); hallRules, offspot,
    tideTurn: the tide under the floor, Moll's off-spot racks, the swell, the gutter crabs, the gull and the Brinepup;
-   select also takes { rerack: true }). */
+   select also takes { rerack: true }).
+   Phase 6 is powers: start({ powers: true | [yours, theirs], autoPow, powOnly }); pow, pow2, ult, sit, manaRules,
+   roarRules, fx0 (the tables); mana, roar, mark, casts; powNow(s, ri), powWhy(s, k, ri), cast(s, k, ri), castMine(k)
+   (yours, while you set up), cpuPower(s), fxFor(s), tip(s); autoPow (Manage). A roster bowler may bring pw. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -38074,6 +38331,12 @@ return {
   manage: o => blManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; }, snapshot: () => blSnapshot(), resume: sn => blResume(sn),
   hallRules: Object.assign({}, BL_HALL), get offspot() { return G && G.offspot ? JSON.parse(JSON.stringify(G.offspot)) : null; }, get tideTurn() { return G && G.tideTurn ? Object.assign({}, G.tideTurn) : null; },
   get tide() { return G ? G.tide : null; }, hallAfter: (s, stand, ball, down) => blHallAfter(s, stand, ball, down),
+  // powers (phase 6)
+  pow: JSON.parse(JSON.stringify(BL_POW)), pow2: JSON.parse(JSON.stringify(BL_POW2)), ult: JSON.parse(JSON.stringify(BL_ULT)), sit: JSON.parse(JSON.stringify(BL_SIT)),
+  manaRules: Object.assign({}, BL_MANA), roarRules: Object.assign({}, BL_ROAR), fx0: Object.assign({}, BL_FX0),
+  get mana() { return G && G.mana ? G.mana.slice() : null; }, get roar() { return G && G.roar ? G.roar.slice() : null; }, get mark() { return G && G.mark ? JSON.parse(JSON.stringify(G.mark)) : null; }, get casts() { return G && G.casts ? JSON.parse(JSON.stringify(G.casts)) : []; },
+  powNow: (s, ri) => G && G.powers ? blPowNow(s, ri) : null, powWhy: (s, k, ri) => blPowWhy(s, k, ri), cast: (s, k, ri) => blCast(s, k, ri), castMine: k => blCastMine(k), cpuPower: s => blCpuPower(s),
+  fxFor: s => blFxFor(s), powersAfter: (s, roll, stand, streak) => blPowersAfter(s, roll, stand, streak), tip: s => G && G.powers ? blPowerTip(s) : '', get autoPow() { return GP ? GP.autoPow : false; }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
@@ -54284,12 +54547,12 @@ function wLanesTeams(taken) {
     name: t.name, short: t.short, color: t.color, roster: t.kinds.map(kind => ({ n: wRinkName(kind, used), kind })),
   }));
 }
-/* one game at the Lanes. opts: { teams, frames, seed, mode, title, tide, skill, hall } */
+/* one game at the Lanes. opts: { teams, frames, seed, mode, title, tide, skill, hall, powers, autoPow } */
 function wLanesGame(opts) {
   const o = opts || {};
   WBL = { over: null };
   $('wLanesTitle').textContent = o.title || 'A game at the Saltmere Lanes';
-  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL], hall: !!o.hall });
+  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL], hall: !!o.hall, powers: o.powers, autoPow: o.autoPow });
   showView('lanes');
   wLanesBarNote(); wLanesRows(); wLanesSheet();
 }
@@ -54809,7 +55072,7 @@ function wStartLanes(o) {
   const world = { kind: o.kind || 'lngame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, tide, cup: !!o.cup };
   if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
-  const opts = { teams: [mine, opp], skill: wLanesSkillOf(tier), frames: wLanesFrames(), tide, hall: true };
+  const opts = { teams: [mine, opp], skill: wLanesSkillOf(tier), frames: wLanesFrames(), tide, hall: true, powers: true };
   if (how === 'sim') { const s = wBL.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts)); wLanesResultCard(wLanesSettle(s)); return ''; }
   wLanesGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WBL.world = true;
@@ -55072,6 +55335,65 @@ renderHelp = function () {
   wW116RenderHelp();
   const after = $('wHelpLanesTab'); if (!after || $('wHelpLanesGame')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesGame"><b>Bowling matches.</b> Moll Gutter's MATCH, or Bowl a match on the Lanes tab: your five against a club at your tier, once a day each, in Play, Manage or Simulate. A win pays XP, gold and fans by the tier; a loss pays a quarter of the XP and costs nothing else. Save and leave keeps the match for later.</p>`);
+};
+/* w117: powers at the Lanes (issue #100, phase 6). Every game at the Lanes has the monster powers (13-powers.js): team
+   mana from strikes, spares and splits made; each bowler's strike power and spare power (one of two each, picked on the
+   Lanes tab: p.blPw { strike, spare }, 0 or 1); one ultimate a game for the roar, which marks the frame; Steady in the
+   last frame; and the situation powers (the Fill, Clean Game, Roll-off).
+   Your ball's rows gain Powers: mana and the roar, the bowler's power (P), the ultimate (U), Steady (K), the situation
+   powers that fit, and the bench's tip. In Manage, Auto powers lets your captain cast for you. The lanes show the mana,
+   the roar and the frame's mark.
+   Wraps: wLanesGame (wW117LanesGame: powers on), wLanesPlayer (wW117LanesPlayer: the bowler's two powers), wFiveRow
+   (wW117FiveRow: the power picks), wRenderCamp (wW117RenderCamp: the picks' changes), wLanesRows (wW117LanesRows: the
+   Powers row and Auto powers), wLanesHowHTML (wW117LanesHow: powers). */
+
+const wW117LanesGame = wLanesGame;
+wLanesGame = function (opts) { return wW117LanesGame(Object.assign({ powers: true }, opts || {})); };
+const wW117LanesPlayer = wLanesPlayer;
+wLanesPlayer = function (p) { const m = wW117LanesPlayer(p); m.pw = { strike: p.blPw && p.blPw.strike === 1 ? 1 : 0, spare: p.blPw && p.blPw.spare === 1 ? 1 : 0 }; return m; };
+function wBlSetPw(k, which, v) { const p = wFiveWho(k); if (!p || (which !== 'strike' && which !== 'spare')) return ''; p.blPw = Object.assign({ strike: 0, spare: 0 }, p.blPw, { [which]: v === 1 ? 1 : 0 }); wSave(); return ''; }
+
+const wW117FiveRow = wFiveRow;
+wFiveRow = function (k, C) {
+  const html = wW117FiveRow(k, C), p = wFiveWho(k); if (!p) return html;
+  const sel = ['strike', 'spare'].map(w => { const a = (wBL.pow[p.kind] || wBL.pow.goblin)[w === 'strike' ? 0 : 1], b = (wBL.pow2[p.kind] || wBL.pow2.goblin)[w === 'strike' ? 0 : 1], cur = p.blPw && p.blPw[w] === 1 ? 1 : 0;
+    return `<label class="wsvl" title="${esc(`${a.n}: ${a.desc} / ${b.n}: ${b.desc}`)}">${w === 'strike' ? 'Strike power' : 'Spare power'} <select data-npw="${w}" aria-label="${esc(p.n)}'s ${w} power"><option value="0"${cur ? '' : ' selected'}>${esc(a.n)}</option><option value="1"${cur ? ' selected' : ''}>${esc(b.n)}</option></select></label>`; }).join('');
+  return html.replace(/(<label class="wsvl">Order[\s\S]*?<\/label>)/, `$1${sel}`);
+};
+const wW117RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW117RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'lanes') return;
+  const keyOf = el => { const k = el.closest('[data-nid]').dataset.nid; return /^n\d+$/.test(k) ? k : +k; };
+  body.querySelectorAll('[data-npw]').forEach(s => s.onchange = () => wCampSay(wBlSetPw(keyOf(s), s.dataset.npw, +s.value)));
+};
+
+// your ball's Powers row, and Manage's Auto powers
+$('wLanesRows').insertAdjacentHTML('beforeend', '<div class="wccrow" id="wLanesRowPow" hidden><span class="wccl">Powers</span><span id="wLanesPow"></span></div>');
+$('wLanesRows').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.npow) { const why = wBL.castMine(b.dataset.npow); if (why) $('wLanesNote').textContent = why; else wLanesBarNote(); wLanesRows(); }
+  else if (b.dataset.nauto) { wBL.autoPow = !wBL.autoPow; wLanesRows(); }
+});
+const wW117LanesRows = wLanesRows;
+wLanesRows = function () {
+  wW117LanesRows();
+  const V = WBL && !WBL.over && wBL.G && wBL.G.teams ? wBL.view : null, G = wBL.G, row = $('wLanesRowPow');
+  const mine = V && V.mode === 'play' && V.ph === 'aim' && V.up === V.you, mgr = V && V.mode === 'manage';
+  row.hidden = !(mine || mgr) || !G.powers;
+  if (row.hidden) return;
+  const s = V.you, ri = V.bowler != null && V.up === s ? V.bowler : G.order[s][0], P = wBL.powNow(s, ri), btn = (k, label, title) => { const why = wBL.powWhy(s, k, ri); return `<button class="ghost" data-npow="${k}" ${why || !mine ? 'disabled' : ''} title="${esc(why ? `${title} (${why})` : title)}">${esc(label)}</button>`; };
+  const U = wBL.ult[(G.teams[s].roster[ri] || {}).kind] || wBL.ult.goblin, sits = Object.keys(wBL.sit).filter(k => !wBL.powWhy(s, k, ri));
+  const tip = mine ? wBL.tip(s) : '';
+  row.querySelector('#wLanesPow').innerHTML = `<small class="hint" title="Mana: strikes, spares and splits made fill it. The roar: the gallery fills it on doubles, turkeys and splits made.">Mana <b>${G.mana[s]}</b>/${wBL.manaRules.max} · Roar <b>${G.roar[s]}</b></small> `
+    + (mine ? (P ? btn('pow', `${P.n} (${P.cost})`, `P: ${P.desc}`) : '') + ' ' + btn('ult', `${U.n} (ultimate)`, `U: ${U.desc} Takes ${wBL.roarRules.ult} roar, once a game, before a frame's first ball.`) + ' ' + btn('steady', 'Steady', `K: ${wBL.roarRules.steady} roar: no pressure on this ball, in the last frame.`) + sits.map(k => ' ' + btn(k, wBL.sit[k].n, wBL.sit[k].desc)).join('') : '')
+    + (mgr ? ` <button class="ghost${wBL.autoPow ? ' on' : ''}" data-nauto="1" title="Your captain casts your side's powers by the moment, as a Knight would">Auto powers</button>` : '')
+    + (tip ? ` <small class="hint">${esc(tip)}</small>` : '');
+};
+
+const wW117LanesHow = wLanesHowHTML;
+wLanesHowHTML = function () {
+  return wW117LanesHow() + `<p class="hint"><b>Powers.</b> Every kind has its own magic: a <b>strike power</b> (for a ball at a full rack) and a <b>spare power</b> (for what is left), and a second of each to pick on the Lanes tab. The bowler casts theirs before their ball (P) for team <b>mana</b>, which strikes, spares and splits made fill. Some are curses on the other side's next ball: a gorgon's Stare turns their front pin to stone, a witch's Hex makes the oil play heavy. The gallery's <b>roar</b> fills on doubles, turkeys and splits made: ${wBL.roarRules.ult} of it pays for the bowler's kind's <b>ultimate</b> (U, once a game, before a frame's first ball), which marks the frame for both sides, and ${wBL.roarRules.steady} steadies a ball in the last frame (K). <b>Situation powers</b>, once a game each: the Fill (the bowler's arm back for the tenth's fill balls), Clean Game (from the 8th with no open frame yet: the next ball truer) and Roll-off. In Manage, <b>Auto powers</b> lets your captain cast for you.</p>`;
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, baseball, football, boxing,
    basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
