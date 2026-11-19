@@ -24,7 +24,12 @@
    Phase 4 is the call and the read: lines, stanceRules, line(s), split(s), stance(s), word, wordOn, scout, cpuCall(s),
    readFt(s) (how far down the lane side s's bowler reads the oil now), turnBall(s), splitMakeable(standing),
    trackDry(lane, hand), tracks (every ball's track this game, by lane), chart(canvas, side) (draws the lane chart on a
-   canvas of its own). select also takes { line, split, tempo, weight, word, pinch }; onChart hears C. */
+   canvas of its own). select also takes { line, split, tempo, weight, word, pinch }; onChart hears C.
+   Phase 5 is games from the world: modes add manage (manage({ line, tempo, weight }), each 'auto' or a choice; mgr),
+   snapshot() and resume(sn) (a match between balls, plain JSON), the box score (G.pst: each bowler's frames, balls,
+   strikes, spares, pins and splits; summary() carries it), and the hall (start({ hall: true }); hallRules, offspot,
+   tideTurn: the tide under the floor, Moll's off-spot racks, the swell, the gutter crabs, the gull and the Brinepup;
+   select also takes { rerack: true }). */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -48,13 +53,17 @@ return {
   stance: s => G && G.stance ? Object.assign({}, G.stance[s]) : null, get word() { return G && G.word ? G.word.slice() : null; }, get wordOn() { return G && G.wordOn ? G.wordOn.slice() : null; },
   get scout() { return G && G.scout ? JSON.parse(JSON.stringify(G.scout)) : null; }, cpuCall: s => blCpuCall(s), readFt: s => G && G.arm ? blReadFt(s) : 0, turnBall: s => G && G.arm ? blTurnBall(s) : false,
   splitMakeable: st => blSplitMakeable(st), trackDry: (lane, hand) => blTrackDry(lane, hand), get tracks() { return GP && GP.tracks ? JSON.parse(JSON.stringify(GP.tracks)) : [[], []]; },
-  chart: (cv, s) => { const c = cv.getContext('2d'), w = cv.width, h = cv.height; blChart(c, s == null ? (GP ? GP.you : 0) : s, w, h); }, set onChart(f) { BL_HOOK.onChart = f; },
+  chart: (cv, s) => { const c = cv.getContext('2d'), w = cv.width, h = cv.height; blChart(c, s == null ? (GP ? GP.you : 0) : s, w, h); }, set onChart(f) { BL_HOOK.onChart = f; }, get onChart() { return BL_HOOK.onChart; },
+  // games from the world (phase 5)
+  manage: o => blManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; }, snapshot: () => blSnapshot(), resume: sn => blResume(sn),
+  hallRules: Object.assign({}, BL_HALL), get offspot() { return G && G.offspot ? JSON.parse(JSON.stringify(G.offspot)) : null; }, get tideTurn() { return G && G.tideTurn ? Object.assign({}, G.tideTurn) : null; },
+  get tide() { return G ? G.tide : null; }, hallAfter: (s, stand, ball, down) => blHallAfter(s, stand, ball, down),
   // the page and bowling by hand (phase 2)
   modes: BL_MODES.slice(), meterRules: Object.assign({}, BL_METER), revs: Object.assign({}, BL_REVS), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; },
   get view() { return blView(); }, get mode() { return GP ? GP.mode : null; }, setMode: m => blSetMode(m), tick: dt => blTick(dt), select: o => blSelect(o), press: () => blPress(),
   drag: (pull, deg) => blDrag(pull, deg), guide: () => blGuide(), swingNums: () => blSwingNums(), scr: (x, y) => blScr(x, y), unscr: (sx, sy) => blUnscr(sx, sy), ovScr: (x, y) => [blOvX(x), blOvY(y)],
   get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
-  set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; },
+  set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; }, get onPhase() { return BL_HOOK.onPhase; }, get onPick() { return BL_HOOK.onPick; }, get onOver() { return BL_HOOK.onOver; },
   show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: () => blRender(0),
   pause: on => { BLP.paused = !!on; }, get paused() { return BLP.paused; }, get speed() { return BLP.speed; }, set speed(n) { BLP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };

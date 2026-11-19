@@ -59,6 +59,7 @@ function blTrackDry(lane, hand) {
 function blCpuCall(s) {
   const sk = G.skill[s], o = 1 - s, ri = blBowler(s), lane = blLane(s), st = blStyleOf(s, ri);
   const f = blCur(s), late = G.ro || f >= Math.min(6, G.frames - 3), gap = blTotal(o) - blTotal(s), out = [];
+  const rr = blHallRerackCall(s); if (rr) out.push(rr);
   let line = 'pocket', split = 'safe';
   if (sk >= 1) {
     if (late && gap >= 20) line = 'deep';
@@ -79,7 +80,9 @@ function blCpuCall(s) {
   // a Knight takes the coach's word for the tenth's first ball
   if (sk === 1 && G.word[s] > 0 && f === blSheetN() - 1 && G.rb[s] === 0 && !G.ro) { G.word[s]--; G.wordOn[s] = true; out.push('the coach\'s word'); }
   if (line !== blLineOf(s) && G.stand[s].length === 10) out.push(BL_LINES[line].n.toLowerCase());
-  G.line[s] = line; G.split[s] = split;
+  // (the line is for a first ball: a spare keeps the line the frame began on)
+  if (G.stand[s].length === 10) G.line[s] = line;
+  G.split[s] = split;
   return out.join(', ');
 }
 const blNameOf = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';

@@ -35,7 +35,9 @@ function blStart(opts) {
     oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0,
     arm: teams.map(T => T.roster.map(() => 1)),
     line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
-    word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }] });
+    word: [1, 1], wordOn: [false, false], scout: [{ same: 0, lane: null, board: null }, { same: 0, lane: null, board: null }],
+    pst: teams.map(T => T.roster.map(() => ({ frames: 0, balls: 0, strikes: 0, spares: 0, pins: 0, splits: 0 }))) });
+  blHallStart(o);
   GB = null;
   return G;
 }
@@ -54,7 +56,9 @@ function blBowlBall(s, plan, rel) {
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
   const mass = BL_PIN.mBall * (.9 + .2 * blRat(s, ri).pow) * BL_STANCE[blStanceOf(s).ball].mass;
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed) : { down: [], trace: [], ball: null };
+  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
+  // the hall: a gutter crab, a swell, the gull (12-hall.js)
+  const H = blHallAfter(s, stand, ball, deck.down); deck.down = H.down;
   G.oil[lane] = blWear(G.oil[lane], ball.path);
   // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader
   if (fresh && plan.ball === 'strike' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
@@ -64,15 +68,19 @@ function blBowlBall(s, plan, rel) {
   if (fresh && plan.ball === 'strike') blScoutSee(s, lane, rel.x0);
   if (G.wordOn[s]) G.wordOn[s] = false;
   const roll = blRoll(s, deck.down);
+  // a fresh rack in front of the side: Moll's hand; and the tide may turn
+  if (G.rb[s] === 0 && G.stand[s].length === 10 && !roll.over) blHallRack(s);
+  const tide = blHallTide();
   // a frame finished: the rest of the side got their breath back while it was bowled
   if (roll.done) G.arm[s] = G.arm[s].map((a, i) => i === ri ? a : Math.min(1, +(a + BL_ARM.back).toFixed(3)));
   blCount(s, stand, first, ball, roll);
+  const P = G.pst[s][ri]; P.balls++; P.pins += roll.n; if (roll.strike) P.strikes++; if (roll.spare) P.spares++; if (roll.split) P.splits++; if (roll.done) P.frames++;
   G.n++;
   G.log.push([s, ri, roll.frame, deck.down.length, roll.strike ? 'X' : roll.spare ? '/' : roll.split ? 'o' : '']);
-  GB = { s, ri, lane, stand, plan, rel, ball, deck, roll };
+  GB = { s, ri, lane, stand, plan, rel, ball, deck, roll, said: H.said, tide };
   // every ball's track this game, by lane, for the lane chart (a point every other foot; the page's, not saved)
   if (GP && GP.tracks) GP.tracks[lane].push({ s, frame: roll.frame, ri, path: ball.path.filter((_, i) => i % 2 === 0), gutter: ball.gutter });
-  return { side: s, ri, frame: roll.frame, plan, release: rel, ball: { x: ball.x, entry: ball.entry, gutter: ball.gutter, skid: ball.skid, roll: ball.roll }, down: deck.down, roll };
+  return { side: s, ri, frame: roll.frame, plan, release: rel, ball: { x: ball.x, entry: ball.entry, gutter: ball.gutter, skid: ball.skid, roll: ball.roll }, down: deck.down, roll, said: H.said, tide };
 }
 // the box score: strikes on full racks, spares and single pins made, splits left and made, the 7-10, the leaves
 function blCount(s, stand, first, ball, roll) {
@@ -88,7 +96,7 @@ function blCount(s, stand, first, ball, roll) {
 // the game so far, short
 function blSummary() {
   if (!G) return null;
-  return { over: G.over, tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
+  return { over: G.over, pst: JSON.parse(JSON.stringify(G.pst || [[], []])), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })), order: G.order.map(o => o.slice()), tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
     marks: [blMarks(0), blMarks(1)], st: JSON.parse(JSON.stringify(G.st)), skill: G.skill.slice(), tide: G.tide, balls: G.n };
 }
 // a whole game headless: leaves the game on the lanes (and the engine's random stream) as they were
@@ -100,4 +108,14 @@ function blSimGame(opts) {
   if (opts && opts.seed != null) engSeed(null);
   G = keep; GB = keepB;
   return out;
+}
+
+// the game as it stands between balls, plain JSON (a match saved and left); and back
+function blSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', streak: GP ? GP.streak : [0, 0], mgr: GP ? GP.mgr : null })); }
+function blResume(sn) {
+  G = JSON.parse(JSON.stringify(sn.G)); GB = null;
+  blPlayStart({ mode: sn.mode });
+  GP.streak = (sn.streak || [0, 0]).slice(); if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr);
+  GP.msg = `Back at the lanes: ${blMatchText(0).toLowerCase()}.`;
+  return G;
 }

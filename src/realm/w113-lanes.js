@@ -89,12 +89,12 @@ function wLanesTeams(taken) {
     name: t.name, short: t.short, color: t.color, roster: t.kinds.map(kind => ({ n: wRinkName(kind, used), kind })),
   }));
 }
-/* one game at the Lanes. opts: { teams, frames, seed, mode, title, tide } */
+/* one game at the Lanes. opts: { teams, frames, seed, mode, title, tide, skill, hall } */
 function wLanesGame(opts) {
   const o = opts || {};
   WBL = { over: null };
   $('wLanesTitle').textContent = o.title || 'A game at the Saltmere Lanes';
-  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL] });
+  wBL.start({ teams: o.teams || wLanesTeams(), frames: o.frames || wLanesFrames(), seed: o.seed, mode: o.mode || W_LANES_MODE, tide: o.tide || (typeof wTide === 'function' ? wTide() : 'mid'), skill: o.skill || [1, W_LANES_SKILL], hall: !!o.hall });
   showView('lanes');
   wLanesBarNote(); wLanesRows(); wLanesSheet();
 }

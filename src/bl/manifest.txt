@@ -11,3 +11,4 @@ src/bl/parts/08-play.js
 src/bl/parts/09-draw.js
 src/bl/parts/10-ratings.js
 src/bl/parts/11-call.js
+src/bl/parts/12-hall.js

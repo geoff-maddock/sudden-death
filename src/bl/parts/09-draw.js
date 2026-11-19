@@ -144,9 +144,11 @@ function blOverDraw(c) {
 // rolling at; after the hit, that rack with what fell lying down; otherwise the rack in front of the side up
 function blPinsNow(s) {
   const A = GP && GP.anim;
-  if (A && GP.ph === 'roll') { const N = blAnimNow(); if (N && N.pins) return N.pins.filter(p => !p[4]).map(p => [p[0], p[1], p[2], p[3]]); return A.before.map(n => [n, ...BL_SPOT[n], 1]); }
-  if (A && (GP.ph === 'rest' || GP.ph === 'over') && GB) return A.before.map(n => [n, ...BL_SPOT[n], GB.deck.down.includes(n) ? 0 : 1]);
-  return (s >= 0 ? G.stand[s] : []).map(n => [n, ...BL_SPOT[n], 1]);
+  const at = (sp, n) => (sp && sp[n]) || BL_SPOT[n];
+  if (A && GP.ph === 'roll') { const N = blAnimNow(); if (N && N.pins) return N.pins.filter(p => !p[4]).map(p => [p[0], p[1], p[2], p[3]]); return A.before.map(n => [n, ...at(A.spots, n), 1]); }
+  if (A && (GP.ph === 'rest' || GP.ph === 'over') && GB) return A.before.map(n => [n, ...at(A.spots, n), GB.deck.down.includes(n) ? 0 : 1]);
+  const sp = s >= 0 && G.hall ? blHallSpots(s) : null;
+  return (s >= 0 ? G.stand[s] : []).map(n => [n, ...at(sp, n), 1]);
 }
 // the rack, big, at the top right: standing white, down grey
 function blRackDraw(c, s) {
@@ -154,6 +156,7 @@ function blRackDraw(c, s) {
   c.save(); c.fillStyle = 'rgba(15,10,8,.6)'; c.fillRect(760, 20, 190, 120);
   for (let n = 1; n <= 10; n++) { const [x, y] = BL_SPOT[n], px = cx - x / 6 * k, py = cy + 50 - (y - BL_LANE.len) / BL_LANE.row * k * 1.6;
     c.fillStyle = up.has(n) ? '#f6f1e4' : 'rgba(255,255,255,.14)'; c.beginPath(); c.arc(px, py, 8, 0, Math.PI * 2); c.fill();
+    const O = G.hall && G.offspot && G.offspot[s]; if (O && O.n === n && up.has(n) && (!GP || GP.ph !== 'roll')) { c.strokeStyle = '#ff9a7a'; c.lineWidth = 2; c.beginPath(); c.arc(px, py, 10.5, 0, Math.PI * 2); c.stroke(); }
     c.fillStyle = up.has(n) ? '#3a2a22' : 'rgba(255,255,255,.35)'; c.font = '10px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(String(n), px, py + 3.5); }
   c.restore();
 }

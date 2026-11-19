@@ -73,7 +73,7 @@ async def main():
         t = await pg.evaluate("""(() => { wBL.start({ seed: 7, skill: [1, 1] }); const first = wBL.turn(), out = { keys: Object.keys(first).sort(), side: first.side, frame: first.frame, pl: first.plan.ball, fr: JSON.stringify(wBL.G.fr[0]) };
           let n = 1; while (wBL.turn()) n++; const S = wBL.summary(); out.n = n; out.over = !!wBL.G.over; out.tot = S.tot; out.balls = S.balls; out.json = JSON.stringify(JSON.parse(JSON.stringify(wBL.G))) === JSON.stringify(wBL.G);
           out.after = wBL.turn(); return out; })()""")
-        check(t['keys'] == ['ball', 'down', 'frame', 'plan', 'release', 'ri', 'roll', 'side'] and t['side'] == 0 and t['frame'] == 1 and t['pl'] == 'strike' and t['fr'] != '[]', 'turn() bowls the next ball: the plan, the release, the ball, the pins, and the sheet follows', t)
+        check(t['keys'] == ['ball', 'down', 'frame', 'plan', 'release', 'ri', 'roll', 'said', 'side', 'tide'] and t['side'] == 0 and t['frame'] == 1 and t['pl'] == 'strike' and t['fr'] != '[]', 'turn() bowls the next ball: the plan, the release, the ball, the pins, and the sheet follows', t)
         check(t['over'] and t['after'] is None and t['balls'] == t['n'] and 20 <= t['n'] <= 60 and t['json'], 'turn() plays the game to its end, then nothing; the game (oil and all) is plain JSON', t)
         s = await pg.evaluate("""(() => { wBL.newGame(); const keep = JSON.stringify(wBL.G); const a = wBL.simGame({ seed: 11 }), b = wBL.simGame({ seed: 11 }), c = wBL.simGame({ seed: 12 });
           return { same: JSON.stringify(a.tot) === JSON.stringify(b.tot) && JSON.stringify(a.marks) === JSON.stringify(b.marks), other: JSON.stringify(a.marks) !== JSON.stringify(c.marks), kept: JSON.stringify(wBL.G) === keep }; })()""")
