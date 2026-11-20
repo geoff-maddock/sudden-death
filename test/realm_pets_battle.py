@@ -44,8 +44,8 @@ async def main():
           const btn = document.getElementById('bPetTrick'); const used = B.pet.used, label = btn.textContent, dis = btn.disabled;
           document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true })); return { used, label, dis, still: B.pet.used, sel }; })()""")
         check(t['used'] and '(used)' in t['label'] and t['dis'] and t['still'] and t['sel'] == -1, 'T uses the trick once (and lets go of a picked card): the button says used and waits', t)
-        mk = await pg.evaluate("(() => { beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true, bubbles: true })); const ctrl = B.pet.used; UI.dragging = true; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true })); const drag = B.pet.used; UI.dragging = false; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true })); return [ctrl, drag, B.pet.used]; })()")
-        check(mk == [False, False, True], 'Ctrl+T, or T with a card in the middle of a drag, leaves the trick alone; a plain T then uses it', mk)
+        mk = await pg.evaluate("(() => { beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true, bubbles: true })); const ctrl = B.pet.used; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true })); return [ctrl, B.pet.used]; })()")
+        check(mk == [False, True], 'Ctrl+T leaves the trick alone; a plain T then uses it', mk)
         pp = await pg.evaluate("""(() => { A.pops = []; B.P.block = 0; B.pet.t = {}; hurtPlayer(3, alive()[0]); consumeFx(); return A.pops.map(p => p.t).filter(t => /Zip/.test(t)); })()""")
         check(len(pp) >= 1 and 'blinks' in pp[0], 'what the pet does pops up over your side', pp)
         sp = await pg.evaluate("""(() => { B.pet.spooked = true; B.pet.bond = 1; RUN.pet.hungry = true; B.pet.hungry = true; renderFightHUD(); const t = document.getElementById('petBox').textContent; return { spooked: t.includes('!'), hungry: t.includes('hungry') }; })()""")
@@ -60,6 +60,14 @@ async def main():
         await pg.screenshot(path='/tmp/pets_battle_phone.png')
         check(ph == {'left': True, 'right': True, 'scroll': True}, 'on a phone the panel fits, and the page doesn\'t scroll sideways', ph)
 
+        dr = await pg.evaluate("""(() => { beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); B.energy = 9; renderFightHUD();
+          const drag = (mutate, end) => { const el = document.querySelector('#hand .card[data-i="1"]'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+            el.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true })); window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 150 }));
+            if (mutate) mutate(); window.dispatchEvent(new PointerEvent(end || 'pointerup', { clientX: x, clientY: y - 300 })); };
+          const n0 = B.cardsThisTurn; drag(() => { B.discard.push(B.hand.shift()); }); const changed = B.cardsThisTurn - n0;
+          drag(null, 'pointercancel'); const cancelled = [B.cardsThisTurn - n0, UI.sel];
+          return { changed, cancelled }; })()""")
+        check(dr == {'changed': 0, 'cancelled': [0, -1]}, 'a drag whose hand changes under it plays nothing on its drop; a gesture the browser takes over lets go of the card', dr)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

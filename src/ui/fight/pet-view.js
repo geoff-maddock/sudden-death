@@ -21,8 +21,7 @@ function petPanelHTML() {
     <button class="ghost pettrick" id="bPetTrick" ${why || busy ? 'disabled' : ''} title="${esc(why ? why : `T: ${D.trick.n}`)}">${esc(D.trick.n)}${p.used ? ' (used)' : ''}</button></div>`;
 }
 function doPetTrick() {
-  // (not with a card in the middle of a drag: its drop would land on a changed hand)
-  if (!B || !B.pet || B.phase !== 'player' || B.over || UI.busy || UI.dragging || petTrickWhy()) return;
+  if (!B || !B.pet || B.phase !== 'player' || B.over || UI.busy || petTrickWhy()) return;
   // (a card picked or a discard waiting is let go: the trick can change the hand and the enemies under it)
   UI.sel = -1; UI.disc = null;
   const K = PETS[B.pet.kind].trick, one = (K.tgt || 'one') === 'one';

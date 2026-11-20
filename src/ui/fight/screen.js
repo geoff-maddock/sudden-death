@@ -99,18 +99,22 @@ function startDrag(ev, el, i) {
   const mv = e => {
     const dx = e.clientX - x0, dy = e.clientY - y0;
     if (!moved && Math.hypot(dx, dy) < 12) return;
-    if (!moved) { moved = true; UI.dragging = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
+    if (!moved) { moved = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
     el.style.transform = `translate(${dx}px, ${dy}px) scale(1.06)`;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
     if (h) { UI.hover = h.e; UI.kbTarget = h.e; }
     updatePreview();
   };
+  // (a gesture the browser takes over, a pan on a phone, ends the drag with nothing played)
+  const cancel = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.sel = -1; renderHand(); } };
   const up = e => {
-    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
-    UI.dragging = false;
+    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel);
     if (!moved) return;
     UI.dragged = true; el.classList.remove('drag'); el.style.transform = base;
+    // (the drop plays the card only if nothing changed under it: still your turn, nothing busy or paused, the same card
+    // in the same place; a key, a tonic, the pet's trick or the pause screen mid-drag leaves it unplayed)
+    if (B.phase !== 'player' || B.over || UI.busy || UI.paused || B.hand[i] !== c) { UI.sel = -1; renderHand(); return; }
     const r = cv.getBoundingClientRect();
     const overStage = e.clientY < r.bottom + 10;
     if (!overStage) { UI.sel = -1; renderHand(); return; }
@@ -120,7 +124,7 @@ function startDrag(ev, el, i) {
     if (needsTarget(c) && alive().length > 1 && !h) { renderHand(); return; } // dropped on open ice: keep it selected
     playSelected(h ? h.e : UI.kbTarget || alive()[0]);
   };
-  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel);
 }
 function selectCard(i) {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
@@ -184,8 +188,8 @@ cv.addEventListener('click', ev => {
 });
 document.addEventListener('keydown', ev => {
   if (UI.view !== 'fight' || !B || !$('modal').hidden || UI.paused || ev.target.closest('input,textarea')) return;
-  // (a browser's own shortcut, Cmd+E or Ctrl+1, isn't a move in the fight)
-  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  // (a browser's own shortcut, Cmd+E or Ctrl+1, isn't a move in the fight; Escape still lets go of a pick)
+  if (ev.key !== 'Escape' && (ev.ctrlKey || ev.metaKey || ev.altKey)) return;
   if (/^[0-9]$/.test(ev.key)) { const i = (+ev.key + 9) % 10; if (i < B.hand.length) selectCard(i); ev.preventDefault(); return; }
   if (ev.key === 'e' || ev.key === 'E') { doEndTurn(); return; }
   if (UI.sel >= 0) {
