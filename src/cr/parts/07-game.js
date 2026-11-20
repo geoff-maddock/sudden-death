@@ -41,14 +41,22 @@ function crTurn() {
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
 // crThrowBegin puts it on the ice (the page then moves it on a step at a time: crRunStep), crThrowFinish settles it
+// (the throw running on this game, if any: one at a time, and it settles only into the game it began on)
+let CR_LIVE = null;
 function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
-  if (crWhyNot(s)) return null;
+  if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
   plan = Object.assign({}, plan, { s });
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
-  return { s, plan, rel, Q, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const X = { s, plan, rel, Q, g: G, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  CR_LIVE = X; return X;
 }
+// a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed
+const crRefused = (s, why) => ({ side: s, ri: null, pos: null, end: null, plan: null, rel: null, stop: null, hits: 0, out: [], made: false, rule: { ok: false, why } });
 function crThrowFinish(X) {
+  if (CR_LIVE === X) CR_LIVE = null;
+  if (X.g !== G) return crRefused(X.s, 'That game is over.');
+  const why = crWhyNot(X.s); if (why) return crRefused(X.s, why);
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
   crWear(G.ice, run.path);
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }), made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
@@ -65,7 +73,7 @@ function crThrowFinish(X) {
   return ev;
 }
 function crThrowStone(s, plan, rel, sweep) {
-  const X = crThrowBegin(s, plan, rel, sweep); if (!X) return { side: s, rule: { ok: false, why: crWhyNot(s) }, made: false };
+  const X = crThrowBegin(s, plan, rel, sweep); if (!X) return crRefused(s, crWhyNot(s) || 'A stone is still sliding.');
   while (crRunStep(X.Q)); return crThrowFinish(X);
 }
 function crSummary() {

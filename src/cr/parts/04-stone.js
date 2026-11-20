@@ -63,7 +63,8 @@ function crRunStep(Q, sweep) {
     if (vx * st.vx + vy * st.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop) { vx = 0; vy = 0; }
     st.x += (st.vx + vx) / 2 * dts; st.y += (st.vy + vy) / 2 * dts; st.vx = vx; st.vy = vy;
     // (the path every foot of travel, so a fast stone wears every cell it crosses)
-    if (st === T) { const P = path[path.length - 1]; if (!P || Math.hypot(st.x - P[0], st.y - P[1]) >= (O.plan ? 36 : 12)) path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]); }
+    // (and the hardest sweeping since the last point, so a stretch swept between two points still wears)
+    if (st === T) { Q.swMax = Math.max(Q.swMax || 0, sw); const P = path[path.length - 1]; if (!P || Math.hypot(st.x - P[0], st.y - P[1]) >= (O.plan ? 36 : 12)) { path.push([+st.x.toFixed(1), +st.y.toFixed(1), +Q.swMax.toFixed(2)]); Q.swMax = 0; } }
   }
   // contacts (only between stones that could touch: one of them moving)
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
@@ -83,14 +84,16 @@ function crRunStep(Q, sweep) {
 const crRunNow = Q => Q.S.filter(st => !st.out).map(st => [st.id, +st.x.toFixed(1), +st.y.toFixed(1)]);
 function crRunTo(Q, t, sweep) { while (!Q.done && Q.t < t) crRunStep(Q, sweep); return !Q.done; }
 function crRunEnd(Q) {
+  if (Q.result) return Q.result;
   const { O, S, T, path } = Q;
   // (the last stretch: where it stopped, or left the sheet, ends the path)
-  const P = path[path.length - 1]; if (!P || P[0] !== +T.x.toFixed(1) || P[1] !== +T.y.toFixed(1)) path.push([+T.x.toFixed(1), +T.y.toFixed(1), 0]);
+  const P = path[path.length - 1]; if (!P || P[0] !== +T.x.toFixed(1) || P[1] !== +T.y.toFixed(1)) path.push([+T.x.toFixed(1), +T.y.toFixed(1), +(Q.swMax || 0).toFixed(2)]);
   // the thrown stone must pass the far hog line, unless it hit a stone in play
   if (!T.out && !crPastHog(T) && !Q.hits) { T.out = true; Q.out.push(T.id); }
   if (!O.plan) Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]);
   const rest = S.filter(st => !st.out).map(st => ({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }));
-  return { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } };
+  Q.done = true;
+  return (Q.result = { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } });
 }
 function crRun(stones, th, opts) { const Q = crRunInit(stones, th, opts); while (crRunStep(Q)); return crRunEnd(Q); }
 // where a stone thrown alone comes to rest (no other stones): { x, y } or null (out), and its path; the CPU's aim

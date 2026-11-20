@@ -12,7 +12,7 @@
    to rest), alone(throw, ice, cold, sweep) a stone on its own, solveDraw(x, y, h, ice, cold) and solveHit(x, y, v, h,
    ice, cold) the aim; value(stones, side, kAfter, hammer, skill) what a result is worth to a skip, plan(side) the
    CPU's call; start(opts) puts a game on the ice ({ ends, teams, order, skill: [2], hammer, cold, fgz, seed }), turn()
-   throws the next stone, throwStone(side, plan, release, sweep) one as released, summary() is the game so far,
+   throws the next stone, throwStone(side, plan, release, sweep) one as released (refused: rule.ok false, nothing changed), summary() is the game so far,
    simGame(opts) a whole game headless. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },

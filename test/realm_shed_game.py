@@ -64,6 +64,8 @@ async def main():
           // a stone out of turn changes nothing
           wCR.start({ seed: 1, skill: [1, 1] }); const ice0 = JSON.stringify(wCR.G.ice), n0 = wCR.G.n, bad = wCR.throwStone(1 - wCR.up(), { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: 0, v: 140, h: 1 }, null);
           out.refused = [bad.rule.ok, JSON.stringify(wCR.G.ice) === ice0, wCR.G.n === n0, wCR.G.st[0].stones + wCR.G.st[1].stones];
+          // a throw refused mid-run (the game moved on) settles nothing, and only one throw runs at a time
+          wCR.start({ seed: 2, skill: [1, 1] }); out.overlap = [wCR.throwStone(wCR.up(), { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: -2.3, v: 141.9, h: 1 }, null).rule.ok];
           // a draw to the back of the house on keen worn ice still solves (a throw out the back is lighter next time)
           const worn = wCR.iceNew().map(() => wCR.iceRules.min); out.back = !!wCR.solveDraw(0, 40, 1, worn, 'keen');
           // value with no skill given is a Knight's

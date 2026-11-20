@@ -39841,7 +39841,8 @@ function crRunStep(Q, sweep) {
     if (vx * st.vx + vy * st.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop) { vx = 0; vy = 0; }
     st.x += (st.vx + vx) / 2 * dts; st.y += (st.vy + vy) / 2 * dts; st.vx = vx; st.vy = vy;
     // (the path every foot of travel, so a fast stone wears every cell it crosses)
-    if (st === T) { const P = path[path.length - 1]; if (!P || Math.hypot(st.x - P[0], st.y - P[1]) >= (O.plan ? 36 : 12)) path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]); }
+    // (and the hardest sweeping since the last point, so a stretch swept between two points still wears)
+    if (st === T) { Q.swMax = Math.max(Q.swMax || 0, sw); const P = path[path.length - 1]; if (!P || Math.hypot(st.x - P[0], st.y - P[1]) >= (O.plan ? 36 : 12)) { path.push([+st.x.toFixed(1), +st.y.toFixed(1), +Q.swMax.toFixed(2)]); Q.swMax = 0; } }
   }
   // contacts (only between stones that could touch: one of them moving)
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
@@ -39861,14 +39862,16 @@ function crRunStep(Q, sweep) {
 const crRunNow = Q => Q.S.filter(st => !st.out).map(st => [st.id, +st.x.toFixed(1), +st.y.toFixed(1)]);
 function crRunTo(Q, t, sweep) { while (!Q.done && Q.t < t) crRunStep(Q, sweep); return !Q.done; }
 function crRunEnd(Q) {
+  if (Q.result) return Q.result;
   const { O, S, T, path } = Q;
   // (the last stretch: where it stopped, or left the sheet, ends the path)
-  const P = path[path.length - 1]; if (!P || P[0] !== +T.x.toFixed(1) || P[1] !== +T.y.toFixed(1)) path.push([+T.x.toFixed(1), +T.y.toFixed(1), 0]);
+  const P = path[path.length - 1]; if (!P || P[0] !== +T.x.toFixed(1) || P[1] !== +T.y.toFixed(1)) path.push([+T.x.toFixed(1), +T.y.toFixed(1), +(Q.swMax || 0).toFixed(2)]);
   // the thrown stone must pass the far hog line, unless it hit a stone in play
   if (!T.out && !crPastHog(T) && !Q.hits) { T.out = true; Q.out.push(T.id); }
   if (!O.plan) Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]);
   const rest = S.filter(st => !st.out).map(st => ({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }));
-  return { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } };
+  Q.done = true;
+  return (Q.result = { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } });
 }
 function crRun(stones, th, opts) { const Q = crRunInit(stones, th, opts); while (crRunStep(Q)); return crRunEnd(Q); }
 // where a stone thrown alone comes to rest (no other stones): { x, y } or null (out), and its path; the CPU's aim
@@ -39898,7 +39901,7 @@ function crSolveDraw(x, y, h, ice, cold) {
   for (let i = 0; i < CR_AIM.tries; i++) {
     const r = crAlone({ x0: 0, ang, v, h }, ice, cold);
     // (out of play: through the back line is too heavy, short of the hog line too light, into the boards too wide)
-    if (!r.stop) { const L = r.last; if (L.y > CR_SHEET.back) v *= .97; else if (Math.abs(L.x) + CR_SHEET.stoneR >= CR_SHEET.halfW) ang -= Math.sign(L.x) * .3; else v *= 1.02; continue; }
+    if (!r.stop) { const L = r.last; if (Math.abs(L.x) + CR_SHEET.stoneR >= CR_SHEET.halfW) ang -= Math.sign(L.x) * .3; else if (L.y > CR_SHEET.back) v *= .97; else v *= 1.02; continue; }
     const ex = x - r.x, ey = y - r.y;
     if (Math.abs(ex) < CR_AIM.tol && Math.abs(ey) < CR_AIM.tol) return { ang: +ang.toFixed(4), v: +v.toFixed(3), h };
     v *= Math.sqrt(Math.max(.25, (y - CR_STONE.y0) / Math.max(1, r.y - CR_STONE.y0)));
@@ -40057,14 +40060,22 @@ function crTurn() {
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
 // crThrowBegin puts it on the ice (the page then moves it on a step at a time: crRunStep), crThrowFinish settles it
+// (the throw running on this game, if any: one at a time, and it settles only into the game it began on)
+let CR_LIVE = null;
 function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
-  if (crWhyNot(s)) return null;
+  if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
   plan = Object.assign({}, plan, { s });
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
-  return { s, plan, rel, Q, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const X = { s, plan, rel, Q, g: G, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  CR_LIVE = X; return X;
 }
+// a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed
+const crRefused = (s, why) => ({ side: s, ri: null, pos: null, end: null, plan: null, rel: null, stop: null, hits: 0, out: [], made: false, rule: { ok: false, why } });
 function crThrowFinish(X) {
+  if (CR_LIVE === X) CR_LIVE = null;
+  if (X.g !== G) return crRefused(X.s, 'That game is over.');
+  const why = crWhyNot(X.s); if (why) return crRefused(X.s, why);
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
   crWear(G.ice, run.path);
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }), made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
@@ -40081,7 +40092,7 @@ function crThrowFinish(X) {
   return ev;
 }
 function crThrowStone(s, plan, rel, sweep) {
-  const X = crThrowBegin(s, plan, rel, sweep); if (!X) return { side: s, rule: { ok: false, why: crWhyNot(s) }, made: false };
+  const X = crThrowBegin(s, plan, rel, sweep); if (!X) return crRefused(s, crWhyNot(s) || 'A stone is still sliding.');
   while (crRunStep(X.Q)); return crThrowFinish(X);
 }
 function crSummary() {
@@ -40114,7 +40125,7 @@ function crSimGame(opts) {
    to rest), alone(throw, ice, cold, sweep) a stone on its own, solveDraw(x, y, h, ice, cold) and solveHit(x, y, v, h,
    ice, cold) the aim; value(stones, side, kAfter, hammer, skill) what a result is worth to a skip, plan(side) the
    CPU's call; start(opts) puts a game on the ice ({ ends, teams, order, skill: [2], hammer, cold, fgz, seed }), turn()
-   throws the next stone, throwStone(side, plan, release, sweep) one as released, summary() is the game so far,
+   throws the next stone, throwStone(side, plan, release, sweep) one as released (refused: rule.ok false, nothing changed), summary() is the game so far,
    simGame(opts) a whole game headless. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
