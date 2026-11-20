@@ -63,6 +63,8 @@ function crTurn(style) {
 // crThrowBegin puts it on the ice (the page then moves it on a step at a time: crRunStep), crThrowFinish settles it
 // (the throw running on this game, if any: one at a time, and it settles only into the game it began on)
 let CR_LIVE = null;
+// every throw's number (the page's sounds tell one stone's run from the next by it, a refused one's too)
+let CR_THROWN = 0;
 function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
   if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
@@ -73,7 +75,7 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (and Frost Salt on its line: it drags, as under a curse)
   const fx = crFxFor(s); if (G.salt && G.salt[s]) fx.heavy *= CR_POTIONS.crsalt.heavy;
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
-  const X = { s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const X = { id: ++CR_THROWN, s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
 // a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed

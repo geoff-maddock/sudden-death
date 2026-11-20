@@ -35,7 +35,7 @@ function wShedSlideBeat() {
   if (!wShedSoundOn() || wCR.paused || wCR.phase !== 'slide') return;
   const b = W_SHED_SND.beat / 1000;
   // (a new stone, by its own run, a refused one's too: its own hits and its own call, from nothing)
-  const ref = wCR.slideRef; if (WSHS.stone !== ref) { WSHS.stone = ref; WSHS.hits = 0; WSHS.call = ''; }
+  const id = wCR.slideId; if (WSHS.stone !== id) { WSHS.stone = id; WSHS.hits = 0; WSHS.call = ''; }
   noise(b * 1.1, W_SHED_SND.rumble[1], W_SHED_SND.rumble[0], .5);
   const h = wCR.slideHits; if (h > WSHS.hits) { for (let i = 0; i < Math.min(3, h - WSHS.hits); i++) { noise(.06, .22, 2600, 2.5, i * .05); tone(520, .08, 'square', .05, -120, i * .05); } WSHS.hits = h; }
   if (wCR.sweep || wCR.slideSwept) noise(b, W_SHED_SND.brush[1], W_SHED_SND.brush[0], 1.2);
@@ -47,7 +47,8 @@ setInterval(wShedSlideBeat, W_SHED_SND.beat);
 // an end scored, from the stone that ended it
 function wShedEndSound() {
   const L = wCR.last, V = wCR.view; if (!L || !V || !L.rule || !L.rule.end) return;
-  const e = L.rule.end, G = wCR.G; if (WSHS.end && WSHS.end.g === G && WSHS.end.n === G.n) return; WSHS.end = { g: G, n: G.n };
+  // (the game's own last end is the horn's: onOver)
+  const e = L.rule.end, G = wCR.G; if (G.over || (WSHS.end && WSHS.end.g === G && WSHS.end.n === G.n)) return; WSHS.end = { g: G, n: G.n };
   if (e.s < 0) { tone(880, .4, 'sine', .03); return; }
   // (a steal: scored by the side without the hammer; the stone's record says who had it)
   const mine = e.s === V.you, steal = L.ham != null && e.s !== L.ham;

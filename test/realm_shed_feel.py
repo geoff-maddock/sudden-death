@@ -67,13 +67,16 @@ async def main():
         check(bt['on']['d'] <= bt['button'] and bt['on']['made'] and bt['on']['count'] == 1 and bt['off']['made'] and bt['off']['count'] == 0, 'the engine counts a draw made that comes to rest on the button, and not one made beside it', bt)
         es = await pg.evaluate("""(() => { SET.sfx = true; let crowd = 0; const c0 = sfx.crowd; sfx.crowd = () => { crowd++; }; W_SHED_MODE = 'watch'; wShedGame({ seed: 12, mode: 'watch', ends: 4 }); wCR.pause(true); __snd.length = 0;
           // (each end's own sound, counted across the stone that ended it: the game's own end is left out, its horn and gallery are onOver's)
-          let n = 0, ok = 0, bad = []; const you = wCR.view.you; wCR.pause(false);
-          while (n++ < 40000 && !wCR.G.over) { const e = wCR.G.end, c0n = crowd, s0 = __snd.length; wCR.tick(0.05); if (wCR.phase === 'rest' && wCR.G.end > e && !wCR.G.over) { while (wCR.phase !== 'rest') wCR.tick(0.05);
+          let n = 0, ok = 0, bad = [], last = null; const you = wCR.view.you; wCR.pause(false);
+          while (n++ < 40000 && !wCR.G.over) { const e = wCR.G.end, c0n = crowd, s0 = __snd.length; wCR.tick(0.05);
+            if (wCR.G.over) { const add = __snd.slice(s0); last = { crowd: crowd - c0n, low: add.filter(x => x[0] === 'tone' && x[1] === 196).length, chime: add.filter(x => x[0] === 'tone' && x[1] === 880).length }; }
+            else if (wCR.phase === 'rest' && wCR.G.end > e) {
               const L = wCR.last.rule.end, add = __snd.slice(s0), low = add.filter(x => x[0] === 'tone' && x[1] === 196).length, chime = add.filter(x => x[0] === 'tone' && x[1] === 880).length, cr = crowd - c0n;
               const want = L.s < 0 ? [0, 0, 1] : L.s === you ? [1, 0, 0] : [0, 1, 0]; if (JSON.stringify([cr, low, chime]) === JSON.stringify(want)) ok++; else bad.push({ end: L, got: [cr, low, chime] }); } }
           wCR.pause(true); sfx.crowd = c0; SET.sfx = false; WCR = null; wLeaveShed();
-          return { ok, bad: bad.slice(0, 3) }; })()""")
+          return { ok, bad: bad.slice(0, 3), last }; })()""")
         check(es['ok'] >= 3 and es['bad'] == [], 'every end heard once: the gallery for yours, a low note for theirs, a chime for a blank', es)
+        check(es['last'] == {'crowd': 1, 'low': 0, 'chime': 0}, 'the game\'s last end is the horn\'s alone (one gallery, no end sound on top)', es)
         cl = await pg.evaluate("""(() => { SET.sfx = true; W_SHED_MODE = 'play'; wShedGame({ seed: 13, mode: 'play', hammer: 1 }); wCR.pause(true); let n = 0; while (wCR.phase !== 'aim' && n++ < 8000) wCR.tick(.05);
           wCR.press(); n = 0; while (wCR.view.meter && wCR.view.meter.v < 0.86 && n++ < 3000) wCR.tick(.002); wCR.press(); wCR.pause(false); __snd.length = 0; n = 0; let hurry = 0;
           while (wCR.phase === 'slide' && n++ < 600) { wCR.tick(.05); wShedSlideBeat(); } hurry = __snd.filter(x => x[0] === 'tone' && x[1] === 392).length;

@@ -40726,6 +40726,8 @@ function crTurn(style) {
 // crThrowBegin puts it on the ice (the page then moves it on a step at a time: crRunStep), crThrowFinish settles it
 // (the throw running on this game, if any: one at a time, and it settles only into the game it began on)
 let CR_LIVE = null;
+// every throw's number (the page's sounds tell one stone's run from the next by it, a refused one's too)
+let CR_THROWN = 0;
 function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
   if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
@@ -40736,7 +40738,7 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (and Frost Salt on its line: it drags, as under a curse)
   const fx = crFxFor(s); if (G.salt && G.salt[s]) fx.heavy *= CR_POTIONS.crsalt.heavy;
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
-  const X = { s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const X = { id: ++CR_THROWN, s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
 // a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed
@@ -42251,7 +42253,7 @@ return {
   fxFor: s => crFxFor(s), yourWt: p => GP ? crYourWt(p) : p, cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
   get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   // the feel (phase 11): the stone sliding now, its hits so far and whether it is swept
-  get slideHits() { return GP && GP.X ? GP.X.Q.hits : 0; }, get slideSwept() { return !!(GP && GP.X && GP.X.Q.sw > 0); }, get slideSide() { return GP && GP.X ? GP.X.s : null; }, get slideRef() { return GP && GP.X ? GP.X.Q : null; }, get slideStone() { return GP && GP.X && !GP.X.Q.T.out ? { x: GP.X.Q.T.x, y: GP.X.Q.T.y } : null; }, button: CR_BUTTON,
+  get slideHits() { return GP && GP.X ? GP.X.Q.hits : 0; }, get slideSwept() { return !!(GP && GP.X && GP.X.Q.sw > 0); }, get slideSide() { return GP && GP.X ? GP.X.s : null; }, get slideId() { return GP && GP.X ? GP.X.id : null; }, get slideStone() { return GP && GP.X && !GP.X.Q.T.out ? { x: GP.X.Q.T.x, y: GP.X.Q.T.y } : null; }, button: CR_BUTTON,
   // superstars and figures (phase 8)
   figKinds: () => Object.keys(KIND), figsNow: () => G && G.teams ? crFigsOn() : [],
   // gear and potions (phase 7)
@@ -60027,7 +60029,7 @@ function wShedHowHTML() {
   <p class="hint"><b>The free guard zone.</b> A stone short of the house, past the hog line, is a guard. Until the fifth stone of an end, a stone may not knock the other rink's guard out of play: if it does, the guard goes back and your stone is removed.</p>
   <p class="hint"><b>Your stone.</b> Your skip calls a shot and holds the broom where to aim. A <b>draw</b> comes to rest at the broom, a <b>guard</b> short of the house, a <b>freeze</b> touching a stone, a <b>takeout</b> hits a stone out, a <b>peel</b> hits a guard out and rolls away, a <b>hit and roll</b> hits and rolls into the house. Change the shot (1 to 6), move the broom (the arrows, or click the house) and pick the <b>handle</b>: out-turn (O) curls left, in-turn (I) curls right. A stone curls most as it slows.</p>
   <p class="hint"><b>The throw.</b> Space twice: once to start, once on the <b>yellow line</b> for the call's weight. Early is light, late is heavy. On a phone, drag back from the hack and let go: the further you pull, the heavier.</p>
-  <p class="hint"><b>Sweeping.</b> While your stone slides, hold Space (or the Sweep button) to sweep: a swept stone goes further and curls less. Your skip calls it: "Hurry hard!" when it will stop well short, "Sweep!" a little short, "Off!" when it has the weight, "Whoa!" when it is heavy. A light stone can be swept home; a heavy one can't be stopped.</p>
+  <p class="hint"><b>Sweeping.</b> While your stone slides, hold Space (or the button marked Hold to sweep, in the Sweep row) to sweep: a swept stone goes further and curls less. Your skip calls it: "Hurry hard!" when it will stop well short, "Sweep!" a little short, "Off!" when it has the weight, "Whoa!" when it is heavy. A light stone can be swept home; a heavy one can't be stopped.</p>
   <p class="hint"><b>The ice</b> is pebbled, and the pebble wears where stones go: worn ice is keener (a stone runs further). The Shed's cold changes the whole sheet: heavy on a warm day, keen after a hard frost.</p>
   <p class="hint"><b>Their rink</b> (on the bar): a <b>Squire</b> doesn't think about the hammer, reads the fresh pebble and misses more; a <b>Knight</b> weighs the house and the hammer, and reads the ice as it was when the end began; an <b>Archmage</b> reads the ice as it is now and misses least. <b>Watch</b> hands both rinks to the CPU, and Speed on the bar runs it faster.</p>`;
 }
@@ -61182,7 +61184,7 @@ function wShedSlideBeat() {
   if (!wShedSoundOn() || wCR.paused || wCR.phase !== 'slide') return;
   const b = W_SHED_SND.beat / 1000;
   // (a new stone, by its own run, a refused one's too: its own hits and its own call, from nothing)
-  const ref = wCR.slideRef; if (WSHS.stone !== ref) { WSHS.stone = ref; WSHS.hits = 0; WSHS.call = ''; }
+  const id = wCR.slideId; if (WSHS.stone !== id) { WSHS.stone = id; WSHS.hits = 0; WSHS.call = ''; }
   noise(b * 1.1, W_SHED_SND.rumble[1], W_SHED_SND.rumble[0], .5);
   const h = wCR.slideHits; if (h > WSHS.hits) { for (let i = 0; i < Math.min(3, h - WSHS.hits); i++) { noise(.06, .22, 2600, 2.5, i * .05); tone(520, .08, 'square', .05, -120, i * .05); } WSHS.hits = h; }
   if (wCR.sweep || wCR.slideSwept) noise(b, W_SHED_SND.brush[1], W_SHED_SND.brush[0], 1.2);
@@ -61194,7 +61196,8 @@ setInterval(wShedSlideBeat, W_SHED_SND.beat);
 // an end scored, from the stone that ended it
 function wShedEndSound() {
   const L = wCR.last, V = wCR.view; if (!L || !V || !L.rule || !L.rule.end) return;
-  const e = L.rule.end, G = wCR.G; if (WSHS.end && WSHS.end.g === G && WSHS.end.n === G.n) return; WSHS.end = { g: G, n: G.n };
+  // (the game's own last end is the horn's: onOver)
+  const e = L.rule.end, G = wCR.G; if (G.over || (WSHS.end && WSHS.end.g === G && WSHS.end.n === G.n)) return; WSHS.end = { g: G, n: G.n };
   if (e.s < 0) { tone(880, .4, 'sine', .03); return; }
   // (a steal: scored by the side without the hammer; the stone's record says who had it)
   const mine = e.s === V.you, steal = L.ham != null && e.s !== L.ham;
@@ -61295,7 +61298,7 @@ const W_QUICK = [
     ],
     tip: 'Before your stone, cast your curler\'s power (P) or the ultimate at the start of an end (U). Press C for the ice chart: every stone\'s path, and where the pebble is worn.',
     keys: [['Space', 'throw (two presses), then hold to sweep'], ['1 to 6', 'the shot'], ['Arrows', 'move the broom'], ['I, O', 'the handle'], ['G', 'the skip\'s call again'], ['P, U, K', 'a power, the ultimate, Steady'], ['C', 'the ice chart']],
-    phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold the Hold to sweep button while it slides.' },
+    phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold the button marked Hold to sweep while it slides.' },
   { id: 'ball', n: 'Baseball', where: 'the Ballpark', more: 'wHelpBall',
     lede: 'You bat first. Batting is two things: put the circle over the ball, and swing when it turns gold. Running and fielding happen by themselves.',
     steps: [
