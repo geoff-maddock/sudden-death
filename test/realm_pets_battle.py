@@ -60,14 +60,19 @@ async def main():
         await pg.screenshot(path='/tmp/pets_battle_phone.png')
         check(ph == {'left': True, 'right': True, 'scroll': True}, 'on a phone the panel fits, and the page doesn\'t scroll sideways', ph)
 
-        dr = await pg.evaluate("""(() => { beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); B.energy = 9; renderFightHUD();
-          const drag = (mutate, end) => { const el = document.querySelector('#hand .card[data-i="1"]'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-            el.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true })); window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 150 }));
-            if (mutate) mutate(); window.dispatchEvent(new PointerEvent(end || 'pointerup', { clientX: x, clientY: y - 300 })); };
-          const n0 = B.cardsThisTurn; drag(() => { B.discard.push(B.hand.shift()); }); const changed = B.cardsThisTurn - n0;
-          drag(null, 'pointercancel'); const cancelled = [B.cardsThisTurn - n0, UI.sel];
-          return { changed, cancelled }; })()""")
-        check(dr == {'changed': 0, 'cancelled': [0, -1]}, 'a drag whose hand changes under it plays nothing on its drop; a gesture the browser takes over lets go of the card', dr)
+        dr = await pg.evaluate("""(() => { beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); B.energy = 99; renderFightHUD();
+          const drag = (mid, end) => { const el = document.querySelector('#hand .card[data-i="1"]'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+            el.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 1 })); window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 150 }));
+            const sel = UI.sel; if (mid) mid(); window.dispatchEvent(new PointerEvent(end || 'pointerup', { clientX: x, clientY: y - 300 })); return sel; };
+          const n = () => B.cardsThisTurn, out = {};
+          let n0 = n(); out.selDuring = drag(); out.plain = n() - n0;
+          n0 = n(); drag(() => { B.discard.push(B.hand.shift()); renderHand(); }); out.handChanged = n() - n0;
+          n0 = n(); drag(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))); out.escape = n() - n0;
+          n0 = n(); drag(() => doPetTrick()); out.trick = n() - n0;
+          n0 = n(); drag(null, 'pointercancel'); out.cancel = [n() - n0, UI.sel];
+          return out; })()""")
+        check(dr['selDuring'] == 1 and dr['plain'] == 1, 'a plain drag of a card onto the arena plays it', dr)
+        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1], 'a drag plays nothing on its drop if the hand changed, Escape let it go, or the pet\'s trick was used while it was held; a gesture the browser takes over lets go of it', dr)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

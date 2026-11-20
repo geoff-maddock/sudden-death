@@ -4806,10 +4806,15 @@ function updatePreview() {
   UI.preview = estDamage(c, t);
   const w = dmgWhy(c, t); if (w) UI.why = Object.assign(w, { card: def(c).n, tgt: t.n });
 }
+/* dragging a card to play it. The drop plays it only if nothing happened while it was held: no action (a card, a
+   tonic, the pet's trick, the end of the turn: UI.acts), the pick not let go (Escape: UI.sel), no pause, dialog or
+   waiting discard, the same card in the same place. A gesture the browser takes over, or the window losing focus,
+   ends the drag with nothing played and the target as it was. */
 function startDrag(ev, el, i) {
   if (ev.button !== 0 || B.phase !== 'player' || B.over || UI.busy || UI.disc) return;
   const c = B.hand[i]; if (!c || !canPlay(c)) return;
-  const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform; let moved = false;
+  const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform, acts0 = UI.acts || 0, kb0 = UI.kbTarget, hv0 = UI.hover; let moved = false;
+  try { el.setPointerCapture(ev.pointerId); } catch (x) { }
   const mv = e => {
     const dx = e.clientX - x0, dy = e.clientY - y0;
     if (!moved && Math.hypot(dx, dy) < 12) return;
@@ -4820,25 +4825,24 @@ function startDrag(ev, el, i) {
     if (h) { UI.hover = h.e; UI.kbTarget = h.e; }
     updatePreview();
   };
-  // (a gesture the browser takes over, a pan on a phone, ends the drag with nothing played)
-  const cancel = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.sel = -1; renderHand(); } };
+  const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; };
+  // (the card back, nothing played; the target as it was before the drag)
+  const drop = () => { if (!B || UI.view !== 'fight') return; UI.sel = -1; UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0; renderHand(); };
+  const cancel = () => { off(); if (moved) drop(); };
   const up = e => {
-    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel);
+    off();
     if (!moved) return;
-    UI.dragged = true; el.classList.remove('drag'); el.style.transform = base;
-    // (the drop plays the card only if nothing changed under it: still your turn, nothing busy or paused, the same card
-    // in the same place; a key, a tonic, the pet's trick or the pause screen mid-drag leaves it unplayed)
-    if (B.phase !== 'player' || B.over || UI.busy || UI.paused || B.hand[i] !== c) { UI.sel = -1; renderHand(); return; }
+    if (!B || UI.view !== 'fight' || (UI.acts || 0) !== acts0 || UI.sel !== i || B.phase !== 'player' || B.over || UI.busy || UI.paused || UI.disc || !$('modal').hidden || B.hand[i] !== c) { drop(); return; }
+    UI.dragged = true;
     const r = cv.getBoundingClientRect();
     const overStage = e.clientY < r.bottom + 10;
-    if (!overStage) { UI.sel = -1; renderHand(); return; }
+    if (!overStage) { UI.dragged = false; UI.sel = -1; renderHand(); return; }
     const x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
-    UI.sel = i;
     if (needsTarget(c) && alive().length > 1 && !h) { renderHand(); return; } // dropped on open ice: keep it selected
     playSelected(h ? h.e : UI.kbTarget || alive()[0]);
   };
-  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel);
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel); window.addEventListener('blur', cancel);
 }
 function selectCard(i) {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
@@ -4868,12 +4872,14 @@ function drinkTonic(slot) {
   hideTip(); afterAction();
 }
 function afterAction() {
+  // (an action happened: a card held in a drag won't play on its drop)
+  UI.acts = (UI.acts || 0) + 1;
   consumeFx(); renderFightHUD();
   if (B.over) { UI.busy = true; setTimeout(() => finishFight(), 1100); }
 }
 function doEndTurn() {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
-  UI.sel = -1; UI.busy = true;
+  UI.acts = (UI.acts || 0) + 1; UI.sel = -1; UI.busy = true;
   const steps = endTurn(); consumeFx(); renderFightHUD();
   let i = 0;
   const next = () => {
