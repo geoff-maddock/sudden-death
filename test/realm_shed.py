@@ -22,9 +22,11 @@ def check(ok, what, detail=None):
     return ok
 
 HELP = r"""
-// throw a whole end: every stone changes nothing, and the last leaves `last` in play (each as [side, x, y])
-window.__end = last => { let r = null; for (let i = 0; i < 16; i++) { const s = wCR.up(), G = wCR.G; const keep = G.stones.slice();
-    const after = i < 15 ? keep : last.map(([ss, x, y], j) => ({ id: ss + ':x' + j, s: ss, x, y })); r = wCR.throw(s, after); } return r; };
+// throw a whole end: each side's stones in `last` ([side, x, y]) come to rest where it says, in that side's order, and
+// every other stone goes out of play
+window.__end = last => { const want = [last.filter(x => x[0] === 0), last.filter(x => x[0] === 1)]; let r = null;
+  for (let i = 0; i < 16; i++) { const s = wCR.up(), G = wCR.G, nx = want[s].shift(), after = G.stones.slice();
+    if (nx) after.push({ id: 'new', s, x: nx[1], y: nx[2] }); r = wCR.throw(s, after); } return r; };
 0"""
 
 async def main():
@@ -40,7 +42,8 @@ async def main():
 
         # ---------- the seam ----------
         sc = await pg.evaluate("""(() => ({ engine: W_ENGINES.shed && W_ENGINES.shed.api === wCR && W_ENGINES.shed.sport === 'curling' && W_ENGINES.shed.view === 'shed',
-          leak: ['crNewGame', 'crThrow', 'CR_RULES', 'CR_SHEET', 'crScoreEnd'].filter(n => typeof window[n] !== 'undefined'), on: wCR.on }))()""")
+          leak: ['crNewGame', 'crThrow', 'CR_RULES', 'CR_SHEET', 'crScoreEnd'].filter(n => typeof window[n] !== 'undefined'), on: wCR.on, before: [wCR.pos(0), wCR.thrower(0), wCR.sideNo(0), wCR.board(), wCR.up()] }))()""")
+        check(sc['before'] == [-1, -1, -1, None, -1], 'before any game, its calls answer without an error', sc['before'])
         check(sc['engine'] and not sc['leak'] and sc['on'] is False, 'the Curling Shed is W_ENGINES.shed (curling), in its own scope: none of its names on the page, and never on yet', sc)
 
         # ---------- the order ----------
@@ -60,6 +63,14 @@ async def main():
             guard: [wCR.inFgz({ x: 0, y: -120 }), wCR.inFgz({ x: 0, y: -20 }), wCR.inFgz({ x: 0, y: 30 })] }; })()""")
         check(s['two']['s'] == 1 and s['two']['n'] == 2 and s['four']['s'] == 0 and s['four']['n'] == 4, 'the nearest side scores each of its stones nearer than the other\'s nearest: two, and a four-ender', s)
         check(s['blank']['s'] == -1 and s['edge'] == [True, False], 'nothing in the house is a blank; a stone just touching the house counts, one just clear doesn\'t', s)
+        t2 = await pg.evaluate("""(() => { const S = wCR.sheet; wCR.newGame({}); const tie = wCR.scoreEnd([{ id: '0:0', s: 0, x: 0, y: 20 }, { id: '1:0', s: 1, x: 20, y: 0 }]);
+          const onHog = { x: 0, y: -S.hog + 2 }, past = { x: 0, y: -S.hog + S.stoneR + 1 };
+          const bad = [wCR.throw(0, [{ id: 'a', s: 0, x: 0, y: 0 }, { id: 'b', s: 0, x: 0, y: 30 }]).ok, wCR.throw(0, [{ id: 'z', s: 1, x: 0, y: 0 }]).ok];
+          const ok = wCR.throw(0, [{ id: 'whatever', s: 0, x: 0, y: 0 }]); const id = wCR.G.stones[0].id;
+          return { tie, hog: [wCR.inPlay(onHog), wCR.inFgz(onHog), wCR.inPlay(past), wCR.inFgz(past)], bad, ok: ok.ok, id }; })()""")
+        check(t2['tie'] == {'s': -1, 'n': 0, 'shot': None}, 'the two sides\' nearest stones measuring the same is a blank', t2['tie'])
+        check(t2['hog'] == [False, False, True, True], 'a stone still touching the hog line is out of play; wholly past it, it is in play and a guard', t2['hog'])
+        check(t2['bad'] == [False, False] and t2['ok'] and t2['id'] == '0:0', 'a throw that brings two new stones, or the other side\'s, is refused; the thrown stone takes its own id', t2)
         check(not s['outBack'] and not s['outBoard'] and not s['short'] and s['guard'] == [True, False, False], 'past the back line, on the boards or short of the hog line is out of play; a guard is short of the house, not in it', s)
 
         # ---------- the hammer, and the extra end ----------
@@ -70,7 +81,7 @@ async def main():
           out.e4 = __end([[0, 0, 0]]).end; out.tot = [wCR.total(0), wCR.total(1)]; out.extra = wCR.G.extra; out.over0 = wCR.G.over;
           out.e5 = __end([[0, 0, 0], [0, 0, 20]]); out.over = wCR.G.over; out.board = wCR.board(); out.text = [wCR.matchText(0), wCR.matchText(1)];
           out.json = JSON.stringify(wCR.G) === JSON.stringify(JSON.parse(JSON.stringify(wCR.G))); return out; })()""")
-        check(h['h0'] == 1 and h['e1'] == {'s': 1, 'n': 2, 'shot': '1:x0', 'end': 1} and h['h1'] == 0, 'the side with the hammer scores two, and gives it up', h)
+        check(h['h0'] == 1 and h['e1'] == {'s': 1, 'n': 2, 'shot': '1:0', 'end': 1} and h['h1'] == 0, 'the side with the hammer scores two, and gives it up', h)
         check(h['e2']['s'] == 0 and h['h2'] == 1 and h['e3']['s'] == -1 and h['h3'] == 1, 'a steal and a blank both leave the hammer where it was', h)
         check(h['tot'] == [2, 2] and h['extra'] == 1 and h['over0'] is None, 'level after the last end: an extra end', h)
         check(h['over'] and h['over']['win'] == 0 and h['over']['tot'] == [4, 2] and h['over']['extra'] == 1 and h['text'][0].startswith('Won 4 to 2') and 'extra end' in h['text'][1], 'the extra end decides it, and the game says so', h)

@@ -16,7 +16,7 @@
    back line at y = +CR_SHEET.back. A stone is { id, s, x, y } (id 's:j', its side and its number for that side this end).
    - in the house: some part of it inside the 12-foot ring (its centre within houseR + stoneR of the button);
    - a guard (in the free guard zone): past the hog line, short of the tee line, and not in the house;
-   - in play: wholly short of the back line's far edge, clear of the side boards, and past the hog line. The physics
+   - in play: not wholly past the back line, clear of the side boards, and wholly past the hog line. The physics
      (phase 1) says where stones stop; these rules only read where they are.
 
    G: { ends, order: [2 × four roster indexes], roster: [2 × size], fgz, hammer (side), end (0-based), k (stones thrown
@@ -39,23 +39,27 @@ function crNewGame(o) {
 // whose stone it is (-1 when the game is over): the side without the hammer throws the even stones of an end
 const crUp = () => !G || G.over ? -1 : (G.k % 2 === 0 ? 1 - G.hammer : G.hammer);
 // side s's stone number this end (0 to 7: how many it has thrown), and who throws it: a position's two stones in turn
-function crSideNo(s) { const first = 1 - G.hammer; return s === first ? Math.ceil(G.k / 2) : Math.floor(G.k / 2); }
-const crPos = s => Math.min(CR_RULES.side - 1, Math.floor(crSideNo(s) / CR_RULES.stones));
-const crThrower = s => G.order[s][crPos(s)];
+function crSideNo(s) { if (!G) return -1; const first = 1 - G.hammer; return s === first ? Math.ceil(G.k / 2) : Math.floor(G.k / 2); }
+const crPos = s => !G ? -1 : Math.min(CR_RULES.side - 1, Math.floor(crSideNo(s) / CR_RULES.stones));
+const crThrower = s => G ? G.order[s][crPos(s)] : -1;
 const crEndsNow = () => G.ends + G.extra;
 const crTotal = s => G ? G.sc[s].reduce((a, b) => a + b, 0) : 0;
 
 /* ---------- where a stone is ---------- */
 const crDist = st => Math.hypot(st.x, st.y);
 const crInHouse = st => crDist(st) <= CR_SHEET.houseR + CR_SHEET.stoneR;
-const crInFgz = st => st.y < 0 && st.y > -CR_SHEET.hog && !crInHouse(st);
-const crInPlay = st => st.y - CR_SHEET.stoneR <= CR_SHEET.back && Math.abs(st.x) + CR_SHEET.stoneR < CR_SHEET.halfW && st.y >= -CR_SHEET.hog;
+// wholly past the far hog line (a stone still touching it is out, as the rule has it): the one test the guard zone and
+// play share
+const crPastHog = st => st.y - CR_SHEET.stoneR > -CR_SHEET.hog;
+const crInFgz = st => crPastHog(st) && st.y < 0 && !crInHouse(st);
+const crInPlay = st => crPastHog(st) && st.y - CR_SHEET.stoneR <= CR_SHEET.back && Math.abs(st.x) + CR_SHEET.stoneR < CR_SHEET.halfW;
 // an end's score from the stones in play: { s: the side that scores (-1 for a blank), n, shot: the nearest stone's id }
 function crScoreEnd(stones) {
   const H = (stones || []).filter(crInHouse).sort((a, b) => crDist(a) - crDist(b));
   if (!H.length) return { s: -1, n: 0, shot: null };
-  const s = H[0].s, other = H.find(st => st.s !== s), lim = other ? crDist(other) : Infinity;
-  return { s, n: H.filter(st => st.s === s && crDist(st) < lim).length, shot: H[0].id };
+  const s = H[0].s, other = H.find(st => st.s !== s), lim = other ? crDist(other) : Infinity, n = H.filter(st => st.s === s && crDist(st) < lim).length;
+  // (the two sides' nearest stones measure the same: nobody scores, a blank)
+  return n ? { s, n, shot: H[0].id } : { s: -1, n: 0, shot: null };
 }
 
 /* ---------- a stone ---------- */
@@ -72,7 +76,11 @@ function crWhyNot(s) {
 function crThrow(s, after) {
   const why = crWhyNot(s); if (why) return { ok: false, why };
   const id = `${s}:${crSideNo(s)}`, before = G.stones.map(st => Object.assign({}, st));
-  let now = (after || []).filter(crInPlay).map(st => ({ id: st.id, s: st.s, x: st.x, y: st.y }));
+  // every stone after is one already in play (the same id and side) or the one just thrown (side s's, new: it takes
+  // its id here); anything else is refused
+  const old = new Map(before.map(b => [b.id, b.s])), fresh = (after || []).filter(st => !old.has(st.id));
+  if ((after || []).some(st => old.has(st.id) && old.get(st.id) !== st.s) || fresh.length > 1 || (fresh[0] && fresh[0].s !== s)) return { ok: false, why: 'Those stones are not the ones in play.' };
+  let now = (after || []).filter(crInPlay).map(st => ({ id: old.has(st.id) ? st.id : id, s: st.s, x: st.x, y: st.y }));
   // the free guard zone: one of the other side's guards gone from play before the fifth stone
   let fgz = false;
   if (G.k < G.fgz) {
@@ -100,7 +108,7 @@ function crEndOf() {
   return { s: R.s, n: R.n, shot: R.shot, end: e + 1 };
 }
 // the board, as a curling scoreboard keeps it: each side's points by end, and the hammer
-function crBoard() { return { sc: G.sc.map(r => r.slice()), ends: crEndsNow(), end: G.end, hammer: G.hammer, tot: [crTotal(0), crTotal(1)] }; }
+function crBoard() { if (!G) return null; return { sc: G.sc.map(r => r.slice()), ends: crEndsNow(), end: G.end, hammer: G.hammer, tot: [crTotal(0), crTotal(1)] }; }
 // the game from side s's point of view, in words
 function crMatchText(s) {
   if (!G) return '';
