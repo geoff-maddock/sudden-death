@@ -41,7 +41,7 @@ function renderFightHUD() {
   $('ctlBox').innerHTML = `
     <div class="piles"><button class="pile" id="pDraw" title="Draw pile">Draw ${B.draw.length}</button><button class="pile" id="pDisc" title="Discard pile">Discard ${B.discard.length}</button>${B.exhaust.length ? `<button class="pile" id="pEx" title="Exhausted">Out ${B.exhaust.length}</button>` : ''}</div>
     <button class="btn endturn" id="bEnd" ${busy ? 'disabled' : ''}>${B.phase === 'enemy' ? 'Their turn' : 'End turn'}</button>
-    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn</span>`;
+    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn${B.pet ? ', <kbd>T</kbd> your pet\'s trick' : ''}</span>`;
   $('bEnd').onclick = () => doEndTurn();
   $('pDraw').onclick = () => showDeck(B.draw, `Draw pile (${B.draw.length}), in no particular order`);
   $('pDisc').onclick = () => showDeck(B.discard, `Discard pile (${B.discard.length})`);

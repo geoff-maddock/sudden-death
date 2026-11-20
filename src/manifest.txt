@@ -73,6 +73,8 @@ src/app/sound.js
 src/ui/fight/arena.js
 src/ui/fight/scene.js
 src/ui/fight/screen.js
+# the pet at your side in a fight: its panel, its trick (T), what it does (issue #104)
+src/ui/fight/pet-view.js
 src/render/boss-art.js
 src/render/vfx.js
 src/ui/fight/field.js

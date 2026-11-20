@@ -5333,6 +5333,8 @@ function consumeFx() {
       case 'mom': case 'save': case 'swish': case 'bases': sportFx(f); break;
       case 'bat': case 'drive': case 'strike': case 'bell': sportPop(f); break;
       case 'say2': A.pops.push({ x: 480, y: 250, t: f.t, col: '#ffd166', t0: A.t + delay, life: 1.1, size: 30 }); delay += .1; break;
+      // a pet's effect (engine/pets.js): over your side, in its element's colour, with a little chirp
+      case 'pet': { const p = partyPt(), D = B.pet && PETS[B.pet.kind]; A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); tone(880, .08, 'sine', .03, 300); delay += .15; break; }
     }
   }
 }
@@ -5380,7 +5382,7 @@ function renderFightHUD() {
   $('ctlBox').innerHTML = `
     <div class="piles"><button class="pile" id="pDraw" title="Draw pile">Draw ${B.draw.length}</button><button class="pile" id="pDisc" title="Discard pile">Discard ${B.discard.length}</button>${B.exhaust.length ? `<button class="pile" id="pEx" title="Exhausted">Out ${B.exhaust.length}</button>` : ''}</div>
     <button class="btn endturn" id="bEnd" ${busy ? 'disabled' : ''}>${B.phase === 'enemy' ? 'Their turn' : 'End turn'}</button>
-    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn</span>`;
+    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn${B.pet ? ', <kbd>T</kbd> your pet\'s trick' : ''}</span>`;
   $('bEnd').onclick = () => doEndTurn();
   $('pDraw').onclick = () => showDeck(B.draw, `Draw pile (${B.draw.length}), in no particular order`);
   $('pDisc').onclick = () => showDeck(B.discard, `Discard pile (${B.discard.length})`);
@@ -5530,6 +5532,45 @@ document.addEventListener('keydown', ev => {
   }
   if (UI.disc && ev.key === 'Escape') { UI.disc = null; renderHand();
   }
+});
+/* Pets in the fight (issue #104, phase 1): the pet at your side, beside your HP and Block. Its badge (its colour by
+   element, its initial, its bond as stars; spooked and hungry shown), a tooltip with everything it does at its bond
+   (the trait, each power and the bond it opens at, the trick), and its trick as a button (T). What it does in the
+   fight pops up over your side of the arena (fx k 'pet') and goes in the log. */
+const PET_EL_COL = { aether: '#d8c8ff', bloom: '#8fd27a', tide: '#6fc3e8', ember: '#ff9a5a', rime: '#bfe8ff' };
+function petTipHTML() {
+  const p = B.pet, T = petText(p.kind, p.bond, p.hungry); if (!T) return '';
+  const pw = T.powers.map(w => `<li${w.open ? '' : ' style="opacity:.55"'}>${w.open ? '' : `<i>(at bond ${w.at})</i> `}${esc(w.d)}</li>`).join('');
+  return `<span class="t">${esc(p.name)}</span>${esc(T.n)}, a ${esc(T.from)} (${esc(T.el)}). Bond ${p.bond} of 3.${p.hungry ? ' <b>Hungry:</b> its numbers are halved.' : ''}${p.spooked ? ' <b>Spooked:</b> its next power won\'t fire.' : ''}
+    <br><b>Always:</b> ${esc(T.trait)}<ul style="margin:4px 0 4px 16px;padding:0">${pw}</ul><b>Trick (T, once a fight):</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}${p.used ? ' <i>(used)</i>' : ''}`;
+}
+function petPanelHTML() {
+  const p = B && B.pet; if (!p || !PETS[p.kind]) return '';
+  const D = PETS[p.kind], col = PET_EL_COL[D.el] || '#e9dcc0', why = petTrickWhy(), stars = '★'.repeat(p.bond) + '☆'.repeat(3 - p.bond);
+  const busy = B.phase !== 'player' || !!B.over || UI.busy;
+  return `<div class="petbox" id="petBox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="petbadge" tabindex="0" data-tip="${esc(petTipHTML())}" aria-label="${esc(p.name)}, your pet" style="display:inline-flex;align-items:center;gap:6px;border:1px solid ${col};border-radius:14px;padding:2px 10px 2px 3px;color:${col}">
+      <b style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:${col};color:#17100e">${esc(p.name[0])}</b>${esc(p.name)} <small style="letter-spacing:1px">${stars}</small>${p.spooked ? ' <small title="Spooked">!</small>' : ''}${p.hungry ? ' <small title="Hungry">(hungry)</small>' : ''}</span>
+    <button class="ghost pettrick" id="bPetTrick" ${why || busy ? 'disabled' : ''} title="${esc(why ? why : `T: ${D.trick.n}`)}">${esc(D.trick.n)}${p.used ? ' (used)' : ''}</button></div>`;
+}
+function doPetTrick() {
+  if (!B || !B.pet || B.phase !== 'player' || B.over || UI.busy || petTrickWhy()) return;
+  const K = PETS[B.pet.kind].trick, one = (K.tgt || 'one') === 'one';
+  petTrick(one ? B.enemies.indexOf(UI.kbTarget && !UI.kbTarget.dead ? UI.kbTarget : alive()[0]) : null);
+  hideTip(); afterAction();
+}
+// the HUD: the pet's panel under your HP and Block, its trick on the button (and T)
+const sdRenderFightHUD = renderFightHUD;
+renderFightHUD = function () {
+  sdRenderFightHUD();
+  if (!B || !B.pet) return;
+  $('meBox').insertAdjacentHTML('beforeend', petPanelHTML());
+  const b = $('bPetTrick'); if (b) b.onclick = () => doPetTrick();
+};
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 't' && ev.key !== 'T') return;
+  if (UI.view !== 'fight' || !B || !B.pet || !$('modal').hidden || UI.paused || (ev.target.closest && ev.target.closest('input,textarea'))) return;
+  doPetTrick(); ev.preventDefault();
 });
 /* p7b: the bosses' art and the arena's special effects */
 BESPOKE.add('wyrm'); BESPOKE.add('zamboni');
