@@ -1,6 +1,8 @@
 # The Curling Shed, the curling engine at the Curling Shed (issue #102). Its parts, in load order. The Realm takes them
 # inside a scope (src/realm/shed/manifest.txt, through `scope wCR ...`), so none of their names reach the page.
 src/scoped/util.js
+# the players, drawn (the scoped engines' one file): the curler holding the broom and the sweepers are their own kind
+src/figures/figures.js
 src/cr/parts/02-rules.js
 src/cr/parts/03-ice.js
 src/cr/parts/04-stone.js

@@ -67,6 +67,8 @@ return {
   powNow: (s, ri, shot) => G && G.powers ? crPowNow(s, ri, shot) : null, powWhy: (s, k, ri) => crPowWhy(s, k, ri), cast: (s, k, ri) => crCast(s, k, ri), castMine: k => crCastMine(k),
   fxFor: s => crFxFor(s), yourWt: p => GP ? crYourWt(p) : p, cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
   get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // superstars and figures (phase 8)
+  figKinds: () => Object.keys(KIND), figsNow: () => { const out = []; if (!GP || !G || !G.order) return out; const S = GP.sel, X = GP.X; if ((GP.ph === 'aim' || GP.ph === 'swing') && S) out.push('broom'); if (GP.ph === 'addr' && GP.cpu) out.push('broom'); if (X && !X.Q.T.out) out.push('sweepers'); return out; },
   // gear and potions (phase 7)
   potions: JSON.parse(JSON.stringify(CR_POTIONS)), kitRules: JSON.parse(JSON.stringify(CR_KIT)), potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
   // games from the world (phase 5)

@@ -168,4 +168,5 @@ src/realm/w124-shedcall.js
 src/realm/w125-shedgame.js
 src/realm/w126-shedpowers.js
 src/realm/w127-shedkit.js
+src/realm/w128-shedstars.js
 src/realm/w112-quickstart.js
