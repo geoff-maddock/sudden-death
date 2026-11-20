@@ -75,7 +75,7 @@ function crKeyUp(e) { if (e.key === ' ' && CRP.sweepKey) { CRP.sweepKey = false;
 window.addEventListener('keydown', crKeyDown, true);
 // C: the ice chart, whenever the Shed is on screen (Watch too, and while a stone slides)
 window.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() !== 'c' || !CRP.on || !GP || CRP.paused || CRP.cv.offsetParent === null || e.ctrlKey || e.metaKey || e.altKey) return;
+  if ((e.key || '').toLowerCase() !== 'c' || !CRP.on || !GP || CRP.cv.offsetParent === null || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return;
   const m = document.getElementById('modal'); if (m && !m.hidden) return;
   if (CR_HOOK.onChart) { try { CR_HOOK.onChart(); } catch (er) { console.error(er); } e.preventDefault(); e.stopPropagation(); }

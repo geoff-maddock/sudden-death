@@ -40009,8 +40009,8 @@ function crPlan(s) {
   // the best few, played a few times with the curler's own miss: the likeliest result wins
   const top = list.slice(0, S.top);
   if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
-  // an Archmage plays its best few on against the other rink's likeliest reply (crReplyWorst), and weighs that in
-  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyWorst(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + w * CR_CALL.replyMix; } }
+  // an Archmage plays its best few on against the other rink's likeliest reply (crReplyLikely), and weighs that in
+  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + w * CR_CALL.replyMix; } }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });
 }
@@ -40221,7 +40221,7 @@ function crSelect(o) {
     if (was && (o.x != null || o.y != null) && !o.shot) return 'A freeze rests just in front of the stone it freezes to: click another stone of theirs to freeze to that one.'; }
   if (!['takeout', 'peel', 'hitroll'].includes(S.shot)) { S.target = null; S.roll = 0; }
   // (a call you've changed is yours now: the skip's reason was for its own)
-  if (o.shot || o.target || o.x != null || o.y != null || o.h != null) S.reason = '';
+  if (S.shot !== GP.sel.shot || S.target !== GP.sel.target || Math.abs(S.x - GP.sel.x) > .01 || Math.abs(S.y - GP.sel.y) > .01) S.reason = '';
   const aim = crSelAim(S); if (!aim) return 'Nothing gets there from here: try the other handle, or another spot.';
   S.aim = aim; GP.sel = S; crPick(); return '';
 }
@@ -40557,9 +40557,9 @@ function crLegsNewEnd() { if (G) G.legs = [1, 1]; }
      down a single is no use.
    - The reason (crReason): your skip says why it calls a shot: they have shot stone, a guard to steal behind, the
      hammer and the house kept clean, a single to win it, and so on.
-   - Two stones ahead (crReplyWorst): an Archmage plays each of its best shots on, against the other rink's likeliest
-     reply (their takeouts of its stones in the house, and a draw to the button), and takes the shot that is best after
-     the reply.
+   - Two stones ahead (crReplyLikely): an Archmage plays each of its best shots on, against the other rink's likeliest
+     reply (a takeout of each of its two nearest stones in the house, and a draw to the button): the mean of the two
+     best for them, weighed in at CR_CALL.replyMix.
    - The ice chart (crChart): the sheet on its side, the pebble's wear as a stain where stones have run, and every
      stone's path this game, for as far back from the house as the side's skip can read it (crReadIn: a reader of 1
      sees the house and a few feet, of 12 all the way to the hog line); the rest is hatched. */
@@ -40575,19 +40575,19 @@ function crEndValue(s, pts, next, sk) {
   }
   return pts + (S.hammer ? (next === s ? CR_VAL.hammer : -CR_VAL.hammer) : 0);
 }
-// the other rink's likeliest reply to stones after (kAfter into the end): the worst of their shots for side s, played
-// out as a Knight would (no miss); null when the end is over
+// the other rink's likeliest reply to stones after (kAfter into the end): what side s is left with, the mean of their
+// two best shots (played out as a Knight would, no miss); null when the end is over
 // draws: the other rink's draws to the button (the same whatever the shot before: worked out once a plan, crReplyDraws)
 function crReplyDraws(s) { const o = 1 - s, ice = crIceRead(o), out = []; for (const h of [1, -1]) { const aim = crSolveDraw(0, 0, h, ice, G.cold); if (aim) out.push(aim); } return out; }
-function crReplyWorst(s, after, kAfter, sk, draws) {
+function crReplyLikely(s, after, kAfter, sk, draws) {
   if (kAfter >= crPerEnd()) return null;
   const o = 1 - s, keep = { stones: G.stones, k: G.k };
   G.stones = after; G.k = kAfter;
   try {
     const R = CR_SHEET.stoneR, hits = [], ice = crIceRead(o);
-    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, 2)) for (const h of [1, -1]) { const aim = crSolveHit(st.x, st.y - R * 1.6, CR_AIM.vHit, h, ice, G.cold); if (aim) hits.push(aim); }
-    // (their takeouts of the nearest of side s's stones, and always their draws to the button)
-    const list = hits.slice(0, Math.max(0, CR_CALL.replies - 2)).concat(draws || crReplyDraws(s));
+    // (a takeout of each of side s's two nearest stones, the first handle that gets there; and always their draws)
+    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, Math.max(0, CR_CALL.replies - 2))) for (const h of [1, -1]) { const aim = crSolveHit(st.x, st.y - R * 1.6, CR_AIM.vHit, h, ice, G.cold); if (aim) { hits.push(aim); break; } }
+    const list = hits.concat(draws || crReplyDraws(s));
     if (!list.length) return null;
     // their likeliest reply: the mean of their best two for them (worst two for side s)
     const vals = list.map(aim => crValue(crTry(o, aim), s, kAfter + 1, G.hammer, sk)).sort((a, b) => a - b), two = vals.slice(0, 2);
@@ -40721,7 +40721,7 @@ function crKeyUp(e) { if (e.key === ' ' && CRP.sweepKey) { CRP.sweepKey = false;
 window.addEventListener('keydown', crKeyDown, true);
 // C: the ice chart, whenever the Shed is on screen (Watch too, and while a stone slides)
 window.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() !== 'c' || !CRP.on || !GP || CRP.paused || CRP.cv.offsetParent === null || e.ctrlKey || e.metaKey || e.altKey) return;
+  if ((e.key || '').toLowerCase() !== 'c' || !CRP.on || !GP || CRP.cv.offsetParent === null || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return;
   const m = document.getElementById('modal'); if (m && !m.hidden) return;
   if (CR_HOOK.onChart) { try { CR_HOOK.onChart(); } catch (er) { console.error(er); } e.preventDefault(); e.stopPropagation(); }
@@ -58840,7 +58840,7 @@ function wShedChart() {
   const s = wCR.view ? wCR.view.you : 0, was = wCR.paused; wCR.pause(true);
   const close = modal(`<header><h3>The ice chart</h3><button class="ghost" data-close>Done</button></header>
     <canvas id="wShedChartCv" width="880" height="300" style="width:100%;max-width:880px;display:block;margin:0 auto;border-radius:6px" aria-label="The sheet on its side: the pebble's wear and every stone's path this game"></canvas>
-    <p class="hint">The sheet on its side: the hack is off to the left, the house at the right. Blue stains are worn pebble, where stones have run: worn ice is keener, so a stone runs further on it. The lines are every stone's path this game, each rink in its colour, the last one bold. Your skip reads the ice ${Math.round(wCR.readIn(s) / 12)} feet back from the tee; past that it is hatched (a better reader sees more, the best all the way to the hog line).</p>`, () => { if (WCR) wCR.pause(was); wDrain(); });
+    <p class="hint">The sheet on its side: the hack is off to the left, the house at the right. Blue stains are worn pebble, where stones have run: worn ice is keener, so a stone runs further on it. The lines are every stone's path this game, each rink in its colour, the last one bold. ${wCR.view && wCR.view.mode === 'watch' ? `${esc(wCR.G.teams[s].name)}'s skip reads` : 'Your skip reads'} the ice ${Math.round(wCR.readIn(s) / 12)} feet back from the tee; past that it is hatched (a better reader sees more, the best all the way to the hog line).</p>`, () => { if (WCR) wCR.pause(was); wDrain(); });
   const cv = $('wShedChartCv'); wCR.chart(cv, s);
   void close;
 }
@@ -58856,13 +58856,13 @@ wShedRows = function () {
 };
 $('wShedRows').addEventListener('click', e => { const b = e.target.closest('[data-cchart]'); if (b) wShedChart(); });
 // (and beside How to play under the ice, for any stone, Watch too)
-$('wShedHowBtn').insertAdjacentHTML('afterend', ' <button class="ghost" id="wShedChartBtn" title="C: the pebble\'s wear and every stone\'s path">Ice chart</button>');
+$('wShedHowBtn').parentElement.insertAdjacentHTML('beforeend', ' <button class="ghost" id="wShedChartBtn" title="C: the pebble\'s wear and every stone\'s path">Ice chart</button>');
 $('wShedChartBtn').addEventListener('click', () => wShedChart());
 
 const wW124ShedHow = wShedHowHTML;
 wShedHowHTML = function () {
   return wW124ShedHow() + `<p class="hint"><b>The skip's call.</b> Before each stone your skip calls a shot and says why: they have shot stone (take it out), a guard to steal behind, the hammer and the house kept clean, a corner guard to set up two. The skip plays the game, not just the end: in the last end, level with the hammer, a single wins it; two down, a single is no use. An Archmage looks a stone further ahead, at the other rink's likeliest reply.</p>
-  <p class="hint"><b>The ice chart</b> (C, or an Ice chart button, any time at the Shed) shows the sheet on its side: worn pebble as blue stains, where stones have run, and every stone's path this game. Your skip reads it only so far back from the house: a better reader sees more of it.</p>`;
+  <p class="hint"><b>The ice chart</b> (C, or an Ice chart button, any time at the Shed) shows the sheet on its side: worn pebble as blue stains, where stones have run, and every stone's path this game. Your skip reads it only so far back from the tee: a better reader sees more of it, the best all the way to the hog line.</p>`;
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
