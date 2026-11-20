@@ -11,7 +11,7 @@
    - an end scored: the gallery when your rink scores (louder for two or more, and for a steal), a low note when they
      do, a soft chime for a blank;
    - the end of a game: the horn and the gallery when you win (or at the end of a game you only watch), a low note
-     when you lose.
+     when you lose; your skip's call is heard on your own stones only.
    The realm's music plays on, as at any ground (the Shed's own track is w26's).
    Tips. TIPS.w_shed once your team can curl (W_SHG.minOwn players), TIPS.w_broom once you have won a curling match.
    Medals, on SD's ACH, from matches from the world (exhibitions and practice don't count; a conceded one doesn't):
@@ -26,23 +26,27 @@
 
 const wShedSoundOn = () => !LAB && SET.sfx !== false && UI.view === 'shed' && !!wCR.G && !!wCR.G.teams;
 const W_SHED_SND = { beat: 220, rumble: [110, .05], brush: [3200, .03] };
-const WSHS = { hits: 0, call: '', end: -1 };
+// (hits: the sliding stone's clacks so far, with the stone they belong to; end: the stone that ended the last end heard,
+// with its game)
+const WSHS = { hits: 0, stone: null, call: '', end: null };
 // a stone sliding: the rumble, a clack for each new hit, and the brooms while it is swept (a beat, on a timer)
 function wShedSlideBeat() {
-  if (!wShedSoundOn() || wCR.paused || wCR.phase !== 'slide') { WSHS.hits = 0; return; }
-  const sp = Math.max(1, wCR.speed || 1), b = W_SHED_SND.beat / 1000;
+  if (!wShedSoundOn() || wCR.paused || wCR.phase !== 'slide') return;
+  const b = W_SHED_SND.beat / 1000, G = wCR.G;
+  // (a new stone: its own hits from nothing)
+  if (!WSHS.stone || WSHS.stone.g !== G || WSHS.stone.n !== G.n) { WSHS.stone = { g: G, n: G.n }; WSHS.hits = 0; }
   noise(b * 1.1, W_SHED_SND.rumble[1], W_SHED_SND.rumble[0], .5);
   const h = wCR.slideHits; if (h > WSHS.hits) { for (let i = 0; i < Math.min(3, h - WSHS.hits); i++) { noise(.06, .22, 2600, 2.5, i * .05); tone(520, .08, 'square', .05, -120, i * .05); } WSHS.hits = h; }
-  if (wCR.sweep || wCR.slideSwept) noise(b, W_SHED_SND.brush[1] * sp, W_SHED_SND.brush[0], 1.2);
-  // the skip's call, as it changes
-  const c = wCR.view ? wCR.view.call || '' : '';
+  if (wCR.sweep || wCR.slideSwept) noise(b, W_SHED_SND.brush[1], W_SHED_SND.brush[0], 1.2);
+  // your skip's call, as it changes, on your own stones only
+  const c = wCR.view && wCR.slideSide === wCR.view.you ? wCR.view.call || '' : '';
   if (c !== WSHS.call) { if (/Hurry/.test(c)) { noise(.18, .06, 900, .7); tone(392, .1, 'triangle', .07); tone(523, .14, 'triangle', .07, 0, .11); } else if (/Whoa/.test(c)) tone(330, .25, 'triangle', .06, -80); WSHS.call = c; }
 }
 setInterval(wShedSlideBeat, W_SHED_SND.beat);
 // an end scored, from the stone that ended it
 function wShedEndSound() {
   const L = wCR.last, V = wCR.view; if (!L || !V || !L.rule || !L.rule.end) return;
-  const e = L.rule.end; if (WSHS.end === wCR.G.n) return; WSHS.end = wCR.G.n;
+  const e = L.rule.end, G = wCR.G; if (WSHS.end && WSHS.end.g === G && WSHS.end.n === G.n) return; WSHS.end = { g: G, n: G.n };
   if (e.s < 0) { tone(880, .4, 'sine', .03); return; }
   // (a steal: scored by the side without the hammer; the stone's record says who had it)
   const mine = e.s === V.you, steal = L.ham != null && e.s !== L.ham;
@@ -57,8 +61,9 @@ const wW130OnOver = wCR.onOver;
 wCR.onOver = s => {
   if (wW130OnOver) wW130OnOver(s);
   try { if (!wShedSoundOn() || !s) return;
-    if (!(WCR && WCR.world)) { sfx.horn(); sfx.crowd(1.4); return; }
-    if (s.win === wCR.view.you) { sfx.horn(); sfx.crowd(2); } else sfx.bad(); } catch (e) { console.error(e); }
+    // (a game you only watch: the horn and the gallery; one you curled, the horn for a win)
+    if (!(WCR && WCR.world) && wCR.mode === 'watch') { sfx.horn(); sfx.crowd(1.4); return; }
+    if (s.win === wCR.view.you) { sfx.horn(); sfx.crowd(WCR && WCR.world ? 2 : 1.4); } else sfx.bad(); } catch (e) { console.error(e); }
 };
 
 Object.assign(TIPS, {

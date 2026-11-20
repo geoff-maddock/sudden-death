@@ -34,7 +34,7 @@ function crStart(opts) {
   return G;
 }
 // (buttons: draws that came to rest on the button itself, the one-foot circle at the tee: phase 11's medal)
-const CR_BUTTON = 6;
+const CR_BUTTON = CR_SHEET.rings[3];
 const crBox = () => ({ stones: 0, made: 0, shots: {}, madeBy: {}, ends: { scored: 0, stolen: 0, blank: 0 }, big: 0, buttons: 0 });
 // was the shot made? (what the call asked, against where the stones came to rest)
 function crMade(plan, before, after, run) {

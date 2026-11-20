@@ -40697,7 +40697,7 @@ function crStart(opts) {
   return G;
 }
 // (buttons: draws that came to rest on the button itself, the one-foot circle at the tee: phase 11's medal)
-const CR_BUTTON = 6;
+const CR_BUTTON = CR_SHEET.rings[3];
 const crBox = () => ({ stones: 0, made: 0, shots: {}, madeBy: {}, ends: { scored: 0, stolen: 0, blank: 0 }, big: 0, buttons: 0 });
 // was the shot made? (what the call asked, against where the stones came to rest)
 function crMade(plan, before, after, run) {
@@ -42251,7 +42251,7 @@ return {
   fxFor: s => crFxFor(s), yourWt: p => GP ? crYourWt(p) : p, cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
   get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   // the feel (phase 11): the stone sliding now, its hits so far and whether it is swept
-  get slideHits() { return GP && GP.X ? GP.X.Q.hits : 0; }, get slideSwept() { return !!(GP && GP.X && GP.X.Q.sw > 0); }, get slideStone() { return GP && GP.X && !GP.X.Q.T.out ? { x: GP.X.Q.T.x, y: GP.X.Q.T.y } : null; }, button: CR_BUTTON,
+  get slideHits() { return GP && GP.X ? GP.X.Q.hits : 0; }, get slideSwept() { return !!(GP && GP.X && GP.X.Q.sw > 0); }, get slideSide() { return GP && GP.X ? GP.X.s : null; }, get slideStone() { return GP && GP.X && !GP.X.Q.T.out ? { x: GP.X.Q.T.x, y: GP.X.Q.T.y } : null; }, button: CR_BUTTON,
   // superstars and figures (phase 8)
   figKinds: () => Object.keys(KIND), figsNow: () => G && G.teams ? crFigsOn() : [],
   // gear and potions (phase 7)
@@ -61158,7 +61158,7 @@ renderHelp = function () {
    - an end scored: the gallery when your rink scores (louder for two or more, and for a steal), a low note when they
      do, a soft chime for a blank;
    - the end of a game: the horn and the gallery when you win (or at the end of a game you only watch), a low note
-     when you lose.
+     when you lose; your skip's call is heard on your own stones only.
    The realm's music plays on, as at any ground (the Shed's own track is w26's).
    Tips. TIPS.w_shed once your team can curl (W_SHG.minOwn players), TIPS.w_broom once you have won a curling match.
    Medals, on SD's ACH, from matches from the world (exhibitions and practice don't count; a conceded one doesn't):
@@ -61173,23 +61173,27 @@ renderHelp = function () {
 
 const wShedSoundOn = () => !LAB && SET.sfx !== false && UI.view === 'shed' && !!wCR.G && !!wCR.G.teams;
 const W_SHED_SND = { beat: 220, rumble: [110, .05], brush: [3200, .03] };
-const WSHS = { hits: 0, call: '', end: -1 };
+// (hits: the sliding stone's clacks so far, with the stone they belong to; end: the stone that ended the last end heard,
+// with its game)
+const WSHS = { hits: 0, stone: null, call: '', end: null };
 // a stone sliding: the rumble, a clack for each new hit, and the brooms while it is swept (a beat, on a timer)
 function wShedSlideBeat() {
-  if (!wShedSoundOn() || wCR.paused || wCR.phase !== 'slide') { WSHS.hits = 0; return; }
-  const sp = Math.max(1, wCR.speed || 1), b = W_SHED_SND.beat / 1000;
+  if (!wShedSoundOn() || wCR.paused || wCR.phase !== 'slide') return;
+  const b = W_SHED_SND.beat / 1000, G = wCR.G;
+  // (a new stone: its own hits from nothing)
+  if (!WSHS.stone || WSHS.stone.g !== G || WSHS.stone.n !== G.n) { WSHS.stone = { g: G, n: G.n }; WSHS.hits = 0; }
   noise(b * 1.1, W_SHED_SND.rumble[1], W_SHED_SND.rumble[0], .5);
   const h = wCR.slideHits; if (h > WSHS.hits) { for (let i = 0; i < Math.min(3, h - WSHS.hits); i++) { noise(.06, .22, 2600, 2.5, i * .05); tone(520, .08, 'square', .05, -120, i * .05); } WSHS.hits = h; }
-  if (wCR.sweep || wCR.slideSwept) noise(b, W_SHED_SND.brush[1] * sp, W_SHED_SND.brush[0], 1.2);
-  // the skip's call, as it changes
-  const c = wCR.view ? wCR.view.call || '' : '';
+  if (wCR.sweep || wCR.slideSwept) noise(b, W_SHED_SND.brush[1], W_SHED_SND.brush[0], 1.2);
+  // your skip's call, as it changes, on your own stones only
+  const c = wCR.view && wCR.slideSide === wCR.view.you ? wCR.view.call || '' : '';
   if (c !== WSHS.call) { if (/Hurry/.test(c)) { noise(.18, .06, 900, .7); tone(392, .1, 'triangle', .07); tone(523, .14, 'triangle', .07, 0, .11); } else if (/Whoa/.test(c)) tone(330, .25, 'triangle', .06, -80); WSHS.call = c; }
 }
 setInterval(wShedSlideBeat, W_SHED_SND.beat);
 // an end scored, from the stone that ended it
 function wShedEndSound() {
   const L = wCR.last, V = wCR.view; if (!L || !V || !L.rule || !L.rule.end) return;
-  const e = L.rule.end; if (WSHS.end === wCR.G.n) return; WSHS.end = wCR.G.n;
+  const e = L.rule.end, G = wCR.G; if (WSHS.end && WSHS.end.g === G && WSHS.end.n === G.n) return; WSHS.end = { g: G, n: G.n };
   if (e.s < 0) { tone(880, .4, 'sine', .03); return; }
   // (a steal: scored by the side without the hammer; the stone's record says who had it)
   const mine = e.s === V.you, steal = L.ham != null && e.s !== L.ham;
@@ -61204,8 +61208,9 @@ const wW130OnOver = wCR.onOver;
 wCR.onOver = s => {
   if (wW130OnOver) wW130OnOver(s);
   try { if (!wShedSoundOn() || !s) return;
-    if (!(WCR && WCR.world)) { sfx.horn(); sfx.crowd(1.4); return; }
-    if (s.win === wCR.view.you) { sfx.horn(); sfx.crowd(2); } else sfx.bad(); } catch (e) { console.error(e); }
+    // (a game you only watch: the horn and the gallery; one you curled, the horn for a win)
+    if (!(WCR && WCR.world) && wCR.mode === 'watch') { sfx.horn(); sfx.crowd(1.4); return; }
+    if (s.win === wCR.view.you) { sfx.horn(); sfx.crowd(WCR && WCR.world ? 2 : 1.4); } else sfx.bad(); } catch (e) { console.error(e); }
 };
 
 Object.assign(TIPS, {
@@ -61288,7 +61293,7 @@ const W_QUICK = [
     ],
     tip: 'Before your stone, cast your curler\'s power (P) or the ultimate at the start of an end (U). Press C for the ice chart: every stone\'s path, and where the pebble is worn.',
     keys: [['Space', 'throw (two presses), then hold to sweep'], ['1 to 6', 'the shot'], ['Arrows', 'move the broom'], ['I, O', 'the handle'], ['G', 'the skip\'s call again'], ['P, U, K', 'a power, the ultimate, Steady'], ['C', 'the ice chart']],
-    phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold Hold to sweep while it slides.' },
+    phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold the Sweep button while it slides.' },
   { id: 'ball', n: 'Baseball', where: 'the Ballpark', more: 'wHelpBall',
     lede: 'You bat first. Batting is two things: put the circle over the ball, and swing when it turns gold. Running and fielding happen by themselves.',
     steps: [

@@ -58,10 +58,26 @@ async def main():
         t = await pg.evaluate("""(() => ({ tips: ['w_shed', 'w_broom'].every(k => TIPS[k] && TIPS[k][1].length > 20),
           ach: ['w_shed', 'w_broom', 'w_steal', 'w_four', 'w_button'].every(id => ACH.some(a => a.id === id)) }))()""")
         check(t == {'tips': True, 'ach': True}, 'tips for curling and the Brass Broom; five curling medals in the record book', t)
-        bt = await pg.evaluate("""(() => { const T = k => ({ name: k, short: 'T', roster: [0, 1, 2, 3].map(i => ({ n: k + i, kind: 'dwarf' })) }); wCR.start({ seed: 9, hammer: 1, teams: [T('a'), T('b')] }); const G = wCR.G;
-          const aim = wCR.solveDraw(0, 0, 1, G.ice, G.cold), ev = wCR.throwStone(0, { shot: 'draw', x: 0, y: 0, h: 1, aim }, aim, null); const d = ev.stop ? Math.hypot(ev.stop.x, ev.stop.y) : 99;
-          return { made: ev.made, on: d <= wCR.button, count: G.st[0].buttons }; })()""")
-        check(bt['count'] == (1 if (bt['made'] and bt['on']) else 0), 'the engine counts a draw that comes to rest on the button', bt)
+        bt = await pg.evaluate("""(() => { const T = k => ({ name: k, short: 'T', roster: [0, 1, 2, 3].map(i => ({ n: k + i, kind: 'dwarf' })) });
+          // (thrown on its aim exactly, a draw to the button rests on it; one to the four-foot's edge doesn't count)
+          wCR.start({ seed: 9, hammer: 1, teams: [T('a'), T('b')] }); let G = wCR.G; const aim = wCR.solveDraw(0, 0, 1, G.ice, G.cold), ev = wCR.throwStone(0, { shot: 'draw', x: 0, y: 0, h: 1, aim }, aim, null);
+          const on = { d: ev.stop ? +Math.hypot(ev.stop.x, ev.stop.y).toFixed(1) : 99, made: ev.made, count: G.st[0].buttons };
+          wCR.start({ seed: 9, hammer: 1, teams: [T('a'), T('b')] }); G = wCR.G; const aim2 = wCR.solveDraw(0, 20, 1, G.ice, G.cold), ev2 = wCR.throwStone(0, { shot: 'draw', x: 0, y: 20, h: 1, aim: aim2 }, aim2, null);
+          return { on, off: { made: ev2.made, count: G.st[0].buttons }, button: wCR.button }; })()""")
+        check(bt['on']['d'] <= bt['button'] and bt['on']['made'] and bt['on']['count'] == 1 and bt['off']['made'] and bt['off']['count'] == 0, 'the engine counts a draw made that comes to rest on the button, and not one made beside it', bt)
+        es = await pg.evaluate("""(() => { SET.sfx = true; let crowd = 0; const c0 = sfx.crowd; sfx.crowd = () => { crowd++; }; W_SHED_MODE = 'watch'; wShedGame({ seed: 12, mode: 'watch', ends: 4 }); wCR.pause(true); __snd.length = 0;
+          let n = 0, mine = 0, blank = 0, theirs = 0; const you = wCR.view.you;
+          while (n++ < 40000 && !wCR.G.over) { const e = wCR.G.end; wCR.tick(0.05); if (wCR.G.end > e) { const L = wCR.last.rule.end; if (L.s < 0) blank++; else if (L.s === you) mine++; else theirs++; } }
+          const low = __snd.filter(x => x[0] === 'tone' && x[1] === 196).length, chime = __snd.filter(x => x[0] === 'tone' && x[1] === 880).length; sfx.crowd = c0; SET.sfx = false; WCR = null; wLeaveShed();
+          return { mine, theirs, blank, crowd, low, chime }; })()""")
+        check(es['crowd'] >= es['mine'] and es['low'] >= es['theirs'] and es['chime'] >= es['blank'] and es['mine'] + es['theirs'] + es['blank'] >= 4, 'an end heard: the gallery for yours, a low note for theirs, a chime for a blank', es)
+        cl = await pg.evaluate("""(() => { SET.sfx = true; W_SHED_MODE = 'play'; wShedGame({ seed: 13, mode: 'play', hammer: 1 }); wCR.pause(true); let n = 0; while (wCR.phase !== 'aim' && n++ < 8000) wCR.tick(.05);
+          wCR.press(); n = 0; while (wCR.view.meter && wCR.view.meter.v < 0.86 && n++ < 3000) wCR.tick(.002); wCR.press(); wCR.pause(false); __snd.length = 0; n = 0; let hurry = 0;
+          while (wCR.phase === 'slide' && n++ < 600) { wCR.tick(.05); wShedSlideBeat(); } hurry = __snd.filter(x => x[0] === 'tone' && x[1] === 392).length;
+          wCR.setMode('watch'); n = 0; while (wCR.slideSide !== 1 - wCR.view.you && n++ < 8000) wCR.tick(.05); __snd.length = 0; n = 0;
+          while (wCR.phase === 'slide' && n++ < 600) { wCR.tick(.05); wShedSlideBeat(); } wCR.pause(true); const cpu = __snd.filter(x => x[0] === 'tone' && (x[1] === 392 || x[1] === 330)).length; SET.sfx = false; W_SHED_MODE = 'play'; WCR = null; wLeaveShed();
+          return { hurry, cpu }; })()""")
+        check(cl['hurry'] >= 1 and cl['cpu'] == 0, 'your skip calls "Hurry hard!" on a light stone of yours, and says nothing on theirs', cl)
         await pg.evaluate("(() => { for (const kind of ['elf', 'dwarf', 'gorgon']) if (wRoster().length < 5) wAddPlayer(wMakePlayer({ kind, lvl: 2 }, 'tavern')); })()")
         m = await pg.evaluate("""(() => { const st0 = Object.assign({}, ACHS.stats), sim0 = wCR.simGame;
           wCR.simGame = o => { const g = sim0(o); g.win = 0; g.tot = [9, 3]; g.text = '9 to 3'; g.board = { sc: [[4, 0, 5, 0], [0, 2, 0, 1]], ends: 4 }; g.st[0].ends.stolen = 2; g.st[0].buttons = 3; return g; };
