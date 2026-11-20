@@ -42,6 +42,8 @@ function startCombat(ids, type, sport, trait) {
   // relics
   const P = B.P;
   B.trait = trait || null; B.stakes = (RUN.pending && RUN.pending.stakes) || null;
+  // the pet at your side, if the run has one (the Realm's: engine/pets.js)
+  petBegin();
   fire('fightStart');
   log(`${SPORTS[B.sport].n} rules: ${SPORTS[B.sport].rule}.`, 'sys');
   playerTurnStart();
@@ -209,11 +211,12 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': e.block += op[1]; fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); break;
-      case 'ba': for (const o of alive()) { o.block += op[1]; fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); } break;
+      case 'b': e.block += op[1]; fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); fire('enemyBlock', { e, n: op[1] }); break;
+      case 'ba': for (const o of alive()) { o.block += op[1]; fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); fire('enemyBlock', { e: o, n: op[1] }); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
-      case 'p': addSt(B.P, op[1], op[2]); fx({ k: 'pst', st: op[1], n: op[2] }); break;
+      // (a debuff on its way to you: a pet may stop it)
+      case 'p': if (ST[op[1]] && ST[op[1]].d && op[2] > 0 && fire('playerDebuff', { k: op[1], n: op[2] })) break; addSt(B.P, op[1], op[2]); fx({ k: 'pst', st: op[1], n: op[2] }); break;
       case 'add': for (let i = 0; i < op[2]; i++) { const c = mkCard(op[1]); if (op[3] === 'draw') B.draw.splice((R() * (B.draw.length + 1)) | 0, 0, c); else B.discard.push(c); } fx({ k: 'addcard', id: op[1], n: op[2] }); log(`${op[2]} × ${CARDS[op[1]].n} shuffled into your ${op[3] === 'draw' ? 'draw pile' : 'discard pile'}.`, 'bad'); break;
       case 'heal': e.hp = Math.min(e.max, e.hp + op[1]); break;
       case 'steal': { const t = Math.min(RUN.gold, op[1]); RUN.gold -= t; e.stolen += t; if (t) { fx({ k: 'num', p: 1, t: `−${t} gold`, col: '#ffd166' }); log(`${e.n} lifts ${t} gold.`, 'bad'); } break; }
@@ -226,6 +229,8 @@ function doMove(e) {
 }
 function hurtPlayer(dmg, e, o = {}) {
   const P = B.P;
+  // (an enemy's hit on its way: a pet may step in before the Block is counted)
+  if (e) fire('playerAttacked', e);
   if (sv(P, 'intang')) dmg = Math.min(dmg, 1);
   if (sv(P, 'pads')) { P.block += 5; addSt(P, 'pads', -1); fx({ k: 'num', p: 1, t: 'Pad save +5', col: '#9fd2ff', small: 1 }); }
   if (sv(P, 'helmet')) { dmg = Math.max(0, dmg - 3); addSt(P, 'helmet', -1); }
@@ -238,6 +243,7 @@ function hurtPlayer(dmg, e, o = {}) {
   if (e && sv(P, 'shoulder') && !e.dead) { hurtEnemy(e, 6, { raw: true, src: 'Shoulder Pads', noScore: 1 }); addSt(P, 'shoulder', -1); }
   if (sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
   sportEnemyHit(taken, dmg);
+  if (e) { fire('playerHit', { e, taken, dmg }); petSpook(taken); }
   return taken;
 }
 function loseHP(n, src, fromHit) {
@@ -270,6 +276,7 @@ function atkDmg(base, e, card, extra = 0) {
     if (B.sport === 'basketball' && (sv(P, 'hot') || (!B.inCard && B.atkCount >= 2))) d += add(3, 'On Fire');
     d += add(sv(P, 'oop'), 'Alley-oop');
     d += add(mod('atk', card), 'Trophies');
+    d += add(petAtk(card, e), petName());
     if (B.sport === 'bowling' && card.sk) d += add(2, 'Practiced');
   }
   if (sv(P, 'weak')) d *= mul(1, .75, 'You are Weak');
@@ -341,6 +348,8 @@ function playCard(i, ti, opt = {}) {
   if (needsTarget(card)) { if (!tgt || tgt.dead || tgt.fled) tgt = alive()[0]; if (!tgt) return false; }
   B.energy -= cardCost(card);
   B.hand.splice(i, 1);
+  // (the card's target, by its id: B stays plain data)
+  B.lastTgt = tgt ? tgt.uid : null;
   // extra costs, paid up front
   if (d.disc) { let j = B.hand.findIndex(c => c.uid === opt.disc); if (j < 0) j = B.hand.reduce((bj, c, k) => cardValue(c) < cardValue(B.hand[bj]) ? k : bj, 0); const dc = B.hand.splice(j, 1)[0]; if (dc) { B.discard.push(dc); log(`You discard ${def(dc).n}.`); } }
   if (d.toll) loseHP(d.toll, d.n);

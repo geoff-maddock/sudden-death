@@ -30,6 +30,8 @@ Several files still open with their old part name in a comment (`/* p5: ... */`)
 | `engine/boss-ops.js` | Boss-only effect ops (steal a card, strip Block, sacrifice an escort...). |
 | `engine/stats.js` | Player stats: card ownership, crediting damage/Block/kills/points, careers. |
 | `engine/sky.js` | The sky: moon phases and constellations and what they do. |
+| `engine/pets.js` | Pets (issue #104): the rules for a small monster at your side in a fight, set by the Realm through `RUN.pet` (a run without one fights as ever). `B.pet` is plain data. A pet's trait, powers (each opening at a bond level) and trick are declared in `PETS` and dispatched through the hooks (`onHook`: `petOn`), their sums added to `mod()` (`petMod`), their damage to `atkDmg`'s breakdown under the pet's name (`petAtk`). Bond scales its numbers (`petPow`), hunger halves them, a big hit spooks it (`petSpook`), the trick is once a fight (`petTrick`). New events fired in `combat.js`: `playerAttacked`, `playerHit`, `enemyBlock`, `playerDebuff` (a truthy return stops the debuff). |
+| `data/pets.js` | The pets themselves (`PETS`): fifteen monsters from the D&D 5e SRD or myth, each with its element, rarity, where it comes from, trait, powers and trick. Loads after `engine/pets.js`, whose rules it uses at runtime only. |
 | `data/draft-class.js` | The open draft class (free agents). Sits after `engine/sky.js` because it reads the sky groups. |
 | `run/run.js` | Starting a run (`newRun`) and party helpers. |
 | `run/map.js` | Map generation and repair, and rolling encounters. |
