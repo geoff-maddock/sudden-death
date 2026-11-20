@@ -48,6 +48,8 @@ scope wHK src/realm/rink/manifest.txt src/realm/rink/exports.js
 scope wGL src/realm/links/manifest.txt src/realm/links/exports.js
 # The Saltmere Lanes, the bowling engine, in its own scope (issue #100): src/realm/lanes/manifest.txt
 scope wBL src/realm/lanes/manifest.txt src/realm/lanes/exports.js
+# The Curling Shed, the curling engine, in its own scope (issue #102): src/realm/shed/manifest.txt
+scope wCR src/realm/shed/manifest.txt src/realm/shed/exports.js
 # the engines, by id (W_ENGINES)
 src/realm/w19b-engines.js
 src/realm/w20-diamond.js

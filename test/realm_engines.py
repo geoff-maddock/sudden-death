@@ -54,8 +54,8 @@ async def main():
           showView('diamond'); const shown = wBD.on && UI.view === 'diamond';
           showView('world'); const hidden = !wBD.on;
           return { ids: Object.keys(W_ENGINES), api: D.api === wBD, view: D.view, sport: D.sport, shown, hidden }; })()""")
-        check(r == {'ids': ['diamond', 'gridiron', 'ring', 'court', 'rink', 'links', 'lanes'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
-              'W_ENGINES has the diamond, the gridiron, the ring, the court, the rink, the links and the lanes: the diamond\'s view shows it, and another view hides it', r)
+        check(r == {'ids': ['diamond', 'gridiron', 'ring', 'court', 'rink', 'links', 'lanes', 'shed'], 'api': True, 'view': 'diamond', 'sport': 'baseball', 'shown': True, 'hidden': True},
+              'W_ENGINES has the diamond, the gridiron, the ring, the court, the rink, the links, the lanes and the shed: the diamond\'s view shows it, and another view hides it', r)
         rk = await pg.evaluate("({ api: W_ENGINES.rink.api === wHK, view: W_ENGINES.rink.view, sport: W_ENGINES.rink.sport })")
         check(rk == {'api': True, 'view': 'rink', 'sport': 'hockey'}, 'the rink is hockey, in the rink view', rk)
         ct = await pg.evaluate("({ api: W_ENGINES.court.api === wBK, view: W_ENGINES.court.view, sport: W_ENGINES.court.sport })")

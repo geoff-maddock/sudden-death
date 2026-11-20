@@ -3,13 +3,14 @@
    onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
    Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/), the Anvil Ring (wBX, boxing; src/bx/,
    issue #23), the Charter Court (wBK, basketball; src/bk/, issue #77) and Black Ice at the Pond Rink (wHK, hockey;
-   src/hk/, issue #83), Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play) and the
-   Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play). Nothing here is saved. */
+   src/hk/, issue #83), Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play), the
+   Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play) and the Curling Shed
+   (wCR, curling; src/cr/, issue #102: the rules so far, with no page, so never on). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' },
   rink: { api: wHK, view: 'rink', sport: 'hockey' }, links: { api: wGL, view: 'links', sport: 'golf' },
-  lanes: { api: wBL, view: 'lanes', sport: 'bowling' } };
+  lanes: { api: wBL, view: 'lanes', sport: 'bowling' }, shed: { api: wCR, view: 'shed', sport: 'curling' } };
 /* an engine's question (Concede?) holds the game still until it closes: askConfirm hears only its two buttons, so this
    runs fn once the box closes however it closes (a button, Escape, a click outside) */
 function wAfterAsk(fn) { const t = setInterval(() => { if (!$('modal').hidden) return; clearInterval(t); try { fn(); } catch (e) { console.error(e); } }, 100); }

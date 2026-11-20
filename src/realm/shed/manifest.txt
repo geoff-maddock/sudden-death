@@ -1,0 +1,3 @@
+# The Realm's shed scope: ./build.sh src/realm/manifest.txt takes this through `scope wCR ...`.
+# The engine's parts first (they don't touch the page); its page in the Realm comes with phase 2, as the lanes' did.
+include src/cr/manifest.txt
