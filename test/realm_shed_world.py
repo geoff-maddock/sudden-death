@@ -104,6 +104,16 @@ async def main():
         await pg.evaluate("(() => { const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); b.click(); })()")
         cd = await pg.evaluate("({ live: wShedLive(), last: WG.shg.games[0].r, text: WG.shg.games[0].text, view: UI.view })")
         check(cd == {'live': False, 'last': 'lose', 'text': 'conceded', 'view': 'world'}, 'Concede counts as a loss, and leaves the Shed', cd)
+        # a match played out to a win is a win (the page's summary, not Simulate's)
+        pw = await pg.evaluate("""(() => { wShg().met = {}; const g0 = RUN.gold, w0 = WG.shg.w; wStartShed({ club: 'local', how: 'play' }); wCR.pause(true);
+          const G = wCR.G, n = G.ends - 1; G.end = n; G.sc = [Array(n).fill(0), Array(n).fill(0)]; G.sc[0][0] = 5; G.k = 15; G.stones = [];
+          $('wShedModes').querySelector('[data-cmode="watch"]').click(); let i = 0; while (wShedLive() && i++ < 40000) wCR.tick(.05);
+          const r = { live: wShedLive(), last: WG.shg.games[0].r, wins: WG.shg.w - w0, gold: RUN.gold - g0 }; wLeaveShed(); return r; })()""")
+        check(pw['live'] is False and pw['last'] == 'win' and pw['wins'] == 1 and pw['gold'] > 0, 'a match played out to a win is settled as a win, with its gold', pw)
+        st = await pg.evaluate("""(() => { const style = st => { let t = 0; for (let i = 0; i < 6; i++) { wCR.start({ seed: 60 + i, ends: 2, mode: 'manage', teams: [__D(), __D()] }); wCR.pause(true); wCR.manage({ style: st });
+              let n = 0; while (!wCR.G.over && n++ < 40000) wCR.tick(.1); const S = wCR.G.st[0].shots; t += (S.takeout || 0) + (S.peel || 0) + (S.hitroll || 0); } return t; };
+          return { hit: style('hit'), draw: style('draw') }; })()""")
+        check(st['hit'] >= st['draw'] + 4, 'Manage\'s hitting game throws clearly more hits than the draw game', st)
         await pg.evaluate("wOpenCamp('shed')")
         await pg.wait_for_selector('#wCampBody .wshedfour')
         tb = await pg.evaluate("(() => { const b = $('wCampBody'); return { play: !!b.querySelector('[data-shplay]'), recent: /Last curling matches/.test(b.textContent) }; })()")

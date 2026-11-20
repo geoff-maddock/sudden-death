@@ -106,6 +106,7 @@ function wResumeShed() {
   const L = wShedLive() && WG.shg.live; if (!L) return;
   if (!L.snap) { wShedCallOff('The match had not reached its first stone, so it is called off.'); return; }
   WCR = { over: null, world: true };
+  W_SHED_MODE = L.snap.mode || W_SHED_MODE;
   wCR.resume(L.snap);
   $('wShedTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
   showView('shed');
@@ -164,7 +165,7 @@ wCR.onOver = s => {
   wShedBarNote();
 };
 function wShedSettle(sum) {
-  const B = wShg(), L = B.live, W = L.world, S0 = sum || {}, win = S0.win === 0;
+  const B = wShg(), L = B.live, W = L.world, S0 = sum || {}, win = (S0.win != null ? S0.win : S0.over ? S0.over.win : -1) === 0;
   B.live = null;
   const r = win ? 'win' : 'lose', tot = S0.tot || [0, 0], us = tot[0], them = tot[1], text = S0.text || (S0.over && S0.over.text) || `${us} to ${them}`;
   if (win) { B.w++; fire('matchWon', { engine: 'shed' }); } else B.l++;

@@ -95,11 +95,13 @@ function crThrowStone(s, plan, rel, sweep) {
 }
 function crSummary() {
   if (!G) return null;
-  return { over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
+  return { win: G.over ? G.over.win : -1, over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
     tot: [crTotal(0), crTotal(1)], log: G.log.slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
 }
 // the game as it stands between stones, plain JSON (a match saved and left); and back
-function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths : [] })); }
+// (each stone's path thinned to every fifth point, so a long game doesn't swell the save)
+const crThin = p => p.filter((_, i) => i % 5 === 0 || i === p.length - 1);
+function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
 function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
   crPlayStart({ mode: sn.mode });

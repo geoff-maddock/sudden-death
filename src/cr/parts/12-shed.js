@@ -17,8 +17,8 @@ function crShedAfter() {
   if (!G.hall || !G.stones.length || R() >= CR_HALL.sprite) return '';
   const st = G.stones[Math.floor(R() * G.stones.length)], a = R() * Math.PI * 2, d = CR_HALL.nudge[0] + R() * (CR_HALL.nudge[1] - CR_HALL.nudge[0]);
   const moved = { x: +(st.x + Math.cos(a) * d).toFixed(2), y: +(st.y + Math.sin(a) * d).toFixed(2) };
-  // (it won't push a stone off the sheet, or into another)
-  if (!crOnSheet(moved) || G.stones.some(o => o !== st && Math.hypot(o.x - moved.x, o.y - moved.y) < 2 * CR_SHEET.stoneR)) return '';
+  // (it won't push a stone off the sheet, or into another, or into or out of the house or the free guard zone)
+  if (!crOnSheet(moved) || crInFgz(moved) !== crInFgz(st) || crInHouse(moved) !== crInHouse(st) || G.stones.some(o => o !== st && Math.hypot(o.x - moved.x, o.y - moved.y) < 2 * CR_SHEET.stoneR)) return '';
   st.x = moved.x; st.y = moved.y;
   return `A frost sprite breathes on ${G.teams[st.s].short || G.teams[st.s].name}'s stone, and it creeps ${d.toFixed(1)} inches.`;
 }

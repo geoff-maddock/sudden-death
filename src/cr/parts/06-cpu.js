@@ -76,13 +76,15 @@ const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout'
 function crPlan(s, style) {
   const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
-  for (const c of list) c.val = crValue(crTry(s, c.aim), s, kAfter, G.hammer, sk) + (CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0);
+  // (the style's bonus goes on every value the pick is made by: the first look, the samples and the reply)
+  const sb = c => CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0;
+  for (const c of list) c.val = crValue(crTry(s, c.aim), s, kAfter, G.hammer, sk) + sb(c);
   list.sort((a, b) => b.val - a.val);
   // the best few, played a few times with the curler's own miss: the likeliest result wins
   const top = list.slice(0, S.top);
-  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
+  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples + sb(c); }
   // an Archmage plays its best few on against the other rink's likeliest reply (crReplyLikely), and weighs that in
-  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + w * CR_CALL.replyMix; } }
+  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + (w + sb(c)) * CR_CALL.replyMix; } }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });
 }

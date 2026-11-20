@@ -40007,13 +40007,15 @@ const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout'
 function crPlan(s, style) {
   const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
-  for (const c of list) c.val = crValue(crTry(s, c.aim), s, kAfter, G.hammer, sk) + (CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0);
+  // (the style's bonus goes on every value the pick is made by: the first look, the samples and the reply)
+  const sb = c => CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0;
+  for (const c of list) c.val = crValue(crTry(s, c.aim), s, kAfter, G.hammer, sk) + sb(c);
   list.sort((a, b) => b.val - a.val);
   // the best few, played a few times with the curler's own miss: the likeliest result wins
   const top = list.slice(0, S.top);
-  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
+  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples + sb(c); }
   // an Archmage plays its best few on against the other rink's likeliest reply (crReplyLikely), and weighs that in
-  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + w * CR_CALL.replyMix; } }
+  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + (w + sb(c)) * CR_CALL.replyMix; } }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });
 }
@@ -40129,11 +40131,13 @@ function crThrowStone(s, plan, rel, sweep) {
 }
 function crSummary() {
   if (!G) return null;
-  return { over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
+  return { win: G.over ? G.over.win : -1, over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
     tot: [crTotal(0), crTotal(1)], log: G.log.slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
 }
 // the game as it stands between stones, plain JSON (a match saved and left); and back
-function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths : [] })); }
+// (each stone's path thinned to every fifth point, so a long game doesn't swell the save)
+const crThin = p => p.filter((_, i) => i % 5 === 0 || i === p.length - 1);
+function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
 function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
   crPlayStart({ mode: sn.mode });
@@ -40687,8 +40691,8 @@ function crShedAfter() {
   if (!G.hall || !G.stones.length || R() >= CR_HALL.sprite) return '';
   const st = G.stones[Math.floor(R() * G.stones.length)], a = R() * Math.PI * 2, d = CR_HALL.nudge[0] + R() * (CR_HALL.nudge[1] - CR_HALL.nudge[0]);
   const moved = { x: +(st.x + Math.cos(a) * d).toFixed(2), y: +(st.y + Math.sin(a) * d).toFixed(2) };
-  // (it won't push a stone off the sheet, or into another)
-  if (!crOnSheet(moved) || G.stones.some(o => o !== st && Math.hypot(o.x - moved.x, o.y - moved.y) < 2 * CR_SHEET.stoneR)) return '';
+  // (it won't push a stone off the sheet, or into another, or into or out of the house or the free guard zone)
+  if (!crOnSheet(moved) || crInFgz(moved) !== crInFgz(st) || crInHouse(moved) !== crInHouse(st) || G.stones.some(o => o !== st && Math.hypot(o.x - moved.x, o.y - moved.y) < 2 * CR_SHEET.stoneR)) return '';
   st.x = moved.x; st.y = moved.y;
   return `A frost sprite breathes on ${G.teams[st.s].short || G.teams[st.s].name}'s stone, and it creeps ${d.toFixed(1)} inches.`;
 }
@@ -40876,7 +40880,7 @@ return {
   chart: (cv, s) => { if (!G || !G.teams || !cv) return false; const c = cv.getContext('2d'); crChart(c, s, cv.width, cv.height, GP ? GP.paths : []); return true; }, get paths() { return GP ? GP.paths.length : 0; },
   set onChart(f) { CR_HOOK.onChart = f; }, get onChart() { return CR_HOOK.onChart; },
   // games from the world (phase 5)
-  hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => crResume(sn), manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
+  hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
   show: () => crShow(), hide: () => crHide(), get on() { return CRP.on; }, render: dt => crRender(dt || 0),
   pause: on => { CRP.paused = !!on; }, get paused() { return CRP.paused; }, get speed() { return CRP.speed; }, set speed(n) { CRP.speed = clamp(Math.round(n) || 1, 1, 8); }
@@ -59033,6 +59037,7 @@ function wResumeShed() {
   const L = wShedLive() && WG.shg.live; if (!L) return;
   if (!L.snap) { wShedCallOff('The match had not reached its first stone, so it is called off.'); return; }
   WCR = { over: null, world: true };
+  W_SHED_MODE = L.snap.mode || W_SHED_MODE;
   wCR.resume(L.snap);
   $('wShedTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
   showView('shed');
@@ -59091,7 +59096,7 @@ wCR.onOver = s => {
   wShedBarNote();
 };
 function wShedSettle(sum) {
-  const B = wShg(), L = B.live, W = L.world, S0 = sum || {}, win = S0.win === 0;
+  const B = wShg(), L = B.live, W = L.world, S0 = sum || {}, win = (S0.win != null ? S0.win : S0.over ? S0.over.win : -1) === 0;
   B.live = null;
   const r = win ? 'win' : 'lose', tot = S0.tot || [0, 0], us = tot[0], them = tot[1], text = S0.text || (S0.over && S0.over.text) || `${us} to ${them}`;
   if (win) { B.w++; fire('matchWon', { engine: 'shed' }); } else B.l++;
