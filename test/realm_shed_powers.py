@@ -138,16 +138,20 @@ async def main():
         r2 = await pg.evaluate("""(() => { wShedGame({ seed: 12, mode: 'watch', hammer: 1 }); wCR.pause(true); const G = wCR.G, you = wCR.view.you; let n = 0;
           while (!(wCR.phase === 'addr' && wCR.view.up === you) && n++ < 40000) wCR.tick(.05); const m0 = G.mana[you]; G.mana[you] = 6; wCR.cast(you, 'pow'); wCR.setMode('play'); __to('aim');
           const watchBack = G.mana[you] === m0 && G.powStone[you] !== G.n;
+          G.stones = [{ id: '1:0', s: 1, x: 3, y: 6 }]; wCR.select({ suggest: true });
           const sh = wCR.view.sel.shot, other = ['takeout', 'peel', 'hitroll'].includes(sh) ? 'draw' : 'hit'; G.powStone[you] = G.n; G.powWhich[you] = other;
-          const sg = wCR.select({ suggest: true }), held = !!sg && wCR.view.sel.shot === sh; G.powStone[you] = -1; G.powWhich[you] = null;
+          const sg = wCR.select({ suggest: true }), now = wCR.view.sel.shot, held = sg === '' && (['takeout', 'peel', 'hitroll'].includes(now) ? 'hit' : 'draw') === other; G.powStone[you] = -1; G.powWhich[you] = null;
+          G.fx[you] = { err: 1.3 }; const capped = wCR.yourWt(wCR.playRules.meter.high) === wCR.playRules.meter.high; G.fx[you] = null;
           const sn = wCR.snapshot(); delete sn.G.powWhich; wCR.resume(sn); wCR.pause(true); __to('aim'); G.mana[you] = 6;
-          const old = wCR.cast(wCR.view.you, 'pow'); W_SHED_MODE = 'play'; return { watchBack, held, old }; })()""")
+          const old = wCR.cast(wCR.view.you, 'pow'); W_SHED_MODE = 'play'; return { watchBack, held, old, capped }; })()""")
         check(r2['watchBack'], 'casts for your side on a stone you take back from Watch are undone too', r2)
-        check(r2['held'], 'the skip\'s call keeps to the kind of a power cast for the stone', r2)
+        check(r2['held'], 'the skip\'s call keeps to the kind of a power cast for the stone (it suggests one of that kind)', r2)
+        check(r2['capped'], 'a curse on your weight stays within the meter, on the keys as on a phone', r2)
         check(r2['old'] == '', 'a match saved before the shot lock resumes, and its powers still cast', r2)
         cs = await pg.evaluate(f"""(() => {{ wCR.start({{ seed: 13, hammer: 1, powers: true, teams: [__team({B}), __team({A})] }}); const G = wCR.G, g = __ri(0, 'gorgon');
-          G.callNow = {{ s: 0, shot: 'takeout' }}; const r = wCR.cast(0, 'pow', g); G.callNow = null; return {{ r, which: G.powWhich[0], curse: wCR.fxFor(1).stiff }}; }})()""")
-        check(cs['r'] == '' and cs['which'] is None and cs['curse'] < 1, 'a curse cast lands on them and leaves your own shot free', cs)
+          G.powWhich[0] = 'draw'; /* (left from an earlier stone) */ G.callNow = {{ s: 0, shot: 'takeout' }}; const r = wCR.cast(0, 'pow', g); G.callNow = null; const which = G.powWhich[0];
+          const stiff = wCR.fxFor(1).stiff; G.powWhich[0] = 'draw'; const ev = wCR.turn(), cleared = ev.rule.ok && G.powWhich[0] === null; return {{ r, which, curse: stiff, cleared }}; }})()""")
+        check(cs['r'] == '' and cs['which'] is None and cs['curse'] < 1 and cs['cleared'], 'a curse cast lands on them and leaves your own shot free, whatever an earlier stone cast', cs)
         wt = await pg.evaluate("""(() => { wShedGame({ seed: 11, mode: 'play', hammer: 1 }); wCR.pause(true); __to('aim'); const G = wCR.G, you = wCR.view.you; const w0 = wCR.yourWt(1.1);
           G.fx[you] = { wt: .7 }; const w1 = wCR.yourWt(1.1); G.fx[you] = null; W_SHED_MODE = 'play'; return [w0, +w1.toFixed(3)]; })()""")
         check(abs(wt[0] - 1.1) < 1e-9 and abs(wt[1] - 1.07) < 1e-6, 'a weight power makes your own meter\'s weight truer', wt)

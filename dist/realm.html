@@ -40015,8 +40015,9 @@ function crTry(s, aim) {
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
 // style: your rink's game under Manage ('draw' or 'hit': a little more for those shots), or none
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
-function crPlan(s, style) {
-  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
+// only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
+function crPlan(s, style, only) {
+  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only), list = only && kind.length ? kind : all;
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
   // (the style's bonus goes on every value the pick is made by: the first look, the samples and the reply)
   const sb = c => CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0;
@@ -40122,7 +40123,8 @@ function crThrowFinish(X) {
   // (a stone refused here gives back the legs its sweeping spent: nothing changed)
   const why = crWhyNot(X.s); if (why) { G.legs = X.legs0; return crRefused(X.s, why); }
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
-  // (a gust as the stone settles pushes their stone nearest the button back, before the rules look)
+  // (a gust as the stones settle pushes their stone nearest the button back, before the rules look; it moves the run's
+  // own copies, so a stone the rules refuse, or the free guard zone undoes, leaves G.stones as it was)
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
@@ -40231,7 +40233,9 @@ function crSelAim(S) {
 // your skip's suggestion for your stone (the call a Knight would make)
 function crSuggest(s) {
   const keep = G.skill[s]; G.skill[s] = 1; let P;
-  try { P = crPlan(s); } finally { G.skill[s] = keep; }
+  // (keeping to the kind of a power cast for this stone)
+  const only = G.powers && G.powStone && G.powStone[s] === G.n && G.powWhich && G.powWhich[s] || null;
+  try { P = crPlan(s, null, only); } finally { G.skill[s] = keep; }
   return { shot: P.shot, x: P.x, y: P.y, h: P.h, target: P.target || null, roll: P.roll || 0, why: P.why, reason: P.reason || '' };
 }
 // your skip's call, aimed; one that won't solve on the ice falls back to a draw to the top of the house
@@ -40246,7 +40250,7 @@ function crSelect(o) {
   if (o.suggest) {
     // (the skip's call keeps to the kind of a power cast for this stone)
     const keep = GP.sel; crSelReset();
-    if (crShotLocked(GP.sel.shot)) { GP.sel = keep; return crLockSay(); }
+    if (crShotLocked(GP.sel.shot)) { GP.sel = keep; return `${crLockSay()} Your skip can't find one of those.`; }
     crPick(); return ''; }
   const S = Object.assign({}, GP.sel);
   // (a power cast for this stone was a draw power or a hit power: the shot keeps to that kind)
@@ -40304,12 +40308,12 @@ function crRelease(p) {
 const crShotLocked = shot => !!(G.powers && G.powStone[GP.you] === G.n && G.powWhich && G.powWhich[GP.you] && (CR_HIT.includes(shot) ? 'hit' : 'draw') !== G.powWhich[GP.you]);
 const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
-function crYourWt(p) { const f = crFxFor(GP.you); return 1 + (p - 1) * f.err * f.wt; }
+function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter; return clamp(1 + (p - 1) * f.err * f.wt, K.low, K.high); }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * clamp(crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), h: GP.sel.h }, null);
   return true;
 }
 
@@ -40404,7 +40408,7 @@ function crManage(o) { if (!GP) return false; if (['auto', 'draw', 'hit'].includ
 const crPageBusy = () => !!GP && (GP.ph === 'slide' || (['aim', 'swing', 'addr'].includes(GP.ph) && typeof CRP !== 'undefined' && CRP.on));
 // a stone thrown from outside while the page had one called (hidden, so not holding the game): the page's call is
 // for a house that isn't there any more, so it lets it go and starts on whose stone it is now
-function crPageStale() { if (GP && ['aim', 'swing', 'addr'].includes(GP.ph)) { GP.cpu = null; GP.sel = null; GP.meter = null; crGo('next'); } }
+function crPageStale() { if (GP && ['aim', 'swing', 'addr'].includes(GP.ph)) { if (GP.cpu && GP.cpu.pre && GP.cpu.s === GP.you) crPowLoad(GP.cpu.pre); GP.cpu = null; GP.sel = null; GP.meter = null; crGo('next'); } }
 // what the page needs, as a copy
 function crView() {
   if (!GP) return null;
@@ -40917,6 +40921,7 @@ function crCast(s, k, ri) {
   const name = (G.teams[s].roster[r] || {}).n || 'Someone', rec = (id, n) => G.casts.push({ side: s, k, id, n, ri: r, end: G.end + 1, stone: G.n });
   if (k === 'pow') {
     const P = crPowNow(s, r); G.mana[s] -= P.cost; G.powStone[s] = G.n;
+    G.powWhich[s] = null;
     if (P.curse) G.curse[1 - s] = Object.assign({}, P.curse, { by: P.n });
     else if (P.now && P.now.drain) { const d = Math.min(G.roar[1 - s], P.now.drain); G.roar[1 - s] -= d; G.roar[s] = Math.min(CR_ROAR.max, G.roar[s] + d); }
     // (only a power on your own stone holds the shot to its kind)
@@ -40935,7 +40940,9 @@ function crCast(s, k, ri) {
 // the powers' state, to put back (your captain's casts on a stone you take back to throw yourself)
 const CR_POW_KEYS = ['mana', 'roar', 'fx', 'curse', 'mark', 'ultUsed', 'sitUsed', 'sitOn', 'steadyOn', 'casts', 'powStone', 'powWhich'];
 function crPowSave() { return JSON.parse(JSON.stringify(Object.fromEntries(CR_POW_KEYS.map(k => [k, G[k]])))); }
-function crPowLoad(P) { for (const k of CR_POW_KEYS) if (P[k] !== undefined) G[k] = JSON.parse(JSON.stringify(P[k])); }
+// (a key missing from an older save takes its starting value)
+const CR_POW_START = { powWhich: [null, null], powStone: [-1, -1], casts: [], sitOn: [null, null], steadyOn: [false, false] };
+function crPowLoad(P) { for (const k of CR_POW_KEYS) if (P[k] !== undefined) G[k] = JSON.parse(JSON.stringify(P[k])); else if (CR_POW_START[k]) G[k] = JSON.parse(JSON.stringify(CR_POW_START[k])); }
 // what side s's next stone has: its power, the end's mark, a curse on it, a situation power, the roar's steadying
 function crFxFor(s) {
   const f = Object.assign({}, CR_FX0);
@@ -40958,7 +40965,7 @@ function crGust(s, stones, f) {
 // after side s's stone: what it spent goes; the mana and the roar it earned come in; the mark ends with its end
 function crPowersAfter(s, ev, endNo, ham) {
   if (!G.powers) return;
-  G.fx[s] = null; G.curse[s] = null; G.steadyOn[s] = false; G.sitOn[s] = null;
+  G.fx[s] = null; G.curse[s] = null; G.steadyOn[s] = false; G.sitOn[s] = null; if (G.powWhich) G.powWhich[s] = null;
   const mana = (k, n) => { G.mana[k] = Math.min(CR_MANA.max, G.mana[k] + n); }, roar = (k, n) => { G.roar[k] = Math.min(CR_ROAR.max, G.roar[k] + n); };
   if (ev.made) { mana(s, CR_MANA.made); roar(s, CR_ROAR.made); }
   if ((ev.out || []).filter(id => id !== 'new' && !String(id).startsWith(s + ':')).length >= 2) roar(s, CR_ROAR.double);

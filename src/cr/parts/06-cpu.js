@@ -73,8 +73,9 @@ function crTry(s, aim) {
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
 // style: your rink's game under Manage ('draw' or 'hit': a little more for those shots), or none
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
-function crPlan(s, style) {
-  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
+// only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
+function crPlan(s, style, only) {
+  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only), list = only && kind.length ? kind : all;
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
   // (the style's bonus goes on every value the pick is made by: the first look, the samples and the reply)
   const sb = c => CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0;

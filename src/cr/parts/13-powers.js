@@ -161,6 +161,7 @@ function crCast(s, k, ri) {
   const name = (G.teams[s].roster[r] || {}).n || 'Someone', rec = (id, n) => G.casts.push({ side: s, k, id, n, ri: r, end: G.end + 1, stone: G.n });
   if (k === 'pow') {
     const P = crPowNow(s, r); G.mana[s] -= P.cost; G.powStone[s] = G.n;
+    G.powWhich[s] = null;
     if (P.curse) G.curse[1 - s] = Object.assign({}, P.curse, { by: P.n });
     else if (P.now && P.now.drain) { const d = Math.min(G.roar[1 - s], P.now.drain); G.roar[1 - s] -= d; G.roar[s] = Math.min(CR_ROAR.max, G.roar[s] + d); }
     // (only a power on your own stone holds the shot to its kind)
@@ -179,7 +180,9 @@ function crCast(s, k, ri) {
 // the powers' state, to put back (your captain's casts on a stone you take back to throw yourself)
 const CR_POW_KEYS = ['mana', 'roar', 'fx', 'curse', 'mark', 'ultUsed', 'sitUsed', 'sitOn', 'steadyOn', 'casts', 'powStone', 'powWhich'];
 function crPowSave() { return JSON.parse(JSON.stringify(Object.fromEntries(CR_POW_KEYS.map(k => [k, G[k]])))); }
-function crPowLoad(P) { for (const k of CR_POW_KEYS) if (P[k] !== undefined) G[k] = JSON.parse(JSON.stringify(P[k])); }
+// (a key missing from an older save takes its starting value)
+const CR_POW_START = { powWhich: [null, null], powStone: [-1, -1], casts: [], sitOn: [null, null], steadyOn: [false, false] };
+function crPowLoad(P) { for (const k of CR_POW_KEYS) if (P[k] !== undefined) G[k] = JSON.parse(JSON.stringify(P[k])); else if (CR_POW_START[k]) G[k] = JSON.parse(JSON.stringify(CR_POW_START[k])); }
 // what side s's next stone has: its power, the end's mark, a curse on it, a situation power, the roar's steadying
 function crFxFor(s) {
   const f = Object.assign({}, CR_FX0);
@@ -202,7 +205,7 @@ function crGust(s, stones, f) {
 // after side s's stone: what it spent goes; the mana and the roar it earned come in; the mark ends with its end
 function crPowersAfter(s, ev, endNo, ham) {
   if (!G.powers) return;
-  G.fx[s] = null; G.curse[s] = null; G.steadyOn[s] = false; G.sitOn[s] = null;
+  G.fx[s] = null; G.curse[s] = null; G.steadyOn[s] = false; G.sitOn[s] = null; if (G.powWhich) G.powWhich[s] = null;
   const mana = (k, n) => { G.mana[k] = Math.min(CR_MANA.max, G.mana[k] + n); }, roar = (k, n) => { G.roar[k] = Math.min(CR_ROAR.max, G.roar[k] + n); };
   if (ev.made) { mana(s, CR_MANA.made); roar(s, CR_ROAR.made); }
   if ((ev.out || []).filter(id => id !== 'new' && !String(id).startsWith(s + ':')).length >= 2) roar(s, CR_ROAR.double);

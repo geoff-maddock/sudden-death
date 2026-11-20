@@ -47,7 +47,9 @@ function crSelAim(S) {
 // your skip's suggestion for your stone (the call a Knight would make)
 function crSuggest(s) {
   const keep = G.skill[s]; G.skill[s] = 1; let P;
-  try { P = crPlan(s); } finally { G.skill[s] = keep; }
+  // (keeping to the kind of a power cast for this stone)
+  const only = G.powers && G.powStone && G.powStone[s] === G.n && G.powWhich && G.powWhich[s] || null;
+  try { P = crPlan(s, null, only); } finally { G.skill[s] = keep; }
   return { shot: P.shot, x: P.x, y: P.y, h: P.h, target: P.target || null, roll: P.roll || 0, why: P.why, reason: P.reason || '' };
 }
 // your skip's call, aimed; one that won't solve on the ice falls back to a draw to the top of the house
@@ -62,7 +64,7 @@ function crSelect(o) {
   if (o.suggest) {
     // (the skip's call keeps to the kind of a power cast for this stone)
     const keep = GP.sel; crSelReset();
-    if (crShotLocked(GP.sel.shot)) { GP.sel = keep; return crLockSay(); }
+    if (crShotLocked(GP.sel.shot)) { GP.sel = keep; return `${crLockSay()} Your skip can't find one of those.`; }
     crPick(); return ''; }
   const S = Object.assign({}, GP.sel);
   // (a power cast for this stone was a draw power or a hit power: the shot keeps to that kind)
@@ -120,12 +122,12 @@ function crRelease(p) {
 const crShotLocked = shot => !!(G.powers && G.powStone[GP.you] === G.n && G.powWhich && G.powWhich[GP.you] && (CR_HIT.includes(shot) ? 'hit' : 'draw') !== G.powWhich[GP.you]);
 const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
-function crYourWt(p) { const f = crFxFor(GP.you); return 1 + (p - 1) * f.err * f.wt; }
+function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter; return clamp(1 + (p - 1) * f.err * f.wt, K.low, K.high); }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * clamp(crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), h: GP.sel.h }, null);
   return true;
 }
 
@@ -220,7 +222,7 @@ function crManage(o) { if (!GP) return false; if (['auto', 'draw', 'hit'].includ
 const crPageBusy = () => !!GP && (GP.ph === 'slide' || (['aim', 'swing', 'addr'].includes(GP.ph) && typeof CRP !== 'undefined' && CRP.on));
 // a stone thrown from outside while the page had one called (hidden, so not holding the game): the page's call is
 // for a house that isn't there any more, so it lets it go and starts on whose stone it is now
-function crPageStale() { if (GP && ['aim', 'swing', 'addr'].includes(GP.ph)) { GP.cpu = null; GP.sel = null; GP.meter = null; crGo('next'); } }
+function crPageStale() { if (GP && ['aim', 'swing', 'addr'].includes(GP.ph)) { if (GP.cpu && GP.cpu.pre && GP.cpu.s === GP.you) crPowLoad(GP.cpu.pre); GP.cpu = null; GP.sel = null; GP.meter = null; crGo('next'); } }
 // what the page needs, as a copy
 function crView() {
   if (!GP) return null;

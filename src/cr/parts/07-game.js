@@ -75,7 +75,8 @@ function crThrowFinish(X) {
   // (a stone refused here gives back the legs its sweeping spent: nothing changed)
   const why = crWhyNot(X.s); if (why) { G.legs = X.legs0; return crRefused(X.s, why); }
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
-  // (a gust as the stone settles pushes their stone nearest the button back, before the rules look)
+  // (a gust as the stones settle pushes their stone nearest the button back, before the rules look; it moves the run's
+  // own copies, so a stone the rules refuse, or the free guard zone undoes, leaves G.stones as it was)
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
