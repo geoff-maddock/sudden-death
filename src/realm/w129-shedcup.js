@@ -35,7 +35,7 @@ const W_SHED_CUP = { gear: ['cr_broom', 'cr_slider', 'cr_gripper', 'cr_charm', '
 const W_CRFIX = { g: 'g_shed', tier: 2 };
 W_BRACKETS.crcup = { K: W_BROOM, name: 'Brass Broom', me: 'your four', store: 'games', view: 'shed', verb: 'held', busy: 'Finish the curling match you started first.',
   live: () => wShedLive(), base: () => wShedProblems(), sim: (a, b, tier) => wBroomSim(a, b, tier), won: () => wBroomWon(),
-  mark: g => g.end === 'xe' ? '†' : '', hint: 'The scores are points. † Settled in an extra end.' };
+  mark: g => g.end === 'xe' ? '†' : g.end === 'c' ? '‡' : '', hint: 'The scores are points. † Settled in an extra end. ‡ Conceded (the score when it was given up).' };
 function wBroom() { return wBrk('crcup'); }
 function wBroomOn() { return wBrkOn('crcup'); }
 function wBroomName(id) { return wBrkName('crcup', id); }
@@ -56,7 +56,9 @@ W_ON_END.crcup = function (r, ref, W) {
   const forced = W_BROOM.force; W_BROOM.force = null;
   const win = (forced || r) === 'win', end = forced ? '' : ((WG.shg.games[0] || {}).end) || '', rd = W_BROOM.rounds[D.round];
   const how = W.text && W.text !== 'conceded' ? ` ${W.text}` : W.text === 'conceded' ? ', conceded' : '';
-  const row = { a: 'me', b: W.club, ra: W.us, rb: W.them, w: win ? 'me' : W.club, end };
+  // (a forced result's score is turned round to fit it, for the tests and the bot; a concede is marked)
+  let ra = W.us, rb = W.them; if (forced && (win ? ra <= rb : rb <= ra)) { [ra, rb] = ra === rb ? (win ? [ra + 1, rb] : [ra, rb + 1]) : [rb, ra]; }
+  const row = { a: 'me', b: W.club, ra, rb, w: win ? 'me' : W.club, end: W.text === 'conceded' && !forced ? 'c' : end };
   D.games[D.round].push(row);
   if (!win) D.out = true;
   D.pending = true;
@@ -69,7 +71,9 @@ function wShedSimClubs(a, b, tier) {
   const B = wShg(), kept = JSON.parse(JSON.stringify(B.opp)), teams = [wShedOpp(a, tier), wShedOpp(b, tier)];
   B.opp = kept;
   const sk = wShedSkillOf(tier)[1], s = wCR.simGame({ teams, skill: [sk, sk], ends: wShedEnds(), cold: wShedColdNow(), hall: true, powers: true, seed: (Math.random() * 1e9) | 0 });
-  const t = s.tot || [0, 0];
+  const t = (s.tot || [0, 0]).slice();
+  // (a game still level when the engine stops is settled as an extra end would be: one more for the side it falls to)
+  if (s.win !== 0 && s.win !== 1) { const k = Math.random() < .5 ? 0 : 1; t[k]++; return { ra: t[0], rb: t[1], w: k === 0 ? a : b, end: 'xe' }; }
   return { ra: t[0], rb: t[1], w: s.win === 0 ? a : b, end: s.extra ? 'xe' : '' };
 }
 function wBroomSim(a, b, tier) { const s = wShedSimClubs(a, b, tier); return { a, b, ra: s.ra, rb: s.rb, w: s.w, end: s.end }; }
@@ -94,7 +98,7 @@ function wOpenBroom(msg) {
   wBroomCatchUp();
   if (WG.cardOffer) { if ($('modal').hidden) wShowCardOffer(); return; }
   if (WG.crcup) WG.crcup.show = false;
-  const D = wBroom(), on = wBroomOn(), probs = wBroomProblems(), opp = on && wBroomMine(), live = wBroomLive();
+  const D = wBroom(), on = wBroomOn(), live = wBroomLive(), probs = wBroomProblems().concat(on && wShedLive() && !live ? [W_BRACKETS.crcup.busy] : []), opp = on && wBroomMine();
   let body;
   if (!on) {
     body = `<p>Eight rinks, three rounds, one game each. Rival clubs and the regions' own sides enter. A weaker rink in the quarter-final, then rinks at your own level, and they bring their bags. Curl your own games (Play, Manage or Simulate); the rest of each round plays out on the ice once yours is done. Nobody goes home level: an extra end.</p>
@@ -141,7 +145,7 @@ W_ON_END.crfix = function (r, ref, W) {
   if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r, { us: W.us, them: W.them, sport: 'curling' }); }
   if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
   const res = r === 'win' ? { a: 'me', b: club, sa: W.us, sb: W.them } : { a: club, b: 'me', sa: W.them, sb: W.us };
-  L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'curling', g: ref.g }));
+  L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'curling', g: ref.g }, W.text === 'conceded' ? { cd: 1 } : {}));
   L.results.length = Math.min(L.results.length, W_LEAGUE.keep);
   if (r === 'win') {
     RUN.fans = (RUN.fans || 0) + W_FIX.fans;

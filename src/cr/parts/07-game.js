@@ -133,11 +133,12 @@ function crResume(sn) {
 }
 // a whole game headless: leaves the game on the ice, and the random stream, as they were
 function crSimGame(opts) {
-  const keep = G, keepB = GB, keepR = engRand;
+  // (the page's game is set aside too, so a stone it has called never weighs in on this one)
+  const keep = G, keepB = GB, keepR = engRand, keepP = GP, keepL = CR_LIVE; GP = null; CR_LIVE = null;
   if (!opts || opts.seed == null) engRand = engRng((Math.random() * 4294967296) >>> 0);
   try {
     crStart(opts);
     let n = 0; while (!G.over && n++ < 400) crTurn();
     return Object.assign({ win: G.over ? G.over.win : -1 }, crSummary());
-  } finally { G = keep; GB = keepB; engRand = keepR; }
+  } finally { G = keep; GB = keepB; engRand = keepR; GP = keepP; CR_LIVE = keepL; }
 }

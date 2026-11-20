@@ -60,7 +60,7 @@ async def main():
         await pg.wait_for_selector('#wShedOk'); await pg.click('#wShedOk')
         check(await pg.evaluate(UNTIL_BRACKET), 'after the Final card, the bracket shows')
         D = await pg.evaluate(CUP); qf = D['games'][0]
-        check(D['round'] == 1 and not D['pending'] and len(qf) == 4 and qf[0]['w'] == 'me', 'the quarter-final: yours settles, and the rest of the round is played out', qf)
+        check(D['round'] == 1 and not D['pending'] and len(qf) == 4 and qf[0]['w'] == 'me' and qf[0]['ra'] > qf[0]['rb'], 'the quarter-final: yours settles, and the rest of the round is played out', qf)
         fair = await pg.evaluate(f"WG.crcup.games[0].slice(1).every({FAIR})")
         check(fair, 'no game ends level: every one has a winner, by points (an extra end if need be)', qf[1:])
 
@@ -96,11 +96,18 @@ async def main():
         check('once a week' in await pg.evaluate("wBroomEnter()"), 'the next cup is next week')
 
         await pg.evaluate("WG.dayAbs += 7; WG.day += 7; WG.shg.met = {}")
-        await pg.evaluate("wBroomEnter(); W_BROOM.force = 'lose'; wBroomPlay('sim')")
+        busy = await pg.evaluate("""(() => { wBroomEnter(); WG.shg.live = { world: { kind: 'shgame', club: 'local', tier: 1, how: 'play', ids: [], day: WG.dayAbs }, snap: { G: {} } }; wOpenBroom();
+          const dis = [...document.querySelectorAll('#modalBox [data-broomhow]')].every(b => b.disabled), say = document.getElementById('modalBox').textContent.includes('Finish the curling match');
+          WG.shg.live = null; return { dis, say }; })()""")
+        check(busy == {'dis': True, 'say': True}, 'with another curling match waiting, the cup card says so and its buttons wait', busy)
+        await pg.evaluate(CLOSE_ALL)
+        await pg.evaluate("(() => { wBroomPlay('play'); wCR.pause(true); $('wShedGive').click(); const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); b.click(); })()")
+        await pg.evaluate("$('wShedBack').click()")
         await pg.evaluate(CLOSE_ALL); await pg.evaluate("wDrain()")
         await pg.wait_for_function("WG.crcup.done", timeout=60000)
         D = await pg.evaluate(CUP)
         check(D['out'] and D['done'] and D['champ'] != 'me' and len(D['games'][2]) == 1 and len(D['games'][1]) == 2, 'lose, and the rest of the bracket is played to a champion', D)
+        check(D['games'][0][0]['end'] == 'c' and D['games'][0][0]['w'] != 'me', 'a conceded game is marked in the bracket', D['games'][0][0])
         await pg.evaluate(CLOSE_ALL)
 
         # ---------- league fixtures at the Curling Shed ----------
