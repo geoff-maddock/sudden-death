@@ -5446,7 +5446,7 @@ function startDrag(ev, el, i) {
   const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform, acts0 = UI.acts || 0, kb0 = UI.kbTarget, hv0 = UI.hover; let moved = false;
   // (only this pointer drives this drag: a second finger is its own)
   const pid = ev.pointerId, mine = e => e.pointerId == null || pid == null || e.pointerId === pid;
-  let held = !!ev.buttons;
+  let held = !!ev.buttons, dragKb;
   const mv = e => {
     if (!mine(e)) return;
     // (a mouse or pen let go where the page never heard it, outside the window or the frame: a move with no button held,
@@ -5461,7 +5461,7 @@ function startDrag(ev, el, i) {
     el.style.transform = `translate(${dx}px, ${dy}px) scale(1.06)`;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
-    if (h) { UI.hover = h.e; UI.kbTarget = h.e; }
+    if (h) { UI.hover = h.e; UI.kbTarget = h.e; dragKb = h.e; }
     updatePreview();
   };
   // (the drag over: its listeners off, the card back, and the click that follows the drop ignored (UI.dragged): the
@@ -5470,7 +5470,14 @@ function startDrag(ev, el, i) {
   // (the card back, nothing played; the target as it was before the drag)
   // (the target back as it was and the pick let go, unless another pick (another finger's, a key's) has taken over: then
   // that one's target and pick are left alone)
-  const drop = () => { if (!B || UI.view !== 'fight' || (UI.sel !== i && UI.sel !== -1)) return; UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; UI.sel = -1; renderHand(); };
+  const drop = () => {
+    if (!B || UI.view !== 'fight') return;
+    const other = UI.sel !== i && UI.sel !== -1;
+    // (the target and hover back, but only where the drag itself set them: another pick's own choice stays)
+    if (!other || UI.kbTarget === dragKb) UI.kbTarget = kb0 && !kb0.dead ? kb0 : (other ? UI.kbTarget : null);
+    if (!other || UI.hover === dragKb) UI.hover = hv0 && !hv0.dead ? hv0 : null;
+    if (other) return; UI.sel = -1; renderHand();
+  };
   const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; off(); if (moved) drop(); };
   const up = e => {
     if (!mine(e)) return;
@@ -61678,12 +61685,13 @@ renderHelp = function () {
    - The kennel at camp holds every pet you own, up to W_PET.kennel. One is at your side (WG.pets.side): it goes into
      every card match (RUN.pet, kept in step by wPetSync), and follows your team on the world map. Change it between
      matches, never during one (wPetBusy).
-   - A new pet (wPetAdd: an egg hatched, a pet bought) goes into the kennel; a full kennel asks which one to let go,
-     which can be the new one.
+   - A new pet (wPetAdd: an egg hatched, a pet bought) goes into the kennel. At a full kennel it waits where it came
+     from at once (never lost) and you're asked which one to let go, which can be the new one: one question at a time,
+     once no window or conversation is open.
    - Letting a pet go (wPetLetGo) sends it back to where it came from (its from: a shop, a keeper or a hatching place),
      where it waits (WG.petAway) and can be had back later (the places add the way, phases 3 and 4: wPetReclaim).
-   - Upkeep: every week, as it turns, each pet you own costs W_PET.upkeep[rarity] gold. What you can't pay leaves
-     pets hungry, the longest at home first: a hungry pet's numbers are halved and its bond doesn't grow until it is
+   - Upkeep: every week, as it turns, each pet you own costs W_PET.upkeep[rarity] gold, the newest paid first. One you
+     can't pay goes hungry (so the longest at home are the likeliest to): a hungry pet's numbers are halved and its bond doesn't grow until it is
      fed (wPetFeed: its week's upkeep, or a treat, phase 5) or its next week is paid. A pet is never lost to hunger.
    - The Pets tab on the Team screen: the kennel, the one at your side, each pet's trait, powers, trick and bond;
      set the one at your side, rename one, feed one, let one go; the week's upkeep and when it is due.
@@ -61709,9 +61717,9 @@ const wPetSideOf = () => { const P = wPets(); return P.side != null ? wPetOf(P.s
 const wPetBusy = () => !!(B && !B.over && UI.view === 'fight');
 // RUN.pet, what the card battle reads: the one at your side, as plain data
 function wPetSync() { if (!RUN || !WG) return; const p = wPetSideOf(); RUN.pet = p ? { kind: p.kind, name: p.name, bond: p.bond || 1, hungry: !!p.hungry } : null; }
-// a new pet into the kennel (kind, where it came from). Returns the pet, or null for an unknown kind. A full kennel:
-// the pet waits where it came from at once (WG.petAway, so it is never lost, a reload or a closed question and all),
-// and you're asked which one goes (wPetFull, one question at a time); wPetOf(q.id) says whether it came in
+// a new pet into the kennel (kind, where it came from). Returns the pet if it came in, else null: an unknown kind, or a
+// full kennel, where the pet waits where it came from at once (WG.petAway, so it is never lost, a reload or a closed
+// question and all) and you're asked which one goes (wPetFull, one question at a time; never in LAB)
 const W_PET_ASK = [];
 function wPetAdd(kind, from, o) {
   if (!PETS[kind]) return null;
@@ -61719,8 +61727,8 @@ function wPetAdd(kind, from, o) {
   q.id = P.seq++;
   if (P.owned.length >= W_PET.kennel) {
     const a = wPetAway(q); wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
-    if (!LAB) { W_PET_ASK.push({ q, a }); wPetAskNext(); }
-    return q;
+    if (!LAB) { W_PET_ASK.push({ q, a }); wPetAskSoon(); }
+    return null;
   }
   P.owned.push(q);
   if (P.side == null) P.side = q.id;
@@ -61729,16 +61737,19 @@ function wPetAdd(kind, from, o) {
   wSave();
   return q;
 }
-// the next full-kennel question, once no other window is open (else as the next one closes: wDrain)
+// the next full-kennel question, on a later tick (a window closing often opens another straight after), once no window
+// or conversation is open and you're on the map; till then it looks again now and then
+function wPetAskSoon() { if (W_PET_ASK.length && !W_PET_ASK.t) W_PET_ASK.t = setTimeout(() => { W_PET_ASK.t = 0; wPetAskNext(); }, 250); }
 function wPetAskNext() {
-  if (!W_PET_ASK.length || !$('modal').hidden || UI.view !== 'world') return;
+  if (!W_PET_ASK.length || !WG) return;
+  if (!$('modal').hidden || UI.view !== 'world' || WUI.talk) return wPetAskSoon();
   const { q, a } = W_PET_ASK.shift();
   // (still waiting, and the kennel still full: ask; else it stays where it waits, to be reclaimed)
   if (!WG.petAway.includes(a) || wPets().owned.length < W_PET.kennel) return wPetAskNext();
   wPetFull(q, a);
 }
 const wW132Drain = wDrain;
-wDrain = function () { wW132Drain.apply(this, arguments); if (W_PET_ASK.length) wPetAskNext(); };
+wDrain = function () { wW132Drain.apply(this, arguments); if (W_PET_ASK.length) wPetAskSoon(); };
 // a full kennel: which one goes (the new one too: it already waits where it came from, a)
 function wPetFull(q, a) {
   const P = wPets(), all = P.owned.concat([q]);
@@ -61759,7 +61770,7 @@ function wPetFull(q, a) {
   });
 }
 // (as it was: its name, bond, hunger and the day it came, all back when reclaimed)
-function wPetAway(q) { wPets(); const a = { kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '', hungry: !!q.hungry, got: q.got || 0 }; WG.petAway.push(a); return a; }
+function wPetAway(q) { wPets(); const a = { kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '', hungry: !!q.hungry, got: q.got != null ? q.got : null }; WG.petAway.push(a); return a; }
 // let one go: it goes back where it came from, and waits there
 function wPetLetGo(id) {
   const P = wPets(), q = wPetOf(id); if (!q) return 'No such pet.';
@@ -61775,7 +61786,7 @@ function wPetReclaim(i) {
   const A = wPets() && WG.petAway, a = A[i]; if (!a) return 'Nobody waits there.';
   if (wPets().owned.length >= W_PET.kennel) return `Your kennel is full (${W_PET.kennel}).`;
   // (taken off the waiting list only once it is really back)
-  const q = wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp, hungry: !!a.hungry, got: a.got || WG.dayAbs }); if (!q || !wPetOf(q.id)) return 'It couldn\'t come.';
+  const q = wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp, hungry: !!a.hungry, got: a.got != null ? a.got : WG.dayAbs }); if (!q || !wPetOf(q.id)) return 'It couldn\'t come.';
   const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1); wSave();
   return '';
 }
@@ -61800,16 +61811,15 @@ function wPetFeed(id) {
   RUN.gold -= c; q.hungry = false; wPetSync(); wSave();
   wLog(`${q.name} eats, and is itself again.`, 'g'); return '';
 }
-// the week's upkeep, as the week turns: the newest are paid first; once one can't be paid, it and every one longer at
-// home go hungry (so the longest at home go hungry first)
+// the week's upkeep, as the week turns: the newest are paid first, then each one you can still afford; one you can't
+// goes hungry (so the longest at home are the likeliest to)
 function wPetUpkeep() {
   const P = wPets(); if (!P.owned.length) return;
-  let paid = 0, hungry = [], short = false;
+  let paid = 0, hungry = [];
   for (const q of P.owned.slice().sort((a, b) => (b.got || 0) - (a.got || 0))) {
     const c = wPetCost(q);
-    if (!short && RUN.gold < c) short = true;
     // (a pet paid for eats, hungry or not)
-    if (!short) { RUN.gold -= c; paid += c; q.hungry = false; } else { q.hungry = true; hungry.push(q.name); }
+    if (RUN.gold >= c) { RUN.gold -= c; paid += c; q.hungry = false; } else { q.hungry = true; hungry.push(q.name); }
   }
   wPetSync();
   wLog(`The week turns: your pets' upkeep is ${paid} gold.${hungry.length ? ` You couldn't feed ${hungry.join(', ')}: hungry, their powers are halved until you feed them (the Pets tab).` : ''}`, hungry.length ? 'b' : 'd');
