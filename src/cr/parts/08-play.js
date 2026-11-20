@@ -48,9 +48,13 @@ function crSelAim(S) {
 function crSuggest(s) {
   const keep = G.skill[s]; G.skill[s] = 1; let P;
   try { P = crPlan(s); } finally { G.skill[s] = keep; }
-  return { shot: P.shot, x: P.x, y: P.y, h: P.h, target: P.target || null, roll: 0, why: P.why };
+  return { shot: P.shot, x: P.x, y: P.y, h: P.h, target: P.target || null, roll: P.roll || 0, why: P.why };
 }
-function crSelReset() { GP.sel = crSuggest(GP.you); GP.sel.aim = crSelAim(GP.sel); }
+// your skip's call, aimed; one that won't solve on the ice falls back to a draw to the top of the house
+function crSelReset() {
+  GP.sel = crSuggest(GP.you); GP.sel.aim = crSelAim(GP.sel);
+  for (const h of [1, -1]) { if (GP.sel.aim) break; const S = { shot: 'draw', x: 0, y: -40, h, target: null, roll: 0, why: 'a draw to the top of the four-foot' }; S.aim = crSelAim(S); if (S.aim) GP.sel = S; }
+}
 /* change your call: { shot, x, y, h, target, suggest }. A hit takes the stone nearest the broom as its target (theirs
    first); a draw keeps the broom where it is. Returns '' or why not */
 function crSelect(o) {
@@ -64,12 +68,17 @@ function crSelect(o) {
   if (['takeout', 'peel', 'hitroll'].includes(S.shot)) {
     if (o.target) S.target = o.target;
     else if (o.shot || o.x != null || o.y != null || !S.target) {
-      const near = G.stones.slice().sort((a, b) => (a.s === GP.you) - (b.s === GP.you) || Math.hypot(a.x - S.x, a.y - S.y) - Math.hypot(b.x - S.x, b.y - S.y))[0];
+      // the stone nearest the broom (theirs first only when two are as near)
+      const d = b => Math.hypot(b.x - S.x, b.y - S.y), near = G.stones.slice().sort((a, b) => (Math.round(d(a) / 4) - Math.round(d(b) / 4)) || (a.s === GP.you) - (b.s === GP.you))[0];
       if (!near) return 'There is nothing to hit.';
       S.target = near.id; S.x = near.x; S.y = near.y;
     }
   }
   if (S.shot === 'guard' && o.shot && o.x == null) { S.x = 0; S.y = -190; }
+  // a freeze: the broom just in front of the stone of theirs nearest it
+  if (S.shot === 'freeze') { const R = CR_SHEET.stoneR, th = G.stones.filter(b => b.s !== GP.you).sort((a, b) => Math.hypot(a.x - S.x, a.y - S.y) - Math.hypot(b.x - S.x, b.y - S.y))[0];
+    if (!th) return 'There is nothing of theirs to freeze to.'; S.x = th.x; S.y = th.y - 2 * R - .5; }
+  if (!['takeout', 'peel', 'hitroll'].includes(S.shot)) { S.target = null; S.roll = 0; }
   const aim = crSelAim(S); if (!aim) return 'Nothing gets there from here: try the other handle, or another spot.';
   S.aim = aim; GP.sel = S; crPick(); return '';
 }
@@ -98,13 +107,16 @@ function crRelease(p) {
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you).ang, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
   return true;
 }
 
 /* ---------- the stone on the ice ---------- */
 function crBegin(s, plan, rel, sweep) {
-  GP.X = crThrowBegin(s, plan, rel, sweep); GP.call = ''; GP.sweep = false;
+  const X = crThrowBegin(s, plan, rel, sweep); GP.call = ''; GP.sweep = false;
+  // (the game moved on under the page: whose stone it is now)
+  if (!X) { GP.meter = null; crGo('next', 0, crWhyNot(s) || 'A stone is still sliding.'); return; }
+  GP.X = X;
   crGo('slide', 0, `${crName(s, GP.X.ri)} (${G.teams[s].short || G.teams[s].name}) throws ${CR_SHOTS[plan.shot] || 'a stone'}…`);
 }
 // the skip's call as your stone slides, from where it would stop now against the broom
@@ -125,7 +137,9 @@ function crSlideTick(dt) {
 }
 function crSettle() {
   const X = GP.X; GP.X = null; GP.sweep = false;
-  const ev = crThrowFinish(X); GP.last = ev;
+  const ev = crThrowFinish(X);
+  if (!ev.rule.ok) { crGo('next', 0, ev.rule.why); return; }
+  GP.last = ev;
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
@@ -148,7 +162,7 @@ function crTick(dt) {
 function crPlayNext() {
   const s = crUp(); if (s < 0) { crGo('over'); return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
-  if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. Your skip calls ${GP.sel.why}. Change the call if you like, then Space.`); return; }
+  if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   const plan = Object.assign(crPlan(s), { s }), rel = crMiss(s, plan.aim);
   GP.cpu = { s, plan, rel };
   crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}.`);
@@ -159,6 +173,8 @@ function crSetMode(m) {
   // a stone you were setting up goes back to the CPU in Watch, and the next one is yours in You play
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
 }
+// the page has a stone set up or sliding (turn() and throwStone() from outside wait)
+const crPageBusy = () => !!GP && ['aim', 'swing', 'addr', 'slide'].includes(GP.ph);
 // what the page needs, as a copy
 function crView() {
   if (!GP) return null;

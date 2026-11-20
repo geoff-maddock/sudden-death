@@ -5,7 +5,7 @@
    issue #23), the Charter Court (wBK, basketball; src/bk/, issue #77) and Black Ice at the Pond Rink (wHK, hockey;
    src/hk/, issue #83), Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play), the
    Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play) and the Curling Shed
-   (wCR, curling; src/cr/, issue #102: the rules so far, with no page, so never on). Nothing here is saved. */
+   (wCR, curling; src/cr/, issue #102: a game at the Shed, Watch or You play). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' },

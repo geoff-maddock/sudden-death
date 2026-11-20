@@ -28,7 +28,9 @@ function crFrame(now) {
   if (!CRP.on) return;
   const dt = Math.min(.05, Math.max(0, (now - CRP.last) / 1000)); CRP.last = now;
   const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
-  if (GP) GP.sweep = CRP.sweepKey || CRP.sweepPtr;
+  // (sweeping is only ever for the stone sliding now: anything held over from before is let go)
+  if (GP && GP.ph !== 'slide') CRP.sweepKey = CRP.sweepPtr = false;
+  if (GP) GP.sweep = GP.ph === 'slide' && (CRP.sweepKey || CRP.sweepPtr);
   if (!CRP.paused && !boxed) for (let i = 0; i < CRP.speed && !CRP.paused; i++) crTick(dt);
   crRender(CRP.paused ? 0 : dt);
   CRP.raf = requestAnimationFrame(crFrame);
@@ -51,7 +53,8 @@ function crKeyDown(e) {
   if (!crKeyOk(e)) return;
   const k = e.key.toLowerCase(), S = GP.sel;
   let took = true;
-  if (k === ' ') { if (GP.ph === 'slide') CRP.sweepKey = true; else if (!e.repeat) crPress(); }
+  // (a press held on from the weight's press doesn't sweep: sweeping starts with a fresh press)
+  if (k === ' ') { if (GP.ph === 'slide') { if (!e.repeat) CRP.sweepKey = true; } else if (!e.repeat) crPress(); }
   else if (GP.ph !== 'aim' || !S) took = false;
   else if (k === 'arrowleft') crSelect({ x: S.x + 3 });
   else if (k === 'arrowright') crSelect({ x: S.x - 3 });
@@ -80,7 +83,7 @@ function crIceAtPt(sx, sy) {
 CRP.cv.addEventListener('pointerdown', e => {
   if (!GP || GP.mode !== 'play' || CRP.paused) return;
   const p = crPtrAt(e);
-  if (GP.ph === 'slide' && GP.X && crYours(GP.X.s)) { CRP.sweepPtr = true; e.preventDefault(); return; }
+  if (GP.ph === 'slide' && GP.X && crYours(GP.X.s)) { CRP.sweepPtr = true; try { CRP.cv.setPointerCapture(e.pointerId); } catch (er) { /* a synthetic press */ } e.preventDefault(); return; }
   if (GP.ph !== 'aim' || !GP.sel) return;
   CRP.ptr = { throw: p.sx < CR_VIEW.w && p.sy > 520, x: p.sx, y: p.sy, cur: p };
   try { CRP.cv.setPointerCapture(e.pointerId); } catch (er) { /* a synthetic press */ }
@@ -96,3 +99,5 @@ function crPtrUp(e) {
   if (dy > 25) crDrag(CR_PLAY.meter.low + (CR_PLAY.meter.high - CR_PLAY.meter.low) * clamp(dy / 240, 0, 1), Math.atan2(dx, dy) * 180 / Math.PI);
 }
 for (const ev of ['pointerup', 'pointercancel']) CRP.cv.addEventListener(ev, crPtrUp);
+for (const ev of ['pointerleave', 'lostpointercapture']) CRP.cv.addEventListener(ev, () => { CRP.sweepPtr = false; });
+window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });

@@ -27,7 +27,8 @@ function crMade(plan, before, after, run) {
   switch (plan.shot) {
     case 'draw': return !!stop && Math.hypot(stop.x - plan.x, stop.y - plan.y) <= 24;
     case 'guard': return !!stop && crInFgz(stop) && Math.hypot(stop.x - plan.x, stop.y - plan.y) <= 36;
-    case 'freeze': { const o = before.find(b => b.s !== plan.s && Math.abs(b.x - plan.x) < 1 && Math.abs(b.y - plan.y - 2 * R - .5) < 1); return !!stop && !!o && Math.hypot(stop.x - o.x, stop.y - o.y) <= 2 * R + 3; }
+    // (a freeze: it came to rest touching one of theirs, whichever it is)
+    case 'freeze': return !!stop && after.some(o => o.s !== plan.s && Math.hypot(stop.x - o.x, stop.y - o.y) <= 2 * R + 3);
     case 'takeout': case 'peel': return !!gone;
     case 'hitroll': return !!gone && !!stop && crInHouse(stop);
   }

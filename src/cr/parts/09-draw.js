@@ -125,7 +125,8 @@ function crCallDraw(c) {
 function crDraw(c, dt) {
   if (!G || !G.teams || !GP) { c.fillStyle = '#16222a'; c.fillRect(0, 0, 960, 600); return; }
   CRC.t += dt || 0;
-  const want = crCamTarget(); CRC.camY += (want - CRC.camY) * Math.min(1, (dt || 0) * 3 + (dt ? 0 : 1));
+  // (the camera eases toward where it should be; still while the game is held, but in place on the first picture)
+  const want = crCamTarget(); if (dt || !CRC.drawn) CRC.camY += (want - CRC.camY) * Math.min(1, dt ? dt * 3 : 1); CRC.drawn = true;
   c.fillStyle = '#16222a'; c.fillRect(0, 0, 960, 600);
   c.save(); c.beginPath(); c.rect(0, 0, CR_VIEW.w, 600); c.clip();
   crLeftDraw(c); crMeterDraw(c); crCallDraw(c); crBoardDraw(c);

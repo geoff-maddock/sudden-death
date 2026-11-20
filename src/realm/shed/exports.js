@@ -30,7 +30,9 @@ return {
   iceNew: () => crIceNew(), iceAt: (ice, x, y, cold) => crIceAt(ice, x, y, cold), wear: (ice, path) => crWear(ice, path),
   run: (stones, th, o) => crRun(stones, th, o), alone: (th, ice, cold, sweep) => crAlone(th, ice, cold, sweep), solveDraw: (x, y, h, ice, cold) => crSolveDraw(x, y, h, ice, cold), solveHit: (x, y, v, h, ice, cold) => crSolveHit(x, y, v, h, ice, cold),
   value: (st, s, k, hammer, sk) => crValue(st, s, k, hammer, sk), plan: s => G && G.teams ? crPlan(s) : null,
-  start: o => { crStart(o); crPlayStart(o); return G; }, turn: () => crTurn(), throwStone: (s, plan, rel, sweep) => G && G.teams ? crThrowStone(s, plan, rel, sweep) : null, summary: () => crSummary(), simGame: o => crSimGame(o),
+  start: o => { crStart(o); crPlayStart(o); CRC.drawn = false; return G; },
+  // (the page owns a stone it is setting up or sliding: turn and throwStone wait for it)
+  turn: () => crPageBusy() ? crRefused(crUp(), 'A stone is being thrown on the page.') : crTurn(), throwStone: (s, plan, rel, sweep) => !G || !G.teams ? null : crPageBusy() ? crRefused(s, 'A stone is being thrown on the page.') : crThrowStone(s, plan, rel, sweep), summary: () => crSummary(), simGame: o => crSimGame(o),
   // the page and throwing by hand (phase 2)
   modes: CR_MODES.slice(), playRules: JSON.parse(JSON.stringify(CR_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get view() { return crView(); }, get mode() { return GP ? GP.mode : null; },
   setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepKey = !!on; if (GP) GP.sweep = !!on; }, get sweep() { return !!(GP && GP.sweep); },

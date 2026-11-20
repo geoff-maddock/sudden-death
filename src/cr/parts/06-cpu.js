@@ -45,7 +45,7 @@ function crShots(s, sk) {
   const S = CR_SKILL[sk], R = CR_SHEET.stoneR, ice = crIceRead(s), cold = G.cold, st = G.stones, out = [];
   const hs = S.top > 1 ? [1, -1] : [1];
   const draw = (shot, x, y) => { for (const h of hs) { const aim = crSolveDraw(x, y, h, ice, cold); if (aim) out.push({ shot, x, y, h, aim }); } };
-  const hit = (shot, o, v, dx) => { for (const h of hs) { const aim = crSolveHit(o.x + (dx || 0), o.y - R * 1.6, v, h, ice, cold); if (aim) out.push({ shot, x: o.x, y: o.y, h, aim, target: o.id }); } };
+  const hit = (shot, o, v, dx) => { for (const h of hs) { const aim = crSolveHit(o.x + (dx || 0), o.y - R * 1.6, v, h, ice, cold); if (aim) out.push({ shot, x: o.x, y: o.y, h, aim, target: o.id, roll: dx || 0 }); } };
   draw('draw', 0, 0); draw('draw', 0, -40); draw('draw', 40, -8); draw('draw', -40, -8); draw('draw', 0, 34);
   draw('guard', 0, -190); draw('guard', 52, -175); draw('guard', -52, -175);
   for (const o of st.filter(o => o.s !== s)) {
