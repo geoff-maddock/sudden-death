@@ -50,25 +50,38 @@ async def main():
           const r = wPetAdd('imp', 'egg:deepseam'); const asked = !document.getElementById('modal').hidden;
           const keep = document.querySelector('#modalBox [data-petgo="' + wPets().owned[1].id + '"]'); if (keep) keep.click();
           return {{ n, r, asked, after: wPets().owned.length, imp: wPets().owned.some(q => q.kind === 'imp'), away: WG.petAway.map(a => a.kind) }}; }})()""")
-        check(f['n'] == 6 and f['r'] is None and f['asked'] and f['after'] == 6 and f['imp'] and f['away'] == ['hootling'], 'a full kennel asks which one goes (here the Hootling): it waits where it came from, and the new one comes in', f)
+        check(f['n'] == 6 and f['r'] and f['asked'] and f['after'] == 6 and f['imp'] and f['away'] == ['hootling'], 'a full kennel asks which one goes (here the Hootling): it waits where it came from, and the new one comes in', f)
         fc = await pg.evaluate("""(() => { const n0 = WG.petAway.length; wPetAdd('glowbeetle', 'shop:cind'); const asked = !document.getElementById('modal').hidden;
+          const waitsAtOnce = WG.petAway.length - n0;
           // (closed with Escape, no choice made)
           document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-          return { asked, waits: WG.petAway.length - n0, last: (WG.petAway[WG.petAway.length - 1] || {}).kind, kennel: wPets().owned.length }; })()""")
-        check(fc['asked'] and fc['waits'] == 1 and fc['last'] == 'glowbeetle' and fc['kennel'] == 6, 'a full kennel\'s question closed without a choice: the new one waits where it came from, not lost', fc)
-        ref = await pg.evaluate("""(() => { B = { over: null }; UI.view = 'fight'; const side = wPetSideOf(); wPetAdd('glowbeetle', 'shop:cind'); const b = document.querySelector('#modalBox [data-petgo="' + side.id + '"]'); b.click();
+          return { asked, waitsAtOnce, waits: WG.petAway.length - n0, last: (WG.petAway[WG.petAway.length - 1] || {}).kind, kennel: wPets().owned.length }; })()""")
+        check(fc['asked'] and fc['waitsAtOnce'] == 1 and fc['waits'] == 1 and fc['last'] == 'glowbeetle' and fc['kennel'] == 6, 'a full kennel\'s question closed without a choice: the new one waits where it came from, not lost', fc)
+        ref = await pg.evaluate("""(() => { const side = wPetSideOf(); wPetAdd('glowbeetle', 'shop:cind'); B = { over: null }; UI.view = 'fight'; const b = document.querySelector('#modalBox [data-petgo="' + side.id + '"]'); b.click();
           const why = document.getElementById('wPetFullWhy'), r = { said: why && !why.hidden && /match/.test(why.textContent), open: !document.getElementById('modal').hidden, kennel: wPets().owned.length };
           const nb = [...document.querySelectorAll('#modalBox [data-petgo]')].pop(); nb.click(); B = null; UI.view = 'world'; r.after = wPets().owned.length; return r; })()""")
         check(ref == {'said': True, 'open': True, 'kennel': 6, 'after': 6}, 'the one at your side can\'t be let go in a match: the question says so and stays open, and the kennel never goes over', ref)
         # (the two Glowbeetles that went back are set aside, so the let-go check below counts only its own)
         await pg.evaluate("WG.petAway = WG.petAway.filter(a => a.kind !== 'glowbeetle')")
+        # (two in a row at a full kennel: the second waits for the first question, and neither is lost)
+        tw = await pg.evaluate("""(() => { const n0 = WG.petAway.length; const a = wPetAdd('mephitling', 'egg:x'), b = wPetAdd('axebeak', 'egg:y');
+          const firstAsk = [...document.querySelectorAll('#modalBox [data-petgo]')].pop().textContent; [...document.querySelectorAll('#modalBox [data-petgo]')].pop().click();
+          const secondAsk = !document.getElementById('modal').hidden && [...document.querySelectorAll('#modalBox [data-petgo]')].pop().textContent; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          const r = { firstAsk, secondAsk, waits: WG.petAway.slice(n0).map(x => x.kind), closed: document.getElementById('modal').hidden };
+          WG.petAway = WG.petAway.filter(x => x.kind !== 'mephitling' && x.kind !== 'axebeak'); return r; })()""")
+        check(tw['firstAsk'].startswith('Mephitling') and tw['secondAsk'] and tw['secondAsk'].startswith('Axebeak') and tw['waits'] == ['mephitling', 'axebeak'] and tw['closed'], 'two at a full kennel in a row: one question at a time, and both wait where they came from', tw)
+        hr = await pg.evaluate("""(() => { const q = wPets().owned.find(x => x.kind === 'chestnut'); q.hungry = true; const got = q.got; wPetLetGo(q.id); const i = WG.petAway.findIndex(a => a.kind === 'chestnut');
+          wPetReclaim(i); const b = wPets().owned.find(x => x.kind === 'chestnut'); b.hungry = false; return { hungry: true, back: !!b, got: b.got === got }; })()""")
+        hr2 = await pg.evaluate("(() => { const q = wPets().owned.find(x => x.kind === 'chestnut'); q.hungry = true; wPetLetGo(q.id); wPetReclaim(WG.petAway.findIndex(a => a.kind === 'chestnut')); const b = wPets().owned.find(x => x.kind === 'chestnut'); const h = b.hungry; b.hungry = false; return h; })()")
+        check(hr['back'] and hr['got'] and hr2 is True, 'a hungry pet let go and reclaimed comes back hungry, and keeps the day it came', [hr, hr2])
         g = await pg.evaluate("""(() => { const q = wPets().owned.find(x => x.kind === 'sprite'); const r = wPetLetGo(q.id); const away = WG.petAway.length; const back = wPetReclaim(WG.petAway.findIndex(a => a.kind === 'hootling'));
           return { r, away, back, has: wPets().owned.some(x => x.kind === 'hootling' && x.name === 'Hoots b'), left: WG.petAway.map(a => a.kind) }; })()""")
         check(g['r'] == '' and g['away'] == 2 and g['back'] == '' and g['has'] and g['left'] == ['sprite'], 'let one go and it waits where it came from; reclaimed, it comes back as it was (its name)', g)
-        u = await pg.evaluate("""(() => { const P = wPets(), cost = P.owned.reduce((n, q) => n + W_PET.upkeep[PETS[q.kind].rar], 0); RUN.gold = cost + 5; const g0 = RUN.gold;
+        u = await pg.evaluate("""(() => { const P = wPets(); P.owned.forEach((q, k) => q.got = k + 1); const cost = P.owned.reduce((n, q) => n + W_PET.upkeep[PETS[q.kind].rar], 0); RUN.gold = cost + 5; const g0 = RUN.gold;
           WG.petWeek = wWeek() - 1; wNewDay(); const paid = g0 - RUN.gold, hungry0 = P.owned.filter(q => q.hungry).length;
+          // (the newest a rare one it can't afford, an older common one it could: once one goes unpaid, the older ones do too)
           RUN.gold = 7; WG.petWeek = wWeek() - 1; wNewDay(); const hungry = P.owned.filter(q => q.hungry).map(q => q.got), fed = P.owned.filter(q => !q.hungry).map(q => q.got);
-          const oldestHungry = Math.min(...hungry) <= Math.min(...fed.concat([Infinity]));
+          const oldestHungry = Math.max(...hungry) <= Math.min(...fed.concat([Infinity]));
           const side = wPetSideOf(); side.hungry = true; wPetSync(); const runHungry = RUN.pet.hungry;
           RUN.gold = 500; const fd = wPetFeed(side.id);
           // (a hungry pet whose upkeep is paid the next week eats: it isn't hungry any more)
@@ -77,9 +90,15 @@ async def main():
         check(u['paid'] == u['cost'] and u['hungry0'] == 0, 'as the week turns, each pet\'s upkeep is paid', u)
         check(u['someHungry'] and u['oldestHungry'] and u['runHungry'], 'what can\'t be paid leaves pets hungry, the longest at home first, and the battle knows', u)
         check(u['fd'] == '' and u['after'] is False and u['runAfter'] is False and u['ateAll'], 'feeding a hungry pet (its upkeep) puts it right, and so does its upkeep paid the next week', u)
-        t = await pg.evaluate("""(async () => { wOpenCamp('pets'); await new Promise(r => setTimeout(r, 30)); const b = document.getElementById('wCampBody');
+        await pg.evaluate("wOpenCamp('pets')"); await pg.wait_for_function("!!document.querySelector('#wCampBody .wpetc')")
+        t = await pg.evaluate("""(async () => { const b = document.getElementById('wCampBody');
           return { tab: !!document.querySelector('#modalBox [data-ctab="pets"]'), cards: b.querySelectorAll('.wpetc').length, side: !!b.querySelector('[data-petside]'), name: !!b.querySelector('[data-petname]'), go: !!b.querySelector('[data-petletgo]'), upkeep: /gold a week/.test(b.textContent) }; })()""")
         check(t == {'tab': True, 'cards': 6, 'side': True, 'name': True, 'go': True, 'upkeep': True}, 'the Pets tab on the Team screen: the kennel, with At my side, Rename and Let go, and the week\'s upkeep', t)
+        lg = await pg.evaluate("""(() => { const b = document.getElementById('wCampBody'), n = wPets().owned.length; b.querySelector('[data-petletgo]').click();
+          const asked = !!b.querySelector('[data-petgoyes]'); b.querySelector('[data-petgoyes]').click();
+          return { asked, open: !document.getElementById('modal').hidden && !!document.getElementById('wCampBody'), n: n - wPets().owned.length, said: /Waiting where/.test(document.getElementById('wCampBody').textContent) }; })()""")
+        check(lg == {'asked': True, 'open': True, 'n': 1, 'said': True}, 'Let go on the Pets tab asks in its own row, and the Team screen stays open', lg)
+        await pg.evaluate("wPetReclaim(WG.petAway.length - 1)")
         await pg.evaluate(CLOSE)
         mp = await pg.evaluate("""(() => { const acts = []; for (const f of W_ACTORS) f(acts, performance.now(), 0); return { pet: acts.some(a => typeof a.draw === 'function') }; })()""")
         check(mp == {'pet': True}, 'the pet at your side is drawn on the map, behind the team', mp)

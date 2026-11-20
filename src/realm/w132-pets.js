@@ -34,12 +34,19 @@ const wPetSideOf = () => { const P = wPets(); return P.side != null ? wPetOf(P.s
 const wPetBusy = () => !!(B && !B.over && UI.view === 'fight');
 // RUN.pet, what the card battle reads: the one at your side, as plain data
 function wPetSync() { if (!RUN || !WG) return; const p = wPetSideOf(); RUN.pet = p ? { kind: p.kind, name: p.name, bond: p.bond || 1, hungry: !!p.hungry } : null; }
-// a new pet into the kennel (kind, where it came from); a full kennel asks which one goes. Returns the pet, or null
+// a new pet into the kennel (kind, where it came from). Returns the pet, or null for an unknown kind. A full kennel:
+// the pet waits where it came from at once (WG.petAway, so it is never lost, a reload or a closed question and all),
+// and you're asked which one goes (wPetFull, one question at a time); wPetOf(q.id) says whether it came in
+const W_PET_ASK = [];
 function wPetAdd(kind, from, o) {
   if (!PETS[kind]) return null;
-  const P = wPets(), q = Object.assign({ id: P.seq++, kind, name: (o && o.name) || PETS[kind].n, bond: 1, xp: 0, got: WG.dayAbs, from: from || '', hungry: false }, o || {});
-  q.id = q.id || P.seq++;
-  if (P.owned.length >= W_PET.kennel) { if (LAB) return null; wPetFull(q); return null; }
+  const P = wPets(), q = Object.assign({ kind, name: (o && o.name) || PETS[kind].n, bond: 1, xp: 0, got: WG.dayAbs, from: from || '', hungry: false }, o || {});
+  q.id = P.seq++;
+  if (P.owned.length >= W_PET.kennel) {
+    const a = wPetAway(q); wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
+    if (!LAB) { W_PET_ASK.push({ q, a }); wPetAskNext(); }
+    return q;
+  }
   P.owned.push(q);
   if (P.side == null) P.side = q.id;
   wPetSync();
@@ -47,27 +54,37 @@ function wPetAdd(kind, from, o) {
   wSave();
   return q;
 }
-// a full kennel: which one goes (the new one too)
-function wPetFull(q) {
+// the next full-kennel question, once no other window is open (else as the next one closes: wDrain)
+function wPetAskNext() {
+  if (!W_PET_ASK.length || !$('modal').hidden || UI.view !== 'world') return;
+  const { q, a } = W_PET_ASK.shift();
+  // (still waiting, and the kennel still full: ask; else it stays where it waits, to be reclaimed)
+  if (!WG.petAway.includes(a) || wPets().owned.length < W_PET.kennel) return wPetAskNext();
+  wPetFull(q, a);
+}
+const wW132Drain = wDrain;
+wDrain = function () { wW132Drain.apply(this, arguments); if (W_PET_ASK.length) wPetAskNext(); };
+// a full kennel: which one goes (the new one too: it already waits where it came from, a)
+function wPetFull(q, a) {
   const P = wPets(), all = P.owned.concat([q]);
   const close = modal(`<header><h3>The kennel is full</h3></header><div class="wmsg"><p>${esc(q.name)} the ${esc(PETS[q.kind].from)} wants in, but your kennel holds ${W_PET.kennel}. Choose one to let go: it goes back to where it came from, and you can come back for it.</p></div>
     <p class="wbad" id="wPetFullWhy" hidden></p>
     <ul class="wpetlist">${all.map(x => `<li><button class="ghost" data-petgo="${x.id}">${esc(x.name)}${x === q ? ' (the new one)' : ''}</button> <small>${esc(PETS[x.kind].from)}, bond ${x.bond}</small></li>`).join('')}</ul>`,
-    // (closed without a choice: the new one goes back where it came from, and waits, rather than be lost)
-    () => { if (!chosen) { wPetAway(q); wLog(`${q.name} goes back to where it came from, and waits there for you.`, 'd'); wSave(); } wDrain(); });
-  let chosen = false;
+    // (closed without a choice: the new one stays where it waits)
+    () => wDrain());
   $('modalBox').querySelectorAll('[data-petgo]').forEach(b => b.onclick = () => {
     const id = +b.dataset.petgo;
-    if (id === q.id) { chosen = true; wPetAway(q); wLog(`${q.name} goes back to where it came from, and waits there for you.`, 'd'); }
-    else {
+    if (id !== q.id) {
       // (one that can't go now, the one at your side in a match, says so and the choice stays open)
       const why = wPetLetGo(id); if (why) { const w = $('wPetFullWhy'); w.textContent = why; w.hidden = false; return; }
-      chosen = true; P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g');
+      const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1);
+      P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g');
     }
     wSave(); close();
   });
 }
-function wPetAway(q) { wPets(); WG.petAway.push({ kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '' }); }
+// (as it was: its name, bond, hunger and the day it came, all back when reclaimed)
+function wPetAway(q) { wPets(); const a = { kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '', hungry: !!q.hungry, got: q.got || 0 }; WG.petAway.push(a); return a; }
 // let one go: it goes back where it came from, and waits there
 function wPetLetGo(id) {
   const P = wPets(), q = wPetOf(id); if (!q) return 'No such pet.';
@@ -82,8 +99,10 @@ function wPetLetGo(id) {
 function wPetReclaim(i) {
   const A = wPets() && WG.petAway, a = A[i]; if (!a) return 'Nobody waits there.';
   if (wPets().owned.length >= W_PET.kennel) return `Your kennel is full (${W_PET.kennel}).`;
-  WG.petAway.splice(i, 1);
-  return wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp }) ? '' : 'It couldn\'t come.';
+  // (taken off the waiting list only once it is really back)
+  const q = wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp, hungry: !!a.hungry, got: a.got || WG.dayAbs }); if (!q || !wPetOf(q.id)) return 'It couldn\'t come.';
+  const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1); wSave();
+  return '';
 }
 function wPetSide(id) {
   const P = wPets(), q = wPetOf(id); if (!q) return 'No such pet.';
@@ -106,14 +125,16 @@ function wPetFeed(id) {
   RUN.gold -= c; q.hungry = false; wPetSync(); wSave();
   wLog(`${q.name} eats, and is itself again.`, 'g'); return '';
 }
-// the week's upkeep, as the week turns: the newest are paid first, so the longest at home go hungry first
+// the week's upkeep, as the week turns: the newest are paid first; once one can't be paid, it and every one longer at
+// home go hungry (so the longest at home go hungry first)
 function wPetUpkeep() {
   const P = wPets(); if (!P.owned.length) return;
-  let paid = 0, hungry = [];
+  let paid = 0, hungry = [], short = false;
   for (const q of P.owned.slice().sort((a, b) => (b.got || 0) - (a.got || 0))) {
     const c = wPetCost(q);
+    if (!short && RUN.gold < c) short = true;
     // (a pet paid for eats, hungry or not)
-    if (RUN.gold >= c) { RUN.gold -= c; paid += c; q.hungry = false; } else { q.hungry = true; hungry.push(q.name); }
+    if (!short) { RUN.gold -= c; paid += c; q.hungry = false; } else { q.hungry = true; hungry.push(q.name); }
   }
   wPetSync();
   wLog(`The week turns: your pets' upkeep is ${paid} gold.${hungry.length ? ` You couldn't feed ${hungry.join(', ')}: hungry, their powers are halved until you feed them (the Pets tab).` : ''}`, hungry.length ? 'b' : 'd');
@@ -164,7 +185,13 @@ wRenderCamp = function () {
   body.innerHTML = `<div class="wcsum"><span>Pets <b>${P.owned.length}/${W_PET.kennel}</b></span><span>Gold <b>${RUN.gold}</b></span></div>${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampPets();
   body.querySelectorAll('[data-petside]').forEach(b => b.onclick = () => wCampSay(wPetSide(+b.dataset.petside)));
   body.querySelectorAll('[data-petfeed]').forEach(b => b.onclick = () => wCampSay(wPetFeed(+b.dataset.petfeed)));
-  body.querySelectorAll('[data-petletgo]').forEach(b => b.onclick = () => { const q = wPetOf(+b.dataset.petletgo); askConfirm(`Let ${q.name} go?`, 'It goes back to where it came from, and waits there: you can come back for it.', 'Let go', () => { wCampSay(wPetLetGo(q.id)); }); });
+  // (asked in place, in its own row: the Team screen stays open)
+  body.querySelectorAll('[data-petletgo]').forEach(b => b.onclick = () => {
+    const q = wPetOf(+b.dataset.petletgo), li = b.closest('li');
+    li.querySelector('.wpa').innerHTML = `<small>Let ${esc(q.name)} go? It waits where it came from, to be had back.</small><button class="ghost" data-petgoyes="1">Let go</button><button class="ghost" data-petgono="1">Keep</button>`;
+    li.querySelector('[data-petgoyes]').onclick = () => wCampSay(wPetLetGo(q.id));
+    const no = li.querySelector('[data-petgono]'); no.onclick = () => wRenderCamp(); no.focus();
+  });
   body.querySelectorAll('[data-petname]').forEach(b => b.onclick = () => {
     const q = wPetOf(+b.dataset.petname), li = b.closest('li');
     li.querySelector('.wpa').innerHTML = `<input type="text" maxlength="${W_PET.nameMax}" value="${esc(q.name)}" aria-label="${esc(q.name)}'s new name" data-petin="1"><button class="ghost" data-petok="1">Done</button>`;
@@ -177,7 +204,10 @@ wRenderCamp = function () {
 /* ---------- the pet at your side on the map: behind the team ---------- */
 W_ACTORS.push((acts, now, t) => {
   const p = WG && WG.map && wPetSideOf(); if (!p || !WUI.party || !WUI.party.length) return;
-  const last = WUI.party[WUI.party.length - 1], pos = wLerpPos(last, now), dx = (last.fx - last.tx) * .45, dy = (last.fy - last.ty) * .45;
+  const last = WUI.party[WUI.party.length - 1], pos = wLerpPos(last, now);
+  // (behind the last of the team, the way it came; standing still, behind the way the team faces)
+  let dx = (last.fx - last.tx) * .45, dy = (last.fy - last.ty) * .45;
+  if (!dx && !dy) dx = WUI.face === 'l' ? .45 : -.45;
   const D = PETS[p.kind], col = PET_EL_COL[D.el] || '#e9dcc0';
   acts.push({ y: pos[1] + dy - .01, x: pos[0] + dx, draw: (c, x, y) => {
     const bob = Math.sin(t * 6) * (pos[2] ? 2 : .6);
