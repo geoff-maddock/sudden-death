@@ -105,7 +105,7 @@ function startDrag(ev, el, i) {
   const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform, acts0 = UI.acts || 0, kb0 = UI.kbTarget, hv0 = UI.hover; let moved = false;
   // (only this pointer drives this drag: a second finger is its own)
   const pid = ev.pointerId, mine = e => e.pointerId == null || pid == null || e.pointerId === pid;
-  let held = !!ev.buttons, dragKb;
+  let held = !!ev.buttons;
   const mv = e => {
     if (!mine(e)) return;
     // (a mouse or pen let go where the page never heard it, outside the window or the frame: a move with no button held,
@@ -120,22 +120,17 @@ function startDrag(ev, el, i) {
     el.style.transform = `translate(${dx}px, ${dy}px) scale(1.06)`;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
-    if (h) { UI.hover = h.e; UI.kbTarget = h.e; dragKb = h.e; }
+    if (h) { UI.hover = h.e; UI.kbTarget = h.e; }
     updatePreview();
   };
   // (the drag over: its listeners off, the card back, and the click that follows the drop ignored (UI.dragged): the
   // card's click clears it, and so does the next press)
   const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.hoverCard = -1; UI.dragged = true; } };
-  // (the card back, nothing played; the target as it was before the drag)
-  // (the target back as it was and the pick let go, unless another pick (another finger's, a key's) has taken over: then
-  // that one's target and pick are left alone)
+  // (the card back, nothing played; the target and hover as they were before the drag, the pick let go. If another pick
+  // (another finger's, a key's) has taken over, the drag touches nothing: that pick keeps the target it was made with)
   const drop = () => {
-    if (!B || UI.view !== 'fight') return;
-    const other = UI.sel !== i && UI.sel !== -1;
-    // (the target and hover back, but only where the drag itself set them: another pick's own choice stays)
-    if (!other || UI.kbTarget === dragKb) UI.kbTarget = kb0 && !kb0.dead ? kb0 : (other ? UI.kbTarget : null);
-    if (!other || UI.hover === dragKb) UI.hover = hv0 && !hv0.dead ? hv0 : null;
-    if (other) return; UI.sel = -1; renderHand();
+    if (!B || UI.view !== 'fight' || (UI.sel !== i && UI.sel !== -1)) return;
+    UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; UI.sel = -1; renderHand();
   };
   const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; off(); if (moved) drop(); };
   const up = e => {

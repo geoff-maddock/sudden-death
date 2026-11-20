@@ -50,7 +50,7 @@ async def main():
           const r = wPetAdd('imp', 'egg:deepseam'); await new Promise(res => { const w = () => document.getElementById('modal').hidden ? setTimeout(w, 20) : res(); w(); }); const asked = !document.getElementById('modal').hidden;
           const keep = document.querySelector('#modalBox [data-petgo="' + wPets().owned[1].id + '"]'); if (keep) keep.click();
           return { n, r, asked, after: wPets().owned.length, imp: wPets().owned.some(q => q.kind === 'imp'), away: WG.petAway.map(a => a.kind) }; })()""")
-        check(f['n'] == 6 and f['r'] is None and f['asked'] and f['after'] == 6 and f['imp'] and f['away'] == ['hootling'], 'a full kennel asks which one goes (here the Hootling): it waits where it came from, and the new one comes in', f)
+        check(f['n'] == 6 and f['r'] and f['r']['waits'] and f['asked'] and f['after'] == 6 and f['imp'] and f['away'] == ['hootling'], 'a full kennel asks which one goes (here the Hootling): it waits where it came from, and the new one comes in', f)
         fc = await pg.evaluate("""(async () => { const n0 = WG.petAway.length; wPetAdd('glowbeetle', 'shop:cind'); await new Promise(res => { const w = () => document.getElementById('modal').hidden ? setTimeout(w, 20) : res(); w(); }); const asked = !document.getElementById('modal').hidden;
           const waitsAtOnce = WG.petAway.length - n0;
           // (closed with Escape, no choice made)
@@ -71,7 +71,7 @@ async def main():
           await open(); const secondAsk = last().textContent; esc();
           // (a window that closes and opens another straight after doesn't bury the question, nor the question it)
           wPetAdd('hippogriff', 'egg:z'); modal('<p>one window</p>', () => wDrain()); esc(); modal('<p>another window</p>', () => wDrain());
-          await new Promise(r => setTimeout(r, 400)); const kept = document.getElementById('modalBox').textContent.includes('another window'); esc();
+          const t0 = W_PET_ASK.tries || 0; await new Promise(res => { const w = () => (W_PET_ASK.tries || 0) >= t0 + 2 ? res() : setTimeout(w, 20); w(); }); const kept = document.getElementById('modalBox').textContent.includes('another window'); esc();
           await open(); const thirdAsk = last().textContent; esc();
           const r = { firstAsk, secondAsk, kept, thirdAsk, waits: WG.petAway.slice(n0).map(x => x.kind), closed: document.getElementById('modal').hidden };
           WG.petAway = WG.petAway.filter(x => !['mephitling', 'axebeak', 'hippogriff'].includes(x.kind)); return r; })()""")

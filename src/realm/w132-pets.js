@@ -35,9 +35,9 @@ const wPetSideOf = () => { const P = wPets(); return P.side != null ? wPetOf(P.s
 const wPetBusy = () => !!(B && !B.over && UI.view === 'fight');
 // RUN.pet, what the card battle reads: the one at your side, as plain data
 function wPetSync() { if (!RUN || !WG) return; const p = wPetSideOf(); RUN.pet = p ? { kind: p.kind, name: p.name, bond: p.bond || 1, hungry: !!p.hungry } : null; }
-// a new pet into the kennel (kind, where it came from). Returns the pet if it came in, else null: an unknown kind, or a
-// full kennel, where the pet waits where it came from at once (WG.petAway, so it is never lost, a reload or a closed
-// question and all) and you're asked which one goes (wPetFull, one question at a time; never in LAB)
+// a new pet into the kennel (kind, where it came from). Returns the pet, or null for an unknown kind. At a full kennel
+// the pet waits where it came from at once (WG.petAway, so it is never lost, a reload or a closed question and all;
+// the pet returned says waits: true) and you're asked which one goes (wPetFull, one question at a time; never in LAB)
 const W_PET_ASK = [];
 function wPetAdd(kind, from, o) {
   if (!PETS[kind]) return null;
@@ -45,8 +45,8 @@ function wPetAdd(kind, from, o) {
   q.id = P.seq++;
   if (P.owned.length >= W_PET.kennel) {
     const a = wPetAway(q); wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
-    if (!LAB) { W_PET_ASK.push({ q, a }); wPetAskSoon(); }
-    return null;
+    if (!LAB) { W_PET_ASK.push(q.id); wPetAskSoon(); }
+    return Object.assign({}, q, { waits: true });
   }
   P.owned.push(q);
   if (P.side == null) P.side = q.id;
@@ -60,11 +60,11 @@ function wPetAdd(kind, from, o) {
 function wPetAskSoon() { if (W_PET_ASK.length && !W_PET_ASK.t) W_PET_ASK.t = setTimeout(() => { W_PET_ASK.t = 0; wPetAskNext(); }, 250); }
 function wPetAskNext() {
   if (!W_PET_ASK.length || !WG) return;
-  if (!$('modal').hidden || UI.view !== 'world' || WUI.talk) return wPetAskSoon();
-  const { q, a } = W_PET_ASK.shift();
+  if (!wActive() || WUI.talk) { W_PET_ASK.tries = (W_PET_ASK.tries || 0) + 1; return wPetAskSoon(); }
+  const id = W_PET_ASK.shift(), a = WG.petAway.find(x => x.id === id);
   // (still waiting, and the kennel still full: ask; else it stays where it waits, to be reclaimed)
-  if (!WG.petAway.includes(a) || wPets().owned.length < W_PET.kennel) return wPetAskNext();
-  wPetFull(q, a);
+  if (!a || wPets().owned.length < W_PET.kennel) return wPetAskNext();
+  wPetFull(Object.assign({}, a, { id }), a);
 }
 const wW132Drain = wDrain;
 wDrain = function () { wW132Drain.apply(this, arguments); if (W_PET_ASK.length) wPetAskSoon(); };
@@ -88,7 +88,7 @@ function wPetFull(q, a) {
   });
 }
 // (as it was: its name, bond, hunger and the day it came, all back when reclaimed)
-function wPetAway(q) { wPets(); const a = { kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '', hungry: !!q.hungry, got: q.got != null ? q.got : null }; WG.petAway.push(a); return a; }
+function wPetAway(q) { wPets(); const a = { id: q.id, kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '', hungry: !!q.hungry, got: q.got != null ? q.got : null }; WG.petAway.push(a); return a; }
 // let one go: it goes back where it came from, and waits there
 function wPetLetGo(id) {
   const P = wPets(), q = wPetOf(id); if (!q) return 'No such pet.';
@@ -150,7 +150,8 @@ wNewDay = function () {
   if (wk !== WG.petWeek) { WG.petWeek = wk; if (P.owned.length) wPetUpkeep(); }
 };
 const wW132Start = wStart;
-wStart = function (save, opts) { const r = wW132Start(save, opts); if (WG) { wPets(); wPetSync(); } return r; };
+// (a new or loaded journey: questions from before are dropped; their pets wait where they came from)
+wStart = function (save, opts) { W_PET_ASK.length = 0; const r = wW132Start(save, opts); if (WG) { wPets(); wPetSync(); } return r; };
 
 /* ---------- the Pets tab on the Team screen ---------- */
 function wPetCard(q, side) {
