@@ -43,11 +43,11 @@ function crMade(plan, before, after, run) {
   return false;
 }
 // the next stone: { side, ri, pos, plan, rel, run, rule, made } or null when the game is over; a stone the game can't
-// take (crRefused: rule.ok false, plan and ri null) changes nothing
-function crTurn() {
+// take (crRefused: rule.ok false, plan and ri null) changes nothing. style: Manage's game for that stone (the page's
+// caller passes it for your side; a headless game has none)
+function crTurn(style) {
   const s = crUp(); if (s < 0) return null;
-  // (your side under Manage plays the game you set, however the stone is called)
-  const plan = Object.assign(crPlan(s, typeof GP !== 'undefined' && GP && GP.mode === 'manage' && s === GP.you ? GP.mgr.style : null), { s });
+  const plan = Object.assign(crPlan(s, style || null), { s });
   return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
@@ -102,7 +102,11 @@ function crSummary() {
 // the game as it stands between stones, plain JSON (a match saved and left); and back
 // (each stone's path thinned to a point every five feet, so a long game doesn't swell the save; a path already thinned
 // stays as it is, however often the match is saved and resumed)
-const crThin = p => { const out = []; p.forEach((q, i) => { const L = out[out.length - 1]; if (!L || i === p.length - 1 || Math.hypot(q[0] - L[0], q[1] - L[1]) >= 59) out.push(q); }); return out; };
+// (and every sharp turn, where it hit something, marked [x, y, 1] so a second thinning keeps it too)
+const crTurnAt = (p, i) => { if (p[i][2] === 1) return true; const a = p[i - 1], b = p[i], c = p[i + 1]; if (!a || !c) return false;
+  const h1 = Math.atan2(b[1] - a[1], b[0] - a[0]), h2 = Math.atan2(c[1] - b[1], c[0] - b[0]); let d = Math.abs(h1 - h2); if (d > Math.PI) d = 2 * Math.PI - d; return d > .35; };
+const crThin = p => { const out = []; let D = null; p.forEach((q, i) => {
+  if (!D || i === p.length - 1 || Math.hypot(q[0] - D[0], q[1] - D[1]) >= 59) { out.push([q[0], q[1]]); D = q; } else if (crTurnAt(p, i)) out.push([q[0], q[1], 1]); }); return out; };
 function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
 function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;

@@ -44,7 +44,7 @@ return {
   value: (st, s, k, hammer, sk) => crValue(st, s, k, hammer, sk), plan: s => G && G.teams ? crPlan(s) : null,
   start: o => { crStart(o); crPlayStart(o); CRC.drawn = false; return G; },
   // (the page owns a stone it is setting up or sliding: turn and throwStone wait for it)
-  turn: () => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(crUp(), 'A stone is being thrown on the page.'); const r = crTurn(); crPageStale(); return r; }, throwStone: (s, plan, rel, sweep) => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(s, 'A stone is being thrown on the page.'); const r = crThrowStone(s, plan, rel, sweep); crPageStale(); return r; }, summary: () => crSummary(), simGame: o => crSimGame(o),
+  turn: () => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(crUp(), 'A stone is being thrown on the page.'); const r = crTurn(GP && GP.mode === 'manage' && crUp() === GP.you ? GP.mgr.style : null); crPageStale(); return r; }, throwStone: (s, plan, rel, sweep) => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(s, 'A stone is being thrown on the page.'); const r = crThrowStone(s, plan, rel, sweep); crPageStale(); return r; }, summary: () => crSummary(), simGame: o => crSimGame(o),
   // ratings, positions, legs and nerve (phase 3)
   stats: CR_STATS.slice(), rate: k => crRate(k), cap: CR_RCAP, fit: (r, pos) => crFit(r, pos), autoOrder: ro => crAutoOrder(ro.map(m => ({ rs: Object.fromEntries(CR_STATS.map(k => [k, crScale((m.r || crRate(m.kind))[k])])) }))),
   reachRules: Object.assign({}, CR_REACH), legsRules: Object.assign({}, CR_LEGS), get legs() { return G && G.legs ? G.legs.slice() : null; }, pressure: s => G && G.teams ? crPressure(s) : 0,

@@ -65,6 +65,9 @@ async def main():
               const S = wCR.G.st[0].shots; t.draw += (S.draw || 0) + (S.guard || 0) + (S.freeze || 0); t.hit += (S.takeout || 0) + (S.peel || 0) + (S.hitroll || 0); } return t; };
           return { draw: count('draw'), hit: count('hit') }; })()""")
         check(mg['draw']['draw'] > mg['hit']['draw'] and mg['hit']['hit'] > mg['draw']['hit'], 'Manage: the draw game throws more draws and guards, the hitting game more takeouts', mg)
+        ind = await pg.evaluate("""(() => { const sim = () => { const g = wCR.simGame({ seed: 77, ends: 4, teams: [__D(), __D()] }); return JSON.stringify([g.tot, g.st[0].shots]); };
+          const a = sim(); wCR.start({ seed: 5, ends: 4, mode: 'manage', teams: [__D(), __D()] }); wCR.pause(true); wCR.manage({ style: 'hit' }); const b = sim(); return a === b; })()""")
+        check(ind, 'a game simulated after a Manage game plays the same as before it (Manage\'s game stays with the page)', ind)
         sn = await pg.evaluate("""(() => { wCR.start({ seed: 8, ends: 4, mode: 'watch', hall: true, teams: [__D(), __D()] }); wCR.pause(true); let n = 0; while (wCR.G.n < 9 && n++ < 30000) wCR.tick(.05); __to('next');
           const S = wCR.snapshot(), json = JSON.stringify(S) === JSON.stringify(JSON.parse(JSON.stringify(S))), want = JSON.stringify(S.G);
           wCR.start({ seed: 99 }); wCR.resume(S); const same = JSON.stringify(wCR.G) === want; const again = JSON.stringify(wCR.snapshot().paths) === JSON.stringify(S.paths) && S.paths.length >= 8 && S.paths.every(q => q.path.length >= 3); n = 0; while (!wCR.G.over && n++ < 60000) wCR.tick(.1);
@@ -108,8 +111,8 @@ async def main():
         pw = await pg.evaluate("""(() => { wShg().met = {}; const keepMode = W_SHED_MODE, g0 = RUN.gold, w0 = WG.shg.w; wStartShed({ club: 'local', how: 'play' }); wCR.pause(true);
           const G = wCR.G, n = G.ends - 1; G.end = n; G.sc = [Array(n).fill(0), Array(n).fill(0)]; G.sc[0][0] = 5; G.k = 15; G.stones = [];
           $('wShedModes').querySelector('[data-cmode="watch"]').click(); let i = 0; while (wShedLive() && i++ < 40000) wCR.tick(.05);
-          const r = { live: wShedLive(), last: WG.shg.games[0].r, wins: WG.shg.w - w0, gold: RUN.gold - g0 }; wLeaveShed(); W_SHED_MODE = keepMode; return r; })()""")
-        check(pw['live'] is False and pw['last'] == 'win' and pw['wins'] == 1 and pw['gold'] > 0, 'a match played out to a win is settled as a win, with its gold', pw)
+          const r = { live: wShedLive(), last: WG.shg.games[0].r, wins: WG.shg.w - w0, gold: RUN.gold - g0 }; r.mode = W_SHED_MODE === keepMode; wLeaveShed(); return r; })()""")
+        check(pw['live'] is False and pw['last'] == 'win' and pw['wins'] == 1 and pw['gold'] > 0 and pw['mode'], 'a match played out to a win is settled as a win, with its gold; the mode you changed to in it goes back to yours', pw)
         st = await pg.evaluate("""(() => { const style = st => { let t = 0, all = 0; for (let i = 0; i < 10; i++) { wCR.start({ seed: 60 + i, ends: 4, mode: 'manage', teams: [__D(), __D()] }); wCR.pause(true); wCR.manage({ style: st });
               let n = 0; while (!wCR.G.over && n++ < 40000) wCR.tick(.1); const S = wCR.G.st[0].shots; t += (S.takeout || 0) + (S.peel || 0) + (S.hitroll || 0); all += wCR.G.st[0].stones; } return +(t / all).toFixed(3); };
           return { hit: style('hit'), draw: style('draw') }; })()""")

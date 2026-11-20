@@ -94,6 +94,8 @@ function wStartShed(o) {
   const world = { kind: o.kind || 'shgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, cold, cup: !!o.cup };
   if (!o.cup) B.met[club] = WG.dayAbs;
   B.live = { world, snap: null };
+  // (your own Shed mode, back when the match is settled or you leave: wShedModeBack)
+  if (how !== 'sim' && WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
   const opts = { teams: [mine, opp], skill: wShedSkillOf(tier), ends: wShedEnds(), cold, hall: true, hammer: Math.random() < .5 ? 0 : 1 };
   if (how === 'sim') { const s = wCR.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts)); wShedResultCard(wShedSettle(s)); return ''; }
   wShedGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
@@ -163,7 +165,7 @@ wCR.onPhase = ph => {
 };
 const wW125OnOver = wCR.onOver;
 wCR.onOver = s => {
-  if (WCR && WCR.world && wShedLive()) WCR.msg = wShedSettle(s);
+  if (WCR && WCR.world && wShedLive()) { WCR.msg = wShedSettle(s); WCR.endMode = wCR.mode; wShedModeBack(); }
   wW125OnOver(s);
   wShedBarNote();
 };
@@ -229,6 +231,8 @@ wShedBarNote = function () {
   $('wShedSave').hidden = $('wShedGive').hidden = !live;
   $('wShedAgain').hidden = real; $('wShedBack').hidden = live; $('wShedEnds').parentElement.hidden = real; $('wShedSkill').parentElement.hidden = real;
   if (real && !live && WCR.msg) $('wShedNote').textContent = WCR.msg;
+  // (a settled match still shows the mode it was played in; your own is back for the next game)
+  if (real && WCR.over && WCR.endMode) for (const b of $('wShedModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.cmode === WCR.endMode); b.setAttribute('aria-pressed', b.dataset.cmode === WCR.endMode); }
 };
 const wW125LeaveShed = wLeaveShed;
 wLeaveShed = function () { if (wShedWorld()) return wShedLeaveGame(); wShedModeBack(); wW125LeaveShed(); if (WG) { wSave(); wDrain(); } };
