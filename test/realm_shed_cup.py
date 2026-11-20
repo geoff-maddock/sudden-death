@@ -131,14 +131,15 @@ async def main():
 
         dc = await pg.evaluate("""(() => { const a = wShedDecide({ win: -1, tot: [5, 3] }), b = wShedDecide({ win: -1, tot: [4, 4] });
           const t = wResultText({ a: 'me', b: wLeagueClubs()[0], sa: 3, sb: 6, sport: 'curling', cd: 1 });
-          return { lead: a.win === 0 && a.tot.join() === '5,3', level: b.tot[0] + b.tot[1] === 9 && b.tot[b.win] === 5 && !!b.extra, cd: t.includes('(conceded)') }; })()""")
-        check(dc == {'lead': True, 'level': True, 'cd': True}, 'a game stopped undecided goes to the side ahead, or a level one to an extra end; a conceded fixture says so in the results', dc)
+          const c1 = wShedDecide({ win: -1, tot: [2, 2], board: { sc: [[1, 1], [2, 0]] } }, 7), c2 = wShedDecide({ win: -1, tot: [2, 2], board: { sc: [[1, 1], [2, 0]] } }, 7);
+          return { seeded: c1.win === c2.win && c1.board.sc[c1.win].length === 3 && c1.board.sc[c1.win][2] === 1, lead: a.win === 0 && a.tot.join() === '5,3', level: b.tot[0] + b.tot[1] === 9 && b.tot[b.win] === 5 && !!b.extra, cd: t.includes('conceding') }; })()""")
+        check(dc == {'seeded': True, 'lead': True, 'level': True, 'cd': True}, 'a game stopped undecided goes to the side ahead, or a level one to an extra end; a conceded fixture says so in the results', dc)
         bt = await pg.evaluate("""(() => { wOpenCamp('shed'); const tab = !!document.querySelector('#wCampBody [data-crcup]'); WCAMP.close();
           wOpenShedCard(); const card = !!document.querySelector('#modalBox [data-crcup]'); return { tab, card }; })()""")
         check(bt['tab'] and bt['card'], 'the Shed tab and the match card have a Brass Broom button', bt)
         await pg.evaluate(CLOSE_ALL)
         await pg.evaluate("showPage('help')")
-        hp = await pg.evaluate("(() => { const t = (document.getElementById('wHelpShedCup') || {}).textContent || ''; return ['Brass Broom', 'CUP', 'extra end', 'league fixture'].map(s => t.includes(s)); })()")
+        hp = await pg.evaluate("(() => { const t = (document.getElementById('wHelpShedCup') || {}).textContent || ''; return ['Brass Broom', 'CUP', 'extra end', 'league fixture', 'concede'].map(s => t.includes(s)); })()")
         check(all(hp), 'How to play explains the Brass Broom and the fixtures at the Shed', hp)
 
         check(not errs, 'no page errors', errs[:5])

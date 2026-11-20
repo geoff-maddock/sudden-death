@@ -97,7 +97,7 @@ function wStartShed(o) {
   // (your own Shed mode, back when the match is settled or you leave: wShedModeBack)
   if (how !== 'sim' && WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
   const opts = { teams: [mine, opp], skill: wShedSkillOf(tier), ends: wShedEnds(), cold, hall: true, powers: true, hammer: Math.random() < .5 ? 0 : 1 };
-  if (how === 'sim') { const s = wShedDecide(wCR.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts))); wShedResultCard(wShedSettle(s)); return ''; }
+  if (how === 'sim') { const seed = (Math.random() * 1e9) | 0, s = wShedDecide(wCR.simGame(Object.assign({ seed }, opts)), seed); wShedResultCard(wShedSettle(s)); return ''; }
   wShedGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WCR.world = true;
   wShedBarNote();
@@ -208,11 +208,12 @@ function wShedSettle(sum) {
   return msg;
 }
 // a game the engine stopped before it was decided (it never should): the side ahead wins it; level, it is settled as an
-// extra end would be, one more point for the side it falls to. s: a summary, changed in place
-function wShedDecide(s) {
+// extra end would be, one more point for the side it falls to (by the game's seed, when it had one: the same game
+// settles the same way), and that end goes on the board. s: a summary, changed in place
+function wShedDecide(s, seed) {
   if (!s || s.win === 0 || s.win === 1) return s;
-  const t = (s.tot || [0, 0]).slice(); let k = t[0] === t[1] ? (Math.random() < .5 ? 0 : 1) : t[0] > t[1] ? 0 : 1;
-  if (t[0] === t[1]) { t[k]++; s.extra = (s.extra || 0) + 1; }
+  const t = (s.tot || [0, 0]).slice(), k = t[0] === t[1] ? (seed != null ? Math.abs(seed | 0) % 2 : Math.random() < .5 ? 0 : 1) : t[0] > t[1] ? 0 : 1;
+  if (t[0] === t[1]) { t[k]++; s.extra = (s.extra || 0) + 1; if (s.board && s.board.sc) { s.board.sc[k].push(1); s.board.sc[1 - k].push(0); } }
   s.tot = t; s.win = k; s.text = `${Math.max(t[0], t[1])} to ${Math.min(t[0], t[1])}${s.extra ? ' after an extra end' : ''}`;
   return s;
 }

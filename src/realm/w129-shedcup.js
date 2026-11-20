@@ -57,10 +57,12 @@ W_ON_END.crcup = function (r, ref, W) {
   const D = wBroom(); if (!D || !ref || D.done || ref.week !== D.week || ref.round !== D.round) return;
   const forced = W_BROOM.force; W_BROOM.force = null;
   const win = (forced || r) === 'win', end = forced ? '' : ((WG.shg.games[0] || {}).end) || '', rd = W_BROOM.rounds[D.round];
-  const how = W.text && W.text !== 'conceded' ? ` ${W.text}` : W.text === 'conceded' ? ', conceded' : '';
+  let how = W.text && W.text !== 'conceded' ? ` ${W.text}` : W.text === 'conceded' ? ', conceded' : '';
   // (a forced result's score is turned round to fit it, for the tests and the bot; a concede is marked)
   let ra = W.us, rb = W.them; if (forced && (win ? ra <= rb : rb <= ra)) { [ra, rb] = ra === rb ? (win ? [ra + 1, rb] : [ra, rb + 1]) : [rb, ra]; }
   const row = { a: 'me', b: W.club, ra, rb, w: win ? 'me' : W.club, end: W.text === 'conceded' && !forced ? 'c' : end };
+  // (a forced result's line says the score turned round to fit it)
+  if (forced) how = ` ${Math.max(ra, rb)} to ${Math.min(ra, rb)}`;
   D.games[D.round].push(row);
   if (!win) D.out = true;
   D.pending = true;
@@ -72,9 +74,9 @@ W_ON_END.crcup = function (r, ref, W) {
 function wShedSimClubs(a, b, tier) {
   const B = wShg(), kept = JSON.parse(JSON.stringify(B.opp)), teams = [wShedOpp(a, tier), wShedOpp(b, tier)];
   B.opp = kept;
-  const sk = wShedSkillOf(tier)[1], s = wCR.simGame({ teams, skill: [sk, sk], ends: wShedEnds(), cold: wShedColdNow(), hall: true, powers: true, seed: (Math.random() * 1e9) | 0 });
+  const sk = wShedSkillOf(tier)[1], seed = (Math.random() * 1e9) | 0, s = wCR.simGame({ teams, skill: [sk, sk], ends: wShedEnds(), cold: wShedColdNow(), hall: true, powers: true, seed });
   // (a game the engine stopped before it was decided: wShedDecide)
-  wShedDecide(s); const t = s.tot || [0, 0];
+  wShedDecide(s, seed); const t = s.tot || [0, 0];
   return { ra: t[0], rb: t[1], w: s.win === 0 ? a : b, end: s.extra ? 'xe' : '' };
 }
 function wBroomSim(a, b, tier) { const s = wShedSimClubs(a, b, tier); return { a, b, ra: s.ra, rb: s.rb, w: s.w, end: s.end }; }
@@ -156,7 +158,7 @@ W_ON_END.crfix = function (r, ref, W) {
 };
 // a conceded fixture says so in the results (its score is the one when it was given up)
 const wW129ResultText = wResultText;
-wResultText = function (r) { return wW129ResultText(r) + (r && r.cd ? ' (conceded)' : ''); };
+wResultText = function (r) { return wW129ResultText(r) + (r && r.cd ? `, ${wTheClub(r.b)} conceding` : ''); };
 const wW129SimAt = wSimAt;
 wSimAt = function (a, b, g) {
   if (g !== W_CRFIX.g || LAB) return wW129SimAt(a, b, g);
@@ -210,5 +212,5 @@ const wW129RenderHelp = renderHelp;
 renderHelp = function () {
   wW129RenderHelp();
   const g = $('wHelpShedStars') || $('wHelpShedKit') || $('wHelpShedGame'); if (!g || $('wHelpShedCup')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedCup"><b>The Brass Broom.</b> Curling's cup, every week at the Curling Shed: ask Brush Hennock about the CUP, or use the Brass Broom button on the Shed tab. ${W_BROOM.fee} gold to enter. Eight rinks, three rounds of one game each; nobody goes home level (an extra end), and lose and you're out. Win it for ${W_BROOM.prize.gold} gold, ${W_BROOM.prize.fans} fans, a pick of cards and a piece of curling gear. Your league fixture at the Shed is curled on the ice too.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedCup"><b>The Brass Broom.</b> Curling's cup, every week at the Curling Shed: ask Brush Hennock about the CUP, or use the Brass Broom button on the Shed tab. ${W_BROOM.fee} gold to enter. Eight rinks, three rounds of one game each; nobody goes home level (an extra end), and lose and you're out. Win it for ${W_BROOM.prize.gold} gold, ${W_BROOM.prize.fans} fans, a pick of cards and a piece of curling gear. Your league fixture at the Shed is curled on the ice too. A match you concede is a loss at the score when you gave up: marked ‡ in the bracket, and conceding in the results.</p>`);
 };

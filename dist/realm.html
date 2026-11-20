@@ -60387,7 +60387,7 @@ function wStartShed(o) {
   // (your own Shed mode, back when the match is settled or you leave: wShedModeBack)
   if (how !== 'sim' && WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
   const opts = { teams: [mine, opp], skill: wShedSkillOf(tier), ends: wShedEnds(), cold, hall: true, powers: true, hammer: Math.random() < .5 ? 0 : 1 };
-  if (how === 'sim') { const s = wShedDecide(wCR.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts))); wShedResultCard(wShedSettle(s)); return ''; }
+  if (how === 'sim') { const seed = (Math.random() * 1e9) | 0, s = wShedDecide(wCR.simGame(Object.assign({ seed }, opts)), seed); wShedResultCard(wShedSettle(s)); return ''; }
   wShedGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WCR.world = true;
   wShedBarNote();
@@ -60498,11 +60498,12 @@ function wShedSettle(sum) {
   return msg;
 }
 // a game the engine stopped before it was decided (it never should): the side ahead wins it; level, it is settled as an
-// extra end would be, one more point for the side it falls to. s: a summary, changed in place
-function wShedDecide(s) {
+// extra end would be, one more point for the side it falls to (by the game's seed, when it had one: the same game
+// settles the same way), and that end goes on the board. s: a summary, changed in place
+function wShedDecide(s, seed) {
   if (!s || s.win === 0 || s.win === 1) return s;
-  const t = (s.tot || [0, 0]).slice(); let k = t[0] === t[1] ? (Math.random() < .5 ? 0 : 1) : t[0] > t[1] ? 0 : 1;
-  if (t[0] === t[1]) { t[k]++; s.extra = (s.extra || 0) + 1; }
+  const t = (s.tot || [0, 0]).slice(), k = t[0] === t[1] ? (seed != null ? Math.abs(seed | 0) % 2 : Math.random() < .5 ? 0 : 1) : t[0] > t[1] ? 0 : 1;
+  if (t[0] === t[1]) { t[k]++; s.extra = (s.extra || 0) + 1; if (s.board && s.board.sc) { s.board.sc[k].push(1); s.board.sc[1 - k].push(0); } }
   s.tot = t; s.win = k; s.text = `${Math.max(t[0], t[1])} to ${Math.min(t[0], t[1])}${s.extra ? ' after an extra end' : ''}`;
   return s;
 }
@@ -60962,10 +60963,12 @@ W_ON_END.crcup = function (r, ref, W) {
   const D = wBroom(); if (!D || !ref || D.done || ref.week !== D.week || ref.round !== D.round) return;
   const forced = W_BROOM.force; W_BROOM.force = null;
   const win = (forced || r) === 'win', end = forced ? '' : ((WG.shg.games[0] || {}).end) || '', rd = W_BROOM.rounds[D.round];
-  const how = W.text && W.text !== 'conceded' ? ` ${W.text}` : W.text === 'conceded' ? ', conceded' : '';
+  let how = W.text && W.text !== 'conceded' ? ` ${W.text}` : W.text === 'conceded' ? ', conceded' : '';
   // (a forced result's score is turned round to fit it, for the tests and the bot; a concede is marked)
   let ra = W.us, rb = W.them; if (forced && (win ? ra <= rb : rb <= ra)) { [ra, rb] = ra === rb ? (win ? [ra + 1, rb] : [ra, rb + 1]) : [rb, ra]; }
   const row = { a: 'me', b: W.club, ra, rb, w: win ? 'me' : W.club, end: W.text === 'conceded' && !forced ? 'c' : end };
+  // (a forced result's line says the score turned round to fit it)
+  if (forced) how = ` ${Math.max(ra, rb)} to ${Math.min(ra, rb)}`;
   D.games[D.round].push(row);
   if (!win) D.out = true;
   D.pending = true;
@@ -60977,9 +60980,9 @@ W_ON_END.crcup = function (r, ref, W) {
 function wShedSimClubs(a, b, tier) {
   const B = wShg(), kept = JSON.parse(JSON.stringify(B.opp)), teams = [wShedOpp(a, tier), wShedOpp(b, tier)];
   B.opp = kept;
-  const sk = wShedSkillOf(tier)[1], s = wCR.simGame({ teams, skill: [sk, sk], ends: wShedEnds(), cold: wShedColdNow(), hall: true, powers: true, seed: (Math.random() * 1e9) | 0 });
+  const sk = wShedSkillOf(tier)[1], seed = (Math.random() * 1e9) | 0, s = wCR.simGame({ teams, skill: [sk, sk], ends: wShedEnds(), cold: wShedColdNow(), hall: true, powers: true, seed });
   // (a game the engine stopped before it was decided: wShedDecide)
-  wShedDecide(s); const t = s.tot || [0, 0];
+  wShedDecide(s, seed); const t = s.tot || [0, 0];
   return { ra: t[0], rb: t[1], w: s.win === 0 ? a : b, end: s.extra ? 'xe' : '' };
 }
 function wBroomSim(a, b, tier) { const s = wShedSimClubs(a, b, tier); return { a, b, ra: s.ra, rb: s.rb, w: s.w, end: s.end }; }
@@ -61061,7 +61064,7 @@ W_ON_END.crfix = function (r, ref, W) {
 };
 // a conceded fixture says so in the results (its score is the one when it was given up)
 const wW129ResultText = wResultText;
-wResultText = function (r) { return wW129ResultText(r) + (r && r.cd ? ' (conceded)' : ''); };
+wResultText = function (r) { return wW129ResultText(r) + (r && r.cd ? `, ${wTheClub(r.b)} conceding` : ''); };
 const wW129SimAt = wSimAt;
 wSimAt = function (a, b, g) {
   if (g !== W_CRFIX.g || LAB) return wW129SimAt(a, b, g);
@@ -61115,7 +61118,7 @@ const wW129RenderHelp = renderHelp;
 renderHelp = function () {
   wW129RenderHelp();
   const g = $('wHelpShedStars') || $('wHelpShedKit') || $('wHelpShedGame'); if (!g || $('wHelpShedCup')) return;
-  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedCup"><b>The Brass Broom.</b> Curling's cup, every week at the Curling Shed: ask Brush Hennock about the CUP, or use the Brass Broom button on the Shed tab. ${W_BROOM.fee} gold to enter. Eight rinks, three rounds of one game each; nobody goes home level (an extra end), and lose and you're out. Win it for ${W_BROOM.prize.gold} gold, ${W_BROOM.prize.fans} fans, a pick of cards and a piece of curling gear. Your league fixture at the Shed is curled on the ice too.</p>`);
+  g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedCup"><b>The Brass Broom.</b> Curling's cup, every week at the Curling Shed: ask Brush Hennock about the CUP, or use the Brass Broom button on the Shed tab. ${W_BROOM.fee} gold to enter. Eight rinks, three rounds of one game each; nobody goes home level (an extra end), and lose and you're out. Win it for ${W_BROOM.prize.gold} gold, ${W_BROOM.prize.fans} fans, a pick of cards and a piece of curling gear. Your league fixture at the Shed is curled on the ice too. A match you concede is a loss at the score when you gave up: marked ‡ in the bracket, and conceding in the results.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
