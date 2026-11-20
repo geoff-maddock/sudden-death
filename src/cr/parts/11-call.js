@@ -7,8 +7,8 @@
    - The reason (crReason): your skip says why it calls a shot: they have shot stone, a guard to steal behind, the
      hammer and the house kept clean, a single to win it, and so on.
    - Two stones ahead (crReplyLikely): an Archmage plays each of its best shots on, against the other rink's likeliest
-     reply (a takeout of each of its two nearest stones in the house, and a draw to the button): the mean of the two
-     best for them, weighed in at CR_CALL.replyMix.
+     reply (a takeout of each of its nearest stones in the house, CR_CALL.replies - 2 of them, the better handle for
+     them, and a draw to the button): the mean of the two best for them, weighed in at CR_CALL.replyMix.
    - The ice chart (crChart): the sheet on its side, the pebble's wear as a stain where stones have run, and every
      stone's path this game, for as far back from the house as the side's skip can read it (crReadIn: a reader of 1
      sees the house and a few feet, of 12 all the way to the hog line); the rest is hatched. */
@@ -33,13 +33,16 @@ function crReplyLikely(s, after, kAfter, sk, draws) {
   const o = 1 - s, keep = { stones: G.stones, k: G.k };
   G.stones = after; G.k = kAfter;
   try {
-    const R = CR_SHEET.stoneR, hits = [], ice = crIceRead(o);
-    // (a takeout of each of side s's two nearest stones, the first handle that gets there; and always their draws)
-    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, Math.max(0, CR_CALL.replies - 2))) for (const h of [1, -1]) { const aim = crSolveHit(st.x, st.y - R * 1.6, CR_AIM.vHit, h, ice, G.cold); if (aim) { hits.push(aim); break; } }
-    const list = hits.concat(draws || crReplyDraws(s));
-    if (!list.length) return null;
+    const R = CR_SHEET.stoneR, ice = crIceRead(o);
+    // (a takeout of each of side s's nearest stones, CR_CALL.replies - 2 of them, by whichever handle does it better for
+    // the other rink; and always their draws to the button)
+    const v = aim => crValue(crTry(o, aim), s, kAfter + 1, G.hammer, sk), vals = [];
+    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, Math.max(0, CR_CALL.replies - 2))) {
+      const both = [1, -1].map(h => crSolveHit(st.x, st.y - R * 1.6, CR_AIM.vHit, h, ice, G.cold)).filter(Boolean).map(v); if (both.length) vals.push(Math.min(...both)); }
+    for (const aim of draws || crReplyDraws(s)) vals.push(v(aim));
+    if (!vals.length) return null;
     // their likeliest reply: the mean of their best two for them (worst two for side s)
-    const vals = list.map(aim => crValue(crTry(o, aim), s, kAfter + 1, G.hammer, sk)).sort((a, b) => a - b), two = vals.slice(0, 2);
+    vals.sort((a, b) => a - b); const two = vals.slice(0, 2);
     return two.reduce((a, b) => a + b, 0) / two.length;
   } finally { G.stones = keep.stones; G.k = keep.k; }
 }

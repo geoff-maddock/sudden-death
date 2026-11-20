@@ -43,6 +43,7 @@ function crHide() { CRP.ptr = null; CRP.sweepKey = CRP.sweepPtr = CRP.sweepBtn =
 /* ---------- the keys ---------- */
 const CR_SHOT_KEYS = { 1: 'draw', 2: 'guard', 3: 'freeze', 4: 'takeout', 5: 'peel', 6: 'hitroll' };
 function crKeyOk(e) {
+  if (!e.key) return false;
   if (!CRP.on || !GP || GP.mode !== 'play' || CRP.paused || CRP.cv.offsetParent === null) return false;
   // Space belongs to the Shed for the whole of a live game, so it never presses a focused bar button mid-game
   if (e.key === ' ' ? !!G.over && GP.ph !== 'slide' : GP.ph !== 'aim') return false;
