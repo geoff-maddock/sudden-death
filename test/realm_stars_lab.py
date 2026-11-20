@@ -107,7 +107,8 @@ window.SLAB = {
     const club = Object.values(WG.rivals)[0]; wShg().opp = {};
     const opp = wShedOpp(club, 2), sq = wShedSquad(opp);
     const g = wCR.simGame({ teams: [sq.team, opp], skill: wShedSkillOf(2), ends: 6, hall: true, powers: true, hammer: Math.random() < .5 ? 0 : 1 });
-    return { win: g.win === 0, on: sq.team.roster.some(r => r.kind === p.kind), d: g.tot[0] - g.tot[1] };
+    // (no 'on': a four of four always puts the extra player on the ice)
+    return { win: g.win === 0, d: g.tot[0] - g.tot[1] };
   }
 };
 """

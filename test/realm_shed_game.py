@@ -101,6 +101,14 @@ async def main():
           return { same, repeat: JSON.stringify(a.log) === JSON.stringify(b.log), stream: s1 === s2, json: want === JSON.stringify(JSON.parse(want)) }; })()""")
         check(d == {'same': True, 'repeat': True, 'stream': True, 'json': True}, 'simGame leaves the game on the ice and its seeded stream alone; the same seed plays the same game; the game is plain JSON', d)
 
+        # ---------- the lab's switches (phase 10) ----------
+        lb = await pg.evaluate("""(() => { const T = k => ({ name: k, short: 'T', roster: [0, 1, 2, 3].map(i => ({ n: k + i, kind: 'dwarf' })) });
+          const held = wCR.simGame({ seed: 41, ends: 2, teams: [T('a'), T('b')], fixShot: ['guard', null] }), S = held.st[0].shots, all = Object.values(S).reduce((a, b) => a + b, 0);
+          wCR.start({ seed: 42, ends: 2, teams: [T('a'), T('b')], wear: false }); const ice0 = JSON.stringify(wCR.G.ice); let n = 0; while (!wCR.G.over && n++ < 100) wCR.turn(); const fresh = JSON.stringify(wCR.G.ice) === ice0;
+          wCR.start({ seed: 43, ends: 2, teams: [T('a'), T('b')], noSweep: [true, false] }); const L0 = wCR.G.legs.slice(); n = 0; let swept0 = 0; while (!wCR.G.over && n++ < 100) { const s = wCR.up(); const ev = wCR.turn(); if (s === 0 && wCR.G.legs[0] < 1) swept0++; }
+          const sum = wCR.simGame({ seed: 44, ends: 2, powers: true, teams: [T('a'), T('b')] });
+          return { guards: S.guard || 0, all, fresh, swept0, arrays: Array.isArray(sum.casts) && Array.isArray(sum.pots) }; })()""")
+        check(lb['guards'] >= lb['all'] * .7 and lb['fresh'] and lb['swept0'] == 0 and lb['arrays'], 'the lab\'s switches: a side held to the guard throws guards, wear off leaves the pebble fresh, no sweeping spends no legs; a summary carries the casts and the potions', lb)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('FAILURES: ' + str(len(FAILS)) if FAILS else 'all ok')

@@ -33,7 +33,7 @@ $('v-shed').insertAdjacentHTML('beforebegin', `<div id="wShedBar" class="wdbar" 
   <b id="wShedTitle">A game at the Curling Shed</b><span id="wShedNote" class="hint wsnote"></span>
   <span id="wShedModes" class="wgmodes" role="group" aria-label="Who throws">${Object.entries(W_SHED_MODES).map(([k, m]) => `<button class="ghost" data-cmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <label class="hint" title="How many ends a game is. Also on the Settings panel.">Ends <select id="wShedEnds">${wCR.rules.endsAt.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label>
-  <label class="hint" title="How well the other rink curls: a Squire looks at the easy shots and misses more; a Knight weighs the house and the hammer; an Archmage reads the ice as it is now and misses least.">Their rink <select id="wShedSkill">${wCR.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
+  <label class="hint" title="How well the other rink curls: a Squire doesn't think about the hammer, reads the fresh pebble and misses more; a Knight weighs the house and the hammer; an Archmage reads the ice as it is now and misses least.">Their rink <select id="wShedSkill">${wCR.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
   <label class="hint" id="wShedSpeedL" title="How fast the game runs while you watch. In You play it is always 1.">Speed <select id="wShedSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
   <button class="ghost" id="wShedAgain">Another game</button>
   <button class="ghost" id="wShedBack">Back to the world</button></div>`);
@@ -200,7 +200,7 @@ function wShedHowHTML() {
   <p class="hint"><b>The throw.</b> Space twice: once to start, once on the <b>yellow line</b> for the call's weight. Early is light, late is heavy. On a phone, drag back from the hack and let go: the further you pull, the heavier.</p>
   <p class="hint"><b>Sweeping.</b> While your stone slides, hold Space (or the Sweep button) to sweep: a swept stone goes further and curls less. Your skip calls it: "Hurry hard!" when it will stop well short, "Sweep!" a little short, "Off!" when it has the weight, "Whoa!" when it is heavy. A light stone can be swept home; a heavy one can't be stopped.</p>
   <p class="hint"><b>The ice</b> is pebbled, and the pebble wears where stones go: worn ice is keener (a stone runs further). The Shed's cold changes the whole sheet: heavy on a warm day, keen after a hard frost.</p>
-  <p class="hint"><b>Their rink</b> (on the bar): a <b>Squire</b> looks at the easy shots and misses more; a <b>Knight</b> weighs the house and the hammer, and reads the ice as it was when the end began; an <b>Archmage</b> reads the ice as it is now and misses least. <b>Watch</b> hands both rinks to the CPU, and Speed on the bar runs it faster.</p>`;
+  <p class="hint"><b>Their rink</b> (on the bar): a <b>Squire</b> doesn't think about the hammer, reads the fresh pebble and misses more; a <b>Knight</b> weighs the house and the hammer, and reads the ice as it was when the end began; an <b>Archmage</b> reads the ice as it is now and misses least. <b>Watch</b> hands both rinks to the CPU, and Speed on the bar runs it faster.</p>`;
 }
 const wW122RenderHelp = renderHelp;
 renderHelp = function () {

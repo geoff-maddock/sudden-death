@@ -7,19 +7,22 @@
    What a result is worth (crValue): the end's score if it stopped there, less as more stones are to come; stones in
    the house; and, for a Knight and up, the hammer: the side without it wants guards in the centre, the side with it
    wants the middle open and corner guards, and at the end of an end what the hammer is worth next.
-   The skills (CR_SKILL): a Squire looks at fewer shots (only one handle), doesn't think about the hammer, misses more
-   and sweeps late; a Knight looks at them all and plays the likeliest result over a few throws with its own miss; an
-   Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now.
+   The skills (CR_SKILL): a Squire looks at the plain shots (both handles, and the hit and roll, but no draws round the
+   guards), doesn't think about the hammer, reads the fresh pebble, misses more, plays its best two over two throws
+   each and sweeps a little late (from 300 inches past the hack); a Knight looks at them all and plays its best three over three throws with its own miss; an
+   Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now. (top:
+   how many of its best it weighs; samples: the throws each; wide: both handles and the hit and roll.)
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.
    The ice a skip reads (crIceRead, CR_SKILL's ice): an Archmage the pebble as it is now, a Knight as it was when the end
    began, a Squire the fresh pebble; it aims on it and judges its shots on it, so a misread costs it. Its shots know the
    free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
-  // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%)
-  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
-  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
-  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
+  // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%; on the old,
+  // narrow shot list, one handle and no hit and roll, it was still 91%)
+  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, wide: true, hammer: false, ice: 'fresh', sweepLate: 300 },
+  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, wide: true, hammer: true, ice: 'end', sweepLate: 0 },
+  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, wide: true, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
@@ -48,13 +51,13 @@ function crValue(stones, s, kAfter, hammer, sk) {
 // the shots worth a look for side s now: [{ shot, x, y, v?, h, aim: { ang, v, h }, target? }]
 function crShots(s, sk) {
   const S = CR_SKILL[sk], R = CR_SHEET.stoneR, ice = crIceRead(s), cold = G.cold, st = G.stones, out = [];
-  const hs = S.top > 1 ? [1, -1] : [1];
+  const hs = S.wide ? [1, -1] : [1];
   const draw = (shot, x, y) => { for (const h of hs) { const aim = crSolveDraw(x, y, h, ice, cold); if (aim) out.push({ shot, x, y, h, aim }); } };
   const hit = (shot, o, v, dx) => { for (const h of hs) { const aim = crSolveHit(o.x + (dx || 0), o.y - R * 1.6, v, h, ice, cold); if (aim) out.push({ shot, x: o.x, y: o.y, h, aim, target: o.id, roll: dx || 0 }); } };
   draw('draw', 0, 0); draw('draw', 0, -40); draw('draw', 40, -8); draw('draw', -40, -8); draw('draw', 0, 34);
   draw('guard', 0, -190); draw('guard', 52, -175); draw('guard', -52, -175);
   for (const o of st.filter(o => o.s !== s)) {
-    if (crInHouse(o)) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.top > 1) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
+    if (crInHouse(o)) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.wide) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
     // (a guard of theirs can't be taken out before the fifth stone: the free guard zone)
     else if (crInFgz(o) && G.k >= G.fgz) hit('peel', o, CR_AIM.vPeel);
   }
@@ -78,7 +81,7 @@ const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout'
 function crPlan(s, style, only) {
   const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
   // (the lab's fixShot holds a side to one shot where it can be played)
-  const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs) : [], list = held.length ? held : only && kind.length ? kind : all;
+  const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs && (!only || (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only)) : [], list = held.length ? held : only && kind.length ? kind : all;
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
   // (the style's bonus goes on every value the pick is made by: the first look, the samples and the reply)
   const sb = c => CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0;
@@ -97,7 +100,7 @@ function crWhy(c) {
   return `${CR_SHOTS[c.shot]}${where ? ' ' + where : ''}, ${c.h > 0 ? 'out-turn' : 'in-turn'}`;
 }
 // the sweepers for a called shot: sweep while the stone would stop short of the call (its speed now), harder the
-// further short, from the release (a Squire's only from halfway down the sheet: sweepLate)
+// further short, from the release (a Squire's a little later, sweepLate inches past the hack)
 function crSweeper(s, plan) {
   if (G.noSweep && G.noSweep[s]) return null;
   if (!plan || !['draw', 'guard', 'freeze'].includes(plan.shot)) return null;

@@ -1267,11 +1267,18 @@ swapping sides) is faster for one question at a time.
 The first run found two things wrong, both fixed before the numbers below:
 
 1. **The Squire lost 99 to 100% of the time** to a Knight, so tier 1 read 95%. It now misses less (`ang` .45 to .33,
-   `v` .022 to .016), weighs its best two shots twice each, and its sweepers start from 300 inches past the hack
-   rather than halfway: a Knight beats it 83% (150 games in node), 84 to 87% in the lab.
+   `v` .022 to .016), weighs its best two shots twice each, looks at both handles and the hit and roll (it had one
+   handle and no hit and roll; with the rest of the change and the old list it was still 91%, 150 games), and its
+   sweepers start from 300 inches past the hack rather than halfway: a Knight beats it 83% (150 games in node), 84 to
+   87% in the lab.
 2. **Granite decided games.** A golem's Granite Stone (the draw power: once at rest, the stone is heavier) won 80%
    against the same four with no powers (120 games). Granite is now twice an ordinary stone, not three times
-   (`CR_GRANITE`): 58%.
+   (`CR_GRANITE`): 58%. Measured again at 100 a cell in the lab, the granite on a hitting stone was still strong (a
+   takeout that sticks and won't be moved): Stone Wall 71% against 60% with none, the troll's Boulder 60% against
+   37%, Troll Bridge 54%, the Kraken's Grasp 65% against 60%, the Behemoth's Mountain Stone 79% against 66%; the
+   Granite Stone 61% against 60%. Granite is cast on nearly every stone that matters, so a granite power now costs 3
+   mana, not 2 (`CR_MANA.granite`): in node (150 games) Stone Wall 70% to 63% against 55%, the Boulder 49% to 56%
+   against 45% (within the noise).
 
 **Tiers, as the world sets them** (100 each; their level yours plus the tier less one, `W_SHG.oppBonus` a point on each
 of their four, their skill by tier, round every club):
@@ -1316,6 +1323,8 @@ each potion, two in the bag: 37.5 to 57.5% against 47.5%.
 
 ### Superstars on the ice
 
-`realm_stars_lab.py 60 '' cr` (three of your own and the extra player as your four, at an even level against a Knight,
-tier 2): the control (a league kind) 48.3%, the Phoenix 56.7%, the Kraken 48.3%, the Behemoth 55.0%, the Djinn 53.3%, the
-Hydra 48.3%, the Frost Wyrm 51.7%. A superstar adds a little, as one player in four, within the noise at 60.
+`realm_stars_lab.py 100 '' cr` (three of your own and the extra player as your four, at an even level against a
+Knight, tier 2; granite at twice, before its cost went to 3): the control (a league kind) 37%, the Phoenix 51%, the
+Kraken 48%, the Behemoth 45%, the Djinn 55%, the Hydra 43%, the Frost Wyrm 66%. A first run at 60 read the control at
+48% and the superstars 48 to 57%: the control cell alone moves 11 points between runs, so a superstar adds somewhere
+between a little and about 10 points as one player in four; the Frost Wyrm's 66% is the one to watch.

@@ -2,7 +2,8 @@
    started with { powers: true } (the Realm's games do; the bare engine, its tests and the labs don't, unless asked;
    powers: [yours, theirs] gives one side only).
    - Team mana (G.mana, by side): CR_MANA.start to begin, up to CR_MANA.max. A shot made fills it, and an end scored
-     (more for two or more, and a steal). A power costs CR_MANA.pow, a curse CR_MANA.curse.
+     (more for two or more, and a steal). A power costs CR_MANA.pow, a curse CR_MANA.curse, a granite power
+     CR_MANA.granite.
    - Everyday powers: every kind has a draw power (for a draw, a guard or a freeze) and a hit power (for a takeout, a
      peel or a hit and roll), and a second of each (CR_POW, CR_POW2); a curler brings one of each pair (m.pw: { draw,
      hit }, 0 or 1; picked on the Shed tab). The thrower casts theirs before their stone, for mana, on the shot called;
@@ -27,7 +28,8 @@
    slides through the first guard it meets, like smoke), gust (as the stone comes to rest, the other rink's stone
    nearest the button is pushed back this many inches) and nerve (no pressure) are the rest. The thrower's aim knows
    none of them: a power makes the stone truer, or the sweepers stronger, never a different shot. */
-const CR_MANA = { start: 2, max: 6, made: 1, end: 1, two: 1, steal: 1, pow: 2, curse: 2 };
+// (a granite power costs more: phase 10's lab found a granite stone cast on every big stone decided games)
+const CR_MANA = { start: 2, max: 6, made: 1, end: 1, two: 1, steal: 1, pow: 2, curse: 2, granite: 3 };
 const CR_ROAR = { max: 100, ult: 60, steady: 25, made: 5, double: 15, two: 15, big: 30, steal: 25 };
 const CR_FX0 = { err: 1, line: 1, wt: 1, sweep: 1, legs: 1, heavy: 1, stiff: 1, granite: 0, ghost: 0, gust: 0, nerve: 0 };
 const CR_FX_MUL = new Set(['err', 'line', 'wt', 'sweep', 'legs', 'heavy', 'stiff']);
@@ -129,7 +131,7 @@ function crShotNow(s) {
 function crPowNow(s, ri, shot) {
   const m = G.teams[s].roster[ri == null ? crThrower(s) : ri]; if (!m || !G.powers) return null;
   const which = CR_HIT.includes(shot || crShotNow(s)) ? 'hit' : 'draw', pw = m.pw || {}, P = crPowOf(m.kind, which, pw[which] === 1);
-  return Object.assign({ which }, P, { cost: P.curse ? CR_MANA.curse : CR_MANA.pow });
+  return Object.assign({ which }, P, { cost: P.curse ? CR_MANA.curse : P.fx && P.fx.granite ? CR_MANA.granite : CR_MANA.pow });
 }
 function crPowIdOf(s, k, ri) {
   if (k === 'pow') { const P = crPowNow(s, ri); return P ? P.id : null; }

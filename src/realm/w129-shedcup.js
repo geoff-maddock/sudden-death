@@ -28,7 +28,7 @@
 
 const W_BROOM = {
   fee: 40, size: 8,
-  tiers: [1, 2, 2],               // the tier of each round: they curl like a Squire, then a Knight (to be measured: phase 10)
+  tiers: [1, 2, 2],               // the tier of each round: they curl like a Squire, then a Knight (phase 10's lab: won 19%)
   rounds: ['Quarter-final', 'Semi-final', 'Final'],
   prize: { gold: 150, fans: 20, pick: 3 },
   force: null

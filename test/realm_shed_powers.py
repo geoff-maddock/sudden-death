@@ -115,11 +115,11 @@ async def main():
         await pg.evaluate("WCAMP.close && WCAMP.close()")
         rw = await pg.evaluate("""(() => { W_SHED_MODE = 'play'; wShedGame({ seed: 7, mode: 'play', hammer: 1 }); wCR.pause(true); __to('aim'); wCR.G.mana[wCR.view.you] = 6; wShedRows();
           const row = $('wShedPowRow'), p0 = row.querySelector('[data-crpow="pow"]').textContent; wCR.G.stones = [{ id: '1:0', s: 1, x: 4, y: 8 }]; const hit = ['takeout', 'peel', 'hitroll'].includes(wCR.view.sel.shot); wCR.select(hit ? { shot: 'draw' } : { shot: 'takeout', target: '1:0' }); wShedRows();
-          const p1 = row.querySelector('[data-crpow="pow"]').textContent, m0 = wCR.G.mana[wCR.view.you]; wCR.pause(false);
+          const p1 = row.querySelector('[data-crpow="pow"]').textContent, m0 = wCR.G.mana[wCR.view.you], cost = wCR.powNow(wCR.view.you).cost; wCR.pause(false);
           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })); wCR.pause(true);
-          return { powers: !!wCR.G.powers && !!wCR.G.hall, shown: !row.hidden, mana: /Mana/.test(row.textContent), changes: p0 !== p1, spent: m0 - wCR.G.mana[wCR.view.you] }; })()""")
+          return { powers: !!wCR.G.powers && !!wCR.G.hall, shown: !row.hidden, mana: /Mana/.test(row.textContent), changes: p0 !== p1, spent: m0 - wCR.G.mana[wCR.view.you], cost }; })()""")
         check(rw['powers'] and rw['shown'] and rw['mana'] and rw['changes'], 'every game at the Shed has powers (and the Shed\'s ways); your stone\'s Powers row shows the mana and the power for the shot, which changes with the shot', rw)
-        check(rw['spent'] == 2, 'P casts your curler\'s power, for its mana', rw)
+        check(rw['spent'] == rw['cost'] and rw['cost'] in (2, 3), 'P casts your curler\'s power, for its mana (3 for a granite power)', rw)
         ma = await pg.evaluate("""(() => { $('wShedModes').querySelector('[data-cmode="manage"]').click(); wCR.pause(true); wShedRows(); const b = document.querySelector('[data-crauto]'); const before = wCR.autoPow; if (b) b.click();
           const r = { btn: !!b, on: wCR.autoPow !== before }; W_SHED_MODE = 'play'; return r; })()""")
         check(ma == {'btn': True, 'on': True}, 'Manage has Auto powers', ma)
