@@ -101,7 +101,7 @@ function wPshopStand(m, x, y) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
     if (!wOpenTile(m, xx, yy) || m.meta[xx + ',' + yy] || (xx === sx && yy === sy) || !G.seen0[yy * m.w + xx]) continue;
-    m.npcs.push({ id: '_stand', x: xx, y: yy }); const seen = G.reach(); m.npcs.pop();
+    m.npcs.push({ id: '_stand', x: xx, y: yy, fixed: true }); const seen = G.reach(); m.npcs.pop();
     if (G.ok(seen) && G.side(seen, xx, yy)) return [xx, yy];
   }
   return null;

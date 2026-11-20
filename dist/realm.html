@@ -61928,7 +61928,7 @@ renderHelp = function () {
    deterministically), so only flags and WG.petEggs go into the save.
 
    WG.petEggs = { [element]: { kind, due } }
-   W_PEGG, wPeggBuild, wPlaceGuard, wPeggPut, wPeggTake, wPeggPlace, wPeggHatch, wPetNameAny
+   W_PEGG, W_SIDES, wPeggBuild, wPlaceGuard, wPeggPut, wPeggTake, wPeggPlace, wPeggHatch, wPetNameAny
    Wrapped: buildAllMaps (wW133BuildAllMaps), wStart (wW133Start: old saves' unknown eggs), wAudit (wW133Audit: each egg's spot, each place), wUse (wW133Use: 'petegg' and 'pethatch' tiles), wTileVariant
    (wW133TileVariant: an egg there or not), renderHelp (wW133RenderHelp: #wHelpPetEggs). */
 
@@ -61968,23 +61968,24 @@ Object.assign(W_MAP_COL, { [W_PEGG_CH.egg]: '#c8a060', [W_PEGG_CH.hatch]: '#e0b8
 
 /* ---------- laid over the maps: an egg's spot, each hatching place ---------- */
 /* placing things on a built map without cutting anything off (shared with w134's people). wPlaceGuard(m) measures the
-   map as it is: people stand in the way (bfsReach walks through them, so they are walls while it looks), and it notes
-   everything that has a way to it: each thing on the map (its meta) a reachable side, each person a reachable side, or,
-   behind a counter, the tile across it you talk to them from, free and reachable. ok() says whether that all still
-   holds, give or take the one tile just taken. (People who wander step up to two tiles from home: a block by one of
-   them lasts only till they move on.) */
+   map as it is: people who stay put (fixed) stand in the way (bfsReach walks through them, so they are walls while it
+   looks); people who wander can be squeezed past, and move on. It notes everything that has a way to it: each thing on
+   the map (its meta) a reachable side; each person a reachable side, or the tile across any counter beside them (where
+   you talk to them from), reachable and with nobody fixed on it. ok() says whether that all still holds, give or take
+   the one tile just taken. */
 const W_SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 function wPlaceGuard(m) {
   const sx = m.spawn[0], sy = m.spawn[1], count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
   const side = (seen, x, y) => W_SIDES.some(([dx, dy]) => seen[(y + dy) * m.w + x + dx]);
   // (put back last to first, so two standing on one tile can't leave a wall behind)
-  const reach = () => { const ps = m.npcs || [], saved = ps.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); for (let i = ps.length - 1; i >= 0; i--) m.t[ps[i].y][ps[i].x] = saved[i]; return s; };
+  const fixed = () => (m.npcs || []).filter(n => n.fixed);
+  const reach = () => { const ps = fixed(), saved = ps.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); for (let i = ps.length - 1; i >= 0; i--) m.t[ps[i].y][ps[i].x] = saved[i]; return s; };
   const goals = [];
   for (const k in m.meta) { const [x, y] = k.split(',').map(Number); goals.push(s => side(s, x, y)); }
   for (const n of m.npcs || []) {
-    const c = W_SIDES.find(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter');
-    if (c) { const tx = n.x + 2 * c[0], ty = n.y + 2 * c[1]; goals.push(s => !!s[ty * m.w + tx] && !(m.npcs || []).some(o => o !== n && o.x === tx && o.y === ty)); }
-    else goals.push(s => side(s, n.x, n.y));
+    // (any open side, or the far side of any counter beside them, free of anybody who stays put)
+    const across = W_SIDES.filter(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter').map(([dx, dy]) => [n.x + 2 * dx, n.y + 2 * dy]);
+    goals.push(s => side(s, n.x, n.y) || across.some(([tx, ty]) => !!s[ty * m.w + tx] && !fixed().some(o => o !== n && o.x === tx && o.y === ty)));
   }
   const seen0 = reach(), base = count(seen0), had = goals.filter(f => f(seen0));
   return { seen0, side, reach, ok: seen => count(seen) >= base - 1 && had.every(f => f(seen)) };
@@ -62274,7 +62275,7 @@ function wPshopStand(m, x, y) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
     if (!wOpenTile(m, xx, yy) || m.meta[xx + ',' + yy] || (xx === sx && yy === sy) || !G.seen0[yy * m.w + xx]) continue;
-    m.npcs.push({ id: '_stand', x: xx, y: yy }); const seen = G.reach(); m.npcs.pop();
+    m.npcs.push({ id: '_stand', x: xx, y: yy, fixed: true }); const seen = G.reach(); m.npcs.pop();
     if (G.ok(seen) && G.side(seen, xx, yy)) return [xx, yy];
   }
   return null;

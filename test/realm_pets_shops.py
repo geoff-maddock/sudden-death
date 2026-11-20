@@ -37,18 +37,16 @@ async def main():
 
         pl = await pg.evaluate("""(() => { const npc = [...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].filter(S => !MAPS[S.town].npcs.some(n => n.id === S.npc)).map(S => S.npc);
           const loose = ['hq', 'cind'].map(id => Object.values(MAPS[W_PSHOP.shops[id].town].meta).filter(x => x.loose === id).length);
-          // (everybody in the five towns has a way to them, with the others standing about in the way, as in the game)
-          const reach = [...new Set([...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].map(S => S.town))].flatMap(t => { const m = MAPS[t];
-            const saved = m.npcs.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const seen = bfsReach(m, m.spawn[0], m.spawn[1]); for (let i = m.npcs.length - 1; i >= 0; i--) m.t[m.npcs[i].y][m.npcs[i].x] = saved[i];
-            // (one behind a counter is talked to across it)
-            const counter = n => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter');
-            return m.npcs.filter(n => !counter(n)).filter(n => ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(n.y + dy) * m.w + n.x + dx])).map(n => t + ':' + n.id); });
-          // (every loose pet, and every counter's talking tile, has a way to it with people in the way)
-          const lp = ['hq', 'cind'].flatMap(id => { const m = MAPS[W_PSHOP.shops[id].town], G = wPlaceGuard(m); return Object.keys(m.meta).filter(k => m.meta[k].loose === id).filter(k => { const [x, y] = k.split(',').map(Number); return !G.side(G.seen0, x, y); }); });
-          const ct = [...new Set([...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].map(S => S.town))].flatMap(t => { const m = MAPS[t], G = wPlaceGuard(m);
-            return m.npcs.flatMap(n => { const c = W_SIDES.find(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter'); if (!c) return []; const tx = n.x + 2 * c[0], ty = n.y + 2 * c[1];
-              return G.seen0[ty * m.w + tx] && !m.npcs.some(o => o !== n && o.x === tx && o.y === ty) ? [] : [t + ':' + n.id]; }); });
-          reach.push(...lp.map(k => 'loose ' + k), ...ct.map(k => 'counter ' + k));
+          // (from the way in, by the game's own path-finder, as a click on them walks: to them, or to a counter in front of
+          // them; every loose pet too)
+          const x0 = WG.x, y0 = WG.y, map0 = WG.map, reach = [];
+          for (const t of [...new Set([...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].map(S => S.town))]) {
+            const m = MAPS[t]; WG.map = t; WG.x = m.spawn[0]; WG.y = m.spawn[1];
+            const can = (x, y) => Math.abs(x - WG.x) + Math.abs(y - WG.y) <= 1 || !!wPathStep(x, y);
+            for (const n of m.npcs) if (!can(n.x, n.y) && !W_SIDES.some(([dx, dy]) => wTileAt(m, n.x + dx, n.y + dy) === '-' && can(n.x + dx, n.y + dy))) reach.push(t + ':' + n.id);
+            for (const k in m.meta) if (m.meta[k].loose) { const [x, y] = k.split(',').map(Number); if (!can(x, y)) reach.push('loose ' + t + ':' + k); }
+          }
+          WG.map = map0; WG.x = x0; WG.y = y0;
           return { npc, loose, reach, audit: wAudit().filter(s => /pet|keeper/.test(s)) }; })()""")
         check(pl == {'npc': [], 'loose': [3, 3], 'reach': [], 'audit': []}, 'the three shopkeepers and two keepers stand in their towns, and the loose pets wait on open ground', pl)
 
