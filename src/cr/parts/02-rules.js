@@ -16,7 +16,8 @@
    back line at y = +CR_SHEET.back. A stone is { id, s, x, y } (id 's:j', its side and its number for that side this end).
    - in the house: some part of it inside the 12-foot ring (its centre within houseR + stoneR of the button);
    - a guard (in the free guard zone): past the hog line, short of the tee line, and not in the house;
-   - in play: not wholly past the back line, clear of the side boards, and wholly past the hog line. The physics
+   - in play: not wholly past the back line, clear of the side boards, and wholly past the hog line (the thrown stone:
+     one short of it is removed, unless it hit a stone in play; a stone already in play knocked back short of it stays). The physics
      (phase 1) says where stones stop; these rules only read where they are.
 
    G: { ends, order: [2 × four roster indexes], roster: [2 × size], fgz, hammer (side), end (0-based), k (stones thrown
@@ -31,7 +32,8 @@ function crOrderOk(o, n) { return Array.isArray(o) && o.length === CR_RULES.side
 // a new game: { ends, order, roster, hammer (the side with the hammer in the first end, 1 if not given), fgz }
 function crNewGame(o) {
   o = o || {};
-  const ends = CR_RULES.endsAt.includes(o.ends) ? o.ends : CR_RULES.ends, roster = [0, 1].map(s => Math.max(CR_RULES.side, ((o.roster || [])[s]) | 0));
+  const ends = CR_RULES.endsAt.includes(o.ends) ? o.ends : CR_RULES.ends, roster = [0, 1].map(s => o.roster && o.roster[s] != null ? o.roster[s] | 0 : CR_RULES.side);
+  if (roster.some(n => n < CR_RULES.side)) throw new Error(`A rink is ${CR_RULES.side}: a roster of ${Math.min(...roster)} can't play.`);
   const order = [0, 1].map(s => crOrderOk((o.order || [])[s], roster[s]) ? o.order[s].slice() : [0, 1, 2, 3]);
   G = { ends, order, roster, fgz: o.fgz === false ? 0 : CR_RULES.fgz, hammer: o.hammer === 0 ? 0 : 1, end: 0, k: 0, stones: [], sc: [[], []], log: [], extra: 0, over: null };
   return G;
@@ -52,7 +54,10 @@ const crInHouse = st => crDist(st) <= CR_SHEET.houseR + CR_SHEET.stoneR;
 // play share
 const crPastHog = st => st.y - CR_SHEET.stoneR > -CR_SHEET.hog;
 const crInFgz = st => crPastHog(st) && st.y < 0 && !crInHouse(st);
-const crInPlay = st => crPastHog(st) && st.y - CR_SHEET.stoneR <= CR_SHEET.back && Math.abs(st.x) + CR_SHEET.stoneR < CR_SHEET.halfW;
+// on the sheet: not wholly past the back line, clear of the side boards. A stone already in play stays in play short of
+// the hog line (knocked back); the hog-line rule is for the stone just thrown (crThrow)
+const crOnSheet = st => st.y - CR_SHEET.stoneR <= CR_SHEET.back && Math.abs(st.x) + CR_SHEET.stoneR < CR_SHEET.halfW;
+const crInPlay = st => crPastHog(st) && crOnSheet(st);
 // an end's score from the stones in play: { s: the side that scores (-1 for a blank), n, shot: the nearest stone's id }
 function crScoreEnd(stones) {
   const H = (stones || []).filter(crInHouse).sort((a, b) => crDist(a) - crDist(b));
@@ -70,17 +75,20 @@ function crWhyNot(s) {
   return '';
 }
 /* side s's stone thrown: after is every stone in play once it has stopped ({ id, s, x, y }; the thrown one with
-   id 's:j' for its number this end, or left out if it didn't stay in play). The free guard zone is applied, the
-   stones out of play are dropped, and after the end's last stone the end is scored. Returns { ok, why?, fgz (the
-   rule took the stone back), end: { s, n } when the end was scored, over when the game was decided } */
-function crThrow(s, after) {
+   id 's:j' for its number this end, or left out if it didn't stay in play); o.hit: it touched a stone in play (so the
+   hog-line rule spares it). The free guard zone is applied, the stones out of play are dropped, and after the end's
+   last stone the end is scored. Returns { ok, why?, fgz (the rule took the stone back), end: { s, n } when the end was
+   scored, over when the game was decided } */
+function crThrow(s, after, o) {
   const why = crWhyNot(s); if (why) return { ok: false, why };
   const id = `${s}:${crSideNo(s)}`, before = G.stones.map(st => Object.assign({}, st));
   // every stone after is one already in play (the same id and side) or the one just thrown (side s's, new: it takes
   // its id here); anything else is refused
   const old = new Map(before.map(b => [b.id, b.s])), fresh = (after || []).filter(st => !old.has(st.id));
-  if ((after || []).some(st => old.has(st.id) && old.get(st.id) !== st.s) || fresh.length > 1 || (fresh[0] && fresh[0].s !== s)) return { ok: false, why: 'Those stones are not the ones in play.' };
-  let now = (after || []).filter(crInPlay).map(st => ({ id: old.has(st.id) ? st.id : id, s: st.s, x: st.x, y: st.y }));
+  const ids = (after || []).map(st => st.id);
+  if (new Set(ids).size !== ids.length || (after || []).some(st => old.has(st.id) && old.get(st.id) !== st.s) || fresh.length > 1 || (fresh[0] && fresh[0].s !== s)) return { ok: false, why: 'Those stones are not the ones in play.' };
+  const hit = !!(o && o.hit);
+  let now = (after || []).filter(st => crOnSheet(st) && (old.has(st.id) || hit || crPastHog(st))).map(st => ({ id: old.has(st.id) ? st.id : id, s: st.s, x: st.x, y: st.y }));
   // the free guard zone: one of the other side's guards gone from play before the fifth stone
   let fgz = false;
   if (G.k < G.fgz) {

@@ -1,0 +1,74 @@
+/* The Curling Shed: one game, CPU against CPU (issue #102, phase 1).
+   crStart(opts) puts a game on the ice: { ends, teams: [2 × { name, short, color, roster: [{ n, kind }] }], order,
+   skill: [2 skills, 0 to 2], hammer, cold ('heavy' | 'mid' | 'keen'), fgz, seed }. crTurn() throws the next stone
+   (the skip's call, the release with its miss, the sweepers, the stones to rest, the pebble worn, the rules) and says
+   what happened; crSimGame(opts) plays a whole game headless and leaves the game on the ice (and the random stream)
+   as it was; crSummary() is the game so far.
+   The box score (G.st by side, G.pst by player): stones thrown, shots made (crMade: a draw within two feet of its
+   call, a guard where it was called, a freeze touching, a takeout or a peel that took its stone out, a hit and roll
+   that took it and stayed in the house), and each shot's kind. G.last is the last stone, for the page. */
+let GB = null;   // the stone in play between crTurn() and the page's drawing (phase 2): not saved
+function crStart(opts) {
+  const o = opts || {};
+  if (o.seed != null) engSeed(o.seed);
+  const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#b83a3a' };
+    const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' }))).map(p => Object.assign({}, p));
+    return Object.assign({}, T, { roster }); });
+  crNewGame({ ends: o.ends, order: o.order || teams.map(T => T.order), roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, n: 0,
+    st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
+  GB = null;
+  return G;
+}
+const crBox = () => ({ stones: 0, made: 0, shots: {}, madeBy: {}, ends: { scored: 0, stolen: 0, blank: 0 }, big: 0 });
+// was the shot made? (what the call asked, against where the stones came to rest)
+function crMade(plan, before, after, run) {
+  const stop = run.stop, R = CR_SHEET.stoneR, tg = plan.target && before.find(b => b.id === plan.target), gone = tg && !after.some(a => a.id === plan.target);
+  switch (plan.shot) {
+    case 'draw': return !!stop && Math.hypot(stop.x - plan.x, stop.y - plan.y) <= 24;
+    case 'guard': return !!stop && crInFgz(stop) && Math.hypot(stop.x - plan.x, stop.y - plan.y) <= 36;
+    case 'freeze': { const o = before.find(b => b.s !== plan.s && Math.abs(b.x - plan.x) < 1 && Math.abs(b.y - plan.y - 2 * R - .5) < 1); return !!stop && !!o && Math.hypot(stop.x - o.x, stop.y - o.y) <= 2 * R + 3; }
+    case 'takeout': case 'peel': return !!gone;
+    case 'hitroll': return !!gone && !!stop && crInHouse(stop);
+  }
+  return false;
+}
+// the next stone: { side, ri, pos, plan, rel, run, rule, made } or null when the game is over
+function crTurn() {
+  const s = crUp(); if (s < 0) return null;
+  const plan = Object.assign(crPlan(s), { s });
+  return crThrowStone(s, plan, crMiss(s, plan.aim), crSweeper(s, plan));
+}
+// a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules
+function crThrowStone(s, plan, rel, sweep) {
+  const ri = crThrower(s), pos = crPos(s), before = G.stones.map(b => Object.assign({}, b)), endNo = G.end, ham = G.hammer;
+  const run = crRun(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
+  crWear(G.ice, run.path);
+  const made = crMade(plan, before, run.stones, run), rule = crThrow(s, run.stones, { hit: run.hits > 0 });
+  // a new end: the ice as it is now is what a Knight reads through it
+  if (rule.end) G.iceEnd = G.ice.slice();
+  const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
+  if (made) { B.made++; P.made++; B.madeBy[plan.shot] = (B.madeBy[plan.shot] || 0) + 1; }
+  // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
+  if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
+  G.n++;
+  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule };
+  G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end };
+  GB = { s, ri, plan, rel, run, before, made, rule };
+  return ev;
+}
+function crSummary() {
+  if (!G) return null;
+  return { over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
+    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
+}
+// a whole game headless: leaves the game on the ice, and the random stream, as they were
+function crSimGame(opts) {
+  const keep = G, keepB = GB, keepR = engRand;
+  if (!opts || opts.seed == null) engRand = engRng((Math.random() * 4294967296) >>> 0);
+  try {
+    crStart(opts);
+    let n = 0; while (!G.over && n++ < 400) crTurn();
+    return Object.assign({ win: G.over ? G.over.win : -1 }, crSummary());
+  } finally { G = keep; GB = keepB; engRand = keepR; }
+}

@@ -1,0 +1,84 @@
+/* The Curling Shed: the stones on the ice (issue #102, phase 1). A pure model, shared by Play, the CPU and the sim.
+
+   A throw leaves the near hog line (y = CR_STONE.y0) at x0, with a heading (ang, degrees, plus to the thrower's
+   left), a speed (v, inches a second) and a handle (h: +1 curls to the left, -1 to the right; for a right-hander the
+   out-turn and the in-turn). On the ice:
+   - it slows by friction, CR_STONE.a inches a second every second on fresh pebble on a mid day, by the ice under it;
+   - it curls toward its handle side, and more as it slows (a stone curls most in its last few feet), less on worn
+     pebble;
+   - sweeping (0 to 1, how hard, times how good the sweepers are) cuts the friction and the curl: a swept stone goes
+     further and straighter;
+   - stones that touch trade momentum (equal granite, nearly elastic): a stone hit square stops and the one it hits
+     takes the speed; a stone hit thin keeps most of its own. The struck stone picks up a little turn from the hit, and
+     the striker's own turn is halved;
+   - a stone that touches the side boards, or goes wholly past the back line, is out of play, and the thrown stone is
+     out if it stops short of the far hog line.
+   crRun(stones, throw, opts) plays one stone to rest among the others and gives the stones in play after it, the
+   thrown stone's path (with where it was swept), the hits, and a trace for the page. opts.sweep(st, t) says how hard
+   the thrown stone is swept now (the CPU's sweepers, or your Space bar); opts.ice and opts.cold the ice. */
+const CR_STONE = { y0: -1116, a: 9, curl: .28, vc: 34, sweepMu: .16, sweepCurl: .4, e: .9, keepCurl: .25, dt: .02, planDt: .05, traceEvery: .1, stop: .5 };
+// the stone's acceleration on the ice: friction against its motion, and the curl across it
+function crAccel(st, ice, cold, sw) {
+  const v = Math.hypot(st.vx, st.vy); if (v < 1e-6) return [0, 0];
+  const mu = crIceAt(ice, st.x, st.y, cold) * (1 - CR_STONE.sweepMu * sw), ux = st.vx / v, uy = st.vy / v;
+  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y));
+  // (the curl is across the motion: to the left of it for h = +1, and x is plus to the thrower's left, so the left of a
+  // stone going (ux, uy) is (uy, -ux))
+  return [-CR_STONE.a * mu * ux + lat * uy, -CR_STONE.a * mu * uy - lat * ux];
+}
+// two stones touch: trade momentum along the line between them (equal mass, restitution e)
+function crCollide(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-6, nx = dx / d, ny = dy / d;
+  const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny; if (rel <= 0) return false;
+  const j = (1 + CR_STONE.e) / 2 * rel;
+  a.vx -= j * nx; a.vy -= j * ny; b.vx += j * nx; b.vy += j * ny;
+  // pull them apart to just touching
+  const over = 2 * CR_SHEET.stoneR - d; if (over > 0) { a.x -= nx * over / 2; a.y -= ny * over / 2; b.x += nx * over / 2; b.y += ny * over / 2; }
+  b.h = (b.h || 0) * .5 + (a.h || 0) * CR_STONE.keepCurl * .6; a.h = (a.h || 0) * .5; return true;
+}
+/* one stone thrown among the stones at rest: stones [{ id, s, x, y }], throw { id, s, x0, ang, v, h }; opts { ice,
+   cold, sweep(st, t) -> 0..1, plan (a coarser step, no trace: the CPU's look ahead), maxT }. Returns { stones (in
+   play, at rest), out: [ids gone], path: [[x, y, swept]] of the thrown stone, hits, t, trace: [[t, [[id, x, y]]]],
+   stop: where the thrown stone came to rest (or null) } */
+function crRun(stones, th, opts) {
+  const O = opts || {}, dt = O.plan ? CR_STONE.planDt : CR_STONE.dt, R = CR_SHEET.stoneR, maxT = O.maxT || 60;
+  const a = th.ang * Math.PI / 180, S = stones.map(st => ({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }));
+  const T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
+  S.push(T);
+  const path = [], trace = [], out = [];
+  let t = 0, hits = 0, nextTr = 0, nextPath = 0;
+  const live = () => S.filter(st => !st.out);
+  while (t < maxT) {
+    const L = live(), moving = L.filter(st => st.vx || st.vy); if (!moving.length) break;
+    const sw = O.sweep && !T.out && (T.vx || T.vy) ? clamp(O.sweep(T, t) || 0, 0, 1) : 0;
+    // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
+    const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(dt, .5 * R / Math.max(1, vmax));
+    for (const st of moving) {
+      const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
+      let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
+      // friction stops a stone, it never turns it round
+      if (vx * st.vx + vy * st.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop) { vx = 0; vy = 0; }
+      st.x += (st.vx + vx) / 2 * dts; st.y += (st.vy + vy) / 2 * dts; st.vx = vx; st.vy = vy;
+      if (st === T && t >= nextPath) { path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]); nextPath += O.plan ? .5 : .25; }
+    }
+    // contacts (only between stones that could touch: one of them moving)
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+      const p = L[i], q = L[j]; if (!(p.vx || p.vy || q.vx || q.vy)) continue;
+      if (Math.abs(p.x - q.x) < 2 * R && Math.abs(p.y - q.y) < 2 * R && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R) {
+        const [m, n] = (p.vx || p.vy) && Math.hypot(p.vx, p.vy) >= Math.hypot(q.vx, q.vy) ? [p, q] : [q, p];
+        if (crCollide(m, n)) hits++;
+      }
+    }
+    // out of play: the side boards, wholly past the back line
+    for (const st of L) if (!crOnSheet(st)) { st.out = true; st.vx = st.vy = 0; out.push(st.id); }
+    t += dts;
+    if (!O.plan && t >= nextTr) { trace.push([+t.toFixed(2), live().map(st => [st.id, +st.x.toFixed(1), +st.y.toFixed(1)])]); nextTr += CR_STONE.traceEvery; }
+  }
+  // the thrown stone must pass the far hog line, unless it hit a stone in play
+  if (!T.out && !crPastHog(T) && !hits) { T.out = true; out.push(T.id); }
+  if (!O.plan) trace.push([+t.toFixed(2), live().map(st => [st.id, +st.x.toFixed(1), +st.y.toFixed(1)])]);
+  const rest = live().map(st => ({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }));
+  return { stones: rest, out, path, hits, t: +t.toFixed(2), trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } };
+}
+// where a stone thrown alone comes to rest (no other stones): { x, y } or null (out), and its path; the CPU's aim
+function crAlone(th, ice, cold, sweep) { const r = crRun([], th, { ice, cold, plan: true, sweep }); return { stop: r.stop, path: r.path, x: r.stop ? r.stop.x : null, y: r.stop ? r.stop.y : null }; }
