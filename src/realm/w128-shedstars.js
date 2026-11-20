@@ -9,6 +9,7 @@
      done; a superstar made from now on has it from the start). Gear is untouched: it never changed the ratings.
    - How to play: #wHelpShedStars, after curling's gear and potions, each superstar's game on the ice.
    wShedStarFix(p)   true when p's ratings were made again
+   wShedRepick(C)    the captain's four again on the new ratings, the call-ups kept
    Wraps: wMakePlayer (wW128MakePlayer: the mark), wStart (wW128Start: older saves), renderHelp (wW128RenderHelp). */
 
 const wShedStarKind = k => W_STARS.some(s => s.kind === k) && !!wCR.pow[k];
@@ -18,13 +19,19 @@ function wShedStarFix(p) {
   delete p.cr; const b = wCrOf(p); b.st = 1;
   return had;
 }
+function wShedRepick(C) {
+  const cu = C.cu.slice(); wFourCrAutoPick(C);
+  for (let i = 0; i < 4 && cu.length; i++) if (C.four[i] == null) { const c = cu.shift(); C.four[i] = c.cid; C.cu.push(c); }
+  wFourSyncCr();
+}
 const wW128MakePlayer = wMakePlayer;
 wMakePlayer = function (spec, from) { const p = wW128MakePlayer.apply(this, arguments); if (p && wShedStarKind(p.kind)) { const b = wCrOf(p); if (b) b.st = 1; } return p; };
 const wW128Start = wStart;
 wStart = function (save, opts) {
   const r = wW128Start(save, opts);
-  // (ratings made again: the captain picks the four again, unless you set it yourself)
-  if (WG) { let n = 0; for (const p of (WG.roster || []).concat(WG.wwait || [])) if (wShedStarFix(p)) n++; if (n && !(WG.shed && WG.shed.mine)) wFourAutoCr(); if (n && save) wSave(); }
+  // (ratings made again: the captain picks the four again from your roster, unless you set it yourself; the call-ups
+  // filling the rest are kept, with their ratings and picks)
+  if (WG) { let n = 0; for (const p of (WG.roster || []).concat(WG.wwait || [])) if (wShedStarFix(p)) n++; if (n && WG.shed && WG.shed.four && !WG.shed.mine) wShedRepick(WG.shed); if (n && save) wSave(); }
   return r;
 };
 

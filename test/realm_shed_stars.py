@@ -52,9 +52,10 @@ async def main():
         await pg.evaluate(HELP)
         r = await pg.evaluate("""(() => { const p = wMakePlayer({ kind: 'kraken', lvl: 3, n: 'Kraken' }, 'tavern'); wAddPlayer(p);
           const q = wMakePlayer({ kind: 'djinn', lvl: 3, n: 'Djinn' }, 'tavern'); wAddPlayer(q); q.cr = { lv: 3, got: {}, drw: 6, lin: 6, hit: 6, swp: 6, nrv: 6, red: 6 };
+          const C0 = wFourSyncCr(); C0.mine = false; const cus = C0.cu.map(c => c.cid);
           const save = JSON.parse(JSON.stringify({ WG, RUN })); wStart(save); const Q = wPlayer(q.id), P = wPlayer(p.id);
-          const four = JSON.stringify(WG.shed && WG.shed.four); wFourAutoCr(); const again = JSON.stringify(WG.shed.four);
-          return { made: !!(P.cr && P.cr.st), swp: P.cr.swp, fixed: !!(Q.cr && Q.cr.st), drw: Q.cr.drw, repicked: four === again }; })()""")
+          const four = JSON.stringify(WG.shed.four), keptCu = cus.every(cid => WG.shed.cu.some(c => c.cid === cid)), djinnIn = WG.shed.four.includes(q.id); wFourCrAutoPick(WG.shed); const again = JSON.stringify(WG.shed.four.filter(k => typeof k === 'number')) === JSON.stringify(JSON.parse(four).filter(k => typeof k === 'number'));
+          return { made: !!(P.cr && P.cr.st), swp: P.cr.swp, fixed: !!(Q.cr && Q.cr.st), drw: Q.cr.drw, repicked: again && keptCu && djinnIn }; })()""")
         check(r['made'] and r['swp'] >= 10, 'a superstar made now has curling ratings from its kind (the Kraken sweeps best)', r)
         check(r['fixed'] and r['drw'] >= 9 and r['repicked'], 'a superstar from an older save is made again from its kind, once, on load, and the captain picks the four on the new ratings', r)
         g = await pg.evaluate("""(() => { const T = { name: 'Stars', short: 'STA', roster: ['phoenix', 'kraken', 'behemoth', 'djinn'].map((k, i) => ({ n: k, kind: k })) }, U = { name: 'Dwarves', short: 'DWA', roster: [0, 1, 2, 3].map(i => ({ n: 'd' + i, kind: 'dwarf' })) };
@@ -64,10 +65,10 @@ async def main():
 
         # ---------- the players drawn ----------
         f = await pg.evaluate("""(async () => { W_SHED_MODE = 'play'; wShedGame({ seed: 5, mode: 'play', hammer: 1, teams: [{ name: 'Stars', short: 'STA', color: '#c84a2a', roster: ['phoenix', 'kraken', 'behemoth', 'djinn'].map(k => ({ n: k, kind: k })) }, { name: 'Dwarves', short: 'DWA', color: '#2a6ac8', roster: [0, 1, 2, 3].map(i => ({ n: 'd' + i, kind: 'dwarf' })) }] });
-          wCR.pause(true); __to('aim'); wCR.pause(false); await new Promise(r => setTimeout(r, 250)); wCR.pause(true); return { aim: wCR.figsNow() }; })()""")
+          wCR.pause(true); __to('aim'); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return { aim: wCR.figsNow() }; })()""")
         await pg.locator('#v-shed canvas').screenshot(path='/tmp/shed_figs_aim.png')
         s2 = await pg.evaluate("""(async () => { wCR.press(); let n = 0; while (wCR.view.meter && wCR.view.meter.v < 1 && n++ < 2000) wCR.tick(.002); wCR.press(); n = 0; while (wCR.phase === 'slide' && n++ < 30) wCR.tick(.05);
-          wCR.sweep = true; wCR.tick(.05); wCR.pause(false); await new Promise(r => setTimeout(r, 250)); wCR.pause(true); return wCR.figsNow(); })()""")
+          wCR.sweep = true; wCR.tick(.05); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return wCR.figsNow(); })()""")
         await pg.locator('#v-shed canvas').screenshot(path='/tmp/shed_figs_slide.png')
         await pg.evaluate("wCR.sweep = false")
         check(f['aim'] == ['broom'] and s2 == ['sweeper'], 'the broom stands behind a called stone; the sweepers run beside a sliding one', [f, s2])

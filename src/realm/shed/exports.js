@@ -68,7 +68,7 @@ return {
   fxFor: s => crFxFor(s), yourWt: p => GP ? crYourWt(p) : p, cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
   get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   // superstars and figures (phase 8)
-  figKinds: () => Object.keys(KIND), figsNow: () => CRC.figs.filter((w, i, a) => a.indexOf(w) === i),
+  figKinds: () => Object.keys(KIND), figsNow: () => G && G.teams ? crFigsOn() : [],
   // gear and potions (phase 7)
   potions: JSON.parse(JSON.stringify(CR_POTIONS)), kitRules: JSON.parse(JSON.stringify(CR_KIT)), potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
   // games from the world (phase 5)
