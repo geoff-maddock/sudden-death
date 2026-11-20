@@ -4,7 +4,7 @@
 # further and straighter; worn pebble and a keen day run further, a heavy day shorter. The aim brings a draw to rest on
 # its call, either handle, and sends a takeout through its stone: hit square, the stone hit leaves and the thrower stays.
 # The hog line: a thrown stone that doesn't pass it is removed; a stone already in play knocked back short of it stays.
-# A fast stone never passes through another. One game, CPU against CPU: Knights make most of their draws and nearly all
+# A fast stone never passes through another. One game, CPU against CPU: Knights make most of their draws and most of
 # their takeouts, ends score like curling (mostly one point or a blank, a big end rare), and every game has a winner.
 # The skills: an Archmage beats a Knight, a Knight beats a Squire. simGame leaves the game on the ice and its seeded
 # stream alone, and the same seed plays the same game. Asserts; exits nonzero on failure.
@@ -89,7 +89,7 @@ async def main():
             for (const k in o.ends) o.ends[k] = +(o.ends[k] / o.e).toFixed(3); return o; };
           return { kk: sum(16, [1, 1], 200), ak: sum(16, [2, 1], 300), ks: sum(16, [1, 0], 400) }; })()""")
         kk = g['kk']
-        check(kk['over'] == kk['n'] and .6 <= kk['draw'] <= .95 and kk['take'] >= .75, 'Knight against Knight: every game decided, most draws made and nearly all takeouts', kk)
+        check(kk['over'] == kk['n'] and .6 <= kk['draw'] <= .9 and .6 <= kk['take'] <= .88, 'Knight against Knight: every game decided, most draws and most takeouts made (a takeout is missed now and then)', kk)
         check(kk['ends'].get('1', 0) >= .3 and .02 <= kk['ends'].get('blank', 0) <= .5 and kk['ends'].get('big', 0) <= .12, 'ends score like curling: mostly one point or a blank, a big end rare', kk['ends'])
         check(g['ak']['w'][0] > g['ak']['w'][1] and g['ks']['w'][0] > g['ks']['w'][1], 'an Archmage beats a Knight, and a Knight beats a Squire', [g['ak']['w'], g['ks']['w']])
 
@@ -103,10 +103,10 @@ async def main():
 
         # ---------- the lab's switches (phase 10) ----------
         lb = await pg.evaluate("""(() => { const T = k => ({ name: k, short: 'T', roster: [0, 1, 2, 3].map(i => ({ n: k + i, kind: 'dwarf' })) });
-          const held = wCR.simGame({ seed: 41, ends: 2, teams: [T('a'), T('b')], fixShot: ['guard', null] }), S = held.st[0].shots, all = Object.values(S).reduce((a, b) => a + b, 0);
-          wCR.start({ seed: 42, ends: 2, teams: [T('a'), T('b')], wear: false }); const ice0 = JSON.stringify(wCR.G.ice); let n = 0; while (!wCR.G.over && n++ < 100) wCR.turn(); const fresh = JSON.stringify(wCR.G.ice) === ice0 && !!wCR.G.over && wCR.G.n >= 32;
-          wCR.start({ seed: 43, ends: 4, teams: [T('a'), T('b')], noSweep: [true, false] }); n = 0; let swept0 = 0, swept1 = 0; while (!wCR.G.over && n++ < 100) { const s = wCR.up(); wCR.turn(); if (s === 0 && wCR.G.legs[0] < 1) swept0++; if (s === 1 && wCR.G.legs[1] < 1) swept1++; } const over = !!wCR.G.over;
-          const sum = wCR.simGame({ seed: 44, ends: 2, powers: true, teams: [T('a'), T('b')] });
+          const held = wCR.simGame({ seed: 41, ends: 4, teams: [T('a'), T('b')], fixShot: ['guard', null] }), S = held.st[0].shots, all = Object.values(S).reduce((a, b) => a + b, 0);
+          wCR.start({ seed: 42, ends: 4, teams: [T('a'), T('b')], wear: false }); const ice0 = JSON.stringify(wCR.G.ice); let n = 0; while (!wCR.G.over && n++ < 200) wCR.turn(); const fresh = JSON.stringify(wCR.G.ice) === ice0 && !!wCR.G.over && wCR.G.n >= 32;
+          wCR.start({ seed: 43, ends: 4, teams: [T('a'), T('b')], noSweep: [true, false] }); n = 0; let swept0 = 0, swept1 = 0; while (!wCR.G.over && n++ < 200) { const s = wCR.up(); wCR.turn(); if (s === 0 && wCR.G.legs[0] < 1) swept0++; if (s === 1 && wCR.G.legs[1] < 1) swept1++; } const over = !!wCR.G.over;
+          const sum = wCR.simGame({ seed: 44, ends: 4, powers: true, teams: [T('a'), T('b')] });
           return { guards: S.guard || 0, all, fresh, swept0, swept1: swept1 > 0 && over, arrays: Array.isArray(sum.casts) && Array.isArray(sum.pots) }; })()""")
         check(lb['guards'] >= lb['all'] * .7, 'the lab\'s fixShot: a side held to the guard throws guards', lb)
         check(lb['fresh'], 'the lab\'s wear: false: a game played out (every stone) leaves the pebble fresh', lb)

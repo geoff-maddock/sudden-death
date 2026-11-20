@@ -15,7 +15,7 @@
      "Whoa!" when it is heavy. A hit needs no sweeping, and the skip says so.
    - Watch: the CPU throws both sides, its own sweepers sweeping. You play: your side's stones are yours.
    The stone moves on the page at CR_PLAY.speed times real time, a step at a time, the same steps the sim takes. */
-const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .12 } };
+const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .25, hitAng: .4, v: .01 } };
 const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
 const CR_MODES = ['watch', 'manage', 'play'];
 let GP = null;
@@ -115,19 +115,25 @@ function crRelease(p) {
   const S = GP.sel, err = Math.abs(p - CR_PLAY.meter.line) <= CR_PLAY.meter.win ? 1 : p;
   // (your weight's miss is the meter's, made smaller or wider by the stone's powers; the line's is your curler's, by
   // their ratings and the moment)
-  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you, S.shot).ang, v: S.aim.v * crYourWt(err), h: S.h };
+  const rel = crYourRel(S, S.aim.ang, crYourWt(err));
   crBegin(GP.you, Object.assign({}, S), rel, null);
 }
 // a power cast on your stone for this shot's kind (a draw power or a hit power): another kind of shot isn't allowed
 const crShotLocked = shot => !!(G.powers && G.powStone[GP.you] === G.n && G.powWhich && G.powWhich[GP.you] && (CR_HIT.includes(shot) ? 'hit' : 'draw') !== G.powWhich[GP.you]);
 const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
+// your release: the line off your aim by your curler's line (a hit's wider), the weight off the meter's by their draw or
+// hit rating as well (the meter is your part, the ratings theirs: a good curler is truer for you too)
+function crYourRel(S, ang, wt) {
+  const k = crErrK(GP.you, S.shot), hit = ['takeout', 'peel', 'hitroll'].includes(S.shot), Y = CR_PLAY.you;
+  return { ang: ang + gauss() * (hit ? Y.hitAng : Y.ang) * k.ang, v: S.aim.v * wt * (1 + gauss() * Y.v * k.v), h: S.h };
+}
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
 function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter, kit = crKitErr(GP.you, crThrower(GP.you)); return clamp(1 + (p - 1) * f.err * f.wt * kit.v, K.low, K.high); }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), crYourRel(GP.sel, GP.sel.aim.ang + clamp(deg, -3, 3) * .15, crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high))), null);
   return true;
 }
 

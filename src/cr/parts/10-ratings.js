@@ -33,7 +33,10 @@ const CR_KIND = {
   skeleton: [7, 7, 6, 6, 9, 6], witch: [8, 6, 5, 7, 6, 10],
 };
 const CR_RCAP = 12;
-const CR_REACH = { drw: 1.1, lin: 1, hit: 1, nrv: .8, swp: .6 };
+// (drw, lin, hit reach as a multiplier: exp(reach x (.5 - rating)), so a curler rated 1 misses about twice as wide as
+// an average one, and one rated 12 about half as wide; the rest are linear)
+const CR_REACH = { drw: 1.4, lin: 1.4, hit: 1.4, nrv: .8, swp: .6 };
+const crReachK = (reach, r) => Math.exp(reach * (.5 - r));
 // (a stone swept hard the whole way spends about a third of an end's legs: the skip's stones can still be swept)
 const CR_LEGS = { burn: .02, low: .45 };
 const CR_DEF_RAT = { drw: .5, lin: .5, hit: .5, swp: .5, nrv: .5, red: .5 };
@@ -75,7 +78,7 @@ function crErrK(s, shot) {
   // (and the stone's powers: truer, or wilder under a curse; no pressure with nerve: 13-powers.js)
   // (and their gear, and a Warming Draught: 14-kit.js)
   const f = crFxFor(s), ri = crThrower(s), r = crRat(s, ri), kit = crKitErr(s, ri), nk = crNerveK(f.nerve ? 0 : crPressure(s) * crKitPress(s, ri), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
-  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk * f.err * f.line * kit.ang, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk * f.err * f.wt * kit.v };
+  return { ang: crReachK(CR_REACH.lin, hit ? (r.lin + r.hit) / 2 : r.lin) * nk * f.err * f.line * kit.ang, v: (hit ? crReachK(CR_REACH.hit, r.hit) : crReachK(CR_REACH.drw, r.drw)) * nk * f.err * f.wt * kit.v };
 }
 // the legs are fresh at the start of an end
 function crLegsNewEnd() { if (G) G.legs = [1, 1]; }

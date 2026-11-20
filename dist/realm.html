@@ -40570,9 +40570,9 @@ function crSolveHit(x, y, v, h, ice, cold) {
    free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
   // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%)
-  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
-  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
-  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
+  { n: 'Squire', ang: .4, hitAng: .7, v: .022, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
+  { n: 'Knight', ang: .3, hitAng: .46, v: .016, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
+  { n: 'Archmage', ang: .22, hitAng: .36, v: .011, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
@@ -40616,7 +40616,8 @@ function crShots(s, sk) {
   return out;
 }
 // side s's release of a shot: its aim, with the curler's miss (heading and weight)
-function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
+// (a hit's line is its own, and wider: a takeout at full weight misses by its line, where a draw misses by its weight)
+function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
 function crTry(s, aim) {
@@ -40830,7 +40831,7 @@ function crSimGame(opts) {
      "Whoa!" when it is heavy. A hit needs no sweeping, and the skip says so.
    - Watch: the CPU throws both sides, its own sweepers sweeping. You play: your side's stones are yours.
    The stone moves on the page at CR_PLAY.speed times real time, a step at a time, the same steps the sim takes. */
-const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .12 } };
+const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .25, hitAng: .4, v: .01 } };
 const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
 const CR_MODES = ['watch', 'manage', 'play'];
 let GP = null;
@@ -40930,19 +40931,25 @@ function crRelease(p) {
   const S = GP.sel, err = Math.abs(p - CR_PLAY.meter.line) <= CR_PLAY.meter.win ? 1 : p;
   // (your weight's miss is the meter's, made smaller or wider by the stone's powers; the line's is your curler's, by
   // their ratings and the moment)
-  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you, S.shot).ang, v: S.aim.v * crYourWt(err), h: S.h };
+  const rel = crYourRel(S, S.aim.ang, crYourWt(err));
   crBegin(GP.you, Object.assign({}, S), rel, null);
 }
 // a power cast on your stone for this shot's kind (a draw power or a hit power): another kind of shot isn't allowed
 const crShotLocked = shot => !!(G.powers && G.powStone[GP.you] === G.n && G.powWhich && G.powWhich[GP.you] && (CR_HIT.includes(shot) ? 'hit' : 'draw') !== G.powWhich[GP.you]);
 const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
+// your release: the line off your aim by your curler's line (a hit's wider), the weight off the meter's by their draw or
+// hit rating as well (the meter is your part, the ratings theirs: a good curler is truer for you too)
+function crYourRel(S, ang, wt) {
+  const k = crErrK(GP.you, S.shot), hit = ['takeout', 'peel', 'hitroll'].includes(S.shot), Y = CR_PLAY.you;
+  return { ang: ang + gauss() * (hit ? Y.hitAng : Y.ang) * k.ang, v: S.aim.v * wt * (1 + gauss() * Y.v * k.v), h: S.h };
+}
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
 function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter, kit = crKitErr(GP.you, crThrower(GP.you)); return clamp(1 + (p - 1) * f.err * f.wt * kit.v, K.low, K.high); }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), crYourRel(GP.sel, GP.sel.aim.ang + clamp(deg, -3, 3) * .15, crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high))), null);
   return true;
 }
 
@@ -41252,7 +41259,10 @@ const CR_KIND = {
   skeleton: [7, 7, 6, 6, 9, 6], witch: [8, 6, 5, 7, 6, 10],
 };
 const CR_RCAP = 12;
-const CR_REACH = { drw: 1.1, lin: 1, hit: 1, nrv: .8, swp: .6 };
+// (drw, lin, hit reach as a multiplier: exp(reach x (.5 - rating)), so a curler rated 1 misses about twice as wide as
+// an average one, and one rated 12 about half as wide; the rest are linear)
+const CR_REACH = { drw: 1.4, lin: 1.4, hit: 1.4, nrv: .8, swp: .6 };
+const crReachK = (reach, r) => Math.exp(reach * (.5 - r));
 // (a stone swept hard the whole way spends about a third of an end's legs: the skip's stones can still be swept)
 const CR_LEGS = { burn: .02, low: .45 };
 const CR_DEF_RAT = { drw: .5, lin: .5, hit: .5, swp: .5, nrv: .5, red: .5 };
@@ -41294,7 +41304,7 @@ function crErrK(s, shot) {
   // (and the stone's powers: truer, or wilder under a curse; no pressure with nerve: 13-powers.js)
   // (and their gear, and a Warming Draught: 14-kit.js)
   const f = crFxFor(s), ri = crThrower(s), r = crRat(s, ri), kit = crKitErr(s, ri), nk = crNerveK(f.nerve ? 0 : crPressure(s) * crKitPress(s, ri), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
-  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk * f.err * f.line * kit.ang, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk * f.err * f.wt * kit.v };
+  return { ang: crReachK(CR_REACH.lin, hit ? (r.lin + r.hit) / 2 : r.lin) * nk * f.err * f.line * kit.ang, v: (hit ? crReachK(CR_REACH.hit, r.hit) : crReachK(CR_REACH.drw, r.drw)) * nk * f.err * f.wt * kit.v };
 }
 // the legs are fresh at the start of an end
 function crLegsNewEnd() { if (G) G.legs = [1, 1]; }
@@ -61262,12 +61272,14 @@ renderHelp = function () {
    done to it (wShedColdNow, the same all day), and how the frost lies along the boards.
    Ask her to PLAY: until your four has won a curling match from the world she doesn't believe you have a rink. Once
    you have, she joins your team, once a journey: a spider at the team's level (wStarLvl), the best sweeper there is
-   (her curling sweep at the cap). A full roster asks who goes, as any recruit does. After that she greets you as one
-   of your own.
+   (her curling sweep at the cap). A full roster asks who goes, as any recruit does; turned down, she waits at camp
+   (sign her there). After that she greets you as one of your own; let go, she goes back to Hennock's brooms. Her
+   greeting names her topics.
    WG.flags: tilda_joined (she has joined: once a journey)
    wTildaReady()   your four has won a curling match from the world
-   wTildaJoin()    she joins ('' or why not); the PLAY topic's act ('tildaplay')
-   Wraps: wSay (wW131Say: her greeting and the ICE topic, which change), wRunAct (wW131RunAct: 'tildaplay'), wAddPlayer
+   wTildaState()   'team', 'camp', 'gone', 'ready' or 'no'
+   wTildaJoin()    she joins when she can ('' or what she says); the PLAY topic's act ('tildaplay')
+   Wraps: wSay (wW131Say: her greeting, the ICE and PLAY answers, which change), wRunAct (wW131RunAct: 'tildaplay'), wAddPlayer
    (wW131AddPlayer: her sweeping), renderHelp (wW131RenderHelp: a line in #wHelpShedGame). */
 
 const W_TILDA = { n: 'Tilda Spindle', kind: 'spider', flav: 'Eight legs, eight brooms. Hennock\'s pebble-keeper, at last on a rink of her own.' };
@@ -61279,22 +61291,41 @@ const wTildaReady = () => !!(WG && WG.shg && WG.shg.w > 0);
   T.topics.play = { t: 'You want me to PLAY? For your rink?', act: 'tildaplay' };
   T.topics.job = { t: 'I keep the ice for Brush Hennock. Ask me about the ICE before you curl, or ask me to SWEEP. Or ask me to PLAY. Go on. Nobody ever does.' };
 })();
+// where she stands: 'team' (on your roster), 'camp' (waiting at camp: turned down on a full roster), 'gone' (joined once
+// and let go), 'ready' (your four has won: she'll come), or 'no'
+const wTildaIs = p => p && p.n === W_TILDA.n && p.kind === W_TILDA.kind;
+function wTildaState() {
+  if (wRoster().some(wTildaIs)) return 'team';
+  if ((WG.wwait || []).some(wTildaIs)) return 'camp';
+  if (wFlag('tilda_joined')) return 'gone';
+  return wTildaReady() ? 'ready' : 'no';
+}
+const W_TILDA_SAY = {
+  no: 'A rink? Win a curling match here first, a real one against a club, and I will believe you have one.',
+  ready: 'You mean it? Hold this. No, all of these. I will be at the Shed before you are.',
+  full: 'You mean it? Your team is full, though. Make room for me and I am yours.',
+  camp: 'I am waiting at your camp, with my brooms. Sign me there when you have room.',
+  team: 'I am on your team already. Put me on the brooms.',
+  gone: 'You let me go. I am back on the brooms for Hennock. No hard feelings. Some hard feelings.',
+};
+// her answer to PLAY, in the talk box (wSay), and what follows it (the act): she joins when she can
+function wTildaPlaySay() { const st = wTildaState(); return st === 'ready' && wRoster().length >= W_PARTY.max ? W_TILDA_SAY.full : W_TILDA_SAY[st]; }
 function wTildaJoin() {
-  if (!WG) return '';
-  if (wFlag('tilda_joined')) return 'I am on your team already. Put me on the brooms.';
-  if (!wTildaReady()) return 'A rink? Win a curling match here first, a real one against a club, and I will believe you have one.';
-  // (the flag is set when she really joins, in wAddPlayer: a full roster you won't make room on leaves her asking)
+  if (!WG || wTildaState() !== 'ready') return wTildaPlaySay();
+  // (the flag is set when she really joins, in wAddPlayer: a full roster you won't make room on sends her to camp)
   wRecruitTopic({ kind: W_TILDA.kind, n: W_TILDA.n, lvl: wStarLvl(), flav: W_TILDA.flav });
-  return 'You mean it? Hold this. No, all of these. I will be at the Shed before you are.';
+  return '';
 }
 const wW131RunAct = wRunAct;
-wRunAct = function (act, id) { if (act === 'tildaplay') { const say = wTildaJoin(); if (say) wLog(`${W_TILDA.n}: "${say}"`, 'g'); return; } return wW131RunAct.apply(this, arguments); };
-// her greeting once she is yours, and the day's ice
+wRunAct = function (act, id) { if (act === 'tildaplay') { wTildaJoin(); return; } return wW131RunAct.apply(this, arguments); };
+// her greeting (her topics named, or as one of your own), the day's ice, and her answer to PLAY
 const wW131Say = wSay;
 wSay = function (id, kw) {
   const r = wW131Say(id, kw);
   if (id !== 'gf_shed' || !WG || !r) return r;
-  if (!(kw || '').trim() && wFlag('tilda_joined')) return Object.assign({}, r, { text: 'Back at the Shed? I come in early to keep the pebble. Old habits. Then I get to sweep it for real.' });
+  if (!(kw || '').trim()) return Object.assign({}, r, { text: wTildaState() === 'team' ? 'Back at the Shed? I come in early to keep the pebble. Old habits. Then I get to sweep it for real.'
+    : `${r.text} Ask me about the ICE before you curl. Or ask me to PLAY. Nobody ever does.` });
+  if (r.key === 'play') return Object.assign({}, r, { text: wTildaPlaySay() });
   if (r.key === 'ice') {
     const cold = wShedColdNow(), said = cold === 'heavy' ? 'Heavy today: a warm wind off the sea, and frost on the pebble. Throw it firm, and your sweepers will earn their supper.'
       : cold === 'keen' ? 'Keen today: a hard frost last night, and it runs like a hare. Throw it soft, and let it come to you.' : 'As Hennock likes it today: honest ice. Throw it as you mean it.';
@@ -61306,7 +61337,8 @@ wSay = function (id, kw) {
 const wW131AddPlayer = wAddPlayer;
 wAddPlayer = function (p) {
   const q = wW131AddPlayer(p);
-  if (q && q.n === W_TILDA.n && q.kind === W_TILDA.kind && !wFlag('tilda_joined')) { wSetFlag('tilda_joined'); const b = wCrOf(q); if (b) b.swp = Math.max(b.swp, wCrCap()); }
+  // (she joins once: the flag, her sweeping at the cap, off the camp list if she was on it, and saved with all of it)
+  if (wTildaIs(q) && !wFlag('tilda_joined')) { wSetFlag('tilda_joined'); WG.wwait = (WG.wwait || []).filter(x => !wTildaIs(x)); const b = wCrOf(q); if (b) b.swp = Math.max(b.swp, wCrCap()); wSave(); }
   return q;
 };
 const wW131RenderHelp = renderHelp;

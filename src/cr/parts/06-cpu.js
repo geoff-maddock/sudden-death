@@ -21,9 +21,9 @@
    free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
   // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%)
-  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
-  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
-  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
+  { n: 'Squire', ang: .4, hitAng: .7, v: .022, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
+  { n: 'Knight', ang: .3, hitAng: .46, v: .016, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
+  { n: 'Archmage', ang: .22, hitAng: .36, v: .011, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
@@ -67,7 +67,8 @@ function crShots(s, sk) {
   return out;
 }
 // side s's release of a shot: its aim, with the curler's miss (heading and weight)
-function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
+// (a hit's line is its own, and wider: a takeout at full weight misses by its line, where a draw misses by its weight)
+function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
 function crTry(s, aim) {

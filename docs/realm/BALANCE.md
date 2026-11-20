@@ -1314,6 +1314,29 @@ same four on both sides: an Archmage beats a Knight 70%, a Knight beats a Squire
 - **The Brass Broom** (Simulate every round, their bags in): won 15% before, 19% after; out in the quarter-final 17%,
   the semi-final 40%, the final 24%.
 
+### Harder to make a shot (after play)
+
+Played by hand, curling felt too hard to score: every stone you got into the house was knocked out. The numbers agreed:
+takeouts were made 89% of the time by a Squire, 93% by a Knight and 99% by an Archmage (60 games a skill, in node), and
+a curler's ratings moved their miss only a little. Three changes:
+
+1. **A hit has its own, wider line** by skill (`CR_SKILL` `hitAng`: a Squire .7, a Knight .46, an Archmage .36 degrees,
+   against .4, .3 and .22 for a draw): a takeout at full weight misses by its line, where a draw misses by its weight.
+   Draws are a little harder too (`v` .022, .016, .011).
+2. **Ratings reach further,** as a multiplier: a curler's miss is `exp(reach x (.5 - rating))` of the skill's
+   (`crReachK`, `CR_REACH` drw, lin and hit 1.4), so one rated 1 misses about twice as wide as an average curler and
+   one rated 12 about half as wide. Draw, line and hit 10 against 3 (both Knights): 85% before, 99% now. Three more
+   rating points a player wins 61% (60% before), six more 68% (56%), twelve more 75% (74%).
+3. **Your own stones answer to your curler's ratings:** the line off your aim (`CR_PLAY.you` .25 degrees, a hit's .4,
+   from .12 for both) and a small part of the weight on top of the meter's (`v` .01), each times the curler's own
+   ratings.
+
+Shots made by skill (60 games, in node): takeouts 53%, 73% and 85%; draws 53%, 69% and 83%; points a game rose. The
+lab (100 a cell): tiers 98%, 53% and 24% (80%, 49% and 31% before); against a Squire 94%, a Knight 50%, an Archmage
+20%; an Archmage beats a Knight 82% and a Knight beats a Squire 95% (70% and 87% before); your rink scores 6.8, 3.3 and
+2.7 points a game by tier (3.4, 2.4 and 2.2); shots made about 70% (80%); the Brass Broom won 24% (19%). The low skill
+plays much worse, as asked, and both sides score more.
+
 ### One thing at a time
 
 `realm_shed_lab.py 40 '' single` (40 games a cell, so about 8 points of noise; the granite rows were measured again

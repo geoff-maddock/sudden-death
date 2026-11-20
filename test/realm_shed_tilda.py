@@ -35,17 +35,25 @@ async def main():
           const want = cold === 'heavy' ? 'Heavy' : cold === 'keen' ? 'Keen' : 'As Hennock likes it';
           return { ice: ice.startsWith(want) && /boards/.test(ice), sweep: /empty/.test(sweep), greet: /nobody lets me play/.test(greet) }; })()""")
         check(t == {'ice': True, 'sweep': True, 'greet': True}, 'Tilda reads the day\'s ICE (the cold and the boards), sweeps the empty sheet, and nobody lets her play', t)
-        n0 = await pg.evaluate("(() => { const n = wRoster().length; const r = wSay('gf_shed', 'play'); wRunAct(r.act, 'gf_shed'); return { n, after: wRoster().length, joined: wFlag('tilda_joined'), said: WLOG.slice(-1)[0][0] }; })()")
-        check(n0['after'] == n0['n'] and not n0['joined'] and 'Win a curling match' in n0['said'], 'before your four has won a curling match, she won\'t believe you have a rink', n0)
+        n0 = await pg.evaluate("(() => { const n = wRoster().length; const r = wSay('gf_shed', 'play'); wRunAct(r.act, 'gf_shed'); return { n, after: wRoster().length, joined: wFlag('tilda_joined'), said: r.text, greet: /ICE/.test(wSay('gf_shed', '').text) && /PLAY/.test(wSay('gf_shed', '').text) }; })()")
+        check(n0['after'] == n0['n'] and not n0['joined'] and 'Win a curling match' in n0['said'] and n0['greet'], 'her greeting names ICE and PLAY; before your four has won a curling match, she won\'t believe you have a rink (said in the talk box)', n0)
         j = await pg.evaluate("""(() => { WG.shg = Object.assign(wShg(), { w: 1 }); while (wRoster().length >= W_PARTY.max) WG.roster.pop(); const n = wRoster().length, lv = wStarLvl();
           const r = wSay('gf_shed', 'play'); wRunAct(r.act, 'gf_shed'); const T = wRoster().find(p => p.n === 'Tilda Spindle');
           const again = (() => { const r2 = wSay('gf_shed', 'play'); wRunAct(r2.act, 'gf_shed'); return wRoster().filter(p => p.n === 'Tilda Spindle').length; })();
           return { joined: !!T && wFlag('tilda_joined'), kind: T && T.kind, lvl: T && T.lvl === lv, swp: T && wCrOf(T).swp === wCrCap(), again, greet: /Back at the Shed/.test(wSay('gf_shed', '').text), grew: wRoster().length - n }; })()""")
         check(j == {'joined': True, 'kind': 'spider', 'lvl': True, 'swp': True, 'again': 1, 'greet': True, 'grew': 1}, 'after a win she joins, once: a spider at the team\'s level, the best sweeper there is, and greets you as her own', j)
-        f = await pg.evaluate("""(() => { WG.roster = WG.roster.filter(p => p.n !== 'Tilda Spindle'); delete WG.flags.tilda_joined; let k = 0; while (wRoster().length < W_PARTY.max) wAddPlayer(wMakePlayer({ kind: 'goblin', lvl: 1, n: 'Fill' + k++ }, 'tavern'));
-          const r = wSay('gf_shed', 'play'); wRunAct(r.act, 'gf_shed'); const asked = !document.getElementById('modal').hidden; for (let i = 0; i < 6 && !document.getElementById('modal').hidden; i++) { const b = [...document.querySelectorAll('#modalBox button')].pop(); if (!b) break; b.click(); }
-          return { asked, joined: wFlag('tilda_joined'), on: wRoster().some(p => p.n === 'Tilda Spindle') }; })()""")
-        check(f['asked'] and (f['joined'] == f['on']), 'a full roster asks who goes; turned down, she is still there to ask (joined only when she really joins)', f)
+        f = await pg.evaluate("""(() => { const T = wRoster().find(p => p.n === 'Tilda Spindle'); wRelease(T.id); const gone = wSay('gf_shed', 'play').text;
+          delete WG.flags.tilda_joined; let k = 0; while (wRoster().length < W_PARTY.max) wAddPlayer(wMakePlayer({ kind: 'goblin', lvl: 1, n: 'Fill' + k++ }, 'tavern'));
+          const r = wSay('gf_shed', 'play'); wRunAct(r.act, 'gf_shed'); const asked = !document.getElementById('modal').hidden;
+          const no = [...document.querySelectorAll('#modalBox button')].find(b => /No thanks|Not now|Keep/i.test(b.textContent)) || [...document.querySelectorAll('#modalBox button')].pop(); if (no) no.click();
+          const camp = WG.wwait.filter(p => p.n === 'Tilda Spindle').length, flag = wFlag('tilda_joined'), campSay = wSay('gf_shed', 'play').text;
+          // (room made: asking again sends you to camp; signed there, she joins once, and only once)
+          wRelease(wRoster().find(p => /^Fill/.test(p.n)).id); const r2 = wSay('gf_shed', 'play'); wRunAct(r2.act, 'gf_shed'); const before = wRoster().filter(p => p.n === 'Tilda Spindle').length;
+          wSignWaiting(WG.wwait.findIndex(p => p.n === 'Tilda Spindle')); const one = wRoster().filter(p => p.n === 'Tilda Spindle').length;
+          return { gone: /let me go/.test(gone), asked, camp, flag, campSay: /camp/.test(campSay), before, one, joined: wFlag('tilda_joined'), left: WG.wwait.filter(p => p.n === 'Tilda Spindle').length }; })()""")
+        check(f['gone'], 'let go, she is back on Hennock\'s brooms (not on your team)', f)
+        check(f['asked'] and f['camp'] == 1 and not f['flag'] and f['campSay'], 'a full roster asks who goes; turned down, she waits at camp and says so', f)
+        check(f['before'] == 0 and f['one'] == 1 and f['joined'] and f['left'] == 0, 'signed from camp she joins once, and only once', f)
         await pg.evaluate("showPage('help')")
         hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpShedGame'); return !!h && /Tilda Spindle/.test(h.textContent); })()")
         check(hp, 'How to play names her', hp)
