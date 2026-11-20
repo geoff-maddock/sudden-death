@@ -16,12 +16,12 @@
    - Watch: the CPU throws both sides, its own sweepers sweeping. You play: your side's stones are yours.
    The stone moves on the page at CR_PLAY.speed times real time, a step at a time, the same steps the sim takes. */
 const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .12 } };
-const CR_HOOK = { onPhase: null, onPick: null, onOver: null };
+const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
 const CR_MODES = ['watch', 'play'];
 let GP = null;
 
 function crPlayStart(o) {
-  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null };
+  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null, paths: [] };
   crGo('next');
   return GP;
 }
@@ -48,7 +48,7 @@ function crSelAim(S) {
 function crSuggest(s) {
   const keep = G.skill[s]; G.skill[s] = 1; let P;
   try { P = crPlan(s); } finally { G.skill[s] = keep; }
-  return { shot: P.shot, x: P.x, y: P.y, h: P.h, target: P.target || null, roll: P.roll || 0, why: P.why };
+  return { shot: P.shot, x: P.x, y: P.y, h: P.h, target: P.target || null, roll: P.roll || 0, why: P.why, reason: P.reason || '' };
 }
 // your skip's call, aimed; one that won't solve on the ice falls back to a draw to the top of the house
 function crSelReset() {
@@ -148,6 +148,8 @@ function crSettle() {
   const ev = crThrowFinish(X);
   if (!ev.rule.ok) { crGo('rest', CR_PLAY.pace.rest, ev.rule.why); return; }
   GP.last = ev;
+  // (every stone's path this game, for the ice chart)
+  GP.paths.push({ s: ev.side, path: X.Q.path.map(p => [p[0], p[1]]) });
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
@@ -170,10 +172,10 @@ function crTick(dt) {
 function crPlayNext() {
   const s = crUp(); if (s < 0) { crGo('over'); return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
-  if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
+  if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   const plan = Object.assign(crPlan(s), { s }), rel = crMiss(s, plan.aim);
   GP.cpu = { s, plan, rel };
-  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}.`);
+  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.`);
 }
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;

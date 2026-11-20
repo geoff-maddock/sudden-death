@@ -23,7 +23,11 @@
    Phase 3 is ratings, positions, the sweepers' legs and nerve: stats (the six, in order), rate(kind) (1 to 12), cap,
    fit(r, pos) (r 0 to 1, pos 0 lead to 3 skip), autoOrder(roster), legs (G.legs), pressure(side), sweepers(side) (who
    sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair: run's opts.legs applies it), errK(side, shot), and the
-   tables reachRules and legsRules. A roster curler may bring r (1 to 12); a team may bring its order. */
+   tables reachRules and legsRules. A roster curler may bring r (1 to 12); a team may bring its order.
+   Phase 4 is the call and the read: endValue(side, pts, next, skill) (an end's last stone by what it does to the
+   game), reason(side, call) (why the skip calls it; plan(side) carries it as reason), readIn(side) (how far back from
+   the house the side's skip reads the ice, inches), chart(canvas, side) (draws the ice chart: the pebble's wear and
+   every stone's path this game, paths their count); onChart hears C. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -47,6 +51,10 @@ return {
   setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepBtn = !!on; if (GP) GP.sweep = !!on && GP.ph === 'slide' && !!GP.X && crYours(GP.X.s); }, get sweep() { return !!(GP && GP.sweep); },
   scr: (x, y) => crScr(x, y), unscr: (sx, sy) => crUnscr(sx, sy), houseScr: (x, y) => crHouseScr(x, y), houseUn: (sx, sy) => crHouseUn(sx, sy), get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
   get live() { const X = GP && GP.X; return X ? { s: X.s, t: X.Q.t, stone: { x: X.Q.T.x, y: X.Q.T.y, vx: X.Q.T.vx, vy: X.Q.T.vy }, sw: X.Q.sw, plan: X.plan } : null; },
+  // the call and the read (phase 4)
+  endValue: (s, pts, next, sk) => G && G.teams ? crEndValue(s, pts, next, sk) : 0, reason: (s, c) => G && G.teams ? crReason(s, c) : '', readIn: s => G && G.teams ? crReadIn(s) : 0,
+  chart: (cv, s) => { if (!G || !G.teams || !cv) return false; const c = cv.getContext('2d'); crChart(c, s, cv.width, cv.height, GP ? GP.paths : []); return true; }, get paths() { return GP ? GP.paths.length : 0; },
+  set onChart(f) { CR_HOOK.onChart = f; }, get onChart() { return CR_HOOK.onChart; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
   show: () => crShow(), hide: () => crHide(), get on() { return CRP.on; }, render: dt => crRender(dt || 0),
   pause: on => { CRP.paused = !!on; }, get paused() { return CRP.paused; }, get speed() { return CRP.speed; }, set speed(n) { CRP.speed = clamp(Math.round(n) || 1, 1, 8); }

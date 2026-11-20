@@ -30,7 +30,8 @@ const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0,
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
   const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
-  if (kAfter >= crPerEnd()) { const next = R.s >= 0 ? 1 - R.s : hammer; return pts + (S.hammer ? (next === s ? CR_VAL.hammer : -CR_VAL.hammer) : 0); }
+  // (the end's last stone: what it does to the game, crEndValue in 11-call.js)
+  if (kAfter >= crPerEnd()) { const next = R.s >= 0 ? 1 - R.s : hammer; return crEndValue(s, pts, next, sk); }
   const left = (crPerEnd() - kAfter) / crPerEnd(); let v = pts * (1 - CR_VAL.left * left);
   for (const st of stones) {
     const mine = st.s === s ? 1 : -1;
@@ -78,8 +79,10 @@ function crPlan(s) {
   // the best few, played a few times with the curler's own miss: the likeliest result wins
   const top = list.slice(0, S.top);
   if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
+  // an Archmage plays its best few on against the other rink's likeliest reply (crReplyWorst), and weighs that in
+  if (sk >= 2) for (const c of top) { const w = crReplyWorst(s, crTry(s, c.aim), kAfter, sk); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + w * CR_CALL.replyMix; }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
-  return Object.assign({}, best, { why: crWhy(best) });
+  return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });
 }
 function crWhy(c) {
   const where = c.shot === 'guard' ? (Math.abs(c.x) < 30 ? 'in the centre' : 'on the corner') : c.shot === 'draw' ? (Math.hypot(c.x, c.y) < 10 ? 'to the button' : c.y > 20 ? 'to the back of the house' : c.y < -30 ? 'to the top of the four-foot' : 'to the side of the house') : '';
