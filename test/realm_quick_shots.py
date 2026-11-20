@@ -3,7 +3,7 @@
 # look changes, then rebuild. Each shot sets the game up through its API (a setup may wait on the game), freezes it,
 # lays labels with arrows over it and takes the picture: the canvas, and any bar above it that the step is about.
 #   python3 test/realm_quick_shots.py              every sport
-#   python3 test/realm_quick_shots.py links ring   some sports (the others' shots are kept)
+#   python3 test/realm_quick_shots.py links lanes   some sports (the others' shots are kept)
 # A label: { t: text, x, y: where the arrow points, in the canvas's own pixels (or el: a page element, the arrow at its
 # middle), dx, dy: where the text sits from there (canvas pixels), al: 'l' or 'r' to hang the text off that side }.
 import asyncio, base64, os, re, subprocess, sys
@@ -153,7 +153,23 @@ RINK = {
   ],
 }
 
-SHOTS = {'links': GOLF, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK}
+# ---------- bowling ----------
+# (the meter's marker: x 590, from v -0.22 at y 470 up to v 1.1 at y 150; the yellow line is v 1, the green block v 0)
+LANES = {
+  'prep': "window.__to = (ph, n) => { let i = 0; while (wBL.phase !== ph && i++ < (n || 8000)) wBL.tick(0.05); return wBL.phase === ph; }; window.__mY = v => 470 - (v + 0.22) / 1.32 * 320; 0",
+  'cv': "document.querySelector('#v-lanes canvas')", 'W': 960,
+  'shots': [
+    ('lanes-aim', "(() => { W_LANES_MODE = 'play'; wLanesGame({ seed: 5, mode: 'play' }); wBL.pause(true); __to('aim'); for (const m of wBL.G.teams[wBL.view.you].roster) if (m.style) m.style.hand = 1; wBL.select({ suggest: true }); for (let i = 0; i < 40; i++) wBL.render(0.05); })()",
+     """(() => { const S = wBL.view.sel, g = wBL.geo, [fx, fy] = wBL.scr(wBL.boardX(S.stand), 0), [ax, ay] = wBL.scr(wBL.boardX(S.arrow), g.arrows), [px, py] = wBL.scr(0, g.len);
+       return [{ t: 'The guide line: where a good ball goes', x: (ax + px) / 2 + 6, y: (ay + py) / 2, dx: 150, dy: -40, al: 'l' }, { t: 'The arrow you roll over (A, D)', x: ax + 12, y: ay, dx: 150, dy: 30, al: 'l' }, { t: 'Your feet (the left and right arrows)', x: fx - 10, y: fy, dx: -150, dy: -60, al: 'r' }]; })()"""),
+    ('lanes-speed', "(() => { wBL.press(); let i = 0; while (wBL.view.meter.v < 0.82 && i++ < 400) wBL.tick(0.01); for (let j = 0; j < 4; j++) wBL.render(0.02); })()",
+     """[{ t: 'The marker climbs', x: 604, y: __mY(wBL.view.meter.v), dx: -170, dy: 40, al: 'r' }, { t: 'Press Space at the yellow line: the speed', x: 578, y: __mY(1), dx: -130, dy: -40, al: 'r' }, { t: 'Red: a power ball', x: 600, y: __mY(1.05), dx: 110, dy: 70, al: 'l' }]"""),
+    ('lanes-mark', "(() => { wBL.press(); let i = 0; while (wBL.view.meter.v > 0.3 && i++ < 400) wBL.tick(0.01); for (let j = 0; j < 4; j++) wBL.render(0.02); })()",
+     """[{ t: 'Press Space inside the green block', x: 578, y: __mY(0), dx: -170, dy: -30, al: 'r' }, { t: 'Before it: pulled left', x: 600, y: __mY(0.15), dx: 120, dy: -60, al: 'l' }, { t: 'After it: pushed right', x: 600, y: __mY(-0.15), dx: 120, dy: 40, al: 'l' }]"""),
+  ],
+}
+
+SHOTS = {'links': GOLF, 'lanes': LANES, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK}
 
 async def main():
     only = sys.argv[1:] or list(SHOTS)

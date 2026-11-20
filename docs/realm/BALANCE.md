@@ -1134,3 +1134,123 @@ those (two 120-match runs are good to about 6 points), so the engines read the s
 older than later changes, and these labs draw each journey's rival clubs once, which swings a tier cell (as phase 10
 found in golf).
 
+
+## Bowling at the Saltmere Lanes (issue #100, phase 10)
+
+`python3 test/realm_lanes_lab.py N`: every game is the bowling engine played to a final, headless, as Simulate plays it
+(one Baker game of ten frames, the hall on, the tide mid, powers on), your five bowling as a Knight, theirs at the tier's
+skill. Every game draws both fives afresh, and **each cell has its own run of seeds**: the first version gave every cell
+the same 200 seeds, and that one run's luck put side 0 at 55 to 62% in every "even" cell. About 40 ms a game; a cell of
+400 is good to about 2.5 points either way, 150 to about 4. A roll-off settles about 1 game in 100.
+
+The first run found five things wrong, all fixed before these numbers:
+
+1. **Levels didn't matter.** Their five three levels up won as often as an even five (52%). A level is one rating
+   point to one of six ratings, and each point was worth too little. Accuracy, spare, power and revs now reach further
+   (`BL_REACH` in `10-ratings.js`), and an average bowler (6.5) is where they were.
+2. **Power and revs made a bowler worse.** They set the ball's speed and revs outright, and the lane has a sweet spot
+   (about 16.8 mph and 350 rpm: 43% strikes there, 30 to 33% at the corners of the range). +3 power or +3 revs cost
+   about 9 points. Now they set the speed and revs only within a narrow band round the sweet spot, and pay in a wider
+   pocket on the strike ball (a strong, spinning ball strikes from further off the line) and in drive through the pins.
+   Each rating +3 on all five, against the same five (500 each): accuracy +15, revs +9, power +5, nerve +5, spare +3,
+   read +2.
+3. **A line fixed up the boards beat everything** (65% against the captain's own 53%), and Deep inside lost (37%).
+   With both sides on one line, strikes are level from `blStand`'s stand out to 4.5 boards further out and fall off
+   fast either side. And the line didn't really move anyone: a Knight tries three stands two boards apart and the
+   line only shifted the set, so the sets overlapped and every line picked the same stand. Now the best stand is
+   found round a point two boards out from `blStand` (`BL_LINE_BASE`), and the line moves the feet off it (deep two
+   boards in, up the boards two out). The CPU moves up the boards when its track dries (onto fresher oil), not deep.
+4. **The Squire lost 87% of the time,** so tier 1 read 90%. It now plays spares (as the others do) from one of two
+   stands, with a little less miss. Every skill's miss is a fifth wider than before (which keeps Knight against Knight
+   near 195), and the gaps between the three are as they were.
+5. **The skid curses decided games.** A Hex (the oil plays heavy for their next ball) was worth +24 to +31 points on a
+   five that casts it: the CPU plans for the oil it sees, so a ball that skids long misses the pocket badly. Skid is
+   a touch now (Hex and the Coven 1.06, Iced Lane 1.04, Chill and Mirage mostly a wider miss), and the harpy's Gust
+   wobbles less.
+
+**Tiers, as the world sets them** (400 each; their level yours plus the tier less one, `W_LNG.oppBonus` extra rating
+points on each of their five, now 1/1/1 from 2/4/7, and their skill by tier), round every club (600 each):
+
+| | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Win | 74% | 50% | 23% |
+
+With the bonus at 2/2/2 it read 70/43/22%; with 2/3/4, 75/46/14.5%. Since the ratings reach further, a point counts.
+
+Beside golf's 66 to 79 / 46 to 54 / 20 to 24%, hockey's 59/40/21% and basketball's 57/44/26%.
+
+**Level gap** (even kinds, both Knights, no bonus, 400 each, over two runs): a level below 50 to 60%, even 50 to 53%,
++1 48 to 51%, +2 46.5 to 47%, +3 45.5 to 48%: 2 to 4 points a level, less than golf (where +3 is 37%). A level is one
+point on one of six ratings, and the tier's skill counts for more. **Their skill** (even, over two runs): Squire 70 to
+75%, Knight 50 to 54%, Archmage 18 to 27%.
+
+The cells below are from the run before the line's last change, and were measured again on the final settings (300
+each, about 4 points either way): powers both 51.7%, neither 60.3%, yours only 59%, theirs only 48.3%; tempo and ball
+fixed 44 to 53%, none above the noise; the full kit 81.7%, 54.7% and 19.7% by tier against plain 75.7%, 52.7% and
+22.3%; the hall on 55.7%, off 51.3%. The same picture.
+
+**Powers** (even): both 56%, neither 52%, yours only 56%, theirs only 45%: worth about 5 or 6 points to a side that has
+them and the other doesn't (golf 8 to 10), and nothing between sides that both do. About five everyday powers a side a
+game.
+
+**Your line, fixed all game** (theirs their own call, 400 each): the pocket 53%, the captain's own 50%, Up the boards
+40%, Deep inside 37.5%. The other lines are for a moment, not a game: deep is the gamble when behind late, the boards
+for a dried lane or a lead to keep. Every ball off the pocket line costs, as laying up every shot does in golf.
+
+**Your tempo and ball, fixed all game:** Steady and heavy 52%, Quick and heavy 51.5%, Steady and light 47%, Quick and
+light 47%. The light ball costs a few points fixed all game: it is for a tired arm.
+
+**Gear and potions** (by tier, 300 each): plain; their bag only (`W_LANES_KIT.opp`); both bags; the full kit (both bags,
+and your five in gear, a piece each).
+
+| | Plain | Their bag | Both bags | Full kit |
+|---|---|---|---|---|
+| Tier 1 | 71.7% | 73.3% | 73% | 75.7% |
+| Tier 2 | 49% | 43.3% | 53% | 52% |
+| Tier 3 | 17.3% | 19.7% | 20.7% | 21% |
+
+Potions are worth little, as in golf; the full kit about 3 or 4 points.
+
+**The hall** (even, 300 each): on 52%, off 50%; a side a level up wins 48% with it on and 48% off. The tide moves
+scores (low tide about 10 pins down for both sides), not who wins.
+
+**Gutter Cups** (600, Simulate every round, the final best of three), by the rounds' tiers:
+
+| Rounds | Won | Out in the QF | SF | Final | Finals to a third game |
+|---|---|---|---|---|---|
+| 1, 2, 3 | 4.8% | 28% | 34% | 33% | 35% |
+| 2, 2, 2 | 14.3% | 50% | 22% | 13.5% | 49% |
+| **1, 2, 2** (now) | 25.5% | 25% | 34% | 16% | 44% |
+
+Golf's Divot Cup is won 14.5%. The Gutter Cup is set at 1, 2, 2 (a weaker side first, then two at your level), which is
+generous; `W_GUTTER.tiers = [2, 2, 2]` is the lever if the cup comes too easily by hand.
+
+**Reading the transition** (`read`, 400 each; lab-only switches: `noRead` plans a side's balls on the fresh lane whatever
+it has become, `wear: false` keeps the lanes as dressed). An Archmage that moves (reads the oil as it is and changes its
+line) against one that doesn't (plans on the fresh lane, the pocket every ball): 63%. With the transition off, 46.5%:
+reading is worth about 13 to 15 points, and only because the lanes change. Knight against Knight scores 206 with the
+transition on and 211.5 with it off (54 and 58% strikes): the worn lanes cost both sides about 6 pins. (Archmage
+against Archmage averages about 238, 70% strikes.)
+
+**The order** (your five in the order the ratings suggest, in its reverse, and shuffled; 400 each): 50%, 52%, 50%. The
+order hardly changes a result: the anchor's nerve counts only in the tenth, and every bowler bowls two frames. It is
+there for the feel of a lineup more than for the score; giving it teeth (a lead-off's strike setting up the next
+bowler, say) would be its own change.
+
+### One thing at a time
+
+`python3 test/realm_lanes_lab.py 150 '' single`: for each kind, a five of that kind with only that one power castable
+by your side (`powOnly`) and none for the other side, against the same five with none (150 a cell, about 6 points
+either way; all five cast it, so these are upper bounds). Most powers sit inside the noise. Measured again at 300 after
+the skid change: the witch's Hex 51% (none 40%), the Frost Wyrm's Iced Lane 83% (none 68%, before the last trim to
+1.04), the Djinn's Wish Ball 77% (none 62%), the wraith's Ghost Ball 58% (none 51%). The situation powers and Steady,
+each piece of gear on all five, and each potion two in the bag are all within the noise of none.
+
+### Superstars on the lanes (issue #100, phase 11)
+
+`python3 test/realm_stars_lab.py 200 '' bl`: four of your own and one more player as your five (the order set by the
+ratings), a whole game Simulated at an even level against a Knight's five (tier 2), the hall and powers on. Against the
+control (a league kind the team lacks), 52%: the Phoenix 52%, the Kraken 51%, the Djinn 51.5%, the Hydra 63.5%, the
+Frost Wyrm 56%, and the Behemoth 40.5%. One bowler of five bowls two frames, so a superstar moves a game less than in
+the other sports. The Behemoth's 4s in revs, accuracy, spare and read cost more than its 12 in power earned, so they
+are 7, 7, 6 and 6 now (nerve 10): 53% against the control's 49% (300 each).

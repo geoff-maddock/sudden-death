@@ -46,6 +46,8 @@ scope wBK src/realm/court/manifest.txt src/realm/court/exports.js
 scope wHK src/realm/rink/manifest.txt src/realm/rink/exports.js
 # Mossgate Links, the golf engine, in its own scope (issue #92): src/realm/links/manifest.txt
 scope wGL src/realm/links/manifest.txt src/realm/links/exports.js
+# The Saltmere Lanes, the bowling engine, in its own scope (issue #100): src/realm/lanes/manifest.txt
+scope wBL src/realm/lanes/manifest.txt src/realm/lanes/exports.js
 # the engines, by id (W_ENGINES)
 src/realm/w19b-engines.js
 src/realm/w20-diamond.js
@@ -149,4 +151,13 @@ src/realm/w109-linksstars.js
 src/realm/w110-linkscup.js
 src/realm/w111-linksfeel.js
 src/realm/w112a-quickshots.js
+src/realm/w113-lanes.js
+src/realm/w114-lanesfive.js
+src/realm/w115-lanescall.js
+src/realm/w116-lanesgame.js
+src/realm/w117-lanespowers.js
+src/realm/w118-laneskit.js
+src/realm/w119-lanesstars.js
+src/realm/w120-lanescup.js
+src/realm/w121-lanesfeel.js
 src/realm/w112-quickstart.js

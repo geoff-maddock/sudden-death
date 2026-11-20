@@ -1,5 +1,5 @@
-/* w112: Quick start, the simple how-to for each sport you can play by hand: golf, baseball, football, boxing,
-   basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
+/* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
+   boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
    test/realm_quick_shots.py), the keys you need and nothing else, then where the full rules are.
    It sits at the top of How to play (#wQuick, before #wHelp), one tab a sport. Each sport's bar gets a Quick start
    button beside its How to play button (baseball's beside Back to the world), which opens the page on that sport's
@@ -21,6 +21,16 @@ const W_QUICK = [
     tip: 'Every hole has its own hazards and magic. Point at anything on the course with the mouse to see what it does to your ball, good or bad; on a phone, press This hole on the bar.',
     keys: [['Space', 'swing (three presses; two for a putt)'], ['Click, or the arrows', 'aim'], ['1 to 4', 'pick who hits'], ['Q, E', 'change club'], ['P', 'use a power']],
     phone: 'On a phone, touch your ball, drag back away from where you want it to go, and let go. A longer pull hits it further.' },
+  { id: 'lanes', n: 'Bowling', where: 'the Saltmere Lanes', more: 'wLanesHow',
+    lede: 'Your coach has already set your feet and your arrow for the pocket. All you have to do is throw: press Space three times.',
+    steps: [
+      { img: 'lanes-aim', h: 'Look at the guide line', t: 'The dashed yellow line is where a good ball goes. Your feet are the yellow marker at the foul line, and the ring is the arrow you roll over, fifteen feet down. To move them, use the left and right arrows for your feet and A and D for the arrow, or click the lane.' },
+      { img: 'lanes-speed', h: 'Press Space, then press again at the yellow line', t: 'The first press starts the approach and the marker climbs the bar. Press again at the yellow line: that is your bowler\'s own speed. The red end above it is a power ball: faster, with more revs, but a smaller mark.' },
+      { img: 'lanes-mark', h: 'Press a third time in the green block', t: 'The marker comes back down. Press while it is inside the green block and the ball goes where the guide line goes. Too soon and it is pulled left; too late and it is pushed right (for a right-hander).' },
+    ],
+    tip: 'At a spare, press B for the spare ball, which rolls straight: the coach sets you up for it. After every ball, Moll\'s glass shows what you bowled.',
+    keys: [['Space', 'throw (three presses)'], ['Left, right arrows', 'move your feet'], ['A, D', 'move your arrow'], ['B', 'strike ball or spare ball'], ['G', 'back to the coach\'s line'], ['P', 'use a power']],
+    phone: 'On a phone, drag up the lane from the bowler and let go. How far you pull is the speed; a pull off straight misses.' },
   { id: 'ball', n: 'Baseball', where: 'the Ballpark', more: 'wHelpBall',
     lede: 'You bat first. Batting is two things: put the circle over the ball, and swing when it turns gold. Running and fielding happen by themselves.',
     steps: [
@@ -105,7 +115,7 @@ renderHelp = function () {
 };
 
 // the Quick start buttons: beside each sport's How to play button (baseball's on its bar)
-for (const [how, id] of [['wLinksHowBtn', 'links'], ['wGridHowBtn', 'grid'], ['wRingHowBtn', 'ring'], ['wCourtHowBtn', 'court'], ['wRinkHowBtn', 'rink']]) {
+for (const [how, id] of [['wLinksHowBtn', 'links'], ['wLanesHowBtn', 'lanes'], ['wGridHowBtn', 'grid'], ['wRingHowBtn', 'ring'], ['wCourtHowBtn', 'court'], ['wRinkHowBtn', 'rink']]) {
   const b = $(how); if (!b) continue;
   b.insertAdjacentHTML('beforebegin', `<button class="ghost" id="wQuick_${id}">Quick start</button> `);
   $('wQuick_' + id).addEventListener('click', () => wQuickOpen(id));
