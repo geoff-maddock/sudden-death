@@ -96,7 +96,7 @@ wCR.onPhase = ph => { if (ph === 'next') W_SHED_KITMSG = ''; wW127OnPhase(ph); }
 const wW127ResumeShed = wResumeShed;
 wResumeShed = function () {
   wW127ResumeShed();
-  const L = WG.shg && WG.shg.live, G = wCR.G; if (L && G && G.bags && G.bags[1] == null && WCR && WCR.world) { G.bags[1] = Object.assign({}, W_SHED_KIT.opp[L.world.tier] || {}); L.snap = wCR.snapshot(); wSave(); }
+  const L = WG.shg && WG.shg.live, G = wCR.G; if (L && L.world && G && G.bags && G.bags[1] == null && WCR && WCR.world) { G.bags[1] = Object.assign({}, W_SHED_KIT.opp[L.world.tier || wBallTier(L.world.club) || 1] || {}); L.snap = wCR.snapshot(); wSave(); wShedRows(); }
 };
 $('wShedBagRow').addEventListener('click', e => {
   const b = e.target.closest('[data-crkuse]'); if (!b || b.disabled) return;

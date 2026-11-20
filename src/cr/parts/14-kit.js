@@ -61,11 +61,13 @@ function crPotionGive(s, id, why) {
 // your potion now: '' when given (the page takes it out of your bag), or why not
 function crPotion(id) {
   if (!GP) return 'No game.';
-  const s = GP.you; if (!['aim', 'swing'].includes(GP.ph) || (GP.meter && GP.meter.st === 'gone')) return 'Only before your stone.';
+  // (before the swing: not with the meter going)
+  const s = GP.you; if (GP.ph !== 'aim') return 'Only before your stone, before the swing.';
   const why = crPotionWhy(s, id); if (why) return why;
   GP.msg = crPotionGive(s, id);
   // (fresh ice runs differently: your skip's aim is worked out again on it)
-  if (id === 'crpebble' && GP.sel) GP.sel.aim = crSelAim(GP.sel);
+  // (fresh ice runs differently: your call is aimed again on it, or, when no line gets there now, your skip calls again)
+  if (id === 'crpebble' && GP.sel) { GP.sel.aim = crSelAim(GP.sel); if (!GP.sel.aim) { crSelReset(); GP.msg += ` On the fresh ice that line doesn't get there: your skip calls ${GP.sel.why}.`; } }
   crPick();
   return '';
 }
@@ -76,7 +78,7 @@ function crPotionValues(s, bag, shot) {
   const out = [], T = G.teams[s], legs = G.legs ? G.legs[s] : 1, p = crPressure(s), ri = crThrower(s), m = T.roster[ri], late = G.k >= crPerEnd() - 4;
   const draw = !['takeout', 'peel', 'hitroll'].includes(shot || 'draw');
   if (bag.draught && legs < .6) out.push({ id: 'draught', v: (.7 - legs) * 10 + (draw ? 1 : 0) + (p ? 1 : 0), why: `the sweepers are down to ${Math.round(legs * 100)}% of their legs` });
-  if (bag.crwarm && p && m && m.rs.nrv < .75) out.push({ id: 'crwarm', v: 3 + p * 2 * (1 - m.rs.nrv), why: `${m.n} throws the last end` });
+  if (bag.crwarm && p && m && m.rs.nrv < .75) out.push({ id: 'crwarm', v: 3 + p * 2 * (1 - clamp(m.rs.nrv, 0, 1)), why: `${m.n} throws the last end` });
   if (bag.crsalt && late && G.hammer !== s) out.push({ id: 'crsalt', v: 2.2 + (G.end >= G.ends - 1 ? 1 : 0) + (G.k === crPerEnd() - 2 ? .8 : 0), why: 'their last stones are coming, and they have the hammer' });
   const worn = crIceWorn(); if (bag.crpebble && worn > .08) out.push({ id: 'crpebble', v: 2 + worn * 8, why: `${Math.round(worn * 100)}% of the pebble is worn` });
   return out.filter(o => !crPotionWhy(s, o.id)).sort((a, c) => c.v - a.v);
