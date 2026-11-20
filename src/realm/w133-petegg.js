@@ -108,7 +108,7 @@ const wW133Audit = wAudit;
 wAudit = function () {
   const P = wW133Audit().filter(s => !Object.keys(W_PEGG.eggs).some(k => s === 'item ' + wPeggItem(k) + ' cannot be obtained' && wPeggFind(MAPS[W_PEGG.eggs[k].map], W_PEGG_CH.egg, 'petegg', k)));
   for (const k in W_PEGG.eggs) { if (!wPeggFind(MAPS[W_PEGG.eggs[k].map], W_PEGG_CH.egg, 'petegg', k)) P.push('pet egg ' + k + ' has no spot on ' + W_PEGG.eggs[k].map); if (!PETS[k] || PETS[k].how !== 'egg' || !wPeggPlaceOf(k)) P.push('pet egg ' + k + ' is not an egg pet with a hatching place'); }
-  for (const k in PETS) if (PETS[k].how === 'egg' && !W_PEGG.eggs[k]) P.push('egg pet ' + k + ' has no egg');
+  for (const k in PETS) { if (PETS[k].how === 'egg' && !W_PEGG.eggs[k]) P.push('egg pet ' + k + ' has no egg'); if (PETS[k].n.length > W_PET.nameMax) P.push('pet ' + k + '\'s name is longer than a pet\'s name may be'); }
   for (const el in W_PEGG.places) if (!wPeggFind(MAPS[W_PEGG.places[el].map], W_PEGG_CH.hatch, 'pethatch', el)) P.push('hatching place ' + el + ' is not on ' + W_PEGG.places[el].map);
   return P;
 };
@@ -118,9 +118,9 @@ function wPeggTake(m, meta) {
   const kind = meta.petegg, E = W_PEGG.eggs[kind]; if (!E) return;
   if (wFlag('pegg_' + kind)) return wLog('The little nest is empty now. Whatever was in it is yours.', 'd');
   if (E.alpha && meta.alpha && !wFlag('alpha_' + meta.alpha)) return wLog('A small nest, right beside the alpha. Not while it is watching.', 'd');
-  if (E.night && wDarkness() < .3) return wLog('A small nest, lined with grey feathers. Nothing in it by daylight.', 'd');
+  if (E.night && !wIsNight()) return wLog('A grey egg in a nest of grey feathers, stone-cold and stuck fast. It won\'t come loose by daylight: come back after dark.', 'd');
   const P = wPeggPlaceOf(kind), city = (DB.towns.find(t => t.id === P.map) || {}).name;
-  wAddItem(wPeggItem(kind), 1); wSetFlag('pegg_' + kind); wAdvance(10);
+  wAddItem(wPeggItem(kind), 1); wSetFlag('pegg_' + kind); wAdvance(10); wInvalidate(WG.map);
   wLog(`In the little nest: a ${E.name}. It will hatch only at ${P.name} in ${city}.`, 'm');
   wSave();
 }
@@ -141,9 +141,11 @@ function wPeggPlace(el, kind) {
 function wPeggHatch(el) {
   const H = wPetEggs(), I = H[el]; if (!I) return null;
   if (WG.dayAbs < I.due) return null;
-  delete H[el];
-  const q = wPetAdd(I.kind, 'hatch:' + el);
+  if (!PETS[I.kind]) return null;
   wLog(`The ${W_PEGG.eggs[I.kind].name} cracks. Out tumbles ${petA(PETS[I.kind].n)} ${PETS[I.kind].n}!`, 'g');
+  // (the egg leaves its place only once its pet is really there)
+  const q = wPetAdd(I.kind, 'hatch:' + el); if (!q) return null;
+  delete H[el];
   wInvalidate(WG.map); wSave();
   return q;
 }
@@ -158,9 +160,9 @@ function wPetHatchScene(q, el) {
   const D = PETS[q.kind];
   const close = modal(`<header><h3>It hatched!</h3></header><div class="wmsg"><p>${esc(W_PEGG.places[el].name)[0].toUpperCase() + esc(W_PEGG.places[el].name).slice(1)} gives up its egg: out tumbles ${petA(D.n)} ${esc(D.n)}, a ${esc(D.from)}, blinking at you. ${q.waits ? 'Your kennel is full, so it will wait here for you.' : 'It joins your kennel.'}</p>
     <label>What will you call it? <input type="text" id="wHatchName" maxlength="${W_PET.nameMax}" value="${esc(q.name)}"></label></div>
-    <div class="row"><button class="btn" id="wHatchOk">That's its name</button></div>`, () => wDrain());
+    <p class="wbad" id="wHatchWhy" hidden></p><div class="row"><button class="btn" id="wHatchOk">That's its name</button></div>`, () => wDrain());
   const inp = $('wHatchName'); inp.focus(); inp.select();
-  const ok = () => { const why = wPetNameAny(q.id, inp.value); if (why) return; const nm = (wPetOf(q.id) || (WG.petAway || []).find(x => x.id === q.id) || q).name; wLog(`You call it ${nm}.`, 'g'); close(); };
+  const ok = () => { const why = wPetNameAny(q.id, inp.value); if (why) { const w = $('wHatchWhy'); w.textContent = why; w.hidden = false; return; } const nm = (wPetOf(q.id) || (WG.petAway || []).find(x => x.id === q.id) || q).name; wLog(`You call it ${nm}.`, 'g'); close(); };
   $('wHatchOk').onclick = ok; inp.onkeydown = e => { if (e.key === 'Enter') ok(); };
 }
 function wPeggOpen(el) {

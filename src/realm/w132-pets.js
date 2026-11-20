@@ -21,7 +21,7 @@
    wRenderCamp (wW132OpenCamp, wW132RenderCamp: the Pets tab), renderHelp (wW132RenderHelp: #wHelpPets). The pet on the
    map is one of w7's actors (W_ACTORS). */
 
-const W_PET = { kennel: 6, upkeep: { c: 6, u: 10, r: 16 }, nameMax: 18 };
+const W_PET = { kennel: 6, upkeep: { c: 6, u: 10, r: 16 }, nameMax: 24 };
 function wPets() {
   const P = WG.pets = WG.pets || { owned: [], side: null, seq: 1 };
   P.owned = P.owned || []; if (!P.seq) P.seq = 1 + P.owned.reduce((m, x) => Math.max(m, x.id || 0), 0);

@@ -44,14 +44,14 @@ async def main():
           const use = (mid, k) => { const at = find(mid, W_PEGG_CH.egg, 'petegg', k); WG.map = mid; wUse(at[0], at[1]); return wHas(wPeggItem(k)); };
           const v = (mid, k) => { const at = find(mid, W_PEGG_CH.egg, 'petegg', k); return wTileVariant(MAPS[mid], at[0], at[1], W_PEGG_CH.egg); };
           const out = { v0: v('genevault', 'pseudodragon') };
-          out.alphaUp = use('genevault', 'pseudodragon'); wSetFlag('alpha_vaultwarden'); out.alphaDown = use('genevault', 'pseudodragon'); out.v1 = v('genevault', 'pseudodragon');
+          out.alphaUp = use('genevault', 'pseudodragon'); wSetFlag('alpha_vaultwarden'); const inv0 = wInvalidate; let inv = 0; wInvalidate = function () { inv++; return inv0.apply(this, arguments); }; out.alphaDown = use('genevault', 'pseudodragon'); wInvalidate = inv0; out.redrawn = inv > 0; out.v1 = v('genevault', 'pseudodragon');
           wAddItem(wPeggItem('pseudodragon'), -1); out.again = use('genevault', 'pseudodragon');
           WG.min = 12 * 60; out.day = use('umbralden', 'cockatrice'); WG.min = 23 * 60; out.night = use('umbralden', 'cockatrice');
           out.sprite = use('hollowshrine', 'sprite');
           wAddItem(wPeggItem('pseudodragon'), 1); WG.map = 'graftonbury'; return out; })()""")
         check(tk['alphaUp'] is False and tk['alphaDown'] is True and tk['again'] is False, 'an alpha\'s egg can\'t be taken while the alpha stands, then can, once a journey', tk)
         check(tk['day'] is False and tk['night'] is True and tk['sprite'] is True, 'the Cockatrice\'s egg only after dark; a quiet corner\'s egg any time', tk)
-        check(tk['v0'] == '1' and tk['v1'] == '0', 'the nest shows its egg until it is taken', tk)
+        check(tk['v0'] == '1' and tk['v1'] == '0' and tk['redrawn'], 'the nest shows its egg until it is taken, and the map redraws then', tk)
 
         pl = await pg.evaluate("""(() => { """ + FIND + """
           const at = find('graftonbury', W_PEGG_CH.hatch, 'pethatch', 'aether'); WG.map = 'graftonbury'; wUse(at[0], at[1]);
@@ -67,10 +67,11 @@ async def main():
         ht = await pg.evaluate("""(async () => { """ + FIND + """
           const at = find('graftonbury', W_PEGG_CH.hatch, 'pethatch', 'aether'); wUse(at[0], at[1]);
           const inp = document.getElementById('wHatchName'); const scene = !!inp && /It hatched/.test(document.getElementById('modalBox').textContent);
+          inp.value = ''; document.getElementById('wHatchOk').click(); const emptySaid = !document.getElementById('wHatchWhy').hidden && !document.getElementById('modal').hidden;
           inp.value = 'Puff'; document.getElementById('wHatchOk').click();
           const q = wPets().owned.find(x => x.kind === 'pseudodragon');
-          return { scene, name: q && q.name, from: q && q.from, empty: !WG.petEggs.aether, side: wPetSideOf() && wPetSideOf().name, closed: document.getElementById('modal').hidden }; })()""")
-        check(ht == {'scene': True, 'name': 'Puff', 'from': 'hatch:aether', 'empty': True, 'side': 'Puff', 'closed': True}, 'after its days it hatches as you walk in: you name it, and it joins the kennel (at your side, the first)', ht)
+          return { emptySaid, longest: Object.values(PETS).every(d => d.n.length <= W_PET.nameMax), scene, name: q && q.name, from: q && q.from, empty: !WG.petEggs.aether, side: wPetSideOf() && wPetSideOf().name, closed: document.getElementById('modal').hidden }; })()""")
+        check(ht == {'emptySaid': True, 'longest': True, 'scene': True, 'name': 'Puff', 'from': 'hatch:aether', 'empty': True, 'side': 'Puff', 'closed': True}, 'after its days it hatches as you walk in: you name it (an empty name says so; every default name fits), and it joins the kennel (at your side, the first)', ht)
 
         fu = await pg.evaluate("""(async () => { """ + FIND + """
           for (const k of ['blinkpup', 'axebeak', 'hootling', 'chestnut', 'jellycube']) wPetAdd(k, 'shop:x');
