@@ -100,8 +100,10 @@ function wPshopStand(m, x, y) {
   const sx = m.spawn[0], sy = m.spawn[1], count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
   const side = (seen, k) => { const [mx, my] = k.split(',').map(Number); return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(my + dy) * m.w + mx + dx]); };
   // (bfsReach ignores people: they are stood in for by a wall while it looks)
-  const reach = () => { const saved = m.npcs.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); m.npcs.forEach((n, i) => { m.t[n.y][n.x] = saved[i]; }); return s; };
-  const seen0 = reach(), base = count(seen0), had = Object.keys(m.meta).filter(k => side(seen0, k));
+  // (put back last to first, so two standing on one tile can't leave a wall behind)
+  const reach = () => { const saved = m.npcs.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); for (let i = m.npcs.length - 1; i >= 0; i--) m.t[m.npcs[i].y][m.npcs[i].x] = saved[i]; return s; };
+  // (every thing on the map, and everybody standing about, that has a way to it keeps one)
+  const seen0 = reach(), base = count(seen0), had = Object.keys(m.meta).concat(m.npcs.map(n => n.x + ',' + n.y)).filter(k => side(seen0, k));
   for (let rad = 0; rad <= 10; rad++) for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
@@ -137,9 +139,8 @@ wAudit = function () {
 /* ---------- a loose pet, caught ---------- */
 function wPshopCatch(m, meta) {
   const S = W_PSHOP.shops[meta.loose]; if (!S) return;
+  // (a caught one, or one whose shop is open, is ground again (wTileAt), so it never comes here)
   const f = 'pq_' + meta.loose + '_' + meta.i, D = PETS[meta.pet] || { n: 'pet' };
-  if (wFlag(f)) return wLog('Nothing here now but a few hairs.', 'd');
-  if (wFlag(S.quest)) return wLog('Nothing here now.', 'd');
   wSetFlag(f); wAdvance(10); wInvalidate(WG.map);
   const left = [...Array(W_PSHOP.loose).keys()].filter(i => !wFlag('pq_' + meta.loose + '_' + i)).length, who = W_PSHOP_PEOPLE[S.npc].name;
   wLog(left ? `You catch a loose ${D.n}! It wriggles into your coat. ${left} still out there; ${who} will want them all.` : `You catch the last loose ${D.n}. Time to take them back to ${who}.`, 'm');

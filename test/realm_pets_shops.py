@@ -37,7 +37,12 @@ async def main():
 
         pl = await pg.evaluate("""(() => { const npc = [...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].filter(S => !MAPS[S.town].npcs.some(n => n.id === S.npc)).map(S => S.npc);
           const loose = ['hq', 'cind'].map(id => Object.values(MAPS[W_PSHOP.shops[id].town].meta).filter(x => x.loose === id).length);
-          const reach = [...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].filter(S => { const m = MAPS[S.town], n = m.npcs.find(n => n.id === S.npc), seen = bfsReach(m, m.spawn[0], m.spawn[1]); return !(n && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(n.y + dy) * m.w + n.x + dx])); }).map(S => S.npc);
+          // (everybody in the five towns has a way to them, with the others standing about in the way, as in the game)
+          const reach = [...new Set([...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].map(S => S.town))].flatMap(t => { const m = MAPS[t];
+            const saved = m.npcs.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const seen = bfsReach(m, m.spawn[0], m.spawn[1]); for (let i = m.npcs.length - 1; i >= 0; i--) m.t[m.npcs[i].y][m.npcs[i].x] = saved[i];
+            // (one behind a counter is talked to across it)
+            const counter = n => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter');
+            return m.npcs.filter(n => !counter(n)).filter(n => ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(n.y + dy) * m.w + n.x + dx])).map(n => t + ':' + n.id); });
           return { npc, loose, reach, audit: wAudit().filter(s => /pet|keeper/.test(s)) }; })()""")
         check(pl == {'npc': [], 'loose': [3, 3], 'reach': [], 'audit': []}, 'the three shopkeepers and two keepers stand in their towns, and the loose pets wait on open ground', pl)
 
