@@ -162,12 +162,12 @@ function endTurn() {
   if (sv(P, 'plate')) gainBlock(sv(P, 'plate'), true);
   fire('turnEnd');
   for (const c of B.hand) { const d = def(c); if (d.endHurt) loseHP(d.endHurt, d.n); }
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   if (sv(P, 'regen')) { healP(sv(P, 'regen')); addSt(P, 'regen', -1); }
   fire('turnEndHeal');
   sportTurnEnd();
   B.lt = B.tt || null;
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   const keep = [];
   for (const c of B.hand) { const d = def(c); if (d.retain) keep.push(c); else if (d.eth) B.exhaust.push(c); else B.discard.push(c); }
   B.hand = keep;
@@ -213,8 +213,8 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': { const b0 = e.block; blockE(e, op[1]); fx({ k: 'num', e: e.uid, t: '+' + Math.max(0, e.block - b0), col: '#9fd2ff', blk: 1 }); break; }
-      case 'ba': for (const o of alive()) { const b0 = o.block; blockE(o, op[1]); fx({ k: 'num', e: o.uid, t: '+' + Math.max(0, o.block - b0), col: '#9fd2ff', blk: 1 }); } break;
+      case 'b': { const b0 = e.block; blockE(e, op[1]); if (e.block > b0) fx({ k: 'num', e: e.uid, t: '+' + (e.block - b0), col: '#9fd2ff', blk: 1 }); break; }
+      case 'ba': for (const o of alive()) { const b0 = o.block; blockE(o, op[1]); if (o.block > b0) fx({ k: 'num', e: o.uid, t: '+' + (o.block - b0), col: '#9fd2ff', blk: 1 }); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
       case 'p': if (debuffP(op[1], op[2])) fx({ k: 'pst', st: op[1], n: op[2] }); break;
@@ -316,8 +316,7 @@ function hurtEnemy(e, dmg, o = {}) {
 }
 function killEnemy(e) {
   if (e.dead) return;
-  // (an ally a boss eats is gone, but it isn't your kill: no credit, no count, no enemyFalls)
-  e.hp = 0; e.dead = true; if (!e.eaten) { B.killsThisTurn++; credit('k', 1); if (e !== B.P) fire('enemyFalls', e); if (B.inCard && B.cd) B.cd.kills++; }
+  e.hp = 0; e.dead = true; B.killsThisTurn++; credit('k', 1); if (e !== B.P) fire('enemyFalls', e); if (B.inCard && B.cd) B.cd.kills++;
   fx({ k: 'die', e: e.uid });
   log(`${e.n} goes down.`, 'good');
   if (e.stolen) { RUN.gold += e.stolen; log(`You get your ${e.stolen} gold back.`, 'good'); e.stolen = 0; }

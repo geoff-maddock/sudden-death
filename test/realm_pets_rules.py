@@ -106,11 +106,11 @@ async def main():
           __fight({ kind: 'axebeak', bond: 1 }); const atk = { uid: 998, id: Object.keys(CARDS).find(id => CARDS[id].type === 'atk'), up: false }; const base = (() => { const k = B.pet; B.pet = null; const n = atkDmg(5, alive()[0], atk); B.pet = k; return n; })();
           out.face = atkDmg(5, alive()[0], atk) - base; const W = dmgWhy(atk, alive()[0]); out.why = W ? W.parts.map(x => x[0]) : [];
           __fight({ kind: 'bogfrog', bond: 2 }); B.ending = true; const h = B.hand.length; fire('enemyFalls', alive()[0]); out.ending = [B.hand.length - h, sv(B.P, 'drawnext')]; delete B.ending;
-          __fight(null, ['skelss', 'thief']); const k0 = B.killsThisTurn, o = alive()[0]; o.eaten = 1; hurtEnemy(o, o.hp + o.block, { raw: true }); out.eatenKill = B.killsThisTurn - k0;
+          __fight({ kind: 'chestnut', bond: 2 }, ['skelss', 'thief']); const k0 = B.killsThisTurn, g0 = RUN.gold, o = alive()[0]; o.eaten = 1; hurtEnemy(o, o.hp + o.block, { raw: true }); out.eatenKill = [B.killsThisTurn - k0, RUN.gold - g0];
           return out; })()""")
         check(r2['stare'] == 1, 'Cockatrice: an attack with no standing target doesn\'t spend the turn\'s stare; the next one exposes', r2)
-        check(r2['face'] == 0 and 'Axebeak Chick' in r2['why'], 'Axebeak: a forecast leaves the +3 out (it\'s one hit\'s), the breakdown of the first hit shows it', r2)
-        check(r2['ending'] == [0, 1] and r2['eatenKill'] == 0, 'a kill as your turn ends: the Bog Frog\'s card waits for the next turn; an eaten ally is no kill of yours', r2)
+        check(r2['face'] == 3 and 'Axebeak Chick' in r2['why'], 'Axebeak: the card face and the breakdown both count its +3 until the first hit spends it', r2)
+        check(r2['ending'] == [0, 1] and r2['eatenKill'] == [1, 0], 'a kill as your turn ends: the Bog Frog\'s card waits for the next turn; an ally a boss eats pays a pet nothing (the base game counts it as before)', r2)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

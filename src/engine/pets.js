@@ -10,8 +10,9 @@
    the hooks (onHook: one dispatcher an event), and mod: { name: fn(arg, pet) } sums (petMod, added to mod()). Its damage
    goes into atkDmg's breakdown under the pet's own name (petAtk). The moments a pet reads that the engine had no event
    for are fired in combat.js: playerAttacked (an enemy's hit on its way, with the enemy), playerHit ({ e, taken }),
-   enemyBlock ({ e, n }: every enemy Block, through blockE) and playerDebuff ({ k, n }: every debuff on you, through
-   debuffP; a truthy return stops it). An ally a boss eats isn't a kill of yours (enemyFalls skips it: e.eaten).
+   enemyBlock ({ e, n }: an enemy's Block from a move, a phase or its turn, through blockE; a hockey save isn't Block
+   raised) and playerDebuff ({ k, n }: every debuff on you, through debuffP; a truthy return stops it). An ally a boss
+   eats isn't a kill of yours, for a pet (its enemyFalls skips e.eaten; trophies are as they were).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
 const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15 };

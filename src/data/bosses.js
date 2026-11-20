@@ -81,7 +81,7 @@ ENEMIES.kqueen.brain = e => {
   if (e.hp < e.max * .5 && last !== 'snack') return 'snack';                    // hurt: eat a cheerleader
   return null;
 };
-ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); fx({ k: 'num', e: e.uid, t: `+${Math.max(0, e.block - b0)}`, col: '#9fd2ff' }); } };
+ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); if (e.block > b0) fx({ k: 'num', e: e.uid, t: `+${e.block - b0}`, col: '#9fd2ff' }); } };
 ENEMIES.kqueen.phases = [{ at: .4, n: 'Halftime Show', sub: 'Pyrotechnics. Lots of them.', fn: e => { addSt(e, 'str', 3); e.st.enraged = 1; } }];
 
 /* ----- Act 2: the Rimegrave Arena ----- */

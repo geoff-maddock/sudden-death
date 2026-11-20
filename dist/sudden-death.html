@@ -1948,7 +1948,7 @@ ENEMIES.kqueen.brain = e => {
   if (e.hp < e.max * .5 && last !== 'snack') return 'snack';                    // hurt: eat a cheerleader
   return null;
 };
-ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); fx({ k: 'num', e: e.uid, t: `+${Math.max(0, e.block - b0)}`, col: '#9fd2ff' }); } };
+ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); if (e.block > b0) fx({ k: 'num', e: e.uid, t: `+${e.block - b0}`, col: '#9fd2ff' }); } };
 ENEMIES.kqueen.phases = [{ at: .4, n: 'Halftime Show', sub: 'Pyrotechnics. Lots of them.', fn: e => { addSt(e, 'str', 3); e.st.enraged = 1; } }];
 
 /* ----- Act 2: the Rimegrave Arena ----- */
@@ -2298,12 +2298,12 @@ function endTurn() {
   if (sv(P, 'plate')) gainBlock(sv(P, 'plate'), true);
   fire('turnEnd');
   for (const c of B.hand) { const d = def(c); if (d.endHurt) loseHP(d.endHurt, d.n); }
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   if (sv(P, 'regen')) { healP(sv(P, 'regen')); addSt(P, 'regen', -1); }
   fire('turnEndHeal');
   sportTurnEnd();
   B.lt = B.tt || null;
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   const keep = [];
   for (const c of B.hand) { const d = def(c); if (d.retain) keep.push(c); else if (d.eth) B.exhaust.push(c); else B.discard.push(c); }
   B.hand = keep;
@@ -2349,8 +2349,8 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': { const b0 = e.block; blockE(e, op[1]); fx({ k: 'num', e: e.uid, t: '+' + Math.max(0, e.block - b0), col: '#9fd2ff', blk: 1 }); break; }
-      case 'ba': for (const o of alive()) { const b0 = o.block; blockE(o, op[1]); fx({ k: 'num', e: o.uid, t: '+' + Math.max(0, o.block - b0), col: '#9fd2ff', blk: 1 }); } break;
+      case 'b': { const b0 = e.block; blockE(e, op[1]); if (e.block > b0) fx({ k: 'num', e: e.uid, t: '+' + (e.block - b0), col: '#9fd2ff', blk: 1 }); break; }
+      case 'ba': for (const o of alive()) { const b0 = o.block; blockE(o, op[1]); if (o.block > b0) fx({ k: 'num', e: o.uid, t: '+' + (o.block - b0), col: '#9fd2ff', blk: 1 }); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
       case 'p': if (debuffP(op[1], op[2])) fx({ k: 'pst', st: op[1], n: op[2] }); break;
@@ -2452,8 +2452,7 @@ function hurtEnemy(e, dmg, o = {}) {
 }
 function killEnemy(e) {
   if (e.dead) return;
-  // (an ally a boss eats is gone, but it isn't your kill: no credit, no count, no enemyFalls)
-  e.hp = 0; e.dead = true; if (!e.eaten) { B.killsThisTurn++; credit('k', 1); if (e !== B.P) fire('enemyFalls', e); if (B.inCard && B.cd) B.cd.kills++; }
+  e.hp = 0; e.dead = true; B.killsThisTurn++; credit('k', 1); if (e !== B.P) fire('enemyFalls', e); if (B.inCard && B.cd) B.cd.kills++;
   fx({ k: 'die', e: e.uid });
   log(`${e.n} goes down.`, 'good');
   if (e.stolen) { RUN.gold += e.stolen; log(`You get your ${e.stolen} gold back.`, 'good'); e.stolen = 0; }
@@ -3088,8 +3087,9 @@ onHook('fightStart', skyCombatStart);
    the hooks (onHook: one dispatcher an event), and mod: { name: fn(arg, pet) } sums (petMod, added to mod()). Its damage
    goes into atkDmg's breakdown under the pet's own name (petAtk). The moments a pet reads that the engine had no event
    for are fired in combat.js: playerAttacked (an enemy's hit on its way, with the enemy), playerHit ({ e, taken }),
-   enemyBlock ({ e, n }: every enemy Block, through blockE) and playerDebuff ({ k, n }: every debuff on you, through
-   debuffP; a truthy return stops it). An ally a boss eats isn't a kill of yours (enemyFalls skips it: e.eaten).
+   enemyBlock ({ e, n }: an enemy's Block from a move, a phase or its turn, through blockE; a hockey save isn't Block
+   raised) and playerDebuff ({ k, n }: every debuff on you, through debuffP; a truthy return stops it). An ally a boss
+   eats isn't a kill of yours, for a pet (its enemyFalls skips e.eaten; trophies are as they were).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
 const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15 };
@@ -3199,9 +3199,9 @@ const PETS = {
     ],
     trick: { n: 'Sting', d: p => `${pv(6, p)} damage and Weak ${pv(2, p)} to one enemy.`, ops: p => [['d', pv(6, p)], ['s', 'weak', pv(2, p)]] } },
   axebeak: { n: 'Axebeak Chick', from: 'axe beak', el: 'aether', rar: 'c', how: 'shop',
-    // (its first hit only: counted on a real hit in a card, which sets the flag, and in the breakdown (WHY), which explains
-    // a card's first hit; a card face or a forecast leaves it out, rather than count it on every hit)
-    trait: { d: p => `Your first attack each fight deals ${pv(3, p)} more (its first hit).`, atk: (card, e, p) => { if (p.f.peck1 || !card || def(card).type !== 'atk') return 0; if (WHY) return pv(3, p); if (!B.inCard) return 0; p.f.peck1 = 1; return pv(3, p); } },
+    // (its first hit only: every forecast (the card face, the breakdown, a bot's guess) counts it until it is spent, so they
+    // agree with the hit it lands on; a real hit in a card spends it. A forecast of a many-hit card counts it on each hit)
+    trait: { d: p => `Your first attack each fight deals ${pv(3, p)} more (its first hit).`, atk: (card, e, p) => { if (p.f.peck1 || !card || def(card).type !== 'atk') return 0; if (B.inCard && !WHY) p.f.peck1 = 1; return pv(3, p); } },
     powers: [
       { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, then: (c, p) => { p.t.peck = 1; const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
       { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
@@ -3238,7 +3238,7 @@ const PETS = {
   jellycube: { n: 'Jellycube', from: 'gelatinous cube', el: 'tide', rar: 'u', how: 'shop',
     trait: { d: 'The first debuff on you each fight sticks to it instead.', on: { playerDebuff: { when: (a, p) => !p.f.sticky, then: (a, p) => { p.f.sticky = 1; petSay(`swallows the ${(ST[a.k] || {}).n || a.k}.`); return true; } } } },
     powers: [
-      // (one more than it says: Weak goes down at the end of the attacker's own turn, so the said amount reaches its next attack)
+      // (one more than its base: Weak goes down at the end of the attacker's own turn, so this much reaches its next attack)
       { at: 1, d: p => `The first enemy to attack you each turn: Weak ${pv(1, p) + 1}, enough to last through its next attack.`, on: { playerAttacked: { when: (e, p) => !p.t.wob && e && !e.dead, then: (e, p) => { p.t.wob = 1; addSt(e, 'weak', pv(1, p) + 1); petSay(`wobbles at ${e.n}: Weak ${pv(1, p) + 1}.`); } } } },
       { at: 2, d: p => `End your turn with no cards in hand: ${pv(4, p)} Block.`, on: { turnEnd: { when: () => !B.hand.length, then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
