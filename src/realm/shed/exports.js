@@ -19,7 +19,11 @@
    what the page needs), tick(dt), live (the stone sliding now). Your stone: select({ shot, x, y, h, target, suggest
    }), press (Space: start, then the weight), drag(pull, deg) (the phone's throw), sweep (held: true while you hold
    Space), setMode; playRules (the meter, the pace); scr, unscr, houseScr and houseUn map the ice to the pictures and
-   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end. */
+   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end.
+   Phase 3 is ratings, positions, the sweepers' legs and nerve: stats (the six, in order), rate(kind) (1 to 12), cap,
+   fit(r, pos) (r 0 to 1, pos 0 lead to 3 skip), autoOrder(roster), legs (G.legs), pressure(side), sweepers(side) (who
+   sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair), errK(side, shot), and the
+   tables reachRules and legsRules. A roster curler may bring r (1 to 12); a team may bring its order. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -34,6 +38,10 @@ return {
   start: o => { crStart(o); crPlayStart(o); CRC.drawn = false; return G; },
   // (the page owns a stone it is setting up or sliding: turn and throwStone wait for it)
   turn: () => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(crUp(), 'A stone is being thrown on the page.'); const r = crTurn(); crPageStale(); return r; }, throwStone: (s, plan, rel, sweep) => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(s, 'A stone is being thrown on the page.'); const r = crThrowStone(s, plan, rel, sweep); crPageStale(); return r; }, summary: () => crSummary(), simGame: o => crSimGame(o),
+  // ratings, positions, legs and nerve (phase 3)
+  stats: CR_STATS.slice(), rate: k => crRate(k), cap: CR_RCAP, fit: (r, pos) => crFit(r, pos), autoOrder: ro => crAutoOrder(ro.map(m => ({ rs: Object.fromEntries(CR_STATS.map(k => [k, crScale((m.r || crRate(m.kind))[k])])) }))),
+  reachRules: Object.assign({}, CR_REACH), legsRules: Object.assign({}, CR_LEGS), get legs() { return G && G.legs ? G.legs.slice() : null; }, pressure: s => G && G.teams ? crPressure(s) : 0,
+  sweepers: s => G && G.teams ? crSweepers(s) : [], sweepEff: s => G && G.teams ? crSweepEff(s) : 1, errK: (s, shot) => G && G.teams ? crErrK(s, shot) : null,
   // the page and throwing by hand (phase 2)
   modes: CR_MODES.slice(), playRules: JSON.parse(JSON.stringify(CR_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get view() { return crView(); }, get mode() { return GP ? GP.mode : null; },
   setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepBtn = !!on; if (GP) GP.sweep = !!on && GP.ph === 'slide' && !!GP.X && crYours(GP.X.s); }, get sweep() { return !!(GP && GP.sweep); },

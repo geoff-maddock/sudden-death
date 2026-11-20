@@ -23,7 +23,10 @@ const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
 // the last end's stones), a Squire the fresh pebble on the day
-const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)].ice; return I === 'now' ? G.ice : I === 'end' ? G.iceEnd || null : null; };
+// (a Knight whose skip reads the ice well, CR_READ.now and up, sees it as it is now)
+const CR_READ = { now: .7 };
+const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)].ice, skip = G.order ? G.order[s][3] : 0;
+  return I === 'now' || (I === 'end' && crRat(s, skip).red >= CR_READ.now) ? G.ice : I === 'end' ? G.iceEnd || null : null; };
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
   const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
@@ -58,9 +61,7 @@ function crShots(s, sk) {
   return out;
 }
 // side s's release of a shot: its aim, with the curler's miss (heading and weight)
-function crMiss(s, aim) { const S = CR_SKILL[G.skill[s]], k = crErrK(s); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
-// how much a side's curler misses by, times the skill's (ratings come in phase 3): { ang, v }
-function crErrK() { return { ang: 1, v: 1 }; }
+function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
 function crTry(s, aim) {
@@ -76,7 +77,7 @@ function crPlan(s) {
   list.sort((a, b) => b.val - a.val);
   // the best few, played a few times with the curler's own miss: the likeliest result wins
   const top = list.slice(0, S.top);
-  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
+  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best) });
 }

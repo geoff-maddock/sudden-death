@@ -103,14 +103,15 @@ function crRelease(p) {
   const M = GP.meter; if (!M || M.st === 'gone') return;
   M.st = 'gone'; M.p = p;
   const S = GP.sel, err = Math.abs(p - CR_PLAY.meter.line) <= CR_PLAY.meter.win ? 1 : p;
-  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you).ang, v: S.aim.v * err, h: S.h };
+  // (your weight's miss is the meter's; the line's is your curler's, by their ratings and the moment)
+  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you, S.shot).ang, v: S.aim.v * err, h: S.h };
   crBegin(GP.you, Object.assign({}, S), rel, null);
 }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you).ang, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
   return true;
 }
 
@@ -131,12 +132,15 @@ function crSkipCall(X) {
   const stopY = T.y + (T.vy / v) * v * v / (2 * CR_STONE.a * crIceAt(G.ice, T.x, T.y, G.cold)), short = P.y - stopY;
   return short > 30 ? 'Hurry hard!' : short > 8 ? 'Sweep!' : short > -20 ? 'Off!' : 'Whoa! It\'s heavy.';
 }
-// how hard your sweepers sweep while you hold Space (phase 3 gives the sweepers their legs)
+// how hard you ask your sweepers to sweep: all they have while you hold Space
 const crYourSweep = () => GP.sweep ? 1 : 0;
 function crSlideTick(dt) {
   const X = GP.X; if (!X) return;
   const mine = crYours(X.s);
-  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? crYourSweep() : undefined);
+  // (your sweepers: how hard you hold them to it, times how good they are and their legs, which it spends)
+  const ask = mine ? crYourSweep() : 0, T = X.Q.T;
+  if (ask && (T.vx || T.vy)) crLegsBurn(X.s, ask, dt * CR_PLAY.speed);
+  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? (ask ? ask * crSweepEff(X.s) : 0) : undefined);
   GP.call = crSkipCall(X);
   if (X.Q.done) crSettle();
 }

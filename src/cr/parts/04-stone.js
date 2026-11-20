@@ -53,7 +53,8 @@ function crRunStep(Q, sweep) {
   if (Q.done) return false;
   const { O, S, T, path } = Q, R = CR_SHEET.stoneR, L = S.filter(st => !st.out), moving = L.filter(st => st.vx || st.vy);
   if (!moving.length || Q.t >= Q.maxT) { Q.done = true; return false; }
-  const sw = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1) : 0; Q.sw = sw;
+  // (a pair of good sweepers with fresh legs sweeps a little harder than an average pair: up to 1.5)
+  const sw = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1.5) : 0; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
   for (const st of moving) {

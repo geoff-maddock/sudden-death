@@ -9,3 +9,4 @@ src/cr/parts/06-cpu.js
 src/cr/parts/07-game.js
 src/cr/parts/08-play.js
 src/cr/parts/09-draw.js
+src/cr/parts/10-ratings.js

@@ -39831,7 +39831,8 @@ function crRunStep(Q, sweep) {
   if (Q.done) return false;
   const { O, S, T, path } = Q, R = CR_SHEET.stoneR, L = S.filter(st => !st.out), moving = L.filter(st => st.vx || st.vy);
   if (!moving.length || Q.t >= Q.maxT) { Q.done = true; return false; }
-  const sw = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1) : 0; Q.sw = sw;
+  // (a pair of good sweepers with fresh legs sweeps a little harder than an average pair: up to 1.5)
+  const sw = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1.5) : 0; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
   for (const st of moving) {
@@ -39945,7 +39946,10 @@ const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
 // the last end's stones), a Squire the fresh pebble on the day
-const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)].ice; return I === 'now' ? G.ice : I === 'end' ? G.iceEnd || null : null; };
+// (a Knight whose skip reads the ice well, CR_READ.now and up, sees it as it is now)
+const CR_READ = { now: .7 };
+const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)].ice, skip = G.order ? G.order[s][3] : 0;
+  return I === 'now' || (I === 'end' && crRat(s, skip).red >= CR_READ.now) ? G.ice : I === 'end' ? G.iceEnd || null : null; };
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
   const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
@@ -39980,9 +39984,7 @@ function crShots(s, sk) {
   return out;
 }
 // side s's release of a shot: its aim, with the curler's miss (heading and weight)
-function crMiss(s, aim) { const S = CR_SKILL[G.skill[s]], k = crErrK(s); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
-// how much a side's curler misses by, times the skill's (ratings come in phase 3): { ang, v }
-function crErrK() { return { ang: 1, v: 1 }; }
+function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
 function crTry(s, aim) {
@@ -39998,7 +40000,7 @@ function crPlan(s) {
   list.sort((a, b) => b.val - a.val);
   // the best few, played a few times with the curler's own miss: the likeliest result wins
   const top = list.slice(0, S.top);
-  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
+  if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples; }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best) });
 }
@@ -40031,10 +40033,15 @@ function crStart(opts) {
   const o = opts || {};
   if (o.seed != null) engSeed(o.seed);
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#b83a3a' };
-    const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' }))).map(p => Object.assign({}, p));
+    // a curler with a kind the engine knows gets that kind's ratings (or their own)
+    const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
+      .map(p => { const r = p.r || (CR_KIND[p.kind] ? crRate(p.kind) : null), m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
+        m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT); return m; });
     return Object.assign({}, T, { roster }); });
-  crNewGame({ ends: o.ends, order: o.order || teams.map(T => T.order), roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
-  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, n: 0,
+  // an order: the game's, the team's own, or set by the ratings
+  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? crAutoOrder(teams[s].roster) : null));
+  crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
   GB = null;
   return G;
@@ -40058,7 +40065,7 @@ function crMade(plan, before, after, run) {
 function crTurn() {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s), { s });
-  return crThrowStone(s, plan, crMiss(s, plan.aim), crSweeper(s, plan));
+  return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
 // crThrowBegin puts it on the ice (the page then moves it on a step at a time: crRunStep), crThrowFinish settles it
@@ -40068,6 +40075,8 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
   if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
   plan = Object.assign({}, plan, { s });
+  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs: crSweepFn)
+  sweep = sweep ? crSweepFn(s, sweep) : null;
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
   const X = { s, plan, rel, Q, g: G, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
@@ -40083,7 +40092,7 @@ function crThrowFinish(X) {
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
-  if (rule.end) G.iceEnd = G.ice.slice();
+  if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
   if (made) { B.made++; P.made++; B.madeBy[plan.shot] = (B.madeBy[plan.shot] || 0) + 1; }
   // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
@@ -40218,14 +40227,15 @@ function crRelease(p) {
   const M = GP.meter; if (!M || M.st === 'gone') return;
   M.st = 'gone'; M.p = p;
   const S = GP.sel, err = Math.abs(p - CR_PLAY.meter.line) <= CR_PLAY.meter.win ? 1 : p;
-  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you).ang, v: S.aim.v * err, h: S.h };
+  // (your weight's miss is the meter's; the line's is your curler's, by their ratings and the moment)
+  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you, S.shot).ang, v: S.aim.v * err, h: S.h };
   crBegin(GP.you, Object.assign({}, S), rel, null);
 }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you).ang, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
   return true;
 }
 
@@ -40246,12 +40256,15 @@ function crSkipCall(X) {
   const stopY = T.y + (T.vy / v) * v * v / (2 * CR_STONE.a * crIceAt(G.ice, T.x, T.y, G.cold)), short = P.y - stopY;
   return short > 30 ? 'Hurry hard!' : short > 8 ? 'Sweep!' : short > -20 ? 'Off!' : 'Whoa! It\'s heavy.';
 }
-// how hard your sweepers sweep while you hold Space (phase 3 gives the sweepers their legs)
+// how hard you ask your sweepers to sweep: all they have while you hold Space
 const crYourSweep = () => GP.sweep ? 1 : 0;
 function crSlideTick(dt) {
   const X = GP.X; if (!X) return;
   const mine = crYours(X.s);
-  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? crYourSweep() : undefined);
+  // (your sweepers: how hard you hold them to it, times how good they are and their legs, which it spends)
+  const ask = mine ? crYourSweep() : 0, T = X.Q.T;
+  if (ask && (T.vx || T.vy)) crLegsBurn(X.s, ask, dt * CR_PLAY.speed);
+  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? (ask ? ask * crSweepEff(X.s) : 0) : undefined);
   GP.call = crSkipCall(X);
   if (X.Q.done) crSettle();
 }
@@ -40440,6 +40453,89 @@ function crDraw(c, dt) {
   c.restore();
   crRightDraw(c);
 }
+/* The Curling Shed: ratings, positions, the sweepers' legs and nerve (issue #102, phase 3).
+
+   A curler's six ratings (CR_STATS) run 1 to 12, seeded by kind (CR_KIND, crRate); the game works on them as 0 to 1
+   (crScale):
+   - draw (drw): touch on the weight of a draw, a guard and a freeze (the weight's miss);
+   - line (lin): holding the broom (the heading's miss);
+   - hit (hit): a takeout's weight and line (the miss on a hit);
+   - sweep (swp): how much a sweeper does to a stone, and how long their legs last;
+   - nerve (nrv): how little the big stones shake them (see pressure);
+   - read (red): how well they read the ice as it changes (a Knight skip who reads it well sees it as it is now;
+     phase 4's ice chart shows more of it).
+   How far they reach (CR_REACH): an average curler (6.5) misses as the skill says; a rating of 1 by reach / 2 more, of
+   12 by reach / 2 less.
+   The positions (CR_RULES.posN): the lead throws first (the guards and the draws: draw and line), the second the
+   takeouts (hit and sweep), the third the middle stones (hit, draw and read), and the skip the last two (nerve, draw
+   and read). crFit says how well ratings suit a position, crAutoOrder sets an order by them: the skip first, then the
+   lead, the second and the third.
+   The sweepers (crSweepers): the two of the four who are not throwing and not holding the broom (the skip holds it,
+   or the third when the skip throws). How hard they sweep is what is asked (0 to 1) times how good they are (their
+   sweep rating) times their legs.
+   Legs (G.legs, 0 to 1 a side): an end's sweeping is so much; every second a stone is swept spends some, and the legs
+   are fresh again at the next end. Tired legs do less.
+   Pressure (crPressure, 0 to 1.5): the skip's stones in the last end (or an extra end), more on the hammer's stone when
+   the game is close. Nerve takes it off (crNerveK): the release shakes, the CPU's and yours. */
+const CR_STATS = ['drw', 'lin', 'hit', 'swp', 'nrv', 'red'];
+// by kind, 1 to 12: draw, line, hit, sweep, nerve, read. A spider sweeps with eight brooms; an ogre hits like a
+// landslide and has no touch; a golem never shakes; a wraith reads the ice like its own breath on a window
+const CR_KIND = {
+  goblin: [6, 6, 5, 7, 5, 6], kobold: [6, 7, 5, 6, 5, 7], werewolf: [5, 5, 8, 9, 6, 5], dwarf: [8, 8, 7, 6, 8, 7],
+  ogre: [4, 4, 10, 8, 6, 4], minotaur: [4, 5, 10, 8, 6, 4], troll: [5, 5, 9, 9, 7, 4], golem: [7, 7, 9, 4, 10, 5],
+  harpy: [6, 6, 6, 10, 4, 7], elf: [9, 9, 6, 5, 6, 8], wraith: [9, 7, 6, 6, 9, 9], vampire: [7, 7, 7, 7, 7, 8],
+  lich: [8, 8, 6, 5, 11, 9], zombie: [6, 6, 7, 8, 9, 4], gorgon: [7, 9, 7, 6, 8, 7], spider: [6, 6, 6, 12, 6, 7],
+  skeleton: [7, 7, 6, 6, 9, 6], witch: [8, 6, 5, 7, 6, 10],
+};
+const CR_RCAP = 12;
+const CR_REACH = { drw: 1.1, lin: 1, hit: 1, nrv: .8, swp: .6 };
+const CR_LEGS = { burn: .055, low: .45 };
+const CR_DEF_RAT = { drw: .5, lin: .5, hit: .5, swp: .5, nrv: .5, red: .5 };
+function crRate(kind) { const k = CR_KIND[kind]; return Object.fromEntries(CR_STATS.map((s, i) => [s, k ? k[i] : 6.5])); }
+const crScale = v => clamp((v - 1) / (CR_RCAP - 1), 0, 1);
+function crRat(s, ri) { const m = G && G.teams && G.teams[s].roster[ri]; return (m && m.rs) || CR_DEF_RAT; }
+// how well ratings (0 to 1) suit a position (0 lead, 1 second, 2 third, 3 skip)
+const crFit = (r, pos) => pos === 0 ? r.drw * .5 + r.lin * .4 + r.swp * .1 : pos === 1 ? r.hit * .5 + r.swp * .3 + r.lin * .2 : pos === 2 ? r.hit * .35 + r.drw * .35 + r.red * .3 : r.nrv * .45 + r.drw * .3 + r.red * .25;
+// an order for a roster (each with rs, 0 to 1): the skip first, then the lead, the second and the third; roster indexes
+function crAutoOrder(roster) {
+  const left = new Set(roster.map((_, i) => i)), best = pos => { const i = [...left].sort((a, b) => crFit(roster[b].rs, pos) - crFit(roster[a].rs, pos) || a - b)[0]; left.delete(i); return i; };
+  const skip = best(3), lead = best(0), second = best(1), third = best(2);
+  return [lead, second, third, skip];
+}
+// the two sweepers of side s's stone now: roster indexes (the two not throwing nor holding the broom)
+function crSweepers(s) {
+  const o = G.order[s], pos = crPos(s), broom = pos === 3 ? 2 : 3;
+  return o.filter((ri, p) => p !== pos && p !== broom);
+}
+// how much side s's sweepers do now, against an average pair with fresh legs (1)
+function crSweepEff(s) {
+  const sw = crSweepers(s).map(ri => crRat(s, ri).swp), avg = sw.reduce((a, b) => a + b, 0) / Math.max(1, sw.length), legs = G.legs ? G.legs[s] : 1;
+  return (1 + CR_REACH.swp * (avg - .5)) * (CR_LEGS.low + (1 - CR_LEGS.low) * legs);
+}
+// side s's sweepers swept this hard (0 to 1, asked) for dt seconds of the stone's time: their legs pay for it
+function crLegsBurn(s, sw, dt) { if (G.legs) G.legs[s] = Math.max(0, +(G.legs[s] - CR_LEGS.burn * sw * dt).toFixed(4)); }
+// the sweepers for a run: what they are asked (a function of the stone, or a number), made into how hard they sweep,
+// their legs paying as the stone's time goes on
+function crSweepFn(s, ask) {
+  if (!ask) return null;
+  let last = 0;
+  return (st, t) => { const a = clamp((typeof ask === 'function' ? ask(st, t) : ask) || 0, 0, 1); crLegsBurn(s, a, Math.max(0, t - last)); last = t; return a ? a * crSweepEff(s) : 0; };
+}
+// how big the moment is for side s's stone: the skip's in the last end (or an extra end), more on the hammer's stone
+// in a close game
+function crPressure(s) {
+  if (!G || G.over || crPos(s) !== 3 || G.end < G.ends - 1) return 0;
+  const gap = Math.abs(crTotal(0) - crTotal(1)), last = G.k === crPerEnd() - 1;
+  return 1 + (gap <= 2 && last ? .5 : 0);
+}
+const crNerveK = (p, nrv) => 1 + CR_REACH.nrv * p * (1 - clamp(nrv, 0, 1));
+// how much side s's curler misses by, times the skill's: { ang (the line), v (the weight: a draw's touch, or a hit's) }
+function crErrK(s, shot) {
+  const ri = crThrower(s), r = crRat(s, ri), nk = crNerveK(crPressure(s), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
+  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk };
+}
+// the legs are fresh at the start of an end
+function crLegsNewEnd() { if (G) G.legs = [1, 1]; }
 /* The Shed's page in the Realm (issue #102, phase 2). A canvas in #v-shed, after the Lanes', and a frame loop that runs
    only while it is on screen (show/hide): it moves the game on (crTick) and draws it (crDraw), at the screen's density.
    The engine's parts don't touch the page; this file is the only one that does.
@@ -40569,7 +40665,11 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    what the page needs), tick(dt), live (the stone sliding now). Your stone: select({ shot, x, y, h, target, suggest
    }), press (Space: start, then the weight), drag(pull, deg) (the phone's throw), sweep (held: true while you hold
    Space), setMode; playRules (the meter, the pace); scr, unscr, houseScr and houseUn map the ice to the pictures and
-   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end. */
+   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end.
+   Phase 3 is ratings, positions, the sweepers' legs and nerve: stats (the six, in order), rate(kind) (1 to 12), cap,
+   fit(r, pos) (r 0 to 1, pos 0 lead to 3 skip), autoOrder(roster), legs (G.legs), pressure(side), sweepers(side) (who
+   sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair), errK(side, shot), and the
+   tables reachRules and legsRules. A roster curler may bring r (1 to 12); a team may bring its order. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -40584,6 +40684,10 @@ return {
   start: o => { crStart(o); crPlayStart(o); CRC.drawn = false; return G; },
   // (the page owns a stone it is setting up or sliding: turn and throwStone wait for it)
   turn: () => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(crUp(), 'A stone is being thrown on the page.'); const r = crTurn(); crPageStale(); return r; }, throwStone: (s, plan, rel, sweep) => { if (!G || !G.teams) return null; if (crPageBusy()) return crRefused(s, 'A stone is being thrown on the page.'); const r = crThrowStone(s, plan, rel, sweep); crPageStale(); return r; }, summary: () => crSummary(), simGame: o => crSimGame(o),
+  // ratings, positions, legs and nerve (phase 3)
+  stats: CR_STATS.slice(), rate: k => crRate(k), cap: CR_RCAP, fit: (r, pos) => crFit(r, pos), autoOrder: ro => crAutoOrder(ro.map(m => ({ rs: Object.fromEntries(CR_STATS.map(k => [k, crScale((m.r || crRate(m.kind))[k])])) }))),
+  reachRules: Object.assign({}, CR_REACH), legsRules: Object.assign({}, CR_LEGS), get legs() { return G && G.legs ? G.legs.slice() : null; }, pressure: s => G && G.teams ? crPressure(s) : 0,
+  sweepers: s => G && G.teams ? crSweepers(s) : [], sweepEff: s => G && G.teams ? crSweepEff(s) : 1, errK: (s, shot) => G && G.teams ? crErrK(s, shot) : null,
   // the page and throwing by hand (phase 2)
   modes: CR_MODES.slice(), playRules: JSON.parse(JSON.stringify(CR_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get view() { return crView(); }, get mode() { return GP ? GP.mode : null; },
   setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepBtn = !!on; if (GP) GP.sweep = !!on && GP.ph === 'slide' && !!GP.X && crYours(GP.X.s); }, get sweep() { return !!(GP && GP.sweep); },
@@ -58364,6 +58468,240 @@ renderHelp = function () {
   const after = $('wHelpLanes') || $('wHelpLinks') || [...h.querySelectorAll('[id^="wHelpG"]')].pop();
   h.insertAdjacentHTML('beforeend', `<section id="wShedHow" class="wghelp"><h3>Curling: how it works</h3>${wShedHowHTML()}</section>`);
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShed"><b>Real curling.</b> The Curling Shed plays curling on the ice itself now, four a side. Ask Brush Hennock to CURL: a game of ${wCR.rules.ends} ends. Call the shot, put the broom down, pick the handle and throw, then sweep it home; or watch the two rinks play it out, with the end board under the ice (see Curling: how it works). It is an exhibition: nothing is won or lost.</p>`);
+};
+/* w123: curling ratings, the four and their positions (issue #102, phase 3), as w114 is bowling's. Every Realm player
+   has Curling Shed ratings, p.cr: draw, line, hit, sweep, nerve and read, 1 to 12. They are seeded from the kind's
+   (wCR.rate), each moved by up to 1, and every level above 1 adds a point to one of them, weighted by what the kind is
+   good at; an older save's players get theirs when it loads.
+   The four: a rink is four (W_GRD_SQUAD.curling): the lead, the second, the third and the skip, each throwing two
+   stones an end in that order. The Shed tab on the Team screen sets your four and their positions; the rest of your
+   roster are reserves. Called-up players at your level fill the four when your roster is short. Left alone, the
+   captain sets them from the ratings (the skip first: nerve, draw and read; then the lead: draw and line; the second:
+   hit and sweep; the third). Practice game plays your four against Saltmere's at the Shed; nothing is won or lost. The
+   Stats tab's Curling view shows the ratings and the positions.
+
+   p.cr       { drw, lin, hit, swp, nrv, red, lv, got: { stat: points from levels } }
+   WG.shed    { four: [4 keys, lead to skip], cu: [call-ups], seq, mine?: true once you've changed something }
+              a key is a roster id, or a call-up's cid ('c1', 'c2', ...)
+   wCrOf(p)           p's ratings, made or caught up first
+   wFourSyncCr()      makes the four, or brings it up to date with the roster; returns WG.shed
+   wFourMineCr()      your four as the Curling Shed takes a rink (roster in order, and the order)
+   wFourSetPos(key, pos), wFourAutoCr()    changes; each returns a message, or '' when it worked (pos 0 to 3, or
+                      'reserve': the best reserve for that position takes it)
+   Wrapped: wMakePlayer (wW123MakePlayer), wGiveXp (wW123GiveXp), wStart (wW123Start), wStatsCard (wW123StatsCard: a
+   Curling block), wCampStats (wW123CampStats: the Curling view), wOpenCamp (wW123OpenCamp: the Shed tab), wRenderCamp
+   (wW123RenderCamp), wShedRows (wW123ShedRows: the curler up, their sweepers' legs, the moment), renderHelp
+   (wW123RenderHelp: #wHelpShedTab), wShedHowHTML (wW123ShedHow: ratings, positions, legs and nerve). */
+
+const W_CRR = {
+  cuKinds: ['wraith', 'spider', 'troll', 'gorgon', 'zombie', 'dwarf'],
+  stat: { drw: ['Drw', 'Draw: the touch on the weight of a draw, a guard and a freeze'], lin: ['Lin', 'Line: holding the broom\'s line'],
+    hit: ['Hit', 'Hit: a takeout\'s weight and line'], swp: ['Swp', 'Sweep: how much a sweeper does, and how long their legs last'],
+    nrv: ['Nrv', 'Nerve: steady with the last stones, when the end hangs on them'], red: ['Red', 'Read: how soon they see the ice change'] },
+  pos: ['the lead', 'the second', 'the third', 'the skip'],
+  short: ['Lead', '2nd', '3rd', 'Skip'],
+};
+const wCrCap = () => wCR.cap;
+
+/* ---------- ratings ---------- */
+function wCrOf(p) {
+  if (!p || !p.kind) return null;
+  if (!p.cr) { const r = wCR.rate(p.kind); p.cr = { lv: 1, got: {} }; for (const s of wCR.stats) p.cr[s] = Math.max(1, Math.min(wCrCap(), Math.round(r[s]) + Math.floor(Math.random() * 3) - 1)); }
+  const b = p.cr, lvl = p.lvl || 1;
+  while (b.lv < lvl) { b.lv++; const s = wCrGrowStat(p); if (s) { b[s]++; b.got[s] = (b.got[s] || 0) + 1; } }
+  return b;
+}
+function wCrGrowStat(p) {
+  const K = wCR.rate(p.kind), open = wCR.stats.filter(s => p.cr[s] < wCrCap());
+  if (!open.length) return null;
+  let r = Math.random() * open.reduce((a, s) => a + K[s], 0);
+  for (const s of open) { r -= K[s]; if (r < 0) return s; }
+  return open[open.length - 1];
+}
+function wCrAll() { if (!WG) return; for (const p of WG.roster || []) wCrOf(p); for (const p of WG.wwait || []) wCrOf(p); for (const c of (WG.shed && WG.shed.cu) || []) wCrOf(c); }
+// how well a player suits a position, 0 to 1
+const wCrFit = (p, pos) => wCR.fit(Object.fromEntries(wCR.stats.map(s => [s, (wCrOf(p)[s] - 1) / (wCrCap() - 1)])), pos);
+
+const wW123MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW123MakePlayer.apply(this, arguments); wCrOf(p); return p; };
+const wW123GiveXp = wGiveXp;
+wGiveXp = function (p, n) { const r = wW123GiveXp(p, n); wCrOf(p); return r; };
+const wW123Start = wStart;
+wStart = function (save, opts) { const r = wW123Start(save, opts); wCrAll(); if (save) wSave(); return r; };
+
+/* ---------- the four ---------- */
+const wFourCrCu = k => typeof k === 'string';
+function wFourCrWho(k) { if (wFourCrCu(k)) return ((WG.shed && WG.shed.cu) || []).find(c => c.cid === k) || null; return wPlayer(k); }
+function wFourCrCallUp(C) {
+  const used = new Set(C.four.filter(k => k != null).map(k => (wFourCrWho(k) || {}).kind));
+  const kind = W_CRR.cuKinds.find(k => !used.has(k)) || pick(W_CRR.cuKinds);
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'c' + (C.seq++) });
+  wCrOf(c); C.cu.push(c);
+  return c;
+}
+// the captain's pick: the skip first, then the lead, the second and the third, each the best of those left
+function wFourCrAutoPick(C) {
+  const left = new Set(wRoster().map(p => p.id)), four = [null, null, null, null];
+  for (const pos of [3, 0, 1, 2]) {
+    const best = [...left].sort((a, b) => wCrFit(wFourCrWho(b), pos) - wCrFit(wFourCrWho(a), pos))[0];
+    if (best == null) break;
+    four[pos] = best; left.delete(best);
+  }
+  C.four = four;
+  C.cu = C.cu.filter(c => four.includes(c.cid));
+}
+function wFourSyncCr() {
+  if (!WG) return null;
+  let fresh = false;
+  if (!WG.shed || !Array.isArray(WG.shed.four)) { WG.shed = { four: [null, null, null, null], cu: [], seq: 1 }; fresh = true; }
+  const C = WG.shed, before = JSON.stringify(C.four);
+  C.four = C.four.map(k => k != null && wFourCrWho(k) ? k : null);
+  C.cu = C.cu.filter(c => C.four.includes(c.cid));
+  const tier = wNineTier();
+  for (const c of C.cu) if (c.lvl < tier) { c.lvl = tier; wCrOf(c); }
+  // a roster player not in the four takes a call-up's place
+  for (const p of wRoster()) {
+    if (C.four.includes(p.id)) continue;
+    const at = C.four.findIndex(k => wFourCrCu(k)); if (at < 0) break;
+    const old = C.four[at]; C.four[at] = p.id; C.cu = C.cu.filter(c => c.cid !== old);
+  }
+  // a gap: the best reserve for the position, or a call-up
+  for (let i = 0; i < 4; i++) if (C.four[i] == null) {
+    const res = wRoster().map(p => p.id).filter(id => !C.four.includes(id)).sort((a, b) => wCrFit(wPlayer(b), i) - wCrFit(wPlayer(a), i))[0];
+    C.four[i] = res != null ? res : wFourCrCallUp(C).cid;
+  }
+  if (fresh || (!C.mine && JSON.stringify(C.four) !== before)) wFourCrAutoPick(C);
+  for (let i = 0; i < 4; i++) if (C.four[i] == null) C.four[i] = wFourCrCallUp(C).cid;
+  return C;
+}
+// a player as the Curling Shed takes one (ratings 1 to 12)
+function wShedPlayer(p) { const b = wCrOf(p); return { n: p.n, kind: p.kind, r: Object.fromEntries(wCR.stats.map(s => [s, b[s]])) }; }
+function wFourMineCr() {
+  const C = wFourSyncCr(), t = wPartyTeam();
+  return { name: t.name, short: t.short, color: t.color, roster: C.four.map(k => wShedPlayer(wFourCrWho(k))), order: [0, 1, 2, 3] };
+}
+const wFourCrPosOf = (k, C) => { const i = (C || wFourSyncCr()).four.indexOf(k); return i < 0 ? null : i; };
+const wFourCrReserves = C => wRoster().map(p => p.id).filter(id => !C.four.includes(id));
+
+/* ---------- changes ---------- */
+function wFourCrDone() { WG.shed.mine = true; wSave(); return ''; }
+function wFourSetPos(k, pos) {
+  const C = wFourSyncCr(), at = wFourCrPosOf(k, C);
+  if (pos === 'reserve') {
+    if (at == null) return '';
+    const res = wFourCrReserves(C).sort((a, b) => wCrFit(wPlayer(b), at) - wCrFit(wPlayer(a), at))[0];
+    if (res == null) return 'No reserve to take their place.';
+    C.four[at] = res; if (wFourCrCu(k)) C.cu = C.cu.filter(c => c.cid !== k);
+    return wFourCrDone();
+  }
+  pos = +pos; if (!(pos >= 0 && pos < 4) || at === pos) return '';
+  const other = C.four[pos];
+  C.four[pos] = k;
+  if (at != null) C.four[at] = other; else if (wFourCrCu(other)) C.cu = C.cu.filter(c => c.cid !== other);
+  return wFourCrDone();
+}
+function wFourAutoCr() { WG.shed = null; wFourSyncCr(); wSave(); return ''; }
+function wFourCrPractice() {
+  if (WCAMP.close) WCAMP.close();
+  const mine = wFourMineCr(), home = wShedTeams(mine.roster.map(m => m.n))[0];
+  wShedGame({ teams: [mine, home], title: 'A practice game at the Curling Shed' });
+}
+
+/* ---------- the Curling block on a player's stats ---------- */
+function wCrCard(p) {
+  const b = wCrOf(p); if (!b) return '';
+  const bars = wCR.stats.map(s => { const [ab, what] = W_CRR.stat[s], got = b.got[s] || 0;
+    return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wCrCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
+  const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null;
+  return `<div class="wbd wbkc wcrc"><h5>Curling</h5><p class="wbdpos">${pos != null ? `In your four, ${esc(W_CRR.pos[pos])}.` : WG && WG.shed ? 'A reserve for your four.' : 'Not in your squad.'}</p>
+    <div class="wbdbars">${bars}</div><p class="hint">Each level adds a point to one rating (shown as +), mostly to what their kind is good at. Ratings run from 1 to ${wCrCap()}.</p></div>`;
+}
+const wW123StatsCard = wStatsCard;
+wStatsCard = function (p) { return wW123StatsCard(p).replace(/<\/section>\s*$/, wCrCard(p) + '</section>'); };
+
+/* ---------- the Shed tab ---------- */
+function wFourCrRow(k, C) {
+  const p = wFourCrWho(k), b = wCrOf(p), cu = wFourCrCu(k), at = wFourCrPosOf(k, C), key = esc(String(k));
+  const opts = W_CRR.pos.map((n, i) => `<option value="${i}"${at === i ? ' selected' : ''}>${esc(n[4].toUpperCase() + n.slice(5))}</option>`).join('') + `<option value="reserve"${at == null ? ' selected' : ''}>Reserve</option>`;
+  const fits = [0, 1, 2, 3].map(i => `${W_CRR.pos[i].replace('the ', '')} ${Math.round(wCrFit(p, i) * 100)}`).join(', ');
+  return `<li class="wpr wnr wcrt${cu ? ' wcu' : ''}" data-cid="${key}">
+    <span class="wno">${at != null ? esc(W_CRR.short[at]) : '&ndash;'}</span><img src="${wPlayerPort(p, 64)}" alt="">
+    <div class="wpi"><div class="wpn"><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}</span>${cu ? '<span class="wtag wb">Call-up</span>' : ''}</div>
+      <small class="wnst" title="How well they suit each position: ${esc(fits)}">${wCR.stats.map(s => `<span title="${esc(W_CRR.stat[s][1])}">${W_CRR.stat[s][0]} <b>${b[s]}</b></span>`).join(' ')}</small></div>
+    <div class="wpa"><label class="wsvl">Position <select data-cpos aria-label="${esc(p.n)}'s position">${opts}</select></label></div>
+  </li>`;
+}
+function wCampShed(C) {
+  const res = wFourCrReserves(C);
+  return `<p class="hint">Your rink of four, in the order they throw: the lead throws the end's first two stones (the guards and the draws: draw and line), the second the next two (the takeouts: hit and sweep), the third the next two (hit, draw and read), and the skip the last two, where ends are won (nerve, draw and read). The two not throwing and not holding the broom sweep: good sweepers carry a stone further, and their legs tire over an end.</p>
+    <h4>The four</h4><ol class="wroster wnine wcourt wshedfour">${C.four.map(k => wFourCrRow(k, C)).join('')}</ol>
+    <h4>Reserves</h4>${res.length ? `<ol class="wroster wnine wcourtb wshedres">${res.map(k => wFourCrRow(k, C)).join('')}</ol>` : '<p class="hint">Nobody: every player you have is in the four.</p>'}
+    <div class="row wnbtn"><button class="ghost" data-cauto>The captain's pick</button><button class="btn" data-cpractice>Practice game</button></div>`;
+}
+const wW123OpenCamp = wOpenCamp;
+wOpenCamp = function (tab) {
+  const want = tab || WCAMP.tab;
+  wW123OpenCamp(want === 'shed' ? 'team' : tab);
+  const tabs = document.querySelector('#modalBox .wctabs');
+  if (!tabs || tabs.querySelector('[data-ctab="shed"]')) return;
+  tabs.lastElementChild.insertAdjacentHTML('afterend', '<button role="tab" data-ctab="shed">Shed</button>');
+  tabs.querySelector('[data-ctab="shed"]').onclick = () => { WCAMP.tab = 'shed'; WCAMP.swap = null; WCAMP.msg = ''; wRenderCamp(); };
+  if (want === 'shed') { WCAMP.tab = 'shed'; wRenderCamp(); }
+};
+const wW123RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  if (WCAMP.tab !== 'shed') return wW123RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  if (!$('modalBox').querySelector('[data-ctab="shed"]')) { WCAMP.tab = 'team'; return wRenderCamp(); }
+  $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'shed'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  const before = JSON.stringify(WG.shed), C = wFourSyncCr(); if (JSON.stringify(C) !== before) wSave();
+  body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
+    ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampShed(C);
+  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^c\d+$/.test(k) ? k : +k; };
+  body.querySelectorAll('[data-cpos]').forEach(s => s.onchange = () => wCampSay(wFourSetPos(keyOf(s), s.value)));
+  const auto = body.querySelector('[data-cauto]'); if (auto) auto.onclick = () => wCampSay(wFourAutoCr());
+  const pr = body.querySelector('[data-cpractice]'); if (pr) pr.onclick = () => wFourCrPractice();
+};
+
+/* ---------- the Curling view on the Stats tab ---------- */
+const W_CR_COLS = () => wCR.stats.map(s => [s, W_CRR.stat[s][0], W_CRR.stat[s][1]]);
+const wW123CampStats = wCampStats;
+wCampStats = function () {
+  const html = wW123CampStats().replace(/(<button data-wsview="career"[^>]*>Career<\/button>)/, `$1<button data-wsview="curling" aria-pressed="${WSTAT.view === 'curling'}">Curling</button>`);
+  if (WSTAT.view !== 'curling') return html;
+  const cols = W_CR_COLS(), k = WSTAT.sort && cols.some(c => c[0] === WSTAT.sort) ? WSTAT.sort : null;
+  const C = wFourSyncCr(), rows = wRoster().map((p, i) => ({ p, i, b: wCrOf(p), pos: wFourCrPosOf(p.id, C) }));
+  if (k) rows.sort((a, b) => (b.b[k] - a.b[k]) || a.i - b.i);
+  const head = `<th scope="col"><button class="wsth" data-wsort="" aria-pressed="${!k}">Player</button></th><th scope="col">Position</th>` + cols.map(([c, s, l]) => `<th scope="col"><button class="wsth" data-wsort="${c}" title="${esc(l)}" aria-pressed="${k === c}">${s}</button></th>`).join('');
+  const body = rows.map(({ p, b, pos }) => `<tr data-wsp="${p.id}"${WSTAT.pid === p.id ? ' class="wsel"' : ''}><th scope="row"><button class="wsname" data-wsp-open aria-expanded="${WSTAT.pid === p.id}"><img src="${wPlayerPort(p, 40)}" alt=""><span><b>${esc(p.n)}</b><small>${esc(wKindName(p.kind))}</small></span></button></th>
+    <td>${pos != null ? esc(W_CRR.pos[pos].replace(/^the /, '')) : 'Reserve'}</td>${cols.map(([c]) => `<td>${b[c]}</td>`).join('')}</tr>`).join('');
+  const sel = WSTAT.pid != null && wPlayer(WSTAT.pid);
+  return html.replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every player\'s curling ratings and their position in your four (set on the Shed tab). Pick a heading to sort, a player to see more.</small>')
+    .replace(/<div class="tablewrap">[\s\S]*$/, `<div class="tablewrap"><table class="wstats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${sel ? wStatsCard(sel) : ''}`);
+};
+
+// your stone's rows gain a line for the curler up: their position, the sweepers' legs, and the moment
+$('wShedRows').insertAdjacentHTML('afterbegin', '<div class="wccrow" id="wShedRowUp"><span class="wccl">Curler</span><span id="wShedUp"></span></div>');
+const wW123ShedRows = wShedRows;
+wShedRows = function () {
+  wW123ShedRows();
+  const V = WCR && !WCR.over && wCR.G && wCR.G.teams ? wCR.view : null; if (!V || V.up !== V.you || !V.sel) return;
+  const m = wCR.G.teams[V.you].roster[V.thrower], legs = Math.round(((wCR.G.legs || [1, 1])[V.you]) * 100), pr = wCR.pressure(V.you), sw = wCR.sweepers(V.you).map(ri => wCR.G.teams[V.you].roster[ri].n);
+  $('wShedUp').innerHTML = `<b>${esc(m.n)}</b> <small>${esc(wKindName(m.kind) || '')}, ${esc(W_CRR.pos[V.pos] || '')}</small> · <span title="Sweeping spends their legs over an end; they are fresh again at the next. Tired legs do less.">Sweepers ${esc(sw.join(' and '))}, legs <b>${legs}%</b></span>${pr ? ` · <b class="wbad" title="The skip's stones in the last end: the release shakes, less for a steady nerve.">The last end${pr > 1 ? ', the hammer, and close' : ''}</b>` : ''}`;
+};
+// Curling: how it works gains the ratings, the positions, the legs and nerve
+const wW123ShedHow = wShedHowHTML;
+wShedHowHTML = function () {
+  return wW123ShedHow() + `<p class="hint"><b>Ratings.</b> Each curler has six: <b>draw</b> (the touch on a draw's weight), <b>line</b> (holding the broom), <b>hit</b> (a takeout's weight and line), <b>sweep</b>, <b>nerve</b> and <b>read</b> (how soon they see the ice change). Each level adds a point, mostly to what their kind is good at.</p>
+  <p class="hint"><b>The positions.</b> Your four are set on the Shed tab: the lead throws first (draws and guards), then the second (takeouts), the third and the skip, who throws the end's last stones.</p>
+  <p class="hint"><b>The sweepers</b> are the two not throwing and not holding the broom. Good sweepers carry a stone further; sweeping spends their legs over an end, and tired legs do less. They are fresh again at the next end.</p>
+  <p class="hint"><b>Nerve.</b> The skip's stones in the last end weigh on them, the hammer's stone most in a close game: the release shakes, less for a steady nerve. The CPU's curlers feel it too.</p>`;
+};
+const wW123RenderHelp = renderHelp;
+renderHelp = function () {
+  wW123RenderHelp();
+  const after = $('wHelpShed'); if (!after || $('wHelpShedTab')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedTab"><b>Curling ratings, the four and their positions.</b> Every player also has curling ratings: draw, line, hit, sweep, nerve and read (1 to ${wCrCap()}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Curling view. The Shed tab on the Team screen sets your four and their positions (the lead, the second, the third and the skip). The two not throwing and not holding the broom sweep, and their legs tire over an end. The skip's last stones weigh on their nerve. Called-up players at your level fill the four when your roster is short. Practice game there plays your four against Saltmere's; nothing is won or lost.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

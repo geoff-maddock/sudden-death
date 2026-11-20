@@ -12,10 +12,15 @@ function crStart(opts) {
   const o = opts || {};
   if (o.seed != null) engSeed(o.seed);
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#b83a3a' };
-    const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' }))).map(p => Object.assign({}, p));
+    // a curler with a kind the engine knows gets that kind's ratings (or their own)
+    const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
+      .map(p => { const r = p.r || (CR_KIND[p.kind] ? crRate(p.kind) : null), m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
+        m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT); return m; });
     return Object.assign({}, T, { roster }); });
-  crNewGame({ ends: o.ends, order: o.order || teams.map(T => T.order), roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
-  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, n: 0,
+  // an order: the game's, the team's own, or set by the ratings
+  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? crAutoOrder(teams[s].roster) : null));
+  crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
   GB = null;
   return G;
@@ -39,7 +44,7 @@ function crMade(plan, before, after, run) {
 function crTurn() {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s), { s });
-  return crThrowStone(s, plan, crMiss(s, plan.aim), crSweeper(s, plan));
+  return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
 // crThrowBegin puts it on the ice (the page then moves it on a step at a time: crRunStep), crThrowFinish settles it
@@ -49,6 +54,8 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
   if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
   plan = Object.assign({}, plan, { s });
+  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs: crSweepFn)
+  sweep = sweep ? crSweepFn(s, sweep) : null;
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
   const X = { s, plan, rel, Q, g: G, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
@@ -64,7 +71,7 @@ function crThrowFinish(X) {
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
-  if (rule.end) G.iceEnd = G.ice.slice();
+  if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
   if (made) { B.made++; P.made++; B.madeBy[plan.shot] = (B.madeBy[plan.shot] || 0) + 1; }
   // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
