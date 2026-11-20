@@ -62,17 +62,22 @@ async def main():
 
         dr = await pg.evaluate("""(() => { beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); B.energy = 99; renderFightHUD();
           const drag = (mid, end) => { const el = document.querySelector('#hand .card[data-i="1"]'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-            el.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 1 })); window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 150 }));
-            const sel = UI.sel; if (mid) mid(); window.dispatchEvent(new PointerEvent(end || 'pointerup', { clientX: x, clientY: y - 300 })); return sel; };
+            el.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 1 })); window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 150, pointerId: 1 }));
+            const sel = UI.sel; if (mid) mid(); if (end === 'blur') window.dispatchEvent(new Event('blur')); else window.dispatchEvent(new PointerEvent(end || 'pointerup', { clientX: x, clientY: y - 300, pointerId: 1 }));
+            // (the click the browser sends after the drop, on the card)
+            const el2 = document.querySelector('#hand .card[data-i="1"]'); if (el2) el2.click(); return sel; };
           const n = () => B.cardsThisTurn, out = {};
           let n0 = n(); out.selDuring = drag(); out.plain = n() - n0;
           n0 = n(); drag(() => { B.discard.push(B.hand.shift()); renderHand(); }); out.handChanged = n() - n0;
           n0 = n(); drag(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))); out.escape = n() - n0;
           n0 = n(); drag(() => doPetTrick()); out.trick = n() - n0;
           n0 = n(); drag(null, 'pointercancel'); out.cancel = [n() - n0, UI.sel];
-          return out; })()""")
+          n0 = n(); drag(null, 'blur'); out.blur = [n() - n0, UI.sel];
+          // (and a real click after all that selects a card at once)
+          const el3 = document.querySelector('#hand .card[data-i="0"]'); return new Promise(res => setTimeout(() => { el3.click(); out.nextClick = UI.sel === 0 || n() > n0; out.hoverCard = UI.hoverCard; res(out); }, 10));
+          })()""")
         check(dr['selDuring'] == 1 and dr['plain'] == 1, 'a plain drag of a card onto the arena plays it', dr)
-        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1], 'a drag plays nothing on its drop if the hand changed, Escape let it go, or the pet\'s trick was used while it was held; a gesture the browser takes over lets go of it', dr)
+        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] in (-1, 0), 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; the next real click works', dr)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

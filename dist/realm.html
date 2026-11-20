@@ -5436,13 +5436,15 @@ function updatePreview() {
 /* dragging a card to play it. The drop plays it only if nothing happened while it was held: no action (a card, a
    tonic, the pet's trick, the end of the turn: UI.acts), the pick not let go (Escape: UI.sel), no pause, dialog or
    waiting discard, the same card in the same place. A gesture the browser takes over, or the window losing focus,
-   ends the drag with nothing played and the target as it was. */
+   ends the drag with nothing played and the target as it was. Only the pointer that started it drives it. */
 function startDrag(ev, el, i) {
   if (ev.button !== 0 || B.phase !== 'player' || B.over || UI.busy || UI.disc) return;
   const c = B.hand[i]; if (!c || !canPlay(c)) return;
   const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform, acts0 = UI.acts || 0, kb0 = UI.kbTarget, hv0 = UI.hover; let moved = false;
-  try { el.setPointerCapture(ev.pointerId); } catch (x) { }
+  // (only this pointer drives this drag: a second finger is its own)
+  const pid = ev.pointerId, mine = e => e.pointerId == null || pid == null || e.pointerId === pid;
   const mv = e => {
+    if (!mine(e)) return;
     const dx = e.clientX - x0, dy = e.clientY - y0;
     if (!moved && Math.hypot(dx, dy) < 12) return;
     if (!moved) { moved = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
@@ -5452,18 +5454,20 @@ function startDrag(ev, el, i) {
     if (h) { UI.hover = h.e; UI.kbTarget = h.e; }
     updatePreview();
   };
-  const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; };
+  // (the drag over: its listeners off, the card back, and the click that follows the drop ignored (UI.dragged), but only
+  // that one: cleared just after, so the next real click isn't eaten)
+  const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; UI.hoverCard = -1; if (moved) { UI.dragged = true; setTimeout(() => { UI.dragged = false; }, 0); } };
   // (the card back, nothing played; the target as it was before the drag)
-  const drop = () => { if (!B || UI.view !== 'fight') return; UI.sel = -1; UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0; renderHand(); };
-  const cancel = () => { off(); if (moved) drop(); };
+  const drop = () => { if (!B || UI.view !== 'fight') return; UI.sel = -1; UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; renderHand(); };
+  const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; off(); if (moved) drop(); };
   const up = e => {
+    if (!mine(e)) return;
     off();
     if (!moved) return;
     if (!B || UI.view !== 'fight' || (UI.acts || 0) !== acts0 || UI.sel !== i || B.phase !== 'player' || B.over || UI.busy || UI.paused || UI.disc || !$('modal').hidden || B.hand[i] !== c) { drop(); return; }
-    UI.dragged = true;
     const r = cv.getBoundingClientRect();
     const overStage = e.clientY < r.bottom + 10;
-    if (!overStage) { UI.dragged = false; UI.sel = -1; renderHand(); return; }
+    if (!overStage) { drop(); return; }
     const x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
     if (needsTarget(c) && alive().length > 1 && !h) { renderHand(); return; } // dropped on open ice: keep it selected
