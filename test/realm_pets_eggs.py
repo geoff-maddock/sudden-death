@@ -39,6 +39,11 @@ async def main():
 
         sp = await pg.evaluate("(() => { " + FIND + " return { eggs: Object.keys(PETS).filter(k => PETS[k].how === 'egg').filter(k => !W_PEGG.eggs[k] || !find(W_PEGG.eggs[k].map, W_PEGG_CH.egg, 'petegg', k)), places: Object.keys(W_PEGG.places).filter(el => !find(W_PEGG.places[el].map, W_PEGG_CH.hatch, 'pethatch', el)), audit: wAudit().filter(s => /pet|egg|hatch/.test(s)) }; })()")
         check(sp == {'eggs': [], 'places': [], 'audit': []}, 'every egg pet has its egg\'s spot, and every element its hatching place, on the maps', sp)
+        pw = await pg.evaluate("""(() => { const x0 = WG.x, y0 = WG.y, map0 = WG.map, out = [];
+          try { for (const m of Object.values(MAPS)) for (const k in m.meta) { const mt = m.meta[k]; if (!mt.petegg && !mt.pethatch) continue; const [x, y] = k.split(',').map(Number);
+            WG.map = m.id; WG.x = m.spawn[0]; WG.y = m.spawn[1]; if (Math.abs(x - WG.x) + Math.abs(y - WG.y) > 1 && !wPathStep(x, y)) out.push(m.id + ' ' + k); } } finally { WG.map = map0; WG.x = x0; WG.y = y0; }
+          return out; })()""")
+        check(pw == [], 'a click walks to every egg\'s spot and hatching place, from the way in (the game\'s path-finder)', pw)
 
         tk = await pg.evaluate("""(() => { """ + FIND + """
           const use = (mid, k) => { const at = find(mid, W_PEGG_CH.egg, 'petegg', k); WG.map = mid; wUse(at[0], at[1]); return wHas(wPeggItem(k)); };

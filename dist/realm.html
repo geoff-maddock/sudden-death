@@ -61969,14 +61969,16 @@ Object.assign(W_MAP_COL, { [W_PEGG_CH.egg]: '#c8a060', [W_PEGG_CH.hatch]: '#e0b8
 /* ---------- laid over the maps: an egg's spot, each hatching place ---------- */
 /* placing things on a built map without cutting anything off (shared with w134's people). wPlaceGuard(m) measures the
    map as it is: people who stay put (fixed) stand in the way (bfsReach walks through them, so they are walls while it
-   looks); people who wander can be squeezed past, and move on. It notes everything that has a way to it: each thing on
+   looks); people who wander can be squeezed past on foot and move on (a click to walk goes round them, so w134 keeps a
+   side free of anybody for its people, and the checks walk the path-finder to every spot). It notes everything that has a way to it: each thing on
    the map (its meta) a reachable side; each person a reachable side, or the tile across any counter beside them (where
    you talk to them from), reachable and with nobody fixed on it. ok() says whether that all still holds, give or take
    the one tile just taken. */
 const W_SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 function wPlaceGuard(m) {
   const sx = m.spawn[0], sy = m.spawn[1], count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
-  const side = (seen, x, y) => W_SIDES.some(([dx, dy]) => seen[(y + dy) * m.w + x + dx]);
+  const at = (seen, x, y) => x >= 0 && y >= 0 && x < m.w && y < m.h && !!seen[y * m.w + x];
+  const side = (seen, x, y) => W_SIDES.some(([dx, dy]) => at(seen, x + dx, y + dy));
   // (put back last to first, so two standing on one tile can't leave a wall behind)
   const fixed = () => (m.npcs || []).filter(n => n.fixed);
   const reach = () => { const ps = fixed(), saved = ps.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); for (let i = ps.length - 1; i >= 0; i--) m.t[ps[i].y][ps[i].x] = saved[i]; return s; };
@@ -61985,10 +61987,10 @@ function wPlaceGuard(m) {
   for (const n of m.npcs || []) {
     // (any open side, or the far side of any counter beside them, free of anybody who stays put)
     const across = W_SIDES.filter(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter').map(([dx, dy]) => [n.x + 2 * dx, n.y + 2 * dy]);
-    goals.push(s => side(s, n.x, n.y) || across.some(([tx, ty]) => !!s[ty * m.w + tx] && !fixed().some(o => o !== n && o.x === tx && o.y === ty)));
+    goals.push(s => side(s, n.x, n.y) || across.some(([tx, ty]) => at(s, tx, ty) && !fixed().some(o => o !== n && o.x === tx && o.y === ty)));
   }
   const seen0 = reach(), base = count(seen0), had = goals.filter(f => f(seen0));
-  return { seen0, side, reach, ok: seen => count(seen) >= base - 1 && had.every(f => f(seen)) };
+  return { seen0, side, at, reach, ok: seen => count(seen) >= base - 1 && had.every(f => f(seen)) };
 }
 // put ch on the nearest open tile of the kinds in on, near (x, y), where it has a reachable side and cuts nothing off
 function wPeggPut(m, ch, x, y, on, meta) {
@@ -62276,7 +62278,8 @@ function wPshopStand(m, x, y) {
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
     if (!wOpenTile(m, xx, yy) || m.meta[xx + ',' + yy] || (xx === sx && yy === sy) || !G.seen0[yy * m.w + xx]) continue;
     m.npcs.push({ id: '_stand', x: xx, y: yy, fixed: true }); const seen = G.reach(); m.npcs.pop();
-    if (G.ok(seen) && G.side(seen, xx, yy)) return [xx, yy];
+    // (a side you can reach with nobody on it, so a click on them walks there)
+    if (G.ok(seen) && W_SIDES.some(([ax, ay]) => G.at(seen, xx + ax, yy + ay) && !m.npcs.some(n => n.x === xx + ax && n.y === yy + ay))) return [xx, yy];
   }
   return null;
 }

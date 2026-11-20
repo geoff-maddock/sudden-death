@@ -40,13 +40,12 @@ async def main():
           // (from the way in, by the game's own path-finder, as a click on them walks: to them, or to a counter in front of
           // them; every loose pet too)
           const x0 = WG.x, y0 = WG.y, map0 = WG.map, reach = [];
-          for (const t of [...new Set([...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].map(S => S.town))]) {
+          try { for (const t of [...new Set([...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].map(S => S.town))]) {
             const m = MAPS[t]; WG.map = t; WG.x = m.spawn[0]; WG.y = m.spawn[1];
             const can = (x, y) => Math.abs(x - WG.x) + Math.abs(y - WG.y) <= 1 || !!wPathStep(x, y);
-            for (const n of m.npcs) if (!can(n.x, n.y) && !W_SIDES.some(([dx, dy]) => wTileAt(m, n.x + dx, n.y + dy) === '-' && can(n.x + dx, n.y + dy))) reach.push(t + ':' + n.id);
+            for (const n of m.npcs) if (!can(n.x, n.y) && !W_SIDES.some(([dx, dy]) => (DB.tiles[wTileAt(m, n.x + dx, n.y + dy)] || {}).use === 'counter' && can(n.x + dx, n.y + dy))) reach.push(t + ':' + n.id);
             for (const k in m.meta) if (m.meta[k].loose) { const [x, y] = k.split(',').map(Number); if (!can(x, y)) reach.push('loose ' + t + ':' + k); }
-          }
-          WG.map = map0; WG.x = x0; WG.y = y0;
+          } } finally { WG.map = map0; WG.x = x0; WG.y = y0; }
           return { npc, loose, reach, audit: wAudit().filter(s => /pet|keeper/.test(s)) }; })()""")
         check(pl == {'npc': [], 'loose': [3, 3], 'reach': [], 'audit': []}, 'the three shopkeepers and two keepers stand in their towns, and the loose pets wait on open ground', pl)
 

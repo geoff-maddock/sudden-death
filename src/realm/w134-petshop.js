@@ -102,7 +102,8 @@ function wPshopStand(m, x, y) {
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
     if (!wOpenTile(m, xx, yy) || m.meta[xx + ',' + yy] || (xx === sx && yy === sy) || !G.seen0[yy * m.w + xx]) continue;
     m.npcs.push({ id: '_stand', x: xx, y: yy, fixed: true }); const seen = G.reach(); m.npcs.pop();
-    if (G.ok(seen) && G.side(seen, xx, yy)) return [xx, yy];
+    // (a side you can reach with nobody on it, so a click on them walks there)
+    if (G.ok(seen) && W_SIDES.some(([ax, ay]) => G.at(seen, xx + ax, yy + ay) && !m.npcs.some(n => n.x === xx + ax && n.y === yy + ay))) return [xx, yy];
   }
   return null;
 }
