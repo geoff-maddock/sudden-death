@@ -193,11 +193,11 @@ function crPlayNext() {
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
   if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
-  const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
+  const mgr = GP.mode === 'manage' && s === GP.you; let plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
   // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
   // (what the powers were before your captain cast, so they come back if you take the stone to throw it yourself)
   // (the CPU's potion first: never yours, your bag is your own)
-  const pre = s === GP.you && G.powers ? crPowSave() : null, pot = crCpuPotion(s, plan.shot), cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
+  const pre = s === GP.you && G.powers ? crPowSave() : null, PP = crCpuPotionPlan(s, plan, () => crPlan(s, mgr ? GP.mgr.style : null)), pot = PP.pot; plan = PP.plan; const cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel, pre };
   crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${pot ? ` ${pot}` : ''}${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }

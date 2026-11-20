@@ -49,9 +49,9 @@ function crMade(plan, before, after, run) {
 // caller passes it for your side; a headless game has none)
 function crTurn(style) {
   const s = crUp(); if (s < 0) return null;
-  const plan = Object.assign(crPlan(s, style || null), { s });
-  // (the CPU's powers on the shot it has called, before the release: they make the stone truer, or the sweepers stronger)
-  crCpuPotion(s, plan.shot); crCpuPower(s, plan.shot);
+  let plan = Object.assign(crPlan(s, style || null), { s });
+  // (the CPU's potion, and its powers on the shot it has called, before the release)
+  plan = crCpuPotionPlan(s, plan, () => crPlan(s, style || null)).plan; crCpuPower(s, plan.shot);
   return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
@@ -95,7 +95,7 @@ function crThrowFinish(X) {
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
-  crPowersAfter(s, ev, endNo, ham); crKitAfter(s);
+  crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
   return ev;

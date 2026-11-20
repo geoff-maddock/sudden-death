@@ -38,7 +38,9 @@ const CR_REACH = { drw: 1.1, lin: 1, hit: 1, nrv: .8, swp: .6 };
 const CR_LEGS = { burn: .02, low: .45 };
 const CR_DEF_RAT = { drw: .5, lin: .5, hit: .5, swp: .5, nrv: .5, red: .5 };
 function crRate(kind) { const k = CR_KIND[kind]; return Object.fromEntries(CR_STATS.map((s, i) => [s, k ? k[i] : 6.5])); }
-const crScale = v => clamp((v - 1) / (CR_RCAP - 1), 0, 1);
+// (gear may carry a rating CR_ROVER past the cap: it still counts, a little past the best)
+const CR_ROVER = 2;
+const crScale = v => clamp((v - 1) / (CR_RCAP - 1), 0, (CR_RCAP + CR_ROVER - 1) / (CR_RCAP - 1));
 function crRat(s, ri) { const m = G && G.teams && G.teams[s].roster[ri]; return (m && m.rs) || CR_DEF_RAT; }
 // how well ratings (0 to 1) suit a position (0 lead, 1 second, 2 third, 3 skip)
 const crFit = (r, pos) => pos === 0 ? r.drw * .5 + r.lin * .4 + r.swp * .1 : pos === 1 ? r.hit * .5 + r.swp * .3 + r.lin * .2 : pos === 2 ? r.hit * .35 + r.drw * .35 + r.red * .3 : r.nrv * .45 + r.drw * .3 + r.red * .25;

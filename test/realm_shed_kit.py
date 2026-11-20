@@ -52,15 +52,25 @@ async def main():
           G.end = 1; out.salt = [wCR.potion('crsalt'), G.salt[1]];
           G.end = 2; G.ice = G.ice.map(() => .97); out.pebble = [wCR.potion('crpebble'), Math.min(...G.ice)];
           G.end = G.ends - 1; G.k = 15; G.hammer = 0; const k0 = wCR.errK(0, 'draw'); out.warm = wCR.potion('crwarm'); const k1 = wCR.errK(0, 'draw'); out.calm = k1.ang < k0.ang;
+          G.end = 1; G.potEnd[0] = -1; G.salt = [false, false]; G.k = 15; out.lastSalt = wCR.potionWhy(G.hammer === 0 ? 0 : 1, 'crsalt');
           return out; })()""")
+        check(pt['lastSalt'] != '', 'no Frost Salt when the other rink has no stone left this end', pt)
         check(pt['draught'][0] == '' and abs(pt['draught'][1] - .7) < 1e-6, 'the Stamina Draught gives the sweepers two fifths of their legs back', pt)
         check(pt['again'] != '', 'one potion a side an end', pt)
         check(pt['salt'] == ['', True] and pt['pebble'][0] == '' and pt['pebble'][1] == 1, 'Frost Salt salts the other rink\'s line; Hennock\'s Pebble makes the worn ice fresh', pt)
         check(pt['warm'] == '' and pt['calm'], 'a Warming Draught takes the pressure off the skip\'s stone', pt)
         sl = await pg.evaluate("""(() => { const stop = salt => { wCR.start({ seed: 4, hammer: 0, teams: [__D(), __D()] }); const G = wCR.G; if (salt) G.salt[1] = true;
             const aim = wCR.solveDraw(0, 0, 1, G.ice, G.cold), ev = wCR.throwStone(1, { shot: 'draw', x: 0, y: 0, h: 1, aim }, aim, null); return { y: ev.stop ? ev.stop.y : -999, left: G.salt[1] }; };
-          return { plain: stop(false), salted: stop(true) }; })()""")
+          wCR.start({ seed: 4, hammer: 1, teams: [__D(), __D()] }); const G = wCR.G; G.k = 15; G.salt[0] = true; const aim = wCR.solveDraw(0, 0, 1, G.ice, G.cold); wCR.throwStone(1, { shot: 'draw', x: 0, y: 0, h: 1, aim }, aim, null);
+          return { plain: stop(false), salted: stop(true), endClears: G.salt.every(x => !x) && G.end === 1 }; })()""")
+        check(sl['endClears'], 'salt and warmth left at an end\'s end go with it', sl)
         check(sl['salted']['y'] < sl['plain']['y'] - 10 and sl['salted']['left'] is False, 'a stone on a salted line drags and comes up short, and the salt goes with it', sl)
+        cap = await pg.evaluate("""(() => { const sw = v => { wCR.start({ seed: 7, teams: [{ name: 'A', roster: [0, 1, 2, 3].map(i => ({ n: 'a' + i, kind: 'dwarf', r: { swp: v } })) }, __D()] }); return wCR.G.teams[0].roster[0].rs.swp; };
+          return [sw(12), sw(13), sw(14)]; })()""")
+        check(cap[1] > cap[0] and cap[2] > cap[1], 'gear past the rating cap still counts (up to two past it)', cap)
+        pb = await pg.evaluate("""(() => { wCR.start({ seed: 8, hammer: 1, mode: 'play', teams: [__D(), __D()] }); wCR.pause(true); __to('aim'); const G = wCR.G; G.ice = G.ice.map(() => .966); G.iceEnd = G.ice.slice();
+          wCR.select({ shot: 'draw', x: 20, y: 20 }); const a0 = JSON.stringify(wCR.view.sel.aim), r = wCR.potion('crpebble'), a1 = JSON.stringify(wCR.view.sel.aim); return { r, changed: a0 !== a1 }; })()""")
+        check(pb == {'r': '', 'changed': True}, 'after Hennock\'s Pebble your skip\'s aim is worked out again on the fresh ice', pb)
         cpu = await pg.evaluate("""(() => { wCR.start({ seed: 5, ends: 6, skill: [2, 2], bags: [null, { draught: 2, crwarm: 1, crsalt: 2, crpebble: 1 }], teams: [__D(), __D()] }); let n = 0; while (!wCR.G.over && n++ < 300) wCR.turn();
           const P = wCR.G.pots; return { mine: P.filter(x => x.side === 0).length, theirs: P.filter(x => x.side === 1).length, why: P.every(x => x.why) }; })()""")
         check(cpu['theirs'] >= 2 and cpu['mine'] == 0 and cpu['why'], 'a CPU with a bag gives potions at its skill, with a reason; a side without one never does', cpu)
@@ -79,10 +89,14 @@ async def main():
         check(rg['n'] == 6 and rg['store'] and rg['chest'], 'six pieces of curling gear and three potions: the store sells three of each, chests hold the rest', rg)
         check(rg['up'] == 1 and rg['tag'] == 'cr_broom', 'a piece worn reaches the game: its rating and its tag', rg)
         mt = await pg.evaluate("""(() => { wAddItem('crwarm', 2); wAddItem('draught', 1); wShg().met = {}; wStartShed({ club: 'local', how: 'play' }); wCR.pause(true); __to('aim');
-          const G = wCR.G, bags = [G.bags[0], G.bags[1]]; wShedRows(); const row = $('wShedBagRow'), btn = row.querySelector('[data-crkuse="crwarm"]'), n0 = WG.items.crwarm || 0;
-          btn.click(); return { mine: bags[0], theirs: bags[1], shown: !row.hidden, used: n0 - (WG.items.crwarm || 0), pots: G.pots.length, msg: W_SHED_KITMSG }; })()""")
+          const G = wCR.G, bags = [G.bags[0], G.bags[1]]; wShedRows(); const row = $('wShedBagRow'); G.legs[wCR.view.you] = .4; wShedRows(); const n0 = WG.items.draught || 0, nw = WG.items.crwarm || 0;
+          row.querySelector('[data-crkuse="crwarm"]').click(); const refused = W_SHED_KITMSG, keptW = (WG.items.crwarm || 0) === nw;
+          row.querySelector('[data-crkuse="draught"]').click(); return { mine: bags[0], theirs: bags[1], shown: !row.hidden, used: n0 - (WG.items.draught || 0), pots: G.pots.length, refused, keptW }; })()""")
         check(mt['mine'] is None and mt['theirs'] == {'draught': 1}, 'in a real match their bag goes in by tier, and yours stays your own', mt)
         check(mt['shown'] and mt['used'] == 1 and mt['pots'] == 1, 'the Bag row gives a potion from your bag, and it comes out', mt)
+        check(mt['refused'] != '' and mt['keptW'], 'a potion that can do nothing now (a Warming Draught before the skip\'s last end) is refused, and stays in the bag', mt)
+        clr = await pg.evaluate("(() => { W_SHED_KITMSG = 'x'; wCR.setMode('watch'); wCR.pause(false); let n = 0; while (W_SHED_KITMSG && n++ < 20000) wCR.tick(.05); wCR.pause(true); wCR.setMode('play'); return W_SHED_KITMSG; })()")
+        check(clr == '', 'a refusal in the Bag row goes with its stone', clr)
         await pg.evaluate("(() => { $('wShedGive').click(); const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); if (b) b.click(); })()")
         ex = await pg.evaluate("(() => { wShedGame({ seed: 6, mode: 'play' }); wCR.pause(true); __to('aim'); const r = wShedPotion('crwarm'); wShedRows(); const h = $('wShedBagRow').hidden; wLeaveShed(); return { r, h }; })()")
         check(ex['r'] != '' and ex['h'], 'an exhibition takes no potions, and has no Bag row', ex)

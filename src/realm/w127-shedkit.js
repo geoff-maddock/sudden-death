@@ -12,7 +12,8 @@
    Wraps: wGearLive (wW127GearLive: the Shed), wShedPlayer (wW127ShedPlayer: gear's ratings and the piece), wStartShed
    (wW127StartShed: their bag goes in), wShedRows (wW127ShedRows: the Bag row), wFourCrRow (wW127FourCrRow: the gear on
    the Shed tab), wOpenShedCard (wW127OpenShedCard: the bags on the card), wShedHowHTML (wW127ShedHow), renderHelp
-   (wW127RenderHelp: #wHelpShedKit); and wCR.start and wCR.simGame (the bags go in). */
+   (wW127RenderHelp: #wHelpShedKit), wResumeShed (wW127ResumeShed: an older save's bag); and wCR.start, wCR.simGame
+   (the bags go in) and wCR.onPhase (a refusal goes with its stone). */
 
 W_GEAR_CFG.sports.shed = 'curling';
 W_GEAR_STATN.shed = { drw: 'draw', lin: 'line', hit: 'hit', swp: 'sweep', nrv: 'nerve', red: 'read' };
@@ -56,10 +57,12 @@ wShedPlayer = function (p) {
 
 /* ---------- the bags go in ---------- */
 const WSHK = { next: null };
+let W_SHED_KITMSG = '';
 const wShedBagMine = () => Object.fromEntries(wMatchBag('shed').filter(x => wCR.potions[x.id]).map(x => [x.id, x.n]));
 const wShedBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wCR.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wCR.potions[id].n}`).join(', ') : 'nothing'; };
 const wW127StartShed = wStartShed;
 wStartShed = function (o) {
+  W_SHED_KITMSG = '';
   WSHK.next = [null, Object.assign({}, W_SHED_KIT.opp[(o && o.tier) || (o && o.club ? wBallTier(o.club) : 1)] || {})];
   try { return wW127StartShed(o); } finally { WSHK.next = null; }
 };
@@ -74,7 +77,6 @@ function wShedPotion(id) {
   const r = wCR.potion(id); if (r) return r;
   wAddItem(id, -1); if (WG.shg && WG.shg.live) WG.shg.live.snap = wCR.snapshot(); wSave(); return '';
 }
-let W_SHED_KITMSG = '';
 $('wShedPowRow').insertAdjacentHTML('afterend', '<div id="wShedBagRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Bag</span><span id="wShedBag"></span></div></div>');
 const wW127ShedRows = wShedRows;
 wShedRows = function () {
@@ -86,6 +88,15 @@ wShedRows = function () {
   $('wShedBag').innerHTML = (ids.length ? ids.map(id => { const P = wCR.potions[id];
       return `<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-crkuse="${id}" ${V.mode === 'play' ? '' : 'disabled'} title="${esc(P.desc)}">${esc(P.n)} (${bag[id]})</button>`; }).join(' ') : '<small class="hint">No curling potions in your bag. Saltmere\'s store sells them.</small>')
     + (W_SHED_KITMSG ? ` <small class="wbad">${esc(W_SHED_KITMSG)}</small>` : '') + (adv ? ` <small class="hint">Your captain says: <b>${esc(wCR.potions[adv.id].n)}</b>, ${esc(adv.why)}.</small>` : '');
+};
+// (a refusal is for the stone it was about: a new stone clears it)
+const wW127OnPhase = wCR.onPhase;
+wCR.onPhase = ph => { if (ph === 'next') W_SHED_KITMSG = ''; wW127OnPhase(ph); };
+// a match saved before bags came in: the other club's bag by its tier
+const wW127ResumeShed = wResumeShed;
+wResumeShed = function () {
+  wW127ResumeShed();
+  const L = WG.shg && WG.shg.live, G = wCR.G; if (L && G && G.bags && G.bags[1] == null && WCR && WCR.world) G.bags[1] = Object.assign({}, W_SHED_KIT.opp[L.world.tier] || {});
 };
 $('wShedBagRow').addEventListener('click', e => {
   const b = e.target.closest('[data-crkuse]'); if (!b || b.disabled) return;

@@ -41,7 +41,9 @@ function crPotionWhy(s, id) {
   if (G.potEnd[s] === G.end) return 'One potion an end.';
   if (id === 'draught' && (G.legs ? G.legs[s] : 1) >= .95) return 'Their legs are fresh.';
   if (id === 'crwarm' && G.still[s]) return 'Already warm.';
+  if (id === 'crwarm' && !crPressure(s)) return 'Only for the skip, in the last end.';
   if (id === 'crsalt' && G.salt[1 - s]) return 'Their line is salted already.';
+  if (id === 'crsalt' && G.k >= crPerEnd() - 1) return 'They have no stone left this end.';
   if (id === 'crpebble' && !crIceWorn()) return 'The ice is fresh.';
   return '';
 }
@@ -62,6 +64,8 @@ function crPotion(id) {
   const s = GP.you; if (!['aim', 'swing'].includes(GP.ph) || (GP.meter && GP.meter.st === 'gone')) return 'Only before your stone.';
   const why = crPotionWhy(s, id); if (why) return why;
   GP.msg = crPotionGive(s, id);
+  // (fresh ice runs differently: your skip's aim is worked out again on it)
+  if (id === 'crpebble' && GP.sel) { const a = crSelAim(GP.sel); if (a) GP.sel.aim = a; }
   crPick();
   return '';
 }
@@ -86,5 +90,7 @@ function crCpuPotion(s, shot) {
   if (!sk) return R() < CR_KIT.squire ? crPotionGive(s, vals[0].id, vals[0].why) : '';
   return vals[0].v >= CR_KIT.take[sk] ? crPotionGive(s, vals[0].id, vals[0].why) : '';
 }
-// after side s's stone: the warming draught is spent, and the salt on its line
-function crKitAfter(s) { if (G && G.still) { G.still[s] = false; G.salt[s] = false; } }
+// after side s's stone: the warming draught is spent, and the salt on its line; at an end's end, all of it
+function crKitAfter(s, endDone) { if (G && G.still) { G.still[s] = false; G.salt[s] = false; if (endDone) { G.still = [false, false]; G.salt = [false, false]; } } }
+// a CPU's potion, and its plan made again if the potion changed the ice under it (Hennock's Pebble)
+function crCpuPotionPlan(s, plan, again) { const n = G.pots.length, pot = crCpuPotion(s, plan.shot); return { pot, plan: pot && G.pots[n] && G.pots[n].id === 'crpebble' ? Object.assign(again(), { s }) : plan }; }
