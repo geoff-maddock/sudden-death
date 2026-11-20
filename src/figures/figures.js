@@ -1,9 +1,9 @@
 /* The players, drawn: one file for the scoped engines (issue #85). Boxing (src/bx), football (src/gf), basketball
-   (src/bk), hockey (src/hk) and bowling (src/bl, issue #100) each load this inside their own scope, so its names (KIND, BACK, HEAD, BODY, ink,
+   (src/bk), hockey (src/hk), bowling (src/bl, issue #100) and curling (src/cr, issue #102) each load this inside their own scope, so its names (KIND, BACK, HEAD, BODY, ink,
    drawFig, ...) are that engine's own; it names no engine. It came from Brimstone Diamond's figures
    (src/bd/parts/14-rendering.js), which keeps its own.
    The animation clock is figClock(): seconds, a function each engine defines beside its drawing clock (BXT.t, GFT.t,
-   BKT.t, HKT.t, BLC.t).
+   BKT.t, HKT.t, BLC.t, CRC.t).
    drawFig(c, kind, x, y, hpx, team, o): an inked, cel-shaded player standing at (x, y), hpx tall, facing right (o.flip
    faces left); team { color, light, short }; o { num, run (a stride phase), flip, alpha, throwK (0..1, the throwing or
    shooting arm), lift, noShadow, stone, pose, glove, bare }. A pose moves the arms (armL, the rear hand, and armR, the

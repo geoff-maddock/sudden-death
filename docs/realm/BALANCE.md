@@ -1254,3 +1254,105 @@ control (a league kind the team lacks), 52%: the Phoenix 52%, the Kraken 51%, th
 Frost Wyrm 56%, and the Behemoth 40.5%. One bowler of five bowls two frames, so a superstar moves a game less than in
 the other sports. The Behemoth's 4s in revs, accuracy, spare and read cost more than its 12 in power earned, so they
 are 7, 7, 6 and 6 now (nerve 10): 53% against the control's 49% (300 each).
+
+## Curling at the Curling Shed (issue #102, phase 10)
+
+`python3 test/realm_shed_lab.py N`: every game is the curling engine played to a result, headless, as Simulate plays
+it (6 ends, the Shed's ways on, powers on), your four curling as a Knight, theirs at the tier's skill, the hammer to
+each side in turn. Every game draws both fours afresh and each cell has its own run of seeds. About 0.6 s a game, so
+the lab is slow: the main parts at 100 a cell take about 50 minutes, the single parts at 40 about the same; a cell of
+100 is good to about 5 points either way, 40 to about 8. A head-to-head check in node (the engine alone, the rinks
+swapping sides) is faster for one question at a time.
+
+The first run found two things wrong, both fixed before the numbers below:
+
+1. **The Squire lost 99 to 100% of the time** to a Knight, so tier 1 read 95%. It now misses less (`ang` .45 to .33,
+   `v` .022 to .016), weighs its best two shots twice each, which (weighing more than one) also brought in both
+   handles and the hit and roll (it had one handle and no hit and roll; with the rest of the change and the old list
+   it was still 91%, 150 games: the wider list is most of it), and its
+   sweepers start from 300 inches past the hack rather than halfway: a Knight beats it 83% (150 games in node), 84 to
+   87% in the lab.
+2. **Granite decided games.** A golem's Granite Stone (the draw power: once at rest, the stone is heavier) won 80%
+   against the same four with no powers (120 games). Granite is now twice an ordinary stone, not three times
+   (`CR_GRANITE`): 58%. Measured again at 100 a cell in the lab, the granite on a hitting stone was still strong (a
+   takeout that sticks and won't be moved): Stone Wall 71% against 60% with none, the troll's Boulder 60% against
+   37%, Troll Bridge 54%, the Kraken's Grasp 65% against 60%, the Behemoth's Mountain Stone 79% against 66%; the
+   Granite Stone 61% against 60%. Granite is cast on nearly every stone that matters, so a granite power now costs 3
+   mana, not 2 (`CR_MANA.granite`): in node (150 games) Stone Wall 70% to 63% against 55%, the Boulder 49% to 56%
+   against 45% (within the noise). The cost works through how often it is cast: a golem rink with only Stone Wall to
+   cast threw it 15.7 times a game at 2 mana and 10.8 at 3 (100 games each), 71% and 63%. Mana is the limit for you as
+   for the CPU, so a player who casts it on every stone that matters is held to about as many. The troll's Troll Bridge (an ultimate: granite on every stone of one end, 54% against
+   37% at twice) is paid from the roar, once a game, and is left as it is.
+
+**Tiers, as the world sets them** (100 each; their level yours plus the tier less one, `W_SHG.oppBonus` a point on each
+of their four, their skill by tier, round every club):
+
+| | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Before | 95% | 43% | 32% |
+| After | 80% | 49% | 31% |
+
+**Their skill** (even level, your Knight): a Squire 84% (99% before), a Knight 53%, an Archmage 31%. The ladder with the
+same four on both sides: an Archmage beats a Knight 70%, a Knight beats a Squire 87%.
+
+**What stayed as it was, and why:**
+
+- **Levels matter, but not much.** In node, a rink with 3 more rating points a player (about three levels) wins 60%,
+  with 6 more about 56%, with 12 more 74%; the lab's level gaps (-1 to +3, both Knights) read 39 to 54% with no clear
+  trend. More reach for the ratings (`CR_REACH` drw 1.6, lin and hit 1.4) didn't read any better at 100 games, so it
+  was left. Curling here is decided mostly by the call and the miss (the skill), which is what the tiers turn.
+- **Sweeping is worth about 6 points.** Head to head in node (200 games), a rink that sweeps beats one that doesn't 56%;
+  it lifts shots made from 73% to 81%. In the lab's separate cells the win rate didn't move (on 46 to 50%, off 49 to
+  50%), within its noise. Sweeping less hard on the curl (`sweepCurl` .4 to .2) read no better (52%), so it was left.
+- **The hammer is worth a lot.** With the hammer in the first end your Knight wins 69% (a margin of +0.6); without it,
+  25% (-0.8). Ends a game (6 ends): about 3.5 singles, 0.5 twos, 0.05 big ends, 2.1 blanks and 0.5 steals, which is
+  low scoring, as club curling between careful skips is.
+- **Powers** (even level, both Knights): both 49%, neither 49%, yours only 64%, theirs only 34%.
+- **The pebble and the Shed** (an Archmage against a Knight): the wear on 68%, off 75%; the Shed's ways on 67%, off 72%.
+- **Gear and potions** move a game by a few points at most (tier 2: plain 44%, their bag 47%, both bags 48%, the full
+  kit 45%); the side with the tier 3 bag in node: 45 to 49%.
+- **The Brass Broom** (Simulate every round, their bags in): won 15% before, 19% after; out in the quarter-final 17%,
+  the semi-final 40%, the final 24%.
+
+### Harder to make a shot (after play)
+
+Played by hand, curling felt too hard to score: every stone you got into the house was knocked out. The numbers agreed:
+takeouts were made 89% of the time by a Squire, 93% by a Knight and 99% by an Archmage (60 games a skill, in node), and
+a curler's ratings moved their miss only a little. Three changes:
+
+1. **A hit has its own, wider line** by skill (`CR_SKILL` `hitAng`: a Squire .7, a Knight .46, an Archmage .36 degrees,
+   against .4, .3 and .22 for a draw): a takeout at full weight misses by its line, where a draw misses by its weight.
+   Draws are a little harder too (`v` .022, .016, .011).
+2. **Ratings reach further,** as a multiplier: a curler's miss is `exp(reach x (.5 - rating))` of the skill's
+   (`crReachK`, `CR_REACH` drw, lin and hit 1.4), so one rated 1 misses about twice as wide as an average curler and
+   one rated 12 about half as wide. Draw, line and hit 10 against 3 (both Knights): 85% before, 99% now. Three more
+   rating points a player wins 61% (60% before), six more 68% (56%), twelve more 75% (74%).
+3. **Your own stones answer to your curler's ratings:** the line off your aim (`CR_PLAY.you` .25 degrees, a hit's .4,
+   from .12 for both) and a small part of the weight on top of the meter's (`v` .01), each times the curler's own
+   ratings.
+
+Shots made by skill (60 games, in node): takeouts 53%, 73% and 85%; draws 53%, 69% and 83%; points a game rose. The
+lab (100 a cell): tiers 98%, 53% and 24% (80%, 49% and 31% before); against a Squire 94%, a Knight 50%, an Archmage
+20%; an Archmage beats a Knight 82% and a Knight beats a Squire 95% (70% and 87% before); your rink scores 6.8, 3.3 and
+2.7 points a game by tier (3.4, 2.4 and 2.2); shots made about 70% (80%); the Brass Broom won 24% (19%). The low skill
+plays much worse, as asked, and both sides score more.
+
+### One thing at a time
+
+`realm_shed_lab.py 40 '' single` (40 games a cell, so about 8 points of noise; the granite rows were measured again
+after the change). With only that one power castable by your side (a four of that kind against the same four with
+none), most powers sit within the noise of their kind's "none". The stand-outs before the change were granite (the
+golem's Granite Stone 75%, Stone Wall 85%, the troll's Boulder 72.5% and Troll Bridge 70%, against 47.5 to 50%), and the
+sweeping powers read a little negative (Pack Sweep 27.5% against 42.5%, Broomstick 32.5% against 42.5%), within two
+standard errors. The situation powers: the Hammer 62.5% and the Steal 67.5% against 45% (cast about once and a third
+of a time a game), Extra End and Steady within the noise. Each piece of gear on all four: 35 to 57.5% against 47.5%;
+each potion, two in the bag: 37.5 to 57.5% against 47.5%.
+
+### Superstars on the ice
+
+`realm_stars_lab.py 100 '' cr` (three of your own and the extra player as your four, at an even level against a
+Knight, tier 2), on the build with granite at twice and its powers at 3 mana: the control (a league kind) 45%, the
+Phoenix 47%, the Kraken 53%, the Behemoth 47%, the Djinn 65%, the Hydra 60%, the Frost Wyrm 50%. An earlier run (granite
+at twice, its powers still at 2) read the control 37% and the Frost Wyrm 66%, and one at 60 the control 48%: the cells
+move about 10 points between runs, so a superstar adds from nothing to about 20 points as one player in four. The
+Djinn (+20 here, the best draw in the realm) is the one to watch; a run at 200 or more a cell would settle it.
