@@ -172,4 +172,5 @@ src/realm/w128-shedstars.js
 src/realm/w129-shedcup.js
 src/realm/w130-shedfeel.js
 src/realm/w131-shedtilda.js
+src/realm/w132-pets.js
 src/realm/w112-quickstart.js

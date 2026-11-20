@@ -307,6 +307,8 @@ function wFit() {
   Object.assign(WUI, { cssW, cssH, zoom, s, r, vw: W / s, vh: H / s });
   return true;
 }
+// actors later parts draw on the map, beside the townsfolk and the team (w132: the pet at your side)
+const W_ACTORS = [];
 function wRender(now) {
   if (!WUI.built || !WG || !MAPS[WG.map]) return;
   const dt = Math.min(.1, (now - (WUI.last || now)) / 1000); WUI.last = now;
@@ -355,8 +357,10 @@ function wRender(now) {
     const face = i === 0 ? WUI.face : (p.tx < p.fx ? 'l' : p.tx > p.fx ? 'r' : WUI.face);
     acts.push({ y: pos[1] + (i === 0 ? .01 : 0), x: pos[0], who: { kind: pm.kind, team: { color: team.color, light: team.light, short: team.short }, num: pm.num, face, walk: moving ? t * 12 + i : 0, seed: i }, size: i === 0 ? 32 : 28, alpha: i === 0 ? 1 : .96 });
   });
+  // (later parts add their own actors here: each W_ACTORS fn pushes { x, y, draw(c, sx, sy, t) } or a who)
+  for (const f of W_ACTORS) { try { f(acts, now, t); } catch (e) { console.error(e); } }
   acts.sort((a, b) => a.y - b.y);
-  for (const a of acts) wDrawActor(c, a.who, a.x * T + T / 2, a.y * T + T - 3, t, { size: a.size, alpha: a.alpha });
+  for (const a of acts) { if (a.draw) a.draw(c, a.x * T + T / 2, a.y * T + T - 3, t); else wDrawActor(c, a.who, a.x * T + T / 2, a.y * T + T - 3, t, { size: a.size, alpha: a.alpha }); }
   c.restore();
   // night: always in dungeons, by the clock everywhere else, with a light around the party
   const night = m.kind === 'dungeon' ? .8 : wDarkness() * 1.15;
