@@ -61928,7 +61928,7 @@ renderHelp = function () {
    deterministically), so only flags and WG.petEggs go into the save.
 
    WG.petEggs = { [element]: { kind, due } }
-   W_PEGG, wPeggBuild, wPeggPut, wPeggTake, wPeggPlace, wPeggHatch, wPetNameAny
+   W_PEGG, wPeggBuild, wPlaceGuard, wPeggPut, wPeggTake, wPeggPlace, wPeggHatch, wPetNameAny
    Wrapped: buildAllMaps (wW133BuildAllMaps), wStart (wW133Start: old saves' unknown eggs), wAudit (wW133Audit: each egg's spot, each place), wUse (wW133Use: 'petegg' and 'pethatch' tiles), wTileVariant
    (wW133TileVariant: an egg there or not), renderHelp (wW133RenderHelp: #wHelpPetEggs). */
 
@@ -61967,21 +61967,40 @@ Object.assign(DB.tiles, {
 Object.assign(W_MAP_COL, { [W_PEGG_CH.egg]: '#c8a060', [W_PEGG_CH.hatch]: '#e0b84a' });
 
 /* ---------- laid over the maps: an egg's spot, each hatching place ---------- */
-// put ch on the nearest open tile of the kinds in on, keeping everything reachable that was: every floor tile but
-// the one taken, and every thing on the map (its meta) still has a reachable side
-function wPeggPut(m, ch, x, y, on, meta) {
+/* placing things on a built map without cutting anything off (shared with w134's people). wPlaceGuard(m) measures the
+   map as it is: people stand in the way (bfsReach walks through them, so they are walls while it looks), and it notes
+   everything that has a way to it: each thing on the map (its meta) a reachable side, each person a reachable side, or,
+   behind a counter, the tile across it you talk to them from, free and reachable. ok() says whether that all still
+   holds, give or take the one tile just taken. (People who wander step up to two tiles from home: a block by one of
+   them lasts only till they move on.) */
+const W_SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+function wPlaceGuard(m) {
   const sx = m.spawn[0], sy = m.spawn[1], count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
-  const side = (seen, k) => { const [mx, my] = k.split(',').map(Number); return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(my + dy) * m.w + mx + dx]); };
-  const seen0 = bfsReach(m, sx, sy), base = count(seen0), had = Object.keys(m.meta).filter(k => side(seen0, k));
+  const side = (seen, x, y) => W_SIDES.some(([dx, dy]) => seen[(y + dy) * m.w + x + dx]);
+  // (put back last to first, so two standing on one tile can't leave a wall behind)
+  const reach = () => { const ps = m.npcs || [], saved = ps.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); for (let i = ps.length - 1; i >= 0; i--) m.t[ps[i].y][ps[i].x] = saved[i]; return s; };
+  const goals = [];
+  for (const k in m.meta) { const [x, y] = k.split(',').map(Number); goals.push(s => side(s, x, y)); }
+  for (const n of m.npcs || []) {
+    const c = W_SIDES.find(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter');
+    if (c) { const tx = n.x + 2 * c[0], ty = n.y + 2 * c[1]; goals.push(s => !!s[ty * m.w + tx] && !(m.npcs || []).some(o => o !== n && o.x === tx && o.y === ty)); }
+    else goals.push(s => side(s, n.x, n.y));
+  }
+  const seen0 = reach(), base = count(seen0), had = goals.filter(f => f(seen0));
+  return { seen0, side, reach, ok: seen => count(seen) >= base - 1 && had.every(f => f(seen)) };
+}
+// put ch on the nearest open tile of the kinds in on, near (x, y), where it has a reachable side and cuts nothing off
+function wPeggPut(m, ch, x, y, on, meta) {
+  const G = wPlaceGuard(m);
   for (let rad = 0; rad <= 6; rad++) for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
     const c0 = m.t[yy][xx], k = xx + ',' + yy;
-    if (!on.includes(c0) || m.meta[k] || !seen0[yy * m.w + xx] || (m.npcs || []).some(n => n.x === xx && n.y === yy) || wInsideBuilding(m, xx, yy)) continue;
-    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => m.t[yy + ay] && m.t[yy + ay][xx + ax] === '+')) continue;
+    if (!on.includes(c0) || m.meta[k] || !G.seen0[yy * m.w + xx] || (m.npcs || []).some(n => n.x === xx && n.y === yy) || wInsideBuilding(m, xx, yy)) continue;
+    if (W_SIDES.some(([ax, ay]) => m.t[yy + ay] && m.t[yy + ay][xx + ax] === '+')) continue;
     m.t[yy][xx] = ch;
-    const seen = bfsReach(m, sx, sy);
-    if (count(seen) >= base - 1 && side(seen, k) && had.every(h => side(seen, h))) { m.meta[k] = Object.assign({ under: c0 }, meta || {}); return [xx, yy]; }
+    const seen = G.reach();
+    if (G.ok(seen) && G.side(seen, xx, yy)) { m.meta[k] = Object.assign({ under: c0 }, meta || {}); return [xx, yy]; }
     m.t[yy][xx] = c0;
   }
   return null;
@@ -62247,23 +62266,16 @@ Object.assign(DB.tiles, { [W_PSHOP_CH]: { name: 'loose pet', walk: 0, use: 'petl
 Object.assign(W_MAP_COL, { [W_PSHOP_CH]: '#d8c8ff' });
 
 /* ---------- placed over the maps: the five, the loose pets ---------- */
-// the nearest open tile to (x, y) for somebody to stand on: one you can reach, and standing there cuts nothing off
-// (every other reachable tile, and every thing on the map, keeps a way to it; the others standing about count as
-// in the way too)
+// the nearest open tile to (x, y) for somebody to stand on: one you can reach, with a free side to talk from, where
+// standing cuts nothing and nobody off (wPlaceGuard)
 function wPshopStand(m, x, y) {
-  const sx = m.spawn[0], sy = m.spawn[1], count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
-  const side = (seen, k) => { const [mx, my] = k.split(',').map(Number); return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(my + dy) * m.w + mx + dx]); };
-  // (bfsReach ignores people: they are stood in for by a wall while it looks)
-  // (put back last to first, so two standing on one tile can't leave a wall behind)
-  const reach = () => { const saved = m.npcs.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); for (let i = m.npcs.length - 1; i >= 0; i--) m.t[m.npcs[i].y][m.npcs[i].x] = saved[i]; return s; };
-  // (every thing on the map, and everybody standing about, that has a way to it keeps one)
-  const seen0 = reach(), base = count(seen0), had = Object.keys(m.meta).concat(m.npcs.map(n => n.x + ',' + n.y)).filter(k => side(seen0, k));
+  const G = wPlaceGuard(m), sx = m.spawn[0], sy = m.spawn[1];
   for (let rad = 0; rad <= 10; rad++) for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
-    if (!wOpenTile(m, xx, yy) || m.meta[xx + ',' + yy] || (xx === sx && yy === sy) || !seen0[yy * m.w + xx]) continue;
-    m.npcs.push({ id: '_stand', x: xx, y: yy }); const seen = reach(); m.npcs.pop();
-    if (count(seen) >= base - 1 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => seen[(yy + ay) * m.w + xx + ax]) && had.every(h => side(seen, h))) return [xx, yy];
+    if (!wOpenTile(m, xx, yy) || m.meta[xx + ',' + yy] || (xx === sx && yy === sy) || !G.seen0[yy * m.w + xx]) continue;
+    m.npcs.push({ id: '_stand', x: xx, y: yy }); const seen = G.reach(); m.npcs.pop();
+    if (G.ok(seen) && G.side(seen, xx, yy)) return [xx, yy];
   }
   return null;
 }
@@ -62293,8 +62305,9 @@ wAudit = function () {
 /* ---------- a loose pet, caught ---------- */
 function wPshopCatch(m, meta) {
   const S = W_PSHOP.shops[meta.loose]; if (!S) return;
-  // (a caught one, or one whose shop is open, is ground again (wTileAt), so it never comes here)
+  // (a caught one, or one whose shop is open, is ground again (wTileAt) and never comes here; called some other way, nothing)
   const f = 'pq_' + meta.loose + '_' + meta.i, D = PETS[meta.pet] || { n: 'pet' };
+  if (wFlag(f) || wFlag(S.quest)) return;
   wSetFlag(f); wAdvance(10); wInvalidate(WG.map);
   const left = [...Array(W_PSHOP.loose).keys()].filter(i => !wFlag('pq_' + meta.loose + '_' + i)).length, who = W_PSHOP_PEOPLE[S.npc].name;
   wLog(left ? `You catch a loose ${D.n}! It wriggles into your coat. ${left} still out there; ${who} will want them all.` : `You catch the last loose ${D.n}. Time to take them back to ${who}.`, 'm');

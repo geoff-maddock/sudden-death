@@ -17,7 +17,7 @@
    deterministically), so only flags and WG.petEggs go into the save.
 
    WG.petEggs = { [element]: { kind, due } }
-   W_PEGG, wPeggBuild, wPeggPut, wPeggTake, wPeggPlace, wPeggHatch, wPetNameAny
+   W_PEGG, wPeggBuild, wPlaceGuard, wPeggPut, wPeggTake, wPeggPlace, wPeggHatch, wPetNameAny
    Wrapped: buildAllMaps (wW133BuildAllMaps), wStart (wW133Start: old saves' unknown eggs), wAudit (wW133Audit: each egg's spot, each place), wUse (wW133Use: 'petegg' and 'pethatch' tiles), wTileVariant
    (wW133TileVariant: an egg there or not), renderHelp (wW133RenderHelp: #wHelpPetEggs). */
 
@@ -56,21 +56,40 @@ Object.assign(DB.tiles, {
 Object.assign(W_MAP_COL, { [W_PEGG_CH.egg]: '#c8a060', [W_PEGG_CH.hatch]: '#e0b84a' });
 
 /* ---------- laid over the maps: an egg's spot, each hatching place ---------- */
-// put ch on the nearest open tile of the kinds in on, keeping everything reachable that was: every floor tile but
-// the one taken, and every thing on the map (its meta) still has a reachable side
-function wPeggPut(m, ch, x, y, on, meta) {
+/* placing things on a built map without cutting anything off (shared with w134's people). wPlaceGuard(m) measures the
+   map as it is: people stand in the way (bfsReach walks through them, so they are walls while it looks), and it notes
+   everything that has a way to it: each thing on the map (its meta) a reachable side, each person a reachable side, or,
+   behind a counter, the tile across it you talk to them from, free and reachable. ok() says whether that all still
+   holds, give or take the one tile just taken. (People who wander step up to two tiles from home: a block by one of
+   them lasts only till they move on.) */
+const W_SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+function wPlaceGuard(m) {
   const sx = m.spawn[0], sy = m.spawn[1], count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
-  const side = (seen, k) => { const [mx, my] = k.split(',').map(Number); return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(my + dy) * m.w + mx + dx]); };
-  const seen0 = bfsReach(m, sx, sy), base = count(seen0), had = Object.keys(m.meta).filter(k => side(seen0, k));
+  const side = (seen, x, y) => W_SIDES.some(([dx, dy]) => seen[(y + dy) * m.w + x + dx]);
+  // (put back last to first, so two standing on one tile can't leave a wall behind)
+  const reach = () => { const ps = m.npcs || [], saved = ps.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); for (let i = ps.length - 1; i >= 0; i--) m.t[ps[i].y][ps[i].x] = saved[i]; return s; };
+  const goals = [];
+  for (const k in m.meta) { const [x, y] = k.split(',').map(Number); goals.push(s => side(s, x, y)); }
+  for (const n of m.npcs || []) {
+    const c = W_SIDES.find(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter');
+    if (c) { const tx = n.x + 2 * c[0], ty = n.y + 2 * c[1]; goals.push(s => !!s[ty * m.w + tx] && !(m.npcs || []).some(o => o !== n && o.x === tx && o.y === ty)); }
+    else goals.push(s => side(s, n.x, n.y));
+  }
+  const seen0 = reach(), base = count(seen0), had = goals.filter(f => f(seen0));
+  return { seen0, side, reach, ok: seen => count(seen) >= base - 1 && had.every(f => f(seen)) };
+}
+// put ch on the nearest open tile of the kinds in on, near (x, y), where it has a reachable side and cuts nothing off
+function wPeggPut(m, ch, x, y, on, meta) {
+  const G = wPlaceGuard(m);
   for (let rad = 0; rad <= 6; rad++) for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
     const c0 = m.t[yy][xx], k = xx + ',' + yy;
-    if (!on.includes(c0) || m.meta[k] || !seen0[yy * m.w + xx] || (m.npcs || []).some(n => n.x === xx && n.y === yy) || wInsideBuilding(m, xx, yy)) continue;
-    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => m.t[yy + ay] && m.t[yy + ay][xx + ax] === '+')) continue;
+    if (!on.includes(c0) || m.meta[k] || !G.seen0[yy * m.w + xx] || (m.npcs || []).some(n => n.x === xx && n.y === yy) || wInsideBuilding(m, xx, yy)) continue;
+    if (W_SIDES.some(([ax, ay]) => m.t[yy + ay] && m.t[yy + ay][xx + ax] === '+')) continue;
     m.t[yy][xx] = ch;
-    const seen = bfsReach(m, sx, sy);
-    if (count(seen) >= base - 1 && side(seen, k) && had.every(h => side(seen, h))) { m.meta[k] = Object.assign({ under: c0 }, meta || {}); return [xx, yy]; }
+    const seen = G.reach();
+    if (G.ok(seen) && G.side(seen, xx, yy)) { m.meta[k] = Object.assign({ under: c0 }, meta || {}); return [xx, yy]; }
     m.t[yy][xx] = c0;
   }
   return null;

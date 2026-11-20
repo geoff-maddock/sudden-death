@@ -43,6 +43,12 @@ async def main():
             // (one behind a counter is talked to across it)
             const counter = n => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter');
             return m.npcs.filter(n => !counter(n)).filter(n => ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(n.y + dy) * m.w + n.x + dx])).map(n => t + ':' + n.id); });
+          // (every loose pet, and every counter's talking tile, has a way to it with people in the way)
+          const lp = ['hq', 'cind'].flatMap(id => { const m = MAPS[W_PSHOP.shops[id].town], G = wPlaceGuard(m); return Object.keys(m.meta).filter(k => m.meta[k].loose === id).filter(k => { const [x, y] = k.split(',').map(Number); return !G.side(G.seen0, x, y); }); });
+          const ct = [...new Set([...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].map(S => S.town))].flatMap(t => { const m = MAPS[t], G = wPlaceGuard(m);
+            return m.npcs.flatMap(n => { const c = W_SIDES.find(([dx, dy]) => (DB.tiles[m.t[n.y + dy] && m.t[n.y + dy][n.x + dx]] || {}).use === 'counter'); if (!c) return []; const tx = n.x + 2 * c[0], ty = n.y + 2 * c[1];
+              return G.seen0[ty * m.w + tx] && !m.npcs.some(o => o !== n && o.x === tx && o.y === ty) ? [] : [t + ':' + n.id]; }); });
+          reach.push(...lp.map(k => 'loose ' + k), ...ct.map(k => 'counter ' + k));
           return { npc, loose, reach, audit: wAudit().filter(s => /pet|keeper/.test(s)) }; })()""")
         check(pl == {'npc': [], 'loose': [3, 3], 'reach': [], 'audit': []}, 'the three shopkeepers and two keepers stand in their towns, and the loose pets wait on open ground', pl)
 
