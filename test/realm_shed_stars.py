@@ -51,13 +51,19 @@ async def main():
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
         await pg.evaluate(HELP)
         r = await pg.evaluate("""(() => { const p = wMakePlayer({ kind: 'kraken', lvl: 3, n: 'Kraken' }, 'tavern'); wAddPlayer(p);
-          const q = wMakePlayer({ kind: 'djinn', lvl: 3, n: 'Djinn' }, 'tavern'); wAddPlayer(q); q.cr = { lv: 3, got: {}, drw: 6, lin: 6, hit: 6, swp: 6, nrv: 6, red: 6 };
-          const C0 = wFourSyncCr(); C0.mine = false; const cus = C0.cu.map(c => c.cid);
+          // (a short roster: the call-ups the captain's repick keeps, each in an open position)
+          const allR = wRoster; wRoster = () => allR().slice(0, 2); WG.shed = null; const C = wFourSyncCr(); C.mine = false; const cus = C.cu.map(c => c.cid); wShedRepick(C);
+          const keptCu = cus.length > 0 && cus.every(cid => WG.shed.cu.some(c => c.cid === cid) && WG.shed.four.includes(cid)); wRoster = allR; WG.shed = null; wFourSyncCr();
+          // (a long one: an older save's Djinn, average till it is made again, makes the four on its own ratings)
+          for (let i = 0; i < 4; i++) wAddPlayer(wMakePlayer({ kind: 'goblin', lvl: 1, n: 'Gob' + i }, 'tavern'));
+          const q = wMakePlayer({ kind: 'djinn', lvl: 3, n: 'Djinn' }, 'tavern'); wAddPlayer(q); q.cr = { lv: 3, got: {}, drw: 2, lin: 2, hit: 2, swp: 2, nrv: 2, red: 2 };
+          const C2 = wFourSyncCr(); C2.mine = false; wFourCrAutoPick(C2); wFourSyncCr(); const outBefore = !WG.shed.four.includes(q.id);
           const save = JSON.parse(JSON.stringify({ WG, RUN })); wStart(save); const Q = wPlayer(q.id), P = wPlayer(p.id);
-          const four = JSON.stringify(WG.shed.four), keptCu = cus.every(cid => WG.shed.cu.some(c => c.cid === cid)), djinnIn = WG.shed.four.includes(q.id); wFourCrAutoPick(WG.shed); const again = JSON.stringify(WG.shed.four.filter(k => typeof k === 'number')) === JSON.stringify(JSON.parse(four).filter(k => typeof k === 'number'));
-          return { made: !!(P.cr && P.cr.st), swp: P.cr.swp, fixed: !!(Q.cr && Q.cr.st), drw: Q.cr.drw, repicked: again && keptCu && djinnIn }; })()""")
+          const copy = JSON.parse(JSON.stringify(WG.shed)), djinnIn = WG.shed.four.includes(q.id);
+          return { made: !!(P.cr && P.cr.st), swp: P.cr.swp, fixed: !!(Q.cr && Q.cr.st), drw: Q.cr.drw, keptCu, outBefore, djinnIn, shed: !!copy.four }; })()""")
         check(r['made'] and r['swp'] >= 10, 'a superstar made now has curling ratings from its kind (the Kraken sweeps best)', r)
-        check(r['fixed'] and r['drw'] >= 9 and r['repicked'], 'a superstar from an older save is made again from its kind, once, on load, and the captain picks the four on the new ratings', r)
+        check(r['fixed'] and r['drw'] >= 9 and r['outBefore'] and r['djinnIn'], 'a superstar from an older save is made again from its kind, once, on load, and the captain picks the four on the new ratings', r)
+        check(r['keptCu'], 'the captain\'s repick keeps the call-ups, each in an open position', r)
         g = await pg.evaluate("""(() => { const T = { name: 'Stars', short: 'STA', roster: ['phoenix', 'kraken', 'behemoth', 'djinn'].map((k, i) => ({ n: k, kind: k })) }, U = { name: 'Dwarves', short: 'DWA', roster: [0, 1, 2, 3].map(i => ({ n: 'd' + i, kind: 'dwarf' })) };
           const s = wCR.simGame({ seed: 3, ends: 6, skill: [2, 1], powers: true, teams: [T, U] }); wCR.start({ seed: 3, ends: 6, skill: [2, 1], powers: true, teams: [T, U] }); let n = 0; while (!wCR.G.over && n++ < 300) wCR.turn();
           const ids = wCR.G.casts.filter(c => c.side === 0).map(c => c.id); return { over: !!s.over, own: ids.filter(id => id.endsWith('cr')).length }; })()""")

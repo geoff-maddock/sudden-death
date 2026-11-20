@@ -34,7 +34,9 @@
    Phase 6 is powers: start({ powers: true | [yours, theirs], powOnly }) (pow, pow2, ult, sit: the tables; manaRules,
    roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers).
    Phase 7 is gear and potions: a roster curler's { gear: { id, name, fx } } (gx: what the engine reads), start({ bags:
-   [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion). */
+   [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion).
+   Phase 8 is the superstars (in the tables) and the players drawn: figKinds() (the kinds the figures know), figsNow()
+   (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),

@@ -83,7 +83,8 @@ function figClock() { return CRC.t; }
 const CR_FIG = { tall: 54, broomBack: 26, sweepOff: 36 };
 const crTeamLook = s => { const T = G.teams[s]; return { color: T.color || '#888', light: T.light || '#f2ead8', short: T.short || T.name || '?' }; };
 const crFigSeen = f => { const [, sy, sc] = crScr(f.x, f.y); return sc >= .05 && sy <= 640; };
-const crFigsOn = () => crFigsList().filter(crFigSeen).map(f => f.who).filter((w, i, a) => a.indexOf(w) === i);
+// (judged with the camera where it is going, not where it has got to: the same answer however long the game is held)
+const crFigsOn = () => { const keep = CRC.camY; CRC.camY = crCamTarget(); try { return crFigsList().filter(crFigSeen).map(f => f.who).filter((w, i, a) => a.indexOf(w) === i); } finally { CRC.camY = keep; } };
 function crFigAt(c, f) {
   if (!crFigSeen(f)) return;
   const [sx, sy, sc] = crScr(f.x, f.y);

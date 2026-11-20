@@ -21,7 +21,8 @@ function wShedStarFix(p) {
 }
 function wShedRepick(C) {
   const cu = C.cu.slice(); wFourCrAutoPick(C);
-  for (let i = 0; i < 4 && cu.length; i++) if (C.four[i] == null) { const c = cu.shift(); C.four[i] = c.cid; C.cu.push(c); }
+  // (each open position takes the kept call-up that suits it best)
+  for (let i = 0; i < 4 && cu.length; i++) if (C.four[i] == null) { cu.sort((a, b) => wCrFit(b, i) - wCrFit(a, i)); const c = cu.shift(); C.four[i] = c.cid; C.cu.push(c); }
   wFourSyncCr();
 }
 const wW128MakePlayer = wMakePlayer;

@@ -41114,7 +41114,8 @@ function figClock() { return CRC.t; }
 const CR_FIG = { tall: 54, broomBack: 26, sweepOff: 36 };
 const crTeamLook = s => { const T = G.teams[s]; return { color: T.color || '#888', light: T.light || '#f2ead8', short: T.short || T.name || '?' }; };
 const crFigSeen = f => { const [, sy, sc] = crScr(f.x, f.y); return sc >= .05 && sy <= 640; };
-const crFigsOn = () => crFigsList().filter(crFigSeen).map(f => f.who).filter((w, i, a) => a.indexOf(w) === i);
+// (judged with the camera where it is going, not where it has got to: the same answer however long the game is held)
+const crFigsOn = () => { const keep = CRC.camY; CRC.camY = crCamTarget(); try { return crFigsList().filter(crFigSeen).map(f => f.who).filter((w, i, a) => a.indexOf(w) === i); } finally { CRC.camY = keep; } };
 function crFigAt(c, f) {
   if (!crFigSeen(f)) return;
   const [sx, sy, sc] = crScr(f.x, f.y);
@@ -42195,7 +42196,9 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    Phase 6 is powers: start({ powers: true | [yours, theirs], powOnly }) (pow, pow2, ult, sit: the tables; manaRules,
    roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers).
    Phase 7 is gear and potions: a roster curler's { gear: { id, name, fx } } (gx: what the engine reads), start({ bags:
-   [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion). */
+   [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion).
+   Phase 8 is the superstars (in the tables) and the players drawn: figKinds() (the kinds the figures know), figsNow()
+   (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -60866,7 +60869,8 @@ function wShedStarFix(p) {
 }
 function wShedRepick(C) {
   const cu = C.cu.slice(); wFourCrAutoPick(C);
-  for (let i = 0; i < 4 && cu.length; i++) if (C.four[i] == null) { const c = cu.shift(); C.four[i] = c.cid; C.cu.push(c); }
+  // (each open position takes the kept call-up that suits it best)
+  for (let i = 0; i < 4 && cu.length; i++) if (C.four[i] == null) { cu.sort((a, b) => wCrFit(b, i) - wCrFit(a, i)); const c = cu.shift(); C.four[i] = c.cid; C.cu.push(c); }
   wFourSyncCr();
 }
 const wW128MakePlayer = wMakePlayer;
