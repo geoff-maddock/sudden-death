@@ -30,7 +30,9 @@
    every stone's path this game, paths their count); onChart hears C.
    Phase 5 is games from the world: start({ hall: true }) gives the Shed's ways (hallRules: the frost, the sprites,
    Hennock's pebble; frostAt(x)); modes add manage (manage({ style: 'auto' | 'draw' | 'hit' }), mgr); snapshot() and
-   resume(sn) keep a match between stones (plain JSON). */
+   resume(sn) keep a match between stones (plain JSON).
+   Phase 6 is powers: start({ powers: true | [yours, theirs], powOnly }) (pow, pow2, ult, sit: the tables; manaRules,
+   roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -58,6 +60,11 @@ return {
   endValue: (s, pts, next, sk) => G && G.teams ? crEndValue(s, pts, next, sk) : 0, reason: (s, c) => G && G.teams ? crReason(s, c) : '', readIn: s => G && G.teams ? crReadIn(s) : 0,
   chart: (cv, s) => { if (!G || !G.teams || !cv) return false; const c = cv.getContext('2d'); crChart(c, s, cv.width, cv.height, GP ? GP.paths : []); return true; }, get paths() { return GP ? GP.paths.length : 0; },
   set onChart(f) { CR_HOOK.onChart = f; }, get onChart() { return CR_HOOK.onChart; },
+  // powers (phase 6)
+  pow: CR_POW, pow2: CR_POW2, ult: CR_ULT, sit: CR_SIT, manaRules: CR_MANA, roarRules: CR_ROAR, fx0: CR_FX0, granite: CR_GRANITE,
+  powNow: (s, ri, shot) => G && G.powers ? crPowNow(s, ri, shot) : null, powWhy: (s, k, ri) => crPowWhy(s, k, ri), cast: (s, k, ri) => crCast(s, k, ri), castMine: k => crCastMine(k),
+  fxFor: s => crFxFor(s), cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
+  get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   // games from the world (phase 5)
   hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },

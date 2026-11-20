@@ -96,7 +96,7 @@ function wStartShed(o) {
   B.live = { world, snap: null };
   // (your own Shed mode, back when the match is settled or you leave: wShedModeBack)
   if (how !== 'sim' && WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
-  const opts = { teams: [mine, opp], skill: wShedSkillOf(tier), ends: wShedEnds(), cold, hall: true, hammer: Math.random() < .5 ? 0 : 1 };
+  const opts = { teams: [mine, opp], skill: wShedSkillOf(tier), ends: wShedEnds(), cold, hall: true, powers: true, hammer: Math.random() < .5 ? 0 : 1 };
   if (how === 'sim') { const s = wCR.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts)); wShedResultCard(wShedSettle(s)); return ''; }
   wShedGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WCR.world = true;

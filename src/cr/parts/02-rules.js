@@ -88,7 +88,7 @@ function crThrow(s, after, o) {
   const ids = (after || []).map(st => st.id);
   if (new Set(ids).size !== ids.length || (after || []).some(st => old.has(st.id) && old.get(st.id) !== st.s) || fresh.length > 1 || (fresh[0] && fresh[0].s !== s)) return { ok: false, why: 'Those stones are not the ones in play.' };
   const hit = !!(o && o.hit);
-  let now = (after || []).filter(st => crOnSheet(st) && (old.has(st.id) || hit || crPastHog(st))).map(st => ({ id: old.has(st.id) ? st.id : id, s: st.s, x: st.x, y: st.y }));
+  let now = (after || []).filter(st => crOnSheet(st) && (old.has(st.id) || hit || crPastHog(st))).map(st => Object.assign({ id: old.has(st.id) ? st.id : id, s: st.s, x: st.x, y: st.y }, st.g ? { g: 1 } : {}));
   // the free guard zone: one of the other side's guards gone from play before the fifth stone
   let fgz = false;
   if (G.k < G.fgz) {

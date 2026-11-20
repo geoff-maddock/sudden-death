@@ -39714,7 +39714,7 @@ function crThrow(s, after, o) {
   const ids = (after || []).map(st => st.id);
   if (new Set(ids).size !== ids.length || (after || []).some(st => old.has(st.id) && old.get(st.id) !== st.s) || fresh.length > 1 || (fresh[0] && fresh[0].s !== s)) return { ok: false, why: 'Those stones are not the ones in play.' };
   const hit = !!(o && o.hit);
-  let now = (after || []).filter(st => crOnSheet(st) && (old.has(st.id) || hit || crPastHog(st))).map(st => ({ id: old.has(st.id) ? st.id : id, s: st.s, x: st.x, y: st.y }));
+  let now = (after || []).filter(st => crOnSheet(st) && (old.has(st.id) || hit || crPastHog(st))).map(st => Object.assign({ id: old.has(st.id) ? st.id : id, s: st.s, x: st.x, y: st.y }, st.g ? { g: 1 } : {}));
   // the free guard zone: one of the other side's guards gone from play before the fifth stone
   let fgz = false;
   if (G.k < G.fgz) {
@@ -39799,18 +39799,20 @@ const CR_STONE = { y0: -1116, a: 9, curl: .28, vc: 34, sweepMu: .16, sweepCurl: 
 // the stone's acceleration on the ice: friction against its motion, and the curl across it
 function crAccel(st, ice, cold, sw) {
   const v = Math.hypot(st.vx, st.vy); if (v < 1e-6) return [0, 0];
-  const mu = crIceAt(ice, st.x, st.y, cold) * (1 - CR_STONE.sweepMu * sw), ux = st.vx / v, uy = st.vy / v;
-  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y));
+  // (a cursed stone drags heavy, or turns stiff and hardly curls: its own drag and curl, 13-powers.js)
+  const mu = crIceAt(ice, st.x, st.y, cold) * (st.drag || 1) * (1 - CR_STONE.sweepMu * sw), ux = st.vx / v, uy = st.vy / v;
+  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y)) * (st.curlK || 1);
   // (the curl is across the motion: to the left of it for h = +1, and x is plus to the thrower's left, so the left of a
   // stone going (ux, uy) is (uy, -ux))
   return [-CR_STONE.a * mu * ux + lat * uy, -CR_STONE.a * mu * uy - lat * ux];
 }
-// two stones touch: trade momentum along the line between them (equal mass, restitution e)
+// two stones touch: trade momentum along the line between them (restitution e; a granite stone, g, is CR_GRANITE times
+// as heavy as an ordinary one: 13-powers.js)
 function crCollide(a, b) {
   const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-6, nx = dx / d, ny = dy / d;
   const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny; if (rel <= 0) return false;
-  const j = (1 + CR_STONE.e) / 2 * rel;
-  a.vx -= j * nx; a.vy -= j * ny; b.vx += j * nx; b.vy += j * ny;
+  const ma = a.g ? CR_GRANITE : 1, mb = b.g ? CR_GRANITE : 1, j = (1 + CR_STONE.e) * rel / (1 / ma + 1 / mb);
+  a.vx -= j / ma * nx; a.vy -= j / ma * ny; b.vx += j / mb * nx; b.vy += j / mb * ny;
   // pull them apart to just touching
   const over = 2 * CR_SHEET.stoneR - d; if (over > 0) { a.x -= nx * over / 2; a.y -= ny * over / 2; b.x += nx * over / 2; b.y += ny * over / 2; }
   b.h = (b.h || 0) * .5 + (a.h || 0) * CR_STONE.keepCurl * .6; a.h = (a.h || 0) * .5; return true;
@@ -39824,8 +39826,10 @@ function crCollide(a, b) {
    it one step (sweep: how hard it is swept now, or opts.sweep's), crRunTo moves it on to a time, crRunEnd gives the
    result. The steps are the same however the run is driven, so the page's stone and the sim's go the same way. */
 function crRunInit(stones, th, opts) {
-  const O = opts || {}, a = th.ang * Math.PI / 180, S = stones.map(st => ({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }));
-  const T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
+  const O = opts || {}, a = th.ang * Math.PI / 180, S = stones.map(st => Object.assign({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }, st.g ? { g: 1 } : {}));
+  // (opts.fx: the thrown stone's powers, 13-powers.js: a curse's drag and stiffness, granite, smoke through a guard)
+  const F = O.fx || null, T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
+  if (F) { if (F.heavy && F.heavy !== 1) T.drag = F.heavy; if (F.stiff && F.stiff !== 1) T.curlK = F.stiff; if (F.granite) T.g = 1; if (F.ghost) T.ghost = 1; }
   S.push(T);
   return { O, S, T, dt: O.plan ? CR_STONE.planDt : CR_STONE.dt, maxT: O.maxT || 60, path: [], trace: [], out: [], t: 0, hits: 0, nextTr: 0, sw: 0, done: false };
 }
@@ -39839,10 +39843,10 @@ function crRunStep(Q, sweep) {
   // (without legs, a caller's own sweep may run to 1.5, as a good fresh pair's does)
   const legs = !!O.legs && O.side != null && !!G && !!G.teams;
   const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, legs ? 1 : 1.5) : 0;
-  const sw = ask && legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
+  const fxs = O.fx && O.fx.sweep != null ? O.fx.sweep : 1, sw = ask && legs ? clamp(ask * crSweepEff(O.side) * fxs, 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
-  if (ask && legs) crLegsBurn(O.side, ask, dts);
+  if (ask && legs) crLegsBurn(O.side, ask * (O.fx && O.fx.legs != null ? O.fx.legs : 1), dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
@@ -39856,6 +39860,8 @@ function crRunStep(Q, sweep) {
   // contacts (only between stones that could touch: one of them moving)
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
     const p = L[i], q = L[j]; if (!(p.vx || p.vy || q.vx || q.vy)) continue;
+    // (a smoke stone slides through the first guard it meets, and that one only)
+    if (T.ghost && (p === T || q === T)) { const o = p === T ? q : p; if (T.ghostId === o.id) continue; if (!T.ghostId && !o.vx && !o.vy && crInFgz(o) && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R) { T.ghostId = o.id; continue; } }
     if (Math.abs(p.x - q.x) < 2 * R && Math.abs(p.y - q.y) < 2 * R && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R) {
       const [m, n] = (p.vx || p.vy) && Math.hypot(p.vx, p.vy) >= Math.hypot(q.vx, q.vy) ? [p, q] : [q, p];
       if (crCollide(m, n)) Q.hits++;
@@ -39877,8 +39883,10 @@ function crRunEnd(Q) {
   const P = path[path.length - 1]; if (!P || P[0] !== +T.x.toFixed(1) || P[1] !== +T.y.toFixed(1)) path.push([+T.x.toFixed(1), +T.y.toFixed(1), +(Q.swMax || 0).toFixed(2)]);
   // the thrown stone must pass the far hog line, unless it hit a stone in play
   if (!T.out && !crPastHog(T) && !Q.hits) { T.out = true; Q.out.push(T.id); }
+  // (a smoke stone that came to rest inside the guard it slid through goes on just past it)
+  const gh = T.ghostId && S.find(st => st.id === T.ghostId && !st.out); if (!T.out && gh) { let n = 0; while (Math.hypot(T.x - gh.x, T.y - gh.y) < 2 * CR_SHEET.stoneR && n++ < 40) T.y += 1; }
   if (!O.plan) Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]);
-  const rest = S.filter(st => !st.out).map(st => ({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }));
+  const rest = S.filter(st => !st.out).map(st => Object.assign({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }, st.g ? { g: 1 } : {}));
   Q.done = true;
   return (Q.result = { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } });
 }
@@ -40060,7 +40068,7 @@ function crStart(opts) {
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
-  crShedStart(o);
+  crShedStart(o); crPowersStart(o);
   GB = null;
   return G;
 }
@@ -40084,6 +40092,8 @@ function crMade(plan, before, after, run) {
 function crTurn(style) {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s, style || null), { s });
+  // (the CPU's powers on the shot it has called, before the release: they make the stone truer, or the sweepers stronger)
+  crCpuPower(s, plan.shot);
   return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
@@ -40097,8 +40107,8 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out; a
   // number is a steady ask)
   if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
-  const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s });
-  const X = { s, plan, rel, Q, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const fx = crFxFor(s), Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
+  const X = { s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
 // a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed
@@ -40109,6 +40119,8 @@ function crThrowFinish(X) {
   // (a stone refused here gives back the legs its sweeping spent: nothing changed)
   const why = crWhyNot(X.s); if (why) { G.legs = X.legs0; return crRefused(X.s, why); }
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
+  // (a gust as the stone settles pushes their stone nearest the button back, before the rules look)
+  const gust = crGust(s, run.stones, X.fx);
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
@@ -40121,7 +40133,8 @@ function crThrowFinish(X) {
   // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
-  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule };
+  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust, ghost: X.Q.T.ghostId || null };
+  crPowersAfter(s, ev, endNo, ham);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
   return ev;
@@ -40184,7 +40197,7 @@ const CR_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
 function crPlayStart(o) {
-  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null, paths: [], mgr: { style: 'auto' } };
+  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null, paths: [], mgr: { style: 'auto' }, autoPow: false };
   crGo('next');
   return GP;
 }
@@ -40318,6 +40331,8 @@ function crSettle() {
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
+  if (ev.ghost) say += ' It slid through the guard like smoke.';
+  if (ev.gust) say += ` A gust pushes their stone back ${ev.gust} inches.`;
   if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
   crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
@@ -40340,9 +40355,11 @@ function crPlayNext() {
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
   if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
-  const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s }), rel = crMiss(s, plan.aim, plan.shot);
+  const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
+  // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
+  const cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel };
-  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.`);
+  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;
@@ -40353,6 +40370,12 @@ function crSetMode(m) {
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
   // (a stone of the CPU's called for your side, as you take it back: yours to throw)
   if (m === 'play' && GP.ph === 'addr' && GP.cpu && GP.cpu.s === GP.you) { GP.cpu = null; crGo('next'); }
+}
+// your cast before your stone (P the thrower's power, U the ultimate, K Steady, or a situation power): '' or why not
+function crCastMine(k) {
+  if (!GP || GP.mode !== 'play' || !['aim', 'swing'].includes(GP.ph) || (GP.meter && GP.meter.st === 'gone') || !crYours(crUp())) return 'Only before your stone.';
+  const why = crCast(GP.you, k); if (why) return why;
+  const c = G.casts[G.casts.length - 1]; GP.msg = `${crName(GP.you, c.ri)} casts ${c.n}.`; crPick(); return '';
 }
 // Manage: your rink's game ({ style: 'auto' | 'draw' | 'hit' })
 function crManage(o) { if (!GP) return false; if (['auto', 'draw', 'hit'].includes(o && o.style)) GP.mgr.style = o.style; crPick(); return true; }
@@ -40575,8 +40598,9 @@ function crPressure(s) {
 const crNerveK = (p, nrv) => 1 + CR_REACH.nrv * p * (1 - clamp(nrv, 0, 1));
 // how much side s's curler misses by, times the skill's: { ang (the line), v (the weight: a draw's touch, or a hit's) }
 function crErrK(s, shot) {
-  const ri = crThrower(s), r = crRat(s, ri), nk = crNerveK(crPressure(s), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
-  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk };
+  // (and the stone's powers: truer, or wilder under a curse; no pressure with nerve: 13-powers.js)
+  const f = crFxFor(s), ri = crThrower(s), r = crRat(s, ri), nk = crNerveK(f.nerve ? 0 : crPressure(s), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
+  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk * f.err * f.line, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk * f.err * f.wt };
 }
 // the legs are fresh at the start of an end
 function crLegsNewEnd() { if (G) G.legs = [1, 1]; }
@@ -40709,6 +40733,252 @@ function crShedEnd(endNo) {
   if (endNo === Math.floor(G.ends / 2)) { G.ice = G.ice.map(v => +(1 - (1 - v) * (1 - CR_HALL.pebble)).toFixed(4)); if (G.iceEnd) G.iceEnd = G.ice.slice(); return 'At the half Brush Hennock pebbles the sheet again: the worn ice is half fresh.'; }
   return G.frost >= .03 ? 'The frost creeps further in from the windows: the ice along the boards plays heavy.' : '';
 }
+/* The Curling Shed: monster powers (issue #102, phase 6), as on the Lanes, for a game of stones. A game has them when
+   started with { powers: true } (the Realm's games do; the bare engine, its tests and the labs don't, unless asked;
+   powers: [yours, theirs] gives one side only).
+   - Team mana (G.mana, by side): CR_MANA.start to begin, up to CR_MANA.max. A shot made fills it, and an end scored
+     (more for two or more, and a steal). A power costs CR_MANA.pow, a curse CR_MANA.curse.
+   - Everyday powers: every kind has a draw power (for a draw, a guard or a freeze) and a hit power (for a takeout, a
+     peel or a hit and roll), and a second of each (CR_POW, CR_POW2); a curler brings one of each pair (m.pw: { draw,
+     hit }, 0 or 1; picked on the Shed tab). The thrower casts theirs before their stone, for mana, on the shot called;
+     it works on that stone. A curse works on the other rink's next stone instead. One everyday power a stone. A Drain
+     works at once.
+   - The roar (G.roar, by side, 0 to CR_ROAR.max): the gallery fills it on a shot made, more on a double takeout, a two
+     or more, a big end and most on a steal. It pays for the ultimate (CR_ROAR.ult), or steadies the skip's stone in the
+     last end (CR_ROAR.steady: no pressure on it).
+   - The ultimate: one per kind (CR_ULT), once a game per side, for the roar, cast at the start of an end (before
+     either rink's second stone). It marks the end (G.mark): one set of effects on its side's stones (own), another on
+     the other rink's (rival), until the end is scored.
+   - Situation powers (CR_SIT), the team's, once a game each, for mana, when the moment fits: the Hammer (the end's last
+     stone, with the hammer: a third truer), the Steal (the last stone of yours in an end without the hammer, lying
+     shot: a third truer) and the Extra End (in an extra end: the stone's miss halved).
+   - Who casts (crCpuPower): the CPU by its skill (a Squire now and then at random; a Knight on the stones that matter,
+     keeping a mana back; an Archmage when it is behind, late, or the moment is big, saving the roar for the
+     ultimate); your side the same way under Auto powers in Manage, or what you press.
+   Effects (CR_FX0): err (the release's miss, line and weight), line (the line's alone), wt (the weight's alone), sweep
+   (how much the sweepers do) and legs (what sweeping costs their legs) multiply; heavy (a curse: the stone drags, and
+   comes up short) and stiff (a curse: the stone hardly curls) multiply the thrown stone's friction and curl; granite
+   (once at rest, the stone is three times as heavy: a hit barely moves it, for the rest of the end), ghost (the stone
+   slides through the first guard it meets, like smoke), gust (as the stone comes to rest, the other rink's stone
+   nearest the button is pushed back this many inches) and nerve (no pressure) are the rest. The thrower's aim knows
+   none of them: a power makes the stone truer, or the sweepers stronger, never a different shot. */
+const CR_MANA = { start: 2, max: 6, made: 1, end: 1, two: 1, steal: 1, pow: 2, curse: 2 };
+const CR_ROAR = { max: 100, ult: 60, steady: 25, made: 5, double: 15, two: 15, big: 30, steal: 25 };
+const CR_FX0 = { err: 1, line: 1, wt: 1, sweep: 1, legs: 1, heavy: 1, stiff: 1, granite: 0, ghost: 0, gust: 0, nerve: 0 };
+const CR_FX_MUL = new Set(['err', 'line', 'wt', 'sweep', 'legs', 'heavy', 'stiff']);
+// granite's weight against an ordinary stone
+const CR_GRANITE = 3;
+const crP = (id, n, desc, fx, curse, now) => ({ id, n, desc, fx: fx || null, curse: curse || null, now: now || null });
+// everyday powers by kind: [draw, hit]
+const CR_POW = {
+  goblin: [crP('slyslide', 'Sly Slide', 'A sly release: the miss a fifth smaller.', { err: .8 }), crP('sneakhit', 'Sneaky Hit', 'Down the line unseen: the line\'s miss a fifth smaller.', { line: .8 })],
+  kobold: [crP('emberstone', 'Ember Stone', 'A warm stone: the sweepers do a fifth more on it.', { sweep: 1.2 }), crP('fireline', 'Fire Line', 'The heat shows the line: its miss a quarter smaller.', { line: .75 })],
+  werewolf: [crP('packsweep', 'Pack Sweep', 'The pack sweeps it: a quarter more from the brooms.', { sweep: 1.25 }), crP('moonhit', 'Moon Hit', 'Thrown by moonlight: the weight\'s miss nearly a third smaller.', { wt: .7 })],
+  dwarf: [crP('forgeddraw', 'Forged Draw', 'Hammered true: the weight\'s miss nearly a third smaller.', { wt: .7 }), crP('stoneread', 'Stone Read', 'Reads the ice like rock: the line\'s miss nearly a third smaller.', { line: .7 })],
+  ogre: [crP('thumpdraw', 'Thump Draw', 'Set down dead: the miss a little smaller.', { err: .85 }), crP('smash', 'Smash', 'All of it: the weight\'s miss nearly a third smaller, the line a little.', { wt: .7, line: .9 })],
+  minotaur: [crP('labline', 'Labyrinth Line', 'Knows the way in: the line\'s miss a fifth smaller.', { line: .8 }), crP('hornhit', 'Horned Hit', 'Head down at it: the miss a quarter smaller.', { err: .75 })],
+  troll: [crP('mossystone', 'Mossy Stone', 'Moss on the handle: the sweepers don\'t tire on it.', { legs: 0 }), crP('boulder', 'Boulder', 'A troll\'s stone: once at rest, a hit barely moves it.', { granite: 1 })],
+  golem: [crP('granitestone', 'Granite Stone', 'Once at rest it won\'t be moved: three times as heavy, for the end.', { granite: 1 }), crP('monohit', 'Monolith Hit', 'Unmoving hands: the miss a quarter smaller.', { err: .75 })],
+  harpy: [crP('gust', 'Gust', 'A gust as it settles: the other rink\'s stone nearest the button is pushed back 8 inches.', { gust: 8 }), crP('talon', 'Talon', 'Plucked and placed: the line\'s miss nearly a third smaller.', { line: .7 })],
+  elf: [crP('elveneye', 'Elven Eye', 'Sees every pebble: the miss nearly a third smaller.', { err: .7 }), crP('arrowline', 'Arrow Line', 'Like an arrow: the line\'s miss much smaller.', { line: .65 })],
+  wraith: [crP('smokestone', 'Smoke Stone', 'It slides through the first guard it meets like smoke.', { ghost: 1 }), crP('coldhand', 'Cold Hand', 'Nothing to lose: no pressure on it, and truer.', { nerve: 1, err: .85 })],
+  vampire: [crP('drain', 'Drain', 'Drinks the other rink\'s gallery: 20 of their roar, now.', null, null, { drain: 20 }), crP('bloodread', 'Blood Read', 'Smells the line: its miss a quarter smaller.', { line: .75 })],
+  lich: [crP('deadcalm', 'Dead Calm', 'No pressure on it, and truer.', { nerve: 1, err: .85 }), crP('graveline', 'Grave Line', 'Cold and certain: the line\'s miss a quarter smaller.', { line: .75 })],
+  zombie: [crP('shamble', 'Shamble', 'Slow and sure: the weight\'s miss a fifth smaller.', { wt: .8 }), crP('rothit', 'Rot Hit', 'It doesn\'t flinch: the miss a fifth smaller.', { err: .8 })],
+  gorgon: [crP('serpentline', 'Serpent Line', 'Snakes round the guard: the line\'s miss a fifth smaller.', { line: .8 }), crP('stare', 'Stare', 'A curse: the other rink\'s next stone turns stiff, and hardly curls.', null, { stiff: .6 })],
+  spider: [crP('eightlegs', 'Eight-Leg Sweep', 'Eight legs on the brooms: the sweepers do nearly a third more.', { sweep: 1.3 }), crP('silkline', 'Silk Line', 'On a thread: the line\'s miss a fifth smaller.', { line: .8 })],
+  skeleton: [crP('bonedry', 'Bone Dry', 'A dry, true stone: the miss a fifth smaller.', { err: .8 }), crP('rattle', 'Rattle', 'The house rattles as it settles: their stone nearest the button is pushed back 6 inches.', { gust: 6 })],
+  witch: [crP('broomstick', 'Broomstick', 'A witch\'s broom: the sweepers do a fifth more.', { sweep: 1.2 }), crP('frosthex', 'Frost Hex', 'A curse: frost on the other rink\'s next stone, and it drags heavy.', null, { heavy: 1.04 })],
+};
+// the second of each, picked on the Shed tab: [draw, hit]
+const CR_POW2 = {
+  goblin: [crP('pocketdraw', 'Pocket Draw', 'The weight\'s miss a fifth smaller.', { wt: .8 }), crP('jostle', 'Jostle', 'A curse: a goblin at their elbow (their next stone a third wilder).', null, { err: 1.3 })],
+  kobold: [crP('hothand', 'Hot Hand', 'The miss a fifth smaller.', { err: .8 }), crP('smokescreen', 'Smoke Screen', 'A curse: smoke over the sheet (their next stone a third wilder).', null, { err: 1.3 })],
+  werewolf: [crP('moonlit', 'Moonlit', 'The weight\'s miss a quarter smaller.', { wt: .75 }), crP('howl', 'Howl', 'A curse: a howl as they release (their next stone a quarter wilder).', null, { err: 1.25 })],
+  dwarf: [crP('steadyhands', 'Steady Hands', 'No pressure on it.', { nerve: 1 }), crP('lowline', 'Low Line', 'A straight, sure hit: the line\'s miss a fifth smaller, the weight a little.', { line: .8, wt: .9 })],
+  ogre: [crP('groundshake', 'Ground Shake', 'A curse: the ice shakes under their next stone (a quarter wilder).', null, { err: 1.25 }), crP('clubhit', 'Club Hit', 'The miss a fifth smaller.', { err: .8 })],
+  minotaur: [crP('charge', 'Charge', 'The weight\'s miss a fifth smaller.', { wt: .8 }), crP('bullline', 'Bull Line', 'The line\'s miss a quarter smaller.', { line: .75 })],
+  troll: [crP('regrow', 'Regrow', 'The sweepers don\'t tire on it, and it goes a little truer.', { legs: 0, err: .9 }), crP('grumble', 'Grumble', 'The miss a little smaller.', { err: .85 })],
+  golem: [crP('unmoved', 'Unmoved', 'No pressure on it.', { nerve: 1 }), crP('stonewall', 'Stone Wall', 'Once at rest, a hit barely moves it.', { granite: 1 })],
+  harpy: [crP('feather', 'Feather', 'The weight\'s miss a fifth smaller.', { wt: .8 }), crP('shriek', 'Shriek', 'A curse: a shriek as they release (their next stone a third wilder).', null, { err: 1.3 })],
+  elf: [crP('starlight', 'Starlight', 'The weight\'s miss nearly a third smaller.', { wt: .7 }), crP('leafline', 'Leaf Line', 'The line\'s miss a fifth smaller.', { line: .8 })],
+  wraith: [crP('fade', 'Fade', 'The miss a fifth smaller.', { err: .8 }), crP('chill', 'Chill', 'A curse: a chill on their next stone (it drags a little, and goes wilder).', null, { heavy: 1.03, err: 1.1 })],
+  vampire: [crP('batflight', 'Bat Flight', 'Bats on the brooms: the sweepers do more, and it goes a little truer.', { sweep: 1.15, err: .9 }), crP('thirst', 'Thirst', 'The miss a fifth smaller.', { err: .8 })],
+  lich: [crP('boneread', 'Bone Read', 'The miss a quarter smaller.', { err: .75 }), crP('wither', 'Wither', 'A curse: their next stone withers (a third wilder).', null, { err: 1.3 })],
+  zombie: [crP('groan', 'Groan', 'The miss a little smaller.', { err: .85 }), crP('deadweight', 'Dead Weight', 'Once at rest, a hit barely moves it.', { granite: 1 })],
+  gorgon: [crP('scaled', 'Scaled', 'The weight\'s miss a fifth smaller.', { wt: .8 }), crP('hiss', 'Hiss', 'A curse: a hiss as they release (their next stone a quarter wilder).', null, { err: 1.25 })],
+  spider: [crP('dropline', 'Drop Line', 'Lowered on a thread: the weight\'s miss nearly a third smaller.', { wt: .7 }), crP('webbed', 'Webbed', 'The line\'s miss nearly a third smaller.', { line: .7 })],
+  skeleton: [crP('grin', 'Grin', 'Nothing to lose: no pressure on it.', { nerve: 1 }), crP('hollowline', 'Hollow Line', 'The line\'s miss a little smaller.', { line: .85 })],
+  witch: [crP('charm', 'Charm', 'The miss a fifth smaller.', { err: .8 }), crP('brew', 'Brew', 'A brew that shows the line: the miss a quarter smaller.', { err: .75 })],
+};
+// the ultimate by kind: a mark on the end (own: its side's stones; rival: the other rink's)
+const crU = (id, n, desc, own, rival) => ({ id, n, desc, own: own || null, rival: rival || null });
+const CR_ULT = {
+  goblin: crU('mischief', 'Mischief', 'Goblins under the ice: the other rink\'s every stone this end a third wilder.', null, { err: 1.3 }),
+  kobold: crU('wildfire', 'Wildfire', 'The ice runs warm for you: your sweepers do a fifth more this end, and your stones go truer.', { sweep: 1.2, err: .9 }),
+  werewolf: crU('fullmoon', 'Full Moon', 'Under the full moon: your stones this end a fifth truer.', { err: .8 }),
+  dwarf: crU('mountainhall', 'Mountain Hall', 'Your four dig in: truer, and half the legs spent sweeping, this end.', { err: .85, legs: .5 }),
+  ogre: crU('earthquake', 'Earthquake', 'The ice heaves: the other rink\'s stones this end a third wilder.', null, { err: 1.3 }),
+  minotaur: crU('stampede', 'Stampede', 'The herd runs: your stones this end go truer, the weight most.', { err: .85, wt: .9 }),
+  troll: crU('trollbridge', 'Troll Bridge', 'Every stone of yours this end sets like a troll under a bridge: once at rest, a hit barely moves it.', { granite: 1 }),
+  golem: crU('monolith', 'Monolith', 'Set like stone: your stones this end a fifth truer, and steady.', { err: .8, nerve: 1 }),
+  harpy: crU('stormwing', 'Storm Wing', 'She owns the air: as your stones settle this end they push the other rink\'s back, and theirs go wild.', { gust: 6 }, { err: 1.15 }),
+  elf: crU('feysheet', 'Fey Sheet', 'The ice favours you: your stones this end a quarter truer.', { err: .75 }),
+  wraith: crU('haunting', 'Haunting', 'The Shed is haunted: the other rink\'s stones this end a quarter wilder.', null, { err: 1.25 }),
+  vampire: crU('eternalnight', 'Eternal Night', 'Night falls: your sweepers don\'t tire this end, and your stones go truer.', { legs: 0, err: .9 }),
+  lich: crU('phylactery', 'Phylactery', 'Death has no pressure: your stones this end steady, and truer.', { nerve: 1, err: .8 }),
+  zombie: crU('undying', 'Undying', 'The dead don\'t tire: your sweepers spend no legs this end, and the weight goes truer.', { legs: 0, wt: .85 }),
+  gorgon: crU('medusa', 'Medusa', 'Her gaze lies on the ice: the other rink\'s stones this end turn stiff, and hardly curl.', null, { stiff: .6 }),
+  spider: crU('greatweb', 'Great Web', 'Webs on every broom this end: your sweepers do nearly a third more, and your stones go truer.', { sweep: 1.3, err: .9 }),
+  skeleton: crU('bonepile', 'Bone Pile', 'Bones under the pebble: the other rink\'s stones this end drag, and go wilder.', null, { heavy: 1.03, err: 1.1 }),
+  witch: crU('coven', 'Coven', 'Thirteen witches over the ice: frost on the other rink\'s stones this end, and yours go truer.', { err: .9 }, { heavy: 1.04 }),
+};
+// situation powers: the team's, once a game each, for mana
+const CR_SIT = {
+  hammer: { id: 'hammer', n: 'The Hammer', cost: 1, desc: 'The end\'s last stone, with the hammer: a third truer.' },
+  steal: { id: 'steal', n: 'The Steal', cost: 1, desc: 'Your last stone of an end without the hammer, while you lie shot: a third truer.' },
+  extra: { id: 'extra', n: 'Extra End', cost: 1, desc: 'In an extra end: the stone\'s miss halved.' },
+};
+const CR_HIT = ['takeout', 'peel', 'hitroll'];
+const crPowOf = (kind, which, alt) => { const T = (alt ? CR_POW2 : CR_POW)[kind] || CR_POW.goblin; return T[which === 'draw' ? 0 : 1]; };
+
+function crPowersStart(o) {
+  G.powers = Array.isArray(o.powers) ? o.powers.some(Boolean) : !!o.powers;
+  G.powSides = Array.isArray(o.powers) ? o.powers.map(Boolean) : [G.powers, G.powers];
+  G.mana = [CR_MANA.start, CR_MANA.start]; G.roar = [0, 0]; G.fx = [null, null]; G.curse = [null, null]; G.mark = null;
+  G.ultUsed = [false, false]; G.sitUsed = [{}, {}]; G.sitOn = [null, null]; G.steadyOn = [false, false]; G.casts = []; G.powStone = [-1, -1];
+  G.powOnly = Array.isArray(o.powOnly) ? o.powOnly.map(x => x || null) : null;
+}
+// the shot side s is about to throw: the one a cast is weighed for, the page's call for your stone, the CPU's (or
+// Manage's) plan for the rest
+// (G.callNow: the shot a cast is being weighed for, set while the CPU casts)
+function crShotNow(s) {
+  if (G.callNow && G.callNow.s === s) return G.callNow.shot;
+  if (typeof GP !== 'undefined' && GP) {
+    if (GP.sel && GP.sel.shot && ['aim', 'swing'].includes(GP.ph) && crYours(s)) return GP.sel.shot;
+    if (GP.cpu && GP.cpu.s === s) return GP.cpu.plan.shot;
+  }
+  return 'draw';
+}
+// the everyday power curler ri of side s would cast on their next stone: the hit power for a hit, else the draw power
+function crPowNow(s, ri, shot) {
+  const m = G.teams[s].roster[ri == null ? crThrower(s) : ri]; if (!m || !G.powers) return null;
+  const which = CR_HIT.includes(shot || crShotNow(s)) ? 'hit' : 'draw', pw = m.pw || {}, P = crPowOf(m.kind, which, pw[which] === 1);
+  return Object.assign({ which }, P, { cost: P.curse ? CR_MANA.curse : CR_MANA.pow });
+}
+function crPowIdOf(s, k, ri) {
+  if (k === 'pow') { const P = crPowNow(s, ri); return P ? P.id : null; }
+  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? crThrower(s) : ri]; return (CR_ULT[m && m.kind] || CR_ULT.goblin).id; }
+  return k;
+}
+// side s lies shot (its stone nearest the button, in the house)
+function crLiesShot(s) { const h = G.stones.filter(crInHouse).sort((a, b) => crDist(a) - crDist(b)); return !!h.length && h[0].s === s; }
+// why a power can't be cast now ('' if it can)
+function crPowWhy(s, k, ri) {
+  if (!G || !G.powers || !G.powSides[s]) return 'No powers in this game.';
+  if (G.over) return 'The game is over.';
+  if (crUp() !== s) return 'Not your stone.';
+  if (G.powOnly && G.powOnly[s] && crPowIdOf(s, k, ri) !== G.powOnly[s]) return 'Not in this game.';
+  if (k === 'pow') { const P = crPowNow(s, ri); if (!P) return 'No power.'; if (G.powStone[s] === G.n) return 'One power a stone.'; return G.mana[s] < P.cost ? `It costs ${P.cost} mana.` : ''; }
+  if (k === 'ult') { if (G.ultUsed[s]) return 'Once a game.'; if (G.k > 1) return 'Only at the start of an end.'; if (G.mark && G.mark.end === G.end) return 'This end already bears a mark.'; return G.roar[s] < CR_ROAR.ult ? `It takes ${CR_ROAR.ult} roar.` : ''; }
+  if (k === 'steady') { if (G.steadyOn[s]) return 'Already steady.'; if (!crPressure(s)) return 'Only for the skip, in the last end.'; return G.roar[s] < CR_ROAR.steady ? `It takes ${CR_ROAR.steady} roar.` : ''; }
+  const S = CR_SIT[k]; if (!S) return 'No such power.';
+  if (G.sitUsed[s][k]) return 'Once a game.'; if (G.sitOn[s]) return 'One a stone.'; if (G.mana[s] < S.cost) return `It costs ${S.cost} mana.`;
+  const per = crPerEnd();
+  if (k === 'hammer') return G.hammer === s && G.k === per - 1 ? '' : 'Only on the end\'s last stone, with the hammer.';
+  if (k === 'steal') return G.hammer !== s && G.k === per - 2 && crLiesShot(s) ? '' : 'Only on your last stone of an end without the hammer, lying shot.';
+  if (k === 'extra') return G.end >= G.ends ? '' : 'Only in an extra end.';
+  return '';
+}
+// cast: k 'pow' (the thrower's), 'ult', 'steady' or a situation power. Returns '' or why not
+function crCast(s, k, ri) {
+  const r = ri == null ? crThrower(s) : ri, why = crPowWhy(s, k, r); if (why) return why;
+  const name = (G.teams[s].roster[r] || {}).n || 'Someone', rec = (id, n) => G.casts.push({ side: s, k, id, n, ri: r, end: G.end + 1, stone: G.n });
+  if (k === 'pow') {
+    const P = crPowNow(s, r); G.mana[s] -= P.cost; G.powStone[s] = G.n;
+    if (P.curse) G.curse[1 - s] = Object.assign({}, P.curse, { by: P.n });
+    else if (P.now && P.now.drain) { const d = Math.min(G.roar[1 - s], P.now.drain); G.roar[1 - s] -= d; G.roar[s] = Math.min(CR_ROAR.max, G.roar[s] + d); }
+    else G.fx[s] = Object.assign({}, P.fx, { n: P.n });
+    rec(P.id, P.n); return '';
+  }
+  if (k === 'ult') {
+    const m = G.teams[s].roster[r], U = CR_ULT[m.kind] || CR_ULT.goblin;
+    G.roar[s] -= CR_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, end: G.end, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
+    rec(U.id, U.n); return '';
+  }
+  if (k === 'steady') { G.roar[s] -= CR_ROAR.steady; G.steadyOn[s] = true; rec('steady', 'Steady'); return ''; }
+  const S = CR_SIT[k]; G.mana[s] -= S.cost; G.sitUsed[s][k] = true; G.sitOn[s] = { id: k };
+  rec(k, S.n); return '';
+}
+// what side s's next stone has: its power, the end's mark, a curse on it, a situation power, the roar's steadying
+function crFxFor(s) {
+  const f = Object.assign({}, CR_FX0);
+  if (!G || !G.powers) return f;
+  const add = x => { if (!x) return; for (const k in x) { if (!(k in CR_FX0)) continue; if (CR_FX_MUL.has(k)) f[k] *= x[k]; else f[k] = Math.max(f[k], x[k]); } };
+  add(G.fx[s]); add(G.curse[s]);
+  const M = G.mark; if (M && M.end === G.end) add(M.side === s ? M.own : M.rival);
+  const si = G.sitOn[s]; if (si) add(si.id === 'extra' ? { err: .5 } : { err: .67 });
+  if (G.steadyOn[s]) f.nerve = 1;
+  return f;
+}
+// as the thrown stone comes to rest (before the rules): a gust pushes the other rink's stone nearest the button back
+function crGust(s, stones, f) {
+  if (!f || !f.gust) return '';
+  const R = CR_SHEET.stoneR, theirs = stones.filter(b => b.s !== s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b))[0]; if (!theirs) return '';
+  const d = crDist(theirs) || 1, ux = d > .5 ? theirs.x / d : 0, uy = d > .5 ? theirs.y / d : 1, to = { x: +(theirs.x + ux * f.gust).toFixed(2), y: +(theirs.y + uy * f.gust).toFixed(2) };
+  if (!crOnSheet(to) || stones.some(o => o !== theirs && Math.hypot(o.x - to.x, o.y - to.y) < 2 * R)) return '';
+  theirs.x = to.x; theirs.y = to.y; return f.gust;
+}
+// after side s's stone: what it spent goes; the mana and the roar it earned come in; the mark ends with its end
+function crPowersAfter(s, ev, endNo, ham) {
+  if (!G.powers) return;
+  G.fx[s] = null; G.curse[s] = null; G.steadyOn[s] = false; G.sitOn[s] = null;
+  const mana = (k, n) => { G.mana[k] = Math.min(CR_MANA.max, G.mana[k] + n); }, roar = (k, n) => { G.roar[k] = Math.min(CR_ROAR.max, G.roar[k] + n); };
+  if (ev.made) { mana(s, CR_MANA.made); roar(s, CR_ROAR.made); }
+  if ((ev.out || []).filter(id => id !== 'new' && !String(id).startsWith(s + ':')).length >= 2) roar(s, CR_ROAR.double);
+  const e = ev.rule && ev.rule.end;
+  if (e && e.s >= 0) {
+    mana(e.s, CR_MANA.end + (e.n >= 2 ? CR_MANA.two : 0) + (e.s !== ham ? CR_MANA.steal : 0));
+    roar(e.s, (e.n >= 3 ? CR_ROAR.big : e.n >= 2 ? CR_ROAR.two : 0) + (e.s !== ham ? CR_ROAR.steal : 0));
+  }
+  if (G.mark && G.mark.end !== G.end) G.mark = null;
+}
+// the CPU's powers before its stone (and yours under Auto in Manage), by skill, on the shot it has called. Returns the
+// casts' names, or []
+function crCpuPower(s, shot) {
+  if (!G.powers || !G.powSides[s] || G.over) return [];
+  const sk = G.skill[s], ri = crThrower(s), o = 1 - s, late = G.end >= G.ends - 2, gap = crTotal(o) - crTotal(s), p = crPressure(s), out = [], keep = G.callNow;
+  G.callNow = { s, shot };
+  try {
+    const tryCast = k => { if (!crCast(s, k, ri)) out.push(G.casts[G.casts.length - 1].n); };
+    if (sk >= 1) for (const k of ['extra', 'hammer', 'steal']) if (!crPowWhy(s, k)) tryCast(k);
+    if (!crPowWhy(s, 'ult', ri) && (sk === 0 ? R() < .5 : sk === 1 ? gap > 0 || late : (gap > 0 && late) || G.end >= G.ends - 1 || (G.hammer === s && gap >= 0 && late))) tryCast('ult');
+    if (sk >= 1 && p && !crPowWhy(s, 'steady') && crRat(s, ri).nrv < .7 && G.roar[s] >= CR_ROAR.steady + (sk >= 2 && !G.ultUsed[s] ? CR_ROAR.ult : 0)) tryCast('steady');
+    const P = crPowNow(s, ri, shot); if (!P || crPowWhy(s, 'pow', ri)) return out;
+    // (a stone worth it: the skip's and the third's, or any stone late in a close game)
+    const big = crPos(s) >= 2 || (late && Math.abs(gap) <= 2);
+    const go = sk === 0 ? R() < .3 : sk === 1 ? big && G.mana[s] >= P.cost + 1 : (big || p > 0 || gap > 0) && G.mana[s] >= P.cost;
+    if (go) tryCast('pow');
+    return out;
+  } finally { G.callNow = keep; }
+}
+// the bench's tip for your stone ('' when nothing stands out)
+function crPowerTip(s) {
+  if (!G.powers) return '';
+  const ri = crThrower(s), P = crPowNow(s, ri);
+  if (!crPowWhy(s, 'hammer')) return 'Tip: the end\'s last stone, with the hammer: the Hammer makes it a third truer.';
+  if (!crPowWhy(s, 'steal')) return 'Tip: you lie shot without the hammer: the Steal makes this stone a third truer.';
+  if (!crPowWhy(s, 'extra')) return 'Tip: an extra end; Extra End halves this stone\'s miss.';
+  if (crPressure(s) && !crPowWhy(s, 'steady') && crRat(s, ri).nrv < .6) return `Tip: the game hangs on this stone; ${CR_ROAR.steady} roar steadies it.`;
+  if (P && !crPowWhy(s, 'pow', ri)) {
+    if (P.fx && P.fx.ghost && G.stones.some(crInFgz)) return `Tip: a guard in the way; ${P.n} slides through it.`;
+    if (P.fx && P.fx.gust && G.stones.some(b => b.s !== s && crInHouse(b))) return `Tip: ${P.n} pushes their stone nearest the button back.`;
+    if (P.fx && P.fx.granite && !CR_HIT.includes(crShotNow(s))) return `Tip: ${P.n} sets your stone like granite: hard to take out.`;
+    if (P.curse) return `Tip: ${P.n} works on their next stone.`;
+  }
+  if (!crPowWhy(s, 'ult', ri)) { const U = CR_ULT[G.teams[s].roster[ri].kind] || CR_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this end.`; }
+  return '';
+}
 /* The Shed's page in the Realm (issue #102, phase 2). A canvas in #v-shed, after the Lanes', and a frame loop that runs
    only while it is on screen (show/hide): it moves the game on (crTick) and draws it (crDraw), at the screen's density.
    The engine's parts don't touch the page; this file is the only one that does.
@@ -40778,6 +41048,8 @@ function crKeyDown(e) {
   else if (k === 'o') crSelSay(crSelect({ h: 1 }));
   else if (CR_SHOT_KEYS[k]) crSelSay(crSelect({ shot: CR_SHOT_KEYS[k] }));
   else if (k === 'g') crSelSay(crSelect({ suggest: true }));
+  // P, U, K: your power, the ultimate, Steady (13-powers.js)
+  else if (G.powers && (k === 'p' || k === 'u' || k === 'k')) { const why = crCastMine(k === 'p' ? 'pow' : k === 'u' ? 'ult' : 'steady'); if (why) GP.msg = why; if (CR_HOOK.onPick) try { CR_HOOK.onPick(); } catch (er) { console.error(er); } }
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
 }
@@ -40857,7 +41129,9 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    every stone's path this game, paths their count); onChart hears C.
    Phase 5 is games from the world: start({ hall: true }) gives the Shed's ways (hallRules: the frost, the sprites,
    Hennock's pebble; frostAt(x)); modes add manage (manage({ style: 'auto' | 'draw' | 'hit' }), mgr); snapshot() and
-   resume(sn) keep a match between stones (plain JSON). */
+   resume(sn) keep a match between stones (plain JSON).
+   Phase 6 is powers: start({ powers: true | [yours, theirs], powOnly }) (pow, pow2, ult, sit: the tables; manaRules,
+   roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -40885,6 +41159,11 @@ return {
   endValue: (s, pts, next, sk) => G && G.teams ? crEndValue(s, pts, next, sk) : 0, reason: (s, c) => G && G.teams ? crReason(s, c) : '', readIn: s => G && G.teams ? crReadIn(s) : 0,
   chart: (cv, s) => { if (!G || !G.teams || !cv) return false; const c = cv.getContext('2d'); crChart(c, s, cv.width, cv.height, GP ? GP.paths : []); return true; }, get paths() { return GP ? GP.paths.length : 0; },
   set onChart(f) { CR_HOOK.onChart = f; }, get onChart() { return CR_HOOK.onChart; },
+  // powers (phase 6)
+  pow: CR_POW, pow2: CR_POW2, ult: CR_ULT, sit: CR_SIT, manaRules: CR_MANA, roarRules: CR_ROAR, fx0: CR_FX0, granite: CR_GRANITE,
+  powNow: (s, ri, shot) => G && G.powers ? crPowNow(s, ri, shot) : null, powWhy: (s, k, ri) => crPowWhy(s, k, ri), cast: (s, k, ri) => crCast(s, k, ri), castMine: k => crCastMine(k),
+  fxFor: s => crFxFor(s), cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
+  get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   // games from the world (phase 5)
   hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
@@ -58558,7 +58837,9 @@ function wShedGame(opts) {
   const o = opts || {};
   WCR = { over: null };
   $('wShedTitle').textContent = o.title || 'A game at the Curling Shed';
-  wCR.start({ teams: o.teams || wShedTeams(), ends: o.ends || wShedEnds(), seed: o.seed, mode: o.mode || W_SHED_MODE, cold: o.cold || 'mid', skill: o.skill || [1, W_SHED_SKILL], hammer: o.hammer });
+  // (anything else the game is given goes through to the engine: the Shed's ways, powers, and what later parts add)
+  const { title, ...rest } = o;
+  wCR.start(Object.assign({}, rest, { teams: o.teams || wShedTeams(), ends: o.ends || wShedEnds(), seed: o.seed, mode: o.mode || W_SHED_MODE, cold: o.cold || 'mid', skill: o.skill || [1, W_SHED_SKILL], hammer: o.hammer }));
   showView('shed');
   wShedBarNote(); wShedRows(); wShedBoard();
 }
@@ -59033,7 +59314,7 @@ function wStartShed(o) {
   B.live = { world, snap: null };
   // (your own Shed mode, back when the match is settled or you leave: wShedModeBack)
   if (how !== 'sim' && WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
-  const opts = { teams: [mine, opp], skill: wShedSkillOf(tier), ends: wShedEnds(), cold, hall: true, hammer: Math.random() < .5 ? 0 : 1 };
+  const opts = { teams: [mine, opp], skill: wShedSkillOf(tier), ends: wShedEnds(), cold, hall: true, powers: true, hammer: Math.random() < .5 ? 0 : 1 };
   if (how === 'sim') { const s = wCR.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts)); wShedResultCard(wShedSettle(s)); return ''; }
   wShedGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WCR.world = true;
@@ -59288,6 +59569,83 @@ renderHelp = function () {
   wW125RenderHelp();
   const after = $('wHelpShedTab'); if (!after || $('wHelpShedGame')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedGame"><b>Curling matches.</b> Brush Hennock's MATCH, or Curl a match on the Shed tab: your four against a club at your tier, once a day each, in Play, Manage or Simulate. A win pays XP, gold and fans by the tier; a loss pays a quarter of the XP and costs nothing else. Save and leave keeps the match for later.</p>`);
+};
+/* w126: powers at the Shed (issue #102, phase 6), as w117 is the Lanes'. Every game at the Shed has the monster powers
+   (13-powers.js): team mana from shots made and ends scored; each curler's draw power and hit power (one of two each,
+   picked on the Shed tab: p.crPw { draw, hit }, 0 or 1); one ultimate a game for the roar, which marks the end; Steady
+   for the skip in the last end; and the situation powers (the Hammer, the Steal, Extra End). The CPU casts by its skill.
+   Your stone's rows gain Powers: mana and the roar, the thrower's power for the shot called (P), the ultimate (U),
+   Steady (K), the situation powers that fit, and the bench's tip. In Manage, Auto powers lets your captain cast for you.
+   The end board says the end's mark.
+   Wraps: wShedGame (wW126ShedGame: powers on), wShedPlayer (wW126ShedPlayer: the curler's two powers), wFourCrRow
+   (wW126FourCrRow: the power picks), wRenderCamp (wW126RenderCamp: the picks' changes), wShedRows (wW126ShedRows: the
+   Powers row and Auto powers), wShedBoard (wW126ShedBoard: the mark), wShedHowHTML (wW126ShedHow: powers), renderHelp
+   (wW126RenderHelp: #wHelpShedPowers). */
+
+const wW126ShedGame = wShedGame;
+wShedGame = function (opts) { return wW126ShedGame(Object.assign({ powers: true }, opts || {})); };
+const wW126ShedPlayer = wShedPlayer;
+wShedPlayer = function (p) { const m = wW126ShedPlayer(p); m.pw = { draw: p.crPw && p.crPw.draw === 1 ? 1 : 0, hit: p.crPw && p.crPw.hit === 1 ? 1 : 0 }; return m; };
+function wCrSetPw(k, which, v) { const p = wFourCrWho(k); if (!p || (which !== 'draw' && which !== 'hit')) return ''; p.crPw = Object.assign({ draw: 0, hit: 0 }, p.crPw, { [which]: v === 1 ? 1 : 0 }); wSave(); return ''; }
+// the two a curler of this kind picks between, for a draw or a hit
+const wCrPowPair = (kind, which) => [wCR.pow, wCR.pow2].map(T => (T[kind] || T.goblin)[which === 'draw' ? 0 : 1]);
+
+const wW126FourCrRow = wFourCrRow;
+wFourCrRow = function (k, C) {
+  const html = wW126FourCrRow(k, C), p = wFourCrWho(k); if (!p) return html;
+  const sel = ['draw', 'hit'].map(w => { const [a, b] = wCrPowPair(p.kind, w), cur = p.crPw && p.crPw[w] === 1 ? 1 : 0;
+    return `<label class="wsvl" title="${esc(`${a.n}: ${a.desc} / ${b.n}: ${b.desc}`)}">${w === 'draw' ? 'Draw power' : 'Hit power'} <select data-crpw="${w}" aria-label="${esc(p.n)}'s ${w} power"><option value="0"${cur ? '' : ' selected'}>${esc(a.n)}</option><option value="1"${cur ? ' selected' : ''}>${esc(b.n)}</option></select></label>`; }).join('');
+  return html.replace(/(<label class="wsvl">Position[\s\S]*?<\/label>)/, `$1${sel}`);
+};
+const wW126RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW126RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'shed') return;
+  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^\d+$/.test(k) ? +k : k; };
+  body.querySelectorAll('[data-crpw]').forEach(s => s.onchange = () => wCampSay(wCrSetPw(keyOf(s), s.dataset.crpw, +s.value)));
+};
+
+// your stone's Powers row, and Manage's Auto powers
+$('wShedRows').insertAdjacentHTML('afterend', '<div id="wShedPowRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Powers</span><span id="wShedPow"></span></div></div>');
+$('wShedPowRow').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.crpow) { const why = wCR.castMine(b.dataset.crpow); if (why) $('wShedNote').textContent = why; else wShedBarNote(); wShedRows(); }
+  else if (b.dataset.crauto) { wCR.autoPow = !wCR.autoPow; wShedRows(); }
+});
+const wW126ShedRows = wShedRows;
+wShedRows = function () {
+  wW126ShedRows();
+  const V = WCR && !WCR.over && wCR.G && wCR.G.teams ? wCR.view : null, G = wCR.G, row = $('wShedPowRow');
+  const mine = !!V && V.mode === 'play' && V.ph === 'aim' && V.up === V.you, mgr = !!V && V.mode === 'manage';
+  row.hidden = !(mine || mgr) || !G.powers;
+  if (row.hidden) return;
+  const s = V.you, ri = mine ? null : V.up === s ? V.thrower : G.order[s][0], P = wCR.powNow(s, ri), btn = (k, label, title) => { const why = wCR.powWhy(s, k, ri); return `<button class="ghost" data-crpow="${k}" ${why || !mine ? 'disabled' : ''} title="${esc(why ? `${title} (${why})` : title)}">${esc(label)}</button>`; };
+  const who = G.teams[s].roster[ri == null ? V.thrower : ri] || {}, U = wCR.ult[who.kind] || wCR.ult.goblin, sits = mine ? Object.keys(wCR.sit).filter(k => !wCR.powWhy(s, k)) : [];
+  const tip = mine ? wCR.tip(s) : '', R = wCR.roarRules;
+  $('wShedPow').innerHTML = `<small class="hint" title="Mana: shots made and ends scored fill it. The roar: the gallery fills it on shots made, double takeouts, twos, big ends and steals.">Mana <b>${G.mana[s]}</b>/${wCR.manaRules.max} · Roar <b>${G.roar[s]}</b></small> `
+    + (mine ? (P ? btn('pow', `${P.n} (${P.cost})`, `P: ${P.desc} For ${P.which === 'hit' ? 'a hit' : 'a draw, a guard or a freeze'}: change the shot and the power changes with it.`) : '') + ' ' + btn('ult', `${U.n} (ultimate)`, `U: ${U.desc} Takes ${R.ult} roar, once a game, at the start of an end.`) + ' ' + btn('steady', 'Steady', `K: ${R.steady} roar: no pressure on the skip's stone, in the last end.`) + sits.map(k => ' ' + btn(k, wCR.sit[k].n, wCR.sit[k].desc)).join('') : '')
+    + (mgr ? ` <button class="ghost${wCR.autoPow ? ' on' : ''}" data-crauto="1" title="Your captain casts your side's powers by the moment, as a Knight would">Auto powers</button>` : '')
+    + (tip ? ` <small class="hint">${esc(tip)}</small>` : '');
+};
+// the end's mark, on the end board
+const wW126ShedBoard = wShedBoard;
+wShedBoard = function () {
+  wW126ShedBoard();
+  const G = wCR.G, el = $('wShedBoard'); if (!el || !G || !G.teams || !G.powers) return;
+  const M = G.mark && G.mark.end === G.end ? G.mark : null, old = el.querySelector('.wshedmark'); if (old) old.remove();
+  if (M) el.insertAdjacentHTML('beforeend', `<p class="hint wshedmark"><b>${esc(M.n)}</b> marks this end (${esc(G.teams[M.side].name)}, cast by ${esc(M.by)}).</p>`);
+};
+
+const wW126ShedHow = wShedHowHTML;
+wShedHowHTML = function () {
+  return wW126ShedHow() + `<p class="hint"><b>Powers.</b> Every kind has its own magic: a <b>draw power</b> (for a draw, a guard or a freeze) and a <b>hit power</b> (for a takeout, a peel or a hit and roll), and a second of each to pick on the Shed tab. The thrower casts theirs before their stone (P) for team <b>mana</b>, which shots made and ends scored fill. Most make the stone truer or the sweepers stronger; a golem's granite stone won't be moved once it is at rest, a wraith's smoke stone slides through a guard, a harpy's gust pushes their stone back from the button, and some are curses on the other rink's next stone: a witch's frost hex makes it drag heavy, a gorgon's stare makes it stiff.</p>
+  <p class="hint"><b>The roar</b> fills on shots made, double takeouts, twos, big ends and most on a steal. It pays for the curler's <b>ultimate</b> (U), once a game at the start of an end: it marks the whole end, for your stones or against theirs. Or it steadies the skip's stone in the last end (K). <b>Situation powers</b>, once a game each: the Hammer (the end's last stone, with the hammer), the Steal (your last stone without it, lying shot) and Extra End. In Manage, <b>Auto powers</b> lets your captain cast for you.</p>`;
+};
+const wW126RenderHelp = renderHelp;
+renderHelp = function () {
+  wW126RenderHelp();
+  const after = $('wHelpShedGame'); if (!after || $('wHelpShedPowers')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedPowers"><b>Powers on the ice.</b> Every curler brings a draw power and a hit power (picked on the Shed tab), cast before their stone for team mana; one ultimate a game marks an end; Steady, the Hammer, the Steal and Extra End fit their moments. See Curling: how it works.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

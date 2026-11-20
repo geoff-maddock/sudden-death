@@ -67,6 +67,8 @@ function crKeyDown(e) {
   else if (k === 'o') crSelSay(crSelect({ h: 1 }));
   else if (CR_SHOT_KEYS[k]) crSelSay(crSelect({ shot: CR_SHOT_KEYS[k] }));
   else if (k === 'g') crSelSay(crSelect({ suggest: true }));
+  // P, U, K: your power, the ultimate, Steady (13-powers.js)
+  else if (G.powers && (k === 'p' || k === 'u' || k === 'k')) { const why = crCastMine(k === 'p' ? 'pow' : k === 'u' ? 'ult' : 'steady'); if (why) GP.msg = why; if (CR_HOOK.onPick) try { CR_HOOK.onPick(); } catch (er) { console.error(er); } }
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
 }

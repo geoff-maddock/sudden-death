@@ -70,8 +70,9 @@ function crPressure(s) {
 const crNerveK = (p, nrv) => 1 + CR_REACH.nrv * p * (1 - clamp(nrv, 0, 1));
 // how much side s's curler misses by, times the skill's: { ang (the line), v (the weight: a draw's touch, or a hit's) }
 function crErrK(s, shot) {
-  const ri = crThrower(s), r = crRat(s, ri), nk = crNerveK(crPressure(s), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
-  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk };
+  // (and the stone's powers: truer, or wilder under a curse; no pressure with nerve: 13-powers.js)
+  const f = crFxFor(s), ri = crThrower(s), r = crRat(s, ri), nk = crNerveK(f.nerve ? 0 : crPressure(s), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
+  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk * f.err * f.line, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk * f.err * f.wt };
 }
 // the legs are fresh at the start of an end
 function crLegsNewEnd() { if (G) G.legs = [1, 1]; }

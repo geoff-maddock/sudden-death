@@ -21,7 +21,7 @@ const CR_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
 function crPlayStart(o) {
-  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null, paths: [], mgr: { style: 'auto' } };
+  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null, paths: [], mgr: { style: 'auto' }, autoPow: false };
   crGo('next');
   return GP;
 }
@@ -155,6 +155,8 @@ function crSettle() {
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
+  if (ev.ghost) say += ' It slid through the guard like smoke.';
+  if (ev.gust) say += ` A gust pushes their stone back ${ev.gust} inches.`;
   if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
   crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
@@ -177,9 +179,11 @@ function crPlayNext() {
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
   if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
-  const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s }), rel = crMiss(s, plan.aim, plan.shot);
+  const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
+  // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
+  const cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel };
-  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.`);
+  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;
@@ -190,6 +194,12 @@ function crSetMode(m) {
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
   // (a stone of the CPU's called for your side, as you take it back: yours to throw)
   if (m === 'play' && GP.ph === 'addr' && GP.cpu && GP.cpu.s === GP.you) { GP.cpu = null; crGo('next'); }
+}
+// your cast before your stone (P the thrower's power, U the ultimate, K Steady, or a situation power): '' or why not
+function crCastMine(k) {
+  if (!GP || GP.mode !== 'play' || !['aim', 'swing'].includes(GP.ph) || (GP.meter && GP.meter.st === 'gone') || !crYours(crUp())) return 'Only before your stone.';
+  const why = crCast(GP.you, k); if (why) return why;
+  const c = G.casts[G.casts.length - 1]; GP.msg = `${crName(GP.you, c.ri)} casts ${c.n}.`; crPick(); return '';
 }
 // Manage: your rink's game ({ style: 'auto' | 'draw' | 'hit' })
 function crManage(o) { if (!GP) return false; if (['auto', 'draw', 'hit'].includes(o && o.style)) GP.mgr.style = o.style; crPick(); return true; }

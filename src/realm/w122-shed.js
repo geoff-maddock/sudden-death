@@ -103,7 +103,9 @@ function wShedGame(opts) {
   const o = opts || {};
   WCR = { over: null };
   $('wShedTitle').textContent = o.title || 'A game at the Curling Shed';
-  wCR.start({ teams: o.teams || wShedTeams(), ends: o.ends || wShedEnds(), seed: o.seed, mode: o.mode || W_SHED_MODE, cold: o.cold || 'mid', skill: o.skill || [1, W_SHED_SKILL], hammer: o.hammer });
+  // (anything else the game is given goes through to the engine: the Shed's ways, powers, and what later parts add)
+  const { title, ...rest } = o;
+  wCR.start(Object.assign({}, rest, { teams: o.teams || wShedTeams(), ends: o.ends || wShedEnds(), seed: o.seed, mode: o.mode || W_SHED_MODE, cold: o.cold || 'mid', skill: o.skill || [1, W_SHED_SKILL], hammer: o.hammer }));
   showView('shed');
   wShedBarNote(); wShedRows(); wShedBoard();
 }

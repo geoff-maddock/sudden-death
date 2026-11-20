@@ -20,18 +20,20 @@ const CR_STONE = { y0: -1116, a: 9, curl: .28, vc: 34, sweepMu: .16, sweepCurl: 
 // the stone's acceleration on the ice: friction against its motion, and the curl across it
 function crAccel(st, ice, cold, sw) {
   const v = Math.hypot(st.vx, st.vy); if (v < 1e-6) return [0, 0];
-  const mu = crIceAt(ice, st.x, st.y, cold) * (1 - CR_STONE.sweepMu * sw), ux = st.vx / v, uy = st.vy / v;
-  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y));
+  // (a cursed stone drags heavy, or turns stiff and hardly curls: its own drag and curl, 13-powers.js)
+  const mu = crIceAt(ice, st.x, st.y, cold) * (st.drag || 1) * (1 - CR_STONE.sweepMu * sw), ux = st.vx / v, uy = st.vy / v;
+  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y)) * (st.curlK || 1);
   // (the curl is across the motion: to the left of it for h = +1, and x is plus to the thrower's left, so the left of a
   // stone going (ux, uy) is (uy, -ux))
   return [-CR_STONE.a * mu * ux + lat * uy, -CR_STONE.a * mu * uy - lat * ux];
 }
-// two stones touch: trade momentum along the line between them (equal mass, restitution e)
+// two stones touch: trade momentum along the line between them (restitution e; a granite stone, g, is CR_GRANITE times
+// as heavy as an ordinary one: 13-powers.js)
 function crCollide(a, b) {
   const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-6, nx = dx / d, ny = dy / d;
   const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny; if (rel <= 0) return false;
-  const j = (1 + CR_STONE.e) / 2 * rel;
-  a.vx -= j * nx; a.vy -= j * ny; b.vx += j * nx; b.vy += j * ny;
+  const ma = a.g ? CR_GRANITE : 1, mb = b.g ? CR_GRANITE : 1, j = (1 + CR_STONE.e) * rel / (1 / ma + 1 / mb);
+  a.vx -= j / ma * nx; a.vy -= j / ma * ny; b.vx += j / mb * nx; b.vy += j / mb * ny;
   // pull them apart to just touching
   const over = 2 * CR_SHEET.stoneR - d; if (over > 0) { a.x -= nx * over / 2; a.y -= ny * over / 2; b.x += nx * over / 2; b.y += ny * over / 2; }
   b.h = (b.h || 0) * .5 + (a.h || 0) * CR_STONE.keepCurl * .6; a.h = (a.h || 0) * .5; return true;
@@ -45,8 +47,10 @@ function crCollide(a, b) {
    it one step (sweep: how hard it is swept now, or opts.sweep's), crRunTo moves it on to a time, crRunEnd gives the
    result. The steps are the same however the run is driven, so the page's stone and the sim's go the same way. */
 function crRunInit(stones, th, opts) {
-  const O = opts || {}, a = th.ang * Math.PI / 180, S = stones.map(st => ({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }));
-  const T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
+  const O = opts || {}, a = th.ang * Math.PI / 180, S = stones.map(st => Object.assign({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }, st.g ? { g: 1 } : {}));
+  // (opts.fx: the thrown stone's powers, 13-powers.js: a curse's drag and stiffness, granite, smoke through a guard)
+  const F = O.fx || null, T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
+  if (F) { if (F.heavy && F.heavy !== 1) T.drag = F.heavy; if (F.stiff && F.stiff !== 1) T.curlK = F.stiff; if (F.granite) T.g = 1; if (F.ghost) T.ghost = 1; }
   S.push(T);
   return { O, S, T, dt: O.plan ? CR_STONE.planDt : CR_STONE.dt, maxT: O.maxT || 60, path: [], trace: [], out: [], t: 0, hits: 0, nextTr: 0, sw: 0, done: false };
 }
@@ -60,10 +64,10 @@ function crRunStep(Q, sweep) {
   // (without legs, a caller's own sweep may run to 1.5, as a good fresh pair's does)
   const legs = !!O.legs && O.side != null && !!G && !!G.teams;
   const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, legs ? 1 : 1.5) : 0;
-  const sw = ask && legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
+  const fxs = O.fx && O.fx.sweep != null ? O.fx.sweep : 1, sw = ask && legs ? clamp(ask * crSweepEff(O.side) * fxs, 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
-  if (ask && legs) crLegsBurn(O.side, ask, dts);
+  if (ask && legs) crLegsBurn(O.side, ask * (O.fx && O.fx.legs != null ? O.fx.legs : 1), dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
@@ -77,6 +81,8 @@ function crRunStep(Q, sweep) {
   // contacts (only between stones that could touch: one of them moving)
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
     const p = L[i], q = L[j]; if (!(p.vx || p.vy || q.vx || q.vy)) continue;
+    // (a smoke stone slides through the first guard it meets, and that one only)
+    if (T.ghost && (p === T || q === T)) { const o = p === T ? q : p; if (T.ghostId === o.id) continue; if (!T.ghostId && !o.vx && !o.vy && crInFgz(o) && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R) { T.ghostId = o.id; continue; } }
     if (Math.abs(p.x - q.x) < 2 * R && Math.abs(p.y - q.y) < 2 * R && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R) {
       const [m, n] = (p.vx || p.vy) && Math.hypot(p.vx, p.vy) >= Math.hypot(q.vx, q.vy) ? [p, q] : [q, p];
       if (crCollide(m, n)) Q.hits++;
@@ -98,8 +104,10 @@ function crRunEnd(Q) {
   const P = path[path.length - 1]; if (!P || P[0] !== +T.x.toFixed(1) || P[1] !== +T.y.toFixed(1)) path.push([+T.x.toFixed(1), +T.y.toFixed(1), +(Q.swMax || 0).toFixed(2)]);
   // the thrown stone must pass the far hog line, unless it hit a stone in play
   if (!T.out && !crPastHog(T) && !Q.hits) { T.out = true; Q.out.push(T.id); }
+  // (a smoke stone that came to rest inside the guard it slid through goes on just past it)
+  const gh = T.ghostId && S.find(st => st.id === T.ghostId && !st.out); if (!T.out && gh) { let n = 0; while (Math.hypot(T.x - gh.x, T.y - gh.y) < 2 * CR_SHEET.stoneR && n++ < 40) T.y += 1; }
   if (!O.plan) Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]);
-  const rest = S.filter(st => !st.out).map(st => ({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }));
+  const rest = S.filter(st => !st.out).map(st => Object.assign({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }, st.g ? { g: 1 } : {}));
   Q.done = true;
   return (Q.result = { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } });
 }

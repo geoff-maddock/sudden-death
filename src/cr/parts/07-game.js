@@ -24,7 +24,7 @@ function crStart(opts) {
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
-  crShedStart(o);
+  crShedStart(o); crPowersStart(o);
   GB = null;
   return G;
 }
@@ -48,6 +48,8 @@ function crMade(plan, before, after, run) {
 function crTurn(style) {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s, style || null), { s });
+  // (the CPU's powers on the shot it has called, before the release: they make the stone truer, or the sweepers stronger)
+  crCpuPower(s, plan.shot);
   return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
@@ -61,8 +63,8 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out; a
   // number is a steady ask)
   if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
-  const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s });
-  const X = { s, plan, rel, Q, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const fx = crFxFor(s), Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
+  const X = { s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
 // a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed
@@ -73,6 +75,8 @@ function crThrowFinish(X) {
   // (a stone refused here gives back the legs its sweeping spent: nothing changed)
   const why = crWhyNot(X.s); if (why) { G.legs = X.legs0; return crRefused(X.s, why); }
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
+  // (a gust as the stone settles pushes their stone nearest the button back, before the rules look)
+  const gust = crGust(s, run.stones, X.fx);
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
@@ -85,7 +89,8 @@ function crThrowFinish(X) {
   // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
-  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule };
+  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust, ghost: X.Q.T.ghostId || null };
+  crPowersAfter(s, ev, endNo, ham);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
   return ev;
