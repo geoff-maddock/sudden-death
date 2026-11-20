@@ -73,6 +73,11 @@ async def main():
           n0 = n(); drag(() => doPetTrick()); out.trick = n() - n0;
           n0 = n(); drag(null, 'pointercancel'); out.cancel = [n() - n0, UI.sel];
           n0 = n(); drag(null, 'blur'); out.blur = [n() - n0, UI.sel];
+          // (a mouse let go outside the frame: its next move, with no button held, ends the drag)
+          n0 = n(); (() => { const el = document.querySelector('#hand .card[data-i="1"]'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+            el.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 3, pointerType: 'mouse', buttons: 1 })); window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 150, pointerId: 3, pointerType: 'mouse', buttons: 1 }));
+            window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 200, pointerId: 3, pointerType: 'mouse', buttons: 0 })); window.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y - 300, pointerId: 3, pointerType: 'mouse' })); })();
+          out.outside = [n() - n0, UI.sel];
           // (and a real click after all that selects a card at once)
           out.hoverCard = UI.hoverCard;
           // (a late click, a phone's tap, 50 ms after a drop: still ignored; a press starts afresh, and its click works)
@@ -80,7 +85,7 @@ async def main():
           return new Promise(res => setTimeout(() => { el4.click(); out.late = [n() - n0, UI.sel]; const el3 = document.querySelector('#hand .card[data-i="0"]'); el3.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, pointerId: 2 })); window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2 })); el3.click(); out.nextClick = UI.sel === 0 || n() > n0; res(out); }, 50));
           })()""")
         check(dr['selDuring'] == 1 and dr['plain'] == 1, 'a plain drag of a card onto the arena plays it', dr)
-        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] == -1 and dr['late'] == [0, -1], 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; a late click after a drop is ignored, and the next press and click work', dr)
+        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] == -1 and dr['late'] == [0, -1] and dr['outside'] == [0, -1], 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; a late click after a drop is ignored, and the next press and click work', dr)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))
