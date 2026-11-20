@@ -109,8 +109,10 @@ async def main():
           __fight({ kind: 'chestnut', bond: 2 }, ['skelss', 'thief']); const k0 = B.killsThisTurn, g0 = RUN.gold, o = alive()[0]; o.eaten = 1; hurtEnemy(o, o.hp + o.block, { raw: true }); out.eatenKill = [B.killsThisTurn - k0, RUN.gold - g0];
           return out; })()""")
         check(r2['stare'] == 1, 'Cockatrice: an attack with no standing target doesn\'t spend the turn\'s stare; the next one exposes', r2)
-        check(r2['face'] == 3 and 'Axebeak Chick' in r2['why'], 'Axebeak: the card face and the breakdown both count its +3 until the first hit spends it', r2)
+        check(r2['face'] == 3 and 'Axebeak Chick' in r2['why'], 'Axebeak: the card face and the breakdown both count its +3 until the first attack card resolves', r2)
         check(r2['ending'] == [0, 1] and r2['eatenKill'] == [1, 0], 'a kill as your turn ends: the Bog Frog\'s card waits for the next turn; an ally a boss eats pays a pet nothing (the base game counts it as before)', r2)
+        sp = await pg.evaluate("""(() => { __fight({ kind: 'rustnibbler', bond: 1 }); const e = alive()[0]; B.pet.spooked = true; e.block = 5 + 9; fire('enemyBlock', { e, n: 9 }); return { spooked: B.pet.spooked, block: e.block }; })()""")
+        check(sp == {'spooked': True, 'block': 5}, 'a spooked pet keeps its spook when a power would take nothing (the trait ate the whole gain)', sp)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

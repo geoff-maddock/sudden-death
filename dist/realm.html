@@ -3851,7 +3851,7 @@ const PETS = {
   bogfrog: { n: 'Bog Frog', from: 'giant frog', el: 'bloom', rar: 'c', how: 'egg',
     trait: { d: p => `Starts each fight with ${pv(5, p)} Block.`, on: { fightStart: (a, p) => { B.P.block += pv(5, p); } } },
     powers: [
-      { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0, then: (a, p) => { p.t.tongue = 1; const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
+      { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, then: (a, p) => { p.t.tongue = 1; const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
       { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn).', on: { enemyFalls: () => { if (B.phase === 'player' && !B.ending) drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
     ],
     trick: { n: 'Gulp', d: p => `Swallows an enemy (not a boss) with ${pv(12, p)} HP or less; any other takes 16 damage.`, ops: p => [['devour', pv(12, p), 0]] } },
@@ -3887,7 +3887,7 @@ const PETS = {
   rustnibbler: { n: 'Rustnibbler', from: 'rust monster', el: 'ember', rar: 'u', how: 'shop',
     trait: { d: 'The first enemy to gain Block each fight loses what it gained.', on: { enemyBlock: { when: (a, p) => !p.f.rust && a.e && a.e.block > 0, then: (a, p) => { p.f.rust = 1; const n = Math.min(a.e.block, a.n); a.e.block -= n; a.ate = (a.ate || 0) + n; petSay(`eats the ${n} Block ${a.e.n} just raised.`); } } } },
     powers: [
-      { at: 1, d: p => `Whenever an enemy gains Block: it nibbles ${pv(2, p)} of what it gained.`, on: { enemyBlock: { when: a => a.e && a.e.block > 0, then: (a, p) => { const n = Math.min(a.e.block, a.n - (a.ate || 0), pv(2, p)); if (n > 0) { a.e.block -= n; a.ate = (a.ate || 0) + n; } } } } },
+      { at: 1, d: p => `Whenever an enemy gains Block: it nibbles ${pv(2, p)} of what it gained.`, on: { enemyBlock: { when: a => a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, then: (a, p) => { const n = Math.min(a.e.block, a.n - (a.ate || 0), pv(2, p)); if (n > 0) { a.e.block -= n; a.ate = (a.ate || 0) + n; } } } } },
       { at: 2, d: p => `Your first attack each turn on an enemy with no Block deals ${pv(3, p)} more.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && !e.block ? pv(3, p) : 0 },
     ],
     trick: { n: 'Rust', tgt: 'all', d: 'Every enemy loses its Block and its Strength.', ops: () => [['strip']] } },
