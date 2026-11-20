@@ -14,7 +14,8 @@ const CR_COLD = { heavy: { mu: 1.08, n: 'heavy', say: 'A warm day off the sea: f
 function crIceNew() { return Array(CR_ICE.cols * CR_ICE.rows).fill(1); }
 const crIceCell = (x, y) => { const C = CR_ICE, c = clamp(Math.floor((x + CR_SHEET.halfW) / (2 * CR_SHEET.halfW) * C.cols), 0, C.cols - 1), r = clamp(Math.floor((y - C.y0) / (C.y1 - C.y0) * C.rows), 0, C.rows - 1); return r * C.cols + c; };
 // the friction at (x, y): the pebble there and the day's cold
-function crIceAt(ice, x, y, cold) { return (ice ? ice[crIceCell(x, y)] : 1) * ((CR_COLD[cold] || CR_COLD.mid).mu); }
+// (and the frost along the boards, late in a game with the Shed's ways: crFrostAt, 12-shed.js)
+function crIceAt(ice, x, y, cold) { return (ice ? ice[crIceCell(x, y)] : 1) * ((CR_COLD[cold] || CR_COLD.mid).mu) * (1 + crFrostAt(x)); }
 // how worn the pebble is there, 0 (fresh) to 1 (as worn as it gets): worn pebble curls a little less
 const crWornAt = (ice, x, y) => ice ? (1 - ice[crIceCell(x, y)]) / (1 - CR_ICE.min) : 0;
 // a stone went down the sheet: path [[x, y, swept 0..1]]; each cell it crossed once

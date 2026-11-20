@@ -165,4 +165,5 @@ src/realm/w121-lanesfeel.js
 src/realm/w122-shed.js
 src/realm/w123-shedfour.js
 src/realm/w124-shedcall.js
+src/realm/w125-shedgame.js
 src/realm/w112-quickstart.js

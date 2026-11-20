@@ -24,6 +24,7 @@ function crStart(opts) {
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
+  crShedStart(o);
   GB = null;
   return G;
 }
@@ -76,6 +77,8 @@ function crThrowFinish(X) {
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
+  // the Shed's ways: after a stone a frost sprite now and then; after an end the frost, and Hennock's pebble at the half
+  G.hallSaid = rule.end ? crShedEnd(rule.end.end) : crShedAfter();
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
   if (made) { B.made++; P.made++; B.madeBy[plan.shot] = (B.madeBy[plan.shot] || 0) + 1; }
   // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
@@ -94,6 +97,15 @@ function crSummary() {
   if (!G) return null;
   return { over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
     tot: [crTotal(0), crTotal(1)], log: G.log.slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
+}
+// the game as it stands between stones, plain JSON (a match saved and left); and back
+function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths : [] })); }
+function crResume(sn) {
+  G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
+  crPlayStart({ mode: sn.mode });
+  if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.paths = (sn.paths || []).slice();
+  GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;
+  return G;
 }
 // a whole game headless: leaves the game on the ice, and the random stream, as they were
 function crSimGame(opts) {

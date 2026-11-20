@@ -17,11 +17,11 @@
    The stone moves on the page at CR_PLAY.speed times real time, a step at a time, the same steps the sim takes. */
 const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .12 } };
 const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
-const CR_MODES = ['watch', 'play'];
+const CR_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
 function crPlayStart(o) {
-  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null, paths: [] };
+  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null, paths: [], mgr: { style: 'auto' } };
   crGo('next');
   return GP;
 }
@@ -155,6 +155,7 @@ function crSettle() {
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
+  if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
   crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
   if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); }
@@ -175,7 +176,8 @@ function crPlayNext() {
   const s = crUp(); if (s < 0) { crGo('over'); return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
   if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
-  const plan = Object.assign(crPlan(s), { s }), rel = crMiss(s, plan.aim);
+  // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
+  const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s }), rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel };
   crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.`);
 }
@@ -186,7 +188,11 @@ function crSetMode(m) {
   if (m !== 'play' && GP.ph === 'slide' && GP.X && GP.X.s === GP.you && !GP.X.Q.O.sweep) GP.X.Q.O.sweep = crSweeper(GP.X.s, GP.X.plan);
   // a stone you were setting up goes back to the CPU in Watch, and the next one is yours in You play
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
+  // (a stone of the CPU's called for your side, as you take it back: yours to throw)
+  if (m === 'play' && GP.ph === 'addr' && GP.cpu && GP.cpu.s === GP.you) { GP.cpu = null; crGo('next'); }
 }
+// Manage: your rink's game ({ style: 'auto' | 'draw' | 'hit' })
+function crManage(o) { if (!GP) return false; if (['auto', 'draw', 'hit'].includes(o && o.style)) GP.mgr.style = o.style; crPick(); return true; }
 // the page has a stone set up or sliding (turn() and throwStone() from outside wait)
 const crPageBusy = () => !!GP && (GP.ph === 'slide' || (['aim', 'swing', 'addr'].includes(GP.ph) && typeof CRP !== 'undefined' && CRP.on));
 // a stone thrown from outside while the page had one called (hidden, so not holding the game): the page's call is

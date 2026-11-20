@@ -27,7 +27,10 @@
    Phase 4 is the call and the read: endValue(side, pts, next, skill) (an end's last stone by what it does to the
    game), reason(side, call) (why the skip calls it; plan(side) carries it as reason), readIn(side) (how far back from
    the house the side's skip reads the ice, inches), chart(canvas, side) (draws the ice chart: the pebble's wear and
-   every stone's path this game, paths their count); onChart hears C. */
+   every stone's path this game, paths their count); onChart hears C.
+   Phase 5 is games from the world: start({ hall: true }) gives the Shed's ways (hallRules: the frost, the sprites,
+   Hennock's pebble; frostAt(x)); modes add manage (manage({ style: 'auto' | 'draw' | 'hit' }), mgr); snapshot() and
+   resume(sn) keep a match between stones (plain JSON). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -55,6 +58,8 @@ return {
   endValue: (s, pts, next, sk) => G && G.teams ? crEndValue(s, pts, next, sk) : 0, reason: (s, c) => G && G.teams ? crReason(s, c) : '', readIn: s => G && G.teams ? crReadIn(s) : 0,
   chart: (cv, s) => { if (!G || !G.teams || !cv) return false; const c = cv.getContext('2d'); crChart(c, s, cv.width, cv.height, GP ? GP.paths : []); return true; }, get paths() { return GP ? GP.paths.length : 0; },
   set onChart(f) { CR_HOOK.onChart = f; }, get onChart() { return CR_HOOK.onChart; },
+  // games from the world (phase 5)
+  hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => crResume(sn), manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
   show: () => crShow(), hide: () => crHide(), get on() { return CRP.on; }, render: dt => crRender(dt || 0),
   pause: on => { CRP.paused = !!on; }, get paused() { return CRP.paused; }, get speed() { return CRP.speed; }, set speed(n) { CRP.speed = clamp(Math.round(n) || 1, 1, 8); }

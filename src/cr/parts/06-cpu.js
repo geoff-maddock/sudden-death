@@ -71,10 +71,12 @@ function crTry(s, aim) {
   return r.stones;
 }
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
-function crPlan(s) {
+// style: your rink's game under Manage ('draw' or 'hit': a little more for those shots), or none
+const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
+function crPlan(s, style) {
   const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
-  for (const c of list) c.val = crValue(crTry(s, c.aim), s, kAfter, G.hammer, sk);
+  for (const c of list) c.val = crValue(crTry(s, c.aim), s, kAfter, G.hammer, sk) + (CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0);
   list.sort((a, b) => b.val - a.val);
   // the best few, played a few times with the curler's own miss: the likeliest result wins
   const top = list.slice(0, S.top);
