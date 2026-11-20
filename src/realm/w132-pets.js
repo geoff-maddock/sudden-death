@@ -128,6 +128,7 @@ const wPetCost = q => W_PET.upkeep[(PETS[q.kind] || {}).rar] || W_PET.upkeep.c;
 function wPetFeed(id) {
   const q = wPetOf(id); if (!q) return 'No such pet.';
   if (!q.hungry) return `${q.name} isn't hungry.`;
+  if (wPets().side === id && wPetBusy()) return 'Not during a match.';
   const c = wPetCost(q); if (RUN.gold < c) return `It costs ${c} gold.`;
   RUN.gold -= c; q.hungry = false; wPetSync(); wSave();
   wLog(`${q.name} eats, and is itself again.`, 'g'); return '';

@@ -61805,6 +61805,7 @@ const wPetCost = q => W_PET.upkeep[(PETS[q.kind] || {}).rar] || W_PET.upkeep.c;
 function wPetFeed(id) {
   const q = wPetOf(id); if (!q) return 'No such pet.';
   if (!q.hungry) return `${q.name} isn't hungry.`;
+  if (wPets().side === id && wPetBusy()) return 'Not during a match.';
   const c = wPetCost(q); if (RUN.gold < c) return `It costs ${c} gold.`;
   RUN.gold -= c; q.hungry = false; wPetSync(); wSave();
   wLog(`${q.name} eats, and is itself again.`, 'g'); return '';
@@ -62457,7 +62458,7 @@ function wPetBondXp(q, n, why) {
 // a treat would do something: feed it (hungry), or grow its bond (not yet today, not at 3)
 const wPetTreatUseful = q => !!q.hungry || (q.treat !== WG.dayAbs && (q.bond || 1) < 3);
 // the treats you hold that this pet eats, while one would do something: its favourite, and pet biscuits
-const wPetTreatsFor = q => wPetTreatUseful(q) ? [wPetFav(q.kind), 'pettreat'].filter(k => k && DB.items[k] && wHas(k)) : [];
+const wPetTreatsFor = q => wPetTreatUseful(q) && !(wPets().side === q.id && wPetBusy()) ? [wPetFav(q.kind), 'pettreat'].filter(k => k && DB.items[k] && wHas(k)) : [];
 // give a treat: it feeds a hungry pet; bond points once a day each
 function wPetTreat(id, item) {
   const q = wPetOf(id); if (!q) return 'No such pet.';
@@ -62470,7 +62471,7 @@ function wPetTreat(id, item) {
   wAddItem(item, -1);
   const was = !!q.hungry; q.hungry = false;
   const today = q.treat !== WG.dayAbs; q.treat = WG.dayAbs;
-  wLog(`${q.name} ${fav ? `wolfs down the ${DB.items[item].name}: its favourite!` : `crunches a ${DB.items[item].name}.`}${was ? ' It isn\'t hungry any more.' : ''}`, 'g');
+  wLog(`${q.name} ${fav ? `wolfs down the ${DB.items[item].name}: its favourite!` : `crunches a ${DB.items[item].name}.`}${was ? ' It isn\'t hungry any more.' : ''}${!today && (q.bond || 1) < 3 ? ' (One treat a day grows its bond.)' : ''}`, 'g');
   if (today && (q.bond || 1) < 3) wPetBondXp(q, fav ? W_PBOND.fav : W_PBOND.treat, 'a treat');
   wPetSync(); wSave(); return '';
 }
@@ -62506,9 +62507,17 @@ wPshopOpen = function (id) {
   wW135PshopOpen.apply(this, arguments);
   if (!W_PSHOP.shops[id] || !wPshopIsOpen(id)) return;
   const box = $('modalBox'), at = box.querySelector('#wPshopWhy'); if (!at) return;
-  at.insertAdjacentHTML('beforebegin', `<p>Pet biscuits, ${W_PBOND.biscuit} gold each (you have ${WG.items.pettreat || 0}). <button class="ghost" data-psbisc="1"${RUN.gold < W_PBOND.biscuit ? ' disabled' : ''}>Buy one</button></p>`);
-  // (bought: the window closes as Leave would, and opens again with the new count)
-  box.querySelector('[data-psbisc]').onclick = () => { const why = wPetBuyBiscuit(id); if (why) { const w = $('wPshopWhy'); w.textContent = why; w.hidden = false; return; } box.querySelector('[data-close]').click(); wPshopOpen(id); };
+  at.insertAdjacentHTML('beforebegin', `<p>Pet biscuits, ${W_PBOND.biscuit} gold each (you have <span id="wBiscN">${WG.items.pettreat || 0}</span>). <button class="ghost" data-psbisc="1"${RUN.gold < W_PBOND.biscuit ? ' disabled' : ''}>Buy one</button></p>`);
+  // (bought: the window stays as it is, focus and all; the count, the gold and what it can still afford change in place)
+  const bb = box.querySelector('[data-psbisc]');
+  bb.onclick = () => {
+    const why = wPetBuyBiscuit(id), w = $('wPshopWhy'); if (why) { w.textContent = why; w.hidden = false; return; } w.hidden = true;
+    $('wBiscN').textContent = WG.items.pettreat || 0;
+    box.querySelectorAll('p.hint').forEach(p => { if (/^Gold: /.test(p.textContent)) p.textContent = `Gold: ${RUN.gold}.`; });
+    box.querySelectorAll('[data-psbuy]').forEach(b => { if (RUN.gold < wPshopPrice(b.dataset.psbuy)) b.disabled = true; });
+    box.querySelectorAll('[data-psback]').forEach(b => { const a = WG.petAway[+b.dataset.psback]; if (a && RUN.gold < wPshopPrice(a.kind)) b.disabled = true; });
+    if (RUN.gold < W_PBOND.biscuit) bb.disabled = true;
+  };
 };
 const wW135Audit = wAudit;
 wAudit = function () {
@@ -62521,7 +62530,7 @@ const wW135RenderHelp = renderHelp;
 renderHelp = function () {
   wW135RenderHelp();
   const h = $('wHelpPetShops') || $('wHelpPets'); if (!h || $('wHelpPetBond')) return;
-  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetBond"><b>Bond and treats.</b> A pet's bond (1 to 3) grows with card matches won with it at your side, and faster with treats: each pet has its favourite (the Pets tab says which), and every pet eats pet biscuits from the pet shops. A treat grows its bond once a day, and feeds a hungry pet whenever it is given. ${W_PBOND.at[2]} bond points make bond 2, and ${W_PBOND.at[3]} make bond 3; each level makes its trait stronger and opens or lifts a power. Bond never goes down, but a hungry pet's doesn't grow.</p>`);
+  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetBond"><b>Bond and treats.</b> A pet's bond (1 to 3) grows with card matches won with it at your side, and faster with treats: each pet has its favourite (the Pets tab says which), and every pet eats pet biscuits from the pet shops. A treat grows its bond once a day, and feeds a hungry pet whenever it is given; one that would do neither isn't given, and the pet at your side waits till the match is over. ${W_PBOND.at[2]} bond points make bond 2, and ${W_PBOND.at[3]} make bond 3; each level makes its trait stronger and opens or lifts a power. Bond never goes down, but a hungry pet's doesn't grow.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

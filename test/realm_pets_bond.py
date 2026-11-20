@@ -64,11 +64,12 @@ async def main():
           card.querySelector('[data-pettreat][data-item="mossberry"]').click();
           const r = { points: /Bond points/.test(txt), fav: /favourite: Mossberry/.test(txt), gave: q.xp - x0, open: !!document.getElementById('wCampBody') }; """ + ESC + """ return r; })()""")
         check(tab == {'points': True, 'fav': True, 'gave': 3, 'open': True}, 'the Pets tab shows bond points and the favourite, and gives a treat', tab)
-        sh = await pg.evaluate("""(() => { WG.flags.q_petshop_salt = 1; RUN.gold = 50; const n0 = WG.items.pettreat || 0; wPshopOpen('salt'); document.querySelector('#modalBox [data-psbisc]').click(); document.querySelector('#modalBox [data-psbisc]').click();
+        sh = await pg.evaluate("""(() => { WG.flags.q_petshop_salt = 1; RUN.gold = 50; const n0 = WG.items.pettreat || 0; wPshopOpen('salt'); const bb = document.querySelector('#modalBox [data-psbisc]'); bb.focus(); bb.click(); bb.click();
+          const focused = document.activeElement === bb && document.body.contains(bb), psbuy = document.querySelector('#modalBox [data-psbuy]');
           // (two bought: one Escape closes the window, and leaves no other behind)
           let drains = 0; const d0 = wDrain; wDrain = function () { drains++; return d0.apply(this, arguments); }; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); const closed = document.getElementById('modal').hidden; modal('<p>x</p>'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); wDrain = d0;
-          return { got: (WG.items.pettreat || 0) - n0, paid: 50 - RUN.gold, closed, drains }; })()""")
-        check(sh == {'got': 2, 'paid': 16, 'closed': True, 'drains': 1}, 'the pet shops sell pet biscuits, the window open between buys, with no listener left behind', sh)
+          return { got: (WG.items.pettreat || 0) - n0, paid: 50 - RUN.gold, closed, drains, focused: focused || !psbuy }; })()""")
+        check(sh == {'got': 2, 'paid': 16, 'closed': True, 'drains': 1, 'focused': True}, 'the pet shops sell pet biscuits, the window open between buys, with no listener left behind', sh)
 
         # (a real card match in the world, won: the bond point comes)
         await pg.evaluate("(() => { const q = wPets().owned.find(x => x.kind === 'hootling'); wPetSide(q.id); q.xp = 0; q.bond = 1; q.hungry = false; wPetSync(); RUN.hp = 999; RUN.maxhp = 999; WG.grace = 99; startMatch({ ids: ['skelss'], type: 'normal', tier: 1, card: false, sport: 'baseball', world: { kind: 'wild', region: 'plains' } }); })()")
