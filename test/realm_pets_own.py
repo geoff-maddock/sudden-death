@@ -108,6 +108,12 @@ async def main():
         await pg.evaluate(CLOSE)
         mp = await pg.evaluate("""(() => { const acts = []; for (const f of W_ACTORS) f(acts, performance.now(), 0); return { pet: acts.some(a => typeof a.draw === 'function') }; })()""")
         check(mp == {'pet': True}, 'the pet at your side is drawn on the map, behind the team', mp)
+        ld = await pg.evaluate("""(async () => { for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          const n = wPets().owned.length; wPetAdd('cockatrice', 'egg:q'); const t0 = Date.now(); await new Promise(res => { const w = () => document.getElementById('wPetFullWhy') || Date.now() - t0 > 4000 ? res() : setTimeout(w, 20); w(); });
+          if (!document.getElementById('wPetFullWhy')) return { stuck: { n, active: wActive(), talk: !!WUI.talk, q: W_PET_ASK.slice(), modal: document.getElementById('modal').hidden, paused: UI.paused, play: document.getElementById('pg-play').hidden } };
+          wSave(); const save = JSON.parse(JSON.stringify({ WG, RUN })); wStart(save);
+          const r = { closed: document.getElementById('modal').hidden, handle: W_PET_ASK.close, waits: WG.petAway.some(a => a.kind === 'cockatrice') }; WG.petAway = WG.petAway.filter(a => a.kind !== 'cockatrice'); return r; })()""")
+        check(ld == {'closed': True, 'handle': None, 'waits': True}, 'loading a journey closes a full-kennel question still open; its pet waits where it came from', ld)
         sv = await pg.evaluate("""(() => { wSave(); const save = JSON.parse(JSON.stringify({ WG, RUN })); const n = WG.pets.owned.length, side = WG.pets.side; wStart(save); return { n: wPets().owned.length === n, side: wPets().side === side, run: !!RUN.pet && RUN.pet.kind === wPetSideOf().kind }; })()""")
         check(sv == {'n': True, 'side': True, 'run': True}, 'the save keeps the kennel and the pet at your side, and the battle\'s pet follows on load', sv)
         await pg.evaluate("showPage('help')")

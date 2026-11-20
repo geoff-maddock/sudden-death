@@ -75,7 +75,7 @@ function wPetFull(q, a) {
     <p class="wbad" id="wPetFullWhy" hidden></p>
     <ul class="wpetlist">${all.map(x => `<li><button class="ghost" data-petgo="${x.id}">${esc(x.name)}${x === q ? ' (the new one)' : ''}</button> <small>${esc(PETS[x.kind].from)}, bond ${x.bond}</small></li>`).join('')}</ul>`,
     // (closed without a choice: the new one stays where it waits)
-    () => { W_PET_ASK.close = null; wDrain(); });
+    () => { W_PET_ASK.close = null; if (!W_PET_ASK.quiet) wDrain(); });
   $('modalBox').querySelectorAll('[data-petgo]').forEach(b => b.onclick = () => {
     const id = +b.dataset.petgo;
     if (id !== q.id) {
@@ -151,7 +151,8 @@ wNewDay = function () {
 };
 const wW132Start = wStart;
 // (a new or loaded journey: questions from before are dropped; their pets wait where they came from)
-wStart = function (save, opts) { W_PET_ASK.length = 0; if (W_PET_ASK.close) W_PET_ASK.close(); const r = wW132Start(save, opts); if (WG) { wPets(); wPetSync(); } return r; };
+// (a question still on screen is closed quietly, without the old journey's queue; one already replaced is let be)
+wStart = function (save, opts) { W_PET_ASK.length = 0; if (W_PET_ASK.close) { if ($('wPetFullWhy')) { W_PET_ASK.quiet = true; try { W_PET_ASK.close(); } finally { W_PET_ASK.quiet = false; } } W_PET_ASK.close = null; } const r = wW132Start(save, opts); if (WG) { wPets(); wPetSync(); } return r; };
 
 /* ---------- the Pets tab on the Team screen ---------- */
 function wPetCard(q, side) {
