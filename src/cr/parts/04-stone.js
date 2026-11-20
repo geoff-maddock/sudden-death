@@ -39,47 +39,59 @@ function crCollide(a, b) {
 /* one stone thrown among the stones at rest: stones [{ id, s, x, y }], throw { id, s, x0, ang, v, h }; opts { ice,
    cold, sweep(st, t) -> 0..1, plan (a coarser step, no trace: the CPU's look ahead), maxT }. Returns { stones (in
    play, at rest), out: [ids gone], path: [[x, y, swept]] of the thrown stone, hits, t, trace: [[t, [[id, x, y]]]],
-   stop: where the thrown stone came to rest (or null) } */
-function crRun(stones, th, opts) {
-  const O = opts || {}, dt = O.plan ? CR_STONE.planDt : CR_STONE.dt, R = CR_SHEET.stoneR, maxT = O.maxT || 60;
-  const a = th.ang * Math.PI / 180, S = stones.map(st => ({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }));
+   stop: where the thrown stone came to rest (or null) }.
+   The same run, a step at a time (the page's, so you can sweep as it goes: phase 2): crRunInit makes it, crRunStep moves
+   it one step (sweep: how hard it is swept now, or opts.sweep's), crRunTo moves it on to a time, crRunEnd gives the
+   result. The steps are the same however the run is driven, so the page's stone and the sim's go the same way. */
+function crRunInit(stones, th, opts) {
+  const O = opts || {}, a = th.ang * Math.PI / 180, S = stones.map(st => ({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }));
   const T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
   S.push(T);
-  const path = [], trace = [], out = [];
-  let t = 0, hits = 0, nextTr = 0;
-  const live = () => S.filter(st => !st.out);
-  while (t < maxT) {
-    const L = live(), moving = L.filter(st => st.vx || st.vy); if (!moving.length) break;
-    const sw = O.sweep && !T.out && (T.vx || T.vy) ? clamp(O.sweep(T, t) || 0, 0, 1) : 0;
-    // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
-    const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(dt, .5 * R / Math.max(1, vmax));
-    for (const st of moving) {
-      const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
-      let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
-      // friction stops a stone, it never turns it round
-      if (vx * st.vx + vy * st.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop) { vx = 0; vy = 0; }
-      st.x += (st.vx + vx) / 2 * dts; st.y += (st.vy + vy) / 2 * dts; st.vx = vx; st.vy = vy;
-      // (the path every foot of travel, so a fast stone wears every cell it crosses)
-      if (st === T && Math.hypot(st.x - (path.length ? path[path.length - 1][0] : st.x - 99), st.y - (path.length ? path[path.length - 1][1] : 0)) >= (O.plan ? 36 : 12)) path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]);
-    }
-    // contacts (only between stones that could touch: one of them moving)
-    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
-      const p = L[i], q = L[j]; if (!(p.vx || p.vy || q.vx || q.vy)) continue;
-      if (Math.abs(p.x - q.x) < 2 * R && Math.abs(p.y - q.y) < 2 * R && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R) {
-        const [m, n] = (p.vx || p.vy) && Math.hypot(p.vx, p.vy) >= Math.hypot(q.vx, q.vy) ? [p, q] : [q, p];
-        if (crCollide(m, n)) hits++;
-      }
-    }
-    // out of play: the side boards, wholly past the back line
-    for (const st of L) if (!crOnSheet(st)) { st.out = true; st.vx = st.vy = 0; out.push(st.id); }
-    t += dts;
-    if (!O.plan && t >= nextTr) { trace.push([+t.toFixed(2), live().map(st => [st.id, +st.x.toFixed(1), +st.y.toFixed(1)])]); nextTr += CR_STONE.traceEvery; }
-  }
-  // the thrown stone must pass the far hog line, unless it hit a stone in play
-  if (!T.out && !crPastHog(T) && !hits) { T.out = true; out.push(T.id); }
-  if (!O.plan) trace.push([+t.toFixed(2), live().map(st => [st.id, +st.x.toFixed(1), +st.y.toFixed(1)])]);
-  const rest = live().map(st => ({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }));
-  return { stones: rest, out, path, hits, t: +t.toFixed(2), trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } };
+  return { O, S, T, dt: O.plan ? CR_STONE.planDt : CR_STONE.dt, maxT: O.maxT || 60, path: [], trace: [], out: [], t: 0, hits: 0, nextTr: 0, sw: 0, done: false };
 }
+function crRunStep(Q, sweep) {
+  if (Q.done) return false;
+  const { O, S, T, path } = Q, R = CR_SHEET.stoneR, L = S.filter(st => !st.out), moving = L.filter(st => st.vx || st.vy);
+  if (!moving.length || Q.t >= Q.maxT) { Q.done = true; return false; }
+  const sw = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1) : 0; Q.sw = sw;
+  // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
+  const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
+  for (const st of moving) {
+    const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
+    let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
+    // friction stops a stone, it never turns it round
+    if (vx * st.vx + vy * st.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop) { vx = 0; vy = 0; }
+    st.x += (st.vx + vx) / 2 * dts; st.y += (st.vy + vy) / 2 * dts; st.vx = vx; st.vy = vy;
+    // (the path every foot of travel, so a fast stone wears every cell it crosses)
+    if (st === T) { const P = path[path.length - 1]; if (!P || Math.hypot(st.x - P[0], st.y - P[1]) >= (O.plan ? 36 : 12)) path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]); }
+  }
+  // contacts (only between stones that could touch: one of them moving)
+  for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+    const p = L[i], q = L[j]; if (!(p.vx || p.vy || q.vx || q.vy)) continue;
+    if (Math.abs(p.x - q.x) < 2 * R && Math.abs(p.y - q.y) < 2 * R && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R) {
+      const [m, n] = (p.vx || p.vy) && Math.hypot(p.vx, p.vy) >= Math.hypot(q.vx, q.vy) ? [p, q] : [q, p];
+      if (crCollide(m, n)) Q.hits++;
+    }
+  }
+  // out of play: the side boards, wholly past the back line
+  for (const st of L) if (!crOnSheet(st)) { st.out = true; st.vx = st.vy = 0; Q.out.push(st.id); }
+  Q.t += dts;
+  if (!O.plan && Q.t >= Q.nextTr) { Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]); Q.nextTr += CR_STONE.traceEvery; }
+  return true;
+}
+// where every stone in play is now: [[id, x, y]]
+const crRunNow = Q => Q.S.filter(st => !st.out).map(st => [st.id, +st.x.toFixed(1), +st.y.toFixed(1)]);
+function crRunTo(Q, t, sweep) { while (!Q.done && Q.t < t) crRunStep(Q, sweep); return !Q.done; }
+function crRunEnd(Q) {
+  const { O, S, T, path } = Q;
+  // (the last stretch: where it stopped, or left the sheet, ends the path)
+  const P = path[path.length - 1]; if (!P || P[0] !== +T.x.toFixed(1) || P[1] !== +T.y.toFixed(1)) path.push([+T.x.toFixed(1), +T.y.toFixed(1), 0]);
+  // the thrown stone must pass the far hog line, unless it hit a stone in play
+  if (!T.out && !crPastHog(T) && !Q.hits) { T.out = true; Q.out.push(T.id); }
+  if (!O.plan) Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]);
+  const rest = S.filter(st => !st.out).map(st => ({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }));
+  return { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } };
+}
+function crRun(stones, th, opts) { const Q = crRunInit(stones, th, opts); while (crRunStep(Q)); return crRunEnd(Q); }
 // where a stone thrown alone comes to rest (no other stones): { x, y } or null (out), and its path; the CPU's aim
-function crAlone(th, ice, cold, sweep) { const r = crRun([], th, { ice, cold, plan: true, sweep }); return { stop: r.stop, path: r.path, x: r.stop ? r.stop.x : null, y: r.stop ? r.stop.y : null }; }
+function crAlone(th, ice, cold, sweep) { const r = crRun([], th, { ice, cold, plan: true, sweep }); return { stop: r.stop, path: r.path, last: r.last, x: r.stop ? r.stop.x : null, y: r.stop ? r.stop.y : null }; }

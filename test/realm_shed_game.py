@@ -61,11 +61,17 @@ async def main():
           // a peel weight stone wears every row of pebble it crosses
           const r = wCR.run([], { id: 't', s: 0, x0: 0, ang: 0, v: 250, h: 0 }, {}), ice = wCR.wear(wCR.iceNew(), r.path), C = wCR.iceRules;
           const rows = new Set(); ice.forEach((v, i) => { if (v < 1) rows.add(Math.floor(i / C.cols)); }); out.rows = [rows.size, C.rows];
+          // a stone out of turn changes nothing
+          wCR.start({ seed: 1, skill: [1, 1] }); const ice0 = JSON.stringify(wCR.G.ice), n0 = wCR.G.n, bad = wCR.throwStone(1 - wCR.up(), { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: 0, v: 140, h: 1 }, null);
+          out.refused = [bad.rule.ok, JSON.stringify(wCR.G.ice) === ice0, wCR.G.n === n0, wCR.G.st[0].stones + wCR.G.st[1].stones];
+          // a draw to the back of the house on keen worn ice still solves (a throw out the back is lighter next time)
+          const worn = wCR.iceNew().map(() => wCR.iceRules.min); out.back = !!wCR.solveDraw(0, 40, 1, worn, 'keen');
           // value with no skill given is a Knight's
           out.value = typeof wCR.value([], 0, 5, 1) === 'number';
           return out; })()""")
         check(not rv['peel'], 'before the fifth stone the skip never calls a peel of their guard (the free guard zone would undo it)', rv)
         check(rv['rows'][0] >= rv['rows'][1] - 2 and rv['value'], 'a fast stone wears every row it crosses; value works without a skill', rv)
+        check(rv['refused'] == [False, True, True, 0] and rv['back'], 'a stone out of turn changes nothing (no wear, no box score); a draw to the back of the house solves on keen, worn ice', rv)
         fz = await pg.evaluate("""(() => { let taken = 0, made = 0;
           for (let i = 0; i < 6; i++) { wCR.start({ seed: 40 + i, skill: [1, 1] }); const H = wCR.G; H.stones = [{ id: '0:0', s: 0, x: 0, y: -180 }]; H.k = 1; H.hammer = 1;
             const aim = wCR.solveHit(0, -180 - 9, 250, 1, null, 'mid'), ev = wCR.throwStone(1, { shot: 'peel', x: 0, y: -180, h: 1, target: '0:0', s: 1 }, aim, null);

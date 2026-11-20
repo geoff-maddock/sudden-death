@@ -23,7 +23,7 @@ const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
 // the last end's stones), a Squire the fresh pebble on the day
-const crIceRead = s => { const I = CR_SKILL[G.skill[s]].ice; return I === 'now' ? G.ice : I === 'end' ? G.iceEnd || null : null; };
+const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)].ice; return I === 'now' ? G.ice : I === 'end' ? G.iceEnd || null : null; };
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
   const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
@@ -49,7 +49,7 @@ function crShots(s, sk) {
   draw('draw', 0, 0); draw('draw', 0, -40); draw('draw', 40, -8); draw('draw', -40, -8); draw('draw', 0, 34);
   draw('guard', 0, -190); draw('guard', 52, -175); draw('guard', -52, -175);
   for (const o of st.filter(o => o.s !== s)) {
-    if (crInHouse(o) && !(G.k < G.fgz && crInFgz(o))) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.top > 1) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
+    if (crInHouse(o)) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.top > 1) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
     // (a guard of theirs can't be taken out before the fifth stone: the free guard zone)
     else if (crInFgz(o) && G.k >= G.fgz) hit('peel', o, CR_AIM.vPeel);
   }
@@ -70,7 +70,7 @@ function crTry(s, aim) {
 }
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
 function crPlan(s) {
-  const sk = G.skill[s], S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
+  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
   for (const c of list) c.val = crValue(crTry(s, c.aim), s, kAfter, G.hammer, sk);
   list.sort((a, b) => b.val - a.val);

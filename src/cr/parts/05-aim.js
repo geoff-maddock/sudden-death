@@ -23,7 +23,7 @@ function crSolveDraw(x, y, h, ice, cold) {
   for (let i = 0; i < CR_AIM.tries; i++) {
     const r = crAlone({ x0: 0, ang, v, h }, ice, cold);
     // (out of play: through the back line is too heavy, short of the hog line too light, into the boards too wide)
-    if (!r.stop) { const L = r.path[r.path.length - 1] || [0, 0]; if (L[1] > CR_SHEET.back - 12) v *= .97; else if (Math.abs(L[0]) > CR_SHEET.halfW - 12) ang -= Math.sign(L[0]) * .3; else v *= 1.02; continue; }
+    if (!r.stop) { const L = r.last; if (L.y > CR_SHEET.back) v *= .97; else if (Math.abs(L.x) + CR_SHEET.stoneR >= CR_SHEET.halfW) ang -= Math.sign(L.x) * .3; else v *= 1.02; continue; }
     const ex = x - r.x, ey = y - r.y;
     if (Math.abs(ex) < CR_AIM.tol && Math.abs(ey) < CR_AIM.tol) return { ang: +ang.toFixed(4), v: +v.toFixed(3), h };
     v *= Math.sqrt(Math.max(.25, (y - CR_STONE.y0) / Math.max(1, r.y - CR_STONE.y0)));

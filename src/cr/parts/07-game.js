@@ -39,10 +39,17 @@ function crTurn() {
   const plan = Object.assign(crPlan(s), { s });
   return crThrowStone(s, plan, crMiss(s, plan.aim), crSweeper(s, plan));
 }
-// a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules
-function crThrowStone(s, plan, rel, sweep) {
-  const ri = crThrower(s), pos = crPos(s), before = G.stones.map(b => Object.assign({}, b)), endNo = G.end, ham = G.hammer;
-  const run = crRun(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
+// a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
+// crThrowBegin puts it on the ice (the page then moves it on a step at a time: crRunStep), crThrowFinish settles it
+function crThrowBegin(s, plan, rel, sweep) {
+  // (a stone out of turn changes nothing: no run, no wear, no box score)
+  if (crWhyNot(s)) return null;
+  plan = Object.assign({}, plan, { s });
+  const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
+  return { s, plan, rel, Q, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+}
+function crThrowFinish(X) {
+  const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
   crWear(G.ice, run.path);
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }), made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
@@ -53,9 +60,13 @@ function crThrowStone(s, plan, rel, sweep) {
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule };
-  G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end };
+  G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
   return ev;
+}
+function crThrowStone(s, plan, rel, sweep) {
+  const X = crThrowBegin(s, plan, rel, sweep); if (!X) return { side: s, rule: { ok: false, why: crWhyNot(s) }, made: false };
+  while (crRunStep(X.Q)); return crThrowFinish(X);
 }
 function crSummary() {
   if (!G) return null;
