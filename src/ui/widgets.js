@@ -37,14 +37,11 @@ function renderRunBar() {
   document.querySelectorAll('[data-tonic]').forEach(b => b.onclick = () => drinkTonic(+b.dataset.tonic));
 }
 function sortDeck(cards) { const ord = { atk: 0, play: 1, skl: 2, pow: 3, gear: 4, junk: 5, curse: 6 }; return cards.slice().sort((a, b) => ord[def(a).type] - ord[def(b).type] || def(a).cost - def(b).cost || def(a).n.localeCompare(def(b).n)); }
-// (a window opened over another replaces it: the old one's Escape is taken off, so one key closes only what is shown)
-let MODAL_ESC = null;
 function modal(html, onClose) {
   const m = $('modal'); $('modalBox').innerHTML = html; m.hidden = false;
-  if (MODAL_ESC) document.removeEventListener('keydown', MODAL_ESC);
-  const close = () => { m.hidden = true; m.onclick = null; document.removeEventListener('keydown', esc1); if (MODAL_ESC === esc1) MODAL_ESC = null; if (onClose) onClose(); };
+  const close = () => { m.hidden = true; m.onclick = null; document.removeEventListener('keydown', esc1); if (onClose) onClose(); };
   const esc1 = e => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', esc1); MODAL_ESC = esc1;
+  document.addEventListener('keydown', esc1);
   m.onclick = e => { if (e.target === m || e.target.closest('[data-close]')) close(); };
   const f = $('modalBox').querySelector('button,[tabindex]'); if (f) f.focus();
   return close;

@@ -71,11 +71,11 @@ wDrain = function () { wW132Drain.apply(this, arguments); if (W_PET_ASK.length) 
 // a full kennel: which one goes (the new one too: it already waits where it came from, a)
 function wPetFull(q, a) {
   const P = wPets(), all = P.owned.concat([q]);
-  const close = modal(`<header><h3>The kennel is full</h3></header><div class="wmsg"><p>${esc(q.name)} the ${esc(PETS[q.kind].from)} wants in, but your kennel holds ${W_PET.kennel}. Choose one to let go: it goes back to where it came from, and you can come back for it.</p></div>
+  const close = W_PET_ASK.close = modal(`<header><h3>The kennel is full</h3></header><div class="wmsg"><p>${esc(q.name)} the ${esc(PETS[q.kind].from)} wants in, but your kennel holds ${W_PET.kennel}. Choose one to let go: it goes back to where it came from, and you can come back for it.</p></div>
     <p class="wbad" id="wPetFullWhy" hidden></p>
     <ul class="wpetlist">${all.map(x => `<li><button class="ghost" data-petgo="${x.id}">${esc(x.name)}${x === q ? ' (the new one)' : ''}</button> <small>${esc(PETS[x.kind].from)}, bond ${x.bond}</small></li>`).join('')}</ul>`,
     // (closed without a choice: the new one stays where it waits)
-    () => wDrain());
+    () => { W_PET_ASK.close = null; wDrain(); });
   $('modalBox').querySelectorAll('[data-petgo]').forEach(b => b.onclick = () => {
     const id = +b.dataset.petgo;
     if (id !== q.id) {
@@ -151,7 +151,7 @@ wNewDay = function () {
 };
 const wW132Start = wStart;
 // (a new or loaded journey: questions from before are dropped; their pets wait where they came from)
-wStart = function (save, opts) { W_PET_ASK.length = 0; const r = wW132Start(save, opts); if (WG) { wPets(); wPetSync(); } return r; };
+wStart = function (save, opts) { W_PET_ASK.length = 0; if (W_PET_ASK.close) W_PET_ASK.close(); const r = wW132Start(save, opts); if (WG) { wPets(); wPetSync(); } return r; };
 
 /* ---------- the Pets tab on the Team screen ---------- */
 function wPetCard(q, side) {
