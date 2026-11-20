@@ -60,7 +60,7 @@ function crThrowFinish(X) {
   if (X.g !== G) return crRefused(X.s, 'That game is over.');
   const why = crWhyNot(X.s); if (why) return crRefused(X.s, why);
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
-  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) return crRefused(s, rule.why);
+  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it

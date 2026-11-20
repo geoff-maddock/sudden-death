@@ -122,7 +122,8 @@ async def main():
           return out; })()""")
         check(rv['busy'] is False and rv['going'], 'a stone thrown from outside while the page has one called is refused, and the page goes on', rv)
         check(rv['freeze'] == [20, round(10 - 2 * rv['R'] - .5, 1)] and rv['own'] == '0:9', 'a freeze snaps in front of their stone; on a hit, a click on your own stone takes it', rv)
-        check(rv['roll'] in (3, -3), 'your skip\'s hit and roll keeps the roll it chose', rv)
+        check(rv['roll'] is not None, 'with one of theirs in the house, the skip calls a hit and roll somewhere', rv)
+        check(rv['roll'] is None or rv['roll'] in (3, -3), 'your skip\'s hit and roll keeps the roll it chose', rv)
         # a sweep held on the canvas and let go off it stops; Space held on from the weight's press doesn't sweep
         await pg.evaluate("(() => { wShedGame({ seed: 14, mode: 'play', hammer: 1 }); wCR.pause(false); __to('aim'); wCR.select({ shot: 'draw', x: 0, y: 0 }); wCR.press(); __meterTo(1); wCR.press(); })()")
         cvb = await pg.evaluate("(() => { const r = document.querySelector('#v-shed canvas').getBoundingClientRect(); return { x: r.left + 200, y: r.top + 300 }; })()")
@@ -134,12 +135,11 @@ async def main():
         let_go = await pg.evaluate("wCR.sweep")
         check(held is True and let_go is False, 'a sweep held on the canvas and let go off it stops', [held, let_go])
         await pg.evaluate("(() => { let n = 0; while (wCR.phase === 'slide' && n++ < 4000) wCR.tick(0.05); __to('aim'); wCR.press(); __meterTo(1); })()")
-        await pg.keyboard.down(' ')
+        await pg.keyboard.press(' ')
         rep = await pg.evaluate("""(async () => { const ph = wCR.phase; window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true, bubbles: true }));
           await new Promise(r => setTimeout(r, 80)); const held = wCR.sweep;
           window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
           await new Promise(r => setTimeout(r, 80)); const fresh = wCR.sweep; window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true })); return { ph, held, fresh }; })()""")
-        await pg.keyboard.up(' ')
         check(rep['ph'] == 'slide' and rep['held'] is False and rep['fresh'] is True, 'Space held on from the weight\'s press doesn\'t sweep: a fresh press does', rep)
         await pg.evaluate("wCR.pause(true)")
 

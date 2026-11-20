@@ -180,6 +180,9 @@ function crSetMode(m) {
 }
 // the page has a stone set up or sliding (turn() and throwStone() from outside wait)
 const crPageBusy = () => !!GP && (GP.ph === 'slide' || (['aim', 'swing', 'addr'].includes(GP.ph) && typeof CRP !== 'undefined' && CRP.on));
+// a stone thrown from outside while the page had one called (hidden, so not holding the game): the page's call is
+// for a house that isn't there any more, so it lets it go and starts on whose stone it is now
+function crPageStale() { if (GP && ['aim', 'swing', 'addr'].includes(GP.ph)) { GP.cpu = null; GP.sel = null; GP.meter = null; crGo('next'); } }
 // what the page needs, as a copy
 function crView() {
   if (!GP) return null;

@@ -38,7 +38,7 @@ function crFrame(now) {
   CRP.raf = requestAnimationFrame(crFrame);
 }
 function crShow() { CRP.host.hidden = false; if (CRP.on) return; CRP.on = true; CRP.last = performance.now(); CRP.raf = requestAnimationFrame(crFrame); }
-function crHide() { CRP.ptr = null; CRP.sweepKey = CRP.sweepPtr = false; CRP.host.hidden = true; CRP.on = false; cancelAnimationFrame(CRP.raf); }
+function crHide() { CRP.ptr = null; CRP.sweepKey = CRP.sweepPtr = CRP.sweepBtn = false; CRP.host.hidden = true; CRP.on = false; cancelAnimationFrame(CRP.raf); }
 
 /* ---------- the keys ---------- */
 const CR_SHOT_KEYS = { 1: 'draw', 2: 'guard', 3: 'freeze', 4: 'takeout', 5: 'peel', 6: 'hitroll' };
@@ -58,17 +58,19 @@ function crKeyDown(e) {
   // (a press held on from the weight's press doesn't sweep: sweeping starts with a fresh press)
   if (k === ' ') { if (GP.ph === 'slide') { if (!e.repeat && GP.X && crYours(GP.X.s)) CRP.sweepKey = true; } else if (!e.repeat) crPress(); }
   else if (GP.ph !== 'aim' || !S) took = false;
-  else if (k === 'arrowleft') crSelect({ x: S.x + 3 });
-  else if (k === 'arrowright') crSelect({ x: S.x - 3 });
-  else if (k === 'arrowup') crSelect({ y: S.y + 12 });
-  else if (k === 'arrowdown') crSelect({ y: S.y - 12 });
-  else if (k === 'i') crSelect({ h: -1 });
-  else if (k === 'o') crSelect({ h: 1 });
-  else if (CR_SHOT_KEYS[k]) crSelect({ shot: CR_SHOT_KEYS[k] });
-  else if (k === 'g') crSelect({ suggest: true });
+  else if (k === 'arrowleft') crSelSay(crSelect({ x: S.x + 3 }));
+  else if (k === 'arrowright') crSelSay(crSelect({ x: S.x - 3 }));
+  else if (k === 'arrowup') crSelSay(crSelect({ y: S.y + 12 }));
+  else if (k === 'arrowdown') crSelSay(crSelect({ y: S.y - 12 }));
+  else if (k === 'i') crSelSay(crSelect({ h: -1 }));
+  else if (k === 'o') crSelSay(crSelect({ h: 1 }));
+  else if (CR_SHOT_KEYS[k]) crSelSay(crSelect({ shot: CR_SHOT_KEYS[k] }));
+  else if (k === 'g') crSelSay(crSelect({ suggest: true }));
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
 }
+// why a change to your call didn't take, on the status line
+function crSelSay(why) { if (why && GP) { GP.msg = why; crPick(); } }
 function crKeyUp(e) { if (e.key === ' ' && CRP.sweepKey) { CRP.sweepKey = false; e.preventDefault(); e.stopPropagation(); } }
 window.addEventListener('keydown', crKeyDown, true);
 window.addEventListener('keyup', crKeyUp, true);
@@ -89,7 +91,7 @@ CRP.cv.addEventListener('pointerdown', e => {
   if (GP.ph !== 'aim' || !GP.sel) return;
   CRP.ptr = { throw: p.sx < CR_VIEW.w && p.sy > 520, x: p.sx, y: p.sy, cur: p };
   try { CRP.cv.setPointerCapture(e.pointerId); } catch (er) { /* a synthetic press */ }
-  if (!CRP.ptr.throw) { const q = crIceAtPt(p.sx, p.sy); if (q) crSelect({ x: q.x, y: q.y }); }
+  if (!CRP.ptr.throw) { const q = crIceAtPt(p.sx, p.sy); if (q) crSelSay(crSelect({ x: q.x, y: q.y })); }
   e.preventDefault();
 });
 CRP.cv.addEventListener('pointermove', e => { if (CRP.ptr) CRP.ptr.cur = crPtrAt(e); });
