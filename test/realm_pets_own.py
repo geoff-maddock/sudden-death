@@ -105,7 +105,7 @@ async def main():
           return { asked, open: !document.getElementById('modal').hidden && !!document.getElementById('wCampBody'), n: n - wPets().owned.length, said: /Waiting where/.test(document.getElementById('wCampBody').textContent) }; })()""")
         check(lg == {'asked': True, 'open': True, 'n': 1, 'said': True}, 'Let go on the Pets tab asks in its own row, and the Team screen stays open', lg)
         await pg.evaluate("wPetReclaim(WG.petAway.length - 1)")
-        ln = await pg.evaluate("""(async () => { const q = wPetSideOf(); const n0 = q.name; wPetRename(q.id, 'W'.repeat(W_PET.nameMax)); wRenderCamp();
+        ln = await pg.evaluate("""(async () => { const q = wPetSideOf(); if (!q) return { noPet: true }; const n0 = q.name; wPetRename(q.id, 'W'.repeat(W_PET.nameMax)); wRenderCamp();
           const li = document.querySelector('#wCampBody [data-petid="' + q.id + '"]'), r = li.getBoundingClientRect(), body = document.getElementById('wCampBody').getBoundingClientRect();
           const btns = [...li.querySelectorAll('button')].every(b => { const br = b.getBoundingClientRect(); return br.right <= r.right + 1 && br.left >= r.left - 1; });
           const out = { row: r.right <= body.right + 1, btns }; for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

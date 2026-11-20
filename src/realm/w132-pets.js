@@ -24,7 +24,10 @@
 const W_PET = { kennel: 6, upkeep: { c: 6, u: 10, r: 16 }, nameMax: 24 };
 function wPets() {
   const P = WG.pets = WG.pets || { owned: [], side: null, seq: 1 };
-  P.owned = P.owned || []; if (!P.seq) P.seq = 1 + P.owned.reduce((m, x) => Math.max(m, x.id || 0), 0);
+  // (a kind the realm no longer knows, from an old save, is dropped: it could never come to a match)
+  P.owned = P.owned || [];
+  if (P.owned.some(x => !PETS[x.kind])) { P.owned = P.owned.filter(x => PETS[x.kind]); if (P.side != null && !P.owned.some(x => x.id === P.side)) P.side = P.owned.length ? P.owned[0].id : null; }
+  if (WG.petAway && WG.petAway.some(a => !PETS[a.kind])) WG.petAway = WG.petAway.filter(a => PETS[a.kind]); if (!P.seq) P.seq = 1 + P.owned.reduce((m, x) => Math.max(m, x.id || 0), 0);
   WG.petAway = WG.petAway || [];
   if (WG.petWeek == null) WG.petWeek = wWeek();
   return P;

@@ -18,7 +18,7 @@
 
    WG.petEggs = { [element]: { kind, due } }
    W_PEGG, wPeggBuild, wPeggPut, wPeggTake, wPeggPlace, wPeggHatch, wPetNameAny
-   Wrapped: buildAllMaps (wW133BuildAllMaps), wAudit (wW133Audit: each egg's spot, each place), wUse (wW133Use: 'petegg' and 'pethatch' tiles), wTileVariant
+   Wrapped: buildAllMaps (wW133BuildAllMaps), wStart (wW133Start: old saves' unknown eggs), wAudit (wW133Audit: each egg's spot, each place), wUse (wW133Use: 'petegg' and 'pethatch' tiles), wTileVariant
    (wW133TileVariant: an egg there or not), renderHelp (wW133RenderHelp: #wHelpPetEggs). */
 
 const W_PEGG = {
@@ -142,10 +142,10 @@ function wPeggHatch(el) {
   const H = wPetEggs(), I = H[el]; if (!I) return null;
   if (WG.dayAbs < I.due) return null;
   if (!PETS[I.kind] || !W_PEGG.eggs[I.kind]) return null;
-  // (the egg leaves its place, and cracks in the log, only once its pet is really there)
+  // (a known kind always comes: wPetAdd only refuses an unknown one. The crack first, then the kennel's line)
+  wLog(`The ${W_PEGG.eggs[I.kind].name} cracks. Out tumbles ${petA(PETS[I.kind].n)} ${PETS[I.kind].n}!`, 'g');
   const q = wPetAdd(I.kind, 'hatch:' + el); if (!q) return null;
   delete H[el];
-  wLog(`The ${W_PEGG.eggs[I.kind].name} cracks. Out tumbles ${petA(PETS[I.kind].n)} ${PETS[I.kind].n}!`, 'g');
   wInvalidate(WG.map); wSave();
   return q;
 }
@@ -190,6 +190,9 @@ function wPeggOpen(el) {
   });
 }
 
+// (a loaded journey: an egg of a kind the realm no longer knows (an old save) goes quiet at once, so its place is free)
+const wW133Start = wStart;
+wStart = function () { const r = wW133Start.apply(this, arguments); if (WG && WG.petEggs) for (const el in WG.petEggs) if (!PETS[WG.petEggs[el].kind] || !W_PEGG.eggs[WG.petEggs[el].kind]) delete WG.petEggs[el]; return r; };
 const wW133Use = wUse;
 wUse = function (x, y) {
   const m = wCurMap(), c = wTileAt(m, x, y), use = (DB.tiles[c] || {}).use, meta = m.meta[x + ',' + y] || {};
