@@ -37,8 +37,9 @@ async def main():
 
         pl = await pg.evaluate("""(() => { const npc = [...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].filter(S => !MAPS[S.town].npcs.some(n => n.id === S.npc)).map(S => S.npc);
           const loose = ['hq', 'cind'].map(id => Object.values(MAPS[W_PSHOP.shops[id].town].meta).filter(x => x.loose === id).length);
-          return { npc, loose, audit: wAudit().filter(s => /pet|keeper/.test(s)) }; })()""")
-        check(pl == {'npc': [], 'loose': [3, 3], 'audit': []}, 'the three shopkeepers and two keepers stand in their towns, and the loose pets wait on open ground', pl)
+          const reach = [...Object.values(W_PSHOP.shops), ...Object.values(W_PSHOP.keepers)].filter(S => { const m = MAPS[S.town], n = m.npcs.find(n => n.id === S.npc), seen = bfsReach(m, m.spawn[0], m.spawn[1]); return !(n && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(n.y + dy) * m.w + n.x + dx])); }).map(S => S.npc);
+          return { npc, loose, reach, audit: wAudit().filter(s => /pet|keeper/.test(s)) }; })()""")
+        check(pl == {'npc': [], 'loose': [3, 3], 'reach': [], 'audit': []}, 'the three shopkeepers and two keepers stand in their towns, and the loose pets wait on open ground', pl)
 
         q = await pg.evaluate("""(() => { const out = {};
           const pets0 = wSay('pshop_hq', 'pets'); out.shut = { act: pets0.act || null, says: /Blinkpups/.test(pets0.text) };
@@ -47,15 +48,19 @@ async def main():
           WG.map = 'graftonbury'; out.v0 = wTileVariant(m, spots[0][0], spots[0][1], W_PSHOP_CH);
           for (const [x, y] of spots) wUse(x, y);
           out.v1 = wTileVariant(m, spots[0][0], spots[0][1], W_PSHOP_CH); out.caught = [0, 1, 2].every(i => wFlag('pq_hq_' + i));
+          out.walk0 = spots.every(([x, y]) => walkCh(wTileAt(m, x, y)));
           wSay('pshop_hq', 'pups'); out.open = wFlag('q_petshop_hq') && wPshopIsOpen('hq'); out.journal = /Done: The pups/.test(WLOG.map(l => l[0]).join(' '));
           const pets1 = wSay('pshop_hq', 'pets'); out.act = pets1.act; return out; })()""")
         check(q['shut'] == {'act': None, 'says': True} and q['early'], 'a shop is shut until its quest is done: PETS and PUPS say what is wrong', q)
+        check(q['walk0'], 'a caught loose pet leaves only the ground: you can walk there', q)
         check(q['v0'].endswith('1') and q['v1'].endswith('0') and q['caught'] and q['open'] and q['journal'] and q['act'] == 'petshop', 'catch the three loose Blinkpups, tell Wick: the shop opens, the side plot is done', q)
 
         b = await pg.evaluate("""(() => { RUN.gold = 500; const kind = wPshopStock('hq'), next = wPshopStock('hq', wWeek() + 1), price = wPshopPrice(kind), g0 = RUN.gold;
           wRunAct('petshop', 'pshop_hq'); const box = document.getElementById('modalBox'), btn = box.querySelector('[data-psbuy]'), shows = /This week/.test(box.textContent) && /Next week/.test(box.textContent);
           btn.click(); const q = wPets().owned.find(x => x.kind === kind);
           const r = { kind, next, shows, paid: g0 - RUN.gold === price, has: !!q, from: q && q.from, closed: document.getElementById('modal').hidden };
+          r.again = wPshopBuy('hq', kind); wRunAct('petshop', 'pshop_hq'); r.soldShown = !document.querySelector('#modalBox [data-psbuy]') && /Sold out/.test(document.getElementById('modalBox').textContent); for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          WG.pshopWk.hq = wWeek() - 1;
           r.other = wPshopBuy('hq', next); RUN.gold = 1; r.poor = wPshopBuy('hq', kind); RUN.gold = 500;
           for (const k of ['sprite', 'bogfrog', 'chestnut', 'jellycube', 'imp']) wPetAdd(k, 'egg:x'); r.full = wPshopBuy('hq', kind);
           wRunAct('petshop', 'pshop_hq'); r.disabled = document.querySelector('#modalBox [data-psbuy]').disabled; """ + ESC + """
@@ -63,6 +68,7 @@ async def main():
           wPetLetGo(wPets().owned.find(x => x.kind === 'imp').id); wRunAct('petshop', 'pshop_hq'); document.querySelector('#modalBox [data-psback]').click();
           r.back = wPets().owned.some(x => x.kind === kind && x.from === 'shop:hq'); r.backPaid = g1 - RUN.gold === price; return r; })()""")
         check(b['shows'] and b['kind'] != b['next'] and b['paid'] and b['has'] and b['from'] == 'shop:hq' and b['closed'], 'open, the shop sells this week\'s pet (next week\'s is another) into the kennel, at its price', b)
+        check(b['again'] != '' and b['soldShown'], 'one pet a week: a second this week is sold out, and the window says so', b)
         check(b['other'] != '' and b['poor'] != '' and b['full'] != '' and b['disabled'], 'not a pet out of stock, not short of gold, not with a full kennel', b)
         check(b['backFull'] and b['back'] and b['backPaid'], 'a pet let go at the shop comes back there at its price, once there is room', b)
         await pg.evaluate("wRunAct('petshop', 'pshop_hq')")
@@ -81,10 +87,10 @@ async def main():
           WG.lkg = { w: 1, l: 0, games: [] }; const b = wSay('pkeep_moss', 'pets'); out.yes = b.act;
           out.frost = wPshopBuy('rime', 'frostpup') !== ''; WG.hkg = { w: 1, l: 0, games: [] };
           while (wPets().owned.length > 4) wPetLetGo(wPets().owned[wPets().owned.length - 1].id);
-          out.hoot = wPshopBuy('moss', 'hootling'); out.fp = wPshopBuy('rime', 'frostpup');
+          out.hoot = wPshopBuy('moss', 'hootling'); out.fp = wPshopBuy('rime', 'frostpup'); out.once = wPshopBuy('moss', 'hootling') !== '';
           out.got = ['hootling', 'frostpup'].every(k => wPets().owned.some(x => x.kind === k && x.from.startsWith('keeper:'))); return out; })()""")
         check(k['no'] == {'act': None, 'says': True} and k['yes'] == 'petshop' and k['frost'], 'a keeper sells only once its condition is met (a golf win at Mossgate Links; a hockey win at the Pond Rink)', k)
-        check(k['hoot'] == '' and k['fp'] == '' and k['got'], 'then the Hootling and the Frostpup come from their keepers', k)
+        check(k['hoot'] == '' and k['fp'] == '' and k['got'] and k['once'], 'then the Hootling and the Frostpup come from their keepers, one each a journey', k)
 
         await pg.evaluate("showPage('help')")
         hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpPetShops'); return !!h && ['Graftonbury', 'Saltmere', 'Cinderhold', 'Hootling', 'Frostpup', 'one a week'].every(w => h.textContent.includes(w)); })()")

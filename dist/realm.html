@@ -62168,14 +62168,18 @@ renderHelp = function () {
      Rimewatch    Sigga Runner, a sled-dog drover: the Frostpup, to a team that has won a hockey match at the Pond Rink
                   (WG.hkg.w)
    Ask a shopkeeper or keeper about PETS to see what they sell. A pet bought goes into the kennel (wPetAdd, from
-   'shop:<id>' or 'keeper:<id>'); a full kennel can't buy (let one go first). Prices by rarity (W_PSHOP.price).
+   'shop:<id>' or 'keeper:<id>'); a full kennel can't buy (let one go first). Prices by rarity (W_PSHOP.price). A shop
+   sells one pet a week (WG.pshopWk[shop], the week of the last), a keeper its one pet once a journey (pkeep_<id>):
+   keeper pets are found nowhere else. Treats come with bond, phase 5.
 
    The five stand in their towns, and the loose pets wait on open ground, placed over the built maps (wPshopBuild,
    deterministic, keeping everything reachable). Flags: pq_<shop>_<n> (a loose pet caught), q_petshop_<shop> (the
    quest, and the shop open).
    W_PSHOP, wPshopStock, wPshopOpen, wPshopBuy, wPshopKeeperOk, wPshopCatch
-   Wrapped: buildAllMaps (wW134BuildAllMaps), wUse (wW134Use: loose pets), wTileVariant (wW134TileVariant), wRunAct
-   (wW134RunAct: 'petshop'), renderHelp (wW134RenderHelp: #wHelpPetShops). */
+   Wrapped: buildAllMaps (wW134BuildAllMaps), wAudit (wW134Audit: the loose pets, the shops' and keepers' pets), wTileAt
+   (wW134TileAt: a caught loose pet's tile is the ground again), wUse (wW134Use: loose pets), wTileVariant
+   (wW134TileVariant), wRunAct (wW134RunAct: 'petshop'), wSay (wW134Say: PETS shut until the quest or the condition),
+   renderHelp (wW134RenderHelp: #wHelpPetShops). */
 
 const W_PSHOP = {
   price: { c: 60, u: 90, r: 140 },
@@ -62243,12 +62247,21 @@ Object.assign(DB.tiles, { [W_PSHOP_CH]: { name: 'loose pet', walk: 0, use: 'petl
 Object.assign(W_MAP_COL, { [W_PSHOP_CH]: '#d8c8ff' });
 
 /* ---------- placed over the maps: the five, the loose pets ---------- */
-// the nearest open tile to (x, y) for somebody to stand on
+// the nearest open tile to (x, y) for somebody to stand on: one you can reach, and standing there cuts nothing off
+// (every other reachable tile, and every thing on the map, keeps a way to it; the others standing about count as
+// in the way too)
 function wPshopStand(m, x, y) {
+  const sx = m.spawn[0], sy = m.spawn[1], count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
+  const side = (seen, k) => { const [mx, my] = k.split(',').map(Number); return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(my + dy) * m.w + mx + dx]); };
+  // (bfsReach ignores people: they are stood in for by a wall while it looks)
+  const reach = () => { const saved = m.npcs.map(n => { const c = m.t[n.y][n.x]; m.t[n.y][n.x] = '#'; return c; }); const s = bfsReach(m, sx, sy); m.npcs.forEach((n, i) => { m.t[n.y][n.x] = saved[i]; }); return s; };
+  const seen0 = reach(), base = count(seen0), had = Object.keys(m.meta).filter(k => side(seen0, k));
   for (let rad = 0; rad <= 10; rad++) for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
     const xx = x + dx, yy = y + dy; if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
-    if (wOpenTile(m, xx, yy) && !m.meta[xx + ',' + yy] && !(xx === m.spawn[0] && yy === m.spawn[1])) return [xx, yy];
+    if (!wOpenTile(m, xx, yy) || m.meta[xx + ',' + yy] || (xx === sx && yy === sy) || !seen0[yy * m.w + xx]) continue;
+    m.npcs.push({ id: '_stand', x: xx, y: yy }); const seen = reach(); m.npcs.pop();
+    if (count(seen) >= base - 1 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => seen[(yy + ay) * m.w + xx + ax]) && had.every(h => side(seen, h))) return [xx, yy];
   }
   return null;
 }
@@ -62292,11 +62305,19 @@ function wPshopBuy(id, kind) {
   const S = wPshopOf(id); if (!S) return 'No such shop.';
   if (!wPshopIsOpen(id)) return S.keeper ? `Only to ${S.need}.` : 'The shop is shut.';
   if (kind !== wPshopStock(id)) return 'Not in stock this week.';
+  const sold = wPshopSold(id); if (sold) return sold;
   if (wPets().owned.length >= W_PET.kennel) return `Your kennel is full (${W_PET.kennel}): let one go first.`;
   const c = wPshopPrice(kind); if (RUN.gold < c) return `It costs ${c} gold.`;
   RUN.gold -= c; const q = wPetAdd(kind, wPshopFrom(S));
   if (!q || q.waits) { RUN.gold += c; return 'It wouldn\'t come.'; }
+  if (S.keeper) wSetFlag('pkeep_' + id); else (WG.pshopWk = WG.pshopWk || {})[id] = wWeek();
   wLog(`You buy ${petA(PETS[kind].n)} ${PETS[kind].n} for ${c} gold.`, 'g'); wSave(); return '';
+}
+// sold out: a shop's pet this week, a keeper's once a journey ('' when there is one to buy)
+function wPshopSold(id) {
+  const S = wPshopOf(id); if (!S) return 'No such shop.';
+  if (S.keeper) return wFlag('pkeep_' + id) ? `${W_PSHOP_PEOPLE[S.npc].name} has only the one ${PETS[S.pet].n} to part with, and it is yours.` : '';
+  return WG.pshopWk && WG.pshopWk[id] === wWeek() ? 'Sold out this week: the next one comes in as the week turns.' : '';
 }
 // one let go here, had back at the price
 function wPshopBack(id, i) {
@@ -62311,11 +62332,11 @@ function wPshopOpen(id) {
   if (typeof wCloseTalk === 'function') wCloseTalk();
   const who = W_PSHOP_PEOPLE[S.npc].name, open = wPshopIsOpen(id), kind = wPshopStock(id), D = PETS[kind];
   const full = wPets().owned.length >= W_PET.kennel, away = (WG.petAway || []).map((a, i) => ({ a, i })).filter(o => o.a.from === wPshopFrom(S));
-  const T = D && petText(kind, 1, false);
+  const T = D && petText(kind, 1, false), sold = open && wPshopSold(id);
   const offer = !open ? `<p>${S.keeper ? `${esc(who)} sells only to ${esc(S.need)}.` : `The shop is shut until ${esc(who)} has sorted things out.`}</p>`
-    : `<p>${S.shop ? 'This week' : 'Always'}: <b>${esc(D.n)}</b>, ${petA(D.from)} ${esc(D.from)} (${esc(T.el)}), ${wPshopPrice(kind)} gold, upkeep ${wPetCost({ kind })} gold a week.</p>
+    : `<p>${S.shop ? 'This week' : 'The only one'}: <b>${esc(D.n)}</b>, ${petA(D.from)} ${esc(D.from)} (${esc(DB.elems.names[T.el] || T.el)}), ${wPshopPrice(kind)} gold, upkeep ${wPetCost({ kind })} gold a week.</p>
        <p class="hint"><b>Always:</b> ${esc(T.trait)} <b>Trick:</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}</p>
-       <div class="row"><button class="btn" data-psbuy="${kind}"${full || RUN.gold < wPshopPrice(kind) ? ' disabled' : ''}>Buy (${wPshopPrice(kind)} gold)</button></div>
+       ${sold ? `<p class="hint">${esc(sold)}</p>` : `<div class="row"><button class="btn" data-psbuy="${kind}"${full || RUN.gold < wPshopPrice(kind) ? ' disabled' : ''}>Buy (${wPshopPrice(kind)} gold)</button></div>`}
        ${S.shop && wPshopPets(id).length > 1 ? `<p class="hint">Next week: ${esc(PETS[wPshopStock(id, wWeek() + 1)].n)}.</p>` : ''}`;
   const wait = away.length ? `<p>Waiting here for you:</p><ul class="wpetlist">${away.map(o => `<li><button class="ghost" data-psback="${o.i}"${full ? ' disabled' : ''}>Have ${esc(o.a.name)} back (${wPshopPrice(o.a.kind)} gold)</button></li>`).join('')}</ul>` : '';
   const close = modal(`<header><h3>${esc(S.name || who)}</h3></header><div class="wmsg">${offer}${wait}${full ? `<p class="hint">Your kennel is full (${W_PET.kennel}): let one go first.</p>` : ''}<p class="hint">Gold: ${RUN.gold}.</p><p class="wbad" id="wPshopWhy" hidden></p></div>
@@ -62338,6 +62359,14 @@ wSay = function (id, kw) {
   return r;
 };
 
+// a caught loose pet (or one whose shop is open) leaves only the ground behind: walk on, look at it, draw it as such
+const wPshopGone = (map, x, y) => { const mt = map.meta[x + ',' + y] || {}, S = W_PSHOP.shops[mt.loose]; return !!(WG && S && (wFlag('pq_' + mt.loose + '_' + mt.i) || wFlag(S.quest))); };
+const wW134TileAt = wTileAt;
+wTileAt = function (map, x, y) {
+  const c = wW134TileAt(map, x, y);
+  if (c === W_PSHOP_CH && wPshopGone(map, x, y)) return (map.meta[x + ',' + y] || {}).under || '.';
+  return c;
+};
 const wW134Use = wUse;
 wUse = function (x, y) {
   const m = wCurMap(), c = wTileAt(m, x, y), use = (DB.tiles[c] || {}).use, meta = m.meta[x + ',' + y] || {};
@@ -62366,7 +62395,7 @@ const wW134RenderHelp = renderHelp;
 renderHelp = function () {
   wW134RenderHelp();
   const h = $('wHelpPetEggs') || $('wHelpPets'); if (!h || $('wHelpPetShops')) return;
-  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetShops"><b>Pet shops and keepers.</b> Graftonbury, Saltmere and Cinderhold have pet shops, each shut until you help its keeper with a small trouble in town. A shop sells its region's pets, one a week, and takes back any pet let go there, at its price. Mossgate and Rimewatch have keepers instead, each with one pet found nowhere else: the Hootling, to a team that has won a golf match at Mossgate Links, and the Frostpup, to a team that has won a hockey match at the Pond Rink. Ask any of them about PETS. Prices: ${W_PSHOP.price.c} gold for a common pet, ${W_PSHOP.price.u} uncommon, ${W_PSHOP.price.r} rare.</p>`);
+  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetShops"><b>Pet shops and keepers.</b> Graftonbury, Saltmere and Cinderhold have pet shops, each shut until you help its keeper with a small trouble in town. A shop sells its region's pets, one a week (a different one as the weeks turn), and takes back any pet let go there, at its price. Mossgate and Rimewatch have keepers instead, each with one pet found nowhere else, and only the one each journey: the Hootling, to a team that has won a golf match at Mossgate Links, and the Frostpup, to a team that has won a hockey match at the Pond Rink. Ask any of them about PETS. Prices: ${W_PSHOP.price.c} gold for a common pet, ${W_PSHOP.price.u} uncommon, ${W_PSHOP.price.r} rare.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
