@@ -12,16 +12,18 @@
    fixture's fans, and either way the fixture is done.
 
    WG.crcup  { week, field: [8 ids, 'me' first], round: 0..2, games: [[{ a, b, ra, rb, w, end }]] by round, pending, show,
-               out, done, champ } or null. ra, rb: the points; end: '' | 'xe' (an extra end decided it). Plain JSON, as
-               WG.lncup.
+               out, done, champ } or null. ra, rb: the points; end: '' | 'xe' (an extra end decided it) | 'c' (conceded:
+               the score when it was given up). Plain JSON, as WG.lncup.
    WG.crcupWins, WG.crcupLog: [{ year, day }]
-   W_BROOM   the numbers; W_BROOM.force ('win' | 'lose') settles your next cup match that way (tests and the bot)
+   W_BROOM   the numbers; W_BROOM.force ('win' | 'lose') settles your next cup match that way in the bracket (its row's
+             score turned round to fit); the match's own record (the log, the head to head, the XP) keeps the real
+             result. For tests and the bot
    wBroomEnter(), wBroomPlay(how), wBroomCatchUp(), wOpenBroom(), wBroomWon(), wShedSimClubs(a, b, tier),
    wCrfixPlay(how), W_ON_END.crcup, W_ON_END.crfix
    Wrapped: wNextPrompt (wW129NextPrompt: the rest of the round, then the bracket), wCampShed and wRenderCamp
    (wW129CampShed, wW129RenderCamp: a Brass Broom button), wOpenShedCard (wW129OpenShedCard: the cup and your fixture),
    wOpenGrdCard (wW129OpenGrdCard: the Shed's fixture row plays on the ice), wSimAt (wW129SimAt: the clubs' matches at
-   the Shed on the engine), wRunAct (wW129RunAct: 'crcup'), wWallText (wW129WallText), renderHelp (wW129RenderHelp:
+   the Shed on the engine), wResultText (wW129ResultText: a conceded fixture), wRunAct (wW129RunAct: 'crcup'), wWallText (wW129WallText), renderHelp (wW129RenderHelp:
    #wHelpShedCup). */
 
 const W_BROOM = {
@@ -35,7 +37,7 @@ const W_SHED_CUP = { gear: ['cr_broom', 'cr_slider', 'cr_gripper', 'cr_charm', '
 const W_CRFIX = { g: 'g_shed', tier: 2 };
 W_BRACKETS.crcup = { K: W_BROOM, name: 'Brass Broom', me: 'your four', store: 'games', view: 'shed', verb: 'held', busy: 'Finish the curling match you started first.',
   live: () => wShedLive(), base: () => wShedProblems(), sim: (a, b, tier) => wBroomSim(a, b, tier), won: () => wBroomWon(),
-  mark: g => g.end === 'xe' ? '†' : g.end === 'c' ? '‡' : '', hint: 'The scores are points. † Settled in an extra end. ‡ Conceded (the score when it was given up).' };
+  mark: g => g.end === 'xe' ? '†' : g.end === 'c' ? '‡' : '', hint: 'The scores are points. † Settled in an extra end. ‡ Won by concession (the score when the other rink gave up).' };
 function wBroom() { return wBrk('crcup'); }
 function wBroomOn() { return wBrkOn('crcup'); }
 function wBroomName(id) { return wBrkName('crcup', id); }
@@ -71,9 +73,8 @@ function wShedSimClubs(a, b, tier) {
   const B = wShg(), kept = JSON.parse(JSON.stringify(B.opp)), teams = [wShedOpp(a, tier), wShedOpp(b, tier)];
   B.opp = kept;
   const sk = wShedSkillOf(tier)[1], s = wCR.simGame({ teams, skill: [sk, sk], ends: wShedEnds(), cold: wShedColdNow(), hall: true, powers: true, seed: (Math.random() * 1e9) | 0 });
-  const t = (s.tot || [0, 0]).slice();
-  // (a game still level when the engine stops is settled as an extra end would be: one more for the side it falls to)
-  if (s.win !== 0 && s.win !== 1) { const k = Math.random() < .5 ? 0 : 1; t[k]++; return { ra: t[0], rb: t[1], w: k === 0 ? a : b, end: 'xe' }; }
+  // (a game the engine stopped before it was decided: wShedDecide)
+  wShedDecide(s); const t = s.tot || [0, 0];
   return { ra: t[0], rb: t[1], w: s.win === 0 ? a : b, end: s.extra ? 'xe' : '' };
 }
 function wBroomSim(a, b, tier) { const s = wShedSimClubs(a, b, tier); return { a, b, ra: s.ra, rb: s.rb, w: s.w, end: s.end }; }
@@ -153,6 +154,9 @@ W_ON_END.crfix = function (r, ref, W) {
     wMaybeBid(club);
   }
 };
+// a conceded fixture says so in the results (its score is the one when it was given up)
+const wW129ResultText = wResultText;
+wResultText = function (r) { return wW129ResultText(r) + (r && r.cd ? ' (conceded)' : ''); };
 const wW129SimAt = wSimAt;
 wSimAt = function (a, b, g) {
   if (g !== W_CRFIX.g || LAB) return wW129SimAt(a, b, g);

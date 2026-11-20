@@ -129,6 +129,10 @@ async def main():
         check(c['res']['sport'] == 'curling' and c['res']['sa'] > c['res']['sb'] and c['played'] == 4 and c['res']['sims'] == 1 and c['res']['kept'] and c['other'] == 'bowling',
               'the clubs\' fixtures at the Shed are played on the curling engine, and a rival\'s four for its matches against you is left alone; the Lanes\' are still bowling', c)
 
+        dc = await pg.evaluate("""(() => { const a = wShedDecide({ win: -1, tot: [5, 3] }), b = wShedDecide({ win: -1, tot: [4, 4] });
+          const t = wResultText({ a: 'me', b: wLeagueClubs()[0], sa: 3, sb: 6, sport: 'curling', cd: 1 });
+          return { lead: a.win === 0 && a.tot.join() === '5,3', level: b.tot[0] + b.tot[1] === 9 && b.tot[b.win] === 5 && !!b.extra, cd: t.includes('(conceded)') }; })()""")
+        check(dc == {'lead': True, 'level': True, 'cd': True}, 'a game stopped undecided goes to the side ahead, or a level one to an extra end; a conceded fixture says so in the results', dc)
         bt = await pg.evaluate("""(() => { wOpenCamp('shed'); const tab = !!document.querySelector('#wCampBody [data-crcup]'); WCAMP.close();
           wOpenShedCard(); const card = !!document.querySelector('#modalBox [data-crcup]'); return { tab, card }; })()""")
         check(bt['tab'] and bt['card'], 'the Shed tab and the match card have a Brass Broom button', bt)
