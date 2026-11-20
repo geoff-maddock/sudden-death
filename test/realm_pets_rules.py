@@ -90,7 +90,7 @@ async def main():
           out.jellyAll = (() => { __fight({ kind: 'jellycube', bond: 1 }); return [debuffP('soaked', 1), debuffP('weak', 1)]; })();
           __fight({ kind: 'rustnibbler', bond: 1 }); const k = alive()[0]; blockE(k, 12); out.rustAll = k.block;
           __fight({ kind: 'axebeak', bond: 1 }, ['skelss', 'thief']); const [a1, a2] = alive(); B.lastTgt = a1.uid; const h1 = a1.hp, h2 = a2.hp; fire('attackPlayed', B.hand[0]); out.peck = [a1.hp === h1, a2.hp < h2];
-          __fight({ kind: 'axebeak', bond: 1 }); const atk = { uid: 999, id: Object.keys(CARDS).find(id => CARDS[id].type === 'atk'), up: false }; B.inCard = true; const x1 = atkDmg(5, alive()[0], atk), x2 = atkDmg(5, alive()[0], atk); B.inCard = false; fire('attackPlayed', atk); const x3 = atkDmg(5, alive()[0], atk); out.firstHit = [x1 - x3, x2 - x3];
+          __fight({ kind: 'axebeak', bond: 1 }); const atk = { uid: 999, id: Object.keys(CARDS).find(id => CARDS[id].type === 'atk'), up: false }; const sky0 = skyAtk; skyAtk = () => 0; B.inCard = true; const x1 = atkDmg(5, alive()[0], atk), x2 = atkDmg(5, alive()[0], atk); B.inCard = false; fire('attackPlayed', atk); const x3 = atkDmg(5, alive()[0], atk); skyAtk = sky0; out.firstHit = [x1 - x3, x2 - x3];
           __fight({ kind: 'cockatrice', bond: 1 }); B.lastTgt = 'gone'; const before = alive().map(e => sv(e, 'vuln')); fire('attackPlayed', B.hand[0]); out.noFallback = JSON.stringify(alive().map(e => sv(e, 'vuln'))) === JSON.stringify(before);
           __fight({ kind: 'bogfrog', bond: 2 }); B.phase = 'enemy'; fire('enemyFalls', alive()[0]); out.drawnext = sv(B.P, 'drawnext'); B.phase = 'player';
           __fight({ kind: 'chestnut', bond: 2 }); const g0 = RUN.gold; fire('enemyFalls', { eaten: 1 }); out.eaten = RUN.gold - g0;
@@ -116,6 +116,9 @@ async def main():
         sb = await pg.evaluate("""(() => { __fight({ kind: 'bogfrog', bond: 1 }, ['skelss', 'thief']); const [a, b] = alive(); B.pet.spooked = true; const p0 = B.P.block;
           a.block = 6; fire('enemyBlock', { e: a, n: 6 }); const first = [B.pet.spooked, a.block]; b.block = 6; fire('enemyBlock', { e: b, n: 6 }); return { first, second: b.block, mine: B.P.block - p0 }; })()""")
         check(sb == {'first': [False, 6], 'second': 6, 'mine': 0}, 'a spook is spent when there is something to take, and it uses up a once-a-turn power for the turn (the Bog Frog\'s tongue doesn\'t come back on the second gain)', sb)
+        pd = await pg.evaluate("""(() => { __fight({ kind: 'pseudodragon', bond: 1 }); RUN.hp = Math.floor(RUN.maxhp * .3); B.pet.spooked = true; const r0 = sv(B.P, 'regen');
+          fire('turnStart'); const first = [B.pet.spooked, sv(B.P, 'regen') - r0]; fire('turnStart'); return { first, second: sv(B.P, 'regen') - r0 }; })()""")
+        check(pd == {'first': [False, 0], 'second': 3}, 'a once-a-fight power the spook stops waits: the Pseudodragon\'s Regen comes the next turn', pd)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

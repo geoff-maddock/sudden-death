@@ -5,7 +5,8 @@
    - its powers, which fire on their own when their moment comes (each opens at a bond level: at);
    - its trick, once a fight, when you choose (petTrick).
    Bond (1 to 3) makes its numbers bigger (petPow: PET.bond); a hungry pet's are smaller (PET.hungry). A hit of
-   PET.spook or more spooks it: its next power doesn't fire (the trait still does).
+   PET.spook or more spooks it: its next power that would fire doesn't (a once-a-turn power is lost for that turn; a
+   once-a-fight power waits for its next chance; the trait is never spooked).
    Declared, not checked by name: each pet's trait and powers carry on: { event: fn(arg, pet) | { when, then } } handlers, read through
    the hooks (onHook: one dispatcher an event), and mod: { name: fn(arg, pet) } sums (petMod, added to mod()). Its damage
    goes into atkDmg's breakdown under the pet's own name (petAtk). The moments a pet reads that the engine had no event
@@ -32,7 +33,7 @@ function petSay(t) { fx({ k: 'pet', t: `${petName()}: ${t}` }); log(`${petName()
 // the powers open at their bond levels
 const petPowers = p => (petDef(p).powers || []).filter(w => (w.at || 1) <= (p.bond || 1));
 // one event, to the pet at your side: its trait, then its powers. A handler is a function (it always fires) or
-// { when(a, pet), then(a, pet), spend(a, pet) } (spend: what a once-a-turn or once-a-fight power marks as used): a spooked pet's first power that would fire doesn't, and the pet settles (the trait
+// { when(a, pet), then(a, pet), spend(a, pet) } (spend: what a once-a-turn power marks as used, before it fires): a spooked pet's first power that would fire doesn't, and the pet settles (the trait
 // is never spooked). A truthy return is passed back (playerDebuff uses it to stop the debuff)
 const petH = h => typeof h === 'function' ? { when: () => true, then: h } : h;
 function petOn(ev, a) {
@@ -46,8 +47,10 @@ function petOn(ev, a) {
   for (const w of petPowers(p)) {
     const f = w.on && w.on[ev]; if (!f) continue;
     const h = petH(f); if (!h.when(a, p)) continue;
-    // (a power the spook stops counts as used, where it is once a turn or a fight: its spend)
-    if (p.spooked) { p.spooked = false; if (h.spend) h.spend(a, p); petSay('too spooked to help this time.'); continue; }
+    // (a once-a-turn power marks itself used (its spend) whether it fires or the spook stops it, so a spook costs it the
+    // turn; a once-a-fight power has no spend here, and waits for its next chance)
+    if (h.spend) h.spend(a, p);
+    if (p.spooked) { p.spooked = false; petSay(h.spend ? 'too spooked to help this turn.' : 'too spooked to help this time.'); continue; }
     const v = h.then(a, p); if (v) r = v;
   }
   return r;
