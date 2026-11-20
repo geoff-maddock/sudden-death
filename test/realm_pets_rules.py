@@ -58,13 +58,13 @@ async def main():
         m = await pg.evaluate("""(() => { const out = {}; const e0 = () => alive()[0];
           __fight({ kind: 'blinkpup', bond: 1 }); B.P.block = 0; const lost = () => { const h = RUN.hp; hurtPlayer(4, e0()); return h - RUN.hp; }; out.blink = [lost(), lost()];
           __fight({ kind: 'jellycube', bond: 1 }); out.jelly = [!!fire('playerDebuff', { k: 'weak', n: 2 }), !!fire('playerDebuff', { k: 'weak', n: 2 })];
-          __fight({ kind: 'rustnibbler', bond: 1 }); const e = e0(); e.block += 9; fire('enemyBlock', { e, n: 9 }); const after1 = e.block; e.block += 9; fire('enemyBlock', { e, n: 9 }); out.rust = [after1, e.block];
+          __fight({ kind: 'rustnibbler', bond: 1 }); const e = e0(); e.block = 5; e.block += 9; fire('enemyBlock', { e, n: 9 }); const after1 = e.block; e.block += 9; fire('enemyBlock', { e, n: 9 }); out.rust = [after1, e.block];
           const hand = pet => { __fight(pet); return B.hand.length; }; out.sprite = [hand(null), hand({ kind: 'sprite', bond: 1 })];
           __fight({ kind: 'bogfrog', bond: 1 }); out.frog = B.P.block;
           return out; })()""")
         check(m['blink'] == [0, 4], 'Blinkpup: the first attack aimed at you each turn gives 4 Block (a 4-damage hit costs nothing), the second none', m['blink'])
         check(m['jelly'] == [True, False], 'Jellycube: the first debuff on you is swallowed, the next lands', m['jelly'])
-        check(m['rust'] == [0, 7], 'Rustnibbler: the first enemy Block is eaten whole, and after that it nibbles 2', m['rust'])
+        check(m['rust'] == [5, 12], 'Rustnibbler: the first Block an enemy raises is eaten (not what it had), and after that it nibbles 2 of each', m['rust'])
         check(m['sprite'][1] == m['sprite'][0] + 1 and m['frog'] >= 5, 'Sprite in a Jar: one more card on the first turn; Bog Frog: Block at the start', m)
 
         # ---------- bond, hunger, spooking, the trick, the breakdown ----------
@@ -90,7 +90,7 @@ async def main():
           out.jellyAll = (() => { __fight({ kind: 'jellycube', bond: 1 }); return [debuffP('soaked', 1), debuffP('weak', 1)]; })();
           __fight({ kind: 'rustnibbler', bond: 1 }); const k = alive()[0]; blockE(k, 12); out.rustAll = k.block;
           __fight({ kind: 'axebeak', bond: 1 }, ['skelss', 'thief']); const [a1, a2] = alive(); B.lastTgt = a1.uid; const h1 = a1.hp, h2 = a2.hp; fire('attackPlayed', B.hand[0]); out.peck = [a1.hp === h1, a2.hp < h2];
-          __fight({ kind: 'axebeak', bond: 1 }); const atk = { uid: 999, id: Object.keys(CARDS).find(id => CARDS[id].type === 'atk'), up: false }; B.inCard = true; const x1 = atkDmg(5, alive()[0], atk), x2 = atkDmg(5, alive()[0], atk); B.inCard = false; out.firstHit = x1 - x2;
+          __fight({ kind: 'axebeak', bond: 1 }); const atk = { uid: 999, id: Object.keys(CARDS).find(id => CARDS[id].type === 'atk'), up: false }; B.inCard = true; const x1 = atkDmg(5, alive()[0], atk), x2 = atkDmg(5, alive()[0], atk); B.inCard = false; fire('attackPlayed', atk); const x3 = atkDmg(5, alive()[0], atk); out.firstHit = [x1 - x3, x2 - x3];
           __fight({ kind: 'cockatrice', bond: 1 }); B.lastTgt = 'gone'; const before = alive().map(e => sv(e, 'vuln')); fire('attackPlayed', B.hand[0]); out.noFallback = JSON.stringify(alive().map(e => sv(e, 'vuln'))) === JSON.stringify(before);
           __fight({ kind: 'bogfrog', bond: 2 }); B.phase = 'enemy'; fire('enemyFalls', alive()[0]); out.drawnext = sv(B.P, 'drawnext'); B.phase = 'player';
           __fight({ kind: 'chestnut', bond: 2 }); const g0 = RUN.gold; fire('enemyFalls', { eaten: 1 }); out.eaten = RUN.gold - g0;
@@ -98,7 +98,7 @@ async def main():
           return out; })()""")
         check(r1['weakLeft'] >= 1, 'Jellycube: the attacker\'s Weak lasts past the end of its own turn, to its next attack', r1)
         check(r1['jellyAll'] == [False, True] and r1['rustAll'] == 0, 'every debuff on you (a boss\'s Soaked) and every enemy Block (a phase\'s) reaches the pet', r1)
-        check(r1['peck'] == [True, True] and r1['firstHit'] == 3, 'Axebeak: the peck lands on another enemy; its +3 is on the first hit only', r1)
+        check(r1['peck'] == [True, True] and r1['firstHit'] == [3, 3], 'Axebeak: the peck lands on another enemy; its +3 is on every hit of the first attack card, and gone after it', r1)
         check(r1['noFallback'] and r1['drawnext'] == 1 and r1['eaten'] == 0, 'Cockatrice exposes only the enemy you hit; Bog Frog\'s draw waits for your turn; an ally a boss eats pays nothing', r1)
         check(r1['badKind'][0] != '' and r1['badKind'][1] is False, 'a pet whose kind is gone has no trick (no error)', r1)
         r2 = await pg.evaluate("""(() => { const out = {};

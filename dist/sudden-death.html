@@ -1948,7 +1948,7 @@ ENEMIES.kqueen.brain = e => {
   if (e.hp < e.max * .5 && last !== 'snack') return 'snack';                    // hurt: eat a cheerleader
   return null;
 };
-ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); if (e.block > b0) fx({ k: 'num', e: e.uid, t: `+${e.block - b0}`, col: '#9fd2ff' }); } };
+ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); if (e.block > b0) fx({ k: 'num', e: e.uid, t: `+${e.block - b0}`, col: '#9fd2ff', blk: 1 }); } };
 ENEMIES.kqueen.phases = [{ at: .4, n: 'Halftime Show', sub: 'Pyrotechnics. Lots of them.', fn: e => { addSt(e, 'str', 3); e.st.enraged = 1; } }];
 
 /* ----- Act 2: the Rimegrave Arena ----- */
@@ -3179,7 +3179,8 @@ function petText(kind, b, hungry) {
    rare), how (where you get one: 'shop', 'keeper', 'egg'), trait { d, on, mod, atk }, powers [{ at (the bond it opens
    at), d, on, mod, atk }], trick { n, d, tgt, ops(pet) } (card ops, resolved like a tonic's). A d is words, or a
    function of the pet (its numbers at its bond). Handlers: on: { event: fn(arg, pet) | { when, then } } (see
-   engine/pets.js), mod: { name: fn(arg, pet) }, atk: fn(card, enemy, pet) (more damage on a hit).
+   engine/pets.js), mod: { name: fn(arg, pet) }, atk: fn(card, enemy, pet) (more damage on a hit). A pet that takes an
+   enemy's Block takes only what it just gained (enemyBlock's n), less what the pet has taken of it already (a.ate).
    Words: a pet is of a kind, never a species. */
 const pv = (n, p) => petPow(n, p);
 const petBelow = f => RUN.hp < RUN.maxhp * f;
@@ -3199,9 +3200,8 @@ const PETS = {
     ],
     trick: { n: 'Sting', d: p => `${pv(6, p)} damage and Weak ${pv(2, p)} to one enemy.`, ops: p => [['d', pv(6, p)], ['s', 'weak', pv(2, p)]] } },
   axebeak: { n: 'Axebeak Chick', from: 'axe beak', el: 'aether', rar: 'c', how: 'shop',
-    // (its first hit only: every forecast (the card face, the breakdown, a bot's guess) counts it until it is spent, so they
-    // agree with the hit it lands on; a real hit in a card spends it. A forecast of a many-hit card counts it on each hit)
-    trait: { d: p => `Your first attack each fight deals ${pv(3, p)} more (its first hit).`, atk: (card, e, p) => { if (p.f.peck1 || !card || def(card).type !== 'atk') return 0; if (B.inCard && !WHY) p.f.peck1 = 1; return pv(3, p); } },
+    // (every hit of the first attack card: spent once that card has resolved, so a forecast and the hits agree)
+    trait: { d: p => `Your first attack card each fight: each of its hits deals ${pv(3, p)} more.`, atk: (card, e, p) => !p.f.peck1 && card && def(card).type === 'atk' ? pv(3, p) : 0, on: { attackPlayed: (c, p) => { p.f.peck1 = 1; } } },
     powers: [
       { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, then: (c, p) => { p.t.peck = 1; const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
       { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
@@ -3224,7 +3224,7 @@ const PETS = {
   bogfrog: { n: 'Bog Frog', from: 'giant frog', el: 'bloom', rar: 'c', how: 'egg',
     trait: { d: p => `Starts each fight with ${pv(5, p)} Block.`, on: { fightStart: (a, p) => { B.P.block += pv(5, p); } } },
     powers: [
-      { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0, then: (a, p) => { p.t.tongue = 1; const n = Math.min(a.e.block, pv(3, p)); a.e.block -= n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
+      { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0, then: (a, p) => { p.t.tongue = 1; const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
       { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn).', on: { enemyFalls: () => { if (B.phase === 'player' && !B.ending) drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
     ],
     trick: { n: 'Gulp', d: p => `Swallows an enemy (not a boss) with ${pv(12, p)} HP or less; any other takes 16 damage.`, ops: p => [['devour', pv(12, p), 0]] } },
@@ -3258,9 +3258,9 @@ const PETS = {
     ],
     trick: { n: 'Flare', tgt: 'all', d: p => `Burn ${pv(4, p)} on every enemy.`, ops: p => [['s', 'burn', pv(4, p), 'all']] } },
   rustnibbler: { n: 'Rustnibbler', from: 'rust monster', el: 'ember', rar: 'u', how: 'shop',
-    trait: { d: 'The first enemy to gain Block each fight loses all of it.', on: { enemyBlock: { when: (a, p) => !p.f.rust && a.e && a.e.block > 0, then: (a, p) => { p.f.rust = 1; const n = a.e.block; a.e.block = 0; petSay(`eats all ${n} of ${a.e.n}'s Block.`); } } } },
+    trait: { d: 'The first enemy to gain Block each fight loses what it gained.', on: { enemyBlock: { when: (a, p) => !p.f.rust && a.e && a.e.block > 0, then: (a, p) => { p.f.rust = 1; const n = Math.min(a.e.block, a.n); a.e.block -= n; a.ate = (a.ate || 0) + n; petSay(`eats the ${n} Block ${a.e.n} just raised.`); } } } },
     powers: [
-      { at: 1, d: p => `Whenever an enemy gains Block: it nibbles ${pv(2, p)} of it.`, on: { enemyBlock: { when: a => a.e && a.e.block > 0, then: (a, p) => { a.e.block = Math.max(0, a.e.block - pv(2, p)); } } } },
+      { at: 1, d: p => `Whenever an enemy gains Block: it nibbles ${pv(2, p)} of what it gained.`, on: { enemyBlock: { when: a => a.e && a.e.block > 0, then: (a, p) => { const n = Math.min(a.e.block, a.n - (a.ate || 0), pv(2, p)); if (n > 0) { a.e.block -= n; a.ate = (a.ate || 0) + n; } } } } },
       { at: 2, d: p => `Your first attack each turn on an enemy with no Block deals ${pv(3, p)} more.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && !e.block ? pv(3, p) : 0 },
     ],
     trick: { n: 'Rust', tgt: 'all', d: 'Every enemy loses its Block and its Strength.', ops: () => [['strip']] } },
