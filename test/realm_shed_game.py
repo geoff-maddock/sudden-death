@@ -108,7 +108,10 @@ async def main():
           wCR.start({ seed: 43, ends: 4, teams: [T('a'), T('b')], noSweep: [true, false] }); n = 0; let swept0 = 0, swept1 = 0; while (!wCR.G.over && n++ < 100) { const s = wCR.up(); wCR.turn(); if (s === 0 && wCR.G.legs[0] < 1) swept0++; if (s === 1 && wCR.G.legs[1] < 1) swept1++; } const over = !!wCR.G.over;
           const sum = wCR.simGame({ seed: 44, ends: 2, powers: true, teams: [T('a'), T('b')] });
           return { guards: S.guard || 0, all, fresh, swept0, swept1: swept1 > 0 && over, arrays: Array.isArray(sum.casts) && Array.isArray(sum.pots) }; })()""")
-        check(lb['guards'] >= lb['all'] * .7 and lb['fresh'] and lb['swept0'] == 0 and lb['swept1'] and lb['arrays'], 'the lab\'s switches: a side held to the guard throws guards, wear off leaves the pebble fresh, no sweeping spends no legs; a summary carries the casts and the potions', lb)
+        check(lb['guards'] >= lb['all'] * .7, 'the lab\'s fixShot: a side held to the guard throws guards', lb)
+        check(lb['fresh'], 'the lab\'s wear: false: a game played out (every stone) leaves the pebble fresh', lb)
+        check(lb['swept0'] == 0 and lb['swept1'], 'the lab\'s noSweep: that side spends no legs, the other side still sweeps', lb)
+        check(lb['arrays'], 'a summary carries the casts and the potions', lb)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('FAILURES: ' + str(len(FAILS)) if FAILS else 'all ok')

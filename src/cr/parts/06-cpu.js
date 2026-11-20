@@ -9,22 +9,21 @@
    wants the middle open and corner guards, and at the end of an end what the hammer is worth next.
    The skills (CR_SKILL): a Squire looks at the plain shots (both handles, and the hit and roll, but no draws round the
    guards), doesn't think about the hammer, reads the fresh pebble, misses more, plays its best two over two throws
-   each and sweeps a little late (from 300 inches past the hack); a Knight looks at the same shots and plays its best
-   three over three throws with its own miss; an
+   each and sweeps a little late (from 300 inches past the hack); a Knight looks at the same shots, thinks about the
+   hammer and plays its best three over three throws with its own miss; an
    Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now. (top:
-   how many of its best it weighs; samples: the throws each; wide: both handles and the hit and roll, on for all three
-   now, kept as a switch for tuning.)
+   how many of its best it weighs; samples: the throws each. Every skill looks at both handles and the hit and roll:
+   a Squire on one handle and no hit and roll lost to a Knight 91% even with the rest of its tuning.)
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.
    The ice a skip reads (crIceRead, CR_SKILL's ice): an Archmage the pebble as it is now, a Knight as it was when the end
    began, a Squire the fresh pebble; it aims on it and judges its shots on it, so a misread costs it. Its shots know the
    free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
-  // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%; on the old,
-  // narrow shot list, one handle and no hit and roll, it was still 91%)
-  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, wide: true, hammer: false, ice: 'fresh', sweepLate: 300 },
-  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, wide: true, hammer: true, ice: 'end', sweepLate: 0 },
-  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, wide: true, hammer: true, ice: 'now', sweepLate: 0 }];
+  // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%)
+  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
+  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
+  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
@@ -53,13 +52,13 @@ function crValue(stones, s, kAfter, hammer, sk) {
 // the shots worth a look for side s now: [{ shot, x, y, v?, h, aim: { ang, v, h }, target? }]
 function crShots(s, sk) {
   const S = CR_SKILL[sk], R = CR_SHEET.stoneR, ice = crIceRead(s), cold = G.cold, st = G.stones, out = [];
-  const hs = S.wide ? [1, -1] : [1];
+  const hs = [1, -1];
   const draw = (shot, x, y) => { for (const h of hs) { const aim = crSolveDraw(x, y, h, ice, cold); if (aim) out.push({ shot, x, y, h, aim }); } };
   const hit = (shot, o, v, dx) => { for (const h of hs) { const aim = crSolveHit(o.x + (dx || 0), o.y - R * 1.6, v, h, ice, cold); if (aim) out.push({ shot, x: o.x, y: o.y, h, aim, target: o.id, roll: dx || 0 }); } };
   draw('draw', 0, 0); draw('draw', 0, -40); draw('draw', 40, -8); draw('draw', -40, -8); draw('draw', 0, 34);
   draw('guard', 0, -190); draw('guard', 52, -175); draw('guard', -52, -175);
   for (const o of st.filter(o => o.s !== s)) {
-    if (crInHouse(o)) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.wide) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
+    if (crInHouse(o)) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); }
     // (a guard of theirs can't be taken out before the fifth stone: the free guard zone)
     else if (crInFgz(o) && G.k >= G.fgz) hit('peel', o, CR_AIM.vPeel);
   }

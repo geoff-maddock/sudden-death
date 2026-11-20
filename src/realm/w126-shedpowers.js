@@ -21,8 +21,10 @@ const wCrPowPair = (kind, which) => [wCR.pow, wCR.pow2].map(T => (T[kind] || T.g
 const wW126FourCrRow = wFourCrRow;
 wFourCrRow = function (k, C) {
   const html = wW126FourCrRow(k, C), p = wFourCrWho(k); if (!p) return html;
+  // (each with its cost in mana, as the engine prices it)
+  const cost = P => P.curse ? wCR.manaRules.curse : P.fx && P.fx.granite ? wCR.manaRules.granite : wCR.manaRules.pow;
   const sel = ['draw', 'hit'].map(w => { const [a, b] = wCrPowPair(p.kind, w), cur = p.crPw && p.crPw[w] === 1 ? 1 : 0;
-    return `<label class="wsvl" title="${esc(`${a.n}: ${a.desc} / ${b.n}: ${b.desc}`)}">${w === 'draw' ? 'Draw power' : 'Hit power'} <select data-crpw="${w}" aria-label="${esc(p.n)}'s ${w} power"><option value="0"${cur ? '' : ' selected'}>${esc(a.n)}</option><option value="1"${cur ? ' selected' : ''}>${esc(b.n)}</option></select></label>`; }).join('');
+    return `<label class="wsvl" title="${esc(`${a.n} (${cost(a)} mana): ${a.desc} / ${b.n} (${cost(b)} mana): ${b.desc}`)}">${w === 'draw' ? 'Draw power' : 'Hit power'} <select data-crpw="${w}" aria-label="${esc(p.n)}'s ${w} power"><option value="0"${cur ? '' : ' selected'}>${esc(a.n)} (${cost(a)})</option><option value="1"${cur ? ' selected' : ''}>${esc(b.n)} (${cost(b)})</option></select></label>`; }).join('');
   return html.replace(/(<label class="wsvl">Position[\s\S]*?<\/label>)/, `$1${sel}`);
 };
 const wW126RenderCamp = wRenderCamp;
@@ -66,7 +68,7 @@ wShedBoard = function () {
 
 const wW126ShedHow = wShedHowHTML;
 wShedHowHTML = function () {
-  return wW126ShedHow() + `<p class="hint"><b>Powers.</b> Every kind has its own magic: a <b>draw power</b> (for a draw, a guard or a freeze) and a <b>hit power</b> (for a takeout, a peel or a hit and roll), and a second of each to pick on the Shed tab. The thrower casts theirs before their stone (P) for team <b>mana</b>, which shots made and ends scored fill. Most make the stone truer or the sweepers stronger; a golem's granite stone won't be moved once it is at rest (a granite power costs 3 mana, the rest 2), a wraith's smoke stone slides through a guard, a harpy's gust pushes their stone back from the button, and some are curses on the other rink's next stone: a witch's frost hex makes it drag heavy, a gorgon's stare makes it stiff.</p>
+  return wW126ShedHow() + `<p class="hint"><b>Powers.</b> Every kind has its own magic: a <b>draw power</b> (for a draw, a guard or a freeze) and a <b>hit power</b> (for a takeout, a peel or a hit and roll), and a second of each to pick on the Shed tab. The thrower casts theirs before their stone (P) for team <b>mana</b>, which shots made and ends scored fill. Most make the stone truer or the sweepers stronger; a golem's granite stone won't be moved once it is at rest, a wraith's smoke stone slides through a guard, a harpy's gust pushes their stone back from the button, and some are curses on the other rink's next stone: a witch's frost hex makes it drag heavy, a gorgon's stare makes it stiff. A power costs ${wCR.manaRules.pow} mana, a curse ${wCR.manaRules.curse}, and any granite power (a golem's, a troll's, a zombie's) ${wCR.manaRules.granite}.</p>
   <p class="hint"><b>The roar</b> fills on shots made, double takeouts, twos, big ends and most on a steal. It pays for the curler's <b>ultimate</b> (U), once a game at the start of an end: it marks the whole end, for your stones or against theirs. Or it steadies the skip's stone in the last end (K). <b>Situation powers</b>, once a game each: the Hammer (the end's last stone, with the hammer), the Steal (your last stone without it, lying shot) and Extra End. In Manage, <b>Auto powers</b> lets your captain cast for you.</p>`;
 };
 const wW126RenderHelp = renderHelp;
