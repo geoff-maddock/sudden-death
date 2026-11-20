@@ -69,7 +69,7 @@ function crReason(s, c) {
 /* ---------- the ice chart ---------- */
 // how far back side s's skip reads the ice, in inches from the tee line toward the thrower (the house and two feet at
 // the least, all the way to the hog line for the best reader)
-function crReadIn(s) { const skip = G.order ? G.order[s][3] : 0, r = crRat(s, skip).red; return CR_CALL.read + (CR_SHEET.hog - CR_CALL.read) * r; }
+function crReadIn(s) { const skip = G.order ? G.order[s][3] : 0, r = clamp(crRat(s, skip).red, 0, 1); return CR_CALL.read + (CR_SHEET.hog - CR_CALL.read) * r; }
 // the chart: the sheet on its side (the thrower at the left, the house at the right), w by h, for side s; paths: every
 // stone's path this game ([{ s, path }]), the last bold
 function crChart(c, s, w, h, paths) {

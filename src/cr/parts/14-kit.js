@@ -14,8 +14,8 @@
    worn ice is fresh again (for both rinks). */
 const CR_POTIONS = {
   draught: { n: 'Stamina Draught', legs: .4, desc: 'Your sweepers get two fifths of their legs back.' },
-  crwarm: { n: 'Warming Draught', desc: 'Your next stone has no pressure on it, whatever rides on it.' },
-  crsalt: { n: 'Frost Salt', heavy: 1.03, desc: 'Salt on the other rink\'s line: their next stone drags heavy, and comes up short.' },
+  crwarm: { n: 'Warming Draught', desc: 'For the skip\'s stones in the last end: the next one has no pressure on it, whatever rides on it.' },
+  crsalt: { n: 'Frost Salt', heavy: 1.03, desc: 'Salt on the other rink\'s line: their next stone this end drags heavy, and comes up short.' },
   crpebble: { n: 'Hennock\'s Pebble', desc: 'Hennock pebbles the sheet: the worn ice is fresh again, for both rinks.' },
 };
 // a CPU gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
@@ -65,7 +65,7 @@ function crPotion(id) {
   const why = crPotionWhy(s, id); if (why) return why;
   GP.msg = crPotionGive(s, id);
   // (fresh ice runs differently: your skip's aim is worked out again on it)
-  if (id === 'crpebble' && GP.sel) { const a = crSelAim(GP.sel); if (a) GP.sel.aim = a; }
+  if (id === 'crpebble' && GP.sel) GP.sel.aim = crSelAim(GP.sel);
   crPick();
   return '';
 }
@@ -92,5 +92,7 @@ function crCpuPotion(s, shot) {
 }
 // after side s's stone: the warming draught is spent, and the salt on its line; at an end's end, all of it
 function crKitAfter(s, endDone) { if (G && G.still) { G.still[s] = false; G.salt[s] = false; if (endDone) { G.still = [false, false]; G.salt = [false, false]; } } }
-// a CPU's potion, and its plan made again if the potion changed the ice under it (Hennock's Pebble)
+// a CPU's potion, and its plan made again if the potion changed the ice under it (Hennock's Pebble). The pebble is
+// given for the worn ice, whatever the shot, so a new shot on the fresh ice still suits it; the page and a headless game
+// both go this way, so a seeded game plays the same either way
 function crCpuPotionPlan(s, plan, again) { const n = G.pots.length, pot = crCpuPotion(s, plan.shot); return { pot, plan: pot && G.pots[n] && G.pots[n].id === 'crpebble' ? Object.assign(again(), { s }) : plan }; }

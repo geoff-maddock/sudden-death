@@ -96,7 +96,7 @@ wCR.onPhase = ph => { if (ph === 'next') W_SHED_KITMSG = ''; wW127OnPhase(ph); }
 const wW127ResumeShed = wResumeShed;
 wResumeShed = function () {
   wW127ResumeShed();
-  const L = WG.shg && WG.shg.live, G = wCR.G; if (L && G && G.bags && G.bags[1] == null && WCR && WCR.world) G.bags[1] = Object.assign({}, W_SHED_KIT.opp[L.world.tier] || {});
+  const L = WG.shg && WG.shg.live, G = wCR.G; if (L && G && G.bags && G.bags[1] == null && WCR && WCR.world) { G.bags[1] = Object.assign({}, W_SHED_KIT.opp[L.world.tier] || {}); L.snap = wCR.snapshot(); wSave(); }
 };
 $('wShedBagRow').addEventListener('click', e => {
   const b = e.target.closest('[data-crkuse]'); if (!b || b.disabled) return;
@@ -118,7 +118,7 @@ wOpenShedCard = function () {
 
 const wW127ShedHow = wShedHowHTML;
 wShedHowHTML = function () {
-  return wW127ShedHow() + `<p class="hint"><b>Gear and potions.</b> Each player can carry one piece for the Shed: a Hair Broom (+1 sweep), a Teflon Slider (+1 draw) and Gripper Shoes (sweeping costs less legs) from Saltmere's store; a Granite Charm (a big moment weighs less), Stone Polish (a truer release) and a Lucky Stopwatch (a truer weight) from chests. In a real match, before one of your stones, give a potion from the Bag row (one an end): the Stamina Draught (the sweepers' legs back), a Warming Draught (no pressure on the stone), Frost Salt (their next stone drags) or Hennock's Pebble (the worn ice fresh again). Your captain advises, but never opens your bag.</p>`;
+  return wW127ShedHow() + `<p class="hint"><b>Gear and potions.</b> Each player can carry one piece for the Shed: a Hair Broom (+1 sweep), a Teflon Slider (+1 draw) and Gripper Shoes (sweeping costs less legs) from Saltmere's store; a Granite Charm (a big moment weighs less), Stone Polish (a truer release) and a Lucky Stopwatch (a truer weight) from chests. In a real match, before one of your stones, give a potion from the Bag row (one an end): the Stamina Draught (the sweepers' legs back), a Warming Draught (the skip's stones in the last end: no pressure on the next one), Frost Salt (their next stone this end drags) or Hennock's Pebble (the worn ice fresh again). Your captain advises, but never opens your bag.</p>`;
 };
 const wW127RenderHelp = renderHelp;
 renderHelp = function () {
