@@ -174,4 +174,5 @@ src/realm/w130-shedfeel.js
 src/realm/w131-shedtilda.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
+src/realm/w134-petshop.js
 src/realm/w112-quickstart.js
