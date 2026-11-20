@@ -9,9 +9,11 @@
    wants the middle open and corner guards, and at the end of an end what the hammer is worth next.
    The skills (CR_SKILL): a Squire looks at the plain shots (both handles, and the hit and roll, but no draws round the
    guards), doesn't think about the hammer, reads the fresh pebble, misses more, plays its best two over two throws
-   each and sweeps a little late (from 300 inches past the hack); a Knight looks at them all and plays its best three over three throws with its own miss; an
+   each and sweeps a little late (from 300 inches past the hack); a Knight looks at the same shots and plays its best
+   three over three throws with its own miss; an
    Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now. (top:
-   how many of its best it weighs; samples: the throws each; wide: both handles and the hit and roll.)
+   how many of its best it weighs; samples: the throws each; wide: both handles and the hit and roll, on for all three
+   now, kept as a switch for tuning.)
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.
    The ice a skip reads (crIceRead, CR_SKILL's ice): an Archmage the pebble as it is now, a Knight as it was when the end

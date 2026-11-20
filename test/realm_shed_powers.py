@@ -46,11 +46,12 @@ async def main():
         e = await pg.evaluate(f"""(() => {{ const out = {{}};
           wCR.start({{ seed: 1, teams: [__team({A}), __team({B})] }}); out.off = [!!wCR.G.powers, wCR.fxFor(0).err];
           wCR.start({{ seed: 1, hammer: 1, powers: true, teams: [__team({A}), __team({B})] }}); const G = wCR.G, elf = __ri(0, 'elf');
-          out.mana = G.mana.slice(); out.which = [wCR.powNow(0, elf, 'draw').id, wCR.powNow(0, elf, 'takeout').id];
+          out.mana = G.mana.slice(); out.which = [wCR.powNow(0, elf, 'draw').id, wCR.powNow(0, elf, 'takeout').id]; out.granite = [wCR.powNow(0, __ri(0, 'golem'), 'draw').cost, wCR.powNow(0, elf, 'draw').cost];
           const k0 = wCR.errK(0, 'draw'), r = wCR.cast(0, 'pow', elf), k1 = wCR.errK(0, 'draw');
           out.cast = {{ r, mana: G.mana[0], again: wCR.cast(0, 'pow', elf), truer: k1.ang < k0.ang && k1.v < k0.v }};
           return out; }})()""")
         check(e['off'] == [False, 1], 'a game has no powers unless asked', e['off'])
+        check(e['granite'] == [3, 2], 'a granite power costs 3 mana, an ordinary one 2', e)
         check(e['mana'] == [2, 2] and e['which'] == ['elveneye', 'arrowline'], 'each rink starts with mana; a curler\'s power is their draw power for a draw, their hit power for a hit', e)
         check(e['cast']['r'] == '' and e['cast']['mana'] == 0 and e['cast']['again'] != '' and e['cast']['truer'], 'a cast costs mana, one a stone, and makes the stone truer', e['cast'])
         mg = await pg.evaluate(f"""(() => {{ wCR.start({{ seed: 2, ends: 4, powers: true, powOnly: ['none', 'none'], teams: [__team({A}), __team({B})] }}); const G = wCR.G; let made = 0, bad = [], n = 0;

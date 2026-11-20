@@ -40558,9 +40558,11 @@ function crSolveHit(x, y, v, h, ice, cold) {
    wants the middle open and corner guards, and at the end of an end what the hammer is worth next.
    The skills (CR_SKILL): a Squire looks at the plain shots (both handles, and the hit and roll, but no draws round the
    guards), doesn't think about the hammer, reads the fresh pebble, misses more, plays its best two over two throws
-   each and sweeps a little late (from 300 inches past the hack); a Knight looks at them all and plays its best three over three throws with its own miss; an
+   each and sweeps a little late (from 300 inches past the hack); a Knight looks at the same shots and plays its best
+   three over three throws with its own miss; an
    Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now. (top:
-   how many of its best it weighs; samples: the throws each; wide: both handles and the hit and roll.)
+   how many of its best it weighs; samples: the throws each; wide: both handles and the hit and roll, on for all three
+   now, kept as a switch for tuning.)
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.
    The ice a skip reads (crIceRead, CR_SKILL's ice): an Archmage the pebble as it is now, a Knight as it was when the end
@@ -60734,7 +60736,7 @@ wShedBoard = function () {
 
 const wW126ShedHow = wShedHowHTML;
 wShedHowHTML = function () {
-  return wW126ShedHow() + `<p class="hint"><b>Powers.</b> Every kind has its own magic: a <b>draw power</b> (for a draw, a guard or a freeze) and a <b>hit power</b> (for a takeout, a peel or a hit and roll), and a second of each to pick on the Shed tab. The thrower casts theirs before their stone (P) for team <b>mana</b>, which shots made and ends scored fill. Most make the stone truer or the sweepers stronger; a golem's granite stone won't be moved once it is at rest, a wraith's smoke stone slides through a guard, a harpy's gust pushes their stone back from the button, and some are curses on the other rink's next stone: a witch's frost hex makes it drag heavy, a gorgon's stare makes it stiff.</p>
+  return wW126ShedHow() + `<p class="hint"><b>Powers.</b> Every kind has its own magic: a <b>draw power</b> (for a draw, a guard or a freeze) and a <b>hit power</b> (for a takeout, a peel or a hit and roll), and a second of each to pick on the Shed tab. The thrower casts theirs before their stone (P) for team <b>mana</b>, which shots made and ends scored fill. Most make the stone truer or the sweepers stronger; a golem's granite stone won't be moved once it is at rest (a granite power costs 3 mana, the rest 2), a wraith's smoke stone slides through a guard, a harpy's gust pushes their stone back from the button, and some are curses on the other rink's next stone: a witch's frost hex makes it drag heavy, a gorgon's stare makes it stiff.</p>
   <p class="hint"><b>The roar</b> fills on shots made, double takeouts, twos, big ends and most on a steal. It pays for the curler's <b>ultimate</b> (U), once a game at the start of an end: it marks the whole end, for your stones or against theirs. Or it steadies the skip's stone in the last end (K). <b>Situation powers</b>, once a game each: the Hammer (the end's last stone, with the hammer), the Steal (your last stone without it, lying shot) and Extra End. In Manage, <b>Auto powers</b> lets your captain cast for you.</p>`;
 };
 const wW126RenderHelp = renderHelp;
