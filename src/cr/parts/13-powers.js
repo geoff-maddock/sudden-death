@@ -52,7 +52,7 @@ const CR_POW = {
   zombie: [crP('shamble', 'Shamble', 'Slow and sure: the weight\'s miss a fifth smaller.', { wt: .8 }), crP('rothit', 'Rot Hit', 'It doesn\'t flinch: the miss a fifth smaller.', { err: .8 })],
   gorgon: [crP('serpentline', 'Serpent Line', 'Snakes round the guard: the line\'s miss a fifth smaller.', { line: .8 }), crP('stare', 'Stare', 'A curse: the other rink\'s next stone turns stiff, and hardly curls.', null, { stiff: .6 })],
   spider: [crP('eightlegs', 'Eight-Leg Sweep', 'Eight legs on the brooms: the sweepers do nearly a third more.', { sweep: 1.3 }), crP('silkline', 'Silk Line', 'On a thread: the line\'s miss a fifth smaller.', { line: .8 })],
-  skeleton: [crP('bonedry', 'Bone Dry', 'A dry, true stone: the miss a fifth smaller.', { err: .8 }), crP('rattle', 'Rattle', 'The house rattles as it settles: their stone nearest the button is pushed back 6 inches.', { gust: 6 })],
+  skeleton: [crP('bonedry', 'Bone Dry', 'A dry, true stone: the miss a fifth smaller.', { err: .8 }), crP('rattle', 'Rattle', 'The house rattles as the stones settle: their stone nearest the button is pushed back 6 inches.', { gust: 6 })],
   witch: [crP('broomstick', 'Broomstick', 'A witch\'s broom: the sweepers do a fifth more.', { sweep: 1.2 }), crP('frosthex', 'Frost Hex', 'A curse: frost on the other rink\'s next stone, and it drags heavy.', null, { heavy: 1.04 })],
 };
 // the second of each, picked on the Shed tab: [draw, hit]
@@ -160,10 +160,11 @@ function crCast(s, k, ri) {
   const r = ri == null ? crThrower(s) : ri, why = crPowWhy(s, k, r); if (why) return why;
   const name = (G.teams[s].roster[r] || {}).n || 'Someone', rec = (id, n) => G.casts.push({ side: s, k, id, n, ri: r, end: G.end + 1, stone: G.n });
   if (k === 'pow') {
-    const P = crPowNow(s, r); G.mana[s] -= P.cost; G.powStone[s] = G.n; G.powWhich[s] = P.which;
+    const P = crPowNow(s, r); G.mana[s] -= P.cost; G.powStone[s] = G.n;
     if (P.curse) G.curse[1 - s] = Object.assign({}, P.curse, { by: P.n });
     else if (P.now && P.now.drain) { const d = Math.min(G.roar[1 - s], P.now.drain); G.roar[1 - s] -= d; G.roar[s] = Math.min(CR_ROAR.max, G.roar[s] + d); }
-    else G.fx[s] = Object.assign({}, P.fx, { n: P.n });
+    // (only a power on your own stone holds the shot to its kind)
+    else { G.fx[s] = Object.assign({}, P.fx, { n: P.n }); G.powWhich[s] = P.which; }
     rec(P.id, P.n); return '';
   }
   if (k === 'ult') {
@@ -178,7 +179,7 @@ function crCast(s, k, ri) {
 // the powers' state, to put back (your captain's casts on a stone you take back to throw yourself)
 const CR_POW_KEYS = ['mana', 'roar', 'fx', 'curse', 'mark', 'ultUsed', 'sitUsed', 'sitOn', 'steadyOn', 'casts', 'powStone', 'powWhich'];
 function crPowSave() { return JSON.parse(JSON.stringify(Object.fromEntries(CR_POW_KEYS.map(k => [k, G[k]])))); }
-function crPowLoad(P) { for (const k of CR_POW_KEYS) G[k] = JSON.parse(JSON.stringify(P[k])); }
+function crPowLoad(P) { for (const k of CR_POW_KEYS) if (P[k] !== undefined) G[k] = JSON.parse(JSON.stringify(P[k])); }
 // what side s's next stone has: its power, the end's mark, a curse on it, a situation power, the roar's steadying
 function crFxFor(s) {
   const f = Object.assign({}, CR_FX0);
@@ -190,7 +191,7 @@ function crFxFor(s) {
   if (G.steadyOn[s]) f.nerve = 1;
   return f;
 }
-// as the thrown stone comes to rest (before the rules): a gust pushes the other rink's stone nearest the button back
+// as the stones settle (before the rules), after a stone that stayed in play or hit one: a gust pushes the other rink's stone nearest the button back
 function crGust(s, stones, f) {
   if (!f || !f.gust) return '';
   const R = CR_SHEET.stoneR, theirs = stones.filter(b => b.s !== s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b))[0]; if (!theirs) return '';

@@ -107,7 +107,7 @@ function crRunEnd(Q) {
   // (a smoke stone that came to rest inside the guard it slid through goes on just past it)
   // (clear of every stone, and still on the sheet, or it is out)
   const gh = T.ghostId && S.find(st => st.id === T.ghostId && !st.out);
-  if (!T.out && gh) { const near = () => S.some(o => o !== T && !o.out && Math.hypot(T.x - o.x, T.y - o.y) < 2 * CR_SHEET.stoneR); let n = 0; while (near() && n++ < 200) T.y += 1; if (near() || !crOnSheet(T)) { T.out = true; Q.out.push(T.id); } }
+  if (!T.out && gh) { const near = () => S.some(o => o !== T && !o.out && Math.hypot(T.x - o.x, T.y - o.y) < 2 * CR_SHEET.stoneR - 1e-6), y0 = T.y; let n = 0; while (near() && n++ < 200) T.y += 1; if (near() || !crOnSheet(T)) { T.out = true; Q.out.push(T.id); } else if (T.y !== y0) path.push([+T.x.toFixed(1), +T.y.toFixed(1), 0]); }
   if (!O.plan) Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]);
   // (a granite stone is heavy only once it is at rest: the thrown one takes it now)
   const rest = S.filter(st => !st.out).map(st => Object.assign({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }, st.g || st.gRest ? { g: 1 } : {}));

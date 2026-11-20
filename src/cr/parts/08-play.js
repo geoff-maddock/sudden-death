@@ -59,11 +59,14 @@ function crSelReset() {
    first); a draw keeps the broom where it is. Returns '' or why not */
 function crSelect(o) {
   if (!GP || GP.ph !== 'aim' || !GP.sel) return 'Not now.';
-  if (o.suggest) { crSelReset(); crPick(); return ''; }
+  if (o.suggest) {
+    // (the skip's call keeps to the kind of a power cast for this stone)
+    const keep = GP.sel; crSelReset();
+    if (crShotLocked(GP.sel.shot)) { GP.sel = keep; return crLockSay(); }
+    crPick(); return ''; }
   const S = Object.assign({}, GP.sel);
   // (a power cast for this stone was a draw power or a hit power: the shot keeps to that kind)
-  if (o.shot && CR_SHOTS[o.shot] && G.powers && G.powStone[GP.you] === G.n && G.powWhich[GP.you] && (CR_HIT.includes(o.shot) ? 'hit' : 'draw') !== G.powWhich[GP.you])
-    return `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
+  if (o.shot && CR_SHOTS[o.shot] && crShotLocked(o.shot)) return crLockSay();
   if (o.shot && CR_SHOTS[o.shot]) S.shot = o.shot;
   if (o.h === 1 || o.h === -1) S.h = o.h;
   if (o.x != null) S.x = clamp(+o.x, -CR_SHEET.halfW + 8, CR_SHEET.halfW - 8);
@@ -113,13 +116,16 @@ function crRelease(p) {
   const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you, S.shot).ang, v: S.aim.v * crYourWt(err), h: S.h };
   crBegin(GP.you, Object.assign({}, S), rel, null);
 }
+// a power cast on your stone for this shot's kind (a draw power or a hit power): another kind of shot isn't allowed
+const crShotLocked = shot => !!(G.powers && G.powStone[GP.you] === G.n && G.powWhich && G.powWhich[GP.you] && (CR_HIT.includes(shot) ? 'hit' : 'draw') !== G.powWhich[GP.you]);
+const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
 function crYourWt(p) { const f = crFxFor(GP.you); return 1 + (p - 1) * f.err * f.wt; }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * clamp(crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
   return true;
 }
 
@@ -188,7 +194,7 @@ function crPlayNext() {
   const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
   // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
   // (what the powers were before your captain cast, so they come back if you take the stone to throw it yourself)
-  const pre = mgr && G.powers ? crPowSave() : null, cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
+  const pre = s === GP.you && G.powers ? crPowSave() : null, cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel, pre };
   crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
