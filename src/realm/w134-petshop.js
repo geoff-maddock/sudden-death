@@ -181,7 +181,7 @@ function wPshopOpen(id) {
        ${sold ? `<p class="hint">${esc(sold)}</p>` : `<div class="row"><button class="btn" data-psbuy="${kind}"${full || RUN.gold < wPshopPrice(kind) ? ' disabled' : ''}>Buy (${wPshopPrice(kind)} gold)</button></div>`}
        ${S.shop && wPshopPets(id).length > 1 ? `<p class="hint">Next week: ${esc(PETS[wPshopStock(id, wWeek() + 1)].n)}.</p>` : ''}`;
   const wait = away.length ? `<p>Waiting here for you:</p><ul class="wpetlist">${away.map(o => `<li><button class="ghost" data-psback="${o.i}"${full ? ' disabled' : ''}>Have ${esc(o.a.name)} back (${wPshopPrice(o.a.kind)} gold)</button></li>`).join('')}</ul>` : '';
-  const close = modal(`<header><h3>${esc(S.name || who)}</h3></header><div class="wmsg">${offer}${wait}${full ? `<p class="hint">Your kennel is full (${W_PET.kennel}): let one go first.</p>` : ''}<p class="hint">Gold: ${RUN.gold}.</p><p class="wbad" id="wPshopWhy" hidden></p></div>
+  const close = modal(`<header><h3>${esc(S.name || who)}</h3></header><div class="wmsg">${offer}${wait}${full ? `<p class="hint">Your kennel is full (${W_PET.kennel}): let one go first.</p>` : ''}<p class="hint" id="wPshopGold">Gold: ${RUN.gold}.</p><p class="wbad" id="wPshopWhy" hidden></p></div>
     <div class="row"><button class="ghost" data-close>Leave</button></div>`, () => wDrain());
   const say = why => { if (why) { const w = $('wPshopWhy'); w.textContent = why; w.hidden = false; return; } close(); };
   $('modalBox').querySelectorAll('[data-psbuy]').forEach(b => b.onclick = () => say(wPshopBuy(id, b.dataset.psbuy)));

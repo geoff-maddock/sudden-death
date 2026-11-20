@@ -61842,7 +61842,7 @@ function wPetCard(q, side) {
     <div class="wpi"><div class="wpn"><b>${esc(q.name)}</b><span class="k">${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)})</span>${side ? '<span class="wtag wb">At your side</span>' : ''}${q.hungry ? '<span class="wtag">Hungry</span>' : ''}</div>
       <small class="wnst">Bond ${q.bond || 1} of 3 · upkeep ${wPetCost(q)} gold a week</small>
       <small class="hint"><b>Always:</b> ${esc(T.trait)} ${T.powers.map(w => `<span${w.open ? '' : ' class="dim"'}>${w.open ? '' : `(bond ${w.at}) `}${esc(w.d)}</span>`).join(' ')} <b>Trick:</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}</small></div>
-    <div class="wpa row">${side ? '' : `<button class="ghost" data-petside="${q.id}">At my side</button>`}<button class="ghost" data-petname="${q.id}">Rename</button>${q.hungry ? `<button class="ghost" data-petfeed="${q.id}">Feed (${wPetCost(q)} gold)</button>` : ''}<button class="ghost" data-petletgo="${q.id}">Let go</button></div>
+    <div class="wpa row">${side ? '' : `<button class="ghost" data-petside="${q.id}">At my side</button>`}<button class="ghost" data-petname="${q.id}">Rename</button>${q.hungry && !(side && wPetBusy()) ? `<button class="ghost" data-petfeed="${q.id}">Feed (${wPetCost(q)} gold)</button>` : ''}<button class="ghost" data-petletgo="${q.id}">Let go</button></div>
   </li>`;
 }
 function wCampPets() {
@@ -62358,7 +62358,7 @@ function wPshopOpen(id) {
        ${sold ? `<p class="hint">${esc(sold)}</p>` : `<div class="row"><button class="btn" data-psbuy="${kind}"${full || RUN.gold < wPshopPrice(kind) ? ' disabled' : ''}>Buy (${wPshopPrice(kind)} gold)</button></div>`}
        ${S.shop && wPshopPets(id).length > 1 ? `<p class="hint">Next week: ${esc(PETS[wPshopStock(id, wWeek() + 1)].n)}.</p>` : ''}`;
   const wait = away.length ? `<p>Waiting here for you:</p><ul class="wpetlist">${away.map(o => `<li><button class="ghost" data-psback="${o.i}"${full ? ' disabled' : ''}>Have ${esc(o.a.name)} back (${wPshopPrice(o.a.kind)} gold)</button></li>`).join('')}</ul>` : '';
-  const close = modal(`<header><h3>${esc(S.name || who)}</h3></header><div class="wmsg">${offer}${wait}${full ? `<p class="hint">Your kennel is full (${W_PET.kennel}): let one go first.</p>` : ''}<p class="hint">Gold: ${RUN.gold}.</p><p class="wbad" id="wPshopWhy" hidden></p></div>
+  const close = modal(`<header><h3>${esc(S.name || who)}</h3></header><div class="wmsg">${offer}${wait}${full ? `<p class="hint">Your kennel is full (${W_PET.kennel}): let one go first.</p>` : ''}<p class="hint" id="wPshopGold">Gold: ${RUN.gold}.</p><p class="wbad" id="wPshopWhy" hidden></p></div>
     <div class="row"><button class="ghost" data-close>Leave</button></div>`, () => wDrain());
   const say = why => { if (why) { const w = $('wPshopWhy'); w.textContent = why; w.hidden = false; return; } close(); };
   $('modalBox').querySelectorAll('[data-psbuy]').forEach(b => b.onclick = () => say(wPshopBuy(id, b.dataset.psbuy)));
@@ -62513,7 +62513,7 @@ wPshopOpen = function (id) {
   bb.onclick = () => {
     const why = wPetBuyBiscuit(id), w = $('wPshopWhy'); if (why) { w.textContent = why; w.hidden = false; return; } w.hidden = true;
     $('wBiscN').textContent = WG.items.pettreat || 0;
-    box.querySelectorAll('p.hint').forEach(p => { if (/^Gold: /.test(p.textContent)) p.textContent = `Gold: ${RUN.gold}.`; });
+    const g = $('wPshopGold'); if (g) g.textContent = `Gold: ${RUN.gold}.`;
     box.querySelectorAll('[data-psbuy]').forEach(b => { if (RUN.gold < wPshopPrice(b.dataset.psbuy)) b.disabled = true; });
     box.querySelectorAll('[data-psback]').forEach(b => { const a = WG.petAway[+b.dataset.psback]; if (a && RUN.gold < wPshopPrice(a.kind)) b.disabled = true; });
     if (RUN.gold < W_PBOND.biscuit) bb.disabled = true;

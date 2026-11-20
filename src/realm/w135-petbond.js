@@ -95,7 +95,7 @@ wPshopOpen = function (id) {
   bb.onclick = () => {
     const why = wPetBuyBiscuit(id), w = $('wPshopWhy'); if (why) { w.textContent = why; w.hidden = false; return; } w.hidden = true;
     $('wBiscN').textContent = WG.items.pettreat || 0;
-    box.querySelectorAll('p.hint').forEach(p => { if (/^Gold: /.test(p.textContent)) p.textContent = `Gold: ${RUN.gold}.`; });
+    const g = $('wPshopGold'); if (g) g.textContent = `Gold: ${RUN.gold}.`;
     box.querySelectorAll('[data-psbuy]').forEach(b => { if (RUN.gold < wPshopPrice(b.dataset.psbuy)) b.disabled = true; });
     box.querySelectorAll('[data-psback]').forEach(b => { const a = WG.petAway[+b.dataset.psback]; if (a && RUN.gold < wPshopPrice(a.kind)) b.disabled = true; });
     if (RUN.gold < W_PBOND.biscuit) bb.disabled = true;

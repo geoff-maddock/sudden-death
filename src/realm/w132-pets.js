@@ -165,7 +165,7 @@ function wPetCard(q, side) {
     <div class="wpi"><div class="wpn"><b>${esc(q.name)}</b><span class="k">${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)})</span>${side ? '<span class="wtag wb">At your side</span>' : ''}${q.hungry ? '<span class="wtag">Hungry</span>' : ''}</div>
       <small class="wnst">Bond ${q.bond || 1} of 3 · upkeep ${wPetCost(q)} gold a week</small>
       <small class="hint"><b>Always:</b> ${esc(T.trait)} ${T.powers.map(w => `<span${w.open ? '' : ' class="dim"'}>${w.open ? '' : `(bond ${w.at}) `}${esc(w.d)}</span>`).join(' ')} <b>Trick:</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}</small></div>
-    <div class="wpa row">${side ? '' : `<button class="ghost" data-petside="${q.id}">At my side</button>`}<button class="ghost" data-petname="${q.id}">Rename</button>${q.hungry ? `<button class="ghost" data-petfeed="${q.id}">Feed (${wPetCost(q)} gold)</button>` : ''}<button class="ghost" data-petletgo="${q.id}">Let go</button></div>
+    <div class="wpa row">${side ? '' : `<button class="ghost" data-petside="${q.id}">At my side</button>`}<button class="ghost" data-petname="${q.id}">Rename</button>${q.hungry && !(side && wPetBusy()) ? `<button class="ghost" data-petfeed="${q.id}">Feed (${wPetCost(q)} gold)</button>` : ''}<button class="ghost" data-petletgo="${q.id}">Let go</button></div>
   </li>`;
 }
 function wCampPets() {
