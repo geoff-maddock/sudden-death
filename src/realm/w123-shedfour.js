@@ -11,7 +11,7 @@
 
    p.cr       { drw, lin, hit, swp, nrv, red, lv, got: { stat: points from levels } }
    WG.shed    { four: [4 keys, lead to skip], cu: [call-ups], seq, mine?: true once you've changed something }
-              a key is a roster id, or a call-up's cid ('c1', 'c2', ...)
+              a key is a roster id, or a call-up's cid ('r1', 'r2', ...: not 'c', which the nine's call-ups use)
    wCrOf(p)           p's ratings, made or caught up first
    wFourSyncCr()      makes the four, or brings it up to date with the roster; returns WG.shed
    wFourMineCr()      your four as the Curling Shed takes a rink (roster in order, and the order)
@@ -64,7 +64,7 @@ function wFourCrWho(k) { if (wFourCrCu(k)) return ((WG.shed && WG.shed.cu) || []
 function wFourCrCallUp(C) {
   const used = new Set(C.four.filter(k => k != null).map(k => (wFourCrWho(k) || {}).kind));
   const kind = W_CRR.cuKinds.find(k => !used.has(k)) || pick(W_CRR.cuKinds);
-  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'c' + (C.seq++) });
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'r' + (C.seq++) });
   wCrOf(c); C.cu.push(c);
   return c;
 }
@@ -139,6 +139,7 @@ function wFourCrPractice() {
 /* ---------- the Curling block on a player's stats ---------- */
 function wCrCard(p) {
   const b = wCrOf(p); if (!b) return '';
+  if (WG && !WG.shed) wFourSyncCr();
   const bars = wCR.stats.map(s => { const [ab, what] = W_CRR.stat[s], got = b.got[s] || 0;
     return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wCrCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
   const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null;
@@ -186,7 +187,7 @@ wRenderCamp = function () {
   const before = JSON.stringify(WG.shed), C = wFourSyncCr(); if (JSON.stringify(C) !== before) wSave();
   body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
     ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampShed(C);
-  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^c\d+$/.test(k) ? k : +k; };
+  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^r\d+$/.test(k) ? k : +k; };
   body.querySelectorAll('[data-cpos]').forEach(s => s.onchange = () => wCampSay(wFourSetPos(keyOf(s), s.value)));
   const auto = body.querySelector('[data-cauto]'); if (auto) auto.onclick = () => wCampSay(wFourAutoCr());
   const pr = body.querySelector('[data-cpractice]'); if (pr) pr.onclick = () => wFourCrPractice();

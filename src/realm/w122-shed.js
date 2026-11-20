@@ -22,7 +22,7 @@ const W_SHED = {
 };
 const W_SHED_MODES = {
   watch: { n: 'Watch', title: 'The CPU throws both sides. Switching goes on with the same game.' },
-  play: { n: 'You play', title: 'You throw for Saltmere: pick the shot, put the broom down, pick the handle and throw (Space twice), then hold Space to sweep.' },
+  play: { n: 'You play', title: 'You throw for the first rink on the board: pick the shot, put the broom down, pick the handle and throw (Space twice), then hold Space to sweep.' },
 };
 let W_SHED_MODE = 'play', W_SHED_SPEED = 1, W_SHED_SKILL = 1;
 const wShedEnds = () => wCR.rules.endsAt.includes(SET.shedEnds) ? SET.shedEnds : wCR.rules.ends;

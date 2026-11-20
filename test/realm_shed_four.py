@@ -65,6 +65,26 @@ async def main():
         check(pr['early'] == 0 and pr['lead'] == 0 and pr['skip'] == 1 and pr['ham'] == 1.5 and pr['wide'] == 1, 'pressure: nothing early or for the lead; the skip in the last end, more on the hammer\'s stone when it is close', pr)
         check(pr['nervy'] > 1.4 and abs(pr['cool'] - pr['calm']) < 1e-9, 'a nervy skip misses more under it; a perfect nerve feels nothing', pr)
 
+        # ---------- found in review ----------
+        rv = await pg.evaluate("""(() => { const out = {};
+          // ratings brought in part: the rest are the kind's, and the throw is a real number
+          wCR.start({ seed: 3, teams: [{ name: 'P', roster: ['dwarf', 'dwarf', 'dwarf', 'dwarf'].map((k, i) => ({ n: 'p' + i, kind: k, r: { drw: 12 } })) }, __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])] });
+          const ev = wCR.turn(); out.partial = [wCR.G.teams[0].roster[0].r.lin, Number.isFinite(ev.rel.ang) && Number.isFinite(ev.rel.v)];
+          // one stone swept hard the whole way leaves most of an end's legs for the rest
+          wCR.start({ seed: 4, teams: [__team(['dwarf', 'dwarf', 'dwarf', 'dwarf']), __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])], hammer: 1 });
+          wCR.throwStone(0, { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: 0, v: 128, h: 1 }, () => 1); out.legs = wCR.G.legs[0];
+          // one curler the engine can't rate doesn't keep the others from their positions
+          const G = wCR.start({ seed: 5, teams: [{ name: 'Q', roster: [{ n: 'x', kind: '' }, { n: 'l', kind: 'lich' }, { n: 'e', kind: 'elf' }, { n: 'o', kind: 'ogre' }] }, __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])] });
+          out.order = G.order[0];
+          return out; })()""")
+        check(rv['partial'] == [8, True], 'ratings brought in part are filled from the kind, and the throw is a real number', rv)
+        check(rv['legs'] > .6, 'one stone swept hard the whole way leaves most of an end\'s legs', rv)
+        check(rv['order'][3] == 1, 'one curler the engine can\'t rate doesn\'t keep the lich from skipping', rv)
+        ws = await pg.evaluate("""(() => { wCR.start({ seed: 6, mode: 'play', hammer: 1, teams: [__team(['dwarf', 'dwarf', 'dwarf', 'dwarf']), __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])] }); wCR.pause(true);
+          let n = 0; while (wCR.phase !== 'aim' && n++ < 4000) wCR.tick(.05); wCR.select({ shot: 'draw', x: 0, y: 0 }); wCR.press(); n = 0; while (wCR.view.meter.v < .88 && n++ < 2000) wCR.tick(.002); wCR.press();
+          wCR.setMode('watch'); let sw = 0; n = 0; while (wCR.phase === 'slide' && n++ < 4000) { wCR.tick(.05); const L = wCR.live; if (L && L.sw > sw) sw = L.sw; } return sw; })()""")
+        check(ws > 0, 'a stone of yours handed to the CPU mid-slide is swept by its sweepers', ws)
+
         # ---------- the Realm ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
         if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')

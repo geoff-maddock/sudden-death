@@ -34,7 +34,8 @@ const CR_KIND = {
 };
 const CR_RCAP = 12;
 const CR_REACH = { drw: 1.1, lin: 1, hit: 1, nrv: .8, swp: .6 };
-const CR_LEGS = { burn: .055, low: .45 };
+// (a stone swept hard the whole way spends about a third of an end's legs: the skip's stones can still be swept)
+const CR_LEGS = { burn: .02, low: .45 };
 const CR_DEF_RAT = { drw: .5, lin: .5, hit: .5, swp: .5, nrv: .5, red: .5 };
 function crRate(kind) { const k = CR_KIND[kind]; return Object.fromEntries(CR_STATS.map((s, i) => [s, k ? k[i] : 6.5])); }
 const crScale = v => clamp((v - 1) / (CR_RCAP - 1), 0, 1);
@@ -58,7 +59,7 @@ function crSweepEff(s) {
   return (1 + CR_REACH.swp * (avg - .5)) * (CR_LEGS.low + (1 - CR_LEGS.low) * legs);
 }
 // side s's sweepers swept this hard (0 to 1, asked) for dt seconds of the stone's time: their legs pay for it
-function crLegsBurn(s, sw, dt) { if (G.legs) G.legs[s] = Math.max(0, +(G.legs[s] - CR_LEGS.burn * sw * dt).toFixed(4)); }
+function crLegsBurn(s, sw, dt) { if (G.legs) G.legs[s] = Math.max(0, G.legs[s] - CR_LEGS.burn * sw * dt); }
 // the sweepers for a run: what they are asked (a function of the stone, or a number), made into how hard they sweep,
 // their legs paying as the stone's time goes on
 function crSweepFn(s, ask) {

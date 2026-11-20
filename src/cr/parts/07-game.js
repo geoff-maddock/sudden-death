@@ -14,11 +14,13 @@ function crStart(opts) {
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#b83a3a' };
     // a curler with a kind the engine knows gets that kind's ratings (or their own)
     const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
-      .map(p => { const r = p.r || (CR_KIND[p.kind] ? crRate(p.kind) : null), m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
+      // (ratings brought in part are the kind's, or an average curler's, for the rest)
+      .map(p => { const r = p.r ? Object.assign(crRate(p.kind), p.r) : CR_KIND[p.kind] ? crRate(p.kind) : null, m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
         m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT); return m; });
     return Object.assign({}, T, { roster }); });
   // an order: the game's, the team's own, or set by the ratings
-  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? crAutoOrder(teams[s].roster) : null));
+  // (one curler the engine can't rate doesn't keep the rest from being placed: their rs is an average curler's)
+  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.some(m => m.r) ? crAutoOrder(teams[s].roster) : null));
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });

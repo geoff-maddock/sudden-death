@@ -40035,11 +40035,13 @@ function crStart(opts) {
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Graftonbury', short: s ? 'SAL' : 'GRA', color: s ? '#2f7898' : '#b83a3a' };
     // a curler with a kind the engine knows gets that kind's ratings (or their own)
     const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
-      .map(p => { const r = p.r || (CR_KIND[p.kind] ? crRate(p.kind) : null), m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
+      // (ratings brought in part are the kind's, or an average curler's, for the rest)
+      .map(p => { const r = p.r ? Object.assign(crRate(p.kind), p.r) : CR_KIND[p.kind] ? crRate(p.kind) : null, m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
         m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT); return m; });
     return Object.assign({}, T, { roster }); });
   // an order: the game's, the team's own, or set by the ratings
-  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? crAutoOrder(teams[s].roster) : null));
+  // (one curler the engine can't rate doesn't keep the rest from being placed: their rs is an average curler's)
+  const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.some(m => m.r) ? crAutoOrder(teams[s].roster) : null));
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
@@ -40262,9 +40264,10 @@ function crSlideTick(dt) {
   const X = GP.X; if (!X) return;
   const mine = crYours(X.s);
   // (your sweepers: how hard you hold them to it, times how good they are and their legs, which it spends)
-  const ask = mine ? crYourSweep() : 0, T = X.Q.T;
-  if (ask && (T.vx || T.vy)) crLegsBurn(X.s, ask, dt * CR_PLAY.speed);
+  // (spent for the stone's time that passed while it was on the sheet and moving)
+  const ask = mine ? crYourSweep() : 0, t0 = X.Q.t;
   crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? (ask ? ask * crSweepEff(X.s) : 0) : undefined);
+  if (ask) crLegsBurn(X.s, ask, X.Q.t - t0);
   GP.call = crSkipCall(X);
   if (X.Q.done) crSettle();
 }
@@ -40303,6 +40306,8 @@ function crPlayNext() {
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;
   GP.mode = m;
+  // (a stone of yours sliding as you hand it to the CPU: its sweepers take it over)
+  if (m !== 'play' && GP.ph === 'slide' && GP.X && GP.X.s === GP.you && !GP.X.Q.O.sweep) GP.X.Q.O.sweep = crSweepFn(GP.X.s, crSweeper(GP.X.s, GP.X.plan));
   // a stone you were setting up goes back to the CPU in Watch, and the next one is yours in You play
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
 }
@@ -40489,7 +40494,8 @@ const CR_KIND = {
 };
 const CR_RCAP = 12;
 const CR_REACH = { drw: 1.1, lin: 1, hit: 1, nrv: .8, swp: .6 };
-const CR_LEGS = { burn: .055, low: .45 };
+// (a stone swept hard the whole way spends about a third of an end's legs: the skip's stones can still be swept)
+const CR_LEGS = { burn: .02, low: .45 };
 const CR_DEF_RAT = { drw: .5, lin: .5, hit: .5, swp: .5, nrv: .5, red: .5 };
 function crRate(kind) { const k = CR_KIND[kind]; return Object.fromEntries(CR_STATS.map((s, i) => [s, k ? k[i] : 6.5])); }
 const crScale = v => clamp((v - 1) / (CR_RCAP - 1), 0, 1);
@@ -40513,7 +40519,7 @@ function crSweepEff(s) {
   return (1 + CR_REACH.swp * (avg - .5)) * (CR_LEGS.low + (1 - CR_LEGS.low) * legs);
 }
 // side s's sweepers swept this hard (0 to 1, asked) for dt seconds of the stone's time: their legs pay for it
-function crLegsBurn(s, sw, dt) { if (G.legs) G.legs[s] = Math.max(0, +(G.legs[s] - CR_LEGS.burn * sw * dt).toFixed(4)); }
+function crLegsBurn(s, sw, dt) { if (G.legs) G.legs[s] = Math.max(0, G.legs[s] - CR_LEGS.burn * sw * dt); }
 // the sweepers for a run: what they are asked (a function of the stone, or a number), made into how hard they sweep,
 // their legs paying as the stone's time goes on
 function crSweepFn(s, ask) {
@@ -58283,7 +58289,7 @@ const W_SHED = {
 };
 const W_SHED_MODES = {
   watch: { n: 'Watch', title: 'The CPU throws both sides. Switching goes on with the same game.' },
-  play: { n: 'You play', title: 'You throw for Saltmere: pick the shot, put the broom down, pick the handle and throw (Space twice), then hold Space to sweep.' },
+  play: { n: 'You play', title: 'You throw for the first rink on the board: pick the shot, put the broom down, pick the handle and throw (Space twice), then hold Space to sweep.' },
 };
 let W_SHED_MODE = 'play', W_SHED_SPEED = 1, W_SHED_SKILL = 1;
 const wShedEnds = () => wCR.rules.endsAt.includes(SET.shedEnds) ? SET.shedEnds : wCR.rules.ends;
@@ -58482,7 +58488,7 @@ renderHelp = function () {
 
    p.cr       { drw, lin, hit, swp, nrv, red, lv, got: { stat: points from levels } }
    WG.shed    { four: [4 keys, lead to skip], cu: [call-ups], seq, mine?: true once you've changed something }
-              a key is a roster id, or a call-up's cid ('c1', 'c2', ...)
+              a key is a roster id, or a call-up's cid ('r1', 'r2', ...: not 'c', which the nine's call-ups use)
    wCrOf(p)           p's ratings, made or caught up first
    wFourSyncCr()      makes the four, or brings it up to date with the roster; returns WG.shed
    wFourMineCr()      your four as the Curling Shed takes a rink (roster in order, and the order)
@@ -58535,7 +58541,7 @@ function wFourCrWho(k) { if (wFourCrCu(k)) return ((WG.shed && WG.shed.cu) || []
 function wFourCrCallUp(C) {
   const used = new Set(C.four.filter(k => k != null).map(k => (wFourCrWho(k) || {}).kind));
   const kind = W_CRR.cuKinds.find(k => !used.has(k)) || pick(W_CRR.cuKinds);
-  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'c' + (C.seq++) });
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'r' + (C.seq++) });
   wCrOf(c); C.cu.push(c);
   return c;
 }
@@ -58610,6 +58616,7 @@ function wFourCrPractice() {
 /* ---------- the Curling block on a player's stats ---------- */
 function wCrCard(p) {
   const b = wCrOf(p); if (!b) return '';
+  if (WG && !WG.shed) wFourSyncCr();
   const bars = wCR.stats.map(s => { const [ab, what] = W_CRR.stat[s], got = b.got[s] || 0;
     return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wCrCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
   const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null;
@@ -58657,7 +58664,7 @@ wRenderCamp = function () {
   const before = JSON.stringify(WG.shed), C = wFourSyncCr(); if (JSON.stringify(C) !== before) wSave();
   body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
     ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampShed(C);
-  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^c\d+$/.test(k) ? k : +k; };
+  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^r\d+$/.test(k) ? k : +k; };
   body.querySelectorAll('[data-cpos]').forEach(s => s.onchange = () => wCampSay(wFourSetPos(keyOf(s), s.value)));
   const auto = body.querySelector('[data-cauto]'); if (auto) auto.onclick = () => wCampSay(wFourAutoCr());
   const pr = body.querySelector('[data-cpractice]'); if (pr) pr.onclick = () => wFourCrPractice();
