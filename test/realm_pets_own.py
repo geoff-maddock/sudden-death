@@ -105,6 +105,14 @@ async def main():
           return { asked, open: !document.getElementById('modal').hidden && !!document.getElementById('wCampBody'), n: n - wPets().owned.length, said: /Waiting where/.test(document.getElementById('wCampBody').textContent) }; })()""")
         check(lg == {'asked': True, 'open': True, 'n': 1, 'said': True}, 'Let go on the Pets tab asks in its own row, and the Team screen stays open', lg)
         await pg.evaluate("wPetReclaim(WG.petAway.length - 1)")
+        ln = await pg.evaluate("""(async () => { const q = wPetSideOf(); const n0 = q.name; wPetRename(q.id, 'W'.repeat(W_PET.nameMax)); wRenderCamp();
+          const li = document.querySelector('#wCampBody [data-petid="' + q.id + '"]'), r = li.getBoundingClientRect(), body = document.getElementById('wCampBody').getBoundingClientRect();
+          const btns = [...li.querySelectorAll('button')].every(b => { const br = b.getBoundingClientRect(); return br.right <= r.right + 1 && br.left >= r.left - 1; });
+          const out = { row: r.right <= body.right + 1, btns }; for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); const pb = document.getElementById('petBox').getBoundingClientRect(); out.battle = pb.right <= innerWidth + 1 && document.documentElement.scrollWidth <= innerWidth + 1;
+          B = null; showView('world'); wPetRename(q.id, n0); return out; })()""")
+        check(ln == {'row': True, 'btns': True, 'battle': True}, "a name as long as a pet's name may be fits its kennel row and the battle panel", ln)
+        await pg.evaluate("wOpenCamp('pets')"); await pg.wait_for_function("!!document.querySelector('#wCampBody .wpetc')")
         await pg.evaluate(CLOSE)
         mp = await pg.evaluate("""(() => { const acts = []; for (const f of W_ACTORS) f(acts, performance.now(), 0); return { pet: acts.some(a => typeof a.draw === 'function') }; })()""")
         check(mp == {'pet': True}, 'the pet at your side is drawn on the map, behind the team', mp)

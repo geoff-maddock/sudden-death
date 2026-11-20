@@ -89,6 +89,8 @@ async def main():
         check(fu['waitsSaid'] and fu['named'] == 'Jarvis' and fu['asked'], 'at a full kennel a hatched pet waits at its hatching place, named all the same, and you\'re asked which one goes', fu)
         check(fu['disabled'] and fu['back'] == 'Jarvis' and fu['free'] and not fu['still'] and fu['closed'], 'there you can take it back for nothing, once there is room', fu)
 
+        uk = await pg.evaluate("""(() => { WG.petEggs.tide = { kind: 'nosuchpet', due: WG.dayAbs - 2 }; wPeggOpen('tide'); const t = document.getElementById('modalBox').textContent; for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return { cleared: !WG.petEggs.tide, takes: /hatches tide eggs|Put in/i.test(t), due: /due in -/.test(t) }; })()""")
+        check(uk == {'cleared': True, 'takes': True, 'due': False}, 'an egg of a kind the realm no longer knows goes quiet, and frees its place', uk)
         sv = await pg.evaluate("""(() => { WG.petEggs.ember = { kind: 'imp', due: WG.dayAbs + 2 }; wSave(); const save = JSON.parse(JSON.stringify({ WG, RUN })); wStart(save); return JSON.parse(JSON.stringify(WG.petEggs.ember || null)); })()""")
         check(sv and sv['kind'] == 'imp', 'the save keeps an egg in its place', sv)
         pe = await pg.evaluate("(() => { const P = DB.chars.pell; return { job: /PETS/.test(P.topics.job.t), topic: !!(P.topics.pets && /glasshouse/.test(P.topics.pets.t)) }; })()")

@@ -141,11 +141,11 @@ function wPeggPlace(el, kind) {
 function wPeggHatch(el) {
   const H = wPetEggs(), I = H[el]; if (!I) return null;
   if (WG.dayAbs < I.due) return null;
-  if (!PETS[I.kind]) return null;
-  wLog(`The ${W_PEGG.eggs[I.kind].name} cracks. Out tumbles ${petA(PETS[I.kind].n)} ${PETS[I.kind].n}!`, 'g');
-  // (the egg leaves its place only once its pet is really there)
+  if (!PETS[I.kind] || !W_PEGG.eggs[I.kind]) return null;
+  // (the egg leaves its place, and cracks in the log, only once its pet is really there)
   const q = wPetAdd(I.kind, 'hatch:' + el); if (!q) return null;
   delete H[el];
+  wLog(`The ${W_PEGG.eggs[I.kind].name} cracks. Out tumbles ${petA(PETS[I.kind].n)} ${PETS[I.kind].n}!`, 'g');
   wInvalidate(WG.map); wSave();
   return q;
 }
@@ -166,7 +166,10 @@ function wPetHatchScene(q, el) {
   $('wHatchOk').onclick = ok; inp.onkeydown = e => { if (e.key === 'Enter') ok(); };
 }
 function wPeggOpen(el) {
-  const P = W_PEGG.places[el], H = wPetEggs(), I = H[el];
+  const P = W_PEGG.places[el], H = wPetEggs();
+  // (an egg of a kind the realm no longer knows (an old save) can't hatch: it goes quiet, and the place is free)
+  if (H[el] && (!PETS[H[el].kind] || !W_PEGG.eggs[H[el].kind])) { delete H[el]; wLog(`The egg in ${P.name} has gone quiet and cold. Whatever it was, it won't hatch now; the place is free again.`, 'b'); wInvalidate(WG.map); wSave(); }
+  const I = H[el];
   // (a due egg hatches as you walk in)
   if (I && WG.dayAbs >= I.due) { const q = wPeggHatch(el); if (q) return wPetHatchScene(q, el); }
   const held = wPeggHeld(el), other = wPeggHeld().filter(k => PETS[k].el !== el), away = (WG.petAway || []).map((a, i) => ({ a, i })).filter(o => o.a.from === 'hatch:' + el);
