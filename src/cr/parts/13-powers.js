@@ -23,7 +23,7 @@
    Effects (CR_FX0): err (the release's miss, line and weight), line (the line's alone), wt (the weight's alone), sweep
    (how much the sweepers do) and legs (what sweeping costs their legs) multiply; heavy (a curse: the stone drags, and
    comes up short) and stiff (a curse: the stone hardly curls) multiply the thrown stone's friction and curl; granite
-   (once at rest, the stone is three times as heavy: a hit barely moves it, for the rest of the end), ghost (the stone
+   (once at rest, the stone is twice as heavy: a hit barely moves it, for the rest of the end), ghost (the stone
    slides through the first guard it meets, like smoke), gust (as the stone comes to rest, the other rink's stone
    nearest the button is pushed back this many inches) and nerve (no pressure) are the rest. The thrower's aim knows
    none of them: a power makes the stone truer, or the sweepers stronger, never a different shot. */
@@ -32,7 +32,7 @@ const CR_ROAR = { max: 100, ult: 60, steady: 25, made: 5, double: 15, two: 15, b
 const CR_FX0 = { err: 1, line: 1, wt: 1, sweep: 1, legs: 1, heavy: 1, stiff: 1, granite: 0, ghost: 0, gust: 0, nerve: 0 };
 const CR_FX_MUL = new Set(['err', 'line', 'wt', 'sweep', 'legs', 'heavy', 'stiff']);
 // granite's weight against an ordinary stone
-const CR_GRANITE = 3;
+const CR_GRANITE = 2;
 const crP = (id, n, desc, fx, curse, now) => ({ id, n, desc, fx: fx || null, curse: curse || null, now: now || null });
 // everyday powers by kind: [draw, hit]
 const CR_POW = {
@@ -43,7 +43,7 @@ const CR_POW = {
   ogre: [crP('thumpdraw', 'Thump Draw', 'Set down dead: the miss a little smaller.', { err: .85 }), crP('smash', 'Smash', 'All of it: the weight\'s miss nearly a third smaller, the line a little.', { wt: .7, line: .9 })],
   minotaur: [crP('labline', 'Labyrinth Line', 'Knows the way in: the line\'s miss a fifth smaller.', { line: .8 }), crP('hornhit', 'Horned Hit', 'Head down at it: the miss a quarter smaller.', { err: .75 })],
   troll: [crP('mossystone', 'Mossy Stone', 'Moss on the handle: the sweepers don\'t tire on it.', { legs: 0 }), crP('boulder', 'Boulder', 'A troll\'s stone: once at rest, a hit barely moves it.', { granite: 1 })],
-  golem: [crP('granitestone', 'Granite Stone', 'Once at rest it won\'t be moved: three times as heavy, for the end.', { granite: 1 }), crP('monohit', 'Monolith Hit', 'Unmoving hands: the miss a quarter smaller.', { err: .75 })],
+  golem: [crP('granitestone', 'Granite Stone', 'Once at rest it won\'t be moved: twice as heavy, for the end.', { granite: 1 }), crP('monohit', 'Monolith Hit', 'Unmoving hands: the miss a quarter smaller.', { err: .75 })],
   harpy: [crP('gust', 'Gust', 'A gust as it settles: the other rink\'s stone nearest the button is pushed back 8 inches.', { gust: 8 }), crP('talon', 'Talon', 'Plucked and placed: the line\'s miss nearly a third smaller.', { line: .7 })],
   elf: [crP('elveneye', 'Elven Eye', 'Sees every pebble: the miss nearly a third smaller.', { err: .7 }), crP('arrowline', 'Arrow Line', 'Like an arrow: the line\'s miss much smaller.', { line: .65 })],
   wraith: [crP('smokestone', 'Smoke Stone', 'It slides through the first guard it meets like smoke.', { ghost: 1 }), crP('coldhand', 'Cold Hand', 'Nothing to lose: no pressure on it, and truer.', { nerve: 1, err: .85 })],

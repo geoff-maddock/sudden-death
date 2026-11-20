@@ -27,6 +27,9 @@ function crStart(opts) {
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
   crShedStart(o); crPowersStart(o); crKitStart(o.bags);
+  // the lab's switches (phase 10): fixShot [shot or null, ...] (a side held to one shot where it can), noSweep [bool, ...]
+  // (a side's sweepers never sweep), wear: false (the pebble never wears)
+  G.fixShot = Array.isArray(o.fixShot) ? o.fixShot.slice() : null; G.noSweep = Array.isArray(o.noSweep) ? o.noSweep.map(Boolean) : null; G.wear = o.wear !== false;
   GB = null;
   return G;
 }
@@ -83,7 +86,7 @@ function crThrowFinish(X) {
   // own copies, so a stone the rules refuse, or the free guard zone undoes, leaves G.stones as it was)
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
-  crWear(G.ice, run.path);
+  if (G.wear !== false) crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
@@ -107,7 +110,7 @@ function crThrowStone(s, plan, rel, sweep) {
 function crSummary() {
   if (!G) return null;
   return { win: G.over ? G.over.win : -1, over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
-    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
+    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
 }
 // the game as it stands between stones, plain JSON (a match saved and left); and back
 // (each stone's path thinned to a point every five feet, so a long game doesn't swell the save; a path already thinned

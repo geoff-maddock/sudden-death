@@ -36,7 +36,9 @@
    Phase 7 is gear and potions: a roster curler's { gear: { id, name, fx } } (gx: what the engine reads), start({ bags:
    [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion).
    Phase 8 is the superstars (in the tables) and the players drawn: figKinds() (the kinds the figures know), figsNow()
-   (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going). */
+   (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going).
+   Phase 10 is the lab's switches: start({ fixShot: [shot or null, ...], noSweep: [bool, ...], wear: false }); a summary
+   carries casts and pots. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),

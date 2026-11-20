@@ -40565,7 +40565,8 @@ function crSolveHit(x, y, v, h, ice, cold) {
    began, a Squire the fresh pebble; it aims on it and judges its shots on it, so a misread costs it. Its shots know the
    free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
-  { n: 'Squire', ang: .45, v: .022, samples: 1, top: 1, hammer: false, ice: 'fresh', sweepLate: 600 },
+  // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%)
+  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
   { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
   { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
@@ -40624,7 +40625,9 @@ function crTry(s, aim) {
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
 // only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
 function crPlan(s, style, only) {
-  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only), list = only && kind.length ? kind : all;
+  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
+  // (the lab's fixShot holds a side to one shot where it can be played)
+  const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs) : [], list = held.length ? held : only && kind.length ? kind : all;
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
   // (the style's bonus goes on every value the pick is made by: the first look, the samples and the reply)
   const sb = c => CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0;
@@ -40645,6 +40648,7 @@ function crWhy(c) {
 // the sweepers for a called shot: sweep while the stone would stop short of the call (its speed now), harder the
 // further short, from the release (a Squire's only from halfway down the sheet: sweepLate)
 function crSweeper(s, plan) {
+  if (G.noSweep && G.noSweep[s]) return null;
   if (!plan || !['draw', 'guard', 'freeze'].includes(plan.shot)) return null;
   const S = CR_SKILL[G.skill[s]];
   return st => {
@@ -40682,6 +40686,9 @@ function crStart(opts) {
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
   crShedStart(o); crPowersStart(o); crKitStart(o.bags);
+  // the lab's switches (phase 10): fixShot [shot or null, ...] (a side held to one shot where it can), noSweep [bool, ...]
+  // (a side's sweepers never sweep), wear: false (the pebble never wears)
+  G.fixShot = Array.isArray(o.fixShot) ? o.fixShot.slice() : null; G.noSweep = Array.isArray(o.noSweep) ? o.noSweep.map(Boolean) : null; G.wear = o.wear !== false;
   GB = null;
   return G;
 }
@@ -40738,7 +40745,7 @@ function crThrowFinish(X) {
   // own copies, so a stone the rules refuse, or the free guard zone undoes, leaves G.stones as it was)
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
-  crWear(G.ice, run.path);
+  if (G.wear !== false) crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
@@ -40762,7 +40769,7 @@ function crThrowStone(s, plan, rel, sweep) {
 function crSummary() {
   if (!G) return null;
   return { win: G.over ? G.over.win : -1, over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
-    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
+    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
 }
 // the game as it stands between stones, plain JSON (a match saved and left); and back
 // (each stone's path thinned to a point every five feet, so a long game doesn't swell the save; a path already thinned
@@ -41436,7 +41443,7 @@ function crShedEnd(endNo) {
    Effects (CR_FX0): err (the release's miss, line and weight), line (the line's alone), wt (the weight's alone), sweep
    (how much the sweepers do) and legs (what sweeping costs their legs) multiply; heavy (a curse: the stone drags, and
    comes up short) and stiff (a curse: the stone hardly curls) multiply the thrown stone's friction and curl; granite
-   (once at rest, the stone is three times as heavy: a hit barely moves it, for the rest of the end), ghost (the stone
+   (once at rest, the stone is twice as heavy: a hit barely moves it, for the rest of the end), ghost (the stone
    slides through the first guard it meets, like smoke), gust (as the stone comes to rest, the other rink's stone
    nearest the button is pushed back this many inches) and nerve (no pressure) are the rest. The thrower's aim knows
    none of them: a power makes the stone truer, or the sweepers stronger, never a different shot. */
@@ -41445,7 +41452,7 @@ const CR_ROAR = { max: 100, ult: 60, steady: 25, made: 5, double: 15, two: 15, b
 const CR_FX0 = { err: 1, line: 1, wt: 1, sweep: 1, legs: 1, heavy: 1, stiff: 1, granite: 0, ghost: 0, gust: 0, nerve: 0 };
 const CR_FX_MUL = new Set(['err', 'line', 'wt', 'sweep', 'legs', 'heavy', 'stiff']);
 // granite's weight against an ordinary stone
-const CR_GRANITE = 3;
+const CR_GRANITE = 2;
 const crP = (id, n, desc, fx, curse, now) => ({ id, n, desc, fx: fx || null, curse: curse || null, now: now || null });
 // everyday powers by kind: [draw, hit]
 const CR_POW = {
@@ -41456,7 +41463,7 @@ const CR_POW = {
   ogre: [crP('thumpdraw', 'Thump Draw', 'Set down dead: the miss a little smaller.', { err: .85 }), crP('smash', 'Smash', 'All of it: the weight\'s miss nearly a third smaller, the line a little.', { wt: .7, line: .9 })],
   minotaur: [crP('labline', 'Labyrinth Line', 'Knows the way in: the line\'s miss a fifth smaller.', { line: .8 }), crP('hornhit', 'Horned Hit', 'Head down at it: the miss a quarter smaller.', { err: .75 })],
   troll: [crP('mossystone', 'Mossy Stone', 'Moss on the handle: the sweepers don\'t tire on it.', { legs: 0 }), crP('boulder', 'Boulder', 'A troll\'s stone: once at rest, a hit barely moves it.', { granite: 1 })],
-  golem: [crP('granitestone', 'Granite Stone', 'Once at rest it won\'t be moved: three times as heavy, for the end.', { granite: 1 }), crP('monohit', 'Monolith Hit', 'Unmoving hands: the miss a quarter smaller.', { err: .75 })],
+  golem: [crP('granitestone', 'Granite Stone', 'Once at rest it won\'t be moved: twice as heavy, for the end.', { granite: 1 }), crP('monohit', 'Monolith Hit', 'Unmoving hands: the miss a quarter smaller.', { err: .75 })],
   harpy: [crP('gust', 'Gust', 'A gust as it settles: the other rink\'s stone nearest the button is pushed back 8 inches.', { gust: 8 }), crP('talon', 'Talon', 'Plucked and placed: the line\'s miss nearly a third smaller.', { line: .7 })],
   elf: [crP('elveneye', 'Elven Eye', 'Sees every pebble: the miss nearly a third smaller.', { err: .7 }), crP('arrowline', 'Arrow Line', 'Like an arrow: the line\'s miss much smaller.', { line: .65 })],
   wraith: [crP('smokestone', 'Smoke Stone', 'It slides through the first guard it meets like smoke.', { ghost: 1 }), crP('coldhand', 'Cold Hand', 'Nothing to lose: no pressure on it, and truer.', { nerve: 1, err: .85 })],
@@ -42199,7 +42206,9 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    Phase 7 is gear and potions: a roster curler's { gear: { id, name, fx } } (gx: what the engine reads), start({ bags:
    [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion).
    Phase 8 is the superstars (in the tables) and the players drawn: figKinds() (the kinds the figures know), figsNow()
-   (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going). */
+   (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going).
+   Phase 10 is the lab's switches: start({ fixShot: [shot or null, ...], noSweep: [bool, ...], wear: false }); a summary
+   carries casts and pots. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),

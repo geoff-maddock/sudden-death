@@ -16,7 +16,8 @@
    began, a Squire the fresh pebble; it aims on it and judges its shots on it, so a misread costs it. Its shots know the
    free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
-  { n: 'Squire', ang: .45, v: .022, samples: 1, top: 1, hammer: false, ice: 'fresh', sweepLate: 600 },
+  // (the Squire tuned in phase 10's lab: a Knight beat the first one 99% of the time, this one about 83%)
+  { n: 'Squire', ang: .33, v: .016, samples: 2, top: 2, hammer: false, ice: 'fresh', sweepLate: 300 },
   { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
   { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
@@ -75,7 +76,9 @@ function crTry(s, aim) {
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
 // only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
 function crPlan(s, style, only) {
-  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only), list = only && kind.length ? kind : all;
+  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
+  // (the lab's fixShot holds a side to one shot where it can be played)
+  const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs) : [], list = held.length ? held : only && kind.length ? kind : all;
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
   // (the style's bonus goes on every value the pick is made by: the first look, the samples and the reply)
   const sb = c => CR_STYLE[style] && CR_STYLE[style].includes(c.shot) ? CR_STYLE.bonus : 0;
@@ -96,6 +99,7 @@ function crWhy(c) {
 // the sweepers for a called shot: sweep while the stone would stop short of the call (its speed now), harder the
 // further short, from the release (a Squire's only from halfway down the sheet: sweepLate)
 function crSweeper(s, plan) {
+  if (G.noSweep && G.noSweep[s]) return null;
   if (!plan || !['draw', 'guard', 'freeze'].includes(plan.shot)) return null;
   const S = CR_SKILL[G.skill[s]];
   return st => {

@@ -1254,3 +1254,68 @@ control (a league kind the team lacks), 52%: the Phoenix 52%, the Kraken 51%, th
 Frost Wyrm 56%, and the Behemoth 40.5%. One bowler of five bowls two frames, so a superstar moves a game less than in
 the other sports. The Behemoth's 4s in revs, accuracy, spare and read cost more than its 12 in power earned, so they
 are 7, 7, 6 and 6 now (nerve 10): 53% against the control's 49% (300 each).
+
+## Curling at the Curling Shed (issue #102, phase 10)
+
+`python3 test/realm_shed_lab.py N`: every game is the curling engine played to a result, headless, as Simulate plays
+it (6 ends, the Shed's ways on, powers on), your four curling as a Knight, theirs at the tier's skill, the hammer to
+each side in turn. Every game draws both fours afresh and each cell has its own run of seeds. About 0.6 s a game, so
+the lab is slow: the main parts at 100 a cell take about 50 minutes, the single parts at 40 about the same; a cell of
+100 is good to about 5 points either way, 40 to about 8. A head-to-head check in node (the engine alone, the rinks
+swapping sides) is faster for one question at a time.
+
+The first run found two things wrong, both fixed before the numbers below:
+
+1. **The Squire lost 99 to 100% of the time** to a Knight, so tier 1 read 95%. It now misses less (`ang` .45 to .33,
+   `v` .022 to .016), weighs its best two shots twice each, and its sweepers start from 300 inches past the hack
+   rather than halfway: a Knight beats it 83% (150 games in node), 84 to 87% in the lab.
+2. **Granite decided games.** A golem's Granite Stone (the draw power: once at rest, the stone is heavier) won 80%
+   against the same four with no powers (120 games). Granite is now twice an ordinary stone, not three times
+   (`CR_GRANITE`): 58%.
+
+**Tiers, as the world sets them** (100 each; their level yours plus the tier less one, `W_SHG.oppBonus` a point on each
+of their four, their skill by tier, round every club):
+
+| | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Before | 95% | 43% | 32% |
+| After | 80% | 49% | 31% |
+
+**Their skill** (even level, your Knight): a Squire 84% (99% before), a Knight 53%, an Archmage 31%. The ladder with the
+same four on both sides: an Archmage beats a Knight 70%, a Knight beats a Squire 87%.
+
+**What stayed as it was, and why:**
+
+- **Levels matter, but not much.** In node, a rink with 3 more rating points a player (about three levels) wins 60%,
+  with 6 more about 56%, with 12 more 74%; the lab's level gaps (-1 to +3, both Knights) read 39 to 54% with no clear
+  trend. More reach for the ratings (`CR_REACH` drw 1.6, lin and hit 1.4) didn't read any better at 100 games, so it
+  was left. Curling here is decided mostly by the call and the miss (the skill), which is what the tiers turn.
+- **Sweeping is worth about 6 points.** Head to head in node (200 games), a rink that sweeps beats one that doesn't 56%;
+  it lifts shots made from 73% to 81%. In the lab's separate cells the win rate didn't move (on 46 to 50%, off 49 to
+  50%), within its noise. Sweeping less hard on the curl (`sweepCurl` .4 to .2) read no better (52%), so it was left.
+- **The hammer is worth a lot.** With the hammer in the first end your Knight wins 69% (a margin of +0.6); without it,
+  25% (-0.8). Ends a game (6 ends): about 3.5 singles, 0.5 twos, 0.05 big ends, 2.1 blanks and 0.5 steals, which is
+  low scoring, as club curling between careful skips is.
+- **Powers** (even level, both Knights): both 49%, neither 49%, yours only 64%, theirs only 34%.
+- **The pebble and the Shed** (an Archmage against a Knight): the wear on 68%, off 75%; the Shed's ways on 67%, off 72%.
+- **Gear and potions** move a game by a few points at most (tier 2: plain 44%, their bag 47%, both bags 48%, the full
+  kit 45%); the side with the tier 3 bag in node: 45 to 49%.
+- **The Brass Broom** (Simulate every round, their bags in): won 15% before, 19% after; out in the quarter-final 17%,
+  the semi-final 40%, the final 24%.
+
+### One thing at a time
+
+`realm_shed_lab.py 40 '' single` (40 games a cell, so about 8 points of noise; the granite rows were measured again
+after the change). With only that one power castable by your side (a four of that kind against the same four with
+none), most powers sit within the noise of their kind's "none". The stand-outs before the change were granite (the
+golem's Granite Stone 75%, Stone Wall 85%, the troll's Boulder 72.5% and Troll Bridge 70%, against 47.5 to 50%), and the
+sweeping powers read a little negative (Pack Sweep 27.5% against 42.5%, Broomstick 32.5% against 42.5%), within two
+standard errors. The situation powers: the Hammer 62.5% and the Steal 67.5% against 45% (cast about once and a third
+of a time a game), Extra End and Steady within the noise. Each piece of gear on all four: 35 to 57.5% against 47.5%;
+each potion, two in the bag: 37.5 to 57.5% against 47.5%.
+
+### Superstars on the ice
+
+`realm_stars_lab.py 60 '' cr` (three of your own and the extra player as your four, at an even level against a Knight,
+tier 2): the control (a league kind) 48.3%, the Phoenix 56.7%, the Kraken 48.3%, the Behemoth 55.0%, the Djinn 53.3%, the
+Hydra 48.3%, the Frost Wyrm 51.7%. A superstar adds a little, as one player in four, within the noise at 60.
