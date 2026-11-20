@@ -7,7 +7,8 @@
      a treat, once a day for each pet             its favourite W_PBOND.fav, a pet biscuit W_PBOND.treat
    and rises at W_PBOND.at points. It never goes down, and a hungry pet's doesn't grow (until fed).
    Treats: every pet has its favourite (W_PBOND.fav_of: something you can forage, cook with or buy), and every pet
-   eats pet biscuits (sold at the pet shops). Any treat feeds a hungry pet, whenever it is given.
+   eats pet biscuits (sold at the pet shops). Any treat feeds a hungry pet, whenever it is given; one that would do
+   nothing (not hungry, and treated today or at bond 3) isn't given, nor one to the pet at your side mid-match.
    The Pets tab shows each pet's bond points, its favourite, and Give a treat.
 
    W_PBOND, wPetBondXp, wPetTreat, wPetTreatsFor
@@ -36,19 +37,24 @@ function wPetBondXp(q, n, why) {
   wPetSync();
   return up;
 }
-// the treats you hold that this pet eats: its favourite, and pet biscuits
-const wPetTreatsFor = q => [wPetFav(q.kind), 'pettreat'].filter(k => k && DB.items[k] && wHas(k));
+// a treat would do something: feed it (hungry), or grow its bond (not yet today, not at 3)
+const wPetTreatUseful = q => !!q.hungry || (q.treat !== WG.dayAbs && (q.bond || 1) < 3);
+// the treats you hold that this pet eats, while one would do something: its favourite, and pet biscuits
+const wPetTreatsFor = q => wPetTreatUseful(q) ? [wPetFav(q.kind), 'pettreat'].filter(k => k && DB.items[k] && wHas(k)) : [];
 // give a treat: it feeds a hungry pet; bond points once a day each
 function wPetTreat(id, item) {
   const q = wPetOf(id); if (!q) return 'No such pet.';
   const fav = item === wPetFav(q.kind);
   if (!(fav || item === 'pettreat') || !DB.items[item]) return `${q.name} won't eat that.`;
   if (!wHas(item)) return `You have no ${DB.items[item].name}.`;
+  // (the pet at your side stays as it is till the match is over; a treat that would do nothing isn't given)
+  if (wPets().side === id && wPetBusy()) return 'Not during a match.';
+  if (!wPetTreatUseful(q)) return (q.bond || 1) >= 3 ? `${q.name} isn't hungry, and its bond is as close as it gets.` : `${q.name} isn't hungry, and has had today's treat.`;
   wAddItem(item, -1);
   const was = !!q.hungry; q.hungry = false;
   const today = q.treat !== WG.dayAbs; q.treat = WG.dayAbs;
-  wLog(`${q.name} ${fav ? `wolfs down the ${DB.items[item].name}: its favourite!` : `crunches a ${DB.items[item].name}.`}${was ? ' It isn\'t hungry any more.' : ''}${today ? '' : ' (One treat a day grows its bond.)'}`, 'g');
-  if (today) wPetBondXp(q, fav ? W_PBOND.fav : W_PBOND.treat, 'a treat');
+  wLog(`${q.name} ${fav ? `wolfs down the ${DB.items[item].name}: its favourite!` : `crunches a ${DB.items[item].name}.`}${was ? ' It isn\'t hungry any more.' : ''}`, 'g');
+  if (today && (q.bond || 1) < 3) wPetBondXp(q, fav ? W_PBOND.fav : W_PBOND.treat, 'a treat');
   wPetSync(); wSave(); return '';
 }
 // a card match won together
@@ -84,7 +90,8 @@ wPshopOpen = function (id) {
   if (!W_PSHOP.shops[id] || !wPshopIsOpen(id)) return;
   const box = $('modalBox'), at = box.querySelector('#wPshopWhy'); if (!at) return;
   at.insertAdjacentHTML('beforebegin', `<p>Pet biscuits, ${W_PBOND.biscuit} gold each (you have ${WG.items.pettreat || 0}). <button class="ghost" data-psbisc="1"${RUN.gold < W_PBOND.biscuit ? ' disabled' : ''}>Buy one</button></p>`);
-  box.querySelector('[data-psbisc]').onclick = () => { const why = wPetBuyBiscuit(id); if (why) { const w = $('wPshopWhy'); w.textContent = why; w.hidden = false; return; } wPshopOpen(id); };
+  // (bought: the window closes as Leave would, and opens again with the new count)
+  box.querySelector('[data-psbisc]').onclick = () => { const why = wPetBuyBiscuit(id); if (why) { const w = $('wPshopWhy'); w.textContent = why; w.hidden = false; return; } box.querySelector('[data-close]').click(); wPshopOpen(id); };
 };
 const wW135Audit = wAudit;
 wAudit = function () {
@@ -97,5 +104,5 @@ const wW135RenderHelp = renderHelp;
 renderHelp = function () {
   wW135RenderHelp();
   const h = $('wHelpPetShops') || $('wHelpPets'); if (!h || $('wHelpPetBond')) return;
-  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetBond"><b>Bond and treats.</b> A pet's bond (1 to 3) grows with card matches won with it at your side, and faster with treats: each pet has its favourite (the Pets tab says which), and every pet eats pet biscuits from the pet shops. A treat grows its bond once a day, and feeds a hungry pet whenever it is given. Bond ${W_PBOND.at[2]} points makes bond 2, ${W_PBOND.at[3]} bond 3; each level makes its trait stronger and opens or lifts a power. Bond never goes down, but a hungry pet's doesn't grow.</p>`);
+  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetBond"><b>Bond and treats.</b> A pet's bond (1 to 3) grows with card matches won with it at your side, and faster with treats: each pet has its favourite (the Pets tab says which), and every pet eats pet biscuits from the pet shops. A treat grows its bond once a day, and feeds a hungry pet whenever it is given. ${W_PBOND.at[2]} bond points make bond 2, and ${W_PBOND.at[3]} make bond 3; each level makes its trait stronger and opens or lifts a power. Bond never goes down, but a hungry pet's doesn't grow.</p>`);
 };

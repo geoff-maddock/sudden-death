@@ -91,7 +91,7 @@ function wPetFull(q, a) {
   });
 }
 // (as it was: its name, bond, hunger and the day it came, all back when reclaimed)
-function wPetAway(q) { wPets(); const a = { id: q.id, kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '', hungry: !!q.hungry, got: q.got != null ? q.got : null }; WG.petAway.push(a); return a; }
+function wPetAway(q) { wPets(); const a = { id: q.id, kind: q.kind, name: q.name, bond: q.bond || 1, xp: q.xp || 0, from: q.from || '', hungry: !!q.hungry, got: q.got != null ? q.got : null, treat: q.treat != null ? q.treat : null }; WG.petAway.push(a); return a; }
 // let one go: it goes back where it came from, and waits there
 function wPetLetGo(id) {
   const P = wPets(), q = wPetOf(id); if (!q) return 'No such pet.';
@@ -107,7 +107,7 @@ function wPetReclaim(i) {
   const A = wPets() && WG.petAway, a = A[i]; if (!a) return 'Nobody waits there.';
   if (wPets().owned.length >= W_PET.kennel) return `Your kennel is full (${W_PET.kennel}).`;
   // (taken off the waiting list only once it is really back)
-  const q = wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp, hungry: !!a.hungry, got: a.got != null ? a.got : WG.dayAbs }); if (!q || !wPetOf(q.id)) return 'It couldn\'t come.';
+  const q = wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp, hungry: !!a.hungry, got: a.got != null ? a.got : WG.dayAbs, treat: a.treat != null ? a.treat : null }); if (!q || !wPetOf(q.id)) return 'It couldn\'t come.';
   const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1); wSave();
   return '';
 }

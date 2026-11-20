@@ -49,8 +49,13 @@ async def main():
           out.fav = W_PBOND.fav_of.hootling; wAddItem('mossberry', 2); wAddItem('pettreat', 2); wAddItem('jerky', 1);
           out.no = wPetTreat(q.id, 'jerky') !== '' && wHas('jerky');
           q.hungry = true; wPetTreat(q.id, 'mossberry'); out.first = [q.xp, q.hungry]; q.hungry = true; wPetTreat(q.id, 'pettreat'); out.second = [q.xp, q.hungry, WG.items.pettreat];
-          WG.dayAbs++; wPetTreat(q.id, 'pettreat'); out.next = q.xp; out.none = wPetTreat(q.id, 'pettreat') !== '';
+          const keep = WG.items.mossberry || 0; out.useless = wPetTreat(q.id, 'mossberry') !== '' && (WG.items.mossberry || 0) === keep;
+          // (let go and had back the same day: still treated today)
+          wPetLetGo(q.id); wPetReclaim(WG.petAway.findIndex(a => a.kind === 'hootling')); const q2 = wPets().owned.find(x => x.kind === 'hootling'); out.kept = wPetTreat(q2.id, 'mossberry') !== '' && q2.xp === 3; wPetSide(q2.id);
+          WG.dayAbs++; wPetTreat(q2.id, 'pettreat'); out.next = q2.xp; out.none = wPetTreat(q2.id, 'pettreat') !== '';
+          wAddItem('pettreat', 1); WG.dayAbs++; B = { over: null }; UI.view = 'fight'; out.busy = wPetTreat(q2.id, 'pettreat') !== ''; B = null; UI.view = 'world';
           out.items = Object.keys(PETS).filter(k => !DB.items[W_PBOND.fav_of[k]]); return out; })()""")
+        check(t['useless'] and t['kept'] and t['busy'], 'a treat that would do nothing isn\'t given (the item kept), letting go doesn\'t reset the day, and not to the pet at your side mid-match', t)
         check(t['no'] and t['first'] == [3, False] and t['second'] == [3, False, 1] and t['next'] == 4 and t['none'], 'its favourite gives 3 points, a biscuit 1, once a day each; any treat feeds a hungry pet; it won\'t eat anything else', t)
         check(t['items'] == [], 'every pet\'s favourite is a real item', t)
         tab = await pg.evaluate("""(async () => { const q = wPets().owned.find(x => x.kind === 'hootling'); wAddItem('mossberry', 1); WG.dayAbs++; const x0 = q.xp;
@@ -59,9 +64,11 @@ async def main():
           card.querySelector('[data-pettreat][data-item="mossberry"]').click();
           const r = { points: /Bond points/.test(txt), fav: /favourite: Mossberry/.test(txt), gave: q.xp - x0, open: !!document.getElementById('wCampBody') }; """ + ESC + """ return r; })()""")
         check(tab == {'points': True, 'fav': True, 'gave': 3, 'open': True}, 'the Pets tab shows bond points and the favourite, and gives a treat', tab)
-        sh = await pg.evaluate("""(() => { WG.flags.q_petshop_salt = 1; RUN.gold = 50; const n0 = WG.items.pettreat || 0; wPshopOpen('salt'); document.querySelector('#modalBox [data-psbisc]').click();
-          const r = { got: (WG.items.pettreat || 0) - n0, paid: 50 - RUN.gold, still: !document.getElementById('modal').hidden }; """ + ESC + """ return r; })()""")
-        check(sh == {'got': 1, 'paid': 8, 'still': True}, 'the pet shops sell pet biscuits', sh)
+        sh = await pg.evaluate("""(() => { WG.flags.q_petshop_salt = 1; RUN.gold = 50; const n0 = WG.items.pettreat || 0; wPshopOpen('salt'); document.querySelector('#modalBox [data-psbisc]').click(); document.querySelector('#modalBox [data-psbisc]').click();
+          // (two bought: one Escape closes the window, and leaves no other behind)
+          let drains = 0; const d0 = wDrain; wDrain = function () { drains++; return d0.apply(this, arguments); }; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); const closed = document.getElementById('modal').hidden; modal('<p>x</p>'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); wDrain = d0;
+          return { got: (WG.items.pettreat || 0) - n0, paid: 50 - RUN.gold, closed, drains }; })()""")
+        check(sh == {'got': 2, 'paid': 16, 'closed': True, 'drains': 1}, 'the pet shops sell pet biscuits, the window open between buys, with no listener left behind', sh)
 
         # (a real card match in the world, won: the bond point comes)
         await pg.evaluate("(() => { const q = wPets().owned.find(x => x.kind === 'hootling'); wPetSide(q.id); q.xp = 0; q.bond = 1; q.hungry = false; wPetSync(); RUN.hp = 999; RUN.maxhp = 999; WG.grace = 99; startMatch({ ids: ['skelss'], type: 'normal', tier: 1, card: false, sport: 'baseball', world: { kind: 'wild', region: 'plains' } }); })()")
