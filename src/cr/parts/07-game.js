@@ -46,7 +46,8 @@ function crMade(plan, before, after, run) {
 // take (crRefused: rule.ok false, plan and ri null) changes nothing
 function crTurn() {
   const s = crUp(); if (s < 0) return null;
-  const plan = Object.assign(crPlan(s), { s });
+  // (your side under Manage plays the game you set, however the stone is called)
+  const plan = Object.assign(crPlan(s, typeof GP !== 'undefined' && GP && GP.mode === 'manage' && s === GP.you ? GP.mgr.style : null), { s });
   return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
@@ -99,8 +100,9 @@ function crSummary() {
     tot: [crTotal(0), crTotal(1)], log: G.log.slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
 }
 // the game as it stands between stones, plain JSON (a match saved and left); and back
-// (each stone's path thinned to every fifth point, so a long game doesn't swell the save)
-const crThin = p => p.filter((_, i) => i % 5 === 0 || i === p.length - 1);
+// (each stone's path thinned to a point every five feet, so a long game doesn't swell the save; a path already thinned
+// stays as it is, however often the match is saved and resumed)
+const crThin = p => { const out = []; p.forEach((q, i) => { const L = out[out.length - 1]; if (!L || i === p.length - 1 || Math.hypot(q[0] - L[0], q[1] - L[1]) >= 59) out.push(q); }); return out; };
 function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
 function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;

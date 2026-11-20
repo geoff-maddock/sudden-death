@@ -106,6 +106,8 @@ function wResumeShed() {
   const L = wShedLive() && WG.shg.live; if (!L) return;
   if (!L.snap) { wShedCallOff('The match had not reached its first stone, so it is called off.'); return; }
   WCR = { over: null, world: true };
+  // (the match's own mode while it is on, and yours back when you leave the Shed: wShedModeBack)
+  if (WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
   W_SHED_MODE = L.snap.mode || W_SHED_MODE;
   wCR.resume(L.snap);
   $('wShedTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
@@ -117,17 +119,18 @@ function wShedLeaveGame() {
   // a stone sliding (or resting) counts: a game it decided is played out and settled, any other is kept after it
   if (wShedWorld() && (wCR.phase === 'slide' || wCR.phase === 'rest')) {
     let n = 0; while (wShedLive() && wCR.phase === 'slide' && n++ < 20000) wCR.tick(0.1);
-    if (!wShedLive()) { WCR = null; wW125LeaveShed(); wSave(); return; }
-    if (wCR.G.over) { n = 0; while (wShedLive() && wCR.phase !== 'over' && n++ < 4000) wCR.tick(0.1); if (!wShedLive()) { WCR = null; wW125LeaveShed(); wSave(); return; } }
+    if (!wShedLive()) { WCR = null; wShedModeBack(); wW125LeaveShed(); wSave(); return; }
+    if (wCR.G.over) { n = 0; while (wShedLive() && wCR.phase !== 'over' && n++ < 4000) wCR.tick(0.1); if (!wShedLive()) { WCR = null; wShedModeBack(); wW125LeaveShed(); wSave(); return; } }
     else L.snap = wCR.snapshot();
   }
   const sn = L.snap;
   WSHG.asked = true;
-  WCR = null; wW125LeaveShed();
+  WCR = null; wShedModeBack(); wW125LeaveShed();
   if (!sn) return wShedCallOff(`You leave before the first stone, so the match against ${wBallName(L.world.club)} is called off.`);
   wLog(`Your curling match against ${wBallName(L.world.club)} is saved: ${wShedScore(sn)}. Resume it from the Shed tab on the Team screen.`, 'd');
   wSave();
 }
+function wShedModeBack() { if (WSHG.keepMode != null) { W_SHED_MODE = WSHG.keepMode; WSHG.keepMode = null; } }
 function wShedCallOff(why) {
   const B = wShg(), L = B.live; if (!L) return;
   B.live = null; if (!L.world.cup) delete B.met[L.world.club];
@@ -141,7 +144,7 @@ function wShedConcede() {
     if (!wShedLive()) return;
     const s = wCR.summary() || {}; s.win = 1; s.text = 'conceded';
     wShedSettle(s);
-    WCR = null; wW125LeaveShed();
+    WCR = null; wShedModeBack(); wW125LeaveShed();
   }, () => { if (WCR) wCR.pause(false); });
   wAfterAsk(() => { if (WCR) wCR.pause(false); });
 }
@@ -228,7 +231,7 @@ wShedBarNote = function () {
   if (real && !live && WCR.msg) $('wShedNote').textContent = WCR.msg;
 };
 const wW125LeaveShed = wLeaveShed;
-wLeaveShed = function () { if (wShedWorld()) return wShedLeaveGame(); wW125LeaveShed(); if (WG) { wSave(); wDrain(); } };
+wLeaveShed = function () { if (wShedWorld()) return wShedLeaveGame(); wShedModeBack(); wW125LeaveShed(); if (WG) { wSave(); wDrain(); } };
 // every game at the Shed has its ways, on the day's cold
 const wW125ShedGame = wShedGame;
 wShedGame = function (opts) { const o = Object.assign({ hall: true }, opts || {}); if (!o.cold) o.cold = wShedColdNow(); return wW125ShedGame(o); };

@@ -67,9 +67,9 @@ async def main():
         check(mg['draw']['draw'] > mg['hit']['draw'] and mg['hit']['hit'] > mg['draw']['hit'], 'Manage: the draw game throws more draws and guards, the hitting game more takeouts', mg)
         sn = await pg.evaluate("""(() => { wCR.start({ seed: 8, ends: 4, mode: 'watch', hall: true, teams: [__D(), __D()] }); wCR.pause(true); let n = 0; while (wCR.G.n < 9 && n++ < 30000) wCR.tick(.05); __to('next');
           const S = wCR.snapshot(), json = JSON.stringify(S) === JSON.stringify(JSON.parse(JSON.stringify(S))), want = JSON.stringify(S.G);
-          wCR.start({ seed: 99 }); wCR.resume(S); const same = JSON.stringify(wCR.G) === want; n = 0; while (!wCR.G.over && n++ < 60000) wCR.tick(.1);
-          return { json, same, over: !!wCR.G.over }; })()""")
-        check(sn == {'json': True, 'same': True, 'over': True}, 'a snapshot between stones is plain JSON, resumes as it was, and plays on to the end', sn)
+          wCR.start({ seed: 99 }); wCR.resume(S); const same = JSON.stringify(wCR.G) === want; const again = JSON.stringify(wCR.snapshot().paths) === JSON.stringify(S.paths) && S.paths.length >= 8 && S.paths.every(q => q.path.length >= 3); n = 0; while (!wCR.G.over && n++ < 60000) wCR.tick(.1);
+          return { json, same, again, over: !!wCR.G.over }; })()""")
+        check(sn == {'json': True, 'same': True, 'again': True, 'over': True}, 'a snapshot between stones is plain JSON, resumes as it was (its paths thinned once, not again), and plays on to the end', sn)
 
         # ---------- the Realm ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
@@ -105,15 +105,15 @@ async def main():
         cd = await pg.evaluate("({ live: wShedLive(), last: WG.shg.games[0].r, text: WG.shg.games[0].text, view: UI.view })")
         check(cd == {'live': False, 'last': 'lose', 'text': 'conceded', 'view': 'world'}, 'Concede counts as a loss, and leaves the Shed', cd)
         # a match played out to a win is a win (the page's summary, not Simulate's)
-        pw = await pg.evaluate("""(() => { wShg().met = {}; const g0 = RUN.gold, w0 = WG.shg.w; wStartShed({ club: 'local', how: 'play' }); wCR.pause(true);
+        pw = await pg.evaluate("""(() => { wShg().met = {}; const keepMode = W_SHED_MODE, g0 = RUN.gold, w0 = WG.shg.w; wStartShed({ club: 'local', how: 'play' }); wCR.pause(true);
           const G = wCR.G, n = G.ends - 1; G.end = n; G.sc = [Array(n).fill(0), Array(n).fill(0)]; G.sc[0][0] = 5; G.k = 15; G.stones = [];
           $('wShedModes').querySelector('[data-cmode="watch"]').click(); let i = 0; while (wShedLive() && i++ < 40000) wCR.tick(.05);
-          const r = { live: wShedLive(), last: WG.shg.games[0].r, wins: WG.shg.w - w0, gold: RUN.gold - g0 }; wLeaveShed(); return r; })()""")
+          const r = { live: wShedLive(), last: WG.shg.games[0].r, wins: WG.shg.w - w0, gold: RUN.gold - g0 }; wLeaveShed(); W_SHED_MODE = keepMode; return r; })()""")
         check(pw['live'] is False and pw['last'] == 'win' and pw['wins'] == 1 and pw['gold'] > 0, 'a match played out to a win is settled as a win, with its gold', pw)
-        st = await pg.evaluate("""(() => { const style = st => { let t = 0; for (let i = 0; i < 6; i++) { wCR.start({ seed: 60 + i, ends: 2, mode: 'manage', teams: [__D(), __D()] }); wCR.pause(true); wCR.manage({ style: st });
-              let n = 0; while (!wCR.G.over && n++ < 40000) wCR.tick(.1); const S = wCR.G.st[0].shots; t += (S.takeout || 0) + (S.peel || 0) + (S.hitroll || 0); } return t; };
+        st = await pg.evaluate("""(() => { const style = st => { let t = 0, all = 0; for (let i = 0; i < 10; i++) { wCR.start({ seed: 60 + i, ends: 4, mode: 'manage', teams: [__D(), __D()] }); wCR.pause(true); wCR.manage({ style: st });
+              let n = 0; while (!wCR.G.over && n++ < 40000) wCR.tick(.1); const S = wCR.G.st[0].shots; t += (S.takeout || 0) + (S.peel || 0) + (S.hitroll || 0); all += wCR.G.st[0].stones; } return +(t / all).toFixed(3); };
           return { hit: style('hit'), draw: style('draw') }; })()""")
-        check(st['hit'] >= st['draw'] + 4, 'Manage\'s hitting game throws clearly more hits than the draw game', st)
+        check(st['hit'] >= st['draw'] + .08, 'Manage\'s hitting game throws a clearly larger share of hits than the draw game', st)
         await pg.evaluate("wOpenCamp('shed')")
         await pg.wait_for_selector('#wCampBody .wshedfour')
         tb = await pg.evaluate("(() => { const b = $('wCampBody'); return { play: !!b.querySelector('[data-shplay]'), recent: /Last curling matches/.test(b.textContent) }; })()")
