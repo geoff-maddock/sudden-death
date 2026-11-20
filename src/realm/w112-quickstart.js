@@ -31,6 +31,16 @@ const W_QUICK = [
     tip: 'At a spare, press B for the spare ball, which rolls straight: the coach sets you up for it. After every ball, Moll\'s glass shows what you bowled.',
     keys: [['Space', 'throw (three presses)'], ['Left, right arrows', 'move your feet'], ['A, D', 'move your arrow'], ['B', 'strike ball or spare ball'], ['G', 'back to the coach\'s line'], ['P', 'use a power']],
     phone: 'On a phone, drag up the lane from the bowler and let go. How far you pull is the speed; a pull off straight misses.' },
+  { id: 'shed', n: 'Curling', where: 'the Curling Shed', more: 'wShedHow',
+    lede: 'Your skip has already called the shot and put the broom down. All you have to do is throw it, then sweep: press Space twice, then hold it.',
+    steps: [
+      { img: 'shed-aim', h: 'Look at the broom', t: 'The yellow broom in the house is where your skip wants the stone, and the house on the right shows it from above. Your skip says what the shot is and why. Change it if you like (1 to 6 for the shot, the arrows to move the broom, I and O for the handle), or press G for the skip\'s call again.' },
+      { img: 'shed-weight', h: 'Press Space twice: start, then stop on the yellow line', t: 'The first press starts the slide and the marker climbs the bar. Press again on the yellow line for the weight the skip called. Early is light (it stops short), late is heavy (it runs long).' },
+      { img: 'shed-sweep', h: 'Hold Space to sweep', t: 'While your stone slides, hold Space and your two sweepers sweep it: it runs further and curls less. Listen to your skip: "Hurry hard!" means sweep, "Off!" or "Whoa!" means let it go. Their legs tire over an end.' },
+    ],
+    tip: 'Before your stone, cast your curler\'s power (P) or the ultimate at the start of an end (U). Press C for the ice chart: every stone\'s path, and where the pebble is worn.',
+    keys: [['Space', 'throw (two presses), then hold to sweep'], ['1 to 6', 'the shot'], ['Arrows', 'move the broom'], ['I, O', 'the handle'], ['G', 'the skip\'s call again'], ['P, U, K', 'a power, the ultimate, Steady'], ['C', 'the ice chart']],
+    phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold Hold to sweep while it slides.' },
   { id: 'ball', n: 'Baseball', where: 'the Ballpark', more: 'wHelpBall',
     lede: 'You bat first. Batting is two things: put the circle over the ball, and swing when it turns gold. Running and fielding happen by themselves.',
     steps: [
@@ -115,7 +125,7 @@ renderHelp = function () {
 };
 
 // the Quick start buttons: beside each sport's How to play button (baseball's on its bar)
-for (const [how, id] of [['wLinksHowBtn', 'links'], ['wLanesHowBtn', 'lanes'], ['wGridHowBtn', 'grid'], ['wRingHowBtn', 'ring'], ['wCourtHowBtn', 'court'], ['wRinkHowBtn', 'rink']]) {
+for (const [how, id] of [['wLinksHowBtn', 'links'], ['wLanesHowBtn', 'lanes'], ['wShedHowBtn', 'shed'], ['wGridHowBtn', 'grid'], ['wRingHowBtn', 'ring'], ['wCourtHowBtn', 'court'], ['wRinkHowBtn', 'rink']]) {
   const b = $(how); if (!b) continue;
   b.insertAdjacentHTML('beforebegin', `<button class="ghost" id="wQuick_${id}">Quick start</button> `);
   $('wQuick_' + id).addEventListener('click', () => wQuickOpen(id));

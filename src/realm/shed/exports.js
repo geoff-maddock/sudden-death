@@ -71,6 +71,8 @@ return {
   powNow: (s, ri, shot) => G && G.powers ? crPowNow(s, ri, shot) : null, powWhy: (s, k, ri) => crPowWhy(s, k, ri), cast: (s, k, ri) => crCast(s, k, ri), castMine: k => crCastMine(k),
   fxFor: s => crFxFor(s), yourWt: p => GP ? crYourWt(p) : p, cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
   get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // the feel (phase 11): the stone sliding now, its hits so far and whether it is swept
+  get slideHits() { return GP && GP.X ? GP.X.Q.hits : 0; }, get slideSwept() { return !!(GP && GP.X && GP.X.Q.sw > 0); }, get slideStone() { return GP && GP.X && !GP.X.Q.T.out ? { x: GP.X.Q.T.x, y: GP.X.Q.T.y } : null; }, button: CR_BUTTON,
   // superstars and figures (phase 8)
   figKinds: () => Object.keys(KIND), figsNow: () => G && G.teams ? crFigsOn() : [],
   // gear and potions (phase 7)

@@ -33,7 +33,9 @@ function crStart(opts) {
   GB = null;
   return G;
 }
-const crBox = () => ({ stones: 0, made: 0, shots: {}, madeBy: {}, ends: { scored: 0, stolen: 0, blank: 0 }, big: 0 });
+// (buttons: draws that came to rest on the button itself, the one-foot circle at the tee: phase 11's medal)
+const CR_BUTTON = 6;
+const crBox = () => ({ stones: 0, made: 0, shots: {}, madeBy: {}, ends: { scored: 0, stolen: 0, blank: 0 }, big: 0, buttons: 0 });
 // was the shot made? (what the call asked, against where the stones came to rest)
 function crMade(plan, before, after, run) {
   const stop = run.stop, R = CR_SHEET.stoneR, tg = plan.target && before.find(b => b.id === plan.target), gone = tg && !after.some(a => a.id === plan.target);
@@ -94,10 +96,11 @@ function crThrowFinish(X) {
   G.hallSaid = rule.end ? crShedEnd(rule.end.end) : crShedAfter();
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
   if (made) { B.made++; P.made++; B.madeBy[plan.shot] = (B.madeBy[plan.shot] || 0) + 1; }
+  if (made && plan.shot === 'draw' && run.stop && Math.hypot(run.stop.x, run.stop.y) <= CR_BUTTON) B.buttons = (B.buttons || 0) + 1;
   // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
-  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
+  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, ham, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
   crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };

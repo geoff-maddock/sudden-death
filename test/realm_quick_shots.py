@@ -3,7 +3,7 @@
 # look changes, then rebuild. Each shot sets the game up through its API (a setup may wait on the game), freezes it,
 # lays labels with arrows over it and takes the picture: the canvas, and any bar above it that the step is about.
 #   python3 test/realm_quick_shots.py              every sport
-#   python3 test/realm_quick_shots.py links lanes   some sports (the others' shots are kept)
+#   python3 test/realm_quick_shots.py links lanes   some sports (the others' shots are kept; shed is curling)
 # A label: { t: text, x, y: where the arrow points, in the canvas's own pixels (or el: a page element, the arrow at its
 # middle), dx, dy: where the text sits from there (canvas pixels), al: 'l' or 'r' to hang the text off that side }.
 import asyncio, base64, os, re, subprocess, sys
@@ -169,7 +169,24 @@ LANES = {
   ],
 }
 
-SHOTS = {'links': GOLF, 'lanes': LANES, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK}
+# ---------- curling ----------
+# (the meter: x 584, from v .82 at y 470 up to v 1.22 at y 150; the yellow line is v 1, at y 326)
+SHED = {
+  'prep': "window.__to = (ph, n) => { let i = 0; while (wCR.phase !== ph && i++ < (n || 8000)) wCR.tick(0.05); return wCR.phase === ph; }; window.__mY = v => 470 - (v - 0.82) / 0.4 * 320; 0",
+  'cv': "document.querySelector('#v-shed canvas')", 'W': 960,
+  'shots': [
+    ('shed-aim', "(() => { W_SHED_MODE = 'play'; wShedGame({ seed: 7, mode: 'play', hammer: 1 }); wCR.pause(true); __to('aim'); wCR.select({ suggest: true }); for (let i = 0; i < 40; i++) wCR.render(0.05); })()",
+     """(() => { const S = wCR.view.sel, [bx, by] = wCR.scr(S.x, S.y), [hx, hy] = wCR.houseScr(S.x, S.y);
+       return [{ t: 'Your skip\\'s broom: where the stone should stop', x: bx, y: by, dx: -60, dy: 150, al: 'r' }, { t: 'The house from above: the broom again', x: hx, y: hy, dx: -10, dy: 200, al: 'r' }]; })()"""),
+    ('shed-weight', "(() => { wCR.press(); let i = 0; while (wCR.view.meter && wCR.view.meter.v < 0.94 && i++ < 2000) wCR.tick(0.002); for (let j = 0; j < 4; j++) wCR.render(0.02); })()",
+     """[{ t: 'The marker climbs', x: 604, y: __mY(wCR.view.meter.v), dx: 120, dy: 50, al: 'l' }, { t: 'Press Space on the yellow line: the called weight', x: 570, y: __mY(1), dx: -160, dy: -50, al: 'r' }, { t: 'Above it: heavy (runs long)', x: 584, y: __mY(1.15), dx: 110, dy: -40, al: 'l' }, { t: 'Below it: light (stops short)', x: 584, y: __mY(0.88), dx: -150, dy: 40, al: 'r' }]"""),
+    ('shed-sweep', "(() => { let i = 0; while (wCR.view.meter && wCR.view.meter.v < 0.9 && i++ < 2000) wCR.tick(0.002); wCR.press(); i = 0; while (wCR.phase === 'slide' && i++ < 34) wCR.tick(0.05); wCR.sweep = true; for (let j = 0; j < 30; j++) { wCR.tick(0.02); wCR.render(0.02); } })()",
+     """(() => { const T = wCR.slideStone || { x: 0, y: -600 }, [sx, sy] = wCR.scr(T.x, T.y);
+       return [{ t: 'Hold Space: your two sweepers sweep it', x: sx, y: sy - 20, dx: 170, dy: 90, al: 'l' }, { t: 'Your skip\\'s call: sweep, or let it go', x: 310, y: 190, dx: 150, dy: -60, al: 'l' }]; })()"""),
+  ],
+}
+
+SHOTS = {'links': GOLF, 'lanes': LANES, 'shed': SHED, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK}
 
 async def main():
     only = sys.argv[1:] or list(SHOTS)
