@@ -57,11 +57,13 @@ function crRunStep(Q, sweep) {
   // how hard the thrown stone is asked to be swept (0 to 1: the page's Space, or the CPU's sweepers), only while it is on
   // the sheet and moving; with opts.legs, the side's sweepers sweep that times how good they are and their legs, which
   // the step spends (a good pair with fresh legs sweeps a little harder than an average pair: up to 1.5)
-  const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1) : 0;
-  const sw = ask && O.legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
+  // (without legs, a caller's own sweep may run to 1.5, as a good fresh pair's does)
+  const legs = !!O.legs && O.side != null && !!G && !!G.teams;
+  const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, legs ? 1 : 1.5) : 0;
+  const sw = ask && legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
-  if (ask && O.legs) crLegsBurn(O.side, ask, dts);
+  if (ask && legs) crLegsBurn(O.side, ask, dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;

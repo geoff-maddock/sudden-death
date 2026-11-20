@@ -39835,11 +39835,13 @@ function crRunStep(Q, sweep) {
   // how hard the thrown stone is asked to be swept (0 to 1: the page's Space, or the CPU's sweepers), only while it is on
   // the sheet and moving; with opts.legs, the side's sweepers sweep that times how good they are and their legs, which
   // the step spends (a good pair with fresh legs sweeps a little harder than an average pair: up to 1.5)
-  const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1) : 0;
-  const sw = ask && O.legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
+  // (without legs, a caller's own sweep may run to 1.5, as a good fresh pair's does)
+  const legs = !!O.legs && O.side != null && !!G && !!G.teams;
+  const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, legs ? 1 : 1.5) : 0;
+  const sw = ask && legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
-  if (ask && O.legs) crLegsBurn(O.side, ask, dts);
+  if (ask && legs) crLegsBurn(O.side, ask, dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
@@ -40082,9 +40084,11 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
   if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
   plan = Object.assign({}, plan, { s });
-  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out)
+  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out; a
+  // number is a steady ask)
+  if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s });
-  const X = { s, plan, rel, Q, g: G, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const X = { s, plan, rel, Q, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
 // a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed
@@ -40092,9 +40096,10 @@ const crRefused = (s, why) => ({ side: s, ri: null, pos: null, end: null, plan: 
 function crThrowFinish(X) {
   if (CR_LIVE === X) CR_LIVE = null;
   if (X.g !== G) return crRefused(X.s, 'That game is over.');
-  const why = crWhyNot(X.s); if (why) return crRefused(X.s, why);
+  // (a stone refused here gives back the legs its sweeping spent: nothing changed)
+  const why = crWhyNot(X.s); if (why) { G.legs = X.legs0; return crRefused(X.s, why); }
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
-  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
+  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
@@ -58528,7 +58533,7 @@ wMakePlayer = function (spec, from) { const p = wW123MakePlayer.apply(this, argu
 const wW123GiveXp = wGiveXp;
 wGiveXp = function (p, n) { const r = wW123GiveXp(p, n); wCrOf(p); return r; };
 const wW123Start = wStart;
-wStart = function (save, opts) { const r = wW123Start(save, opts); wCrAll(); if (save) wSave(); return r; };
+wStart = function (save, opts) { const r = wW123Start(save, opts); wCrAll(); if (WG) wFourSyncCr(); if (save) wSave(); return r; };
 
 /* ---------- the four ---------- */
 const wFourCrCu = k => typeof k === 'string';
@@ -58611,7 +58616,8 @@ function wFourCrPractice() {
 /* ---------- the Curling block on a player's stats ---------- */
 function wCrCard(p) {
   const b = wCrOf(p); if (!b) return '';
-  if (WG && !WG.shed) { wFourSyncCr(); wSave(); }
+  // (the four is made when a save loads; here it is only brought up to date, and saved if that changed it)
+  if (WG && WG.shed) { const before = JSON.stringify(WG.shed); wFourSyncCr(); if (JSON.stringify(WG.shed) !== before) wSave(); }
   const bars = wCR.stats.map(s => { const [ab, what] = W_CRR.stat[s], got = b.got[s] || 0;
     return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wCrCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
   const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null, other = p.cid && !(WG && WG.shed && WG.shed.cu.some(c => c.cid === p.cid));

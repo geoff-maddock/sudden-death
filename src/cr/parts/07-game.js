@@ -56,9 +56,11 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
   if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
   plan = Object.assign({}, plan, { s });
-  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out)
+  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out; a
+  // number is a steady ask)
+  if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s });
-  const X = { s, plan, rel, Q, g: G, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
+  const X = { s, plan, rel, Q, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
 // a throw the game can't take now (it isn't theirs any more, or it is a different game): the same shape, nothing changed
@@ -66,9 +68,10 @@ const crRefused = (s, why) => ({ side: s, ri: null, pos: null, end: null, plan: 
 function crThrowFinish(X) {
   if (CR_LIVE === X) CR_LIVE = null;
   if (X.g !== G) return crRefused(X.s, 'That game is over.');
-  const why = crWhyNot(X.s); if (why) return crRefused(X.s, why);
+  // (a stone refused here gives back the legs its sweeping spent: nothing changed)
+  const why = crWhyNot(X.s); if (why) { G.legs = X.legs0; return crRefused(X.s, why); }
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
-  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
+  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it

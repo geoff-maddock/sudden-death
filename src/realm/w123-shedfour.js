@@ -56,7 +56,7 @@ wMakePlayer = function (spec, from) { const p = wW123MakePlayer.apply(this, argu
 const wW123GiveXp = wGiveXp;
 wGiveXp = function (p, n) { const r = wW123GiveXp(p, n); wCrOf(p); return r; };
 const wW123Start = wStart;
-wStart = function (save, opts) { const r = wW123Start(save, opts); wCrAll(); if (save) wSave(); return r; };
+wStart = function (save, opts) { const r = wW123Start(save, opts); wCrAll(); if (WG) wFourSyncCr(); if (save) wSave(); return r; };
 
 /* ---------- the four ---------- */
 const wFourCrCu = k => typeof k === 'string';
@@ -139,7 +139,8 @@ function wFourCrPractice() {
 /* ---------- the Curling block on a player's stats ---------- */
 function wCrCard(p) {
   const b = wCrOf(p); if (!b) return '';
-  if (WG && !WG.shed) { wFourSyncCr(); wSave(); }
+  // (the four is made when a save loads; here it is only brought up to date, and saved if that changed it)
+  if (WG && WG.shed) { const before = JSON.stringify(WG.shed); wFourSyncCr(); if (JSON.stringify(WG.shed) !== before) wSave(); }
   const bars = wCR.stats.map(s => { const [ab, what] = W_CRR.stat[s], got = b.got[s] || 0;
     return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wCrCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
   const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null, other = p.cid && !(WG && WG.shed && WG.shed.cu.some(c => c.cid === p.cid));
