@@ -61,11 +61,11 @@ async def main():
         check(ph == {'left': True, 'right': True, 'scroll': True}, 'on a phone the panel fits, and the page doesn\'t scroll sideways', ph)
 
         dr = await pg.evaluate("""(() => { beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); B.energy = 99; renderFightHUD();
-          const drag = (mid, end) => { const el = document.querySelector('#hand .card[data-i="1"]'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+          const drag = (mid, end, noClick) => { const el = document.querySelector('#hand .card[data-i="1"]'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
             el.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 1 })); window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y - 150, pointerId: 1 }));
             const sel = UI.sel; if (mid) mid(); if (end === 'blur') window.dispatchEvent(new Event('blur')); else window.dispatchEvent(new PointerEvent(end || 'pointerup', { clientX: x, clientY: y - 300, pointerId: 1 }));
             // (the click the browser sends after the drop, on the card)
-            const el2 = document.querySelector('#hand .card[data-i="1"]'); if (el2) el2.click(); return sel; };
+            const el2 = document.querySelector('#hand .card[data-i="1"]'); if (el2 && !noClick) el2.click(); return sel; };
           const n = () => B.cardsThisTurn, out = {};
           let n0 = n(); out.selDuring = drag(); out.plain = n() - n0;
           n0 = n(); drag(() => { B.discard.push(B.hand.shift()); renderHand(); }); out.handChanged = n() - n0;
@@ -74,10 +74,13 @@ async def main():
           n0 = n(); drag(null, 'pointercancel'); out.cancel = [n() - n0, UI.sel];
           n0 = n(); drag(null, 'blur'); out.blur = [n() - n0, UI.sel];
           // (and a real click after all that selects a card at once)
-          const el3 = document.querySelector('#hand .card[data-i="0"]'); return new Promise(res => setTimeout(() => { el3.click(); out.nextClick = UI.sel === 0 || n() > n0; out.hoverCard = UI.hoverCard; res(out); }, 10));
+          out.hoverCard = UI.hoverCard;
+          // (a late click, a phone's tap, 50 ms after a drop: still ignored; a press starts afresh, and its click works)
+          n0 = n(); drag(() => { B.discard.push(B.hand.shift()); renderHand(); }, null, true); const el4 = document.querySelector('#hand .card[data-i="1"]');
+          return new Promise(res => setTimeout(() => { el4.click(); out.late = [n() - n0, UI.sel]; const el3 = document.querySelector('#hand .card[data-i="0"]'); el3.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, pointerId: 2 })); window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2 })); el3.click(); out.nextClick = UI.sel === 0 || n() > n0; res(out); }, 50));
           })()""")
         check(dr['selDuring'] == 1 and dr['plain'] == 1, 'a plain drag of a card onto the arena plays it', dr)
-        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] in (-1, 0), 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; the next real click works', dr)
+        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] == -1 and dr['late'] == [0, -1], 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; a late click after a drop is ignored, and the next press and click work', dr)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))
