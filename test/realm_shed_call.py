@@ -81,8 +81,8 @@ async def main():
         m = await pg.evaluate("""(() => { W_SHED_MODE = 'play'; wShedGame({ seed: 5, mode: 'play', hammer: 1 }); wCR.pause(true); __to('aim'); wShedRows();
           return { why: (document.querySelector('#wShedShot .wshedwhy') || {}).textContent || '', btn: !!document.querySelector('#wShedGo [data-cchart]') }; })()""")
         check(m['why'].startswith('Your skip:') and m['btn'], 'your stone\'s rows say the skip\'s reason, and have an Ice chart button', m)
-        same = await pg.evaluate("(() => { wCR.select({ suggest: true }); const S = wCR.view.sel, r0 = S.reason; wCR.select({ x: S.x, y: S.y }); const kept = wCR.view.sel.reason === r0;
-          let threw = false; try { window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true })); } catch (e) { threw = true; } return { kept, r0: !!r0, threw }; })()")
+        same = await pg.evaluate("""(() => { wCR.select({ suggest: true }); const S = wCR.view.sel, r0 = S.reason; wCR.select({ x: S.x, y: S.y }); const kept = wCR.view.sel.reason === r0;
+          let threw = false; try { window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true })); } catch (e) { threw = true; } return { kept, r0: !!r0, threw }; })()""")
         check(same == {'kept': True, 'r0': True, 'threw': False}, 'a change that leaves the call the skip\'s keeps its reason; a keydown with no key (autofill) troubles nothing', same)
         rs = await pg.evaluate("(() => { const s0 = wCR.view.sel.shot; wCR.select({ shot: s0 === 'guard' ? 'draw' : 'guard' }); wShedRows(); return { reason: wCR.view.sel.reason, shown: !!document.querySelector('#wShedShot .wshedwhy') }; })()")
         check(rs == {'reason': '', 'shown': False}, 'a call you change is yours: the skip\'s reason goes', rs)
