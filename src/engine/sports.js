@@ -126,7 +126,7 @@ function sportCardEnd(card, d, tgt) {
         delete B.P.st.pulled; B.sc.goals++; scoreUs(1, 'goal');
         fx({ k: 'banner', t: 'Goal', sub: pp ? 'Power-play goal: draw a card' : 'Draw a card', small: 1 }); log('GOAL! Draw a card.', 'good'); drawCards(1);
         if (B.sc.goals >= 3) addHL('hattrick');
-      } else { const g = t && !t.dead ? t : alive()[0]; if (g) { blockE(g, 2); fx({ k: 'save', e: g.uid }); } fx({ k: 'say2', t: 'Saved (+2 Block)' }); }
+      } else { const g = t && !t.dead ? t : alive()[0]; if (g) { g.block += 2; fx({ k: 'save', e: g.uid }); } fx({ k: 'say2', t: 'Saved (+2 Block)' }); }
       break;
     }
     case 'basketball': {
@@ -206,7 +206,7 @@ function sportTurnStart() {
   if (B.sport === 'boxing' && B.turn > 1) {
     const [u, t] = B.sc.rd; fx({ k: 'bell', win: u > t }); if (u > t) { B.sc.rounds[0]++; scoreUs(0); } else if (t > u) { B.sc.rounds[1]++; scoreThem(0); }
     if (u - t >= 15) { for (const e of alive()) addSt(e, 'weak', 1); fx({ k: 'banner', t: 'They’re rocked', sub: 'You took the round by 15+: every enemy is Weak', small: 1 }); }
-    else if (t - u >= 15) { debuffP('weak', 1); fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
+    else if (t - u >= 15 && debuffP('weak', 1)) { fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
     B.sc.rd = [0, 0];
   }
 }

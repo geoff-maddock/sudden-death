@@ -101,6 +101,16 @@ async def main():
         check(r1['peck'] == [True, True] and r1['firstHit'] == 3, 'Axebeak: the peck lands on another enemy; its +3 is on the first hit only', r1)
         check(r1['noFallback'] and r1['drawnext'] == 1 and r1['eaten'] == 0, 'Cockatrice exposes only the enemy you hit; Bog Frog\'s draw waits for your turn; an ally a boss eats pays nothing', r1)
         check(r1['badKind'][0] != '' and r1['badKind'][1] is False, 'a pet whose kind is gone has no trick (no error)', r1)
+        r2 = await pg.evaluate("""(() => { const out = {};
+          __fight({ kind: 'cockatrice', bond: 1 }, ['skelss', 'thief']); B.lastTgt = null; fire('attackPlayed', B.hand[0]); const t = alive()[1]; B.lastTgt = t.uid; const v0 = sv(t, 'vuln'); fire('attackPlayed', B.hand[0]); out.stare = sv(t, 'vuln') - v0;
+          __fight({ kind: 'axebeak', bond: 1 }); const atk = { uid: 998, id: Object.keys(CARDS).find(id => CARDS[id].type === 'atk'), up: false }; const base = (() => { const k = B.pet; B.pet = null; const n = atkDmg(5, alive()[0], atk); B.pet = k; return n; })();
+          out.face = atkDmg(5, alive()[0], atk) - base; const W = dmgWhy(atk, alive()[0]); out.why = W ? W.parts.map(x => x[0]) : [];
+          __fight({ kind: 'bogfrog', bond: 2 }); B.ending = true; const h = B.hand.length; fire('enemyFalls', alive()[0]); out.ending = [B.hand.length - h, sv(B.P, 'drawnext')]; delete B.ending;
+          __fight(null, ['skelss', 'thief']); const k0 = B.killsThisTurn, o = alive()[0]; o.eaten = 1; hurtEnemy(o, o.hp + o.block, { raw: true }); out.eatenKill = B.killsThisTurn - k0;
+          return out; })()""")
+        check(r2['stare'] == 1, 'Cockatrice: an attack with no standing target doesn\'t spend the turn\'s stare; the next one exposes', r2)
+        check(r2['face'] == 0 and 'Axebeak Chick' in r2['why'], 'Axebeak: a forecast leaves the +3 out (it\'s one hit\'s), the breakdown of the first hit shows it', r2)
+        check(r2['ending'] == [0, 1] and r2['eatenKill'] == 0, 'a kill as your turn ends: the Bog Frog\'s card waits for the next turn; an eaten ally is no kill of yours', r2)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

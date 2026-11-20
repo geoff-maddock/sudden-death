@@ -156,6 +156,8 @@ function drawCards(n) {
 function endTurn() {
   if (B.phase !== 'player' || B.over) return [];
   const P = B.P;
+  // (the turn is ending: a card drawn now would be thrown away with the hand, so a draw waits for the next: B.ending)
+  B.ending = true;
   if (B.sport === 'curling' && B.hand.length) { gainBlock(B.hand.length * 2, true); log(`Sweep! ${B.hand.length} cards left in hand: +${B.hand.length * 2} Block.`, 'good'); }
   if (sv(P, 'plate')) gainBlock(sv(P, 'plate'), true);
   fire('turnEnd');
@@ -170,7 +172,7 @@ function endTurn() {
   for (const c of B.hand) { const d = def(c); if (d.retain) keep.push(c); else if (d.eth) B.exhaust.push(c); else B.discard.push(c); }
   B.hand = keep;
   for (const k of ['weak', 'vuln']) if (sv(P, k)) addSt(P, k, -1);
-  B.phase = 'enemy';
+  B.phase = 'enemy'; delete B.ending;
   return enemyTurnSteps();
 }
 // the enemy turn as a list of steps, so the UI can pace it and the lab can run it flat out
@@ -211,8 +213,8 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); blockE(e, op[1]); break;
-      case 'ba': for (const o of alive()) { fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); blockE(o, op[1]); } break;
+      case 'b': { const b0 = e.block; blockE(e, op[1]); fx({ k: 'num', e: e.uid, t: '+' + Math.max(0, e.block - b0), col: '#9fd2ff', blk: 1 }); break; }
+      case 'ba': for (const o of alive()) { const b0 = o.block; blockE(o, op[1]); fx({ k: 'num', e: o.uid, t: '+' + Math.max(0, o.block - b0), col: '#9fd2ff', blk: 1 }); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
       case 'p': if (debuffP(op[1], op[2])) fx({ k: 'pst', st: op[1], n: op[2] }); break;
@@ -228,7 +230,8 @@ function doMove(e) {
 }
 // a status on you from the other side: a debuff fires playerDebuff first, and a pet may stop it (false: it was stopped)
 function debuffP(k, n) { if (ST[k] && ST[k].d && n > 0 && fire('playerDebuff', { k, n })) return false; addSt(B.P, k, n); return true; }
-// an enemy gains Block (from a move, a phase, its turn or a rule): enemyBlock, for a pet that reads it
+// an enemy gains Block (from a move, a phase or its turn): enemyBlock, for a pet that reads it (a hockey save is a goal
+// stopped, not Block raised: it doesn't come here)
 function blockE(e, n) { e.block += n; if (n > 0) fire('enemyBlock', { e, n }); }
 function hurtPlayer(dmg, e, o = {}) {
   const P = B.P;
@@ -313,7 +316,8 @@ function hurtEnemy(e, dmg, o = {}) {
 }
 function killEnemy(e) {
   if (e.dead) return;
-  e.hp = 0; e.dead = true; B.killsThisTurn++; credit('k', 1); if (e !== B.P) fire('enemyFalls', e); if (B.inCard && B.cd) B.cd.kills++;
+  // (an ally a boss eats is gone, but it isn't your kill: no credit, no count, no enemyFalls)
+  e.hp = 0; e.dead = true; if (!e.eaten) { B.killsThisTurn++; credit('k', 1); if (e !== B.P) fire('enemyFalls', e); if (B.inCard && B.cd) B.cd.kills++; }
   fx({ k: 'die', e: e.uid });
   log(`${e.n} goes down.`, 'good');
   if (e.stolen) { RUN.gold += e.stolen; log(`You get your ${e.stolen} gold back.`, 'good'); e.stolen = 0; }
