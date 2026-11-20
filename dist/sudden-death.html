@@ -4819,11 +4819,15 @@ function startDrag(ev, el, i) {
   const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform, acts0 = UI.acts || 0, kb0 = UI.kbTarget, hv0 = UI.hover; let moved = false;
   // (only this pointer drives this drag: a second finger is its own)
   const pid = ev.pointerId, mine = e => e.pointerId == null || pid == null || e.pointerId === pid;
+  let held = false;
   const mv = e => {
     if (!mine(e)) return;
-    // (a mouse or pen let go where the page never heard it, outside the window or the frame: its next move, with no
-    // button held, ends the drag with nothing played; it locks nothing)
-    if (e.pointerType && e.pointerType !== 'touch' && e.buttons === 0) { cancel(); return; }
+    // (a mouse or pen let go where the page never heard it, outside the window or the frame: a move with no button held,
+    // after one with it held, ends the drag with nothing played; it locks nothing, and a tap-and-drag that never
+    // reports a button isn't touched)
+    if (e.pointerType && e.pointerType !== 'touch') { if (e.buttons) held = true; else if (held) { cancel(); return; } }
+    // (the pick let go mid-drag, by Escape or an action: the drag ends, rather than go on choosing targets)
+    if (moved && UI.sel !== i) { cancel(); return; }
     const dx = e.clientX - x0, dy = e.clientY - y0;
     if (!moved && Math.hypot(dx, dy) < 12) return;
     if (!moved) { moved = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
@@ -4837,8 +4841,8 @@ function startDrag(ev, el, i) {
   // card's click clears it, and so does the next press)
   const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.hoverCard = -1; UI.dragged = true; } };
   // (the card back, nothing played; the target as it was before the drag)
-  // (only while this drag still holds the pick: another finger's is left alone)
-  const drop = () => { if (!B || UI.view !== 'fight' || UI.sel !== i) return; UI.sel = -1; UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; renderHand(); };
+  // (the target always back as it was; the pick let go and the hand redrawn unless another finger holds a pick of its own)
+  const drop = () => { if (!B || UI.view !== 'fight') return; UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; if (UI.sel !== i && UI.sel !== -1) return; UI.sel = -1; renderHand(); };
   const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; off(); if (moved) drop(); };
   const up = e => {
     if (!mine(e)) return;

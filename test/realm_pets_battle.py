@@ -69,7 +69,8 @@ async def main():
           const n = () => B.cardsThisTurn, out = {};
           let n0 = n(); out.selDuring = drag(); out.plain = n() - n0;
           n0 = n(); drag(() => { B.discard.push(B.hand.shift()); renderHand(); }); out.handChanged = n() - n0;
-          n0 = n(); drag(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))); out.escape = n() - n0;
+          beginFight({ ids: ['skelss', 'thief'], type: 'normal', sport: 'baseball' }); B.energy = 99; renderFightHUD(); const kbA = alive()[1]; UI.kbTarget = kbA;
+          n0 = n(); drag(() => { UI.kbTarget = alive()[0]; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); }); out.escape = n() - n0; out.kbBack = UI.kbTarget === kbA;
           n0 = n(); drag(() => doPetTrick()); out.trick = n() - n0;
           n0 = n(); drag(null, 'pointercancel'); out.cancel = [n() - n0, UI.sel];
           n0 = n(); drag(null, 'blur'); out.blur = [n() - n0, UI.sel];
@@ -85,7 +86,7 @@ async def main():
           return new Promise(res => setTimeout(() => { el4.click(); out.late = [n() - n0, UI.sel]; const el3 = document.querySelector('#hand .card[data-i="0"]'); el3.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, pointerId: 2 })); window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2 })); el3.click(); out.nextClick = UI.sel === 0 || n() > n0; res(out); }, 50));
           })()""")
         check(dr['selDuring'] == 1 and dr['plain'] == 1, 'a plain drag of a card onto the arena plays it', dr)
-        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] == -1 and dr['late'] == [0, -1] and dr['outside'] == [0, -1], 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; a late click after a drop is ignored, and the next press and click work', dr)
+        check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] == -1 and dr['late'] == [0, -1] and dr['outside'] == [0, -1] and dr['kbBack'], 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; a late click after a drop is ignored, and the next press and click work; a drop let go puts the target back', dr)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))
