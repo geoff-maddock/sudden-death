@@ -75,9 +75,12 @@ function crSelect(o) {
     }
   }
   if (S.shot === 'guard' && o.shot && o.x == null) { S.x = 0; S.y = -190; }
-  // a freeze: the broom just in front of the stone of theirs nearest it
+  // a freeze: the broom just in front of the stone of theirs nearest it (a small move keeps the same stone: say so)
   if (S.shot === 'freeze') { const R = CR_SHEET.stoneR, th = G.stones.filter(b => b.s !== GP.you).sort((a, b) => Math.hypot(a.x - S.x, a.y - S.y) - Math.hypot(b.x - S.x, b.y - S.y))[0];
-    if (!th) return 'There is nothing of theirs to freeze to.'; S.x = th.x; S.y = th.y - 2 * R - .5; }
+    if (!th) return 'There is nothing of theirs to freeze to.';
+    const was = GP.sel.shot === 'freeze' && Math.abs(GP.sel.x - th.x) < .01 && Math.abs(GP.sel.y - (th.y - 2 * R - .5)) < .01;
+    S.x = th.x; S.y = th.y - 2 * R - .5;
+    if (was && (o.x != null || o.y != null) && !o.shot) return 'A freeze rests just in front of the stone it freezes to: click another stone of theirs to freeze to that one.'; }
   if (!['takeout', 'peel', 'hitroll'].includes(S.shot)) { S.target = null; S.roll = 0; }
   const aim = crSelAim(S); if (!aim) return 'Nothing gets there from here: try the other handle, or another spot.';
   S.aim = aim; GP.sel = S; crPick(); return '';
@@ -113,9 +116,11 @@ function crDrag(pull, deg) {
 
 /* ---------- the stone on the ice ---------- */
 function crBegin(s, plan, rel, sweep) {
-  const X = crThrowBegin(s, plan, rel, sweep); GP.call = ''; GP.sweep = false;
-  // (the game moved on under the page: whose stone it is now)
-  if (!X) { GP.meter = null; crGo('next', 0, crWhyNot(s) || 'A stone is still sliding.'); return; }
+  let X = crThrowBegin(s, plan, rel, sweep); GP.call = ''; GP.sweep = false;
+  // (a throw left holding the game that isn't the page's, a broken one: let it go and try once more)
+  if (!X && !crWhyNot(s) && CR_LIVE && CR_LIVE.g === G && CR_LIVE !== GP.X) { CR_LIVE = null; X = crThrowBegin(s, plan, rel, sweep); }
+  // (the game moved on under the page: say why for a moment, then whose stone it is now)
+  if (!X) { GP.meter = null; crGo('rest', CR_PLAY.pace.rest, crWhyNot(s) || 'A stone is still sliding.'); return; }
   GP.X = X;
   crGo('slide', 0, `${crName(s, GP.X.ri)} (${G.teams[s].short || G.teams[s].name}) throws ${CR_SHOTS[plan.shot] || 'a stone'}…`);
 }
@@ -138,7 +143,7 @@ function crSlideTick(dt) {
 function crSettle() {
   const X = GP.X; GP.X = null; GP.sweep = false;
   const ev = crThrowFinish(X);
-  if (!ev.rule.ok) { crGo('next', 0, ev.rule.why); return; }
+  if (!ev.rule.ok) { crGo('rest', CR_PLAY.pace.rest, ev.rule.why); return; }
   GP.last = ev;
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
@@ -174,7 +179,7 @@ function crSetMode(m) {
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
 }
 // the page has a stone set up or sliding (turn() and throwStone() from outside wait)
-const crPageBusy = () => !!GP && ['aim', 'swing', 'addr', 'slide'].includes(GP.ph);
+const crPageBusy = () => !!GP && (GP.ph === 'slide' || (['aim', 'swing', 'addr'].includes(GP.ph) && typeof CRP !== 'undefined' && CRP.on));
 // what the page needs, as a copy
 function crView() {
   if (!GP) return null;

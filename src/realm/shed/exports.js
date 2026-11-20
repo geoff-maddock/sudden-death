@@ -11,7 +11,8 @@
    to rest), alone(throw, ice, cold, sweep) a stone on its own, solveDraw(x, y, h, ice, cold) and solveHit(x, y, v, h,
    ice, cold) the aim; value(stones, side, kAfter, hammer, skill) what a result is worth to a skip, plan(side) the
    CPU's call; start(opts) puts a game on the ice ({ ends, teams, order, skill: [2], hammer, cold, fgz, seed }), turn()
-   throws the next stone, throwStone(side, plan, release, sweep) one as released (refused: rule.ok false, nothing changed), summary() is the game so far,
+   throws the next stone, throwStone(side, plan, release, sweep) one as released (both refused, rule.ok false and plan
+   null with nothing changed, when the stone isn't theirs or the page has one called or sliding), summary() is the game so far,
    simGame(opts) a whole game headless.
    Phase 2 is the page and throwing by hand: start(opts) also puts the game on show ({ mode: 'watch' | 'play' }), and
    show, hide, on, pause, paused, speed and render drive the canvas (n1-page.js). The beat: phase, msg, view (a copy of
@@ -35,7 +36,7 @@ return {
   turn: () => crPageBusy() ? crRefused(crUp(), 'A stone is being thrown on the page.') : crTurn(), throwStone: (s, plan, rel, sweep) => !G || !G.teams ? null : crPageBusy() ? crRefused(s, 'A stone is being thrown on the page.') : crThrowStone(s, plan, rel, sweep), summary: () => crSummary(), simGame: o => crSimGame(o),
   // the page and throwing by hand (phase 2)
   modes: CR_MODES.slice(), playRules: JSON.parse(JSON.stringify(CR_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get view() { return crView(); }, get mode() { return GP ? GP.mode : null; },
-  setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepKey = !!on; if (GP) GP.sweep = !!on; }, get sweep() { return !!(GP && GP.sweep); },
+  setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepBtn = !!on; if (GP) GP.sweep = !!on && GP.ph === 'slide' && !!GP.X && crYours(GP.X.s); }, get sweep() { return !!(GP && GP.sweep); },
   scr: (x, y) => crScr(x, y), unscr: (sx, sy) => crUnscr(sx, sy), houseScr: (x, y) => crHouseScr(x, y), houseUn: (sx, sy) => crHouseUn(sx, sy), get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
   get live() { const X = GP && GP.X; return X ? { s: X.s, t: X.Q.t, stone: { x: X.Q.T.x, y: X.Q.T.y, vx: X.Q.T.vx, vy: X.Q.T.vy }, sw: X.Q.sw, plan: X.plan } : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },

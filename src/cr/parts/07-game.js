@@ -34,7 +34,8 @@ function crMade(plan, before, after, run) {
   }
   return false;
 }
-// the next stone: { side, ri, pos, plan, rel, run, rule, made } or null when the game is over
+// the next stone: { side, ri, pos, plan, rel, run, rule, made } or null when the game is over; a stone the game can't
+// take (crRefused: rule.ok false, plan and ri null) changes nothing
 function crTurn() {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s), { s });
@@ -59,8 +60,9 @@ function crThrowFinish(X) {
   if (X.g !== G) return crRefused(X.s, 'That game is over.');
   const why = crWhyNot(X.s); if (why) return crRefused(X.s, why);
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
+  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) return crRefused(s, rule.why);
   crWear(G.ice, run.path);
-  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }), made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
+  const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) G.iceEnd = G.ice.slice();
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;

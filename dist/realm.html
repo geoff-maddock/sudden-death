@@ -40053,7 +40053,8 @@ function crMade(plan, before, after, run) {
   }
   return false;
 }
-// the next stone: { side, ri, pos, plan, rel, run, rule, made } or null when the game is over
+// the next stone: { side, ri, pos, plan, rel, run, rule, made } or null when the game is over; a stone the game can't
+// take (crRefused: rule.ok false, plan and ri null) changes nothing
 function crTurn() {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s), { s });
@@ -40078,8 +40079,9 @@ function crThrowFinish(X) {
   if (X.g !== G) return crRefused(X.s, 'That game is over.');
   const why = crWhyNot(X.s); if (why) return crRefused(X.s, why);
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
+  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) return crRefused(s, rule.why);
   crWear(G.ice, run.path);
-  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }), made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
+  const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) G.iceEnd = G.ice.slice();
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
@@ -40188,9 +40190,12 @@ function crSelect(o) {
     }
   }
   if (S.shot === 'guard' && o.shot && o.x == null) { S.x = 0; S.y = -190; }
-  // a freeze: the broom just in front of the stone of theirs nearest it
+  // a freeze: the broom just in front of the stone of theirs nearest it (a small move keeps the same stone: say so)
   if (S.shot === 'freeze') { const R = CR_SHEET.stoneR, th = G.stones.filter(b => b.s !== GP.you).sort((a, b) => Math.hypot(a.x - S.x, a.y - S.y) - Math.hypot(b.x - S.x, b.y - S.y))[0];
-    if (!th) return 'There is nothing of theirs to freeze to.'; S.x = th.x; S.y = th.y - 2 * R - .5; }
+    if (!th) return 'There is nothing of theirs to freeze to.';
+    const was = GP.sel.shot === 'freeze' && Math.abs(GP.sel.x - th.x) < .01 && Math.abs(GP.sel.y - (th.y - 2 * R - .5)) < .01;
+    S.x = th.x; S.y = th.y - 2 * R - .5;
+    if (was && (o.x != null || o.y != null) && !o.shot) return 'A freeze rests just in front of the stone it freezes to: click another stone of theirs to freeze to that one.'; }
   if (!['takeout', 'peel', 'hitroll'].includes(S.shot)) { S.target = null; S.roll = 0; }
   const aim = crSelAim(S); if (!aim) return 'Nothing gets there from here: try the other handle, or another spot.';
   S.aim = aim; GP.sel = S; crPick(); return '';
@@ -40226,9 +40231,11 @@ function crDrag(pull, deg) {
 
 /* ---------- the stone on the ice ---------- */
 function crBegin(s, plan, rel, sweep) {
-  const X = crThrowBegin(s, plan, rel, sweep); GP.call = ''; GP.sweep = false;
-  // (the game moved on under the page: whose stone it is now)
-  if (!X) { GP.meter = null; crGo('next', 0, crWhyNot(s) || 'A stone is still sliding.'); return; }
+  let X = crThrowBegin(s, plan, rel, sweep); GP.call = ''; GP.sweep = false;
+  // (a throw left holding the game that isn't the page's, a broken one: let it go and try once more)
+  if (!X && !crWhyNot(s) && CR_LIVE && CR_LIVE.g === G && CR_LIVE !== GP.X) { CR_LIVE = null; X = crThrowBegin(s, plan, rel, sweep); }
+  // (the game moved on under the page: say why for a moment, then whose stone it is now)
+  if (!X) { GP.meter = null; crGo('rest', CR_PLAY.pace.rest, crWhyNot(s) || 'A stone is still sliding.'); return; }
   GP.X = X;
   crGo('slide', 0, `${crName(s, GP.X.ri)} (${G.teams[s].short || G.teams[s].name}) throws ${CR_SHOTS[plan.shot] || 'a stone'}…`);
 }
@@ -40251,7 +40258,7 @@ function crSlideTick(dt) {
 function crSettle() {
   const X = GP.X; GP.X = null; GP.sweep = false;
   const ev = crThrowFinish(X);
-  if (!ev.rule.ok) { crGo('next', 0, ev.rule.why); return; }
+  if (!ev.rule.ok) { crGo('rest', CR_PLAY.pace.rest, ev.rule.why); return; }
   GP.last = ev;
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
@@ -40287,7 +40294,7 @@ function crSetMode(m) {
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
 }
 // the page has a stone set up or sliding (turn() and throwStone() from outside wait)
-const crPageBusy = () => !!GP && ['aim', 'swing', 'addr', 'slide'].includes(GP.ph);
+const crPageBusy = () => !!GP && (GP.ph === 'slide' || (['aim', 'swing', 'addr'].includes(GP.ph) && typeof CRP !== 'undefined' && CRP.on));
 // what the page needs, as a copy
 function crView() {
   if (!GP) return null;
@@ -40442,7 +40449,7 @@ function crDraw(c, dt) {
    a drag that starts at the hack (the bottom of the left view) and pulls back is a throw (the pull is the weight, a
    pull off straight the miss); and while your stone slides, holding a finger or the button down on the canvas
    sweeps. */
-const CRP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null, sweepKey: false, sweepPtr: false };
+const CRP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null, sweepKey: false, sweepPtr: false, sweepBtn: false };
 (() => {
   const h = document.createElement('div'); h.id = 'v-shed'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
@@ -40461,8 +40468,10 @@ function crFrame(now) {
   const dt = Math.min(.05, Math.max(0, (now - CRP.last) / 1000)); CRP.last = now;
   const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
   // (sweeping is only ever for the stone sliding now: anything held over from before is let go)
-  if (GP && GP.ph !== 'slide') CRP.sweepKey = CRP.sweepPtr = false;
-  if (GP) GP.sweep = GP.ph === 'slide' && (CRP.sweepKey || CRP.sweepPtr);
+  // (and only your own stone is swept: Space, a finger on the canvas and the Sweep button each hold it on their own)
+  const yours = GP && GP.ph === 'slide' && GP.X && crYours(GP.X.s);
+  if (GP && !yours) CRP.sweepKey = CRP.sweepPtr = CRP.sweepBtn = false;
+  if (GP) GP.sweep = !!yours && (CRP.sweepKey || CRP.sweepPtr || CRP.sweepBtn);
   if (!CRP.paused && !boxed) for (let i = 0; i < CRP.speed && !CRP.paused; i++) crTick(dt);
   crRender(CRP.paused ? 0 : dt);
   CRP.raf = requestAnimationFrame(crFrame);
@@ -40486,7 +40495,7 @@ function crKeyDown(e) {
   const k = e.key.toLowerCase(), S = GP.sel;
   let took = true;
   // (a press held on from the weight's press doesn't sweep: sweeping starts with a fresh press)
-  if (k === ' ') { if (GP.ph === 'slide') { if (!e.repeat) CRP.sweepKey = true; } else if (!e.repeat) crPress(); }
+  if (k === ' ') { if (GP.ph === 'slide') { if (!e.repeat && GP.X && crYours(GP.X.s)) CRP.sweepKey = true; } else if (!e.repeat) crPress(); }
   else if (GP.ph !== 'aim' || !S) took = false;
   else if (k === 'arrowleft') crSelect({ x: S.x + 3 });
   else if (k === 'arrowright') crSelect({ x: S.x - 3 });
@@ -40502,7 +40511,7 @@ function crKeyDown(e) {
 function crKeyUp(e) { if (e.key === ' ' && CRP.sweepKey) { CRP.sweepKey = false; e.preventDefault(); e.stopPropagation(); } }
 window.addEventListener('keydown', crKeyDown, true);
 window.addEventListener('keyup', crKeyUp, true);
-window.addEventListener('blur', () => { CRP.sweepKey = CRP.sweepPtr = false; });
+window.addEventListener('blur', () => { CRP.sweepKey = CRP.sweepPtr = CRP.sweepBtn = false; });
 
 /* ---------- the pointer: the broom, a drag throw, and holding to sweep ---------- */
 function crPtrAt(e) { const r = CRP.cv.getBoundingClientRect(); return { sx: (e.clientX - r.left) * 960 / r.width, sy: (e.clientY - r.top) * 600 / r.height }; }
@@ -40547,7 +40556,8 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    to rest), alone(throw, ice, cold, sweep) a stone on its own, solveDraw(x, y, h, ice, cold) and solveHit(x, y, v, h,
    ice, cold) the aim; value(stones, side, kAfter, hammer, skill) what a result is worth to a skip, plan(side) the
    CPU's call; start(opts) puts a game on the ice ({ ends, teams, order, skill: [2], hammer, cold, fgz, seed }), turn()
-   throws the next stone, throwStone(side, plan, release, sweep) one as released (refused: rule.ok false, nothing changed), summary() is the game so far,
+   throws the next stone, throwStone(side, plan, release, sweep) one as released (both refused, rule.ok false and plan
+   null with nothing changed, when the stone isn't theirs or the page has one called or sliding), summary() is the game so far,
    simGame(opts) a whole game headless.
    Phase 2 is the page and throwing by hand: start(opts) also puts the game on show ({ mode: 'watch' | 'play' }), and
    show, hide, on, pause, paused, speed and render drive the canvas (n1-page.js). The beat: phase, msg, view (a copy of
@@ -40571,7 +40581,7 @@ return {
   turn: () => crPageBusy() ? crRefused(crUp(), 'A stone is being thrown on the page.') : crTurn(), throwStone: (s, plan, rel, sweep) => !G || !G.teams ? null : crPageBusy() ? crRefused(s, 'A stone is being thrown on the page.') : crThrowStone(s, plan, rel, sweep), summary: () => crSummary(), simGame: o => crSimGame(o),
   // the page and throwing by hand (phase 2)
   modes: CR_MODES.slice(), playRules: JSON.parse(JSON.stringify(CR_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get view() { return crView(); }, get mode() { return GP ? GP.mode : null; },
-  setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepKey = !!on; if (GP) GP.sweep = !!on; }, get sweep() { return !!(GP && GP.sweep); },
+  setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepBtn = !!on; if (GP) GP.sweep = !!on && GP.ph === 'slide' && !!GP.X && crYours(GP.X.s); }, get sweep() { return !!(GP && GP.sweep); },
   scr: (x, y) => crScr(x, y), unscr: (sx, sy) => crUnscr(sx, sy), houseScr: (x, y) => crHouseScr(x, y), houseUn: (sx, sy) => crHouseUn(sx, sy), get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
   get live() { const X = GP && GP.X; return X ? { s: X.s, t: X.Q.t, stone: { x: X.Q.T.x, y: X.Q.T.y, vx: X.Q.T.vx, vy: X.Q.T.vy }, sw: X.Q.sw, plan: X.plan } : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },

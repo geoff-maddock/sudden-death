@@ -10,7 +10,7 @@
    a drag that starts at the hack (the bottom of the left view) and pulls back is a throw (the pull is the weight, a
    pull off straight the miss); and while your stone slides, holding a finger or the button down on the canvas
    sweeps. */
-const CRP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null, sweepKey: false, sweepPtr: false };
+const CRP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null, sweepKey: false, sweepPtr: false, sweepBtn: false };
 (() => {
   const h = document.createElement('div'); h.id = 'v-shed'; h.hidden = true;
   const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
@@ -29,8 +29,10 @@ function crFrame(now) {
   const dt = Math.min(.05, Math.max(0, (now - CRP.last) / 1000)); CRP.last = now;
   const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
   // (sweeping is only ever for the stone sliding now: anything held over from before is let go)
-  if (GP && GP.ph !== 'slide') CRP.sweepKey = CRP.sweepPtr = false;
-  if (GP) GP.sweep = GP.ph === 'slide' && (CRP.sweepKey || CRP.sweepPtr);
+  // (and only your own stone is swept: Space, a finger on the canvas and the Sweep button each hold it on their own)
+  const yours = GP && GP.ph === 'slide' && GP.X && crYours(GP.X.s);
+  if (GP && !yours) CRP.sweepKey = CRP.sweepPtr = CRP.sweepBtn = false;
+  if (GP) GP.sweep = !!yours && (CRP.sweepKey || CRP.sweepPtr || CRP.sweepBtn);
   if (!CRP.paused && !boxed) for (let i = 0; i < CRP.speed && !CRP.paused; i++) crTick(dt);
   crRender(CRP.paused ? 0 : dt);
   CRP.raf = requestAnimationFrame(crFrame);
@@ -54,7 +56,7 @@ function crKeyDown(e) {
   const k = e.key.toLowerCase(), S = GP.sel;
   let took = true;
   // (a press held on from the weight's press doesn't sweep: sweeping starts with a fresh press)
-  if (k === ' ') { if (GP.ph === 'slide') { if (!e.repeat) CRP.sweepKey = true; } else if (!e.repeat) crPress(); }
+  if (k === ' ') { if (GP.ph === 'slide') { if (!e.repeat && GP.X && crYours(GP.X.s)) CRP.sweepKey = true; } else if (!e.repeat) crPress(); }
   else if (GP.ph !== 'aim' || !S) took = false;
   else if (k === 'arrowleft') crSelect({ x: S.x + 3 });
   else if (k === 'arrowright') crSelect({ x: S.x - 3 });
@@ -70,7 +72,7 @@ function crKeyDown(e) {
 function crKeyUp(e) { if (e.key === ' ' && CRP.sweepKey) { CRP.sweepKey = false; e.preventDefault(); e.stopPropagation(); } }
 window.addEventListener('keydown', crKeyDown, true);
 window.addEventListener('keyup', crKeyUp, true);
-window.addEventListener('blur', () => { CRP.sweepKey = CRP.sweepPtr = false; });
+window.addEventListener('blur', () => { CRP.sweepKey = CRP.sweepPtr = CRP.sweepBtn = false; });
 
 /* ---------- the pointer: the broom, a drag throw, and holding to sweep ---------- */
 function crPtrAt(e) { const r = CRP.cv.getBoundingClientRect(); return { sx: (e.clientX - r.left) * 960 / r.width, sy: (e.clientY - r.top) * 600 / r.height }; }

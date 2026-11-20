@@ -115,12 +115,14 @@ async def main():
           wCR.select({ shot: 'freeze', x: 25, y: 0 }); const S = wCR.view.sel; out.freeze = [S.x, +(S.y).toFixed(1)];
           // a hit: a click on your own stone takes your own stone
           wCR.select({ shot: 'takeout' }); wCR.select({ x: -29, y: 1 }); out.own = wCR.view.sel.target;
-          // the skip's hit and roll keeps its roll
-          G.stones = [{ id: '1:9', s: 1, x: 6, y: 4 }]; wCR.select({ suggest: true }); out.roll = wCR.view.sel.shot === 'hitroll' ? wCR.view.sel.roll : null;
+          // the skip's hit and roll keeps its roll (positions tried until the skip calls one)
+          out.roll = null; for (let i = 0; i < 60 && out.roll == null; i++) { G.stones = [{ id: '1:9', s: 1, x: (i * 7) % 50 - 25, y: (i * 11) % 60 - 30 }, { id: '0:8', s: 0, x: (i * 13) % 70 - 35, y: -60 + (i * 5) % 40 }];
+            wCR.select({ suggest: true }); if (wCR.view.sel.shot === 'hitroll') out.roll = wCR.view.sel.roll; }
+          out.R = R;
           return out; })()""")
         check(rv['busy'] is False and rv['going'], 'a stone thrown from outside while the page has one called is refused, and the page goes on', rv)
-        check(rv['freeze'] == [20, round(10 - 2 * 5.75 - .5, 1)] and rv['own'] == '0:9', 'a freeze snaps in front of their stone; on a hit, a click on your own stone takes it', rv)
-        check(rv['roll'] is None or rv['roll'] != 0, 'your skip\'s hit and roll keeps the roll it chose', rv)
+        check(rv['freeze'] == [20, round(10 - 2 * rv['R'] - .5, 1)] and rv['own'] == '0:9', 'a freeze snaps in front of their stone; on a hit, a click on your own stone takes it', rv)
+        check(rv['roll'] in (3, -3), 'your skip\'s hit and roll keeps the roll it chose', rv)
         # a sweep held on the canvas and let go off it stops; Space held on from the weight's press doesn't sweep
         await pg.evaluate("(() => { wShedGame({ seed: 14, mode: 'play', hammer: 1 }); wCR.pause(false); __to('aim'); wCR.select({ shot: 'draw', x: 0, y: 0 }); wCR.press(); __meterTo(1); wCR.press(); })()")
         cvb = await pg.evaluate("(() => { const r = document.querySelector('#v-shed canvas').getBoundingClientRect(); return { x: r.left + 200, y: r.top + 300 }; })()")
@@ -133,10 +135,12 @@ async def main():
         check(held is True and let_go is False, 'a sweep held on the canvas and let go off it stops', [held, let_go])
         await pg.evaluate("(() => { let n = 0; while (wCR.phase === 'slide' && n++ < 4000) wCR.tick(0.05); __to('aim'); wCR.press(); __meterTo(1); })()")
         await pg.keyboard.down(' ')
-        await pg.wait_for_timeout(700)
-        rep = await pg.evaluate("({ ph: wCR.phase, sweep: wCR.sweep })")
+        rep = await pg.evaluate("""(async () => { const ph = wCR.phase; window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true, bubbles: true }));
+          await new Promise(r => setTimeout(r, 80)); const held = wCR.sweep;
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+          await new Promise(r => setTimeout(r, 80)); const fresh = wCR.sweep; window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true })); return { ph, held, fresh }; })()""")
         await pg.keyboard.up(' ')
-        check(rep['ph'] == 'slide' and rep['sweep'] is False, 'Space held on from the weight\'s press doesn\'t sweep: sweeping takes a fresh press', rep)
+        check(rep['ph'] == 'slide' and rep['held'] is False and rep['fresh'] is True, 'Space held on from the weight\'s press doesn\'t sweep: a fresh press does', rep)
         await pg.evaluate("wCR.pause(true)")
 
         # ---------- modes, How to play, leaving ----------
