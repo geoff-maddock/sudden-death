@@ -12,14 +12,14 @@ const PETS = {
   blinkpup: { n: 'Blinkpup', from: 'blink dog', el: 'aether', rar: 'c', how: 'shop',
     trait: { d: p => `Starts each fight with ${pv(1, p)} Footwork.`, on: { fightStart: (a, p) => addSt(B.P, 'dex', pv(1, p)) } },
     powers: [
-      { at: 1, d: p => `The first attack aimed at you each turn: it blinks you aside, ${pv(4, p)} Block.`, on: { playerAttacked: { when: (e, p) => !p.t.blink, then: (e, p) => { p.t.blink = 1; B.P.block += pv(4, p); petSay(`blinks you aside: +${pv(4, p)} Block.`); } } } },
+      { at: 1, d: p => `The first attack aimed at you each turn: it blinks you aside, ${pv(4, p)} Block.`, on: { playerAttacked: { when: (e, p) => !p.t.blink, spend: (a, p) => { p.t.blink = 1; }, then: (e, p) => { p.t.blink = 1; B.P.block += pv(4, p); petSay(`blinks you aside: +${pv(4, p)} Block.`); } } } },
       { at: 2, d: 'Your third card in a turn: draw 1.', on: { cardPlayed: { when: () => B.cardsThisTurn === 3, then: () => { B.pendingDraw = (B.pendingDraw || 0) + 1; petSay('fetches you a card.'); } } } },
     ],
     trick: { n: 'Blink Shuffle', tgt: 'self', d: 'Your hand blinks away, and as many new cards blink in.', ops: () => [['audible']] } },
   pseudodragon: { n: 'Pocket Pseudodragon', from: 'pseudodragon', el: 'aether', rar: 'u', how: 'egg',
     trait: { d: p => `Starts each fight with ${pv(1, p)} Regen.`, on: { fightStart: (a, p) => addSt(B.P, 'regen', pv(1, p)) } },
     powers: [
-      { at: 1, d: p => `Once a fight, at the start of a turn below half HP: ${pv(3, p)} Regen.`, on: { turnStart: { when: (a, p) => petBelow(.5) && !p.f.warm, then: (a, p) => { p.f.warm = 1; addSt(B.P, 'regen', pv(3, p)); petSay(`curls round you, warm: ${pv(3, p)} Regen.`); } } } },
+      { at: 1, d: p => `Once a fight, at the start of a turn below half HP: ${pv(3, p)} Regen.`, on: { turnStart: { when: (a, p) => petBelow(.5) && !p.f.warm, spend: (a, p) => { p.f.warm = 1; }, then: (a, p) => { p.f.warm = 1; addSt(B.P, 'regen', pv(3, p)); petSay(`curls round you, warm: ${pv(3, p)} Regen.`); } } } },
       { at: 2, d: p => `When an enemy falls: heal ${pv(2, p)}.`, on: { enemyFalls: (e, p) => healP(pv(2, p)) } },
     ],
     trick: { n: 'Sting', d: p => `${pv(6, p)} damage and Weak ${pv(2, p)} to one enemy.`, ops: p => [['d', pv(6, p)], ['s', 'weak', pv(2, p)]] } },
@@ -27,8 +27,8 @@ const PETS = {
     // (every hit of the first attack card: spent once that card has resolved, so a forecast and the hits agree)
     trait: { d: p => `Your first attack card each fight: each of its hits deals ${pv(3, p)} more.`, atk: (card, e, p) => !p.f.peck1 && card && def(card).type === 'atk' ? pv(3, p) : 0, on: { attackPlayed: (c, p) => { p.f.peck1 = 1; } } },
     powers: [
-      { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, then: (c, p) => { p.t.peck = 1; const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
-      { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
+      { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, spend: (a, p) => { p.t.peck = 1; }, then: (c, p) => { p.t.peck = 1; const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
+      { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, spend: (a, p) => { p.f.str = 1; }, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
     ],
     trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },
   hootling: { n: 'Hootling', from: 'owlbear cub', el: 'bloom', rar: 'u', how: 'keeper',
@@ -41,14 +41,14 @@ const PETS = {
   sprite: { n: 'Sprite in a Jar', from: 'sprite', el: 'bloom', rar: 'u', how: 'egg',
     trait: { d: p => `Draw ${pv(1, p)} more card on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
     powers: [
-      { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn.`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four, then: (c, p) => { p.t.four = 1; addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
+      { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn.`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four, spend: (a, p) => { p.t.four = 1; }, then: (c, p) => { p.t.four = 1; addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
       { at: 2, d: p => `A debuff lands on you: ${pv(3, p)} Block.`, on: { playerDebuff: (a, p) => { B.P.block += pv(3, p); petSay(`argues the call: +${pv(3, p)} Block.`); } } },
     ],
     trick: { n: 'Recount', tgt: 'self', d: p => `Draw ${pv(2, p)}.`, ops: p => [['draw', pv(2, p)]] } },
   bogfrog: { n: 'Bog Frog', from: 'giant frog', el: 'bloom', rar: 'c', how: 'egg',
     trait: { d: p => `Starts each fight with ${pv(5, p)} Block.`, on: { fightStart: (a, p) => { B.P.block += pv(5, p); } } },
     powers: [
-      { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, then: (a, p) => { p.t.tongue = 1; const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
+      { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, spend: (a, p) => { p.t.tongue = 1; }, then: (a, p) => { p.t.tongue = 1; const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
       { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn).', on: { enemyFalls: () => { if (B.phase === 'player' && !B.ending) drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
     ],
     trick: { n: 'Gulp', d: p => `Swallows an enemy (not a boss) with ${pv(12, p)} HP or less; any other takes 16 damage.`, ops: p => [['devour', pv(12, p), 0]] } },
@@ -63,7 +63,7 @@ const PETS = {
     trait: { d: 'The first debuff on you each fight sticks to it instead.', on: { playerDebuff: { when: (a, p) => !p.f.sticky, then: (a, p) => { p.f.sticky = 1; petSay(`swallows the ${(ST[a.k] || {}).n || a.k}.`); return true; } } } },
     powers: [
       // (one more than its base: Weak goes down at the end of the attacker's own turn, so this much reaches its next attack)
-      { at: 1, d: p => `The first enemy to attack you each turn: Weak ${pv(1, p) + 1}, enough to last through its next attack.`, on: { playerAttacked: { when: (e, p) => !p.t.wob && e && !e.dead, then: (e, p) => { p.t.wob = 1; addSt(e, 'weak', pv(1, p) + 1); petSay(`wobbles at ${e.n}: Weak ${pv(1, p) + 1}.`); } } } },
+      { at: 1, d: p => `The first enemy to attack you each turn: Weak ${pv(1, p) + 1}, enough to last through its next attack.`, on: { playerAttacked: { when: (e, p) => !p.t.wob && e && !e.dead, spend: (a, p) => { p.t.wob = 1; }, then: (e, p) => { p.t.wob = 1; addSt(e, 'weak', pv(1, p) + 1); petSay(`wobbles at ${e.n}: Weak ${pv(1, p) + 1}.`); } } } },
       { at: 2, d: p => `End your turn with no cards in hand: ${pv(4, p)} Block.`, on: { turnEnd: { when: () => !B.hand.length, then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
     trick: { n: 'Engulf', d: p => `Weak ${pv(2, p)} and Exposed ${pv(2, p)} to one enemy.`, ops: p => [['s', 'weak', pv(2, p)], ['s', 'vuln', pv(2, p)]] } },
@@ -78,7 +78,7 @@ const PETS = {
     trait: { d: p => `A lantern: draw ${pv(2, p)} more on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(2, p) : 0 } },
     powers: [
       { at: 1, d: p => `At the start of each turn: Burn ${pv(1, p)} on a random enemy.`, on: { turnStart: { when: () => alive().length > 0, then: (a, p) => { addSt(pick(alive()), 'burn', pv(1, p)); } } } },
-      { at: 2, d: p => `Your first Power each turn: ${pv(1, p)} Stamina.`, on: { cardPlayed: { when: (c, p) => def(c).type === 'pow' && !p.t.pow, then: (c, p) => { p.t.pow = 1; B.energy += pv(1, p); petSay(`glows brighter: +${pv(1, p)} Stamina.`); } } } },
+      { at: 2, d: p => `Your first Power each turn: ${pv(1, p)} Stamina.`, on: { cardPlayed: { when: (c, p) => def(c).type === 'pow' && !p.t.pow, spend: (a, p) => { p.t.pow = 1; }, then: (c, p) => { p.t.pow = 1; B.energy += pv(1, p); petSay(`glows brighter: +${pv(1, p)} Stamina.`); } } } },
     ],
     trick: { n: 'Flare', tgt: 'all', d: p => `Burn ${pv(4, p)} on every enemy.`, ops: p => [['s', 'burn', pv(4, p), 'all']] } },
   rustnibbler: { n: 'Rustnibbler', from: 'rust monster', el: 'ember', rar: 'u', how: 'shop',
@@ -112,8 +112,8 @@ const PETS = {
   cockatrice: { n: 'Cockatrice Chick', from: 'cockatrice', el: 'rime', rar: 'r', how: 'egg',
     trait: { d: p => `At the start of each fight, a random enemy is Weak ${pv(2, p)}.`, on: { fightStart: (a, p) => { const t = pick(alive()); if (t) addSt(t, 'weak', pv(2, p)); } } },
     powers: [
-      { at: 1, d: p => `Your first attack each turn on an enemy still standing leaves it Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare && alive().some(e => e.uid === B.lastTgt), then: (c, p) => { p.t.stare = 1; addSt(alive().find(e => e.uid === B.lastTgt), 'vuln', pv(1, p)); } } } },
-      { at: 2, d: 'Once a fight, at the end of your turn, an enemy (not a boss) at a quarter of its HP or less turns to stone.', on: { turnEnd: { when: (a, p) => !p.f.stone && alive().some(e => !isBoss(e) && e.hp <= e.max * .25), then: (a, p) => { p.f.stone = 1; const t = alive().find(e => !isBoss(e) && e.hp <= e.max * .25); petSay(`stares ${t.n} to stone.`); hurtEnemy(t, t.hp + t.block, { raw: true, src: 'Stare' }); } } } },
+      { at: 1, d: p => `Your first attack each turn on an enemy still standing leaves it Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare && alive().some(e => e.uid === B.lastTgt), spend: (a, p) => { p.t.stare = 1; }, then: (c, p) => { p.t.stare = 1; addSt(alive().find(e => e.uid === B.lastTgt), 'vuln', pv(1, p)); } } } },
+      { at: 2, d: 'Once a fight, at the end of your turn, an enemy (not a boss) at a quarter of its HP or less turns to stone.', on: { turnEnd: { when: (a, p) => !p.f.stone && alive().some(e => !isBoss(e) && e.hp <= e.max * .25), spend: (a, p) => { p.f.stone = 1; }, then: (a, p) => { p.f.stone = 1; const t = alive().find(e => !isBoss(e) && e.hp <= e.max * .25); petSay(`stares ${t.n} to stone.`); hurtEnemy(t, t.hp + t.block, { raw: true, src: 'Stare' }); } } } },
     ],
     trick: { n: 'Petrifying Glare', d: 'An enemy (not a boss) at 30% of its HP or less turns to stone; any other takes 18 damage.', ops: () => [['petrify', .3]] } },
 };

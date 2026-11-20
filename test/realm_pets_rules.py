@@ -113,6 +113,9 @@ async def main():
         check(r2['ending'] == [0, 1] and r2['eatenKill'] == [1, 0], 'a kill as your turn ends: the Bog Frog\'s card waits for the next turn; an ally a boss eats pays a pet nothing (the base game counts it as before)', r2)
         sp = await pg.evaluate("""(() => { __fight({ kind: 'rustnibbler', bond: 1 }); const e = alive()[0]; B.pet.spooked = true; e.block = 5 + 9; fire('enemyBlock', { e, n: 9 }); return { spooked: B.pet.spooked, block: e.block }; })()""")
         check(sp == {'spooked': True, 'block': 5}, 'a spooked pet keeps its spook when a power would take nothing (the trait ate the whole gain)', sp)
+        sb = await pg.evaluate("""(() => { __fight({ kind: 'bogfrog', bond: 1 }, ['skelss', 'thief']); const [a, b] = alive(); B.pet.spooked = true; const p0 = B.P.block;
+          a.block = 6; fire('enemyBlock', { e: a, n: 6 }); const first = [B.pet.spooked, a.block]; b.block = 6; fire('enemyBlock', { e: b, n: 6 }); return { first, second: b.block, mine: B.P.block - p0 }; })()""")
+        check(sb == {'first': [False, 6], 'second': 6, 'mine': 0}, 'a spook is spent when there is something to take, and it uses up a once-a-turn power for the turn (the Bog Frog\'s tongue doesn\'t come back on the second gain)', sb)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))
