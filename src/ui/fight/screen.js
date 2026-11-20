@@ -99,7 +99,7 @@ function startDrag(ev, el, i) {
   const mv = e => {
     const dx = e.clientX - x0, dy = e.clientY - y0;
     if (!moved && Math.hypot(dx, dy) < 12) return;
-    if (!moved) { moved = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
+    if (!moved) { moved = true; UI.dragging = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
     el.style.transform = `translate(${dx}px, ${dy}px) scale(1.06)`;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
@@ -108,6 +108,7 @@ function startDrag(ev, el, i) {
   };
   const up = e => {
     window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+    UI.dragging = false;
     if (!moved) return;
     UI.dragged = true; el.classList.remove('drag'); el.style.transform = base;
     const r = cv.getBoundingClientRect();
@@ -142,6 +143,8 @@ function playSelected(e) {
 function drinkTonic(slot) {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
   const id = RUN.tonics[slot]; if (!id) return;
+  // (a picked card or a waiting discard is let go: the tonic can change the hand and the enemies under them)
+  UI.sel = -1; UI.disc = null;
   const needsT = TONICS[id].fx.some(o => o[0] === 'd' && o[3] !== 'all');
   useTonic(slot, needsT ? B.enemies.indexOf(UI.kbTarget || alive()[0]) : null);
   hideTip(); afterAction();
@@ -181,6 +184,8 @@ cv.addEventListener('click', ev => {
 });
 document.addEventListener('keydown', ev => {
   if (UI.view !== 'fight' || !B || !$('modal').hidden || UI.paused || ev.target.closest('input,textarea')) return;
+  // (a browser's own shortcut, Cmd+E or Ctrl+1, isn't a move in the fight)
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if (/^[0-9]$/.test(ev.key)) { const i = (+ev.key + 9) % 10; if (i < B.hand.length) selectCard(i); ev.preventDefault(); return; }
   if (ev.key === 'e' || ev.key === 'E') { doEndTurn(); return; }
   if (UI.sel >= 0) {
