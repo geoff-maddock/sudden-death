@@ -46,7 +46,7 @@ function crRun(stones, th, opts) {
   const T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
   S.push(T);
   const path = [], trace = [], out = [];
-  let t = 0, hits = 0, nextTr = 0, nextPath = 0;
+  let t = 0, hits = 0, nextTr = 0;
   const live = () => S.filter(st => !st.out);
   while (t < maxT) {
     const L = live(), moving = L.filter(st => st.vx || st.vy); if (!moving.length) break;
@@ -59,7 +59,8 @@ function crRun(stones, th, opts) {
       // friction stops a stone, it never turns it round
       if (vx * st.vx + vy * st.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop) { vx = 0; vy = 0; }
       st.x += (st.vx + vx) / 2 * dts; st.y += (st.vy + vy) / 2 * dts; st.vx = vx; st.vy = vy;
-      if (st === T && t >= nextPath) { path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]); nextPath += O.plan ? .5 : .25; }
+      // (the path every foot of travel, so a fast stone wears every cell it crosses)
+      if (st === T && Math.hypot(st.x - (path.length ? path[path.length - 1][0] : st.x - 99), st.y - (path.length ? path[path.length - 1][1] : 0)) >= (O.plan ? 36 : 12)) path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]);
     }
     // contacts (only between stones that could touch: one of them moving)
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {

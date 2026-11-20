@@ -53,6 +53,25 @@ async def main():
         check(a['tunnel'] >= 1, 'a stone at full weight hits the guard on its line, it never passes through it', a)
         check(a['weak'][0] is None and a['weak'][1] == ['t'] and a['back'] == ['0:0', '1:0'], 'a throw short of the hog line is out; a stone in play knocked back short of it stays', a)
 
+        # ---------- found in review ----------
+        rv = await pg.evaluate("""(() => { const out = {};
+          // the free guard zone: no peel of their guard before the fifth stone, and a stone the rule takes back isn't made
+          wCR.start({ seed: 3, skill: [2, 2] }); const G = wCR.G; G.stones = [{ id: '0:0', s: 0, x: 0, y: -180 }, { id: '0:1', s: 0, x: 10, y: 20 }]; G.k = 3; G.hammer = 1;
+          const P = wCR.plan(1); out.peel = P.shot === 'peel' && P.target === '0:0';
+          // a peel weight stone wears every row of pebble it crosses
+          const r = wCR.run([], { id: 't', s: 0, x0: 0, ang: 0, v: 250, h: 0 }, {}), ice = wCR.wear(wCR.iceNew(), r.path), C = wCR.iceRules;
+          const rows = new Set(); ice.forEach((v, i) => { if (v < 1) rows.add(Math.floor(i / C.cols)); }); out.rows = [rows.size, C.rows];
+          // value with no skill given is a Knight's
+          out.value = typeof wCR.value([], 0, 5, 1) === 'number';
+          return out; })()""")
+        check(not rv['peel'], 'before the fifth stone the skip never calls a peel of their guard (the free guard zone would undo it)', rv)
+        check(rv['rows'][0] >= rv['rows'][1] - 2 and rv['value'], 'a fast stone wears every row it crosses; value works without a skill', rv)
+        fz = await pg.evaluate("""(() => { let taken = 0, made = 0;
+          for (let i = 0; i < 6; i++) { wCR.start({ seed: 40 + i, skill: [1, 1] }); const H = wCR.G; H.stones = [{ id: '0:0', s: 0, x: 0, y: -180 }]; H.k = 1; H.hammer = 1;
+            const aim = wCR.solveHit(0, -180 - 9, 250, 1, null, 'mid'), ev = wCR.throwStone(1, { shot: 'peel', x: 0, y: -180, h: 1, target: '0:0', s: 1 }, aim, null);
+            if (ev.rule.fgz) { taken++; if (ev.made) made++; } }
+          return { taken, made }; })()""")
+        check(fz['taken'] >= 4 and fz['made'] == 0, 'a peel the free guard zone takes back is never counted as made', fz)
         # ---------- a game ----------
         g = await pg.evaluate("""(() => { const sum = (n, sk, s0) => { const o = { n, w: [0, 0], ends: {}, e: 0, tried: {}, made: {}, over: 0 };
             for (let i = 0; i < n; i++) { const r = wCR.simGame({ seed: s0 + i, skill: sk, ends: 6 }); if (r.over) o.over++; o.w[r.win]++;

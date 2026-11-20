@@ -39824,7 +39824,7 @@ function crRun(stones, th, opts) {
   const T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
   S.push(T);
   const path = [], trace = [], out = [];
-  let t = 0, hits = 0, nextTr = 0, nextPath = 0;
+  let t = 0, hits = 0, nextTr = 0;
   const live = () => S.filter(st => !st.out);
   while (t < maxT) {
     const L = live(), moving = L.filter(st => st.vx || st.vy); if (!moving.length) break;
@@ -39837,7 +39837,8 @@ function crRun(stones, th, opts) {
       // friction stops a stone, it never turns it round
       if (vx * st.vx + vy * st.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop) { vx = 0; vy = 0; }
       st.x += (st.vx + vx) / 2 * dts; st.y += (st.vy + vy) / 2 * dts; st.vx = vx; st.vy = vy;
-      if (st === T && t >= nextPath) { path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]); nextPath += O.plan ? .5 : .25; }
+      // (the path every foot of travel, so a fast stone wears every cell it crosses)
+      if (st === T && Math.hypot(st.x - (path.length ? path[path.length - 1][0] : st.x - 99), st.y - (path.length ? path[path.length - 1][1] : 0)) >= (O.plan ? 36 : 12)) path.push([+st.x.toFixed(1), +st.y.toFixed(1), +sw.toFixed(2)]);
     }
     // contacts (only between stones that could touch: one of them moving)
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
@@ -39884,7 +39885,8 @@ function crSolveDraw(x, y, h, ice, cold) {
   let v = Math.sqrt(2 * CR_STONE.a * crIceAt(ice, x / 2, (y + CR_STONE.y0) / 2, cold) * d0), ang = Math.atan2(x, d0) * 180 / Math.PI;
   for (let i = 0; i < CR_AIM.tries; i++) {
     const r = crAlone({ x0: 0, ang, v, h }, ice, cold);
-    if (!r.stop) { v *= 1.02; ang -= h * .3; continue; }
+    // (out of play: through the back line is too heavy, short of the hog line too light, into the boards too wide)
+    if (!r.stop) { const L = r.path[r.path.length - 1] || [0, 0]; if (L[1] > CR_SHEET.back - 12) v *= .97; else if (Math.abs(L[0]) > CR_SHEET.halfW - 12) ang -= Math.sign(L[0]) * .3; else v *= 1.02; continue; }
     const ex = x - r.x, ey = y - r.y;
     if (Math.abs(ex) < CR_AIM.tol && Math.abs(ey) < CR_AIM.tol) return { ang: +ang.toFixed(4), v: +v.toFixed(3), h };
     v *= Math.sqrt(Math.max(.25, (y - CR_STONE.y0) / Math.max(1, r.y - CR_STONE.y0)));
@@ -39917,20 +39919,21 @@ function crSolveHit(x, y, v, h, ice, cold) {
    Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now.
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.
-   The ice a skip reads (crIceRead): an Archmage the pebble as it is now, a Knight as it was when the end began, a
-   Squire the fresh pebble. */
+   The ice a skip reads (crIceRead, CR_SKILL's ice): an Archmage the pebble as it is now, a Knight as it was when the end
+   began, a Squire the fresh pebble; it aims on it and judges its shots on it, so a misread costs it. Its shots know the
+   free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
-  { n: 'Squire', ang: .45, v: .022, samples: 1, top: 1, hammer: false, read: false, sweepLate: 600 },
-  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, read: false, sweepLate: 0 },
-  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, read: true, sweepLate: 0 }];
+  { n: 'Squire', ang: .45, v: .022, samples: 1, top: 1, hammer: false, ice: 'fresh', sweepLate: 600 },
+  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
+  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
 // the last end's stones), a Squire the fresh pebble on the day
-const crIceRead = s => { const sk = G.skill[s]; return sk >= 2 ? G.ice : sk === 1 ? G.iceEnd || null : null; };
+const crIceRead = s => { const I = CR_SKILL[G.skill[s]].ice; return I === 'now' ? G.ice : I === 'end' ? G.iceEnd || null : null; };
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
-  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[sk];
+  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
   if (kAfter >= crPerEnd()) { const next = R.s >= 0 ? 1 - R.s : hammer; return pts + (S.hammer ? (next === s ? CR_VAL.hammer : -CR_VAL.hammer) : 0); }
   const left = (crPerEnd() - kAfter) / crPerEnd(); let v = pts * (1 - CR_VAL.left * left);
   for (const st of stones) {
@@ -39953,8 +39956,9 @@ function crShots(s, sk) {
   draw('draw', 0, 0); draw('draw', 0, -40); draw('draw', 40, -8); draw('draw', -40, -8); draw('draw', 0, 34);
   draw('guard', 0, -190); draw('guard', 52, -175); draw('guard', -52, -175);
   for (const o of st.filter(o => o.s !== s)) {
-    if (crInHouse(o)) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.top > 1) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
-    else if (crInFgz(o)) hit('peel', o, CR_AIM.vPeel);
+    if (crInHouse(o) && !(G.k < G.fgz && crInFgz(o))) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.top > 1) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
+    // (a guard of theirs can't be taken out before the fifth stone: the free guard zone)
+    else if (crInFgz(o) && G.k >= G.fgz) hit('peel', o, CR_AIM.vPeel);
   }
   // an Archmage also draws round the guards (behind each one, at the top of the house)
   if (sk >= 2) for (const g of st.filter(crInFgz)) draw('draw', g.x, Math.max(-60, g.y + 150));
@@ -39964,8 +39968,13 @@ function crShots(s, sk) {
 function crMiss(s, aim) { const S = CR_SKILL[G.skill[s]], k = crErrK(s); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // how much a side's curler misses by, times the skill's (ratings come in phase 3): { ang, v }
 function crErrK() { return { ang: 1, v: 1 }; }
-// play a shot out on the model (no sweeping, the stones as they lie): the stones after
-const crTry = (s, aim) => crRun(G.stones, { id: 'try', s, x0: 0, ang: aim.ang, v: aim.v, h: aim.h }, { ice: G.ice, cold: G.cold, plan: true }).stones;
+// play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
+// rules leave them (the free guard zone puts a taken guard back and removes the stone)
+function crTry(s, aim) {
+  const r = crRun(G.stones, { id: 'try', s, x0: 0, ang: aim.ang, v: aim.v, h: aim.h }, { ice: crIceRead(s), cold: G.cold, plan: true });
+  if (G.k < G.fgz && G.stones.some(b => b.s !== s && crInFgz(b) && !r.stones.some(a => a.id === b.id))) return G.stones.slice();
+  return r.stones;
+}
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
 function crPlan(s) {
   const sk = G.skill[s], S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
@@ -40039,7 +40048,7 @@ function crThrowStone(s, plan, rel, sweep) {
   const ri = crThrower(s), pos = crPos(s), before = G.stones.map(b => Object.assign({}, b)), endNo = G.end, ham = G.hammer;
   const run = crRun(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
   crWear(G.ice, run.path);
-  const made = crMade(plan, before, run.stones, run), rule = crThrow(s, run.stones, { hit: run.hits > 0 });
+  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }), made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) G.iceEnd = G.ice.slice();
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
@@ -40073,7 +40082,8 @@ function crSimGame(opts) {
    end's hammer, fgz: false for no free guard zone }); up (whose stone it is), thrower (who throws side s's stone now),
    pos (their position, 0 lead to 3 skip), sideNo (side s's stone number this end), throw(side, after, { hit }) (the stones in
    play once it stopped, and whether it touched one; applies the free guard zone, scores the end after its sixteenth stone, and says so), whyNot;
-   scoreEnd(stones), inHouse, inFgz, inPlay and dist read where stones are; total, board (the scoreboard), matchText.
+   scoreEnd(stones), inHouse, inFgz, inPlay (a thrown stone's: wholly past the hog line and on the sheet), onSheet
+   (a stone already in play: it stays short of the hog line) and dist read where stones are; total, board (the scoreboard), matchText.
    rules and sheet are the tables. G is the game, plain JSON. The page comes in phase 2: until then the shed is never
    on.
    Phase 1 is the stone, the ice and one game, CPU against CPU: stoneRules, iceRules, colds, skills, shots (the tables);
@@ -40081,19 +40091,20 @@ function crSimGame(opts) {
    to rest), alone(throw, ice, cold, sweep) a stone on its own, solveDraw(x, y, h, ice, cold) and solveHit(x, y, v, h,
    ice, cold) the aim; value(stones, side, kAfter, hammer, skill) what a result is worth to a skip, plan(side) the
    CPU's call; start(opts) puts a game on the ice ({ ends, teams, order, skill: [2], hammer, cold, fgz, seed }), turn()
-   throws the next stone, summary() is the game so far, simGame(opts) a whole game headless. */
+   throws the next stone, throwStone(side, plan, release, sweep) one as released, summary() is the game so far,
+   simGame(opts) a whole game headless. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
   throw: (s, after, o) => crThrow(s, after, o), whyNot: s => crWhyNot(s),
-  scoreEnd: st => crScoreEnd(st), inHouse: st => crInHouse(st), inFgz: st => crInFgz(st), inPlay: st => crInPlay(st), dist: st => crDist(st),
+  scoreEnd: st => crScoreEnd(st), inHouse: st => crInHouse(st), inFgz: st => crInFgz(st), inPlay: st => crInPlay(st), onSheet: st => crOnSheet(st), dist: st => crDist(st),
   total: s => crTotal(s), board: () => crBoard(), matchText: s => crMatchText(s),
   // the stone, the ice and one game (phase 1)
   stoneRules: JSON.parse(JSON.stringify(CR_STONE)), iceRules: JSON.parse(JSON.stringify(CR_ICE)), colds: JSON.parse(JSON.stringify(CR_COLD)), skills: JSON.parse(JSON.stringify(CR_SKILL)), shots: Object.assign({}, CR_SHOTS),
   iceNew: () => crIceNew(), iceAt: (ice, x, y, cold) => crIceAt(ice, x, y, cold), wear: (ice, path) => crWear(ice, path),
   run: (stones, th, o) => crRun(stones, th, o), alone: (th, ice, cold, sweep) => crAlone(th, ice, cold, sweep), solveDraw: (x, y, h, ice, cold) => crSolveDraw(x, y, h, ice, cold), solveHit: (x, y, v, h, ice, cold) => crSolveHit(x, y, v, h, ice, cold),
   value: (st, s, k, hammer, sk) => crValue(st, s, k, hammer, sk), plan: s => G && G.teams ? crPlan(s) : null,
-  start: o => crStart(o), turn: () => crTurn(), summary: () => crSummary(), simGame: o => crSimGame(o),
+  start: o => crStart(o), turn: () => crTurn(), throwStone: (s, plan, rel, sweep) => G && G.teams ? crThrowStone(s, plan, rel, sweep) : null, summary: () => crSummary(), simGame: o => crSimGame(o),
   show: () => {}, hide: () => {}, get on() { return false; }
 };
 

@@ -44,7 +44,7 @@ function crThrowStone(s, plan, rel, sweep) {
   const ri = crThrower(s), pos = crPos(s), before = G.stones.map(b => Object.assign({}, b)), endNo = G.end, ham = G.hammer;
   const run = crRun(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
   crWear(G.ice, run.path);
-  const made = crMade(plan, before, run.stones, run), rule = crThrow(s, run.stones, { hit: run.hits > 0 });
+  const rule = crThrow(s, run.stones, { hit: run.hits > 0 }), made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) G.iceEnd = G.ice.slice();
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;

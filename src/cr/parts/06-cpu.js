@@ -12,20 +12,21 @@
    Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now.
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.
-   The ice a skip reads (crIceRead): an Archmage the pebble as it is now, a Knight as it was when the end began, a
-   Squire the fresh pebble. */
+   The ice a skip reads (crIceRead, CR_SKILL's ice): an Archmage the pebble as it is now, a Knight as it was when the end
+   began, a Squire the fresh pebble; it aims on it and judges its shots on it, so a misread costs it. Its shots know the
+   free guard zone: no peel of a guard of theirs before the fifth stone. */
 const CR_SKILL = [
-  { n: 'Squire', ang: .45, v: .022, samples: 1, top: 1, hammer: false, read: false, sweepLate: 600 },
-  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, read: false, sweepLate: 0 },
-  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, read: true, sweepLate: 0 }];
+  { n: 'Squire', ang: .45, v: .022, samples: 1, top: 1, hammer: false, ice: 'fresh', sweepLate: 600 },
+  { n: 'Knight', ang: .28, v: .013, samples: 3, top: 3, hammer: true, ice: 'end', sweepLate: 0 },
+  { n: 'Archmage', ang: .2, v: .009, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
 // the last end's stones), a Squire the fresh pebble on the day
-const crIceRead = s => { const sk = G.skill[s]; return sk >= 2 ? G.ice : sk === 1 ? G.iceEnd || null : null; };
+const crIceRead = s => { const I = CR_SKILL[G.skill[s]].ice; return I === 'now' ? G.ice : I === 'end' ? G.iceEnd || null : null; };
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
-  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[sk];
+  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
   if (kAfter >= crPerEnd()) { const next = R.s >= 0 ? 1 - R.s : hammer; return pts + (S.hammer ? (next === s ? CR_VAL.hammer : -CR_VAL.hammer) : 0); }
   const left = (crPerEnd() - kAfter) / crPerEnd(); let v = pts * (1 - CR_VAL.left * left);
   for (const st of stones) {
@@ -48,8 +49,9 @@ function crShots(s, sk) {
   draw('draw', 0, 0); draw('draw', 0, -40); draw('draw', 40, -8); draw('draw', -40, -8); draw('draw', 0, 34);
   draw('guard', 0, -190); draw('guard', 52, -175); draw('guard', -52, -175);
   for (const o of st.filter(o => o.s !== s)) {
-    if (crInHouse(o)) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.top > 1) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
-    else if (crInFgz(o)) hit('peel', o, CR_AIM.vPeel);
+    if (crInHouse(o) && !(G.k < G.fgz && crInFgz(o))) { draw('freeze', o.x, o.y - 2 * R - .5); hit('takeout', o, CR_AIM.vHit); if (S.top > 1) { hit('hitroll', o, CR_AIM.vRoll, 3); hit('hitroll', o, CR_AIM.vRoll, -3); } }
+    // (a guard of theirs can't be taken out before the fifth stone: the free guard zone)
+    else if (crInFgz(o) && G.k >= G.fgz) hit('peel', o, CR_AIM.vPeel);
   }
   // an Archmage also draws round the guards (behind each one, at the top of the house)
   if (sk >= 2) for (const g of st.filter(crInFgz)) draw('draw', g.x, Math.max(-60, g.y + 150));
@@ -59,8 +61,13 @@ function crShots(s, sk) {
 function crMiss(s, aim) { const S = CR_SKILL[G.skill[s]], k = crErrK(s); return { ang: aim.ang + gauss() * S.ang * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // how much a side's curler misses by, times the skill's (ratings come in phase 3): { ang, v }
 function crErrK() { return { ang: 1, v: 1 }; }
-// play a shot out on the model (no sweeping, the stones as they lie): the stones after
-const crTry = (s, aim) => crRun(G.stones, { id: 'try', s, x0: 0, ang: aim.ang, v: aim.v, h: aim.h }, { ice: G.ice, cold: G.cold, plan: true }).stones;
+// play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
+// rules leave them (the free guard zone puts a taken guard back and removes the stone)
+function crTry(s, aim) {
+  const r = crRun(G.stones, { id: 'try', s, x0: 0, ang: aim.ang, v: aim.v, h: aim.h }, { ice: crIceRead(s), cold: G.cold, plan: true });
+  if (G.k < G.fgz && G.stones.some(b => b.s !== s && crInFgz(b) && !r.stones.some(a => a.id === b.id))) return G.stones.slice();
+  return r.stones;
+}
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
 function crPlan(s) {
   const sk = G.skill[s], S = CR_SKILL[sk], kAfter = G.k + 1, list = crShots(s, sk);
