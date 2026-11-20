@@ -40,7 +40,7 @@ const W_QUICK = [
     ],
     tip: 'Before your stone, cast your curler\'s power (P) or the ultimate at the start of an end (U). Press C for the ice chart: every stone\'s path, and where the pebble is worn.',
     keys: [['Space', 'throw (two presses), then hold to sweep'], ['1 to 6', 'the shot'], ['Arrows', 'move the broom'], ['I, O', 'the handle'], ['G', 'the skip\'s call again'], ['P, U, K', 'a power, the ultimate, Steady'], ['C', 'the ice chart']],
-    phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold the Sweep button while it slides.' },
+    phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold the Hold to sweep button while it slides.' },
   { id: 'ball', n: 'Baseball', where: 'the Ballpark', more: 'wHelpBall',
     lede: 'You bat first. Batting is two things: put the circle over the ball, and swing when it turns gold. Running and fielding happen by themselves.',
     steps: [
