@@ -211,7 +211,7 @@ function consumeFx() {
       case 'bat': case 'drive': case 'strike': case 'bell': sportPop(f); break;
       case 'say2': A.pops.push({ x: 480, y: 250, t: f.t, col: '#ffd166', t0: A.t + delay, life: 1.1, size: 30 }); delay += .1; break;
       // a pet's effect (engine/pets.js): over your side, in its element's colour, with a little chirp
-      case 'pet': { const p = partyPt(), D = B.pet && PETS[B.pet.kind]; A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); tone(880, .08, 'sine', .03, 300); delay += .15; break; }
+      case 'pet': { const p = partyPt(), D = B.pet && PETS[B.pet.kind]; A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); tone(880, .08, 'sine', .03, 300, delay); delay += .15; break; }
     }
   }
 }
