@@ -40110,6 +40110,406 @@ function crSimGame(opts) {
     return Object.assign({ win: G.over ? G.over.win : -1 }, crSummary());
   } finally { G = keep; GB = keepB; engRand = keepR; }
 }
+/* The Curling Shed: the game on show and throwing by hand (issue #102, phase 2). GP is the page's: the beat, your
+   stone's call, the meter, the sweepers, the stone sliding now. It is not the game's state (G is) and never saved.
+
+   The beat (GP.ph): next (whose stone, and who throws it) → aim (yours: the call, the broom and the handle) → swing
+   (the weight meter) → slide (the stone on the ice: hold Space to sweep it) → rest (the stones settle; the end scored
+   after its sixteenth) → next, and over at the end. A CPU stone goes next → addr (the skip calls it) → slide → rest.
+   - The call (GP.sel): the shot (CR_SHOTS), the broom (where the skip holds it: x, y), the handle (h: +1 out-turn,
+     curls left; -1 in-turn, curls right) and, for a hit, the stone it is to hit. Your skip suggests one (the CPU's
+     call, as a Knight would make it) and puts the broom there; you can change any of it. The aim follows the call on
+     the ice as a Knight reads it.
+   - The weight: Space starts the meter, and the marker climbs from light to heavy; press again at the line (the
+     call's weight). Early is light, late is heavy, by how far. The line off the broom is your curler's own miss.
+   - Sweeping: hold Space while your stone slides (a phone: hold the Sweep button). The skip calls it as it goes: "Hurry
+     hard!" when the stone would stop well short of the broom, "Sweep!" a little short, "Off!" when it has the weight,
+     "Whoa!" when it is heavy. A hit needs no sweeping, and the skip says so.
+   - Watch: the CPU throws both sides, its own sweepers sweeping. You play: your side's stones are yours.
+   The stone moves on the page at CR_PLAY.speed times real time, a step at a time, the same steps the sim takes. */
+const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .12 } };
+const CR_HOOK = { onPhase: null, onPick: null, onOver: null };
+const CR_MODES = ['watch', 'play'];
+let GP = null;
+
+function crPlayStart(o) {
+  GP = { mode: CR_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, meter: null, sweep: false, X: null, cpu: null, call: '', last: null };
+  crGo('next');
+  return GP;
+}
+function crGo(ph, wait, msg) {
+  GP.ph = ph; GP.t = 0; GP.wait = wait || 0; if (msg != null) GP.msg = msg;
+  if (CR_HOOK.onPhase) try { CR_HOOK.onPhase(ph); } catch (e) { console.error(e); }
+}
+const crName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
+const crYours = s => GP.mode === 'play' && s === GP.you;
+const crPosName = s => CR_RULES.posN[crPos(s)];
+
+/* ---------- your call ---------- */
+// the aim for a call, on the ice as a Knight reads it (null if nothing gets there)
+function crSelAim(S) {
+  const ice = G.iceEnd || null, R = CR_SHEET.stoneR;
+  if (['takeout', 'peel', 'hitroll'].includes(S.shot)) {
+    const tg = G.stones.find(b => b.id === S.target); if (!tg) return null;
+    const v = S.shot === 'peel' ? CR_AIM.vPeel : S.shot === 'hitroll' ? CR_AIM.vRoll : CR_AIM.vHit;
+    return crSolveHit(tg.x + (S.shot === 'hitroll' ? (S.roll || 0) : 0), tg.y - R * 1.6, v, S.h, ice, G.cold);
+  }
+  return crSolveDraw(S.x, S.y, S.h, ice, G.cold);
+}
+// your skip's suggestion for your stone (the call a Knight would make)
+function crSuggest(s) {
+  const keep = G.skill[s]; G.skill[s] = 1; let P;
+  try { P = crPlan(s); } finally { G.skill[s] = keep; }
+  return { shot: P.shot, x: P.x, y: P.y, h: P.h, target: P.target || null, roll: 0, why: P.why };
+}
+function crSelReset() { GP.sel = crSuggest(GP.you); GP.sel.aim = crSelAim(GP.sel); }
+/* change your call: { shot, x, y, h, target, suggest }. A hit takes the stone nearest the broom as its target (theirs
+   first); a draw keeps the broom where it is. Returns '' or why not */
+function crSelect(o) {
+  if (!GP || GP.ph !== 'aim' || !GP.sel) return 'Not now.';
+  if (o.suggest) { crSelReset(); crPick(); return ''; }
+  const S = Object.assign({}, GP.sel);
+  if (o.shot && CR_SHOTS[o.shot]) S.shot = o.shot;
+  if (o.h === 1 || o.h === -1) S.h = o.h;
+  if (o.x != null) S.x = clamp(+o.x, -CR_SHEET.halfW + 8, CR_SHEET.halfW - 8);
+  if (o.y != null) S.y = clamp(+o.y, -CR_SHEET.hog + 10, CR_SHEET.back - 8);
+  if (['takeout', 'peel', 'hitroll'].includes(S.shot)) {
+    if (o.target) S.target = o.target;
+    else if (o.shot || o.x != null || o.y != null || !S.target) {
+      const near = G.stones.slice().sort((a, b) => (a.s === GP.you) - (b.s === GP.you) || Math.hypot(a.x - S.x, a.y - S.y) - Math.hypot(b.x - S.x, b.y - S.y))[0];
+      if (!near) return 'There is nothing to hit.';
+      S.target = near.id; S.x = near.x; S.y = near.y;
+    }
+  }
+  if (S.shot === 'guard' && o.shot && o.x == null) { S.x = 0; S.y = -190; }
+  const aim = crSelAim(S); if (!aim) return 'Nothing gets there from here: try the other handle, or another spot.';
+  S.aim = aim; GP.sel = S; crPick(); return '';
+}
+function crPick() { if (CR_HOOK.onPick) try { CR_HOOK.onPick(); } catch (e) { console.error(e); } }
+
+/* ---------- the weight meter ---------- */
+function crPress() {
+  if (!GP || GP.mode !== 'play') return false;
+  if (GP.ph === 'aim' && GP.sel && GP.sel.aim) { GP.meter = { st: 'up', v: CR_PLAY.meter.low, p: null }; crGo('swing', 0, `${crName(GP.you, crThrower(GP.you))} in the hack: press again at the line for the weight.`); return true; }
+  if (GP.ph === 'swing' && GP.meter && GP.meter.st === 'up') { crRelease(GP.meter.v); return true; }
+  return false;
+}
+function crMeterTick(dt) {
+  const M = GP.meter, K = CR_PLAY.meter; if (!M || M.st !== 'up') return;
+  M.v += K.rise * dt; if (M.v >= K.high) crRelease(K.high);
+}
+// the weight: p (the meter's mark, 1 the call's own weight); the line: your curler's miss off the broom
+function crRelease(p) {
+  const M = GP.meter; if (!M || M.st === 'gone') return;
+  M.st = 'gone'; M.p = p;
+  const S = GP.sel, err = Math.abs(p - CR_PLAY.meter.line) <= CR_PLAY.meter.win ? 1 : p;
+  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you).ang, v: S.aim.v * err, h: S.h };
+  crBegin(GP.you, Object.assign({}, S), rel, null);
+}
+// a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
+function crDrag(pull, deg) {
+  if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
+  GP.meter = { st: 'gone', v: pull, p: pull };
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
+  return true;
+}
+
+/* ---------- the stone on the ice ---------- */
+function crBegin(s, plan, rel, sweep) {
+  GP.X = crThrowBegin(s, plan, rel, sweep); GP.call = ''; GP.sweep = false;
+  crGo('slide', 0, `${crName(s, GP.X.ri)} (${G.teams[s].short || G.teams[s].name}) throws ${CR_SHOTS[plan.shot] || 'a stone'}…`);
+}
+// the skip's call as your stone slides, from where it would stop now against the broom
+function crSkipCall(X) {
+  const T = X.Q.T, P = X.plan; if (!['draw', 'guard', 'freeze'].includes(P.shot)) return X.Q.hits ? '' : 'Let it go: it has the weight.';
+  const v = Math.hypot(T.vx, T.vy); if (!v) return '';
+  const stopY = T.y + (T.vy / v) * v * v / (2 * CR_STONE.a * crIceAt(G.ice, T.x, T.y, G.cold)), short = P.y - stopY;
+  return short > 30 ? 'Hurry hard!' : short > 8 ? 'Sweep!' : short > -20 ? 'Off!' : 'Whoa! It\'s heavy.';
+}
+// how hard your sweepers sweep while you hold Space (phase 3 gives the sweepers their legs)
+const crYourSweep = () => GP.sweep ? 1 : 0;
+function crSlideTick(dt) {
+  const X = GP.X; if (!X) return;
+  const mine = crYours(X.s);
+  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? crYourSweep() : undefined);
+  GP.call = crSkipCall(X);
+  if (X.Q.done) crSettle();
+}
+function crSettle() {
+  const X = GP.X; GP.X = null; GP.sweep = false;
+  const ev = crThrowFinish(X); GP.last = ev;
+  const R = ev.rule, e = R.end;
+  let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
+  if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
+  if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
+  crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
+  if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); }
+}
+
+/* ---------- the beat ---------- */
+function crTick(dt) {
+  if (!GP || !G || !G.teams) return;
+  GP.t += dt;
+  const P = GP.ph;
+  if (P === 'next') crPlayNext();
+  else if (P === 'addr') { if (GP.t >= CR_PLAY.pace.addr) { const c = GP.cpu; GP.cpu = null; crBegin(c.s, c.plan, c.rel, crSweeper(c.s, c.plan)); } }
+  else if (P === 'swing') crMeterTick(dt);
+  else if (P === 'slide') crSlideTick(dt);
+  else if (P === 'rest') { if (GP.t >= GP.wait) crGo(G.over ? 'over' : 'next'); }
+}
+function crPlayNext() {
+  const s = crUp(); if (s < 0) { crGo('over'); return; }
+  const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
+  if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. Your skip calls ${GP.sel.why}. Change the call if you like, then Space.`); return; }
+  const plan = Object.assign(crPlan(s), { s }), rel = crMiss(s, plan.aim);
+  GP.cpu = { s, plan, rel };
+  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}.`);
+}
+function crSetMode(m) {
+  if (!GP || !CR_MODES.includes(m)) return;
+  GP.mode = m;
+  // a stone you were setting up goes back to the CPU in Watch, and the next one is yours in You play
+  if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
+}
+// what the page needs, as a copy
+function crView() {
+  if (!GP) return null;
+  const s = crUp();
+  return { mode: GP.mode, you: GP.you, ph: GP.ph, msg: GP.msg, up: s, thrower: s >= 0 ? crThrower(s) : null, pos: s >= 0 ? crPos(s) : null, end: G.end + 1, k: G.k,
+    sel: GP.sel ? JSON.parse(JSON.stringify(GP.sel)) : null, meter: GP.meter ? Object.assign({}, GP.meter) : null, sweep: GP.sweep, call: GP.call, hammer: G.hammer };
+}
+/* The Curling Shed: drawing (issue #102, phase 2). The picture is 960 by 600:
+   - on the left, the sheet from behind the hack, in perspective: the pebbled ice with frost creeping in at the boards,
+     the hog line, the house's rings (blue twelve-foot, white eight, red four, the button), the stones (granite, their
+     handles in their side's colour), the broom where your skip holds it, and the stone sliding with its sweepers. The
+     camera sits back to show the house while a stone is called, follows the stone down the sheet, and settles over the
+     house when it stops.
+   - on the right, the house from above, big: every stone in it, the broom and the call, the path of the stone in play,
+     and under it the whole sheet as a strip.
+   - over the left, the end board (each side's points by end, the hammer); the weight meter while you swing; the
+     skip's call while your stone slides ("Hurry hard!"), and the brooms going while you sweep.
+   Drawing only: nothing here is in the game's state. crScr and crUnscr map the ice to the left picture and back,
+   crHouseScr and crHouseUn the house picture (the tests and the pointer use them). Witch-light lamps hang from the
+   Shed's beams, and the breath of the sweepers smokes in the cold. */
+const CR_VIEW = { cx: 310, hor: 96, base: 590, px: 2.6, d0: 300, w: 620, hx: 790, hy: 175, hk: 1.55, sx: 655, sy: 360, sw: 270, sh: 230 };
+const CRC = { camY: -700, t: 0 };
+const crS = y => CR_VIEW.d0 / Math.max(20, y - CRC.camY + CR_VIEW.d0);
+function crScr(x, y) { const V = CR_VIEW, s = crS(y); return [V.cx - x * s * V.px, V.hor + (V.base - V.hor) * s, s]; }
+function crUnscr(sx, sy) { const V = CR_VIEW, s = (sy - V.hor) / (V.base - V.hor); if (s <= .02) return null; return { x: -(sx - V.cx) / (s * V.px), y: V.d0 / s - V.d0 + CRC.camY }; }
+// the house picture: the button at (hx, hy), hk pixels an inch, the thrower at the bottom
+const crHouseScr = (x, y) => [CR_VIEW.hx - x * CR_VIEW.hk, CR_VIEW.hy - y * CR_VIEW.hk];
+const crHouseUn = (sx, sy) => ({ x: -(sx - CR_VIEW.hx) / CR_VIEW.hk, y: -(sy - CR_VIEW.hy) / CR_VIEW.hk });
+// the stones as drawn now: [[id, x, y]] (the run's, while one slides; else the game's)
+function crStonesNow() { const X = GP && GP.X; return X ? crRunNow(X.Q) : (G.stones || []).map(st => [st.id, st.x, st.y]); }
+const crSideOf = id => +String(id).split(':')[0];
+function crCamTarget() {
+  const X = GP && GP.X; if (X) { const T = X.Q.T; return clamp(T.y - 260, -1300, -300); }
+  if (GP && (GP.ph === 'rest' || GP.ph === 'over')) return -300;
+  return -560;
+}
+function crPoly(c, pts, fill) { c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fillStyle = fill; c.fill(); }
+function crRing(c, r, fill) { const pts = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2, p = crScr(Math.cos(a) * r, Math.sin(a) * r); pts.push(p); } crPoly(c, pts, fill); }
+function crStoneDraw(c, x, y, s, col, k) {
+  const r = CR_SHEET.stoneR * k, [sx, sy] = [x, y];
+  c.save(); c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(sx, sy + r * .2, r * 1.05, r * .55 * s, 0, 0, Math.PI * 2); c.fill();
+  const g = c.createRadialGradient(sx - r * .3, sy - r * .4, r * .1, sx, sy, r); g.addColorStop(0, '#d9d6cf'); g.addColorStop(1, '#6d6a66');
+  c.fillStyle = g; c.beginPath(); c.ellipse(sx, sy, r, r * s, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(30,25,20,.55)'; c.lineWidth = Math.max(.6, r * .08); c.stroke();
+  c.fillStyle = col; c.beginPath(); c.ellipse(sx, sy - r * .1 * s, r * .55, r * .3 * s, 0, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+// the sheet in perspective
+function crSheetDraw(c) {
+  const S = CR_SHEET, y0 = Math.max(-1200, CRC.camY - CR_VIEW.d0 * .7), y1 = S.back + 60, q = (x, y) => crScr(x, y).slice(0, 2);
+  // the Shed: timber walls in the dark, witch-light lamps on the beams
+  const g = c.createLinearGradient(0, 0, 0, CR_VIEW.hor + 30); g.addColorStop(0, '#0e1418'); g.addColorStop(1, '#243038'); c.fillStyle = g; c.fillRect(0, 0, CR_VIEW.w, CR_VIEW.hor + 30);
+  for (let i = 0; i < 7; i++) { const x = 40 + i * 90, f = .6 + .4 * Math.sin(CRC.t * 2.6 + i * 1.7), gl = c.createRadialGradient(x, 30, 1, x, 30, 26); gl.addColorStop(0, `rgba(160,230,255,${.5 * f})`); gl.addColorStop(1, 'rgba(160,230,255,0)'); c.fillStyle = gl; c.beginPath(); c.arc(x, 30, 26, 0, Math.PI * 2); c.fill(); c.fillStyle = '#dff6ff'; c.fillRect(x - 2, 26, 4, 7); }
+  crPoly(c, [q(S.halfW + 14, y0), q(-S.halfW - 14, y0), q(-S.halfW - 14, y1), q(S.halfW + 14, y1)], '#3a2c22');
+  crPoly(c, [q(S.halfW, y0), q(-S.halfW, y0), q(-S.halfW, y1 - 20), q(S.halfW, y1 - 20)], '#e9f2f6');
+  // the pebble, faint; frost creeping in at the boards
+  c.save(); c.fillStyle = 'rgba(150,180,200,.18)';
+  for (let i = 0; i < 160; i++) { const x = ((i * 53) % 180) - 90, y = y0 + ((i * 131) % Math.max(1, y1 - y0)); const [px, py, s] = crScr(x, y); if (s > .04) c.fillRect(px, py, Math.max(1, 1.4 * s * 3), Math.max(1, s * 2)); }
+  for (const side of [1, -1]) { const pts = [q(side * S.halfW, y0), q(side * S.halfW, y1 - 20), q(side * (S.halfW - 10), y1 - 20), q(side * (S.halfW - 6), y0)]; crPoly(c, pts, 'rgba(255,255,255,.55)'); }
+  c.restore();
+  // the house's rings and the lines
+  crRing(c, 72, '#3c78c8'); crRing(c, 48, '#f4f8fa'); crRing(c, 24, '#c83a3a'); crRing(c, 6, '#f4f8fa');
+  const line = (y, col, w) => { if (y < y0) return; const [a1, a2] = q(S.halfW, y), [b1, b2] = q(-S.halfW, y); c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(a1, a2); c.lineTo(b1, b2); c.stroke(); };
+  line(-S.hog, '#c83a3a', 3); line(0, '#2a3a48', 1); line(S.back, '#2a3a48', 1.2);
+  const [c1, c2] = q(0, y0), [d1, d2] = q(0, S.back); c.strokeStyle = 'rgba(42,58,72,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(c1, c2); c.lineTo(d1, d2); c.stroke();
+}
+// the broom: where your skip holds it while a stone is called
+function crBroomDraw(c, x, y, col) { const [sx, sy, s] = crScr(x, y); c.save(); c.strokeStyle = col; c.lineWidth = Math.max(1.5, 3 * s); c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + 4 * s * 6, sy - 30 * s * 6 / 2); c.stroke(); c.fillStyle = col; c.beginPath(); c.ellipse(sx, sy, 9 * s * 2.6, 4 * s * 2.6, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+function crLeftDraw(c) {
+  crSheetDraw(c);
+  const S = GP && GP.sel, X = GP && GP.X;
+  if (GP && (GP.ph === 'aim' || GP.ph === 'swing') && S) crBroomDraw(c, S.x, S.y, '#ffd34a');
+  const st = crStonesNow().slice().sort((a, b) => b[2] - a[2]);
+  for (const [id, x, y] of st) { const [sx, sy, s] = crScr(x, y); if (s < .03) continue; crStoneDraw(c, sx, sy, .55, G.teams[crSideOf(id === 'new' && X ? X.s : id)].color || '#888', s * CR_VIEW.px); }
+  // the sweepers at the stone, brooms going while it is swept
+  if (X && X.Q.sw > 0) { const T = X.Q.T, [sx, sy, s] = crScr(T.x, T.y + 18); c.save(); c.strokeStyle = '#e7d9b0'; c.lineWidth = Math.max(1, 3 * s);
+    for (const k of [-1, 1]) { const w = Math.sin(CRC.t * 22 + k) * 10 * s * 2.6; c.beginPath(); c.moveTo(sx + k * 14 * s * 2.6 + w, sy); c.lineTo(sx + k * 24 * s * 2.6, sy - 22 * s * 2.6); c.stroke(); }
+    c.fillStyle = 'rgba(230,245,255,.35)'; c.beginPath(); c.arc(sx, sy - 30 * s * 2.6, 8 * s * 2.6, 0, Math.PI * 2); c.fill(); c.restore(); }
+}
+// the house from above, and the sheet strip
+function crRightDraw(c) {
+  const V = CR_VIEW, k = V.hk;
+  c.save(); c.fillStyle = '#16222a'; c.fillRect(V.w, 0, 960 - V.w, 600);
+  c.beginPath(); c.rect(V.w + 10, 18, 960 - V.w - 20, 300); c.clip();
+  c.fillStyle = '#e9f2f6'; c.fillRect(V.w + 10, 18, 960 - V.w - 20, 300);
+  for (const [r, col] of [[72, '#3c78c8'], [48, '#f4f8fa'], [24, '#c83a3a'], [6, '#f4f8fa']]) { c.fillStyle = col; c.beginPath(); c.arc(V.hx, V.hy, r * k, 0, Math.PI * 2); c.fill(); }
+  c.strokeStyle = '#2a3a48'; c.lineWidth = 1; c.beginPath(); c.moveTo(V.w, V.hy); c.lineTo(960, V.hy); c.moveTo(V.hx, 0); c.lineTo(V.hx, 330); c.stroke();
+  const by = crHouseScr(0, CR_SHEET.back)[1]; c.beginPath(); c.moveTo(V.w, by); c.lineTo(960, by); c.stroke();
+  // the path of the stone in play, and the call
+  const X = GP && GP.X; if (X) { c.strokeStyle = 'rgba(40,60,90,.45)'; c.lineWidth = 1.5; c.beginPath(); X.Q.path.forEach(([x, y], i) => { const [px, py] = crHouseScr(x, y); i ? c.lineTo(px, py) : c.moveTo(px, py); }); const T = X.Q.T, [tx, ty] = crHouseScr(T.x, T.y); c.lineTo(tx, ty); c.stroke(); }
+  const S = GP && GP.sel; if (GP && (GP.ph === 'aim' || GP.ph === 'swing') && S) { const [bx, by2] = crHouseScr(S.x, S.y); c.strokeStyle = '#d8a400'; c.lineWidth = 2.5; c.beginPath(); c.arc(bx, by2, 9, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.moveTo(bx - 13, by2); c.lineTo(bx + 13, by2); c.moveTo(bx, by2 - 13); c.lineTo(bx, by2 + 13); c.stroke(); }
+  for (const [id, x, y] of crStonesNow()) { const [sx, sy] = crHouseScr(x, y); crStoneDraw(c, sx, sy, 1, G.teams[crSideOf(id === 'new' && X ? X.s : id)].color || '#888', k); }
+  c.restore();
+  // the whole sheet as a strip, the stones on it as dots
+  const top = 340, bot = 590, Y = y => bot - (y - CR_STONE.y0) / (CR_SHEET.back + 40 - CR_STONE.y0) * (bot - top), Xs = x => 910 - x * .18;
+  c.save(); c.fillStyle = '#e9f2f6'; c.fillRect(Xs(CR_SHEET.halfW), top, CR_SHEET.halfW * 2 * .18, bot - top);
+  c.fillStyle = '#3c78c8'; c.beginPath(); c.arc(Xs(0), Y(0), 72 * .18, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c83a3a'; c.beginPath(); c.arc(Xs(0), Y(0), 24 * .18, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#c83a3a'; c.fillRect(Xs(CR_SHEET.halfW), Y(-CR_SHEET.hog) - 1, CR_SHEET.halfW * 2 * .18, 2);
+  for (const [id, x, y] of crStonesNow()) { c.fillStyle = G.teams[crSideOf(id === 'new' && X ? X.s : id)].color || '#888'; c.beginPath(); c.arc(Xs(x), Y(y), 3, 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = '#cfe2ec'; c.font = '11px system-ui, sans-serif'; c.textAlign = 'left';
+  c.fillText(`The ice: ${CR_COLD[G.cold].n}`, V.w + 14, 352); c.fillText('The sheet', V.w + 14, 368);
+  c.restore();
+}
+// the end board: each side's points by end, the totals and the hammer
+function crBoardDraw(c) {
+  const B = crBoard(), n = B.ends, w = 22, x0 = 12, y0 = 12, nameW = 150;
+  c.save(); c.fillStyle = 'rgba(10,16,20,.8)'; c.fillRect(x0, y0, nameW + n * w + 50, 56);
+  c.font = '600 12px system-ui, sans-serif'; c.textBaseline = 'middle';
+  for (let i = 0; i < n; i++) { c.fillStyle = i === B.end ? '#ffd34a' : '#9fb4c0'; c.textAlign = 'center'; c.fillText(String(i + 1), x0 + nameW + i * w + w / 2, y0 + 9); }
+  [0, 1].forEach(s => { const y = y0 + 25 + s * 19, T = G.teams[s]; c.fillStyle = T.color || '#888'; c.fillRect(x0 + 4, y - 7, 5, 14); c.fillStyle = '#eef4f6'; c.textAlign = 'left'; c.fillText(`${T.short || T.name}${B.hammer === s && !G.over ? ' ●' : ''}`, x0 + 14, y);
+    for (let i = 0; i < n; i++) { const v = B.sc[s][i]; c.textAlign = 'center'; c.fillStyle = v ? '#fff' : 'rgba(255,255,255,.35)'; c.fillText(v == null ? '' : String(v), x0 + nameW + i * w + w / 2, y); }
+    c.textAlign = 'right'; c.fillStyle = '#ffd34a'; c.fillText(String(B.tot[s]), x0 + nameW + n * w + 40, y); });
+  c.restore();
+}
+function crMeterDraw(c) {
+  const M = GP && GP.meter; if (!M || GP.ph !== 'swing') return;
+  const K = CR_PLAY.meter, x = 584, top = 150, bot = 470, Y = v => bot - (v - K.low) / (K.high - K.low) * (bot - top);
+  c.save(); c.fillStyle = 'rgba(10,16,20,.8)'; c.fillRect(x - 16, top - 10, 32, bot - top + 20);
+  const g = c.createLinearGradient(0, bot, 0, top); g.addColorStop(0, '#5aa0e0'); g.addColorStop(.5, '#4caa48'); g.addColorStop(1, '#c84a3a'); c.fillStyle = g; c.fillRect(x - 8, top, 16, bot - top);
+  c.fillStyle = '#ffd34a'; c.fillRect(x - 13, Y(K.line + K.win), 26, Y(K.line - K.win) - Y(K.line + K.win));
+  c.fillStyle = '#fff'; c.beginPath(); c.moveTo(x + 10, Y(M.v)); c.lineTo(x + 20, Y(M.v) - 6); c.lineTo(x + 20, Y(M.v) + 6); c.fill();
+  c.font = '11px system-ui, sans-serif'; c.fillStyle = '#eef4f6'; c.textAlign = 'center'; c.fillText('Heavy', x, top - 16); c.fillText('Light', x, bot + 22);
+  c.restore();
+}
+function crCallDraw(c) {
+  const X = GP && GP.X; if (!X || !GP.call) return;
+  const mine = crYours(X.s);
+  c.save(); c.font = `800 ${GP.call.length > 12 ? 26 : 34}px system-ui, sans-serif`; c.textAlign = 'center';
+  c.fillStyle = 'rgba(0,0,0,.45)'; c.fillText(GP.call, CR_VIEW.cx + 2, 172); c.fillStyle = GP.call.startsWith('Hurry') ? '#ffd34a' : GP.call.startsWith('Sweep') ? '#ffe9a0' : '#cfe8ff'; c.fillText(GP.call, CR_VIEW.cx, 170);
+  if (mine) { c.font = '13px system-ui, sans-serif'; c.fillStyle = '#eef4f6'; c.fillText(GP.sweep ? 'Sweeping…' : 'Hold Space to sweep', CR_VIEW.cx, 196); }
+  c.restore();
+}
+function crDraw(c, dt) {
+  if (!G || !G.teams || !GP) { c.fillStyle = '#16222a'; c.fillRect(0, 0, 960, 600); return; }
+  CRC.t += dt || 0;
+  const want = crCamTarget(); CRC.camY += (want - CRC.camY) * Math.min(1, (dt || 0) * 3 + (dt ? 0 : 1));
+  c.fillStyle = '#16222a'; c.fillRect(0, 0, 960, 600);
+  c.save(); c.beginPath(); c.rect(0, 0, CR_VIEW.w, 600); c.clip();
+  crLeftDraw(c); crMeterDraw(c); crCallDraw(c); crBoardDraw(c);
+  c.restore();
+  crRightDraw(c);
+}
+/* The Shed's page in the Realm (issue #102, phase 2). A canvas in #v-shed, after the Lanes', and a frame loop that runs
+   only while it is on screen (show/hide): it moves the game on (crTick) and draws it (crDraw), at the screen's density.
+   The engine's parts don't touch the page; this file is the only one that does.
+   In You play it hears the keys only while the Shed is on screen (not under How to play), in the capture phase so
+   nothing else takes them: Space throws (a press to start, a press at the line for the weight), and while your stone
+   slides, holding Space sweeps it; the arrows move the broom (left and right a few inches, up and down a foot); I and
+   O the handle (in-turn, out-turn); 1 to 6 the shot (draw, guard, freeze, takeout, peel, hit and roll); G your skip's
+   call again.
+   The mouse or a finger: a click on the house (either view) puts the broom there (for a hit, on the stone nearest it);
+   a drag that starts at the hack (the bottom of the left view) and pulls back is a throw (the pull is the weight, a
+   pull off straight the miss); and while your stone slides, holding a finger or the button down on the canvas
+   sweeps. */
+const CRP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null, sweepKey: false, sweepPtr: false };
+(() => {
+  const h = document.createElement('div'); h.id = 'v-shed'; h.hidden = true;
+  const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
+  cv.style.cssText = 'display:block;width:100%;max-width:1180px;margin:0 auto;aspect-ratio:960/600;background:#16222a;border-radius:6px;touch-action:none';
+  h.appendChild(cv);
+  (document.getElementById('v-lanes') || document.getElementById('v-links') || document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
+  Object.assign(CRP, { host: h, cv, c: cv.getContext('2d') });
+})();
+function crRender(dt) {
+  const d = Math.min(2, window.devicePixelRatio || 1);
+  if (d !== CRP.dpr || CRP.cv.width !== Math.round(960 * d)) { CRP.dpr = d; CRP.cv.width = Math.round(960 * d); CRP.cv.height = Math.round(600 * d); }
+  const c = CRP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); crDraw(c, dt || 0); c.restore();
+}
+function crFrame(now) {
+  if (!CRP.on) return;
+  const dt = Math.min(.05, Math.max(0, (now - CRP.last) / 1000)); CRP.last = now;
+  const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
+  if (GP) GP.sweep = CRP.sweepKey || CRP.sweepPtr;
+  if (!CRP.paused && !boxed) for (let i = 0; i < CRP.speed && !CRP.paused; i++) crTick(dt);
+  crRender(CRP.paused ? 0 : dt);
+  CRP.raf = requestAnimationFrame(crFrame);
+}
+function crShow() { CRP.host.hidden = false; if (CRP.on) return; CRP.on = true; CRP.last = performance.now(); CRP.raf = requestAnimationFrame(crFrame); }
+function crHide() { CRP.ptr = null; CRP.sweepKey = CRP.sweepPtr = false; CRP.host.hidden = true; CRP.on = false; cancelAnimationFrame(CRP.raf); }
+
+/* ---------- the keys ---------- */
+const CR_SHOT_KEYS = { 1: 'draw', 2: 'guard', 3: 'freeze', 4: 'takeout', 5: 'peel', 6: 'hitroll' };
+function crKeyOk(e) {
+  if (!CRP.on || !GP || GP.mode !== 'play' || CRP.paused || CRP.cv.offsetParent === null) return false;
+  // Space belongs to the Shed for the whole of a live game, so it never presses a focused bar button mid-game
+  if (e.key === ' ' ? !!G.over && GP.ph !== 'slide' : GP.ph !== 'aim') return false;
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return false;
+  const m = document.getElementById('modal'); if (m && !m.hidden) return false;
+  return true;
+}
+function crKeyDown(e) {
+  if (!crKeyOk(e)) return;
+  const k = e.key.toLowerCase(), S = GP.sel;
+  let took = true;
+  if (k === ' ') { if (GP.ph === 'slide') CRP.sweepKey = true; else if (!e.repeat) crPress(); }
+  else if (GP.ph !== 'aim' || !S) took = false;
+  else if (k === 'arrowleft') crSelect({ x: S.x + 3 });
+  else if (k === 'arrowright') crSelect({ x: S.x - 3 });
+  else if (k === 'arrowup') crSelect({ y: S.y + 12 });
+  else if (k === 'arrowdown') crSelect({ y: S.y - 12 });
+  else if (k === 'i') crSelect({ h: -1 });
+  else if (k === 'o') crSelect({ h: 1 });
+  else if (CR_SHOT_KEYS[k]) crSelect({ shot: CR_SHOT_KEYS[k] });
+  else if (k === 'g') crSelect({ suggest: true });
+  else took = false;
+  if (took) { e.preventDefault(); e.stopPropagation(); }
+}
+function crKeyUp(e) { if (e.key === ' ' && CRP.sweepKey) { CRP.sweepKey = false; e.preventDefault(); e.stopPropagation(); } }
+window.addEventListener('keydown', crKeyDown, true);
+window.addEventListener('keyup', crKeyUp, true);
+window.addEventListener('blur', () => { CRP.sweepKey = CRP.sweepPtr = false; });
+
+/* ---------- the pointer: the broom, a drag throw, and holding to sweep ---------- */
+function crPtrAt(e) { const r = CRP.cv.getBoundingClientRect(); return { sx: (e.clientX - r.left) * 960 / r.width, sy: (e.clientY - r.top) * 600 / r.height }; }
+// a point of the picture as a point on the ice (the house view or the sheet), or null off it
+function crIceAtPt(sx, sy) {
+  if (sx >= CR_VIEW.w + 10 && sy >= 18 && sy <= 318) return crHouseUn(sx, sy);
+  if (sx < CR_VIEW.w) return crUnscr(sx, sy);
+  return null;
+}
+CRP.cv.addEventListener('pointerdown', e => {
+  if (!GP || GP.mode !== 'play' || CRP.paused) return;
+  const p = crPtrAt(e);
+  if (GP.ph === 'slide' && GP.X && crYours(GP.X.s)) { CRP.sweepPtr = true; e.preventDefault(); return; }
+  if (GP.ph !== 'aim' || !GP.sel) return;
+  CRP.ptr = { throw: p.sx < CR_VIEW.w && p.sy > 520, x: p.sx, y: p.sy, cur: p };
+  try { CRP.cv.setPointerCapture(e.pointerId); } catch (er) { /* a synthetic press */ }
+  if (!CRP.ptr.throw) { const q = crIceAtPt(p.sx, p.sy); if (q) crSelect({ x: q.x, y: q.y }); }
+  e.preventDefault();
+});
+CRP.cv.addEventListener('pointermove', e => { if (CRP.ptr) CRP.ptr.cur = crPtrAt(e); });
+function crPtrUp(e) {
+  CRP.sweepPtr = false;
+  const P = CRP.ptr; CRP.ptr = null; if (!P || !GP || e.type === 'pointercancel' || !P.throw || GP.ph !== 'aim') return;
+  const q = P.cur, dx = q.sx - P.x, dy = q.sy - P.y;
+  // pulled back (down the picture) is the weight: about 110 pixels is the call's own; off to the side is the miss
+  if (dy > 25) crDrag(CR_PLAY.meter.low + (CR_PLAY.meter.high - CR_PLAY.meter.low) * clamp(dy / 240, 0, 1), Math.atan2(dx, dy) * 180 / Math.PI);
+}
+for (const ev of ['pointerup', 'pointercancel']) CRP.cv.addEventListener(ev, crPtrUp);
 
 /* the end of the wCR scope: what the Realm may call (w19b-engines.js). Phase 0 is the rules: newGame(opts) starts a
    game ({ ends: 4 | 6 | 8, order: [two orders of four], roster: [two roster sizes], hammer: the side with the first
@@ -40118,15 +40518,20 @@ function crSimGame(opts) {
    play once it stopped, and whether it touched one; applies the free guard zone, scores the end after its sixteenth stone, and says so), whyNot;
    scoreEnd(stones), inHouse, inFgz, inPlay (a thrown stone's: wholly past the hog line and on the sheet), onSheet
    (a stone already in play: it stays short of the hog line) and dist read where stones are; total, board (the scoreboard), matchText.
-   rules and sheet are the tables. G is the game, plain JSON. The page comes in phase 2: until then the shed is never
-   on.
+   rules and sheet are the tables. G is the game, plain JSON.
    Phase 1 is the stone, the ice and one game, CPU against CPU: stoneRules, iceRules, colds, skills, shots (the tables);
    iceNew, iceAt and wear (the pebble); run(stones, throw, opts) the pure stone model (one stone thrown among the others
    to rest), alone(throw, ice, cold, sweep) a stone on its own, solveDraw(x, y, h, ice, cold) and solveHit(x, y, v, h,
    ice, cold) the aim; value(stones, side, kAfter, hammer, skill) what a result is worth to a skip, plan(side) the
    CPU's call; start(opts) puts a game on the ice ({ ends, teams, order, skill: [2], hammer, cold, fgz, seed }), turn()
    throws the next stone, throwStone(side, plan, release, sweep) one as released (refused: rule.ok false, nothing changed), summary() is the game so far,
-   simGame(opts) a whole game headless. */
+   simGame(opts) a whole game headless.
+   Phase 2 is the page and throwing by hand: start(opts) also puts the game on show ({ mode: 'watch' | 'play' }), and
+   show, hide, on, pause, paused, speed and render drive the canvas (n1-page.js). The beat: phase, msg, view (a copy of
+   what the page needs), tick(dt), live (the stone sliding now). Your stone: select({ shot, x, y, h, target, suggest
+   }), press (Space: start, then the weight), drag(pull, deg) (the phone's throw), sweep (held: true while you hold
+   Space), setMode; playRules (the meter, the pace); scr, unscr, houseScr and houseUn map the ice to the pictures and
+   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -40138,8 +40543,15 @@ return {
   iceNew: () => crIceNew(), iceAt: (ice, x, y, cold) => crIceAt(ice, x, y, cold), wear: (ice, path) => crWear(ice, path),
   run: (stones, th, o) => crRun(stones, th, o), alone: (th, ice, cold, sweep) => crAlone(th, ice, cold, sweep), solveDraw: (x, y, h, ice, cold) => crSolveDraw(x, y, h, ice, cold), solveHit: (x, y, v, h, ice, cold) => crSolveHit(x, y, v, h, ice, cold),
   value: (st, s, k, hammer, sk) => crValue(st, s, k, hammer, sk), plan: s => G && G.teams ? crPlan(s) : null,
-  start: o => crStart(o), turn: () => crTurn(), throwStone: (s, plan, rel, sweep) => G && G.teams ? crThrowStone(s, plan, rel, sweep) : null, summary: () => crSummary(), simGame: o => crSimGame(o),
-  show: () => {}, hide: () => {}, get on() { return false; }
+  start: o => { crStart(o); crPlayStart(o); return G; }, turn: () => crTurn(), throwStone: (s, plan, rel, sweep) => G && G.teams ? crThrowStone(s, plan, rel, sweep) : null, summary: () => crSummary(), simGame: o => crSimGame(o),
+  // the page and throwing by hand (phase 2)
+  modes: CR_MODES.slice(), playRules: JSON.parse(JSON.stringify(CR_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get view() { return crView(); }, get mode() { return GP ? GP.mode : null; },
+  setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepKey = !!on; if (GP) GP.sweep = !!on; }, get sweep() { return !!(GP && GP.sweep); },
+  scr: (x, y) => crScr(x, y), unscr: (sx, sy) => crUnscr(sx, sy), houseScr: (x, y) => crHouseScr(x, y), houseUn: (sx, sy) => crHouseUn(sx, sy), get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
+  get live() { const X = GP && GP.X; return X ? { s: X.s, t: X.Q.t, stone: { x: X.Q.T.x, y: X.Q.T.y, vx: X.Q.T.vx, vy: X.Q.T.vy }, sw: X.Q.sw, plan: X.plan } : null; },
+  set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
+  show: () => crShow(), hide: () => crHide(), get on() { return CRP.on; }, render: dt => crRender(dt || 0),
+  pause: on => { CRP.paused = !!on; }, get paused() { return CRP.paused; }, get speed() { return CRP.speed; }, set speed(n) { CRP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };
 
 })();
@@ -57702,6 +58114,216 @@ renderHelp = function () {
   wW121RenderHelp();
   const d = $('wHelpLanesCup'); if (!d || $('wHelpLanesFeel')) return;
   d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesFeel"><b>At the lanes</b> you hear the ball roll down the wood and the pins when it gets there (a crash for a strike), the gallery for a strike (louder for a double and a turkey), a bright pair of notes for a spare, the ring of a lone corner pin that won't fall, and the sea under the floor; sounds follow your Sound effects setting, and the realm's music plays on. Bowling matches won, Gutter Cups, a turkey, a clean game, the 7-10 converted and a 300 have medals in the record book.</p>`);
+};
+/* w122: the Curling Shed (issue #102, phase 2). The Curling Shed, the curling engine, runs in the wCR scope (src/cr/ and
+   src/realm/shed/: a canvas in #v-shed, and none of its names reach ours). This part gives it a view beside the world,
+   laid out as the other sports' pages are (w87): the bar with the status line under it, the ice, your stone's rows,
+   the end board, then This game (every end).
+   A game is Saltmere's rink of four against a visiting rink from Rimewatch: 6 ends (or 4 or 8: SET.shedEnds, on the bar
+   and the Settings panel), each curler two stones an end. Ask Brush Hennock at the Shed to CURL (GAME and CURLING stay
+   the card-game match and how it scores). Nothing is won or lost, and nothing is saved.
+   Two modes on the bar (W_SHED_MODES): Watch (the CPU throws both sides) and You play (your stones are yours: the keys
+   are in n1-page.js, and the rows under the ice do the same with a mouse or a finger). Switching goes on with the same
+   game; the last one picked is kept for the next (not saved).
+   The rows, in You play on your stone: Shot (draw, guard, freeze, takeout, peel, hit and roll), Broom (where your skip
+   holds it), Handle (in-turn or out-turn), and Throw (with your skip's call again); while your stone slides, Sweep
+   (hold it, as you hold Space).
+   On a phone the scoreboard strip (w86) covers the Shed too: W_SB_VIEWS.shed and W_SB_HTML.shed.
+   Wraps: showView (wW122ShowView: the bar), openPause (wW122OpenPause: not at the Shed), wRunAct (wW122RunAct:
+   'shedcurl'), showPage (wW122ShowPage: the game waits while another page is up), renderHelp (wW122RenderHelp:
+   #wHelpShed and #wShedHow). The Settings row goes in by an observer on the modal, as w113's does. */
+
+const W_SHED = {
+  home: { kinds: ['wraith', 'spider', 'troll', 'gorgon'], color: '#b83a3a', short: 'SAL' },
+  away: { city: 'rimewatch', kinds: ['witch', 'harpy', 'lich', 'skeleton'], color: '#3a7ab8', short: 'RIM' },
+};
+const W_SHED_MODES = {
+  watch: { n: 'Watch', title: 'The CPU throws both sides. Switching goes on with the same game.' },
+  play: { n: 'You play', title: 'You throw for Saltmere: pick the shot, put the broom down, pick the handle and throw (Space twice), then hold Space to sweep.' },
+};
+let W_SHED_MODE = 'play', W_SHED_SPEED = 1, W_SHED_SKILL = 1;
+const wShedEnds = () => wCR.rules.endsAt.includes(SET.shedEnds) ? SET.shedEnds : wCR.rules.ends;
+// the game on the ice: plain data, never saved
+let WCR = null;
+
+$('v-shed').insertAdjacentHTML('beforebegin', `<div id="wShedBar" class="wdbar" hidden>
+  <b id="wShedTitle">A game at the Curling Shed</b><span id="wShedNote" class="hint wsnote"></span>
+  <span id="wShedModes" class="wgmodes" role="group" aria-label="Who throws">${Object.entries(W_SHED_MODES).map(([k, m]) => `<button class="ghost" data-cmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
+  <label class="hint" title="How many ends a game is. Also on the Settings panel.">Ends <select id="wShedEnds">${wCR.rules.endsAt.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label>
+  <label class="hint" title="How well the other rink curls: a Squire looks at the easy shots and misses more; a Knight weighs the house and the hammer; an Archmage reads the ice as it is now and misses least.">Their rink <select id="wShedSkill">${wCR.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
+  <label class="hint" id="wShedSpeedL" title="How fast the game runs while you watch. In You play it is always 1.">Speed <select id="wShedSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+  <button class="ghost" id="wShedAgain">Another game</button>
+  <button class="ghost" id="wShedBack">Back to the world</button></div>`);
+$('wShedBar').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.cmode) { W_SHED_MODE = b.dataset.cmode; if (WCR && !WCR.over) wCR.setMode(W_SHED_MODE); wShedBarNote(); wShedRows(); }
+  else if (b.id === 'wShedAgain') wShedGame();
+  else if (b.id === 'wShedBack') wLeaveShed();
+});
+function wShedSpeedSet() { const play = wCR.mode === 'play'; wCR.speed = play ? 1 : W_SHED_SPEED; $('wShedSpeedL').hidden = play || !WCR || !!WCR.over; $('wShedSpeed').value = String(W_SHED_SPEED); }
+$('wShedSkill').addEventListener('change', e => { W_SHED_SKILL = +e.target.value; e.target.blur(); $('wShedNote').textContent = `Their rink: ${wCR.skills[W_SHED_SKILL].n}s, from the next game.`; });
+$('wShedSpeed').addEventListener('change', e => { W_SHED_SPEED = +e.target.value || 1; wShedSpeedSet(); e.target.blur(); });
+$('wShedEnds').addEventListener('change', e => { SET.shedEnds = +e.target.value; saveSettings(); wShedBarNote(); e.target.blur(); });
+
+// under the ice: your stone's rows, the end board, this game, and How curling works
+const W_SHED_SHOTS = [['draw', 'Draw', 'To rest where the broom is'], ['guard', 'Guard', 'To rest in front of the house, to hide a stone behind'], ['freeze', 'Freeze', 'To rest touching a stone, so it can\'t be taken out cleanly'],
+  ['takeout', 'Takeout', 'Hit a stone out of play'], ['peel', 'Peel', 'Hit a guard out, and roll out too'], ['hitroll', 'Hit and roll', 'Hit a stone out, and roll into the house']];
+$('v-shed').insertAdjacentHTML('beforeend', `<div id="wShedRows" class="wccalls wscoach" hidden>
+  <div class="wccrow"><span class="wccl">Shot</span><span id="wShedShot"></span></div>
+  <div class="wccrow"><span class="wccl">Broom</span><span id="wShedBroom"></span></div>
+  <div class="wccrow"><span class="wccl">Handle</span><span id="wShedHandle"></span></div>
+  <div class="wccrow"><span class="wccl">Throw</span><span id="wShedGo"></span></div></div>
+  <div id="wShedSweepRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Sweep</span><span><button class="ghost" id="wShedSweep">Hold to sweep</button> <small class="hint" id="wShedCall"></small></span></div></div>
+  <h4 class="wsh">The end board</h4><div id="wShedBoard" class="wcbox"></div>
+  <h4 class="wsh">This game</h4><ol id="wShedLog" class="wglog wslog"></ol>
+  <p class="hint wghowlink">How curling works here: the end, the hammer, the house, the throw and the sweep. <button class="ghost" id="wShedHowBtn">How to play curling</button> <small>The game waits while you read.</small></p>`);
+$('wShedHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wShedHow'); if (h) h.scrollIntoView({ block: 'start' }); });
+$('wShedRows').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const d = b.dataset, S = wCR.view && wCR.view.sel; if (!S && !d.cgo) return;
+  let why = '';
+  if (d.cshot) why = wCR.select({ shot: d.cshot });
+  else if (d.cbx) why = wCR.select({ x: S.x + +d.cbx });
+  else if (d.cby) why = wCR.select({ y: S.y + +d.cby });
+  else if (d.ch) why = wCR.select({ h: +d.ch });
+  else if (d.csuggest) why = wCR.select({ suggest: true });
+  else if (d.cgo) wCR.press();
+  else return;
+  if (why) $('wShedNote').textContent = why;
+  wShedRows(); if (!why) wShedBarNote();
+});
+// the Sweep button: held, as Space is held
+for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $('wShedSweep').addEventListener(ev, e => { if (WCR) { wCR.sweep = on; e.preventDefault(); } });
+// the rows: your stone's call while you set it up, Sweep while it slides
+function wShedRows() {
+  const box = $('wShedRows'), V = WCR && !WCR.over && wCR.G && wCR.G.teams ? wCR.view : null, mine = V && V.mode === 'play' && (V.ph === 'aim' || V.ph === 'swing') && V.sel;
+  const L = wCR.live, sliding = !!V && V.mode === 'play' && V.ph === 'slide' && L && L.s === V.you;
+  $('wShedSweepRow').hidden = !sliding; if (sliding) $('wShedCall').textContent = V.call || '';
+  box.hidden = !mine; if (!mine) return;
+  const S = V.sel, aim = V.ph === 'aim', on = (a, b) => a === b ? ' on' : '', dis = aim ? '' : 'disabled', hit = ['takeout', 'peel', 'hitroll'].includes(S.shot);
+  $('wShedShot').innerHTML = W_SHED_SHOTS.map(([k, n, t], i) => `<button class="ghost${on(k, S.shot)}" data-cshot="${k}" ${dis} title="${i + 1}: ${esc(t)}">${n}</button>`).join(' ');
+  $('wShedBroom').innerHTML = hit ? `<small class="hint">On the stone to hit: click another stone in the house to change it.</small>`
+    : `<button class="ghost" data-cbx="6" ${dis} title="Left arrow">◀</button> <button class="ghost" data-cbx="-6" ${dis} title="Right arrow">▶</button> <button class="ghost" data-cby="-12" ${dis} title="Down arrow: a foot nearer">▼</button> <button class="ghost" data-cby="12" ${dis} title="Up arrow: a foot further">▲</button> <small class="hint">Or click the house where you want it.</small>`;
+  $('wShedHandle').innerHTML = [[1, 'Out-turn', 'O: it curls to the left'], [-1, 'In-turn', 'I: it curls to the right']].map(([h, n, t]) => `<button class="ghost${on(h, S.h)}" data-ch="${h}" ${dis} title="${esc(t)}">${n}</button>`).join(' ');
+  const M = V.meter, st = V.ph !== 'swing' || !M ? 'Start' : 'Weight';
+  $('wShedGo').innerHTML = `<button class="ghost on" data-cgo="1" title="Space">${st}</button> <button class="ghost" data-csuggest="1" ${dis} title="G: your skip's call for this stone">Skip's call</button> <small class="hint">Two presses: start, then stop on the yellow line for the call's weight (early is light, late is heavy). Then hold Space to sweep.</small>`;
+}
+// the two rinks; taken: names already in the game, so nobody shares one
+function wShedTeams(taken) {
+  const g = W_GRDS.find(x => x.id === 'g_shed'), H = W_SHED.home, A = W_SHED.away, used = new Set(taken || []);
+  return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.curling} Club` }, A)].map(t => ({
+    name: t.name, short: t.short, color: t.color, roster: t.kinds.map(kind => ({ n: wRinkName(kind, used), kind })),
+  }));
+}
+/* one game at the Shed. opts: { teams, ends, seed, mode, title, cold, skill } */
+function wShedGame(opts) {
+  const o = opts || {};
+  WCR = { over: null };
+  $('wShedTitle').textContent = o.title || 'A game at the Curling Shed';
+  wCR.start({ teams: o.teams || wShedTeams(), ends: o.ends || wShedEnds(), seed: o.seed, mode: o.mode || W_SHED_MODE, cold: o.cold || 'mid', skill: o.skill || [1, W_SHED_SKILL], hammer: o.hammer });
+  showView('shed');
+  wShedBarNote(); wShedRows(); wShedBoard();
+}
+function wShedBarNote() {
+  if (!WCR) return;
+  const mode = WCR.over ? W_SHED_MODE : wCR.mode || W_SHED_MODE;
+  for (const b of $('wShedModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.cmode === mode); b.setAttribute('aria-pressed', b.dataset.cmode === mode); }
+  wShedSpeedSet();
+  const G = wCR.G, later = !WCR.over && G && G.ends !== wShedEnds();
+  $('wShedNote').textContent = (wCR.msg || '') + (later ? ` (Ends: ${wShedEnds()} from the next game; this one is ${G.ends}.)` : '');
+  $('wShedEnds').value = String(wShedEnds());
+  $('wShedSkill').value = String(W_SHED_SKILL);
+}
+// the end board: a column an end, each side's points, the hammer, the totals
+function wShedBoard() {
+  const G = wCR.G; if (!G || !G.teams) { $('wShedBoard').innerHTML = ''; $('wShedLog').innerHTML = ''; return; }
+  const B = wCR.board(), cols = []; for (let i = 0; i < B.ends; i++) cols.push(i);
+  const row = s => `<tr><td style="border-left:4px solid ${G.teams[s].color || '#888'}">${esc(G.teams[s].name)}${B.hammer === s && !G.over ? ' <small title="The hammer: the last stone of the end">●</small>' : ''}</td>${cols.map(i => `<td>${B.sc[s][i] == null ? '' : B.sc[s][i]}</td>`).join('')}<td><b>${B.tot[s]}</b></td></tr>`;
+  const head = `<tr><th></th>${cols.map(i => `<th${i >= G.ends ? ' title="An extra end"' : ''}>${i >= G.ends ? 'X' + (i - G.ends + 1) : i + 1}</th>`).join('')}<th>Total</th></tr>`;
+  $('wShedBoard').innerHTML = `<div style="overflow-x:auto;max-width:100%"><table class="wrpow wcboxt"><caption>${esc(G.teams[0].name)}: ${esc(wCR.matchText(0))}</caption>${head}${row(0)}${row(1)}</table></div>`;
+  $('wShedLog').innerHTML = wShedLogHTML();
+}
+// every end so far, newest first: who scored, or a blank
+function wShedLogHTML() {
+  const G = wCR.G; if (!G.log.length) return '<li class="hint">No ends played yet.</li>';
+  return G.log.slice().reverse().map(e => e.s < 0 ? `<li><small>End ${e.end}</small> A blank: nobody scores${e.extra ? ' (an extra end)' : ''}.</li>`
+    : `<li style="border-left-color:${G.teams[e.s].color}"><small>End ${e.end}</small> ${esc(G.teams[e.s].name)} score <b>${e.n}</b>${e.extra ? ' (an extra end)' : ''}.</li>`).join('');
+}
+function wLeaveShed() {
+  WCR = null; wCR.pause(false);
+  if (WG) showView('world');
+  else { wCR.hide(); showScreen('title'); renderTitle(); }
+}
+let W_SHED_BOARDKEY = '';
+wCR.onPhase = ph => {
+  if (!WCR) return; wShedBarNote(); wShedRows();
+  if (ph === 'slide') return;   // (the board waits for the stones to settle, as the status line does)
+  const G = wCR.G, key = G ? [G.n, !!G.over, G.end].join('|') : '';
+  if (key !== W_SHED_BOARDKEY) { W_SHED_BOARDKEY = key; wShedBoard(); }
+};
+wCR.onPick = () => { if (WCR) { wShedRows(); wShedBarNote(); } };
+wCR.onOver = s => { if (WCR) { WCR.over = s; wShedBarNote(); wShedRows(); wShedBoard(); $('wShedAgain').focus(); } };
+// the skip's call while your stone slides: the Sweep row's text follows it
+setInterval(() => { if (WCR && UI.view === 'shed' && !$('wShedSweepRow').hidden) $('wShedCall').textContent = (wCR.view || {}).call || ''; }, 200);
+
+// the scoreboard strip on a phone (w86): both sides' totals, and the end
+W_SB_VIEWS.shed = 'wSbShed';
+W_SB_HTML.shed = function () {
+  const G = wCR.G, V = wCR.view; if (!G || !G.teams || !V) return '';
+  return wSbSide(G.teams[0].name, G.teams[0].color, wCR.total(0), G.hammer === 0 && !G.over, '') + `<div class="wsbmid"><b>${G.over ? 'Final' : 'End ' + Math.min(V.end, wCR.board().ends)}</b><small>${esc(wCR.matchText(0))}</small></div>` + wSbSide(G.teams[1].name, G.teams[1].color, wCR.total(1), G.hammer === 1 && !G.over, '');
+};
+
+const wW122ShowView = showView;
+showView = function (v) {
+  wW122ShowView(v);
+  $('wShedBar').hidden = v !== 'shed';
+  if (v === 'shed') $('runbar').hidden = true;
+};
+const wW122OpenPause = openPause;
+openPause = function () { if (UI.view === 'shed') return; return wW122OpenPause.apply(this, arguments); };
+const wW122ShowPage = showPage;
+showPage = function (p) {
+  wW122ShowPage(p);
+  if (WCR && UI.view === 'shed') wCR.pause(p !== 'play');
+};
+
+// Brush Hennock at the Shed puts on a game (not CURLING or GAME: those are how card-game curling scores, and the match)
+(() => {
+  const K = DB.chars.gk_shed; if (!K) return;
+  K.topics.job.t += ' And we curl it for real now, on the sheets themselves, four a side: ask me to CURL.';
+  K.topics.curl = { t: 'Four of ours against four from Rimewatch. Two stones each, sixteen an end, the house at the far end. Sweep when your skip shouts. Mind the pebble: it wears.', act: 'shedcurl' };
+})();
+const wW122RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'shedcurl') return wShedGame(); return wW122RunAct.apply(this, arguments); };
+
+// the Settings panel: how many ends a game is (the observer puts the row back whenever the panel redraws)
+function wShedSetRow() {
+  const g = document.querySelector('#modalBox .setgrid'); if (!g || $('sShedEnds')) return;
+  g.insertAdjacentHTML('beforeend', `<label class="rng"><span>Curling ends</span><select id="sShedEnds">${wCR.rules.endsAt.map(m => `<option value="${m}" ${wShedEnds() === m ? 'selected' : ''}>${m} ends</option>`).join('')}</select></label>`);
+  $('sShedEnds').onchange = e => { SET.shedEnds = +e.target.value; saveSettings(); if (WCR) wShedBarNote(); };
+}
+new MutationObserver(wShedSetRow).observe($('modalBox'), { childList: true });
+
+// How to play: Curling, how it works
+function wShedHowHTML() {
+  const R = wCR.rules;
+  return `<p class="hint">A game is two rinks of four: the <b>lead</b>, the <b>second</b>, the <b>third</b> and the <b>skip</b>. An <b>end</b> is sixteen stones: each curler throws two, the rinks taking turns, lead first and skip last. A game is ${R.ends} ends (or ${R.endsAt.join(', ')} in Settings).</p>
+  <p class="hint"><b>Scoring.</b> After the sixteenth stone, the rink with the stone nearest the <b>button</b> (the middle of the house) scores one for every stone of theirs nearer than the other rink's nearest. Only stones touching the house's rings count. Nothing in the house is a <b>blank end</b>. Level after the last end: an extra end.</p>
+  <p class="hint"><b>The hammer</b> is the last stone of an end, and it is a big advantage. The rink that scores gives it up for the next end; after a blank it stays. With the hammer you want two or more, or a blank to keep it; without it you want to <b>steal</b> (score without the hammer).</p>
+  <p class="hint"><b>The free guard zone.</b> A stone short of the house, past the hog line, is a guard. Until the fifth stone of an end, a stone may not knock the other rink's guard out of play: if it does, the guard goes back and your stone is removed.</p>
+  <p class="hint"><b>Your stone.</b> Your skip calls a shot and holds the broom where to aim. A <b>draw</b> comes to rest at the broom, a <b>guard</b> short of the house, a <b>freeze</b> touching a stone, a <b>takeout</b> hits a stone out, a <b>peel</b> hits a guard out and rolls away, a <b>hit and roll</b> hits and rolls into the house. Change the shot (1 to 6), move the broom (the arrows, or click the house) and pick the <b>handle</b>: out-turn (O) curls left, in-turn (I) curls right. A stone curls most as it slows.</p>
+  <p class="hint"><b>The throw.</b> Space twice: once to start, once on the <b>yellow line</b> for the call's weight. Early is light, late is heavy. On a phone, drag back from the hack and let go: the further you pull, the heavier.</p>
+  <p class="hint"><b>Sweeping.</b> While your stone slides, hold Space (or the Sweep button) to sweep: a swept stone goes further and curls less. Your skip calls it: "Hurry hard!" when it will stop well short, "Sweep!" a little short, "Off!" when it has the weight, "Whoa!" when it is heavy. A light stone can be swept home; a heavy one can't be stopped.</p>
+  <p class="hint"><b>The ice</b> is pebbled, and the pebble wears where stones go: worn ice is keener (a stone runs further). The Shed's cold changes the whole sheet: heavy on a warm day, keen after a hard frost.</p>
+  <p class="hint"><b>Their rink</b> (on the bar): a <b>Squire</b> looks at the easy shots and misses more; a <b>Knight</b> weighs the house and the hammer, and reads the ice as it was when the end began; an <b>Archmage</b> reads the ice as it is now and misses least. <b>Watch</b> hands both rinks to the CPU, and Speed on the bar runs it faster.</p>`;
+}
+const wW122RenderHelp = renderHelp;
+renderHelp = function () {
+  wW122RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpShed') || !$('wHelpGrounds')) return;
+  const after = $('wHelpLanes') || $('wHelpLinks') || [...h.querySelectorAll('[id^="wHelpG"]')].pop();
+  h.insertAdjacentHTML('beforeend', `<section id="wShedHow" class="wghelp"><h3>Curling: how it works</h3>${wShedHowHTML()}</section>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShed"><b>Real curling.</b> The Curling Shed plays curling on the ice itself now, four a side. Ask Brush Hennock to CURL: a game of ${wCR.rules.ends} ends. Call the shot, put the broom down, pick the handle and throw, then sweep it home; or watch the two rinks play it out, with the end board under the ice (see Curling: how it works). It is an exhibition: nothing is won or lost.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

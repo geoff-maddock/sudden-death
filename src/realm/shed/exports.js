@@ -5,15 +5,20 @@
    play once it stopped, and whether it touched one; applies the free guard zone, scores the end after its sixteenth stone, and says so), whyNot;
    scoreEnd(stones), inHouse, inFgz, inPlay (a thrown stone's: wholly past the hog line and on the sheet), onSheet
    (a stone already in play: it stays short of the hog line) and dist read where stones are; total, board (the scoreboard), matchText.
-   rules and sheet are the tables. G is the game, plain JSON. The page comes in phase 2: until then the shed is never
-   on.
+   rules and sheet are the tables. G is the game, plain JSON.
    Phase 1 is the stone, the ice and one game, CPU against CPU: stoneRules, iceRules, colds, skills, shots (the tables);
    iceNew, iceAt and wear (the pebble); run(stones, throw, opts) the pure stone model (one stone thrown among the others
    to rest), alone(throw, ice, cold, sweep) a stone on its own, solveDraw(x, y, h, ice, cold) and solveHit(x, y, v, h,
    ice, cold) the aim; value(stones, side, kAfter, hammer, skill) what a result is worth to a skip, plan(side) the
    CPU's call; start(opts) puts a game on the ice ({ ends, teams, order, skill: [2], hammer, cold, fgz, seed }), turn()
    throws the next stone, throwStone(side, plan, release, sweep) one as released (refused: rule.ok false, nothing changed), summary() is the game so far,
-   simGame(opts) a whole game headless. */
+   simGame(opts) a whole game headless.
+   Phase 2 is the page and throwing by hand: start(opts) also puts the game on show ({ mode: 'watch' | 'play' }), and
+   show, hide, on, pause, paused, speed and render drive the canvas (n1-page.js). The beat: phase, msg, view (a copy of
+   what the page needs), tick(dt), live (the stone sliding now). Your stone: select({ shot, x, y, h, target, suggest
+   }), press (Space: start, then the weight), drag(pull, deg) (the phone's throw), sweep (held: true while you hold
+   Space), setMode; playRules (the meter, the pace); scr, unscr, houseScr and houseUn map the ice to the pictures and
+   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -25,6 +30,13 @@ return {
   iceNew: () => crIceNew(), iceAt: (ice, x, y, cold) => crIceAt(ice, x, y, cold), wear: (ice, path) => crWear(ice, path),
   run: (stones, th, o) => crRun(stones, th, o), alone: (th, ice, cold, sweep) => crAlone(th, ice, cold, sweep), solveDraw: (x, y, h, ice, cold) => crSolveDraw(x, y, h, ice, cold), solveHit: (x, y, v, h, ice, cold) => crSolveHit(x, y, v, h, ice, cold),
   value: (st, s, k, hammer, sk) => crValue(st, s, k, hammer, sk), plan: s => G && G.teams ? crPlan(s) : null,
-  start: o => crStart(o), turn: () => crTurn(), throwStone: (s, plan, rel, sweep) => G && G.teams ? crThrowStone(s, plan, rel, sweep) : null, summary: () => crSummary(), simGame: o => crSimGame(o),
-  show: () => {}, hide: () => {}, get on() { return false; }
+  start: o => { crStart(o); crPlayStart(o); return G; }, turn: () => crTurn(), throwStone: (s, plan, rel, sweep) => G && G.teams ? crThrowStone(s, plan, rel, sweep) : null, summary: () => crSummary(), simGame: o => crSimGame(o),
+  // the page and throwing by hand (phase 2)
+  modes: CR_MODES.slice(), playRules: JSON.parse(JSON.stringify(CR_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get view() { return crView(); }, get mode() { return GP ? GP.mode : null; },
+  setMode: m => crSetMode(m), tick: dt => crTick(dt), select: o => crSelect(o), press: () => crPress(), drag: (pull, deg) => crDrag(pull, deg), set sweep(on) { CRP.sweepKey = !!on; if (GP) GP.sweep = !!on; }, get sweep() { return !!(GP && GP.sweep); },
+  scr: (x, y) => crScr(x, y), unscr: (sx, sy) => crUnscr(sx, sy), houseScr: (x, y) => crHouseScr(x, y), houseUn: (sx, sy) => crHouseUn(sx, sy), get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
+  get live() { const X = GP && GP.X; return X ? { s: X.s, t: X.Q.t, stone: { x: X.Q.T.x, y: X.Q.T.y, vx: X.Q.T.vx, vy: X.Q.T.vy }, sw: X.Q.sw, plan: X.plan } : null; },
+  set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
+  show: () => crShow(), hide: () => crHide(), get on() { return CRP.on; }, render: dt => crRender(dt || 0),
+  pause: on => { CRP.paused = !!on; }, get paused() { return CRP.paused; }, get speed() { return CRP.speed; }, set speed(n) { CRP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };

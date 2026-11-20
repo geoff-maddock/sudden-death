@@ -7,3 +7,5 @@ src/cr/parts/04-stone.js
 src/cr/parts/05-aim.js
 src/cr/parts/06-cpu.js
 src/cr/parts/07-game.js
+src/cr/parts/08-play.js
+src/cr/parts/09-draw.js

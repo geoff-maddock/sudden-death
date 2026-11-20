@@ -1,3 +1,4 @@
 # The Realm's shed scope: ./build.sh src/realm/manifest.txt takes this through `scope wCR ...`.
-# The engine's parts first (they don't touch the page); its page in the Realm comes with phase 2, as the lanes' did.
+# The engine's parts first (they don't touch the page), then its page in the Realm: a canvas in #v-shed (phase 2).
 include src/cr/manifest.txt
+src/realm/shed/n1-page.js

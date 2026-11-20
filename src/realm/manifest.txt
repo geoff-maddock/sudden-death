@@ -162,4 +162,5 @@ src/realm/w118-laneskit.js
 src/realm/w119-lanesstars.js
 src/realm/w120-lanescup.js
 src/realm/w121-lanesfeel.js
+src/realm/w122-shed.js
 src/realm/w112-quickstart.js
