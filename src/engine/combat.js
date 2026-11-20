@@ -211,12 +211,11 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': e.block += op[1]; fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); fire('enemyBlock', { e, n: op[1] }); break;
-      case 'ba': for (const o of alive()) { o.block += op[1]; fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); fire('enemyBlock', { e: o, n: op[1] }); } break;
+      case 'b': fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); blockE(e, op[1]); break;
+      case 'ba': for (const o of alive()) { fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); blockE(o, op[1]); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
-      // (a debuff on its way to you: a pet may stop it)
-      case 'p': if (ST[op[1]] && ST[op[1]].d && op[2] > 0 && fire('playerDebuff', { k: op[1], n: op[2] })) break; addSt(B.P, op[1], op[2]); fx({ k: 'pst', st: op[1], n: op[2] }); break;
+      case 'p': if (debuffP(op[1], op[2])) fx({ k: 'pst', st: op[1], n: op[2] }); break;
       case 'add': for (let i = 0; i < op[2]; i++) { const c = mkCard(op[1]); if (op[3] === 'draw') B.draw.splice((R() * (B.draw.length + 1)) | 0, 0, c); else B.discard.push(c); } fx({ k: 'addcard', id: op[1], n: op[2] }); log(`${op[2]} × ${CARDS[op[1]].n} shuffled into your ${op[3] === 'draw' ? 'draw pile' : 'discard pile'}.`, 'bad'); break;
       case 'heal': e.hp = Math.min(e.max, e.hp + op[1]); break;
       case 'steal': { const t = Math.min(RUN.gold, op[1]); RUN.gold -= t; e.stolen += t; if (t) { fx({ k: 'num', p: 1, t: `−${t} gold`, col: '#ffd166' }); log(`${e.n} lifts ${t} gold.`, 'bad'); } break; }
@@ -227,6 +226,10 @@ function doMove(e) {
     }
   }
 }
+// a status on you from the other side: a debuff fires playerDebuff first, and a pet may stop it (false: it was stopped)
+function debuffP(k, n) { if (ST[k] && ST[k].d && n > 0 && fire('playerDebuff', { k, n })) return false; addSt(B.P, k, n); return true; }
+// an enemy gains Block (from a move, a phase, its turn or a rule): enemyBlock, for a pet that reads it
+function blockE(e, n) { e.block += n; if (n > 0) fire('enemyBlock', { e, n }); }
 function hurtPlayer(dmg, e, o = {}) {
   const P = B.P;
   // (an enemy's hit on its way: a pet may step in before the Block is counted)

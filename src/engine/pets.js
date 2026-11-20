@@ -10,7 +10,8 @@
    the hooks (onHook: one dispatcher an event), and mod: { name: fn(arg, pet) } sums (petMod, added to mod()). Its damage
    goes into atkDmg's breakdown under the pet's own name (petAtk). The moments a pet reads that the engine had no event
    for are fired in combat.js: playerAttacked (an enemy's hit on its way, with the enemy), playerHit ({ e, taken }),
-   enemyBlock ({ e, n }) and playerDebuff ({ k, n }: a truthy return stops the debuff).
+   enemyBlock ({ e, n }: every enemy Block, through blockE) and playerDebuff ({ k, n }: every debuff on you, through
+   debuffP; a truthy return stops it). An ally a boss eats isn't a kill of yours (enemyFalls skips it: e.eaten).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
 const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15 };
@@ -21,9 +22,9 @@ const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) ||
 function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
-  const R = RUN && RUN.pet; B.pet = null;
-  if (!R || !PETS[R.kind]) return;
-  B.pet = { kind: R.kind, name: R.name || PETS[R.kind].n, bond: clamp(R.bond || 1, 1, 3), hungry: !!R.hungry, used: false, spooked: false, t: {}, f: {} };
+  const rp = RUN && RUN.pet; B.pet = null;
+  if (!rp || !PETS[rp.kind]) return;
+  B.pet = { kind: rp.kind, name: rp.name || PETS[rp.kind].n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, used: false, spooked: false, t: {}, f: {} };
 }
 // a pet's effect said: on screen and in the log
 function petSay(t) { fx({ k: 'pet', t: `${petName()}: ${t}` }); log(`${petName()}: ${t}`, 'good'); }
@@ -36,6 +37,8 @@ const petH = h => typeof h === 'function' ? { when: () => true, then: h } : h;
 function petOn(ev, a) {
   if (!B || !B.pet || B.over === 'lose') return;
   const p = B.pet, D = petDef(p); if (!D) return;
+  // (an ally a boss eats isn't a kill of yours)
+  if (ev === 'enemyFalls' && a && a.eaten) return;
   if (ev === 'turnStart') p.t = {};
   let r;
   const T = D.trait && D.trait.on && D.trait.on[ev]; if (T) { const h = petH(T); if (h.when(a, p)) { const v = h.then(a, p); if (v) r = v; } }
@@ -72,7 +75,7 @@ function petAtk(card, e) {
 function petSpook(taken) { if (B && B.pet && !B.pet.spooked && taken >= PET.spook) { B.pet.spooked = true; petSay('spooked by that hit: its next power won\'t fire.'); } }
 // why the trick can't be used now ('' if it can)
 function petTrickWhy() {
-  if (!B || !B.pet) return 'No pet.';
+  if (!B || !B.pet || !petDef(B.pet)) return 'No pet.';
   if (B.over || B.phase !== 'player') return 'Only on your turn.';
   if (B.pet.used) return 'Once a fight.';
   return '';
@@ -80,7 +83,7 @@ function petTrickWhy() {
 // the trick, once a fight: ti the target (an enemy's index), or the first standing
 function petTrick(ti) {
   if (petTrickWhy()) return false;
-  const p = B.pet, D = petDef(p), K = D.trick, tgt = ti != null && B.enemies[ti] && !B.enemies[ti].dead ? B.enemies[ti] : alive()[0];
+  const p = B.pet, D = petDef(p), K = D.trick, tgt = ti != null && B.enemies[ti] && !B.enemies[ti].dead && !B.enemies[ti].fled ? B.enemies[ti] : alive()[0];
   p.used = true;
   petSay(`${K.n}!`);
   resolve(K.ops(p), { card: null, tgt, d: { tgt: K.tgt || 'one', n: K.n, type: 'pet' } });

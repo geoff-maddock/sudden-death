@@ -84,6 +84,23 @@ async def main():
         check(b['trick'][:3] == [True, True, False] and b['trick'][3] != '', 'the trick works once a fight', b['trick'])
         check(b['why'] and 'Hootling' in b['why'], 'a pet\'s damage shows in the breakdown under its own name (Hootling below half HP)', b['why'])
 
+        # ---------- round 1: the moments the review found ----------
+        r1 = await pg.evaluate("""(() => { const out = {};
+          __fight({ kind: 'jellycube', bond: 1 }); const e = alive()[0]; hurtPlayer(3, e); addSt(e, 'weak', -1); out.weakLeft = sv(e, 'weak');
+          out.jellyAll = (() => { __fight({ kind: 'jellycube', bond: 1 }); return [debuffP('soaked', 1), debuffP('weak', 1)]; })();
+          __fight({ kind: 'rustnibbler', bond: 1 }); const k = alive()[0]; blockE(k, 12); out.rustAll = k.block;
+          __fight({ kind: 'axebeak', bond: 1 }, ['skelss', 'thief']); const [a1, a2] = alive(); B.lastTgt = a1.uid; const h1 = a1.hp, h2 = a2.hp; fire('attackPlayed', B.hand[0]); out.peck = [a1.hp === h1, a2.hp < h2];
+          __fight({ kind: 'axebeak', bond: 1 }); const atk = { uid: 999, id: Object.keys(CARDS).find(id => CARDS[id].type === 'atk'), up: false }; B.inCard = true; const x1 = atkDmg(5, alive()[0], atk), x2 = atkDmg(5, alive()[0], atk); B.inCard = false; out.firstHit = x1 - x2;
+          __fight({ kind: 'cockatrice', bond: 1 }); B.lastTgt = 'gone'; const before = alive().map(e => sv(e, 'vuln')); fire('attackPlayed', B.hand[0]); out.noFallback = JSON.stringify(alive().map(e => sv(e, 'vuln'))) === JSON.stringify(before);
+          __fight({ kind: 'bogfrog', bond: 2 }); B.phase = 'enemy'; fire('enemyFalls', alive()[0]); out.drawnext = sv(B.P, 'drawnext'); B.phase = 'player';
+          __fight({ kind: 'chestnut', bond: 2 }); const g0 = RUN.gold; fire('enemyFalls', { eaten: 1 }); out.eaten = RUN.gold - g0;
+          __fight({ kind: 'axebeak', bond: 1 }); B.pet.kind = 'nosuch'; out.badKind = [petTrickWhy(), petTrick()];
+          return out; })()""")
+        check(r1['weakLeft'] >= 1, 'Jellycube: the attacker\'s Weak lasts past the end of its own turn, to its next attack', r1)
+        check(r1['jellyAll'] == [False, True] and r1['rustAll'] == 0, 'every debuff on you (a boss\'s Soaked) and every enemy Block (a phase\'s) reaches the pet', r1)
+        check(r1['peck'] == [True, True] and r1['firstHit'] == 3, 'Axebeak: the peck lands on another enemy; its +3 is on the first hit only', r1)
+        check(r1['noFallback'] and r1['drawnext'] == 1 and r1['eaten'] == 0, 'Cockatrice exposes only the enemy you hit; Bog Frog\'s draw waits for your turn; an ally a boss eats pays nothing', r1)
+        check(r1['badKind'][0] != '' and r1['badKind'][1] is False, 'a pet whose kind is gone has no trick (no error)', r1)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

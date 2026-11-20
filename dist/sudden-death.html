@@ -1891,7 +1891,7 @@ ENEMIES.argus.brain = e => {
   if (RUN.hp <= RUN.maxhp * .25) return 'ray';                                          // smells blood
   return null;
 };
-ENEMIES.argus.phases = [{ at: .5, n: 'Video Review', sub: 'Every eye opens. Three rays now.', fn: e => { addSt(e, 'str', 1); e.block += 10; } }];
+ENEMIES.argus.phases = [{ at: .5, n: 'Video Review', sub: 'Every eye opens. Three rays now.', fn: e => { addSt(e, 'str', 1); blockE(e, 10); } }];
 ENEMIES.argus.flav = 'He has never missed a call. He has never made a correct one. Wipes out a turtle’s Block, and goes for the kill when you are low.';
 
 Object.assign(ENEMIES.cube.moves, {
@@ -1913,7 +1913,7 @@ ENEMIES.cubelet.boss = 0;
 ENEMIES.baron.moves.check = { n: 'Hellfire Check', ops: e => [['a', 22, 1, B.P.block >= 20 ? 'pierce' : null]], vfx: 'shock' };
 ENEMIES.baron.moves.dunk.vfx = 'shock'; ENEMIES.baron.moves.dunk.far = 1;
 ENEMIES.baron.moves.pitch.vfx = 'orb'; ENEMIES.baron.moves.bean.vfx = 'orb'; ENEMIES.baron.moves.blitz.far = 1;
-ENEMIES.baron.phases = [{ at: .25, n: 'Two-Minute Warning', sub: 'The Commissioner stops pretending to be fair.', fn: e => { addSt(e, 'str', 4); e.st.enraged = 1; e.block += 20; } }];
+ENEMIES.baron.phases = [{ at: .25, n: 'Two-Minute Warning', sub: 'The Commissioner stops pretending to be fair.', fn: e => { addSt(e, 'str', 4); e.st.enraged = 1; blockE(e, 20); } }];
 ENEMIES.baron.aura = 'embers';
 ENEMIES.baron.flav = 'Owns the league, the pit, the refs and the concession stand. Changes sport every quarter, checks through a wall of Block, and loses his temper at the two-minute warning.';
 
@@ -1931,7 +1931,7 @@ ENEMIES.groundskeeper.brain = e => {
   if (B.lt && B.lt.blk >= 14 && last !== 'rain') return 'rain';                   // you blocked a lot: wash out your next hand
   return null;
 };
-ENEMIES.groundskeeper.phases = [{ at: .5, n: 'Flood the Field', sub: 'The infield turns to swamp. Things crawl out.', fn: e => { for (let i = 0; i < 1; i++) if (alive().length < 4) { const o = spawn('ooze', i ? undefined : 0); fx({ k: 'spawn', e: o.uid }); } addSt(B.P, 'soaked', 1); } }];
+ENEMIES.groundskeeper.phases = [{ at: .5, n: 'Flood the Field', sub: 'The infield turns to swamp. Things crawl out.', fn: e => { for (let i = 0; i < 1; i++) if (alive().length < 4) { const o = spawn('ooze', i ? undefined : 0); fx({ k: 'spawn', e: o.uid }); } debuffP('soaked', 1); } }];
 
 cloneKind('kqueen', 'kobold', { skin: '#d8743a', h: 1.02, w: 1.1, eye: '#fff07a' });
 EN('kqueen', 'Queen Pompadour, Captain of Cheer', 'kqueen', [106, 106], {
@@ -1948,7 +1948,7 @@ ENEMIES.kqueen.brain = e => {
   if (e.hp < e.max * .5 && last !== 'snack') return 'snack';                    // hurt: eat a cheerleader
   return null;
 };
-ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { e.block += 3 * n; fx({ k: 'num', e: e.uid, t: `+${3 * n}`, col: '#9fd2ff' }); } };
+ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { blockE(e, 3 * n); fx({ k: 'num', e: e.uid, t: `+${3 * n}`, col: '#9fd2ff' }); } };
 ENEMIES.kqueen.phases = [{ at: .4, n: 'Halftime Show', sub: 'Pyrotechnics. Lots of them.', fn: e => { addSt(e, 'str', 3); e.st.enraged = 1; } }];
 
 /* ----- Act 2: the Rimegrave Arena ----- */
@@ -1965,7 +1965,7 @@ ENEMIES.zamboni.brain = e => {
   if ((B.P.block >= 12 || sv(e, 'weak') + sv(e, 'vuln') + sv(e, 'psn') >= 4) && last !== 'resurface') return 'resurface';
   return null;
 };
-ENEMIES.zamboni.phases = [{ at: .5, n: 'Overtime Ice', sub: 'The ice gets faster. So does he.', fn: e => { addSt(e, 'str', 2); e.block += 15; } }];
+ENEMIES.zamboni.phases = [{ at: .5, n: 'Overtime Ice', sub: 'The ice gets faster. So does he.', fn: e => { addSt(e, 'str', 2); blockE(e, 15); } }];
 
 cloneKind('banshee', 'wraith', { skin: '#d8e4f0', eye: '#7ff0ff', robe: '#4a5a7a' });
 EN('banshee', 'Mordant, the Banshee Coach', 'banshee', [175, 175], {
@@ -2016,7 +2016,7 @@ ENEMIES.mirror.brain = e => {
   if (sv(B.P, 'str') > sv(e, 'str') && last !== 'copy') return 'copy';             // you got stronger: so does it
   return null;
 };
-ENEMIES.mirror.phases = [{ at: .5, n: 'Through the Looking Glass', sub: 'It stops copying you and starts being you.', fn: e => { e.st.str = Math.max(sv(e, 'str'), sv(B.P, 'str')) + 3; e.block += 25; } }];
+ENEMIES.mirror.phases = [{ at: .5, n: 'Through the Looking Glass', sub: 'It stops copying you and starts being you.', fn: e => { e.st.str = Math.max(sv(e, 'str'), sv(B.P, 'str')) + 3; blockE(e, 25); } }];
 /* p3c: the sports front office. Sport glyphs, the published schedule, and the Practice track. */
 // tiny glyphs for each sport (24×24 viewBox), used on the map, cards and panels
 const SPORT_GLYPH = {
@@ -2347,12 +2347,11 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': e.block += op[1]; fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); fire('enemyBlock', { e, n: op[1] }); break;
-      case 'ba': for (const o of alive()) { o.block += op[1]; fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); fire('enemyBlock', { e: o, n: op[1] }); } break;
+      case 'b': fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); blockE(e, op[1]); break;
+      case 'ba': for (const o of alive()) { fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); blockE(o, op[1]); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
-      // (a debuff on its way to you: a pet may stop it)
-      case 'p': if (ST[op[1]] && ST[op[1]].d && op[2] > 0 && fire('playerDebuff', { k: op[1], n: op[2] })) break; addSt(B.P, op[1], op[2]); fx({ k: 'pst', st: op[1], n: op[2] }); break;
+      case 'p': if (debuffP(op[1], op[2])) fx({ k: 'pst', st: op[1], n: op[2] }); break;
       case 'add': for (let i = 0; i < op[2]; i++) { const c = mkCard(op[1]); if (op[3] === 'draw') B.draw.splice((R() * (B.draw.length + 1)) | 0, 0, c); else B.discard.push(c); } fx({ k: 'addcard', id: op[1], n: op[2] }); log(`${op[2]} × ${CARDS[op[1]].n} shuffled into your ${op[3] === 'draw' ? 'draw pile' : 'discard pile'}.`, 'bad'); break;
       case 'heal': e.hp = Math.min(e.max, e.hp + op[1]); break;
       case 'steal': { const t = Math.min(RUN.gold, op[1]); RUN.gold -= t; e.stolen += t; if (t) { fx({ k: 'num', p: 1, t: `−${t} gold`, col: '#ffd166' }); log(`${e.n} lifts ${t} gold.`, 'bad'); } break; }
@@ -2363,6 +2362,10 @@ function doMove(e) {
     }
   }
 }
+// a status on you from the other side: a debuff fires playerDebuff first, and a pet may stop it (false: it was stopped)
+function debuffP(k, n) { if (ST[k] && ST[k].d && n > 0 && fire('playerDebuff', { k, n })) return false; addSt(B.P, k, n); return true; }
+// an enemy gains Block (from a move, a phase, its turn or a rule): enemyBlock, for a pet that reads it
+function blockE(e, n) { e.block += n; if (n > 0) fire('enemyBlock', { e, n }); }
 function hurtPlayer(dmg, e, o = {}) {
   const P = B.P;
   // (an enemy's hit on its way: a pet may step in before the Block is counted)
@@ -2753,7 +2756,7 @@ function sportCardEnd(card, d, tgt) {
         delete B.P.st.pulled; B.sc.goals++; scoreUs(1, 'goal');
         fx({ k: 'banner', t: 'Goal', sub: pp ? 'Power-play goal: draw a card' : 'Draw a card', small: 1 }); log('GOAL! Draw a card.', 'good'); drawCards(1);
         if (B.sc.goals >= 3) addHL('hattrick');
-      } else { const g = t && !t.dead ? t : alive()[0]; if (g) { g.block += 2; fx({ k: 'save', e: g.uid }); } fx({ k: 'say2', t: 'Saved (+2 Block)' }); }
+      } else { const g = t && !t.dead ? t : alive()[0]; if (g) { blockE(g, 2); fx({ k: 'save', e: g.uid }); } fx({ k: 'say2', t: 'Saved (+2 Block)' }); }
       break;
     }
     case 'basketball': {
@@ -2833,7 +2836,7 @@ function sportTurnStart() {
   if (B.sport === 'boxing' && B.turn > 1) {
     const [u, t] = B.sc.rd; fx({ k: 'bell', win: u > t }); if (u > t) { B.sc.rounds[0]++; scoreUs(0); } else if (t > u) { B.sc.rounds[1]++; scoreThem(0); }
     if (u - t >= 15) { for (const e of alive()) addSt(e, 'weak', 1); fx({ k: 'banner', t: 'They’re rocked', sub: 'You took the round by 15+: every enemy is Weak', small: 1 }); }
-    else if (t - u >= 15) { addSt(B.P, 'weak', 1); fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
+    else if (t - u >= 15) { debuffP('weak', 1); fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
     B.sc.rd = [0, 0];
   }
 }
@@ -2933,7 +2936,7 @@ function bossOp(e, op) {
     case 'dispel': { const pool = ['ritual', 'plate', 'barricade', 'haunt', 'kindle', 'nightgame', 'trollblood', 'spin', 'tempest', 'necro', 'basilisk', 'coldsnap', 'pads', 'helmet', 'shoulder', 'luckybat', 'sweat', 'ward', 'thorns'].filter(k => sv(P, k) > 0); const gone = shuffle(pool).slice(0, op[1]); for (const k of gone) delete P.st[k]; if (gone.length) { log(`Unmade: ${gone.map(k => ST[k].n).join(', ')}.`, 'bad'); fx({ k: 'num', p: 1, t: `Unmade: ${gone.map(k => ST[k].n).join(', ')}`, col: '#b494ff' }); } break; }
     case 'charge': addSt(e, 'charge', 1); break;
     case 'land': delete e.st.air; delete e.st.charge; break;
-    case 'sacrifice': { const v = alive().filter(o => o !== e); if (!v.length) break; const o = pick(v); hurtEnemy(o, o.hp + o.block, { raw: true, noScore: 1 }); e.hp = Math.min(e.max, e.hp + op[1]); addSt(e, 'str', op[2]); fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#6fe08a' }); log(`${e.n} eats ${o.n}. Heals ${op[1]}, gains ${op[2]} Strength.`, 'foe'); break; }
+    case 'sacrifice': { const v = alive().filter(o => o !== e); if (!v.length) break; const o = pick(v); o.eaten = 1; hurtEnemy(o, o.hp + o.block, { raw: true, noScore: 1 }); e.hp = Math.min(e.max, e.hp + op[1]); addSt(e, 'str', op[2]); fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#6fe08a' }); log(`${e.n} eats ${o.n}. Heals ${op[1]}, gains ${op[2]} Strength.`, 'foe'); break; }
     case 'stealbest': { const pile = B.draw.length ? B.draw : B.discard; if (!pile.length) break; let j = 0; pile.forEach((c, k) => { if (cardValue(c) > cardValue(pile[j])) j = k; }); const c = pile.splice(j, 1)[0]; (e.pocket = e.pocket || []).push(c); fx({ k: 'say', e: e.uid, t: `Stole ${def(c).n}` }); log(`${e.n} steals ${def(c).n} from your deck. Beat it to get it back.`, 'bad'); break; }
     case 'mirrorstr': { const n = Math.max(0, sv(P, 'str')); if (n > sv(e, 'str')) e.st.str = n; fx({ k: 'say', e: e.uid, t: `Copies your Strength (${n})` }); break; }
   }
@@ -3081,7 +3084,8 @@ onHook('fightStart', skyCombatStart);
    the hooks (onHook: one dispatcher an event), and mod: { name: fn(arg, pet) } sums (petMod, added to mod()). Its damage
    goes into atkDmg's breakdown under the pet's own name (petAtk). The moments a pet reads that the engine had no event
    for are fired in combat.js: playerAttacked (an enemy's hit on its way, with the enemy), playerHit ({ e, taken }),
-   enemyBlock ({ e, n }) and playerDebuff ({ k, n }: a truthy return stops the debuff).
+   enemyBlock ({ e, n }: every enemy Block, through blockE) and playerDebuff ({ k, n }: every debuff on you, through
+   debuffP; a truthy return stops it). An ally a boss eats isn't a kill of yours (enemyFalls skips it: e.eaten).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
 const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15 };
@@ -3092,9 +3096,9 @@ const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) ||
 function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
-  const R = RUN && RUN.pet; B.pet = null;
-  if (!R || !PETS[R.kind]) return;
-  B.pet = { kind: R.kind, name: R.name || PETS[R.kind].n, bond: clamp(R.bond || 1, 1, 3), hungry: !!R.hungry, used: false, spooked: false, t: {}, f: {} };
+  const rp = RUN && RUN.pet; B.pet = null;
+  if (!rp || !PETS[rp.kind]) return;
+  B.pet = { kind: rp.kind, name: rp.name || PETS[rp.kind].n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, used: false, spooked: false, t: {}, f: {} };
 }
 // a pet's effect said: on screen and in the log
 function petSay(t) { fx({ k: 'pet', t: `${petName()}: ${t}` }); log(`${petName()}: ${t}`, 'good'); }
@@ -3107,6 +3111,8 @@ const petH = h => typeof h === 'function' ? { when: () => true, then: h } : h;
 function petOn(ev, a) {
   if (!B || !B.pet || B.over === 'lose') return;
   const p = B.pet, D = petDef(p); if (!D) return;
+  // (an ally a boss eats isn't a kill of yours)
+  if (ev === 'enemyFalls' && a && a.eaten) return;
   if (ev === 'turnStart') p.t = {};
   let r;
   const T = D.trait && D.trait.on && D.trait.on[ev]; if (T) { const h = petH(T); if (h.when(a, p)) { const v = h.then(a, p); if (v) r = v; } }
@@ -3143,7 +3149,7 @@ function petAtk(card, e) {
 function petSpook(taken) { if (B && B.pet && !B.pet.spooked && taken >= PET.spook) { B.pet.spooked = true; petSay('spooked by that hit: its next power won\'t fire.'); } }
 // why the trick can't be used now ('' if it can)
 function petTrickWhy() {
-  if (!B || !B.pet) return 'No pet.';
+  if (!B || !B.pet || !petDef(B.pet)) return 'No pet.';
   if (B.over || B.phase !== 'player') return 'Only on your turn.';
   if (B.pet.used) return 'Once a fight.';
   return '';
@@ -3151,7 +3157,7 @@ function petTrickWhy() {
 // the trick, once a fight: ti the target (an enemy's index), or the first standing
 function petTrick(ti) {
   if (petTrickWhy()) return false;
-  const p = B.pet, D = petDef(p), K = D.trick, tgt = ti != null && B.enemies[ti] && !B.enemies[ti].dead ? B.enemies[ti] : alive()[0];
+  const p = B.pet, D = petDef(p), K = D.trick, tgt = ti != null && B.enemies[ti] && !B.enemies[ti].dead && !B.enemies[ti].fled ? B.enemies[ti] : alive()[0];
   p.used = true;
   petSay(`${K.n}!`);
   resolve(K.ops(p), { card: null, tgt, d: { tgt: K.tgt || 'one', n: K.n, type: 'pet' } });
@@ -3172,9 +3178,7 @@ function petText(kind, b, hungry) {
    engine/pets.js), mod: { name: fn(arg, pet) }, atk: fn(card, enemy, pet) (more damage on a hit).
    Words: a pet is of a kind, never a species. */
 const pv = (n, p) => petPow(n, p);
-const firstEach = (p, k) => { if (p.t[k]) return false; p.t[k] = 1; return true; };
-const onceFight = (p, k) => { if (p.f[k]) return false; p.f[k] = 1; return true; };
-const below = f => RUN.hp < RUN.maxhp * f;
+const petBelow = f => RUN.hp < RUN.maxhp * f;
 const PETS = {
   blinkpup: { n: 'Blinkpup', from: 'blink dog', el: 'aether', rar: 'c', how: 'shop',
     trait: { d: p => `Starts each fight with ${pv(1, p)} Footwork.`, on: { fightStart: (a, p) => addSt(B.P, 'dex', pv(1, p)) } },
@@ -3186,14 +3190,15 @@ const PETS = {
   pseudodragon: { n: 'Pocket Pseudodragon', from: 'pseudodragon', el: 'aether', rar: 'u', how: 'egg',
     trait: { d: p => `Starts each fight with ${pv(1, p)} Regen.`, on: { fightStart: (a, p) => addSt(B.P, 'regen', pv(1, p)) } },
     powers: [
-      { at: 1, d: p => `Once a fight, at the start of a turn below half HP: ${pv(3, p)} Regen.`, on: { turnStart: { when: (a, p) => below(.5) && !p.f.warm, then: (a, p) => { p.f.warm = 1; addSt(B.P, 'regen', pv(3, p)); petSay(`curls round you, warm: ${pv(3, p)} Regen.`); } } } },
+      { at: 1, d: p => `Once a fight, at the start of a turn below half HP: ${pv(3, p)} Regen.`, on: { turnStart: { when: (a, p) => petBelow(.5) && !p.f.warm, then: (a, p) => { p.f.warm = 1; addSt(B.P, 'regen', pv(3, p)); petSay(`curls round you, warm: ${pv(3, p)} Regen.`); } } } },
       { at: 2, d: p => `When an enemy falls: heal ${pv(2, p)}.`, on: { enemyFalls: (e, p) => healP(pv(2, p)) } },
     ],
     trick: { n: 'Sting', d: p => `${pv(6, p)} damage and Weak ${pv(2, p)} to one enemy.`, ops: p => [['d', pv(6, p)], ['s', 'weak', pv(2, p)]] } },
   axebeak: { n: 'Axebeak Chick', from: 'axe beak', el: 'aether', rar: 'c', how: 'shop',
-    trait: { d: p => `Your first attack each fight deals ${pv(3, p)} more.`, atk: (card, e, p) => !p.f.peck1 && card && def(card).type === 'atk' ? pv(3, p) : 0, on: { attackPlayed: (c, p) => { p.f.peck1 = 1; } } },
+    // (its first hit only: the flag is set by a hit that counts, in a card, not by a preview or the bot's guess)
+    trait: { d: p => `Your first attack each fight deals ${pv(3, p)} more (its first hit).`, atk: (card, e, p) => { if (p.f.peck1 || !card || def(card).type !== 'atk') return 0; if (B.inCard && !WHY) p.f.peck1 = 1; return pv(3, p); } },
     powers: [
-      { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, then: (c, p) => { p.t.peck = 1; const t = pick(alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
+      { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, then: (c, p) => { p.t.peck = 1; const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
       { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
     ],
     trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },
@@ -3201,7 +3206,7 @@ const PETS = {
     trait: { d: p => `Starts each fight with ${pv(1, p)} Strength.`, on: { fightStart: (a, p) => addSt(B.P, 'str', pv(1, p)) } },
     powers: [
       { at: 1, d: p => `Your third attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: () => B.atkCount === 3, then: (c, p) => { addSt(B.P, 'str', pv(1, p)); petSay(`hoots: +${pv(1, p)} Strength.`); } } } },
-      { at: 2, d: p => `Below half HP, your attacks deal ${pv(2, p)} more.`, atk: (card, e, p) => card && def(card).type === 'atk' && below(.5) ? pv(2, p) : 0 },
+      { at: 2, d: p => `Below half HP, your attacks deal ${pv(2, p)} more.`, atk: (card, e, p) => card && def(card).type === 'atk' && petBelow(.5) ? pv(2, p) : 0 },
     ],
     trick: { n: 'Bear Hug', d: p => `${pv(14, p)} damage to one enemy. It hugs too hard.`, ops: p => [['d', pv(14, p)]] } },
   sprite: { n: 'Sprite in a Jar', from: 'sprite', el: 'bloom', rar: 'u', how: 'egg',
@@ -3215,7 +3220,7 @@ const PETS = {
     trait: { d: p => `Starts each fight with ${pv(5, p)} Block.`, on: { fightStart: (a, p) => { B.P.block += pv(5, p); } } },
     powers: [
       { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0, then: (a, p) => { p.t.tongue = 1; const n = Math.min(a.e.block, pv(3, p)); a.e.block -= n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
-      { at: 2, d: 'When an enemy falls: draw 1.', on: { enemyFalls: () => { if (B.phase === 'player') drawCards(1); } } },
+      { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn).', on: { enemyFalls: () => { if (B.phase === 'player') drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
     ],
     trick: { n: 'Gulp', d: p => `Swallows an enemy (not a boss) with ${pv(12, p)} HP or less; any other takes 16 damage.`, ops: p => [['devour', pv(12, p), 0]] } },
   chestnut: { n: 'Chestnut', from: 'mimic', el: 'tide', rar: 'u', how: 'shop',
@@ -3228,7 +3233,8 @@ const PETS = {
   jellycube: { n: 'Jellycube', from: 'gelatinous cube', el: 'tide', rar: 'u', how: 'shop',
     trait: { d: 'The first debuff on you each fight sticks to it instead.', on: { playerDebuff: { when: (a, p) => !p.f.sticky, then: (a, p) => { p.f.sticky = 1; petSay(`swallows the ${(ST[a.k] || {}).n || a.k}.`); return true; } } } },
     powers: [
-      { at: 1, d: p => `The first enemy to attack you each turn: Weak ${pv(1, p)}.`, on: { playerAttacked: { when: (e, p) => !p.t.wob && e && !e.dead, then: (e, p) => { p.t.wob = 1; addSt(e, 'weak', pv(1, p)); petSay(`wobbles at ${e.n}: Weak ${pv(1, p)}.`); } } } },
+      // (one more than it says: Weak goes down at the end of the attacker's own turn, so the said amount reaches its next attack)
+      { at: 1, d: p => `The first enemy to attack you each turn: Weak ${pv(1, p)} (for its next attack).`, on: { playerAttacked: { when: (e, p) => !p.t.wob && e && !e.dead, then: (e, p) => { p.t.wob = 1; addSt(e, 'weak', pv(1, p) + 1); petSay(`wobbles at ${e.n}: Weak ${pv(1, p)}.`); } } } },
       { at: 2, d: p => `End your turn with no cards in hand: ${pv(4, p)} Block.`, on: { turnEnd: { when: () => !B.hand.length, then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
     trick: { n: 'Engulf', d: p => `Weak ${pv(2, p)} and Exposed ${pv(2, p)} to one enemy.`, ops: p => [['s', 'weak', pv(2, p)], ['s', 'vuln', pv(2, p)]] } },
@@ -3264,7 +3270,7 @@ const PETS = {
     trait: { d: p => `At the start of each fight, the enemy with the most HP is Weak ${pv(1, p)}.`, on: { fightStart: (a, p) => { const t = alive().slice().sort((x, y) => y.hp - x.hp)[0]; if (t) addSt(t, 'weak', pv(1, p)); } } },
     powers: [
       { at: 1, d: 'Every third turn, its breath Stuns a random enemy (a boss is Weak 2 instead).', on: { turnStart: { when: () => B.turn % 3 === 0 && alive().length > 0, then: () => { const t = pick(alive()); resolve([['s', 'stun', 1]], { card: null, tgt: t, d: { tgt: 'one', n: 'Snow Breath', type: 'pet' } }); petSay(`breathes snow on ${t.n}.`); } } } },
-      { at: 2, d: p => `Below half HP, each turn: ${pv(4, p)} Block.`, on: { turnStart: { when: () => below(.5), then: (a, p) => { gainBlock(pv(4, p), true); } } } },
+      { at: 2, d: p => `Below half HP, each turn: ${pv(4, p)} Block.`, on: { turnStart: { when: () => petBelow(.5), then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
     trick: { n: 'Snow Breath', d: 'Stuns one enemy (a boss is Weak 2 instead).', ops: () => [['s', 'stun', 1]] } },
   mephitling: { n: 'Mephitling', from: 'ice mephit', el: 'rime', rar: 'c', how: 'egg',
@@ -3277,7 +3283,7 @@ const PETS = {
   cockatrice: { n: 'Cockatrice Chick', from: 'cockatrice', el: 'rime', rar: 'r', how: 'egg',
     trait: { d: p => `At the start of each fight, a random enemy is Weak ${pv(2, p)}.`, on: { fightStart: (a, p) => { const t = pick(alive()); if (t) addSt(t, 'weak', pv(2, p)); } } },
     powers: [
-      { at: 1, d: p => `Your first attack each turn leaves its target Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare, then: (c, p) => { p.t.stare = 1; const t = alive().find(e => e.uid === B.lastTgt) || alive()[0]; if (t) addSt(t, 'vuln', pv(1, p)); } } } },
+      { at: 1, d: p => `Your first attack each turn leaves its target Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare, then: (c, p) => { p.t.stare = 1; const t = alive().find(e => e.uid === B.lastTgt); if (t) addSt(t, 'vuln', pv(1, p)); } } } },
       { at: 2, d: 'Once a fight, at the end of your turn, an enemy (not a boss) at a quarter of its HP or less turns to stone.', on: { turnEnd: { when: (a, p) => !p.f.stone && alive().some(e => !isBoss(e) && e.hp <= e.max * .25), then: (a, p) => { p.f.stone = 1; const t = alive().find(e => !isBoss(e) && e.hp <= e.max * .25); petSay(`stares ${t.n} to stone.`); hurtEnemy(t, t.hp + t.block, { raw: true, src: 'Stare' }); } } } },
     ],
     trick: { n: 'Petrifying Glare', d: 'An enemy (not a boss) at 30% of its HP or less turns to stone; any other takes 18 damage.', ops: () => [['petrify', .3]] } },
