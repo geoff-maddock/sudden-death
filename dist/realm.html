@@ -3752,7 +3752,7 @@ function petOn(ev, a) {
     const f = w.on && w.on[ev]; if (!f) continue;
     const h = petH(f); if (!h.when(a, p)) continue;
     // (a once-a-turn power marks itself used (its spend) whether it fires or the spook stops it, so a spook costs it the
-    // turn; a once-a-fight power has no spend here, and waits for its next chance)
+    // turn; a once-a-fight power has no spend here, and waits for its next chance: the spook's cost to it is that delay)
     if (h.spend) h.spend(a, p);
     if (p.spooked) { p.spooked = false; petSay(h.spend ? 'too spooked to help this turn.' : 'too spooked to help this time.'); continue; }
     const v = h.then(a, p); if (v) r = v;
@@ -3781,7 +3781,7 @@ function petAtk(card, e) {
   return n;
 }
 // a hit big enough spooks it
-function petSpook(taken) { if (B && B.pet && !B.pet.spooked && taken >= PET.spook) { B.pet.spooked = true; petSay('spooked by that hit: its next power won\'t fire.'); } }
+function petSpook(taken) { if (B && B.pet && !B.pet.spooked && taken >= PET.spook) { B.pet.spooked = true; petSay('spooked by that hit: it will hold back its next power.'); } }
 // why the trick can't be used now ('' if it can)
 function petTrickWhy() {
   if (!B || !B.pet || !petDef(B.pet)) return 'No pet.';
