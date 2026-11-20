@@ -76,7 +76,7 @@ function crThrowFinish(X) {
   const why = crWhyNot(X.s); if (why) { G.legs = X.legs0; return crRefused(X.s, why); }
   const { s, plan, rel, ri, pos, before, endNo, ham } = X, run = crRunEnd(X.Q);
   // (a gust as the stone settles pushes their stone nearest the button back, before the rules look)
-  const gust = crGust(s, run.stones, X.fx);
+  const gust = run.stop ? crGust(s, run.stones, X.fx) : '';
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   crWear(G.ice, run.path);
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
@@ -89,7 +89,7 @@ function crThrowFinish(X) {
   // the end: a blank, a score (three or more is a big end), or a steal (scored by the side without the hammer)
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
-  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust, ghost: X.Q.T.ghostId || null };
+  const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
   crPowersAfter(s, ev, endNo, ham);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
@@ -112,11 +112,11 @@ const crTurnAt = (p, i) => { if (p[i][2] === 1) return true; const a = p[i - 1],
   const h1 = Math.atan2(b[1] - a[1], b[0] - a[0]), h2 = Math.atan2(c[1] - b[1], c[0] - b[0]); let d = Math.abs(h1 - h2); if (d > Math.PI) d = 2 * Math.PI - d; return d > .35; };
 const crThin = p => { const out = []; let D = null; p.forEach((q, i) => {
   if (!D || i === p.length - 1 || Math.hypot(q[0] - D[0], q[1] - D[1]) >= 59) { out.push([q[0], q[1]]); D = q; } else if (crTurnAt(p, i)) out.push([q[0], q[1], 1]); }); return out; };
-function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
+function crSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, autoPow: !!(GP && GP.autoPow), paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
 function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
   crPlayStart({ mode: sn.mode });
-  if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.paths = (sn.paths || []).slice();
+  if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.autoPow = !!sn.autoPow; GP.paths = (sn.paths || []).slice();
   GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;
   return G;
 }

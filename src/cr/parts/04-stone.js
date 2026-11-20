@@ -50,7 +50,7 @@ function crRunInit(stones, th, opts) {
   const O = opts || {}, a = th.ang * Math.PI / 180, S = stones.map(st => Object.assign({ id: st.id, s: st.s, x: st.x, y: st.y, vx: 0, vy: 0, h: 0, out: false }, st.g ? { g: 1 } : {}));
   // (opts.fx: the thrown stone's powers, 13-powers.js: a curse's drag and stiffness, granite, smoke through a guard)
   const F = O.fx || null, T = { id: th.id, s: th.s, x: th.x0 || 0, y: CR_STONE.y0, vx: th.v * Math.sin(a), vy: th.v * Math.cos(a), h: th.h || 0, out: false, thrown: true };
-  if (F) { if (F.heavy && F.heavy !== 1) T.drag = F.heavy; if (F.stiff && F.stiff !== 1) T.curlK = F.stiff; if (F.granite) T.g = 1; if (F.ghost) T.ghost = 1; }
+  if (F) { if (F.heavy && F.heavy !== 1) T.drag = F.heavy; if (F.stiff && F.stiff !== 1) T.curlK = F.stiff; if (F.granite) T.gRest = 1; if (F.ghost) T.ghost = 1; }
   S.push(T);
   return { O, S, T, dt: O.plan ? CR_STONE.planDt : CR_STONE.dt, maxT: O.maxT || 60, path: [], trace: [], out: [], t: 0, hits: 0, nextTr: 0, sw: 0, done: false };
 }
@@ -105,9 +105,12 @@ function crRunEnd(Q) {
   // the thrown stone must pass the far hog line, unless it hit a stone in play
   if (!T.out && !crPastHog(T) && !Q.hits) { T.out = true; Q.out.push(T.id); }
   // (a smoke stone that came to rest inside the guard it slid through goes on just past it)
-  const gh = T.ghostId && S.find(st => st.id === T.ghostId && !st.out); if (!T.out && gh) { let n = 0; while (Math.hypot(T.x - gh.x, T.y - gh.y) < 2 * CR_SHEET.stoneR && n++ < 40) T.y += 1; }
+  // (clear of every stone, and still on the sheet, or it is out)
+  const gh = T.ghostId && S.find(st => st.id === T.ghostId && !st.out);
+  if (!T.out && gh) { const near = () => S.some(o => o !== T && !o.out && Math.hypot(T.x - o.x, T.y - o.y) < 2 * CR_SHEET.stoneR); let n = 0; while (near() && n++ < 200) T.y += 1; if (near() || !crOnSheet(T)) { T.out = true; Q.out.push(T.id); } }
   if (!O.plan) Q.trace.push([+Q.t.toFixed(2), crRunNow(Q)]);
-  const rest = S.filter(st => !st.out).map(st => Object.assign({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }, st.g ? { g: 1 } : {}));
+  // (a granite stone is heavy only once it is at rest: the thrown one takes it now)
+  const rest = S.filter(st => !st.out).map(st => Object.assign({ id: st.id, s: st.s, x: +st.x.toFixed(2), y: +st.y.toFixed(2) }, st.g || st.gRest ? { g: 1 } : {}));
   Q.done = true;
   return (Q.result = { stones: rest, out: Q.out, path: Q.path, hits: Q.hits, t: +Q.t.toFixed(2), trace: Q.trace, stop: T.out ? null : { x: +T.x.toFixed(2), y: +T.y.toFixed(2) }, last: { x: +T.x.toFixed(2), y: +T.y.toFixed(2) } });
 }

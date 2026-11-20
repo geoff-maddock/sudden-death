@@ -111,7 +111,7 @@ function crPowersStart(o) {
   G.powers = Array.isArray(o.powers) ? o.powers.some(Boolean) : !!o.powers;
   G.powSides = Array.isArray(o.powers) ? o.powers.map(Boolean) : [G.powers, G.powers];
   G.mana = [CR_MANA.start, CR_MANA.start]; G.roar = [0, 0]; G.fx = [null, null]; G.curse = [null, null]; G.mark = null;
-  G.ultUsed = [false, false]; G.sitUsed = [{}, {}]; G.sitOn = [null, null]; G.steadyOn = [false, false]; G.casts = []; G.powStone = [-1, -1];
+  G.ultUsed = [false, false]; G.sitUsed = [{}, {}]; G.sitOn = [null, null]; G.steadyOn = [false, false]; G.casts = []; G.powStone = [-1, -1]; G.powWhich = [null, null];
   G.powOnly = Array.isArray(o.powOnly) ? o.powOnly.map(x => x || null) : null;
 }
 // the shot side s is about to throw: the one a cast is weighed for, the page's call for your stone, the CPU's (or
@@ -160,7 +160,7 @@ function crCast(s, k, ri) {
   const r = ri == null ? crThrower(s) : ri, why = crPowWhy(s, k, r); if (why) return why;
   const name = (G.teams[s].roster[r] || {}).n || 'Someone', rec = (id, n) => G.casts.push({ side: s, k, id, n, ri: r, end: G.end + 1, stone: G.n });
   if (k === 'pow') {
-    const P = crPowNow(s, r); G.mana[s] -= P.cost; G.powStone[s] = G.n;
+    const P = crPowNow(s, r); G.mana[s] -= P.cost; G.powStone[s] = G.n; G.powWhich[s] = P.which;
     if (P.curse) G.curse[1 - s] = Object.assign({}, P.curse, { by: P.n });
     else if (P.now && P.now.drain) { const d = Math.min(G.roar[1 - s], P.now.drain); G.roar[1 - s] -= d; G.roar[s] = Math.min(CR_ROAR.max, G.roar[s] + d); }
     else G.fx[s] = Object.assign({}, P.fx, { n: P.n });
@@ -175,6 +175,10 @@ function crCast(s, k, ri) {
   const S = CR_SIT[k]; G.mana[s] -= S.cost; G.sitUsed[s][k] = true; G.sitOn[s] = { id: k };
   rec(k, S.n); return '';
 }
+// the powers' state, to put back (your captain's casts on a stone you take back to throw yourself)
+const CR_POW_KEYS = ['mana', 'roar', 'fx', 'curse', 'mark', 'ultUsed', 'sitUsed', 'sitOn', 'steadyOn', 'casts', 'powStone', 'powWhich'];
+function crPowSave() { return JSON.parse(JSON.stringify(Object.fromEntries(CR_POW_KEYS.map(k => [k, G[k]])))); }
+function crPowLoad(P) { for (const k of CR_POW_KEYS) G[k] = JSON.parse(JSON.stringify(P[k])); }
 // what side s's next stone has: its power, the end's mark, a curse on it, a situation power, the roar's steadying
 function crFxFor(s) {
   const f = Object.assign({}, CR_FX0);

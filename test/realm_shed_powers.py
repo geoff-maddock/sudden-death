@@ -64,9 +64,14 @@ async def main():
           const plain = wCR.run([], th(132), o).stop.y, heavy = wCR.run([], th(132), Object.assign({ fx: { heavy: 1.04 } }, o)).stop.y;
           const hit = g => { const r = wCR.run([Object.assign({ id: 'a', s: 1, x: 0, y: 0 }, g ? { g: 1 } : {})], th(152), o); const a = r.stones.find(b => b.id === 'a'); return a ? Math.hypot(a.x, a.y) : 999; };
           const guard = [{ id: 'g', s: 1, x: 0, y: -160 }], solid = wCR.run(guard, th(141.7), o), smoke = wCR.run(guard, th(141.7), Object.assign({ fx: { ghost: 1 } }, o));
-          return { plain, heavy, moved: [hit(false), hit(true)], solid: [solid.hits, solid.stop && solid.stop.y], smoke: [smoke.hits, smoke.stop && smoke.stop.y] }; })()""")
+          const gr = (fx) => { const r = wCR.run([{ id: 'a', s: 1, x: 0, y: 0 }], th(152), Object.assign({ fx }, o)), a = r.stones.find(b => b.id === 'a'), t = r.stones.find(b => b.id === 't'); return { d: a ? +Math.hypot(a.x, a.y).toFixed(1) : 999, g: t ? !!t.g : null }; };
+          const two = wCR.run([{ id: 'g1', s: 1, x: 0, y: -170 }, { id: 'g2', s: 1, x: 0, y: -158 }], th(60), Object.assign({ fx: { ghost: 1 } }, o)), R2 = 2 * wCR.sheet.stoneR - .01;
+          const clash = two.stones.some((p, i) => two.stones.some((q, j) => j > i && Math.hypot(p.x - q.x, p.y - q.y) < R2));
+          return { plain, heavy, moved: [hit(false), hit(true)], thrownG: [gr(null), gr({ granite: 1 })], clash, solid: [solid.hits, solid.stop && solid.stop.y], smoke: [smoke.hits, smoke.stop && smoke.stop.y] }; })()""")
         check(st['heavy'] < st['plain'] - 12, 'a stone under a frost hex drags heavy and comes up short', st)
         check(st['moved'][1] < st['moved'][0] / 2, 'a granite stone barely moves when it is hit', st['moved'])
+        check(st['thrownG'][0]['d'] == st['thrownG'][1]['d'] and st['thrownG'][1]['g'] is True, 'a granite stone is heavy only once at rest: it hits like any other, then keeps its weight', st['thrownG'])
+        check(not st['clash'], 'a smoke stone that stops in a guard goes on clear of every stone', st)
         check(st['solid'][0] > 0 and st['smoke'][0] == 0 and st['smoke'][1] is not None and st['smoke'][1] > -100, 'a smoke stone slides through the guard it meets, and on into the house', st)
         cu = await pg.evaluate(f"""(() => {{ wCR.start({{ seed: 3, hammer: 1, powers: true, teams: [__team({A}), __team({B})] }}); const G = wCR.G, w = __ri(0, 'witch');
           G.callNow = {{ s: 0, shot: 'takeout' }}; const r = wCR.cast(0, 'pow', w); G.callNow = null; /* (the witch's hit power is the frost hex) */ const fx1 = wCR.fxFor(1).heavy, fx0 = wCR.fxFor(0).heavy;
@@ -118,6 +123,21 @@ async def main():
         ma = await pg.evaluate("""(() => { $('wShedModes').querySelector('[data-cmode="manage"]').click(); wCR.pause(true); wShedRows(); const b = document.querySelector('[data-crauto]'); const before = wCR.autoPow; if (b) b.click();
           const r = { btn: !!b, on: wCR.autoPow !== before }; W_SHED_MODE = 'play'; return r; })()""")
         check(ma == {'btn': True, 'on': True}, 'Manage has Auto powers', ma)
+        ub = await pg.evaluate("""(() => { wShedGame({ seed: 9, mode: 'manage', hammer: 1 }); wCR.pause(true); const G = wCR.G, you = wCR.view.you; let n = 0;
+          while (!(wCR.phase === 'addr' && wCR.view.up === you) && n++ < 40000) wCR.tick(.05); const m0 = G.mana[you]; G.mana[you] = 6; wCR.autoPow = true;
+          const r = wCR.cast(you, 'pow'); const spent = G.mana[you] < 6; wCR.setMode('play'); __to('aim');
+          const back = G.mana[you] === m0 && G.powStone[you] !== G.n;
+          const sn = wCR.snapshot(); wCR.setMode('manage'); wCR.autoPow = true; const sn2 = wCR.snapshot(); wCR.resume(sn2); const kept = wCR.autoPow;
+          wCR.resume(sn); wCR.pause(true); __to('aim');
+          const sh = wCR.view.sel.shot, hitk = ['takeout', 'peel', 'hitroll'].includes(sh); G.mana[you] = 6; G.stones = [{ id: '1:0', s: 1, x: 3, y: 6 }];
+          const c = wCR.cast(you, 'pow'), lock = wCR.select(hitk ? { shot: 'draw' } : { shot: 'takeout', target: '1:0' }), same = wCR.view.sel.shot === sh;
+          W_SHED_MODE = 'play'; return { r, spent, back, kept, c, lock: !!lock, same }; })()""")
+        check(ub['spent'] and ub['back'], 'your captain\'s casts on a stone you take back to throw yourself are undone', ub)
+        check(ub['kept'], 'Auto powers is kept when a match is saved and resumed', ub)
+        check(ub['c'] == '' and ub['lock'] and ub['same'], 'once a power is cast, the shot keeps to its kind (a draw power, a draw-kind shot)', ub)
+        wt = await pg.evaluate("""(() => { wShedGame({ seed: 11, mode: 'play', hammer: 1 }); wCR.pause(true); __to('aim'); const G = wCR.G, you = wCR.view.you; const w0 = wCR.yourWt(1.1);
+          G.fx[you] = { wt: .7 }; const w1 = wCR.yourWt(1.1); G.fx[you] = null; W_SHED_MODE = 'play'; return [w0, +w1.toFixed(3)]; })()""")
+        check(abs(wt[0] - 1.1) < 1e-9 and abs(wt[1] - 1.07) < 1e-6, 'a weight power makes your own meter\'s weight truer', wt)
         await pg.evaluate("wCR.pause(true); showPage('help')")
         hp = await pg.evaluate("({ help: !!$('wHelpShedPowers'), how: ['Powers.', 'The roar'].every(w => ($('wShedHow') || {}).textContent.includes(w)) })")
         check(hp == {'help': True, 'how': True}, 'How to play explains powers', hp)

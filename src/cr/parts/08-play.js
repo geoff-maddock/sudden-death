@@ -61,6 +61,9 @@ function crSelect(o) {
   if (!GP || GP.ph !== 'aim' || !GP.sel) return 'Not now.';
   if (o.suggest) { crSelReset(); crPick(); return ''; }
   const S = Object.assign({}, GP.sel);
+  // (a power cast for this stone was a draw power or a hit power: the shot keeps to that kind)
+  if (o.shot && CR_SHOTS[o.shot] && G.powers && G.powStone[GP.you] === G.n && G.powWhich[GP.you] && (CR_HIT.includes(o.shot) ? 'hit' : 'draw') !== G.powWhich[GP.you])
+    return `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
   if (o.shot && CR_SHOTS[o.shot]) S.shot = o.shot;
   if (o.h === 1 || o.h === -1) S.h = o.h;
   if (o.x != null) S.x = clamp(+o.x, -CR_SHEET.halfW + 8, CR_SHEET.halfW - 8);
@@ -105,15 +108,18 @@ function crRelease(p) {
   const M = GP.meter; if (!M || M.st === 'gone') return;
   M.st = 'gone'; M.p = p;
   const S = GP.sel, err = Math.abs(p - CR_PLAY.meter.line) <= CR_PLAY.meter.win ? 1 : p;
-  // (your weight's miss is the meter's; the line's is your curler's, by their ratings and the moment)
-  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you, S.shot).ang, v: S.aim.v * err, h: S.h };
+  // (your weight's miss is the meter's, made smaller or wider by the stone's powers; the line's is your curler's, by
+  // their ratings and the moment)
+  const rel = { ang: S.aim.ang + gauss() * CR_PLAY.you.ang * crErrK(GP.you, S.shot).ang, v: S.aim.v * crYourWt(err), h: S.h };
   crBegin(GP.you, Object.assign({}, S), rel, null);
 }
+// your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
+function crYourWt(p) { const f = crFxFor(GP.you); return 1 + (p - 1) * f.err * f.wt; }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
   GP.meter = { st: 'gone', v: pull, p: pull };
-  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high), h: GP.sel.h }, null);
+  crBegin(GP.you, Object.assign({}, GP.sel), { ang: GP.sel.aim.ang + clamp(deg, -3, 3) * .15 + gauss() * CR_PLAY.you.ang * crErrK(GP.you, GP.sel.shot).ang, v: GP.sel.aim.v * crYourWt(clamp(pull, CR_PLAY.meter.low, CR_PLAY.meter.high)), h: GP.sel.h }, null);
   return true;
 }
 
@@ -181,8 +187,9 @@ function crPlayNext() {
   // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
   const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
   // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
-  const cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
-  GP.cpu = { s, plan, rel };
+  // (what the powers were before your captain cast, so they come back if you take the stone to throw it yourself)
+  const pre = mgr && G.powers ? crPowSave() : null, cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
+  GP.cpu = { s, plan, rel, pre };
   crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
 function crSetMode(m) {
@@ -193,7 +200,7 @@ function crSetMode(m) {
   // a stone you were setting up goes back to the CPU in Watch, and the next one is yours in You play
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
   // (a stone of the CPU's called for your side, as you take it back: yours to throw)
-  if (m === 'play' && GP.ph === 'addr' && GP.cpu && GP.cpu.s === GP.you) { GP.cpu = null; crGo('next'); }
+  if (m === 'play' && GP.ph === 'addr' && GP.cpu && GP.cpu.s === GP.you) { if (GP.cpu.pre) crPowLoad(GP.cpu.pre); GP.cpu = null; crGo('next'); }
 }
 // your cast before your stone (P the thrower's power, U the ultimate, K Steady, or a situation power): '' or why not
 function crCastMine(k) {
