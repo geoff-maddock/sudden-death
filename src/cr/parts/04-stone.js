@@ -67,7 +67,7 @@ function crRunStep(Q, sweep) {
   const fxs = O.fx && O.fx.sweep != null ? O.fx.sweep : 1, sw = ask && legs ? clamp(ask * crSweepEff(O.side) * fxs, 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
-  if (ask && legs) crLegsBurn(O.side, ask * (O.fx && O.fx.legs != null ? O.fx.legs : 1), dts);
+  if (ask && legs) crLegsBurn(O.side, ask * (O.fx && O.fx.legs != null ? O.fx.legs : 1) * crKitLegs(O.side), dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;

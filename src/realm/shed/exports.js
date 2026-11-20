@@ -32,7 +32,9 @@
    Hennock's pebble; frostAt(x)); modes add manage (manage({ style: 'auto' | 'draw' | 'hit' }), mgr); snapshot() and
    resume(sn) keep a match between stones (plain JSON).
    Phase 6 is powers: start({ powers: true | [yours, theirs], powOnly }) (pow, pow2, ult, sit: the tables; manaRules,
-   roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers). */
+   roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers).
+   Phase 7 is gear and potions: a roster curler's { gear: { id, name, fx } } (gx: what the engine reads), start({ bags:
+   [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -65,6 +67,8 @@ return {
   powNow: (s, ri, shot) => G && G.powers ? crPowNow(s, ri, shot) : null, powWhy: (s, k, ri) => crPowWhy(s, k, ri), cast: (s, k, ri) => crCast(s, k, ri), castMine: k => crCastMine(k),
   fxFor: s => crFxFor(s), yourWt: p => GP ? crYourWt(p) : p, cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
   get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // gear and potions (phase 7)
+  potions: CR_POTIONS, kitRules: CR_KIT, potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
   // games from the world (phase 5)
   hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },

@@ -122,7 +122,7 @@ function crRelease(p) {
 const crShotLocked = shot => !!(G.powers && G.powStone[GP.you] === G.n && G.powWhich && G.powWhich[GP.you] && (CR_HIT.includes(shot) ? 'hit' : 'draw') !== G.powWhich[GP.you]);
 const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
-function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter; return clamp(1 + (p - 1) * f.err * f.wt, K.low, K.high); }
+function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter, kit = crKitErr(GP.you, crThrower(GP.you)); return clamp(1 + (p - 1) * f.err * f.wt * kit.v, K.low, K.high); }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
@@ -196,9 +196,10 @@ function crPlayNext() {
   const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
   // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
   // (what the powers were before your captain cast, so they come back if you take the stone to throw it yourself)
-  const pre = s === GP.you && G.powers ? crPowSave() : null, cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
+  // (the CPU's potion first: never yours, your bag is your own)
+  const pre = s === GP.you && G.powers ? crPowSave() : null, pot = crCpuPotion(s, plan.shot), cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel, pre };
-  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
+  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${pot ? ` ${pot}` : ''}${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;

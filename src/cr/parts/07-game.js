@@ -16,7 +16,9 @@ function crStart(opts) {
     const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
       // (ratings brought in part are the kind's, or an average curler's, for the rest)
       .map(p => { const r = p.r ? Object.assign(crRate(p.kind), p.r) : CR_KIND[p.kind] ? crRate(p.kind) : null, m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
-        m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT); return m; });
+        m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT);
+        // (their gear's effects the engine reads: 14-kit.js)
+        m.gx = crGx(m.gear && m.gear.fx); return m; });
     return Object.assign({}, T, { roster }); });
   // an order: the game's, the team's own, or set by the ratings
   // (one curler the engine can't rate doesn't keep the rest from being placed: their rs is an average curler's)
@@ -24,7 +26,7 @@ function crStart(opts) {
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
-  crShedStart(o); crPowersStart(o);
+  crShedStart(o); crPowersStart(o); crKitStart(o.bags);
   GB = null;
   return G;
 }
@@ -49,7 +51,7 @@ function crTurn(style) {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s, style || null), { s });
   // (the CPU's powers on the shot it has called, before the release: they make the stone truer, or the sweepers stronger)
-  crCpuPower(s, plan.shot);
+  crCpuPotion(s, plan.shot); crCpuPower(s, plan.shot);
   return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
@@ -63,7 +65,9 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out; a
   // number is a steady ask)
   if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
-  const fx = crFxFor(s), Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
+  // (and Frost Salt on its line: it drags, as under a curse)
+  const fx = crFxFor(s); if (G.salt && G.salt[s]) fx.heavy *= CR_POTIONS.crsalt.heavy;
+  const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
   const X = { s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
@@ -91,7 +95,7 @@ function crThrowFinish(X) {
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
-  crPowersAfter(s, ev, endNo, ham);
+  crPowersAfter(s, ev, endNo, ham); crKitAfter(s);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
   return ev;
@@ -121,6 +125,7 @@ function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
   // (a game saved before a part added its state: that part's state as it starts)
   if (G.powers && !G.powWhich) G.powWhich = [null, null];
+  if (!G.potEnd) { const b = G.bags; crKitStart(b); }
   crPlayStart({ mode: sn.mode });
   if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.autoPow = !!sn.autoPow; GP.paths = (sn.paths || []).slice();
   GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;

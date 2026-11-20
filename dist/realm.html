@@ -39846,7 +39846,7 @@ function crRunStep(Q, sweep) {
   const fxs = O.fx && O.fx.sweep != null ? O.fx.sweep : 1, sw = ask && legs ? clamp(ask * crSweepEff(O.side) * fxs, 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
-  if (ask && legs) crLegsBurn(O.side, ask * (O.fx && O.fx.legs != null ? O.fx.legs : 1), dts);
+  if (ask && legs) crLegsBurn(O.side, ask * (O.fx && O.fx.legs != null ? O.fx.legs : 1) * crKitLegs(O.side), dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
@@ -40064,7 +40064,9 @@ function crStart(opts) {
     const roster = (T.roster && T.roster.length >= CR_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
       // (ratings brought in part are the kind's, or an average curler's, for the rest)
       .map(p => { const r = p.r ? Object.assign(crRate(p.kind), p.r) : CR_KIND[p.kind] ? crRate(p.kind) : null, m = Object.assign({}, p, r ? { r: Object.assign({}, r) } : {});
-        m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT); return m; });
+        m.rs = r ? Object.fromEntries(CR_STATS.map(k => [k, crScale(r[k])])) : Object.assign({}, CR_DEF_RAT);
+        // (their gear's effects the engine reads: 14-kit.js)
+        m.gx = crGx(m.gear && m.gear.fx); return m; });
     return Object.assign({}, T, { roster }); });
   // an order: the game's, the team's own, or set by the ratings
   // (one curler the engine can't rate doesn't keep the rest from being placed: their rs is an average curler's)
@@ -40072,7 +40074,7 @@ function crStart(opts) {
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
-  crShedStart(o); crPowersStart(o);
+  crShedStart(o); crPowersStart(o); crKitStart(o.bags);
   GB = null;
   return G;
 }
@@ -40097,7 +40099,7 @@ function crTurn(style) {
   const s = crUp(); if (s < 0) return null;
   const plan = Object.assign(crPlan(s, style || null), { s });
   // (the CPU's powers on the shot it has called, before the release: they make the stone truer, or the sweepers stronger)
-  crCpuPower(s, plan.shot);
+  crCpuPotion(s, plan.shot); crCpuPower(s, plan.shot);
   return crThrowStone(s, plan, crMiss(s, plan.aim, plan.shot), crSweeper(s, plan));
 }
 // a stone as released (the CPU's, or yours from the page): down the sheet among the others, the pebble worn, the rules.
@@ -40111,7 +40113,9 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out; a
   // number is a steady ask)
   if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
-  const fx = crFxFor(s), Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
+  // (and Frost Salt on its line: it drags, as under a curse)
+  const fx = crFxFor(s); if (G.salt && G.salt[s]) fx.heavy *= CR_POTIONS.crsalt.heavy;
+  const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
   const X = { s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
@@ -40139,7 +40143,7 @@ function crThrowFinish(X) {
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
-  crPowersAfter(s, ev, endNo, ham);
+  crPowersAfter(s, ev, endNo, ham); crKitAfter(s);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
   return ev;
@@ -40169,6 +40173,7 @@ function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
   // (a game saved before a part added its state: that part's state as it starts)
   if (G.powers && !G.powWhich) G.powWhich = [null, null];
+  if (!G.potEnd) { const b = G.bags; crKitStart(b); }
   crPlayStart({ mode: sn.mode });
   if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.autoPow = !!sn.autoPow; GP.paths = (sn.paths || []).slice();
   GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;
@@ -40308,7 +40313,7 @@ function crRelease(p) {
 const crShotLocked = shot => !!(G.powers && G.powStone[GP.you] === G.n && G.powWhich && G.powWhich[GP.you] && (CR_HIT.includes(shot) ? 'hit' : 'draw') !== G.powWhich[GP.you]);
 const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: keep to ${G.powWhich[GP.you] === 'hit' ? 'a takeout, a peel or a hit and roll' : 'a draw, a guard or a freeze'}.`;
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
-function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter; return clamp(1 + (p - 1) * f.err * f.wt, K.low, K.high); }
+function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter, kit = crKitErr(GP.you, crThrower(GP.you)); return clamp(1 + (p - 1) * f.err * f.wt * kit.v, K.low, K.high); }
 // a phone's throw: the pull (1 the call's weight) and how far off the broom (degrees)
 function crDrag(pull, deg) {
   if (!GP || GP.mode !== 'play' || GP.ph !== 'aim' || !GP.sel || !GP.sel.aim) return false;
@@ -40382,9 +40387,10 @@ function crPlayNext() {
   const mgr = GP.mode === 'manage' && s === GP.you, plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
   // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
   // (what the powers were before your captain cast, so they come back if you take the stone to throw it yourself)
-  const pre = s === GP.you && G.powers ? crPowSave() : null, cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
+  // (the CPU's potion first: never yours, your bag is your own)
+  const pre = s === GP.you && G.powers ? crPowSave() : null, pot = crCpuPotion(s, plan.shot), cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel, pre };
-  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
+  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${pot ? ` ${pot}` : ''}${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;
@@ -40624,8 +40630,9 @@ const crNerveK = (p, nrv) => 1 + CR_REACH.nrv * p * (1 - clamp(nrv, 0, 1));
 // how much side s's curler misses by, times the skill's: { ang (the line), v (the weight: a draw's touch, or a hit's) }
 function crErrK(s, shot) {
   // (and the stone's powers: truer, or wilder under a curse; no pressure with nerve: 13-powers.js)
-  const f = crFxFor(s), ri = crThrower(s), r = crRat(s, ri), nk = crNerveK(f.nerve ? 0 : crPressure(s), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
-  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk * f.err * f.line, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk * f.err * f.wt };
+  // (and their gear, and a Warming Draught: 14-kit.js)
+  const f = crFxFor(s), ri = crThrower(s), r = crRat(s, ri), kit = crKitErr(s, ri), nk = crNerveK(f.nerve ? 0 : crPressure(s) * crKitPress(s, ri), r.nrv), hit = ['takeout', 'peel', 'hitroll'].includes(shot);
+  return { ang: (1 + CR_REACH.lin * (.5 - (hit ? (r.lin + r.hit) / 2 : r.lin))) * nk * f.err * f.line * kit.ang, v: (1 + (hit ? CR_REACH.hit * (.5 - r.hit) : CR_REACH.drw * (.5 - r.drw))) * nk * f.err * f.wt * kit.v };
 }
 // the legs are fresh at the start of an end
 function crLegsNewEnd() { if (G) G.legs = [1, 1]; }
@@ -41012,6 +41019,96 @@ function crPowerTip(s) {
   if (!crPowWhy(s, 'ult', ri)) { const U = CR_ULT[G.teams[s].roster[ri].kind] || CR_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this end.`; }
   return '';
 }
+/* The Curling Shed: gear and potions (issue #102, phase 7), by #61's conventions; the Realm's side is w127-shedkit.js.
+   Gear: a curler may wear one piece. A roster curler sent with { gear: { id, name, fx } } keeps its name (gear) and the
+   effects the engine reads (gx: fx without r; fx.r is laid on the ratings by the Realm before the engine sees them).
+   What gx may hold: err (their release's miss, line and weight, ×), wt (the weight's miss alone, ×), press (how much a
+   big moment weighs on them, ×) and legs (what sweeping costs their legs when they sweep, ×: the side's legs pay the
+   mean of its two sweepers').
+   Potions (CR_POTIONS): one a side an end (G.potEnd), before a stone of that side's. G.bags = [bag or null, ...] by
+   side: a null bag is kept by the page (the Realm keeps yours and takes each one out as you give it), and a bag here
+   ({ id: n }) is the CPU's, given at its skill before its stones (crCpuPotion). Every use goes in G.pots ({ side, id,
+   end, why }). What each does, all plain data in G:
+   draught (the Stamina Draught): the side's sweepers CR_POTIONS.draught.legs of their legs back; crwarm (a Warming
+   Draught): no pressure on the side's next stone (G.still); crsalt (Frost Salt): salt on the other rink's line, so
+   their next stone drags heavy (G.salt, as a curse); crpebble (Hennock's Pebble): Hennock pebbles the sheet, and the
+   worn ice is fresh again (for both rinks). */
+const CR_POTIONS = {
+  draught: { n: 'Stamina Draught', legs: .4, desc: 'Your sweepers get two fifths of their legs back.' },
+  crwarm: { n: 'Warming Draught', desc: 'Your next stone has no pressure on it, whatever rides on it.' },
+  crsalt: { n: 'Frost Salt', heavy: 1.03, desc: 'Salt on the other rink\'s line: their next stone drags heavy, and comes up short.' },
+  crpebble: { n: 'Hennock\'s Pebble', desc: 'Hennock pebbles the sheet: the worn ice is fresh again, for both rinks.' },
+};
+// a CPU gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
+const CR_KIT = { take: [99, 2.5, 2], squire: .25 };
+function crGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
+const crGxOf = (s, ri) => (G && G.teams && G.teams[s].roster[ri] && G.teams[s].roster[ri].gx) || {};
+function crKitStart(bags) {
+  G.bags = [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null);
+  G.pots = []; G.potEnd = [-1, -1]; G.still = [false, false]; G.salt = [false, false];
+}
+// the kit's part in side s's curler ri's miss: { ang, v } multipliers (gear's err and wt)
+function crKitErr(s, ri) { const g = crGxOf(s, ri), e = g.err || 1; return { ang: e, v: e * (g.wt || 1) }; }
+// how a big moment weighs on them (a Warming Draught takes it away; gear lightens it)
+const crKitPress = (s, ri) => (G.still && G.still[s] ? 0 : 1) * (crGxOf(s, ri).press || 1);
+// what sweeping costs side s's legs, by its sweepers' gear (the mean of the two)
+function crKitLegs(s) { const sw = crSweepers(s); return sw.length ? sw.reduce((a, ri) => a + (crGxOf(s, ri).legs || 1), 0) / sw.length : 1; }
+// how worn the sheet is: the share of the pebble worn past a little
+const crIceWorn = () => G.ice.filter(v => v < 1 - (1 - CR_ICE.min) * .3).length / G.ice.length;
+function crPotionWhy(s, id) {
+  const P = CR_POTIONS[id]; if (!P) return 'No such potion.';
+  if (!G || G.over) return 'The game is over.';
+  if (crUp() !== s) return 'Not your stone.';
+  if (G.potEnd[s] === G.end) return 'One potion an end.';
+  if (id === 'draught' && (G.legs ? G.legs[s] : 1) >= .95) return 'Their legs are fresh.';
+  if (id === 'crwarm' && G.still[s]) return 'Already warm.';
+  if (id === 'crsalt' && G.salt[1 - s]) return 'Their line is salted already.';
+  if (id === 'crpebble' && !crIceWorn()) return 'The ice is fresh.';
+  return '';
+}
+function crPotionGive(s, id, why) {
+  const P = CR_POTIONS[id], T = G.teams[s];
+  if (id === 'draught' && G.legs) G.legs[s] = Math.min(1, +(G.legs[s] + P.legs).toFixed(3));
+  if (id === 'crwarm') G.still[s] = true;
+  if (id === 'crsalt') G.salt[1 - s] = true;
+  if (id === 'crpebble') { G.ice = crIceNew(); G.iceEnd = G.ice.slice(); }
+  if (G.bags[s]) { G.bags[s][id]--; if (G.bags[s][id] <= 0) delete G.bags[s][id]; }
+  G.potEnd[s] = G.end;
+  G.pots.push({ side: s, id, end: G.end + 1, why: why || '' });
+  return `${T.name}: ${P.n}${why ? ` (${why})` : ''}.`;
+}
+// your potion now: '' when given (the page takes it out of your bag), or why not
+function crPotion(id) {
+  if (!GP) return 'No game.';
+  const s = GP.you; if (!['aim', 'swing'].includes(GP.ph) || (GP.meter && GP.meter.st === 'gone')) return 'Only before your stone.';
+  const why = crPotionWhy(s, id); if (why) return why;
+  GP.msg = crPotionGive(s, id);
+  crPick();
+  return '';
+}
+/* what a potion would be worth now: [{ id, v, why }] for the potions in bag, for side s's next stone. A draught when
+   the sweepers' legs are going and the stone is a draw; the warming draught for a nervy skip in the last end; the salt
+   when the other rink's next stone is a big one (late in the end, theirs the hammer); the pebble when the sheet is worn */
+function crPotionValues(s, bag, shot) {
+  const out = [], T = G.teams[s], legs = G.legs ? G.legs[s] : 1, p = crPressure(s), ri = crThrower(s), m = T.roster[ri], late = G.k >= crPerEnd() - 4;
+  const draw = !['takeout', 'peel', 'hitroll'].includes(shot || 'draw');
+  if (bag.draught && legs < .6) out.push({ id: 'draught', v: (.7 - legs) * 10 + (draw ? 1 : 0) + (p ? 1 : 0), why: `the sweepers are down to ${Math.round(legs * 100)}% of their legs` });
+  if (bag.crwarm && p && m && m.rs.nrv < .75) out.push({ id: 'crwarm', v: 3 + p * 2 * (1 - m.rs.nrv), why: `${m.n} throws the last end` });
+  if (bag.crsalt && late && G.hammer !== s) out.push({ id: 'crsalt', v: 2.2 + (G.end >= G.ends - 1 ? 1 : 0) + (G.k === crPerEnd() - 2 ? .8 : 0), why: 'their last stones are coming, and they have the hammer' });
+  const worn = crIceWorn(); if (bag.crpebble && worn > .08) out.push({ id: 'crpebble', v: 2 + worn * 8, why: `${Math.round(worn * 100)}% of the pebble is worn` });
+  return out.filter(o => !crPotionWhy(s, o.id)).sort((a, c) => c.v - a.v);
+}
+function crPotionAdvice(bag) { if (!G || !GP) return null; const sh = GP.sel ? GP.sel.shot : 'draw', o = crPotionValues(GP.you, bag || {}, sh)[0]; return o && o.v >= CR_KIT.take[1] ? { id: o.id, why: o.why } : null; }
+// the CPU before its stone. Never yours: your bag is your own (a null bag here). Returns the words, or ''
+function crCpuPotion(s, shot) {
+  const bag = G.bags && G.bags[s]; if (!bag || !Object.keys(bag).length || G.over) return '';
+  const vals = crPotionValues(s, bag, shot); if (!vals.length) return '';
+  const sk = G.skill[s];
+  if (!sk) return R() < CR_KIT.squire ? crPotionGive(s, vals[0].id, vals[0].why) : '';
+  return vals[0].v >= CR_KIT.take[sk] ? crPotionGive(s, vals[0].id, vals[0].why) : '';
+}
+// after side s's stone: the warming draught is spent, and the salt on its line
+function crKitAfter(s) { if (G && G.still) { G.still[s] = false; G.salt[s] = false; } }
 /* The Shed's page in the Realm (issue #102, phase 2). A canvas in #v-shed, after the Lanes', and a frame loop that runs
    only while it is on screen (show/hide): it moves the game on (crTick) and draws it (crDraw), at the screen's density.
    The engine's parts don't touch the page; this file is the only one that does.
@@ -41164,7 +41261,9 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    Hennock's pebble; frostAt(x)); modes add manage (manage({ style: 'auto' | 'draw' | 'hit' }), mgr); snapshot() and
    resume(sn) keep a match between stones (plain JSON).
    Phase 6 is powers: start({ powers: true | [yours, theirs], powOnly }) (pow, pow2, ult, sit: the tables; manaRules,
-   roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers). */
+   roarRules; powNow, powWhy, cast, castMine, fxFor, cpuPower, tip; autoPow, Manage's Auto powers).
+   Phase 7 is gear and potions: a roster curler's { gear: { id, name, fx } } (gx: what the engine reads), start({ bags:
+   [yours or null, theirs] }) (potions, kitRules; potion(id) yours, advice(bag), potionWhy(s, id), cpuPotion). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -41197,6 +41296,8 @@ return {
   powNow: (s, ri, shot) => G && G.powers ? crPowNow(s, ri, shot) : null, powWhy: (s, k, ri) => crPowWhy(s, k, ri), cast: (s, k, ri) => crCast(s, k, ri), castMine: k => crCastMine(k),
   fxFor: s => crFxFor(s), yourWt: p => GP ? crYourWt(p) : p, cpuPower: (s, shot) => crCpuPower(s, shot), tip: s => G && G.powers ? crPowerTip(s) : '',
   get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // gear and potions (phase 7)
+  potions: CR_POTIONS, kitRules: CR_KIT, potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
   // games from the world (phase 5)
   hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
@@ -59679,6 +59780,123 @@ renderHelp = function () {
   wW126RenderHelp();
   const after = $('wHelpShedGame'); if (!after || $('wHelpShedPowers')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedPowers"><b>Powers on the ice.</b> Every curler brings a draw power and a hit power (picked on the Shed tab), cast before their stone for team mana; one ultimate a game marks an end; Steady, the Hammer, the Steal and Extra End fit their moments. See Curling: how it works.</p>`);
+};
+/* w127: curling gear and potions (issue #102, phase 7), by #61's conventions; the engine's side is
+   src/cr/parts/14-kit.js, the plumbing (W_GEAR, W_POTIONS, the slot, the Bag) is w72.
+   Gear (W_SHED_GEAR, one piece a player, p.gear.shed): a Hair Broom, a Teflon Slider and Gripper Shoes from Saltmere's
+   store; a Granite Charm, Stone Polish and a Lucky Stopwatch from chests. Small effects (to be measured in phase 10's
+   lab). It reaches the engine through wShedPlayer, never by changing the player's own ratings, and shows on the stats
+   card's Gear block and the Shed tab.
+   Potions: the Stamina Draught (football's item, serving the Shed too: here it gives the sweepers' legs back), and a
+   Warming Draught, Frost Salt and Hennock's Pebble from Saltmere's store. In a real match, before one of your stones,
+   from the Bag row under the ice (one an end), with your captain's advice; each comes out of your bag when given. Your
+   captain never opens your bag (Watch, Manage and Auto powers don't), and Simulate leaves it alone. The other side
+   brings W_SHED_KIT.opp[tier] and gives at its skill; the match card says what each club brings.
+   Wraps: wGearLive (wW127GearLive: the Shed), wShedPlayer (wW127ShedPlayer: gear's ratings and the piece), wStartShed
+   (wW127StartShed: their bag goes in), wShedRows (wW127ShedRows: the Bag row), wFourCrRow (wW127FourCrRow: the gear on
+   the Shed tab), wOpenShedCard (wW127OpenShedCard: the bags on the card), wShedHowHTML (wW127ShedHow), renderHelp
+   (wW127RenderHelp: #wHelpShedKit); and wCR.start and wCR.simGame (the bags go in). */
+
+W_GEAR_CFG.sports.shed = 'curling';
+W_GEAR_STATN.shed = { drw: 'draw', lin: 'line', hit: 'hit', swp: 'sweep', nrv: 'nerve', red: 'read' };
+const W_SHED_GEAR = {
+  cr_broom: { sport: 'shed', name: 'Hair Broom', price: 55, desc: 'Horsehair, as Hennock swears by: +1 sweep.', fx: { r: { swp: 1 } } },
+  cr_slider: { sport: 'shed', name: 'Teflon Slider', price: 60, desc: 'A long, smooth slide out of the hack: +1 draw.', fx: { r: { drw: 1 } } },
+  cr_gripper: { sport: 'shed', name: 'Gripper Shoes', price: 40, desc: 'A sure foot on the ice: sweeping costs their legs a fifth less.', fx: { legs: .8 } },
+  cr_charm: { sport: 'shed', name: 'Granite Charm', price: 45, desc: 'A chip of Ailsa granite on a cord: a big moment weighs a third less on them.', fx: { press: .65 } },
+  cr_polish: { sport: 'shed', name: 'Stone Polish', price: 50, desc: 'A running band polished true: their release strays a tenth less.', fx: { err: .9 } },
+  cr_stopwatch: { sport: 'shed', name: 'Lucky Stopwatch', price: 45, desc: 'Times the stone from hog to hog: their weight a tenth truer.', fx: { wt: .9 } },
+};
+for (const id of Object.keys(W_SHED_GEAR)) wGearAdd(id, W_SHED_GEAR[id]);
+const W_SHED_KIT = {
+  potions: { crwarm: 35, crsalt: 40, crpebble: 45 },
+  store: ['cr_broom', 'cr_slider', 'cr_gripper'],
+  opp: { 1: { draught: 1 }, 2: { draught: 1, crwarm: 1 }, 3: { draught: 2, crwarm: 1, crsalt: 1, crpebble: 1 } },
+};
+for (const id of Object.keys(wCR.potions)) {
+  const P = wCR.potions[id];
+  if (id === 'draught') {
+    W_POTIONS[id].sports = (W_POTIONS[id].sports || ['grid']).concat('shed');
+    DB.items[id].desc += ` At the Shed: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items[id].use += ' Or in a curling match, before a stone, one an end.';
+    continue;
+  }
+  wPotionAdd(id, { sport: 'shed' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a curling match, before one of your stones: the Bag row under the ice. One potion an end.', price: W_SHED_KIT.potions[id] };
+}
+if (DB.shops.salt) { for (const id of Object.keys(W_SHED_KIT.potions)) DB.shops.salt[id] = W_SHED_KIT.potions[id]; for (const id of W_SHED_KIT.store) DB.shops.salt[id] = W_SHED_GEAR[id].price; }
+for (const [c, it] of [['cottage_chest', 'cr_charm'], ['shrine_chest', 'cr_polish'], ['genevault_c6', 'cr_stopwatch'], ['emberdeep_c3', 'crpebble'], ['genevault_c3', 'crsalt']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wW127GearLive = wGearLive;
+wGearLive = function (sport) { return sport === 'shed' ? wShedLive() : wW127GearLive(sport); };
+const wW127ShedPlayer = wShedPlayer;
+wShedPlayer = function (p) {
+  const t = wW127ShedPlayer(p), G = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'shed') : null;
+  if (G) { t.r = wGearRate(t.r, G, wCR.cap); t.gear = wGearTag(G); }
+  return t;
+};
+
+/* ---------- the bags go in ---------- */
+const WSHK = { next: null };
+const wShedBagMine = () => Object.fromEntries(wMatchBag('shed').filter(x => wCR.potions[x.id]).map(x => [x.id, x.n]));
+const wShedBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wCR.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wCR.potions[id].n}`).join(', ') : 'nothing'; };
+const wW127StartShed = wStartShed;
+wStartShed = function (o) {
+  WSHK.next = [null, Object.assign({}, W_SHED_KIT.opp[(o && o.tier) || (o && o.club ? wBallTier(o.club) : 1)] || {})];
+  try { return wW127StartShed(o); } finally { WSHK.next = null; }
+};
+const wW127Start = wCR.start, wW127SimGame = wCR.simGame;
+wCR.start = o => wW127Start(WSHK.next ? Object.assign({}, o, { bags: WSHK.next }) : o);
+wCR.simGame = o => wW127SimGame(WSHK.next ? Object.assign({}, o, { bags: WSHK.next }) : o);
+
+/* ---------- your Bag, in a real match ---------- */
+function wShedPotion(id) {
+  if (!wShedWorld()) return 'Potions are for real matches, not exhibitions or practice.';
+  if (!wHas(id)) return `You have no ${(wCR.potions[id] || {}).n || 'such potion'}.`;
+  const r = wCR.potion(id); if (r) return r;
+  wAddItem(id, -1); if (WG.shg && WG.shg.live) WG.shg.live.snap = wCR.snapshot(); wSave(); return '';
+}
+let W_SHED_KITMSG = '';
+$('wShedPowRow').insertAdjacentHTML('afterend', '<div id="wShedBagRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Bag</span><span id="wShedBag"></span></div></div>');
+const wW127ShedRows = wShedRows;
+wShedRows = function () {
+  wW127ShedRows();
+  const row = $('wShedBagRow'), V = WCR && !WCR.over && wCR.G && wCR.G.teams ? wCR.view : null;
+  const show = !!V && wShedWorld() && ((V.mode === 'play' && V.ph === 'aim' && V.up === V.you) || V.mode === 'manage');
+  row.hidden = !show; if (!show) return;
+  const bag = wShedBagMine(), ids = Object.keys(bag), adv = V.up === V.you ? wCR.advice(bag) : null;
+  $('wShedBag').innerHTML = (ids.length ? ids.map(id => { const P = wCR.potions[id];
+      return `<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-crkuse="${id}" ${V.mode === 'play' ? '' : 'disabled'} title="${esc(P.desc)}">${esc(P.n)} (${bag[id]})</button>`; }).join(' ') : '<small class="hint">No curling potions in your bag. Saltmere\'s store sells them.</small>')
+    + (W_SHED_KITMSG ? ` <small class="wbad">${esc(W_SHED_KITMSG)}</small>` : '') + (adv ? ` <small class="hint">Your captain says: <b>${esc(wCR.potions[adv.id].n)}</b>, ${esc(adv.why)}.</small>` : '');
+};
+$('wShedBagRow').addEventListener('click', e => {
+  const b = e.target.closest('[data-crkuse]'); if (!b || b.disabled) return;
+  W_SHED_KITMSG = wShedPotion(b.dataset.crkuse); wShedRows(); wShedBarNote();
+});
+
+/* ---------- the Shed tab and the card ---------- */
+const wW127FourCrRow = wFourCrRow;
+wFourCrRow = function (k, C) {
+  const html = wW127FourCrRow(k, C), p = wFourCrWho(k), g = p && typeof k === 'number' ? wGearOf(p, 'shed') : null;
+  return g ? html.replace('<small class="wnst"', `<small class="wnst" title="${esc(g.desc)}">Curls with the <b>${esc(g.name)}</b>.</small><small class="wnst"`) : html;
+};
+const wW127OpenShedCard = wOpenShedCard;
+wOpenShedCard = function () {
+  wW127OpenShedCard();
+  const ul = document.querySelector('#modalBox .wbclubs'); if (!ul) return;
+  ul.insertAdjacentHTML('afterend', `<p class="hint">What their curlers bring: ${[1, 2, 3].map(t => `tier ${t}, ${esc(wShedBagWords(W_SHED_KIT.opp[t]))}`).join('; ')}. Yours is your bag: give from it before a stone, in the Bag row under the ice.</p>`);
+};
+
+const wW127ShedHow = wShedHowHTML;
+wShedHowHTML = function () {
+  return wW127ShedHow() + `<p class="hint"><b>Gear and potions.</b> Each player can carry one piece for the Shed: a Hair Broom (+1 sweep), a Teflon Slider (+1 draw) and Gripper Shoes (sweeping costs less legs) from Saltmere's store; a Granite Charm (a big moment weighs less), Stone Polish (a truer release) and a Lucky Stopwatch (a truer weight) from chests. In a real match, before one of your stones, give a potion from the Bag row (one an end): the Stamina Draught (the sweepers' legs back), a Warming Draught (no pressure on the stone), Frost Salt (their next stone drags) or Hennock's Pebble (the worn ice fresh again). Your captain advises, but never opens your bag.</p>`;
+};
+const wW127RenderHelp = renderHelp;
+renderHelp = function () {
+  wW127RenderHelp();
+  const after = $('wHelpShedPowers'); if (!after || $('wHelpShedKit')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedKit"><b>Curling gear and potions.</b> One piece of curling gear a player (Saltmere's store sells a Hair Broom, a Teflon Slider and Gripper Shoes; chests hold the rest), and curling potions from your bag in a real match, one an end, from the Bag row under the ice. See Curling: how it works.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

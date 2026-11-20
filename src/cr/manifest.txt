@@ -13,3 +13,4 @@ src/cr/parts/10-ratings.js
 src/cr/parts/11-call.js
 src/cr/parts/12-shed.js
 src/cr/parts/13-powers.js
+src/cr/parts/14-kit.js
