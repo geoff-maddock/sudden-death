@@ -17,7 +17,7 @@
    lead, the second and the third.
    The sweepers (crSweepers): the two of the four who are not throwing and not holding the broom (the skip holds it,
    or the third when the skip throws). How hard they sweep is what is asked (0 to 1) times how good they are (their
-   sweep rating) times their legs.
+   sweep rating) times their legs; the run works it out each step (crRun's opts.legs) and spends the legs as it goes.
    Legs (G.legs, 0 to 1 a side): an end's sweeping is so much; every second a stone is swept spends some, and the legs
    are fresh again at the next end. Tired legs do less.
    Pressure (crPressure, 0 to 1.5): the skip's stones in the last end (or an extra end), more on the hammer's stone when
@@ -60,13 +60,6 @@ function crSweepEff(s) {
 }
 // side s's sweepers swept this hard (0 to 1, asked) for dt seconds of the stone's time: their legs pay for it
 function crLegsBurn(s, sw, dt) { if (G.legs) G.legs[s] = Math.max(0, G.legs[s] - CR_LEGS.burn * sw * dt); }
-// the sweepers for a run: what they are asked (a function of the stone, or a number), made into how hard they sweep,
-// their legs paying as the stone's time goes on
-function crSweepFn(s, ask) {
-  if (!ask) return null;
-  let last = 0;
-  return (st, t) => { const a = clamp((typeof ask === 'function' ? ask(st, t) : ask) || 0, 0, 1); crLegsBurn(s, a, Math.max(0, t - last)); last = t; return a ? a * crSweepEff(s) : 0; };
-}
 // how big the moment is for side s's stone: the skip's in the last end (or an extra end), more on the hammer's stone
 // in a close game
 function crPressure(s) {

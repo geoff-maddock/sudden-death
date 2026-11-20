@@ -70,6 +70,10 @@ async def main():
           // ratings brought in part: the rest are the kind's, and the throw is a real number
           wCR.start({ seed: 3, teams: [{ name: 'P', roster: ['dwarf', 'dwarf', 'dwarf', 'dwarf'].map((k, i) => ({ n: 'p' + i, kind: k, r: { drw: 12 } })) }, __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])] });
           const ev = wCR.turn(); out.partial = [wCR.G.teams[0].roster[0].r.lin, Number.isFinite(ev.rel.ang) && Number.isFinite(ev.rel.v)];
+          // a sweep held after the stone stops (others still rolling) costs nothing more
+          wCR.start({ seed: 8, teams: [__team(['dwarf', 'dwarf', 'dwarf', 'dwarf']), __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])], hammer: 1 }); wCR.G.stones = [{ id: '1:0', s: 1, x: 0, y: 0 }];
+          wCR.G.k = 1; wCR.G.hammer = 0; const tk = wCR.solveHit(0, -9, 205, 1, null, 'mid'); const l0 = wCR.G.legs[1]; const hit = wCR.throwStone(1, { shot: 'takeout', x: 0, y: 0, h: 1, target: '1:0' }, tk, () => 1);
+          out.afterHit = [l0 - wCR.G.legs[1]];
           // one stone swept hard the whole way leaves most of an end's legs for the rest
           wCR.start({ seed: 4, teams: [__team(['dwarf', 'dwarf', 'dwarf', 'dwarf']), __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])], hammer: 1 });
           wCR.throwStone(0, { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: 0, v: 128, h: 1 }, () => 1); out.legs = wCR.G.legs[0];
@@ -79,6 +83,7 @@ async def main():
           return out; })()""")
         check(rv['partial'] == [8, True], 'ratings brought in part are filled from the kind, and the throw is a real number', rv)
         check(rv['legs'] > .6, 'one stone swept hard the whole way leaves most of an end\'s legs', rv)
+        check(rv['afterHit'][0] < .2, 'a takeout swept only until it stops: the legs pay for the slide, not for stones rolling after', rv)
         check(rv['order'][3] == 1, 'one curler the engine can\'t rate doesn\'t keep the lich from skipping', rv)
         ws = await pg.evaluate("""(() => { wCR.start({ seed: 6, mode: 'play', hammer: 1, teams: [__team(['dwarf', 'dwarf', 'dwarf', 'dwarf']), __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'])] }); wCR.pause(true);
           let n = 0; while (wCR.phase !== 'aim' && n++ < 4000) wCR.tick(.05); wCR.select({ shot: 'draw', x: 0, y: 0 }); wCR.press(); n = 0; while (wCR.view.meter.v < .88 && n++ < 2000) wCR.tick(.002); wCR.press();
@@ -99,8 +104,10 @@ async def main():
         ol = await pg.evaluate("""(() => { const save = JSON.parse(JSON.stringify({ WG, RUN })); for (const p of save.WG.roster) delete p.cr; delete save.WG.shed;
           wStart(save); return wRoster().every(p => p.cr && p.cr.lv === (p.lvl || 1)); })()""")
         check(ol, 'an older save\'s players get their curling ratings when it loads', ol)
+        cd = await pg.evaluate("""(() => { WG.shed = null; const p = wRoster()[0], h = wStatsCard(p); return { named: /In your four, the/.test(h), saved: !!JSON.parse(localStorage.getItem(wSaveKey())).WG.shed }; })()""")
+        check(cd == {'named': True, 'saved': True}, 'a player\'s card names their position on a save with no four yet, and the four it made is saved', cd)
         f = await pg.evaluate("""(() => { const C = wFourSyncCr(), keys = C.four, own = keys.filter(k => typeof k !== 'string').length;
-          return { roster: wRoster().length, own, cu: C.cu.length, distinct: new Set(keys).size === 4, cuRated: C.cu.every(c => c.cr && c.lvl === wNineTier()), json: JSON.stringify(JSON.parse(JSON.stringify(WG.shed))) === JSON.stringify(WG.shed) }; })()""")
+          return { roster: wRoster().length, own, cu: C.cu.length, distinct: new Set(keys).size === 4, cuRated: C.cu.every(c => c.cr && c.lvl === wNineTier() && /^r\d+$/.test(c.cid)), json: JSON.stringify(JSON.parse(JSON.stringify(WG.shed))) === JSON.stringify(WG.shed) }; })()""")
         check(f['own'] == min(4, f['roster']) and f['cu'] == 4 - f['own'] and f['distinct'] and f['cuRated'] and f['json'], 'the four: your players first, call-ups at your level fill it, plain JSON', f)
         a = await pg.evaluate("""(() => { const kinds = ['zombie', 'spider', 'troll', 'witch', 'gorgon', 'lich', 'ogre']; let i = 0;
           while (wRoster().length < W_PARTY.max) wAddPlayer(wMakePlayer({ kind: kinds[i++], lvl: 2 }, 'tavern'));

@@ -39815,7 +39815,8 @@ function crCollide(a, b) {
   b.h = (b.h || 0) * .5 + (a.h || 0) * CR_STONE.keepCurl * .6; a.h = (a.h || 0) * .5; return true;
 }
 /* one stone thrown among the stones at rest: stones [{ id, s, x, y }], throw { id, s, x0, ang, v, h }; opts { ice,
-   cold, sweep(st, t) -> 0..1, plan (a coarser step, no trace: the CPU's look ahead), maxT }. Returns { stones (in
+   cold, sweep(st, t) -> 0..1 (how hard it is asked to be swept), legs + side (that side's sweepers, their rating and
+   legs: crSweepEff, and the step spends their legs), plan (a coarser step, no trace: the CPU's look ahead), maxT }. Returns { stones (in
    play, at rest), out: [ids gone], path: [[x, y, swept]] of the thrown stone, hits, t, trace: [[t, [[id, x, y]]]],
    stop: where the thrown stone came to rest (or null) }.
    The same run, a step at a time (the page's, so you can sweep as it goes: phase 2): crRunInit makes it, crRunStep moves
@@ -39831,10 +39832,14 @@ function crRunStep(Q, sweep) {
   if (Q.done) return false;
   const { O, S, T, path } = Q, R = CR_SHEET.stoneR, L = S.filter(st => !st.out), moving = L.filter(st => st.vx || st.vy);
   if (!moving.length || Q.t >= Q.maxT) { Q.done = true; return false; }
-  // (a pair of good sweepers with fresh legs sweeps a little harder than an average pair: up to 1.5)
-  const sw = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1.5) : 0; Q.sw = sw;
+  // how hard the thrown stone is asked to be swept (0 to 1: the page's Space, or the CPU's sweepers), only while it is on
+  // the sheet and moving; with opts.legs, the side's sweepers sweep that times how good they are and their legs, which
+  // the step spends (a good pair with fresh legs sweeps a little harder than an average pair: up to 1.5)
+  const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1) : 0;
+  const sw = ask && O.legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
+  if (ask && O.legs) crLegsBurn(O.side, ask, dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;
@@ -40077,9 +40082,8 @@ function crThrowBegin(s, plan, rel, sweep) {
   // (a stone out of turn changes nothing: no run, no wear, no box score)
   if (crWhyNot(s) || (CR_LIVE && CR_LIVE.g === G)) return null;
   plan = Object.assign({}, plan, { s });
-  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs: crSweepFn)
-  sweep = sweep ? crSweepFn(s, sweep) : null;
-  const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep });
+  // (the sweepers asked to sweep: how hard they really do, by their sweep rating and their legs, the run works out)
+  const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s });
   const X = { s, plan, rel, Q, g: G, ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
 }
@@ -40264,10 +40268,8 @@ function crSlideTick(dt) {
   const X = GP.X; if (!X) return;
   const mine = crYours(X.s);
   // (your sweepers: how hard you hold them to it, times how good they are and their legs, which it spends)
-  // (spent for the stone's time that passed while it was on the sheet and moving)
-  const ask = mine ? crYourSweep() : 0, t0 = X.Q.t;
-  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? (ask ? ask * crSweepEff(X.s) : 0) : undefined);
-  if (ask) crLegsBurn(X.s, ask, X.Q.t - t0);
+  // (the run makes it how hard they really sweep, and spends their legs, only while the stone is on the sheet and moving)
+  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? crYourSweep() : undefined);
   GP.call = crSkipCall(X);
   if (X.Q.done) crSettle();
 }
@@ -40307,7 +40309,7 @@ function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;
   GP.mode = m;
   // (a stone of yours sliding as you hand it to the CPU: its sweepers take it over)
-  if (m !== 'play' && GP.ph === 'slide' && GP.X && GP.X.s === GP.you && !GP.X.Q.O.sweep) GP.X.Q.O.sweep = crSweepFn(GP.X.s, crSweeper(GP.X.s, GP.X.plan));
+  if (m !== 'play' && GP.ph === 'slide' && GP.X && GP.X.s === GP.you && !GP.X.Q.O.sweep) GP.X.Q.O.sweep = crSweeper(GP.X.s, GP.X.plan);
   // a stone you were setting up goes back to the CPU in Watch, and the next one is yours in You play
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
 }
@@ -40477,7 +40479,7 @@ function crDraw(c, dt) {
    lead, the second and the third.
    The sweepers (crSweepers): the two of the four who are not throwing and not holding the broom (the skip holds it,
    or the third when the skip throws). How hard they sweep is what is asked (0 to 1) times how good they are (their
-   sweep rating) times their legs.
+   sweep rating) times their legs; the run works it out each step (crRun's opts.legs) and spends the legs as it goes.
    Legs (G.legs, 0 to 1 a side): an end's sweeping is so much; every second a stone is swept spends some, and the legs
    are fresh again at the next end. Tired legs do less.
    Pressure (crPressure, 0 to 1.5): the skip's stones in the last end (or an extra end), more on the hammer's stone when
@@ -40520,13 +40522,6 @@ function crSweepEff(s) {
 }
 // side s's sweepers swept this hard (0 to 1, asked) for dt seconds of the stone's time: their legs pay for it
 function crLegsBurn(s, sw, dt) { if (G.legs) G.legs[s] = Math.max(0, G.legs[s] - CR_LEGS.burn * sw * dt); }
-// the sweepers for a run: what they are asked (a function of the stone, or a number), made into how hard they sweep,
-// their legs paying as the stone's time goes on
-function crSweepFn(s, ask) {
-  if (!ask) return null;
-  let last = 0;
-  return (st, t) => { const a = clamp((typeof ask === 'function' ? ask(st, t) : ask) || 0, 0, 1); crLegsBurn(s, a, Math.max(0, t - last)); last = t; return a ? a * crSweepEff(s) : 0; };
-}
 // how big the moment is for side s's stone: the skip's in the last end (or an extra end), more on the hammer's stone
 // in a close game
 function crPressure(s) {
@@ -40674,7 +40669,7 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    back. onPhase, onPick and onOver hear a new beat, a change to your call and the end.
    Phase 3 is ratings, positions, the sweepers' legs and nerve: stats (the six, in order), rate(kind) (1 to 12), cap,
    fit(r, pos) (r 0 to 1, pos 0 lead to 3 skip), autoOrder(roster), legs (G.legs), pressure(side), sweepers(side) (who
-   sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair), errK(side, shot), and the
+   sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair: run's opts.legs applies it), errK(side, shot), and the
    tables reachRules and legsRules. A roster curler may bring r (1 to 12); a team may bring its order. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
@@ -58616,11 +58611,11 @@ function wFourCrPractice() {
 /* ---------- the Curling block on a player's stats ---------- */
 function wCrCard(p) {
   const b = wCrOf(p); if (!b) return '';
-  if (WG && !WG.shed) wFourSyncCr();
+  if (WG && !WG.shed) { wFourSyncCr(); wSave(); }
   const bars = wCR.stats.map(s => { const [ab, what] = W_CRR.stat[s], got = b.got[s] || 0;
     return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wCrCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
-  const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null;
-  return `<div class="wbd wbkc wcrc"><h5>Curling</h5><p class="wbdpos">${pos != null ? `In your four, ${esc(W_CRR.pos[pos])}.` : WG && WG.shed ? 'A reserve for your four.' : 'Not in your squad.'}</p>
+  const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null, other = p.cid && !(WG && WG.shed && WG.shed.cu.some(c => c.cid === p.cid));
+  return `<div class="wbd wbkc wcrc"><h5>Curling</h5><p class="wbdpos">${pos != null ? `In your four, ${esc(W_CRR.pos[pos])}.` : WG && WG.shed && !other ? 'A reserve for your four.' : 'Not in your squad.'}</p>
     <div class="wbdbars">${bars}</div><p class="hint">Each level adds a point to one rating (shown as +), mostly to what their kind is good at. Ratings run from 1 to ${wCrCap()}.</p></div>`;
 }
 const wW123StatsCard = wStatsCard;
@@ -58664,7 +58659,7 @@ wRenderCamp = function () {
   const before = JSON.stringify(WG.shed), C = wFourSyncCr(); if (JSON.stringify(C) !== before) wSave();
   body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
     ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampShed(C);
-  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^r\d+$/.test(k) ? k : +k; };
+  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^\d+$/.test(k) ? +k : k; };
   body.querySelectorAll('[data-cpos]').forEach(s => s.onchange = () => wCampSay(wFourSetPos(keyOf(s), s.value)));
   const auto = body.querySelector('[data-cauto]'); if (auto) auto.onclick = () => wCampSay(wFourAutoCr());
   const pr = body.querySelector('[data-cpractice]'); if (pr) pr.onclick = () => wFourCrPractice();

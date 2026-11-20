@@ -139,11 +139,11 @@ function wFourCrPractice() {
 /* ---------- the Curling block on a player's stats ---------- */
 function wCrCard(p) {
   const b = wCrOf(p); if (!b) return '';
-  if (WG && !WG.shed) wFourSyncCr();
+  if (WG && !WG.shed) { wFourSyncCr(); wSave(); }
   const bars = wCR.stats.map(s => { const [ab, what] = W_CRR.stat[s], got = b.got[s] || 0;
     return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wCrCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
-  const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null;
-  return `<div class="wbd wbkc wcrc"><h5>Curling</h5><p class="wbdpos">${pos != null ? `In your four, ${esc(W_CRR.pos[pos])}.` : WG && WG.shed ? 'A reserve for your four.' : 'Not in your squad.'}</p>
+  const pos = WG && WG.shed ? wFourCrPosOf(p.cid || p.id, WG.shed) : null, other = p.cid && !(WG && WG.shed && WG.shed.cu.some(c => c.cid === p.cid));
+  return `<div class="wbd wbkc wcrc"><h5>Curling</h5><p class="wbdpos">${pos != null ? `In your four, ${esc(W_CRR.pos[pos])}.` : WG && WG.shed && !other ? 'A reserve for your four.' : 'Not in your squad.'}</p>
     <div class="wbdbars">${bars}</div><p class="hint">Each level adds a point to one rating (shown as +), mostly to what their kind is good at. Ratings run from 1 to ${wCrCap()}.</p></div>`;
 }
 const wW123StatsCard = wStatsCard;
@@ -187,7 +187,7 @@ wRenderCamp = function () {
   const before = JSON.stringify(WG.shed), C = wFourSyncCr(); if (JSON.stringify(C) !== before) wSave();
   body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
     ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampShed(C);
-  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^r\d+$/.test(k) ? k : +k; };
+  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^\d+$/.test(k) ? +k : k; };
   body.querySelectorAll('[data-cpos]').forEach(s => s.onchange = () => wCampSay(wFourSetPos(keyOf(s), s.value)));
   const auto = body.querySelector('[data-cauto]'); if (auto) auto.onclick = () => wCampSay(wFourAutoCr());
   const pr = body.querySelector('[data-cpractice]'); if (pr) pr.onclick = () => wFourCrPractice();

@@ -37,7 +37,8 @@ function crCollide(a, b) {
   b.h = (b.h || 0) * .5 + (a.h || 0) * CR_STONE.keepCurl * .6; a.h = (a.h || 0) * .5; return true;
 }
 /* one stone thrown among the stones at rest: stones [{ id, s, x, y }], throw { id, s, x0, ang, v, h }; opts { ice,
-   cold, sweep(st, t) -> 0..1, plan (a coarser step, no trace: the CPU's look ahead), maxT }. Returns { stones (in
+   cold, sweep(st, t) -> 0..1 (how hard it is asked to be swept), legs + side (that side's sweepers, their rating and
+   legs: crSweepEff, and the step spends their legs), plan (a coarser step, no trace: the CPU's look ahead), maxT }. Returns { stones (in
    play, at rest), out: [ids gone], path: [[x, y, swept]] of the thrown stone, hits, t, trace: [[t, [[id, x, y]]]],
    stop: where the thrown stone came to rest (or null) }.
    The same run, a step at a time (the page's, so you can sweep as it goes: phase 2): crRunInit makes it, crRunStep moves
@@ -53,10 +54,14 @@ function crRunStep(Q, sweep) {
   if (Q.done) return false;
   const { O, S, T, path } = Q, R = CR_SHEET.stoneR, L = S.filter(st => !st.out), moving = L.filter(st => st.vx || st.vy);
   if (!moving.length || Q.t >= Q.maxT) { Q.done = true; return false; }
-  // (a pair of good sweepers with fresh legs sweeps a little harder than an average pair: up to 1.5)
-  const sw = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1.5) : 0; Q.sw = sw;
+  // how hard the thrown stone is asked to be swept (0 to 1: the page's Space, or the CPU's sweepers), only while it is on
+  // the sheet and moving; with opts.legs, the side's sweepers sweep that times how good they are and their legs, which
+  // the step spends (a good pair with fresh legs sweeps a little harder than an average pair: up to 1.5)
+  const ask = !T.out && (T.vx || T.vy) ? clamp((sweep != null ? sweep : O.sweep ? O.sweep(T, Q.t) : 0) || 0, 0, 1) : 0;
+  const sw = ask && O.legs ? clamp(ask * crSweepEff(O.side), 0, 1.5) : ask; Q.sw = sw;
   // (no stone moves more than half its radius in a step, so a fast one can't pass through another)
   const vmax = Math.max(...moving.map(st => Math.hypot(st.vx, st.vy))), dts = Math.min(Q.dt, .5 * R / Math.max(1, vmax));
+  if (ask && O.legs) crLegsBurn(O.side, ask, dts);
   for (const st of moving) {
     const [ax, ay] = crAccel(st, O.ice, O.cold, st === T ? sw : 0);
     let vx = st.vx + ax * dts, vy = st.vy + ay * dts;

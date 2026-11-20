@@ -22,7 +22,7 @@
    back. onPhase, onPick and onOver hear a new beat, a change to your call and the end.
    Phase 3 is ratings, positions, the sweepers' legs and nerve: stats (the six, in order), rate(kind) (1 to 12), cap,
    fit(r, pos) (r 0 to 1, pos 0 lead to 3 skip), autoOrder(roster), legs (G.legs), pressure(side), sweepers(side) (who
-   sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair), errK(side, shot), and the
+   sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair: run's opts.legs applies it), errK(side, shot), and the
    tables reachRules and legsRules. A roster curler may bring r (1 to 12); a team may bring its order. */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },

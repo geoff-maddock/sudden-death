@@ -138,10 +138,8 @@ function crSlideTick(dt) {
   const X = GP.X; if (!X) return;
   const mine = crYours(X.s);
   // (your sweepers: how hard you hold them to it, times how good they are and their legs, which it spends)
-  // (spent for the stone's time that passed while it was on the sheet and moving)
-  const ask = mine ? crYourSweep() : 0, t0 = X.Q.t;
-  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? (ask ? ask * crSweepEff(X.s) : 0) : undefined);
-  if (ask) crLegsBurn(X.s, ask, X.Q.t - t0);
+  // (the run makes it how hard they really sweep, and spends their legs, only while the stone is on the sheet and moving)
+  crRunTo(X.Q, X.Q.t + dt * CR_PLAY.speed, mine ? crYourSweep() : undefined);
   GP.call = crSkipCall(X);
   if (X.Q.done) crSettle();
 }
@@ -181,7 +179,7 @@ function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;
   GP.mode = m;
   // (a stone of yours sliding as you hand it to the CPU: its sweepers take it over)
-  if (m !== 'play' && GP.ph === 'slide' && GP.X && GP.X.s === GP.you && !GP.X.Q.O.sweep) GP.X.Q.O.sweep = crSweepFn(GP.X.s, crSweeper(GP.X.s, GP.X.plan));
+  if (m !== 'play' && GP.ph === 'slide' && GP.X && GP.X.s === GP.you && !GP.X.Q.O.sweep) GP.X.Q.O.sweep = crSweeper(GP.X.s, GP.X.plan);
   // a stone you were setting up goes back to the CPU in Watch, and the next one is yours in You play
   if (m !== 'play' && (GP.ph === 'aim' || (GP.ph === 'swing' && GP.meter && GP.meter.st !== 'gone'))) { GP.meter = null; crGo('next'); }
 }
