@@ -48,12 +48,14 @@ async def main():
         # ---------- the reason, and the last stone ----------
         r = await pg.evaluate("""(() => { const D = __team(['dwarf', 'dwarf', 'dwarf', 'dwarf']); wCR.start({ seed: 2, ends: 6, teams: [D, D] }); const G = wCR.G, out = {};
           G.stones = [{ id: '0:0', s: 0, x: 3, y: 4 }]; out.take = wCR.reason(1, { shot: 'takeout', target: '0:0' });
-          G.hammer = 0; out.cguard = wCR.reason(1, { shot: 'guard', x: 0, y: -190 }); G.hammer = 1; out.kguard = wCR.reason(1, { shot: 'guard', x: 50, y: -180 });
+          G.hammer = 0; out.cguard = wCR.reason(1, { shot: 'guard', x: 0, y: -190 }); G.hammer = 1; out.kguard = wCR.reason(1, { shot: 'guard', x: 50, y: -180 }); out.hcguard = wCR.reason(1, { shot: 'guard', x: 0, y: -190 });
+          out.voice = ['takeout', 'peel', 'hitroll', 'freeze', 'guard', 'draw'].map(k => wCR.reason(1, { shot: k, x: 0, y: 0, target: '0:0' })).filter(t => /\byou\b|\btheirs?\b/.test(t));
           // the last end, tied, the hammer, the last stone, an empty house
           G.end = 5; G.sc = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]; G.k = 15; G.hammer = 1; G.stones = [];
           const P = wCR.plan(1); out.last = { shot: P.shot, reason: P.reason, inHouse: wCR.inHouse({ x: P.x, y: P.y }) };
           return out; })()""")
-        check('shot stone' in r['take'] and 'steal' in r['cguard'] and 'two' in r['kguard'], 'the skip says why: they have shot stone; a centre guard to steal; a corner guard to set up two', r)
+        check('shot stone' in r['take'] and 'steal' in r['cguard'] and 'two' in r['kguard'] and 'centre' in r['hcguard'], 'the skip says why: the other rink lies shot; a centre guard to steal; a corner guard to set up two (a guard\'s reason says where it is)', r)
+        check(r['voice'] == [], 'every reason is worded for either rink (no "you" or "theirs"), so it reads right on the CPU\'s stones too', r['voice'])
         check(r['last']['shot'] == 'draw' and r['last']['inHouse'] and 'wins' in r['last']['reason'], 'the last end, tied, with the hammer and the last stone into an empty house: the skip draws for the single that wins it', r['last'])
         a = await pg.evaluate("""(() => { const T = __team(['dwarf', 'gorgon', 'wraith', 'vampire']); let w = 0; const n = 14;
           for (let i = 0; i < n; i++) if (wCR.simGame({ seed: 700 + i, ends: 4, skill: [2, 1], hammer: i % 2, teams: [T, T] }).win === 0) w++; return w / n; })()""")
@@ -63,12 +65,12 @@ async def main():
         c = await pg.evaluate("""(() => { const out = {};
           wCR.start({ seed: 3, ends: 4, mode: 'watch', teams: [__team(['dwarf', 'dwarf', 'dwarf', 'dwarf'], { red: 12 }), __team(['dwarf', 'dwarf', 'dwarf', 'dwarf'], { red: 1 })] }); wCR.pause(true);
           let n = 0; while (wCR.G.n < 6 && n++ < 20000) wCR.tick(.05); __to('next');
-          out.paths = wCR.paths; out.read = [wCR.readIn(0), wCR.readIn(1)];
+          out.paths = wCR.paths; out.read = [wCR.readIn(0), wCR.readIn(1)]; out.sheet = wCR.sheet;
           const cv = document.createElement('canvas'); cv.width = 600; cv.height = 220; out.drawn = wCR.chart(cv, 1);
           const d = cv.getContext('2d').getImageData(0, 0, 600, 220).data; const cols = new Set(); for (let i = 0; i < d.length; i += 4 * 97) cols.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]); out.colours = cols.size;
           return out; })()""")
         check(c['paths'] >= 6 and c['drawn'] and c['colours'] > 8, 'the ice chart draws the pebble\'s wear and every stone\'s path this game', c)
-        check(c['read'][0] > c['read'][1] + 100, 'a skip who reads the ice well sees further back from the house than one who doesn\'t', c['read'])
+        check(c['read'][0] > c['read'][1] + 100 and c['read'][0] >= c['sheet']['hog'] - 1 and c['read'][1] >= c['sheet']['houseR'], 'a skip who reads the ice well sees to the hog line, one who doesn\'t still sees the whole house', c['read'])
 
         # ---------- in the Realm ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
@@ -79,6 +81,8 @@ async def main():
         m = await pg.evaluate("""(() => { W_SHED_MODE = 'play'; wShedGame({ seed: 5, mode: 'play', hammer: 1 }); wCR.pause(true); __to('aim'); wShedRows();
           return { why: (document.querySelector('#wShedShot .wshedwhy') || {}).textContent || '', btn: !!document.querySelector('#wShedGo [data-cchart]') }; })()""")
         check(m['why'].startswith('Your skip:') and m['btn'], 'your stone\'s rows say the skip\'s reason, and have an Ice chart button', m)
+        rs = await pg.evaluate("(() => { const s0 = wCR.view.sel.shot; wCR.select({ shot: s0 === 'guard' ? 'draw' : 'guard' }); wShedRows(); return { reason: wCR.view.sel.reason, shown: !!document.querySelector('#wShedShot .wshedwhy') }; })()")
+        check(rs == {'reason': '', 'shown': False}, 'a call you change is yours: the skip\'s reason goes', rs)
         await pg.evaluate("wCR.pause(false)")
         await pg.keyboard.press('c')
         await pg.wait_for_selector('#modalBox #wShedChartCv')
@@ -86,6 +90,8 @@ async def main():
         await pg.click('#modalBox [data-close]')
         after = await pg.evaluate("wCR.paused")
         check(held and not after, 'C opens the ice chart in a box; the game waits while it is open', [held, after])
+        wt = await pg.evaluate("(async () => { $('wShedModes').querySelector('[data-cmode=\"watch\"]').click(); wCR.pause(false); await new Promise(r => setTimeout(r, 50)); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true })); await new Promise(r => setTimeout(r, 50)); const open = !!document.getElementById('wShedChartCv'); const b = document.querySelector('#modalBox [data-close]'); if (b) b.click(); return { open, btn: !!document.getElementById('wShedChartBtn') }; })()")
+        check(wt == {'open': True, 'btn': True}, 'in Watch, C opens the ice chart too, and an Ice chart button sits beside How to play', wt)
         await pg.evaluate("wCR.pause(true); showPage('help')")
         hp = await pg.evaluate("['The skip\\'s call.', 'The ice chart'].every(w => (document.getElementById('wShedHow') || {}).textContent.includes(w))")
         check(hp, 'How to play explains the skip\'s call and the ice chart', hp)

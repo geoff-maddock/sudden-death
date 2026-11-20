@@ -82,6 +82,8 @@ function crSelect(o) {
     S.x = th.x; S.y = th.y - 2 * R - .5;
     if (was && (o.x != null || o.y != null) && !o.shot) return 'A freeze rests just in front of the stone it freezes to: click another stone of theirs to freeze to that one.'; }
   if (!['takeout', 'peel', 'hitroll'].includes(S.shot)) { S.target = null; S.roll = 0; }
+  // (a call you've changed is yours now: the skip's reason was for its own)
+  if (o.shot || o.target || o.x != null || o.y != null || o.h != null) S.reason = '';
   const aim = crSelAim(S); if (!aim) return 'Nothing gets there from here: try the other handle, or another spot.';
   S.aim = aim; GP.sel = S; crPick(); return '';
 }

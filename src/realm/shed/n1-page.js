@@ -66,7 +66,6 @@ function crKeyDown(e) {
   else if (k === 'o') crSelSay(crSelect({ h: 1 }));
   else if (CR_SHOT_KEYS[k]) crSelSay(crSelect({ shot: CR_SHOT_KEYS[k] }));
   else if (k === 'g') crSelSay(crSelect({ suggest: true }));
-  else if (k === 'c') { if (CR_HOOK.onChart) try { CR_HOOK.onChart(); } catch (er) { console.error(er); } }
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
 }
@@ -74,6 +73,13 @@ function crKeyDown(e) {
 function crSelSay(why) { if (why && GP) { GP.msg = why; crPick(); } }
 function crKeyUp(e) { if (e.key === ' ' && CRP.sweepKey) { CRP.sweepKey = false; e.preventDefault(); e.stopPropagation(); } }
 window.addEventListener('keydown', crKeyDown, true);
+// C: the ice chart, whenever the Shed is on screen (Watch too, and while a stone slides)
+window.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() !== 'c' || !CRP.on || !GP || CRP.paused || CRP.cv.offsetParent === null || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return;
+  const m = document.getElementById('modal'); if (m && !m.hidden) return;
+  if (CR_HOOK.onChart) { try { CR_HOOK.onChart(); } catch (er) { console.error(er); } e.preventDefault(); e.stopPropagation(); }
+}, true);
 window.addEventListener('keyup', crKeyUp, true);
 window.addEventListener('blur', () => { CRP.sweepKey = CRP.sweepPtr = CRP.sweepBtn = false; });
 
