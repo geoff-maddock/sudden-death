@@ -9,8 +9,9 @@
    - nerve (nrv): how little the big stones shake them (see pressure);
    - read (red): how well they read the ice as it changes (a Knight skip who reads it well sees it as it is now;
      phase 4's ice chart shows more of it).
-   How far they reach (CR_REACH): an average curler (6.5) misses as the skill says; a rating of 1 by reach / 2 more, of
-   12 by reach / 2 less.
+   How far they reach (CR_REACH): an average curler (6.5) misses as the skill says; draw, line and hit scale the miss by
+   exp(reach x (.5 - rating)) (crReachK: at 1.4, a rating of 1 about twice as wide, of 12 about half); the rest are
+   linear.
    The positions (CR_RULES.posN): the lead throws first (the guards and the draws: draw and line), the second the
    takeouts (hit and sweep), the third the middle stones (hit, draw and read), and the skip the last two (nerve, draw
    and read). crFit says how well ratings suit a position, crAutoOrder sets an order by them: the skip first, then the

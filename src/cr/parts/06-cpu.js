@@ -12,7 +12,8 @@
    each and sweeps a little late (from 300 inches past the hack); a Knight looks at the same shots, thinks about the
    hammer and plays its best three over three throws with its own miss; an
    Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now. (top:
-   how many of its best it weighs; samples: the throws each. Every skill looks at both handles and the hit and roll:
+   how many of its best it weighs; samples: the throws each; ang the line's miss on a draw, hitAng on a hit, wider:
+   a takeout at full weight misses by its line; v the weight's. Every skill looks at both handles and the hit and roll:
    a Squire on one handle and no hit and roll lost to a Knight 91% even with the rest of its tuning.)
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.

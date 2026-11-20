@@ -43,7 +43,8 @@ const W_TILDA_SAY = {
 // her answer to PLAY, in the talk box (wSay), and what follows it (the act): she joins when she can
 function wTildaPlaySay() { const st = wTildaState(); return st === 'ready' && wRoster().length >= W_PARTY.max ? W_TILDA_SAY.full : W_TILDA_SAY[st]; }
 function wTildaJoin() {
-  if (!WG || wTildaState() !== 'ready') return wTildaPlaySay();
+  if (!WG) return '';
+  if (wTildaState() !== 'ready') return wTildaPlaySay();
   // (the flag is set when she really joins, in wAddPlayer: a full roster you won't make room on sends her to camp)
   wRecruitTopic({ kind: W_TILDA.kind, n: W_TILDA.n, lvl: wStarLvl(), flav: W_TILDA.flav });
   return '';
@@ -55,8 +56,11 @@ const wW131Say = wSay;
 wSay = function (id, kw) {
   const r = wW131Say(id, kw);
   if (id !== 'gf_shed' || !WG || !r) return r;
-  if (!(kw || '').trim()) return Object.assign({}, r, { text: wTildaState() === 'team' ? 'Back at the Shed? I come in early to keep the pebble. Old habits. Then I get to sweep it for real.'
-    : `${r.text} Ask me about the ICE before you curl. Or ask me to PLAY. Nobody ever does.` });
+  if (!(kw || '').trim()) { const st = wTildaState();
+    return Object.assign({}, r, { text: st === 'team' ? 'Back at the Shed? I come in early to keep the pebble. Old habits. Then I get to sweep it for real.'
+      : st === 'camp' ? 'My brooms are packed and waiting at your camp. Ask me about the ICE, while you are here.'
+      : st === 'gone' ? 'Back on Hennock\'s brooms, me. Ask me about the ICE, if you curl today.'
+      : `${r.text} Ask me about the ICE before you curl. Or ask me to PLAY.` }); }
   if (r.key === 'play') return Object.assign({}, r, { text: wTildaPlaySay() });
   if (r.key === 'ice') {
     const cold = wShedColdNow(), said = cold === 'heavy' ? 'Heavy today: a warm wind off the sea, and frost on the pebble. Throw it firm, and your sweepers will earn their supper.'

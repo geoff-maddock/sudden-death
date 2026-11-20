@@ -104,7 +104,7 @@ async def main():
         # ---------- the lab's switches (phase 10) ----------
         lb = await pg.evaluate("""(() => { const T = k => ({ name: k, short: 'T', roster: [0, 1, 2, 3].map(i => ({ n: k + i, kind: 'dwarf' })) });
           const held = wCR.simGame({ seed: 41, ends: 4, teams: [T('a'), T('b')], fixShot: ['guard', null] }), S = held.st[0].shots, all = Object.values(S).reduce((a, b) => a + b, 0);
-          wCR.start({ seed: 42, ends: 4, teams: [T('a'), T('b')], wear: false }); const ice0 = JSON.stringify(wCR.G.ice); let n = 0; while (!wCR.G.over && n++ < 200) wCR.turn(); const fresh = JSON.stringify(wCR.G.ice) === ice0 && !!wCR.G.over && wCR.G.n >= 32;
+          wCR.start({ seed: 42, ends: 4, teams: [T('a'), T('b')], wear: false }); const ice0 = JSON.stringify(wCR.G.ice); let n = 0; while (!wCR.G.over && n++ < 200) wCR.turn(); const fresh = JSON.stringify(wCR.G.ice) === ice0 && !!wCR.G.over && wCR.G.n >= 64;
           wCR.start({ seed: 43, ends: 4, teams: [T('a'), T('b')], noSweep: [true, false] }); n = 0; let swept0 = 0, swept1 = 0; while (!wCR.G.over && n++ < 200) { const s = wCR.up(); wCR.turn(); if (s === 0 && wCR.G.legs[0] < 1) swept0++; if (s === 1 && wCR.G.legs[1] < 1) swept1++; } const over = !!wCR.G.over;
           const sum = wCR.simGame({ seed: 44, ends: 4, powers: true, teams: [T('a'), T('b')] });
           return { guards: S.guard || 0, all, fresh, swept0, swept1: swept1 > 0 && over, arrays: Array.isArray(sum.casts) && Array.isArray(sum.pots) }; })()""")

@@ -9,7 +9,8 @@
      call, as a Knight would make it) and puts the broom there; you can change any of it. The aim follows the call on
      the ice as a Knight reads it.
    - The weight: Space starts the meter, and the marker climbs from light to heavy; press again at the line (the
-     call's weight). Early is light, late is heavy, by how far. The line off the broom is your curler's own miss.
+     call's weight, give or take your curler's own touch: their draw or hit rating). Early is light, late is heavy, by
+     how far. The line off the broom is your curler's own miss (a hit's wider), by their ratings.
    - Sweeping: hold Space while your stone slides (a phone: hold the Sweep button). The skip calls it as it goes: "Hurry
      hard!" when the stone would stop well short of the broom, "Sweep!" a little short, "Off!" when it has the weight,
      "Whoa!" when it is heavy. A hit needs no sweeping, and the skip says so.
@@ -124,8 +125,9 @@ const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: 
 // your release: the line off your aim by your curler's line (a hit's wider), the weight off the meter's by their draw or
 // hit rating as well (the meter is your part, the ratings theirs: a good curler is truer for you too)
 function crYourRel(S, ang, wt) {
-  const k = crErrK(GP.you, S.shot), hit = ['takeout', 'peel', 'hitroll'].includes(S.shot), Y = CR_PLAY.you;
-  return { ang: ang + gauss() * (hit ? Y.hitAng : Y.ang) * k.ang, v: S.aim.v * wt * (1 + gauss() * Y.v * k.v), h: S.h };
+  // (the touch on the weight is the ratings' alone: powers, gear and a curse already scale the meter's error, crYourWt)
+  const k = crErrK(GP.you, S.shot), hit = ['takeout', 'peel', 'hitroll'].includes(S.shot), Y = CR_PLAY.you, r = crRat(GP.you, crThrower(GP.you));
+  return { ang: ang + gauss() * (hit ? Y.hitAng : Y.ang) * k.ang, v: S.aim.v * wt * (1 + gauss() * Y.v * crReachK(hit ? CR_REACH.hit : CR_REACH.drw, hit ? r.hit : r.drw)), h: S.h };
 }
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
 function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter, kit = crKitErr(GP.you, crThrower(GP.you)); return clamp(1 + (p - 1) * f.err * f.wt * kit.v, K.low, K.high); }

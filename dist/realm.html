@@ -40561,7 +40561,8 @@ function crSolveHit(x, y, v, h, ice, cold) {
    each and sweeps a little late (from 300 inches past the hack); a Knight looks at the same shots, thinks about the
    hammer and plays its best three over three throws with its own miss; an
    Archmage also looks at draws round the guards, at more throws, misses least and reads the ice as it is now. (top:
-   how many of its best it weighs; samples: the throws each. Every skill looks at both handles and the hit and roll:
+   how many of its best it weighs; samples: the throws each; ang the line's miss on a draw, hitAng on a hit, wider:
+   a takeout at full weight misses by its line; v the weight's. Every skill looks at both handles and the hit and roll:
    a Squire on one handle and no hit and roll lost to a Knight 91% even with the rest of its tuning.)
    The sweepers (crSweeper): on a draw, a guard and a freeze they sweep whenever the stone would stop short of where
    it was called (by its speed now), harder the further short; on a hit they don't.
@@ -40825,7 +40826,8 @@ function crSimGame(opts) {
      call, as a Knight would make it) and puts the broom there; you can change any of it. The aim follows the call on
      the ice as a Knight reads it.
    - The weight: Space starts the meter, and the marker climbs from light to heavy; press again at the line (the
-     call's weight). Early is light, late is heavy, by how far. The line off the broom is your curler's own miss.
+     call's weight, give or take your curler's own touch: their draw or hit rating). Early is light, late is heavy, by
+     how far. The line off the broom is your curler's own miss (a hit's wider), by their ratings.
    - Sweeping: hold Space while your stone slides (a phone: hold the Sweep button). The skip calls it as it goes: "Hurry
      hard!" when the stone would stop well short of the broom, "Sweep!" a little short, "Off!" when it has the weight,
      "Whoa!" when it is heavy. A hit needs no sweeping, and the skip says so.
@@ -40940,8 +40942,9 @@ const crLockSay = () => `You cast a ${G.powWhich[GP.you]} power for this stone: 
 // your release: the line off your aim by your curler's line (a hit's wider), the weight off the meter's by their draw or
 // hit rating as well (the meter is your part, the ratings theirs: a good curler is truer for you too)
 function crYourRel(S, ang, wt) {
-  const k = crErrK(GP.you, S.shot), hit = ['takeout', 'peel', 'hitroll'].includes(S.shot), Y = CR_PLAY.you;
-  return { ang: ang + gauss() * (hit ? Y.hitAng : Y.ang) * k.ang, v: S.aim.v * wt * (1 + gauss() * Y.v * k.v), h: S.h };
+  // (the touch on the weight is the ratings' alone: powers, gear and a curse already scale the meter's error, crYourWt)
+  const k = crErrK(GP.you, S.shot), hit = ['takeout', 'peel', 'hitroll'].includes(S.shot), Y = CR_PLAY.you, r = crRat(GP.you, crThrower(GP.you));
+  return { ang: ang + gauss() * (hit ? Y.hitAng : Y.ang) * k.ang, v: S.aim.v * wt * (1 + gauss() * Y.v * crReachK(hit ? CR_REACH.hit : CR_REACH.drw, hit ? r.hit : r.drw)), h: S.h };
 }
 // your meter's weight, its miss scaled by the stone's powers (a weight power makes it truer, a curse wilder)
 function crYourWt(p) { const f = crFxFor(GP.you), K = CR_PLAY.meter, kit = crKitErr(GP.you, crThrower(GP.you)); return clamp(1 + (p - 1) * f.err * f.wt * kit.v, K.low, K.high); }
@@ -41235,8 +41238,9 @@ function crDraw(c, dt) {
    - nerve (nrv): how little the big stones shake them (see pressure);
    - read (red): how well they read the ice as it changes (a Knight skip who reads it well sees it as it is now;
      phase 4's ice chart shows more of it).
-   How far they reach (CR_REACH): an average curler (6.5) misses as the skill says; a rating of 1 by reach / 2 more, of
-   12 by reach / 2 less.
+   How far they reach (CR_REACH): an average curler (6.5) misses as the skill says; draw, line and hit scale the miss by
+   exp(reach x (.5 - rating)) (crReachK: at 1.4, a rating of 1 about twice as wide, of 12 about half); the rest are
+   linear.
    The positions (CR_RULES.posN): the lead throws first (the guards and the draws: draw and line), the second the
    takeouts (hit and sweep), the third the middle stones (hit, draw and read), and the skip the last two (nerve, draw
    and read). crFit says how well ratings suit a position, crAutoOrder sets an order by them: the skip first, then the
@@ -61311,7 +61315,8 @@ const W_TILDA_SAY = {
 // her answer to PLAY, in the talk box (wSay), and what follows it (the act): she joins when she can
 function wTildaPlaySay() { const st = wTildaState(); return st === 'ready' && wRoster().length >= W_PARTY.max ? W_TILDA_SAY.full : W_TILDA_SAY[st]; }
 function wTildaJoin() {
-  if (!WG || wTildaState() !== 'ready') return wTildaPlaySay();
+  if (!WG) return '';
+  if (wTildaState() !== 'ready') return wTildaPlaySay();
   // (the flag is set when she really joins, in wAddPlayer: a full roster you won't make room on sends her to camp)
   wRecruitTopic({ kind: W_TILDA.kind, n: W_TILDA.n, lvl: wStarLvl(), flav: W_TILDA.flav });
   return '';
@@ -61323,8 +61328,11 @@ const wW131Say = wSay;
 wSay = function (id, kw) {
   const r = wW131Say(id, kw);
   if (id !== 'gf_shed' || !WG || !r) return r;
-  if (!(kw || '').trim()) return Object.assign({}, r, { text: wTildaState() === 'team' ? 'Back at the Shed? I come in early to keep the pebble. Old habits. Then I get to sweep it for real.'
-    : `${r.text} Ask me about the ICE before you curl. Or ask me to PLAY. Nobody ever does.` });
+  if (!(kw || '').trim()) { const st = wTildaState();
+    return Object.assign({}, r, { text: st === 'team' ? 'Back at the Shed? I come in early to keep the pebble. Old habits. Then I get to sweep it for real.'
+      : st === 'camp' ? 'My brooms are packed and waiting at your camp. Ask me about the ICE, while you are here.'
+      : st === 'gone' ? 'Back on Hennock\'s brooms, me. Ask me about the ICE, if you curl today.'
+      : `${r.text} Ask me about the ICE before you curl. Or ask me to PLAY.` }); }
   if (r.key === 'play') return Object.assign({}, r, { text: wTildaPlaySay() });
   if (r.key === 'ice') {
     const cold = wShedColdNow(), said = cold === 'heavy' ? 'Heavy today: a warm wind off the sea, and frost on the pebble. Throw it firm, and your sweepers will earn their supper.'
