@@ -23,7 +23,8 @@ wMakePlayer = function (spec, from) { const p = wW128MakePlayer.apply(this, argu
 const wW128Start = wStart;
 wStart = function (save, opts) {
   const r = wW128Start(save, opts);
-  if (WG) { let n = 0; for (const p of (WG.roster || []).concat(WG.wwait || [])) if (wShedStarFix(p)) n++; if (n && save) wSave(); }
+  // (ratings made again: the captain picks the four again, unless you set it yourself)
+  if (WG) { let n = 0; for (const p of (WG.roster || []).concat(WG.wwait || [])) if (wShedStarFix(p)) n++; if (n && !(WG.shed && WG.shed.mine)) wFourAutoCr(); if (n && save) wSave(); }
   return r;
 };
 

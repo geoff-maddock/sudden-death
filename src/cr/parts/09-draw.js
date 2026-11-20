@@ -12,7 +12,7 @@
    crHouseScr and crHouseUn the house picture (the tests and the pointer use them). Witch-light lamps hang from the
    Shed's beams, and the breath of the sweepers smokes in the cold. */
 const CR_VIEW = { cx: 310, hor: 96, base: 590, px: 2.6, d0: 300, w: 620, hx: 790, hy: 175, hk: 1.55, sx: 655, sy: 360, sw: 270, sh: 230 };
-const CRC = { camY: -700, t: 0 };
+const CRC = { camY: -700, t: 0, figs: [] };
 const crS = y => CR_VIEW.d0 / Math.max(20, y - CRC.camY + CR_VIEW.d0);
 function crScr(x, y) { const V = CR_VIEW, s = crS(y); return [V.cx - x * s * V.px, V.hor + (V.base - V.hor) * s, s]; }
 function crUnscr(sx, sy) { const V = CR_VIEW, s = (sy - V.hor) / (V.base - V.hor); if (s <= .02) return null; return { x: -(sx - V.cx) / (s * V.px), y: V.d0 / s - V.d0 + CRC.camY }; }
@@ -62,35 +62,39 @@ function crLeftDraw(c) {
   crSheetDraw(c);
   const S = GP && GP.sel, X = GP && GP.X;
   if (GP && (GP.ph === 'aim' || GP.ph === 'swing') && S) crBroomDraw(c, S.x, S.y, '#ffd34a');
-  const st = crStonesNow().slice().sort((a, b) => b[2] - a[2]);
-  for (const [id, x, y] of st) { const [sx, sy, s] = crScr(x, y); if (s < .03) continue; crStoneDraw(c, sx, sy, .55, G.teams[crSideOf(id === 'new' && X ? X.s : id)].color || '#888', s * CR_VIEW.px); }
-  // the players on the ice: the broom behind the call, the sweepers beside the stone
-  crFigsDraw(c);
-  // the sweepers at the stone, brooms going while it is swept
-  if (X && X.Q.sw > 0) { const T = X.Q.T, [sx, sy, s] = crScr(T.x, T.y + 18); c.save(); c.strokeStyle = '#e7d9b0'; c.lineWidth = Math.max(1, 3 * s);
-    for (const k of [-1, 1]) { const w = Math.sin(CRC.t * 22 + k) * 10 * s * 2.6; c.beginPath(); c.moveTo(sx + k * 14 * s * 2.6 + w, sy); c.lineTo(sx + k * 24 * s * 2.6, sy - 22 * s * 2.6); c.stroke(); }
-    c.fillStyle = 'rgba(230,245,255,.35)'; c.beginPath(); c.arc(sx, sy - 30 * s * 2.6, 8 * s * 2.6, 0, Math.PI * 2); c.fill(); c.restore(); }
+  // the stones and the players on the ice, farthest first, so nearer ones are drawn over them
+  CRC.figs = [];
+  const items = crStonesNow().map(([id, x, y]) => ({ y, draw: () => { const [sx, sy, s] = crScr(x, y); if (s < .03) return; crStoneDraw(c, sx, sy, .55, G.teams[crSideOf(id === 'new' && X ? X.s : id)].color || '#888', s * CR_VIEW.px); } }))
+    .concat(crFigsList().map(f => ({ y: f.y, draw: () => crFigAt(c, f) })));
+  items.sort((a, b) => b.y - a.y).forEach(it => it.draw());
 }
 // the clock the figures animate on (src/figures/figures.js asks every engine for one)
 function figClock() { return CRC.t; }
 /* the players on the ice, drawn as their own kind (the figures every scoped engine shares), in their side's colours:
    the one holding the broom stands behind it while a stone is called (the skip, or the third when the skip throws),
-   and the two sweepers run beside a stone as it slides, brooms going while it is swept */
+   and the two sweepers walk beside a stone as it slides, and run with their brooms going while it is swept. CRC.figs:
+   who was drawn in the last picture ('broom', 'sweeper') */
 const CR_FIG = { tall: 54, broomBack: 26, sweepOff: 36 };
 const crTeamLook = s => { const T = G.teams[s]; return { color: T.color || '#888', light: T.light || '#f2ead8', short: T.short || T.name || '?' }; };
-function crFigAt(c, s, ri, x, y, o) {
-  const [sx, sy, sc] = crScr(x, y); if (sc < .05 || sy > 640) return;
-  const m = G.teams[s].roster[ri] || {}, kind = KIND[m.kind] ? m.kind : 'goblin';
-  drawFig(c, kind, sx, sy, sc * CR_VIEW.px * CR_FIG.tall, crTeamLook(s), Object.assign({ num: ri + 1 }, o || {}));
+function crFigAt(c, f) {
+  const [sx, sy, sc] = crScr(f.x, f.y); if (sc < .05 || sy > 640) return;
+  const m = G.teams[f.s].roster[f.ri] || {}, kind = KIND[m.kind] ? m.kind : 'goblin', px = sc * CR_VIEW.px;
+  drawFig(c, kind, sx, sy, px * CR_FIG.tall, crTeamLook(f.s), Object.assign({ num: f.ri + 1 }, f.o || {}));
+  // a sweeper's broom, from the hands to the ice in front of the stone, going while it is swept
+  if (f.broom) { const [bx, by] = crScr(f.broom.x + (f.broom.sw ? Math.sin(CRC.t * 22 + f.ri) * 6 : 0), f.broom.y); c.save(); c.strokeStyle = '#e7d9b0'; c.lineWidth = Math.max(1, 3 * sc);
+    c.beginPath(); c.moveTo(sx + (f.x > f.broom.x ? -1 : 1) * 10 * px, sy - 30 * px); c.lineTo(bx, by); c.stroke();
+    if (f.broom.sw) { c.fillStyle = 'rgba(230,245,255,.35)'; c.beginPath(); c.arc(bx, by - 2 * px, 5 * px, 0, Math.PI * 2); c.fill(); } c.restore(); }
+  CRC.figs.push(f.who);
 }
-function crFigsDraw(c) {
-  if (!GP || !G.order) return;
+function crFigsList() {
+  const out = []; if (!GP || !G.order) return out;
   const S = GP.sel, X = GP.X, call = (GP.ph === 'aim' || GP.ph === 'swing') && S ? { s: GP.you, x: S.x, y: S.y } : GP.ph === 'addr' && GP.cpu ? { s: GP.cpu.s, x: GP.cpu.plan.x, y: GP.cpu.plan.y } : null;
-  if (call && call.x != null) { const pos = crPos(call.s), broom = G.order[call.s][pos === 3 ? 2 : 3]; crFigAt(c, call.s, broom, call.x, call.y + CR_FIG.broomBack, { flip: true }); }
+  if (call && call.x != null) { const pos = crPos(call.s), broom = G.order[call.s][pos === 3 ? 2 : 3]; out.push({ who: 'broom', s: call.s, ri: broom, x: call.x, y: call.y + CR_FIG.broomBack, o: { flip: true } }); }
   if (X && !X.Q.T.out) {
-    const T = X.Q.T, sw = X.Q.sw > 0, run = sw ? CRC.t * 9 : 0;
-    crSweepers(X.s).forEach((ri, i) => crFigAt(c, X.s, ri, T.x + (i ? -1 : 1) * CR_FIG.sweepOff, T.y + 6, { run, flip: !!i }));
+    const T = X.Q.T, sw = X.Q.sw > 0, moving = !!(T.vx || T.vy), run = moving ? CRC.t * (sw ? 9 : 4) : 0;
+    crSweepers(X.s).forEach((ri, i) => { const k = i ? -1 : 1; out.push({ who: 'sweeper', s: X.s, ri, x: T.x + k * CR_FIG.sweepOff, y: T.y + 6, o: { run, flip: !!i }, broom: { x: T.x + k * 4, y: T.y + 16, sw } }); });
   }
+  return out;
 }
 // the house from above, and the sheet strip
 function crRightDraw(c) {

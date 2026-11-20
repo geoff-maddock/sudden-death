@@ -1,6 +1,6 @@
 /* Superstars, drawn (issue #24, phase 2). One file, loaded five times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK: their manifests in src/realm/diamond,
-   gridiron, ring and court), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the four scoped engines share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
