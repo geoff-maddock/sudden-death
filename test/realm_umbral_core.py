@@ -41,14 +41,14 @@ async def main():
         check(u['umb'] and u['den'] and u['tile'] == 'D' and u['json'] and u['again'] is False, 'winning the Crown opens the Umbral once (WG.umbral, plain data), marks the Road to Nowhere, and shows the portal', u)
 
         mp = await pg.evaluate("""(() => { const out = {};
-          for (const id of ['u:world', 'u:umbralden']) { const m = MAPS[id], used = []; for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) { const c = m.t[y][x], td = DB.tiles[c] || {}; if (td.use && c !== 'S' && !(m.meta[x + ',' + y] || {}).loc) used.push(c + '@' + x + ',' + y); } out[id] = used.slice(0, 5); }
+          for (const id of ['u:world', 'u:umbralden']) { const m = MAPS[id], used = []; for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) { const c = m.t[y][x], td = DB.tiles[c] || {}; if (td.use && c !== 'S' && c !== W_UMB2.ch && !(m.meta[x + ',' + y] || {}).loc) used.push(c + '@' + x + ',' + y); } out[id] = used.slice(0, 5); }
           out.pal = [wMapPal(MAPS['u:umbralden']).id, MAPS['u:world'].region[37 + 6 * WW]];
           const reach = (m) => { const P = m.uPortal || Object.keys(m.meta).find(k => m.meta[k].portal).split(',').map(Number), s = bfsReach(m, m.spawn[0], m.spawn[1]); return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => s[(P[1] + dy) * m.w + P[0] + dx]); };
           out.reach = [reach(MAPS.umbralden), reach(MAPS['u:umbralden'])];
           out.names = [MAPS['u:world'].name, MAPS['u:umbralden'].name];
           out.audit = wAudit().filter(s => /u:|umbral|portal/i.test(s));
           return out; })()""")
-        check(mp['u:world'] == [] and mp['u:umbralden'] == [], 'the dark maps have nothing to use yet (no wells, nests, bushes or eggs to take twice)', mp)
+        check(mp['u:world'] == [] and mp['u:umbralden'] == [], 'the dark maps have nothing to use yet but their lanterns (no wells, nests, bushes or eggs to take twice)', mp)
         check(mp['pal'] == ['urime', 'urime'] and mp['reach'] == [True, True] and mp['names'] == ['The Umbral Realm', 'The Road to Somewhere'] and mp['audit'] == [], 'they are drawn in the dark palettes, the portal can be walked to on both sides, and the audit is clean', mp)
 
         cr = await pg.evaluate("""(() => { const [x, y] = W_UMB.portal.umbralden, out = {};
@@ -59,11 +59,11 @@ async def main():
           // (off the dark road's west end: the dark world, by the Road to Nowhere)
           WG.x = 0; WG.y = 6; wTryMove(-1, 0); wDrain(); const L = DB.locs.find(l => l.id === 'umbralden');
           out.world = { map: WG.map, at: [WG.x, WG.y], want: [L.x, L.y + 1], name: wRegionName() };
-          // (a town on the dark world is shut)
-          const T = DB.locs.find(l => l.id === 'rimewatch'); WG.x = T.x; WG.y = T.y + 1; wTryMove(0, -1); wDrain();
+          // (a place on the dark world with no dark map yet is shut: a dungeon)
+          const T = DB.locs.find(l => l.kind === 'dungeon' && !MAPS['u:' + l.map]); WG.x = T.x; WG.y = T.y + 1; wTryMove(0, -1); wDrain();
           out.shut = { map: WG.map, at: [WG.x, WG.y], want: [T.x, T.y + 1], log: WLOG.slice(-1)[0][0] };
           // (a border crossed on the dark world says the dark region; a light map's picture cleared clears its dark copy's)
-          const n0 = WLOG.length; wAmbient(MAPS['u:world'], 'plains'); out.arrive = WLOG.slice(n0).map(l => l[0]).join(' ');
+          const n0 = WLOG.length, rg = regionAt(WG.x, WG.y); wAmbient(MAPS['u:world'], rg === 'plains' ? 'rime' : 'plains'); out.arrive = WLOG.slice(n0).map(l => l[0]).join(' '); out.wantArrive = W_UMB.arrive[rg]; out.light = DB.regions[rg].name;
           WLAY['u:world'] = WLAY['u:world'] || { m: MAPS['u:world'] }; wInvalidate('world'); out.inval = !WLAY['u:world'];
           // (and an alpha's lair, used rather than walked into)
           const Z = DB.locs.find(l => l.kind === 'lair'); WG.x = Z.x; WG.y = Z.y + 1; const v0 = UI.view; wTryMove(0, -1); wDrain();
@@ -73,8 +73,8 @@ async def main():
         check(cr['saved'] == 1, 'the crossing is counted in the save the map change makes', cr)
         check(cr['over']['map'] == 'u:umbralden' and cr['over']['crossed'] == 1 and cr['over']['region'] == 'rime' and cr['over']['name'] == 'The Deadspire' and cr['over']['dusk'] and cr['over']['near'] == 1, 'stepping into the portal crosses to the dark road, beside its portal, in the Deadspire, at dusk or darker', cr)
         check(cr['world']['map'] == 'u:world' and cr['world']['at'] == cr['world']['want'] and cr['world']['name'] == 'The Deadspire', 'leaving the dark road comes out on the dark world, by the Road to Nowhere', cr)
-        check(cr['shut']['map'] == 'u:world' and cr['shut']['at'] == cr['shut']['want'] and 'shut' in cr['shut']['log'], 'a town on the dark world is shut for now, and you stay outside it', cr)
-        check('Deadspire' in cr['arrive'] and 'Frostspire' not in cr['arrive'] and cr['inval'], 'crossing a border on the dark world names the dark region; clearing the light world\'s picture clears the dark one\'s', cr)
+        check(cr['shut']['map'] == 'u:world' and cr['shut']['at'] == cr['shut']['want'] and 'shut' in cr['shut']['log'], 'a place on the dark world with nothing built behind it yet is shut, and you stay outside it', cr)
+        check(cr['arrive'] == cr['wantArrive'] and cr['light'] not in cr['arrive'] and cr['inval'], 'crossing a border on the dark world names the dark region; clearing the light world\'s picture clears the dark one\'s', cr)
         check(cr['lair']['map'] == 'u:world' and cr['lair']['view'] == 'world' and not cr['lair']['fight'] and 'shut' in cr['lair']['log'], 'so is an alpha\'s lair: no light match starts from the dark world', cr)
 
         await pg.wait_for_timeout(400)
