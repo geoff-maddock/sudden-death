@@ -44,6 +44,8 @@ async def main():
         k = await pg.evaluate("""(async () => { const out = {}; RUN.hp = RUN.maxhp = 999; WG.grace = 99;
           const play = async (o) => { startMatch(Object.assign({ ids: ['skelss'], type: 'normal', card: false, sport: 'baseball' }, o)); await new Promise(r => { const f = () => (UI.view === 'fight' && B && !B.over) ? r() : setTimeout(f, 20); f(); });
             const fp = B.foePet ? { kind: B.foePet.kind, skill: B.foePet.skill } : null; for (const e of B.enemies) { e.hp = 0; e.dead = true; } B.over = 'win'; consumeFx(); renderFightHUD(); finishFight();
+            // (gone as the fight finishes, in memory and in the save, before the reward panel's Continue)
+            if (fp) { out.atFinish = RUN.foePet == null && !JSON.stringify(localStorage).includes('"foePet":{'); }
             await new Promise(r => { const f = () => UI.view !== 'fight' ? r() : setTimeout(f, 20); f(); }); """ + ESC + """ return fp; };
           out.road = await play({ tier: 2, world: { kind: 'event', ref: { rival: 'ironmaw' }, region: 'plains' } }); out.clearedWin = RUN.foePet == null;
           startMatch({ ids: ['skelss'], type: 'normal', card: false, sport: 'baseball', tier: 1, world: { kind: 'event', ref: { rival: 'bramblegate' }, region: 'plains' } });
@@ -51,6 +53,7 @@ async def main():
           B.over = 'lose'; finishFight(); out.clearedLoss = RUN.foePet == null; await new Promise(r => { const f = () => UI.view !== 'fight' ? r() : setTimeout(f, 20); f(); }); for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); RUN.hp = RUN.maxhp = 999;
           out.wild = await play({ tier: 1, world: { kind: 'wild', region: 'plains' } });
           return out; })()""")
+        check(k.pop('atFinish', None) is True, 'the club\'s pet is gone as the fight finishes, from the save too', k)
         check(k.pop('clearedWin', None) is True and k.pop('loseHad', None) is True and k.pop('clearedLoss', None) is True, 'the club\'s pet is gone once the match is over, won or lost', k)
         check(k == {'road': {'kind': 'wyvern', 'skill': 2}, 'wild': None}, 'a club\'s match brings its pet (the tier as its skill); any other match has none', k)
 
@@ -61,6 +64,9 @@ async def main():
           // (the trick alone, then the turn really ending: its Weak 1 still on you for your next turn)
           B.P.block = 0; const h0 = RUN.hp; fire('turnEnd'); out.used = B.foePet.used; out.hit = h0 - RUN.hp; out.weak0 = sv(B.P, 'weak');
           B.foePet.used = true; for (const k of ['weak', 'vuln']) addSt(B.P, k, -1); out.weak = sv(B.P, 'weak');
+          // (on a real end of turn, the Weak it lays gets its extra turn)
+          __rv('wyvern', 3); B.P.block = 0; const laid = []; const d0 = debuffP; debuffP = function (k, n) { if (k === 'weak' && B.foePet && B.foePet.atEnd) laid.push(n); return d0.apply(this, arguments); };
+          try { runSteps(endTurn()); } finally { debuffP = d0; } out.realEnd = laid;
           // (the hit alone, in a scoring sport: no run for them)
           LAB = true; RUN.clock = 1 * MOON_EVERY; RUN.pet = null; RUN.foePet = { kind: 'wyvern', skill: 3 }; startCombat(['skelss', 'thief'], 'normal', 'football');
           B.P.block = 0; B.turn = 1; const sc0 = B.sc.them; fire('turnEnd'); out.noScore = B.foePet.used ? B.sc.them - sc0 : 'not thrown';
@@ -70,6 +76,7 @@ async def main():
           const r0 = R; R = () => 0; __rv('griffon', 1, 'blinkpup'); B.P.block = 99; B.turn = 1; fire('turnEnd'); out.green = B.foePet.used; out.spooked = B.pet.spooked; R = r0;
           const snap = JSON.parse(JSON.stringify(B)); out.saved = !!snap.foePet && snap.foePet.used === true;
           return out; })()""")
+        check(t['realEnd'] == [2], 'on a real end of turn, the trick\'s Weak 1 is laid with its extra turn', t)
         check(t['trait'] >= 2 and t['wait'] is False and t['used'] is True and t['hit'] == 9 and t['weak0'] == 2 and t['weak'] == 1, 'a skilled side waits for its trick until it hurts (the Wyvern\'s Venom Sting with your Block down); its trait works from the start', t)
         check(t['gear'] and t['noScore'] == 0, 'a rival pet\'s hit is plain damage: no gear (pads, helmet, shoulder pads), Seeing Red, Spikes or score (in football) is set off by it', t)
         check(t['power'] == 4 and t['green'] and t['spooked'] and t['saved'], 'its power on its moment (every third turn); a green side throws its trick whenever; the Griffon\'s Dive spooks your pet; the battle\'s state keeps it', t)

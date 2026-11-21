@@ -3852,13 +3852,14 @@ function foePetOn(ev, a) {
   if (!B || !B.foePet || B.over) return;
   const p = B.foePet, F = FOE_PETS[p.kind]; if (!F) return;
   if (ev === 'turnStart') p.t = {};
-  // (atEnd: what it does as your turn ends, which foeDeb reads; never left set, nor saved set)
-  p.atEnd = ev === 'turnEnd';
+  // (atEnd: what it does as your turn ends, which foeDeb reads; put back as it was after, so a call inside another
+  // leaves the outer one's alone, and never left set)
+  const was = p.atEnd; p.atEnd = ev === 'turnEnd' || !!was;
   try {
     for (const h of [F.trait, F.power]) if (h && h.on && h.on[ev] && !B.over) h.on[ev](a, p);
     // (the trick: once a match, as your turn ends and theirs begins)
     if (ev === 'turnEnd' && !p.used && !B.over && F.trick && alive().length && foeTrickNow(F, p)) { p.used = true; foeSay(`${F.trick.n}!`); F.trick.go(p); }
-  } finally { delete p.atEnd; }
+  } finally { if (was) p.atEnd = was; else delete p.atEnd; }
 }
 for (const ev of ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'enemyFalls']) onHook(ev, a => foePetOn(ev, a));
 /* The pets (issue #104): small monsters from the D&D 5e SRD (5.1, CC-BY-4.0) or common myth, with a little whimsy. The
@@ -62719,9 +62720,10 @@ wKickoff = function (enc) {
 const wW137ReturnToWorld = wReturnToWorld, wW137MatchLost = wMatchLost;
 wReturnToWorld = function () { if (RUN) RUN.foePet = null; return wW137ReturnToWorld.apply(this, arguments); };
 wMatchLost = function () { if (RUN) RUN.foePet = null; return wW137MatchLost.apply(this, arguments); };
-// (as the fight finishes, before the reward panel: nothing after it needs the club's pet)
+// (as the fight finishes, before its save and the reward panel: nothing after needs the club's pet; B.foePet has the
+// fight's own copy)
 const wW137FinishFight = finishFight;
-finishFight = function () { const r = wW137FinishFight.apply(this, arguments); if (WG && RUN && B && B.over) RUN.foePet = null; return r; };
+finishFight = function () { if (WG && RUN && B && B.over) RUN.foePet = null; return wW137FinishFight.apply(this, arguments); };
 const wW137PreGame = wPreGame;
 wPreGame = function (enc) {
   wW137PreGame.apply(this, arguments);

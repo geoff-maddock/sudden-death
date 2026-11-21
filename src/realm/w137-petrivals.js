@@ -33,9 +33,10 @@ wKickoff = function (enc) {
 const wW137ReturnToWorld = wReturnToWorld, wW137MatchLost = wMatchLost;
 wReturnToWorld = function () { if (RUN) RUN.foePet = null; return wW137ReturnToWorld.apply(this, arguments); };
 wMatchLost = function () { if (RUN) RUN.foePet = null; return wW137MatchLost.apply(this, arguments); };
-// (as the fight finishes, before the reward panel: nothing after it needs the club's pet)
+// (as the fight finishes, before its save and the reward panel: nothing after needs the club's pet; B.foePet has the
+// fight's own copy)
 const wW137FinishFight = finishFight;
-finishFight = function () { const r = wW137FinishFight.apply(this, arguments); if (WG && RUN && B && B.over) RUN.foePet = null; return r; };
+finishFight = function () { if (WG && RUN && B && B.over) RUN.foePet = null; return wW137FinishFight.apply(this, arguments); };
 const wW137PreGame = wPreGame;
 wPreGame = function (enc) {
   wW137PreGame.apply(this, arguments);
