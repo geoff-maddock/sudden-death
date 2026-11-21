@@ -32,8 +32,9 @@ async def main():
         await pg.wait_for_selector('#wGo'); await pg.click('#wGo')
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
 
-        b = await pg.evaluate("""(() => { const [x, y] = W_UMB.portal.umbralden; return { on: wUmbOn(), tile: wTileAt(MAPS.umbralden, x, y), dark: !!MAPS['u:world'] && !!MAPS['u:umbralden'] }; })()""")
-        check(not b['on'] and b['tile'] != 'D' and b['dark'], 'before the Crown the Umbral is shut and the light portal isn\'t there (the dark maps are built all the same)', b)
+        b = await pg.evaluate("""(() => { const [x, y] = W_UMB.portal.umbralden, m0 = WG.map, x0 = WG.x, y0 = WG.y; wEnterMap('umbralden', 2, 6); const look = wLookText(x, y), raw = MAPS.umbralden.t[y][x], meta = !!MAPS.umbralden.meta[x + ',' + y];
+          wEnterMap(m0, x0, y0); return { on: wUmbOn(), tile: wTileAt(MAPS.umbralden, x, y), raw, meta, look, dark: !!MAPS['u:world'] && !!MAPS['u:umbralden'] }; })()""")
+        check(not b['on'] and b['tile'] != 'D' and b['raw'] != 'D' and not b['meta'] and 'tear' not in b['look'] and b['dark'], 'before the Crown the Umbral is shut, and nothing of the light portal shows: not its tile, not in the raw map (the local map), not to Look (the dark maps are built all the same)', b)
 
         u = await pg.evaluate("""(() => { const [x, y] = W_UMB.portal.umbralden; wSetFlag('champion'); const U = WG.umbral;
           return { umb: !!U && Array.isArray(U.pieces) && U.finale === 0, den: wFlag('clue_den'), tile: wTileAt(MAPS.umbralden, x, y), json: JSON.stringify(WG.umbral) === JSON.stringify(JSON.parse(JSON.stringify(WG.umbral))), again: wUmbralUnlock() }; })()""")
@@ -42,7 +43,7 @@ async def main():
         mp = await pg.evaluate("""(() => { const out = {};
           for (const id of ['u:world', 'u:umbralden']) { const m = MAPS[id], used = []; for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) { const c = m.t[y][x], td = DB.tiles[c] || {}; if (td.use && c !== 'S' && !(m.meta[x + ',' + y] || {}).loc) used.push(c + '@' + x + ',' + y); } out[id] = used.slice(0, 5); }
           out.pal = [wMapPal(MAPS['u:umbralden']).id, MAPS['u:world'].region[37 + 6 * WW]];
-          const reach = (m) => { const P = Object.keys(m.meta).find(k => m.meta[k].portal).split(',').map(Number), s = bfsReach(m, m.spawn[0], m.spawn[1]); return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => s[(P[1] + dy) * m.w + P[0] + dx]); };
+          const reach = (m) => { const P = m.uPortal || Object.keys(m.meta).find(k => m.meta[k].portal).split(',').map(Number), s = bfsReach(m, m.spawn[0], m.spawn[1]); return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => s[(P[1] + dy) * m.w + P[0] + dx]); };
           out.reach = [reach(MAPS.umbralden), reach(MAPS['u:umbralden'])];
           out.names = [MAPS['u:world'].name, MAPS['u:umbralden'].name];
           out.audit = wAudit().filter(s => /u:|umbral|portal/i.test(s));
@@ -53,6 +54,7 @@ async def main():
         cr = await pg.evaluate("""(() => { const [x, y] = W_UMB.portal.umbralden, out = {};
           wEnterMap('umbralden', 2, 6); const [bx, by] = wUmbBeside(MAPS.umbralden, x, y); WG.x = bx; WG.y = by;
           wTryMove(x - bx, y - by); wDrain();
+          out.saved = (wLoadSave().WG.umbral || {}).crossed;
           out.over = { map: WG.map, crossed: WG.umbral.crossed, region: wRegionHere(), name: wRegionName(), dusk: wDarkness() >= W_UMB.dusk, near: Math.abs(WG.x - x) + Math.abs(WG.y - y) };
           // (off the dark road's west end: the dark world, by the Road to Nowhere)
           WG.x = 0; WG.y = 6; wTryMove(-1, 0); wDrain(); const L = DB.locs.find(l => l.id === 'umbralden');
@@ -60,19 +62,26 @@ async def main():
           // (a town on the dark world is shut)
           const T = DB.locs.find(l => l.id === 'rimewatch'); WG.x = T.x; WG.y = T.y + 1; wTryMove(0, -1); wDrain();
           out.shut = { map: WG.map, at: [WG.x, WG.y], want: [T.x, T.y + 1], log: WLOG.slice(-1)[0][0] };
+          // (a border crossed on the dark world says the dark region; a light map's picture cleared clears its dark copy's)
+          const n0 = WLOG.length; wAmbient(MAPS['u:world'], 'plains'); out.arrive = WLOG.slice(n0).map(l => l[0]).join(' ');
+          WLAY['u:world'] = WLAY['u:world'] || { m: MAPS['u:world'] }; wInvalidate('world'); out.inval = !WLAY['u:world'];
           // (and an alpha's lair, used rather than walked into)
           const Z = DB.locs.find(l => l.kind === 'lair'); WG.x = Z.x; WG.y = Z.y + 1; const v0 = UI.view; wTryMove(0, -1); wDrain();
           out.lair = { map: WG.map, view: UI.view, fight: !!B, log: WLOG.slice(-1)[0][0] };
           WG.x = T.x; WG.y = T.y + 1;
           wSave(); return out; })()""")
+        check(cr['saved'] == 1, 'the crossing is counted in the save the map change makes', cr)
         check(cr['over']['map'] == 'u:umbralden' and cr['over']['crossed'] == 1 and cr['over']['region'] == 'rime' and cr['over']['name'] == 'The Deadspire' and cr['over']['dusk'] and cr['over']['near'] == 1, 'stepping into the portal crosses to the dark road, beside its portal, in the Deadspire, at dusk or darker', cr)
         check(cr['world']['map'] == 'u:world' and cr['world']['at'] == cr['world']['want'] and cr['world']['name'] == 'The Deadspire', 'leaving the dark road comes out on the dark world, by the Road to Nowhere', cr)
         check(cr['shut']['map'] == 'u:world' and cr['shut']['at'] == cr['shut']['want'] and 'shut' in cr['shut']['log'], 'a town on the dark world is shut for now, and you stay outside it', cr)
+        check('Deadspire' in cr['arrive'] and 'Frostspire' not in cr['arrive'] and cr['inval'], 'crossing a border on the dark world names the dark region; clearing the light world\'s picture clears the dark one\'s', cr)
         check(cr['lair']['map'] == 'u:world' and cr['lair']['view'] == 'world' and not cr['lair']['fight'] and 'shut' in cr['lair']['log'], 'so is an alpha\'s lair: no light match starts from the dark world', cr)
 
         await pg.wait_for_timeout(400)
         await pg.screenshot(path='/tmp/umbral_world.png')
         await pg.goto(REALM_URL); await pg.wait_for_function("typeof wUmbralUnlock === 'function'")
+        tl = await pg.evaluate("(() => { renderTitle(); const sp = document.querySelector('#resumeRow span'); return sp ? sp.textContent : ''; })()")
+        check(tl.startswith('The Umbral Realm.') and 'u:' not in tl, 'the title\'s Continue row names the dark place, not its map id', tl)
         ld = await pg.evaluate("""(() => { const s = wLoadSave(); wStart(s); return { map: WG.map, at: [WG.x, WG.y], umb: !!WG.umbral && WG.umbral.crossed === 1, view: UI.view }; })()""")
         check(ld['map'] == 'u:world' and ld['at'] == cr['shut']['want'] and ld['umb'] and ld['view'] == 'world', 'a save on the dark side loads back on the dark side, the Umbral as it was', ld)
 

@@ -63182,9 +63182,11 @@ W_QUICK.push({ id: 'pets', n: 'Pets', where: 'your camp', more: 'wHelpPets',
    On the dark side: region names are the dark ones (W_UMB.regions), it is never brighter than dusk, and the world
    map's fog is left alone (phase 2 gives the Umbral its own).
 
-   W_UMB, wUmb, wUmbOn, wUmbDark, wUmbralUnlock, wUmbralMap, wUmbCross
-   Wraps: buildAllMaps (wWU0BuildAllMaps: the dark maps and the light portal), wTileAt (wWU0TileAt: the light portal
-   hidden while shut), wStepEnter (wWU0StepEnter: the portal; places on the dark world), wLeaveToWorld
+   W_UMB, wUmb, wUmbOn, wUmbDark, wUmbralUnlock, wUmbralMap, wUmbCross, wUmbPortalAt
+   Wraps: buildAllMaps (wWU0BuildAllMaps: the dark maps and the light portal's spot), wTileAt (wWU0TileAt: the light
+   portal, once open), wLookText (wWU0LookText: its words, once open), wInvalidate (wWU0Invalidate: a dark copy's
+   picture with its light map's), wAmbient (wWU0Ambient: the dark regions' arrival lines), renderTitle
+   (wWU0RenderTitle: a dark place's name on the Continue row), wStepEnter (wWU0StepEnter: the portal; places on the dark world), wLeaveToWorld
    (wWU0LeaveToWorld: off a dark place onto the dark world), wUse (wWU0Use: a lair on the dark world is shut), wRegionHere (wWU0RegionHere: a dark place's own region),
    wRegionName (wWU0RegionName), wDarkness (wWU0Darkness), wMapRevealHere (wWU0MapRevealHere), wSetFlag
    (wWU0SetFlag: the Crown unlocks it), wStart (wWU0Start: a journey that won the Crown before). */
@@ -63198,7 +63200,7 @@ const W_UMB = {
   signs: { umbralden: 'Somebody made this road. It was here before the spring, and it goes somewhere, and at the end of it something waits for the light.' },
   // the portal, at the end of the Road to Nowhere, past the nest
   portal: { umbralden: [16, 6] },
-  dusk: .35,
+  dusk: .28,   // dim, but under wIsNight's .3: the dark side's rules are day's till its own night
 };
 
 const wUmb = () => (typeof WG !== 'undefined' && WG && WG.umbral) || null;
@@ -63273,13 +63275,16 @@ function wUmbralMap(m) {
   }
   return u;
 }
-// a portal on a map: the tile, what it says, and a light on the dark side
+// a portal on a map. The dark one is a tile with its words and a light. The light one is only a spot (m.uPortal): the
+// map's own tiles and meta are left as they were, and wTileAt and wLookText show it once the Umbral is open, so
+// nothing reading the raw map (the local map, Look) gives it away before the Crown
 function wUmbPortal(m, x, y, dark) {
-  if (!dark) { m.uPortal = [x, y]; m.uPortalUnder = m.t[y][x]; }
+  if (!dark) { m.uPortal = [x, y]; return; }
   m.t[y][x] = 'D';
-  m.meta[x + ',' + y] = { portal: 1, look: dark ? 'The portal, from the wrong side. Through it, faintly, snow that is white.' : 'A tear in the air at the end of the road. The snow around it is black, and cold comes out of it.' };
-  if (dark) m.light.push([x, y, 3.2]);
+  m.meta[x + ',' + y] = { portal: 1, look: 'The portal, from the wrong side. Through it, faintly, snow that is white.' };
+  m.light.push([x, y, 3.2]);
 }
+const wUmbPortalAt = (m, x, y) => !!m && (m.uPortal ? m.uPortal[0] === x && m.uPortal[1] === y && wUmbOn() : !!(m.meta[x + ',' + y] || {}).portal);
 const wWU0BuildAllMaps = buildAllMaps;
 buildAllMaps = function () {
   const r = wWU0BuildAllMaps.apply(this, arguments);
@@ -63291,29 +63296,42 @@ buildAllMaps = function () {
   }
   return r;
 };
-// the light portal is ground till the Umbral opens
+// the light portal is there once the Umbral opens
 const wWU0TileAt = wTileAt;
 wTileAt = function (map, x, y) {
   const c = wWU0TileAt(map, x, y);
-  if (c === 'D' && map.uPortal && map.uPortal[0] === x && map.uPortal[1] === y && !wUmbOn()) return map.uPortalUnder;
-  return c;
+  return map.uPortal && map.uPortal[0] === x && map.uPortal[1] === y && wUmbOn() ? 'D' : c;
+};
+const wWU0LookText = wLookText;
+wLookText = function (x, y) {
+  const m = wCurMap();
+  if (m && m.uPortal && wUmbPortalAt(m, x, y)) return 'A tear in the air at the end of the road. The snow around it is black, and cold comes out of it.';
+  return wWU0LookText.apply(this, arguments);
+};
+// a picture cached for a light map is cached for its dark copy too: clear both (a clue that shows a place, the unlock)
+const wWU0Invalidate = wInvalidate;
+wInvalidate = function (mapId) {
+  wWU0Invalidate.apply(this, arguments);
+  if (mapId != null && W_UMB.maps.includes(mapId)) wWU0Invalidate('u:' + mapId);
 };
 
 /* ---------- crossing ---------- */
 function wUmbCross() {
   const m = wCurMap(), U = wUmb(); if (!U || !m.uPortal && !m.umbral) return false;
   const to = MAPS[m.umbral ? m.id.slice(2) : 'u:' + m.id]; if (!to) return false;
-  const p = Object.keys(to.meta).find(k => to.meta[k].portal), [px, py] = p ? p.split(',').map(Number) : to.spawn;
+  const p = Object.keys(to.meta).find(k => to.meta[k].portal), [px, py] = to.uPortal || (p ? p.split(',').map(Number) : to.spawn);
   const [ax, ay] = wUmbBeside(to, px, py);
+  // (counted before the map changes, which saves)
+  if (to.umbral) U.crossed = (U.crossed || 0) + 1;
   wEnterMap(to.id, ax, ay); WG.face = ax < px ? 'l' : ax > px ? 'r' : ay < py ? 'u' : 'd';
-  if (to.umbral) { U.crossed = (U.crossed || 0) + 1; wLog(U.crossed === 1 ? 'You step through. The cold goes into your teeth. The road runs on, the same road, and the snow on it is grey as ash.' : 'You step through, into the Umbral.', 'b'); }
+  if (to.umbral) { wLog(U.crossed === 1 ? 'You step through. The cold goes into your teeth. The road runs on, the same road, and the snow on it is grey as ash.' : 'You step through, into the Umbral.', 'b'); }
   else wLog('You step back through. White snow, and a sky with colour in it.', 'g');
   return true;
 }
 const wWU0StepEnter = wStepEnter;
 wStepEnter = function (c, x, y) {
   const m = wCurMap(), mt = m.meta[x + ',' + y];
-  if (c === 'D' && mt && mt.portal) { wUmbCross(); return; }
+  if (c === 'D' && wUmbPortalAt(m, x, y)) { wUmbCross(); return; }
   if (m.umbral && m.kind === 'world' && mt && mt.loc) {
     const L = DB.locs.find(l => l.id === mt.loc), to = L && MAPS['u:' + L.map];
     if (!to) {
@@ -63360,6 +63378,22 @@ const wWU0Darkness = wDarkness;
 wDarkness = function () { const d = wWU0Darkness.apply(this, arguments); return wUmbDark() ? Math.max(W_UMB.dusk, d) : d; };
 const wWU0MapRevealHere = wMapRevealHere;
 wMapRevealHere = function () { if (wUmbDark()) return; return wWU0MapRevealHere.apply(this, arguments); };
+
+// crossing a border on the dark world says the dark region's name, not the light one's
+W_UMB.arrive = { plains: 'The Severed Plains. The grass is ash and the roads run the same, almost.', bloom: 'The Rotwold. The trees are grey and soft, and nothing sings in them.',
+  tide: 'The Drownfen. The water is black and very still, and it is watching.', ember: 'The Ashmaw. Cold cinders, and smoke that drifts the wrong way.', rime: 'The Deadspire. Bone-grey snow, and no tracks in it but yours.' };
+const wWU0Ambient = wAmbient;
+wAmbient = function (m, preReg) {
+  if (m && m.umbral && m.kind === 'world') { const rg = regionAt(WG.x, WG.y); if (rg !== preReg && W_UMB.arrive[rg]) wLog(W_UMB.arrive[rg], 'd'); return; }
+  return wWU0Ambient.apply(this, arguments);
+};
+// the title's Continue row names a dark place by its name, not its map id
+const wWU0RenderTitle = renderTitle;
+renderTitle = function () {
+  const r = wWU0RenderTitle.apply(this, arguments), sv = wLoadSave(), id = sv && sv.WG && sv.WG.map, sp = $('resumeRow') && $('resumeRow').querySelector('span');
+  if (sp && typeof id === 'string' && id.startsWith('u:')) sp.textContent = sp.textContent.replace(id, W_UMB.names[id.slice(2)] || 'The Umbral Realm');
+  return r;
+};
 
 /* ---------- the unlock ---------- */
 const wWU0SetFlag = wSetFlag;
