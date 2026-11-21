@@ -147,8 +147,12 @@ function foePetOn(ev, a) {
   if (!B || !B.foePet || B.over) return;
   const p = B.foePet, F = FOE_PETS[p.kind]; if (!F) return;
   if (ev === 'turnStart') p.t = {};
-  for (const h of [F.trait, F.power]) if (h && h.on && h.on[ev] && !B.over) h.on[ev](a, p);
-  // (the trick: once a match, as your turn ends and theirs begins)
-  if (ev === 'turnEnd' && !p.used && !B.over && F.trick && alive().length && foeTrickNow(F, p)) { p.used = true; foeSay(`${F.trick.n}!`); F.trick.go(p); }
+  // (atEnd: what it does as your turn ends, which foeDeb reads; never left set, nor saved set)
+  p.atEnd = ev === 'turnEnd';
+  try {
+    for (const h of [F.trait, F.power]) if (h && h.on && h.on[ev] && !B.over) h.on[ev](a, p);
+    // (the trick: once a match, as your turn ends and theirs begins)
+    if (ev === 'turnEnd' && !p.used && !B.over && F.trick && alive().length && foeTrickNow(F, p)) { p.used = true; foeSay(`${F.trick.n}!`); F.trick.go(p); }
+  } finally { delete p.atEnd; }
 }
 for (const ev of ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'enemyFalls']) onHook(ev, a => foePetOn(ev, a));

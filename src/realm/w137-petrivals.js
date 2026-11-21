@@ -12,7 +12,8 @@
 
    W_RIVAL_PET, wRivalPetOf(enc)
    Wrapped: wKickoff (wW137Kickoff: RUN.foePet), wReturnToWorld and wMatchLost (wW137ReturnToWorld, wW137MatchLost:
-   RUN.foePet cleared as the match ends), wPreGame (wW137PreGame: the line on the match card), renderHelp
+   RUN.foePet cleared as the match ends), finishFight (wW137FinishFight: cleared as the fight finishes, before the
+   reward panel), wPreGame (wW137PreGame: the line on the match card), renderHelp
    (wW137RenderHelp: #wHelpPetRivals). */
 
 const W_RIVAL_PET = Object.fromEntries(Object.keys(FOE_PETS).map(k => [FOE_PETS[k].club, k]));
@@ -32,6 +33,9 @@ wKickoff = function (enc) {
 const wW137ReturnToWorld = wReturnToWorld, wW137MatchLost = wMatchLost;
 wReturnToWorld = function () { if (RUN) RUN.foePet = null; return wW137ReturnToWorld.apply(this, arguments); };
 wMatchLost = function () { if (RUN) RUN.foePet = null; return wW137MatchLost.apply(this, arguments); };
+// (as the fight finishes, before the reward panel: nothing after it needs the club's pet)
+const wW137FinishFight = finishFight;
+finishFight = function () { const r = wW137FinishFight.apply(this, arguments); if (WG && RUN && B && B.over) RUN.foePet = null; return r; };
 const wW137PreGame = wPreGame;
 wPreGame = function (enc) {
   wW137PreGame.apply(this, arguments);

@@ -126,11 +126,12 @@ const PETS = {
    them (the Rustnibbler eats the Block, the Jellycube swallows a debuff). */
 const foeLead = () => alive().slice().sort((a, b) => (b.st.str || 0) - (a.st.str || 0) || b.hp - a.hp)[0];
 const foeHurt = () => alive().slice().sort((a, b) => (b.max - b.hp) - (a.max - a.hp))[0];
-// a rival pet's hit: plain damage, not an attack (no gear, Spikes or score is set off by it, nor your pet's answers to
-// an attack)
-const foeHit = n => hurtPlayer(n, null, { noScore: 1 });
-// its debuff: Weak and Vulnerable laid as your turn ends would lose a turn at once, so they get that turn back
-const foeDeb = (k, n) => debuffP(k, n + ((k === 'weak' || k === 'vuln') && B.ending ? 1 : 0));
+// a rival pet's hit: plain damage, not an attack (no gear, Spikes, Seeing Red or score is set off by it, nor your
+// pet's answers to an attack), though a big one spooks your pet as any big hit does
+const foeHit = n => { const t = hurtPlayer(n, null, { plain: 1 }); petSpook(t); return t; };
+// its debuff: Weak and Vulnerable laid as your turn ends (B.foePet.atEnd, set by foePetOn) would lose a turn at once,
+// so they get that turn back
+const foeDeb = (k, n) => debuffP(k, n + ((k === 'weak' || k === 'vuln') && B.foePet && B.foePet.atEnd ? 1 : 0));
 const FOE_PETS = {
   wyvern: { n: 'Wyvern Hatchling', from: 'wyvern', el: 'ember', club: 'ironmaw',
     trait: { d: 'Their strongest player starts with 2 Strength.', on: { fightStart: () => { const e = foeLead(); if (e) addSt(e, 'str', 2); } } },

@@ -238,8 +238,9 @@ function hurtPlayer(dmg, e, o = {}) {
   // (an enemy's hit on its way: a pet may step in before the Block is counted)
   if (e) fire('playerAttacked', e);
   if (sv(P, 'intang')) dmg = Math.min(dmg, 1);
-  if (sv(P, 'pads')) { P.block += 5; addSt(P, 'pads', -1); fx({ k: 'num', p: 1, t: 'Pad save +5', col: '#9fd2ff', small: 1 }); }
-  if (sv(P, 'helmet')) { dmg = Math.max(0, dmg - 3); addSt(P, 'helmet', -1); }
+  // (o.plain: damage that is no attack, a rival pet's: past Block to HP, setting off no gear and no score)
+  if (!o.plain && sv(P, 'pads')) { P.block += 5; addSt(P, 'pads', -1); fx({ k: 'num', p: 1, t: 'Pad save +5', col: '#9fd2ff', small: 1 }); }
+  if (!o.plain && sv(P, 'helmet')) { dmg = Math.max(0, dmg - 3); addSt(P, 'helmet', -1); }
   let taken = dmg;
   const blocked = o.pierce ? 0 : Math.min(P.block, taken); P.block -= blocked; taken -= blocked;
   if (blocked) fx({ k: 'num', p: 1, t: 'blocked ' + blocked, col: '#9fd2ff', small: 1 });
@@ -247,8 +248,8 @@ function hurtPlayer(dmg, e, o = {}) {
   fx({ k: 'hitP', amt: taken });
   if (e && sv(P, 'thorns') && !e.dead) hurtEnemy(e, sv(P, 'thorns'), { raw: true, src: 'Spikes' });
   if (e && sv(P, 'shoulder') && !e.dead) { hurtEnemy(e, 6, { raw: true, src: 'Shoulder Pads', noScore: 1 }); addSt(P, 'shoulder', -1); }
-  if (sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
-  if (!o.noScore) sportEnemyHit(taken, dmg);
+  if (!o.plain && sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
+  if (!o.plain) sportEnemyHit(taken, dmg);
   if (e) { fire('playerHit', { e, taken, dmg }); petSpook(taken); }
   return taken;
 }
