@@ -13,8 +13,9 @@
      fed (wPetFeed: its week's upkeep, or a treat, phase 5) or its next week is paid. A pet is never lost to hunger.
    - The Pets tab on the Team screen: the kennel, the one at your side, each pet's trait, powers, trick and bond;
      set the one at your side, rename one, feed one, let one go; the week's upkeep and when it is due.
-   WG.pets = { owned: [{ id, kind, name, bond, xp, got, from, hungry }], side: id or null, seq }, WG.petAway: [{ kind,
-   name, bond, xp, from }], WG.petWeek (the week last paid).
+   WG.pets = { owned: [{ id, kind, name, bond, xp, got, from, hungry, treat }], side: id or null, seq }, WG.petAway: [{ id,
+   kind, name, bond, xp, from, hungry, got, treat, quiet (hatched into a full kennel: no welcome when it joins) }],
+   WG.petWeek (the week last paid).
    wPetAdd(kind, from, o?), wPetSide(id), wPetLetGo(id), wPetRename(id, name), wPetFeed(id), wPetReclaim(i),
    wPetUpkeep(), wPetSync(), wPetOf(id), wPetSideOf()
    Wraps: wStart (wW132Start: older saves, and the pet in step), wNewDay (wW132NewDay: the week's upkeep), wOpenCamp and

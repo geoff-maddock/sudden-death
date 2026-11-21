@@ -49,7 +49,12 @@ async def main():
           const out = { start: st() };
           for (const k of ['blinkpup', 'sprite', 'bogfrog', 'chestnut']) wPetAdd(k, 'egg:x'); out.full = st();
           // (a seventh, of a new kind, joins by the full kennel's swap)
-          wPetAdd('imp', 'egg:y'); const t0 = Date.now(); await new Promise(r => { const f = () => document.querySelector('#modalBox [data-petgo]') || Date.now() - t0 > 3000 ? r() : setTimeout(f, 20); f(); }); if (!document.querySelector('#modalBox [data-petgo]')) return { stuck: { modal: document.getElementById('modal').hidden, text: document.getElementById('modalBox').textContent.slice(0, 120), ask: W_PET_ASK.slice(), active: wActive(), talk: !!WUI.talk, view: UI.view, n: wPets().owned.length } };
+          // (an egg hatched into the full kennel, swapped in: no welcome chirp, as it had its crack)
+          WG.petEggs = { bloom: { kind: 'sprite', due: WG.dayAbs } }; __snd.length = 0; wPeggHatch('bloom'); """ + ESC + """
+          { const t2 = Date.now(); await new Promise(r => { const f = () => (!document.getElementById('modal').hidden && document.querySelector('#modalBox [data-petgo]')) || Date.now() - t2 > 3000 ? r() : setTimeout(f, 20); f(); }); }
+          const gone = wPets().owned.find(x => x.kind === 'chestnut'), btn = gone && document.querySelector('#modalBox [data-petgo="' + gone.id + '"]'); if (btn) btn.click();
+          out.quietSwap = { snd: __snd.slice(), joined: wPets().owned.filter(x => x.kind === 'sprite').length, mark: wPets().owned.some(x => 'quiet' in x) };
+          wPetAdd('imp', 'egg:y'); const t0 = Date.now(); await new Promise(r => { const f = () => (!document.getElementById('modal').hidden && document.querySelector('#modalBox [data-petgo]')) || Date.now() - t0 > 3000 ? r() : setTimeout(f, 20); f(); }); if (document.getElementById('modal').hidden || !document.querySelector('#modalBox [data-petgo]')) return { stuck: { modal: document.getElementById('modal').hidden, text: document.getElementById('modalBox').textContent.slice(0, 120), ask: W_PET_ASK.slice(), active: wActive(), talk: !!WUI.talk, view: UI.view, n: wPets().owned.length } };
           document.querySelector('#modalBox [data-petgo="' + wPets().owned.find(x => x.kind === 'bogfrog').id + '"]').click(); out.swap = st().kinds.includes('imp');
           const h = wPets().owned.find(x => x.kind === 'hootling'); h.bond = 2; h.xp = W_PBOND.at[3] - 1; h.hungry = false; wPetSide(h.id); fire('fightWon'); out.b3 = st().b3;
           RUN.pet = { kind: 'hootling', name: 'H', bond: 3 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); petTrick(0); out.tr = st().tr; B = null; showView('world');
@@ -57,6 +62,7 @@ async def main():
           return out; })()""")
         if not check('stuck' not in m, 'the full kennel\'s question opened', m): m = {'full': {'full': 0, 'kinds': [], 'hatch': []}, 'swap': False, 'b3': 0, 'tr': 0, 'ach': ['?']}
         check(m['full']['full'] == 1 and 'pseudodragon' in m['full']['kinds'] and m['full']['hatch'] == ['aether'], 'medals: kinds owned, a full kennel, hatching places used', m)
+        check(m.get('quietSwap', {}).get('snd') == ['crack'] and m['quietSwap']['joined'] == 2 and not m['quietSwap']['mark'], 'an egg hatched into a full kennel and swapped in cracks, with no welcome chirp, and keeps no mark', m.get('quietSwap'))
         check(m['swap'] and m['b3'] == 1 and m['tr'] == 1 and m['ach'] == [], 'a pet joining by a full kennel\'s swap counts its kind; bond 3 and a trick thrown count; all five medals are in the book', m)
 
         t = await pg.evaluate("""(async () => { __tips.length = 0; UI.view = 'world'; SET.tips = true; wAddItem(wPeggItem('imp'), 1); const t0 = Date.now(); await new Promise(r => { const f = () => __tips.includes('w_petegg') || Date.now() - t0 > 5000 ? r() : setTimeout(f, 50); f(); });
