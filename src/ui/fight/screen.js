@@ -60,7 +60,7 @@ function renderHand() {
   fitHand();
   h.querySelectorAll('.card').forEach(el => {
     const i = +el.dataset.i;
-    el.onclick = () => { if (UI.dragged) { UI.dragged = false; return; } selectCard(i); };
+    el.onclick = () => { if (UI.dragged) { UI.dragged = false; return; } if (DRAG_NOW && DRAG_NOW.el !== el) return; selectCard(i); };
     el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCard(i); } };
     el.onmouseenter = () => { UI.hoverCard = i; updatePreview(); };
     el.onmouseleave = () => { if (UI.hoverCard === i) UI.hoverCard = -1; updatePreview(); };
@@ -96,8 +96,13 @@ function updatePreview() {
    tonic, the pet's trick, the end of the turn: UI.acts), the pick not let go (Escape: UI.sel), no pause, dialog or
    waiting discard, the same card in the same place. A gesture the browser takes over, or the window losing focus,
    ends the drag with nothing played and the target as it was, and so does a mouse let go where the page never heard
-   it (a move with no button held, once one was). Only the pointer that started it drives it. */
+   it (a move with no button held, once one was). Only the pointer that started it drives it.
+   Issue #107: while a drag is live (DRAG_NOW), a second finger is ignored, its press and its tap, until the first
+   lifts. A drag the game has moved on from (the pick let go, an action, a window, the tab hidden) ends at once, even
+   with the pointer outside the frame, so a card never hangs there. A drop let go outside the page plays nothing. */
+let DRAG_NOW = null;
 function startDrag(ev, el, i) {
+  if (DRAG_NOW) { if (DRAG_NOW.pid !== ev.pointerId) return; DRAG_NOW.cancel(); }
   // (a new press: the last drop's click, if it was ever coming, is past)
   UI.dragged = false;
   if (ev.button !== 0 || B.phase !== 'player' || B.over || UI.busy || UI.disc) return;
@@ -125,27 +130,35 @@ function startDrag(ev, el, i) {
   };
   // (the drag over: its listeners off, the card back, and the click that follows the drop ignored (UI.dragged): the
   // card's click clears it, and so does the next press)
-  const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.hoverCard = -1; UI.dragged = true; } };
+  // (once: a drag ends one way only, whichever comes first)
+  let over = false;
+  const off = () => { if (over) return false; over = true; if (DRAG_NOW && DRAG_NOW.cancel === cancel) DRAG_NOW = null; clearInterval(watch); document.removeEventListener('visibilitychange', cancel); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.hoverCard = -1; UI.dragged = true; } return true; };
   // (the card back, nothing played; the target and hover as they were before the drag, the pick let go. If another pick
   // (another finger's, a key's) has taken over, the drag touches nothing: that pick keeps the target it was made with)
   const drop = () => {
     if (!B || UI.view !== 'fight' || (UI.sel !== i && UI.sel !== -1)) return;
     UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; UI.sel = -1; renderHand();
   };
-  const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; off(); if (moved) drop(); };
+  const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; if (!off()) return; if (moved) drop(); };
   const up = e => {
     if (!mine(e)) return;
-    off();
+    if (!off()) return;
     if (!moved) return;
     if (!B || UI.view !== 'fight' || (UI.acts || 0) !== acts0 || UI.sel !== i || B.phase !== 'player' || B.over || UI.busy || UI.paused || UI.disc || !$('modal').hidden || B.hand[i] !== c) { drop(); return; }
     const r = cv.getBoundingClientRect();
+    const outside = e.clientX < 0 || e.clientY < 0 || e.clientX > window.innerWidth || e.clientY > window.innerHeight;
     const overStage = e.clientY < r.bottom + 10;
-    if (!overStage) { drop(); return; }
+    if (outside || !overStage) { drop(); return; }
     const x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
     if (needsTarget(c) && alive().length > 1 && !h) { renderHand(); return; } // dropped on open ice: keep it selected
     playSelected(h ? h.e : UI.kbTarget || alive()[0]);
   };
+  // (the game moved on while the pointer was elsewhere: Escape, an action, the end of the turn, a window, a pause)
+  const stale = () => !B || UI.view !== 'fight' || B.over || B.phase !== 'player' || UI.busy || UI.paused || UI.disc || !$('modal').hidden || (UI.acts || 0) !== acts0 || B.hand[i] !== c || (moved && UI.sel !== i) || document.hidden;
+  const watch = setInterval(() => { if (stale()) cancel(); }, 150);
+  document.addEventListener('visibilitychange', cancel);
+  DRAG_NOW = { pid: ev.pointerId, el, cancel };
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel); window.addEventListener('blur', cancel);
 }
 function selectCard(i) {
@@ -220,8 +233,9 @@ document.addEventListener('keydown', ev => {
     const al = alive(); let j = al.indexOf(UI.kbTarget);
     if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') { j = (j + (ev.key === 'ArrowRight' ? 1 : -1) + al.length) % al.length; UI.kbTarget = al[j]; renderHand(); ev.preventDefault(); }
     else if (ev.key === 'Enter') { playSelected(UI.kbTarget); ev.preventDefault(); }
-    else if (ev.key === 'Escape') { UI.sel = -1; renderHand(); }
+    else if (ev.key === 'Escape') { UI.sel = -1; renderHand(); ev.sdSpent = true; ev.preventDefault(); }
   }
-  if (UI.disc && ev.key === 'Escape') { UI.disc = null; renderHand();
+  // (an Escape that let go of something is spent (ev.sdSpent): the pause, whose handler runs after this one, leaves it alone)
+  if (UI.disc && ev.key === 'Escape') { UI.disc = null; renderHand(); ev.sdSpent = true; ev.preventDefault();
   }
 });

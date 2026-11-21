@@ -37,10 +37,33 @@ function renderRunBar() {
   document.querySelectorAll('[data-tonic]').forEach(b => b.onclick = () => drinkTonic(+b.dataset.tonic));
 }
 function sortDeck(cards) { const ord = { atk: 0, play: 1, skl: 2, pow: 3, gear: 4, junk: 5, curse: 6 }; return cards.slice().sort((a, b) => ord[def(a).type] - ord[def(b).type] || def(a).cost - def(b).cost || def(a).n.localeCompare(def(b).n)); }
+/* one window at a time (issue #107). A window opened over another replaces it: the old one's Escape comes off (one
+   Escape closes one window), and its close() no longer touches the window on screen. Its onClose still runs, once:
+   when its own close() is called, or else once nothing is open any more (after the replacing window closes and
+   whatever that closing does has run; if that opens another window, the new one carries it). */
+let MODAL_NOW = null;
+function modalUnwind(fns) {
+  setTimeout(() => {
+    for (let k = 0; k < fns.length; k++) {
+      if (MODAL_NOW) { MODAL_NOW.under.push(...fns.slice(k)); return; }
+      try { fns[k](); } catch (e) { console.error(e); }
+    }
+  }, 0);
+}
 function modal(html, onClose) {
-  const m = $('modal'); $('modalBox').innerHTML = html; m.hidden = false;
-  const close = () => { m.hidden = true; m.onclick = null; document.removeEventListener('keydown', esc1); if (onClose) onClose(); };
+  const m = $('modal'), was = MODAL_NOW;
+  let done = false; const fin = () => { if (done) return; done = true; if (onClose) onClose(); };
+  const me = { under: [], gone: false };
+  if (was) { was.gone = true; document.removeEventListener('keydown', was.esc); me.under = was.under.concat([was.fin]); }
+  $('modalBox').innerHTML = html; m.hidden = false; MODAL_NOW = me;
+  const close = () => {
+    if (me.gone) { fin(); return; }
+    if (MODAL_NOW !== me) return;
+    m.hidden = true; m.onclick = null; document.removeEventListener('keydown', esc1); MODAL_NOW = null;
+    fin(); if (me.under.length) modalUnwind(me.under);
+  };
   const esc1 = e => { if (e.key === 'Escape') close(); };
+  me.esc = esc1; me.fin = fin;
   document.addEventListener('keydown', esc1);
   m.onclick = e => { if (e.target === m || e.target.closest('[data-close]')) close(); };
   const f = $('modalBox').querySelector('button,[tabindex]'); if (f) f.focus();
