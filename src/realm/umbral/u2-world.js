@@ -150,7 +150,7 @@ const wUmbXp = g => Math.max(1, Math.ceil(g * W_UMB2.xp));
 // the player with the most XP toward their next level
 const wUmbXpPlayer = () => wRoster().filter(p => p.lvl < W_PARTY.maxLvl).sort((a, b) => (b.xp || 0) - (a.xp || 0))[0] || null;
 function wUmbBuy(shop, k, how) {
-  const g = (DB.shops[shop] || {})[k], it = DB.items[k]; if (!g || !it) return 'Not sold here.';
+  const g = (DB.shops[shop] || {})[k], it = DB.items[k]; if (!g || !it || (W_UMB2.noSell || []).includes(k)) return 'Not sold here.';
   if (how === 'fans') { const n = wUmbFans(g); if ((RUN.fans || 0) < n) return `It costs ${n} fans.`; RUN.fans -= n; wLog(`You pay ${n} fans for a ${it.name}. Somewhere, people forget they ever cheered for you.`, 'd'); }
   else { const n = wUmbXp(g), p = wUmbXpPlayer(); if (!p || (p.xp || 0) < n) return `It costs ${n} XP from one player, and nobody has that much toward their next level.`; p.xp -= n; wLog(`${p.n} pays ${n} XP for a ${it.name}, and forgets something they had just learned.`, 'd'); }
   wAddItem(k, 1); wSave(); return '';
@@ -161,7 +161,7 @@ function wUmbShop(shop, who) {
     const sh = DB.shops[shop] || DB.shops.general, p = wUmbXpPlayer(), body = $('wUmbShopBody'); if (!body) return;
     let h = `<p class="hint">No gold here. You have <b>${RUN.fans || 0} fans</b>${p ? `, and ${esc(p.n)} has ${p.xp || 0} XP toward their next level` : ''}.${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p><table class="wshop"><tbody>`;
     for (const k in sh) {
-      const it = DB.items[k]; if (!it) continue;
+      const it = DB.items[k]; if (!it || (W_UMB2.noSell || []).includes(k)) continue;
       const f = wUmbFans(sh[k]), x = wUmbXp(sh[k]);
       h += `<tr><td><b>${esc(it.name)}</b><small>${esc(it.desc)}</small></td><td class="wnum dim">have ${WG.items[k] || 0}</td><td><button class="ghost" data-ubuy="${k}" data-how="fans" ${(RUN.fans || 0) < f ? 'disabled' : ''}>${f} fans</button></td><td><button class="ghost" data-ubuy="${k}" data-how="xp" ${!p || (p.xp || 0) < x ? 'disabled' : ''}>${x} XP</button></td></tr>`;
     }
@@ -255,7 +255,7 @@ wBlackout = function (W, result) {
 
 /* ---------- camping, and people's places, on this side ---------- */
 const wWU2CanCamp = wCanCamp;
-wCanCamp = function () { const m = WG && wCurMap(); if (m && m.umbral && m.kind === 'town') return 'There is no inn on this side, and nobody camps in these streets. Find a lantern, outside town.'; return wWU2CanCamp.apply(this, arguments); };
+wCanCamp = function () { const m = WG && wCurMap(); if (m && m.umbral && m.kind === 'town') return 'Nobody camps here, on this side, and there is no inn. Find a lantern, out on the dark world.'; return wWU2CanCamp.apply(this, arguments); };
 // a dark town's saved positions fit its people, or are dropped (a light town's layout that changed changes its copy)
 const wWU2ApplyNpcs = wApplyNpcs;
 wApplyNpcs = function (id) {
@@ -267,7 +267,7 @@ wApplyNpcs = function (id) {
 /* ---------- the dark towns' lines ---------- */
 const wWU2Ambient = wAmbient;
 wAmbient = function (m, preReg) {
-  if (m && m.umbral && m.kind === 'town') { if (!LAB && WG.step % 9 === 0 && Math.random() < .4) wLog(pick((W_UMB2.ambient[m.id.slice(2)] || []).concat(W_UMB2.ambient.all)), 'd'); return; }
+  if (m && m.umbral && m.kind === 'town' && W_UMB2.towns.includes(m.id.slice(2))) { if (!LAB && WG.step % 9 === 0 && Math.random() < .4) wLog(pick((W_UMB2.ambient[m.id.slice(2)] || []).concat(W_UMB2.ambient.all)), 'd'); return; }
   return wWU2Ambient.apply(this, arguments);
 };
 

@@ -18,7 +18,7 @@ def check(ok, what, detail=None):
 
 STUB = """W_NADIR.ztest = { piece: 'baseball', char: 'nadir_ztest', ground: 'g_ballpark', map: 'u:g_ballpark', region: 'plains', engine: 'zstub', toll: 20, gold: 50, hexes: 1 };
   DB.chars.nadir_ztest = { name: 'The Test Champion', kind: 'goblin', greet: 'Hello.', topics: { play: { t: 'Go.', act: 'unadir:ztest' } } };
-  W_UMB4.start.zstub = (C, id, hx) => { window.__stub = (window.__stub || []).concat([{ id, hx }]); return ''; }; 0"""
+  W_UMB4.start.zstub = (C, id, hx) => { window.__stub = (window.__stub || []).concat([{ id, hx }]); if (!window.__stubBack) wUmbTollAtKickoff(id); return ''; }; 0"""
 
 async def main():
     subprocess.run(REALM_BUILD, cwd=ROOT, check=True, capture_output=True)
@@ -41,9 +41,13 @@ async def main():
           wEnterMap('u:world', G.at[0], G.at[1] + 1); wTryMove(0, -1); wDrain(); out.in = WG.map;
           const m = MAPS['u:g_ballpark'], d = wUmbFarEnd(m), at = id => m.npcs.find(n => n.id === id), c = at('nadir_ztest'), g0 = at(wUmbGuardOf('g_ballpark', 0)), g1 = at(wUmbGuardOf('g_ballpark', 1));
           out.placed = !!c && !!g0 && !!g1 && d[c.y * m.w + c.x] > d[g0.y * m.w + g0.x] && d[c.y * m.w + c.x] > d[g1.y * m.w + g1.x];
+          out.field = !!c && m.t[c.y][c.x] === 'd' && c.y > 0 && Math.abs(g0.x - c.x) === 1 && Math.abs(g1.x - c.x) === 1;
+          out.look = !!m.field && m.t.some(r => r.includes('%'));
+          out.noSell = Object.values(W_UMB4.gate).every(k => wUmbBuy('general', k, 'fans') === 'Not sold here.');
           return out; })()""")
         check(all(gd['names']) and gd['names'][0] == 'The Bone Diamond' and gd['in'] == 'u:g_ballpark', 'the eight engine grounds are on the dark world under their dark names, and you walk into one', gd)
-        check(gd['placed'], 'the champion stands at the far end, the two guards nearer the way in', gd)
+        check(gd['placed'] and gd['field'], 'the champion stands at the far end of the field, the two guards in front, either side of the way up', gd)
+        check(gd['look'] and gd['noSell'], 'a dark ground keeps its field\'s look and its scoreboard; the gate\'s items are not sold on the dark side', gd)
 
         cd = await pg.evaluate("""(() => { const m = MAPS['u:g_ballpark']; WG.x = m.spawn[0]; WG.y = m.spawn[1]; const h0 = RUN.hp; let steps = 0;
           for (const [dx, dy] of [[0, -1], [0, 1], [0, -1], [0, 1]]) if (wTryMove(dx, dy)) steps++; return { lost: h0 - RUN.hp, steps }; })()""")
@@ -58,14 +62,17 @@ async def main():
           W_ON_END.uguard('win', { g: 'g_ballpark', i: 1 }); out.again = wUmbGuardMatch('g_ballpark', 1);
           WG.items.grain = 0; out.gate = wNadirMatch('ztest');
           wAddItem('grain', 1); window.__stub = []; out.go = wNadirMatch('ztest'); out.stub = window.__stub.slice(); out.grain = WG.items.grain || 0;
-          wUmbNadirEnd('ztest', 'lose'); RUN.gold = 5; out.poor = wNadirMatch('ztest'); RUN.gold = 100; out.paid = wNadirMatch('ztest') === '' && RUN.gold === 80;
+          wUmbNadirEnd('ztest', 'lose'); RUN.gold = 5; out.poor = wNadirMatch('ztest');
+          // (backing out of the sport's card costs nothing; the toll is paid at the real kickoff, once a try)
+          RUN.gold = 100; window.__stubBack = true; wNadirMatch('ztest'); out.back = RUN.gold; window.__stubBack = false;
+          out.paid = wNadirMatch('ztest') === '' && RUN.gold === 80; wUmbTollAtKickoff('ztest'); out.once = RUN.gold === 80;
           wUmbNadirEnd('ztest', 'win'); out.pieces = WG.umbral.pieces.slice(); out.done = wNadirMatch('ztest');
           out.audit = wAudit(); return out; })()""")
         check('Left Hand' in gt['early'] and 'Right Hand' in gt['early'], 'the champion won\'t play until both guards are beaten, and says who is left', gt)
         check(gt['guard']['kind'] == 'uguard' and gt['guard']['umb'] and gt['guard']['type'] == 'elite' and 'Hand' in gt['guard']['lead'], 'a guard plays an Umbral card match, an elite', gt)
         check('Right Hand' in gt['one'] and 'Left Hand' not in gt['one'] and 'steps aside' in gt['again'], 'a beaten guard stands aside for good', gt)
         check('Grain' in gt['gate'] and gt['go'] == '' and gt['grain'] == 0 and len(gt['stub']) == 1 and len(gt['stub'][0]['hx']) == 1, 'then it wants something from the light side of the region (handed over once), and PLAY goes to the sport\'s adapter with its hexes', gt)
-        check('toll' in gt['poor'] and gt['paid'] and gt['pieces'] == ['baseball'] and 'yours' in gt['done'], 'a lost game costs a toll next time; a won one pays the piece', gt)
+        check('toll' in gt['poor'] and gt['back'] == 100 and gt['paid'] and gt['once'] and gt['pieces'] == ['baseball'] and 'yours' in gt['done'], 'a lost game costs a toll next time, paid at kickoff, once (backing out costs nothing); a won one pays the piece', gt)
         check(gt['audit'] == [], 'the audit is clean: every dark ground has its guards and champion where they can be reached', gt)
         check(not errs, 'no page errors', errs[:5])
         await br.close()

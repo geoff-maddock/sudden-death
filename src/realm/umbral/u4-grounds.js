@@ -8,13 +8,17 @@
                   beaten stands aside for the rest of the journey (WG.umbral.guards)
      the gate     the champion plays nobody who hasn't brought something from the light side of the region
                   (W_UMB4.gate: an item, handed over once; WG.umbral.gates)
+   The champion stands at the far end of the field, the guards two rows in front of them, either side of the way up.
    Then PLAY: a champion who plays a sport starts its engine's game through that sport's adapter (W_UMB4.start[engine],
    written by u4a..u4h), at tier U, with its hexes; the adapter reports the end to wUmbNadirEnd, which pays the piece
    (or counts the try) as the card game's champion does. A champion may want a condition too (C.cond: its words, and
    the adapter checks it).
 
-   W_UMB4, wUmbNadirEnd, wUmbGuardOf
-   Wraps: wNadirMatch (wWU4NadirMatch: the guards, the gate, an engine's champion), wTryMove (wWU4TryMove: the cold),
+   W_UMB4, wUmbNadirEnd, wUmbGuardOf, wUmbGuardMatch, wUmbTollAtKickoff, wUmbFieldEnd, wUmbFarEnd, wUmbPlaceGround
+   An adapter charges a retry's toll itself, at the real kickoff (wUmbTollAtKickoff), so backing out costs nothing.
+   The gate's items are not sold in the dark shops (W_UMB2.noSell).
+   Wraps: wNadirMatch (wWU4NadirMatch: the guards, the gate, an engine's champion), wRunAct (wWU4RunAct: a guard's
+   PLAY), wUmbralMap (wWU4UmbralMap: a ground's field look, scoreboard and sign), wTryMove (wWU4TryMove: the cold),
    buildAllMaps (wWU4BuildAllMaps: the champions and guards on the dark grounds), wAudit (wWU4Audit: every dark
    ground has its guards, and its gate is a real item). */
 
@@ -74,10 +78,17 @@ wNadirMatch = function (id) {
   const tries = U.tries[id] || 0;
   if (tries > 0 && RUN.gold < C.toll) return `Another game costs a toll of ${C.toll} gold, and you have ${RUN.gold}.`;
   const go = W_UMB4.start[C.engine]; if (!go) return `${DB.chars[C.char].name} is not ready to play yet.`;
-  const why = go(C, id, wUmbHexes(id, C.hexes || 1));
-  if (!why && tries > 0) { RUN.gold -= C.toll; wLog(`You pay the toll: ${C.toll} gold.`, 'd'); }
-  return why;
+  // (the adapter charges the toll itself, at the real kickoff, through wUmbTollAtKickoff: backing out costs nothing)
+  return go(C, id, wUmbHexes(id, C.hexes || 1));
 };
+// a retry's toll, paid once per try when the game really starts (an adapter calls it after Play, Manage or Simulate)
+function wUmbTollAtKickoff(id) {
+  const C = W_NADIR[id], U = wUmb(); if (!C || !U) return 0;
+  const t = U.tries[id] || 0; U.paid = U.paid || {};
+  if (!t || U.paid[id] === t) return 0;
+  U.paid[id] = t; RUN.gold = Math.max(0, RUN.gold - C.toll); wLog(`You pay the toll: ${C.toll} gold.`, 'd'); wSave();
+  return C.toll;
+}
 const wWU4RunAct = wRunAct;
 wRunAct = function (act, id) {
   if (typeof act === 'string' && act.startsWith('uguard:')) { WUI.held = null; if (WUI.talk) wCloseTalk(); const [, g, i] = act.split(':'); const why = wUmbGuardMatch(g, +i); if (why) wLog(why, 'd'); return; }
@@ -103,8 +114,24 @@ function wUmbFarEnd(m) {
   for (let i = 0; i < q.length; i++) { const [x, y] = q[i]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= m.h || dist[ny * W + nx] >= 0 || !walkCh(m.t[ny][nx])) continue; dist[ny * W + nx] = dist[y * W + x] + 1; q.push([nx, ny]); } }
   return dist;
 }
+// the far end of the field (tiles 'd'), away from the way in: the champion's spot, with the guards two rows in front,
+// one either side of the way up the middle; null when the ground has no field
+function wUmbFieldEnd(m) {
+  let x0 = m.w, x1 = -1, y0 = m.h, y1 = -1;
+  for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.t[y][x] === 'd') { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (x1 < 0) return null;
+  const cx = (x0 + x1) >> 1, far = Math.abs(m.spawn[1] - y0) > Math.abs(m.spawn[1] - y1), cy = far ? y0 + 1 : y1 - 1, dy = far ? 2 : -2;
+  return { champ: [cx, cy], guards: [[cx - 1, cy + dy], [cx + 1, cy + dy]] };
+}
 function wUmbPlaceGround(g) {
   const m = MAPS['u:' + g]; if (!m) return;
+  const F = wUmbFieldEnd(m), ok = (x, y) => { const c = m.t[y] && m.t[y][x], td = c && DB.tiles[c]; return td && td.walk && !td.enter && !m.npcs.some(n => n.x === x && n.y === y); };
+  if (F && ok(...F.champ) && F.guards.every(p => ok(...p))) {
+    const champ = Object.keys(W_NADIR).find(k => W_NADIR[k].ground === g), C = champ && W_NADIR[champ];
+    if (C && !m.npcs.some(n => n.id === C.char)) m.npcs.push({ id: C.char, x: F.champ[0], y: F.champ[1], fixed: true });
+    F.guards.forEach((p, i) => { if (!m.npcs.some(n => n.id === wUmbGuardOf(g, i))) m.npcs.push({ id: wUmbGuardOf(g, i), x: p[0], y: p[1], fixed: true }); });
+    return;
+  }
   const dist = wUmbFarEnd(m), W = m.w, taken = (x, y) => m.npcs.some(n => n.x === x && n.y === y);
   const free = (x, y) => { const c = m.t[y] && m.t[y][x], td = c && DB.tiles[c]; return td && td.walk && !td.enter && !taken(x, y) && !m.meta[x + ',' + y] && dist[y * W + x] > 2; };
   // the champion (if one plays here) at the far end; the guards two and four steps nearer the way in
@@ -120,6 +147,21 @@ function wUmbPlaceGround(g) {
     if (at) m.npcs.push({ id: wUmbGuardOf(g, i), x: at[0], y: at[1], fixed: true });
   });
 }
+// the gate wants something brought from the light side: the dark shops don't sell it
+W_UMB2.noSell = (W_UMB2.noSell || []).concat(Object.values(W_UMB4.gate));
+// a dark ground keeps its field's look (m.field) and its scoreboard, and its sign has gone wrong
+const wWU4UmbralMap = wUmbralMap;
+wUmbralMap = function (m) {
+  const u = wWU4UmbralMap.apply(this, arguments);
+  if (!W_UMB4.grounds[m.id]) return u;
+  if (m.field) u.field = JSON.parse(JSON.stringify(m.field));
+  for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
+    const c = m.t[y][x], mt = m.meta[x + ',' + y];
+    if (c === '%') u.t[y][x] = c;
+    if (c === 'S' && mt) u.meta[x + ',' + y] = { text: wUmbWrongSign(mt.text || '...') };
+  }
+  return u;
+};
 const wWU4BuildAllMaps = buildAllMaps;
 buildAllMaps = function () { const r = wWU4BuildAllMaps.apply(this, arguments); for (const g in W_UMB4.grounds) wUmbPlaceGround(g); return r; };
 const wWU4Audit = wAudit;
@@ -132,6 +174,11 @@ wAudit = function () {
     for (const n of m.npcs) if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => s[(n.y + dy) * m.w + n.x + dx])) P.push('u:' + g + ': cannot reach ' + n.id);
   }
   for (const rg in W_UMB4.gate) if (!DB.items[W_UMB4.gate[rg]]) P.push('the gate item for ' + rg + ' is not an item');
-  for (const id in W_NADIR) { const C = W_NADIR[id]; if (C.ground && !MAPS[C.map].npcs.some(n => n.id === C.char)) P.push('the Nadir champion ' + id + ' has nowhere to stand on ' + C.map); }
+  for (const id in W_NADIR) {
+    const C = W_NADIR[id]; if (!C.ground) continue;
+    if (C.map !== 'u:' + C.ground) P.push('the Nadir champion ' + id + ' is on ' + C.map + ' but its ground is ' + C.ground);
+    if (!W_UMB4.gate[C.region]) P.push('the Nadir champion ' + id + '\'s region ' + C.region + ' has no gate item');
+    if (!W_UMB4.grounds[C.ground]) P.push('the Nadir champion ' + id + '\'s ground ' + C.ground + ' is not a dark ground');
+  }
   return P;
 };
