@@ -2,8 +2,8 @@
 # 1. a card drag the game has moved on from (Escape, the end of the turn) ends at once, with no pointer event, so a card
 #    let go outside the frame never hangs there; a drop let go outside the page plays nothing;
 # 2. a second finger is ignored while a drag is live, its press and its tap, until the first lifts;
-# 3. one Escape closes one window: a window opened over another takes its Escape off, its close() leaves the window
-#    on screen alone, and its onClose runs once, when nothing is open any more (carried by any window opened meanwhile);
+# 3. one Escape closes one window: a window opened over another takes its Escape off, and its close() leaves the
+#    window on screen alone; its onClose runs only by its own close(), so a card pick covered for a moment comes back;
 # 4. click to walk squeezes past a person who wanders into the only way through, and walks round one who doesn't.
 # Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
@@ -46,11 +46,18 @@ async def main():
           a = b = c = 0; modal('<p>A</p>', () => a++); modal('<p>B</p>', () => { b++; modal('<p>C</p>', () => c++); }); """ + ESC + """ await tick();
           out.chain = { shut: shut(), a, b, c, text: document.getElementById('modalBox').textContent }; """ + ESC + """ await tick(); out.chain2 = { shut: shut(), a, b, c };
           a = 0; let yes = 0; modal('<p>A</p>', () => a++); askConfirm('Sure?', 'Really.', 'Yes', () => yes++); document.getElementById('cfYes').click(); await tick(); out.confirm = { shut: shut(), a, yes };
+          // (a card pick covered by another window is set aside and comes back once that one closes: covering it isn't declining it)
+          if (UI.paused) closePause(); // (an Escape above, with nothing open, paused the game: the pick waits for a free world)
+          WG.cardOffer = { list: wCardOffer({}), why: 'a test', pid: wRoster()[0].id }; wShowCardOffer(); wOpenBallCard(); const offer = WG.cardOffer;
+          document.querySelector('#modalBox [data-close]').click(); await new Promise(r => setTimeout(r, 800));
+          out.buried = { kept: !!WG.cardOffer && WG.cardOffer === offer, back: !shut() && /card/i.test(document.querySelector('#modalBox h3').textContent) };
+          WG.cardOffer = null; for (let k = 0; k < 4 && !shut(); k++) """ + ESC + """
           return out; })()""")
-        check(md['one'] == {'shut': True, 'a': 0, 'b': 1} and md['later'] == {'a': 1, 'b': 1} and md['again'] == {'a': 1, 'b': 1}, 'one Escape closes the window on top; the one it replaced has its onClose run once, after, and no later Escape runs it again', md)
+        check(md['one'] == {'shut': True, 'a': 0, 'b': 1} and md['later'] == {'a': 0, 'b': 1} and md['again'] == {'a': 0, 'b': 1}, 'one Escape closes the window on top; the one it replaced keeps its onClose to itself, and no later Escape runs it', md)
         check(md['stale'] == {'shut': False, 'a': 1, 'b': 0} and md['stale2'] == {'shut': True, 'a': 1, 'b': 1}, 'a replaced window\'s close() runs its onClose but leaves the window on screen alone', md)
-        check(md['chain'] == {'shut': False, 'a': 0, 'b': 1, 'c': 0, 'text': 'C'} and md['chain2'] == {'shut': True, 'a': 1, 'b': 1, 'c': 1}, 'a window opened as another closes carries the replaced one\'s onClose until it closes too', md)
-        check(md['confirm'] == {'shut': True, 'a': 1, 'yes': 1}, 'a confirm over a window: Yes does its thing, and the window under it closes once', md)
+        check(md['chain'] == {'shut': False, 'a': 0, 'b': 1, 'c': 0, 'text': 'C'} and md['chain2'] == {'shut': True, 'a': 0, 'b': 1, 'c': 1}, 'a window opened as another closes is the one the next Escape closes', md)
+        check(md['confirm'] == {'shut': True, 'a': 0, 'yes': 1}, 'a confirm over a window: Yes does its thing, and nothing else runs', md)
+        check(md.get('buried') == {'kept': True, 'back': True}, 'a card pick covered by another window comes back when that one closes, still waiting', md)
 
         # 1 and 2. card drags
         dr = await pg.evaluate("""(async () => { const out = {}, wait = ms => new Promise(r => setTimeout(r, ms));

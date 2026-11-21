@@ -276,8 +276,8 @@ function wGotoStep() {
   let st = wPathStep(g[0], g[1]);
   // somebody behind a counter: go to the counter in front of them, which talks to them
   if (!st && g[3] != null) {
-    const m = wCurMap(), c = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => [g[0] + dx, g[1] + dy]).find(([x, y]) => wTileAt(m, x, y) === '-' && wPathStep(x, y));
-    if (c) { g[0] = c[0]; g[1] = c[1]; g[3] = null; if (Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y) === 1) { WUI.goto = null; wFaceAndAct(g[0], g[1]); return; } st = wPathStep(g[0], g[1]); }
+    const m = wCurMap(), c = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => [g[0] + dx, g[1] + dy]).find(([x, y]) => wTileAt(m, x, y) === '-' && (wPathStep(x, y) || wPathStep(x, y, true)));
+    if (c) { g[0] = c[0]; g[1] = c[1]; g[3] = null; if (Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y) === 1) { WUI.goto = null; wFaceAndAct(g[0], g[1]); return; } st = wPathStep(g[0], g[1]) || wPathStep(g[0], g[1], true); }
   }
   // (no way round: a person who wanders stands in a narrow gap. Walk through them, squeezing past, as a second bump
   // does, rather than stop till they move on)
