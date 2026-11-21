@@ -4025,7 +4025,7 @@ const FOE_PETS = {
     trait: { d: 'Their smallest player starts with 6 Block.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => a.max - b.max)[0]; if (e) blockE(e, 6); } } },
     power: { d: 'The first time you end a turn with no Block, it squeezes you for 5.', on: { turnEnd: (a, p) => { if (!p.f.sq && !(B.P.block > 0)) { p.f.sq = 1; foeSay('drops on you: 5.'); foeHit(5); } } } },
     trick: { n: 'Darkness', d: 'You are Weak 2, and your pet is spooked.', when: () => B.turn >= 2, go: () => { foeDeb('weak', 2); foeSpook(); } } },
-  claw: { n: 'Crawling Claw', from: 'crawling claw', el: 'rime', club: 'rattlebone',
+  claw: { n: 'Hand of Glory', from: 'hand of glory', el: 'rime', club: 'rattlebone',
     trait: { d: 'When one of their players falls, the rest gain 1 Strength.', on: { enemyFalls: (e) => { if (e && e.eaten) return; const rest = alive(); if (rest.length) { for (const x of rest) addSt(x, 'str', 1); foeSay('scuttles to the next one: +1 Strength.'); } } } },
     power: { d: 'Every third turn it grabs your guard: you lose 4 Block.', on: { turnEnd: () => { if (B.turn % 3 === 0 && B.P.block > 0) { const n = Math.min(4, B.P.block); B.P.block -= n; foeSay(`grabs ${n} Block.`); } } } },
     trick: { n: 'Throttle', d: '7 damage, and you have 1 less Stamina next turn.', when: () => (B.P.block || 0) <= 3, go: () => { foeHit(7); debuffP('drained', 1); } } },
@@ -5857,6 +5857,9 @@ function drawPetFig(c, kind, x, y, t, o = {}) {
     petEll(c, 0, -8, 11, 7, col, 1.8);
     for (let i = 0; i < 4; i++) { const a = -2.4 + i * .5 + Math.sin(t * 6 + i) * .08; petPath(c, () => { c.moveTo(Math.cos(a) * 8, -8 + Math.sin(a) * 5); c.lineTo(Math.cos(a) * 18, -8 + Math.sin(a) * 14); }); c.lineWidth = 5; c.strokeStyle = PET_INK; c.stroke(); c.lineWidth = 3; c.strokeStyle = col; c.stroke(); }
     petEyes(c, 0, -10, 3, 1.6, 0);
+    // (the Hand of Glory's candle, on the back of the hand)
+    c.fillStyle = PET_INK; c.fillRect(-2.5, -24, 5, 10); c.fillStyle = '#f0e6c8'; c.fillRect(-1.5, -23, 3, 8);
+    c.save(); c.globalAlpha = .75 + .2 * Math.sin(t * 9); c.fillStyle = '#ffcc55'; petPath(c, () => { c.moveTo(0, -32 + Math.sin(t * 7)); c.quadraticCurveTo(3.5, -26, 0, -24); c.quadraticCurveTo(-3.5, -26, 0, -32 + Math.sin(t * 7)); }); c.fill(); c.restore();
   }
   c.restore();
 }
@@ -62840,7 +62843,7 @@ renderHelp = function () {
    Each rival club brings its own pet to its matches (FOE_PETS in data/pets.js, one for each club, never hatched or
    bought): the Ironmaw Marauders a Wyvern Hatchling, the Mirewood Hexers a Will-o'-Wisp, the Gallowmere Banshees a
    Shrieker Sprout, the Cragspire Tusks a Basilisk Hatchling, the Frostfang Glaciers a Remorhaz Grub, the Duskhollow
-   Feasters a Darkmantle, the Rattlebone Rollers a Crawling Claw, the Bramblegate Brutes a Griffon Chick. A club's
+   Feasters a Darkmantle, the Rattlebone Rollers a Hand of Glory, the Bramblegate Brutes a Griffon Chick. A club's
    match is a cup round against it or a road meeting with it (the same as its head-to-head record). At kickoff the
    Realm sets RUN.foePet (its kind, and its skill: the match's tier), and the card battle plays it from the other side
    (engine/pets.js, foePetOn); in any other match there is none. The match card says which pet a club brings, and what

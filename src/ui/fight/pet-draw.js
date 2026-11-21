@@ -118,6 +118,9 @@ function drawPetFig(c, kind, x, y, t, o = {}) {
     petEll(c, 0, -8, 11, 7, col, 1.8);
     for (let i = 0; i < 4; i++) { const a = -2.4 + i * .5 + Math.sin(t * 6 + i) * .08; petPath(c, () => { c.moveTo(Math.cos(a) * 8, -8 + Math.sin(a) * 5); c.lineTo(Math.cos(a) * 18, -8 + Math.sin(a) * 14); }); c.lineWidth = 5; c.strokeStyle = PET_INK; c.stroke(); c.lineWidth = 3; c.strokeStyle = col; c.stroke(); }
     petEyes(c, 0, -10, 3, 1.6, 0);
+    // (the Hand of Glory's candle, on the back of the hand)
+    c.fillStyle = PET_INK; c.fillRect(-2.5, -24, 5, 10); c.fillStyle = '#f0e6c8'; c.fillRect(-1.5, -23, 3, 8);
+    c.save(); c.globalAlpha = .75 + .2 * Math.sin(t * 9); c.fillStyle = '#ffcc55'; petPath(c, () => { c.moveTo(0, -32 + Math.sin(t * 7)); c.quadraticCurveTo(3.5, -26, 0, -24); c.quadraticCurveTo(-3.5, -26, 0, -32 + Math.sin(t * 7)); }); c.fill(); c.restore();
   }
   c.restore();
 }

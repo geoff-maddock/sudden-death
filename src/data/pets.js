@@ -157,7 +157,7 @@ const FOE_PETS = {
     trait: { d: 'Their smallest player starts with 6 Block.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => a.max - b.max)[0]; if (e) blockE(e, 6); } } },
     power: { d: 'The first time you end a turn with no Block, it squeezes you for 5.', on: { turnEnd: (a, p) => { if (!p.f.sq && !(B.P.block > 0)) { p.f.sq = 1; foeSay('drops on you: 5.'); foeHit(5); } } } },
     trick: { n: 'Darkness', d: 'You are Weak 2, and your pet is spooked.', when: () => B.turn >= 2, go: () => { foeDeb('weak', 2); foeSpook(); } } },
-  claw: { n: 'Crawling Claw', from: 'crawling claw', el: 'rime', club: 'rattlebone',
+  claw: { n: 'Hand of Glory', from: 'hand of glory', el: 'rime', club: 'rattlebone',
     trait: { d: 'When one of their players falls, the rest gain 1 Strength.', on: { enemyFalls: (e) => { if (e && e.eaten) return; const rest = alive(); if (rest.length) { for (const x of rest) addSt(x, 'str', 1); foeSay('scuttles to the next one: +1 Strength.'); } } } },
     power: { d: 'Every third turn it grabs your guard: you lose 4 Block.', on: { turnEnd: () => { if (B.turn % 3 === 0 && B.P.block > 0) { const n = Math.min(4, B.P.block); B.P.block -= n; foeSay(`grabs ${n} Block.`); } } } },
     trick: { n: 'Throttle', d: '7 damage, and you have 1 less Stamina next turn.', when: () => (B.P.block || 0) <= 3, go: () => { foeHit(7); debuffP('drained', 1); } } },

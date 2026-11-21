@@ -4,7 +4,7 @@
    Each rival club brings its own pet to its matches (FOE_PETS in data/pets.js, one for each club, never hatched or
    bought): the Ironmaw Marauders a Wyvern Hatchling, the Mirewood Hexers a Will-o'-Wisp, the Gallowmere Banshees a
    Shrieker Sprout, the Cragspire Tusks a Basilisk Hatchling, the Frostfang Glaciers a Remorhaz Grub, the Duskhollow
-   Feasters a Darkmantle, the Rattlebone Rollers a Crawling Claw, the Bramblegate Brutes a Griffon Chick. A club's
+   Feasters a Darkmantle, the Rattlebone Rollers a Hand of Glory, the Bramblegate Brutes a Griffon Chick. A club's
    match is a cup round against it or a road meeting with it (the same as its head-to-head record). At kickoff the
    Realm sets RUN.foePet (its kind, and its skill: the match's tier), and the card battle plays it from the other side
    (engine/pets.js, foePetOn); in any other match there is none. The match card says which pet a club brings, and what
