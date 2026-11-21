@@ -172,4 +172,11 @@ src/realm/w128-shedstars.js
 src/realm/w129-shedcup.js
 src/realm/w130-shedfeel.js
 src/realm/w131-shedtilda.js
+src/realm/w132-pets.js
+src/realm/w133-petegg.js
+src/realm/w134-petshop.js
+src/realm/w135-petbond.js
+src/realm/w136-petctx.js
+src/realm/w137-petrivals.js
 src/realm/w112-quickstart.js
+src/realm/w138-petfeel.js

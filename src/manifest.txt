@@ -43,6 +43,9 @@ src/engine/sports.js
 src/engine/boss-ops.js
 src/engine/stats.js
 src/engine/sky.js
+# pets (issue #104): the rules, then the pets themselves (they use the rules only at runtime)
+src/engine/pets.js
+src/data/pets.js
 
 # the open draft class reads the sky groups at load, so it comes after engine/sky.js
 src/data/draft-class.js
@@ -70,6 +73,9 @@ src/app/sound.js
 src/ui/fight/arena.js
 src/ui/fight/scene.js
 src/ui/fight/screen.js
+# the pet at your side in a fight: its panel, its trick (T), what it does (issue #104)
+src/ui/fight/pet-view.js
+src/ui/fight/pet-draw.js
 src/render/boss-art.js
 src/render/vfx.js
 src/ui/fight/field.js

@@ -24,7 +24,7 @@ ENEMIES.argus.brain = e => {
   if (RUN.hp <= RUN.maxhp * .25) return 'ray';                                          // smells blood
   return null;
 };
-ENEMIES.argus.phases = [{ at: .5, n: 'Video Review', sub: 'Every eye opens. Three rays now.', fn: e => { addSt(e, 'str', 1); e.block += 10; } }];
+ENEMIES.argus.phases = [{ at: .5, n: 'Video Review', sub: 'Every eye opens. Three rays now.', fn: e => { addSt(e, 'str', 1); blockE(e, 10); } }];
 ENEMIES.argus.flav = 'He has never missed a call. He has never made a correct one. Wipes out a turtle’s Block, and goes for the kill when you are low.';
 
 Object.assign(ENEMIES.cube.moves, {
@@ -46,7 +46,7 @@ ENEMIES.cubelet.boss = 0;
 ENEMIES.baron.moves.check = { n: 'Hellfire Check', ops: e => [['a', 22, 1, B.P.block >= 20 ? 'pierce' : null]], vfx: 'shock' };
 ENEMIES.baron.moves.dunk.vfx = 'shock'; ENEMIES.baron.moves.dunk.far = 1;
 ENEMIES.baron.moves.pitch.vfx = 'orb'; ENEMIES.baron.moves.bean.vfx = 'orb'; ENEMIES.baron.moves.blitz.far = 1;
-ENEMIES.baron.phases = [{ at: .25, n: 'Two-Minute Warning', sub: 'The Commissioner stops pretending to be fair.', fn: e => { addSt(e, 'str', 4); e.st.enraged = 1; e.block += 20; } }];
+ENEMIES.baron.phases = [{ at: .25, n: 'Two-Minute Warning', sub: 'The Commissioner stops pretending to be fair.', fn: e => { addSt(e, 'str', 4); e.st.enraged = 1; blockE(e, 20); } }];
 ENEMIES.baron.aura = 'embers';
 ENEMIES.baron.flav = 'Owns the league, the pit, the refs and the concession stand. Changes sport every quarter, checks through a wall of Block, and loses his temper at the two-minute warning.';
 
@@ -64,7 +64,7 @@ ENEMIES.groundskeeper.brain = e => {
   if (B.lt && B.lt.blk >= 14 && last !== 'rain') return 'rain';                   // you blocked a lot: wash out your next hand
   return null;
 };
-ENEMIES.groundskeeper.phases = [{ at: .5, n: 'Flood the Field', sub: 'The infield turns to swamp. Things crawl out.', fn: e => { for (let i = 0; i < 1; i++) if (alive().length < 4) { const o = spawn('ooze', i ? undefined : 0); fx({ k: 'spawn', e: o.uid }); } addSt(B.P, 'soaked', 1); } }];
+ENEMIES.groundskeeper.phases = [{ at: .5, n: 'Flood the Field', sub: 'The infield turns to swamp. Things crawl out.', fn: e => { for (let i = 0; i < 1; i++) if (alive().length < 4) { const o = spawn('ooze', i ? undefined : 0); fx({ k: 'spawn', e: o.uid }); } debuffP('soaked', 1); } }];
 
 cloneKind('kqueen', 'kobold', { skin: '#d8743a', h: 1.02, w: 1.1, eye: '#fff07a' });
 EN('kqueen', 'Queen Pompadour, Captain of Cheer', 'kqueen', [106, 106], {
@@ -81,7 +81,7 @@ ENEMIES.kqueen.brain = e => {
   if (e.hp < e.max * .5 && last !== 'snack') return 'snack';                    // hurt: eat a cheerleader
   return null;
 };
-ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { e.block += 3 * n; fx({ k: 'num', e: e.uid, t: `+${3 * n}`, col: '#9fd2ff' }); } };
+ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); if (e.block > b0) fx({ k: 'num', e: e.uid, t: `+${e.block - b0}`, col: '#9fd2ff', blk: 1 }); } };
 ENEMIES.kqueen.phases = [{ at: .4, n: 'Halftime Show', sub: 'Pyrotechnics. Lots of them.', fn: e => { addSt(e, 'str', 3); e.st.enraged = 1; } }];
 
 /* ----- Act 2: the Rimegrave Arena ----- */
@@ -98,7 +98,7 @@ ENEMIES.zamboni.brain = e => {
   if ((B.P.block >= 12 || sv(e, 'weak') + sv(e, 'vuln') + sv(e, 'psn') >= 4) && last !== 'resurface') return 'resurface';
   return null;
 };
-ENEMIES.zamboni.phases = [{ at: .5, n: 'Overtime Ice', sub: 'The ice gets faster. So does he.', fn: e => { addSt(e, 'str', 2); e.block += 15; } }];
+ENEMIES.zamboni.phases = [{ at: .5, n: 'Overtime Ice', sub: 'The ice gets faster. So does he.', fn: e => { addSt(e, 'str', 2); blockE(e, 15); } }];
 
 cloneKind('banshee', 'wraith', { skin: '#d8e4f0', eye: '#7ff0ff', robe: '#4a5a7a' });
 EN('banshee', 'Mordant, the Banshee Coach', 'banshee', [175, 175], {
@@ -149,4 +149,4 @@ ENEMIES.mirror.brain = e => {
   if (sv(B.P, 'str') > sv(e, 'str') && last !== 'copy') return 'copy';             // you got stronger: so does it
   return null;
 };
-ENEMIES.mirror.phases = [{ at: .5, n: 'Through the Looking Glass', sub: 'It stops copying you and starts being you.', fn: e => { e.st.str = Math.max(sv(e, 'str'), sv(B.P, 'str')) + 3; e.block += 25; } }];
+ENEMIES.mirror.phases = [{ at: .5, n: 'Through the Looking Glass', sub: 'It stops copying you and starts being you.', fn: e => { e.st.str = Math.max(sv(e, 'str'), sv(B.P, 'str')) + 3; blockE(e, 25); } }];

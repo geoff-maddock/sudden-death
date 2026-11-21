@@ -10,6 +10,13 @@ window.REALMBOT = function (opts = {}) {
     while (B.phase === 'player' && !B.over && guard++ < 30) { const al = alive(); if (!al.length) break; const ok = B.hand.map((c, i) => [c, i]).filter(([c]) => canPlay(c) && def(c).type !== 'junk'); if (!ok.length) break; const [c, i] = pick(ok); playCard(i, B.enemies.indexOf(pick(al))); }
     return;
   }
+  // (the pet's trick, as a player would: a debuff or a buff early, at once in a hard match; damage on the weakest when
+  // it finishes it, or from the second turn)
+  if (B.pet && !B.pet.used && opts.trick !== false && typeof petTrickWhy === 'function' && !petTrickWhy()) {
+    const K = PETS[B.pet.kind].trick, al = alive(), weak = al.slice().sort((a, b) => (a.hp + a.block) - (b.hp + b.block))[0];
+    const dmg = (K.ops(B.pet).find(o => o[0] === 'd') || [])[1] || 0;
+    if (weak && (dmg ? (dmg >= weak.hp + weak.block || B.turn >= 2) : (B.turn >= 2 || B.type !== 'normal')) && petTrick((K.tgt || 'one') === 'one' ? B.enemies.indexOf(weak) : null) !== false) window.__labTricks = (window.__labTricks || 0) + 1;
+  }
   while (B.phase === 'player' && !B.over && guard++ < 30) {
     const al = alive(); if (!al.length) break;
     let incoming = 0; for (const e of al) { if (sv(e, 'stun')) continue; const I = intentInfo(e); if (I.kinds.includes('atk')) incoming += I.dmg * I.hits; }
@@ -45,6 +52,13 @@ window.REALMLAB = function (opts = {}) {
   /* ---------- a new journey ---------- */
   const club = opts.club || pick(CLUB_IDS);
   wStart(null, { club, hardcore: !!opts.hardcore });
+  // a pet at your side from the start (opts.pet: a kind; opts.petBond; opts.petHungry: kept hungry all journey);
+  // opts.rivals === false: no rival club brings its pet
+  if (opts.pet) { const q = wPetAdd(opts.pet, 'lab'); if (q) { q.bond = opts.petBond || 1; q.xp = W_PBOND.at[q.bond] || 0; if (opts.petHungry) q.hungry = true; wPetSync(); } }
+  // (the rival pets as they were, every journey: one with rivals off leaves the next one's alone)
+  window.__rivalPets0 = window.__rivalPets0 || Object.assign({}, W_RIVAL_PET);
+  for (const k in W_RIVAL_PET) delete W_RIVAL_PET[k]; if (opts.rivals !== false) Object.assign(W_RIVAL_PET, window.__rivalPets0);
+  window.__labTricks = 0;
   RUN.diff = opts.diff != null ? opts.diff : RUN.diff;
   const log = { club, result: null, stage: null, matches: [], stages: [], blackouts: 0, days: 0, crownTries: 0 };
   let stage = '';
@@ -89,6 +103,8 @@ window.REALMLAB = function (opts = {}) {
   /* ---------- between matches: what a player does with what the realm gives ---------- */
   const rar = { l: 5, r: 3, u: 2, c: 1 };
   function settle() {
+    // (a hungry pet is fed when there is the gold, unless the lab keeps it hungry; and kept hungry, it stays so)
+    if (opts.pet && WG.pets) for (const q of WG.pets.owned) { if (opts.petHungry) { q.hungry = true; wPetSync(); } else if (q.hungry && RUN.gold >= wPetCost(q) + 20) wPetFeed(q.id); }
     for (let guard = 0; guard < 20; guard++) {
       if (WG.cardOffer) { const O = WG.cardOffer, c = O.list.slice().sort((a, b) => (rar[CARDS[b.id].rar] || 0) - (rar[CARDS[a.id].rar] || 0))[0]; WG.cardOffer = null; wGainCard({ id: c.id, up: c.up, pid: O.pid }, O.why); continue; }
       const k = (WG.wprompts || []).findIndex(P => P.t === 'recruit');
@@ -369,5 +385,6 @@ window.REALMLAB = function (opts = {}) {
   log.notices = WG.notice ? WG.notice.done : 0; log.lapsed = WG.notice ? WG.notice.lapsed : 0;
   log.quests = wRoster().filter(p => p.pq && p.pq.st === 'done').length; log.combos = wComboCards().length; log.fans = RUN.fans || 0; log.goldAll = RUN.stats.gold || 0;
   log.days = WG.dayAbs; log.gold = RUN.gold; log.maxhp = RUN.maxhp; log.deck = RUN.deck.length; log.lvls = wRoster().map(p => p.lvl); log.relics = RUN.relics.length;
+  if (WG.pets && WG.pets.owned.length) { const q = WG.pets.owned[0]; log.petBond = q.bond; log.petXp = q.xp || 0; log.petTricks = window.__labTricks || 0; }
   return log;
 };

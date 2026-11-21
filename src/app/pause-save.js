@@ -47,6 +47,7 @@ function openPause() {
 function closePause() { UI.paused = false; const el = $('pause'); if (el) el.hidden = true; if (SND.ctx && MUS_BUS && MUS.timer) MUS_BUS.gain.setTargetAtTime(SET.mvol * .9 * MODE_VOL[MUS.mode || 'fight'], SND.ctx.currentTime, .2); }
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape' && ev.key !== 'p' && ev.key !== 'P') return;
+  if (ev.key !== 'Escape' && (ev.ctrlKey || ev.metaKey || ev.altKey)) return;
   if (ev.target.closest('input,textarea') || !$('modal').hidden) return;
   if (UI.paused) { if (ev.key === 'Escape' || ev.key.toLowerCase() === 'p') { closePause(); ev.preventDefault(); } return; }
   if (!RUN || UI.screen === 'title' || UI.screen === 'end') return;

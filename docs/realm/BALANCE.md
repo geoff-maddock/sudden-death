@@ -1356,3 +1356,78 @@ Phoenix 47%, the Kraken 53%, the Behemoth 47%, the Djinn 65%, the Hydra 60%, the
 at twice, its powers still at 2) read the control 37% and the Frost Wyrm 66%, and one at 60 the control 48%: the cells
 move about 10 points between runs, so a superstar adds from nothing to about 20 points as one player in four. The
 Djinn (+20 here, the best draw in the realm) is the one to watch; a run at 200 or more a cell would settle it.
+
+## Pets (issue #104, phase 8)
+
+The bot keeps a pet at its side from the start (`test/realm_lab.js`, `opts.pet`), feeds it when it goes hungry and
+there is the gold, lets its bond grow from wins as a player's would, and throws its trick as a player would: a buff or
+debuff from the second turn (at once in a hard match), damage when it finishes the weakest enemy or from the second
+turn. `opts.petBond` starts it at a bond, `opts.petHungry` keeps it hungry, `opts.trick: false` never throws the trick,
+`opts.rivals: false` takes the rival clubs' pets away. Per-match numbers are from `/tmp/realm_lab.json` (HP lost as a
+share of max HP, over every match of every journey).
+
+**First cut (as phases 0 to 7 shipped them), 60 to 120 runs a pet.** Far too strong: every pet lifted the champion rate,
+most to 95 to 100% from about 75%, and blackouts fell from 3.3 to under 1 a journey. Half-scaling every number
+(`PET.scale = .5`) barely moved it: the strength was in things that don't scale, a card drawn every turn, Stamina every
+turn, Weak on every enemy at each kill, and in bond rounding a 1 up to 2 at bond 3.
+
+**The retune.**
+- Bond multipliers ×1/×1.5/×2 became ×0.7/×0.9/×1.1, rounding a half down (`PET.bias = .4`), so a 1 stays a 1.
+- Bond comes slower: bond 2 at 12 points, bond 3 at 45 (was 6 and 16). The bot still reaches bond 3 by the end of a journey (about 48 wins).
+- What suits a match is 15% a step (was 25%).
+- The repeatable effects are capped:
+  - the Blinkpup's fetch and the Sprite's Stamina, twice a fight;
+  - the Bog Frog's draw on a fall, twice a fight;
+  - the Jellycube's Weak and the Cockatrice's Exposed, every second turn;
+  - the Mephitling's Weak, on the first fall only;
+  - the Hootling's third-attack Strength, once a fight;
+  - the Frostpup's breath, every fourth turn.
+- Smaller numbers:
+  - Blinkpup: its blink gives 2 Block (was 4).
+  - Mephitling: hand Block 1 a card, at most 4; its sulk 1 Strength; Frost Puff Weak 1 and 4 Block.
+  - Hippogriff: late Block 2.
+  - Rustnibbler: Rust strips Block, not Strength.
+  - Hootling: its Strength comes on the first enemy hit that leaves you below half HP, not at the start.
+
+**After (100 runs each, skilled bot, rival pets on).** About ±5 points of noise on the champion rate at this size. (The Hootling's row is from after its trait settled on the first enemy hit that leaves you below half HP; no pet in that batch: 76%, 30.1%.)
+
+| setup | champion | blackouts | match win | HP lost a match |
+|---|---|---|---|---|
+| no pet | 75% | 3.3 | 93.6% | 30.9% |
+| Blinkpup | 85% | 2.3 | 95.6% | 25.4% |
+| Pseudodragon | 88% | 2.2 | 95.8% | 26.2% |
+| Axebeak Chick | 87% | 2.0 | 96.2% | 25.5% |
+| Hootling | 92% | 1.5 | 97.0% | 27.4% |
+| Sprite in a Jar | 81% | 2.5 | 95.4% | 27.4% |
+| Bog Frog | 75% | 2.9 | 94.7% | 27.9% |
+| Chestnut | 85% | 2.7 | 95.0% | 28.0% |
+| Jellycube | 83% | 2.1 | 96.0% | 24.2% |
+| Hatchling Hippogriff | 92% | 1.6 | 96.9% | 24.4% |
+| Glowbeetle | 85% | 2.4 | 95.5% | 26.4% |
+| Rustnibbler | 87% | 2.3 | 95.6% | 27.5% |
+| Imp-in-Waiting | 78% | 2.5 | 95.3% | 28.1% |
+| Frostpup | 90% | 1.4 | 97.3% | 20.2% |
+| Mephitling | 91% | 1.5 | 97.0% | 22.9% |
+| Cockatrice Chick | 84% | 1.8 | 96.7% | 22.6% |
+
+A pet takes 10 to 25% off the HP a match costs. The Frostpup (the Rimewatch keeper's, after a hockey win) is the
+strongest, as a pet found nowhere else may be; the Bog Frog and the Imp the mildest.
+
+**Bond, hunger, the trick and rivals (Blinkpup, 100 runs).**
+
+| setup | champion | HP lost a match |
+|---|---|---|
+| bond growing from 1 | 85% | 25.4% |
+| bond 3 from the start | 89% | 24.6% |
+| kept at bond 1 all journey | 88% | 27.1% |
+| hungry all journey (bond 1, halved) | 78% | 28.2% |
+| no trick | 93% | 25.7% |
+| no pet, rival pets off | 81% | 27.7% |
+
+A hungry pet is worth little, which is the point of upkeep. The trick is a small part of a pet's worth; the run
+without it landing higher is noise. The rival clubs' pets cost the bot about 3 points of HP a match and a few points
+of champion rate.
+
+**Upkeep against earnings.** A journey earns about 3,100 gold. One common pet costs 6 a week, about 100 a journey (3%);
+a full kennel of six costs 40 to 90 a week, a third to a half of what a journey earns. That is the limit on
+collecting. Treats are cheap (an 8-gold biscuit feeds a hungry pet), so hunger is a nuisance, not a trap.

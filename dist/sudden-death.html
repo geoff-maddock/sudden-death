@@ -1891,7 +1891,7 @@ ENEMIES.argus.brain = e => {
   if (RUN.hp <= RUN.maxhp * .25) return 'ray';                                          // smells blood
   return null;
 };
-ENEMIES.argus.phases = [{ at: .5, n: 'Video Review', sub: 'Every eye opens. Three rays now.', fn: e => { addSt(e, 'str', 1); e.block += 10; } }];
+ENEMIES.argus.phases = [{ at: .5, n: 'Video Review', sub: 'Every eye opens. Three rays now.', fn: e => { addSt(e, 'str', 1); blockE(e, 10); } }];
 ENEMIES.argus.flav = 'He has never missed a call. He has never made a correct one. Wipes out a turtle’s Block, and goes for the kill when you are low.';
 
 Object.assign(ENEMIES.cube.moves, {
@@ -1913,7 +1913,7 @@ ENEMIES.cubelet.boss = 0;
 ENEMIES.baron.moves.check = { n: 'Hellfire Check', ops: e => [['a', 22, 1, B.P.block >= 20 ? 'pierce' : null]], vfx: 'shock' };
 ENEMIES.baron.moves.dunk.vfx = 'shock'; ENEMIES.baron.moves.dunk.far = 1;
 ENEMIES.baron.moves.pitch.vfx = 'orb'; ENEMIES.baron.moves.bean.vfx = 'orb'; ENEMIES.baron.moves.blitz.far = 1;
-ENEMIES.baron.phases = [{ at: .25, n: 'Two-Minute Warning', sub: 'The Commissioner stops pretending to be fair.', fn: e => { addSt(e, 'str', 4); e.st.enraged = 1; e.block += 20; } }];
+ENEMIES.baron.phases = [{ at: .25, n: 'Two-Minute Warning', sub: 'The Commissioner stops pretending to be fair.', fn: e => { addSt(e, 'str', 4); e.st.enraged = 1; blockE(e, 20); } }];
 ENEMIES.baron.aura = 'embers';
 ENEMIES.baron.flav = 'Owns the league, the pit, the refs and the concession stand. Changes sport every quarter, checks through a wall of Block, and loses his temper at the two-minute warning.';
 
@@ -1931,7 +1931,7 @@ ENEMIES.groundskeeper.brain = e => {
   if (B.lt && B.lt.blk >= 14 && last !== 'rain') return 'rain';                   // you blocked a lot: wash out your next hand
   return null;
 };
-ENEMIES.groundskeeper.phases = [{ at: .5, n: 'Flood the Field', sub: 'The infield turns to swamp. Things crawl out.', fn: e => { for (let i = 0; i < 1; i++) if (alive().length < 4) { const o = spawn('ooze', i ? undefined : 0); fx({ k: 'spawn', e: o.uid }); } addSt(B.P, 'soaked', 1); } }];
+ENEMIES.groundskeeper.phases = [{ at: .5, n: 'Flood the Field', sub: 'The infield turns to swamp. Things crawl out.', fn: e => { for (let i = 0; i < 1; i++) if (alive().length < 4) { const o = spawn('ooze', i ? undefined : 0); fx({ k: 'spawn', e: o.uid }); } debuffP('soaked', 1); } }];
 
 cloneKind('kqueen', 'kobold', { skin: '#d8743a', h: 1.02, w: 1.1, eye: '#fff07a' });
 EN('kqueen', 'Queen Pompadour, Captain of Cheer', 'kqueen', [106, 106], {
@@ -1948,7 +1948,7 @@ ENEMIES.kqueen.brain = e => {
   if (e.hp < e.max * .5 && last !== 'snack') return 'snack';                    // hurt: eat a cheerleader
   return null;
 };
-ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { e.block += 3 * n; fx({ k: 'num', e: e.uid, t: `+${3 * n}`, col: '#9fd2ff' }); } };
+ENEMIES.kqueen.onTurn = e => { const n = alive().filter(o => o !== e).length; if (n) { const b0 = e.block; blockE(e, 3 * n); if (e.block > b0) fx({ k: 'num', e: e.uid, t: `+${e.block - b0}`, col: '#9fd2ff', blk: 1 }); } };
 ENEMIES.kqueen.phases = [{ at: .4, n: 'Halftime Show', sub: 'Pyrotechnics. Lots of them.', fn: e => { addSt(e, 'str', 3); e.st.enraged = 1; } }];
 
 /* ----- Act 2: the Rimegrave Arena ----- */
@@ -1965,7 +1965,7 @@ ENEMIES.zamboni.brain = e => {
   if ((B.P.block >= 12 || sv(e, 'weak') + sv(e, 'vuln') + sv(e, 'psn') >= 4) && last !== 'resurface') return 'resurface';
   return null;
 };
-ENEMIES.zamboni.phases = [{ at: .5, n: 'Overtime Ice', sub: 'The ice gets faster. So does he.', fn: e => { addSt(e, 'str', 2); e.block += 15; } }];
+ENEMIES.zamboni.phases = [{ at: .5, n: 'Overtime Ice', sub: 'The ice gets faster. So does he.', fn: e => { addSt(e, 'str', 2); blockE(e, 15); } }];
 
 cloneKind('banshee', 'wraith', { skin: '#d8e4f0', eye: '#7ff0ff', robe: '#4a5a7a' });
 EN('banshee', 'Mordant, the Banshee Coach', 'banshee', [175, 175], {
@@ -2016,7 +2016,7 @@ ENEMIES.mirror.brain = e => {
   if (sv(B.P, 'str') > sv(e, 'str') && last !== 'copy') return 'copy';             // you got stronger: so does it
   return null;
 };
-ENEMIES.mirror.phases = [{ at: .5, n: 'Through the Looking Glass', sub: 'It stops copying you and starts being you.', fn: e => { e.st.str = Math.max(sv(e, 'str'), sv(B.P, 'str')) + 3; e.block += 25; } }];
+ENEMIES.mirror.phases = [{ at: .5, n: 'Through the Looking Glass', sub: 'It stops copying you and starts being you.', fn: e => { e.st.str = Math.max(sv(e, 'str'), sv(B.P, 'str')) + 3; blockE(e, 25); } }];
 /* p3c: the sports front office. Sport glyphs, the published schedule, and the Practice track. */
 // tiny glyphs for each sport (24×24 viewBox), used on the map, cards and panels
 const SPORT_GLYPH = {
@@ -2178,6 +2178,8 @@ function startCombat(ids, type, sport, trait) {
   // relics
   const P = B.P;
   B.trait = trait || null; B.stakes = (RUN.pending && RUN.pending.stakes) || null;
+  // the pet at your side, if the run has one (the Realm's: engine/pets.js)
+  petBegin();
   fire('fightStart');
   log(`${SPORTS[B.sport].n} rules: ${SPORTS[B.sport].rule}.`, 'sys');
   playerTurnStart();
@@ -2290,21 +2292,23 @@ function drawCards(n) {
 function endTurn() {
   if (B.phase !== 'player' || B.over) return [];
   const P = B.P;
+  // (the turn is ending: a card drawn now would be thrown away with the hand, so a draw waits for the next: B.ending)
+  B.ending = true;
   if (B.sport === 'curling' && B.hand.length) { gainBlock(B.hand.length * 2, true); log(`Sweep! ${B.hand.length} cards left in hand: +${B.hand.length * 2} Block.`, 'good'); }
   if (sv(P, 'plate')) gainBlock(sv(P, 'plate'), true);
   fire('turnEnd');
   for (const c of B.hand) { const d = def(c); if (d.endHurt) loseHP(d.endHurt, d.n); }
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   if (sv(P, 'regen')) { healP(sv(P, 'regen')); addSt(P, 'regen', -1); }
   fire('turnEndHeal');
   sportTurnEnd();
   B.lt = B.tt || null;
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   const keep = [];
   for (const c of B.hand) { const d = def(c); if (d.retain) keep.push(c); else if (d.eth) B.exhaust.push(c); else B.discard.push(c); }
   B.hand = keep;
   for (const k of ['weak', 'vuln']) if (sv(P, k)) addSt(P, k, -1);
-  B.phase = 'enemy';
+  B.phase = 'enemy'; delete B.ending;
   return enemyTurnSteps();
 }
 // the enemy turn as a list of steps, so the UI can pace it and the lab can run it flat out
@@ -2345,11 +2349,11 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': e.block += op[1]; fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); break;
-      case 'ba': for (const o of alive()) { o.block += op[1]; fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); } break;
+      case 'b': { const b0 = e.block; blockE(e, op[1]); if (e.block > b0) fx({ k: 'num', e: e.uid, t: '+' + (e.block - b0), col: '#9fd2ff', blk: 1 }); break; }
+      case 'ba': for (const o of alive()) { const b0 = o.block; blockE(o, op[1]); if (o.block > b0) fx({ k: 'num', e: o.uid, t: '+' + (o.block - b0), col: '#9fd2ff', blk: 1 }); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
-      case 'p': addSt(B.P, op[1], op[2]); fx({ k: 'pst', st: op[1], n: op[2] }); break;
+      case 'p': if (debuffP(op[1], op[2])) fx({ k: 'pst', st: op[1], n: op[2] }); break;
       case 'add': for (let i = 0; i < op[2]; i++) { const c = mkCard(op[1]); if (op[3] === 'draw') B.draw.splice((R() * (B.draw.length + 1)) | 0, 0, c); else B.discard.push(c); } fx({ k: 'addcard', id: op[1], n: op[2] }); log(`${op[2]} × ${CARDS[op[1]].n} shuffled into your ${op[3] === 'draw' ? 'draw pile' : 'discard pile'}.`, 'bad'); break;
       case 'heal': e.hp = Math.min(e.max, e.hp + op[1]); break;
       case 'steal': { const t = Math.min(RUN.gold, op[1]); RUN.gold -= t; e.stolen += t; if (t) { fx({ k: 'num', p: 1, t: `−${t} gold`, col: '#ffd166' }); log(`${e.n} lifts ${t} gold.`, 'bad'); } break; }
@@ -2360,11 +2364,19 @@ function doMove(e) {
     }
   }
 }
+// a status on you from the other side: a debuff fires playerDebuff first, and a pet may stop it (false: it was stopped)
+function debuffP(k, n) { if (ST[k] && ST[k].d && n > 0 && fire('playerDebuff', { k, n })) return false; addSt(B.P, k, n); return true; }
+// an enemy gains Block (from a move, a phase or its turn): enemyBlock, for a pet that reads it (a hockey save is a goal
+// stopped, not Block raised: it doesn't come here)
+function blockE(e, n) { e.block += n; if (n > 0) fire('enemyBlock', { e, n }); }
 function hurtPlayer(dmg, e, o = {}) {
   const P = B.P;
+  // (an enemy's hit on its way: a pet may step in before the Block is counted)
+  if (e) fire('playerAttacked', e);
   if (sv(P, 'intang')) dmg = Math.min(dmg, 1);
-  if (sv(P, 'pads')) { P.block += 5; addSt(P, 'pads', -1); fx({ k: 'num', p: 1, t: 'Pad save +5', col: '#9fd2ff', small: 1 }); }
-  if (sv(P, 'helmet')) { dmg = Math.max(0, dmg - 3); addSt(P, 'helmet', -1); }
+  // (o.plain: damage that is no attack, a rival pet's: past Block to HP, setting off no gear and no score)
+  if (!o.plain && sv(P, 'pads')) { P.block += 5; addSt(P, 'pads', -1); fx({ k: 'num', p: 1, t: 'Pad save +5', col: '#9fd2ff', small: 1 }); }
+  if (!o.plain && sv(P, 'helmet')) { dmg = Math.max(0, dmg - 3); addSt(P, 'helmet', -1); }
   let taken = dmg;
   const blocked = o.pierce ? 0 : Math.min(P.block, taken); P.block -= blocked; taken -= blocked;
   if (blocked) fx({ k: 'num', p: 1, t: 'blocked ' + blocked, col: '#9fd2ff', small: 1 });
@@ -2372,8 +2384,9 @@ function hurtPlayer(dmg, e, o = {}) {
   fx({ k: 'hitP', amt: taken });
   if (e && sv(P, 'thorns') && !e.dead) hurtEnemy(e, sv(P, 'thorns'), { raw: true, src: 'Spikes' });
   if (e && sv(P, 'shoulder') && !e.dead) { hurtEnemy(e, 6, { raw: true, src: 'Shoulder Pads', noScore: 1 }); addSt(P, 'shoulder', -1); }
-  if (sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
-  sportEnemyHit(taken, dmg);
+  if (!o.plain && sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
+  if (!o.plain) sportEnemyHit(taken, dmg);
+  if (e) { fire('playerHit', { e, taken, dmg }); petSpook(taken); }
   return taken;
 }
 function loseHP(n, src, fromHit) {
@@ -2406,6 +2419,7 @@ function atkDmg(base, e, card, extra = 0) {
     if (B.sport === 'basketball' && (sv(P, 'hot') || (!B.inCard && B.atkCount >= 2))) d += add(3, 'On Fire');
     d += add(sv(P, 'oop'), 'Alley-oop');
     d += add(mod('atk', card), 'Trophies');
+    d += add(petAtk(card, e), petName());
     if (B.sport === 'bowling' && card.sk) d += add(2, 'Practiced');
   }
   if (sv(P, 'weak')) d *= mul(1, .75, 'You are Weak');
@@ -2477,6 +2491,8 @@ function playCard(i, ti, opt = {}) {
   if (needsTarget(card)) { if (!tgt || tgt.dead || tgt.fled) tgt = alive()[0]; if (!tgt) return false; }
   B.energy -= cardCost(card);
   B.hand.splice(i, 1);
+  // (the card's target, by its id: B stays plain data)
+  B.lastTgt = tgt ? tgt.uid : null;
   // extra costs, paid up front
   if (d.disc) { let j = B.hand.findIndex(c => c.uid === opt.disc); if (j < 0) j = B.hand.reduce((bj, c, k) => cardValue(c) < cardValue(B.hand[bj]) ? k : bj, 0); const dc = B.hand.splice(j, 1)[0]; if (dc) { B.discard.push(dc); log(`You discard ${def(dc).n}.`); } }
   if (d.toll) loseHP(d.toll, d.n);
@@ -2583,6 +2599,7 @@ function resolve(ops, ctx) {
       case 'execute': { const e = ctx.tgt; if (!e || e.dead) break; if (!isBoss(e)) { fx({ k: 'say', e: e.uid, t: 'Hole in one!' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(40, e, ctx.card)); break; }
       case 'luck': B.luck = 1; RUN.luck = 1; break;
       case 'loseblock': P.block = 0; break;
+      case 'unblock': for (const e of alive()) e.block = 0; log('Every enemy loses its Block.', 'good'); break;
       case 'strip': for (const e of alive()) { e.block = 0; if (sv(e, 'str') > 0) delete e.st.str; } log('Every enemy is stripped of Block and Strength.', 'good'); break;
       case 'drainall': { let tot = 0; for (const e of alive()) tot += hurtEnemy(e, atkDmg(op[1], e, ctx.card)); healP(tot); break; }
       case 'split': { const al = alive(); const ends = al.length > 1 ? [al[0], al[al.length - 1]] : al; for (const e of ends) hurtEnemy(e, atkDmg(op[1], e, ctx.card)); break; }
@@ -2631,9 +2648,9 @@ function sportInit() { B.sc = { us: 0, them: 0, bases: [0, 0, 0], outs: 0, goals
 const scored = () => !!SPORT_UNIT[B.sport];
 function cardHasDmg(d) { const has = ops => ops.some(o => ['d', 'drain', 'dunk', 'bodyslam', 'split', 'drainall', 'bonestorm', 'devour', 'petrify', 'petrifyall', 'execute'].includes(o[0]) || (o[0] === 'roll' && (has(o[2]) || has(o[3])))); return has(d.fx); }
 function cardValue(c) { const d = def(c); if (d.type === 'junk' || d.type === 'curse') return -10; return ({ s: 1, c: 2, u: 3, r: 4, l: 6 }[d.rar] || 1) + (c.up ? 1 : 0) - (d.id === 'check' || d.id === 'hold' ? 1 : 0); }
-function addHL(id) { if (B.sc.hl.includes(id)) return; B.sc.hl.push(id); fx({ k: 'banner', t: HL_NAME[id], sub: 'Highlight: bonus style points', small: 1 }); log(`Highlight: ${HL_NAME[id]}.`, 'good'); }
-function scoreUs(n, what) { B.sc.us += n; credit('p', n); potg(what, n); fx({ k: 'score', side: 0, n, what }); momentumCheck(); }
-function scoreThem(n) { if (n && perkOn('ace')) n *= 2; B.sc.them += n; fx({ k: 'score', side: 1, n }); momentumCheck(); }
+function addHL(id) { if (B.sc.hl.includes(id)) return; B.sc.hl.push(id); fx({ k: 'banner', t: HL_NAME[id], sub: 'Highlight: bonus style points', small: 1 }); log(`Highlight: ${HL_NAME[id]}.`, 'good'); fire('highlight', id); }
+function scoreUs(n, what) { B.sc.us += n; credit('p', n); potg(what, n); fx({ k: 'score', side: 0, n, what }); momentumCheck(); fire('score', { side: 0, n, what }); }
+function scoreThem(n) { if (n && perkOn('ace')) n *= 2; B.sc.them += n; fx({ k: 'score', side: 1, n }); momentumCheck(); fire('score', { side: 1, n }); }
 /* momentum: the score margin pushes the fight. Lead and your hits land harder; trail and theirs do,
    until you are far enough behind that desperation kicks in (Comeback: an extra card every turn). */
 const MOM = { baseball: [2, 4], football: [7, 14], hockey: [2, 3], basketball: [6, 12], jousting: [2, 3], curling: [2, 3], boxing: [1, 2], soccer: [2, 3] };
@@ -2824,7 +2841,7 @@ function sportTurnStart() {
   if (B.sport === 'boxing' && B.turn > 1) {
     const [u, t] = B.sc.rd; fx({ k: 'bell', win: u > t }); if (u > t) { B.sc.rounds[0]++; scoreUs(0); } else if (t > u) { B.sc.rounds[1]++; scoreThem(0); }
     if (u - t >= 15) { for (const e of alive()) addSt(e, 'weak', 1); fx({ k: 'banner', t: 'They’re rocked', sub: 'You took the round by 15+: every enemy is Weak', small: 1 }); }
-    else if (t - u >= 15) { addSt(B.P, 'weak', 1); fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
+    else if (t - u >= 15 && debuffP('weak', 1)) { fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
     B.sc.rd = [0, 0];
   }
 }
@@ -2924,7 +2941,7 @@ function bossOp(e, op) {
     case 'dispel': { const pool = ['ritual', 'plate', 'barricade', 'haunt', 'kindle', 'nightgame', 'trollblood', 'spin', 'tempest', 'necro', 'basilisk', 'coldsnap', 'pads', 'helmet', 'shoulder', 'luckybat', 'sweat', 'ward', 'thorns'].filter(k => sv(P, k) > 0); const gone = shuffle(pool).slice(0, op[1]); for (const k of gone) delete P.st[k]; if (gone.length) { log(`Unmade: ${gone.map(k => ST[k].n).join(', ')}.`, 'bad'); fx({ k: 'num', p: 1, t: `Unmade: ${gone.map(k => ST[k].n).join(', ')}`, col: '#b494ff' }); } break; }
     case 'charge': addSt(e, 'charge', 1); break;
     case 'land': delete e.st.air; delete e.st.charge; break;
-    case 'sacrifice': { const v = alive().filter(o => o !== e); if (!v.length) break; const o = pick(v); hurtEnemy(o, o.hp + o.block, { raw: true, noScore: 1 }); e.hp = Math.min(e.max, e.hp + op[1]); addSt(e, 'str', op[2]); fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#6fe08a' }); log(`${e.n} eats ${o.n}. Heals ${op[1]}, gains ${op[2]} Strength.`, 'foe'); break; }
+    case 'sacrifice': { const v = alive().filter(o => o !== e); if (!v.length) break; const o = pick(v); o.eaten = 1; hurtEnemy(o, o.hp + o.block, { raw: true, noScore: 1 }); e.hp = Math.min(e.max, e.hp + op[1]); addSt(e, 'str', op[2]); fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#6fe08a' }); log(`${e.n} eats ${o.n}. Heals ${op[1]}, gains ${op[2]} Strength.`, 'foe'); break; }
     case 'stealbest': { const pile = B.draw.length ? B.draw : B.discard; if (!pile.length) break; let j = 0; pile.forEach((c, k) => { if (cardValue(c) > cardValue(pile[j])) j = k; }); const c = pile.splice(j, 1)[0]; (e.pocket = e.pocket || []).push(c); fx({ k: 'say', e: e.uid, t: `Stole ${def(c).n}` }); log(`${e.n} steals ${def(c).n} from your deck. Beat it to get it back.`, 'bad'); break; }
     case 'mirrorstr': { const n = Math.max(0, sv(P, 'str')); if (n > sv(e, 'str')) e.st.str = n; fx({ k: 'say', e: e.uid, t: `Copies your Strength (${n})` }); break; }
   }
@@ -3060,6 +3077,336 @@ function skyCombatStart() {
 
 // the sky as a system hook: it acts at the start of every fight
 onHook('fightStart', skyCombatStart);
+/* Pets (issue #104, phase 0): a small monster companion at your side in a card battle. The rules; the pets themselves
+   are data/pets.js. Pets are the Realm's (it sets RUN.pet before a match, phase 2); a run without one fights as ever.
+   A pet has no hit points and is never knocked out. What it brings:
+   - its trait, always on;
+   - its powers, which fire on their own when their moment comes (each opens at a bond level: at);
+   - its trick, once a fight, when you choose (petTrick).
+   Bond (1 to 3) scales its numbers (petPow: PET.bond, x0.7/0.9/1.1, a half rounding down, PET.bias, so a 1 stays
+   a 1; PET.scale is the balance knob, docs/realm/BALANCE.md); a hungry pet's are smaller (PET.hungry). A hit of
+   PET.spook or more spooks it: its next power that would fire doesn't (a once-a-turn power is lost for that turn; a
+   once-a-fight power waits for its next chance; the trait is never spooked).
+   Declared, not checked by name: each pet's trait and powers carry on: { event: fn(arg, pet) | { when, then } } handlers, read through
+   the hooks (onHook: one dispatcher an event), and mod: { name: fn(arg, pet) } sums (petMod, added to mod()). Its damage
+   goes into atkDmg's breakdown under the pet's own name (petAtk). The moments a pet reads that the engine had no event
+   for are fired in combat.js: playerAttacked (an enemy's hit on its way, with the enemy), playerHit ({ e, taken }),
+   enemyBlock ({ e, n }: an enemy's Block from a move, a phase or its turn, through blockE; a hockey save isn't Block
+   raised) and playerDebuff ({ k, n }: every debuff on you, through debuffP; a truthy return stops it). An ally a boss
+   eats isn't a kill of yours, for a pet (its enemyFalls skips e.eaten; trophies are as they were).
+   B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
+   flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
+// (scale: every pet number, the balance knob: docs/realm/BALANCE.md)
+const PET = { bond: [.7, .9, 1.1], hungry: .5, spook: 15, ctx: .15, scale: 1, bias: .4 };
+const PET_EVENTS = ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'attackPlayed', 'enemyFalls', 'fightWon', 'playerAttacked', 'playerHit', 'enemyBlock', 'playerDebuff', 'highlight', 'score'];
+const petDef = p => p && PETS[p.kind] || null;
+const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) || 'Your pet';
+// a pet's number at its bond, smaller when it is hungry (at least 1)
+/* context (phase 6): a pet is a step stronger, PET.ctx a step, for each that fits the match: one of its sports
+   (PETS[k].sports, the sport being played), one of its moons (PETS[k].moon, the sky's phase), its own ground (here: the
+   element of the match's region, set by the Realm) and an element its own beats (foe: the other side's, PET_BEATS).
+   Outside the Realm there is no ground or foe, so only the sport and the moon. It counts only for the pet in the fight
+   (B.pet), or a copy of it that petText was given, and not once the fight is lost (a win's payouts, fightWon, still
+   count it); anything else, the Pets tab or a shop, shows a pet's own numbers. The moon is read once, as the fight
+   begins (B.pet.moonOn, set by petBegin; a B.pet without it has no moon, as a save from before context began fought
+   without any), so what the pet gave at the start and what it says agree */
+const petMoonOn = D => !!(D.moon && !window.SKY_OFF && typeof skyNow === 'function' && D.moon.includes(skyNow().moon));
+const PET_BEATS = { ember: 'bloom', bloom: 'tide', tide: 'ember', aether: 'rime', rime: 'aether' };
+const PET_CTX_NAME = { sport: 'its sport', moon: 'its moon', home: 'its home ground', foe: 'an element it beats' };
+function petCtx(q) {
+  const D = q && PETS[q.kind]; if (!D || !B || B.over === 'lose' || !(q === B.pet || q.inFight)) return [];
+  const out = [];
+  if (D.sports && D.sports.includes(B.sport)) out.push('sport');
+  if (q.moonOn) out.push('moon');
+  if (q.here && q.here === D.el) out.push('home');
+  if (q.foe && PET_BEATS[D.el] === q.foe) out.push('foe');
+  return out;
+}
+function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; // (rounded with PET.bias, so a half goes down: a 1 stays a 1 until it is well past it; small numbers matter most)
+  return Math.max(1, Math.floor(PET.bias + n * PET.scale * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
+// the pet at a fight's start: from the run (the Realm's), as plain data
+function petBegin() {
+  foePetBegin();
+  const rp = RUN && RUN.pet; B.pet = null;
+  if (!rp || !PETS[rp.kind]) return;
+  const D = PETS[rp.kind], moonOn = petMoonOn(D);
+  B.pet = { kind: rp.kind, name: rp.name || D.n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, here: rp.here || null, foe: rp.foe || null, moonOn, used: false, spooked: false, t: {}, f: {} };
+}
+// a pet's effect said: on screen and in the log
+function petSay(t) { fx({ k: 'pet', t: `${petName()}: ${t}` }); log(`${petName()}: ${t}`, 'good'); }
+// the powers open at their bond levels
+const petPowers = p => (petDef(p).powers || []).filter(w => (w.at || 1) <= (p.bond || 1));
+// one event, to the pet at your side: its trait, then its powers. A handler is a function (it always fires) or
+// { when(a, pet), then(a, pet), spend(a, pet) } (spend: what a once-a-turn power marks as used, before it fires): a spooked pet's first power that would fire doesn't, and the pet settles (the trait
+// is never spooked). A truthy return is passed back (playerDebuff uses it to stop the debuff)
+const petH = h => typeof h === 'function' ? { when: () => true, then: h } : h;
+function petOn(ev, a) {
+  if (!B || !B.pet || B.over === 'lose') return;
+  const p = B.pet, D = petDef(p); if (!D) return;
+  // (an ally a boss eats isn't a kill of yours)
+  if (ev === 'enemyFalls' && a && a.eaten) return;
+  if (ev === 'turnStart') p.t = {};
+  let r;
+  const T = D.trait && D.trait.on && D.trait.on[ev]; if (T) { const h = petH(T); if (h.when(a, p)) { const v = h.then(a, p); if (v) r = v; } }
+  for (const w of petPowers(p)) {
+    const f = w.on && w.on[ev]; if (!f) continue;
+    const h = petH(f); if (!h.when(a, p)) continue;
+    // (a once-a-turn power marks itself used (its spend) whether it fires or the spook stops it, so a spook costs it the
+    // turn; a once-a-fight power has no spend here, and waits for its next chance: the spook's cost to it is that delay)
+    if (h.spend) h.spend(a, p);
+    if (p.spooked) { p.spooked = false; petSay(h.spend ? 'too spooked to help this turn.' : 'too spooked to help this time.'); continue; }
+    const v = h.then(a, p); if (v) r = v;
+  }
+  return r;
+}
+for (const ev of PET_EVENTS) onHook(ev, a => petOn(ev, a));
+// the pet's sums (draw, energy, and the like), added to the trophies' in mod()
+function petMod(name, a) {
+  if (!B || !B.pet) return 0;
+  const p = B.pet, D = petDef(p); if (!D) return 0;
+  let n = 0; const add = m => { if (m == null) return; n += (typeof m === 'function' ? m(a, p) : m) || 0; };
+  add(D.trait && D.trait.mod && D.trait.mod[name]);
+  for (const w of petPowers(p)) add(w.mod && w.mod[name]);
+  return n;
+}
+const sdMod = mod;
+mod = function (name, a) { return sdMod(name, a) + petMod(name, a); };
+// what the pet adds to a hit (atkDmg shows it under the pet's name)
+function petAtk(card, e) {
+  if (!B || !B.pet) return 0;
+  const p = B.pet, D = petDef(p); if (!D) return 0;
+  let n = 0; const add = f => { if (f) n += f(card, e, p) || 0; };
+  add(D.trait && D.trait.atk);
+  for (const w of petPowers(p)) add(w.atk);
+  return n;
+}
+// a hit big enough spooks it
+function petSpook(taken) { if (B && B.pet && !B.pet.spooked && taken >= PET.spook) { B.pet.spooked = true; petSay('spooked by that hit: it will hold back its next power.'); } }
+// why the trick can't be used now ('' if it can)
+function petTrickWhy() {
+  if (!B || !B.pet || !petDef(B.pet)) return 'No pet.';
+  if (B.over || B.phase !== 'player') return 'Only on your turn.';
+  if (B.pet.used) return 'Once a fight.';
+  return '';
+}
+// the trick, once a fight: ti the target (an enemy's index), or the first standing
+function petTrick(ti) {
+  if (petTrickWhy()) return false;
+  const p = B.pet, D = petDef(p), K = D.trick, tgt = ti != null && B.enemies[ti] && !B.enemies[ti].dead && !B.enemies[ti].fled ? B.enemies[ti] : alive()[0];
+  p.used = true;
+  petSay(`${K.n}!`);
+  resolve(K.ops(p), { card: null, tgt, d: { tgt: K.tgt || 'one', n: K.n, type: 'pet' } });
+  checkWin();
+  return true;
+}
+// what a pet does, in words (the trait, each power with the bond it opens at, the trick), its numbers at bond b
+// (st: the pet in a fight, whose ground and foe count; its numbers then include what suits it, ctx naming each)
+function petText(kind, b, hungry, st) {
+  const D = PETS[kind]; if (!D) return null;
+  const p = { kind, bond: b || 1, hungry: !!hungry, here: st ? st.here : null, foe: st ? st.foe : null, moonOn: st ? !!st.moonOn : false, inFight: !!st }, say = x => typeof x === 'function' ? x(p) : x;
+  return { n: D.n, from: D.from, el: D.el, ctx: st ? petCtx(p).map(k => PET_CTX_NAME[k]) : [], trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
+}
+
+/* ---------- the other side's pet (phase 7): a rival club's special pet, set by the Realm in RUN.foePet ---------- */
+// B.foePet = { kind, name, skill (1 to 3: when it throws its trick), used, t: {} (this turn), f: {} (this fight) }
+function foePetBegin() {
+  const rp = RUN && RUN.foePet; B.foePet = null;
+  if (!rp || typeof FOE_PETS === 'undefined' || !FOE_PETS[rp.kind]) return;
+  B.foePet = { kind: rp.kind, name: FOE_PETS[rp.kind].n, skill: clamp(rp.skill || 1, 1, 3), used: false, t: {}, f: {} };
+}
+function foeSay(t) { fx({ k: 'pet', side: 1, t: `${B.foePet.name}: ${t}` }); log(`Their ${B.foePet.name}: ${t}`, 'bad'); }
+// a rival pet's fright: your pet's next power won't fire
+function foeSpook() { if (B.pet && !B.pet.spooked) { B.pet.spooked = true; log(`${petName()} is spooked: its next power won't fire.`, 'bad'); } }
+// when the CPU throws its trick: at skill 3 when it hurts (or from turn 5, whatever), at 2 now and then once it is
+// ready, at 1 whenever
+function foeTrickNow(F, p) {
+  const ready = F.trick.when ? !!F.trick.when(p) : true;
+  if (p.skill >= 3) return ready || B.turn >= 5;
+  if (p.skill === 2) return B.turn >= 2 && R() < (ready ? .7 : .2);
+  return R() < .3;
+}
+function foePetOn(ev, a) {
+  if (!B || !B.foePet || B.over) return;
+  const p = B.foePet, F = FOE_PETS[p.kind]; if (!F) return;
+  if (ev === 'turnStart') p.t = {};
+  // (atEnd: what it does as your turn ends, which foeDeb reads; put back as it was after, so a call inside another
+  // leaves the outer one's alone, and never left set)
+  const was = p.atEnd; p.atEnd = ev === 'turnEnd' || !!was;
+  try {
+    for (const h of [F.trait, F.power]) if (h && h.on && h.on[ev] && !B.over) h.on[ev](a, p);
+    // (the trick: once a match, as your turn ends and theirs begins)
+    if (ev === 'turnEnd' && !p.used && !B.over && F.trick && alive().length && foeTrickNow(F, p)) { p.used = true; foeSay(`${F.trick.n}!`); F.trick.go(p); }
+  } finally { if (was) p.atEnd = was; else delete p.atEnd; }
+}
+for (const ev of ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'enemyFalls']) onHook(ev, a => foePetOn(ev, a));
+/* The pets (issue #104): small monsters from the D&D 5e SRD (5.1, CC-BY-4.0) or common myth, with a little whimsy. The
+   rules are engine/pets.js. Each pet: n (its name), from (what it is), el (its element), rar (c common, u uncommon, r
+   rare), how (where you get one: 'shop', 'keeper', 'egg'), trait { d, on, mod, atk }, powers [{ at (the bond it opens
+   at), d, on, mod, atk }], trick { n, d, tgt, ops(pet) } (card ops, resolved like a tonic's). A d is words, or a
+   function of the pet (its numbers at its bond). Handlers: on: { event: fn(arg, pet) | { when, then } } (see
+   engine/pets.js), mod: { name: fn(arg, pet) }, atk: fn(card, enemy, pet) (more damage on a hit). A pet that takes an
+   enemy's Block takes only what it just gained (enemyBlock's n), less what the pet has taken of it already (a.ate).
+   Words: a pet is of a kind, never a species. */
+const pv = (n, p) => petPow(n, p);
+const petBelow = f => RUN.hp < RUN.maxhp * f;
+const PETS = {
+  blinkpup: { n: 'Blinkpup', from: 'blink dog', el: 'aether', rar: 'c', how: 'shop', sports: ['soccer', 'basketball'],
+    trait: { d: p => `Starts each fight with ${pv(1, p)} Footwork.`, on: { fightStart: (a, p) => addSt(B.P, 'dex', pv(1, p)) } },
+    powers: [
+      { at: 1, d: p => `The first attack aimed at you each turn: it blinks you aside, ${pv(2, p)} Block.`, on: { playerAttacked: { when: (e, p) => !p.t.blink, spend: (a, p) => { p.t.blink = 1; }, then: (e, p) => { B.P.block += pv(2, p); petSay(`blinks you aside: +${pv(2, p)} Block.`); } } } },
+      { at: 2, d: 'Your third card in a turn: draw 1 (twice a fight).', on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 3 && (p.f.fetch || 0) < 2, then: (c, p) => { p.f.fetch = (p.f.fetch || 0) + 1; B.pendingDraw = (B.pendingDraw || 0) + 1; petSay('fetches you a card.'); } } } },
+    ],
+    trick: { n: 'Blink Shuffle', tgt: 'self', d: 'Your hand blinks away, and as many new cards blink in.', ops: () => [['audible']] } },
+  pseudodragon: { n: 'Pocket Pseudodragon', from: 'pseudodragon', el: 'aether', rar: 'u', how: 'egg', sports: ['jousting'], moon: [2],
+    trait: { d: p => `Starts each fight with ${pv(1, p)} Regen.`, on: { fightStart: (a, p) => addSt(B.P, 'regen', pv(1, p)) } },
+    powers: [
+      { at: 1, d: p => `Once a fight, at the start of a turn below half HP: ${pv(3, p)} Regen.`, on: { turnStart: { when: (a, p) => petBelow(.5) && !p.f.warm, then: (a, p) => { p.f.warm = 1; addSt(B.P, 'regen', pv(3, p)); petSay(`curls round you, warm: ${pv(3, p)} Regen.`); } } } },
+      { at: 2, d: p => `When an enemy falls: heal ${pv(2, p)}.`, on: { enemyFalls: (e, p) => healP(pv(2, p)) } },
+    ],
+    trick: { n: 'Sting', d: p => `${pv(6, p)} damage and Weak ${pv(2, p)} to one enemy.`, ops: p => [['d', pv(6, p)], ['s', 'weak', pv(2, p)]] } },
+  axebeak: { n: 'Axebeak Chick', from: 'axe beak', el: 'aether', rar: 'c', how: 'shop', sports: ['football'],
+    // (every hit of the first attack card: spent once that card has resolved, so a forecast and the hits agree)
+    trait: { d: p => `Your first attack card each fight: each of its hits deals ${pv(3, p)} more.`, atk: (card, e, p) => !p.f.peck1 && card && def(card).type === 'atk' ? pv(3, p) : 0, on: { attackPlayed: (c, p) => { p.f.peck1 = 1; } } },
+    powers: [
+      { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, spend: (a, p) => { p.t.peck = 1; }, then: (c, p) => { const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
+      { at: 1, d: p => `In football, your first touchdown each fight: ${pv(1, p)} Strength.`, on: { score: { when: (a, p) => B.sport === 'football' && a && a.side === 0 && a.what === 'touchdown' && !p.f.td, then: (a, p) => { p.f.td = 1; addSt(B.P, 'str', pv(1, p)); petSay(`struts after the touchdown: +${pv(1, p)} Strength.`); } } } },
+      { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
+    ],
+    trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },
+  hootling: { n: 'Hootling', from: 'owlbear cub', el: 'bloom', rar: 'u', how: 'keeper', sports: ['golf'], moon: [4],
+    trait: { d: p => `The first enemy hit that leaves you below half HP each fight: ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => !p.f.roar && a && a.taken > 0 && RUN.hp > 0 && petBelow(.5), then: (a, p) => { p.f.roar = 1; addSt(B.P, 'str', pv(2, p)); petSay(`roars: +${pv(2, p)} Strength.`); } } } },
+    powers: [
+      { at: 1, d: p => `Once a fight, your third attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 3 && !p.f.hoot, then: (c, p) => { p.f.hoot = 1; addSt(B.P, 'str', pv(1, p)); petSay(`hoots: +${pv(1, p)} Strength.`); } } } },
+      { at: 2, d: p => `Below half HP, your attacks deal ${pv(2, p)} more.`, atk: (card, e, p) => card && def(card).type === 'atk' && petBelow(.5) ? pv(2, p) : 0 },
+    ],
+    trick: { n: 'Bear Hug', d: p => `${pv(14, p)} damage to one enemy. It hugs too hard.`, ops: p => [['d', pv(14, p)]] } },
+  sprite: { n: 'Sprite in a Jar', from: 'sprite', el: 'bloom', rar: 'u', how: 'egg', sports: ['golf', 'bowling'],
+    trait: { d: p => `Draw ${pv(1, p)} more card on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
+    powers: [
+      { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn (twice a fight).`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four && (p.f.four || 0) < 2, spend: (a, p) => { p.t.four = 1; }, then: (c, p) => { p.f.four = (p.f.four || 0) + 1; addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
+      { at: 2, d: p => `A debuff lands on you: ${pv(3, p)} Block.`, on: { playerDebuff: (a, p) => { B.P.block += pv(3, p); petSay(`argues the call: +${pv(3, p)} Block.`); } } },
+    ],
+    trick: { n: 'Recount', tgt: 'self', d: p => `Draw ${pv(2, p)}.`, ops: p => [['draw', pv(2, p)]] } },
+  bogfrog: { n: 'Bog Frog', from: 'giant frog', el: 'bloom', rar: 'c', how: 'egg', sports: ['golf'],
+    trait: { d: p => `Starts each fight with ${pv(5, p)} Block.`, on: { fightStart: (a, p) => { B.P.block += pv(5, p); } } },
+    powers: [
+      { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, spend: (a, p) => { p.t.tongue = 1; }, then: (a, p) => { const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
+      { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn), twice a fight.', on: { enemyFalls: (e, p) => { if ((p.f.tongue || 0) >= 2) return; p.f.tongue = (p.f.tongue || 0) + 1; if (B.phase === 'player' && !B.ending) drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
+    ],
+    trick: { n: 'Gulp', d: p => `Swallows an enemy (not a boss) with ${pv(12, p)} HP or less; any other takes 16 damage.`, ops: p => [['devour', pv(12, p), 0]] } },
+  chestnut: { n: 'Chestnut', from: 'mimic', el: 'tide', rar: 'u', how: 'shop', sports: ['bowling'],
+    trait: { d: p => `After a fight you win: ${pv(6, p)} gold (it was holding it).`, on: { fightWon: (a, p) => { RUN.gold += pv(6, p); } } },
+    powers: [
+      { at: 1, d: p => `A turn with no attack played: it bites a random enemy for ${pv(5, p)}.`, on: { turnEnd: { when: () => B.tt && !B.tt.atk && alive().length > 0, then: (a, p) => { const t = pick(alive()); hurtEnemy(t, pv(5, p), { raw: true, src: 'Chestnut' }); petSay(`bites ${t.n} for ${pv(5, p)}.`); } } } },
+      { at: 2, d: p => `When an enemy falls: ${pv(3, p)} gold.`, on: { enemyFalls: (e, p) => { RUN.gold += pv(3, p); } } },
+    ],
+    trick: { n: 'Lid Snap', d: p => `${pv(12, p)} damage to one enemy.`, ops: p => [['d', pv(12, p)]] } },
+  jellycube: { n: 'Jellycube', from: 'gelatinous cube', el: 'tide', rar: 'u', how: 'shop', sports: ['curling'],
+    trait: { d: 'The first debuff on you each fight sticks to it instead.', on: { playerDebuff: { when: (a, p) => !p.f.sticky, then: (a, p) => { p.f.sticky = 1; petSay(`swallows the ${(ST[a.k] || {}).n || a.k}.`); return true; } } } },
+    powers: [
+      // (one more than its base: Weak goes down at the end of the attacker's own turn, so this much reaches its next attack)
+      { at: 1, d: p => `Every second turn, the first enemy to attack you: Weak ${pv(1, p) + 1}, enough to last through its next attack.`, on: { playerAttacked: { when: (e, p) => !p.t.wob && B.turn % 2 === 1 && e && !e.dead, spend: (a, p) => { p.t.wob = 1; }, then: (e, p) => { addSt(e, 'weak', pv(1, p) + 1); petSay(`wobbles at ${e.n}: Weak ${pv(1, p) + 1}.`); } } } },
+      { at: 2, d: p => `End your turn with no cards in hand: ${pv(4, p)} Block.`, on: { turnEnd: { when: () => !B.hand.length, then: (a, p) => { gainBlock(pv(4, p), true); } } } },
+    ],
+    trick: { n: 'Engulf', d: p => `Weak ${pv(2, p)} and Exposed ${pv(2, p)} to one enemy.`, ops: p => [['s', 'weak', pv(2, p)], ['s', 'vuln', pv(2, p)]] } },
+  hippogriff: { n: 'Hatchling Hippogriff', from: 'hippogriff', el: 'tide', rar: 'u', how: 'egg', sports: ['jousting', 'soccer'],
+    trait: { d: p => `${pv(1, p)} more Stamina on the first turn.`, mod: { energy: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
+    powers: [
+      { at: 1, d: p => `From the fourth turn on, each turn: ${pv(2, p)} Block.`, on: { turnStart: { when: () => B.turn >= 4, then: (a, p) => { gainBlock(pv(2, p), true); } } } },
+      { at: 2, d: p => `Your first attack each turn deals ${pv(3, p)} more to the enemy with the most HP.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && alive().every(o => o.hp <= e.hp) ? pv(3, p) : 0 },
+    ],
+    trick: { n: 'Swoop', d: p => `${pv(5, p)} damage, twice, to one enemy.`, ops: p => [['d', pv(5, p), 2]] } },
+  glowbeetle: { n: 'Glowbeetle', from: 'giant fire beetle', el: 'ember', rar: 'c', how: 'shop', sports: ['boxing'],
+    trait: { d: p => `A lantern: draw ${pv(2, p)} more on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(2, p) : 0 } },
+    powers: [
+      { at: 1, d: p => `At the start of each turn: Burn ${pv(1, p)} on a random enemy.`, on: { turnStart: { when: () => alive().length > 0, then: (a, p) => { addSt(pick(alive()), 'burn', pv(1, p)); } } } },
+      { at: 2, d: p => `Your first Power each turn: ${pv(1, p)} Stamina.`, on: { cardPlayed: { when: (c, p) => def(c).type === 'pow' && !p.t.pow, spend: (a, p) => { p.t.pow = 1; }, then: (c, p) => { B.energy += pv(1, p); petSay(`glows brighter: +${pv(1, p)} Stamina.`); } } } },
+    ],
+    trick: { n: 'Flare', tgt: 'all', d: p => `Burn ${pv(4, p)} on every enemy.`, ops: p => [['s', 'burn', pv(4, p), 'all']] } },
+  rustnibbler: { n: 'Rustnibbler', from: 'rust monster', el: 'ember', rar: 'u', how: 'shop', sports: ['boxing', 'football'],
+    trait: { d: 'The first enemy to gain Block each fight loses what it gained.', on: { enemyBlock: { when: (a, p) => !p.f.rust && a.e && a.e.block > 0, then: (a, p) => { p.f.rust = 1; const n = Math.min(a.e.block, a.n); a.e.block -= n; a.ate = (a.ate || 0) + n; petSay(`eats the ${n} Block ${a.e.n} just raised.`); } } } },
+    powers: [
+      { at: 1, d: p => `Whenever an enemy gains Block: it nibbles ${pv(2, p)} of what it gained.`, on: { enemyBlock: { when: a => a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, then: (a, p) => { const n = Math.min(a.e.block, a.n - (a.ate || 0), pv(2, p)); if (n > 0) { a.e.block -= n; a.ate = (a.ate || 0) + n; } } } } },
+      { at: 2, d: p => `Your first attack each turn on an enemy with no Block deals ${pv(3, p)} more.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && !e.block ? pv(3, p) : 0 },
+    ],
+    trick: { n: 'Rust', tgt: 'all', d: 'Every enemy loses its Block.', ops: () => [['unblock']] } },
+  imp: { n: 'Imp-in-Waiting', from: 'imp', el: 'ember', rar: 'u', how: 'egg', sports: ['basketball'], moon: [0],
+    trait: { d: p => `${pv(1, p)} Spikes all fight.`, on: { fightStart: (a, p) => addSt(B.P, 'thorns', pv(1, p)) } },
+    powers: [
+      { at: 1, d: p => `Hit for 6 or more: the attacker takes ${pv(3, p)}.`, on: { playerHit: { when: a => a.e && !a.e.dead && a.taken >= 6, then: (a, p) => { hurtEnemy(a.e, pv(3, p), { raw: true, src: 'Imp' }); petSay(`curses ${a.e.n}: ${pv(3, p)} damage.`); } } } },
+      { at: 2, d: p => `When an enemy falls: Burn ${pv(2, p)} on another.`, on: { enemyFalls: { when: () => alive().length > 0, then: (e, p) => { addSt(pick(alive()), 'burn', pv(2, p)); } } } },
+    ],
+    trick: { n: 'Curse', d: p => `Plague ${pv(5, p)} on one enemy.`, ops: p => [['s', 'psn', pv(5, p)]] } },
+  frostpup: { n: 'Frostpup', from: 'winter wolf cub', el: 'rime', rar: 'u', how: 'keeper', sports: ['hockey', 'curling'], moon: [4],
+    trait: { d: p => `At the start of each fight, the enemy with the most HP is Weak ${pv(1, p)}.`, on: { fightStart: (a, p) => { const t = alive().slice().sort((x, y) => y.hp - x.hp)[0]; if (t) addSt(t, 'weak', pv(1, p)); } } },
+    powers: [
+      { at: 1, d: 'Every fourth turn, its breath Stuns a random enemy (a boss is Weak 2 instead).', on: { turnStart: { when: () => B.turn % 4 === 0 && alive().length > 0, then: () => { const t = pick(alive()); resolve([['s', 'stun', 1]], { card: null, tgt: t, d: { tgt: 'one', n: 'Snow Breath', type: 'pet' } }); petSay(`breathes snow on ${t.n}.`); } } } },
+      { at: 2, d: p => `Below half HP, each turn: ${pv(4, p)} Block.`, on: { turnStart: { when: () => petBelow(.5), then: (a, p) => { gainBlock(pv(4, p), true); } } } },
+    ],
+    trick: { n: 'Snow Breath', d: 'Stuns one enemy (a boss is Weak 2 instead).', ops: () => [['s', 'stun', 1]] } },
+  mephitling: { n: 'Mephitling', from: 'ice mephit', el: 'rime', rar: 'c', how: 'egg', sports: ['hockey'], moon: [7],
+    trait: { d: p => `Once a fight, hit for 10 or more: it sulks you up to ${pv(1, p)} Strength.`, on: { playerHit: { when: (a, p) => a.taken >= 10 && !p.f.sulk, then: (a, p) => { p.f.sulk = 1; addSt(B.P, 'str', pv(1, p)); petSay(`sulks beautifully: +${pv(1, p)} Strength.`); } } } },
+    powers: [
+      { at: 1, d: p => `End your turn: ${pv(1, p)} Block for each card left in hand (at most ${pv(4, p)}).`, on: { turnEnd: { when: () => B.hand.length > 0, then: (a, p) => { gainBlock(Math.min(pv(4, p), B.hand.length * pv(1, p)), true); } } } },
+      { at: 2, d: p => `The first enemy to fall each fight: every other enemy is Weak ${pv(1, p)}.`, on: { enemyFalls: { when: (e, p) => alive().length > 0 && !p.f.frost, then: (e, p) => { p.f.frost = 1; for (const o of alive()) addSt(o, 'weak', pv(1, p)); } } } },
+    ],
+    trick: { n: 'Frost Puff', tgt: 'all', d: p => `Every enemy is Weak ${pv(1, p)}, and you gain ${pv(4, p)} Block.`, ops: p => [['s', 'weak', pv(1, p), 'all'], ['b', pv(4, p)]] } },
+  cockatrice: { n: 'Cockatrice Chick', from: 'cockatrice', el: 'rime', rar: 'r', how: 'egg', sports: ['jousting'], moon: [6],
+    trait: { d: p => `At the start of each fight, a random enemy is Weak ${pv(2, p)}.`, on: { fightStart: (a, p) => { const t = pick(alive()); if (t) addSt(t, 'weak', pv(2, p)); } } },
+    powers: [
+      { at: 1, d: p => `Every second turn, your first attack on an enemy still standing leaves it Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare && B.turn % 2 === 1 && alive().some(e => e.uid === B.lastTgt), spend: (a, p) => { p.t.stare = 1; }, then: (c, p) => { addSt(alive().find(e => e.uid === B.lastTgt), 'vuln', pv(1, p)); } } } },
+      { at: 2, d: 'Once a fight, at the end of your turn, an enemy (not a boss) at a quarter of its HP or less turns to stone.', on: { turnEnd: { when: (a, p) => !p.f.stone && alive().some(e => !isBoss(e) && e.hp <= e.max * .25), then: (a, p) => { p.f.stone = 1; const t = alive().find(e => !isBoss(e) && e.hp <= e.max * .25); petSay(`stares ${t.n} to stone.`); hurtEnemy(t, t.hp + t.block, { raw: true, src: 'Stare' }); } } } },
+    ],
+    trick: { n: 'Petrifying Glare', d: 'An enemy (not a boss) at 30% of its HP or less turns to stone; any other takes 18 damage.', ops: () => [['petrify', .3]] } },
+};
+
+/* rivals' special pets (phase 7): one for each rival club, never hatched or bought, across the table in that club's
+   matches (the Realm sets RUN.foePet). Each has a trait and a power (on the hooks, from the other side) and a trick the
+   CPU uses once a match, when its skill says (foeTrickNow: skill 3 waits for when it hurts, 1 throws it whenever).
+   They are stronger than a shop pet. Their Block and debuffs go through blockE and debuffP, so your own pet answers
+   them (the Rustnibbler eats the Block, the Jellycube swallows a debuff). */
+const foeLead = () => alive().slice().sort((a, b) => (b.st.str || 0) - (a.st.str || 0) || b.hp - a.hp)[0];
+const foeHurt = () => alive().slice().sort((a, b) => (b.max - b.hp) - (a.max - a.hp))[0];
+// a rival pet's hit: plain damage, not an attack (no gear, Spikes, Seeing Red or score is set off by it, nor your
+// pet's answers to an attack), though a big one spooks your pet as any big hit does
+const foeHit = n => { const t = hurtPlayer(n, null, { plain: 1 }); petSpook(t); return t; };
+// its debuff: Weak and Vulnerable laid as your turn ends (B.foePet.atEnd, set by foePetOn) would lose a turn at once,
+// so they get that turn back
+const foeDeb = (k, n) => debuffP(k, n + ((k === 'weak' || k === 'vuln') && B.foePet && B.foePet.atEnd ? 1 : 0));
+const FOE_PETS = {
+  wyvern: { n: 'Wyvern Hatchling', from: 'wyvern', el: 'ember', club: 'ironmaw',
+    trait: { d: 'Their strongest player starts with 2 Strength.', on: { fightStart: () => { const e = foeLead(); if (e) addSt(e, 'str', 2); } } },
+    power: { d: 'Every third turn, its tail flicks you for 4.', on: { turnEnd: () => { if (B.turn % 3 === 0) { foeSay('a tail flick, for 4.'); foeHit(4); } } } },
+    trick: { n: 'Venom Sting', d: '9 damage, and you are Weak 1.', when: () => (B.P.block || 0) <= 3, go: () => { foeHit(9); foeDeb('weak', 1); } } },
+  wisp: { n: 'Will-o\'-Wisp', from: 'will-o\'-wisp', el: 'aether', club: 'mirewood',
+    trait: { d: 'You start each match Weak 1.', on: { fightStart: () => foeDeb('weak', 1) } },
+    power: { d: 'At the end of each of your turns, it mends their most hurt player by 3.', on: { turnEnd: () => { const e = foeHurt(); if (e && e.hp < e.max) { const h = Math.min(3, e.max - e.hp); e.hp += h; foeSay(`mends ${e.n} by ${h}.`); } } } },
+    trick: { n: 'Lure', d: 'You are Vulnerable 2, and have 1 less Stamina next turn.', when: () => B.turn >= 2, go: () => { foeDeb('vuln', 2); debuffP('drained', 1); } } },
+  shrieker: { n: 'Shrieker Sprout', from: 'shrieker', el: 'bloom', club: 'gallowmere',
+    trait: { d: 'Every one of their players starts with 4 Block.', on: { fightStart: () => { for (const e of alive()) blockE(e, 4); } } },
+    power: { d: 'The fourth card you play in a turn sets it off: you are Weak 1.', on: { cardPlayed: (c, p) => { if (B.cardsThisTurn === 4 && !p.t.shriek) { p.t.shriek = 1; foeSay('SHRIEKS.'); foeDeb('weak', 1); } } } },
+    trick: { n: 'Wail', d: 'You are Weak 2 and Vulnerable 2, and your pet is spooked.', when: () => B.turn <= 2, go: () => { foeDeb('weak', 2); foeDeb('vuln', 2); foeSpook(); } } },
+  basilisk: { n: 'Basilisk Hatchling', from: 'basilisk', el: 'rime', club: 'cragspire',
+    trait: { d: 'As each of your turns begins, their players gain 2 Block.', on: { turnStart: () => { for (const e of alive()) blockE(e, 2); } } },
+    power: { d: 'Its first glare each match: you have 1 less Stamina next turn.', on: { turnEnd: (a, p) => { if (!p.f.glare && B.turn >= 2) { p.f.glare = 1; foeSay('glares.'); debuffP('drained', 1); } } } },
+    trick: { n: 'Stony Gaze', d: 'You have 2 less Stamina next turn, and your pet is spooked.', when: () => B.turn >= 3, go: () => { debuffP('drained', 2); foeSpook(); } } },
+  remorhaz: { n: 'Remorhaz Grub', from: 'remorhaz', el: 'ember', club: 'frostfang',
+    trait: { d: 'Their players have 2 Spikes: hit them and you take 2.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'thorns', 2); } } },
+    power: { d: 'Every second turn its back glows: you take 3.', on: { turnEnd: () => { if (B.turn % 2 === 0) { foeSay('glows red-hot: 3.'); foeHit(3); } } } },
+    trick: { n: 'Searing Coil', d: '12 damage.', when: () => (B.P.block || 0) <= 4, go: () => { foeHit(12); } } },
+  darkmantle: { n: 'Darkmantle', from: 'darkmantle', el: 'tide', club: 'duskhollow',
+    trait: { d: 'Their smallest player starts with 6 Block.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => a.max - b.max)[0]; if (e) blockE(e, 6); } } },
+    power: { d: 'The first time you end a turn with no Block, it squeezes you for 5.', on: { turnEnd: (a, p) => { if (!p.f.sq && !(B.P.block > 0)) { p.f.sq = 1; foeSay('drops on you: 5.'); foeHit(5); } } } },
+    trick: { n: 'Darkness', d: 'You are Weak 2, and your pet is spooked.', when: () => B.turn >= 2, go: () => { foeDeb('weak', 2); foeSpook(); } } },
+  claw: { n: 'Crawling Claw', from: 'crawling claw', el: 'rime', club: 'rattlebone',
+    trait: { d: 'When one of their players falls, the rest gain 1 Strength.', on: { enemyFalls: (e) => { if (e && e.eaten) return; const rest = alive(); if (rest.length) { for (const x of rest) addSt(x, 'str', 1); foeSay('scuttles to the next one: +1 Strength.'); } } } },
+    power: { d: 'Every third turn it grabs your guard: you lose 4 Block.', on: { turnEnd: () => { if (B.turn % 3 === 0 && B.P.block > 0) { const n = Math.min(4, B.P.block); B.P.block -= n; foeSay(`grabs ${n} Block.`); } } } },
+    trick: { n: 'Throttle', d: '7 damage, and you have 1 less Stamina next turn.', when: () => (B.P.block || 0) <= 3, go: () => { foeHit(7); debuffP('drained', 1); } } },
+  griffon: { n: 'Griffon Chick', from: 'griffon', el: 'aether', club: 'bramblegate',
+    trait: { d: 'Their strongest player starts with 2 Strength.', on: { fightStart: () => { const e = foeLead(); if (e) addSt(e, 'str', 2); } } },
+    power: { d: 'Every second turn it dives at you for 3.', on: { turnEnd: () => { if (B.turn % 2 === 0) { foeSay('dives: 3.'); foeHit(3); } } } },
+    trick: { n: 'Dive', d: '14 damage, and your pet is spooked.', when: () => (B.P.block || 0) <= 5, go: () => { foeHit(14); foeSpook(); } } },
+};
 /* p2c: the open draft. Free agents: one prospect of every kind, no club, no colours but the league's own sand. */
 CLUBS.free = { id: 'free', name: 'Free Agents', short: 'FA', color: '#c2a46a', light: '#f4e8c4', dark: '#2a2216', motto: 'No club. No contract. No mercy.', relic: null, roster: [] };
 const FA_NAMES = {
@@ -3895,6 +4242,7 @@ function opText(op, d, ctx) {
     case 'dunk': return `Deal ${dmgS(op[1])} damage, or ${dmgS(op[2])} if the target is below half HP.`;
     case 'luck': return 'Your next d20 is a natural 20.';
     case 'loseblock': return 'Lose all your Block.';
+    case 'unblock': return 'Every enemy loses its Block.';
     case 'strip': return 'Every enemy loses its Block and Strength.';
     case 'drainall': return `Deal ${dmgS(op[1])} damage to ALL enemies. Heal what gets through.`;
     case 'split': return `Deal ${dmgS(op[1])} damage to the enemies on each end.`;
@@ -4357,6 +4705,11 @@ function drawFight(c, dt) {
     if (ht < .18) { c.globalCompositeOperation = 'source-atop'; }
     c.restore();
   } });
+  // the pets: yours in front of your team, a rival club's in front of theirs (ui/fight/pet-draw.js)
+  if (B.pet && typeof drawPetFig === 'function') draws.push({ y: 440, f: () => drawPetFig(c, B.pet.kind, 420, 440, now, { act: now - (entA('pet').act || -9), spooked: B.pet.spooked }) });
+  // (a rival's pet stands clear of their first player, however many there are)
+  // (it glides there as the field changes, as the players do, and keeps clear of your own pet)
+  if (B.foePet && typeof drawPetFig === 'function') { const fa = entA('foepet'), fx0 = Math.max(480, Math.min(500, (lay.length ? Math.min(...lay.map(L => L.x)) : 560) - 66)); fa.x = fa.x == null ? fx0 : lerp(fa.x, fx0, Math.min(1, dt * 6)); draws.push({ y: 446, f: () => drawPetFig(c, B.foePet.kind, fa.x, 446, now, { flip: true, foe: true, act: now - (fa.act || -9) }) }); }
   list.forEach((e, i) => {
     const L = lay[i], a = entA(e.uid);
     if (a.x == null) a.x = L.x; a.x = lerp(a.x, L.x, Math.min(1, dt * 6)); a.y = L.y;
@@ -4469,6 +4822,8 @@ function consumeFx() {
       case 'mom': case 'save': case 'swish': case 'bases': sportFx(f); break;
       case 'bat': case 'drive': case 'strike': case 'bell': sportPop(f); break;
       case 'say2': A.pops.push({ x: 480, y: 250, t: f.t, col: '#ffd166', t0: A.t + delay, life: 1.1, size: 30 }); delay += .1; break;
+      // a pet's effect (engine/pets.js): over your side, in its element's colour, with a little chirp
+      case 'pet': { const p = f.side ? { x: entA('foepet').x || 490, y: 400 } : partyPt(), D = f.side ? (B.foePet && FOE_PETS[B.foePet.kind]) : (B.pet && PETS[B.pet.kind]); A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); entA(f.side ? 'foepet' : 'pet').act = A.t + delay; tone(880, .08, 'sine', .03, 300, delay); delay += .15; break; }
     }
   }
 }
@@ -4516,7 +4871,7 @@ function renderFightHUD() {
   $('ctlBox').innerHTML = `
     <div class="piles"><button class="pile" id="pDraw" title="Draw pile">Draw ${B.draw.length}</button><button class="pile" id="pDisc" title="Discard pile">Discard ${B.discard.length}</button>${B.exhaust.length ? `<button class="pile" id="pEx" title="Exhausted">Out ${B.exhaust.length}</button>` : ''}</div>
     <button class="btn endturn" id="bEnd" ${busy ? 'disabled' : ''}>${B.phase === 'enemy' ? 'Their turn' : 'End turn'}</button>
-    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn</span>`;
+    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn${B.pet ? ', <kbd>T</kbd> your pet\'s trick' : ''}</span>`;
   $('bEnd').onclick = () => doEndTurn();
   $('pDraw').onclick = () => showDeck(B.draw, `Draw pile (${B.draw.length}), in no particular order`);
   $('pDisc').onclick = () => showDeck(B.discard, `Discard pile (${B.discard.length})`);
@@ -4567,11 +4922,28 @@ function updatePreview() {
   UI.preview = estDamage(c, t);
   const w = dmgWhy(c, t); if (w) UI.why = Object.assign(w, { card: def(c).n, tgt: t.n });
 }
+/* dragging a card to play it. The drop plays it only if nothing happened while it was held: no action (a card, a
+   tonic, the pet's trick, the end of the turn: UI.acts), the pick not let go (Escape: UI.sel), no pause, dialog or
+   waiting discard, the same card in the same place. A gesture the browser takes over, or the window losing focus,
+   ends the drag with nothing played and the target as it was, and so does a mouse let go where the page never heard
+   it (a move with no button held, once one was). Only the pointer that started it drives it. */
 function startDrag(ev, el, i) {
+  // (a new press: the last drop's click, if it was ever coming, is past)
+  UI.dragged = false;
   if (ev.button !== 0 || B.phase !== 'player' || B.over || UI.busy || UI.disc) return;
   const c = B.hand[i]; if (!c || !canPlay(c)) return;
-  const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform; let moved = false;
+  const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform, acts0 = UI.acts || 0, kb0 = UI.kbTarget, hv0 = UI.hover; let moved = false;
+  // (only this pointer drives this drag: a second finger is its own)
+  const pid = ev.pointerId, mine = e => e.pointerId == null || pid == null || e.pointerId === pid;
+  let held = !!ev.buttons;
   const mv = e => {
+    if (!mine(e)) return;
+    // (a mouse or pen let go where the page never heard it, outside the window or the frame: a move with no button held,
+    // after one with it held, ends the drag with nothing played; it locks nothing, and a tap-and-drag that never
+    // reports a button isn't touched)
+    if (e.pointerType && e.pointerType !== 'touch') { if (e.buttons) held = true; else if (held) { cancel(); return; } }
+    // (the pick let go mid-drag, by Escape or an action: the drag ends, rather than go on choosing targets)
+    if (moved && UI.sel !== i) { cancel(); return; }
     const dx = e.clientX - x0, dy = e.clientY - y0;
     if (!moved && Math.hypot(dx, dy) < 12) return;
     if (!moved) { moved = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
@@ -4581,20 +4953,30 @@ function startDrag(ev, el, i) {
     if (h) { UI.hover = h.e; UI.kbTarget = h.e; }
     updatePreview();
   };
+  // (the drag over: its listeners off, the card back, and the click that follows the drop ignored (UI.dragged): the
+  // card's click clears it, and so does the next press)
+  const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.hoverCard = -1; UI.dragged = true; } };
+  // (the card back, nothing played; the target and hover as they were before the drag, the pick let go. If another pick
+  // (another finger's, a key's) has taken over, the drag touches nothing: that pick keeps the target it was made with)
+  const drop = () => {
+    if (!B || UI.view !== 'fight' || (UI.sel !== i && UI.sel !== -1)) return;
+    UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; UI.sel = -1; renderHand();
+  };
+  const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; off(); if (moved) drop(); };
   const up = e => {
-    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+    if (!mine(e)) return;
+    off();
     if (!moved) return;
-    UI.dragged = true; el.classList.remove('drag'); el.style.transform = base;
+    if (!B || UI.view !== 'fight' || (UI.acts || 0) !== acts0 || UI.sel !== i || B.phase !== 'player' || B.over || UI.busy || UI.paused || UI.disc || !$('modal').hidden || B.hand[i] !== c) { drop(); return; }
     const r = cv.getBoundingClientRect();
     const overStage = e.clientY < r.bottom + 10;
-    if (!overStage) { UI.sel = -1; renderHand(); return; }
+    if (!overStage) { drop(); return; }
     const x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
-    UI.sel = i;
     if (needsTarget(c) && alive().length > 1 && !h) { renderHand(); return; } // dropped on open ice: keep it selected
     playSelected(h ? h.e : UI.kbTarget || alive()[0]);
   };
-  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel); window.addEventListener('blur', cancel);
 }
 function selectCard(i) {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
@@ -4617,17 +4999,21 @@ function playSelected(e) {
 function drinkTonic(slot) {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
   const id = RUN.tonics[slot]; if (!id) return;
+  // (a picked card or a waiting discard is let go: the tonic can change the hand and the enemies under them)
+  UI.sel = -1; UI.disc = null;
   const needsT = TONICS[id].fx.some(o => o[0] === 'd' && o[3] !== 'all');
   useTonic(slot, needsT ? B.enemies.indexOf(UI.kbTarget || alive()[0]) : null);
   hideTip(); afterAction();
 }
 function afterAction() {
+  // (an action happened: a card held in a drag won't play on its drop)
+  UI.acts = (UI.acts || 0) + 1;
   consumeFx(); renderFightHUD();
   if (B.over) { UI.busy = true; setTimeout(() => finishFight(), 1100); }
 }
 function doEndTurn() {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
-  UI.sel = -1; UI.busy = true;
+  UI.acts = (UI.acts || 0) + 1; UI.sel = -1; UI.busy = true;
   const steps = endTurn(); consumeFx(); renderFightHUD();
   let i = 0;
   const next = () => {
@@ -4656,6 +5042,8 @@ cv.addEventListener('click', ev => {
 });
 document.addEventListener('keydown', ev => {
   if (UI.view !== 'fight' || !B || !$('modal').hidden || UI.paused || ev.target.closest('input,textarea')) return;
+  // (a browser's own shortcut, Cmd+E or Ctrl+1, isn't a move in the fight; Escape still lets go of a pick)
+  if (ev.key !== 'Escape' && (ev.ctrlKey || ev.metaKey || ev.altKey)) return;
   if (/^[0-9]$/.test(ev.key)) { const i = (+ev.key + 9) % 10; if (i < B.hand.length) selectCard(i); ev.preventDefault(); return; }
   if (ev.key === 'e' || ev.key === 'E') { doEndTurn(); return; }
   if (UI.sel >= 0) {
@@ -4667,6 +5055,184 @@ document.addEventListener('keydown', ev => {
   if (UI.disc && ev.key === 'Escape') { UI.disc = null; renderHand();
   }
 });
+/* Pets in the fight (issue #104, phase 1): the pet at your side, beside your HP and Block. Its badge (its colour by
+   element, its initial, its bond as stars; spooked and hungry shown), a tooltip with everything it does at its bond
+   (the trait, each power and the bond it opens at, the trick), and its trick as a button (T). What it does in the
+   fight pops up over your side of the arena (fx k 'pet') and goes in the log. */
+// 'a' or 'an' before a word
+const petA = w => /^[aeiou]/i.test(w || '') ? 'an' : 'a';
+const PET_EL_COL = { aether: '#d8c8ff', bloom: '#8fd27a', tide: '#6fc3e8', ember: '#ff9a5a', rime: '#bfe8ff' };
+function petTipHTML() {
+  const p = B.pet, T = petText(p.kind, p.bond, p.hungry, p); if (!T) return '';
+  const pw = T.powers.map(w => `<li${w.open ? '' : ' style="opacity:.55"'}>${w.open ? '' : `<i>(at bond ${w.at})</i> `}${esc(w.d)}</li>`).join('');
+  return `<span class="t">${esc(p.name)}</span>${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)}). Bond ${p.bond} of 3.${p.hungry ? ' <b>Hungry:</b> its numbers are about halved (at least 1).' : ''}${p.spooked ? ' <b>Spooked:</b> its next power won\'t fire.' : ''}
+${T.ctx.length ? `<br><b>Suits it today</b> (${Math.round(PET.ctx * 100)}% stronger for each): ${esc(T.ctx.join(', '))}.` : ''}
+    <br><b>Always:</b> ${esc(T.trait)}<ul style="margin:4px 0 4px 16px;padding:0">${pw}</ul><b>Trick (T, once a fight):</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}${p.used ? ' <i>(used)</i>' : ''}`;
+}
+function petPanelHTML() {
+  const p = B && B.pet; if (!p || !PETS[p.kind]) return '';
+  const D = PETS[p.kind], col = PET_EL_COL[D.el] || '#e9dcc0', why = petTrickWhy(), stars = '★'.repeat(p.bond) + '☆'.repeat(3 - p.bond);
+  const busy = B.phase !== 'player' || !!B.over || UI.busy;
+  return `<div class="petbox" id="petBox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="petbadge" tabindex="0" data-tip="${esc(petTipHTML())}" aria-label="${esc(p.name)}, your pet" style="display:inline-flex;align-items:center;gap:6px;border:1px solid ${col};border-radius:14px;padding:2px 10px 2px 3px;color:${col}">
+      <b style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:${col};color:#17100e">${esc(p.name[0])}</b>${esc(p.name)} <small style="letter-spacing:1px">${stars}</small>${p.spooked ? ' <small title="Spooked">!</small>' : ''}${p.hungry ? ' <small title="Hungry">(hungry)</small>' : ''}</span>
+    <button class="ghost pettrick" id="bPetTrick" ${why || busy ? 'disabled' : ''} title="${esc(why ? why : `T: ${D.trick.n}`)}">${esc(D.trick.n)}${p.used ? ' (used)' : ''}</button></div>`;
+}
+function doPetTrick() {
+  if (!B || !B.pet || B.phase !== 'player' || B.over || UI.busy || petTrickWhy()) return;
+  // (a card picked or a discard waiting is let go: the trick can change the hand and the enemies under it)
+  UI.sel = -1; UI.disc = null;
+  const K = PETS[B.pet.kind].trick, one = (K.tgt || 'one') === 'one';
+  petTrick(one ? B.enemies.indexOf(UI.kbTarget && !UI.kbTarget.dead ? UI.kbTarget : alive()[0]) : null);
+  hideTip(); afterAction();
+}
+// the HUD: the pet's panel under your HP and Block, its trick on the button (and T)
+const sdRenderFightHUD = renderFightHUD;
+renderFightHUD = function () {
+  sdRenderFightHUD();
+  if (!B) return;
+  if (B.foePet) $('meBox').insertAdjacentHTML('beforeend', foePanelHTML());
+  if (!B.pet) return;
+  $('meBox').insertAdjacentHTML('beforeend', petPanelHTML());
+  const b = $('bPetTrick'); if (b) b.onclick = () => doPetTrick();
+};
+// the other side's pet (a rival club's): a badge with what it does, and whether its trick is spent
+function foePanelHTML() {
+  const p = B.foePet, F = p && FOE_PETS[p.kind]; if (!F) return '';
+  const col = PET_EL_COL[F.el] || '#e9dcc0';
+  const tip = `<span class="t">Their ${esc(F.n)}</span>${petA(F.from)} ${esc(F.from)} (${esc(F.el)}), the club's own pet.<br><b>Always:</b> ${esc(F.trait.d)} ${esc(F.power.d)}<br><b>Trick (once a match):</b> ${esc(F.trick.n)}: ${esc(F.trick.d)}${p.used ? ' <i>(used)</i>' : ''}`;
+  return `<div class="petbox foepet" id="foePetBox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;opacity:.95">
+    <span class="petbadge" tabindex="0" data-tip="${esc(tip)}" aria-label="Their ${esc(F.n)}" style="display:inline-flex;align-items:center;gap:6px;border:1px dashed ${col};border-radius:14px;padding:2px 10px 2px 3px;color:${col}">
+      <b style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#17100e;color:${col};border:1px solid ${col}">${esc(F.n[0])}</b>vs. ${esc(F.n)} <small>${p.used ? '(trick spent)' : '(trick ready)'}</small></span></div>`;
+}
+document.addEventListener('keydown', ev => {
+  if ((ev.key !== 't' && ev.key !== 'T') || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (UI.view !== 'fight' || !B || !B.pet || !$('modal').hidden || UI.paused || (ev.target.closest && ev.target.closest('input,textarea'))) return;
+  doPetTrick(); ev.preventDefault();
+});
+/* Pets on the field (issue #104): your pet in front of your team, and a rival club's pet in front of theirs, facing each
+   other like two mascots. Drawn in the arena's ink style from a few parts a kind (PET_LOOK: its body, ears, wings, beak,
+   horns, tail and colours), bobbing when idle, hopping when it acts (A.ent.pet / A.ent.foepet .act, set by the 'pet' fx),
+   and trembling when spooked. The canvas state is wrapped in save()/restore(). */
+const PET_INK = '#1d140f';
+const PET_LOOK = {
+  blinkpup: { body: 'dog', col: '#c9b8f0', ears: 'pointy', tail: 'wag', glow: '#d8c8ff' },
+  pseudodragon: { body: 'drake', col: '#b5523a', wings: 'bat', horns: 1, tail: 'sting' },
+  axebeak: { body: 'bird', col: '#d8b860', beak: 'axe', legs: 'long' },
+  hootling: { body: 'bear', col: '#8a6a42', ears: 'round', beak: 'owl', face: '#e8d8b0' },
+  sprite: { body: 'jar', col: '#bfe8a0', wings: 'fly', glow: '#c8ff9a' },
+  bogfrog: { body: 'frog', col: '#5d8a3a', belly: '#d8e8a0' },
+  chestnut: { body: 'chest', col: '#8a5a2a', teeth: 1 },
+  jellycube: { body: 'cube', col: 'rgba(120,210,200,.55)' },
+  hippogriff: { body: 'bird', col: '#d8d0c0', wings: 'feather', beak: 'hook', back: '#8a6a42' },
+  glowbeetle: { body: 'beetle', col: '#5a2a1a', glow: '#ffb35a' },
+  rustnibbler: { body: 'bug', col: '#c96a3a', antennae: 1 },
+  imp: { body: 'imp', col: '#c94a3a', horns: 1, wings: 'bat', tail: 'sting' },
+  frostpup: { body: 'dog', col: '#e8f2f6', ears: 'pointy', tail: 'bush', glow: '#bfe8ff' },
+  mephitling: { body: 'imp', col: '#9ad0ec', wings: 'bat', glow: '#cfeaf4' },
+  cockatrice: { body: 'bird', col: '#e8e0cc', beak: 'hook', comb: '#c94a3a', tail: 'snake' },
+  // the rival clubs' own
+  wyvern: { body: 'drake', col: '#6a8a3a', wings: 'bat', tail: 'sting', big: 1 },
+  wisp: { body: 'orb', col: 'rgba(216,200,255,.7)', glow: '#d8c8ff' },
+  shrieker: { body: 'shroom', col: '#9a6aa8' },
+  basilisk: { body: 'lizard', col: '#7a8a6a', big: 1 },
+  remorhaz: { body: 'grub', col: '#d8c0a0', glow: '#ff8a3c' },
+  darkmantle: { body: 'mantle', col: '#3a3440' },
+  claw: { body: 'claw', col: '#e8e0d0' },
+  griffon: { body: 'bird', col: '#c9a040', wings: 'feather', beak: 'hook', back: '#8a5a2a', big: 1 },
+};
+const petPath = (c, f) => { c.beginPath(); f(); };
+function petInk(c, fill, w) { c.fillStyle = fill; c.fill(); c.lineWidth = w || 2.2; c.strokeStyle = PET_INK; c.stroke(); }
+function petEll(c, x, y, rx, ry, fill, w) { petPath(c, () => c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2)); petInk(c, fill, w); }
+function petEyes(c, x, y, gap, r, look) {
+  for (const s of [-1, 1]) { c.beginPath(); c.arc(x + s * gap, y, r, 0, Math.PI * 2); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 1.4; c.strokeStyle = PET_INK; c.stroke();
+    c.beginPath(); c.arc(x + s * gap + (look || 0), y + .5, r * .55, 0, Math.PI * 2); c.fillStyle = PET_INK; c.fill(); }
+}
+// one pet, standing at (x, y) on the ground, about s tall, at time t
+function drawPetFig(c, kind, x, y, t, o = {}) {
+  const L = PET_LOOK[kind]; if (!L) return;
+  const s = (o.size || 46) * (L.big ? 1.2 : 1) / 46, act = o.act != null && o.act >= 0 && o.act < .5 ? Math.sin(o.act / .5 * Math.PI) : 0;
+  const bob = Math.sin(t * 3.2 + (o.flip ? 1.7 : 0)) * 1.6, hop = act * 16, shake = o.spooked ? Math.sin(t * 40) * 1.4 : 0;
+  c.save();
+  // (its shadow, flat on the ground)
+  c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x, y + 2, 22 * s, 6 * s, 0, 0, Math.PI * 2); c.fill();
+  c.translate(x + shake, y - hop - bob); c.scale(o.flip ? -s : s, s);
+  if (L.glow) { const g = c.createRadialGradient(0, -20, 2, 0, -20, 34); g.addColorStop(0, L.glow + '66'); g.addColorStop(1, L.glow + '00'); c.fillStyle = g; c.fillRect(-36, -56, 72, 72); }
+  if (o.foe) { c.setLineDash([3, 2]); }
+  const B0 = L.body, col = L.col;
+  // wings and tails behind the body
+  if (L.wings === 'bat') for (const k of [-1, 1]) { petPath(c, () => { c.moveTo(k * 6, -26); c.quadraticCurveTo(k * 26, -44, k * 24, -20); c.quadraticCurveTo(k * 16, -24, k * 8, -16); c.closePath(); }); petInk(c, col, 1.8); }
+  if (L.wings === 'feather') for (const k of [-1, 1]) { petPath(c, () => { c.moveTo(k * 4, -24); c.quadraticCurveTo(k * 24, -38, k * 22, -14); c.lineTo(k * 6, -14); c.closePath(); }); petInk(c, L.back || col, 1.8); }
+  if (L.wings === 'fly') for (const k of [-1, 1]) { c.save(); c.globalAlpha = .6 + .3 * Math.sin(t * 30); petEll(c, k * 14, -34, 8, 12, '#e8fff0', 1.2); c.restore(); }
+  if (L.tail === 'wag' || L.tail === 'bush') { const w = Math.sin(t * 9) * 5; petPath(c, () => { c.moveTo(-14, -14); c.quadraticCurveTo(-26, -22 + w, -24, -32 + w); }); c.lineWidth = L.tail === 'bush' ? 7 : 4; c.strokeStyle = PET_INK; c.stroke(); c.lineWidth = L.tail === 'bush' ? 4.5 : 2; c.strokeStyle = col; c.stroke(); }
+  if (L.tail === 'sting' || L.tail === 'snake') { petPath(c, () => { c.moveTo(-12, -10); c.quadraticCurveTo(-28, -6, -30, -20); }); c.lineWidth = 4; c.strokeStyle = PET_INK; c.stroke(); c.lineWidth = 2; c.strokeStyle = L.tail === 'snake' ? '#5d8a3a' : col; c.stroke(); petPath(c, () => { c.moveTo(-30, -20); c.lineTo(-34, -26); c.lineTo(-26, -24); c.closePath(); }); petInk(c, PET_INK, 1); }
+  // the body
+  if (B0 === 'dog' || B0 === 'bear') {
+    for (const k of [-8, 8]) { petPath(c, () => c.rect(k - 3, -10, 6, 10)); petInk(c, col, 1.6); }
+    petEll(c, 0, -16, 16, 11, col); petEll(c, 10, -28, 11, 10, col);
+    if (L.ears === 'pointy') for (const k of [4, 15]) { petPath(c, () => { c.moveTo(k - 4, -34); c.lineTo(k, -46); c.lineTo(k + 4, -34); c.closePath(); }); petInk(c, col, 1.6); }
+    if (L.ears === 'round') for (const k of [3, 17]) petEll(c, k, -37, 4, 4, col, 1.6);
+    if (L.face) petEll(c, 12, -26, 7, 6, L.face, 1.2);
+    petEyes(c, 11, -30, 4, 2.4, 1);
+    if (L.beak === 'owl') { petPath(c, () => { c.moveTo(11, -26); c.lineTo(14, -23); c.lineTo(11, -21); c.closePath(); }); petInk(c, '#e0b84a', 1); }
+    else { c.beginPath(); c.arc(19, -27, 1.6, 0, Math.PI * 2); c.fillStyle = PET_INK; c.fill(); }
+  } else if (B0 === 'bird') {
+    for (const k of [-5, 5]) { petPath(c, () => { c.moveTo(k, -12); c.lineTo(k, L.legs === 'long' ? 0 : -2); }); c.lineWidth = 2.4; c.strokeStyle = '#c98a3a'; c.stroke(); }
+    petEll(c, 0, -22, 14, 13, col); petEll(c, 8, -38, 9, 9, col);
+    if (L.comb) petEll(c, 6, -48, 4, 3, L.comb, 1.2);
+    petPath(c, () => { if (L.beak === 'axe') { c.moveTo(15, -42); c.lineTo(28, -38); c.lineTo(15, -32); } else { c.moveTo(15, -40); c.quadraticCurveTo(24, -38, 19, -32); c.lineTo(15, -34); } c.closePath(); }); petInk(c, '#e0b84a', 1.6);
+    petEyes(c, 9, -40, 0.01, 2.6, 1);
+  } else if (B0 === 'drake' || B0 === 'imp' || B0 === 'lizard') {
+    const lz = B0 === 'lizard';
+    for (const k of [-7, 7]) { petPath(c, () => c.rect(k - 3, -9, 6, 9)); petInk(c, col, 1.6); }
+    petEll(c, 0, -17, lz ? 20 : 12, lz ? 9 : 12, col); petEll(c, lz ? 18 : 7, lz ? -24 : -33, lz ? 10 : 9, lz ? 7 : 9, col);
+    if (L.horns) for (const k of [3, 11]) { petPath(c, () => { c.moveTo(k - 2, -40); c.lineTo(k - 1, -48); c.lineTo(k + 2, -40); c.closePath(); }); petInk(c, '#f2e6c8', 1.2); }
+    petEyes(c, lz ? 19 : 8, lz ? -26 : -35, 3.4, lz ? 2.8 : 2.2, 1);
+    if (lz) { c.save(); c.globalAlpha = .5 + .3 * Math.sin(t * 2); petEyes(c, 19, -26, 3.4, 2.8, 1); c.restore(); }
+  } else if (B0 === 'jar') {
+    petPath(c, () => c.rect(-11, -34, 22, 32)); petInk(c, 'rgba(220,240,230,.55)', 2);
+    petPath(c, () => c.rect(-13, -38, 26, 5)); petInk(c, '#8a6a42', 1.6);
+    petEll(c, 0, -20, 6, 7, col, 1.4); petEyes(c, 0, -21, 2.4, 1.4, 0);
+  } else if (B0 === 'frog') {
+    petEll(c, 0, -12, 18, 11, col); petEll(c, 0, -9, 11, 6, L.belly, 1.2);
+    for (const k of [-8, 8]) petEll(c, k, -22, 5, 5, col, 1.6); petEyes(c, 0, -22, 8, 2.6, 0);
+    petPath(c, () => { c.moveTo(-8, -14); c.quadraticCurveTo(0, -10, 8, -14); }); c.lineWidth = 1.4; c.strokeStyle = PET_INK; c.stroke();
+  } else if (B0 === 'chest') {
+    const open = 4 + Math.max(0, Math.sin(t * 2.2)) * 5 + act * 8;
+    petPath(c, () => c.rect(-17, -18, 34, 18)); petInk(c, col);
+    c.save(); c.translate(-17, -18); c.rotate(-open * .04); petPath(c, () => c.rect(0, -12, 34, 12)); petInk(c, '#a06a32'); c.restore();
+    c.fillStyle = '#fff'; for (let i = -12; i <= 12; i += 6) { c.beginPath(); c.moveTo(i, -18); c.lineTo(i + 3, -13); c.lineTo(i + 6, -18); c.fill(); }
+    petEyes(c, 0, -26 - open * .6, 5, 2.2, 1); petPath(c, () => c.rect(-3, -12, 6, 5)); petInk(c, '#e0b84a', 1);
+  } else if (B0 === 'cube') {
+    const w = 1 + Math.sin(t * 4) * .05;
+    c.save(); c.scale(w, 2 - w); petPath(c, () => c.rect(-17, -32, 34, 32)); petInk(c, col); c.restore();
+    c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(-12, -27, 6, 4); petPath(c, () => c.rect(-6, -18, 6, 6)); petInk(c, '#e0b84a', 1);
+    petEyes(c, 0, -22, 6, 2.4, 1);
+  } else if (B0 === 'beetle' || B0 === 'bug') {
+    for (const k of [-10, -2, 6]) { petPath(c, () => { c.moveTo(k, -8); c.lineTo(k - 3, 0); }); c.lineWidth = 2; c.strokeStyle = PET_INK; c.stroke(); }
+    petEll(c, 0, -14, 17, 11, col); if (B0 === 'beetle') { petPath(c, () => { c.moveTo(0, -25); c.lineTo(0, -4); }); c.lineWidth = 1.4; c.strokeStyle = PET_INK; c.stroke(); c.save(); c.globalAlpha = .6 + .3 * Math.sin(t * 3); petEll(c, -11, -14, 6, 5, L.glow, 1); c.restore(); }
+    petEll(c, 15, -16, 7, 6, col, 1.6); petEyes(c, 16, -18, 2.6, 1.8, 1);
+    if (L.antennae) for (const k of [-1, 1]) { petPath(c, () => { c.moveTo(18, -21); c.quadraticCurveTo(24 + k * 2, -34, 28 + k * 3, -32); }); c.lineWidth = 1.6; c.strokeStyle = PET_INK; c.stroke(); petEll(c, 28 + k * 3, -32, 2, 2, '#e8a060', 1); }
+  } else if (B0 === 'orb') {
+    const r = 12 + Math.sin(t * 5) * 1.5; petEll(c, 0, -30, r, r, col, 1.4); petEyes(c, 0, -31, 4, 2, 0);
+  } else if (B0 === 'shroom') {
+    petPath(c, () => c.rect(-5, -16, 10, 16)); petInk(c, '#e8dcc0', 1.6);
+    petEll(c, 0, -20, 18, 9, col); c.fillStyle = '#f2e6c8'; for (const [a, b] of [[-8, -22], [4, -24], [9, -19]]) { c.beginPath(); c.arc(a, b, 1.8, 0, 7); c.fill(); }
+    petEyes(c, 0, -9, 2.6, 1.6, 0); if (act || Math.sin(t * 1.3) > .95) { c.beginPath(); c.ellipse(0, -4, 3, 2.4, 0, 0, 7); c.fillStyle = PET_INK; c.fill(); }
+  } else if (B0 === 'grub') {
+    for (let i = 0; i < 4; i++) petEll(c, -15 + i * 9, -9 - (i === 3 ? 3 : 0), 7, 7 - i * .3, col, 1.6);
+    c.save(); c.globalAlpha = .5 + .3 * Math.sin(t * 4); c.fillStyle = L.glow; for (let i = 0; i < 3; i++) c.fillRect(-17 + i * 9, -15, 4, 2); c.restore();
+    petEyes(c, 13, -13, 2.4, 1.6, 1);
+  } else if (B0 === 'mantle') {
+    petPath(c, () => { c.moveTo(-18, -4); c.quadraticCurveTo(0, -40, 18, -4); for (let i = 18; i >= -18; i -= 6) c.lineTo(i - 3, -1 - (i % 12 ? 0 : 3)); c.closePath(); }); petInk(c, col);
+    petEyes(c, 0, -20, 5, 2, 0);
+  } else if (B0 === 'claw') {
+    petEll(c, 0, -8, 11, 7, col, 1.8);
+    for (let i = 0; i < 4; i++) { const a = -2.4 + i * .5 + Math.sin(t * 6 + i) * .08; petPath(c, () => { c.moveTo(Math.cos(a) * 8, -8 + Math.sin(a) * 5); c.lineTo(Math.cos(a) * 18, -8 + Math.sin(a) * 14); }); c.lineWidth = 5; c.strokeStyle = PET_INK; c.stroke(); c.lineWidth = 3; c.strokeStyle = col; c.stroke(); }
+    petEyes(c, 0, -10, 3, 1.6, 0);
+  }
+  c.restore();
+}
 /* p7b: the bosses' art and the arena's special effects */
 BESPOKE.add('wyrm'); BESPOKE.add('zamboni');
 Object.assign(KIND_WPN, { bogtroll: 'rake', kqueen: 'baton', banshee: 'scythe' });
@@ -5862,6 +6428,7 @@ function openPause() {
 function closePause() { UI.paused = false; const el = $('pause'); if (el) el.hidden = true; if (SND.ctx && MUS_BUS && MUS.timer) MUS_BUS.gain.setTargetAtTime(SET.mvol * .9 * MODE_VOL[MUS.mode || 'fight'], SND.ctx.currentTime, .2); }
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape' && ev.key !== 'p' && ev.key !== 'P') return;
+  if (ev.key !== 'Escape' && (ev.ctrlKey || ev.metaKey || ev.altKey)) return;
   if (ev.target.closest('input,textarea') || !$('modal').hidden) return;
   if (UI.paused) { if (ev.key === 'Escape' || ev.key.toLowerCase() === 'p') { closePause(); ev.preventDefault(); } return; }
   if (!RUN || UI.screen === 'title' || UI.screen === 'end') return;

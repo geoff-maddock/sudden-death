@@ -42,6 +42,8 @@ function startCombat(ids, type, sport, trait) {
   // relics
   const P = B.P;
   B.trait = trait || null; B.stakes = (RUN.pending && RUN.pending.stakes) || null;
+  // the pet at your side, if the run has one (the Realm's: engine/pets.js)
+  petBegin();
   fire('fightStart');
   log(`${SPORTS[B.sport].n} rules: ${SPORTS[B.sport].rule}.`, 'sys');
   playerTurnStart();
@@ -154,21 +156,23 @@ function drawCards(n) {
 function endTurn() {
   if (B.phase !== 'player' || B.over) return [];
   const P = B.P;
+  // (the turn is ending: a card drawn now would be thrown away with the hand, so a draw waits for the next: B.ending)
+  B.ending = true;
   if (B.sport === 'curling' && B.hand.length) { gainBlock(B.hand.length * 2, true); log(`Sweep! ${B.hand.length} cards left in hand: +${B.hand.length * 2} Block.`, 'good'); }
   if (sv(P, 'plate')) gainBlock(sv(P, 'plate'), true);
   fire('turnEnd');
   for (const c of B.hand) { const d = def(c); if (d.endHurt) loseHP(d.endHurt, d.n); }
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   if (sv(P, 'regen')) { healP(sv(P, 'regen')); addSt(P, 'regen', -1); }
   fire('turnEndHeal');
   sportTurnEnd();
   B.lt = B.tt || null;
-  if (B.over) return [];
+  if (B.over) { delete B.ending; return []; }
   const keep = [];
   for (const c of B.hand) { const d = def(c); if (d.retain) keep.push(c); else if (d.eth) B.exhaust.push(c); else B.discard.push(c); }
   B.hand = keep;
   for (const k of ['weak', 'vuln']) if (sv(P, k)) addSt(P, k, -1);
-  B.phase = 'enemy';
+  B.phase = 'enemy'; delete B.ending;
   return enemyTurnSteps();
 }
 // the enemy turn as a list of steps, so the UI can pace it and the lab can run it flat out
@@ -209,11 +213,11 @@ function doMove(e) {
     if (B.over || e.dead) break;
     switch (op[0]) {
       case 'a': for (let i = 0; i < (op[2] || 1); i++) { if (B.over || e.dead) break; const dealt = hurtPlayer(enemyHitDmg(e, op[1]), e, { pierce: op[3] === 'pierce' }); if (op[3] === 'drain' && dealt > 0) { e.hp = Math.min(e.max, e.hp + dealt); fx({ k: 'num', e: e.uid, t: '+' + dealt, col: '#6fe08a' }); } } break;
-      case 'b': e.block += op[1]; fx({ k: 'num', e: e.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); break;
-      case 'ba': for (const o of alive()) { o.block += op[1]; fx({ k: 'num', e: o.uid, t: '+' + op[1], col: '#9fd2ff', blk: 1 }); } break;
+      case 'b': { const b0 = e.block; blockE(e, op[1]); if (e.block > b0) fx({ k: 'num', e: e.uid, t: '+' + (e.block - b0), col: '#9fd2ff', blk: 1 }); break; }
+      case 'ba': for (const o of alive()) { const b0 = o.block; blockE(o, op[1]); if (o.block > b0) fx({ k: 'num', e: o.uid, t: '+' + (o.block - b0), col: '#9fd2ff', blk: 1 }); } break;
       case 's': addSt(e, op[1], op[2]); break;
       case 'sa': for (const o of alive()) addSt(o, op[1], op[2]); break;
-      case 'p': addSt(B.P, op[1], op[2]); fx({ k: 'pst', st: op[1], n: op[2] }); break;
+      case 'p': if (debuffP(op[1], op[2])) fx({ k: 'pst', st: op[1], n: op[2] }); break;
       case 'add': for (let i = 0; i < op[2]; i++) { const c = mkCard(op[1]); if (op[3] === 'draw') B.draw.splice((R() * (B.draw.length + 1)) | 0, 0, c); else B.discard.push(c); } fx({ k: 'addcard', id: op[1], n: op[2] }); log(`${op[2]} × ${CARDS[op[1]].n} shuffled into your ${op[3] === 'draw' ? 'draw pile' : 'discard pile'}.`, 'bad'); break;
       case 'heal': e.hp = Math.min(e.max, e.hp + op[1]); break;
       case 'steal': { const t = Math.min(RUN.gold, op[1]); RUN.gold -= t; e.stolen += t; if (t) { fx({ k: 'num', p: 1, t: `−${t} gold`, col: '#ffd166' }); log(`${e.n} lifts ${t} gold.`, 'bad'); } break; }
@@ -224,11 +228,19 @@ function doMove(e) {
     }
   }
 }
+// a status on you from the other side: a debuff fires playerDebuff first, and a pet may stop it (false: it was stopped)
+function debuffP(k, n) { if (ST[k] && ST[k].d && n > 0 && fire('playerDebuff', { k, n })) return false; addSt(B.P, k, n); return true; }
+// an enemy gains Block (from a move, a phase or its turn): enemyBlock, for a pet that reads it (a hockey save is a goal
+// stopped, not Block raised: it doesn't come here)
+function blockE(e, n) { e.block += n; if (n > 0) fire('enemyBlock', { e, n }); }
 function hurtPlayer(dmg, e, o = {}) {
   const P = B.P;
+  // (an enemy's hit on its way: a pet may step in before the Block is counted)
+  if (e) fire('playerAttacked', e);
   if (sv(P, 'intang')) dmg = Math.min(dmg, 1);
-  if (sv(P, 'pads')) { P.block += 5; addSt(P, 'pads', -1); fx({ k: 'num', p: 1, t: 'Pad save +5', col: '#9fd2ff', small: 1 }); }
-  if (sv(P, 'helmet')) { dmg = Math.max(0, dmg - 3); addSt(P, 'helmet', -1); }
+  // (o.plain: damage that is no attack, a rival pet's: past Block to HP, setting off no gear and no score)
+  if (!o.plain && sv(P, 'pads')) { P.block += 5; addSt(P, 'pads', -1); fx({ k: 'num', p: 1, t: 'Pad save +5', col: '#9fd2ff', small: 1 }); }
+  if (!o.plain && sv(P, 'helmet')) { dmg = Math.max(0, dmg - 3); addSt(P, 'helmet', -1); }
   let taken = dmg;
   const blocked = o.pierce ? 0 : Math.min(P.block, taken); P.block -= blocked; taken -= blocked;
   if (blocked) fx({ k: 'num', p: 1, t: 'blocked ' + blocked, col: '#9fd2ff', small: 1 });
@@ -236,8 +248,9 @@ function hurtPlayer(dmg, e, o = {}) {
   fx({ k: 'hitP', amt: taken });
   if (e && sv(P, 'thorns') && !e.dead) hurtEnemy(e, sv(P, 'thorns'), { raw: true, src: 'Spikes' });
   if (e && sv(P, 'shoulder') && !e.dead) { hurtEnemy(e, 6, { raw: true, src: 'Shoulder Pads', noScore: 1 }); addSt(P, 'shoulder', -1); }
-  if (sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
-  sportEnemyHit(taken, dmg);
+  if (!o.plain && sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
+  if (!o.plain) sportEnemyHit(taken, dmg);
+  if (e) { fire('playerHit', { e, taken, dmg }); petSpook(taken); }
   return taken;
 }
 function loseHP(n, src, fromHit) {
@@ -270,6 +283,7 @@ function atkDmg(base, e, card, extra = 0) {
     if (B.sport === 'basketball' && (sv(P, 'hot') || (!B.inCard && B.atkCount >= 2))) d += add(3, 'On Fire');
     d += add(sv(P, 'oop'), 'Alley-oop');
     d += add(mod('atk', card), 'Trophies');
+    d += add(petAtk(card, e), petName());
     if (B.sport === 'bowling' && card.sk) d += add(2, 'Practiced');
   }
   if (sv(P, 'weak')) d *= mul(1, .75, 'You are Weak');
@@ -341,6 +355,8 @@ function playCard(i, ti, opt = {}) {
   if (needsTarget(card)) { if (!tgt || tgt.dead || tgt.fled) tgt = alive()[0]; if (!tgt) return false; }
   B.energy -= cardCost(card);
   B.hand.splice(i, 1);
+  // (the card's target, by its id: B stays plain data)
+  B.lastTgt = tgt ? tgt.uid : null;
   // extra costs, paid up front
   if (d.disc) { let j = B.hand.findIndex(c => c.uid === opt.disc); if (j < 0) j = B.hand.reduce((bj, c, k) => cardValue(c) < cardValue(B.hand[bj]) ? k : bj, 0); const dc = B.hand.splice(j, 1)[0]; if (dc) { B.discard.push(dc); log(`You discard ${def(dc).n}.`); } }
   if (d.toll) loseHP(d.toll, d.n);
@@ -447,6 +463,7 @@ function resolve(ops, ctx) {
       case 'execute': { const e = ctx.tgt; if (!e || e.dead) break; if (!isBoss(e)) { fx({ k: 'say', e: e.uid, t: 'Hole in one!' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(40, e, ctx.card)); break; }
       case 'luck': B.luck = 1; RUN.luck = 1; break;
       case 'loseblock': P.block = 0; break;
+      case 'unblock': for (const e of alive()) e.block = 0; log('Every enemy loses its Block.', 'good'); break;
       case 'strip': for (const e of alive()) { e.block = 0; if (sv(e, 'str') > 0) delete e.st.str; } log('Every enemy is stripped of Block and Strength.', 'good'); break;
       case 'drainall': { let tot = 0; for (const e of alive()) tot += hurtEnemy(e, atkDmg(op[1], e, ctx.card)); healP(tot); break; }
       case 'split': { const al = alive(); const ends = al.length > 1 ? [al[0], al[al.length - 1]] : al; for (const e of ends) hurtEnemy(e, atkDmg(op[1], e, ctx.card)); break; }

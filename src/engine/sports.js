@@ -13,9 +13,9 @@ function sportInit() { B.sc = { us: 0, them: 0, bases: [0, 0, 0], outs: 0, goals
 const scored = () => !!SPORT_UNIT[B.sport];
 function cardHasDmg(d) { const has = ops => ops.some(o => ['d', 'drain', 'dunk', 'bodyslam', 'split', 'drainall', 'bonestorm', 'devour', 'petrify', 'petrifyall', 'execute'].includes(o[0]) || (o[0] === 'roll' && (has(o[2]) || has(o[3])))); return has(d.fx); }
 function cardValue(c) { const d = def(c); if (d.type === 'junk' || d.type === 'curse') return -10; return ({ s: 1, c: 2, u: 3, r: 4, l: 6 }[d.rar] || 1) + (c.up ? 1 : 0) - (d.id === 'check' || d.id === 'hold' ? 1 : 0); }
-function addHL(id) { if (B.sc.hl.includes(id)) return; B.sc.hl.push(id); fx({ k: 'banner', t: HL_NAME[id], sub: 'Highlight: bonus style points', small: 1 }); log(`Highlight: ${HL_NAME[id]}.`, 'good'); }
-function scoreUs(n, what) { B.sc.us += n; credit('p', n); potg(what, n); fx({ k: 'score', side: 0, n, what }); momentumCheck(); }
-function scoreThem(n) { if (n && perkOn('ace')) n *= 2; B.sc.them += n; fx({ k: 'score', side: 1, n }); momentumCheck(); }
+function addHL(id) { if (B.sc.hl.includes(id)) return; B.sc.hl.push(id); fx({ k: 'banner', t: HL_NAME[id], sub: 'Highlight: bonus style points', small: 1 }); log(`Highlight: ${HL_NAME[id]}.`, 'good'); fire('highlight', id); }
+function scoreUs(n, what) { B.sc.us += n; credit('p', n); potg(what, n); fx({ k: 'score', side: 0, n, what }); momentumCheck(); fire('score', { side: 0, n, what }); }
+function scoreThem(n) { if (n && perkOn('ace')) n *= 2; B.sc.them += n; fx({ k: 'score', side: 1, n }); momentumCheck(); fire('score', { side: 1, n }); }
 /* momentum: the score margin pushes the fight. Lead and your hits land harder; trail and theirs do,
    until you are far enough behind that desperation kicks in (Comeback: an extra card every turn). */
 const MOM = { baseball: [2, 4], football: [7, 14], hockey: [2, 3], basketball: [6, 12], jousting: [2, 3], curling: [2, 3], boxing: [1, 2], soccer: [2, 3] };
@@ -206,7 +206,7 @@ function sportTurnStart() {
   if (B.sport === 'boxing' && B.turn > 1) {
     const [u, t] = B.sc.rd; fx({ k: 'bell', win: u > t }); if (u > t) { B.sc.rounds[0]++; scoreUs(0); } else if (t > u) { B.sc.rounds[1]++; scoreThem(0); }
     if (u - t >= 15) { for (const e of alive()) addSt(e, 'weak', 1); fx({ k: 'banner', t: 'They’re rocked', sub: 'You took the round by 15+: every enemy is Weak', small: 1 }); }
-    else if (t - u >= 15) { addSt(B.P, 'weak', 1); fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
+    else if (t - u >= 15 && debuffP('weak', 1)) { fx({ k: 'banner', t: 'You’re rocked', sub: 'They took the round by 15+: you are Weak', small: 1 }); }
     B.sc.rd = [0, 0];
   }
 }

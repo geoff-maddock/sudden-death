@@ -41,7 +41,7 @@ function renderFightHUD() {
   $('ctlBox').innerHTML = `
     <div class="piles"><button class="pile" id="pDraw" title="Draw pile">Draw ${B.draw.length}</button><button class="pile" id="pDisc" title="Discard pile">Discard ${B.discard.length}</button>${B.exhaust.length ? `<button class="pile" id="pEx" title="Exhausted">Out ${B.exhaust.length}</button>` : ''}</div>
     <button class="btn endturn" id="bEnd" ${busy ? 'disabled' : ''}>${B.phase === 'enemy' ? 'Their turn' : 'End turn'}</button>
-    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn</span>`;
+    <span class="hint" style="font-size:13px">Keys: <kbd>1</kbd>–<kbd>0</kbd> cards, <kbd>E</kbd> end turn${B.pet ? ', <kbd>T</kbd> your pet\'s trick' : ''}</span>`;
   $('bEnd').onclick = () => doEndTurn();
   $('pDraw').onclick = () => showDeck(B.draw, `Draw pile (${B.draw.length}), in no particular order`);
   $('pDisc').onclick = () => showDeck(B.discard, `Discard pile (${B.discard.length})`);
@@ -92,11 +92,28 @@ function updatePreview() {
   UI.preview = estDamage(c, t);
   const w = dmgWhy(c, t); if (w) UI.why = Object.assign(w, { card: def(c).n, tgt: t.n });
 }
+/* dragging a card to play it. The drop plays it only if nothing happened while it was held: no action (a card, a
+   tonic, the pet's trick, the end of the turn: UI.acts), the pick not let go (Escape: UI.sel), no pause, dialog or
+   waiting discard, the same card in the same place. A gesture the browser takes over, or the window losing focus,
+   ends the drag with nothing played and the target as it was, and so does a mouse let go where the page never heard
+   it (a move with no button held, once one was). Only the pointer that started it drives it. */
 function startDrag(ev, el, i) {
+  // (a new press: the last drop's click, if it was ever coming, is past)
+  UI.dragged = false;
   if (ev.button !== 0 || B.phase !== 'player' || B.over || UI.busy || UI.disc) return;
   const c = B.hand[i]; if (!c || !canPlay(c)) return;
-  const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform; let moved = false;
+  const x0 = ev.clientX, y0 = ev.clientY, base = el.style.transform, acts0 = UI.acts || 0, kb0 = UI.kbTarget, hv0 = UI.hover; let moved = false;
+  // (only this pointer drives this drag: a second finger is its own)
+  const pid = ev.pointerId, mine = e => e.pointerId == null || pid == null || e.pointerId === pid;
+  let held = !!ev.buttons;
   const mv = e => {
+    if (!mine(e)) return;
+    // (a mouse or pen let go where the page never heard it, outside the window or the frame: a move with no button held,
+    // after one with it held, ends the drag with nothing played; it locks nothing, and a tap-and-drag that never
+    // reports a button isn't touched)
+    if (e.pointerType && e.pointerType !== 'touch') { if (e.buttons) held = true; else if (held) { cancel(); return; } }
+    // (the pick let go mid-drag, by Escape or an action: the drag ends, rather than go on choosing targets)
+    if (moved && UI.sel !== i) { cancel(); return; }
     const dx = e.clientX - x0, dy = e.clientY - y0;
     if (!moved && Math.hypot(dx, dy) < 12) return;
     if (!moved) { moved = true; el.classList.add('drag'); UI.sel = i; if (!UI.kbTarget || UI.kbTarget.dead) UI.kbTarget = alive()[0]; }
@@ -106,20 +123,30 @@ function startDrag(ev, el, i) {
     if (h) { UI.hover = h.e; UI.kbTarget = h.e; }
     updatePreview();
   };
+  // (the drag over: its listeners off, the card back, and the click that follows the drop ignored (UI.dragged): the
+  // card's click clears it, and so does the next press)
+  const off = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); el.classList.remove('drag'); el.style.transform = base; if (moved) { UI.hoverCard = -1; UI.dragged = true; } };
+  // (the card back, nothing played; the target and hover as they were before the drag, the pick let go. If another pick
+  // (another finger's, a key's) has taken over, the drag touches nothing: that pick keeps the target it was made with)
+  const drop = () => {
+    if (!B || UI.view !== 'fight' || (UI.sel !== i && UI.sel !== -1)) return;
+    UI.kbTarget = kb0 && !kb0.dead ? kb0 : null; UI.hover = hv0 && !hv0.dead ? hv0 : null; UI.sel = -1; renderHand();
+  };
+  const cancel = e => { if (e && e.type === 'pointercancel' && !mine(e)) return; off(); if (moved) drop(); };
   const up = e => {
-    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+    if (!mine(e)) return;
+    off();
     if (!moved) return;
-    UI.dragged = true; el.classList.remove('drag'); el.style.transform = base;
+    if (!B || UI.view !== 'fight' || (UI.acts || 0) !== acts0 || UI.sel !== i || B.phase !== 'player' || B.over || UI.busy || UI.paused || UI.disc || !$('modal').hidden || B.hand[i] !== c) { drop(); return; }
     const r = cv.getBoundingClientRect();
     const overStage = e.clientY < r.bottom + 10;
-    if (!overStage) { UI.sel = -1; renderHand(); return; }
+    if (!overStage) { drop(); return; }
     const x = (e.clientX - r.left) * SW / r.width, y = (e.clientY - r.top) * SH / r.height;
     const h = (UI.hit || []).find(o => !o.e.dead && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1);
-    UI.sel = i;
     if (needsTarget(c) && alive().length > 1 && !h) { renderHand(); return; } // dropped on open ice: keep it selected
     playSelected(h ? h.e : UI.kbTarget || alive()[0]);
   };
-  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel); window.addEventListener('blur', cancel);
 }
 function selectCard(i) {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
@@ -142,17 +169,21 @@ function playSelected(e) {
 function drinkTonic(slot) {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
   const id = RUN.tonics[slot]; if (!id) return;
+  // (a picked card or a waiting discard is let go: the tonic can change the hand and the enemies under them)
+  UI.sel = -1; UI.disc = null;
   const needsT = TONICS[id].fx.some(o => o[0] === 'd' && o[3] !== 'all');
   useTonic(slot, needsT ? B.enemies.indexOf(UI.kbTarget || alive()[0]) : null);
   hideTip(); afterAction();
 }
 function afterAction() {
+  // (an action happened: a card held in a drag won't play on its drop)
+  UI.acts = (UI.acts || 0) + 1;
   consumeFx(); renderFightHUD();
   if (B.over) { UI.busy = true; setTimeout(() => finishFight(), 1100); }
 }
 function doEndTurn() {
   if (!B || B.phase !== 'player' || B.over || UI.busy) return;
-  UI.sel = -1; UI.busy = true;
+  UI.acts = (UI.acts || 0) + 1; UI.sel = -1; UI.busy = true;
   const steps = endTurn(); consumeFx(); renderFightHUD();
   let i = 0;
   const next = () => {
@@ -181,6 +212,8 @@ cv.addEventListener('click', ev => {
 });
 document.addEventListener('keydown', ev => {
   if (UI.view !== 'fight' || !B || !$('modal').hidden || UI.paused || ev.target.closest('input,textarea')) return;
+  // (a browser's own shortcut, Cmd+E or Ctrl+1, isn't a move in the fight; Escape still lets go of a pick)
+  if (ev.key !== 'Escape' && (ev.ctrlKey || ev.metaKey || ev.altKey)) return;
   if (/^[0-9]$/.test(ev.key)) { const i = (+ev.key + 9) % 10; if (i < B.hand.length) selectCard(i); ev.preventDefault(); return; }
   if (ev.key === 'e' || ev.key === 'E') { doEndTurn(); return; }
   if (UI.sel >= 0) {
