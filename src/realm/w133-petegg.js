@@ -166,7 +166,7 @@ function wPeggHatch(el) {
   if (!PETS[I.kind] || !W_PEGG.eggs[I.kind]) return null;
   // (a known kind always comes: wPetAdd only refuses an unknown one. The crack first, then the kennel's line)
   wLog(`The ${W_PEGG.eggs[I.kind].name} cracks. Out tumbles ${petA(PETS[I.kind].n)} ${PETS[I.kind].n}!`, 'g');
-  const q = wPetAdd(I.kind, 'hatch:' + el); if (!q) return null;
+  const q = wPetAdd(I.kind, 'hatch:' + el, { quiet: 1 }); if (!q) return null;
   delete H[el];
   wInvalidate(WG.map); wSave();
   return q;

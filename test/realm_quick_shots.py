@@ -3,7 +3,8 @@
 # look changes, then rebuild. Each shot sets the game up through its API (a setup may wait on the game), freezes it,
 # lays labels with arrows over it and takes the picture: the canvas, and any bar above it that the step is about.
 #   python3 test/realm_quick_shots.py              every sport
-#   python3 test/realm_quick_shots.py links lanes   some sports (the others' shots are kept; shed is curling)
+#   python3 test/realm_quick_shots.py links lanes   some sports (the others' shots are kept; shed is curling; pets and
+#                                                   petfield are the Pets tab's)
 # A label: { t: text, x, y: where the arrow points, in the canvas's own pixels (or el: a page element, the arrow at its
 # middle), dx, dy: where the text sits from there (canvas pixels), al: 'l' or 'r' to hang the text off that side }.
 import asyncio, base64, os, re, subprocess, sys
@@ -186,7 +187,29 @@ SHED = {
   ],
 }
 
-SHOTS = {'links': GOLF, 'lanes': LANES, 'shed': SHED, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK}
+# ---------- pets: the Pets tab and a hatching (dialogs), a match with both pets on the field ----------
+PETS = {
+  'prep': "0",
+  'cv': "document.getElementById('modalBox')", 'W': "document.getElementById('modalBox').getBoundingClientRect().width",
+  'shots': [
+    ('pets-tab', "(async () => { __closeModals(); const L0 = LAB; LAB = true; const q = wPetAdd('hootling', 'keeper:moss'); wPetAdd('blinkpup', 'shop:hq'); LAB = L0; wAddItem('mossberry', 1); q.xp = 8; wOpenCamp('pets'); await __until(() => document.querySelector('#wCampBody .wpetc')); })()",
+     """(() => { const side = document.querySelector('#wCampBody [data-petside]'), bond = document.querySelector('#wCampBody .wpetbond'), treat = document.querySelector('#wCampBody [data-pettreat]');
+       return [{ t: 'At my side: the pet that goes into your matches', el: side, dx: -40, dy: -60, al: 'r' }, { t: 'Its bond, and what it likes to eat', el: bond, dx: 60, dy: 50, al: 'l' }].concat(treat ? [{ t: 'Give it a treat', el: treat, dx: 20, dy: -55, al: 'r' }] : []); })()"""),
+    ('pets-hatch', "(async () => { __closeModals(); WG.petEggs = WG.petEggs || {}; WG.petEggs.aether = { kind: 'pseudodragon', due: WG.dayAbs }; wPeggOpen('aether'); await __until(() => document.getElementById('wHatchName')); })()",
+     """[{ t: 'An egg hatched at its hatching place: name your pet', el: document.getElementById('wHatchName'), dx: 0, dy: -70 }]"""),
+  ],
+}
+PETFIELD = {
+  'prep': "0",
+  'cv': "document.querySelector('#v-fight #cv')", 'W': 960, 'more': ["document.getElementById('petBox')", "document.getElementById('foePetBox')"],
+  'shots': [
+    ('pets-field', "(async () => { __closeModals(); const L0 = LAB; LAB = true; const q = wPets().owned.find(x => x.kind === 'hootling') || wPetAdd('hootling', 'keeper:moss'); LAB = L0; wPetSide(q.id); RUN.foePet = { kind: 'griffon', skill: 2 }; beginFight({ ids: ['skelss', 'thief'], type: 'normal', sport: 'baseball' }); await __until(() => UI.view === 'fight' && (!A.banner || A.t > A.banner.t0 + A.banner.life)); })()",
+     """[{ t: 'Your pet: it acts on its own', x: 420, y: 410, dx: -120, dy: -150, al: 'r' }, { t: 'A rival club brings its own', x: entA('foepet').x || 490, y: 410, dx: 120, dy: -170, al: 'l' },
+       { t: 'Hover: what it does. The button: its trick (T), once a match', el: document.getElementById('bPetTrick'), dx: 120, dy: -40, al: 'l' }]"""),
+  ],
+}
+
+SHOTS = {'links': GOLF, 'lanes': LANES, 'shed': SHED, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK, 'pets': PETS, 'petfield': PETFIELD}
 
 async def main():
     only = sys.argv[1:] or list(SHOTS)

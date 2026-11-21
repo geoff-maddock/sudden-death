@@ -42,9 +42,15 @@ function wPetSync() { if (!RUN || !WG) return; const p = wPetSideOf(); RUN.pet =
 // the pet waits where it came from at once (WG.petAway, so it is never lost, a reload or a closed question and all;
 // the pet returned says waits: true) and you're asked which one goes (wPetFull, one question at a time; never in LAB)
 const W_PET_ASK = [];
+// (o: what the pet keeps, its name, bond and so on; o.back: one had back from where it waited, o.quiet: no welcome, as a
+// hatching has its own; neither is kept on the pet)
+// a pet joins the kennel (wPetAdd, or a full kennel's swap): later parts hang their welcome here (w138: the sound, the
+// medals)
+function wPetJoined(q, how) { }
 function wPetAdd(kind, from, o) {
   if (!PETS[kind]) return null;
-  const P = wPets(), q = Object.assign({ kind, name: (o && o.name) || PETS[kind].n, bond: 1, xp: 0, got: WG.dayAbs, from: from || '', hungry: false }, o || {});
+  const how = { back: !!(o && o.back), quiet: !!(o && o.quiet) }; o = Object.assign({}, o || {}); delete o.back; delete o.quiet;
+  const P = wPets(), q = Object.assign({ kind, name: o.name || PETS[kind].n, bond: 1, xp: 0, got: WG.dayAbs, from: from || '', hungry: false }, o);
   q.id = P.seq++;
   if (P.owned.length >= W_PET.kennel) {
     const a = wPetAway(q); wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
@@ -55,6 +61,7 @@ function wPetAdd(kind, from, o) {
   if (P.side == null) P.side = q.id;
   wPetSync();
   wLog(`${q.name} the ${PETS[kind].from} joins your kennel${P.side === q.id ? ', and goes at your side' : ''}.`, 'g');
+  wPetJoined(q, how);
   wSave();
   return q;
 }
@@ -85,7 +92,7 @@ function wPetFull(q, a) {
       // (one that can't go now, the one at your side in a match, says so and the choice stays open)
       const why = wPetLetGo(id); if (why) { const w = $('wPetFullWhy'); w.textContent = why; w.hidden = false; return; }
       const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1);
-      P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g');
+      P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g'); wPetJoined(q, {});
     }
     wSave(); close();
   });
@@ -107,7 +114,7 @@ function wPetReclaim(i) {
   const A = wPets() && WG.petAway, a = A[i]; if (!a) return 'Nobody waits there.';
   if (wPets().owned.length >= W_PET.kennel) return `Your kennel is full (${W_PET.kennel}).`;
   // (taken off the waiting list only once it is really back)
-  const q = wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp, hungry: !!a.hungry, got: a.got != null ? a.got : WG.dayAbs, treat: a.treat != null ? a.treat : null }); if (!q || !wPetOf(q.id)) return 'It couldn\'t come.';
+  const q = wPetAdd(a.kind, a.from, { name: a.name, bond: a.bond, xp: a.xp, hungry: !!a.hungry, got: a.got != null ? a.got : WG.dayAbs, treat: a.treat != null ? a.treat : null, back: 1 }); if (!q || !wPetOf(q.id)) return 'It couldn\'t come.';
   const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1); wSave();
   return '';
 }
@@ -162,6 +169,7 @@ wStart = function (save, opts) { W_PET_ASK.length = 0; if (W_PET_ASK.close) { if
 function wPetCard(q, side) {
   const T = petText(q.kind, q.bond || 1, q.hungry), D = PETS[q.kind], col = PET_EL_COL[D.el] || '#e9dcc0';
   return `<li class="wpr wpetc" data-petid="${q.id}" style="border-left:4px solid ${col}">
+    <canvas class="wpetpic" width="64" height="64" data-petpic="${q.kind}" aria-hidden="true"></canvas>
     <div class="wpi"><div class="wpn"><b>${esc(q.name)}</b><span class="k">${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)})</span>${side ? '<span class="wtag wb">At your side</span>' : ''}${q.hungry ? '<span class="wtag">Hungry</span>' : ''}</div>
       <small class="wnst">Bond ${q.bond || 1} of 3 · upkeep ${wPetCost(q)} gold a week</small>
       <small class="hint"><b>Always:</b> ${esc(T.trait)} ${T.powers.map(w => `<span${w.open ? '' : ' class="dim"'}>${w.open ? '' : `(bond ${w.at}) `}${esc(w.d)}</span>`).join(' ')} <b>Trick:</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}</small></div>
@@ -192,6 +200,8 @@ wRenderCamp = function () {
   $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'pets'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
   const P = wPets();
   body.innerHTML = `<div class="wcsum"><span>Pets <b>${P.owned.length}/${W_PET.kennel}</b></span><span>Gold <b>${RUN.gold}</b></span></div>${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampPets();
+  // (each card's portrait: the pet's own figure, as on the field)
+  body.querySelectorAll('[data-petpic]').forEach(cv => { try { const c = cv.getContext('2d'); c.clearRect(0, 0, 64, 64); if (typeof drawPetFig === 'function') drawPetFig(c, cv.dataset.petpic, 32, 58, 0, { size: 38 }); } catch (e) { console.error(e); } });
   body.querySelectorAll('[data-petside]').forEach(b => b.onclick = () => wCampSay(wPetSide(+b.dataset.petside)));
   body.querySelectorAll('[data-petfeed]').forEach(b => b.onclick = () => wCampSay(wPetFeed(+b.dataset.petfeed)));
   // (asked in place, in its own row: the Team screen stays open)
@@ -218,7 +228,9 @@ W_ACTORS.push((acts, now, t) => {
   let dx = (last.fx - last.tx) * .45, dy = (last.fy - last.ty) * .45;
   if (!dx && !dy) dx = WUI.face === 'l' ? .45 : -.45;
   const D = PETS[p.kind], col = PET_EL_COL[D.el] || '#e9dcc0';
+  // (its own figure, as on the field: ui/fight/pet-draw.js; a plain blob if that is missing)
   acts.push({ y: pos[1] + dy - .01, x: pos[0] + dx, draw: (c, x, y) => {
+    if (typeof drawPetFig === 'function' && PET_LOOK[p.kind]) { drawPetFig(c, p.kind, x, y, t, { size: 20, flip: WUI.face === 'l' }); return; }
     const bob = Math.sin(t * 6) * (pos[2] ? 2 : .6);
     c.save(); c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(x, y, 7, 2.5, 0, 0, Math.PI * 2); c.fill();
     c.fillStyle = col; c.strokeStyle = '#17100e'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(x, y - 7 + bob, 7, 6, 0, 0, Math.PI * 2); c.fill(); c.stroke();

@@ -37,7 +37,7 @@ async def main():
         pg0 = await pg.evaluate("""(() => { const q = document.getElementById('wQuick'), help = document.getElementById('wHelp');
           return { first: q.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING ? true : false, tabs: [...q.querySelectorAll('[data-wq]')].map(b => b.dataset.wq),
             shown: [...q.querySelectorAll('[data-wqp]')].filter(p => !p.hidden).map(p => p.dataset.wqp) }; })()""")
-        check(pg0['first'] and pg0['tabs'] == ['links', 'lanes', 'shed', 'ball', 'grid', 'ring', 'court', 'rink'] and pg0['shown'] == ['links'], 'Quick start is at the top of How to play: eight sports, golf showing', pg0)
+        check(pg0['first'] and pg0['tabs'] == ['links', 'lanes', 'shed', 'ball', 'grid', 'ring', 'court', 'rink', 'pets'] and pg0['shown'] == ['links'], 'Quick start is at the top of How to play: eight sports and pets, golf showing', pg0)
         await pg.click('#wQuick [data-wq="rink"]')
         sw = await pg.evaluate("[...document.querySelectorAll('#wQuick [data-wqp]')].filter(p => !p.hidden).map(p => p.dataset.wqp)")
         check(sw == ['rink'], 'a tab shows its sport and hides the others', sw)

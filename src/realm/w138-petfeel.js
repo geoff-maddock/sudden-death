@@ -1,4 +1,4 @@
-/* w138: the feel of pets (issue #104, phase 9). Loads after w137-petrivals.js; changes earlier parts only by
+/* w138: the feel of pets (issue #104, phase 9). Loads after w112-quickstart.js (it adds a Quick start tab); changes earlier parts only by
    reassignment (saved originals carry the wW138 prefix).
 
    Sound, from Sudden Death's own tone and noise, following your Sound effects setting: a pet joining (a rising
@@ -13,7 +13,7 @@
    tab, a match with your pet and a rival's on the field, a hatching.
 
    wPetSound(k)
-   Wraps: wPetAdd (wW138PetAdd: the chirp, the kinds and the full kennel), wPeggHatch (wW138PeggHatch: the crack, the
+   Wraps: wPetJoined (wW138PetJoined: the chirp, the kinds and the full kennel, however a pet joins), wPeggHatch (wW138PeggHatch: the crack, the
    places), wPetBondXp (wW138PetBondXp: the chime, bond 3), wPetTreat (wW138PetTreat: the crunch), petTrick
    (wW138PetTrick: tricks thrown), wPetUpkeep (wW138PetUpkeep: the hungry tip). */
 
@@ -26,14 +26,14 @@ function wPetSound(k) {
     else if (k === 'treat') { noise(.05, .3, 1800, 2); noise(.05, .25, 1500, 2, .08); }
   } catch (e) { console.error(e); }
 }
-const wW138PetAdd = wPetAdd;
-wPetAdd = function (kind, from, o) {
-  const q = wW138PetAdd.apply(this, arguments);
-  if (q && !q.waits && !LAB) {
-    wPetSound('join'); achSet('realmPetKinds', kind);
-    if (wPets().owned.length >= W_PET.kennel && !wFlag('kennel_full')) { wSetFlag('kennel_full'); achAdd('realmKennelFull', 1); }
-  }
-  return q;
+// (a pet joins, however it came: a welcome chirp, unless it was had back or hatched with its own; the medals)
+const wW138PetJoined = wPetJoined;
+wPetJoined = function (q, how) {
+  wW138PetJoined.apply(this, arguments);
+  if (LAB || !q) return;
+  if (!(how && (how.back || how.quiet))) wPetSound('join');
+  achSet('realmPetKinds', q.kind);
+  if (wPets().owned.length >= W_PET.kennel && !wFlag('kennel_full')) { wSetFlag('kennel_full'); achAdd('realmKennelFull', 1); }
 };
 const wW138PeggHatch = wPeggHatch;
 wPeggHatch = function (el) { const q = wW138PeggHatch.apply(this, arguments); if (q && !LAB) { wPetSound('crack'); achSet('realmHatchPlaces', el); } return q; };
@@ -80,5 +80,5 @@ W_QUICK.push({ id: 'pets', n: 'Pets', where: 'your camp', more: 'wHelpPets',
     { img: 'pets-hatch', h: 'More pets: eggs, shops and keepers', t: 'Eggs turn up in the alphas\' rooms and quiet corners, and each hatches at one place by its element. Three towns have pet shops, opened by a small favour, and two have keepers with a pet found nowhere else.' },
   ],
   tip: 'Every pet costs its upkeep each week. A hungry one is weaker: feed it, or give it a treat.',
-  keys: [['C', 'the Team screen (the Pets tab)'], ['T', 'your pet\'s trick, in a match']],
+  keys: [['C', 'the Team screen (the Pets tab)'], ['T', 'your pet\'s trick, in a match'], ['Hover', 'its name in a match: what it does now']],
   phone: 'On a phone, tap the trick button by your pet\'s name.' });

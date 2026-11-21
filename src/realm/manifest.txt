@@ -179,3 +179,4 @@ src/realm/w135-petbond.js
 src/realm/w136-petctx.js
 src/realm/w137-petrivals.js
 src/realm/w112-quickstart.js
+src/realm/w138-petfeel.js

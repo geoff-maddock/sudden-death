@@ -97,7 +97,7 @@ function wQuickHTML() {
     <p class="hint">${s.phone}</p>
     <p class="hint"><small>That's all you need for a first game. The full rules, and everything optional (powers, stances, calls), are further down: <a href="#" data-wqmore="${s.more}">${s.n}: how it works</a>.</small></p></div>`).join('');
   return `<section id="wQuick" class="whelp"><h3>Quick start: playing the sports</h3>
-    <p class="hint">Six sports have games you can play yourself at their grounds. Pick one for the few things you need to know.</p>
+    <p class="hint">Eight sports have games you can play yourself at their grounds; the last tab is for pets. Pick one for the few things you need to know.</p>
     <div class="wqtabs">${tabs}</div>${panes}</section>`;
 }
 function wQuickShow(id) {
