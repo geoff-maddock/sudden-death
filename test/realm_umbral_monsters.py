@@ -39,8 +39,18 @@ async def main():
             startMatch({ type: 'normal', ids: ['skelss', 'golemnt', 'harpyf'], tier: 2, world: { kind: 'wild', ref: null, region: 'plains' } }); LAB = false;
             const r = { tier: RUN.pending.world.tier, umb: !!RUN.pending.world.umbral, drawMod: B.drawMod || 0, hand: B.hand.length, shade: B.enemies.map(e => !!e.shade), str: B.enemies.map(e => (e.st.str || 0)), thorns: (B.enemies[0].st.thorns || 0), block: B.enemies[1].block || 0, weak: B.P.st.weak || 0, hp: B.enemies.map(e => e.max), log: B.log.map(l => l[0] || l.t || '').join(' ') };
             B = null; RUN.pending = null; return r; };
-          out.light = go('graftonbury'); out.dark = go('u:world'); beginFight = keep; return out; })()""")
+          out.light = go('graftonbury'); out.dark = go('u:world');
+          // (the realm daily, started from a screen that works anywhere, stays itself on the dark side)
+          wEnterMap('u:world', 40, 40); RUN.pending = null; B = null; LAB = true; startMatch({ type: 'normal', ids: ['skelss'], tier: 1, world: { kind: 'rdaily', ref: null, region: 'plains' } }); LAB = false;
+          out.daily = { tier: RUN.pending.world.tier, umb: !!RUN.pending.world.umbral, drawMod: B.drawMod || 0 }; B = null; RUN.pending = null;
+          // (the other kinds' traits do what they say: the ogre's Block; a player summoned mid-match takes the form next turn)
+          LAB = true; startMatch({ type: 'normal', ids: ['gorlak', 'lichoc'], world: { kind: 'wild', ref: null, region: 'plains' } }); LAB = false;
+          out.ogre = B.enemies[0].block; B.enemies.push(Object.assign(JSON.parse(JSON.stringify(B.enemies[1])), { shade: 0, uid: 999, st: {} })); const n = B.enemies.length - 1, h0 = B.enemies[n].max; fire('turnStart');
+          out.summon = { shade: B.enemies[n].shade, str: B.enemies[n].st.str || 0, hp: B.enemies[n].max > h0 }; B = null; RUN.pending = null;
+          beginFight = keep; return out; })()""")
         L, D = um['light'], um['dark']
+        check(um['daily'] == {'tier': 1, 'umb': False, 'drawMod': 0}, 'the realm daily started on the dark side stays the day\'s match, not an Umbral one', um)
+        check(um['ogre'] >= 12 and um['summon'] == {'shade': 1, 'str': 1, 'hp': True}, 'the ogre starts with its Block; a player who joins mid-match takes the umbral form at your next turn', um)
         check(not L['umb'] and D['umb'] and D['tier'] == 3 and L['tier'] == 2, 'a match on the dark side is an Umbral match, at tier 3; the same match in the light is not', um)
         check(D['drawMod'] == -1 and L['drawMod'] == 0 and D['hand'] == L['hand'] - 1 and all(D['shade']) and not any(L['shade']), 'tier U: you draw one card fewer, and its players are drawn in shadow', um)
         check(all(d >= l + 1 for d, l in zip(D['str'], L['str'])) and D['thorns'] == 2 and D['block'] >= 10 and D['weak'] >= 1 and 'tier U' in D['log'] and 'Rattle' in D['log'], 'each has more Strength and its kind\'s dark trait (the skeleton\'s Spikes, the golem\'s Bedrock, the harpy\'s Shriek), named in the log', um)
@@ -70,8 +80,12 @@ async def main():
         await pg.evaluate("for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));")
 
         tl = await pg.evaluate("""(() => { const U = WG.umbral; U.pieces = []; U.tries = {}; W_ON_END.nadir('lose', { id: 'gate' }); const out = { tries: U.tries.gate };
-          RUN.gold = 10; out.poor = wNadirMatch('gate'); RUN.gold = 100; LAB = true; const keep = beginFight; beginFight = () => {}; out.rich = wNadirMatch('gate'); out.paid = 100 - RUN.gold; beginFight = keep; LAB = false; RUN.pending = null; B = null;
+          RUN.gold = 10; out.poor = wNadirMatch('gate');
+          // (Not yet on the match card costs nothing; the toll is paid at kickoff)
+          RUN.gold = 100; out.card = wNadirMatch('gate'); document.getElementById('wNotYet').click(); out.backed = 100 - RUN.gold;
+          LAB = true; const keep = beginFight; beginFight = enc => { UI.busy = false; startCombat(enc.ids, enc.type, enc.sport, enc.trait); }; out.rich = wNadirMatch('gate'); out.paid = 100 - RUN.gold; beginFight = keep; LAB = false; RUN.pending = null; B = null;
           return out; })()""")
+        check(tl['backed'] == 0, 'backing away from the match card (Not yet) costs nothing', tl)
         check(tl['tries'] == 1 and 'toll' in tl['poor'] and tl['rich'] == '' and tl['paid'] == 30, 'lose, and the next hand costs a toll (refused without the gold)', tl)
         aud = await pg.evaluate("wAudit()")
         check(aud == [], 'the audit is clean', aud)

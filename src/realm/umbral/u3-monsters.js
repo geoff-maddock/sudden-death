@@ -21,18 +21,19 @@
 
 const W_UMB3 = {
   card: { hp: 1.25, str: 1, draw: -1 },
+  darkKinds: ['wild', 'event'],
   traits: {
     goblin: { n: 'Light Fingers', d: '1 more Strength.', go: e => addSt(e, 'str', 1) },
     kobold: { n: 'Swarming', d: 'A fifth more HP.', go: e => wUmbHp(e, 1.2) },
     werewolf: { n: 'Moon-Mad', d: 'Gains Strength every turn (Full Moon 1).', go: e => addSt(e, 'ritual', 1) },
-    dwarf: { n: 'Iron Beard', d: 'Plating 4.', go: e => addSt(e, 'plate', 4) },
-    ogre: { n: 'Won\'t Flinch', d: 'Plating 6.', go: e => addSt(e, 'plate', 6) },
+    dwarf: { n: 'Iron Beard', d: 'Starts with 8 Block.', go: e => blockE(e, 8) },
+    ogre: { n: 'Won\'t Flinch', d: 'Starts with 12 Block.', go: e => blockE(e, 12) },
     minotaur: { n: 'Bull Rush', d: '2 more Strength.', go: e => addSt(e, 'str', 2) },
     troll: { n: 'Rot-Regrowth', d: 'Regen 3.', go: e => addSt(e, 'regen', 3) },
     golem: { n: 'Bedrock', d: 'Starts with 10 Block.', go: e => blockE(e, 10) },
     harpy: { n: 'Shriek', d: 'You start Weak 1.', go: () => debuffP('weak', 1) },
     elf: { n: 'Pale Arrow', d: '1 more Strength.', go: e => addSt(e, 'str', 1) },
-    wraith: { n: 'Unseen', d: 'Phased 1: the first hit does nothing.', go: e => addSt(e, 'intang', 1) },
+    wraith: { n: 'Half There', d: '1 more Strength, and starts with 6 Block.', go: e => { addSt(e, 'str', 1); blockE(e, 6); } },
     vampire: { n: 'Thirst', d: 'Regen 2.', go: e => addSt(e, 'regen', 2) },
     lich: { n: 'Phylactery', d: 'A quarter more HP.', go: e => wUmbHp(e, 1.25) },
     zombie: { n: 'Rot', d: 'Three tenths more HP.', go: e => wUmbHp(e, 1.3) },
@@ -85,7 +86,9 @@ DB.chars.nadir_gate = { name: 'Morrow Vane, the Gatekeeper', kind: 'lich', look:
 /* ---------- every match on the dark side is an Umbral match ---------- */
 const wWU3BuildEncounter = wBuildEncounter;
 wBuildEncounter = function (o) {
-  const umb = wUmbDark() || !!(o && o.world && o.world.umbral);
+  // (a match the dark side starts: wild, a road event, or one marked umbral. Not one started from a screen that works
+  // anywhere, like the realm daily, which is the same for everyone)
+  const kind = (o && o.world && o.world.kind) || 'wild', umb = !!(o && o.world && o.world.umbral) || (wUmbDark() && W_UMB3.darkKinds.includes(kind));
   const enc = wWU3BuildEncounter.call(this, umb ? Object.assign({}, o, { tier: 3 }) : o);
   if (umb) { enc.world.umbral = 1; if (o.world && o.world.hexes) enc.world.hexes = o.world.hexes.slice(); }
   return enc;
@@ -93,14 +96,23 @@ wBuildEncounter = function (o) {
 onHook('fightStart', () => {
   const W = RUN && RUN.pending && RUN.pending.world; if (!B || !W || !W.umbral) return;
   B.umb = 1; B.drawMod = (B.drawMod || 0) + W_UMB3.card.draw;
-  const named = {};
-  for (const e of B.enemies) {
-    e.shade = 1; wUmbHp(e, W_UMB3.card.hp); addSt(e, 'str', W_UMB3.card.str);
-    const T = W_UMB3.traits[e.kind]; if (T) { T.go(e); named[T.n] = T.d; }
-  }
+  if (W.kind === 'nadir' && W.ref && W.ref.toll) { RUN.gold = Math.max(0, RUN.gold - W.ref.toll); log(`You pay the toll: ${W.ref.toll} gold.`, 'sys'); }
+  const named = wUmbForm(B.enemies);
   log(`The Umbral: tier U. The other side has more HP and Strength, and you draw one card fewer.${Object.keys(named).length ? ' ' + Object.keys(named).map(n => `${n}: ${named[n]}`).join(' ') : ''}`, 'bad');
   for (const h of W.hexes || []) { const H = W_UMB3.hexes[h]; if (H) { H.go(); log(`Hex: ${H.n}. ${H.d}`, 'bad'); } }
 });
+// the umbral form: shadow, more HP and Strength, the kind's dark trait; once for each player (e.shade marks it done)
+function wUmbForm(es) {
+  const named = {};
+  for (const e of es) {
+    if (e.shade || e.dead) continue;
+    e.shade = 1; wUmbHp(e, W_UMB3.card.hp); addSt(e, 'str', W_UMB3.card.str);
+    const T = W_UMB3.traits[e.kind]; if (T) { T.go(e); named[T.n] = T.d; }
+  }
+  return named;
+}
+// a player who joins mid-match (summoned) takes the form at the start of your next turn
+onHook('turnStart', () => { if (B && B.umb && B.enemies.some(e => !e.shade && !e.dead)) wUmbForm(B.enemies); });
 const wWU3PreGame = wPreGame;
 wPreGame = function (enc) {
   const r = wWU3PreGame.apply(this, arguments), W = enc && enc.world, box = $('modalBox'), txt = box && box.querySelector('.wpgtxt');
@@ -124,10 +136,11 @@ function wNadirMatch(id) {
   const C = W_NADIR[id], U = wUmb(); if (!C || !U) return 'Nobody here plays.';
   if (U.pieces.includes(C.piece)) return `${DB.chars[C.char].name} has nothing left to play for: ${W_UMB_PIECES[C.piece].n} is yours.`;
   const tries = U.tries[id] || 0;
-  if (tries > 0) { if (RUN.gold < C.toll) return `Another hand costs a toll of ${C.toll} gold, and you have ${RUN.gold}.`; RUN.gold -= C.toll; wLog(`You pay the toll: ${C.toll} gold.`, 'd'); }
+  // (the toll is paid at kickoff: backing away from the match card costs nothing)
+  if (tries > 0 && RUN.gold < C.toll) return `Another hand costs a toll of ${C.toll} gold, and you have ${RUN.gold}.`;
   const ch = DB.chars[C.char];
   startMatch({ type: C.type, ids: C.ids.slice(), tier: 3, lv: W_ROAD.maxLv, ambush: false, trait: false, name: ch.name,
-    world: { kind: 'nadir', ref: { id }, region: C.region, umbral: 1, hexes: wUmbHexes(id, C.hexes) } });
+    world: { kind: 'nadir', ref: { id, toll: tries > 0 ? C.toll : 0 }, region: C.region, umbral: 1, hexes: wUmbHexes(id, C.hexes) } });
   return '';
 }
 W_ON_END.nadir = function (r, ref) {

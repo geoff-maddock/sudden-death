@@ -1485,6 +1485,20 @@ and the lanterns are few. The Gatekeeper's first cut was a formality, so he was 
 | 210 to 220 HP, hits 15 and 7×3, two Bone Linemen (30 journeys) | 2.3% | 99.7% |
 | **150 to 160 HP, hits 12 and 6×3, a Bone Lineman beside him (45 journeys, 68 matches)** | **55.9%** | **76.8%** |
 
-The last is kept: the gentlest of the nine, won a little over half the time on a first try by the team that won the
-Crown, and every try after the first costs a toll.
+The last is kept: the gentlest of the nine, won about half the time on a first try by the team that won the Crown, and
+every try after the first costs a toll.
+
+**After the review (three traits fixed).** The first measurements had the dwarf's, ogre's and wraith's traits doing
+nothing (the engine has no Plating or Phased for the other side); they now give starting Block (and the wraith 1
+Strength). Measured again (60 journeys, 44 champions, 132 matches each):
+
+| kind | win | HP lost a match | turns |
+|---|---|---|---|
+| light, tier 3 | 99.2% | 27.4% | 6.5 |
+| dark, tier U | 91.7% | 43.8% | 8.2 |
+| light elite, tier 3 | 85.6% | 62.3% | 10.1 |
+| dark elite, tier U | 66.7% | 75.0% | 12.0 |
+| the Gatekeeper | 47.0% | 80.0% | 12.4 |
+
+About ±9 points of noise on the Gatekeeper at this size: the two batches (56% and 47%) agree on about half.
 
