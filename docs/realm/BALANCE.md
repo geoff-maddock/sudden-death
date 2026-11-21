@@ -1458,3 +1458,33 @@ of champion rate.
 **Upkeep against earnings.** A journey earns about 3,100 gold. One common pet costs 6 a week, about 100 a journey (3%);
 a full kennel of six costs 40 to 90 a week, a third to a half of what a journey earns. That is the limit on
 collecting. Treats are cheap (an 8-gold biscuit feeds a hungry pet), so hunger is a nuisance, not a trap.
+
+## The Umbral Realm (issue #99)
+
+`test/realm_umbral_lab.py N K` plays N journeys with the realm bot; each that wins the Crown then plays K matches of
+each kind at full HP, at level 4, from the same team (team level about 10, a deck of about 110). A champion's team is
+far stronger than a fresh one, so this is the honest measure of the dark side.
+
+**The card game at tier U (phase 3).** An Umbral match is tier 3, then tier U: the other side has a quarter more HP
+and 1 more Strength, each player its kind's dark trait, and you draw one card fewer (the Hall of Fame's draw).
+
+| kind (60 journeys, 45 champions, 135 matches each) | win | HP lost a match | turns |
+|---|---|---|---|
+| light, tier 3 | 100% | 25.7% | 6.2 |
+| dark, tier U | 95.6% | 39.9% | 8.4 |
+| light elite, tier 3 | 90.4% | 55.3% | 10.1 |
+| dark elite, tier U | 81.5% | 66.0% | 11.8 |
+| the Gatekeeper, first cut (92 to 98 HP, alone) | 100% | 29.5% | 9.8 |
+
+An ordinary dark match is still won, but costs half as much HP again as a light one: the dark side wears a team down,
+and the lanterns are few. The Gatekeeper's first cut was a formality, so he was rebuilt and measured:
+
+| the Gatekeeper (two hexes, a first try) | win | HP lost |
+|---|---|---|
+| 170 to 180 HP, hits 13 and 6×3, a Bone Lineman beside him (30 journeys) | 50.0% | 82.4% |
+| 210 to 220 HP, hits 15 and 7×3, two Bone Linemen (30 journeys) | 2.3% | 99.7% |
+| **150 to 160 HP, hits 12 and 6×3, a Bone Lineman beside him (45 journeys, 68 matches)** | **55.9%** | **76.8%** |
+
+The last is kept: the gentlest of the nine, won a little over half the time on a first try by the team that won the
+Crown, and every try after the first costs a toll.
+

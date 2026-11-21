@@ -20,7 +20,7 @@ function drawWho(c, kind, x, y, hpx, team, o) {
   if (!SPR_ON || !id || !o.idle || BESPOKE.has(kind) || o.pose || o.run || o.lift) { if (id) SPR.delete(id); drawAny(c, kind, x, y, hpx, team, o); return; }
   const m = c.getTransform(), sc = Math.max(1, Math.min(3, Math.hypot(m.a, m.b)));
   const W = Math.ceil(hpx * 2.6), H = Math.ceil(hpx * 2.1), ox = Math.round(W / 2), oy = Math.round(H * .86);
-  const key = [kind, team.color, team.light, team.short, o.num, hpx, o.flip ? 1 : 0, o.wpn, o.disguised ? 1 : 0, o.crown ? 1 : 0, o.seed || 0, o.stone ? 1 : 0, sc.toFixed(2)].join('|');
+  const key = [kind, team.color, team.light, team.short, o.num, hpx, o.flip ? 1 : 0, o.wpn, o.disguised ? 1 : 0, o.crown ? 1 : 0, o.seed || 0, o.stone ? 1 : 0, o.shade ? 1 : 0, sc.toFixed(2)].join('|');
   const bucket = Math.floor(G.time * SPR_FPS);
   let s = SPR.get(id);
   if (!s || s.key !== key) { const cv2 = s && s.cv || document.createElement('canvas'); cv2.width = Math.ceil(W * sc); cv2.height = Math.ceil(H * sc); s = { cv: cv2, key, bucket: -1 }; SPR.set(id, s); }
@@ -124,7 +124,7 @@ function drawFight(c, dt) {
       c.save(); if (ht < .3) c.translate(Math.sin(ht * 50) * 6, 0);
       if (e.dead && !e.fled) { c.translate(x, y); c.rotate(Math.min(1, dt2 / .5) * -.9 * (e.kind === 'orb' || e.kind === 'cube' ? 0 : 1)); c.translate(-x, -y + dt2 * 30); }
       const wang = lt < .45 ? lerp(-2.2, .9, Math.min(1, lt / .32)) : -1.15 + Math.sin(now * 2 + i * 1.3) * .06;
-      drawWho(c, e.kind, x, y, hpx, e.team, { num: e.num, wpn: ENEMIES[e.id].wpn || KIND_WPN[e.kind], wang, flip: true, alpha, disguised: e.disguised, seed: i * 2, mouth: e.intent === 'breath' || (now - a.lunge < .8 && e.hist[e.hist.length - 1] === 'breath'), charging: !!sv(e, 'charge'), crown: ENEMIES[e.id].crown, sid: e.uid, idle: lt >= .45 && !sv(e, 'charge') && e.intent !== 'breath' && !(now - a.lunge < .8) });
+      drawWho(c, e.kind, x, y, hpx, e.team, { shade: !!e.shade, num: e.num, wpn: ENEMIES[e.id].wpn || KIND_WPN[e.kind], wang, flip: true, alpha, disguised: e.disguised, seed: i * 2, mouth: e.intent === 'breath' || (now - a.lunge < .8 && e.hist[e.hist.length - 1] === 'breath'), charging: !!sv(e, 'charge'), crown: ENEMIES[e.id].crown, sid: e.uid, idle: lt >= .45 && !sv(e, 'charge') && e.intent !== 'breath' && !(now - a.lunge < .8) });
       if (isBoss(e) || ENEMIES[e.id].aura) bossFront(c, e, x, y, hpx, hgt);
       c.restore();
       if (ht < .14 && !e.dead) { c.save(); c.globalAlpha = .5 * (1 - ht / .14); c.fillStyle = '#fff'; c.beginPath(); c.ellipse(x, y - hgt * .5, 46, hgt * .55, 0, 0, Math.PI * 2); c.fill(); c.restore(); }

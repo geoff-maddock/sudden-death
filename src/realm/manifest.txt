@@ -184,3 +184,4 @@ src/realm/w138-petfeel.js
 src/realm/umbral/u0-core.js
 src/realm/umbral/u1-event.js
 src/realm/umbral/u2-world.js
+src/realm/umbral/u3-monsters.js

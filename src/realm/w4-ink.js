@@ -1187,14 +1187,14 @@ function wDrawActor(c, who, px, py, t, opts) {
   const flip = who.face === 'l';
   const walking = who.walk != null && who.walk !== false && who.walk !== 0;
   const phase = walking ? ((Math.floor(((typeof who.walk === 'number' ? who.walk : t * 10) % (Math.PI * 2) + Math.PI * 2) / (Math.PI / 4))) % 8) : -1;
-  const key = [who.kind, team.color, team.light, flip ? 1 : 0, phase, hpx, sc.toFixed(2), who.crown ? 1 : 0].join('|');
+  const key = [who.kind, team.color, team.light, flip ? 1 : 0, phase, hpx, sc.toFixed(2), who.crown ? 1 : 0, who.shade ? 1 : 0].join('|');
   const W = Math.ceil(hpx * 1.9), H = Math.ceil(hpx * 1.6), ox = Math.round(W / 2), oy = Math.round(H * .9);
   let s = WSPR.get(key);
   if (!s) {
     const cv2 = document.createElement('canvas'); cv2.width = Math.ceil(W * sc); cv2.height = Math.ceil(H * sc);
     const g = cv2.getContext('2d'); g.setTransform(sc, 0, 0, sc, 0, 0);
     const t0 = G.time; G.time = 0;
-    try { drawAny(g, who.kind, ox, oy, hpx, team, { flip, run: phase >= 0 ? phase * Math.PI / 4 + .01 : 0, crown: who.crown, num: who.num }); }
+    try { drawAny(g, who.kind, ox, oy, hpx, team, { flip, run: phase >= 0 ? phase * Math.PI / 4 + .01 : 0, crown: who.crown, num: who.num, shade: !!who.shade }); }
     catch (e) { console.error('w4 actor', who.kind, e); }
     finally { G.time = t0; }
     s = { cv: cv2 };
