@@ -11,6 +11,7 @@ title Champions of the Realm
 style src/realm/w0.css
 style src/realm/w6.css
 style src/realm/w9.css
+style src/realm/umbral/u.css
 
 src/realm/w1-data.js
 src/realm/w2-maps.js
@@ -181,3 +182,4 @@ src/realm/w137-petrivals.js
 src/realm/w112-quickstart.js
 src/realm/w138-petfeel.js
 src/realm/umbral/u0-core.js
+src/realm/umbral/u1-event.js

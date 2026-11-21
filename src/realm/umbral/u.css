@@ -1,0 +1,7 @@
+/* the Umbral Realm (issue #99): its scene and its journal chapter */
+.wumbcv{width:100%;max-width:640px;height:auto;display:block;margin:0 auto;border-radius:6px;background:#120c1c}
+.wumblines{max-height:190px;overflow:auto;margin:10px 0 6px}
+.wumblines p{margin:.35em 0}
+.wumblines .wumbn{color:var(--muted,#b8ab94)}
+.wumblines .wumbh{color:#e4defa;font-style:italic}
+.wumbj p{margin:.4em 0}
