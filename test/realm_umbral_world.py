@@ -41,8 +41,11 @@ async def main():
           out.sign = [L.meta[sign].text, (D.meta[mk] || {}).text, D.t[y][L.w - 1 - x]];
           out.mirror = L.t.every((row, yy) => row.every((c, xx) => DB.tiles[c] && DB.tiles[c].use && !W_UMB2.keep.includes(DB.tiles[c].use) ? true : D.t[yy][L.w - 1 - xx] === c));
           out.style = wStyleOf(D).id;
+          out.fronts = !!D.fac && Object.keys(D.fac).every(k => { const [fx, fy] = k.split(',').map(Number); return L.fac[(L.w - 1 - fx) + ',' + fy]; }) && Object.keys(D.fac).length === Object.keys(L.fac).length && D.bldK.length === L.bldK.length;
+          out.people = W_UMB2.towns.flatMap(id => Object.values(MAPS['u:' + id].meta).map(mt => mt.text).filter(Boolean)).filter(t => W_UMB2.after.some(a => t.endsWith(a)));
           return out; })()""")
         check(tw['names'] == ['Gravesbury', 'Mossgrave', 'Saltmourn', 'Cindergrave', 'Rimewake', 'The Hollow Coliseum'], 'the six dark towns are built, with their dark names', tw)
+        check(tw['fronts'] and tw['people'] == [], 'the buildings keep their fronts, mirrored with them; no sign gets a line meant for a person', tw)
         check(tw['mirror'] and tw['sign'][2] == 'S' and tw['sign'][1] == ' '.join(w[::-1] for w in tw['sign'][0].split(' ')) and tw['style'] == 'ubrick', 'a dark town is its light town mirrored, its signs spelt backwards, in its stone darkened', tw)
 
         dd = await pg.evaluate("""(() => { const bad = [], D = MAPS['u:graftonbury'], L = MAPS.graftonbury;
@@ -74,11 +77,13 @@ async def main():
         ln = await pg.evaluate("""(() => { const out = {}, w = MAPS['u:world'], keys = Object.keys(w.meta).filter(k => w.meta[k].lantern);
           out.n = keys.length; out.rgs = keys.map(k => w.meta[k].lantern).sort();
           const [x, y] = keys.find(k => w.meta[k].lantern === 'plains').split(',').map(Number), side = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) => { const c = wTileAt(w, x + dx, y + dy); return c && DB.tiles[c].walk && !DB.tiles[c].enter; });
-          wEnterMap('u:world', x + side[0], y + side[1]); RUN.hp = 5; wTryMove(-side[0], -side[1]); wDrain();
+          wEnterMap('u:world', x + side[0], y + side[1]); RUN.hp = 5; for (const q of wRoster()) q.legs = 6; WG.grace = 0; wTryMove(-side[0], -side[1]); wDrain();
           out.modal = !!document.getElementById('wUmbRest'); document.getElementById('wUmbRest').click();
+          out.legs = wRoster().map(q => q.legs); out.grace = WG.grace;
           out.rest = { hp: RUN.hp === RUN.maxhp, hour: Math.floor(WG.min / 60), lantern: WG.umbral.lantern && WG.umbral.lantern.rg, at: [WG.umbral.lantern.x, WG.umbral.lantern.y, WG.x, WG.y] };
           return out; })()""")
         check(ln['n'] == 5 and ln['rgs'] == ['bloom', 'ember', 'plains', 'rime', 'tide'], 'there is a lantern in each of the five regions', ln)
+        check(all(l == 6 - 4 for l in ln['legs']) and ln['grace'] > 0, 'it rests tired legs as a bed does, and the dark lets you be for a few steps', ln)
         check(ln['modal'] and ln['rest']['hp'] and ln['rest']['hour'] == 7 and ln['rest']['lantern'] == 'plains' and ln['rest']['at'][:2] == ln['rest']['at'][2:], 'resting by one passes the night, makes your team whole, and remembers it', ln)
 
         bo = await pg.evaluate("""(() => { const out = {}, U = WG.umbral, here = [U.lantern.map, U.lantern.x, U.lantern.y];
@@ -97,8 +102,11 @@ async def main():
           out.dark = !!(WG.fogs && WG.fogs['u:world']) && wMapSeenCount('u:world') > 0; out.lightSame = WG.fog === f0; out.count = wMapSeenCount() === wMapSeenCount('u:world');
           wOpenMap('world'); out.cv = (document.getElementById('wMapCv') || {}).width > 0; document.querySelector('#modalBox [data-close]').click();
           const n0 = WLOG.length, rnd = Math.random; Math.random = () => 0; WG.step = 9; wAmbient(MAPS['u:mossgate']); Math.random = rnd; out.amb = WLOG.slice(n0).map(l => l[0]);
+          wEnterMap('u:mossgate', MAPS['u:mossgate'].spawn[0], MAPS['u:mossgate'].spawn[1]); out.camp = wCanCamp();
+          WG.npc['u:mossgate'] = [[0, 0]]; wApplyNpcs('u:mossgate'); out.stale = !WG.npc['u:mossgate'];
           out.audit = wAudit(); return out; })()""")
         check(mp['dark'] and mp['lightSame'] and mp['count'] and mp['cv'], 'the dark world has its own fog and its own map, and leaves the light one\'s alone', mp)
+        check('lantern' in mp['camp'] and 'inn' in mp['camp'] and mp['stale'], 'camping in a dark town points you to a lantern; saved places that no longer fit a dark town are dropped', mp)
         check(len(mp['amb']) == 1 and mp['audit'] == [], 'a dark town has its own lines; the audit walks every dark map clean', mp)
         await pg.screenshot(path='/tmp/umbral_town.png')
         check(not errs, 'no page errors', errs[:5])

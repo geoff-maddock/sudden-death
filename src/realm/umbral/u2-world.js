@@ -20,7 +20,8 @@
    The audit walks every dark map: every person, sign and lantern can be reached, and every place on the dark world.
 
    W_UMB2, wUmbWrong, wUmbDouble, wUmbShop, wUmbLantern
-   Wraps: wUmbralMap (wWU2UmbralMap: the towns' counters, signs, doubles, the mirror), buildAllMaps (wWU2BuildAllMaps:
+   Wraps: wUmbralMap (wWU2UmbralMap: the towns' counters, signs, doubles, fronts, the mirror), wCanCamp (wWU2CanCamp: no
+   inn here), wApplyNpcs (wWU2ApplyNpcs: a dark town's saved places that no longer fit are dropped), buildAllMaps (wWU2BuildAllMaps:
    the lanterns), wRunAct (wWU2RunAct: the dark shop), wUse (wWU2Use: a lantern), wBlackout (wWU2Blackout: waking on
    this side), wAmbient (wWU2Ambient: the dark towns' lines), wMapRevealHere (wWU2MapRevealHere: the dark fog),
    wMapHere (wWU2MapHere), wMapDraw (wWU2MapDraw: the dark world's map), wMapSeenCount (wWU2MapSeenCount), wAudit
@@ -73,6 +74,11 @@ function wUmbWrong(text) {
   const [i, w, to] = hits[wUmbHash(text) % hits.length], out = w[0] === w[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to;
   return text.slice(0, i) + out + text.slice(i + w.length);
 }
+// a sign's words gone wrong: a short name spelt backwards, a word turned, or else its first word spelt backwards
+function wUmbWrongSign(text) {
+  const t = wUmbWrong(text); if (!W_UMB2.after.some(a => t === text + ' ' + a)) return t;
+  const m = text.match(/[A-Za-z]{3,}/); return m ? text.slice(0, m.index) + m[0].split('').reverse().join('') + text.slice(m.index + m[0].length) : text;
+}
 // a name misspelt: two letters of its longest word swapped
 function wUmbMisspell(name) {
   const ws = name.split(' '), k = ws.reduce((b, w, i) => w.length > ws[b].length ? i : b, 0), w = ws[k];
@@ -93,7 +99,8 @@ function wUmbDouble(id) {
     if (t.needNight) d.needNight = 1;
     if (t.act === 'shop') { d.t = 'I sell. Not for gold. Gold is no good here. Fans, or what your players have learned.'; d.act = 'ushop'; }
     else if (t.act === 'inn') d.t = 'Sleep? Not here. Nobody sleeps here. Find a LANTERN if you want to rest.';
-    else if (t.act && /^cup/.test(t.act)) d.t = 'No cups here. Not any more. Not for you.';
+    else if (t.act && /cup/.test(t.act)) d.t = 'No cups here. Not any more. Not for you.';
+    else if (t.act) d.t = 'Not here. Not any more. Whatever you came for, it is on the other side.';
     topics[k] = d;
   }
   if (acts.includes('inn') && !topics.lantern) topics.lantern = { t: 'There is one burning outside town. The dark does not go near it. Rest there, if you can bear the quiet.' };
@@ -111,6 +118,9 @@ function wUmbMirror(u) {
   u.spawn = [fx(u.spawn[0]), u.spawn[1]];
   u.light = u.light.map(l => [fx(l[0]), l[1]].concat(l.slice(2)));
   u.blds = (u.blds || []).map(([bx, by, bw, bh]) => [W - bx - bw, by, bw, bh]);
+  // the buildings' fronts (w103's facade plan: windows, signs, awnings, doors, chimneys)
+  if (u.fac) { const f = {}; for (const k in u.fac) { const [x, y] = k.split(',').map(Number); f[fx(x) + ',' + y] = u.fac[k]; } u.fac = f; }
+  if (u.bldK) u.bldK = u.bldK.map(([bx, by, bw, bh, kind]) => [W - bx - bw, by, bw, bh, kind]);
   return u;
 }
 const wWU2UmbralMap = wUmbralMap;
@@ -123,10 +133,12 @@ wUmbralMap = function (m) {
     if (!W_UMB2.keep.includes(td.use)) continue;
     u.t[y][x] = c;
     const mt = m.meta[x + ',' + y];
-    if (td.use === 'sign' && mt) u.meta[x + ',' + y] = Object.assign({}, mt, { text: wUmbWrong(mt.text || '...') });
+    if (td.use === 'sign' && mt) u.meta[x + ',' + y] = Object.assign({}, mt, { text: wUmbWrongSign(mt.text || '...') });
   }
   u.npcs = m.npcs.map(n => { const id = wUmbDouble(n.id); return id && { id, x: n.x, y: n.y, fixed: !!n.fixed }; }).filter(Boolean);
   u.light = (m.light || []).map(l => l.slice());
+  if (m.fac) u.fac = JSON.parse(JSON.stringify(m.fac));
+  if (m.bldK) u.bldK = m.bldK.map(b => b.slice());
   wUmbMirror(u);
   wSettleSpawn(u);
   return u;
@@ -201,6 +213,9 @@ function wUmbLantern(x, y) {
     <div class="row"><button class="btn" id="wUmbRest">Rest</button></div>`);
   $('wUmbRest').onclick = () => {
     wAdvance((24 * 60 - WG.min) + 7 * 60); RUN.hp = RUN.maxhp;
+    // (tired legs rest as in a bed, and the dark lets you be for a few steps after, as after a night at camp)
+    if (typeof wRestLegs === 'function') wRestLegs(W_FAT.bed);
+    WG.grace = W_ENC.grace;
     U.lantern = { map: m.id, x: WG.x, y: WG.y, rg: mt.lantern || wRegionHere() };
     wLog('You rest by the lantern. Nobody sleeps, quite, but the night passes and your team is whole again. You will wake here if a match goes badly on this side.', 'm');
     wSave(); close(); wDrain();
@@ -236,6 +251,17 @@ wBlackout = function (W, result) {
       () => { if (WG && WG.cardOffer) wShowCardOffer(); else wDrain(); });
     $('wWake').focus(); $('wWake').onclick = () => close();
   }
+};
+
+/* ---------- camping, and people's places, on this side ---------- */
+const wWU2CanCamp = wCanCamp;
+wCanCamp = function () { const m = WG && wCurMap(); if (m && m.umbral && m.kind === 'town') return 'There is no inn on this side, and nobody camps in these streets. Find a lantern, outside town.'; return wWU2CanCamp.apply(this, arguments); };
+// a dark town's saved positions fit its people, or are dropped (a light town's layout that changed changes its copy)
+const wWU2ApplyNpcs = wApplyNpcs;
+wApplyNpcs = function (id) {
+  const m = MAPS[id], s = WG && WG.npc && WG.npc[id];
+  if (m && m.umbral && s && (s.length !== m.npcs.length || s.some(p => { const c = p && m.t[p[1]] && m.t[p[1]][p[0]]; return !c || !(DB.tiles[c] || {}).walk; }))) { delete WG.npc[id]; return; }
+  return wWU2ApplyNpcs.apply(this, arguments);
 };
 
 /* ---------- the dark towns' lines ---------- */
