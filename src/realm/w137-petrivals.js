@@ -11,7 +11,8 @@
    it does.
 
    W_RIVAL_PET, wRivalPetOf(enc)
-   Wrapped: wKickoff (wW137Kickoff: RUN.foePet), wPreGame (wW137PreGame: the line on the match card), renderHelp
+   Wrapped: wKickoff (wW137Kickoff: RUN.foePet), wReturnToWorld and wMatchLost (wW137ReturnToWorld, wW137MatchLost:
+   RUN.foePet cleared as the match ends), wPreGame (wW137PreGame: the line on the match card), renderHelp
    (wW137RenderHelp: #wHelpPetRivals). */
 
 const W_RIVAL_PET = Object.fromEntries(Object.keys(FOE_PETS).map(k => [FOE_PETS[k].club, k]));
@@ -27,6 +28,10 @@ wKickoff = function (enc) {
   RUN.foePet = r ? { kind: r.kind, club: r.club, skill: clamp((enc.world && enc.world.tier) || 1, 1, 3) } : null;
   return wW137Kickoff.apply(this, arguments);
 };
+// (the match over, won or lost: no club's pet hangs about for the next one)
+const wW137ReturnToWorld = wReturnToWorld, wW137MatchLost = wMatchLost;
+wReturnToWorld = function () { if (RUN) RUN.foePet = null; return wW137ReturnToWorld.apply(this, arguments); };
+wMatchLost = function () { if (RUN) RUN.foePet = null; return wW137MatchLost.apply(this, arguments); };
 const wW137PreGame = wPreGame;
 wPreGame = function (enc) {
   wW137PreGame.apply(this, arguments);

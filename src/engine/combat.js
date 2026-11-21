@@ -248,7 +248,7 @@ function hurtPlayer(dmg, e, o = {}) {
   if (e && sv(P, 'thorns') && !e.dead) hurtEnemy(e, sv(P, 'thorns'), { raw: true, src: 'Spikes' });
   if (e && sv(P, 'shoulder') && !e.dead) { hurtEnemy(e, 6, { raw: true, src: 'Shoulder Pads', noScore: 1 }); addSt(P, 'shoulder', -1); }
   if (sv(P, 'rage')) addSt(P, 'str', sv(P, 'rage'));
-  sportEnemyHit(taken, dmg);
+  if (!o.noScore) sportEnemyHit(taken, dmg);
   if (e) { fire('playerHit', { e, taken, dmg }); petSpook(taken); }
   return taken;
 }

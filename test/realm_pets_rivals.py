@@ -47,19 +47,24 @@ async def main():
             await new Promise(r => { const f = () => UI.view !== 'fight' ? r() : setTimeout(f, 20); f(); }); """ + ESC + """ return fp; };
           out.road = await play({ tier: 2, world: { kind: 'event', ref: { rival: 'ironmaw' }, region: 'plains' } });
           out.wild = await play({ tier: 1, world: { kind: 'wild', region: 'plains' } });
-          return out; })()""")
+          out.cleared = RUN.foePet == null; return out; })()""")
+        check(k.pop('cleared', None) is True, 'the club\'s pet is gone once the match is over', k)
         check(k == {'road': {'kind': 'wyvern', 'skill': 2}, 'wild': None}, 'a club\'s match brings its pet (the tier as its skill); any other match has none', k)
 
         t = await pg.evaluate("""(() => { const out = {};
           __rv('wyvern', 3); const lead = foeLead(); out.trait = sv(lead, 'str');
           B.P.block = 99; B.turn = 1; fire('turnEnd'); out.wait = B.foePet.used;
-          B.P.block = 0; const h0 = RUN.hp; fire('turnEnd'); out.used = B.foePet.used; out.hit = h0 - RUN.hp; out.weak = sv(B.P, 'weak');
-          B.foePet.used = true; B.turn = 3; B.P.block = 0; const h1 = RUN.hp; fire('turnEnd'); out.power = h1 - RUN.hp;
+          // (thrown as your turn really ends: its Weak still on you for your next turn)
+          B.P.block = 0; const h0 = RUN.hp; runSteps(endTurn()); out.used = B.foePet.used; out.hit = h0 - RUN.hp > 0; out.weak = sv(B.P, 'weak');
+          // (the hit alone, in a scoring sport: no run for them)
+          __rv('wyvern', 3); B.P.block = 0; B.turn = 1; const sc0 = B.sc.them; fire('turnEnd'); out.noScore = B.foePet.used ? B.sc.them - sc0 : 'not thrown';
+          __rv('wyvern', 3); B.foePet.used = true; B.turn = 3; B.P.block = 0; B.P.st.shoulder = 1; const h1 = RUN.hp, e1 = alive().map(e => e.hp); fire('turnEnd'); out.power = h1 - RUN.hp; out.gear = sv(B.P, 'shoulder') === 1 && alive().every((e, i) => e.hp === e1[i]);
           // (a green side throws it whenever: here on turn 1, whatever the Block)
           const r0 = R; R = () => 0; __rv('griffon', 1, 'blinkpup'); B.P.block = 99; B.turn = 1; fire('turnEnd'); out.green = B.foePet.used; out.spooked = B.pet.spooked; R = r0;
           const snap = JSON.parse(JSON.stringify(B)); out.saved = !!snap.foePet && snap.foePet.used === true;
           return out; })()""")
-        check(t['trait'] >= 2 and t['wait'] is False and t['used'] is True and t['hit'] > 0 and t['weak'] >= 1, 'a skilled side waits for its trick until it hurts (the Wyvern\'s Venom Sting with your Block down); its trait works from the start', t)
+        check(t['trait'] >= 2 and t['wait'] is False and t['used'] is True and t['hit'] and t['weak'] >= 1, 'a skilled side waits for its trick until it hurts (the Wyvern\'s Venom Sting with your Block down); its trait works from the start', t)
+        check(t['gear'] and t['noScore'] == 0, 'a rival pet\'s hit is plain damage: no gear, Spikes or score is set off by it', t)
         check(t['power'] == 4 and t['green'] and t['spooked'] and t['saved'], 'its power on its moment (every third turn); a green side throws its trick whenever; the Griffon\'s Dive spooks your pet; the battle\'s state keeps it', t)
 
         a = await pg.evaluate("""(() => { const out = {};
@@ -67,7 +72,10 @@ async def main():
           __rv('shrieker', 3, 'rustnibbler'); out.blockRust = alive().map(e => e.block);
           __rv('wisp', 3, null); out.weakNo = sv(B.P, 'weak');
           __rv('wisp', 3, 'jellycube'); out.weakJelly = sv(B.P, 'weak');
+          // (the Basilisk's Block comes as your turn begins, and is there to face)
+          __rv('basilisk', 3); runSteps(endTurn()); out.basilisk = B.phase === 'player' ? alive().map(e => e.block).every(b => b >= 2) : 'phase ' + B.phase;
           return out; })()""")
+        check(a['basilisk'] is True, 'the Basilisk\'s Block is there to face on your turn', a)
         check(sum(a['blockRust']) < sum(a['blockNo']) and a['weakJelly'] < a['weakNo'], 'your pet answers it: the Rustnibbler eats the Block it gives, the Jellycube swallows its debuff', a)
 
         ui = await pg.evaluate("""(async () => { LAB = false; const enc = wBuildEncounter({ ids: ['skelss'], type: 'normal', tier: 1, sport: 'baseball', world: { kind: 'event', ref: { rival: 'frostfang' }, region: 'rime' } });
