@@ -20,7 +20,8 @@ def check(ok, what, detail=None):
 
 HELP = r"""
 // a fight against these enemies, with this pet (or none): LAB, so nothing is drawn or saved
-window.__fight = (pet, ids, sport) => { LAB = true; RUN.pet = pet || null; RUN.hp = RUN.maxhp; startCombat(ids || ['skelss', 'thief'], 'normal', sport || 'baseball'); return B; };
+// (a Waxing Crescent: no pet's moon, so the numbers here are the pets' own)
+window.__fight = (pet, ids, sport) => { LAB = true; RUN.pet = pet || null; RUN.hp = RUN.maxhp; RUN.clock = 1 * MOON_EVERY; startCombat(ids || ['skelss', 'thief'], 'normal', sport || 'baseball'); return B; };
 window.__play = () => { let g = 0; while (!B.over && g++ < 60) { REALMBOT(); if (B.over) break; runSteps(endTurn()); } return B.over; };
 0"""
 

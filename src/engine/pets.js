@@ -24,14 +24,16 @@ const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) ||
 /* context (phase 6): a pet is a step stronger, PET.ctx a step, for each that fits the match: one of its sports
    (PETS[k].sports, the sport being played), one of its moons (PETS[k].moon, the sky's phase), its own ground (here: the
    element of the match's region, set by the Realm) and an element its own beats (foe: the other side's, PET_BEATS).
-   Outside the Realm there is no ground or foe, so only the sport and the moon */
+   Outside the Realm there is no ground or foe, so only the sport and the moon. It counts only in a fight: for the pet
+   in it (B.pet), or a copy of it that petText was given; the moon is read once, as the fight begins (moonOn), so what
+   the pet gave at the start and what it says agree. Off the battle screen a pet's numbers are its own */
 const PET_BEATS = { ember: 'bloom', bloom: 'tide', tide: 'ember', aether: 'rime', rime: 'aether' };
 const PET_CTX_NAME = { sport: 'its sport', moon: 'its moon', home: 'its home ground', foe: 'an element it beats' };
 function petCtx(q) {
-  const D = q && PETS[q.kind]; if (!D) return [];
+  const D = q && PETS[q.kind]; if (!D || !B || B.over || !(q === B.pet || q.inFight)) return [];
   const out = [];
-  if (B && D.sports && D.sports.includes(B.sport)) out.push('sport');
-  if (D.moon && !window.SKY_OFF && typeof skyNow === 'function' && D.moon.includes(skyNow().moon)) out.push('moon');
+  if (D.sports && D.sports.includes(B.sport)) out.push('sport');
+  if (q.moonOn) out.push('moon');
   if (q.here && q.here === D.el) out.push('home');
   if (q.foe && PET_BEATS[D.el] === q.foe) out.push('foe');
   return out;
@@ -41,7 +43,8 @@ function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Ma
 function petBegin() {
   const rp = RUN && RUN.pet; B.pet = null;
   if (!rp || !PETS[rp.kind]) return;
-  B.pet = { kind: rp.kind, name: rp.name || PETS[rp.kind].n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, here: rp.here || null, foe: rp.foe || null, used: false, spooked: false, t: {}, f: {} };
+  const D = PETS[rp.kind], moonOn = !!(D.moon && !window.SKY_OFF && typeof skyNow === 'function' && D.moon.includes(skyNow().moon));
+  B.pet = { kind: rp.kind, name: rp.name || D.n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, here: rp.here || null, foe: rp.foe || null, moonOn, used: false, spooked: false, t: {}, f: {} };
 }
 // a pet's effect said: on screen and in the log
 function petSay(t) { fx({ k: 'pet', t: `${petName()}: ${t}` }); log(`${petName()}: ${t}`, 'good'); }
@@ -114,6 +117,6 @@ function petTrick(ti) {
 // (st: the pet in a fight, whose ground and foe count; its numbers then include what suits it, ctx naming each)
 function petText(kind, b, hungry, st) {
   const D = PETS[kind]; if (!D) return null;
-  const p = { kind, bond: b || 1, hungry: !!hungry, here: st ? st.here : null, foe: st ? st.foe : null }, say = x => typeof x === 'function' ? x(p) : x;
+  const p = { kind, bond: b || 1, hungry: !!hungry, here: st ? st.here : null, foe: st ? st.foe : null, moonOn: st ? !!st.moonOn : false, inFight: !!st }, say = x => typeof x === 'function' ? x(p) : x;
   return { n: D.n, from: D.from, el: D.el, ctx: st ? petCtx(p).map(k => PET_CTX_NAME[k]) : [], trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
 }

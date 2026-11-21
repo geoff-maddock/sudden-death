@@ -28,7 +28,7 @@ const PETS = {
     trait: { d: p => `Your first attack card each fight: each of its hits deals ${pv(3, p)} more.`, atk: (card, e, p) => !p.f.peck1 && card && def(card).type === 'atk' ? pv(3, p) : 0, on: { attackPlayed: (c, p) => { p.f.peck1 = 1; } } },
     powers: [
       { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, spend: (a, p) => { p.t.peck = 1; }, then: (c, p) => { const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
-      { at: 1, d: p => `In football, your first touchdown each fight: ${pv(1, p)} Strength.`, on: { score: { when: (a, p) => B.sport === 'football' && a && a.side === 0 && a.what === 'touchdown' && !p.f.td, then: (a, p) => { p.f.td = 1; addSt(B.P, 'str', pv(1, p)); petSay(`struts after the touchdown: +${pv(1, p)} Strength`); } } } },
+      { at: 1, d: p => `In football, your first touchdown each fight: ${pv(1, p)} Strength.`, on: { score: { when: (a, p) => B.sport === 'football' && a && a.side === 0 && a.what === 'touchdown' && !p.f.td, then: (a, p) => { p.f.td = 1; addSt(B.P, 'str', pv(1, p)); petSay(`struts after the touchdown: +${pv(1, p)} Strength.`); } } } },
       { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
     ],
     trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },

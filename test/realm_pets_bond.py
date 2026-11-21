@@ -70,11 +70,11 @@ async def main():
           const focused = document.activeElement === bb && document.body.contains(bb);
           const inplace = document.getElementById('wPshopGold').textContent === 'Gold: ' + RUN.gold + '.' && document.getElementById('wBiscN').textContent === String(WG.items.pettreat);
           // (bought down to under a biscuit's price: what it can't afford turns off)
-          RUN.gold = 9; bb.click(); const off = bb.disabled && [...document.querySelectorAll('#modalBox [data-psbuy]')].every(b => b.disabled); RUN.gold = 50 - 16;
+          const paid = 50 - RUN.gold; RUN.gold = 9; bb.click(); const third = 9 - RUN.gold; const off = bb.disabled && [...document.querySelectorAll('#modalBox [data-psbuy]')].every(b => b.disabled);
           // (two bought: one Escape closes the window, and leaves no other behind)
           let drains = 0; const d0 = wDrain; wDrain = function () { drains++; return d0.apply(this, arguments); }; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); const closed = document.getElementById('modal').hidden; modal('<p>x</p>'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); wDrain = d0;
-          return { got: (WG.items.pettreat || 0) - n0 - 1, paid: 50 - RUN.gold, closed, drains, focused, inplace, off }; })()""")
-        check(sh == {'got': 2, 'paid': 16, 'closed': True, 'drains': 1, 'focused': True, 'inplace': True, 'off': True}, 'the pet shops sell pet biscuits, the window open between buys, with no listener left behind', sh)
+          return { got: (WG.items.pettreat || 0) - n0 - 1, paid, third, closed, drains, focused, inplace, off }; })()""")
+        check(sh == {'got': 2, 'paid': 16, 'third': 8, 'closed': True, 'drains': 1, 'focused': True, 'inplace': True, 'off': True}, 'the pet shops sell pet biscuits, the window open between buys, with no listener left behind', sh)
 
         # (a real card match in the world, won: the bond point comes)
         await pg.evaluate("(() => { const q = wPets().owned.find(x => x.kind === 'hootling'); wPetSide(q.id); q.xp = 0; q.bond = 1; q.hungry = false; wPetSync(); RUN.hp = 999; RUN.maxhp = 999; WG.grace = 99; startMatch({ ids: ['skelss'], type: 'normal', tier: 1, card: false, sport: 'baseball', world: { kind: 'wild', region: 'plains' } }); })()")

@@ -36,19 +36,25 @@ async def main():
 
         c = await pg.evaluate("""(() => { const out = {}; RUN.clock = 0; // (the new moon: only the Imp's)
           beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' });
-          const q = (kind, o) => Object.assign({ kind, bond: 1, hungry: false }, o || {});
+          const q = (kind, o) => Object.assign({ kind, bond: 1, hungry: false, inFight: true }, o || {});
           out.none = [petCtx(q('frostpup')), petPow(8, q('frostpup'))];
           B.sport = 'hockey'; out.sport = [petCtx(q('frostpup')), petPow(8, q('frostpup'))];
           out.home = [petCtx(q('frostpup', { here: 'rime' })), petPow(8, q('frostpup', { here: 'rime' }))];
           out.foe = [petCtx(q('frostpup', { here: 'rime', foe: 'aether' })), petPow(8, q('frostpup', { here: 'rime', foe: 'aether' }))];
           out.notFoe = petCtx(q('frostpup', { foe: 'tide' }));
-          RUN.clock = 4 * MOON_EVERY; out.moon = petCtx(q('hootling')); window.SKY_OFF = true; out.skyOff = petCtx(q('hootling')); window.SKY_OFF = false;
-          out.all = petPow(8, q('frostpup', { here: 'rime', foe: 'aether' }));
-          RUN.clock = 0; out.imp = petCtx(q('imp'));
+          // (the moon is read as a fight begins)
+          RUN.clock = 4 * MOON_EVERY; RUN.pet = { kind: 'hootling', name: 'H', bond: 1 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'hockey' }); out.moon = petCtx(B.pet).filter(k => k === 'moon');
+          RUN.clock = 5 * MOON_EVERY; out.moonHeld = petCtx(B.pet).filter(k => k === 'moon');
+          window.SKY_OFF = true; RUN.clock = 4 * MOON_EVERY; beginFight({ ids: ['skelss'], type: 'normal', sport: 'hockey' }); out.skyOff = petCtx(B.pet).filter(k => k === 'moon'); window.SKY_OFF = false;
+          // (off the battle screen, and once a fight is over, a pet's numbers are its own)
+          out.off = petCtx({ kind: 'frostpup', bond: 1 }).length === 0 && petPow(8, { kind: 'frostpup', bond: 1 }) === 8; B.over = 'win'; out.over = petCtx(B.pet).length === 0; B.over = null; B.sport = 'hockey';
+          out.all = petPow(8, q('frostpup', { here: 'rime', foe: 'aether', moonOn: true }));
+          RUN.clock = 0; RUN.pet = { kind: 'imp', name: 'I', bond: 1 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'hockey' }); out.imp = petCtx(B.pet);
           out.data = Object.keys(PETS).filter(k => !(PETS[k].sports || []).length || (PETS[k].sports || []).some(s => !SPORTS[s]) || (PETS[k].moon || []).some(i => !MOON[i]));
           out.beats = Object.keys(PET_BEATS).every(e => PET_BEATS[PET_BEATS[e]] !== e || ['aether', 'rime'].includes(e));
           return out; })()""")
         check(c['none'] == [[], 8] and c['sport'] == [['sport'], 10] and c['home'] == [['sport', 'home'], 12] and c['foe'] == [['sport', 'home', 'foe'], 14], 'each thing that suits a pet makes it 25% stronger: its sport, its ground, a foe it beats', c)
+        check(c['off'] and c['over'] and c['moonHeld'] == ['moon'], 'off the battle screen, or once a fight is over, a pet\'s numbers are its own; the moon holds for the fight', c)
         check(c['notFoe'] == ['sport'] and c['moon'] == ['moon'] and c['skyOff'] == [] and c['all'] == 16 and c['imp'] == ['moon'], 'one of its moons counts (the Full Moon for the Hootling and the Frostpup, the New Moon for the Imp); a foe it doesn\'t beat doesn\'t', c)
         check(c['data'] == [] and c['beats'], 'every pet has its sports, and its moons are real phases', c)
 
@@ -72,7 +78,7 @@ async def main():
         await pg.evaluate(ESC)
 
         tab = await pg.evaluate("""(async () => { wOpenCamp('pets'); await new Promise(r => { const f = () => document.querySelector('#wCampBody .wpetctx') ? r() : setTimeout(f, 20); f(); });
-          const t = [...document.querySelectorAll('#wCampBody .wpetctx')].map(x => x.textContent).join(' | '); """ + ESC + """ return { golf: /Stronger in Golf/.test(t), moon: /Full Moon/.test(t), beats: /against Tide teams/.test(t) }; })()""")
+          const t = [...document.querySelectorAll('#wCampBody .wpetctx')].map(x => x.textContent).join(' | '); """ + ESC + """ return { golf: /Stronger in Golf/.test(t), moon: /Full Moon/.test(t), beats: /edge in Tide country/.test(t) }; })()""")
         check(tab == {'golf': True, 'moon': True, 'beats': True}, 'the Pets tab says what suits each pet', tab)
         await pg.evaluate("showPage('help')")
         hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpPetCtx'); return !!h && ['sports', 'moons', 'region', 'ember beats bloom', '25%'].every(w => h.textContent.includes(w)); })()")

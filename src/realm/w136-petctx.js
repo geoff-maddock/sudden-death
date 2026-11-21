@@ -5,7 +5,8 @@
    sports, one of its moons, its own ground, and the other side's element when its own beats it (PET_BEATS: ember
    beats bloom, bloom tide, tide ember; aether and rime beat each other). The engine knows the sport and the sky; the
    Realm tells it the ground and the foe: at kickoff, RUN.pet gets here and foe, the element of the match's region
-   (W_PET_REGION_EL: the plains are aether), since a region's teams play in its element.
+   (W_PET_REGION_EL: the plains are aether), since a region's teams play in its element. So in the Realm a pet is either
+   at home or has the edge, never both: its own region, or one whose element its own beats.
    The Pets tab says each pet's sports and moons, and what beats what; How to play explains.
 
    W_PET_REGION_EL
@@ -22,7 +23,7 @@ wKickoff = function (enc) {
 const wW136PetCard = wPetCard;
 wPetCard = function (q, side) {
   const D = PETS[q.kind], sp = (D.sports || []).map(s => SPORTS[s] ? SPORTS[s].n : s), mo = (D.moon || []).map(i => MOON[i] ? MOON[i].n : '');
-  const line = `<small class="wnst wpetctx">Stronger in ${sp.length ? esc(sp.join(' and ')) : 'no sport in particular'}${mo.length ? `, under a ${esc(mo.join(' or '))}` : ''}, at home in its own region, and against ${esc(DB.elems.names[PET_BEATS[D.el]] || PET_BEATS[D.el])} teams.</small>`;
+  const line = `<small class="wnst wpetctx">Stronger in ${sp.length ? esc(sp.join(' and ')) : 'no sport in particular'}${mo.length ? `, under a ${esc(mo.join(' or '))}` : ''}, at home in its own region, and with the edge in ${esc(DB.elems.names[PET_BEATS[D.el]] || PET_BEATS[D.el])} country.</small>`;
   return wW136PetCard(q, side).replace('<small class="hint">', line + '<small class="hint">');
 };
 const wW136RenderHelp = renderHelp;
@@ -30,5 +31,5 @@ renderHelp = function () {
   wW136RenderHelp();
   const h = $('wHelpPetBond') || $('wHelpPets'); if (!h || $('wHelpPetCtx')) return;
   const n = Math.round(PET.ctx * 100);
-  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetCtx"><b>Pets in context.</b> A pet is ${n}% stronger for each thing about a match that suits it: one of its sports, one of its moons, its own region (its element's), and teams of an element its own beats (ember beats bloom, bloom beats tide, tide beats ember; aether and rime beat each other). A region's teams play in its element. The Pets tab says what suits each pet.</p>`);
+  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetCtx"><b>Pets in context.</b> A pet is ${n}% stronger for each thing about a match that suits it: one of its sports, one of its moons, and where it plays: at home in its own region (its element's), or with the edge in a region whose element its own beats (ember beats bloom, bloom beats tide, tide beats ember; aether and rime beat each other), since a region's teams play in its element. The Pets tab says what suits each pet.</p>`);
 };
