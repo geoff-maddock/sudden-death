@@ -1073,17 +1073,18 @@ function wDrawMap(c, mapId, camX, camY, vw, vh, t, opts) {
   c.beginPath(); c.rect(ox, oy, W, H); c.clip();
   c.imageSmoothingEnabled = false;
   // the void beyond the map
-  c.fillStyle = m.kind === 'dungeon' ? '#07060a' : m.kind === 'town' ? '#14100d' : '#163a4e'; c.fillRect(ox, oy, W, H);
+  // (a map may name its own: m.voidCol, and the world's sea palette m.sea, a WINK id; the Umbral's do)
+  c.fillStyle = m.voidCol || (m.kind === 'dungeon' ? '#07060a' : m.kind === 'town' ? '#14100d' : '#163a4e'); c.fillRect(ox, oy, W, H);
   const mw = Math.round(m.w * WTILE * sd), mh = Math.round(m.h * WTILE * sd);
   // live water under the whole map (the world's ocean runs past its edge)
   if (L.water) {
-    const fr = Math.floor(t * 5) % 12, F = wFluid('~', m.kind === 'world' ? WINK.plains.water : P0.water, sd, fr);
+    const SEA = WINK[m.sea] || WINK.plains, fr = Math.floor(t * 5) % 12, F = wFluid('~', m.kind === 'world' ? SEA.water : P0.water, sd, fr);
     F.pat.setTransform(new DOMMatrix([1, 0, 0, 1, bx, by]));
     c.fillStyle = F.pat;
     if (m.kind === 'world') {
       c.fillRect(ox, oy, W, H);
       // the open sea past the map's edge gets the same deep-water tint the chunks bake in
-      const wc = rgbOf(WINK.plains.water), out = new Path2D(); out.rect(ox, oy, W, H); out.rect(bx, by, mw, mh);
+      const wc = rgbOf(SEA.water), out = new Path2D(); out.rect(ox, oy, W, H); out.rect(bx, by, mw, mh);
       c.fillStyle = `rgba(${Math.round(wc[0] * .4 + 7)},${Math.round(wc[1] * .4 + 24)},${Math.round(wc[2] * .4 + 43)},.34)`; c.fill(out, 'evenodd');
     } else c.fillRect(Math.max(ox, bx), Math.max(oy, by), Math.min(ox + W, bx + mw) - Math.max(ox, bx), Math.min(oy + H, by + mh) - Math.max(oy, by));
   }
