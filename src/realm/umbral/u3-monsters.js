@@ -161,7 +161,7 @@ wRunAct = function (act, id) {
 // each champion stands on their map, on the free tile nearest their spot that keeps everything reachable
 function wUmbPlaceChamps() {
   for (const id in W_NADIR) {
-    const C = W_NADIR[id], m = MAPS[C.map]; if (!m || m.npcs.some(n => n.id === C.char)) continue;
+    const C = W_NADIR[id], m = MAPS[C.map]; if (!m || C.ground || m.npcs.some(n => n.id === C.char)) continue; // (a dark ground's champion: u4 places them)
     const s = bfsReach(m, m.spawn[0], m.spawn[1]), [hx, hy] = C.at;
     const ok = (x, y) => { const c = m.t[y] && m.t[y][x], td = c && DB.tiles[c]; return td && td.walk && !td.enter && c !== '=' && !m.npcs.some(n => n.x === x && n.y === y) && !m.meta[x + ',' + y] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => s[(y + dy) * m.w + x + dx]); };
     let at = null;
