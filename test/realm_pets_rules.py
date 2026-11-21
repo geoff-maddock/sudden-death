@@ -127,9 +127,11 @@ async def main():
           // (below half, a blocked hit: no roar; then a hit that lands: a roar, once)
           __fight({ kind: 'hootling', bond: 2 }); let s0 = sv(B.P, 'str'); RUN.hp = Math.floor(RUN.maxhp * .4); B.P.block = 99; hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0);
           B.P.block = 0; hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0); hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0);
+          // (a hit that takes you from above half to below it: a roar)
+          __fight({ kind: 'hootling', bond: 2 }); s0 = sv(B.P, 'str'); RUN.hp = Math.floor(RUN.maxhp * .55); B.P.block = 0; hurtPlayer(Math.ceil(RUN.maxhp * .1), alive()[0]); out.push(sv(B.P, 'str') - s0);
           // (above half, a hit that lands: none)
           __fight({ kind: 'hootling', bond: 2 }); s0 = sv(B.P, 'str'); RUN.hp = RUN.maxhp; B.P.block = 0; hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0); return out; })()""")
-        check(ho[0] == 0 and ho[1] >= 1 and ho[2] == ho[1] and ho[3] == 0, 'the Hootling roars on the first enemy hit you take below half HP, once (not a blocked one, nor one above half)', ho)
+        check(ho[0] == 0 and ho[1] >= 1 and ho[2] == ho[1] and ho[3] >= 1 and ho[4] == 0, 'the Hootling roars on the first enemy hit that leaves you below half HP, once (one that crosses half too; not a blocked one, nor one above half)', ho)
         check(pd == {'first': [False, 0], 'second': 3}, 'a once-a-fight power the spook stops waits: the Pseudodragon\'s Regen comes the next turn', pd)
         check(not errs, 'no page errors', errs[:5])
         await br.close()

@@ -1387,9 +1387,9 @@ turn, Weak on every enemy at each kill, and in bond rounding a 1 up to 2 at bond
   - Mephitling: hand Block 1 a card, at most 4; its sulk 1 Strength; Frost Puff Weak 1 and 4 Block.
   - Hippogriff: late Block 2.
   - Rustnibbler: Rust strips Block, not Strength.
-  - Hootling: its Strength comes the first time you fall below half HP, not at the start.
+  - Hootling: its Strength comes on the first enemy hit that leaves you below half HP, not at the start.
 
-**After (100 runs each, skilled bot, rival pets on).** About ±5 points of noise on the champion rate at this size.
+**After (100 runs each, skilled bot, rival pets on).** About ±5 points of noise on the champion rate at this size. (The Hootling's row is from after its trait settled on the first enemy hit that leaves you below half HP; no pet in that batch: 76%, 30.1%.)
 
 | setup | champion | blackouts | match win | HP lost a match |
 |---|---|---|---|---|
@@ -1397,7 +1397,7 @@ turn, Weak on every enemy at each kill, and in bond rounding a 1 up to 2 at bond
 | Blinkpup | 85% | 2.3 | 95.6% | 25.4% |
 | Pseudodragon | 88% | 2.2 | 95.8% | 26.2% |
 | Axebeak Chick | 87% | 2.0 | 96.2% | 25.5% |
-| Hootling | 85% | 1.8 | 96.6% | 28.4% |
+| Hootling | 92% | 1.5 | 97.0% | 27.4% |
 | Sprite in a Jar | 81% | 2.5 | 95.4% | 27.4% |
 | Bog Frog | 75% | 2.9 | 94.7% | 27.9% |
 | Chestnut | 85% | 2.7 | 95.0% | 28.0% |

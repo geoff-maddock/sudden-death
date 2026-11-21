@@ -101,7 +101,8 @@ function drawFight(c, dt) {
   // the pets: yours in front of your team, a rival club's in front of theirs (ui/fight/pet-draw.js)
   if (B.pet && typeof drawPetFig === 'function') draws.push({ y: 440, f: () => drawPetFig(c, B.pet.kind, 420, 440, now, { act: now - (entA('pet').act || -9), spooked: B.pet.spooked }) });
   // (a rival's pet stands clear of their first player, however many there are)
-  if (B.foePet && typeof drawPetFig === 'function') { const fx0 = Math.min(500, (lay.length ? Math.min(...lay.map(L => L.x)) : 560) - 66); draws.push({ y: 446, f: () => drawPetFig(c, B.foePet.kind, fx0, 446, now, { flip: true, foe: true, act: now - (entA('foepet').act || -9) }) }); }
+  // (it glides there as the field changes, as the players do, and keeps clear of your own pet)
+  if (B.foePet && typeof drawPetFig === 'function') { const fa = entA('foepet'), fx0 = Math.max(480, Math.min(500, (lay.length ? Math.min(...lay.map(L => L.x)) : 560) - 66)); fa.x = fa.x == null ? fx0 : lerp(fa.x, fx0, Math.min(1, dt * 6)); draws.push({ y: 446, f: () => drawPetFig(c, B.foePet.kind, fa.x, 446, now, { flip: true, foe: true, act: now - (fa.act || -9) }) }); }
   list.forEach((e, i) => {
     const L = lay[i], a = entA(e.uid);
     if (a.x == null) a.x = L.x; a.x = lerp(a.x, L.x, Math.min(1, dt * 6)); a.y = L.y;
@@ -215,7 +216,7 @@ function consumeFx() {
       case 'bat': case 'drive': case 'strike': case 'bell': sportPop(f); break;
       case 'say2': A.pops.push({ x: 480, y: 250, t: f.t, col: '#ffd166', t0: A.t + delay, life: 1.1, size: 30 }); delay += .1; break;
       // a pet's effect (engine/pets.js): over your side, in its element's colour, with a little chirp
-      case 'pet': { const e0 = f.side ? alive()[0] : null, p = f.side ? (e0 ? ep(e0.uid) : { x: 720, y: 220 }) : partyPt(), D = f.side ? (B.foePet && FOE_PETS[B.foePet.kind]) : (B.pet && PETS[B.pet.kind]); A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); entA(f.side ? 'foepet' : 'pet').act = A.t + delay; tone(880, .08, 'sine', .03, 300, delay); delay += .15; break; }
+      case 'pet': { const p = f.side ? { x: entA('foepet').x || 490, y: 400 } : partyPt(), D = f.side ? (B.foePet && FOE_PETS[B.foePet.kind]) : (B.pet && PETS[B.pet.kind]); A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); entA(f.side ? 'foepet' : 'pet').act = A.t + delay; tone(880, .08, 'sine', .03, 300, delay); delay += .15; break; }
     }
   }
 }
