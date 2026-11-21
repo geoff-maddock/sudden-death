@@ -5,8 +5,7 @@
    chirp), an egg cracking (two taps and a chirp), a bond level reached (a chime), a treat given (a crunch). What a pet
    does in a match already chirps (the 'pet' fx in ui/fight/scene.js).
    Tips: TIPS.w_pet with your first pet (the Pets tab, the trick's key), TIPS.w_petegg with your first pet egg (where
-   it hatches), TIPS.w_pethungry the first time a pet goes hungry (feed it, or a treat): noted as the week turns
-   (WG.petHungryTip, only while tips are on and it is unseen) and shown once you are on the map, if a pet is still hungry.
+   it hatches), TIPS.w_pethungry while a pet is hungry (feed it, or a treat); each shown on the map, once (tip()).
    Medals, on SD's ACH: pets of different kinds owned (realmPetKinds, a set), a full kennel (realmKennelFull), pets
    that reach bond 3 (realmPetBond3), hatching places used (realmHatchPlaces, a set) and tricks thrown in matches
    (realmPetTricks).
@@ -16,7 +15,7 @@
    wPetSound(k)
    Wraps: wPetJoined (wW138PetJoined: the chirp, the kinds and the full kennel, however a pet joins), wPeggHatch (wW138PeggHatch: the crack, the
    places), wPetBondXp (wW138PetBondXp: the chime, bond 3), wPetTreat (wW138PetTreat: the crunch), petTrick
-   (wW138PetTrick: tricks thrown), wPetUpkeep (wW138PetUpkeep: notes the hungry tip, WG.petHungryTip). */
+   (wW138PetTrick: tricks thrown). */
 
 function wPetSound(k) {
   if (LAB || !SET.sfx) return;
@@ -49,9 +48,6 @@ wPetTreat = function () { const why = wW138PetTreat.apply(this, arguments); if (
 // (a trick thrown in a match from the world: petTrick says false when it couldn't be)
 const wW138PetTrick = petTrick;
 petTrick = function () { const r = wW138PetTrick.apply(this, arguments); if (r !== false && WG && !LAB) achAdd('realmPetTricks', 1); return r; };
-const wW138PetUpkeep = wPetUpkeep;
-// (noted as the week turns; shown by wPetTips once you are on the map)
-wPetUpkeep = function () { const r = wW138PetUpkeep.apply(this, arguments); if (!LAB && SET.tips && !TIPS_SEEN.includes('w_pethungry') && wPets().owned.some(q => q.hungry)) WG.petHungryTip = 1; return r; };
 
 Object.assign(TIPS, {
   w_pet: ['Your pet', 'Your pet fights beside you in card matches. The Pets tab on the Team screen (C) shows what it does and which one goes with you. In a match, its trick is the button by its name, or T, once a match.'],
@@ -61,7 +57,7 @@ Object.assign(TIPS, {
 function wPetTips() {
   if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
   if (WG.pets && WG.pets.owned.length) tip('w_pet');
-  if (WG.petHungryTip) { delete WG.petHungryTip; if (wPets().owned.some(q => q.hungry)) tip('w_pethungry'); }
+  if (WG.pets && WG.pets.owned.some(q => q.hungry)) tip('w_pethungry');
   if (typeof W_PEGG !== 'undefined' && Object.keys(W_PEGG.eggs).some(k => wHas(wPeggItem(k)))) tip('w_petegg');
 }
 setInterval(wPetTips, 900);

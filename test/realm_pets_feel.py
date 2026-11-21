@@ -52,7 +52,8 @@ async def main():
           // (an egg hatched into the full kennel, swapped in: no welcome chirp, as it had its crack)
           WG.petEggs = { bloom: { kind: 'sprite', due: WG.dayAbs } }; __snd.length = 0; wPeggHatch('bloom'); """ + ESC + """
           { const t2 = Date.now(); await new Promise(r => { const f = () => (!document.getElementById('modal').hidden && document.querySelector('#modalBox [data-petgo]')) || Date.now() - t2 > 3000 ? r() : setTimeout(f, 20); f(); }); }
-          const gone = wPets().owned.find(x => x.kind === 'chestnut'), btn = gone && document.querySelector('#modalBox [data-petgo="' + gone.id + '"]'); if (btn) btn.click();
+          const gone = wPets().owned.find(x => x.kind === 'chestnut'), btn = gone && !document.getElementById('modal').hidden && document.querySelector('#modalBox [data-petgo="' + gone.id + '"]');
+          if (!btn) return { stuck: { where: 'the question for the hatched pet', modal: document.getElementById('modal').hidden, ask: W_PET_ASK.slice() } }; btn.click();
           out.quietSwap = { snd: __snd.slice(), joined: wPets().owned.filter(x => x.kind === 'sprite').length, mark: wPets().owned.some(x => 'quiet' in x) };
           wPetAdd('imp', 'egg:y'); const t0 = Date.now(); await new Promise(r => { const f = () => (!document.getElementById('modal').hidden && document.querySelector('#modalBox [data-petgo]')) || Date.now() - t0 > 3000 ? r() : setTimeout(f, 20); f(); }); if (document.getElementById('modal').hidden || !document.querySelector('#modalBox [data-petgo]')) return { stuck: { modal: document.getElementById('modal').hidden, text: document.getElementById('modalBox').textContent.slice(0, 120), ask: W_PET_ASK.slice(), active: wActive(), talk: !!WUI.talk, view: UI.view, n: wPets().owned.length } };
           document.querySelector('#modalBox [data-petgo="' + wPets().owned.find(x => x.kind === 'bogfrog').id + '"]').click(); out.swap = st().kinds.includes('imp');
