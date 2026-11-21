@@ -3273,9 +3273,9 @@ function sportInit() { B.sc = { us: 0, them: 0, bases: [0, 0, 0], outs: 0, goals
 const scored = () => !!SPORT_UNIT[B.sport];
 function cardHasDmg(d) { const has = ops => ops.some(o => ['d', 'drain', 'dunk', 'bodyslam', 'split', 'drainall', 'bonestorm', 'devour', 'petrify', 'petrifyall', 'execute'].includes(o[0]) || (o[0] === 'roll' && (has(o[2]) || has(o[3])))); return has(d.fx); }
 function cardValue(c) { const d = def(c); if (d.type === 'junk' || d.type === 'curse') return -10; return ({ s: 1, c: 2, u: 3, r: 4, l: 6 }[d.rar] || 1) + (c.up ? 1 : 0) - (d.id === 'check' || d.id === 'hold' ? 1 : 0); }
-function addHL(id) { if (B.sc.hl.includes(id)) return; B.sc.hl.push(id); fx({ k: 'banner', t: HL_NAME[id], sub: 'Highlight: bonus style points', small: 1 }); log(`Highlight: ${HL_NAME[id]}.`, 'good'); }
-function scoreUs(n, what) { B.sc.us += n; credit('p', n); potg(what, n); fx({ k: 'score', side: 0, n, what }); momentumCheck(); }
-function scoreThem(n) { if (n && perkOn('ace')) n *= 2; B.sc.them += n; fx({ k: 'score', side: 1, n }); momentumCheck(); }
+function addHL(id) { if (B.sc.hl.includes(id)) return; B.sc.hl.push(id); fx({ k: 'banner', t: HL_NAME[id], sub: 'Highlight: bonus style points', small: 1 }); log(`Highlight: ${HL_NAME[id]}.`, 'good'); fire('highlight', id); }
+function scoreUs(n, what) { B.sc.us += n; credit('p', n); potg(what, n); fx({ k: 'score', side: 0, n, what }); momentumCheck(); fire('score', { side: 0, n, what }); }
+function scoreThem(n) { if (n && perkOn('ace')) n *= 2; B.sc.them += n; fx({ k: 'score', side: 1, n }); momentumCheck(); fire('score', { side: 1, n }); }
 /* momentum: the score margin pushes the fight. Lead and your hits land harder; trail and theirs do,
    until you are far enough behind that desperation kicks in (Comeback: an extra card every turn). */
 const MOM = { baseball: [2, 4], football: [7, 14], hockey: [2, 3], basketball: [6, 12], jousting: [2, 3], curling: [2, 3], boxing: [1, 2], soccer: [2, 3] };
@@ -3720,17 +3720,32 @@ onHook('fightStart', skyCombatStart);
    eats isn't a kill of yours, for a pet (its enemyFalls skips e.eaten; trophies are as they were).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
-const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15 };
-const PET_EVENTS = ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'attackPlayed', 'enemyFalls', 'fightWon', 'playerAttacked', 'playerHit', 'enemyBlock', 'playerDebuff'];
+const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15, ctx: .25 };
+const PET_EVENTS = ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'attackPlayed', 'enemyFalls', 'fightWon', 'playerAttacked', 'playerHit', 'enemyBlock', 'playerDebuff', 'highlight', 'score'];
 const petDef = p => p && PETS[p.kind] || null;
 const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) || 'Your pet';
 // a pet's number at its bond, smaller when it is hungry (at least 1)
-function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1))); }
+/* context (phase 6): a pet is a step stronger, PET.ctx a step, for each that fits the match: one of its sports
+   (PETS[k].sports, the sport being played), one of its moons (PETS[k].moon, the sky's phase), its own ground (here: the
+   element of the match's region, set by the Realm) and an element its own beats (foe: the other side's, PET_BEATS).
+   Outside the Realm there is no ground or foe, so only the sport and the moon */
+const PET_BEATS = { ember: 'bloom', bloom: 'tide', tide: 'ember', aether: 'rime', rime: 'aether' };
+const PET_CTX_NAME = { sport: 'its sport', moon: 'its moon', home: 'its home ground', foe: 'an element it beats' };
+function petCtx(q) {
+  const D = q && PETS[q.kind]; if (!D) return [];
+  const out = [];
+  if (B && D.sports && D.sports.includes(B.sport)) out.push('sport');
+  if (D.moon && !window.SKY_OFF && typeof skyNow === 'function' && D.moon.includes(skyNow().moon)) out.push('moon');
+  if (q.here && q.here === D.el) out.push('home');
+  if (q.foe && PET_BEATS[D.el] === q.foe) out.push('foe');
+  return out;
+}
+function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
   const rp = RUN && RUN.pet; B.pet = null;
   if (!rp || !PETS[rp.kind]) return;
-  B.pet = { kind: rp.kind, name: rp.name || PETS[rp.kind].n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, used: false, spooked: false, t: {}, f: {} };
+  B.pet = { kind: rp.kind, name: rp.name || PETS[rp.kind].n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, here: rp.here || null, foe: rp.foe || null, used: false, spooked: false, t: {}, f: {} };
 }
 // a pet's effect said: on screen and in the log
 function petSay(t) { fx({ k: 'pet', t: `${petName()}: ${t}` }); log(`${petName()}: ${t}`, 'good'); }
@@ -3800,10 +3815,11 @@ function petTrick(ti) {
   return true;
 }
 // what a pet does, in words (the trait, each power with the bond it opens at, the trick), its numbers at bond b
-function petText(kind, b, hungry) {
+// (st: the pet in a fight, whose ground and foe count; its numbers then include what suits it, ctx naming each)
+function petText(kind, b, hungry, st) {
   const D = PETS[kind]; if (!D) return null;
-  const p = { kind, bond: b || 1, hungry: !!hungry }, say = x => typeof x === 'function' ? x(p) : x;
-  return { n: D.n, from: D.from, el: D.el, trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
+  const p = { kind, bond: b || 1, hungry: !!hungry, here: st ? st.here : null, foe: st ? st.foe : null }, say = x => typeof x === 'function' ? x(p) : x;
+  return { n: D.n, from: D.from, el: D.el, ctx: st ? petCtx(p).map(k => PET_CTX_NAME[k]) : [], trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
 }
 /* The pets (issue #104): small monsters from the D&D 5e SRD (5.1, CC-BY-4.0) or common myth, with a little whimsy. The
    rules are engine/pets.js. Each pet: n (its name), from (what it is), el (its element), rar (c common, u uncommon, r
@@ -3816,57 +3832,58 @@ function petText(kind, b, hungry) {
 const pv = (n, p) => petPow(n, p);
 const petBelow = f => RUN.hp < RUN.maxhp * f;
 const PETS = {
-  blinkpup: { n: 'Blinkpup', from: 'blink dog', el: 'aether', rar: 'c', how: 'shop',
+  blinkpup: { n: 'Blinkpup', from: 'blink dog', el: 'aether', rar: 'c', how: 'shop', sports: ['soccer', 'basketball'],
     trait: { d: p => `Starts each fight with ${pv(1, p)} Footwork.`, on: { fightStart: (a, p) => addSt(B.P, 'dex', pv(1, p)) } },
     powers: [
       { at: 1, d: p => `The first attack aimed at you each turn: it blinks you aside, ${pv(4, p)} Block.`, on: { playerAttacked: { when: (e, p) => !p.t.blink, spend: (a, p) => { p.t.blink = 1; }, then: (e, p) => { B.P.block += pv(4, p); petSay(`blinks you aside: +${pv(4, p)} Block.`); } } } },
       { at: 2, d: 'Your third card in a turn: draw 1.', on: { cardPlayed: { when: () => B.cardsThisTurn === 3, then: () => { B.pendingDraw = (B.pendingDraw || 0) + 1; petSay('fetches you a card.'); } } } },
     ],
     trick: { n: 'Blink Shuffle', tgt: 'self', d: 'Your hand blinks away, and as many new cards blink in.', ops: () => [['audible']] } },
-  pseudodragon: { n: 'Pocket Pseudodragon', from: 'pseudodragon', el: 'aether', rar: 'u', how: 'egg',
+  pseudodragon: { n: 'Pocket Pseudodragon', from: 'pseudodragon', el: 'aether', rar: 'u', how: 'egg', sports: ['jousting'], moon: [2],
     trait: { d: p => `Starts each fight with ${pv(1, p)} Regen.`, on: { fightStart: (a, p) => addSt(B.P, 'regen', pv(1, p)) } },
     powers: [
       { at: 1, d: p => `Once a fight, at the start of a turn below half HP: ${pv(3, p)} Regen.`, on: { turnStart: { when: (a, p) => petBelow(.5) && !p.f.warm, then: (a, p) => { p.f.warm = 1; addSt(B.P, 'regen', pv(3, p)); petSay(`curls round you, warm: ${pv(3, p)} Regen.`); } } } },
       { at: 2, d: p => `When an enemy falls: heal ${pv(2, p)}.`, on: { enemyFalls: (e, p) => healP(pv(2, p)) } },
     ],
     trick: { n: 'Sting', d: p => `${pv(6, p)} damage and Weak ${pv(2, p)} to one enemy.`, ops: p => [['d', pv(6, p)], ['s', 'weak', pv(2, p)]] } },
-  axebeak: { n: 'Axebeak Chick', from: 'axe beak', el: 'aether', rar: 'c', how: 'shop',
+  axebeak: { n: 'Axebeak Chick', from: 'axe beak', el: 'aether', rar: 'c', how: 'shop', sports: ['football'],
     // (every hit of the first attack card: spent once that card has resolved, so a forecast and the hits agree)
     trait: { d: p => `Your first attack card each fight: each of its hits deals ${pv(3, p)} more.`, atk: (card, e, p) => !p.f.peck1 && card && def(card).type === 'atk' ? pv(3, p) : 0, on: { attackPlayed: (c, p) => { p.f.peck1 = 1; } } },
     powers: [
       { at: 1, d: p => `The first attack each turn: it pecks another enemy for ${pv(3, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.peck && alive().length > 0, spend: (a, p) => { p.t.peck = 1; }, then: (c, p) => { const others = alive().filter(e => e.uid !== B.lastTgt), t = pick(others.length ? others : alive()); if (t) { hurtEnemy(t, pv(3, p), { raw: true, src: 'Peck' }); petSay(`pecks ${t.n} for ${pv(3, p)}.`); } } } } },
+      { at: 1, d: p => `In football, your first touchdown each fight: ${pv(1, p)} Strength.`, on: { score: { when: (a, p) => B.sport === 'football' && a && a.side === 0 && a.what === 'touchdown' && !p.f.td, then: (a, p) => { p.f.td = 1; addSt(B.P, 'str', pv(1, p)); petSay(`struts after the touchdown: +${pv(1, p)} Strength`); } } } },
       { at: 2, d: p => `Once a fight, your second attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 2 && !p.f.str, then: (c, p) => { p.f.str = 1; addSt(B.P, 'str', pv(1, p)); petSay(`squawks you on: +${pv(1, p)} Strength.`); } } } },
     ],
     trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },
-  hootling: { n: 'Hootling', from: 'owlbear cub', el: 'bloom', rar: 'u', how: 'keeper',
+  hootling: { n: 'Hootling', from: 'owlbear cub', el: 'bloom', rar: 'u', how: 'keeper', sports: ['golf'], moon: [4],
     trait: { d: p => `Starts each fight with ${pv(1, p)} Strength.`, on: { fightStart: (a, p) => addSt(B.P, 'str', pv(1, p)) } },
     powers: [
       { at: 1, d: p => `Your third attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: () => B.atkCount === 3, then: (c, p) => { addSt(B.P, 'str', pv(1, p)); petSay(`hoots: +${pv(1, p)} Strength.`); } } } },
       { at: 2, d: p => `Below half HP, your attacks deal ${pv(2, p)} more.`, atk: (card, e, p) => card && def(card).type === 'atk' && petBelow(.5) ? pv(2, p) : 0 },
     ],
     trick: { n: 'Bear Hug', d: p => `${pv(14, p)} damage to one enemy. It hugs too hard.`, ops: p => [['d', pv(14, p)]] } },
-  sprite: { n: 'Sprite in a Jar', from: 'sprite', el: 'bloom', rar: 'u', how: 'egg',
+  sprite: { n: 'Sprite in a Jar', from: 'sprite', el: 'bloom', rar: 'u', how: 'egg', sports: ['golf', 'bowling'],
     trait: { d: p => `Draw ${pv(1, p)} more card on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
     powers: [
       { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn.`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four, spend: (a, p) => { p.t.four = 1; }, then: (c, p) => { addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
       { at: 2, d: p => `A debuff lands on you: ${pv(3, p)} Block.`, on: { playerDebuff: (a, p) => { B.P.block += pv(3, p); petSay(`argues the call: +${pv(3, p)} Block.`); } } },
     ],
     trick: { n: 'Recount', tgt: 'self', d: p => `Draw ${pv(2, p)}.`, ops: p => [['draw', pv(2, p)]] } },
-  bogfrog: { n: 'Bog Frog', from: 'giant frog', el: 'bloom', rar: 'c', how: 'egg',
+  bogfrog: { n: 'Bog Frog', from: 'giant frog', el: 'bloom', rar: 'c', how: 'egg', sports: ['golf'],
     trait: { d: p => `Starts each fight with ${pv(5, p)} Block.`, on: { fightStart: (a, p) => { B.P.block += pv(5, p); } } },
     powers: [
       { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, spend: (a, p) => { p.t.tongue = 1; }, then: (a, p) => { const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
       { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn).', on: { enemyFalls: () => { if (B.phase === 'player' && !B.ending) drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
     ],
     trick: { n: 'Gulp', d: p => `Swallows an enemy (not a boss) with ${pv(12, p)} HP or less; any other takes 16 damage.`, ops: p => [['devour', pv(12, p), 0]] } },
-  chestnut: { n: 'Chestnut', from: 'mimic', el: 'tide', rar: 'u', how: 'shop',
+  chestnut: { n: 'Chestnut', from: 'mimic', el: 'tide', rar: 'u', how: 'shop', sports: ['bowling'],
     trait: { d: p => `After a fight you win: ${pv(6, p)} gold (it was holding it).`, on: { fightWon: (a, p) => { RUN.gold += pv(6, p); } } },
     powers: [
       { at: 1, d: p => `A turn with no attack played: it bites a random enemy for ${pv(5, p)}.`, on: { turnEnd: { when: () => B.tt && !B.tt.atk && alive().length > 0, then: (a, p) => { const t = pick(alive()); hurtEnemy(t, pv(5, p), { raw: true, src: 'Chestnut' }); petSay(`bites ${t.n} for ${pv(5, p)}.`); } } } },
       { at: 2, d: p => `When an enemy falls: ${pv(3, p)} gold.`, on: { enemyFalls: (e, p) => { RUN.gold += pv(3, p); } } },
     ],
     trick: { n: 'Lid Snap', d: p => `${pv(12, p)} damage to one enemy.`, ops: p => [['d', pv(12, p)]] } },
-  jellycube: { n: 'Jellycube', from: 'gelatinous cube', el: 'tide', rar: 'u', how: 'shop',
+  jellycube: { n: 'Jellycube', from: 'gelatinous cube', el: 'tide', rar: 'u', how: 'shop', sports: ['curling'],
     trait: { d: 'The first debuff on you each fight sticks to it instead.', on: { playerDebuff: { when: (a, p) => !p.f.sticky, then: (a, p) => { p.f.sticky = 1; petSay(`swallows the ${(ST[a.k] || {}).n || a.k}.`); return true; } } } },
     powers: [
       // (one more than its base: Weak goes down at the end of the attacker's own turn, so this much reaches its next attack)
@@ -3874,49 +3891,49 @@ const PETS = {
       { at: 2, d: p => `End your turn with no cards in hand: ${pv(4, p)} Block.`, on: { turnEnd: { when: () => !B.hand.length, then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
     trick: { n: 'Engulf', d: p => `Weak ${pv(2, p)} and Exposed ${pv(2, p)} to one enemy.`, ops: p => [['s', 'weak', pv(2, p)], ['s', 'vuln', pv(2, p)]] } },
-  hippogriff: { n: 'Hatchling Hippogriff', from: 'hippogriff', el: 'tide', rar: 'u', how: 'egg',
+  hippogriff: { n: 'Hatchling Hippogriff', from: 'hippogriff', el: 'tide', rar: 'u', how: 'egg', sports: ['jousting', 'soccer'],
     trait: { d: p => `${pv(1, p)} more Stamina on the first turn.`, mod: { energy: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
     powers: [
       { at: 1, d: p => `From the fourth turn on, each turn: ${pv(3, p)} Block.`, on: { turnStart: { when: () => B.turn >= 4, then: (a, p) => { gainBlock(pv(3, p), true); } } } },
       { at: 2, d: p => `Your first attack each turn deals ${pv(3, p)} more to the enemy with the most HP.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && alive().every(o => o.hp <= e.hp) ? pv(3, p) : 0 },
     ],
     trick: { n: 'Swoop', d: p => `${pv(5, p)} damage, twice, to one enemy.`, ops: p => [['d', pv(5, p), 2]] } },
-  glowbeetle: { n: 'Glowbeetle', from: 'giant fire beetle', el: 'ember', rar: 'c', how: 'shop',
+  glowbeetle: { n: 'Glowbeetle', from: 'giant fire beetle', el: 'ember', rar: 'c', how: 'shop', sports: ['boxing'],
     trait: { d: p => `A lantern: draw ${pv(2, p)} more on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(2, p) : 0 } },
     powers: [
       { at: 1, d: p => `At the start of each turn: Burn ${pv(1, p)} on a random enemy.`, on: { turnStart: { when: () => alive().length > 0, then: (a, p) => { addSt(pick(alive()), 'burn', pv(1, p)); } } } },
       { at: 2, d: p => `Your first Power each turn: ${pv(1, p)} Stamina.`, on: { cardPlayed: { when: (c, p) => def(c).type === 'pow' && !p.t.pow, spend: (a, p) => { p.t.pow = 1; }, then: (c, p) => { B.energy += pv(1, p); petSay(`glows brighter: +${pv(1, p)} Stamina.`); } } } },
     ],
     trick: { n: 'Flare', tgt: 'all', d: p => `Burn ${pv(4, p)} on every enemy.`, ops: p => [['s', 'burn', pv(4, p), 'all']] } },
-  rustnibbler: { n: 'Rustnibbler', from: 'rust monster', el: 'ember', rar: 'u', how: 'shop',
+  rustnibbler: { n: 'Rustnibbler', from: 'rust monster', el: 'ember', rar: 'u', how: 'shop', sports: ['boxing', 'football'],
     trait: { d: 'The first enemy to gain Block each fight loses what it gained.', on: { enemyBlock: { when: (a, p) => !p.f.rust && a.e && a.e.block > 0, then: (a, p) => { p.f.rust = 1; const n = Math.min(a.e.block, a.n); a.e.block -= n; a.ate = (a.ate || 0) + n; petSay(`eats the ${n} Block ${a.e.n} just raised.`); } } } },
     powers: [
       { at: 1, d: p => `Whenever an enemy gains Block: it nibbles ${pv(2, p)} of what it gained.`, on: { enemyBlock: { when: a => a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, then: (a, p) => { const n = Math.min(a.e.block, a.n - (a.ate || 0), pv(2, p)); if (n > 0) { a.e.block -= n; a.ate = (a.ate || 0) + n; } } } } },
       { at: 2, d: p => `Your first attack each turn on an enemy with no Block deals ${pv(3, p)} more.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && !e.block ? pv(3, p) : 0 },
     ],
     trick: { n: 'Rust', tgt: 'all', d: 'Every enemy loses its Block and its Strength.', ops: () => [['strip']] } },
-  imp: { n: 'Imp-in-Waiting', from: 'imp', el: 'ember', rar: 'u', how: 'egg',
+  imp: { n: 'Imp-in-Waiting', from: 'imp', el: 'ember', rar: 'u', how: 'egg', sports: ['basketball'], moon: [0],
     trait: { d: p => `${pv(1, p)} Spikes all fight.`, on: { fightStart: (a, p) => addSt(B.P, 'thorns', pv(1, p)) } },
     powers: [
       { at: 1, d: p => `Hit for 6 or more: the attacker takes ${pv(3, p)}.`, on: { playerHit: { when: a => a.e && !a.e.dead && a.taken >= 6, then: (a, p) => { hurtEnemy(a.e, pv(3, p), { raw: true, src: 'Imp' }); petSay(`curses ${a.e.n}: ${pv(3, p)} damage.`); } } } },
       { at: 2, d: p => `When an enemy falls: Burn ${pv(2, p)} on another.`, on: { enemyFalls: { when: () => alive().length > 0, then: (e, p) => { addSt(pick(alive()), 'burn', pv(2, p)); } } } },
     ],
     trick: { n: 'Curse', d: p => `Plague ${pv(5, p)} on one enemy.`, ops: p => [['s', 'psn', pv(5, p)]] } },
-  frostpup: { n: 'Frostpup', from: 'winter wolf cub', el: 'rime', rar: 'u', how: 'keeper',
+  frostpup: { n: 'Frostpup', from: 'winter wolf cub', el: 'rime', rar: 'u', how: 'keeper', sports: ['hockey', 'curling'], moon: [4],
     trait: { d: p => `At the start of each fight, the enemy with the most HP is Weak ${pv(1, p)}.`, on: { fightStart: (a, p) => { const t = alive().slice().sort((x, y) => y.hp - x.hp)[0]; if (t) addSt(t, 'weak', pv(1, p)); } } },
     powers: [
       { at: 1, d: 'Every third turn, its breath Stuns a random enemy (a boss is Weak 2 instead).', on: { turnStart: { when: () => B.turn % 3 === 0 && alive().length > 0, then: () => { const t = pick(alive()); resolve([['s', 'stun', 1]], { card: null, tgt: t, d: { tgt: 'one', n: 'Snow Breath', type: 'pet' } }); petSay(`breathes snow on ${t.n}.`); } } } },
       { at: 2, d: p => `Below half HP, each turn: ${pv(4, p)} Block.`, on: { turnStart: { when: () => petBelow(.5), then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
     trick: { n: 'Snow Breath', d: 'Stuns one enemy (a boss is Weak 2 instead).', ops: () => [['s', 'stun', 1]] } },
-  mephitling: { n: 'Mephitling', from: 'ice mephit', el: 'rime', rar: 'c', how: 'egg',
+  mephitling: { n: 'Mephitling', from: 'ice mephit', el: 'rime', rar: 'c', how: 'egg', sports: ['hockey'], moon: [7],
     trait: { d: p => `Once a fight, hit for 10 or more: it sulks you up to ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => a.taken >= 10 && !p.f.sulk, then: (a, p) => { p.f.sulk = 1; addSt(B.P, 'str', pv(2, p)); petSay(`sulks beautifully: +${pv(2, p)} Strength.`); } } } },
     powers: [
       { at: 1, d: p => `End your turn: ${pv(2, p)} Block for each card left in hand (at most ${pv(6, p)}).`, on: { turnEnd: { when: () => B.hand.length > 0, then: (a, p) => { gainBlock(Math.min(pv(6, p), B.hand.length * pv(2, p)), true); } } } },
       { at: 2, d: p => `When an enemy falls: every enemy is Weak ${pv(1, p)}.`, on: { enemyFalls: { when: () => alive().length > 0, then: (e, p) => { for (const o of alive()) addSt(o, 'weak', pv(1, p)); } } } },
     ],
     trick: { n: 'Frost Puff', tgt: 'all', d: p => `Every enemy is Weak ${pv(2, p)}, and you gain ${pv(6, p)} Block.`, ops: p => [['s', 'weak', pv(2, p), 'all'], ['b', pv(6, p)]] } },
-  cockatrice: { n: 'Cockatrice Chick', from: 'cockatrice', el: 'rime', rar: 'r', how: 'egg',
+  cockatrice: { n: 'Cockatrice Chick', from: 'cockatrice', el: 'rime', rar: 'r', how: 'egg', sports: ['jousting'], moon: [6],
     trait: { d: p => `At the start of each fight, a random enemy is Weak ${pv(2, p)}.`, on: { fightStart: (a, p) => { const t = pick(alive()); if (t) addSt(t, 'weak', pv(2, p)); } } },
     powers: [
       { at: 1, d: p => `Your first attack each turn on an enemy still standing leaves it Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare && alive().some(e => e.uid === B.lastTgt), spend: (a, p) => { p.t.stare = 1; }, then: (c, p) => { addSt(alive().find(e => e.uid === B.lastTgt), 'vuln', pv(1, p)); } } } },
@@ -5574,9 +5591,10 @@ document.addEventListener('keydown', ev => {
 const petA = w => /^[aeiou]/i.test(w || '') ? 'an' : 'a';
 const PET_EL_COL = { aether: '#d8c8ff', bloom: '#8fd27a', tide: '#6fc3e8', ember: '#ff9a5a', rime: '#bfe8ff' };
 function petTipHTML() {
-  const p = B.pet, T = petText(p.kind, p.bond, p.hungry); if (!T) return '';
+  const p = B.pet, T = petText(p.kind, p.bond, p.hungry, p); if (!T) return '';
   const pw = T.powers.map(w => `<li${w.open ? '' : ' style="opacity:.55"'}>${w.open ? '' : `<i>(at bond ${w.at})</i> `}${esc(w.d)}</li>`).join('');
   return `<span class="t">${esc(p.name)}</span>${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)}). Bond ${p.bond} of 3.${p.hungry ? ' <b>Hungry:</b> its numbers are about halved (at least 1).' : ''}${p.spooked ? ' <b>Spooked:</b> its next power won\'t fire.' : ''}
+${T.ctx.length ? `<br><b>Suits it today</b> (${Math.round(PET.ctx * 100)}% stronger for each): ${esc(T.ctx.join(', '))}.` : ''}
     <br><b>Always:</b> ${esc(T.trait)}<ul style="margin:4px 0 4px 16px;padding:0">${pw}</ul><b>Trick (T, once a fight):</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}${p.used ? ' <i>(used)</i>' : ''}`;
 }
 function petPanelHTML() {
@@ -62531,6 +62549,40 @@ renderHelp = function () {
   wW135RenderHelp();
   const h = $('wHelpPetShops') || $('wHelpPets'); if (!h || $('wHelpPetBond')) return;
   h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetBond"><b>Bond and treats.</b> A pet's bond (1 to 3) grows with card matches won with it at your side, and faster with treats: each pet has its favourite (the Pets tab says which), and every pet eats pet biscuits from the pet shops. A treat grows its bond once a day, and feeds a hungry pet whenever it is given; one that would do neither isn't given, and the pet at your side waits till the match is over. ${W_PBOND.at[2]} bond points make bond 2, and ${W_PBOND.at[3]} make bond 3; each level makes its trait stronger and opens or lifts a power. Bond never goes down, but a hungry pet's doesn't grow.</p>`);
+};
+/* w136: pets in context (issue #104, phase 6). Loads after w135-petbond.js; changes earlier parts only by reassignment
+   (saved originals carry the wW136 prefix).
+
+   A pet is a step stronger (engine/pets.js: PET.ctx, petCtx) for each thing about a match that suits it: one of its
+   sports, one of its moons, its own ground, and the other side's element when its own beats it (PET_BEATS: ember
+   beats bloom, bloom tide, tide ember; aether and rime beat each other). The engine knows the sport and the sky; the
+   Realm tells it the ground and the foe: at kickoff, RUN.pet gets here and foe, the element of the match's region
+   (W_PET_REGION_EL: the plains are aether), since a region's teams play in its element.
+   The Pets tab says each pet's sports and moons, and what beats what; How to play explains.
+
+   W_PET_REGION_EL
+   Wrapped: wKickoff (wW136Kickoff: here and foe), wPetCard (wW136PetCard: sports and moons), renderHelp
+   (wW136RenderHelp: #wHelpPetCtx). */
+
+const W_PET_REGION_EL = { plains: 'aether', bloom: 'bloom', tide: 'tide', ember: 'ember', rime: 'rime' };
+const wW136Kickoff = wKickoff;
+wKickoff = function (enc) {
+  // (the pet at your side learns where it is playing, and whom: the region's element, for both)
+  if (RUN && RUN.pet && enc && enc.world) { const el = W_PET_REGION_EL[enc.world.region] || null; RUN.pet.here = el; RUN.pet.foe = el; }
+  return wW136Kickoff.apply(this, arguments);
+};
+const wW136PetCard = wPetCard;
+wPetCard = function (q, side) {
+  const D = PETS[q.kind], sp = (D.sports || []).map(s => SPORTS[s] ? SPORTS[s].n : s), mo = (D.moon || []).map(i => MOON[i] ? MOON[i].n : '');
+  const line = `<small class="wnst wpetctx">Stronger in ${sp.length ? esc(sp.join(' and ')) : 'no sport in particular'}${mo.length ? `, under a ${esc(mo.join(' or '))}` : ''}, at home in its own region, and against ${esc(DB.elems.names[PET_BEATS[D.el]] || PET_BEATS[D.el])} teams.</small>`;
+  return wW136PetCard(q, side).replace('<small class="hint">', line + '<small class="hint">');
+};
+const wW136RenderHelp = renderHelp;
+renderHelp = function () {
+  wW136RenderHelp();
+  const h = $('wHelpPetBond') || $('wHelpPets'); if (!h || $('wHelpPetCtx')) return;
+  const n = Math.round(PET.ctx * 100);
+  h.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpPetCtx"><b>Pets in context.</b> A pet is ${n}% stronger for each thing about a match that suits it: one of its sports, one of its moons, its own region (its element's), and teams of an element its own beats (ember beats bloom, bloom beats tide, tide beats ember; aether and rime beat each other). A region's teams play in its element. The Pets tab says what suits each pet.</p>`);
 };
 /* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
    boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by

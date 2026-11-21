@@ -6,9 +6,10 @@
 const petA = w => /^[aeiou]/i.test(w || '') ? 'an' : 'a';
 const PET_EL_COL = { aether: '#d8c8ff', bloom: '#8fd27a', tide: '#6fc3e8', ember: '#ff9a5a', rime: '#bfe8ff' };
 function petTipHTML() {
-  const p = B.pet, T = petText(p.kind, p.bond, p.hungry); if (!T) return '';
+  const p = B.pet, T = petText(p.kind, p.bond, p.hungry, p); if (!T) return '';
   const pw = T.powers.map(w => `<li${w.open ? '' : ' style="opacity:.55"'}>${w.open ? '' : `<i>(at bond ${w.at})</i> `}${esc(w.d)}</li>`).join('');
   return `<span class="t">${esc(p.name)}</span>${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)}). Bond ${p.bond} of 3.${p.hungry ? ' <b>Hungry:</b> its numbers are about halved (at least 1).' : ''}${p.spooked ? ' <b>Spooked:</b> its next power won\'t fire.' : ''}
+${T.ctx.length ? `<br><b>Suits it today</b> (${Math.round(PET.ctx * 100)}% stronger for each): ${esc(T.ctx.join(', '))}.` : ''}
     <br><b>Always:</b> ${esc(T.trait)}<ul style="margin:4px 0 4px 16px;padding:0">${pw}</ul><b>Trick (T, once a fight):</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}${p.used ? ' <i>(used)</i>' : ''}`;
 }
 function petPanelHTML() {

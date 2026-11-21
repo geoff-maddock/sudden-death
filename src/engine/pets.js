@@ -16,17 +16,32 @@
    eats isn't a kill of yours, for a pet (its enemyFalls skips e.eaten; trophies are as they were).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
-const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15 };
-const PET_EVENTS = ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'attackPlayed', 'enemyFalls', 'fightWon', 'playerAttacked', 'playerHit', 'enemyBlock', 'playerDebuff'];
+const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15, ctx: .25 };
+const PET_EVENTS = ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'attackPlayed', 'enemyFalls', 'fightWon', 'playerAttacked', 'playerHit', 'enemyBlock', 'playerDebuff', 'highlight', 'score'];
 const petDef = p => p && PETS[p.kind] || null;
 const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) || 'Your pet';
 // a pet's number at its bond, smaller when it is hungry (at least 1)
-function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1))); }
+/* context (phase 6): a pet is a step stronger, PET.ctx a step, for each that fits the match: one of its sports
+   (PETS[k].sports, the sport being played), one of its moons (PETS[k].moon, the sky's phase), its own ground (here: the
+   element of the match's region, set by the Realm) and an element its own beats (foe: the other side's, PET_BEATS).
+   Outside the Realm there is no ground or foe, so only the sport and the moon */
+const PET_BEATS = { ember: 'bloom', bloom: 'tide', tide: 'ember', aether: 'rime', rime: 'aether' };
+const PET_CTX_NAME = { sport: 'its sport', moon: 'its moon', home: 'its home ground', foe: 'an element it beats' };
+function petCtx(q) {
+  const D = q && PETS[q.kind]; if (!D) return [];
+  const out = [];
+  if (B && D.sports && D.sports.includes(B.sport)) out.push('sport');
+  if (D.moon && !window.SKY_OFF && typeof skyNow === 'function' && D.moon.includes(skyNow().moon)) out.push('moon');
+  if (q.here && q.here === D.el) out.push('home');
+  if (q.foe && PET_BEATS[D.el] === q.foe) out.push('foe');
+  return out;
+}
+function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
   const rp = RUN && RUN.pet; B.pet = null;
   if (!rp || !PETS[rp.kind]) return;
-  B.pet = { kind: rp.kind, name: rp.name || PETS[rp.kind].n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, used: false, spooked: false, t: {}, f: {} };
+  B.pet = { kind: rp.kind, name: rp.name || PETS[rp.kind].n, bond: clamp(rp.bond || 1, 1, 3), hungry: !!rp.hungry, here: rp.here || null, foe: rp.foe || null, used: false, spooked: false, t: {}, f: {} };
 }
 // a pet's effect said: on screen and in the log
 function petSay(t) { fx({ k: 'pet', t: `${petName()}: ${t}` }); log(`${petName()}: ${t}`, 'good'); }
@@ -96,8 +111,9 @@ function petTrick(ti) {
   return true;
 }
 // what a pet does, in words (the trait, each power with the bond it opens at, the trick), its numbers at bond b
-function petText(kind, b, hungry) {
+// (st: the pet in a fight, whose ground and foe count; its numbers then include what suits it, ctx naming each)
+function petText(kind, b, hungry, st) {
   const D = PETS[kind]; if (!D) return null;
-  const p = { kind, bond: b || 1, hungry: !!hungry }, say = x => typeof x === 'function' ? x(p) : x;
-  return { n: D.n, from: D.from, el: D.el, trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
+  const p = { kind, bond: b || 1, hungry: !!hungry, here: st ? st.here : null, foe: st ? st.foe : null }, say = x => typeof x === 'function' ? x(p) : x;
+  return { n: D.n, from: D.from, el: D.el, ctx: st ? petCtx(p).map(k => PET_CTX_NAME[k]) : [], trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
 }
