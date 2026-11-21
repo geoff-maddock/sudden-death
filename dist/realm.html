@@ -63082,9 +63082,9 @@ const wW138PetUpkeep = wPetUpkeep;
 wPetUpkeep = function () { const r = wW138PetUpkeep.apply(this, arguments); if (!LAB && SET.tips && wPets().owned.some(q => q.hungry)) tip('w_pethungry'); return r; };
 
 Object.assign(TIPS, {
-  w_pet: ['Your pet', 'A pet fights at your side in card matches: open the Team screen (C), then the Pets tab, to see what it does, change which one goes with you, and feed it. In a match it stands in front of your team; its trick is the button by its name, or the T key, once a match.'],
-  w_petegg: ['A pet egg', 'Each pet egg hatches at one place only, by its element: Graftonbury\'s glasshouse, the Mossgate warm spring, Saltmere\'s rock pool, the Cinderhold forge or the Rimewatch ice-house. Walk into it and put the egg in; it hatches in three days.'],
-  w_pethungry: ['A hungry pet', 'You couldn\'t pay a pet\'s upkeep this week, so it is hungry: its numbers are halved and its bond won\'t grow. Feed it on the Pets tab, or give it a treat (its favourite, or a pet biscuit from a pet shop).'],
+  w_pet: ['Your pet', 'Your pet fights beside you in card matches. The Pets tab on the Team screen (C) shows what it does and which one goes with you. In a match, its trick is the button by its name, or T, once a match.'],
+  w_petegg: ['A pet egg', 'A pet egg hatches at one place, by its element: Graftonbury\'s glasshouse, the Mossgate spring, Saltmere\'s rock pool, the Cinderhold forge or the Rimewatch ice-house. Put it in; it hatches in three days.'],
+  w_pethungry: ['A hungry pet', 'A pet\'s upkeep went unpaid, so it is hungry: its numbers are halved and its bond won\'t grow. Feed it on the Pets tab, or give it a treat (its favourite, or a pet biscuit).'],
 });
 function wPetTips() {
   if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
