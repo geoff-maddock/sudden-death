@@ -63410,8 +63410,9 @@ wStart = function (save) {
    The scene (wUmbScene): the first time the world is free after the Umbral opens (after the Crown's ending, or on
    loading a journey that won it before), a staged scene in a window: the crown in your captain's hands, an eclipse
    over the Crown Coliseum at noon, the crowd falling silent, the smooth block beside the statue turning black, a
-   sound from the west and the ground shaking, and the Pale Herald walking out of the dark to tell you what it means.
-   Skip ends it at once (what it said goes in the log); the Journal's Umbral chapter plays it again. It is marked
+   sound from the north (the Road to Nowhere) and the ground shaking, and the Pale Herald walking out of the dark to tell you what it means.
+   Skip ends it at once; however the first showing is closed, what it said goes in the log. The Journal's Umbral
+   chapter plays it again. It is marked
    seen (WG.umbral.seen) as it starts. Never in LAB mode.
    The Pale Herald (DB.chars.uherald) stays by the statue in the Coliseum from then on, and answers about the PORTAL,
    the SEAL, the NADIR, the GATE and the ROAD.
@@ -63422,14 +63423,15 @@ wStart = function (save) {
    their dreams of the other side; the innkeepers answer about DREAMS; the Coliseum's statue has its black block.
 
    W_UMB1, wUmbScene, wUmbEclipse
-   Wraps: wNextPrompt (wWU1NextPrompt: the scene, once), wStart (wWU1Start: the herald in or out of the Coliseum),
+   Wraps: wNextPrompt (wWU1NextPrompt: the scene, once, after the Crown's ending), wSay (wWU1Say: an innkeeper's hello
+   names the DREAMS), wStart (wWU1Start: the herald in or out of the Coliseum),
    wUmbralUnlock (wWU1UmbralUnlock: the herald, the flag topics wait on), wDarkness (wWU1Darkness: the eclipse),
    wNewDay (wWU1NewDay: the eclipse said at dawn), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
    statue), wOpenJournal (wWU1OpenJournal: the chapter shows once open), wRenderJournal (wWU1RenderJournal: its
    button). */
 
 const W_UMB1 = {
-  eclipseMax: 3, eclipseEvery: 4,   // one more eclipse day a week for every 4 weeks open, up to 3
+  eclipseMax: 3, eclipseEvery: 4, eclipseDark: .28,   // one more eclipse day a week for every 4 weeks open, up to 3
   herald: [15, 13],                 // where the herald stands in the Coliseum, by the statue (or the nearest free tile)
   speech: [
     'Champions. You won it fair, and that is the trouble.',
@@ -63445,7 +63447,7 @@ const W_UMB1 = {
 };
 
 DB.chars.uherald = { name: 'The Pale Herald', kind: 'lich', look: { coat: '#d8d4e8', acc: 'hat' },
-  greet: 'You came back. Good. Ask me about the PORTAL, the SEAL, the NADIR, the GATE or the ROAD.',
+  greet: 'You came back. Good. Ask me about the PORTAL, the SEAL and its PIECES, the NADIR, the GATE or the ROAD.',
   topics: {
     job: { t: 'I announce. Not games. Endings. Ask me about the SEAL.' },
     portal: { t: 'At the end of the Road to Nowhere, north of the Roost. It goes both ways: rest on this side, play on that one. Time runs on both.' },
@@ -63458,17 +63460,26 @@ DB.chars.uherald = { name: 'The Pale Herald', kind: 'lich', look: { coat: '#d8d4
 // (the flag topics wait on, set by the unlock: the audit counts it as set)
 DB.engineFlags.push('umbral_open');
 // the innkeepers have had dreams too, once the door is open
-for (const id of ['hq_inn', 'moss_inn', 'salt_inn', 'cind_inn', 'rime_inn']) if (DB.chars[id]) {
+for (const id of ['hq_inn', 'moss_inn', 'salt_inn', 'cind_inn', 'rime_inn']) if (DB.chars[id]) { // (W_UMB1_INNS, below)
   DB.chars[id].topics.dreams = { need: 'umbral_open', needNo: 'Dreams? I sleep like a stone, and so would you after a day of my stairs.',
     t: 'Since the Crown? Everyone has the same one. This place, only darker, and the people in it are us but wrong, and they are waiting for something. Folk come down in the morning and do not want their breakfast.' };
 }
+
+// (talk links come from capitals in what they say: once the door is open, an innkeeper's hello mentions the DREAMS)
+const W_UMB1_INNS = ['hq_inn', 'moss_inn', 'salt_inn', 'cind_inn', 'rime_inn'];
+const wWU1Say = wSay;
+wSay = function (id, kw) {
+  const r = wWU1Say.apply(this, arguments);
+  if (!kw && r && r.text && wFlag('umbral_open') && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
+  return r;
+};
 
 /* ---------- the herald in the Coliseum ---------- */
 function wUmbHeraldSync() {
   const m = MAPS.coliseum; if (!m) return;
   const i = m.npcs.findIndex(n => n.id === 'uherald');
   if (wUmbOn() && i < 0) {
-    const [hx, hy] = W_UMB1.herald, free = (x, y) => { const c = m.t[y] && m.t[y][x], td = c && DB.tiles[c]; return td && td.walk && !td.enter && !m.npcs.some(n => n.x === x && n.y === y); };
+    const [hx, hy] = W_UMB1.herald, free = (x, y) => { const c = m.t[y] && m.t[y][x], td = c && DB.tiles[c]; return td && td.walk && !td.enter && !m.npcs.some(n => n.x === x && n.y === y) && !(WG && WG.map === 'coliseum' && WG.x === x && WG.y === y); };
     let at = free(hx, hy) ? [hx, hy] : null;
     for (let r = 1; !at && r < 5; r++) for (let dy = -r; dy <= r && !at; dy++) for (let dx = -r; dx <= r && !at; dx++) if (free(hx + dx, hy + dy)) at = [hx + dx, hy + dy];
     if (at) m.npcs.push({ id: 'uherald', x: at[0], y: at[1], fixed: true });
@@ -63496,11 +63507,15 @@ function wUmbScene(replay) {
   const close = modal(`<header><h3>The Crown cracks</h3><button class="ghost" id="wUmbSkip">${replay ? 'Close' : 'Skip'}</button></header>
     <canvas id="wUmbCv" width="640" height="300" class="wumbcv" aria-label="The Crown Coliseum goes dark at noon, and a pale figure walks out onto the sand"></canvas>
     <div id="wUmbLines" class="wumblines" aria-live="polite"></div>
-    <div class="row" id="wUmbEnd" hidden><button class="btn" id="wUmbGo">North, then</button></div>`, () => { cancelAnimationFrame(WUS.raf); WUS.raf = 0; WUI.hudKey = ''; wDrain(); });
+    <div class="row" id="wUmbEnd" hidden><button class="btn" id="wUmbGo">North, then</button></div>`, () => {
+      cancelAnimationFrame(WUS.raf); WUS.raf = 0;
+      if (!replay) wLog('The crown cracked, the Coliseum went dark at noon, and a pale herald said the Seal of the Crown is broken into nine pieces, held by the Nadir on the other side of a portal at the end of the Road to Nowhere. Win them back and forge the Seal. The herald waits by the Coliseum\'s statue.', 'b');
+      WUI.hudKey = ''; wDrain();
+    });
   const cv = $('wUmbCv'), c = cv.getContext('2d'), lines = $('wUmbLines'), t0 = performance.now();
   const say = (t, cls) => { lines.insertAdjacentHTML('beforeend', `<p class="${cls || ''}">${esc(t)}</p>`); lines.scrollTop = lines.scrollHeight; };
   const beats = [[1.2, 'Your captain lifts the crown. It cracks, a thin line of dark straight through it.', 'wumbn'], [3.6, 'At noon the sky over the Coliseum goes dark.', 'wumbn'],
-    [6.4, 'The crowd falls silent. Beside the statue, the smooth block turns black.', 'wumbn'], [7.6, 'Something answers, far off in the north. The sand shakes.', 'wumbn'],
+    [6.4, 'The crowd falls silent. Beside the statue, the smooth block turns black.', 'wumbn'], [7.6, 'Something answers, far off to the north. The sand shakes.', 'wumbn'],
     [9.2, 'A pale figure walks out of the dark and onto the pitch.', 'wumbn']].concat(W_UMB1.speech.map((s, i) => [12.4 + i * 3.4, s, 'wumbh']));
   let said = 0, shook = false;
   const end = 12.4 + W_UMB1.speech.length * 3.4;
@@ -63547,14 +63562,15 @@ function wUmbScene(replay) {
   };
   WUS.raf = requestAnimationFrame(frame);
   $('wUmbGo').onclick = () => close();
-  $('wUmbSkip').onclick = () => { if (!replay) wLog('The crown cracked, the Coliseum went dark at noon, and a pale herald said the Seal of the Crown is broken into nine pieces, held by the Nadir on the other side of a portal at the end of the Road to Nowhere. Win them back and forge the Seal. The herald waits by the Coliseum\'s statue.', 'b'); close(); };
+  $('wUmbSkip').onclick = () => close();
   return true;
 }
 const wWU1NextPrompt = wNextPrompt;
 wNextPrompt = function () {
   if (wWU1NextPrompt.apply(this, arguments)) return true;
   const U = wUmb();
-  if (U && !U.seen && !LAB && wActive()) { wUmbScene(false); return true; }
+  // (after the Crown's own ending, and after a card pick or a road event: those come first)
+  if (U && !U.seen && !LAB && wActive() && !(typeof W11 !== 'undefined' && W11.ending) && !WG.cardOffer && !WG.event) { wUmbScene(false); return true; }
   return false;
 };
 
@@ -63570,7 +63586,8 @@ wDarkness = function () {
   const d = wWU1Darkness.apply(this, arguments);
   if (!WG || wUmbDark() || !wUmbEclipse()) return d;
   const h = wHour(); if (h < 11 || h >= 14) return d;
-  return Math.max(d, .5 * Math.sin((h - 11) / 3 * Math.PI));
+  // (a dark sky, kept under wIsNight's .3: the eclipse doesn't make midday count as night for anything else)
+  return Math.max(d, W_UMB1.eclipseDark * Math.sin((h - 11) / 3 * Math.PI));
 };
 const wWU1NewDay = wNewDay;
 wNewDay = function () { wWU1NewDay.apply(this, arguments); if (!LAB && wUmbEclipse()) wLog('An eclipse today: the sun goes out at midday for an hour or two. Nobody in the league will say what it means.', 'b'); };

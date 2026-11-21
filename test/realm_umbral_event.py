@@ -35,21 +35,25 @@ async def main():
         pre = await pg.evaluate("""(() => { wOpenJournal(); const tab = !!document.querySelector('[data-jtab="umbral"]'); WJ.close(); return { tab, dream: wSay('hq_inn', 'dreams').text, herald: MAPS.coliseum.npcs.some(n => n.id === 'uherald') }; })()""")
         check(not pre['tab'] and 'stone' in pre['dream'] and not pre['herald'], 'before the Crown: no Umbral chapter, no dreams at the inn, no herald', pre)
 
-        await pg.evaluate("wSetFlag('champion')")
+        # (the Crown's own ending first: while it is pending, the scene waits)
+        await pg.evaluate("W11.ending = true; wSetFlag('champion'); wRenderHud()")
+        held = await pg.evaluate("(() => ({ scene: !!document.getElementById('wUmbCv'), seen: !!WG.umbral.seen }))()")
+        check(held == {'scene': False, 'seen': False}, 'while the Crown\'s ending is still to come, the scene waits', held)
+        await pg.evaluate("W11.ending = false")
         await pg.wait_for_function("!!document.getElementById('wUmbCv')", timeout=5000)
-        await pg.wait_for_timeout(2600)
+        await pg.wait_for_function("document.querySelectorAll('#wUmbLines p').length >= 1", timeout=8000)
         sc = await pg.evaluate("""(() => ({ seen: WG.umbral.seen === WG.dayAbs, lines: document.querySelectorAll('#wUmbLines p').length, herald: MAPS.coliseum.npcs.some(n => n.id === 'uherald'), flag: wFlag('umbral_open') }))()""")
         check(sc['seen'] and sc['lines'] >= 1 and sc['herald'] and sc['flag'], 'once open, the scene plays when the world is free, marked seen as it starts; the herald is in the Coliseum', sc)
         await pg.screenshot(path='/tmp/umbral_scene.png')
         await pg.click('#wUmbSkip')
-        await pg.wait_for_timeout(1500)
+        await pg.wait_for_function("document.getElementById('modal').hidden")
+        for _ in range(3): await pg.evaluate("wRenderHud()")
         sk = await pg.evaluate("""(() => ({ shut: document.getElementById('modal').hidden, log: WLOG.slice(-3).map(l => l[0]).join(' ') }))()""")
         check(sk['shut'] and 'nine pieces' in sk['log'], 'Skip ends it, and what it said goes in the log; it does not come back', sk)
 
         await pg.evaluate("wSave()")
         await pg.goto(REALM_URL); await pg.wait_for_function("typeof wUmbScene === 'function'")
-        await pg.evaluate("wStart(wLoadSave())")
-        await pg.wait_for_timeout(1200)
+        await pg.evaluate("wStart(wLoadSave()); for (let k = 0; k < 3; k++) wRenderHud()")
         rl = await pg.evaluate("""(() => ({ shut: document.getElementById('modal').hidden, herald: MAPS.coliseum.npcs.filter(n => n.id === 'uherald').length }))()""")
         check(rl == {'shut': True, 'herald': 1}, 'after a reload it stays seen, and the herald is there once', rl)
 
@@ -61,18 +65,18 @@ async def main():
         rp = await pg.evaluate("""(() => { const n = document.querySelectorAll('#wUmbLines p').length, last = document.querySelector('#wUmbLines p:last-child').textContent; document.getElementById('wUmbGo').click(); return { n, last, want: 5 + W_UMB1.speech.length, shut: document.getElementById('modal').hidden }; })()""")
         check(rp['n'] == rp['want'] and 'Start there' in rp['last'] and rp['shut'], 'from the Journal it plays again, to the herald\'s last word, and closes', rp)
 
-        tk = await pg.evaluate("""(() => { const out = {}; out.seal = wSay('uherald', 'seal').text; out.gate = wSay('uherald', 'gate').text; out.dream = wSay('hq_inn', 'dreams').text;
+        tk = await pg.evaluate("""(() => { const out = {}; out.seal = wSay('uherald', 'seal').text; out.gate = wSay('uherald', 'gate').text; out.dream = wSay('hq_inn', 'dreams').text; out.hello = wSay('hq_inn', '').text;
           wEnterMap('coliseum', MAPS.coliseum.spawn[0], MAPS.coliseum.spawn[1]); const m = MAPS.coliseum; let g = null; for (let y = 0; y < m.h && !g; y++) for (let x = 0; x < m.w; x++) if (m.t[y][x] === 'G') { g = [x, y]; break; }
           out.statue = wLookText(g[0], g[1]); return out; })()""")
-        check('Nine pieces' in tk['seal'] and 'gentlest' in tk['gate'] and 'Since the Crown' in tk['dream'] and 'black' in tk['statue'], 'the herald answers, the innkeepers dream, and the statue\'s block is black', tk)
+        check('Nine pieces' in tk['seal'] and 'gentlest' in tk['gate'] and 'Since the Crown' in tk['dream'] and 'DREAMS' in tk['hello'] and 'black' in tk['statue'], 'the herald answers, the innkeepers dream (their hello names the DREAMS), and the statue\'s block is black', tk)
 
         ec = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; WG.map = 'graftonbury';
-          U.at = WG.dayAbs - 7; WG.min = 12.5 * 60; out.noon = wDarkness(); WG.min = 9 * 60; out.morning = wDarkness();
+          U.at = WG.dayAbs - 7; WG.min = 12.5 * 60; out.noon = wDarkness(); out.night = wIsNight(); WG.min = 9 * 60; out.morning = wDarkness();
           WG.min = 12.5 * 60; U.at = WG.dayAbs - 3; out.early3 = wUmbEclipse(); U.at = WG.dayAbs - 7 * 8 - 3; out.late3 = wUmbEclipse();
           U.at = WG.dayAbs - 7; WG.map = 'u:world'; out.dark = wDarkness();
           const n = WLOG.length; U.at = WG.dayAbs - 6; WG.map = 'graftonbury'; wNewDay(); out.dawn = WLOG.slice(n).some(l => /eclipse/i.test(l[0]));
           return out; })()""")
-        check(ec['noon'] > .3 and ec['morning'] == 0 and ec['dawn'], 'an eclipse day darkens the light realm at midday, not in the morning, and is said at dawn', ec)
+        check(ec['noon'] > .2 and not ec['night'] and ec['morning'] == 0 and ec['dawn'], 'an eclipse day darkens the light realm\'s sky at midday (without counting as night), not in the morning, and is said at dawn', ec)
         check(not ec['early3'] and ec['late3'], 'the blight: more eclipse days a week the longer the portal stands open', ec)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
