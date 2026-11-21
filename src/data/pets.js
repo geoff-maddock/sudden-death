@@ -71,10 +71,10 @@ const PETS = {
   hippogriff: { n: 'Hatchling Hippogriff', from: 'hippogriff', el: 'tide', rar: 'u', how: 'egg', sports: ['jousting', 'soccer'],
     trait: { d: p => `${pv(1, p)} more Stamina on the first turn.`, mod: { energy: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
     powers: [
-      { at: 1, d: p => `From the fourth turn on, each turn: ${pv(2, p)} Block.`, on: { turnStart: { when: () => B.turn >= 4, then: (a, p) => { gainBlock(pv(2, p), true); } } } },
-      { at: 2, d: p => `Your first attack each turn deals ${pv(3, p)} more to the enemy with the most HP.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && alive().every(o => o.hp <= e.hp) ? pv(3, p) : 0 },
+      { at: 1, d: p => `From the fourth turn on, every second turn: ${pv(2, p)} Block.`, on: { turnStart: { when: () => B.turn >= 4 && B.turn % 2 === 0, then: (a, p) => { gainBlock(pv(2, p), true); } } } },
+      { at: 2, d: p => `Your first attack each turn deals ${pv(2, p)} more to the enemy with the most HP.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && alive().every(o => o.hp <= e.hp) ? pv(2, p) : 0 },
     ],
-    trick: { n: 'Swoop', d: p => `${pv(5, p)} damage, twice, to one enemy.`, ops: p => [['d', pv(5, p), 2]] } },
+    trick: { n: 'Swoop', d: p => `${pv(4, p)} damage, twice, to one enemy.`, ops: p => [['d', pv(4, p), 2]] } },
   glowbeetle: { n: 'Glowbeetle', from: 'giant fire beetle', el: 'ember', rar: 'c', how: 'shop', sports: ['boxing'],
     trait: { d: p => `A lantern: draw ${pv(2, p)} more on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(2, p) : 0 } },
     powers: [
@@ -99,10 +99,10 @@ const PETS = {
   frostpup: { n: 'Frostpup', from: 'winter wolf cub', el: 'rime', rar: 'u', how: 'keeper', sports: ['hockey', 'curling'], moon: [4],
     trait: { d: p => `At the start of each fight, the enemy with the most HP is Weak ${pv(1, p)}.`, on: { fightStart: (a, p) => { const t = alive().slice().sort((x, y) => y.hp - x.hp)[0]; if (t) addSt(t, 'weak', pv(1, p)); } } },
     powers: [
-      { at: 1, d: 'Every fourth turn, its breath Stuns a random enemy (a boss is Weak 2 instead).', on: { turnStart: { when: () => B.turn % 4 === 0 && alive().length > 0, then: () => { const t = pick(alive()); resolve([['s', 'stun', 1]], { card: null, tgt: t, d: { tgt: 'one', n: 'Snow Breath', type: 'pet' } }); petSay(`breathes snow on ${t.n}.`); } } } },
-      { at: 2, d: p => `Below half HP, each turn: ${pv(4, p)} Block.`, on: { turnStart: { when: () => petBelow(.5), then: (a, p) => { gainBlock(pv(4, p), true); } } } },
+      { at: 1, d: 'Once a fight, on the fourth turn, its breath Stuns a random enemy (a boss is Weak 2 instead).', on: { turnStart: { when: () => B.turn === 4 && alive().length > 0, then: () => { const t = pick(alive()); resolve([['s', 'stun', 1]], { card: null, tgt: t, d: { tgt: 'one', n: 'Snow Breath', type: 'pet' } }); petSay(`breathes snow on ${t.n}.`); } } } },
+      { at: 2, d: p => `Below half HP, each turn: ${pv(2, p)} Block.`, on: { turnStart: { when: () => petBelow(.5), then: (a, p) => { gainBlock(pv(2, p), true); } } } },
     ],
-    trick: { n: 'Snow Breath', d: 'Stuns one enemy (a boss is Weak 2 instead).', ops: () => [['s', 'stun', 1]] } },
+    trick: { n: 'Snow Breath', d: p => `One enemy is Weak ${pv(2, p)}.`, ops: p => [['s', 'weak', pv(2, p)]] } },
   mephitling: { n: 'Mephitling', from: 'ice mephit', el: 'rime', rar: 'c', how: 'egg', sports: ['hockey'], moon: [7],
     trait: { d: p => `Once a fight, hit for 10 or more: it sulks you up to ${pv(1, p)} Strength.`, on: { playerHit: { when: (a, p) => a.taken >= 10 && !p.f.sulk, then: (a, p) => { p.f.sulk = 1; addSt(B.P, 'str', pv(1, p)); petSay(`sulks beautifully: +${pv(1, p)} Strength.`); } } } },
     powers: [
@@ -157,7 +157,7 @@ const FOE_PETS = {
     trait: { d: 'Their smallest player starts with 6 Block.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => a.max - b.max)[0]; if (e) blockE(e, 6); } } },
     power: { d: 'The first time you end a turn with no Block, it squeezes you for 5.', on: { turnEnd: (a, p) => { if (!p.f.sq && !(B.P.block > 0)) { p.f.sq = 1; foeSay('drops on you: 5.'); foeHit(5); } } } },
     trick: { n: 'Darkness', d: 'You are Weak 2, and your pet is spooked.', when: () => B.turn >= 2, go: () => { foeDeb('weak', 2); foeSpook(); } } },
-  claw: { n: 'Crawling Claw', from: 'crawling claw', el: 'rime', club: 'rattlebone',
+  claw: { n: 'Hand of Glory', from: 'hand of glory', el: 'rime', club: 'rattlebone',
     trait: { d: 'When one of their players falls, the rest gain 1 Strength.', on: { enemyFalls: (e) => { if (e && e.eaten) return; const rest = alive(); if (rest.length) { for (const x of rest) addSt(x, 'str', 1); foeSay('scuttles to the next one: +1 Strength.'); } } } },
     power: { d: 'Every third turn it grabs your guard: you lose 4 Block.', on: { turnEnd: () => { if (B.turn % 3 === 0 && B.P.block > 0) { const n = Math.min(4, B.P.block); B.P.block -= n; foeSay(`grabs ${n} Block.`); } } } },
     trick: { n: 'Throttle', d: '7 damage, and you have 1 less Stamina next turn.', when: () => (B.P.block || 0) <= 3, go: () => { foeHit(7); debuffP('drained', 1); } } },
