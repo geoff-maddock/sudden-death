@@ -49,6 +49,7 @@ function opText(op, d, ctx) {
     case 'dunk': return `Deal ${dmgS(op[1])} damage, or ${dmgS(op[2])} if the target is below half HP.`;
     case 'luck': return 'Your next d20 is a natural 20.';
     case 'loseblock': return 'Lose all your Block.';
+    case 'unblock': return 'Every enemy loses its Block.';
     case 'strip': return 'Every enemy loses its Block and Strength.';
     case 'drainall': return `Deal ${dmgS(op[1])} damage to ALL enemies. Heal what gets through.`;
     case 'split': return `Deal ${dmgS(op[1])} damage to the enemies on each end.`;

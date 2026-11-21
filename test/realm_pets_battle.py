@@ -87,6 +87,12 @@ async def main():
           })()""")
         check(dr['selDuring'] == 1 and dr['plain'] == 1, 'a plain drag of a card onto the arena plays it', dr)
         check(dr['handChanged'] == 0 and dr['escape'] == 0 and dr['trick'] == 0 and dr['cancel'] == [0, -1] and dr['blur'] == [0, -1] and dr['nextClick'] and dr['hoverCard'] == -1 and dr['late'] == [0, -1] and dr['outside'] == [0, -1] and dr['kbBack'], 'a drag plays nothing on its drop (nor on the click after it) if the hand changed, Escape let it go, or the pet\'s trick was used; a gesture the browser takes over, or the window losing focus, lets go of it; a late click after a drop is ignored, and the next press and click work; a drop let go puts the target back', dr)
+        fd = await pg.evaluate("""(async () => { const seen = []; const d0 = drawPetFig; drawPetFig = function (c, kind, x, y, t, o) { seen.push([kind, !!(o && o.foe)]); return d0.apply(this, arguments); };
+          RUN.pet = { kind: 'frostpup', name: 'F', bond: 1 }; RUN.foePet = { kind: 'griffon', skill: 2 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' });
+          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); drawPetFig = d0; RUN.foePet = null;
+          return { mine: seen.some(s => s[0] === 'frostpup' && !s[1]), theirs: seen.some(s => s[0] === 'griffon' && s[1]), looks: Object.keys(PETS).concat(Object.keys(FOE_PETS)).filter(k => !PET_LOOK[k]) }; })()""")
+        await pg.screenshot(path='/tmp/pets_field.png')
+        check(fd == {'mine': True, 'theirs': True, 'looks': []}, 'your pet stands on the field in front of your team, and a rival club\'s in front of theirs; every pet has its look', fd)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

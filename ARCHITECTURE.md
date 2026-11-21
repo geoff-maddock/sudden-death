@@ -52,6 +52,7 @@ Several files still open with their old part name in a comment (`/* p5: ... */`)
 | `ui/fight/scene.js` | Drawing a scene: entities, the sprite cache, intents, pops, banners, dice, `consumeFx`. |
 | `ui/fight/screen.js` | The fight screen: stage sizing, HUD, the hand, drag and target. |
 | `ui/fight/pet-view.js` | The pet at your side in a fight (issue #104): its panel under your HP and Block (its badge, name, bond as stars, spooked and hungry), a tooltip with what it does at its bond (`petText`), and its trick as a button and `T` (`doPetTrick`). Wraps `renderFightHUD`. Its effects pop up over your side (`consumeFx`'s `pet` case in `scene.js`). |
+| `ui/fight/pet-draw.js` | The pets on the field: yours in front of your team, a rival club's in front of theirs (`drawPetFig`, called from `scene.js`'s `drawFight`), in the arena's ink style from a few parts a kind (`PET_LOOK`: body, ears, wings, beak, horns, tail, colours); bobbing, hopping when it acts (the `pet` fx sets `A.ent.pet.act`), trembling when spooked. |
 | `render/boss-art.js` | Bespoke boss art. |
 | `render/vfx.js` | The visual effects layer (`spawnVfx`, `drawVfx`). |
 | `ui/fight/field.js` | Sport visuals on the field, the crowd, the momentum bar, the damage breakdown. |

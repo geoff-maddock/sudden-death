@@ -36,7 +36,7 @@ async def main():
 
         c = await pg.evaluate("""(() => { const out = {}; RUN.clock = 0; // (the new moon: only the Imp's)
           // (the rules, not the tuning: the numbers these checks were written with, put back after)
-          const knobs = JSON.stringify(PET); PET.bond = [1, 1.5, 2]; PET.ctx = .25; PET.scale = 1; PET.bias = .5;
+          const knobs = JSON.stringify(PET); PET.bond = [1, 1.5, 2]; PET.ctx = .25; PET.scale = 1; PET.bias = .5; try {
           beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' });
           const q = (kind, o) => Object.assign({ kind, bond: 1, hungry: false, inFight: true }, o || {});
           out.none = [petCtx(q('frostpup')), petPow(8, q('frostpup'))];
@@ -57,7 +57,7 @@ async def main():
           RUN.clock = 0; RUN.pet = { kind: 'imp', name: 'I', bond: 1 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'hockey' }); out.imp = petCtx(B.pet);
           out.data = Object.keys(PETS).filter(k => !(PETS[k].sports || []).length || (PETS[k].sports || []).some(s => !SPORTS[s]) || (PETS[k].moon || []).some(i => !MOON[i]));
           out.beats = Object.keys(PET_BEATS).every(e => PET_BEATS[PET_BEATS[e]] !== e || ['aether', 'rime'].includes(e));
-          Object.assign(PET, JSON.parse(knobs)); return out; })()""")
+          } finally { Object.assign(PET, JSON.parse(knobs)); } return out; })()""")
         check(c['none'] == [[], 8] and c['sport'] == [['sport'], 10] and c['home'] == [['sport', 'home'], 12] and c['foe'] == [['sport', 'home', 'foe'], 14], 'each thing that suits a pet makes it 25% stronger: its sport, its ground, a foe it beats', c)
         check(c['off'] and c['over'] and c['win'] and c['moonHeld'] == ['moon'] and c['oldSave'], 'off the battle screen, or once a fight is lost, a pet\'s numbers are its own (a win\'s payouts still count what suits it); the moon holds for the fight; a save from before it fights on without one, as it began', c)
         check(c['notFoe'] == ['sport'] and c['moon'] == ['moon'] and c['skyOff'] == [] and c['all'] == 16 and c['imp'] == ['moon'], 'one of its moons counts (the Full Moon for the Hootling and the Frostpup, the New Moon for the Imp); a foe it doesn\'t beat doesn\'t', c)

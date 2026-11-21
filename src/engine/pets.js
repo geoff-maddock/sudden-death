@@ -4,7 +4,8 @@
    - its trait, always on;
    - its powers, which fire on their own when their moment comes (each opens at a bond level: at);
    - its trick, once a fight, when you choose (petTrick).
-   Bond (1 to 3) makes its numbers bigger (petPow: PET.bond); a hungry pet's are smaller (PET.hungry). A hit of
+   Bond (1 to 3) scales its numbers (petPow: PET.bond, x0.7/0.9/1.1, a half rounding down, PET.bias, so a 1 stays
+   a 1; PET.scale is the balance knob, docs/realm/BALANCE.md); a hungry pet's are smaller (PET.hungry). A hit of
    PET.spook or more spooks it: its next power that would fire doesn't (a once-a-turn power is lost for that turn; a
    once-a-fight power waits for its next chance; the trait is never spooked).
    Declared, not checked by name: each pet's trait and powers carry on: { event: fn(arg, pet) | { when, then } } handlers, read through

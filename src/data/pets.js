@@ -33,7 +33,7 @@ const PETS = {
     ],
     trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },
   hootling: { n: 'Hootling', from: 'owlbear cub', el: 'bloom', rar: 'u', how: 'keeper', sports: ['golf'], moon: [4],
-    trait: { d: p => `The first time you drop below half HP each fight: ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => !p.f.roar && petBelow(.5), then: (a, p) => { p.f.roar = 1; addSt(B.P, 'str', pv(2, p)); petSay(`roars: +${pv(2, p)} Strength.`); } } } },
+    trait: { d: p => `The first time an enemy's hit drops you below half HP each fight: ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => !p.f.roar && a && a.taken > 0 && petBelow(.5) && RUN.hp + a.taken >= RUN.maxhp * .5, then: (a, p) => { p.f.roar = 1; addSt(B.P, 'str', pv(2, p)); petSay(`roars: +${pv(2, p)} Strength.`); } } } },
     powers: [
       { at: 1, d: p => `Once a fight, your third attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 3 && !p.f.hoot, then: (c, p) => { p.f.hoot = 1; addSt(B.P, 'str', pv(1, p)); petSay(`hoots: +${pv(1, p)} Strength.`); } } } },
       { at: 2, d: p => `Below half HP, your attacks deal ${pv(2, p)} more.`, atk: (card, e, p) => card && def(card).type === 'atk' && petBelow(.5) ? pv(2, p) : 0 },
@@ -42,7 +42,7 @@ const PETS = {
   sprite: { n: 'Sprite in a Jar', from: 'sprite', el: 'bloom', rar: 'u', how: 'egg', sports: ['golf', 'bowling'],
     trait: { d: p => `Draw ${pv(1, p)} more card on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
     powers: [
-      { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn (twice a fight).`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four && (p.f.four || 0) < 2, spend: (a, p) => { p.t.four = 1; p.f.four = (p.f.four || 0) + 1; }, then: (c, p) => { addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
+      { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn (twice a fight).`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four && (p.f.four || 0) < 2, spend: (a, p) => { p.t.four = 1; }, then: (c, p) => { p.f.four = (p.f.four || 0) + 1; addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
       { at: 2, d: p => `A debuff lands on you: ${pv(3, p)} Block.`, on: { playerDebuff: (a, p) => { B.P.block += pv(3, p); petSay(`argues the call: +${pv(3, p)} Block.`); } } },
     ],
     trick: { n: 'Recount', tgt: 'self', d: p => `Draw ${pv(2, p)}.`, ops: p => [['draw', pv(2, p)]] } },
