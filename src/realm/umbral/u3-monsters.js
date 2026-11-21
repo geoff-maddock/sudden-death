@@ -21,7 +21,7 @@
 
 const W_UMB3 = {
   card: { hp: 1.25, str: 1, draw: -1 },
-  darkKinds: ['wild', 'event'],
+  darkKinds: ['wild', 'event', 'camp', 'legend'],   // what the dark side starts: wild, road events (hunters, grudges), camp ambushes, road legends
   traits: {
     goblin: { n: 'Light Fingers', d: '1 more Strength.', go: e => addSt(e, 'str', 1) },
     kobold: { n: 'Swarming', d: 'A fifth more HP.', go: e => wUmbHp(e, 1.2) },

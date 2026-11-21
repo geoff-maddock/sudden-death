@@ -43,6 +43,9 @@ async def main():
           // (the realm daily, started from a screen that works anywhere, stays itself on the dark side)
           wEnterMap('u:world', 40, 40); RUN.pending = null; B = null; LAB = true; startMatch({ type: 'normal', ids: ['skelss'], tier: 1, world: { kind: 'rdaily', ref: null, region: 'plains' } }); LAB = false;
           out.daily = { tier: RUN.pending.world.tier, umb: !!RUN.pending.world.umbral, drawMod: B.drawMod || 0 }; B = null; RUN.pending = null;
+          // (a camp ambush on the dark world is Umbral, as any match the dark side starts)
+          RUN.pending = null; B = null; LAB = true; startMatch({ type: 'normal', ids: ['skelss'], world: { kind: 'camp', ref: null, region: 'plains' } }); LAB = false;
+          out.camp = { tier: RUN.pending.world.tier, umb: !!RUN.pending.world.umbral }; B = null; RUN.pending = null;
           // (the other kinds' traits do what they say: the ogre's Block; a player summoned mid-match takes the form next turn)
           LAB = true; startMatch({ type: 'normal', ids: ['gorlak', 'lichoc'], world: { kind: 'wild', ref: null, region: 'plains' } }); LAB = false;
           out.ogre = B.enemies[0].block; B.enemies.push(Object.assign(JSON.parse(JSON.stringify(B.enemies[1])), { shade: 0, uid: 999, st: {} })); const n = B.enemies.length - 1, h0 = B.enemies[n].max; fire('turnStart');
@@ -50,6 +53,7 @@ async def main():
           beginFight = keep; return out; })()""")
         L, D = um['light'], um['dark']
         check(um['daily'] == {'tier': 1, 'umb': False, 'drawMod': 0}, 'the realm daily started on the dark side stays the day\'s match, not an Umbral one', um)
+        check(um['camp'] == {'tier': 3, 'umb': True}, 'a camp ambush on the dark world is an Umbral match', um)
         check(um['ogre'] >= 12 and um['summon'] == {'shade': 1, 'str': 1, 'hp': True}, 'the ogre starts with its Block; a player who joins mid-match takes the umbral form at your next turn', um)
         check(not L['umb'] and D['umb'] and D['tier'] == 3 and L['tier'] == 2, 'a match on the dark side is an Umbral match, at tier 3; the same match in the light is not', um)
         check(D['drawMod'] == -1 and L['drawMod'] == 0 and D['hand'] == L['hand'] - 1 and all(D['shade']) and not any(L['shade']), 'tier U: you draw one card fewer, and its players are drawn in shadow', um)
