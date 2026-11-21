@@ -33,10 +33,21 @@ function doPetTrick() {
 const sdRenderFightHUD = renderFightHUD;
 renderFightHUD = function () {
   sdRenderFightHUD();
-  if (!B || !B.pet) return;
+  if (!B) return;
+  if (B.foePet) $('meBox').insertAdjacentHTML('beforeend', foePanelHTML());
+  if (!B.pet) return;
   $('meBox').insertAdjacentHTML('beforeend', petPanelHTML());
   const b = $('bPetTrick'); if (b) b.onclick = () => doPetTrick();
 };
+// the other side's pet (a rival club's): a badge with what it does, and whether its trick is spent
+function foePanelHTML() {
+  const p = B.foePet, F = p && FOE_PETS[p.kind]; if (!F) return '';
+  const col = PET_EL_COL[F.el] || '#e9dcc0';
+  const tip = `<span class="t">Their ${esc(F.n)}</span>${petA(F.from)} ${esc(F.from)} (${esc(F.el)}), the club's own pet.<br><b>Always:</b> ${esc(F.trait.d)} ${esc(F.power.d)}<br><b>Trick (once a match):</b> ${esc(F.trick.n)}: ${esc(F.trick.d)}${p.used ? ' <i>(used)</i>' : ''}`;
+  return `<div class="petbox foepet" id="foePetBox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;opacity:.95">
+    <span class="petbadge" tabindex="0" data-tip="${esc(tip)}" aria-label="Their ${esc(F.n)}" style="display:inline-flex;align-items:center;gap:6px;border:1px dashed ${col};border-radius:14px;padding:2px 10px 2px 3px;color:${col}">
+      <b style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#17100e;color:${col};border:1px solid ${col}">${esc(F.n[0])}</b>vs. ${esc(F.n)} <small>${p.used ? '(trick spent)' : '(trick ready)'}</small></span></div>`;
+}
 document.addEventListener('keydown', ev => {
   if ((ev.key !== 't' && ev.key !== 'T') || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if (UI.view !== 'fight' || !B || !B.pet || !$('modal').hidden || UI.paused || (ev.target.closest && ev.target.closest('input,textarea'))) return;

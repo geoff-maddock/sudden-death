@@ -44,6 +44,7 @@ function petCtx(q) {
 function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
+  foePetBegin();
   const rp = RUN && RUN.pet; B.pet = null;
   if (!rp || !PETS[rp.kind]) return;
   const D = PETS[rp.kind], moonOn = petMoonOn(D);
@@ -123,3 +124,31 @@ function petText(kind, b, hungry, st) {
   const p = { kind, bond: b || 1, hungry: !!hungry, here: st ? st.here : null, foe: st ? st.foe : null, moonOn: st ? !!st.moonOn : false, inFight: !!st }, say = x => typeof x === 'function' ? x(p) : x;
   return { n: D.n, from: D.from, el: D.el, ctx: st ? petCtx(p).map(k => PET_CTX_NAME[k]) : [], trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
 }
+
+/* ---------- the other side's pet (phase 7): a rival club's special pet, set by the Realm in RUN.foePet ---------- */
+// B.foePet = { kind, name, skill (1 to 3: when it throws its trick), used, t: {} (this turn), f: {} (this fight) }
+function foePetBegin() {
+  const rp = RUN && RUN.foePet; B.foePet = null;
+  if (!rp || typeof FOE_PETS === 'undefined' || !FOE_PETS[rp.kind]) return;
+  B.foePet = { kind: rp.kind, name: FOE_PETS[rp.kind].n, skill: clamp(rp.skill || 1, 1, 3), used: false, t: {}, f: {} };
+}
+function foeSay(t) { fx({ k: 'pet', side: 1, t: `${B.foePet.name}: ${t}` }); log(`Their ${B.foePet.name}: ${t}`, 'bad'); }
+// a rival pet's fright: your pet's next power won't fire
+function foeSpook() { if (B.pet && !B.pet.spooked) { B.pet.spooked = true; log(`${petName()} is spooked: its next power won't fire.`, 'bad'); } }
+// when the CPU throws its trick: at skill 3 when it hurts (or from turn 5, whatever), at 2 now and then once it is
+// ready, at 1 whenever
+function foeTrickNow(F, p) {
+  const ready = F.trick.when ? !!F.trick.when(p) : true;
+  if (p.skill >= 3) return ready || B.turn >= 5;
+  if (p.skill === 2) return B.turn >= 2 && R() < (ready ? .7 : .2);
+  return R() < .3;
+}
+function foePetOn(ev, a) {
+  if (!B || !B.foePet || B.over) return;
+  const p = B.foePet, F = FOE_PETS[p.kind]; if (!F) return;
+  if (ev === 'turnStart') p.t = {};
+  for (const h of [F.trait, F.power]) if (h && h.on && h.on[ev] && !B.over) h.on[ev](a, p);
+  // (the trick: once a match, as your turn ends and theirs begins)
+  if (ev === 'turnEnd' && !p.used && !B.over && F.trick && alive().length && foeTrickNow(F, p)) { p.used = true; foeSay(`${F.trick.n}!`); F.trick.go(p); }
+}
+for (const ev of ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'enemyFalls']) onHook(ev, a => foePetOn(ev, a));

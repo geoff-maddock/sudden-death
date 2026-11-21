@@ -118,3 +118,45 @@ const PETS = {
     ],
     trick: { n: 'Petrifying Glare', d: 'An enemy (not a boss) at 30% of its HP or less turns to stone; any other takes 18 damage.', ops: () => [['petrify', .3]] } },
 };
+
+/* rivals' special pets (phase 7): one for each rival club, never hatched or bought, across the table in that club's
+   matches (the Realm sets RUN.foePet). Each has a trait and a power (on the hooks, from the other side) and a trick the
+   CPU uses once a match, when its skill says (foeTrickNow: skill 3 waits for when it hurts, 1 throws it whenever).
+   They are stronger than a shop pet. Their Block and debuffs go through blockE and debuffP, so your own pet answers
+   them (the Rustnibbler eats the Block, the Jellycube swallows a debuff). */
+const foeLead = () => alive().slice().sort((a, b) => (b.st.str || 0) - (a.st.str || 0) || b.hp - a.hp)[0];
+const foeHurt = () => alive().slice().sort((a, b) => (b.max - b.hp) - (a.max - a.hp))[0];
+const FOE_PETS = {
+  wyvern: { n: 'Wyvern Hatchling', from: 'wyvern', el: 'ember', club: 'ironmaw',
+    trait: { d: 'Their strongest player starts with 2 Strength.', on: { fightStart: () => { const e = foeLead(); if (e) addSt(e, 'str', 2); } } },
+    power: { d: 'Every third turn, its tail flicks you for 4.', on: { turnEnd: () => { const e = foeLead(); if (e && B.turn % 3 === 0) { foeSay('a tail flick, for 4.'); hurtPlayer(4, e); } } } },
+    trick: { n: 'Venom Sting', d: '9 damage, and you are Weak 1.', when: () => (B.P.block || 0) <= 3, go: () => { const e = foeLead(); if (e) hurtPlayer(9, e); debuffP('weak', 1); } } },
+  wisp: { n: 'Will-o\'-Wisp', from: 'will-o\'-wisp', el: 'aether', club: 'mirewood',
+    trait: { d: 'You start each match Weak 1.', on: { fightStart: () => debuffP('weak', 1) } },
+    power: { d: 'At the end of each of your turns, it mends their most hurt player by 3.', on: { turnEnd: () => { const e = foeHurt(); if (e && e.hp < e.max) { const h = Math.min(3, e.max - e.hp); e.hp += h; foeSay(`mends ${e.n} by ${h}.`); } } } },
+    trick: { n: 'Lure', d: 'You are Vulnerable 2, and have 1 less Stamina next turn.', when: () => B.turn >= 2, go: () => { debuffP('vuln', 2); debuffP('drained', 1); } } },
+  shrieker: { n: 'Shrieker Sprout', from: 'shrieker', el: 'bloom', club: 'gallowmere',
+    trait: { d: 'Every one of their players starts with 4 Block.', on: { fightStart: () => { for (const e of alive()) blockE(e, 4); } } },
+    power: { d: 'The fourth card you play in a turn sets it off: you are Weak 1.', on: { cardPlayed: (c, p) => { if (B.cardsThisTurn === 4 && !p.t.shriek) { p.t.shriek = 1; foeSay('SHRIEKS.'); debuffP('weak', 1); } } } },
+    trick: { n: 'Wail', d: 'You are Weak 2 and Vulnerable 2, and your pet is spooked.', when: () => B.turn <= 2, go: () => { debuffP('weak', 2); debuffP('vuln', 2); foeSpook(); } } },
+  basilisk: { n: 'Basilisk Hatchling', from: 'basilisk', el: 'rime', club: 'cragspire',
+    trait: { d: 'At the end of each of your turns, their players gain 2 Block.', on: { turnEnd: () => { for (const e of alive()) blockE(e, 2); } } },
+    power: { d: 'Its first glare each match: you have 1 less Stamina next turn.', on: { turnEnd: (a, p) => { if (!p.f.glare && B.turn >= 2) { p.f.glare = 1; foeSay('glares.'); debuffP('drained', 1); } } } },
+    trick: { n: 'Stony Gaze', d: 'You have 2 less Stamina next turn, and your pet is spooked.', when: () => B.turn >= 3, go: () => { debuffP('drained', 2); foeSpook(); } } },
+  remorhaz: { n: 'Remorhaz Grub', from: 'remorhaz', el: 'ember', club: 'frostfang',
+    trait: { d: 'Their players have 2 Spikes: hit them and you take 2.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'thorns', 2); } } },
+    power: { d: 'Every second turn its back glows: you take 3.', on: { turnEnd: () => { const e = foeLead(); if (e && B.turn % 2 === 0) { foeSay('glows red-hot: 3.'); hurtPlayer(3, e); } } } },
+    trick: { n: 'Searing Coil', d: '12 damage.', when: () => (B.P.block || 0) <= 4, go: () => { const e = foeLead(); if (e) hurtPlayer(12, e); } } },
+  darkmantle: { n: 'Darkmantle', from: 'darkmantle', el: 'tide', club: 'duskhollow',
+    trait: { d: 'Their most hurt player starts with 6 Block.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => a.hp - b.hp)[0]; if (e) blockE(e, 6); } } },
+    power: { d: 'The first time you end a turn with no Block, it squeezes you for 5.', on: { turnEnd: (a, p) => { const e = foeLead(); if (e && !p.f.sq && !(B.P.block > 0)) { p.f.sq = 1; foeSay('drops on you: 5.'); hurtPlayer(5, e); } } } },
+    trick: { n: 'Darkness', d: 'You are Weak 2, and your pet is spooked.', when: () => B.turn >= 2, go: () => { debuffP('weak', 2); foeSpook(); } } },
+  claw: { n: 'Crawling Claw', from: 'crawling claw', el: 'rime', club: 'rattlebone',
+    trait: { d: 'When one of their players falls, the rest gain 1 Strength.', on: { enemyFalls: (e) => { if (e && e.eaten) return; const rest = alive(); if (rest.length) { for (const x of rest) addSt(x, 'str', 1); foeSay('scuttles to the next one: +1 Strength.'); } } } },
+    power: { d: 'Every third turn it grabs your guard: you lose 4 Block.', on: { turnEnd: () => { if (B.turn % 3 === 0 && B.P.block > 0) { const n = Math.min(4, B.P.block); B.P.block -= n; foeSay(`grabs ${n} Block.`); } } } },
+    trick: { n: 'Throttle', d: '7 damage, and you have 1 less Stamina next turn.', when: () => (B.P.block || 0) <= 3, go: () => { const e = foeLead(); if (e) hurtPlayer(7, e); debuffP('drained', 1); } } },
+  griffon: { n: 'Griffon Chick', from: 'griffon', el: 'aether', club: 'bramblegate',
+    trait: { d: 'Their strongest player starts with 2 Strength.', on: { fightStart: () => { const e = foeLead(); if (e) addSt(e, 'str', 2); } } },
+    power: { d: 'Every second turn it dives at you for 3.', on: { turnEnd: () => { const e = foeLead(); if (e && B.turn % 2 === 0) { foeSay('dives: 3.'); hurtPlayer(3, e); } } } },
+    trick: { n: 'Dive', d: '14 damage, and your pet is spooked.', when: () => (B.P.block || 0) <= 5, go: () => { const e = foeLead(); if (e) hurtPlayer(14, e); foeSpook(); } } },
+};

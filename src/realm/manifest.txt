@@ -177,4 +177,5 @@ src/realm/w133-petegg.js
 src/realm/w134-petshop.js
 src/realm/w135-petbond.js
 src/realm/w136-petctx.js
+src/realm/w137-petrivals.js
 src/realm/w112-quickstart.js

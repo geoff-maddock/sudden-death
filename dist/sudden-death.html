@@ -3121,6 +3121,7 @@ function petCtx(q) {
 function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
+  foePetBegin();
   const rp = RUN && RUN.pet; B.pet = null;
   if (!rp || !PETS[rp.kind]) return;
   const D = PETS[rp.kind], moonOn = petMoonOn(D);
@@ -3200,6 +3201,34 @@ function petText(kind, b, hungry, st) {
   const p = { kind, bond: b || 1, hungry: !!hungry, here: st ? st.here : null, foe: st ? st.foe : null, moonOn: st ? !!st.moonOn : false, inFight: !!st }, say = x => typeof x === 'function' ? x(p) : x;
   return { n: D.n, from: D.from, el: D.el, ctx: st ? petCtx(p).map(k => PET_CTX_NAME[k]) : [], trait: say(D.trait.d), powers: (D.powers || []).map(w => ({ at: w.at || 1, d: say(w.d), open: (w.at || 1) <= p.bond })), trick: { n: D.trick.n, d: say(D.trick.d) } };
 }
+
+/* ---------- the other side's pet (phase 7): a rival club's special pet, set by the Realm in RUN.foePet ---------- */
+// B.foePet = { kind, name, skill (1 to 3: when it throws its trick), used, t: {} (this turn), f: {} (this fight) }
+function foePetBegin() {
+  const rp = RUN && RUN.foePet; B.foePet = null;
+  if (!rp || typeof FOE_PETS === 'undefined' || !FOE_PETS[rp.kind]) return;
+  B.foePet = { kind: rp.kind, name: FOE_PETS[rp.kind].n, skill: clamp(rp.skill || 1, 1, 3), used: false, t: {}, f: {} };
+}
+function foeSay(t) { fx({ k: 'pet', side: 1, t: `${B.foePet.name}: ${t}` }); log(`Their ${B.foePet.name}: ${t}`, 'bad'); }
+// a rival pet's fright: your pet's next power won't fire
+function foeSpook() { if (B.pet && !B.pet.spooked) { B.pet.spooked = true; log(`${petName()} is spooked: its next power won't fire.`, 'bad'); } }
+// when the CPU throws its trick: at skill 3 when it hurts (or from turn 5, whatever), at 2 now and then once it is
+// ready, at 1 whenever
+function foeTrickNow(F, p) {
+  const ready = F.trick.when ? !!F.trick.when(p) : true;
+  if (p.skill >= 3) return ready || B.turn >= 5;
+  if (p.skill === 2) return B.turn >= 2 && R() < (ready ? .7 : .2);
+  return R() < .3;
+}
+function foePetOn(ev, a) {
+  if (!B || !B.foePet || B.over) return;
+  const p = B.foePet, F = FOE_PETS[p.kind]; if (!F) return;
+  if (ev === 'turnStart') p.t = {};
+  for (const h of [F.trait, F.power]) if (h && h.on && h.on[ev] && !B.over) h.on[ev](a, p);
+  // (the trick: once a match, as your turn ends and theirs begins)
+  if (ev === 'turnEnd' && !p.used && !B.over && F.trick && alive().length && foeTrickNow(F, p)) { p.used = true; foeSay(`${F.trick.n}!`); F.trick.go(p); }
+}
+for (const ev of ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'enemyFalls']) onHook(ev, a => foePetOn(ev, a));
 /* The pets (issue #104): small monsters from the D&D 5e SRD (5.1, CC-BY-4.0) or common myth, with a little whimsy. The
    rules are engine/pets.js. Each pet: n (its name), from (what it is), el (its element), rar (c common, u uncommon, r
    rare), how (where you get one: 'shop', 'keeper', 'egg'), trait { d, on, mod, atk }, powers [{ at (the bond it opens
@@ -3319,6 +3348,48 @@ const PETS = {
       { at: 2, d: 'Once a fight, at the end of your turn, an enemy (not a boss) at a quarter of its HP or less turns to stone.', on: { turnEnd: { when: (a, p) => !p.f.stone && alive().some(e => !isBoss(e) && e.hp <= e.max * .25), then: (a, p) => { p.f.stone = 1; const t = alive().find(e => !isBoss(e) && e.hp <= e.max * .25); petSay(`stares ${t.n} to stone.`); hurtEnemy(t, t.hp + t.block, { raw: true, src: 'Stare' }); } } } },
     ],
     trick: { n: 'Petrifying Glare', d: 'An enemy (not a boss) at 30% of its HP or less turns to stone; any other takes 18 damage.', ops: () => [['petrify', .3]] } },
+};
+
+/* rivals' special pets (phase 7): one for each rival club, never hatched or bought, across the table in that club's
+   matches (the Realm sets RUN.foePet). Each has a trait and a power (on the hooks, from the other side) and a trick the
+   CPU uses once a match, when its skill says (foeTrickNow: skill 3 waits for when it hurts, 1 throws it whenever).
+   They are stronger than a shop pet. Their Block and debuffs go through blockE and debuffP, so your own pet answers
+   them (the Rustnibbler eats the Block, the Jellycube swallows a debuff). */
+const foeLead = () => alive().slice().sort((a, b) => (b.st.str || 0) - (a.st.str || 0) || b.hp - a.hp)[0];
+const foeHurt = () => alive().slice().sort((a, b) => (b.max - b.hp) - (a.max - a.hp))[0];
+const FOE_PETS = {
+  wyvern: { n: 'Wyvern Hatchling', from: 'wyvern', el: 'ember', club: 'ironmaw',
+    trait: { d: 'Their strongest player starts with 2 Strength.', on: { fightStart: () => { const e = foeLead(); if (e) addSt(e, 'str', 2); } } },
+    power: { d: 'Every third turn, its tail flicks you for 4.', on: { turnEnd: () => { const e = foeLead(); if (e && B.turn % 3 === 0) { foeSay('a tail flick, for 4.'); hurtPlayer(4, e); } } } },
+    trick: { n: 'Venom Sting', d: '9 damage, and you are Weak 1.', when: () => (B.P.block || 0) <= 3, go: () => { const e = foeLead(); if (e) hurtPlayer(9, e); debuffP('weak', 1); } } },
+  wisp: { n: 'Will-o\'-Wisp', from: 'will-o\'-wisp', el: 'aether', club: 'mirewood',
+    trait: { d: 'You start each match Weak 1.', on: { fightStart: () => debuffP('weak', 1) } },
+    power: { d: 'At the end of each of your turns, it mends their most hurt player by 3.', on: { turnEnd: () => { const e = foeHurt(); if (e && e.hp < e.max) { const h = Math.min(3, e.max - e.hp); e.hp += h; foeSay(`mends ${e.n} by ${h}.`); } } } },
+    trick: { n: 'Lure', d: 'You are Vulnerable 2, and have 1 less Stamina next turn.', when: () => B.turn >= 2, go: () => { debuffP('vuln', 2); debuffP('drained', 1); } } },
+  shrieker: { n: 'Shrieker Sprout', from: 'shrieker', el: 'bloom', club: 'gallowmere',
+    trait: { d: 'Every one of their players starts with 4 Block.', on: { fightStart: () => { for (const e of alive()) blockE(e, 4); } } },
+    power: { d: 'The fourth card you play in a turn sets it off: you are Weak 1.', on: { cardPlayed: (c, p) => { if (B.cardsThisTurn === 4 && !p.t.shriek) { p.t.shriek = 1; foeSay('SHRIEKS.'); debuffP('weak', 1); } } } },
+    trick: { n: 'Wail', d: 'You are Weak 2 and Vulnerable 2, and your pet is spooked.', when: () => B.turn <= 2, go: () => { debuffP('weak', 2); debuffP('vuln', 2); foeSpook(); } } },
+  basilisk: { n: 'Basilisk Hatchling', from: 'basilisk', el: 'rime', club: 'cragspire',
+    trait: { d: 'At the end of each of your turns, their players gain 2 Block.', on: { turnEnd: () => { for (const e of alive()) blockE(e, 2); } } },
+    power: { d: 'Its first glare each match: you have 1 less Stamina next turn.', on: { turnEnd: (a, p) => { if (!p.f.glare && B.turn >= 2) { p.f.glare = 1; foeSay('glares.'); debuffP('drained', 1); } } } },
+    trick: { n: 'Stony Gaze', d: 'You have 2 less Stamina next turn, and your pet is spooked.', when: () => B.turn >= 3, go: () => { debuffP('drained', 2); foeSpook(); } } },
+  remorhaz: { n: 'Remorhaz Grub', from: 'remorhaz', el: 'ember', club: 'frostfang',
+    trait: { d: 'Their players have 2 Spikes: hit them and you take 2.', on: { fightStart: () => { for (const e of alive()) addSt(e, 'thorns', 2); } } },
+    power: { d: 'Every second turn its back glows: you take 3.', on: { turnEnd: () => { const e = foeLead(); if (e && B.turn % 2 === 0) { foeSay('glows red-hot: 3.'); hurtPlayer(3, e); } } } },
+    trick: { n: 'Searing Coil', d: '12 damage.', when: () => (B.P.block || 0) <= 4, go: () => { const e = foeLead(); if (e) hurtPlayer(12, e); } } },
+  darkmantle: { n: 'Darkmantle', from: 'darkmantle', el: 'tide', club: 'duskhollow',
+    trait: { d: 'Their most hurt player starts with 6 Block.', on: { fightStart: () => { const e = alive().slice().sort((a, b) => a.hp - b.hp)[0]; if (e) blockE(e, 6); } } },
+    power: { d: 'The first time you end a turn with no Block, it squeezes you for 5.', on: { turnEnd: (a, p) => { const e = foeLead(); if (e && !p.f.sq && !(B.P.block > 0)) { p.f.sq = 1; foeSay('drops on you: 5.'); hurtPlayer(5, e); } } } },
+    trick: { n: 'Darkness', d: 'You are Weak 2, and your pet is spooked.', when: () => B.turn >= 2, go: () => { debuffP('weak', 2); foeSpook(); } } },
+  claw: { n: 'Crawling Claw', from: 'crawling claw', el: 'rime', club: 'rattlebone',
+    trait: { d: 'When one of their players falls, the rest gain 1 Strength.', on: { enemyFalls: (e) => { if (e && e.eaten) return; const rest = alive(); if (rest.length) { for (const x of rest) addSt(x, 'str', 1); foeSay('scuttles to the next one: +1 Strength.'); } } } },
+    power: { d: 'Every third turn it grabs your guard: you lose 4 Block.', on: { turnEnd: () => { if (B.turn % 3 === 0 && B.P.block > 0) { const n = Math.min(4, B.P.block); B.P.block -= n; foeSay(`grabs ${n} Block.`); } } } },
+    trick: { n: 'Throttle', d: '7 damage, and you have 1 less Stamina next turn.', when: () => (B.P.block || 0) <= 3, go: () => { const e = foeLead(); if (e) hurtPlayer(7, e); debuffP('drained', 1); } } },
+  griffon: { n: 'Griffon Chick', from: 'griffon', el: 'aether', club: 'bramblegate',
+    trait: { d: 'Their strongest player starts with 2 Strength.', on: { fightStart: () => { const e = foeLead(); if (e) addSt(e, 'str', 2); } } },
+    power: { d: 'Every second turn it dives at you for 3.', on: { turnEnd: () => { const e = foeLead(); if (e && B.turn % 2 === 0) { foeSay('dives: 3.'); hurtPlayer(3, e); } } } },
+    trick: { n: 'Dive', d: '14 damage, and your pet is spooked.', when: () => (B.P.block || 0) <= 5, go: () => { const e = foeLead(); if (e) hurtPlayer(14, e); foeSpook(); } } },
 };
 /* p2c: the open draft. Free agents: one prospect of every kind, no club, no colours but the league's own sand. */
 CLUBS.free = { id: 'free', name: 'Free Agents', short: 'FA', color: '#c2a46a', light: '#f4e8c4', dark: '#2a2216', motto: 'No club. No contract. No mercy.', relic: null, roster: [] };
@@ -4730,7 +4801,7 @@ function consumeFx() {
       case 'bat': case 'drive': case 'strike': case 'bell': sportPop(f); break;
       case 'say2': A.pops.push({ x: 480, y: 250, t: f.t, col: '#ffd166', t0: A.t + delay, life: 1.1, size: 30 }); delay += .1; break;
       // a pet's effect (engine/pets.js): over your side, in its element's colour, with a little chirp
-      case 'pet': { const p = partyPt(), D = B.pet && PETS[B.pet.kind]; A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); tone(880, .08, 'sine', .03, 300, delay); delay += .15; break; }
+      case 'pet': { const e0 = f.side ? alive()[0] : null, p = f.side ? (e0 ? ep(e0.uid) : { x: 720, y: 220 }) : partyPt(), D = f.side ? (B.foePet && FOE_PETS[B.foePet.kind]) : (B.pet && PETS[B.pet.kind]); A.pops.push({ x: p.x, y: p.y - 48, t: f.t, col: (D && typeof PET_EL_COL !== 'undefined' && PET_EL_COL[D.el]) || '#e9dcc0', t0: A.t + delay, life: 1.8, size: 17 }); tone(880, .08, 'sine', .03, 300, delay); delay += .15; break; }
     }
   }
 }
@@ -4997,10 +5068,21 @@ function doPetTrick() {
 const sdRenderFightHUD = renderFightHUD;
 renderFightHUD = function () {
   sdRenderFightHUD();
-  if (!B || !B.pet) return;
+  if (!B) return;
+  if (B.foePet) $('meBox').insertAdjacentHTML('beforeend', foePanelHTML());
+  if (!B.pet) return;
   $('meBox').insertAdjacentHTML('beforeend', petPanelHTML());
   const b = $('bPetTrick'); if (b) b.onclick = () => doPetTrick();
 };
+// the other side's pet (a rival club's): a badge with what it does, and whether its trick is spent
+function foePanelHTML() {
+  const p = B.foePet, F = p && FOE_PETS[p.kind]; if (!F) return '';
+  const col = PET_EL_COL[F.el] || '#e9dcc0';
+  const tip = `<span class="t">Their ${esc(F.n)}</span>${petA(F.from)} ${esc(F.from)} (${esc(F.el)}), the club's own pet.<br><b>Always:</b> ${esc(F.trait.d)} ${esc(F.power.d)}<br><b>Trick (once a match):</b> ${esc(F.trick.n)}: ${esc(F.trick.d)}${p.used ? ' <i>(used)</i>' : ''}`;
+  return `<div class="petbox foepet" id="foePetBox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;opacity:.95">
+    <span class="petbadge" tabindex="0" data-tip="${esc(tip)}" aria-label="Their ${esc(F.n)}" style="display:inline-flex;align-items:center;gap:6px;border:1px dashed ${col};border-radius:14px;padding:2px 10px 2px 3px;color:${col}">
+      <b style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#17100e;color:${col};border:1px solid ${col}">${esc(F.n[0])}</b>vs. ${esc(F.n)} <small>${p.used ? '(trick spent)' : '(trick ready)'}</small></span></div>`;
+}
 document.addEventListener('keydown', ev => {
   if ((ev.key !== 't' && ev.key !== 'T') || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if (UI.view !== 'fight' || !B || !B.pet || !$('modal').hidden || UI.paused || (ev.target.closest && ev.target.closest('input,textarea'))) return;
