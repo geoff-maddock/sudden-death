@@ -67,7 +67,7 @@ async def main():
         check(m['swap'] and m['b3'] == 1 and m['tr'] == 1 and m['ach'] == [], 'a pet joining by a full kennel\'s swap counts its kind; bond 3 and a trick thrown count; all five medals are in the book', m)
 
         t = await pg.evaluate("""(async () => { __tips.length = 0; UI.view = 'world'; SET.tips = true; wAddItem(wPeggItem('imp'), 1); const t0 = Date.now(); await new Promise(r => { const f = () => __tips.includes('w_petegg') || Date.now() - t0 > 5000 ? r() : setTimeout(f, 50); f(); });
-          const q = wPets().owned[0]; q.hungry = false; RUN.gold = 0; WG.petWeek = wWeek() - 1; wNewDay(); const t1 = Date.now(); await new Promise(r => { const f = () => __tips.includes('w_pethungry') || Date.now() - t1 > 5000 ? r() : setTimeout(f, 50); f(); });
+          for (const x of wPets().owned) x.hungry = false; __tips.length = 0; RUN.gold = 0; WG.petWeek = wWeek() - 1; wNewDay(); const t1 = Date.now(); await new Promise(r => { const f = () => __tips.includes('w_pethungry') || Date.now() - t1 > 5000 ? r() : setTimeout(f, 50); f(); });
           return { tips: [...new Set(__tips)].filter(id => id.startsWith('w_pet')), defined: ['w_pet', 'w_petegg', 'w_pethungry'].filter(k => !TIPS[k]) }; })()""")
         check(set(['w_pet', 'w_petegg', 'w_pethungry']) <= set(t['tips']) and t['defined'] == [], 'tips: the first pet, the first pet egg, the first hungry pet', t)
 
