@@ -55,11 +55,12 @@ async def main():
           RUN.pet = { kind: 'hootling', name: 'H', bond: 3 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' }); petTrick(0); out.tr = st().tr; B = null; showView('world');
           out.ach = ['w_petkinds', 'w_kennel', 'w_bond3', 'w_hatch', 'w_tricks'].filter(id => !ACH.some(a => a.id === id));
           return out; })()""")
+        if not check('stuck' not in m, 'the full kennel\'s question opened', m): m = {'full': {'full': 0, 'kinds': [], 'hatch': []}, 'swap': False, 'b3': 0, 'tr': 0, 'ach': ['?']}
         check(m['full']['full'] == 1 and 'pseudodragon' in m['full']['kinds'] and m['full']['hatch'] == ['aether'], 'medals: kinds owned, a full kennel, hatching places used', m)
         check(m['swap'] and m['b3'] == 1 and m['tr'] == 1 and m['ach'] == [], 'a pet joining by a full kennel\'s swap counts its kind; bond 3 and a trick thrown count; all five medals are in the book', m)
 
-        t = await pg.evaluate("""(async () => { __tips.length = 0; UI.view = 'world'; SET.tips = true; wAddItem(wPeggItem('imp'), 1); await new Promise(r => setTimeout(r, 1000));
-          const q = wPets().owned[0]; q.hungry = false; RUN.gold = 0; WG.petWeek = wWeek() - 1; wNewDay();
+        t = await pg.evaluate("""(async () => { __tips.length = 0; UI.view = 'world'; SET.tips = true; wAddItem(wPeggItem('imp'), 1); const t0 = Date.now(); await new Promise(r => { const f = () => __tips.includes('w_petegg') || Date.now() - t0 > 5000 ? r() : setTimeout(f, 50); f(); });
+          const q = wPets().owned[0]; q.hungry = false; RUN.gold = 0; WG.petWeek = wWeek() - 1; wNewDay(); const t1 = Date.now(); await new Promise(r => { const f = () => __tips.includes('w_pethungry') || Date.now() - t1 > 5000 ? r() : setTimeout(f, 50); f(); });
           return { tips: [...new Set(__tips)].filter(id => id.startsWith('w_pet')), defined: ['w_pet', 'w_petegg', 'w_pethungry'].filter(k => !TIPS[k]) }; })()""")
         check(set(['w_pet', 'w_petegg', 'w_pethungry']) <= set(t['tips']) and t['defined'] == [], 'tips: the first pet, the first pet egg, the first hungry pet', t)
 
@@ -69,6 +70,7 @@ async def main():
         tab = await pg.evaluate("""(async () => { wOpenCamp('pets'); const t0 = Date.now(); await new Promise(r => { const f = () => document.querySelector('#wCampBody .wpetpic') || Date.now() - t0 > 3000 ? r() : setTimeout(f, 20); f(); }); if (!document.querySelector('#wCampBody .wpetpic')) return { stuck: true };
           const cvs = [...document.querySelectorAll('#wCampBody .wpetpic')], inked = cvs.filter(cv => { const d = cv.getContext('2d').getImageData(0, 0, 64, 64).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; }).length;
           const card = document.querySelector('#wCampBody .wpetc .wpi').getBoundingClientRect().width; """ + ESC + """ return { cards: cvs.length, inked, wide: card > 300 }; })()""")
+        if not check('stuck' not in tab, 'the Pets tab opened', tab): tab = {'cards': 0, 'inked': -1, 'wide': False}
         check(tab['cards'] > 0 and tab['inked'] == tab['cards'] and tab['wide'], 'each Pets tab card has its portrait, and its words have the room they need', tab)
         await pg.evaluate("showPage('help')")
         qs = await pg.evaluate("""(() => { const p = document.querySelector('#wQuick [data-wqp="pets"]'); return { tab: !!document.querySelector('#wQuick [data-wq="pets"]'), imgs: p ? p.querySelectorAll('img.wqimg').length : 0, missing: ['pets-tab', 'pets-field', 'pets-hatch'].filter(k => !W_QUICK_IMG[k]) }; })()""")

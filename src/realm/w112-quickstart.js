@@ -5,7 +5,8 @@
    button beside its How to play button (baseball's beside Back to the world), which opens the page on that sport's
    tab: the game waits while you read, as it does for How to play (baseball calls Time out).
    W_QUICK is the table: a sport's { id, n: name, where, lede, steps: [{ img, h, t }], keys: [[keys, what]], phone,
-   more: the full rules' section id }. A new sport is a row (and its shots in the script).
+   more: the full rules' section id, foot: an ending of its own (else the sports' one) }. A new sport is a row (and its
+   shots in the script).
 
    Wraps: renderHelp (wW112RenderHelp: #wQuick). */
 
@@ -95,7 +96,7 @@ function wQuickHTML() {
     ${s.tip ? `<p class="hint"><b>Tip.</b> ${s.tip}</p>` : ''}
     <table class="wqkeys">${s.keys.map(([k, w]) => `<tr><td><kbd>${k}</kbd></td><td>${w}</td></tr>`).join('')}</table>
     <p class="hint">${s.phone}</p>
-    <p class="hint"><small>That's all you need for a first game. The full rules, and everything optional (powers, stances, calls), are further down: <a href="#" data-wqmore="${s.more}">${s.n}: how it works</a>.</small></p></div>`).join('');
+    <p class="hint"><small>${s.foot || `That's all you need for a first game. The full rules, and everything optional (powers, stances, calls), are further down: <a href="#" data-wqmore="${s.more}">${s.n}: how it works</a>.`}</small></p></div>`).join('');
   return `<section id="wQuick" class="whelp"><h3>Quick start: playing the sports</h3>
     <p class="hint">Eight sports have games you can play yourself at their grounds; the last tab is for pets. Pick one for the few things you need to know.</p>
     <div class="wqtabs">${tabs}</div>${panes}</section>`;

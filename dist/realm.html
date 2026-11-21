@@ -61984,7 +61984,7 @@ function wPetAdd(kind, from, o) {
   const P = wPets(), q = Object.assign({ kind, name: o.name || PETS[kind].n, bond: 1, xp: 0, got: WG.dayAbs, from: from || '', hungry: false }, o);
   q.id = P.seq++;
   if (P.owned.length >= W_PET.kennel) {
-    const a = wPetAway(q); wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
+    const a = wPetAway(q); if (how.quiet) a.quiet = 1; wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
     if (!LAB) { W_PET_ASK.push(q.id); wPetAskSoon(); }
     return Object.assign({}, q, { waits: true });
   }
@@ -62005,7 +62005,7 @@ function wPetAskNext() {
   const id = W_PET_ASK.shift(), a = WG.petAway.find(x => x.id === id);
   // (still waiting, and the kennel still full: ask; else it stays where it waits, to be reclaimed)
   if (!a || wPets().owned.length < W_PET.kennel) return wPetAskNext();
-  wPetFull(Object.assign({}, a, { id }), a);
+  const q = Object.assign({}, a, { id }); delete q.quiet; wPetFull(q, a);
 }
 const wW132Drain = wDrain;
 wDrain = function () { wW132Drain.apply(this, arguments); if (W_PET_ASK.length) wPetAskSoon(); };
@@ -62023,7 +62023,7 @@ function wPetFull(q, a) {
       // (one that can't go now, the one at your side in a match, says so and the choice stays open)
       const why = wPetLetGo(id); if (why) { const w = $('wPetFullWhy'); w.textContent = why; w.hidden = false; return; }
       const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1);
-      P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g'); wPetJoined(q, {});
+      P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g'); wPetJoined(q, { quiet: !!a.quiet });
     }
     wSave(); close();
   });
@@ -62100,7 +62100,7 @@ wStart = function (save, opts) { W_PET_ASK.length = 0; if (W_PET_ASK.close) { if
 function wPetCard(q, side) {
   const T = petText(q.kind, q.bond || 1, q.hungry), D = PETS[q.kind], col = PET_EL_COL[D.el] || '#e9dcc0';
   return `<li class="wpr wpetc" data-petid="${q.id}" style="border-left:4px solid ${col}">
-    <canvas class="wpetpic" width="64" height="64" data-petpic="${q.kind}" aria-hidden="true"></canvas>
+    <canvas class="wpetpic" width="64" height="64" style="width:100%;max-width:64px;height:auto" data-petpic="${q.kind}" aria-hidden="true"></canvas>
     <div class="wpi"><div class="wpn"><b>${esc(q.name)}</b><span class="k">${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)})</span>${side ? '<span class="wtag wb">At your side</span>' : ''}${q.hungry ? '<span class="wtag">Hungry</span>' : ''}</div>
       <small class="wnst">Bond ${q.bond || 1} of 3 · upkeep ${wPetCost(q)} gold a week</small>
       <small class="hint"><b>Always:</b> ${esc(T.trait)} ${T.powers.map(w => `<span${w.open ? '' : ' class="dim"'}>${w.open ? '' : `(bond ${w.at}) `}${esc(w.d)}</span>`).join(' ')} <b>Trick:</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}</small></div>
@@ -62892,7 +62892,8 @@ renderHelp = function () {
    button beside its How to play button (baseball's beside Back to the world), which opens the page on that sport's
    tab: the game waits while you read, as it does for How to play (baseball calls Time out).
    W_QUICK is the table: a sport's { id, n: name, where, lede, steps: [{ img, h, t }], keys: [[keys, what]], phone,
-   more: the full rules' section id }. A new sport is a row (and its shots in the script).
+   more: the full rules' section id, foot: an ending of its own (else the sports' one) }. A new sport is a row (and its
+   shots in the script).
 
    Wraps: renderHelp (wW112RenderHelp: #wQuick). */
 
@@ -62982,7 +62983,7 @@ function wQuickHTML() {
     ${s.tip ? `<p class="hint"><b>Tip.</b> ${s.tip}</p>` : ''}
     <table class="wqkeys">${s.keys.map(([k, w]) => `<tr><td><kbd>${k}</kbd></td><td>${w}</td></tr>`).join('')}</table>
     <p class="hint">${s.phone}</p>
-    <p class="hint"><small>That's all you need for a first game. The full rules, and everything optional (powers, stances, calls), are further down: <a href="#" data-wqmore="${s.more}">${s.n}: how it works</a>.</small></p></div>`).join('');
+    <p class="hint"><small>${s.foot || `That's all you need for a first game. The full rules, and everything optional (powers, stances, calls), are further down: <a href="#" data-wqmore="${s.more}">${s.n}: how it works</a>.`}</small></p></div>`).join('');
   return `<section id="wQuick" class="whelp"><h3>Quick start: playing the sports</h3>
     <p class="hint">Eight sports have games you can play yourself at their grounds; the last tab is for pets. Pick one for the few things you need to know.</p>
     <div class="wqtabs">${tabs}</div>${panes}</section>`;
@@ -63079,7 +63080,8 @@ wPetTreat = function () { const why = wW138PetTreat.apply(this, arguments); if (
 const wW138PetTrick = petTrick;
 petTrick = function () { const r = wW138PetTrick.apply(this, arguments); if (r !== false && WG && !LAB) achAdd('realmPetTricks', 1); return r; };
 const wW138PetUpkeep = wPetUpkeep;
-wPetUpkeep = function () { const r = wW138PetUpkeep.apply(this, arguments); if (!LAB && SET.tips && wPets().owned.some(q => q.hungry)) tip('w_pethungry'); return r; };
+// (noted as the week turns; shown by wPetTips once you are on the map)
+wPetUpkeep = function () { const r = wW138PetUpkeep.apply(this, arguments); if (!LAB && wPets().owned.some(q => q.hungry)) WG.petHungryTip = 1; return r; };
 
 Object.assign(TIPS, {
   w_pet: ['Your pet', 'Your pet fights beside you in card matches. The Pets tab on the Team screen (C) shows what it does and which one goes with you. In a match, its trick is the button by its name, or T, once a match.'],
@@ -63089,6 +63091,7 @@ Object.assign(TIPS, {
 function wPetTips() {
   if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
   if (WG.pets && WG.pets.owned.length) tip('w_pet');
+  if (WG.petHungryTip) { delete WG.petHungryTip; tip('w_pethungry'); }
   if (typeof W_PEGG !== 'undefined' && Object.keys(W_PEGG.eggs).some(k => wHas(wPeggItem(k)))) tip('w_petegg');
 }
 setInterval(wPetTips, 900);
@@ -63111,6 +63114,7 @@ W_QUICK.push({ id: 'pets', n: 'Pets', where: 'your camp', more: 'wHelpPets',
   ],
   tip: 'Every pet costs its upkeep each week. A hungry one is weaker: feed it, or give it a treat.',
   keys: [['C', 'the Team screen (the Pets tab)'], ['T', 'your pet\'s trick, in a match'], ['Hover', 'its name in a match: what it does now']],
-  phone: 'On a phone, tap the trick button by your pet\'s name.' });
+  phone: 'On a phone, tap the trick button by your pet\'s name.',
+  foot: 'That\'s all you need to start. Everything else, bond, treats, eggs, shops and what suits each pet, is further down: <a href="#" data-wqmore="wHelpPets">Pets: how it works</a>.' });
 </script>
 </body></html>

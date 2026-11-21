@@ -49,7 +49,8 @@ wPetTreat = function () { const why = wW138PetTreat.apply(this, arguments); if (
 const wW138PetTrick = petTrick;
 petTrick = function () { const r = wW138PetTrick.apply(this, arguments); if (r !== false && WG && !LAB) achAdd('realmPetTricks', 1); return r; };
 const wW138PetUpkeep = wPetUpkeep;
-wPetUpkeep = function () { const r = wW138PetUpkeep.apply(this, arguments); if (!LAB && SET.tips && wPets().owned.some(q => q.hungry)) tip('w_pethungry'); return r; };
+// (noted as the week turns; shown by wPetTips once you are on the map)
+wPetUpkeep = function () { const r = wW138PetUpkeep.apply(this, arguments); if (!LAB && wPets().owned.some(q => q.hungry)) WG.petHungryTip = 1; return r; };
 
 Object.assign(TIPS, {
   w_pet: ['Your pet', 'Your pet fights beside you in card matches. The Pets tab on the Team screen (C) shows what it does and which one goes with you. In a match, its trick is the button by its name, or T, once a match.'],
@@ -59,6 +60,7 @@ Object.assign(TIPS, {
 function wPetTips() {
   if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run' || UI.view !== 'world') return;
   if (WG.pets && WG.pets.owned.length) tip('w_pet');
+  if (WG.petHungryTip) { delete WG.petHungryTip; tip('w_pethungry'); }
   if (typeof W_PEGG !== 'undefined' && Object.keys(W_PEGG.eggs).some(k => wHas(wPeggItem(k)))) tip('w_petegg');
 }
 setInterval(wPetTips, 900);
@@ -81,4 +83,5 @@ W_QUICK.push({ id: 'pets', n: 'Pets', where: 'your camp', more: 'wHelpPets',
   ],
   tip: 'Every pet costs its upkeep each week. A hungry one is weaker: feed it, or give it a treat.',
   keys: [['C', 'the Team screen (the Pets tab)'], ['T', 'your pet\'s trick, in a match'], ['Hover', 'its name in a match: what it does now']],
-  phone: 'On a phone, tap the trick button by your pet\'s name.' });
+  phone: 'On a phone, tap the trick button by your pet\'s name.',
+  foot: 'That\'s all you need to start. Everything else, bond, treats, eggs, shops and what suits each pet, is further down: <a href="#" data-wqmore="wHelpPets">Pets: how it works</a>.' });

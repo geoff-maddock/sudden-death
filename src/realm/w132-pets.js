@@ -53,7 +53,7 @@ function wPetAdd(kind, from, o) {
   const P = wPets(), q = Object.assign({ kind, name: o.name || PETS[kind].n, bond: 1, xp: 0, got: WG.dayAbs, from: from || '', hungry: false }, o);
   q.id = P.seq++;
   if (P.owned.length >= W_PET.kennel) {
-    const a = wPetAway(q); wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
+    const a = wPetAway(q); if (how.quiet) a.quiet = 1; wLog(`${q.name} the ${PETS[kind].from} wants in, but your kennel is full: it waits where it came from.`, 'd'); wSave();
     if (!LAB) { W_PET_ASK.push(q.id); wPetAskSoon(); }
     return Object.assign({}, q, { waits: true });
   }
@@ -74,7 +74,7 @@ function wPetAskNext() {
   const id = W_PET_ASK.shift(), a = WG.petAway.find(x => x.id === id);
   // (still waiting, and the kennel still full: ask; else it stays where it waits, to be reclaimed)
   if (!a || wPets().owned.length < W_PET.kennel) return wPetAskNext();
-  wPetFull(Object.assign({}, a, { id }), a);
+  const q = Object.assign({}, a, { id }); delete q.quiet; wPetFull(q, a);
 }
 const wW132Drain = wDrain;
 wDrain = function () { wW132Drain.apply(this, arguments); if (W_PET_ASK.length) wPetAskSoon(); };
@@ -92,7 +92,7 @@ function wPetFull(q, a) {
       // (one that can't go now, the one at your side in a match, says so and the choice stays open)
       const why = wPetLetGo(id); if (why) { const w = $('wPetFullWhy'); w.textContent = why; w.hidden = false; return; }
       const k = WG.petAway.indexOf(a); if (k >= 0) WG.petAway.splice(k, 1);
-      P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g'); wPetJoined(q, {});
+      P.owned.push(q); if (P.side == null) P.side = q.id; wPetSync(); wLog(`${q.name} the ${PETS[q.kind].from} joins your kennel.`, 'g'); wPetJoined(q, { quiet: !!a.quiet });
     }
     wSave(); close();
   });
@@ -169,7 +169,7 @@ wStart = function (save, opts) { W_PET_ASK.length = 0; if (W_PET_ASK.close) { if
 function wPetCard(q, side) {
   const T = petText(q.kind, q.bond || 1, q.hungry), D = PETS[q.kind], col = PET_EL_COL[D.el] || '#e9dcc0';
   return `<li class="wpr wpetc" data-petid="${q.id}" style="border-left:4px solid ${col}">
-    <canvas class="wpetpic" width="64" height="64" data-petpic="${q.kind}" aria-hidden="true"></canvas>
+    <canvas class="wpetpic" width="64" height="64" style="width:100%;max-width:64px;height:auto" data-petpic="${q.kind}" aria-hidden="true"></canvas>
     <div class="wpi"><div class="wpn"><b>${esc(q.name)}</b><span class="k">${esc(T.n)}, ${petA(T.from)} ${esc(T.from)} (${esc(T.el)})</span>${side ? '<span class="wtag wb">At your side</span>' : ''}${q.hungry ? '<span class="wtag">Hungry</span>' : ''}</div>
       <small class="wnst">Bond ${q.bond || 1} of 3 · upkeep ${wPetCost(q)} gold a week</small>
       <small class="hint"><b>Always:</b> ${esc(T.trait)} ${T.powers.map(w => `<span${w.open ? '' : ' class="dim"'}>${w.open ? '' : `(bond ${w.at}) `}${esc(w.d)}</span>`).join(' ')} <b>Trick:</b> ${esc(T.trick.n)}: ${esc(T.trick.d)}</small></div>
