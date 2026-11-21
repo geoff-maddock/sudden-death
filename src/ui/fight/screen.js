@@ -60,7 +60,7 @@ function renderHand() {
   fitHand();
   h.querySelectorAll('.card').forEach(el => {
     const i = +el.dataset.i;
-    el.onclick = () => { if (UI.dragged) { UI.dragged = false; return; } if (DRAG_NOW && DRAG_NOW.el !== el) return; selectCard(i); };
+    el.onclick = () => { if (UI.dragged) { UI.dragged = false; return; } if (DRAG_NOW && DRAG_NOW.touch && DRAG_NOW.el !== el) return; selectCard(i); };
     el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCard(i); } };
     el.onmouseenter = () => { UI.hoverCard = i; updatePreview(); };
     el.onmouseleave = () => { if (UI.hoverCard === i) UI.hoverCard = -1; updatePreview(); };
@@ -97,12 +97,14 @@ function updatePreview() {
    waiting discard, the same card in the same place. A gesture the browser takes over, or the window losing focus,
    ends the drag with nothing played and the target as it was, and so does a mouse let go where the page never heard
    it (a move with no button held, once one was). Only the pointer that started it drives it.
-   Issue #107: while a drag is live (DRAG_NOW), a second finger is ignored, its press and its tap, until the first
-   lifts. A drag the game has moved on from (the pick let go, an action, a window, the tab hidden) ends at once, even
+   Issue #107: while a touch drag is live (DRAG_NOW), a second finger is ignored, its press and its tap, until the
+   first lifts. A drag the game has moved on from (the pick let go, an action, a window, the tab hidden) ends at once, even
    with the pointer outside the frame, so a card never hangs there. A drop let go outside the page plays nothing. */
 let DRAG_NOW = null;
 function startDrag(ev, el, i) {
-  if (DRAG_NOW) { if (DRAG_NOW.pid !== ev.pointerId) return; DRAG_NOW.cancel(); }
+  // (a second finger waits; a mouse or pen press takes over from a drag of its own kind it never heard end, as a pen
+  // lifted outside the frame may come back with a new id)
+  if (DRAG_NOW) { if (DRAG_NOW.pid !== ev.pointerId && DRAG_NOW.touch) return; DRAG_NOW.cancel(); }
   // (a new press: the last drop's click, if it was ever coming, is past)
   UI.dragged = false;
   if (ev.button !== 0 || B.phase !== 'player' || B.over || UI.busy || UI.disc) return;
@@ -158,7 +160,7 @@ function startDrag(ev, el, i) {
   const stale = () => !B || UI.view !== 'fight' || B.over || B.phase !== 'player' || UI.busy || UI.paused || UI.disc || !$('modal').hidden || (UI.acts || 0) !== acts0 || B.hand[i] !== c || (moved && UI.sel !== i) || document.hidden;
   const watch = setInterval(() => { if (stale()) cancel(); }, 150);
   document.addEventListener('visibilitychange', cancel);
-  DRAG_NOW = { pid: ev.pointerId, el, cancel };
+  DRAG_NOW = { pid: ev.pointerId, el, cancel, touch: ev.pointerType !== 'mouse' && ev.pointerType !== 'pen' };
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel); window.addEventListener('blur', cancel);
 }
 function selectCard(i) {

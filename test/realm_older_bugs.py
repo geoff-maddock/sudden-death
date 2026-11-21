@@ -80,12 +80,16 @@ async def main():
           [x, y] = down(card(0), 4); move(x, y - 150, 4); UI.acts = (UI.acts || 0) + 1; await wait(400); out.acted = { drag: !!document.querySelector('#hand .card.drag'), now: DRAG_NOW };
           // (let go outside the page: nothing played)
           [x, y] = down(grab(0), 5); move(x, y - 150, 5); upE(x, -40, 5); out.outside = { played: gone(), sel: UI.sel, now: DRAG_NOW };
+          // (a pen drag never heard to end, then the pen back with a new id: the new press takes over, and its drop plays)
+          [x, y] = down(card(1), 7, { pointerType: 'pen' }); move(x, y - 150, 7, { pointerType: 'pen' });
+          [x, y] = down(grab(0), 8, { pointerType: 'pen' }); move(x, y - 150, 8, { pointerType: 'pen' }); upE(x, y - 300, 8); out.pen = { played: gone(), now: DRAG_NOW, drag: !!document.querySelector('#hand .card.drag') };
           // (and a plain drag still plays)
           [x, y] = down(grab(0), 6); move(x, y - 150, 6); upE(x, y - 300, 6); out.plain = gone();
           B = null; showView('world'); return out; })()""")
         check(dr['second'] == {'sel': 1, 'after': 1} and dr['played'] == 1, 'a second finger mid-drag is ignored, its press and its tap; the first finger\'s drop still plays', dr)
         check(dr['escape'] == {'live': True, 'drag': False, 'now': None, 'sel': -1, 'paused': False} and dr['escapePlayed'] == 0 and dr['acted'] == {'drag': False, 'now': None}, 'a drag the game has moved on from (Escape, an action) ends by itself, with no pointer event, and plays nothing; that Escape doesn\'t pause the game too', dr)
         check(dr['outside'] == {'played': 0, 'sel': -1, 'now': None} and dr['plain'] == 1, 'a drop let go outside the page plays nothing; a plain drag still plays', dr)
+        check(dr.get('pen') == {'played': 1, 'now': None, 'drag': False}, 'a pen back with a new id after a drag it never ended takes over: its drop plays and nothing hangs', dr)
 
         # 4. a person in the way
         wk = await pg.evaluate("""(() => { const out = {}, keep = { map: WG.map, x: WG.x, y: WG.y, bump: WG.bump, goto: WUI.goto }, who = Object.keys(DB.chars)[0];
