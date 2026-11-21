@@ -186,3 +186,11 @@ src/realm/umbral/u1-event.js
 src/realm/umbral/u2-world.js
 src/realm/umbral/u3-monsters.js
 src/realm/umbral/u4-grounds.js
+src/realm/umbral/u4a-baseball.js
+src/realm/umbral/u4b-football.js
+src/realm/umbral/u4c-boxing.js
+src/realm/umbral/u4d-basketball.js
+src/realm/umbral/u4e-hockey.js
+src/realm/umbral/u4f-golf.js
+src/realm/umbral/u4g-bowling.js
+src/realm/umbral/u4h-curling.js
