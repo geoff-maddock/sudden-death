@@ -27,14 +27,13 @@ const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) ||
    Outside the Realm there is no ground or foe, so only the sport and the moon. It counts only for the pet in the fight
    (B.pet), or a copy of it that petText was given, and not once the fight is lost (a win's payouts, fightWon, still
    count it); anything else, the Pets tab or a shop, shows a pet's own numbers. The moon is read once, as the fight
-   begins (moonOn; a save from before it was kept works it out once, on resuming), so what the pet gave at the start
-   and what it says agree */
+   begins (moonOn; a save from before it was kept works it out once, in restoreBattle), so what the pet gave at the
+   start and what it says agree */
 const petMoonOn = D => !!(D.moon && !window.SKY_OFF && typeof skyNow === 'function' && D.moon.includes(skyNow().moon));
 const PET_BEATS = { ember: 'bloom', bloom: 'tide', tide: 'ember', aether: 'rime', rime: 'aether' };
 const PET_CTX_NAME = { sport: 'its sport', moon: 'its moon', home: 'its home ground', foe: 'an element it beats' };
 function petCtx(q) {
   const D = q && PETS[q.kind]; if (!D || !B || B.over === 'lose' || !(q === B.pet || q.inFight)) return [];
-  if (q === B.pet && q.moonOn == null) q.moonOn = petMoonOn(D);
   const out = [];
   if (D.sports && D.sports.includes(B.sport)) out.push('sport');
   if (q.moonOn) out.push('moon');

@@ -49,7 +49,8 @@ async def main():
           // (off the battle screen, and once a fight is over, a pet's numbers are its own)
           out.off = petCtx({ kind: 'frostpup', bond: 1 }).length === 0 && petPow(8, { kind: 'frostpup', bond: 1 }) === 8; B.over = 'lose'; out.over = petCtx(B.pet).length === 0; B.sport = (PETS[B.pet.kind].sports || [])[0]; B.over = 'win'; out.win = petCtx(B.pet).includes('sport'); B.over = null; B.sport = 'hockey';
           // (a save from before moonOn: worked out once, on resuming)
-          RUN.clock = 4 * MOON_EVERY; delete B.pet.moonOn; out.oldSave = petCtx(B.pet).includes('moon') && B.pet.moonOn === true;
+          RUN.clock = 4 * MOON_EVERY; const snap = JSON.parse(JSON.stringify(B)); delete snap.pet.moonOn; restoreBattle(snap);
+          out.oldSave = B.pet.moonOn === true && petCtx(B.pet).includes('moon') && /its moon/.test(petTipHTML());
           out.all = petPow(8, q('frostpup', { here: 'rime', foe: 'aether', moonOn: true }));
           RUN.clock = 0; RUN.pet = { kind: 'imp', name: 'I', bond: 1 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'hockey' }); out.imp = petCtx(B.pet);
           out.data = Object.keys(PETS).filter(k => !(PETS[k].sports || []).length || (PETS[k].sports || []).some(s => !SPORTS[s]) || (PETS[k].moon || []).some(i => !MOON[i]));
