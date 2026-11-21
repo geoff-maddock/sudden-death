@@ -33,7 +33,7 @@ const PETS = {
     ],
     trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },
   hootling: { n: 'Hootling', from: 'owlbear cub', el: 'bloom', rar: 'u', how: 'keeper', sports: ['golf'], moon: [4],
-    trait: { d: p => `The first time an enemy's hit drops you below half HP each fight: ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => !p.f.roar && a && a.taken > 0 && petBelow(.5) && RUN.hp + a.taken >= RUN.maxhp * .5, then: (a, p) => { p.f.roar = 1; addSt(B.P, 'str', pv(2, p)); petSay(`roars: +${pv(2, p)} Strength.`); } } } },
+    trait: { d: p => `The first enemy hit you take below half HP each fight: ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => !p.f.roar && a && a.taken > 0 && petBelow(.5), then: (a, p) => { p.f.roar = 1; addSt(B.P, 'str', pv(2, p)); petSay(`roars: +${pv(2, p)} Strength.`); } } } },
     powers: [
       { at: 1, d: p => `Once a fight, your third attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 3 && !p.f.hoot, then: (c, p) => { p.f.hoot = 1; addSt(B.P, 'str', pv(1, p)); petSay(`hoots: +${pv(1, p)} Strength.`); } } } },
       { at: 2, d: p => `Below half HP, your attacks deal ${pv(2, p)} more.`, atk: (card, e, p) => card && def(card).type === 'atk' && petBelow(.5) ? pv(2, p) : 0 },

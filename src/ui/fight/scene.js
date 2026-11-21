@@ -100,7 +100,8 @@ function drawFight(c, dt) {
   } });
   // the pets: yours in front of your team, a rival club's in front of theirs (ui/fight/pet-draw.js)
   if (B.pet && typeof drawPetFig === 'function') draws.push({ y: 440, f: () => drawPetFig(c, B.pet.kind, 420, 440, now, { act: now - (entA('pet').act || -9), spooked: B.pet.spooked }) });
-  if (B.foePet && typeof drawPetFig === 'function') draws.push({ y: 446, f: () => drawPetFig(c, B.foePet.kind, 500, 446, now, { flip: true, foe: true, act: now - (entA('foepet').act || -9) }) });
+  // (a rival's pet stands clear of their first player, however many there are)
+  if (B.foePet && typeof drawPetFig === 'function') { const fx0 = Math.min(500, (lay.length ? Math.min(...lay.map(L => L.x)) : 560) - 66); draws.push({ y: 446, f: () => drawPetFig(c, B.foePet.kind, fx0, 446, now, { flip: true, foe: true, act: now - (entA('foepet').act || -9) }) }); }
   list.forEach((e, i) => {
     const L = lay[i], a = entA(e.uid);
     if (a.x == null) a.x = L.x; a.x = lerp(a.x, L.x, Math.min(1, dt * 6)); a.y = L.y;

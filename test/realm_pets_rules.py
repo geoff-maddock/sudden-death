@@ -123,9 +123,13 @@ async def main():
           fire('turnStart'); const first = [B.pet.spooked, sv(B.P, 'regen') - r0]; fire('turnStart'); return { first, second: sv(B.P, 'regen') - r0 }; })()""")
         ru = await pg.evaluate("""(() => { __fight({ kind: 'rustnibbler', bond: 1 }); for (const e of alive()) { e.block = 7; e.st.str = 2; } petTrick(null); return alive().map(e => [e.block, e.st.str || 0]); })()""")
         check(all(x == [0, 2] for x in ru), 'the Rustnibbler\'s Rust strips every enemy\'s Block and leaves its Strength', ru)
-        ho = await pg.evaluate("""(() => { __fight({ kind: 'hootling', bond: 2 }); const s0 = sv(B.P, 'str'); RUN.hp = Math.floor(RUN.maxhp * .4); B.P.block = 99; hurtPlayer(5, alive()[0]); const blocked = sv(B.P, 'str') - s0;
-          __fight({ kind: 'hootling', bond: 2 }); RUN.hp = Math.floor(RUN.maxhp * .55); B.P.block = 0; hurtPlayer(Math.ceil(RUN.maxhp * .1), alive()[0]); return [blocked, sv(B.P, 'str') - s0]; })()""")
-        check(ho[0] == 0 and ho[1] >= 1, 'the Hootling roars only when an enemy\'s hit drops you below half HP (not a blocked hit when you were already there)', ho)
+        ho = await pg.evaluate("""(() => { const out = [];
+          // (below half, a blocked hit: no roar; then a hit that lands: a roar, once)
+          __fight({ kind: 'hootling', bond: 2 }); let s0 = sv(B.P, 'str'); RUN.hp = Math.floor(RUN.maxhp * .4); B.P.block = 99; hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0);
+          B.P.block = 0; hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0); hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0);
+          // (above half, a hit that lands: none)
+          __fight({ kind: 'hootling', bond: 2 }); s0 = sv(B.P, 'str'); RUN.hp = RUN.maxhp; B.P.block = 0; hurtPlayer(5, alive()[0]); out.push(sv(B.P, 'str') - s0); return out; })()""")
+        check(ho[0] == 0 and ho[1] >= 1 and ho[2] == ho[1] and ho[3] == 0, 'the Hootling roars on the first enemy hit you take below half HP, once (not a blocked one, nor one above half)', ho)
         check(pd == {'first': [False, 0], 'second': 3}, 'a once-a-fight power the spook stops waits: the Pseudodragon\'s Regen comes the next turn', pd)
         check(not errs, 'no page errors', errs[:5])
         await br.close()

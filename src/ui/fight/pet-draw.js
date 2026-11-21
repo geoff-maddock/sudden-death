@@ -39,7 +39,7 @@ function petEyes(c, x, y, gap, r, look) {
 // one pet, standing at (x, y) on the ground, about s tall, at time t
 function drawPetFig(c, kind, x, y, t, o = {}) {
   const L = PET_LOOK[kind]; if (!L) return;
-  const s = (o.size || 46) * (L.big ? 1.2 : 1) / 46, act = o.act != null && o.act < .5 ? Math.sin(o.act / .5 * Math.PI) : 0;
+  const s = (o.size || 46) * (L.big ? 1.2 : 1) / 46, act = o.act != null && o.act >= 0 && o.act < .5 ? Math.sin(o.act / .5 * Math.PI) : 0;
   const bob = Math.sin(t * 3.2 + (o.flip ? 1.7 : 0)) * 1.6, hop = act * 16, shake = o.spooked ? Math.sin(t * 40) * 1.4 : 0;
   c.save();
   // (its shadow, flat on the ground)
@@ -57,7 +57,7 @@ function drawPetFig(c, kind, x, y, t, o = {}) {
   // the body
   if (B0 === 'dog' || B0 === 'bear') {
     for (const k of [-8, 8]) { petPath(c, () => c.rect(k - 3, -10, 6, 10)); petInk(c, col, 1.6); }
-    petEll(c, 0, -16, 16, 11, col); petEll(c, 10, -28, 11, 10, L.face && B0 === 'bear' ? col : col);
+    petEll(c, 0, -16, 16, 11, col); petEll(c, 10, -28, 11, 10, col);
     if (L.ears === 'pointy') for (const k of [4, 15]) { petPath(c, () => { c.moveTo(k - 4, -34); c.lineTo(k, -46); c.lineTo(k + 4, -34); c.closePath(); }); petInk(c, col, 1.6); }
     if (L.ears === 'round') for (const k of [3, 17]) petEll(c, k, -37, 4, 4, col, 1.6);
     if (L.face) petEll(c, 12, -26, 7, 6, L.face, 1.2);
@@ -108,7 +108,7 @@ function drawPetFig(c, kind, x, y, t, o = {}) {
     petEll(c, 0, -20, 18, 9, col); c.fillStyle = '#f2e6c8'; for (const [a, b] of [[-8, -22], [4, -24], [9, -19]]) { c.beginPath(); c.arc(a, b, 1.8, 0, 7); c.fill(); }
     petEyes(c, 0, -9, 2.6, 1.6, 0); if (act || Math.sin(t * 1.3) > .95) { c.beginPath(); c.ellipse(0, -4, 3, 2.4, 0, 0, 7); c.fillStyle = PET_INK; c.fill(); }
   } else if (B0 === 'grub') {
-    for (let i = 0; i < 4; i++) petEll(c, -15 + i * 9, -9 - (i === 3 ? 3 : 0), 7, 7 - i * .3, i === 3 ? col : col, 1.6);
+    for (let i = 0; i < 4; i++) petEll(c, -15 + i * 9, -9 - (i === 3 ? 3 : 0), 7, 7 - i * .3, col, 1.6);
     c.save(); c.globalAlpha = .5 + .3 * Math.sin(t * 4); c.fillStyle = L.glow; for (let i = 0; i < 3; i++) c.fillRect(-17 + i * 9, -15, 4, 2); c.restore();
     petEyes(c, 13, -13, 2.4, 1.6, 1);
   } else if (B0 === 'mantle') {
