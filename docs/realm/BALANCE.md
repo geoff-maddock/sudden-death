@@ -1410,8 +1410,35 @@ turn, Weak on every enemy at each kill, and in bond rounding a 1 up to 2 at bond
 | Mephitling | 91% | 1.5 | 97.0% | 22.9% |
 | Cockatrice Chick | 84% | 1.8 | 96.7% | 22.6% |
 
-A pet takes 10 to 25% off the HP a match costs. The Frostpup (the Rimewatch keeper's, after a hockey win) is the
-strongest, as a pet found nowhere else may be; the Bog Frog and the Imp the mildest.
+A pet takes 10 to 25% off the HP a match costs. The Bog Frog and the Imp are the mildest. (The Hippogriff and the
+Frostpup were toned down after this table: see the second retune below.)
+
+**Second retune: the Hippogriff and the Frostpup (100 runs each, skilled bot, rival pets on).** They sat at the top
+with the Hootling and the Mephitling, and added more than "a few points" of champion rate. Each was measured fresh,
+then after each change.
+- Hippogriff: its late Block comes every second turn from the fourth, not every turn; the bond 2 hit on the biggest
+  enemy is 2 more, not 3; Swoop is 4 twice, not 5 twice.
+- Frostpup: its breath Stuns once a fight, on the fourth turn, not every fourth turn; its Block below half HP is 2,
+  not 4; Snow Breath (the trick) makes one enemy Weak 2 instead of Stunning it. The trick was most of its strength:
+  without it, HP lost a match went from 21% to 27% and blackouts from 1.5 to 2.5, while taking its trait away moved
+  much less. A Stun once a match is a free turn against the strongest enemy.
+
+| setup | champion | blackouts | match win | HP lost a match |
+|---|---|---|---|---|
+| no pet (two batches) | 79%, 72% | 3.3, 3.3 | 93.9%, 93.5% | 30.1%, 31.4% |
+| Hippogriff, before | 93% | 1.5 | 97.1% | 24.5% |
+| Hippogriff, Block every second turn, Swoop 4×2 | 90% | 1.9 | 96.3% | 25.8% |
+| Hippogriff, and the bond 2 hit 2 (shipped) | 79% | 2.1 | 96.0% | 27.3% |
+| Frostpup, before | 92% | 1.5 | 97.1% | 21.6% |
+| Frostpup, breath every fifth turn, Block 3 | 91% | 1.7 | 96.6% | 22.5% |
+| Frostpup, breath once a fight, Block 2 | 89% | 1.5 | 97.1% | 21.4% |
+| Frostpup, that, and no trick (diagnostic) | 84% | 2.5 | 95.2% | 27.1% |
+| Frostpup, that, and no trait (diagnostic) | 85% | 2.1 | 95.9% | 22.2% |
+| Frostpup, Snow Breath Weak 2 (shipped) | 83% | 2.0 | 96.1% | 25.8% |
+
+Both now sit in the middle of the pack on blackouts and HP lost a match, which are steadier than the champion rate
+at this size (the Hippogriff's 79% is low partly by chance; the two no-pet batches differ by 7 points). The Hootling
+(92%) and the Mephitling (91%) are now the strongest.
 
 **Bond, hunger, the trick and rivals (Blinkpup, 100 runs).**
 
