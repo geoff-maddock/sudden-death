@@ -50,14 +50,14 @@ async def main():
           out.off = petCtx({ kind: 'frostpup', bond: 1 }).length === 0 && petPow(8, { kind: 'frostpup', bond: 1 }) === 8; B.over = 'lose'; out.over = petCtx(B.pet).length === 0; B.sport = (PETS[B.pet.kind].sports || [])[0]; B.over = 'win'; out.win = petCtx(B.pet).includes('sport'); B.over = null; B.sport = 'hockey';
           // (a save from before moonOn: worked out once, on resuming)
           RUN.clock = 4 * MOON_EVERY; const snap = JSON.parse(JSON.stringify(B)); delete snap.pet.moonOn; restoreBattle(snap);
-          out.oldSave = B.pet.moonOn === true && petCtx(B.pet).includes('moon') && /its moon/.test(petTipHTML());
+          out.oldSave = !B.pet.moonOn && !petCtx(B.pet).includes('moon') && !/its moon/.test(petTipHTML());
           out.all = petPow(8, q('frostpup', { here: 'rime', foe: 'aether', moonOn: true }));
           RUN.clock = 0; RUN.pet = { kind: 'imp', name: 'I', bond: 1 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'hockey' }); out.imp = petCtx(B.pet);
           out.data = Object.keys(PETS).filter(k => !(PETS[k].sports || []).length || (PETS[k].sports || []).some(s => !SPORTS[s]) || (PETS[k].moon || []).some(i => !MOON[i]));
           out.beats = Object.keys(PET_BEATS).every(e => PET_BEATS[PET_BEATS[e]] !== e || ['aether', 'rime'].includes(e));
           return out; })()""")
         check(c['none'] == [[], 8] and c['sport'] == [['sport'], 10] and c['home'] == [['sport', 'home'], 12] and c['foe'] == [['sport', 'home', 'foe'], 14], 'each thing that suits a pet makes it 25% stronger: its sport, its ground, a foe it beats', c)
-        check(c['off'] and c['over'] and c['win'] and c['moonHeld'] == ['moon'] and c['oldSave'], 'off the battle screen, or once a fight is lost, a pet\'s numbers are its own (a win\'s payouts still count what suits it); the moon holds for the fight, and an old save works it out', c)
+        check(c['off'] and c['over'] and c['win'] and c['moonHeld'] == ['moon'] and c['oldSave'], 'off the battle screen, or once a fight is lost, a pet\'s numbers are its own (a win\'s payouts still count what suits it); the moon holds for the fight; a save from before it fights on without one, as it began', c)
         check(c['notFoe'] == ['sport'] and c['moon'] == ['moon'] and c['skyOff'] == [] and c['all'] == 16 and c['imp'] == ['moon'], 'one of its moons counts (the Full Moon for the Hootling and the Frostpup, the New Moon for the Imp); a foe it doesn\'t beat doesn\'t', c)
         check(c['data'] == [] and c['beats'], 'every pet has its sports, and its moons are real phases', c)
 

@@ -11,8 +11,6 @@ function restoreBattle(snap) {
   A.ent = {}; A.pops = []; A.dice = null; A.vfx = []; A.banner = null; A.spops = [];
   UI.sel = -1; UI.busy = false; UI.kbTarget = null; UI.disc = null; sprClear();
   B = JSON.parse(JSON.stringify(snap)); B.fx = [];
-  // (a pet saved before its moon was kept: worked out once, here, as the fight resumes)
-  if (B.pet && B.pet.moonOn == null && typeof petMoonOn === 'function' && PETS[B.pet.kind]) B.pet.moonOn = petMoonOn(PETS[B.pet.kind]);
   for (const e of B.enemies) if (!e.dead && e.intent) { try { e.plan = planOps(e); } catch (x) { e.plan = null; } }
   const uids = [].concat(B.draw, B.hand, B.discard, B.exhaust || [], B.engulfed || []).map(c => c.uid || 0).concat(B.enemies.map(e => +String(e.uid).replace(/\D/g, '') || 0));
   UID = Math.max(UID, ...uids, ...RUN.deck.map(c => c.uid)) + 1;

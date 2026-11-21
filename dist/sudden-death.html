@@ -3104,8 +3104,8 @@ const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) ||
    Outside the Realm there is no ground or foe, so only the sport and the moon. It counts only for the pet in the fight
    (B.pet), or a copy of it that petText was given, and not once the fight is lost (a win's payouts, fightWon, still
    count it); anything else, the Pets tab or a shop, shows a pet's own numbers. The moon is read once, as the fight
-   begins (moonOn; a save from before it was kept works it out once, in restoreBattle), so what the pet gave at the
-   start and what it says agree */
+   begins (B.pet.moonOn, set by petBegin; a B.pet without it has no moon, as a save from before context began fought
+   without any), so what the pet gave at the start and what it says agree */
 const petMoonOn = D => !!(D.moon && !window.SKY_OFF && typeof skyNow === 'function' && D.moon.includes(skyNow().moon));
 const PET_BEATS = { ember: 'bloom', bloom: 'tide', tide: 'ember', aether: 'rime', rime: 'aether' };
 const PET_CTX_NAME = { sport: 'its sport', moon: 'its moon', home: 'its home ground', foe: 'an element it beats' };
@@ -6165,8 +6165,6 @@ function restoreBattle(snap) {
   A.ent = {}; A.pops = []; A.dice = null; A.vfx = []; A.banner = null; A.spops = [];
   UI.sel = -1; UI.busy = false; UI.kbTarget = null; UI.disc = null; sprClear();
   B = JSON.parse(JSON.stringify(snap)); B.fx = [];
-  // (a pet saved before its moon was kept: worked out once, here, as the fight resumes)
-  if (B.pet && B.pet.moonOn == null && typeof petMoonOn === 'function' && PETS[B.pet.kind]) B.pet.moonOn = petMoonOn(PETS[B.pet.kind]);
   for (const e of B.enemies) if (!e.dead && e.intent) { try { e.plan = planOps(e); } catch (x) { e.plan = null; } }
   const uids = [].concat(B.draw, B.hand, B.discard, B.exhaust || [], B.engulfed || []).map(c => c.uid || 0).concat(B.enemies.map(e => +String(e.uid).replace(/\D/g, '') || 0));
   UID = Math.max(UID, ...uids, ...RUN.deck.map(c => c.uid)) + 1;
