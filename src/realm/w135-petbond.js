@@ -17,7 +17,7 @@
    (wW135RenderHelp: #wHelpPetBond). The card match's win is the fightWon hook. */
 
 const W_PBOND = {
-  at: [0, 0, 6, 16], win: 1, fav: 3, treat: 1, biscuit: 8,
+  at: [0, 0, 12, 45], win: 1, fav: 3, treat: 1, biscuit: 8,
   fav_of: { blinkpup: 'jerky', pseudodragon: 'honeydrop', axebeak: 'grain', hootling: 'mossberry', sprite: 'aethercap', bogfrog: 'brinekelp', chestnut: 'hardtack', jellycube: 'ration', hippogriff: 'saltfish', glowbeetle: 'emberpepper', rustnibbler: 'salt', imp: 'cinderegg', frostpup: 'frostmint', mephitling: 'rimeegg', cockatrice: 'meadowegg' },
 };
 DB.items.pettreat = { name: 'Pet Biscuit', desc: 'A hard little biscuit shaped like a bone, or a fish, or a beetle. Every pet likes one.', use: 'Give it to a pet on the Pets tab (Team screen): it feeds a hungry pet and grows its bond a little, once a day.', price: W_PBOND.biscuit };

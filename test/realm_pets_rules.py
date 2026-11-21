@@ -21,6 +21,8 @@ def check(ok, what, detail=None):
 HELP = r"""
 // a fight against these enemies, with this pet (or none): LAB, so nothing is drawn or saved
 // (a Waxing Crescent: no pet's moon, so the numbers here are the pets' own)
+// (the rules, not the tuning: the numbers these checks were written with)
+PET.bond = [1, 1.5, 2]; PET.ctx = .25; PET.scale = 1; PET.bias = .5;
 window.__fight = (pet, ids, sport) => { LAB = true; RUN.pet = pet || null; RUN.hp = RUN.maxhp; RUN.clock = 1 * MOON_EVERY; startCombat(ids || ['skelss', 'thief'], 'normal', sport || 'baseball'); return B; };
 window.__play = () => { let g = 0; while (!B.over && g++ < 60) { REALMBOT(); if (B.over) break; runSteps(endTurn()); } return B.over; };
 0"""
@@ -63,7 +65,7 @@ async def main():
           const hand = pet => { __fight(pet); return B.hand.length; }; out.sprite = [hand(null), hand({ kind: 'sprite', bond: 1 })];
           __fight({ kind: 'bogfrog', bond: 1 }); out.frog = B.P.block;
           return out; })()""")
-        check(m['blink'] == [0, 4], 'Blinkpup: the first attack aimed at you each turn gives 4 Block (a 4-damage hit costs nothing), the second none', m['blink'])
+        check(m['blink'] == [2, 4], 'Blinkpup: the first attack aimed at you each turn gives 2 Block (a 4-damage hit costs 2), the second none', m['blink'])
         check(m['jelly'] == [True, False], 'Jellycube: the first debuff on you is swallowed, the next lands', m['jelly'])
         check(m['rust'] == [5, 12], 'Rustnibbler: the first Block an enemy raises is eaten (not what it had), and after that it nibbles 2 of each', m['rust'])
         check(m['sprite'][1] == m['sprite'][0] + 1 and m['frog'] >= 5, 'Sprite in a Jar: one more card on the first turn; Bog Frog: Block at the start', m)
@@ -81,7 +83,7 @@ async def main():
           return out; })()""")
         check(b['pow'] == [4, 6, 8, 4], 'bond makes its numbers bigger (x1, x1.5, x2), hunger halves them', b['pow'])
         check(b['open'] == [[True, False], [True, True]] and b['bond1draw'] == 0 and b['bond2draw'] == 1, 'a power opens at its bond level (Blinkpup\'s card at bond 2)', b)
-        check(b['spooked'] is True and b['afterSpook'] == [4, False] and b['next'] == 0, 'a big hit spooks it: its next power that would fire doesn\'t, then it settles', b)
+        check(b['spooked'] is True and b['afterSpook'] == [4, False] and b['next'] == 2, 'a big hit spooks it: its next power that would fire doesn\'t, then it settles', b)
         check(b['trick'][:3] == [True, True, False] and b['trick'][3] != '', 'the trick works once a fight', b['trick'])
         check(b['why'] and 'Hootling' in b['why'], 'a pet\'s damage shows in the breakdown under its own name (Hootling below half HP)', b['why'])
 

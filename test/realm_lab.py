@@ -49,6 +49,7 @@ async def main():
     if ok and 'fans' in ok[0]: print(f"fans at the end {sum(l['fans'] for l in ok) / len(ok):.0f} (most {max(l['fans'] for l in ok)}), gold earned a journey {sum(l['goldAll'] for l in ok) / len(ok):.0f}")
     if ok and any(l.get('favours') for l in ok): print(f"favours asked a journey {sum(l.get('favours', 0) for l in ok) / len(ok):.1f}")
     if ok and 'quests' in ok[0]: print(f"quests done {sum(l['quests'] for l in ok) / len(ok):.2f}, combo cards {sum(l['combos'] for l in ok) / len(ok):.2f}, grudge matches {sum(l.get('grudges', 0) for l in ok) / len(ok):.2f} a journey")
+    if ok and 'petBond' in ok[0]: print(f"pet: bond at the end {sum(l['petBond'] for l in ok) / len(ok):.2f}, bond points {sum(l['petXp'] for l in ok) / len(ok):.1f}")
     ends = collections.Counter(l['stage'] for l in ok if l['result'] != 'champion')
     print('ended at', ends.most_common())
     # how far runs get: share of runs that cleared each stage

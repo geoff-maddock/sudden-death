@@ -45,6 +45,7 @@ python3 test/daily_lab.py twists 300           # daily balance: each twist again
 ./build.sh src/bd/manifest.txt                # Brimstone Diamond, standalone, into build/ (the Realm's baseball engine; src/bd/README.md)
 python3 test/realm_smoke.py                   # one realm check (realm_*.py; all of them are in ./test/all.sh)
 python3 test/realm_lab.py 140 '{}'            # Realm balance: champion rate, where runs end, per-match cost (docs/realm/BALANCE.md)
+python3 test/realm_lab.py 100 '{"pet": "blinkpup"}'   # Realm balance with a pet at your side (petBond, petHungry, trick: false, rivals: false; docs/realm/BALANCE.md)
 python3 test/realm_diamond_lab.py 120          # Realm baseball balance: win rate by level gap and tier, Diamond Cups (Simulate)
 python3 test/realm_gridiron_lab.py 120         # Realm football balance: win rate by level gap, tier and CPU skill, powers on and off, stances, Cinder Cups, gear and potions by tier
 python3 test/realm_ring_lab.py 120             # Realm boxing balance: card win rate by level gap, tier and CPU skill, powers on and off, Anvil Belts, gear and potions by tier

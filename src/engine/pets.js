@@ -16,7 +16,8 @@
    eats isn't a kill of yours, for a pet (its enemyFalls skips e.eaten; trophies are as they were).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
-const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15, ctx: .25 };
+// (scale: every pet number, the balance knob: docs/realm/BALANCE.md)
+const PET = { bond: [.7, .9, 1.1], hungry: .5, spook: 15, ctx: .15, scale: 1, bias: .4 };
 const PET_EVENTS = ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'attackPlayed', 'enemyFalls', 'fightWon', 'playerAttacked', 'playerHit', 'enemyBlock', 'playerDebuff', 'highlight', 'score'];
 const petDef = p => p && PETS[p.kind] || null;
 const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) || 'Your pet';
@@ -41,7 +42,8 @@ function petCtx(q) {
   if (q.foe && PET_BEATS[D.el] === q.foe) out.push('foe');
   return out;
 }
-function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
+function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; // (rounded with PET.bias, so a half goes down: a 1 stays a 1 until it is well past it; small numbers matter most)
+  return Math.max(1, Math.floor(PET.bias + n * PET.scale * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
   foePetBegin();

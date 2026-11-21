@@ -463,6 +463,7 @@ function resolve(ops, ctx) {
       case 'execute': { const e = ctx.tgt; if (!e || e.dead) break; if (!isBoss(e)) { fx({ k: 'say', e: e.uid, t: 'Hole in one!' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(40, e, ctx.card)); break; }
       case 'luck': B.luck = 1; RUN.luck = 1; break;
       case 'loseblock': P.block = 0; break;
+      case 'unblock': for (const e of alive()) e.block = 0; log('Every enemy loses its Block.', 'good'); break;
       case 'strip': for (const e of alive()) { e.block = 0; if (sv(e, 'str') > 0) delete e.st.str; } log('Every enemy is stripped of Block and Strength.', 'good'); break;
       case 'drainall': { let tot = 0; for (const e of alive()) tot += hurtEnemy(e, atkDmg(op[1], e, ctx.card)); healP(tot); break; }
       case 'split': { const al = alive(); const ends = al.length > 1 ? [al[0], al[al.length - 1]] : al; for (const e of ends) hurtEnemy(e, atkDmg(op[1], e, ctx.card)); break; }

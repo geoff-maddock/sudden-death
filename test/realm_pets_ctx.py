@@ -1,4 +1,4 @@
-# Realm pets (issue #104, phase 6): pets in context. A pet is 25% stronger for each thing about a match that suits it:
+# Realm pets (issue #104, phase 6): pets in context. A pet is PET.ctx stronger (25% in these checks) for each thing about a match that suits it:
 # one of its sports, one of its moons, its own ground, and a foe of an element its own beats; none of it outside them.
 # Every pet has its sports, and its moons are real phases. The new moments fire: a highlight and a score (both sides).
 # The Axebeak's first touchdown in football gives Strength, once. In the Realm the pet at your side learns its ground
@@ -35,6 +35,8 @@ async def main():
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
 
         c = await pg.evaluate("""(() => { const out = {}; RUN.clock = 0; // (the new moon: only the Imp's)
+          // (the rules, not the tuning: the numbers these checks were written with, put back after)
+          const knobs = JSON.stringify(PET); PET.bond = [1, 1.5, 2]; PET.ctx = .25; PET.scale = 1; PET.bias = .5;
           beginFight({ ids: ['skelss'], type: 'normal', sport: 'baseball' });
           const q = (kind, o) => Object.assign({ kind, bond: 1, hungry: false, inFight: true }, o || {});
           out.none = [petCtx(q('frostpup')), petPow(8, q('frostpup'))];
@@ -55,7 +57,7 @@ async def main():
           RUN.clock = 0; RUN.pet = { kind: 'imp', name: 'I', bond: 1 }; beginFight({ ids: ['skelss'], type: 'normal', sport: 'hockey' }); out.imp = petCtx(B.pet);
           out.data = Object.keys(PETS).filter(k => !(PETS[k].sports || []).length || (PETS[k].sports || []).some(s => !SPORTS[s]) || (PETS[k].moon || []).some(i => !MOON[i]));
           out.beats = Object.keys(PET_BEATS).every(e => PET_BEATS[PET_BEATS[e]] !== e || ['aether', 'rime'].includes(e));
-          return out; })()""")
+          Object.assign(PET, JSON.parse(knobs)); return out; })()""")
         check(c['none'] == [[], 8] and c['sport'] == [['sport'], 10] and c['home'] == [['sport', 'home'], 12] and c['foe'] == [['sport', 'home', 'foe'], 14], 'each thing that suits a pet makes it 25% stronger: its sport, its ground, a foe it beats', c)
         check(c['off'] and c['over'] and c['win'] and c['moonHeld'] == ['moon'] and c['oldSave'], 'off the battle screen, or once a fight is lost, a pet\'s numbers are its own (a win\'s payouts still count what suits it); the moon holds for the fight; a save from before it fights on without one, as it began', c)
         check(c['notFoe'] == ['sport'] and c['moon'] == ['moon'] and c['skyOff'] == [] and c['all'] == 16 and c['imp'] == ['moon'], 'one of its moons counts (the Full Moon for the Hootling and the Frostpup, the New Moon for the Imp); a foe it doesn\'t beat doesn\'t', c)
@@ -84,7 +86,7 @@ async def main():
           const t = [...document.querySelectorAll('#wCampBody .wpetctx')].map(x => x.textContent).join(' | '); """ + ESC + """ return { golf: /Stronger in Golf/.test(t), moon: /Full Moon/.test(t), beats: /edge in Tide country/.test(t) }; })()""")
         check(tab == {'golf': True, 'moon': True, 'beats': True}, 'the Pets tab says what suits each pet', tab)
         await pg.evaluate("showPage('help')")
-        hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpPetCtx'); return !!h && ['sports', 'moons', 'region', 'ember beats bloom', '25%'].every(w => h.textContent.includes(w)); })()")
+        hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpPetCtx'); return !!h && ['sports', 'moons', 'region', 'ember beats bloom', Math.round(PET.ctx * 100) + '%'].every(w => h.textContent.includes(w)); })()")
         check(hp, 'How to play explains pets in context', hp)
         check(not errs, 'no page errors', errs[:5])
         await br.close()

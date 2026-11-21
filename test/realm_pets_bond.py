@@ -36,14 +36,14 @@ async def main():
 
         w = await pg.evaluate("""(() => { const q = wPetAdd('hootling', 'keeper:moss'), out = {};
           fire('fightWon'); out.one = q.xp;
-          q.xp = 5; fire('fightWon'); out.two = [q.bond, RUN.pet.bond, /grows to 2 of 3/.test(WLOG.map(l => l[0]).join(' ')), /Now:/.test(WLOG[WLOG.length - 1][0])];
-          q.xp = 15; fire('fightWon'); out.three = [q.bond, RUN.pet.bond]; q.xp = 99; fire('fightWon'); out.cap = q.bond;
+          const A = W_PBOND.at; q.xp = A[2] - 1; fire('fightWon'); out.two = [q.bond, RUN.pet.bond, /grows to 2 of 3/.test(WLOG.map(l => l[0]).join(' ')), /Now:/.test(WLOG[WLOG.length - 1][0])];
+          q.xp = A[3] - 1; fire('fightWon'); out.three = [q.bond, RUN.pet.bond]; q.xp = 99; fire('fightWon'); out.cap = q.bond;
           q.bond = 1; q.xp = 0; q.hungry = true; fire('fightWon'); out.hungry = q.xp; q.hungry = false;
           // (no pet at your side: nothing, and nothing thrown)
           const side = wPets().side; wPets().side = null; wPetSync(); fire('fightWon'); out.none = q.xp; wPets().side = side; wPetSync();
           return out; })()""")
         check(w['one'] == 1, 'a card match won with a pet at your side gives it a bond point', w)
-        check(w['two'] == [2, 2, True, True] and w['three'] == [3, 3] and w['cap'] == 3, 'at 6 points bond 2, at 16 bond 3 (the battle follows; it says what each opens); never past 3', w)
+        check(w['two'] == [2, 2, True, True] and w['three'] == [3, 3] and w['cap'] == 3, 'at its points bond 2, then bond 3 (W_PBOND.at; the battle follows; it says what each opens); never past 3', w)
         check(w['hungry'] == 0 and w['none'] == 0, 'a hungry pet\'s bond doesn\'t grow; no pet at your side, nothing', w)
         t = await pg.evaluate("""(() => { const q = wPets().owned.find(x => x.kind === 'hootling'), out = {}; q.xp = 0; q.bond = 1; q.treat = null;
           out.fav = W_PBOND.fav_of.hootling; wAddItem('mossberry', 2); wAddItem('pettreat', 2); wAddItem('jerky', 1);

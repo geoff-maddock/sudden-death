@@ -3226,6 +3226,7 @@ function resolve(ops, ctx) {
       case 'execute': { const e = ctx.tgt; if (!e || e.dead) break; if (!isBoss(e)) { fx({ k: 'say', e: e.uid, t: 'Hole in one!' }); hurtEnemy(e, e.hp + e.block, { raw: true }); } else hurtEnemy(e, atkDmg(40, e, ctx.card)); break; }
       case 'luck': B.luck = 1; RUN.luck = 1; break;
       case 'loseblock': P.block = 0; break;
+      case 'unblock': for (const e of alive()) e.block = 0; log('Every enemy loses its Block.', 'good'); break;
       case 'strip': for (const e of alive()) { e.block = 0; if (sv(e, 'str') > 0) delete e.st.str; } log('Every enemy is stripped of Block and Strength.', 'good'); break;
       case 'drainall': { let tot = 0; for (const e of alive()) tot += hurtEnemy(e, atkDmg(op[1], e, ctx.card)); healP(tot); break; }
       case 'split': { const al = alive(); const ends = al.length > 1 ? [al[0], al[al.length - 1]] : al; for (const e of ends) hurtEnemy(e, atkDmg(op[1], e, ctx.card)); break; }
@@ -3721,7 +3722,8 @@ onHook('fightStart', skyCombatStart);
    eats isn't a kill of yours, for a pet (its enemyFalls skips e.eaten; trophies are as they were).
    B.pet (plain data, kept in a mid-fight save): { kind, name, bond, hungry, used (the trick), spooked, t: { per-turn
    flags }, f: { per-fight flags } }. Effects say what they did with fx({ k: 'pet', t }) and the log. */
-const PET = { bond: [1, 1.5, 2], hungry: .5, spook: 15, ctx: .25 };
+// (scale: every pet number, the balance knob: docs/realm/BALANCE.md)
+const PET = { bond: [.7, .9, 1.1], hungry: .5, spook: 15, ctx: .15, scale: 1, bias: .4 };
 const PET_EVENTS = ['fightStart', 'turnStart', 'turnEnd', 'cardPlayed', 'attackPlayed', 'enemyFalls', 'fightWon', 'playerAttacked', 'playerHit', 'enemyBlock', 'playerDebuff', 'highlight', 'score'];
 const petDef = p => p && PETS[p.kind] || null;
 const petName = () => (B && B.pet && (B.pet.name || (petDef(B.pet) || {}).n)) || 'Your pet';
@@ -3746,7 +3748,8 @@ function petCtx(q) {
   if (q.foe && PET_BEATS[D.el] === q.foe) out.push('foe');
   return out;
 }
-function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; return Math.max(1, Math.round(n * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
+function petPow(n, p) { const q = p || (B && B.pet); if (!q) return n; // (rounded with PET.bias, so a half goes down: a 1 stays a 1 until it is well past it; small numbers matter most)
+  return Math.max(1, Math.floor(PET.bias + n * PET.scale * PET.bond[clamp((q.bond || 1) - 1, 0, 2)] * (q.hungry ? PET.hungry : 1) * (1 + PET.ctx * petCtx(q).length))); }
 // the pet at a fight's start: from the run (the Realm's), as plain data
 function petBegin() {
   foePetBegin();
@@ -3876,8 +3879,8 @@ const PETS = {
   blinkpup: { n: 'Blinkpup', from: 'blink dog', el: 'aether', rar: 'c', how: 'shop', sports: ['soccer', 'basketball'],
     trait: { d: p => `Starts each fight with ${pv(1, p)} Footwork.`, on: { fightStart: (a, p) => addSt(B.P, 'dex', pv(1, p)) } },
     powers: [
-      { at: 1, d: p => `The first attack aimed at you each turn: it blinks you aside, ${pv(4, p)} Block.`, on: { playerAttacked: { when: (e, p) => !p.t.blink, spend: (a, p) => { p.t.blink = 1; }, then: (e, p) => { B.P.block += pv(4, p); petSay(`blinks you aside: +${pv(4, p)} Block.`); } } } },
-      { at: 2, d: 'Your third card in a turn: draw 1.', on: { cardPlayed: { when: () => B.cardsThisTurn === 3, then: () => { B.pendingDraw = (B.pendingDraw || 0) + 1; petSay('fetches you a card.'); } } } },
+      { at: 1, d: p => `The first attack aimed at you each turn: it blinks you aside, ${pv(2, p)} Block.`, on: { playerAttacked: { when: (e, p) => !p.t.blink, spend: (a, p) => { p.t.blink = 1; }, then: (e, p) => { B.P.block += pv(2, p); petSay(`blinks you aside: +${pv(2, p)} Block.`); } } } },
+      { at: 2, d: 'Your third card in a turn: draw 1 (twice a fight).', on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 3 && (p.f.fetch || 0) < 2, then: (c, p) => { p.f.fetch = (p.f.fetch || 0) + 1; B.pendingDraw = (B.pendingDraw || 0) + 1; petSay('fetches you a card.'); } } } },
     ],
     trick: { n: 'Blink Shuffle', tgt: 'self', d: 'Your hand blinks away, and as many new cards blink in.', ops: () => [['audible']] } },
   pseudodragon: { n: 'Pocket Pseudodragon', from: 'pseudodragon', el: 'aether', rar: 'u', how: 'egg', sports: ['jousting'], moon: [2],
@@ -3897,16 +3900,16 @@ const PETS = {
     ],
     trick: { n: 'Charge', d: p => `${pv(10, p)} damage to one enemy.`, ops: p => [['d', pv(10, p)]] } },
   hootling: { n: 'Hootling', from: 'owlbear cub', el: 'bloom', rar: 'u', how: 'keeper', sports: ['golf'], moon: [4],
-    trait: { d: p => `Starts each fight with ${pv(1, p)} Strength.`, on: { fightStart: (a, p) => addSt(B.P, 'str', pv(1, p)) } },
+    trait: { d: p => `The first time you drop below half HP each fight: ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => !p.f.roar && petBelow(.5), then: (a, p) => { p.f.roar = 1; addSt(B.P, 'str', pv(2, p)); petSay(`roars: +${pv(2, p)} Strength.`); } } } },
     powers: [
-      { at: 1, d: p => `Your third attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: () => B.atkCount === 3, then: (c, p) => { addSt(B.P, 'str', pv(1, p)); petSay(`hoots: +${pv(1, p)} Strength.`); } } } },
+      { at: 1, d: p => `Once a fight, your third attack in a turn: ${pv(1, p)} Strength.`, on: { attackPlayed: { when: (c, p) => B.atkCount === 3 && !p.f.hoot, then: (c, p) => { p.f.hoot = 1; addSt(B.P, 'str', pv(1, p)); petSay(`hoots: +${pv(1, p)} Strength.`); } } } },
       { at: 2, d: p => `Below half HP, your attacks deal ${pv(2, p)} more.`, atk: (card, e, p) => card && def(card).type === 'atk' && petBelow(.5) ? pv(2, p) : 0 },
     ],
     trick: { n: 'Bear Hug', d: p => `${pv(14, p)} damage to one enemy. It hugs too hard.`, ops: p => [['d', pv(14, p)]] } },
   sprite: { n: 'Sprite in a Jar', from: 'sprite', el: 'bloom', rar: 'u', how: 'egg', sports: ['golf', 'bowling'],
     trait: { d: p => `Draw ${pv(1, p)} more card on the first turn.`, mod: { draw: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
     powers: [
-      { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn.`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four, spend: (a, p) => { p.t.four = 1; }, then: (c, p) => { addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
+      { at: 1, d: p => `Your fourth card in a turn: ${pv(1, p)} more Stamina next turn (twice a fight).`, on: { cardPlayed: { when: (c, p) => B.cardsThisTurn === 4 && !p.t.four && (p.f.four || 0) < 2, spend: (a, p) => { p.t.four = 1; p.f.four = (p.f.four || 0) + 1; }, then: (c, p) => { addSt(B.P, 'nrgnext', pv(1, p)); petSay(`keeps count: +${pv(1, p)} Stamina next turn.`); } } } },
       { at: 2, d: p => `A debuff lands on you: ${pv(3, p)} Block.`, on: { playerDebuff: (a, p) => { B.P.block += pv(3, p); petSay(`argues the call: +${pv(3, p)} Block.`); } } },
     ],
     trick: { n: 'Recount', tgt: 'self', d: p => `Draw ${pv(2, p)}.`, ops: p => [['draw', pv(2, p)]] } },
@@ -3914,7 +3917,7 @@ const PETS = {
     trait: { d: p => `Starts each fight with ${pv(5, p)} Block.`, on: { fightStart: (a, p) => { B.P.block += pv(5, p); } } },
     powers: [
       { at: 1, d: p => `The first time each turn an enemy gains Block: its tongue takes ${pv(3, p)} of it, for you.`, on: { enemyBlock: { when: (a, p) => !p.t.tongue && a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, spend: (a, p) => { p.t.tongue = 1; }, then: (a, p) => { const n = Math.max(0, Math.min(a.e.block, a.n - (a.ate || 0), pv(3, p))); a.e.block -= n; a.ate = (a.ate || 0) + n; B.P.block += n; petSay(`snaps ${n} Block off ${a.e.n}.`); } } } },
-      { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn).', on: { enemyFalls: () => { if (B.phase === 'player' && !B.ending) drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
+      { at: 2, d: 'When an enemy falls: draw 1 (on their turn, one more next turn), twice a fight.', on: { enemyFalls: (e, p) => { if ((p.f.tongue || 0) >= 2) return; p.f.tongue = (p.f.tongue || 0) + 1; if (B.phase === 'player' && !B.ending) drawCards(1); else addSt(B.P, 'drawnext', 1); } } },
     ],
     trick: { n: 'Gulp', d: p => `Swallows an enemy (not a boss) with ${pv(12, p)} HP or less; any other takes 16 damage.`, ops: p => [['devour', pv(12, p), 0]] } },
   chestnut: { n: 'Chestnut', from: 'mimic', el: 'tide', rar: 'u', how: 'shop', sports: ['bowling'],
@@ -3928,14 +3931,14 @@ const PETS = {
     trait: { d: 'The first debuff on you each fight sticks to it instead.', on: { playerDebuff: { when: (a, p) => !p.f.sticky, then: (a, p) => { p.f.sticky = 1; petSay(`swallows the ${(ST[a.k] || {}).n || a.k}.`); return true; } } } },
     powers: [
       // (one more than its base: Weak goes down at the end of the attacker's own turn, so this much reaches its next attack)
-      { at: 1, d: p => `The first enemy to attack you each turn: Weak ${pv(1, p) + 1}, enough to last through its next attack.`, on: { playerAttacked: { when: (e, p) => !p.t.wob && e && !e.dead, spend: (a, p) => { p.t.wob = 1; }, then: (e, p) => { addSt(e, 'weak', pv(1, p) + 1); petSay(`wobbles at ${e.n}: Weak ${pv(1, p) + 1}.`); } } } },
+      { at: 1, d: p => `Every second turn, the first enemy to attack you: Weak ${pv(1, p) + 1}, enough to last through its next attack.`, on: { playerAttacked: { when: (e, p) => !p.t.wob && B.turn % 2 === 1 && e && !e.dead, spend: (a, p) => { p.t.wob = 1; }, then: (e, p) => { addSt(e, 'weak', pv(1, p) + 1); petSay(`wobbles at ${e.n}: Weak ${pv(1, p) + 1}.`); } } } },
       { at: 2, d: p => `End your turn with no cards in hand: ${pv(4, p)} Block.`, on: { turnEnd: { when: () => !B.hand.length, then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
     trick: { n: 'Engulf', d: p => `Weak ${pv(2, p)} and Exposed ${pv(2, p)} to one enemy.`, ops: p => [['s', 'weak', pv(2, p)], ['s', 'vuln', pv(2, p)]] } },
   hippogriff: { n: 'Hatchling Hippogriff', from: 'hippogriff', el: 'tide', rar: 'u', how: 'egg', sports: ['jousting', 'soccer'],
     trait: { d: p => `${pv(1, p)} more Stamina on the first turn.`, mod: { energy: (a, p) => B && B.turn === 1 ? pv(1, p) : 0 } },
     powers: [
-      { at: 1, d: p => `From the fourth turn on, each turn: ${pv(3, p)} Block.`, on: { turnStart: { when: () => B.turn >= 4, then: (a, p) => { gainBlock(pv(3, p), true); } } } },
+      { at: 1, d: p => `From the fourth turn on, each turn: ${pv(2, p)} Block.`, on: { turnStart: { when: () => B.turn >= 4, then: (a, p) => { gainBlock(pv(2, p), true); } } } },
       { at: 2, d: p => `Your first attack each turn deals ${pv(3, p)} more to the enemy with the most HP.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && alive().every(o => o.hp <= e.hp) ? pv(3, p) : 0 },
     ],
     trick: { n: 'Swoop', d: p => `${pv(5, p)} damage, twice, to one enemy.`, ops: p => [['d', pv(5, p), 2]] } },
@@ -3952,7 +3955,7 @@ const PETS = {
       { at: 1, d: p => `Whenever an enemy gains Block: it nibbles ${pv(2, p)} of what it gained.`, on: { enemyBlock: { when: a => a.e && a.e.block > 0 && a.n - (a.ate || 0) > 0, then: (a, p) => { const n = Math.min(a.e.block, a.n - (a.ate || 0), pv(2, p)); if (n > 0) { a.e.block -= n; a.ate = (a.ate || 0) + n; } } } } },
       { at: 2, d: p => `Your first attack each turn on an enemy with no Block deals ${pv(3, p)} more.`, atk: (card, e, p) => card && e && def(card).type === 'atk' && !B.firstAtk && !e.block ? pv(3, p) : 0 },
     ],
-    trick: { n: 'Rust', tgt: 'all', d: 'Every enemy loses its Block and its Strength.', ops: () => [['strip']] } },
+    trick: { n: 'Rust', tgt: 'all', d: 'Every enemy loses its Block.', ops: () => [['unblock']] } },
   imp: { n: 'Imp-in-Waiting', from: 'imp', el: 'ember', rar: 'u', how: 'egg', sports: ['basketball'], moon: [0],
     trait: { d: p => `${pv(1, p)} Spikes all fight.`, on: { fightStart: (a, p) => addSt(B.P, 'thorns', pv(1, p)) } },
     powers: [
@@ -3963,21 +3966,21 @@ const PETS = {
   frostpup: { n: 'Frostpup', from: 'winter wolf cub', el: 'rime', rar: 'u', how: 'keeper', sports: ['hockey', 'curling'], moon: [4],
     trait: { d: p => `At the start of each fight, the enemy with the most HP is Weak ${pv(1, p)}.`, on: { fightStart: (a, p) => { const t = alive().slice().sort((x, y) => y.hp - x.hp)[0]; if (t) addSt(t, 'weak', pv(1, p)); } } },
     powers: [
-      { at: 1, d: 'Every third turn, its breath Stuns a random enemy (a boss is Weak 2 instead).', on: { turnStart: { when: () => B.turn % 3 === 0 && alive().length > 0, then: () => { const t = pick(alive()); resolve([['s', 'stun', 1]], { card: null, tgt: t, d: { tgt: 'one', n: 'Snow Breath', type: 'pet' } }); petSay(`breathes snow on ${t.n}.`); } } } },
+      { at: 1, d: 'Every fourth turn, its breath Stuns a random enemy (a boss is Weak 2 instead).', on: { turnStart: { when: () => B.turn % 4 === 0 && alive().length > 0, then: () => { const t = pick(alive()); resolve([['s', 'stun', 1]], { card: null, tgt: t, d: { tgt: 'one', n: 'Snow Breath', type: 'pet' } }); petSay(`breathes snow on ${t.n}.`); } } } },
       { at: 2, d: p => `Below half HP, each turn: ${pv(4, p)} Block.`, on: { turnStart: { when: () => petBelow(.5), then: (a, p) => { gainBlock(pv(4, p), true); } } } },
     ],
     trick: { n: 'Snow Breath', d: 'Stuns one enemy (a boss is Weak 2 instead).', ops: () => [['s', 'stun', 1]] } },
   mephitling: { n: 'Mephitling', from: 'ice mephit', el: 'rime', rar: 'c', how: 'egg', sports: ['hockey'], moon: [7],
-    trait: { d: p => `Once a fight, hit for 10 or more: it sulks you up to ${pv(2, p)} Strength.`, on: { playerHit: { when: (a, p) => a.taken >= 10 && !p.f.sulk, then: (a, p) => { p.f.sulk = 1; addSt(B.P, 'str', pv(2, p)); petSay(`sulks beautifully: +${pv(2, p)} Strength.`); } } } },
+    trait: { d: p => `Once a fight, hit for 10 or more: it sulks you up to ${pv(1, p)} Strength.`, on: { playerHit: { when: (a, p) => a.taken >= 10 && !p.f.sulk, then: (a, p) => { p.f.sulk = 1; addSt(B.P, 'str', pv(1, p)); petSay(`sulks beautifully: +${pv(1, p)} Strength.`); } } } },
     powers: [
-      { at: 1, d: p => `End your turn: ${pv(2, p)} Block for each card left in hand (at most ${pv(6, p)}).`, on: { turnEnd: { when: () => B.hand.length > 0, then: (a, p) => { gainBlock(Math.min(pv(6, p), B.hand.length * pv(2, p)), true); } } } },
-      { at: 2, d: p => `When an enemy falls: every enemy is Weak ${pv(1, p)}.`, on: { enemyFalls: { when: () => alive().length > 0, then: (e, p) => { for (const o of alive()) addSt(o, 'weak', pv(1, p)); } } } },
+      { at: 1, d: p => `End your turn: ${pv(1, p)} Block for each card left in hand (at most ${pv(4, p)}).`, on: { turnEnd: { when: () => B.hand.length > 0, then: (a, p) => { gainBlock(Math.min(pv(4, p), B.hand.length * pv(1, p)), true); } } } },
+      { at: 2, d: p => `The first enemy to fall each fight: every other enemy is Weak ${pv(1, p)}.`, on: { enemyFalls: { when: (e, p) => alive().length > 0 && !p.f.frost, then: (e, p) => { p.f.frost = 1; for (const o of alive()) addSt(o, 'weak', pv(1, p)); } } } },
     ],
-    trick: { n: 'Frost Puff', tgt: 'all', d: p => `Every enemy is Weak ${pv(2, p)}, and you gain ${pv(6, p)} Block.`, ops: p => [['s', 'weak', pv(2, p), 'all'], ['b', pv(6, p)]] } },
+    trick: { n: 'Frost Puff', tgt: 'all', d: p => `Every enemy is Weak ${pv(1, p)}, and you gain ${pv(4, p)} Block.`, ops: p => [['s', 'weak', pv(1, p), 'all'], ['b', pv(4, p)]] } },
   cockatrice: { n: 'Cockatrice Chick', from: 'cockatrice', el: 'rime', rar: 'r', how: 'egg', sports: ['jousting'], moon: [6],
     trait: { d: p => `At the start of each fight, a random enemy is Weak ${pv(2, p)}.`, on: { fightStart: (a, p) => { const t = pick(alive()); if (t) addSt(t, 'weak', pv(2, p)); } } },
     powers: [
-      { at: 1, d: p => `Your first attack each turn on an enemy still standing leaves it Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare && alive().some(e => e.uid === B.lastTgt), spend: (a, p) => { p.t.stare = 1; }, then: (c, p) => { addSt(alive().find(e => e.uid === B.lastTgt), 'vuln', pv(1, p)); } } } },
+      { at: 1, d: p => `Every second turn, your first attack on an enemy still standing leaves it Exposed ${pv(1, p)}.`, on: { attackPlayed: { when: (c, p) => !p.t.stare && B.turn % 2 === 1 && alive().some(e => e.uid === B.lastTgt), spend: (a, p) => { p.t.stare = 1; }, then: (c, p) => { addSt(alive().find(e => e.uid === B.lastTgt), 'vuln', pv(1, p)); } } } },
       { at: 2, d: 'Once a fight, at the end of your turn, an enemy (not a boss) at a quarter of its HP or less turns to stone.', on: { turnEnd: { when: (a, p) => !p.f.stone && alive().some(e => !isBoss(e) && e.hp <= e.max * .25), then: (a, p) => { p.f.stone = 1; const t = alive().find(e => !isBoss(e) && e.hp <= e.max * .25); petSay(`stares ${t.n} to stone.`); hurtEnemy(t, t.hp + t.block, { raw: true, src: 'Stare' }); } } } },
     ],
     trick: { n: 'Petrifying Glare', d: 'An enemy (not a boss) at 30% of its HP or less turns to stone; any other takes 18 damage.', ops: () => [['petrify', .3]] } },
@@ -62553,7 +62556,7 @@ renderHelp = function () {
    (wW135RenderHelp: #wHelpPetBond). The card match's win is the fightWon hook. */
 
 const W_PBOND = {
-  at: [0, 0, 6, 16], win: 1, fav: 3, treat: 1, biscuit: 8,
+  at: [0, 0, 12, 45], win: 1, fav: 3, treat: 1, biscuit: 8,
   fav_of: { blinkpup: 'jerky', pseudodragon: 'honeydrop', axebeak: 'grain', hootling: 'mossberry', sprite: 'aethercap', bogfrog: 'brinekelp', chestnut: 'hardtack', jellycube: 'ration', hippogriff: 'saltfish', glowbeetle: 'emberpepper', rustnibbler: 'salt', imp: 'cinderegg', frostpup: 'frostmint', mephitling: 'rimeegg', cockatrice: 'meadowegg' },
 };
 DB.items.pettreat = { name: 'Pet Biscuit', desc: 'A hard little biscuit shaped like a bone, or a fish, or a beetle. Every pet likes one.', use: 'Give it to a pet on the Pets tab (Team screen): it feeds a hungry pet and grows its bond a little, once a day.', price: W_PBOND.biscuit };
