@@ -1774,3 +1774,59 @@ The first cut swung each by 11 to 13 points: the bot's game is precise, so a few
 the game by more than about 6 points. The champion draws one hex a try (two was 4 to 6 points more): about 13% across
 the two runs, a little under the 15 to 25% band, as football's champion is; a careful human, who sees the fog and
 reads the cup's creep, wins more.
+
+### Umbral: hockey (#99, 4e)
+
+`python3 test/realm_rink_lab.py N '' umbral` plays only the Umbral part: your six at level 3 under Simulate (your coach
+a Knight), at an even level. Tier U on the ice is tier 4 in the hockey tables: `W_HKG.oppBonus[4]` rating points on
+each of their six, the Lich coaching (skill 3, `src/hk/parts/16-umbral.js`) and their full bag (`W_RINK_KIT.opp[4]`).
+Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same game seed for seed (60 seeded games on
+the build from before this part and on this one, each CPU skill pairing, the pond and snow on and off, powers on and
+off, bags, 3, 6 and 9 minutes: identical, summary for summary), so every hockey number above stands.
+
+**The Lich.** On top of the Archmage it answers your call at every face-off (what beats your systems far more, what
+loses to them far less), leaves a system you have scouted, matches your special-teams setups, changes lines sooner,
+pulls its goalie sooner, looks harder for the pass across, and sends its checker at where your carrier is going (0.4
+seconds ahead, against 0.22): that last one was worth the most against a Knight. The same six on both sides, the Lich
+on each side half the time (800 seeded games a row):
+
+| | win for the better coach |
+|---|---|
+| Archmage against Archmage (the control) | 48.1% |
+| Lich against Archmage | 61.9% |
+| Archmage against Knight | 56.4% |
+| Lich against Knight | 65.1% |
+
+Each part measured alone against the Knight (600 games): the answer to your call adds little against a Knight (who
+answers nobody), the line changes and the pull a point or two each, and the checker's lead the most (+7). Waiting for
+a better look before shooting measured at nothing and was taken out. In the lab's own row (your Knight against a
+rival's six on tier 2 ratings, three runs of 600) an Archmage wins 38.5% of your games and the Lich 33.2%.
+
+**Tier U** (600 games a row, their bag):
+
+| even level | first cut (7 points, 600) | **kept (6 points, 600)** |
+|---|---|---|
+| tier 3, a rival's six (5 points, Archmage) | 23.7% | 24.8% |
+| tier U, a rival's six | 18.2% | 22.2% |
+| tier U, the Nadir six (the champion's game without hexes) | 14.3% | **17.3%** |
+| the champion as played, one hex drawn | 12.7% | **18.7%** |
+
+At 7 points the champion's own game fell under the 15 to 25% band; at 6 it sits in it, a little under tier 3 against a
+rival. The Nadir six (Hollis Grael, a wraith, at centre with his own ultimate, The Long Night; a gorgon in goal) is
+about as hard as a rival's six at tier U.
+
+**The hexes, each alone on the champion's game against none** (600 games a row; about ±3 points of noise on a swing):
+
+| hex | first cut (200 games, 7 points) | second (600, 7 points) | **kept (600, 6 points)** |
+|---|---|---|---|
+| The Ice Opens | -12.5 (three holes, the face-off in your own end) | -4.7 (three, at centre ice) | -2.3 (two, at centre ice) |
+| The Wandering Net (1.3 m, then 1.8 m) | -6.0 | -0.5 | +1.0 |
+| Grave Cold (35%, then 30% more tiring) | -10.0 | -1.3 | 0.0 |
+| The Hollow Whistle (your fouls twice as often) | -6.5 | +0.2 | +2.7 |
+
+The first 200-game look had a lucky base (21%) and read every hex as costly; at 600 games only The Ice Opens shows
+clearly, and it was the one that was cut (a face-off in your own end, three holes): no hex moves the game more than
+about 5 points in any later run, well inside the 10-point limit. The Wandering Net and The Hollow Whistle barely touch
+the bot: the net slides away from where the puck is, so it costs shots from the wings, and the bot shoots mostly from
+the slot; a whistled side takes about 2.5 penalties a game instead of 1.3, and a power play here is worth little (see
+the hockey notes above). A human, who sees the net wander and spends more time on the wings, will feel them more.

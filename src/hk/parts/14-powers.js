@@ -113,6 +113,8 @@ const HK_SIT = {
 };
 const HK_POW_BY = {}; for (const T of [HK_POW, HK_POW2]) for (const k in T) for (const p of T[k]) HK_POW_BY[p.id] = p;
 const HK_ULT_BY = {}; for (const k in HK_ULT) HK_ULT_BY[HK_ULT[k].id] = HK_ULT[k];
+// a player's own ultimate, not any kind's (16-umbral.js fills it), and an ultimate by id, either kind
+const HK_ULT_OWN = {}, hkUltOf = id => HK_ULT_BY[id] || HK_ULT_OWN[id];
 // the power a player brings: role 'puck' or 'chk'
 const hkPowFor = (m, role) => { const i = role === 'puck' ? 0 : 1, two = HK_POW2[m.kind]; return two && m.pw && m.pw[role] === 1 ? two[i] : HK_POW[m.kind] && HK_POW[m.kind][i]; };
 let HK_FXNOW = [Object.assign({}, HK_FX0), Object.assign({}, HK_FX0)];
@@ -137,7 +139,7 @@ function hkFxMerge(F, fx) { for (const k in fx || {}) { if (!(k in HK_FX0)) cont
 function hkFxNow() {
   HK_FXNOW = [0, 1].map(s => {
     const F = Object.assign({}, HK_FX0);
-    for (const e of (G && G.fxs) || []) { if (e.side !== s) continue; const U = e.k === 'ult' && HK_ULT_BY[e.id]; hkFxMerge(F, U ? (G.poss === s ? U.o : U.d) : e.k === 'sit' ? HK_SIT[e.id].fx : (HK_POW_BY[e.id] || {}).fx); }
+    for (const e of (G && G.fxs) || []) { if (e.side !== s) continue; const U = e.k === 'ult' && hkUltOf(e.id); hkFxMerge(F, U ? (G.poss === s ? U.o : U.d) : e.k === 'sit' ? HK_SIT[e.id].fx : (HK_POW_BY[e.id] || {}).fx); }
     return F;
   });
 }
@@ -177,7 +179,8 @@ function hkUltOptions(side) {
   if (!G.powers || !G.powOn[side] || !L) return [];
   const live = GD.ph === 'live';
   return hkSk(side).filter(p => p.pos !== 'G').map(p => {
-    const U = HK_ULT[p.kind]; if (!U) return null;
+    // (a player may bring an ultimate of their own: 16-umbral.js)
+    const own = G.teams[side].roster[p.ri].ult, U = (own && hkUltOf(own)) || HK_ULT[p.kind]; if (!U) return null;
     const why = !live ? 'Only in live play.' : G.ultUsed[side] ? 'One ultimate a game.' : G.spirit[side] < HK_SPIRIT.ult ? 'Not enough spirit.' : hkSta(p) < HK_POW_STA.min ? `${p.n} is too tired.` : '';
     return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, id: U.id, name: U.n, desc: U.desc, ok: !why, why };
   }).filter(Boolean);
@@ -202,7 +205,7 @@ function hkCast(side, i) {
 }
 function hkCastUlt(side, i) {
   const o = hkUltOptions(side).find(x => x.i === i); if (!o) return 'No ultimate to cast.'; if (!o.ok) return o.why;
-  const p = L.pl[i], U = HK_ULT_BY[o.id];
+  const p = L.pl[i], U = hkUltOf(o.id);
   G.spirit[side] -= HK_SPIRIT.ult; G.ultUsed[side] = true; G.sta[side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - HK_POW_STA.ult);
   G.fxs.push({ side, k: 'ult', id: o.id, n: o.name, ri: p.ri, t: HK_ULT_SECS });
   // the mark: in your crease, in their slot, or at centre ice

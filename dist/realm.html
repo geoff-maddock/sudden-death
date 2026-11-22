@@ -32505,7 +32505,7 @@ const hkSpotOk = (m, n) => !!m && HK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [6 or more kinds] }
 function hkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 4 + i * 9 }))).slice(0, HK_RULES.side + HK_RULES.bench)
-    .map(p => ({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 }, gear: p.gear ? p.gear.name || '' : '', gx: hkGx(p.gear && p.gear.fx) }));
+    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(hkRate(p.kind), p.r || {}), pw: { puck: p.pw && p.pw.puck === 1 ? 1 : 0, chk: p.pw && p.pw.chk === 1 ? 1 : 0 }, gear: p.gear ? p.gear.name || '' : '', gx: hkGx(p.gear && p.gear.fx) }, p.ult ? { ult: p.ult } : {}));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the six's spots: the best reflexes in goal, then the two best defenders, the centre, and the wings
   const free = new Set(roster.slice(0, HK_RULES.side).map((_, i) => i)), by = pos => { const i = [...free].sort((a, b) => hkFit(roster[b].r, pos) - hkFit(roster[a].r, pos))[0]; free.delete(i); return i; };
@@ -32594,7 +32594,8 @@ function hkBound(o, m, e) {
   return hit;
 }
 // the two nets as boxes: [x0, x1, y0, y1], from the goal line back
-const hkNets = () => [[HK_RULES.goal - HK_RULES.deep, HK_RULES.goal], [HK_RULES.len - HK_RULES.goal, HK_RULES.len - HK_RULES.goal + HK_RULES.deep]].map(([a, b]) => [a, b, -HK_RULES.net, HK_RULES.net]);
+// (the Wandering Net, 16-umbral.js, slides one of them along its goal line: hkNetOffX)
+const hkNets = () => [[HK_RULES.goal - HK_RULES.deep, HK_RULES.goal], [HK_RULES.len - HK_RULES.goal, HK_RULES.len - HK_RULES.goal + HK_RULES.deep]].map(([a, b]) => { const o = hkNetOffX(a); return o ? [a, b, o - HK_RULES.net, o + HK_RULES.net] : [a, b, -HK_RULES.net, HK_RULES.net]; });
 // push o out of a net (m: its own radius), with bounce e. Returns true when it was in one.
 function hkNetOut(o, m, e) {
   for (const [x0, x1, y0, y1] of hkNets()) {
@@ -32662,6 +32663,7 @@ function hkStep(dt) {
   // (the CPU keeps its hands off a skater you are playing)
   else if (h >= 0 && !hkYoursNow(h)) { L.think -= dt; if (L.think <= 0) { L.think = (.2 + R() * .2) * hkTempo(L.pl[h].side).think * (hkDim(L.pl[h].side) ? HK_DIM.think : 1); hkThink(h); } }
   hkMeterStep(dt); hkLunge(dt);
+  if (G.hex) hkHexStep(dt);
   if (GD.ph === 'live') { hkStaStep(dt); hkCoach(dt); hkChangeStep(); hkPondStep(dt); hkPowersStep(dt); hkCpuPowers(dt); }
   hkChase();
   L.pl.forEach((p, i) => {
@@ -32701,7 +32703,7 @@ function hkAim(p, i) {
   const c = L.pl[h];
   // without the puck: the nearest skater goes at the carrier (not at a goalie holding it)
   // (how far up the ice a side goes at the carrier is its system's: a Forecheck anywhere, a Box only in front of its net)
-  if (c.side !== p.side && !hkIsGk(c) && hkUp(p.side, c.x) < hkDefNow(p.side).high && (hkPresser(p.side) === i || (HK_DIM.chase && hkDim(p.side) && hkSecond(p.side, c) === i))) return [c.x + c.vx * .22, c.y + c.vy * .22];
+  if (c.side !== p.side && !hkIsGk(c) && hkUp(p.side, c.x) < hkDefNow(p.side).high && (hkPresser(p.side) === i || (HK_DIM.chase && hkDim(p.side) && hkSecond(p.side, c) === i))) { const k = G.skill[p.side] === 3 && hkCpuSide(p.side) ? HK_LICH.lead : .22; return [c.x + c.vx * k, c.y + c.vy * k]; }
   const f = hkForm(p);
   // (a Squire's skaters drift toward the puck, out of their shape)
   if (HK_DIM.drift && hkDim(p.side) && c.side !== p.side) return [lerp(f[0], c.x, HK_DIM.drift), lerp(f[1], c.y, HK_DIM.drift)];
@@ -32759,7 +32761,7 @@ function hkChecks() {
     d.cd = .8 + R() * .4;
     const closing = ((d.vx - c.vx) * dx + (d.vy - c.vy) * dy) / (dist || 1);
     // beaten, and reaching from behind: a hook
-    if (closing < -.5 && R() < HK_FOUL.hook * hkEdgeSt(d.side).foul) return hkFoul(d, 'hooking', c);
+    if (closing < -.5 && R() < HK_FOUL.hook * hkFoulK(d.side)) return hkFoul(d, 'hooking', c);
     if (closing > 3.5 && R() < clamp((.4 + (d.r.siz - 5) * .06) * hkEdgeSt(d.side).hit * hkFx(d.side, 'hit') * hkFx(c.side, 'wall'), .03, .97)) return hkHit(d, c, closing);
     return hkPoke(d, c);
   }
@@ -32771,7 +32773,7 @@ function hkPoke(d, c, edge) {
   if (R() >= clamp(.15 + (d.r.def - c.r.hnd) * .03 + (c.act === 'wind' ? .2 : 0) + (edge || 0) + hkCallPoke(c.side) + hkFx(d.side, 'poke') + hkFx(c.side, 'guard') + (hkGxOf(c).guard || 0), .03, .65)) {
     hkEv('pokemiss', d.n, c.n);
     // a miss up close can take their skates out: a trip
-    if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip * hkEdgeSt(d.side).foul) hkFoul(d, 'tripping', c);
+    if (hyp(c.x - d.x, c.y - d.y) < 1 && R() < HK_FOUL.trip * hkFoulK(d.side)) hkFoul(d, 'tripping', c);
     return false;
   }
   hkBoxAdd(d.side, d.ri, 'take'); hkBoxAdd(c.side, c.ri, 'give'); hkEv('poke', d.n, c.n);
@@ -32785,7 +32787,7 @@ function hkHit(d, c, closing) {
   d.act = 'hit'; d.actT = .3;
   // from behind into the boards is boarding; now and then a hit is just too much (roughing)
   const dv = hyp(d.vx, d.vy) || 1, behind = (d.vx * c.fx + d.vy * c.fy) / dv > .5, wall = Math.abs(c.y) > HK_RULES.wid / 2 - 2 || c.x < 2.5 || c.x > HK_RULES.len - 2.5;
-  const fk = hkEdgeSt(d.side).foul, foul = behind && wall ? (R() < Math.min(.9, HK_FOUL.board * fk) ? 'boarding' : '') : R() < HK_FOUL.rough * fk ? 'roughing' : '';
+  const fk = hkFoulK(d.side), foul = behind && wall ? (R() < Math.min(.9, HK_FOUL.board * fk) ? 'boarding' : '') : R() < HK_FOUL.rough * fk ? 'roughing' : '';
   if (R() < clamp(.34 + (d.r.siz - c.r.siz) * .045 + (closing - 3) * .04, .08, .8)) {
     hkBoxAdd(d.side, d.ri, 'hit'); hkEv('hit', d.n, c.n); hkPondHit(d, c, closing); hkSpiritEv(d.side, 'hit');
     c.stun = .7; c.act = 'down'; c.actT = .55; c.vx = c.vx * .3 + d.vx * .4; c.vy = c.vy * .3 + d.vy * .4;
@@ -32836,6 +32838,7 @@ function hkPuck(dt) {
     // (a shot on its way is settled at the goal line, above: the net is no wall to it)
     const bounced = hkBound(P, .12, hkPondBounce(P.x, P.y, .55)), net = P.k !== 'shot' && hkNetOut(P, .1, .4);
     hkPondPuck(P);
+    if (G.hex && hkHexHole(P)) return;
     if ((bounced || net) && P.k === 'pass') { P.k = 'loose'; P.to = -1; }
     if (hkPickup()) return;
   }
@@ -32910,7 +32913,7 @@ function hkSend(ux, uy) {
    about 1.5 from the goal line), miss (it misses the net), q (on the net, it beats the goalie), set (how set the
    goalie is, 0 to 1), screen, block: the first skater in its lane, [index, metres along] or null, blockP } */
 function hkShotOdds(p, kind, x, y) {
-  const gx = hkGoalX(p.side), dir = hkDir(p.side), dx = (gx - x) * dir, dist = hyp(dx, y), ang = Math.atan2(Math.abs(y), Math.max(.01, dx));
+  const gx = hkGoalX(p.side), dir = hkDir(p.side), oy = hkNetOff(1 - p.side), yy = oy ? y - oy : y, dx = (gx - x) * dir, dist = hyp(dx, yy), ang = Math.atan2(Math.abs(yy), Math.max(.01, dx));
   if (dx < .4) return { ok: false, dist, ang, miss: 1, q: 0, set: 1, screen: false, block: null, blockP: 0 };
   // (a power can hide the shot from their goalie: set, but for somewhere else)
   const g = L.pl[hkGk(1 - p.side)], inNet = hkInNet(1 - p.side), set = inNet ? hkSet(g, x, y) * hkFx(p.side, 'blind') : 0, sh = p.r.sht;
@@ -32919,7 +32922,7 @@ function hkShotOdds(p, kind, x, y) {
   let block = null, blockP = 0;
   for (const d of hkSk(1 - p.side)) {
     if (d.stun > 0) continue;
-    const ax = gx - x, ay = -y, len = hyp(ax, ay) || 1, s = ((d.x - x) * ax + (d.y - y) * ay) / (len * len); if (s < .08 || s > .88) continue;
+    const ax = gx - x, ay = oy ? oy - y : -y, len = hyp(ax, ay) || 1, s = ((d.x - x) * ax + (d.y - y) * ay) / (len * len); if (s < .08 || s > .88) continue;
     if (Math.abs((d.x - x) * ay - (d.y - y) * ax) / len < .7 && (!block || s * len < block[1])) { block = [L.pl.indexOf(d), s * len]; blockP = clamp((.2 + d.r.def * .022 + (kind === 'slap' ? .06 : 0) - (kind === 'one' ? .08 : 0)) * (hkDefNow(d.side).block || 1) * hkFx(d.side, 'block'), .1, .8); }
   }
   const tired = clamp(1 - hkSta(p) / .6, 0, 1);
@@ -32940,7 +32943,7 @@ function hkRelease(i, kind, o) {
   const H = o || {}, p = L.pl[i], O = hkShotOdds(p, kind, p.x, p.y), gx = hkGoalX(p.side), dir = hkDir(p.side), g = L.pl[hkGk(1 - p.side)], inNet = hkInNet(1 - p.side);
   /* by hand (09-hands.js): the target against where the goalie is, how hard a slap shot was wound up (a soft one is
      nearer a wrist shot), and a one-timer pressed too early (a fan: weak, and wild) */
-  const A = hkAimFx(1 - p.side, H.aim), pow = H.pow == null ? 1 : H.pow, W = kind === 'slap' && pow < 1 ? hkShotOdds(p, 'wrist', p.x, p.y) : null;
+  const oy = hkNetOff(1 - p.side), gy = oy ? g.y - oy : g.y, A = hkAimFx(1 - p.side, H.aim), pow = H.pow == null ? 1 : H.pow, W = kind === 'slap' && pow < 1 ? hkShotOdds(p, 'wrist', p.x, p.y) : null;
   let q = W ? lerp(W.q, O.q, pow) : O.q, miss = W ? lerp(W.miss, O.miss, pow) : O.miss;
   if (O.ok) { q = clamp(q * A.f * (H.fan ? .5 : 1), .01, .97); miss = clamp(miss + A.miss + (H.fan ? .2 : 0), .03, .8); }
   let res;
@@ -32951,7 +32954,8 @@ function hkRelease(i, kind, o) {
   else res = R() < clamp(.5 + (kind === 'slap' ? .1 : 0) - g.r.ref * .02, .15, .8) ? 'reb' : 'hold';
   // where on the goal line it is going: inside the posts, or just wide of one
   const T = H.aim && H.aim !== 'five' ? H.aim : null, wide = (T ? T.y : R() < .5 ? -1 : 1) * (HK_RULES.net + .35 + R() * 1.2);
-  const ty = res === 'miss' ? wide : res === 'goal' ? (T ? T.y * .85 : H.aim === 'five' ? clamp(g.y, -.5, .5) : !inNet ? 0 : clamp(-g.y * 1.5, -.9, .9) || (R() - .5)) : clamp(!inNet ? 0 : g.y + (R() - .5) * .5, -.9, .9);
+  let ty = res === 'miss' ? wide : res === 'goal' ? (T ? T.y * .85 : H.aim === 'five' ? clamp(gy, -.5, .5) : !inNet ? 0 : clamp(-gy * 1.5, -.9, .9) || (R() - .5)) : clamp(!inNet ? 0 : gy + (R() - .5) * .5, -.9, .9);
+  if (oy) ty += oy;
   const d = hyp(gx - p.x, ty - p.y) || 1, V = W ? lerp(HK_V.wrist, HK_V.slap, pow) : HK_V[kind];
   Object.assign(L.puck, { st: 'free', h: -1, x: p.x, y: p.y, vx: (gx - p.x) / d * V, vy: (ty - p.y) / d * V, k: 'shot', from: i, to: -1, ice: -1, tried: [], go: 0,
     shot: { i, side: p.side, kind, res, gx, dir, by: O.block ? O.block[0] : -1, blockD: O.block ? O.block[1] : 0, dist: Math.round(O.dist * 10) / 10, q: Math.round(q * 100) / 100, miss: Math.round(miss * 100) / 100, aim: H.aim || null, set: Math.round(O.set * 100) / 100, screen: O.screen, en: !inNet, touch: L.touch.slice() } });
@@ -33009,7 +33013,7 @@ function hkPassValue(h, j) {
   const p = L.pl[h], q = L.pl[j], s = p.side, d = hyp(q.x - p.x, q.y - p.y);
   const O = hkShotOdds(q, 'one', q.x, q.y), look = O.ok && O.dist < 13 ? (1 - O.miss) * O.q * (O.block ? .75 : 1) : 0;
   // (an Archmage's side looks harder for the pass across the front; Point shots and the Umbrella want it at the point)
-  const A = hkAttNow(s), across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? (hkCpuSide(s) && G.skill[s] >= 2 ? .1 : .06) : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
+  const A = hkAttNow(s), across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? (hkCpuSide(s) && G.skill[s] >= 2 ? (G.skill[s] === 3 ? HK_LICH.across : .1) : .06) : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
   const point = A.point && HK_ROLE[q.pos] === 'defender' && hkUp(s, q.x) > HK_RULES.len - HK_RULES.blue - 1 ? A.point * .08 : 0;
   const [, md] = hkNearest(q.x, q.y, hkSk(1 - s));
   return look + across + point + (hkDim(s) ? (R() - .5) * HK_DIM.noise : 0) + prog * .4 - hkLaneRisk(s, p.x, p.y, q.x, q.y) - (d > 18 ? .15 : 0) - (d < 2.5 ? .2 : 0) - (md < 1.3 ? .08 : 0);
@@ -33081,7 +33085,7 @@ function hkPullThink() {
   for (const s of [0, 1]) {
     // (yours is your own call, in Manage as in You play; a Squire never thinks of it, and an Archmage does a little sooner)
     if ((GD.mode !== 'watch' && s === GD.you) || G.skill[s] < 1) continue;
-    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at * (G.skill[s] >= 2 ? 1.3 : 1) && diff >= 1 && diff <= HK_PULL.by;
+    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at * (G.skill[s] === 3 ? HK_LICH.pull : G.skill[s] >= 2 ? 1.3 : 1) && diff >= 1 && diff <= HK_PULL.by;
     if (g.pulled === 'late' && !want) { g.pulled = false; continue; }
     if (!g.pulled && want && G.poss === s && hkUp(s, L.puck.x) > HK_RULES.len * HK_PULL.up) hkPull(s, 'late');
   }
@@ -33127,10 +33131,10 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkFansStart(o.fans); G.crowd = engCrowd(o); hkKitStart(o.bags);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkFansStart(o.fans); G.crowd = engCrowd(o); hkKitStart(o.bags); hkHexStart(o.hexes, o.hexOn);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}.${G.hex ? ` Hexes: ${hkHexNames()}.` : ''} The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
   hkInputClear();
   hkLines(); hkFaceoffSpots(HK_RULES.len / 2, 0).forEach(([x, y], i) => { const p = L.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; });
   GD.fo = { x: HK_RULES.len / 2, y: 0 }; hkPuckAt(GD.fo.x, GD.fo.y);
@@ -33339,7 +33343,7 @@ function hkPeriodOver() {
   // (a penalty that was coming when the period ended is served from the start of the next)
   if (GD.delay) hkPenaltyCall(true);
   // everyone rests between periods, the ice is scraped, and both sides get a mana
-  hkChangeWhistle(-1, true); hkPondBreak(); for (const s of [0, 1]) hkManaAdd(s, HK_MANA.brk);
+  hkChangeWhistle(-1, true); hkPondBreak(); if (G.hex) hkHexBreak(); for (const s of [0, 1]) hkManaAdd(s, HK_MANA.brk);
   hkGo('break');
   hkCpuPotion();
 }
@@ -33481,6 +33485,7 @@ function hkDraw(c) {
   c.translate(-HKC.left * HKC.k, HK_CAM.top - HKC.top * HKC.k); c.scale(HKC.k, HKC.k);
   hkDrawBack(c, dens);
   hkDrawPond(c);
+  if (G.hex) hkHexDrawIce(c);
   hkDrawMarks(c);
   hkDrawNets(c);
   hkDrawPlayers(c);
@@ -33697,10 +33702,11 @@ function hkDrawCues(c) {
   }
 }
 // a big moment in big letters on the ice, for a moment; and at the end, the final
-const HK_BIG = { goal: ['GOAL!', '#ffd08a', 1.8], icing: ['ICING', '#ff8a6a', 1.2], hit: ['BIG HIT', '#ffd08a', .9], penalty: ['PENALTY', '#ff8a6a', 1.4], nogoal: ['NO GOAL', '#ff8a6a', 1] };
+const HK_BIG = { hole: ['SWALLOWED', '#c8b8ff', 1.2], goal: ['GOAL!', '#ffd08a', 1.8], icing: ['ICING', '#ff8a6a', 1.2], hit: ['BIG HIT', '#ffd08a', .9], penalty: ['PENALTY', '#ff8a6a', 1.4], nogoal: ['NO GOAL', '#ff8a6a', 1] };
 function hkDrawBig(c) {
   let word = null, col = '#ffd08a', sub = '', al = 1, sc = 1;
-  if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}${G.over && G.over.so ? ' (shootout)' : G.over && G.over.ot ? ' (sudden death)' : ''}`; }
+  if (GD.ph === 'intro' && G.hex) { word = 'HEXES'; col = '#c8b8ff'; sub = hkHexNames(); }
+  else if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}${G.over && G.over.so ? ' (shootout)' : G.over && G.over.ot ? ' (sudden death)' : ''}`; }
   else if (GD.ph === 'so' && !GD.so.cur && !G.so.tries[0] && !G.so.tries[1]) { word = 'SHOOTOUT'; sub = `${HK_RULES.so} tries each, then one each until it's settled.`; }
   else if (GD.ph === 'break') { word = hkOt() ? 'SUDDEN DEATH' : `END OF THE ${hkPeriodName(G.p - 1).toUpperCase()}`; if (hkOt()) sub = 'Three skaters a side. The next goal wins.'; }
   else if (GD.big && (HK_BIG[GD.big.k] || GD.big.w)) {
@@ -33744,6 +33750,7 @@ function hkDrawHud(c) {
   txt(c, GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), 480, 25, F(12, 700), dim, 'center');
   txt(c, GD.ph === 'so' ? `${G.so.goals[0]}–${G.so.goals[1]}` : hkClockText(), 480, 48, F(22, 900), G.clock < 10 && live ? '#ff8a6a' : '#ffd08a', 'center');
   // under the clock: the man advantage and how long is left of it, or a penalty that is coming
+  if (G.hex) hkHexDrawHud(c, live && GD.ph !== 'so' && (GD.delay || G.box.length) ? 90 : 66);
   if (!live || GD.ph === 'so') return;
   const n = hkStrength(), D = GD.delay, up = n[0] > n[1] ? 0 : n[1] > n[0] ? 1 : -1, first = G.box.length ? Math.min(...G.box.map(b => b.t)) : 0;
   const pill = D ? ['PENALTY COMING', G.teams[D.side].color] : up >= 0 ? [`POWER PLAY  ${n[up]} on ${n[1 - up]}  0:${String(Math.ceil(first)).padStart(2, '0')}`, G.teams[up].color] : G.box.length ? [`${n[0]} ON ${n[1]}  0:${String(Math.ceil(first)).padStart(2, '0')}`, '#5a5048'] : null;
@@ -34033,7 +34040,7 @@ function hkStaStep(dt) {
     if (p.off || (p.pos === 'G' && !p.pulled)) continue;
     const top = 5 + p.r.spd * .52, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
     // (a pushed Tempo tires them, and so does a system that chases, while they are without the puck)
-    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire') * hkAnti(p.side);
+    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire') * hkAnti(p.side) * (G.hex ? hkHexTire(p.side) : 1);
     G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * tire * dt);
   }
   if (!hkShort(0) && !hkShort(1)) G.sysLog[G.poss][G.call[G.poss].att].t += dt;
@@ -34059,7 +34066,7 @@ function hkCoach(dt) {
     const safe = G.poss === s || hkUp(s, L.puck.x) > HK_RULES.len / 2 + 2;
     if (!safe) continue;
     const going = hkSk(s).filter(p => p.chg).length; if (going >= 2) continue;
-    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < (hkCpuSide(s) && G.skill[s] === 0 ? HK_STA.late : HK_STA.tired) && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
+    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < (hkCpuSide(s) && G.skill[s] === 0 ? HK_STA.late : hkCpuSide(s) && G.skill[s] === 3 ? HK_LICH.tired : HK_STA.tired) && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
     for (const p of tired.slice(0, 2 - going)) { const inn = hkNextOn(s, p.pos); if (inn >= 0 && !hkSk(s).some(q => q.chg && q.chg.to === inn)) p.chg = { to: inn }; }
   }
 }
@@ -34166,7 +34173,7 @@ function hkCallsStart(o) {
   const ok = c => Object.fromEntries(Object.entries(c || {}).filter(([k, v]) => HK_CALL_T[k] && HK_CALL_T[k][v]));
   G.call = [0, 1].map(s => Object.assign({}, HK_CALL0, ok(o.calls && o.calls[s])));
   G.fixed = [0, 1].map(s => !!(o.calls && o.calls[s]));
-  G.skill = [0, 1].map(s => { const k = Array.isArray(o.skill) ? o.skill[s] : o.skill; return [0, 1, 2].includes(k) ? k : 1; });
+  G.skill = [0, 1].map(s => { const k = Array.isArray(o.skill) ? o.skill[s] : o.skill; return [0, 1, 2, 3].includes(k) ? k : 1; });
   G.scout = G.call.map(c => ({ att: c.att, n: 0 })); G.to = [HK_TO.n, HK_TO.n];
   G.sysLog = [0, 1].map(() => Object.fromEntries(Object.keys(HK_ATT).map(k => [k, { t: 0, sog: 0, g: 0 }])));
 }
@@ -34215,6 +34222,8 @@ const hkLate = share => G.p >= HK_RULES.periods && G.clock < G.plen * share, hkL
    ahead late: sit on it and clog the ice). An Archmage also looks at the other side's call and answers it. */
 function hkCpuCall(side) {
   const C = G.call[side], O = G.call[1 - side], sk = G.skill[side];
+  // (the Lich: 16-umbral.js)
+  if (sk === 3) return hkLichCall(side);
   if (sk === 0) {
     if (R() < .35) for (const k of Object.keys(HK_CALL_T)) C[k] = pick(Object.keys(HK_CALL_T[k]));
     return;
@@ -34467,6 +34476,8 @@ const HK_SIT = {
 };
 const HK_POW_BY = {}; for (const T of [HK_POW, HK_POW2]) for (const k in T) for (const p of T[k]) HK_POW_BY[p.id] = p;
 const HK_ULT_BY = {}; for (const k in HK_ULT) HK_ULT_BY[HK_ULT[k].id] = HK_ULT[k];
+// a player's own ultimate, not any kind's (16-umbral.js fills it), and an ultimate by id, either kind
+const HK_ULT_OWN = {}, hkUltOf = id => HK_ULT_BY[id] || HK_ULT_OWN[id];
 // the power a player brings: role 'puck' or 'chk'
 const hkPowFor = (m, role) => { const i = role === 'puck' ? 0 : 1, two = HK_POW2[m.kind]; return two && m.pw && m.pw[role] === 1 ? two[i] : HK_POW[m.kind] && HK_POW[m.kind][i]; };
 let HK_FXNOW = [Object.assign({}, HK_FX0), Object.assign({}, HK_FX0)];
@@ -34491,7 +34502,7 @@ function hkFxMerge(F, fx) { for (const k in fx || {}) { if (!(k in HK_FX0)) cont
 function hkFxNow() {
   HK_FXNOW = [0, 1].map(s => {
     const F = Object.assign({}, HK_FX0);
-    for (const e of (G && G.fxs) || []) { if (e.side !== s) continue; const U = e.k === 'ult' && HK_ULT_BY[e.id]; hkFxMerge(F, U ? (G.poss === s ? U.o : U.d) : e.k === 'sit' ? HK_SIT[e.id].fx : (HK_POW_BY[e.id] || {}).fx); }
+    for (const e of (G && G.fxs) || []) { if (e.side !== s) continue; const U = e.k === 'ult' && hkUltOf(e.id); hkFxMerge(F, U ? (G.poss === s ? U.o : U.d) : e.k === 'sit' ? HK_SIT[e.id].fx : (HK_POW_BY[e.id] || {}).fx); }
     return F;
   });
 }
@@ -34531,7 +34542,8 @@ function hkUltOptions(side) {
   if (!G.powers || !G.powOn[side] || !L) return [];
   const live = GD.ph === 'live';
   return hkSk(side).filter(p => p.pos !== 'G').map(p => {
-    const U = HK_ULT[p.kind]; if (!U) return null;
+    // (a player may bring an ultimate of their own: 16-umbral.js)
+    const own = G.teams[side].roster[p.ri].ult, U = (own && hkUltOf(own)) || HK_ULT[p.kind]; if (!U) return null;
     const why = !live ? 'Only in live play.' : G.ultUsed[side] ? 'One ultimate a game.' : G.spirit[side] < HK_SPIRIT.ult ? 'Not enough spirit.' : hkSta(p) < HK_POW_STA.min ? `${p.n} is too tired.` : '';
     return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, id: U.id, name: U.n, desc: U.desc, ok: !why, why };
   }).filter(Boolean);
@@ -34556,7 +34568,7 @@ function hkCast(side, i) {
 }
 function hkCastUlt(side, i) {
   const o = hkUltOptions(side).find(x => x.i === i); if (!o) return 'No ultimate to cast.'; if (!o.ok) return o.why;
-  const p = L.pl[i], U = HK_ULT_BY[o.id];
+  const p = L.pl[i], U = hkUltOf(o.id);
   G.spirit[side] -= HK_SPIRIT.ult; G.ultUsed[side] = true; G.sta[side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - HK_POW_STA.ult);
   G.fxs.push({ side, k: 'ult', id: o.id, n: o.name, ri: p.ri, t: HK_ULT_SECS });
   // the mark: in your crease, in their slot, or at centre ice
@@ -34699,6 +34711,133 @@ function hkCpuPotion() {
     if (vals[0].v >= HK_KIT.take[sk]) hkPotionGive(side, vals[0].id, vals[0].ri, vals[0].why);
   }
 }
+/* Black Ice in the Umbral (issue #99, phase 4e): the Lich, the hexes and a captain's own ultimate. Nothing here runs
+   unless a game asks for it: with no hexes and no skill 3, the engine plays exactly as before (same seed, same game).
+   The Lich (G.skill 3, above the Archmage; the Realm names it, W_BALL_SKILL[3]: HK_SKILL keeps its three). Everywhere else it is an Archmage (every check of skill >= 2
+   holds for it), and on top:
+   - its call (hkLichCall): it answers your call at every face-off, not now and then; what beats your systems is worth
+     far more to it than to the Archmage and what loses to them far less (HK_LICH.counter), and it leaves a system you
+     have scouted (HK_LICH.scouted) rather than let you read it. Its power-play and penalty-kill setups answer yours, its
+     Tempo pushes from further out when behind and sits on a lead sooner, and its Edge goes Rough when it is the bigger
+     side and a goal or more behind, Clean when ahead.
+   - the skater who goes at your carrier goes for where they will be, not where they are (HK_LICH.lead seconds ahead,
+     the others' .22: fewer carriers skate round the check); its skaters look harder for the pass across the front
+     (HK_LICH.across); its coach changes a line sooner (HK_LICH.tired), so its skaters are fresher; it pulls its goalie
+     sooner when behind (HK_LICH.pull) and gives a potion worth HK_LICH.take (HK_KIT.take[3]).
+   Hexes (opts.hexes: ids in HK_HEX; G.hex = { ids, on, slide, holes }, plain JSON, so a saved game keeps them). Each
+   works against one side, G.hex.on (opts.hexOn, 0 by default: yours):
+     holes    The Ice Opens: HK_HEX.holes.n holes of open water in the end that side attacks (new ones each period, as
+              the ends swap); a puck sliding free (a pass, a dump, a rebound, a loose one: not a shot in the air) into
+              one is swallowed, and the face-off goes back to centre ice
+     slide    The Wandering Net: the net that side shoots at slides along its goal line away from the puck, up to
+              HK_HEX.slide.max metres either way, at HK_HEX.slide.v metres a second; the goalie goes with it. Shots from
+              the wings come at a worse angle (hkNetOff, read by hkShotOdds, hkRelease, hkGoalSpot and hkNets)
+     cold     Grave Cold: that side's skaters tire HK_HEX.cold.k times as fast
+     whistle  The Hollow Whistle: the referee is the other side's: that side's fouls are called HK_HEX.whistle.k times as
+              often (hkFoulK)
+   The hexes are named over the opening face-off (the intro beat, and the line under the rink) and under the score bar
+   all game; the holes are drawn on the ice and the net is drawn where it has slid.
+   A captain's own ultimate: a roster player sent with { ult: id } brings that one (HK_ULT_BY) instead of their kind's
+   (hkTeam keeps it, hkUltOptions reads it; HK_ULT_OWN, apart from the kinds' HK_ULT_BY): the Nadir captain's The Long Night is the first. */
+const HK_LICH = { counter: [6, .12], change: .9, scouted: .35, across: .13, lead: .4, tired: .55, take: 2.5, pull: 1.6 };
+HK_KIT.take[3] = HK_LICH.take;
+const HK_HEX = {
+  holes: { n: 'The Ice Opens', d: 'Holes of open water in the end you attack, new ones each period: a puck that slides into one is gone, and the face-off goes back to centre ice.', count: 2, r: .9 },
+  slide: { n: 'The Wandering Net', d: 'The net you shoot at slides along its goal line away from the puck, and the goalie goes with it: shots from the wings come at a worse angle.', max: 1.8, v: 1.6, k: .4 },
+  cold: { n: 'Grave Cold', d: 'The cold of the pond gets into your skaters: they tire 30% faster.', k: 1.3 },
+  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called twice as often.', k: 2 },
+};
+// the Nadir captain's own ultimate
+HK_ULT_OWN.longnight = hkU0('longnight', 'The Long Night', 'The lamps go out over the pond: their goalie is set late for everything, and they skate as if through deep snow.', { blind: .6, shot: .02 }, { slow: .86 }, 'slot');
+
+/* ---------- the Lich ---------- */
+function hkLichCall(side) {
+  const C = G.call[side], O = G.call[1 - side], [up, down] = HK_LICH.counter;
+  const spd = hkMean(side, 'spd'), siz = hkMean(side, 'siz'), hnd = hkMean(side, 'hnd'), dSht = hkMean(side, 'sht', ['defender']), def = hkMean(side, 'def');
+  const lead = hkLead(side), late = hkLate(.45), sizeEdge = siz - hkMean(1 - side, 'siz');
+  const wa = { cycle: 1 + (hnd - 6) * .4, rush: 1 + (spd - 6) * .45, dump: .4 + (siz - 6) * .2, point: .6 + (dSht - 6) * .45, crash: .8 + (siz - 6) * .4 };
+  const wd = { fore: 1 + (spd - 6) * .35, trap: .9, box: .8 + (siz - 6) * .2, collapse: .7, man: 1 + (def - 6) * .35 };
+  if (late && lead < 0) { wa.rush *= 2; wa.crash *= 2.5; wa.dump *= .4; wd.fore *= 3; wd.trap *= .2; wd.collapse *= .3; }
+  if (late && lead > 0) { wa.cycle *= 1.5; wd.trap *= 2.5; wd.fore *= .4; }
+  for (const a of Object.keys(wa)) { const e = (HK_EDGE[a + '/' + O.def] || [0])[0]; wa[a] = Math.max(.05, wa[a]) * (e > 0 ? up : e < 0 ? down : 1); }
+  for (const d of Object.keys(wd)) { const e = (HK_EDGE[O.att + '/' + d] || [0])[0]; wd[d] = Math.max(.05, wd[d]) * (e < 0 ? up : e > 0 ? down : 1); }
+  // (a system the other side has read is worth less: it moves on rather than be read)
+  if (G.scout[side].n >= 1) wa[C.att] *= HK_LICH.scouted;
+  const pp = Object.keys(HK_PP).map(k => [k, (HK_EDGE_PP[k + '/' + O.pk] || [0])[0]]).sort((a, b) => b[1] - a[1])[0], pk = Object.keys(HK_PK).map(k => [k, (HK_EDGE_PP[O.pp + '/' + k] || [0])[0]]).sort((a, b) => a[1] - b[1])[0];
+  C.pp = pp[0]; C.pk = pk[0];
+  if (R() < HK_LICH.change || late) { C.att = wpick(wa); C.def = wpick(wd); }
+  C.tempo = late && lead < 0 ? 'push' : hkLate(.2) && lead > 0 ? 'sit' : 'bal';
+  C.edge = lead > 0 && hkLate(.45) ? 'clean' : lead < 0 && sizeEdge > .5 ? 'rough' : 'bal';
+}
+
+/* ---------- the hexes ---------- */
+function hkHexStart(ids, on) {
+  const hx = (ids || []).filter((k, i, a) => HK_HEX[k] && a.indexOf(k) === i); if (!hx.length) { G.hex = null; return; }
+  G.hex = { ids: hx, on: on === 1 ? 1 : 0, slide: 0, holes: [] };
+  hkHexHoles();
+}
+const hkHexHas = id => !!(G && G.hex && G.hex.ids.includes(id));
+const hkHexOn = (id, side) => hkHexHas(id) && side === G.hex.on;
+// the holes for this period: in the end G.hex.on attacks, between its blue line and the goal line, clear of the crease
+function hkHexHoles() {
+  if (!hkHexHas('holes')) return;
+  const H = HK_HEX.holes, on = G.hex.on, out = [];
+  for (let k = 0; k < 40 && out.length < H.count; k++) {
+    const u = HK_RULES.len - HK_RULES.goal - 1.5 - R() * (HK_RULES.blue - HK_RULES.goal - 2.5), v = (R() - .5) * (HK_RULES.wid - 4), [x, y] = hkAt(on, u, v);
+    if (hyp(x - hkGoalX(on), y) < 3.2 || out.some(h => hyp(h.x - x, h.y - y) < 3)) continue;
+    out.push({ x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, r: H.r });
+  }
+  G.hex.holes = out;
+}
+// how far side's net (the one side defends) has slid off the middle of its goal line
+const hkNetOff = side => G && G.hex && G.hex.slide && side === 1 - G.hex.on ? G.hex.slide : 0;
+// the same, for the net whose goal line is near x (the nets' boxes, 05-live.js)
+function hkNetOffX(x) { if (!G || !G.hex || !G.hex.slide) return 0; const d = 1 - G.hex.on; return (hkGoalX(1 - d) < HK_RULES.len / 2) === (x < HK_RULES.len / 2) ? G.hex.slide : 0; }
+const hkHexTire = side => hkHexOn('cold', side) ? HK_HEX.cold.k : 1;
+// how often side's fouls are called: its Edge, and the Hollow Whistle
+const hkFoulK = side => hkEdgeSt(side).foul * (hkHexOn('whistle', side) ? HK_HEX.whistle.k : 1);
+// each step: the net slides away from the puck
+function hkHexStep(dt) {
+  if (!hkHexHas('slide')) return;
+  const S = HK_HEX.slide, P = L.puck, tgt = clamp(-P.y * S.k, -S.max, S.max), d = tgt - G.hex.slide;
+  G.hex.slide = Math.abs(d) <= S.v * dt ? tgt : G.hex.slide + Math.sign(d) * S.v * dt;
+}
+// a free puck in a hole is swallowed: a face-off at centre ice. True: play has stopped
+function hkHexHole(P) {
+  if (!hkHexHas('holes') || GD.ph !== 'live' || P.st !== 'free' || P.k === 'shot' || P.k === 'in') return false;
+  const h = G.hex.holes.find(o => hyp(P.x - o.x, P.y - o.y) < o.r); if (!h) return false;
+  if (GD.delay) { hkPenaltyCall(); return true; }
+  hkEv('hole', G.teams[G.hex.on].name);
+  hkWhistle(HK_RULES.len / 2, 0, 'The ice opens and swallows the puck. The face-off goes back to centre ice.', 'hole', HK_PACE.dead);
+  return true;
+}
+// a break between periods: new holes at the new end, and the net back in the middle
+function hkHexBreak() { if (!G.hex) return; G.hex.slide = 0; hkHexHoles(); }
+const hkHexNames = () => G && G.hex ? G.hex.ids.map(k => HK_HEX[k].n).join(', ') : '';
+const hkHexLine = () => G && G.hex ? '☾ Hexes: ' + G.hex.ids.map(k => HK_HEX[k].n).join('  ·  ') : '';
+// the holes on the ice: black water with a pale rim of broken ice
+function hkHexDrawIce(c) {
+  if (!G.hex || !G.hex.holes.length) return;
+  c.save();
+  for (const h of G.hex.holes) {
+    const p = hkScr(h.x, h.y), rx = h.r * HK_PX, ry = h.r * HK_PY;
+    c.fillStyle = 'rgba(214,226,236,.9)'; c.beginPath(); c.ellipse(p.x, p.y, rx * 1.18, ry * 1.18, 0, 0, Math.PI * 2); c.fill();
+    const g = c.createRadialGradient(p.x, p.y, 1, p.x, p.y, rx); g.addColorStop(0, '#05080c'); g.addColorStop(.8, '#0e1a26'); g.addColorStop(1, '#2a3f52');
+    c.fillStyle = g; c.beginPath(); c.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(200,184,255,.55)'; c.lineWidth = 1.2; c.beginPath(); c.ellipse(p.x, p.y, rx * .6, ry * .6, Math.sin(HKT.t * .7) * .4, 0, Math.PI * 2); c.stroke();
+  }
+  c.restore();
+}
+// the line under the score bar (under the power-play pill when there is one)
+function hkHexDrawHud(c, y) {
+  if (!G.hex) return;
+  const t = hkHexLine(); c.save(); c.font = `700 12px ${HK_FONT}`; const w = c.measureText(t).width + 20;
+  rr(c, 480 - w / 2, y, w, 19, 5); c.fillStyle = 'rgba(30,18,44,.86)'; c.fill(); c.restore();
+  txt(c, t, 480, y + 13.5, `700 12px ${HK_FONT}`, '#c8b8ff', 'center');
+}
+// the goalie stands in front of the net where it has slid to (wraps 05-live.js's hkGoalSpot, saved as hkGoalSpot0)
+const hkGoalSpot0 = hkGoalSpot;
+hkGoalSpot = function (side, px, py) { const oy = hkNetOff(side); if (!oy) return hkGoalSpot0(side, px, py); const s = hkGoalSpot0(side, px, py - oy); return [s[0], s[1] + oy]; };
 /* Black Ice's superstars (issue #83, phase 9), inside the wHK scope: each superstar's ratings and powers, added to the
    engine's own tables after its parts load, as the court's are (c0-stars.js). Plain assignments, nothing declared.
    Ratings are [speed, size, hands, shot, defense, reflexes]; each has a puck power and a checking power, a second of
@@ -35116,6 +35255,11 @@ return {
   get soTry() { const U = GD && GD.so && GD.so.cur; return U ? { side: U.side, i: U.i, gi: U.gi, st: U.st, scored: U.scored, win: U.win } : null; },
   foul: (i, k) => { if (L) hkFoul(L.pl[i], k || 'tripping', null); }, setFouls: o => Object.assign(HK_FOUL, o || {}),
   goalBy: i => { if (!L) return; const p = L.pl[i]; hkGoalScored({ i, side: p.side, kind: 'wrist', gx: hkGoalX(p.side), dir: hkDir(p.side), dist: 5, touch: [], en: !hkInNet(1 - p.side) }); }, pull: (side, why) => !!L && hkPull(side, why || 'hand'), lines: () => { if (L) hkLines(); },
+  // the Umbral (issue #99, 4e: 16-umbral.js): start({ hexes: [ids], hexOn }) and skill 3 (the Lich). The hexes ({ id: { n, d } }),
+  // their numbers, the game's (G.hex: { ids, on, slide, holes }) and its line, how far side's net has slid, the Lich's
+  // numbers, and its call for side now (the tests'), and the players' own ultimates (ids)
+  hexes: Object.fromEntries(Object.entries(HK_HEX).map(([k, v]) => [k, { n: v.n, d: v.d }])), hexRules: JSON.parse(JSON.stringify(HK_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null,
+  hexLine: () => hkHexLine(), netOff: side => G ? hkNetOff(side) : 0, lichRules: HK_LICH, lichCall: side => { if (G && G.call) hkLichCall(side); }, ownUlts: Object.keys(HK_ULT_OWN),
   // the ratings, the spots and the clubs, for the page and How to play
   rate: kind => hkRate(kind), fit: (r, pos) => hkFit(r, pos), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
   // the test's handle on the rink: one step of the play (or of whatever beat is on), the play, its events, a shot's odds
@@ -65518,8 +65662,156 @@ W_UMB4.start.court = function (C, id) {
 };
 // the end: the piece (or the finale's round), or a try counted (a tie is not a win)
 W_ON_END[W_UMB4D.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
-/* u4e: hockey in the Umbral (issue #99, phase 4e): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4e: hockey in the Umbral (issue #99, phase 4e). Loads after u4-grounds.js; changes earlier parts only by
+   reassignment (saved originals carry the wWU4E prefix).
+
+   Tier U on the ice is tier 4 in the hockey tables: W_HKG.oppBonus[4] rating points on each of their six (an umbral
+   form changes only their ratings and start values, never yours), the Lich coaching them (W_BALL.diff[4] = 3, read by
+   wRinkSkill; the engine's own decisions: src/hk/parts/16-umbral.js) and a full potion bag (W_RINK_KIT.opp[4]). Tiers
+   1 to 3 are as they were. Your side keeps the coach it always has in Simulate (a Knight), so Simulate is no way round
+   the Lich: it is your own skating and calling, in Play and Manage, that beats it.
+   The champion of the Dead Pond (u:g_rink, the Deadspire): Hollis Grael, the Drowned Captain, holds the Dead Puck. Past
+   the two guards and the gate (u4), PLAY opens the game card (wUmbHkCard): tier U, the Nadir six (W_UMB4E.six: Grael
+   at centre with his own ultimate, The Long Night), the hexes for this try, and Play, Manage or Simulate. The game is
+   the Realm's own hockey game (wStartRink: Save and leave, Resume after a reload, Concede, the box scores) against club
+   'nadir:rink' at tier 4, with kind 'unadirhk'; its end goes to wUmbNadirEnd. A hockey game never ends level. The
+   toll, when this is a retry, is paid as the game starts (wUmbTollAtKickoff), never for backing away from the card.
+   Hexes: hockey's own (wHK.hexes, the engine's table: The Ice Opens, The Wandering Net, Grave Cold, The Hollow
+   Whistle), C.hexes of them, drawn for each try by wUmbHkHexes (fixed for the try: a reload doesn't redraw them),
+   named on the card, in the log, over the opening face-off and under the score bar, and kept in the game's snapshot.
+   The finale (u5) plays a hockey round through the same adapter, with id 'finale' (W_NADIR.finale: no piece, no toll).
+   PLAY with a hockey game left half-played (any, saved at a whistle) resumes it instead (W_UMB4.live.rink).
+   In LAB mode PLAY skips the card and Simulates at once, for the realm bot.
+
+   W_UMB4E, wUmbHkTeam, wUmbHkHexes, wUmbHkCard, wUmbHkKick
+   Wraps: wBallTeam (wWU4EBallTeam: the Nadir six's colours), wRinkOpp (wWU4ERinkOpp: club 'nadir:rink' is the Nadir
+   six), wRinkBarNote (wWU4ERinkBarNote: tier U and the hexes in the line under the bar), wRinkResultCard
+   (wWU4ERinkResultCard: not over the end of a Hardcore journey), and wHK.start and wHK.simGame (wWU4EStart,
+   wWU4ESimGame: the hexes go in). */
+
+const W_UMB4E = {
+  id: 'rink', club: 'nadir:rink', kind: 'unadirhk', labHow: 'sim',
+  team: { name: 'Dead Pond Nadir', short: 'NDR', color: '#2c2a44', light: '#c8b8ff' },
+  // their level against your team's (0: level for level), and the six, then the bench; the captain at centre
+  gap: 0,
+  six: [
+    { n: 'Hollis Grael', kind: 'wraith', num: 9, ult: 'longnight', cap: true }, { n: 'Stillwater', kind: 'gorgon', num: 1 }, { n: 'Knell', kind: 'skeleton', num: 13 },
+    { n: 'Rime-Eye', kind: 'vampire', num: 21 }, { n: 'Sallow', kind: 'zombie', num: 44 }, { n: 'Hollow Tam', kind: 'witch', num: 6 },
+    { n: 'Drowned Jack', kind: 'werewolf', num: 31 }, { n: 'Pale Wick', kind: 'lich', num: 17 },
+  ],
+  next: null, // the hexes, while the champion's game is being started
+};
+// tier U in the hockey tables (W_BALL.diff and W_BALL_SKILL are shared with baseball's tier U: set once)
+W_HKG.oppBonus[4] = 6;
+W_RINK_KIT.opp[4] = { draught: 3, hkanti: 2, hkcider: 2, hkliniment: 1 };
+if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
+if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
+
+W_NADIR.rink = { piece: 'hockey', char: 'nadir_rink', ground: 'g_rink', map: 'u:g_rink', region: 'rime', engine: 'rink', hexes: 1, toll: 30, gold: 100 };
+DB.chars.nadir_rink = { name: 'Hollis Grael, the Drowned Captain', kind: 'wraith', look: { coat: '#2c2a44', acc: 'scarf', hair: '#d8e4f0' },
+  greet: 'You crossed the cold for a game. I captain the Nadir on this pond, and I hold the PUCK. Say PLAY when you want to try to take it off me. Ask about the RULES first. The ice here has opinions.',
+  topics: {
+    job: { t: 'I went through the ice on this pond one winter, and I came up captain. I have not lost a game on it since.' },
+    puck: { t: 'The Dead Puck. One ninth of your Seal, frozen through. Beat my six at hockey and it is yours. Lose, and the next game costs a TOLL.' },
+    rules: { t: 'Real hockey, five skaters and a goalie, three periods, our pond. My six skate harder than anything you have met, a Lich calls our lines, and our bench carries a full bag. I keep a NIGHT of my own for when it matters. Before the puck drops I draw the HEXES.' },
+    hexes: { t: 'The pond has moods. It opens under the puck and gives it back at centre ice. The net wanders off its line. The cold gets into your legs. The whistle forgets whose side it is on. You will hear which before the puck drops, and they stay up on the board.' },
+    toll: { t: 'Thirty gold a game, after the first. Paid when the puck drops. Walking away from the card costs nothing.' },
+    night: { t: 'The Long Night. Once a game I put the lamps out. Your goalie cannot find the puck, and your skaters wade.' },
+    play: { t: 'Then lace up.', act: 'unadir:rink' },
+  } };
+
+/* ---------- the Nadir six ---------- */
+// their six and bench, as Black Ice takes a team: your team's level plus W_UMB4E.gap, tier U's points spread over each
+// of the six (as wRinkOpp spreads a tier's), the captain at centre with his own ultimate
+function wUmbHkTeam(lvl) {
+  const L = lvl != null ? lvl : Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4E.gap)), k = W_HKG.oppBonus[4] || 0, n = wHK.pos.length;
+  const roster = W_UMB4E.six.map((s, i) => {
+    const m = wRinkPlayer(wMakePlayer({ kind: s.kind, lvl: i < n ? L : Math.max(1, L - 1), n: s.n, num: s.num }, 'opp'));
+    if (s.ult) m.ult = s.ult;
+    return m;
+  });
+  if (k) roster.slice(0, n).forEach((p, j) => { const st = wHK.stats; for (let i = 0; i < k; i++) { const s = st[(i * 5 + j) % st.length]; p.r[s] = Math.min(W_HKR.cap, p.r[s] + 1); } });
+  // the captain at centre; the rest of the six as the engine's coach picks spots (the best reflexes in goal, then the
+  // defenders and the wings)
+  const cap = W_UMB4E.six.findIndex(s => s.cap), free = new Set(roster.slice(0, n).map((_, i) => i).filter(i => i !== cap)), spot = { C: cap };
+  for (const pos of ['G', 'LD', 'RD', 'LW', 'RW']) { const i = [...free].sort((a, b) => wHK.fit(roster[b].r, pos) - wHK.fit(roster[a].r, pos))[0]; free.delete(i); spot[pos] = i; }
+  return Object.assign({}, W_UMB4E.team, { roster, spot });
+}
+const wWU4EBallTeam = wBallTeam;
+wBallTeam = function (club) { if (club === W_UMB4E.club) { const T = W_UMB4E.team; return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.6), light: T.light, motto: '' }; } return wWU4EBallTeam.apply(this, arguments); };
+const wWU4ERinkOpp = wRinkOpp;
+wRinkOpp = function (club, tier) { return club === W_UMB4E.club ? wUmbHkTeam() : wWU4ERinkOpp.apply(this, arguments); };
+
+/* ---------- the hexes ---------- */
+const wWU4EStart = wHK.start, wWU4ESimGame = wHK.simGame;
+wHK.start = o => wWU4EStart(W_UMB4E.next ? Object.assign({}, o, { hexes: W_UMB4E.next.slice() }) : o);
+wHK.simGame = o => wWU4ESimGame(W_UMB4E.next && !(o && o.keep) ? Object.assign({}, o, { hexes: W_UMB4E.next.slice() }) : o);
+// n of hockey's hexes for this try of the champion (or of the finale's round): fixed for the try, the same after a reload
+function wUmbHkHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wHK.hexes), r = mulberry(wUmbHash('hk:' + id) + 977 * ((U && U.tries[id]) || 0) + ((U && id === 'finale' ? 31 * (U.finale || 0) : 0)) + ((WG && WG.year) || 1));
+  const out = []; while (out.length < Math.min(n, ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+const wUmbHkHexWords = hx => hx.map(h => wHK.hexes[h]).filter(Boolean);
+
+/* ---------- PLAY: the card, then the face-off ---------- */
+function wUmbHkCard(C, id, hx) {
+  const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4E.gap)), H = wUmbHkHexWords(hx);
+  const ult = wHK.pows.wraith ? 'The Long Night' : '', prize = C.piece ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.` : 'Win, and the round is yours.';
+  const toll = !C.toll ? '' : tries > 0 ? ` This try costs the toll, ${C.toll} gold, as the puck drops.` : ` The first game is free; after a loss, each costs a toll of ${C.toll} gold.`;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
+    <p><b>The Dead Pond: tier U.</b> Hockey against ${esc(W_UMB4E.team.name)}: level ${lvl}, in umbral form (${W_HKG.oppBonus[4]} rating points on each of their six), coached by a ${esc(W_BALL_SKILL[3])}, with a full bag (${esc(wRinkBagWords(W_RINK_KIT.opp[4]))}). Hollis Grael plays centre, and once a game casts ${esc(ult)}: their goalie set late for everything, and you skate as if through deep snow.</p>
+    <p class="hint wumbpg" id="wUhkHexes"><b>Hexes:</b> ${H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ')}</p>
+    <p class="hint">${prize}${toll} Nobody goes home level: sudden death, then a shootout. <b>Play</b>: you skate your six by hand, and call it. <b>Manage</b>: you call it, your six play. <b>Simulate</b>: the result now.</p></div>
+    <div class="row"><button class="btn" data-uhk="play">Play</button><button class="ghost" data-uhk="manage">Manage</button><button class="ghost" data-uhk="sim">Simulate</button><button class="ghost" id="wUhkNo">Not now</button></div>`, () => wDrain());
+  $('modalBox').querySelectorAll('[data-uhk]').forEach(b => b.onclick = () => { close(); const why = wUmbHkKick(C, id, hx, b.dataset.uhk); if (why) wLog(why, 'b'); });
+  $('wUhkNo').onclick = () => close();
+  const f = $('modalBox').querySelector('[data-uhk="play"]'); if (f) f.focus();
+}
+// why your team can't play the champion now, or ''
+function wUmbHkWhy() {
+  const probs = wRinkProblems(); if (probs.length) return probs.join(' ');
+  if (wRinkLive()) return 'Finish the hockey game you started first.';
+  return '';
+}
+// the face-off: the toll (on a retry), the hexes in the log, and the Realm's hockey game at tier U ('' when it started)
+function wUmbHkKick(C, id, hx, how) {
+  const why = wUmbHkWhy(); if (why) return why;
+  wUmbTollAtKickoff(id);
+  const H = wUmbHkHexWords(hx);
+  wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
+  W_UMB4E.next = hx.slice();
+  try { return wStartRink({ club: W_UMB4E.club, how, tier: 4, kind: W_UMB4E.kind, ref: { id, hexes: hx.slice() }, cup: true }); } finally { W_UMB4E.next = null; }
+}
+// a hockey game half-played (u4 asks no toll to go back to one)
+W_UMB4.live.rink = () => wRinkLive();
+// u4's adapter (and u5's, for a hockey round): the card, or for the bots a Simulated game at once. The hexes u4
+// passes are the card game's: hockey draws its own.
+W_UMB4.start.rink = function (C, id) {
+  // (a hockey game left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wRinkLive()) { wResumeRink(); return ''; }
+  const why = wUmbHkWhy(); if (why) return why;
+  const hx = wUmbHkHexes(id, C.hexes || 1);
+  if (LAB) return wUmbHkKick(C, id, hx, W_UMB4E.labHow);
+  wUmbHkCard(C, id, hx);
+  return '';
+};
+// the end (wRinkSettle has paid the hockey game's own XP, gold and fans): the piece, or a try counted
+W_ON_END[W_UMB4E.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
+
+/* ---------- the line under the bar, and the end ---------- */
+const wWU4ERinkBarNote = wRinkBarNote;
+wRinkBarNote = function () {
+  const r = wWU4ERinkBarNote.apply(this, arguments), L = WG && WG.hkg && WG.hkg.live;
+  if (L && L.world && L.world.kind === W_UMB4E.kind && WHK && WHK.world) {
+    const hx = (L.world.ref && L.world.ref.hexes) || [];
+    $('wRinkNote').textContent += ` The Umbral, tier U: a ${W_BALL_SKILL[3]} coaches them. Hexes: ${wUmbHkHexWords(hx).map(h => h.n).join(', ')}.`;
+  }
+  return r;
+};
+// a Hardcore journey that ended on this game (the finale's) keeps its end screen
+const wWU4ERinkResultCard = wRinkResultCard;
+wRinkResultCard = function () { if ((RUN && RUN.over) || (typeof UI !== 'undefined' && UI.screen === 'end')) return; return wWU4ERinkResultCard.apply(this, arguments); };
 /* u4f: golf in the Umbral (issue #99, phase 4f). Loads after u4-grounds.js; changes earlier parts only by reassignment
    (saved originals carry the wWU4F prefix). The engine's side is src/gl/parts/14-umbral.js: the Lich (CPU skill 3)
    and the hexes (opts.hexes).

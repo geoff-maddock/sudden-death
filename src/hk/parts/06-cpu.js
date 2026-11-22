@@ -23,7 +23,7 @@ function hkPassValue(h, j) {
   const p = L.pl[h], q = L.pl[j], s = p.side, d = hyp(q.x - p.x, q.y - p.y);
   const O = hkShotOdds(q, 'one', q.x, q.y), look = O.ok && O.dist < 13 ? (1 - O.miss) * O.q * (O.block ? .75 : 1) : 0;
   // (an Archmage's side looks harder for the pass across the front; Point shots and the Umbrella want it at the point)
-  const A = hkAttNow(s), across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? (hkCpuSide(s) && G.skill[s] >= 2 ? .1 : .06) : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
+  const A = hkAttNow(s), across = look > 0 && q.y * p.y < 0 && Math.abs(q.y - p.y) > 3.5 ? (hkCpuSide(s) && G.skill[s] >= 2 ? (G.skill[s] === 3 ? HK_LICH.across : .1) : .06) : 0, prog = (hkUp(s, q.x) - hkUp(s, p.x)) / HK_RULES.len;
   const point = A.point && HK_ROLE[q.pos] === 'defender' && hkUp(s, q.x) > HK_RULES.len - HK_RULES.blue - 1 ? A.point * .08 : 0;
   const [, md] = hkNearest(q.x, q.y, hkSk(1 - s));
   return look + across + point + (hkDim(s) ? (R() - .5) * HK_DIM.noise : 0) + prog * .4 - hkLaneRisk(s, p.x, p.y, q.x, q.y) - (d > 18 ? .15 : 0) - (d < 2.5 ? .2 : 0) - (md < 1.3 ? .08 : 0);
@@ -95,7 +95,7 @@ function hkPullThink() {
   for (const s of [0, 1]) {
     // (yours is your own call, in Manage as in You play; a Squire never thinks of it, and an Archmage does a little sooner)
     if ((GD.mode !== 'watch' && s === GD.you) || G.skill[s] < 1) continue;
-    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at * (G.skill[s] >= 2 ? 1.3 : 1) && diff >= 1 && diff <= HK_PULL.by;
+    const g = L.pl[hkGk(s)], diff = G.score[1 - s] - G.score[s], want = G.p === HK_RULES.periods && G.clock < G.plen * HK_PULL.at * (G.skill[s] === 3 ? HK_LICH.pull : G.skill[s] >= 2 ? 1.3 : 1) && diff >= 1 && diff <= HK_PULL.by;
     if (g.pulled === 'late' && !want) { g.pulled = false; continue; }
     if (!g.pulled && want && G.poss === s && hkUp(s, L.puck.x) > HK_RULES.len * HK_PULL.up) hkPull(s, 'late');
   }

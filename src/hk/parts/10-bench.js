@@ -36,7 +36,7 @@ function hkStaStep(dt) {
     if (p.off || (p.pos === 'G' && !p.pulled)) continue;
     const top = 5 + p.r.spd * .52, k = clamp(hyp(p.vx, p.vy) / top, 0, 1);
     // (a pushed Tempo tires them, and so does a system that chases, while they are without the puck)
-    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire') * hkAnti(p.side);
+    const tire = hkTempo(p.side).tire * (G.poss !== p.side ? hkDefNow(p.side).tire || 1 : 1) * (hkRoaring(p.side) ? HK_POND.roar.tire : 1) * hkFx(p.side, 'tire') * hkAnti(p.side) * (G.hex ? hkHexTire(p.side) : 1);
     G.sta[p.side][p.ri] = Math.max(HK_STA.floor, hkSta(p) - (HK_STA.drain + HK_STA.fast * k) * tire * dt);
   }
   if (!hkShort(0) && !hkShort(1)) G.sysLog[G.poss][G.call[G.poss].att].t += dt;
@@ -62,7 +62,7 @@ function hkCoach(dt) {
     const safe = G.poss === s || hkUp(s, L.puck.x) > HK_RULES.len / 2 + 2;
     if (!safe) continue;
     const going = hkSk(s).filter(p => p.chg).length; if (going >= 2) continue;
-    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < (hkCpuSide(s) && G.skill[s] === 0 ? HK_STA.late : HK_STA.tired) && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
+    const tired = hkSk(s).filter(p => p.pos !== 'G' && !p.chg && hkSta(p) < (hkCpuSide(s) && G.skill[s] === 0 ? HK_STA.late : hkCpuSide(s) && G.skill[s] === 3 ? HK_LICH.tired : HK_STA.tired) && L.pl.indexOf(p) !== hkHand()).sort((a, b) => hkSta(a) - hkSta(b));
     for (const p of tired.slice(0, 2 - going)) { const inn = hkNextOn(s, p.pos); if (inn >= 0 && !hkSk(s).some(q => q.chg && q.chg.to === inn)) p.chg = { to: inn }; }
   }
 }
