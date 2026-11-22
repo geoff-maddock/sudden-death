@@ -12,12 +12,13 @@
                              four, gold for the Seal (pieces won, and one more for the Seal)
      New Game+               the profile remembers (pkey('sd-realm-umbral')): the next journey starts with a rumour
                              that the door is closed, but not locked
-   How to play: an Umbral section (#wHelpUmbral) once it is open; before that, one closed line.
+   How to play: an Umbral section (#wHelpUmbral) once it is open; before that, one closed line. The Quick start gains a
+   tab of every way to play's hexes (wUmbQuick) once it is open.
 
    W_UMB6, wUmbAch
    Wraps: wUmbSeal (wWU6Seal: the rewards; the recruit is asked once the world is free), W_ON_END.nadir (wWU6OnNadir:
    the medal as pieces come in), wLegendOfJourney (wWU6LegendOfJourney: the mark survives a later Crown), wOpenLegends
-   (wWU6OpenLegends: the mark), wStart (wWU6Start: the rumour on a new journey), renderHelp (wWU6RenderHelp). */
+   (wWU6OpenLegends: the mark), wStart (wWU6Start: the rumour on a new journey), renderHelp (wWU6RenderHelp), wQuickHTML (wWU6QuickHTML: the hexes tab). */
 
 const W_UMB6 = { block: 6, draw: 1, key: () => pkey('sd-realm-umbral') };
 RELICS.umbseal = { n: 'The Seal of the Crown', adv: 1, desc: 'Start each card match with 6 Block, and your first hand there has a card more.', ico: 'gem' };
@@ -87,4 +88,25 @@ renderHelp = function () {
     <p class="hint"><b>The Seal.</b> With all nine, Hollow Aurelia plays you for the Seal in the Hollow Coliseum: three games, in your three weakest ways to play on that side. A piece you won at the first try takes a hex off its game. Lose a game and you try that one again. Win all three and the door shuts.</p>
     <p class="hint"><b>When it shuts.</b> Forge the Seal and you keep it, a trophy: every card match starts with 6 Block and a card more in your first hand. The Nadir captain you beat most cleanly asks to join you. Your team's portrait in the Hall of Legends says you sealed it, for every later journey to see, and your profile's medal (The Door Shut) fills: bronze for the first piece, silver for four, gold for the Seal.</p>
     <p class="hint"><b>On the light side.</b> While the portal stands open, the sun goes out at midday once a week, and more often the longer it stays open. The Pale Herald, by the statue in the Coliseum, will tell you anything twice.</p></div>`);
+};
+
+/* ---------- Quick start: the hexes, sport by sport (only once the Umbral is open) ---------- */
+const W_UMB6_SPORTS = [['diamond', 'Baseball', 'The Bone Diamond'], ['gridiron', 'Football', 'The Cinder Pit'], ['ring', 'Boxing', 'The Broken Ring'], ['court', 'Basketball', 'The Black Court'],
+  ['rink', 'Hockey', 'The Dead Pond'], ['links', 'Golf', 'The Hollow Links'], ['lanes', 'Bowling', 'The Drowned Lanes'], ['shed', 'Curling', 'The Sunken Shed']];
+function wUmbQuick() {
+  const steps = W_UMB6_SPORTS.map(([e, n, g]) => {
+    const E = W_ENGINES[e], h = E && E.api.hexes, t = (typeof h === 'function' ? h() : h) || {};
+    return { h: `${n}, at ${g}`, t: Object.keys(t).map(k => `<b>${esc(t[k].n)}</b>: ${esc(t[k].d)}`).join(' ') };
+  });
+  steps.unshift({ h: 'The card game, everywhere', t: Object.values(W_UMB3.hexes).map(H => `<b>${esc(H.n)}</b>: ${esc(H.d)}`).join(' ') });
+  return { id: 'umbral', n: 'The Umbral', where: 'the other side of the portal', more: 'wHelpUmbral',
+    lede: 'Every game on this side is tier U, and a Nadir champion\'s game draws one or two hexes, named before it starts and shown on the scoreboard. These are the hexes each way to play can draw.',
+    steps, tip: 'A piece won at the first try takes a hex off its game in the Seal\'s final.', keys: [], phone: '',
+    foot: 'Everything else about the Umbral is further down: <a href="#" data-wqmore="wHelpUmbral">The Umbral Realm</a>.' };
+}
+const wWU6QuickHTML = wQuickHTML;
+wQuickHTML = function () {
+  if (!wUmbOn()) return wWU6QuickHTML.apply(this, arguments);
+  W_QUICK.push(wUmbQuick());
+  try { return wWU6QuickHTML.apply(this, arguments); } finally { W_QUICK.pop(); }
 };

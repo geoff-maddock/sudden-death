@@ -33,11 +33,17 @@ async def main():
 
         await pg.evaluate("showPage('help')")
         h0 = await pg.evaluate("(() => { const h = document.getElementById('wHelpUmbral'); return h ? h.textContent : ''; })()")
+        q0 = await pg.evaluate("!!document.querySelector('#wQuick [data-wq=\"umbral\"]')")
         await pg.evaluate("showPage('play'); wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; document.getElementById('wHelpUmbral') && document.getElementById('wHelpUmbral').remove(); showPage('help')")
         h1 = await pg.evaluate("(() => { const h = document.getElementById('wHelpUmbral'); return h ? h.textContent : ''; })()")
         await pg.evaluate("showPage('play')")
+        check(not q0, 'before the Crown the Quick start has no Umbral tab', q0)
         check('After the Crown' in h0 and 'lantern' not in h0 and 'Aurelia' not in h0, 'before the Crown, How to play has only a closed line about the Umbral', h0[:200])
         check(all(w in h1 for w in ['portal', 'tier U', 'lantern', 'Gatekeeper', 'Hollow Aurelia', 'hexes']), 'after it opens, How to play explains the Umbral', h1[:300])
+        await pg.evaluate("showPage('help')")
+        qk = await pg.evaluate("(() => { const p = document.querySelector('#wQuick [data-wqp=\"umbral\"]'); return { tab: !!document.querySelector('#wQuick [data-wq=\"umbral\"]'), steps: p ? p.querySelectorAll('.wqsteps li').length : 0, text: p ? p.textContent : '' }; })()")
+        await pg.evaluate("showPage('play')")
+        check(qk['tab'] and qk['steps'] == 9 and all(w in qk['text'] for w in ['The Phantom Pitch', 'The Ice Opens', 'Hoarfrost', 'Shades in the Deck']), 'once it is open, the Quick start has a tab of every way to play\'s hexes', {k: qk[k] for k in ['tab', 'steps']})
 
         md = await pg.evaluate("""(() => { const U = WG.umbral; ACHS.stats.realmUmbral = 0; W_ON_END.nadir('win', { id: 'gate' }); const one = ACHS.stats.realmUmbral;
           return { one, ach: ACH.some(a => a.id === 'w_umbral') }; })()""")
