@@ -215,6 +215,7 @@ function wUmbLantern(x, y) {
     wAdvance((24 * 60 - WG.min) + 7 * 60); RUN.hp = RUN.maxhp;
     // (tired legs rest as in a bed, and the dark lets you be for a few steps after, as after a night at camp)
     if (typeof wRestLegs === 'function') wRestLegs(W_FAT.bed);
+    if (typeof wUmbSound === 'function') wUmbSound('rest'); // (u7's chime)
     WG.grace = W_ENC.grace;
     U.lantern = { map: m.id, x: WG.x, y: WG.y, rg: mt.lantern || wRegionHere() };
     wLog('You rest by the lantern. Nobody sleeps, quite, but the night passes and your team is whole again. You will wake here if a match goes badly on this side.', 'm');
