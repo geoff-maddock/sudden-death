@@ -180,11 +180,11 @@ function gfRated(side, ri) { const r = gfWorn(side, ri, G.teams[side].roster[ri]
 // the half gives a lot back; every play costs everyone a little (the undead and golems tire at half the rate)
 function gfRest(n) { if (G.stam) for (const s of G.stam) for (let i = 0; i < s.length; i++) s[i] = Math.min(100, s[i] + n); }
 // (the bench rests instead; the stance sets how hard the seven go, 16-stance.js)
-function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * gfStanceStam(t) * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
+function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * gfStanceStam(t) * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1) * gfHexCold(t)) : Math.min(100, v + GF_STAM.bench); }); }); }
 const gfStamCost = (cost, ult) => ult ? GF_STAM.ult : GF_STAM.base + GF_STAM.per * cost;
 const gfRole = side => side === G.poss ? 'off' : 'def';
 /* the powers a side can cast now (with the call): each of its players' everyday power for the side of the ball they
-   are on, and their kind's ultimate if it is that side's and unused. { key, id, ri, n (the player), name, cost, ult,
+   are on, and their kind's ultimate (or their own, m.ult) if it is that side's and unused. { key, id, ri, n (the player), name, cost, ult,
    fits, desc, ok, why } */
 function gfPowerOptions(side) {
   if (!G.mana) return [];
@@ -192,7 +192,7 @@ function gfPowerOptions(side) {
   const on = gfOnField(side);
   T.roster.forEach((m, ri) => {
     if (!on.includes(ri)) return;
-    const pw = GF_POW[m.kind], u = GF_ULT[m.kind], st = G.stam[side][ri];
+    const pw = GF_POW[m.kind], u = (m.ult && GF_ULT_BY[m.ult]) || GF_ULT[m.kind], st = G.stam[side][ri];
     const add = (p, ult) => {
       const cost = ult ? GF_ULT_COST : p.cost, used = ult && !!(G.ultUsed[side][m.kind] || G.ultUsed[side][ri]);
       const why = used ? 'used this game' : gfMana(side) < cost ? 'needs mana' : st < GF_STAM.min ? 'winded' : '';
@@ -236,14 +236,17 @@ function gfLever() {
 }
 // what the defense expects: a pass on long yardage, a run on short
 const gfExpect = () => G.togo >= 7 ? 'pass' : G.togo <= 3 ? 'run' : 'any';
-function gfCpuPower(side, call, skill) {
+function gfCpuPower(side, call, skillIn) {
   const opts = gfPowerOptions(side).filter(o => o.ok); if (!opts.length) return null;
+  // (a Lich casts as an Archmage, more readily, and on defense expects what its own reading expects, 18-umbral.js)
+  const lich = skillIn === 3, skill = lich ? 2 : skillIn;
   const role = gfRole(side), lever = gfLever(), full = gfMana(side) >= GF_MANA.max - 1;
   // what the play is: the offense knows; a defense guesses from the down (an Archmage reads their habits too)
   let kind = role === 'off' ? (GF_PLAYS[call] ? GF_PLAYS[call].kind : 'any') : skill >= 1 ? gfExpect() : 'any';
   if (role === 'def' && skill === 2) { const T = gfTendency(G.poss, 'off'), run = T.run || 0; if (Object.keys(T).length) kind = run >= .5 ? 'run' : run <= .2 ? 'pass' : kind; }
+  if (role === 'def' && lich) kind = gfLichExpectKind();
   // how often: a Squire now and then, a Knight more, an Archmage saves its mana for the downs that matter
-  const p = skill === 2 ? (lever || full ? .85 : .2) : [.25, .4][skill] + lever + (gfMana(side) >= 5 ? .2 : 0);
+  const p = lich ? (lever || full ? GF_LICH.cast[1] : GF_LICH.cast[0]) : skill === 2 ? (lever || full ? .85 : .2) : [.25, .4][skill] + lever + (gfMana(side) >= 5 ? .2 : 0);
   if (R() > p && !(skill >= 1 && opts.some(o => o.sit))) return null;
   const fit = o => o.fits === 'any' || kind === 'any' || o.fits === kind;
   const w = {};

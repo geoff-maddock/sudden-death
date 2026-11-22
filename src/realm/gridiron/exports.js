@@ -42,6 +42,10 @@ return {
   stances: Object.fromEntries(GF_ST_IDS.map(k => [k, { n: GF_STANCE[k].n, desc: GF_STANCE[k].desc, stam: GF_STANCE[k].stam, off: Object.assign({}, GF_STANCE[k].off), def: Object.assign({}, GF_STANCE[k].def) }])),
   // (the fumble rules themselves, not a copy: a test may raise the chance to see one)
   fumRules: GF_FUM, fumRisk: side => G ? gfFumbleRisk(side) : null,
+  // the Umbral (18-umbral.js): the hexes ({ id: { n, d } }), the game's (null without: { ids, on, short, line }), where
+  // the offense scores now, and the Lich's and the hexes' rules themselves (not copies: the balance bot tunes them)
+  hexes: Object.fromEntries(Object.entries(GF_HEX).map(([k, H]) => [k, { n: H.n, d: H.d }])), hex: () => G && G.hex ? Object.assign({ line: gfHexLine() }, JSON.parse(JSON.stringify(G.hex))) : null,
+  goal: () => G ? gfGoal() : GF_RULES.field, hexRules: GF_HEX, lichRules: GF_LICH, ult: id => GF_ULT_BY[id] ? { n: GF_ULT_BY[id].n, desc: GF_ULT_BY[id].desc, role: GF_ULT_BY[id].role } : null,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches

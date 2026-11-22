@@ -22684,7 +22684,8 @@ function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w
    is first down again; miss on fourth down and the other side takes over where the ball is.
    A field goal is kicked from 7 yards behind the line, so its distance is the yards to the goal line plus 17.
    G is the game, plain JSON (so a snapshot can be saved): { poss, ball, down, togo, score, plays }; 08-drive.js adds
-   teams and the drive. */
+   teams and the drive.
+   The goal line the offense drives at is gfGoal(): the far end, unless a hex brings it nearer (18-umbral.js). */
 const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, bench: 5, td: 6, fg: 3, safety: 2, start: 25 };
 let G = null;
 
@@ -22694,14 +22695,14 @@ function gfNewGame(opts) {
   return G;
 }
 // first and ten from where the ball is (first and goal inside the ten)
-function gfFirstDown() { G.down = 1; G.togo = Math.min(GF_RULES.chain, GF_RULES.field - G.ball); }
+function gfFirstDown() { G.down = 1; G.togo = Math.min(GF_RULES.chain, gfGoal() - G.ball); }
 // the other side has the ball, ball yards from its own goal line
 function gfGive(ball) { G.poss = 1 - G.poss; G.ball = ball; gfFirstDown(); }
 /* a play gained (or lost) yards: move the ball, then the score, the down and the chains.
    Returns what happened: 'td', 'safety', 'first', 'down' (the next down) or 'turnover' (on downs). */
 function gfSpot(gain) {
   G.plays++; G.ball += gain;
-  if (G.ball >= GF_RULES.field) { G.score[G.poss] += GF_RULES.td; gfGive(GF_RULES.start); return 'td'; }
+  if (G.ball >= gfGoal()) { G.score[G.poss] += GF_RULES.td; gfGive(GF_RULES.start); return 'td'; }
   if (G.ball <= 0) { G.score[1 - G.poss] += GF_RULES.safety; gfGive(GF_RULES.start); return 'safety'; }
   if (gain >= G.togo) { gfFirstDown(); return 'first'; }
   if (G.down >= GF_RULES.downs) { gfGive(GF_RULES.field - G.ball); return 'turnover'; }
@@ -22710,7 +22711,7 @@ function gfSpot(gain) {
 }
 // the ball changes hands where it is (an interception, or a punt landing there)
 function gfTurnover() { gfGive(GF_RULES.field - G.ball); }
-function gfKickDist() { return GF_RULES.field - G.ball + 17; }
+function gfKickDist() { return gfGoal() - G.ball + 17 + gfHexWind(G.poss, 'fg'); }
 // a field goal try: 3 if it is good, and either way the other side has the ball (from its 25, or where the kick was)
 function gfFieldGoal(good) {
   G.plays++;
@@ -23333,7 +23334,7 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    where off and def map each position to a roster index. A team sent with its own off and def (the Realm's lineup,
    phase 3) keeps them when they name all seven positions, each a different player. Realm ratings run to 12.
    A roster may be longer than seven: the first seven start (unless off and def say otherwise), and the rest, up to
-   GF_RULES.bench, sit on the bench to come on for a tired player (15-bench.js). A roster player's gear ({ gear: { id, name, fx } })
+   GF_RULES.bench, sit on the bench (a player may bring an ultimate of their own, { ult: id }, the Nadir captain's) to come on for a tired player (15-bench.js). A roster player's gear ({ gear: { id, name, fx } })
    stays with them as gear (its name), gid and gx (its effects, 17-kit.js). */
 const GF_OFF_POS = ['QB', 'RB', 'C', 'LG', 'RG', 'X', 'Z'], GF_DEF_POS = ['DT', 'DL', 'DR', 'CL', 'CR', 'LB', 'S'];
 // a position map that names every position once, each to a different player in the roster
@@ -23357,7 +23358,7 @@ const GF_CLUBS = {
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [7 kinds] }
 function gfTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side + GF_RULES.bench)
-    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: gfGx(p.gear.fx) } : {}, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}));
+    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: gfGx(p.gear.fx) } : {}, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.ult && GF_ULT_BY[p.ult] ? { ult: p.ult } : {}));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   const starters = roster.slice(0, GF_RULES.side).map((_, i) => i), free = new Set(starters), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
   T.off = {}; T.off.QB = by(r => r.arm * 2 + r.hnd * .3, 1)[0]; T.off.RB = by(r => r.spd + r.str * .8, 1)[0];
@@ -23464,7 +23465,7 @@ function gfSnap(oc, dc, st) {
     if (p.job === 'zone') p.spot = (D.zone && D.zone[k]) || GF_DEF_SET[k];
   }
   L = { oc, dc, t: 0, pl, id, did, ball: { st: 'held', h: id.QB, x: pl[id.QB].x, y: 0, z: 1, fx: 0, fy: 0, tx: 0, ty: 0, bt: 0, T: 0, tgt: -1 },
-    carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: GF_RULES.field - G.ball, back: G.ball, ev: [],
+    carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: gfGoal() - G.ball, back: G.ball, ev: [],
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
     read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };
@@ -23744,20 +23745,26 @@ function gfDead(what, by, x, byi) {
 function gfPlayDown(oc, dc, st) { gfSnap(oc, dc, st); while (!L.done) gfStep(GF_DT); return L.done; }
 /* Cinder Gridiron: the coaches (issue #9, phase 1). Each side's call is a weighted pick from the down and distance,
    leaning to what beats the other side's recent calls and away from tired ones (12-playbook.js). On fourth down the coach kicks a field goal in
-   range, goes for it when it is short, and punts otherwise; a Knight or better weighs the fumble risk first (gfFourthWary). */
+   range, goes for it when it is short, and punts otherwise; a Knight or better weighs the fumble risk first (gfFourthWary). A Lich (skill 3) calls and decides by its own rules (18-umbral.js). */
 function gfCpuOffense() {
-  const d = G.down, tg = G.togo;
-  const w = { run: 3 + (tg <= 3 ? 3 : 0) - (tg >= 9 && d >= 2 ? 1.5 : 0), short: 3 + (tg >= 4 && tg <= 8 ? 1.5 : 0),
-    deep: 1.2 + (tg >= 9 ? 2 : 0) + (d === 3 && tg >= 7 ? 1.5 : 0), screen: 1.3 + (tg >= 6 ? .8 : 0) };
-  return wpick(gfCounterOffense(w));
+  if ((G.skill || [1, 1])[G.poss] === 3) return gfLichOffense();
+  return wpick(gfCounterOffense(gfOffLean()));
 }
 function gfCpuDefense() {
-  const d = G.down, tg = G.togo;
-  return wpick(gfCounterDefense({ blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 }));
+  if ((G.skill || [1, 1])[1 - G.poss] === 3) return gfLichDefense();
+  return wpick(gfCounterDefense(gfDefLean()));
 }
+// what a coach leans to by the down and the distance, before reading the other side
+function gfOffLean() {
+  const d = G.down, tg = G.togo;
+  return { run: 3 + (tg <= 3 ? 3 : 0) - (tg >= 9 && d >= 2 ? 1.5 : 0), short: 3 + (tg >= 4 && tg <= 8 ? 1.5 : 0),
+    deep: 1.2 + (tg >= 9 ? 2 : 0) + (d === 3 && tg >= 7 ? 1.5 : 0), screen: 1.3 + (tg >= 6 ? .8 : 0) };
+}
+function gfDefLean() { const d = G.down, tg = G.togo; return { blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 }; }
 // GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call (a kicking tee adds to both, 17-kit.js)
 const GF_FG_RANGE = 52, GF_FG_MAX = 62;
 function gfFourth() {
+  if ((G.skill || [1, 1])[G.poss] === 3) return gfLichFourth();
   if (gfKickDist() <= GF_FG_RANGE + gfTee(G.poss)) return 'fg';
   if (G.togo <= 2 && G.ball >= 40) return gfFourthWary(G.poss) && !(G.togo <= 1 && G.ball >= 50) ? 'punt' : 'go';
   return 'punt';
@@ -23780,7 +23787,7 @@ function gfPuntYards(k) { return Math.round(36 + k.r.kck * 1.6 + (gfGxOf(k).punt
    In a full game (10-game.js) you call the defense too when the other side has the ball.
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
-   GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..2, 0..2]).
+   GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..3, 0..3]: Squire, Knight, Archmage, Lich).
    Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
    opts.bags: each side's potions ([bag or null, ...], 17-kit.js); a CPU coach with a bag uses it at the call, after its swaps.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
@@ -23794,13 +23801,15 @@ function gfStart(opts) {
   engSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
-  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
+  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 3)) : [1, 1];
   gfPlaybookStart(); gfBoxStart();
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
   gfFansStart(o.fans); G.crowd = engCrowd(o);
   gfStanceStart(o.stance);
   gfKitStart(o.bags);
+  // (opts.hexes: the Umbral's, 18-umbral.js; none, and nothing changes)
+  if (o.hexes && o.hexes.length) gfHexStart(o.hexes, o.hexOn);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null, wary: '' };
@@ -23883,9 +23892,9 @@ function gfResult(r) {
   if (r.what === 'fum' && r.lost) {
     G.drive.yards += r.gain; G.plays++;
     G.ball = clamp(G.ball + r.gain, 1, 99); gfTurnover();
-    const ret = Math.min(r.ret || 0, GF_RULES.field - G.ball), back = ret ? ` and runs it back ${ret} yard${ret === 1 ? '' : 's'}` : '';
+    const ret = Math.max(0, Math.min(r.ret || 0, gfGoal() - G.ball)), back = ret ? ` and runs it back ${ret} yard${ret === 1 ? '' : 's'}` : '';
     G.ball += ret;
-    if (G.ball >= GF_RULES.field) {
+    if (G.ball >= gfGoal()) {
       G.score[G.poss] += GF_RULES.td; G.drive.end = 'fumtd'; gfBoxAdd(G.poss, L && L.pl[r.reci] ? L.pl[r.reci].ri : -1, 'td');
       GD.msg = `Fumble! ${r.rec} picks it up${back} for a touchdown.` + gfExtraPoint(G.poss); gfScoredOn(off);
       GD.big = { k: 'fumtd', sub: `${r.rec}, ${ret} yards` };
@@ -23947,7 +23956,7 @@ function gfKick() {
       : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
     if (gfZoneSum('kick') < 0) GD.why += ` The ${gfZoneName('kick')} pushes the ball${gust ? ' wide' : ''}.`;
   } else {
-    const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt'))); G.plays++;
+    const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt')) - gfHexWind(off, 'punt')); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
     G.drive.end = 'punt'; GD.big = null; GD.msg = `${k.n} punts, ${y} yards.`;
     const wary = GD.wary ? `The coach punts on fourth and short rather than risk a fumble: ${GD.wary}. ` : ''; GD.wary = '';
@@ -24077,6 +24086,7 @@ function gfDrawField(c) {
   for (let a = 1; a < 100; a++) { const p = gfScr(a, 0); if (p.x < 0 || p.x > 960 || a % 5 === 0) continue; for (const hy of [-3.1, 3.1]) { const q = gfScr(a, hy); c.fillStyle = 'rgba(240,236,224,.45)'; c.fillRect(q.x - .5, q.y - 3, 1, 6); } }
   for (let a = 10; a < 100; a += 10) { const n = String(a <= 50 ? a : 100 - a); for (const ny of [-19, 19]) { const p = gfScr(a, ny); if (p.x > -30 && p.x < 990) txt(c, n, p.x, p.y + 7, '700 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(240,236,224,.55)', 'center'); } }
   c.restore();
+  if (G.hex) gfHexDrawField(c, top, bot);
   for (const s of [0, 1]) { const p = gfScr(s ? 105 : -5, 0); if (p.x > -100 && p.x < 1060) { c.save(); c.translate(p.x, p.y); c.rotate(s ? Math.PI / 2 : -Math.PI / 2); txt(c, G.teams[s].name.toUpperCase(), 0, 8, '800 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(255,240,220,.35)', 'center'); c.restore(); } }
   // the goalposts, scorched at the top
   for (const a of [-10, 110]) {
@@ -24202,7 +24212,7 @@ function gfDrawHud(c) {
       c.fillStyle = i < G.mana[s] ? '#a88cff' : 'rgba(168,140,255,.15)'; c.fill();
     }
   });
-  let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
+  let mid = `${GF_ORD[G.down]} & ${G.togo >= gfGoal() - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   // (you call in You call and in You play; only Coaches has the coaches call it)
   const youCall = GD.mode === 'call' || GD.mode === 'play';
   if (GD.ph === 'call') sub = !youCall ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
@@ -24213,12 +24223,15 @@ function gfDrawHud(c) {
   if (GD.ph === 'call' && youCall && G.poss !== GD.you) sub = 'Your call: pick a defense';
   if (GD.ph === 'kick') sub = (GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt') + (GD.meter ? ': tap Space twice, for power and aim' : '');
   if (GD.ph === 'kickoff') { mid = `Kickoff  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`; sub = `${G.teams[1 - GD.kickoff].name} kick to ${G.teams[GD.kickoff].name}`; }
+  if (GD.ph === 'kickoff' && G.hex && G.half === 1 && G.clock >= GF_GAME.half) sub = 'Hexes: ' + gfHexNames();
   if (GD.ph === 'half') { mid = GD.msg; sub = ''; }
   if (GD.ph === 'post' || GD.ph === 'over') { mid = GD.msg; sub = GD.ph === 'over' ? (GD.game ? gfFinalLine() : gfEndLine()) : ''; }
   txt(c, mid, 480, 27, F(18, 800), '#f3ead6', 'center');
   if (sub) txt(c, sub, 480, 49, F(15, 600), GD.ph === 'pre' ? '#ffd08a' : '#b9b0a0', 'center');
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
   if (cast.length) txt(c, 'Powers: ' + cast.join('  ·  '), 480, 72, F(14, 700), '#d6c4ff', 'center');
+  // the hexes on this game, under the bar (18-umbral.js)
+  if (G.hex) txt(c, '☾ ' + gfHexLine(), 16, h + 17, F(13, 700), '#c8b8ff', 'left');
   // a broken tackle, a shed block, the catch: the play's last moment, briefly
   if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (GFT.why && GFT.why !== 'Touchdown!' && GFT.why !== 'Picked off!') txt(c, GFT.why, 480, 104, F(24, 900), '#ffd08a', 'center'); else if (e && L.t - e.t < .9 && e.k === 'catch') txt(c, 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
   // a power doing its work, a little longer
@@ -24318,7 +24331,7 @@ function gfKickoff() {
   GD.msg = `${ret.n} returns the kickoff to the ${gfSpotName(G.ball)}.`; GD.why = `${T.name} has the ball.`;
   gfNewDrive();
 }
-function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; L = null; GD.kick = null; GD.pick = null; GD.pow = null; GD.big = null; if (G.zones) G.zones = []; gfPowersDrive(); }
+function gfNewDrive() { G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0, half: G.half }; if (G.hex) gfHexDrive(); L = null; GD.kick = null; GD.pick = null; GD.pow = null; GD.big = null; if (G.zones) G.zones = []; gfPowersDrive(); }
 /* a drive is over (or the clock ran out on it): true when the game goes on, false when it is over. Puts the next beat on:
    a kickoff after a score or a new half, halftime, or the next drive the other way. */
 function gfGameNext() {
@@ -24705,11 +24718,11 @@ function gfRated(side, ri) { const r = gfWorn(side, ri, G.teams[side].roster[ri]
 // the half gives a lot back; every play costs everyone a little (the undead and golems tire at half the rate)
 function gfRest(n) { if (G.stam) for (const s of G.stam) for (let i = 0; i < s.length; i++) s[i] = Math.min(100, s[i] + n); }
 // (the bench rests instead; the stance sets how hard the seven go, 16-stance.js)
-function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * gfStanceStam(t) * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1)) : Math.min(100, v + GF_STAM.bench); }); }); }
+function gfTirePlay() { if (G.stam) G.stam.forEach((s, t) => { const on = gfOnField(t); s.forEach((v, i) => { s[i] = on.includes(i) ? Math.max(0, v - GF_STAM.play * gfStanceStam(t) * (GF_UNDEAD.includes(G.teams[t].roster[i].kind) ? .5 : 1) * gfHexCold(t)) : Math.min(100, v + GF_STAM.bench); }); }); }
 const gfStamCost = (cost, ult) => ult ? GF_STAM.ult : GF_STAM.base + GF_STAM.per * cost;
 const gfRole = side => side === G.poss ? 'off' : 'def';
 /* the powers a side can cast now (with the call): each of its players' everyday power for the side of the ball they
-   are on, and their kind's ultimate if it is that side's and unused. { key, id, ri, n (the player), name, cost, ult,
+   are on, and their kind's ultimate (or their own, m.ult) if it is that side's and unused. { key, id, ri, n (the player), name, cost, ult,
    fits, desc, ok, why } */
 function gfPowerOptions(side) {
   if (!G.mana) return [];
@@ -24717,7 +24730,7 @@ function gfPowerOptions(side) {
   const on = gfOnField(side);
   T.roster.forEach((m, ri) => {
     if (!on.includes(ri)) return;
-    const pw = GF_POW[m.kind], u = GF_ULT[m.kind], st = G.stam[side][ri];
+    const pw = GF_POW[m.kind], u = (m.ult && GF_ULT_BY[m.ult]) || GF_ULT[m.kind], st = G.stam[side][ri];
     const add = (p, ult) => {
       const cost = ult ? GF_ULT_COST : p.cost, used = ult && !!(G.ultUsed[side][m.kind] || G.ultUsed[side][ri]);
       const why = used ? 'used this game' : gfMana(side) < cost ? 'needs mana' : st < GF_STAM.min ? 'winded' : '';
@@ -24761,14 +24774,17 @@ function gfLever() {
 }
 // what the defense expects: a pass on long yardage, a run on short
 const gfExpect = () => G.togo >= 7 ? 'pass' : G.togo <= 3 ? 'run' : 'any';
-function gfCpuPower(side, call, skill) {
+function gfCpuPower(side, call, skillIn) {
   const opts = gfPowerOptions(side).filter(o => o.ok); if (!opts.length) return null;
+  // (a Lich casts as an Archmage, more readily, and on defense expects what its own reading expects, 18-umbral.js)
+  const lich = skillIn === 3, skill = lich ? 2 : skillIn;
   const role = gfRole(side), lever = gfLever(), full = gfMana(side) >= GF_MANA.max - 1;
   // what the play is: the offense knows; a defense guesses from the down (an Archmage reads their habits too)
   let kind = role === 'off' ? (GF_PLAYS[call] ? GF_PLAYS[call].kind : 'any') : skill >= 1 ? gfExpect() : 'any';
   if (role === 'def' && skill === 2) { const T = gfTendency(G.poss, 'off'), run = T.run || 0; if (Object.keys(T).length) kind = run >= .5 ? 'run' : run <= .2 ? 'pass' : kind; }
+  if (role === 'def' && lich) kind = gfLichExpectKind();
   // how often: a Squire now and then, a Knight more, an Archmage saves its mana for the downs that matter
-  const p = skill === 2 ? (lever || full ? .85 : .2) : [.25, .4][skill] + lever + (gfMana(side) >= 5 ? .2 : 0);
+  const p = lich ? (lever || full ? GF_LICH.cast[1] : GF_LICH.cast[0]) : skill === 2 ? (lever || full ? .85 : .2) : [.25, .4][skill] + lever + (gfMana(side) >= 5 ? .2 : 0);
   if (R() > p && !(skill >= 1 && opts.some(o => o.sit))) return null;
   const fit = o => o.fits === 'any' || kind === 'any' || o.fits === kind;
   const w = {};
@@ -24899,12 +24915,12 @@ function gfPowerBook() {
      between plays), and so do a few powers (14-powers.js: rest, restZ; gfPowRest).
    - The coaches swap too (gfCpuSwaps, once a call and before any kick, by skill): a Squire now and then, for anyone fresher; a Knight a
      player under 40, for the freshest who would play those positions at least as well now (gfPlaysAs: the ratings the
-     positions use, worn by stamina); an Archmage a player under 55, for whoever would play them best, and only if
+     positions use, worn by stamina); an Archmage a player under 55 (a Lich under 60), for whoever would play them best, and only if
      better. Never for someone less than GF_SWAP.gap fresher.
    - The log: every swap, potion and power that gives stamina back waits in GD.notes ({ side, k, msg }) and goes in the
      next play's log line (gfTakeNotes: e.notes), with the powers cast (e.pw, 08-drive.js).
    G.played[side]: every roster index that has taken the field (the Realm pays them as the seven). */
-const GF_SWAP = { gap: 25, lim: [30, 40, 55], squire: .3 };
+const GF_SWAP = { gap: 25, lim: [30, 40, 55, 60], squire: .3 };
 // the ratings each position leans on (the coaches weigh a swap by them)
 const GF_POS_KEY = { QB: ['arm'], RB: ['spd', 'str'], C: ['str'], LG: ['str'], RG: ['str'], X: ['spd', 'hnd'], Z: ['spd', 'hnd'],
   DT: ['str', 'tkl'], DL: ['str', 'tkl'], DR: ['str', 'tkl'], CL: ['spd'], CR: ['spd'], LB: ['tkl', 'spd'], S: ['spd', 'tkl'] };
@@ -24971,9 +24987,9 @@ function gfCpuSwaps(side, skill) {
   for (const out of gfOnField(side).sort((a, b) => gfStamOf(side, a) - gfStamOf(side, b))) {
     if (gfStamOf(side, out) >= lim) break;
     let bench = gfBench(side).filter(i => gfStamOf(side, i) >= gfStamOf(side, out) + GF_SWAP.gap);
-    if (skill >= 1) { const now = gfPlaysAs(side, out, out); bench = bench.filter(i => skill === 2 ? gfPlaysAs(side, i, out) > now * 1.02 : gfPlaysAs(side, i, out) >= now); }
+    if (skill >= 1) { const now = gfPlaysAs(side, out, out); bench = bench.filter(i => skill >= 2 ? gfPlaysAs(side, i, out) > now * 1.02 : gfPlaysAs(side, i, out) >= now); }
     if (!bench.length) continue;
-    const inn = skill === 2 ? bench.sort((a, b) => gfPlaysAs(side, b, out) - gfPlaysAs(side, a, out))[0] : skill === 1 ? bench.sort((a, b) => gfStamOf(side, b) - gfStamOf(side, a))[0] : pick(bench);
+    const inn = skill >= 2 ? bench.sort((a, b) => gfPlaysAs(side, b, out) - gfPlaysAs(side, a, out))[0] : skill === 1 ? bench.sort((a, b) => gfStamOf(side, b) - gfStamOf(side, a))[0] : pick(bench);
     gfSwap(side, out, inn);
   }
 }
@@ -25110,14 +25126,14 @@ function gfFumbleRisk(side) {
 // does this tackle knock the ball loose: c the carrier, d the tackler
 function gfFumbleRoll(c, d) {
   const F = L.fx || GF_FX0, worn = gfStamOf(G.poss, c.ri) < 50 ? 1.4 : 1;
-  const p = GF_FUM.base * F.fum * worn * gfFumMul(G.poss, G.teams[G.poss].roster[c.ri]) * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2);
+  const p = GF_FUM.base * F.fum * worn * gfFumMul(G.poss, G.teams[G.poss].roster[c.ri]) * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2) * gfHexFum(G.poss);
   return R() < p;
 }
 // the ball is out: the nearest players go for it, the defense likelier to come up with it; a defender may run it back
 function gfFumble(c, d) {
   gfEv('fumble', c.n, d.n);
   const near = side => gfNearest(c.x, c.y, L.pl.filter(p => p.side === side && p !== c && !(p.stun > 0)));
-  const [o, od] = near(0), [x, xd] = near(1), pd = clamp(GF_FUM.def + (od - xd) * .08, .3, .85);
+  const [o, od] = near(0), [x, xd] = near(1), pd = gfHexRecover(clamp(GF_FUM.def + (od - xd) * .08, .3, .85));
   const lost = !!x && (!o || R() < pd), rec = lost ? x : (o || c);
   let ret = 0;
   if (lost && R() < .55) ret = Math.round(-Math.log(Math.max(.02, R())) * (2 + rec.r.spd * .6));
@@ -25188,8 +25204,8 @@ const GF_POTIONS = {
 };
 // (issue #61, phase 7: at 1.06 a full bag was worth about nothing; speed is worth the most on the field)
 const GF_HASTE = 1.1;
-// a CPU coach takes a potion worth this much (Knight, Archmage); a Squire, now and then, whatever comes first
-const GF_KIT = { take: [99, 4.5, 3.5], squire: .25 };
+// a CPU coach takes a potion worth this much (Knight, Archmage, Lich); a Squire, now and then, whatever comes first
+const GF_KIT = { take: [99, 4.5, 3.5, 3], squire: .25 };
 const GF_GX0 = Object.freeze({});
 // gear's effects, without the ratings (those are on r already)
 function gfGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
@@ -25300,6 +25316,100 @@ function gfPotionAdvice(bag) {
   G.bags[s] = Object.assign({}, bag || save || {});
   try { const top = gfPotionNeeds(s)[0]; return top && top.v >= GF_KIT.take[1] ? { id: top.id, ri: top.ri, why: top.why } : null; } finally { G.bags[s] = save; }
 }
+/* Cinder Gridiron in the Umbral (issue #99, phase 4b): the Lich, and the hexes. Nothing here runs unless a game asks
+   for it: with no hexes and no skill 3, the engine plays exactly as before (same seed, same game).
+   The Lich (G.skill 3, above the Archmage). The other coaches read what you keep calling; the Lich reads the whole
+   down: what a coach would call here by the down and the distance, countered against the Lich's own habits as the other
+   side has seen them, blended with what the other side has really called lately (GF_LICH.see). It then leans to the
+   call with the best matchup against that (GF_LICH.edge, from GF_EDGE), stays mixed so it can't be read, and rests a
+   tired call harder (GF_LICH.fresh). On defense its powers expect what it expects (gfLichExpectKind), and it casts
+   more readily (GF_LICH.cast). On fourth down it goes for it more than the others (gfLichFourth): short yardage past
+   its own 35, and anything makeable when behind late. It swaps a player under 60 (15-bench.js) and takes a potion
+   worth 3 (17-kit.js); its stances are the Archmage's.
+   Hexes (opts.hexes: ids in GF_HEX; G.hex = { ids, on, short }, plain JSON, so a saved game keeps them). Each works
+   against one side, G.hex.on (opts.hexOn, 0 by default: yours), and so for the other:
+     shrink    The Pit Closes: each quarter after the first the end zone at that side's end creeps GF_HEX.shrink.yd
+               out, from the next drive on (G.hex.short; gfGoal() is where the offense scores)
+     rolldark  Fumbles Roll Dark: that side's carriers fumble GF_HEX.rolldark.x as often, and the other side falls on
+               almost every loose ball (rec when it is on defense, own when it has the ball)
+     chill     Grave Cold: every play costs that side's seven GF_HEX.chill.k times the stamina
+     ashwind   Ash Wind: that side's field goals play GF_HEX.ashwind.yd yards longer and its punts go as much shorter
+   The hexes are named over the opening kickoff and under the score bar all game, and the shrunk end zone is shaded on
+   the grass. */
+const GF_LICH = { see: .5, edge: 4, fresh: 1.5, cast: [.35, .95] };
+const GF_HEX = {
+  shrink: { n: 'The Pit Closes', d: 'Each quarter after the first, the end zone at your end creeps 5 yards out (from the next drive on): the other side needs that much less to score.', yd: 5 },
+  rolldark: { n: 'Fumbles Roll Dark', d: 'Loose balls roll to the dark side: your carriers fumble twice as often, and the other side falls on nearly every fumble, yours or theirs.', x: 2, rec: .92, own: .15 },
+  chill: { n: 'Grave Cold', d: 'The cold gets into your seven: every play costs them 40% more stamina.', k: 1.4 },
+  ashwind: { n: 'Ash Wind', d: 'A wind off the pit in your face: your field goals play 6 yards longer, and your punts go 6 yards shorter.', yd: 6 },
+};
+
+/* ---------- the Lich ---------- */
+// a weights table as shares, and blended with what a side has really called (T, shares too; empty: the model alone)
+function gfLichShares(w) { const s = Object.values(w).reduce((a, v) => a + Math.max(0, v), 0) || 1, o = {}; for (const k in w) o[k] = Math.max(0, w[k]) / s; return o; }
+function gfLichBlend(model, T) {
+  const P = gfLichShares(model); if (!Object.keys(T).length) return P;
+  for (const k in P) P[k] = (1 - GF_LICH.see) * P[k] + GF_LICH.see * (T[k] || 0);
+  return P;
+}
+// what the Lich expects the other side to call: their defense when it has the ball, their play when it hasn't
+const gfLichDefP = () => gfLichBlend(gfCounterDefense(gfDefLean()), G.fog === 1 - G.poss ? {} : gfTendency(1 - G.poss, 'def'));
+const gfLichOffP = () => gfLichBlend(gfCounterOffense(gfOffLean()), G.fog === G.poss ? {} : gfTendency(G.poss, 'off'));
+// a call's weight: the coach's lean, times how its matchups go against what is expected (e: -1 to 1), times how fresh
+const gfLichW = (lean, e, f) => Math.max(.1, lean * (1 + GF_LICH.edge * e)) * Math.pow(.1 + .9 * f, GF_LICH.fresh);
+function gfLichOffense() {
+  const w = gfOffLean(), P = gfLichDefP();
+  for (const oc in w) { let e = 0; for (const dc in P) e += P[dc] * gfEdge(oc, dc)[0]; w[oc] = gfLichW(w[oc], e, gfFresh(G.poss, 'off', oc)); }
+  return wpick(w);
+}
+function gfLichDefense() {
+  const w = gfDefLean(), P = gfLichOffP();
+  for (const dc in w) { let e = 0; for (const oc in P) e -= P[oc] * gfEdge(oc, dc)[0]; w[dc] = gfLichW(w[dc], e, gfFresh(1 - G.poss, 'def', dc)); }
+  return wpick(w);
+}
+// on defense: a run, a pass, or either, by what it expects
+function gfLichExpectKind() { const P = gfLichOffP(), run = P.run || 0; return run >= .5 ? 'run' : run <= .25 ? 'pass' : 'any'; }
+function gfLichFourth() {
+  const s = G.poss, m = G.score[s] - G.score[1 - s], late = !!GD.game && (G.half === 3 || (G.half === 2 && G.clock < 150));
+  const inRange = gfKickDist() <= GF_FG_MAX + gfTee(s), ch = gfKickChance();
+  // behind late by more than a field goal: a kick doesn't do it
+  if (late && m < -3) return G.togo <= 8 || G.ball >= 50 ? 'go' : 'punt';
+  if (G.togo <= 1 && G.ball >= 70) return 'go';
+  if (inRange && ch >= .5) return 'fg';
+  if (G.togo <= 2 && G.ball >= 35) return 'go';
+  if (G.togo <= 4 && G.ball >= 60) return 'go';
+  return 'punt';
+}
+
+/* ---------- the hexes ---------- */
+function gfHexStart(ids, on) { const hx = (ids || []).filter((k, i, a) => GF_HEX[k] && a.indexOf(k) === i); if (hx.length) G.hex = { ids: hx, on: on === 1 ? 1 : 0, short: 0 }; }
+const gfHexHas = id => !!(G && G.hex && G.hex.ids.includes(id));
+const gfHexOn = (id, side) => gfHexHas(id) && side === G.hex.on;
+// the quarter: each half is two (Sudden Death counts as the fourth); a single drive is the first
+function gfQuarter() { if (!GD || !GD.game || !G.half) return 1; if (G.half >= 3) return 4; return (G.half - 1) * 2 + (G.clock > GF_GAME.half / 2 ? 1 : 2); }
+// where side scores (yards from its own goal line), and where the side with the ball does
+function gfGoalOf(side) { return GF_RULES.field - (G && G.hex && side !== G.hex.on ? G.hex.short || 0 : 0); }
+function gfGoal() { return gfGoalOf(G.poss); }
+// a new drive: The Pit Closes moves the end zone for the quarter, and the chains go to the new goal line
+function gfHexDrive() { if (gfHexHas('shrink')) { G.hex.short = GF_HEX.shrink.yd * (gfQuarter() - 1); if (G.down === 1) gfFirstDown(); } }
+const gfHexWind = (side, k) => gfHexOn('ashwind', side) ? GF_HEX.ashwind.yd : 0;
+const gfHexCold = side => gfHexOn('chill', side) ? GF_HEX.chill.k : 1;
+const gfHexFum = side => gfHexOn('rolldark', side) ? GF_HEX.rolldark.x : 1;
+// who falls on a loose ball: pd is the defense's chance
+function gfHexRecover(pd) { if (!gfHexHas('rolldark')) return pd; return G.poss === G.hex.on ? Math.max(pd, GF_HEX.rolldark.rec) : Math.min(pd, GF_HEX.rolldark.own); }
+const gfHexNames = () => G && G.hex ? G.hex.ids.map(k => GF_HEX[k].n).join(', ') : '';
+const gfHexLine = () => !G || !G.hex ? '' : 'Hexes: ' + G.hex.ids.map(k => k === 'shrink' && G.hex.short ? `${GF_HEX[k].n} (${G.hex.short} yd)` : GF_HEX[k].n).join('  ·  ');
+// the shrunk end zone on the grass: the yards it has swallowed, shaded, and its new line
+function gfHexDrawField(c, top, bot) {
+  const s = G.hex.short; if (!s || !gfHexHas('shrink')) return;
+  const [a0, a1] = G.hex.on === 0 ? [0, s] : [GF_RULES.field - s, GF_RULES.field], p0 = gfScr(a0, 0), p1 = gfScr(a1, 0), edge = G.hex.on === 0 ? p1.x : p0.x;
+  if (p1.x < -20 || p0.x > 980) return;
+  c.save(); c.fillStyle = 'rgba(40,12,58,.55)'; c.fillRect(p0.x, top, p1.x - p0.x, bot - top);
+  c.strokeStyle = '#c8b8ff'; c.lineWidth = 3; c.setLineDash([8, 6]); c.beginPath(); c.moveTo(edge, top); c.lineTo(edge, bot); c.stroke(); c.restore();
+}
+
+/* ---------- the Nadir captain's ultimate (a player brings it as { ult: 'eclipse' }, 04-teams.js) ---------- */
+GF_ULT_BY.eclipse = { id: 'eclipse', n: 'Eclipse', role: 'def', desc: 'The sun goes out over the field: their offense 12% slower, and their throws far wilder, while it lasts.', zone: { oSpd: .88, errM: 1.3 }, vis: ['#6a4a8a', 'all'] };
 /* Cinder Gridiron's superstars (issue #24, phase 2), inside the wGF scope: each superstar's ratings and powers, added
    to the engine's own tables after its parts load. Plain assignments, nothing declared.
    The Phoenix: fast, good hands; its offense power sets the carrier alight, its defense power drops ash in the
@@ -25710,6 +25820,10 @@ return {
   stances: Object.fromEntries(GF_ST_IDS.map(k => [k, { n: GF_STANCE[k].n, desc: GF_STANCE[k].desc, stam: GF_STANCE[k].stam, off: Object.assign({}, GF_STANCE[k].off), def: Object.assign({}, GF_STANCE[k].def) }])),
   // (the fumble rules themselves, not a copy: a test may raise the chance to see one)
   fumRules: GF_FUM, fumRisk: side => G ? gfFumbleRisk(side) : null,
+  // the Umbral (18-umbral.js): the hexes ({ id: { n, d } }), the game's (null without: { ids, on, short, line }), where
+  // the offense scores now, and the Lich's and the hexes' rules themselves (not copies: the balance bot tunes them)
+  hexes: Object.fromEntries(Object.entries(GF_HEX).map(([k, H]) => [k, { n: H.n, d: H.d }])), hex: () => G && G.hex ? Object.assign({ line: gfHexLine() }, JSON.parse(JSON.stringify(G.hex))) : null,
+  goal: () => G ? gfGoal() : GF_RULES.field, hexRules: GF_HEX, lichRules: GF_LICH, ult: id => GF_ULT_BY[id] ? { n: GF_ULT_BY[id].n, desc: GF_ULT_BY[id].desc, role: GF_ULT_BY[id].role } : null,
   get why() { return GD ? GD.why : ''; }, get msg() { return GD ? GD.msg : ''; }, highlight: h => { GFT.hl = h || null; },
   edge: (oc, dc) => gfEdge(oc, dc).slice(), stats: GF_STATS.slice(),
   // ratings and positions for the Realm's players (phase 3): a kind's ratings, the positions, and the lineup the coaches
@@ -64282,8 +64396,132 @@ wAudit = function () {
 };
 /* u4a: baseball in the Umbral (issue #99, phase 4a): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
-/* u4b: football in the Umbral (issue #99, phase 4b): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4b: football in the Umbral (issue #99, phase 4b). Loads after u4-grounds.js; changes earlier parts only by
+   reassignment (saved originals carry the wWU4B prefix).
+
+   Tier U on the gridiron is tier 4 in the football tables: W_GFG.oppBonus[4] rating points on each of their seven (an
+   umbral form changes only their ratings and start values, never yours), the Lich coaching them (W_BALL.diff[4] = 3,
+   skill index 3, the engine's own decisions: src/gf/parts/18-umbral.js), and a full potion bag (W_GRID_KIT.opp[4]).
+   Tiers 1 to 3 are as they were.
+   The champion of the Cinder Pit (u:g_bowl, the Ashmaw): Ossian Pyre, the Ash Marshal, holds the Ash Ball. Past the two
+   guards and the gate (u4), PLAY opens the game card (wUmbGfCard): tier U, the Nadir seven (W_UMB4B.seven, a lich at
+   quarterback with an ultimate of his own, Eclipse), the hexes for this try, and Play, Manage or Simulate. The game is
+   the Realm's own football game (wStartGrid: save and leave, resume after a reload, Concede, the box scores), against
+   club 'nadir:gridiron' at tier 4, with kind 'unadirgf': its end goes to wUmbNadirEnd (a tie counts as a loss). The
+   toll, when this is a retry, is paid at kickoff (wUmbTollAtKickoff, the frame's), never for backing away from the card.
+   Hexes: football's own (wGF.hexes, the engine's table), W_NADIR.gridiron.hexes of them, drawn for each try by
+   wUmbGfHexes (fixed for the try: a reload doesn't redraw them), named on the card, in the log and on the field.
+   In LAB mode PLAY skips the card and plays W_UMB4B.labHow (Simulate) at once, for the realm bot.
+
+   W_UMB4B, wUmbGfTeam, wUmbGfHexes, wUmbGfCard, wUmbGfKick
+   Wraps: wBallRegion (wWU4BBallRegion), wBallTeam (wWU4BBallTeam), wGridOpp (wWU4BGridOpp): a 'nadir:<id>' club is the
+   champion's region and the Nadir seven; and wGF.game and wGF.simGame (wWU4BGame, wWU4BSimGame: the hexes go in). */
+
+const W_UMB4B = {
+  id: 'gridiron', club: 'nadir:gridiron', kind: 'unadirgf', labHow: 'sim',
+  team: { name: 'Cinder Pit Nadir', short: 'NDR', color: '#3a2a4a', light: '#c8b8ff' },
+  // their level against your team's (0: level for level), and the seven, then the bench
+  gap: 0,
+  seven: [
+    { n: 'Ossian Pyre', kind: 'lich', num: 1, ult: 'eclipse', qb: true }, { n: 'Cinderjaw', kind: 'minotaur', num: 33 }, { n: 'Slagheart', kind: 'golem', num: 70 },
+    { n: 'Ashbone', kind: 'dwarf', num: 66 }, { n: 'Grue', kind: 'troll', num: 77 }, { n: 'Vesk', kind: 'wraith', num: 13 }, { n: 'Hollow Wren', kind: 'goblin', num: 81 },
+    { n: 'Soot', kind: 'zombie', num: 52 }, { n: 'Rattlebrand', kind: 'skeleton', num: 4 }, { n: 'Emberfang', kind: 'werewolf', num: 28 },
+  ],
+};
+// tier U in the football tables (W_BALL.diff and W_BALL_SKILL are shared with baseball's tier U: set once)
+W_GFG.oppBonus[4] = 5;
+W_GRID_KIT.opp[4] = { draught: 2, secondwind: 1, gfresin: 1, gfhaste: 1, gffog: 1, gfsalve: 1 };
+if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
+if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
+
+W_NADIR.gridiron = { piece: 'football', char: 'nadir_gridiron', ground: 'g_bowl', map: 'u:g_bowl', region: 'ember', engine: 'gridiron', hexes: 1, toll: 30, gold: 100 };
+DB.chars.nadir_gridiron = { name: 'Ossian Pyre, the Ash Marshal', kind: 'lich', look: { coat: '#3a2a4a', acc: 'hat' },
+  greet: 'Another one who walked through the cold for a game. I captain the Nadir here, and I hold the BALL. Say PLAY when you are ready to lose it. Ask about the RULES first; nobody ever does.',
+  topics: {
+    job: { t: 'I call the plays in the Pit. I called them before the Ash Bowl had grass, and I will call them after it is ash.' },
+    ball: { t: 'The Ash Ball. One ninth of your Seal, and still warm. Beat my seven at football and it is yours. Lose, and the next game costs a TOLL.' },
+    rules: { t: 'Real football, seven a side, two halves, our field. My side plays harder than anything you have met, a Lich calls our plays, and our sideline carries a full bag. I keep an ECLIPSE for when it matters. Before kickoff I draw the HEXES.' },
+    hexes: { t: 'The Pit has its moods. The end zone at your end creeps out, the ball rolls our way, the cold gets into your legs, the wind turns your kicks. You will hear which before kickoff.' },
+    toll: { t: 'Thirty gold a game, after the first. Paid at kickoff. Walking away from the card costs nothing.' },
+    eclipse: { t: 'Once a game I put the sun out. Your runners slow, your throws go wild. Enjoy the dark.' },
+    play: { t: 'Then pick your seven.', act: 'unadir:gridiron' },
+  } };
+
+/* ---------- the Nadir seven ---------- */
+// their seven and bench, as Cinder Gridiron takes a team: your team's level plus W_UMB4B.gap, tier U's points on each of
+// the seven (spread as wGridOpp spreads a tier's), the captain at quarterback with his ultimate
+function wUmbGfTeam(lvl) {
+  const L = lvl != null ? lvl : Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4B.gap)), k = W_GFG.oppBonus[4] || 0;
+  const roster = W_UMB4B.seven.map((s, i) => {
+    const m = wSevenPlayer(wMakePlayer({ kind: s.kind, lvl: i < W_GFR.side ? L : Math.max(1, L - 1), n: s.n, num: s.num }, 'opp'));
+    if (s.ult) m.ult = s.ult;
+    if (wGridHasTwo(m.kind)) { const h = seedHash(0x6f1, m.n + ':' + m.kind); m.pw = { off: h & 1, def: (h >> 1) & 1 }; }
+    return m;
+  });
+  if (k) for (const p of roster.slice(0, W_GFR.side)) { const st = Object.keys(p.r); for (let i = 0; i < k; i++) { const s = st[(i * 5 + (p.num || 0)) % st.length]; p.r[s] = Math.min(W_GFR.cap, p.r[s] + 1); } }
+  const team = Object.assign({}, W_UMB4B.team, { roster }), auto = wGF.auto(roster.slice(0, W_GFR.side)), cap = W_UMB4B.seven.findIndex(s => s.qb);
+  // the captain plays quarterback: whoever the coaches put there takes his place
+  const was = Object.keys(auto.off).find(p => auto.off[p] === cap);
+  if (was && was !== 'QB') { auto.off[was] = auto.off.QB; auto.off.QB = cap; }
+  return Object.assign(team, { off: auto.off, def: auto.def, kicker: auto.kicker });
+}
+const wWU4BBallRegion = wBallRegion;
+wBallRegion = function (club) { if (String(club).startsWith('nadir:')) { const C = W_NADIR[String(club).slice(6)]; return C ? C.region : null; } return wWU4BBallRegion.apply(this, arguments); };
+const wWU4BBallTeam = wBallTeam;
+wBallTeam = function (club) { if (club === W_UMB4B.club) { const T = W_UMB4B.team; return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.6), light: T.light, motto: '' }; } return wWU4BBallTeam.apply(this, arguments); };
+const wWU4BGridOpp = wGridOpp;
+wGridOpp = function (club, tier) { return club === W_UMB4B.club ? wUmbGfTeam() : wWU4BGridOpp.apply(this, arguments); };
+
+/* ---------- the hexes ---------- */
+const WU4B = { next: null };
+const wWU4BGame = wGF.game, wWU4BSimGame = wGF.simGame;
+wGF.game = o => wWU4BGame(WU4B.next ? Object.assign({}, o, { hexes: WU4B.next.slice() }) : o);
+wGF.simGame = o => wWU4BSimGame(WU4B.next && !(o && o.keep) ? Object.assign({}, o, { hexes: WU4B.next.slice() }) : o);
+// n of football's hexes for this try of the champion: fixed for the try (the same draw after a reload)
+function wUmbGfHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wGF.hexes), r = mulberry(wUmbHash('gf:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));
+  const out = []; while (out.length < Math.min(n, ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+const wUmbGfHexWords = hx => hx.map(h => wGF.hexes[h]).filter(Boolean);
+
+/* ---------- PLAY: the card, then kickoff ---------- */
+function wUmbGfCard(C, id, hx) {
+  const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4B.gap));
+  const eu = wGF.ult('eclipse'), H = wUmbGfHexWords(hx);
+  // (the frame of phase 4 charged the toll as the card opened; it no longer does: then backing away gives it back)
+  const oldFrame = typeof wUmbTollAtKickoff !== 'function' && tries > 0;
+  let went = false;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
+    <p><b>The Cinder Pit: tier U.</b> Football against ${esc(W_UMB4B.team.name)}: level ${lvl}, in umbral form (${W_GFG.oppBonus[4]} rating points on each of their seven), coached by a ${esc(W_BALL_SKILL[3])}, with a full potion bag. ${esc(ch.name.split(',')[0])} plays quarterback, and once a game casts ${esc(eu.n)}: ${esc(eu.desc)}</p>
+    <p class="hint wumbpg"><b>Hexes:</b> ${H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ')}</p>
+    <p class="hint">Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold. ${tries > 0 ? `This try costs the toll, ${C.toll} gold, at kickoff.` : 'The first game is free; after a loss, each costs a toll of ' + C.toll + ' gold.'} A tie counts as a loss.</p></div>
+    <div class="row"><button class="btn" data-ugf="play">Play</button><button class="ghost" data-ugf="manage">Manage</button><button class="ghost" data-ugf="sim">Simulate</button><button class="ghost" id="wUgfNo">Not now</button></div>`,
+    () => { if (!went && oldFrame) { RUN.gold += C.toll; wLog('You walk away from the card. You keep your toll.', 'd'); } wDrain(); });
+  $('modalBox').querySelectorAll('[data-ugf]').forEach(b => b.onclick = () => { went = true; close(); const why = wUmbGfKick(C, id, hx, b.dataset.ugf); if (why) wLog(why, 'b'); });
+  $('wUgfNo').onclick = () => close();
+  const f = $('modalBox').querySelector('[data-ugf="play"]'); if (f) f.focus();
+}
+// kickoff: the toll (on a retry), the hexes in the log, and the Realm's football game at tier U ('' when it started)
+function wUmbGfKick(C, id, hx, how) {
+  const probs = wGridProblems(); if (probs.length) return probs.join(' ');
+  if (wGridLive()) return 'Finish the football game you started first.';
+  if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
+  const H = wUmbGfHexWords(hx);
+  wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
+  WU4B.next = hx.slice();
+  try { return wStartGrid({ club: W_UMB4B.club, how, tier: 4, kind: W_UMB4B.kind, ref: { id }, cup: true }); } finally { WU4B.next = null; }
+}
+W_UMB4.start.gridiron = function (C, id) {
+  const probs = wGridProblems(); if (probs.length) return probs.join(' ');
+  if (wGridLive()) return 'Finish the football game you started first.';
+  const hx = wUmbGfHexes(id, C.hexes || 1);
+  if (LAB) return wUmbGfKick(C, id, hx, W_UMB4B.labHow);
+  wUmbGfCard(C, id, hx);
+  return '';
+};
+// the end: the piece, or a try counted (a tie is not a win)
+W_ON_END[W_UMB4B.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
 /* u4c: boxing in the Umbral (issue #99, phase 4c): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
 /* u4d: basketball in the Umbral (issue #99, phase 4d): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.

@@ -15,7 +15,13 @@ earns.
 Part 4, gear and potions (issue #61, phase 7): by tier (gap 0), four ways: plain (no gear, no potions); their bag only
 (W_GRID_KIT.opp[tier], as Simulate plays it now); both bags (yours a full one, KIT_MINE, given by your coach as a
 Knight would: a stand-in for giving them by hand in Play and Manage); and the full kit (both bags, and your five own
-players in gear, KIT_GEAR). Writes /tmp/realm_gridiron_lab.json."""
+players in gear, KIT_GEAR).
+Part 5, the Umbral (issue #99, phase 4b): their CPU skill again, the Archmage beside the Lich (skill 3); tier U
+(tier 4: W_GFG.oppBonus[4], the Lich, their full bag W_GRID_KIT.opp[4]) at an even level against a rival's seven and
+against the Cinder Pit's Nadir seven (wUmbGfTeam, the champion's game without hexes); each football hex alone against
+none on the champion's game (no single hex should swing it by more than about 10 points); and the champion's game as
+played, with W_NADIR.gridiron.hexes drawn at random. Only this part: a third argument 'umbral'
+(python3 test/realm_gridiron_lab.py 200 '' umbral). Writes /tmp/realm_gridiron_lab.json."""
 import asyncio, json, sys, os, time, collections
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -23,6 +29,7 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 PRE = sys.argv[2] if len(sys.argv) > 2 else ''
+ONLY = sys.argv[3] if len(sys.argv) > 3 else ''
 
 LAB_JS = r"""
 window.GLAB = {
@@ -54,6 +61,15 @@ window.GLAB = {
         big: G.drives.filter(d => d.side === 0).reduce((a, d) => a + d.plays.filter(e => e.gain >= 20).length, 0), stam: on.reduce((a, j) => a + (G.stam ? G.stam[0][j] : 100), 0) / on.length });
     }
     return out;
+  },
+  // the champion's game: the Nadir seven at your level, the Lich, their full bag, and these hexes ('draw': as PLAY draws them)
+  nadir(lvl, hx) {
+    GLAB.journey(lvl);
+    if (hx === 'draw') WG.umbral = { tries: { gridiron: Math.floor(Math.random() * 1e6) }, pieces: [], beaten: {} };
+    const opp = wUmbGfTeam(lvl), t0 = performance.now(), hexes = hx === 'draw' ? wUmbGfHexes('gridiron', W_NADIR.gridiron.hexes) : hx || [];
+    const g = wGF.simGame({ teams: [wGridSquad(opp).team, opp], skill: wGridSkill(4), bags: [null, Object.assign({}, W_GRID_KIT.opp[4])], hexes });
+    const mine = g.box.filter(b => b.side === 0), sum = k => mine.reduce((a, b) => a + (b.line[k] || 0), 0);
+    return { hex: hx === 'draw' ? 'draw' : hexes.join('+') || 'none', us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], to: sum('fuml') + sum('pint'), ms: performance.now() - t0 };
   },
   cup(lvl) {
     GLAB.journey(lvl);
@@ -100,6 +116,8 @@ async def main():
         await pg.add_script_tag(content=LAB_JS)
         if PRE: await pg.evaluate(PRE + "\n;0")
         t0 = time.time()
+        if ONLY == 'umbral':
+            await umbral(pg, errs, t0); await br.close(); return
         games = []
         for gap in (-1, 0, 1, 2, 3):
             games += await batch(pg, N, f"GLAB.game(3, {gap}, 1 + i % 3)")
@@ -158,5 +176,39 @@ async def main():
             if not rs: continue
             w = sum(g['win'] for g in rs); tt = sum(g['tie'] for g in rs); u = [sum(g['used'][s] for g in rs) / len(rs) for s in (0, 1)]
             print(f"  {'tier ' + str(t) + ': ' + name:26s} {len(rs):5d}  {pct(w, len(rs))}  {pct(tt, len(rs))}   {sum(g['us'] for g in rs) / len(rs):.1f}-{sum(g['them'] for g in rs) / len(rs):.1f}            {u[0]:.1f}-{u[1]:.1f}")
+
+async def umbral(pg, errs, t0):
+    skills = []
+    for sk in (2, 3):
+        skills += await batch(pg, N, f"GLAB.game(3, 0, 2, {{ skill: {sk} }})")
+    tiers = []
+    for t in (3, 4):
+        rows = await batch(pg, N, f"GLAB.game(3, 0, {t}, {{ kit: 'theirs' }})")
+        for g in rows: g['row'] = f'tier {t}' if t < 4 else 'tier U'
+        tiers += rows
+    champ = await batch(pg, N, "GLAB.nadir(3, [])")
+    hexes = {}
+    for h in await pg.evaluate("Object.keys(wGF.hexes)"):
+        hexes[h] = await batch(pg, N, f"GLAB.nadir(3, ['{h}'])")
+    drawn = await batch(pg, N, "GLAB.nadir(3, 'draw')")
+    json.dump({'skills': skills, 'tiers': tiers, 'champ': champ, 'hexes': hexes, 'drawn': drawn}, open('/tmp/realm_gridiron_lab.json', 'w'))
+    print('override', PRE or '(none)', f' {time.time() - t0:.0f}s')
+    print('page errors', len(errs), errs[:2])
+    print("\nthe Umbral (issue #99, 4b): your seven at level 3, Simulate (you cast as a Knight)")
+    print('                                 n    win    tie   points for-against')
+    print('their CPU skill, even level, tier 2 ratings, no bags')
+    for sk, name in ((2, 'Archmage'), (3, 'Lich')):
+        row(name, [g for g in skills if g['skill'] == sk])
+    print('by tier, even level, their bag only')
+    for r in ('tier 3', 'tier U'):
+        row(r + " (a rival's seven)", [g for g in tiers if g['row'] == r])
+    row('tier U: the Nadir seven', champ)
+    print("each hex alone on the champion's game (tier U, the Nadir seven), against none")
+    row('no hex', champ)
+    w0 = sum(g['win'] for g in champ) / len(champ)
+    for h, rs in hexes.items():
+        w1 = sum(g['win'] for g in rs) / len(rs)
+        row(h, rs); print(f"  {'':26s}       swing {100 * (w1 - w0):+5.1f} points; your turnovers {sum(g['to'] for g in rs) / len(rs):.2f} (none {sum(g['to'] for g in champ) / len(champ):.2f})")
+    row(f"the champion, {await pg.evaluate('W_NADIR.gridiron.hexes')} drawn", drawn)
 
 asyncio.run(main())

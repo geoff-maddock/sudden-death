@@ -7,7 +7,7 @@
    In a full game (10-game.js) you call the defense too when the other side has the ball.
    Each result says what happened and why (GD.why: the matchup and the play's story), and goes in the drive's log.
    With the calls, each side may cast a power (14-powers.js): yours is GD.pow (your pick) or Auto powers' (GD.auto);
-   GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..2, 0..2]).
+   GD.cast is what both sides cast for the play on show, and GD.stc the stances both sides play it in (16-stance.js). opts.skill: the CPU's skill by side ([0..3, 0..3]: Squire, Knight, Archmage, Lich).
    Swaps, potions and powers that give stamina back (15-bench.js) wait in GD.notes, and go in the next play's log line.
    opts.bags: each side's potions ([bag or null, ...], 17-kit.js); a CPU coach with a bag uses it at the call, after its swaps.
    GD is the drive on show (not saved: G is the game, plain JSON, with G.drive = { side, from, plays, end, yards }: side has the ball).
@@ -21,13 +21,15 @@ function gfStart(opts) {
   engSeed(o.seed);
   gfNewGame({ poss: 0 });
   G.teams = [gfTeam(T[0] || GF_CLUBS.home), gfTeam(T[1] || GF_CLUBS.away)];
-  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
+  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 3)) : [1, 1];
   gfPlaybookStart(); gfBoxStart();
   // (opts.powers false: a game without them, for the balance bot)
   if (o.powers !== false) gfPowersStart();
   gfFansStart(o.fans); G.crowd = engCrowd(o);
   gfStanceStart(o.stance);
   gfKitStart(o.bags);
+  // (opts.hexes: the Umbral's, 18-umbral.js; none, and nothing changes)
+  if (o.hexes && o.hexes.length) gfHexStart(o.hexes, o.hexOn);
   G.drive = { side: G.poss, from: G.ball, plays: [], end: null, yards: 0 };
   L = null;
   GD = { ph: 'call', t: 0, mode: ['call', 'play'].includes(o.mode) ? o.mode : 'watch', pick: null, oc: null, dc: null, msg: '', why: '', kick: null, acc: 0, cam: G.ball + 6, you: 0, game: false, kickoff: null, next: null, auto: o.mode === 'call', pow: null, cast: null, notes: [], item: false, stc: null, wary: '' };
@@ -110,9 +112,9 @@ function gfResult(r) {
   if (r.what === 'fum' && r.lost) {
     G.drive.yards += r.gain; G.plays++;
     G.ball = clamp(G.ball + r.gain, 1, 99); gfTurnover();
-    const ret = Math.min(r.ret || 0, GF_RULES.field - G.ball), back = ret ? ` and runs it back ${ret} yard${ret === 1 ? '' : 's'}` : '';
+    const ret = Math.max(0, Math.min(r.ret || 0, gfGoal() - G.ball)), back = ret ? ` and runs it back ${ret} yard${ret === 1 ? '' : 's'}` : '';
     G.ball += ret;
-    if (G.ball >= GF_RULES.field) {
+    if (G.ball >= gfGoal()) {
       G.score[G.poss] += GF_RULES.td; G.drive.end = 'fumtd'; gfBoxAdd(G.poss, L && L.pl[r.reci] ? L.pl[r.reci].ri : -1, 'td');
       GD.msg = `Fumble! ${r.rec} picks it up${back} for a touchdown.` + gfExtraPoint(G.poss); gfScoredOn(off);
       GD.big = { k: 'fumtd', sub: `${r.rec}, ${ret} yards` };
@@ -174,7 +176,7 @@ function gfKick() {
       : `A ${dist}-yard try with a kicking rating of ${k.r.kck} is good about ${Math.round(ch * 100)}% of the time.`;
     if (gfZoneSum('kick') < 0) GD.why += ` The ${gfZoneName('kick')} pushes the ball${gust ? ' wide' : ''}.`;
   } else {
-    const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt'))); G.plays++;
+    const y = Math.max(10, (GD.meter ? gfMeterPunt(k) : gfPuntYards(k)) + Math.round(gfZoneSum('punt')) - gfHexWind(off, 'punt')); G.plays++;
     if (G.ball + y >= GF_RULES.field) { G.poss = 1 - G.poss; G.ball = 20; } else { G.ball += y; gfTurnover(); }
     G.drive.end = 'punt'; GD.big = null; GD.msg = `${k.n} punts, ${y} yards.`;
     const wary = GD.wary ? `The coach punts on fourth and short rather than risk a fumble: ${GD.wary}. ` : ''; GD.wary = '';

@@ -5,7 +5,8 @@
    is first down again; miss on fourth down and the other side takes over where the ball is.
    A field goal is kicked from 7 yards behind the line, so its distance is the yards to the goal line plus 17.
    G is the game, plain JSON (so a snapshot can be saved): { poss, ball, down, togo, score, plays }; 08-drive.js adds
-   teams and the drive. */
+   teams and the drive.
+   The goal line the offense drives at is gfGoal(): the far end, unless a hex brings it nearer (18-umbral.js). */
 const GF_RULES = { field: 100, chain: 10, downs: 4, side: 7, bench: 5, td: 6, fg: 3, safety: 2, start: 25 };
 let G = null;
 
@@ -15,14 +16,14 @@ function gfNewGame(opts) {
   return G;
 }
 // first and ten from where the ball is (first and goal inside the ten)
-function gfFirstDown() { G.down = 1; G.togo = Math.min(GF_RULES.chain, GF_RULES.field - G.ball); }
+function gfFirstDown() { G.down = 1; G.togo = Math.min(GF_RULES.chain, gfGoal() - G.ball); }
 // the other side has the ball, ball yards from its own goal line
 function gfGive(ball) { G.poss = 1 - G.poss; G.ball = ball; gfFirstDown(); }
 /* a play gained (or lost) yards: move the ball, then the score, the down and the chains.
    Returns what happened: 'td', 'safety', 'first', 'down' (the next down) or 'turnover' (on downs). */
 function gfSpot(gain) {
   G.plays++; G.ball += gain;
-  if (G.ball >= GF_RULES.field) { G.score[G.poss] += GF_RULES.td; gfGive(GF_RULES.start); return 'td'; }
+  if (G.ball >= gfGoal()) { G.score[G.poss] += GF_RULES.td; gfGive(GF_RULES.start); return 'td'; }
   if (G.ball <= 0) { G.score[1 - G.poss] += GF_RULES.safety; gfGive(GF_RULES.start); return 'safety'; }
   if (gain >= G.togo) { gfFirstDown(); return 'first'; }
   if (G.down >= GF_RULES.downs) { gfGive(GF_RULES.field - G.ball); return 'turnover'; }
@@ -31,7 +32,7 @@ function gfSpot(gain) {
 }
 // the ball changes hands where it is (an interception, or a punt landing there)
 function gfTurnover() { gfGive(GF_RULES.field - G.ball); }
-function gfKickDist() { return GF_RULES.field - G.ball + 17; }
+function gfKickDist() { return gfGoal() - G.ball + 17 + gfHexWind(G.poss, 'fg'); }
 // a field goal try: 3 if it is good, and either way the other side has the ball (from its 25, or where the kick was)
 function gfFieldGoal(good) {
   G.plays++;
