@@ -86,8 +86,7 @@ wNineDef = function () { const d = wWU4ANineDef.apply(this, arguments); if (W_UM
 // why your team can't play the champion now, or ''
 function wUmb4aWhy() {
   const probs = wBallProblems(); if (probs.length) return probs.join(' ');
-  // (a game left half-played picks up where it was, here as anywhere)
-  if (wBallLive()) { wResumeBall(); return ''; }
+  if (wBallLive()) return 'Finish the ball game you started first.';
   return '';
 }
 // start the champion's game: '' when it started (for Simulate: when it is over), or why not
@@ -119,6 +118,8 @@ function wUmb4aCard(C0, id, hexes) {
 }
 // u4's adapter: the card (or, for the bots, a Simulated game at once). The hexes u4 passes are the card game's: baseball draws its own.
 W_UMB4.start.diamond = function (C, id) {
+  // (a game left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wBallLive()) { wResumeBall(); return ''; }
   const why = wUmb4aWhy(); if (why) return why;
   const hx = wUmb4aHexes(id, C.hexes || 1);
   if (LAB) return wUmb4aGo(id, hx, 'sim');

@@ -13,7 +13,8 @@
 
    W_UMB5, wUmbFinale, wUmbFinaleEntry, wUmbFinaleSports, wUmbSeal, wUmbSealScene
    Once sealed, the portal is gone (u0's wUmbOpen), and so are the herald, the eclipses and the dreams (u1).
-   Wraps: W_ON_END.nadir (wWU5OnNadir: a finale round's end), wRunAct (wWU5RunAct: PLAY), buildAllMaps
+   Wraps: W_ON_END.nadir (wWU5OnNadir: a finale round's end), wNextPrompt (wWU5NextPrompt: the closing scene once the
+   world is free, WG.umbral.sealScene), wRunAct (wWU5RunAct: PLAY), buildAllMaps
    (wWU5BuildAllMaps: Aurelia in the Hollow Coliseum), wAudit (wWU5Audit: she is placed, and every piece has its sport). */
 
 const W_UMB5 = {
@@ -99,7 +100,8 @@ function wUmbSeal() {
   wUmbHeraldSync(); // (the herald has nothing more to say: he goes)
   const m = MAPS.coliseum; wEnterMap('coliseum', m.spawn[0], m.spawn[1]); WG.face = 'u';
   wInvalidate('umbralden'); wSave();
-  if (!LAB) wUmbSealScene();
+  // (the scene waits till the world is free: a sport's own result card closes first, and a recruit's question after)
+  if (!LAB) U.sealScene = 1;
 }
 function wUmbSealScene() {
   const close = modal(`<header><h3>The Seal of the Crown</h3></header>
@@ -111,6 +113,12 @@ function wUmbSealScene() {
     <div class="row"><button class="btn" id="wUmbSealed">Home, then</button></div>`, () => { WUI.hudKey = ''; wDrain(); });
   $('wUmbSealed').onclick = () => close();
 }
+const wWU5NextPrompt = wNextPrompt;
+wNextPrompt = function () {
+  const U = wUmb();
+  if (U && U.sealScene && !LAB && wActive()) { U.sealScene = 0; wSave(); wUmbSealScene(); return true; }
+  return wWU5NextPrompt.apply(this, arguments);
+};
 const wWU5RunAct = wRunAct;
 wRunAct = function (act, id) {
   if (act === 'ufinale') { WUI.held = null; if (WUI.talk) wCloseTalk(); const why = wUmbFinale(); if (why) wLog(why, 'b'); return; }

@@ -30,8 +30,10 @@ const W_UMB4 = {
   cold: { steps: 2, hp: 1 },
   gate: { plains: 'grain', bloom: 'mossberry', tide: 'brinekelp', ember: 'emberpepper', rime: 'frostmint' },
   guardNames: ['The Left Hand of the Nadir', 'The Right Hand of the Nadir'],
-  // the sports' adapters: (C, id, hexes) => '' when the game started, or why not
+  // the sports' adapters: (C, id, hexes) => '' when the game started, or why not; and whether a sport has a game left
+  // half-played (its adapter resumes that one)
   start: {},
+  live: { diamond: () => wBallLive(), gridiron: () => wGridLive(), ring: () => !!wBxg().live },
 };
 W_UMB.maps.push(...Object.keys(W_UMB4.grounds));
 Object.assign(W_UMB.names, W_UMB4.names);
@@ -78,7 +80,9 @@ wNadirMatch = function (id) {
   }
   if (!C.engine) return wWU4NadirMatch.apply(this, arguments);
   const tries = U.tries[id] || 0;
-  if (tries > 0 && RUN.gold < C.toll) return `Another game costs a toll of ${C.toll} gold, and you have ${RUN.gold}.`;
+  // (a game of this sport left half-played resumes, toll or no: it was paid at its kickoff)
+  const live = W_UMB4.live[C.engine] && W_UMB4.live[C.engine]();
+  if (tries > 0 && !live && RUN.gold < C.toll) return `Another game costs a toll of ${C.toll} gold, and you have ${RUN.gold}.`;
   const go = W_UMB4.start[C.engine]; if (!go) return `${DB.chars[C.char].name} is not ready to play yet.`;
   // (the adapter charges the toll itself, at the real kickoff, through wUmbTollAtKickoff: backing out costs nothing)
   return go(C, id, wUmbHexes(id, C.hexes || 1));

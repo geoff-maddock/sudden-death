@@ -64453,8 +64453,10 @@ const W_UMB4 = {
   cold: { steps: 2, hp: 1 },
   gate: { plains: 'grain', bloom: 'mossberry', tide: 'brinekelp', ember: 'emberpepper', rime: 'frostmint' },
   guardNames: ['The Left Hand of the Nadir', 'The Right Hand of the Nadir'],
-  // the sports' adapters: (C, id, hexes) => '' when the game started, or why not
+  // the sports' adapters: (C, id, hexes) => '' when the game started, or why not; and whether a sport has a game left
+  // half-played (its adapter resumes that one)
   start: {},
+  live: { diamond: () => wBallLive(), gridiron: () => wGridLive(), ring: () => !!wBxg().live },
 };
 W_UMB.maps.push(...Object.keys(W_UMB4.grounds));
 Object.assign(W_UMB.names, W_UMB4.names);
@@ -64501,7 +64503,9 @@ wNadirMatch = function (id) {
   }
   if (!C.engine) return wWU4NadirMatch.apply(this, arguments);
   const tries = U.tries[id] || 0;
-  if (tries > 0 && RUN.gold < C.toll) return `Another game costs a toll of ${C.toll} gold, and you have ${RUN.gold}.`;
+  // (a game of this sport left half-played resumes, toll or no: it was paid at its kickoff)
+  const live = W_UMB4.live[C.engine] && W_UMB4.live[C.engine]();
+  if (tries > 0 && !live && RUN.gold < C.toll) return `Another game costs a toll of ${C.toll} gold, and you have ${RUN.gold}.`;
   const go = W_UMB4.start[C.engine]; if (!go) return `${DB.chars[C.char].name} is not ready to play yet.`;
   // (the adapter charges the toll itself, at the real kickoff, through wUmbTollAtKickoff: backing out costs nothing)
   return go(C, id, wUmbHexes(id, C.hexes || 1));
@@ -64695,8 +64699,7 @@ wNineDef = function () { const d = wWU4ANineDef.apply(this, arguments); if (W_UM
 // why your team can't play the champion now, or ''
 function wUmb4aWhy() {
   const probs = wBallProblems(); if (probs.length) return probs.join(' ');
-  // (a game left half-played picks up where it was, here as anywhere)
-  if (wBallLive()) { wResumeBall(); return ''; }
+  if (wBallLive()) return 'Finish the ball game you started first.';
   return '';
 }
 // start the champion's game: '' when it started (for Simulate: when it is over), or why not
@@ -64728,6 +64731,8 @@ function wUmb4aCard(C0, id, hexes) {
 }
 // u4's adapter: the card (or, for the bots, a Simulated game at once). The hexes u4 passes are the card game's: baseball draws its own.
 W_UMB4.start.diamond = function (C, id) {
+  // (a game left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wBallLive()) { wResumeBall(); return ''; }
   const why = wUmb4aWhy(); if (why) return why;
   const hx = wUmb4aHexes(id, C.hexes || 1);
   if (LAB) return wUmb4aGo(id, hx, 'sim');
@@ -64870,7 +64875,7 @@ function wUmbGfCard(C, id, hx) {
   const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
     <p><b>The Cinder Pit: tier U.</b> Football against ${esc(W_UMB4B.team.name)}: level ${lvl}, in umbral form (${W_GFG.oppBonus[4]} rating points on each of their seven), coached by a ${esc(W_BALL_SKILL[3])}, with a full potion bag. ${esc(ch.name.split(',')[0])} plays quarterback, and once a game casts ${esc(eu.n)}: ${esc(eu.desc)}</p>
     <p class="hint wumbpg"><b>Hexes:</b> ${H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ')}</p>
-    <p class="hint">Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold. ${tries > 0 ? `This try costs the toll, ${C.toll} gold, at kickoff.` : 'The first game is free; after a loss, each costs a toll of ' + C.toll + ' gold.'} A tie counts as a loss.</p></div>
+    <p class="hint">${C.piece ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold. ` : 'Win, and the round is yours. '}${!C.toll ? '' : tries > 0 ? `This try costs the toll, ${C.toll} gold, at kickoff. ` : 'The first game is free; after a loss, each costs a toll of ' + C.toll + ' gold. '}A tie counts as a loss.</p></div>
     <div class="row"><button class="btn" data-ugf="play">Play</button><button class="ghost" data-ugf="manage">Manage</button><button class="ghost" data-ugf="sim">Simulate</button><button class="ghost" id="wUgfNo">Not now</button></div>`,
     () => { if (!went && oldFrame) { RUN.gold += C.toll; wLog('You walk away from the card. You keep your toll.', 'd'); } wDrain(); });
   $('modalBox').querySelectorAll('[data-ugf]').forEach(b => b.onclick = () => { went = true; close(); const why = wUmbGfKick(C, id, hx, b.dataset.ugf); if (why) wLog(why, 'b'); });
@@ -65070,7 +65075,8 @@ wRingResultCard = function () { if (RUN && RUN.over) return; return wWU4CRingRes
 
    W_UMB5, wUmbFinale, wUmbFinaleEntry, wUmbFinaleSports, wUmbSeal, wUmbSealScene
    Once sealed, the portal is gone (u0's wUmbOpen), and so are the herald, the eclipses and the dreams (u1).
-   Wraps: W_ON_END.nadir (wWU5OnNadir: a finale round's end), wRunAct (wWU5RunAct: PLAY), buildAllMaps
+   Wraps: W_ON_END.nadir (wWU5OnNadir: a finale round's end), wNextPrompt (wWU5NextPrompt: the closing scene once the
+   world is free, WG.umbral.sealScene), wRunAct (wWU5RunAct: PLAY), buildAllMaps
    (wWU5BuildAllMaps: Aurelia in the Hollow Coliseum), wAudit (wWU5Audit: she is placed, and every piece has its sport). */
 
 const W_UMB5 = {
@@ -65156,7 +65162,8 @@ function wUmbSeal() {
   wUmbHeraldSync(); // (the herald has nothing more to say: he goes)
   const m = MAPS.coliseum; wEnterMap('coliseum', m.spawn[0], m.spawn[1]); WG.face = 'u';
   wInvalidate('umbralden'); wSave();
-  if (!LAB) wUmbSealScene();
+  // (the scene waits till the world is free: a sport's own result card closes first, and a recruit's question after)
+  if (!LAB) U.sealScene = 1;
 }
 function wUmbSealScene() {
   const close = modal(`<header><h3>The Seal of the Crown</h3></header>
@@ -65168,6 +65175,12 @@ function wUmbSealScene() {
     <div class="row"><button class="btn" id="wUmbSealed">Home, then</button></div>`, () => { WUI.hudKey = ''; wDrain(); });
   $('wUmbSealed').onclick = () => close();
 }
+const wWU5NextPrompt = wNextPrompt;
+wNextPrompt = function () {
+  const U = wUmb();
+  if (U && U.sealScene && !LAB && wActive()) { U.sealScene = 0; wSave(); wUmbSealScene(); return true; }
+  return wWU5NextPrompt.apply(this, arguments);
+};
 const wWU5RunAct = wRunAct;
 wRunAct = function (act, id) {
   if (act === 'ufinale') { WUI.held = null; if (WUI.talk) wCloseTalk(); const why = wUmbFinale(); if (why) wLog(why, 'b'); return; }

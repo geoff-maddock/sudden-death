@@ -54,7 +54,7 @@ async def main():
           __ad.length = 0; wUmbFinale(); out.r2 = __ad.slice(); W_ON_END.nadir('lose', { id: 'finale' }); out.lost = [U.finale, U.tries.finale];
           // (a reload mid-round loses the in-memory entry: the result still finds its round)
           wUmbFinale(); delete W_NADIR.finale; W_ON_END.nadir('win', { id: 'finale' }); out.after2 = U.finale;
-          wUmbFinale(); W_ON_END.nadir('win', { id: 'finale' });
+          wUmbFinale(); W_ON_END.nadir('win', { id: 'finale' }); wNextPrompt(); // (the scene, once the world is free)
           out.sealed = { sealed: !!U.sealed, year: U.sealedYear, map: WG.map, scene: !!document.getElementById('wUmbSealed'), portal: wTileAt(MAPS.umbralden, ...W_UMB.portal.umbralden), eclipse: wUmbEclipse(), again: wUmbFinale() };
           const g = (() => { const m = MAPS.coliseum; for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.t[y][x] === 'G') return [x, y]; })();
           out.after = { statue: wLookText(g[0], g[1]), herald: MAPS.coliseum.npcs.some(n => n.id === 'uherald'), journal: wUmbJournal()[0] };

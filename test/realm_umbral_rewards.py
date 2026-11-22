@@ -46,7 +46,9 @@ async def main():
         sl = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; U.pieces = Object.keys(W_UMB_PIECES); U.tries = {}; U.beaten = { gate: WG.dayAbs };
           WG.legId = 'Ltest'; wLegendsSave([{ id: 'Ltest', name: 'Us', short: 'US', color: '#c94a3a', light: '#fff', year: WG.year, crowns: 1, at: '2026-11-21', players: [] }]);
           const n0 = wRoster().length; U.finale = W_UMB5.rounds - 1; wUmbSeal();
-          out.relic = RUN.relics.includes('umbseal'); out.scene = !!document.getElementById('wUmbSealed');
+          // (the piece above left its card pick open: the world must be free for the scene)
+          WG.cardOffer = null; for (let k = 0; k < 6 && !document.getElementById('modal').hidden; k++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          wNextPrompt(); out.relic = RUN.relics.includes('umbseal'); out.scene = !!document.getElementById('wUmbSealed');
           out.queued = (WG.wprompts || []).some(P => P.t === 'recruit' && P.p.n === 'Morrow Vane'); out.redeemed = U.redeemed;
           out.mark = (wLegendsAll().find(l => l.id === 'Ltest') || {}).sealed;
           // (a later Crown writes the portrait again: the mark stays)

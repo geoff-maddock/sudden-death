@@ -97,7 +97,7 @@ function wUmbGfCard(C, id, hx) {
   const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
     <p><b>The Cinder Pit: tier U.</b> Football against ${esc(W_UMB4B.team.name)}: level ${lvl}, in umbral form (${W_GFG.oppBonus[4]} rating points on each of their seven), coached by a ${esc(W_BALL_SKILL[3])}, with a full potion bag. ${esc(ch.name.split(',')[0])} plays quarterback, and once a game casts ${esc(eu.n)}: ${esc(eu.desc)}</p>
     <p class="hint wumbpg"><b>Hexes:</b> ${H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ')}</p>
-    <p class="hint">Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold. ${tries > 0 ? `This try costs the toll, ${C.toll} gold, at kickoff.` : 'The first game is free; after a loss, each costs a toll of ' + C.toll + ' gold.'} A tie counts as a loss.</p></div>
+    <p class="hint">${C.piece ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold. ` : 'Win, and the round is yours. '}${!C.toll ? '' : tries > 0 ? `This try costs the toll, ${C.toll} gold, at kickoff. ` : 'The first game is free; after a loss, each costs a toll of ' + C.toll + ' gold. '}A tie counts as a loss.</p></div>
     <div class="row"><button class="btn" data-ugf="play">Play</button><button class="ghost" data-ugf="manage">Manage</button><button class="ghost" data-ugf="sim">Simulate</button><button class="ghost" id="wUgfNo">Not now</button></div>`,
     () => { if (!went && oldFrame) { RUN.gold += C.toll; wLog('You walk away from the card. You keep your toll.', 'd'); } wDrain(); });
   $('modalBox').querySelectorAll('[data-ugf]').forEach(b => b.onclick = () => { went = true; close(); const why = wUmbGfKick(C, id, hx, b.dataset.ugf); if (why) wLog(why, 'b'); });
