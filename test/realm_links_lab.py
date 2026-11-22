@@ -3,7 +3,8 @@
   python3 test/realm_links_lab.py 120            120 matches for every cell, and 120 cups
   python3 test/realm_links_lab.py 120 'W_LKG.oppBonus = { 1: 0, 2: 1, 3: 2 }'    a tuning override, run in the page first
   python3 test/realm_links_lab.py 300 '' tiers,gaps    only some parts (tiers, gaps, skills, powers, lines, stances,
-                                                       kits, enchant, rule, cups)
+                                                       kits, enchant, rule, cups, single, umbral)
+  python3 test/realm_links_lab.py 600 '' umbral        only the Umbral (issue #99, phase 4f)
 
 Every match is the golf engine played to a final, headless (wGL.simGame), as Simulate plays it: nine holes of captain's
 choice match play on the standing nine, the day's weather, the wood and the enchanted course on, powers on, your four
@@ -28,6 +29,11 @@ Your four: a fresh journey with five players at level 3, the caddie's four in th
   side has none), against the four with no powers; each everyday power, second power and ultimate, with how often it
   was cast a match; and the situation powers and Steady with your own four. Gear: each piece on the player whose role
   uses it. Potions: a bag of two of that one, given by your caddie as a Knight would.
+- umbral (issue #99, phase 4f): your four at level 3 against level 3 (level parity), as Simulate plays the Hollow
+  Links' champion (your four caddied as a Knight). The Lich against the Archmage (no bonus, no bags); tier 3 as the world
+  sets it and tier U on a rival's four (W_LKG.oppBonus[4], the Lich, a full bag) for reference; the Nadir four (the
+  champion's game) with no hexes, each hex alone, as many drawn as the champion draws (every draw in turn), and two
+  (the finale's round).
 Writes /tmp/realm_links_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
@@ -36,7 +42,7 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 120
 OVR = sys.argv[2] if len(sys.argv) > 2 else ''
-PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,enchant,rule,cups,single').split(','))
+PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,enchant,rule,cups,single,umbral').split(','))
 
 SETUP = r"""
 window.__lab = {};
@@ -159,6 +165,28 @@ async def main():
                 for (const t of W_DIVOT.tiers) {{ const s = wGL.simGame(Object.assign({{ seed: 9000 + i * 3 + r }}, __lab.base, {{ teams: [__lab.mine(), __lab.opp(__lab.clubs[i % __lab.clubs.length], t)], skill: wLinksSkill(t) }})); if (s.win !== 0) break; r++; }} far[r]++; }}
               return {{ out_qf: far[0], out_sf: far[1], out_final: far[2], won: far[3], win: +(100 * far[3] / {N}).toFixed(1) }}; }})()""")
             print('Divot Cups:', json.dumps(out['cups']))
+        if 'umbral' in PARTS:
+            # (every row draws match i's two fours from the same stream, so the rows play the same players, seed for seed:
+            # a hex's swing is measured on the same matches as the row without it. Your four is the journey's, whose
+            # first player is new each run: runs differ by a few points, rows in a run much less)
+            out['umbral'] = await pg.evaluate(f"""(() => {{ const o = {{}}, bag = W_LINKS_KIT.opp[4], sk = wLinksSkill(4), hx = Object.keys(wGL.hexes), MR = Math.random;
+              const same = (i, f) => {{ let q = Math.imul(i + 1, 7919) >>> 0; Math.random = () => {{ q = (Math.imul(q, 1103515245) + 12345) >>> 0; return (q >>> 8) / 16777216; }}; try {{ return f(); }} finally {{ Math.random = MR; }} }};
+              o.archmage = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 2] }})));
+              o.lich = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 3] }})));
+              o.tier3 = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.opp(__lab.clubs[i % __lab.clubs.length], 3)], skill: wLinksSkill(3), bags: [null, W_LINKS_KIT.opp[3]] }})));
+              o.tierU = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.four(3, W_LKG.oppBonus[4])], skill: sk, bags: [null, bag] }})));
+              const nadir = x => __lab.play({N}, i => same(i, () => Object.assign({{ teams: [__lab.mine(), wUmbGlFour(3)], skill: sk, bags: [null, bag] }}, x(i))));
+              o.nadir = nadir(() => ({{}}));
+              // (the champion without their own ultimate: what The Hollow Flag is worth)
+              o.noUlt = __lab.play({N}, i => same(i, () => {{ const T = wUmbGlFour(3); T.roster.forEach(m => delete m.ult); return {{ teams: [__lab.mine(), T], skill: sk, bags: [null, bag] }}; }}));
+              for (const h of hx) o[h] = nadir(() => ({{ hexes: [h] }}));
+              // (as the champion draws them: W_NADIR.links.hexes of them, every such draw in turn; the finale draws two)
+              const draws = n => n <= 1 ? hx.map(h => [h]) : hx.flatMap((a, j) => hx.slice(j + 1).map(b => [a, b])), dr = draws(W_NADIR.links.hexes), two = draws(2);
+              o.drawn = nadir(i => ({{ hexes: dr[i % dr.length] }}));
+              if (W_NADIR.links.hexes !== 2) o.two = nadir(i => ({{ hexes: two[i % two.length] }}));
+              return o; }})()""")
+            U = out['umbral']
+            print('Umbral (level parity):', ', '.join(f"{k} {v['win']}% ({v['over']:+.2f}/hole)" for k, v in U.items()))
         await br.close()
     out['n'] = N; out['secs'] = round(time.time() - t0)
     json.dump(out, open('/tmp/realm_links_lab.json', 'w'), indent=1)

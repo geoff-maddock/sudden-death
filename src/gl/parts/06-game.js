@@ -23,13 +23,14 @@ const GL_TEAMS = [{ name: 'Mossgate' }, { name: 'The visitors' }];
 function glTeam(t, side) {
   const T = t || GL_TEAMS[side], ro = (T.roster || (T.kinds || []).map(kind => ({ n: kind[0].toUpperCase() + kind.slice(1), kind }))).slice(0, GL_RULES.side);
   while (ro.length < GL_RULES.side) ro.push({ n: 'Player ' + (ro.length + 1) });
-  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return { n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 }, gear: m.gear ? m.gear.name || '' : '', gx: glGx(m.gear && m.gear.fx) }; });
+  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return Object.assign({ n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 }, gear: m.gear ? m.gear.name || '' : '', gx: glGx(m.gear && m.gear.fx) }, m.ult && GL_ULT_OWN[m.ult] ? { ult: m.ult } : {}); });
   const R = T.roles, ok = R && ['tee', 'approach', 'short', 'putt'].every(k => Number.isInteger(R[k]) && R[k] >= 0 && R[k] < roster.length) && new Set(['tee', 'approach', 'short', 'putt'].map(k => R[k])).size === 4;
   return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster, roles: ok ? Object.assign({}, R) : glAutoRoles(roster) };
 }
 // the hole being played, built from the course's seed (playoff holes go round again)
 function glHoleAt(i) { return glCourseHole(G.cs, (i % G.holes) % 9, glParOf(i)); }
-function glHoleNow() { return glHoleAt(G.h); }
+// (with the Wandering Cup, the cup where it has crept to: 14-umbral.js)
+function glHoleNow() { const H = glHoleAt(G.h); return G.hex ? glHexHole(H) : H; }
 
 function glStart(opts) {
   const o = opts || {}, T = o.teams || [];
@@ -38,7 +39,7 @@ function glStart(opts) {
   const cs = wild ? ((o.course != null ? o.course : R() * 4294967296) >>> 0) : GL_STAND;
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
-    cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
+    cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 3)),
     wood: !!o.wood, enchant: !!o.enchant, webbed: [false, false], weather: GL_WEATHER[o.weather] ? o.weather : null,
     focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false,
@@ -47,6 +48,8 @@ function glStart(opts) {
   });
   glPowersStart(o);
   glKitStart(o.bags);
+  // (the Umbral's hexes, when a game asks for them: 14-umbral.js)
+  glHexStart(o.hexes, o.hexOn);
   glHoleStart();
   return G;
 }
@@ -83,11 +86,12 @@ function glHit(s, plan) {
   const dist = GL_STANCE[glStanceOf(s).mood].dist * (G.webbed && G.webbed[s] ? GL_ENCH.webK : 1);
   if (plan.putt) {
     const k = (1.5 - rat.put) * fx.putt, a = plan.a + gauss() * GL_SWING.pa * k * em / fx.err, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em / fx.err);
-    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK(), lip: fx.lip });
+    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK(), lip: fx.lip, tilt: G.hex ? glHexTilt(s) : null });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  const key = plan.kind === 'short' ? rat.tch : rat.acc, k = 1.4 - key;
-  return glFlight(Object.assign({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * fx.dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, spin: plan.spin, rat, fk: glWetK() }, glFxFlight(fx, plan.aim, b)));
+  const key = plan.kind === 'short' ? rat.tch : rat.acc, k = 1.4 - key, ff = glFxFlight(fx, plan.aim, b);
+  if (G.hex) ff.wind = glHexWind(s, ff.wind);
+  return glFlight(Object.assign({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * fx.dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, spin: plan.spin, rat, fk: glWetK() }, ff));
 }
 
 // who plays next: { side, d (yards to the pin), putt, give (the other side may give this putt) }, or null when it's over
@@ -136,6 +140,8 @@ function glShoot(s, plan, r) {
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);
   glKitAfter(s, plan);
+  // (the Wandering Cup creeps away from a ball that stopped near it: 14-umbral.js)
+  if (G.hex) glHexAfter(s, ev);
   ev.up = !!Hs.up[s] && !r.holed;
   if (r.holed && !r.water && !Hs.done[s]) glHoled(s); else glDecide();
   return glLogEv(ev, h0, Hs);
