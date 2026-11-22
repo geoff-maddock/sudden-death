@@ -7,7 +7,9 @@
    - a Knight reads it as it was too, but corrects by what it saw: after each of a bowler's strike balls it moves that
      bowler's aim on that lane by half of how far they missed. It uses the spare ball, and on a split it takes the
      bigger group;
-   - an Archmage reads the lane as it is now, and stands where the angle into the pocket is best (4 to 6 degrees).
+   - an Archmage reads the lane as it is now, and stands where the angle into the pocket is best (4 to 6 degrees);
+   - a Lich (3, the Umbral's: 16-umbral.js) reads it as an Archmage does and weighs every stand, aim and speed through
+     the ball model and the pins before it bowls.
    Knights and Archmages try a few places to stand, and keep off a line that brushes the gutter.
    A spare ball (plastic, it rolls straight) goes across the lane at the front pin of what is left, a touch to the
    side that drives that pin into the rest.
@@ -47,6 +49,8 @@ function blSpareTarget(pins) {
 /* the side's plan for its next ball: { x0, ang, mph, rpm, ball, hand, aim: { x, y }, why } (what it means to throw,
    before the release strays) */
 function blPlan(s) {
+  // (the Lich weighs its ball through the shot model: 16-umbral.js)
+  if (BL_SKILL[G.skill[s]].lich) { const L = blLichPlan(s); if (L) return L; }
   const sk = BL_SKILL[G.skill[s]], st = blStyleNow(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
   // the oil as the side reads it: as it was at the start, or as it is (an Archmage, or anyone with the coach's word)
   const oil = (sk.read && !(G.noRead && G.noRead[s])) || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;

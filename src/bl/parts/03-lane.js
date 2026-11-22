@@ -51,8 +51,9 @@ function blMu(oil, x, y, tide, heavy) {
   return BL_OIL.muDry - (BL_OIL.muDry - BL_OIL.muOil) * Math.pow(k, .7);
 }
 // a ball's path moves oil: it picks some up from the cells it skids over (and the board each side), and lays a
-// share of that down on the dry cells past the pattern on the same boards. Returns a new grid
-function blWear(oil, path) {
+// share of that down on the dry cells past the pattern on the same boards (k: how many times as much it takes, an
+// Umbral hex's ichor; 1 when not given). Returns a new grid
+function blWear(oil, path, k) {
   const L = BL_LANE, out = oil.slice(), w = BL_OIL.width;
   let carried = 0;
   for (const [x, y] of path) {
@@ -61,7 +62,7 @@ function blWear(oil, path) {
     for (let d = -w; d <= w; d++) {
       const bb = b + d; if (bb < 1 || bb > L.boards) continue;
       const i = (bb - 1) * L.ft + f, share = d ? .5 / w : 1, o = out[i];
-      if (o > .02) { const t = o * BL_OIL.take * share; out[i] = o - t; carried += t; }
+      if (o > .02) { const t = Math.min(o, o * BL_OIL.take * share * (k || 1)); out[i] = o - t; carried += t; }
       else if (carried > 0 && f >= L.oilFt) { const lay = carried * BL_OIL.carry * share * .08; out[i] = o + lay; carried -= lay; }
     }
   }

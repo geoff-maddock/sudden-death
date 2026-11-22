@@ -11,8 +11,8 @@
    spin, and wears the spin down. It gives the path, where the ball meets the pins and at what angle (the entry
    angle: 4 to 6 degrees carries best), and where it skidded, hooked and rolled. A ball whose middle leaves the lane
    before the pins is in the gutter.
-   A throw may carry web (a gutter ball is caught and set back on the lane, once) and oilK (the oil plays heavier:
-   a Hex). Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
+   A throw may carry web (a gutter ball is caught and set back on the lane, once), oilK (the oil plays heavier:
+   a Hex) and pull ({ w, k }: within w inches of either edge the ball drifts k a step toward it, an Umbral hex). Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
    the mirrored boards (so the left side of the lane, fresh, is theirs). */
 const BL_BALL = { step: 3, hook: .004, decay: .012, mu0: .043, rollAt: .045, spareSpin: .08, v0: 17, rpm0: 350, drag: .012 };
 const BL_MPH = 17.6;   // inches a second in a mile an hour
@@ -37,6 +37,8 @@ function blBall(t, oil, tide) {
       if (S <= B.rollAt && roll === null) roll = y;
     }
     v = Math.max(8 * BL_MPH, v - B.drag * mu * v * dy / 12);
+    // a gutter that pulls (an Umbral hex, 16-umbral.js): near either edge the ball drifts toward it
+    if (t.pull && Math.abs(x) > L.edge - t.pull.w) m += Math.sign(x) * t.pull.k * dy;
     x += m * dy; y += dy;
     // a web in the gutter (a spider's) catches the ball once and sets it back on the lane, rolling straight
     if (Math.abs(x) > L.edge && web) { web = false; webbed = true; x = Math.sign(x) * (L.edge - L.ballR); m = 0; S = 0; }

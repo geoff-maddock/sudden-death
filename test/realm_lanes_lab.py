@@ -3,7 +3,8 @@
   python3 test/realm_lanes_lab.py 200            200 games for every cell, and 200 cups
   python3 test/realm_lanes_lab.py 200 'W_LNG.oppBonus = { 1: 0, 2: 2, 3: 5 }'    a tuning override, run in the page first
   python3 test/realm_lanes_lab.py 300 '' tiers,gaps    only some parts (tiers, gaps, skills, powers, lines, stances,
-                                                       kits, hall, cups, read, single)
+                                                       kits, hall, cups, read, single, umbral)
+  python3 test/realm_lanes_lab.py 300 '' umbral        only the Umbral (issue #99, phase 4g)
 
 Every game is the bowling engine played to a final, headless (wBL.simGame), as Simulate plays it: one Baker game of ten
 frames, the hall on (the tide mid), powers on, your five bowling as a Knight would, the other side at the skill of the
@@ -30,6 +31,13 @@ level 3, in the order their ratings suggest.
   with no powers; each strike power, spare power, second power and ultimate, with how often it was cast a game; and the
   situation powers and Steady with your own five. Gear: each piece on every one of your five. Potions: a bag of two of
   that one, given as a Knight would.
+- umbral (issue #99, phase 4g): your five at level 3 against level 3 (level parity), as Simulate plays the Drowned
+  Lanes' champion (your five bowling as a Knight). The Lich against the Archmage (your own kinds, no bonus, no bags);
+  tier 3 as the world sets it and tier U on your own kinds (W_LNG.oppBonus[4], the Lich, a full bag) for reference; the
+  Nadir five (the champion's game) with no hexes, without the champion's own ultimate, each hex alone, as many drawn as
+  the champion draws (every draw in turn), and two (the finale's round). The rows are paired: game i of the Archmage,
+  Lich and tier U rows plays the same two fives on the same seed, and so does game i of every Nadir row, so a hex's
+  swing is measured on the same games as the row without it.
 Every game reports side 0's win %, its average score and its strike %. Writes /tmp/realm_lanes_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
@@ -38,7 +46,7 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 200
 OVR = sys.argv[2] if len(sys.argv) > 2 else ''
-PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,hall,cups,read,single').split(','))
+PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,lines,stances,kits,hall,cups,read,single,umbral').split(','))
 
 SETUP = r"""
 window.__lab = {};
@@ -58,7 +66,7 @@ __lab.seed0 = 1000;
 __lab.cell = () => { __lab.seed0 += 100003; return __lab.seed0; };
 __lab.one = (i, o, s0) => wBL.simGame(Object.assign({ seed: s0 + i }, __lab.base, o));
 // play n games; o(i) gives the options; { win, score (side 0's average), strikes (side 0's strike %), ro (roll-offs %) }
-__lab.play = (n, o) => { let w = 0, sc = 0, x = 0, f = 0, ro = 0; const s0 = __lab.cell();
+__lab.play = (n, o, seed0) => { let w = 0, sc = 0, x = 0, f = 0, ro = 0; const s0 = seed0 || __lab.cell();
   for (let i = 0; i < n; i++) { const r = __lab.one(i, o(i), s0); if (r.win === 0) w++; sc += r.game[0]; x += r.st[0].strikes; f += r.st[0].firsts; if (r.ro) ro++; }
   return { win: +(100 * w / n).toFixed(1), score: +(sc / n).toFixed(1), strikes: +(100 * x / Math.max(1, f)).toFixed(1), ro: +(100 * ro / n).toFixed(1) }; };
 // play n games and count side 0's casts of one power id: { win, casts (a game) }
@@ -159,6 +167,26 @@ async def main():
             print('Situation powers and Steady (none ' + str(S['situation']['base']) + '%):', ', '.join(f"{k} {v['win']}% ({v['casts']})" for k, v in S['situation'].items() if k != 'base'))
             print('One piece of gear on all five (none ' + str(S['gear']['base']) + '%):', ', '.join(f"{k} {v}%" for k, v in S['gear'].items() if k != 'base'))
             print('One potion, two in the bag (none ' + str(S['potions']['base']) + '%):', ', '.join(f"{k} {v}%" for k, v in S['potions'].items() if k != 'base'))
+        if 'umbral' in PARTS:
+            # (every row draws game i's two fives from the same stream; paired rows also play game i on the same seed)
+            out['umbral'] = await pg.evaluate(f"""(() => {{ const o = {{}}, bag = W_LANES_KIT.opp[4], sk = wLanesSkillOf(4), hx = Object.keys(wBL.hexes), MR = Math.random, P0 = 7770001;
+              const same = (i, f) => {{ let q = Math.imul(i + 1, 7919) >>> 0; Math.random = () => {{ q = (Math.imul(q, 1103515245) + 12345) >>> 0; return (q >>> 8) / 16777216; }}; try {{ return f(); }} finally {{ Math.random = MR; }} }};
+              o.archmage = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.five(3, 0)], skill: [1, 2] }})), P0);
+              o.lich = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.five(3, 0)], skill: [1, 3] }})), P0);
+              o.tier3 = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.opp(__lab.clubs[i % __lab.clubs.length], 3)], skill: wLanesSkillOf(3), bags: [null, W_LANES_KIT.opp[3]] }})));
+              o.tierU = __lab.play({N}, i => same(i, () => ({{ teams: [__lab.mine(), __lab.five(3, W_LNG.oppBonus[4])], skill: sk, bags: [null, bag] }})), P0);
+              const nadir = x => __lab.play({N}, i => same(i, () => Object.assign({{ teams: [__lab.mine(), wUmbBlFive(3)], skill: sk, bags: [null, bag] }}, x(i))), P0 + 1);
+              o.nadir = nadir(() => ({{}}));
+              // (the champion without their own ultimate: what The Drowning Bell is worth)
+              o.noUlt = __lab.play({N}, i => same(i, () => {{ const T = wUmbBlFive(3); T.roster.forEach(m => delete m.ult); return {{ teams: [__lab.mine(), T], skill: sk, bags: [null, bag] }}; }}), P0 + 1);
+              for (const h of hx) o[h] = nadir(() => ({{ hexes: [h] }}));
+              // (as the champion draws them: W_NADIR.lanes.hexes of them, every such draw in turn; the finale draws two)
+              const draws = n => n <= 1 ? hx.map(h => [h]) : hx.flatMap((a, j) => hx.slice(j + 1).map(b => [a, b])), dr = draws(W_NADIR.lanes.hexes), two = draws(2);
+              o.drawn = nadir(i => ({{ hexes: dr[i % dr.length] }}));
+              if (W_NADIR.lanes.hexes !== 2) o.two = nadir(i => ({{ hexes: two[i % two.length] }}));
+              return o; }})()""")
+            U = out['umbral']
+            print('Umbral (level parity):', ', '.join(f"{k} {v['win']}% ({v['score']}, {v['strikes']}% X)" for k, v in U.items()))
         await br.close()
     out['n'] = N; out['secs'] = round(time.time() - t0)
     json.dump(out, open('/tmp/realm_lanes_lab.json', 'w'), indent=1)

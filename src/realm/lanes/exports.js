@@ -39,7 +39,11 @@
    Phase 8 is the superstars (p0-stars.js: their kinds in rate, pow, pow2 and ult) and the look: the bowler drawn as
    their own kind (atLine(): who is at the foul line and how, or null), the hall's fantasy dressing, and Moll's glass
    (screen(): the cartoon for the last ball, { k, text, n, left }, or null; screenRules). render(dt) moves the
-   drawing's clock on by dt. */
+   drawing's clock on by dt.
+   The Umbral (issue #99, phase 4g: 16-umbral.js): skill 3, the Lich (skills[3]; lichRules); start({ hexes: [ids],
+   hexOn }) and simGame the same: hexes (the table), hex() (the game's, or null), hexPin(s) (side s's waterlogged pin
+   this frame), hexLine() (as the scoreboard says it); a roster bowler may bring ult (an id in ultOwn), and ultOf(s,
+   ri) is the ultimate they cast; carry(dx, entry, mph) is the Lich's carry table. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -88,6 +92,9 @@ return {
   // the look (phase 8)
   screen: () => GP && GP.last && GP.anim ? blScreenFor(GP.last, GP.anim.s, GP.anim.before) : null, screenRules: JSON.parse(JSON.stringify(BL_SCREEN)),
   atLine: () => { const B = blBowlerNow(); return B ? Object.assign({}, B, { kind: (G.teams[B.s].roster[B.ri] || {}).kind }) : null; },
+  // the Umbral (phase 4g)
+  hexes: JSON.parse(JSON.stringify(BL_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexPin: s => G && G.teams ? blHexPin(s) : null, hexLine: () => blHexLine(),
+  ultOwn: JSON.parse(JSON.stringify(BL_ULT_OWN)), ultOf: (s, ri) => G && G.teams ? Object.assign({}, blUltOf(s, ri)) : null, lichRules: JSON.parse(JSON.stringify(BL_LICH)), carry: (d, e, v) => blLichCarry(d, e, v),
   set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; }, get onPhase() { return BL_HOOK.onPhase; }, get onPick() { return BL_HOOK.onPick; }, get onOver() { return BL_HOOK.onOver; },
   show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: dt => blRender(dt || 0),
   pause: on => { BLP.paused = !!on; }, get paused() { return BLP.paused; }, get speed() { return BLP.speed; }, set speed(n) { BLP.speed = clamp(Math.round(n) || 1, 1, 8); }
