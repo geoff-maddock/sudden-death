@@ -66,8 +66,8 @@ function wUmbRingHexes(id, n) {
 function wUmbRingSide(C, taken) {
   const lvl = wNineTier(), k = W_BXG.oppBonus[W_UMB4C.tier] || 0, X = W_UMB4C.champ;
   const fighters = W_UMB4C.seconds.concat([[X.n, X.kind]]).map(([n, kind], j) => {
-    // (the champion at tier U's full points; the two on the undercard W_UMB4C.under fewer: the card is two bouts of
-    // three, and three bouts at full tier U made it nearly unwinnable, about 7%)
+    // (the champion at tier U's points plus W_UMB4C.champ.more (one under, after phase 7); the two on the undercard
+    // W_UMB4C.under fewer: the card is two bouts of three, and three bouts at full tier U made it nearly unwinnable, about 7%)
     const p = wMakePlayer({ kind, lvl, n }, 'opp'), f = wBxFighter(p), more = j === 2 ? X.more : -W_UMB4C.under;
     taken.add(f.n); f.pid = null; f.umb = 1;
     for (let i = 0; i < Math.max(0, k + more); i++) { const s = wBX.stats[(i * 5 + j) % wBX.stats.length]; f.r[s] = Math.min(W_BXG.cap, f.r[s] + 1); }
@@ -96,7 +96,7 @@ W_UMB4.start.ring = function (C, id) {
   WRK.tier = W_UMB4C.tier;
   try {
     wRingPairing({ mine, theirs, title: `${ch.name}: a card for ${W_UMB_PIECES[C.piece].n}`, go: [['Play', 'play'], ['Manage', 'manage'], ['Simulate', 'sim']],
-      intro: `Three bouts, one fighter each, and each fighter boxes once: two of the Nadir, then ${esc(ch.name)} in the main event. <b>The Umbral: tier U.</b> Their boxers are level ${wNineTier()} with more on every rating, in umbral form, and their corner is a ${W_BALL_SKILL[wRingSkill(W_UMB4C.tier)[1]]}. <span data-umbhex><b>Hexes:</b> ${hx}</span> Win the card and ${esc(W_UMB_PIECES[C.piece].n)} is yours. <b>Play</b>: your corner, and you box the rounds. <b>Manage</b>: your corner; your fighters box. <b>Simulate</b>: the result now.`,
+      intro: `Three bouts, one fighter each, and each fighter boxes once: two of the Nadir, then ${esc(ch.name)} in the main event. <b>The Umbral: tier U.</b> Their boxers are level ${wNineTier()}, in umbral form, ${esc(W_UMB4C.champ.n)} with more on every rating, and their corner is a ${W_BALL_SKILL[wRingSkill(W_UMB4C.tier)[1]]}. <span data-umbhex><b>Hexes:</b> ${hx}</span> Win the card and ${esc(W_UMB_PIECES[C.piece].n)} is yours. <b>Play</b>: your corner, and you box the rounds. <b>Manage</b>: your corner; your fighters box. <b>Simulate</b>: the result now.`,
       onGo: go });
   } finally { WRK.tier = null; }
   return '';

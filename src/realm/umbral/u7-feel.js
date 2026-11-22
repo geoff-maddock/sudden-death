@@ -46,7 +46,8 @@ wAmbient = function (m, preReg) {
 };
 
 // a dark ground's field and stands are painted in the light's colours (w21): on this side they are drained and darkened
-const wUmbDim = c => { c.save(); c.globalCompositeOperation = 'multiply'; c.fillStyle = '#6e6080'; c.fillRect(0, 0, 32, 32); c.restore(); };
+// (a tile's object may reach a pixel past its edges, as the stands' benches do: the dim covers that too)
+const wUmbDim = c => { c.save(); c.globalCompositeOperation = 'multiply'; c.fillStyle = '#6e6080'; c.fillRect(-1, 0, 34, 32); c.restore(); };
 const wWU7GndD = WGND.d, wWU7ObjJ = WOBJ.J;
 WGND.d = function (c, P, r, e) { wWU7GndD.apply(this, arguments); if (e && e.m && e.m.umbral && e.m.field) wUmbDim(c); };
 WOBJ.J = function (c, P, r, e) { wWU7ObjJ.apply(this, arguments); if (e && e.m && e.m.umbral) wUmbDim(c); };

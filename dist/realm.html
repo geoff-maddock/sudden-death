@@ -65848,8 +65848,8 @@ function wUmbRingHexes(id, n) {
 function wUmbRingSide(C, taken) {
   const lvl = wNineTier(), k = W_BXG.oppBonus[W_UMB4C.tier] || 0, X = W_UMB4C.champ;
   const fighters = W_UMB4C.seconds.concat([[X.n, X.kind]]).map(([n, kind], j) => {
-    // (the champion at tier U's full points; the two on the undercard W_UMB4C.under fewer: the card is two bouts of
-    // three, and three bouts at full tier U made it nearly unwinnable, about 7%)
+    // (the champion at tier U's points plus W_UMB4C.champ.more (one under, after phase 7); the two on the undercard
+    // W_UMB4C.under fewer: the card is two bouts of three, and three bouts at full tier U made it nearly unwinnable, about 7%)
     const p = wMakePlayer({ kind, lvl, n }, 'opp'), f = wBxFighter(p), more = j === 2 ? X.more : -W_UMB4C.under;
     taken.add(f.n); f.pid = null; f.umb = 1;
     for (let i = 0; i < Math.max(0, k + more); i++) { const s = wBX.stats[(i * 5 + j) % wBX.stats.length]; f.r[s] = Math.min(W_BXG.cap, f.r[s] + 1); }
@@ -65878,7 +65878,7 @@ W_UMB4.start.ring = function (C, id) {
   WRK.tier = W_UMB4C.tier;
   try {
     wRingPairing({ mine, theirs, title: `${ch.name}: a card for ${W_UMB_PIECES[C.piece].n}`, go: [['Play', 'play'], ['Manage', 'manage'], ['Simulate', 'sim']],
-      intro: `Three bouts, one fighter each, and each fighter boxes once: two of the Nadir, then ${esc(ch.name)} in the main event. <b>The Umbral: tier U.</b> Their boxers are level ${wNineTier()} with more on every rating, in umbral form, and their corner is a ${W_BALL_SKILL[wRingSkill(W_UMB4C.tier)[1]]}. <span data-umbhex><b>Hexes:</b> ${hx}</span> Win the card and ${esc(W_UMB_PIECES[C.piece].n)} is yours. <b>Play</b>: your corner, and you box the rounds. <b>Manage</b>: your corner; your fighters box. <b>Simulate</b>: the result now.`,
+      intro: `Three bouts, one fighter each, and each fighter boxes once: two of the Nadir, then ${esc(ch.name)} in the main event. <b>The Umbral: tier U.</b> Their boxers are level ${wNineTier()}, in umbral form, ${esc(W_UMB4C.champ.n)} with more on every rating, and their corner is a ${W_BALL_SKILL[wRingSkill(W_UMB4C.tier)[1]]}. <span data-umbhex><b>Hexes:</b> ${hx}</span> Win the card and ${esc(W_UMB_PIECES[C.piece].n)} is yours. <b>Play</b>: your corner, and you box the rounds. <b>Manage</b>: your corner; your fighters box. <b>Simulate</b>: the result now.`,
       onGo: go });
   } finally { WRK.tier = null; }
   return '';
@@ -66628,7 +66628,7 @@ function wUmbCrCard(C, id, hx) {
   const toll = !C.toll ? '' : tries > 0 ? ` This match costs the toll, ${C.toll} gold, at the first stone.` : ` The first match is free; after a loss, each costs a toll of ${C.toll} gold.`;
   const prize = fin ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours.` : `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.${toll}`;
   const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
-    <p><b>${fin ? 'The Seal: curling' : 'The Sunken Shed'}: tier U.</b> Curling against ${esc(T.name)}: level ${lvl}, in umbral form (${W_SHG.oppBonus[W_UMB4H.tier]} rating point${W_SHG.oppBonus[W_UMB4H.tier] === 1 ? '' : 's'} on each of their four), their stones called by a ${esc(W_BALL_SKILL[wShedSkillOf(W_UMB4H.tier)[1]])}, who weighs more shots than any skip you have met and whose sweepers read every stone as it runs, and a full bag of potions. ${esc(champ)} skips them, and once a match lets ${esc(uo.n)} take the end: ${esc(uo.desc)}</p>
+    <p><b>${fin ? 'The Seal: curling' : 'The Sunken Shed'}: tier U.</b> Curling against ${esc(T.name)}: level ${lvl}, in umbral form${W_SHG.oppBonus[W_UMB4H.tier] ? ` (${W_SHG.oppBonus[W_UMB4H.tier]} rating point${W_SHG.oppBonus[W_UMB4H.tier] === 1 ? '' : 's'} on each of their four)` : ''}, their stones called by a ${esc(W_BALL_SKILL[wShedSkillOf(W_UMB4H.tier)[1]])}, who weighs more shots than any skip you have met and whose sweepers read every stone as it runs, and a full bag of potions. ${esc(champ)} skips them, and once a match lets ${esc(uo.n)} take the end: ${esc(uo.desc)}</p>
     <p class="hint wumbpg"><b>Hexes:</b> ${H.length ? H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ') : 'none'}</p>
     <p class="hint">${prize} Nobody goes home level: an extra end. <b>Play</b>: you throw and sweep every stone of yours. <b>Manage</b>: you set your rink's game; your four throw. <b>Simulate</b>: the result now.</p></div>
     <div class="row"><button class="btn" data-ucr="play">Play</button><button class="ghost" data-ucr="manage">Manage</button><button class="ghost" data-ucr="sim">Simulate</button><button class="ghost" id="wUcrNo">Not now</button></div>`, () => wDrain());
@@ -66988,7 +66988,8 @@ wAmbient = function (m, preReg) {
 };
 
 // a dark ground's field and stands are painted in the light's colours (w21): on this side they are drained and darkened
-const wUmbDim = c => { c.save(); c.globalCompositeOperation = 'multiply'; c.fillStyle = '#6e6080'; c.fillRect(0, 0, 32, 32); c.restore(); };
+// (a tile's object may reach a pixel past its edges, as the stands' benches do: the dim covers that too)
+const wUmbDim = c => { c.save(); c.globalCompositeOperation = 'multiply'; c.fillStyle = '#6e6080'; c.fillRect(-1, 0, 34, 32); c.restore(); };
 const wWU7GndD = WGND.d, wWU7ObjJ = WOBJ.J;
 WGND.d = function (c, P, r, e) { wWU7GndD.apply(this, arguments); if (e && e.m && e.m.umbral && e.m.field) wUmbDim(c); };
 WOBJ.J = function (c, P, r, e) { wWU7ObjJ.apply(this, arguments); if (e && e.m && e.m.umbral) wUmbDim(c); };
