@@ -57,12 +57,12 @@ function bxPotionNeeds(f) {
   if (has('draught') && f.staMax < 115 && (f.plan === 'press' || o.plan === 'press' || bxFrac(f) < .9)) out.push({ id: 'draught', v: 2 + (115 - f.staMax) / 15, why: 'short of breath for the round to come' });
   return out.sort((a, b) => b.v - a.v);
 }
-// the CPU corner's potion: a Knight or Archmage takes the best when it is worth it; a Squire, now and then, whatever is first in the bag
+// the CPU corner's potion: a Knight, Archmage or Lich takes the best when it is worth it (a Lich sooner); a Squire, now and then, whatever is first in the bag
 function bxCornerPotion(f) {
   const skill = G.skill ? G.skill[f.side] : 1, bag = (G.bags && G.bags[f.side]) || {};
   if (skill === 0) { const any = Object.keys(bag).filter(id => bag[id] > 0 && BX_POTIONS[id]); if (any.length && R() < .35) bxPotionUse(f.side, any[0], 'their corner reaches for the bag'); return; }
   const N = bxPotionNeeds(f), top = N[0];
-  if (top && top.v >= (skill === 2 ? 3 : 4.5)) bxPotionUse(f.side, top.id, top.why);
+  if (top && top.v >= (skill >= 3 ? BX_LICH.potion : skill === 2 ? 3 : 4.5)) bxPotionUse(f.side, top.id, top.why);
 }
 // what your corner would give, for the call (the Knight's choice)
 function bxPotionAdvice(f) { const top = bxPotionNeeds(f)[0]; return top && top.v >= 3 ? { id: top.id, why: top.why } : null; }

@@ -91,7 +91,7 @@ function bxFx(f) {
   return o;
 }
 const bxPowOn = () => !G || G.powers !== false;
-const bxPowOf = (f, which) => { const P = bxPowOn() && BX_POW[f.kind]; if (!P) return null; return which === 'sp' && f.spPick === 'sp2' && P.sp2 ? P.sp2 : P[which] || null; };
+const bxPowOf = (f, which) => { const P = bxPowOn() && (f.pw || BX_POW[f.kind]); if (!P) return null; return which === 'sp' && f.spPick === 'sp2' && P.sp2 ? P.sp2 : P[which] || null; };
 // spirit (a bout saved before there was any has a full meter)
 /* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
    and the same again, once, when behind going into the last round. It is spirit, so it does nothing without powers. */
@@ -138,7 +138,7 @@ function bxCast(f, which) {
   f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
   const d = bxDist(f, o), ux = (o.x - f.x) / (d || 1), uy = (o.y - f.y) / (d || 1);
   if (N.dash) { const step = Math.max(0, Math.min(N.dash, d - BX_RING.body)); f.x += ux * step; f.y += uy * step; }
-  if (N.push) { const pu = Math.max(N.push, -Math.max(0, bxDist(f, o) - BX_RING.body)); o.x = clamp(o.x + ux * pu, -BX_RING.rope, BX_RING.rope); o.y = clamp(o.y + uy * pu, -BX_RING.rope, BX_RING.rope); }
+  if (N.push) { const pu = Math.max(N.push, -Math.max(0, bxDist(f, o) - BX_RING.body)); const rp = bxRope(); o.x = clamp(o.x + ux * pu, -rp, rp); o.y = clamp(o.y + uy * pu, -rp, rp); }
   if (N.mySta) f.sta = Math.min(f.staMax, f.sta + N.mySta);
   if (N.hp) f.hp = Math.min(f.hpMax, f.hp + N.hp);
   if (N.sta) o.sta = Math.max(0, o.sta - N.sta);
@@ -188,11 +188,12 @@ function bxCpuCast(f, o) {
   const suits = w => w === 'any' || (w === 'close' && d <= bxRange(f, 'hook')) || (w === 'mid' && d <= bxRange(f, 'jab') + 1.5) || (w === 'hurt' && hurt) || (w === 'tired' && (tired || hurt));
   for (const which of ['ult', 'sp']) {
     const P = bxPowOf(f, which); if (!P || !bxCanCast(f, which).ok) continue;
-    const late = G.round === G.rounds && G.clock < 15, turn = hurt || o.hp < o.hpMax * .4 || late;
+    // (a Lich also sees the bout turn when the other fighter is stunned or pinned on the ropes: the moment to finish it)
+    const late = G.round === G.rounds && G.clock < 15, turn = hurt || o.hp < o.hpMax * .4 || late || (skill >= 3 && (o.a.k === 'stun' || bxOnRopes(o)));
     if (which === 'ult' && !turn && skill > 0) continue;
     // (a Knight or better keeps the spirit for its ultimate in the last round, unless the special would turn it)
     if (which === 'sp' && skill > 0 && !f.ultUsed && G.round === G.rounds && bxSpirit(f) - BX_SPIRIT.sp < BX_SPIRIT.ult && !hurt) continue;
-    const p = suits(P.when) ? .05 + skill * .04 : skill === 0 ? .02 : 0;
+    const p = suits(P.when) ? .05 + Math.min(skill, 2) * .04 : skill === 0 ? .02 : 0;
     if (R() < p) return bxCast(f, which);
   }
   return false;

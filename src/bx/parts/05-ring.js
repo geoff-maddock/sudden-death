@@ -15,7 +15,8 @@
    Powers (11-powers.js) leave statuses that change all of this: quicker or slower, rooted, harder to hit, hitting
    harder, healing on what lands, and the rest (bxFx); a punch's damage goes through bxHurt, which knows them.
    Every punch, slip, block and knockdown is told to BXE ({ k, side, p, n, ctr }), which the page drains for its
-   words and the bout for its log; it is not saved. */
+   words and the bout for its log; it is not saved.
+   Hexes (14-hexes.js) move the ropes in (bxRope) and make a punch dearer for the hexed side (bxHex). */
 const BX_DT = .05;
 const BX_RING = { half: 9, rope: 8.3, body: 1.55, back: .6, ropes: .7 };
 const BX_PUNCH = {
@@ -31,14 +32,14 @@ let BXE = [];
 
 const bxFrac = f => clamp(f.sta / f.staMax, 0, 1);
 const bxDist = (a, b) => hyp(a.x - b.x, a.y - b.y);
-const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range + (k === 'jab' && BX_TRAIT[f.kind] && BX_TRAIT[f.kind].jabReach || 0);
+const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range + (k === 'jab' && (bxTrait(f) || {}).jabReach || 0);
 // how long everything takes: quicker for the fast, slower when tired
 const bxTempo = f => (1.08 - f.r.spd * .015) * (1 + .5 * (1 - bxFrac(f))) / bxFx(f).spd;
 const bxMoveSpd = f => (2.6 + f.r.spd * .2) * (.6 + .4 * bxFrac(f)) * bxFx(f).move;
 const bxPunching = f => !!BX_PUNCH[f.a.k];
 const bxBusy = f => f.a.k !== 'idle' && f.a.k !== 'guard';
 const bxMass = f => { const K = KIND[f.kind] || KIND.goblin; return K.w * K.h; };
-const bxOnRopes = f => Math.max(Math.abs(f.x), Math.abs(f.y)) > BX_RING.rope - .15;
+const bxOnRopes = f => Math.max(Math.abs(f.x), Math.abs(f.y)) > bxRope() - .15;
 function bxEv(k, side, o) {
   const e = Object.assign({ k, side, round: G.round }, o || {}); BXE.push(e); if (BXE.length > 60) BXE.shift();
   // (the page hears each one as it happens, for its sounds: never headless)
@@ -51,7 +52,7 @@ function bxAct(f, k) {
   const P = BX_PUNCH[k], tm = bxTempo(f);
   if (P) {
     if (f.sta < P.sta * .5) return false;
-    f.sta = Math.max(0, f.sta - P.sta); f.rs.thrown++;
+    f.sta = Math.max(0, f.sta - P.sta * (bxHex(f, 'lead') ? BX_HEXES.lead.sta : 1)); f.rs.thrown++;
     f.a = { k, t: 0, dur: P.dur * tm, hitAt: P.hit * tm, id: ++G.aid, done: false, ctr: f.ctr > 0 }; f.ctr = 0;
     return true;
   }
@@ -79,7 +80,8 @@ function bxBreak() {
   const [A, B] = G.F; let dx = B.x - A.x, dy = B.y - A.y; const d = hyp(dx, dy) || 1; dx /= d; dy /= d;
   const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, h = BX_CLINCH.gap / 2;
   A.x = mx - dx * h; A.y = my - dy * h; B.x = mx + dx * h; B.y = my + dy * h;
-  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; f.x = clamp(f.x, -BX_RING.rope, BX_RING.rope); f.y = clamp(f.y, -BX_RING.rope, BX_RING.rope); }
+  const rp = bxRope();
+  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; f.x = clamp(f.x, -rp, rp); f.y = clamp(f.y, -rp, rp); }
   bxEv('break', -1);
 }
 /* a's punch k arrives: out of range, slipped, missed, blocked or landed */
@@ -157,7 +159,8 @@ function bxMove(dt) {
   const [A, B] = G.F; let dx = B.x - A.x, dy = B.y - A.y; const d = hyp(dx, dy) || .001;
   // the bigger body gives less ground
   if (d < BX_RING.body) { const ma = bxMass(A), mb = bxMass(B), push = BX_RING.body - d; dx /= d; dy /= d; A.x -= dx * push * mb / (ma + mb); A.y -= dy * push * mb / (ma + mb); B.x += dx * push * ma / (ma + mb); B.y += dy * push * ma / (ma + mb); }
-  for (const f of G.F) { f.x = clamp(f.x, -BX_RING.rope, BX_RING.rope); f.y = clamp(f.y, -BX_RING.rope, BX_RING.rope); }
+  const rp = bxRope();
+  for (const f of G.F) { f.x = clamp(f.x, -rp, rp); f.y = clamp(f.y, -rp, rp); }
 }
 /* one step of the round: both fighters think (06-cpu.js), act, breathe and move */
 function bxStep(dt) {

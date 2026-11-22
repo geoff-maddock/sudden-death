@@ -15,14 +15,24 @@ it earns.
 Part 5, gear and potions (issue #61, phase 7): by tier, as the world sets it, four ways: plain (no gear, no potions);
 their bag only (W_RING_KIT.opp[tier], as Simulate boxes it now); both bags (yours a full one, KIT_MINE, used by your
 corner as a Knight's would: a stand-in for giving them by hand in Play and Manage); and the full kit (both bags, and
-your three in gear, KIT_GEAR). Writes /tmp/realm_ring_lab.json."""
+your three in gear, KIT_GEAR).
+Part 6, tier U (the Umbral, issue #99, phase 4c): a card at tier U as the world sets it (tier 4: their rating bonus,
+the Lich in their corner, their full bag; Simulate, so your bag stays home) at level parity, by their CPU skill
+(Archmage and Lich, the same ratings) and powers; and the Nadir champion's own card (wUmbRingSide), without hexes and
+with each try's two as they are drawn.
+Part 7, hexes: the tier U card with each hex alone, against none. Parts 6 and 7 are seeded by the card's number (the
+journey, their side and the bouts), so each row boxes the same cards and differs only in what the row changes.
+  python3 test/realm_ring_lab.py 120 --umbral   parts 6 and 7 only
+Writes /tmp/realm_ring_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
 from playwright.async_api import async_playwright
 
-N = int(sys.argv[1]) if len(sys.argv) > 1 else 100
-PRE = sys.argv[2] if len(sys.argv) > 2 else ''
+UMB_ONLY = '--umbral' in sys.argv
+ARGS = [a for a in sys.argv[1:] if a != '--umbral']
+N = int(ARGS[0]) if len(ARGS) > 0 else 100
+PRE = ARGS[1] if len(ARGS) > 1 else ''
 
 LAB_JS = r"""
 window.BLAB = {
@@ -36,6 +46,9 @@ window.BLAB = {
   // one card: their level is yours plus the gap; tier sets their rating bonus and CPU skill (skill overrides the skill)
   card(lvl, gap, tier, o) {
     o = o || {};
+    // (seeded: the journey, their side and the card itself all from the seed, so rows that differ only in one thing
+    // box the same cards: the Umbral parts compare that way)
+    if (o.seed != null && !o.seeded) { const keep = Math.random; Math.random = mulberry(o.seed); try { return BLAB.card(lvl, gap, tier, Object.assign({}, o, { seeded: true })); } finally { Math.random = keep; } }
     BLAB.journey(lvl);
     // (gear: one piece each, round the three; it goes in through wBxFighter as a player's own)
     if (o.gear) wRoster().forEach((p, i) => { p.gear = { ring: o.gear[i % o.gear.length] }; });
@@ -45,10 +58,15 @@ window.BLAB = {
     const sk = wRingSkill(tier); if (o.skill != null) sk[1] = o.skill;
     const t0 = performance.now();
     const bags = o.kit ? [o.kit === 'theirs' ? {} : Object.assign({}, KIT_MINE), Object.assign({}, W_RING_KIT.opp[tier] || {})] : null;
-    const r = wBX.simCard(Object.assign({ sides: [mine, opp], skill: sk, powers: o.powers !== false }, bags ? { bags } : {}));
+    // (the Umbral: the Nadir champion's own three in place of the club's, and the card's hexes)
+    if (o.champ) { const t2 = new Set(mine.fighters.map(f => f.n)); opp = wUmbRingSide(W_NADIR.ring, t2); }
+    // ('drawn': the hexes a try would draw, a different try each card)
+    let hexes = o.hexes;
+    if (hexes === 'drawn') { const keep = WG.umbral; WG.umbral = { tries: { ring: BLAB.tries = (BLAB.tries || 0) + 1 } }; try { hexes = wUmbRingHexes('ring', W_NADIR.ring.hexes); } finally { WG.umbral = keep; } }
+    const r = wBX.simCard(Object.assign({ sides: [mine, opp], skill: sk, powers: o.powers !== false }, bags ? { bags } : {}, hexes && hexes.length ? { hexes } : {}, o.seed != null ? { seed: o.seed } : {}));
     const R = r.result, bouts = r.bouts;
     const used = r.bags && bags ? [0, 1].map(s => Object.keys(bags[s]).reduce((n, id) => n + bags[s][id] - ((r.bags[s] || {})[id] || 0), 0)) : [0, 0];
-    return { kit: o.kit || 'plain', used, gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
+    return { hexes: hexes || [], champ: !!o.champ, kit: o.kit || 'plain', used, gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
       boutWins: bouts.filter(b => b.over.win === 0).length, stops: bouts.filter(b => b.over.how !== 'dec').length, myKos: bouts.filter(b => b.over.win === 1 && b.over.how !== 'dec').length, ms: performance.now() - t0 };
   },
   belt(lvl) {
@@ -97,28 +115,45 @@ async def main():
         await pg.add_script_tag(content=LAB_JS)
         if PRE: await pg.evaluate(PRE + "\n;0")
         t0 = time.time()
-        cards = []
-        for gap in (-1, 0, 1, 2, 3):
-            cards += await batch(pg, N, f"BLAB.card(3, {gap}, 1 + i % 3)")
-        tiers = []
-        for t in (1, 2, 3):
-            tiers += await batch(pg, N, f"BLAB.card(3, {t - 1}, {t})")
-        skills = []
-        for sk in (0, 1, 2):
-            skills += await batch(pg, N, f"BLAB.card(3, 0, 2, {{ skill: {sk} }})")
-        nopow = await batch(pg, N, "BLAB.card(3, 0, 2, { skill: 1, powers: false })")
-        belts = await batch(pg, N, "BLAB.belt(3)", per=5)
-        kits = []
-        for t in (1, 2, 3):
-            for kit, extra in (('plain', ''), ('theirs', ", kit: 'theirs'"), ('both', ", kit: 'both'"), ('full', ", kit: 'both', gear: KIT_GEAR")):
-                rows = await batch(pg, N, f"BLAB.card(3, {t - 1}, {t}, {{ {extra[2:]} }})" if extra else f"BLAB.card(3, {t - 1}, {t})")
-                for g in rows: g['kit'] = kit
-                kits += rows
+        cards, tiers, skills, nopow, belts, kits = [], [], [], [], [], []
+        if not UMB_ONLY:
+            for gap in (-1, 0, 1, 2, 3):
+                cards += await batch(pg, N, f"BLAB.card(3, {gap}, 1 + i % 3)")
+            for t in (1, 2, 3):
+                tiers += await batch(pg, N, f"BLAB.card(3, {t - 1}, {t})")
+            for sk in (0, 1, 2):
+                skills += await batch(pg, N, f"BLAB.card(3, 0, 2, {{ skill: {sk} }})")
+            nopow = await batch(pg, N, "BLAB.card(3, 0, 2, { skill: 1, powers: false })")
+            belts = await batch(pg, N, "BLAB.belt(3)", per=5)
+            for t in (1, 2, 3):
+                for kit, extra in (('plain', ''), ('theirs', ", kit: 'theirs'"), ('both', ", kit: 'both'"), ('full', ", kit: 'both', gear: KIT_GEAR")):
+                    rows = await batch(pg, N, f"BLAB.card(3, {t - 1}, {t}, {{ {extra[2:]} }})" if extra else f"BLAB.card(3, {t - 1}, {t})")
+                    for g in rows: g['kit'] = kit
+                    kits += rows
+        # the Umbral (issue #99, phase 4c): tier U at level parity, as the world sets it (Simulate: their bag only)
+        umb = {}
+        umb['tier U'] = await batch(pg, N, "BLAB.card(3, 0, 4, { seed: 10007 + i, kit: 'theirs' })")
+        umb['tier U, Archmage'] = await batch(pg, N, "BLAB.card(3, 0, 4, { seed: 10007 + i, kit: 'theirs', skill: 2 })")
+        umb['tier U, no powers'] = await batch(pg, N, "BLAB.card(3, 0, 4, { seed: 10007 + i, kit: 'theirs', powers: false })")
+        umb['champion, no hexes'] = await batch(pg, N, "BLAB.card(3, 0, 4, { seed: 10007 + i, kit: 'theirs', champ: true })")
+        umb['champion, drawn hexes'] = await batch(pg, N, "BLAB.card(3, 0, 4, { seed: 10007 + i, kit: 'theirs', champ: true, hexes: 'drawn' })")
+        hexes = await pg.evaluate("Object.keys(wBX.hexes)")
+        hx = {}
+        for h in ['none'] + hexes:
+            hx[h] = await batch(pg, 2 * N, f"BLAB.card(3, 0, 4, {{ seed: 10007 + i, kit: 'theirs'{'' if h == 'none' else ', hexes: [' + repr(h) + ']'} }})")
         await br.close()
-    json.dump({'cards': cards, 'tiers': tiers, 'skills': skills, 'nopow': nopow, 'belts': belts, 'kits': kits}, open('/tmp/realm_ring_lab.json', 'w'))
-    allc = cards + tiers + skills + nopow
+    json.dump({'cards': cards, 'tiers': tiers, 'skills': skills, 'nopow': nopow, 'belts': belts, 'kits': kits, 'umbral': umb, 'hexes': hx}, open('/tmp/realm_ring_lab.json', 'w'))
+    allc = cards + tiers + skills + nopow + umb['tier U']
     print('override', PRE or '(none)', f' {time.time() - t0:.0f}s, {sum(g["ms"] for g in allc) / len(allc):.0f} ms a card')
     print('page errors', len(errs), errs[:2])
+    print('\nthe Umbral: tier U at level parity, Simulate (their rating bonus, their full bag, the Lich in their corner)')
+    print('                                   n    win   draw')
+    for k, rs in umb.items(): row(k, rs)
+    print('hexes, one at a time against none, tier U at level parity (target: none moves the win rate more than 10 points)')
+    base = sum(g['win'] for g in hx['none']) / len(hx['none'])
+    for h, rs in hx.items():
+        row(h, rs, '' if h == 'none' else f"   {100 * (sum(g['win'] for g in rs) / len(rs) - base):+5.1f} points")
+    if UMB_ONLY: return
     print('\nsingle cards, your three at level 3, Simulate (you box and cast as Knights, they at the tier\'s skill)')
     print('                                   n    win   draw')
     for gap in (-1, 0, 1, 2, 3):

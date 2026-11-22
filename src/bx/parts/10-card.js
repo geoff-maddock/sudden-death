@@ -26,7 +26,7 @@ function bxCardAuto(mine, theirs) {
   return best;
 }
 /* a card in the ring. opts: { sides: [2 × side], picks: [your fighter index × 3] (the corner's when not given),
-   order: [their fighter index × 3] (their first three when not given), mode, you, seed, powers, skill } */
+   order: [their fighter index × 3] (their first three when not given), mode, you, seed, powers, skill, hexes, hexOn } */
 function bxCardStart(opts) {
   const o = opts || {}, you = o.you === 1 ? 1 : 0, S = o.sides.map(s => Object.assign({}, s, { fighters: s.fighters.map(f => Object.assign({}, f)) }));
   const rate = f => Object.assign(bxRate(f.kind), f.r || {}), N = BX_RULES.card;
@@ -36,6 +36,8 @@ function bxCardStart(opts) {
   const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
   CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null,
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [], fans: (o.fans || [0, 0]).slice(), crowd: o.crowd == null ? null : o.crowd };
+  // (the hexes, for every bout on the card: 14-hexes.js)
+  if (o.hexes && o.hexes.length) { CD.hexes = o.hexes.slice(); CD.hexOn = o.hexOn === 1 ? 1 : 0; }
   bxCardBout();
   return CD;
 }
@@ -43,7 +45,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
@@ -75,7 +77,7 @@ function bxSimCard(opts) {
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
     let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}]));
-    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags }); bags = b.bags; return b; });
+    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn }); bags = b.bags; return b; });
     return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)), bags };
   } finally { CD = keep; }
 }

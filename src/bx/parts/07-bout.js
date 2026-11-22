@@ -30,7 +30,8 @@ let BD = null;
 const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 
 /* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r?, style? }], corners: [2 × { name, short, color, light }],
-   mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..2, 0..2], powers (false: none), headless } */
+   mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..3, 0..3] (3: the Lich, 06-cpu.js), powers (false: none),
+   headless, hexes: [BX_HEXES ids] and hexOn: the side they are against (0 when not given; 14-hexes.js) } */
 const BX_MODES = ['watch', 'call', 'play'];
 function bxStart(opts) {
   const o = opts || {};
@@ -38,8 +39,11 @@ function bxStart(opts) {
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
+  // (a Lich corner reads the other fighter before the first bell: 06-cpu.js)
+  for (const f of G.F) if (o.skill && o.skill[f.side] >= 3) { const L = bxLichRead(f, G.F[1 - f.side]); if (L) f.plan = L.plan; }
   Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0,
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] });
+  bxHexStart(o);
   bxFansStart(o.fans); G.crowd = engCrowd(o);
   // gear with a status at the opening bell (13-kit.js)
   for (const f of G.F) { const op = bxGx(f).open; if (op) f.fx.push(Object.assign({ id: 'g_open' }, op)); }
@@ -52,7 +56,7 @@ function bxStart(opts) {
 function bxPh(ph) { BD.ph = ph; BD.t = 0; if (!BD.headless && BX_HOOK.onPhase) BX_HOOK.onPhase(ph); }
 function bxLog(msg, big) { G.log.push({ r: G.round, t: Math.round((BX_RULES.secs - G.clock) * 10) / 10, msg, big: !!big }); }
 // both fighters back in their corners, facing out of them
-function bxCornerSpots() { const [A, B] = G.F; Object.assign(A, { x: -6.8, y: -5.6, mv: [0, 0] }); Object.assign(B, { x: 6.8, y: 5.6, mv: [0, 0] }); for (const f of G.F) f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; }
+function bxCornerSpots() { const [A, B] = G.F, k = bxRope() / BX_RING.rope; Object.assign(A, { x: -6.8 * k, y: -5.6 * k, mv: [0, 0] }); Object.assign(B, { x: 6.8 * k, y: 5.6 * k, mv: [0, 0] }); for (const f of G.F) f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; }
 const bxName = s => G.F[s].n;
 
 // the page's clock: real seconds into beats
@@ -79,7 +83,7 @@ function bxBeat(dt) {
       }
       break;
     case 'rise': if (BD.t >= BX_BEAT.rise) bxPh('round'); break;
-    case 'corner': if (BD.t >= BX_BEAT.corner && !G.wait) { bxLog(`Round ${G.round}.`); bxPh('round'); } break;
+    case 'corner': if (BD.t >= BX_BEAT.corner && !G.wait) { bxLog(`Round ${G.round}.`); if (bxHex(null, 'shrink')) bxLog('The ropes close in.'); bxPh('round'); } break;
   }
 }
 // what happened this step, for the log (the page reads BXE itself first, for its words)
@@ -103,7 +107,7 @@ function bxDown() {
   const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
   // gear's seconds off the count, and smelling salts (once: 13-kit.js)
   const quick = (bxGx(f).rise || 0) + (f.salts || 0); if (f.salts) { f.salts = 0; bxLog(`The smelling salts clear ${f.n}'s head.`); }
-  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0) - quick, 2, BX_RULES.count); BD.count = 1;
+  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0) + (bxHex(f, 'count') ? BX_HEXES.count.rise : 0) - quick, 2, BX_RULES.count); BD.count = 1;
   // Rebirth (a superstar's nature): once a bout, a count it would not beat, it beats at nine, and rises with most of its health
   if (BD.getUp >= BX_RULES.count && (bxTrait(f) || {}).reborn && !f.reborn) { f.reborn = 1; BD.getUp = BX_RULES.count - 1; }
   bxPh('kd');
@@ -115,7 +119,7 @@ function bxRise() {
   else bxLog(`${f.n} is up at ${BD.getUp}.`);
   // the other fighter to a neutral corner's distance, and on again
   const dx = o.x - f.x, dy = o.y - f.y, d = hyp(dx, dy) || 1;
-  o.x = clamp(f.x + dx / d * 3.2, -BX_RING.rope, BX_RING.rope); o.y = clamp(f.y + dy / d * 3.2, -BX_RING.rope, BX_RING.rope);
+  const rp = bxRope(); o.x = clamp(f.x + dx / d * 3.2, -rp, rp); o.y = clamp(f.y + dy / d * 3.2, -rp, rp);
   G.down = null;
   bxPh('rise');
 }
@@ -135,7 +139,9 @@ function bxRoundEnd() {
 }
 function bxCorner() {
   for (const f of G.F) {
-    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35)); f.sta = (bxTrait(f) || {}).corner ? f.staMax : f.sta + (f.staMax - f.sta) * .75; f.ctr = 0; f.halt = 0;
+    // (tainted water, 14-hexes.js: the hexed side gets back only a share of what the break would give)
+    const wat = bxHex(f, 'water') ? BX_HEXES.water.corner : 1;
+    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35) * wat); f.sta = (bxTrait(f) || {}).corner ? (wat < 1 ? f.sta + (f.staMax - f.sta) * wat : f.staMax) : f.sta + (f.staMax - f.sta) * .75 * wat; f.ctr = 0; f.halt = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
     if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }

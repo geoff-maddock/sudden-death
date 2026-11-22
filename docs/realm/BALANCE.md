@@ -1594,3 +1594,57 @@ register for the bot (its swing rarely misses by the margin they take away); a h
 bat and the smaller circle, feels them more. The Black Font's first-cut 7.5 points did not hold up in the later runs
 (the code did not change), which is the size of the noise at 600 games.
 
+
+### Umbral: boxing (#99, 4c)
+
+`test/realm_ring_lab.py N --umbral` (parts 6 and 7 only). Cards as Simulate boxes them: your three at level 3 against
+three at level 3 (level parity), your corner's pairing, your fighters boxing and casting as Knights; your bag stays
+home, theirs is tier U's. Each card is seeded by its number (the journey, their side and the bouts), so the rows box
+much the same cards; the realm still draws some of its own randomness, so blocks of 300 seeds differ by up to ±4
+points, and the numbers below are 600 cards a row (1,200 for the hexes).
+
+**Tier U** is tier 4 in the ring's tables: their rating bonus `W_BXG.oppBonus[4]` (tier 3's is 2), a full bag
+(`W_RING_KIT.opp[4]`: one of each potion) and the Lich in their corner (CPU skill 3). The Lich is as sharp as an
+Archmage (the same reading and timing numbers) and wins on its decisions (`BX_LICH`, 06-cpu.js): it slips more head
+punches and every body shot, works the body of a fighter covering up, steps on the gas when the other fighter is
+hurt, tired or on the ropes, saves its breath for the hooks that count, ties up sooner when hurt, reads the other
+fighter's plan in the corner, sends the cut-man in sooner and opens the bag sooner.
+
+| tier U at level parity | win |
+|---|---|
+| first cut: bonus 4, the Lich sharper than an Archmage (skill 3 on every scaled number), slip 0.8, gas 1.6 (120) | 5.8% |
+| the same ratings, an Archmage in their corner (120) | 15.0% |
+| bonus 1, the same Lich (200; two batches, 21.7% and 11.5%) | about 15% |
+| bonus 3, the Lich only as sharp as an Archmage, slip 0.65, gas 1.3, cut-man at 70%, one of each potion | **17.3%** |
+| the same, an Archmage in their corner | 25.2% |
+| the same, no powers either side | 15.7% |
+
+The Lich costs a skilled bot about 8 points of card win rate against an Archmage with the same ratings (in single
+bouts, a Knight wins 31% against an Archmage and 26% against the Lich, 1,200 seeded bouts). Kept: bonus 3, 17% at
+parity, inside the 15 to 25% target.
+
+**Hexes** (14-hexes.js): one at a time against none, the tier U card. The first cut (water a half, leaden gloves a
+quarter more breath, the Shrinking Ring a foot and a half, the Quick Count one more) at bonus 4 and then 1:
+
+| hex | first cut (400 cards, none 13.0%) | kept (1,200 cards, none 15.6%) |
+|---|---|---|
+| The Shrinking Ring (the ropes 2 ft in a round, never under 5) | -1.0 | +3.5 |
+| Tainted Water (four fifths of the break's breath and health) | -7.8 | -5.9 |
+| Leaden Gloves (a punch costs a tenth more breath) | **-11.8** | -6.2 |
+| The Quick Count (a count of two more to rise) | +4.0 (noise) | -0.9 |
+
+No hex moves a card more than about 6 points. The Shrinking Ring closes in on both fighters, so it changes the fight
+(more time on the ropes) more than it changes who wins; the Quick Count bites only on the knockdowns a bout has.
+
+**The champion's card.** Brakka Knell (a minotaur with their own powers, Death Knell and The Last Bell, and nature,
+Cracked Bronze), in the main event behind two Nadir boxers, all at tier U. Their card draws one or two hexes a try.
+
+| the Nadir's card at level parity | win |
+|---|---|
+| first cut: a golem and a kobold before Brakka, Brakka 3 more points (200) | 2.0% |
+| a zombie and a kobold, Brakka 1 more (300) | 6.0% |
+| **an ogre and a dwarf (Ashmaw kinds), Brakka no more points: no hexes (600)** | **9.5%** |
+| the same, the try's hexes drawn (600) | 4.2% |
+
+The boss of the ring is harder than a tier U club by their powers and nature alone; a careful human in the corner (or
+boxing the rounds) wins far more than the bot. Phase 7 measures it inside whole journeys.
