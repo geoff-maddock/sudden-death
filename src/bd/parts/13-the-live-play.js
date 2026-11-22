@@ -234,7 +234,7 @@ function holderThink(f, dt) {
     const dir = I.p.up ? 2 : I.p.right ? 1 : I.p.left ? 3 : I.p.down ? 0 : -1;
     if (dir >= 0) { I.p.up = I.p.right = I.p.left = I.p.down = false; const d = hyp(f.x - BASE[dir].x, f.y - BASE[dir].y); if (d < 10) { f.goal = { ...BASE[dir] }; } else throwTo(f, dir); return; }
   }
-  const delay = isHuman(ft) ? .6 : [.3, .2, .12][G.diff];
+  const delay = isHuman(ft) ? .6 : [.3, .2, .12, .08][dOf(ft)];
   if (L.holdT < delay) return;
   L.decideCD -= dt; if (L.decideCD > 0) return; L.decideCD = .12;
   const plan = bestPlay(f);
@@ -328,7 +328,7 @@ function runnerControl(dt) {
   }
   // the CPU's runner magic; with Auto powers on it also runs for a human's runners
   if ((!isHuman(bt) || AUTO) && L.cpuRunCD <= 0) {
-    L.cpuRunCD = .25; const ad = isHuman(bt) ? 2 : G.diff;
+    L.cpuRunCD = .25; const ad = isHuman(bt) ? 2 : dOf(bt);
     for (const r of list) { const e = runUltEntry(r); if (e && e.ok && r.target > r.s && R() < .3 + ad * .1) { castRunUlt(e, r); break; } }
     for (const r of list) {
       const ab = r.p.run; if (!ab || r.used || AB[ab].passive || bt.mana < abCost(r.p, ab) || settled(r)) continue;
@@ -358,7 +358,7 @@ function runnerAI(r) {
   if (L.homer) { r.target = 4; return; }
   if (isForcedNow(r) && r.target < r.origin + 1) r.target = r.origin + 1;
   if (L.flyPending && r.origin > 0) return;
-  const aggr = [.45, .35, .25][G.diff];
+  const aggr = [.45, .35, .25, .2][dOf(BT())];
   if (settled(r)) {
     const cur = Math.round(r.s), nb = cur + 1; if (nb > 4) return;
     if (occupiedAhead(r, nb)) return;
@@ -601,7 +601,7 @@ function fieldAbilityControl(dt) {
   L.fabs = list;
   if (HINTS && isHuman(ft)) for (const o of list) { const k = o.ab + (o.f ? o.f.p.n : ''); if (o.ok && !L.readyNote[k] && o.ab !== 'gust' && o.ab !== 'boulder' && o.ab !== 'telek' && o.ab !== 'block') { L.readyNote[k] = true; if (o.ab === 'devour' || o.ab === 'petrify' || o.ab === 'mesmer' || o.ab === 'web' || o.ab === 'roots') addFx('callout', { text: `${AB[o.ab].name} is in range: ${keyHints(ft.ctl).cyc} to pick it, ${keyHints(ft.ctl).ab} to cast`, col: '#d6c4ff', small: true }); } }
   if (isHuman(ft)) { const I = INP[ft.ctl]; if (I.p.hus) { const f = L.ball.holder || L.chaser; if (f) tapEffort(f, 'eff', f.p); } }
-  else if (L.chaser && !L.chaser.cpuHustled && (L.ball.st === 'batted' || L.ball.st === 'loose') && G.diff >= 1 && fatigue(L.chaser.p) > .4) { L.chaser.cpuHustled = true; L.chaser.eff = .3 + .2 * G.diff; drain(L.chaser.p, 3, 'effort'); }
+  else if (L.chaser && !L.chaser.cpuHustled && (L.ball.st === 'batted' || L.ball.st === 'loose') && dOf(ft) >= 1 && fatigue(L.chaser.p) > .4) { L.chaser.cpuHustled = true; L.chaser.eff = Math.min(1, .3 + .2 * dOf(ft)); drain(L.chaser.p, 3, 'effort'); }
   if (!list.length) return;
   L.selF = clamp(L.selF, 0, list.length - 1);
   if (isHuman(ft)) {
@@ -612,7 +612,7 @@ function fieldAbilityControl(dt) {
   }
   if (!isHuman(ft) || AUTO) { // the CPU's fielding magic; with Auto powers on it also casts for a human's fielders
     L.cpuCD -= dt; if (L.cpuCD > 0) return; L.cpuCD = .3;
-    const want = [.18, .28, .4][isHuman(ft) ? 2 : G.diff];
+    const want = [.18, .28, .4, .5][isHuman(ft) ? 2 : dOf(ft)];
     for (const o of [...list].sort((a, b) => (b.ult ? 1 : 0) - (a.ult ? 1 : 0))) {
       if (!o.ok) continue;
       if (o.ab === 'block' || o.ab === 'boulder' || o.ab === 'telek' || o.ab === 'gust') { if (!(L.ball.st === 'held' || L.ball.st === 'loose')) continue; }
@@ -655,6 +655,7 @@ function finishPlay() {
   if (G.lastPitch && typeof renderReadout === 'function') { G.lastPitch.outcome = G.log[0].text; renderReadout(); }
   statInPlay(L, bat, batR, hit);
   if (hit) { pst(bat).h++; if (L.homer) pst(bat).hr++; bt.H++; bt.mana = Math.min(6, bt.mana + 1); if (!L.homer) banner(['', 'Single', 'Double', 'Triple', 'Inside the park!'][batR.scored ? 4 : Math.round(batR.s)] || 'Hit', '', 1.1); }
+  if (hit && G.hx) hexDrift(bat);
   PL = null;
   if (G.outs >= 3) return endHalf();
   if (checkWalkoff()) return;

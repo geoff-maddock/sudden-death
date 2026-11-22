@@ -50,6 +50,10 @@ function bdxNames() {
   return { ab: o(AB, v => ({ n: v.name, type: v.type, desc: v.desc })), ult: o(ULT, v => ({ n: v.name, role: v.role, desc: v.desc })),
     pitch: o(PITCHES, v => ({ n: v.name, magic: !!v.magic, desc: v.desc })) };
 }
+/* the Umbral (issue #99, 4a): the hexes a game can carry (opts.hexes, or rules.hexes, with hexBy the side casting them),
+   and the Nadir champion's own pitch, the Dead Ball (the Phantom's vanish, faster and tighter; nobody else throws it) */
+PITCHES.deadball = { name: 'Dead Ball', T: .46, bx: .2, bh: -.3, ctrl: .11, cost: 2, magic: true, fx: 'phantom', desc: 'Thrown from a dead hand. It vanishes after release, comes back just before the plate, and comes back fast.' };
+function bdxHexes() { return Object.fromEntries(Object.entries(HEXES).map(([k, v]) => [k, { n: v.name, d: v.desc }])); }
 // the kinds whose player on the founding clubs plays pos (two each), for call-ups
 function bdxKindsAt(pos) { return KINDS.filter(k => TEMPL[k].pos === pos); }
 // a founding club to play against, with a reliever warming up as a quick game gets one
@@ -62,5 +66,5 @@ return {
   scr: (x, d, h) => { const p = proj(x, d || 0, h); return [p.x, p.y]; },
   get live() { return gameOn(); }, audio: (music, sfx) => { if (MUS.on !== !!music) setMusic(!!music, true); SND.on = !!sfx; }, get sound() { return { music: !!MUS.on, sfx: !!SND.on }; }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
   teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
-  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice()
+  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich']
 };

@@ -39,14 +39,15 @@ async def main():
 
         gd = await pg.evaluate("""(() => { const out = { names: Object.keys(W_UMB4.grounds).map(g => (MAPS['u:' + g] || {}).name) }, G = wGrd('g_ballpark');
           wEnterMap('u:world', G.at[0], G.at[1] + 1); wTryMove(0, -1); wDrain(); out.in = WG.map;
-          const m = MAPS['u:g_ballpark'], d = wUmbFarEnd(m), at = id => m.npcs.find(n => n.id === id), c = at('nadir_ztest'), g0 = at(wUmbGuardOf('g_ballpark', 0)), g1 = at(wUmbGuardOf('g_ballpark', 1));
+          const m = MAPS['u:g_ballpark'], d = wUmbFarEnd(m), at = id => m.npcs.find(n => n.id === id), c = at(W_NADIR[Object.keys(W_NADIR).find(k => W_NADIR[k].ground === 'g_ballpark')].char), g0 = at(wUmbGuardOf('g_ballpark', 0)), g1 = at(wUmbGuardOf('g_ballpark', 1));
           out.placed = !!c && !!g0 && !!g1 && d[c.y * m.w + c.x] > d[g0.y * m.w + g0.x] && d[c.y * m.w + c.x] > d[g1.y * m.w + g1.x];
+          out.stand = !!at('nadir_ztest'); // (a second champion on a ground stands beside the first)
           out.field = !!c && m.t[c.y][c.x] === 'd' && c.y > 0 && Math.abs(g0.x - c.x) === 1 && Math.abs(g1.x - c.x) === 1;
           out.look = !!m.field && m.t.some(r => r.includes('%'));
           out.noSell = Object.values(W_UMB4.gate).every(k => wUmbBuy('general', k, 'fans') === 'Not sold here.');
           return out; })()""")
         check(all(gd['names']) and gd['names'][0] == 'The Bone Diamond' and gd['in'] == 'u:g_ballpark', 'the eight engine grounds are on the dark world under their dark names, and you walk into one', gd)
-        check(gd['placed'] and gd['field'], 'the champion stands at the far end of the field, the two guards in front, either side of the way up', gd)
+        check(gd['placed'] and gd['field'] and gd['stand'], 'the champion stands at the far end of the field, the two guards in front, either side of the way up', gd)
         check(gd['look'] and gd['noSell'], 'a dark ground keeps its field\'s look and its scoreboard; the gate\'s items are not sold on the dark side', gd)
 
         cd = await pg.evaluate("""(() => { const m = MAPS['u:g_ballpark']; WG.x = m.spawn[0]; WG.y = m.spawn[1]; const h0 = RUN.hp; let steps = 0;

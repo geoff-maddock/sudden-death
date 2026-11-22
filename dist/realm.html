@@ -14488,6 +14488,47 @@ const pitcher = () => FT().def.roster.find(p => p.pos === 'P');
 const ctlOf = t => t.ctl;               // 'p1' | 'p2' | 'cpu'
 const isHuman = t => t.ctl !== 'cpu';
 const shortName = p => p.n.split(' ').slice(-1)[0];
+// a side's CPU skill: its club's own (def.diff, when a club brings one) or the game's (0 Squire, 1 Knight, 2 Archmage, 3 Lich)
+const dOf = t => t && t.def && t.def.diff != null ? t.def.diff : G.diff;
+
+/* ---------- hexes: dark twists one side casts on the other (the Realm's Umbral). rules.hexes lists them and
+   rules.hexBy is the side that casts them; a game without hexes never reads this (G.hx stays null). The words are
+   for the side under them ("your", "their"). ---------- */
+const HEXES = {
+  phase: { name: 'The Phantom Pitch', desc: 'Once an inning, the first ball one of your batters would hit hard passes through the bat: a swing and a miss.' },
+  drift: { name: 'Restless Bases', desc: 'After each of their hits, their runners already on base drift one base on, and from third, home.' },
+  font: { name: 'The Black Font', desc: 'They start with full mana, and draw 1 more every half inning.' },
+  chill: { name: 'Grave Chill', desc: 'Your batters swing stiff: their swing circle is a fifth smaller.' },
+};
+const HEX_CHILL = .8, HEX_HARD = .5;
+const hexOn = k => !!(G.hx && G.rules.hexes.includes(k));
+// is this side under the hexes?
+const hexed = t => !!G.hx && G.teams.indexOf(t) !== G.rules.hexBy;
+function hexSetup() {
+  const hx = (G.rules.hexes || []).filter(k => HEXES[k]);
+  if (!hx.length) { G.hx = null; return; }
+  G.rules.hexes = hx;
+  if (G.rules.hexBy !== 0 && G.rules.hexBy !== 1) { const c = G.teams.filter(t => t.ctl === 'cpu'); G.rules.hexBy = c.length === 1 ? G.teams.indexOf(c[0]) : 1; }
+  G.hx = {};
+}
+// the Phantom Pitch: true (once an inning, on the hexed side's first ball hit hard) when the ball passes through
+function hexPhase() {
+  if (!hexOn('phase') || !hexed(BT()) || G.hx.ph === G.inning) return false;
+  G.hx.ph = G.inning;
+  addFx('callout', { text: 'It passes through the bat!', col: '#c9a4ff' }); useTag('hex', HEXES.phase.name);
+  return true;
+}
+// Restless Bases: after a hit by the casting side, its runners already on base (not the batter) move up one
+function hexDrift(bat) {
+  if (!hexOn('drift') || hexed(BT()) || G.outs >= 3) return;
+  let moved = 0;
+  for (let b = 3; b >= 1; b--) {
+    const p = G.bases[b]; if (!p || p === bat) continue;
+    if (b === 3) { G.bases[3] = null; scoreRun(p); pst(pitcher()).ra++; moved++; }
+    else if (!G.bases[b + 1]) { G.bases[b + 1] = p; G.bases[b] = null; moved++; }
+  }
+  if (moved) { logLine(`${HEXES.drift.name}: the bases shift under ${BT().def.short}'s runners.`); addFx('callout', { text: 'The bases shift!', col: '#c9a4ff' }); }
+}
 
 function newGame(opts) {
   G.opts = opts;
@@ -14499,6 +14540,7 @@ function newGame(opts) {
   if (!opts.defs) for (const d of [a, h]) d.pen = quickPen(d, opts.innings);
   G.season = !!opts.season; G.pstats = new Map(); G.committed = false;
   G.teams = [a, h].map((def, i) => ({ def, ctl: ctl[i], mana: 2 + (def.manaBonus || 0), idx: 0, line: [], R: 0, H: 0, devourUsed: false, pen: (def.pen || []).slice(), used: [] }));
+  hexSetup(); if (hexOn('font')) G.teams[G.rules.hexBy].mana = 6;
   G.starters = G.teams.map(t => t.def.roster.find(p => p.pos === 'P'));
   for (const t of G.teams) attachGear(t);
   if (typeof skyStart === 'function' && MOON) skyStart();
@@ -14553,6 +14595,7 @@ function startHalf() {
   G.outs = 0; G.bases = [null, null, null, null];
   BT().line[G.inning - 1] = BT().line[G.inning - 1] || 0;
   for (const t of G.teams) t.mana = Math.min(6, t.mana + 1);
+  if (hexOn('font')) { const t = G.teams[G.rules.hexBy]; t.mana = Math.min(6, t.mana + 1); }
   FT().devourUsed = false; G.rallyHalf = false; clearZones(); healHalf();
   if (G.half === 1 && G.innings > 1 && G.inning === Math.min(7, G.innings)) { seventhInningStretch(); logLine(`${G.innings >= 7 ? 'Seventh-inning' : 'Last-inning'} stretch. The organist plays the old tune, badly on purpose.`); }
   G.phase = 'between'; G.betweenT = 2.0;
@@ -14705,6 +14748,7 @@ function swingMods(bat, k, ab, sk, be) {
   if (ab === 'bunt') { r *= 1.7; win *= 1.9; }
   r *= zoneMult('swing', 0, 0) * hurtMul(bat, .2) * (1 - .25 * weakK(bat, 'con'));
   { const gr = gearReach(k); r *= gr.r; win *= gr.win; }
+  if (G.hx && hexOn('chill') && hexed(BT())) r *= HEX_CHILL;
   return { r, win };
 }
 // magic, skills, hustle and dice used during the current at-bat; they ride along on its play-by-play line
@@ -14781,6 +14825,7 @@ function resolveSwing() {
   if (ab === 'axe') { r *= 1 + .6 * pm; pw *= 1 + .25 * pm; } if (ab === 'crush') { pw *= 1 + .5 * pm; r *= .8; }
   if (ab === 'sticky') { r *= 1 + .4 * pm; pw *= .8; } if (ab === 'pact') { pw *= 1 + .4 * pm; r *= 1 + .1 * pm; } if (ab === 'dispel') r *= 1 + .15 * pm;
   { const gm = gearSwing(pc); r *= gm.r; pw *= gm.pw; win *= gm.win; P.gearLaunch = gm.launch; }
+  if (G.hx && hexOn('chill') && hexed(bt)) r *= HEX_CHILL;
   const e = P.swing.tc - pc.Ta;
   const dx = pc.fx0 - P.pci.x, dh = pc.fh0 - P.pci.h, d = hyp(dx, dh);
   P.swingE = e; P.swingWin = win; P.swingR = r; P.swingD = d; P.swingDX = dx; P.swingDH = dh;
@@ -14792,6 +14837,7 @@ function resolveSwing() {
   if (Math.abs(e) <= win && d <= r) {
     if (wC && R() < .25 * wC) { P.swing.miss = true; P.swing.why = `Whiffed: poor contact (CON ${bat.con})`; if (isHuman(bt) || G.mode === 'demo') addFx('callout', { text: 'Whiff!', col: '#ff8a7a', small: true }); return; }
     const q = .55 * (1 - d / r) + .45 * (1 - Math.abs(e) / win);
+    if (G.hx && q >= HEX_HARD && hexPhase()) { P.swing.miss = true; P.swing.why = `The pitch passed through the bat (${HEXES.phase.name})`; return; }
     if (q < .08) { sfx.crack(.1); return foul('Foul tip'); }
     if (pc.fx === 'fire') {
       const roll = d20(), bonus = bat.con + luck(bat); const ok = roll + bonus >= 16;
@@ -14934,7 +14980,7 @@ function gameOver(walkoff) {
 
 /* ---------- CPU at the plate ---------- */
 function cpuChoosePitch() {
-  const P = G.P, ft = FT(), diff = G.diff;
+  const P = G.P, ft = FT(), diff = dOf(ft);
   if (G.strikes === 2 && fatigue(pitcher()) > .45 && R() < .35 + diff * .1) { P.peff = .5 + R() * .4; drain(pitcher(), 4, 'effort'); }
   const opts = P.pitches.map((p, i) => ({ p, i })).filter(o => affordable(o.p, ft));
   const ultP = opts.find(o => o.p.ult), magic = opts.filter(o => o.p.magic && !o.p.ult);
@@ -14943,9 +14989,11 @@ function cpuChoosePitch() {
   else if (magic.length && R() < .28 + diff * .08) choice = pick(magic);
   else choice = pick(opts.filter(o => !o.p.magic && !o.p.gear));
   P.pi = choice.i; gearCpuPitch();
+  // the Lich times its release like a careful player: always good, often perfect
+  if (diff >= 3) P.relGrade = R() < .4 ? 'perfect' : 'good';
   let x, h;
   if (G.balls === 3) { x = (R() - .5) * 1.5; h = 1.8 + R() * 1.4; }
-  else if (G.strikes === 2 && R() < .4) { x = (R() < .5 ? -1 : 1) * (1 + R() * .4); h = 1.1 + R() * .5; }
+  else if (G.strikes === 2 && R() < (diff >= 3 ? .55 : .4)) { x = (R() < .5 ? -1 : 1) * (1 + R() * .4); h = 1.1 + R() * .5; }
   else { x = (R() < .5 ? -1 : 1) * (.3 + R() * .7); h = 1.7 + R() * 1.6; if (R() < .18) h = R() < .5 ? 1.2 : 3.9; }
   P.aim = { x, h };
 }
@@ -14972,31 +15020,31 @@ function autoPitch() {
   gearCpuPitch();
 }
 function cpuChooseStance() {
-  const P = G.P, bt = BT(), b = batter();
-  if (fatigue(b) > .5 && R() < .2 + G.diff * .1) { P.beff = .4 + R() * .4; drain(b, 4, 'effort'); }
+  const P = G.P, bt = BT(), b = batter(), diff = dOf(bt);
+  if (fatigue(b) > .5 && R() < .2 + diff * .1) { P.beff = .4 + R() * .4; drain(b, 4, 'effort'); }
   let si = 0;
   if (G.strikes === 2 && R() < .5) si = 2; else if (G.strikes === 0 && G.balls >= 1 && R() < .35) si = 1;
   const ab = P.stances.find(s => s.k === 'ab'), phs = P.stances.find(s => s.k === 'phys');
-  if (phs && si === 0 && fatigue(b) > .45 && R() < .18 + G.diff * .08) si = P.stances.indexOf(phs);
+  if (phs && si === 0 && fatigue(b) > .45 && R() < .18 + diff * .08) si = P.stances.indexOf(phs);
   if (ab && bt.mana >= ab.cost) {
-    let want = .22 + G.diff * .08;
+    let want = .22 + diff * .08;
     if (ab.ab === 'undying') want = G.strikes === 2 ? .7 : 0;
     if (ab.ab === 'bunt') want = (G.bases[1] || G.bases[2]) && G.outs < 2 ? .45 : .12;
     if (bt.mana >= 5) want += .2;
     if (R() < want) si = P.stances.indexOf(ab);
   }
-  const us = P.stances.find(s => s.k === 'ult'); if (us && bt.mana >= us.cost && R() < .35 + (bt.mana >= 5 ? .25 : 0) + G.diff * .05) si = P.stances.indexOf(us);
+  const us = P.stances.find(s => s.k === 'ult'); if (us && bt.mana >= us.cost && R() < .35 + (bt.mana >= 5 ? .25 : 0) + diff * .05) si = P.stances.indexOf(us);
   P.si = si; gearCpuStance();
 }
 function cpuPlanSwing() {
-  const P = G.P, pc = P.pitch, diff = G.diff;
-  let sl = [.36, .26, .19][diff], stt = [.085, .065, .048][diff];
+  const P = G.P, pc = P.pitch, diff = dOf(BT());
+  let sl = [.36, .26, .19, .13][diff], stt = [.085, .065, .048, .036][diff];
   if (zoneOn('hideMarker')) { sl *= 1.6; stt *= 1.3; }
   if (pc.fx === 'phantom') sl *= 1.6; if (pc.fx === 'hex') sl *= 1.35; if (pc.fx === 'fire') stt += .02; if (pc.key === 'change') stt += .02;
   if (pc.ab === 'eagle') sl *= .4;
   const gx = pc.fx0 + gauss() * sl, gh = pc.fh0 + gauss() * sl;
   const zone = inZone(gx, gh);
-  let sp = zone ? .88 : [.3, .22, .14][diff] + (G.strikes === 2 ? .2 : 0);
+  let sp = zone ? .88 : [.3, .22, .14, .09][diff] + (G.strikes === 2 ? .2 : 0);
   if (G.balls === 3 && !zone) sp *= .5;
   const swing = R() < sp;
   P.cpu = { gx, gh, swing, swingT: pc.Ta - SWING_DELAY + gauss() * stt, react: .12 + R() * .06 };
@@ -15275,7 +15323,7 @@ function holderThink(f, dt) {
     const dir = I.p.up ? 2 : I.p.right ? 1 : I.p.left ? 3 : I.p.down ? 0 : -1;
     if (dir >= 0) { I.p.up = I.p.right = I.p.left = I.p.down = false; const d = hyp(f.x - BASE[dir].x, f.y - BASE[dir].y); if (d < 10) { f.goal = { ...BASE[dir] }; } else throwTo(f, dir); return; }
   }
-  const delay = isHuman(ft) ? .6 : [.3, .2, .12][G.diff];
+  const delay = isHuman(ft) ? .6 : [.3, .2, .12, .08][dOf(ft)];
   if (L.holdT < delay) return;
   L.decideCD -= dt; if (L.decideCD > 0) return; L.decideCD = .12;
   const plan = bestPlay(f);
@@ -15369,7 +15417,7 @@ function runnerControl(dt) {
   }
   // the CPU's runner magic; with Auto powers on it also runs for a human's runners
   if ((!isHuman(bt) || AUTO) && L.cpuRunCD <= 0) {
-    L.cpuRunCD = .25; const ad = isHuman(bt) ? 2 : G.diff;
+    L.cpuRunCD = .25; const ad = isHuman(bt) ? 2 : dOf(bt);
     for (const r of list) { const e = runUltEntry(r); if (e && e.ok && r.target > r.s && R() < .3 + ad * .1) { castRunUlt(e, r); break; } }
     for (const r of list) {
       const ab = r.p.run; if (!ab || r.used || AB[ab].passive || bt.mana < abCost(r.p, ab) || settled(r)) continue;
@@ -15399,7 +15447,7 @@ function runnerAI(r) {
   if (L.homer) { r.target = 4; return; }
   if (isForcedNow(r) && r.target < r.origin + 1) r.target = r.origin + 1;
   if (L.flyPending && r.origin > 0) return;
-  const aggr = [.45, .35, .25][G.diff];
+  const aggr = [.45, .35, .25, .2][dOf(BT())];
   if (settled(r)) {
     const cur = Math.round(r.s), nb = cur + 1; if (nb > 4) return;
     if (occupiedAhead(r, nb)) return;
@@ -15642,7 +15690,7 @@ function fieldAbilityControl(dt) {
   L.fabs = list;
   if (HINTS && isHuman(ft)) for (const o of list) { const k = o.ab + (o.f ? o.f.p.n : ''); if (o.ok && !L.readyNote[k] && o.ab !== 'gust' && o.ab !== 'boulder' && o.ab !== 'telek' && o.ab !== 'block') { L.readyNote[k] = true; if (o.ab === 'devour' || o.ab === 'petrify' || o.ab === 'mesmer' || o.ab === 'web' || o.ab === 'roots') addFx('callout', { text: `${AB[o.ab].name} is in range: ${keyHints(ft.ctl).cyc} to pick it, ${keyHints(ft.ctl).ab} to cast`, col: '#d6c4ff', small: true }); } }
   if (isHuman(ft)) { const I = INP[ft.ctl]; if (I.p.hus) { const f = L.ball.holder || L.chaser; if (f) tapEffort(f, 'eff', f.p); } }
-  else if (L.chaser && !L.chaser.cpuHustled && (L.ball.st === 'batted' || L.ball.st === 'loose') && G.diff >= 1 && fatigue(L.chaser.p) > .4) { L.chaser.cpuHustled = true; L.chaser.eff = .3 + .2 * G.diff; drain(L.chaser.p, 3, 'effort'); }
+  else if (L.chaser && !L.chaser.cpuHustled && (L.ball.st === 'batted' || L.ball.st === 'loose') && dOf(ft) >= 1 && fatigue(L.chaser.p) > .4) { L.chaser.cpuHustled = true; L.chaser.eff = Math.min(1, .3 + .2 * dOf(ft)); drain(L.chaser.p, 3, 'effort'); }
   if (!list.length) return;
   L.selF = clamp(L.selF, 0, list.length - 1);
   if (isHuman(ft)) {
@@ -15653,7 +15701,7 @@ function fieldAbilityControl(dt) {
   }
   if (!isHuman(ft) || AUTO) { // the CPU's fielding magic; with Auto powers on it also casts for a human's fielders
     L.cpuCD -= dt; if (L.cpuCD > 0) return; L.cpuCD = .3;
-    const want = [.18, .28, .4][isHuman(ft) ? 2 : G.diff];
+    const want = [.18, .28, .4, .5][isHuman(ft) ? 2 : dOf(ft)];
     for (const o of [...list].sort((a, b) => (b.ult ? 1 : 0) - (a.ult ? 1 : 0))) {
       if (!o.ok) continue;
       if (o.ab === 'block' || o.ab === 'boulder' || o.ab === 'telek' || o.ab === 'gust') { if (!(L.ball.st === 'held' || L.ball.st === 'loose')) continue; }
@@ -15696,6 +15744,7 @@ function finishPlay() {
   if (G.lastPitch && typeof renderReadout === 'function') { G.lastPitch.outcome = G.log[0].text; renderReadout(); }
   statInPlay(L, bat, batR, hit);
   if (hit) { pst(bat).h++; if (L.homer) pst(bat).hr++; bt.H++; bt.mana = Math.min(6, bt.mana + 1); if (!L.homer) banner(['', 'Single', 'Double', 'Triple', 'Inside the park!'][batR.scored ? 4 : Math.round(batR.s)] || 'Hit', '', 1.1); }
+  if (hit && G.hx) hexDrift(bat);
   PL = null;
   if (G.outs >= 3) return endHalf();
   if (checkWalkoff()) return;
@@ -16812,7 +16861,10 @@ function drawScoreboard(c) {
     manaGems(c, 142, y - 8, t.mana, t);
     txt(c, String(t.R), 260, y + 1, F_HUD(32), COL.bone, 'right');
   });
-  if (AUTO && G.teams.some(isHuman)) { c.font = F_HUD(15); const lbl = 'AUTO POWERS · T', tw = c.measureText(lbl).width + 16; rr(c, 10, 98, tw, 20, 10); c.fillStyle = 'rgba(168,140,255,.22)'; c.fill(); c.strokeStyle = 'rgba(168,140,255,.6)'; c.lineWidth = 1; c.stroke(); txt(c, lbl, 18, 113, F_HUD(15), '#d6c4ff'); }
+  let py = 98;
+  if (AUTO && G.teams.some(isHuman)) { c.font = F_HUD(15); const lbl = 'AUTO POWERS · T', tw = c.measureText(lbl).width + 16; rr(c, 10, 98, tw, 20, 10); c.fillStyle = 'rgba(168,140,255,.22)'; c.fill(); c.strokeStyle = 'rgba(168,140,255,.6)'; c.lineWidth = 1; c.stroke(); txt(c, lbl, 18, 113, F_HUD(15), '#d6c4ff'); py += 24; }
+  // the hexes on this game, one pill each, under the score
+  if (G.hx) for (const k of G.rules.hexes) { c.font = F_HUD(15); const lbl = 'HEX · ' + HEXES[k].name.toUpperCase(), tw = c.measureText(lbl).width + 16; rr(c, 10, py, tw, 20, 10); c.fillStyle = 'rgba(120,40,90,.55)'; c.fill(); c.strokeStyle = 'rgba(214,120,200,.7)'; c.lineWidth = 1; c.stroke(); txt(c, lbl, 18, py + 15, F_HUD(15), '#f0c8ff'); py += 24; }
 }
 function drawCount(c) {
   const px = W - 206, pw = 196;
@@ -17118,7 +17170,7 @@ function renderLog() {
 function lineScoreHTML() {
   if (!G.teams) return '';
   const n = Math.max(G.innings, G.inning);
-  let h = '<table class="ls"><thead><tr><th></th>';
+  let h = `<table class="ls">${G.hx ? `<caption class="ls-hex">Hexes: ${G.rules.hexes.map(k => esc(HEXES[k].name)).join(', ')}</caption>` : ''}<thead><tr><th></th>`;
   for (let i = 1; i <= n; i++) h += `<th>${i}</th>`;
   h += '<th>R</th><th>H</th></tr></thead><tbody>';
   for (const t of G.teams) { h += `<tr><td style="color:${t.def.color}">${esc(t.def.short)}</td>`; for (let i = 0; i < n; i++) h += `<td>${t.line[i] ?? ''}</td>`; h += `<td>${t.R}</td><td>${t.H}</td></tr>`; }
@@ -18011,7 +18063,7 @@ function snapGame() {
     v: 1, mode: G.mode, innings: G.innings, diff: G.diff, rules: G.rules, humanSide: G.teams.findIndex(t => t.ctl !== 'cpu'),
     defs: G.teams.map(t => { const d = { ...t.def, roster: t.def.roster.map(reg) }; delete d.pen; return d; }),
     teams: G.teams.map(t => ({ ctl: t.ctl, mana: t.mana, idx: t.idx, line: t.line, R: t.R, H: t.H, devourUsed: t.devourUsed, ultUsed: t.ultUsed || {}, pen: t.pen.map(reg), used: t.used.map(reg) })),
-    players, full: G.full || [], sky: [G.abN || 0, G.moon0 || 0, G.star0 || 0], inning: G.inning, half: G.half, outs: G.outs, balls: G.balls, strikes: G.strikes, bases: G.bases.map(reg), log: G.log.slice(0, 40), pstats: pst,
+    players, full: G.full || [], sky: [G.abN || 0, G.moon0 || 0, G.star0 || 0], inning: G.inning, half: G.half, outs: G.outs, balls: G.balls, strikes: G.strikes, bases: G.bases.map(reg), log: G.log.slice(0, 40), pstats: pst, hx: G.hx ? { ...G.hx } : undefined,
   };
 }
 function seasonLiveSave() {
@@ -18032,6 +18084,7 @@ function resumeSnap(sn, season) {
   G.teams = sn.teams.map((t, i) => ({ ...t, def: { ...sn.defs[i], roster: sn.defs[i].roster.map(P), pen: [] }, pen: t.pen.map(P), used: t.used.map(P) }));
   G.pstats = new Map(sn.pstats.map(([i, s]) => [P(i), Object.assign(blankLine(), s)])); G.committed = false; G.starters = G.teams.map(t => t.def.roster.find(p => p.pos === 'P')); for (const t of G.teams) attachGear(t); if (sn.sky) { [G.abN, G.moon0, G.star0] = sn.sky; } else if (typeof skyStart === 'function') skyStart(); if (typeof skyApply === 'function') skyApply(); if (typeof takeStart === 'function') takeStart();
   G.inning = sn.inning; G.half = sn.half; G.outs = sn.outs; G.balls = sn.balls; G.strikes = sn.strikes; G.bases = sn.bases.map(P);
+  G.hx = G.rules.hexes && G.rules.hexes.length ? { ...(sn.hx || {}) } : null;
   G.log = sn.log || []; G.full = sn.full || G.log.slice().reverse(); G.archived = false; G.gameId = null; G.rolls = []; G.fx = []; G.slow = 0; G.shake = 0; G.hitstop = 0;
   renderLog(); renderLineScore(); if (typeof renderReadout === 'function') renderReadout();
   G.P = null; startPitch(true);
@@ -19230,6 +19283,7 @@ function takeRules(opts) {
   const r = { ...nextRules() };
   if (opts.innings) r.innings = opts.innings;
   if (opts.diff != null) r.diff = opts.diff;
+  if (opts.hexes) { r.hexes = opts.hexes.slice(); if (opts.hexBy != null) r.hexBy = opts.hexBy; }
   NEXT = null; return r;
 }
 function prefGet(k) { if (k === 'music') return MUS.on; if (k === 'sound') return SND.on; if (k === 'hints') return HINTS; if (k === 'cpuSpeed') return SET.cpuSpeed || 1; }
@@ -19405,7 +19459,7 @@ function cpuHold(S0) {
   let best = 0, bb = 0; for (let b = 1; b <= 3; b++) if (G.bases[b] && S0.lead[b] >= best) { best = S0.lead[b]; bb = b; }
   if (!bb || !best) return;
   let ch = best === 2 ? .3 : runSpd(G.bases[bb], bb) >= 6 ? .12 : .04;
-  if (S0.picks >= 2) ch *= .4; ch *= .8 + .15 * G.diff;
+  if (S0.picks >= 2) ch *= .4; ch *= .8 + .15 * dOf(FT());
   if (R() < ch) S0.pickAt = G.P.cpuT * (.25 + R() * .5);
 }
 function pickBase() { const S0 = G.run; let bb = 0, best = -1; for (let b = 3; b >= 1; b--) if (G.bases[b] && S0.lead[b] > best) { best = S0.lead[b]; bb = b; } return bb; }
@@ -22631,6 +22685,10 @@ function bdxNames() {
   return { ab: o(AB, v => ({ n: v.name, type: v.type, desc: v.desc })), ult: o(ULT, v => ({ n: v.name, role: v.role, desc: v.desc })),
     pitch: o(PITCHES, v => ({ n: v.name, magic: !!v.magic, desc: v.desc })) };
 }
+/* the Umbral (issue #99, 4a): the hexes a game can carry (opts.hexes, or rules.hexes, with hexBy the side casting them),
+   and the Nadir champion's own pitch, the Dead Ball (the Phantom's vanish, faster and tighter; nobody else throws it) */
+PITCHES.deadball = { name: 'Dead Ball', T: .46, bx: .2, bh: -.3, ctrl: .11, cost: 2, magic: true, fx: 'phantom', desc: 'Thrown from a dead hand. It vanishes after release, comes back just before the plate, and comes back fast.' };
+function bdxHexes() { return Object.fromEntries(Object.entries(HEXES).map(([k, v]) => [k, { n: v.name, d: v.desc }])); }
 // the kinds whose player on the founding clubs plays pos (two each), for call-ups
 function bdxKindsAt(pos) { return KINDS.filter(k => TEMPL[k].pos === pos); }
 // a founding club to play against, with a reliever warming up as a quick game gets one
@@ -22643,7 +22701,7 @@ return {
   scr: (x, d, h) => { const p = proj(x, d || 0, h); return [p.x, p.y]; },
   get live() { return gameOn(); }, audio: (music, sfx) => { if (MUS.on !== !!music) setMusic(!!music, true); SND.on = !!sfx; }, get sound() { return { music: !!MUS.on, sfx: !!SND.on }; }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
   teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
-  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice()
+  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich']
 };
 
 })();
@@ -64449,8 +64507,164 @@ wAudit = function () {
   }
   return P;
 };
-/* u4a: baseball in the Umbral (issue #99, phase 4a): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4a: baseball in the Umbral (issue #99, phase 4a): tier U, the Lich, the hexes, the Nadir champion and the piece.
+   Loads after u4-grounds.js; changes earlier parts only by reassignment (saved originals carry the wWU4A prefix).
+
+   Tier U on the diamond is tier 4 in the ball game's tables: W_BALL.diff[4] is the Lich (Brimstone Diamond's CPU skill
+   3: it reads pitches sooner, chases less, times its releases, fields and runs sharper) and W_BALL.oppBonus[4] goes on
+   every rating of the other nine. Tiers 1 to 3 are as they were.
+   The champion of the Bone Diamond (W_NADIR.diamond) plays you there with the Bone Nine: at your nine's level (level
+   parity), tier U, the Lich on their side only (in Simulate your side plays as an Archmage, W_UMB4A.mine, so Simulate
+   is no easier than facing the Lich yourself), and the champion on the mound with her own pitch, the Dead Ball.
+   Her game draws its hexes from baseball's own table (W_UMB4A.hexes, the engine's HEXES), fixed for each try as the
+   card game's are; the game card names them before the first pitch and the scoreboard shows them all game.
+   PLAY (u4's gate open) shows that card: Play, Manage or Simulate starts the game through wStartBall (Save and leave
+   and Resume work as for any ball game; a game card you back out of costs nothing), the toll is taken at the first
+   pitch (wUmbTollAtKickoff), and the final goes to wUmbNadirEnd through W_ON_END.unadir_ball.
+
+   W_UMB4A, wUmb4aHexes, wUmb4aNine, wUmb4aCard, wUmb4aGo
+   Wraps: wBallTeam (wWU4ABallTeam: the Bone Nine's colours), wBallOpp (wWU4ABallOpp: the Bone Nine), wNineDef
+   (wWU4ANineDef: your side's CPU skill in a Nadir game), wBallBar (wWU4ABallBar: the hexes on the bar), wUmbPlaceGround
+   (wWU4APlaceGround: every champion of a ground gets a spot, not only the first). */
+
+const W_UMB4A = {
+  club: 'wild:nadir', tier: 4, mine: 2, star: 2,
+  team: { name: 'Bone Nine', short: 'BON', color: '#3a2a4a', light: '#c8b8ff', motto: 'Nobody leaves the Bone Diamond with the ball.' },
+  // the Bone Nine's kinds, first choice at each position
+  kinds: ['skeleton', 'zombie', 'spider', 'vampire', 'wraith', 'gorgon', 'lich', 'werewolf', 'witch'],
+  hexes: ['phase', 'drift', 'font', 'chill'],
+  going: null, // { id } while a Nadir game is being started
+};
+W_BALL.diff[4] = 3; W_BALL.oppBonus[4] = 1; W_BALL_SKILL[3] = 'Lich';
+
+/* ---------- the champion ---------- */
+W_NADIR.diamond = { piece: 'baseball', char: 'nadir_diamond', ground: 'g_ballpark', map: 'u:g_ballpark', region: 'plains', engine: 'diamond', hexes: 2, toll: 30, gold: 100,
+  star: { kind: 'witch', n: 'Vesper Quill', num: 13, pitches: ['deadball'] } };
+DB.chars.nadir_diamond = { name: 'Vesper Quill, the Stitcher', kind: 'witch', look: { coat: '#2e2438', acc: 'hat', hair: '#d8d0e8' },
+  greet: 'Another nine through the door. I keep the STITCH, and I pitch for the Bone Nine. Say PLAY when you want to try to hit me. Ask about the RULES first. Everybody should.',
+  topics: {
+    job: { t: 'I pitch. I have pitched every game ever played on this diamond, and I have never once been taken out of one.' },
+    stitch: { t: 'The Iron Stitch. One ninth of your Seal, sewn into the oldest ball on this side of the door. Beat my nine and it is yours. Lose, and the next game costs a TOLL.' },
+    rules: { t: 'Three innings, our ground, our rules. My nine play at your level, a little better at everything, and they think faster than any coach you have met. Before the first pitch I draw the HEXES: two, for you.' },
+    hexes: { t: 'A pitch that goes through the bat. Bases that will not stay put. A font that never runs dry. A chill in the hands. You will see which before we start, and they stay up on the scoreboard.' },
+    dead: { t: 'The Dead Ball. It leaves my hand and it is not there, and then it is, and it is late. Nobody else throws it.' },
+    toll: { t: 'Thirty gold a game, after the first. You pay it when the first pitch is thrown, not before.' },
+    play: { t: 'Then pick up a bat.', act: 'unadir:diamond' },
+  } };
+
+// a champion's hexes for this try, from baseball's table: fixed for the try, so a reload doesn't redraw them
+function wUmb4aHexes(id, n) {
+  const U = wUmb(), ks = W_UMB4A.hexes, r = mulberry(wUmbHash('bd:' + id) + 977 * ((U && U.tries[id]) || 0) + (WG.year || 1));
+  const out = []; while (out.length < Math.min(n, ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+
+/* ---------- the Bone Nine ---------- */
+/* at your nine's level, W_BALL.oppBonus[tier] on every rating, the Lich (def.diff), dark kinds first, and the champion
+   on the mound: W_UMB4A.star more on every rating and her own pitch */
+function wUmb4aNine(tier, id) {
+  const C = W_NADIR[id || 'diamond'], S = C.star, lvl = wNineTier(), k = W_BALL.oppBonus[tier] || 0, T = W_UMB4A.team;
+  const used = new Set(), names = new Set([S.n]);
+  const mk = (pos, as) => {
+    const ks = wBD.kindsAt(pos), kind = W_UMB4A.kinds.find(x => ks.includes(x) && !used.has(x)) || ks.find(x => !used.has(x)) || pick(ks);
+    used.add(kind);
+    const free = (FA_NAMES[kind] || []).filter(n => !names.has(n));
+    const p = wMakePlayer({ kind, lvl, n: free.length ? pick(free) : undefined }, 'opp'); names.add(p.n);
+    return Object.assign(wNineBdPlayer(p, as || pos), { rid: null });
+  };
+  const roster = W_NINE.pos.map(pos => pos === 'P' ? null : mk(pos));
+  const star = Object.assign(wNineBdPlayer(wMakePlayer({ kind: S.kind, lvl, n: S.n, num: S.num, flav: 'Has pitched every game ever played on the Bone Diamond.' }, 'opp'), 'P'), { rid: null, nadir: id || 'diamond' });
+  star.pitches = (star.pitches || ['heater', 'curve']).filter(x => !S.pitches.includes(x)).concat(S.pitches);
+  roster[W_NINE.pos.indexOf('P')] = star;
+  const def = { id: 'nadir', name: T.name, short: T.short, color: T.color, trim: tint(T.color, -.5), light: T.light, motto: T.motto, roster, pen: [mk('P', 'RP')], diff: W_BALL.diff[tier] };
+  for (const p of def.roster.concat(def.pen)) for (const s of wBD.stats) p[s] = Math.min(W_BDR.cap, p[s] + k + (p === star ? W_UMB4A.star : 0));
+  return def;
+}
+const wWU4ABallTeam = wBallTeam;
+wBallTeam = function (club) {
+  if (club !== W_UMB4A.club) return wWU4ABallTeam.apply(this, arguments);
+  const T = W_UMB4A.team; return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.5), light: T.light, motto: T.motto };
+};
+const wWU4ABallOpp = wBallOpp;
+wBallOpp = function (club, tier) { return club === W_UMB4A.club ? wUmb4aNine(tier, W_UMB4A.going && W_UMB4A.going.id) : wWU4ABallOpp.apply(this, arguments); };
+const wWU4ANineDef = wNineDef;
+wNineDef = function () { const d = wWU4ANineDef.apply(this, arguments); if (W_UMB4A.going) d.diff = W_UMB4A.mine; return d; };
+
+/* ---------- PLAY: the game card, and the game ---------- */
+// why your team can't play the champion now, or ''
+function wUmb4aWhy() {
+  const probs = wBallProblems(); if (probs.length) return probs.join(' ');
+  if (wBallLive()) return 'Finish the ball game you started first.';
+  return '';
+}
+// start the champion's game: '' when it started (for Simulate: when it is over), or why not
+function wUmb4aGo(id, hexes, how) {
+  const why = wUmb4aWhy(); if (why) return why;
+  // the toll, at the first pitch: once you have chosen to play, before any result
+  if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
+  const keep = W_BALL.rules;
+  W_UMB4A.going = { id };
+  // the hexes ride on the game's rules (kept in its snapshot); the Bone Nine are at home (side 1) and cast them
+  W_BALL.rules = Object.assign({}, keep, { hexes: hexes.slice(), hexBy: 1 });
+  try {
+    return wStartBall({ club: W_UMB4A.club, how, home: false, tier: W_UMB4A.tier, kind: 'unadir_ball', ref: { id, hexes: hexes.slice() }, cup: true });
+  } finally { W_BALL.rules = keep; W_UMB4A.going = null; }
+}
+function wUmb4aCard(C, id, hexes) {
+  const ch = DB.chars[C.char], HX = wBD.hexes(), U = wUmb(), tries = (U && U.tries[id]) || 0;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3><button class="ghost" data-close>Not yet</button></header>
+    <div class="wmsg"><p><b>The Bone Diamond: the ${esc(W_UMB4A.team.name)}.</b> ${W_BALL.innings} innings for ${esc(W_UMB_PIECES[C.piece].n)}.</p>
+    <p class="hint wumbpg"><b>The Umbral: tier U.</b> Their players are level ${wNineTier()}, your nine's level, with ${W_BALL.oppBonus[W_UMB4A.tier]} more on every rating, and the CPU plays them as a ${W_BALL_SKILL[W_BALL.diff[W_UMB4A.tier]]}: it reads your pitches sooner, chases less and fields and runs sharper. ${esc(C.star.n)} pitches, with her own Dead Ball.</p>
+    <p class="hint wumbpg" id="wUmbHexes"><b>Hexes:</b> ${hexes.map(h => `${esc(HX[h].n)} (${esc(HX[h].d)})`).join(' ')}</p>
+    <p class="hint">${tries > 0 ? `This game costs the toll, ${C.toll} gold, at the first pitch.` : 'The first game is free; the next costs a toll.'} <b>Play</b>: you pitch, swing and run. <b>Manage</b>: your players cast their own powers. <b>Simulate</b>: the result now.</p></div>
+    <div class="row">${Object.keys(W_BALL_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-uhow="${how}">${W_BALL_HOW[how]}</button>`).join('')}</div>`);
+  $('modalBox').querySelectorAll('[data-uhow]').forEach(b => b.onclick = () => {
+    close();
+    const why = wUmb4aGo(id, hexes, b.dataset.uhow); if (why) wLog(why, 'b');
+  });
+  const b0 = $('modalBox').querySelector('[data-uhow="play"]'); if (b0) b0.focus();
+}
+// u4's adapter: the card (or, for the bots, a Simulated game at once). The hexes u4 passes are the card game's: baseball draws its own.
+W_UMB4.start.diamond = function (C, id) {
+  const why = wUmb4aWhy(); if (why) return why;
+  const hx = wUmb4aHexes(id, C.hexes || 1);
+  if (LAB) return wUmb4aGo(id, hx, 'sim');
+  wUmb4aCard(C, id, hx);
+  return '';
+};
+// the final: a win pays the piece, a loss counts a try (wBallSettle has paid the ball game's own XP, gold and fans)
+W_ON_END.unadir_ball = function (r, ref) {
+  if (!ref || !W_NADIR[ref.id]) return;
+  wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose');
+};
+
+/* ---------- the bar above the field ---------- */
+const wWU4ABallBar = wBallBar;
+wBallBar = function () {
+  const r = wWU4ABallBar.apply(this, arguments), L = WG && WG.ball && WG.ball.live;
+  if (L && L.world && L.world.kind === 'unadir_ball' && WD && WD.ball && wBD.G.teams) {
+    const HX = wBD.hexes(), hx = (L.world.ref && L.world.ref.hexes) || [];
+    $('wDiamondNote').textContent += ` The Umbral, tier U. Hexes: ${hx.map(h => HX[h] ? HX[h].n : h).join(', ')}.`;
+  }
+  return r;
+};
+
+/* ---------- more than one champion on a ground ---------- */
+// u4 puts the first champion of a ground at its far end; any other stands beside them
+const wWU4APlaceGround = wUmbPlaceGround;
+wUmbPlaceGround = function (g) {
+  const r = wWU4APlaceGround.apply(this, arguments), m = MAPS['u:' + g]; if (!m) return r;
+  const champs = Object.keys(W_NADIR).filter(k => W_NADIR[k].ground === g), first = champs.length && m.npcs.find(n => n.id === W_NADIR[champs[0]].char);
+  if (!first) return r;
+  const taken = (x, y) => m.npcs.some(n => n.x === x && n.y === y), s = bfsReach(m, m.spawn[0], m.spawn[1]);
+  const ok = (x, y) => { const c = m.t[y] && m.t[y][x], td = c && DB.tiles[c]; return td && td.walk && !td.enter && !taken(x, y) && !m.meta[x + ',' + y] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => s[(y + dy) * m.w + x + dx]); };
+  for (const k of champs.slice(1)) {
+    const C = W_NADIR[k]; if (m.npcs.some(n => n.id === C.char)) continue;
+    let at = null; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) if (!at && ok(first.x + dx, first.y + dy)) at = [first.x + dx, first.y + dy];
+    if (at) m.npcs.push({ id: C.char, x: at[0], y: at[1], fixed: true });
+  }
+  return r;
+};
 /* u4b: football in the Umbral (issue #99, phase 4b). Loads after u4-grounds.js; changes earlier parts only by
    reassignment (saved originals carry the wWU4B prefix).
 

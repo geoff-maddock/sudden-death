@@ -1544,3 +1544,53 @@ a 200-game first look (noise at that size), and was cut to 6. Grave Cold barely 
 below half stamina, where it starts to cost ratings; at twice the stamina (500 games) it was still -1.6. The champion
 draws one hex a try (two, in the first look, put the bot at 11.5%): about 13%, a little under the 15 to 25% band (the
 Gatekeeper, the gentlest of the nine, is about half); a careful human, calling the plays, wins far more.
+
+### Umbral: baseball (#99, 4a)
+
+`python3 test/realm_diamond_lab.py 600 '' umbral` (part 3 of the baseball lab; 600 Simulated games a row, your nine
+of five at level 3, call-ups filling the rest). Tier U on the diamond is tier 4 in the ball game's tables: the Lich
+(CPU skill 3) and `W_BALL.oppBonus[4]` on every rating of the other nine. The champion's game puts your nine, as an
+Archmage, against the Bone Nine at your level (level parity): the Lich on their side only, the bonus, and the champion
+on the mound with 2 more on every rating and her Dead Ball. Simulate plays it the same way, so it is no way round the
+Lich. Tiers 1 to 3 are unchanged: with no hexes, 36 seeded games (each CPU skill, Auto powers on and off) play out
+identically on the engine before and after this part, line for line.
+
+**The Lich.** On the same nine, an Archmage against the Lich, against an Archmage against an Archmage (each row 600):
+
+| run | Archmage v Archmage | Archmage v Lich | the Lich's edge |
+|---|---|---|---|
+| 1 | 57.2% | 43.7% | 13.5 pts |
+| 2 | 60.0% | 44.3% | 15.7 pts |
+| 3 | 58.3% | 44.8% | 13.5 pts |
+
+It reads pitches sooner (aim error 0.13 ft against the Archmage's 0.19), times its swing tighter, chases less, times
+its releases (always a good release, 40% perfect), throws a two-strike chase pitch more often, and fields, throws and
+runs sharper. (The away side wins the even game a little more than half the time in these runs.)
+
+**Tier U at level parity** (target 15 to 25% for the skilled bot):
+
+| the rating bonus at tier U | your win | runs for-against |
+|---|---|---|
+| +2 (300 games) | 8.7% | 2.0-5.8 |
+| **+1 (kept; three runs of 600)** | **23.7%, 22.2%, 19.8%** | 2.3-4.5 |
+
+Tier 3 at +2 levels is 20 to 25% today, so tier U at parity sits with it, with the Lich and the champion doing what
+the two levels did.
+
+**Hexes, each alone against none** (600 games a row, the tier U setup; about ±2.4 points of noise on a difference):
+
+| hex | first cut | second | kept |
+|---|---|---|---|
+| none (the base) | 23.7% | 22.2% | 19.8% |
+| The Phantom Pitch | -1.3 pts (first ball in play an inning, never strike three) | +0.5 pts (any count) | +1.3 pts (the first ball hit hard) |
+| Restless Bases | -4.2 pts | -4.3 pts | -2.5 pts |
+| The Black Font | -7.5 pts | -3.5 pts | -1.2 pts |
+| Grave Chill | +0.8 pts (timing window 5/6) | -0.7 pts (window 0.72) | -0.3 pts (swing circle 0.8) |
+| the champion's game, two drawn | 17.5% (-6.2) | 17.2% (-5.0) | 14.7% (-5.2) |
+
+No single hex moves the game by more than about 8 points in any run, inside the 10-point ceiling. Two together cost
+about 5 points, steadily, so the champion's own game lands at 15 to 17.5%. The Phantom Pitch and Grave Chill barely
+register for the bot (its swing rarely misses by the margin they take away); a human, who sees the ball go through the
+bat and the smaller circle, feels them more. The Black Font's first-cut 7.5 points did not hold up in the later runs
+(the code did not change), which is the size of the noise at 600 games.
+

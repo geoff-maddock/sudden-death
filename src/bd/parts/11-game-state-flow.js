@@ -7,6 +7,47 @@ const pitcher = () => FT().def.roster.find(p => p.pos === 'P');
 const ctlOf = t => t.ctl;               // 'p1' | 'p2' | 'cpu'
 const isHuman = t => t.ctl !== 'cpu';
 const shortName = p => p.n.split(' ').slice(-1)[0];
+// a side's CPU skill: its club's own (def.diff, when a club brings one) or the game's (0 Squire, 1 Knight, 2 Archmage, 3 Lich)
+const dOf = t => t && t.def && t.def.diff != null ? t.def.diff : G.diff;
+
+/* ---------- hexes: dark twists one side casts on the other (the Realm's Umbral). rules.hexes lists them and
+   rules.hexBy is the side that casts them; a game without hexes never reads this (G.hx stays null). The words are
+   for the side under them ("your", "their"). ---------- */
+const HEXES = {
+  phase: { name: 'The Phantom Pitch', desc: 'Once an inning, the first ball one of your batters would hit hard passes through the bat: a swing and a miss.' },
+  drift: { name: 'Restless Bases', desc: 'After each of their hits, their runners already on base drift one base on, and from third, home.' },
+  font: { name: 'The Black Font', desc: 'They start with full mana, and draw 1 more every half inning.' },
+  chill: { name: 'Grave Chill', desc: 'Your batters swing stiff: their swing circle is a fifth smaller.' },
+};
+const HEX_CHILL = .8, HEX_HARD = .5;
+const hexOn = k => !!(G.hx && G.rules.hexes.includes(k));
+// is this side under the hexes?
+const hexed = t => !!G.hx && G.teams.indexOf(t) !== G.rules.hexBy;
+function hexSetup() {
+  const hx = (G.rules.hexes || []).filter(k => HEXES[k]);
+  if (!hx.length) { G.hx = null; return; }
+  G.rules.hexes = hx;
+  if (G.rules.hexBy !== 0 && G.rules.hexBy !== 1) { const c = G.teams.filter(t => t.ctl === 'cpu'); G.rules.hexBy = c.length === 1 ? G.teams.indexOf(c[0]) : 1; }
+  G.hx = {};
+}
+// the Phantom Pitch: true (once an inning, on the hexed side's first ball hit hard) when the ball passes through
+function hexPhase() {
+  if (!hexOn('phase') || !hexed(BT()) || G.hx.ph === G.inning) return false;
+  G.hx.ph = G.inning;
+  addFx('callout', { text: 'It passes through the bat!', col: '#c9a4ff' }); useTag('hex', HEXES.phase.name);
+  return true;
+}
+// Restless Bases: after a hit by the casting side, its runners already on base (not the batter) move up one
+function hexDrift(bat) {
+  if (!hexOn('drift') || hexed(BT()) || G.outs >= 3) return;
+  let moved = 0;
+  for (let b = 3; b >= 1; b--) {
+    const p = G.bases[b]; if (!p || p === bat) continue;
+    if (b === 3) { G.bases[3] = null; scoreRun(p); pst(pitcher()).ra++; moved++; }
+    else if (!G.bases[b + 1]) { G.bases[b + 1] = p; G.bases[b] = null; moved++; }
+  }
+  if (moved) { logLine(`${HEXES.drift.name}: the bases shift under ${BT().def.short}'s runners.`); addFx('callout', { text: 'The bases shift!', col: '#c9a4ff' }); }
+}
 
 function newGame(opts) {
   G.opts = opts;
@@ -18,6 +59,7 @@ function newGame(opts) {
   if (!opts.defs) for (const d of [a, h]) d.pen = quickPen(d, opts.innings);
   G.season = !!opts.season; G.pstats = new Map(); G.committed = false;
   G.teams = [a, h].map((def, i) => ({ def, ctl: ctl[i], mana: 2 + (def.manaBonus || 0), idx: 0, line: [], R: 0, H: 0, devourUsed: false, pen: (def.pen || []).slice(), used: [] }));
+  hexSetup(); if (hexOn('font')) G.teams[G.rules.hexBy].mana = 6;
   G.starters = G.teams.map(t => t.def.roster.find(p => p.pos === 'P'));
   for (const t of G.teams) attachGear(t);
   if (typeof skyStart === 'function' && MOON) skyStart();
@@ -72,6 +114,7 @@ function startHalf() {
   G.outs = 0; G.bases = [null, null, null, null];
   BT().line[G.inning - 1] = BT().line[G.inning - 1] || 0;
   for (const t of G.teams) t.mana = Math.min(6, t.mana + 1);
+  if (hexOn('font')) { const t = G.teams[G.rules.hexBy]; t.mana = Math.min(6, t.mana + 1); }
   FT().devourUsed = false; G.rallyHalf = false; clearZones(); healHalf();
   if (G.half === 1 && G.innings > 1 && G.inning === Math.min(7, G.innings)) { seventhInningStretch(); logLine(`${G.innings >= 7 ? 'Seventh-inning' : 'Last-inning'} stretch. The organist plays the old tune, badly on purpose.`); }
   G.phase = 'between'; G.betweenT = 2.0;
@@ -224,6 +267,7 @@ function swingMods(bat, k, ab, sk, be) {
   if (ab === 'bunt') { r *= 1.7; win *= 1.9; }
   r *= zoneMult('swing', 0, 0) * hurtMul(bat, .2) * (1 - .25 * weakK(bat, 'con'));
   { const gr = gearReach(k); r *= gr.r; win *= gr.win; }
+  if (G.hx && hexOn('chill') && hexed(BT())) r *= HEX_CHILL;
   return { r, win };
 }
 // magic, skills, hustle and dice used during the current at-bat; they ride along on its play-by-play line
@@ -300,6 +344,7 @@ function resolveSwing() {
   if (ab === 'axe') { r *= 1 + .6 * pm; pw *= 1 + .25 * pm; } if (ab === 'crush') { pw *= 1 + .5 * pm; r *= .8; }
   if (ab === 'sticky') { r *= 1 + .4 * pm; pw *= .8; } if (ab === 'pact') { pw *= 1 + .4 * pm; r *= 1 + .1 * pm; } if (ab === 'dispel') r *= 1 + .15 * pm;
   { const gm = gearSwing(pc); r *= gm.r; pw *= gm.pw; win *= gm.win; P.gearLaunch = gm.launch; }
+  if (G.hx && hexOn('chill') && hexed(bt)) r *= HEX_CHILL;
   const e = P.swing.tc - pc.Ta;
   const dx = pc.fx0 - P.pci.x, dh = pc.fh0 - P.pci.h, d = hyp(dx, dh);
   P.swingE = e; P.swingWin = win; P.swingR = r; P.swingD = d; P.swingDX = dx; P.swingDH = dh;
@@ -311,6 +356,7 @@ function resolveSwing() {
   if (Math.abs(e) <= win && d <= r) {
     if (wC && R() < .25 * wC) { P.swing.miss = true; P.swing.why = `Whiffed: poor contact (CON ${bat.con})`; if (isHuman(bt) || G.mode === 'demo') addFx('callout', { text: 'Whiff!', col: '#ff8a7a', small: true }); return; }
     const q = .55 * (1 - d / r) + .45 * (1 - Math.abs(e) / win);
+    if (G.hx && q >= HEX_HARD && hexPhase()) { P.swing.miss = true; P.swing.why = `The pitch passed through the bat (${HEXES.phase.name})`; return; }
     if (q < .08) { sfx.crack(.1); return foul('Foul tip'); }
     if (pc.fx === 'fire') {
       const roll = d20(), bonus = bat.con + luck(bat); const ok = roll + bonus >= 16;
@@ -453,7 +499,7 @@ function gameOver(walkoff) {
 
 /* ---------- CPU at the plate ---------- */
 function cpuChoosePitch() {
-  const P = G.P, ft = FT(), diff = G.diff;
+  const P = G.P, ft = FT(), diff = dOf(ft);
   if (G.strikes === 2 && fatigue(pitcher()) > .45 && R() < .35 + diff * .1) { P.peff = .5 + R() * .4; drain(pitcher(), 4, 'effort'); }
   const opts = P.pitches.map((p, i) => ({ p, i })).filter(o => affordable(o.p, ft));
   const ultP = opts.find(o => o.p.ult), magic = opts.filter(o => o.p.magic && !o.p.ult);
@@ -462,9 +508,11 @@ function cpuChoosePitch() {
   else if (magic.length && R() < .28 + diff * .08) choice = pick(magic);
   else choice = pick(opts.filter(o => !o.p.magic && !o.p.gear));
   P.pi = choice.i; gearCpuPitch();
+  // the Lich times its release like a careful player: always good, often perfect
+  if (diff >= 3) P.relGrade = R() < .4 ? 'perfect' : 'good';
   let x, h;
   if (G.balls === 3) { x = (R() - .5) * 1.5; h = 1.8 + R() * 1.4; }
-  else if (G.strikes === 2 && R() < .4) { x = (R() < .5 ? -1 : 1) * (1 + R() * .4); h = 1.1 + R() * .5; }
+  else if (G.strikes === 2 && R() < (diff >= 3 ? .55 : .4)) { x = (R() < .5 ? -1 : 1) * (1 + R() * .4); h = 1.1 + R() * .5; }
   else { x = (R() < .5 ? -1 : 1) * (.3 + R() * .7); h = 1.7 + R() * 1.6; if (R() < .18) h = R() < .5 ? 1.2 : 3.9; }
   P.aim = { x, h };
 }
@@ -491,31 +539,31 @@ function autoPitch() {
   gearCpuPitch();
 }
 function cpuChooseStance() {
-  const P = G.P, bt = BT(), b = batter();
-  if (fatigue(b) > .5 && R() < .2 + G.diff * .1) { P.beff = .4 + R() * .4; drain(b, 4, 'effort'); }
+  const P = G.P, bt = BT(), b = batter(), diff = dOf(bt);
+  if (fatigue(b) > .5 && R() < .2 + diff * .1) { P.beff = .4 + R() * .4; drain(b, 4, 'effort'); }
   let si = 0;
   if (G.strikes === 2 && R() < .5) si = 2; else if (G.strikes === 0 && G.balls >= 1 && R() < .35) si = 1;
   const ab = P.stances.find(s => s.k === 'ab'), phs = P.stances.find(s => s.k === 'phys');
-  if (phs && si === 0 && fatigue(b) > .45 && R() < .18 + G.diff * .08) si = P.stances.indexOf(phs);
+  if (phs && si === 0 && fatigue(b) > .45 && R() < .18 + diff * .08) si = P.stances.indexOf(phs);
   if (ab && bt.mana >= ab.cost) {
-    let want = .22 + G.diff * .08;
+    let want = .22 + diff * .08;
     if (ab.ab === 'undying') want = G.strikes === 2 ? .7 : 0;
     if (ab.ab === 'bunt') want = (G.bases[1] || G.bases[2]) && G.outs < 2 ? .45 : .12;
     if (bt.mana >= 5) want += .2;
     if (R() < want) si = P.stances.indexOf(ab);
   }
-  const us = P.stances.find(s => s.k === 'ult'); if (us && bt.mana >= us.cost && R() < .35 + (bt.mana >= 5 ? .25 : 0) + G.diff * .05) si = P.stances.indexOf(us);
+  const us = P.stances.find(s => s.k === 'ult'); if (us && bt.mana >= us.cost && R() < .35 + (bt.mana >= 5 ? .25 : 0) + diff * .05) si = P.stances.indexOf(us);
   P.si = si; gearCpuStance();
 }
 function cpuPlanSwing() {
-  const P = G.P, pc = P.pitch, diff = G.diff;
-  let sl = [.36, .26, .19][diff], stt = [.085, .065, .048][diff];
+  const P = G.P, pc = P.pitch, diff = dOf(BT());
+  let sl = [.36, .26, .19, .13][diff], stt = [.085, .065, .048, .036][diff];
   if (zoneOn('hideMarker')) { sl *= 1.6; stt *= 1.3; }
   if (pc.fx === 'phantom') sl *= 1.6; if (pc.fx === 'hex') sl *= 1.35; if (pc.fx === 'fire') stt += .02; if (pc.key === 'change') stt += .02;
   if (pc.ab === 'eagle') sl *= .4;
   const gx = pc.fx0 + gauss() * sl, gh = pc.fh0 + gauss() * sl;
   const zone = inZone(gx, gh);
-  let sp = zone ? .88 : [.3, .22, .14][diff] + (G.strikes === 2 ? .2 : 0);
+  let sp = zone ? .88 : [.3, .22, .14, .09][diff] + (G.strikes === 2 ? .2 : 0);
   if (G.balls === 3 && !zone) sp *= .5;
   const swing = R() < sp;
   P.cpu = { gx, gh, swing, swingT: pc.Ta - SWING_DELAY + gauss() * stt, react: .12 + R() * .06 };
