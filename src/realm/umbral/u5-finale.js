@@ -60,7 +60,8 @@ function wUmbFinaleEntry() {
   // (an engine round is that sport's champion's game, their side and all, with Aurelia's name on it: no ground, no
   // piece, no toll)
   const base = eng ? W_NADIR[wUmbChampOf(piece)] || {} : {};
-  const C = Object.assign({}, base, { piece: null, finale: r, char: 'nadir_aurelia', region: base.region || 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
+  // (Aurelia plays a sport's round through its champion, who takes the field under her: their name on its card)
+  const C = Object.assign({}, base, { piece: null, finale: r, char: base.char || 'nadir_aurelia', region: base.region || 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
     eng ? {} : { ids: W_UMB5.card.ids.slice(), type: W_UMB5.card.type });
   delete C.ground; delete C.map; delete C.cond;
   return W_NADIR.finale = C;

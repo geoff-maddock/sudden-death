@@ -86,7 +86,8 @@ wNineDef = function () { const d = wWU4ANineDef.apply(this, arguments); if (W_UM
 // why your team can't play the champion now, or ''
 function wUmb4aWhy() {
   const probs = wBallProblems(); if (probs.length) return probs.join(' ');
-  if (wBallLive()) return 'Finish the ball game you started first.';
+  // (a game left half-played picks up where it was, here as anywhere)
+  if (wBallLive()) { wResumeBall(); return ''; }
   return '';
 }
 // start the champion's game: '' when it started (for Simulate: when it is over), or why not

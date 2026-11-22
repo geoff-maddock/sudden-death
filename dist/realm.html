@@ -64695,7 +64695,8 @@ wNineDef = function () { const d = wWU4ANineDef.apply(this, arguments); if (W_UM
 // why your team can't play the champion now, or ''
 function wUmb4aWhy() {
   const probs = wBallProblems(); if (probs.length) return probs.join(' ');
-  if (wBallLive()) return 'Finish the ball game you started first.';
+  // (a game left half-played picks up where it was, here as anywhere)
+  if (wBallLive()) { wResumeBall(); return ''; }
   return '';
 }
 // start the champion's game: '' when it started (for Simulate: when it is over), or why not
@@ -64879,7 +64880,7 @@ function wUmbGfCard(C, id, hx) {
 // kickoff: the toll (on a retry), the hexes in the log, and the Realm's football game at tier U ('' when it started)
 function wUmbGfKick(C, id, hx, how) {
   const probs = wGridProblems(); if (probs.length) return probs.join(' ');
-  if (wGridLive()) return 'Finish the football game you started first.';
+  if (wGridLive()) { wResumeGrid(); return ''; } // (a game left half-played picks up where it was)
   if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
   const H = wUmbGfHexWords(hx);
   wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
@@ -64888,7 +64889,7 @@ function wUmbGfKick(C, id, hx, how) {
 }
 W_UMB4.start.gridiron = function (C, id) {
   const probs = wGridProblems(); if (probs.length) return probs.join(' ');
-  if (wGridLive()) return 'Finish the football game you started first.';
+  if (wGridLive()) { wResumeGrid(); return ''; } // (a game left half-played picks up where it was)
   const hx = wUmbGfHexes(id, C.hexes || 1);
   if (LAB) return wUmbGfKick(C, id, hx, W_UMB4B.labHow);
   wUmbGfCard(C, id, hx);
@@ -64957,7 +64958,8 @@ DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur',
 // a try's hexes: one or two (up to n) from the engine's table, fixed for the try (so a reload doesn't redraw them)
 function wUmbRingHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wBX.hexes), r = mulberry(wUmbHash(id + ':ring') + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));
-  const many = Math.min(ks.length, 1 + Math.floor(r() * Math.max(1, n)));
+  // (one or two for Brakka's own card; a round of the Seal draws exactly its count)
+  const many = id === 'finale' ? Math.min(ks.length, n) : Math.min(ks.length, 1 + Math.floor(r() * Math.max(1, n)));
   const out = []; while (out.length < many) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
   return out;
 }
@@ -64978,7 +64980,7 @@ function wUmbRingSide(C, taken) {
 const WU4C = { hexes: null };
 W_UMB4.start.ring = function (C, id) {
   const probs = wRingProblems(); if (probs.length) return probs.join(' ');
-  if (wBxg().live) return 'Finish the card you started first.';
+  if (wBxg().live) { wResumeRing(); return ''; } // (a card left half-fought picks up where it was)
   const hexes = wUmbRingHexes(id, C.hexes || 1), taken = new Set(), mine = wRingSide(taken), theirs = wUmbRingSide(C, taken), ch = DB.chars[C.char];
   const o = { club: 'nadir', tier: W_UMB4C.tier, kind: 'unbox', ref: { id }, cup: true };
   // the real kickoff: the toll for a retry (once a try), then the card, with its hexes
@@ -65040,6 +65042,9 @@ wRingBarNote = function () {
   const L = wRingLive() && WG.bxg.live, H = L && L.world.hexes;
   if (WBX && H && H.length && !WBX.over) $('wRingNote').textContent += ` Hexes: ${H.map(h => wBX.hexes[h].n).join(', ')}.`;
 };
+// after a Hardcore journey ends on the finale's lost round, the card's result stays off the end screen
+const wWU4CRingResultCard = wRingResultCard;
+wRingResultCard = function () { if (RUN && RUN.over) return; return wWU4CRingResultCard.apply(this, arguments); };
 /* u4d: basketball in the Umbral (issue #99, phase 4d): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
 /* u4e: hockey in the Umbral (issue #99, phase 4e): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
@@ -65112,7 +65117,8 @@ function wUmbFinaleEntry() {
   // (an engine round is that sport's champion's game, their side and all, with Aurelia's name on it: no ground, no
   // piece, no toll)
   const base = eng ? W_NADIR[wUmbChampOf(piece)] || {} : {};
-  const C = Object.assign({}, base, { piece: null, finale: r, char: 'nadir_aurelia', region: base.region || 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
+  // (Aurelia plays a sport's round through its champion, who takes the field under her: their name on its card)
+  const C = Object.assign({}, base, { piece: null, finale: r, char: base.char || 'nadir_aurelia', region: base.region || 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
     eng ? {} : { ids: W_UMB5.card.ids.slice(), type: W_UMB5.card.type });
   delete C.ground; delete C.map; delete C.cond;
   return W_NADIR.finale = C;

@@ -107,7 +107,7 @@ function wUmbGfCard(C, id, hx) {
 // kickoff: the toll (on a retry), the hexes in the log, and the Realm's football game at tier U ('' when it started)
 function wUmbGfKick(C, id, hx, how) {
   const probs = wGridProblems(); if (probs.length) return probs.join(' ');
-  if (wGridLive()) return 'Finish the football game you started first.';
+  if (wGridLive()) { wResumeGrid(); return ''; } // (a game left half-played picks up where it was)
   if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
   const H = wUmbGfHexWords(hx);
   wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
@@ -116,7 +116,7 @@ function wUmbGfKick(C, id, hx, how) {
 }
 W_UMB4.start.gridiron = function (C, id) {
   const probs = wGridProblems(); if (probs.length) return probs.join(' ');
-  if (wGridLive()) return 'Finish the football game you started first.';
+  if (wGridLive()) { wResumeGrid(); return ''; } // (a game left half-played picks up where it was)
   const hx = wUmbGfHexes(id, C.hexes || 1);
   if (LAB) return wUmbGfKick(C, id, hx, W_UMB4B.labHow);
   wUmbGfCard(C, id, hx);

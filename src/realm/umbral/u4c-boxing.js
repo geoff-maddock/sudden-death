@@ -56,7 +56,8 @@ DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur',
 // a try's hexes: one or two (up to n) from the engine's table, fixed for the try (so a reload doesn't redraw them)
 function wUmbRingHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wBX.hexes), r = mulberry(wUmbHash(id + ':ring') + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));
-  const many = Math.min(ks.length, 1 + Math.floor(r() * Math.max(1, n)));
+  // (one or two for Brakka's own card; a round of the Seal draws exactly its count)
+  const many = id === 'finale' ? Math.min(ks.length, n) : Math.min(ks.length, 1 + Math.floor(r() * Math.max(1, n)));
   const out = []; while (out.length < many) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
   return out;
 }
@@ -77,7 +78,7 @@ function wUmbRingSide(C, taken) {
 const WU4C = { hexes: null };
 W_UMB4.start.ring = function (C, id) {
   const probs = wRingProblems(); if (probs.length) return probs.join(' ');
-  if (wBxg().live) return 'Finish the card you started first.';
+  if (wBxg().live) { wResumeRing(); return ''; } // (a card left half-fought picks up where it was)
   const hexes = wUmbRingHexes(id, C.hexes || 1), taken = new Set(), mine = wRingSide(taken), theirs = wUmbRingSide(C, taken), ch = DB.chars[C.char];
   const o = { club: 'nadir', tier: W_UMB4C.tier, kind: 'unbox', ref: { id }, cup: true };
   // the real kickoff: the toll for a retry (once a try), then the card, with its hexes
@@ -139,3 +140,6 @@ wRingBarNote = function () {
   const L = wRingLive() && WG.bxg.live, H = L && L.world.hexes;
   if (WBX && H && H.length && !WBX.over) $('wRingNote').textContent += ` Hexes: ${H.map(h => wBX.hexes[h].n).join(', ')}.`;
 };
+// after a Hardcore journey ends on the finale's lost round, the card's result stays off the end screen
+const wWU4CRingResultCard = wRingResultCard;
+wRingResultCard = function () { if (RUN && RUN.over) return; return wWU4CRingResultCard.apply(this, arguments); };
