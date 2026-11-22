@@ -89,8 +89,8 @@ wCourtOpp = function (club, tier) { const f = wUmbBkClub(club); return f ? wUmbB
 /* ---------- the hexes ---------- */
 const WU4D = { next: null };
 const wWU4DStart = wBK.start, wWU4DSimGame = wBK.simGame;
-wBK.start = o => wWU4DStart(WU4D.next ? Object.assign({}, o, { hexes: WU4D.next.slice() }) : o);
-wBK.simGame = o => wWU4DSimGame(WU4D.next && !(o && o.keep) ? Object.assign({}, o, { hexes: WU4D.next.slice() }) : o);
+wBK.start = o => wWU4DStart(WU4D.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4D) }) : o);
+wBK.simGame = o => wWU4DSimGame(WU4D.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4D) }) : o);
 // n of basketball's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
 // after a reload)
 function wUmbBkHexes(id, n) {

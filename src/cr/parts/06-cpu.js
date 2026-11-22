@@ -98,7 +98,7 @@ function crPlan(s, style, only) {
   const top = list.slice(0, S.top);
   if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples + sb(c); }
   // an Archmage plays its best few on against the other rink's likeliest reply (crReplyLikely), and weighs that in
-  // (the Lich weighs more of the replies, and weighs them more: its own replies and replyMix)
+  // (the Lich weighs them as the Archmage does: CR_LICH.replies and replyMix are kept at the Archmage's values)
   if (sk >= 2) { const draws = crReplyDraws(s), mix = S.replyMix ?? CR_CALL.replyMix; for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - mix) + (w + sb(c)) * mix; } }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });

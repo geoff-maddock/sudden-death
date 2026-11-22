@@ -80,8 +80,8 @@ wRinkOpp = function (club, tier) { return club === W_UMB4E.club ? wUmbHkTeam() :
 
 /* ---------- the hexes ---------- */
 const wWU4EStart = wHK.start, wWU4ESimGame = wHK.simGame;
-wHK.start = o => wWU4EStart(W_UMB4E.next ? Object.assign({}, o, { hexes: W_UMB4E.next.slice() }) : o);
-wHK.simGame = o => wWU4ESimGame(W_UMB4E.next && !(o && o.keep) ? Object.assign({}, o, { hexes: W_UMB4E.next.slice() }) : o);
+wHK.start = o => wWU4EStart(W_UMB4E.next ? Object.assign({}, o, { hexes: wUmbTakeHex(W_UMB4E) }) : o);
+wHK.simGame = o => wWU4ESimGame(W_UMB4E.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(W_UMB4E) }) : o);
 // n of hockey's hexes for this try of the champion (or of the finale's round): fixed for the try, the same after a reload
 function wUmbHkHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wHK.hexes), r = mulberry(wUmbHash('hk:' + id) + 977 * ((U && U.tries[id]) || 0) + ((U && id === 'finale' ? 31 * (U.finale || 0) : 0)) + ((WG && WG.year) || 1));
@@ -96,7 +96,7 @@ function wUmbHkCard(C, id, hx) {
   const ult = wHK.pows.wraith ? 'The Long Night' : '', prize = C.piece ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.` : 'Win, and the round is yours.';
   const toll = !C.toll ? '' : tries > 0 ? ` This try costs the toll, ${C.toll} gold, as the puck drops.` : ` The first game is free; after a loss, each costs a toll of ${C.toll} gold.`;
   const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
-    <p><b>The Dead Pond: tier U.</b> Hockey against ${esc(W_UMB4E.team.name)}: level ${lvl}, in umbral form (${W_HKG.oppBonus[4]} rating points on each of their six), coached by a ${esc(W_BALL_SKILL[3])}, with a full bag (${esc(wRinkBagWords(W_RINK_KIT.opp[4]))}). Hollis Grael plays centre, and once a game casts ${esc(ult)}: their goalie set late for everything, and you skate as if through deep snow.</p>
+    <p><b>The Dead Pond: tier U.</b> Hockey against ${esc(W_UMB4E.team.name)}: level ${lvl}, in umbral form (${W_HKG.oppBonus[4]} rating points on each of their six), coached by a ${esc(W_BALL_SKILL[3])}, with a full bag (${esc(wRinkBagWords(W_RINK_KIT.opp[4]))}). Hollis Grael plays centre, and once a game casts ${esc(ult)}: your goalie set late for everything, and you skate as if through deep snow.</p>
     <p class="hint wumbpg" id="wUhkHexes"><b>Hexes:</b> ${H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ')}</p>
     <p class="hint">${prize}${toll} Nobody goes home level: sudden death, then a shootout. <b>Play</b>: you skate your six by hand, and call it. <b>Manage</b>: you call it, your six play. <b>Simulate</b>: the result now.</p></div>
     <div class="row"><button class="btn" data-uhk="play">Play</button><button class="ghost" data-uhk="manage">Manage</button><button class="ghost" data-uhk="sim">Simulate</button><button class="ghost" id="wUhkNo">Not now</button></div>`, () => wDrain());

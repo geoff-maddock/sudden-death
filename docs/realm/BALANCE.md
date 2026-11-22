@@ -1966,3 +1966,25 @@ pin is a threshold: at three times a pin's weight the ball still carries it, at 
 strikes fall from 53% to 34%. Kept, none moves the game by more than about 5 points; the champion draws one hex a try:
 16 to 17% across the two runs, inside the 15 to 25% band, and the finale's round with two 12 to 16%. A careful human,
 who is told the waterlogged pin before each frame and can move off a dried track or a heavy tide, wins more.
+
+### Umbral: the whole journey (#99, phase 7)
+
+`test/realm_umbral_journey_lab.py N TRIES` plays N journeys with the realm bot; each Crown winner then plays the whole
+Umbral: the Gatekeeper, then each sport's champion (its two guards first, Umbral card matches tried until beaten), each
+tried at most TRIES times while the gold lasts for the toll, rested by a lantern before every match; with all nine
+pieces, the Seal's three rounds, each tried at most TRIES times. Engine games are Simulated; card matches played by
+the bot. The target (issue #99): the Seal on about 5 to 15% of journeys that reach the Crown.
+
+| run (40 journeys) | Crown winners | forged the Seal | where most stopped |
+|---|---|---|---|
+| first, TRIES 10 | 26 | 0 (0%) | beaten by baseball (6), boxing (6), football (3); out of gold (7) |
+| boxing's card eased (undercard 2 points under, one hex), TRIES 15 | 29 | 2 (7%) | out of gold (14), boxing (4), football (4) |
+| and boxing's undercard 3 under, Brakka 1 under, curling's tier U bonus 0, TRIES 15 | 33 | **4 (12%)** | |
+
+Each champion's games won in the last run (all tries, all journeys): the Gatekeeper 44%, the Bone Diamond 22%, the
+Dead Pond 27%, the Cinder Pit 16%, the Drowned Lanes 15%, the Broken Ring 13%, the Hollow Links 12%, the Black Court
+10%, the Sunken Shed 10%; the guards 77%. The finale's rounds 0 to 67% on small numbers (a round of the Seal draws two
+hexes). Boxing's card of three (two bouts of three to win) was nearly unwinnable at full tier U for every bout (7%);
+curling's champion read 14% in its own lab but 4% in a real journey, and 10% with tier U's bonus at 0. Gold for the
+tolls is now a common place for a run to stop: the Seal is a long, expensive road, which is the point.
+

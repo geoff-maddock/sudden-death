@@ -33844,7 +33844,8 @@ function hkAimTarget(dir) {
 function hkAimFx(side, t) {
   const g = L.pl[hkGk(side)]; if (!t || !hkInNet(side)) return { f: 1, miss: 0 };
   if (t === 'five') return { f: .75 + Math.min(1, hyp(g.vx, g.vy) / 2.5) * .8, miss: -.06 };
-  const open = clamp(Math.abs(t.y * HK_RULES.net - g.y) / (2 * HK_RULES.net), 0, 1);
+  // (the target is in the net's own frame: a net slid by the Wandering Net moves the goalie's spot in it)
+  const open = clamp(Math.abs(t.y * HK_RULES.net - (g.y - (typeof hkNetOff === 'function' ? hkNetOff(side) : 0))) / (2 * HK_RULES.net), 0, 1);
   return { f: (.55 + open * .9) * (t.hi ? 1.15 : .95), miss: t.hi ? .09 : .02 };
 }
 /* your keys: { steer: [x, y], shoot: true | false (Space down and up), pass: true | false (J), lift: true | false
@@ -34545,7 +34546,7 @@ function hkUltOptions(side) {
     // (a player may bring an ultimate of their own: 16-umbral.js)
     const own = G.teams[side].roster[p.ri].ult, U = (own && hkUltOf(own)) || HK_ULT[p.kind]; if (!U) return null;
     const why = !live ? 'Only in live play.' : G.ultUsed[side] ? 'One ultimate a game.' : G.spirit[side] < HK_SPIRIT.ult ? 'Not enough spirit.' : hkSta(p) < HK_POW_STA.min ? `${p.n} is too tired.` : '';
-    return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, id: U.id, name: U.n, desc: U.desc, ok: !why, why };
+    return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, id: U.id, name: U.n, desc: U.desc, ok: !why, why, own: !!(own && hkUltOf(own)) };
   }).filter(Boolean);
 }
 function hkSitOptions(side) {
@@ -34607,7 +34608,7 @@ function hkCpuPowers(dt) {
     // the ultimate: a Knight when it has the spirit and the puck is in the right end; an Archmage in a close third, or behind
     const right = has ? up > HK_RULES.len - HK_RULES.blue : up < HK_RULES.blue + 2;
     const us = hkUltOptions(s).filter(o => o.ok);
-    if (us.length && right && (sk === 0 ? R() < .1 : sk === 1 ? true : (G.p >= HK_RULES.periods && Math.abs(hkLead(s)) <= 1) || hkLead(s) < 0 || hkOt())) { hkCastUlt(s, pick(us).i); continue; }
+    if (us.length && right && (sk === 0 ? R() < .1 : sk === 1 ? true : (G.p >= HK_RULES.periods && Math.abs(hkLead(s)) <= 1) || hkLead(s) < 0 || hkOt())) { hkCastUlt(s, (us.find(o => o.own) || pick(us)).i); continue; } // (a player's own ultimate first)
     const os = hkPowerOptions(s).filter(o => o.ok); if (!os.length) continue;
     if (sk === 0) { if (R() < .06) hkCast(s, pick(os).i); continue; }
     if (!right) continue;
@@ -40240,7 +40241,9 @@ function blCpuPower(s) {
   const sk = G.skill[s], ri = blBowler(s), o = 1 - s, f = blCur(s), late = G.ro || f >= G.frames - 3, gap = blTotal(o) - blTotal(s), p = blPressure(s), out = [];
   const tryCast = k => { if (!blCast(s, k, ri)) out.push(G.casts[G.casts.length - 1].n); };
   if (sk >= 1) { for (const k of ['rolloff', 'clean']) if (!blPowWhy(s, k)) tryCast(k); if (!blPowWhy(s, 'fill') && G.arm[s][ri] < .75) tryCast('fill'); }
-  if (!blPowWhy(s, 'ult', ri) && (sk === 0 ? R() < .5 : sk === 1 ? gap > 0 || late : (gap > 0 && late) || f === blSheetN() - 1)) tryCast('ult');
+  // (a bowler who brings an ultimate of their own rings it, whoever is bowling; otherwise the bowler's kind's)
+  const own = G.teams[s].roster.findIndex(m => m && m.ult && typeof BL_ULT_OWN !== 'undefined' && BL_ULT_OWN[m.ult]), ur = own >= 0 ? own : ri;
+  if (!blPowWhy(s, 'ult', ur) && (sk === 0 ? R() < .5 : sk === 1 ? gap > 0 || late : (gap > 0 && late) || f === blSheetN() - 1)) { if (!blCast(s, 'ult', ur)) out.push(G.casts[G.casts.length - 1].n); }
   if (sk >= 1 && p && !blPowWhy(s, 'steady') && blRat(s, ri).nrv < .7 && G.roar[s] >= BL_ROAR.steady + (sk >= 2 && !G.ultUsed[s] ? BL_ROAR.ult : 0)) tryCast('steady');
   const P = blPowNow(s, ri); if (!P || blPowWhy(s, 'pow', ri)) return out;
   const st = G.stand[s], worth = P.which === 'strike' ? true : st.length <= 3 || blIsSplit(st);
@@ -42253,7 +42256,7 @@ function crPlan(s, style, only) {
   const top = list.slice(0, S.top);
   if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples + sb(c); }
   // an Archmage plays its best few on against the other rink's likeliest reply (crReplyLikely), and weighs that in
-  // (the Lich weighs more of the replies, and weighs them more: its own replies and replyMix)
+  // (the Lich weighs them as the Archmage does: CR_LICH.replies and replyMix are kept at the Archmage's values)
   if (sk >= 2) { const draws = crReplyDraws(s), mix = S.replyMix ?? CR_CALL.replyMix; for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - mix) + (w + sb(c)) * mix; } }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });
@@ -56249,7 +56252,7 @@ function wRinkCalls(force) {
   if (!box.querySelector('.wccrows')) box.innerHTML = '<div class="wccrows"></div><p class="hint wrnow" id="wRinkNow"></p><div class="wccnowbox"></div>';
   const you = wHK.you, C = wHK.calls, rk = JSON.stringify([C, wHK.strength()]);
   if (force || rk !== W_RINK_ROWKEY) { W_RINK_ROWKEY = rk; box.querySelector('.wccrows').innerHTML = wRinkCallRows(); $('wRinkNow').textContent = wRinkNowLine(); }
-  const to = wHK.to[you], pulled = wHK.pulled(you), ph = wHK.phase, whistle = ['dead', 'set', 'drop'].includes(ph), nk = [to, pulled, wHK.auto, whistle, ph === 'live', wHK.skillNames[wHK.G.skill[1 - you]]].join('|');
+  const to = wHK.to[you], pulled = wHK.pulled(you), ph = wHK.phase, whistle = ['dead', 'set', 'drop'].includes(ph), nk = [to, pulled, wHK.auto, whistle, ph === 'live', (wHK.skillNames[wHK.G.skill[1 - you]] || W_BALL_SKILL[wHK.G.skill[1 - you]])].join('|');
   if (force || nk !== box.dataset.now) {
     box.dataset.now = nk;
     box.querySelector('.wccnowbox').innerHTML = `<div class="wccrow"><span class="wccl">Bench</span>
@@ -56257,7 +56260,7 @@ function wRinkCalls(force) {
       <button class="ghost${wHK.auto ? ' on' : ''}" data-rbench="auto" aria-pressed="${wHK.auto}" title="Who changes your lines: the coach (when it is safe), or only you.">Lines: ${wHK.auto ? 'the coach' : 'you'}</button>
       <button class="ghost" data-rbench="timeout" ${to && whistle ? '' : 'disabled'} title="One a game, at a whistle: your skaters on the ice get their breath back. Most use after an icing, when a tired line may not change.">Timeout (${to} left)</button>
       <button class="ghost${pulled ? ' on' : ''}" data-rbench="pull" ${ph === 'live' ? '' : 'disabled'} aria-pressed="${!!pulled}" title="Take your goalie off for an extra skater, or send them back. The net is empty while they are off.">${pulled ? 'Goalie back' : 'Pull goalie'}</button>
-      <small class="hint">Their coach: ${esc(wHK.skillNames[wHK.G.skill[1 - you]])}.</small></div>`;
+      <small class="hint">Their coach: ${esc((wHK.skillNames[wHK.G.skill[1 - you]] || W_BALL_SKILL[wHK.G.skill[1 - you]]))}.</small></div>`;
   }
 }
 $('wRinkCalls').addEventListener('click', e => {
@@ -65373,6 +65376,9 @@ wNadirMatch = function (id) {
   // (the adapter charges the toll itself, at the real kickoff, through wUmbTollAtKickoff: backing out costs nothing)
   return go(C, id, wUmbHexes(id, C.hexes || 1));
 };
+// the hexes an adapter hands its engine's start: taken by the first game started (and cleared), so a game the world
+// plays in the same moment (a league fixture simulated across a midnight) never picks them up
+function wUmbTakeHex(o, k) { k = k || 'next'; const h = o[k] ? o[k].slice() : []; o[k] = null; return h; }
 // a retry's toll, paid once per try when the game really starts (an adapter calls it after Play, Manage or Simulate)
 function wUmbTollAtKickoff(id) {
   const C = W_NADIR[id], U = wUmb(); if (!C || !U) return 0;
@@ -65571,12 +65577,12 @@ function wUmb4aGo(id, hexes, how) {
   // the toll, at the first pitch: once you have chosen to play, before any result
   if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
   const keep = W_BALL.rules;
-  W_UMB4A.going = { id };
+  W_UMB4A.going = { id }; W_UMB4A.keep = keep;
   // the hexes ride on the game's rules (kept in its snapshot); the Bone Nine are at home (side 1) and cast them
   W_BALL.rules = Object.assign({}, keep, { hexes: hexes.slice(), hexBy: 1 });
   try {
     return wStartBall({ club: W_UMB4A.club, how, home: false, tier: W_UMB4A.tier, kind: 'unadir_ball', ref: { id, hexes: hexes.slice() }, cup: true });
-  } finally { W_BALL.rules = keep; W_UMB4A.going = null; }
+  } finally { W_BALL.rules = keep; W_UMB4A.going = null; W_UMB4A.keep = null; }
 }
 function wUmb4aCard(C0, id, hexes) {
   const C = C0.star ? C0 : Object.assign({}, W_NADIR.diamond, { char: C0.char, piece: C0.piece, toll: C0.toll }), ch = DB.chars[C.char], HX = wBD.hexes(), U = wUmb(), tries = (U && U.tries[id]) || 0;
@@ -65639,6 +65645,11 @@ wUmbPlaceGround = function (g) {
   }
   return r;
 };
+// (the game's options carry the hexes from here: the shared rules go back the moment the engine starts, so a game the
+// world plays in the same moment, a league or cup sim across a midnight, never picks them up)
+const wWU4ABdSim = wBD.sim, wWU4ABdStart = wBD.start;
+wBD.sim = function () { if (W_UMB4A.keep) { W_BALL.rules = W_UMB4A.keep; W_UMB4A.keep = null; } return wWU4ABdSim.apply(this, arguments); };
+wBD.start = function () { if (W_UMB4A.keep) { W_BALL.rules = W_UMB4A.keep; W_UMB4A.keep = null; } return wWU4ABdStart.apply(this, arguments); };
 /* u4b: football in the Umbral (issue #99, phase 4b). Loads after u4-grounds.js; changes earlier parts only by
    reassignment (saved originals carry the wWU4B prefix).
 
@@ -65718,8 +65729,8 @@ wGridOpp = function (club, tier) { return club === W_UMB4B.club ? wUmbGfTeam() :
 /* ---------- the hexes ---------- */
 const WU4B = { next: null };
 const wWU4BGame = wGF.game, wWU4BSimGame = wGF.simGame;
-wGF.game = o => wWU4BGame(WU4B.next ? Object.assign({}, o, { hexes: WU4B.next.slice() }) : o);
-wGF.simGame = o => wWU4BSimGame(WU4B.next && !(o && o.keep) ? Object.assign({}, o, { hexes: WU4B.next.slice() }) : o);
+wGF.game = o => wWU4BGame(WU4B.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B) }) : o);
+wGF.simGame = o => wWU4BSimGame(WU4B.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B) }) : o);
 // n of football's hexes for this try of the champion: fixed for the try (the same draw after a reload)
 function wUmbGfHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wGF.hexes), r = mulberry(wUmbHash('gf:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));
@@ -65797,7 +65808,8 @@ const W_UMB4C = {
   side: { name: 'The Nadir', short: 'NDR', color: '#3a2a4a', light: '#c8b8ff' },
   seconds: [['Old Clapper', 'ogre'], ['Soot Wick', 'dwarf']],
   // the champion: their kind, the points on top of tier U's, and what is theirs alone (the engine's pw and tr)
-  champ: { n: 'Brakka Knell', kind: 'minotaur', more: 0,
+  under: 3,   // (the undercard's points under tier U's; phase 7's journey lab: 2 left the card at 8%, 3 brought it to 13%)
+  champ: { n: 'Brakka Knell', kind: 'minotaur', more: -1,
     pw: {
       sp: { id: 'deathknell', n: 'Death Knell', when: 'close', desc: 'A blow that rings through the guard (8), and they reel for half a second.', now: { dmg: 8, stun: .5 } },
       ult: { id: 'lastbell', n: 'The Last Bell', when: 'any', desc: 'The bell tolls for them: for 6 seconds they get no breath back, and punches at them do 20% more.', fx: { who: 'them', t: 6, noReg: 1, dmgIn: 1.2 } },
@@ -65811,7 +65823,7 @@ W_BXG.oppBonus[W_UMB4C.tier] = 3;
 W_RING_KIT.opp[W_UMB4C.tier] = { draught: 1, cutsalve: 1, smellsalts: 1, ragetonic: 1 };
 
 /* ---------- the champion ---------- */
-W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 2, toll: 30, gold: 100 };
+W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 1, toll: 30, gold: 100 };
 DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur', look: { coat: '#3a2a4a' },
   greet: 'Every bell on this side rang once for somebody, and then it cracked. I hold the BELL. Say PLAY when you want to hear it ring for you. Ask about the RULES first, if you like.',
   topics: {
@@ -65835,9 +65847,11 @@ function wUmbRingHexes(id, n) {
 function wUmbRingSide(C, taken) {
   const lvl = wNineTier(), k = W_BXG.oppBonus[W_UMB4C.tier] || 0, X = W_UMB4C.champ;
   const fighters = W_UMB4C.seconds.concat([[X.n, X.kind]]).map(([n, kind], j) => {
-    const p = wMakePlayer({ kind, lvl, n }, 'opp'), f = wBxFighter(p), more = j === 2 ? X.more : 0;
+    // (the champion at tier U's full points; the two on the undercard W_UMB4C.under fewer: the card is two bouts of
+    // three, and three bouts at full tier U made it nearly unwinnable, about 7%)
+    const p = wMakePlayer({ kind, lvl, n }, 'opp'), f = wBxFighter(p), more = j === 2 ? X.more : -W_UMB4C.under;
     taken.add(f.n); f.pid = null; f.umb = 1;
-    for (let i = 0; i < k + more; i++) { const s = wBX.stats[(i * 5 + j) % wBX.stats.length]; f.r[s] = Math.min(W_BXG.cap, f.r[s] + 1); }
+    for (let i = 0; i < Math.max(0, k + more); i++) { const s = wBX.stats[(i * 5 + j) % wBX.stats.length]; f.r[s] = Math.min(W_BXG.cap, f.r[s] + 1); }
     if (j === 2) { f.pw = JSON.parse(JSON.stringify(X.pw)); f.tr = JSON.parse(JSON.stringify(X.tr)); f.sp = 'sp'; f.champ = 1; }
     return f;
   });
@@ -65875,10 +65889,10 @@ W_ON_END.unbox = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r =
 const wWU4CCardStart = wBX.cardStart, wWU4CSimCard = wBX.simCard;
 wBX.cardStart = o => {
   if (!WU4C.hexes) return wWU4CCardStart(o);
-  const L = wBxg().live; if (L) L.world.hexes = WU4C.hexes.slice();
-  return wWU4CCardStart(Object.assign({}, o, { hexes: WU4C.hexes.slice(), hexOn: 0 }));
+  const L = wBxg().live, hx = wUmbTakeHex(WU4C, 'hexes'); if (L) L.world.hexes = hx.slice();
+  return wWU4CCardStart(Object.assign({}, o, { hexes: hx, hexOn: 0 }));
 };
-wBX.simCard = o => WU4C.hexes ? wWU4CSimCard(Object.assign({}, o, { hexes: WU4C.hexes.slice(), hexOn: 0 })) : wWU4CSimCard(o);
+wBX.simCard = o => WU4C.hexes ? wWU4CSimCard(Object.assign({}, o, { hexes: wUmbTakeHex(WU4C, 'hexes'), hexOn: 0 })) : wWU4CSimCard(o);
 
 /* ---------- on screen ---------- */
 const wWU4CBallName = wBallName;
@@ -66004,8 +66018,8 @@ wCourtOpp = function (club, tier) { const f = wUmbBkClub(club); return f ? wUmbB
 /* ---------- the hexes ---------- */
 const WU4D = { next: null };
 const wWU4DStart = wBK.start, wWU4DSimGame = wBK.simGame;
-wBK.start = o => wWU4DStart(WU4D.next ? Object.assign({}, o, { hexes: WU4D.next.slice() }) : o);
-wBK.simGame = o => wWU4DSimGame(WU4D.next && !(o && o.keep) ? Object.assign({}, o, { hexes: WU4D.next.slice() }) : o);
+wBK.start = o => wWU4DStart(WU4D.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4D) }) : o);
+wBK.simGame = o => wWU4DSimGame(WU4D.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4D) }) : o);
 // n of basketball's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
 // after a reload)
 function wUmbBkHexes(id, n) {
@@ -66141,8 +66155,8 @@ wRinkOpp = function (club, tier) { return club === W_UMB4E.club ? wUmbHkTeam() :
 
 /* ---------- the hexes ---------- */
 const wWU4EStart = wHK.start, wWU4ESimGame = wHK.simGame;
-wHK.start = o => wWU4EStart(W_UMB4E.next ? Object.assign({}, o, { hexes: W_UMB4E.next.slice() }) : o);
-wHK.simGame = o => wWU4ESimGame(W_UMB4E.next && !(o && o.keep) ? Object.assign({}, o, { hexes: W_UMB4E.next.slice() }) : o);
+wHK.start = o => wWU4EStart(W_UMB4E.next ? Object.assign({}, o, { hexes: wUmbTakeHex(W_UMB4E) }) : o);
+wHK.simGame = o => wWU4ESimGame(W_UMB4E.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(W_UMB4E) }) : o);
 // n of hockey's hexes for this try of the champion (or of the finale's round): fixed for the try, the same after a reload
 function wUmbHkHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wHK.hexes), r = mulberry(wUmbHash('hk:' + id) + 977 * ((U && U.tries[id]) || 0) + ((U && id === 'finale' ? 31 * (U.finale || 0) : 0)) + ((WG && WG.year) || 1));
@@ -66157,7 +66171,7 @@ function wUmbHkCard(C, id, hx) {
   const ult = wHK.pows.wraith ? 'The Long Night' : '', prize = C.piece ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.` : 'Win, and the round is yours.';
   const toll = !C.toll ? '' : tries > 0 ? ` This try costs the toll, ${C.toll} gold, as the puck drops.` : ` The first game is free; after a loss, each costs a toll of ${C.toll} gold.`;
   const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
-    <p><b>The Dead Pond: tier U.</b> Hockey against ${esc(W_UMB4E.team.name)}: level ${lvl}, in umbral form (${W_HKG.oppBonus[4]} rating points on each of their six), coached by a ${esc(W_BALL_SKILL[3])}, with a full bag (${esc(wRinkBagWords(W_RINK_KIT.opp[4]))}). Hollis Grael plays centre, and once a game casts ${esc(ult)}: their goalie set late for everything, and you skate as if through deep snow.</p>
+    <p><b>The Dead Pond: tier U.</b> Hockey against ${esc(W_UMB4E.team.name)}: level ${lvl}, in umbral form (${W_HKG.oppBonus[4]} rating points on each of their six), coached by a ${esc(W_BALL_SKILL[3])}, with a full bag (${esc(wRinkBagWords(W_RINK_KIT.opp[4]))}). Hollis Grael plays centre, and once a game casts ${esc(ult)}: your goalie set late for everything, and you skate as if through deep snow.</p>
     <p class="hint wumbpg" id="wUhkHexes"><b>Hexes:</b> ${H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ')}</p>
     <p class="hint">${prize}${toll} Nobody goes home level: sudden death, then a shootout. <b>Play</b>: you skate your six by hand, and call it. <b>Manage</b>: you call it, your six play. <b>Simulate</b>: the result now.</p></div>
     <div class="row"><button class="btn" data-uhk="play">Play</button><button class="ghost" data-uhk="manage">Manage</button><button class="ghost" data-uhk="sim">Simulate</button><button class="ghost" id="wUhkNo">Not now</button></div>`, () => wDrain());
@@ -66284,8 +66298,8 @@ wLinksOpp = function (club, tier) { return club === W_UMB4F.club ? wUmbGlFour() 
 /* ---------- the hexes ---------- */
 const WU4F = { next: null };
 const wWU4FStart = wGL.start, wWU4FSimGame = wGL.simGame;
-wGL.start = o => wWU4FStart(WU4F.next ? Object.assign({}, o, { hexes: WU4F.next.slice(), hexOn: 0 }) : o);
-wGL.simGame = o => wWU4FSimGame(WU4F.next ? Object.assign({}, o, { hexes: WU4F.next.slice(), hexOn: 0 }) : o);
+wGL.start = o => wWU4FStart(WU4F.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4F), hexOn: 0 }) : o);
+wGL.simGame = o => wWU4FSimGame(WU4F.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4F), hexOn: 0 }) : o);
 // n of golf's hexes for this try of the champion: fixed for the try (the same draw after a reload)
 function wUmbGlHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wGL.hexes), r = mulberry(wUmbHash('gl:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));
@@ -66437,8 +66451,8 @@ wLanesOpp = function (club, tier) { const f = wUmbBlClub(club); return f ? wUmbB
 /* ---------- the hexes ---------- */
 const WU4G = { next: null };
 const wWU4GStart = wBL.start, wWU4GSimGame = wBL.simGame;
-wBL.start = o => wWU4GStart(WU4G.next ? Object.assign({}, o, { hexes: WU4G.next.slice(), hexOn: 0 }) : o);
-wBL.simGame = o => wWU4GSimGame(WU4G.next ? Object.assign({}, o, { hexes: WU4G.next.slice(), hexOn: 0 }) : o);
+wBL.start = o => wWU4GStart(WU4G.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4G), hexOn: 0 }) : o);
+wBL.simGame = o => wWU4GSimGame(WU4G.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4G), hexOn: 0 }) : o);
 // n of bowling's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
 // after a reload)
 function wUmbBlHexes(id, n) {
@@ -66503,6 +66517,8 @@ wLanesBarNote = function () {
 // after a Hardcore journey ends on the finale's lost round, the bowling result card stays off the end screen
 const wWU4GLanesResultCard = wLanesResultCard;
 wLanesResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4GLanesResultCard.apply(this, arguments); };
+// (the Lich is the Umbral's only: the light-side "Their bowlers" picker keeps its three)
+{ const o = document.querySelector('#wLanesSkill option[value="3"]'); if (o) o.remove(); }
 /* u4h: curling in the Umbral (issue #99, phase 4h). Loads after u4-grounds.js; changes earlier parts only by
    reassignment (saved originals carry the wWU4H prefix). The engine's side is src/cr/parts/15-umbral.js: the Lich (CPU
    skill 3), the hexes (opts.hexes) and a curler's own ultimate.
@@ -66542,7 +66558,7 @@ const W_UMB4H = {
   champ: { more: 0, ult: 'sunkenstone' },
 };
 // tier U in curling's tables (W_BALL.diff and W_BALL_SKILL are shared with the other sports' tier U: set once)
-W_SHG.oppBonus[4] = 1;
+W_SHG.oppBonus[4] = 0; // (1 at first: the journey lab, phase 7, found the champion at 4% in a real journey; 0 brought it to about 10%)
 W_SHED_KIT.opp[4] = { draught: 2, crwarm: 1, crsalt: 2, crpebble: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
@@ -66591,8 +66607,8 @@ wShedOpp = function (club, tier) { const f = wUmbCrClub(club); return f ? wUmbCr
 /* ---------- the hexes ---------- */
 const WU4H = { next: null };
 const wWU4HStart = wCR.start, wWU4HSimGame = wCR.simGame;
-wCR.start = o => wWU4HStart(WU4H.next ? Object.assign({}, o, { hexes: WU4H.next.slice(), hexOn: 0 }) : o);
-wCR.simGame = o => wWU4HSimGame(WU4H.next ? Object.assign({}, o, { hexes: WU4H.next.slice(), hexOn: 0 }) : o);
+wCR.start = o => wWU4HStart(WU4H.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4H), hexOn: 0 }) : o);
+wCR.simGame = o => wWU4HSimGame(WU4H.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4H), hexOn: 0 }) : o);
 // n of curling's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
 // after a reload)
 function wUmbCrHexes(id, n) {
@@ -66628,7 +66644,9 @@ function wUmbCrKick(C, id, hx, how) {
   const H = wUmbCrHexWords(hx);
   if (H.length) wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
   WU4H.next = hx.slice();
-  try { return wStartShed({ club: id === 'finale' ? W_UMB4H.finaleClub : W_UMB4H.club, how, tier: W_UMB4H.tier, kind: W_UMB4H.kind, ref: { id }, cup: true }); } finally { WU4H.next = null; }
+  // (the champion's match is six ends, whatever the Shed tab is set to: as the rules say and the lab measured)
+  const ends0 = SET.shedEnds; SET.shedEnds = wCR.rules.ends;
+  try { return wStartShed({ club: id === 'finale' ? W_UMB4H.finaleClub : W_UMB4H.club, how, tier: W_UMB4H.tier, kind: W_UMB4H.kind, ref: { id }, cup: true }); } finally { WU4H.next = null; SET.shedEnds = ends0; }
 }
 W_UMB4.live.shed = () => wShedLive();
 W_UMB4.start.shed = function (C, id) {

@@ -37,7 +37,7 @@ const W_UMB4H = {
   champ: { more: 0, ult: 'sunkenstone' },
 };
 // tier U in curling's tables (W_BALL.diff and W_BALL_SKILL are shared with the other sports' tier U: set once)
-W_SHG.oppBonus[4] = 1;
+W_SHG.oppBonus[4] = 0; // (1 at first: the journey lab, phase 7, found the champion at 4% in a real journey; 0 brought it to about 10%)
 W_SHED_KIT.opp[4] = { draught: 2, crwarm: 1, crsalt: 2, crpebble: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
@@ -86,8 +86,8 @@ wShedOpp = function (club, tier) { const f = wUmbCrClub(club); return f ? wUmbCr
 /* ---------- the hexes ---------- */
 const WU4H = { next: null };
 const wWU4HStart = wCR.start, wWU4HSimGame = wCR.simGame;
-wCR.start = o => wWU4HStart(WU4H.next ? Object.assign({}, o, { hexes: WU4H.next.slice(), hexOn: 0 }) : o);
-wCR.simGame = o => wWU4HSimGame(WU4H.next ? Object.assign({}, o, { hexes: WU4H.next.slice(), hexOn: 0 }) : o);
+wCR.start = o => wWU4HStart(WU4H.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4H), hexOn: 0 }) : o);
+wCR.simGame = o => wWU4HSimGame(WU4H.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4H), hexOn: 0 }) : o);
 // n of curling's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
 // after a reload)
 function wUmbCrHexes(id, n) {
@@ -123,7 +123,9 @@ function wUmbCrKick(C, id, hx, how) {
   const H = wUmbCrHexWords(hx);
   if (H.length) wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
   WU4H.next = hx.slice();
-  try { return wStartShed({ club: id === 'finale' ? W_UMB4H.finaleClub : W_UMB4H.club, how, tier: W_UMB4H.tier, kind: W_UMB4H.kind, ref: { id }, cup: true }); } finally { WU4H.next = null; }
+  // (the champion's match is six ends, whatever the Shed tab is set to: as the rules say and the lab measured)
+  const ends0 = SET.shedEnds; SET.shedEnds = wCR.rules.ends;
+  try { return wStartShed({ club: id === 'finale' ? W_UMB4H.finaleClub : W_UMB4H.club, how, tier: W_UMB4H.tier, kind: W_UMB4H.kind, ref: { id }, cup: true }); } finally { WU4H.next = null; SET.shedEnds = ends0; }
 }
 W_UMB4.live.shed = () => wShedLive();
 W_UMB4.start.shed = function (C, id) {

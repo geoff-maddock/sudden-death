@@ -73,8 +73,8 @@ wLinksOpp = function (club, tier) { return club === W_UMB4F.club ? wUmbGlFour() 
 /* ---------- the hexes ---------- */
 const WU4F = { next: null };
 const wWU4FStart = wGL.start, wWU4FSimGame = wGL.simGame;
-wGL.start = o => wWU4FStart(WU4F.next ? Object.assign({}, o, { hexes: WU4F.next.slice(), hexOn: 0 }) : o);
-wGL.simGame = o => wWU4FSimGame(WU4F.next ? Object.assign({}, o, { hexes: WU4F.next.slice(), hexOn: 0 }) : o);
+wGL.start = o => wWU4FStart(WU4F.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4F), hexOn: 0 }) : o);
+wGL.simGame = o => wWU4FSimGame(WU4F.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4F), hexOn: 0 }) : o);
 // n of golf's hexes for this try of the champion: fixed for the try (the same draw after a reload)
 function wUmbGlHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wGL.hexes), r = mulberry(wUmbHash('gl:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));

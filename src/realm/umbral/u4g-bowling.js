@@ -90,8 +90,8 @@ wLanesOpp = function (club, tier) { const f = wUmbBlClub(club); return f ? wUmbB
 /* ---------- the hexes ---------- */
 const WU4G = { next: null };
 const wWU4GStart = wBL.start, wWU4GSimGame = wBL.simGame;
-wBL.start = o => wWU4GStart(WU4G.next ? Object.assign({}, o, { hexes: WU4G.next.slice(), hexOn: 0 }) : o);
-wBL.simGame = o => wWU4GSimGame(WU4G.next ? Object.assign({}, o, { hexes: WU4G.next.slice(), hexOn: 0 }) : o);
+wBL.start = o => wWU4GStart(WU4G.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4G), hexOn: 0 }) : o);
+wBL.simGame = o => wWU4GSimGame(WU4G.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4G), hexOn: 0 }) : o);
 // n of bowling's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
 // after a reload)
 function wUmbBlHexes(id, n) {
@@ -156,3 +156,5 @@ wLanesBarNote = function () {
 // after a Hardcore journey ends on the finale's lost round, the bowling result card stays off the end screen
 const wWU4GLanesResultCard = wLanesResultCard;
 wLanesResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4GLanesResultCard.apply(this, arguments); };
+// (the Lich is the Umbral's only: the light-side "Their bowlers" picker keeps its three)
+{ const o = document.querySelector('#wLanesSkill option[value="3"]'); if (o) o.remove(); }

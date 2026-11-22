@@ -27,7 +27,8 @@ const W_UMB4C = {
   side: { name: 'The Nadir', short: 'NDR', color: '#3a2a4a', light: '#c8b8ff' },
   seconds: [['Old Clapper', 'ogre'], ['Soot Wick', 'dwarf']],
   // the champion: their kind, the points on top of tier U's, and what is theirs alone (the engine's pw and tr)
-  champ: { n: 'Brakka Knell', kind: 'minotaur', more: 0,
+  under: 3,   // (the undercard's points under tier U's; phase 7's journey lab: 2 left the card at 8%, 3 brought it to 13%)
+  champ: { n: 'Brakka Knell', kind: 'minotaur', more: -1,
     pw: {
       sp: { id: 'deathknell', n: 'Death Knell', when: 'close', desc: 'A blow that rings through the guard (8), and they reel for half a second.', now: { dmg: 8, stun: .5 } },
       ult: { id: 'lastbell', n: 'The Last Bell', when: 'any', desc: 'The bell tolls for them: for 6 seconds they get no breath back, and punches at them do 20% more.', fx: { who: 'them', t: 6, noReg: 1, dmgIn: 1.2 } },
@@ -41,7 +42,7 @@ W_BXG.oppBonus[W_UMB4C.tier] = 3;
 W_RING_KIT.opp[W_UMB4C.tier] = { draught: 1, cutsalve: 1, smellsalts: 1, ragetonic: 1 };
 
 /* ---------- the champion ---------- */
-W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 2, toll: 30, gold: 100 };
+W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 1, toll: 30, gold: 100 };
 DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur', look: { coat: '#3a2a4a' },
   greet: 'Every bell on this side rang once for somebody, and then it cracked. I hold the BELL. Say PLAY when you want to hear it ring for you. Ask about the RULES first, if you like.',
   topics: {
@@ -65,9 +66,11 @@ function wUmbRingHexes(id, n) {
 function wUmbRingSide(C, taken) {
   const lvl = wNineTier(), k = W_BXG.oppBonus[W_UMB4C.tier] || 0, X = W_UMB4C.champ;
   const fighters = W_UMB4C.seconds.concat([[X.n, X.kind]]).map(([n, kind], j) => {
-    const p = wMakePlayer({ kind, lvl, n }, 'opp'), f = wBxFighter(p), more = j === 2 ? X.more : 0;
+    // (the champion at tier U's full points; the two on the undercard W_UMB4C.under fewer: the card is two bouts of
+    // three, and three bouts at full tier U made it nearly unwinnable, about 7%)
+    const p = wMakePlayer({ kind, lvl, n }, 'opp'), f = wBxFighter(p), more = j === 2 ? X.more : -W_UMB4C.under;
     taken.add(f.n); f.pid = null; f.umb = 1;
-    for (let i = 0; i < k + more; i++) { const s = wBX.stats[(i * 5 + j) % wBX.stats.length]; f.r[s] = Math.min(W_BXG.cap, f.r[s] + 1); }
+    for (let i = 0; i < Math.max(0, k + more); i++) { const s = wBX.stats[(i * 5 + j) % wBX.stats.length]; f.r[s] = Math.min(W_BXG.cap, f.r[s] + 1); }
     if (j === 2) { f.pw = JSON.parse(JSON.stringify(X.pw)); f.tr = JSON.parse(JSON.stringify(X.tr)); f.sp = 'sp'; f.champ = 1; }
     return f;
   });
@@ -105,10 +108,10 @@ W_ON_END.unbox = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r =
 const wWU4CCardStart = wBX.cardStart, wWU4CSimCard = wBX.simCard;
 wBX.cardStart = o => {
   if (!WU4C.hexes) return wWU4CCardStart(o);
-  const L = wBxg().live; if (L) L.world.hexes = WU4C.hexes.slice();
-  return wWU4CCardStart(Object.assign({}, o, { hexes: WU4C.hexes.slice(), hexOn: 0 }));
+  const L = wBxg().live, hx = wUmbTakeHex(WU4C, 'hexes'); if (L) L.world.hexes = hx.slice();
+  return wWU4CCardStart(Object.assign({}, o, { hexes: hx, hexOn: 0 }));
 };
-wBX.simCard = o => WU4C.hexes ? wWU4CSimCard(Object.assign({}, o, { hexes: WU4C.hexes.slice(), hexOn: 0 })) : wWU4CSimCard(o);
+wBX.simCard = o => WU4C.hexes ? wWU4CSimCard(Object.assign({}, o, { hexes: wUmbTakeHex(WU4C, 'hexes'), hexOn: 0 })) : wWU4CSimCard(o);
 
 /* ---------- on screen ---------- */
 const wWU4CBallName = wBallName;

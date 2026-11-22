@@ -77,8 +77,8 @@ wGridOpp = function (club, tier) { return club === W_UMB4B.club ? wUmbGfTeam() :
 /* ---------- the hexes ---------- */
 const WU4B = { next: null };
 const wWU4BGame = wGF.game, wWU4BSimGame = wGF.simGame;
-wGF.game = o => wWU4BGame(WU4B.next ? Object.assign({}, o, { hexes: WU4B.next.slice() }) : o);
-wGF.simGame = o => wWU4BSimGame(WU4B.next && !(o && o.keep) ? Object.assign({}, o, { hexes: WU4B.next.slice() }) : o);
+wGF.game = o => wWU4BGame(WU4B.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B) }) : o);
+wGF.simGame = o => wWU4BSimGame(WU4B.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B) }) : o);
 // n of football's hexes for this try of the champion: fixed for the try (the same draw after a reload)
 function wUmbGfHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wGF.hexes), r = mulberry(wUmbHash('gf:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));

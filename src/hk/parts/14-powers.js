@@ -182,7 +182,7 @@ function hkUltOptions(side) {
     // (a player may bring an ultimate of their own: 16-umbral.js)
     const own = G.teams[side].roster[p.ri].ult, U = (own && hkUltOf(own)) || HK_ULT[p.kind]; if (!U) return null;
     const why = !live ? 'Only in live play.' : G.ultUsed[side] ? 'One ultimate a game.' : G.spirit[side] < HK_SPIRIT.ult ? 'Not enough spirit.' : hkSta(p) < HK_POW_STA.min ? `${p.n} is too tired.` : '';
-    return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, id: U.id, name: U.n, desc: U.desc, ok: !why, why };
+    return { i: L.pl.indexOf(p), ri: p.ri, n: p.n, id: U.id, name: U.n, desc: U.desc, ok: !why, why, own: !!(own && hkUltOf(own)) };
   }).filter(Boolean);
 }
 function hkSitOptions(side) {
@@ -244,7 +244,7 @@ function hkCpuPowers(dt) {
     // the ultimate: a Knight when it has the spirit and the puck is in the right end; an Archmage in a close third, or behind
     const right = has ? up > HK_RULES.len - HK_RULES.blue : up < HK_RULES.blue + 2;
     const us = hkUltOptions(s).filter(o => o.ok);
-    if (us.length && right && (sk === 0 ? R() < .1 : sk === 1 ? true : (G.p >= HK_RULES.periods && Math.abs(hkLead(s)) <= 1) || hkLead(s) < 0 || hkOt())) { hkCastUlt(s, pick(us).i); continue; }
+    if (us.length && right && (sk === 0 ? R() < .1 : sk === 1 ? true : (G.p >= HK_RULES.periods && Math.abs(hkLead(s)) <= 1) || hkLead(s) < 0 || hkOt())) { hkCastUlt(s, (us.find(o => o.own) || pick(us)).i); continue; } // (a player's own ultimate first)
     const os = hkPowerOptions(s).filter(o => o.ok); if (!os.length) continue;
     if (sk === 0) { if (R() < .06) hkCast(s, pick(os).i); continue; }
     if (!right) continue;

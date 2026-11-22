@@ -87,6 +87,9 @@ wNadirMatch = function (id) {
   // (the adapter charges the toll itself, at the real kickoff, through wUmbTollAtKickoff: backing out costs nothing)
   return go(C, id, wUmbHexes(id, C.hexes || 1));
 };
+// the hexes an adapter hands its engine's start: taken by the first game started (and cleared), so a game the world
+// plays in the same moment (a league fixture simulated across a midnight) never picks them up
+function wUmbTakeHex(o, k) { k = k || 'next'; const h = o[k] ? o[k].slice() : []; o[k] = null; return h; }
 // a retry's toll, paid once per try when the game really starts (an adapter calls it after Play, Manage or Simulate)
 function wUmbTollAtKickoff(id) {
   const C = W_NADIR[id], U = wUmb(); if (!C || !U) return 0;

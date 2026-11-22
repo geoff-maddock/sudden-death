@@ -95,12 +95,12 @@ function wUmb4aGo(id, hexes, how) {
   // the toll, at the first pitch: once you have chosen to play, before any result
   if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
   const keep = W_BALL.rules;
-  W_UMB4A.going = { id };
+  W_UMB4A.going = { id }; W_UMB4A.keep = keep;
   // the hexes ride on the game's rules (kept in its snapshot); the Bone Nine are at home (side 1) and cast them
   W_BALL.rules = Object.assign({}, keep, { hexes: hexes.slice(), hexBy: 1 });
   try {
     return wStartBall({ club: W_UMB4A.club, how, home: false, tier: W_UMB4A.tier, kind: 'unadir_ball', ref: { id, hexes: hexes.slice() }, cup: true });
-  } finally { W_BALL.rules = keep; W_UMB4A.going = null; }
+  } finally { W_BALL.rules = keep; W_UMB4A.going = null; W_UMB4A.keep = null; }
 }
 function wUmb4aCard(C0, id, hexes) {
   const C = C0.star ? C0 : Object.assign({}, W_NADIR.diamond, { char: C0.char, piece: C0.piece, toll: C0.toll }), ch = DB.chars[C.char], HX = wBD.hexes(), U = wUmb(), tries = (U && U.tries[id]) || 0;
@@ -163,3 +163,8 @@ wUmbPlaceGround = function (g) {
   }
   return r;
 };
+// (the game's options carry the hexes from here: the shared rules go back the moment the engine starts, so a game the
+// world plays in the same moment, a league or cup sim across a midnight, never picks them up)
+const wWU4ABdSim = wBD.sim, wWU4ABdStart = wBD.start;
+wBD.sim = function () { if (W_UMB4A.keep) { W_BALL.rules = W_UMB4A.keep; W_UMB4A.keep = null; } return wWU4ABdSim.apply(this, arguments); };
+wBD.start = function () { if (W_UMB4A.keep) { W_BALL.rules = W_UMB4A.keep; W_UMB4A.keep = null; } return wWU4ABdStart.apply(this, arguments); };
