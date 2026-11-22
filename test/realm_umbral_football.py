@@ -83,7 +83,7 @@ async def main():
         C = ch['C']
         check(C['ground'] == 'g_bowl' and C['map'] == 'u:g_bowl' and C['region'] == 'ember' and C['engine'] == 'gridiron' and C['piece'] == 'football' and C['hexes'] in (1, 2) and ch['map'],
               'the Cinder Pit\'s champion holds the Ash Ball and stands on the dark ground', ch)
-        check('PLAY' in ch['greet'] and 'RULES' in ch['greet'] and ch['play'] == 'unadir:gridiron' and ch['qb'] == 'Ossian Pyre' and ch['ult'] == 'eclipse' and ch['n'] == 10,
+        check('PLAY' in ch['greet'] and 'RULES' in ch['greet'] and ch['play'] == 'unadir:gridiron' and ch['qb'] == 'Ossian Pyre' and ch['ult'] == 'nadirEclipse' and ch['n'] == 10,
               'he says PLAY and RULES, and fields the Nadir seven and a bench, himself at quarterback with his own ultimate', ch)
         check(ch['h1'] == ch['h2'] and len(ch['h1']) == C['hexes'], 'the hexes for a try are fixed (a reload draws the same)', ch)
         check(ch['audit'] == [], 'the audit is clean', ch['audit'])

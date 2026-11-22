@@ -72,6 +72,18 @@ async def main():
         hc = await pg.evaluate("""(() => { const U = WG.umbral; U.sealed = 0; U.finale = 1; WG.hardcore = true; let ended = null; const r0 = recordRun, s0 = showEnd; recordRun = k => { ended = k; }; showEnd = () => {};
           wUmbFinale(); W_ON_END.nadir('lose', { id: 'finale' }); recordRun = r0; showEnd = s0; WG.hardcore = false; return { ended }; })()""")
         check(hc['ended'] == 'lose', 'in a Hardcore journey, a lost engine round ends the journey', hc)
+        # (the real adapters, as the bots drive them (LAB simulates at once): a round of the Seal in each finished sport plays
+        # and is reported, a round won or a try counted, and nothing throws)
+        ra = await pg.evaluate("""(() => { const out = {}, U = WG.umbral; WG.hardcore = false; U.sealed = 0;
+          LAB = true; for (const k of ['goblin', 'dwarf', 'ogre', 'elf']) wRecruit({ kind: k, lvl: 5 }, 'tavern'); LAB = false;
+          for (const [piece, e] of [['baseball', 'diamond'], ['football', 'gridiron'], ['boxing', 'ring']]) {
+            if (!window['__real_' + e]) { out[piece] = 'no adapter'; continue; }
+            W_UMB4.start[e] = window['__real_' + e]; U.finaleSports = [piece, 'card', 'golf']; U.finale = 0; U.tries.finale = 0;
+            let why; try { LAB = true; why = wUmbFinale(); } catch (err) { why = 'threw: ' + err.message; } finally { LAB = false; }
+            out[piece] = { why: why || '', moved: (U.finale || 0) + (U.tries.finale || 0) };
+          }
+          return out; })()""")
+        check(all(isinstance(v, dict) and v['why'] == '' and v['moved'] == 1 for v in ra.values()), 'a round of the Seal through each finished sport\'s real adapter plays and is reported', ra)
         aud = await pg.evaluate("wAudit()")
         check(aud == [], 'the audit is clean', aud)
         check(not errs, 'no page errors', errs[:5])

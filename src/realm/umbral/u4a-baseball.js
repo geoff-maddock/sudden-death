@@ -54,7 +54,8 @@ function wUmb4aHexes(id, n) {
 /* at your nine's level, W_BALL.oppBonus[tier] on every rating, the Lich (def.diff), dark kinds first, and the champion
    on the mound: W_UMB4A.star more on every rating and her own pitch */
 function wUmb4aNine(tier, id) {
-  const C = W_NADIR[id || 'diamond'], S = C.star, lvl = wNineTier(), k = W_BALL.oppBonus[tier] || 0, T = W_UMB4A.team;
+  // (the finale's round has no side of its own: it is Vesper Quill's Bone Nine, her star and all)
+  const C0 = W_NADIR[id || 'diamond'], C = C0 && C0.star ? C0 : W_NADIR.diamond, S = C.star, lvl = wNineTier(), k = W_BALL.oppBonus[tier] || 0, T = W_UMB4A.team;
   const used = new Set(), names = new Set([S.n]);
   const mk = (pos, as) => {
     const ks = wBD.kindsAt(pos), kind = W_UMB4A.kinds.find(x => ks.includes(x) && !used.has(x)) || ks.find(x => !used.has(x)) || pick(ks);
@@ -101,13 +102,13 @@ function wUmb4aGo(id, hexes, how) {
     return wStartBall({ club: W_UMB4A.club, how, home: false, tier: W_UMB4A.tier, kind: 'unadir_ball', ref: { id, hexes: hexes.slice() }, cup: true });
   } finally { W_BALL.rules = keep; W_UMB4A.going = null; }
 }
-function wUmb4aCard(C, id, hexes) {
-  const ch = DB.chars[C.char], HX = wBD.hexes(), U = wUmb(), tries = (U && U.tries[id]) || 0;
+function wUmb4aCard(C0, id, hexes) {
+  const C = C0.star ? C0 : Object.assign({}, W_NADIR.diamond, { char: C0.char, piece: C0.piece, toll: C0.toll }), ch = DB.chars[C.char], HX = wBD.hexes(), U = wUmb(), tries = (U && U.tries[id]) || 0;
   const close = modal(`<header><h3>${esc(ch.name)}</h3><button class="ghost" data-close>Not yet</button></header>
-    <div class="wmsg"><p><b>The Bone Diamond: the ${esc(W_UMB4A.team.name)}.</b> ${W_BALL.innings} innings for ${esc(W_UMB_PIECES[C.piece].n)}.</p>
+    <div class="wmsg"><p><b>The Bone Diamond: the ${esc(W_UMB4A.team.name)}.</b> ${W_BALL.innings} innings for ${esc(C.piece ? W_UMB_PIECES[C.piece].n : 'a round of the Seal')}.</p>
     <p class="hint wumbpg"><b>The Umbral: tier U.</b> Their players are level ${wNineTier()}, your nine's level, with ${W_BALL.oppBonus[W_UMB4A.tier]} more on every rating, and the CPU plays them as a ${W_BALL_SKILL[W_BALL.diff[W_UMB4A.tier]]}: it reads your pitches sooner, chases less and fields and runs sharper. ${esc(C.star.n)} pitches, with her own Dead Ball.</p>
     <p class="hint wumbpg" id="wUmbHexes"><b>Hexes:</b> ${hexes.map(h => `${esc(HX[h].n)} (${esc(HX[h].d)})`).join(' ')}</p>
-    <p class="hint">${tries > 0 ? `This game costs the toll, ${C.toll} gold, at the first pitch.` : 'The first game is free; the next costs a toll.'} <b>Play</b>: you pitch, swing and run. <b>Manage</b>: your players cast their own powers. <b>Simulate</b>: the result now.</p></div>
+    <p class="hint">${!C.toll ? '' : tries > 0 ? `This game costs the toll, ${C.toll} gold, at the first pitch. ` : 'The first game is free; the next costs a toll. '}<b>Play</b>: you pitch, swing and run. <b>Manage</b>: your players cast their own powers. <b>Simulate</b>: the result now.</p></div>
     <div class="row">${Object.keys(W_BALL_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-uhow="${how}">${W_BALL_HOW[how]}</button>`).join('')}</div>`);
   $('modalBox').querySelectorAll('[data-uhow]').forEach(b => b.onclick = () => {
     close();
@@ -125,9 +126,13 @@ W_UMB4.start.diamond = function (C, id) {
 };
 // the final: a win pays the piece, a loss counts a try (wBallSettle has paid the ball game's own XP, gold and fans)
 W_ON_END.unadir_ball = function (r, ref) {
-  if (!ref || !W_NADIR[ref.id]) return;
+  // (always reported: the finale's entry is rebuilt by u5 if a reload lost it)
+  if (!ref || !ref.id) return;
   wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose');
 };
+// after a Hardcore journey ends on the finale's lost round, the ball game's result card stays off the end screen
+const wWU4ABallResultCard = wBallResultCard;
+wBallResultCard = function () { if (RUN && RUN.over) return; return wWU4ABallResultCard.apply(this, arguments); };
 
 /* ---------- the bar above the field ---------- */
 const wWU4ABallBar = wBallBar;

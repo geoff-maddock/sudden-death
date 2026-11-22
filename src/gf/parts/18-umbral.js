@@ -73,7 +73,8 @@ function gfQuarter() { if (!GD || !GD.game || !G.half) return 1; if (G.half >= 3
 function gfGoalOf(side) { return GF_RULES.field - (G && G.hex && side !== G.hex.on ? G.hex.short || 0 : 0); }
 function gfGoal() { return gfGoalOf(G.poss); }
 // a new drive: The Pit Closes moves the end zone for the quarter, and the chains go to the new goal line
-function gfHexDrive() { if (gfHexHas('shrink')) { G.hex.short = GF_HEX.shrink.yd * (gfQuarter() - 1); if (G.down === 1) gfFirstDown(); } }
+// (never past the ball: a drive that starts deep never starts on or over the moved line)
+function gfHexDrive() { if (gfHexHas('shrink')) { G.hex.short = GF_HEX.shrink.yd * (gfQuarter() - 1); if (G.poss !== G.hex.on) G.hex.short = Math.max(0, Math.min(G.hex.short, GF_RULES.field - G.ball - 1)); if (G.down === 1) gfFirstDown(); } }
 const gfHexWind = (side, k) => gfHexOn('ashwind', side) ? GF_HEX.ashwind.yd : 0;
 const gfHexCold = side => gfHexOn('chill', side) ? GF_HEX.chill.k : 1;
 const gfHexFum = side => gfHexOn('rolldark', side) ? GF_HEX.rolldark.x : 1;
@@ -90,5 +91,6 @@ function gfHexDrawField(c, top, bot) {
   c.strokeStyle = '#c8b8ff'; c.lineWidth = 3; c.setLineDash([8, 6]); c.beginPath(); c.moveTo(edge, top); c.lineTo(edge, bot); c.stroke(); c.restore();
 }
 
-/* ---------- the Nadir captain's ultimate (a player brings it as { ult: 'eclipse' }, 04-teams.js) ---------- */
-GF_ULT_BY.eclipse = { id: 'eclipse', n: 'Eclipse', role: 'def', desc: 'The sun goes out over the field: their offense 12% slower, and their throws far wilder, while it lasts.', zone: { oSpd: .88, errM: 1.3 }, vis: ['#6a4a8a', 'all'] };
+/* ---------- the Nadir captain's ultimate (a player brings it as { ult: 'nadirEclipse' }, 04-teams.js) ---------- */
+// (its own id: the vampire's ultimate is 'eclipse', and ids must not clash)
+GF_ULT_BY.nadirEclipse = { id: 'nadirEclipse', n: 'Eclipse', role: 'def', desc: 'The sun goes out over the field: their offense 12% slower, and their throws far wilder, while it lasts.', zone: { oSpd: .88, errM: 1.3 }, vis: ['#6a4a8a', 'all'] };

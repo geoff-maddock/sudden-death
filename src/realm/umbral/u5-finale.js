@@ -40,6 +40,8 @@ DB.chars.nadir_aurelia = { name: 'Hollow Aurelia', kind: 'wraith', look: { coat:
 
 /* ---------- the finale ---------- */
 // the champion who held a piece (not the finale's own entries)
+// (a round of the Seal holds no piece: an adapter's card that names the piece reads this instead of failing)
+Object.defineProperty(W_UMB_PIECES, 'null', { value: { n: 'a round of the Seal', sport: 'the Seal' }, enumerable: false });
 const wUmbChampOf = piece => Object.keys(W_NADIR).find(k => W_NADIR[k].piece === piece && !('finale' in W_NADIR[k])) || null;
 // the three ways to play where your record is weakest: the most tries taken; ties in the pieces' own order
 function wUmbFinaleSports() {
@@ -55,8 +57,13 @@ const wUmbClean = piece => { const U = wUmb(), c = wUmbChampOf(piece); return !!
 function wUmbFinaleEntry() {
   const U = wUmb(); if (!U) return null;
   const r = Math.min(U.finale || 0, W_UMB5.rounds - 1), piece = wUmbFinaleSports()[r], eng = W_UMB5.engine[piece];
-  return W_NADIR.finale = Object.assign({ piece: null, finale: r, char: 'nadir_aurelia', region: 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
+  // (an engine round is that sport's champion's game, their side and all, with Aurelia's name on it: no ground, no
+  // piece, no toll)
+  const base = eng ? W_NADIR[wUmbChampOf(piece)] || {} : {};
+  const C = Object.assign({}, base, { piece: null, finale: r, char: 'nadir_aurelia', region: base.region || 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
     eng ? {} : { ids: W_UMB5.card.ids.slice(), type: W_UMB5.card.type });
+  delete C.ground; delete C.map; delete C.cond;
+  return W_NADIR.finale = C;
 }
 function wUmbFinale() {
   const U = wUmb(); if (!U) return 'Nobody here plays.';

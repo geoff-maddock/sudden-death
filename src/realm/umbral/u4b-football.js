@@ -25,7 +25,7 @@ const W_UMB4B = {
   // their level against your team's (0: level for level), and the seven, then the bench
   gap: 0,
   seven: [
-    { n: 'Ossian Pyre', kind: 'lich', num: 1, ult: 'eclipse', qb: true }, { n: 'Cinderjaw', kind: 'minotaur', num: 33 }, { n: 'Slagheart', kind: 'golem', num: 70 },
+    { n: 'Ossian Pyre', kind: 'lich', num: 1, ult: 'nadirEclipse', qb: true }, { n: 'Cinderjaw', kind: 'minotaur', num: 33 }, { n: 'Slagheart', kind: 'golem', num: 70 },
     { n: 'Ashbone', kind: 'dwarf', num: 66 }, { n: 'Grue', kind: 'troll', num: 77 }, { n: 'Vesk', kind: 'wraith', num: 13 }, { n: 'Hollow Wren', kind: 'goblin', num: 81 },
     { n: 'Soot', kind: 'zombie', num: 52 }, { n: 'Rattlebrand', kind: 'skeleton', num: 4 }, { n: 'Emberfang', kind: 'werewolf', num: 28 },
   ],
@@ -90,7 +90,7 @@ const wUmbGfHexWords = hx => hx.map(h => wGF.hexes[h]).filter(Boolean);
 /* ---------- PLAY: the card, then kickoff ---------- */
 function wUmbGfCard(C, id, hx) {
   const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4B.gap));
-  const eu = wGF.ult('eclipse'), H = wUmbGfHexWords(hx);
+  const eu = wGF.ult('nadirEclipse'), H = wUmbGfHexWords(hx);
   // (the frame of phase 4 charged the toll as the card opened; it no longer does: then backing away gives it back)
   const oldFrame = typeof wUmbTollAtKickoff !== 'function' && tries > 0;
   let went = false;
@@ -124,3 +124,6 @@ W_UMB4.start.gridiron = function (C, id) {
 };
 // the end: the piece, or a try counted (a tie is not a win)
 W_ON_END[W_UMB4B.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
+// after a Hardcore journey ends on the finale's lost round, the football result card stays off the end screen
+const wWU4BGridResultCard = wGridResultCard;
+wGridResultCard = function () { if (RUN && RUN.over) return; return wWU4BGridResultCard.apply(this, arguments); };
