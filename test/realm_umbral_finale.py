@@ -46,22 +46,27 @@ async def main():
         check(fn['sports'][0] == 'card' and len(fn['sports']) == 3 and fn['fixed'] == fn['sports'], 'the three rounds are where your record is weakest (the most tries first), chosen once', fn)
 
         r1 = await pg.evaluate("""(() => { const U = WG.umbral, out = {}, keep = beginFight; beginFight = enc => { UI.busy = false; startCombat(enc.ids, enc.type, enc.sport, enc.trait); }; LAB = true;
-          wRunAct('ufinale', 'nadir_aurelia'); out.card = { kind: RUN.pending.world.kind, ids: RUN.pending.ids.slice(), hexes: RUN.pending.world.hexes.length, umb: !!B.umb };
+          U.tries.gate = 1; wRunAct('ufinale', 'nadir_aurelia'); out.card = { kind: RUN.pending.world.kind, ids: RUN.pending.ids.slice(), hexes: RUN.pending.world.hexes.length, umb: !!B.umb };
           B = null; RUN.pending = null;
           // (a piece won cleanly: one hex fewer in its round)
-          U.clean = { card: 1 }; wUmbFinale(); out.clean = RUN.pending.world.hexes.length; B = null; RUN.pending = null; LAB = false; beginFight = keep;
+          U.tries.gate = 0; wUmbFinale(); out.clean = RUN.pending.world.hexes.length; B = null; RUN.pending = null; LAB = false; beginFight = keep;
           W_ON_END.nadir('win', { id: 'finale' }); out.after1 = U.finale;
           __ad.length = 0; wUmbFinale(); out.r2 = __ad.slice(); W_ON_END.nadir('lose', { id: 'finale' }); out.lost = [U.finale, U.tries.finale];
           // (a reload mid-round loses the in-memory entry: the result still finds its round)
           wUmbFinale(); delete W_NADIR.finale; W_ON_END.nadir('win', { id: 'finale' }); out.after2 = U.finale;
           wUmbFinale(); W_ON_END.nadir('win', { id: 'finale' });
           out.sealed = { sealed: !!U.sealed, year: U.sealedYear, map: WG.map, scene: !!document.getElementById('wUmbSealed'), portal: wTileAt(MAPS.umbralden, ...W_UMB.portal.umbralden), eclipse: wUmbEclipse(), again: wUmbFinale() };
+          const g = (() => { const m = MAPS.coliseum; for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.t[y][x] === 'G') return [x, y]; })();
+          out.after = { statue: wLookText(g[0], g[1]), herald: MAPS.coliseum.npcs.some(n => n.id === 'uherald'), journal: wUmbJournal()[0] };
+          wEnterMap('umbralden', 2, 6); out.after.look = wLookText(...W_UMB.portal.umbralden); wEnterMap('coliseum', 5, 5);
           document.getElementById('wUmbSealed').click();
           return out; })()""")
         check(r1['card']['kind'] == 'nadir' and r1['card']['ids'][0] == 'u_aurelia' and r1['card']['hexes'] == 2 and r1['card']['umb'], 'a card round is an Umbral card match against Hollow Aurelia, with two hexes', r1)
         check(r1['clean'] == 1, 'a piece won at the first try takes a hex off its round', r1)
         check(r1['after1'] == 1 and len(r1['r2']) == 1 and r1['r2'][0]['id'] == 'finale' and r1['lost'] == [1, 1] and r1['after2'] == 2, 'an engine round goes to its sport\'s adapter; a lost round is tried again, from that round', r1)
         S = r1['sealed']
+        A = r1.get('after', {})
+        check('white again' in A.get('statue', '') and not A.get('herald') and A.get('journal') == 'sealed' and 'tear' not in A.get('look', 'tear'), 'after the Seal: the statue\'s block is white again, the herald is gone, the journal says so, and nothing of the portal shows', A)
         check(S['sealed'] and S['map'] == 'coliseum' and S['scene'] and S['portal'] != 'D' and not S['eclipse'] and 'forged' in S['again'], 'win the third and the Seal is forged: back in the Crown Coliseum, the portal shut, no more eclipses, a closing scene', r1)
 
         hc = await pg.evaluate("""(() => { const U = WG.umbral; U.sealed = 0; U.finale = 1; WG.hardcore = true; let ended = null; const r0 = recordRun, s0 = showEnd; recordRun = k => { ended = k; }; showEnd = () => {};

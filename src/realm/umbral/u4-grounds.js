@@ -16,6 +16,8 @@
 
    W_UMB4, wUmbNadirEnd, wUmbGuardOf, wUmbGuardMatch, wUmbTollAtKickoff, wUmbFieldEnd, wUmbFarEnd, wUmbPlaceGround
    An adapter charges a retry's toll itself, at the real kickoff (wUmbTollAtKickoff), so backing out costs nothing.
+   An adapter settles a drawn game itself (a loss, or play it again) before it reports, and after a Hardcore journey
+   ends on a loss (the finale's) it must not draw over the end screen.
    The gate's items are not sold in the dark shops (W_UMB2.noSell).
    Wraps: wNadirMatch (wWU4NadirMatch: the guards, the gate, an engine's champion), wRunAct (wWU4RunAct: a guard's
    PLAY), wUmbralMap (wWU4UmbralMap: a ground's field look, scoreboard and sign), wTryMove (wWU4TryMove: the cold),
@@ -85,7 +87,7 @@ wNadirMatch = function (id) {
 function wUmbTollAtKickoff(id) {
   const C = W_NADIR[id], U = wUmb(); if (!C || !U) return 0;
   const t = U.tries[id] || 0; U.paid = U.paid || {};
-  if (!t || U.paid[id] === t) return 0;
+  if (!t || !C.toll || U.paid[id] === t) return 0;
   U.paid[id] = t; RUN.gold = Math.max(0, RUN.gold - C.toll); wLog(`You pay the toll: ${C.toll} gold.`, 'd'); wSave();
   return C.toll;
 }

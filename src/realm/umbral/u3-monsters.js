@@ -128,7 +128,8 @@ wPreGame = function (enc) {
 /* ---------- the champions ---------- */
 // a champion's hexes for this try: drawn from the table, fixed for the try (so a reload doesn't redraw them)
 function wUmbHexes(id, n) {
-  const U = wUmb(), ks = Object.keys(W_UMB3.hexes), r = mulberry(wUmbHash(id) + 977 * ((U && U.tries[id]) || 0) + (WG.year || 1));
+  // (the finale's rounds each draw their own: the round is in the seed)
+  const U = wUmb(), ks = Object.keys(W_UMB3.hexes), r = mulberry(wUmbHash(id) + 977 * ((U && U.tries[id]) || 0) + (WG.year || 1) + (id === 'finale' && U ? 1013 * (U.finale || 0) : 0));
   const out = []; while (out.length < Math.min(n, ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
   return out;
 }

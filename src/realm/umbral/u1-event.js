@@ -64,7 +64,7 @@ const W_UMB1_INNS = ['hq_inn', 'moss_inn', 'salt_inn', 'cind_inn', 'rime_inn'];
 const wWU1Say = wSay;
 wSay = function (id, kw) {
   const r = wWU1Say.apply(this, arguments);
-  if (!kw && r && r.text && wFlag('umbral_open') && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
+  if (!kw && r && r.text && wFlag('umbral_open') && wUmbOpen() && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
   return r;
 };
 
@@ -72,12 +72,12 @@ wSay = function (id, kw) {
 function wUmbHeraldSync() {
   const m = MAPS.coliseum; if (!m) return;
   const i = m.npcs.findIndex(n => n.id === 'uherald');
-  if (wUmbOn() && i < 0) {
+  if (wUmbOpen() && i < 0) {
     const [hx, hy] = W_UMB1.herald, free = (x, y) => { const c = m.t[y] && m.t[y][x], td = c && DB.tiles[c]; return td && td.walk && !td.enter && !m.npcs.some(n => n.x === x && n.y === y) && !(WG && WG.map === 'coliseum' && WG.x === x && WG.y === y); };
     let at = free(hx, hy) ? [hx, hy] : null;
     for (let r = 1; !at && r < 5; r++) for (let dy = -r; dy <= r && !at; dy++) for (let dx = -r; dx <= r && !at; dx++) if (free(hx + dx, hy + dy)) at = [hx + dx, hy + dy];
     if (at) m.npcs.push({ id: 'uherald', x: at[0], y: at[1], fixed: true });
-  } else if (!wUmbOn() && i >= 0) m.npcs.splice(i, 1);
+  } else if (!wUmbOpen() && i >= 0) m.npcs.splice(i, 1);
 }
 // the herald is placed when the Umbral opens, not by the map: the audit asks only that there is room for him by the statue
 const wWU1Audit = wAudit;
@@ -188,12 +188,12 @@ wNewDay = function () { wWU1NewDay.apply(this, arguments); if (!LAB && wUmbEclip
 const wWU1Ambient = wAmbient;
 wAmbient = function (m, preReg) {
   wWU1Ambient.apply(this, arguments);
-  if (!LAB && wUmbOn() && m && m.kind === 'town' && !m.umbral && WG.step % 13 === 0 && Math.random() < .3) wLog(pick(W_UMB1.dreams), 'd');
+  if (!LAB && wUmbOpen() && m && m.kind === 'town' && !m.umbral && WG.step % 13 === 0 && Math.random() < .3) wLog(pick(W_UMB1.dreams), 'd');
 };
 const wWU1LookText = wLookText;
 wLookText = function (x, y) {
   const m = wCurMap();
-  if (wUmbOn() && m && m.id === 'coliseum' && wTileAt(m, x, y) === 'G') return 'A statue of Aurelia Vance. The smooth block beside it, waiting for the next champion\'s name, has turned black, and it is cold to the touch.';
+  if (wUmbOn() && m && m.id === 'coliseum' && wTileAt(m, x, y) === 'G') return wUmb().sealed ? 'A statue of Aurelia Vance. The block beside it is white again, and somebody has carved your team\'s name in it.' : 'A statue of Aurelia Vance. The smooth block beside it, waiting for the next champion\'s name, has turned black, and it is cold to the touch.';
   return wWU1LookText.apply(this, arguments);
 };
 
@@ -201,6 +201,7 @@ wLookText = function (x, y) {
 function wUmbJournal() {
   const U = wUmb(); if (!U) return [0, ''];
   const got = U.pieces.length;
+  if (U.sealed) return ['sealed', `<div class="wumbj"><p>The Seal of the Crown is forged, in year ${U.sealedYear || WG.year}. You won back all nine pieces and beat Hollow Aurelia's Nadir Athletic in the Hollow Coliseum; the portal at the end of the Road to Nowhere is shut, and the eclipses are over.</p><button class="ghost" data-umbscene="1">See the first night again</button></div>`];
   return [`${got}/9`, `<div class="wumbj"><p>The Crown cracked in your hands, and the Coliseum went dark at noon. The Pale Herald says the Seal of the Crown is broken into nine pieces, one for every way to play, and the Nadir hold them on the far side of a portal at the end of the Road to Nowhere, north of the Roost. Win them back, bring them to the portal, forge the Seal, and close the door. The herald waits by the statue in the Coliseum.</p>
     <p class="hint">Pieces won: ${got} of 9.${U.crossed ? ` You have crossed ${U.crossed} time${U.crossed === 1 ? '' : 's'}.` : ' You have not crossed yet.'}</p>
     <button class="ghost" data-umbscene="1">See it again</button></div>`];

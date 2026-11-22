@@ -12,9 +12,9 @@
    back in the Crown Coliseum, in daylight (WG.umbral.sealed, the year in sealedYear). Phase 6 hangs the rewards on it.
 
    W_UMB5, wUmbFinale, wUmbFinaleEntry, wUmbFinaleSports, wUmbSeal, wUmbSealScene
+   Once sealed, the portal is gone (u0's wUmbOpen), and so are the herald, the eclipses and the dreams (u1).
    Wraps: W_ON_END.nadir (wWU5OnNadir: a finale round's end), wRunAct (wWU5RunAct: PLAY), buildAllMaps
-   (wWU5BuildAllMaps: Aurelia in the Hollow Coliseum), wTileAt (wWU5TileAt: the light portal shut once sealed),
-   wAudit (wWU5Audit: she is placed, and every piece has its sport). */
+   (wWU5BuildAllMaps: Aurelia in the Hollow Coliseum), wAudit (wWU5Audit: she is placed, and every piece has its sport). */
 
 const W_UMB5 = {
   rounds: 3, hexes: 2,
@@ -49,8 +49,8 @@ function wUmbFinaleSports() {
   U.finaleSports = ps.map((p, i) => [p, tries(p), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).slice(0, W_UMB5.rounds).map(x => x[0]);
   return U.finaleSports;
 }
-// a piece won at the first try: its round draws one hex fewer
-const wUmbClean = piece => { const U = wUmb(), c = wUmbChampOf(piece); return !!(U && c && U.pieces.includes(piece) && (U.clean || {})[piece]); };
+// a piece won at the first try (held, and its champion never beat you): its round draws one hex fewer
+const wUmbClean = piece => { const U = wUmb(), c = wUmbChampOf(piece); return !!(U && c && U.pieces.includes(piece) && !U.tries[c]); };
 // the round being played, as a champion's entry (W_NADIR.finale): made from WG.umbral, so a reload mid-round finds it
 function wUmbFinaleEntry() {
   const U = wUmb(); if (!U) return null;
@@ -72,11 +72,7 @@ const wWU5OnNadir = W_ON_END.nadir;
 W_ON_END.nadir = function (r, ref) {
   if (ref && ref.id === 'finale' && !W_NADIR.finale) wUmbFinaleEntry();
   const C = ref && W_NADIR[ref.id], U = wUmb();
-  if (!C || !('finale' in C) || !U) {
-    // a champion's piece won at the first try is a clean win (its finale round draws one hex fewer)
-    if (r === 'win' && C && U && !(U.tries[ref.id]) && C.piece) { U.clean = U.clean || {}; U.clean[C.piece] = 1; }
-    return wWU5OnNadir.apply(this, arguments);
-  }
+  if (!C || !('finale' in C) || !U) return wWU5OnNadir.apply(this, arguments);
   if (r === 'win') {
     U.finale = (U.finale || 0) + 1;
     if (U.finale >= W_UMB5.rounds) { wUmbSeal(); return; }
@@ -92,6 +88,7 @@ W_ON_END.nadir = function (r, ref) {
 function wUmbSeal() {
   const U = wUmb(); U.sealed = WG.dayAbs; U.sealedYear = WG.year; U.finale = W_UMB5.rounds;
   wLog(`The Seal is forged. The nine pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
+  wUmbHeraldSync(); // (the herald has nothing more to say: he goes)
   const m = MAPS.coliseum; wEnterMap('coliseum', m.spawn[0], m.spawn[1]); WG.face = 'u';
   wInvalidate('umbralden'); wSave();
   if (!LAB) wUmbSealScene();
@@ -111,12 +108,7 @@ wRunAct = function (act, id) {
   if (act === 'ufinale') { WUI.held = null; if (WUI.talk) wCloseTalk(); const why = wUmbFinale(); if (why) wLog(why, 'b'); return; }
   return wWU5RunAct.apply(this, arguments);
 };
-// once sealed, the light portal is gone
-const wWU5TileAt = wTileAt;
-wTileAt = function (map, x, y) {
-  if (map.uPortal && map.uPortal[0] === x && map.uPortal[1] === y && wUmb() && wUmb().sealed) return map.t[y][x];
-  return wWU5TileAt.apply(this, arguments);
-};
+// (once sealed, the portal is gone: u0's wUmbOpen)
 // Aurelia in the Hollow Coliseum, by the statue's mirror
 const wWU5BuildAllMaps = buildAllMaps;
 buildAllMaps = function () {

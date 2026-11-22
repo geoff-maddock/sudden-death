@@ -39,6 +39,8 @@ const W_UMB = {
 
 const wUmb = () => (typeof WG !== 'undefined' && WG && WG.umbral) || null;
 const wUmbOn = () => !!wUmb();
+// the portal is open: the Umbral is, and the Seal is not yet forged
+const wUmbOpen = () => !!wUmb() && !wUmb().sealed;
 // the map you are on is a dark one
 const wUmbDark = m => !!(m || (typeof WG !== 'undefined' && WG && MAPS[WG.map]) || {}).umbral;
 
@@ -118,7 +120,7 @@ function wUmbPortal(m, x, y, dark) {
   m.meta[x + ',' + y] = { portal: 1, look: 'The portal, from the wrong side. Through it, faintly, snow that is white.' };
   m.light.push([x, y, 3.2]);
 }
-const wUmbPortalAt = (m, x, y) => !!m && (m.uPortal ? m.uPortal[0] === x && m.uPortal[1] === y && wUmbOn() : !!(m.meta[x + ',' + y] || {}).portal);
+const wUmbPortalAt = (m, x, y) => !!m && (m.uPortal ? m.uPortal[0] === x && m.uPortal[1] === y && wUmbOpen() : !!(m.meta[x + ',' + y] || {}).portal);
 const wWU0BuildAllMaps = buildAllMaps;
 buildAllMaps = function () {
   const r = wWU0BuildAllMaps.apply(this, arguments);
@@ -134,7 +136,7 @@ buildAllMaps = function () {
 const wWU0TileAt = wTileAt;
 wTileAt = function (map, x, y) {
   const c = wWU0TileAt(map, x, y);
-  return map.uPortal && map.uPortal[0] === x && map.uPortal[1] === y && wUmbOn() ? 'D' : c;
+  return map.uPortal && map.uPortal[0] === x && map.uPortal[1] === y && wUmbOpen() ? 'D' : c;
 };
 const wWU0LookText = wLookText;
 wLookText = function (x, y) {
