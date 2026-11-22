@@ -108,6 +108,7 @@ function gfDrawField(c) {
   for (let a = 1; a < 100; a++) { const p = gfScr(a, 0); if (p.x < 0 || p.x > 960 || a % 5 === 0) continue; for (const hy of [-3.1, 3.1]) { const q = gfScr(a, hy); c.fillStyle = 'rgba(240,236,224,.45)'; c.fillRect(q.x - .5, q.y - 3, 1, 6); } }
   for (let a = 10; a < 100; a += 10) { const n = String(a <= 50 ? a : 100 - a); for (const ny of [-19, 19]) { const p = gfScr(a, ny); if (p.x > -30 && p.x < 990) txt(c, n, p.x, p.y + 7, '700 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(240,236,224,.55)', 'center'); } }
   c.restore();
+  if (G.hex) gfHexDrawField(c, top, bot);
   for (const s of [0, 1]) { const p = gfScr(s ? 105 : -5, 0); if (p.x > -100 && p.x < 1060) { c.save(); c.translate(p.x, p.y); c.rotate(s ? Math.PI / 2 : -Math.PI / 2); txt(c, G.teams[s].name.toUpperCase(), 0, 8, '800 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(255,240,220,.35)', 'center'); c.restore(); } }
   // the goalposts, scorched at the top
   for (const a of [-10, 110]) {
@@ -233,7 +234,7 @@ function gfDrawHud(c) {
       c.fillStyle = i < G.mana[s] ? '#a88cff' : 'rgba(168,140,255,.15)'; c.fill();
     }
   });
-  let mid = `${GF_ORD[G.down]} & ${G.togo >= GF_RULES.field - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
+  let mid = `${GF_ORD[G.down]} & ${G.togo >= gfGoal() - G.ball ? 'goal' : G.togo} · ${gfSpotName(G.ball)}`, sub = '';
   // (you call in You call and in You play; only Coaches has the coaches call it)
   const youCall = GD.mode === 'call' || GD.mode === 'play';
   if (GD.ph === 'call') sub = !youCall ? 'The coaches call it' : G.down === GF_RULES.downs ? 'Fourth down, your call: go for it, punt, or kick' : 'Your call';
@@ -244,12 +245,15 @@ function gfDrawHud(c) {
   if (GD.ph === 'call' && youCall && G.poss !== GD.you) sub = 'Your call: pick a defense';
   if (GD.ph === 'kick') sub = (GD.kick === 'fg' ? `Field goal try, ${gfKickDist()} yards` : 'Punt') + (GD.meter ? ': tap Space twice, for power and aim' : '');
   if (GD.ph === 'kickoff') { mid = `Kickoff  ·  ${GF_HALF_NAME[G.half]} ${gfClockText()}`; sub = `${G.teams[1 - GD.kickoff].name} kick to ${G.teams[GD.kickoff].name}`; }
+  if (GD.ph === 'kickoff' && G.hex && G.half === 1 && G.clock >= GF_GAME.half) sub = 'Hexes: ' + gfHexNames();
   if (GD.ph === 'half') { mid = GD.msg; sub = ''; }
   if (GD.ph === 'post' || GD.ph === 'over') { mid = GD.msg; sub = GD.ph === 'over' ? (GD.game ? gfFinalLine() : gfEndLine()) : ''; }
   txt(c, mid, 480, 27, F(18, 800), '#f3ead6', 'center');
   if (sub) txt(c, sub, 480, 49, F(15, 600), GD.ph === 'pre' ? '#ffd08a' : '#b9b0a0', 'center');
   why.forEach((l, i) => txt(c, l, 480, (sub ? 70 : 52) + i * 18, F(14, 500), '#d8cfbd', 'center'));
   if (cast.length) txt(c, 'Powers: ' + cast.join('  ·  '), 480, 72, F(14, 700), '#d6c4ff', 'center');
+  // the hexes on this game, under the bar (18-umbral.js)
+  if (G.hex) txt(c, '☾ ' + gfHexLine(), 16, h + 17, F(13, 700), '#c8b8ff', 'left');
   // a broken tackle, a shed block, the catch: the play's last moment, briefly
   if (L && GD.ph === 'live') { const e = L.ev[L.ev.length - 1]; if (GFT.why && GFT.why !== 'Touchdown!' && GFT.why !== 'Picked off!') txt(c, GFT.why, 480, 104, F(24, 900), '#ffd08a', 'center'); else if (e && L.t - e.t < .9 && e.k === 'catch') txt(c, 'Caught!', 480, 96, F(20, 800), '#ffd08a', 'center'); }
   // a power doing its work, a little longer

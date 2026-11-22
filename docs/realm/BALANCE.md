@@ -1502,3 +1502,45 @@ Strength). Measured again (60 journeys, 44 champions, 132 matches each):
 
 About ±9 points of noise on the Gatekeeper at this size: the two batches (56% and 47%) agree on about half.
 
+### Umbral: football (#99, 4b)
+
+`python3 test/realm_gridiron_lab.py N '' umbral` plays only the Umbral part: your seven at level 3 under Simulate (you
+cast as a Knight), at an even level. Tier U on the gridiron is tier 4 in the football tables: `W_GFG.oppBonus[4]`
+rating points on each of their seven, the Lich coaching (skill 3: it reads the whole down and leans to the call with
+the best matchup against what it expects, goes for it more on fourth down, swaps and drinks sooner), and their full bag
+(`W_GRID_KIT.opp[4]`). Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same game seed for
+seed (30 seeded games, before and after, identical), and the full lab at 100 a row reads as before (tier 3, all gaps:
+21.8% before, 22.4% after).
+
+**The Lich against the Archmage** (tier 2 ratings, no bags, 1,000 games each): you win 46.9% against an Archmage and
+36.5% against a Lich. The Lich is ten points better from its decisions alone.
+
+**Tier U.** First cut: 6 rating points (one more on every rating), the Lich and the full bag; the Nadir seven had an
+ogre on the line and a harpy at receiver.
+
+| even level, their bag | first cut (6 points, 200 games) | **kept (5 points, the Nadir seven with a dwarf and a goblin; 1,000 games)** |
+|---|---|---|
+| tier 3, a rival's seven (4 points, Archmage) | 29.5% | 27.2% |
+| tier U, a rival's seven | 13.5% | **18.7%** |
+| tier U, the Nadir seven (the champion's game without hexes) | 2.5% | **15.0%** |
+
+The first cut's Nadir seven was out of reach. At 5 points tier U sits between tier 3 and the target's floor, and the
+Cinder Pit's champion (Ossian Pyre at quarterback, with his own ultimate, Eclipse) is a little harder than a rival's
+seven at the same tier.
+
+**The hexes, each alone on the champion's game against none** (1,000 games each; about ±2 points of noise):
+
+| hex | win | swing | your turnovers a game |
+|---|---|---|---|
+| none | 15.0% | | 0.19 |
+| The Pit Closes (your end zone 5 yards out each quarter after the first) | 14.4% | -0.6 | 0.18 |
+| Fumbles Roll Dark (you fumble twice as often; they fall on 92%) | 11.5% | -3.5 | 0.45 |
+| Grave Cold (40% more stamina a play) | 16.0% | +1.0 | 0.19 |
+| Ash Wind (your kicks 6 yards longer, punts 6 shorter; first cut 8) | 13.3% | -1.7 | 0.19 |
+| **the champion as played, one hex drawn** | **13.2%** | | |
+
+No hex swings a game by more than about 4 points, well inside the 10-point limit. Ash Wind at 8 yards cost 8 points in
+a 200-game first look (noise at that size), and was cut to 6. Grave Cold barely shows: a game rarely runs a seven
+below half stamina, where it starts to cost ratings; at twice the stamina (500 games) it was still -1.6. The champion
+draws one hex a try (two, in the first look, put the bot at 11.5%): about 13%, a little under the 15 to 25% band (the
+Gatekeeper, the gentlest of the nine, is about half); a careful human, calling the plays, wins far more.
