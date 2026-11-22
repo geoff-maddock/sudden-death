@@ -63475,6 +63475,8 @@ const W_UMB1_INNS = ['hq_inn', 'moss_inn', 'salt_inn', 'cind_inn', 'rime_inn'];
 const wWU1Say = wSay;
 wSay = function (id, kw) {
   const r = wWU1Say.apply(this, arguments);
+  // (after the Seal, the dreams are over)
+  if (kw && r && r.key === 'dreams' && W_UMB1_INNS.includes(id) && wUmb() && wUmb().sealed) r.text = 'The dreams? They stopped, the night the sun came back. Folk eat their breakfast again.';
   if (!kw && r && r.text && wFlag('umbral_open') && wUmbOpen() && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
   return r;
 };
@@ -64496,11 +64498,12 @@ wAudit = function () {
    How to play: an Umbral section (#wHelpUmbral) once it is open; before that, one closed line.
 
    W_UMB6, wUmbAch
-   Wraps: wUmbSeal (wWU6Seal: the rewards), W_ON_END.nadir (wWU6OnNadir: the medal as pieces come in), wOpenLegends
+   Wraps: wUmbSeal (wWU6Seal: the rewards; the recruit is asked once the world is free), W_ON_END.nadir (wWU6OnNadir:
+   the medal as pieces come in), wLegendOfJourney (wWU6LegendOfJourney: the mark survives a later Crown), wOpenLegends
    (wWU6OpenLegends: the mark), wStart (wWU6Start: the rumour on a new journey), renderHelp (wWU6RenderHelp). */
 
 const W_UMB6 = { block: 6, draw: 1, key: () => pkey('sd-realm-umbral') };
-RELICS.umbseal = { n: 'The Seal of the Crown', adv: 1, desc: 'Start each match with 6 Block, and your first hand has a card more.', ico: 'gem' };
+RELICS.umbseal = { n: 'The Seal of the Crown', adv: 1, desc: 'Start each card match with 6 Block, and your first hand there has a card more.', ico: 'gem' };
 TROPHY_FX.umbseal = { on: { fightStart: () => { gainBlock(W_UMB6.block, true); } }, mod: { draw: () => (B && B.turn <= 1 ? W_UMB6.draw : 0) } };
 Object.assign(RELICS.umbseal, TROPHY_FX.umbseal); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 ACH.push({ id: 'w_umbral', n: 'The Door Shut', d: 'Win back the pieces of the Seal of the Crown, and forge it', stat: 'realmUmbral', at: [1, 4, 10] });
@@ -64526,7 +64529,8 @@ wUmbSeal = function () {
     U.redeemed = won[0];
     const lvl = Math.max(1, ...wRoster().map(p => p.lvl || 1));
     wLog(`${ch.name.split(',')[0]} walks out of the Hollow Coliseum behind you. "You beat me fairly," they say. "Nobody ever did, over there."`, 'g');
-    wRecruit({ kind: ch.kind, n: ch.name.split(',')[0], lvl }, 'tavern');
+    // (asked once the world is free, after the closing scene: a full roster's question never covers it)
+    WG.wprompts = WG.wprompts || []; WG.wprompts.push({ t: 'recruit', p: wMakePlayer({ kind: ch.kind, n: ch.name.split(',')[0], lvl }, 'quest') });
   }
   // the legend mark, on the profile
   if (!LAB) {
@@ -64536,6 +64540,9 @@ wUmbSeal = function () {
   wUmbAch(); wSave();
   return r;
 };
+// the mark survives a later Crown, which writes the journey's portrait again
+const wWU6LegendOfJourney = wLegendOfJourney;
+wLegendOfJourney = function () { const L = wWU6LegendOfJourney.apply(this, arguments), U = wUmb(); if (U && U.sealed) L.sealed = U.sealedYear || WG.year; return L; };
 const wWU6OpenLegends = wOpenLegends;
 wOpenLegends = function () {
   const r = wWU6OpenLegends.apply(this, arguments), list = wLegends();
@@ -64561,6 +64568,7 @@ renderHelp = function () {
     <p class="hint"><b>Harder everywhere.</b> Every match on the dark side is tier U: tier 3 and more (the other side has a quarter more HP and a point more Strength, and you draw a card fewer), and every player has its kind's dark trait. There are no inns: rest by a lantern, one in each region, and a match that goes badly wakes you by the last one you rested at. The dark shops sell for fans or a player's XP, never gold.</p>
     <p class="hint"><b>The pieces.</b> Nine Nadir champions hold them. The Gatekeeper, just through the portal, plays the card game. The others wait at the far end of their sport's dark ground, past the cold, two guards (each a card match) and a gate: bring them something from the light side of their region. Their games are at tier U, with one or two hexes (dark twists, named before you start). Lose, and the next try costs a toll.</p>
     <p class="hint"><b>The Seal.</b> With all nine, Hollow Aurelia plays you for the Seal in the Hollow Coliseum: three games, in your three weakest ways to play on that side. A piece you won at the first try takes a hex off its game. Lose a game and you try that one again. Win all three and the door shuts.</p>
+    <p class="hint"><b>When it shuts.</b> Forge the Seal and you keep it, a trophy: every card match starts with 6 Block and a card more in your first hand. The Nadir captain you beat most cleanly asks to join you. Your team's portrait in the Hall of Legends says you sealed it, for every later journey to see, and your profile's medal (The Door Shut) fills: bronze for the first piece, silver for four, gold for the Seal.</p>
     <p class="hint"><b>On the light side.</b> While the portal stands open, the sun goes out at midday once a week, and more often the longer it stays open. The Pale Herald, by the statue in the Coliseum, will tell you anything twice.</p></div>`);
 };
 </script>

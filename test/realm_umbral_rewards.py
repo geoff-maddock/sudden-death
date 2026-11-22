@@ -46,11 +46,18 @@ async def main():
         sl = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; U.pieces = Object.keys(W_UMB_PIECES); U.tries = {}; U.beaten = { gate: WG.dayAbs };
           WG.legId = 'Ltest'; wLegendsSave([{ id: 'Ltest', name: 'Us', short: 'US', color: '#c94a3a', light: '#fff', year: WG.year, crowns: 1, at: '2026-11-21', players: [] }]);
           const n0 = wRoster().length; U.finale = W_UMB5.rounds - 1; wUmbSeal();
-          out.relic = RUN.relics.includes('umbseal'); out.recruit = wRoster().length - n0 === 1 && wRoster().some(p => p.n === 'Morrow Vane'); out.redeemed = U.redeemed;
-          out.mark = (wLegendsAll().find(l => l.id === 'Ltest') || {}).sealed; out.medal = ACHS.stats.realmUmbral; out.rumour = JSON.parse(localStorage.getItem(pkey('sd-realm-umbral')) || 'null');
+          out.relic = RUN.relics.includes('umbseal'); out.scene = !!document.getElementById('wUmbSealed');
+          out.queued = (WG.wprompts || []).some(P => P.t === 'recruit' && P.p.n === 'Morrow Vane'); out.redeemed = U.redeemed;
+          out.mark = (wLegendsAll().find(l => l.id === 'Ltest') || {}).sealed;
+          // (a later Crown writes the portrait again: the mark stays)
+          wCupWon('crown'); out.mark2 = (wLegendsAll().find(l => l.id === 'Ltest') || {}).sealed;
+          out.medal = ACHS.stats.realmUmbral; out.rumour = JSON.parse(localStorage.getItem(pkey('sd-realm-umbral')) || 'null');
           const sc = document.getElementById('wUmbSealed'); if (sc) sc.click();
+          for (const P of WG.wprompts.splice(0)) if (P.t === 'recruit') wAddPlayer(P.p); out.recruit = wRoster().length - n0 === 1 && wRoster().some(p => p.n === 'Morrow Vane');
+          out.dreams = wSay('hq_inn', 'dreams').text;
           return out; })()""")
-        check(sl['relic'] and sl['recruit'] and sl['redeemed'] == 'gate', 'forging the Seal gives the Seal of the Crown and the cleanest-beaten champion as a recruit', sl)
+        check(sl['relic'] and sl['scene'] and sl['queued'] and sl['recruit'] and sl['redeemed'] == 'gate', 'forging the Seal gives the Seal of the Crown, shows its scene, and the cleanest-beaten champion asks to join once the world is free', sl)
+        check(sl['mark2'] and 'stopped' in sl['dreams'], 'a later Crown keeps the legend mark; the innkeepers\' dreams are over', sl)
         check(sl['mark'] and sl['medal'] == 10 and sl['rumour'] and sl['rumour']['sealed'] == 1, 'it marks your team\'s portrait, fills the medal (nine pieces and the Seal), and the profile remembers', sl)
 
         tr = await pg.evaluate("""(() => { const out = {}, keep = beginFight; beginFight = enc => { UI.busy = false; startCombat(enc.ids, enc.type, enc.sport, enc.trait); };

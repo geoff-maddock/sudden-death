@@ -64,6 +64,8 @@ const W_UMB1_INNS = ['hq_inn', 'moss_inn', 'salt_inn', 'cind_inn', 'rime_inn'];
 const wWU1Say = wSay;
 wSay = function (id, kw) {
   const r = wWU1Say.apply(this, arguments);
+  // (after the Seal, the dreams are over)
+  if (kw && r && r.key === 'dreams' && W_UMB1_INNS.includes(id) && wUmb() && wUmb().sealed) r.text = 'The dreams? They stopped, the night the sun came back. Folk eat their breakfast again.';
   if (!kw && r && r.text && wFlag('umbral_open') && wUmbOpen() && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
   return r;
 };
