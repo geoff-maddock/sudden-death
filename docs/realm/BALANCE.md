@@ -1830,3 +1830,73 @@ about 5 points in any later run, well inside the 10-point limit. The Wandering N
 the bot: the net slides away from where the puck is, so it costs shots from the wings, and the bot shoots mostly from
 the slot; a whistled side takes about 2.5 penalties a game instead of 1.3, and a power play here is worth little (see
 the hockey notes above). A human, who sees the net wander and spends more time on the wings, will feel them more.
+
+### Umbral: curling (#99, 4h)
+
+`python3 test/realm_shed_lab.py N '' umbral` (the Umbral part of the curling lab; `... umbral nadir,rime` plays only
+those rows, so rows can run in several processes). Games as Simulate plays the Sunken Shed's champion: your four at
+level 3 (the journey's kinds) curling as a Knight, against level 3 (level parity), six ends, the Shed's ways and powers
+on. Every row plays game i on the same seed with the same two fours (Math.random seeded while they are drawn), so the
+rows are paired and a run is repeatable exactly; a hex's swing is measured on the same games as the row without it.
+About 1.2 s a game with the Lich in the page, so the tuning was done head to head in node on the engine alone (400
+games a row over ten processes, your four elf, spider, gorgon and dwarf at their kind's ratings, the same seeds in every
+row), and the lab run at the end.
+
+Tier U at the Shed is tier 4 in curling's tables: `W_SHG.oppBonus[4]` (1) rating point on each of their four, a full
+bag (`W_SHED_KIT.opp[4]`: two Stamina Draughts, a Warming Draught, two Frost Salts and Hennock's Pebble) and the Lich
+skipping (skill 3, its own row `CR_LICH` in `src/cr/parts/15-umbral.js`, so the exhibition still offers three skips).
+Tiers 1 to 3 are untouched: with no hexes, no Lich and no curler's own ultimate the engine plays the same game seed for
+seed (36 seeded games across every skill pairing, length, cold, the Shed's ways, powers both, one side or none, bags and
+the free guard zone, before and after this part: identical summaries; and three games played through the page's own
+beat in Watch, ticked to the end with a snapshot every 400 ticks: identical).
+
+**The Lich.** It throws no better than an Archmage (the same miss). The first cut decided more: more shots (draws to
+five more spots, three more guards, a takeout of each of their stones in the house hit a little thin either way), its
+best six over six throws each, six replies weighed in at 0.35; and its sweepers read the stone as it runs (every
+quarter second of the stone's run they play it on, alone on the ice as it is now, swept not at all, half and hard, and
+sweep the way that brings it nearest the call: a draw's spot or a hit's line, since a swept stone curls less).
+
+| your win against (node, your Knight, even level, no bonus, no bags) | 200 | 400 |
+|---|---|---|
+| an Archmage | 29.0% | 24.8% |
+| the first-cut Lich | 21.5% | |
+| ... with an Archmage's sweepers | 31.5% | |
+| ... with an Archmage's search (best four of five throws, four replies at 0.3) | 15.5% | 13.3% |
+| ... and no extra shots | | 12.8% |
+| ... the Archmage's search, its sweepers also in its head when it weighs a shot | | 13.3% |
+
+The broom is nearly all of it: its sweepers alone take about 12 points off you, and the wider search was worse than
+the Archmage's (weighing six noisy candidates picks a lucky one). Kept: the Archmage's search with the extra shots (no
+cost, and it calls a different shot about a third of the time, `test/realm_umbral_curling.py`), and the Lich's
+sweepers. Playing its sweepers in its head as well changed nothing and was dropped. In the page: the Archmage 19%, the
+Lich 11% (100 a row): 8 to 12 points from its decisions.
+
+**Tier U.** One point at level parity, as golf: curling's ratings move a game little (the Nadir four with no bonus won
+1 point more in node, 14.5% against 13.5% with one hex), the Lich and the bag do the rest. The Nadir four: a zombie
+lead (Silt), a spider second (Weir, the best broom on the sheet), a skeleton third (Knucklebone) and the champion
+skipping, Grisel Mourne (a lich), with an ultimate of their own, The Sunken Stone (the other rink's stones that end drag
+heavy, 1.03, and hardly curl, 0.7): within the noise for the bot (15% without it, 16% with it).
+
+| your win, level parity | page, 100 | page, 200 | node, 400 |
+|---|---|---|---|
+| tier 3, a rival's four as the world sets it | 18% | | |
+| tier U, your own kinds (1 point, the Lich, the full bag) | 12% | 11% | |
+| **the Nadir four, no hexes (the champion's game)** | **16%** | **15.5%** | **19.0%** |
+
+**The hexes** (15-umbral.js), each against your side, each alone on the champion's game, node 400 (none 19.0%):
+
+| hex | first cut | second | **kept** |
+|---|---|---|---|
+| Rime on the Pebble (your stones curl more than your skip reads: 1.2, 1.4, kept 1.3) | +0.5 | -12.2 | **-4.2** |
+| Leaden Brooms (your sweepers' legs: 3 times, sweeping 0.7; kept 4 times, 0.6) | -1.5 | **-2.0** | |
+| The Drifting House (your stone at rest in the house slides 4 inches out) | **-5.5** | | |
+| Hoarfrost (their stones frozen like granite: every one in the four-foot, -10 in the page; every one on the button; kept the first in the four-foot an end) | | -2.7 | **-3.5** |
+
+In the page (100, paired with none's 16%): Rime -7, Leaden Brooms +2, the Drifting House -3, Hoarfrost -2. Rime on the
+Pebble is steep: the bot's draws are judged on inches, so a fifth more curl does nothing and two fifths more takes 12
+points. No hex swings a game by more than about 7 points. Leaden Brooms is the gentlest: sweeping is worth about 6 points
+to the bot in all (phase 10), so a hex on the brooms can't take much; a human who sweeps by hand feels it more.
+
+**The champion as played**, one hex drawn a try: **14%** (200, the page; every draw in turn), two drawn (the finale's
+round) 12.5%. A little under the 15 to 25% band, as golf's and football's champions are; a careful human, who sweeps
+their own stones and sees the curl the rime adds, wins far more.

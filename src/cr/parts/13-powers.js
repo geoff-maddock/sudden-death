@@ -135,7 +135,7 @@ function crPowNow(s, ri, shot) {
 }
 function crPowIdOf(s, k, ri) {
   if (k === 'pow') { const P = crPowNow(s, ri); return P ? P.id : null; }
-  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? crThrower(s) : ri]; return (CR_ULT[m && m.kind] || CR_ULT.goblin).id; }
+  if (k === 'ult') return crUltOf(s, ri).id;
   return k;
 }
 // side s lies shot (its stone nearest the button, in the house)
@@ -171,7 +171,7 @@ function crCast(s, k, ri) {
     rec(P.id, P.n); return '';
   }
   if (k === 'ult') {
-    const m = G.teams[s].roster[r], U = CR_ULT[m.kind] || CR_ULT.goblin;
+    const U = crUltOf(s, r);
     G.roar[s] -= CR_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, end: G.end, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     rec(U.id, U.n); return '';
   }
@@ -251,6 +251,6 @@ function crPowerTip(s) {
     if (P.fx && P.fx.granite && !CR_HIT.includes(crShotNow(s))) return `Tip: ${P.n} sets your stone like granite: hard to take out.`;
     if (P.curse) return `Tip: ${P.n} works on their next stone.`;
   }
-  if (!crPowWhy(s, 'ult', ri)) { const U = CR_ULT[G.teams[s].roster[ri].kind] || CR_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this end.`; }
+  if (!crPowWhy(s, 'ult', ri)) { const U = crUltOf(s, ri); return `Tip: the roar is up; ${U.n} would mark this end.`; }
   return '';
 }

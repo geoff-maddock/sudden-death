@@ -38,7 +38,12 @@
    Phase 8 is the superstars (in the tables) and the players drawn: figKinds() (the kinds the figures know), figsNow()
    (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going).
    Phase 10 is the lab's switches: start({ fixShot: [shot or null, ...], noSweep: [bool, ...], wear: false }); a summary
-   carries casts and pots. */
+   carries casts and pots.
+   The Umbral (issue #99, phase 4h; 15-umbral.js): start({ hexes: [ids], hexOn }) and skill 3 (the Lich, its own row:
+   skills stays three); hexes (the table), hex() (a game's: { ids, on } or null), hexLine() (the line under the end
+   board), lich (the Lich's row; lichSet and hexSet change them, for the lab), ultOwn (a curler's own ultimates), ultOf(s)
+   (the ultimate side s's rink would cast), hexFx(s) (what side s's next stone takes, its hexes with its powers),
+   sweeper(s, plan) (side s's sweepers for a call, as its skill sweeps: (stone, t) => how hard, or null). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -77,6 +82,11 @@ return {
   figKinds: () => Object.keys(KIND), figsNow: () => G && G.teams ? crFigsOn() : [],
   // gear and potions (phase 7)
   potions: JSON.parse(JSON.stringify(CR_POTIONS)), kitRules: JSON.parse(JSON.stringify(CR_KIT)), potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
+  // the Umbral (15-umbral.js)
+  hexes: JSON.parse(JSON.stringify(CR_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => crHexLine(), lich: JSON.parse(JSON.stringify(CR_LICH)),
+  lichSet: o => Object.assign(CR_LICH, o), hexSet: (id, o) => CR_HEX[id] && Object.assign(CR_HEX[id], o), ultOwn: JSON.parse(JSON.stringify(CR_ULT_OWN)),
+  ultOf: (s, ri) => G && G.teams ? crUltOf(s, ri) : null, hexFx: s => G && G.teams ? crHexFx(s, crFxFor(s)) : null,
+  sweeper: (s, plan) => G && G.teams ? crSweeper(s, plan) : null,
   // games from the world (phase 5)
   hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
