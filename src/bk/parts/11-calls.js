@@ -1,7 +1,8 @@
 /* The Charter Court: the call (issue #77, phase 4). Each side has a standing call: an offense set, a defense, and two
    stances, Pace on offense and Pressure on defense (G.call[side]: { off, def, pace, press }). It stays until it's
    changed (a set or a defense from the next possession): yours by you (in Manage and You play), the CPU's at the start of each of its possessions (and each of yours,
-   for its defense), by its coach's skill (G.skill: 0 Squire, at random, stances too; 1 Knight; 2 Archmage).
+   for its defense), by its coach's skill (G.skill: 0 Squire, at random, stances too; 1 Knight; 2 Archmage; 3 Lich, the
+   Umbral's, by its own rules: 16-umbral.js).
    Each possession is played in the calls on at its start (G.cur: { off, def, side, stale, star }).
    - The sets move the five and steer the player with the ball (BK_SETS): Pick and roll (picks early and often), Post up
      (the bigs deep on the blocks, fed inside), Motion (cuts and passes), Isolation (the best scorer, the rest cleared
@@ -87,6 +88,8 @@ function bkPossStart(side) {
   G.possScore = G.score[side];
   // (the powers cast with it, and the zones on the floor: 14-powers.js)
   bkPowersPoss();
+  // (the Umbral's hexes: the Shadow Sixth may come out for this one, 16-umbral.js)
+  if (G.hex) bkHexPoss(side);
 }
 function bkPossEnd() {
   const C = G.cur; if (!C || G.possScore == null) return;
@@ -151,7 +154,7 @@ function bkCpuTimeout(side) {
   const run = G.run.side === 1 - side ? G.run.pts : 0, tired = G.on[side].reduce((a, ri) => a + G.stam[side][ri], 0) / 5 < 45 && !bkBench(side).some(ri => G.stam[side][ri] >= BK_STAM.fresh);
   const fire = G.on[1 - side].some(ri => (G.hot[1 - side][ri] || 0) >= BK_FIRE.n), lastMin = G.q >= 4 && G.clock < 30;
   if (sk >= 2 && G.to[side] === 1 && !lastMin && G.q >= 3) return false;
-  if (run >= 7 || tired || fire || (sk >= 2 && lastMin && Math.abs(G.score[0] - G.score[1]) <= 3 && G.poss === side)) return !bkTimeout(side);
+  if (run >= (sk === 3 ? BK_LICH.run : 7) || tired || fire || (sk >= 2 && lastMin && Math.abs(G.score[0] - G.score[1]) <= 3 && G.poss === side)) return !bkTimeout(side);
   return false;
 }
 /* ---------- the CPU's calls by skill ---------- */
@@ -162,22 +165,33 @@ const bkLate = share => G.q >= 4 && G.clock < G.qlen * share, bkLead = side => G
 function bkCpuSet(side) {
   const sk = G.skill[side], them = 1 - side;
   if (!sk) return pick(BK_SET_IDS);
-  const late = bkLate(.4), diff = bkLead(side);
-  const w = { pick: 1.2, post: .6 + Math.max(0, bkMean(side, 'siz', ['big']) + bkMean(side, 'hop', ['big']) - bkMean(them, 'siz', ['big']) - bkMean(them, 'hop', ['big'])) * .3,
-    motion: 1, iso: .4 + Math.max(0, Math.max(...G.on[side].map(ri => G.teams[side].roster[ri].r.hnd)) - 7) * .4, spread: .5 + Math.max(0, bkMean(side, 'tch') - 6) * .5 + (late && diff < -5 ? 1.5 : 0),
-    hot: G.on[side].some(ri => (G.hot[side][ri] || 0) >= BK_FIRE.n) ? 3 : .2 };
+  // (a Lich calls by its own rules, 16-umbral.js)
+  if (sk === 3) return bkLichSet(side);
+  const w = bkSetLean(side);
   // the scout: a set run twice is worth less a third time
   const sc = G.scout[side]; if (sc.last && sc.n >= 2) w[sc.last] *= .35;
   // a Knight leans to what beats the defense on the floor; an Archmage runs it
   { const d = G.call[them].def, k0 = sk >= 2 ? .9 : .45; for (const k in w) w[k] *= 1 + k0 * bkEdge(k, d)[0]; }
   return wpick(w);
 }
+// what a coach leans to on offense, by the ratings, the score and the clock, before reading the defense
+function bkSetLean(side) {
+  const them = 1 - side, late = bkLate(.4), diff = bkLead(side);
+  return { pick: 1.2, post: .6 + Math.max(0, bkMean(side, 'siz', ['big']) + bkMean(side, 'hop', ['big']) - bkMean(them, 'siz', ['big']) - bkMean(them, 'hop', ['big'])) * .3,
+    motion: 1, iso: .4 + Math.max(0, Math.max(...G.on[side].map(ri => G.teams[side].roster[ri].r.hnd)) - 7) * .4, spread: .5 + Math.max(0, bkMean(side, 'tch') - 6) * .5 + (late && diff < -5 ? 1.5 : 0),
+    hot: G.on[side].some(ri => (G.hot[side][ri] || 0) >= BK_FIRE.n) ? 3 : .2 };
+}
+// and on defense, against the other side's five
+function bkDefLean(side) {
+  const them = 1 - side, late = bkLate(.4), diff = bkLead(side);
+  return { man: 1.4, zone: .6 + Math.max(0, bkMean(them, 'siz', ['big']) - 6) * .4 + Math.max(0, 6 - bkMean(them, 'tch')) * .3,
+    press: .3 + (late && diff < -5 ? 2 : 0) + Math.max(0, 6 - bkMean(them, 'hnd', ['guard'])) * .4, switch: .6, pack: .5 + Math.max(0, 6 - bkMean(them, 'tch')) * .5 };
+}
 function bkCpuDef(side) {
   const sk = G.skill[side], them = 1 - side;
   if (!sk) return pick(BK_DEF_IDS);
-  const late = bkLate(.4), diff = bkLead(side);
-  const w = { man: 1.4, zone: .6 + Math.max(0, bkMean(them, 'siz', ['big']) - 6) * .4 + Math.max(0, 6 - bkMean(them, 'tch')) * .3,
-    press: .3 + (late && diff < -5 ? 2 : 0) + Math.max(0, 6 - bkMean(them, 'hnd', ['guard'])) * .4, switch: .6, pack: .5 + Math.max(0, 6 - bkMean(them, 'tch')) * .5 };
+  if (sk === 3) return bkLichDef(side);
+  const w = bkDefLean(side);
   // an Archmage reads your habits: the set you run most, and the defense that beats it
   if (sk >= 2 && G.seen[them].length >= 3) {
     const n = {}; for (const s of G.seen[them]) n[s] = (n[s] || 0) + 1;
@@ -189,6 +203,7 @@ function bkCpuDef(side) {
 function bkCpuStance(side) {
   // (a Squire's stances are as random as its calls)
   if (!G.skill[side]) return { pace: pick(Object.keys(BK_PACES)), press: pick(Object.keys(BK_PRESSES)) };
+  if (G.skill[side] === 3) return bkLichStance(side);
   const late = bkLate(.5), diff = bkLead(side);
   return { pace: late && diff < -4 ? 'push' : late && diff > 4 ? 'grind' : 'bal', press: late && diff < -4 ? 'gamble' : G.tf[side] > BK_RULES.limit ? 'sit' : 'bal' };
 }

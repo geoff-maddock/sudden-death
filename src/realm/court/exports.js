@@ -46,6 +46,13 @@ return {
   powers: side => G && G.mana ? { mana: Math.floor(G.mana[side] + 1e-9), spirit: Math.round(G.spirit[side]), ultUsed: G.ultUsed[side], zones: JSON.parse(JSON.stringify(G.zones)), cast: G.cur && G.cur.cast ? JSON.parse(JSON.stringify(G.cur.cast)) : [], on: G.powers } : null,
   powerOptions: side => G && G.cur ? bkPowerOptions(side) : [], powerList: (side, role) => G && G.on ? bkPowerList(side, role) : [], ultOptions: side => G && G.on ? bkUltOptions(side) : [], sitOptions: side => G && G.cur ? bkSitOptions(side) : [],
   queue: (role, ri, id) => G && GD ? bkPowQueue(role, ri, id) : 'No game on.', get queued() { return GD && GD.pow ? JSON.parse(JSON.stringify(GD.pow)) : null; }, ult: ri => G && GD ? bkUltNow(GD.you, ri) : 'No game on.', sit: id => G && GD ? bkSitNow(GD.you, id) : 'No game on.',
+  // the Umbral (16-umbral.js): the hexes ({ id: { n, d } }), the game's (null without: { ids, on, sq, shadows, line, out:
+  // the Shadow Sixth is out now }), the hexes' and the Lich's rules themselves (not copies: the balance bot tunes them),
+  // an ultimate's words by id (the Nadir captain's too), and the tests' handles on a CPU coach's call now for side
+  hexes: Object.fromEntries(Object.entries(BK_HEX).map(([k, H]) => [k, { n: H.n, d: H.d }])),
+  hex: () => G && G.hex ? Object.assign({ line: bkHexLine(), out: !!(G.cur && G.cur.shadow) }, JSON.parse(JSON.stringify(G.hex))) : null,
+  hexRules: BK_HEX, lichRules: BK_LICH, ultBook: id => BK_ULT_BY[id] ? { id, n: BK_ULT_BY[id].n, desc: BK_ULT_BY[id].desc } : null,
+  cpu: { set: side => bkCpuSet(side), def: side => bkCpuDef(side), stance: side => bkCpuStance(side) }, ftNow: i => L && GD && GD.ft ? bkFtNow(L.pl[i]) : null,
   // (the tests' handle: cast this power of player ri now, as if at the start of the possession)
   castNow: (side, ri, id) => { const o = bkPowerList(side, G.cur && G.cur.side === side ? 'off' : 'def').find(x => x.ri === ri && x.id === id); if (!o) return false; const ok = bkCast(side, o); bkFxNow(); bkFxStart(); return ok; },
   get auto() { return !!GD && GD.auto; }, set auto(v) { if (GD) GD.auto = !!v; }, fx: k => bkFx(k), fits: Object.assign({}, BK_FITS),

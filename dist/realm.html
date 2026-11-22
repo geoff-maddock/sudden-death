@@ -29110,7 +29110,7 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    A team: { name, short, color, light, roster: [{ n, kind, num, r }], spot: { PG: ri, ... } }. A roster may be longer
    than five: the first five start, and the rest (up to BK_RULES.bench) sit on the bench. A player may bring pw ({ off,
    def }: which of their kind's two powers for each end, 14-powers.js), and gear ({ id, name, fx }: kept as gear, gid and
-   gx, 15-kit.js). */
+   gx, 15-kit.js), and an ultimate of their own in place of their kind's ({ ult: id }, the Nadir captain's, 16-umbral.js). */
 const BK_POS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const BK_ROLE = { PG: 'guard', SG: 'guard', SF: 'wing', PF: 'big', C: 'big' };
 const BK_STATS = ['spd', 'siz', 'hop', 'tch', 'hnd', 'def'];
@@ -29134,7 +29134,7 @@ const bkSpotOk = (m, n) => !!m && BK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [5 or more kinds] }
 function bkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 3 + i * 7 }))).slice(0, BK_RULES.side + BK_RULES.bench)
-    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: bkGx(p.gear.fx) } : {}));
+    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: bkGx(p.gear.fx) } : {}, p.ult && BK_ULT_BY[p.ult] ? { ult: p.ult } : {}));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the five's spots: the best handler at the point, the two biggest inside, then the better shooter on the wing
   const free = new Set(roster.slice(0, BK_RULES.side).map((_, i) => i)), by = f => { const i = [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r))[0]; free.delete(i); return i; };
@@ -29295,7 +29295,9 @@ function bkGuardSpot(p) {
   // handler too once they're out past the arc)
   const press = Df.back && bkHand() >= 0 && bkU(m.side, L.pl[bkHand()].x) > 14;
   const gap = press ? (onBall ? .7 : 1) : onBall ? Math.min(d * .5, Df.sag && d > 6.2 ? 1.6 : .95) : clamp(d * .32, .9, 3.2) + (Df.sag && d > 5 ? Df.sag : 0);
-  let x = m.x + dx / d * gap, y = m.y + dy / d * gap;
+  // (a Lich's defenders have scouted the shooters: tighter on a good one, further off a poor one, 16-umbral.js)
+  const g2 = !press && G.skill[p.side] === 3 ? gap * bkLichGap(m) : gap;
+  let x = m.x + dx / d * g2, y = m.y + dy / d * g2;
   // off the ball, help toward a driver
   if (!onBall && L.drive && bkHand() >= 0) { const hb = L.pl[bkHand()]; x = lerp(x, hb.x, .25); y = lerp(y, hb.y, .25); }
   return [x, y];
@@ -29373,7 +29375,7 @@ function bkShotP(p, x, y) {
   else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
   if (bkOnFire(p)) pr += BK_FIRE.p;
   pr -= .1 * bkTired(p);
-  pr += bkCallMod(p, dist) + bkCourtMod(p);
+  pr += bkCallMod(p, dist) + bkCourtMod(p) - (G.hex ? bkHexShot(p, rim) : 0);
   // (the powers on the floor: every shot, threes, at the rim)
   if (G.cur && p.side === G.cur.side) pr += bkFx('shot') + (bkShotValue(dist, y) === 3 ? bkFx('three') : 0) + (rim ? bkFx('rim') : 0);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
@@ -29392,10 +29394,12 @@ function bkShoot(o) {
   if (near) {
     // the jump: a defender already up as the shot goes up (just before it) blocks far more; one you play who didn't jump, far less
     jumped = d.act === 'jump' && d.jumpAt != null && L.t - d.jumpAt < BK_JUMP.window;
+    // (a Lich's defender reads the shooter and is up in time more often, 16-umbral.js)
+    if (!jumped && G.skill[d.side] === 3 && !bkYoursNow(S.d) && R() < BK_LICH.jump) jumped = true;
     const mine = bkYoursNow(S.d) && !jumped;
     const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1) * bkPress(d.side).block * bkFx('blk');
     block = R() < pb;
-    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul;
+    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul * (G.hex ? bkHexFoul(d.side) : 1);
     if (!mine && !jumped) { d.act = 'jump'; d.actT = .5; d.jumpAt = L.t; }
   }
   // (Wrist Bands: your shots get the wider window, bkWindow; the CPU's a touch more likely)
@@ -29418,7 +29422,7 @@ function bkShotLands() {
 }
 // the ball comes off loose from (x, y) at height z0, landing r metres away on average, back toward the floor
 function bkLoose(x, y, z0, r) {
-  const wild = z0 > 3 && bkBent(G.poss) ? BK_RIM.wild : 1, back = bkDir(G.poss), a = Math.PI + (R() - .5) * 2.4 * wild, rr = r * (.55 + R() * .7) * wild;
+  const wild = z0 > 3 && (bkBent(G.poss) || (G.hex && bkHexWild(G.poss))) ? BK_RIM.wild : 1, back = bkDir(G.poss), a = Math.PI + (R() - .5) * 2.4 * wild, rr = r * (.55 + R() * .7) * wild;
   let tx = x + Math.cos(a) * rr * back, ty = y + Math.sin(a) * rr;
   tx = clamp(tx, .5, BK_RULES.len - .5); ty = clamp(ty, -BK_RULES.wid / 2 + .5, BK_RULES.wid / 2 - .5);
   Object.assign(L.ball, { st: 'loose', h: -1, fx: x, fy: y, tx, ty, t: 0, T: .55 + rr * .08, z0 });
@@ -29544,7 +29548,8 @@ function bkPressure(h) {
   if (!nd || ndd >= 1 || nd.stun > 0) return false;
   const Pr = bkPress(nd.side), Df = bkDefNow(), press = Df.back ? (bkU(p.side, p.x) > 14 ? Df.back : Df.front) : 1;
   if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02) * press * Pr.steal * bkPace(p.side).risk * bkFx('stl')) { bkPicked(nd); return true; }
-  if (R() < BK_THINK.reach * Pr.foul) { bkReach(nd); return true; }
+  // (a hex's whistle calls more, 16-umbral.js)
+  if (R() < BK_THINK.reach * Pr.foul * (G.hex ? bkHexFoul(nd.side) : 1)) { bkReach(nd); return true; }
   return false;
 }
 // the defender standing in the lane to the rim (within about a metre of the line from the handler to it), or null
@@ -29640,9 +29645,12 @@ function bkStart(opts) {
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
-  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
+  // (0 Squire, 1 Knight, 2 Archmage; 3 the Umbral's Lich, 16-umbral.js)
+  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 3)) : [1, 1];
   bkCallsStart(o);
   bkCourtStart(!!o.court); bkPowersStart(o.powers); bkFansStart(o.fans); G.crowd = engCrowd(o); bkKitStart(o.bags);
+  // (opts.hexes: the Umbral's, 16-umbral.js; none, and nothing changes)
+  if (o.hexes && o.hexes.length) bkHexStart(o.hexes, o.hexOn);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
@@ -29650,6 +29658,8 @@ function bkStart(opts) {
   G.tally = { break: 0, fire: 0, screen: 0, lob: 0, beat: 0, goaltend: 0, alley: 0, slip: 0, bent: 0, roar: 0, pow: 0, ult: 0, sit: 0 };
   bkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: 0, meter: null, auto: true, pow: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
+  // (the hexes are named before the tip)
+  if (G.hex) { GD.msg += ` Hexes: ${bkHexNames()}.`; GD.big = { k: 'hex' }; }
   bkInputClear(); bkTipSet();
   return G;
 }
@@ -29866,8 +29876,8 @@ function bkFreeThrow(o) {
   bkShotReset(); bkLoose(bkHoopX(F.side), 0, 3.05, 1.8); L.t = 0; bkGo('live');
 }
 const bkFtChance = p => clamp(.5 + p.r.tch * .04, .3, .95);
-// a free throw's chance now: touch, Lucky Socks, the nerve, the powers on the floor, an icing
-function bkFtNow(p) { const F = GD && GD.ft; return clamp(bkFtChance(p) + (bkGxOf(p).ft || 0) - (F ? bkNerve(F.side) : 0) + (F && G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + ((F && F.ice) || 0), .05, .98); }
+// a free throw's chance now: touch, Lucky Socks, the nerve, the powers on the floor, an icing (and a hex, 16-umbral.js)
+function bkFtNow(p) { const F = GD && GD.ft; return clamp(bkFtChance(p) + (bkGxOf(p).ft || 0) - (F ? bkNerve(F.side) : 0) + (F && G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + ((F && F.ice) || 0) - (F && G.hex ? bkHexFt(F.side) : 0), .05, .98); }
 // the meter's window at the line: from that chance, so nerves narrow it and the socks widen it
 const bkFtWindow = p => BK_WIN.min + BK_WIN.per * bkFtNow(p);
 // who plays it: the CPU both sides ('watch'), or you play your side by hand ('play'); the same game goes on
@@ -29979,6 +29989,8 @@ function bkDraw(c) {
   bkDrawHoop(c, 1, true);
   bkDrawZones(c);
   bkDrawPlayers(c);
+  // (the Umbral's hexes: the Shadow Sixth, 16-umbral.js)
+  if (G.hex) bkHexDraw(c);
   bkDrawHoop(c, 0, false);
   bkDrawHoop(c, 1, false);
   bkDrawBall(c);
@@ -30072,7 +30084,8 @@ function bkDrawFloor(c) {
 }
 // a hoop: the pole and the backboard behind (back), or the rim and its chain net in front (front)
 function bkDrawHoop(c, s, back) {
-  const dir = s ? -1 : 1, bx = s ? BK_RULES.len : 0, rim = bx + dir * BK_RULES.rim, R0 = bkScr(rim, 0, 3.05), bb = bkScr(bx + dir * 1.2, 0, 3.4);
+  // (a drifting rim, the Umbral's hex, hangs off to one side: 16-umbral.js)
+  const dir = s ? -1 : 1, bx = s ? BK_RULES.len : 0, rim = bx + dir * BK_RULES.rim, R0 = bkScr(rim, G.hex ? bkHexRimOff(s) : 0, 3.05), bb = bkScr(bx + dir * 1.2, 0, 3.4);
   c.save();
   if (back) {
     const pole = bkScr(bx - dir * .6, 0); c.strokeStyle = '#2a201a'; c.lineWidth = 5 * BKC.sx; c.beginPath(); c.moveTo(pole.x, pole.y); c.lineTo(pole.x, bb.y); c.lineTo(bb.x, bb.y); c.stroke();
@@ -30172,6 +30185,8 @@ function bkDrawHud(c) {
   const sc = Math.ceil(G.shot), off = G.clock < G.shot, low = !off && sc <= 4;
   c.fillStyle = '#1e0d08'; rr(c, 461, 35, 38, 22, 4); c.fill(); c.strokeStyle = low ? '#ff6a4a' : 'rgba(255,208,138,.4)'; c.lineWidth = 1; c.stroke();
   txt(c, off ? '–' : String(sc), 480, 52, F(17, 900), low ? '#ff6a4a' : '#ffd08a', 'center');
+  // the hexes on this game, under the bar (16-umbral.js)
+  if (G.hex) txt(c, '☾ ' + bkHexLine(), 16, 81, F(13, 700), '#c8b8ff', 'left');
 }
 function bkDrawMsg(c) {
   const notes = GD.notes && GD.notes.length ? ' ' + GD.notes.join(' ') : '';
@@ -30444,7 +30459,8 @@ function bkCoachSubs(side, brk) {
     // a rested starter back in at a break
     const st0 = G.starters[side][k];
     if (brk && out !== st0 && bench.includes(st0) && G.stam[side][st0] >= BK_STAM.back) return bkSubDo(side, out, st0, 'back');
-    if (G.stam[side][out] >= BK_STAM.sub) return;
+    // (a Lich's coach takes a tiring player off sooner, 16-umbral.js)
+    if (G.stam[side][out] >= (!mine && G.skill[side] === 3 ? BK_LICH.sub : BK_STAM.sub)) return;
     const fresh = bench.filter(i => G.stam[side][i] >= BK_STAM.fresh);
     if (!fresh.length) return;
     const inn = mine ? fresh[0] : fresh.sort((a, b) => bkFit(T.roster[b].r, pos) - bkFit(T.roster[a].r, pos))[0];
@@ -30477,7 +30493,8 @@ function bkSub(side, out, inn) {
 /* The Charter Court: the call (issue #77, phase 4). Each side has a standing call: an offense set, a defense, and two
    stances, Pace on offense and Pressure on defense (G.call[side]: { off, def, pace, press }). It stays until it's
    changed (a set or a defense from the next possession): yours by you (in Manage and You play), the CPU's at the start of each of its possessions (and each of yours,
-   for its defense), by its coach's skill (G.skill: 0 Squire, at random, stances too; 1 Knight; 2 Archmage).
+   for its defense), by its coach's skill (G.skill: 0 Squire, at random, stances too; 1 Knight; 2 Archmage; 3 Lich, the
+   Umbral's, by its own rules: 16-umbral.js).
    Each possession is played in the calls on at its start (G.cur: { off, def, side, stale, star }).
    - The sets move the five and steer the player with the ball (BK_SETS): Pick and roll (picks early and often), Post up
      (the bigs deep on the blocks, fed inside), Motion (cuts and passes), Isolation (the best scorer, the rest cleared
@@ -30563,6 +30580,8 @@ function bkPossStart(side) {
   G.possScore = G.score[side];
   // (the powers cast with it, and the zones on the floor: 14-powers.js)
   bkPowersPoss();
+  // (the Umbral's hexes: the Shadow Sixth may come out for this one, 16-umbral.js)
+  if (G.hex) bkHexPoss(side);
 }
 function bkPossEnd() {
   const C = G.cur; if (!C || G.possScore == null) return;
@@ -30627,7 +30646,7 @@ function bkCpuTimeout(side) {
   const run = G.run.side === 1 - side ? G.run.pts : 0, tired = G.on[side].reduce((a, ri) => a + G.stam[side][ri], 0) / 5 < 45 && !bkBench(side).some(ri => G.stam[side][ri] >= BK_STAM.fresh);
   const fire = G.on[1 - side].some(ri => (G.hot[1 - side][ri] || 0) >= BK_FIRE.n), lastMin = G.q >= 4 && G.clock < 30;
   if (sk >= 2 && G.to[side] === 1 && !lastMin && G.q >= 3) return false;
-  if (run >= 7 || tired || fire || (sk >= 2 && lastMin && Math.abs(G.score[0] - G.score[1]) <= 3 && G.poss === side)) return !bkTimeout(side);
+  if (run >= (sk === 3 ? BK_LICH.run : 7) || tired || fire || (sk >= 2 && lastMin && Math.abs(G.score[0] - G.score[1]) <= 3 && G.poss === side)) return !bkTimeout(side);
   return false;
 }
 /* ---------- the CPU's calls by skill ---------- */
@@ -30638,22 +30657,33 @@ const bkLate = share => G.q >= 4 && G.clock < G.qlen * share, bkLead = side => G
 function bkCpuSet(side) {
   const sk = G.skill[side], them = 1 - side;
   if (!sk) return pick(BK_SET_IDS);
-  const late = bkLate(.4), diff = bkLead(side);
-  const w = { pick: 1.2, post: .6 + Math.max(0, bkMean(side, 'siz', ['big']) + bkMean(side, 'hop', ['big']) - bkMean(them, 'siz', ['big']) - bkMean(them, 'hop', ['big'])) * .3,
-    motion: 1, iso: .4 + Math.max(0, Math.max(...G.on[side].map(ri => G.teams[side].roster[ri].r.hnd)) - 7) * .4, spread: .5 + Math.max(0, bkMean(side, 'tch') - 6) * .5 + (late && diff < -5 ? 1.5 : 0),
-    hot: G.on[side].some(ri => (G.hot[side][ri] || 0) >= BK_FIRE.n) ? 3 : .2 };
+  // (a Lich calls by its own rules, 16-umbral.js)
+  if (sk === 3) return bkLichSet(side);
+  const w = bkSetLean(side);
   // the scout: a set run twice is worth less a third time
   const sc = G.scout[side]; if (sc.last && sc.n >= 2) w[sc.last] *= .35;
   // a Knight leans to what beats the defense on the floor; an Archmage runs it
   { const d = G.call[them].def, k0 = sk >= 2 ? .9 : .45; for (const k in w) w[k] *= 1 + k0 * bkEdge(k, d)[0]; }
   return wpick(w);
 }
+// what a coach leans to on offense, by the ratings, the score and the clock, before reading the defense
+function bkSetLean(side) {
+  const them = 1 - side, late = bkLate(.4), diff = bkLead(side);
+  return { pick: 1.2, post: .6 + Math.max(0, bkMean(side, 'siz', ['big']) + bkMean(side, 'hop', ['big']) - bkMean(them, 'siz', ['big']) - bkMean(them, 'hop', ['big'])) * .3,
+    motion: 1, iso: .4 + Math.max(0, Math.max(...G.on[side].map(ri => G.teams[side].roster[ri].r.hnd)) - 7) * .4, spread: .5 + Math.max(0, bkMean(side, 'tch') - 6) * .5 + (late && diff < -5 ? 1.5 : 0),
+    hot: G.on[side].some(ri => (G.hot[side][ri] || 0) >= BK_FIRE.n) ? 3 : .2 };
+}
+// and on defense, against the other side's five
+function bkDefLean(side) {
+  const them = 1 - side, late = bkLate(.4), diff = bkLead(side);
+  return { man: 1.4, zone: .6 + Math.max(0, bkMean(them, 'siz', ['big']) - 6) * .4 + Math.max(0, 6 - bkMean(them, 'tch')) * .3,
+    press: .3 + (late && diff < -5 ? 2 : 0) + Math.max(0, 6 - bkMean(them, 'hnd', ['guard'])) * .4, switch: .6, pack: .5 + Math.max(0, 6 - bkMean(them, 'tch')) * .5 };
+}
 function bkCpuDef(side) {
   const sk = G.skill[side], them = 1 - side;
   if (!sk) return pick(BK_DEF_IDS);
-  const late = bkLate(.4), diff = bkLead(side);
-  const w = { man: 1.4, zone: .6 + Math.max(0, bkMean(them, 'siz', ['big']) - 6) * .4 + Math.max(0, 6 - bkMean(them, 'tch')) * .3,
-    press: .3 + (late && diff < -5 ? 2 : 0) + Math.max(0, 6 - bkMean(them, 'hnd', ['guard'])) * .4, switch: .6, pack: .5 + Math.max(0, 6 - bkMean(them, 'tch')) * .5 };
+  if (sk === 3) return bkLichDef(side);
+  const w = bkDefLean(side);
   // an Archmage reads your habits: the set you run most, and the defense that beats it
   if (sk >= 2 && G.seen[them].length >= 3) {
     const n = {}; for (const s of G.seen[them]) n[s] = (n[s] || 0) + 1;
@@ -30665,6 +30695,7 @@ function bkCpuDef(side) {
 function bkCpuStance(side) {
   // (a Squire's stances are as random as its calls)
   if (!G.skill[side]) return { pace: pick(Object.keys(BK_PACES)), press: pick(Object.keys(BK_PRESSES)) };
+  if (G.skill[side] === 3) return bkLichStance(side);
   const late = bkLate(.5), diff = bkLead(side);
   return { pace: late && diff < -4 ? 'push' : late && diff > 4 ? 'grind' : 'bal', press: late && diff < -4 ? 'gamble' : G.tf[side] > BK_RULES.limit ? 'sit' : 'bal' };
 }
@@ -30893,9 +30924,10 @@ function bkPowerOptions(side) { return G.powers && G.cur ? bkPowerList(side, G.c
 function bkUltOptions(side) {
   if (!G.powers) return [];
   const T = G.teams[side];
-  return G.on[side].map(ri => { const m = T.roster[ri], u = BK_ULT[m.kind]; if (!u) return null;
+  // (a player with an ultimate of their own, m.ult, brings it in place of their kind's: the CPU casts it first)
+  return G.on[side].map(ri => { const m = T.roster[ri], u = (m.ult && BK_ULT_BY[m.ult]) || BK_ULT[m.kind]; if (!u) return null;
     const why = G.ultUsed[side] ? 'used this game' : G.spirit[side] < BK_SPIRIT.ult ? `the crowd needs to be louder (spirit ${Math.round(G.spirit[side])} of ${BK_SPIRIT.ult})` : '';
-    return { ri, id: u.id, n: u.n, desc: u.desc, who: m.n, ok: !why, why }; }).filter(Boolean);
+    return Object.assign({ ri, id: u.id, n: u.n, desc: u.desc, who: m.n, ok: !why, why }, m.ult ? { own: true } : {}); }).filter(Boolean);
 }
 // the situation powers a side may cast now: { id, n, desc, cost, ok, why }
 function bkSitOptions(side) {
@@ -30935,6 +30967,8 @@ function bkFxNow() {
   const C = G.cur, F = Object.assign({}, BK_FX0);
   for (const c of C.cast) { const p = c.sit ? null : !c.ult && BK_POW_BY[c.id]; if (p) bkFxMerge(F, p.fx); }
   for (const z of G.zones) { const U0 = BK_ULT_BY[z.id] || BK_SIT[z.id], e = U0 && (z.side === C.side ? U0.o : U0.d); if (e && Object.keys(e).length) { bkFxMerge(F, e); z.acted = true; } }
+  // (the Shadow Sixth on this possession, 16-umbral.js)
+  if (C.shadow) bkFxMerge(F, BK_HEX.shadow.fx);
   C.fx = F;
 }
 // the start of a possession: frozen bodies and stamina back, once
@@ -31009,7 +31043,8 @@ function bkCpuPower(side, sk) {
   if (!pool.length) return null;
   const keep = sk >= 2 ? Math.min(...pool.map(o => o.cost)) : 1;
   const can = pool.filter(o => G.mana[side] - o.cost >= (bkLate(.5) ? 0 : keep));
-  if (!can.length || R() < (sk >= 2 ? .15 : .35)) return null;
+  // (a Lich holds back less often)
+  if (!can.length || R() < (sk === 3 ? BK_LICH.hold : sk >= 2 ? .15 : .35)) return null;
   return can.sort((a, b) => b.cost - a.cost)[0];
 }
 function bkCpuUlt(side, sk) {
@@ -31017,7 +31052,8 @@ function bkCpuUlt(side, sk) {
   if (!sk) return R() < .5 ? pick(opts) : null;
   const lead = bkLead(side), late = bkLate(.6), run = G.run.side === 1 - side ? G.run.pts : 0;
   // a Knight whenever it can once it's behind or late; an Archmage for a close finish or to stop a run
-  if (sk >= 2 ? ((late && Math.abs(lead) <= 6) || run >= 8) : (lead < 0 || late)) return opts.sort((a, b) => (G.teams[side].roster[b.ri].r.siz) - (G.teams[side].roster[a.ri].r.siz))[0];
+  // (a Lich stops a run sooner)
+  if (sk >= 2 ? ((late && Math.abs(lead) <= 6) || run >= (sk === 3 ? BK_LICH.run : 8)) : (lead < 0 || late)) return opts.sort((a, b) => ((b.own ? 1 : 0) - (a.own ? 1 : 0)) || (G.teams[side].roster[b.ri].r.siz) - (G.teams[side].roster[a.ri].r.siz))[0];
   return null;
 }
 function bkCpuSit(side, sk) {
@@ -31073,8 +31109,9 @@ const BK_POTIONS = {
   secondwind: { n: 'Second Wind', all: true, rest: 20, desc: 'At a timeout: the whole five get 20 stamina back.' },
 };
 const BK_NERVE = { secs: 60, close: 5, p: .07 };
-// a CPU coach gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
-const BK_KIT = { take: [99, 4, 3], squire: .25 };
+// a CPU coach gives a potion worth this much (by skill: a Squire, now and then, whatever comes first; then a Knight,
+// an Archmage and a Lich)
+const BK_KIT = { take: [99, 4, 3, 2.5], squire: .25 };
 const BK_GX0 = Object.freeze({});
 function bkGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
 const bkGxOf = p => { if (!p) return BK_GX0; const m = G.teams[p.side] && G.teams[p.side].roster[p.ri]; return (m && m.gx) || BK_GX0; };
@@ -31141,6 +31178,120 @@ function bkCpuPotion(side, sk) {
   const vals = bkPotionValues(side, bag); if (!vals.length) return;
   if (!sk) { if (R() < BK_KIT.squire) bkPotionGive(side, vals[0].id, vals[0].ri, vals[0].why); return; }
   if (vals[0].v >= BK_KIT.take[sk]) bkPotionGive(side, vals[0].id, vals[0].ri, vals[0].why);
+}
+/* The Charter Court in the Umbral (issue #99, phase 4d): the Lich, the hexes, and the Nadir captain's ultimate. Nothing
+   here runs unless a game asks for it: with no hexes and no skill 3, the engine plays exactly as before (same seed, same
+   game).
+   The Lich (G.skill 3, above the Archmage). The Archmage reads the set you run most and plays the defense that beats it;
+   the Lich reads the whole possession. On defense it weighs each defense by what your offense will really run against
+   it: a coach calling by hand keeps the set it has called, a CPU coach leans to what beats that defense as its skill
+   does, blended with what you have really run lately (BK_LICH.see; the later the more it counts). Each defense is then
+   weighed down by the edge that leaves you (BK_LICH.edge), so it stays mixed and can't be read, but rarely gives you the
+   matchup. On offense it runs what beats the defense on the floor, counting the scout too: a set run again is scouted,
+   so it changes sets before the defense catches up (BK_LICH.stale, in the edge's terms). Its stances read the game:
+   Push when its five are fresher by BK_LICH.fresh, Gamble against loose-handling guards, Sit back in foul trouble. On
+   the floor its defenders have scouted your shooters: each plays a good shooter tighter and a poor one further off,
+   helping inside (bkLichGap, by BK_LICH.close; 05-live.js), and reads the shot, up in time a share BK_LICH.jump more
+   often (the timed jump's block and spoiled make). It calls a timeout and casts its ultimate against a run of
+   BK_LICH.run, holds a power back less often (BK_LICH.hold), subs a player under BK_LICH.sub (10-bench.js) and gives
+   a potion worth 2.5 (15-kit.js).
+   Hexes (opts.hexes: ids in BK_HEX; G.hex = { ids, on, sq, shadows }, plain JSON, so a saved game keeps them). Each
+   works against one side, G.hex.on (opts.hexOn, 0 by default: yours):
+     drift   The Rim Drifts: the rim that side shoots at swings on its bracket (a slow sway through the game clock,
+             BK_HEX.drift.period seconds of play a swing): its jump shots up to BK_HEX.drift.p less likely, as far as the
+             rim is out, at the rim a share of that, and its misses come off wild, as off a bent rim
+     shadow  The Shadow Sixth: once a quarter (and once an overtime), on that side's first possession past the middle of
+             the period, a sixth defender made of shadow comes out for the one trip: BK_HEX.shadow.fx on it (shots
+             harder, the contest closer, drives stopped, passes picked off)
+     whistle The Crooked Whistle: fouls on that side's defenders (on shots and reaching in) BK_HEX.whistle.k as likely
+     cold    Cold Hands: that side's free throws BK_HEX.cold.ft less likely, all game
+   The hexes are named before the tip (in the line under the court, and HEXES on the floor), and under the score bar all
+   game; the drifting rim hangs off to one side, and the Shadow Sixth stands between the ball and the basket while it is
+   out. */
+const BK_LICH = { n: 'Lich', see: .5, edge: 2.5, stale: .67, run: 6, sub: 50, hold: .05, fresh: 12, loose: 5.5, close: 1, jump: .3 };
+// how close a Lich's defender plays man m, against the usual: by m's touch
+const bkLichGap = m => clamp(1 - BK_LICH.close * (m.r.tch - 6) * .1, .6, 1.4);
+const BK_HEX = {
+  drift: { n: 'The Rim Drifts', d: 'The rim you shoot at swings on its bracket: your jump shots up to 8 points less likely when it is furthest out (layups a third of that), and your misses come off wild.', p: .08, rim: .35, period: 24, draw: .55 },
+  shadow: { n: 'The Shadow Sixth', d: 'Once a quarter a sixth defender made of shadow comes out for one of your possessions: every shot of that trip harder, drives stopped, passes picked off.', at: .5, fx: { shot: -.08, con: 1.35, lane: .6, stl: 1.6, blk: 1.4, dreb: 1.3 } },
+  whistle: { n: 'The Crooked Whistle', d: 'A shadow referee calls the game: fouls on your five called half again as often, on shots and reaching in.', k: 1.5 },
+  cold: { n: 'Cold Hands', d: 'The cold gets into your fingers: your free throws 15 points less likely, all game.', ft: .15 },
+};
+// the Nadir captain's own ultimate (a player brings it as { ult: 'lightsout' }, 04-teams.js)
+BK_ULT_BY.lightsout = bkU0('lightsout', 'Lights Out', 'The torches on the wall gutter out: every shot of theirs 7 points less likely, and their passes picked off a third more.', null, { shot: -.07, stl: 1.3 }, ['#3a2a4a', 'all']);
+BK_BIG.hex = ['HEXES', '#c8b8ff'];
+BK_BIG.shadow = ['THE SHADOW SIXTH', '#c8b8ff'];
+
+/* ---------- the Lich ---------- */
+// a weights table as shares
+function bkLichShares(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); const o = {}; for (const k in w) o[k] = s ? Math.max(0, w[k]) / s : 0; return o; }
+// what side has really run lately, as shares (the later the more it counts; {} with nothing seen)
+function bkLichSeen(side) { const S = G.seen[side], o = {}; S.forEach((k, i) => { o[k] = (o[k] || 0) + i + 1; }); return S.length ? bkLichShares(o) : {}; }
+// what side's offense will run against defense d, as shares: a coach by hand keeps the set it has called; a CPU coach
+// leans to what beats d as its skill does; blended with what side has really run
+function bkLichOffP(side, d) {
+  let M;
+  if (!bkCpuSide(side)) M = { [G.call[side].off]: 1 };
+  else if (!G.skill[side]) M = Object.fromEntries(BK_SET_IDS.map(k => [k, 1]));
+  else {
+    M = bkSetLean(side);
+    const sc = G.scout[side]; if (sc.last && sc.n >= 2) M[sc.last] *= .35;
+    const k0 = G.skill[side] >= 2 ? .9 : .45; for (const k in M) M[k] *= 1 + k0 * bkEdge(k, d)[0];
+  }
+  const P = bkLichShares(M), T = bkLichSeen(side);
+  if (!Object.keys(T).length) return P;
+  for (const k of BK_SET_IDS) P[k] = (1 - BK_LICH.see) * (P[k] || 0) + BK_LICH.see * (T[k] || 0);
+  return P;
+}
+function bkLichDef(side) {
+  const w = bkDefLean(side);
+  for (const d in w) { const P = bkLichOffP(1 - side, d); let e = 0; for (const k in P) e += P[k] * bkEdge(k, d)[0]; w[d] *= Math.exp(-BK_LICH.edge * e); }
+  return wpick(w);
+}
+function bkLichSet(side) {
+  const w = bkSetLean(side), d = G.call[1 - side].def, sc = G.scout[side];
+  for (const k in w) { const stale = sc.last === k ? Math.min(2, sc.n) : 0; w[k] *= Math.exp(BK_LICH.edge * (bkEdge(k, d)[0] - stale * BK_LICH.stale)); }
+  return wpick(w);
+}
+function bkLichStance(side) {
+  const them = 1 - side, late = bkLate(.5), diff = bkLead(side), st = s => G.on[s].reduce((a, ri) => a + G.stam[s][ri], 0) / G.on[s].length;
+  const fresh = G.stam ? st(side) - st(them) : 0, trouble = G.on[side].some(ri => (G.pf[side][ri] || 0) >= BK_RULES.out - 1);
+  return { pace: late && diff < -4 ? 'push' : late && diff > 4 ? 'grind' : fresh >= BK_LICH.fresh ? 'push' : 'bal',
+    press: late && diff < -4 ? 'gamble' : G.tf[side] > BK_RULES.limit || trouble ? 'sit' : bkMean(them, 'hnd', ['guard']) < BK_LICH.loose ? 'gamble' : 'bal' };
+}
+
+/* ---------- the hexes ---------- */
+function bkHexStart(ids, on) { const hx = (ids || []).filter((k, i, a) => BK_HEX[k] && a.indexOf(k) === i); if (hx.length) G.hex = { ids: hx, on: on === 1 ? 1 : 0, sq: 0, shadows: 0 }; }
+const bkHexHas = id => !!(G && G.hex && G.hex.ids.includes(id));
+const bkHexOn = (id, side) => bkHexHas(id) && side === G.hex.on;
+// how far out the drifting rim is now: -1 to 1, on the game seconds played
+const bkHexDrift = () => Math.sin(2 * Math.PI * (G.secs || 0) / BK_HEX.drift.period);
+// what a hex takes off p's shot (from rim: at the rim)
+function bkHexShot(p, rim) { return bkHexOn('drift', p.side) ? Math.abs(bkHexDrift()) * BK_HEX.drift.p * (rim ? BK_HEX.drift.rim : 1) : 0; }
+const bkHexWild = side => bkHexOn('drift', side);
+// a foul by side's defenders, how much likelier
+const bkHexFoul = side => bkHexOn('whistle', side) ? BK_HEX.whistle.k : 1;
+const bkHexFt = side => bkHexOn('cold', side) ? BK_HEX.cold.ft : 0;
+// the drawn rim's offset across, in metres (hoop s: 0 the left, 1 the right)
+const bkHexRimOff = s => bkHexHas('drift') && s === bkHoopOf(G.hex.on) ? bkHexDrift() * BK_HEX.drift.draw : 0;
+// a new possession for side: the Shadow Sixth comes out on its first past the middle of the period, once a period
+function bkHexPoss(side) {
+  if (!bkHexOn('shadow', side) || G.hex.sq === G.q || !G.cur) return;
+  const len = G.q > BK_RULES.quarters ? BK_RULES.ot : G.qlen;
+  if (G.clock > len * BK_HEX.shadow.at) return;
+  G.hex.sq = G.q; G.hex.shadows++; G.cur.shadow = true; bkFxNow();
+  GD.big = { k: 'shadow' }; bkEv('shadow', G.teams[1 - side].name, G.teams[side].name);
+}
+const bkHexNames = () => G && G.hex ? G.hex.ids.map(k => BK_HEX[k].n).join(', ') : '';
+const bkHexLine = () => !G || !G.hex ? '' : 'Hexes: ' + G.hex.ids.map(k => k === 'shadow' && G.cur && G.cur.shadow ? `${BK_HEX[k].n} (out now)` : BK_HEX[k].n).join('  ·  ');
+// the Shadow Sixth, while it is out: a dark figure between the ball and the basket it guards
+function bkHexDraw(c) {
+  if (!G.cur || !G.cur.shadow || !['live', 'walk'].includes(GD.ph)) return;
+  const hx = bkHoopX(G.cur.side), B = L.ball, x = lerp(hx, B.x, .42), y = B.y * .42, s = bkScr(x, y);
+  c.save(); bkZoomAt(c, s);
+  c.save(); c.globalAlpha = .35 + .1 * Math.sin(BKT.t * 3); c.fillStyle = '#1a1022'; c.beginPath(); c.ellipse(s.x, s.y + 1, 18, 6, 0, 0, Math.PI * 2); c.fill(); c.restore();
+  drawFig(c, 'wraith', s.x, s.y, 54, { color: '#1a1022', light: '#c8b8ff', short: 'N' }, { num: 6, flip: bkDir(G.cur.side) > 0, alpha: .55 + .1 * Math.sin(BKT.t * 2.3), lift: 2 + Math.sin(BKT.t * 2) * 2 });
+  c.restore();
 }
 /* The Charter Court's superstars (issue #77, phase 8), inside the wBK scope: each superstar's ratings and powers, added
    to the engine's own tables after its parts load, as the gridiron's are (g0-stars.js). Plain assignments, nothing
@@ -31544,6 +31695,13 @@ return {
   powers: side => G && G.mana ? { mana: Math.floor(G.mana[side] + 1e-9), spirit: Math.round(G.spirit[side]), ultUsed: G.ultUsed[side], zones: JSON.parse(JSON.stringify(G.zones)), cast: G.cur && G.cur.cast ? JSON.parse(JSON.stringify(G.cur.cast)) : [], on: G.powers } : null,
   powerOptions: side => G && G.cur ? bkPowerOptions(side) : [], powerList: (side, role) => G && G.on ? bkPowerList(side, role) : [], ultOptions: side => G && G.on ? bkUltOptions(side) : [], sitOptions: side => G && G.cur ? bkSitOptions(side) : [],
   queue: (role, ri, id) => G && GD ? bkPowQueue(role, ri, id) : 'No game on.', get queued() { return GD && GD.pow ? JSON.parse(JSON.stringify(GD.pow)) : null; }, ult: ri => G && GD ? bkUltNow(GD.you, ri) : 'No game on.', sit: id => G && GD ? bkSitNow(GD.you, id) : 'No game on.',
+  // the Umbral (16-umbral.js): the hexes ({ id: { n, d } }), the game's (null without: { ids, on, sq, shadows, line, out:
+  // the Shadow Sixth is out now }), the hexes' and the Lich's rules themselves (not copies: the balance bot tunes them),
+  // an ultimate's words by id (the Nadir captain's too), and the tests' handles on a CPU coach's call now for side
+  hexes: Object.fromEntries(Object.entries(BK_HEX).map(([k, H]) => [k, { n: H.n, d: H.d }])),
+  hex: () => G && G.hex ? Object.assign({ line: bkHexLine(), out: !!(G.cur && G.cur.shadow) }, JSON.parse(JSON.stringify(G.hex))) : null,
+  hexRules: BK_HEX, lichRules: BK_LICH, ultBook: id => BK_ULT_BY[id] ? { id, n: BK_ULT_BY[id].n, desc: BK_ULT_BY[id].desc } : null,
+  cpu: { set: side => bkCpuSet(side), def: side => bkCpuDef(side), stance: side => bkCpuStance(side) }, ftNow: i => L && GD && GD.ft ? bkFtNow(L.pl[i]) : null,
   // (the tests' handle: cast this power of player ri now, as if at the start of the possession)
   castNow: (side, ri, id) => { const o = bkPowerList(side, G.cur && G.cur.side === side ? 'off' : 'def').find(x => x.ri === ri && x.id === id); if (!o) return false; const ok = bkCast(side, o); bkFxNow(); bkFxStart(); return ok; },
   get auto() { return !!GD && GD.auto; }, set auto(v) { if (GD) GD.auto = !!v; }, fx: k => bkFx(k), fits: Object.assign({}, BK_FITS),
@@ -65050,8 +65208,152 @@ wRingBarNote = function () {
 // after a Hardcore journey ends on the finale's lost round, the card's result stays off the end screen
 const wWU4CRingResultCard = wRingResultCard;
 wRingResultCard = function () { if (RUN && RUN.over) return; return wWU4CRingResultCard.apply(this, arguments); };
-/* u4d: basketball in the Umbral (issue #99, phase 4d): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4d: basketball in the Umbral (issue #99, phase 4d). Loads after u4-grounds.js; changes earlier parts only by
+   reassignment (saved originals carry the wWU4D prefix).
+
+   Tier U on the court is tier 4 in the basketball tables: W_BKG.oppBonus[4] rating points on each of their five (an
+   umbral form changes only their ratings and start values, never yours), the Lich coaching them (W_BALL.diff[4] = 3,
+   skill index 3, shared with the other engines' tier U: set once; the engine's own decisions, src/bk/parts/16-umbral.js),
+   and a full potion bag (W_COURT_KIT.opp[4]). Tiers 1 to 3 are as they were.
+   The champion of the Black Court (u:g_court, the Severed Plains): Vesper Gloam, the Night Warden, holds the Black Net.
+   Past the two guards and the gate (u4), PLAY opens the game card (wUmbBkCard): tier U, the Nadir five (W_UMB4D.five,
+   a vampire at the point with an ultimate of her own, Lights Out), the hexes for this try, and Play, Manage or Simulate.
+   The game is the Realm's own basketball game (wStartCourt: save and leave, resume after a reload, Concede, the box
+   scores), against club 'nadir:court' at tier 4, with kind 'unadirbk': its end goes to wUmbNadirEnd (a tie, still
+   level after the overtimes, counts as a loss). The toll, when this is a retry, is paid at tip-off
+   (wUmbTollAtKickoff, the frame's), never for backing away from the card.
+   The finale (u5) plays a basketball round through the same adapter, id 'finale': the same five as Nadir Athletic
+   (club 'nadir:court:finale'), no toll, no piece; its end goes to W_ON_END.nadir as the finale's.
+   Hexes: basketball's own (wBK.hexes, the engine's table), W_NADIR.court.hexes of them (the finale's round its own
+   count), drawn for each try by wUmbBkHexes (fixed for the try: a reload doesn't redraw them), named on the card, in
+   the log, before the tip and on the scoreboard.
+   In LAB mode PLAY skips the card and plays W_UMB4D.labHow (Simulate) at once, for the realm bot. A game left
+   half-played (W_UMB4.live.court) is picked up by PLAY where it was, with no card and no toll.
+
+   W_UMB4D, wUmbBkTeam, wUmbBkClub, wUmbBkHexes, wUmbBkCard, wUmbBkTip
+   Wraps: wBallRegion (wWU4DBallRegion), wBallTeam (wWU4DBallTeam), wCourtOpp (wWU4DCourtOpp): the Nadir's clubs are
+   the Severed Plains' and the Nadir five; wBK.start and wBK.simGame (wWU4DStart, wWU4DSimGame: the hexes go in); and
+   wCourtResultCard (wWU4DCourtResultCard: no card over the end screen when a Hardcore journey has just ended, RUN.over). */
+
+const W_UMB4D = {
+  id: 'court', club: 'nadir:court', finaleClub: 'nadir:court:finale', kind: 'unadirbk', labHow: 'sim',
+  team: { name: 'Black Court Nadir', short: 'NDR', color: '#2e2440', light: '#c8b8ff' },
+  finaleTeam: { name: 'Nadir Athletic', short: 'NDR', color: '#2a1e34', light: '#e4defa' },
+  // their level against your team's (0: level for level), and the five, then the bench
+  gap: 0,
+  five: [
+    { n: 'Vesper Gloam', kind: 'vampire', num: 0, ult: 'lightsout', cap: true }, { n: 'Hush', kind: 'skeleton', num: 13 }, { n: 'Sable Thorn', kind: 'skeleton', num: 22 },
+    { n: 'Weft', kind: 'zombie', num: 8 }, { n: 'Cairn', kind: 'golem', num: 50 },
+    { n: 'Mortlake', kind: 'zombie', num: 44 }, { n: 'Grieve', kind: 'witch', num: 3 },
+  ],
+};
+// tier U in the basketball tables (W_BALL.diff and W_BALL_SKILL are shared with the other engines' tier U: set once)
+W_BKG.oppBonus[4] = 6;
+W_COURT_KIT.opp[4] = { draught: 2, secondwind: 2, bksteady: 1, bkhot: 2 };
+if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
+if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
+
+W_NADIR.court = { piece: 'basketball', char: 'nadir_court', ground: 'g_court', map: 'u:g_court', region: 'plains', engine: 'court', hexes: 1, toll: 30, gold: 100 };
+DB.chars.nadir_court = { name: 'Vesper Gloam, the Night Warden', kind: 'vampire', look: { coat: '#2e2440', acc: 'scarf' },
+  greet: 'You walked all the way through the cold for a game of basketball. I captain the Nadir on the Black Court, and I keep the NET. Say PLAY when you want to lose it. Ask about the RULES first, if you like; nobody listens.',
+  topics: {
+    job: { t: 'I run the point on the Black Court. I was running it when the torches on that wall were lit, and I will be running it when the last one goes out.' },
+    net: { t: 'The Black Net. One ninth of your Seal, and it has never once let a ball through cleanly. Beat my five at basketball and it is yours. Lose, and the next game costs a TOLL.' },
+    rules: { t: 'Real basketball, five on five, four quarters, our boards. My side plays harder than anything you have met, a Lich calls our sets, and our bench carries a full bag. I keep the LIGHTS for when it matters. Before the tip I draw the HEXES.' },
+    hexes: { t: 'The Black Court has its moods. Your rim drifts on its bracket, a shadow comes out to guard you, a crooked whistle calls every touch against you, the cold gets into your fingers at the line. You will hear which before the tip.' },
+    toll: { t: 'Thirty gold a game, after the first. Paid at the tip. Walking away from the card costs nothing.' },
+    lights: { t: 'Once a game I put the torches out. Your shots go dark, and my five take the ball off you in the gloom.' },
+    play: { t: 'Then bring your five.', act: 'unadir:court' },
+  } };
+
+/* ---------- the Nadir five ---------- */
+// which of the Nadir's clubs this is: 'champ', 'finale', or ''
+const wUmbBkClub = club => club === W_UMB4D.club ? 'champ' : club === W_UMB4D.finaleClub ? 'finale' : '';
+// their five and bench, as the court takes a team: your team's level plus W_UMB4D.gap, tier U's points on each of the
+// five (spread as wCourtOpp spreads a tier's), the captain at the point with her own ultimate
+function wUmbBkTeam(lvl, finale) {
+  const L = lvl != null ? lvl : Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4D.gap)), k = W_BKG.oppBonus[4] || 0;
+  const roster = W_UMB4D.five.map((s, i) => {
+    const t = wCourtPlayer(wMakePlayer({ kind: s.kind, lvl: i < 5 ? L : Math.max(1, L - 1), n: s.n, num: s.num }, 'opp'));
+    if (s.ult) t.ult = s.ult;
+    return t;
+  });
+  if (k) roster.slice(0, 5).forEach((p, j) => { const st = wBK.stats; for (let i = 0; i < k; i++) { const s = st[(i * 5 + j) % st.length]; p.r[s] = Math.min(W_BKR.cap, p.r[s] + 1); } });
+  const T = Object.assign({}, finale ? W_UMB4D.finaleTeam : W_UMB4D.team, { roster });
+  // the captain plays the point: whoever the coaches put there takes her spot
+  const spot = wBK.team(T).spot, cap = W_UMB4D.five.findIndex(s => s.cap), was = Object.keys(spot).find(p => spot[p] === cap);
+  if (was && was !== 'PG') { spot[was] = spot.PG; spot.PG = cap; }
+  return Object.assign(T, { spot });
+}
+const wWU4DBallRegion = wBallRegion;
+wBallRegion = function (club) { return wUmbBkClub(club) ? W_NADIR.court.region : wWU4DBallRegion.apply(this, arguments); };
+const wWU4DBallTeam = wBallTeam;
+wBallTeam = function (club) {
+  const f = wUmbBkClub(club); if (!f) return wWU4DBallTeam.apply(this, arguments);
+  const T = f === 'finale' ? W_UMB4D.finaleTeam : W_UMB4D.team;
+  return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.6), light: T.light, motto: '' };
+};
+const wWU4DCourtOpp = wCourtOpp;
+wCourtOpp = function (club, tier) { const f = wUmbBkClub(club); return f ? wUmbBkTeam(null, f === 'finale') : wWU4DCourtOpp.apply(this, arguments); };
+
+/* ---------- the hexes ---------- */
+const WU4D = { next: null };
+const wWU4DStart = wBK.start, wWU4DSimGame = wBK.simGame;
+wBK.start = o => wWU4DStart(WU4D.next ? Object.assign({}, o, { hexes: WU4D.next.slice() }) : o);
+wBK.simGame = o => wWU4DSimGame(WU4D.next && !(o && o.keep) ? Object.assign({}, o, { hexes: WU4D.next.slice() }) : o);
+// n of basketball's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
+// after a reload)
+function wUmbBkHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wBK.hexes);
+  const r = mulberry(wUmbHash('bk:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1) + (id === 'finale' && U ? 1013 * (U.finale || 0) : 0));
+  const out = []; while (out.length < Math.min(n, ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+const wUmbBkHexWords = hx => hx.map(h => wBK.hexes[h]).filter(Boolean);
+// (a Hardcore journey that has just ended on this game's loss: no result card over the end screen)
+const wWU4DCourtResultCard = wCourtResultCard;
+wCourtResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4DCourtResultCard.apply(this, arguments); };
+
+/* ---------- PLAY: the card, then the tip ---------- */
+function wUmbBkCard(C, id, hx) {
+  const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4D.gap));
+  const fin = id === 'finale' || !C.piece, T = fin ? W_UMB4D.finaleTeam : W_UMB4D.team, lu = wBK.ultBook('lightsout'), H = wUmbBkHexWords(hx);
+  // (a round of the Seal holds no piece and costs no toll)
+  const toll = !C.toll ? '' : tries > 0 ? ` This try costs the toll, ${C.toll} gold, at the tip.` : ` The first game is free; after a loss, each costs a toll of ${C.toll} gold.`;
+  const prize = fin ? 'Win, and this round of the Seal is yours.' : `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.${toll}`;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
+    <p><b>${fin ? 'The Seal: basketball' : 'The Black Court'}: tier U.</b> Basketball against ${esc(T.name)}: level ${lvl}, in umbral form (${W_BKG.oppBonus[4]} rating points on each of their five), coached by a ${esc(W_BALL_SKILL[3])}, with a full potion bag. ${esc(W_UMB4D.five[0].n)} plays the point, and once a game casts ${esc(lu.n)}: ${esc(lu.desc)}</p>
+    <p class="hint wumbpg"><b>Hexes:</b> ${H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ')}</p>
+    <p class="hint">${prize} A tie counts as a loss.</p></div>
+    <div class="row"><button class="btn" data-ubk="play">Play</button><button class="ghost" data-ubk="manage">Manage</button><button class="ghost" data-ubk="sim">Simulate</button><button class="ghost" id="wUbkNo">Not now</button></div>`,
+    () => wDrain());
+  $('modalBox').querySelectorAll('[data-ubk]').forEach(b => b.onclick = () => { close(); const why = wUmbBkTip(C, id, hx, b.dataset.ubk); if (why) wLog(why, 'b'); });
+  $('wUbkNo').onclick = () => close();
+  const f = $('modalBox').querySelector('[data-ubk="play"]'); if (f) f.focus();
+}
+// the tip: the toll (on a retry), the hexes in the log, and the Realm's basketball game at tier U ('' when it started)
+function wUmbBkTip(C, id, hx, how) {
+  const probs = wCourtProblems(); if (probs.length) return probs.join(' ');
+  if (wCourtLive()) return 'Finish the basketball game you started first.';
+  wUmbTollAtKickoff(id);
+  const H = wUmbBkHexWords(hx);
+  wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
+  WU4D.next = hx.slice();
+  try { return wStartCourt({ club: id === 'finale' ? W_UMB4D.finaleClub : W_UMB4D.club, how, tier: 4, kind: W_UMB4D.kind, ref: { id }, cup: true }); } finally { WU4D.next = null; }
+}
+// (a basketball game left half-played: u4 skips the toll's gold check, and PLAY picks it up)
+W_UMB4.live.court = () => wCourtLive();
+W_UMB4.start.court = function (C, id) {
+  // (a game left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wCourtLive()) { wResumeCourt(); return ''; }
+  const probs = wCourtProblems(); if (probs.length) return probs.join(' ');
+  const hx = wUmbBkHexes(id, C.hexes || 1);
+  if (LAB) return wUmbBkTip(C, id, hx, W_UMB4D.labHow);
+  wUmbBkCard(C, id, hx);
+  return '';
+};
+// the end: the piece (or the finale's round), or a try counted (a tie is not a win)
+W_ON_END[W_UMB4D.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
 /* u4e: hockey in the Umbral (issue #99, phase 4e): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
 /* u4f: golf in the Umbral (issue #99, phase 4f): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.

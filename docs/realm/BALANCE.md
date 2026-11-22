@@ -1648,3 +1648,73 @@ Cracked Bronze), in the main event behind two Nadir boxers, all at tier U. Their
 
 The boss of the ring is harder than a tier U club by their powers and nature alone; a careful human in the corner (or
 boxing the rounds) wins far more than the bot. Phase 7 measures it inside whole journeys.
+
+### Umbral: basketball (#99, 4d)
+
+`python3 test/realm_court_lab.py N '' umbral` plays only the Umbral part: your five at level 3 under Simulate (your
+coach a Knight), at an even level, five minutes, the Charter Court's own ways on. Tier U on the court is tier 4 in the
+basketball tables: `W_BKG.oppBonus[4]` rating points on each of their five, the Lich coaching (skill 3), and their full
+bag (`W_COURT_KIT.opp[4]`). Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same game seed
+for seed (40 seeded games against a build from before the change, at every skill pairing, length, with and without
+powers, the ground and bags: score, box score, tally, subs, sets, timeouts and the scoring log identical). Games here
+are short and swingy: blocks of 1,000 differ by up to ±4 points (tier 3 at an even level read 31.1%, 32.5% and 34.2%
+in three batches), so the rows below are 1,000 games or more, and averages of batches where there are several.
+
+**The Lich against the Archmage** (tier 2 ratings, no bags). The first cut decided only the calls: on defense it weighs
+each defense by what your offense will run against it (a coach by hand keeps the set it called; a CPU coach leans to
+what beats that defense; blended with what you have really run), on offense it changes sets before the scout catches
+up, and its stances read the game. That was worth about 2 points (Archmage 39.7%, Lich 37.5%, 1,500 games each):
+the Archmage already reads the defense on the floor and your habit, and most of what the calls are worth it had. Tried
+on the floor, 1,500 games each against the Lich's 37.5%:
+
+| the Lich also... | you win |
+|---|---|
+| waits for a better look (+.06 on the shot it takes), passes to a better one, reaches in half as often | 38.3% |
+| no stances of its own | 37.3% |
+| subs a tiring player later (35, not 50) | 37.6% |
+| shoots sooner (-.05) | 39.7% |
+| is up in time on the contest a share .3 more often | 36.8% |
+| **plays a good shooter tighter and a poor one further off** (`BK_LICH.close` 1) | **33.4%** |
+| **both** (close 1, jump .3) | **29.3%** |
+| close 1.5 and jump .3 / close 2 alone | 28.7% / 31.0% |
+
+Kept: the calls, and close 1 with jump .3. Scouting the shooters is the big one: the contest is most of a shot's odds,
+and putting it where the shooting is wins far more than any call. Over three batches of 1,000 you win 43.4% against an
+Archmage and 31.6% against the Lich: the Lich is about 12 points better on its decisions alone.
+
+**Tier U.** First cut: 7 points, the calls-only Lich, the full bag (two Stamina Draughts, two Second Winds, Steady
+Drops and two Hot Hand Elixirs); the Nadir five a vampire, a wraith, an elf, a spider and a golem, a zombie and a
+skeleton on the bench.
+
+| even level, their bag | tier U, a rival's five | tier U, the Nadir five (no hexes) |
+|---|---|---|
+| first cut (300) | 20.3% | 11.7% |
+| 7 points, calls-only Lich, a skeleton for the elf, a witch on the bench (1,000) | 23.6% | 14.7% |
+| 6 points, the same (1,000) | 24.1% | 17.4% |
+| 6 points, **the sharper Lich** (close-outs and jumps), the same five (1,000 each) | 20.5%, 19.8% | 12.7%, 11.8%, 10.8% |
+| the same, a zombie for the spider (1,500) | | 16.0% |
+| **kept: 6 points, the sharper Lich, a zombie for the spider and a skeleton for the wraith** | **19.6%** | **16.9%** (1,000), **18.5%** (1,500) |
+| (tier 3, a rival's five, 5 points and an Archmage, the same batches) | 31.1%, 34.2%, 32.5% | |
+
+Tier U sits at 6 points (one more than tier 3): about 20% against a rival's five at level parity, inside the 15 to 25%
+target. The Nadir five were out of the band with the sharper Lich: the spider's defense and the wraith's handle cost
+most. Kept: Vesper Gloam (a vampire, at the point, with her own ultimate, Lights Out), two skeletons on the wings, a
+zombie and a golem inside; a zombie and a witch on the bench: about 17.5% without hexes.
+
+**The hexes, each alone on the champion's game against none** (1,000 games; first a rough 300-game look, with the
+calls-only Lich; the figures in brackets are two batches with the sharper Lich against the five before the last swap):
+
+| hex | first cut | **kept** | your FG / FT, against none's 42% / 66% |
+|---|---|---|---|
+| The Rim Drifts (your jumpers up to **8** points worse as the rim swings, layups a third; wild misses. At 9: -6.3 and -7.3; at 7: -3.6) | -6.3 | **-5.5** (also -5.7, -5.0) | 40% / 64% |
+| The Shadow Sixth (once a quarter, a shadow defends one of your possessions) | -4.3 | **-3.9** (also -5.3, -2.1) | 40% / 65% |
+| The Short Clock (a 10-second shot clock; then 7, then 6): **cut** | 0.0 | -0.9 at 7 s, +0.2 at 6 s | 42% / 64% |
+| The Crooked Whistle (fouls on your five half again as likely), in its place | | **-1.3** (also -2.6, -3.0) | 41% / 63% |
+| Cold Hands (your free throws 12, then **15** points worse) | -1.3 | **-1.4** (also -1.7, -0.8) | 41% / 50% |
+
+No hex swings a game by more than about 6 points. The Short Clock did nothing at any length: the CPU rarely needs more
+than 6 seconds, and both sides only played faster; it was replaced by the Crooked Whistle. Cold Hands is the gentlest:
+a five-minute game has few free throws.
+
+**The champion as played**, one hex drawn a try: **about 15%** (17.1% in 1,000, 13.8% in 2,000), inside the 15 to 25%
+band. A careful human, calling the sets and timing the shots, wins far more.

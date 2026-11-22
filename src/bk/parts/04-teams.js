@@ -7,7 +7,7 @@
    A team: { name, short, color, light, roster: [{ n, kind, num, r }], spot: { PG: ri, ... } }. A roster may be longer
    than five: the first five start, and the rest (up to BK_RULES.bench) sit on the bench. A player may bring pw ({ off,
    def }: which of their kind's two powers for each end, 14-powers.js), and gear ({ id, name, fx }: kept as gear, gid and
-   gx, 15-kit.js). */
+   gx, 15-kit.js), and an ultimate of their own in place of their kind's ({ ult: id }, the Nadir captain's, 16-umbral.js). */
 const BK_POS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const BK_ROLE = { PG: 'guard', SG: 'guard', SF: 'wing', PF: 'big', C: 'big' };
 const BK_STATS = ['spd', 'siz', 'hop', 'tch', 'hnd', 'def'];
@@ -31,7 +31,7 @@ const bkSpotOk = (m, n) => !!m && BK_POS.every(k => Number.isInteger(m[k]) && m[
 // a team from { name, short, color, light, roster: [{ n, kind, num, r? }] } or { ..., kinds: [5 or more kinds] }
 function bkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 3 + i * 7 }))).slice(0, BK_RULES.side + BK_RULES.bench)
-    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: bkGx(p.gear.fx) } : {}));
+    .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: bkGx(p.gear.fx) } : {}, p.ult && BK_ULT_BY[p.ult] ? { ult: p.ult } : {}));
   const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
   // the five's spots: the best handler at the point, the two biggest inside, then the better shooter on the wing
   const free = new Set(roster.slice(0, BK_RULES.side).map((_, i) => i)), by = f => { const i = [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r))[0]; free.delete(i); return i; };

@@ -136,9 +136,10 @@ function bkPowerOptions(side) { return G.powers && G.cur ? bkPowerList(side, G.c
 function bkUltOptions(side) {
   if (!G.powers) return [];
   const T = G.teams[side];
-  return G.on[side].map(ri => { const m = T.roster[ri], u = BK_ULT[m.kind]; if (!u) return null;
+  // (a player with an ultimate of their own, m.ult, brings it in place of their kind's: the CPU casts it first)
+  return G.on[side].map(ri => { const m = T.roster[ri], u = (m.ult && BK_ULT_BY[m.ult]) || BK_ULT[m.kind]; if (!u) return null;
     const why = G.ultUsed[side] ? 'used this game' : G.spirit[side] < BK_SPIRIT.ult ? `the crowd needs to be louder (spirit ${Math.round(G.spirit[side])} of ${BK_SPIRIT.ult})` : '';
-    return { ri, id: u.id, n: u.n, desc: u.desc, who: m.n, ok: !why, why }; }).filter(Boolean);
+    return Object.assign({ ri, id: u.id, n: u.n, desc: u.desc, who: m.n, ok: !why, why }, m.ult ? { own: true } : {}); }).filter(Boolean);
 }
 // the situation powers a side may cast now: { id, n, desc, cost, ok, why }
 function bkSitOptions(side) {
@@ -178,6 +179,8 @@ function bkFxNow() {
   const C = G.cur, F = Object.assign({}, BK_FX0);
   for (const c of C.cast) { const p = c.sit ? null : !c.ult && BK_POW_BY[c.id]; if (p) bkFxMerge(F, p.fx); }
   for (const z of G.zones) { const U0 = BK_ULT_BY[z.id] || BK_SIT[z.id], e = U0 && (z.side === C.side ? U0.o : U0.d); if (e && Object.keys(e).length) { bkFxMerge(F, e); z.acted = true; } }
+  // (the Shadow Sixth on this possession, 16-umbral.js)
+  if (C.shadow) bkFxMerge(F, BK_HEX.shadow.fx);
   C.fx = F;
 }
 // the start of a possession: frozen bodies and stamina back, once
@@ -252,7 +255,8 @@ function bkCpuPower(side, sk) {
   if (!pool.length) return null;
   const keep = sk >= 2 ? Math.min(...pool.map(o => o.cost)) : 1;
   const can = pool.filter(o => G.mana[side] - o.cost >= (bkLate(.5) ? 0 : keep));
-  if (!can.length || R() < (sk >= 2 ? .15 : .35)) return null;
+  // (a Lich holds back less often)
+  if (!can.length || R() < (sk === 3 ? BK_LICH.hold : sk >= 2 ? .15 : .35)) return null;
   return can.sort((a, b) => b.cost - a.cost)[0];
 }
 function bkCpuUlt(side, sk) {
@@ -260,7 +264,8 @@ function bkCpuUlt(side, sk) {
   if (!sk) return R() < .5 ? pick(opts) : null;
   const lead = bkLead(side), late = bkLate(.6), run = G.run.side === 1 - side ? G.run.pts : 0;
   // a Knight whenever it can once it's behind or late; an Archmage for a close finish or to stop a run
-  if (sk >= 2 ? ((late && Math.abs(lead) <= 6) || run >= 8) : (lead < 0 || late)) return opts.sort((a, b) => (G.teams[side].roster[b.ri].r.siz) - (G.teams[side].roster[a.ri].r.siz))[0];
+  // (a Lich stops a run sooner)
+  if (sk >= 2 ? ((late && Math.abs(lead) <= 6) || run >= (sk === 3 ? BK_LICH.run : 8)) : (lead < 0 || late)) return opts.sort((a, b) => ((b.own ? 1 : 0) - (a.own ? 1 : 0)) || (G.teams[side].roster[b.ri].r.siz) - (G.teams[side].roster[a.ri].r.siz))[0];
   return null;
 }
 function bkCpuSit(side, sk) {

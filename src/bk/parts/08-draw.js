@@ -61,6 +61,8 @@ function bkDraw(c) {
   bkDrawHoop(c, 1, true);
   bkDrawZones(c);
   bkDrawPlayers(c);
+  // (the Umbral's hexes: the Shadow Sixth, 16-umbral.js)
+  if (G.hex) bkHexDraw(c);
   bkDrawHoop(c, 0, false);
   bkDrawHoop(c, 1, false);
   bkDrawBall(c);
@@ -154,7 +156,8 @@ function bkDrawFloor(c) {
 }
 // a hoop: the pole and the backboard behind (back), or the rim and its chain net in front (front)
 function bkDrawHoop(c, s, back) {
-  const dir = s ? -1 : 1, bx = s ? BK_RULES.len : 0, rim = bx + dir * BK_RULES.rim, R0 = bkScr(rim, 0, 3.05), bb = bkScr(bx + dir * 1.2, 0, 3.4);
+  // (a drifting rim, the Umbral's hex, hangs off to one side: 16-umbral.js)
+  const dir = s ? -1 : 1, bx = s ? BK_RULES.len : 0, rim = bx + dir * BK_RULES.rim, R0 = bkScr(rim, G.hex ? bkHexRimOff(s) : 0, 3.05), bb = bkScr(bx + dir * 1.2, 0, 3.4);
   c.save();
   if (back) {
     const pole = bkScr(bx - dir * .6, 0); c.strokeStyle = '#2a201a'; c.lineWidth = 5 * BKC.sx; c.beginPath(); c.moveTo(pole.x, pole.y); c.lineTo(pole.x, bb.y); c.lineTo(bb.x, bb.y); c.stroke();
@@ -254,6 +257,8 @@ function bkDrawHud(c) {
   const sc = Math.ceil(G.shot), off = G.clock < G.shot, low = !off && sc <= 4;
   c.fillStyle = '#1e0d08'; rr(c, 461, 35, 38, 22, 4); c.fill(); c.strokeStyle = low ? '#ff6a4a' : 'rgba(255,208,138,.4)'; c.lineWidth = 1; c.stroke();
   txt(c, off ? '–' : String(sc), 480, 52, F(17, 900), low ? '#ff6a4a' : '#ffd08a', 'center');
+  // the hexes on this game, under the bar (16-umbral.js)
+  if (G.hex) txt(c, '☾ ' + bkHexLine(), 16, 81, F(13, 700), '#c8b8ff', 'left');
 }
 function bkDrawMsg(c) {
   const notes = GD.notes && GD.notes.length ? ' ' + GD.notes.join(' ') : '';

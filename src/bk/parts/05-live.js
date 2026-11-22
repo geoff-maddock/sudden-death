@@ -150,7 +150,9 @@ function bkGuardSpot(p) {
   // handler too once they're out past the arc)
   const press = Df.back && bkHand() >= 0 && bkU(m.side, L.pl[bkHand()].x) > 14;
   const gap = press ? (onBall ? .7 : 1) : onBall ? Math.min(d * .5, Df.sag && d > 6.2 ? 1.6 : .95) : clamp(d * .32, .9, 3.2) + (Df.sag && d > 5 ? Df.sag : 0);
-  let x = m.x + dx / d * gap, y = m.y + dy / d * gap;
+  // (a Lich's defenders have scouted the shooters: tighter on a good one, further off a poor one, 16-umbral.js)
+  const g2 = !press && G.skill[p.side] === 3 ? gap * bkLichGap(m) : gap;
+  let x = m.x + dx / d * g2, y = m.y + dy / d * g2;
   // off the ball, help toward a driver
   if (!onBall && L.drive && bkHand() >= 0) { const hb = L.pl[bkHand()]; x = lerp(x, hb.x, .25); y = lerp(y, hb.y, .25); }
   return [x, y];
@@ -228,7 +230,7 @@ function bkShotP(p, x, y) {
   else pr = .6 - (dist - 1.5) * .03 - Math.max(0, dist - 5) * .02 + (p.r.tch - 6) * .03 - con * .28 - Math.max(0, dist - 7.6) * .07;
   if (bkOnFire(p)) pr += BK_FIRE.p;
   pr -= .1 * bkTired(p);
-  pr += bkCallMod(p, dist) + bkCourtMod(p);
+  pr += bkCallMod(p, dist) + bkCourtMod(p) - (G.hex ? bkHexShot(p, rim) : 0);
   // (the powers on the floor: every shot, threes, at the rim)
   if (G.cur && p.side === G.cur.side) pr += bkFx('shot') + (bkShotValue(dist, y) === 3 ? bkFx('three') : 0) + (rim ? bkFx('rim') : 0);
   return { p: clamp(pr, .02, .96), dist, d: d ? L.pl.indexOf(d) : -1, dd, con, rim, dunk, three: bkShotValue(dist, y) === 3 };
@@ -247,10 +249,12 @@ function bkShoot(o) {
   if (near) {
     // the jump: a defender already up as the shot goes up (just before it) blocks far more; one you play who didn't jump, far less
     jumped = d.act === 'jump' && d.jumpAt != null && L.t - d.jumpAt < BK_JUMP.window;
+    // (a Lich's defender reads the shooter and is up in time more often, 16-umbral.js)
+    if (!jumped && G.skill[d.side] === 3 && !bkYoursNow(S.d) && R() < BK_LICH.jump) jumped = true;
     const mine = bkYoursNow(S.d) && !jumped;
     const pb = clamp(.08 + (d.r.hop * .4 + d.r.siz * .4 + d.r.def * .3 - p.r.siz * .5 - p.r.hop * .3 - 1.4) * .03, .015, .35) * (1.2 - S.dd) / 1.2 * (S.dist < 2.6 ? 1.5 : .4) * (jumped ? BK_JUMP.block : mine ? .5 : 1) * bkPress(d.side).block * bkFx('blk');
     block = R() < pb;
-    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul;
+    foul = !block && R() < (S.dist < 2.2 ? .14 : .05) * (1.35 - d.r.def * .05) * bkPress(d.side).foul * (G.hex ? bkHexFoul(d.side) : 1);
     if (!mine && !jumped) { d.act = 'jump'; d.actT = .5; d.jumpAt = L.t; }
   }
   // (Wrist Bands: your shots get the wider window, bkWindow; the CPU's a touch more likely)
@@ -273,7 +277,7 @@ function bkShotLands() {
 }
 // the ball comes off loose from (x, y) at height z0, landing r metres away on average, back toward the floor
 function bkLoose(x, y, z0, r) {
-  const wild = z0 > 3 && bkBent(G.poss) ? BK_RIM.wild : 1, back = bkDir(G.poss), a = Math.PI + (R() - .5) * 2.4 * wild, rr = r * (.55 + R() * .7) * wild;
+  const wild = z0 > 3 && (bkBent(G.poss) || (G.hex && bkHexWild(G.poss))) ? BK_RIM.wild : 1, back = bkDir(G.poss), a = Math.PI + (R() - .5) * 2.4 * wild, rr = r * (.55 + R() * .7) * wild;
   let tx = x + Math.cos(a) * rr * back, ty = y + Math.sin(a) * rr;
   tx = clamp(tx, .5, BK_RULES.len - .5); ty = clamp(ty, -BK_RULES.wid / 2 + .5, BK_RULES.wid / 2 - .5);
   Object.assign(L.ball, { st: 'loose', h: -1, fx: x, fy: y, tx, ty, t: 0, T: .55 + rr * .08, z0 });

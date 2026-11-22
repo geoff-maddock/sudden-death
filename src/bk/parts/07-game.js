@@ -28,9 +28,12 @@ function bkStart(opts) {
   bkNewGame({ mins: o.mins });
   G.teams = [bkTeam(T[0] || BK_CLUBS.home), bkTeam(T[1] || BK_CLUBS.away)];
   G.on = G.teams.map(t => BK_POS.map(k => t.spot[k]));
-  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 2)) : [1, 1];
+  // (0 Squire, 1 Knight, 2 Archmage; 3 the Umbral's Lich, 16-umbral.js)
+  G.skill = Array.isArray(o.skill) ? o.skill.map(n => clamp(n | 0, 0, 3)) : [1, 1];
   bkCallsStart(o);
   bkCourtStart(!!o.court); bkPowersStart(o.powers); bkFansStart(o.fans); G.crowd = engCrowd(o); bkKitStart(o.bags);
+  // (opts.hexes: the Umbral's, 16-umbral.js; none, and nothing changes)
+  if (o.hexes && o.hexes.length) bkHexStart(o.hexes, o.hexOn);
   bkStamStart(); G.ordered = Array.isArray(o.ordered) ? o.ordered.map(Boolean) : [false, false];
   G.box = G.teams.map(t => t.roster.map(() => ({ pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, tov: 0, sec: 0 })));
   G.log = []; G.poss0 = [0, 0]; G.secs = 0; G.hot = [{}, {}];
@@ -38,6 +41,8 @@ function bkStart(opts) {
   G.tally = { break: 0, fire: 0, screen: 0, lob: 0, beat: 0, goaltend: 0, alley: 0, slip: 0, bent: 0, roar: 0, pow: 0, ult: 0, sit: 0 };
   bkNewPlay();
   GD = { ph: 'intro', t: 0, acc: 0, mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: 0, meter: null, auto: true, pow: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. Tip-off.`, big: null, walk: null, ft: null };
+  // (the hexes are named before the tip)
+  if (G.hex) { GD.msg += ` Hexes: ${bkHexNames()}.`; GD.big = { k: 'hex' }; }
   bkInputClear(); bkTipSet();
   return G;
 }
@@ -254,8 +259,8 @@ function bkFreeThrow(o) {
   bkShotReset(); bkLoose(bkHoopX(F.side), 0, 3.05, 1.8); L.t = 0; bkGo('live');
 }
 const bkFtChance = p => clamp(.5 + p.r.tch * .04, .3, .95);
-// a free throw's chance now: touch, Lucky Socks, the nerve, the powers on the floor, an icing
-function bkFtNow(p) { const F = GD && GD.ft; return clamp(bkFtChance(p) + (bkGxOf(p).ft || 0) - (F ? bkNerve(F.side) : 0) + (F && G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + ((F && F.ice) || 0), .05, .98); }
+// a free throw's chance now: touch, Lucky Socks, the nerve, the powers on the floor, an icing (and a hex, 16-umbral.js)
+function bkFtNow(p) { const F = GD && GD.ft; return clamp(bkFtChance(p) + (bkGxOf(p).ft || 0) - (F ? bkNerve(F.side) : 0) + (F && G.cur && G.cur.side === F.side ? bkFx('ft') : 0) + ((F && F.ice) || 0) - (F && G.hex ? bkHexFt(F.side) : 0), .05, .98); }
 // the meter's window at the line: from that chance, so nerves narrow it and the socks widen it
 const bkFtWindow = p => BK_WIN.min + BK_WIN.per * bkFtNow(p);
 // who plays it: the CPU both sides ('watch'), or you play your side by hand ('play'); the same game goes on
