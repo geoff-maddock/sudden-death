@@ -179,6 +179,7 @@ function crSettle() {
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
   if (ev.ghost) say += ' It slid through the guard like smoke.';
   if (ev.gust) say += ` A gust pushes their stone back ${ev.gust} inches.`;
+  if (ev.drift) say += ` The house drifts: the stone slides ${ev.drift} inches further out.`;
   if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
   crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
@@ -199,7 +200,9 @@ function crTick(dt) {
 function crPlayNext() {
   const s = crUp(); if (s < 0) { crGo('over'); return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
-  if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
+  // (the Umbral's hexes, named before the first stone: 15-umbral.js)
+  const hx = G.hex && !G.n ? `${crHexLine()}. ` : '';
+  if (crYours(s)) { crSelReset(); crGo('aim', 0, `${hx}End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
   const mgr = GP.mode === 'manage' && s === GP.you; let plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
   // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
@@ -207,7 +210,7 @@ function crPlayNext() {
   // (the CPU's potion first: never yours, your bag is your own)
   const pre = s === GP.you && G.powers ? crPowSave() : null, PP = crCpuPotionPlan(s, plan, () => crPlan(s, mgr ? GP.mgr.style : null)), pot = PP.pot; plan = PP.plan; const cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel, pre };
-  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${pot ? ` ${pot}` : ''}${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
+  crGo('addr', 0, `${hx}End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${pot ? ` ${pot}` : ''}${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;

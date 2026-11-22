@@ -24,9 +24,11 @@ function crStart(opts) {
   // (one curler the engine can't rate doesn't keep the rest from being placed: their rs is an average curler's)
   const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.some(m => m.r) ? crAutoOrder(teams[s].roster) : null));
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
-  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 3)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
   crShedStart(o); crPowersStart(o); crKitStart(o.bags);
+  // (the Umbral's hexes, when a game asks for them: 15-umbral.js)
+  crHexStart(o.hexes, o.hexOn);
   // the lab's switches (phase 10): fixShot [shot or null, ...] (a side held to one shot where it can), noSweep [bool, ...]
   // (a side's sweepers never sweep), wear: false (the pebble never wears)
   G.fixShot = Array.isArray(o.fixShot) ? o.fixShot.slice() : null; G.noSweep = Array.isArray(o.noSweep) ? o.noSweep.map(Boolean) : null; G.wear = o.wear !== false;
@@ -74,6 +76,8 @@ function crThrowBegin(s, plan, rel, sweep) {
   if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
   // (and Frost Salt on its line: it drags, as under a curse)
   const fx = crFxFor(s); if (G.salt && G.salt[s]) fx.heavy *= CR_POTIONS.crsalt.heavy;
+  // (and a hex on their stones: rime on the pebble, leaden brooms: 15-umbral.js)
+  if (G.hex) crHexFx(s, fx);
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
   const X = { id: ++CR_THROWN, s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
@@ -89,8 +93,12 @@ function crThrowFinish(X) {
   // (a gust as the stones settle pushes their stone nearest the button back, before the rules look; it moves the run's
   // own copies, so a stone the rules refuse, or the free guard zone undoes, leaves G.stones as it was)
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
+  // (the Drifting House: a hexed side's stone at rest in the house slides further out, before the rules look: 15-umbral.js)
+  const drift = G.hex ? crHexDrift(s, run) : 0;
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   if (G.wear !== false) crWear(G.ice, run.path);
+  // (Hoarfrost: the first of the other rink's stones an end to lie in the four-foot freezes there: 15-umbral.js)
+  if (G.hex) crHexFreeze();
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
@@ -103,6 +111,7 @@ function crThrowFinish(X) {
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, ham, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
+  if (drift && !rule.fgz) ev.drift = drift;
   crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };

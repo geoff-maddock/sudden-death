@@ -41792,15 +41792,17 @@ const CR_SKILL = [
   { n: 'Archmage', ang: .22, hitAng: .36, v: .011, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
+// a skill's row: CR_SKILL's three, or the Umbral's Lich (skill 3, CR_LICH: 15-umbral.js)
+const crSk = sk => (sk ?? 1) >= 3 ? CR_LICH : CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
 // the last end's stones), a Squire the fresh pebble on the day
 // (a Knight whose skip reads the ice well, CR_READ.now and up, sees it as it is now)
 const CR_READ = { now: .7 };
-const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)].ice, skip = G.order ? G.order[s][3] : 0;
+const crIceRead = s => { const I = crSk((G.skill || [])[s]).ice, skip = G.order ? G.order[s][3] : 0;
   return I === 'now' || (I === 'end' && crRat(s, skip).red >= CR_READ.now) ? G.ice : I === 'end' ? G.iceEnd || null : null; };
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
-  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
+  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = crSk(sk);
   // (the end's last stone: what it does to the game, crEndValue in 11-call.js)
   if (kAfter >= crPerEnd()) { const next = R.s >= 0 ? 1 - R.s : hammer; return crEndValue(s, pts, next, sk); }
   const left = (crPerEnd() - kAfter) / crPerEnd(); let v = pts * (1 - CR_VAL.left * left);
@@ -41830,11 +41832,13 @@ function crShots(s, sk) {
   }
   // an Archmage also draws round the guards (behind each one, at the top of the house)
   if (sk >= 2) for (const g of st.filter(crInFgz)) draw('draw', g.x, Math.max(-60, g.y + 150));
+  // (and the Lich looks at more: 15-umbral.js)
+  if (sk >= 3) crLichShots(s, draw, hit);
   return out;
 }
 // side s's release of a shot: its aim, with the curler's miss (heading and weight)
 // (a hit's line is its own, and wider: a takeout at full weight misses by its line, where a draw misses by its weight)
-function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
+function crMiss(s, aim, shot) { const S = crSk((G.skill || [])[s]), k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
 function crTry(s, aim) {
@@ -41847,7 +41851,7 @@ function crTry(s, aim) {
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
 // only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
 function crPlan(s, style, only) {
-  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
+  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 3), S = crSk(sk), kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
   // (the lab's fixShot holds a side to one shot where it can be played)
   const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs && (!only || (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only)) : [], list = held.length ? held : only && kind.length ? kind : all;
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
@@ -41859,7 +41863,8 @@ function crPlan(s, style, only) {
   const top = list.slice(0, S.top);
   if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples + sb(c); }
   // an Archmage plays its best few on against the other rink's likeliest reply (crReplyLikely), and weighs that in
-  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + (w + sb(c)) * CR_CALL.replyMix; } }
+  // (the Lich weighs more of the replies, and weighs them more: its own replies and replyMix)
+  if (sk >= 2) { const draws = crReplyDraws(s), mix = S.replyMix ?? CR_CALL.replyMix; for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - mix) + (w + sb(c)) * mix; } }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });
 }
@@ -41871,8 +41876,10 @@ function crWhy(c) {
 // further short, from the release (a Squire's a little later, sweepLate inches past the hack)
 function crSweeper(s, plan) {
   if (G.noSweep && G.noSweep[s]) return null;
+  // (the Lich's sweepers read the stone as it goes, a hit's line too: 15-umbral.js)
+  if (plan && G.skill[s] >= 3) return crLichSweeper(s, plan);
   if (!plan || !['draw', 'guard', 'freeze'].includes(plan.shot)) return null;
-  const S = CR_SKILL[G.skill[s]];
+  const S = crSk(G.skill[s]);
   return st => {
     if (st.y < CR_STONE.y0 + S.sweepLate) return 0;
     const v = Math.hypot(st.vx, st.vy), stopY = st.y + (st.vy / Math.max(v, 1e-6)) * v * v / (2 * CR_STONE.a * crIceAt(G.ice, st.x, st.y, G.cold));
@@ -41905,9 +41912,11 @@ function crStart(opts) {
   // (one curler the engine can't rate doesn't keep the rest from being placed: their rs is an average curler's)
   const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.some(m => m.r) ? crAutoOrder(teams[s].roster) : null));
   crNewGame({ ends: o.ends, order, roster: teams.map(T => T.roster.length), hammer: o.hammer, fgz: o.fgz });
-  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 3)), cold: CR_COLD[o.cold] ? o.cold : 'mid', ice: crIceNew(), iceEnd: null, legs: [1, 1], n: 0,
     st: [crBox(), crBox()], pst: teams.map(T => T.roster.map(() => ({ stones: 0, made: 0 }))), last: null });
   crShedStart(o); crPowersStart(o); crKitStart(o.bags);
+  // (the Umbral's hexes, when a game asks for them: 15-umbral.js)
+  crHexStart(o.hexes, o.hexOn);
   // the lab's switches (phase 10): fixShot [shot or null, ...] (a side held to one shot where it can), noSweep [bool, ...]
   // (a side's sweepers never sweep), wear: false (the pebble never wears)
   G.fixShot = Array.isArray(o.fixShot) ? o.fixShot.slice() : null; G.noSweep = Array.isArray(o.noSweep) ? o.noSweep.map(Boolean) : null; G.wear = o.wear !== false;
@@ -41955,6 +41964,8 @@ function crThrowBegin(s, plan, rel, sweep) {
   if (typeof sweep === 'number') { const k = sweep; sweep = () => k; }
   // (and Frost Salt on its line: it drags, as under a curse)
   const fx = crFxFor(s); if (G.salt && G.salt[s]) fx.heavy *= CR_POTIONS.crsalt.heavy;
+  // (and a hex on their stones: rime on the pebble, leaden brooms: 15-umbral.js)
+  if (G.hex) crHexFx(s, fx);
   const Q = crRunInit(G.stones, { id: 'new', s, x0: 0, ang: rel.ang, v: rel.v, h: rel.h }, { ice: G.ice, cold: G.cold, sweep, legs: true, side: s, fx });
   const X = { id: ++CR_THROWN, s, plan, rel, Q, fx, g: G, legs0: (G.legs || [1, 1]).slice(), ri: crThrower(s), pos: crPos(s), before: G.stones.map(b => Object.assign({}, b)), endNo: G.end, ham: G.hammer };
   CR_LIVE = X; return X;
@@ -41970,8 +41981,12 @@ function crThrowFinish(X) {
   // (a gust as the stones settle pushes their stone nearest the button back, before the rules look; it moves the run's
   // own copies, so a stone the rules refuse, or the free guard zone undoes, leaves G.stones as it was)
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
+  // (the Drifting House: a hexed side's stone at rest in the house slides further out, before the rules look: 15-umbral.js)
+  const drift = G.hex ? crHexDrift(s, run) : 0;
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   if (G.wear !== false) crWear(G.ice, run.path);
+  // (Hoarfrost: the first of the other rink's stones an end to lie in the four-foot freezes there: 15-umbral.js)
+  if (G.hex) crHexFreeze();
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
@@ -41984,6 +41999,7 @@ function crThrowFinish(X) {
   if (rule.end) { const e = rule.end; if (e.s < 0) [0, 1].forEach(k => G.st[k].ends.blank++); else { const W = G.st[e.s]; W.ends.scored++; if (e.n >= 3) W.big++; if (e.s !== ham) W.ends.stolen++; } }
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, ham, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
+  if (drift && !rule.fgz) ev.drift = drift;
   crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
@@ -42212,6 +42228,7 @@ function crSettle() {
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
   if (ev.ghost) say += ' It slid through the guard like smoke.';
   if (ev.gust) say += ` A gust pushes their stone back ${ev.gust} inches.`;
+  if (ev.drift) say += ` The house drifts: the stone slides ${ev.drift} inches further out.`;
   if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
   crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
@@ -42232,7 +42249,9 @@ function crTick(dt) {
 function crPlayNext() {
   const s = crUp(); if (s < 0) { crGo('over'); return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
-  if (crYours(s)) { crSelReset(); crGo('aim', 0, `End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
+  // (the Umbral's hexes, named before the first stone: 15-umbral.js)
+  const hx = G.hex && !G.n ? `${crHexLine()}. ` : '';
+  if (crYours(s)) { crSelReset(); crGo('aim', 0, `${hx}End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
   const mgr = GP.mode === 'manage' && s === GP.you; let plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
   // (the CPU's powers, and yours under Auto powers in Manage, on the shot called, before the miss is worked out)
@@ -42240,7 +42259,7 @@ function crPlayNext() {
   // (the CPU's potion first: never yours, your bag is your own)
   const pre = s === GP.you && G.powers ? crPowSave() : null, PP = crCpuPotionPlan(s, plan, () => crPlan(s, mgr ? GP.mgr.style : null)), pot = PP.pot; plan = PP.plan; const cast = !mgr || GP.autoPow ? crCpuPower(s, plan.shot) : [], rel = crMiss(s, plan.aim, plan.shot);
   GP.cpu = { s, plan, rel, pre };
-  crGo('addr', 0, `End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${pot ? ` ${pot}` : ''}${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
+  crGo('addr', 0, `${hx}End ${e}, stone ${no} of 8${hm}: ${crName(s, ri)} (${G.teams[s].name}), ${crPosName(s)}: ${plan.why}${plan.reason ? ` (${plan.reason})` : ''}.${pot ? ` ${pot}` : ''}${cast.length ? ` Casts ${cast.join(', ')}.` : ''}`);
 }
 function crSetMode(m) {
   if (!GP || !CR_MODES.includes(m)) return;
@@ -42406,7 +42425,10 @@ function crRightDraw(c) {
 // the end board: each side's points by end, the totals and the hammer
 function crBoardDraw(c) {
   const B = crBoard(), n = B.ends, w = 22, x0 = 12, y0 = 12, nameW = 150;
+  // (the Umbral's hexes, all game, on a line under the board: 15-umbral.js)
+  const hx = G.hex ? crHexLine() : '';
   c.save(); c.fillStyle = 'rgba(10,16,20,.8)'; c.fillRect(x0, y0, nameW + n * w + 50, 56);
+  if (hx) { c.font = '11px system-ui, sans-serif'; const hw = c.measureText(hx).width + 16; c.fillStyle = 'rgba(30,14,40,.85)'; c.fillRect(x0, y0 + 56, Math.max(nameW + n * w + 50, hw), 18); c.fillStyle = '#d8c8ff'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(hx, x0 + 8, y0 + 65); }
   c.font = '600 12px system-ui, sans-serif'; c.textBaseline = 'middle';
   for (let i = 0; i < n; i++) { c.fillStyle = i === B.end ? '#ffd34a' : '#9fb4c0'; c.textAlign = 'center'; c.fillText(String(i + 1), x0 + nameW + i * w + w / 2, y0 + 9); }
   [0, 1].forEach(s => { const y = y0 + 25 + s * 19, T = G.teams[s]; c.fillStyle = T.color || '#888'; c.fillRect(x0 + 4, y - 7, 5, 14); c.fillStyle = '#eef4f6'; c.textAlign = 'left'; c.fillText(`${T.short || T.name}${B.hammer === s && !G.over ? ' ●' : ''}`, x0 + 14, y);
@@ -42547,7 +42569,7 @@ function crLegsNewEnd() { if (G) G.legs = [1, 1]; }
 const CR_CALL = { win: 4, xend: 1, replies: 4, replyMix: .3, read: 96 };
 // what the end ending this way is worth to side s: pts (theirs, signed), the hammer next end
 function crEndValue(s, pts, next, sk) {
-  const S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
+  const S = crSk(sk);
   if (S.hammer && G.end >= G.ends - 1) {
     const m = crTotal(s) - crTotal(1 - s) + pts;
     return m > 0 ? CR_CALL.win + m * .05 : m < 0 ? -CR_CALL.win + m * .05 : next === s ? CR_CALL.xend : -CR_CALL.xend;
@@ -42566,8 +42588,8 @@ function crReplyLikely(s, after, kAfter, sk, draws) {
     const R = CR_SHEET.stoneR, ice = crIceRead(o);
     // (a takeout of each of side s's nearest stones, CR_CALL.replies - 2 of them, by whichever handle does it better for
     // the other rink; and always their draws to the button)
-    const v = aim => crValue(crTry(o, aim), s, kAfter + 1, G.hammer, sk), vals = [];
-    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, Math.max(0, CR_CALL.replies - 2))) {
+    const v = aim => crValue(crTry(o, aim), s, kAfter + 1, G.hammer, sk), vals = [], reps = crSk(sk).replies ?? CR_CALL.replies;
+    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, Math.max(0, reps - 2))) {
       const both = [1, -1].map(h => crSolveHit(st.x, st.y - R * 1.6, CR_AIM.vHit, h, ice, G.cold)).filter(Boolean).map(v); if (both.length) vals.push(Math.min(...both)); }
     for (const aim of draws || crReplyDraws(s)) vals.push(v(aim));
     if (!vals.length) return null;
@@ -42794,7 +42816,7 @@ function crPowNow(s, ri, shot) {
 }
 function crPowIdOf(s, k, ri) {
   if (k === 'pow') { const P = crPowNow(s, ri); return P ? P.id : null; }
-  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? crThrower(s) : ri]; return (CR_ULT[m && m.kind] || CR_ULT.goblin).id; }
+  if (k === 'ult') return crUltOf(s, ri).id;
   return k;
 }
 // side s lies shot (its stone nearest the button, in the house)
@@ -42830,7 +42852,7 @@ function crCast(s, k, ri) {
     rec(P.id, P.n); return '';
   }
   if (k === 'ult') {
-    const m = G.teams[s].roster[r], U = CR_ULT[m.kind] || CR_ULT.goblin;
+    const U = crUltOf(s, r);
     G.roar[s] -= CR_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, end: G.end, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     rec(U.id, U.n); return '';
   }
@@ -42910,7 +42932,7 @@ function crPowerTip(s) {
     if (P.fx && P.fx.granite && !CR_HIT.includes(crShotNow(s))) return `Tip: ${P.n} sets your stone like granite: hard to take out.`;
     if (P.curse) return `Tip: ${P.n} works on their next stone.`;
   }
-  if (!crPowWhy(s, 'ult', ri)) { const U = CR_ULT[G.teams[s].roster[ri].kind] || CR_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this end.`; }
+  if (!crPowWhy(s, 'ult', ri)) { const U = crUltOf(s, ri); return `Tip: the roar is up; ${U.n} would mark this end.`; }
   return '';
 }
 /* The Curling Shed: gear and potions (issue #102, phase 7), by #61's conventions; the Realm's side is w127-shedkit.js.
@@ -43013,6 +43035,127 @@ function crKitAfter(s, endDone) { if (G && G.still) { G.still[s] = false; G.salt
 // given for the worn ice, whatever the shot, so a new shot on the fresh ice still suits it; the page and a headless game
 // both go this way, so a seeded game plays the same either way
 function crCpuPotionPlan(s, plan, again) { const n = G.pots.length, pot = crCpuPotion(s, plan.shot); return { pot, plan: pot && G.pots[n] && G.pots[n].id === 'crpebble' ? Object.assign(again(), { s }) : plan }; }
+/* The Curling Shed in the Umbral (issue #99, phase 4h): the Lich, the hexes, and a champion's own ultimate. Nothing here
+   runs unless a game asks for it: with no hexes, no skill 3 and no curler's own ultimate, the engine plays exactly as
+   before (same seed, same game).
+   The Lich (G.skill 3, above the Archmage: CR_LICH, its own row, so CR_SKILL and the exhibition's skills stay three;
+   crSk reads either). It throws no better than an Archmage (the same miss); it decides better:
+   - the shot: it looks at more shots (CR_LICH.draws and guards: more spots in and in front of the house; a takeout of
+     each of their stones in the house hit a little thin either way, to roll the shooter or take a second), and weighs
+     its best CR_LICH.top over CR_LICH.samples throws each and against the other rink's likeliest replies
+     (CR_LICH.replies, replyMix) as an Archmage does (a wider search, its best six over six, was worse: it picked lucky
+     candidates; docs/realm/BALANCE.md);
+   - the broom: its sweepers read the stone as it goes (crLichSweeper). Every CR_LICH.sweepEvery seconds of the stone's
+     run they play it on, alone on the ice as it is now (the pebble's wear, the frost, the stone's own drag and curl),
+     swept not at all, half and hard, and sweep the way that brings it nearest the call: a draw's spot, or a hit's line
+     where it meets its stone (sweeping a stone straightens it, so they can hold a hit's line, which no other skip's
+     sweepers do). Within CR_LICH.sweepTol inches they sweep the least, to save their legs;
+   - the ice and the end: it reads the ice as it is now (as an Archmage), weighs the hammer and the game as an Archmage,
+     takes a potion worth CR_KIT.take[3] and casts as an Archmage.
+   Hexes (opts.hexes: ids in CR_HEX; G.hex = { ids, on }, plain JSON, so a kept game keeps them). Each works against
+   one side, G.hex.on (opts.hexOn, 0 by default: yours):
+     rime    Rime on the Pebble: that side's stones curl CR_HEX.rime.curl times as much as its skip reads (no read sees
+             it: the aim is worked out on the ice as it lies)
+     lead    Leaden Brooms: that side's sweepers spend CR_HEX.lead.legs times the legs, and do CR_HEX.lead.sweep as much
+     drift   The Drifting House: a stone of that side's that comes to rest in the house slides CR_HEX.drift.in inches
+             further from the button (as a gust does: not into another stone, nor off the sheet)
+     hoar    Hoarfrost: the first stone of the other rink's an end to lie in the four-foot (within CR_HEX.hoar.r inches
+             and a stone of it) freezes where it lies: as heavy as granite for the rest of the end, so that side's hits
+             barely move it (G.hex.froze: the end it froze in; one an end)
+   The hexes are named before the first stone (the status line) and under the end board all game (crHexLine).
+   A curler's own ultimate (a roster curler sent with { ult: id }, an id in CR_ULT_OWN): their rink casts it in place of
+   the thrower's kind's (crUltOf). The Sunken Shed's champion brings one. */
+const CR_LICH = { n: 'Lich', ang: .22, hitAng: .36, v: .011, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0, replies: 4, replyMix: .3,
+  draws: [[20, -20], [-20, -20], [0, -60], [25, 12], [-25, 12]], guards: [[0, -230], [30, -150], [-30, -150]], thin: 4,
+  sweepEvery: .25, sweepTol: 1.5, levels: [0, .5, 1], dt: .1 };
+CR_KIT.take[3] = 2;
+const CR_HEX = {
+  rime: { n: 'Rime on the Pebble', d: 'Frost on the pebble under your stones: they curl more than your skip reads.', curl: 1.3 },
+  lead: { n: 'Leaden Brooms', d: 'Your sweepers tire four times as fast, and their brooms do less.', legs: 4, sweep: .6 },
+  drift: { n: 'The Drifting House', d: 'The house slips away from you: a stone of yours that comes to rest in it slides 4 inches further from the button.', in: 4 },
+  hoar: { n: 'Hoarfrost', d: 'The first of their stones each end to lie in the four-foot freezes where it lies: your hits barely move it.', r: 24 },
+};
+const CR_ULT_OWN = {
+  sunkenstone: crU('sunkenstone', 'The Sunken Stone', 'The house goes under for the other rink: their stones this end drag heavy, and hardly curl.', null, { heavy: 1.03, stiff: .7 }),
+};
+
+/* ---------- the Lich ---------- */
+// its extra shots (crShots's draw and hit, so they are aimed and listed as every other)
+function crLichShots(s, draw, hit) {
+  const L = CR_LICH;
+  for (const [x, y] of L.draws) draw('draw', x, y);
+  for (const [x, y] of L.guards) draw('guard', x, y);
+  if (L.thin) for (const o of G.stones.filter(o => o.s !== s && crInHouse(o))) { hit('takeout', o, CR_AIM.vHit, L.thin); hit('takeout', o, CR_AIM.vHit, -L.thin); }
+}
+// where a stone sliding now would go, alone on the ice as it is, swept at k (asked: times the side's sweepers and their
+// legs, and the stone's own sweep); how far that is from what was called (inches; more when it would leave play)
+function crLichProject(s, st, k, plan, eff) {
+  const L = CR_LICH, P = { x: st.x, y: st.y, vx: st.vx, vy: st.vy, h: st.h, curlK: st.curlK, drag: st.drag }, sw = clamp(k * eff, 0, 1.5);
+  const hit = CR_HIT.includes(plan.shot), tg = hit && G.stones.find(b => b.id === plan.target), ty = tg ? tg.y - CR_SHEET.stoneR * 1.6 : null, tx = tg ? tg.x + (plan.roll || 0) : null;
+  for (let t = 0; t < 60; t += L.dt) {
+    const [ax, ay] = crAccel(P, G.ice, G.cold, sw), vx = P.vx + ax * L.dt, vy = P.vy + ay * L.dt, py = P.y, px = P.x;
+    const stop = vx * P.vx + vy * P.vy <= 0 || Math.hypot(vx, vy) < CR_STONE.stop;
+    P.x += (P.vx + (stop ? 0 : vx)) / 2 * L.dt; P.y += (P.vy + (stop ? 0 : vy)) / 2 * L.dt; P.vx = stop ? 0 : vx; P.vy = stop ? 0 : vy;
+    if (ty != null && P.y >= ty) { const u = (ty - py) / ((P.y - py) || 1e-6); return Math.abs(px + (P.x - px) * u - tx); }
+    if (!crOnSheet(P)) return 500 + Math.abs(P.y - (plan.y || 0));
+    if (stop) break;
+  }
+  // (a hit that stops short of its stone; a draw short of the hog line)
+  if (ty != null) return 200 + (ty - P.y);
+  if (!crPastHog(P)) return 300 + (-CR_SHEET.hog - P.y);
+  return Math.hypot(P.x - plan.x, P.y - plan.y);
+}
+// the Lich's sweepers for a called shot: every CR_LICH.sweepEvery seconds, the sweeping that brings the stone nearest
+function crLichSweeper(s, plan) {
+  const L = CR_LICH, C = { t: -1, k: 0, eff: null };
+  return (st, t) => {
+    if (C.t >= 0 && t < C.t + L.sweepEvery) return C.k;
+    if (C.eff == null) C.eff = crFxFor(s).sweep * (crHexOn('lead', s) ? CR_HEX.lead.sweep : 1);
+    const eff = crSweepEff(s) * C.eff;
+    let best = 0, bv = Infinity;
+    for (const k of L.levels) { const v = crLichProject(s, st, k, plan, eff); if (v < bv - L.sweepTol) { bv = v; best = k; } }
+    C.t = t; C.k = best; return best;
+  };
+}
+
+/* ---------- the hexes ---------- */
+function crHexStart(ids, on) { const hx = (ids || []).filter((k, i, a) => CR_HEX[k] && a.indexOf(k) === i); if (hx.length) G.hex = { ids: hx, on: on === 1 ? 1 : 0 }; }
+const crHexHas = id => !!(G && G.hex && G.hex.ids.includes(id));
+const crHexOn = (id, s) => crHexHas(id) && G.hex.on === s;
+// a hexed side's stone, before it is thrown: rime on the pebble (it curls more), leaden brooms
+function crHexFx(s, fx) {
+  if (crHexOn('rime', s)) fx.stiff *= CR_HEX.rime.curl;
+  if (crHexOn('lead', s)) { fx.legs *= CR_HEX.lead.legs; fx.sweep *= CR_HEX.lead.sweep; }
+  return fx;
+}
+// The Drifting House: side s's thrown stone at rest in the house slides further out (the run's own copies, before the
+// rules look, as a gust). Returns the inches, or 0
+function crHexDrift(s, run) {
+  if (!crHexOn('drift', s) || !run.stop) return 0;
+  const st = run.stones.find(b => b.id === 'new'); if (!st || !crInHouse(st)) return 0;
+  const d = crDist(st), ux = d > .5 ? st.x / d : 0, uy = d > .5 ? st.y / d : 1, D = CR_HEX.drift.in, to = { x: +(st.x + ux * D).toFixed(2), y: +(st.y + uy * D).toFixed(2) };
+  if (!crOnSheet(to) || run.stones.some(o => o !== st && Math.hypot(o.x - to.x, o.y - to.y) < 2 * CR_SHEET.stoneR)) return 0;
+  st.x = to.x; st.y = to.y; run.stop = { x: to.x, y: to.y };
+  return D;
+}
+// Hoarfrost: after a stone, the other rink's stone nearest the button, on it, freezes where it lies (granite, for the
+// end), the first such an end
+function crHexFreeze() {
+  if (!crHexHas('hoar') || G.hex.froze === G.end) return;
+  const o = 1 - G.hex.on, lim = CR_HEX.hoar.r + CR_SHEET.stoneR, st = G.stones.filter(b => b.s === o && !b.g && crDist(b) <= lim).sort((a, b) => crDist(a) - crDist(b))[0];
+  if (st) { st.g = 1; G.hex.froze = G.end; }
+}
+const crHexNames = () => G && G.hex ? G.hex.ids.map(k => CR_HEX[k].n).join(', ') : '';
+const crHexLine = () => G && G.hex ? `Hexes on ${G.teams[G.hex.on].short || G.teams[G.hex.on].name}: ${crHexNames()}` : '';
+
+/* ---------- a curler's own ultimate ---------- */
+// the ultimate side s's rink would cast: a curler's own (any of the four who brings one), else the thrower's kind's
+function crUltOf(s, ri) {
+  const T = G.teams[s], own = T.roster.find(m => m && m.ult && CR_ULT_OWN[m.ult]);
+  if (own) return CR_ULT_OWN[own.ult];
+  const m = T.roster[ri == null ? crThrower(s) : ri];
+  return CR_ULT[m && m.kind] || CR_ULT.goblin;
+}
 /* The Curling Shed's superstars (issue #102, phase 8), inside the wCR scope: each superstar's curling ratings and
    powers, added to the engine's own tables after its parts load, as bowling's are (lanes/p0-stars.js). Plain
    assignments, nothing declared. Ratings are [draw, line, hit, sweep, nerve, read]; each has a draw power and a hit
@@ -43449,7 +43592,12 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    Phase 8 is the superstars (in the tables) and the players drawn: figKinds() (the kinds the figures know), figsNow()
    (who is on the ice in view, 'broom' and 'sweeper', from the game as it stands with the camera where it is going).
    Phase 10 is the lab's switches: start({ fixShot: [shot or null, ...], noSweep: [bool, ...], wear: false }); a summary
-   carries casts and pots. */
+   carries casts and pots.
+   The Umbral (issue #99, phase 4h; 15-umbral.js): start({ hexes: [ids], hexOn }) and skill 3 (the Lich, its own row:
+   skills stays three); hexes (the table), hex() (a game's: { ids, on } or null), hexLine() (the line under the end
+   board), lich (the Lich's row; lichSet and hexSet change them, for the lab), ultOwn (a curler's own ultimates), ultOf(s)
+   (the ultimate side s's rink would cast), hexFx(s) (what side s's next stone takes, its hexes with its powers),
+   sweeper(s, plan) (side s's sweepers for a call, as its skill sweeps: (stone, t) => how hard, or null). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -43488,6 +43636,11 @@ return {
   figKinds: () => Object.keys(KIND), figsNow: () => G && G.teams ? crFigsOn() : [],
   // gear and potions (phase 7)
   potions: JSON.parse(JSON.stringify(CR_POTIONS)), kitRules: JSON.parse(JSON.stringify(CR_KIT)), potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
+  // the Umbral (15-umbral.js)
+  hexes: JSON.parse(JSON.stringify(CR_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => crHexLine(), lich: JSON.parse(JSON.stringify(CR_LICH)),
+  lichSet: o => Object.assign(CR_LICH, o), hexSet: (id, o) => CR_HEX[id] && Object.assign(CR_HEX[id], o), ultOwn: JSON.parse(JSON.stringify(CR_ULT_OWN)),
+  ultOf: (s, ri) => G && G.teams ? crUltOf(s, ri) : null, hexFx: s => G && G.teams ? crHexFx(s, crFxFor(s)) : null,
+  sweeper: (s, plan) => G && G.teams ? crSweeper(s, plan) : null,
   // games from the world (phase 5)
   hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
@@ -65654,8 +65807,166 @@ const wWU4FLinksResultCard = wLinksResultCard;
 wLinksResultCard = function () { if (RUN && RUN.over) return; return wWU4FLinksResultCard.apply(this, arguments); };
 /* u4g: bowling in the Umbral (issue #99, phase 4g): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
-/* u4h: curling in the Umbral (issue #99, phase 4h): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4h: curling in the Umbral (issue #99, phase 4h). Loads after u4-grounds.js; changes earlier parts only by
+   reassignment (saved originals carry the wWU4H prefix). The engine's side is src/cr/parts/15-umbral.js: the Lich (CPU
+   skill 3), the hexes (opts.hexes) and a curler's own ultimate.
+
+   Tier U at the Shed is tier 4 in curling's tables: W_SHG.oppBonus[4] rating points on each of their four (an umbral
+   form changes only their ratings, never yours), the Lich skipping them (W_BALL.diff[4] = 3, the skill every engine
+   reads by tier, named in W_BALL_SKILL) and a full bag (W_SHED_KIT.opp[4]). Tiers 1 to 3 are as they were.
+   The champion of the Sunken Shed (u:g_shed, the Drownfen): Grisel Mourne, the Sunken Skip, holds the Sunken Stone. Past
+   the two guards and the gate (u4), PLAY opens the game card (wUmbCrCard): tier U, the Nadir rink (W_UMB4H.four, at your
+   team's level, the champion skipping with an ultimate of their own, The Sunken Stone), the hexes for this try, and
+   Play, Manage or Simulate. The match is the Realm's own curling match (wStartShed: save and leave, resume after a
+   reload, Concede, the end board) against club 'nadir:shed' (or 'nadir:shed:finale', Nadir Athletic, for a round of
+   the Seal) at tier 4 with kind 'unadircr': its end goes to wUmbNadirEnd (a curling match never ends level: an extra
+   end settles it, and Simulate's wShedDecide one the engine stopped). Your four curl as a Knight in Manage and Simulate,
+   against the Lich, with the same hexes, so Simulate is no way round them. The toll, on a retry, is paid at the first
+   stone (wUmbTollAtKickoff); backing away from the card costs nothing.
+   Hexes: curling's own (wCR.hexes, the engine's table), W_NADIR.shed.hexes of them (a finale round its own count, drawn
+   exactly), drawn for each try by wUmbCrHexes (fixed for the try: a reload doesn't redraw them), named on the card, in
+   the log, before the first stone, under the end board all game, on the bar and in the board's caption.
+   In LAB mode PLAY skips the card and plays W_UMB4H.labHow (Simulate) at once. A match left half-played (W_UMB4.live.shed)
+   is picked up by PLAY where it was, with no card and no toll.
+   The finale (u5) drives the same adapter with id 'finale' (no piece, no toll).
+
+   W_UMB4H, wUmbCrClub, wUmbCrFour, wUmbCrHexes, wUmbCrCard, wUmbCrKick; W_NADIR.shed, DB.chars.nadir_shed,
+   W_UMB4.start.shed, W_UMB4.live.shed, W_ON_END.unadircr
+   Wraps: wBallRegion (wWU4HBallRegion), wBallTeam (wWU4HBallTeam), wShedOpp (wWU4HShedOpp): the Nadir's clubs are the
+   Drownfen's and the Nadir four; wCR.start and wCR.simGame (wWU4HStart, wWU4HSimGame: the hexes go in); wShedBarNote
+   (wWU4HShedBarNote: the hexes on the bar), wShedBoard (wWU4HShedBoard: and in the board's caption), wShedResultCard
+   (wWU4HShedResultCard: never over the end screen of a journey the finale ended). */
+
+const W_UMB4H = {
+  id: 'shed', club: 'nadir:shed', finaleClub: 'nadir:shed:finale', kind: 'unadircr', tier: 4, labHow: 'sim',
+  team: { name: 'Sunken Shed Nadir', short: 'NDR', color: '#24384a', light: '#9fe8ff' },
+  finaleTeam: { name: 'Nadir Athletic', short: 'NDR', color: '#2a1e34', light: '#e4defa' },
+  // the four, lead to skip (they curl in this order); the champion skips, with more points and an ultimate of their own
+  four: [{ n: 'Silt', kind: 'zombie' }, { n: 'Weir', kind: 'spider' }, { n: 'Knucklebone', kind: 'skeleton' }, { n: 'Grisel Mourne', kind: 'lich', champ: true }],
+  champ: { more: 0, ult: 'sunkenstone' },
+};
+// tier U in curling's tables (W_BALL.diff and W_BALL_SKILL are shared with the other sports' tier U: set once)
+W_SHG.oppBonus[4] = 1;
+W_SHED_KIT.opp[4] = { draught: 2, crwarm: 1, crsalt: 2, crpebble: 1 };
+if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
+if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
+
+W_NADIR.shed = { piece: 'curling', char: 'nadir_shed', ground: 'g_shed', map: 'u:g_shed', region: 'tide', engine: 'shed', hexes: 1, toll: 30, gold: 100 };
+DB.chars.nadir_shed = { name: 'Grisel Mourne, the Sunken Skip', kind: 'lich', look: { coat: '#24384a', acc: 'scarf' },
+  greet: 'The tide came in over this sheet a long time ago, and nobody told the stones. I skip the Nadir here, and I keep the STONE at the bottom of the house. Say PLAY when you want to curl for it. Ask about the RULES first. The ice here has its own.',
+  topics: {
+    job: { t: 'I skipped at the Shed when the pebble was water and the windows had glass. I still call every stone. The sea never asked me to stop.' },
+    stone: { t: 'The Sunken Stone. One ninth of your Seal, and it has sat on the button so long the button has forgotten it is there. Beat my four at curling and it is yours. Lose, and the next match costs a TOLL.' },
+    rules: { t: 'Real curling, your four against my four, six ends, nobody goes home level. My side curls at your level and a little better at everything, a Lich calls our stones and reads every pebble as it is, our sweepers know where a stone is going before it does, and we bring a full bag. Before the first stone I draw the HEXES.' },
+    hexes: { t: 'Rime on your pebble, so your stones curl past where your skip reads them. Brooms that weigh like lead. A house that slides away from you. Frost that sets my stones in the four-foot like rock. One of them, for you. You will hear which before the first stone.' },
+    sunken: { t: 'Once a match I let the house go under. Your stones drag in the cold water, and they hardly curl. Mind the end I choose.' },
+    toll: { t: 'Thirty gold a match, after the first. Paid at the first stone. Walking away from the card costs nothing.' },
+    play: { t: 'Then pick your four.', act: 'unadir:shed' },
+  } };
+
+/* ---------- the Nadir four ---------- */
+// which of the Nadir's clubs this is: 'champ', 'finale', or ''
+const wUmbCrClub = club => club === W_UMB4H.club ? 'champ' : club === W_UMB4H.finaleClub ? 'finale' : '';
+// at your team's level (level parity), tier U's points on each (spread as wShedOpp spreads a tier's), the champion
+// skipping with W_UMB4H.champ.more points more and their own ultimate; they curl in the order given
+function wUmbCrFour(lvl, finale) {
+  const L = lvl != null ? lvl : Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier())), k = W_SHG.oppBonus[W_UMB4H.tier] || 0, X = W_UMB4H.champ;
+  const roster = W_UMB4H.four.map((f, j) => {
+    const p = wShedPlayer(wMakePlayer({ kind: f.kind, lvl: L, n: f.n }, 'opp')), n = k + (f.champ ? X.more : 0);
+    p.n = f.n;
+    for (let i = 0; i < n; i++) { const s = wCR.stats[(i * 5 + j) % wCR.stats.length]; p.r[s] = Math.min(wCR.cap, p.r[s] + 1); }
+    if (f.champ) p.ult = X.ult;
+    return p;
+  });
+  const T = finale ? W_UMB4H.finaleTeam : W_UMB4H.team;
+  return { name: T.name, short: T.short, color: T.color, roster, order: [0, 1, 2, 3] };
+}
+const wWU4HBallRegion = wBallRegion;
+wBallRegion = function (club) { return wUmbCrClub(club) ? W_NADIR.shed.region : wWU4HBallRegion.apply(this, arguments); };
+const wWU4HBallTeam = wBallTeam;
+wBallTeam = function (club) {
+  const f = wUmbCrClub(club); if (!f) return wWU4HBallTeam.apply(this, arguments);
+  const T = f === 'finale' ? W_UMB4H.finaleTeam : W_UMB4H.team;
+  return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.6), light: T.light, motto: '' };
+};
+const wWU4HShedOpp = wShedOpp;
+wShedOpp = function (club, tier) { const f = wUmbCrClub(club); return f ? wUmbCrFour(null, f === 'finale') : wWU4HShedOpp.apply(this, arguments); };
+
+/* ---------- the hexes ---------- */
+const WU4H = { next: null };
+const wWU4HStart = wCR.start, wWU4HSimGame = wCR.simGame;
+wCR.start = o => wWU4HStart(WU4H.next ? Object.assign({}, o, { hexes: WU4H.next.slice(), hexOn: 0 }) : o);
+wCR.simGame = o => wWU4HSimGame(WU4H.next ? Object.assign({}, o, { hexes: WU4H.next.slice(), hexOn: 0 }) : o);
+// n of curling's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
+// after a reload)
+function wUmbCrHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wCR.hexes);
+  const r = mulberry(wUmbHash('cr:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1) + (id === 'finale' && U ? 1013 * (U.finale || 0) : 0));
+  const out = []; while (out.length < Math.min(Math.max(0, n), ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+const wUmbCrHexWords = hx => hx.map(h => wCR.hexes[h]).filter(Boolean);
+
+/* ---------- PLAY: the card, then the first stone ---------- */
+function wUmbCrCard(C, id, hx) {
+  const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier()));
+  const fin = id === 'finale' || !C.piece, T = fin ? W_UMB4H.finaleTeam : W_UMB4H.team, H = wUmbCrHexWords(hx), uo = wCR.ultOwn[W_UMB4H.champ.ult], champ = W_UMB4H.four.find(f => f.champ).n;
+  // (a round of the Seal holds no piece and costs no toll)
+  const toll = !C.toll ? '' : tries > 0 ? ` This match costs the toll, ${C.toll} gold, at the first stone.` : ` The first match is free; after a loss, each costs a toll of ${C.toll} gold.`;
+  const prize = fin ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours.` : `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.${toll}`;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
+    <p><b>${fin ? 'The Seal: curling' : 'The Sunken Shed'}: tier U.</b> Curling against ${esc(T.name)}: level ${lvl}, in umbral form (${W_SHG.oppBonus[W_UMB4H.tier]} rating point${W_SHG.oppBonus[W_UMB4H.tier] === 1 ? '' : 's'} on each of their four), their stones called by a ${esc(W_BALL_SKILL[wShedSkillOf(W_UMB4H.tier)[1]])}, who weighs more shots than any skip you have met and whose sweepers read every stone as it runs, and a full bag of potions. ${esc(champ)} skips them, and once a match lets ${esc(uo.n)} take the end: ${esc(uo.desc)}</p>
+    <p class="hint wumbpg"><b>Hexes:</b> ${H.length ? H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ') : 'none'}</p>
+    <p class="hint">${prize} Nobody goes home level: an extra end. <b>Play</b>: you throw and sweep every stone of yours. <b>Manage</b>: you set your rink's game; your four throw. <b>Simulate</b>: the result now.</p></div>
+    <div class="row"><button class="btn" data-ucr="play">Play</button><button class="ghost" data-ucr="manage">Manage</button><button class="ghost" data-ucr="sim">Simulate</button><button class="ghost" id="wUcrNo">Not now</button></div>`, () => wDrain());
+  $('modalBox').querySelectorAll('[data-ucr]').forEach(b => b.onclick = () => { close(); const why = wUmbCrKick(C, id, hx, b.dataset.ucr); if (why) wLog(why, 'b'); });
+  $('wUcrNo').onclick = () => close();
+  const f = $('modalBox').querySelector('[data-ucr="play"]'); if (f) f.focus();
+}
+// why your team can't curl the champion now, or ''
+function wUmbCrWhy() { const probs = wShedProblems(); if (probs.length) return probs.join(' '); return wShedLive() ? 'Finish the curling match you started first.' : ''; }
+// the first stone: the toll (on a retry), the hexes in the log, and the Realm's curling match at tier U ('' when it started)
+function wUmbCrKick(C, id, hx, how) {
+  const why = wUmbCrWhy(); if (why) return why;
+  wUmbTollAtKickoff(id);
+  const H = wUmbCrHexWords(hx);
+  if (H.length) wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
+  WU4H.next = hx.slice();
+  try { return wStartShed({ club: id === 'finale' ? W_UMB4H.finaleClub : W_UMB4H.club, how, tier: W_UMB4H.tier, kind: W_UMB4H.kind, ref: { id }, cup: true }); } finally { WU4H.next = null; }
+}
+W_UMB4.live.shed = () => wShedLive();
+W_UMB4.start.shed = function (C, id) {
+  // (a match left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wShedLive()) { wResumeShed(); return ''; }
+  const why = wUmbCrWhy(); if (why) return why;
+  // (a round of the Seal draws exactly its own count)
+  const hx = wUmbCrHexes(id, C.hexes != null ? C.hexes : 1);
+  if (LAB) return wUmbCrKick(C, id, hx, W_UMB4H.labHow);
+  wUmbCrCard(C, id, hx);
+  return '';
+};
+// the end: the piece (or the finale's round), or a try counted (the finale's entry is rebuilt by u5 after a reload, so
+// no check on W_NADIR here)
+W_ON_END[W_UMB4H.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
+
+/* ---------- on screen ---------- */
+// the hexes on the bar and in the board's caption, while a Nadir match is on
+const wUmbCrLiveHex = () => { const L = WG && WG.shg && WG.shg.live; return L && L.world.kind === W_UMB4H.kind && WCR && !WCR.over ? wCR.hex() : null; };
+const wWU4HShedBarNote = wShedBarNote;
+wShedBarNote = function () {
+  const r = wWU4HShedBarNote.apply(this, arguments), hx = wUmbCrLiveHex();
+  if (hx) $('wShedNote').textContent += ` The Umbral, tier U. Hexes: ${hx.ids.map(h => wCR.hexes[h].n).join(', ')}.`;
+  return r;
+};
+const wWU4HShedBoard = wShedBoard;
+wShedBoard = function () {
+  const r = wWU4HShedBoard.apply(this, arguments), hx = wUmbCrLiveHex(), cap = hx && document.querySelector('#wShedBoard caption');
+  if (cap) cap.insertAdjacentHTML('beforeend', ` <small class="wumbpg">${esc(wCR.hexLine())}</small>`);
+  return r;
+};
+// after a Hardcore journey ends on the finale's lost round, the curling result card stays off the end screen
+const wWU4HShedResultCard = wShedResultCard;
+wShedResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4HShedResultCard.apply(this, arguments); };
 /* u5: the finale (issue #99, phase 5). Loads after the sports' parts (u4a..u4h); changes earlier parts only by
    reassignment (saved originals carry the wWU5 prefix).
 
