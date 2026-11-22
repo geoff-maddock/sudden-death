@@ -16,7 +16,7 @@ function renderLog() {
 function lineScoreHTML() {
   if (!G.teams) return '';
   const n = Math.max(G.innings, G.inning);
-  let h = '<table class="ls"><thead><tr><th></th>';
+  let h = `<table class="ls">${G.hx ? `<caption class="ls-hex">Hexes: ${G.rules.hexes.map(k => esc(HEXES[k].name)).join(', ')}</caption>` : ''}<thead><tr><th></th>`;
   for (let i = 1; i <= n; i++) h += `<th>${i}</th>`;
   h += '<th>R</th><th>H</th></tr></thead><tbody>';
   for (const t of G.teams) { h += `<tr><td style="color:${t.def.color}">${esc(t.def.short)}</td>`; for (let i = 0; i < n; i++) h += `<td>${t.line[i] ?? ''}</td>`; h += `<td>${t.R}</td><td>${t.H}</td></tr>`; }

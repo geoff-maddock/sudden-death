@@ -82,7 +82,7 @@ function cpuHold(S0) {
   let best = 0, bb = 0; for (let b = 1; b <= 3; b++) if (G.bases[b] && S0.lead[b] >= best) { best = S0.lead[b]; bb = b; }
   if (!bb || !best) return;
   let ch = best === 2 ? .3 : runSpd(G.bases[bb], bb) >= 6 ? .12 : .04;
-  if (S0.picks >= 2) ch *= .4; ch *= .8 + .15 * G.diff;
+  if (S0.picks >= 2) ch *= .4; ch *= .8 + .15 * dOf(FT());
   if (R() < ch) S0.pickAt = G.P.cpuT * (.25 + R() * .5);
 }
 function pickBase() { const S0 = G.run; let bb = 0, best = -1; for (let b = 3; b >= 1; b--) if (G.bases[b] && S0.lead[b] > best) { best = S0.lead[b]; bb = b; } return bb; }

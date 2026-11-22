@@ -34,6 +34,7 @@ function takeRules(opts) {
   const r = { ...nextRules() };
   if (opts.innings) r.innings = opts.innings;
   if (opts.diff != null) r.diff = opts.diff;
+  if (opts.hexes) { r.hexes = opts.hexes.slice(); if (opts.hexBy != null) r.hexBy = opts.hexBy; }
   NEXT = null; return r;
 }
 function prefGet(k) { if (k === 'music') return MUS.on; if (k === 'sound') return SND.on; if (k === 'hints') return HINTS; if (k === 'cpuSpeed') return SET.cpuSpeed || 1; }
