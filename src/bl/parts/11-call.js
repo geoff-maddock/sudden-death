@@ -94,6 +94,8 @@ function blCpuCall(s) {
   // (the line is for a first ball: a spare keeps the line the frame began on)
   if (G.stand[s].length === 10) G.line[s] = line;
   G.split[s] = split;
+  // (a Lich makes its own call, by weighing it: 16-umbral.js)
+  if (BL_SKILL[sk] && BL_SKILL[sk].lich && !F) { const w = blLichCall(s); if (w) out.push(w); }
   return out.join(', ');
 }
 const blNameOf = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';

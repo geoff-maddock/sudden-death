@@ -38656,8 +38656,9 @@ function blMu(oil, x, y, tide, heavy) {
   return BL_OIL.muDry - (BL_OIL.muDry - BL_OIL.muOil) * Math.pow(k, .7);
 }
 // a ball's path moves oil: it picks some up from the cells it skids over (and the board each side), and lays a
-// share of that down on the dry cells past the pattern on the same boards. Returns a new grid
-function blWear(oil, path) {
+// share of that down on the dry cells past the pattern on the same boards (k: how many times as much it takes, an
+// Umbral hex's ichor; 1 when not given). Returns a new grid
+function blWear(oil, path, k) {
   const L = BL_LANE, out = oil.slice(), w = BL_OIL.width;
   let carried = 0;
   for (const [x, y] of path) {
@@ -38666,7 +38667,7 @@ function blWear(oil, path) {
     for (let d = -w; d <= w; d++) {
       const bb = b + d; if (bb < 1 || bb > L.boards) continue;
       const i = (bb - 1) * L.ft + f, share = d ? .5 / w : 1, o = out[i];
-      if (o > .02) { const t = o * BL_OIL.take * share; out[i] = o - t; carried += t; }
+      if (o > .02) { const t = Math.min(o, o * BL_OIL.take * share * (k || 1)); out[i] = o - t; carried += t; }
       else if (carried > 0 && f >= L.oilFt) { const lay = carried * BL_OIL.carry * share * .08; out[i] = o + lay; carried -= lay; }
     }
   }
@@ -38686,8 +38687,8 @@ function blWear(oil, path) {
    spin, and wears the spin down. It gives the path, where the ball meets the pins and at what angle (the entry
    angle: 4 to 6 degrees carries best), and where it skidded, hooked and rolled. A ball whose middle leaves the lane
    before the pins is in the gutter.
-   A throw may carry web (a gutter ball is caught and set back on the lane, once) and oilK (the oil plays heavier:
-   a Hex). Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
+   A throw may carry web (a gutter ball is caught and set back on the lane, once), oilK (the oil plays heavier:
+   a Hex) and pull ({ w, k }: within w inches of either edge the ball drifts k a step toward it, an Umbral hex). Everything is worked in the bowler's hand: a left-hander's throw is a right-hander's mirrored, reading the oil on
    the mirrored boards (so the left side of the lane, fresh, is theirs). */
 const BL_BALL = { step: 3, hook: .004, decay: .012, mu0: .043, rollAt: .045, spareSpin: .08, v0: 17, rpm0: 350, drag: .012 };
 const BL_MPH = 17.6;   // inches a second in a mile an hour
@@ -38712,6 +38713,8 @@ function blBall(t, oil, tide) {
       if (S <= B.rollAt && roll === null) roll = y;
     }
     v = Math.max(8 * BL_MPH, v - B.drag * mu * v * dy / 12);
+    // a gutter that pulls (an Umbral hex, 16-umbral.js): near either edge the ball drifts toward it
+    if (t.pull && Math.abs(x) > L.edge - t.pull.w) m += Math.sign(x) * t.pull.k * dy;
     x += m * dy; y += dy;
     // a web in the gutter (a spider's) catches the ball once and sets it back on the lane, rolling straight
     if (Math.abs(x) > L.edge && web) { web = false; webbed = true; x = Math.sign(x) * (L.edge - L.ballR); m = 0; S = 0; }
@@ -38748,7 +38751,8 @@ function blAimAt(t, tx, oil, tide) {
    - the ball keeps hooking on the dry deck by the spin it has left, which is what drives through the pocket.
    A pin's knock has a little seeded scatter in its direction (pins spin and bounce in three dimensions, which this
    model doesn't), so the same throw can carry or leave a pin; with the same seed, it always does the same.
-   The ball may carry mass (how hard it drives), ghost (pins it passes through) and stone (a pin turned to stone).
+   The ball may carry mass (how hard it drives), ghost (pins it passes through), stone (a pin turned to stone) and drown
+   (a waterlogged pin, drownK times as heavy: an Umbral hex).
    It gives the pins that fell, and a trace of every body for the page to draw. */
 const BL_PIN = { dt: .001, steps: 1600, mBall: 15, mPin: 3.5, eBall: .6, ePin: .55, eKick: .45, knock: 15, fallR: 3, fallT: .04,
   slide: 260, ballDeck: 60, scatter: .12, still: 6, traceEvery: 10, len: 15, reach: 5, pass: .4 };
@@ -38764,8 +38768,9 @@ function blDeck(standing, ball, seed, spots) {
   const B = { x: ball.x - ball.m * 30, y: y0, vx: ball.v * Math.sin(ang), vy: ball.v * Math.cos(ang), r: L.ballR, m: ball.mass || P.mBall, live: true };
   const pins = standing.map(n => { const sp = (spots && spots[n]) || BL_SPOT[n];
     // a stone pin (a gorgon's Stare) is three times as heavy and as hard to topple
-    const stone = ball.stone === n;
-    return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin * (stone ? 3 : 1), knock: P.knock * (stone ? 3 : 1), up: true, hit: false, t: 0, gone: false }; });
+    // (and a waterlogged pin, an Umbral hex's, drownK times as heavy and as hard to topple)
+    const stone = ball.stone === n, dk = ball.drown === n ? ball.drownK || 2 : 1;
+    return { n, x: sp[0], y: sp[1], vx: 0, vy: 0, r: L.pinR, m: P.mPin * (stone ? 3 : 1) * dk, knock: P.knock * (stone ? 3 : 1) * dk, up: true, hit: false, t: 0, gone: false }; });
   const ghost = new Set(ball.ghost || []);
   const trace = [];
   const snap = t => trace.push([+t.toFixed(3), [+B.x.toFixed(1), +B.y.toFixed(1)], pins.map(p => [p.n, +p.x.toFixed(1), +p.y.toFixed(1), p.hit ? 0 : 1, p.gone ? 1 : 0])]);
@@ -38833,7 +38838,9 @@ function blDeck(standing, ball, seed, spots) {
    - a Knight reads it as it was too, but corrects by what it saw: after each of a bowler's strike balls it moves that
      bowler's aim on that lane by half of how far they missed. It uses the spare ball, and on a split it takes the
      bigger group;
-   - an Archmage reads the lane as it is now, and stands where the angle into the pocket is best (4 to 6 degrees).
+   - an Archmage reads the lane as it is now, and stands where the angle into the pocket is best (4 to 6 degrees);
+   - a Lich (3, the Umbral's: 16-umbral.js) reads it as an Archmage does and weighs every stand, aim and speed through
+     the ball model and the pins before it bowls.
    Knights and Archmages try a few places to stand, and keep off a line that brushes the gutter.
    A spare ball (plastic, it rolls straight) goes across the lane at the front pin of what is left, a touch to the
    side that drives that pin into the rest.
@@ -38873,6 +38880,8 @@ function blSpareTarget(pins) {
 /* the side's plan for its next ball: { x0, ang, mph, rpm, ball, hand, aim: { x, y }, why } (what it means to throw,
    before the release strays) */
 function blPlan(s) {
+  // (the Lich weighs its ball through the shot model: 16-umbral.js)
+  if (BL_SKILL[G.skill[s]].lich) { const L = blLichPlan(s); if (L) return L; }
   const sk = BL_SKILL[G.skill[s]], st = blStyleNow(s, blBowler(s)), lane = blLane(s), stand = G.stand[s];
   // the oil as the side reads it: as it was at the start, or as it is (an Archmage, or anyone with the coach's word)
   const oil = (sk.read && !(G.noRead && G.noRead[s])) || (G.wordOn && G.wordOn[s]) ? G.oil[lane] : G.oil0, fresh = stand.length === 10;
@@ -38958,7 +38967,7 @@ function blStart(opts) {
   const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? blAutoOrder(teams[s].roster) : null));
   blNewGame({ frames: o.frames, order, lead: o.lead, roster: teams.map(T => T.roster.length) });
   const oil = blHouse();
-  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, BL_SKILL.length - 1)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
     oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0,
     arm: teams.map(T => T.roster.map(() => 1)),
     line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
@@ -38971,6 +38980,7 @@ function blStart(opts) {
   blHallStart(o);
   blPowersStart(o);
   blKitStart(o.bags);
+  blHexStart(o.hexes, o.hexOn);
   GB = null;
   return G;
 }
@@ -38987,17 +38997,18 @@ function blBowlBall(s, plan, rel) {
   const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
   // the powers on this ball (13-powers.js): the web and a Hex's oil go into the ball, the rest below
   const fx = blFxFor(s);
-  const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid }), G.oil[lane], G.tide);
+  // (and the Umbral's hexes on this side, 16-umbral.js: the black tide's heavier oil, the gutters that pull)
+  const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid * blHexOilK(s) }, G.hex ? blHexThrow(s) : null), G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
   const mass = BL_PIN.mBall * (1 + BL_REACH.pow * (blRat(s, ri).pow - .5) + BL_REACH.rev * (blRat(s, ri).rev - .5)) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1) * (blGxOf(s, ri).carry || 1);
   const front = stand.slice().sort((a, b) => BL_SPOT[a][1] - BL_SPOT[b][1] || Math.abs(BL_SPOT[a][0]) - Math.abs(BL_SPOT[b][0]))[0];
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
+  const deck = ball.gutter === null ? blDeck(stand, Object.assign({ x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, G.hex ? blHexDeck(s) : null), seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
   // a wobble (a harpy's Gust): a pin left standing beside one that fell may go
   if (fx.wobble && ball.gutter === null) { const left = stand.filter(p => !deck.down.includes(p)); for (const p of left) if (BL_ADJ.some(([a, b]) => (a === p && deck.down.includes(b)) || (b === p && deck.down.includes(a))) && R() < fx.wobble) deck.down.push(p); deck.down.sort((a, b) => a - b); }
   // the hall: a gutter crab, a swell, the gull (12-hall.js)
   const H = blHallAfter(s, stand, ball, deck.down); deck.down = H.down;
-  if (G.wear !== false) G.oil[lane] = blWear(G.oil[lane], ball.path);
+  if (G.wear !== false) G.oil[lane] = blWear(G.oil[lane], ball.path, G.hex ? blHexWearK(s) : 1);
   // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader.
   // Only a plan aimed at the pins (the CPU's, the captain's): a ball you bowl by hand aims at your arrow, 15 feet down
   if (fresh && plan.ball === 'strike' && plan.why !== 'yours' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);
@@ -39094,6 +39105,8 @@ function blPlayStart(o) {
     mgr: { line: 'auto', tempo: 'auto', weight: 'auto' }, autoPow: !(o && o.autoPow === false) };
   BLC.tracks = [[], []]; BLC.camY = -40; GP.tracks = [[], []];
   GP.msg = `${G.teams[0].name} against ${G.teams[1].name}: ${G.frames} frames, the Baker format. ${G.teams[G.lead].name} bowl first.`;
+  // (the Umbral's hexes, named before the first frame: 16-umbral.js)
+  if (G.hex) GP.msg += ` ${blHexLine()}.`;
 }
 function blGo(ph, wait, msg) {
   if (msg != null) GP.msg = msg;
@@ -39263,7 +39276,7 @@ function blPlayNext() {
   const ri = blBowler(s), fr = blFrameNo(s), now = blSheet(s)[blCur(s)] || [], tenth = blCur(s) === blSheetN() - 1;
   const ball = !now.length ? 'first ball' : tenth && (now.length === 2 || now[0] === 10) ? 'fill ball' : 'second ball';
   const chant = G.rb[s] === 0 && G.stand[s].length === 10 && GP.streak[s] === 2 ? 'The gallery chants: TUR-KEY! TUR-KEY! ' : '';
-  const off = G.hall && G.offspot && G.offspot[s] && G.rb[s] === 0 && G.stand[s].length === 10 ? `Moll has set the ${G.offspot[s].n} a touch off its spot. ` : '';
+  const off = (G.hall && G.offspot && G.offspot[s] && G.rb[s] === 0 && G.stand[s].length === 10 ? `Moll has set the ${G.offspot[s].n} a touch off its spot. ` : '') + (G.hex ? blHexSay(s) : '');
   if (GP.mode === 'manage' && s === GP.you) { const said = [blManageCall(s)].concat(GP.autoPow ? blCpuPower(s) : []).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
     GP.cpu = { s, plan, rel }; blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)}, ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`); return; }
   if (blYours(s)) { blSelReset(); blGo('aim', 0, `${chant}${off}${blTurnBall(s) ? 'The turn: the lanes are re-read, and the chart shows all the oil for this ball. ' : ''}Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }
@@ -39573,6 +39586,8 @@ function blHudDraw(c) {
   if (G.powers) { c.font = '11px system-ui, sans-serif'; [0, 1].forEach(k => { c.fillStyle = 'rgba(15,10,8,.7)'; c.fillRect(244, 12 + k * 26, 104, 22); c.fillStyle = '#9fc6e8'; c.textAlign = 'left'; c.fillText(`mana ${G.mana[k]} · roar ${G.roar[k]}`, 250, 27 + k * 26); }); }
   if (G.powers && G.mark) { c.font = '600 12px system-ui, sans-serif'; c.fillStyle = '#e8b0ff'; c.textAlign = 'left'; c.fillText(`${G.mark.n} marks frame ${G.mark.f + 1} (${G.teams[G.mark.side].short || G.teams[G.mark.side].name})`, 18, 122); }
   if (G.tide && G.tide !== 'mid') { c.fillStyle = '#9fc6e8'; c.font = '12px system-ui, sans-serif'; c.fillText(G.tide === 'high' ? 'High tide: the lanes play heavy' : 'Low tide: the lanes play dry', 18, 104); }
+  // the Umbral's hexes (16-umbral.js), all game
+  if (G.hex) { c.font = '600 12px system-ui, sans-serif'; c.fillStyle = 'rgba(15,10,8,.7)'; const t = blHexLine(); c.fillRect(12, 130, Math.min(616, c.measureText(t).width + 14), 20); c.fillStyle = '#c8b8ff'; c.fillText(t, 18, 144); }
   c.restore();
 }
 function blDraw(c, dt) {
@@ -39805,6 +39820,8 @@ function blCpuCall(s) {
   // (the line is for a first ball: a spare keeps the line the frame began on)
   if (G.stand[s].length === 10) G.line[s] = line;
   G.split[s] = split;
+  // (a Lich makes its own call, by weighing it: 16-umbral.js)
+  if (BL_SKILL[sk] && BL_SKILL[sk].lich && !F) { const w = blLichCall(s); if (w) out.push(w); }
   return out.join(', ');
 }
 const blNameOf = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
@@ -40008,7 +40025,7 @@ function blPowNow(s, ri) {
 }
 function blPowIdOf(s, k, ri) {
   if (k === 'pow') { const P = blPowNow(s, ri); return P ? P.id : null; }
-  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? blBowler(s) : ri]; return (BL_ULT[m && m.kind] || BL_ULT.goblin).id; }
+  if (k === 'ult') return blUltOf(s, ri == null ? blBowler(s) : ri).id;
   return k;
 }
 // the last frame's index on the sheet in play, and whether a side's frames so far are all marks
@@ -40042,7 +40059,7 @@ function blCast(s, k, ri) {
     rec(P.id, P.n); return '';
   }
   if (k === 'ult') {
-    const m = G.teams[s].roster[r], U = BL_ULT[m.kind] || BL_ULT.goblin;
+    const U = blUltOf(s, r);
     G.roar[s] -= BL_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, f: blSlot(s, blCur(s)), ro: G.ro, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     rec(U.id, U.n); return '';
   }
@@ -40098,7 +40115,7 @@ function blPowerTip(s) {
     if (P.curse) return `Tip: ${P.n} works on their next ball.`;
     if (blIsSplit(st)) return `Tip: a split; ${P.n} helps (${P.desc.toLowerCase()})`;
   }
-  if (!blPowWhy(s, 'ult', ri)) { const U = BL_ULT[G.teams[s].roster[ri].kind] || BL_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this frame.`; }
+  if (!blPowWhy(s, 'ult', ri)) { const U = blUltOf(s, ri); return `Tip: the roar is up; ${U.n} would mark this frame.`; }
   return '';
 }
 /* The Saltmere Lanes: gear and potions (issue #100, phase 7), by #61's conventions; the Realm's side is
@@ -40318,6 +40335,226 @@ function blScreenToon(c, S, u, cyc) {
     blPixRack(c, 92, 34, 3, S.left);
     if (S.open && u > .3) blPixText(c, 'OPEN', -88, 78, 4, '#ff9a5a');
   }
+}
+/* The Saltmere Lanes in the Umbral (issue #99, phase 4g): the Lich, the hexes, and a bowler's own ultimate. Nothing here
+   runs unless a game asks for it: with no hexes, no skill 3 and no bowler's own ultimate, the engine plays exactly as
+   before (same seed, same game).
+
+   The Lich (G.skill 3, above the Archmage; BL_SKILL's fourth row). Its release strays exactly as an Archmage's does; it
+   decides better. It reads the lane as it is now, the tide and the transition and any curse on its ball (a Hex's
+   heavy oil, a power's hook) included, and before every ball it weighs what it could bowl through the same pure ball
+   model the game uses:
+   - a strike ball: every stand across BL_LICH.stands spots (deep inside to up the boards), three aims in the pocket
+     (light, flush, high) and, from the best of them, a touch slower and quicker. Each is thrown BL_LICH.z times in its
+     head (its own miss at this moment, the line's and the tempo's part in it: a spread of fixed samples, so no random
+     number is drawn) and scored at the pins by what that entry carries (blLichCarry: the strikes and splits of the
+     ball at that place, angle and speed, from the pins themselves, worked once a page: blLichTable). The line follows
+     from the stand it picks (G.line: deep inside, the pocket or up the boards). The Archmage's own plan is always one of
+     those weighed, and another is played only when it scores better by BL_LICH.margin;
+   - a spare: three aims across the pin and three places to stand, weighed the same way (a lone pin by whether the ball
+     reaches it; more pins on the deck, from seeds of its own);
+   - a split: convert or take the sure count by what each is worth (blLichCall: the chance of the spare times the frame
+     it makes, against the pins of the safe side).
+   It takes a potion worth 2 and casts as an Archmage.
+   Hexes (opts.hexes: ids in BL_HEX; G.hex = { ids, on }, plain JSON, so a kept game keeps them). Each works against
+   one side, G.hex.on (opts.hexOn, 0 by default: yours):
+     ichor  The Ichor Oil: that side's balls take BL_HEX.ichor.k times as much oil off the lane (blWear's k): the track
+            dries early and the lanes move under both sides, and the side that reads the oil as it is gains
+     drown  The Waterlogged Pin: one pin of each of that side's frames (blHexPin: a pin from the frame, never R) is
+            BL_HEX.drown.k times as heavy and as hard to topple (blDeck's drown)
+     pull   The Hungry Gutters: within BL_HEX.pull.w inches of either edge that side's ball drifts toward the gutter
+            (blBall's pull), BL_HEX.pull.k a step
+     tide   The Black Tide: under that side's balls the oil plays BL_HEX.tide.k times as heavy as it looks (the ball's
+            oilK); no read sees it, so the ball skids long and comes in light
+   The hexes are named before the first frame, on the scoreboard all game, and the waterlogged pin before the frame.
+   A bowler's own ultimate (a roster bowler sent with { ult: id }, an id in BL_ULT_OWN): used in place of their kind's
+   (blUltOf). The Drowned Lanes' champion brings one. */
+BL_SKILL.push({ n: 'Lich', ang: BL_SKILL[2].ang, mph: BL_SKILL[2].mph, rpm: BL_SKILL[2].rpm, read: 1, spare: true, learn: 0, stands: BL_SKILL[2].stands, lich: true });
+BL_KIT.take[3] = 2;
+const BL_LICH = {
+  stands: 9, step: 1.4, aims: [-.8, 0, .8], speeds: [-.7, .7], margin: .012, gutter: -.5, splitCost: .5,
+  // the samples of its miss it throws in its head: [ang z, mph z, weight]
+  z: [[0, 0, .3], [.9, 0, .17], [-.9, 0, .17], [1.8, 0, .06], [-1.8, 0, .06], [0, 1.2, .12], [0, -1.2, .12]],
+  spareZ: [[0, .34], [1, .24], [-1, .24], [2, .09], [-2, .09]], spareAims: [-1.5, 0, 1.5], spareStands: [0, -5, 5], bonus: 8,
+  // the carry table: the place at the pins off the pocket (inches, plus toward the headpin), the entry angle, the speed
+  // at the pins (mph), each from `seeds` racks of pins
+  table: { dx: [-3, 3, .5], en: [2, 8, 2], v: [14.5, 16.5], seeds: 8, spin: .15, mass: 1.04 },
+};
+const BL_HEX = {
+  ichor: { n: 'The Ichor Oil', d: 'The oil turns to ichor under your balls: each takes twice as much off the lane, so your track dries early and the lanes move under you.', k: 2 },
+  drown: { n: 'The Waterlogged Pin', d: 'One pin of every frame you bowl is waterlogged: nearly four times as heavy, and as hard to knock down. You are told which before the frame.', k: 3.7 },
+  pull: { n: 'The Hungry Gutters', d: 'The gutters pull at your ball: within three boards of either edge it drifts toward them.', w: 3, k: .0006 },
+  tide: { n: 'The Black Tide', d: 'The tide runs black under your balls: the oil plays heavier than it looks, and no read sees it, so your ball skids long.', k: 1.012 },
+};
+const BL_ULT_OWN = {
+  drownbell: blU('drownbell', 'The Drowning Bell', 'A bell rings under the floor: their balls this frame skid long on heavy oil, and carry less.', null, { skid: 1.05, carry: .92 }),
+};
+// the ultimate bowler ri of side s casts: their own, if they bring one, else their kind's
+function blUltOf(s, ri) { const m = G.teams[s].roster[ri]; return (m && m.ult && BL_ULT_OWN[m.ult]) || BL_ULT[m && m.kind] || BL_ULT.goblin; }
+
+/* ---------- the hexes ---------- */
+function blHexStart(ids, on) { const hx = (ids || []).filter((k, i, a) => BL_HEX[k] && a.indexOf(k) === i); if (hx.length) G.hex = { ids: hx, on: on === 1 ? 1 : 0 }; }
+const blHexOn = (id, s) => !!(G && G.hex && G.hex.ids.includes(id) && s === G.hex.on);
+const blHexOilK = s => blHexOn('tide', s) ? BL_HEX.tide.k : 1;
+const blHexWearK = s => blHexOn('ichor', s) ? BL_HEX.ichor.k : 1;
+const blHexThrow = s => blHexOn('pull', s) ? { pull: { w: BL_HEX.pull.w, k: BL_HEX.pull.k } } : null;
+// the waterlogged pin of side s's frame now: from the frame (the same for both its balls), never R
+function blHexPin(s) {
+  const key = 'drown:' + s + ':' + blKey(s) + ':' + G.frames + ':' + G.lead;
+  let h = 2166136261; for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  return 1 + ((h >>> 0) % 10);
+}
+const blHexDeck = s => blHexOn('drown', s) ? { drown: blHexPin(s), drownK: BL_HEX.drown.k } : null;
+const blHexNames = () => G && G.hex ? G.hex.ids.map(k => BL_HEX[k].n).join(', ') : '';
+const blHexLine = () => G && G.hex ? `Hexes on ${G.teams[G.hex.on].name}: ${blHexNames()}` : '';
+// before a frame of the hexed side: which pin is waterlogged
+function blHexSay(s) { return blHexOn('drown', s) && G.rb[s] === 0 && G.stand[s].length === 10 ? `The ${blHexPin(s)} is waterlogged this frame. ` : ''; }
+
+/* ---------- the Lich ---------- */
+const BLU = { table: null };
+const blLichAxis = A => { const out = []; for (let v = A[0]; v <= A[1] + 1e-9; v += A[2]) out.push(+v.toFixed(3)); return out; };
+// the carry table: for a ball at dx inches off the pocket, entry en degrees and v mph at the pins, the share of racks it
+// strikes, and the share it splits (a right-hander's ball; a left-hander's is its mirror). Worked once a page, from
+// seeds of its own (never R)
+function blLichTable() {
+  if (BLU.table) return BLU.table;
+  const T = BL_LICH.table, dx = blLichAxis(T.dx), en = blLichAxis(T.en), v = T.v, cell = [];
+  let k = 0;
+  for (const vv of v) for (const e of en) for (const d of dx) {
+    let st = 0, sp = 0;
+    for (let i = 0; i < T.seeds; i++) {
+      const r = blDeck(blRack(), { x: BL_POCKET + d, m: Math.tan(e * Math.PI / 180), v: vv * BL_MPH, spin: T.spin, hand: 1, mass: BL_PIN.mBall * T.mass }, 7919 * (i + 1) + 104729 * k);
+      if (r.down.length === 10) st++; else if (blIsSplit(blRack().filter(p => !r.down.includes(p)))) sp++;
+    }
+    cell.push([st / T.seeds, sp / T.seeds]); k++;
+  }
+  return BLU.table = { dx, en, v, cell };
+}
+// what a ball carries at the pins (trilinear on the table; past its edge, less and less): [strike, split]
+function blLichCarry(d, e, vm) {
+  const T = blLichTable(), at = (A, x) => { const c = clamp(x, A[0], A[A.length - 1]); let i = 0; while (i < A.length - 2 && A[i + 1] <= c) i++; return [i, A.length > 1 ? (c - A[i]) / (A[i + 1] - A[i]) : 0]; };
+  const [i, u] = at(T.dx, d), [j, w] = at(T.en, e), [l, y] = at(T.v, vm), nd = T.dx.length, ne = T.en.length;
+  const get = (a, b, c) => T.cell[(c * ne + b) * nd + a];
+  const out = [0, 0];
+  for (const [a, fa] of [[i, 1 - u], [i + 1, u]]) for (const [b, fb] of [[j, 1 - w], [j + 1, w]]) for (const [c, fc] of [[l, 1 - y], [l + 1, y]]) {
+    const f = fa * fb * fc; if (!f) continue; const C = get(Math.min(a, nd - 1), Math.min(b, ne - 1), Math.min(c, T.v.length - 1)); out[0] += f * C[0]; out[1] += f * C[1];
+  }
+  const past = Math.max(0, Math.abs(d) - T.dx[T.dx.length - 1]);
+  if (past) out[0] *= Math.max(0, 1 - past / 1.5);
+  return out;
+}
+// how good a strike ball t is for side s, thrown in its head with its miss at this moment (k): the weighted carry
+function blLichWeigh(s, t, oil, k) {
+  const sk = BL_SKILL[3], h = t.hand === -1 ? -1 : 1;
+  let sum = 0;
+  for (const [za, zm, wt] of BL_LICH.z) {
+    const r = blBall(Object.assign({}, t, { ang: t.ang + za * sk.ang * k, mph: t.mph + zm * sk.mph * k }), oil, G.tide);
+    if (r.gutter !== null) { sum += wt * BL_LICH.gutter; continue; }
+    const C = blLichCarry(h * r.x - BL_POCKET, r.entry, r.v / BL_MPH);
+    sum += wt * (C[0] - BL_LICH.splitCost * C[1]);
+  }
+  return sum;
+}
+// the angle that sends throw t to tx at the pins, from a guess a0 (the secant method, a few balls; blAimAt's bisection
+// when it doesn't settle): null when nothing gets there
+function blLichAim(t, tx, oil, a0) {
+  const at = a => { const r = blBall(Object.assign({}, t, { ang: a }), oil, G.tide); return r.gutter !== null ? null : r.x; };
+  if (a0 != null) {
+    let a = a0, x = at(a), b = a0 + .05, y = at(b);
+    for (let i = 0; i < 6 && x !== null && y !== null; i++) {
+      if (Math.abs(y - tx) < .25) return +b.toFixed(4);
+      if (Math.abs(y - x) < 1e-6) break;
+      const c = b + (tx - y) * (b - a) / (y - x); if (!isFinite(c) || Math.abs(c) > 6) break;
+      a = b; x = y; b = c; y = at(b);
+    }
+  }
+  return blAimAt(t, tx, oil, G.tide);
+}
+// the line a stand is on, for a bowler whose best stand (the pocket line's) is base0
+function blLichLineAt(x0, base0, h) { const off = h * (x0 - base0) / BL_LANE.bw; return off >= 1 ? 'deep' : off <= -1 ? 'boards' : 'pocket'; }
+// the Lich's ball for side s (null to fall back on the Archmage's). On a full rack it also sets the line it picked
+function blLichPlan(s) {
+  const ri = blBowler(s), st = blStyleNow(s, ri), lane = blLane(s), stand = G.stand[s], oil = G.oil[lane], fx = blFxFor(s), h = st.hand;
+  const base = { mph: st.mph, rpm: st.rpm, hand: h, oilK: fx.skid };
+  // the Archmage's plan: the one to beat
+  const kk = G.skill[s]; G.skill[s] = 2; let A; try { A = blPlan(s); } finally { G.skill[s] = kk; }
+  if (stand.length < 10) return blLichSpare(s, A, base, oil);
+  const errK = blErrK(s, ri, false) * BL_STANCE[blStanceOf(s).tempo].err, kOf = line => errK * BL_LINES[line].err;
+  const base0 = blStand(st) + h * BL_LINE_BASE * BL_LANE.bw;
+  let guess = A.ang;
+  const weigh = (x0, mph, aim) => {
+    const t = Object.assign({}, base, { x0, mph, ball: 'strike' }), tx = h * (BL_POCKET + aim), ang = blLichAim(t, tx, oil, guess);
+    if (ang === null) return null;
+    guess = ang;
+    const line = blLichLineAt(x0, base0, h);
+    return { x0, ang, mph, aim, tx, line, v: blLichWeigh(s, Object.assign(t, { ang }), oil, kOf(line)) };
+  };
+  // (the Archmage's own, as it would bowl it, on its line)
+  const aLine = blLineOf(s), a0 = { x0: A.x0, ang: A.ang, mph: A.mph, aim: 0, tx: A.aim.x, line: aLine, v: blLichWeigh(s, Object.assign({}, base, { x0: A.x0, ang: A.ang, ball: 'strike' }), oil, kOf(aLine)) };
+  let best = null;
+  const n = BL_LICH.stands, m = (n - 1) / 2;
+  for (let i = 0; i < n; i++) {
+    const x0 = base0 + h * (i - m) * BL_LICH.step; if (Math.abs(x0) > BL_LANE.edge - 2) continue;
+    for (const aim of BL_LICH.aims) { const c = weigh(x0, st.mph, aim); if (c && (!best || c.v > best.v)) best = c; }
+  }
+  if (best) for (const d of BL_LICH.speeds) { const c = weigh(best.x0, +(st.mph + d).toFixed(2), best.aim); if (c && c.v > best.v) best = c; }
+  const P = best && best.v > a0.v + BL_LICH.margin ? best : a0;
+  G.line[s] = P.line;
+  // (oilK goes no further: blRelease copies the plan, and blBowlBall sets the ball's own)
+  return Object.assign({}, base, { x0: P.x0, ang: P.ang, mph: P.mph, ball: 'strike', aim: { x: P.tx, y: BL_LANE.len }, why: 'the pocket' + (P.line !== 'pocket' ? ', ' + BL_LINES[P.line].n.toLowerCase() : ''), weighed: +P.v.toFixed(3) });
+}
+// a spare: what side s's standing pins would give for a spare ball t, thrown in its head (k its miss): [chance of the
+// spare, pins down on average]
+function blLichSpareTry(s, pins, t, oil, k) {
+  const sk = BL_SKILL[3], L = BL_LANE, one = pins.length === 1, spots = blHallSpots(s);
+  let p = 0, n = 0, i = 0;
+  for (const [za, wt] of BL_LICH.spareZ) {
+    const r = blBall(Object.assign({}, t, { ang: t.ang + za * sk.ang * k }), oil, G.tide); i++;
+    if (r.gutter !== null) continue;
+    if (one) { const sp = (spots && spots[pins[0]]) || BL_SPOT[pins[0]], x = r.x + r.m * (sp[1] - L.len); if (Math.abs(x - sp[0]) < (L.ballR + L.pinR) * .92) { p += wt; n += wt; } continue; }
+    const d = blDeck(pins, { x: r.x, m: r.m, v: r.v, spin: r.spin, hand: r.hand, mass: BL_PIN.mBall }, (Math.imul(G.n + 1, 2654435761) ^ (i * 40503)) >>> 0, spots);
+    n += wt * d.down.length; if (d.down.length === pins.length) p += wt;
+  }
+  return [p, n];
+}
+// the best spare ball at pins (a group, or all that stand): { t, p, n }
+function blLichSpareBest(s, pins, base, oil, k) {
+  const T = blSpareTarget(pins), x00 = clamp(-T.x * .7, -14, 14);
+  let best = null;
+  // (more pins on the deck cost a rack of pins a throw in its head: three aims from the Archmage's stand; a lone pin, every
+  // stand too)
+  for (const dx0 of pins.length === 1 ? BL_LICH.spareStands : [0]) for (const a of BL_LICH.spareAims) {
+    const x0 = clamp(x00 + dx0, -14, 14), t = Object.assign({}, base, { x0, ball: 'spare' }), tx = T.x + a;
+    let ang = blAimAt(t, tx, oil, G.tide); if (ang === null) continue;
+    const r = blBall(Object.assign({ ang }, t), oil, G.tide), a2 = blAimAt(t, tx - r.m * (T.y - BL_LANE.len), oil, G.tide); if (a2 !== null) ang = a2;
+    const [p, n] = blLichSpareTry(s, pins, Object.assign({}, t, { ang }), oil, k), v = p + n / 100;
+    if (!best || v > best.v + 1e-9) best = { t: Object.assign({}, t, { ang }), p, n, v, tx, ty: T.y };
+  }
+  return best;
+}
+function blLichSpare(s, A, base, oil) {
+  const stand = G.stand[s], ri = blBowler(s), k = blErrK(s, ri, true) * blCallErr(s);
+  const groups = blGroups(stand).sort((a, b) => b.length - a.length || Math.min(...a.map(p => Math.abs(BL_SPOT[p][0]))) - Math.min(...b.map(p => Math.abs(BL_SPOT[p][0]))));
+  const conv = groups.length > 1 && G.split[s] === 'convert', pins = conv ? stand : groups[0];
+  const B = blLichSpareBest(s, pins, base, oil, k); if (!B) return null;
+  // (the Archmage's own spare ball is one of those weighed: another only when it is better)
+  const [p0, n0] = blLichSpareTry(s, pins, Object.assign({}, base, { x0: A.x0, ang: A.ang, ball: 'spare' }), oil, k);
+  if (B.v <= p0 + n0 / 100 + BL_LICH.margin) return A;
+  return Object.assign({}, base, { x0: B.t.x0, ang: B.t.ang, ball: 'spare', aim: { x: B.tx, y: B.ty }, why: A.why, weighed: +B.p.toFixed(3) });
+}
+// the Lich's call before a ball: on a split, convert or take the sure count by what each is worth. Says what, or ''
+function blLichCall(s) {
+  const stand = G.stand[s];
+  if (stand.length === 10 || !blIsSplit(stand)) return '';
+  const groups = blGroups(stand).sort((a, b) => b.length - a.length || Math.min(...a.map(p => Math.abs(BL_SPOT[p][0]))) - Math.min(...b.map(p => Math.abs(BL_SPOT[p][0]))));
+  if (groups.length < 2) return '';
+  const ri = blBowler(s), st = blStyleNow(s, ri), fx = blFxFor(s), oil = G.oil[blLane(s)], base = { mph: st.mph, rpm: st.rpm, hand: st.hand, oilK: fx.skid };
+  const k = blErrK(s, ri, true) * blCallErr(s), C = blLichSpareBest(s, stand, base, oil, k), S = blLichSpareBest(s, groups[0], base, oil, k);
+  if (!C || !S) return '';
+  // a spare is worth the pins and the next ball on top (about BL_LICH.bonus); the safe side's count is worth its pins
+  const vc = C.p * (stand.length + BL_LICH.bonus) + (1 - C.p) * Math.min(C.n, stand.length - 1), vs = S.n;
+  const was = G.split[s]; G.split[s] = vc > vs ? 'convert' : 'safe';
+  return G.split[s] !== was ? (G.split[s] === 'convert' ? 'it goes for the split' : 'it takes the sure count') : '';
 }
 /* The Saltmere Lanes' superstars (issue #100, phase 8), inside the wBL scope: each superstar's bowling ratings and
    powers, added to the engine's own tables after its parts load, as golf's are (links/l0-stars.js). Plain assignments,
@@ -40755,7 +40992,11 @@ for (const ev of ['pointerup', 'pointercancel']) BLP.cv.addEventListener(ev, blP
    Phase 8 is the superstars (p0-stars.js: their kinds in rate, pow, pow2 and ult) and the look: the bowler drawn as
    their own kind (atLine(): who is at the foul line and how, or null), the hall's fantasy dressing, and Moll's glass
    (screen(): the cartoon for the last ball, { k, text, n, left }, or null; screenRules). render(dt) moves the
-   drawing's clock on by dt. */
+   drawing's clock on by dt.
+   The Umbral (issue #99, phase 4g: 16-umbral.js): skill 3, the Lich (skills[3]; lichRules); start({ hexes: [ids],
+   hexOn }) and simGame the same: hexes (the table), hex() (the game's, or null), hexPin(s) (side s's waterlogged pin
+   this frame), hexLine() (as the scoreboard says it); a roster bowler may bring ult (an id in ultOwn), and ultOf(s,
+   ri) is the ultimate they cast; carry(dx, entry, mph) is the Lich's carry table. */
 return {
   rules: JSON.parse(JSON.stringify(BL_RULES)), adj: BL_ADJ.map(p => p.slice()), get G() { return G; },
   newGame: o => blNewGame(o), up: () => blUp(), bowler: s => blBowler(s), standing: s => G ? G.stand[s].slice() : [],
@@ -40804,6 +41045,9 @@ return {
   // the look (phase 8)
   screen: () => GP && GP.last && GP.anim ? blScreenFor(GP.last, GP.anim.s, GP.anim.before) : null, screenRules: JSON.parse(JSON.stringify(BL_SCREEN)),
   atLine: () => { const B = blBowlerNow(); return B ? Object.assign({}, B, { kind: (G.teams[B.s].roster[B.ri] || {}).kind }) : null; },
+  // the Umbral (phase 4g)
+  hexes: JSON.parse(JSON.stringify(BL_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexPin: s => G && G.teams ? blHexPin(s) : null, hexLine: () => blHexLine(),
+  ultOwn: JSON.parse(JSON.stringify(BL_ULT_OWN)), ultOf: (s, ri) => G && G.teams ? Object.assign({}, blUltOf(s, ri)) : null, lichRules: JSON.parse(JSON.stringify(BL_LICH)), carry: (d, e, v) => blLichCarry(d, e, v),
   set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; }, get onPhase() { return BL_HOOK.onPhase; }, get onPick() { return BL_HOOK.onPick; }, get onOver() { return BL_HOOK.onOver; },
   show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: dt => blRender(dt || 0),
   pause: on => { BLP.paused = !!on; }, get paused() { return BLP.paused; }, get speed() { return BLP.speed; }, set speed(n) { BLP.speed = clamp(Math.round(n) || 1, 1, 8); }
@@ -65652,8 +65896,164 @@ wLinksBarNote = function () {
 // after a Hardcore journey ends on the finale's lost round, the golf result card stays off the end screen
 const wWU4FLinksResultCard = wLinksResultCard;
 wLinksResultCard = function () { if (RUN && RUN.over) return; return wWU4FLinksResultCard.apply(this, arguments); };
-/* u4g: bowling in the Umbral (issue #99, phase 4g): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4g: bowling in the Umbral (issue #99, phase 4g). Loads after u4-grounds.js; changes earlier parts only by
+   reassignment (saved originals carry the wWU4G prefix). The engine's side is src/bl/parts/16-umbral.js: the Lich (CPU
+   skill 3), the hexes (opts.hexes) and a bowler's own ultimate.
+
+   Tier U at the lanes is tier 4 in bowling's tables: W_LNG.oppBonus[4] rating points on each of their five (an umbral
+   form changes only their ratings, never yours), the Lich bowling for them (W_BALL.diff[4] = 3, the skill every engine
+   reads by tier, named in W_BALL_SKILL: it weighs every stand, aim and speed through the ball model and the pins, and
+   a split by what it is worth), and a full potion bag (W_LANES_KIT.opp[4]). Tiers 1 to 3 are as they were.
+   The champion of the Drowned Lanes (u:g_lanes, the Tidelands): Ossery Brine, the Drowned Pinsetter, keeps the Drowned
+   Pin. Past the two guards and the gate (u4), PLAY opens the game card (wUmbBlCard): tier U, the Nadir five
+   (W_UMB4G.five, at your team's level, the champion with an ultimate of their own, The Drowning Bell), the hexes for
+   this try, and Play, Manage or Simulate. The game is the Realm's own bowling match (wStartLanes: save and leave,
+   resume after a reload, Concede, the sheet) against club 'nadir:lanes' at tier 4 with kind 'unadirbl': its end goes
+   to wUmbNadirEnd (a bowling game never ends level: the roll-off; a game that never finished, or a concession, is a
+   loss). Your five bowl as a Knight in Manage and Simulate, against the Lich, with the same hexes, so Simulate is no
+   way round them. The toll, on a retry, is paid at the first ball's setup (wUmbTollAtKickoff); backing away from the
+   card costs nothing.
+   The finale (u5) plays a bowling round through the same adapter, id 'finale': the same five as Nadir Athletic (club
+   'nadir:lanes:finale'), no toll, no piece, its own count of hexes; its end goes to W_ON_END.nadir as the finale's.
+   Hexes: bowling's own (wBL.hexes, the engine's table), W_NADIR.lanes.hexes of them (the finale's round its own
+   count), drawn for each try by wUmbBlHexes (fixed for the try: a reload doesn't redraw them), named on the card, in
+   the log, before the first frame, on the scoreboard all game and on the bar. In LAB mode PLAY skips the card and plays
+   W_UMB4G.labHow (Simulate) at once. A bowling match left half-played (W_UMB4.live.lanes) is picked up by PLAY where it
+   was, with no card and no toll.
+
+   W_UMB4G, wUmbBlClub, wUmbBlFive, wUmbBlHexes, wUmbBlCard, wUmbBlKick; W_NADIR.lanes, DB.chars.nadir_lanes,
+   W_UMB4.start.lanes, W_UMB4.live.lanes, W_ON_END.unadirbl
+   Wraps: wBallRegion (wWU4GBallRegion), wBallTeam (wWU4GBallTeam), wLanesOpp (wWU4GLanesOpp): the Nadir's clubs are the
+   Tidelands' and the Nadir five; wBL.start and wBL.simGame (wWU4GStart, wWU4GSimGame: the hexes go in); wLanesBarNote
+   (wWU4GLanesBarNote: the hexes on the bar); and wLanesResultCard (wWU4GLanesResultCard: no card over the end screen
+   when a Hardcore journey has just ended, RUN.over). */
+
+const W_UMB4G = {
+  id: 'lanes', club: 'nadir:lanes', finaleClub: 'nadir:lanes:finale', kind: 'unadirbl', tier: 4, labHow: 'sim',
+  team: { name: 'Drowned Lanes Nadir', short: 'NDR', color: '#1e3a44', light: '#9fe8e0' },
+  finaleTeam: { name: 'Nadir Athletic', short: 'NDR', color: '#2a1e34', light: '#e4defa' },
+  // their level against your team's (0: level for level), the five (the order is set by their ratings), and the
+  // champion's more points and own ultimate
+  gap: 0,
+  five: [{ n: 'Ossery Brine', kind: 'zombie', champ: true }, { n: 'Hagwrack', kind: 'witch' }, { n: 'Pale Tallow', kind: 'wraith' }, { n: 'Saltbones', kind: 'skeleton' }, { n: 'Marrowlamp', kind: 'lich' }],
+  champ: { more: 0, ult: 'drownbell' },
+};
+// tier U in bowling's tables (W_BALL.diff and W_BALL_SKILL are shared with the other engines' tier U: set once)
+W_LNG.oppBonus[4] = 1;
+W_LANES_KIT.opp[4] = { draught: 2, blsteady: 2, blchalk: 2, bloil: 1 };
+if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
+if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
+
+W_NADIR.lanes = { piece: 'bowling', char: 'nadir_lanes', ground: 'g_lanes', map: 'u:g_lanes', region: 'tide', engine: 'lanes', hexes: 1, toll: 30, gold: 100 };
+DB.chars.nadir_lanes = { name: 'Ossery Brine, the Drowned Pinsetter', kind: 'zombie', look: { coat: '#1e3a44', acc: 'hat' },
+  greet: 'The sea came in under these lanes a long time ago, and we kept bowling. I set the pins down here, and I keep the PIN. Say PLAY when you want to bowl for it. Ask about the RULES first; the water changes them.',
+  topics: {
+    job: { t: 'I set the pins on the Drowned Lanes. I set them when the lamps were lit and the floor was dry, and I set them now. Every one of them comes up wet.' },
+    pin: { t: 'The Drowned Pin. One ninth of your Seal, and it has never once gone down clean. Beat my five at bowling and it is yours. Lose, and the next game costs a TOLL.' },
+    rules: { t: 'One team game, ten frames, the Baker format, your five against mine. My side bowls at your level and better at everything, a Lich reads the oil for us and weighs every ball before it leaves the hand, and we bring a full bag. Nobody goes home level: a roll-off. Before the first frame I draw the HEXES.' },
+    hexes: { t: 'The water has its moods. Oil that turns to ichor under your ball, a pin too heavy to fall, gutters that pull, a black tide under your lane. You will hear which before the first frame.' },
+    bell: { t: 'Once a game I ring the bell under the floor. The oil goes heavy for your five, and your ball carries less. Mind it.' },
+    toll: { t: 'Thirty gold a game, after the first. Paid at the first ball. Walking away from the card costs nothing.' },
+    play: { t: 'Then bring your five.', act: 'unadir:lanes' },
+  } };
+
+/* ---------- the Nadir five ---------- */
+// which of the Nadir's clubs this is: 'champ', 'finale', or ''
+const wUmbBlClub = club => club === W_UMB4G.club ? 'champ' : club === W_UMB4G.finaleClub ? 'finale' : '';
+// their five, as the lanes take a team: your team's level plus W_UMB4G.gap, tier U's points on each (spread as
+// wLanesOpp spreads a tier's), the champion with W_UMB4G.champ.more points more and their own ultimate
+function wUmbBlFive(lvl, finale) {
+  const L = lvl != null ? lvl : Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4G.gap)), k = W_LNG.oppBonus[W_UMB4G.tier] || 0, X = W_UMB4G.champ;
+  const roster = W_UMB4G.five.map((f, j) => {
+    const p = wLanesPlayer(wMakePlayer({ kind: f.kind, lvl: L, n: f.n }, 'opp')), n = k + (f.champ ? X.more : 0);
+    p.n = f.n;
+    for (let i = 0; i < n; i++) { const s = wBL.stats[(i * 5 + j) % wBL.stats.length]; p.r[s] = Math.min(wBL.cap, p.r[s] + 1); }
+    if (f.champ) p.ult = X.ult;
+    return p;
+  });
+  const T = finale ? W_UMB4G.finaleTeam : W_UMB4G.team;
+  return { name: T.name, short: T.short, color: T.color, roster };
+}
+const wWU4GBallRegion = wBallRegion;
+wBallRegion = function (club) { return wUmbBlClub(club) ? W_NADIR.lanes.region : wWU4GBallRegion.apply(this, arguments); };
+const wWU4GBallTeam = wBallTeam;
+wBallTeam = function (club) {
+  const f = wUmbBlClub(club); if (!f) return wWU4GBallTeam.apply(this, arguments);
+  const T = f === 'finale' ? W_UMB4G.finaleTeam : W_UMB4G.team;
+  return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.6), light: T.light, motto: '' };
+};
+const wWU4GLanesOpp = wLanesOpp;
+wLanesOpp = function (club, tier) { const f = wUmbBlClub(club); return f ? wUmbBlFive(null, f === 'finale') : wWU4GLanesOpp.apply(this, arguments); };
+
+/* ---------- the hexes ---------- */
+const WU4G = { next: null };
+const wWU4GStart = wBL.start, wWU4GSimGame = wBL.simGame;
+wBL.start = o => wWU4GStart(WU4G.next ? Object.assign({}, o, { hexes: WU4G.next.slice(), hexOn: 0 }) : o);
+wBL.simGame = o => wWU4GSimGame(WU4G.next ? Object.assign({}, o, { hexes: WU4G.next.slice(), hexOn: 0 }) : o);
+// n of bowling's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
+// after a reload)
+function wUmbBlHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wBL.hexes);
+  const r = mulberry(wUmbHash('bl:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1) + (id === 'finale' && U ? 1013 * (U.finale || 0) : 0));
+  const out = []; while (out.length < Math.min(Math.max(0, n), ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+const wUmbBlHexWords = hx => hx.map(h => wBL.hexes[h]).filter(Boolean);
+
+/* ---------- PLAY: the card, then the first frame ---------- */
+function wUmbBlCard(C, id, hx) {
+  const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier() + W_UMB4G.gap));
+  const fin = id === 'finale' || !C.piece, T = fin ? W_UMB4G.finaleTeam : W_UMB4G.team, uo = wBL.ultOwn[W_UMB4G.champ.ult], champ = W_UMB4G.five.find(f => f.champ).n, H = wUmbBlHexWords(hx);
+  // (a round of the Seal holds no piece and costs no toll)
+  const toll = !C.toll ? '' : tries > 0 ? ` This game costs the toll, ${C.toll} gold, at the first ball.` : ` The first game is free; after a loss, each costs a toll of ${C.toll} gold.`;
+  const prize = fin ? `Win, and ${esc(W_UMB_PIECES[null].n)} is yours.` : `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.${toll}`;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
+    <p><b>${fin ? 'The Seal: bowling' : 'The Drowned Lanes'}: tier U.</b> Bowling against ${esc(T.name)}: level ${lvl}, in umbral form (${W_LNG.oppBonus[W_UMB4G.tier]} rating point${W_LNG.oppBonus[W_UMB4G.tier] === 1 ? '' : 's'} on each of their five), bowling as a ${esc(W_BALL_SKILL[wLanesSkillOf(W_UMB4G.tier)[1]])}, who reads the oil as it is and weighs every ball before it leaves the hand, with a full potion bag. ${esc(champ)} bowls for them, and once a game rings ${esc(uo.n)}: ${esc(uo.desc)}</p>
+    <p class="hint wumbpg"><b>Hexes:</b> ${H.length ? H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ') : 'none'}</p>
+    <p class="hint">${prize} Nobody goes home level: a roll-off. <b>Play</b>: you bowl every ball. <b>Manage</b>: you call the line, the tempo and the ball; your five bowl. <b>Simulate</b>: the result now.</p></div>
+    <div class="row"><button class="btn" data-ubl="play">Play</button><button class="ghost" data-ubl="manage">Manage</button><button class="ghost" data-ubl="sim">Simulate</button><button class="ghost" id="wUblNo">Not now</button></div>`, () => wDrain());
+  $('modalBox').querySelectorAll('[data-ubl]').forEach(b => b.onclick = () => { close(); const why = wUmbBlKick(C, id, hx, b.dataset.ubl); if (why) wLog(why, 'b'); });
+  $('wUblNo').onclick = () => close();
+  const f = $('modalBox').querySelector('[data-ubl="play"]'); if (f) f.focus();
+}
+// why your team can't bowl the champion now, or ''
+function wUmbBlWhy() { const probs = wLanesProblems(); if (probs.length) return probs.join(' '); return wLanesLive() ? 'Finish the bowling match you started first.' : ''; }
+// the first frame: the toll (on a retry), the hexes in the log, and the Realm's bowling match at tier U ('' when it
+// started)
+function wUmbBlKick(C, id, hx, how) {
+  const why = wUmbBlWhy(); if (why) return why;
+  wUmbTollAtKickoff(id);
+  const H = wUmbBlHexWords(hx);
+  if (H.length) wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
+  WU4G.next = hx.slice();
+  try { return wStartLanes({ club: id === 'finale' ? W_UMB4G.finaleClub : W_UMB4G.club, how, tier: W_UMB4G.tier, kind: W_UMB4G.kind, ref: { id }, cup: true }); } finally { WU4G.next = null; }
+}
+// (a bowling match left half-played: u4 skips the toll's gold check, and PLAY picks it up)
+W_UMB4.live.lanes = () => wLanesLive();
+W_UMB4.start.lanes = function (C, id) {
+  // (a match left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wLanesLive()) { wResumeLanes(); return ''; }
+  const why = wUmbBlWhy(); if (why) return why;
+  const hx = wUmbBlHexes(id, C.hexes || 1);
+  if (LAB) return wUmbBlKick(C, id, hx, W_UMB4G.labHow);
+  wUmbBlCard(C, id, hx);
+  return '';
+};
+// the end: the piece (or the finale's round), or a try counted (the finale's entry is rebuilt by u5 after a reload, so
+// no check on W_NADIR here)
+W_ON_END[W_UMB4G.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
+
+/* ---------- on screen ---------- */
+// the bar: the hexes, while a Nadir match is on
+const wWU4GLanesBarNote = wLanesBarNote;
+wLanesBarNote = function () {
+  const r = wWU4GLanesBarNote.apply(this, arguments), L = WG && WG.lng && WG.lng.live, hx = L && L.world.kind === W_UMB4G.kind && wBL.hex();
+  if (hx && WBL && !WBL.over && $('wLanesNote')) $('wLanesNote').textContent += ` The Umbral, tier U. Hexes: ${hx.ids.map(h => wBL.hexes[h].n).join(', ')}.`;
+  return r;
+};
+// after a Hardcore journey ends on the finale's lost round, the bowling result card stays off the end screen
+const wWU4GLanesResultCard = wLanesResultCard;
+wLanesResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4GLanesResultCard.apply(this, arguments); };
 /* u4h: curling in the Umbral (issue #99, phase 4h): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
 /* u5: the finale (issue #99, phase 5). Loads after the sports' parts (u4a..u4h); changes earlier parts only by

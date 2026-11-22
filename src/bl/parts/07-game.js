@@ -33,7 +33,7 @@ function blStart(opts) {
   const order = [0, 1].map(s => (o.order && o.order[s]) || teams[s].order || (teams[s].roster.every(m => m.r) ? blAutoOrder(teams[s].roster) : null));
   blNewGame({ frames: o.frames, order, lead: o.lead, roster: teams.map(T => T.roster.length) });
   const oil = blHouse();
-  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, BL_SKILL.length - 1)), tide: BL_TIDE[o.tide] ? o.tide : 'mid',
     oil: [oil.slice(), oil.slice()], oil0: oil, bias: teams.map(T => T.roster.map(() => [0, 0])), st: [blBox(), blBox()], log: [], n: 0,
     arm: teams.map(T => T.roster.map(() => 1)),
     line: ['pocket', 'pocket'], split: ['safe', 'safe'], stance: [{ tempo: 'steady', ball: 'heavy' }, { tempo: 'steady', ball: 'heavy' }],
@@ -46,6 +46,7 @@ function blStart(opts) {
   blHallStart(o);
   blPowersStart(o);
   blKitStart(o.bags);
+  blHexStart(o.hexes, o.hexOn);
   GB = null;
   return G;
 }
@@ -62,17 +63,18 @@ function blBowlBall(s, plan, rel) {
   const ri = blBowler(s), lane = blLane(s), stand = G.stand[s].slice(), fresh = stand.length === 10, first = G.rb[s] === 0;
   // the powers on this ball (13-powers.js): the web and a Hex's oil go into the ball, the rest below
   const fx = blFxFor(s);
-  const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid }), G.oil[lane], G.tide);
+  // (and the Umbral's hexes on this side, 16-umbral.js: the black tide's heavier oil, the gutters that pull)
+  const ball = blBall(Object.assign({}, rel, { web: !!fx.web, oilK: fx.skid * blHexOilK(s) }, G.hex ? blHexThrow(s) : null), G.oil[lane], G.tide);
   const seed = Math.floor(R() * 2147483647);
   // power: the ball drives through the pins like a heavier one
   const mass = BL_PIN.mBall * (1 + BL_REACH.pow * (blRat(s, ri).pow - .5) + BL_REACH.rev * (blRat(s, ri).rev - .5)) * BL_STANCE[blStanceOf(s).ball].mass * fx.carry * (fx.nodefl ? 1.35 : 1) * (blGxOf(s, ri).carry || 1);
   const front = stand.slice().sort((a, b) => BL_SPOT[a][1] - BL_SPOT[b][1] || Math.abs(BL_SPOT[a][0]) - Math.abs(BL_SPOT[b][0]))[0];
-  const deck = ball.gutter === null ? blDeck(stand, { x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
+  const deck = ball.gutter === null ? blDeck(stand, Object.assign({ x: ball.x, m: ball.m, v: ball.v, spin: ball.spin, hand: ball.hand, mass, ghost: fx.ghost && stand.includes(1) && ball.hand * (ball.x - ball.hand * BL_POCKET) < -1 ? [1] : [], stone: fx.stone ? front : null }, G.hex ? blHexDeck(s) : null), seed, blHallSpots(s)) : { down: [], trace: [], ball: null };
   // a wobble (a harpy's Gust): a pin left standing beside one that fell may go
   if (fx.wobble && ball.gutter === null) { const left = stand.filter(p => !deck.down.includes(p)); for (const p of left) if (BL_ADJ.some(([a, b]) => (a === p && deck.down.includes(b)) || (b === p && deck.down.includes(a))) && R() < fx.wobble) deck.down.push(p); deck.down.sort((a, b) => a - b); }
   // the hall: a gutter crab, a swell, the gull (12-hall.js)
   const H = blHallAfter(s, stand, ball, deck.down); deck.down = H.down;
-  if (G.wear !== false) G.oil[lane] = blWear(G.oil[lane], ball.path);
+  if (G.wear !== false) G.oil[lane] = blWear(G.oil[lane], ball.path, G.hex ? blHexWearK(s) : 1);
   // a Knight learns from its strike balls: half of how far it missed the pocket on that lane, more for a good reader.
   // Only a plan aimed at the pins (the CPU's, the captain's): a ball you bowl by hand aims at your arrow, 15 feet down
   if (fresh && plan.ball === 'strike' && plan.why !== 'yours' && ball.gutter === null && BL_SKILL[G.skill[s]].learn) G.bias[s][ri][lane] += BL_SKILL[G.skill[s]].learn * (.6 + .8 * blRat(s, ri).red) * (plan.aim.x - ball.x);

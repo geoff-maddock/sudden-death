@@ -1774,3 +1774,69 @@ The first cut swung each by 11 to 13 points: the bot's game is precise, so a few
 the game by more than about 6 points. The champion draws one hex a try (two was 4 to 6 points more): about 13% across
 the two runs, a little under the 15 to 25% band, as football's champion is; a careful human, who sees the fog and
 reads the cup's creep, wins more.
+
+### Umbral: bowling (#99, 4g)
+
+`python3 test/realm_lanes_lab.py N '' umbral` (the Umbral part of the bowling lab). Games as Simulate plays the Drowned
+Lanes' champion: your five at level 3 (the journey's kinds) bowling as a Knight, against level 3 (level parity), one
+Baker game of ten frames, the hall on (the tide mid) and powers on. Every row draws game i's two fives from the same
+seeded stream, and the paired rows (the Archmage, the Lich and tier U; every Nadir row) play game i on the same seed, so
+a hex is measured on the same games as the row without it. A run's journey (its first player) is new each run, and runs
+differ by up to 5 points. About 0.15 s a game with the Lich (0.05 without).
+
+Tier U at the lanes is tier 4 in bowling's tables: `W_LNG.oppBonus[4]` rating points on each of their five, a full bag
+(`W_LANES_KIT.opp[4]`: two draughts, two Steady Hands, two Grip Chalks, Moll's Lane Oil) and the Lich bowling for them
+(skill 3, `src/bl/parts/16-umbral.js`). Tiers 1 to 3 are untouched: with no hexes, no Lich and no bowler's own
+ultimate the engine plays the same game seed for seed (30 seeded sims across every skill, the hall, powers, bags, the
+tides, five and ten frames and the transition off, and a watched game ticked through by hand, before and after this
+part: identical, summary, sheet, casts, potions and every message).
+
+**The Lich.** Its release strays exactly as an Archmage's. Before every ball it weighs nine stands (deep inside to up
+the boards, which sets its line), three aims in the pocket and, from the best, a touch slower and quicker: each thrown
+seven times in its head through the ball model with its own miss at that moment (line, tempo and any curse on its ball
+included), scored at the pins by a carry table worked once a page from the pins themselves (strikes and splits by
+place, entry angle and speed). The Archmage's own ball is one of those weighed and wins unless another scores better.
+At a spare it weighs three aims (and, at a lone pin, three stands); at a split it converts or takes the sure count by
+what each is worth. No random number is drawn for any of it.
+
+| even level, no bonus, no bags (your win, 300 a row) | run 1 | run 2 | run 3 | run 4 | run 5 |
+|---|---|---|---|---|---|
+| their bowlers Archmages | 19.7% | 21.7% | 23.7% | 19.7% | 24.3% |
+| their bowlers the Lich | 14.7% | 12.3% | 13.0% | 9.7% | 13.0% |
+
+Five to ten points from its decisions alone. Against a Knight over 120 seeded games it strikes 8 points more often than
+an Archmage (71% against 63%) and converts more spares (85% against 80%): about 14 pins a game more.
+
+**Tier U.** Tier 3 is one rating point at two levels up with an Archmage. The Nadir five are the undead kinds (Ossery
+Brine, the champion, a zombie; a witch, a wraith, a skeleton and a lich): middling bowlers, against the journey's five.
+A second rating point (`W_LNG.oppBonus[4] = 2`) put the Nadir five at 12.5% with no hexes and 8% as played, so tier U
+keeps **1 point**, as tier 3 has, at level parity: the Lich and the bag make it the harder game. The champion's own
+ultimate, The Drowning Bell (their balls this frame skid long on heavy oil and carry less), is their mark rather than a
+swing: within noise (18.7% against 18.7%, 20.3% against 14%, 17.3% against 20%).
+
+| your win, level parity (300 a row) | run 1 | run 2 |
+|---|---|---|
+| tier 3, a rival's five as the world sets it (two levels up, 1 point, Archmage, bag) | 21.7% | 23.0% |
+| tier U, your own kinds (1 point, the Lich, the full bag) | 17.3% | 9.0% |
+| **the Nadir five, no hexes (the champion's game)** | **18.7%** | **19.3%** |
+
+**The hexes** (16-umbral.js), each against your side, each alone on the champion's game (300 a row, paired):
+
+| hex (its setting in each cut) | cut 1 (150) | cut 2 (200) | cut 3 (two runs) | cut 4 (two runs) | kept, run 1 | kept, run 2 |
+|---|---|---|---|---|---|---|
+| none | 17.3% | 18.5% | 20.3%, 18.7% | 20.3%, 16.3% | 18.7% | 19.3% |
+| The Ichor Oil (your balls take k times the oil off the lane: 3, 3, 2.5, 2.5, kept 2) | -4.6 | -5.5 | -3.3, -6.0 | -9.0, -3.6 | -5.0 | -5.0 |
+| The Waterlogged Pin (a pin of each of your frames k times as heavy: 2, 2, 3, 5, kept 3.7) | -2.6 | -0.5 | -2.0, +1.0 | -15.6, -14.0 | -3.4 | -5.0 |
+| The Hungry Gutters (near either edge your ball drifts toward the gutter: 6 inches and 0.0016 a step, 0.0007, 0.0003, then 3 boards and 0.0006, kept) | -11.3 | -11.0 | -11.6, -12.0 | -1.6, -3.0 | -2.7 | -2.0 |
+| The Black Tide (the oil under your balls k times as heavy as it looks: 1.07, 1.025, 1.012, kept) | -15.3 | -9.5 | -5.6, -0.4 | -5.3, -1.3 | -0.4 | -2.6 |
+| **the champion as played: one drawn** | 7.3% | 12.0% | 14.0%, 15.3% | 11.7%, 9.0% | **17.3%** | **15.7%** |
+| two drawn (the finale's round) | 4.7% | 5.5% | 11.7%, 9.7% | 8.7%, 7.7% | 12.0% | 16.3% |
+
+The first cut found two hexes far too strong for the bot, for the reason the skid curses were (phase 10): a Knight
+plans on the lane it sees, so a ball that skids long on a heavier tide misses the pocket every time, and the gutters'
+pull reached in to the boards a hook ball rolls out to at its breakpoint, so every strike ball came back light. Kept,
+the pull works only on the outside three boards (a wide miss, a corner pin), and the tide is a touch. The waterlogged
+pin is a threshold: at three times a pin's weight the ball still carries it, at five it is heavier than the ball and
+strikes fall from 53% to 34%. Kept, none moves the game by more than about 5 points; the champion draws one hex a try:
+16 to 17% across the two runs, inside the 15 to 25% band, and the finale's round with two 12 to 16%. A careful human,
+who is told the waterlogged pin before each frame and can move off a dried track or a heavy tide, wins more.

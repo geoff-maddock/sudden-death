@@ -118,7 +118,7 @@ function blPowNow(s, ri) {
 }
 function blPowIdOf(s, k, ri) {
   if (k === 'pow') { const P = blPowNow(s, ri); return P ? P.id : null; }
-  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? blBowler(s) : ri]; return (BL_ULT[m && m.kind] || BL_ULT.goblin).id; }
+  if (k === 'ult') return blUltOf(s, ri == null ? blBowler(s) : ri).id;
   return k;
 }
 // the last frame's index on the sheet in play, and whether a side's frames so far are all marks
@@ -152,7 +152,7 @@ function blCast(s, k, ri) {
     rec(P.id, P.n); return '';
   }
   if (k === 'ult') {
-    const m = G.teams[s].roster[r], U = BL_ULT[m.kind] || BL_ULT.goblin;
+    const U = blUltOf(s, r);
     G.roar[s] -= BL_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, f: blSlot(s, blCur(s)), ro: G.ro, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     rec(U.id, U.n); return '';
   }
@@ -208,6 +208,6 @@ function blPowerTip(s) {
     if (P.curse) return `Tip: ${P.n} works on their next ball.`;
     if (blIsSplit(st)) return `Tip: a split; ${P.n} helps (${P.desc.toLowerCase()})`;
   }
-  if (!blPowWhy(s, 'ult', ri)) { const U = BL_ULT[G.teams[s].roster[ri].kind] || BL_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this frame.`; }
+  if (!blPowWhy(s, 'ult', ri)) { const U = blUltOf(s, ri); return `Tip: the roar is up; ${U.n} would mark this frame.`; }
   return '';
 }
