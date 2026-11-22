@@ -195,3 +195,4 @@ src/realm/umbral/u4f-golf.js
 src/realm/umbral/u4g-bowling.js
 src/realm/umbral/u4h-curling.js
 src/realm/umbral/u5-finale.js
+src/realm/umbral/u6-rewards.js

@@ -11,7 +11,7 @@
    Win the third, and the Seal is forged: the pieces lock together, the portal closes, the eclipse lifts, and you are
    back in the Crown Coliseum, in daylight (WG.umbral.sealed, the year in sealedYear). Phase 6 hangs the rewards on it.
 
-   W_UMB5, wUmbFinale, wUmbFinaleSports, wUmbSealScene
+   W_UMB5, wUmbFinale, wUmbFinaleEntry, wUmbFinaleSports, wUmbSeal, wUmbSealScene
    Wraps: W_ON_END.nadir (wWU5OnNadir: a finale round's end), wRunAct (wWU5RunAct: PLAY), buildAllMaps
    (wWU5BuildAllMaps: Aurelia in the Hollow Coliseum), wTileAt (wWU5TileAt: the light portal shut once sealed),
    wAudit (wWU5Audit: she is placed, and every piece has its sport). */
@@ -51,19 +51,26 @@ function wUmbFinaleSports() {
 }
 // a piece won at the first try: its round draws one hex fewer
 const wUmbClean = piece => { const U = wUmb(), c = wUmbChampOf(piece); return !!(U && c && U.pieces.includes(piece) && (U.clean || {})[piece]); };
+// the round being played, as a champion's entry (W_NADIR.finale): made from WG.umbral, so a reload mid-round finds it
+function wUmbFinaleEntry() {
+  const U = wUmb(); if (!U) return null;
+  const r = Math.min(U.finale || 0, W_UMB5.rounds - 1), piece = wUmbFinaleSports()[r], eng = W_UMB5.engine[piece];
+  return W_NADIR.finale = Object.assign({ piece: null, finale: r, char: 'nadir_aurelia', region: 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
+    eng ? {} : { ids: W_UMB5.card.ids.slice(), type: W_UMB5.card.type });
+}
 function wUmbFinale() {
   const U = wUmb(); if (!U) return 'Nobody here plays.';
   if (U.sealed) return 'The Seal is forged. Hollow Aurelia is gone, and the stands are empty.';
   const missing = Object.keys(W_UMB_PIECES).filter(p => !U.pieces.includes(p));
   if (missing.length) return `You hold ${U.pieces.length} of the nine pieces. Hollow Aurelia will not play for the Seal until you hold them all (still out: ${missing.map(p => W_UMB_PIECES[p].n).join(', ')}).`;
-  const sports = wUmbFinaleSports(), r = U.finale || 0, piece = sports[r], eng = W_UMB5.engine[piece];
-  W_NADIR.finale = Object.assign({ piece: null, finale: r, char: 'nadir_aurelia', region: 'plains', engine: eng, hexes: W_UMB5.hexes - (wUmbClean(piece) ? 1 : 0), toll: 0, gold: 0 },
-    eng ? {} : { ids: W_UMB5.card.ids.slice(), type: W_UMB5.card.type });
+  const r = U.finale || 0, piece = wUmbFinaleSports()[r];
+  wUmbFinaleEntry();
   wLog(`The Seal, round ${r + 1} of ${W_UMB5.rounds}: ${W_UMB_PIECES[piece].sport}.${wUmbClean(piece) ? ` (You won ${W_UMB_PIECES[piece].n} cleanly: one hex fewer.)` : ''}`, 'b');
   return wNadirMatch('finale');
 }
 const wWU5OnNadir = W_ON_END.nadir;
 W_ON_END.nadir = function (r, ref) {
+  if (ref && ref.id === 'finale' && !W_NADIR.finale) wUmbFinaleEntry();
   const C = ref && W_NADIR[ref.id], U = wUmb();
   if (!C || !('finale' in C) || !U) {
     // a champion's piece won at the first try is a clean win (its finale round draws one hex fewer)

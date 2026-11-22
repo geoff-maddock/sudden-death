@@ -52,7 +52,8 @@ async def main():
           U.clean = { card: 1 }; wUmbFinale(); out.clean = RUN.pending.world.hexes.length; B = null; RUN.pending = null; LAB = false; beginFight = keep;
           W_ON_END.nadir('win', { id: 'finale' }); out.after1 = U.finale;
           __ad.length = 0; wUmbFinale(); out.r2 = __ad.slice(); W_ON_END.nadir('lose', { id: 'finale' }); out.lost = [U.finale, U.tries.finale];
-          wUmbFinale(); W_ON_END.nadir('win', { id: 'finale' }); out.after2 = U.finale;
+          // (a reload mid-round loses the in-memory entry: the result still finds its round)
+          wUmbFinale(); delete W_NADIR.finale; W_ON_END.nadir('win', { id: 'finale' }); out.after2 = U.finale;
           wUmbFinale(); W_ON_END.nadir('win', { id: 'finale' });
           out.sealed = { sealed: !!U.sealed, year: U.sealedYear, map: WG.map, scene: !!document.getElementById('wUmbSealed'), portal: wTileAt(MAPS.umbralden, ...W_UMB.portal.umbralden), eclipse: wUmbEclipse(), again: wUmbFinale() };
           document.getElementById('wUmbSealed').click();
