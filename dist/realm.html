@@ -26463,7 +26463,9 @@ function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0
    A fighter in the ring, plain JSON: { side, n, kind, num, r, style, x, y, hp, hpMax, sta, staMax, a, mv, plan, ... }.
    hp falls when they're hit and zero is a knockdown; big shots also lower hpMax, the most they can get back, so each
    knockdown comes easier than the last. sta pays for punches and comes back off the gas. a is what they're doing now
-   ({ k, t, dur, hitAt, id }), mv where they want to move. */
+   ({ k, t, dur, hitAt, id }), mv where they want to move.
+   A Nadir fighter (issue #99, phase 4c) may bring three things more, all plain JSON: umb (their umbral form: drawn in
+   shadow), pw (their own powers, { sp, ult }, in place of their kind's) and tr (their own nature, in place of their kind's). */
 const BX_STATS = ['reach', 'pow', 'spd', 'chin', 'sta', 'gui'];
 const BX_KIND = {
   goblin: [4, 5, 8, 4, 7, 8], kobold: [4, 5, 7, 5, 8, 7], werewolf: [6, 8, 8, 4, 6, 4], dwarf: [3, 7, 4, 7, 7, 5],
@@ -26498,19 +26500,24 @@ const BX_TRAIT = {
   ogre:     { n: 'Heavy Breather', desc: 'Gets its breath back a little more slowly.', regen: .92 },
   zombie:   { n: 'Rotting', desc: 'Big shots take more off the most health it can get back.', rot: 1.6 },
 };
-const bxTrait = f => BX_TRAIT[f.kind] || null;
+// (a fighter may bring a nature of its own, f.tr: a Nadir champion's, issue #99)
+const bxTrait = f => f.tr || BX_TRAIT[f.kind] || null;
 const BX_HP = 100;
 const bxStaMax = r => Math.round(68 + r.sta * 4.5); // the most stamina a fighter has, from their stamina rating
 /* the fighter for side from { n, kind, num, r?, style?, lvl?, rec? } (r: ratings to lay over the kind's; style: a plan
    to box to; lvl and rec, their level and record { bb, w, l, d, ko }, only for the intro to show) */
 function bxFighter(p, side) {
   const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = bxStaMax(r), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
-  return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
+  const f = { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
     // gear (13-kit.js): its name, and what it does beyond the ratings (already laid on r)
     gear: p.gear && p.gear.name ? p.gear.name : null, gx: p.gear && p.gear.fx ? JSON.parse(JSON.stringify(Object.assign({}, p.gear.fx, { r: undefined }))) : null,
     a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false, spPick: p.sp === 'sp2' ? 'sp2' : 'sp', spirit: BX_SPIRIT.start,
     rs: bxStatsZero(), bs: bxStatsZero() };
+  if (p.umb) f.umb = 1;
+  if (p.pw) f.pw = JSON.parse(JSON.stringify(p.pw));
+  if (p.tr) f.tr = JSON.parse(JSON.stringify(p.tr));
+  return f;
 }
 // a round's (rs) or bout's (bs) work: punches thrown and landed, power punches landed, damage done, defense as the
 // judges count it (a slip 1, a block half), punches slipped and blocked, seconds pressing forward, clinches started,
@@ -26533,7 +26540,8 @@ function bxStatsZero() { return { thrown: 0, landed: 0, power: 0, dmg: 0, def: 0
    Powers (11-powers.js) leave statuses that change all of this: quicker or slower, rooted, harder to hit, hitting
    harder, healing on what lands, and the rest (bxFx); a punch's damage goes through bxHurt, which knows them.
    Every punch, slip, block and knockdown is told to BXE ({ k, side, p, n, ctr }), which the page drains for its
-   words and the bout for its log; it is not saved. */
+   words and the bout for its log; it is not saved.
+   Hexes (14-hexes.js) move the ropes in (bxRope) and make a punch dearer for the hexed side (bxHex). */
 const BX_DT = .05;
 const BX_RING = { half: 9, rope: 8.3, body: 1.55, back: .6, ropes: .7 };
 const BX_PUNCH = {
@@ -26549,14 +26557,14 @@ let BXE = [];
 
 const bxFrac = f => clamp(f.sta / f.staMax, 0, 1);
 const bxDist = (a, b) => hyp(a.x - b.x, a.y - b.y);
-const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range + (k === 'jab' && BX_TRAIT[f.kind] && BX_TRAIT[f.kind].jabReach || 0);
+const bxRange = (f, k) => (1.95 + f.r.reach * .18) * BX_PUNCH[k].range + (k === 'jab' && (bxTrait(f) || {}).jabReach || 0);
 // how long everything takes: quicker for the fast, slower when tired
 const bxTempo = f => (1.08 - f.r.spd * .015) * (1 + .5 * (1 - bxFrac(f))) / bxFx(f).spd;
 const bxMoveSpd = f => (2.6 + f.r.spd * .2) * (.6 + .4 * bxFrac(f)) * bxFx(f).move;
 const bxPunching = f => !!BX_PUNCH[f.a.k];
 const bxBusy = f => f.a.k !== 'idle' && f.a.k !== 'guard';
 const bxMass = f => { const K = KIND[f.kind] || KIND.goblin; return K.w * K.h; };
-const bxOnRopes = f => Math.max(Math.abs(f.x), Math.abs(f.y)) > BX_RING.rope - .15;
+const bxOnRopes = f => Math.max(Math.abs(f.x), Math.abs(f.y)) > bxRope() - .15;
 function bxEv(k, side, o) {
   const e = Object.assign({ k, side, round: G.round }, o || {}); BXE.push(e); if (BXE.length > 60) BXE.shift();
   // (the page hears each one as it happens, for its sounds: never headless)
@@ -26569,7 +26577,7 @@ function bxAct(f, k) {
   const P = BX_PUNCH[k], tm = bxTempo(f);
   if (P) {
     if (f.sta < P.sta * .5) return false;
-    f.sta = Math.max(0, f.sta - P.sta); f.rs.thrown++;
+    f.sta = Math.max(0, f.sta - P.sta * (bxHex(f, 'lead') ? BX_HEXES.lead.sta : 1)); f.rs.thrown++;
     f.a = { k, t: 0, dur: P.dur * tm, hitAt: P.hit * tm, id: ++G.aid, done: false, ctr: f.ctr > 0 }; f.ctr = 0;
     return true;
   }
@@ -26597,7 +26605,8 @@ function bxBreak() {
   const [A, B] = G.F; let dx = B.x - A.x, dy = B.y - A.y; const d = hyp(dx, dy) || 1; dx /= d; dy /= d;
   const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, h = BX_CLINCH.gap / 2;
   A.x = mx - dx * h; A.y = my - dy * h; B.x = mx + dx * h; B.y = my + dy * h;
-  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; f.x = clamp(f.x, -BX_RING.rope, BX_RING.rope); f.y = clamp(f.y, -BX_RING.rope, BX_RING.rope); }
+  const rp = bxRope();
+  for (const f of G.F) { f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; f.x = clamp(f.x, -rp, rp); f.y = clamp(f.y, -rp, rp); }
   bxEv('break', -1);
 }
 /* a's punch k arrives: out of range, slipped, missed, blocked or landed */
@@ -26675,7 +26684,8 @@ function bxMove(dt) {
   const [A, B] = G.F; let dx = B.x - A.x, dy = B.y - A.y; const d = hyp(dx, dy) || .001;
   // the bigger body gives less ground
   if (d < BX_RING.body) { const ma = bxMass(A), mb = bxMass(B), push = BX_RING.body - d; dx /= d; dy /= d; A.x -= dx * push * mb / (ma + mb); A.y -= dy * push * mb / (ma + mb); B.x += dx * push * ma / (ma + mb); B.y += dy * push * ma / (ma + mb); }
-  for (const f of G.F) { f.x = clamp(f.x, -BX_RING.rope, BX_RING.rope); f.y = clamp(f.y, -BX_RING.rope, BX_RING.rope); }
+  const rp = bxRope();
+  for (const f of G.F) { f.x = clamp(f.x, -rp, rp); f.y = clamp(f.y, -rp, rp); }
 }
 /* one step of the round: both fighters think (06-cpu.js), act, breathe and move */
 function bxStep(dt) {
@@ -26693,7 +26703,10 @@ function bxStep(dt) {
    plan) and slip it or cover up. Otherwise every fraction of a second (quicker with guile) they pick where to move (in
    or out to the plan's range, circling once there, off the ropes) and whether to punch, cover or clinch. A slip opens
    a counter window, and a counterpuncher waits for one. Tired fighters back off and throw less; hurt ones tie up.
-   G.skill[side] (0 to 2) sharpens the reading and the timing.
+   G.skill[side] (0 to 2) sharpens the reading and the timing. 3 is the Lich (the Umbral's tier U, issue #99): as
+   sharp as an Archmage, but it decides better (BX_LICH; test/realm_ring_lab.py measures it against an Archmage): it slips body shots (a guard doesn't stop them), digs to the body of a fighter who
+   covers up, steps on the gas when the other fighter is hurt, tired or on the ropes, saves its breath for the hooks
+   that count, ties up sooner when hurt, and in the corner picks the plan that beats the other fighter's.
    A fighter boxed by hand (09-hands.js) does none of the thinking but the footwork, and only while you don't steer. */
 const BX_PLAN = {
   press:   { n: 'Press',     desc: 'Walk them down and stay in their face.',          range: .55, rate: 1.15, mix: { jab: .35, hook: .4, body: .25 }, def: .7 },
@@ -26709,53 +26722,76 @@ function bxThink(f, o, dt) {
   if (bxHand(f) && BXI.q && (BXI.qt += dt) > BX_BUFFER) BXI.q = null;
   if (f.a.k === 'down' || f.a.k === 'clinch' || f.a.k === 'stun') { f.mv = [0, 0]; return; }
   if (bxHand(f)) return bxHandThink(f, o, dt);
-  const skill = G.skill ? G.skill[f.side] : 1, P = BX_PLAN[f.plan] || BX_PLAN.press;
+  const skill = G.skill ? G.skill[f.side] : 1, P = BX_PLAN[f.plan] || BX_PLAN.press, lich = skill >= 3;
   // a punch on its way, seen once
   if (bxPunching(o) && !o.a.done && o.a.id !== f.seen && !bxBusy(f)) {
     f.seen = o.a.id;
     if (bxDist(f, o) < bxRange(o, o.a.k) + .4) {
-      const p = bxFx(f).sight ? .9 : clamp((.1 + f.r.gui * .018 + skill * .06) * P.def, 0, .7);
+      const p = bxFx(f).sight ? .9 : clamp((.1 + f.r.gui * .018 + Math.min(skill, 2) * .06) * P.def, 0, lich ? BX_LICH.read : .7);
       if (R() < p) {
-        const slip = R() < clamp(.3 + f.r.gui * .03 + (P.slip || 0) - (BX_PUNCH[o.a.k].head ? 0 : .3), .05, .9);
+        const slip = lich ? !BX_PUNCH[o.a.k].head || R() < BX_LICH.slip : R() < clamp(.3 + f.r.gui * .03 + (P.slip || 0) - (BX_PUNCH[o.a.k].head ? 0 : .3), .05, .9);
         bxAct(f, slip ? 'slip' : 'guard'); return;
       }
     }
   }
   f.think -= dt; if (f.think > 0) return;
-  f.think = Math.max(.1, .3 - f.r.gui * .006 - skill * .03) * (.8 + R() * .4);
+  f.think = Math.max(.1, .3 - f.r.gui * .006 - Math.min(skill, 2) * .03) * (.8 + R() * .4);
   const tired = bxFrac(f) < .22, hurt = f.hp < f.hpMax * .3, { d, want } = bxFeet(f, o);
   if (bxBusy(f)) return;
   if (bxCpuCast(f, o)) return;
   // cover up, tie up
-  if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? .2 : 0)) { bxClinch(f, o); return; }
+  if ((P.clinch || hurt || tired) && d < BX_CLINCH.near && R() < (P.clinch ? .3 : .15) + (hurt ? (lich ? BX_LICH.tie : .2) : 0)) { bxClinch(f, o); return; }
   if (P.guard && R() < P.guard * (tired ? 1.3 : 1)) { bxAct(f, 'guard'); return; }
   // a punch in range, at the plan's rate; a counter window says now
   // (a power punch only from well inside its range: it is slow enough that a fighter backing off gets out of it)
   const can = BX_PUNCH_IDS.filter(k => d <= bxRange(f, k) * (BX_PUNCH[k].power ? .95 : 1) + .05 && f.sta >= BX_PUNCH[k].sta);
   if (!can.length) { if (f.a.k === 'guard' && R() < .5) bxAct(f, 'idle'); return; }
   // still coming in to the plan's range: mostly moving, not punching
-  const rate = P.rate * (.5 + f.r.spd * .015) * (tired ? .4 : 1) * (f.ctr > 0 ? 2.5 : 1) * (P.wait && !f.ctr && !bxPunching(o) ? .5 : 1) * (d > want + .45 ? .35 : 1);
-  if (R() < rate) { const w = {}; for (const k of can) w[k] = P.mix[k] * (o.a.k === 'guard' && k === 'body' ? 2 : 1); bxAct(f, wpick(w)); }
+  // (a Lich steps on the gas when the other fighter is open: hurt, stunned, tired or on the ropes)
+  const open = lich && (o.a.k === 'stun' || o.a.k === 'grab' || bxFrac(o) < .25 || o.hp < o.hpMax * .35 || bxOnRopes(o));
+  const rate = P.rate * (.5 + f.r.spd * .015) * (tired ? .4 : 1) * (f.ctr > 0 ? 2.5 : 1) * (P.wait && !f.ctr && !bxPunching(o) ? .5 : 1) * (d > want + .45 ? .35 : 1) * (open ? BX_LICH.gas : 1);
+  if (R() < rate) { const w = {}; for (const k of can) w[k] = P.mix[k] * (o.a.k === 'guard' && k === 'body' ? 2 : 1) * (lich ? bxLichMix(f, o, k, open) : 1); bxAct(f, wpick(w)); }
   else if (R() < .22 * P.def) bxAct(f, 'guard');
+}
+/* the Lich (skill 3): its numbers, and its mix: to the body of a fighter covering up (the guard stops none of it) and
+   not into the guard upstairs, the hook when they are open, and few hooks (the dearest punch) when short of breath,
+   unless it's a counter */
+const BX_LICH = { read: .75, slip: .65, tie: .35, gas: 1.3, guardBody: 2, guardHook: .4, openHook: 1.4, saveHook: .35, save: .35, patch: .7, potion: 2.5 };
+function bxLichMix(f, o, k, open) {
+  let m = 1;
+  if (o.a.k === 'guard') m *= k === 'body' ? BX_LICH.guardBody : k === 'hook' ? BX_LICH.guardHook : 1;
+  if (open && k === 'hook') m *= BX_LICH.openHook;
+  if (k === 'hook' && !f.ctr && bxFrac(f) < BX_LICH.save) m *= BX_LICH.saveHook;
+  return m;
+}
+/* the Lich's read of the other fighter, for its plan in the corner: a presser is countered, a fighter who stays away
+   is walked down, and a counterpuncher or one covering up is worked to the body. null: nothing to read */
+function bxLichRead(f, o) {
+  const p = o.plan;
+  if (p === 'press' && f.r.gui >= 5) return { plan: 'counter', why: 'they come forward: make them miss and pay' };
+  if (p === 'away') return { plan: 'press', why: 'they keep away: cut the ring off' };
+  if (p === 'counter' || p === 'cover') return { plan: 'body', why: p === 'cover' ? 'they cover up: dig under the guard' : 'they wait to counter: go to the body' };
+  return null;
 }
 /* the footwork: f.mv toward the range the plan wants (further when tired). Returns { d, want } */
 function bxFeet(f, o) {
   const P = BX_PLAN[f.plan] || BX_PLAN.press, d = bxDist(f, o), dx = (o.x - f.x) / (d || 1), dy = (o.y - f.y) / (d || 1);
   const want = bxRange(f, 'jab') * (bxFrac(f) < .22 ? 1.25 : P.range);
   // where to: in or out to the plan's range, circling once there (now and then the other way), off the ropes
+  // (the ropes where they are now: a hex can move them in, 14-hexes.js; k is 1 otherwise)
   let mx = 0, my = 0;
-  const edge = Math.max(Math.abs(f.x), Math.abs(f.y));
+  const edge = Math.max(Math.abs(f.x), Math.abs(f.y)), k = bxRope() / BX_RING.rope;
   if (d > want + .25) { mx = dx; my = dy; } else if (d < want - .25) { mx = -dx; my = -dy; }
-  if (Math.abs(d - want) < .6 || edge > 6.2 || R() < .3) {
+  if (Math.abs(d - want) < .6 || edge > 6.2 * k || R() < .3) {
     if (!f.n2 || R() < .08) f.n2 = R() < .5 ? 1 : -1;
     // near the ropes they pivot off them toward the middle; otherwise, lined up front to back, they circle back side
     // by side (the ring is seen from the side)
-    if (edge > 6.2) f.n2 = Math.sign(dy * f.x - dx * f.y) || f.n2;
+    if (edge > 6.2 * k) f.n2 = Math.sign(dy * f.x - dx * f.y) || f.n2;
     else if (Math.abs(dy) > .45) f.n2 = Math.sign(dx * dy) || f.n2;
     mx += -dy * f.n2 * .7; my += dx * f.n2 * .7;
   }
   // away from the ropes and corners, toward the middle (harder once they are on them)
-  if (edge > 4) { const k = bxOnRopes(f) ? .18 : .08; mx -= f.x * k; my -= f.y * k; }
+  if (edge > 4 * k) { const k = bxOnRopes(f) ? .18 : .08; mx -= f.x * k; my -= f.y * k; }
   f.mv = [mx, my];
   return { d, want };
 }
@@ -26764,14 +26800,15 @@ function bxFeet(f, o) {
    the other fighter is fading; otherwise their own style. A patch (the cut-man) when they're down to two thirds. Before
    the first round it is their style. */
 function bxCornerCpu(f) {
-  const o = G.F[1 - f.side], T = bxTotals(), lead = T.reduce((n, t) => n + Math.sign(f.side ? t[1] - t[0] : t[0] - t[1]), 0), last = G.round === G.rounds;
+  const o = G.F[1 - f.side], lich = !!G.skill && G.skill[f.side] >= 3, T = bxTotals(), lead =T.reduce((n, t) => n + Math.sign(f.side ? t[1] - t[0] : t[0] - t[1]), 0), last = G.round === G.rounds;
   let plan = f.style, why = 'it suits them';
   if (!G.cards.length) why = 'it suits them';
   else if (last && lead < 0) { plan = 'press'; why = 'behind on the cards, last round'; }
   else if (f.hp < f.hpMax * .45 || f.hpMax < 55) { plan = 'cover'; why = 'hurt: get the legs back'; }
   else if (last && lead >= 2) { plan = f.style === 'press' ? 'counter' : 'away'; why = 'ahead on the cards: stay safe'; }
   else if (o.hpMax < 60 || o.hp < 40) { plan = 'press'; why = 'the other fighter is fading'; }
-  return { plan, patch: f.patches > 0 && f.hp < f.hpMax * .67, why };
+  else if (lich) { const L = bxLichRead(f, o); if (L) { plan = L.plan; why = L.why; } }
+  return { plan, patch: f.patches > 0 && f.hp < f.hpMax * (lich ? BX_LICH.patch : .67), why };
 }
 /* The Anvil Ring: a bout (issue #23, phase 1). BD runs it in beats (BD.ph): the intro, each round on the clock, the
    count after a knockdown, the fighter rising, the corner between rounds, and the end. The round clock stops for the
@@ -26805,7 +26842,8 @@ let BD = null;
 const BX_HOOK = { onOver: null, onPhase: null, onSnap: null, wantSnap: null, onEv: null };
 
 /* a bout in the ring. opts: { fighters: [2 × { n, kind, num, r?, style? }], corners: [2 × { name, short, color, light }],
-   mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..2, 0..2], powers (false: none), headless } */
+   mode: 'watch' | 'call' | 'play', you: 0 | 1, seed, skill: [0..3, 0..3] (3: the Lich, 06-cpu.js), powers (false: none),
+   headless, hexes: [BX_HEXES ids] and hexOn: the side they are against (0 when not given; 14-hexes.js) } */
 const BX_MODES = ['watch', 'call', 'play'];
 function bxStart(opts) {
   const o = opts || {};
@@ -26813,8 +26851,11 @@ function bxStart(opts) {
   G.corners = (o.corners || BX_CLUBS).map((c, i) => Object.assign({}, BX_CLUBS[i], c));
   G.F = o.fighters.map((p, s) => bxFighter(p, s));
   for (const f of G.F) if (!BX_PLAN[o.fighters[f.side].style]) f.style = f.plan = bxStyle(f.r, G.F[1 - f.side].r);
+  // (a Lich corner reads the other fighter before the first bell: 06-cpu.js)
+  for (const f of G.F) if (o.skill && o.skill[f.side] >= 3) { const L = bxLichRead(f, G.F[1 - f.side]); if (L) f.plan = L.plan; }
   Object.assign(G, { powers: o.powers !== false, aid: 0, down: null, skill: (o.skill || [1, 1]).slice(), work: [], rstats: [], plans: [G.F.map(f => f.plan)], log: [], secs: 0,
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [] });
+  bxHexStart(o);
   bxFansStart(o.fans); G.crowd = engCrowd(o);
   // gear with a status at the opening bell (13-kit.js)
   for (const f of G.F) { const op = bxGx(f).open; if (op) f.fx.push(Object.assign({ id: 'g_open' }, op)); }
@@ -26827,7 +26868,7 @@ function bxStart(opts) {
 function bxPh(ph) { BD.ph = ph; BD.t = 0; if (!BD.headless && BX_HOOK.onPhase) BX_HOOK.onPhase(ph); }
 function bxLog(msg, big) { G.log.push({ r: G.round, t: Math.round((BX_RULES.secs - G.clock) * 10) / 10, msg, big: !!big }); }
 // both fighters back in their corners, facing out of them
-function bxCornerSpots() { const [A, B] = G.F; Object.assign(A, { x: -6.8, y: -5.6, mv: [0, 0] }); Object.assign(B, { x: 6.8, y: 5.6, mv: [0, 0] }); for (const f of G.F) f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; }
+function bxCornerSpots() { const [A, B] = G.F, k = bxRope() / BX_RING.rope; Object.assign(A, { x: -6.8 * k, y: -5.6 * k, mv: [0, 0] }); Object.assign(B, { x: 6.8 * k, y: 5.6 * k, mv: [0, 0] }); for (const f of G.F) f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid }; }
 const bxName = s => G.F[s].n;
 
 // the page's clock: real seconds into beats
@@ -26854,7 +26895,7 @@ function bxBeat(dt) {
       }
       break;
     case 'rise': if (BD.t >= BX_BEAT.rise) bxPh('round'); break;
-    case 'corner': if (BD.t >= BX_BEAT.corner && !G.wait) { bxLog(`Round ${G.round}.`); bxPh('round'); } break;
+    case 'corner': if (BD.t >= BX_BEAT.corner && !G.wait) { bxLog(`Round ${G.round}.`); if (bxHex(null, 'shrink')) bxLog('The ropes close in.'); bxPh('round'); } break;
   }
 }
 // what happened this step, for the log (the page reads BXE itself first, for its words)
@@ -26878,7 +26919,7 @@ function bxDown() {
   const n = G.kd[s], score = f.r.chin * .5 + f.hpMax / 25 - (n - 1) * 2.6 + gauss() * 1.6;
   // gear's seconds off the count, and smelling salts (once: 13-kit.js)
   const quick = (bxGx(f).rise || 0) + (f.salts || 0); if (f.salts) { f.salts = 0; bxLog(`The smelling salts clear ${f.n}'s head.`); }
-  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0) - quick, 2, BX_RULES.count); BD.count = 1;
+  BD.getUp = clamp(Math.round(10.5 - score) + ((bxTrait(f) || {}).rise || 0) + (bxHex(f, 'count') ? BX_HEXES.count.rise : 0) - quick, 2, BX_RULES.count); BD.count = 1;
   // Rebirth (a superstar's nature): once a bout, a count it would not beat, it beats at nine, and rises with most of its health
   if (BD.getUp >= BX_RULES.count && (bxTrait(f) || {}).reborn && !f.reborn) { f.reborn = 1; BD.getUp = BX_RULES.count - 1; }
   bxPh('kd');
@@ -26890,7 +26931,7 @@ function bxRise() {
   else bxLog(`${f.n} is up at ${BD.getUp}.`);
   // the other fighter to a neutral corner's distance, and on again
   const dx = o.x - f.x, dy = o.y - f.y, d = hyp(dx, dy) || 1;
-  o.x = clamp(f.x + dx / d * 3.2, -BX_RING.rope, BX_RING.rope); o.y = clamp(f.y + dy / d * 3.2, -BX_RING.rope, BX_RING.rope);
+  const rp = bxRope(); o.x = clamp(f.x + dx / d * 3.2, -rp, rp); o.y = clamp(f.y + dy / d * 3.2, -rp, rp);
   G.down = null;
   bxPh('rise');
 }
@@ -26910,7 +26951,9 @@ function bxRoundEnd() {
 }
 function bxCorner() {
   for (const f of G.F) {
-    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35)); f.sta = (bxTrait(f) || {}).corner ? f.staMax : f.sta + (f.staMax - f.sta) * .75; f.ctr = 0; f.halt = 0;
+    // (tainted water, 14-hexes.js: the hexed side gets back only a share of what the break would give)
+    const wat = bxHex(f, 'water') ? BX_HEXES.water.corner : 1;
+    f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35) * wat); f.sta = (bxTrait(f) || {}).corner ? (wat < 1 ? f.sta + (f.staMax - f.sta) * wat : f.staMax) : f.sta + (f.staMax - f.sta) * .75 * wat; f.ctr = 0; f.halt = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
     if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
@@ -27001,6 +27044,9 @@ function bxSimBout(opts) {
    (the better of each pair lit) and their work so far this bout; at the top in the middle the judges' running totals,
    with the round on now scored as it stands (bxLive: the judges' weights without their own eye, so drawing never
    draws from the seeded stream; the real card at the bell can differ in a close round).
+   Hexes (issue #99, 14-hexes.js): named on the tale of the tape and the corner card, and under the clock in a round;
+   the Shrinking Ring's ropes and posts stand where the ropes are now. A Nadir fighter in umbral form (f.umb) is drawn
+   drained of colour over a violet shadow.
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -27066,15 +27112,16 @@ function bxDrawPost(c, x, y, col) {
   rr(c, p.x - 6 * p.k, bxProj(x, y, 80).y, 12 * p.k, bxProj(x, y, 26).y - bxProj(x, y, 80).y, 3); c.fill();
 }
 function bxDrawRing(c, part) {
-  const H = BX_RING.half, ropeH = [30, 52, 74];
+  // (the canvas is always the whole ring; the ropes and posts stand where the ropes are now: the Shrinking Ring moves them in)
+  const H0 = BX_RING.half, H = H0 - (BX_RING.rope - bxRope()), ropeH = [30, 52, 74], post = ([x, y, col]) => bxDrawPost(c, x * H / H0, y * H / H0, col);
   if (part === 'back') {
     // the platform's skirt, then the canvas
-    const fl = bxProj(-H - .6, H + .6), fr = bxProj(H + .6, H + .6);
+    const fl = bxProj(-H0 - .6, H0 + .6), fr = bxProj(H0 + .6, H0 + .6);
     c.fillStyle = '#3a1612'; c.beginPath(); c.moveTo(fl.x, fl.y); c.lineTo(fr.x, fr.y); c.lineTo(fr.x, fr.y + 36); c.lineTo(fl.x, fl.y + 36); c.closePath(); c.fill();
     txt(c, 'THE ANVIL RING', 480, fl.y + 25, '800 16px "Alegreya Sans", sans-serif', 'rgba(255,208,160,.55)', 'center');
-    const q = [bxProj(-H - .6, -H - .6), bxProj(H + .6, -H - .6), bxProj(H + .6, H + .6), bxProj(-H - .6, H + .6)];
+    const q = [bxProj(-H0 - .6, -H0 - .6), bxProj(H0 + .6, -H0 - .6), bxProj(H0 + .6, H0 + .6), bxProj(-H0 - .6, H0 + .6)];
     c.fillStyle = '#2a1d17'; c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
-    const f = [bxProj(-H, -H), bxProj(H, -H), bxProj(H, H), bxProj(-H, H)];
+    const f = [bxProj(-H0, -H0), bxProj(H0, -H0), bxProj(H0, H0), bxProj(-H0, H0)];
     const g = c.createLinearGradient(0, f[0].y, 0, f[2].y); g.addColorStop(0, '#b9ad97'); g.addColorStop(.5, '#d4c9b2'); g.addColorStop(1, '#c4b89f');
     c.fillStyle = g; c.beginPath(); f.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
     // scorch at the edges, and an anvil in the middle
@@ -27084,11 +27131,11 @@ function bxDrawRing(c, part) {
     // the back and side ropes, and the back posts
     c.lineWidth = 2.2;
     ropeH.forEach((h, i) => { c.strokeStyle = BX_ROPE[i]; bxRopeLine(c, [-H, -H], [H, -H], h); bxRopeLine(c, [-H, -H], [-H, H], h); bxRopeLine(c, [H, -H], [H, H], h); });
-    for (const [x, y, col] of BX_POSTS.slice(0, 2)) bxDrawPost(c, x, y, col);
+    BX_POSTS.slice(0, 2).forEach(post);
   } else {
     c.lineWidth = 2.8;
     ropeH.forEach((h, i) => { c.strokeStyle = BX_ROPE[i]; bxRopeLine(c, [-H, H], [H, H], h); });
-    for (const [x, y, col] of BX_POSTS.slice(2)) bxDrawPost(c, x, y, col);
+    BX_POSTS.slice(2).forEach(post);
   }
 }
 /* a fighter's pose from what they're doing (in figure units, facing right; the lead hand is armR) */
@@ -27112,12 +27159,10 @@ function bxDrawFighter(c, f, o) {
   const p = bxProj(f.x, f.y), flip = bxProj(o.x, o.y).x < p.x, team = G.corners[f.side], hpx = 92 * p.k;
   const F = bxFx(f), stone = (f.a.k === 'stun' && f.a.stone) || F.rampart || F.dmgIn < .6;
   const opt = { glove: team.color, pose: bxPose(f), flip, num: '', stone, alpha: F.miss ? .38 : null };
-  if (F.root || F.noBack || F.move < .6) { c.save(); c.strokeStyle = 'rgba(236,232,220,.7)'; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + BXT.t * .3; c.beginPath(); c.moveTo(p.x, p.y - 4); c.lineTo(p.x + Math.cos(a) * 26 * p.k, p.y + Math.sin(a) * 6 * p.k); c.stroke(); } c.restore(); }
-  if (f.a.k === 'down') {
-    const e = Math.min(1, f.a.t / .35);
-    ell(c, p.x + (flip ? 1 : -1) * 40 * p.k * e, p.y, 46 * p.k, 7 * p.k, 'rgba(0,0,0,.35)');
-    c.save(); c.translate(p.x, p.y); c.rotate((flip ? 1 : -1) * 1.45 * e); drawFig(c, f.kind, 0, 0, hpx, team, Object.assign(opt, { noShadow: true })); c.restore();
-  } else drawFig(c, f.kind, p.x, p.y, hpx, team, opt);
+  // an umbral form (a Nadir fighter, issue #99): a violet shadow at their feet, and drawn drained of colour
+  if (f.umb) { ell(c, p.x, p.y, 40 * p.k, 9 * p.k, 'rgba(120,80,190,.35)'); c.save(); c.filter = 'saturate(.3) brightness(.72) contrast(1.15)'; }
+  bxDrawBody(c, f, p, flip, team, hpx, opt);
+  if (f.umb) c.restore();
   // a counter window: a glint at the gloves
   if (f.ctr > 0 && f.a.k !== 'down') { c.save(); c.globalAlpha = Math.min(1, f.ctr * 3); txt(c, '✦', p.x + (flip ? -1 : 1) * 30 * p.k, p.y - 92 * p.k, `${14 * p.k}px sans-serif`, '#ffe9a0', 'center'); c.restore(); }
   // yours: a marker over them
@@ -27125,6 +27170,16 @@ function bxDrawFighter(c, f, o) {
     const y = p.y - 112 * p.k; c.save(); c.fillStyle = '#ffd24a'; c.beginPath(); c.moveTo(p.x - 6, y - 8); c.lineTo(p.x + 6, y - 8); c.lineTo(p.x, y); c.closePath(); c.fill();
     txt(c, BD.mode === 'play' ? 'you' : 'yours', p.x, y - 11, '700 11px "Alegreya Sans", sans-serif', '#ffd24a', 'center'); c.restore();
   }
+}
+// the figure itself: threads at the feet when rooted, then standing or down
+function bxDrawBody(c, f, p, flip, team, hpx, opt) {
+  const F = bxFx(f);
+  if (F.root || F.noBack || F.move < .6) { c.save(); c.strokeStyle = 'rgba(236,232,220,.7)'; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + BXT.t * .3; c.beginPath(); c.moveTo(p.x, p.y - 4); c.lineTo(p.x + Math.cos(a) * 26 * p.k, p.y + Math.sin(a) * 6 * p.k); c.stroke(); } c.restore(); }
+  if (f.a.k === 'down') {
+    const e = Math.min(1, f.a.t / .35);
+    ell(c, p.x + (flip ? 1 : -1) * 40 * p.k * e, p.y, 46 * p.k, 7 * p.k, 'rgba(0,0,0,.35)');
+    c.save(); c.translate(p.x, p.y); c.rotate((flip ? 1 : -1) * 1.45 * e); drawFig(c, f.kind, 0, 0, hpx, team, Object.assign(opt, { noShadow: true })); c.restore();
+  } else drawFig(c, f.kind, p.x, p.y, hpx, team, opt);
 }
 // while the bout waits for your corner: what they'd do, and why
 function bxDrawAsk(c, y) {
@@ -27196,7 +27251,10 @@ function bxDrawBar(c) {
   const live = BD.ph === 'round' || BD.ph === 'kd' || BD.ph === 'rise';
   txt(c, BD.ph === 'over' ? 'FINAL' : `ROUND ${G.round} of ${G.rounds}`, 480, 26, '800 13px "Alegreya Sans", sans-serif', '#c9b99c', 'center');
   txt(c, BD.ph === 'intro' ? `0:${String(BX_RULES.secs).padStart(2, '0')}` : `0:${String(Math.ceil(G.clock)).padStart(2, '0')}`, 480, 60, '800 30px "Alegreya Sans", sans-serif', live ? '#fff4dc' : '#8a7c68', 'center');
-  txt(c, { intro: 'Touch gloves', round: '', kd: 'Knockdown', rise: 'Box on', corner: 'Between rounds', over: '' }[BD.ph], 480, 80, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  const ph = { intro: 'Touch gloves', round: '', kd: 'Knockdown', rise: 'Box on', corner: 'Between rounds', over: '' }[BD.ph];
+  // the hexes (14-hexes.js) under the clock while nothing else is there
+  if (!ph && G.hex) txt(c, `Hex: ${bxHexWords()}`, 480, 80, '700 11px "Alegreya Sans", sans-serif', '#c8b8ff', 'center');
+  else txt(c, ph, 480, 80, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 /* the bout at a glance: each fighter's ratings and work this bout (rounds done and the round on now), and each judge's
    totals with the round on now as it stands. round is null between rounds and at the end */
@@ -27248,9 +27306,9 @@ function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, 
    it shows, as words (the tests read it) */
 const BX_STAT_WORD = { reach: 'reach', pow: 'power', spd: 'speed', chin: 'chin', sta: 'stamina', gui: 'guile' };
 function bxIntroTape() {
-  const one = f => { const L = f.rec, P = bxPowOn() && BX_POW[f.kind], T = bxTrait(f);
+  const one = f => { const L = f.rec, P = bxPowOf(f, 'ult'), T = bxTrait(f);
     return { n: f.n, sub: [f.lvl ? `level ${f.lvl}` : '', T ? T.n : ''].filter(Boolean).join(', '), r: Object.assign({}, f.r),
-      pow: P ? `${bxPowOf(f, 'sp').n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
+      pow: P ? `${bxPowOf(f, 'sp').n} / ${P.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
   return G.F.map(one);
 }
 function bxDrawIntro(c) {
@@ -27267,6 +27325,7 @@ function bxDrawIntro(c) {
     const y = 348 + i * 20;
     txt(c, A[f], col[0], y, F(0, 13), '#e8dcc0', 'center'); txt(c, k, 480, y, F(0, 12), dim, 'center'); txt(c, B[f], col[1], y, F(0, 13), '#e8dcc0', 'center');
   });
+  if (G.hex) txt(c, `Hexes: ${bxHexWords(true)}`, 480, 388, F(700, 13), '#c8b8ff', 'center');
   if (G.wait) bxDrawAsk(c, 406);
   else txt(c, `red corner: ${BX_PLAN[G.F[0].plan].n}  ·  blue corner: ${BX_PLAN[G.F[1].plan].n}`, 480, 406, F(0, 12), dim, 'center');
 }
@@ -27275,6 +27334,7 @@ function bxDrawCorner(c) {
   bxPanel(c, 230, 270, 500, 110);
   txt(c, `End of round ${n}`, 480, 295, '800 18px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_JUDGES.forEach((J, j) => txt(c, `${J.n}  ${sc[j][0]}-${sc[j][1]}  (${T[j][0]}-${T[j][1]})`, 340 + j * 140, 322, '14px "Alegreya Sans", sans-serif', '#e8dcc0', 'center'));
+  if (G.hex) txt(c, `Hexes: ${bxHexWords(true)}${bxHex(null, 'shrink') ? ` (the ropes at ${Math.round(bxRope() * 10) / 10} ft)` : ''}`, 480, 372, '700 12px "Alegreya Sans", sans-serif', '#c8b8ff', 'center');
   if (G.wait) bxDrawAsk(c, 352);
   else txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
@@ -27368,7 +27428,7 @@ function bxCardAuto(mine, theirs) {
   return best;
 }
 /* a card in the ring. opts: { sides: [2 × side], picks: [your fighter index × 3] (the corner's when not given),
-   order: [their fighter index × 3] (their first three when not given), mode, you, seed, powers, skill } */
+   order: [their fighter index × 3] (their first three when not given), mode, you, seed, powers, skill, hexes, hexOn } */
 function bxCardStart(opts) {
   const o = opts || {}, you = o.you === 1 ? 1 : 0, S = o.sides.map(s => Object.assign({}, s, { fighters: s.fighters.map(f => Object.assign({}, f)) }));
   const rate = f => Object.assign(bxRate(f.kind), f.r || {}), N = BX_RULES.card;
@@ -27378,6 +27438,8 @@ function bxCardStart(opts) {
   const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
   CD = { sides: S, pairs: order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]), bouts: [], i: 0, mode: o.mode || 'watch', you, seed: o.seed, powers: o.powers !== false, skill: (o.skill || [1, 1]).slice(), result: null,
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [], fans: (o.fans || [0, 0]).slice(), crowd: o.crowd == null ? null : o.crowd };
+  // (the hexes, for every bout on the card: 14-hexes.js)
+  if (o.hexes && o.hexes.length) { CD.hexes = o.hexes.slice(); CD.hexOn = o.hexOn === 1 ? 1 : 0; }
   bxCardBout();
   return CD;
 }
@@ -27385,7 +27447,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
@@ -27417,7 +27479,7 @@ function bxSimCard(opts) {
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
     let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}]));
-    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags }); bags = b.bags; return b; });
+    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn }); bags = b.bags; return b; });
     return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)), bags };
   } finally { CD = keep; }
 }
@@ -27521,7 +27583,7 @@ function bxFx(f) {
   return o;
 }
 const bxPowOn = () => !G || G.powers !== false;
-const bxPowOf = (f, which) => { const P = bxPowOn() && BX_POW[f.kind]; if (!P) return null; return which === 'sp' && f.spPick === 'sp2' && P.sp2 ? P.sp2 : P[which] || null; };
+const bxPowOf = (f, which) => { const P = bxPowOn() && (f.pw || BX_POW[f.kind]); if (!P) return null; return which === 'sp' && f.spPick === 'sp2' && P.sp2 ? P.sp2 : P[which] || null; };
 // spirit (a bout saved before there was any has a full meter)
 /* the travelling fans (the Realm's following, issue #79): opts.fans [a, b] by side: 0 none, 1 a lift to start, 2 that
    and the same again, once, when behind going into the last round. It is spirit, so it does nothing without powers. */
@@ -27568,7 +27630,7 @@ function bxCast(f, which) {
   f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
   const d = bxDist(f, o), ux = (o.x - f.x) / (d || 1), uy = (o.y - f.y) / (d || 1);
   if (N.dash) { const step = Math.max(0, Math.min(N.dash, d - BX_RING.body)); f.x += ux * step; f.y += uy * step; }
-  if (N.push) { const pu = Math.max(N.push, -Math.max(0, bxDist(f, o) - BX_RING.body)); o.x = clamp(o.x + ux * pu, -BX_RING.rope, BX_RING.rope); o.y = clamp(o.y + uy * pu, -BX_RING.rope, BX_RING.rope); }
+  if (N.push) { const pu = Math.max(N.push, -Math.max(0, bxDist(f, o) - BX_RING.body)); const rp = bxRope(); o.x = clamp(o.x + ux * pu, -rp, rp); o.y = clamp(o.y + uy * pu, -rp, rp); }
   if (N.mySta) f.sta = Math.min(f.staMax, f.sta + N.mySta);
   if (N.hp) f.hp = Math.min(f.hpMax, f.hp + N.hp);
   if (N.sta) o.sta = Math.max(0, o.sta - N.sta);
@@ -27618,11 +27680,12 @@ function bxCpuCast(f, o) {
   const suits = w => w === 'any' || (w === 'close' && d <= bxRange(f, 'hook')) || (w === 'mid' && d <= bxRange(f, 'jab') + 1.5) || (w === 'hurt' && hurt) || (w === 'tired' && (tired || hurt));
   for (const which of ['ult', 'sp']) {
     const P = bxPowOf(f, which); if (!P || !bxCanCast(f, which).ok) continue;
-    const late = G.round === G.rounds && G.clock < 15, turn = hurt || o.hp < o.hpMax * .4 || late;
+    // (a Lich also sees the bout turn when the other fighter is stunned or pinned on the ropes: the moment to finish it)
+    const late = G.round === G.rounds && G.clock < 15, turn = hurt || o.hp < o.hpMax * .4 || late || (skill >= 3 && (o.a.k === 'stun' || bxOnRopes(o)));
     if (which === 'ult' && !turn && skill > 0) continue;
     // (a Knight or better keeps the spirit for its ultimate in the last round, unless the special would turn it)
     if (which === 'sp' && skill > 0 && !f.ultUsed && G.round === G.rounds && bxSpirit(f) - BX_SPIRIT.sp < BX_SPIRIT.ult && !hurt) continue;
-    const p = suits(P.when) ? .05 + skill * .04 : skill === 0 ? .02 : 0;
+    const p = suits(P.when) ? .05 + Math.min(skill, 2) * .04 : skill === 0 ? .02 : 0;
     if (R() < p) return bxCast(f, which);
   }
   return false;
@@ -27710,17 +27773,48 @@ function bxPotionNeeds(f) {
   if (has('draught') && f.staMax < 115 && (f.plan === 'press' || o.plan === 'press' || bxFrac(f) < .9)) out.push({ id: 'draught', v: 2 + (115 - f.staMax) / 15, why: 'short of breath for the round to come' });
   return out.sort((a, b) => b.v - a.v);
 }
-// the CPU corner's potion: a Knight or Archmage takes the best when it is worth it; a Squire, now and then, whatever is first in the bag
+// the CPU corner's potion: a Knight, Archmage or Lich takes the best when it is worth it (a Lich sooner); a Squire, now and then, whatever is first in the bag
 function bxCornerPotion(f) {
   const skill = G.skill ? G.skill[f.side] : 1, bag = (G.bags && G.bags[f.side]) || {};
   if (skill === 0) { const any = Object.keys(bag).filter(id => bag[id] > 0 && BX_POTIONS[id]); if (any.length && R() < .35) bxPotionUse(f.side, any[0], 'their corner reaches for the bag'); return; }
   const N = bxPotionNeeds(f), top = N[0];
-  if (top && top.v >= (skill === 2 ? 3 : 4.5)) bxPotionUse(f.side, top.id, top.why);
+  if (top && top.v >= (skill >= 3 ? BX_LICH.potion : skill === 2 ? 3 : 4.5)) bxPotionUse(f.side, top.id, top.why);
 }
 // what your corner would give, for the call (the Knight's choice)
 function bxPotionAdvice(f) { const top = bxPotionNeeds(f)[0]; return top && top.v >= 3 ? { id: top.id, why: top.why } : null; }
 // a side's bag, and what each potion does (for the page)
 function bxBagOf(s) { return G && G.bags && G.bags[s] ? Object.assign({}, G.bags[s]) : {}; }
+/* The Anvil Ring: hexes (issue #99, phase 4c). A bout in the Umbral may carry one or two (opts.hexes, ids in
+   BX_HEXES), each against one side (opts.hexOn, 0 when not given: the Realm's own side is always 0). They are
+   announced in the log before the first bell, named on the tale of the tape and between rounds, and kept on the
+   scoreboard all bout. With no hexes the bout is exactly as it was (G.hex is never set, and nothing draws from the
+   random stream).
+     shrink  the ropes close in BX_HEXES.shrink.rope feet a round (never nearer than BX_HEX_ROPE): less room to back
+             away, and the ropes come sooner, for both fighters (bxRope, read wherever the ropes are)
+     water   the hexed side's water is tainted: between rounds it gets back only a share of the breath and health the
+             break would give (07-bout.js's corner)
+     lead    the hexed side's gloves are heavy: every punch costs more breath (05-ring.js's bxAct)
+     count   the referee counts fast over the hexed side: it needs a longer count to rise (07-bout.js's knockdown)
+   G.hex, plain JSON: { ids, on }. */
+const BX_HEXES = {
+  shrink: { n: 'The Shrinking Ring', short: 'Shrinking Ring', desc: 'The ropes close in two feet every round: less room to back away, and the ropes come sooner.', rope: 2 },
+  water: { n: 'Tainted Water', short: 'Tainted Water', desc: 'Your corner\'s water is tainted: between rounds your fighter gets back only four fifths of the breath and health they would.', corner: .8 },
+  lead: { n: 'Leaden Gloves', short: 'Leaden Gloves', desc: 'Your fighter\'s gloves are heavy: every punch costs a tenth more breath.', sta: 1.1 },
+  count: { n: 'The Quick Count', short: 'Quick Count', desc: 'The referee counts fast over your fighter: they need a count of two more to get up.', rise: 2 },
+};
+const BX_HEX_ROPE = 5;
+function bxHexStart(o) {
+  const ids = (o.hexes || []).filter((k, i, a) => BX_HEXES[k] && a.indexOf(k) === i);
+  if (!ids.length) return;
+  G.hex = { ids, on: o.hexOn === 1 ? 1 : 0 };
+  for (const k of ids) bxLog(`Hex: ${BX_HEXES[k].n}. ${BX_HEXES[k].desc}`, true);
+}
+// whether hex k is on in this bout (and, given a fighter, whether it is against them)
+const bxHex = (f, k) => !!(G && G.hex && G.hex.ids.includes(k) && (f == null || f.side === G.hex.on));
+// where the ropes are now (the Shrinking Ring moves them in each round)
+function bxRope() { return G && G.hex && G.hex.ids.includes('shrink') ? Math.max(BX_HEX_ROPE, BX_RING.rope - BX_HEXES.shrink.rope * (G.round - 1)) : BX_RING.rope; }
+// the hexes on now, short, for the scoreboard
+const bxHexWords = (long) => G && G.hex ? G.hex.ids.map(k => long ? BX_HEXES[k].n : BX_HEXES[k].short).join(' · ') : '';
 /* The Anvil Ring's superstars (issue #24, phase 2), inside the wBX scope: each superstar's ratings, nature and powers,
    added to the engine's own tables after its parts load. Plain assignments, nothing declared. A superstar is never
    picked for a CPU side by kind (the Realm only ever sends one as your own player). Each has a second special too
@@ -28101,6 +28195,10 @@ return {
   powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, Object.assign({ sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }, P.sp2 ? { sp2: { n: P.sp2.n, desc: P.sp2.desc } } : {})])),
   // spirit (issue #61, phase 4): the meter's rules
   spirit: Object.assign({}, BX_SPIRIT),
+  // hexes (issue #99, phase 4c: 14-hexes.js): the table ({ id: { n, short, desc } }), the bout's ({ ids, on } or null), what the
+  // scoreboard says of them (bxHexWords), and where the ropes are now; the Lich's numbers (06-cpu.js)
+  hexes: Object.fromEntries(Object.entries(BX_HEXES).map(([k, H]) => [k, { n: H.n, short: H.short, desc: H.desc }])), get hex() { return G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null; },
+  rope: () => bxRope(), hexWords: () => bxHexWords(), lich: Object.assign({}, BX_LICH),
   // each kind's nature in the ring (a trait for some, none for the rest): { kind: { n, desc } }
   traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],
@@ -64284,8 +64382,147 @@ wAudit = function () {
    Not built yet. */
 /* u4b: football in the Umbral (issue #99, phase 4b): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
-/* u4c: boxing in the Umbral (issue #99, phase 4c): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4c: boxing in the Umbral (issue #99, phase 4c). Loads after u4-grounds.js; changes earlier parts only by
+   reassignment (saved originals carry the wWU4C prefix). The engine's side is src/bx/: the Lich (06-cpu.js, CPU skill
+   3) and the hexes (14-hexes.js, opts.hexes).
+
+   Tier U is tier 4 in the ring's tables: the other corner's rating bonus (W_BXG.oppBonus[4]), a full bag
+   (W_RING_KIT.opp[4]) and the Lich in their corner (W_BALL.diff[4] = 3, the skill every engine reads by tier; named
+   in W_BALL_SKILL). Tiers 1 to 3 are as they were.
+   The champion: Brakka Knell, the Broken Bell, at the far end of the Broken Ring (u:g_ring, the Ashmaw), holds the
+   Broken Bell. PLAY (past the guards, with an Emberpepper handed over: u4) opens a card of three bouts against the
+   Nadir, as a card against a club opens (the pairing; Play, Manage or Simulate; save and resume as any card): two
+   Nadir boxers and Brakka in the main event, every one in umbral form (drawn in shadow) at tier U, with the Lich in
+   their corner. Brakka brings their own powers and nature (W_UMB4C.champ: the engine's f.pw and f.tr) and more on
+   their ratings. The card draws its hexes from the engine's table (wUmbRingHexes: fixed for the try, so a reload
+   doesn't redraw them), named on the pairing, in the log before the first bell and on the scoreboard. The toll for a
+   retry is paid at the real kickoff (Play, Manage or Simulate picked); backing out of the pairing costs nothing.
+   The card is settled as any card (XP, gold and fans by tier 4), then W_ON_END.unbox reports it to wUmbNadirEnd: a
+   won card pays the piece, a lost or drawn one counts a try.
+
+   W_UMB4C, wUmbRingHexes, wUmbRingSide; W_NADIR.ring, DB.chars.nadir_ring, W_UMB4.start.ring, W_ON_END.unbox
+   Wraps: wBX.cardStart and wBX.simCard (wWU4CCardStart, wWU4CSimCard: the hexes go in), wBallName (wWU4CBallName:
+   the Nadir by name), wRingTapeOf (wWU4CRingTapeOf: a champion's own powers and nature on the tape), wRingPairing
+   (wWU4CRingPairing: the same on the pairing), wRingBarNote (wWU4CRingBarNote: the hexes on the ring bar). */
+
+const W_UMB4C = {
+  tier: 4,
+  // the Nadir's corner, and its two boxers before the main event
+  side: { name: 'The Nadir', short: 'NDR', color: '#3a2a4a', light: '#c8b8ff' },
+  seconds: [['Old Clapper', 'ogre'], ['Soot Wick', 'dwarf']],
+  // the champion: their kind, the points on top of tier U's, and what is theirs alone (the engine's pw and tr)
+  champ: { n: 'Brakka Knell', kind: 'minotaur', more: 0,
+    pw: {
+      sp: { id: 'deathknell', n: 'Death Knell', when: 'close', desc: 'A blow that rings through the guard (8), and they reel for half a second.', now: { dmg: 8, stun: .5 } },
+      ult: { id: 'lastbell', n: 'The Last Bell', when: 'any', desc: 'The bell tolls for them: for 6 seconds they get no breath back, and punches at them do 20% more.', fx: { who: 'them', t: 6, noReg: 1, dmgIn: 1.2 } },
+    },
+    tr: { n: 'Cracked Bronze', desc: 'Rings, but never breaks: it beats every count a second sooner, and counters hurt it less.', rise: -1, ctrTaken: .85 } },
+};
+// tier U in the ring's tables (W_BALL's are shared by every engine: set once, by whichever sport loads first)
+if (W_BALL.diff[W_UMB4C.tier] == null) W_BALL.diff[W_UMB4C.tier] = 3;
+if (W_BALL_SKILL[3] == null) W_BALL_SKILL[3] = 'Lich';
+W_BXG.oppBonus[W_UMB4C.tier] = 3;
+W_RING_KIT.opp[W_UMB4C.tier] = { draught: 1, cutsalve: 1, smellsalts: 1, ragetonic: 1 };
+
+/* ---------- the champion ---------- */
+W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 2, toll: 30, gold: 100 };
+DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur', look: { coat: '#3a2a4a' },
+  greet: 'Every bell on this side rang once for somebody, and then it cracked. I hold the BELL. Say PLAY when you want to hear it ring for you. Ask about the RULES first, if you like.',
+  topics: {
+    job: { t: 'I box. I have boxed every fool who walked down this ring since the bell broke. None of them heard the end of the third round.' },
+    bell: { t: 'The Broken Bell. One ninth of your Seal. Win the card and it is yours. Lose, and the next card costs you a TOLL.' },
+    rules: { t: 'Three bouts, as in your Anvil Ring: two of my Nadir, then me. Everything here is harder. My boxers are stronger than yours, my corner is cleverer than any you have met, and before the bell I draw the HEXES. One or two, for you.' },
+    hexes: { t: 'A ring that closes in. Bad water in your bucket. Heavy gloves. A quick count. You will hear which before the bell.' },
+    toll: { t: 'Thirty gold a card, after the first. The first is free. The bell does not ring for nothing twice.' },
+    play: { t: 'Then glove up.', act: 'unadir:ring' },
+  } };
+
+// a try's hexes: one or two (up to n) from the engine's table, fixed for the try (so a reload doesn't redraw them)
+function wUmbRingHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wBX.hexes), r = mulberry(wUmbHash(id + ':ring') + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));
+  const many = Math.min(ks.length, 1 + Math.floor(r() * Math.max(1, n)));
+  const out = []; while (out.length < many) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+// the Nadir's three, at your team's level (level parity) with tier U's points, in umbral form; the champion last
+function wUmbRingSide(C, taken) {
+  const lvl = wNineTier(), k = W_BXG.oppBonus[W_UMB4C.tier] || 0, X = W_UMB4C.champ;
+  const fighters = W_UMB4C.seconds.concat([[X.n, X.kind]]).map(([n, kind], j) => {
+    const p = wMakePlayer({ kind, lvl, n }, 'opp'), f = wBxFighter(p), more = j === 2 ? X.more : 0;
+    taken.add(f.n); f.pid = null; f.umb = 1;
+    for (let i = 0; i < k + more; i++) { const s = wBX.stats[(i * 5 + j) % wBX.stats.length]; f.r[s] = Math.min(W_BXG.cap, f.r[s] + 1); }
+    if (j === 2) { f.pw = JSON.parse(JSON.stringify(X.pw)); f.tr = JSON.parse(JSON.stringify(X.tr)); f.sp = 'sp'; f.champ = 1; }
+    return f;
+  });
+  return Object.assign({}, W_UMB4C.side, { fighters });
+}
+
+/* ---------- the adapter: PLAY ---------- */
+const WU4C = { hexes: null };
+W_UMB4.start.ring = function (C, id) {
+  const probs = wRingProblems(); if (probs.length) return probs.join(' ');
+  if (wBxg().live) return 'Finish the card you started first.';
+  const hexes = wUmbRingHexes(id, C.hexes || 1), taken = new Set(), mine = wRingSide(taken), theirs = wUmbRingSide(C, taken), ch = DB.chars[C.char];
+  const o = { club: 'nadir', tier: W_UMB4C.tier, kind: 'unbox', ref: { id }, cup: true };
+  // the real kickoff: the toll for a retry (once a try), then the card, with its hexes
+  const go = (picks, how) => {
+    if (wBxg().live) return;
+    if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
+    WU4C.hexes = hexes;
+    try { wRingGo(Object.assign({}, o, { how }), mine, theirs, picks); } finally { WU4C.hexes = null; }
+  };
+  if (LAB) { go(wBX.cardAuto(mine.fighters, theirs.fighters), 'sim'); return ''; }
+  const hx = hexes.map(h => `<b>${esc(wBX.hexes[h].n)}</b> (${esc(wBX.hexes[h].desc)})`).join(' ');
+  WRK.tier = W_UMB4C.tier;
+  try {
+    wRingPairing({ mine, theirs, title: `${ch.name}: a card for ${W_UMB_PIECES[C.piece].n}`, go: [['Play', 'play'], ['Manage', 'manage'], ['Simulate', 'sim']],
+      intro: `Three bouts, one fighter each, and each fighter boxes once: two of the Nadir, then ${esc(ch.name)} in the main event. <b>The Umbral: tier U.</b> Their boxers are level ${wNineTier()} with more on every rating, in umbral form, and their corner is a ${W_BALL_SKILL[wRingSkill(W_UMB4C.tier)[1]]}. <span data-umbhex><b>Hexes:</b> ${hx}</span> Win the card and ${esc(W_UMB_PIECES[C.piece].n)} is yours. <b>Play</b>: your corner, and you box the rounds. <b>Manage</b>: your corner; your fighters box. <b>Simulate</b>: the result now.`,
+      onGo: go });
+  } finally { WRK.tier = null; }
+  return '';
+};
+// the end of the card: the piece, or a try counted (a drawn card is not a win)
+W_ON_END.unbox = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
+
+// the hexes go in with the card, and the card in the world keeps them
+const wWU4CCardStart = wBX.cardStart, wWU4CSimCard = wBX.simCard;
+wBX.cardStart = o => {
+  if (!WU4C.hexes) return wWU4CCardStart(o);
+  const L = wBxg().live; if (L) L.world.hexes = WU4C.hexes.slice();
+  return wWU4CCardStart(Object.assign({}, o, { hexes: WU4C.hexes.slice(), hexOn: 0 }));
+};
+wBX.simCard = o => WU4C.hexes ? wWU4CSimCard(Object.assign({}, o, { hexes: WU4C.hexes.slice(), hexOn: 0 })) : wWU4CSimCard(o);
+
+/* ---------- on screen ---------- */
+const wWU4CBallName = wBallName;
+wBallName = function (club) { return club === 'nadir' ? 'the Nadir' : wWU4CBallName.apply(this, arguments); };
+// the tape: a champion's own powers and nature
+const wWU4CRingTapeOf = wRingTapeOf;
+wRingTapeOf = function (f) {
+  const t = wWU4CRingTapeOf(f);
+  if (f && f.pw) t.P = Object.assign({}, t.P, { sp: { n: f.pw.sp.n, desc: f.pw.sp.desc }, ult: { n: f.pw.ult.n, desc: f.pw.ult.desc } });
+  if (f && f.tr) t.T = { n: f.tr.n, desc: f.tr.desc };
+  return t;
+};
+// the pairing: the same, in the champion's row
+const wWU4CRingPairing = wRingPairing;
+wRingPairing = function (o) {
+  const r = wWU4CRingPairing(o), T = $('wRingPairT');
+  if (T && o && o.theirs) T.querySelectorAll('tr:not(.wrtape)').forEach((tr, i) => {
+    const f = o.theirs.fighters[i]; if (!f || !f.pw) return;
+    const td = tr.querySelector('td'); if (!td) return;
+    td.querySelectorAll('[data-rsppair]').forEach(e => e.remove());
+    td.insertAdjacentHTML('beforeend', `<br><small data-umbchamp title="${esc(f.tr.desc)}">${esc(f.tr.n)}. Special: <b title="${esc(f.pw.sp.desc)}">${esc(f.pw.sp.n)}</b>, ultimate: <b title="${esc(f.pw.ult.desc)}">${esc(f.pw.ult.n)}</b></small>`);
+  });
+  return r;
+};
+// the ring bar: the hexes, while a Nadir card is on
+const wWU4CRingBarNote = wRingBarNote;
+wRingBarNote = function () {
+  wWU4CRingBarNote();
+  const L = wRingLive() && WG.bxg.live, H = L && L.world.hexes;
+  if (WBX && H && H.length && !WBX.over) $('wRingNote').textContent += ` Hexes: ${H.map(h => wBX.hexes[h].n).join(', ')}.`;
+};
 /* u4d: basketball in the Umbral (issue #99, phase 4d): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
 /* u4e: hockey in the Umbral (issue #99, phase 4e): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.

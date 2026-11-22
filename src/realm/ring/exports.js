@@ -30,6 +30,10 @@ return {
   powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, Object.assign({ sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }, P.sp2 ? { sp2: { n: P.sp2.n, desc: P.sp2.desc } } : {})])),
   // spirit (issue #61, phase 4): the meter's rules
   spirit: Object.assign({}, BX_SPIRIT),
+  // hexes (issue #99, phase 4c: 14-hexes.js): the table ({ id: { n, short, desc } }), the bout's ({ ids, on } or null), what the
+  // scoreboard says of them (bxHexWords), and where the ropes are now; the Lich's numbers (06-cpu.js)
+  hexes: Object.fromEntries(Object.entries(BX_HEXES).map(([k, H]) => [k, { n: H.n, short: H.short, desc: H.desc }])), get hex() { return G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null; },
+  rope: () => bxRope(), hexWords: () => bxHexWords(), lich: Object.assign({}, BX_LICH),
   // each kind's nature in the ring (a trait for some, none for the rest): { kind: { n, desc } }
   traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],

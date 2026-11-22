@@ -17,6 +17,9 @@
    (the better of each pair lit) and their work so far this bout; at the top in the middle the judges' running totals,
    with the round on now scored as it stands (bxLive: the judges' weights without their own eye, so drawing never
    draws from the seeded stream; the real card at the bell can differ in a close round).
+   Hexes (issue #99, 14-hexes.js): named on the tale of the tape and the corner card, and under the clock in a round;
+   the Shrinking Ring's ropes and posts stand where the ropes are now. A Nadir fighter in umbral form (f.umb) is drawn
+   drained of colour over a violet shadow.
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -82,15 +85,16 @@ function bxDrawPost(c, x, y, col) {
   rr(c, p.x - 6 * p.k, bxProj(x, y, 80).y, 12 * p.k, bxProj(x, y, 26).y - bxProj(x, y, 80).y, 3); c.fill();
 }
 function bxDrawRing(c, part) {
-  const H = BX_RING.half, ropeH = [30, 52, 74];
+  // (the canvas is always the whole ring; the ropes and posts stand where the ropes are now: the Shrinking Ring moves them in)
+  const H0 = BX_RING.half, H = H0 - (BX_RING.rope - bxRope()), ropeH = [30, 52, 74], post = ([x, y, col]) => bxDrawPost(c, x * H / H0, y * H / H0, col);
   if (part === 'back') {
     // the platform's skirt, then the canvas
-    const fl = bxProj(-H - .6, H + .6), fr = bxProj(H + .6, H + .6);
+    const fl = bxProj(-H0 - .6, H0 + .6), fr = bxProj(H0 + .6, H0 + .6);
     c.fillStyle = '#3a1612'; c.beginPath(); c.moveTo(fl.x, fl.y); c.lineTo(fr.x, fr.y); c.lineTo(fr.x, fr.y + 36); c.lineTo(fl.x, fl.y + 36); c.closePath(); c.fill();
     txt(c, 'THE ANVIL RING', 480, fl.y + 25, '800 16px "Alegreya Sans", sans-serif', 'rgba(255,208,160,.55)', 'center');
-    const q = [bxProj(-H - .6, -H - .6), bxProj(H + .6, -H - .6), bxProj(H + .6, H + .6), bxProj(-H - .6, H + .6)];
+    const q = [bxProj(-H0 - .6, -H0 - .6), bxProj(H0 + .6, -H0 - .6), bxProj(H0 + .6, H0 + .6), bxProj(-H0 - .6, H0 + .6)];
     c.fillStyle = '#2a1d17'; c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
-    const f = [bxProj(-H, -H), bxProj(H, -H), bxProj(H, H), bxProj(-H, H)];
+    const f = [bxProj(-H0, -H0), bxProj(H0, -H0), bxProj(H0, H0), bxProj(-H0, H0)];
     const g = c.createLinearGradient(0, f[0].y, 0, f[2].y); g.addColorStop(0, '#b9ad97'); g.addColorStop(.5, '#d4c9b2'); g.addColorStop(1, '#c4b89f');
     c.fillStyle = g; c.beginPath(); f.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
     // scorch at the edges, and an anvil in the middle
@@ -100,11 +104,11 @@ function bxDrawRing(c, part) {
     // the back and side ropes, and the back posts
     c.lineWidth = 2.2;
     ropeH.forEach((h, i) => { c.strokeStyle = BX_ROPE[i]; bxRopeLine(c, [-H, -H], [H, -H], h); bxRopeLine(c, [-H, -H], [-H, H], h); bxRopeLine(c, [H, -H], [H, H], h); });
-    for (const [x, y, col] of BX_POSTS.slice(0, 2)) bxDrawPost(c, x, y, col);
+    BX_POSTS.slice(0, 2).forEach(post);
   } else {
     c.lineWidth = 2.8;
     ropeH.forEach((h, i) => { c.strokeStyle = BX_ROPE[i]; bxRopeLine(c, [-H, H], [H, H], h); });
-    for (const [x, y, col] of BX_POSTS.slice(2)) bxDrawPost(c, x, y, col);
+    BX_POSTS.slice(2).forEach(post);
   }
 }
 /* a fighter's pose from what they're doing (in figure units, facing right; the lead hand is armR) */
@@ -128,12 +132,10 @@ function bxDrawFighter(c, f, o) {
   const p = bxProj(f.x, f.y), flip = bxProj(o.x, o.y).x < p.x, team = G.corners[f.side], hpx = 92 * p.k;
   const F = bxFx(f), stone = (f.a.k === 'stun' && f.a.stone) || F.rampart || F.dmgIn < .6;
   const opt = { glove: team.color, pose: bxPose(f), flip, num: '', stone, alpha: F.miss ? .38 : null };
-  if (F.root || F.noBack || F.move < .6) { c.save(); c.strokeStyle = 'rgba(236,232,220,.7)'; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + BXT.t * .3; c.beginPath(); c.moveTo(p.x, p.y - 4); c.lineTo(p.x + Math.cos(a) * 26 * p.k, p.y + Math.sin(a) * 6 * p.k); c.stroke(); } c.restore(); }
-  if (f.a.k === 'down') {
-    const e = Math.min(1, f.a.t / .35);
-    ell(c, p.x + (flip ? 1 : -1) * 40 * p.k * e, p.y, 46 * p.k, 7 * p.k, 'rgba(0,0,0,.35)');
-    c.save(); c.translate(p.x, p.y); c.rotate((flip ? 1 : -1) * 1.45 * e); drawFig(c, f.kind, 0, 0, hpx, team, Object.assign(opt, { noShadow: true })); c.restore();
-  } else drawFig(c, f.kind, p.x, p.y, hpx, team, opt);
+  // an umbral form (a Nadir fighter, issue #99): a violet shadow at their feet, and drawn drained of colour
+  if (f.umb) { ell(c, p.x, p.y, 40 * p.k, 9 * p.k, 'rgba(120,80,190,.35)'); c.save(); c.filter = 'saturate(.3) brightness(.72) contrast(1.15)'; }
+  bxDrawBody(c, f, p, flip, team, hpx, opt);
+  if (f.umb) c.restore();
   // a counter window: a glint at the gloves
   if (f.ctr > 0 && f.a.k !== 'down') { c.save(); c.globalAlpha = Math.min(1, f.ctr * 3); txt(c, '✦', p.x + (flip ? -1 : 1) * 30 * p.k, p.y - 92 * p.k, `${14 * p.k}px sans-serif`, '#ffe9a0', 'center'); c.restore(); }
   // yours: a marker over them
@@ -141,6 +143,16 @@ function bxDrawFighter(c, f, o) {
     const y = p.y - 112 * p.k; c.save(); c.fillStyle = '#ffd24a'; c.beginPath(); c.moveTo(p.x - 6, y - 8); c.lineTo(p.x + 6, y - 8); c.lineTo(p.x, y); c.closePath(); c.fill();
     txt(c, BD.mode === 'play' ? 'you' : 'yours', p.x, y - 11, '700 11px "Alegreya Sans", sans-serif', '#ffd24a', 'center'); c.restore();
   }
+}
+// the figure itself: threads at the feet when rooted, then standing or down
+function bxDrawBody(c, f, p, flip, team, hpx, opt) {
+  const F = bxFx(f);
+  if (F.root || F.noBack || F.move < .6) { c.save(); c.strokeStyle = 'rgba(236,232,220,.7)'; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + BXT.t * .3; c.beginPath(); c.moveTo(p.x, p.y - 4); c.lineTo(p.x + Math.cos(a) * 26 * p.k, p.y + Math.sin(a) * 6 * p.k); c.stroke(); } c.restore(); }
+  if (f.a.k === 'down') {
+    const e = Math.min(1, f.a.t / .35);
+    ell(c, p.x + (flip ? 1 : -1) * 40 * p.k * e, p.y, 46 * p.k, 7 * p.k, 'rgba(0,0,0,.35)');
+    c.save(); c.translate(p.x, p.y); c.rotate((flip ? 1 : -1) * 1.45 * e); drawFig(c, f.kind, 0, 0, hpx, team, Object.assign(opt, { noShadow: true })); c.restore();
+  } else drawFig(c, f.kind, p.x, p.y, hpx, team, opt);
 }
 // while the bout waits for your corner: what they'd do, and why
 function bxDrawAsk(c, y) {
@@ -212,7 +224,10 @@ function bxDrawBar(c) {
   const live = BD.ph === 'round' || BD.ph === 'kd' || BD.ph === 'rise';
   txt(c, BD.ph === 'over' ? 'FINAL' : `ROUND ${G.round} of ${G.rounds}`, 480, 26, '800 13px "Alegreya Sans", sans-serif', '#c9b99c', 'center');
   txt(c, BD.ph === 'intro' ? `0:${String(BX_RULES.secs).padStart(2, '0')}` : `0:${String(Math.ceil(G.clock)).padStart(2, '0')}`, 480, 60, '800 30px "Alegreya Sans", sans-serif', live ? '#fff4dc' : '#8a7c68', 'center');
-  txt(c, { intro: 'Touch gloves', round: '', kd: 'Knockdown', rise: 'Box on', corner: 'Between rounds', over: '' }[BD.ph], 480, 80, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
+  const ph = { intro: 'Touch gloves', round: '', kd: 'Knockdown', rise: 'Box on', corner: 'Between rounds', over: '' }[BD.ph];
+  // the hexes (14-hexes.js) under the clock while nothing else is there
+  if (!ph && G.hex) txt(c, `Hex: ${bxHexWords()}`, 480, 80, '700 11px "Alegreya Sans", sans-serif', '#c8b8ff', 'center');
+  else txt(c, ph, 480, 80, '12px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
 /* the bout at a glance: each fighter's ratings and work this bout (rounds done and the round on now), and each judge's
    totals with the round on now as it stands. round is null between rounds and at the end */
@@ -264,9 +279,9 @@ function bxPanel(c, x, y, w, h) { c.fillStyle = 'rgba(16,11,9,.9)'; rr(c, x, y, 
    it shows, as words (the tests read it) */
 const BX_STAT_WORD = { reach: 'reach', pow: 'power', spd: 'speed', chin: 'chin', sta: 'stamina', gui: 'guile' };
 function bxIntroTape() {
-  const one = f => { const L = f.rec, P = bxPowOn() && BX_POW[f.kind], T = bxTrait(f);
+  const one = f => { const L = f.rec, P = bxPowOf(f, 'ult'), T = bxTrait(f);
     return { n: f.n, sub: [f.lvl ? `level ${f.lvl}` : '', T ? T.n : ''].filter(Boolean).join(', '), r: Object.assign({}, f.r),
-      pow: P ? `${bxPowOf(f, 'sp').n} / ${P.ult.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
+      pow: P ? `${bxPowOf(f, 'sp').n} / ${P.n}` : '-', rec: L && L.bb ? `${L.w}-${L.l}${L.d ? `-${L.d}` : ''}${L.ko ? `, ${L.ko} KO` : ''}` : 'no record' }; };
   return G.F.map(one);
 }
 function bxDrawIntro(c) {
@@ -283,6 +298,7 @@ function bxDrawIntro(c) {
     const y = 348 + i * 20;
     txt(c, A[f], col[0], y, F(0, 13), '#e8dcc0', 'center'); txt(c, k, 480, y, F(0, 12), dim, 'center'); txt(c, B[f], col[1], y, F(0, 13), '#e8dcc0', 'center');
   });
+  if (G.hex) txt(c, `Hexes: ${bxHexWords(true)}`, 480, 388, F(700, 13), '#c8b8ff', 'center');
   if (G.wait) bxDrawAsk(c, 406);
   else txt(c, `red corner: ${BX_PLAN[G.F[0].plan].n}  ·  blue corner: ${BX_PLAN[G.F[1].plan].n}`, 480, 406, F(0, 12), dim, 'center');
 }
@@ -291,6 +307,7 @@ function bxDrawCorner(c) {
   bxPanel(c, 230, 270, 500, 110);
   txt(c, `End of round ${n}`, 480, 295, '800 18px "Alegreya Sans", sans-serif', '#f4ead8', 'center');
   BX_JUDGES.forEach((J, j) => txt(c, `${J.n}  ${sc[j][0]}-${sc[j][1]}  (${T[j][0]}-${T[j][1]})`, 340 + j * 140, 322, '14px "Alegreya Sans", sans-serif', '#e8dcc0', 'center'));
+  if (G.hex) txt(c, `Hexes: ${bxHexWords(true)}${bxHex(null, 'shrink') ? ` (the ropes at ${Math.round(bxRope() * 10) / 10} ft)` : ''}`, 480, 372, '700 12px "Alegreya Sans", sans-serif', '#c8b8ff', 'center');
   if (G.wait) bxDrawAsk(c, 352);
   else txt(c, `Round ${G.round}: ${G.F[0].n} will ${BX_PLAN[pl[0]].n.toLowerCase()}, ${G.F[1].n} will ${BX_PLAN[pl[1]].n.toLowerCase()}.`, 480, 352, '13px "Alegreya Sans", sans-serif', '#b8aa94', 'center');
 }
