@@ -126,7 +126,7 @@ function glHexTilt(s) {
   const a = glHexQ(101 + G.hole.st[s] * 17 + G.log.length) * Math.PI * 2, g = GL_HEX.tilt.g;
   return [g * Math.cos(a), g * Math.sin(a)];
 }
-// The Turning Wind: the wind side s's full shot really flies in (w: the wind it would have), a quarter turn either way
+// The Turning Wind: the wind side s's full shot really flies in (w: the wind it would have), a twelfth of a turn (GL_HEX.gust.turn)
 function glHexWind(s, w) {
   if (!glHexOn('gust', s)) return w;
   const W = w || { s: 0, d: 0 }, sg = glHexQ(211 + G.log.length) < 0.5 ? -1 : 1;

@@ -132,3 +132,5 @@ wLinksBarNote = function () {
 // after a Hardcore journey ends on the finale's lost round, the golf result card stays off the end screen
 const wWU4FLinksResultCard = wLinksResultCard;
 wLinksResultCard = function () { if (RUN && RUN.over) return; return wWU4FLinksResultCard.apply(this, arguments); };
+// (the Lich is the Umbral's only: the light-side caddie picker keeps its three)
+{ const o = document.querySelector('#wLinksSkill option[value="3"]'); if (o) o.remove(); }

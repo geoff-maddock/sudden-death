@@ -204,7 +204,9 @@ function glCpuPower(s, ri) {
   if (sk >= 1 && kind === 'short' && G.mana[s] >= 3 && !glPowWhy(s, 'updown')) tryCast('updown');
   // the ultimate: a Squire as soon as it can; a Knight behind or late; an Archmage behind late, or on a stroke that wins
   // or halves late in the game
-  if (!glPowWhy(s, 'ult', ri) && G.hole.st[s] === 0 && (sk === 0 ? R() < 0.5 : sk === 1 ? up < 0 || late : (up < 0 && late) || (late && up <= 0))) tryCast('ult', ri);
+  // (a player who brings an ultimate of their own casts it, whoever is hitting; otherwise the hitter's kind's)
+  const own = G.teams[s].roster.findIndex(m => m && m.ult && typeof GL_ULT_OWN !== 'undefined' && GL_ULT_OWN[m.ult]), ur = own >= 0 ? own : ri;
+  if (!glPowWhy(s, 'ult', ur) && G.hole.st[s] === 0 && (sk === 0 ? R() < 0.5 : sk === 1 ? up < 0 || late : (up < 0 && late) || (late && up <= 0))) tryCast('ult', ur);
   if (sk >= 1 && p && !glPowWhy(s, 'steady') && glRat(s, ri).nrv < 0.7 && G.roar[s] >= GL_ROAR.steady + (sk >= 2 && !G.ultUsed[s] ? GL_ROAR.ult : 0)) tryCast('steady');
   // the everyday power
   const P = glPowNow(s, ri); if (!P || glPowWhy(s, 'pow', ri)) return out;
