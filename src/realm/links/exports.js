@@ -54,6 +54,11 @@ return {
   built: (seed, par) => glBuildHole(seed, par), wildPars: (cs, n) => glWildPars(cs, n), lie: (H, x, y) => glLie(H, x, y), slope: (H, x, y) => glSlope(H, x, y),
   reach: (club, lie, rat, pow) => glReach(club, lie, rat, pow), flight: s => glFlight(s), putt: p => glPutt(p), read: (H, from, k) => glRead(H, from, k == null ? 1 : k),
   plan: (s, line) => glPlan(s, null, line), turn: () => glTurn(), summary: () => G && G.teams ? glSummary() : null, simGame: o => glSimGame(o),
+  // the Umbral (14-umbral.js): start({ hexes: [ids], hexOn }) and skill 3 (the Lich); the hexes' table, a game's hexes
+  // ({ ids, on, pin } or null), the line on the hole card, the Lich's rules and its strokes-left table, the hole as a side
+  // sees it in the fog, the tilt under a side's putt, the wind its full shot flies in, and a player's own ultimates
+  hexes: JSON.parse(JSON.stringify(GL_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => glHexLine(), lichRules: JSON.parse(JSON.stringify(GL_LICH)), lichSet: o => Object.assign(GL_LICH, o), lichLeft: (d, lie) => glLichLeft(d, lie),
+  hexSeen: s => G && G.teams ? glHexSeen(glHoleNow(), s) : null, hexTilt: s => G && G.teams ? glHexTilt(s) : null, hexWind: (s, w) => G && G.teams ? glHexWind(s, w || G.wind) : null, ultOwn: JSON.parse(JSON.stringify(GL_ULT_OWN)), hole: () => G && G.teams ? glHoleNow() : null,
   // the hole inspector (13-inspect.js): what is at a point of the hole, and everything on it, in plain words
   look: (x, y) => glLookAt(x, y), holeGuide: () => glHoleGuide(), spots: () => glLookSpots().map(o => Object.assign({}, o)),
   set onShot(f) { GL_HOOK.onShot = f; }, get onShot() { return GL_HOOK.onShot; }, set onOver(f) { GL_HOOK.onOver = f; }, get onOver() { return GL_HOOK.onOver; },

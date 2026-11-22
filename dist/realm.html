@@ -35570,7 +35570,8 @@ function glWaterDrop(H, from, wet) {
 }
 
 /* a putt (or the run of a ball on the green). p: { hole, from, a (angle), v (yards a second), slopeK (a read: 1 is
-   the true slope), noCup, fk (the green's friction: 1 dry, more when soft) }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
+   the true slope), noCup, fk (the green's friction: 1 dry, more when soft), tilt ([x, y] grade on top of the slope,
+   that no read sees: the Restless Green, 14-umbral.js) }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
    it passed, on the line through the cup square to the putt; null if it never got there) */
 function glPutt(p) {
   const H = p.hole, pin = H.pin, P = GL_PUTT, k = p.slopeK == null ? 1 : p.slopeK;
@@ -35581,7 +35582,7 @@ function glPutt(p) {
   const res = o => Object.assign(o, { cross });
   for (let i = 0, t = 0; i < 3000; i++, t += P.dt) {
     const sp = hyp(vx, vy), fr = (p.fk || 1) * (lie === 'G' ? P.fric : lie === 'F' || lie === 'T' ? P.fric * P.fringe : P.fric * P.rough);
-    const sl = lie === 'G' ? glSlope(H, x, y) : [0, 0], gx = sl[0] * P.g * k, gy = sl[1] * P.g * k;
+    const sl = lie === 'G' ? glSlope(H, x, y) : [0, 0], tl = lie === 'G' && p.tilt ? p.tilt : null, gx = sl[0] * P.g * k + (tl ? tl[0] * P.g : 0), gy = sl[1] * P.g * k + (tl ? tl[1] * P.g : 0);
     if (sp < 0.03 && hyp(gx, gy) < fr) return res({ end: { x, y }, lie, holed: false, lip, path, t });
     const ax = gx - (sp ? vx / sp : 0) * fr, ay = gy - (sp ? vy / sp : 0) * fr;
     const nx = x + vx * P.dt, ny = y + vy * P.dt;
@@ -35775,7 +35776,11 @@ function glLayTarget(H, b, reach, careful, rollFrac) {
 
 // the shot for side s, hit by ri: { ri, kind, club, aim, pow, spin } or a putt { ri, kind, putt: true, a, v }
 function glPlan(s, riIn, lineIn) {
-  const H = glHoleNow(), b = G.ball[s], sk = G.skill[s], kind = glShotKind(H, s), ri = riIn == null ? glPickHitter(s, kind) : riIn, rat = glRat(s, ri);
+  const H0 = glHoleNow(), b = G.ball[s], sk = G.skill[s], kind = glShotKind(H0, s), ri = riIn == null ? glPickHitter(s, kind) : riIn, rat = glRat(s, ri);
+  // (in the Grey Fog a side plays to the flag where it sees it, off the green: 14-umbral.js)
+  const H = G.hex && kind !== 'putt' ? glHexSeen(H0, s) : H0;
+  // (the Lich weighs every line and plays the best: 14-umbral.js; null when it goes for everything, behind late)
+  if (sk >= 3 && !GL_LINES[lineIn] && !(G.fixLine && G.fixLine[s])) { const L = glLichPlan(s, ri, H, b, kind); if (L) return L; }
   const line = GL_LINES[lineIn] ? lineIn : G.fixLine && G.fixLine[s] ? G.fixLine[s] : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
   if (kind === 'putt') {
     // (the caddie's word: read without error)
@@ -35878,13 +35883,14 @@ const GL_TEAMS = [{ name: 'Mossgate' }, { name: 'The visitors' }];
 function glTeam(t, side) {
   const T = t || GL_TEAMS[side], ro = (T.roster || (T.kinds || []).map(kind => ({ n: kind[0].toUpperCase() + kind.slice(1), kind }))).slice(0, GL_RULES.side);
   while (ro.length < GL_RULES.side) ro.push({ n: 'Player ' + (ro.length + 1) });
-  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return { n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 }, gear: m.gear ? m.gear.name || '' : '', gx: glGx(m.gear && m.gear.fx) }; });
+  const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return Object.assign({ n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 }, gear: m.gear ? m.gear.name || '' : '', gx: glGx(m.gear && m.gear.fx) }, m.ult && GL_ULT_OWN[m.ult] ? { ult: m.ult } : {}); });
   const R = T.roles, ok = R && ['tee', 'approach', 'short', 'putt'].every(k => Number.isInteger(R[k]) && R[k] >= 0 && R[k] < roster.length) && new Set(['tee', 'approach', 'short', 'putt'].map(k => R[k])).size === 4;
   return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster, roles: ok ? Object.assign({}, R) : glAutoRoles(roster) };
 }
 // the hole being played, built from the course's seed (playoff holes go round again)
 function glHoleAt(i) { return glCourseHole(G.cs, (i % G.holes) % 9, glParOf(i)); }
-function glHoleNow() { return glHoleAt(G.h); }
+// (with the Wandering Cup, the cup where it has crept to: 14-umbral.js)
+function glHoleNow() { const H = glHoleAt(G.h); return G.hex ? glHexHole(H) : H; }
 
 function glStart(opts) {
   const o = opts || {}, T = o.teams || [];
@@ -35893,7 +35899,7 @@ function glStart(opts) {
   const cs = wild ? ((o.course != null ? o.course : R() * 4294967296) >>> 0) : GL_STAND;
   glNewGame({ holes, pars: wild ? glWildPars(cs, holes) : glPars(holes), honour: o.honour });
   Object.assign(G, {
-    cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 2)),
+    cs, wild, teams: [glTeam(T[0], 0), glTeam(T[1], 1)], skill: [0, 1].map(s => clamp(Math.round(o.skill && o.skill[s] != null ? o.skill[s] : 1), 0, 3)),
     wood: !!o.wood, enchant: !!o.enchant, webbed: [false, false], weather: GL_WEATHER[o.weather] ? o.weather : null,
     focus: [0, 1].map(() => [1, 1, 1, 1]), stance: [0, 1].map(() => ({ tempo: 'steady', mood: 'careful' })), word: [1, 1], wordOn: [false, false],
     scout: [0, 1].map(() => ({ go: 0, bad: 0 })), turned: false,
@@ -35902,6 +35908,8 @@ function glStart(opts) {
   });
   glPowersStart(o);
   glKitStart(o.bags);
+  // (the Umbral's hexes, when a game asks for them: 14-umbral.js)
+  glHexStart(o.hexes, o.hexOn);
   glHoleStart();
   return G;
 }
@@ -35938,11 +35946,12 @@ function glHit(s, plan) {
   const dist = GL_STANCE[glStanceOf(s).mood].dist * (G.webbed && G.webbed[s] ? GL_ENCH.webK : 1);
   if (plan.putt) {
     const k = (1.5 - rat.put) * fx.putt, a = plan.a + gauss() * GL_SWING.pa * k * em / fx.err, v = plan.v * (1 + gauss() * GL_SWING.pv * k * em / fx.err);
-    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK(), lip: fx.lip });
+    const P = glPutt({ hole: H, from: { x: b.x, y: b.y }, a, v, fk: glWetK(), lip: fx.lip, tilt: G.hex ? glHexTilt(s) : null });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  const key = plan.kind === 'short' ? rat.tch : rat.acc, k = 1.4 - key;
-  return glFlight(Object.assign({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * fx.dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, spin: plan.spin, rat, fk: glWetK() }, glFxFlight(fx, plan.aim, b)));
+  const key = plan.kind === 'short' ? rat.tch : rat.acc, k = 1.4 - key, ff = glFxFlight(fx, plan.aim, b);
+  if (G.hex) ff.wind = glHexWind(s, ff.wind);
+  return glFlight(Object.assign({ hole: H, from: { x: b.x, y: b.y }, lie: b.lie, club: plan.club, aim: plan.aim, pow: plan.pow * dist * fx.dist * (1 + gauss() * (plan.kind === 'short' ? GL_SWING.sp : GL_SWING.p) * k * em), err: gauss() * (plan.kind === 'short' ? GL_SWING.se : GL_SWING.e) * k * em, spin: plan.spin, rat, fk: glWetK() }, ff));
 }
 
 // who plays next: { side, d (yards to the pin), putt, give (the other side may give this putt) }, or null when it's over
@@ -35991,6 +36000,8 @@ function glShoot(s, plan, r) {
   // the powers: what this stroke spent goes, and what it earned (mana, the roar) comes in
   glPowersAfter(s, ev, plan);
   glKitAfter(s, plan);
+  // (the Wandering Cup creeps away from a ball that stopped near it: 14-umbral.js)
+  if (G.hex) glHexAfter(s, ev);
   ev.up = !!Hs.up[s] && !r.holed;
   if (r.holed && !r.water && !Hs.done[s]) glHoled(s); else glDecide();
   return glLogEv(ev, h0, Hs);
@@ -36083,6 +36094,8 @@ function glPlayStart(o) {
     mgr: { line: 'auto', ri: null }, line: o && o.line || null, autoPow: !(o && o.autoPow === false) };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
+  // (the Umbral's hexes, named over the first tee: 14-umbral.js)
+  if (G.hex) GD.msg += ` ${glHexLine()}.`;
 }
 // what is drawn: the hole and both balls, as they were before the shot in the air
 function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow(), wind: Object.assign({}, G.wind), match: glMatchText(0), st: G.hole.st.slice(), won: G.won.slice(), over: !!G.over }; }
@@ -36145,6 +36158,8 @@ const glFeet = n => `${n} ${n === 1 ? 'foot' : 'feet'}`;
 const glYards = d => d < 1 ? glFeet(Math.max(1, Math.round(d * 3))) : `${Math.round(d)} ${Math.round(d) === 1 ? 'yard' : 'yards'}`;
 function glShotSay(s, plan, d) {
   if (plan.putt) return `a putt from ${glYards(d)}`;
+  // (in the Grey Fog: the flag where it is seen)
+  if (G.hex && glHexFogged(s)) { const Hf = glHexSeen(glHoleNow(), s); d = hyp(G.ball[s].x - Hf.pin.x, G.ball[s].y - Hf.pin.y); return `${GL_CLUBS[plan.club].n.toLowerCase()} from the ${GL_TER[G.ball[s].lie] || 'fairway'}, about ${glYards(d)} to the flag in the fog`; }
   return `${GL_CLUBS[plan.club].n.toLowerCase()} from the ${GL_TER[G.ball[s].lie] || 'fairway'}, ${glYards(d)} to the pin`;
 }
 
@@ -36208,10 +36223,10 @@ function glHoleSay(ev) {
 }
 function glAimMsg() {
   const S = GD.sel; if (!S) return '';
-  const d = glDistOf(glHoleNow(), GD.you), who = glName(GD.you, S.ri), p = glPressure(GD.you);
+  const fog = !!G.hex && !S.putt && glHexFogged(GD.you), d = glDistOf(fog ? glHexSeen(glHoleNow(), GD.you) : glHoleNow(), GD.you), who = glName(GD.you, S.ri), p = glPressure(GD.you);
   const big = p ? `A stroke ${G.hole.st[GD.you] + 1 < G.hole.st[1 - GD.you] ? 'to win' : 'to halve'} the hole${p > 1 ? ', and a big one' : ''}: the ${S.putt ? 'bar runs quicker and wobbles' : 'meter runs quicker and the mark shakes'}, less for a steady nerve. ` : '';
   return big + (S.putt ? `${who} to putt, ${glYards(d)}. Aim with the arrows or a click on the green, then Space to start the stroke and Space again for the weight.`
-    : `${who} to hit, ${GL_CLUBS[S.club].n.toLowerCase()}, ${glYards(d)} to the pin. Space to start the swing, again for the power, again on the mark.`);
+    : `${who} to hit, ${GL_CLUBS[S.club].n.toLowerCase()}, ${fog ? `about ${glYards(d)} to the flag in the fog` : `${glYards(d)} to the pin`}. Space to start the swing, again for the power, again on the mark.`);
 }
 
 /* ---------- your shot: the choice ---------- */
@@ -36377,11 +36392,12 @@ function glStrike(s, S, sw) {
   const H = glHoleNow(), b = G.ball[s], rat = glRat(s, S.ri), from = { x: b.x, y: b.y };
   if (S.putt) {
     // (a drag pulled off the line starts the putt off line: + is left, as a hook; GL_HANDS.puttDeg of a degree a degree)
-    const fx = glFxFor(s), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK(), lip: fx.lip });
+    const fx = glFxFor(s), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK(), lip: fx.lip, tilt: G.hex ? glHexTilt(s) : null });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s), web = G.webbed && G.webbed[s] ? GL_ENCH.webK : 1;
-  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist * web, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, glFxFlight(fx, S.aim, b)));
+  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s), web = G.webbed && G.webbed[s] ? GL_ENCH.webK : 1, ff = glFxFlight(fx, S.aim, b);
+  if (G.hex) ff.wind = glHexWind(s, ff.wind);
+  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist * web, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, ff));
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;
@@ -36617,8 +36633,11 @@ function glDrawGrain(c, H) {
   c.restore();
 }
 function glDrawPin(c, H) {
-  const [x, y] = glScr(H.pin.x, H.pin.y), r = Math.max(2.2, GL_PUTT.cup * GLC.k * 1.2);
+  // (in the Grey Fog, your side sees the flag where the fog puts it, off the green, and the course under a veil)
+  const fog = !!G.hex && GD.disp.h === G.h && glHexFogged(GD.you), P = fog ? glHexSeen(H, GD.you).pin : H.pin;
+  const [x, y] = glScr(P.x, P.y), r = Math.max(2.2, GL_PUTT.cup * GLC.k * 1.2);
   c.save();
+  if (fog) { c.fillStyle = 'rgba(190,190,200,.18)'; c.fillRect(0, 0, 960, 600); }
   c.fillStyle = '#16210f'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
   const tall = clamp(GLC.k * 2.2, 18, 46), wv = Math.sin(GLC.t * 3) * 2;
   c.strokeStyle = '#efe9d8'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - tall); c.stroke();
@@ -36675,6 +36694,8 @@ function glDrawCard(c, H) {
   const st = GD.disp.st;
   lines.push(`Strokes this hole: ${G.teams[0].name} ${st[0]}, ${G.teams[1].name} ${st[1]}`);
   if (G.powers) lines.push(`Mana ${G.mana[0]}–${G.mana[1]} · Roar ${G.roar[0]}–${G.roar[1]}${G.mark && G.mark.h === GD.disp.h ? ` · ${G.mark.n} (${G.teams[G.mark.side].name})` : ''}`);
+  // (the Umbral's hexes, all game: 14-umbral.js)
+  if (G.hex) lines.push(glHexLine());
   c.save();
   c.save(); c.font = '13px system-ui, sans-serif'; const w = Math.max(...lines.map(t => c.measureText(t).width)) + 26; c.restore();
   c.fillStyle = 'rgba(16,26,12,.72)'; rr(c, 10, 10, Math.min(820, w), 28 + lines.length * 19, 7); c.fill();
@@ -36894,7 +36915,7 @@ function glPowersStart(o) {
 // the id of the power a cast of k by (s, ri) would be: a player's everyday power, their ultimate, or k itself
 function glPowIdOf(s, k, ri) {
   if (k === 'pow') { const P = glPowNow(s, ri); return P ? P.id : null; }
-  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? 0 : ri]; return (GL_ULT[m && m.kind] || GL_ULT.goblin).id; }
+  if (k === 'ult') return glUltOf(s, ri).id;
   return k;
 }
 // the everyday power player ri of side s would cast for their next stroke: long or short by the shot
@@ -36932,7 +36953,7 @@ function glCast(s, k, ri) {
     return '';
   }
   if (k === 'ult') {
-    const m = G.teams[s].roster[ri == null ? 0 : ri], U = GL_ULT[m.kind] || GL_ULT.goblin;
+    const U = glUltOf(s, ri);
     G.roar[s] -= GL_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, h: G.h, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     G.casts.push({ side: s, k, id: U.id, n: U.n, ri, h: G.h, st: H.st[s] });
     return '';
@@ -37006,7 +37027,7 @@ function glPowerTip(s, ri) {
     if (P.fx && P.fx.water) { const b = G.ball[s]; if (glTrouble(H, b, H.pin)) return `Tip: water on the line; ${P.n} brings a wet ball back.`; }
     if (P.curse) return `Tip: ${P.n} works on their next stroke.`;
   }
-  if (!glPowWhy(s, 'ult', ri)) { const U = GL_ULT[G.teams[s].roster[ri].kind] || GL_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this hole.`; }
+  if (!glPowWhy(s, 'ult', ri)) { const U = glUltOf(s, ri); return `Tip: the roar is up; ${U.n} would mark this hole.`; }
   return '';
 }
 // the moment's pressure on side s's next stroke, after its powers (nerve: none)
@@ -37324,6 +37345,142 @@ function glHoleGuide() {
   if (G.enchant) out.push(glLookItem('wyvern'));
   return out;
 }
+/* Mossgate Links in the Umbral (issue #99, phase 4f): the Lich, the hexes, and a champion's own ultimate. Nothing here
+   runs unless a game asks for it: with no hexes, no skill 3 and no player's own ultimate, the engine plays exactly as
+   before (same seed, same round).
+   The Lich (G.skill 3, above the Archmage; GL_SKILL's fourth column). It swings no better than an Archmage; it decides
+   better. Before each of its strokes it weighs every line it could play (go for it, the percentages, lay up) by
+   hitting each one a few times in its head through the same pure shot model (GL_LICH.tries swings, its own errors at
+   this moment, from a stream of its own so the round's random numbers are untouched) and plays the line that leaves
+   the fewest strokes to hole out (glLichLeft: by the distance and the lie). On a stroke that must drop to halve the
+   hole it plays for the drop instead. On the green it reads the slope far better (GL_SKILL.read[3]) and weighs each
+   pace the same way. Behind late, it goes for everything (as the Knight and the Archmage do). It makes you putt more
+   (give[3]), takes a potion worth 2 and casts as an Archmage.
+   Hexes (opts.hexes: ids in GL_HEX; G.hex = { ids, on, pin }, plain JSON, so a kept game keeps them). Each works
+   against one side, G.hex.on (opts.hexOn, 0 by default: yours):
+     tilt     The Restless Green: every putt that side strikes breaks on an extra tilt of GL_HEX.tilt.g, a new way each
+              putt; no read sees it (the read line and the caddie read the green as it lies)
+     wander   The Wandering Cup: after each of that side's shots from off the green that stops within
+              GL_HEX.wander.near yards of the cup, the cup creeps GL_HEX.wander.yd yards away from the ball, never off the green (G.hex.pin: this hole's
+              offset; glHoleNow() is the hole with the cup where it is now)
+     fog      The Grey Fog: off the green, that side sees the flag GL_HEX.fog.yd yards from where it is (a way and a
+              distance fixed for the hole): its caddie plays to it, and the picture and the words show it there
+     gust     The Turning Wind: on that side's full shots the wind swings GL_HEX.gust.turn from where it was read, and
+              blows GL_HEX.gust.mph harder
+   The hexes are named over the first tee, on the hole card all game, and the fogged flag is drawn where it is seen.
+   A player's own ultimate (a roster player sent with { ult: id }, an id in GL_ULT_OWN): used in place of their kind's
+   (glUltOf). The Hollow Links' champion brings one. */
+GL_SKILL.names[3] = 'Lich'; GL_SKILL.err[3] = 0.85; GL_SKILL.read[3] = 0.06; GL_SKILL.wind[3] = 1; GL_SKILL.give[3] = 0.45;
+GL_KIT.take[3] = 2;
+const GL_LICH = { tries: 14, lines: ['go', 'pct', 'lay'], side: 0.035, margin: 0.03, lie: { T: 0, F: 0, r: 0.25, R: 0.5, S: 0.4, B: 0.6, O: 0.65 } };
+const GL_HEX = {
+  tilt: { n: 'The Restless Green', d: 'Between your putts the green tilts: every putt you strike breaks a little on a slope no read can see, a new way each time.', g: 0.003 },
+  wander: { n: 'The Wandering Cup', d: 'The cup creeps away from you: when a shot of yours from off the green stops near the cup, it creeps most of a yard further from your ball.', yd: 0.75, near: 40 },
+  fog: { n: 'The Grey Fog', d: 'Fog hides the flag from you until you reach the green: you see it two or three yards from where it is.', yd: [2, 3.5] },
+  gust: { n: 'The Turning Wind', d: 'The wind turns as you swing: on your full shots it blows a twelfth of a turn from where you read it, and 1 mph harder.', turn: Math.PI / 6, mph: 1 },
+};
+const GL_ULT_OWN = {
+  hollowflag: glU('hollowflag', 'The Hollow Flag', 'The flag goes hollow for the other side: their read lines this hole half as long, and their putts a third shakier.', { nerve: 1 }, { read: 0.5, putt: 1.35 }),
+};
+const glUltOf = (s, ri) => { const m = G.teams[s].roster[ri == null ? 0 : ri]; return (m && m.ult && GL_ULT_OWN[m.ult]) || GL_ULT[m && m.kind] || GL_ULT.goblin; };
+
+/* ---------- the Lich ---------- */
+// the strokes left to hole out from d yards in lie (0 holed); a strokes-gained table in a line
+function glLichLeft(d, lie) {
+  if (lie === 'G') return 1 + Math.min(1.35, 0.9 * (1 - Math.exp(-Math.max(0, d - 0.3) / 3)) + 0.012 * d);
+  const base = 2 + 0.4 * (1 - Math.exp(-d / 40)) + d / 220;
+  return base + (GL_LICH.lie[lie] != null ? GL_LICH.lie[lie] : 0.3);
+}
+// how good a ball r is for side s: strokes left (a drop counts one), or, when only holing it will do, the drop first
+function glLichScore(s, r, must) {
+  if (r.holed && !r.water) return must ? -10 : 0;
+  const H = glHoleNow(), d = hyp(r.end.x - H.pin.x, r.end.y - H.pin.y);
+  return glLichLeft(d, r.lie) + (r.water ? 1 : 0);
+}
+// a plan hit GL_LICH.tries times in the Lich's head, its own errors at this moment, from a stream of its own (seed: the
+// same for every line it weighs, so they are compared on the same swings). Returns the mean score
+function glLichTry(s, plan, seed, must) {
+  const was = engRand; engRand = engRng(seed);
+  let t = 0;
+  try { for (let i = 0; i < GL_LICH.tries; i++) t += glLichScore(s, glHit(s, plan), must); } finally { engRand = was; }
+  return t / GL_LICH.tries;
+}
+// the Lich's shot: every line weighed, the best played (behind late, the Knight's rule: everything at the pin)
+function glLichPlan(s, ri, H, b, kind) {
+  const Hs = G.hole, o = 1 - s, up = s === 0 ? glUp() : -glUp(), left = glLeft();
+  if ((up <= -2 && left <= 4) || (up < 0 && left <= 2) || G.res.length >= G.holes) return null;
+  const must = Hs.done[o] && !Hs.up[o] && Hs.st[s] + 1 === Hs.st[o];
+  const seed = (Math.imul(G.log.length + 1, 2654435761) ^ Math.imul(G.h + 7, 40503) ^ (s + 1)) >>> 0;
+  // the line the Archmage would play is the one to beat: another must be better by GL_LICH.margin of a stroke (a few
+  // swings in the head are not the truth, and the closest call goes to the plain one)
+  const line0 = glCpuLine(s);
+  let best = null, bv = Infinity, base = null, b0 = Infinity;
+  const weigh = (plan, line) => { const v = glLichTry(s, plan, seed, must); if (line === line0 && base == null) { base = plan; b0 = v; } if (v < bv - 1e-9) { bv = v; best = plan; } };
+  if (kind === 'putt') {
+    // one read (as well as a Lich reads), then each pace weighed on it
+    const rat = glRat(s, ri), word = !!(G.wordOn && G.wordOn[s]), readK = word ? 1 : 1 + gauss() * GL_SKILL.read[3] * (1.4 - rat.put) / glHazeK();
+    for (const line of GL_LICH.lines) weigh(Object.assign({ ri, kind, club: 'pt', putt: true, line }, glRead(H, b, readK, GL_LINES[line].putt)), line);
+  } else {
+    // each line's plan, and the same aimed a little left and right of it (away from whatever the miss would find)
+    const seen = {};
+    for (const line of [line0].concat(GL_LICH.lines.filter(l => l !== line0))) {
+      const P0 = glPlan(s, ri, line), dx = P0.aim.x - b.x, dy = P0.aim.y - b.y, d = hyp(dx, dy) || 1, w = d * GL_LICH.side;
+      for (const k of [0, -1, 1]) {
+        const plan = k ? Object.assign({}, P0, { aim: { x: P0.aim.x - dy / d * w * k, y: P0.aim.y + dx / d * w * k } }) : P0;
+        const key = plan.club + ':' + plan.aim.x.toFixed(1) + ':' + plan.aim.y.toFixed(1) + ':' + plan.pow.toFixed(3);
+        if (seen[key]) continue; seen[key] = 1;
+        weigh(plan, k ? null : line);
+      }
+    }
+  }
+  return base && bv > b0 - GL_LICH.margin ? base : best;
+}
+
+/* ---------- the hexes ---------- */
+function glHexStart(ids, on) { const hx = (ids || []).filter((k, i, a) => GL_HEX[k] && a.indexOf(k) === i); if (hx.length) G.hex = { ids: hx, on: on === 1 ? 1 : 0, pin: null }; }
+const glHexHas = id => !!(G && G.hex && G.hex.ids.includes(id));
+const glHexOn = (id, s) => glHexHas(id) && s === G.hex.on;
+// a number from the course, the hole and k, 0 to 1 (never R: the round's random numbers are untouched)
+const glHexQ = k => ((Math.imul(((G.cs >>> 0) ^ Math.imul(G.h + 1, 2654435761)) + k, 40503) >>> 0) % 100000) / 100000;
+// The Wandering Cup: the hole with the cup where it has crept to this hole
+function glHexHole(H) {
+  const P = G && G.hex && G.hex.pin; if (!P || P.h !== G.h || (!P.dx && !P.dy)) return H;
+  return Object.assign({}, H, { pin: { x: H.pin.x + P.dx, y: H.pin.y + P.dy } });
+}
+// after side s's shot: the cup creeps away from a ball that stopped near it (kept on the green, inside its edge)
+function glHexAfter(s, ev) {
+  if (!glHexOn('wander', s) || ev.holed || ev.res != null || G.hole.done[s] || ev.lie0 === 'G') return;
+  const H = glHoleNow(), b = G.ball[s], d = hyp(H.pin.x - b.x, H.pin.y - b.y);
+  if (d > GL_HEX.wander.near) return;
+  const base = glHoleAt(G.h), g = base.green, ux = (H.pin.x - b.x) / (d || 1), uy = (H.pin.y - b.y) / (d || 1);
+  let x = H.pin.x + ux * GL_HEX.wander.yd, y = H.pin.y + uy * GL_HEX.wander.yd;
+  const e = Math.sqrt(((x - g.x) / g.rx) ** 2 + ((y - g.y) / g.ry) ** 2), k = 0.8;
+  if (e > k) { x = g.x + (x - g.x) * k / e; y = g.y + (y - g.y) * k / e; }
+  G.hex.pin = { h: G.h, dx: +(x - base.pin.x).toFixed(2), dy: +(y - base.pin.y).toFixed(2) };
+  ev.hex = 'wander';
+}
+// The Grey Fog: the hole as side s sees it off the green (the flag where the fog puts it)
+function glHexSeen(H, s) {
+  if (!glHexOn('fog', s)) return H;
+  const a = glHexQ(11) * Math.PI * 2, F = GL_HEX.fog.yd, r = F[0] + glHexQ(23) * (F[1] - F[0]);
+  return Object.assign({}, H, { pin: { x: H.pin.x + Math.cos(a) * r, y: H.pin.y + Math.sin(a) * r } });
+}
+// is side s in the fog now (off the green, its flag not where it is)?
+const glHexFogged = s => glHexOn('fog', s) && glShotKind(glHoleNow(), s) !== 'putt';
+// The Restless Green: the extra tilt under side s's putt now ([x, y] grade), a new way each putt
+function glHexTilt(s) {
+  if (!glHexOn('tilt', s)) return null;
+  const a = glHexQ(101 + G.hole.st[s] * 17 + G.log.length) * Math.PI * 2, g = GL_HEX.tilt.g;
+  return [g * Math.cos(a), g * Math.sin(a)];
+}
+// The Turning Wind: the wind side s's full shot really flies in (w: the wind it would have), a quarter turn either way
+function glHexWind(s, w) {
+  if (!glHexOn('gust', s)) return w;
+  const W = w || { s: 0, d: 0 }, sg = glHexQ(211 + G.log.length) < 0.5 ? -1 : 1;
+  return { s: (W.s || 0) + GL_HEX.gust.mph, d: (W.d || 0) + sg * GL_HEX.gust.turn };
+}
+const glHexNames = () => G && G.hex ? G.hex.ids.map(k => GL_HEX[k].n).join(', ') : '';
+const glHexLine = () => G && G.hex ? `Hexes on ${G.teams[G.hex.on].name}: ${glHexNames()}` : '';
 /* Mossgate Links' superstars (issue #92, phase 8), inside the wGL scope: each superstar's golf ratings and powers,
    added to the engine's own tables after its parts load, as the rink's are (rink/k0-stars.js). Plain assignments,
    nothing declared. Ratings are [power, accuracy, touch, putting, nerve, scrambling]; each has a long-game power and a
@@ -37571,6 +37728,11 @@ return {
   built: (seed, par) => glBuildHole(seed, par), wildPars: (cs, n) => glWildPars(cs, n), lie: (H, x, y) => glLie(H, x, y), slope: (H, x, y) => glSlope(H, x, y),
   reach: (club, lie, rat, pow) => glReach(club, lie, rat, pow), flight: s => glFlight(s), putt: p => glPutt(p), read: (H, from, k) => glRead(H, from, k == null ? 1 : k),
   plan: (s, line) => glPlan(s, null, line), turn: () => glTurn(), summary: () => G && G.teams ? glSummary() : null, simGame: o => glSimGame(o),
+  // the Umbral (14-umbral.js): start({ hexes: [ids], hexOn }) and skill 3 (the Lich); the hexes' table, a game's hexes
+  // ({ ids, on, pin } or null), the line on the hole card, the Lich's rules and its strokes-left table, the hole as a side
+  // sees it in the fog, the tilt under a side's putt, the wind its full shot flies in, and a player's own ultimates
+  hexes: JSON.parse(JSON.stringify(GL_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => glHexLine(), lichRules: JSON.parse(JSON.stringify(GL_LICH)), lichSet: o => Object.assign(GL_LICH, o), lichLeft: (d, lie) => glLichLeft(d, lie),
+  hexSeen: s => G && G.teams ? glHexSeen(glHoleNow(), s) : null, hexTilt: s => G && G.teams ? glHexTilt(s) : null, hexWind: (s, w) => G && G.teams ? glHexWind(s, w || G.wind) : null, ultOwn: JSON.parse(JSON.stringify(GL_ULT_OWN)), hole: () => G && G.teams ? glHoleNow() : null,
   // the hole inspector (13-inspect.js): what is at a point of the hole, and everything on it, in plain words
   look: (x, y) => glLookAt(x, y), holeGuide: () => glHoleGuide(), spots: () => glLookSpots().map(o => Object.assign({}, o)),
   set onShot(f) { GL_HOOK.onShot = f; }, get onShot() { return GL_HOOK.onShot; }, set onOver(f) { GL_HOOK.onOver = f; }, get onOver() { return GL_HOOK.onOver; },
@@ -65356,8 +65518,140 @@ W_UMB4.start.court = function (C, id) {
 W_ON_END[W_UMB4D.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
 /* u4e: hockey in the Umbral (issue #99, phase 4e): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
-/* u4f: golf in the Umbral (issue #99, phase 4f): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
-   Not built yet. */
+/* u4f: golf in the Umbral (issue #99, phase 4f). Loads after u4-grounds.js; changes earlier parts only by reassignment
+   (saved originals carry the wWU4F prefix). The engine's side is src/gl/parts/14-umbral.js: the Lich (CPU skill 3)
+   and the hexes (opts.hexes).
+
+   Tier U on the course is tier 4 in golf's tables: W_LKG.oppBonus[4] rating points on each of their four, the Lich
+   caddying for them (W_BALL.diff[4] = 3, the skill every engine reads by tier, named in W_BALL_SKILL), and a full bag
+   (W_LINKS_KIT.opp[4]). Tiers 1 to 3 are as they were.
+   The champion of the Hollow Links (u:g_links, the Rotwold): Sexton Vale, the Last Caddie, holds the Hollow Flag. Past
+   the two guards and the gate (u4), PLAY opens the game card (wUmbGlCard): tier U, the Nadir four (W_UMB4F.four, at
+   your team's level, the champion with an ultimate of their own, The Hollow Flag; W_UMB4F.champ.more points on top), the
+   hexes for this try, and Play, Manage or Simulate. The match is the Realm's own golf match (wStartLinks: save and
+   leave, resume after a reload, Concede, the scorecard) against club 'nadir:links' at tier 4 with kind 'unadirgl': its
+   end goes to wUmbNadirEnd (a golf match never ends level: a playoff settles it). Your four are caddied as a Knight in
+   Manage and Simulate, against the Lich, with the same hexes, so Simulate is no way round them. The toll, on a retry,
+   is paid at the real start (wUmbTollAtKickoff); backing away from the card costs nothing.
+   Hexes: golf's own (wGL.hexes, the engine's table), W_NADIR.links.hexes of them, drawn for each try by wUmbGlHexes
+   (fixed for the try: a reload doesn't redraw them), named on the card, in the log, over the first tee, on the hole
+   card all game and on the bar. In LAB mode PLAY skips the card and plays W_UMB4F.labHow (Simulate) at once.
+   The finale (u5) drives the same adapter with id 'finale' (no piece, no toll).
+
+   W_UMB4F, wUmbGlFour, wUmbGlHexes, wUmbGlCard, wUmbGlKick; W_NADIR.links, DB.chars.nadir_links, W_UMB4.start.links,
+   W_UMB4.live.links (PLAY with a golf match left half-played resumes it), W_ON_END.unadirgl
+   Wraps: wBallTeam (wWU4FBallTeam: the Nadir four's colours), wLinksOpp (wWU4FLinksOpp: the Nadir four), wGL.start and
+   wGL.simGame (wWU4FStart, wWU4FSimGame: the hexes go in), wLinksBarNote (wWU4FLinksBarNote: the hexes on the bar),
+   wLinksResultCard (wWU4FLinksResultCard: never over the end screen of a journey the finale ended). */
+
+const W_UMB4F = {
+  id: 'links', club: 'nadir:links', kind: 'unadirgl', tier: 4, labHow: 'sim',
+  team: { name: 'Hollow Links Nadir', short: 'NDR', color: '#3a2a4a', light: '#b6ff6a' },
+  // the four, in their roles' order (tee, approach, short game, putting); the champion's more points and own ultimate
+  four: [{ n: 'Ashgrove', kind: 'vampire' }, { n: 'Sexton Vale', kind: 'wraith', champ: true }, { n: 'Old Loam', kind: 'witch' }, { n: 'Mirebell', kind: 'spider' }],
+  champ: { more: 0, ult: 'hollowflag' },
+};
+// tier U in golf's tables (W_BALL.diff and W_BALL_SKILL are shared with the other sports' tier U: set once)
+W_LKG.oppBonus[4] = 1;
+W_LINKS_KIT.opp[4] = { draught: 2, glstill: 1, glmoss: 1, gloil: 1 };
+if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
+if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
+
+W_NADIR.links = { piece: 'golf', char: 'nadir_links', ground: 'g_links', map: 'u:g_links', region: 'bloom', engine: 'links', hexes: 1, toll: 30, gold: 100 };
+DB.chars.nadir_links = { name: 'Sexton Vale, the Last Caddie', kind: 'wraith', look: { coat: '#2e3a28', acc: 'hat' },
+  greet: 'Nobody finishes a round here. They just stop playing. I keep the FLAG on the last green. Say PLAY when you want to try for it, and ask about the RULES first. They change.',
+  topics: {
+    job: { t: 'I caddied on these links when they were green. I still do. Every round on this side ends on my last hole.' },
+    flag: { t: 'The Hollow Flag. One ninth of your Seal, and it flies on a green nobody has ever reached in regulation. Beat my four at golf and it is yours. Lose, and the next round costs a TOLL.' },
+    rules: { t: 'Match play, captain\'s choice, your four against my four, one ball a side. My side plays at your level and better at everything, a Lich carries our bag and reads every green for us, and we bring a full bag of potions. Before the first tee I draw the HEXES.' },
+    hexes: { t: 'A green that will not lie still. A cup that wanders off. Fog over the flag. A wind that turns while you swing. One of them, for you. You will hear which before the first tee.' },
+    hollow: { t: 'Once a round I let the flag go hollow. Your reads come up short, and your hands shake on the putts. Mind it.' },
+    toll: { t: 'Thirty gold a round, after the first. Paid on the first tee. Walking away from the card costs nothing.' },
+    play: { t: 'Then pick your four.', act: 'unadir:links' },
+  } };
+
+/* ---------- the Nadir four ---------- */
+// at your team's level (level parity), tier U's points on each (spread as wLinksOpp spreads a tier's), the champion
+// with W_UMB4F.champ.more points more and their own ultimate
+function wUmbGlFour(lvl) {
+  const L = lvl != null ? lvl : Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier())), k = W_LKG.oppBonus[W_UMB4F.tier] || 0, X = W_UMB4F.champ;
+  const roster = W_UMB4F.four.map((f, j) => {
+    const p = wLinksPlayer(wMakePlayer({ kind: f.kind, lvl: L, n: f.n }, 'opp')), n = k + (f.champ ? X.more : 0);
+    p.n = f.n;
+    for (let i = 0; i < n; i++) { const s = wGL.stats[(i * 5 + j) % wGL.stats.length]; p.r[s] = Math.min(wGL.cap, p.r[s] + 1); }
+    if (f.champ) p.ult = X.ult;
+    return p;
+  });
+  const T = W_UMB4F.team;
+  return { name: T.name, short: T.short, color: T.color, roster, roles: { tee: 0, approach: 1, short: 2, putt: 3 } };
+}
+const wWU4FBallTeam = wBallTeam;
+wBallTeam = function (club) { if (club === W_UMB4F.club) { const T = W_UMB4F.team; return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.6), light: T.light, motto: '' }; } return wWU4FBallTeam.apply(this, arguments); };
+const wWU4FLinksOpp = wLinksOpp;
+wLinksOpp = function (club, tier) { return club === W_UMB4F.club ? wUmbGlFour() : wWU4FLinksOpp.apply(this, arguments); };
+
+/* ---------- the hexes ---------- */
+const WU4F = { next: null };
+const wWU4FStart = wGL.start, wWU4FSimGame = wGL.simGame;
+wGL.start = o => wWU4FStart(WU4F.next ? Object.assign({}, o, { hexes: WU4F.next.slice(), hexOn: 0 }) : o);
+wGL.simGame = o => wWU4FSimGame(WU4F.next ? Object.assign({}, o, { hexes: WU4F.next.slice(), hexOn: 0 }) : o);
+// n of golf's hexes for this try of the champion: fixed for the try (the same draw after a reload)
+function wUmbGlHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wGL.hexes), r = mulberry(wUmbHash('gl:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));
+  const out = []; while (out.length < Math.min(Math.max(0, n), ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+const wUmbGlHexWords = hx => hx.map(h => wGL.hexes[h]).filter(Boolean);
+
+/* ---------- PLAY: the card, then the first tee ---------- */
+function wUmbGlCard(C, id, hx) {
+  const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier()));
+  const H = wUmbGlHexWords(hx), uo = wGL.ultOwn[W_UMB4F.champ.ult], champ = W_UMB4F.four.find(f => f.champ).n, piece = W_UMB_PIECES[C.piece];
+  const toll = !C.toll ? '' : tries > 0 ? `This round costs the toll, ${C.toll} gold, on the first tee.` : `The first round is free; after a loss, each costs a toll of ${C.toll} gold.`;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
+    <p><b>The Hollow Links: tier U.</b> Golf against the ${esc(W_UMB4F.team.name)}: level ${lvl}, in umbral form (${W_LKG.oppBonus[W_UMB4F.tier]} rating points on each of their four), their bag carried by a ${esc(W_BALL_SKILL[wLinksSkill(W_UMB4F.tier)[1]])}, who weighs every shot before they play it and reads the greens better than any caddie you have met, and a full bag of potions. ${esc(champ)} plays for them, and once a round lets ${esc(uo.n)} fly: ${esc(uo.desc)}</p>
+    <p class="hint wumbpg"><b>Hexes:</b> ${H.length ? H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ') : 'none'}</p>
+    <p class="hint">Win, and ${C.piece ? `${esc(piece.n)} is yours, with ${C.gold} gold` : `${esc(piece.n)} is yours`}. ${toll} A golf match never ends level. <b>Play</b>: you swing every shot. <b>Manage</b>: you call the line and the stances; your four swing. <b>Simulate</b>: the result now.</p></div>
+    <div class="row"><button class="btn" data-ugl="play">Play</button><button class="ghost" data-ugl="manage">Manage</button><button class="ghost" data-ugl="sim">Simulate</button><button class="ghost" id="wUglNo">Not now</button></div>`, () => wDrain());
+  $('modalBox').querySelectorAll('[data-ugl]').forEach(b => b.onclick = () => { close(); const why = wUmbGlKick(C, id, hx, b.dataset.ugl); if (why) wLog(why, 'b'); });
+  $('wUglNo').onclick = () => close();
+  const f = $('modalBox').querySelector('[data-ugl="play"]'); if (f) f.focus();
+}
+// why your team can't play the champion now, or ''
+function wUmbGlWhy() { const probs = wLinksProblems(); if (probs.length) return probs.join(' '); return wLinksLive() ? 'Finish the golf match you started first.' : ''; }
+// the first tee: the toll (on a retry), the hexes in the log, and the Realm's golf match at tier U ('' when it started)
+function wUmbGlKick(C, id, hx, how) {
+  const why = wUmbGlWhy(); if (why) return why;
+  if (typeof wUmbTollAtKickoff === 'function') wUmbTollAtKickoff(id);
+  const H = wUmbGlHexWords(hx);
+  if (H.length) wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
+  WU4F.next = hx.slice();
+  try { return wStartLinks({ club: W_UMB4F.club, how, tier: W_UMB4F.tier, kind: W_UMB4F.kind, ref: { id, hexes: hx.slice() }, cup: true }); } finally { WU4F.next = null; }
+}
+W_UMB4.live.links = () => wLinksLive();
+W_UMB4.start.links = function (C, id) {
+  // (a match left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wLinksLive()) { wResumeLinks(); return ''; }
+  const why = wUmbGlWhy(); if (why) return why;
+  const hx = wUmbGlHexes(id, C.hexes || 1);
+  if (LAB) return wUmbGlKick(C, id, hx, W_UMB4F.labHow);
+  wUmbGlCard(C, id, hx);
+  return '';
+};
+// the end: the piece, or a try counted (the finale's entry is rebuilt by u5 after a reload, so no check on W_NADIR here)
+W_ON_END[W_UMB4F.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
+
+/* ---------- on screen ---------- */
+// the bar: the hexes, while a Nadir match is on
+const wWU4FLinksBarNote = wLinksBarNote;
+wLinksBarNote = function () {
+  const r = wWU4FLinksBarNote.apply(this, arguments), L = WG && WG.lkg && WG.lkg.live, hx = L && L.world.kind === W_UMB4F.kind && wGL.hex();
+  if (hx && WGL && !WGL.over && $('wLinksNote')) $('wLinksNote').textContent += ` The Umbral, tier U. Hexes: ${hx.ids.map(h => wGL.hexes[h].n).join(', ')}.`;
+  return r;
+};
+// after a Hardcore journey ends on the finale's lost round, the golf result card stays off the end screen
+const wWU4FLinksResultCard = wLinksResultCard;
+wLinksResultCard = function () { if (RUN && RUN.over) return; return wWU4FLinksResultCard.apply(this, arguments); };
 /* u4g: bowling in the Umbral (issue #99, phase 4g): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.
    Not built yet. */
 /* u4h: curling in the Umbral (issue #99, phase 4h): tier U, the Lich CPU, the hexes, the Nadir champion and the piece.

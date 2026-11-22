@@ -114,7 +114,7 @@ function glPowersStart(o) {
 // the id of the power a cast of k by (s, ri) would be: a player's everyday power, their ultimate, or k itself
 function glPowIdOf(s, k, ri) {
   if (k === 'pow') { const P = glPowNow(s, ri); return P ? P.id : null; }
-  if (k === 'ult') { const m = G.teams[s].roster[ri == null ? 0 : ri]; return (GL_ULT[m && m.kind] || GL_ULT.goblin).id; }
+  if (k === 'ult') return glUltOf(s, ri).id;
   return k;
 }
 // the everyday power player ri of side s would cast for their next stroke: long or short by the shot
@@ -152,7 +152,7 @@ function glCast(s, k, ri) {
     return '';
   }
   if (k === 'ult') {
-    const m = G.teams[s].roster[ri == null ? 0 : ri], U = GL_ULT[m.kind] || GL_ULT.goblin;
+    const U = glUltOf(s, ri);
     G.roar[s] -= GL_ROAR.ult; G.ultUsed[s] = true; G.mark = { side: s, h: G.h, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     G.casts.push({ side: s, k, id: U.id, n: U.n, ri, h: G.h, st: H.st[s] });
     return '';
@@ -226,7 +226,7 @@ function glPowerTip(s, ri) {
     if (P.fx && P.fx.water) { const b = G.ball[s]; if (glTrouble(H, b, H.pin)) return `Tip: water on the line; ${P.n} brings a wet ball back.`; }
     if (P.curse) return `Tip: ${P.n} works on their next stroke.`;
   }
-  if (!glPowWhy(s, 'ult', ri)) { const U = GL_ULT[G.teams[s].roster[ri].kind] || GL_ULT.goblin; return `Tip: the roar is up; ${U.n} would mark this hole.`; }
+  if (!glPowWhy(s, 'ult', ri)) { const U = glUltOf(s, ri); return `Tip: the roar is up; ${U.n} would mark this hole.`; }
   return '';
 }
 // the moment's pressure on side s's next stroke, after its powers (nerve: none)

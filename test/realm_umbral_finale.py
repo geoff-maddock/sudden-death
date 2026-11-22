@@ -76,7 +76,7 @@ async def main():
         # and is reported, a round won or a try counted, and nothing throws)
         ra = await pg.evaluate("""(() => { const out = {}, U = WG.umbral; WG.hardcore = false; U.sealed = 0;
           LAB = true; for (const k of ['goblin', 'dwarf', 'ogre', 'elf']) wRecruit({ kind: k, lvl: 5 }, 'tavern'); LAB = false;
-          for (const [piece, e] of [['baseball', 'diamond'], ['football', 'gridiron'], ['boxing', 'ring']]) {
+          for (const [piece, e] of [['baseball', 'diamond'], ['football', 'gridiron'], ['boxing', 'ring'], ['basketball', 'court'], ['golf', 'links']]) {
             if (!window['__real_' + e]) { out[piece] = 'no adapter'; continue; }
             W_UMB4.start[e] = window['__real_' + e]; U.finaleSports = [piece, 'card', 'golf']; U.finale = 0; U.tries.finale = 0;
             let why; try { LAB = true; why = wUmbFinale(); } catch (err) { why = 'threw: ' + err.message; } finally { LAB = false; }

@@ -1718,3 +1718,59 @@ a five-minute game has few free throws.
 
 **The champion as played**, one hex drawn a try: **about 15%** (17.1% in 1,000, 13.8% in 2,000), inside the 15 to 25%
 band. A careful human, calling the sets and timing the shots, wins far more.
+
+### Umbral: golf (#99, 4f)
+
+`python3 test/realm_links_lab.py N '' umbral` (the Umbral part of the golf lab). Matches as Simulate plays the Hollow
+Links' champion: your four at level 3 (the journey's kinds) caddied as a Knight, against level 3 (level parity), nine
+holes on the standing nine with the wood, the enchanted course and powers on. Every row draws match i's two fours from
+the same seeded stream, so the rows in a run play the same players; a run's journey (its first player) is new each
+time, and runs differ by up to 6 points, so two runs of 800 a row are given.
+
+Tier U on the course is tier 4 in golf's tables: `W_LKG.oppBonus[4]` rating points on each of their four, a full bag
+(`W_LINKS_KIT.opp[4]`: two draughts, Still Water, Moss Tonic, Agatha's Oil) and the Lich caddying (skill 3,
+`src/gl/parts/14-umbral.js`). Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same round
+seed for seed (36 seeded rounds across every skill, length, weather, the wood, the enchanted course, powers and bags,
+before and after this part: identical, summary and shot log).
+
+**The Lich.** It swings no better than an Archmage (the same error); before each stroke it hits every line (go, the
+percentages, lay up), each aimed straight and a little left and right, 14 times in its head through the same shot
+model, and plays the one that leaves the fewest strokes to hole out, unless the Archmage's own choice is within 0.03 of
+a stroke. On the green it reads far better (read error 0.06 against 0.12) and weighs each pace the same way.
+
+| even level, no bonus, no bags (your win) | run 1 | run 2 |
+|---|---|---|
+| their caddie an Archmage | 32.1% | 31.0% |
+| their caddie the Lich | 22.4% | 24.8% |
+
+Six to ten points from its decisions alone (over 600 rounds against a Knight, a Lich side takes about 0.07 strokes a
+hole fewer than an Archmage side: fewer putts, more lay-ups to a wedge).
+
+**Tier U.** Tier 3's bonus is 7 points at two levels up; golf's ratings are steep (one point on one rating a player
+moved the parity match about 8 points in a fixed-four probe), so tier U's bonus at level parity is small and the Lich
+and the bag do the rest. First cut 3 points (and the champion 2 more): the Nadir four at 14.7% with no hexes and 0% with
+two. Kept: **1 point**, the champion no more (their own ultimate, The Hollow Flag, is their mark: within noise for the
+bot, 16.3% against 19.4% in run 1, 12.8% against 13.4% in run 2).
+
+| your win, level parity (800 a row) | run 1 | run 2 |
+|---|---|---|
+| tier 3, a rival's four as the world sets it (two levels up, 7 points, Archmage, bag) | 19.1% | 13.8% |
+| tier U, your own kinds (1 point, the Lich, the full bag) | 15.8% | 15.1% |
+| **the Nadir four, no hexes (the champion's game)** | **19.4%** | **13.4%** |
+
+**The hexes** (14-umbral.js), each against your side, each alone on the champion's game:
+
+| hex | first cut (300) | kept, run 1 | kept, run 2 |
+|---|---|---|---|
+| none | 14.7% | 19.4% | 13.4% |
+| The Restless Green (a tilt no read sees under your putts: first 0.011, kept 0.003) | -13.4 | -3.9 | -2.3 |
+| The Wandering Cup (the cup creeps from your ball: first 2 yd after any shot, kept 0.75 yd after a shot from off the green) | -13.0 | -5.8 | -4.3 |
+| The Grey Fog (the flag seen off the green: first 6 to 10 yd, kept 2 to 3.5) | -11.4 | -4.0 | -3.1 |
+| The Turning Wind (on your full shots: first a quarter turn and 4 mph, kept a twelfth and 1 mph) | -13.4 | -2.0 | -3.9 |
+| **the champion as played: one drawn** | | **17.0%** | **9.4%** |
+| two drawn (the finale's round) | 0% | 11.5% | 5.9% |
+
+The first cut swung each by 11 to 13 points: the bot's game is precise, so a few yards cost a hole. Kept, none moves
+the game by more than about 6 points. The champion draws one hex a try (two was 4 to 6 points more): about 13% across
+the two runs, a little under the 15 to 25% band, as football's champion is; a careful human, who sees the fog and
+reads the cup's creep, wins more.
