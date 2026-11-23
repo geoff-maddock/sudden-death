@@ -132,8 +132,8 @@ const wUmbShadowOk = (m, x, y) => wUmbFreeAt(m, x, y) && !wUmbLanternLit(m, x, y
 function wUmbShadowShove(m, s) {
   for (const [x, y] of [[s.hx, s.hy]].concat([[2, 0], [-2, 0], [0, 2], [0, -2], [3, 1], [-3, -1], [1, 3], [-1, -3]].map(([dx, dy]) => [s.x + dx, s.y + dy])))
     if (!(x === WG.x && y === WG.y) && wUmbShadowOk(m, x, y)) { s.x = x; s.y = y; return true; }
-  // (nowhere near to go: it sinks back into the ground, and another gathers somewhere else)
-  const S = wUmbShadows(), i = S.indexOf(s); if (i >= 0) S.splice(i, 1);
+  // (nowhere near to go: it sinks back into the ground, and another gathers somewhere else, the next day)
+  const S = wUmbShadows(), i = S.indexOf(s), U = wUmb(); if (i >= 0) { S.splice(i, 1); (U.shadowWait = U.shadowWait || []).push((WG.dayAbs || 0) + 1); }
   return false;
 }
 function wUmbShadowsSync() {
@@ -227,8 +227,8 @@ wTryMove = function (dx, dy) {
   const s0 = wUmbShadowAt(WG.x + dx, WG.y + dy);
   if (s0) { WG.face = dx < 0 ? 'l' : dx > 0 ? 'r' : dy < 0 ? 'u' : 'd'; wUmbShadowMatch(s0); return false; }
   const n0 = W_UMB8C.started, moved = wWU8CTryMove.apply(this, arguments);
-  // (a step that took you somewhere else, or started a match, is the end of it: the match comes first, and its card
-  // and save already have your HP and where you stand)
+  // (a step that took you somewhere else, or started a match, is the end of it. A hazard tile never rolls a wild match
+  // (wEncounterP), so a match started here never skips one)
   if (!moved || WG.map !== m0 || W_UMB8C.started !== n0) return moved;
   wUmbHazardStep();
   const s = wUmbShadowStep();
@@ -236,7 +236,11 @@ wTryMove = function (dx, dy) {
   return moved;
 };
 const wWU8CEncounterP = wEncounterP;
-wEncounterP = function (m) { const p = wWU8CEncounterP.apply(this, arguments); return m && m.umbral && m.kind === 'world' ? p * W_UMB8C.encMult : p; };
+wEncounterP = function (m) {
+  const p = wWU8CEncounterP.apply(this, arguments); if (!m || !m.umbral || m.kind !== 'world') return p;
+  // (the step's tile is where you now stand: a spike or a pit is its own trouble, and never a wild match as well)
+  return WG && WG.map === m.id && wUmbHazardAt(m, WG.x, WG.y) ? 0 : p * W_UMB8C.encMult;
+};
 const wWU8CLookText = wLookText;
 wLookText = function (x, y) {
   const m = wCurMap();

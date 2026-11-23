@@ -54,17 +54,17 @@ async def main():
         wd = await pg.evaluate("""(() => { const U = WG.umbral, out = {};
           // the Hockey champion draws 1 hex; the Gatekeeper 2
           out.hk0 = wUmbHkHexes('rink', 1).length; out.gate0 = wUmbHexes('gate', 2).length;
-          WG.items.uward = (WG.items.uward || 0) + 1; const lv = W_UMB4.live.diamond; W_UMB4.live.diamond = () => true; out.live = wUseItem('uward'); W_UMB4.live.diamond = lv; WG.items.uward--;
           out.use = wUseItem('uward'); out.ready = U.ward; out.again = wUseItem('uward') !== '';
           out.hk1 = wUmbHkHexes('rink', 1).length; out.gate1 = wUmbHexes('gate', 2).length;
           out.bk = wUmbBkHexes('court', 1).length; out.cr = wUmbCrHexes('shed', 1).length;
-          // a game ends (lost): the ward is used up
+          // another champion's game, drawn before the ward (left half-played and resumed), ends: the ward stays
+          U.wardFor = 'gate'; W_ON_END.nadir('lose', { id: 'rink' }); out.kept = U.ward; U.tries.rink = 0;
+          // the game whose draw it trimmed ends (lost): the ward is used up
           W_ON_END.nadir('lose', { id: 'gate' }); out.after = U.ward; out.gate2 = wUmbHexes('gate', 2).length; U.tries.gate = 0;
           return out; })()""")
-        check('half-played' in wd['live'], 'no ward while a game is left half-played (its hexes are drawn)', wd)
         check(wd['hk0'] == 1 and wd['gate0'] == 2 and wd['use'] == '' and wd['ready'] == 1 and wd['again'], 'a Hex Ward readies from the Bag (one at a time)', wd)
         check(wd['hk1'] == 0 and wd['gate1'] == 1 and wd['bk'] == 0 and wd['cr'] == 0, 'with it readied, every draw has a hex fewer, a 1-hex champion none', wd)
-        check(wd['after'] == 0 and wd['gate2'] == 2, 'the ward is used up when the game ends', wd)
+        check(wd['kept'] == 1 and wd['after'] == 0 and wd['gate2'] == 2, 'the ward is used up when the game it trimmed ends, not by another', wd)
 
         ic = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; out.use = wUseItem('uichor'); out.ready = U.ichor;
           wEnterMap('u:umbralden', 5, 5);

@@ -67,6 +67,8 @@ async def main():
           wEnterMap('u:world', x - dx, y - dy); WG.grace = 0; RUN.hp = 30; wTryMove(dx, dy); out.open = [WG.x === x && WG.y === y, RUN.hp, Math.abs(WG.x - x) + Math.abs(WG.y - y)];
           U.pieces = []; return out; })()""")
         check(sp['spike'] == [True, 28] and sp['floor'] == 1, 'a spike costs 2 HP, and never takes you below 1', sp)
+        en = await pg.evaluate("(() => { const m = MAPS['u:world'], k = Object.keys(m.hazards)[0].split(',').map(Number); wEnterMap('u:world', k[0], k[1]); const on = wEncounterP(m, m.t[k[1]][k[0]]); wEnterMap('u:world', 2, 2); return on; })()")
+        check(en == 0, 'a hazard tile never rolls a wild match as well', en)
         check(sp['closed'] == [True, 30] and not sp['open'][0] and sp['open'][1] == 27 and 2 <= sp['open'][2] <= 8, 'a pit holds in the Quiet; from the Stirring it costs 3 HP and you come up somewhere else', sp)
 
         # the shadows

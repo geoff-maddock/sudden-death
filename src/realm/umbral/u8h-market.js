@@ -3,7 +3,8 @@
 
    Every dark shop has a second list, for a trophy (W_UMB8H.wares): the Umbral's own wares, which nothing else sells.
      Hex Ward      ready it from the Bag: the next Nadir game you play (a champion's, or a round of the Seal) draws one
-                   hex fewer (WG.umbral.ward; used up when that game ends, won or lost; backing away keeps it)
+                   hex fewer (WG.umbral.ward; used up when the game whose draw it trimmed ends, won or lost, WG.umbral.wardFor;
+                   backing away keeps it, and a game drawn before it was readied never spends it)
      Lantern Oil   from the Bag, on the dark side: rest where you stand, once, as by a lantern (you wake by your last
                    lantern after a blackout, as before)
      Ichor Draught ready it from the Bag: your next card match on the dark side starts with 2 Strength (WG.umbral.ichor)
@@ -32,7 +33,13 @@ DB.items.uichor = { name: 'Ichor Draught', desc: `A black draught. Ready it from
 /* ---------- the hex count ---------- */
 // how many hexes come off this Nadir game's draw (u8f's shards and u8g's well-won pieces wrap it)
 function wUmbHexCut(id) { const U = wUmb(); return U && U.ward ? 1 : 0; }
-const wUmbCutHexes = (id, hx) => { const n = Math.max(0, wUmbHexCut(id) || 0); return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx; };
+// (the ward remembers which champion's draw it last trimmed: only that game's end uses it up, so a game whose hexes were
+// drawn before it was readied, left half-played and resumed, never spends it)
+const wUmbCutHexes = (id, hx) => {
+  const n = Math.max(0, wUmbHexCut(id) || 0), U = wUmb();
+  if (U && U.ward && Array.isArray(hx) && hx.length) U.wardFor = id;
+  return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx;
+};
 const wWU8HHexes = wUmbHexes; wUmbHexes = function (id) { return wUmbCutHexes(id, wWU8HHexes.apply(this, arguments)); };
 const wWU8HBallHexes = wUmb4aHexes; wUmb4aHexes = function (id) { return wUmbCutHexes(id, wWU8HBallHexes.apply(this, arguments)); };
 const wWU8HGfHexes = wUmbGfHexes; wUmbGfHexes = function (id) { return wUmbCutHexes(id, wWU8HGfHexes.apply(this, arguments)); };
@@ -45,11 +52,10 @@ const wWU8HCrHexes = wUmbCrHexes; wUmbCrHexes = function (id) { return wUmbCutHe
 // the ward is used up by the game it was readied for, won or lost (a game backed away from never ends: it keeps)
 const wWU8HOnNadir = W_ON_END.nadir;
 W_ON_END.nadir = function () {
-  // (cleared first: an error further down the chain must not leave it for the next game)
-  const U = wUmb(), had = U && U.ward;
-  if (had) { U.ward = 0; if (!LAB) wLog('The Hex Ward unravels. It did its work.', 'd'); }
-  const r = wWU8HOnNadir.apply(this, arguments); if (had) wSave();
-  return r;
+  // (cleared first, so an error further down the chain can't leave it for the next game; said after the game's own lines)
+  const U = wUmb(), ref = arguments[1], had = U && U.ward && ref && ref.id && U.wardFor === ref.id;
+  if (had) { U.ward = 0; U.wardFor = null; }
+  try { return wWU8HOnNadir.apply(this, arguments); } finally { if (had) { if (!LAB) wLog('The Hex Ward unravels. It did its work.', 'd'); wSave(); } }
 };
 
 /* ---------- the draught ---------- */
@@ -68,9 +74,7 @@ wUseItem = function (k) {
   if (B && !B.over && UI.view === 'fight') return 'Not during a match.';
   if (!wHas(k)) return `You have no ${DB.items[k].name}.`;
   if (k === 'uward') {
-    if (U.ward) return 'A ward is already readied.';
-    // (a game left half-played drew its hexes at kickoff: a ward readied now would be spent on it for nothing)
-    if (Object.keys(W_UMB4.live).some(e => { try { return W_UMB4.live[e](); } catch (err) { return false; } })) return 'Finish the game you left half-played first: its hexes are already drawn.'; wAddItem(k, -1); U.ward = 1; wLog('You knot the Hex Ward round your captain\'s wrist. The next Nadir game draws one hex fewer.', 'm'); }
+    if (U.ward) return 'A ward is already readied.'; wAddItem(k, -1); U.ward = 1; wLog('You knot the Hex Ward round your captain\'s wrist. The next Nadir game draws one hex fewer.', 'm'); }
   else if (k === 'uichor') { if (U.ichor) return 'A draught is already readied.'; wAddItem(k, -1); U.ichor = 1; wLog(`You pour the Ichor Draught. Your next card match on this side starts with ${W_UMB8H.str} Strength.`, 'm'); }
   else {
     if (!wUmbDark()) return 'Lantern Oil only burns on the dark side.';
