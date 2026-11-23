@@ -12,22 +12,25 @@
    laid on a lattice in map coordinates, so they run on across tile edges. Look says the dark tile's words
    (W_UMB8B.look), unless the place has words of its own.
    The sky in a card match (Sudden Death's two skylights) is mirrored left for right on the dark side, the moon's on
-   the right and the constellations reversed, and the dead moon hangs in the skylight just clear of the moon. The sky still
-   does what it does on the light side; only the drawing changes. (The Realm's world view draws no sky of its own;
+   the right and the constellations reversed, and the dead moon hangs in the moon's dark part (or, when the moon is
+   gibbous or full, just clear of it). The sky still does what it does on the light side; only the drawing changes. (The Realm's world view draws no sky of its own;
    baseball's engine draws its own and is left as it is.)
 
    W_UMB8B, wUmbSkyMirrored
    Wraps: WGND['.'], WGND['"'], WGND['~'], WGND.s, WGND.n, WGND[':'] (wWU8BGnd[ch]: ash, ichor, bone drift, salt), WOBJ.T,
    WOBJ.f, WOBJ.p (wWU8BObj[ch]: dead trees), wUmbralMap (wWU8BUmbralMap: the ichor's shades, m.waterSh, read by w4's
    chunk builder), wLookText (wWU8BLookText: the dark tiles' words), drawSky (wWU8BDrawSky: mirrored), drawMoon
-   (wWU8BDrawMoon: the dead moon beside it), starsSVG and moonSVG (wWU8BStarsSVG, wWU8BMoonSVG: the
+   (wWU8BDrawMoon: the dead moon in its shadow), starsSVG and moonSVG (wWU8BStarsSVG, wWU8BMoonSVG: the
    chips reversed too), renderHelp (wWU8BRenderHelp: a line on the land). */
 
 const W_UMB8B = {
   ash: '#5e5963', salt: '#d2cbc0', bone: '#ddd5c2', ichor: '#0c0612', trunk: '#6f6a72',
   // the water's shades baked into the map (w4's WWATER, by depth): black ichor, faintly violet in the shallows, and a
   // dim violet edge where the land meets it, never white foam
-  water: { shallow: [52, 26, 70, .55], mid: [26, 12, 40, .5], deep: [8, 4, 14, .6], foam: ['rgba(120,80,170,.2)', 'rgba(170,130,225,.28)'] },
+  // (thick enough that the live water under it barely shows; sea: the deep shade x .6 at its alpha, as the chunks mix
+  // it, so the open sea past the map's edge meets the map without a seam)
+  water: { shallow: [40, 20, 56, .7], mid: [20, 10, 32, .74], deep: [6, 2, 10, .8], foam: ['rgba(120,80,170,.2)', 'rgba(170,130,225,.28)'],
+    sea: [3.6, 1.2, 6, .8], ripple: ['rgba(150,100,210,.38)', 'rgba(0,0,0,.4)'] },
   look: {
     '.': 'Ash, ankle deep. Something under it moves when you stop.',
     '"': 'Dead stalks standing in the ash, waist high. They rattle when there is no wind.',
@@ -83,8 +86,8 @@ function wU8bBone(c, x, y, len, a) {
 const W_U8B_GND = {
   '.': (c, P, r) => wU8bAsh(c, P, r, false),
   '"': (c, P, r) => wU8bAsh(c, P, r, true),
-  // the water under is drawn live beneath the chunk: darken it, and lay an oily sheen on top
-  '~': (c, P, r) => { c.fillStyle = 'rgba(10,4,16,.5)'; c.fillRect(0, 0, 32, 32); if (r() < .7) wU8bSheen(c, r, 1 + (r() < .35 ? 1 : 0)); },
+  // the ichor itself is the map's water shades (m.waterSh, baked under the ground): lay an oily sheen on it
+  '~': (c, P, r) => { if (r() < .4) wU8bSheen(c, r, 1); },
   s: (c, P, r) => {
     c.fillStyle = wMix(P.fen, '#150d1b', .55); c.fillRect(0, 0, 32, 32);
     wMottle(c, r, 3, 'rgba(160,130,190,.06)', 'rgba(0,0,0,.16)');
@@ -197,15 +200,24 @@ drawSky = function (c) {
   c.save(); c.translate(SW, 0); c.scale(-1, 1);
   try { return wWU8BDrawSky.apply(this, arguments); } finally { c.restore(); }
 };
-// the dead moon, a small black disc with a cold rim, hanging just clear of the moon (never over it: its phase matters)
+// the dead moon, a black disc with a cold rim. It hangs in the moon's own dark part, never over the lit limb (the phase
+// matters): a big disc on the dark half of a new, crescent or quarter moon; when the moon is gibbous or full, a small one
+// just clear of it, inside the skylight's frame (the frame, radius r * 1.5, is drawn over its outer 2.5px)
+function wU8bDeadMoon(x, y, r, phase) {
+  const p = ((phase | 0) % 8 + 8) % 8, side = p <= 4 ? -1 : 1;   // the unlit side: west while waxing, east while waning
+  if (p === 0 || p === 1 || p === 7) return [x + side * r * .3, y, r * .45];
+  if (p === 2 || p === 6) return [x + side * r * .45, y, r * .35];
+  const dr = r * .13, a = -Math.PI / 2 - .35, d = r + dr + .6;
+  return [x + Math.cos(a) * d, y + Math.sin(a) * d, dr];
+}
 const wWU8BDrawMoon = drawMoon;
-drawMoon = function (c, x, y, r) {
+drawMoon = function (c, x, y, r, phase) {
   const out = wWU8BDrawMoon.apply(this, arguments);
   if (!wUmbSkyMirrored()) return out;
-  const dr = r * .22, a = -Math.PI / 2 - .35, d = r + dr + 1.5, dx = x + Math.cos(a) * d, dy = y + Math.sin(a) * d;
+  const [dx, dy, dr] = wU8bDeadMoon(x, y, r, phase);
   c.save();
   c.fillStyle = '#100a16'; c.beginPath(); c.arc(dx, dy, dr, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(200,184,255,.6)'; c.lineWidth = 1.2; c.beginPath(); c.arc(dx, dy, dr, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = 'rgba(200,184,255,.6)'; c.lineWidth = 1; c.beginPath(); c.arc(dx, dy, dr - .5, 0, Math.PI * 2); c.stroke();
   c.restore();
   return out;
 };
@@ -223,6 +235,6 @@ moonSVG = function () { const h = wWU8BMoonSVG.apply(this, arguments); return wU
 const wWU8BRenderHelp = renderHelp;
 renderHelp = function () {
   const out = wWU8BRenderHelp.apply(this, arguments), u = $('wHelpUmbral');
-  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon beside the moon, and does just what it does on the light side.</p>');
+  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon hanging in the moon\'s shadow, and does just what it does on the light side.</p>');
   return out;
 };

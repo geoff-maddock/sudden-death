@@ -1010,12 +1010,15 @@ function wGrain(s) {
 }
 
 /* ---------- live water and lava ---------- */
-// the shades baked into a chunk's water (rgb + alpha, by depth) and the foam where land meets it; a map may name its own
-// (m.waterSh: the Umbral's ichor)
-const WWATER = { shallow: [150, 215, 205, .42], mid: [90, 170, 190, .16], deep: [12, 40, 72, .34], foam: ['rgba(240,250,245,.42)', 'rgba(255,255,255,.55)'] };
+// the shades baked into a chunk's water (rgb + alpha, by depth), the foam where land meets it, the open sea's tint past
+// the map's edge (deep water's shade, as the chunks mix it), and the live water's ripples (highlight, ink); a map may
+// name its own (m.waterSh: the Umbral's ichor)
+const WWATER = { shallow: [150, 215, 205, .42], mid: [90, 170, 190, .16], deep: [12, 40, 72, .34], foam: ['rgba(240,250,245,.42)', 'rgba(255,255,255,.55)'],
+  sea: [7, 24, 43, .34], ripple: ['rgba(235,250,255,.55)', 'rgba(18,40,60,.45)'] };
 const WFLUID = {};
-function wFluid(kind, col, s, fr) {
-  const key = kind + col + s.toFixed(2) + ':' + fr;
+function wFluid(kind, col, s, fr, rip) {
+  rip = rip || WWATER.ripple;
+  const key = kind + col + s.toFixed(2) + ':' + fr + (kind === '~' ? ':' + rip.join('/') : '');
   if (WFLUID[key]) return WFLUID[key];
   const N = kind === 'L' ? 256 : 128, D = Math.max(1, Math.round(N * s)), cv2 = document.createElement('canvas'); cv2.width = cv2.height = D;
   const g = cv2.getContext('2d'); g.scale(D / N, D / N);
@@ -1029,7 +1032,7 @@ function wFluid(kind, col, s, fr) {
       const x = wx + ox + Math.sin(ph + p0) * 2.2, y = wy + oy + Math.cos(ph + p0) * .8;
       if (x < -12 || x > N + 12 || y < -6 || y > N + 6) continue;
       g.beginPath(); g.moveTo(x - len, y); g.quadraticCurveTo(x - len / 2, y - 2.2, x, y); g.quadraticCurveTo(x + len / 2, y + 2.2, x + len, y);
-      g.lineWidth = hi ? 1.3 : 1; g.strokeStyle = hi ? 'rgba(235,250,255,.55)' : 'rgba(18,40,60,.45)'; g.lineCap = 'round'; g.stroke();
+      g.lineWidth = hi ? 1.3 : 1; g.strokeStyle = hi ? rip[0] : rip[1]; g.lineCap = 'round'; g.stroke();
     }
   } else {
     // lava: a dark-red flow, bright veins that crawl along, and cooled crust plates with glowing seams
@@ -1081,14 +1084,14 @@ function wDrawMap(c, mapId, camX, camY, vw, vh, t, opts) {
   const mw = Math.round(m.w * WTILE * sd), mh = Math.round(m.h * WTILE * sd);
   // live water under the whole map (the world's ocean runs past its edge)
   if (L.water) {
-    const SEA = WINK[m.sea] || WINK.plains, fr = Math.floor(t * 5) % 12, F = wFluid('~', m.kind === 'world' ? SEA.water : P0.water, sd, fr);
+    const SEA = WINK[m.sea] || WINK.plains, WS = m.waterSh || WWATER, fr = Math.floor(t * 5) % 12, F = wFluid('~', m.kind === 'world' ? SEA.water : P0.water, sd, fr, WS.ripple);
     F.pat.setTransform(new DOMMatrix([1, 0, 0, 1, bx, by]));
     c.fillStyle = F.pat;
     if (m.kind === 'world') {
       c.fillRect(ox, oy, W, H);
       // the open sea past the map's edge gets the same deep-water tint the chunks bake in
-      const wc = rgbOf(SEA.water), out = new Path2D(); out.rect(ox, oy, W, H); out.rect(bx, by, mw, mh);
-      c.fillStyle = `rgba(${Math.round(wc[0] * .4 + 7)},${Math.round(wc[1] * .4 + 24)},${Math.round(wc[2] * .4 + 43)},.34)`; c.fill(out, 'evenodd');
+      const wc = rgbOf(SEA.water), sea = WS.sea, out = new Path2D(); out.rect(ox, oy, W, H); out.rect(bx, by, mw, mh);
+      c.fillStyle = `rgba(${Math.round(wc[0] * .4 + sea[0])},${Math.round(wc[1] * .4 + sea[1])},${Math.round(wc[2] * .4 + sea[2])},${sea[3]})`; c.fill(out, 'evenodd');
     } else c.fillRect(Math.max(ox, bx), Math.max(oy, by), Math.min(ox + W, bx + mw) - Math.max(ox, bx), Math.min(oy + H, by + mh) - Math.max(oy, by));
   }
   const CP = WCH * WTILE * sd;
