@@ -123,22 +123,42 @@ async def main():
           finally { wMapTileCol = keepCol; wFogSeen = keepFog; } return out; })()""")
         check(mp['g_ballpark']['open'] and not mp['g_ballpark']['shut'] and mp['g_rink']['shut'] and not mp['g_rink']['open'] and mp['g_ballpark']['raw'], 'the local map shows an open gate open and a shut one shut (the map itself keeps the gate)', mp)
 
-        # u4's backstop opening a gate (the bot never walks): the gate reads open and the guards step clear
-        bs = await pg.evaluate("""(() => { const g = 'g_court', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), it = W_UMB4.gate[c.C.region];
+        # u4's backstop opening a gate (the bot never walks): the gate reads open for every champion behind it (a stub
+        # second one here), and the guards step clear
+        bs = await pg.evaluate("""(() => { const g = 'g_court', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), it = W_UMB4.gate[c.C.region], E = c.C.engine, keep = W_UMB4.start[E];
           W_ON_END.uguard('win', { g, i: 0 }); W_ON_END.uguard('win', { g, i: 1 }); wAddItem(it, 1); const n0 = WG.items[it] || 0;
-          W_NADIR.zgate = Object.assign({}, c.C, { char: 'nadir_zgate', piece: 'zgate' });   // (a second champion behind the same gate)
-          const E = c.C.engine, keep = W_UMB4.start[E]; W_UMB4.start[E] = () => ''; const r = wNadirMatch(c.id); W_UMB4.start[E] = keep;
-          const both = !!WG.umbral.gates[c.id] && !!WG.umbral.gates.zgate; delete W_NADIR.zgate; delete WG.umbral.gates.zgate;
-          return { r, both, open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, clear: [__at(g, 0), __at(g, 1)], c: G.clear, took: n0 - (WG.items[it] || 0) }; })()""")
+          W_NADIR.zgate = Object.assign({}, c.C, { char: 'nadir_zgate', piece: 'zgate' }); W_UMB4.start[E] = () => '';
+          try { const r = wNadirMatch(c.id), both = !!WG.umbral.gates[c.id] && !!WG.umbral.gates.zgate;
+            return { r, both, open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, clear: [__at(g, 0), __at(g, 1)], c: G.clear, took: n0 - (WG.items[it] || 0) }; }
+          finally { W_UMB4.start[E] = keep; delete W_NADIR.zgate; delete WG.umbral.gates.zgate; } })()""")
         check(bs['r'] == '' and bs['open'] and bs['clear'] == bs['c'] and bs['took'] == 1 and bs['both'], 'a gate opened through the champion\'s refusal reads open for every champion behind it, and its guards step clear', bs)
+
+        # a gate already open (given for one champion) is given for a second one behind it too: u4 asks for nothing
+        two = await pg.evaluate("""(() => { const g = 'g_shed', c = __champ(g), U = WG.umbral, it = W_UMB4.gate[c.C.region], E = c.C.engine, keep = W_UMB4.start[E];
+          const snap = JSON.stringify({ gates: U.gates, guards: U.guards, items: WG.items });
+          U.guards[g + ':0'] = U.guards[g + ':1'] = 1; U.gates[c.id] = WG.dayAbs; wAddItem(it, 1); const n0 = WG.items[it];
+          W_NADIR.zgate2 = Object.assign({}, c.C, { char: 'nadir_zgate2', piece: 'zgate2' }); W_UMB4.start[E] = () => '';
+          try { const r = wNadirMatch('zgate2'); return { r, entry: !!U.gates.zgate2, took: n0 - (WG.items[it] || 0) }; }
+          finally { W_UMB4.start[E] = keep; delete W_NADIR.zgate2; const o = JSON.parse(snap); U.gates = o.gates; U.guards = o.guards; WG.items = o.items; wUmbGauntletSync(g); } })()""")
+        check(two['r'] == '' and two['entry'] and two['took'] == 0, 'a gate already open counts as given for every champion behind it: nobody asks for the item twice', two)
 
         # a save from before the wall where the piece is already yours but the gate has no entry: it is open, and free
         pc = await pg.evaluate("""(() => { const g = 'g_links', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), U = WG.umbral, it = W_UMB4.gate[c.C.region];
-          delete U.gates[c.id]; U.guards[g + ':0'] = U.guards[g + ':1'] = 1; U.pieces = U.pieces.concat([c.C.piece]); wAddItem(it, 2); const n0 = WG.items[it];
-          wEnterMap(m.id, G.gate[0], G.gate[1] + 1); wDrain(); wUse(G.gate[0], G.gate[1]); wUmbUseGate(m, g); __close();
-          const out = { open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, took: n0 - (WG.items[it] || 0), walk: __walk(c.x, c.y + 1) };
-          U.pieces = U.pieces.filter(p => p !== c.C.piece); return out; })()""")
+          const snap = JSON.stringify({ gates: U.gates, guards: U.guards, items: WG.items, pieces: U.pieces });
+          try { delete U.gates[c.id]; U.guards[g + ':0'] = U.guards[g + ':1'] = 1; U.pieces = U.pieces.concat([c.C.piece]); wAddItem(it, 2); const n0 = WG.items[it];
+            wEnterMap(m.id, G.gate[0], G.gate[1] + 1); wDrain(); wUse(G.gate[0], G.gate[1]); wUmbUseGate(m, g); __close();
+            return { open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, took: n0 - (WG.items[it] || 0), walk: __walk(c.x, c.y + 1) }; }
+          finally { const o = JSON.parse(snap); U.gates = o.gates; U.guards = o.guards; WG.items = o.items; U.pieces = o.pieces; wEnterMap(m.id, m.spawn[0], m.spawn[1]); wDrain(); wUmbGauntletSync(g); } })()""")
         check(pc['open'] and pc['took'] == 0 and pc['walk'], 'with the champion\'s piece already yours (an old save, no gate entry), the gate is open and takes nothing', pc)
+
+        # winning the piece opens the gate then and there: its picture is redrawn and the guards step clear
+        pw = await pg.evaluate("""(() => { const g = 'g_lanes', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), U = WG.umbral;
+          const snap = JSON.stringify({ gates: U.gates, guards: U.guards, pieces: U.pieces, beaten: U.beaten, tries: U.tries, items: WG.items, gold: RUN.gold });
+          try { U.guards[g + ':0'] = U.guards[g + ':1'] = 1; delete U.gates[c.id]; wUmbGauntletSync(g); const out = { before: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.gate, aside: [__at(g, 0), __at(g, 1)], a: G.aside };
+            wLayer(m, 1); wUmbNadirEnd(c.id, 'win'); __close();
+            Object.assign(out, { piece: U.pieces.includes(c.C.piece), open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, redrawn: !WLAY[m.id], entry: !!U.gates[c.id], clear: [__at(g, 0), __at(g, 1)], c: G.clear }); return out; }
+          finally { const o = JSON.parse(snap); Object.assign(U, { gates: o.gates, guards: o.guards, pieces: o.pieces, beaten: o.beaten, tries: o.tries }); WG.items = o.items; RUN.gold = o.gold; wUmbGauntletSync(g); wInvalidate(m.id); } })()""")
+        check(pw['before'] and pw['aside'] == pw['a'] and pw['piece'] and pw['open'] and pw['redrawn'] and pw['entry'] and pw['clear'] == pw['c'], 'winning the piece opens the gate there and then: redrawn, given, and the guards step clear', pw)
 
         # a save from before the wall: guards beaten and the gate handed over through u4 (no other keys), or standing
         # behind the line at a ground whose guards still stand
