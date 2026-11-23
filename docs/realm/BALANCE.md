@@ -1996,3 +1996,35 @@ after: 29 Crown winners, the Seal forged by 4 (14%, against 12% before: inside t
 made those two the hardest games in the Umbral: the Bone Diamond 22% to 10% a game, the Dead Pond 27% to 8% (a hockey
 game is low-scoring, so a two-goal margin is steep). The others as before, within the noise: the Gatekeeper 38%, the Cinder
 Pit 18%, the Black Court 17%, the Drowned Lanes 17%, the Hollow Links 9%, the Broken Ring 9%.
+
+### Umbral: corrupted forms (#111, E)
+
+Three card-game traits replaced their stand-ins (`src/realm/umbral/u8e-forms.js`): the wraith's Half There (the first
+hit from an attack against it each turn does nothing; was 1 Strength and 6 Block), the ogre's Won't Flinch (Weak and
+Exposed don't take; was 12 Block), the spider's Webs the Bench (a card in your hand costs 1 more that turn; was a Slimed
+in your draw pile). `python3 test/realm_umbral_lab.py 80`, the old traits put back by the override against the new,
+same build:
+
+| kind | old traits (80) | new traits (80) | old, after the review fixes (80) | new, after the fixes (80) |
+|---|---|---|---|---|
+| light3 | 99.5% | 97.9% | 98.9% | 98.7% |
+| dark | 92.3% | 95.4% | 91.4% | 94.9% |
+| light3 elite | 89.6% | 87.7% | 88.7% | 94.2% |
+| dark elite | 68.9% | 63.6% | 73.7% | 64.1% |
+| gate | 44.8% | 60.5% | 57.0% | 56.4% |
+
+The lab is noisy: each run is a fresh set of journeys, and the gate (no wraith, ogre or spider in it) moved 16 points
+between two runs with nothing changed for it, so a row moves about 10 points on its own. Only dark elite fell in both
+pairs; its elites are the Champ and the Spider Matriarch, and by the match ids the whole fall was the Matriarch. Paired
+(each Crown-winning team fights the dark Matriarch 10 times under each spider trait; 29 teams, 290 matches each):
+
+| spider trait | win |
+|---|---|
+| none | 63.4% |
+| a Slimed in your draw pile (the old) | 53.8% |
+| Webs the Bench every turn | 45.9% |
+| **Webs the Bench every other turn (the first, the third...)** | **50.0%** |
+
+Every turn was 8 points under the old trait, every other turn 4, inside the 10-point rule for a single trait: the web
+lands every other turn. The wraith and the ogre don't come up in the lab's dark pools (their checks are in
+`test/realm_umbral_forms.py`, the realm bot beating a Wraith among them).

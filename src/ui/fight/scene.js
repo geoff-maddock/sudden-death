@@ -38,7 +38,7 @@ function drawWho(c, kind, x, y, hpx, team, o) {
 function sprClear() { SPR.clear(); }
 function drawStatusPills(c, st, x, y) {
   const keys = Object.keys(st).filter(k => st[k] && ST[k] && ST[k].n && k !== 'foamfinger'); if (!keys.length) return;
-  c.font = F_HUD(15); let w = 0; const items = keys.map(k => { const s = `${ST[k].n.split(' ')[0]} ${st[k]}`; const tw = c.measureText(s).width + 8; w += tw + 3; return [k, s, tw]; });
+  c.font = F_HUD(15); let w = 0; const items = keys.map(k => { const s = ST[k].pill || `${ST[k].n.split(' ')[0]} ${st[k]}`; const tw = c.measureText(s).width + 8; w += tw + 3; return [k, s, tw]; });
   let cx = x - w / 2;
   for (const [k, s, tw] of items) { rr(c, cx, y, tw, 16, 3); c.fillStyle = 'rgba(16,11,8,.85)'; c.fill(); c.strokeStyle = ST[k].col; c.lineWidth = 1; c.stroke(); txt(c, s, cx + tw / 2, y + 13, F_HUD(15), ST[k].col, 'center'); cx += tw + 3; }
 }

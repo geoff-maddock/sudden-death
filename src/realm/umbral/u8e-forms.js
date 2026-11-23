@@ -10,18 +10,20 @@
    team without it is drawn as it always was.
 
    Truer dark traits in the card game (W_UMB3.traits, three replaced; the others keep theirs):
-     wraith  Half There: the first hit against it each of your turns does nothing (status u_phase: a hit spends it, and
-             turnStart puts it back). atkDmg shows it in the breakdown (Half There ×0); hurtEnemy spends it.
-     ogre    Won't Flinch: Weak and Exposed don't take on it (status u_still: they come off the moment they land,
-             before a hit or its own swing can use them, and the log says so).
-     spider  Webs the Bench: at the start of each of your turns one card in your hand costs 1 more that turn (B.uWeb,
+     wraith  Half There: the first hit from an attack card against it each of your turns does nothing (status u_phase:
+             hurtEnemy spends it on a card's hit, never on poison, burn or a raw blow; turnStart puts it back). atkDmg
+             stays pure: previews show the real number, and the breakdown notes the first hit is lost.
+     ogre    Won't Flinch: Weak and Exposed don't take on it (status u_still: the sums ignore them, and they come off
+             after a card or tonic resolves, at the start of your turn and before its swing; the log says so).
+     spider  Webs the Bench: at the start of every other turn of yours (the first, the third...) one card in your hand
+             costs 1 more that turn (each turn was a 15-point swing against the Spider Matriarch in the lab) (B.uWeb,
              the card's uid; status u_web on the spider), marked Webbed on the card.
    All of it is plain data on B and its players (uHalf, uStill, uWeb), so a mid-match save keeps it.
 
-   wUmbShrug, wUmbShrugAll, wUmbWeb
+   wUmbShrug, wUmbShrugAll, wUmbWithout, wUmbWeb
    Wraps: wUmb4aNine, wUmbGfTeam, wUmbBkTeam, wUmbHkTeam, wUmbGlFour, wUmbBlFive, wUmbCrFour (wWU8ENine, wWU8EGfTeam,
    wWU8EBkTeam, wWU8EHkTeam, wWU8EGlFour, wWU8EBlFive, wWU8ECrFour: the team goes with shade); atkDmg (wWU8EAtkDmg),
-   hurtEnemy (wWU8EHurtEnemy), enemyHitDmg (wWU8EEnemyHitDmg), resolve (wWU8EResolve), playerTurnStart
+   hurtEnemy (wWU8EHurtEnemy), enemyHitDmg (wWU8EEnemyHitDmg), resolve (wWU8EResolve), doMove (wWU8EDoMove), playerTurnStart
    (wWU8EPlayerTurnStart), cardCost (wWU8ECardCost), cardHTML (wWU8ECardHTML: Webbed), renderHelp (wWU8ERenderHelp),
    wUmbQuick (wWU8EQuick: the traits on the Quick start's Umbral tab). */
 
@@ -33,35 +35,40 @@ wUmb4aNine = wU8EShade(wWU8ENine); wUmbGfTeam = wU8EShade(wWU8EGfTeam); wUmbBkTe
 wUmbGlFour = wU8EShade(wWU8EGlFour); wUmbBlFive = wU8EShade(wWU8EBlFive); wUmbCrFour = wU8EShade(wWU8ECrFour);
 
 /* ---------- truer dark traits ---------- */
-ST.u_phase = { n: 'Half-There', col: '#c8b8ff', desc: 'The first hit against it each turn does nothing.' };
-ST.u_still = { n: 'Unflinching', col: '#c8b8ff', desc: 'Weak and Exposed don\'t take on it.' };
-ST.u_web = { n: 'Webbing', col: '#c8b8ff', desc: 'At the start of each of your turns, one card in your hand costs 1 more that turn.' };
+ST.u_phase = { n: 'Half There', pill: 'Half There', col: '#c8b8ff', desc: 'The first hit from an attack against it each turn does nothing.' };
+ST.u_still = { n: 'Won\'t Flinch', pill: 'Won\'t Flinch', col: '#c8b8ff', desc: 'Weak and Exposed don\'t take on it.' };
+ST.u_web = { n: 'Webs the Bench', pill: 'Webs the Bench', col: '#c8b8ff', desc: 'Every other turn of yours (the first, the third and on), one card in your hand costs 1 more that turn.' };
 Object.assign(W_UMB3.traits, {
-  wraith: { n: 'Half There', d: 'The first hit against it each turn does nothing.', go: e => { e.uHalf = 1; e.st.u_phase = 1; } },
+  wraith: { n: 'Half There', d: 'The first hit from an attack against it each turn does nothing.', go: e => { e.uHalf = 1; e.st.u_phase = 1; } },
   ogre: { n: 'Won\'t Flinch', d: 'Weak and Exposed don\'t take on it.', go: e => { e.uStill = 1; e.st.u_still = 1; } },
-  spider: { n: 'Webs the Bench', d: 'At the start of each of your turns, one card in your hand costs 1 more that turn.', go: e => { e.uWeb = 1; e.st.u_web = 1; } },
+  spider: { n: 'Webs the Bench', d: 'Every other turn of yours (the first, the third and on), one card in your hand costs 1 more that turn.', go: e => { e.uWeb = 1; e.st.u_web = 1; } },
 });
 // Half There comes back at the start of each of your turns (after u3's hook gives a newcomer its form)
 onHook('turnStart', () => { if (B && B.umb) for (const e of B.enemies) if (e.uHalf && !e.dead && !e.fled) e.st.u_phase = 1; });
+// a status set aside for one sum and put back at once (the maths of Won't Flinch: nothing is changed)
+function wUmbWithout(e, k, f) { const v = e.st[k]; if (!v) return f(); delete e.st[k]; try { return f(); } finally { e.st[k] = v; } }
+// the damage maths stay pure: Exposed counts for nothing on an Unflinching player; Half There is only a note in the
+// breakdown (WHY, the explanation dmgWhy asks for), since only the first real hit is lost (hurtEnemy)
 const wWU8EAtkDmg = atkDmg;
 atkDmg = function (base, e) {
-  if (e && e.uStill && B && B.umb) wUmbShrug(e);
-  const n = wWU8EAtkDmg.apply(this, arguments);
-  // (the hit that spends Half There: nothing, and the breakdown says why)
-  if (e && e.st && e.st.u_phase && B && B.phase === 'player') { if (WHY) WHY.push(['Half There', '×', 0]); return 0; }
+  const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wWU8EAtkDmg.apply(this, args)) : wWU8EAtkDmg.apply(this, args);
+  if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player') WHY.push(['Half There (the first hit)', '×', 0]);
   return n;
 };
+// Half There: the first hit from an attack card against it this turn does nothing (not poison, burn, or a raw blow:
+// an instant kill, Tempest, Haunt)
 const wWU8EHurtEnemy = hurtEnemy;
 hurtEnemy = function (e, dmg, o) {
   o = o || {};
-  if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && !o.psn && !o.burn) {
+  if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && B.inCard && !o.raw && !o.psn && !o.burn) {
     delete e.st.u_phase; dmg = 0;
     fx({ k: 'say', e: e.uid, t: 'Half There' });
     log(`${e.n} is Half There: the hit passes straight through.`, 'bad');
   }
   return wWU8EHurtEnemy.call(this, e, dmg, o);
 };
-// Won't Flinch: Weak and Exposed come off it as soon as they land
+// Won't Flinch: Weak and Exposed come off it at the game's own moments (after a card or a tonic, at the start of your
+// turn, before its swing); in between, the sums ignore them
 function wUmbShrug(e) {
   const ks = ['weak', 'vuln'].filter(k => e.st[k]); if (!ks.length) return;
   for (const k of ks) delete e.st[k];
@@ -70,12 +77,14 @@ function wUmbShrug(e) {
 }
 function wUmbShrugAll() { if (B && B.umb) for (const e of B.enemies) if (e.uStill && !e.dead) wUmbShrug(e); }
 const wWU8EEnemyHitDmg = enemyHitDmg;
-enemyHitDmg = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wWU8EEnemyHitDmg.apply(this, arguments); };
+enemyHitDmg = function (e) { const args = arguments; return e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'weak', () => wWU8EEnemyHitDmg.apply(this, args)) : wWU8EEnemyHitDmg.apply(this, args); };
 const wWU8EResolve = resolve;
 resolve = function () { const r = wWU8EResolve.apply(this, arguments); wUmbShrugAll(); return r; };
+const wWU8EDoMove = doMove;
+doMove = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wWU8EDoMove.apply(this, arguments); };
 // Webs the Bench: a card of the hand you drew costs 1 more this turn
 function wUmbWeb() {
-  const sp = B.enemies.find(e => e.uWeb && !e.dead && !e.fled); if (!sp) return;
+  const sp = B.enemies.find(e => e.uWeb && !e.dead && !e.fled); if (!sp || B.turn % 2 === 0) return; // (every other turn: the first, the third...)
   const can = B.hand.filter(c => def(c).cost >= 0); if (!can.length) return;
   const c = pick(can); B.uWeb = c.uid;
   fx({ k: 'say', e: sp.uid, t: 'Webs the Bench' });
@@ -89,7 +98,8 @@ playerTurnStart = function () {
   return r;
 };
 const wWU8ECardCost = cardCost;
-cardCost = function (card) { const n = wWU8ECardCost.apply(this, arguments); return n >= 0 && card && B && B.uWeb != null && card.uid === B.uWeb ? n + 1 : n; };
+// (a turn of free Attacks wins: a webbed Attack is free with the rest)
+cardCost = function (card) { const n = wWU8ECardCost.apply(this, arguments); return n >= 0 && card && B && B.uWeb != null && card.uid === B.uWeb && !(B.freeAtk && def(card).type === 'atk') ? n + 1 : n; };
 const wWU8ECardHTML = cardHTML;
 cardHTML = function (card, o) {
   const h = wWU8ECardHTML.apply(this, arguments);
@@ -99,7 +109,7 @@ cardHTML = function (card, o) {
 (() => { if (typeof document === 'undefined') return; const st = document.createElement('style'); st.textContent = `.card.uwebbed .art{box-shadow:inset 0 0 0 2px #c8b8ff}.card.uwebbed .cost{color:#e4defa;border-color:#c8b8ff;background:#3a2a4a}.card .uweb{position:absolute;left:calc(var(--cw)*.03);top:calc(var(--cw)*.28);font-family:var(--hud);font-size:calc(var(--cw)*.075);line-height:1;color:#1a1022;background:#c8b8ff;padding:2px 4px 0;border-radius:3px;z-index:2}`; document.head.appendChild(st); })();
 
 /* ---------- How to play and the Quick start ---------- */
-const W_UMB8E_HELP = 'On the dark side every player is drawn in shadow, horned and cracked with light, in every sport. Three dark traits bend the card game\'s rules: a Wraith is <b>Half There</b> (the first hit against it each turn does nothing), an Ogre <b>Won\'t Flinch</b> (Weak and Exposed don\'t take on it), and a Spider Queen <b>Webs the Bench</b> (at the start of each of your turns, one card in your hand costs 1 more that turn, marked Webbed).';
+const W_UMB8E_HELP = 'On the dark side every player is drawn in shadow, horned and cracked with light, in every sport. Three dark traits bend the card game\'s rules: a Wraith is <b>Half There</b> (the first hit from an attack against it each turn does nothing), an Ogre <b>Won\'t Flinch</b> (Weak and Exposed don\'t take on it), and a Spider Queen <b>Webs the Bench</b> (every other turn of yours, the first, the third and on, one card in your hand costs 1 more that turn, marked Webbed).';
 const wWU8ERenderHelp = renderHelp;
 renderHelp = function () {
   const r = wWU8ERenderHelp.apply(this, arguments), u = $('wHelpUmbral');

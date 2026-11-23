@@ -40,19 +40,29 @@ async def main():
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
         await pg.evaluate("wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; RUN.hp = RUN.maxhp = 999; RUN.gold = 500; wSave()")
         await pg.evaluate(FIGHT)
+        await pg.add_script_tag(path=ROOT + '/test/realm_lab.js')
 
         # ---------- the Wraith: Half There ----------
         wr = await pg.evaluate("""(() => { const out = {};
           const hit = () => { const e = B.enemies[0]; B.energy = 9; B.hand.unshift(mkCard('check')); const h0 = e.hp; playCard(0, 0); return h0 - e.hp; };
           __fight('u:world', ['winger']); const e = B.enemies[0];
-          out.umb = !!B.umb; out.phase0 = e.st.u_phase || 0; B.hand.unshift(mkCard('check')); const w = dmgWhy(B.hand[0], e); out.why = w && w.parts.some(p => p[0] === 'Half There' && p[2] === 0) && w.n === 0;
-          out.first = hit(); out.phase1 = e.st.u_phase || 0; out.second = hit(); out.log = B.log.map(l => l.t).join(' ');
+          out.umb = !!B.umb; out.phase0 = e.st.u_phase || 0; B.hand.unshift(mkCard('gob_five')); const w = dmgWhy(B.hand[0], e), est = estDamage(B.hand[0], e);
+          out.why = { note: !!w && w.parts.some(p => p[0].startsWith('Half There')), n: w && w.n, real: atkDmg(2, e, B.hand[0]), est: est.total, text: cardText(B.hand[0], { live: true, card: B.hand[0], tgt: e }).replace(/<[^>]+>/g, '') };
+          B.hand.shift(); out.first = hit(); out.phase1 = e.st.u_phase || 0; out.second = hit(); out.log = B.log.map(l => l.t).join(' ');
           runSteps(endTurn()); out.back = e.st.u_phase || 0; out.third = hit();
+          // (a raw blow, an instant kill or Tempest, goes straight through it, and leaves Half There up)
+          runSteps(endTurn()); const h0 = e.hp; B.inCard = true; hurtEnemy(e, 5, { raw: true }); B.inCard = false; out.raw = [h0 - e.hp, e.st.u_phase || 0];
+          B.P.st.tempest = 3; runSteps(endTurn()); out.tempest = e.st.u_phase || 0;
+          // (the realm bot beats a Wraith on the dark side)
+          __fight('u:world', ['winger']); let g = 0; while (!B.over && g++ < 60) { REALMBOT({}); if (B.over) break; runSteps(endTurn()); } out.bot = [B.over, B.turn];
           __fight('graftonbury', ['winger']); out.light = { phase: B.enemies[0].st.u_phase || 0, first: hit() };
           B = null; RUN.pending = null; return out; })()""")
-        check(wr['umb'] and wr['phase0'] == 1 and wr['why'], 'a Wraith on the dark side is Half There, and the damage breakdown shows the first hit is nothing (Half There ×0)', wr)
+        y = wr['why']
+        check(wr['umb'] and wr['phase0'] == 1 and y['note'] and y['n'] == y['real'] > 0 and y['est'] > 0 and 'Deal 0' not in y['text'], 'a Wraith on the dark side is Half There: previews show the real number (no "Deal 0"), and the breakdown notes the first hit is lost', wr)
         check(wr['first'] == 0 and wr['phase1'] == 0 and wr['second'] > 0 and 'Half There' in wr['log'], 'the first hit against it does nothing and spends Half There; the second lands; the log says so', wr)
         check(wr['back'] == 1 and wr['third'] == 0, 'Half There comes back at the start of your next turn', wr)
+        check(wr['raw'][0] > 0 and wr['raw'][1] == 1 and wr['tempest'] == 1, 'a raw blow (an instant kill, Tempest) is not an attack hit: it lands, and Half There stays up', wr)
+        check(wr['bot'][0] == 'win', 'the realm bot beats a Wraith', wr)
         check(wr['light']['phase'] == 0 and wr['light']['first'] > 0, 'in the light the same Wraith takes the first hit', wr)
 
         # ---------- the Ogre: Won't Flinch ----------
@@ -62,12 +72,14 @@ async def main():
           B.hand.unshift(mkCard('gob_bunt')); playCard(0, 0); out.weak = e.st.weak || 0;
           // (Exposed laid on inside a card doesn't swell the hit that follows it)
           const c = mkCard('check'), base = atkDmg(6, e, c); addSt(e, 'vuln', 2); out.within = [atkDmg(6, e, c), base, e.st.vuln || 0];
-          addSt(e, 'weak', 2); out.swing = [enemyHitDmg(e, 10), e.st.weak || 0];
+          B.hand.unshift(mkCard('check')); playCard(0, 0); out.after = e.st.vuln || 0;
+          const s0 = enemyHitDmg(e, 10); addSt(e, 'weak', 2); out.swing = [enemyHitDmg(e, 10), s0, e.st.weak || 0]; doMove(e); out.swung = e.st.weak || 0;
           out.log = B.log.map(l => l.t).join(' ');
           __fight('graftonbury', ['gorlak'], 'elite'); B.energy = 9; B.hand.unshift(mkCard('kob_brush')); playCard(0, 0); out.light = B.enemies[0].st.vuln || 0;
           B = null; RUN.pending = null; return out; })()""")
         check(og['still'] == 1 and og['vuln'] == 0 and og['weak'] == 0 and "Won't Flinch" in og['log'], "an Ogre on the dark side Won't Flinch: Exposed and Weak from a card don't take, and the log says so", og)
-        check(og['within'][0] == og['within'][1] and og['within'][2] == 0 and og['swing'][1] == 0, 'Exposed laid on just before a hit adds nothing to it, and Weak never touches its swing', og)
+        check(og['within'][0] == og['within'][1] and og['within'][2] == 2 and og['after'] == 0, 'Exposed on it adds nothing to a hit, and a sum never changes it: it comes off when the card resolves', og)
+        check(og['swing'][0] == og['swing'][1] and og['swing'][2] == 2 and og['swung'] == 0, 'Weak never touches its swing, and comes off when it swings', og)
         check(og['light'] > 0, 'in the light the same Ogre can be Exposed', og)
 
         # ---------- the Spider Queen: Webs the Bench ----------
@@ -77,13 +89,16 @@ async def main():
           const h = c ? cardHTML(c, { live: true }) : ''; out.face = h.includes('uwebbed') && h.includes('Webbed +1') && h.includes('class="cost');
           out.plain = B.hand.filter(x => x !== c).every(x => !cardHTML(x, { live: true }).includes('uwebbed'));
           out.log = B.log.map(l => l.t).join(' ');
-          runSteps(endTurn()); out.next = B.uWeb != null && B.hand.some(x => x.uid === B.uWeb);
+          const a = mkCard('check'); B.hand.push(a); B.uWeb = a.uid; out.free = [cardCost(a)]; B.freeAtk = true; out.free.push(cardCost(a)); B.freeAtk = false;
+          runSteps(endTurn()); out.second = B.uWeb == null && B.hand.every(x => def(x).cost < 0 || cardCost(x) === def(x).cost);
+          runSteps(endTurn()); out.next = B.turn === 3 && B.uWeb != null && B.hand.some(x => x.uid === B.uWeb);
           out.snap = JSON.parse(JSON.stringify(B)).uWeb === B.uWeb;
           __fight('graftonbury', ['netspider']); out.light = B.uWeb == null && B.hand.every(x => def(x).cost < 0 || cardCost(x) === def(x).cost);
           B = null; RUN.pending = null; return out; })()""")
         check(sp['web'] and sp['cost'][0] == sp['cost'][1] + 1 and sp['others'] and 'Webs the Bench' in sp['log'], 'a Spider Queen Webs the Bench: one card in your hand costs 1 more this turn, the rest as they were', sp)
+        check(sp['free'] == [2, 0], 'a webbed Attack costs 1 more, but a turn of free Attacks still makes it free', sp)
         check(sp['face'] and sp['plain'], 'the webbed card says so on its face (Webbed +1); no other card does', sp)
-        check(sp['next'] and sp['snap'], 'each of your turns webs a card of the new hand, and it is plain data a save keeps', sp)
+        check(sp['second'] and sp['next'] and sp['snap'], 'every other turn (the first, the third) webs a card of the new hand, the second none, and it is plain data a save keeps', sp)
         check(sp['light'], 'in the light the same Spider webs nothing', sp)
 
         # ---------- the Nadir in shadow, in every engine ----------
@@ -128,9 +143,11 @@ async def main():
 
         # every kind (the superstars and the dungeon folk too) draws in shadow without trouble, and differently
         ks = await pg.evaluate("""(() => { const cv = document.createElement('canvas'); cv.width = cv.height = 120; const c = cv.getContext('2d'), team = { color: '#3a2a4a', light: '#c8b8ff', short: 'N' }, bad = [];
-          for (const k of Object.keys(KIND)) { try { c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7 }); const a = cv.toDataURL(); c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7, shade: 1 }); if (cv.toDataURL() === a) bad.push(k + ': same'); } catch (e) { bad.push(k + ': ' + e.message); } }
+          for (const k of Object.keys(KIND)) { try { c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7 }); const a = cv.toDataURL(); c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7, shade: 1 }); if (cv.toDataURL() === a) bad.push(k + ': same');
+            // (turned to stone, it keeps its shadow)
+            c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7, stone: 1 }); const st = cv.toDataURL(); c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7, stone: 1, shade: 1 }); if (cv.toDataURL() === st) bad.push(k + ': stone loses its shadow'); } catch (e) { bad.push(k + ': ' + e.message); } }
           return { n: Object.keys(KIND).length, bad }; })()""")
-        check(ks['n'] >= 24 and ks['bad'] == [], 'every kind, superstars included, draws in shadow without an error, and looks different for it', ks)
+        check(ks['n'] >= 24 and ks['bad'] == [], 'every kind, superstars included, draws in shadow without an error, and looks different for it, turned to stone too', ks)
 
         # ---------- How to play and the Quick start ----------
         hp = await pg.evaluate("""(() => { renderHelp(); const u = document.getElementById('wHelpUmbForms'), q = wUmbQuick();
