@@ -140,6 +140,14 @@ async def main():
           const out = { hexes: wUmbFinaleEntry().hexes, refused: wUmbShardUse('hex'), on: U.shardOn };
           wUmbFinale(); out.hexBtn = !!document.querySelector('[data-ushard="hex"]'); out.blockBtn = !!document.querySelector('[data-ushard="block"]');
           document.getElementById('modal').hidden = true; MODAL_NOW = null; U.ward = 0; return out; })()""")
+        lr = await pg.evaluate("""(() => { const U = WG.umbral; U.shardOn = null; U.shards = 1; U.finale = 0; U.tries = {}; U.ward = 1; U.wardFor = null;
+          const out = { later: wUmbShardUse('hex', 1), on: U.shardOn, cur: W_NADIR.finale.finale };
+          U.ward = 0; out.laterOk = wUmbShardUse('hex', 1); out.on2 = U.shardOn; U.shardOn = null;
+          // set on this round, then a ward readied: by the time the round starts the shard would cut nothing, and it is given back
+          wUmbShardUse('hex'); U.ward = 1; wUmbFinale(); out.back = [U.shardOn, U.shards];
+          document.getElementById('modal').hidden = true; MODAL_NOW = null; U.ward = 0; U.shardOn = null; return out; })()""")
+        check(lr['later'] != '' and lr['on'] is None and lr['cur'] == 0 and lr['laterOk'] == '' and lr['on2'] == {'r': 1, 'how': 'hex'} and lr['back'] == [None, 1],
+              'a later round is checked for a hex to cut too; a shard that would cut nothing by the time its round starts is given back', lr)
         check(nr['hexes'] == 1 and nr['refused'] != '' and nr['on'] is None and not nr['hexBtn'] and nr['blockBtn'], 'a round already down to no hexes takes no shard for a hex: only the Block is offered', nr)
 
         # PLAY with Aurelia: the shard's question, then back out of the round's card: the shard stays; the round ending spends it
