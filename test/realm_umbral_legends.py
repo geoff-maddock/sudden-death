@@ -59,6 +59,10 @@ async def main():
               'a legend stands there only from its stage on: the Kraken at 3 pieces, the Phoenix at 6, the Wyrm at 8; none once sealed', wk)
         check(wk['npc'] and not wk['npcPhx'] and 'Kraken' in wk['look'], 'an awake legend stands in the way (wNpcAt) and Look names it; a sleeping one does not', wk)
         check(wk['audit'] == [], 'the audit is clean', wk['audit'])
+        al = await pg.evaluate("""(() => { const m = MAPS['u:world'], den = DB.locs.find(l => l.id === 'umbralden'), s = wUmbReachLairs(m, den), sides = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+          const cut = DB.locs.filter(L => !sides.some(([dx, dy]) => s[(L.y + dy) * m.w + L.x + dx])).map(L => L.id);
+          const lairs = Object.values(m.legends).map(([x, y]) => s[y * m.w + x]); return { cut, lairs }; })()""")
+        check(al['cut'] == [] and al['lairs'] == [0, 0, 0], 'with all three legends standing at once, every place on the dark world can still be walked to', al)
 
         sc = await pg.evaluate("""(() => ({ s1: W_UMB8C.scenes[1].lines.some(l => /too many arms/.test(l)), s2: W_UMB8C.scenes[2].lines.some(l => /black flame/.test(l)), s3: W_UMB8C.scenes[3].lines.some(l => /Coliseum/.test(l)),
           d1: wUmbDreadDoes(1), d3: wUmbDreadDoes(3) }))()""")
@@ -130,6 +134,13 @@ async def main():
         check(sh['both2'] == 0 and sh['both1'] == 0 and sh['otherRound'] == 2, 'with a Hex Ward too, a 2-hex round draws none and a 1-hex round none, never fewer; a champion\'s game is untouched', sh)
         check(sh['engineNoBlock'] != '' and sh['notThisRound'] == 2, 'the Block is only for a card round, and a shard set on one round does nothing for another', sh)
         check(sh['reload'] == {'on': {'r': 0, 'how': 'hex'}, 'n': 1}, 'a shard set keeps through a reload', sh)
+
+        # a round that draws no hexes now (its clean piece's one taken by a Hex Ward): a shard offers only the Block
+        nr = await pg.evaluate("""(() => { const U = WG.umbral; U.shardOn = null; U.shards = 1; U.finale = 0; U.tries = {}; U.ward = 1; U.wardFor = null;
+          const out = { hexes: wUmbFinaleEntry().hexes, refused: wUmbShardUse('hex'), on: U.shardOn };
+          wUmbFinale(); out.hexBtn = !!document.querySelector('[data-ushard="hex"]'); out.blockBtn = !!document.querySelector('[data-ushard="block"]');
+          document.getElementById('modal').hidden = true; MODAL_NOW = null; U.ward = 0; return out; })()""")
+        check(nr['hexes'] == 1 and nr['refused'] != '' and nr['on'] is None and not nr['hexBtn'] and nr['blockBtn'], 'a round already down to no hexes takes no shard for a hex: only the Block is offered', nr)
 
         # PLAY with Aurelia: the shard's question, then back out of the round's card: the shard stays; the round ending spends it
         await pg.evaluate("(() => { const U = WG.umbral; U.shardOn = null; U.shards = 2; U.finale = 0; wUmbFinale(); })()")

@@ -13,14 +13,14 @@
                                played that turn (B.uFrost, the cards' uids; two a turn under half HP).
    Each stage's scene (u8c) gains a line about its legend. A legend's lair is a spot on the dark world (MAPS['u:world']
    .legends, k -> [x, y], placed when the maps are, as u2 places lanterns: never off the ground, on a road, a hazard, in
-   a lantern's light or beside a place's way in, and never cutting anywhere off). It stands there only while awake (its
+   a lantern's light or beside a place's way in, and never cutting anywhere off, all three standing at once). It stands there only while awake (its
    stage reached, not beaten, the Seal not forged): wNpcAt answers for it, so walking into it, facing it or clicking it
    opens the match card (the realm's own, with its two phases and the prize named). Shadows and pits keep off a lair.
    WG.umbral.legends: { k: 'awake' | 'beaten' } (absent before it wakes; an old save has no key).
    The prize: a Legend's Shard (WG.umbral.shards, a count), a rare card and W_UMB8I.gold gold; no trophy (a legend is a
    boss to the card game, but its prize is the shard). Lose: the dark side's blackout (u2); the legend stays, whole.
    A shard is spent on a round of the Seal: before the round starts (PLAY with Hollow Aurelia), set it on the round,
-   for one hex fewer (wUmbHexCut, 'finale') or, in a card round, 15 Block at the start (WG.umbral.shardOn: { r, how }).
+   for one hex fewer (wUmbHexCut, 'finale'; offered only while the round still draws one, wUmbShardRoom) or, in a card round, 15 Block at the start (WG.umbral.shardOn: { r, how }).
    It is spent when that round ends, won or lost; backing out of the round's card keeps it set on the round.
    Three Nadir lineups field a corrupted legend in place of one player (W_UMB8I.lineups, written into the lineup
    tables at load, so the finale's round in that sport fields it too): the Behemoth on the Cinder Pit's line
@@ -44,17 +44,17 @@
 
 const W_UMB8I = {
   legends: {
-    kraken: { stage: 1, region: 'tide', near: 'saltmere', id: 'u_kraken', kind: 'kraken', n: 'The Corrupted Kraken', where: 'the Drownfen', ring: [5, 13], water: 1,
+    kraken: { stage: 1, region: 'tide', near: 'saltmere', id: 'u_kraken', kind: 'kraken', n: 'The Corrupted Kraken', where: 'in the Drownfen', ring: [5, 13], water: 1,
       wake: 'In the Drownfen the black water heaves, and something with too many arms comes up to look at the cracked moon.',
       p1: 'It drowns your hand: at the start of your turn cards in your hand go under, and a Slimed comes up for each.',
       p2: 'Under half HP, the Maelstrom: it hits harder and drowns three at a time.',
       look: 'The Corrupted Kraken, half out of the black water. Its arms taste the air. It wants a game.' },
-    phoenix: { stage: 2, region: 'ember', near: 'cinderhold', id: 'u_phoenix', kind: 'phoenix', n: 'The Corrupted Phoenix', where: 'the Ashmaw', ring: [5, 13],
+    phoenix: { stage: 2, region: 'ember', near: 'cinderhold', id: 'u_phoenix', kind: 'phoenix', n: 'The Corrupted Phoenix', where: 'in the Ashmaw', ring: [5, 13],
       wake: 'Over the Ashmaw a fire lights that gives no warmth. A bird of black flame settles on the cinders, and waits.',
       p1: 'It sets you alight: Burn, every turn it can.',
       p2: 'Under half HP, Wildfire: more Burn, and harder. And once, when it would go down, it rises again with two fifths of its HP.',
       look: 'The Corrupted Phoenix, burning black. The cinders under it are cold. It wants a game.' },
-    wyrm: { stage: 3, region: null, near: 'coliseum', id: 'u_wyrm', kind: 'frostwyrm', n: 'The Corrupted Frost Wyrm', where: 'the road to the Hollow Coliseum', ring: [3, 8],
+    wyrm: { stage: 3, region: null, near: 'coliseum', id: 'u_wyrm', kind: 'frostwyrm', n: 'The Corrupted Frost Wyrm', where: 'on the road to the Hollow Coliseum', ring: [3, 8],
       wake: 'Something huge and white lands on the road to the Hollow Coliseum, and the frost runs out from it a mile each way.',
       p1: 'Weak and Exposed, and a Blizzard: at the start of each of your turns a card in your hand freezes, and you can\'t play it that turn.',
       p2: 'Under half HP, Whiteout: it hits harder, and two cards freeze each turn.',
@@ -66,7 +66,7 @@ const W_UMB8I = {
   // the three lineups that field one: the row it takes, its player, and how many levels under the rest it plays (down)
   lineups: {
     gridiron: { at: 2, p: { n: 'The Corrupted Behemoth', kind: 'behemoth', num: 99 }, where: 'on their line', down: 1 },
-    court: { at: 4, p: { n: 'The Corrupted Hydra', kind: 'hydra', num: 3 }, where: 'in their five' },
+    court: { at: 4, p: { n: 'The Corrupted Hydra', kind: 'hydra', num: 50 }, where: 'in their five' },
     lanes: { at: 2, p: { n: 'The Corrupted Djinn', kind: 'djinn' }, where: 'in their five', down: 1 },
   },
 };
@@ -78,9 +78,9 @@ ST.u_blizzard = { n: 'Blizzard', col: '#9fffe8', desc: 'At the start of each of 
 const W_UMB8I_TEAM = { name: 'The Nadir', short: 'NDR', color: '#2a1e34', light: '#e4defa' };
 EN('u_kraken', 'The Corrupted Kraken', 'kraken', [180, 190], {
   grip: { n: 'Tentacle Grip', ops: [['a', 7, 2]] },
-  pull: { n: 'The Deep Pulls', ops: [['a', 9], ['udrown', 2]] },
+  pull: { n: 'The Deep Pulls', ops: [['a', 9], ['udrown', W_UMB8I.drown[0]]] },
   ink: { n: 'Ink Cloud', ops: [['b', 14], ['p', 'weak', 1]] },
-  whirl: { n: 'Maelstrom', ops: [['a', 5, 3], ['udrown', 3]] },
+  whirl: { n: 'Maelstrom', ops: [['a', 5, 3], ['udrown', W_UMB8I.drown[1]]] },
   crush: { n: 'Crushing Deep', ops: [['a', 18]] },
 }, { seq: ['grip', 'pull', 'ink'] }, { boss: 1, sport: 'soccer', team: W_UMB8I_TEAM, aura: 'wisps', flav: 'It slept under the Drownfen since before there was a league. The Dread woke it, and it came up hungry.' });
 ENEMIES.u_kraken.brain = e => (e.phase ? ['whirl', 'crush', 'grip'][e.step % 3] : null);
@@ -204,6 +204,10 @@ function wUmbPlaceLegends() {
   const reach = () => bfsReach(m, den.x, den.y + 1), count = s => { let n = 0; for (let i = 0; i < s.length; i++) n += s[i]; return n; };
   const lan = Object.keys(m.meta).filter(k => m.meta[k].lantern).map(k => k.split(',').map(Number));
   const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  // (every lair placed so far stands blocked while the next is tested, so no two together close a pass: all may be
+  // awake at once)
+  const held = [];
+  try {
   for (const k in W_UMB8I.legends) {
     const L = W_UMB8I.legends[k], P = DB.locs.find(l => l.id === L.near); if (!P) continue;
     const base = reach(), n0 = count(base), cand = [];
@@ -224,9 +228,16 @@ function wUmbPlaceLegends() {
       const c = m.t[y][x]; m.t[y][x] = W_UMB2.ch;
       const s = reach(), side = sides.some(([ax, ay]) => s[(y + ay) * m.w + x + ax]);
       m.t[y][x] = c;
-      if (count(s) === n0 - 1 && side) { m.legends[k] = [x, y]; break; }
+      if (count(s) === n0 - 1 && side) { m.legends[k] = [x, y]; held.push([x, y, c]); m.t[y][x] = W_UMB2.ch; break; }
     }
   }
+  } finally { for (const [x, y, c] of held) m.t[y][x] = c; }
+}
+// the dark world's reach from the portal road with every lair standing (as if all were awake)
+function wUmbReachLairs(m, den) {
+  const held = Object.values(m.legends || {}).map(([x, y]) => [x, y, m.t[y][x]]);
+  for (const [x, y] of held) m.t[y][x] = W_UMB2.ch;
+  try { return bfsReach(m, den.x, den.y + 1); } finally { for (const [x, y, c] of held) m.t[y][x] = c; }
 }
 const wWU8IBuildAllMaps = buildAllMaps;
 buildAllMaps = function () { const r = wWU8IBuildAllMaps.apply(this, arguments); wUmbPlaceLegends(); return r; };
@@ -303,7 +314,7 @@ for (const k in W_UMB8I.legends) { const L = W_UMB8I.legends[k], S = W_UMB8C.sce
 const wWU8IDreadDoes = wUmbDreadDoes;
 wUmbDreadDoes = function (s) {
   const t = wWU8IDreadDoes.apply(this, arguments), k = Object.keys(W_UMB8I.legends).find(k => W_UMB8I.legends[k].stage === s);
-  return k ? `${t} ${W_UMB8I.legends[k].n} is awake in ${W_UMB8I.legends[k].where}: a hard fight, if you want one, for a Legend's Shard.` : t;
+  return k ? `${t} ${W_UMB8I.legends[k].n} is awake ${W_UMB8I.legends[k].where}: a hard fight, if you want one, for a Legend's Shard.` : t;
 };
 const wWU8IStart = wStart;
 wStart = function () { const r = wWU8IStart.apply(this, arguments); wUmbLegendsSync(); return r; };
@@ -318,9 +329,17 @@ function wUmbShardUse(how, round) {
   if (U.shardOn && U.shardOn.r === r) return 'A shard is already set on this round.';
   if (how !== 'hex' && how !== 'block') return 'A shard takes a hex off, or gives Block.';
   if (how === 'block' && W_UMB5.engine[wUmbFinaleSports()[r]]) return 'The Block is for a card round.';
+  if (how === 'hex' && r === (U.finale || 0) && !wUmbShardRoom()) return 'This round draws no hexes now: a shard would take nothing off.';
   U.shardOn = { r, how };
   if (!LAB) wLog(how === 'hex' ? `You set a Legend's Shard on round ${r + 1} of the Seal: one hex fewer.` : `You set a Legend's Shard on round ${r + 1} of the Seal: ${W_UMB8I.block} Block at the start.`, 'm');
   wSave(); return '';
+}
+// the round of the Seal still draws a hex after every other cut (the clean or well-won piece's, in its entry's hexes; a
+// Hex Ward's, in u8h's wUmbHexCut): only then can a shard take one off
+function wUmbShardRoom() {
+  const U = wUmb(); if (!U) return false;
+  const C = wUmbFinaleEntry(), n = (C && C.hexes) || 0;
+  return n - (wWU8IHexCut('finale') || 0) > 0;
 }
 const wUmbShardSet = how => { const U = wUmb(); return !!(U && U.shardOn && U.shardOn.r === (U.finale || 0) && (U.shards || 0) > 0 && (!how || U.shardOn.how === how)); };
 const wWU8IHexCut = wUmbHexCut;
@@ -334,11 +353,11 @@ onHook('fightStart', () => {
 // spent when the round it was set on ends, won or lost; a round started without one leaves a shard set elsewhere alone
 const wWU8IOnNadir = W_ON_END.nadir;
 W_ON_END.nadir = function (r, ref) {
+  // (spent first, so an error further down the chain can't leave it set for the next game; said after the game's lines)
   const U = wUmb(), spend = !!(U && ref && ref.id === 'finale' && wUmbShardSet());
-  const out = wWU8IOnNadir.apply(this, arguments);
-  if (spend && U.shardOn) { U.shards = Math.max(0, (U.shards || 0) - 1); U.shardOn = null; if (!LAB) wLog(`The Legend's Shard goes dark in your captain's hand. It did its work (${U.shards} left).`, 'd'); wSave(); }
-  wUmbLegendsSync();
-  return out;
+  if (spend) { U.shards = Math.max(0, (U.shards || 0) - 1); U.shardOn = null; }
+  try { return wWU8IOnNadir.apply(this, arguments); }
+  finally { if (spend && !(RUN && RUN.over)) { if (!LAB) wLog(`The Legend's Shard goes dark in your captain's hand. It did its work (${U.shards} left).`, 'd'); wSave(); } wUmbLegendsSync(); }
 };
 // before a round of the Seal starts: spend a shard on it?
 const wWU8IFinale = wUmbFinale;
@@ -348,11 +367,14 @@ wUmbFinale = function () {
   const r = U.finale || 0, piece = wUmbFinaleSports()[r], eng = W_UMB5.engine[piece], card = !eng;
   // (a game of the round left half-played picks up where it was: its hexes were drawn at its kickoff)
   if (eng && W_UMB4.live[eng] && W_UMB4.live[eng]()) return wWU8IFinale.apply(this, arguments);
+  const room = wUmbShardRoom();
+  // (nothing a shard could do here: no hex left to take off, and no card round for the Block)
+  if (!room && !card && !wUmbShardSet()) return wWU8IFinale.apply(this, arguments);
   if (wUmbShardSet()) { wLog(`Your Legend's Shard is set on this round: ${U.shardOn.how === 'hex' ? 'one hex fewer' : W_UMB8I.block + ' Block at the start'}.`, 'm'); return wWU8IFinale.apply(this, arguments); }
   const close = modal(`<header><h3>A Legend's Shard</h3><button class="ghost" data-close>Not now</button></header>
     <div class="wmsg"><p>You hold ${U.shards} Legend's Shard${U.shards === 1 ? '' : 's'}. Round ${r + 1} of the Seal is ${esc(W_UMB_PIECES[piece].sport)}. Spend one on it?</p>
-    <p class="hint">It is spent when the round ends, won or lost. Back out of the round's card and it stays set on this round.</p></div>
-    <div class="row"><button class="btn" data-ushard="hex">One hex fewer</button>${card ? `<button class="ghost" data-ushard="block">${W_UMB8I.block} Block at the start</button>` : ''}<button class="ghost" data-ushard="">Keep it</button></div>`);
+    <p class="hint">It is spent when the round ends, won or lost. Back out of the round's card and it stays set on this round.</p>${room ? '' : '<p class="hint">This round draws no hexes now, so a shard can only give Block.</p>'}</div>
+    <div class="row">${room ? '<button class="btn" data-ushard="hex">One hex fewer</button>' : ''}${card ? `<button class="${room ? 'ghost' : 'btn'}" data-ushard="block">${W_UMB8I.block} Block at the start</button>` : ''}<button class="ghost" data-ushard="">Keep it</button></div>`);
   $('modalBox').querySelectorAll('[data-ushard]').forEach(b => b.onclick = () => {
     const how = b.dataset.ushard; close();
     const no = how ? wUmbShardUse(how) : ''; if (no) wLog(no, 'b');
@@ -413,14 +435,16 @@ wUmbJournal = function () {
   const r = wWU8IJournal.apply(this, arguments), U = wUmb(); if (!U || U.sealed || !Array.isArray(r) || typeof r[1] !== 'string') return r;
   const S = U.legends || {}, ks = Object.keys(W_UMB8I.legends).filter(k => S[k]);
   if (!ks.length && !(U.shards > 0)) return r;
-  const line = `<p class="hint">The legends: ${ks.length ? ks.map(k => `${esc(W_UMB8I.legends[k].n)} (${S[k] === 'beaten' ? 'beaten' : 'awake, in ' + esc(W_UMB8I.legends[k].where)})`).join('; ') : 'none awake yet'}. Legend's Shards held: ${U.shards || 0}${wUmbShardSet() ? ' (one set on this round of the Seal)' : ''}.</p>`;
+  const line = `<p class="hint">The legends: ${ks.length ? ks.map(k => `${esc(W_UMB8I.legends[k].n)} (${S[k] === 'beaten' ? 'beaten' : 'awake, ' + esc(W_UMB8I.legends[k].where)})`).join('; ') : 'none awake yet'}. Legend's Shards held: ${U.shards || 0}${wUmbShardSet() ? ' (one set on this round of the Seal)' : ''}.</p>`;
   return [r[0], r[1].replace(/<\/div>\s*$/, line + '</div>')];
 };
 const wWU8IAudit = wAudit;
 wAudit = function () {
   const P = wWU8IAudit.apply(this, arguments), m = MAPS['u:world'], den = DB.locs.find(l => l.id === 'umbralden');
   if (!m || !den) return P;
-  const s = bfsReach(m, den.x, den.y + 1);
+  const s = wUmbReachLairs(m, den), sides = [[1, 0], [-1, 0], [0, 1], [0, -1]], near = (x, y) => !!s[y * m.w + x] || sides.some(([dx, dy]) => s[(y + dy) * m.w + x + dx]);
+  for (const L of DB.locs) if (!near(L.x, L.y)) P.push('u:world: with every legend awake, cannot walk to ' + L.id);
+  for (const q in m.meta) if (m.meta[q].lantern) { const [x, y] = q.split(',').map(Number); if (!near(x, y)) P.push('u:world: with every legend awake, cannot reach the lantern at ' + q); }
   for (const k in W_UMB8I.legends) {
     const p = m.legends && m.legends[k]; if (!p) { P.push('u:world: the legend ' + k + ' has no lair'); continue; }
     if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => s[(p[1] + dy) * m.w + p[0] + dx])) P.push('u:world: cannot reach the legend ' + k);
@@ -434,7 +458,7 @@ renderHelp = function () {
   const r = wWU8IRenderHelp.apply(this, arguments), u = $('wHelpUmbral');
   if (u && u.tagName === 'DIV' && !$('wHelpUmbLegends')) {
     const L = W_UMB8I.legends;
-    u.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpUmbLegends"><b>The corrupted legends.</b> As the Dread rises, three legends wake on the dark world, one at each stage from the Stirring: ${Object.keys(L).map(k => `${esc(L[k].n)} in ${esc(L[k].where)} (${esc(W_UMB8C.names[L[k].stage])})`).join(', ')}. Each is a hard card match against it alone, in two phases: the Kraken drowns cards from your hand, the Phoenix burns and rises once when it would go down, and the Frost Wyrm leaves you Weak and Exposed and freezes a card in your hand each turn. None has to be fought. Beat one for a <b>Legend's Shard</b>, a rare card and ${W_UMB8I.gold} gold. Before a round of the Seal, set a shard on it: one hex fewer, or in a card round ${W_UMB8I.block} Block at the start. Lose to a legend and you black out as on any loss on this side; it waits for you, whole again. Three champions also field a corrupted legend in their side: ${Object.values(W_UMB8I.lineups).map(X => esc(X.p.n)).join(', ')}.</p>`);
+    u.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpUmbLegends"><b>The corrupted legends.</b> As the Dread rises, three legends wake on the dark world, one at each stage from the Stirring: ${Object.keys(L).map(k => `${esc(L[k].n)} ${esc(L[k].where)} (${esc(W_UMB8C.names[L[k].stage])})`).join(', ')}. Each is a hard card match against it alone, in two phases: the Kraken drowns cards from your hand, the Phoenix burns and rises once when it would go down, and the Frost Wyrm leaves you Weak and Exposed and freezes a card in your hand each turn. None has to be fought. Beat one for a <b>Legend's Shard</b>, a rare card and ${W_UMB8I.gold} gold. Before a round of the Seal, set a shard on it: one hex fewer, or in a card round ${W_UMB8I.block} Block at the start. Lose to a legend and you black out as on any loss on this side; it waits for you, whole again. Three champions also field a corrupted legend in their side: ${Object.values(W_UMB8I.lineups).map(X => esc(X.p.n)).join(', ')}.</p>`);
   }
   return r;
 };
