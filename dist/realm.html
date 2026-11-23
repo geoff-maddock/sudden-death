@@ -68444,7 +68444,7 @@ renderHelp = function () {
    team without it is drawn as it always was.
 
    Truer dark traits in the card game (W_UMB3.traits, three replaced; the others keep theirs):
-     wraith  Half There: the first hit from an attack card (or a set play, an attack as the engine counts them)
+     wraith  Half There: the first hit from an Attack or a set play (grouped on purpose, as the sports layer does)
              against it each of your turns does nothing (status u_phase: hurtEnemy spends it on such a hit, never a
              skill's, poison, burn or a raw blow; turnStart puts it back). atkDmg stays pure: previews show the real
              number, and the breakdown notes the first hit is lost.
@@ -68473,11 +68473,11 @@ wUmb4aNine = wU8EShade(wWU8ENine); wUmbGfTeam = wU8EShade(wWU8EGfTeam); wUmbBkTe
 wUmbGlFour = wU8EShade(wWU8EGlFour); wUmbBlFive = wU8EShade(wWU8EBlFive); wUmbCrFour = wU8EShade(wWU8ECrFour);
 
 /* ---------- truer dark traits ---------- */
-ST.u_phase = { n: 'Half There', pill: 'Half There', col: '#c8b8ff', desc: 'The first hit from an attack against it each turn does nothing.' };
+ST.u_phase = { n: 'Half There', pill: 'Half There', col: '#c8b8ff', desc: 'The first hit from an Attack or a set play against it each turn does nothing.' };
 ST.u_still = { n: 'Won\'t Flinch', pill: 'Won\'t Flinch', col: '#c8b8ff', desc: 'Weak and Exposed don\'t take on it.' };
 ST.u_web = { n: 'Webs the Bench', pill: 'Webs the Bench', col: '#c8b8ff', desc: 'Every other turn of yours (the first, the third and on), one card in your hand costs 1 more that turn.' };
 Object.assign(W_UMB3.traits, {
-  wraith: { n: 'Half There', d: 'The first hit from an attack against it each turn does nothing.', go: e => { e.uHalf = 1; e.st.u_phase = 1; } },
+  wraith: { n: 'Half There', d: 'The first hit from an Attack or a set play against it each turn does nothing.', go: e => { e.uHalf = 1; e.st.u_phase = 1; } },
   ogre: { n: 'Won\'t Flinch', d: 'Weak and Exposed don\'t take on it.', go: e => { e.uStill = 1; e.st.u_still = 1; } },
   spider: { n: 'Webs the Bench', d: 'Every other turn of yours (the first, the third and on), one card in your hand costs 1 more that turn.', go: e => { e.uWeb = 1; e.st.u_web = 1; } },
 });
@@ -68487,16 +68487,17 @@ onHook('turnStart', () => { if (B && B.umb) for (const e of B.enemies) if (e.uHa
 function wUmbWithout(e, k, f) { const v = e.st[k]; if (!v) return f(); delete e.st[k]; try { return f(); } finally { e.st[k] = v; } }
 // the damage maths stay pure: Exposed counts for nothing on an Unflinching player; Half There is only a note in the
 // breakdown (WHY, the explanation dmgWhy asks for), since only the first real hit is lost (hurtEnemy)
-// (an attack, as the engine counts them: an Attack or a set play)
+// (an Attack or a set play: grouped together here on purpose, as the sports layer groups them; most of the engine
+// checks 'atk' alone)
 const wUmbIsAtk = t => t === 'atk' || t === 'play';
 const wWU8EAtkDmg = atkDmg;
 atkDmg = function (base, e, card) {
   const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wWU8EAtkDmg.apply(this, args)) : wWU8EAtkDmg.apply(this, args);
-  // (a short note, not a multiplier: the total is the real hit; only an attack's)
+  // (a short note, not a multiplier: the total is the real hit; only an Attack's or a set play's)
   if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player' && card && wUmbIsAtk(def(card).type)) WHY.push(['Half There', '', 'Half There: 1st hit lost']);
   return n;
 };
-// Half There: the first hit from an attack card against it this turn does nothing (not poison, burn, or a raw blow:
+// Half There: the first hit from an Attack or a set play against it this turn does nothing (not poison, burn, or a raw blow:
 // an instant kill, Tempest, Haunt)
 const wWU8EHurtEnemy = hurtEnemy;
 hurtEnemy = function (e, dmg, o) {
@@ -68557,7 +68558,7 @@ cardHTML = function (card, o) {
 (() => { if (typeof document === 'undefined') return; const st = document.createElement('style'); st.textContent = `.card.uwebbed .art{box-shadow:inset 0 0 0 2px #c8b8ff}.card.uwebbed .cost{color:#e4defa;border-color:#c8b8ff;background:#3a2a4a}.card .uweb{position:absolute;left:calc(var(--cw)*.03);top:calc(var(--cw)*.28);font-family:var(--hud);font-size:calc(var(--cw)*.075);line-height:1;color:#1a1022;background:#c8b8ff;padding:2px 4px 0;border-radius:3px;z-index:2}`; document.head.appendChild(st); })();
 
 /* ---------- How to play and the Quick start ---------- */
-const W_UMB8E_HELP = 'On the dark side every player is drawn in shadow, horned and cracked with light, in every sport. Three dark traits bend the card game\'s rules: a Wraith is <b>Half There</b> (the first hit from an attack against it each turn does nothing), an Ogre <b>Won\'t Flinch</b> (Weak and Exposed don\'t take on it), and a Spider Queen <b>Webs the Bench</b> (every other turn of yours, the first, the third and on, one card in your hand costs 1 more that turn, marked Webbed).';
+const W_UMB8E_HELP = 'On the dark side every player is drawn in shadow, horned and cracked with light, in every sport. Three dark traits bend the card game\'s rules: a Wraith is <b>Half There</b> (the first hit from an Attack or a set play against it each turn does nothing), an Ogre <b>Won\'t Flinch</b> (Weak and Exposed don\'t take on it), and a Spider Queen <b>Webs the Bench</b> (every other turn of yours, the first, the third and on, one card in your hand costs 1 more that turn, marked Webbed).';
 const wWU8ERenderHelp = renderHelp;
 renderHelp = function () {
   const r = wWU8ERenderHelp.apply(this, arguments), u = $('wHelpUmbral');
