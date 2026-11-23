@@ -2026,5 +2026,7 @@ pairs; its elites are the Champ and the Spider Matriarch, and by the match ids t
 | **Webs the Bench every other turn (the first, the third...)** | **50.0%** |
 
 Every turn was 8 points under the old trait, every other turn 4, inside the 10-point rule for a single trait: the web
-lands every other turn. The wraith and the ogre don't come up in the lab's dark pools (their checks are in
+lands every other turn. These spider figures came from the realm bot as it was then, valuing a card by its printed
+cost; it now values one by `cardCost` (a webbed card 1 more, as a player sees it), so the final balance pass
+re-measures them. The wraith and the ogre don't come up in the lab's dark pools (their checks are in
 `test/realm_umbral_forms.py`, the realm bot beating a Wraith among them).
