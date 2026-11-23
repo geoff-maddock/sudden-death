@@ -167,9 +167,11 @@ async def main():
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); SET.sfx = false; SET.music = false")
         await pg.evaluate("wStart(wLoadSave())"); await pg.wait_for_function("UI.view === 'world' && !!WG")
         od = await pg.evaluate("""(() => { const p = wRoster().find(q => q.n === 'Brakka Knell'); return { p: !!p, star: p && p.star, num: p && p.num, card: !!p && wCardsOf(p.id).some(c => c.id === 'u9_knell'),
-          ult: p ? (wBxFighter(p).pw || {}).ult : null, count: wRoster().filter(q => q.n === 'Brakka Knell').length }; })()""")
+          ult: p ? (wBxFighter(p).pw || {}).ult : null, count: wRoster().filter(q => q.n === 'Brakka Knell').length,
+          sp2: !!p && (() => { p.bxSp = 'sp2'; const f = wBxFighter(p); delete p.bxSp; return f.sp === 'sp2' && f.pw.sp.id === wBX.powerData.minotaur.sp2.id && f.pw.ult.id === 'lastbell'; })() }; })()""")
         check(od['p'] and od['count'] == 1, 'an old save with the redeemed captain signed as a plain player still loads, with them on the team', od)
         check(od['star'] == 'nadir_ring' and od['num'] == 7 and od['card'] and od['ult'] and od['ult']['id'] == 'lastbell', 'and they are made the superstar: their number, their card, and The Last Bell in the ring', od)
+        check(od['sp2'], 'in the ring the special picked on the Ring tab is the one they bring (and the tape names), with The Last Bell', od)
 
         # ---------- each of the nine, forced as the redeemed: a star with their card, in every engine ----------
         await pg.add_script_tag(content=LAB_JS)

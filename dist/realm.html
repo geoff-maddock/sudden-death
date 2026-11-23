@@ -69533,11 +69533,12 @@ const wWU9LanesPlayer = wLanesPlayer;
 wLanesPlayer = function (p) { const m = wWU9LanesPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'lanes'); if (u) m.ult = u; return m; };
 const wWU9ShedPlayer = wShedPlayer;
 wShedPlayer = function (p) { const m = wWU9ShedPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'shed'); if (u) m.ult = u; return m; };
-// boxing: the fighter's own powers (the engine's f.pw) are the minotaur's two specials and Brakka's ultimate
+// boxing: the fighter's own powers (the engine's f.pw) are the minotaur's two specials and Brakka's ultimate (sp is the
+// special picked on the Ring tab, f.sp, so the tale of the tape, which reads f.pw.sp, names the one they bring)
 const wWU9BxFighter = wBxFighter;
 wBxFighter = function (p) {
   const f = wWU9BxFighter.apply(this, arguments), u = wUmbHomeUlt(p, 'ring'), P = u && wBX.powerData[p.kind];
-  if (P) f.pw = JSON.parse(JSON.stringify(Object.assign({}, P, { ult: W_UMB4C.champ.pw.ult })));
+  if (P) f.pw = JSON.parse(JSON.stringify(Object.assign({}, P, { sp: f.sp === 'sp2' && P.sp2 ? P.sp2 : P.sp, ult: W_UMB4C.champ.pw.ult })));
   return f;
 };
 // baseball: the Dead Ball joins her pitches
