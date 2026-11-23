@@ -47,7 +47,7 @@ async def main():
           const hit = () => { const e = B.enemies[0]; B.energy = 9; B.hand.unshift(mkCard('check')); const h0 = e.hp; playCard(0, 0); return h0 - e.hp; };
           __fight('u:world', ['winger']); const e = B.enemies[0];
           out.umb = !!B.umb; out.phase0 = e.st.u_phase || 0; B.hand.unshift(mkCard('gob_five')); const w = dmgWhy(B.hand[0], e), est = estDamage(B.hand[0], e);
-          out.why = { note: !!w && w.parts.some(p => p[0].startsWith('Half There')), n: w && w.n, real: atkDmg(2, e, B.hand[0]), est: est.total, text: cardText(B.hand[0], { live: true, card: B.hand[0], tgt: e }).replace(/<[^>]+>/g, '') };
+          out.why = { note: !!w && w.parts.some(p => p[0] === 'Half There' && p[1] === '' && /first hit/.test(p[2])) && !w.parts.some(p => p[1] === '×' && p[2] === 0), n: w && w.n, real: atkDmg(2, e, B.hand[0]), est: est.total, text: cardText(B.hand[0], { live: true, card: B.hand[0], tgt: e }).replace(/<[^>]+>/g, '') };
           B.hand.shift(); out.first = hit(); out.phase1 = e.st.u_phase || 0; out.second = hit(); out.log = B.log.map(l => l.t).join(' ');
           runSteps(endTurn()); out.back = e.st.u_phase || 0; out.third = hit();
           // (a raw blow, an instant kill or Tempest, goes straight through it, and leaves Half There up)
@@ -58,7 +58,7 @@ async def main():
           __fight('graftonbury', ['winger']); out.light = { phase: B.enemies[0].st.u_phase || 0, first: hit() };
           B = null; RUN.pending = null; return out; })()""")
         y = wr['why']
-        check(wr['umb'] and wr['phase0'] == 1 and y['note'] and y['n'] == y['real'] > 0 and y['est'] > 0 and 'Deal 0' not in y['text'], 'a Wraith on the dark side is Half There: previews show the real number (no "Deal 0"), and the breakdown notes the first hit is lost', wr)
+        check(wr['umb'] and wr['phase0'] == 1 and y['note'] and y['n'] == y['real'] > 0 and y['est'] > 0 and 'Deal 0' not in y['text'], 'a Wraith on the dark side is Half There: previews show the real number (no "Deal 0"), and the breakdown notes the first hit is lost (a note, not a ×0)', wr)
         check(wr['first'] == 0 and wr['phase1'] == 0 and wr['second'] > 0 and 'Half There' in wr['log'], 'the first hit against it does nothing and spends Half There; the second lands; the log says so', wr)
         check(wr['back'] == 1 and wr['third'] == 0, 'Half There comes back at the start of your next turn', wr)
         check(wr['raw'][0] > 0 and wr['raw'][1] == 1 and wr['tempest'] == 1, 'a raw blow (an instant kill, Tempest) is not an attack hit: it lands, and Half There stays up', wr)
@@ -74,11 +74,15 @@ async def main():
           const c = mkCard('check'), base = atkDmg(6, e, c); addSt(e, 'vuln', 2); out.within = [atkDmg(6, e, c), base, e.st.vuln || 0];
           B.hand.unshift(mkCard('check')); playCard(0, 0); out.after = e.st.vuln || 0;
           const s0 = enemyHitDmg(e, 10); addSt(e, 'weak', 2); out.swing = [enemyHitDmg(e, 10), s0, e.st.weak || 0]; doMove(e); out.swung = e.st.weak || 0;
+          // (laid on outside a card's ops, by a hook after an attack, as a pet or Haunt would: off when the card is done)
+          window.__ogreHook = e; onHook('attackPlayed', () => { if (window.__ogreHook) addSt(window.__ogreHook, 'vuln', 2); });
+          B.energy = 9; B.hand.unshift(mkCard('check')); playCard(0, 0); window.__ogreHook = null; out.hook = e.st.vuln || 0;
           out.log = B.log.map(l => l.t).join(' ');
           __fight('graftonbury', ['gorlak'], 'elite'); B.energy = 9; B.hand.unshift(mkCard('kob_brush')); playCard(0, 0); out.light = B.enemies[0].st.vuln || 0;
           B = null; RUN.pending = null; return out; })()""")
         check(og['still'] == 1 and og['vuln'] == 0 and og['weak'] == 0 and "Won't Flinch" in og['log'], "an Ogre on the dark side Won't Flinch: Exposed and Weak from a card don't take, and the log says so", og)
         check(og['within'][0] == og['within'][1] and og['within'][2] == 2 and og['after'] == 0, 'Exposed on it adds nothing to a hit, and a sum never changes it: it comes off when the card resolves', og)
+        check(og['hook'] == 0, 'Exposed laid on by a hook after an attack comes off when the card is done', og)
         check(og['swing'][0] == og['swing'][1] and og['swing'][2] == 2 and og['swung'] == 0, 'Weak never touches its swing, and comes off when it swings', og)
         check(og['light'] > 0, 'in the light the same Ogre can be Exposed', og)
 
