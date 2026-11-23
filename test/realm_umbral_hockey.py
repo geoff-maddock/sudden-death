@@ -35,7 +35,8 @@ async def main():
         if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')
         await pg.wait_for_selector('#wGo'); await pg.click('#wGo')
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
-        await pg.evaluate("""wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; RUN.hp = RUN.maxhp = 200; RUN.gold = 500;
+        await pg.evaluate("""W_NADIR.rink.cond = null;   // (the champion's condition is realm_umbral_conds' to check)
+          wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; RUN.hp = RUN.maxhp = 200; RUN.gold = 500;
           const ks = Object.keys(SIG).filter(k => FA_NAMES[k] && wHK.kinds.includes(k) && !wRoster().some(p => p.kind === k));
           while (wRoster().length < 8) wRecruit({ kind: ks.pop(), lvl: 6 }, 'tavern');
           for (const p of wRoster()) { p.lvl = 6; delete p.hk; wHkOf(p); } WG.rink = null; wSixSync(); wSave()""")

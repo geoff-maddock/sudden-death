@@ -35,6 +35,10 @@ async def main():
         c = await pg.evaluate("""Object.fromEntries(Object.keys(W_UMB4I.conds).map(id => [id, (W_NADIR[id].cond || {}).k]))""")
         check(c == {'court': 'night', 'links': 'night', 'diamond': 'margin', 'rink': 'margin'}, 'four champions carry a condition', c)
 
+        o = await pg.evaluate("""(() => { const U = WG.umbral, C = W_NADIR.court; delete U.guards[C.ground + ':0']; WG.map = C.map; WG.min = 12 * 60;
+          const why = wNadirMatch('court'); U.guards[C.ground + ':0'] = 1; return why; })()""")
+        check('will not play you until' in (o or '') and 'after dark' not in (o or ''), 'by day, a night champion\'s other asks come first (the guards)', o)
+
         n = await pg.evaluate("""(() => { const out = {}, close = () => { for (let i = 0; i < 6 && !document.getElementById('modal').hidden; i++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.getElementById('modal').hidden = true; };
           for (const id of ['court', 'links']) { WG.map = W_NADIR[id].map;
             WG.min = 12 * 60; const day = wNadirMatch(id), dayModal = !document.getElementById('modal').hidden;
@@ -59,6 +63,11 @@ async def main():
             r = m[id]
             check(not r['by1']['piece'] and r['by1']['tries'] == 1 and r['by1']['said'], f'{id}: a win by one keeps the piece with them, counts a try and says why', r)
             check(r['by2'], f'{id}: a win by two pays the piece', r)
+
+        st = await pg.evaluate("""(() => { const n0 = WLOG.length, fake = wUmbCondSettle(function () { W_ON_END[W_UMB4I.kinds.rink]('win', { id: 'rink' }, { us: 3, them: 2 }); wLog('Final: you win 3-2.', 'g'); return 'Final: you win 3-2.'; });
+          const m = fake(); const L = WLOG.slice(n0).map(l => l[0]); for (let i = 0; i < 6 && !document.getElementById('modal').hidden; i++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          return { m, fin: L.findIndex(t => /^Final/.test(t)), note: L.findIndex(t => /wanted it by 2/.test(t)), card: W_UMB4I.note, settling: W_UMB4I.settling }; })()""")
+        check(st['m'].startswith('Final') and 'wanted it by 2' in st['m'] and 0 <= st['fin'] < st['note'] and st['card'] is None and st['settling'] == 0, "in a settle, the margin's words follow the final, on the result card and in the log", st)
 
         f = await pg.evaluate("""(() => { WG.umbral.pieces = Object.keys(W_UMB_PIECES); const seen = [];
           for (let r = 0; r < 3; r++) { WG.umbral.finale = r; wUmbFinaleEntry(); seen.push([W_NADIR.finale.engine || 'card', W_NADIR.finale.cond || null]); }

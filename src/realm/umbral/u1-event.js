@@ -4,7 +4,7 @@
    The scene (wUmbScene): the first time the world is free after the Umbral opens (after the Crown's ending, or on
    loading a journey that won it before), a staged scene in a window: the crown in your captain's hands, an eclipse
    over the Crown Coliseum at noon, the crowd falling silent, the smooth block beside the statue turning black, a
-   sound from the north (the Road to Nowhere) and the ground shaking (a music sting as the block turns black, with Music on), and the Pale Herald walking out of the dark to tell you what it means.
+   sound from the north (the Road to Nowhere) and the ground shaking (a music sting as the block turns black, with Music and Sound effects on), and the Pale Herald walking out of the dark to tell you what it means.
    Skip ends it at once; however the first showing is closed, what it said goes in the log. The Journal's Umbral
    chapter plays it again. It is marked
    seen (WG.umbral.seen) as it starts. Never in LAB mode.
@@ -122,8 +122,9 @@ function wUmbScene(replay) {
     else if (k === 'boom') { noise(.9, .16, 220, 1); tone(55, 1.2, 'sine', .07, -15); }
     else if (k === 'herald') { tone(392, .5, 'triangle', .035, 0); tone(370, .7, 'triangle', .035, 0, .45); tone(262, 1.1, 'triangle', .04, 0, .95); }
   } catch (e) { console.error(e); } };
-  // the music sting, as the block turns black: a falling minor phrase over a low drone (Music, not Sound effects)
-  const sting = () => { if (LAB || !SET.music) return; try {
+  // the music sting, as the block turns black: a falling minor phrase over a low drone (with Music on; it plays
+  // through the sound effects' tone, so Sound effects must be on too)
+  const sting = () => { if (LAB || !SET.music || !SET.sfx) return; try {
     for (const [f, d, at] of [[220, .5, 0], [208, .5, .4], [175, .7, .8], [147, 2.4, 1.3]]) tone(f, d, 'sawtooth', .025, 0, at);
     tone(55, 3.6, 'sine', .05, 0, .2);
   } catch (e) { console.error(e); } };

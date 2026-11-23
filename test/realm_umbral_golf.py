@@ -35,7 +35,8 @@ async def main():
         if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')
         await pg.wait_for_selector('#wGo'); await pg.click('#wGo')
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
-        await pg.evaluate("""wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; RUN.hp = RUN.maxhp = 200; RUN.gold = 500;
+        await pg.evaluate("""W_NADIR.links.cond = null;   // (the champion's condition is realm_umbral_conds' to check)
+          wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; RUN.hp = RUN.maxhp = 200; RUN.gold = 500;
           const ks = ['elf', 'spider', 'gorgon', 'dwarf'].filter(k => !wRoster().some(p => p.kind === k));
           while (wRoster().length < 4) wRecruit({ kind: ks.pop(), lvl: 6 }, 'tavern');
           for (const p of wRoster()) { p.lvl = 6; delete p.gl; wGlOf(p); } wFourAuto(); wSave()""")
@@ -139,7 +140,7 @@ async def main():
         # ...and after a reload too
         await pg.evaluate("wLinksLeaveGame(); wSave()")
         await pg.goto(REALM_URL); await pg.wait_for_function("typeof wUmbGlFour === 'function'")
-        await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); SET.sfx = false; SET.music = false")
+        await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); SET.sfx = false; SET.music = false; W_NADIR.links.cond = null")
         await pg.evaluate("wStart(wLoadSave())"); await pg.wait_for_function("UI.view === 'world' && !!WG")
         await pg.evaluate("for (let i = 0; i < 4 && !document.getElementById('modal').hidden; i++) { const b = document.getElementById('wLkLater'); if (b) b.click(); else break; }")
         rl = await pg.evaluate("""(() => { const live = wLinksLive(), g0 = RUN.gold; RUN.gold = 0; const why = wNadirMatch('links'); const card = !!document.querySelector('[data-ugl]'); RUN.gold = g0;

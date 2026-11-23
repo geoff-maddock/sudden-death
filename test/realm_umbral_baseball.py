@@ -71,7 +71,7 @@ async def main():
         if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')
         await pg.wait_for_selector('#wGo'); await pg.click('#wGo')
         await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
-        await pg.evaluate("wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; RUN.hp = RUN.maxhp = 200; wRecruit({ kind: 'troll', lvl: 2 }, 'tavern'); wRecruit({ kind: 'harpy', lvl: 2 }, 'tavern'); wDrain(); WG.cardOffer = null; " + CLEAR)
+        await pg.evaluate("W_NADIR.diamond.cond = null; wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; RUN.hp = RUN.maxhp = 200; wRecruit({ kind: 'troll', lvl: 2 }, 'tavern'); wRecruit({ kind: 'harpy', lvl: 2 }, 'tavern'); wDrain(); WG.cardOffer = null; " + CLEAR)
         await pg.evaluate(CLEAR)
         ch = await pg.evaluate("""(() => { const C = W_NADIR.diamond, D = DB.chars[C.char], m = MAPS[C.map];
           return { C: { ground: C.ground, map: C.map, region: C.region, engine: C.engine, piece: C.piece, hexes: C.hexes, toll: C.toll, gold: C.gold }, greet: D.greet, act: D.topics.play.act,
