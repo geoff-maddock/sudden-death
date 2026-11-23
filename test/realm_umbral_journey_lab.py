@@ -9,7 +9,9 @@ match, tried until beaten, at most TRIES each; the region's gate item taken as b
 beaten, at most TRIES times, while the gold lasts for the toll. Rested by a lantern before every match (full HP).
 With all nine pieces, the Seal: three rounds, each tried at most TRIES times. Engine games are Simulated (the adapters
 in LAB), card matches played by the bot. The walk out there (#111): before each guard's and champion's try, a hungry
-shadow match by the Dread's stage (UJ_SHADOW_P; 'window.UJ_NOSHADOW = 1' as PRE turns it off).
+shadow match by the Dread's stage (UJ_SHADOW_P; 'window.UJ_NOSHADOW = 1' as PRE turns it off). The corrupted legends
+(#111, phase F): when a piece wakes one, the bot fights it once, rested; each shard won is set on the Seal's rounds in
+order, for one hex fewer ('window.UJ_NOLEGEND = 1' as PRE: no legends fought).
 Prints: how many of the Crown winners forged the Seal, the pieces they held at the end, where the others stopped, and
 each champion's games won / played (and the guards' and the finale rounds'). Writes /tmp/realm_umbral_journey.json.
 The target (issue #99): the Seal on about 5 to 15% of journeys that reach the Crown."""
@@ -50,6 +52,12 @@ window.UJLAB = function (TRIES) {
     if (window.UJ_NOSHADOW || typeof wUmbDread !== 'function') return;
     if (Math.random() < UJ_SHADOW_P[wUmbDread()]) { rest(); WG.map = 'u:world'; const r = card(() => wUmbShadowMatch({ id: 'lab', x: WG.x, y: WG.y })); out.games.push({ who: 'shadow', res: r }); }
   };
+  // the corrupted legends (issue #111, phase F): each fought once, rested, when a piece has woken it (window.UJ_NOLEGEND: off)
+  const fought = {};
+  const legends = () => {
+    if (window.UJ_NOLEGEND || typeof wUmbLegendAwake !== 'function') return;
+    for (const k of Object.keys(W_UMB8I.legends)) if (!fought[k] && wUmbLegendAwake(k)) { fought[k] = 1; rest(); WG.map = 'u:world'; const r = card(() => wUmbLegendMatch(k)); out.games.push({ who: 'legend ' + k, res: r }); }
+  };
   const champs = ['gate'].concat(Object.keys(W_NADIR).filter(k => W_NADIR[k].ground));
   for (const id of champs) {
     const C = W_NADIR[id]; WG.map = C.map || 'u:umbralden';
@@ -66,13 +74,15 @@ window.UJLAB = function (TRIES) {
       out.games.push({ who: id, res: r }); won = r === 'win';
     }
     if (!won) { out.stop = out.stop || 'lost to ' + id; break; }
+    legends();
   }
+  out.shards = U.shards || 0;
   out.pieces = U.pieces.length;
   if (out.pieces === 9) {
     WG.map = 'u:coliseum';
     for (let round = 0; round < 3 && !U.sealed; round++) {
       let won = false;
-      for (let t = 0; t < TRIES && !won && !U.sealed; t++) { const r0 = U.finale || 0; wUmbFinaleEntry(); const r = play('finale'); out.games.push({ who: 'finale' + r0 + ':' + (W_NADIR.finale.engine || 'card'), res: r }); won = r === 'win' || (U.finale || 0) > r0 || !!U.sealed; }
+      for (let t = 0; t < TRIES && !won && !U.sealed; t++) { const r0 = U.finale || 0; if (typeof wUmbShardUse === 'function' && (U.shards || 0) > 0) wUmbShardUse('hex'); wUmbFinaleEntry(); const r = play('finale'); out.games.push({ who: 'finale' + r0 + ':' + (W_NADIR.finale.engine || 'card'), res: r }); won = r === 'win' || (U.finale || 0) > r0 || !!U.sealed; }
       if (!won && !U.sealed) { out.stop = 'the Seal, round ' + (round + 1); break; }
     }
   }
@@ -100,6 +110,7 @@ async def main():
     ch = [l for l in logs if l.get('champion')]
     print(f"page errors {len(errs)} {errs[:2]}  run errors {len(bad)} {bad[:2]}")
     print(f"journeys {len(logs)}, Crown winners {len(ch)}, forged the Seal {sum(l.get('sealed', False) for l in ch)} ({100 * sum(l.get('sealed', False) for l in ch) / max(1, len(ch)):.0f}% of Crown winners)")
+    print('Legend\'s Shards won:', dict(sorted(collections.Counter(l.get('shards', 0) for l in ch).items())))
     print('pieces at the end:', dict(sorted(collections.Counter(l.get('pieces', 0) for l in ch).items())))
     print('where the others stopped:', dict(collections.Counter(l.get('stop') for l in ch if not l.get('sealed')).most_common()))
     games = collections.defaultdict(lambda: [0, 0])
