@@ -963,8 +963,8 @@ function wBuildChunk(L, cx, cy) {
       const x = x0 + tx - 1, y = y0 + ty - 1, nv = wNoise(x, y, 5, 3) * .65 + wNoise(x, y, 2, 4) * .35 - .5, i = (ty * tw + tx) * 4;
       if (nv > 0) { img.data[i] = 255; img.data[i + 1] = 246; img.data[i + 2] = 200; } else { img.data[i] = 10; img.data[i + 1] = 20; img.data[i + 2] = 10; }
       img.data[i + 3] = Math.round(Math.min(1, Math.abs(nv) * 2.2) * 58);
-      // (a map with its own water leaves its water out of it: the open sea past the edge has none)
-      if (m.waterSh && wGround(L, Math.max(0, Math.min(m.w - 1, x)), Math.max(0, Math.min(m.h - 1, y))) === '~') img.data[i + 3] = 0;
+      // (a world with its own water leaves its water out of it: the open sea past the edge has none)
+      if (m.waterSh && m.kind === 'world' && wGround(L, Math.max(0, Math.min(m.w - 1, x)), Math.max(0, Math.min(m.h - 1, y))) === '~') img.data[i + 3] = 0;
     }
     tg.putImageData(img, 0, 0);
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-atop'; c.imageSmoothingEnabled = true;
