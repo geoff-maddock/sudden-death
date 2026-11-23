@@ -202,4 +202,5 @@ src/realm/umbral/u8a-fixes.js
 src/realm/umbral/u8b-land.js
 src/realm/umbral/u8c-dread.js
 src/realm/umbral/u8d-gauntlet.js
+src/realm/umbral/u8e-forms.js
 src/realm/umbral/u8h-market.js

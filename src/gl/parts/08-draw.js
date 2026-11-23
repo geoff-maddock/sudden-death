@@ -199,6 +199,8 @@ function glDrawBalls(c, H) {
   if (n >= 0 && D.balls[n]) {
     const ri = n === GD.you && GD.sel && GD.ph !== 'addr' ? GD.sel.ri : GD.cpu ? GD.cpu.plan.ri : 0, [x, y] = glScr(D.balls[n].x, D.balls[n].y);
     c.fillStyle = G.teams[n].color || GL_SIDE[n]; c.beginPath(); c.arc(x - 9, y + 9, 5, 0, Math.PI * 2); c.fill();
+    // (an Umbral side, issue #111: its hitter in shadow, a violet glow and two pale eyes)
+    if (G.teams[n].shade) { c.save(); c.shadowColor = '#c8b8ff'; c.shadowBlur = 8; c.strokeStyle = '#c8b8ff'; c.lineWidth = 1.2; c.beginPath(); c.arc(x - 9, y + 9, 5.5, 0, Math.PI * 2); c.stroke(); c.restore(); c.fillStyle = '#c8fff0'; c.fillRect(x - 11.2, y + 7.6, 1.6, 1.6); c.fillRect(x - 8.2, y + 7.6, 1.6, 1.6); }
     txt(c, glName(n, ri), x - 9, y + 24, '600 11px system-ui, sans-serif', '#f4f1e0', 'center', 'middle');
   }
   c.restore();
