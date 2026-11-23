@@ -44,8 +44,14 @@ function wUmbHexCut(id) {
 }
 // the game a ward is bound to is still on: a sport's game half-played, or a card champion's match under way
 function wUmbWardLive(id) {
-  // (the Seal's round is rebuilt from WG.umbral, so it is there after a reload too)
-  const C = W_NADIR[id] || (id === 'finale' && typeof wUmbFinaleEntry === 'function' ? wUmbFinaleEntry() : null); if (!C) return false;
+  // (the Seal's round is read from WG.umbral, so it is there after a reload too, without building it)
+  if (id === 'finale' && !W_NADIR.finale) {
+    const U = wUmb(), sp = U && U.finaleSports, piece = sp && sp[Math.min(U.finale || 0, sp.length - 1)], e = piece && W_UMB5.engine[piece];
+    if (!piece) return false;
+    if (e) { const f = W_UMB4.live[e]; try { return f ? !!f() : true; } catch (err) { return true; } }
+    const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
+  }
+  const C = W_NADIR[id]; if (!C) return false;
   if (C.engine) { const f = W_UMB4.live[C.engine]; try { return f ? !!f() : true; } catch (e) { return true; } }
   const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
 }
