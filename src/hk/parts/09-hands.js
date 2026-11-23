@@ -183,9 +183,10 @@ function hkLunge(dt) {
   }
   if ((U.t -= dt) > 0) return;
   L.lunge = null; d.stun = .3; hkEv('hitmiss', d.n, c ? c.n : '');
-  // you ran into somebody who doesn't have the puck: interference, more often than not
-  const [o, od] = hkNearest(d.x, d.y, hkSk(1 - d.side).filter(q => L.pl.indexOf(q) !== h));
-  if (o && od < .9 && R() < HK_FOUL.interfere) hkFoul(d, 'interference', o);
+  // you ran into somebody who doesn't have the puck: interference, more often than not (and more under the Hollow
+  // Whistle: 16-umbral.js; with no hex it is HK_FOUL.interfere, as before)
+  const [o, od] = hkNearest(d.x, d.y, hkSk(1 - d.side).filter(q => L.pl.indexOf(q) !== h)), wk = hkWhistleK(d.side);
+  if (o && od < .9 && R() < (wk === 1 ? HK_FOUL.interfere : Math.min(HK_HEX.whistle.max, HK_FOUL.interfere * wk))) hkFoul(d, 'interference', o);
 }
 /* your press at the face-off, as an edge on the roll: in the last HK_HANDS.drop seconds before the puck lands, up to
    +.3 (the closer the better); earlier, you've jumped it: -.15. No press: 0. */

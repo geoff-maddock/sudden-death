@@ -518,6 +518,9 @@ table.season tr.won td{background:rgba(47,138,98,.12)} table.season tr.fell td{b
 .whcbox span{display:grid;gap:3px}
 .whcbox small{color:var(--dim);font-size:14px;line-height:1.35}
 .whelp{margin:0 0 18px}
+/* How to play's wide tables (the powers tables run to 660px) scroll inside themselves on a narrow screen, so the page
+   never scrolls sideways (#111) */
+@media (max-width:760px){.whelp table{display:block;max-width:100%;overflow-x:auto}}
 #modalBox:has([data-wco]){width:min(860px,100%)}
 @media (max-width:520px){
   .wpg{grid-template-columns:minmax(0,1fr)}
@@ -33960,9 +33963,10 @@ function hkLunge(dt) {
   }
   if ((U.t -= dt) > 0) return;
   L.lunge = null; d.stun = .3; hkEv('hitmiss', d.n, c ? c.n : '');
-  // you ran into somebody who doesn't have the puck: interference, more often than not
-  const [o, od] = hkNearest(d.x, d.y, hkSk(1 - d.side).filter(q => L.pl.indexOf(q) !== h));
-  if (o && od < .9 && R() < HK_FOUL.interfere) hkFoul(d, 'interference', o);
+  // you ran into somebody who doesn't have the puck: interference, more often than not (and more under the Hollow
+  // Whistle: 16-umbral.js; with no hex it is HK_FOUL.interfere, as before)
+  const [o, od] = hkNearest(d.x, d.y, hkSk(1 - d.side).filter(q => L.pl.indexOf(q) !== h)), wk = hkWhistleK(d.side);
+  if (o && od < .9 && R() < (wk === 1 ? HK_FOUL.interfere : Math.min(HK_HEX.whistle.max, HK_FOUL.interfere * wk))) hkFoul(d, 'interference', o);
 }
 /* your press at the face-off, as an edge on the roll: in the last HK_HANDS.drop seconds before the puck lands, up to
    +.3 (the closer the better); earlier, you've jumped it: -.15. No press: 0. */
@@ -34735,7 +34739,7 @@ function hkCpuPotion() {
               the wings come at a worse angle (hkNetOff, read by hkShotOdds, hkRelease, hkGoalSpot and hkNets)
      cold     Grave Cold: that side's skaters tire HK_HEX.cold.k times as fast
      whistle  The Hollow Whistle: the referee is the other side's: that side's fouls are called HK_HEX.whistle.k times as
-              often (hkFoulK)
+              often (hkFoulK; interference too, hkWhistleK, at most HK_HEX.whistle.max of the time)
    The hexes are named over the opening face-off (the intro beat, and the line under the rink) and under the score bar
    all game; the holes are drawn on the ice and the net is drawn where it has slid.
    A captain's own ultimate: a roster player sent with { ult: id } brings that one (HK_ULT_BY) instead of their kind's
@@ -34746,7 +34750,7 @@ const HK_HEX = {
   holes: { n: 'The Ice Opens', d: 'Holes of open water in the end you attack, new ones each period: a puck that slides into one is gone, and the face-off goes back to centre ice.', count: 2, r: .9 },
   slide: { n: 'The Wandering Net', d: 'The net you shoot at slides along its goal line away from the puck, and the goalie goes with it: shots from the wings come at a worse angle.', max: 1.8, v: 1.6, k: .4 },
   cold: { n: 'Grave Cold', d: 'The cold of the pond gets into your skaters: they tire 30% faster.', k: 1.3 },
-  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called twice as often.', k: 2 },
+  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called twice as often.', k: 2, max: .9 },
 };
 // the Nadir captain's own ultimate
 HK_ULT_OWN.longnight = hkU0('longnight', 'The Long Night', 'The lamps go out over the pond: their goalie is set late for everything, and they skate as if through deep snow.', { blind: .6, shot: .02 }, { slow: .86 }, 'slot');
@@ -34795,8 +34799,10 @@ const hkNetOff = side => G && G.hex && G.hex.slide && side === 1 - G.hex.on ? G.
 // the same, for the net whose goal line is near x (the nets' boxes, 05-live.js)
 function hkNetOffX(x) { if (!G || !G.hex || !G.hex.slide) return 0; const d = 1 - G.hex.on; return (hkGoalX(1 - d) < HK_RULES.len / 2) === (x < HK_RULES.len / 2) ? G.hex.slide : 0; }
 const hkHexTire = side => hkHexOn('cold', side) ? HK_HEX.cold.k : 1;
-// how often side's fouls are called: its Edge, and the Hollow Whistle
-const hkFoulK = side => hkEdgeSt(side).foul * (hkHexOn('whistle', side) ? HK_HEX.whistle.k : 1);
+// how often side's fouls are called: its Edge, and the Hollow Whistle (hkWhistleK alone for interference, which no
+// Edge changes: 09-hands.js)
+const hkWhistleK = side => hkHexOn('whistle', side) ? HK_HEX.whistle.k : 1;
+const hkFoulK = side => hkEdgeSt(side).foul * hkWhistleK(side);
 // each step: the net slides away from the puck
 function hkHexStep(dt) {
   if (!hkHexHas('slide')) return;
@@ -42379,7 +42385,7 @@ function crThrowFinish(X) {
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   if (G.wear !== false) crWear(G.ice, run.path);
   // (Hoarfrost: the first of the other rink's stones an end to lie in the four-foot freezes there: 15-umbral.js)
-  if (G.hex) crHexFreeze();
+  const froze = G.hex ? crHexFreeze() : false;
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
@@ -42393,6 +42399,7 @@ function crThrowFinish(X) {
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, ham, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
   if (drift && !rule.fgz) ev.drift = drift;
+  if (froze) ev.froze = 1 - G.hex.on;
   crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };
@@ -42621,7 +42628,8 @@ function crSettle() {
   if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
   if (ev.ghost) say += ' It slid through the guard like smoke.';
   if (ev.gust) say += ` A gust pushes their stone back ${ev.gust} inches.`;
-  if (ev.drift) say += ` The house drifts: the stone slides ${ev.drift} inches further out.`;
+  // (the Drifting House and Hoarfrost, when they act: 15-umbral.js)
+  if (G.hex) say += crHexSay(ev);
   if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
   crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
@@ -43455,7 +43463,8 @@ function crCpuPotionPlan(s, plan, again) { const n = G.pots.length, pot = crCpuP
      hoar    Hoarfrost: the first stone of the other rink's an end to lie in the four-foot (within CR_HEX.hoar.r inches
              and a stone of it) freezes where it lies: as heavy as granite for the rest of the end, so that side's hits
              barely move it (G.hex.froze: the end it froze in; one an end)
-   The hexes are named before the first stone (the status line) and under the end board all game (crHexLine).
+   The hexes are named before the first stone (the status line) and under the end board all game (crHexLine); the
+   Drifting House and Hoarfrost say so on the status line after the stone they act on (crHexSay).
    A curler's own ultimate (a roster curler sent with { ult: id }, an id in CR_ULT_OWN): their rink casts it in place of
    the thrower's kind's (crUltOf). The Sunken Shed's champion brings one. */
 const CR_LICH = { n: 'Lich', ang: .22, hitAng: .36, v: .011, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0, replies: 4, replyMix: .3,
@@ -43532,11 +43541,21 @@ function crHexDrift(s, run) {
   return D;
 }
 // Hoarfrost: after a stone, the other rink's stone nearest the button, on it, freezes where it lies (granite, for the
-// end), the first such an end
+// end), the first such an end. True when one froze (the stone's event carries froze: the side whose stone it is, and
+// the page says so: crHexSay)
 function crHexFreeze() {
   if (!crHexHas('hoar') || G.hex.froze === G.end) return;
   const o = 1 - G.hex.on, lim = CR_HEX.hoar.r + CR_SHEET.stoneR, st = G.stones.filter(b => b.s === o && !b.g && crDist(b) <= lim).sort((a, b) => crDist(a) - crDist(b))[0];
-  if (st) { st.g = 1; G.hex.froze = G.end; }
+  if (st) { st.g = 1; G.hex.froze = G.end; return true; }
+  return false;
+}
+// what a hex did on a stone, for the page's line after it (the Drifting House and Hoarfrost), or ''
+function crHexSay(ev) {
+  if (!G || !G.hex || !ev) return '';
+  let say = '';
+  if (ev.drift) say += ` The house drifts: the stone slides ${ev.drift} inches further out.`;
+  if (ev.froze != null) say += ` Hoarfrost: ${G.teams[ev.froze].name}'s stone in the four-foot freezes where it lies, as heavy as granite for the rest of the end.`;
+  return say;
 }
 const crHexNames = () => G && G.hex ? G.hex.ids.map(k => CR_HEX[k].n).join(', ') : '';
 const crHexLine = () => G && G.hex ? `Hexes on ${G.teams[G.hex.on].short || G.teams[G.hex.on].name}: ${crHexNames()}` : '';
@@ -67102,5 +67121,78 @@ const wWU7GndD = WGND.d, wWU7ObjJ = WOBJ.J;
 WGND.d = function (c, P, r, e) { wWU7GndD.apply(this, arguments); if (e && e.m && e.m.umbral && e.m.field) wUmbDim(c); };
 WOBJ.J = function (c, P, r, e) { wWU7ObjJ.apply(this, arguments); if (e && e.m && e.m.umbral) wUmbDim(c); };
 
+/* u8a: the small things found along the way (issue #111, phase A). Loads after u7-feel.js; changes earlier parts only
+   by reassignment (saved originals carry the wWU8A prefix). The fixes that live inside an engine are in its own
+   Umbral part: curling's Hoarfrost said on the status line (src/cr/parts/15-umbral.js, crHexSay), hockey's
+   interference under The Hollow Whistle (src/hk/parts/16-umbral.js, hkWhistleK). How to play's wide tables scroll
+   inside themselves at phone width (src/realm/w0.css, .whelp table).
+
+   Brakka's own nature on boxing's pairing: the pairing's line of ratings named the kind's nature (a minotaur's Charges
+   In) for every boxer, Brakka too, though the engine boxes a champion with their own (f.tr: Cracked Bronze). A boxer
+   who brings a nature of their own shows it there instead.
+   A champion's game is the standard length: golf, bowling and basketball took their length from Settings (holes,
+   frames, minutes), so a champion's game (and a round of the Seal in that sport) could be cut short. It is now always
+   the engine's standard length, the one the labs measured (W_UMB8A.len), whatever Settings says, and the card says so.
+   Curling's champion already plays six ends (u4h).
+
+   W_UMB8A, wUmbFixedLen
+   Wraps: wRingPairing (wWU8ARingPairing: the champion's own nature), wUmbGlKick, wUmbBlKick and wUmbBkTip
+   (wWU8AUmbGlKick, wWU8AUmbBlKick, wWU8AUmbBkTip: the standard length), wUmbGlCard, wUmbBlCard and wUmbBkCard
+   (wWU8AUmbGlCard, wWU8AUmbBlCard, wWU8AUmbBkCard: the card says so), renderHelp (wWU8ARenderHelp: a sentence in
+   the Umbral section). */
+
+const W_UMB8A = {
+  // each sport's length setting (SET key), the engine's standard length and its words
+  len: {
+    links: { set: 'linksHoles', std: () => wGL.rules.holes, words: n => `${n} holes` },
+    lanes: { set: 'lanesFrames', std: () => wBL.rules.frames, words: n => `${n} frames` },
+    court: { set: 'courtMins', std: () => wBK.rules.mins, words: n => `${n} minutes` },
+  },
+};
+
+/* ---------- boxing: the champion's own nature on the pairing ---------- */
+const wWU8ARingPairing = wRingPairing;
+wRingPairing = function (o) {
+  const r = wWU8ARingPairing.apply(this, arguments), T = $('wRingPairT');
+  if (T && o && o.theirs) T.querySelectorAll('tr:not(.wrtape)').forEach((tr, i) => {
+    const f = o.theirs.fighters[i]; if (!f || !f.tr) return;
+    const sm = tr.querySelector('td small'), K = wBX.traits[f.kind]; if (!sm) return;
+    const own = `<span data-u8anature title="${esc(f.tr.desc)}">${esc(f.tr.n)}</span>`;
+    const sp = K && [...sm.querySelectorAll('span[title]')].find(e => e.textContent === K.n);
+    if (sp) sp.outerHTML = own; else if (!sm.querySelector('[data-u8anature]')) sm.insertAdjacentHTML('beforeend', ` · ${own}`);
+  });
+  return r;
+};
+
+/* ---------- a champion's game is the standard length ---------- */
+// run fn with sport e's length setting at its standard, and put the setting back after (whatever fn does)
+function wUmbFixedLen(e, fn) {
+  const L = W_UMB8A.len[e], was = SET[L.set];
+  SET[L.set] = L.std();
+  try { return fn(); } finally { if (was === undefined) delete SET[L.set]; else SET[L.set] = was; }
+}
+const wWU8AUmbGlKick = wUmbGlKick, wWU8AUmbBlKick = wUmbBlKick, wWU8AUmbBkTip = wUmbBkTip;
+wUmbGlKick = function () { const a = arguments; return wUmbFixedLen('links', () => wWU8AUmbGlKick.apply(this, a)); };
+wUmbBlKick = function () { const a = arguments; return wUmbFixedLen('lanes', () => wWU8AUmbBlKick.apply(this, a)); };
+wUmbBkTip = function () { const a = arguments; return wUmbFixedLen('court', () => wWU8AUmbBkTip.apply(this, a)); };
+// the card: its length, after the prize
+function wUmbLenNote(e) {
+  const box = $('modalBox'), L = W_UMB8A.len[e]; if (!box || box.querySelector('[data-u8alen]')) return;
+  const ps = box.querySelectorAll('.wmsg p.hint'), p = ps[ps.length - 1]; if (!p) return;
+  p.insertAdjacentHTML('afterbegin', `<span data-u8alen>Always ${esc(L.words(L.std()))}, the standard game, whatever Settings says. </span>`);
+}
+const wWU8AUmbGlCard = wUmbGlCard, wWU8AUmbBlCard = wUmbBlCard, wWU8AUmbBkCard = wUmbBkCard;
+wUmbGlCard = function () { const r = wWU8AUmbGlCard.apply(this, arguments); wUmbLenNote('links'); return r; };
+wUmbBlCard = function () { const r = wWU8AUmbBlCard.apply(this, arguments); wUmbLenNote('lanes'); return r; };
+wUmbBkCard = function () { const r = wWU8AUmbBkCard.apply(this, arguments); wUmbLenNote('court'); return r; };
+
+/* ---------- How to play ---------- */
+const wWU8ARenderHelp = renderHelp;
+renderHelp = function () {
+  wWU8ARenderHelp.apply(this, arguments);
+  const h = $('wHelpUmbral'); if (!h || h.tagName !== 'DIV' || $('wHelpU8aLen')) return;
+  const L = W_UMB8A.len;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpU8aLen"><b>No short games.</b> A champion's game, and a round of the Seal, is always the standard length: ${esc(L.links.words(L.links.std()))} of golf, ${esc(L.lanes.words(L.lanes.std()))} of bowling, ${esc(L.court.words(L.court.std()))} of basketball, whatever Settings says.</p>`);
+};
 </script>
 </body></html>
