@@ -206,3 +206,4 @@ src/realm/umbral/u8e-forms.js
 src/realm/umbral/u8h-market.js
 src/realm/umbral/u8i-legends.js
 src/realm/umbral/u8j-feats.js
+src/realm/umbral/u9-redeemed.js
