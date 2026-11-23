@@ -8,7 +8,8 @@ Each Crown winner: the Gatekeeper first, then each sport's champion in turn (its
 match, tried until beaten, at most TRIES each; the region's gate item taken as brought). A champion is tried until
 beaten, at most TRIES times, while the gold lasts for the toll. Rested by a lantern before every match (full HP).
 With all nine pieces, the Seal: three rounds, each tried at most TRIES times. Engine games are Simulated (the adapters
-in LAB), card matches played by the bot.
+in LAB), card matches played by the bot. The walk out there (#111): before each guard's and champion's try, a hungry
+shadow match by the Dread's stage (UJ_SHADOW_P; 'window.UJ_NOSHADOW = 1' as PRE turns it off).
 Prints: how many of the Crown winners forged the Seal, the pieces they held at the end, where the others stopped, and
 each champion's games won / played (and the guards' and the finale rounds'). Writes /tmp/realm_umbral_journey.json.
 The target (issue #99): the Seal on about 5 to 15% of journeys that reach the Crown."""
@@ -23,6 +24,7 @@ TRIES = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 PRE = sys.argv[3] if len(sys.argv) > 3 else ''
 
 LAB_JS = r"""
+window.UJ_SHADOW_P = [.35, .5, .65, .8];
 window.UJLAB = function (TRIES) {
   const log = REALMLAB({}), out = { champion: log.result === 'champion', games: [], stop: null };
   if (!out.champion || !WG.umbral) return out;
@@ -43,17 +45,23 @@ window.UJLAB = function (TRIES) {
       return id === 'finale' ? ((U.finale || 0) > f0 ? 'win' : 'lose') : (U.pieces.length > p0 ? 'win' : 'lose'); }
     return card(() => wNadirMatch(id));
   };
+  // the walk out there (issue #111, the Dread): before each try, a chance of a hungry shadow, by stage (window.UJ_NOSHADOW: off)
+  const trip = () => {
+    if (window.UJ_NOSHADOW || typeof wUmbDread !== 'function') return;
+    if (Math.random() < UJ_SHADOW_P[wUmbDread()]) { rest(); WG.map = 'u:world'; const r = card(() => wUmbShadowMatch({ id: 'lab', x: WG.x, y: WG.y })); out.games.push({ who: 'shadow', res: r }); }
+  };
   const champs = ['gate'].concat(Object.keys(W_NADIR).filter(k => W_NADIR[k].ground));
   for (const id of champs) {
     const C = W_NADIR[id]; WG.map = C.map || 'u:umbralden';
     if (C.ground) {
       U.guards = U.guards || {}; U.gates = U.gates || {}; U.gates[id] = WG.dayAbs;
-      for (const i of [0, 1]) for (let t = 0; t < TRIES && !U.guards[C.ground + ':' + i]; t++) { rest(); const r = card(() => wUmbGuardMatch(C.ground, i)); out.games.push({ who: 'guard', res: r }); }
+      for (const i of [0, 1]) for (let t = 0; t < TRIES && !U.guards[C.ground + ':' + i]; t++) { trip(); WG.map = C.map; rest(); const r = card(() => wUmbGuardMatch(C.ground, i)); out.games.push({ who: 'guard', res: r }); }
       if (![0, 1].every(i => U.guards[C.ground + ':' + i])) { out.stop = out.stop || 'guards of ' + id; break; }
     }
     let won = false;
     for (let t = 0; t < TRIES && !won; t++) {
       if ((U.tries[id] || 0) > 0 && RUN.gold < C.toll) { out.stop = out.stop || 'gold at ' + id; break; }
+      trip(); WG.map = C.map || 'u:umbralden';
       const r = play(id); if (r == null) { out.stop = out.stop || 'could not play ' + id; break; }
       out.games.push({ who: id, res: r }); won = r === 'win';
     }
