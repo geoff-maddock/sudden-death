@@ -96,7 +96,7 @@ const W_UMB6_SPORTS = [['diamond', 'Baseball', 'The Bone Diamond'], ['gridiron',
 function wUmbQuick() {
   const steps = W_UMB6_SPORTS.map(([e, n, g]) => {
     const E = W_ENGINES[e], h = E && E.api.hexes, t = (typeof h === 'function' ? h() : h) || {};
-    return { h: `${n}, at ${g}`, t: Object.keys(t).map(k => `<b>${esc(t[k].n)}</b>: ${esc(t[k].d)}`).join(' ') };
+    return { h: `${n}, at ${g}`, t: Object.keys(t).map(k => `<b>${esc(t[k].n)}</b>: ${esc(t[k].d || t[k].desc || '')}`).join(' ') };   // (boxing's table says desc)
   });
   steps.unshift({ h: 'The card game, everywhere', t: Object.values(W_UMB3.hexes).map(H => `<b>${esc(H.n)}</b>: ${esc(H.d)}`).join(' ') });
   return { id: 'umbral', n: 'The Umbral', where: 'the other side of the portal', more: 'wHelpUmbral',

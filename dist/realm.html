@@ -66743,7 +66743,9 @@ wNadirMatch = function (id) {
   const box = $('modalBox');
   if (!LAB && box && !$('modal').hidden && !box.querySelector('.wumbcond')) {
     const p = document.createElement('p'); p.className = 'hint wumbcond'; p.innerHTML = `<b>${esc(who)} ${esc(cd.n)}.</b>${cd.k === 'margin' ? ' A win by less pays as a win, but the piece stays with them.' : ''}`;
-    const h = box.querySelector('h2, h3'); if (h) h.after(p); else box.prepend(p);
+    // (first in the card's body, under its header row: the cards are <header>, then a .wmsg body)
+    const body = box.querySelector('.wmsg'), head = box.querySelector('header');
+    if (body) body.prepend(p); else if (head) head.after(p); else box.prepend(p);
   }
   return why;
 };
@@ -67005,7 +67007,7 @@ const W_UMB6_SPORTS = [['diamond', 'Baseball', 'The Bone Diamond'], ['gridiron',
 function wUmbQuick() {
   const steps = W_UMB6_SPORTS.map(([e, n, g]) => {
     const E = W_ENGINES[e], h = E && E.api.hexes, t = (typeof h === 'function' ? h() : h) || {};
-    return { h: `${n}, at ${g}`, t: Object.keys(t).map(k => `<b>${esc(t[k].n)}</b>: ${esc(t[k].d)}`).join(' ') };
+    return { h: `${n}, at ${g}`, t: Object.keys(t).map(k => `<b>${esc(t[k].n)}</b>: ${esc(t[k].d || t[k].desc || '')}`).join(' ') };   // (boxing's table says desc)
   });
   steps.unshift({ h: 'The card game, everywhere', t: Object.values(W_UMB3.hexes).map(H => `<b>${esc(H.n)}</b>: ${esc(H.d)}`).join(' ') });
   return { id: 'umbral', n: 'The Umbral', where: 'the other side of the portal', more: 'wHelpUmbral',

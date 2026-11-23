@@ -38,7 +38,9 @@ wNadirMatch = function (id) {
   const box = $('modalBox');
   if (!LAB && box && !$('modal').hidden && !box.querySelector('.wumbcond')) {
     const p = document.createElement('p'); p.className = 'hint wumbcond'; p.innerHTML = `<b>${esc(who)} ${esc(cd.n)}.</b>${cd.k === 'margin' ? ' A win by less pays as a win, but the piece stays with them.' : ''}`;
-    const h = box.querySelector('h2, h3'); if (h) h.after(p); else box.prepend(p);
+    // (first in the card's body, under its header row: the cards are <header>, then a .wmsg body)
+    const body = box.querySelector('.wmsg'), head = box.querySelector('header');
+    if (body) body.prepend(p); else if (head) head.after(p); else box.prepend(p);
   }
   return why;
 };
