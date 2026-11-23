@@ -82,7 +82,7 @@ async def main():
         # Anvil Ring a boxing card, in test/realm_ring_cup.py, and one at the Charter Court a basketball game, in
         # test/realm_court_cup.py, one at the Pond Rink a hockey game, in test/realm_rink_kettle.py, and one at Mossgate
         # Links a golf match, in test/realm_links_cup.py; each has its own engine and its own card)
-        OWN = "['g_bowl', 'g_ring', 'g_court', 'g_rink', 'g_links', 'g_lanes']"
+        OWN = "['g_bowl', 'g_ring', 'g_court', 'g_rink', 'g_links', 'g_lanes', 'g_shed']"
         mine = await pg.evaluate(f"""(() => {{ const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me'), own = {OWN};
           if (own.includes(f.g)) f.g = W_GRDS.find(g => !own.includes(g.id) && g.sport !== 'baseball').id; return wMyFixture(); }})()""")
         other = await pg.evaluate(f"W_GRDS.find(g => g.id !== '{mine['g']}' && !{OWN}.includes(g.id) && g.sport !== 'baseball').id")

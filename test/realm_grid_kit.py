@@ -47,7 +47,7 @@ async def main():
         r = await pg.evaluate("""(() => ({ gear: Object.keys(W_GRID_GEAR).map(id => [id, DB.items[id] && DB.items[id].gear, !!DB.items[id].desc]),
           pots: Object.keys(W_GRID_KIT.potions).map(id => [id, !!DB.items[id], wPotionSports(id)]),
           everyStore: Object.values(DB.shops).every(S => S.gfresin && S.gfsalve), cind: ['gfhaste', 'gffog', 'gf_cleats', 'gf_helmet', 'gf_tee'].every(id => DB.shops.cind[id]),
-          elsewhere: Object.keys(DB.shops).filter(k => k !== 'cind' && (DB.shops[k].gfhaste || DB.shops[k].gffog || DB.shops[k].gf_cleats)),
+          elsewhere: Object.keys(DB.shops).filter(k => k !== 'cind' && k !== 'u_cind' && (DB.shops[k].gfhaste || DB.shops[k].gffog || DB.shops[k].gf_cleats)),
           chests: ['gf_gloves', 'gf_pads'].map(id => Object.keys(DB.chests).filter(c => (DB.chests[c].items || {})[id])) }))()""")
         check(len(r['gear']) == 5 and all(g[1] == 'grid' and g[2] for g in r['gear']), 'five pieces of football gear, each an item with what it does', r['gear'])
         check(len(r['pots']) == 4 and all(x[1] and x[2] == ['grid'] for x in r['pots']), 'four new football potions, each an item for football', r['pots'])
