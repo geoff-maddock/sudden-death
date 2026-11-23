@@ -153,11 +153,12 @@ async def main():
 
         # winning the piece opens the gate then and there: its picture is redrawn and the guards step clear
         pw = await pg.evaluate("""(() => { const g = 'g_lanes', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), U = WG.umbral;
-          const snap = JSON.stringify({ gates: U.gates, guards: U.guards, pieces: U.pieces, beaten: U.beaten, tries: U.tries, items: WG.items, gold: RUN.gold });
+          const snap = JSON.stringify({ gates: U.gates, guards: U.guards, pieces: U.pieces, beaten: U.beaten, tries: U.tries, items: WG.items, gold: RUN.gold, deck: RUN.deck, offer: WG.cardOffer || null });
+          const keepGain = wGainCard; wGainCard = () => {};   // (the champion's card pick is not this check's business)
           try { U.guards[g + ':0'] = U.guards[g + ':1'] = 1; delete U.gates[c.id]; wUmbGauntletSync(g); const out = { before: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.gate, aside: [__at(g, 0), __at(g, 1)], a: G.aside };
             wLayer(m, 1); wUmbNadirEnd(c.id, 'win'); __close();
             Object.assign(out, { piece: U.pieces.includes(c.C.piece), open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, redrawn: !WLAY[m.id], entry: !!U.gates[c.id], clear: [__at(g, 0), __at(g, 1)], c: G.clear }); return out; }
-          finally { const o = JSON.parse(snap); Object.assign(U, { gates: o.gates, guards: o.guards, pieces: o.pieces, beaten: o.beaten, tries: o.tries }); WG.items = o.items; RUN.gold = o.gold; wUmbGauntletSync(g); wInvalidate(m.id); } })()""")
+          finally { wGainCard = keepGain; const o = JSON.parse(snap); Object.assign(U, { gates: o.gates, guards: o.guards, pieces: o.pieces, beaten: o.beaten, tries: o.tries }); WG.items = o.items; RUN.gold = o.gold; RUN.deck = o.deck; if (o.offer) WG.cardOffer = o.offer; else delete WG.cardOffer; wUmbGauntletSync(g); wInvalidate(m.id); } })()""")
         check(pw['before'] and pw['aside'] == pw['a'] and pw['piece'] and pw['open'] and pw['redrawn'] and pw['entry'] and pw['clear'] == pw['c'], 'winning the piece opens the gate there and then: redrawn, given, and the guards step clear', pw)
 
         # a save from before the wall: guards beaten and the gate handed over through u4 (no other keys), or standing
@@ -172,6 +173,17 @@ async def main():
             map: WG.map, at: [WG.x, WG.y], spawn: rm.spawn, log: __logs(4) }; })()""")
         check(old['bowl'] and old['bclear'] == old['bc'], 'a save from before the wall: a gate handed over through the champion reads open, its guards clear', old)
         check(old['rink'] and old['rline'] == old['rl'] and old['map'] == 'u:g_rink' and old['at'] == old['spawn'] and 'railing of bone' in old['log'], 'one saved standing behind the line, guards standing, wakes at the way in, the gate shut', old)
+
+        # a railing that would seal a marked tile off (reachable before it stood, not after) isn't built: no wall there,
+        # and the audit says which ground
+        sw = await pg.evaluate("""(() => { const g = 'g_ring', m = MAPS['u:' + g], G = m.gauntlet, out = {};
+          for (const x of G.wall.concat([G.gate[0]])) m.t[G.row][x] = 'd'; delete m.gauntlet;
+          [0, 1].forEach(i => { const n = m.npcs.find(k => k.id === wUmbGuardOf(g, i)); n.x = G.line[i][0]; n.y = G.line[i][1]; });
+          const sx = G.wall[1], sy = G.row - 1; for (const [x, y] of [[sx - 1, sy], [sx + 1, sy], [sx, sy - 1]]) m.t[y][x] = 'J'; m.t[sy][sx] = 'S'; m.meta[sx + ',' + sy] = { text: 'test' };
+          out.built = wUmbBuildGauntlet(g); out.why = m.gauntletWhy; out.row = m.t[G.row].includes(W_UMB8D.wall); out.audit = wAudit().filter(s => s.startsWith('u:' + g));
+          buildAllMaps(); out.back = !!MAPS['u:' + g].gauntlet; out.clean = wAudit(); return out; })()""")
+        check(sw['built'] is False and not sw['row'] and 'tile' in sw['why'] and any('no wall' in a for a in sw['audit']), 'a railing that would seal off a marked tile reachable before it is not built, and the audit names the ground', sw)
+        check(sw['back'] and sw['clean'] == [], 'built afresh, the ground has its wall again and the audit is clean', sw)
 
         # How to play says so
         hp = await pg.evaluate("""(() => { showPage('help'); const p = document.getElementById('wHelpUmbGate'), prev = p && p.previousElementSibling;
