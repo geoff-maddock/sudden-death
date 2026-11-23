@@ -67349,10 +67349,10 @@ WOBJ.J = function (c, P, r, e) { wWU7ObjJ.apply(this, arguments); if (e && e.m &
    team without it is drawn as it always was.
 
    Truer dark traits in the card game (W_UMB3.traits, three replaced; the others keep theirs):
-     wraith  Half There: the first hit from an attack card against it each of your turns does nothing (status u_phase:
-             hurtEnemy spends it on an attack's hit, never a skill's, poison, burn or a raw blow; turnStart puts it
-             back). atkDmg
-             stays pure: previews show the real number, and the breakdown notes the first hit is lost.
+     wraith  Half There: the first hit from an attack card (or a set play, an attack as the engine counts them)
+             against it each of your turns does nothing (status u_phase: hurtEnemy spends it on such a hit, never a
+             skill's, poison, burn or a raw blow; turnStart puts it back). atkDmg stays pure: previews show the real
+             number, and the breakdown notes the first hit is lost.
      ogre    Won't Flinch: Weak and Exposed don't take on it (status u_still: the sums ignore them, and they come off
              after a card or tonic resolves and when it is done, at the end and the start of your turn, and before its swing;
              the log says so. One laid on in the other side's turn shows until then).
@@ -67392,11 +67392,13 @@ onHook('turnStart', () => { if (B && B.umb) for (const e of B.enemies) if (e.uHa
 function wUmbWithout(e, k, f) { const v = e.st[k]; if (!v) return f(); delete e.st[k]; try { return f(); } finally { e.st[k] = v; } }
 // the damage maths stay pure: Exposed counts for nothing on an Unflinching player; Half There is only a note in the
 // breakdown (WHY, the explanation dmgWhy asks for), since only the first real hit is lost (hurtEnemy)
+// (an attack, as the engine counts them: an Attack or a set play)
+const wUmbIsAtk = t => t === 'atk' || t === 'play';
 const wWU8EAtkDmg = atkDmg;
 atkDmg = function (base, e, card) {
   const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wWU8EAtkDmg.apply(this, args)) : wWU8EAtkDmg.apply(this, args);
   // (a short note, not a multiplier: the total is the real hit; only an attack's)
-  if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player' && card && def(card).type === 'atk') WHY.push(['Half There', '', 'Half There: 1st hit lost']);
+  if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player' && card && wUmbIsAtk(def(card).type)) WHY.push(['Half There', '', 'Half There: 1st hit lost']);
   return n;
 };
 // Half There: the first hit from an attack card against it this turn does nothing (not poison, burn, or a raw blow:
@@ -67404,7 +67406,7 @@ atkDmg = function (base, e, card) {
 const wWU8EHurtEnemy = hurtEnemy;
 hurtEnemy = function (e, dmg, o) {
   o = o || {};
-  if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && B.inCard && B.curType === 'atk' && !o.raw && !o.psn && !o.burn) {
+  if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && B.inCard && wUmbIsAtk(B.curType) && !o.raw && !o.psn && !o.burn) {
     delete e.st.u_phase; dmg = 0;
     fx({ k: 'say', e: e.uid, t: 'Half There' });
     log(`${e.n} is Half There: the hit passes straight through.`, 'bad');
@@ -67430,7 +67432,7 @@ resolve = function () { const r = wWU8EResolve.apply(this, arguments); wUmbShrug
 const wWU8EPlayCard = playCard, wWU8EUseTonic = useTonic, wWU8EEndTurn = endTurn;
 playCard = function () { const r = wWU8EPlayCard.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
 useTonic = function () { const r = wWU8EUseTonic.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
-endTurn = function () { const r = wWU8EEndTurn.apply(this, arguments); wUmbShrugAll(); return r; };
+endTurn = function () { const mine = !!B && B.phase === 'player' && !B.over, r = wWU8EEndTurn.apply(this, arguments); if (mine) wUmbShrugAll(); return r; };
 const wWU8EDoMove = doMove;
 doMove = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wWU8EDoMove.apply(this, arguments); };
 // Webs the Bench: a card of the hand you drew costs 1 more this turn

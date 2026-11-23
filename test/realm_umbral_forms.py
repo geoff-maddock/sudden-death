@@ -50,6 +50,8 @@ async def main():
           out.why = { note: !!w && w.parts.some(p => p[0] === 'Half There' && p[1] === '' && /1st hit lost/.test(p[2])) && !w.parts.some(p => p[1] === '×' && p[2] === 0), n: w && w.n, real: atkDmg(2, e, B.hand[0]), est: est.total, text: cardText(B.hand[0], { live: true, card: B.hand[0], tgt: e }).replace(/<[^>]+>/g, '') };
           B.hand.shift(); out.first = hit(); out.phase1 = e.st.u_phase || 0; out.second = hit(); out.log = B.log.map(l => l.t).join(' ');
           runSteps(endTurn()); out.back = e.st.u_phase || 0; out.third = hit();
+          // (a set play is an attack too: the first one each turn is lost)
+          runSteps(endTurn()); B.energy = 9; B.hand.unshift(mkCard('ply_squeeze')); let hp = e.hp; playCard(0, 0); out.play = [hp - e.hp, e.st.u_phase || 0]; hp = e.hp; B.hand.unshift(mkCard('ply_squeeze')); playCard(0, 0); out.play.push(hp - e.hp);
           // (a raw blow, an instant kill or Tempest, goes straight through it, and leaves Half There up)
           runSteps(endTurn()); const h0 = e.hp; B.inCard = true; hurtEnemy(e, 5, { raw: true }); B.inCard = false; out.raw = [h0 - e.hp, e.st.u_phase || 0];
           // (nor does a skill's damage: only an attack's)
@@ -63,6 +65,7 @@ async def main():
         check(wr['umb'] and wr['phase0'] == 1 and y['note'] and y['n'] == y['real'] > 0 and y['est'] > 0 and 'Deal 0' not in y['text'], 'a Wraith on the dark side is Half There: previews show the real number (no "Deal 0"), and the breakdown notes the first hit is lost (a note, not a ×0)', wr)
         check(wr['first'] == 0 and wr['phase1'] == 0 and wr['second'] > 0 and 'Half There' in wr['log'], 'the first hit against it does nothing and spends Half There; the second lands; the log says so', wr)
         check(wr['back'] == 1 and wr['third'] == 0, 'Half There comes back at the start of your next turn', wr)
+        check(wr['play'][0] == 0 and wr['play'][1] == 0 and wr['play'][2] > 0, 'a set play is an attack: the first one each turn is lost, the next lands', wr)
         check(wr['raw'][0] > 0 and wr['raw'][1] == 1 and wr['skill'][0] > 0 and wr['skill'][1] == 1 and wr['tempest'] == 1, 'a raw blow (an instant kill, Tempest) or a skill\'s damage is not an attack hit: it lands, and Half There stays up', wr)
         check(wr['bot'][0] == 'win', 'the realm bot beats a Wraith', wr)
         check(wr['light']['phase'] == 0 and wr['light']['first'] > 0, 'in the light the same Wraith takes the first hit', wr)
