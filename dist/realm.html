@@ -68189,6 +68189,12 @@ function wUmbGauntletProblems(m, g) {
   const near = (s, x, y) => wUmbNear(m, s, x, y), B = wUmbBehind(m, g), shut = B.shut;
   const past = [[true, false], [false, true], [true, true]].map(b => wUmbGauntletReach(m, g, { open: false, beaten: b }));
   const open = wUmbGauntletReach(m, g, { open: true, beaten: true });
+  // the same with the railing's tiles open too: what even that can't reach is cut off by people, not by the railing
+  // (P.people lists those problems: the audit reports them, but they don't cost a ground its wall)
+  const rail = (x, y) => y === G.row && (x === G.gate[0] || G.wall.includes(x));
+  const who = new Set(m.npcs.filter(n => !gi.includes(n.id)).map(n => n.x + ',' + n.y).concat(G.clear.map(p => p.join(','))));
+  const bare = wUmbWalkFrom(m, who, (x, y) => rail(x, y) || walkCh(m.t[y][x])), people = [];
+  const unreached = (x, y, line) => { if (near(open, x, y)) return; P.push(line); if (!near(bare, x, y)) people.push(line); };
   for (const n of m.npcs) if (champs.includes(n.id)) {
     if (near(shut, n.x, n.y)) P.push(id + ': ' + n.id + ' can be reached past the guards');
     else if (past.some(s => near(s, n.x, n.y))) P.push(id + ': ' + n.id + ' can be reached with the gate shut');
@@ -68198,9 +68204,10 @@ function wUmbGauntletProblems(m, g) {
   for (const n of m.npcs) {
     if (!B.npcs.includes(n.id)) continue;
     const k = gi.indexOf(n.id), p = k >= 0 ? G.clear[k] : [n.x, n.y];
-    if (!near(open, ...p)) P.push(id + ': cannot reach ' + n.id + ' with the gate open');
+    unreached(p[0], p[1], id + ': cannot reach ' + n.id + ' with the gate open');
   }
-  for (const k of B.tiles) { const [x, y] = k.split(',').map(Number); if (!near(open, x, y)) P.push(id + ': cannot reach the tile ' + k + ' with the gate open'); }
+  for (const k of B.tiles) { const [x, y] = k.split(',').map(Number); unreached(x, y, id + ': cannot reach the tile ' + k + ' with the gate open'); }
+  P.people = people;
   return P;
 }
 
@@ -68234,11 +68241,13 @@ function wUmbBuildGauntlet(g) {
   for (const x of run) m.t[gy][x] = W_UMB8D.wall;
   m.t[gy][gx] = W_UMB8D.gate;
   m.gauntlet = { row: gy, gate: [gx, gy], wall: run.slice().sort((a, b) => a - b), line: F.guards.map(p => p.slice()), aside, clear };
-  // it must really shut the champion off, and really let you through once open, to everything you could reach
-  // before it stood; if not, no wall
-  const P = wUmbGauntletProblems(m, g);
+  // it must really shut the champion off and leave the guards and the gate in reach, and once open it must let you
+  // through to everyone and everything behind the line (wUmbBehind's rule); if not, no wall. A problem that is
+  // somebody standing in the way, which the railing didn't cause (P.people), is left to the audit: a map edit that
+  // puts a sign behind the champion never turns a ground's gauntlet off unnoticed
+  const P = wUmbGauntletProblems(m, g), bad = P.filter(l => !P.people.includes(l));
   m.gauntletProblems = P;
-  if (P.length) { run.forEach((x, k) => { m.t[gy][x] = was[k]; }); m.t[gy][gx] = wasGate; delete m.gauntlet; return no(P[0]); }
+  if (bad.length) { run.forEach((x, k) => { m.t[gy][x] = was[k]; }); m.t[gy][gx] = wasGate; delete m.gauntlet; return no(bad[0]); }
   return true;
 }
 // the guards where the journey says they stand (step: walk them there, as people in towns walk)

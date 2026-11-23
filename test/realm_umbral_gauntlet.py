@@ -207,7 +207,7 @@ async def main():
           const x0 = Math.min(...G.wall), y0 = G.row + s * 3, at = (x, y) => m.npcs.some(n => n.x === x && n.y === y);
           // a corner of the field behind the line: the stands on two sides, a person in the way, and stands on the last side
           const pocket = [x0, y0], door = [x0 + 1, y0], plug = [x0, y0 - s], was = [plug, pocket, door].map(([x, y]) => [x, y, m.t[y][x]]);
-          if (![pocket, door, plug].every(([x, y]) => walkCh(m.t[y][x]) && !at(x, y)) || walkCh(m.t[y0][x0 - 1])) return { setup: false, pocket, door, plug };
+          if (![pocket, door, plug].every(([x, y]) => walkCh(m.t[y][x]) && !at(x, y)) || walkCh(m.t[y0][x0 - 1]) || walkCh(m.t[y0 + s][x0])) return { setup: false, pocket, door, plug };
           DB.chars.zback = DB.chars.zdoor = { name: 'Somebody', kind: 'goblin', greet: '...', topics: {} };
           m.npcs.push({ id: 'zback', x: pocket[0], y: pocket[1], fixed: true }, { id: 'zdoor', x: door[0], y: door[1], fixed: true }); m.t[plug[1]][plug[0]] = 'J';
           try { const B = wUmbBehind(m, g), a = wAudit(); return { setup: true, behind: B.npcs.includes('zback') && B.npcs.includes('zdoor'), back: a.filter(l => /zback/.test(l)), door: a.filter(l => /zdoor/.test(l)) }; }
@@ -219,6 +219,21 @@ async def main():
         ag = await pg.evaluate("""(() => { const out = {}; for (const g in W_UMB4.grounds) { const m = MAPS['u:' + g], B = wUmbBehind(m, g), r = wUmbGauntletReach(m, g, { open: false, beaten: false });
             out[g] = B.shut.every((v, i) => v === r[i]) && wUmbGroundChamps(g).every(k => B.npcs.includes(W_NADIR[k].char)); } return out; })()""")
         check(all(ag.values()) and len(ag) == 8, 'one rule: the reach checks and the filter use the same play walk with the gate shut, and every champion is judged by it', ag)
+
+        # a marked tile behind the line whose only open side is the champion's tile: somebody in the way, not the railing,
+        # so the ground keeps its wall and the audit reports the tile
+        kp = await pg.evaluate("""(() => { const g = 'g_ring', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), s = Math.sign(G.row - m.spawn[1]), out = {};
+          const sx = c.x, sy = c.y + s, side = [[sx - 1, sy], [sx + 1, sy], [sx, sy + s]];
+          out.setup = walkCh(m.t[sy][sx]) && !side.slice(0, 2).some(([x, y]) => m.npcs.some(n => n.x === x && n.y === y)) && (!m.t[sy + s] || !walkCh(m.t[sy + s][sx]));
+          try {
+            for (const x of G.wall.concat([G.gate[0]])) m.t[G.row][x] = 'd'; delete m.gauntlet;
+            [0, 1].forEach(i => { const n = m.npcs.find(k => k.id === wUmbGuardOf(g, i)); n.x = G.line[i][0]; n.y = G.line[i][1]; });
+            for (const [x, y] of side.slice(0, 2)) m.t[y][x] = 'J'; m.t[sy][sx] = 'S'; m.meta[sx + ',' + sy] = { text: 'test' };
+            out.built = wUmbBuildGauntlet(g); out.tile = sx + ',' + sy; out.problems = m.gauntletProblems.slice(); out.audit = wAudit().filter(l => l.startsWith('u:' + g));
+          } finally { delete m.meta[sx + ',' + sy]; buildAllMaps(); }
+          out.clean = wAudit(); return out; })()""")
+        kp_line = 'u:g_ring: cannot reach the tile ' + str(kp.get('tile')) + ' with the gate open'
+        check(kp['setup'] and kp['built'] is True and kp['problems'] == [kp_line] and kp['audit'] == [kp_line] and kp['clean'] == [], 'a marked tile behind the line blocked only by the champion keeps the wall; the audit reports the tile', kp)
 
         # a tile in front of the line whose only open side has somebody standing on it is not 'behind the line': the
         # railing doesn't cut it off, so the gate-open check leaves it to the older checks (which find it reachable)
