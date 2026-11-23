@@ -895,7 +895,7 @@ function wBuildChunk(L, cx, cy) {
   L._ox = px0; L._oy = py0;
   const K = { cv: cv2, x: px0, y: py0, w: cw, h: chh, anim: [], lava: null };
   const env = (x, y) => ({ m, L, x, y, at: (dx, dy) => wAt(m, x + dx, y + dy) });
-  const bg = m.kind === 'dungeon' ? '#0b0a10' : '#1a1410';
+  const bg = m.kind === 'dungeon' ? '#0b0a10' : '#1a1410', WS = m.waterSh || WWATER;
 
   // 1. water: see-through, tinted by region and depth (a tiny canvas upscaled smoothly so depth has no tile edges)
   if (L.water) {
@@ -910,8 +910,8 @@ function wBuildChunk(L, cx, cy) {
       const P = WINK[reg] || WINK.plains, wc = rgbOf(P.water);
       const i = (ty * tw + tx) * 4;
       // shallow water lifts toward a pale turquoise; deep water sinks toward navy
-      const k = Math.max(0, Math.min(1, (d - 1) / 2.4)), A = [150, 215, 205, .42], B = [12, 40, 72, .34];
-      const sh = k < .5 ? A.map((v, j) => v + ([90, 170, 190, .16][j] - v) * k * 2) : [90, 170, 190, .16].map((v, j) => v + (B[j] - v) * (k - .5) * 2);
+      const k = Math.max(0, Math.min(1, (d - 1) / 2.4)), A = WS.shallow, M = WS.mid, B = WS.deep;
+      const sh = k < .5 ? A.map((v, j) => v + (M[j] - v) * k * 2) : M.map((v, j) => v + (B[j] - v) * (k - .5) * 2);
       img.data[i] = Math.round(wc[0] * .4 + sh[0] * .6); img.data[i + 1] = Math.round(wc[1] * .4 + sh[1] * .6); img.data[i + 2] = Math.round(wc[2] * .4 + sh[2] * .6);
       img.data[i + 3] = Math.round(255 * (sh[3] + (m.kind === 'dungeon' ? .25 : 0)));
     }
@@ -937,7 +937,7 @@ function wBuildChunk(L, cx, cy) {
         for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const n = wGround(L, x + dx, y + dy); if (n && n !== g && n !== '~' && ((WPRI[n] > pg && WGND[n]) || (g === '~' && n === 'L'))) types.add(n); }
         for (const n of [...types].sort((a, b) => WPRI[a] - WPRI[b])) {
           const sp = wSpillPath(L, x, y, n, g), Pn = wPal(L, x, y);
-          if (g === '~') { c.lineWidth = 6; c.strokeStyle = 'rgba(240,250,245,.42)'; c.stroke(sp); c.lineWidth = 3.2; c.strokeStyle = 'rgba(255,255,255,.55)'; c.stroke(sp); }
+          if (g === '~') { c.lineWidth = 6; c.strokeStyle = WS.foam[0]; c.stroke(sp); c.lineWidth = 3.2; c.strokeStyle = WS.foam[1]; c.stroke(sp); }
           if (g === 'L') { c.save(); c.shadowColor = '#ffb02e'; c.shadowBlur = 6; c.lineWidth = 4; c.strokeStyle = '#ffcf5a'; c.stroke(sp); c.restore(); }
           c.lineWidth = g === '~' || g === 'L' ? 2.6 : 1.8; c.strokeStyle = g === '~' || g === 'L' ? WINKC : 'rgba(29,20,15,.42)'; c.stroke(sp);
           c.save(); c.clip(sp); (n === 'L' ? wObsidian : WGND[n])(c, Pn, wRng((x * 7919 + y * 104729 + n.charCodeAt(0)) | 0), e); c.restore();
@@ -1010,6 +1010,9 @@ function wGrain(s) {
 }
 
 /* ---------- live water and lava ---------- */
+// the shades baked into a chunk's water (rgb + alpha, by depth) and the foam where land meets it; a map may name its own
+// (m.waterSh: the Umbral's ichor)
+const WWATER = { shallow: [150, 215, 205, .42], mid: [90, 170, 190, .16], deep: [12, 40, 72, .34], foam: ['rgba(240,250,245,.42)', 'rgba(255,255,255,.55)'] };
 const WFLUID = {};
 function wFluid(kind, col, s, fr) {
   const key = kind + col + s.toFixed(2) + ':' + fr;

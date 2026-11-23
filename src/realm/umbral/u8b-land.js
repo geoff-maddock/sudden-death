@@ -12,18 +12,22 @@
    laid on a lattice in map coordinates, so they run on across tile edges. Look says the dark tile's words
    (W_UMB8B.look), unless the place has words of its own.
    The sky in a card match (Sudden Death's two skylights) is mirrored left for right on the dark side, the moon's on
-   the right and the constellations reversed, and the dead moon hangs in the skylight beside the moon. The sky still
+   the right and the constellations reversed, and the dead moon hangs in the skylight just clear of the moon. The sky still
    does what it does on the light side; only the drawing changes. (The Realm's world view draws no sky of its own;
    baseball's engine draws its own and is left as it is.)
 
    W_UMB8B, wUmbSkyMirrored
    Wraps: WGND['.'], WGND['"'], WGND['~'], WGND.s, WGND.n, WGND[':'] (wWU8BGnd[ch]: ash, ichor, bone drift, salt), WOBJ.T,
-   WOBJ.f, WOBJ.p (wWU8BObj[ch]: dead trees), wLookText (wWU8BLookText: the dark tiles' words), drawSky (wWU8BDrawSky:
-   mirrored), drawMoon (wWU8BDrawMoon: the dead moon beside it), starsSVG (wWU8BStarsSVG: the chips reversed too), renderHelp
-   (wWU8BRenderHelp: a line on the land). */
+   WOBJ.f, WOBJ.p (wWU8BObj[ch]: dead trees), wUmbralMap (wWU8BUmbralMap: the ichor's shades, m.waterSh, read by w4's
+   chunk builder), wLookText (wWU8BLookText: the dark tiles' words), drawSky (wWU8BDrawSky: mirrored), drawMoon
+   (wWU8BDrawMoon: the dead moon beside it), starsSVG and moonSVG (wWU8BStarsSVG, wWU8BMoonSVG: the
+   chips reversed too), renderHelp (wWU8BRenderHelp: a line on the land). */
 
 const W_UMB8B = {
   ash: '#5e5963', salt: '#d2cbc0', bone: '#ddd5c2', ichor: '#0c0612', trunk: '#6f6a72',
+  // the water's shades baked into the map (w4's WWATER, by depth): black ichor, faintly violet in the shallows, and a
+  // dim violet edge where the land meets it, never white foam
+  water: { shallow: [52, 26, 70, .55], mid: [26, 12, 40, .5], deep: [8, 4, 14, .6], foam: ['rgba(120,80,170,.2)', 'rgba(170,130,225,.28)'] },
   look: {
     '.': 'Ash, ankle deep. Something under it moves when you stop.',
     '"': 'Dead stalks standing in the ash, waist high. They rattle when there is no wind.',
@@ -120,6 +124,9 @@ const W_U8B_GND = {
     wStipple(c, r, 6, 'rgba(255,255,250,.55)', 1);
   },
 };
+// the dark maps name their own water (maps are built at the start of every journey, after this loads)
+const wWU8BUmbralMap = wUmbralMap;
+wUmbralMap = function () { const u = wWU8BUmbralMap.apply(this, arguments); if (u) u.waterSh = W_UMB8B.water; return u; };
 const wWU8BGnd = {};
 for (const ch in W_U8B_GND) {
   const orig = wWU8BGnd[ch] = WGND[ch], dark = W_U8B_GND[ch];
@@ -190,12 +197,12 @@ drawSky = function (c) {
   c.save(); c.translate(SW, 0); c.scale(-1, 1);
   try { return wWU8BDrawSky.apply(this, arguments); } finally { c.restore(); }
 };
-// the dead moon, a black disc with a cold rim, hanging half over the moon
+// the dead moon, a small black disc with a cold rim, hanging just clear of the moon (never over it: its phase matters)
 const wWU8BDrawMoon = drawMoon;
 drawMoon = function (c, x, y, r) {
   const out = wWU8BDrawMoon.apply(this, arguments);
   if (!wUmbSkyMirrored()) return out;
-  const dx = x + r * .62, dy = y - r * .5, dr = r * .6;
+  const dr = r * .22, a = -Math.PI / 2 - .35, d = r + dr + 1.5, dx = x + Math.cos(a) * d, dy = y + Math.sin(a) * d;
   c.save();
   c.fillStyle = '#100a16'; c.beginPath(); c.arc(dx, dy, dr, 0, Math.PI * 2); c.fill();
   c.strokeStyle = 'rgba(200,184,255,.6)'; c.lineWidth = 1.2; c.beginPath(); c.arc(dx, dy, dr, 0, Math.PI * 2); c.stroke();
@@ -208,6 +215,9 @@ starsSVG = function (C, size) {
   const M = C && C.pts && wUmbSkyMirrored() ? Object.assign({}, C, { pts: C.pts.map(([x, y]) => [-x, y]) }) : C;
   return wWU8BStarsSVG.call(this, M, size);
 };
+// and the moon's, so its lit side matches the skylight's
+const wWU8BMoonSVG = moonSVG;
+moonSVG = function () { const h = wWU8BMoonSVG.apply(this, arguments); return wUmbSkyMirrored() ? h.replace('<svg ', '<svg style="transform:scaleX(-1)" ') : h; };
 
 /* ---------- How to play ---------- */
 const wWU8BRenderHelp = renderHelp;
