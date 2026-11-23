@@ -78,25 +78,30 @@ async def main():
         ic, lt = wt['ichor']['mean'], wt['light']['mean']
         check(wt['ichor']['n'] > 100 and sum(ic[:3]) < sum(lt[:3]) - 30 and ic[1] < lt[1] - 12 and ic[1] <= ic[2], 'the dark world\'s water is baked as black ichor (its own shades, no turquoise), not the light water darkened', wt)
 
-        # the seam at the dark world's edge: a frame drawn across its west and east edges, where the sea runs off the
-        # map; just inside and just outside the edge, the water is the same colour
+        # the seam at the dark world's edge: a frame drawn across each of its four edges, where the sea runs off the map
+        # (ten tiles of water along the edge, four deep); just inside and just outside the edge, the water is the same colour
         eg = await pg.evaluate("""(() => { const m = MAPS['u:world'], out = {};
-          for (const side of ['west', 'east']) {
-            const cols = side === 'west' ? [0, 1, 2, 3] : [m.w - 4, m.w - 3, m.w - 2, m.w - 1];
-            let y0 = -1; for (let y = 4; y < m.h - 10 && y0 < 0; y++) { let ok = true; for (let yy = y - 2; yy < y + 8 && ok; yy++) for (const x of cols) if (m.t[yy][x] !== '~') ok = false; if (ok) y0 = y; }
-            if (y0 < 0) { out[side] = null; continue; }
-            const cv = document.createElement('canvas'); cv.width = 640; cv.height = 320; const c = cv.getContext('2d');
-            wDrawMap(c, 'u:world', side === 'west' ? -10 : m.w - 10, y0 - 2, 640, 320, 0, { noNight: true });
-            const d = c.getImageData(0, 0, 640, 320).data, mean = (xa, xb) => { const s = [0, 0, 0]; let n = 0;
-              for (let y = 2 * 32 + 4; y < 8 * 32 - 4; y++) for (let x = xa; x < xb; x++) { const i = (y * 640 + x) * 4; s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; n++; }
-              return s.map(v => +(v / n).toFixed(1)); };
-            const inner = side === 'west' ? mean(324, 372) : mean(268, 316), outer = side === 'west' ? mean(268, 316) : mean(324, 372);
-            out[side] = { y0, inner, outer, diff: Math.max(...inner.map((v, j) => Math.abs(v - outer[j]))) };
+          for (const side of ['west', 'east', 'north', 'south']) {
+            const vert = side === 'west' || side === 'east', far = side === 'east' || side === 'south', len = vert ? m.h : m.w, depth = vert ? m.w : m.h;
+            const deep = far ? [depth - 4, depth - 3, depth - 2, depth - 1] : [0, 1, 2, 3], at = (a, b) => vert ? m.t[a][b] : m.t[b][a];
+            let a0 = -1; for (let a = 4; a < len - 10 && a0 < 0; a++) { let ok = true; for (let aa = a - 2; aa < a + 8 && ok; aa++) for (const b of deep) if (at(aa, b) !== '~') ok = false; if (ok) a0 = a; }
+            if (a0 < 0) { out[side] = null; continue; }
+            // the frame: the edge across its middle (at 320 or 160 px), the run of water along it
+            const W = 640, H = 320, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+            const camE = far ? depth - (vert ? 10 : 5) : -(vert ? 10 : 5);
+            wDrawMap(c, 'u:world', vert ? camE : a0 - 2, vert ? a0 - 2 : camE, W, H, 0, { noNight: true });
+            const d = c.getImageData(0, 0, W, H).data, E = vert ? 320 : 160;
+            const mean = (lo, hi) => { const s = [0, 0, 0]; let n = 0;
+              for (let u = 2 * 32 + 4; u < 8 * 32 - 4; u++) for (let v = lo; v < hi; v++) { const x = vert ? v : u, y = vert ? u : v, i = (y * W + x) * 4; s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; n++; }
+              return s.map(q => +(q / n).toFixed(1)); };
+            const before = mean(E - 52, E - 4), after = mean(E + 4, E + 52), inner = far ? before : after, outer = far ? after : before;
+            out[side] = { a0, inner, outer, diff: Math.max(...inner.map((q, k) => Math.abs(q - outer[k]))) };
           }
           return out; })()""")
-        check(all(eg.get(k) for k in ('west', 'east')) and all(eg[k]['diff'] <= 5 for k in ('west', 'east')), 'the dark sea runs off the world\'s west and east edges without a seam' + (f" (largest channel difference {eg['west']['diff']} west, {eg['east']['diff']} east)" if eg.get('west') and eg.get('east') else ''), eg)
+        sides = ('west', 'east', 'north', 'south')
+        check(all(eg.get(k) for k in sides) and all(eg[k]['diff'] <= 5 for k in sides), 'the dark sea runs off all four of the world\'s edges without a seam' + (' (largest channel difference: ' + ', '.join(f"{k} {eg[k]['diff']:.1f}" for k in sides) + ')' if all(eg.get(k) for k in sides) else ''), eg)
 
-        # the dead moon never covers the lit moon, at any phase, and stays inside the skylight's frame (radius 26 of 30)
+        # the dead moon never covers the lit moon, at any phase, and stays inside the skylight's frame (drawn from 27.5px out)
         dm = await pg.evaluate("""(() => { const keep = WG.map, out = [];
           const cv = document.createElement('canvas'); cv.width = cv.height = 80; const c = cv.getContext('2d');
           const px = fn => { c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#000'; c.fillRect(0, 0, 80, 80); fn(c, 40, 40, 20); return c.getImageData(0, 0, 80, 80).data; };

@@ -87,7 +87,8 @@ const W_U8B_GND = {
   '.': (c, P, r) => wU8bAsh(c, P, r, false),
   '"': (c, P, r) => wU8bAsh(c, P, r, true),
   // the ichor itself is the map's water shades (m.waterSh, baked under the ground): lay an oily sheen on it
-  '~': (c, P, r) => { if (r() < .4) wU8bSheen(c, r, 1); },
+  // (not on the world's last few tiles: the open sea past its edge has no sheen to meet)
+  '~': (c, P, r, e) => { const m = e && e.m; if (m && m.kind === 'world' && Math.min(e.x, e.y, m.w - 1 - e.x, m.h - 1 - e.y) < 3) return; if (r() < .4) wU8bSheen(c, r, 1); },
   s: (c, P, r) => {
     c.fillStyle = wMix(P.fen, '#150d1b', .55); c.fillRect(0, 0, 32, 32);
     wMottle(c, r, 3, 'rgba(160,130,190,.06)', 'rgba(0,0,0,.16)');
@@ -207,8 +208,9 @@ function wU8bDeadMoon(x, y, r, phase) {
   const p = ((phase | 0) % 8 + 8) % 8, side = p <= 4 ? -1 : 1;   // the unlit side: west while waxing, east while waning
   if (p === 0 || p === 1 || p === 7) return [x + side * r * .3, y, r * .45];
   if (p === 2 || p === 6) return [x + side * r * .45, y, r * .35];
-  // (as big as fits between the moon's edge and the frame's inner edge, r * 1.375: a ring, not a stray star)
-  const dr = r * .17, a = -Math.PI / 2 - .35, d = r + dr + .2;
+  // (as big as fits between the moon's edge, with half a pixel to spare, and the frame's inner edge, r * 1.375: a ring,
+  // not a stray star)
+  const dr = r * .16, a = -Math.PI / 2 - .35, d = r + dr + .6;
   return [x + Math.cos(a) * d, y + Math.sin(a) * d, dr];
 }
 const wWU8BDrawMoon = drawMoon;
@@ -236,6 +238,6 @@ moonSVG = function () { const h = wWU8BMoonSVG.apply(this, arguments); return wU
 const wWU8BRenderHelp = renderHelp;
 renderHelp = function () {
   const out = wWU8BRenderHelp.apply(this, arguments), u = $('wHelpUmbral');
-  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon hanging in the moon\'s shadow (or beside it, when the moon is nearly full), and does just what it does on the light side.</p>');
+  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon hanging in the moon\'s shadow (or beside it, when the moon is full or nearly full), and does just what it does on the light side.</p>');
   return out;
 };
