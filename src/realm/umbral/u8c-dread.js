@@ -101,13 +101,21 @@ function wUmbHazardStep() {
   if (wUmbDread() < 1) { if (!LAB && Math.random() < .3) wLog('The ground here is cracked, and it holds. For now.', 'd'); return ''; }
   const h0 = RUN.hp; RUN.hp = Math.max(Math.min(1, h0), h0 - W_UMB8C.pitHp);
   // out of the pit a few steps away, wherever the dark lets you climb: never somewhere you can't walk back from
-  const r = mulberry(WG.step * 31 + WG.x * 7 + WG.y), opts = [], reach = bfsReach(m, WG.x, WG.y);
+  const r = mulberry(WG.step * 31 + WG.x * 7 + WG.y), opts = [], reach = wUmbOpenReach(m, WG.x, WG.y);
   for (let dy = -W_UMB8C.pitDrop; dy <= W_UMB8C.pitDrop; dy++) for (let dx = -W_UMB8C.pitDrop; dx <= W_UMB8C.pitDrop; dx++) {
     const x = WG.x + dx, y = WG.y + dy; if ((dx || dy) && Math.abs(dx) + Math.abs(dy) >= 2 && x >= 0 && y >= 0 && x < m.w && y < m.h && reach[y * m.w + x] && wUmbFreeAt(m, x, y) && !wUmbShadowAt(x, y)) opts.push([x, y]);
   }
   if (opts.length) { const [x, y] = opts[Math.floor(r() * opts.length)]; WG.x = x; WG.y = y; }
   wLog(`The ground opens under you. Your team falls, climbs, and comes up somewhere else${h0 > RUN.hp ? `, ${h0 - RUN.hp} HP down` : ''} (${RUN.hp}/${RUN.maxhp}).`, 'b');
   return 'pit';
+}
+// where you can walk to from (x, y) over open ground: not through a place's way in (that is going into the place)
+function wUmbOpenReach(m, x0, y0) {
+  const W = m.w, seen = new Uint8Array(W * m.h), q = [[x0, y0]]; seen[y0 * W + x0] = 1;
+  for (let i = 0; i < q.length; i++) { const [x, y] = q[i]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= m.h || seen[ny * W + nx]) continue;
+    const td = DB.tiles[m.t[ny][nx]]; if (!td || !td.walk || td.enter) continue; seen[ny * W + nx] = 1; q.push([nx, ny]); } }
+  return seen;
 }
 // (u8g's resonance makes spikes cheaper: it wraps this)
 function wUmbSpikeHp() { return W_UMB8C.spikeHp; }
@@ -124,6 +132,8 @@ const wUmbShadowOk = (m, x, y) => wUmbFreeAt(m, x, y) && !wUmbLanternLit(m, x, y
 function wUmbShadowShove(m, s) {
   for (const [x, y] of [[s.hx, s.hy]].concat([[2, 0], [-2, 0], [0, 2], [0, -2], [3, 1], [-3, -1], [1, 3], [-1, -3]].map(([dx, dy]) => [s.x + dx, s.y + dy])))
     if (!(x === WG.x && y === WG.y) && wUmbShadowOk(m, x, y)) { s.x = x; s.y = y; return true; }
+  // (nowhere near to go: it sinks back into the ground, and another gathers somewhere else)
+  const S = wUmbShadows(), i = S.indexOf(s); if (i >= 0) S.splice(i, 1);
   return false;
 }
 function wUmbShadowsSync() {
@@ -178,7 +188,7 @@ function wUmbShadowStep() {
   const U = wUmb(), m = MAPS['u:world']; if (!U || !m || WG.map !== 'u:world' || U.sealed) return null;
   if (U.salt > 0) U.salt--;
   wUmbShadowsSync();
-  for (const s of wUmbShadows()) if (s.x === WG.x && s.y === WG.y) wUmbShadowShove(m, s);
+  for (const s of wUmbShadows().slice()) if (s.x === WG.x && s.y === WG.y) wUmbShadowShove(m, s);
   if (WG.grace > 0) return null;
   const r = mulberry((WG.step || 0) * 131 + (WG.dayAbs || 0)), twice = wUmbDread() >= W_UMB8C.hunt && WG.step % 3 === 0;
   for (const s of wUmbShadows()) {
@@ -217,11 +227,10 @@ wTryMove = function (dx, dy) {
   const s0 = wUmbShadowAt(WG.x + dx, WG.y + dy);
   if (s0) { WG.face = dx < 0 ? 'l' : dx > 0 ? 'r' : dy < 0 ? 'u' : 'd'; wUmbShadowMatch(s0); return false; }
   const n0 = W_UMB8C.started, moved = wWU8CTryMove.apply(this, arguments);
-  // (a step that took you somewhere else is the end of it; one that started a match still costs its hazard, but the
-  // shadows wait)
-  if (!moved || WG.map !== m0) return moved;
+  // (a step that took you somewhere else, or started a match, is the end of it: the match comes first, and its card
+  // and save already have your HP and where you stand)
+  if (!moved || WG.map !== m0 || W_UMB8C.started !== n0) return moved;
   wUmbHazardStep();
-  if (W_UMB8C.started !== n0) return moved;
   const s = wUmbShadowStep();
   if (s) wUmbShadowMatch(s);
   return moved;
