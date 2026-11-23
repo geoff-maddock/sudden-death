@@ -62,14 +62,47 @@ async def main():
         ws = await pg.evaluate("Object.keys(MAPS).map(id => [id, !!MAPS[id].waterSh, !!MAPS[id].umbral]).filter(([id, w, u]) => w !== u)")
         check(ws == [], 'every dark map, and only a dark one, names its own water (black ichor, no white foam)', ws)
 
+        # the dark water baked into a chunk is the ichor's (m.waterSh): with it, the Drownfen's water is far darker than
+        # with the light shades put back, and not turquoise
+        wt = await pg.evaluate("""(() => {
+          const m = MAPS['u:world'], L = DB.locs.find(l => l.id === 'saltmere'), cx = Math.floor(L.x / WCH), cy = Math.floor(L.y / WCH);
+          const mean = () => { const L2 = Object.assign({}, wLayer(m, 1), { chunks: {} }), K = wBuildChunk(L2, cx, cy), d = K.cv.getContext('2d').getImageData(0, 0, K.cv.width, K.cv.height).data;
+            const s = [0, 0, 0, 0]; let n = 0;
+            for (let y = cy * WCH; y < Math.min(m.h, cy * WCH + WCH); y++) for (let x = cx * WCH; x < Math.min(m.w, cx * WCH + WCH); x++) {
+              if (m.t[y][x] !== '~') continue;
+              for (let yy = 4; yy < 28; yy += 3) for (let xx = 4; xx < 28; xx += 3) { const i = (((y - cy * WCH) * 32 + yy) * K.cv.width + (x - cx * WCH) * 32 + xx) * 4; for (let j = 0; j < 4; j++) s[j] += d[i + j]; n++; } }
+            return { n, mean: s.map(v => Math.round(v / Math.max(1, n))) }; };
+          const ws = m.waterSh, out = { ichor: mean() };
+          try { delete m.waterSh; out.light = mean(); } finally { m.waterSh = ws; }
+          return out; })()""")
+        ic, lt = wt['ichor']['mean'], wt['light']['mean']
+        check(wt['ichor']['n'] > 100 and sum(ic[:3]) < sum(lt[:3]) - 30 and ic[1] < lt[1] - 12 and ic[1] <= ic[2], 'the dark world\'s water is baked as black ichor (its own shades, no turquoise), not the light water darkened', wt)
+
+        # the dead moon never covers the lit moon, at any phase, and stays inside the skylight's frame (radius 26 of 30)
+        dm = await pg.evaluate("""(() => { const keep = WG.map, out = [];
+          const cv = document.createElement('canvas'); cv.width = cv.height = 80; const c = cv.getContext('2d');
+          const px = fn => { c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#000'; c.fillRect(0, 0, 80, 80); fn(c, 40, 40, 20); return c.getImageData(0, 0, 80, 80).data; };
+          try { WG.map = 'u:world';
+            for (let ph = 0; ph < 8; ph++) {
+              const a = px((c, x, y, r) => wWU8BDrawMoon(c, x, y, r, ph)), b = px((c, x, y, r) => drawMoon(c, x, y, r, ph));
+              let lit = 0, hidden = 0, changed = 0, far = 0;
+              for (let i = 0; i < a.length; i += 4) { const q = i / 4, dx = q % 80 - 40, dy = Math.floor(q / 80) - 40, ch = Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 12;
+                if (a[i] > 170) { lit++; if (ch) hidden++; } if (ch) { changed++; if (Math.hypot(dx, dy) > 27) far++; } }
+              out.push({ ph, lit, hidden, changed, far });
+            }
+          } finally { WG.map = keep; }
+          return out; })()""")
+        check(all(v['hidden'] <= 2 and v['changed'] > 10 and v['far'] == 0 for v in dm), 'the dead moon is drawn at every phase, never over the lit moon, and inside the skylight\'s frame', dm)
+
         # each wrapped drawer, tile by tile: the dark map gets the dark look, the light map the original's to the pixel
         tl = await pg.evaluate("""(() => {
           const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d'), out = {};
-          const pix = (fn, m, P) => { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 32, 32); c.save(); fn(c, P, wRng(1234), { m, L: null, x: 7, y: 9, at: () => '.' }); c.restore();
+          const pix = (fn, m, P, seed) => { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 32, 32); c.save(); fn(c, P, wRng(seed || 1234), { m, L: null, x: 7, y: 9, at: () => '.' }); c.restore();
             const d = c.getImageData(0, 0, 32, 32).data; let h = 0; for (let i = 0; i < d.length; i++) h = (Math.imul(h, 31) + d[i]) | 0; return h; };
           for (const [tab, orig] of [[WGND, wWU8BGnd], [WOBJ, wWU8BObj]]) for (const k in orig) {
             out[k] = { lightSame: pix(tab[k], MAPS.world, WINK.plains) === pix(orig[k], MAPS.world, WINK.plains),
-              darkNew: pix(tab[k], MAPS['u:world'], WINK.uplains) !== pix(orig[k], MAPS['u:world'], WINK.uplains),
+              // (on some tile: the ichor's sheen is on a few of them)
+              darkNew: [1, 2, 3, 4, 5, 6, 7, 8].some(sd => pix(tab[k], MAPS['u:world'], WINK.uplains, sd) !== pix(orig[k], MAPS['u:world'], WINK.uplains, sd)),
               stable: pix(tab[k], MAPS['u:world'], WINK.uplains) === pix(tab[k], MAPS['u:world'], WINK.uplains) };
           }
           return out; })()""")
@@ -94,8 +127,7 @@ async def main():
           [WG.map, WG.x, WG.y] = keep; return out; })()""")
         kinds = [k for k in lk if k != 'portal']
         found = [k for k in kinds if lk[k]]
-        print('     (no bare tile on the dark maps, skipped: ' + (', '.join(repr(k) for k in kinds if not lk[k]) or 'none') + ')')
-        check(len(kinds) == 9 and len(found) >= 8, 'every dark word has a bare tile to Look at (one kind may be missing)', {k: bool(lk[k]) for k in kinds})
+        check(len(kinds) == 9 and found == kinds, 'every one of the nine dark words has a bare tile to Look at on the dark maps', {k: bool(lk[k]) for k in kinds})
         for ch in found:
             v = lk[ch]
             check(v['dark'] == v['wantDark'] and v['light'] == v['wantLight'], f'Look on {ch!r} gives its dark words; the same kind of tile in the light, the old ones', v)
