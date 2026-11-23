@@ -106,7 +106,7 @@ function wUmbHazardStep() {
     const x = WG.x + dx, y = WG.y + dy; if ((dx || dy) && Math.abs(dx) + Math.abs(dy) >= 2 && x >= 0 && y >= 0 && x < m.w && y < m.h && reach[y * m.w + x] && wUmbFreeAt(m, x, y) && !wUmbShadowAt(x, y)) opts.push([x, y]);
   }
   if (opts.length) { const [x, y] = opts[Math.floor(r() * opts.length)]; WG.x = x; WG.y = y; }
-  wLog(`The ground opens under you. Your team falls, climbs, and comes up somewhere else${h0 > RUN.hp ? `, ${h0 - RUN.hp} HP down` : ''} (${RUN.hp}/${RUN.maxhp}).`, 'b');
+  wLog(`The ground opens under you. Your team falls, climbs, and comes up ${opts.length ? 'somewhere else' : 'where it fell'}${h0 > RUN.hp ? `, ${h0 - RUN.hp} HP down` : ''} (${RUN.hp}/${RUN.maxhp}).`, 'b');
   return 'pit';
 }
 // where you can walk to from (x, y) over open ground: not through a place's way in (that is going into the place)

@@ -68,13 +68,19 @@ const wUmbBoon = piece => { const r = wUmbResonance(piece), B8 = W_UMB8J.boons[p
 function wUmbWellInit() { const U = wUmb(); if (U && !U.well) { U.well = {}; U.wellLegacy = U.pieces.slice(); } }
 
 /* ---------- judging a feat ---------- */
-onHook('fightWon', () => { const W = RUN && RUN.pending && RUN.pending.world; if (W && W.kind === 'nadir') W_UMB8J.winHp = [RUN.hp, RUN.maxhp]; });
+// (the HP as the match is won: checkWin decides it, before any heal a trophy gives for winning at fightWon)
+const wWU8JCheckWin = checkWin;
+checkWin = function () {
+  const was = B && B.over, hp = RUN && RUN.hp, r = wWU8JCheckWin.apply(this, arguments), W = RUN && RUN.pending && RUN.pending.world;
+  if (B && !was && B.over === 'win' && W && W.kind === 'nadir') W_UMB8J.winHp = [hp, RUN.maxhp];
+  return r;
+};
 function wUmbFeatMet(id, r, W, ref) {
   const F = wUmbFeat(id), U = wUmb(); if (!F || !U || r !== 'win') return false;
   if (F.k === 'brink') { const h = W_UMB8J.winHp || [RUN.hp, RUN.maxhp]; return h[0] <= h[1] * F.at; }
   if (F.k === 'margin') return !!W && typeof W.us === 'number' && typeof W.them === 'number' && W.us - W.them >= F.by;
   // (judged by the hour it kicked off: a game saved and resumed later keeps that)
-  if (F.k === 'night') { const k = U.kickNight && U.kickNight[id]; return k != null ? !!k : wIsNight(); }
+  if (F.k === 'night') { const K = U.kickNight || {}, k = 'id' in K ? (K.id === id ? K.night : null) : K[id]; return k != null ? !!k : wIsNight(); }   // (the old one-slot form too)
   if (F.k === 'nopowers') return !!(ref && ref.nopow);
   if (F.k === 'first') return !U.tries[id];
   return false;
@@ -100,7 +106,7 @@ W_ON_END.nadir = function (r, ref, W) {
   if (U && C && C.piece && !had && U.pieces.includes(C.piece)) {
     const F = wUmbFeat(id), well = met || first;
     if (well) { U.well[C.piece] = 1; if (!LAB) wLog(`${W_UMB_PIECES[C.piece].n} is won well${met && F ? ` (you ${F.n.replace(/^win /, 'won ')})` : ', at the first try'}. It sings in your captain's hands.`, 'g'); }
-    else if (F && !LAB) wLog(`${W_UMB_PIECES[C.piece].n} is yours, but quiet: it would sing if you had ${F.n.replace(/^win /, 'won ')}, or won at the first try.`, 'd');
+    else if (F && !LAB) wLog(`${W_UMB_PIECES[C.piece].n} is yours, but quiet: it would sing if you had ${F.n.replace(/^win /, 'won ')}${F.k === 'first' ? '' : ', or won at the first try'}.`, 'd');
     wSave();
   }
   return out;
@@ -114,7 +120,8 @@ wNadirMatch = function (id) {
   if (why || !F || !U || !C || U.pieces.includes(C.piece) || LAB || open0 || $('modal').hidden) return why;
   const box = $('modalBox'); if (!box || box.querySelector('.wumbfeat')) return why;
   const p = document.createElement('p'); p.className = 'hint wumbfeat';
-  p.innerHTML = `<b>The feat:</b> ${esc(F.n)}, or win at the first try, and the piece is won well: it sings for you on this side, twice as strongly, and makes its game in the Seal kinder.${F.k === 'nopowers' ? ` <label><input type="checkbox" id="wUmbNoPow"> Play without powers</label>` : ''}`;
+  const orFirst = F.k !== 'first' && !U.tries[id] ? ', or win at the first try' : '';
+  p.innerHTML = `<b>The feat:</b> ${esc(F.n)}${orFirst}, and the piece is won well: it sings for you on this side, twice as strongly, and makes its game in the Seal kinder.${F.k === 'nopowers' ? ` <label><input type="checkbox" id="wUmbNoPow"> Play without powers</label>` : ''}`;
   const body = box.querySelector('.wmsg'), head = box.querySelector('header'), cond = box.querySelector('.wumbcond');
   if (cond) cond.after(p); else if (body) body.prepend(p); else if (head) head.after(p); else box.prepend(p);
   // (the choice is made fresh on each card: the bots, with no card, set WG.umbral.nopow themselves)
@@ -127,10 +134,10 @@ const wUmbNoPowStart = (orig, kind) => function (o) {
   const U = wUmb(), id = o && o.ref && o.ref.id;
   if (!U || !o || o.kind !== kind || !id || id === 'finale' || U.nopow !== id) return orig.apply(this, arguments);
   const o2 = Object.assign({}, o, { ref: Object.assign({}, o.ref, { nopow: 1 }) });
-  // (spent before the start, which saves; a start that refuses, with its reason, gives it back)
-  U.nopow = null; W_UMB8J.nopowNext = 1; if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd');
-  let r; try { r = orig.call(this, o2); } finally { W_UMB8J.nopowNext = 0; }
-  if (r) U.nopow = id;
+  // (spent before the start, which saves; a start that refuses with its reason, or throws, gives it back)
+  U.nopow = null; W_UMB8J.nopowNext = 1; let r, done = false;
+  try { r = orig.call(this, o2); done = true; } finally { W_UMB8J.nopowNext = 0; if (!done || r) U.nopow = id; }
+  if (!r && !LAB) wLog('No powers for your side, this game. For the feat.', 'd');
   return r;
 };
 const wWU8JStartLinks = wStartLinks; wStartLinks = wUmbNoPowStart(wWU8JStartLinks, 'unadirgl');
@@ -175,7 +182,11 @@ wUmbTollAtKickoff = function (id) {
 // (a card champion's match kicks off at fightStart: the hour is noted there)
 onHook('fightStart', () => { const W = RUN && RUN.pending && RUN.pending.world, U = wUmb(); if (B && U && W && W.kind === 'nadir' && W.ref && W.ref.id !== 'finale') wUmbKickNight(U, W.ref.id); });
 // the hour each champion's game kicked off (one per champion, so another game in between doesn't overwrite it)
-function wUmbKickNight(U, id) { if (!U.kickNight || typeof U.kickNight !== 'object' || 'id' in U.kickNight) U.kickNight = {}; U.kickNight[id] = wIsNight() ? 1 : 0; }
+function wUmbKickNight(U, id) {
+  const K = U.kickNight; if (!K || typeof K !== 'object') U.kickNight = {};
+  else if ('id' in K) U.kickNight = K.id ? { [K.id]: K.night ? 1 : 0 } : {};   // (the old one-slot form, kept)
+  U.kickNight[id] = wIsNight() ? 1 : 0;
+}
 // (the Ash Ball: a blackout on this side costs less of the gold)
 const wWU8JBlackout = wBlackout;
 wBlackout = function () {

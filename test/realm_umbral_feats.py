@@ -74,12 +74,16 @@ async def main():
           // brink (the card game), from the HP when the match was won
           reset('card'); U.tries.gate = 1; W_UMB8J.winHp = [10, 100]; W_ON_END.nadir('win', { id: 'gate' }, { kind: 'nadir' }); out.brink = !!U.well.card;
           reset('card'); U.tries.gate = 1; W_UMB8J.winHp = [60, 100]; W_ON_END.nadir('win', { id: 'gate' }, { kind: 'nadir' }); out.fresh = !!U.well.card;
+          // the HP is read where the win is decided, before an on-win heal: a won match at 10 HP reads 10
+          B = { over: null, enemies: [], P: { st: {} } }; RUN.pending = { world: { kind: 'nadir', ref: { id: 'gate' } } }; RUN.hp = 10; W_UMB8J.winHp = null;
+          const sf = sportFinal; sportFinal = () => {}; try { checkWin(); } finally { sportFinal = sf; }
+          out.snap = W_UMB8J.winHp && W_UMB8J.winHp[0]; B = null; RUN.pending = null; RUN.hp = RUN.maxhp;
           return out; })()""")
         check(ft['wide'] == [True, True] and ft['narrow'] == [True, False], 'a margin feat: a wide win is well, a narrower win still takes the piece', ft)
         check(ft['first'] == [True, True], 'a first-try win is well', ft)
         check(not ft['day'] and ft['night'] and ft['kicked'], 'the night feat: well after dark only, judged by the hour each game kicked off', ft)
         check(ft['nopow'] and not ft['pow'], 'the no-powers feat follows the game’s ref', ft)
-        check(ft['brink'] and not ft['fresh'], 'the brink feat follows the HP as the match was won', ft)
+        check(ft['brink'] and not ft['fresh'] and ft['snap'] == 10, 'the brink feat follows the HP as the match was won (read where the win is decided)', ft)
 
         rs = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; const all = Object.keys(W_UMB_PIECES);
           U.pieces = []; U.well = {}; out.none = [wUmbSpikeHp(), wUmbShadowSight()];
@@ -89,7 +93,7 @@ async def main():
           U.pieces.push('boxing'); U.tries.rink = 1; U.paid = {}; let g0 = RUN.gold; wUmbTollAtKickoff('rink'); out.toll = g0 - RUN.gold; out.tollKept = W_NADIR.rink.toll;
           // and through the card's gold check: 22 gold is enough for a 30-gold toll cut to 20
           RUN.gold = 22; U.guards = Object.assign(U.guards || {}, { 'g_rink:0': 1, 'g_rink:1': 1 }); U.gates = Object.assign(U.gates || {}, { rink: 1 });
-          const why = wNadirMatch('rink'); out.tollWhy = why; document.getElementById('modal').hidden = true; MODAL_NOW = null; RUN.gold = 999;
+          const why = wNadirMatch('rink'); out.tollWhy = why; out.card = !document.getElementById('modal').hidden; document.getElementById('modal').hidden = true; MODAL_NOW = null; RUN.gold = 999;
           // the Ash Ball: a blackout keeps half the gold
           U.pieces.push('football'); wEnterMap('u:umbralden', 5, 5); RUN.gold = 1000; LAB = true; try { wBlackout({ kind: 'wild', tier: 3 }, 'lose'); } finally { LAB = false; } out.black = RUN.gold;
           // old journey: a piece held before this part, never lost, is well by the first-try rule
@@ -97,7 +101,7 @@ async def main():
           return out; })()""")
         check(rs['none'][0] == 2 and rs['held'][:2] == [1, 1] and rs['well'][:2] == [2, 0], 'the Black Net: spikes 1 HP cheaper held, 2 won well', rs)
         check(rs['held'][2] == rs['none'][1] - 1 and rs['well'][2] == max(1, rs['none'][1] - 2), 'the Iron Stitch: the shadows see 1 step less held, 2 won well', rs)
-        check(rs['toll'] == 20 and rs['tollKept'] == 30 and 'toll' not in (rs['tollWhy'] or ''), 'the Broken Bell: a 30-gold toll costs 20, and the champion’s own toll is left alone', rs)
+        check(rs['toll'] == 20 and rs['tollKept'] == 30 and not rs['tollWhy'] and rs['card'], 'the Broken Bell: a 30-gold toll costs 20, and the champion’s own toll is left alone', rs)
         check(rs['black'] == 950, 'the Ash Ball: a blackout on the dark side loses half the gold it would', rs)
         check(rs['legacy'], 'an old journey’s piece keeps the first-try rule', rs)
 
