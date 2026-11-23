@@ -9226,7 +9226,10 @@ function wBuildChunk(L, cx, cy) {
       const P = WINK[reg] || WINK.plains, wc = rgbOf(P.water);
       const i = (ty * tw + tx) * 4;
       // shallow water lifts toward a pale turquoise; deep water sinks toward navy
-      const k = Math.max(0, Math.min(1, (d - 1) / 2.4)), A = WS.shallow, M = WS.mid, B = WS.deep;
+      let k = Math.max(0, Math.min(1, (d - 1) / 2.4));
+      // a map with its own water (m.waterSh) deepens toward the world's edge, to meet the open sea's deep tint past it
+      if (m.waterSh && m.kind === 'world') k = Math.max(k, Math.min(1, 1 - (Math.min(x, y, m.w - 1 - x, m.h - 1 - y) - .5) / 3));
+      const A = WS.shallow, M = WS.mid, B = WS.deep;
       const sh = k < .5 ? A.map((v, j) => v + (M[j] - v) * k * 2) : M.map((v, j) => v + (B[j] - v) * (k - .5) * 2);
       img.data[i] = Math.round(wc[0] * .4 + sh[0] * .6); img.data[i + 1] = Math.round(wc[1] * .4 + sh[1] * .6); img.data[i + 2] = Math.round(wc[2] * .4 + sh[2] * .6);
       img.data[i + 3] = Math.round(255 * (sh[3] + (m.kind === 'dungeon' ? .25 : 0)));
@@ -9276,6 +9279,8 @@ function wBuildChunk(L, cx, cy) {
       const x = x0 + tx - 1, y = y0 + ty - 1, nv = wNoise(x, y, 5, 3) * .65 + wNoise(x, y, 2, 4) * .35 - .5, i = (ty * tw + tx) * 4;
       if (nv > 0) { img.data[i] = 255; img.data[i + 1] = 246; img.data[i + 2] = 200; } else { img.data[i] = 10; img.data[i + 1] = 20; img.data[i + 2] = 10; }
       img.data[i + 3] = Math.round(Math.min(1, Math.abs(nv) * 2.2) * 58);
+      // (a map with its own water leaves its water out of it: the open sea past the edge has none)
+      if (m.waterSh && wGround(L, Math.max(0, Math.min(m.w - 1, x)), Math.max(0, Math.min(m.h - 1, y))) === '~') img.data[i + 3] = 0;
     }
     tg.putImageData(img, 0, 0);
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-atop'; c.imageSmoothingEnabled = true;
@@ -67317,7 +67322,8 @@ function wU8bDeadMoon(x, y, r, phase) {
   const p = ((phase | 0) % 8 + 8) % 8, side = p <= 4 ? -1 : 1;   // the unlit side: west while waxing, east while waning
   if (p === 0 || p === 1 || p === 7) return [x + side * r * .3, y, r * .45];
   if (p === 2 || p === 6) return [x + side * r * .45, y, r * .35];
-  const dr = r * .13, a = -Math.PI / 2 - .35, d = r + dr + .6;
+  // (as big as fits between the moon's edge and the frame's inner edge, r * 1.375: a ring, not a stray star)
+  const dr = r * .17, a = -Math.PI / 2 - .35, d = r + dr + .2;
   return [x + Math.cos(a) * d, y + Math.sin(a) * d, dr];
 }
 const wWU8BDrawMoon = drawMoon;
@@ -67327,7 +67333,7 @@ drawMoon = function (c, x, y, r, phase) {
   const [dx, dy, dr] = wU8bDeadMoon(x, y, r, phase);
   c.save();
   c.fillStyle = '#100a16'; c.beginPath(); c.arc(dx, dy, dr, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(200,184,255,.6)'; c.lineWidth = 1; c.beginPath(); c.arc(dx, dy, dr - .5, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = 'rgba(200,184,255,.75)'; c.lineWidth = 1.2; c.beginPath(); c.arc(dx, dy, dr - .6, 0, Math.PI * 2); c.stroke();
   c.restore();
   return out;
 };
@@ -67345,7 +67351,7 @@ moonSVG = function () { const h = wWU8BMoonSVG.apply(this, arguments); return wU
 const wWU8BRenderHelp = renderHelp;
 renderHelp = function () {
   const out = wWU8BRenderHelp.apply(this, arguments), u = $('wHelpUmbral');
-  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon hanging in the moon\'s shadow, and does just what it does on the light side.</p>');
+  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon hanging in the moon\'s shadow (or beside it, when the moon is nearly full), and does just what it does on the light side.</p>');
   return out;
 };
 </script>

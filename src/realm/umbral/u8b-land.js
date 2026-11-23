@@ -207,7 +207,8 @@ function wU8bDeadMoon(x, y, r, phase) {
   const p = ((phase | 0) % 8 + 8) % 8, side = p <= 4 ? -1 : 1;   // the unlit side: west while waxing, east while waning
   if (p === 0 || p === 1 || p === 7) return [x + side * r * .3, y, r * .45];
   if (p === 2 || p === 6) return [x + side * r * .45, y, r * .35];
-  const dr = r * .13, a = -Math.PI / 2 - .35, d = r + dr + .6;
+  // (as big as fits between the moon's edge and the frame's inner edge, r * 1.375: a ring, not a stray star)
+  const dr = r * .17, a = -Math.PI / 2 - .35, d = r + dr + .2;
   return [x + Math.cos(a) * d, y + Math.sin(a) * d, dr];
 }
 const wWU8BDrawMoon = drawMoon;
@@ -217,7 +218,7 @@ drawMoon = function (c, x, y, r, phase) {
   const [dx, dy, dr] = wU8bDeadMoon(x, y, r, phase);
   c.save();
   c.fillStyle = '#100a16'; c.beginPath(); c.arc(dx, dy, dr, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(200,184,255,.6)'; c.lineWidth = 1; c.beginPath(); c.arc(dx, dy, dr - .5, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = 'rgba(200,184,255,.75)'; c.lineWidth = 1.2; c.beginPath(); c.arc(dx, dy, dr - .6, 0, Math.PI * 2); c.stroke();
   c.restore();
   return out;
 };
@@ -235,6 +236,6 @@ moonSVG = function () { const h = wWU8BMoonSVG.apply(this, arguments); return wU
 const wWU8BRenderHelp = renderHelp;
 renderHelp = function () {
   const out = wWU8BRenderHelp.apply(this, arguments), u = $('wHelpUmbral');
-  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon hanging in the moon\'s shadow, and does just what it does on the light side.</p>');
+  if (u && u.tagName === 'DIV' && !$('wHelpUmbLand')) u.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbLand"><b>The land.</b> On the dark side the grass is ash, the water and the fen black ichor, the trees dead, the snow bone-grey and the sand a crust of salt. It is all the same ground underfoot: Look at anything to hear what it is now. In a card match the sky is mirrored, with the dead moon hanging in the moon\'s shadow (or beside it, when the moon is nearly full), and does just what it does on the light side.</p>');
   return out;
 };

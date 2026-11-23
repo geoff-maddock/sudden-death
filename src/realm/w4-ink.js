@@ -910,7 +910,10 @@ function wBuildChunk(L, cx, cy) {
       const P = WINK[reg] || WINK.plains, wc = rgbOf(P.water);
       const i = (ty * tw + tx) * 4;
       // shallow water lifts toward a pale turquoise; deep water sinks toward navy
-      const k = Math.max(0, Math.min(1, (d - 1) / 2.4)), A = WS.shallow, M = WS.mid, B = WS.deep;
+      let k = Math.max(0, Math.min(1, (d - 1) / 2.4));
+      // a map with its own water (m.waterSh) deepens toward the world's edge, to meet the open sea's deep tint past it
+      if (m.waterSh && m.kind === 'world') k = Math.max(k, Math.min(1, 1 - (Math.min(x, y, m.w - 1 - x, m.h - 1 - y) - .5) / 3));
+      const A = WS.shallow, M = WS.mid, B = WS.deep;
       const sh = k < .5 ? A.map((v, j) => v + (M[j] - v) * k * 2) : M.map((v, j) => v + (B[j] - v) * (k - .5) * 2);
       img.data[i] = Math.round(wc[0] * .4 + sh[0] * .6); img.data[i + 1] = Math.round(wc[1] * .4 + sh[1] * .6); img.data[i + 2] = Math.round(wc[2] * .4 + sh[2] * .6);
       img.data[i + 3] = Math.round(255 * (sh[3] + (m.kind === 'dungeon' ? .25 : 0)));
@@ -960,6 +963,8 @@ function wBuildChunk(L, cx, cy) {
       const x = x0 + tx - 1, y = y0 + ty - 1, nv = wNoise(x, y, 5, 3) * .65 + wNoise(x, y, 2, 4) * .35 - .5, i = (ty * tw + tx) * 4;
       if (nv > 0) { img.data[i] = 255; img.data[i + 1] = 246; img.data[i + 2] = 200; } else { img.data[i] = 10; img.data[i + 1] = 20; img.data[i + 2] = 10; }
       img.data[i + 3] = Math.round(Math.min(1, Math.abs(nv) * 2.2) * 58);
+      // (a map with its own water leaves its water out of it: the open sea past the edge has none)
+      if (m.waterSh && wGround(L, Math.max(0, Math.min(m.w - 1, x)), Math.max(0, Math.min(m.h - 1, y))) === '~') img.data[i + 3] = 0;
     }
     tg.putImageData(img, 0, 0);
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-atop'; c.imageSmoothingEnabled = true;
