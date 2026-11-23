@@ -96,7 +96,7 @@ async def main():
         check(s0['off'] == [0, 0] and s1['off'][0] == 0 and s1['off'][1] > .5 and s1['spot'] > s0['spot'] + .5 and s1['odds']['ang'] > s0['odds']['ang'] and s1['odds']['miss'] > s0['odds']['miss'],
               'The Wandering Net: the net you shoot at slides away from the puck (yours stays put), its goalie goes with it, and a shot from the wing comes at a worse angle', sl)
 
-        # Grave Cold: the same seconds of play, your skaters tire 35% faster (theirs as before); The Hollow Whistle: your fouls called twice as often
+        # Grave Cold: the same seconds of play, your skaters tire 35% faster (theirs as before); The Hollow Whistle: your fouls called up to twice as often (capped)
         cw = await pg.evaluate("""(() => { const drain = hx => { wHK.start({ seed: 3, skill: [1, 1], hexes: hx, powers: false }); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step(); wHK.step(90);
             const S = wHK.sta(), on = wHK.play.pl.filter(q => !q.off && q.pos !== 'G'); return [0, 1].map(s => on.filter(q => q.side === s).reduce((a, q) => a + 1 - S[s][q.ri], 0)); };
           const pens = hx => { let a = 0, b = 0; for (let i = 0; i < 40; i++) { const g = wHK.simGame({ seed: 300 + i, skill: [1, 1], hexes: hx }); a += g.pens.filter(x => x.side === 0).length; b += g.pens.filter(x => x.side === 1).length; } return [a, b]; };
