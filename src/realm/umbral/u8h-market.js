@@ -25,7 +25,9 @@
 const W_UMB8H = {
   wares: ['uward', 'ulampoil', 'uichor'],
   str: 2,
-  noTrade: ['umbseal', 'belt'],   // (the Bandolier's tonic slot is added outside its gain, and would stay)
+  noTrade: ['umbseal', 'belt'],
+  // each sport's Nadir game kind (a champion's and the Seal's round), to tell its saved game from another of that sport
+  kindOf: { diamond: 'unadir_ball', gridiron: W_UMB4B.kind, ring: 'unbox', court: W_UMB4D.kind, rink: W_UMB4E.kind, links: W_UMB4F.kind, lanes: W_UMB4G.kind, shed: W_UMB4H.kind },   // (the Bandolier's tonic slot is added outside its gain, and would stay)
 };
 DB.items.uward = { name: 'Hex Ward', desc: 'A knot of black thread. Ready it from the Bag: the next Nadir game you play draws one hex fewer.', use: 'Bag → Ready. Used up when that game ends.', price: 0 };
 DB.items.ulampoil = { name: 'Lantern Oil', desc: 'A flask of violet oil. On the dark side, rest where you stand, once, as by a lantern.', use: 'Bag → Rest, on the dark side.', price: 0 };
@@ -42,10 +44,10 @@ function wUmbHexCut(id) {
   if (U.wardFor && !wUmbWardLive(U.wardFor)) U.wardFor = null;
   return !U.wardFor || U.wardFor === id ? 1 : 0;
 }
-// the champions (or 'finale') of every sport's game left half-played, read from each game's own saved world
-function wUmbLiveRefs() {
+// every game left half-played, by its own saved world (WG[k].live.world)
+function wUmbLiveWorlds() {
   const out = []; if (!WG) return out;
-  for (const k in WG) { const L = WG[k] && typeof WG[k] === 'object' && WG[k].live; const id = L && L.world && L.world.ref && L.world.ref.id; if (id) out.push(id); }
+  for (const k in WG) { const L = WG[k] && typeof WG[k] === 'object' && WG[k].live; if (L && L.world) out.push(L.world); }
   return out;
 }
 // the game a ward is bound to is still on: a sport's game half-played, or a card champion's match under way
@@ -60,9 +62,12 @@ function wUmbWardLive(id) {
     e = W_UMB5.engine[sp[Math.min(U.finale || 0, W_UMB5.rounds - 1)]];
   } else { const C = W_NADIR[id]; if (!C) return false; e = C.engine; }
   if (e) {
-    // (the sport's live game must be this one: its world names the champion, or the Seal, it was kicked off for)
-    const refs = wUmbLiveRefs(); if (refs.length) return refs.includes(id);
-    const f = W_UMB4.live[e]; try { return f ? !!f() : true; } catch (err) { return true; }
+    // (that sport's game must be live, and if its saved world is found, be this one: a Nadir game of that sport kicked
+    // off for this champion, or the Seal. Another sport's game, or a light-side one, says nothing about it)
+    const f = W_UMB4.live[e]; let on = true; try { on = f ? !!f() : true; } catch (err) { on = true; }
+    if (!on) return false;
+    const ws = wUmbLiveWorlds().filter(w => w.kind === W_UMB8H.kindOf[e]);
+    return ws.length ? ws.some(w => w.ref && w.ref.id === id) : true;
   }
   const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
 }

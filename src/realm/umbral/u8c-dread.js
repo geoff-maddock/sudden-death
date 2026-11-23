@@ -105,7 +105,8 @@ function wUmbHazardStep() {
   for (let dy = -W_UMB8C.pitDrop; dy <= W_UMB8C.pitDrop; dy++) for (let dx = -W_UMB8C.pitDrop; dx <= W_UMB8C.pitDrop; dx++) {
     const x = WG.x + dx, y = WG.y + dy; if ((dx || dy) && Math.abs(dx) + Math.abs(dy) >= 2 && x >= 0 && y >= 0 && x < m.w && y < m.h && reach[y * m.w + x] && wUmbFreeAt(m, x, y) && !wUmbShadowAt(x, y)) opts.push([x, y]);
   }
-  if (opts.length) { const [x, y] = opts[Math.floor(r() * opts.length)]; WG.x = x; WG.y = y; }
+  // (the view and the fog follow you out of the pit, as after any move to a new spot)
+  if (opts.length) { const [x, y] = opts[Math.floor(r() * opts.length)]; WG.x = x; WG.y = y; WQ.push({ k: 'map' }); wMapRevealHere(); }
   wLog(`The ground opens under you. Your team falls, climbs, and comes up ${opts.length ? 'somewhere else' : 'where it fell'}${h0 > RUN.hp ? `, ${h0 - RUN.hp} HP down` : ''} (${RUN.hp}/${RUN.maxhp}).`, 'b');
   return 'pit';
 }
@@ -123,7 +124,8 @@ function wUmbPitHp() { return W_UMB8C.pitHp; }
 
 /* ---------- the hungry shadows ---------- */
 const W_UMB8C_ANIM = {};   // (where each shadow was drawn last, for the glide between steps: not saved)
-const wUmbShadows = () => { const U = wUmb(); if (!U) return []; if (!Array.isArray(U.shadows)) U.shadows = []; return U.shadows; };
+// (once the Seal is forged the dark side is quiet: no shadows, drawn, met or looked at)
+const wUmbShadows = () => { const U = wUmb(); if (!U) return []; if (!Array.isArray(U.shadows) || U.sealed) U.shadows = []; return U.shadows; };
 const wUmbShadowAt = (x, y) => wUmbShadows().find(s => s.x === x && s.y === y) || null;
 const wUmbLanternLit = (m, x, y) => Object.keys(m.meta).some(k => { if (!m.meta[k].lantern) return false; const [lx, ly] = k.split(',').map(Number); return Math.hypot(lx - x, ly - y) <= W_UMB8C.lanternR; });
 // where a shadow may stand: free ground, out of a lantern's light, not in front of a place's way in (where you come

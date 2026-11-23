@@ -367,5 +367,6 @@ renderHelp = function () {
   wWU8DRenderHelp.apply(this, arguments);
   const h = $('wHelpUmbral'); if (!h || $('wHelpUmbGate') || h.tagName === 'P') return;
   const at = [...h.querySelectorAll('p')].find(p => /^The pieces\./.test(p.textContent)) || h.lastElementChild;
-  at.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpUmbGate"><b>The wall.</b> On every dark ground a railing of bone runs across the field. The two guards stand in its gap, either side of a shut gate, and nobody squeezes past them. Beat a guard and they step back off the line. Beat both, then give the gate what the champion wants from the light side, and it opens for good. Once the champion's piece is yours, the gate stands open anyway.</p>`);
+  const html = `<p class="hint" id="wHelpUmbGate"><b>The wall.</b> On every dark ground a railing of bone runs across the field. The two guards stand in its gap, either side of a shut gate, and nobody squeezes past them. Beat a guard and they step back off the line. Beat both, then give the gate what the champion wants from the light side, and it opens for good. Once the champion's piece is yours, the gate stands open anyway.</p>`;
+  if (at) at.insertAdjacentHTML('afterend', html); else h.insertAdjacentHTML('beforeend', html);
 };

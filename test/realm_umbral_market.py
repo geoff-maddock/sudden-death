@@ -66,8 +66,10 @@ async def main():
           // a bound game called off with no end frees the ward for the next game
           U.ward = 1; U.wardFor = 'rink'; out.freed = wUmbHkHexes('rink', 1).length === 0 && U.wardFor === null;
           // a sport's game left half-played keeps it bound only if that game is the bound one
-          U.wardFor = 'rink'; WG.zz = { live: { world: { ref: { id: 'links' } } } }; out.otherGame = (wUmbHexCut('gate'), U.wardFor);
-          U.wardFor = 'rink'; WG.zz = { live: { world: { ref: { id: 'rink' } } } }; out.same = (wUmbHexCut('gate'), U.wardFor); delete WG.zz;
+          const lv = W_UMB4.live.rink; W_UMB4.live.rink = () => true; const k = W_UMB8H.kindOf.rink;
+          U.wardFor = 'rink'; WG.zz = { live: { world: { kind: k, ref: { id: 'finale' } } } }; out.otherGame = (wUmbHexCut('gate'), U.wardFor);
+          U.wardFor = 'rink'; WG.zz = { live: { world: { kind: k, ref: { id: 'rink' } } } }; WG.zy = { live: { world: { kind: W_UMB8H.kindOf.shed, ref: { id: 'shed' } } } }; out.same = (wUmbHexCut('gate'), U.wardFor);
+          delete WG.zz; delete WG.zy; W_UMB4.live.rink = lv;
           // bound to the Seal, the round read from WG.umbral; never settled: freed
           U.wardFor = 'finale'; const fs = U.finaleSports; U.finaleSports = null; out.unsettled = (wUmbHexCut('gate'), U.wardFor); U.finaleSports = fs; U.ward = 0; out.gate2 = wUmbHexes('gate', 2).length; U.tries.gate = 0;
           return out; })()""")

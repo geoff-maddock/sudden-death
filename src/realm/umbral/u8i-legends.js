@@ -122,7 +122,7 @@ bossOp = function (e, op) {
 const wWU8IIntentInfo = intentInfo;
 intentInfo = function (e) {
   const r = wWU8IIntentInfo.apply(this, arguments);
-  if (r && r.kinds && (e.plan || []).some(o => o[0] === 'udrown') && !r.kinds.includes('debuff') && !e.disguised) r.kinds.push('debuff');
+  if (r && r.kinds && (e.plan || (typeof planOps === 'function' ? planOps(e) : []) || []).some(o => o[0] === 'udrown') && !r.kinds.includes('debuff') && !e.disguised) r.kinds.push('debuff');
   return r;
 };
 function wUmbDrownNow() {

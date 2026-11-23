@@ -136,6 +136,8 @@ async def main():
         rl = await pg.evaluate("({ s: WG.umbral.shadows, salt: WG.umbral.salt })")
         check(rl['s'] == [{'id': 'sr', 'x': 30, 'y': 31, 'hx': 30, 'hy': 31}] and rl['salt'] == 7, 'the shadows and the salt keep through a reload', rl)
 
+        sl = await pg.evaluate("(() => { const U = WG.umbral; U.shadows = [{ id: 'q', x: 30, y: 31, hx: 30, hy: 31 }]; U.sealed = 1; const n = wUmbShadows().length, at = !!wUmbShadowAt(30, 31); U.sealed = 0; return [n, at]; })()")
+        check(sl == [0, False], 'once the Seal is forged, the shadows are gone', sl)
         hp = await pg.evaluate("(() => { renderHelp(); const h = document.getElementById('wHelpDread'); return h ? h.textContent : ''; })()")
         check('Dread' in hp and 'Shadow Salt' in hp, 'How to play explains the Dread', hp[:200])
         check(not errs, 'no page errors', errs[:5])
