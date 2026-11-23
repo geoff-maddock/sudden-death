@@ -59,6 +59,9 @@ async def main():
             check(px['dark']['mean'] != px['darkOrig']['mean'] and px['dark']['h'] != px['darkOrig']['h'], f'{where}, the dark world\'s ground is drawn its dark way: its pixels change', px)
             check(px['light']['h'] == px['lightOrig']['h'] and px['light']['mean'] == px['lightOrig']['mean'], f'{where}, the light world\'s pixels are what the original drawers give', px)
 
+        ws = await pg.evaluate("Object.keys(MAPS).map(id => [id, !!MAPS[id].waterSh, !!MAPS[id].umbral]).filter(([id, w, u]) => w !== u)")
+        check(ws == [], 'every dark map, and only a dark one, names its own water (black ichor, no white foam)', ws)
+
         # each wrapped drawer, tile by tile: the dark map gets the dark look, the light map the original's to the pixel
         tl = await pg.evaluate("""(() => {
           const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d'), out = {};
@@ -75,8 +78,8 @@ async def main():
         check(all(v['darkNew'] and v['stable'] for v in tl.values()), 'on a dark map every one draws its dark look, the same each time for the same tile', tl)
 
         # Look: ash, ichor and a dead tree say the dark words; the same places in the light say the old ones
-        lk = await pg.evaluate("""(() => { const out = {}, maps = ['u:world', 'u:graftonbury', 'u:umbralden'], keep = [WG.map, WG.x, WG.y];
-          for (const ch of ['.', '~', 'T', 'n']) {
+        lk = await pg.evaluate("""(() => { const out = {}, maps = Object.keys(MAPS).filter(id => id.startsWith('u:')), keep = [WG.map, WG.x, WG.y];
+          for (const ch of Object.keys(W_UMB8B.look)) {
             // a bare tile of that kind (no words of its own, nobody on it), on the dark maps and on their light ones
             const find = ids => { for (const id of ids) { const m = MAPS[id];
               for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.t[y][x] === ch && !m.meta[x + ',' + y] && !(m.npcs || []).some(n => n.x === x && n.y === y)) return [id, x, y]; } return null; };
@@ -89,21 +92,25 @@ async def main():
           // a place's own words stand on the dark side: the dark portal
           WG.map = 'u:umbralden'; const [px, py] = W_UMB.portal.umbralden; out.portal = wLookText(px, py);
           [WG.map, WG.x, WG.y] = keep; return out; })()""")
-        for ch, name in [('.', 'ash'), ('~', 'ichor'), ('T', 'a dead tree'), ('n', 'bone drift')]:
-            v = lk.get(ch)
-            check(bool(v) and v['dark'] == v['wantDark'] and v['light'] == v['wantLight'], f'Look on {name} gives the dark words; the same place in the light, the old ones', v)
+        kinds = [k for k in lk if k != 'portal']
+        found = [k for k in kinds if lk[k]]
+        print('     (no bare tile on the dark maps, skipped: ' + (', '.join(repr(k) for k in kinds if not lk[k]) or 'none') + ')')
+        check(len(kinds) == 9 and len(found) >= 8, 'every dark word has a bare tile to Look at (one kind may be missing)', {k: bool(lk[k]) for k in kinds})
+        for ch in found:
+            v = lk[ch]
+            check(v['dark'] == v['wantDark'] and v['light'] == v['wantLight'], f'Look on {ch!r} gives its dark words; the same kind of tile in the light, the old ones', v)
         check(lk['portal'].startswith('The portal, from the wrong side'), 'a place with words of its own keeps them on the dark side', lk['portal'])
 
         # the sky: mirrored on the dark side (the drawing flipped left for right), as it was in the light
         sk = await pg.evaluate("""(() => { const keep = WG.map, out = {};
           const run = id => { WG.map = id; const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH; const c = cv.getContext('2d'), calls = [];
             const sc = c.scale.bind(c); c.scale = (a, b) => { calls.push([a, b]); return sc(a, b); };
-            drawSky(c); return { mirrored: wUmbSkyMirrored(), flips: calls.filter(([a, b]) => a === -1 && b === 1).length, svg: starsSVG(STARS[0]) }; };
+            drawSky(c); return { mirrored: wUmbSkyMirrored(), flips: calls.filter(([a, b]) => a === -1 && b === 1).length, svg: starsSVG(STARS[0]), moon: moonSVG(2) }; };
           out.dark = run('u:world'); out.ground = run('u:g_ballpark'); out.light = run('world'); out.town = run('graftonbury');
           WG.map = keep; return out; })()""")
         check(sk['dark']['mirrored'] and sk['dark']['flips'] == 1 and sk['ground']['mirrored'], 'on a dark map the sky is drawn mirrored left for right', sk)
         check(not sk['light']['mirrored'] and sk['light']['flips'] == 0 and not sk['town']['mirrored'], 'in the light it is drawn as it always was', sk)
-        check(sk['dark']['svg'] != sk['light']['svg'], 'the constellations\' small pictures are reversed with it', sk)
+        check(sk['dark']['svg'] != sk['light']['svg'] and 'scaleX(-1)' in sk['dark']['moon'] and 'scaleX(-1)' not in sk['light']['moon'], 'the moon\'s and the constellations\' small pictures are reversed with it', sk)
 
         # How to play says so; the audit is clean
         hp = await pg.evaluate("""(() => { showPage('help'); const u = document.getElementById('wHelpUmbral'), l = document.getElementById('wHelpUmbLand');
