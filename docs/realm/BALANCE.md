@@ -1996,3 +1996,55 @@ after: 29 Crown winners, the Seal forged by 4 (14%, against 12% before: inside t
 made those two the hardest games in the Umbral: the Bone Diamond 22% to 10% a game, the Dead Pond 27% to 8% (a hockey
 game is low-scoring, so a two-goal margin is steep). The others as before, within the noise: the Gatekeeper 38%, the Cinder
 Pit 18%, the Black Court 17%, the Drowned Lanes 17%, the Hollow Links 9%, the Broken Ring 9%.
+
+### Umbral: the corrupted legends (#111, phase F)
+
+**The world legends.** Three card-game bosses, each a single player (boss HP, then tier U's quarter more), in two
+phases, waking with the Dread: the Corrupted Kraken (the Stirring), the Corrupted Phoenix (the Raging) and the
+Corrupted Frost Wyrm (the Last Hour). Played alone against a whole team, the first cut (no extra Strength, the Wyrm
+under curling's rules) was far too easy: the bot won 97%, 79% and 100% straight after the Crown. Curling made the
+Wyrm's Blizzard a gift (a frozen card left in hand is 2 Block), so the Wyrm plays golf. Each now starts with extra
+Strength (`W_UMB8I.str`: 11, 9 and 10) and a fifth more HP than the first cut. Measured with a scratch lab: N realm-bot
+journeys, and each Crown winner then fights each legend three times rested, with the pieces set to its stage, and the
+Gatekeeper three times for reference:
+
+| straight after the Crown | the Kraken | the Phoenix | the Wyrm | the Gatekeeper |
+|---|---|---|---|---|
+| first cut (50 journeys) | 97% | 79% | 100% | 56% |
+| Strength 9, 7, 8; the Wyrm at golf (60 journeys) | 52% | 45% | 33% | 51% |
+| **kept: Strength 11, 9, 10, a fifth more HP (80 journeys, 153 fights each)** | **36%** | **38%** | **30%** | 64% |
+
+All but a handful of fights reach the second phase; the Phoenix rose in 85 of its 153. By the time a journey meets
+them the team has grown (guards, shadows, cards), so they are easier there: in the journey lab with the 9, 7, 8 cut the
+bot won 9 of 10 Kraken fights, 4 of 4 Phoenix and 3 of 4 Wyrm; with the kept numbers 10 of 26, 1 of 8 and 1 of 2 (small
+numbers: few journeys reach six and eight pieces). Hard, optional, and harder as the Dread climbs, which is the point.
+
+**The Seal with and without them** (`python3 test/realm_umbral_journey_lab.py N 15`, and `'window.UJ_NOLEGEND = 1'`):
+the bot fights each legend once when it wakes and sets each shard on the Seal's rounds in order, for one hex fewer.
+A lost legend costs a blackout (a tenth of the gold), and gold for the tolls is where many runs stop.
+
+| run | with the legends | without |
+|---|---|---|
+| 30 journeys (the 9, 7, 8 cut) | 19 Crown winners, the Seal 2 (11%); shards 0: 10, 1: 5, 2: 1, 3: 3 | 19, the Seal 0 (0%) |
+| **60 journeys (kept)** | 48, the Seal 1 (2%); shards 0: 37, 1: 10, 2: 1 | 49, the Seal 2 (4%) |
+
+Pooled, 3 of 67 with them and 2 of 68 without: inside the noise. The legends neither make nor break the Seal; the Seal
+rate itself is under the 5 to 15% target on these runs with or without them (phase C's shadows came in since the last
+measured runs), which is phase I's to tune.
+
+**The three lineups.** Each lab's Umbral part, run on the same build with the legend in its row and with the player it
+replaced put back (an override), 400 games a row (300 for bowling). Bowling's lab is deterministic for a given five (the
+journey's kinds pinned to `elf, minotaur, werewolf, goblin, spider`), so its rows pair game for game; football's and
+basketball's differ by 2 to 3 points between runs, so the average of the six Nadir rows (no hex, each hex alone, as
+played) is the steadier number.
+
+| the champion's game | without the legend | with it, at the team's level | **kept** |
+|---|---|---|---|
+| football, the Cinder Pit (Slagheart, a golem lineman, for the Behemoth): six rows / as played | 14.6% / 15.1% (three runs) | 10.6% / 10.3% | **a level down: 10.4% / 11.5%** (two levels down: 11.5% / 11.0%) |
+| basketball, the Black Court (Cairn, a golem, for the Hydra) | 15.5% / 15.9% (two runs) | **11.8% / 13.0%** | at its level |
+| bowling, the Drowned Lanes (Pale Tallow, a wraith, for the Djinn): eight rows / no hex / as played | 17.2% / 20.0% / 14.7% | 13.8% / 14.7% / 16.0% | **a level down: 14.2% / 16.3% / 15.0%** |
+
+The Behemoth and the Djinn each took about 5 points off at their team's level, so both play a level under the rest
+(`W_UMB8I.lineups[k].down`); the Behemoth's ratings are high enough that a level (or two) barely shows, and it stays at
+one level down, about 4 points under the game without it. The Hydra took about 3 and keeps its level. The finale's
+round in those sports fields the same side.
