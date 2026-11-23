@@ -17,16 +17,20 @@
    A ground whose guards' row does not run straight across the field from one solid edge to the other gets no wall
    (today's behaviour) and the audit says which and why. The audit checks each wall really works: the champion cut off
    with the gate shut (guards standing or beaten), the guards and the gate reachable, and with the gate open and the
-   guards clear, everyone and every marked tile on the ground reachable.
+   guards clear, everyone and every marked tile on the ground reachable (the build checks only the railing's part).
    Tiles taken: 'ƚ' (bone railing), 'Ƞ' (the gate, shut), 'ƞ' (the gate, open: only ever what wTileAt shows).
 
-   W_UMB8D, wUmbGroundChamps, wUmbGateOpen, wUmbGuardSpot, wUmbGauntletReach, wUmbGauntletProblems, wUmbBuildGauntlet,
-   wUmbGauntletSync, wUmbGauntletSyncAll, wUmbUseGate
+   One gate for the ground: whenever it reads open, every champion behind it gets its WG.umbral.gates entry
+   (wUmbGateFill), so u4 never asks for the item twice.
+
+   W_UMB8D, wUmbGroundChamps, wUmbGateOpen, wUmbGuardSpot, wUmbGauntletReach, wUmbGauntletProblems, wUmbGauntletTiles,
+   wUmbBuildGauntlet, wUmbGauntletSync, wUmbGauntletSyncAll, wUmbUseGate, wUmbGateFill, wUmbGateChanged
    Wraps: buildAllMaps (wWU8DBuildAllMaps: the wall and the gate), wTileAt (wWU8DTileAt: an opened gate reads open),
    wUse (wWU8DUse: the gate), wTryMove (wWU8DTryMove: a guard kept off your tile takes it), wMapPaint (wWU8DMapPaint:
    an open gate on the local map), wApplyNpcs (wWU8DApplyNpcs: the guards where WG.umbral puts them), wStart (wWU8DStart:
    the same on loading, and nobody left behind the line), W_ON_END.uguard (wWU8DOnGuard: a beaten guard steps back),
-   wNadirMatch (wWU8DNadirMatch: a gate opened by u4's backstop is given for the whole ground and redrawn open), wAudit
+   wNadirMatch (wWU8DNadirMatch: the gate filled for the whole ground before u4 asks; one opened by u4's backstop
+   redrawn open), W_ON_END.nadir (wWU8DOnNadir: a piece that opens the gate redraws it, the guards step clear), wAudit
    (wWU8DAudit: every wall works; the reach checks that knew nothing of the gate are replaced for the champions, guards
    and tiles behind it), renderHelp (wWU8DRenderHelp: the wall in #wHelpUmbral). */
 
@@ -60,9 +64,10 @@ function wUmbGuardSpot(m, g, i, st) {
   return !beaten ? G.line[i] : open ? G.clear[i] : G.aside[i];
 }
 // the tiles you can walk to from the way in, with the gate shut or open and everyone where they would stand (every
-// person on a dark ground is fixed, so each is in the way). st left out: the journey as it is, the guards where they
-// really stand (one kept off your tile stays where it was)
+// person on a dark ground is fixed, so each is in the way). st left out: the journey as it is, the guards synced to
+// it first and then read where they really stand (one kept off your tile stays where it was)
 function wUmbGauntletReach(m, g, st) {
+  if (!st) wUmbGauntletSync(g);
   const G = m.gauntlet, W = m.w, seen = new Uint8Array(W * m.h), gi = [0, 1].map(i => wUmbGuardOf(g, i));
   const open = st ? st.open : wUmbGateOpen(g), who = new Set(m.npcs.filter(n => !st || !gi.includes(n.id)).map(n => n.x + ',' + n.y));
   if (st) for (const i of [0, 1]) who.add(wUmbGuardSpot(m, g, i, st).join(','));
@@ -79,7 +84,9 @@ function wUmbGauntletReach(m, g, st) {
   return seen;
 }
 // what is wrong with a ground's wall: [] when it shuts the champion off until the guards are beaten and the gate open
-function wUmbGauntletProblems(m, g) {
+// (tiles: also check every marked tile, and every wall of awards or incubator, with the gate open; the audit does,
+// the build doesn't, since a tile that fails says nothing about the railing)
+function wUmbGauntletProblems(m, g, tiles) {
   const P = [], G = m.gauntlet, id = 'u:' + g, gi = [0, 1].map(i => wUmbGuardOf(g, i)), champs = wUmbGroundChamps(g).map(k => W_NADIR[k].char);
   const near = (s, x, y) => W_SIDES.some(([dx, dy]) => { const nx = x + dx, ny = y + dy; return nx >= 0 && ny >= 0 && nx < m.w && ny < m.h && !!s[ny * m.w + nx]; });
   const shut = wUmbGauntletReach(m, g, { open: false, beaten: false });
@@ -92,8 +99,15 @@ function wUmbGauntletProblems(m, g) {
   for (const i of [0, 1]) if (!near(shut, ...G.line[i])) P.push(id + ': cannot reach guard ' + i + ' on the line');
   if (!near(shut, ...G.gate)) P.push(id + ': cannot reach the gate');
   for (const n of m.npcs) { const k = gi.indexOf(n.id), p = k >= 0 ? G.clear[k] : [n.x, n.y]; if (!near(open, ...p)) P.push(id + ': cannot reach ' + n.id + ' with the gate open'); }
-  for (const k in m.meta) { const [x, y] = k.split(',').map(Number); if (!near(open, x, y)) P.push(id + ': cannot reach the tile ' + k + ' with the gate open'); }
+  if (tiles) for (const k of wUmbGauntletTiles(m)) { const [x, y] = k.split(',').map(Number); if (!near(open, x, y)) P.push(id + ': cannot reach the tile ' + k + ' with the gate open'); }
   return P;
+}
+
+// the tiles the town audit wants reached on a ground: every marked one, and every wall of awards or incubator
+function wUmbGauntletTiles(m) {
+  const out = Object.keys(m.meta);
+  for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if ((m.t[y][x] === 'W' || m.t[y][x] === 'E') && !out.includes(x + ',' + y)) out.push(x + ',' + y);
+  return out;
 }
 
 /* ---------- building the wall ---------- */
@@ -170,17 +184,31 @@ wUse = function (x, y) {
   if (G && x === G.gate[0] && y === G.gate[1] && wTileAt(m, x, y) === W_UMB8D.gate) return wUmbUseGate(m, m.id.slice(2));
   return wWU8DUse.apply(this, arguments);
 };
-// a gate opened by the champion's own refusal (u4's backstop: the bot, an old save) is drawn open at once
+// one gate for the ground: once it reads open, every champion behind it counts it given (so u4, which asks
+// WG.umbral.gates champion by champion, never asks for the item again). True when it filled anything
+function wUmbGateFill(g) {
+  const U = wUmb(); if (!U || !wUmbGateOpen(g)) return false;
+  U.gates = U.gates || {};
+  const ids = wUmbGroundChamps(g), at = ids.map(k => U.gates[k]).find(Boolean) || WG.dayAbs; let n = 0;
+  for (const k of ids) if (!U.gates[k]) { U.gates[k] = at; n++; }
+  return n > 0;
+}
+// the gate's picture and its guards, after it may have opened (u4's backstop: the bot, an old save; a piece won)
+function wUmbGateChanged(g, step) { wUmbGateFill(g); wInvalidate('u:' + g); wUmbGauntletSync(g, step); }
 const wWU8DNadirMatch = wNadirMatch;
 wNadirMatch = function (id) {
-  const C = W_NADIR[id], g = C && C.ground, was = !!g && wUmbGateOpen(g), r = wWU8DNadirMatch.apply(this, arguments);
-  if (g && !was && wUmbGateOpen(g)) {
-    // (one gate for the ground: every champion behind it counts it given, as wUmbUseGate does)
-    const U = wUmb(), at = (U.gates && U.gates[id]) || WG.dayAbs; U.gates = U.gates || {};
-    for (const k of wUmbGroundChamps(g)) if (!U.gates[k]) U.gates[k] = at;
-    wInvalidate('u:' + g); wUmbGauntletSync(g);
-  }
+  const C = W_NADIR[id], g = C && C.ground;
+  if (g) wUmbGateFill(g);
+  const was = !!g && wUmbGateOpen(g), r = wWU8DNadirMatch.apply(this, arguments);
+  if (g && !was && wUmbGateOpen(g)) wUmbGateChanged(g);
   return r;
+};
+// a piece won can open the gate (every champion behind it beaten): draw it open, and the guards step clear
+const wWU8DOnNadir = W_ON_END.nadir;
+W_ON_END.nadir = function (r, ref) {
+  const C = ref && W_NADIR[ref.id], g = C && C.ground, was = !!g && wUmbGateOpen(g), out = wWU8DOnNadir.apply(this, arguments);
+  if (g && !was && wUmbGateOpen(g)) wUmbGateChanged(g, true);
+  return out;
 };
 
 /* ---------- the guards step back ---------- */
@@ -193,8 +221,8 @@ W_ON_END.uguard = function (r, ref) {
 // a guard kept off your tile (a journey loaded with you standing on their spot) takes it once you step off
 const wWU8DTryMove = wTryMove;
 wTryMove = function () {
-  const r = wWU8DTryMove.apply(this, arguments), m = WG && MAPS[WG.map];
-  if (m && m.gauntlet) wUmbGauntletSync(m.id.slice(2), true);
+  const m0 = WG && WG.map, r = wWU8DTryMove.apply(this, arguments), m = WG && MAPS[WG.map];
+  if (r && m && m.id === m0 && m.gauntlet) wUmbGauntletSync(m.id.slice(2), true);
   return r;
 };
 const wWU8DApplyNpcs = wApplyNpcs;
@@ -272,19 +300,19 @@ wMapPaint = function (c, m) {
 /* ---------- the audit ---------- */
 const wWU8DAudit = wAudit;
 wAudit = function () {
-  // the reach checks before this part know nothing of the wall: on a walled ground, for its champions, its guards and
-  // its tiles, its own check (with the gate open) replaces them; anything else they say stands
-  const behind = (id, who) => { const m = MAPS[id]; if (!m || !m.gauntlet) return false; const g = id.slice(2);
-    return who.includes(',') ? !!m.meta[who] : [0, 1].some(i => wUmbGuardOf(g, i) === who) || wUmbGroundChamps(g).some(k => W_NADIR[k].char === who); };
+  // the reach checks before this part know nothing of the wall: on a walled ground, for everyone and every tile its
+  // own check covers (with the gate open), that check replaces them; anything else they say stands
+  const covered = (id, who) => { const m = MAPS[id]; if (!m || !m.gauntlet) return false;
+    return who.includes(',') ? wUmbGauntletTiles(m).includes(who) : m.npcs.some(n => n.id === who); };
   const P = wWU8DAudit.apply(this, arguments).filter(s => {
-    const k = /^(u:g_\w+): cannot reach (\S+)$/.exec(s) || /^town (u:g_\w+): (\S+) cannot be reached$/.exec(s) || /^town (u:g_\w+): tile (\d+,\d+) unreachable$/.exec(s);
-    return !(k && behind(k[1], k[2]));
+    const k = /^(u:g_\w+): cannot reach (\S+)$/.exec(s) || /^town (u:g_\w+): (\S+) cannot be reached$/.exec(s) || /^town (u:g_\w+): tile (\d+,\d+) unreachable$/.exec(s) || /^town (u:g_\w+): [WE] at (\d+,\d+) unreachable$/.exec(s);
+    return !(k && covered(k[1], k[2]));
   });
   for (const t in W_UMB8D.tiles) if (DB.tiles[t] !== W_UMB8D.tiles[t]) P.push('the gauntlet\'s tile ' + t + ' was taken by another part (' + ((DB.tiles[t] || {}).name || 'nothing') + ')');
   for (const g in W_UMB4.grounds) {
     const m = MAPS['u:' + g]; if (!m) continue;
     if (!m.gauntlet) { P.push('u:' + g + ': no wall across the field (' + (m.gauntletWhy || 'not built') + ')'); continue; }
-    P.push(...wUmbGauntletProblems(m, g));
+    P.push(...wUmbGauntletProblems(m, g, true));
   }
   return P;
 };
@@ -295,5 +323,5 @@ renderHelp = function () {
   wWU8DRenderHelp.apply(this, arguments);
   const h = $('wHelpUmbral'); if (!h || $('wHelpUmbGate') || h.tagName === 'P') return;
   const at = [...h.querySelectorAll('p')].find(p => /^The pieces\./.test(p.textContent)) || h.lastElementChild;
-  at.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpUmbGate"><b>The wall.</b> On every dark ground a railing of bone runs across the field. The two guards stand in its gap, either side of a shut gate, and nobody squeezes past them. Beat a guard and they step back off the line. Beat both, then give the gate what the champion wants from the light side, and it opens for good.</p>`);
+  at.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpUmbGate"><b>The wall.</b> On every dark ground a railing of bone runs across the field. The two guards stand in its gap, either side of a shut gate, and nobody squeezes past them. Beat a guard and they step back off the line. Beat both, then give the gate what the champion wants from the light side, and it opens for good. Once the champion's piece is yours, the gate stands open anyway.</p>`);
 };
