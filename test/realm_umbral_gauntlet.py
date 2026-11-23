@@ -29,6 +29,7 @@ async def main():
     async with async_playwright() as p:
         br = await p.chromium.launch()
         pg = await br.new_page(viewport={'width': 1280, 'height': 900})
+        pg.set_default_timeout(120000)   # (loading the 6 MB page on a busy machine can take longer than the 30 s default)
         errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
@@ -100,12 +101,44 @@ async def main():
           return { map: WG.map, at: [WG.x, WG.y], want: [c.x, c.y + 1], open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, clear: [__at(g, 0), __at(g, 1)], c: G.clear }; })()""")
         check(rl['open'] and rl['clear'] == rl['c'] and rl['map'] == 'u:g_ballpark' and rl['at'] == rl['want'], 'after a reload the gate is still open, the guards still clear, and you stand where you were', rl)
 
+        # loaded standing on a guard's spot past the open gate: you stay put (no railing line), the guard keeps off you,
+        # and takes the spot once you step off
+        await pg.evaluate("(() => { const G = MAPS['u:g_ballpark'].gauntlet; WG.x = G.clear[0][0]; WG.y = G.clear[0][1]; WLOG.length = 0; wSave(); for (const k in MAPS) delete MAPS[k]; wStart(wLoadSave()); })()")  # (the maps built afresh, as on opening the page)
+        await pg.wait_for_function("UI.view === 'world' && !!WG")
+        sp = await pg.evaluate("""(() => { const g = 'g_ballpark', G = MAPS['u:' + g].gauntlet, out = { at: [WG.x, WG.y], spot: G.clear[0], g0: __at(g, 0), log: WLOG.map(l => l[0]).join(' | ') };
+          wTryMove(0, -1); __close(); out.moved = [WG.x, WG.y]; out.g0after = __at(g, 0); return out; })()""")
+        check(sp['at'] == sp['spot'] and sp['g0'] != sp['spot'] and 'railing of bone' not in sp['log'], 'loaded standing on a guard\'s spot past the open gate, you stay where you were', sp)
+        check(sp['moved'] != sp['spot'] and sp['g0after'] == sp['spot'], 'and the guard takes the spot once you step off it', sp)
+
+        # a tile marked behind the line counts as reached with the gate open (the older checks would call it unreachable)
+        mt = await pg.evaluate("""(() => { const m = MAPS['u:g_ballpark'], c = __champ('g_ballpark'), k = (c.x - 3) + ',' + c.y; m.meta[k] = { text: 'test' };
+          const a = wAudit(); delete m.meta[k]; return a; })()""")
+        check(mt == [], 'a marked tile behind the line is checked with the gate open, and the audit stays clean', mt)
+
+        # the local map shows an open gate open, and a shut one shut
+        mp = await pg.evaluate("""(() => { const keepCol = wMapTileCol, keepFog = wFogSeen, seen = []; wFogSeen = () => true; wMapTileCol = function (ch) { seen.push(ch); return keepCol.apply(this, arguments); };
+          const cv = document.createElement('canvas'), out = {};
+          try { for (const g of ['g_ballpark', 'g_rink']) { const m = MAPS['u:' + g]; seen.length = 0; cv.width = m.w * 4; cv.height = m.h * 4; wMapPaint(cv.getContext('2d'), m, 4, m.id);
+            out[g] = { open: seen.includes(W_UMB8D.open), shut: seen.includes(W_UMB8D.gate), raw: m.t[m.gauntlet.row][m.gauntlet.gate[0]] === W_UMB8D.gate }; } }
+          finally { wMapTileCol = keepCol; wFogSeen = keepFog; } return out; })()""")
+        check(mp['g_ballpark']['open'] and not mp['g_ballpark']['shut'] and mp['g_rink']['shut'] and not mp['g_rink']['open'] and mp['g_ballpark']['raw'], 'the local map shows an open gate open and a shut one shut (the map itself keeps the gate)', mp)
+
         # u4's backstop opening a gate (the bot never walks): the gate reads open and the guards step clear
         bs = await pg.evaluate("""(() => { const g = 'g_court', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), it = W_UMB4.gate[c.C.region];
           W_ON_END.uguard('win', { g, i: 0 }); W_ON_END.uguard('win', { g, i: 1 }); wAddItem(it, 1); const n0 = WG.items[it] || 0;
+          W_NADIR.zgate = Object.assign({}, c.C, { char: 'nadir_zgate', piece: 'zgate' });   // (a second champion behind the same gate)
           const E = c.C.engine, keep = W_UMB4.start[E]; W_UMB4.start[E] = () => ''; const r = wNadirMatch(c.id); W_UMB4.start[E] = keep;
-          return { r, open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, clear: [__at(g, 0), __at(g, 1)], c: G.clear, took: n0 - (WG.items[it] || 0) }; })()""")
-        check(bs['r'] == '' and bs['open'] and bs['clear'] == bs['c'] and bs['took'] == 1, 'a gate opened through the champion\'s refusal reads open, and its guards step clear', bs)
+          const both = !!WG.umbral.gates[c.id] && !!WG.umbral.gates.zgate; delete W_NADIR.zgate; delete WG.umbral.gates.zgate;
+          return { r, both, open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, clear: [__at(g, 0), __at(g, 1)], c: G.clear, took: n0 - (WG.items[it] || 0) }; })()""")
+        check(bs['r'] == '' and bs['open'] and bs['clear'] == bs['c'] and bs['took'] == 1 and bs['both'], 'a gate opened through the champion\'s refusal reads open for every champion behind it, and its guards step clear', bs)
+
+        # a save from before the wall where the piece is already yours but the gate has no entry: it is open, and free
+        pc = await pg.evaluate("""(() => { const g = 'g_links', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), U = WG.umbral, it = W_UMB4.gate[c.C.region];
+          delete U.gates[c.id]; U.guards[g + ':0'] = U.guards[g + ':1'] = 1; U.pieces = U.pieces.concat([c.C.piece]); wAddItem(it, 2); const n0 = WG.items[it];
+          wEnterMap(m.id, G.gate[0], G.gate[1] + 1); wDrain(); wUse(G.gate[0], G.gate[1]); wUmbUseGate(m, g); __close();
+          const out = { open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, took: n0 - (WG.items[it] || 0), walk: __walk(c.x, c.y + 1) };
+          U.pieces = U.pieces.filter(p => p !== c.C.piece); return out; })()""")
+        check(pc['open'] and pc['took'] == 0 and pc['walk'], 'with the champion\'s piece already yours (an old save, no gate entry), the gate is open and takes nothing', pc)
 
         # a save from before the wall: guards beaten and the gate handed over through u4 (no other keys), or standing
         # behind the line at a ground whose guards still stand
