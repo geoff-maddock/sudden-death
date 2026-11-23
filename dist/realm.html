@@ -67198,19 +67198,19 @@ function wUmbFreeAt(m, x, y) {
 function wUmbHazardStep() {
   const m = wCurMap(), h = wUmbHazardAt(m, WG.x, WG.y); if (!h) return '';
   if (h === 'spike') {
-    const cost = wUmbSpikeHp(); if (RUN.hp > 1) RUN.hp = Math.max(1, RUN.hp - cost);
-    wLog(`Spikes, black as old bone, through the soles. Your team loses ${cost} HP (${RUN.hp}/${RUN.maxhp}).`, 'b');
+    const h0 = RUN.hp; RUN.hp = Math.max(Math.min(1, h0), h0 - wUmbSpikeHp());
+    wLog(`Spikes, black as old bone, through the soles. ${h0 > RUN.hp ? `Your team loses ${h0 - RUN.hp} HP` : 'Your team limps on'} (${RUN.hp}/${RUN.maxhp}).`, 'b');
     return 'spike';
   }
   if (wUmbDread() < 1) { if (!LAB && Math.random() < .3) wLog('The ground here is cracked, and it holds. For now.', 'd'); return ''; }
-  const cost = W_UMB8C.pitHp; if (RUN.hp > 1) RUN.hp = Math.max(1, RUN.hp - cost);
-  // out of the pit a few steps away, wherever the dark lets you climb
-  const r = mulberry(WG.step * 31 + WG.x * 7 + WG.y), opts = [];
+  const h0 = RUN.hp; RUN.hp = Math.max(Math.min(1, h0), h0 - W_UMB8C.pitHp);
+  // out of the pit a few steps away, wherever the dark lets you climb: never somewhere you can't walk back from
+  const r = mulberry(WG.step * 31 + WG.x * 7 + WG.y), opts = [], reach = bfsReach(m, WG.x, WG.y);
   for (let dy = -W_UMB8C.pitDrop; dy <= W_UMB8C.pitDrop; dy++) for (let dx = -W_UMB8C.pitDrop; dx <= W_UMB8C.pitDrop; dx++) {
-    const x = WG.x + dx, y = WG.y + dy; if ((dx || dy) && Math.abs(dx) + Math.abs(dy) >= 2 && wUmbFreeAt(m, x, y) && !wUmbShadowAt(x, y)) opts.push([x, y]);
+    const x = WG.x + dx, y = WG.y + dy; if ((dx || dy) && Math.abs(dx) + Math.abs(dy) >= 2 && x >= 0 && y >= 0 && x < m.w && y < m.h && reach[y * m.w + x] && wUmbFreeAt(m, x, y) && !wUmbShadowAt(x, y)) opts.push([x, y]);
   }
   if (opts.length) { const [x, y] = opts[Math.floor(r() * opts.length)]; WG.x = x; WG.y = y; }
-  wLog(`The ground opens under you. Your team falls, climbs, and comes up somewhere else, ${cost} HP down (${RUN.hp}/${RUN.maxhp}).`, 'b');
+  wLog(`The ground opens under you. Your team falls, climbs, and comes up somewhere else${h0 > RUN.hp ? `, ${h0 - RUN.hp} HP down` : ''} (${RUN.hp}/${RUN.maxhp}).`, 'b');
   return 'pit';
 }
 // (u8g's resonance makes spikes cheaper: it wraps this)
@@ -67221,8 +67221,15 @@ const W_UMB8C_ANIM = {};   // (where each shadow was drawn last, for the glide b
 const wUmbShadows = () => { const U = wUmb(); if (!U) return []; if (!Array.isArray(U.shadows)) U.shadows = []; return U.shadows; };
 const wUmbShadowAt = (x, y) => wUmbShadows().find(s => s.x === x && s.y === y) || null;
 const wUmbLanternLit = (m, x, y) => Object.keys(m.meta).some(k => { if (!m.meta[k].lantern) return false; const [lx, ly] = k.split(',').map(Number); return Math.hypot(lx - x, ly - y) <= W_UMB8C.lanternR; });
-// where a shadow may stand: free ground, out of a lantern's light
-const wUmbShadowOk = (m, x, y) => wUmbFreeAt(m, x, y) && !wUmbLanternLit(m, x, y) && !wUmbShadowAt(x, y);
+// where a shadow may stand: free ground, out of a lantern's light, not in front of a place's way in (where you come
+// out of it)
+const wUmbShadowOk = (m, x, y) => wUmbFreeAt(m, x, y) && !wUmbLanternLit(m, x, y) && !wUmbShadowAt(x, y) && !DB.locs.some(L => Math.abs(L.x - x) + Math.abs(L.y - y) <= 1);
+// a shadow off your tile (you came out of a place onto it, or ran from its match): back toward home, or anywhere free
+function wUmbShadowShove(m, s) {
+  for (const [x, y] of [[s.hx, s.hy]].concat([[2, 0], [-2, 0], [0, 2], [0, -2], [3, 1], [-3, -1], [1, 3], [-1, -3]].map(([dx, dy]) => [s.x + dx, s.y + dy])))
+    if (!(x === WG.x && y === WG.y) && wUmbShadowOk(m, x, y)) { s.x = x; s.y = y; return true; }
+  return false;
+}
 function wUmbShadowsSync() {
   const U = wUmb(), m = MAPS['u:world']; if (!U || !m || U.sealed) return;
   const S = wUmbShadows();
@@ -67240,7 +67247,8 @@ function wUmbShadowsSync() {
 }
 // a clear walkable line between a shadow and you (no wall, water or mountain in the way)
 function wUmbSees(m, s) {
-  if ((wUmb().salt || 0) > 0) return false;
+  // (salt hides you; so does a lantern's light, which no shadow comes into)
+  if ((wUmb().salt || 0) > 0 || wUmbLanternLit(m, WG.x, WG.y)) return false;
   const sight = wUmbShadowSight(), d = Math.abs(s.x - WG.x) + Math.abs(s.y - WG.y); if (d > sight) return false;
   const n = Math.max(Math.abs(WG.x - s.x), Math.abs(WG.y - s.y));
   for (let i = 1; i < n; i++) {
@@ -67274,6 +67282,7 @@ function wUmbShadowStep() {
   const U = wUmb(), m = MAPS['u:world']; if (!U || !m || WG.map !== 'u:world' || U.sealed) return null;
   if (U.salt > 0) U.salt--;
   wUmbShadowsSync();
+  for (const s of wUmbShadows()) if (s.x === WG.x && s.y === WG.y) wUmbShadowShove(m, s);
   if (WG.grace > 0) return null;
   const r = mulberry((WG.step || 0) * 131 + (WG.dayAbs || 0)), twice = wUmbDread() >= W_UMB8C.hunt && WG.step % 3 === 0;
   for (const s of wUmbShadows()) {
@@ -67294,6 +67303,11 @@ W_ON_END.shadow = function (r, ref) {
     if (i >= 0) { S.splice(i, 1); (U.shadowWait = U.shadowWait || []).push((WG.dayAbs || 0) + 1); }
     WG.grace = Math.max(WG.grace || 0, 3);
     wLog('The shadow comes apart like smoke. Somewhere out on the dark world, another one starts to gather.', 'g');
+  } else if (ref) {
+    // (run from, or lost: it lets you be for a moment, off your tile)
+    const s = wUmbShadows().find(s => s.id === ref.id), m = MAPS['u:world'];
+    if (s && m && WG.map === 'u:world' && s.x === WG.x && s.y === WG.y) wUmbShadowShove(m, s);
+    WG.grace = Math.max(WG.grace || 0, 3);
   }
 };
 
@@ -67307,9 +67321,11 @@ wTryMove = function (dx, dy) {
   const s0 = wUmbShadowAt(WG.x + dx, WG.y + dy);
   if (s0) { WG.face = dx < 0 ? 'l' : dx > 0 ? 'r' : dy < 0 ? 'u' : 'd'; wUmbShadowMatch(s0); return false; }
   const n0 = W_UMB8C.started, moved = wWU8CTryMove.apply(this, arguments);
-  // (a step that took you somewhere else, or started a match, is the end of it)
-  if (!moved || WG.map !== m0 || W_UMB8C.started !== n0) return moved;
+  // (a step that took you somewhere else is the end of it; one that started a match still costs its hazard, but the
+  // shadows wait)
+  if (!moved || WG.map !== m0) return moved;
   wUmbHazardStep();
+  if (W_UMB8C.started !== n0) return moved;
   const s = wUmbShadowStep();
   if (s) wUmbShadowMatch(s);
   return moved;
@@ -67394,6 +67410,7 @@ function wUmbDreadDoes(s) {
 const wWU8CNextPrompt = wNextPrompt;
 wNextPrompt = function () {
   const U = wUmb();
+  if (U && U.dreadScene && U.sealed) U.dreadScene = 0;   // (stale once the Seal is forged)
   if (U && U.dreadScene && !LAB && wActive()) { const s = U.dreadScene; U.dreadScene = 0; wSave(); if (wUmbDreadScene(s)) return true; }
   return wWU8CNextPrompt.apply(this, arguments);
 };
@@ -67438,6 +67455,140 @@ renderHelp = function () {
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : '-9'} pieces)`).join(', ')}.
     Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
     Spikes cost ${W_UMB8C.spikeHp} HP to walk on. From the Stirring, the cracked ground opens into pits: ${W_UMB8C.pitHp} HP, and you climb out somewhere else. Wild matches come half as often on that side; the danger is one you can see.</p>`);
+};
+/* u8h: dark shops that take a trophy (issue #111, phase H). Loads after u8c-dread.js; changes earlier parts only by
+   reassignment (saved originals carry the wWU8H prefix).
+
+   Every dark shop has a second list, for a trophy (W_UMB8H.wares): the Umbral's own wares, which nothing else sells.
+     Hex Ward      ready it from the Bag: the next Nadir game you play (a champion's, or a round of the Seal) draws one
+                   hex fewer (WG.umbral.ward; used up when that game ends, won or lost; backing away keeps it)
+     Lantern Oil   from the Bag, on the dark side: rest where you stand, once, as by a lantern (you wake by your last
+                   lantern after a blackout, as before)
+     Ichor Draught ready it from the Bag: your next card match on the dark side starts with 2 Strength (WG.umbral.ichor)
+   Shadow Salt (u8c) is on the fans list. The price is one trophy (RUN.relics), chosen from the ones you can trade: not
+   the Seal of the Crown, not a club's own trophy, not one that changed your team for good when you won it (R.gain).
+   It is gone for good.
+   The hex count: wUmbHexCut(id) is how many hexes come off a Nadir game's draw (the ward's one here; u8f and u8g add
+   theirs by wrapping it). Every way to play's hex draw is trimmed by it (the card game's wUmbHexes and each sport's),
+   never below none, so a 1-hex champion with a ward plays with no hexes at all.
+
+   W_UMB8H, wUmbHexCut, wUmbTradable, wUmbTrade
+   Wraps: the hex draws wUmbHexes, wUmb4aHexes, wUmbGfHexes, wUmbRingHexes, wUmbBkHexes, wUmbHkHexes, wUmbGlHexes,
+   wUmbBlHexes and wUmbCrHexes (wWU8H<Name>: trimmed), W_ON_END.nadir (wWU8HOnNadir: the ward used up), wUseItem
+   (wWU8HUseItem: the wares from the Bag), wCampBag (wWU8HCampBag: their buttons), wUmbShop (wWU8HUmbShop: the trophy
+   list), wAudit (wWU8HAudit: the wares come from the dark shops), renderHelp (wWU8HRenderHelp). */
+
+const W_UMB8H = {
+  wares: ['uward', 'ulampoil', 'uichor'],
+  str: 2,
+  noTrade: ['umbseal'],
+};
+DB.items.uward = { name: 'Hex Ward', desc: 'A knot of black thread. Ready it from the Bag: the next Nadir game you play draws one hex fewer.', use: 'Bag → Ready. Used up when that game ends.', price: 0 };
+DB.items.ulampoil = { name: 'Lantern Oil', desc: 'A flask of violet oil. On the dark side, rest where you stand, once, as by a lantern.', use: 'Bag → Rest, on the dark side.', price: 0 };
+DB.items.uichor = { name: 'Ichor Draught', desc: `A black draught. Ready it from the Bag: your next card match on the dark side starts with ${W_UMB8H.str} Strength.`, use: 'Bag → Ready. Used up by that match.', price: 0 };
+
+/* ---------- the hex count ---------- */
+// how many hexes come off this Nadir game's draw (u8f's shards and u8g's well-won pieces wrap it)
+function wUmbHexCut(id) { const U = wUmb(); return U && U.ward ? 1 : 0; }
+const wUmbCutHexes = (id, hx) => { const n = Math.max(0, wUmbHexCut(id) || 0); return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx; };
+const wWU8HHexes = wUmbHexes; wUmbHexes = function (id) { return wUmbCutHexes(id, wWU8HHexes.apply(this, arguments)); };
+const wWU8HBallHexes = wUmb4aHexes; wUmb4aHexes = function (id) { return wUmbCutHexes(id, wWU8HBallHexes.apply(this, arguments)); };
+const wWU8HGfHexes = wUmbGfHexes; wUmbGfHexes = function (id) { return wUmbCutHexes(id, wWU8HGfHexes.apply(this, arguments)); };
+const wWU8HRingHexes = wUmbRingHexes; wUmbRingHexes = function (id) { return wUmbCutHexes(id, wWU8HRingHexes.apply(this, arguments)); };
+const wWU8HBkHexes = wUmbBkHexes; wUmbBkHexes = function (id) { return wUmbCutHexes(id, wWU8HBkHexes.apply(this, arguments)); };
+const wWU8HHkHexes = wUmbHkHexes; wUmbHkHexes = function (id) { return wUmbCutHexes(id, wWU8HHkHexes.apply(this, arguments)); };
+const wWU8HGlHexes = wUmbGlHexes; wUmbGlHexes = function (id) { return wUmbCutHexes(id, wWU8HGlHexes.apply(this, arguments)); };
+const wWU8HBlHexes = wUmbBlHexes; wUmbBlHexes = function (id) { return wUmbCutHexes(id, wWU8HBlHexes.apply(this, arguments)); };
+const wWU8HCrHexes = wUmbCrHexes; wUmbCrHexes = function (id) { return wUmbCutHexes(id, wWU8HCrHexes.apply(this, arguments)); };
+// the ward is used up by the game it was readied for, won or lost (a game backed away from never ends: it keeps)
+const wWU8HOnNadir = W_ON_END.nadir;
+W_ON_END.nadir = function () {
+  const U = wUmb(), had = U && U.ward, r = wWU8HOnNadir.apply(this, arguments);
+  if (had && U.ward) { U.ward = 0; if (!LAB) wLog('The Hex Ward unravels. It did its work.', 'd'); wSave(); }
+  return r;
+};
+
+/* ---------- the draught ---------- */
+onHook('fightStart', () => {
+  const U = wUmb(), W = RUN && RUN.pending && RUN.pending.world;
+  if (!B || !U || !U.ichor || !W || !W.umbral) return;
+  U.ichor = 0; addSt(B.P, 'str', W_UMB8H.str);
+  log(`The Ichor Draught: your team starts with ${W_UMB8H.str} Strength.`, 'sys');
+});
+
+/* ---------- from the Bag ---------- */
+const wWU8HUseItem = wUseItem;
+wUseItem = function (k) {
+  if (!W_UMB8H.wares.includes(k)) return wWU8HUseItem.apply(this, arguments);
+  const U = wUmb(); if (!U) return 'Only on a journey with the Umbral open.';
+  if (B && !B.over && UI.view === 'fight') return 'Not during a match.';
+  if (!wHas(k)) return `You have no ${DB.items[k].name}.`;
+  if (k === 'uward') { if (U.ward) return 'A ward is already readied.'; wAddItem(k, -1); U.ward = 1; wLog('You knot the Hex Ward round your captain\'s wrist. The next Nadir game draws one hex fewer.', 'm'); }
+  else if (k === 'uichor') { if (U.ichor) return 'A draught is already readied.'; wAddItem(k, -1); U.ichor = 1; wLog(`You pour the Ichor Draught. Your next card match on this side starts with ${W_UMB8H.str} Strength.`, 'm'); }
+  else {
+    if (!wUmbDark()) return 'Lantern Oil only burns on the dark side.';
+    wAddItem(k, -1);
+    wAdvance((24 * 60 - WG.min) + 7 * 60); RUN.hp = RUN.maxhp;
+    if (typeof wRestLegs === 'function') wRestLegs(W_FAT.bed);
+    WG.grace = W_ENC.grace;
+    wUmbSound('rest');
+    wLog('You light the oil where you stand. The dark keeps back from it all night, and your team is whole again by morning.', 'm');
+  }
+  wSave(); return '';
+};
+const wWU8HCampBag = wCampBag;
+wCampBag = function () {
+  let h = wWU8HCampBag.apply(this, arguments); const U = wUmb();
+  for (const k of W_UMB8H.wares) {
+    if (!wHas(k)) continue;
+    const off = k === 'ulampoil' ? (wUmbDark() ? '' : 'disabled title="Only on the dark side"') : (k === 'uward' && U && U.ward) || (k === 'uichor' && U && U.ichor) ? 'disabled title="One is already readied"' : '';
+    const re = new RegExp(`(<b>${DB.items[k].name}</b>[\\s\\S]*?<td class="wnum dim">have \\d+</td><td>)`);
+    h = h.replace(re, `$1<button class="ghost" data-wuse="${k}" ${off}>${k === 'ulampoil' ? 'Rest' : 'Ready'}</button>`);
+  }
+  return h;
+};
+
+/* ---------- paying with a trophy ---------- */
+const wUmbTradable = () => (RUN.relics || []).filter(id => { const R = RELICS[id]; return R && !R.gain && !R.club && !W_UMB8H.noTrade.includes(id); });
+// trade a trophy for a ware: '' when done, or why not
+function wUmbTrade(ware, relic) {
+  if (!W_UMB8H.wares.includes(ware)) return 'Not sold here.';
+  if (!wUmbTradable().includes(relic)) return 'That is not yours to trade.';
+  RUN.relics.splice(RUN.relics.indexOf(relic), 1);
+  wAddItem(ware, 1);
+  wLog(`You hand over ${RELICS[relic].n}. The shopkeeper holds it up to the dark, and it goes grey in their hand. A ${DB.items[ware].name} is yours.`, 'd');
+  wSave(); return '';
+}
+const wWU8HUmbShop = wUmbShop;
+wUmbShop = function (shop, who) {
+  const r = wWU8HUmbShop.apply(this, arguments), box = $('modalBox'); if (!box || !$('wUmbShopBody')) return r;
+  const sec = document.createElement('div'); sec.id = 'wUmbTrade'; box.appendChild(sec);
+  let want = null;
+  const render = msg => {
+    const tr = wUmbTradable();
+    let h = `<h4>For a trophy</h4><p class="hint">Some things on this side are paid for with something you won. ${tr.length ? `You could trade: ${tr.map(id => esc(RELICS[id].n)).join(', ')}.` : 'You have no trophy you could trade.'}${msg ? ' <span class="wbad">' + esc(msg) + '</span>' : ''}</p>`;
+    if (want) {
+      h += `<p class="hint">Which trophy for the <b>${esc(DB.items[want].name)}</b>? It is gone for good.</p><div class="row">${tr.map(id => `<button class="ghost" data-utrade="${id}" title="${esc(RELICS[id].desc || '')}">${esc(RELICS[id].n)}</button>`).join('')}<button class="ghost" data-utrade="">Not now</button></div>`;
+    } else {
+      h += `<table class="wshop"><tbody>${W_UMB8H.wares.map(k => `<tr><td><b>${esc(DB.items[k].name)}</b><small>${esc(DB.items[k].desc)}</small></td><td class="wnum dim">have ${WG.items[k] || 0}</td><td><button class="ghost" data-uware="${k}" ${tr.length ? '' : 'disabled'}>1 trophy</button></td></tr>`).join('')}</tbody></table>`;
+    }
+    sec.innerHTML = h;
+    sec.querySelectorAll('[data-uware]').forEach(b => b.onclick = () => { want = b.dataset.uware; render(''); });
+    sec.querySelectorAll('[data-utrade]').forEach(b => b.onclick = () => { const id = b.dataset.utrade, w = want; want = null; render(id ? wUmbTrade(w, id) : ''); wDrain(); });
+  };
+  render('');
+  return r;
+};
+// the wares come from the dark shops' trophy list, which the audit's own sources don't know
+const wWU8HAudit = wAudit;
+wAudit = function () { return wWU8HAudit.apply(this, arguments).filter(s => !W_UMB8H.wares.some(k => s === 'item ' + k + ' cannot be obtained')); };
+
+/* ---------- How to play ---------- */
+const wWU8HRenderHelp = renderHelp;
+renderHelp = function () {
+  wWU8HRenderHelp.apply(this, arguments);
+  const h = $('wHelpUmbral'); if (!h || !wUmbOn() || $('wHelpUmbTrade')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpUmbTrade"><b>For a trophy.</b> The dark shops sell three things for one of your trophies, and nothing else will buy them: a <b>Hex Ward</b> (the next Nadir game draws one hex fewer), <b>Lantern Oil</b> (rest where you stand, once, on the dark side) and an <b>Ichor Draught</b> (your next card match there starts with ${W_UMB8H.str} Strength). The trophy is gone for good. The Seal of the Crown, a club's own trophy and one that changed your team for good can't be traded.</p>`);
 };
 </script>
 </body></html>
