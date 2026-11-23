@@ -537,8 +537,8 @@ function torsoPath(d, K) {
 }
 
 function drawFig(c, kind, x, y, hpx, team, o = {}) {
-  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone, sh = !st && !!(o.shade || team.shade);
-  const C = v => st ? grey(v) : sh ? shadeOf(v) : v;
+  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone, sh = !!(o.shade || team.shade);
+  const C = v => st ? (sh ? shadeOf(grey(v)) : grey(v)) : sh ? shadeOf(v) : v; // (stone in shadow: an Umbral player turned to stone keeps its look)
   const hunch = K.hunch ? 6 : 0, shY = -70 + hunch, hipY = -36;
   const shw = 17 * w * (kind === 'ogre' ? .9 : 1);
   const hy = kind === 'ogre' ? -80 : kind === 'golem' ? -80 : -83 + hunch * 1.4;
