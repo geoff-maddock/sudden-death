@@ -42,19 +42,28 @@ function wUmbHexCut(id) {
   if (U.wardFor && !wUmbWardLive(U.wardFor)) U.wardFor = null;
   return !U.wardFor || U.wardFor === id ? 1 : 0;
 }
+// the champions (or 'finale') of every sport's game left half-played, read from each game's own saved world
+function wUmbLiveRefs() {
+  const out = []; if (!WG) return out;
+  for (const k in WG) { const L = WG[k] && typeof WG[k] === 'object' && WG[k].live; const id = L && L.world && L.world.ref && L.world.ref.id; if (id) out.push(id); }
+  return out;
+}
 // the game a ward is bound to is still on: a sport's game half-played, or a card champion's match under way
 function wUmbWardLive(id) {
   // (the Seal's round: always the current one, read from WG.umbral the way the game picks it, never a round cached
   // earlier, and without building it. A list that isn't settled can't be read: the ward stays bound)
+  let e = null;
   if (id === 'finale') {
+    // (a list never settled means the Seal never started: nothing of it can be live)
     const U = wUmb(), sp = U && U.finaleSports;
-    if (!sp || sp.length !== W_UMB5.rounds) return true;
-    const e = W_UMB5.engine[sp[Math.min(U.finale || 0, W_UMB5.rounds - 1)]];
-    if (e) { const f = W_UMB4.live[e]; try { return f ? !!f() : true; } catch (err) { return true; } }
-    const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
+    if (!sp || sp.length !== W_UMB5.rounds) return false;
+    e = W_UMB5.engine[sp[Math.min(U.finale || 0, W_UMB5.rounds - 1)]];
+  } else { const C = W_NADIR[id]; if (!C) return false; e = C.engine; }
+  if (e) {
+    // (the sport's live game must be this one: its world names the champion, or the Seal, it was kicked off for)
+    const refs = wUmbLiveRefs(); if (refs.length) return refs.includes(id);
+    const f = W_UMB4.live[e]; try { return f ? !!f() : true; } catch (err) { return true; }
   }
-  const C = W_NADIR[id]; if (!C) return false;
-  if (C.engine) { const f = W_UMB4.live[C.engine]; try { return f ? !!f() : true; } catch (e) { return true; } }
   const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
 }
 const wUmbCutHexes = (id, hx) => { const n = Math.max(0, wUmbHexCut(id) || 0); return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx; };

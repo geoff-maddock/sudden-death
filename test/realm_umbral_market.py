@@ -64,11 +64,16 @@ async def main():
           // the game whose draw it trimmed ends (lost): the ward is used up
           W_ON_END.nadir('lose', { id: 'gate' }); out.after = U.ward; RUN.pending = null;
           // a bound game called off with no end frees the ward for the next game
-          U.ward = 1; U.wardFor = 'rink'; out.freed = wUmbHkHexes('rink', 1).length === 0 && U.wardFor === null; U.ward = 0; out.gate2 = wUmbHexes('gate', 2).length; U.tries.gate = 0;
+          U.ward = 1; U.wardFor = 'rink'; out.freed = wUmbHkHexes('rink', 1).length === 0 && U.wardFor === null;
+          // a sport's game left half-played keeps it bound only if that game is the bound one
+          U.wardFor = 'rink'; WG.zz = { live: { world: { ref: { id: 'links' } } } }; out.otherGame = (wUmbHexCut('gate'), U.wardFor);
+          U.wardFor = 'rink'; WG.zz = { live: { world: { ref: { id: 'rink' } } } }; out.same = (wUmbHexCut('gate'), U.wardFor); delete WG.zz;
+          // bound to the Seal, the round read from WG.umbral; never settled: freed
+          U.wardFor = 'finale'; const fs = U.finaleSports; U.finaleSports = null; out.unsettled = (wUmbHexCut('gate'), U.wardFor); U.finaleSports = fs; U.ward = 0; out.gate2 = wUmbHexes('gate', 2).length; U.tries.gate = 0;
           return out; })()""")
         check(wd['hk0'] == 1 and wd['gate0'] == 2 and wd['use'] == '' and wd['ready'] == 1 and wd['again'], 'a Hex Ward readies from the Bag (one at a time)', wd)
         check(wd['hk1'] == 0 and wd['gate1'] == 1 and wd['bk'] == 0 and wd['cr'] == 0, 'with it readied, every draw has a hex fewer, a 1-hex champion none', wd)
-        check(wd['freed'], 'a ward bound to a game called off with no end is freed for the next', wd)
+        check(wd['freed'] and wd['otherGame'] is None and wd['same'] == 'rink' and wd['unsettled'] is None, 'a ward bound to a game called off with no end, or to another game than the one left half-played, or to a Seal never started, is freed', wd)
         check(wd['kept'] == 1 and wd['bound'] == 'gate' and wd['other'] == 1 and wd['after'] == 0 and wd['gate2'] == 2, 'the ward is used up when the game it trimmed ends, not by another', wd)
 
         ic = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; out.use = wUseItem('uichor'); out.ready = U.ichor;

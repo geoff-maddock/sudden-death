@@ -135,17 +135,22 @@ const wUmbNoPowStart = (orig, kind) => function (o) {
   if (!U || !o || o.kind !== kind || !id || id === 'finale' || U.nopow !== id) return orig.apply(this, arguments);
   const o2 = Object.assign({}, o, { ref: Object.assign({}, o.ref, { nopow: 1 }) });
   // (spent before the start, which saves; a start that refuses with its reason, or throws, gives it back)
-  // (said before the start, so it comes before a Simulated game's result; a refusal says the choice still stands)
-  U.nopow = null; W_UMB8J.nopowNext = 1; let r, done = false;
-  if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd');
-  try { r = orig.call(this, o2); done = true; } finally { W_UMB8J.nopowNext = 0; if (!done || r) U.nopow = id; }
-  if (r && !LAB) wLog('No game after all, so the choice to play without powers still stands.', 'd');
-  return r;
+  // (spent before the start, which saves. It is said, and counts as used, only where the engine really starts with
+  // your powers off (wUmbNoPowOpts), so before a Simulated game's result; a start that refuses, quietly or with its
+  // reason, or throws, gives the choice back)
+  U.nopow = null; W_UMB8J.nopowNext = 1; W_UMB8J.nopowUsed = 0;
+  try { return orig.call(this, o2); } finally { W_UMB8J.nopowNext = 0; if (!W_UMB8J.nopowUsed) U.nopow = id; }
 };
 const wWU8JStartLinks = wStartLinks; wStartLinks = wUmbNoPowStart(wWU8JStartLinks, 'unadirgl');
 const wWU8JStartLanes = wStartLanes; wStartLanes = wUmbNoPowStart(wWU8JStartLanes, 'unadirbl');
 const wWU8JStartShed = wStartShed; wStartShed = wUmbNoPowStart(wWU8JStartShed, 'unadircr');
-const wUmbNoPowOpts = o => { if (!W_UMB8J.nopowNext) return o; W_UMB8J.lastPowers = [false, true]; return Object.assign({}, o, { powers: [false, true] }); };
+const wUmbNoPowOpts = o => {
+  if (!W_UMB8J.nopowNext) return o;
+  W_UMB8J.lastPowers = [false, true];
+  if (!W_UMB8J.nopowUsed && !LAB) wLog('No powers for your side, this game. For the feat.', 'd');
+  W_UMB8J.nopowUsed = 1;
+  return Object.assign({}, o, { powers: [false, true] });
+};
 const wWU8JGlStart = wGL.start, wWU8JGlSim = wGL.simGame;
 wGL.start = o => wWU8JGlStart(wUmbNoPowOpts(o)); wGL.simGame = o => wWU8JGlSim(wUmbNoPowOpts(o));
 const wWU8JBlStart = wBL.start, wWU8JBlSim = wBL.simGame;
@@ -237,4 +242,16 @@ renderHelp = function () {
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpUmbFeats"><b>Feats and the pieces' songs.</b> Every champion has a feat, named on their card: win on the brink, by a wide margin, after dark, without your powers, or at the first try. It's never required. Meet it, or win at the first try, and the piece is <b>won well</b>.
     Each piece you hold sings for you on the dark side, twice as strongly when won well: ${Object.keys(b).map(p => `${esc(W_UMB_PIECES[p].n)}: ${esc(b[p].n.toLowerCase())}`).join('; ')}.
     In the Seal's final, a game whose piece you won well draws a hex fewer, and a card game whose piece you won well starts with ${W_UMB8J.edgeBlock} Block. The journal's Umbral chapter lists every piece and what it does for you now.</p>`);
+};
+
+/* ---------- the Quick start's Umbral tab: the Dread and the feats ---------- */
+const wWU8JQuick = wUmbQuick;
+wUmbQuick = function () {
+  const q = wWU8JQuick.apply(this, arguments), at = q.steps.findIndex(s => /Dark traits/.test(s.h)), i = at < 0 ? q.steps.length : at;
+  q.steps.splice(i, 0,
+    { h: 'The Dread: the dark side wakes', t: W_UMB8C.names.map((n, k) => `<b>${esc(n)}</b> (${W_UMB8C.stages[k]}${W_UMB8C.stages[k + 1] ? '-' + (W_UMB8C.stages[k + 1] - 1) : '-9'} pieces): ${esc(wUmbDreadDoes(k))}`).join(' ') },
+    { h: 'Feats: win the pieces well', t: Object.keys(W_UMB8J.feats).map(id => { const C = W_NADIR[id]; return C && C.piece ? `<b>${esc(W_UMB_PIECES[C.piece].n)}</b>: ${esc(W_UMB8J.feats[id].n)}.` : ''; }).join(' ') + ' Or win at the first try. A piece won well sings twice as strongly on the dark side, and its game in the Seal draws a hex fewer.' });
+  q.lede = q.lede.replace(' Last, the dark traits', ' Then the Dread and the feats, and last, the dark traits');
+  q.tip = 'A piece won well (by its feat, or at the first try) takes a hex off its game in the Seal\'s final.';
+  return q;
 };

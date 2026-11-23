@@ -51,10 +51,12 @@ async def main():
           const e0 = W_ON_END.unadirgl; W_ON_END.unadirgl = function (r, rf) { ref = rf; return e0.apply(this, arguments); };
           LAB = true; try { wNadirMatch('links'); } finally { LAB = false; W_ON_END.unadirgl = e0; }
           out.powers = W_UMB8J.lastPowers; out.ref = ref && ref.nopow; out.cleared = U.nopow;
-          // a start that refuses gives the choice back
-          U.nopow = 'links'; const o0 = WG.lkg.live; WG.lkg.live = { world: { kind: 'lkgame' } }; const why = wStartLinks({ club: 'nadir:links', how: 'sim', kind: 'unadirgl', ref: { id: 'links' }, cup: true }); WG.lkg.live = o0;
-          out.refused = [!!why, U.nopow]; U.nopow = null; return out; })()""")
-        check(np['powers'] == [False, True] and np['ref'] == 1 and np['cleared'] is None and np['refused'] == [True, 'links'], 'without powers reaches the engine as [false, true], in the game’s ref, and is used up', np)
+          // a start that refuses gives the choice back, and says nothing about powers; so does a quiet refusal ('')
+          U.nopow = 'links'; const o0 = WG.lkg.live; WG.lkg.live = { world: { kind: 'lkgame' } }; WLOG.length = 0; const n0 = 0; const why = wStartLinks({ club: 'nadir:links', how: 'sim', kind: 'unadirgl', ref: { id: 'links' }, cup: true }); WG.lkg.live = o0;
+          out.refused = [!!why, U.nopow, WLOG.slice(n0).some(l => /No powers/.test(l[0]))];
+          U.nopow = 'links'; const quiet = wStartLinks({ club: 'nowhere', how: 'sim', kind: 'unadirgl', ref: { id: 'links' }, cup: true }); out.quiet = [quiet, U.nopow];
+          U.nopow = null; return out; })()""")
+        check(np['powers'] == [False, True] and np['ref'] == 1 and np['cleared'] is None and np['refused'] == [True, 'links', False] and np['quiet'] == ['', 'links'], 'without powers reaches the engine as [false, true], in the game’s ref, and is used up', np)
 
         ft = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; const reset = p => { U.pieces = U.pieces.filter(x => x !== p); delete U.well[p]; };
           // margin feat (baseball by 4), not at the first try: a 5-0 win is well, a 3-1 win (meets the condition) is not
@@ -120,6 +122,8 @@ async def main():
         check('The Cracked Card' in jp and 'won well' in jp and 'still out' in jp, 'the journal shows the Seal panel', jp[:200])
         hp = await pg.evaluate("(() => { renderHelp(); const h = document.getElementById('wHelpUmbFeats'); return h ? h.textContent : ''; })()")
         check('won well' in hp, 'How to play explains feats and the pieces’ songs', hp[:160])
+        qs = await pg.evaluate("(() => { const q = wUmbQuick(); return { steps: q.steps.map(s => s.h), tip: q.tip, lede: q.lede }; })()")
+        check(any('Dread' in h for h in qs['steps']) and any('Feats' in h for h in qs['steps']) and 'won well' in qs['tip'] and qs['steps'].index([h for h in qs['steps'] if 'Feats' in h][0]) < qs['steps'].index([h for h in qs['steps'] if 'Dark traits' in h][0]), 'the Quick start has the Dread and the feats, before the dark traits, and the tip says won well', qs)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\nall ok' if not FAILS else f'\n{len(FAILS)} FAILED'); sys.exit(1 if FAILS else 0)

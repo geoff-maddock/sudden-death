@@ -68627,19 +68627,28 @@ function wUmbHexCut(id) {
   if (U.wardFor && !wUmbWardLive(U.wardFor)) U.wardFor = null;
   return !U.wardFor || U.wardFor === id ? 1 : 0;
 }
+// the champions (or 'finale') of every sport's game left half-played, read from each game's own saved world
+function wUmbLiveRefs() {
+  const out = []; if (!WG) return out;
+  for (const k in WG) { const L = WG[k] && typeof WG[k] === 'object' && WG[k].live; const id = L && L.world && L.world.ref && L.world.ref.id; if (id) out.push(id); }
+  return out;
+}
 // the game a ward is bound to is still on: a sport's game half-played, or a card champion's match under way
 function wUmbWardLive(id) {
   // (the Seal's round: always the current one, read from WG.umbral the way the game picks it, never a round cached
   // earlier, and without building it. A list that isn't settled can't be read: the ward stays bound)
+  let e = null;
   if (id === 'finale') {
+    // (a list never settled means the Seal never started: nothing of it can be live)
     const U = wUmb(), sp = U && U.finaleSports;
-    if (!sp || sp.length !== W_UMB5.rounds) return true;
-    const e = W_UMB5.engine[sp[Math.min(U.finale || 0, W_UMB5.rounds - 1)]];
-    if (e) { const f = W_UMB4.live[e]; try { return f ? !!f() : true; } catch (err) { return true; } }
-    const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
+    if (!sp || sp.length !== W_UMB5.rounds) return false;
+    e = W_UMB5.engine[sp[Math.min(U.finale || 0, W_UMB5.rounds - 1)]];
+  } else { const C = W_NADIR[id]; if (!C) return false; e = C.engine; }
+  if (e) {
+    // (the sport's live game must be this one: its world names the champion, or the Seal, it was kicked off for)
+    const refs = wUmbLiveRefs(); if (refs.length) return refs.includes(id);
+    const f = W_UMB4.live[e]; try { return f ? !!f() : true; } catch (err) { return true; }
   }
-  const C = W_NADIR[id]; if (!C) return false;
-  if (C.engine) { const f = W_UMB4.live[C.engine]; try { return f ? !!f() : true; } catch (e) { return true; } }
   const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
 }
 const wUmbCutHexes = (id, hx) => { const n = Math.max(0, wUmbHexCut(id) || 0); return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx; };
@@ -69350,17 +69359,22 @@ const wUmbNoPowStart = (orig, kind) => function (o) {
   if (!U || !o || o.kind !== kind || !id || id === 'finale' || U.nopow !== id) return orig.apply(this, arguments);
   const o2 = Object.assign({}, o, { ref: Object.assign({}, o.ref, { nopow: 1 }) });
   // (spent before the start, which saves; a start that refuses with its reason, or throws, gives it back)
-  // (said before the start, so it comes before a Simulated game's result; a refusal says the choice still stands)
-  U.nopow = null; W_UMB8J.nopowNext = 1; let r, done = false;
-  if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd');
-  try { r = orig.call(this, o2); done = true; } finally { W_UMB8J.nopowNext = 0; if (!done || r) U.nopow = id; }
-  if (r && !LAB) wLog('No game after all, so the choice to play without powers still stands.', 'd');
-  return r;
+  // (spent before the start, which saves. It is said, and counts as used, only where the engine really starts with
+  // your powers off (wUmbNoPowOpts), so before a Simulated game's result; a start that refuses, quietly or with its
+  // reason, or throws, gives the choice back)
+  U.nopow = null; W_UMB8J.nopowNext = 1; W_UMB8J.nopowUsed = 0;
+  try { return orig.call(this, o2); } finally { W_UMB8J.nopowNext = 0; if (!W_UMB8J.nopowUsed) U.nopow = id; }
 };
 const wWU8JStartLinks = wStartLinks; wStartLinks = wUmbNoPowStart(wWU8JStartLinks, 'unadirgl');
 const wWU8JStartLanes = wStartLanes; wStartLanes = wUmbNoPowStart(wWU8JStartLanes, 'unadirbl');
 const wWU8JStartShed = wStartShed; wStartShed = wUmbNoPowStart(wWU8JStartShed, 'unadircr');
-const wUmbNoPowOpts = o => { if (!W_UMB8J.nopowNext) return o; W_UMB8J.lastPowers = [false, true]; return Object.assign({}, o, { powers: [false, true] }); };
+const wUmbNoPowOpts = o => {
+  if (!W_UMB8J.nopowNext) return o;
+  W_UMB8J.lastPowers = [false, true];
+  if (!W_UMB8J.nopowUsed && !LAB) wLog('No powers for your side, this game. For the feat.', 'd');
+  W_UMB8J.nopowUsed = 1;
+  return Object.assign({}, o, { powers: [false, true] });
+};
 const wWU8JGlStart = wGL.start, wWU8JGlSim = wGL.simGame;
 wGL.start = o => wWU8JGlStart(wUmbNoPowOpts(o)); wGL.simGame = o => wWU8JGlSim(wUmbNoPowOpts(o));
 const wWU8JBlStart = wBL.start, wWU8JBlSim = wBL.simGame;
@@ -69452,6 +69466,18 @@ renderHelp = function () {
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpUmbFeats"><b>Feats and the pieces' songs.</b> Every champion has a feat, named on their card: win on the brink, by a wide margin, after dark, without your powers, or at the first try. It's never required. Meet it, or win at the first try, and the piece is <b>won well</b>.
     Each piece you hold sings for you on the dark side, twice as strongly when won well: ${Object.keys(b).map(p => `${esc(W_UMB_PIECES[p].n)}: ${esc(b[p].n.toLowerCase())}`).join('; ')}.
     In the Seal's final, a game whose piece you won well draws a hex fewer, and a card game whose piece you won well starts with ${W_UMB8J.edgeBlock} Block. The journal's Umbral chapter lists every piece and what it does for you now.</p>`);
+};
+
+/* ---------- the Quick start's Umbral tab: the Dread and the feats ---------- */
+const wWU8JQuick = wUmbQuick;
+wUmbQuick = function () {
+  const q = wWU8JQuick.apply(this, arguments), at = q.steps.findIndex(s => /Dark traits/.test(s.h)), i = at < 0 ? q.steps.length : at;
+  q.steps.splice(i, 0,
+    { h: 'The Dread: the dark side wakes', t: W_UMB8C.names.map((n, k) => `<b>${esc(n)}</b> (${W_UMB8C.stages[k]}${W_UMB8C.stages[k + 1] ? '-' + (W_UMB8C.stages[k + 1] - 1) : '-9'} pieces): ${esc(wUmbDreadDoes(k))}`).join(' ') },
+    { h: 'Feats: win the pieces well', t: Object.keys(W_UMB8J.feats).map(id => { const C = W_NADIR[id]; return C && C.piece ? `<b>${esc(W_UMB_PIECES[C.piece].n)}</b>: ${esc(W_UMB8J.feats[id].n)}.` : ''; }).join(' ') + ' Or win at the first try. A piece won well sings twice as strongly on the dark side, and its game in the Seal draws a hex fewer.' });
+  q.lede = q.lede.replace(' Last, the dark traits', ' Then the Dread and the feats, and last, the dark traits');
+  q.tip = 'A piece won well (by its feat, or at the first try) takes a hex off its game in the Seal\'s final.';
+  return q;
 };
 /* u9: the redeemed captain, a true superstar (issue #111, phase I1). Loads after u8j-feats.js; changes earlier parts
    only by reassignment (saved originals carry the wWU9 prefix).
