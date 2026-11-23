@@ -68,6 +68,11 @@ return {
   get soTry() { const U = GD && GD.so && GD.so.cur; return U ? { side: U.side, i: U.i, gi: U.gi, st: U.st, scored: U.scored, win: U.win } : null; },
   foul: (i, k) => { if (L) hkFoul(L.pl[i], k || 'tripping', null); }, setFouls: o => Object.assign(HK_FOUL, o || {}),
   goalBy: i => { if (!L) return; const p = L.pl[i]; hkGoalScored({ i, side: p.side, kind: 'wrist', gx: hkGoalX(p.side), dir: hkDir(p.side), dist: 5, touch: [], en: !hkInNet(1 - p.side) }); }, pull: (side, why) => !!L && hkPull(side, why || 'hand'), lines: () => { if (L) hkLines(); },
+  // the Umbral (issue #99, 4e: 16-umbral.js): start({ hexes: [ids], hexOn }) and skill 3 (the Lich). The hexes ({ id: { n, d } }),
+  // their numbers, the game's (G.hex: { ids, on, slide, holes }) and its line, how far side's net has slid, the Lich's
+  // numbers, and its call for side now (the tests'), and the players' own ultimates (ids)
+  hexes: Object.fromEntries(Object.entries(HK_HEX).map(([k, v]) => [k, { n: v.n, d: v.d }])), hexRules: JSON.parse(JSON.stringify(HK_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null,
+  hexLine: () => hkHexLine(), netOff: side => G ? hkNetOff(side) : 0, lichRules: HK_LICH, lichCall: side => { if (G && G.call) hkLichCall(side); }, ownUlts: Object.keys(HK_ULT_OWN),
   // the ratings, the spots and the clubs, for the page and How to play
   rate: kind => hkRate(kind), fit: (r, pos) => hkFit(r, pos), kinds: Object.keys(HK_KIND), stats: HK_STATS.slice(), pos: HK_POS.slice(), roles: Object.assign({}, HK_ROLE), team: t => JSON.parse(JSON.stringify(hkTeam(t))),
   // the test's handle on the rink: one step of the play (or of whatever beat is on), the play, its events, a shot's odds

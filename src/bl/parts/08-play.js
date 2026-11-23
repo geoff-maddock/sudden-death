@@ -29,6 +29,8 @@ function blPlayStart(o) {
     mgr: { line: 'auto', tempo: 'auto', weight: 'auto' }, autoPow: !(o && o.autoPow === false) };
   BLC.tracks = [[], []]; BLC.camY = -40; GP.tracks = [[], []];
   GP.msg = `${G.teams[0].name} against ${G.teams[1].name}: ${G.frames} frames, the Baker format. ${G.teams[G.lead].name} bowl first.`;
+  // (the Umbral's hexes, named before the first frame: 16-umbral.js)
+  if (G.hex) GP.msg += ` ${blHexLine()}.`;
 }
 function blGo(ph, wait, msg) {
   if (msg != null) GP.msg = msg;
@@ -198,7 +200,7 @@ function blPlayNext() {
   const ri = blBowler(s), fr = blFrameNo(s), now = blSheet(s)[blCur(s)] || [], tenth = blCur(s) === blSheetN() - 1;
   const ball = !now.length ? 'first ball' : tenth && (now.length === 2 || now[0] === 10) ? 'fill ball' : 'second ball';
   const chant = G.rb[s] === 0 && G.stand[s].length === 10 && GP.streak[s] === 2 ? 'The gallery chants: TUR-KEY! TUR-KEY! ' : '';
-  const off = G.hall && G.offspot && G.offspot[s] && G.rb[s] === 0 && G.stand[s].length === 10 ? `Moll has set the ${G.offspot[s].n} a touch off its spot. ` : '';
+  const off = (G.hall && G.offspot && G.offspot[s] && G.rb[s] === 0 && G.stand[s].length === 10 ? `Moll has set the ${G.offspot[s].n} a touch off its spot. ` : '') + (G.hex ? blHexSay(s) : '');
   if (GP.mode === 'manage' && s === GP.you) { const said = [blManageCall(s)].concat(GP.autoPow ? blCpuPower(s) : []).filter(Boolean).join(', '), plan = blPlan(s), rel = blRelease(plan, s), who = blBowler(s);
     GP.cpu = { s, plan, rel }; blGo('addr', 0, `${chant}${off}Frame ${fr}: ${blName(s, who)}, ${ball}, going for ${plan.why}${said ? ` (${said})` : ''}.`); return; }
   if (blYours(s)) { blSelReset(); blGo('aim', 0, `${chant}${off}${blTurnBall(s) ? 'The turn: the lanes are re-read, and the chart shows all the oil for this ball. ' : ''}Frame ${fr}, your ${ball}: ${blName(s, ri)} is up. Set your feet and your arrow, then Space.`); return; }

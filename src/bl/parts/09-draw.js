@@ -260,6 +260,8 @@ function blHudDraw(c) {
   if (G.powers) { c.font = '11px system-ui, sans-serif'; [0, 1].forEach(k => { c.fillStyle = 'rgba(15,10,8,.7)'; c.fillRect(244, 12 + k * 26, 104, 22); c.fillStyle = '#9fc6e8'; c.textAlign = 'left'; c.fillText(`mana ${G.mana[k]} · roar ${G.roar[k]}`, 250, 27 + k * 26); }); }
   if (G.powers && G.mark) { c.font = '600 12px system-ui, sans-serif'; c.fillStyle = '#e8b0ff'; c.textAlign = 'left'; c.fillText(`${G.mark.n} marks frame ${G.mark.f + 1} (${G.teams[G.mark.side].short || G.teams[G.mark.side].name})`, 18, 122); }
   if (G.tide && G.tide !== 'mid') { c.fillStyle = '#9fc6e8'; c.font = '12px system-ui, sans-serif'; c.fillText(G.tide === 'high' ? 'High tide: the lanes play heavy' : 'Low tide: the lanes play dry', 18, 104); }
+  // the Umbral's hexes (16-umbral.js), all game
+  if (G.hex) { c.font = '600 12px system-ui, sans-serif'; c.fillStyle = 'rgba(15,10,8,.7)'; const t = blHexLine(); c.fillRect(12, 130, Math.min(616, c.measureText(t).width + 14), 20); c.fillStyle = '#c8b8ff'; c.fillText(t, 18, 144); }
   c.restore();
 }
 function blDraw(c, dt) {

@@ -132,7 +132,10 @@ function crRightDraw(c) {
 // the end board: each side's points by end, the totals and the hammer
 function crBoardDraw(c) {
   const B = crBoard(), n = B.ends, w = 22, x0 = 12, y0 = 12, nameW = 150;
+  // (the Umbral's hexes, all game, on a line under the board: 15-umbral.js)
+  const hx = G.hex ? crHexLine() : '';
   c.save(); c.fillStyle = 'rgba(10,16,20,.8)'; c.fillRect(x0, y0, nameW + n * w + 50, 56);
+  if (hx) { c.font = '11px system-ui, sans-serif'; const hw = c.measureText(hx).width + 16; c.fillStyle = 'rgba(30,14,40,.85)'; c.fillRect(x0, y0 + 56, Math.max(nameW + n * w + 50, hw), 18); c.fillStyle = '#d8c8ff'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(hx, x0 + 8, y0 + 65); }
   c.font = '600 12px system-ui, sans-serif'; c.textBaseline = 'middle';
   for (let i = 0; i < n; i++) { c.fillStyle = i === B.end ? '#ffd34a' : '#9fb4c0'; c.textAlign = 'center'; c.fillText(String(i + 1), x0 + nameW + i * w + w / 2, y0 + 9); }
   [0, 1].forEach(s => { const y = y0 + 25 + s * 19, T = G.teams[s]; c.fillStyle = T.color || '#888'; c.fillRect(x0 + 4, y - 7, 5, 14); c.fillStyle = '#eef4f6'; c.textAlign = 'left'; c.fillText(`${T.short || T.name}${B.hammer === s && !G.over ? ' ●' : ''}`, x0 + 14, y);

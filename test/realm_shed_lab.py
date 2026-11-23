@@ -3,7 +3,9 @@
   python3 test/realm_shed_lab.py 120            120 games for every cell, and 120 cups
   python3 test/realm_shed_lab.py 120 'W_SHG.oppBonus = { 1: 0, 2: 2, 3: 4 }'    a tuning override, run in the page first
   python3 test/realm_shed_lab.py 200 '' tiers,gaps    only some parts (tiers, gaps, skills, powers, shots, sweep, hammer,
-                                                      pebble, kits, cups, single)
+                                                      pebble, kits, cups, single, umbral)
+  python3 test/realm_shed_lab.py 100 '' umbral        only the Umbral (issue #99, phase 4h)
+  python3 test/realm_shed_lab.py 100 '' umbral nadir,rime    only those rows of it (to run rows in several processes)
 
 Every game is the curling engine played to a result, headless (wCR.simGame), as Simulate plays it: 6 ends, the Shed's
 ways on, powers on, your four curling as a Knight would, the other rink at the skill of the tier (Squire, Knight,
@@ -29,6 +31,13 @@ ratings suggest. The hammer goes to each side in turn.
   with no powers; each draw power, hit power, second power and ultimate, with how often it was cast a game; and the
   situation powers and Steady with your own four. Gear: each piece on every one of your four. Potions: a bag of two of
   that one, given as a Knight would.
+- umbral (issue #99, phase 4h): your four at level 3 against level 3 (level parity), as Simulate plays the Sunken
+  Shed's champion (your four curl as a Knight). The Lich against the Archmage (no bonus, no bags: archmage, lich); tier
+  3 as the world sets it (tier3) and tier U on your own kinds (tierU: W_SHG.oppBonus[4], the Lich, a full bag) for
+  reference; the Nadir four (the champion's game: nadir) with no hexes, without the champion's own ultimate (noUlt),
+  each hex alone (rime, lead, drift, hoar), as many drawn as the champion draws (every draw in turn: drawn) and two (the
+  finale's round: two). Every row plays game i with the same seed and the same fours (Math.random seeded per game), so a
+  hex's swing is measured on the same games as the row without it.
 Every game reports side 0's win %, its points a game and its shots made %. Writes /tmp/realm_shed_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
@@ -37,7 +46,9 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 120
 OVR = sys.argv[2] if len(sys.argv) > 2 else ''
-PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,shots,sweep,hammer,pebble,kits,cups,single').split(','))
+PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,shots,sweep,hammer,pebble,kits,cups,single,umbral').split(','))
+ROWS = sys.argv[4].split(',') if len(sys.argv) > 4 and sys.argv[4] else None
+OUT = os.environ.get('SHED_LAB_OUT', '/tmp/realm_shed_lab.json')
 
 SETUP = r"""
 window.__lab = {};
@@ -160,9 +171,34 @@ async def main():
             print('Situation powers and Steady (none ' + str(S['situation']['base']) + '%):', ', '.join(f"{k} {v['win']}% ({v['casts']})" for k, v in S['situation'].items() if k != 'base'))
             print('One piece of gear on all four (none ' + str(S['gear']['base']) + '%):', ', '.join(f"{k} {v}%" for k, v in S['gear'].items() if k != 'base'))
             print('One potion, two in the bag (none ' + str(S['potions']['base']) + '%):', ', '.join(f"{k} {v}%" for k, v in S['potions'].items() if k != 'base'))
+        if 'umbral' in PARTS:
+            # (every row plays game i on the same seed with the same two fours: Math.random is seeded per game while the fours
+            # are drawn, so a hex's swing is measured on the same games as the row without it)
+            out['umbral'] = await pg.evaluate(f"""(() => {{ const o = {{}}, rows = {json.dumps(ROWS)}, bag = W_SHED_KIT.opp[4], sk = wShedSkillOf(4), hx = Object.keys(wCR.hexes), MR = Math.random;
+              const same = (i, f) => {{ let q = Math.imul(i + 1, 7919) >>> 0; Math.random = () => {{ q = (Math.imul(q, 1103515245) + 12345) >>> 0; return (q >>> 8) / 16777216; }}; try {{ return f(); }} finally {{ Math.random = MR; }} }};
+              const play = (n, f) => {{ let w = 0, pts = 0, opp = 0, m = 0, st = 0; for (let i = 0; i < n; i++) {{ const r = wCR.simGame(Object.assign({{ seed: 31000 + i, hammer: i % 2 }}, __lab.base, same(i, () => f(i))));
+                if (r.win === 0) w++; pts += r.tot[0]; opp += r.tot[1]; m += r.st[0].made; st += r.st[0].stones; }}
+                return {{ win: +(100 * w / n).toFixed(1), pts: +(pts / n).toFixed(2), opp: +(opp / n).toFixed(2), made: +(100 * m / Math.max(1, st)).toFixed(1) }}; }};
+              const want = k => !rows || rows.includes(k);
+              const nadir = x => play({N}, i => Object.assign({{ teams: [__lab.mine(), wUmbCrFour(3)], skill: sk, bags: [null, bag] }}, x(i)));
+              if (want('archmage')) o.archmage = play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 2] }}));
+              if (want('lich')) o.lich = play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 3] }}));
+              if (want('tier3')) o.tier3 = play({N}, i => ({{ teams: [__lab.mine(), __lab.opp(__lab.clubs[i % __lab.clubs.length], 3)], skill: wShedSkillOf(3), bags: [null, W_SHED_KIT.opp[3]] }}));
+              if (want('tierU')) o.tierU = play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, W_SHG.oppBonus[4])], skill: sk, bags: [null, bag] }}));
+              if (want('nadir')) o.nadir = nadir(() => ({{}}));
+              // (the champion without their own ultimate: what The Sunken Stone is worth)
+              if (want('noUlt')) o.noUlt = play({N}, () => {{ const T = wUmbCrFour(3); T.roster.forEach(m => delete m.ult); return {{ teams: [__lab.mine(), T], skill: sk, bags: [null, bag] }}; }});
+              for (const h of hx) if (want(h)) o[h] = nadir(() => ({{ hexes: [h] }}));
+              // (as the champion draws them: W_NADIR.shed.hexes of them, every such draw in turn; the finale draws two)
+              const draws = n => n <= 1 ? hx.map(h => [h]) : hx.flatMap((a, j) => hx.slice(j + 1).map(b => [a, b])), dr = draws(W_NADIR.shed.hexes), two = draws(2);
+              if (want('drawn')) o.drawn = nadir(i => ({{ hexes: dr[i % dr.length] }}));
+              if (want('two') && W_NADIR.shed.hexes !== 2) o.two = nadir(i => ({{ hexes: two[i % two.length] }}));
+              return o; }})()""")
+            U = out['umbral']
+            print('Umbral (level parity):', ', '.join(f"{k} {v['win']}% ({v['pts']}-{v['opp']}, made {v['made']}%)" for k, v in U.items()))
         await br.close()
     out['n'] = N; out['secs'] = round(time.time() - t0)
-    json.dump(out, open('/tmp/realm_shed_lab.json', 'w'), indent=1)
-    print(f"{out['secs']}s, /tmp/realm_shed_lab.json")
+    json.dump(out, open(OUT, 'w'), indent=1)
+    print(f"{out['secs']}s, {OUT}")
 
 asyncio.run(main())

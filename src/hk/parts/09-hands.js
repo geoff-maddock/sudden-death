@@ -67,7 +67,8 @@ function hkAimTarget(dir) {
 function hkAimFx(side, t) {
   const g = L.pl[hkGk(side)]; if (!t || !hkInNet(side)) return { f: 1, miss: 0 };
   if (t === 'five') return { f: .75 + Math.min(1, hyp(g.vx, g.vy) / 2.5) * .8, miss: -.06 };
-  const open = clamp(Math.abs(t.y * HK_RULES.net - g.y) / (2 * HK_RULES.net), 0, 1);
+  // (the target is in the net's own frame: a net slid by the Wandering Net moves the goalie's spot in it)
+  const open = clamp(Math.abs(t.y * HK_RULES.net - (g.y - (typeof hkNetOff === 'function' ? hkNetOff(side) : 0))) / (2 * HK_RULES.net), 0, 1);
   return { f: (.55 + open * .9) * (t.hi ? 1.15 : .95), miss: t.hi ? .09 : .02 };
 }
 /* your keys: { steer: [x, y], shoot: true | false (Space down and up), pass: true | false (J), lift: true | false

@@ -17,3 +17,5 @@ src/bl/parts/12-hall.js
 src/bl/parts/13-powers.js
 src/bl/parts/14-kit.js
 src/bl/parts/15-screen.js
+# the Umbral (issue #99, phase 4g): the Lich, the hexes, a bowler's own ultimate
+src/bl/parts/16-umbral.js

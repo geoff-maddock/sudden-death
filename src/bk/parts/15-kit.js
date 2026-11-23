@@ -21,8 +21,9 @@ const BK_POTIONS = {
   secondwind: { n: 'Second Wind', all: true, rest: 20, desc: 'At a timeout: the whole five get 20 stamina back.' },
 };
 const BK_NERVE = { secs: 60, close: 5, p: .07 };
-// a CPU coach gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
-const BK_KIT = { take: [99, 4, 3], squire: .25 };
+// a CPU coach gives a potion worth this much (by skill: a Squire, now and then, whatever comes first; then a Knight,
+// an Archmage and a Lich)
+const BK_KIT = { take: [99, 4, 3, 2.5], squire: .25 };
 const BK_GX0 = Object.freeze({});
 function bkGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }
 const bkGxOf = p => { if (!p) return BK_GX0; const m = G.teams[p.side] && G.teams[p.side].roster[p.ri]; return (m && m.gx) || BK_GX0; };

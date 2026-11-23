@@ -172,8 +172,11 @@ function glDrawGrain(c, H) {
   c.restore();
 }
 function glDrawPin(c, H) {
-  const [x, y] = glScr(H.pin.x, H.pin.y), r = Math.max(2.2, GL_PUTT.cup * GLC.k * 1.2);
+  // (in the Grey Fog, your side sees the flag where the fog puts it, off the green, and the course under a veil)
+  const fog = !!G.hex && GD.disp.h === G.h && glHexFogged(GD.you), P = fog ? glHexSeen(H, GD.you).pin : H.pin;
+  const [x, y] = glScr(P.x, P.y), r = Math.max(2.2, GL_PUTT.cup * GLC.k * 1.2);
   c.save();
+  if (fog) { c.fillStyle = 'rgba(190,190,200,.18)'; c.fillRect(0, 0, 960, 600); }
   c.fillStyle = '#16210f'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
   const tall = clamp(GLC.k * 2.2, 18, 46), wv = Math.sin(GLC.t * 3) * 2;
   c.strokeStyle = '#efe9d8'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - tall); c.stroke();
@@ -230,6 +233,8 @@ function glDrawCard(c, H) {
   const st = GD.disp.st;
   lines.push(`Strokes this hole: ${G.teams[0].name} ${st[0]}, ${G.teams[1].name} ${st[1]}`);
   if (G.powers) lines.push(`Mana ${G.mana[0]}–${G.mana[1]} · Roar ${G.roar[0]}–${G.roar[1]}${G.mark && G.mark.h === GD.disp.h ? ` · ${G.mark.n} (${G.teams[G.mark.side].name})` : ''}`);
+  // (the Umbral's hexes, all game: 14-umbral.js)
+  if (G.hex) lines.push(glHexLine());
   c.save();
   c.save(); c.font = '13px system-ui, sans-serif'; const w = Math.max(...lines.map(t => c.measureText(t).width)) + 26; c.restore();
   c.fillStyle = 'rgba(16,26,12,.72)'; rr(c, 10, 10, Math.min(820, w), 28 + lines.length * 19, 7); c.fill();

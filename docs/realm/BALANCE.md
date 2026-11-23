@@ -1458,3 +1458,541 @@ of champion rate.
 **Upkeep against earnings.** A journey earns about 3,100 gold. One common pet costs 6 a week, about 100 a journey (3%);
 a full kennel of six costs 40 to 90 a week, a third to a half of what a journey earns. That is the limit on
 collecting. Treats are cheap (an 8-gold biscuit feeds a hungry pet), so hunger is a nuisance, not a trap.
+
+## The Umbral Realm (issue #99)
+
+`test/realm_umbral_lab.py N K` plays N journeys with the realm bot; each that wins the Crown then plays K matches of
+each kind at full HP, at level 4, from the same team (team level about 10, a deck of about 110). A champion's team is
+far stronger than a fresh one, so this is the honest measure of the dark side.
+
+**The card game at tier U (phase 3).** An Umbral match is tier 3, then tier U: the other side has a quarter more HP
+and 1 more Strength, each player its kind's dark trait, and you draw one card fewer (the Hall of Fame's draw).
+
+| kind (60 journeys, 45 champions, 135 matches each) | win | HP lost a match | turns |
+|---|---|---|---|
+| light, tier 3 | 100% | 25.7% | 6.2 |
+| dark, tier U | 95.6% | 39.9% | 8.4 |
+| light elite, tier 3 | 90.4% | 55.3% | 10.1 |
+| dark elite, tier U | 81.5% | 66.0% | 11.8 |
+| the Gatekeeper, first cut (92 to 98 HP, alone) | 100% | 29.5% | 9.8 |
+
+An ordinary dark match is still won, but costs half as much HP again as a light one: the dark side wears a team down,
+and the lanterns are few. The Gatekeeper's first cut was a formality, so he was rebuilt and measured:
+
+| the Gatekeeper (two hexes, a first try) | win | HP lost |
+|---|---|---|
+| 170 to 180 HP, hits 13 and 6×3, a Bone Lineman beside him (30 journeys) | 50.0% | 82.4% |
+| 210 to 220 HP, hits 15 and 7×3, two Bone Linemen (30 journeys) | 2.3% | 99.7% |
+| **150 to 160 HP, hits 12 and 6×3, a Bone Lineman beside him (45 journeys, 68 matches)** | **55.9%** | **76.8%** |
+
+The last is kept: the gentlest of the nine, won about half the time on a first try by the team that won the Crown, and
+every try after the first costs a toll.
+
+**After the review (three traits fixed).** The first measurements had the dwarf's, ogre's and wraith's traits doing
+nothing (the engine has no Plating or Phased for the other side); they now give starting Block (and the wraith 1
+Strength). Measured again (60 journeys, 44 champions, 132 matches each):
+
+| kind | win | HP lost a match | turns |
+|---|---|---|---|
+| light, tier 3 | 99.2% | 27.4% | 6.5 |
+| dark, tier U | 91.7% | 43.8% | 8.2 |
+| light elite, tier 3 | 85.6% | 62.3% | 10.1 |
+| dark elite, tier U | 66.7% | 75.0% | 12.0 |
+| the Gatekeeper | 47.0% | 80.0% | 12.4 |
+
+About ±9 points of noise on the Gatekeeper at this size: the two batches (56% and 47%) agree on about half.
+
+### Umbral: football (#99, 4b)
+
+`python3 test/realm_gridiron_lab.py N '' umbral` plays only the Umbral part: your seven at level 3 under Simulate (you
+cast as a Knight), at an even level. Tier U on the gridiron is tier 4 in the football tables: `W_GFG.oppBonus[4]`
+rating points on each of their seven, the Lich coaching (skill 3: it reads the whole down and leans to the call with
+the best matchup against what it expects, goes for it more on fourth down, swaps and drinks sooner), and their full bag
+(`W_GRID_KIT.opp[4]`). Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same game seed for
+seed (30 seeded games, before and after, identical), and the full lab at 100 a row reads as before (tier 3, all gaps:
+21.8% before, 22.4% after).
+
+**The Lich against the Archmage** (tier 2 ratings, no bags, 1,000 games each): you win 46.9% against an Archmage and
+36.5% against a Lich. The Lich is ten points better from its decisions alone.
+
+**Tier U.** First cut: 6 rating points (one more on every rating), the Lich and the full bag; the Nadir seven had an
+ogre on the line and a harpy at receiver.
+
+| even level, their bag | first cut (6 points, 200 games) | **kept (5 points, the Nadir seven with a dwarf and a goblin; 1,000 games)** |
+|---|---|---|
+| tier 3, a rival's seven (4 points, Archmage) | 29.5% | 27.2% |
+| tier U, a rival's seven | 13.5% | **18.7%** |
+| tier U, the Nadir seven (the champion's game without hexes) | 2.5% | **15.0%** |
+
+The first cut's Nadir seven was out of reach. At 5 points tier U sits between tier 3 and the target's floor, and the
+Cinder Pit's champion (Ossian Pyre at quarterback, with his own ultimate, Eclipse) is a little harder than a rival's
+seven at the same tier.
+
+**The hexes, each alone on the champion's game against none** (1,000 games each; about ±2 points of noise):
+
+| hex | win | swing | your turnovers a game |
+|---|---|---|---|
+| none | 15.0% | | 0.19 |
+| The Pit Closes (your end zone 5 yards out each quarter after the first) | 14.4% | -0.6 | 0.18 |
+| Fumbles Roll Dark (you fumble twice as often; they fall on 92%) | 11.5% | -3.5 | 0.45 |
+| Grave Cold (40% more stamina a play) | 16.0% | +1.0 | 0.19 |
+| Ash Wind (your kicks 6 yards longer, punts 6 shorter; first cut 8) | 13.3% | -1.7 | 0.19 |
+| **the champion as played, one hex drawn** | **13.2%** | | |
+
+No hex swings a game by more than about 4 points, well inside the 10-point limit. Ash Wind at 8 yards cost 8 points in
+a 200-game first look (noise at that size), and was cut to 6. Grave Cold barely shows: a game rarely runs a seven
+below half stamina, where it starts to cost ratings; at twice the stamina (500 games) it was still -1.6. The champion
+draws one hex a try (two, in the first look, put the bot at 11.5%): about 13%, a little under the 15 to 25% band (the
+Gatekeeper, the gentlest of the nine, is about half); a careful human, calling the plays, wins far more.
+
+### Umbral: baseball (#99, 4a)
+
+`python3 test/realm_diamond_lab.py 600 '' umbral` (part 3 of the baseball lab; 600 Simulated games a row, your nine
+of five at level 3, call-ups filling the rest). Tier U on the diamond is tier 4 in the ball game's tables: the Lich
+(CPU skill 3) and `W_BALL.oppBonus[4]` on every rating of the other nine. The champion's game puts your nine, as an
+Archmage, against the Bone Nine at your level (level parity): the Lich on their side only, the bonus, and the champion
+on the mound with 2 more on every rating and her Dead Ball. Simulate plays it the same way, so it is no way round the
+Lich. Tiers 1 to 3 are unchanged: with no hexes, 36 seeded games (each CPU skill, Auto powers on and off) play out
+identically on the engine before and after this part, line for line.
+
+**The Lich.** On the same nine, an Archmage against the Lich, against an Archmage against an Archmage (each row 600):
+
+| run | Archmage v Archmage | Archmage v Lich | the Lich's edge |
+|---|---|---|---|
+| 1 | 57.2% | 43.7% | 13.5 pts |
+| 2 | 60.0% | 44.3% | 15.7 pts |
+| 3 | 58.3% | 44.8% | 13.5 pts |
+
+It reads pitches sooner (aim error 0.13 ft against the Archmage's 0.19), times its swing tighter, chases less, times
+its releases (always a good release, 40% perfect), throws a two-strike chase pitch more often, and fields, throws and
+runs sharper. (The away side wins the even game a little more than half the time in these runs.)
+
+**Tier U at level parity** (target 15 to 25% for the skilled bot):
+
+| the rating bonus at tier U | your win | runs for-against |
+|---|---|---|
+| +2 (300 games) | 8.7% | 2.0-5.8 |
+| **+1 (kept; three runs of 600)** | **23.7%, 22.2%, 19.8%** | 2.3-4.5 |
+
+Tier 3 at +2 levels is 20 to 25% today, so tier U at parity sits with it, with the Lich and the champion doing what
+the two levels did.
+
+**Hexes, each alone against none** (600 games a row, the tier U setup; about ±2.4 points of noise on a difference):
+
+| hex | first cut | second | kept |
+|---|---|---|---|
+| none (the base) | 23.7% | 22.2% | 19.8% |
+| The Phantom Pitch | -1.3 pts (first ball in play an inning, never strike three) | +0.5 pts (any count) | +1.3 pts (the first ball hit hard) |
+| Restless Bases | -4.2 pts | -4.3 pts | -2.5 pts |
+| The Black Font | -7.5 pts | -3.5 pts | -1.2 pts |
+| Grave Chill | +0.8 pts (timing window 5/6) | -0.7 pts (window 0.72) | -0.3 pts (swing circle 0.8) |
+| the champion's game, two drawn | 17.5% (-6.2) | 17.2% (-5.0) | 14.7% (-5.2) |
+
+No single hex moves the game by more than about 8 points in any run, inside the 10-point ceiling. Two together cost
+about 5 points, steadily, so the champion's own game lands at 15 to 17.5%. The Phantom Pitch and Grave Chill barely
+register for the bot (its swing rarely misses by the margin they take away); a human, who sees the ball go through the
+bat and the smaller circle, feels them more. The Black Font's first-cut 7.5 points did not hold up in the later runs
+(the code did not change), which is the size of the noise at 600 games.
+
+
+### Umbral: boxing (#99, 4c)
+
+`test/realm_ring_lab.py N --umbral` (parts 6 and 7 only). Cards as Simulate boxes them: your three at level 3 against
+three at level 3 (level parity), your corner's pairing, your fighters boxing and casting as Knights; your bag stays
+home, theirs is tier U's. Each card is seeded by its number (the journey, their side and the bouts), so the rows box
+much the same cards; the realm still draws some of its own randomness, so blocks of 300 seeds differ by up to ±4
+points, and the numbers below are 600 cards a row (1,200 for the hexes).
+
+**Tier U** is tier 4 in the ring's tables: their rating bonus `W_BXG.oppBonus[4]` (tier 3's is 2), a full bag
+(`W_RING_KIT.opp[4]`: one of each potion) and the Lich in their corner (CPU skill 3). The Lich is as sharp as an
+Archmage (the same reading and timing numbers) and wins on its decisions (`BX_LICH`, 06-cpu.js): it slips more head
+punches and every body shot, works the body of a fighter covering up, steps on the gas when the other fighter is
+hurt, tired or on the ropes, saves its breath for the hooks that count, ties up sooner when hurt, reads the other
+fighter's plan in the corner, sends the cut-man in sooner and opens the bag sooner.
+
+| tier U at level parity | win |
+|---|---|
+| first cut: bonus 4, the Lich sharper than an Archmage (skill 3 on every scaled number), slip 0.8, gas 1.6 (120) | 5.8% |
+| the same ratings, an Archmage in their corner (120) | 15.0% |
+| bonus 1, the same Lich (200; two batches, 21.7% and 11.5%) | about 15% |
+| bonus 3, the Lich only as sharp as an Archmage, slip 0.65, gas 1.3, cut-man at 70%, one of each potion | **17.3%** |
+| the same, an Archmage in their corner | 25.2% |
+| the same, no powers either side | 15.7% |
+
+The Lich costs a skilled bot about 8 points of card win rate against an Archmage with the same ratings (in single
+bouts, a Knight wins 31% against an Archmage and 26% against the Lich, 1,200 seeded bouts). Kept: bonus 3, 17% at
+parity, inside the 15 to 25% target.
+
+**Hexes** (14-hexes.js): one at a time against none, the tier U card. The first cut (water a half, leaden gloves a
+quarter more breath, the Shrinking Ring a foot and a half, the Quick Count one more) at bonus 4 and then 1:
+
+| hex | first cut (400 cards, none 13.0%) | kept (1,200 cards, none 15.6%) |
+|---|---|---|
+| The Shrinking Ring (the ropes 2 ft in a round, never under 5) | -1.0 | +3.5 |
+| Tainted Water (four fifths of the break's breath and health) | -7.8 | -5.9 |
+| Leaden Gloves (a punch costs a tenth more breath) | **-11.8** | -6.2 |
+| The Quick Count (a count of two more to rise) | +4.0 (noise) | -0.9 |
+
+No hex moves a card more than about 6 points. The Shrinking Ring closes in on both fighters, so it changes the fight
+(more time on the ropes) more than it changes who wins; the Quick Count bites only on the knockdowns a bout has.
+
+**The champion's card.** Brakka Knell (a minotaur with their own powers, Death Knell and The Last Bell, and nature,
+Cracked Bronze), in the main event behind two Nadir boxers, all at tier U. Their card draws one or two hexes a try.
+
+| the Nadir's card at level parity | win |
+|---|---|
+| first cut: a golem and a kobold before Brakka, Brakka 3 more points (200) | 2.0% |
+| a zombie and a kobold, Brakka 1 more (300) | 6.0% |
+| **an ogre and a dwarf (Ashmaw kinds), Brakka no more points: no hexes (600)** | **9.5%** |
+| the same, the try's hexes drawn (600) | 4.2% |
+
+The boss of the ring is harder than a tier U club by their powers and nature alone; a careful human in the corner (or
+boxing the rounds) wins far more than the bot. Phase 7 measures it inside whole journeys.
+
+### Umbral: basketball (#99, 4d)
+
+`python3 test/realm_court_lab.py N '' umbral` plays only the Umbral part: your five at level 3 under Simulate (your
+coach a Knight), at an even level, five minutes, the Charter Court's own ways on. Tier U on the court is tier 4 in the
+basketball tables: `W_BKG.oppBonus[4]` rating points on each of their five, the Lich coaching (skill 3), and their full
+bag (`W_COURT_KIT.opp[4]`). Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same game seed
+for seed (40 seeded games against a build from before the change, at every skill pairing, length, with and without
+powers, the ground and bags: score, box score, tally, subs, sets, timeouts and the scoring log identical). Games here
+are short and swingy: blocks of 1,000 differ by up to ±4 points (tier 3 at an even level read 31.1%, 32.5% and 34.2%
+in three batches), so the rows below are 1,000 games or more, and averages of batches where there are several.
+
+**The Lich against the Archmage** (tier 2 ratings, no bags). The first cut decided only the calls: on defense it weighs
+each defense by what your offense will run against it (a coach by hand keeps the set it called; a CPU coach leans to
+what beats that defense; blended with what you have really run), on offense it changes sets before the scout catches
+up, and its stances read the game. That was worth about 2 points (Archmage 39.7%, Lich 37.5%, 1,500 games each):
+the Archmage already reads the defense on the floor and your habit, and most of what the calls are worth it had. Tried
+on the floor, 1,500 games each against the Lich's 37.5%:
+
+| the Lich also... | you win |
+|---|---|
+| waits for a better look (+.06 on the shot it takes), passes to a better one, reaches in half as often | 38.3% |
+| no stances of its own | 37.3% |
+| subs a tiring player later (35, not 50) | 37.6% |
+| shoots sooner (-.05) | 39.7% |
+| is up in time on the contest a share .3 more often | 36.8% |
+| **plays a good shooter tighter and a poor one further off** (`BK_LICH.close` 1) | **33.4%** |
+| **both** (close 1, jump .3) | **29.3%** |
+| close 1.5 and jump .3 / close 2 alone | 28.7% / 31.0% |
+
+Kept: the calls, and close 1 with jump .3. Scouting the shooters is the big one: the contest is most of a shot's odds,
+and putting it where the shooting is wins far more than any call. Over three batches of 1,000 you win 43.4% against an
+Archmage and 31.6% against the Lich: the Lich is about 12 points better on its decisions alone.
+
+**Tier U.** First cut: 7 points, the calls-only Lich, the full bag (two Stamina Draughts, two Second Winds, Steady
+Drops and two Hot Hand Elixirs); the Nadir five a vampire, a wraith, an elf, a spider and a golem, a zombie and a
+skeleton on the bench.
+
+| even level, their bag | tier U, a rival's five | tier U, the Nadir five (no hexes) |
+|---|---|---|
+| first cut (300) | 20.3% | 11.7% |
+| 7 points, calls-only Lich, a skeleton for the elf, a witch on the bench (1,000) | 23.6% | 14.7% |
+| 6 points, the same (1,000) | 24.1% | 17.4% |
+| 6 points, **the sharper Lich** (close-outs and jumps), the same five (1,000 each) | 20.5%, 19.8% | 12.7%, 11.8%, 10.8% |
+| the same, a zombie for the spider (1,500) | | 16.0% |
+| **kept: 6 points, the sharper Lich, a zombie for the spider and a skeleton for the wraith** | **19.6%** | **16.9%** (1,000), **18.5%** (1,500) |
+| (tier 3, a rival's five, 5 points and an Archmage, the same batches) | 31.1%, 34.2%, 32.5% | |
+
+Tier U sits at 6 points (one more than tier 3): about 20% against a rival's five at level parity, inside the 15 to 25%
+target. The Nadir five were out of the band with the sharper Lich: the spider's defense and the wraith's handle cost
+most. Kept: Vesper Gloam (a vampire, at the point, with her own ultimate, Lights Out), two skeletons on the wings, a
+zombie and a golem inside; a zombie and a witch on the bench: about 17.5% without hexes.
+
+**The hexes, each alone on the champion's game against none** (1,000 games; first a rough 300-game look, with the
+calls-only Lich; the figures in brackets are two batches with the sharper Lich against the five before the last swap):
+
+| hex | first cut | **kept** | your FG / FT, against none's 42% / 66% |
+|---|---|---|---|
+| The Rim Drifts (your jumpers up to **8** points worse as the rim swings, layups a third; wild misses. At 9: -6.3 and -7.3; at 7: -3.6) | -6.3 | **-5.5** (also -5.7, -5.0) | 40% / 64% |
+| The Shadow Sixth (once a quarter, a shadow defends one of your possessions) | -4.3 | **-3.9** (also -5.3, -2.1) | 40% / 65% |
+| The Short Clock (a 10-second shot clock; then 7, then 6): **cut** | 0.0 | -0.9 at 7 s, +0.2 at 6 s | 42% / 64% |
+| The Crooked Whistle (fouls on your five half again as likely), in its place | | **-1.3** (also -2.6, -3.0) | 41% / 63% |
+| Cold Hands (your free throws 12, then **15** points worse) | -1.3 | **-1.4** (also -1.7, -0.8) | 41% / 50% |
+
+No hex swings a game by more than about 6 points. The Short Clock did nothing at any length: the CPU rarely needs more
+than 6 seconds, and both sides only played faster; it was replaced by the Crooked Whistle. Cold Hands is the gentlest:
+a five-minute game has few free throws.
+
+**The champion as played**, one hex drawn a try: **about 15%** (17.1% in 1,000, 13.8% in 2,000), inside the 15 to 25%
+band. A careful human, calling the sets and timing the shots, wins far more.
+
+### Umbral: golf (#99, 4f)
+
+`python3 test/realm_links_lab.py N '' umbral` (the Umbral part of the golf lab). Matches as Simulate plays the Hollow
+Links' champion: your four at level 3 (the journey's kinds) caddied as a Knight, against level 3 (level parity), nine
+holes on the standing nine with the wood, the enchanted course and powers on. Every row draws match i's two fours from
+the same seeded stream, so the rows in a run play the same players; a run's journey (its first player) is new each
+time, and runs differ by up to 6 points, so two runs of 800 a row are given.
+
+Tier U on the course is tier 4 in golf's tables: `W_LKG.oppBonus[4]` rating points on each of their four, a full bag
+(`W_LINKS_KIT.opp[4]`: two draughts, Still Water, Moss Tonic, Agatha's Oil) and the Lich caddying (skill 3,
+`src/gl/parts/14-umbral.js`). Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same round
+seed for seed (36 seeded rounds across every skill, length, weather, the wood, the enchanted course, powers and bags,
+before and after this part: identical, summary and shot log).
+
+**The Lich.** It swings no better than an Archmage (the same error); before each stroke it hits every line (go, the
+percentages, lay up), each aimed straight and a little left and right, 14 times in its head through the same shot
+model, and plays the one that leaves the fewest strokes to hole out, unless the Archmage's own choice is within 0.03 of
+a stroke. On the green it reads far better (read error 0.06 against 0.12) and weighs each pace the same way.
+
+| even level, no bonus, no bags (your win) | run 1 | run 2 |
+|---|---|---|
+| their caddie an Archmage | 32.1% | 31.0% |
+| their caddie the Lich | 22.4% | 24.8% |
+
+Six to ten points from its decisions alone (over 600 rounds against a Knight, a Lich side takes about 0.07 strokes a
+hole fewer than an Archmage side: fewer putts, more lay-ups to a wedge).
+
+**Tier U.** Tier 3's bonus is 7 points at two levels up; golf's ratings are steep (one point on one rating a player
+moved the parity match about 8 points in a fixed-four probe), so tier U's bonus at level parity is small and the Lich
+and the bag do the rest. First cut 3 points (and the champion 2 more): the Nadir four at 14.7% with no hexes and 0% with
+two. Kept: **1 point**, the champion no more (their own ultimate, The Hollow Flag, is their mark: within noise for the
+bot, 16.3% against 19.4% in run 1, 12.8% against 13.4% in run 2).
+
+| your win, level parity (800 a row) | run 1 | run 2 |
+|---|---|---|
+| tier 3, a rival's four as the world sets it (two levels up, 7 points, Archmage, bag) | 19.1% | 13.8% |
+| tier U, your own kinds (1 point, the Lich, the full bag) | 15.8% | 15.1% |
+| **the Nadir four, no hexes (the champion's game)** | **19.4%** | **13.4%** |
+
+**The hexes** (14-umbral.js), each against your side, each alone on the champion's game:
+
+| hex | first cut (300) | kept, run 1 | kept, run 2 |
+|---|---|---|---|
+| none | 14.7% | 19.4% | 13.4% |
+| The Restless Green (a tilt no read sees under your putts: first 0.011, kept 0.003) | -13.4 | -3.9 | -2.3 |
+| The Wandering Cup (the cup creeps from your ball: first 2 yd after any shot, kept 0.75 yd after a shot from off the green) | -13.0 | -5.8 | -4.3 |
+| The Grey Fog (the flag seen off the green: first 6 to 10 yd, kept 2 to 3.5) | -11.4 | -4.0 | -3.1 |
+| The Turning Wind (on your full shots: first a quarter turn and 4 mph, kept a twelfth and 1 mph) | -13.4 | -2.0 | -3.9 |
+| **the champion as played: one drawn** | | **17.0%** | **9.4%** |
+| two drawn (the finale's round) | 0% | 11.5% | 5.9% |
+
+The first cut swung each by 11 to 13 points: the bot's game is precise, so a few yards cost a hole. Kept, none moves
+the game by more than about 6 points. The champion draws one hex a try (two was 4 to 6 points more): about 13% across
+the two runs, a little under the 15 to 25% band, as football's champion is; a careful human, who sees the fog and
+reads the cup's creep, wins more.
+
+### Umbral: hockey (#99, 4e)
+
+`python3 test/realm_rink_lab.py N '' umbral` plays only the Umbral part: your six at level 3 under Simulate (your coach
+a Knight), at an even level. Tier U on the ice is tier 4 in the hockey tables: `W_HKG.oppBonus[4]` rating points on
+each of their six, the Lich coaching (skill 3, `src/hk/parts/16-umbral.js`) and their full bag (`W_RINK_KIT.opp[4]`).
+Tiers 1 to 3 are untouched: with no hexes and no Lich the engine plays the same game seed for seed (60 seeded games on
+the build from before this part and on this one, each CPU skill pairing, the pond and snow on and off, powers on and
+off, bags, 3, 6 and 9 minutes: identical, summary for summary), so every hockey number above stands.
+
+**The Lich.** On top of the Archmage it answers your call at every face-off (what beats your systems far more, what
+loses to them far less), leaves a system you have scouted, matches your special-teams setups, changes lines sooner,
+pulls its goalie sooner, looks harder for the pass across, and sends its checker at where your carrier is going (0.4
+seconds ahead, against 0.22): that last one was worth the most against a Knight. The same six on both sides, the Lich
+on each side half the time (800 seeded games a row):
+
+| | win for the better coach |
+|---|---|
+| Archmage against Archmage (the control) | 48.1% |
+| Lich against Archmage | 61.9% |
+| Archmage against Knight | 56.4% |
+| Lich against Knight | 65.1% |
+
+Each part measured alone against the Knight (600 games): the answer to your call adds little against a Knight (who
+answers nobody), the line changes and the pull a point or two each, and the checker's lead the most (+7). Waiting for
+a better look before shooting measured at nothing and was taken out. In the lab's own row (your Knight against a
+rival's six on tier 2 ratings, three runs of 600) an Archmage wins 38.5% of your games and the Lich 33.2%.
+
+**Tier U** (600 games a row, their bag):
+
+| even level | first cut (7 points, 600) | **kept (6 points, 600)** |
+|---|---|---|
+| tier 3, a rival's six (5 points, Archmage) | 23.7% | 24.8% |
+| tier U, a rival's six | 18.2% | 22.2% |
+| tier U, the Nadir six (the champion's game without hexes) | 14.3% | **17.3%** |
+| the champion as played, one hex drawn | 12.7% | **18.7%** |
+
+At 7 points the champion's own game fell under the 15 to 25% band; at 6 it sits in it, a little under tier 3 against a
+rival. The Nadir six (Hollis Grael, a wraith, at centre with his own ultimate, The Long Night; a gorgon in goal) is
+about as hard as a rival's six at tier U.
+
+**The hexes, each alone on the champion's game against none** (600 games a row; about ±3 points of noise on a swing):
+
+| hex | first cut (200 games, 7 points) | second (600, 7 points) | **kept (600, 6 points)** |
+|---|---|---|---|
+| The Ice Opens | -12.5 (three holes, the face-off in your own end) | -4.7 (three, at centre ice) | -2.3 (two, at centre ice) |
+| The Wandering Net (1.3 m, then 1.8 m) | -6.0 | -0.5 | +1.0 |
+| Grave Cold (35%, then 30% more tiring) | -10.0 | -1.3 | 0.0 |
+| The Hollow Whistle (your fouls twice as often) | -6.5 | +0.2 | +2.7 |
+
+The first 200-game look had a lucky base (21%) and read every hex as costly; at 600 games only The Ice Opens shows
+clearly, and it was the one that was cut (a face-off in your own end, three holes): no hex moves the game more than
+about 5 points in any later run, well inside the 10-point limit. The Wandering Net and The Hollow Whistle barely touch
+the bot: the net slides away from where the puck is, so it costs shots from the wings, and the bot shoots mostly from
+the slot; a whistled side takes about 2.5 penalties a game instead of 1.3, and a power play here is worth little (see
+the hockey notes above). A human, who sees the net wander and spends more time on the wings, will feel them more.
+
+### Umbral: curling (#99, 4h)
+
+`python3 test/realm_shed_lab.py N '' umbral` (the Umbral part of the curling lab; `... umbral nadir,rime` plays only
+those rows, so rows can run in several processes). Games as Simulate plays the Sunken Shed's champion: your four at
+level 3 (the journey's kinds) curling as a Knight, against level 3 (level parity), six ends, the Shed's ways and powers
+on. Every row plays game i on the same seed with the same two fours (Math.random seeded while they are drawn), so the
+rows are paired and a run is repeatable exactly; a hex's swing is measured on the same games as the row without it.
+About 1.2 s a game with the Lich in the page, so the tuning was done head to head in node on the engine alone (400
+games a row over ten processes, your four elf, spider, gorgon and dwarf at their kind's ratings, the same seeds in every
+row), and the lab run at the end.
+
+Tier U at the Shed is tier 4 in curling's tables: `W_SHG.oppBonus[4]` (1) rating point on each of their four, a full
+bag (`W_SHED_KIT.opp[4]`: two Stamina Draughts, a Warming Draught, two Frost Salts and Hennock's Pebble) and the Lich
+skipping (skill 3, its own row `CR_LICH` in `src/cr/parts/15-umbral.js`, so the exhibition still offers three skips).
+Tiers 1 to 3 are untouched: with no hexes, no Lich and no curler's own ultimate the engine plays the same game seed for
+seed (36 seeded games across every skill pairing, length, cold, the Shed's ways, powers both, one side or none, bags and
+the free guard zone, before and after this part: identical summaries; and three games played through the page's own
+beat in Watch, ticked to the end with a snapshot every 400 ticks: identical).
+
+**The Lich.** It throws no better than an Archmage (the same miss). The first cut decided more: more shots (draws to
+five more spots, three more guards, a takeout of each of their stones in the house hit a little thin either way), its
+best six over six throws each, six replies weighed in at 0.35; and its sweepers read the stone as it runs (every
+quarter second of the stone's run they play it on, alone on the ice as it is now, swept not at all, half and hard, and
+sweep the way that brings it nearest the call: a draw's spot or a hit's line, since a swept stone curls less).
+
+| your win against (node, your Knight, even level, no bonus, no bags) | 200 | 400 |
+|---|---|---|
+| an Archmage | 29.0% | 24.8% |
+| the first-cut Lich | 21.5% | |
+| ... with an Archmage's sweepers | 31.5% | |
+| ... with an Archmage's search (best four of five throws, four replies at 0.3) | 15.5% | 13.3% |
+| ... and no extra shots | | 12.8% |
+| ... the Archmage's search, its sweepers also in its head when it weighs a shot | | 13.3% |
+
+The broom is nearly all of it: its sweepers alone take about 12 points off you, and the wider search was worse than
+the Archmage's (weighing six noisy candidates picks a lucky one). Kept: the Archmage's search with the extra shots (no
+cost, and it calls a different shot about a third of the time, `test/realm_umbral_curling.py`), and the Lich's
+sweepers. Playing its sweepers in its head as well changed nothing and was dropped. In the page: the Archmage 19%, the
+Lich 11% (100 a row): 8 to 12 points from its decisions.
+
+**Tier U.** One point at level parity, as golf: curling's ratings move a game little (the Nadir four with no bonus won
+1 point more in node, 14.5% against 13.5% with one hex), the Lich and the bag do the rest. The Nadir four: a zombie
+lead (Silt), a spider second (Weir, the best broom on the sheet), a skeleton third (Knucklebone) and the champion
+skipping, Grisel Mourne (a lich), with an ultimate of their own, The Sunken Stone (the other rink's stones that end drag
+heavy, 1.03, and hardly curl, 0.7): within the noise for the bot (15% without it, 16% with it).
+
+| your win, level parity | page, 100 | page, 200 | node, 400 |
+|---|---|---|---|
+| tier 3, a rival's four as the world sets it | 18% | | |
+| tier U, your own kinds (1 point, the Lich, the full bag) | 12% | 11% | |
+| **the Nadir four, no hexes (the champion's game)** | **16%** | **15.5%** | **19.0%** |
+
+**The hexes** (15-umbral.js), each against your side, each alone on the champion's game, node 400 (none 19.0%):
+
+| hex | first cut | second | **kept** |
+|---|---|---|---|
+| Rime on the Pebble (your stones curl more than your skip reads: 1.2, 1.4, kept 1.3) | +0.5 | -12.2 | **-4.2** |
+| Leaden Brooms (your sweepers' legs: 3 times, sweeping 0.7; kept 4 times, 0.6) | -1.5 | **-2.0** | |
+| The Drifting House (your stone at rest in the house slides 4 inches out) | **-5.5** | | |
+| Hoarfrost (their stones frozen like granite: every one in the four-foot, -10 in the page; every one on the button; kept the first in the four-foot an end) | | -2.7 | **-3.5** |
+
+In the page (100, paired with none's 16%): Rime -7, Leaden Brooms +2, the Drifting House -3, Hoarfrost -2. Rime on the
+Pebble is steep: the bot's draws are judged on inches, so a fifth more curl does nothing and two fifths more takes 12
+points. No hex swings a game by more than about 7 points. Leaden Brooms is the gentlest: sweeping is worth about 6 points
+to the bot in all (phase 10), so a hex on the brooms can't take much; a human who sweeps by hand feels it more.
+
+**The champion as played**, one hex drawn a try: **14%** (200, the page; every draw in turn), two drawn (the finale's
+round) 12.5%. A little under the 15 to 25% band, as golf's and football's champions are; a careful human, who sweeps
+their own stones and sees the curl the rime adds, wins far more.
+
+### Umbral: bowling (#99, 4g)
+
+`python3 test/realm_lanes_lab.py N '' umbral` (the Umbral part of the bowling lab). Games as Simulate plays the Drowned
+Lanes' champion: your five at level 3 (the journey's kinds) bowling as a Knight, against level 3 (level parity), one
+Baker game of ten frames, the hall on (the tide mid) and powers on. Every row draws game i's two fives from the same
+seeded stream, and the paired rows (the Archmage, the Lich and tier U; every Nadir row) play game i on the same seed, so
+a hex is measured on the same games as the row without it. A run's journey (its first player) is new each run, and runs
+differ by up to 5 points. About 0.15 s a game with the Lich (0.05 without).
+
+Tier U at the lanes is tier 4 in bowling's tables: `W_LNG.oppBonus[4]` rating points on each of their five, a full bag
+(`W_LANES_KIT.opp[4]`: two draughts, two Steady Hands, two Grip Chalks, Moll's Lane Oil) and the Lich bowling for them
+(skill 3, `src/bl/parts/16-umbral.js`). Tiers 1 to 3 are untouched: with no hexes, no Lich and no bowler's own
+ultimate the engine plays the same game seed for seed (30 seeded sims across every skill, the hall, powers, bags, the
+tides, five and ten frames and the transition off, and a watched game ticked through by hand, before and after this
+part: identical, summary, sheet, casts, potions and every message).
+
+**The Lich.** Its release strays exactly as an Archmage's. Before every ball it weighs nine stands (deep inside to up
+the boards, which sets its line), three aims in the pocket and, from the best, a touch slower and quicker: each thrown
+seven times in its head through the ball model with its own miss at that moment (line, tempo and any curse on its ball
+included), scored at the pins by a carry table worked once a page from the pins themselves (strikes and splits by
+place, entry angle and speed). The Archmage's own ball is one of those weighed and wins unless another scores better.
+At a spare it weighs three aims (and, at a lone pin, three stands); at a split it converts or takes the sure count by
+what each is worth. No random number is drawn for any of it.
+
+| even level, no bonus, no bags (your win, 300 a row) | run 1 | run 2 | run 3 | run 4 | run 5 |
+|---|---|---|---|---|---|
+| their bowlers Archmages | 19.7% | 21.7% | 23.7% | 19.7% | 24.3% |
+| their bowlers the Lich | 14.7% | 12.3% | 13.0% | 9.7% | 13.0% |
+
+Five to ten points from its decisions alone. Against a Knight over 120 seeded games it strikes 8 points more often than
+an Archmage (71% against 63%) and converts more spares (85% against 80%): about 14 pins a game more.
+
+**Tier U.** Tier 3 is one rating point at two levels up with an Archmage. The Nadir five are the undead kinds (Ossery
+Brine, the champion, a zombie; a witch, a wraith, a skeleton and a lich): middling bowlers, against the journey's five.
+A second rating point (`W_LNG.oppBonus[4] = 2`) put the Nadir five at 12.5% with no hexes and 8% as played, so tier U
+keeps **1 point**, as tier 3 has, at level parity: the Lich and the bag make it the harder game. The champion's own
+ultimate, The Drowning Bell (their balls this frame skid long on heavy oil and carry less), is their mark rather than a
+swing: within noise (18.7% against 18.7%, 20.3% against 14%, 17.3% against 20%).
+
+| your win, level parity (300 a row) | run 1 | run 2 |
+|---|---|---|
+| tier 3, a rival's five as the world sets it (two levels up, 1 point, Archmage, bag) | 21.7% | 23.0% |
+| tier U, your own kinds (1 point, the Lich, the full bag) | 17.3% | 9.0% |
+| **the Nadir five, no hexes (the champion's game)** | **18.7%** | **19.3%** |
+
+**The hexes** (16-umbral.js), each against your side, each alone on the champion's game (300 a row, paired):
+
+| hex (its setting in each cut) | cut 1 (150) | cut 2 (200) | cut 3 (two runs) | cut 4 (two runs) | kept, run 1 | kept, run 2 |
+|---|---|---|---|---|---|---|
+| none | 17.3% | 18.5% | 20.3%, 18.7% | 20.3%, 16.3% | 18.7% | 19.3% |
+| The Ichor Oil (your balls take k times the oil off the lane: 3, 3, 2.5, 2.5, kept 2) | -4.6 | -5.5 | -3.3, -6.0 | -9.0, -3.6 | -5.0 | -5.0 |
+| The Waterlogged Pin (a pin of each of your frames k times as heavy: 2, 2, 3, 5, kept 3.7) | -2.6 | -0.5 | -2.0, +1.0 | -15.6, -14.0 | -3.4 | -5.0 |
+| The Hungry Gutters (near either edge your ball drifts toward the gutter: 6 inches and 0.0016 a step, 0.0007, 0.0003, then 3 boards and 0.0006, kept) | -11.3 | -11.0 | -11.6, -12.0 | -1.6, -3.0 | -2.7 | -2.0 |
+| The Black Tide (the oil under your balls k times as heavy as it looks: 1.07, 1.025, 1.012, kept) | -15.3 | -9.5 | -5.6, -0.4 | -5.3, -1.3 | -0.4 | -2.6 |
+| **the champion as played: one drawn** | 7.3% | 12.0% | 14.0%, 15.3% | 11.7%, 9.0% | **17.3%** | **15.7%** |
+| two drawn (the finale's round) | 4.7% | 5.5% | 11.7%, 9.7% | 8.7%, 7.7% | 12.0% | 16.3% |
+
+The first cut found two hexes far too strong for the bot, for the reason the skid curses were (phase 10): a Knight
+plans on the lane it sees, so a ball that skids long on a heavier tide misses the pocket every time, and the gutters'
+pull reached in to the boards a hook ball rolls out to at its breakpoint, so every strike ball came back light. Kept,
+the pull works only on the outside three boards (a wide miss, a corner pin), and the tide is a touch. The waterlogged
+pin is a threshold: at three times a pin's weight the ball still carries it, at five it is heavier than the ball and
+strikes fall from 53% to 34%. Kept, none moves the game by more than about 5 points; the champion draws one hex a try:
+16 to 17% across the two runs, inside the 15 to 25% band, and the finale's round with two 12 to 16%. A careful human,
+who is told the waterlogged pin before each frame and can move off a dried track or a heavy tide, wins more.
+
+### Umbral: the whole journey (#99, phase 7)
+
+`test/realm_umbral_journey_lab.py N TRIES` plays N journeys with the realm bot; each Crown winner then plays the whole
+Umbral: the Gatekeeper, then each sport's champion (its two guards first, Umbral card matches tried until beaten), each
+tried at most TRIES times while the gold lasts for the toll, rested by a lantern before every match; with all nine
+pieces, the Seal's three rounds, each tried at most TRIES times. Engine games are Simulated; card matches played by
+the bot. The target (issue #99): the Seal on about 5 to 15% of journeys that reach the Crown.
+
+| run (40 journeys) | Crown winners | forged the Seal | where most stopped |
+|---|---|---|---|
+| first, TRIES 10 | 26 | 0 (0%) | beaten by baseball (6), boxing (6), football (3); out of gold (7) |
+| boxing's card eased (undercard 2 points under, one hex), TRIES 15 | 29 | 2 (7%) | out of gold (14), boxing (4), football (4) |
+| and boxing's undercard 3 under, Brakka 1 under, curling's tier U bonus 0, TRIES 15 | 33 | **4 (12%)** | |
+
+Each champion's games won in the last run (all tries, all journeys): the Gatekeeper 44%, the Bone Diamond 22%, the
+Dead Pond 27%, the Cinder Pit 16%, the Drowned Lanes 15%, the Broken Ring 13%, the Hollow Links 12%, the Black Court
+10%, the Sunken Shed 10%; the guards 77%. The finale's rounds 0 to 67% on small numbers (a round of the Seal draws two
+hexes). Boxing's card of three (two bouts of three to win) was nearly unwinnable at full tier U for every bout (7%);
+curling's champion read 14% in its own lab but 4% in a real journey, and 10% with tier U's bonus at 0. Gold for the
+tolls is now a common place for a run to stop: the Seal is a long, expensive road, which is the point.
+
+
+**The champions' conditions (#99, after phase 8).** Vesper Gloam (basketball) and Sexton Vale (golf) now play only
+after dark (the journey lab waits for night, so it changes nothing there), and Vesper Quill (baseball) and Hollis Grael
+(hockey), the two easiest champions, want it won by two or more. `python3 test/realm_umbral_journey_lab.py 40 15`
+after: 29 Crown winners, the Seal forged by 4 (14%, against 12% before: inside the noise of 40 journeys). The margin
+made those two the hardest games in the Umbral: the Bone Diamond 22% to 10% a game, the Dead Pond 27% to 8% (a hockey
+game is low-scoring, so a two-goal margin is steep). The others as before, within the noise: the Gatekeeper 38%, the Cinder
+Pit 18%, the Black Court 17%, the Drowned Lanes 17%, the Hollow Links 9%, the Broken Ring 9%.

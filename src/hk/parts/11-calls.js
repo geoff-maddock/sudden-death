@@ -71,7 +71,7 @@ function hkCallsStart(o) {
   const ok = c => Object.fromEntries(Object.entries(c || {}).filter(([k, v]) => HK_CALL_T[k] && HK_CALL_T[k][v]));
   G.call = [0, 1].map(s => Object.assign({}, HK_CALL0, ok(o.calls && o.calls[s])));
   G.fixed = [0, 1].map(s => !!(o.calls && o.calls[s]));
-  G.skill = [0, 1].map(s => { const k = Array.isArray(o.skill) ? o.skill[s] : o.skill; return [0, 1, 2].includes(k) ? k : 1; });
+  G.skill = [0, 1].map(s => { const k = Array.isArray(o.skill) ? o.skill[s] : o.skill; return [0, 1, 2, 3].includes(k) ? k : 1; });
   G.scout = G.call.map(c => ({ att: c.att, n: 0 })); G.to = [HK_TO.n, HK_TO.n];
   G.sysLog = [0, 1].map(() => Object.fromEntries(Object.keys(HK_ATT).map(k => [k, { t: 0, sog: 0, g: 0 }])));
 }
@@ -120,6 +120,8 @@ const hkLate = share => G.p >= HK_RULES.periods && G.clock < G.plen * share, hkL
    ahead late: sit on it and clog the ice). An Archmage also looks at the other side's call and answers it. */
 function hkCpuCall(side) {
   const C = G.call[side], O = G.call[1 - side], sk = G.skill[side];
+  // (the Lich: 16-umbral.js)
+  if (sk === 3) return hkLichCall(side);
   if (sk === 0) {
     if (R() < .35) for (const k of Object.keys(HK_CALL_T)) C[k] = pick(Object.keys(HK_CALL_T[k]));
     return;

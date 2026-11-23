@@ -41,7 +41,7 @@ function wRinkCalls(force) {
   if (!box.querySelector('.wccrows')) box.innerHTML = '<div class="wccrows"></div><p class="hint wrnow" id="wRinkNow"></p><div class="wccnowbox"></div>';
   const you = wHK.you, C = wHK.calls, rk = JSON.stringify([C, wHK.strength()]);
   if (force || rk !== W_RINK_ROWKEY) { W_RINK_ROWKEY = rk; box.querySelector('.wccrows').innerHTML = wRinkCallRows(); $('wRinkNow').textContent = wRinkNowLine(); }
-  const to = wHK.to[you], pulled = wHK.pulled(you), ph = wHK.phase, whistle = ['dead', 'set', 'drop'].includes(ph), nk = [to, pulled, wHK.auto, whistle, ph === 'live', wHK.skillNames[wHK.G.skill[1 - you]]].join('|');
+  const to = wHK.to[you], pulled = wHK.pulled(you), ph = wHK.phase, whistle = ['dead', 'set', 'drop'].includes(ph), nk = [to, pulled, wHK.auto, whistle, ph === 'live', (wHK.skillNames[wHK.G.skill[1 - you]] || W_BALL_SKILL[wHK.G.skill[1 - you]])].join('|');
   if (force || nk !== box.dataset.now) {
     box.dataset.now = nk;
     box.querySelector('.wccnowbox').innerHTML = `<div class="wccrow"><span class="wccl">Bench</span>
@@ -49,7 +49,7 @@ function wRinkCalls(force) {
       <button class="ghost${wHK.auto ? ' on' : ''}" data-rbench="auto" aria-pressed="${wHK.auto}" title="Who changes your lines: the coach (when it is safe), or only you.">Lines: ${wHK.auto ? 'the coach' : 'you'}</button>
       <button class="ghost" data-rbench="timeout" ${to && whistle ? '' : 'disabled'} title="One a game, at a whistle: your skaters on the ice get their breath back. Most use after an icing, when a tired line may not change.">Timeout (${to} left)</button>
       <button class="ghost${pulled ? ' on' : ''}" data-rbench="pull" ${ph === 'live' ? '' : 'disabled'} aria-pressed="${!!pulled}" title="Take your goalie off for an extra skater, or send them back. The net is empty while they are off.">${pulled ? 'Goalie back' : 'Pull goalie'}</button>
-      <small class="hint">Their coach: ${esc(wHK.skillNames[wHK.G.skill[1 - you]])}.</small></div>`;
+      <small class="hint">Their coach: ${esc((wHK.skillNames[wHK.G.skill[1 - you]] || W_BALL_SKILL[wHK.G.skill[1 - you]]))}.</small></div>`;
   }
 }
 $('wRinkCalls').addEventListener('click', e => {

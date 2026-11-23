@@ -31,6 +31,8 @@ function glPlayStart(o) {
     mgr: { line: 'auto', ri: null }, line: o && o.line || null, autoPow: !(o && o.autoPow === false) };
   glDispSync();
   GD.msg = `${G.teams[0].name} against ${G.teams[1].name}, ${G.holes} holes of match play. ${G.teams[G.honour].name} have the honour on the 1st.`;
+  // (the Umbral's hexes, named over the first tee: 14-umbral.js)
+  if (G.hex) GD.msg += ` ${glHexLine()}.`;
 }
 // what is drawn: the hole and both balls, as they were before the shot in the air
 function glDispSync() { GD.disp = { h: G.h, balls: G.ball.map(b => Object.assign({}, b)), hole: glHoleNow(), wind: Object.assign({}, G.wind), match: glMatchText(0), st: G.hole.st.slice(), won: G.won.slice(), over: !!G.over }; }
@@ -93,6 +95,8 @@ const glFeet = n => `${n} ${n === 1 ? 'foot' : 'feet'}`;
 const glYards = d => d < 1 ? glFeet(Math.max(1, Math.round(d * 3))) : `${Math.round(d)} ${Math.round(d) === 1 ? 'yard' : 'yards'}`;
 function glShotSay(s, plan, d) {
   if (plan.putt) return `a putt from ${glYards(d)}`;
+  // (in the Grey Fog: the flag where it is seen)
+  if (G.hex && glHexFogged(s)) { const Hf = glHexSeen(glHoleNow(), s); d = hyp(G.ball[s].x - Hf.pin.x, G.ball[s].y - Hf.pin.y); return `${GL_CLUBS[plan.club].n.toLowerCase()} from the ${GL_TER[G.ball[s].lie] || 'fairway'}, about ${glYards(d)} to the flag in the fog`; }
   return `${GL_CLUBS[plan.club].n.toLowerCase()} from the ${GL_TER[G.ball[s].lie] || 'fairway'}, ${glYards(d)} to the pin`;
 }
 
@@ -156,10 +160,10 @@ function glHoleSay(ev) {
 }
 function glAimMsg() {
   const S = GD.sel; if (!S) return '';
-  const d = glDistOf(glHoleNow(), GD.you), who = glName(GD.you, S.ri), p = glPressure(GD.you);
+  const fog = !!G.hex && !S.putt && glHexFogged(GD.you), d = glDistOf(fog ? glHexSeen(glHoleNow(), GD.you) : glHoleNow(), GD.you), who = glName(GD.you, S.ri), p = glPressure(GD.you);
   const big = p ? `A stroke ${G.hole.st[GD.you] + 1 < G.hole.st[1 - GD.you] ? 'to win' : 'to halve'} the hole${p > 1 ? ', and a big one' : ''}: the ${S.putt ? 'bar runs quicker and wobbles' : 'meter runs quicker and the mark shakes'}, less for a steady nerve. ` : '';
   return big + (S.putt ? `${who} to putt, ${glYards(d)}. Aim with the arrows or a click on the green, then Space to start the stroke and Space again for the weight.`
-    : `${who} to hit, ${GL_CLUBS[S.club].n.toLowerCase()}, ${glYards(d)} to the pin. Space to start the swing, again for the power, again on the mark.`);
+    : `${who} to hit, ${GL_CLUBS[S.club].n.toLowerCase()}, ${fog ? `about ${glYards(d)} to the flag in the fog` : `${glYards(d)} to the pin`}. Space to start the swing, again for the power, again on the mark.`);
 }
 
 /* ---------- your shot: the choice ---------- */
@@ -325,11 +329,12 @@ function glStrike(s, S, sw) {
   const H = glHoleNow(), b = G.ball[s], rat = glRat(s, S.ri), from = { x: b.x, y: b.y };
   if (S.putt) {
     // (a drag pulled off the line starts the putt off line: + is left, as a hook; GL_HANDS.puttDeg of a degree a degree)
-    const fx = glFxFor(s), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK(), lip: fx.lip });
+    const fx = glFxFor(s), a = Math.atan2(S.aim.y - b.y, S.aim.x - b.x) + (sw.deg || 0) * GL_HANDS.puttDeg * Math.PI / 180, P = glPutt({ hole: H, from, a, v: glPuttSpeed(sw.pow), fk: glWetK(), lip: fx.lip, tilt: G.hex ? glHexTilt(s) : null });
     return Object.assign({ club: 'pt' }, P, P.water ? glWaterDrop(H, b, P.end) : {});
   }
-  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s), web = G.webbed && G.webbed[s] ? GL_ENCH.webK : 1;
-  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist * web, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, glFxFlight(fx, S.aim, b)));
+  const M = GL_STANCE[glStanceOf(s).mood], fx = glFxFor(s), web = G.webbed && G.webbed[s] ? GL_ENCH.webK : 1, ff = glFxFlight(fx, S.aim, b);
+  if (G.hex) ff.wind = glHexWind(s, ff.wind);
+  return glFlight(Object.assign({ hole: H, from, lie: b.lie, club: S.club, aim: S.aim, pow: sw.pow * M.dist * fx.dist * web, err: sw.err, spin: S.spin * M.shape, shape: S.shape, shapeK: M.shape, traj: S.traj, rat, fk: glWetK() }, ff));
 }
 function glStrikeMine(sw) {
   const S = GD.sel, s = GD.you;

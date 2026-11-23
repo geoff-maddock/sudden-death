@@ -27,15 +27,17 @@ const CR_SKILL = [
   { n: 'Archmage', ang: .22, hitAng: .36, v: .011, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0 }];
 const CR_SHOTS = { draw: 'a draw', guard: 'a guard', freeze: 'a freeze', takeout: 'a takeout', peel: 'a peel', hitroll: 'a hit and roll' };
 const CR_VAL = { left: .45, house: .22, cguard: .35, kguard: .4, hammer: .6 };
+// a skill's row: CR_SKILL's three, or the Umbral's Lich (skill 3, CR_LICH: 15-umbral.js)
+const crSk = sk => (sk ?? 1) >= 3 ? CR_LICH : CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
 // the ice the side's skip reads: an Archmage the ice as it is now, a Knight as it was when the end began (it has seen
 // the last end's stones), a Squire the fresh pebble on the day
 // (a Knight whose skip reads the ice well, CR_READ.now and up, sees it as it is now)
 const CR_READ = { now: .7 };
-const crIceRead = s => { const I = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)].ice, skip = G.order ? G.order[s][3] : 0;
+const crIceRead = s => { const I = crSk((G.skill || [])[s]).ice, skip = G.order ? G.order[s][3] : 0;
   return I === 'now' || (I === 'end' && crRat(s, skip).red >= CR_READ.now) ? G.ice : I === 'end' ? G.iceEnd || null : null; };
 // what the stones after a shot are worth to side s, kAfter stones into the end
 function crValue(stones, s, kAfter, hammer, sk) {
-  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
+  const R = crScoreEnd(stones), pts = R.s === s ? R.n : R.s === 1 - s ? -R.n : 0, S = crSk(sk);
   // (the end's last stone: what it does to the game, crEndValue in 11-call.js)
   if (kAfter >= crPerEnd()) { const next = R.s >= 0 ? 1 - R.s : hammer; return crEndValue(s, pts, next, sk); }
   const left = (crPerEnd() - kAfter) / crPerEnd(); let v = pts * (1 - CR_VAL.left * left);
@@ -65,11 +67,13 @@ function crShots(s, sk) {
   }
   // an Archmage also draws round the guards (behind each one, at the top of the house)
   if (sk >= 2) for (const g of st.filter(crInFgz)) draw('draw', g.x, Math.max(-60, g.y + 150));
+  // (and the Lich looks at more: 15-umbral.js)
+  if (sk >= 3) crLichShots(s, draw, hit);
   return out;
 }
 // side s's release of a shot: its aim, with the curler's miss (heading and weight)
 // (a hit's line is its own, and wider: a takeout at full weight misses by its line, where a draw misses by its weight)
-function crMiss(s, aim, shot) { const S = CR_SKILL[clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2)], k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
+function crMiss(s, aim, shot) { const S = crSk((G.skill || [])[s]), k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
 function crTry(s, aim) {
@@ -82,7 +86,7 @@ function crTry(s, aim) {
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
 // only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
 function crPlan(s, style, only) {
-  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 2), S = CR_SKILL[sk], kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
+  const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 3), S = crSk(sk), kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
   // (the lab's fixShot holds a side to one shot where it can be played)
   const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs && (!only || (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only)) : [], list = held.length ? held : only && kind.length ? kind : all;
   if (!list.length) return { shot: 'draw', x: 0, y: 0, h: 1, aim: { ang: 0, v: CR_AIM.vDraw, h: 1 }, why: 'the button', val: 0 };
@@ -94,7 +98,8 @@ function crPlan(s, style, only) {
   const top = list.slice(0, S.top);
   if (S.samples > 1) for (const c of top) { let sum = 0; for (let i = 0; i < S.samples; i++) sum += crValue(crTry(s, crMiss(s, c.aim, c.shot)), s, kAfter, G.hammer, sk); c.exp = sum / S.samples + sb(c); }
   // an Archmage plays its best few on against the other rink's likeliest reply (crReplyLikely), and weighs that in
-  if (sk >= 2) { const draws = crReplyDraws(s); for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - CR_CALL.replyMix) + (w + sb(c)) * CR_CALL.replyMix; } }
+  // (the Lich weighs them as the Archmage does: CR_LICH.replies and replyMix are kept at the Archmage's values)
+  if (sk >= 2) { const draws = crReplyDraws(s), mix = S.replyMix ?? CR_CALL.replyMix; for (const c of top) { const w = crReplyLikely(s, crTry(s, c.aim), kAfter, sk, draws); if (w !== null) c.exp = (c.exp ?? c.val) * (1 - mix) + (w + sb(c)) * mix; } }
   const best = top.slice().sort((a, b) => (b.exp ?? b.val) - (a.exp ?? a.val))[0];
   return Object.assign({}, best, { why: crWhy(best), reason: crReason(s, best) });
 }
@@ -106,8 +111,10 @@ function crWhy(c) {
 // further short, from the release (a Squire's a little later, sweepLate inches past the hack)
 function crSweeper(s, plan) {
   if (G.noSweep && G.noSweep[s]) return null;
+  // (the Lich's sweepers read the stone as it goes, a hit's line too: 15-umbral.js)
+  if (plan && G.skill[s] >= 3) return crLichSweeper(s, plan);
   if (!plan || !['draw', 'guard', 'freeze'].includes(plan.shot)) return null;
-  const S = CR_SKILL[G.skill[s]];
+  const S = crSk(G.skill[s]);
   return st => {
     if (st.y < CR_STONE.y0 + S.sweepLate) return 0;
     const v = Math.hypot(st.vx, st.vy), stopY = st.y + (st.vy / Math.max(v, 1e-6)) * v * v / (2 * CR_STONE.a * crIceAt(G.ice, st.x, st.y, G.cold));

@@ -120,14 +120,14 @@ function gfFumbleRisk(side) {
 // does this tackle knock the ball loose: c the carrier, d the tackler
 function gfFumbleRoll(c, d) {
   const F = L.fx || GF_FX0, worn = gfStamOf(G.poss, c.ri) < 50 ? 1.4 : 1;
-  const p = GF_FUM.base * F.fum * worn * gfFumMul(G.poss, G.teams[G.poss].roster[c.ri]) * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2);
+  const p = GF_FUM.base * F.fum * worn * gfFumMul(G.poss, G.teams[G.poss].roster[c.ri]) * clamp(1 + (d.r.tkl - c.r.str) * .06 + (6 - c.r.hnd) * .05, .4, 2) * gfHexFum(G.poss);
   return R() < p;
 }
 // the ball is out: the nearest players go for it, the defense likelier to come up with it; a defender may run it back
 function gfFumble(c, d) {
   gfEv('fumble', c.n, d.n);
   const near = side => gfNearest(c.x, c.y, L.pl.filter(p => p.side === side && p !== c && !(p.stun > 0)));
-  const [o, od] = near(0), [x, xd] = near(1), pd = clamp(GF_FUM.def + (od - xd) * .08, .3, .85);
+  const [o, od] = near(0), [x, xd] = near(1), pd = gfHexRecover(clamp(GF_FUM.def + (od - xd) * .08, .3, .85));
   const lost = !!x && (!o || R() < pd), rec = lost ? x : (o || c);
   let ret = 0;
   if (lost && R() < .55) ret = Math.round(-Math.log(Math.max(.02, R())) * (2 + rec.r.spd * .6));

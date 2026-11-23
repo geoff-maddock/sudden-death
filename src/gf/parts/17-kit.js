@@ -22,8 +22,8 @@ const GF_POTIONS = {
 };
 // (issue #61, phase 7: at 1.06 a full bag was worth about nothing; speed is worth the most on the field)
 const GF_HASTE = 1.1;
-// a CPU coach takes a potion worth this much (Knight, Archmage); a Squire, now and then, whatever comes first
-const GF_KIT = { take: [99, 4.5, 3.5], squire: .25 };
+// a CPU coach takes a potion worth this much (Knight, Archmage, Lich); a Squire, now and then, whatever comes first
+const GF_KIT = { take: [99, 4.5, 3.5, 3], squire: .25 };
 const GF_GX0 = Object.freeze({});
 // gear's effects, without the ratings (those are on r already)
 function gfGx(fx) { if (!fx) return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; return Object.keys(o).length ? o : null; }

@@ -23,7 +23,12 @@ earns.
 Part 5, gear and potions: by tier at an even level, four ways: plain (no gear, no potions); their bag only
 (W_RINK_KIT.opp[tier], as Simulate plays it now); both bags (yours a full one, KIT_MINE, given by your bench as a Knight
 would: a stand-in for giving them by hand in Play and Manage); and the full kit (both bags, and your six in gear: one
-piece each, the Bone Mask on your goalie). Writes /tmp/realm_rink_lab.json."""
+piece each, the Bone Mask on your goalie).
+Part 6, the Umbral (issue #99, phase 4e): their coach again, the Archmage beside the Lich (skill 3), at an even level on
+tier 2 ratings; tier 3 and tier U (W_HKG.oppBonus[4], the Lich, W_RINK_KIT.opp[4]) against a rival's six with their bag;
+then the Dead Pond's champion (the Nadir six at your level, the Lich, their full bag) with no hexes, each of hockey's
+hexes alone, and as PLAY draws them (W_NADIR.rink.hexes). Only this part: a third argument 'umbral'
+(python3 test/realm_rink_lab.py 300 '' umbral). Writes /tmp/realm_rink_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -65,6 +70,16 @@ window.HLAB = {
       us: g.score[0], them: g.score[1], win: g.win === 0, ot: g.ot || 0, so: !!g.so, ms: performance.now() - t0,
       sog: T.sog, sogA: U.sog, hit: T.hit, pen: pen(0), penA: pen(1), ppg: ppg(0), ppgA: ppg(1), take: T.take, blk: T.blk, casts: [0, 1].map(s => g.casts.filter(c => c.side === s).length),
       sta: on.length ? on.reduce((a, r) => a + r.sta, 0) / on.length * 100 : 0 };
+  },
+  // the champion's game: the Nadir six at your level, the Lich, their full bag, and these hexes ('draw': as PLAY draws them)
+  nadir(lvl, hx) {
+    HLAB.journey(lvl);
+    if (hx === 'draw') WG.umbral = { tries: { rink: Math.floor(Math.random() * 1e6) }, pieces: [], beaten: {} };
+    const opp = wUmbHkTeam(lvl), t0 = performance.now(), hexes = hx === 'draw' ? wUmbHkHexes('rink', W_NADIR.rink.hexes) : hx || [];
+    const g = wHK.simGame({ teams: [wRinkSquad(opp).team, opp], skill: wRinkSkill(4), mins: 6, pond: true, ordered: [true, false], bags: [null, Object.assign({}, W_RINK_KIT.opp[4])], hexes });
+    const T = g.box[0].tot, U = g.box[1].tot, pen = s => g.pens.filter(x => x.side === s).length;
+    return { hex: hx === 'draw' ? 'draw' : hexes.join('+') || 'none', us: g.score[0], them: g.score[1], win: g.win === 0, ot: g.ot || 0, so: !!g.so, ms: performance.now() - t0,
+      sog: T.sog, sogA: U.sog, pen: pen(0), penA: pen(1), used: g.pots.filter(x => x.side === 1).length };
   },
   cup(lvl) {
     HLAB.journey(lvl);
@@ -120,6 +135,8 @@ async def main():
         await pg.add_script_tag(content=LAB_JS)
         if PRE: await pg.evaluate(PRE + "\n;0")
         t0 = time.time()
+        if PARTS == ['umbral']:
+            await umbral(pg, errs, t0); await br.close(); return
         games, skills, nopow, onepow, calls, special, cups, kits = [], [], [], [], [], [], [], []
         if 'gaps' in PARTS:
             for gap in (-1, 0, 1, 2, 3):
@@ -231,5 +248,40 @@ async def main():
                 if not rs: continue
                 w = sum(g['win'] for g in rs); u = [sum(g['used'][s] for g in rs) / len(rs) for s in (0, 1)]
                 print(f"  {'tier ' + str(t) + ': ' + name:30s} {len(rs):5d}  {pct(w, len(rs))}   {sum(g['us'] for g in rs) / len(rs):.2f}-{sum(g['them'] for g in rs) / len(rs):.2f}            {u[0]:.1f}-{u[1]:.1f}")
+
+async def umbral(pg, errs, t0):
+    skills = []
+    for sk in (2, 3):
+        skills += await batch(pg, N, f"HLAB.game(3, 0, 2, {{ skill: {sk} }})")
+    tiers = []
+    for t in (3, 4):
+        rows = await batch(pg, N, f"HLAB.game(3, 0, {t}, {{ kit: 'theirs' }})")
+        for g in rows: g['row'] = f'tier {t}' if t < 4 else 'tier U'
+        tiers += rows
+    champ = await batch(pg, N, "HLAB.nadir(3, [])")
+    hexes = {}
+    for h in await pg.evaluate("Object.keys(wHK.hexes)"):
+        hexes[h] = await batch(pg, N, f"HLAB.nadir(3, ['{h}'])")
+    drawn = await batch(pg, N, "HLAB.nadir(3, 'draw')")
+    json.dump({'skills': skills, 'tiers': tiers, 'champ': champ, 'hexes': hexes, 'drawn': drawn}, open('/tmp/realm_rink_lab.json', 'w'))
+    print('override', PRE or '(none)', f' {time.time() - t0:.0f}s')
+    print('page errors', len(errs), errs[:2])
+    head = '                                     n    win    goals for-against'
+    print("\nthe Umbral (issue #99, 4e): your six at level 3, Simulate (your coach a Knight)"); print(head)
+    print('their coach, even level, tier 2 ratings, no bags')
+    for sk, name in ((2, 'Archmage'), (3, 'Lich')):
+        row(name, [g for g in skills if g['skill'] == sk])
+    print('by tier, even level, their bag only')
+    for r in ('tier 3', 'tier U'):
+        row(r + " (a rival's six)", [g for g in tiers if g['row'] == r])
+    row('tier U: the Nadir six', champ)
+    print("each hex alone on the champion's game (tier U, the Nadir six), against none")
+    print(head + '    shots  theirs  pens  theirs')
+    w0 = sum(g['win'] for g in champ) / len(champ)
+    m = lambda rs, k: sum(g[k] for g in rs) / len(rs)
+    for h, rs in [('none', champ)] + list(hexes.items()):
+        w1 = sum(g['win'] for g in rs) / len(rs)
+        print(f"  {h:30s} {len(rs):5d}  {pct(sum(g['win'] for g in rs), len(rs))}   {m(rs, 'us'):.2f}-{m(rs, 'them'):.2f}     {m(rs, 'sog'):5.1f}  {m(rs, 'sogA'):5.1f}  {m(rs, 'pen'):4.2f}  {m(rs, 'penA'):4.2f}" + ('' if h == 'none' else f"   swing {100 * (w1 - w0):+5.1f}"))
+    row(f"the champion, {await pg.evaluate('W_NADIR.rink.hexes')} drawn", drawn)
 
 asyncio.run(main())

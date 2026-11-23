@@ -140,7 +140,8 @@ function playerTurnStart() {
   const sw = sv(P, 'sweat') ? 1 : 0; if (sw) addSt(P, 'sweat', -1);
   const soak = sv(P, 'soaked') ? 1 : 0; if (soak) addSt(P, 'soaked', -1);
   sportTurnBegin();
-  let n = TUNE.draw + diffOf(RUN).draw + sw - soak + sportDrawBonus() + sv(P, 'drawnext') + mod('draw');
+  // (B.drawMod: a match's own draw, set by whoever starts it, e.g. a harder kind of match in the Realm)
+  let n = TUNE.draw + diffOf(RUN).draw + (B.drawMod || 0) + sw - soak + sportDrawBonus() + sv(P, 'drawnext') + mod('draw');
   delete P.st.drawnext;
   drawCards(n);
   // three strikes in hand: you're struck out

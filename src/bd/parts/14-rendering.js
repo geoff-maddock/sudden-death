@@ -1104,7 +1104,10 @@ function drawScoreboard(c) {
     manaGems(c, 142, y - 8, t.mana, t);
     txt(c, String(t.R), 260, y + 1, F_HUD(32), COL.bone, 'right');
   });
-  if (AUTO && G.teams.some(isHuman)) { c.font = F_HUD(15); const lbl = 'AUTO POWERS · T', tw = c.measureText(lbl).width + 16; rr(c, 10, 98, tw, 20, 10); c.fillStyle = 'rgba(168,140,255,.22)'; c.fill(); c.strokeStyle = 'rgba(168,140,255,.6)'; c.lineWidth = 1; c.stroke(); txt(c, lbl, 18, 113, F_HUD(15), '#d6c4ff'); }
+  let py = 98;
+  if (AUTO && G.teams.some(isHuman)) { c.font = F_HUD(15); const lbl = 'AUTO POWERS · T', tw = c.measureText(lbl).width + 16; rr(c, 10, 98, tw, 20, 10); c.fillStyle = 'rgba(168,140,255,.22)'; c.fill(); c.strokeStyle = 'rgba(168,140,255,.6)'; c.lineWidth = 1; c.stroke(); txt(c, lbl, 18, 113, F_HUD(15), '#d6c4ff'); py += 24; }
+  // the hexes on this game, one pill each, under the score
+  if (G.hx) for (const k of G.rules.hexes) { c.font = F_HUD(15); const lbl = 'HEX · ' + HEXES[k].name.toUpperCase(), tw = c.measureText(lbl).width + 16; rr(c, 10, py, tw, 20, 10); c.fillStyle = 'rgba(120,40,90,.55)'; c.fill(); c.strokeStyle = 'rgba(214,120,200,.7)'; c.lineWidth = 1; c.stroke(); txt(c, lbl, 18, py + 15, F_HUD(15), '#f0c8ff'); py += 24; }
 }
 function drawCount(c) {
   const px = W - 206, pw = 196;

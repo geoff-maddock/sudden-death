@@ -135,7 +135,8 @@ function glWaterDrop(H, from, wet) {
 }
 
 /* a putt (or the run of a ball on the green). p: { hole, from, a (angle), v (yards a second), slopeK (a read: 1 is
-   the true slope), noCup, fk (the green's friction: 1 dry, more when soft) }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
+   the true slope), noCup, fk (the green's friction: 1 dry, more when soft), tilt ([x, y] grade on top of the slope,
+   that no read sees: the Restless Green, 14-umbral.js) }. Returns { end, lie, holed, lip, path, t, cross } (cross: how far left (+) or right of the cup
    it passed, on the line through the cup square to the putt; null if it never got there) */
 function glPutt(p) {
   const H = p.hole, pin = H.pin, P = GL_PUTT, k = p.slopeK == null ? 1 : p.slopeK;
@@ -146,7 +147,7 @@ function glPutt(p) {
   const res = o => Object.assign(o, { cross });
   for (let i = 0, t = 0; i < 3000; i++, t += P.dt) {
     const sp = hyp(vx, vy), fr = (p.fk || 1) * (lie === 'G' ? P.fric : lie === 'F' || lie === 'T' ? P.fric * P.fringe : P.fric * P.rough);
-    const sl = lie === 'G' ? glSlope(H, x, y) : [0, 0], gx = sl[0] * P.g * k, gy = sl[1] * P.g * k;
+    const sl = lie === 'G' ? glSlope(H, x, y) : [0, 0], tl = lie === 'G' && p.tilt ? p.tilt : null, gx = sl[0] * P.g * k + (tl ? tl[0] * P.g : 0), gy = sl[1] * P.g * k + (tl ? tl[1] * P.g : 0);
     if (sp < 0.03 && hyp(gx, gy) < fr) return res({ end: { x, y }, lie, holed: false, lip, path, t });
     const ax = gx - (sp ? vx / sp : 0) * fr, ay = gy - (sp ? vy / sp : 0) * fr;
     const nx = x + vx * P.dt, ny = y + vy * P.dt;

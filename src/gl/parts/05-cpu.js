@@ -165,7 +165,11 @@ function glLayTarget(H, b, reach, careful, rollFrac) {
 
 // the shot for side s, hit by ri: { ri, kind, club, aim, pow, spin } or a putt { ri, kind, putt: true, a, v }
 function glPlan(s, riIn, lineIn) {
-  const H = glHoleNow(), b = G.ball[s], sk = G.skill[s], kind = glShotKind(H, s), ri = riIn == null ? glPickHitter(s, kind) : riIn, rat = glRat(s, ri);
+  const H0 = glHoleNow(), b = G.ball[s], sk = G.skill[s], kind = glShotKind(H0, s), ri = riIn == null ? glPickHitter(s, kind) : riIn, rat = glRat(s, ri);
+  // (in the Grey Fog a side plays to the flag where it sees it, off the green: 14-umbral.js)
+  const H = G.hex && kind !== 'putt' ? glHexSeen(H0, s) : H0;
+  // (the Lich weighs every line and plays the best: 14-umbral.js; null when it goes for everything, behind late)
+  if (sk >= 3 && !GL_LINES[lineIn] && !(G.fixLine && G.fixLine[s])) { const L = glLichPlan(s, ri, H, b, kind); if (L) return L; }
   const line = GL_LINES[lineIn] ? lineIn : G.fixLine && G.fixLine[s] ? G.fixLine[s] : glCpuLine(s), word = !!(G.wordOn && G.wordOn[s]);
   if (kind === 'putt') {
     // (the caddie's word: read without error)

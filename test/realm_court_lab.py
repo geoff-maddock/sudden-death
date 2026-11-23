@@ -22,7 +22,13 @@ earns.
 Part 5, gear and potions: by tier at an even level, four ways: plain (no gear, no potions); their bag only
 (W_COURT_KIT.opp[tier], as Simulate plays it now); both bags (yours a full one, KIT_MINE, given by your bench as a
 Knight would: a stand-in for giving them by hand in Play and Manage); and the full kit (both bags, and your five in
-gear, KIT_GEAR: one piece each, round the squad). Writes /tmp/realm_court_lab.json."""
+gear, KIT_GEAR: one piece each, round the squad).
+Part 6, the Umbral (issue #99, phase 4d), only when asked for (python3 test/realm_court_lab.py 400 '' umbral): their
+coach again, the Archmage beside the Lich (skill 3), at tier 2 ratings with no bags; tier U (tier 4: W_BKG.oppBonus[4],
+the Lich, their full bag W_COURT_KIT.opp[4]) at an even level against a rival's five, beside tier 3; the Black Court's
+Nadir five (wUmbBkTeam, the champion's game without hexes); each basketball hex alone against none on the champion's
+game (no single hex should swing it by more than about 10 points); and the champion's game as played, with
+W_NADIR.court.hexes drawn at random. Writes /tmp/realm_court_lab.json."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -61,6 +67,16 @@ window.CLAB = {
     return { kit: o.kit || 'plain', used: [0, 1].map(s => wBK.pots().filter(x => x.side === s).length), gap, tier, skill: sk[1], powers: o.powers !== false, call: o.call || null,
       us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ot: g.ot || 0, ms: performance.now() - t0,
       tov: T.tov, stl: T.stl, blk: T.blk, pf: T.pf, fga: T.fga, tpa: T.tpa, reb: T.reb, stam: on[0].reduce((a, ri) => a + st[0][ri], 0) / on[0].length };
+  },
+  // the champion's game: the Nadir five at your level, the Lich, their full bag, and these hexes ('draw': as PLAY draws them)
+  nadir(lvl, hx) {
+    CLAB.journey(lvl);
+    if (hx === 'draw') WG.umbral = { tries: { court: Math.floor(Math.random() * 1e6) }, pieces: [], beaten: {} };
+    const opp = wUmbBkTeam(lvl), t0 = performance.now(), hexes = hx === 'draw' ? wUmbBkHexes('court', W_NADIR.court.hexes) : hx || [];
+    const g = wBK.simGame({ teams: [wCourtSquad(opp).team, opp], skill: wCourtSkill(4), mins: 5, court: true, ordered: [true, false], bags: [null, Object.assign({}, W_COURT_KIT.opp[4])], hexes });
+    const T = g.box[0].tot;
+    return { hex: hx === 'draw' ? 'draw' : hexes.join('+') || 'none', us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ot: g.ot || 0, ms: performance.now() - t0,
+      tov: T.tov, fga: T.fga, fgm: T.fgm, fta: T.fta, ftm: T.ftm, shadows: (wBK.hex() || {}).shadows || 0 };
   },
   cup(lvl) {
     CLAB.journey(lvl);
@@ -114,6 +130,8 @@ async def main():
         await pg.add_script_tag(content=LAB_JS)
         if PRE: await pg.evaluate(PRE + "\n;0")
         t0 = time.time()
+        if 'umbral' in PARTS:
+            await umbral(pg, errs, t0); await br.close(); return
         games, skills, nopow, calls, cups, kits = [], [], [], [], [], []
         if 'gaps' in PARTS:
             for gap in (-1, 0, 1, 2, 3):
@@ -201,5 +219,43 @@ async def main():
                 if not rs: continue
                 w = sum(g['win'] for g in rs); tt = sum(g['tie'] for g in rs); u = [sum(g['used'][s] for g in rs) / len(rs) for s in (0, 1)]
                 print(f"  {'tier ' + str(t) + ': ' + name:28s} {len(rs):5d}  {pct(w, len(rs))}  {pct(tt, len(rs))}   {sum(g['us'] for g in rs) / len(rs):.1f}-{sum(g['them'] for g in rs) / len(rs):.1f}            {u[0]:.1f}-{u[1]:.1f}")
+
+async def umbral(pg, errs, t0):
+    skills = []
+    for sk in (2, 3):
+        skills += await batch(pg, N, f"CLAB.game(3, 0, 2, {{ skill: {sk} }})")
+    tiers = []
+    for t in (3, 4):
+        rows = await batch(pg, N, f"CLAB.game(3, 0, {t}, {{ kit: 'theirs' }})")
+        for g in rows: g['row'] = f'tier {t}' if t < 4 else 'tier U'
+        tiers += rows
+    champ = await batch(pg, N, "CLAB.nadir(3, [])")
+    hexes = {}
+    for h in await pg.evaluate("Object.keys(wBK.hexes)"):
+        hexes[h] = await batch(pg, N, f"CLAB.nadir(3, ['{h}'])")
+    drawn = await batch(pg, N, "CLAB.nadir(3, 'draw')")
+    json.dump({'skills': skills, 'tiers': tiers, 'champ': champ, 'hexes': hexes, 'drawn': drawn}, open('/tmp/realm_court_lab.json', 'w'))
+    print('override', PRE or '(none)', f' {time.time() - t0:.0f}s')
+    print('page errors', len(errs), errs[:2])
+    head = '                                   n    win    tie   points for-against'
+    print("\nthe Umbral (issue #99, 4d): your five at level 3, Simulate (your coach a Knight)"); print(head)
+    print('their coach, even level, tier 2 ratings, no bags')
+    for sk, name in ((2, 'Archmage'), (3, 'Lich')):
+        row(name, [g for g in skills if g['skill'] == sk])
+    print('by tier, even level, their bag only')
+    for r in ('tier 3', 'tier U'):
+        row(r + " (a rival's five)", [g for g in tiers if g['row'] == r])
+    row('tier U: the Nadir five', champ)
+    print("each hex alone on the champion's game (tier U, the Nadir five), against none")
+    m = lambda rs, k: sum(g[k] for g in rs) / len(rs)
+    ft = lambda rs: f"{100 * sum(g['ftm'] for g in rs) / max(1, sum(g['fta'] for g in rs)):.0f}%"
+    fg = lambda rs: f"{100 * sum(g['fgm'] for g in rs) / max(1, sum(g['fga'] for g in rs)):.0f}%"
+    row('no hex', champ)
+    print(f"  {'':28s}       your FG {fg(champ)}, FT {ft(champ)}, turnovers {m(champ, 'tov'):.1f}")
+    w0 = sum(g['win'] for g in champ) / len(champ)
+    for h, rs in hexes.items():
+        w1 = sum(g['win'] for g in rs) / len(rs)
+        row(h, rs); print(f"  {'':28s}       swing {100 * (w1 - w0):+5.1f} points; your FG {fg(rs)}, FT {ft(rs)}, turnovers {m(rs, 'tov'):.1f}, shadows {m(rs, 'shadows'):.1f}")
+    row(f"the champion, {await pg.evaluate('W_NADIR.court.hexes')} drawn", drawn)
 
 asyncio.run(main())

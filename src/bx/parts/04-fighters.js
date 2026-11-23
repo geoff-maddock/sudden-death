@@ -6,7 +6,9 @@
    A fighter in the ring, plain JSON: { side, n, kind, num, r, style, x, y, hp, hpMax, sta, staMax, a, mv, plan, ... }.
    hp falls when they're hit and zero is a knockdown; big shots also lower hpMax, the most they can get back, so each
    knockdown comes easier than the last. sta pays for punches and comes back off the gas. a is what they're doing now
-   ({ k, t, dur, hitAt, id }), mv where they want to move. */
+   ({ k, t, dur, hitAt, id }), mv where they want to move.
+   A Nadir fighter (issue #99, phase 4c) may bring three things more, all plain JSON: umb (their umbral form: drawn in
+   shadow), pw (their own powers, { sp, ult }, in place of their kind's) and tr (their own nature, in place of their kind's). */
 const BX_STATS = ['reach', 'pow', 'spd', 'chin', 'sta', 'gui'];
 const BX_KIND = {
   goblin: [4, 5, 8, 4, 7, 8], kobold: [4, 5, 7, 5, 8, 7], werewolf: [6, 8, 8, 4, 6, 4], dwarf: [3, 7, 4, 7, 7, 5],
@@ -41,19 +43,24 @@ const BX_TRAIT = {
   ogre:     { n: 'Heavy Breather', desc: 'Gets its breath back a little more slowly.', regen: .92 },
   zombie:   { n: 'Rotting', desc: 'Big shots take more off the most health it can get back.', rot: 1.6 },
 };
-const bxTrait = f => BX_TRAIT[f.kind] || null;
+// (a fighter may bring a nature of its own, f.tr: a Nadir champion's, issue #99)
+const bxTrait = f => f.tr || BX_TRAIT[f.kind] || null;
 const BX_HP = 100;
 const bxStaMax = r => Math.round(68 + r.sta * 4.5); // the most stamina a fighter has, from their stamina rating
 /* the fighter for side from { n, kind, num, r?, style?, lvl?, rec? } (r: ratings to lay over the kind's; style: a plan
    to box to; lvl and rec, their level and record { bb, w, l, d, ko }, only for the intro to show) */
 function bxFighter(p, side) {
   const r = Object.assign(bxRate(p.kind), p.r || {}), staMax = bxStaMax(r), style = BX_PLAN[p.style] ? p.style : bxStyle(r);
-  return { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
+  const f = { side, n: p.n || p.kind, kind: p.kind, num: p.num ?? '', r, style, plan: style, lvl: p.lvl || 0, rec: p.rec ? JSON.parse(JSON.stringify(p.rec)) : null,
     x: side ? 5 : -5, y: side ? 1 : -1, hp: BX_HP, hpMax: BX_HP, sta: staMax, staMax, patches: BX_RULES.patches,
     // gear (13-kit.js): its name, and what it does beyond the ratings (already laid on r)
     gear: p.gear && p.gear.name ? p.gear.name : null, gx: p.gear && p.gear.fx ? JSON.parse(JSON.stringify(Object.assign({}, p.gear.fx, { r: undefined }))) : null,
     a: { k: 'idle', t: 0, dur: 0, hitAt: 0, id: 0 }, mv: [0, 0], think: 0, seen: -1, ctr: 0, n2: 0, fx: [], spUsed: 0, ultUsed: false, spPick: p.sp === 'sp2' ? 'sp2' : 'sp', spirit: BX_SPIRIT.start,
     rs: bxStatsZero(), bs: bxStatsZero() };
+  if (p.umb) f.umb = 1;
+  if (p.pw) f.pw = JSON.parse(JSON.stringify(p.pw));
+  if (p.tr) f.tr = JSON.parse(JSON.stringify(p.tr));
+  return f;
 }
 // a round's (rs) or bout's (bs) work: punches thrown and landed, power punches landed, damage done, defense as the
 // judges count it (a slip 1, a block half), punches slipped and blocked, seconds pressing forward, clinches started,

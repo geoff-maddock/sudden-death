@@ -11,6 +11,7 @@ title Champions of the Realm
 style src/realm/w0.css
 style src/realm/w6.css
 style src/realm/w9.css
+style src/realm/umbral/u.css
 
 src/realm/w1-data.js
 src/realm/w2-maps.js
@@ -180,3 +181,20 @@ src/realm/w136-petctx.js
 src/realm/w137-petrivals.js
 src/realm/w112-quickstart.js
 src/realm/w138-petfeel.js
+src/realm/umbral/u0-core.js
+src/realm/umbral/u1-event.js
+src/realm/umbral/u2-world.js
+src/realm/umbral/u3-monsters.js
+src/realm/umbral/u4-grounds.js
+src/realm/umbral/u4a-baseball.js
+src/realm/umbral/u4b-football.js
+src/realm/umbral/u4c-boxing.js
+src/realm/umbral/u4d-basketball.js
+src/realm/umbral/u4e-hockey.js
+src/realm/umbral/u4f-golf.js
+src/realm/umbral/u4g-bowling.js
+src/realm/umbral/u4h-curling.js
+src/realm/umbral/u4i-conds.js
+src/realm/umbral/u5-finale.js
+src/realm/umbral/u6-rewards.js
+src/realm/umbral/u7-feel.js

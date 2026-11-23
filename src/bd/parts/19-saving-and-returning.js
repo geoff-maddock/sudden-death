@@ -118,7 +118,7 @@ function snapGame() {
     v: 1, mode: G.mode, innings: G.innings, diff: G.diff, rules: G.rules, humanSide: G.teams.findIndex(t => t.ctl !== 'cpu'),
     defs: G.teams.map(t => { const d = { ...t.def, roster: t.def.roster.map(reg) }; delete d.pen; return d; }),
     teams: G.teams.map(t => ({ ctl: t.ctl, mana: t.mana, idx: t.idx, line: t.line, R: t.R, H: t.H, devourUsed: t.devourUsed, ultUsed: t.ultUsed || {}, pen: t.pen.map(reg), used: t.used.map(reg) })),
-    players, full: G.full || [], sky: [G.abN || 0, G.moon0 || 0, G.star0 || 0], inning: G.inning, half: G.half, outs: G.outs, balls: G.balls, strikes: G.strikes, bases: G.bases.map(reg), log: G.log.slice(0, 40), pstats: pst,
+    players, full: G.full || [], sky: [G.abN || 0, G.moon0 || 0, G.star0 || 0], inning: G.inning, half: G.half, outs: G.outs, balls: G.balls, strikes: G.strikes, bases: G.bases.map(reg), log: G.log.slice(0, 40), pstats: pst, hx: G.hx ? { ...G.hx } : undefined,
   };
 }
 function seasonLiveSave() {
@@ -139,6 +139,7 @@ function resumeSnap(sn, season) {
   G.teams = sn.teams.map((t, i) => ({ ...t, def: { ...sn.defs[i], roster: sn.defs[i].roster.map(P), pen: [] }, pen: t.pen.map(P), used: t.used.map(P) }));
   G.pstats = new Map(sn.pstats.map(([i, s]) => [P(i), Object.assign(blankLine(), s)])); G.committed = false; G.starters = G.teams.map(t => t.def.roster.find(p => p.pos === 'P')); for (const t of G.teams) attachGear(t); if (sn.sky) { [G.abN, G.moon0, G.star0] = sn.sky; } else if (typeof skyStart === 'function') skyStart(); if (typeof skyApply === 'function') skyApply(); if (typeof takeStart === 'function') takeStart();
   G.inning = sn.inning; G.half = sn.half; G.outs = sn.outs; G.balls = sn.balls; G.strikes = sn.strikes; G.bases = sn.bases.map(P);
+  G.hx = G.rules.hexes && G.rules.hexes.length ? { ...(sn.hx || {}) } : null;
   G.log = sn.log || []; G.full = sn.full || G.log.slice().reverse(); G.archived = false; G.gameId = null; G.rolls = []; G.fx = []; G.slow = 0; G.shake = 0; G.hitstop = 0;
   renderLog(); renderLineScore(); if (typeof renderReadout === 'function') renderReadout();
   G.P = null; startPitch(true);

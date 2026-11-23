@@ -54,7 +54,7 @@ function gfSnap(oc, dc, st) {
     if (p.job === 'zone') p.spot = (D.zone && D.zone[k]) || GF_DEF_SET[k];
   }
   L = { oc, dc, t: 0, pl, id, did, ball: { st: 'held', h: id.QB, x: pl[id.QB].x, y: 0, z: 1, fx: 0, fy: 0, tx: 0, ty: 0, bt: 0, T: 0, tgt: -1 },
-    carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: GF_RULES.field - G.ball, back: G.ball, ev: [],
+    carrier: id.QB, thrown: false, handed: false, done: null, broken: 0, gap: (R() < .5 ? -1 : 1) * (1 + R() * 2.5), toGoal: gfGoal() - G.ball, back: G.ball, ev: [],
     // Play mode (11-play.js): your keys for this play, and the stiff-arm
     read: (st && st.read) || 0, tell: (st && st.tell) || 0,
     hands: gfHands(), ctl: { steer: null, hold: null, tgt: -1, picked: false }, arm: 0, armUsed: false };

@@ -17,7 +17,7 @@
 const CR_CALL = { win: 4, xend: 1, replies: 4, replyMix: .3, read: 96 };
 // what the end ending this way is worth to side s: pts (theirs, signed), the hammer next end
 function crEndValue(s, pts, next, sk) {
-  const S = CR_SKILL[clamp((sk ?? 1) | 0, 0, 2)];
+  const S = crSk(sk);
   if (S.hammer && G.end >= G.ends - 1) {
     const m = crTotal(s) - crTotal(1 - s) + pts;
     return m > 0 ? CR_CALL.win + m * .05 : m < 0 ? -CR_CALL.win + m * .05 : next === s ? CR_CALL.xend : -CR_CALL.xend;
@@ -36,8 +36,8 @@ function crReplyLikely(s, after, kAfter, sk, draws) {
     const R = CR_SHEET.stoneR, ice = crIceRead(o);
     // (a takeout of each of side s's nearest stones, CR_CALL.replies - 2 of them, by whichever handle does it better for
     // the other rink; and always their draws to the button)
-    const v = aim => crValue(crTry(o, aim), s, kAfter + 1, G.hammer, sk), vals = [];
-    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, Math.max(0, CR_CALL.replies - 2))) {
+    const v = aim => crValue(crTry(o, aim), s, kAfter + 1, G.hammer, sk), vals = [], reps = crSk(sk).replies ?? CR_CALL.replies;
+    for (const st of after.filter(b => b.s === s && crInHouse(b)).sort((a, b) => crDist(a) - crDist(b)).slice(0, Math.max(0, reps - 2))) {
       const both = [1, -1].map(h => crSolveHit(st.x, st.y - R * 1.6, CR_AIM.vHit, h, ice, G.cold)).filter(Boolean).map(v); if (both.length) vals.push(Math.min(...both)); }
     for (const aim of draws || crReplyDraws(s)) vals.push(v(aim));
     if (!vals.length) return null;

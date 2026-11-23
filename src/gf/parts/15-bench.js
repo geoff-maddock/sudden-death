@@ -6,12 +6,12 @@
      between plays), and so do a few powers (14-powers.js: rest, restZ; gfPowRest).
    - The coaches swap too (gfCpuSwaps, once a call and before any kick, by skill): a Squire now and then, for anyone fresher; a Knight a
      player under 40, for the freshest who would play those positions at least as well now (gfPlaysAs: the ratings the
-     positions use, worn by stamina); an Archmage a player under 55, for whoever would play them best, and only if
+     positions use, worn by stamina); an Archmage a player under 55 (a Lich under 60), for whoever would play them best, and only if
      better. Never for someone less than GF_SWAP.gap fresher.
    - The log: every swap, potion and power that gives stamina back waits in GD.notes ({ side, k, msg }) and goes in the
      next play's log line (gfTakeNotes: e.notes), with the powers cast (e.pw, 08-drive.js).
    G.played[side]: every roster index that has taken the field (the Realm pays them as the seven). */
-const GF_SWAP = { gap: 25, lim: [30, 40, 55], squire: .3 };
+const GF_SWAP = { gap: 25, lim: [30, 40, 55, 60], squire: .3 };
 // the ratings each position leans on (the coaches weigh a swap by them)
 const GF_POS_KEY = { QB: ['arm'], RB: ['spd', 'str'], C: ['str'], LG: ['str'], RG: ['str'], X: ['spd', 'hnd'], Z: ['spd', 'hnd'],
   DT: ['str', 'tkl'], DL: ['str', 'tkl'], DR: ['str', 'tkl'], CL: ['spd'], CR: ['spd'], LB: ['tkl', 'spd'], S: ['spd', 'tkl'] };
@@ -78,9 +78,9 @@ function gfCpuSwaps(side, skill) {
   for (const out of gfOnField(side).sort((a, b) => gfStamOf(side, a) - gfStamOf(side, b))) {
     if (gfStamOf(side, out) >= lim) break;
     let bench = gfBench(side).filter(i => gfStamOf(side, i) >= gfStamOf(side, out) + GF_SWAP.gap);
-    if (skill >= 1) { const now = gfPlaysAs(side, out, out); bench = bench.filter(i => skill === 2 ? gfPlaysAs(side, i, out) > now * 1.02 : gfPlaysAs(side, i, out) >= now); }
+    if (skill >= 1) { const now = gfPlaysAs(side, out, out); bench = bench.filter(i => skill >= 2 ? gfPlaysAs(side, i, out) > now * 1.02 : gfPlaysAs(side, i, out) >= now); }
     if (!bench.length) continue;
-    const inn = skill === 2 ? bench.sort((a, b) => gfPlaysAs(side, b, out) - gfPlaysAs(side, a, out))[0] : skill === 1 ? bench.sort((a, b) => gfStamOf(side, b) - gfStamOf(side, a))[0] : pick(bench);
+    const inn = skill >= 2 ? bench.sort((a, b) => gfPlaysAs(side, b, out) - gfPlaysAs(side, a, out))[0] : skill === 1 ? bench.sort((a, b) => gfStamOf(side, b) - gfStamOf(side, a))[0] : pick(bench);
     gfSwap(side, out, inn);
   }
 }

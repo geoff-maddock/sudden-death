@@ -43,7 +43,8 @@ function bkCoachSubs(side, brk) {
     // a rested starter back in at a break
     const st0 = G.starters[side][k];
     if (brk && out !== st0 && bench.includes(st0) && G.stam[side][st0] >= BK_STAM.back) return bkSubDo(side, out, st0, 'back');
-    if (G.stam[side][out] >= BK_STAM.sub) return;
+    // (a Lich's coach takes a tiring player off sooner, 16-umbral.js)
+    if (G.stam[side][out] >= (!mine && G.skill[side] === 3 ? BK_LICH.sub : BK_STAM.sub)) return;
     const fresh = bench.filter(i => G.stam[side][i] >= BK_STAM.fresh);
     if (!fresh.length) return;
     const inn = mine ? fresh[0] : fresh.sort((a, b) => bkFit(T.roster[b].r, pos) - bkFit(T.roster[a].r, pos))[0];

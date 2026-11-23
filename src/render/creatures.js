@@ -24,6 +24,8 @@ function rgbOf(h) {
   const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255];
 }
 function tint(h, f) { const [r, g, b] = rgbOf(h), t = f < 0 ? 0 : 255, k = Math.abs(f); return `rgb(${Math.round(r + (t - r) * k)},${Math.round(g + (t - g) * k)},${Math.round(b + (t - b) * k)})`; }
+// a figure drawn in shadow (o.shade): drained, darkened, turned toward violet, with pale eyes that glow
+function shadeOf(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, m = (v, k) => Math.max(0, Math.min(255, Math.round((v + (l - v) * .6) * .55 + k))); return `rgb(${m(r, 20)},${m(g, 8)},${m(b, 30)})`; }
 function grey(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, v = Math.round(92 + l * .42); return `rgb(${v},${v},${v - 4})`; }
 function pRR(x, y, w, h, r) { const p = new Path2D(); r = Math.min(r, w / 2, h / 2); p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + h, r); p.arcTo(x + w, y + h, x, y + h, r); p.arcTo(x, y + h, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); return p; }
 function pEl(x, y, rx, ry, rot = 0) { const p = new Path2D(); p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); return p; }
@@ -496,15 +498,15 @@ function torsoPath(d, K) {
 }
 
 function drawFig(c, kind, x, y, hpx, team, o = {}) {
-  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone;
-  const C = v => st ? grey(v) : v;
+  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone, sh = !st && !!o.shade;
+  const C = v => st ? grey(v) : sh ? shadeOf(v) : v;
   const hunch = K.hunch ? 6 : 0, shY = -70 + hunch, hipY = -36;
   const shw = 17 * w * (kind === 'ogre' ? .9 : 1);
   const hy = kind === 'ogre' ? -80 : kind === 'golem' ? -80 : -83 + hunch * 1.4;
   const hr = kind === 'ogre' ? 11 : kind === 'minotaur' ? 14 : 12.5;
   const B = BODY[kind] || {};
   const d = {
-    o, C, st, w, shY, shw, hy, hr, kind, eye: K.eye, skin: C(K.skin), jer: C(team.color), jerD: C(tint(team.color, -.38)), trimL: C(team.light || '#fff'),
+    o, C, st, w, shY, shw, hy, hr, kind, eye: sh ? '#c8fff0' : K.eye, skin: C(K.skin), jer: C(team.color), jerD: C(tint(team.color, -.38)), trimL: C(team.light || '#fff'),
     teamColor: team.color, letter: (team.short || '?')[0], pants: C('#e4dbc6'), armC: C(K.bony ? '#ebe5d2' : K.skin), bony: K.bony, robe: K.robe ? C(K.robe) : null, B,
   };
   c.save(); c.translate(x, y); c.scale(o.flip ? -s : s, s);

@@ -13,3 +13,5 @@ src/gl/parts/10-powers.js
 src/gl/parts/11-enchant.js
 src/gl/parts/12-kit.js
 src/gl/parts/13-inspect.js
+# the Umbral (issue #99, phase 4f): the Lich (skill 3), the hexes, a champion's own ultimate
+src/gl/parts/14-umbral.js

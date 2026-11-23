@@ -39,10 +39,10 @@ function hkStart(opts) {
   G.sta = G.teams.map(t => t.roster.map(() => 1)); G.ordered = [0, 1].map(s => !!(o.ordered && o.ordered[s]));
   for (const s of [0, 1]) for (const i of G.on[s]) G.stat[s][i].sh = 1;
   GD = { mode: ['play', 'manage'].includes(o.mode) ? o.mode : 'watch', you: o.you === 1 ? 1 : 0 };
-  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkFansStart(o.fans); G.crowd = engCrowd(o); hkKitStart(o.bags);
+  hkCallsStart(o); hkPondStart(!!o.pond, !!o.snow); hkPowersStart(o.powers); hkFansStart(o.fans); G.crowd = engCrowd(o); hkKitStart(o.bags); hkHexStart(o.hexes, o.hexOn);
   G.log = []; G.pens = []; G.secs = 0; G.poss = 0; G.drops = 0; G.icings = 0;
   hkNewPlay();
-  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}. The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
+  GD = { ph: 'intro', t: 0, acc: 0, mode: GD.mode, you: GD.you, auto: o.auto !== false, autoPow: o.autoPow !== false, meter: null, rel: null, press: null, msg: `${G.teams[0].name} against ${G.teams[1].name}.${G.hex ? ` Hexes: ${hkHexNames()}.` : ''} The puck is about to drop.`, big: null, fo: null, set: null, next: null, deadT: HK_PACE.dead, so: null, delay: null };
   hkInputClear();
   hkLines(); hkFaceoffSpots(HK_RULES.len / 2, 0).forEach(([x, y], i) => { const p = L.pl[i]; p.x = x; p.y = y; p.vx = p.vy = 0; });
   GD.fo = { x: HK_RULES.len / 2, y: 0 }; hkPuckAt(GD.fo.x, GD.fo.y);
@@ -251,7 +251,7 @@ function hkPeriodOver() {
   // (a penalty that was coming when the period ended is served from the start of the next)
   if (GD.delay) hkPenaltyCall(true);
   // everyone rests between periods, the ice is scraped, and both sides get a mana
-  hkChangeWhistle(-1, true); hkPondBreak(); for (const s of [0, 1]) hkManaAdd(s, HK_MANA.brk);
+  hkChangeWhistle(-1, true); hkPondBreak(); if (G.hex) hkHexBreak(); for (const s of [0, 1]) hkManaAdd(s, HK_MANA.brk);
   hkGo('break');
   hkCpuPotion();
 }

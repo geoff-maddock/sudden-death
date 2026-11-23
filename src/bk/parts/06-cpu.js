@@ -42,7 +42,8 @@ function bkPressure(h) {
   if (!nd || ndd >= 1 || nd.stun > 0) return false;
   const Pr = bkPress(nd.side), Df = bkDefNow(), press = Df.back ? (bkU(p.side, p.x) > 14 ? Df.back : Df.front) : 1;
   if (R() < clamp(BK_THINK.pick + (nd.r.def - p.r.hnd + 2 * bkTired(p)) * .0018, .001, .02) * press * Pr.steal * bkPace(p.side).risk * bkFx('stl')) { bkPicked(nd); return true; }
-  if (R() < BK_THINK.reach * Pr.foul) { bkReach(nd); return true; }
+  // (a hex's whistle calls more, 16-umbral.js)
+  if (R() < BK_THINK.reach * Pr.foul * (G.hex ? bkHexFoul(nd.side) : 1)) { bkReach(nd); return true; }
   return false;
 }
 // the defender standing in the lane to the rim (within about a metre of the line from the handler to it), or null

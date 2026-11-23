@@ -1,19 +1,25 @@
 /* Cinder Gridiron: the coaches (issue #9, phase 1). Each side's call is a weighted pick from the down and distance,
    leaning to what beats the other side's recent calls and away from tired ones (12-playbook.js). On fourth down the coach kicks a field goal in
-   range, goes for it when it is short, and punts otherwise; a Knight or better weighs the fumble risk first (gfFourthWary). */
+   range, goes for it when it is short, and punts otherwise; a Knight or better weighs the fumble risk first (gfFourthWary). A Lich (skill 3) calls and decides by its own rules (18-umbral.js). */
 function gfCpuOffense() {
-  const d = G.down, tg = G.togo;
-  const w = { run: 3 + (tg <= 3 ? 3 : 0) - (tg >= 9 && d >= 2 ? 1.5 : 0), short: 3 + (tg >= 4 && tg <= 8 ? 1.5 : 0),
-    deep: 1.2 + (tg >= 9 ? 2 : 0) + (d === 3 && tg >= 7 ? 1.5 : 0), screen: 1.3 + (tg >= 6 ? .8 : 0) };
-  return wpick(gfCounterOffense(w));
+  if ((G.skill || [1, 1])[G.poss] === 3) return gfLichOffense();
+  return wpick(gfCounterOffense(gfOffLean()));
 }
 function gfCpuDefense() {
-  const d = G.down, tg = G.togo;
-  return wpick(gfCounterDefense({ blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 }));
+  if ((G.skill || [1, 1])[1 - G.poss] === 3) return gfLichDefense();
+  return wpick(gfCounterDefense(gfDefLean()));
 }
+// what a coach leans to by the down and the distance, before reading the other side
+function gfOffLean() {
+  const d = G.down, tg = G.togo;
+  return { run: 3 + (tg <= 3 ? 3 : 0) - (tg >= 9 && d >= 2 ? 1.5 : 0), short: 3 + (tg >= 4 && tg <= 8 ? 1.5 : 0),
+    deep: 1.2 + (tg >= 9 ? 2 : 0) + (d === 3 && tg >= 7 ? 1.5 : 0), screen: 1.3 + (tg >= 6 ? .8 : 0) };
+}
+function gfDefLean() { const d = G.down, tg = G.togo; return { blitz: 1.2 + (d === 3 && tg >= 6 ? 1.5 : 0) + (tg <= 2 ? 1 : 0), zone: 1.6 + (tg >= 10 ? 1.5 : 0) - (tg <= 3 ? 1 : 0), man: 2 }; }
 // GF_FG_RANGE: the coach kicks from here in; GF_FG_MAX: the longest try you may call (a kicking tee adds to both, 17-kit.js)
 const GF_FG_RANGE = 52, GF_FG_MAX = 62;
 function gfFourth() {
+  if ((G.skill || [1, 1])[G.poss] === 3) return gfLichFourth();
   if (gfKickDist() <= GF_FG_RANGE + gfTee(G.poss)) return 'fg';
   if (G.togo <= 2 && G.ball >= 40) return gfFourthWary(G.poss) && !(G.togo <= 1 && G.ball >= 50) ? 'punt' : 'go';
   return 'punt';

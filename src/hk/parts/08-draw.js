@@ -55,6 +55,7 @@ function hkDraw(c) {
   c.translate(-HKC.left * HKC.k, HK_CAM.top - HKC.top * HKC.k); c.scale(HKC.k, HKC.k);
   hkDrawBack(c, dens);
   hkDrawPond(c);
+  if (G.hex) hkHexDrawIce(c);
   hkDrawMarks(c);
   hkDrawNets(c);
   hkDrawPlayers(c);
@@ -271,10 +272,11 @@ function hkDrawCues(c) {
   }
 }
 // a big moment in big letters on the ice, for a moment; and at the end, the final
-const HK_BIG = { goal: ['GOAL!', '#ffd08a', 1.8], icing: ['ICING', '#ff8a6a', 1.2], hit: ['BIG HIT', '#ffd08a', .9], penalty: ['PENALTY', '#ff8a6a', 1.4], nogoal: ['NO GOAL', '#ff8a6a', 1] };
+const HK_BIG = { hole: ['SWALLOWED', '#c8b8ff', 1.2], goal: ['GOAL!', '#ffd08a', 1.8], icing: ['ICING', '#ff8a6a', 1.2], hit: ['BIG HIT', '#ffd08a', .9], penalty: ['PENALTY', '#ff8a6a', 1.4], nogoal: ['NO GOAL', '#ff8a6a', 1] };
 function hkDrawBig(c) {
   let word = null, col = '#ffd08a', sub = '', al = 1, sc = 1;
-  if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}${G.over && G.over.so ? ' (shootout)' : G.over && G.over.ot ? ' (sudden death)' : ''}`; }
+  if (GD.ph === 'intro' && G.hex) { word = 'HEXES'; col = '#c8b8ff'; sub = hkHexNames(); }
+  else if (GD.ph === 'over') { word = 'FINAL'; sub = `${G.teams[0].name} ${G.score[0]}, ${G.teams[1].name} ${G.score[1]}${G.over && G.over.so ? ' (shootout)' : G.over && G.over.ot ? ' (sudden death)' : ''}`; }
   else if (GD.ph === 'so' && !GD.so.cur && !G.so.tries[0] && !G.so.tries[1]) { word = 'SHOOTOUT'; sub = `${HK_RULES.so} tries each, then one each until it's settled.`; }
   else if (GD.ph === 'break') { word = hkOt() ? 'SUDDEN DEATH' : `END OF THE ${hkPeriodName(G.p - 1).toUpperCase()}`; if (hkOt()) sub = 'Three skaters a side. The next goal wins.'; }
   else if (GD.big && (HK_BIG[GD.big.k] || GD.big.w)) {
@@ -318,6 +320,7 @@ function hkDrawHud(c) {
   txt(c, GD.ph === 'so' ? 'Shootout' : hkPeriodName(G.p), 480, 25, F(12, 700), dim, 'center');
   txt(c, GD.ph === 'so' ? `${G.so.goals[0]}–${G.so.goals[1]}` : hkClockText(), 480, 48, F(22, 900), G.clock < 10 && live ? '#ff8a6a' : '#ffd08a', 'center');
   // under the clock: the man advantage and how long is left of it, or a penalty that is coming
+  if (G.hex) hkHexDrawHud(c, live && GD.ph !== 'so' && (GD.delay || G.box.length) ? 90 : 66);
   if (!live || GD.ph === 'so') return;
   const n = hkStrength(), D = GD.delay, up = n[0] > n[1] ? 0 : n[1] > n[0] ? 1 : -1, first = G.box.length ? Math.min(...G.box.map(b => b.t)) : 0;
   const pill = D ? ['PENALTY COMING', G.teams[D.side].color] : up >= 0 ? [`POWER PLAY  ${n[up]} on ${n[1 - up]}  0:${String(Math.ceil(first)).padStart(2, '0')}`, G.teams[up].color] : G.box.length ? [`${n[0]} ON ${n[1]}  0:${String(Math.ceil(first)).padStart(2, '0')}`, '#5a5048'] : null;
