@@ -49,6 +49,8 @@ document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape' && ev.key !== 'p' && ev.key !== 'P') return;
   if (ev.key !== 'Escape' && (ev.ctrlKey || ev.metaKey || ev.altKey)) return;
   if (ev.target.closest('input,textarea') || !$('modal').hidden) return;
+  // (an Escape the fight already spent letting go of a card (it runs first and marks it): not a pause too)
+  if (ev.key === 'Escape' && ev.sdSpent && !UI.paused) return;
   if (UI.paused) { if (ev.key === 'Escape' || ev.key.toLowerCase() === 'p') { closePause(); ev.preventDefault(); } return; }
   if (!RUN || UI.screen === 'title' || UI.screen === 'end') return;
   if (ev.key === 'Escape' && (UI.sel >= 0 || UI.disc)) return; // Escape first cancels a selected card

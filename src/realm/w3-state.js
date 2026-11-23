@@ -202,11 +202,12 @@ function wWanderNpcs() {
   wStoreNpcs(m.id);
 }
 /* the first step of a shortest walk to (tx, ty), for click/tap to move. A blocked target (a person, a sign, a
-   counter) is walked up to, and the last step bumps into it. Returns [dx, dy] or null. */
-function wPathStep(tx, ty) {
+   counter) is walked up to, and the last step bumps into it. Returns [dx, dy] or null. through: a person who wanders
+   is no wall (wGotoStep asks this way when there is no way round them, and squeezes past; issue #107). */
+function wPathStep(tx, ty, through) {
   const m = wCurMap(); if (tx === WG.x && ty === WG.y) return null;
   const R = 40, W = m.w, H = m.h;
-  const free = (x, y) => { const c = wTileAt(m, x, y); if (c == null) return m.kind === 'town'; const td = DB.tiles[c]; return !!(td && td.walk) && !wNpcAt(x, y); };
+  const free = (x, y) => { const c = wTileAt(m, x, y); if (c == null) return m.kind === 'town'; const td = DB.tiles[c], n = wNpcAt(x, y); return !!(td && td.walk) && (!n || (through && !n.fixed)); };
   const goal = (x, y) => x === tx && y === ty;
   const key = (x, y) => (y + 1) * (W + 2) + (x + 1);
   const prev = new Map(), q = [[WG.x, WG.y]]; prev.set(key(WG.x, WG.y), null);

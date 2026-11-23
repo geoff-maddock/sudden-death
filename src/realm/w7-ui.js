@@ -257,7 +257,8 @@ function wFaceAndAct(x, y) {
   wInteract(); wDrain();
 }
 /* a click or tap: on you, act on what you face; on plain ground, walk there; on a person or a thing, walk up to it,
-   then talk to them, use it or look at it. A person who wanders off is followed. Out of reach, you look from here. */
+   then talk to them, use it or look at it. A person who wanders off is followed. Out of reach, you look from here.
+   A person who wanders into the only way through is squeezed past, not waited on. */
 function wCanvasClick(e) {
   if (!wActive() || !WUI.cam) return;
   const [tx, ty] = wClickTile(e), d = Math.abs(tx - WG.x) + Math.abs(ty - WG.y);
@@ -275,10 +276,14 @@ function wGotoStep() {
   let st = wPathStep(g[0], g[1]);
   // somebody behind a counter: go to the counter in front of them, which talks to them
   if (!st && g[3] != null) {
-    const m = wCurMap(), c = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => [g[0] + dx, g[1] + dy]).find(([x, y]) => wTileAt(m, x, y) === '-' && wPathStep(x, y));
-    if (c) { g[0] = c[0]; g[1] = c[1]; g[3] = null; if (Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y) === 1) { WUI.goto = null; wFaceAndAct(g[0], g[1]); return; } st = wPathStep(g[0], g[1]); }
+    const m = wCurMap(), c = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => [g[0] + dx, g[1] + dy]).find(([x, y]) => wTileAt(m, x, y) === '-' && (wPathStep(x, y) || wPathStep(x, y, true)));
+    if (c) { g[0] = c[0]; g[1] = c[1]; g[3] = null; if (Math.abs(g[0] - WG.x) + Math.abs(g[1] - WG.y) === 1) { WUI.goto = null; wFaceAndAct(g[0], g[1]); return; } st = wPathStep(g[0], g[1]) || wPathStep(g[0], g[1], true); }
   }
+  // (no way round: a person who wanders stands in a narrow gap. Walk through them, squeezing past, as a second bump
+  // does, rather than stop till they move on)
+  if (!st) st = wPathStep(g[0], g[1], true);
   if (!st) { WUI.goto = null; if (g[2]) { wLog(wLookText(g[0], g[1]), 'd'); wDrain(); } return; }
+  { const w = wNpcAt(WG.x + st[0], WG.y + st[1]); if (w && !w.fixed && !(w.x === g[0] && w.y === g[1])) WG.bump = w.id; }
   const map0 = WG.map, moved = wDoStep(st[0], st[1]);
   // a step that went nowhere (a person in the way, a match, a new map) ends the walk
   if (!moved || WG.map !== map0 || !wActive() || (!g[2] && d === 1) || (WG.x === g[0] && WG.y === g[1])) WUI.goto = null;

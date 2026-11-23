@@ -37,10 +37,25 @@ function renderRunBar() {
   document.querySelectorAll('[data-tonic]').forEach(b => b.onclick = () => drinkTonic(+b.dataset.tonic));
 }
 function sortDeck(cards) { const ord = { atk: 0, play: 1, skl: 2, pow: 3, gear: 4, junk: 5, curse: 6 }; return cards.slice().sort((a, b) => ord[def(a).type] - ord[def(b).type] || def(a).cost - def(b).cost || def(a).n.localeCompare(def(b).n)); }
+/* one window at a time (issue #107). A window opened over another replaces it: the old one's Escape comes off (one
+   Escape closes one window), and its close() no longer touches the window on screen (it runs its onClose, once).
+   A replaced window's onClose runs only when its own close() is called, never by itself: some windows are covered
+   on purpose and come back later (a card pick set aside, w20d's WBALL.buried), and their onClose means "declined". */
+let MODAL_NOW = null;
 function modal(html, onClose) {
-  const m = $('modal'); $('modalBox').innerHTML = html; m.hidden = false;
-  const close = () => { m.hidden = true; m.onclick = null; document.removeEventListener('keydown', esc1); if (onClose) onClose(); };
+  const m = $('modal'), was = MODAL_NOW;
+  let done = false; const fin = () => { if (done) return; done = true; if (onClose) onClose(); };
+  const me = { gone: false };
+  if (was) { was.gone = true; document.removeEventListener('keydown', was.esc); }
+  $('modalBox').innerHTML = html; m.hidden = false; MODAL_NOW = me;
+  const close = () => {
+    if (me.gone) { fin(); return; }
+    if (MODAL_NOW !== me) return;
+    m.hidden = true; m.onclick = null; document.removeEventListener('keydown', esc1); MODAL_NOW = null;
+    fin();
+  };
   const esc1 = e => { if (e.key === 'Escape') close(); };
+  me.esc = esc1;
   document.addEventListener('keydown', esc1);
   m.onclick = e => { if (e.target === m || e.target.closest('[data-close]')) close(); };
   const f = $('modalBox').querySelector('button,[tabindex]'); if (f) f.focus();
