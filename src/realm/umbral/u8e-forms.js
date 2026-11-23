@@ -11,21 +11,23 @@
 
    Truer dark traits in the card game (W_UMB3.traits, three replaced; the others keep theirs):
      wraith  Half There: the first hit from an attack card against it each of your turns does nothing (status u_phase:
-             hurtEnemy spends it on a card's hit, never on poison, burn or a raw blow; turnStart puts it back). atkDmg
+             hurtEnemy spends it on an attack's hit, never a skill's, poison, burn or a raw blow; turnStart puts it
+             back). atkDmg
              stays pure: previews show the real number, and the breakdown notes the first hit is lost.
      ogre    Won't Flinch: Weak and Exposed don't take on it (status u_still: the sums ignore them, and they come off
-             after a card or tonic resolves and when it is done, at the start of your turn and before its swing; the log says
-             so).
+             after a card or tonic resolves and when it is done, at the end and the start of your turn, and before its swing;
+             the log says so. One laid on in the other side's turn shows until then).
      spider  Webs the Bench: at the start of every other turn of yours (the first, the third...) one card in your hand
              costs 1 more that turn (every turn cost 17.5 points against the Spider Matriarch next to no trait, 8 next to the
-             old Slimed, in a paired lab; every other turn, 4 next to the old: docs/realm/BALANCE.md) (B.uWeb,
+             old Slimed, in a paired lab; every other turn, 4 next to the old: docs/realm/BALANCE.md. Measured with the realm bot
+             as it was then, valuing a card by its printed cost; it now reads cardCost, the Webbed +1 included) (B.uWeb,
              the card's uid; status u_web on the spider), marked Webbed on the card.
    All of it is plain data on B and its players (uHalf, uStill, uWeb), so a mid-match save keeps it.
 
    wUmbShrug, wUmbShrugAll, wUmbWithout, wUmbWeb
    Wraps: wUmb4aNine, wUmbGfTeam, wUmbBkTeam, wUmbHkTeam, wUmbGlFour, wUmbBlFive, wUmbCrFour (wWU8ENine, wWU8EGfTeam,
    wWU8EBkTeam, wWU8EHkTeam, wWU8EGlFour, wWU8EBlFive, wWU8ECrFour: the team goes with shade); atkDmg (wWU8EAtkDmg),
-   hurtEnemy (wWU8EHurtEnemy), enemyHitDmg (wWU8EEnemyHitDmg), resolve (wWU8EResolve), playCard (wWU8EPlayCard), useTonic (wWU8EUseTonic), doMove (wWU8EDoMove), playerTurnStart
+   hurtEnemy (wWU8EHurtEnemy), enemyHitDmg (wWU8EEnemyHitDmg), resolve (wWU8EResolve), playCard (wWU8EPlayCard), useTonic (wWU8EUseTonic), endTurn (wWU8EEndTurn), doMove (wWU8EDoMove), playerTurnStart
    (wWU8EPlayerTurnStart), cardCost (wWU8ECardCost), cardHTML (wWU8ECardHTML: Webbed), renderHelp (wWU8ERenderHelp),
    wUmbQuick (wWU8EQuick: the traits on the Quick start's Umbral tab). */
 
@@ -52,9 +54,10 @@ function wUmbWithout(e, k, f) { const v = e.st[k]; if (!v) return f(); delete e.
 // the damage maths stay pure: Exposed counts for nothing on an Unflinching player; Half There is only a note in the
 // breakdown (WHY, the explanation dmgWhy asks for), since only the first real hit is lost (hurtEnemy)
 const wWU8EAtkDmg = atkDmg;
-atkDmg = function (base, e) {
+atkDmg = function (base, e, card) {
   const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wWU8EAtkDmg.apply(this, args)) : wWU8EAtkDmg.apply(this, args);
-  if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player') WHY.push(['Half There', '', 'Half There: the first hit from an attack this turn is lost']); // (a note, not a multiplier: the total is the real hit)
+  // (a short note, not a multiplier: the total is the real hit; only an attack's)
+  if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player' && card && def(card).type === 'atk') WHY.push(['Half There', '', 'Half There: 1st hit lost']);
   return n;
 };
 // Half There: the first hit from an attack card against it this turn does nothing (not poison, burn, or a raw blow:
@@ -62,31 +65,33 @@ atkDmg = function (base, e) {
 const wWU8EHurtEnemy = hurtEnemy;
 hurtEnemy = function (e, dmg, o) {
   o = o || {};
-  if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && B.inCard && !o.raw && !o.psn && !o.burn) {
+  if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && B.inCard && B.curType === 'atk' && !o.raw && !o.psn && !o.burn) {
     delete e.st.u_phase; dmg = 0;
     fx({ k: 'say', e: e.uid, t: 'Half There' });
     log(`${e.n} is Half There: the hit passes straight through.`, 'bad');
   }
   return wWU8EHurtEnemy.call(this, e, dmg, o);
 };
-// Won't Flinch: Weak and Exposed come off it at the game's own moments (after a card or a tonic, at the start of your
-// turn, before its swing); in between, the sums ignore them
+// Won't Flinch: Weak and Exposed come off it at the game's own moments (after a card or a tonic, at the end and the start
+// of your turn, before its swing); in between, the sums ignore them
 function wUmbShrug(e) {
   const ks = ['weak', 'vuln'].filter(k => e.st[k]); if (!ks.length) return;
   for (const k of ks) delete e.st[k];
   fx({ k: 'say', e: e.uid, t: 'Won\'t Flinch' });
   log(`${e.n} Won't Flinch: ${ks.map(k => ST[k].n).join(' and ')} doesn't take.`, 'bad');
 }
-function wUmbShrugAll() { if (B && B.umb) for (const e of B.enemies) if (e.uStill && !e.dead) wUmbShrug(e); }
+function wUmbShrugAll() { if (B && B.umb && !B.over) for (const e of B.enemies) if (e.uStill && !e.dead && !e.fled) wUmbShrug(e); }
 const wWU8EEnemyHitDmg = enemyHitDmg;
 enemyHitDmg = function (e) { const args = arguments; return e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'weak', () => wWU8EEnemyHitDmg.apply(this, args)) : wWU8EEnemyHitDmg.apply(this, args); };
 const wWU8EResolve = resolve;
 resolve = function () { const r = wWU8EResolve.apply(this, arguments); wUmbShrugAll(); return r; };
-// (and after a card or a tonic is done: Weak or Exposed laid on outside its ops, by a hook, a pet or Haunt, comes off
-// before it can show; addSt is a constant, so this is the moment after, never inside a sum)
-const wWU8EPlayCard = playCard, wWU8EUseTonic = useTonic;
-playCard = function () { const r = wWU8EPlayCard.apply(this, arguments); wUmbShrugAll(); return r; };
-useTonic = function () { const r = wWU8EUseTonic.apply(this, arguments); wUmbShrugAll(); return r; };
+// (and when a card or a tonic that went ahead is done, and when your turn ends: Weak or Exposed laid on outside a
+// card's ops, by a hook, a pet, Haunt or the end of your turn, comes off there; addSt is a constant, so this is the
+// moment after, never inside a sum. One laid on in the other side's turn shows until its next swing)
+const wWU8EPlayCard = playCard, wWU8EUseTonic = useTonic, wWU8EEndTurn = endTurn;
+playCard = function () { const r = wWU8EPlayCard.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
+useTonic = function () { const r = wWU8EUseTonic.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
+endTurn = function () { const r = wWU8EEndTurn.apply(this, arguments); wUmbShrugAll(); return r; };
 const wWU8EDoMove = doMove;
 doMove = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wWU8EDoMove.apply(this, arguments); };
 // Webs the Bench: a card of the hand you drew costs 1 more this turn

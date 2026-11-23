@@ -47,11 +47,13 @@ async def main():
           const hit = () => { const e = B.enemies[0]; B.energy = 9; B.hand.unshift(mkCard('check')); const h0 = e.hp; playCard(0, 0); return h0 - e.hp; };
           __fight('u:world', ['winger']); const e = B.enemies[0];
           out.umb = !!B.umb; out.phase0 = e.st.u_phase || 0; B.hand.unshift(mkCard('gob_five')); const w = dmgWhy(B.hand[0], e), est = estDamage(B.hand[0], e);
-          out.why = { note: !!w && w.parts.some(p => p[0] === 'Half There' && p[1] === '' && /first hit/.test(p[2])) && !w.parts.some(p => p[1] === '×' && p[2] === 0), n: w && w.n, real: atkDmg(2, e, B.hand[0]), est: est.total, text: cardText(B.hand[0], { live: true, card: B.hand[0], tgt: e }).replace(/<[^>]+>/g, '') };
+          out.why = { note: !!w && w.parts.some(p => p[0] === 'Half There' && p[1] === '' && /1st hit lost/.test(p[2])) && !w.parts.some(p => p[1] === '×' && p[2] === 0), n: w && w.n, real: atkDmg(2, e, B.hand[0]), est: est.total, text: cardText(B.hand[0], { live: true, card: B.hand[0], tgt: e }).replace(/<[^>]+>/g, '') };
           B.hand.shift(); out.first = hit(); out.phase1 = e.st.u_phase || 0; out.second = hit(); out.log = B.log.map(l => l.t).join(' ');
           runSteps(endTurn()); out.back = e.st.u_phase || 0; out.third = hit();
           // (a raw blow, an instant kill or Tempest, goes straight through it, and leaves Half There up)
           runSteps(endTurn()); const h0 = e.hp; B.inCard = true; hurtEnemy(e, 5, { raw: true }); B.inCard = false; out.raw = [h0 - e.hp, e.st.u_phase || 0];
+          // (nor does a skill's damage: only an attack's)
+          const h1 = e.hp; B.inCard = true; B.curType = 'skl'; hurtEnemy(e, 5, {}); B.inCard = false; B.curType = null; out.skill = [h1 - e.hp, e.st.u_phase || 0];
           B.P.st.tempest = 3; runSteps(endTurn()); out.tempest = e.st.u_phase || 0;
           // (the realm bot beats a Wraith on the dark side)
           __fight('u:world', ['winger']); let g = 0; while (!B.over && g++ < 60) { REALMBOT({}); if (B.over) break; runSteps(endTurn()); } out.bot = [B.over, B.turn];
@@ -61,7 +63,7 @@ async def main():
         check(wr['umb'] and wr['phase0'] == 1 and y['note'] and y['n'] == y['real'] > 0 and y['est'] > 0 and 'Deal 0' not in y['text'], 'a Wraith on the dark side is Half There: previews show the real number (no "Deal 0"), and the breakdown notes the first hit is lost (a note, not a ×0)', wr)
         check(wr['first'] == 0 and wr['phase1'] == 0 and wr['second'] > 0 and 'Half There' in wr['log'], 'the first hit against it does nothing and spends Half There; the second lands; the log says so', wr)
         check(wr['back'] == 1 and wr['third'] == 0, 'Half There comes back at the start of your next turn', wr)
-        check(wr['raw'][0] > 0 and wr['raw'][1] == 1 and wr['tempest'] == 1, 'a raw blow (an instant kill, Tempest) is not an attack hit: it lands, and Half There stays up', wr)
+        check(wr['raw'][0] > 0 and wr['raw'][1] == 1 and wr['skill'][0] > 0 and wr['skill'][1] == 1 and wr['tempest'] == 1, 'a raw blow (an instant kill, Tempest) or a skill\'s damage is not an attack hit: it lands, and Half There stays up', wr)
         check(wr['bot'][0] == 'win', 'the realm bot beats a Wraith', wr)
         check(wr['light']['phase'] == 0 and wr['light']['first'] > 0, 'in the light the same Wraith takes the first hit', wr)
 
@@ -76,13 +78,15 @@ async def main():
           const s0 = enemyHitDmg(e, 10); addSt(e, 'weak', 2); out.swing = [enemyHitDmg(e, 10), s0, e.st.weak || 0]; doMove(e); out.swung = e.st.weak || 0;
           // (laid on outside a card's ops, by a hook after an attack, as a pet or Haunt would: off when the card is done)
           window.__ogreHook = e; onHook('attackPlayed', () => { if (window.__ogreHook) addSt(window.__ogreHook, 'vuln', 2); });
-          B.energy = 9; B.hand.unshift(mkCard('check')); playCard(0, 0); window.__ogreHook = null; out.hook = e.st.vuln || 0;
+          B.energy = 9; B.hand.unshift(mkCard('check')); playCard(0, 0); window.__ogreHook = null; out.hook = e.st.vuln || 0; SYS_HOOKS.attackPlayed.pop();
+          // (and one laid on as your turn ends, off before the other side's turn)
+          onHook('turnEnd', () => { addSt(e, 'weak', 2); }); const steps = endTurn(); out.ended = e.st.weak || 0; SYS_HOOKS.turnEnd.pop(); runSteps(steps);
           out.log = B.log.map(l => l.t).join(' ');
           __fight('graftonbury', ['gorlak'], 'elite'); B.energy = 9; B.hand.unshift(mkCard('kob_brush')); playCard(0, 0); out.light = B.enemies[0].st.vuln || 0;
           B = null; RUN.pending = null; return out; })()""")
         check(og['still'] == 1 and og['vuln'] == 0 and og['weak'] == 0 and "Won't Flinch" in og['log'], "an Ogre on the dark side Won't Flinch: Exposed and Weak from a card don't take, and the log says so", og)
         check(og['within'][0] == og['within'][1] and og['within'][2] == 2 and og['after'] == 0, 'Exposed on it adds nothing to a hit, and a sum never changes it: it comes off when the card resolves', og)
-        check(og['hook'] == 0, 'Exposed laid on by a hook after an attack comes off when the card is done', og)
+        check(og['hook'] == 0 and og['ended'] == 0, 'Exposed laid on by a hook after an attack comes off when the card is done; Weak laid on as your turn ends, when it ends', og)
         check(og['swing'][0] == og['swing'][1] and og['swing'][2] == 2 and og['swung'] == 0, 'Weak never touches its swing, and comes off when it swings', og)
         check(og['light'] > 0, 'in the light the same Ogre can be Exposed', og)
 
