@@ -2100,3 +2100,30 @@ The Behemoth and the Djinn each took about 5 points off at their team's level, s
 (`W_UMB8I.lineups[k].down`); the Behemoth's ratings are high enough that a level (or two) barely shows, and it stays at
 one level down, about 4 points under the game without it. The Hydra took about 3 and keeps its level. The finale's
 round in those sports fields the same side.
+
+### Umbral: the redeemed (#111, I1)
+
+The redeemed captain plays as their own kind at your team's best level, with one change: their own ultimate in their own
+sport (and a signature card in the card game). Measured as the stars lab measures a superstar: the extra player at an
+even level against tier 2, Simulate. The redeemed (`nadir_*`, the lab's `wStar` finds them), a plain player of the same
+kind (`k:<kind>`), and the six legends. `python3 test/realm_stars_lab.py 200 '' <part> ctl,k:<kind>,nadir_<id>,phoenix,kraken,behemoth,djinn,hydra,wyrm`
+for football, baseball, basketball, hockey, bowling and curling (120 a side); boxing (the redeemed's own bout in a card)
+and golf by the same set-up in an ad-hoc script, 200 a side. Win rates:
+
+| Sport | Plain kind | Redeemed | Legends (lowest to highest) |
+|---|---|---|---|
+| Football (lich, Eclipse) | 34.0% | 34.0% | 42.0 to 49.5% |
+| Baseball (witch, the Dead Ball) | 48.5% | 47.0% | 50.5 to 61.0% |
+| Boxing (minotaur, The Last Bell; the bout) | 38.5% | 38.5% | 47.5 to 56.0% |
+| Basketball (vampire, Lights Out) | 38.5% | 32.5% | 34.5 to 40.5% |
+| Hockey (wraith, The Long Night) | 40.0% | 42.0% | 39.0 to 55.0% |
+| Hockey, 500 a side | 41.4% | 43.8% | Behemoth 44.0% |
+| Golf (wraith, The Hollow Flag) | 34.0% | 27.0% | 35.0 to 46.5% |
+| Bowling (zombie, The Drowning Bell) | 43.0% | 43.0% | 49.0 to 58.0% |
+| Curling (lich, The Sunken Stone; 120 a side) | 45.8% | 45.8% | 45.0 to 62.5% |
+
+No redeemed star is stronger than the legends in any engine: they sit with a plain player of their kind (every gap is
+within the noise, about 5 points at 200 a side), under the legends' range or at its bottom. The one near-overlap,
+hockey's Hollis Grael at 200 a side (42.0% against the Behemoth's 39.0%), is level at 500 a side (43.8% against 44.0%).
+Nothing tuned: the champions' ultimates were already balanced as opponents (#99) and are the same numbers here. The
+legends' own numbers are unchanged by this part (the redeemed are a separate table; nothing a legend uses was touched).
