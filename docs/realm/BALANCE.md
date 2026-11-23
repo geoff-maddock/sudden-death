@@ -2030,3 +2030,8 @@ lands every other turn. These spider figures came from the realm bot as it was t
 cost; it now values one by `cardCost` (a webbed card 1 more, as a player sees it), so the final balance pass
 re-measures them. The wraith and the ogre don't come up in the lab's dark pools (their checks are in
 `test/realm_umbral_forms.py`, the realm bot beating a Wraith among them).
+
+After the review rounds (Half There narrowed to an attack's or a set play's hit, never a skill's or a raw blow; the
+web every other turn; the bot valuing a card by `cardCost`), `python3 test/realm_umbral_lab.py 100`, once: light3
+99.1%, dark 93.5%, light3 elite 88.4%, dark elite 64.4% (the Champ 79.8%, the Spider Matriarch 50.0%), gate 49.5%.
+Inside the spread of the runs above; the final balance pass measures it again.
