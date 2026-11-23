@@ -2036,6 +2036,19 @@ web every other turn; the bot valuing a card by `cardCost`), `python3 test/realm
 99.1%, dark 93.5%, light3 elite 88.4%, dark elite 64.4% (the Champ 79.8%, the Spider Matriarch 50.0%), gate 49.5%.
 Inside the spread of the runs above; the final balance pass measures it again.
 
+Set plays counted with attacks for Half There (round 4): `python3 test/realm_umbral_lab.py 100` on the build before
+it (`7053df1`) and after it (`7d4c391`, the run above), both before phases F and G were merged in:
+
+| kind | before (100) | after (100) |
+|---|---|---|
+| light3 | 96.4% | 99.1% |
+| dark | 92.7% | 93.5% |
+| light3 elite | 89.6% | 88.4% |
+| dark elite | 64.1% (the Champ 75.5%, the Matriarch 48.8%) | 64.4% (the Champ 79.8%, the Matriarch 50.0%) |
+| gate | 54.7% | 49.5% |
+
+No wraith comes up in the lab's dark matches, so the change can't move these: the two runs differ by the noise alone.
+
 ### Umbral: the corrupted legends (#111, phase F)
 
 **The world legends.** Three card-game bosses, each a single player (boss HP, then tier U's quarter more), in two
