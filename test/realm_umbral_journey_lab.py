@@ -38,6 +38,7 @@ window.UJLAB = function (TRIES) {
   };
   const play = (id) => {
     const C = W_NADIR[id]; rest();
+    if (C.cond && C.cond.k === 'night') WG.min = 23 * 60;   // (a champion who plays only after dark: the bot waits for night)
     if (C.engine && id !== 'finale' || (id === 'finale' && C.engine)) { const t0 = (U.tries[id] || 0), p0 = U.pieces.length, f0 = U.finale || 0; const why = wNadirMatch(id); if (why) return null;
       return id === 'finale' ? ((U.finale || 0) > f0 ? 'win' : 'lose') : (U.pieces.length > p0 ? 'win' : 'lose'); }
     return card(() => wNadirMatch(id));

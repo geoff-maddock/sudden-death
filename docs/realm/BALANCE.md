@@ -1988,3 +1988,11 @@ hexes). Boxing's card of three (two bouts of three to win) was nearly unwinnable
 curling's champion read 14% in its own lab but 4% in a real journey, and 10% with tier U's bonus at 0. Gold for the
 tolls is now a common place for a run to stop: the Seal is a long, expensive road, which is the point.
 
+
+**The champions' conditions (#99, after phase 8).** Vesper Gloam (basketball) and Sexton Vale (golf) now play only
+after dark (the journey lab waits for night, so it changes nothing there), and Vesper Quill (baseball) and Hollis Grael
+(hockey), the two easiest champions, want it won by two or more. `python3 test/realm_umbral_journey_lab.py 40 15`
+after: 29 Crown winners, the Seal forged by 4 (14%, against 12% before: inside the noise of 40 journeys). The margin
+made those two the hardest games in the Umbral: the Bone Diamond 22% to 10% a game, the Dead Pond 27% to 8% (a hockey
+game is low-scoring, so a two-goal margin is steep). The others as before, within the noise: the Gatekeeper 38%, the Cinder
+Pit 18%, the Black Court 17%, the Drowned Lanes 17%, the Hollow Links 9%, the Broken Ring 9%.

@@ -4,7 +4,7 @@
    The scene (wUmbScene): the first time the world is free after the Umbral opens (after the Crown's ending, or on
    loading a journey that won it before), a staged scene in a window: the crown in your captain's hands, an eclipse
    over the Crown Coliseum at noon, the crowd falling silent, the smooth block beside the statue turning black, a
-   sound from the north (the Road to Nowhere) and the ground shaking, and the Pale Herald walking out of the dark to tell you what it means.
+   sound from the north (the Road to Nowhere) and the ground shaking (a music sting as the block turns black, with Music on), and the Pale Herald walking out of the dark to tell you what it means.
    Skip ends it at once; however the first showing is closed, what it said goes in the log. The Journal's Umbral
    chapter plays it again. It is marked
    seen (WG.umbral.seen) as it starts. Never in LAB mode.
@@ -13,19 +13,21 @@
    The Journal gains a chapter, The Umbral Realm, once it is open: what the herald said, the pieces (none yet), and the
    scene to see again.
    The light realm changes a little: an eclipse at midday, once a week to begin with and more often as the weeks go
-   by with the portal open (the blight: up to W_UMB1.eclipseMax days a week), said at dawn; townsfolk mutter about
+   by with the portal open (the blight: up to W_UMB1.eclipseMax days a week), said at dawn, and more clubs out hunting
+   the champions as it grows (W_UMB1.huntUp); townsfolk mutter about
    their dreams of the other side; the innkeepers answer about DREAMS; the Coliseum's statue has its black block.
 
-   W_UMB1, wUmbScene, wUmbEclipse
+   W_UMB1, wUmbScene, wUmbBlight, wUmbEclipse
    Wraps: wNextPrompt (wWU1NextPrompt: the scene, once, after the Crown's ending), wSay (wWU1Say: an innkeeper's hello
    names the DREAMS), wStart (wWU1Start: the herald in or out of the Coliseum),
    wUmbralUnlock (wWU1UmbralUnlock: the herald, the flag topics wait on), wDarkness (wWU1Darkness: the eclipse),
-   wNewDay (wWU1NewDay: the eclipse said at dawn), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
+   wNewDay (wWU1NewDay: the eclipse said at dawn), wEncounterHook (wWU1EncounterHook: the blight's hunters), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
    statue), wOpenJournal (wWU1OpenJournal: the chapter shows once open), wRenderJournal (wWU1RenderJournal: its
    button). */
 
 const W_UMB1 = {
   eclipseMax: 3, eclipseEvery: 4, eclipseDark: .28,   // one more eclipse day a week for every 4 weeks open, up to 3
+  huntUp: .5,   // the blight's hunters: the light side's hunt chance (W_DEF.huntP) half as much again for each step it has grown
   herald: [15, 13],                 // where the herald stands in the Coliseum, by the statue (or the nearest free tile)
   speech: [
     'Champions. You won it fair, and that is the trouble.',
@@ -120,13 +122,18 @@ function wUmbScene(replay) {
     else if (k === 'boom') { noise(.9, .16, 220, 1); tone(55, 1.2, 'sine', .07, -15); }
     else if (k === 'herald') { tone(392, .5, 'triangle', .035, 0); tone(370, .7, 'triangle', .035, 0, .45); tone(262, 1.1, 'triangle', .04, 0, .95); }
   } catch (e) { console.error(e); } };
+  // the music sting, as the block turns black: a falling minor phrase over a low drone (Music, not Sound effects)
+  const sting = () => { if (LAB || !SET.music) return; try {
+    for (const [f, d, at] of [[220, .5, 0], [208, .5, .4], [175, .7, .8], [147, 2.4, 1.3]]) tone(f, d, 'sawtooth', .025, 0, at);
+    tone(55, 3.6, 'sine', .05, 0, .2);
+  } catch (e) { console.error(e); } };
   const rnd = mulberry(77), crowd = Array.from({ length: 150 }, (_, i) => ({ x: 20 + rnd() * 600, y: 120 + rnd() * 60 + (i % 3) * 6, c: ['#e0457b', '#f2c14e', '#6fd0e0', '#efe3c8'][i % 4], p: rnd() * 6 }));
   const frame = now => {
     if (!cv.isConnected) return;
     const t = (now - t0) / 1000 * WUS.speed, k = Math.max(0, Math.min(1, (t - 3) / 4)), W = 640, H = 300;
     while (said < beats.length && t >= beats[said][0]) {
       const b = beats[said++]; say(b[1], b[2]);
-      if (said === 2) snd('dark'); if (said === 4) snd('boom'); if (said === 6) snd('herald');
+      if (said === 2) snd('dark'); if (said === 3) sting(); if (said === 4) snd('boom'); if (said === 6) snd('herald');
     }
     if (t >= 7.6 && !shook) { shook = true; cv.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-6px,3px)' }, { transform: 'translate(5px,-3px)' }, { transform: 'translate(-3px,2px)' }, { transform: 'translate(0,0)' }], { duration: 650 }); }
     if (t >= end) $('wUmbEnd').hidden = false;
@@ -172,11 +179,25 @@ wNextPrompt = function () {
 
 /* ---------- the light realm: the eclipse, the dreams, the statue ---------- */
 // today has an eclipse at midday: once a week to begin with, more often the longer the portal stands open
+// the blight's step: 1 for the first weeks the portal stands open, one more every W_UMB1.eclipseEvery weeks, up to
+// W_UMB1.eclipseMax (0 before it opens, or once it is sealed)
+function wUmbBlight() {
+  const U = wUmb(); if (!U || U.sealed || !WG) return 0;
+  return Math.min(W_UMB1.eclipseMax, 1 + Math.floor(Math.max(0, WG.dayAbs - U.at) / 7 / W_UMB1.eclipseEvery));
+}
 function wUmbEclipse() {
-  const U = wUmb(); if (!U || U.sealed || !WG) return false;
-  const since = Math.max(0, WG.dayAbs - U.at), n = Math.min(W_UMB1.eclipseMax, 1 + Math.floor(since / 7 / W_UMB1.eclipseEvery));
+  const U = wUmb(), n = wUmbBlight(); if (!n) return false;
+  const since = Math.max(0, WG.dayAbs - U.at);
   return since > 0 && [0, 3, 5].slice(0, n).includes(since % 7);
 }
+// the blight brings more hunters on the light side: the hunt's chance a step goes up with each step past the first
+const wWU1EncounterHook = wEncounterHook;
+wEncounterHook = function () {
+  const n = wUmbBlight(), p0 = W_DEF.huntP;
+  if (n < 2 || wUmbDark()) return wWU1EncounterHook.apply(this, arguments);
+  W_DEF.huntP = p0 * (1 + W_UMB1.huntUp * (n - 1));
+  try { return wWU1EncounterHook.apply(this, arguments); } finally { W_DEF.huntP = p0; }
+};
 const wWU1Darkness = wDarkness;
 wDarkness = function () {
   const d = wWU1Darkness.apply(this, arguments);

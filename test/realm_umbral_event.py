@@ -78,6 +78,17 @@ async def main():
           return out; })()""")
         check(ec['noon'] > .2 and not ec['night'] and ec['morning'] == 0 and ec['dawn'], 'an eclipse day darkens the light realm\'s sky at midday (without counting as night), not in the morning, and is said at dawn', ec)
         check(not ec['early3'] and ec['late3'], 'the blight: more eclipse days a week the longer the portal stands open', ec)
+
+        # the blight's hunters: the hunt chance a step that w34's hook reads, at each step of the blight, light and dark
+        hu = await pg.evaluate("""(() => { const U = WG.umbral, out = {}, p0 = W_DEF.huntP; let v = p0; const seen = [];
+          Object.defineProperty(W_DEF, 'huntP', { get() { seen.push(v); return v; }, set(x) { v = x; }, configurable: true });
+          const rnd = Math.random; Math.random = () => .999; WG.crowns = WG.crowns && WG.crowns.length ? WG.crowns : [1]; WG.crownDay = WG.dayAbs - 30; WG.event = null; WG.grace = 0; WG.grudge = null;
+          const at = (weeks, map) => { U.at = WG.dayAbs - 7 * weeks; WG.map = map; seen.length = 0; wEncounterHook(regionAt(WG.x, WG.y), '.', null); return seen.length ? +(seen[seen.length - 1] / p0).toFixed(2) : null; };
+          WG.map = 'world'; out.steps = [0, 4, 8, 20].map(w => { U.at = WG.dayAbs - 7 * w; return wUmbBlight(); });
+          out.light = [0, 4, 8].map(w => at(w, 'world')); out.dark = at(8, 'u:world'); out.after = v / p0;
+          Math.random = rnd; delete W_DEF.huntP; W_DEF.huntP = p0; return out; })()""")
+        check(hu['steps'] == [1, 2, 3, 3] and hu['light'] == [1, 1.5, 2] and hu['after'] == 1, 'the blight brings more hunters on the light side as it grows, and the chance is put back after', hu)
+        check(hu['dark'] in (None, 1), "the blight's hunters don't add to the dark side's own", hu)
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\n' + ('all ok' if not FAILS else f'{len(FAILS)} failed: ' + '; '.join(FAILS)))

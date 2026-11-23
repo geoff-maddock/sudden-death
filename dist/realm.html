@@ -64553,7 +64553,7 @@ wStart = function (save) {
    The scene (wUmbScene): the first time the world is free after the Umbral opens (after the Crown's ending, or on
    loading a journey that won it before), a staged scene in a window: the crown in your captain's hands, an eclipse
    over the Crown Coliseum at noon, the crowd falling silent, the smooth block beside the statue turning black, a
-   sound from the north (the Road to Nowhere) and the ground shaking, and the Pale Herald walking out of the dark to tell you what it means.
+   sound from the north (the Road to Nowhere) and the ground shaking (a music sting as the block turns black, with Music on), and the Pale Herald walking out of the dark to tell you what it means.
    Skip ends it at once; however the first showing is closed, what it said goes in the log. The Journal's Umbral
    chapter plays it again. It is marked
    seen (WG.umbral.seen) as it starts. Never in LAB mode.
@@ -64562,19 +64562,21 @@ wStart = function (save) {
    The Journal gains a chapter, The Umbral Realm, once it is open: what the herald said, the pieces (none yet), and the
    scene to see again.
    The light realm changes a little: an eclipse at midday, once a week to begin with and more often as the weeks go
-   by with the portal open (the blight: up to W_UMB1.eclipseMax days a week), said at dawn; townsfolk mutter about
+   by with the portal open (the blight: up to W_UMB1.eclipseMax days a week), said at dawn, and more clubs out hunting
+   the champions as it grows (W_UMB1.huntUp); townsfolk mutter about
    their dreams of the other side; the innkeepers answer about DREAMS; the Coliseum's statue has its black block.
 
-   W_UMB1, wUmbScene, wUmbEclipse
+   W_UMB1, wUmbScene, wUmbBlight, wUmbEclipse
    Wraps: wNextPrompt (wWU1NextPrompt: the scene, once, after the Crown's ending), wSay (wWU1Say: an innkeeper's hello
    names the DREAMS), wStart (wWU1Start: the herald in or out of the Coliseum),
    wUmbralUnlock (wWU1UmbralUnlock: the herald, the flag topics wait on), wDarkness (wWU1Darkness: the eclipse),
-   wNewDay (wWU1NewDay: the eclipse said at dawn), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
+   wNewDay (wWU1NewDay: the eclipse said at dawn), wEncounterHook (wWU1EncounterHook: the blight's hunters), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
    statue), wOpenJournal (wWU1OpenJournal: the chapter shows once open), wRenderJournal (wWU1RenderJournal: its
    button). */
 
 const W_UMB1 = {
   eclipseMax: 3, eclipseEvery: 4, eclipseDark: .28,   // one more eclipse day a week for every 4 weeks open, up to 3
+  huntUp: .5,   // the blight's hunters: the light side's hunt chance (W_DEF.huntP) half as much again for each step it has grown
   herald: [15, 13],                 // where the herald stands in the Coliseum, by the statue (or the nearest free tile)
   speech: [
     'Champions. You won it fair, and that is the trouble.',
@@ -64669,13 +64671,18 @@ function wUmbScene(replay) {
     else if (k === 'boom') { noise(.9, .16, 220, 1); tone(55, 1.2, 'sine', .07, -15); }
     else if (k === 'herald') { tone(392, .5, 'triangle', .035, 0); tone(370, .7, 'triangle', .035, 0, .45); tone(262, 1.1, 'triangle', .04, 0, .95); }
   } catch (e) { console.error(e); } };
+  // the music sting, as the block turns black: a falling minor phrase over a low drone (Music, not Sound effects)
+  const sting = () => { if (LAB || !SET.music) return; try {
+    for (const [f, d, at] of [[220, .5, 0], [208, .5, .4], [175, .7, .8], [147, 2.4, 1.3]]) tone(f, d, 'sawtooth', .025, 0, at);
+    tone(55, 3.6, 'sine', .05, 0, .2);
+  } catch (e) { console.error(e); } };
   const rnd = mulberry(77), crowd = Array.from({ length: 150 }, (_, i) => ({ x: 20 + rnd() * 600, y: 120 + rnd() * 60 + (i % 3) * 6, c: ['#e0457b', '#f2c14e', '#6fd0e0', '#efe3c8'][i % 4], p: rnd() * 6 }));
   const frame = now => {
     if (!cv.isConnected) return;
     const t = (now - t0) / 1000 * WUS.speed, k = Math.max(0, Math.min(1, (t - 3) / 4)), W = 640, H = 300;
     while (said < beats.length && t >= beats[said][0]) {
       const b = beats[said++]; say(b[1], b[2]);
-      if (said === 2) snd('dark'); if (said === 4) snd('boom'); if (said === 6) snd('herald');
+      if (said === 2) snd('dark'); if (said === 3) sting(); if (said === 4) snd('boom'); if (said === 6) snd('herald');
     }
     if (t >= 7.6 && !shook) { shook = true; cv.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-6px,3px)' }, { transform: 'translate(5px,-3px)' }, { transform: 'translate(-3px,2px)' }, { transform: 'translate(0,0)' }], { duration: 650 }); }
     if (t >= end) $('wUmbEnd').hidden = false;
@@ -64721,11 +64728,25 @@ wNextPrompt = function () {
 
 /* ---------- the light realm: the eclipse, the dreams, the statue ---------- */
 // today has an eclipse at midday: once a week to begin with, more often the longer the portal stands open
+// the blight's step: 1 for the first weeks the portal stands open, one more every W_UMB1.eclipseEvery weeks, up to
+// W_UMB1.eclipseMax (0 before it opens, or once it is sealed)
+function wUmbBlight() {
+  const U = wUmb(); if (!U || U.sealed || !WG) return 0;
+  return Math.min(W_UMB1.eclipseMax, 1 + Math.floor(Math.max(0, WG.dayAbs - U.at) / 7 / W_UMB1.eclipseEvery));
+}
 function wUmbEclipse() {
-  const U = wUmb(); if (!U || U.sealed || !WG) return false;
-  const since = Math.max(0, WG.dayAbs - U.at), n = Math.min(W_UMB1.eclipseMax, 1 + Math.floor(since / 7 / W_UMB1.eclipseEvery));
+  const U = wUmb(), n = wUmbBlight(); if (!n) return false;
+  const since = Math.max(0, WG.dayAbs - U.at);
   return since > 0 && [0, 3, 5].slice(0, n).includes(since % 7);
 }
+// the blight brings more hunters on the light side: the hunt's chance a step goes up with each step past the first
+const wWU1EncounterHook = wEncounterHook;
+wEncounterHook = function () {
+  const n = wUmbBlight(), p0 = W_DEF.huntP;
+  if (n < 2 || wUmbDark()) return wWU1EncounterHook.apply(this, arguments);
+  W_DEF.huntP = p0 * (1 + W_UMB1.huntUp * (n - 1));
+  try { return wWU1EncounterHook.apply(this, arguments); } finally { W_DEF.huntP = p0; }
+};
 const wWU1Darkness = wDarkness;
 wDarkness = function () {
   const d = wWU1Darkness.apply(this, arguments);
@@ -66682,6 +66703,64 @@ wShedBoard = function () {
 // after a Hardcore journey ends on the finale's lost round, the curling result card stays off the end screen
 const wWU4HShedResultCard = wShedResultCard;
 wShedResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4HShedResultCard.apply(this, arguments); };
+/* u4i: the champions' conditions (issue #99, "some champions also want a condition"). Loads after the sports'
+   parts (u4a..u4h); changes earlier parts only by reassignment (saved originals carry the wWU4I prefix).
+
+   Four of the eight sports' champions want more than a win (W_UMB4I.conds, kept on each one's W_NADIR entry as C.cond):
+     night   Vesper Gloam (basketball) and Sexton Vale (golf) play only after dark: by day, PLAY is turned away (a game
+             left half-played resumes whatever the hour).
+     margin  Vesper Quill (baseball) and Hollis Grael (hockey), the two the journey lab found the easiest, want it won
+             by two or more: a win by less pays the game's own XP, gold and fans as any win does, but the piece stays
+             with them and it counts as a try (the next costs the toll).
+   The condition is named on the champion's game card (above the card's own words) and in the log at PLAY. The Seal's
+   final rounds have none (u5 builds them without C.cond).
+
+   W_UMB4I
+   Wraps: wNadirMatch (wWU4INadirMatch: night turned away, the condition named), W_ON_END.unadir_ball and
+   W_ON_END[W_UMB4E.kind] (wWU4IEnd: a win by less than the margin is reported as a loss). */
+
+const W_UMB4I = {
+  conds: {
+    court: { k: 'night', n: 'plays only after dark' },
+    links: { k: 'night', n: 'plays only after dark' },
+    diamond: { k: 'margin', by: 2, n: 'wants it won by two runs or more', unit: ['run', 'runs'] },
+    rink: { k: 'margin', by: 2, n: 'wants it won by two goals or more', unit: ['goal', 'goals'] },
+  },
+  kinds: { diamond: 'unadir_ball', rink: W_UMB4E.kind },
+};
+for (const id in W_UMB4I.conds) if (W_NADIR[id]) W_NADIR[id].cond = W_UMB4I.conds[id];
+
+const wWU4INadirMatch = wNadirMatch;
+wNadirMatch = function (id) {
+  const C = W_NADIR[id], U = wUmb(), cd = C && C.cond;
+  if (!cd || !U || U.pieces.includes(C.piece)) return wWU4INadirMatch.apply(this, arguments);
+  const who = DB.chars[C.char] ? DB.chars[C.char].name : 'The champion';
+  const live = C.engine && W_UMB4.live[C.engine] && W_UMB4.live[C.engine]();
+  if (cd.k === 'night' && !live && !wIsNight()) return `${who} ${cd.n}. Come back when it is dark.`;
+  const why = wWU4INadirMatch.apply(this, arguments);
+  if (why || live) return why;
+  wLog(`${who} ${cd.n}.`, 'd');
+  const box = $('modalBox');
+  if (!LAB && box && !$('modal').hidden && !box.querySelector('.wumbcond')) {
+    const p = document.createElement('p'); p.className = 'hint wumbcond'; p.innerHTML = `<b>${esc(who)} ${esc(cd.n)}.</b>${cd.k === 'margin' ? ' A win by less pays as a win, but the piece stays with them.' : ''}`;
+    const h = box.querySelector('h2, h3'); if (h) h.after(p); else box.prepend(p);
+  }
+  return why;
+};
+
+// a win by less than the margin: the game pays as a win (its own settle has run), the piece stays and it counts a try
+for (const id in W_UMB4I.kinds) {
+  const kind = W_UMB4I.kinds[id], wWU4IEnd = W_ON_END[kind];
+  W_ON_END[kind] = function (r, ref, W) {
+    const C = ref && ref.id && W_NADIR[ref.id], cd = C && C.cond;
+    if (r === 'win' && cd && cd.k === 'margin' && W && typeof W.us === 'number' && typeof W.them === 'number' && W.us - W.them < cd.by) {
+      const d = W.us - W.them, who = DB.chars[C.char] ? DB.chars[C.char].name : 'The champion';
+      wLog(`You won ${W.us} to ${W.them}, by ${d} ${cd.unit[d === 1 ? 0 : 1]}, but ${who} wanted it by ${cd.by}. The piece stays with them.`, 'b');
+      r = 'lose';
+    }
+    return wWU4IEnd.call(this, r, ref, W);
+  };
+}
 /* u5: the finale (issue #99, phase 5). Loads after the sports' parts (u4a..u4h); changes earlier parts only by
    reassignment (saved originals carry the wWU5 prefix).
 
@@ -66914,7 +66993,7 @@ renderHelp = function () {
   h.insertAdjacentHTML('beforeend', `<div id="wHelpUmbral"><h3>The Umbral Realm</h3>
     <p class="hint"><b>The door.</b> Winning the Crown broke the Seal of the Crown into nine pieces, one for every way to play, and opened a portal at the end of the Road to Nowhere, north of the Roost. Through it is the Umbral: the same Realm, wrong. Same roads, the towns mirrored and dark, the people their own doubles. Time runs on both sides, and the portal works both ways.</p>
     <p class="hint"><b>Harder everywhere.</b> Every match on the dark side is tier U: tier 3 and more (the other side has a quarter more HP and a point more Strength, and you draw a card fewer), and every player has its kind's dark trait. There are no inns: rest by a lantern, one in each region, and a match that goes badly wakes you by the last one you rested at. The dark shops sell for fans or a player's XP, never gold.</p>
-    <p class="hint"><b>The pieces.</b> Nine Nadir champions hold them. The Gatekeeper, just through the portal, plays the card game. The others wait at the far end of their sport's dark ground, past the cold, two guards (each a card match) and a gate: bring them something from the light side of their region. Their games are at tier U, with one or two hexes (dark twists, named before you start). Lose, and the next try costs a toll.</p>
+    <p class="hint"><b>The pieces.</b> Nine Nadir champions hold them. The Gatekeeper, just through the portal, plays the card game. The others wait at the far end of their sport's dark ground, past the cold, two guards (each a card match) and a gate: bring them something from the light side of their region. Their games are at tier U, with one or two hexes (dark twists, named before you start). Some want more than a win: two play only after dark, and two want it won by two or more (a narrower win pays as a win, but they keep the piece). Lose, and the next try costs a toll.</p>
     <p class="hint"><b>The Seal.</b> With all nine, Hollow Aurelia plays you for the Seal in the Hollow Coliseum: three games, in your three weakest ways to play on that side. A piece you won at the first try takes a hex off its game. Lose a game and you try that one again. Win all three and the door shuts.</p>
     <p class="hint"><b>When it shuts.</b> Forge the Seal and you keep it, a trophy: every card match starts with 6 Block and a card more in your first hand. The Nadir captain you beat most cleanly asks to join you. Your team's portrait in the Hall of Legends says you sealed it, for every later journey to see, and your profile's medal (The Door Shut) fills: bronze for the first piece, silver for four, gold for the Seal.</p>
     <p class="hint"><b>On the light side.</b> While the portal stands open, the sun goes out at midday once a week, and more often the longer it stays open. The Pale Herald, by the statue in the Coliseum, will tell you anything twice.</p></div>`);
