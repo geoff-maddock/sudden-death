@@ -128,27 +128,35 @@ async def main():
         # the bar, during a champion's game with Settings at their shortest: no "from the next game" length note (the
         # bar without this part's wrap does show it, so the check can fail); curling's six ends (u4h) too. And with that
         # Nadir match saved and left, a practice game at the standard length keeps its note (Settings say shorter). The
-        # journey's gold, tries and tolls are put back after (these are real Nadir matches, called off)
-        bar = await pg.evaluate("""(() => { const out = {}, U = WG.umbral, keep = { gold: RUN.gold, tries: JSON.stringify(U.tries || {}), paid: JSON.stringify(U.paid || {}) }; U.tries = {};
-          const S = [['links', 'linksHoles', 3, 'wLinksNote', wUmbGlKick, wLinksBarNote, wWU8ALinksBarNote, wLinksCallOff, () => wLinksGame({ holes: wGL.rules.holes })],
-            ['lanes', 'lanesFrames', 5, 'wLanesNote', wUmbBlKick, wLanesBarNote, wWU8ALanesBarNote, wLanesCallOff, () => wLanesGame({ frames: wBL.rules.frames })],
-            ['shed', 'shedEnds', 4, 'wShedNote', wUmbCrKick, wShedBarNote, wWU8AShedBarNote, wShedCallOff, () => wShedGame({ ends: wCR.rules.ends })]];
+        # journey's gold, tries and tolls, the length settings and the Shed's mode are put back after, and saved (these are
+        # real Nadir matches, called off)
+        bar = await pg.evaluate("""(() => { const out = {}, U = WG.umbral, keys = ['linksHoles', 'lanesFrames', 'shedEnds'];
+          const keep = { gold: RUN.gold, tries: JSON.stringify(U.tries || {}), paid: JSON.stringify(U.paid || {}), set: keys.map(k => [k, k in SET, SET[k]]), mode: W_SHED_MODE, km: WSHG.keepMode };
+          U.tries = {};
+          const S = [['links', 'linksHoles', 3, 'wLinksNote', wUmbGlKick, wLinksBarNote, wWU8ALinksBarNote, wLinksCallOff, () => wLinksGame({ holes: wGL.rules.holes }), wLinksWorld],
+            ['lanes', 'lanesFrames', 5, 'wLanesNote', wUmbBlKick, wLanesBarNote, wWU8ALanesBarNote, wLanesCallOff, () => wLanesGame({ frames: wBL.rules.frames }), wLanesWorld],
+            ['shed', 'shedEnds', 4, 'wShedNote', wUmbCrKick, wShedBarNote, wWU8AShedBarNote, wShedCallOff, () => wShedGame({ ends: wCR.rules.ends }), wShedWorld]];
           try {
-            for (const [id, key, short, note, kick, bar, raw, off, practice] of S) {
-              wDrain(); SET[key] = short; const why = kick(W_NADIR[id], id, [], 'manage'); bar(); const mine = $(note).textContent;
+            for (const [id, key, short, note, kick, bar, raw, off, practice, onScreen] of S) {
+              wDrain(); SET[key] = short; const why = kick(W_NADIR[id], id, [], 'manage'); bar(); const mine = $(note).textContent, world0 = onScreen();
               raw(); const bare = $(note).textContent;
-              // (left: the Nadir match stays saved while a practice game is on screen)
-              practice(); bar(); const prac = $(note).textContent, still = !!(W_UMB4.live[id] && W_UMB4.live[id]());
+              // (left: the Nadir match stays saved while a practice game is on screen, and isn't the game on screen)
+              practice(); bar(); const prac = $(note).textContent, still = !!(W_UMB4.live[id] && W_UMB4.live[id]()), world1 = onScreen();
               off('test: called off');
-              out[id] = { why, mine, bare, prac, still, set: SET[key] };
+              out[id] = { why, mine, bare, prac, still, world0, world1, set: SET[key] };
             }
-          } finally { RUN.gold = keep.gold; U.tries = JSON.parse(keep.tries); U.paid = JSON.parse(keep.paid); showView('world'); wDrain(); }
+          } finally {
+            RUN.gold = keep.gold; U.tries = JSON.parse(keep.tries); U.paid = JSON.parse(keep.paid);
+            for (const [k, had, v] of keep.set) { if (had) SET[k] = v; else delete SET[k]; }
+            W_SHED_MODE = keep.mode; WSHG.keepMode = keep.km;
+            showView('world'); wDrain(); wSave();
+          }
           return out; })()""")
         for e in ('links', 'lanes', 'shed'):
             b = bar[e]
             check(b['why'] == '' and 'from the next game' in b['bare'] and 'from the next game' not in b['mine'] and b['set'] in (3, 4, 5),
                   f'{e}: during a champion\'s game the bar leaves off the "from the next game" length note', b)
-            check(b['still'] and 'from the next game' in b['prac'], f'{e}: with a Nadir match saved and left, a practice game keeps its note', b)
+            check(b['world0'] and b['still'] and not b['world1'] and 'from the next game' in b['prac'], f'{e}: with a Nadir match saved and left, a practice game (the game on screen, not the Nadir match) keeps its note', b)
 
         # How to play's Umbral section says so
         hp = await pg.evaluate("showPage('help'); (document.getElementById('wHelpU8aLen') || {}).textContent || ''")
