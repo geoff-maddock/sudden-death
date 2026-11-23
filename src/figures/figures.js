@@ -42,7 +42,7 @@ function tint(h, f) { const [r, g, b] = rgbOf(h), t = f < 0 ? 0 : 255, k = Math.
 // toward violet, pale eyes that glow, two short curved horns over the head (not on a kind that has its own) and two or
 // three thin cracks of light across the body, placed by a seed (the kind and the number) so they stay put
 function shadeOf(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, m = (v, k) => Math.max(0, Math.min(255, Math.round((v + (l - v) * .6) * .55 + k))); return `rgb(${m(r, 20)},${m(g, 8)},${m(b, 30)})`; }
-const SHADE_HORNED = ['minotaur', 'dwarf', 'kobold', 'fiend', 'behemoth', 'frostwyrm'];
+const SHADE_HORNED = ['minotaur', 'dwarf', 'kobold', 'fiend', 'behemoth', 'frostwyrm', 'hydra']; // (horns of their own, or no one head to put them on)
 function shadeRnd(d) { let h = 7; for (const ch of d.kind + ':' + (d.o.num ?? '') + ':' + (d.o.seed || 0)) h = (h * 31 + ch.charCodeAt(0)) % 1000003; return i => { const x = Math.sin(h * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); }; }
 function shadeCracks(c, d, torso) {
   const r = shadeRnd(d), n = 2 + Math.floor(r(0) * 2), col = d.o.crack || '#c8b8ff';

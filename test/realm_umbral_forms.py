@@ -126,6 +126,12 @@ async def main():
         check(px['pos'] and len(px['mine']) >= 2 and all(px['mine']), 'on the rink your players are drawn exactly as they were', px)
         check(len(px['theirs']) >= 2 and not any(px['theirs']), "and the Nadir's are drawn differently: in shadow", px)
 
+        # every kind (the superstars and the dungeon folk too) draws in shadow without trouble, and differently
+        ks = await pg.evaluate("""(() => { const cv = document.createElement('canvas'); cv.width = cv.height = 120; const c = cv.getContext('2d'), team = { color: '#3a2a4a', light: '#c8b8ff', short: 'N' }, bad = [];
+          for (const k of Object.keys(KIND)) { try { c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7 }); const a = cv.toDataURL(); c.clearRect(0, 0, 120, 120); drawAny(c, k, 60, 110, 90, team, { num: 7, shade: 1 }); if (cv.toDataURL() === a) bad.push(k + ': same'); } catch (e) { bad.push(k + ': ' + e.message); } }
+          return { n: Object.keys(KIND).length, bad }; })()""")
+        check(ks['n'] >= 24 and ks['bad'] == [], 'every kind, superstars included, draws in shadow without an error, and looks different for it', ks)
+
         # ---------- How to play and the Quick start ----------
         hp = await pg.evaluate("""(() => { renderHelp(); const u = document.getElementById('wHelpUmbForms'), q = wUmbQuick();
           return { help: u ? u.textContent : '', quick: q.steps.map(s => s.h + ': ' + s.t).join(' | ') }; })()""")
