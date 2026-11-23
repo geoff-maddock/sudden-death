@@ -19,7 +19,7 @@
    draws from the seeded stream; the real card at the bell can differ in a close round).
    Hexes (issue #99, 14-hexes.js): named on the tale of the tape and the corner card, and under the clock in a round;
    the Shrinking Ring's ropes and posts stand where the ropes are now. A Nadir fighter in umbral form (f.umb) is drawn
-   drained of colour over a violet shadow.
+   in shadow (the figures' o.shade: drained, glowing eyes, horns and cracks of light) over a violet shadow.
    Ring space to the screen: bxProj(x, y) puts the middle of the ring at (480, 330); nearer (larger y) is lower and
    bigger. */
 const BXT = { t: 0, fx: [], last: 0 };
@@ -131,11 +131,10 @@ function bxPose(f) {
 function bxDrawFighter(c, f, o) {
   const p = bxProj(f.x, f.y), flip = bxProj(o.x, o.y).x < p.x, team = G.corners[f.side], hpx = 92 * p.k;
   const F = bxFx(f), stone = (f.a.k === 'stun' && f.a.stone) || F.rampart || F.dmgIn < .6;
-  const opt = { glove: team.color, pose: bxPose(f), flip, num: '', stone, alpha: F.miss ? .38 : null };
-  // an umbral form (a Nadir fighter, issue #99): a violet shadow at their feet, and drawn drained of colour
-  if (f.umb) { ell(c, p.x, p.y, 40 * p.k, 9 * p.k, 'rgba(120,80,190,.35)'); c.save(); c.filter = 'saturate(.3) brightness(.72) contrast(1.15)'; }
+  const opt = Object.assign({ glove: team.color, pose: bxPose(f), flip, num: '', stone, alpha: F.miss ? .38 : null }, f.umb ? { shade: 1 } : {});
+  // an umbral form (a Nadir fighter, issue #99): a violet shadow at their feet, and drawn in shadow (the figures' shade, issue #111)
+  if (f.umb) ell(c, p.x, p.y, 40 * p.k, 9 * p.k, 'rgba(120,80,190,.35)');
   bxDrawBody(c, f, p, flip, team, hpx, opt);
-  if (f.umb) c.restore();
   // a counter window: a glint at the gloves
   if (f.ctr > 0 && f.a.k !== 'down') { c.save(); c.globalAlpha = Math.min(1, f.ctr * 3); txt(c, '✦', p.x + (flip ? -1 : 1) * 30 * p.k, p.y - 92 * p.k, `${14 * p.k}px sans-serif`, '#ffe9a0', 'center'); c.restore(); }
   // yours: a marker over them

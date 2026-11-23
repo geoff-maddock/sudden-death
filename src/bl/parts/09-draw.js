@@ -84,7 +84,7 @@ function blBowlerDraw(c) {
   const T = G.teams[B.s], m = T.roster[B.ri] || {}, st = blStyleOf(B.s, B.ri), flip = st.hand < 0;
   const [sx, sy, s] = blScr(B.x, -26); if (sy > 760) return;
   const hpx = s * BL_VIEW.px * 19, kind = KIND[m.kind] ? m.kind : 'goblin', K = KIND[kind], k = hpx * K.h / 100;
-  const pose = blBowlerPose(B.th || 0, B.slide || 0, !!B.hold), team = { color: T.color || '#888', light: T.light || '#f2ead8', short: T.short || T.name || '?' };
+  const pose = blBowlerPose(B.th || 0, B.slide || 0, !!B.hold), team = { color: T.color || '#888', light: T.light || '#f2ead8', short: T.short || T.name || '?', shade: !!T.shade };
   c.save();
   drawFig(c, kind, sx, sy, hpx, team, { pose, flip, num: B.ri + 1, bare: true });
   if (B.ball) {

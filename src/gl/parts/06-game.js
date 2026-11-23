@@ -25,7 +25,7 @@ function glTeam(t, side) {
   while (ro.length < GL_RULES.side) ro.push({ n: 'Player ' + (ro.length + 1) });
   const roster = ro.map((m, i) => { const r = Object.assign(glRate(m.kind), m.r || {}); return Object.assign({ n: m.n || 'Player ' + (i + 1), kind: m.kind || '', r: Object.fromEntries(GL_STATS.map(s => [s, glScale(r[s])])), pw: { long: m.pw && m.pw.long === 1 ? 1 : 0, short: m.pw && m.pw.short === 1 ? 1 : 0 }, gear: m.gear ? m.gear.name || '' : '', gx: glGx(m.gear && m.gear.fx) }, m.ult && GL_ULT_OWN[m.ult] ? { ult: m.ult } : {}); });
   const R = T.roles, ok = R && ['tee', 'approach', 'short', 'putt'].every(k => Number.isInteger(R[k]) && R[k] >= 0 && R[k] < roster.length) && new Set(['tee', 'approach', 'short', 'putt'].map(k => R[k])).size === 4;
-  return { name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster, roles: ok ? Object.assign({}, R) : glAutoRoles(roster) };
+  return Object.assign({ name: T.name || GL_TEAMS[side].name, color: T.color || '', short: T.short || '', roster, roles: ok ? Object.assign({}, R) : glAutoRoles(roster) }, T.shade ? { shade: 1 } : {}); // (shade: an Umbral side)
 }
 // the hole being played, built from the course's seed (playoff holes go round again)
 function glHoleAt(i) { return glCourseHole(G.cs, (i % G.holes) % 9, glParOf(i)); }

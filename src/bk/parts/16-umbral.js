@@ -109,6 +109,6 @@ function bkHexDraw(c) {
   const hx = bkHoopX(G.cur.side), B = L.ball, x = lerp(hx, B.x, .42), y = B.y * .42, s = bkScr(x, y);
   c.save(); bkZoomAt(c, s);
   c.save(); c.globalAlpha = .35 + .1 * Math.sin(BKT.t * 3); c.fillStyle = '#1a1022'; c.beginPath(); c.ellipse(s.x, s.y + 1, 18, 6, 0, 0, Math.PI * 2); c.fill(); c.restore();
-  drawFig(c, 'wraith', s.x, s.y, 54, { color: '#1a1022', light: '#c8b8ff', short: 'N' }, { num: 6, flip: bkDir(G.cur.side) > 0, alpha: .55 + .1 * Math.sin(BKT.t * 2.3), lift: 2 + Math.sin(BKT.t * 2) * 2 });
+  drawFig(c, 'wraith', s.x, s.y, 54, { color: '#1a1022', light: '#c8b8ff', short: 'N', shade: 1 }, { num: 6, flip: bkDir(G.cur.side) > 0, alpha: .55 + .1 * Math.sin(BKT.t * 2.3), lift: 2 + Math.sin(BKT.t * 2) * 2 });
   c.restore();
 }

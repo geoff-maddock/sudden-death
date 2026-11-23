@@ -46,15 +46,15 @@ async def main():
           // (a camp ambush on the dark world is Umbral, as any match the dark side starts)
           RUN.pending = null; B = null; LAB = true; startMatch({ type: 'normal', ids: ['skelss'], world: { kind: 'camp', ref: null, region: 'plains' } }); LAB = false;
           out.camp = { tier: RUN.pending.world.tier, umb: !!RUN.pending.world.umbral }; B = null; RUN.pending = null;
-          // (the other kinds' traits do what they say: the ogre's Block; a player summoned mid-match takes the form next turn)
+          // (the other kinds' traits do what they say: the ogre Won't Flinch; a player summoned mid-match takes the form next turn)
           LAB = true; startMatch({ type: 'normal', ids: ['gorlak', 'lichoc'], world: { kind: 'wild', ref: null, region: 'plains' } }); LAB = false;
-          out.ogre = B.enemies[0].block; B.enemies.push(Object.assign(JSON.parse(JSON.stringify(B.enemies[1])), { shade: 0, uid: 999, st: {} })); const n = B.enemies.length - 1, h0 = B.enemies[n].max; fire('turnStart');
+          out.ogre = B.enemies[0].st.u_still || 0; B.enemies.push(Object.assign(JSON.parse(JSON.stringify(B.enemies[1])), { shade: 0, uid: 999, st: {} })); const n = B.enemies.length - 1, h0 = B.enemies[n].max; fire('turnStart');
           out.summon = { shade: B.enemies[n].shade, str: B.enemies[n].st.str || 0, hp: B.enemies[n].max > h0 }; B = null; RUN.pending = null;
           beginFight = keep; return out; })()""")
         L, D = um['light'], um['dark']
         check(um['daily'] == {'tier': 1, 'umb': False, 'drawMod': 0}, 'the realm daily started on the dark side stays the day\'s match, not an Umbral one', um)
         check(um['camp'] == {'tier': 3, 'umb': True}, 'a camp ambush on the dark world is an Umbral match', um)
-        check(um['ogre'] >= 12 and um['summon'] == {'shade': 1, 'str': 1, 'hp': True}, 'the ogre starts with its Block; a player who joins mid-match takes the umbral form at your next turn', um)
+        check(um['ogre'] == 1 and um['summon'] == {'shade': 1, 'str': 1, 'hp': True}, 'the ogre Won\'t Flinch (phase E: realm_umbral_forms checks what it does); a player who joins mid-match takes the umbral form at your next turn', um)
         check(not L['umb'] and D['umb'] and D['tier'] == 3 and L['tier'] == 2, 'a match on the dark side is an Umbral match, at tier 3; the same match in the light is not', um)
         check(D['drawMod'] == -1 and L['drawMod'] == 0 and D['hand'] == L['hand'] - 1 and all(D['shade']) and not any(L['shade']), 'tier U: you draw one card fewer, and its players are drawn in shadow', um)
         check(all(d >= l + 1 for d, l in zip(D['str'], L['str'])) and D['thorns'] == 2 and D['block'] >= 10 and D['weak'] >= 1 and 'tier U' in D['log'] and 'Rattle' in D['log'], 'each has more Strength and its kind\'s dark trait (the skeleton\'s Spikes, the golem\'s Bedrock, the harpy\'s Shriek), named in the log', um)

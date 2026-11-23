@@ -32,7 +32,7 @@ const GF_CLUBS = {
 function gfTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 10 + i * 11 }))).slice(0, GF_RULES.side + GF_RULES.bench)
     .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(gfRate(p.kind), p.r || {}) }, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: gfGx(p.gear.fx) } : {}, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.ult && GF_ULT_BY[p.ult] ? { ult: p.ult } : {}));
-  const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
+  const T = Object.assign({ name: t.name, short: t.short, color: t.color, light: t.light, roster }, t.shade ? { shade: 1 } : {}); // (shade: an Umbral side, drawn in shadow)
   const starters = roster.slice(0, GF_RULES.side).map((_, i) => i), free = new Set(starters), by = (f, n) => [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r)).slice(0, n).map(i => (free.delete(i), i));
   T.off = {}; T.off.QB = by(r => r.arm * 2 + r.hnd * .3, 1)[0]; T.off.RB = by(r => r.spd + r.str * .8, 1)[0];
   [T.off.C, T.off.LG, T.off.RG] = by(r => r.str * 2 - r.spd * .2, 3); [T.off.X, T.off.Z] = [...free];
