@@ -98,7 +98,7 @@ function crThrowFinish(X) {
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
   if (G.wear !== false) crWear(G.ice, run.path);
   // (Hoarfrost: the first of the other rink's stones an end to lie in the four-foot freezes there: 15-umbral.js)
-  if (G.hex) crHexFreeze();
+  const froze = G.hex ? crHexFreeze() : false;
   const made = !rule.fgz && crMade(plan, before, rule.end ? run.stones : G.stones, run);
   // a new end: the ice as it is now is what a Knight reads through it
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
@@ -112,6 +112,7 @@ function crThrowFinish(X) {
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, ham, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
   if (drift && !rule.fgz) ev.drift = drift;
+  if (froze) ev.froze = 1 - G.hex.on;
   crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
   GB = { s, ri, plan, rel, run, before, made, rule };

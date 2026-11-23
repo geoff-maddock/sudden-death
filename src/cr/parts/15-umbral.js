@@ -25,7 +25,8 @@
      hoar    Hoarfrost: the first stone of the other rink's an end to lie in the four-foot (within CR_HEX.hoar.r inches
              and a stone of it) freezes where it lies: as heavy as granite for the rest of the end, so that side's hits
              barely move it (G.hex.froze: the end it froze in; one an end)
-   The hexes are named before the first stone (the status line) and under the end board all game (crHexLine).
+   The hexes are named before the first stone (the status line) and under the end board all game (crHexLine); the
+   Drifting House and Hoarfrost say so on the status line after the stone they act on (crHexSay).
    A curler's own ultimate (a roster curler sent with { ult: id }, an id in CR_ULT_OWN): their rink casts it in place of
    the thrower's kind's (crUltOf). The Sunken Shed's champion brings one. */
 const CR_LICH = { n: 'Lich', ang: .22, hitAng: .36, v: .011, samples: 5, top: 4, hammer: true, ice: 'now', sweepLate: 0, replies: 4, replyMix: .3,
@@ -102,11 +103,21 @@ function crHexDrift(s, run) {
   return D;
 }
 // Hoarfrost: after a stone, the other rink's stone nearest the button, on it, freezes where it lies (granite, for the
-// end), the first such an end
+// end), the first such an end. True when one froze (the stone's event carries froze: the side whose stone it is, and
+// the page says so: crHexSay)
 function crHexFreeze() {
   if (!crHexHas('hoar') || G.hex.froze === G.end) return;
   const o = 1 - G.hex.on, lim = CR_HEX.hoar.r + CR_SHEET.stoneR, st = G.stones.filter(b => b.s === o && !b.g && crDist(b) <= lim).sort((a, b) => crDist(a) - crDist(b))[0];
-  if (st) { st.g = 1; G.hex.froze = G.end; }
+  if (st) { st.g = 1; G.hex.froze = G.end; return true; }
+  return false;
+}
+// what a hex did on a stone, for the page's line after it (the Drifting House and Hoarfrost), or ''
+function crHexSay(ev) {
+  if (!G || !G.hex || !ev) return '';
+  let say = '';
+  if (ev.drift) say += ` The house drifts: the stone slides ${ev.drift} inches further out.`;
+  if (ev.froze != null) say += ` Hoarfrost: ${G.teams[ev.froze].name}'s stone in the four-foot freezes where it lies, as heavy as granite for the rest of the end.`;
+  return say;
 }
 const crHexNames = () => G && G.hex ? G.hex.ids.map(k => CR_HEX[k].n).join(', ') : '';
 const crHexLine = () => G && G.hex ? `Hexes on ${G.teams[G.hex.on].short || G.teams[G.hex.on].name}: ${crHexNames()}` : '';

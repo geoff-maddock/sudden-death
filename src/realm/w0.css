@@ -107,6 +107,9 @@
 .whcbox span{display:grid;gap:3px}
 .whcbox small{color:var(--dim);font-size:14px;line-height:1.35}
 .whelp{margin:0 0 18px}
+/* How to play's wide tables (the powers tables run to 660px) scroll inside themselves on a narrow screen, so the page
+   never scrolls sideways (#111) */
+@media (max-width:760px){.whelp table{display:block;max-width:100%;overflow-x:auto}}
 #modalBox:has([data-wco]){width:min(860px,100%)}
 @media (max-width:520px){
   .wpg{grid-template-columns:minmax(0,1fr)}

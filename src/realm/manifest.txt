@@ -198,5 +198,6 @@ src/realm/umbral/u4i-conds.js
 src/realm/umbral/u5-finale.js
 src/realm/umbral/u6-rewards.js
 src/realm/umbral/u7-feel.js
+src/realm/umbral/u8a-fixes.js
 src/realm/umbral/u8c-dread.js
 src/realm/umbral/u8h-market.js
