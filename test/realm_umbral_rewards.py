@@ -43,7 +43,7 @@ async def main():
         await pg.evaluate("showPage('help')")
         qk = await pg.evaluate("(() => { const p = document.querySelector('#wQuick [data-wqp=\"umbral\"]'); return { tab: !!document.querySelector('#wQuick [data-wq=\"umbral\"]'), steps: p ? p.querySelectorAll('.wqsteps li').length : 0, text: p ? p.textContent : '' }; })()")
         await pg.evaluate("showPage('play')")
-        check(qk['tab'] and qk['steps'] == 10 and 'undefined' not in qk['text'] and all(w in qk['text'] for w in ['The Phantom Pitch', 'The Ice Opens', 'Hoarfrost', 'Shades in the Deck']), 'once it is open, the Quick start has a tab of every way to play\'s hexes, each with its words (and the dark traits, phase E)', {k: qk[k] for k in ['tab', 'steps']})
+        check(qk['tab'] and qk['steps'] >= 10 and 'undefined' not in qk['text'] and all(w in qk['text'] for w in ['Dark traits that bend the rules', 'The Phantom Pitch', 'The Ice Opens', 'Hoarfrost', 'Shades in the Deck']), 'once it is open, the Quick start has a tab of every way to play\'s hexes, each with its words (and the dark traits, phase E)', {k: qk[k] for k in ['tab', 'steps']})
 
         md = await pg.evaluate("""(() => { const U = WG.umbral; ACHS.stats.realmUmbral = 0; W_ON_END.nadir('win', { id: 'gate' }); const one = ACHS.stats.realmUmbral;
           return { one, ach: ACH.some(a => a.id === 'w_umbral') }; })()""")

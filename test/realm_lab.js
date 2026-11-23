@@ -32,7 +32,7 @@ window.REALMBOT = function (opts = {}) {
         for (const o of d.fx) { if (o[0] === 's' && ['weak', 'vuln', 'psn', 'burn', 'stun'].includes(o[1])) s += 5 + (o[1] === 'stun' ? 8 : 0); if (o[0] === 's' && (o[3] === 'self')) s += 6; if (o[0] === 'draw') s += 4 * o[1]; if (o[0] === 'nrg') s += 7 * o[1]; if (o[0] === 'lose') s -= o[1] * (RUN.hp < 25 ? 3 : .8); if (o[0] === 'heal') s += Math.min(o[1], RUN.maxhp - RUN.hp); if (o[0] === 'roll') s += 6; if (o[0] === 'audible') s += 2; if (o[0] === 'add') s += 8; } }
       s -= (d.toll || 0) * (RUN.hp < 30 ? 3 : 1) + (d.foul || 0) * 4 + (d.exert || 0) * 5 + (d.fatigue || 0) * 2 + (d.goldc ? 4 : 0);
       if (d.type === 'play' || d.type === 'gear') s += 6 + (d.sport === B.sport ? 6 : 0);
-      const v = s / (d.cost + .6);
+      const v = s / (Math.max(0, cardCost(c)) + .6); // (what it costs now, as a player sees it: a webbed card 1 more)
       if (s > 0 && v > bs) { bs = v; best = i; }
     });
     if (best == null) break;
