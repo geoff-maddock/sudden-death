@@ -27,7 +27,7 @@
 
    W_UMB8C, wUmbDread, wUmbHazardAt, wUmbShadowsSync, wUmbShadowStep, wUmbDreadScene
    Wraps: buildAllMaps (wWU8CBuildAllMaps: the hazards), wTryMove (wWU8CTryMove: a shadow walked into, hazards, the
-   shadows' step), wEncounterP (wWU8CEncounterP: half the dark world's wild matches), startMatch (wWU8CStartMatch:
+   shadows' step), wEncounterP (wWU8CEncounterP: half the dark world's wild matches), wEncounterRoll (wWU8CEncounterRoll: none on a live hazard), startMatch (wWU8CStartMatch:
    counts matches started, so a step that started one moves no shadows), wLookText (wWU8CLookText: hazards, shadows),
    W_ON_END.nadir (wWU8COnNadir: a stage reached), wNextPrompt (wWU8CNextPrompt: its scene), wStart (wWU8CStart: a save
    past a stage), wUmbBlight (wWU8CBlight), wUmbSound (wWU8CSound: the scene's swell), wUseItem (wWU8CUseItem: Shadow
@@ -236,11 +236,12 @@ wTryMove = function (dx, dy) {
   return moved;
 };
 const wWU8CEncounterP = wEncounterP;
-wEncounterP = function (m) {
-  const p = wWU8CEncounterP.apply(this, arguments); if (!m || !m.umbral || m.kind !== 'world') return p;
-  // (the step's tile is where you now stand: a spike or a pit is its own trouble, and never a wild match as well)
-  return WG && WG.map === m.id && wUmbHazardAt(m, WG.x, WG.y) ? 0 : p * W_UMB8C.encMult;
-};
+wEncounterP = function (m) { const p = wWU8CEncounterP.apply(this, arguments); return m && m.umbral && m.kind === 'world' ? p * W_UMB8C.encMult : p; };
+// a spike, or a pit once open, is its own trouble and never a wild match as well (the roll, not the chance: the music
+// reads the chance). The step's tile is where you now stand
+const wUmbHazardLive = (m, x, y) => { const h = wUmbHazardAt(m, x, y); return h === 'spike' || (h === 'pit' && wUmbDread() >= 1); };
+const wWU8CEncounterRoll = wEncounterRoll;
+wEncounterRoll = function (m) { if (m && m.umbral && m.kind === 'world' && WG && WG.map === m.id && wUmbHazardLive(m, WG.x, WG.y)) return null; return wWU8CEncounterRoll.apply(this, arguments); };
 const wWU8CLookText = wLookText;
 wLookText = function (x, y) {
   const m = wCurMap();

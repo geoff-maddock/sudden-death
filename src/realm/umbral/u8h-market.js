@@ -17,7 +17,8 @@
 
    W_UMB8H, wUmbHexCut, wUmbTradable, wUmbTrade
    Wraps: the hex draws wUmbHexes, wUmb4aHexes, wUmbGfHexes, wUmbRingHexes, wUmbBkHexes, wUmbHkHexes, wUmbGlHexes,
-   wUmbBlHexes and wUmbCrHexes (wWU8H<Name>: trimmed), W_ON_END.nadir (wWU8HOnNadir: the ward used up), wUseItem
+   wUmbBlHexes and wUmbCrHexes (wWU8H<Name>: trimmed), wUmbTollAtKickoff (wWU8HTollAtKickoff: the ward bound to the game that
+   kicks off), W_ON_END.nadir (wWU8HOnNadir: the ward used up), wUseItem
    (wWU8HUseItem: the wares from the Bag), wCampBag (wWU8HCampBag: their buttons), wUmbShop (wWU8HUmbShop: the trophy
    list), wAudit (wWU8HAudit: the wares come from the dark shops), renderHelp (wWU8HRenderHelp). */
 
@@ -32,14 +33,16 @@ DB.items.uichor = { name: 'Ichor Draught', desc: `A black draught. Ready it from
 
 /* ---------- the hex count ---------- */
 // how many hexes come off this Nadir game's draw (u8f's shards and u8g's well-won pieces wrap it)
-function wUmbHexCut(id) { const U = wUmb(); return U && U.ward ? 1 : 0; }
-// (the ward remembers which champion's draw it last trimmed: only that game's end uses it up, so a game whose hexes were
-// drawn before it was readied, left half-played and resumed, never spends it)
-const wUmbCutHexes = (id, hx) => {
-  const n = Math.max(0, wUmbHexCut(id) || 0), U = wUmb();
-  if (U && U.ward && Array.isArray(hx) && hx.length) U.wardFor = id;
-  return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx;
-};
+// (the ward is bound to the first game that really kicks off with it, WG.umbral.wardFor: from then it trims only that
+// game's draw, and only that game's end uses it up. A game drawn before it was readied, left half-played and resumed,
+// never kicked off with it, so it never spends it)
+function wUmbHexCut(id) { const U = wUmb(); return U && U.ward && (!U.wardFor || U.wardFor === id) ? 1 : 0; }
+const wUmbCutHexes = (id, hx) => { const n = Math.max(0, wUmbHexCut(id) || 0); return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx; };
+const wUmbWardBind = id => { const U = wUmb(); if (U && U.ward && !U.wardFor && id) U.wardFor = id; };
+// every sport's kickoff pays its toll here (a resume doesn't); a card champion's match starts at fightStart
+const wWU8HTollAtKickoff = wUmbTollAtKickoff;
+wUmbTollAtKickoff = function (id) { wUmbWardBind(id); return wWU8HTollAtKickoff.apply(this, arguments); };
+onHook('fightStart', () => { const W = RUN && RUN.pending && RUN.pending.world; if (B && W && W.kind === 'nadir' && W.ref) wUmbWardBind(W.ref.id); });
 const wWU8HHexes = wUmbHexes; wUmbHexes = function (id) { return wUmbCutHexes(id, wWU8HHexes.apply(this, arguments)); };
 const wWU8HBallHexes = wUmb4aHexes; wUmb4aHexes = function (id) { return wUmbCutHexes(id, wWU8HBallHexes.apply(this, arguments)); };
 const wWU8HGfHexes = wUmbGfHexes; wUmbGfHexes = function (id) { return wUmbCutHexes(id, wWU8HGfHexes.apply(this, arguments)); };
@@ -55,7 +58,7 @@ W_ON_END.nadir = function () {
   // (cleared first, so an error further down the chain can't leave it for the next game; said after the game's own lines)
   const U = wUmb(), ref = arguments[1], had = U && U.ward && ref && ref.id && U.wardFor === ref.id;
   if (had) { U.ward = 0; U.wardFor = null; }
-  try { return wWU8HOnNadir.apply(this, arguments); } finally { if (had) { if (!LAB) wLog('The Hex Ward unravels. It did its work.', 'd'); wSave(); } }
+  try { return wWU8HOnNadir.apply(this, arguments); } finally { if (had && !(RUN && RUN.over)) { if (!LAB) wLog('The Hex Ward unravels. It did its work.', 'd'); wSave(); } }
 };
 
 /* ---------- the draught ---------- */
