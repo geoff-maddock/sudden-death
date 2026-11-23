@@ -11,7 +11,7 @@
    Shadow Salt (u8c) is on the fans list. The price is one trophy (RUN.relics), chosen from the ones you can trade: not
    the Seal of the Crown, not a club's own trophy, not one that changed your team for good when you won it (R.gain).
    It is gone for good.
-   The hex count: wUmbHexCut(id) is how many hexes come off a Nadir game's draw (the ward's one here; u8f and u8g add
+   The hex count: wUmbHexCut(id) is how many hexes come off a Nadir game's draw (the ward's one here; u8i's shards add
    theirs by wrapping it; u8j's well-won pieces take theirs off the Seal's round itself). Every way to play's hex draw is trimmed by it (the card game's wUmbHexes and each sport's),
    never below none, so a 1-hex champion with a ward plays with no hexes at all.
 
@@ -44,7 +44,8 @@ function wUmbHexCut(id) {
 }
 // the game a ward is bound to is still on: a sport's game half-played, or a card champion's match under way
 function wUmbWardLive(id) {
-  const C = W_NADIR[id]; if (!C) return false;
+  // (the Seal's round is rebuilt from WG.umbral, so it is there after a reload too)
+  const C = W_NADIR[id] || (id === 'finale' && typeof wUmbFinaleEntry === 'function' ? wUmbFinaleEntry() : null); if (!C) return false;
   if (C.engine) { const f = W_UMB4.live[C.engine]; try { return f ? !!f() : true; } catch (e) { return true; } }
   const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
 }

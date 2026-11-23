@@ -50,8 +50,11 @@ async def main():
         np = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; U.nopow = 'links'; W_UMB8J.lastPowers = null; let ref = null; WG.min = 23 * 60;
           const e0 = W_ON_END.unadirgl; W_ON_END.unadirgl = function (r, rf) { ref = rf; return e0.apply(this, arguments); };
           LAB = true; try { wNadirMatch('links'); } finally { LAB = false; W_ON_END.unadirgl = e0; }
-          out.powers = W_UMB8J.lastPowers; out.ref = ref && ref.nopow; out.cleared = U.nopow; return out; })()""")
-        check(np['powers'] == [False, True] and np['ref'] == 1 and np['cleared'] is None, 'without powers reaches the engine as [false, true], in the game’s ref, and is used up', np)
+          out.powers = W_UMB8J.lastPowers; out.ref = ref && ref.nopow; out.cleared = U.nopow;
+          // a start that refuses gives the choice back
+          U.nopow = 'links'; const o0 = WG.lkg.live; WG.lkg.live = { world: { kind: 'lkgame' } }; const why = wStartLinks({ club: 'nadir:links', how: 'sim', kind: 'unadirgl', ref: { id: 'links' }, cup: true }); WG.lkg.live = o0;
+          out.refused = [!!why, U.nopow]; U.nopow = null; return out; })()""")
+        check(np['powers'] == [False, True] and np['ref'] == 1 and np['cleared'] is None and np['refused'] == [True, 'links'], 'without powers reaches the engine as [false, true], in the game’s ref, and is used up', np)
 
         ft = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; const reset = p => { U.pieces = U.pieces.filter(x => x !== p); delete U.well[p]; };
           // margin feat (baseball by 4), not at the first try: a 5-0 win is well, a 3-1 win (meets the condition) is not
@@ -62,6 +65,9 @@ async def main():
           // night (football)
           reset('football'); U.tries.gridiron = 2; const m0 = WG.min; WG.min = 12 * 60; W_ON_END.unadirgf('win', { id: 'gridiron' }, {}); out.day = !!U.well.football;
           reset('football'); U.tries.gridiron = 2; WG.min = 23 * 60; W_ON_END.unadirgf('win', { id: 'gridiron' }, {}); out.night = !!U.well.football; WG.min = m0;
+          // night, judged by the hour it kicked off, per champion: kicked off at night, another game in between, won by day
+          reset('football'); U.tries.gridiron = 2; WG.min = 23 * 60; wUmbTollAtKickoff('gridiron'); WG.min = 12 * 60; wUmbTollAtKickoff('rink');
+          W_ON_END.unadirgf('win', { id: 'gridiron' }, {}); out.kicked = !!U.well.football; WG.min = m0; U.kickNight = {};
           // nopowers (curling): the ref says so
           reset('curling'); U.tries.shed = 1; W_ON_END.unadircr('win', { id: 'shed', nopow: 1 }, {}); out.nopow = !!U.well.curling;
           reset('curling'); U.tries.shed = 1; W_ON_END.unadircr('win', { id: 'shed' }, {}); out.pow = !!U.well.curling;
@@ -71,7 +77,7 @@ async def main():
           return out; })()""")
         check(ft['wide'] == [True, True] and ft['narrow'] == [True, False], 'a margin feat: a wide win is well, a narrower win still takes the piece', ft)
         check(ft['first'] == [True, True], 'a first-try win is well', ft)
-        check(not ft['day'] and ft['night'], 'the night feat: well after dark only', ft)
+        check(not ft['day'] and ft['night'] and ft['kicked'], 'the night feat: well after dark only, judged by the hour each game kicked off', ft)
         check(ft['nopow'] and not ft['pow'], 'the no-powers feat follows the game’s ref', ft)
         check(ft['brink'] and not ft['fresh'], 'the brink feat follows the HP as the match was won', ft)
 
@@ -81,6 +87,9 @@ async def main():
           U.well = { basketball: 1, baseball: 1 }; out.well = [wUmbResonance('basketball'), wUmbSpikeHp(), wUmbShadowSight()];
           // the Broken Bell: a toll 10 cheaper (20 won well)
           U.pieces.push('boxing'); U.tries.rink = 1; U.paid = {}; let g0 = RUN.gold; wUmbTollAtKickoff('rink'); out.toll = g0 - RUN.gold; out.tollKept = W_NADIR.rink.toll;
+          // and through the card's gold check: 22 gold is enough for a 30-gold toll cut to 20
+          RUN.gold = 22; U.guards = Object.assign(U.guards || {}, { 'g_rink:0': 1, 'g_rink:1': 1 }); U.gates = Object.assign(U.gates || {}, { rink: 1 });
+          const why = wNadirMatch('rink'); out.tollWhy = why; document.getElementById('modal').hidden = true; MODAL_NOW = null; RUN.gold = 999;
           // the Ash Ball: a blackout keeps half the gold
           U.pieces.push('football'); wEnterMap('u:umbralden', 5, 5); RUN.gold = 1000; LAB = true; try { wBlackout({ kind: 'wild', tier: 3 }, 'lose'); } finally { LAB = false; } out.black = RUN.gold;
           // old journey: a piece held before this part, never lost, is well by the first-try rule
@@ -88,7 +97,7 @@ async def main():
           return out; })()""")
         check(rs['none'][0] == 2 and rs['held'][:2] == [1, 1] and rs['well'][:2] == [2, 0], 'the Black Net: spikes 1 HP cheaper held, 2 won well', rs)
         check(rs['held'][2] == rs['none'][1] - 1 and rs['well'][2] == max(1, rs['none'][1] - 2), 'the Iron Stitch: the shadows see 1 step less held, 2 won well', rs)
-        check(rs['toll'] == 20 and rs['tollKept'] == 30, 'the Broken Bell: a 30-gold toll costs 20, and the champion’s own toll is left alone', rs)
+        check(rs['toll'] == 20 and rs['tollKept'] == 30 and 'toll' not in (rs['tollWhy'] or ''), 'the Broken Bell: a 30-gold toll costs 20, and the champion’s own toll is left alone', rs)
         check(rs['black'] == 950, 'the Ash Ball: a blackout on the dark side loses half the gold it would', rs)
         check(rs['legacy'], 'an old journey’s piece keeps the first-try rule', rs)
 

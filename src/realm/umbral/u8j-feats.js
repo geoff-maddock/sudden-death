@@ -74,7 +74,7 @@ function wUmbFeatMet(id, r, W, ref) {
   if (F.k === 'brink') { const h = W_UMB8J.winHp || [RUN.hp, RUN.maxhp]; return h[0] <= h[1] * F.at; }
   if (F.k === 'margin') return !!W && typeof W.us === 'number' && typeof W.them === 'number' && W.us - W.them >= F.by;
   // (judged by the hour it kicked off: a game saved and resumed later keeps that)
-  if (F.k === 'night') return U.kickNight && U.kickNight.id === id ? !!U.kickNight.night : wIsNight();
+  if (F.k === 'night') { const k = U.kickNight && U.kickNight[id]; return k != null ? !!k : wIsNight(); }
   if (F.k === 'nopowers') return !!(ref && ref.nopow);
   if (F.k === 'first') return !U.tries[id];
   return false;
@@ -127,10 +127,10 @@ const wUmbNoPowStart = (orig, kind) => function (o) {
   const U = wUmb(), id = o && o.ref && o.ref.id;
   if (!U || !o || o.kind !== kind || !id || id === 'finale' || U.nopow !== id) return orig.apply(this, arguments);
   const o2 = Object.assign({}, o, { ref: Object.assign({}, o.ref, { nopow: 1 }) });
-  W_UMB8J.nopowNext = 1; let r;
-  try { r = orig.call(this, o2); } finally { W_UMB8J.nopowNext = 0; }
-  // (used up only by a game that started; a refusal keeps the choice)
-  if (!r) { U.nopow = null; if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd'); }
+  // (spent before the start, which saves; a start that refuses, with its reason, gives it back)
+  U.nopow = null; W_UMB8J.nopowNext = 1; if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd');
+  let r; try { r = orig.call(this, o2); } finally { W_UMB8J.nopowNext = 0; }
+  if (r) U.nopow = id;
   return r;
 };
 const wWU8JStartLinks = wStartLinks; wStartLinks = wUmbNoPowStart(wWU8JStartLinks, 'unadirgl');
@@ -169,11 +169,13 @@ function wUmbTollCut(id, fn) {
 }
 const wWU8JTollAtKickoff = wUmbTollAtKickoff;
 wUmbTollAtKickoff = function (id) {
-  const U = wUmb(); if (U && id) U.kickNight = { id, night: wIsNight() ? 1 : 0 };
+  const U = wUmb(); if (U && id) wUmbKickNight(U, id);
   const a = arguments; return wUmbTollCut(id, () => wWU8JTollAtKickoff.apply(this, a));
 };
 // (a card champion's match kicks off at fightStart: the hour is noted there)
-onHook('fightStart', () => { const W = RUN && RUN.pending && RUN.pending.world, U = wUmb(); if (B && U && W && W.kind === 'nadir' && W.ref && W.ref.id !== 'finale') U.kickNight = { id: W.ref.id, night: wIsNight() ? 1 : 0 }; });
+onHook('fightStart', () => { const W = RUN && RUN.pending && RUN.pending.world, U = wUmb(); if (B && U && W && W.kind === 'nadir' && W.ref && W.ref.id !== 'finale') wUmbKickNight(U, W.ref.id); });
+// the hour each champion's game kicked off (one per champion, so another game in between doesn't overwrite it)
+function wUmbKickNight(U, id) { if (!U.kickNight || typeof U.kickNight !== 'object' || 'id' in U.kickNight) U.kickNight = {}; U.kickNight[id] = wIsNight() ? 1 : 0; }
 // (the Ash Ball: a blackout on this side costs less of the gold)
 const wWU8JBlackout = wBlackout;
 wBlackout = function () {
