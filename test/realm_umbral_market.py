@@ -60,12 +60,15 @@ async def main():
           // another champion's game, drawn before the ward (left half-played and resumed), ends: the ward stays
           U.wardFor = null; wUmbHexes('rink', 1); W_ON_END.nadir('lose', { id: 'rink' }); out.kept = U.ward; U.tries.rink = 0;
           // a game kicks off with it: bound to that one, and other draws aren't trimmed any more
-          wUmbTollAtKickoff('gate'); out.bound = U.wardFor; out.other = wUmbHkHexes('rink', 1).length;
+          wUmbTollAtKickoff('gate'); RUN.pending = { world: { kind: 'nadir', ref: { id: 'gate' } } }; out.bound = U.wardFor; out.other = wUmbHkHexes('rink', 1).length;
           // the game whose draw it trimmed ends (lost): the ward is used up
-          W_ON_END.nadir('lose', { id: 'gate' }); out.after = U.ward; out.gate2 = wUmbHexes('gate', 2).length; U.tries.gate = 0;
+          W_ON_END.nadir('lose', { id: 'gate' }); out.after = U.ward; RUN.pending = null;
+          // a bound game called off with no end frees the ward for the next game
+          U.ward = 1; U.wardFor = 'rink'; out.freed = wUmbHkHexes('rink', 1).length === 0 && U.wardFor === null; U.ward = 0; out.gate2 = wUmbHexes('gate', 2).length; U.tries.gate = 0;
           return out; })()""")
         check(wd['hk0'] == 1 and wd['gate0'] == 2 and wd['use'] == '' and wd['ready'] == 1 and wd['again'], 'a Hex Ward readies from the Bag (one at a time)', wd)
         check(wd['hk1'] == 0 and wd['gate1'] == 1 and wd['bk'] == 0 and wd['cr'] == 0, 'with it readied, every draw has a hex fewer, a 1-hex champion none', wd)
+        check(wd['freed'], 'a ward bound to a game called off with no end is freed for the next', wd)
         check(wd['kept'] == 1 and wd['bound'] == 'gate' and wd['other'] == 1 and wd['after'] == 0 and wd['gate2'] == 2, 'the ward is used up when the game it trimmed ends, not by another', wd)
 
         ic = await pg.evaluate("""(() => { const U = WG.umbral, out = {}; out.use = wUseItem('uichor'); out.ready = U.ichor;

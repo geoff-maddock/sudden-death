@@ -67,8 +67,11 @@ async def main():
           wEnterMap('u:world', x - dx, y - dy); WG.grace = 0; RUN.hp = 30; wTryMove(dx, dy); out.open = [WG.x === x && WG.y === y, RUN.hp, Math.abs(WG.x - x) + Math.abs(WG.y - y)];
           U.pieces = []; return out; })()""")
         check(sp['spike'] == [True, 28] and sp['floor'] == 1, 'a spike costs 2 HP, and never takes you below 1', sp)
-        en = await pg.evaluate("(() => { const m = MAPS['u:world'], k = Object.keys(m.hazards)[0].split(',').map(Number); wEnterMap('u:world', k[0], k[1]); const p0 = WG.umbral.pieces; WG.umbral.pieces = []; const sp = m.hazards[k.join(',')] === 'spike'; const on = wEncounterRoll(m, m.t[k[1]][k[0]], 0); const chance = wEncounterP(m, m.t[k[1]][k[0]]); WG.umbral.pieces = p0; wEnterMap('u:world', 2, 2); return [sp ? on : null, chance >= 0]; })()")
-        check(en[0] is None and en[1], 'a live hazard tile never rolls a wild match as well (the chance the music reads is left alone)', en)
+        en = await pg.evaluate("""(() => { const m = MAPS['u:world'], U = WG.umbral, p0 = U.pieces, at = kind => Object.keys(m.hazards).find(k => m.hazards[k] === kind).split(',').map(Number);
+          const roll = k => { wEnterMap('u:world', k[0], k[1]); return wEncounterRoll(m, m.t[k[1]][k[0]], 0); };
+          U.pieces = []; const s = roll(at('spike')), closed = roll(at('pit')); U.pieces = Object.keys(W_UMB_PIECES).slice(0, 3); const open = roll(at('pit'));
+          const chance = wEncounterP(m, m.t[at('spike')[1]][at('spike')[0]]); U.pieces = p0; wEnterMap('u:world', 2, 2); return [s, open, closed, chance > 0]; })()""")
+        check(en[0] is None and en[1] is None and en[3], 'a spike, or an open pit, never rolls a wild match as well (the chance the music reads is left alone)', en)
         check(sp['closed'] == [True, 30] and not sp['open'][0] and sp['open'][1] == 27 and 2 <= sp['open'][2] <= 8, 'a pit holds in the Quiet; from the Stirring it costs 3 HP and you come up somewhere else', sp)
 
         # the shadows

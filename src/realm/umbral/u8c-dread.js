@@ -99,7 +99,7 @@ function wUmbHazardStep() {
     return 'spike';
   }
   if (wUmbDread() < 1) { if (!LAB && Math.random() < .3) wLog('The ground here is cracked, and it holds. For now.', 'd'); return ''; }
-  const h0 = RUN.hp; RUN.hp = Math.max(Math.min(1, h0), h0 - W_UMB8C.pitHp);
+  const h0 = RUN.hp; RUN.hp = Math.max(Math.min(1, h0), h0 - wUmbPitHp());
   // out of the pit a few steps away, wherever the dark lets you climb: never somewhere you can't walk back from
   const r = mulberry(WG.step * 31 + WG.x * 7 + WG.y), opts = [], reach = wUmbOpenReach(m, WG.x, WG.y);
   for (let dy = -W_UMB8C.pitDrop; dy <= W_UMB8C.pitDrop; dy++) for (let dx = -W_UMB8C.pitDrop; dx <= W_UMB8C.pitDrop; dx++) {
@@ -117,8 +117,9 @@ function wUmbOpenReach(m, x0, y0) {
     const td = DB.tiles[m.t[ny][nx]]; if (!td || !td.walk || td.enter) continue; seen[ny * W + nx] = 1; q.push([nx, ny]); } }
   return seen;
 }
-// (u8g's resonance makes spikes cheaper: it wraps this)
+// (u8j's resonance makes spikes and pits cheaper: it wraps these)
 function wUmbSpikeHp() { return W_UMB8C.spikeHp; }
+function wUmbPitHp() { return W_UMB8C.pitHp; }
 
 /* ---------- the hungry shadows ---------- */
 const W_UMB8C_ANIM = {};   // (where each shadow was drawn last, for the glide between steps: not saved)
@@ -163,7 +164,7 @@ function wUmbSees(m, s) {
   }
   return true;
 }
-// (u8g's resonance shortens it: it wraps this)
+// (u8j's resonance shortens it: it wraps this)
 function wUmbShadowSight() { return W_UMB8C.sight[wUmbDread()]; }
 // one step of one shadow: toward you if it sees you, else a drift near home. True when it reached you
 function wUmbShadowMove(m, s, r) {
@@ -249,7 +250,7 @@ wLookText = function (x, y) {
     if (wUmbShadowAt(x, y)) return 'A shadow with nobody to cast it. It is looking at you.';
     const h = wUmbHazardAt(m, x, y);
     if (h === 'spike') return `Spikes, black as old bone, a hand high. They cost ${wUmbSpikeHp()} HP to walk on.`;
-    if (h === 'pit') return wUmbDread() >= 1 ? 'A pit, open, with no bottom you can see. Walk round it.' : 'Cracked ground. It holds, for now.';
+    if (h === 'pit') return wUmbDread() >= 1 ? `A pit, open, with no bottom you can see. Falling in costs ${wUmbPitHp()} HP. Walk round it.` : 'Cracked ground. It holds, for now.';
   }
   return wWU8CLookText.apply(this, arguments);
 };
@@ -364,5 +365,5 @@ renderHelp = function () {
   const h = $('wHelpUmbral'); if (!h || !wUmbOn() || $('wHelpDread')) return;
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : '-9'} pieces)`).join(', ')}.
     Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
-    Spikes cost ${W_UMB8C.spikeHp} HP to walk on. From the Stirring, the cracked ground opens into pits: ${W_UMB8C.pitHp} HP, and you climb out somewhere else. Wild matches come half as often on that side; the danger is one you can see.</p>`);
+    Spikes cost ${wUmbSpikeHp()} HP to walk on. From the Stirring, the cracked ground opens into pits: ${wUmbPitHp()} HP, and you climb out somewhere else. Wild matches come half as often on that side; the danger is one you can see.</p>`);
 };

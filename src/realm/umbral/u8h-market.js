@@ -12,7 +12,7 @@
    the Seal of the Crown, not a club's own trophy, not one that changed your team for good when you won it (R.gain).
    It is gone for good.
    The hex count: wUmbHexCut(id) is how many hexes come off a Nadir game's draw (the ward's one here; u8f and u8g add
-   theirs by wrapping it). Every way to play's hex draw is trimmed by it (the card game's wUmbHexes and each sport's),
+   theirs by wrapping it; u8j's well-won pieces take theirs off the Seal's round itself). Every way to play's hex draw is trimmed by it (the card game's wUmbHexes and each sport's),
    never below none, so a 1-hex champion with a ward plays with no hexes at all.
 
    W_UMB8H, wUmbHexCut, wUmbTradable, wUmbTrade
@@ -32,11 +32,22 @@ DB.items.ulampoil = { name: 'Lantern Oil', desc: 'A flask of violet oil. On the 
 DB.items.uichor = { name: 'Ichor Draught', desc: `A black draught. Ready it from the Bag: your next card match on the dark side starts with ${W_UMB8H.str} Strength.`, use: 'Bag → Ready. Used up by that match.', price: 0 };
 
 /* ---------- the hex count ---------- */
-// how many hexes come off this Nadir game's draw (u8f's shards and u8g's well-won pieces wrap it)
+// how many hexes come off this Nadir game's draw (u8i's shards wrap it)
 // (the ward is bound to the first game that really kicks off with it, WG.umbral.wardFor: from then it trims only that
 // game's draw, and only that game's end uses it up. A game drawn before it was readied, left half-played and resumed,
 // never kicked off with it, so it never spends it)
-function wUmbHexCut(id) { const U = wUmb(); return U && U.ward && (!U.wardFor || U.wardFor === id) ? 1 : 0; }
+function wUmbHexCut(id) {
+  const U = wUmb(); if (!U || !U.ward) return 0;
+  // (a bound game called off without an end, or dropped on a reload, frees the ward for the next game)
+  if (U.wardFor && !wUmbWardLive(U.wardFor)) U.wardFor = null;
+  return !U.wardFor || U.wardFor === id ? 1 : 0;
+}
+// the game a ward is bound to is still on: a sport's game half-played, or a card champion's match under way
+function wUmbWardLive(id) {
+  const C = W_NADIR[id]; if (!C) return false;
+  if (C.engine) { const f = W_UMB4.live[C.engine]; try { return f ? !!f() : true; } catch (e) { return true; } }
+  const W = RUN && RUN.pending && RUN.pending.world; return !!(W && W.kind === 'nadir' && W.ref && W.ref.id === id);
+}
 const wUmbCutHexes = (id, hx) => { const n = Math.max(0, wUmbHexCut(id) || 0); return Array.isArray(hx) && n ? hx.slice(0, Math.max(0, hx.length - n)) : hx; };
 const wUmbWardBind = id => { const U = wUmb(); if (U && U.ward && !U.wardFor && id) U.wardFor = id; };
 // every sport's kickoff pays its toll here (a resume doesn't); a card champion's match starts at fightStart

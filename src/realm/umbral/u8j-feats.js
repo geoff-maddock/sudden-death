@@ -1,4 +1,4 @@
-/* u8j: feats, resonance and the Seal's edges (issue #111, phase G). Loads after u8h-market.js (it wraps wUmbHexCut);
+/* u8j: feats, resonance and the Seal's edges (issue #111, phase G). Loads after u8h-market.js;
    changes earlier parts only by reassignment (saved originals carry the wWU8J prefix).
 
    Feats: every champion has one (W_UMB8J.feats), optional, never a wall. Meet it, or win at the first try, and the
@@ -21,7 +21,7 @@
    (wWU8JOnNadir: a piece won well), wNadirMatch (wWU8JNadirMatch: the feat on the card, and the no-powers choice),
    wStartLinks, wStartLanes and wStartShed (wWU8J<Name>: the choice into the game's ref), wGL/wBL/wCR start and simGame
    (wWU8J<Name>: powers off for your side), wUmbFinaleEntry (wWU8JFinaleEntry: a well-won piece's hex), wUmbSpikeHp,
-   wUmbShadowSight, wUmbShadowStep, wUmbHazardStep, wUmbTollAtKickoff, wBlackout (wWU8J<Name>: the boons), W_JTAB_FN.umbral
+   wUmbShadowSight, wUmbShadowStep, wUmbPitHp, wUmbTollAtKickoff (also the hour a game kicked off, for the night feat), wBlackout (wWU8J<Name>: the boons), W_JTAB_FN.umbral
    (wWU8JJournal: the Seal panel), wStart (wWU8JStart: an old journey's pieces keep the first-try rule), renderHelp
    (wWU8JRenderHelp). */
 
@@ -73,7 +73,8 @@ function wUmbFeatMet(id, r, W, ref) {
   const F = wUmbFeat(id), U = wUmb(); if (!F || !U || r !== 'win') return false;
   if (F.k === 'brink') { const h = W_UMB8J.winHp || [RUN.hp, RUN.maxhp]; return h[0] <= h[1] * F.at; }
   if (F.k === 'margin') return !!W && typeof W.us === 'number' && typeof W.them === 'number' && W.us - W.them >= F.by;
-  if (F.k === 'night') return wIsNight();
+  // (judged by the hour it kicked off: a game saved and resumed later keeps that)
+  if (F.k === 'night') return U.kickNight && U.kickNight.id === id ? !!U.kickNight.night : wIsNight();
   if (F.k === 'nopowers') return !!(ref && ref.nopow);
   if (F.k === 'first') return !U.tries[id];
   return false;
@@ -109,7 +110,7 @@ W_ON_END.nadir = function (r, ref, W) {
 const wWU8JNadirMatch = wNadirMatch;
 wNadirMatch = function (id) {
   const C = W_NADIR[id], U = wUmb(), F = wUmbFeat(id), open0 = !$('modal').hidden;
-  const why = wWU8JNadirMatch.apply(this, arguments);
+  const a = arguments, why = wUmbTollCut(id, () => wWU8JNadirMatch.apply(this, a));
   if (why || !F || !U || !C || U.pieces.includes(C.piece) || LAB || open0 || $('modal').hidden) return why;
   const box = $('modalBox'); if (!box || box.querySelector('.wumbfeat')) return why;
   const p = document.createElement('p'); p.className = 'hint wumbfeat';
@@ -126,9 +127,11 @@ const wUmbNoPowStart = (orig, kind) => function (o) {
   const U = wUmb(), id = o && o.ref && o.ref.id;
   if (!U || !o || o.kind !== kind || !id || id === 'finale' || U.nopow !== id) return orig.apply(this, arguments);
   const o2 = Object.assign({}, o, { ref: Object.assign({}, o.ref, { nopow: 1 }) });
-  W_UMB8J.nopowNext = 1; U.nopow = null;
-  if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd');
-  try { return orig.call(this, o2); } finally { W_UMB8J.nopowNext = 0; }
+  W_UMB8J.nopowNext = 1; let r;
+  try { r = orig.call(this, o2); } finally { W_UMB8J.nopowNext = 0; }
+  // (used up only by a game that started; a refusal keeps the choice)
+  if (!r) { U.nopow = null; if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd'); }
+  return r;
 };
 const wWU8JStartLinks = wStartLinks; wStartLinks = wUmbNoPowStart(wWU8JStartLinks, 'unadirgl');
 const wWU8JStartLanes = wStartLanes; wStartLanes = wUmbNoPowStart(wWU8JStartLanes, 'unadirbl');
@@ -152,28 +155,31 @@ onHook('fightStart', () => {
 });
 const wWU8JSpikeHp = wUmbSpikeHp; wUmbSpikeHp = function () { return Math.max(0, wWU8JSpikeHp.apply(this, arguments) - wUmbBoon('basketball')); };
 const wWU8JShadowSight = wUmbShadowSight; wUmbShadowSight = function () { return Math.max(1, wWU8JShadowSight.apply(this, arguments) - wUmbBoon('baseball')); };
-// (the Hollow Flag makes a pit cheaper: the pit's cost is read from W_UMB8C.pitHp at the fall)
-const wWU8JHazardStep = wUmbHazardStep;
-wUmbHazardStep = function () { const p0 = W_UMB8C.pitHp; W_UMB8C.pitHp = Math.max(0, p0 - wUmbBoon('golf')); try { return wWU8JHazardStep.apply(this, arguments); } finally { W_UMB8C.pitHp = p0; } };
+const wWU8JPitHp = wUmbPitHp; wUmbPitHp = function () { return Math.max(0, wWU8JPitHp.apply(this, arguments) - wUmbBoon('golf')); };
 // (the Dead Puck: no hunting two steps at a time)
 const wWU8JShadowStep = wUmbShadowStep;
 wUmbShadowStep = function () { const h0 = W_UMB8C.hunt; if (wUmbBoon('hockey')) W_UMB8C.hunt = 99; try { return wWU8JShadowStep.apply(this, arguments); } finally { W_UMB8C.hunt = h0; } };
-// (the Broken Bell: the toll is cheaper; the champion's own number is left as it is)
+// (the Broken Bell: the toll is cheaper, everywhere it is read while a game is asked for or kicks off: the checks for
+// gold, the card's words, a card champion's ref and the kickoff charge. The champion's own number is left as it is)
+function wUmbTollCut(id, fn) {
+  const C = W_NADIR[id], off = wUmbBoon('boxing');
+  if (!C || !off || !C.toll || W_UMB8J.tollCut) return fn();
+  const t0 = C.toll; C.toll = Math.max(0, t0 - off); W_UMB8J.tollCut = 1;
+  try { return fn(); } finally { C.toll = t0; W_UMB8J.tollCut = 0; }
+}
 const wWU8JTollAtKickoff = wUmbTollAtKickoff;
 wUmbTollAtKickoff = function (id) {
-  const C = W_NADIR[id], off = wUmbBoon('boxing'); if (!C || !off || !C.toll) return wWU8JTollAtKickoff.apply(this, arguments);
-  const t0 = C.toll; C.toll = Math.max(0, t0 - off); try { return wWU8JTollAtKickoff.apply(this, arguments); } finally { C.toll = t0; }
+  const U = wUmb(); if (U && id) U.kickNight = { id, night: wIsNight() ? 1 : 0 };
+  const a = arguments; return wUmbTollCut(id, () => wWU8JTollAtKickoff.apply(this, a));
 };
-onHook('fightStart', () => {   // (a card champion's toll is paid at fightStart in u3, from its ref: cheaper there too)
-  const W = RUN && RUN.pending && RUN.pending.world, off = wUmbBoon('boxing');
-  if (B && W && W.kind === 'nadir' && W.ref && W.ref.toll && off) { const back = Math.min(off, W.ref.toll); RUN.gold += back; log(`The Broken Bell: ${back} gold of the toll back.`, 'sys'); W.ref.toll = 0; }
-});
+// (a card champion's match kicks off at fightStart: the hour is noted there)
+onHook('fightStart', () => { const W = RUN && RUN.pending && RUN.pending.world, U = wUmb(); if (B && U && W && W.kind === 'nadir' && W.ref && W.ref.id !== 'finale') U.kickNight = { id: W.ref.id, night: wIsNight() ? 1 : 0 }; });
 // (the Ash Ball: a blackout on this side costs less of the gold)
 const wWU8JBlackout = wBlackout;
 wBlackout = function () {
   const k = wUmbDark() ? wUmbBoon('football') : 0; if (!k) return wWU8JBlackout.apply(this, arguments);
   const g0 = RUN.gold, r = wWU8JBlackout.apply(this, arguments), lost = g0 - RUN.gold;
-  if (lost > 0) { const back = Math.round(lost * k / 100); RUN.gold += back; if (back) wLog(`The Ash Ball: ${back} of that gold is still in your pocket.`, 'g'); }
+  if (lost > 0) { const back = Math.round(lost * k / 100); RUN.gold += back; if (back) { wLog(`The Ash Ball: ${back} of that gold is still in your pocket.`, 'g'); wSave(); } }
   return r;
 };
 
@@ -192,7 +198,8 @@ function wUmbSealPanel() {
   const U = wUmb(); if (!U) return '';
   const rows = Object.keys(W_UMB_PIECES).map(p => {
     const r = wUmbResonance(p), B8 = W_UMB8J.boons[p], F = wUmbFeat(wUmbChampOf(p) || ''), v = r ? B8.v[r - 1] : 0;
-    return `<li class="${r ? 'wfhave' : ''}"><b>${esc(W_UMB_PIECES[p].n)}</b> <small>${r === 2 ? 'won well' : r ? 'won' : 'still out'}. ${esc(B8.n)}${B8.u ? ` (${B8.v[0]}${B8.u === '%' ? '%' : ' ' + B8.u}, or ${B8.v[1]}${B8.u === '%' ? '%' : ' ' + B8.u} won well)` : ''}${r ? `: now ${v}${B8.u === '%' ? '%' : B8.u ? ' ' + B8.u : ''}` : ''}.${F && !r ? ` The feat: ${esc(F.n)}.` : ''}</small></li>`;
+    const unit = x => B8.u === '%' ? x + '%' : x + ' ' + B8.u, now = !r ? '' : B8.u ? `: now ${unit(v)}` : ': yes';
+    return `<li class="${r ? 'wfhave' : ''}"><b>${esc(W_UMB_PIECES[p].n)}</b> <small>${r === 2 ? 'won well' : r ? 'won' : 'still out'}. ${esc(B8.n)}${B8.u ? ` (${unit(B8.v[0])}, or ${unit(B8.v[1])} won well)` : ''}${now}.${F && !r ? ` The feat: ${esc(F.n)}.` : ''}</small></li>`;
   });
   return `<h4>The Seal</h4><p class="hint">Each piece you hold sings for you on the dark side, twice as strongly if you won it well (by its champion's feat, or at the first try). In the Seal's final, a game whose piece you won well draws a hex fewer.</p><ul class="wumbseal">${rows.join('')}</ul>`;
 }
