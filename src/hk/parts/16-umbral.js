@@ -32,7 +32,7 @@ const HK_HEX = {
   holes: { n: 'The Ice Opens', d: 'Holes of open water in the end you attack, new ones each period: a puck that slides into one is gone, and the face-off goes back to centre ice.', count: 2, r: .9 },
   slide: { n: 'The Wandering Net', d: 'The net you shoot at slides along its goal line away from the puck, and the goalie goes with it: shots from the wings come at a worse angle.', max: 1.8, v: 1.6, k: .4 },
   cold: { n: 'Grave Cold', d: 'The cold of the pond gets into your skaters: they tire 30% faster.', k: 1.3 },
-  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called twice as often.', k: 2, max: .9 },
+  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called up to twice as often.', k: 2, max: .9 },
 };
 // the Nadir captain's own ultimate
 HK_ULT_OWN.longnight = hkU0('longnight', 'The Long Night', 'The lamps go out over the pond: their goalie is set late for everything, and they skate as if through deep snow.', { blind: .6, shot: .02 }, { slow: .86 }, 'slot');
