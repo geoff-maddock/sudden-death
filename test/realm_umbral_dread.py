@@ -77,8 +77,8 @@ async def main():
           // a free open row: you, and a shadow three steps east in plain sight
           let spot = null;
           for (let y = 5; y < m.h - 5 && !spot; y++) for (let x = 5; x < m.w - 9 && !spot; x++) { let ok = true; for (let i = 0; i <= 6 && ok; i++) ok = wUmbShadowOk(m, x + i, y) && wUmbFreeAt(m, x + i, y - 1) && !wUmbLanternLit(m, x + i, y); if (ok) spot = [x, y]; }
-          const [x, y] = spot; U.shadows = [{ id: 'sa', x: x + 4, y, hx: x + 4, hy: y }]; wEnterMap('u:world', x, y); WG.grace = 0; U.salt = 0;
-          const n0 = W_UMB8C.started; wTryMove(0, -1); out.closer = U.shadows[0].x; out.started = W_UMB8C.started - n0;
+          const [x, y] = spot; U.shadows = [{ id: 'sa', x: x + 3, y, hx: x + 3, hy: y }]; wEnterMap('u:world', x, y); WG.grace = 0; U.salt = 0;
+          const n0 = W_UMB8C.started; wTryMove(0, -1); out.closer = (Math.abs(U.shadows[0].x - WG.x) + Math.abs(U.shadows[0].y - WG.y)) - 4; out.started = W_UMB8C.started - n0;
           // out of sight: far away, it stays near home
           U.shadows = [{ id: 'sb', x: x + 30 < m.w ? x + 30 : x - 30, y, hx: 0, hy: 0 }]; U.shadows[0].hx = U.shadows[0].x; U.shadows[0].hy = y;
           for (let i = 0; i < 6; i++) { wEnterMap('u:world', x, y); WG.grace = 0; wTryMove(0, -1); }
@@ -91,7 +91,7 @@ async def main():
           out.kind = (document.querySelector('#modalBox') || {}).textContent ? 'card' : ''; document.getElementById('modal').hidden = true; MODAL_NOW = null;
           return out; })()""")
         check(sh['n0'] == 3 and sh['n2'] == 10 and sh['back'] == 3, 'the shadows number 3 in the Quiet and 10 in the Raging', sh)
-        check(sh['started'] == 0 and sh['closer'] < 999 and sh['home'] <= 3, 'a shadow in sight comes closer; one out of sight drifts near home', sh)
+        check(sh['started'] == 0 and sh['closer'] < 0 and sh['home'] <= 3, 'a shadow in sight comes closer; one out of sight drifts near home', sh)
         check(sh['salted'] and sh['saltLeft'] == 4, 'Shadow Salt: a shadow in sight cannot find you, and the salt counts down', sh)
         check(sh['into'] == [1, True], 'walking into a shadow starts a match, and you stay where you were', sh)
         await pg.evaluate("document.getElementById('modal').hidden = true; MODAL_NOW = null")

@@ -94,19 +94,19 @@ function wUmbFreeAt(m, x, y) {
 function wUmbHazardStep() {
   const m = wCurMap(), h = wUmbHazardAt(m, WG.x, WG.y); if (!h) return '';
   if (h === 'spike') {
-    const cost = wUmbSpikeHp(); if (RUN.hp > 1) RUN.hp = Math.max(1, RUN.hp - cost);
-    wLog(`Spikes, black as old bone, through the soles. Your team loses ${cost} HP (${RUN.hp}/${RUN.maxhp}).`, 'b');
+    const h0 = RUN.hp; RUN.hp = Math.max(Math.min(1, h0), h0 - wUmbSpikeHp());
+    wLog(`Spikes, black as old bone, through the soles. ${h0 > RUN.hp ? `Your team loses ${h0 - RUN.hp} HP` : 'Your team limps on'} (${RUN.hp}/${RUN.maxhp}).`, 'b');
     return 'spike';
   }
   if (wUmbDread() < 1) { if (!LAB && Math.random() < .3) wLog('The ground here is cracked, and it holds. For now.', 'd'); return ''; }
-  const cost = W_UMB8C.pitHp; if (RUN.hp > 1) RUN.hp = Math.max(1, RUN.hp - cost);
-  // out of the pit a few steps away, wherever the dark lets you climb
-  const r = mulberry(WG.step * 31 + WG.x * 7 + WG.y), opts = [];
+  const h0 = RUN.hp; RUN.hp = Math.max(Math.min(1, h0), h0 - W_UMB8C.pitHp);
+  // out of the pit a few steps away, wherever the dark lets you climb: never somewhere you can't walk back from
+  const r = mulberry(WG.step * 31 + WG.x * 7 + WG.y), opts = [], reach = bfsReach(m, WG.x, WG.y);
   for (let dy = -W_UMB8C.pitDrop; dy <= W_UMB8C.pitDrop; dy++) for (let dx = -W_UMB8C.pitDrop; dx <= W_UMB8C.pitDrop; dx++) {
-    const x = WG.x + dx, y = WG.y + dy; if ((dx || dy) && Math.abs(dx) + Math.abs(dy) >= 2 && wUmbFreeAt(m, x, y) && !wUmbShadowAt(x, y)) opts.push([x, y]);
+    const x = WG.x + dx, y = WG.y + dy; if ((dx || dy) && Math.abs(dx) + Math.abs(dy) >= 2 && x >= 0 && y >= 0 && x < m.w && y < m.h && reach[y * m.w + x] && wUmbFreeAt(m, x, y) && !wUmbShadowAt(x, y)) opts.push([x, y]);
   }
   if (opts.length) { const [x, y] = opts[Math.floor(r() * opts.length)]; WG.x = x; WG.y = y; }
-  wLog(`The ground opens under you. Your team falls, climbs, and comes up somewhere else, ${cost} HP down (${RUN.hp}/${RUN.maxhp}).`, 'b');
+  wLog(`The ground opens under you. Your team falls, climbs, and comes up somewhere else${h0 > RUN.hp ? `, ${h0 - RUN.hp} HP down` : ''} (${RUN.hp}/${RUN.maxhp}).`, 'b');
   return 'pit';
 }
 // (u8g's resonance makes spikes cheaper: it wraps this)
@@ -117,8 +117,15 @@ const W_UMB8C_ANIM = {};   // (where each shadow was drawn last, for the glide b
 const wUmbShadows = () => { const U = wUmb(); if (!U) return []; if (!Array.isArray(U.shadows)) U.shadows = []; return U.shadows; };
 const wUmbShadowAt = (x, y) => wUmbShadows().find(s => s.x === x && s.y === y) || null;
 const wUmbLanternLit = (m, x, y) => Object.keys(m.meta).some(k => { if (!m.meta[k].lantern) return false; const [lx, ly] = k.split(',').map(Number); return Math.hypot(lx - x, ly - y) <= W_UMB8C.lanternR; });
-// where a shadow may stand: free ground, out of a lantern's light
-const wUmbShadowOk = (m, x, y) => wUmbFreeAt(m, x, y) && !wUmbLanternLit(m, x, y) && !wUmbShadowAt(x, y);
+// where a shadow may stand: free ground, out of a lantern's light, not in front of a place's way in (where you come
+// out of it)
+const wUmbShadowOk = (m, x, y) => wUmbFreeAt(m, x, y) && !wUmbLanternLit(m, x, y) && !wUmbShadowAt(x, y) && !DB.locs.some(L => Math.abs(L.x - x) + Math.abs(L.y - y) <= 1);
+// a shadow off your tile (you came out of a place onto it, or ran from its match): back toward home, or anywhere free
+function wUmbShadowShove(m, s) {
+  for (const [x, y] of [[s.hx, s.hy]].concat([[2, 0], [-2, 0], [0, 2], [0, -2], [3, 1], [-3, -1], [1, 3], [-1, -3]].map(([dx, dy]) => [s.x + dx, s.y + dy])))
+    if (!(x === WG.x && y === WG.y) && wUmbShadowOk(m, x, y)) { s.x = x; s.y = y; return true; }
+  return false;
+}
 function wUmbShadowsSync() {
   const U = wUmb(), m = MAPS['u:world']; if (!U || !m || U.sealed) return;
   const S = wUmbShadows();
@@ -136,7 +143,8 @@ function wUmbShadowsSync() {
 }
 // a clear walkable line between a shadow and you (no wall, water or mountain in the way)
 function wUmbSees(m, s) {
-  if ((wUmb().salt || 0) > 0) return false;
+  // (salt hides you; so does a lantern's light, which no shadow comes into)
+  if ((wUmb().salt || 0) > 0 || wUmbLanternLit(m, WG.x, WG.y)) return false;
   const sight = wUmbShadowSight(), d = Math.abs(s.x - WG.x) + Math.abs(s.y - WG.y); if (d > sight) return false;
   const n = Math.max(Math.abs(WG.x - s.x), Math.abs(WG.y - s.y));
   for (let i = 1; i < n; i++) {
@@ -170,6 +178,7 @@ function wUmbShadowStep() {
   const U = wUmb(), m = MAPS['u:world']; if (!U || !m || WG.map !== 'u:world' || U.sealed) return null;
   if (U.salt > 0) U.salt--;
   wUmbShadowsSync();
+  for (const s of wUmbShadows()) if (s.x === WG.x && s.y === WG.y) wUmbShadowShove(m, s);
   if (WG.grace > 0) return null;
   const r = mulberry((WG.step || 0) * 131 + (WG.dayAbs || 0)), twice = wUmbDread() >= W_UMB8C.hunt && WG.step % 3 === 0;
   for (const s of wUmbShadows()) {
@@ -190,6 +199,11 @@ W_ON_END.shadow = function (r, ref) {
     if (i >= 0) { S.splice(i, 1); (U.shadowWait = U.shadowWait || []).push((WG.dayAbs || 0) + 1); }
     WG.grace = Math.max(WG.grace || 0, 3);
     wLog('The shadow comes apart like smoke. Somewhere out on the dark world, another one starts to gather.', 'g');
+  } else if (ref) {
+    // (run from, or lost: it lets you be for a moment, off your tile)
+    const s = wUmbShadows().find(s => s.id === ref.id), m = MAPS['u:world'];
+    if (s && m && WG.map === 'u:world' && s.x === WG.x && s.y === WG.y) wUmbShadowShove(m, s);
+    WG.grace = Math.max(WG.grace || 0, 3);
   }
 };
 
@@ -203,9 +217,11 @@ wTryMove = function (dx, dy) {
   const s0 = wUmbShadowAt(WG.x + dx, WG.y + dy);
   if (s0) { WG.face = dx < 0 ? 'l' : dx > 0 ? 'r' : dy < 0 ? 'u' : 'd'; wUmbShadowMatch(s0); return false; }
   const n0 = W_UMB8C.started, moved = wWU8CTryMove.apply(this, arguments);
-  // (a step that took you somewhere else, or started a match, is the end of it)
-  if (!moved || WG.map !== m0 || W_UMB8C.started !== n0) return moved;
+  // (a step that took you somewhere else is the end of it; one that started a match still costs its hazard, but the
+  // shadows wait)
+  if (!moved || WG.map !== m0) return moved;
   wUmbHazardStep();
+  if (W_UMB8C.started !== n0) return moved;
   const s = wUmbShadowStep();
   if (s) wUmbShadowMatch(s);
   return moved;
@@ -290,6 +306,7 @@ function wUmbDreadDoes(s) {
 const wWU8CNextPrompt = wNextPrompt;
 wNextPrompt = function () {
   const U = wUmb();
+  if (U && U.dreadScene && U.sealed) U.dreadScene = 0;   // (stale once the Seal is forged)
   if (U && U.dreadScene && !LAB && wActive()) { const s = U.dreadScene; U.dreadScene = 0; wSave(); if (wUmbDreadScene(s)) return true; }
   return wWU8CNextPrompt.apply(this, arguments);
 };
