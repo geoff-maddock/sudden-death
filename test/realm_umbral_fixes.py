@@ -48,20 +48,21 @@ async def main():
 
         # ---------- A3: hockey's interference under The Hollow Whistle ----------
         hk = await pg.evaluate("""(() => {
-          const was = wHK.fouls.interfere;
+          const was = wHK.foulsNow.interfere;
           // the same seed, the same moment: your skater's lunge misses, the nearest of theirs a stride away; is it called?
           const run = (seed, hx) => { wHK.start({ seed, skill: [1, 1], hexes: hx, powers: false }); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step();
             const L = wHK.play, sk = L.pl.filter(q => q.side === 0 && q.pos !== 'G'), d = sk[0], c = sk[1], o = L.pl.find(q => q.side === 1 && q.pos !== 'G');
             wHK.give(L.pl.indexOf(c)); o.x = d.x + .5; o.y = d.y; o.vx = o.vy = 0; L.lunge = { i: L.pl.indexOf(d), t: .001 }; const e0 = L.evN || 0;
-            wHK.step(); return wHK.ev.slice(-((L.evN || 0) - e0)).some(e => e.k === 'foul' && e.o === 'interference'); };
+            wHK.step(); const ne = (L.evN || 0) - e0; return (ne > 0 ? wHK.ev.slice(-ne) : []).some(e => e.k === 'foul' && e.o === 'interference'); };
           wHK.setFouls({ interfere: .45 }); const none = [], whis = [];
           try { for (let s = 1; s <= 40; s++) { none.push(run(s, [])); whis.push(run(s, ['whistle'])); } } finally { wHK.setFouls({ interfere: was }); }
-          return { none, whis, was, now: wHK.fouls.interfere, k: wHK.hexRules.whistle.k, max: wHK.hexRules.whistle.max }; })()""")
+          return { none, whis, was, now: wHK.foulsNow.interfere, load: wHK.fouls.interfere, d: wHK.hexes.whistle.d, k: wHK.hexRules.whistle.k, max: wHK.hexRules.whistle.max }; })()""")
         nN, nW = sum(hk['none']), sum(hk['whis'])
         check(all(w or not n for n, w in zip(hk['none'], hk['whis'])) and nW > nN and any(w and not n for n, w in zip(hk['none'], hk['whis'])),
               'The Hollow Whistle: the same seeded lunge is called for interference at least as often, and some only under the hex', [nN, nW])
         check(nN >= 8 and nW >= nN * 1.4, 'interference under the hex is called far more often (about twice, up to its cap)', [nN, nW, hk['k'], hk['max']])
-        check(hk['was'] == .6 and hk['now'] == .6 and hk['max'] < 1, 'with no hex, interference is called as before (its odds unchanged)', hk)
+        check('up to twice' in hk['d'] and hk['k'] * .6 > hk['max'], 'The Hollow Whistle\'s words say up to twice as often (interference is capped)', hk['d'])
+        check(hk['was'] == hk['load'] == .6 and hk['now'] == .6 and hk['max'] < 1, 'with no hex, interference is called as before (its odds unchanged)', hk)
 
         # ---------- a journey, the Umbral open ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
@@ -83,9 +84,14 @@ async def main():
           const i = rows.findIndex(tr => tr.textContent.includes(X.n)), line = i >= 0 ? rows[i].querySelector('td small').textContent : '', row = i >= 0 ? rows[i].querySelector('td').textContent : '';
           const other = rows.filter((tr, j) => j !== i).map(tr => tr.querySelector('td small') ? tr.querySelector('td small').textContent : '');
           const sec = W_UMB4C.seconds.map(([n, k]) => wBX.traits[k] ? wBX.traits[k].n : '');
-          return { line, row, own: X.tr.n, kind: K ? K.n : '', other, sec }; })()""")
+          // each boxer's special on their own bout's row (none on the tale-of-the-tape rows between)
+          const sp = W_UMB4C.seconds.map(([n, k]) => { const tr = rows.find(r => r.textContent.includes(n)), e = tr && tr.querySelector('[data-rsppair]'), B = wBX.powerBook[k];
+            return { n, want: B ? B.sp.n : null, got: e ? e.textContent : null }; });
+          const onTape = document.querySelectorAll('#wRingPairT tr.wrtape [data-rsppair]').length;
+          return { line, row, own: X.tr.n, kind: K ? K.n : '', other, sec, sp, onTape }; })()""")
         check(bx['own'] in bx['line'] and bx['kind'] and bx['kind'] not in bx['row'], 'the pairing names Brakka\'s own nature (the engine\'s) and not a minotaur\'s', bx)
         check(all((not s) or s in o for s, o in zip(bx['sec'], bx['other'])), 'the undercard still shows their kinds\' natures', bx)
+        check(all(x['want'] and x['got'] and x['want'] in x['got'] for x in bx['sp']) and bx['onTape'] == 0, 'each undercard boxer\'s special is on their own bout\'s row, none on the tape rows', bx['sp'])
         await pg.click('#modalBox [data-close]')
 
         # ---------- A4: a champion's game is the standard length ----------
@@ -118,6 +124,22 @@ async def main():
             check(r['set'] == r['short'], f'{e}: Settings are left as they were', r)
             f = ln['finale_' + e]
             check(f['seen'] == [f['std']] and f"Always {f['std']} {words}" in f['note'] and f['set'] == f['short'], f'{e}: a round of the Seal is the standard length too, and its card says so', f)
+
+        # the bar, during a champion's game with Settings at their shortest: no "from the next game" length note (the
+        # bar without this part's wrap does show it, so the check can fail); curling's six ends (u4h) too
+        bar = await pg.evaluate("""(() => { const out = {}, U = WG.umbral; U.tries = {};
+          const S = [['links', 'linksHoles', 3, 'wLinksNote', wUmbGlKick, wLinksBarNote, wWU8ALinksBarNote, wLinksCallOff], ['lanes', 'lanesFrames', 5, 'wLanesNote', wUmbBlKick, wLanesBarNote, wWU8ALanesBarNote, wLanesCallOff],
+            ['shed', 'shedEnds', 4, 'wShedNote', wUmbCrKick, wShedBarNote, wWU8AShedBarNote, wShedCallOff]];
+          for (const [id, key, short, note, kick, bar, raw, off] of S) {
+            wDrain(); SET[key] = short; const why = kick(W_NADIR[id], id, [], 'manage'); bar(); const mine = $(note).textContent;
+            raw(); const bare = $(note).textContent; off('test: called off');
+            out[id] = { why, mine, bare, set: SET[key] };
+          }
+          showView('world'); wDrain(); return out; })()""")
+        for e in ('links', 'lanes', 'shed'):
+            b = bar[e]
+            check(b['why'] == '' and 'from the next game' in b['bare'] and 'from the next game' not in b['mine'] and b['set'] in (3, 4, 5),
+                  f'{e}: during a champion\'s game the bar leaves off the "from the next game" length note', b)
 
         # How to play's Umbral section says so
         hp = await pg.evaluate("showPage('help'); (document.getElementById('wHelpU8aLen') || {}).textContent || ''")

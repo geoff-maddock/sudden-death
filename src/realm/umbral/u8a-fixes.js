@@ -12,11 +12,12 @@
    the engine's standard length, the one the labs measured (W_UMB8A.len), whatever Settings says, and the card says so.
    Curling's champion already plays six ends (u4h).
 
-   W_UMB8A, wUmbFixedLen
+   W_UMB8A, W_UMB8A_BARS, wUmbFixedLen, wUmbLenNote, wUmbBarTrim
    Wraps: wRingPairing (wWU8ARingPairing: the champion's own nature), wUmbGlKick, wUmbBlKick and wUmbBkTip
    (wWU8AUmbGlKick, wWU8AUmbBlKick, wWU8AUmbBkTip: the standard length), wUmbGlCard, wUmbBlCard and wUmbBkCard
-   (wWU8AUmbGlCard, wWU8AUmbBlCard, wWU8AUmbBkCard: the card says so), renderHelp (wWU8ARenderHelp: a sentence in
-   the Umbral section). */
+   (wWU8AUmbGlCard, wWU8AUmbBlCard, wWU8AUmbBkCard: the card says so), wLinksBarNote, wLanesBarNote and wShedBarNote
+   (wWU8ALinksBarNote, wWU8ALanesBarNote, wWU8AShedBarNote: no "from the next game" length note during a champion's
+   game), renderHelp (wWU8ARenderHelp: a sentence in the Umbral section). */
 
 const W_UMB8A = {
   // each sport's length setting (SET key), the engine's standard length and its words
@@ -62,6 +63,22 @@ const wWU8AUmbGlCard = wUmbGlCard, wWU8AUmbBlCard = wUmbBlCard, wWU8AUmbBkCard =
 wUmbGlCard = function () { const r = wWU8AUmbGlCard.apply(this, arguments); wUmbLenNote('links'); return r; };
 wUmbBlCard = function () { const r = wWU8AUmbBlCard.apply(this, arguments); wUmbLenNote('lanes'); return r; };
 wUmbBkCard = function () { const r = wWU8AUmbBkCard.apply(this, arguments); wUmbLenNote('court'); return r; };
+
+// the bar: a champion's game (or a round of the Seal) is not followed by a game of the Settings length, so the bar's
+// "(Holes: 3 from the next game; this one is 9.)" is left off while one is on (curling's six ends too: u4h)
+const W_UMB8A_BARS = [
+  ['wLinksNote', () => W_UMB4F.kind, () => WG && WG.lkg && WG.lkg.live, /\s*\(Holes: \d+ from the next game; this one is \d+\.\)/],
+  ['wLanesNote', () => W_UMB4G.kind, () => WG && WG.lng && WG.lng.live, /\s*\(Frames: \d+ from the next game; this one is \d+\.\)/],
+  ['wShedNote', () => W_UMB4H.kind, () => WG && WG.shg && WG.shg.live, /\s*\(Ends: \d+ from the next game; this one is \d+\.\)/],
+];
+function wUmbBarTrim(i) {
+  const [id, kind, live, re] = W_UMB8A_BARS[i], L = live(), el = $(id);
+  if (el && L && L.world && L.world.kind === kind()) el.textContent = el.textContent.replace(re, '');
+}
+const wWU8ALinksBarNote = wLinksBarNote, wWU8ALanesBarNote = wLanesBarNote, wWU8AShedBarNote = wShedBarNote;
+wLinksBarNote = function () { const r = wWU8ALinksBarNote.apply(this, arguments); wUmbBarTrim(0); return r; };
+wLanesBarNote = function () { const r = wWU8ALanesBarNote.apply(this, arguments); wUmbBarTrim(1); return r; };
+wShedBarNote = function () { const r = wWU8AShedBarNote.apply(this, arguments); wUmbBarTrim(2); return r; };
 
 /* ---------- How to play ---------- */
 const wWU8ARenderHelp = renderHelp;

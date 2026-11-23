@@ -34926,7 +34926,7 @@ const HK_HEX = {
   holes: { n: 'The Ice Opens', d: 'Holes of open water in the end you attack, new ones each period: a puck that slides into one is gone, and the face-off goes back to centre ice.', count: 2, r: .9 },
   slide: { n: 'The Wandering Net', d: 'The net you shoot at slides along its goal line away from the puck, and the goalie goes with it: shots from the wings come at a worse angle.', max: 1.8, v: 1.6, k: .4 },
   cold: { n: 'Grave Cold', d: 'The cold of the pond gets into your skaters: they tire 30% faster.', k: 1.3 },
-  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called twice as often.', k: 2, max: .9 },
+  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called up to twice as often.', k: 2, max: .9 },
 };
 // the Nadir captain's own ultimate
 HK_ULT_OWN.longnight = hkU0('longnight', 'The Long Night', 'The lamps go out over the pond: their goalie is set late for everything, and they skate as if through deep snow.', { blind: .6, shot: .02 }, { slow: .86 }, 'slot');
@@ -35432,8 +35432,9 @@ return {
   changing: () => L ? L.pl.map((p, i) => p.chg ? [i, p.chg.to] : null).filter(Boolean) : [], changeNow: side => L ? hkChangeNow(side) : 0, get auto() { return GD ? GD.auto : true; },
   // penalties and the goalie (phase 3): the fouls' odds, the penalty that is coming, whether a goalie is in their net and
   // why not, who takes a side's face-offs, the shootout's try now; the tests' handles: a foul by player i, the fouls' odds
-  // changed, a goal by player i, a pull, the lines set again
-  fouls: Object.assign({}, HK_FOUL), pullRules: Object.assign({}, HK_PULL), get delay() { return GD && GD.delay ? Object.assign({}, GD.delay) : null; },
+  // changed, a goal by player i, a pull, the lines set again (fouls is the odds as the game loaded; foulsNow the odds as
+  // they are, after setFouls)
+  fouls: Object.assign({}, HK_FOUL), get foulsNow() { return Object.assign({}, HK_FOUL); }, pullRules: Object.assign({}, HK_PULL), get delay() { return GD && GD.delay ? Object.assign({}, GD.delay) : null; },
   inNet: side => !!L && hkInNet(side), pulled: side => L ? L.pl[hkGk(side)].pulled || '' : '', taker: side => L ? hkTaker(side) : -1,
   get soTry() { const U = GD && GD.so && GD.so.cur; return U ? { side: U.side, i: U.i, gi: U.gi, st: U.st, scored: U.scored, win: U.win } : null; },
   foul: (i, k) => { if (L) hkFoul(L.pl[i], k || 'tripping', null); }, setFouls: o => Object.assign(HK_FOUL, o || {}),
@@ -54305,11 +54306,11 @@ wRingTapeOf = function (f) {
   if (t.P && sp) t.P = Object.assign({}, t.P, { sp });
   return t;
 };
-// the pairing: the special each of theirs brings
+// the pairing: the special each of theirs brings (on their bout's row: the tale-of-the-tape rows between are skipped)
 const wW75RingPairing = wRingPairing;
 wRingPairing = function (o) {
   const r = wW75RingPairing(o), T = $('wRingPairT');
-  if (T && o && o.theirs) T.querySelectorAll('tr').forEach((tr, i) => { const f = o.theirs.fighters[i], sp = f && wRingSpPow(f), td = tr.querySelector('td');
+  if (T && o && o.theirs) T.querySelectorAll('tr:not(.wrtape)').forEach((tr, i) => { const f = o.theirs.fighters[i], sp = f && wRingSpPow(f), td = tr.querySelector('td');
     if (sp && td) td.insertAdjacentHTML('beforeend', `<br><small data-rsppair title="${esc(sp.desc)}">Special: <b>${esc(sp.n)}</b></small>`); });
   return r;
 };
@@ -67373,11 +67374,12 @@ WOBJ.J = function (c, P, r, e) { wWU7ObjJ.apply(this, arguments); if (e && e.m &
    the engine's standard length, the one the labs measured (W_UMB8A.len), whatever Settings says, and the card says so.
    Curling's champion already plays six ends (u4h).
 
-   W_UMB8A, wUmbFixedLen
+   W_UMB8A, W_UMB8A_BARS, wUmbFixedLen, wUmbLenNote, wUmbBarTrim
    Wraps: wRingPairing (wWU8ARingPairing: the champion's own nature), wUmbGlKick, wUmbBlKick and wUmbBkTip
    (wWU8AUmbGlKick, wWU8AUmbBlKick, wWU8AUmbBkTip: the standard length), wUmbGlCard, wUmbBlCard and wUmbBkCard
-   (wWU8AUmbGlCard, wWU8AUmbBlCard, wWU8AUmbBkCard: the card says so), renderHelp (wWU8ARenderHelp: a sentence in
-   the Umbral section). */
+   (wWU8AUmbGlCard, wWU8AUmbBlCard, wWU8AUmbBkCard: the card says so), wLinksBarNote, wLanesBarNote and wShedBarNote
+   (wWU8ALinksBarNote, wWU8ALanesBarNote, wWU8AShedBarNote: no "from the next game" length note during a champion's
+   game), renderHelp (wWU8ARenderHelp: a sentence in the Umbral section). */
 
 const W_UMB8A = {
   // each sport's length setting (SET key), the engine's standard length and its words
@@ -67423,6 +67425,22 @@ const wWU8AUmbGlCard = wUmbGlCard, wWU8AUmbBlCard = wUmbBlCard, wWU8AUmbBkCard =
 wUmbGlCard = function () { const r = wWU8AUmbGlCard.apply(this, arguments); wUmbLenNote('links'); return r; };
 wUmbBlCard = function () { const r = wWU8AUmbBlCard.apply(this, arguments); wUmbLenNote('lanes'); return r; };
 wUmbBkCard = function () { const r = wWU8AUmbBkCard.apply(this, arguments); wUmbLenNote('court'); return r; };
+
+// the bar: a champion's game (or a round of the Seal) is not followed by a game of the Settings length, so the bar's
+// "(Holes: 3 from the next game; this one is 9.)" is left off while one is on (curling's six ends too: u4h)
+const W_UMB8A_BARS = [
+  ['wLinksNote', () => W_UMB4F.kind, () => WG && WG.lkg && WG.lkg.live, /\s*\(Holes: \d+ from the next game; this one is \d+\.\)/],
+  ['wLanesNote', () => W_UMB4G.kind, () => WG && WG.lng && WG.lng.live, /\s*\(Frames: \d+ from the next game; this one is \d+\.\)/],
+  ['wShedNote', () => W_UMB4H.kind, () => WG && WG.shg && WG.shg.live, /\s*\(Ends: \d+ from the next game; this one is \d+\.\)/],
+];
+function wUmbBarTrim(i) {
+  const [id, kind, live, re] = W_UMB8A_BARS[i], L = live(), el = $(id);
+  if (el && L && L.world && L.world.kind === kind()) el.textContent = el.textContent.replace(re, '');
+}
+const wWU8ALinksBarNote = wLinksBarNote, wWU8ALanesBarNote = wLanesBarNote, wWU8AShedBarNote = wShedBarNote;
+wLinksBarNote = function () { const r = wWU8ALinksBarNote.apply(this, arguments); wUmbBarTrim(0); return r; };
+wLanesBarNote = function () { const r = wWU8ALanesBarNote.apply(this, arguments); wUmbBarTrim(1); return r; };
+wShedBarNote = function () { const r = wWU8AShedBarNote.apply(this, arguments); wUmbBarTrim(2); return r; };
 
 /* ---------- How to play ---------- */
 const wWU8ARenderHelp = renderHelp;
