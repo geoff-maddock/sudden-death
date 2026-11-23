@@ -29,7 +29,7 @@ const W_UMB4A = {
 W_BALL.diff[4] = 3; W_BALL.oppBonus[4] = 1; W_BALL_SKILL[3] = 'Lich';
 
 /* ---------- the champion ---------- */
-W_NADIR.diamond = { piece: 'baseball', char: 'nadir_diamond', ground: 'g_ballpark', map: 'u:g_ballpark', region: 'plains', engine: 'diamond', hexes: 2, toll: 30, gold: 100,
+W_NADIR.diamond = { piece: 'baseball', char: 'nadir_diamond', ground: 'g_ballpark', map: 'u:g_ballpark', region: 'plains', engine: 'diamond', hexes: 2, toll: 20, gold: 100,
   star: { kind: 'witch', n: 'Vesper Quill', num: 13, pitches: ['deadball'] } };
 DB.chars.nadir_diamond = { name: 'Vesper Quill, the Stitcher', kind: 'witch', look: { coat: '#2e2438', acc: 'hat', hair: '#d8d0e8' },
   greet: 'Another nine through the door. I keep the STITCH, and I pitch for the Bone Nine. Say PLAY when you want to try to hit me. Ask about the RULES first. Everybody should.',
@@ -39,7 +39,7 @@ DB.chars.nadir_diamond = { name: 'Vesper Quill, the Stitcher', kind: 'witch', lo
     rules: { t: 'Three innings, our ground, our rules. My nine play at your level, a little better at everything, and they think faster than any coach you have met. Before the first pitch I draw the HEXES: two, for you.' },
     hexes: { t: 'A pitch that goes through the bat. Bases that will not stay put. A font that never runs dry. A chill in the hands. You will see which before we start, and they stay up on the scoreboard.' },
     dead: { t: 'The Dead Ball. It leaves my hand and it is not there, and then it is, and it is late. Nobody else throws it.' },
-    toll: { t: 'Thirty gold a game, after the first. You pay it when the first pitch is thrown, not before.' },
+    toll: { t: 'Twenty gold a game, after the first. You pay it when the first pitch is thrown, not before.' },
     play: { t: 'Then pick up a bat.', act: 'unadir:diamond' },
   } };
 

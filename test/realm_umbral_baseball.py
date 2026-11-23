@@ -76,7 +76,7 @@ async def main():
         ch = await pg.evaluate("""(() => { const C = W_NADIR.diamond, D = DB.chars[C.char], m = MAPS[C.map];
           return { C: { ground: C.ground, map: C.map, region: C.region, engine: C.engine, piece: C.piece, hexes: C.hexes, toll: C.toll, gold: C.gold }, greet: D.greet, act: D.topics.play.act,
             placed: !!m.npcs.find(n => n.id === C.char), h1: wUmb4aHexes('diamond', 2), h2: wUmb4aHexes('diamond', 2), table: W_UMB4A.hexes, known: Object.keys(wBD.hexes()), audit: wAudit(), probs: wBallProblems() }; })()""")
-        check(ch['C'] == {'ground': 'g_ballpark', 'map': 'u:g_ballpark', 'region': 'plains', 'engine': 'diamond', 'piece': 'baseball', 'hexes': 2, 'toll': 30, 'gold': 100} and ch['placed'], 'the champion waits at the Bone Diamond for the Iron Stitch', ch)
+        check(ch['C'] == {'ground': 'g_ballpark', 'map': 'u:g_ballpark', 'region': 'plains', 'engine': 'diamond', 'piece': 'baseball', 'hexes': 2, 'toll': 20, 'gold': 100} and ch['placed'], 'the champion waits at the Bone Diamond for the Iron Stitch', ch)
         check('PLAY' in ch['greet'] and 'RULES' in ch['greet'] and ch['act'] == 'unadir:diamond', 'she names PLAY and RULES, and PLAY asks for the game', ch)
         check(ch['h1'] == ch['h2'] and len(set(ch['h1'])) == 2 and all(h in ch['table'] and h in ch['known'] for h in ch['h1']), 'her hexes come from baseball\'s own table, two, the same for the try', ch)
         check(ch['audit'] == [] and ch['probs'] == [], 'the audit is clean, and the nine can play', ch)
@@ -140,7 +140,7 @@ async def main():
             res['paid'] = g1 - res['gold']
             await pg.click('#wBallOk'); await pg.evaluate(CLEAR)
             if res['last']['r'] == 'win': break
-        expect = 30 - 100 - await pg.evaluate("W_BALL.gold * 4")
+        expect = 20 - 100 - await pg.evaluate("W_BALL.gold * 4")
         check(res['last']['r'] == 'win' and res['pieces'] == ['baseball'] and res['beaten'] and not res['live'], 'a win pays the piece', res)
         check(res['paid'] == expect, 'the try cost the toll, and the win paid the champion\'s gold and the ball game\'s', {'res': res, 'expect': expect})
         done = await pg.evaluate("wNadirMatch('diamond')")

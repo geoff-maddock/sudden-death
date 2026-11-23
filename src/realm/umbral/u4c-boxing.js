@@ -42,7 +42,7 @@ W_BXG.oppBonus[W_UMB4C.tier] = 3;
 W_RING_KIT.opp[W_UMB4C.tier] = { draught: 1, cutsalve: 1, smellsalts: 1, ragetonic: 1 };
 
 /* ---------- the champion ---------- */
-W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur', look: { coat: '#3a2a4a' },
   greet: 'Every bell on this side rang once for somebody, and then it cracked. I hold the BELL. Say PLAY when you want to hear it ring for you. Ask about the RULES first, if you like.',
   topics: {
@@ -50,7 +50,7 @@ DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur',
     bell: { t: 'The Broken Bell. One ninth of your Seal. Win the card and it is yours. Lose, and the next card costs you a TOLL.' },
     rules: { t: 'Three bouts, as in your Anvil Ring: two of my Nadir, then me. Everything here is harder. My boxers are stronger than yours, my corner is cleverer than any you have met, and before the bell I draw the HEXES. One or two, for you.' },
     hexes: { t: 'A ring that closes in. Bad water in your bucket. Heavy gloves. A quick count. You will hear which before the bell.' },
-    toll: { t: 'Thirty gold a card, after the first. The first is free. The bell does not ring for nothing twice.' },
+    toll: { t: 'Twenty gold a card, after the first. The first is free. The bell does not ring for nothing twice.' },
     play: { t: 'Then glove up.', act: 'unadir:ring' },
   } };
 

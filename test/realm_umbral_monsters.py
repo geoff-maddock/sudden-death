@@ -61,7 +61,7 @@ async def main():
 
         await pg.evaluate("const C = W_NADIR.gate, m = MAPS[C.map], n = m.npcs.find(x => x.id === C.char); wEnterMap(C.map, n.x, n.y + 1); wDrain()")
         nd = await pg.evaluate("""(() => { const r = wSay('nadir_gate', 'play'); wRunAct(r.act, 'nadir_gate'); const box = document.getElementById('modalBox'), t = box ? box.textContent : '';
-          return { act: r.act, card: !!document.getElementById('wPlay'), tierU: t.includes('tier U'), hexes: (RUN.pending ? null : null), text: t.slice(0, 900), lantern: t.includes('lantern') && !t.includes('last inn') }; })()""")
+          return { act: r.act, card: !!document.getElementById('wPlay'), tierU: t.includes('tier U'), hexes: (RUN.pending ? null : null), text: t.slice(0, 2400), lantern: t.includes('lantern') && !t.includes('last inn') }; })()""")
         hx = await pg.evaluate("wUmbHexes('gate', 2).map(h => W_UMB3.hexes[h].n)")
         check(nd['act'] == 'unadir:gate' and nd['card'] and nd['tierU'] and all(h in nd['text'] for h in hx) and nd['lantern'], 'the Gatekeeper\'s PLAY opens a match card naming tier U, two hexes, and the lantern you would wake by', {'nd': nd, 'hx': hx})
         await pg.click('#wPlay')
@@ -90,7 +90,7 @@ async def main():
           LAB = true; const keep = beginFight; beginFight = enc => { UI.busy = false; startCombat(enc.ids, enc.type, enc.sport, enc.trait); }; out.rich = wNadirMatch('gate'); out.paid = 100 - RUN.gold; beginFight = keep; LAB = false; RUN.pending = null; B = null;
           return out; })()""")
         check(tl['backed'] == 0, 'backing away from the match card (Not yet) costs nothing', tl)
-        check(tl['tries'] == 1 and 'toll' in tl['poor'] and tl['rich'] == '' and tl['paid'] == 30, 'lose, and the next hand costs a toll (refused without the gold)', tl)
+        check(tl['tries'] == 1 and 'toll' in tl['poor'] and tl['rich'] == '' and tl['paid'] == 20, 'lose, and the next hand costs a toll (refused without the gold)', tl)
         aud = await pg.evaluate("wAudit()")
         check(aud == [], 'the audit is clean', aud)
         check(not errs, 'no page errors', errs[:5])

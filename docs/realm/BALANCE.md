@@ -2127,3 +2127,23 @@ within the noise, about 5 points at 200 a side), under the legends' range or at 
 hockey's Hollis Grael at 200 a side (42.0% against the Behemoth's 39.0%), is level at 500 a side (43.8% against 44.0%).
 Nothing tuned: the champions' ultimates were already balanced as opponents (#99) and are the same numbers here. The
 legends' own numbers are unchanged by this part (the redeemed are a separate table; nothing a legend uses was touched).
+
+### Umbral: the whole journey after #111 (the Dread, feats, legends, the toll)
+
+`python3 test/realm_umbral_journey_lab.py 80 15` on the full #111 build: the walk out to every try (a hungry shadow by
+the Dread's stage), the legends fought once each as they wake, the feats chased where the bot can (night, no powers),
+shards spent on the Seal's rounds.
+
+| run (80 journeys) | Crown winners | Seal forged | reached all nine pieces |
+|---|---|---|---|
+| tolls 30 (as #99 left them), first run | 61 | 2 (3%) | 5 |
+| tolls 30, second run | 44 | 1 (2%) | 4 |
+| **tolls 20 (kept)** | 52 | **6 (12%)** | 12 |
+
+With the tolls at 30, the Seal fell under the 5 to 15% target (3 of 105 Crown winners across the two runs; a 60-journey
+run before the toll question gave 4 of 40). Gold, not losing, was what stopped most runs: 'gold at …' and a toll that
+couldn't be paid ended more journeys than any one champion, and the football champion (now fielding the Behemoth) was
+where most stalled. A champion's toll after a loss is now 20 gold (the Broken Bell takes 10 or 20 off it), which puts the
+Seal back in the band. Elsewhere in the run: pieces won well about 55% (123 of 231), the shadows won about 95% of the
+time (they cost HP, and gold only on a blackout), the Kraken about 40%, the Phoenix and the Wyrm 15 to 20% (the bot
+meets them late, when it has fewer tries left).

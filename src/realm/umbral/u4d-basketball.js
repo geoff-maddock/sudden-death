@@ -43,7 +43,7 @@ W_COURT_KIT.opp[4] = { draught: 2, secondwind: 2, bksteady: 1, bkhot: 2 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.court = { piece: 'basketball', char: 'nadir_court', ground: 'g_court', map: 'u:g_court', region: 'plains', engine: 'court', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.court = { piece: 'basketball', char: 'nadir_court', ground: 'g_court', map: 'u:g_court', region: 'plains', engine: 'court', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_court = { name: 'Vesper Gloam, the Night Warden', kind: 'vampire', look: { coat: '#2e2440', acc: 'scarf' },
   greet: 'You walked all the way through the cold for a game of basketball. I captain the Nadir on the Black Court, and I keep the NET. Say PLAY when you want to lose it. Ask about the RULES first, if you like; nobody listens.',
   topics: {
@@ -51,7 +51,7 @@ DB.chars.nadir_court = { name: 'Vesper Gloam, the Night Warden', kind: 'vampire'
     net: { t: 'The Black Net. One ninth of your Seal, and it has never once let a ball through cleanly. Beat my five at basketball and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real basketball, five on five, four quarters, our boards. My side plays harder than anything you have met, a Lich calls our sets, and our bench carries a full bag. I keep the LIGHTS for when it matters. Before the tip I draw the HEXES.' },
     hexes: { t: 'The Black Court has its moods. Your rim drifts on its bracket, a shadow comes out to guard you, a crooked whistle calls every touch against you, the cold gets into your fingers at the line. You will hear which before the tip.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid at the tip. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid at the tip. Walking away from the card costs nothing.' },
     lights: { t: 'Once a game I put the torches out. Your shots go dark, and my five take the ball off you in the gloom.' },
     play: { t: 'Then bring your five.', act: 'unadir:court' },
   } };

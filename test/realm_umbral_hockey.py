@@ -157,7 +157,7 @@ async def main():
         await pg.evaluate("wLeaveRink(); wDrain(); for (const b of document.querySelectorAll('#modalBox [data-close], #wRinkOk')) b.click()")
 
         # backing away from the card costs nothing, even on a retry; the toll is paid once, at the face-off
-        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('rink'); const card = !!document.querySelector('[data-uhk]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 30 gold');
+        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('rink'); const card = !!document.querySelector('[data-uhk]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 20 gold');
           document.getElementById('wUhkNo').click(); return { why, card, toll, back: RUN.gold - g0, live: wRinkLive() }; })()""")
         check(bk['why'] == '' and bk['card'] and bk['toll'] and bk['back'] == 0 and not bk['live'], 'on a retry the card names the toll, and backing away costs nothing', bk)
         await pg.evaluate("RUN.gold = 200; wNadirMatch('rink')")
@@ -165,7 +165,7 @@ async def main():
         await pg.click('[data-uhk="play"]')
         await pg.wait_for_function("UI.view === 'rink' && wRinkLive() && wHK.on")
         tl = await pg.evaluate("""(() => { const g1 = RUN.gold; const again = wUmbTollAtKickoff('rink'); return { paid: 200 - g1, again, mode: wHK.mode }; })()""")
-        check(tl['paid'] == 30 and tl['again'] == 0 and tl['mode'] == 'play', 'the retry pays its toll once, as the puck drops (Play: you skate it)', tl)
+        check(tl['paid'] == 20 and tl['again'] == 0 and tl['mode'] == 'play', 'the retry pays its toll once, as the puck drops (Play: you skate it)', tl)
 
         # a win pays the Dead Puck (and its gold)
         await pg.evaluate("wHK.pause(true)"); await pg.evaluate("window.__g1 = RUN.gold"); await pg.evaluate(f"({END})(true)")

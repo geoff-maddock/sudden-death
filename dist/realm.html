@@ -65457,7 +65457,7 @@ const W_UMB_PIECES = {
 };
 // the Nadir champions: where each waits, who they field, what they hold. Phase 4 adds the sports' champions.
 const W_NADIR = {
-  gate: { piece: 'card', char: 'nadir_gate', map: 'u:umbralden', at: [9, 4], region: 'rime', ids: ['u_gatekeeper', 'boneline'], type: 'elite', hexes: 2, toll: 30, gold: 80 },
+  gate: { piece: 'card', char: 'nadir_gate', map: 'u:umbralden', at: [9, 4], region: 'rime', ids: ['u_gatekeeper', 'boneline'], type: 'elite', hexes: 2, toll: 20, gold: 80 },
 };
 EN('u_gatekeeper', 'The Gatekeeper', 'lich', [150, 160], {
   stack: { n: 'Stack the Deck', ops: [['b', 14], ['s', 'str', 2]] },
@@ -65472,7 +65472,7 @@ DB.chars.nadir_gate = { name: 'Morrow Vane, the Gatekeeper', kind: 'lich', look:
     card: { t: 'The Cracked Card. One ninth of your Seal. Win a hand of ours and it is yours. Lose, and the next hand costs you a TOLL.' },
     rules: { t: 'Our cards, our rules. Everything here is harder: my side has more in it, you hold one card fewer, and before we start I draw the HEXES. Two, for you.' },
     hexes: { t: 'A little something extra on the table. Shades in your deck, a grudge, cold hands. You will see which before we start.' },
-    toll: { t: 'Thirty gold a hand, after the first. The first is free. Nothing else here is.' },
+    toll: { t: 'Twenty gold a hand, after the first. The first is free. Nothing else here is.' },
     play: { t: 'Then sit down.', act: 'unadir:gate' },
   } };
 
@@ -65801,7 +65801,7 @@ const W_UMB4A = {
 W_BALL.diff[4] = 3; W_BALL.oppBonus[4] = 1; W_BALL_SKILL[3] = 'Lich';
 
 /* ---------- the champion ---------- */
-W_NADIR.diamond = { piece: 'baseball', char: 'nadir_diamond', ground: 'g_ballpark', map: 'u:g_ballpark', region: 'plains', engine: 'diamond', hexes: 2, toll: 30, gold: 100,
+W_NADIR.diamond = { piece: 'baseball', char: 'nadir_diamond', ground: 'g_ballpark', map: 'u:g_ballpark', region: 'plains', engine: 'diamond', hexes: 2, toll: 20, gold: 100,
   star: { kind: 'witch', n: 'Vesper Quill', num: 13, pitches: ['deadball'] } };
 DB.chars.nadir_diamond = { name: 'Vesper Quill, the Stitcher', kind: 'witch', look: { coat: '#2e2438', acc: 'hat', hair: '#d8d0e8' },
   greet: 'Another nine through the door. I keep the STITCH, and I pitch for the Bone Nine. Say PLAY when you want to try to hit me. Ask about the RULES first. Everybody should.',
@@ -65811,7 +65811,7 @@ DB.chars.nadir_diamond = { name: 'Vesper Quill, the Stitcher', kind: 'witch', lo
     rules: { t: 'Three innings, our ground, our rules. My nine play at your level, a little better at everything, and they think faster than any coach you have met. Before the first pitch I draw the HEXES: two, for you.' },
     hexes: { t: 'A pitch that goes through the bat. Bases that will not stay put. A font that never runs dry. A chill in the hands. You will see which before we start, and they stay up on the scoreboard.' },
     dead: { t: 'The Dead Ball. It leaves my hand and it is not there, and then it is, and it is late. Nobody else throws it.' },
-    toll: { t: 'Thirty gold a game, after the first. You pay it when the first pitch is thrown, not before.' },
+    toll: { t: 'Twenty gold a game, after the first. You pay it when the first pitch is thrown, not before.' },
     play: { t: 'Then pick up a bat.', act: 'unadir:diamond' },
   } };
 
@@ -65978,7 +65978,7 @@ W_GRID_KIT.opp[4] = { draught: 2, secondwind: 1, gfresin: 1, gfhaste: 1, gffog: 
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.gridiron = { piece: 'football', char: 'nadir_gridiron', ground: 'g_bowl', map: 'u:g_bowl', region: 'ember', engine: 'gridiron', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.gridiron = { piece: 'football', char: 'nadir_gridiron', ground: 'g_bowl', map: 'u:g_bowl', region: 'ember', engine: 'gridiron', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_gridiron = { name: 'Ossian Pyre, the Ash Marshal', kind: 'lich', look: { coat: '#3a2a4a', acc: 'hat' },
   greet: 'Another one who walked through the cold for a game. I captain the Nadir here, and I hold the BALL. Say PLAY when you are ready to lose it. Ask about the RULES first; nobody ever does.',
   topics: {
@@ -65986,7 +65986,7 @@ DB.chars.nadir_gridiron = { name: 'Ossian Pyre, the Ash Marshal', kind: 'lich', 
     ball: { t: 'The Ash Ball. One ninth of your Seal, and still warm. Beat my seven at football and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real football, seven a side, two halves, our field. My side plays harder than anything you have met, a Lich calls our plays, and our sideline carries a full bag. I keep an ECLIPSE for when it matters. Before kickoff I draw the HEXES.' },
     hexes: { t: 'The Pit has its moods. The end zone at your end creeps out, the ball rolls our way, the cold gets into your legs, the wind turns your kicks. You will hear which before kickoff.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid at kickoff. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid at kickoff. Walking away from the card costs nothing.' },
     eclipse: { t: 'Once a game I put the sun out. Your runners slow, your throws go wild. Enjoy the dark.' },
     play: { t: 'Then pick your seven.', act: 'unadir:gridiron' },
   } };
@@ -66113,7 +66113,7 @@ W_BXG.oppBonus[W_UMB4C.tier] = 3;
 W_RING_KIT.opp[W_UMB4C.tier] = { draught: 1, cutsalve: 1, smellsalts: 1, ragetonic: 1 };
 
 /* ---------- the champion ---------- */
-W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.ring = { piece: 'boxing', char: 'nadir_ring', ground: 'g_ring', map: 'u:g_ring', region: 'ember', engine: 'ring', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur', look: { coat: '#3a2a4a' },
   greet: 'Every bell on this side rang once for somebody, and then it cracked. I hold the BELL. Say PLAY when you want to hear it ring for you. Ask about the RULES first, if you like.',
   topics: {
@@ -66121,7 +66121,7 @@ DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur',
     bell: { t: 'The Broken Bell. One ninth of your Seal. Win the card and it is yours. Lose, and the next card costs you a TOLL.' },
     rules: { t: 'Three bouts, as in your Anvil Ring: two of my Nadir, then me. Everything here is harder. My boxers are stronger than yours, my corner is cleverer than any you have met, and before the bell I draw the HEXES. One or two, for you.' },
     hexes: { t: 'A ring that closes in. Bad water in your bucket. Heavy gloves. A quick count. You will hear which before the bell.' },
-    toll: { t: 'Thirty gold a card, after the first. The first is free. The bell does not ring for nothing twice.' },
+    toll: { t: 'Twenty gold a card, after the first. The first is free. The bell does not ring for nothing twice.' },
     play: { t: 'Then glove up.', act: 'unadir:ring' },
   } };
 
@@ -66262,7 +66262,7 @@ W_COURT_KIT.opp[4] = { draught: 2, secondwind: 2, bksteady: 1, bkhot: 2 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.court = { piece: 'basketball', char: 'nadir_court', ground: 'g_court', map: 'u:g_court', region: 'plains', engine: 'court', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.court = { piece: 'basketball', char: 'nadir_court', ground: 'g_court', map: 'u:g_court', region: 'plains', engine: 'court', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_court = { name: 'Vesper Gloam, the Night Warden', kind: 'vampire', look: { coat: '#2e2440', acc: 'scarf' },
   greet: 'You walked all the way through the cold for a game of basketball. I captain the Nadir on the Black Court, and I keep the NET. Say PLAY when you want to lose it. Ask about the RULES first, if you like; nobody listens.',
   topics: {
@@ -66270,7 +66270,7 @@ DB.chars.nadir_court = { name: 'Vesper Gloam, the Night Warden', kind: 'vampire'
     net: { t: 'The Black Net. One ninth of your Seal, and it has never once let a ball through cleanly. Beat my five at basketball and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real basketball, five on five, four quarters, our boards. My side plays harder than anything you have met, a Lich calls our sets, and our bench carries a full bag. I keep the LIGHTS for when it matters. Before the tip I draw the HEXES.' },
     hexes: { t: 'The Black Court has its moods. Your rim drifts on its bracket, a shadow comes out to guard you, a crooked whistle calls every touch against you, the cold gets into your fingers at the line. You will hear which before the tip.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid at the tip. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid at the tip. Walking away from the card costs nothing.' },
     lights: { t: 'Once a game I put the torches out. Your shots go dark, and my five take the ball off you in the gloom.' },
     play: { t: 'Then bring your five.', act: 'unadir:court' },
   } };
@@ -66408,7 +66408,7 @@ W_RINK_KIT.opp[4] = { draught: 3, hkanti: 2, hkcider: 2, hkliniment: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.rink = { piece: 'hockey', char: 'nadir_rink', ground: 'g_rink', map: 'u:g_rink', region: 'rime', engine: 'rink', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.rink = { piece: 'hockey', char: 'nadir_rink', ground: 'g_rink', map: 'u:g_rink', region: 'rime', engine: 'rink', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_rink = { name: 'Hollis Grael, the Drowned Captain', kind: 'wraith', look: { coat: '#2c2a44', acc: 'scarf', hair: '#d8e4f0' },
   greet: 'You crossed the cold for a game. I captain the Nadir on this pond, and I hold the PUCK. Say PLAY when you want to try to take it off me. Ask about the RULES first. The ice here has opinions.',
   topics: {
@@ -66416,7 +66416,7 @@ DB.chars.nadir_rink = { name: 'Hollis Grael, the Drowned Captain', kind: 'wraith
     puck: { t: 'The Dead Puck. One ninth of your Seal, frozen through. Beat my six at hockey and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real hockey, five skaters and a goalie, three periods, our pond. My six skate harder than anything you have met, a Lich calls our lines, and our bench carries a full bag. I keep a NIGHT of my own for when it matters. Before the puck drops I draw the HEXES.' },
     hexes: { t: 'The pond has moods. It opens under the puck and gives it back at centre ice. The net wanders off its line. The cold gets into your legs. The whistle forgets whose side it is on. You will hear which before the puck drops, and they stay up on the board.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid when the puck drops. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid when the puck drops. Walking away from the card costs nothing.' },
     night: { t: 'The Long Night. Once a game I put the lamps out. Your goalie cannot find the puck, and your skaters wade.' },
     play: { t: 'Then lace up.', act: 'unadir:rink' },
   } };
@@ -66552,7 +66552,7 @@ W_LINKS_KIT.opp[4] = { draught: 2, glstill: 1, glmoss: 1, gloil: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.links = { piece: 'golf', char: 'nadir_links', ground: 'g_links', map: 'u:g_links', region: 'bloom', engine: 'links', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.links = { piece: 'golf', char: 'nadir_links', ground: 'g_links', map: 'u:g_links', region: 'bloom', engine: 'links', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_links = { name: 'Sexton Vale, the Last Caddie', kind: 'wraith', look: { coat: '#2e3a28', acc: 'hat' },
   greet: 'Nobody finishes a round here. They just stop playing. I keep the FLAG on the last green. Say PLAY when you want to try for it, and ask about the RULES first. They change.',
   topics: {
@@ -66561,7 +66561,7 @@ DB.chars.nadir_links = { name: 'Sexton Vale, the Last Caddie', kind: 'wraith', l
     rules: { t: 'Match play, captain\'s choice, your four against my four, one ball a side. My side plays at your level and better at everything, a Lich carries our bag and reads every green for us, and we bring a full bag of potions. Before the first tee I draw the HEXES.' },
     hexes: { t: 'A green that will not lie still. A cup that wanders off. Fog over the flag. A wind that turns while you swing. One of them, for you. You will hear which before the first tee.' },
     hollow: { t: 'Once a round I let the flag go hollow. Your reads come up short, and your hands shake on the putts. Mind it.' },
-    toll: { t: 'Thirty gold a round, after the first. Paid on the first tee. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a round, after the first. Paid on the first tee. Walking away from the card costs nothing.' },
     play: { t: 'Then pick your four.', act: 'unadir:links' },
   } };
 
@@ -66697,7 +66697,7 @@ W_LANES_KIT.opp[4] = { draught: 2, blsteady: 2, blchalk: 2, bloil: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.lanes = { piece: 'bowling', char: 'nadir_lanes', ground: 'g_lanes', map: 'u:g_lanes', region: 'tide', engine: 'lanes', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.lanes = { piece: 'bowling', char: 'nadir_lanes', ground: 'g_lanes', map: 'u:g_lanes', region: 'tide', engine: 'lanes', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_lanes = { name: 'Ossery Brine, the Drowned Pinsetter', kind: 'zombie', look: { coat: '#1e3a44', acc: 'hat' },
   greet: 'The sea came in under these lanes a long time ago, and we kept bowling. I set the pins down here, and I keep the PIN. Say PLAY when you want to bowl for it. Ask about the RULES first; the water changes them.',
   topics: {
@@ -66706,7 +66706,7 @@ DB.chars.nadir_lanes = { name: 'Ossery Brine, the Drowned Pinsetter', kind: 'zom
     rules: { t: 'One team game, ten frames, the Baker format, your five against mine. My side bowls at your level and better at everything, a Lich reads the oil for us and weighs every ball before it leaves the hand, and we bring a full bag. Nobody goes home level: a roll-off. Before the first frame I draw the HEXES.' },
     hexes: { t: 'The water has its moods. Oil that turns to ichor under your ball, a pin too heavy to fall, gutters that pull, a black tide under your lane. You will hear which before the first frame.' },
     bell: { t: 'Once a game I ring the bell under the floor. The oil goes heavy for your five, and your ball carries less. Mind it.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid at the first ball. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid at the first ball. Walking away from the card costs nothing.' },
     play: { t: 'Then bring your five.', act: 'unadir:lanes' },
   } };
 
@@ -66853,7 +66853,7 @@ W_SHED_KIT.opp[4] = { draught: 2, crwarm: 1, crsalt: 2, crpebble: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.shed = { piece: 'curling', char: 'nadir_shed', ground: 'g_shed', map: 'u:g_shed', region: 'tide', engine: 'shed', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.shed = { piece: 'curling', char: 'nadir_shed', ground: 'g_shed', map: 'u:g_shed', region: 'tide', engine: 'shed', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_shed = { name: 'Grisel Mourne, the Sunken Skip', kind: 'lich', look: { coat: '#24384a', acc: 'scarf' },
   greet: 'The tide came in over this sheet a long time ago, and nobody told the stones. I skip the Nadir here, and I keep the STONE at the bottom of the house. Say PLAY when you want to curl for it. Ask about the RULES first. The ice here has its own.',
   topics: {
@@ -66862,7 +66862,7 @@ DB.chars.nadir_shed = { name: 'Grisel Mourne, the Sunken Skip', kind: 'lich', lo
     rules: { t: 'Real curling, your four against my four, six ends, nobody goes home level. My side curls at your level and a little better at everything, a Lich calls our stones and reads every pebble as it is, our sweepers know where a stone is going before it does, and we bring a full bag. Before the first stone I draw the HEXES.' },
     hexes: { t: 'Rime on your pebble, so your stones curl past where your skip reads them. Brooms that weigh like lead. A house that slides away from you. Frost that sets my stones in the four-foot like rock. One of them, for you. You will hear which before the first stone.' },
     sunken: { t: 'Once a match I let the house go under. Your stones drag in the cold water, and they hardly curl. Mind the end I choose.' },
-    toll: { t: 'Thirty gold a match, after the first. Paid at the first stone. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a match, after the first. Paid at the first stone. Walking away from the card costs nothing.' },
     play: { t: 'Then pick your four.', act: 'unadir:shed' },
   } };
 

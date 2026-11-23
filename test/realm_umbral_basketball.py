@@ -181,11 +181,11 @@ async def main():
         await pg.click('[data-ubk="play"]')
         await pg.wait_for_function("UI.view === 'court' && wCourtLive() && WBK && WBK.world")
         tl = await pg.evaluate("({ gold: RUN.gold - window.__g1, paid: WG.umbral.paid.court, log: WLOG.slice(-4).map(l => l[0]).join(' | ') })")
-        check(tl['gold'] == -30 and tl['paid'] == 1 and 'toll' in tl['log'], 'the retry\'s toll is paid at the tip, once', tl)
+        check(tl['gold'] == -20 and tl['paid'] == 1 and 'toll' in tl['log'], 'the retry\'s toll is paid at the tip, once', tl)
         await pg.evaluate(END % '[30, 0]')
         await pg.wait_for_function("!wCourtLive()", timeout=60000)
         wn = await pg.evaluate("({ pieces: WG.umbral.pieces.slice(), beaten: !!WG.umbral.beaten.court, gold: RUN.gold - window.__g1, again: wNadirMatch('court') })")
-        check('basketball' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 30 and 'yours' in wn['again'], 'a win pays the Black Net and the gold, and she has nothing left to play for', wn)
+        check('basketball' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 20 and 'yours' in wn['again'], 'a win pays the Black Net and the gold, and she has nothing left to play for', wn)
         await pg.evaluate("wLeaveCourt(); wDrain()")
 
         sm = await pg.evaluate("""(() => { const U = WG.umbral; U.pieces = []; U.tries = {}; delete U.beaten.court; wDrain(); const n0 = WG.bkg.games.length; const why = wNadirMatch('court');

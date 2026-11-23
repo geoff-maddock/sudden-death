@@ -36,7 +36,7 @@ W_GRID_KIT.opp[4] = { draught: 2, secondwind: 1, gfresin: 1, gfhaste: 1, gffog: 
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.gridiron = { piece: 'football', char: 'nadir_gridiron', ground: 'g_bowl', map: 'u:g_bowl', region: 'ember', engine: 'gridiron', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.gridiron = { piece: 'football', char: 'nadir_gridiron', ground: 'g_bowl', map: 'u:g_bowl', region: 'ember', engine: 'gridiron', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_gridiron = { name: 'Ossian Pyre, the Ash Marshal', kind: 'lich', look: { coat: '#3a2a4a', acc: 'hat' },
   greet: 'Another one who walked through the cold for a game. I captain the Nadir here, and I hold the BALL. Say PLAY when you are ready to lose it. Ask about the RULES first; nobody ever does.',
   topics: {
@@ -44,7 +44,7 @@ DB.chars.nadir_gridiron = { name: 'Ossian Pyre, the Ash Marshal', kind: 'lich', 
     ball: { t: 'The Ash Ball. One ninth of your Seal, and still warm. Beat my seven at football and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real football, seven a side, two halves, our field. My side plays harder than anything you have met, a Lich calls our plays, and our sideline carries a full bag. I keep an ECLIPSE for when it matters. Before kickoff I draw the HEXES.' },
     hexes: { t: 'The Pit has its moods. The end zone at your end creeps out, the ball rolls our way, the cold gets into your legs, the wind turns your kicks. You will hear which before kickoff.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid at kickoff. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid at kickoff. Walking away from the card costs nothing.' },
     eclipse: { t: 'Once a game I put the sun out. Your runners slow, your throws go wild. Enjoy the dark.' },
     play: { t: 'Then pick your seven.', act: 'unadir:gridiron' },
   } };

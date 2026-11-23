@@ -103,7 +103,7 @@ async def main():
           return out; })()""")
         check(rs['none'][0] == 2 and rs['held'][:2] == [1, 1] and rs['well'][:2] == [2, 0], 'the Black Net: spikes 1 HP cheaper held, 2 won well', rs)
         check(rs['held'][2] == rs['none'][1] - 1 and rs['well'][2] == max(1, rs['none'][1] - 2), 'the Iron Stitch: the shadows see 1 step less held, 2 won well', rs)
-        check(rs['toll'] == 20 and rs['tollKept'] == 30 and not rs['tollWhy'] and rs['card'], 'the Broken Bell: a 30-gold toll costs 20, and the champion’s own toll is left alone', rs)
+        check(rs['toll'] == 10 and rs['tollKept'] == 20 and not rs['tollWhy'] and rs['card'], 'the Broken Bell: a 20-gold toll costs 10, and the champion’s own toll is left alone', rs)
         check(rs['black'] == 950, 'the Ash Ball: a blackout on the dark side loses half the gold it would', rs)
         check(rs['legacy'], 'an old journey’s piece keeps the first-try rule', rs)
 

@@ -42,7 +42,7 @@ W_SHED_KIT.opp[4] = { draught: 2, crwarm: 1, crsalt: 2, crpebble: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.shed = { piece: 'curling', char: 'nadir_shed', ground: 'g_shed', map: 'u:g_shed', region: 'tide', engine: 'shed', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.shed = { piece: 'curling', char: 'nadir_shed', ground: 'g_shed', map: 'u:g_shed', region: 'tide', engine: 'shed', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_shed = { name: 'Grisel Mourne, the Sunken Skip', kind: 'lich', look: { coat: '#24384a', acc: 'scarf' },
   greet: 'The tide came in over this sheet a long time ago, and nobody told the stones. I skip the Nadir here, and I keep the STONE at the bottom of the house. Say PLAY when you want to curl for it. Ask about the RULES first. The ice here has its own.',
   topics: {
@@ -51,7 +51,7 @@ DB.chars.nadir_shed = { name: 'Grisel Mourne, the Sunken Skip', kind: 'lich', lo
     rules: { t: 'Real curling, your four against my four, six ends, nobody goes home level. My side curls at your level and a little better at everything, a Lich calls our stones and reads every pebble as it is, our sweepers know where a stone is going before it does, and we bring a full bag. Before the first stone I draw the HEXES.' },
     hexes: { t: 'Rime on your pebble, so your stones curl past where your skip reads them. Brooms that weigh like lead. A house that slides away from you. Frost that sets my stones in the four-foot like rock. One of them, for you. You will hear which before the first stone.' },
     sunken: { t: 'Once a match I let the house go under. Your stones drag in the cold water, and they hardly curl. Mind the end I choose.' },
-    toll: { t: 'Thirty gold a match, after the first. Paid at the first stone. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a match, after the first. Paid at the first stone. Walking away from the card costs nothing.' },
     play: { t: 'Then pick your four.', act: 'unadir:shed' },
   } };
 

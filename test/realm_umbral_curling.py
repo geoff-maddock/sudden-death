@@ -170,7 +170,7 @@ async def main():
         await pg.evaluate("wLeaveShed(); wDrain()")
 
         # backing away from the card costs nothing, even on a retry
-        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('shed'); const card = !!document.querySelector('[data-ucr]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 30 gold');
+        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('shed'); const card = !!document.querySelector('[data-ucr]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 20 gold');
           document.getElementById('wUcrNo').click(); return { why, card, toll, back: RUN.gold - g0, live: wShedLive() }; })()""")
         check(bk['why'] == '' and bk['card'] and bk['toll'] and bk['back'] == 0 and not bk['live'], 'on a retry the card names the toll, and backing away costs nothing', bk)
 
@@ -183,8 +183,8 @@ async def main():
         await pg.evaluate(LAST_END + "(0)")
         await pg.wait_for_function("!wShedLive()", timeout=90000)
         wn = await pg.evaluate("({ pieces: WG.umbral.pieces.slice(), beaten: !!WG.umbral.beaten.shed, gold: RUN.gold - window.__g1, paid: WG.umbral.paid && WG.umbral.paid.shed, again: wNadirMatch('shed') })")
-        check(tl['paid'] == 30 and tl['lines'] == 1 and wn['paid'] == 1, 'the retry\'s toll is paid at the first stone, once', [tl, wn])
-        check('curling' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 30 and 'yours' in wn['again'], 'a win pays the Sunken Stone and the gold, and they have nothing left to play for', wn)
+        check(tl['paid'] == 20 and tl['lines'] == 1 and wn['paid'] == 1, 'the retry\'s toll is paid at the first stone, once', [tl, wn])
+        check('curling' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 20 and 'yours' in wn['again'], 'a win pays the Sunken Stone and the gold, and they have nothing left to play for', wn)
         await pg.evaluate("wLeaveShed(); wDrain()")
 
         sm = await pg.evaluate("""(() => { const U = WG.umbral; U.pieces = []; U.tries = {}; U.paid = {}; delete U.beaten.shed; wDrain(); const n0 = WG.shg.games.length; const why = wNadirMatch('shed');
