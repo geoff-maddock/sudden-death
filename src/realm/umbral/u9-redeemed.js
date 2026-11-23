@@ -28,8 +28,11 @@
    their own card), wShowRecruit (wWU9ShowRecruit: their card on the recruit card; passed over, they wait at camp),
    wCampRow (wWU9CampRow: the Superstar tag), wCampStars (wWU9CampStars: a line on the Stars tab), wSevenPlayer,
    wCourtPlayer, wRinkPlayer, wLinksPlayer, wLanesPlayer, wShedPlayer, wBxFighter and wNineBdPlayer (wWU9<Name>: the
-   ultimate in their own sport), wStart (wWU9Start: older saves), renderHelp (wWU9RenderHelp: the 'When it shuts' line).
-   Also W_FROM.redeemed. */
+   ultimate in their own sport), wRelease (wWU9Release: their card leaves with them), wGridPowNames, wSixRow,
+   wBdCard, wLinksPowRow, wLanesRows and wShedRows (wWU9<Name>: the screens name their own ultimate: football's
+   lineup, the Rink tab, the baseball stats card, and your Powers row in golf, bowling and curling; the court, the ring
+   and hockey's game rows already ask the engine), wStart and wNextPrompt (wWU9Start, wWU9NextPrompt: older saves, with
+   the world free), renderHelp (wWU9RenderHelp: the 'When it shuts' line). Also W_FROM.redeemed. */
 
 const W_UMB9 = {
   // champion: their number, their card (K below), their sport's engine and their own ultimate there ({ id, n, d })
@@ -113,6 +116,16 @@ wShowRecruit = function (p, how, done) {
   return r;
 };
 
+const wWU9Release = wRelease;
+wRelease = function (pid) {
+  const s = wUmbStarOf(wPlayer(pid)), why = wWU9Release.apply(this, arguments);
+  if (s && !why) {
+    const keep = c => c.id !== s.sig || wUmbStarOf(wPlayer(c.wp)) === s;
+    RUN.deck = RUN.deck.filter(keep); RUN.wbench = (RUN.wbench || []).filter(keep); wSyncParty(); wTagCards(); wSave();
+  }
+  return why;
+};
+
 /* ---------- the Team screen ---------- */
 const wWU9CampRow = wCampRow;
 wCampRow = function (p, i) {
@@ -121,7 +134,7 @@ wCampRow = function (p, i) {
 };
 const wWU9CampStars = wCampStars;
 wCampStars = function () {
-  const h = wWU9CampStars.apply(this, arguments), p = wRoster().concat(WG.wwait || []).find(q => wUmbStarOf(q)), s = wUmbStarOf(p);
+  const h = wWU9CampStars.apply(this, arguments), p = wRoster().find(q => wUmbStarOf(q)), s = wUmbStarOf(p);
   return !s ? h : h + `<p class="hint" data-u9star><b>${esc(p.n)}</b>, redeemed from the Umbral, plays for you as a superstar too: ${esc(wKindName(p.kind))}, #${p.num}, with ${esc(CARDS[s.sig].n)}${s.ult ? ` and, in ${esc(W_UMB_PIECES[W_NADIR[s.champ].piece].sport)}, ${esc(s.ult.n)}` : ''}. They do not count as this journey's superstar.</p>`;
 };
 
@@ -155,19 +168,76 @@ wNineBdPlayer = function (p) {
   return g;
 };
 
+/* ---------- the screens name it: the team tabs and the in-game power rows ---------- */
+// football: the lineup's powers (an engine player brings ult; a roster player is the redeemed)
+const wWU9GridPowNames = wGridPowNames;
+wGridPowNames = function (p) {
+  const B = wWU9GridPowNames.apply(this, arguments), id = (p && p.ult) || wUmbHomeUlt(p, 'gridiron'), U = id && wGF.ult(id);
+  return U ? Object.assign({}, B, { ult: U }) : B;
+};
+// hockey: the Rink tab's row
+const wWU9SixRow = wSixRow;
+wSixRow = function (k, C) {
+  const h = wWU9SixRow.apply(this, arguments), p = wSixWho(k), s = wUmbStarOf(p);
+  if (!s || s.home !== 'rink') return h;
+  return h.replace(/<small class="whult"[^>]*>Ultimate: <b>[^<]*<\/b><\/small>/, `<small class="whult" title="${esc(s.ult.d)}">Ultimate: <b>${esc(s.ult.n)}</b> (their own)</small>`);
+};
+// baseball: the Dead Ball among her pitches on the stats card
+const wWU9BdCard = wBdCard;
+wBdCard = function (p) {
+  const h = wWU9BdCard.apply(this, arguments), s = wUmbStarOf(p);
+  if (!s || s.home !== 'diamond') return h;
+  return h.replace(/(<p class="wbdpit">Pitches: [\s\S]*?)(<\/p>)/, `$1, <b title="${esc(s.ult.d)}">${esc(s.ult.n.replace(/^The /, ''))}</b> (her own)$2`);
+};
+// golf, bowling and curling: the ultimate button in your game's Powers row names what the engine casts
+function wUmbUltBtn(btn, kindU, U) {
+  if (!btn || !U || !kindU || U.id === kindU.id) return;
+  btn.textContent = `${U.n} (ultimate)`; btn.title = btn.title.replace(`U: ${kindU.desc}`, `U: ${U.desc}`);
+}
+const wWU9LinksPowRow = wLinksPowRow;
+wLinksPowRow = function (V, show) {
+  const r = wWU9LinksPowRow.apply(this, arguments), G = wGL.G, row = $('wLinksRowPow');
+  if (!row || row.hidden || !G || !G.teams || !V) return r;
+  const m = G.teams[V.you].roster[V.sel ? V.sel.ri : 0] || {};
+  wUmbUltBtn(row.querySelector('[data-lpow="ult"]'), wGL.ult[m.kind] || wGL.ult.goblin, m.ult && wGL.ultOwn[m.ult]);
+  return r;
+};
+const wWU9LanesRows = wLanesRows;
+wLanesRows = function () {
+  const r = wWU9LanesRows.apply(this, arguments), V = WBL && !WBL.over && wBL.G && wBL.G.teams ? wBL.view : null, row = $('wLanesRowPow');
+  if (!V || !row || row.hidden) return r;
+  const G = wBL.G, s = V.you, ri = V.bowler != null && V.up === s ? V.bowler : G.order[s][0], m = G.teams[s].roster[ri] || {};
+  wUmbUltBtn(row.querySelector('[data-npow="ult"]'), wBL.ult[m.kind] || wBL.ult.goblin, wBL.ultOf(s, ri));
+  return r;
+};
+const wWU9ShedRows = wShedRows;
+wShedRows = function () {
+  const r = wWU9ShedRows.apply(this, arguments), V = WCR && !WCR.over && wCR.G && wCR.G.teams ? wCR.view : null, row = $('wShedPowRow');
+  if (!V || !row || row.hidden) return r;
+  const G = wCR.G, s = V.you, mine = V.mode === 'play' && V.ph === 'aim' && V.up === V.you, ri = mine ? null : V.up === s ? V.thrower : G.order[s][0], m = G.teams[s].roster[ri == null ? V.thrower : ri] || {};
+  wUmbUltBtn(row.querySelector('[data-crpow="ult"]'), wCR.ult[m.kind] || wCR.ult.goblin, wCR.ultOf(s, ri));
+  return r;
+};
+
 /* ---------- older saves: a redeemed captain signed before this part ---------- */
+// (only with the world free: a save taken mid-match is fixed up at the next free moment, wNextPrompt, after it)
+function wUmbStarsFixAll() {
+  if (!WG || !RUN || RUN.battle || RUN.pending || !wUmbRedeemed()) return 0;
+  let n = 0;
+  for (const p of wRoster()) if (wUmbStarFix(p)) { n++; const s = wUmbStarOf(p); if (!wAllCards().some(c => c.id === s.sig && c.wp === p.id)) wGainCard({ id: s.sig, pid: p.id }, `${p.n}'s own card`); }
+  for (const p of WG.wwait || []) if (wUmbStarFix(p)) n++;
+  for (const P of WG.wprompts || []) if (P.t === 'recruit' && wUmbStarFix(P.p)) n++;
+  if (n) { wLog('The captain you redeemed in the Umbral is a superstar now: their own card, and their own ultimate in their own game.', 'g'); wSave(); }
+  return n;
+}
 const wWU9Start = wStart;
 wStart = function (save) {
   const r = wWU9Start.apply(this, arguments);
-  if (save && WG && wUmb() && wUmb().redeemed) {
-    let n = 0;
-    for (const p of wRoster()) if (wUmbStarFix(p)) { n++; const s = wUmbStarOf(p); if (!wAllCards().some(c => c.id === s.sig && c.wp === p.id)) wGainCard({ id: s.sig, pid: p.id }, `${p.n}'s own card`); }
-    for (const p of WG.wwait || []) if (wUmbStarFix(p)) n++;
-    for (const P of WG.wprompts || []) if (P.t === 'recruit' && wUmbStarFix(P.p)) n++;
-    if (n) { wLog('The captain you redeemed in the Umbral is a superstar now: their own card, and their own ultimate in their own game.', 'g'); wSave(); }
-  }
+  if (save) wUmbStarsFixAll();
   return r;
 };
+const wWU9NextPrompt = wNextPrompt;
+wNextPrompt = function () { if (WG && !LAB) wUmbStarsFixAll(); return wWU9NextPrompt.apply(this, arguments); };
 
 /* ---------- How to play ---------- */
 const wWU9RenderHelp = renderHelp;

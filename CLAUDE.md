@@ -58,7 +58,7 @@ python3 test/realm_shed_lab.py 100             # Realm curling balance: win rate
 python3 test/realm_umbral_journey_lab.py 40 15  # Umbral balance (#99): the realm bot's Crown winners through the whole Umbral, the Seal's completion rate
 python3 test/realm_umbral_shots.py             # Umbral screenshots (#99): every Umbral screen at desktop and phone width, with contact sheets, into /tmp/umbral-shots/ (also reports sideways scrolling)
 python3 test/realm_umbral_lab.py 40            # Umbral balance (#99): the realm bot's Crown winners against the dark side's card matches at tier U and the Nadir champions
-python3 test/realm_stars_lab.py 200            # Realm superstar balance: what each superstar adds in the card game, football, baseball, basketball, hockey, bowling and curling, against an ordinary player
+python3 test/realm_stars_lab.py 200            # Realm superstar balance: what each superstar adds in the card game, football, baseball, basketball, hockey, bowling, curling, boxing and golf, against an ordinary player (a redeemed Umbral champion by star id, e.g. nadir_ring)
 ```
 
 Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screenshots go to `/tmp/`.

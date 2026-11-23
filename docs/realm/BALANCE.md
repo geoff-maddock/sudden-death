@@ -2107,23 +2107,26 @@ The redeemed captain plays as their own kind at your team's best level, with one
 sport (and a signature card in the card game). Measured as the stars lab measures a superstar: the extra player at an
 even level against tier 2, Simulate. The redeemed (`nadir_*`, the lab's `wStar` finds them), a plain player of the same
 kind (`k:<kind>`), and the six legends. `python3 test/realm_stars_lab.py 200 '' <part> ctl,k:<kind>,nadir_<id>,phoenix,kraken,behemoth,djinn,hydra,wyrm`
-for football, baseball, basketball, hockey, bowling and curling (120 a side); boxing (the redeemed's own bout in a card)
-and golf by the same set-up in an ad-hoc script, 200 a side. Win rates:
+for football, baseball, basketball, hockey, bowling and curling (120 a side), and boxing (`bx`: a card of three bouts,
+two of your own and the extra player; the extra player's own bout) and golf (`gl`: three of your own and the extra player
+as your four), the lab's two parts added for this. Win rates:
 
 | Sport | Plain kind | Redeemed | Legends (lowest to highest) |
 |---|---|---|---|
 | Football (lich, Eclipse) | 34.0% | 34.0% | 42.0 to 49.5% |
 | Baseball (witch, the Dead Ball) | 48.5% | 47.0% | 50.5 to 61.0% |
-| Boxing (minotaur, The Last Bell; the bout) | 38.5% | 38.5% | 47.5 to 56.0% |
+| Boxing (minotaur, The Last Bell; the bout) | 45.5% | 39.0% | 46.5 to 56.5% |
 | Basketball (vampire, Lights Out) | 38.5% | 32.5% | 34.5 to 40.5% |
 | Hockey (wraith, The Long Night) | 40.0% | 42.0% | 39.0 to 55.0% |
 | Hockey, 500 a side | 41.4% | 43.8% | Behemoth 44.0% |
-| Golf (wraith, The Hollow Flag) | 34.0% | 27.0% | 35.0 to 46.5% |
+| Golf (wraith, The Hollow Flag) | 30.0% | 28.0% | 27.5 to 45.5% |
 | Bowling (zombie, The Drowning Bell) | 43.0% | 43.0% | 49.0 to 58.0% |
 | Curling (lich, The Sunken Stone; 120 a side) | 45.8% | 45.8% | 45.0 to 62.5% |
 
 No redeemed star is stronger than the legends in any engine: they sit with a plain player of their kind (every gap is
 within the noise, about 5 points at 200 a side), under the legends' range or at its bottom. The one near-overlap,
-hockey's Hollis Grael at 200 a side (42.0% against the Behemoth's 39.0%), is level at 500 a side (43.8% against 44.0%).
+hockey's Hollis Grael at 200 a side (42.0% against the Behemoth's 39.0%), is level at 500 a side (43.8% against 44.0%);
+golf's Sexton Vale sits with the Phoenix (28.0% against 27.5%, the Phoenix being golf's weakest legend), under a plain
+wraith (30.0%).
 Nothing tuned: the champions' ultimates were already balanced as opponents (#99) and are the same numbers here. The
 legends' own numbers are unchanged by this part (the redeemed are a separate table; nothing a legend uses was touched).
