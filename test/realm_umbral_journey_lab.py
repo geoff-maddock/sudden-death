@@ -41,6 +41,10 @@ window.UJLAB = function (TRIES) {
   const play = (id) => {
     const C = W_NADIR[id]; rest();
     if (C.cond && C.cond.k === 'night') WG.min = 23 * 60;   // (a champion who plays only after dark: the bot waits for night)
+    // the feats (#111): it waits for dark for a night feat, and tries a no-powers feat on the first try
+    const F = typeof wUmbFeat === 'function' && id !== 'finale' ? wUmbFeat(id) : null;
+    if (F && F.k === 'night') WG.min = 23 * 60;
+    if (F && F.k === 'nopowers' && !(U.tries[id] || 0) && !window.UJ_NOFEAT) U.nopow = id;
     if (C.engine && id !== 'finale' || (id === 'finale' && C.engine)) { const t0 = (U.tries[id] || 0), p0 = U.pieces.length, f0 = U.finale || 0; const why = wNadirMatch(id); if (why) { out.why = why; return null; }
       return id === 'finale' ? ((U.finale || 0) > f0 ? 'win' : 'lose') : (U.pieces.length > p0 ? 'win' : 'lose'); }
     return card(() => wNadirMatch(id));
@@ -76,6 +80,7 @@ window.UJLAB = function (TRIES) {
       if (!won && !U.sealed) { out.stop = 'the Seal, round ' + (round + 1); break; }
     }
   }
+  out.well = Object.keys(U.well || {}).length;
   out.sealed = !!U.sealed; out.lvl = wRoster().reduce((a, p) => a + p.lvl, 0) / wRoster().length;
   return out;
 };
@@ -100,6 +105,7 @@ async def main():
     ch = [l for l in logs if l.get('champion')]
     print(f"page errors {len(errs)} {errs[:2]}  run errors {len(bad)} {bad[:2]}")
     print(f"journeys {len(logs)}, Crown winners {len(ch)}, forged the Seal {sum(l.get('sealed', False) for l in ch)} ({100 * sum(l.get('sealed', False) for l in ch) / max(1, len(ch)):.0f}% of Crown winners)")
+    print('pieces won well:', sum(l.get('well', 0) for l in ch), 'of', sum(l.get('pieces', 0) for l in ch))
     print('pieces at the end:', dict(sorted(collections.Counter(l.get('pieces', 0) for l in ch).items())))
     print('where the others stopped:', dict(collections.Counter(l.get('stop') for l in ch if not l.get('sealed')).most_common()))
     games = collections.defaultdict(lambda: [0, 0])
