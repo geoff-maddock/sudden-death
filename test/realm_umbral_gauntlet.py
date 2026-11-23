@@ -154,11 +154,11 @@ async def main():
         # winning the piece opens the gate then and there: its picture is redrawn and the guards step clear
         pw = await pg.evaluate("""(() => { const g = 'g_lanes', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), U = WG.umbral;
           const snap = JSON.stringify({ gates: U.gates, guards: U.guards, pieces: U.pieces, beaten: U.beaten, tries: U.tries, items: WG.items, gold: RUN.gold, deck: RUN.deck, offer: WG.cardOffer || null });
-          const keepGain = wGainCard; wGainCard = () => {};   // (the champion's card pick is not this check's business)
+          const keepGain = wGainCard, keepSave = wSave; wGainCard = () => {}; wSave = () => false;   // (the champion's card pick, and a save of this half-made state, are not this check's business)
           try { U.guards[g + ':0'] = U.guards[g + ':1'] = 1; delete U.gates[c.id]; wUmbGauntletSync(g); const out = { before: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.gate, aside: [__at(g, 0), __at(g, 1)], a: G.aside };
             wLayer(m, 1); wUmbNadirEnd(c.id, 'win'); __close();
             Object.assign(out, { piece: U.pieces.includes(c.C.piece), open: wTileAt(m, G.gate[0], G.gate[1]) === W_UMB8D.open, redrawn: !WLAY[m.id], entry: !!U.gates[c.id], clear: [__at(g, 0), __at(g, 1)], c: G.clear }); return out; }
-          finally { wGainCard = keepGain; const o = JSON.parse(snap); Object.assign(U, { gates: o.gates, guards: o.guards, pieces: o.pieces, beaten: o.beaten, tries: o.tries }); WG.items = o.items; RUN.gold = o.gold; RUN.deck = o.deck; if (o.offer) WG.cardOffer = o.offer; else delete WG.cardOffer; wUmbGauntletSync(g); wInvalidate(m.id); } })()""")
+          finally { wGainCard = keepGain; wSave = keepSave; const o = JSON.parse(snap); Object.assign(U, { gates: o.gates, guards: o.guards, pieces: o.pieces, beaten: o.beaten, tries: o.tries }); WG.items = o.items; RUN.gold = o.gold; RUN.deck = o.deck; if (o.offer) WG.cardOffer = o.offer; else delete WG.cardOffer; wUmbGauntletSync(g); wInvalidate(m.id); } })()""")
         check(pw['before'] and pw['aside'] == pw['a'] and pw['piece'] and pw['open'] and pw['redrawn'] and pw['entry'] and pw['clear'] == pw['c'], 'winning the piece opens the gate there and then: redrawn, given, and the guards step clear', pw)
 
         # a save from before the wall: guards beaten and the gate handed over through u4 (no other keys), or standing
@@ -177,13 +177,28 @@ async def main():
         # a railing that would seal a marked tile off (reachable before it stood, not after) isn't built: no wall there,
         # and the audit says which ground
         sw = await pg.evaluate("""(() => { const g = 'g_ring', m = MAPS['u:' + g], G = m.gauntlet, out = {};
-          for (const x of G.wall.concat([G.gate[0]])) m.t[G.row][x] = 'd'; delete m.gauntlet;
-          [0, 1].forEach(i => { const n = m.npcs.find(k => k.id === wUmbGuardOf(g, i)); n.x = G.line[i][0]; n.y = G.line[i][1]; });
-          const sx = G.wall[1], sy = G.row - 1; for (const [x, y] of [[sx - 1, sy], [sx + 1, sy], [sx, sy - 1]]) m.t[y][x] = 'J'; m.t[sy][sx] = 'S'; m.meta[sx + ',' + sy] = { text: 'test' };
-          out.built = wUmbBuildGauntlet(g); out.why = m.gauntletWhy; out.row = m.t[G.row].includes(W_UMB8D.wall); out.audit = wAudit().filter(s => s.startsWith('u:' + g));
-          buildAllMaps(); out.back = !!MAPS['u:' + g].gauntlet; out.clean = wAudit(); return out; })()""")
-        check(sw['built'] is False and not sw['row'] and 'tile' in sw['why'] and any('no wall' in a for a in sw['audit']), 'a railing that would seal off a marked tile reachable before it is not built, and the audit names the ground', sw)
+          try {
+            for (const x of G.wall.concat([G.gate[0]])) m.t[G.row][x] = 'd'; delete m.gauntlet;
+            [0, 1].forEach(i => { const n = m.npcs.find(k => k.id === wUmbGuardOf(g, i)); n.x = G.line[i][0]; n.y = G.line[i][1]; });
+            // a sign behind the line, walled in on three sides by stands: its only open side is a railing tile
+            const sx = G.wall[1], sy = G.row - 1, J = [[sx - 1, sy], [sx + 1, sy], [sx, sy - 1]], spots = G.aside.concat(G.clear).map(p => p.join());
+            out.offSpots = J.concat([[sx, sy]]).every(p => !spots.includes(p.join()));
+            for (const [x, y] of J) m.t[y][x] = 'J'; m.t[sy][sx] = 'S'; m.meta[sx + ',' + sy] = { text: 'test' };
+            out.built = wUmbBuildGauntlet(g); out.why = m.gauntletWhy; out.problems = m.gauntletProblems; out.tile = sx + ',' + sy;
+            out.row = m.t[G.row].includes(W_UMB8D.wall); out.audit = wAudit().filter(s => s.startsWith('u:' + g));
+          } finally { buildAllMaps(); }
+          out.back = !!MAPS['u:' + g].gauntlet; out.clean = wAudit(); return out; })()""")
+        check(sw['offSpots'] and sw['built'] is False and not sw['row'] and sw['problems'] == ['u:g_ring: cannot reach the tile ' + sw['tile'] + ' with the gate open'] and any('no wall' in a for a in sw['audit']), 'a railing that would seal off a marked tile reachable before it is not built (that and nothing else is wrong), and the audit names the ground', sw)
         check(sw['back'] and sw['clean'] == [], 'built afresh, the ground has its wall again and the audit is clean', sw)
+
+        # a tile in front of the line whose only open side has somebody standing on it is not 'behind the line': the
+        # railing doesn't cut it off, so the gate-open check leaves it to the older checks (which find it reachable)
+        fr = await pg.evaluate("""(() => { const g = 'g_bowl', m = MAPS['u:' + g], k = Object.keys(m.meta).find(k => m.t[+k.split(',')[1]][+k.split(',')[0]] === 'S'), [sx, sy] = k.split(',').map(Number);
+          const sides = [[sx - 1, sy], [sx + 1, sy], [sx, sy - 1], [sx, sy + 1]].filter(([x, y]) => walkCh(m.t[y][x])), [px, py] = sides[0], was = sides.slice(1).map(([x, y]) => [x, y, m.t[y][x]]);
+          DB.chars.zfront = { name: 'Somebody', kind: 'goblin', greet: '...', topics: {} }; m.npcs.push({ id: 'zfront', x: px, y: py, fixed: true });
+          try { for (const [x, y] of was) m.t[y][x] = 'J'; const B = wUmbBehind(m, g); return { sign: k, behind: B.tiles.includes(k) || B.npcs.includes('zfront'), audit: wAudit() }; }
+          finally { for (const [x, y, c] of was) m.t[y][x] = c; m.npcs = m.npcs.filter(n => n.id !== 'zfront'); delete DB.chars.zfront; } })()""")
+        check(fr['sign'] and not fr['behind'] and fr['audit'] == [], 'a tile in front of the line, reached only past somebody, is not counted behind it, and the audit stays clean', fr)
 
         # How to play says so
         hp = await pg.evaluate("""(() => { showPage('help'); const p = document.getElementById('wHelpUmbGate'), prev = p && p.previousElementSibling;
