@@ -17,8 +17,10 @@
    A ground whose guards' row does not run straight across the field from one solid edge to the other gets no wall
    (today's behaviour) and the audit says which and why. The audit checks each wall really works: the champion cut off
    with the gate shut (guards standing or beaten), the guards and the gate reachable, and with the gate open and the
-   guards clear, everyone and every marked tile behind the line reachable (the build, only what was reachable before
-   the railing stood). For who and what is behind the line, that check replaces the older reach checks.
+   guards clear, everyone and every marked tile behind the line reachable. Behind the line (wUmbBehind) is one rule,
+   used by the build, the audit and its filter: what the railing takes from the older, tile-only reach checks (and
+   the guards and champions always). For those this part's checks, which walk as play does with everyone in the way,
+   replace the older ones; the rest keep theirs.
    Tiles taken: 'ƚ' (bone railing), 'Ƞ' (the gate, shut), 'ƞ' (the gate, open: only ever what wTileAt shows).
 
    One gate for the ground: whenever it reads open, every champion behind it gets its WG.umbral.gates entry
@@ -90,25 +92,27 @@ function wUmbGauntletReach(m, g, st) {
   return wUmbWalkFrom(m, who, (x, y) => (open && x === G.gate[0] && y === G.gate[1]) || walkCh(m.t[y][x]));
 }
 const wUmbNear = (m, s, x, y) => W_SIDES.some(([dx, dy]) => { const nx = x + dx, ny = y + dy; return nx >= 0 && ny >= 0 && nx < m.w && ny < m.h && !!s[ny * m.w + nx]; });
-// who and what is behind the line: what the railing itself separates. Two walks with nobody else in the way: one with
-// the railing, the gate shut and the guards on the line (shut), one as the ground was before it (free). Behind are the
-// guards (wherever they stand) and everyone and every tile the town audit wants reached that the free walk reaches
-// and the shut one doesn't. The older reach checks know nothing of the wall: for these the gate-open check replaces
-// them; for everything else (in front of the line, or cut off anyway) they stand. Returns the shut walk too
+// who and what is behind the line: the one rule the build, the audit's filter and the problem checks all use.
+// The older reach checks (the town audit's, u4's) walk the tiles and ignore people, so the line between their word and
+// this part's is drawn in their terms: behind is what the railing itself takes from them, reachable on the tiles with
+// the railing's tiles open (free) and not with them shut (the guards on the line count, as they close its gap). Those,
+// and the guards and the champions always, this part judges; the rest keep the older checks' verdict. Every verdict
+// this part gives walks as play does, with everyone in the way (wUmbGauntletReach): shut, the gate shut and the guards
+// on the line (returned as shut)
 function wUmbBehind(m, g) {
-  const G = m.gauntlet, gi = [0, 1].map(i => wUmbGuardOf(g, i)), near = (s, x, y) => wUmbNear(m, s, x, y);
-  const rail = (x, y) => y === G.row && (x === G.gate[0] || G.wall.includes(x));
-  const shut = wUmbWalkFrom(m, new Set(G.line.map(p => p.join(','))), (x, y) => walkCh(m.t[y][x]));
-  const free = wUmbWalkFrom(m, new Set(), (x, y) => rail(x, y) || walkCh(m.t[y][x]));
-  const cut = (x, y) => near(free, x, y) && !near(shut, x, y);
-  return { shut, free, npcs: m.npcs.filter(n => gi.includes(n.id) || cut(n.x, n.y)).map(n => n.id),
+  const G = m.gauntlet, gi = [0, 1].map(i => wUmbGuardOf(g, i)), champs = wUmbGroundChamps(g).map(k => W_NADIR[k].char), near = (s, x, y) => wUmbNear(m, s, x, y);
+  const rail = (x, y) => y === G.row && (x === G.gate[0] || G.wall.includes(x)), line = new Set(G.line.map(p => p.join(',')));
+  const tShut = wUmbWalkFrom(m, line, (x, y) => walkCh(m.t[y][x])), tFree = wUmbWalkFrom(m, line, (x, y) => rail(x, y) || walkCh(m.t[y][x]));
+  const cut = (x, y) => near(tFree, x, y) && !near(tShut, x, y);
+  return { shut: wUmbGauntletReach(m, g, { open: false, beaten: false }),
+    npcs: m.npcs.filter(n => gi.includes(n.id) || champs.includes(n.id) || cut(n.x, n.y)).map(n => n.id),
     tiles: wUmbGauntletTiles(m).filter(k => { const [x, y] = k.split(',').map(Number); return cut(x, y); }) };
 }
 // what is wrong with a ground's wall: [] when it shuts the champion off until the guards are beaten and the gate
-// open, and everyone and every marked tile behind the line (and every wall of awards or incubator) can be reached
-// once it is. pre: the build's walk from before the wall; then only the people (but the guards, always checked at
-// their clear spots) and tiles that walk reached count: one cut off anyway says nothing about the railing
-function wUmbGauntletProblems(m, g, pre) {
+// open, the guards and the gate can be reached, and everyone and every tile behind the line (wUmbBehind) can be
+// reached once it is open (the guards at their clear spots). Every walk here counts everyone as in the way. The build
+// and the audit judge by this one rule
+function wUmbGauntletProblems(m, g) {
   const P = [], G = m.gauntlet, id = 'u:' + g, gi = [0, 1].map(i => wUmbGuardOf(g, i)), champs = wUmbGroundChamps(g).map(k => W_NADIR[k].char);
   const near = (s, x, y) => wUmbNear(m, s, x, y), B = wUmbBehind(m, g), shut = B.shut;
   const past = [[true, false], [false, true], [true, true]].map(b => wUmbGauntletReach(m, g, { open: false, beaten: b }));
@@ -120,11 +124,11 @@ function wUmbGauntletProblems(m, g, pre) {
   for (const i of [0, 1]) if (!near(shut, ...G.line[i])) P.push(id + ': cannot reach guard ' + i + ' on the line');
   if (!near(shut, ...G.gate)) P.push(id + ': cannot reach the gate');
   for (const n of m.npcs) {
+    if (!B.npcs.includes(n.id)) continue;
     const k = gi.indexOf(n.id), p = k >= 0 ? G.clear[k] : [n.x, n.y];
-    if (!B.npcs.includes(n.id) || (k < 0 && pre && !near(pre, n.x, n.y))) continue;
     if (!near(open, ...p)) P.push(id + ': cannot reach ' + n.id + ' with the gate open');
   }
-  for (const k of B.tiles) { const [x, y] = k.split(',').map(Number); if ((!pre || near(pre, x, y)) && !near(open, x, y)) P.push(id + ': cannot reach the tile ' + k + ' with the gate open'); }
+  for (const k of B.tiles) { const [x, y] = k.split(',').map(Number); if (!near(open, x, y)) P.push(id + ': cannot reach the tile ' + k + ' with the gate open'); }
   return P;
 }
 
@@ -154,14 +158,13 @@ function wUmbBuildGauntlet(g) {
   const aside = F.guards.map(([x, y]) => [x, y + s]);
   if (!aside.every(p => free(...p))) return no('a guard has nowhere to step back to');
   const clear = F.guards.map(([x, y], i) => { const p = [x + (i ? 1 : -1), y + s]; return free(...p) ? p : aside[i]; });
-  const pre = wUmbWalkFrom(m, new Set(m.npcs.map(n => n.x + ',' + n.y)), (x, y) => walkCh(m.t[y][x]));
   const was = run.map(x => m.t[gy][x]), wasGate = m.t[gy][gx];
   for (const x of run) m.t[gy][x] = W_UMB8D.wall;
   m.t[gy][gx] = W_UMB8D.gate;
   m.gauntlet = { row: gy, gate: [gx, gy], wall: run.slice().sort((a, b) => a - b), line: F.guards.map(p => p.slice()), aside, clear };
   // it must really shut the champion off, and really let you through once open, to everything you could reach
   // before it stood; if not, no wall
-  const P = wUmbGauntletProblems(m, g, pre);
+  const P = wUmbGauntletProblems(m, g);
   m.gauntletProblems = P;
   if (P.length) { run.forEach((x, k) => { m.t[gy][x] = was[k]; }); m.t[gy][gx] = wasGate; delete m.gauntlet; return no(P[0]); }
   return true;
@@ -174,7 +177,7 @@ function wUmbGauntletSync(g, step) {
     const n = m.npcs.find(k => k.id === wUmbGuardOf(g, i)); if (!n) continue;
     const [x, y] = wUmbGuardSpot(m, g, i);
     if ((n.x === x && n.y === y) || (here && WG.x === x && WG.y === y)) continue;   // (never onto you)
-    if (step && here) { n.px = n.x; n.py = n.y; n.mt = performance.now(); }
+    if (step && here) { n.px = n.x; n.py = n.y; n.mt = performance.now(); } else delete n.mt;   // (placed: no walk left half-done)
     n.x = x; n.y = y;
   }
 }
@@ -252,8 +255,9 @@ W_ON_END.uguard = function (r, ref) {
 const wWU8DTryMove = wTryMove;
 wTryMove = function () {
   const m0 = WG && WG.map, r = wWU8DTryMove.apply(this, arguments), m = WG && MAPS[WG.map];
-  // (it moves nobody already in place; never under a talk or a window, where a guard would walk behind it)
-  if (m && m.id === m0 && m.gauntlet && !WUI.talk && $('modal').hidden) wUmbGauntletSync(m.id.slice(2), true);
+  // (it moves nobody already in place; under a talk or a window a guard is placed without the walk, which would go on
+  // behind it)
+  if (m && m.id === m0 && m.gauntlet) wUmbGauntletSync(m.id.slice(2), !WUI.talk && $('modal').hidden);
   return r;
 };
 const wWU8DApplyNpcs = wApplyNpcs;

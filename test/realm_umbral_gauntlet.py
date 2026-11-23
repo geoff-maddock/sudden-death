@@ -106,9 +106,12 @@ async def main():
         await pg.evaluate("(() => { const G = MAPS['u:g_ballpark'].gauntlet; WG.x = G.clear[0][0]; WG.y = G.clear[0][1]; WLOG.length = 0; wSave(); for (const k in MAPS) delete MAPS[k]; wStart(wLoadSave()); })()")  # (the maps built afresh, as on opening the page)
         await pg.wait_for_function("UI.view === 'world' && !!WG")
         sp = await pg.evaluate("""(() => { const g = 'g_ballpark', G = MAPS['u:' + g].gauntlet, out = { at: [WG.x, WG.y], spot: G.clear[0], g0: __at(g, 0), log: WLOG.map(l => l[0]).join(' | ') };
-          wTryMove(0, -1); __close(); out.moved = [WG.x, WG.y]; out.g0after = __at(g, 0); return out; })()""")
+          const g0n = MAPS['u:' + g].npcs.find(n => n.id === wUmbGuardOf(g, 0)), mt0 = g0n.mt;
+          wTalkTo(wUmbGuardOf(g, 1)); wDrain(); out.talk = !!WUI.talk; wTryMove(0, -1); out.g0talk = __at(g, 0); out.walked = g0n.mt !== mt0 && g0n.mt != null;
+          __close(); out.moved = [WG.x, WG.y]; out.g0after = __at(g, 0); return out; })()""")
         check(sp['at'] == sp['spot'] and sp['g0'] != sp['spot'] and 'railing of bone' not in sp['log'], 'loaded standing on a guard\'s spot past the open gate, you stay where you were', sp)
         check(sp['moved'] != sp['spot'] and sp['g0after'] == sp['spot'], 'and the guard takes the spot once you step off it', sp)
+        check(sp['talk'] and sp['g0talk'] == sp['spot'] and not sp['walked'], 'stepping off while a talk is open, the guard is placed at once (no walk behind the talk)', sp)
 
         # a tile marked behind the line counts as reached with the gate open (the older checks would call it unreachable)
         mt = await pg.evaluate("""(() => { const m = MAPS['u:g_ballpark'], c = __champ('g_ballpark'), k = (c.x - 3) + ',' + c.y; m.meta[k] = { text: 'test' };
@@ -191,14 +194,43 @@ async def main():
         check(sw['offSpots'] and sw['built'] is False and not sw['row'] and sw['problems'] == ['u:g_ring: cannot reach the tile ' + sw['tile'] + ' with the gate open'] and any('no wall' in a for a in sw['audit']), 'a railing that would seal off a marked tile reachable before it is not built (that and nothing else is wrong), and the audit names the ground', sw)
         check(sw['back'] and sw['clean'] == [], 'built afresh, the ground has its wall again and the audit is clean', sw)
 
+        # somebody standing in the only way up to the line: the gate and the guards can't be reached, and the check says so
+        bl = await pg.evaluate("""(() => { const g = 'g_shed', m = MAPS['u:' + g], G = m.gauntlet, y = G.row + Math.sign(m.spawn[1] - G.row), was = m.t[y].slice();
+          try { for (let x = 0; x < m.w; x++) if (x !== G.gate[0] && walkCh(m.t[y][x])) m.t[y][x] = 'J'; m.npcs.push({ id: 'zblock', x: G.gate[0], y, fixed: true });
+            return wUmbGauntletProblems(m, g); }
+          finally { m.t[y] = was; m.npcs = m.npcs.filter(n => n.id !== 'zblock'); } })()""")
+        check('u:g_shed: cannot reach the gate' in bl and 'u:g_shed: cannot reach guard 0 on the line' in bl, 'somebody standing in the only way up to the line is a problem: the gate and the guards can\'t be reached', bl)
+
+        # somebody behind the line cut off by another person standing there: the older checks, which ignore people, can't
+        # see it, so the gate-open check reports it (it used to be skipped); the person in the way is fine
+        cb = await pg.evaluate("""(() => { const g = 'g_ballpark', m = MAPS['u:' + g], G = m.gauntlet, s = Math.sign(G.row - m.spawn[1]);
+          const x0 = Math.min(...G.wall), y0 = G.row + s * 3, at = (x, y) => m.npcs.some(n => n.x === x && n.y === y);
+          // a corner of the field behind the line: the stands on two sides, a person in the way, and stands on the last side
+          const pocket = [x0, y0], door = [x0 + 1, y0], plug = [x0, y0 - s], was = [plug, pocket, door].map(([x, y]) => [x, y, m.t[y][x]]);
+          if (![pocket, door, plug].every(([x, y]) => walkCh(m.t[y][x]) && !at(x, y)) || walkCh(m.t[y0][x0 - 1])) return { setup: false, pocket, door, plug };
+          DB.chars.zback = DB.chars.zdoor = { name: 'Somebody', kind: 'goblin', greet: '...', topics: {} };
+          m.npcs.push({ id: 'zback', x: pocket[0], y: pocket[1], fixed: true }, { id: 'zdoor', x: door[0], y: door[1], fixed: true }); m.t[plug[1]][plug[0]] = 'J';
+          try { const B = wUmbBehind(m, g), a = wAudit(); return { setup: true, behind: B.npcs.includes('zback') && B.npcs.includes('zdoor'), back: a.filter(l => /zback/.test(l)), door: a.filter(l => /zdoor/.test(l)) }; }
+          finally { for (const [x, y, c] of was) m.t[y][x] = c; m.npcs = m.npcs.filter(n => n.id !== 'zback' && n.id !== 'zdoor'); delete DB.chars.zback; delete DB.chars.zdoor; } })()""")
+        check(cb['setup'] and cb['behind'] and cb['back'] == ['u:g_ballpark: cannot reach zback with the gate open'] and cb['door'] == [], 'somebody behind the line cut off by another person there is reported by the gate-open check; the person in the way is not', cb)
+
+        # one rule for both: the shut walk wUmbBehind hands the reach checks is the play walk (gate shut, guards on the
+        # line, everyone in the way), on every ground, and every champion is among what this part judges
+        ag = await pg.evaluate("""(() => { const out = {}; for (const g in W_UMB4.grounds) { const m = MAPS['u:' + g], B = wUmbBehind(m, g), r = wUmbGauntletReach(m, g, { open: false, beaten: false });
+            out[g] = B.shut.every((v, i) => v === r[i]) && wUmbGroundChamps(g).every(k => B.npcs.includes(W_NADIR[k].char)); } return out; })()""")
+        check(all(ag.values()) and len(ag) == 8, 'one rule: the reach checks and the filter use the same play walk with the gate shut, and every champion is judged by it', ag)
+
         # a tile in front of the line whose only open side has somebody standing on it is not 'behind the line': the
         # railing doesn't cut it off, so the gate-open check leaves it to the older checks (which find it reachable)
-        fr = await pg.evaluate("""(() => { const g = 'g_bowl', m = MAPS['u:' + g], k = Object.keys(m.meta).find(k => m.t[+k.split(',')[1]][+k.split(',')[0]] === 'S'), [sx, sy] = k.split(',').map(Number);
-          const sides = [[sx - 1, sy], [sx + 1, sy], [sx, sy - 1], [sx, sy + 1]].filter(([x, y]) => walkCh(m.t[y][x])), [px, py] = sides[0], was = sides.slice(1).map(([x, y]) => [x, y, m.t[y][x]]);
+        fr = await pg.evaluate("""(() => { const g = 'g_bowl', m = MAPS['u:' + g], k = Object.keys(m.meta).find(k => m.t[+k.split(',')[1]][+k.split(',')[0]] === 'S') || null; if (!k) return { sign: null };
+          const [sx, sy] = k.split(',').map(Number);
+          const sides = [[sx - 1, sy], [sx + 1, sy], [sx, sy - 1], [sx, sy + 1]].filter(([x, y]) => walkCh(m.t[y][x])), G = m.gauntlet, spawnSide = Math.sign(sy - G.row) === Math.sign(m.spawn[1] - G.row);
+          if (!sides.length || !spawnSide) return { sign: k, sides: sides.length, spawnSide };
+          const [px, py] = sides[0], was = sides.slice(1).map(([x, y]) => [x, y, m.t[y][x]]);
           DB.chars.zfront = { name: 'Somebody', kind: 'goblin', greet: '...', topics: {} }; m.npcs.push({ id: 'zfront', x: px, y: py, fixed: true });
-          try { for (const [x, y] of was) m.t[y][x] = 'J'; const B = wUmbBehind(m, g); return { sign: k, behind: B.tiles.includes(k) || B.npcs.includes('zfront'), audit: wAudit() }; }
+          try { for (const [x, y] of was) m.t[y][x] = 'J'; const B = wUmbBehind(m, g); return { sign: k, sides: sides.length, spawnSide, behind: B.tiles.includes(k) || B.npcs.includes('zfront'), audit: wAudit() }; }
           finally { for (const [x, y, c] of was) m.t[y][x] = c; m.npcs = m.npcs.filter(n => n.id !== 'zfront'); delete DB.chars.zfront; } })()""")
-        check(fr['sign'] and not fr['behind'] and fr['audit'] == [], 'a tile in front of the line, reached only past somebody, is not counted behind it, and the audit stays clean', fr)
+        check(fr['sign'] and fr['sides'] > 0 and fr['spawnSide'] and fr.get('behind') is False and fr.get('audit') == [], 'a tile in front of the line, reached only past somebody, is not counted behind it, and the audit stays clean', fr)
 
         # How to play says so
         hp = await pg.evaluate("""(() => { showPage('help'); const p = document.getElementById('wHelpUmbGate'), prev = p && p.previousElementSibling;
