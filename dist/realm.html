@@ -69089,16 +69089,20 @@ function wUmbShardUse(how, round) {
   if (U.shardOn && U.shardOn.r === r) return 'A shard is already set on this round.';
   if (how !== 'hex' && how !== 'block') return 'A shard takes a hex off, or gives Block.';
   if (how === 'block' && W_UMB5.engine[wUmbFinaleSports()[r]]) return 'The Block is for a card round.';
-  if (how === 'hex' && r === (U.finale || 0) && !wUmbShardRoom()) return 'This round draws no hexes now: a shard would take nothing off.';
+  if (how === 'hex' && !wUmbShardRoom(r)) return `Round ${r + 1} draws no hexes now: a shard would take nothing off.`;
   U.shardOn = { r, how };
   if (!LAB) wLog(how === 'hex' ? `You set a Legend's Shard on round ${r + 1} of the Seal: one hex fewer.` : `You set a Legend's Shard on round ${r + 1} of the Seal: ${W_UMB8I.block} Block at the start.`, 'm');
   wSave(); return '';
 }
-// the round of the Seal still draws a hex after every other cut (the clean or well-won piece's, in its entry's hexes; a
-// Hex Ward's, in u8h's wUmbHexCut): only then can a shard take one off
-function wUmbShardRoom() {
+// a round of the Seal (the one being played, by default) still draws a hex after every other cut (the clean or
+// well-won piece's, in its entry's hexes; a Hex Ward's, in u8h's wUmbHexCut): only then can a shard take one off. A
+// later round's entry is built for the moment with that round, then the current one is built again
+function wUmbShardRoom(r) {
   const U = wUmb(); if (!U) return false;
-  const C = wUmbFinaleEntry(), n = (C && C.hexes) || 0;
+  const cur = U.finale || 0; r = r == null ? cur : r;
+  let n;
+  if (r === cur) n = (wUmbFinaleEntry() || {}).hexes || 0;
+  else { U.finale = r; try { n = (wUmbFinaleEntry() || {}).hexes || 0; } finally { U.finale = cur; wUmbFinaleEntry(); } }
   return n - (wWU8IHexCut('finale') || 0) > 0;
 }
 const wUmbShardSet = how => { const U = wUmb(); return !!(U && U.shardOn && U.shardOn.r === (U.finale || 0) && (U.shards || 0) > 0 && (!how || U.shardOn.how === how)); };
@@ -69119,14 +69123,18 @@ W_ON_END.nadir = function (r, ref) {
   try { return wWU8IOnNadir.apply(this, arguments); }
   finally { if (spend && !(RUN && RUN.over)) { if (!LAB) wLog(`The Legend's Shard goes dark in your captain's hand. It did its work (${U.shards} left).`, 'd'); wSave(); } wUmbLegendsSync(); }
 };
+// the round's game left half-played (its hexes, the shard's cut among them, were drawn at its kickoff)
+const wUmbFinaleLive = () => { const U = wUmb(), e = U && W_UMB5.engine[wUmbFinaleSports()[U.finale || 0]]; return !!(e && W_UMB4.live[e] && W_UMB4.live[e]()); };
 // before a round of the Seal starts: spend a shard on it?
 const wWU8IFinale = wUmbFinale;
 wUmbFinale = function () {
   const U = wUmb();
+  // (a shard set for a hex on a round that has none left by the time it starts, a ward readied since, say: given back)
+  if (U && !U.sealed && wUmbShardSet('hex') && !wUmbFinaleLive() && !wUmbShardRoom()) { U.shardOn = null; if (!LAB) wLog('This round draws no hexes now, so your Legend\'s Shard would take nothing off. You keep it.', 'm'); wSave(); }
   if (!U || LAB || U.sealed || !((U.shards || 0) > 0) || Object.keys(W_UMB_PIECES).some(p => !U.pieces.includes(p))) return wWU8IFinale.apply(this, arguments);
   const r = U.finale || 0, piece = wUmbFinaleSports()[r], eng = W_UMB5.engine[piece], card = !eng;
   // (a game of the round left half-played picks up where it was: its hexes were drawn at its kickoff)
-  if (eng && W_UMB4.live[eng] && W_UMB4.live[eng]()) return wWU8IFinale.apply(this, arguments);
+  if (wUmbFinaleLive()) return wWU8IFinale.apply(this, arguments);
   const room = wUmbShardRoom();
   // (nothing a shard could do here: no hex left to take off, and no card round for the Block)
   if (!room && !card && !wUmbShardSet()) return wWU8IFinale.apply(this, arguments);
