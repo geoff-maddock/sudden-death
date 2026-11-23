@@ -1822,7 +1822,7 @@ about as hard as a rival's six at tier U.
 | The Ice Opens | -12.5 (three holes, the face-off in your own end) | -4.7 (three, at centre ice) | -2.3 (two, at centre ice) |
 | The Wandering Net (1.3 m, then 1.8 m) | -6.0 | -0.5 | +1.0 |
 | Grave Cold (35%, then 30% more tiring) | -10.0 | -1.3 | 0.0 |
-| The Hollow Whistle (your fouls twice as often) | -6.5 | +0.2 | +2.7 |
+| The Hollow Whistle (your fouls up to twice as often, capped) | -6.5 | +0.2 | +2.7 |
 
 The first 200-game look had a lucky base (21%) and read every hex as costly; at 600 games only The Ice Opens shows
 clearly, and it was the one that was cut (a face-off in your own end, three holes): no hex moves the game more than

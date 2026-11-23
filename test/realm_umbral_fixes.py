@@ -61,7 +61,7 @@ async def main():
         check(all(w or not n for n, w in zip(hk['none'], hk['whis'])) and nW > nN and any(w and not n for n, w in zip(hk['none'], hk['whis'])),
               'The Hollow Whistle: the same seeded lunge is called for interference at least as often, and some only under the hex', [nN, nW])
         check(nN >= 8 and nW >= nN * 1.4, 'interference under the hex is called far more often (about twice, up to its cap)', [nN, nW, hk['k'], hk['max']])
-        check('up to twice' in hk['d'] and hk['k'] * .6 > hk['max'], 'The Hollow Whistle\'s words say up to twice as often (interference is capped)', hk['d'])
+        check('up to twice' in hk['d'] and hk['load'] * hk['k'] > hk['max'], 'The Hollow Whistle\'s words say up to twice as often (interference is capped)', hk['d'])
         check(hk['was'] == hk['load'] == .6 and hk['now'] == .6 and hk['max'] < 1, 'with no hex, interference is called as before (its odds unchanged)', hk)
 
         # ---------- a journey, the Umbral open ----------
@@ -126,20 +126,29 @@ async def main():
             check(f['seen'] == [f['std']] and f"Always {f['std']} {words}" in f['note'] and f['set'] == f['short'], f'{e}: a round of the Seal is the standard length too, and its card says so', f)
 
         # the bar, during a champion's game with Settings at their shortest: no "from the next game" length note (the
-        # bar without this part's wrap does show it, so the check can fail); curling's six ends (u4h) too
-        bar = await pg.evaluate("""(() => { const out = {}, U = WG.umbral; U.tries = {};
-          const S = [['links', 'linksHoles', 3, 'wLinksNote', wUmbGlKick, wLinksBarNote, wWU8ALinksBarNote, wLinksCallOff], ['lanes', 'lanesFrames', 5, 'wLanesNote', wUmbBlKick, wLanesBarNote, wWU8ALanesBarNote, wLanesCallOff],
-            ['shed', 'shedEnds', 4, 'wShedNote', wUmbCrKick, wShedBarNote, wWU8AShedBarNote, wShedCallOff]];
-          for (const [id, key, short, note, kick, bar, raw, off] of S) {
-            wDrain(); SET[key] = short; const why = kick(W_NADIR[id], id, [], 'manage'); bar(); const mine = $(note).textContent;
-            raw(); const bare = $(note).textContent; off('test: called off');
-            out[id] = { why, mine, bare, set: SET[key] };
-          }
-          showView('world'); wDrain(); return out; })()""")
+        # bar without this part's wrap does show it, so the check can fail); curling's six ends (u4h) too. And with that
+        # Nadir match saved and left, a practice game at the standard length keeps its note (Settings say shorter). The
+        # journey's gold, tries and tolls are put back after (these are real Nadir matches, called off)
+        bar = await pg.evaluate("""(() => { const out = {}, U = WG.umbral, keep = { gold: RUN.gold, tries: JSON.stringify(U.tries || {}), paid: JSON.stringify(U.paid || {}) }; U.tries = {};
+          const S = [['links', 'linksHoles', 3, 'wLinksNote', wUmbGlKick, wLinksBarNote, wWU8ALinksBarNote, wLinksCallOff, () => wLinksGame({ holes: wGL.rules.holes })],
+            ['lanes', 'lanesFrames', 5, 'wLanesNote', wUmbBlKick, wLanesBarNote, wWU8ALanesBarNote, wLanesCallOff, () => wLanesGame({ frames: wBL.rules.frames })],
+            ['shed', 'shedEnds', 4, 'wShedNote', wUmbCrKick, wShedBarNote, wWU8AShedBarNote, wShedCallOff, () => wShedGame({ ends: wCR.rules.ends })]];
+          try {
+            for (const [id, key, short, note, kick, bar, raw, off, practice] of S) {
+              wDrain(); SET[key] = short; const why = kick(W_NADIR[id], id, [], 'manage'); bar(); const mine = $(note).textContent;
+              raw(); const bare = $(note).textContent;
+              // (left: the Nadir match stays saved while a practice game is on screen)
+              practice(); bar(); const prac = $(note).textContent, still = !!(W_UMB4.live[id] && W_UMB4.live[id]());
+              off('test: called off');
+              out[id] = { why, mine, bare, prac, still, set: SET[key] };
+            }
+          } finally { RUN.gold = keep.gold; U.tries = JSON.parse(keep.tries); U.paid = JSON.parse(keep.paid); showView('world'); wDrain(); }
+          return out; })()""")
         for e in ('links', 'lanes', 'shed'):
             b = bar[e]
             check(b['why'] == '' and 'from the next game' in b['bare'] and 'from the next game' not in b['mine'] and b['set'] in (3, 4, 5),
                   f'{e}: during a champion\'s game the bar leaves off the "from the next game" length note', b)
+            check(b['still'] and 'from the next game' in b['prac'], f'{e}: with a Nadir match saved and left, a practice game keeps its note', b)
 
         # How to play's Umbral section says so
         hp = await pg.evaluate("showPage('help'); (document.getElementById('wHelpU8aLen') || {}).textContent || ''")

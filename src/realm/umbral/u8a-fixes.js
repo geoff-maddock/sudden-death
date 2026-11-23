@@ -65,11 +65,12 @@ wUmbBlCard = function () { const r = wWU8AUmbBlCard.apply(this, arguments); wUmb
 wUmbBkCard = function () { const r = wWU8AUmbBkCard.apply(this, arguments); wUmbLenNote('court'); return r; };
 
 // the bar: a champion's game (or a round of the Seal) is not followed by a game of the Settings length, so the bar's
-// "(Holes: 3 from the next game; this one is 9.)" is left off while one is on (curling's six ends too: u4h)
+// "(Holes: 3 from the next game; this one is 9.)" is left off while one is on screen (curling's six ends too: u4h).
+// (Only the match on screen: a Nadir match saved and left doesn't touch a practice round's note, wLinksWorld and kin)
 const W_UMB8A_BARS = [
-  ['wLinksNote', () => W_UMB4F.kind, () => WG && WG.lkg && WG.lkg.live, /\s*\(Holes: \d+ from the next game; this one is \d+\.\)/],
-  ['wLanesNote', () => W_UMB4G.kind, () => WG && WG.lng && WG.lng.live, /\s*\(Frames: \d+ from the next game; this one is \d+\.\)/],
-  ['wShedNote', () => W_UMB4H.kind, () => WG && WG.shg && WG.shg.live, /\s*\(Ends: \d+ from the next game; this one is \d+\.\)/],
+  ['wLinksNote', () => W_UMB4F.kind, () => wLinksWorld() && WG.lkg.live, /\s*\(Holes: \d+ from the next game; this one is \d+\.\)/],
+  ['wLanesNote', () => W_UMB4G.kind, () => wLanesWorld() && WG.lng.live, /\s*\(Frames: \d+ from the next game; this one is \d+\.\)/],
+  ['wShedNote', () => W_UMB4H.kind, () => wShedWorld() && WG.shg.live, /\s*\(Ends: \d+ from the next game; this one is \d+\.\)/],
 ];
 function wUmbBarTrim(i) {
   const [id, kind, live, re] = W_UMB8A_BARS[i], L = live(), el = $(id);
