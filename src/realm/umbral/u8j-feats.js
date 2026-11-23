@@ -17,7 +17,7 @@
    well starts with W_UMB8J.edgeBlock Block.
 
    W_UMB8J, wUmbFeat, wUmbFeatMet, wUmbWell, wUmbResonance, wUmbSealPanel
-   Wraps: W_ON_END for each champion's game kind (wWU8JEnd: the feat judged with the game's own result), W_ON_END.nadir
+   Wraps: checkWin (wSdCheckWin, Sudden Death's: the HP as a Nadir card match is won, before any on-win heal), W_ON_END for each champion's game kind (wWU8JEnd: the feat judged with the game's own result), W_ON_END.nadir
    (wWU8JOnNadir: a piece won well), wNadirMatch (wWU8JNadirMatch: the feat on the card, and the no-powers choice),
    wStartLinks, wStartLanes and wStartShed (wWU8J<Name>: the choice into the game's ref), wGL/wBL/wCR start and simGame
    (wWU8J<Name>: powers off for your side), wUmbFinaleEntry (wWU8JFinaleEntry: a well-won piece's hex), wUmbSpikeHp,
@@ -69,9 +69,9 @@ function wUmbWellInit() { const U = wUmb(); if (U && !U.well) { U.well = {}; U.w
 
 /* ---------- judging a feat ---------- */
 // (the HP as the match is won: checkWin decides it, before any heal a trophy gives for winning at fightWon)
-const wWU8JCheckWin = checkWin;
+const wSdCheckWin = checkWin;
 checkWin = function () {
-  const was = B && B.over, hp = RUN && RUN.hp, r = wWU8JCheckWin.apply(this, arguments), W = RUN && RUN.pending && RUN.pending.world;
+  const was = B && B.over, hp = RUN && RUN.hp, r = wSdCheckWin.apply(this, arguments), W = RUN && RUN.pending && RUN.pending.world;
   if (B && !was && B.over === 'win' && W && W.kind === 'nadir') W_UMB8J.winHp = [hp, RUN.maxhp];
   return r;
 };
@@ -135,9 +135,11 @@ const wUmbNoPowStart = (orig, kind) => function (o) {
   if (!U || !o || o.kind !== kind || !id || id === 'finale' || U.nopow !== id) return orig.apply(this, arguments);
   const o2 = Object.assign({}, o, { ref: Object.assign({}, o.ref, { nopow: 1 }) });
   // (spent before the start, which saves; a start that refuses with its reason, or throws, gives it back)
+  // (said before the start, so it comes before a Simulated game's result; a refusal says the choice still stands)
   U.nopow = null; W_UMB8J.nopowNext = 1; let r, done = false;
+  if (!LAB) wLog('No powers for your side, this game. For the feat.', 'd');
   try { r = orig.call(this, o2); done = true; } finally { W_UMB8J.nopowNext = 0; if (!done || r) U.nopow = id; }
-  if (!r && !LAB) wLog('No powers for your side, this game. For the feat.', 'd');
+  if (r && !LAB) wLog('No game after all, so the choice to play without powers still stands.', 'd');
   return r;
 };
 const wWU8JStartLinks = wStartLinks; wStartLinks = wUmbNoPowStart(wWU8JStartLinks, 'unadirgl');
