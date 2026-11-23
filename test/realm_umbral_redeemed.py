@@ -50,58 +50,77 @@ window.U9 = {
     return { queued, star: p.star, redeemed: !!(s && s.redeemed), kind: p.kind, name: p.n, num: p.num, from: p.from, sig: s && s.sig,
       own: wCardsOf(p.id).some(c => c.id === s.sig), kindSig: wCardsOf(p.id).some(c => c.id === SIG[p.kind]), inMatch, rarS: CARDS[s.sig].rar === 's', ws: WG.star || null };
   },
+  // (each: a whole game, Simulate; then the same teams put into the engine (start), and the ultimate read from the
+  // engine itself: its own team, or the ultimate it offers or would cast for them. own: the champion's own ultimate)
   gf(k) {
     const { p } = U9.team(k, W_GFG.minOwn); for (const q of wRoster()) wGfOf(q); wSevenSync();
     const club = Object.values(WG.rivals)[0]; wGfg().opp = {};
-    const opp = wGridOpp(club, 2), sq = wGridSquad(opp), m = sq.team.roster.find(r => r.n === p.n);
+    const opp = wGridOpp(club, 2), sq = wGridSquad(opp), on = sq.team.roster.some(r => r.n === p.n);
     const g = wGF.simGame({ teams: [sq.team, opp], skill: wGridSkill(2), powers: true });
-    return { on: !!m, ult: (m && m.ult) || null, game: Array.isArray(g.score) };
+    wGF.start({ teams: [sq.team, opp], skill: wGridSkill(2), powers: true }); const m = wGF.G.teams[0].roster.find(r => r.n === p.n);
+    const named = m ? wGridPowNames(m).ult.n : null, kindN = (wGF.powerBook[p.kind].ult || {}).n;
+    return { on, ult: (m && m.ult) || null, named: m && m.ult ? named === 'Eclipse' : named === kindN, game: Array.isArray(g.score) && g.score.every(n => n >= 0) };
   },
   bd(k) {
     const { p } = U9.team(k, W_BALL.minOwn); for (const q of wRoster()) wBdOf(q); wNineSync();
-    const club = Object.values(WG.rivals)[0], def = wNineDef(), m = def.roster.concat(def.pen).find(r => r.n === p.n);
+    const club = Object.values(WG.rivals)[0], def = wNineDef(), on = def.roster.concat(def.pen).some(r => r.n === p.n);
     wBD.sim({ defs: [def, wBallOpp(club, 2)], innings: W_BALL.innings, diff: W_BALL.diff[2], rules: W_BALL.rules });
-    return { on: !!m, ult: m && m.pitches && m.pitches.includes('deadball') ? 'deadball' : null, game: wBD.G.teams[0].R >= 0 };
+    const G = wBD.G, T = G.teams[0], m = T.def.roster.concat(T.pen, T.used || []).find(r => r.n === p.n);
+    const card = /Dead Ball/.test(wBdCard(p));
+    return { on, card, ult: m && m.pitches && m.pitches.includes('deadball') ? 'deadball' : null, game: G.phase === 'over' && G.inning >= W_BALL.innings && G.teams[0].R !== G.teams[1].R };
   },
   bx(k) {
     const { p } = U9.team(k, 3);
-    const side = wRingSide(new Set()), f = side.fighters.find(x => x.n === p.n), P = f && f.pw;
-    const r = wBX.simCard({ sides: [side, wRingOpp(Object.values(WG.rivals)[0], 1, new Set())], skill: [1, 1] });
-    return { on: !!f, ult: P ? P.ult.id : null, sp: P ? [P.sp.id, P.sp2 && P.sp2.id] : null, kindSp: [wBX.powerData[p.kind].sp.id, wBX.powerData[p.kind].sp2 && wBX.powerData[p.kind].sp2.id], game: !!r.result };
+    const side = wRingSide(new Set()), f = side.fighters.find(x => x.n === p.n), P = f && f.pw, opp = wRingOpp(Object.values(WG.rivals)[0], 1, new Set());
+    const r = wBX.simCard({ sides: [side, opp], skill: [1, 1] });
+    wBX.start({ fighters: [f, opp.fighters[0]], mode: 'watch', you: 0, skill: [1, 1] }); const U = wBX.powers(0).ult;
+    return { on: !!f, ult: U && U.id === 'lastbell' ? U.id : null, kindUlt: wBX.powerData[p.kind].ult.id, engUlt: U && U.id, sp: P ? [P.sp.id, P.sp2 && P.sp2.id] : null,
+      kindSp: [wBX.powerData[p.kind].sp.id, wBX.powerData[p.kind].sp2 && wBX.powerData[p.kind].sp2.id], game: !!r.result && r.bouts.every(b => b.over) };
   },
   bk(k) {
     const { p } = U9.team(k, 5); for (const q of wRoster()) { delete q.bk; wBkOf(q); } wCourtSync();
     const club = Object.values(WG.rivals)[0]; wBkg().opp = {};
-    const opp = wCourtOpp(club, 2), sq = wCourtSquad(opp), m = sq.team.roster.slice(0, 5).find(r => r.n === p.n);
+    const opp = wCourtOpp(club, 2), sq = wCourtSquad(opp), on = sq.team.roster.slice(0, 5).some(r => r.n === p.n);
     const g = wBK.simGame({ teams: [sq.team, opp], skill: wCourtSkill(2), mins: 5, court: true, ordered: [true, false] });
-    return { on: !!m, ult: (m && m.ult) || null, game: Array.isArray(g.score) };
+    wBK.start({ teams: [sq.team, opp], skill: wCourtSkill(2), mins: 5, court: true, ordered: [true, false], powers: true });
+    const o = wBK.ultOptions(0).find(u => u.who === p.n);
+    return { on, ult: o && o.own ? o.id : null, offered: !!o, game: Array.isArray(g.score) && g.score[0] !== g.score[1] };
   },
   hk(k) {
     const { p } = U9.team(k, 6); for (const q of wRoster()) { delete q.hk; wHkOf(q); } wSixSync();
+    // (at centre: a goalie casts nothing, so in goal there is no ultimate to read)
+    const C = WG.rink, at = wHK.pos.find(pos => C.six[pos] === p.id); if (at && at !== 'C') [C.six[at], C.six.C] = [C.six.C, C.six[at]]; C.mine = true;
     const club = Object.values(WG.rivals)[0]; wHkg().opp = {};
-    const opp = wRinkOpp(club, 2), sq = wRinkSquad(opp), m = sq.team.roster.slice(0, 6).find(r => r.n === p.n);
+    const opp = wRinkOpp(club, 2), sq = wRinkSquad(opp), on = sq.team.roster.slice(0, 6).some(r => r.n === p.n);
     const g = wHK.simGame({ teams: [sq.team, opp], skill: wRinkSkill(2), mins: 6, pond: true, ordered: [true, false] });
-    return { on: !!m, ult: (m && m.ult) || null, game: Array.isArray(g.score) };
+    wHK.start({ teams: [sq.team, opp], skill: wRinkSkill(2), mins: 6, pond: true, ordered: [true, false], powers: true });
+    const o = wHK.ultOptions(0).find(u => u.n === p.n);
+    return { on, ult: o && o.own ? o.id : null, offered: !!o, game: g.win === 0 || g.win === 1 };
   },
   gl(k) {
     const { p } = U9.team(k, 4); wFourSync();
-    const club = Object.values(WG.rivals)[0], opp = wLinksOpp(club, 2), sq = wLinksSquad(opp), m = sq.team.roster.find(r => r.n === p.n);
+    const club = Object.values(WG.rivals)[0], opp = wLinksOpp(club, 2), sq = wLinksSquad(opp), on = sq.team.roster.some(r => r.n === p.n);
     const g = wGL.simGame({ teams: [sq.team, opp], skill: wLinksSkill(2), holes: wLinksHoles(), powers: true });
-    return { on: !!m, ult: (m && m.ult) || null, game: g.win === 0 || g.win === 1 };
+    wGL.start({ teams: [sq.team, opp], skill: wLinksSkill(2), holes: wLinksHoles(), powers: true }); const m = wGL.G.teams[0].roster.find(r => r.n === p.n);
+    return { on, ult: (m && m.ult) || null, game: g.win === 0 || g.win === 1 };
   },
   bl(k) {
     const { p } = U9.team(k, 5); for (const q of wRoster()) { delete q.bl; wBlOf(q); } wFiveSync();
     const club = Object.values(WG.rivals)[0]; wLng().opp = {};
-    const opp = wLanesOpp(club, 2), sq = wLanesSquad(opp), m = sq.team.roster.find(r => r.n === p.n);
+    const opp = wLanesOpp(club, 2), sq = wLanesSquad(opp), on = sq.team.roster.some(r => r.n === p.n);
     const g = wBL.simGame({ teams: [sq.team, opp], skill: wLanesSkillOf(2), frames: 10, hall: true, powers: true });
-    return { on: !!m, ult: (m && m.ult) || null, game: g.win === 0 || g.win === 1 };
+    wBL.start({ teams: [sq.team, opp], skill: wLanesSkillOf(2), frames: 10, hall: true, powers: true });
+    const U = wBL.ultOf(0, wBL.G.teams[0].roster.findIndex(r => r.n === p.n));
+    return { on, ult: U && wBL.ultOwn[U.id] ? U.id : null, game: g.win === 0 || g.win === 1 };
   },
   cr(k) {
     const { p } = U9.team(k, 4); for (const q of wRoster()) { delete q.cr; wCrOf(q); } wFourSyncCr();
     const club = Object.values(WG.rivals)[0]; wShg().opp = {};
-    const opp = wShedOpp(club, 2), sq = wShedSquad(opp), m = sq.team.roster.find(r => r.n === p.n);
+    const opp = wShedOpp(club, 2), sq = wShedSquad(opp), on = sq.team.roster.some(r => r.n === p.n);
     const g = wCR.simGame({ teams: [sq.team, opp], skill: wShedSkillOf(2), ends: 6, hall: true, powers: true, hammer: 1 });
-    return { on: !!m, ult: (m && m.ult) || null, game: g.win === 0 || g.win === 1 };
+    wCR.start({ teams: [sq.team, opp], skill: wShedSkillOf(2), ends: 6, hall: true, powers: true, hammer: 1 });
+    const U = wCR.ultOf(0, wCR.G.teams[0].roster.findIndex(r => r.n === p.n));
+    return { on, ult: U && wCR.ultOwn[U.id] ? U.id : null, game: g.win === 0 || g.win === 1 };
   },
 };
 """
@@ -147,6 +166,8 @@ async def main():
         check(sl['p'] == ['Hollis Grael', 'wraith', 9, 'nadir_rink', 'redeemed'] and sl['redeemed'] == 'rink', 'forging the Seal queues the redeemed champion as a superstar, with their own name and number', sl)
         check(sl['card'] and 'superstar' in sl['lede'].lower() and 'The Long Night' in sl['lede'], 'the recruit card shows their own signature card and says they are a superstar, with their own ultimate', sl)
         check(sl['wait'], 'turned down, the redeemed captain waits at camp', sl)
+        ws = await pg.evaluate("(() => { wOpenCamp('stars'); const st = !!document.querySelector('#modalBox [data-u9star]'); document.querySelector('#modalBox [data-close]').click(); return st; })()")
+        check(not ws, 'while they wait at camp, the Stars tab does not say they play for you', ws)
         cp = await pg.evaluate("""(() => { const i = WG.wwait.findIndex(q => q.star === 'nadir_rink'); wSignWaiting(i); const p = wRoster().find(q => q.star === 'nadir_rink'), out = {};
           out.joined = !!p; out.card = !!p && wCardsOf(p.id).some(c => c.id === 'u9_night'); out.ws = WG.star || null;
           wOpenCamp('team'); out.tag = !!document.querySelector(`#modalBox [data-pid="${p.id}"] .wu9star`) && !!document.querySelector(`#modalBox [data-pid="${p.id}"]`).textContent.match(/edeemed in the Umbral/);
@@ -156,6 +177,11 @@ async def main():
         check(cp['joined'] and cp['card'] and cp['ws'] is None, 'signed from camp, they join with their own card, and the journey\'s one legend superstar is still free', cp)
         check(cp['tag'] and cp['other'] == 1, 'the Team screen tags them Superstar (redeemed in the Umbral), and nobody else', cp)
         check('Hollis Grael' in cp['stars'] and 'The Long Night' in cp['stars'], 'the Stars tab names the redeemed superstar', cp)
+        rk = await pg.evaluate("""(() => { const p = wRoster().find(q => q.star === 'nadir_rink'), C = wSixSync(), h = wSixRow(p.id, C);
+          const w = wAddPlayer(wMakePlayer({ kind: 'wraith', n: 'Pale Understudy', lvl: 2 }, 'tavern')), hw = wSixRow(w.id, wSixSync());
+          const why = wRelease(p.id); return { row: h.includes('Ultimate: <b>The Long Night</b>'), plain: hw.includes('Ultimate: <b>') && !hw.includes('The Long Night'), why, gone: !wAllCards().some(c => c.id === 'u9_night'), heir: wCardsOf(w.id).length >= 1 }; })()""")
+        check(rk['row'] and rk['plain'], 'the Rink tab names The Long Night as their ultimate (another wraith keeps the wraith\'s)', rk)
+        check(rk['why'] == '' and rk['gone'] and rk['heir'], 'released, their own card leaves with them; another of their kind keeps their other cards', rk)
         hp = await pg.evaluate("(() => { showPage('help'); const p = [...document.querySelectorAll('#wHelpUmbral p')].find(e => /When it shuts/.test(e.textContent)); const t = p ? p.textContent : ''; showPage('play'); return t; })()")
         check('as a superstar' in hp and 'signature card' in hp and 'ultimate' in hp and hp.count('asks to join') == 1, "How to play's 'When it shuts' line says the captain joins as a superstar", hp)
 
@@ -172,6 +198,9 @@ async def main():
         check(od['p'] and od['count'] == 1, 'an old save with the redeemed captain signed as a plain player still loads, with them on the team', od)
         check(od['star'] == 'nadir_ring' and od['num'] == 7 and od['card'] and od['ult'] and od['ult']['id'] == 'lastbell', 'and they are made the superstar: their number, their card, and The Last Bell in the ring', od)
         check(od['sp2'], 'in the ring the special picked on the Ring tab is the one they bring (and the tape names), with The Last Bell', od)
+        lm = await pg.evaluate("""(() => { const p = wRoster().find(q => q.n === 'Brakka Knell'); delete p.star; RUN.battle = { turn: 1 };
+          const n = wUmbStarsFixAll(), during = !!p.star; RUN.battle = null; wNextPrompt(); return { n, during, after: p.star || null }; })()""")
+        check(lm == {'n': 0, 'during': False, 'after': 'nadir_ring'}, 'with a match live the old-save fix-up waits, and the world\'s next free moment does it', lm)
 
         # ---------- each of the nine, forced as the redeemed: a star with their card, in every engine ----------
         await pg.add_script_tag(content=LAB_JS)
@@ -183,8 +212,27 @@ async def main():
                 g = await pg.evaluate(f"(() => {{ try {{ return U9.{e}('{k}'); }} catch (e) {{ return {{ err: String(e.stack || e) }}; }} }})()")
                 want = ult if k == home else None
                 ok = 'err' not in g and g['on'] and g['game'] and g['ult'] == want
-                if e == 'bx' and ok: ok = (g['sp'] == g['kindSp']) if k == 'ring' else g['sp'] is None
+                if e == 'bx' and ok: ok = (g['sp'] == g['kindSp']) if k == 'ring' else (g['sp'] is None and g['engUlt'] == g['kindUlt'])
+                if e in ('bk', 'hk') and ok: ok = g['offered']
+                if e == 'gf' and ok: ok = g['named']
+                if e == 'bd' and ok: ok = g['card'] == (k == 'diamond')
                 check(ok, f'{k} in {e}: plays a whole game in your lineup' + (f', with their own {ult}' if want else ', with their kind\'s powers and no ultimate of a champion'), g)
+        # ---------- your Powers row in a game you play names the ultimate the engine casts ----------
+        # (golf, bowling and curling build the row from the kind; the view is the engine's, frozen at a ball to aim)
+        pr = await pg.evaluate("""(() => { const out = {};
+          const as = (E, v, fn) => { const d = Object.getOwnPropertyDescriptor(E, 'view'); Object.defineProperty(E, 'view', { get: () => v, configurable: true }); try { return fn(); } finally { Object.defineProperty(E, 'view', d); } };
+          { const { p } = U9.team('links', 4); LAB = false; wFourSync(); wStartLinks({ club: Object.values(WG.rivals)[0], how: 'play' });
+            const V = wGL.view, ri = wGL.G.teams[V.you].roster.findIndex(r => r.n === p.n), txt = () => document.querySelector('#wLinksRowPow [data-lpow="ult"]').textContent;
+            wLinksPowRow(Object.assign({}, V, { sel: { ri } }), true); out.gl = txt(); wLinksPowRow(Object.assign({}, V, { sel: { ri: (ri + 1) % 4 } }), true); out.gl2 = txt(); }
+          { const { p } = U9.team('lanes', 5); LAB = false; for (const q of wRoster()) { delete q.bl; wBlOf(q); } wFiveSync(); wStartLanes({ club: Object.values(WG.rivals)[0], how: 'play' });
+            const V = wBL.view, ri = wBL.G.teams[0].roster.findIndex(r => r.n === p.n), txt = () => document.querySelector('#wLanesRowPow [data-npow="ult"]').textContent;
+            out.bl = as(wBL, Object.assign({}, V, { ph: 'aim', up: V.you, bowler: ri }), () => { wLanesRows(); return txt(); });
+            out.bl2 = as(wBL, Object.assign({}, V, { ph: 'aim', up: V.you, bowler: (ri + 1) % 5 }), () => { wLanesRows(); return txt(); }); }
+          { U9.team('shed', 4); LAB = false; for (const q of wRoster()) { delete q.cr; wCrOf(q); } wFourSyncCr(); wStartShed({ club: Object.values(WG.rivals)[0], how: 'play' });
+            out.cr = as(wCR, Object.assign({}, wCR.view, { ph: 'aim', up: wCR.view.you, mode: 'play' }), () => { wShedRows(); return document.querySelector('#wShedPowRow [data-crpow="ult"]').textContent; }); }
+          return out; })()""")
+        check(pr['gl'].startswith('The Hollow Flag') and not pr['gl2'].startswith('The Hollow Flag') and pr['bl'].startswith('The Drowning Bell') and not pr['bl2'].startswith('The Drowning Bell') and pr['cr'].startswith('The Sunken Stone'),
+              'your Powers row in golf, bowling and curling names their own ultimate (the others\' their kind\'s)', pr)
         await pg.evaluate("LAB = false")
         check(not errs, 'no page errors', errs[:5])
         await br.close()
