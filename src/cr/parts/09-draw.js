@@ -56,10 +56,35 @@ function crSheetDraw(c) {
   line(-S.hog, '#c83a3a', 3); line(0, '#2a3a48', 1); line(S.back, '#2a3a48', 1.2);
   const [c1, c2] = q(0, y0), [d1, d2] = q(0, S.back); c.strokeStyle = 'rgba(42,58,72,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(c1, c2); c.lineTo(d1, d2); c.stroke();
 }
+// Old Grey under the ice, in a game with the frozen deep (16-deep.js): the keen ice round him a little glossier, his long
+// dark shape along his heading with its tail slowly swinging, and a dashed ring where he swims next. pt(x, y) puts a
+// point of the sheet on the screen (the sheet view's perspective, or the house view from above).
+function crDeepShape(c, pt, px) {
+  const d = G && G.deep; if (!d) return;
+  const D = CR_DEEP, ring = (cx, cy, r) => { c.beginPath(); for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, p = pt(cx + Math.cos(a) * r, cy + Math.sin(a) * r); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); } c.closePath(); };
+  c.save();
+  ring(d.x, d.y, D.reach); c.fillStyle = 'rgba(205,238,255,.35)'; c.fill();
+  // the body: an ellipse 48 by 15 inches along the heading, a fin either side, a forked tail that swings
+  const ux = Math.cos(d.hd), uy = Math.sin(d.hd), vx = -uy, vy = ux, sw = Math.sin(CRC.t * 2.2) * .35, P = (l, w) => pt(d.x + ux * l + vx * w, d.y + uy * l + vy * w);
+  const poly = pts => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fill(); };
+  c.fillStyle = 'rgba(30,42,52,.5)';
+  for (const sd of [1, -1]) poly([P(6, 6 * sd), P(-2, 13 * sd), P(-4, 6 * sd)]);
+  const body = []; for (let i = 0; i <= 36; i++) { const a = i / 36 * Math.PI * 2, L = Math.cos(a) * 24, W = Math.sin(a) * 7.5 * (Math.cos(a) > 0 ? 1 : .75); body.push(P(L, W)); } poly(body);
+  const ta = Math.PI + sw, tb = [-21, 0], tip = o => P(tb[0] + Math.cos(ta + o) * 13, Math.sin(ta + o) * 13);
+  poly([P(tb[0], 0), tip(.5), P(tb[0] - 7, 0), tip(-.5)]);
+  // his eye, a pale glint at the head
+  const e = P(17, 3); c.fillStyle = 'rgba(230,245,255,.7)'; c.beginPath(); c.arc(e[0], e[1], Math.max(1, px * 1.6), 0, Math.PI * 2); c.fill();
+  // where he swims next
+  ring(d.nx, d.ny, D.bumpR); c.setLineDash([4, 4]); c.strokeStyle = 'rgba(40,60,80,.55)'; c.lineWidth = 1.5; c.stroke();
+  c.restore();
+}
+function crDeepDraw(c) { if (G && G.deep) crDeepShape(c, (x, y) => crScr(x, y), crS(G.deep.y) * CR_VIEW.px); }
+function crDeepHouseDraw(c) { if (G && G.deep) crDeepShape(c, (x, y) => crHouseScr(x, y), CR_VIEW.hk); }
 // the broom: where your skip holds it while a stone is called
 function crBroomDraw(c, x, y, col) { const [sx, sy, s] = crScr(x, y); c.save(); c.strokeStyle = col; c.lineWidth = Math.max(1.5, 3 * s); c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + 4 * s * 6, sy - 30 * s * 6 / 2); c.stroke(); c.fillStyle = col; c.beginPath(); c.ellipse(sx, sy, 9 * s * 2.6, 4 * s * 2.6, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
 function crLeftDraw(c) {
   crSheetDraw(c);
+  crDeepDraw(c);
   const S = GP && GP.sel, X = GP && GP.X;
   if (GP && (GP.ph === 'aim' || GP.ph === 'swing') && S) crBroomDraw(c, S.x, S.y, '#ffd34a');
   // the stones and the players on the ice, farthest first, so nearer ones are drawn over them (one list, kept between
@@ -114,6 +139,8 @@ function crRightDraw(c) {
   for (const [r, col] of [[72, '#3c78c8'], [48, '#f4f8fa'], [24, '#c83a3a'], [6, '#f4f8fa']]) { c.fillStyle = col; c.beginPath(); c.arc(V.hx, V.hy, r * k, 0, Math.PI * 2); c.fill(); }
   c.strokeStyle = '#2a3a48'; c.lineWidth = 1; c.beginPath(); c.moveTo(V.w, V.hy); c.lineTo(960, V.hy); c.moveTo(V.hx, 0); c.lineTo(V.hx, 330); c.stroke();
   const by = crHouseScr(0, CR_SHEET.back)[1]; c.beginPath(); c.moveTo(V.w, by); c.lineTo(960, by); c.stroke();
+  // Old Grey under the ice, under the path and the call (16-deep.js)
+  crDeepHouseDraw(c);
   // the path of the stone in play, and the call
   const X = GP && GP.X; if (X) { c.strokeStyle = 'rgba(40,60,90,.45)'; c.lineWidth = 1.5; c.beginPath(); X.Q.path.forEach(([x, y], i) => { const [px, py] = crHouseScr(x, y); i ? c.lineTo(px, py) : c.moveTo(px, py); }); const T = X.Q.T, [tx, ty] = crHouseScr(T.x, T.y); c.lineTo(tx, ty); c.stroke(); }
   const S = GP && GP.sel; if (GP && (GP.ph === 'aim' || GP.ph === 'swing') && S) { const [bx, by2] = crHouseScr(S.x, S.y); c.strokeStyle = '#d8a400'; c.lineWidth = 2.5; c.beginPath(); c.arc(bx, by2, 9, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.moveTo(bx - 13, by2); c.lineTo(bx + 13, by2); c.moveTo(bx, by2 - 13); c.lineTo(bx, by2 + 13); c.stroke(); }
@@ -124,6 +151,7 @@ function crRightDraw(c) {
   c.save(); c.fillStyle = '#e9f2f6'; c.fillRect(Xs(CR_SHEET.halfW), top, CR_SHEET.halfW * 2 * .18, bot - top);
   c.fillStyle = '#3c78c8'; c.beginPath(); c.arc(Xs(0), Y(0), 72 * .18, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c83a3a'; c.beginPath(); c.arc(Xs(0), Y(0), 24 * .18, 0, Math.PI * 2); c.fill();
   c.fillStyle = '#c83a3a'; c.fillRect(Xs(CR_SHEET.halfW), Y(-CR_SHEET.hog) - 1, CR_SHEET.halfW * 2 * .18, 2);
+  if (G.deep) { c.fillStyle = 'rgba(40,52,62,.55)'; c.beginPath(); c.ellipse(Xs(G.deep.x), Y(G.deep.y), 5, 3, 0, 0, Math.PI * 2); c.fill(); }
   for (const [id, x, y] of crStonesNow()) { c.fillStyle = G.teams[crSideOf(id === 'new' && X ? X.s : id)].color || '#888'; c.beginPath(); c.arc(Xs(x), Y(y), 3, 0, Math.PI * 2); c.fill(); }
   c.fillStyle = '#cfe2ec'; c.font = '11px system-ui, sans-serif'; c.textAlign = 'left';
   c.fillText(`The ice: ${CR_COLD[G.cold].n}`, V.w + 14, 352); c.fillText('The sheet', V.w + 14, 368);

@@ -198,7 +198,7 @@ async def main():
         check(lb['why'] == '' and lb['played'] == 1, 'in LAB mode (the realm bot) PLAY simulates at once', lb)
 
         # a finale round through the same adapter: Nadir Athletic, no toll, no piece; a win takes the round, a loss counts it
-        fn = await pg.evaluate("""(() => { wDrain(); const U = WG.umbral; U.pieces = Object.keys(W_UMB_PIECES); U.tries = { court: 2 }; U.finaleSports = ['basketball', 'card', 'golf']; U.finale = 0;
+        fn = await pg.evaluate("""(() => { wDrain(); const U = WG.umbral; U.pieces = Object.keys(W_UMB_PIECES); U.tries = { court: 2 }; U.well = {}; U.finaleSports = ['basketball', 'card', 'golf']; U.finale = 0;
           RUN.gold = 200; const g0 = RUN.gold, n0 = WG.bkg.games.length; wRunAct('ufinale'); const card = document.querySelector('[data-ubk]'), t = document.getElementById('modalBox').textContent;
           const words = { seal: t.includes('The Seal'), toll: t.includes('toll'), team: t.includes('Nadir Athletic') }; const hexes = W_NADIR.finale.hexes;
           document.querySelector('[data-ubk="sim"]').click(); const g = WG.bkg.games[0], ok = document.getElementById('wCourtOk'); if (ok) ok.click();

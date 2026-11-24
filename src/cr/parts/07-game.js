@@ -29,6 +29,8 @@ function crStart(opts) {
   crShedStart(o); crPowersStart(o); crKitStart(o.bags);
   // (the Umbral's hexes, when a game asks for them: 15-umbral.js)
   crHexStart(o.hexes, o.hexOn);
+  // (the frozen deep, when a game asks for it, last: a game without it draws the same random numbers as before: 16-deep.js)
+  crDeepStart(o);
   // the lab's switches (phase 10): fixShot [shot or null, ...] (a side held to one shot where it can), noSweep [bool, ...]
   // (a side's sweepers never sweep), wear: false (the pebble never wears)
   G.fixShot = Array.isArray(o.fixShot) ? o.fixShot.slice() : null; G.noSweep = Array.isArray(o.noSweep) ? o.noSweep.map(Boolean) : null; G.wear = o.wear !== false;
@@ -95,7 +97,13 @@ function crThrowFinish(X) {
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
   // (the Drifting House: a hexed side's stone at rest in the house slides further out, before the rules look: 15-umbral.js)
   const drift = G.hex ? crHexDrift(s, run) : 0;
+  // (the frozen deep: Old Grey bumps the stones at rest where he swims next, before the rules score them: 16-deep.js)
+  const sc0 = G.deep ? crScoreEnd(run.stones) : null, bumps = G.deep ? crDeepBump(run.stones) : [], sc1 = bumps.length ? crScoreEnd(run.stones) : sc0;
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
+  // (he swims after every stone the rules take; a stone the free guard zone takes off changes nothing, so he stays where he
+  // is, his ring still where he goes next, and its bump isn't kept)
+  const bumped = rule.fgz ? [] : bumps;
+  if (G.deep && !rule.fgz) { G.deep.bumps += bumped.length; if (bumped.length && (sc0.s !== sc1.s || sc0.n !== sc1.n)) G.deep.swings++; crDeepSwim(); }
   if (G.wear !== false) crWear(G.ice, run.path);
   // (Hoarfrost: the first of the other rink's stones an end to lie in the four-foot freezes there: 15-umbral.js)
   const froze = G.hex ? crHexFreeze() : false;
@@ -104,6 +112,7 @@ function crThrowFinish(X) {
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
   // the Shed's ways: after a stone a frost sprite now and then; after an end the frost, and Hennock's pebble at the half
   G.hallSaid = rule.end ? crShedEnd(rule.end.end) : crShedAfter();
+  if (bumped.length) G.hallSaid = [G.hallSaid, crDeepSay(bumped)].filter(Boolean).join(' ');
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
   if (made) { B.made++; P.made++; B.madeBy[plan.shot] = (B.madeBy[plan.shot] || 0) + 1; }
   if (made && plan.shot === 'draw' && run.stop && Math.hypot(run.stop.x, run.stop.y) <= CR_BUTTON) B.buttons = (B.buttons || 0) + 1;
@@ -112,6 +121,7 @@ function crThrowFinish(X) {
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, ham, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
   if (drift && !rule.fgz) ev.drift = drift;
+  if (bumped.length) ev.deep = bumped;
   if (froze) ev.froze = 1 - G.hex.on;
   crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
@@ -125,7 +135,7 @@ function crThrowStone(s, plan, rel, sweep) {
 function crSummary() {
   if (!G) return null;
   return { win: G.over ? G.over.win : -1, over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
-    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
+    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra, deep: G.deep ? { bumps: G.deep.bumps, swings: G.deep.swings } : null };
 }
 // the game as it stands between stones, plain JSON (a match saved and left); and back
 // (each stone's path thinned to a point every five feet, so a long game doesn't swell the save; a path already thinned
@@ -144,6 +154,7 @@ function crResume(sn) {
   // (a game saved before a part added its state: that part's state as it starts)
   if (G.powers && !G.powWhich) G.powWhich = [null, null];
   if (!G.potEnd) { const b = G.bags; crKitStart(b); }
+  if (G.deep === undefined) { G.deep = null; G.deepSaid = ''; }
   crPlayStart({ mode: sn.mode });
   if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.autoPow = !!sn.autoPow; GP.paths = (sn.paths || []).slice();
   GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;

@@ -43,7 +43,12 @@
    skills stays three); hexes (the table), hex() (a game's: { ids, on } or null), hexLine() (the line under the end
    board), lich (the Lich's row; lichSet and hexSet change them, for the lab), ultOwn (a curler's own ultimates), ultOf(s)
    (the ultimate side s's rink would cast), hexFx(s) (what side s's next stone takes, its hexes with its powers),
-   sweeper(s, plan) (side s's sweepers for a call, as its skill sweeps: (stone, t) => how hard, or null). */
+   sweeper(s, plan) (side s's sweepers for a call, as its skill sweeps: (stone, t) => how hard, or null).
+   The frozen deep (issue #108; 16-deep.js): start({ deep: true }) puts Old Grey under the ice; deep (G.deep: { x, y, nx,
+   ny, hd, bumps, swings } or null), deepRules (CR_DEEP, live: the lab tunes it), deepSee(s) (how much of him side s's
+   skip reads: 0, 1 the keen ice, 2 the bumps too), deepMu(x, y) (the keen ice's friction there), deepTry(s, aim) (the stones after a trial run of side s's skip, as
+   its skill reads him); a summary carries deep
+   ({ bumps, swings } or null), and a stone's event deep (the stones he bumped). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -84,6 +89,7 @@ return {
   potions: JSON.parse(JSON.stringify(CR_POTIONS)), kitRules: JSON.parse(JSON.stringify(CR_KIT)), potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
   // the Umbral (15-umbral.js)
   hexes: JSON.parse(JSON.stringify(CR_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => crHexLine(), lich: JSON.parse(JSON.stringify(CR_LICH)),
+  get deep() { return G && G.deep ? JSON.parse(JSON.stringify(G.deep)) : null; }, deepRules: CR_DEEP, deepSee: s => G && G.teams ? crDeepSeeOf(s) : 0, deepMu: (x, y) => crDeepMu(x, y), deepTry: (s, aim) => G && G.teams ? crDeepSight(s, () => crTry(s, aim)) : null,
   lichSet: o => Object.assign(CR_LICH, o), hexSet: (id, o) => CR_HEX[id] && Object.assign(CR_HEX[id], o), ultOwn: JSON.parse(JSON.stringify(CR_ULT_OWN)),
   ultOf: (s, ri) => G && G.teams ? crUltOf(s, ri) : null, hexFx: s => G && G.teams ? crHexFx(s, crFxFor(s)) : null,
   sweeper: (s, plan) => G && G.teams ? crSweeper(s, plan) : null,
