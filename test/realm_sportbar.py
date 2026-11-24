@@ -72,7 +72,7 @@ async def main():
         await pg.wait_for_function("(() => { const b = document.querySelectorAll('#wSbRing .wsbside')[1].querySelector('.wsbbar > i'); return b && b.style.width === '25%'; })()", timeout=5000)
         check(True, "a fighter's health bar follows their health")
         keys = await pg.evaluate("[...document.querySelectorAll('#wRingPad [data-rpad]')].map(b => b.dataset.key)")
-        check(keys == ['J', 'K', 'L', 'Space', 'Shift', 'E', 'Q', 'R'], "the ring's pad buttons carry their keys", keys)
+        check(keys[:8] == ['J', 'K', 'L', 'Space', 'Shift', 'E', 'Q', 'R'] and keys[8:] in ([], ['C']), "the ring's pad buttons carry their keys (C, the curse, for a fighter who has one)", keys)
         await pg.evaluate("wBX.pause(false); wLeaveRing()")
         await pg.wait_for_function("UI.view === 'world'")
 
