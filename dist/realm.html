@@ -28762,7 +28762,8 @@ function bxHandThink(f, o, dt) {
    points on the cards.
    CD is the card, plain JSON (so a card can be saved between bouts): { sides: [2 × { name, short, color, light,
    fighters: [{ n, kind, num, r? }] }], pairs: [[mine, theirs] × 3] (fighter indices), bouts: [{ over, verdict, stats,
-   kd } × done], i (the bout on now), mode, you, seed, powers, skill, result }. A bout on the card ends into CD.bouts (bxCardRecord, from bxOver);
+   kd } × done], i (the bout on now), mode, you, seed, powers, skill, result, forge (the Anvil Ring's forge corner in the
+   last bout boxed, 16-anvil.js) }. A bout on the card ends into CD.bouts (bxCardRecord, from bxOver);
    bxCardNext boxes the next, and after the last CD.result is the card's. */
 let CD = null;
 // how a fighter's ratings stack up against another's for the corner's pairing: the ratings' total, with reach counted
@@ -28806,7 +28807,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn, bxpow: CD.bxpow, anvil: CD.anvil });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn, bxpow: CD.bxpow, anvil: CD.anvil, forgeLast: CD.forge });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
@@ -28816,6 +28817,8 @@ function bxCardRecord() {
   // the bags as this bout left them, for the next (13-kit.js)
   CD.bags = JSON.parse(JSON.stringify(G.bags || [{}, {}])); CD.pots = (CD.pots || []).concat((G.pots || []).map(p => Object.assign({ b: CD.i }, p)));
   CD.bouts[CD.i] = { over: { how: v.how, win: v.win, kind: v.kind || null, round: v.round, kd: v.kd.slice(), pts: v.pts.slice() }, verdict: bxVerdict(), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice() };
+  // (the Anvil Ring's forge corner this bout: the next takes the other, 16-anvil.js)
+  if (G.anvil) CD.forge = G.anvil.forge;
   if (CD.bouts.length === CD.pairs.length) CD.result = bxCardResult(CD.bouts.map(b => b.over));
 }
 function bxCardNext() {
@@ -28837,8 +28840,8 @@ function bxSimCard(opts) {
     const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
-    let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}]));
-    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn, bxpow: o.bxpow, anvil: o.anvil }); bags = b.bags; return b; });
+    let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}])), forge = null;
+    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn, bxpow: o.bxpow, anvil: o.anvil, forgeLast: forge }); bags = b.bags; if (b.anvil) forge = b.anvil.forge; return b; });
     return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)), bags };
   } finally { CD = keep; }
 }
@@ -29413,8 +29416,9 @@ bxDrawFighter = function (c, f, o) {
    its state kept in G.anvil.rs), so a seeded bout plays the same every time, and turning the ways on doesn't move the
    punch-by-punch stream (R) until the forge or the ropes actually change something.
    - The forge corner. One of the two neutral corners (BX_POSTS 1, back right, or 2, front left: never a fighter's own,
-     where they sit between rounds) still sits over the old forge, and glows. Drawn at the start of each bout
-     (bxAnvilRand). Its heat (bxForgeHeat, 0 to 1) is full within BX_ANVIL.forge.r0 feet of the corner and fades out by
+     where they sit between rounds) still sits over the old forge, and glows. Drawn at the start of a bout
+     (bxAnvilRand); on a card each bout after the first takes the other one (opts.forgeLast, from CD.forge, 10-card.js),
+     so it changes each bout. Its heat (bxForgeHeat, 0 to 1) is full within BX_ANVIL.forge.r0 feet of the corner and fades out by
      BX_ANVIL.forge.r (fighters seldom stand right in a corner: the heat reaches out to where they do work). A fighter in
      it gets their breath back slower (regK, down to BX_ANVIL.forge.regK: through bxFx, which 05-ring.js's regen reads)
      and loses up to BX_ANVIL.forge.drain stamina a second on top (bxAdvance), so pushing the other fighter in there pays
@@ -29455,7 +29459,9 @@ function bxAnvilRand() {
 function bxAnvilBegin(o) {
   if (!o || !o.anvil) return;
   G.anvil = { rs: o.seed != null ? (Math.imul((o.seed | 0) ^ 0x5bd1e995, 2654435761) + 0x2545) | 0 : (Math.random() * 4294967296) | 0, heat: [0, 0], rope: [0, 0] };
-  const C = BX_ANVIL.forge.corners, forge = C[Math.floor(bxAnvilRand() * C.length)], slack = Math.floor(bxAnvilRand() * 4);
+  // (on a card, the bout after takes the other neutral corner: o.forgeLast, the last bout's; the draw is still made, so
+  // the ropes draw the same either way)
+  const C = BX_ANVIL.forge.corners, r = bxAnvilRand(), forge = C.includes(o.forgeLast) ? C.find(k => k !== o.forgeLast) : C[Math.floor(r * C.length)], slack = Math.floor(bxAnvilRand() * 4);
   Object.assign(G.anvil, { forge, slack, said: `The old forge is still hot under ${BX_FORGE_N[forge]}: stay out of it. And ${BX_SLACK[slack].n} will work loose this round. I tighten them at the bell.` });
   bxLog(`Ma Gristle: "${G.anvil.said}"`, true);
 }
@@ -65583,8 +65589,8 @@ renderHelp = function () {
   after.insertAdjacentHTML('afterend', '<p class="hint" id="wHelpGfAsh"><b>The Ash Bowl.</b> Ash settles on the grass through each half, and a back who cuts on it can go over; heat off the stands at one end makes long passes and kicks toward it wobble. See Football: how it works.</p>');
 };
 /* w145: the Anvil Ring's own ways (issue #115, phase 4); the engine's side is src/bx/parts/16-anvil.js.
-   The forge corner (one neutral corner still sits over the old forge and glows: breath comes back slower in it, and
-   it takes some more) and the slack ropes (one side works loose through each round: a fighter on them is slower off
+   The forge corner (one neutral corner still sits over the old forge and glows: a fighter in it loses breath there, and
+   gets it back slower) and the slack ropes (one side works loose through each round: a fighter on them is slower off
    them and easier to hit; Ma Gristle tightens them at the bell, and another side goes slack).
    On in every bout the Realm boxes at the Anvil Ring (Play, Manage, Simulate, a club card, the Anvil Belt, the league
    fixtures boxed there, the exhibition BOUT); never in the Umbral's Broken Ring (u4c-boxing.js sends anvil: false), and
@@ -65596,7 +65602,7 @@ renderHelp = function () {
    anvil goes in), renderHelp (wW145RenderHelp: #wRingHowAnvil in Boxing: how it works, and #wHelpRingAnvil). */
 
 const W_ANVIL = { on: true, lab: false,
-  help: 'The Anvil Ring has two ways of its own, in every bout there. <b>The forge corner.</b> One of the two neutral corners (never a fighter\'s own) still sits over the old forge, and it glows on the canvas. A fighter in it gets their breath back half as fast, and loses a little more on top, so walking the other fighter into it pays, and getting caught there costs. Which corner it is changes each bout. <b>The slack ropes.</b> One side\'s ropes work loose during each round, and you can see them sag, more as the round goes on (it says <i>slack ropes</i> over them; <i>slack next</i> between rounds). A fighter on them doesn\'t bounce off: their feet are slower off the ropes, and punches find them more often. Ma Gristle tightens them at the bell, and another side goes slack next round. Ma Gristle says which before the first bell and at every break. The other corner reads them too, more the better it is: a Knight or better steps out of the forge and off the slack side, and circles to put your back to them.' };
+  help: 'The Anvil Ring has two ways of its own, in every bout there. <b>The forge corner.</b> One of the two neutral corners (never a fighter\'s own) still sits over the old forge, and it glows on the canvas. A fighter in it loses breath there, and gets it back slower, so walking the other fighter into it pays, and getting caught there costs. Which corner it is changes each bout. <b>The slack ropes.</b> One side\'s ropes work loose during each round, and you can see them sag, more as the round goes on (it says <i>slack ropes</i> over them; <i>slack next</i> between rounds). A fighter on them doesn\'t bounce off: their feet are slower off the ropes, and punches find them more often. Ma Gristle tightens them at the bell, and another side goes slack next round. Ma Gristle says which before the first bell and at every break. The other corner reads them too, more the better it is: a Knight or better steps out of the forge and off the slack side, and circles to put your back to them.' };
 function wAnvilRules() {
   if (!W_ANVIL.on) return false;
   if (LAB) return !!W_ANVIL.lab;
@@ -65615,7 +65621,7 @@ wBX.simBout = o => wW145SimBout(wAnvilNext(o));
   if (K) {
     K.topics.job.t += ' Ask me about the ROPES and the FORGE before you box here.';
     K.topics.ropes = { t: 'Old ropes, older than me. One side works loose every round, and you can see it sag. Get pushed onto it and it won\'t bounce you off: you\'ll stick there, and they\'ll find you. I tighten them at the bell, and some other side goes next round. I tell you which.' };
-    K.topics.forge = { t: 'This hall was a forge before it was a ring, and one corner still sits on the old firebox. It glows. Stand in it and your breath comes back half as fast, and the heat takes more. Not one of your own corners, mind: a different neutral one each bout. Walk them into it, and stay out yourself.' };
+    K.topics.forge = { t: 'This hall was a forge before it was a ring, and one corner still sits on the old firebox. It glows. Stand in it and the heat takes your breath, and it comes back slower. Not one of your own corners, mind: a different neutral one each bout. Walk them into it, and stay out yourself.' };
   }
 }
 

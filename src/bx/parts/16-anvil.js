@@ -6,8 +6,9 @@
    its state kept in G.anvil.rs), so a seeded bout plays the same every time, and turning the ways on doesn't move the
    punch-by-punch stream (R) until the forge or the ropes actually change something.
    - The forge corner. One of the two neutral corners (BX_POSTS 1, back right, or 2, front left: never a fighter's own,
-     where they sit between rounds) still sits over the old forge, and glows. Drawn at the start of each bout
-     (bxAnvilRand). Its heat (bxForgeHeat, 0 to 1) is full within BX_ANVIL.forge.r0 feet of the corner and fades out by
+     where they sit between rounds) still sits over the old forge, and glows. Drawn at the start of a bout
+     (bxAnvilRand); on a card each bout after the first takes the other one (opts.forgeLast, from CD.forge, 10-card.js),
+     so it changes each bout. Its heat (bxForgeHeat, 0 to 1) is full within BX_ANVIL.forge.r0 feet of the corner and fades out by
      BX_ANVIL.forge.r (fighters seldom stand right in a corner: the heat reaches out to where they do work). A fighter in
      it gets their breath back slower (regK, down to BX_ANVIL.forge.regK: through bxFx, which 05-ring.js's regen reads)
      and loses up to BX_ANVIL.forge.drain stamina a second on top (bxAdvance), so pushing the other fighter in there pays
@@ -48,7 +49,9 @@ function bxAnvilRand() {
 function bxAnvilBegin(o) {
   if (!o || !o.anvil) return;
   G.anvil = { rs: o.seed != null ? (Math.imul((o.seed | 0) ^ 0x5bd1e995, 2654435761) + 0x2545) | 0 : (Math.random() * 4294967296) | 0, heat: [0, 0], rope: [0, 0] };
-  const C = BX_ANVIL.forge.corners, forge = C[Math.floor(bxAnvilRand() * C.length)], slack = Math.floor(bxAnvilRand() * 4);
+  // (on a card, the bout after takes the other neutral corner: o.forgeLast, the last bout's; the draw is still made, so
+  // the ropes draw the same either way)
+  const C = BX_ANVIL.forge.corners, r = bxAnvilRand(), forge = C.includes(o.forgeLast) ? C.find(k => k !== o.forgeLast) : C[Math.floor(r * C.length)], slack = Math.floor(bxAnvilRand() * 4);
   Object.assign(G.anvil, { forge, slack, said: `The old forge is still hot under ${BX_FORGE_N[forge]}: stay out of it. And ${BX_SLACK[slack].n} will work loose this round. I tighten them at the bell.` });
   bxLog(`Ma Gristle: "${G.anvil.said}"`, true);
 }

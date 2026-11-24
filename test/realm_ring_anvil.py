@@ -5,7 +5,7 @@
 # near its corner and none across the ring; the slack ropes (slack from the bell, all the way out late in the round,
 # slower feet and easier to hit on them, nothing on the other sides); Ma Gristle tightens them at each bell and another
 # side goes slack; her line before the first bell and her ROPES and FORGE; the CPU steps out of them by its skill, and a
-# Squire spends longer in them than an Archmage; kept in the bout's snapshot; every bout on a card has them; in the Realm
+# Squire spends longer in them than an Archmage; kept in the bout's snapshot; every bout on a card has them, and the forge corner changes each bout; in the Realm
 # on in every bout (off in LAB unless W_ANVIL.lab; never in the Umbral's Broken Ring); drawn on the ring (the forge
 # corner glows) and in How to play. Exits nonzero on failure. Screenshot: /tmp/realm-ring-anvil.png.
 import asyncio, json, sys, os, subprocess
@@ -121,6 +121,14 @@ async def main():
           LAB = false; return { card: !!c.anvil, live, all: all.every(Boolean), mixed }; })()""")
         check(cd['card'] and cd['live'] and cd['all'], 'a card with the ways has them in every bout, live and headless', cd)
         check(cd['mixed'], 'the forge corner is drawn again for each bout on a card', cd)
+        alt = await pg.evaluate("""(() => { const side = (n, k) => ({ name: n, short: n.slice(0, 3), color: '#a33', light: '#fcc', fighters: k.map((x, i) => ({ n: n + i, kind: x })) });
+          const o = s => ({ sides: [side('Ours', ['witch', 'lich', 'goblin']), side('Them', ['vampire', 'zombie', 'gorgon'])], skill: [1, 1], seed: s }), alts = f => f.every((x, i) => !i || x !== f[i - 1]);
+          LAB = true; const sims = []; for (let s = 0; s < 12; s++) sims.push(wBX.simCard(Object.assign(o(30 + s), { anvil: true })).bouts.map(b => b.anvil.forge));
+          const lives = []; for (let s = 0; s < 3; s++) { wBX.cardStart(Object.assign(o(60 + s), { anvil: true })); const f = [];
+            for (let i = 0; i < 3; i++) { f.push(wBX.anvil.forge); wBX.pause(true); for (let k = 0; k < 20000 && wBX.phase !== 'over'; k++) { if (wBX.wait) wBX.call(wBX.wait.plan); wBX.step(); } wBX.pause(false); if (i < 2) wBX.cardNext(); }
+            lives.push(f); }
+          wBX.hide(); LAB = false; return { sims, lives, sim: sims.every(alts), live: lives.every(alts) }; })()""")
+        check(alt['sim'] and alt['live'], 'on a card, the forge corner changes each bout: the next bout takes the other neutral corner (headless and live)', alt)
 
         # ---------- the Realm: on in every bout, off in LAB, never in the Umbral ----------
         rl = await pg.evaluate("""(() => { const side = (n, k) => ({ name: n, short: n.slice(0, 3), color: '#a33', light: '#fcc', fighters: k.map((x, i) => ({ n: n + i, kind: x })) });
@@ -157,6 +165,10 @@ async def main():
         await pg.evaluate("wBX.pause(false); wLeaveRing()")
         hp = await pg.evaluate("(() => { renderHelp(); const a = document.getElementById('wRingHowAnvil'), b = document.getElementById('wHelpRingAnvil'); return { a: a ? a.textContent : '', b: b ? b.textContent : '' }; })()")
         check(all(w in hp['a'] for w in ('forge corner', 'slack ropes', 'Ma Gristle', 'breath')) and 'Anvil Ring' in hp['b'], 'How to play: Boxing, how it works explains the forge corner and the slack ropes', hp)
+
+        # (the words say what the forge does: breath taken there, and back slower; not "half as fast", which its rate isn't)
+        words = [hp['a'], hp['b'], mg['forge']]
+        check(all('slower' in w for w in words) and not any('half as fast' in w for w in words), 'the forge\'s words match its numbers: it takes breath, and breath comes back slower (not half as fast)', words)
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()
