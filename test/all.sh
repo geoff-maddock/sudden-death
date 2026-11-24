@@ -30,14 +30,16 @@ TIMES=build/test-times.txt; touch "$TIMES"
 
 # one check: its log, then "<exit code> <seconds>" in build/test-status/<check>
 run_one() {
-  local t="$1" s=$(date +%s) code lim=240
-  [ "$t" = realm_music ] && lim=600
+  local t="$1" s=$(date +%s) code lim=240 nc=0
+  # (realm_music renders audio flat out: at the lowest priority, so the real-time checks beside it aren't starved of
+  # CPU and left waiting on a live game; it has the time to spare)
+  [ "$t" = realm_music ] && lim=600 && nc=19
   # (passes alone in under 90s, but with four other heavy checks beside it has run past 240)
   [ "$t" = realm_gridiron_bench ] && lim=420
   # (nine champions through every engine, about 80 Simulated games: under 30s alone, past 240 beside realm_music)
   [ "$t" = realm_umbral_redeemed ] && lim=420
-  if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' $lim "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
-  else "$TO" --foreground -k 10 $lim "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?
+  if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
+  else "$TO" --foreground -k 10 $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?
   echo "$code $(( $(date +%s) - s ))" > "build/test-status/$t"
 }
 export -f run_one
