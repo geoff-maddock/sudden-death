@@ -28,7 +28,12 @@ the tier's level, by tier: off (as the other parts box: LAB mode leaves them out
 yours only and theirs only; then at tier 2 both sides with the curses alone and the situation powers alone. Each row
 boxes the same seeded cards (as parts 6 and 7), so the rows differ only in what they change.
   python3 test/realm_ring_lab.py 150 --more     part 8 only
-Writes /tmp/realm_ring_lab.json (part 8: /tmp/realm_ring_lab_more.json)."""
+Part 9, the Anvil Ring's own ways (issue #115, phase 4; only with --anvil): the forge corner and the slack ropes, off
+against on over the same seeded cards, by tier, with situation powers and curses on both sides (as the Realm's card
+boxes); then at tier 2 with the CPU's read of them turned off (every skill boxes them as a Squire does: blind to them).
+Also how long each side spends in the forge's heat (seconds at full heat) and on the slack ropes, a card.
+  python3 test/realm_ring_lab.py 150 --anvil    part 9 only
+Writes /tmp/realm_ring_lab.json (part 8: /tmp/realm_ring_lab_more.json; part 9: /tmp/realm_ring_lab_anvil.json)."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -36,7 +41,8 @@ from playwright.async_api import async_playwright
 
 UMB_ONLY = '--umbral' in sys.argv
 MORE_ONLY = '--more' in sys.argv
-ARGS = [a for a in sys.argv[1:] if a not in ('--umbral', '--more')]
+ANVIL_ONLY = '--anvil' in sys.argv
+ARGS = [a for a in sys.argv[1:] if a not in ('--umbral', '--more', '--anvil')]
 N = int(ARGS[0]) if len(ARGS) > 0 else 100
 PRE = ARGS[1] if len(ARGS) > 1 else ''
 
@@ -69,12 +75,14 @@ window.BLAB = {
     // ('drawn': the hexes a try would draw, a different try each card)
     let hexes = o.hexes;
     if (hexes === 'drawn') { const keep = WG.umbral; WG.umbral = { tries: { ring: BLAB.tries = (BLAB.tries || 0) + 1 } }; try { hexes = wUmbRingHexes('ring', W_NADIR.ring.hexes); } finally { WG.umbral = keep; } }
-    const r = wBX.simCard(Object.assign({ sides: [mine, opp], skill: sk, powers: o.powers !== false }, o.bxpow !== undefined ? { bxpow: o.bxpow } : {}, bags ? { bags } : {}, hexes && hexes.length ? { hexes } : {}, o.seed != null ? { seed: o.seed } : {}));
+    const r = wBX.simCard(Object.assign({ sides: [mine, opp], skill: sk, powers: o.powers !== false }, o.bxpow !== undefined ? { bxpow: o.bxpow } : {}, o.anvil !== undefined ? { anvil: o.anvil } : {}, bags ? { bags } : {}, hexes && hexes.length ? { hexes } : {}, o.seed != null ? { seed: o.seed } : {}));
     const R = r.result, bouts = r.bouts;
     // situation powers and curses (part 8): what each side cast a card, and its cut-man's washes
     const more = [0, 1].map(s => bouts.reduce((m, b) => { if (b.bxp) { for (const c of b.bxp.casts) if (c.side === s) m[c.k === 'sit' ? c.id : 'cu']++; m.wash += b.bxp.wash[s]; } return m; }, { canvas: 0, last: 0, bell: 0, cu: 0, wash: 0 }));
     const used = r.bags && bags ? [0, 1].map(s => Object.keys(bags[s]).reduce((n, id) => n + bags[s][id] - ((r.bags[s] || {})[id] || 0), 0)) : [0, 0];
-    return { more, hexes: hexes || [], champ: !!o.champ, kit: o.kit || 'plain', used, gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
+    // the Anvil Ring's ways (part 9): seconds in the forge's heat and on the slack ropes, a card, by side
+    const anvil = [0, 1].map(s => bouts.reduce((m, b) => { if (b.anvil) { m.heat += b.anvil.heat[s]; m.rope += b.anvil.rope[s]; } return m; }, { heat: 0, rope: 0 }));
+    return { anvil, more, hexes: hexes || [], champ: !!o.champ, kit: o.kit || 'plain', used, gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
       boutWins: bouts.filter(b => b.over.win === 0).length, stops: bouts.filter(b => b.over.how !== 'dec').length, myKos: bouts.filter(b => b.over.win === 1 && b.over.how !== 'dec').length, ms: performance.now() - t0 };
   },
   belt(lvl) {
@@ -124,6 +132,7 @@ async def main():
         if PRE: await pg.evaluate(PRE + "\n;0")
         t0 = time.time()
         if MORE_ONLY: return await more(pg, errs, t0)
+        if ANVIL_ONLY: return await anvil(pg, errs, t0)
         cards, tiers, skills, nopow, belts, kits = [], [], [], [], [], []
         if not UMB_ONLY:
             for gap in (-1, 0, 1, 2, 3):
@@ -218,5 +227,29 @@ async def more(pg, errs, t0):
     rs = [g for k in out if k.endswith(':all') for g in out[k]]
     n = len(rs)
     print(f"  in the Realm's card ({n} cards, both sides), a card: " + ', '.join(f"{k} {sum(g['more'][s][k] for g in rs for s in (0, 1)) / n:.2f}" for k in ('canvas', 'last', 'bell', 'cu', 'wash')))
+
+ANVIL_ROWS = [('off', 'off', False), ('on', 'the forge and the ropes', True)]
+
+async def anvil(pg, errs, t0):
+    out = {}
+    P = "bxpow: { sit: true, curse: true }"
+    for t in (1, 2, 3):
+        for key, label, on in ANVIL_ROWS:
+            out[f't{t}:{key}'] = await batch(pg, N, f"BLAB.card(3, {t - 1}, {t}, {{ seed: 30011 + i, {P}, anvil: {json.dumps(on)} }})")
+    # the CPU's read off: every skill blind to them (as a Squire is), tier 2
+    keep = await pg.evaluate("JSON.stringify(wBX.anvilRules.read)")
+    await pg.evaluate("wBX.anvilSet({ read: { out: [0, 0, 0, 0], herd: [0, 0, 0, 0] } })")
+    out['t2:blind'] = await batch(pg, N, f"BLAB.card(3, 1, 2, {{ seed: 30011 + i, {P}, anvil: true }})")
+    await pg.evaluate(f"wBX.anvilSet({{ read: {keep} }})")
+    json.dump(out, open('/tmp/realm_ring_lab_anvil.json', 'w'))
+    print(f'{time.time() - t0:.0f}s   page errors', len(errs), errs[:2])
+    print('\nthe Anvil Ring\'s ways, your three at level 3 against a rival\'s at the tier\'s level, Simulate, situation powers and curses on (the same seeded cards in every row)')
+    print('                                             n    win   draw   a card: in the heat (you, them)  on the slack ropes (you, them), seconds')
+    for t in (1, 2, 3):
+        base = sum(g['win'] for g in out[f't{t}:off']) / len(out[f't{t}:off'])
+        for key, label, _ in ANVIL_ROWS + ([('blind', 'on, the CPU blind to them', True)] if t == 2 else []):
+            rs = out[f't{t}:{key}']; n = len(rs)
+            c = lambda s, k: sum(g['anvil'][s][k] for g in rs) / n
+            row(f"tier {t} {label}"[:40].ljust(40), rs, '' if key == 'off' else f"   heat {c(0, 'heat'):.1f}, {c(1, 'heat'):.1f}  ropes {c(0, 'rope'):.1f}, {c(1, 'rope'):.1f}   {100 * (sum(g['win'] for g in rs) / n - base):+5.1f} pts")
 
 asyncio.run(main())

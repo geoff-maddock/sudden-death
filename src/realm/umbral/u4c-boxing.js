@@ -17,7 +17,8 @@
    won card pays the piece, a lost or drawn one counts a try.
 
    W_UMB4C, wUmbRingHexes, wUmbRingSide; W_NADIR.ring, DB.chars.nadir_ring, W_UMB4.start.ring, W_ON_END.unbox
-   Wraps: wBX.cardStart and wBX.simCard (wWU4CCardStart, wWU4CSimCard: the hexes go in), wBallName (wWU4CBallName:
+   Wraps: wBX.cardStart and wBX.simCard (wWU4CCardStart, wWU4CSimCard: the hexes go in, and anvil: false, as the Broken
+   Ring has none of the Anvil Ring's own ways: w145-anvilring.js), wBallName (wWU4CBallName:
    the Nadir by name), wRingTapeOf (wWU4CRingTapeOf: a champion's own powers and nature on the tape), wRingPairing
    (wWU4CRingPairing: the same on the pairing), wRingBarNote (wWU4CRingBarNote: the hexes on the ring bar). */
 
@@ -109,9 +110,10 @@ const wWU4CCardStart = wBX.cardStart, wWU4CSimCard = wBX.simCard;
 wBX.cardStart = o => {
   if (!WU4C.hexes) return wWU4CCardStart(o);
   const L = wBxg().live, hx = wUmbTakeHex(WU4C, 'hexes'); if (L) L.world.hexes = hx.slice();
-  return wWU4CCardStart(Object.assign({}, o, { hexes: hx, hexOn: 0 }));
+  return wWU4CCardStart(Object.assign({}, o, { hexes: hx, hexOn: 0, anvil: false }));
 };
-wBX.simCard = o => WU4C.hexes ? wWU4CSimCard(Object.assign({}, o, { hexes: wUmbTakeHex(WU4C, 'hexes'), hexOn: 0 })) : wWU4CSimCard(o);
+// (the Broken Ring is not the Anvil Ring: no forge corner, no slack ropes, w145-anvilring.js)
+wBX.simCard = o => WU4C.hexes ? wWU4CSimCard(Object.assign({}, o, { hexes: wUmbTakeHex(WU4C, 'hexes'), hexOn: 0, anvil: false })) : wWU4CSimCard(o);
 
 /* ---------- on screen ---------- */
 const wWU4CBallName = wBallName;
