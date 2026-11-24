@@ -3,9 +3,10 @@
   python3 test/realm_shed_lab.py 120            120 games for every cell, and 120 cups
   python3 test/realm_shed_lab.py 120 'W_SHG.oppBonus = { 1: 0, 2: 2, 3: 4 }'    a tuning override, run in the page first
   python3 test/realm_shed_lab.py 200 '' tiers,gaps    only some parts (tiers, gaps, skills, powers, shots, sweep, hammer,
-                                                      pebble, kits, cups, single, umbral)
+                                                      pebble, deep, kits, cups, single, umbral)
   python3 test/realm_shed_lab.py 100 '' umbral        only the Umbral (issue #99, phase 4h)
   python3 test/realm_shed_lab.py 100 '' umbral nadir,rime    only those rows of it (to run rows in several processes)
+  python3 test/realm_shed_lab.py 300 '' deep knights          only that row of the deep (knights, knightSquire, knightArchmage, archmageKnight)
 
 Every game is the curling engine played to a result, headless (wCR.simGame), as Simulate plays it: 6 ends, the Shed's
 ways on, powers on, your four curling as a Knight would, the other rink at the skill of the tier (Squire, Knight,
@@ -23,6 +24,9 @@ ratings suggest. The hammer goes to each side in turn.
 - hammer: the hammer's worth, with the hammer in the first end against without; and the ends (singles, twos, big ends,
   blanks and steals a game).
 - pebble: the pebble's wear on and off (wear), and the Shed's ways on and off.
+- deep (issue #108): Old Grey under the ice, on and off on the same games (game i the same seed and the same fours both
+  ways), for even Knights, your Knight against a Squire and against an Archmage, and an Archmage against a Knight: side
+  0's win % each way, and with the deep, the stones he bumps a game and the bumps that changed an end's score (swings).
 - kits: by tier, plain; their bag only (as Simulate plays it); both bags; and the full kit (both bags, and your four in
   gear, a piece each).
 - cups: Simulate every round: how far it gets, how often it wins.
@@ -46,7 +50,7 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 120
 OVR = sys.argv[2] if len(sys.argv) > 2 else ''
-PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,shots,sweep,hammer,pebble,kits,cups,single,umbral').split(','))
+PARTS = set((sys.argv[3] if len(sys.argv) > 3 else 'tiers,gaps,skills,powers,shots,sweep,hammer,pebble,deep,kits,cups,single,umbral').split(','))
 ROWS = sys.argv[4].split(',') if len(sys.argv) > 4 and sys.argv[4] else None
 OUT = os.environ.get('SHED_LAB_OUT', '/tmp/realm_shed_lab.json')
 
@@ -83,6 +87,12 @@ __lab.ends = (n, ham) => { let w = 0, pts = 0; const E = { single: 0, two: 0, bi
     E.steal += r.st[0].ends.stolen + r.st[1].ends.stolen; }
   for (const k in E) E[k] = +(E[k] / n).toFixed(2);
   return { win: +(100 * w / n).toFixed(1), margin: +(pts / n).toFixed(2), ends: E }; };
+// the frozen deep on and off on the same games: { off, on, bumps, swings (a game), margin (side 0's points less theirs, a
+// game, each way) }
+__lab.deep = (n, o) => { const s0 = __lab.cell(), A = { off: 0, on: 0, bumps: 0, swings: 0, mOff: 0, mOn: 0 };
+  for (let i = 0; i < n; i++) { const opts = o(i), a = __lab.one(i, Object.assign({}, opts, { deep: false }), s0), b = __lab.one(i, Object.assign({}, opts, { deep: true }), s0);
+    if (a.win === 0) A.off++; if (b.win === 0) A.on++; A.bumps += b.deep.bumps; A.swings += b.deep.swings; A.mOff += a.tot[0] - a.tot[1]; A.mOn += b.tot[0] - b.tot[1]; }
+  return { off: +(100 * A.off / n).toFixed(1), on: +(100 * A.on / n).toFixed(1), bumps: +(A.bumps / n).toFixed(2), swings: +(A.swings / n).toFixed(2), margin: [+(A.mOff / n).toFixed(2), +(A.mOn / n).toFixed(2)] }; };
 // a four of one kind at level 3 (pw: { draw, hit } 1 for a curler's second power)
 __lab.fourOf = (kind, pw) => ({ name: 'Us', short: 'US', roster: [0, 1, 2, 3].map(() => Object.assign(wShedPlayer(wMakePlayer({ kind, lvl: 3 }, 'opp')), pw ? { pw } : {})) });
 __lab.geared = id => { const T = __lab.mine(), G = Object.assign({ id }, W_GEAR[id]); T.roster = T.roster.map(m => Object.assign({}, m, { r: wGearRate(m.r, G, wCR.cap), gear: wGearTag(G) })); return T; };
@@ -133,6 +143,11 @@ async def main():
             out['pebble'] = await pg.evaluate(f"""(() => {{ const go = x => __lab.play({N}, () => Object.assign({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [2, 1] }}, x));
               return {{ wear: go({{}}), noWear: go({{ wear: false }}), shed: go({{}}), noShed: go({{ hall: false }}) }}; }})()""")
             print('The pebble and the Shed (an Archmage against a Knight):', json.dumps(out['pebble']))
+        if 'deep' in PARTS:
+            out['deep'] = await pg.evaluate(f"""(() => {{ const go = sk => __lab.deep({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: sk }}));
+              const rows = {{ knights: [1, 1], knightSquire: [1, 0], knightArchmage: [1, 2], archmageKnight: [2, 1] }}, want = {json.dumps(ROWS)}, o = {{}};
+              for (const k in rows) if (!want || want.includes(k)) o[k] = go(rows[k]); return o; }})()""")
+            print('The frozen deep, off and on (the same games):', json.dumps(out['deep']))
         if 'kits' in PARTS:
             out['kits'] = await pg.evaluate(f"""(() => {{ const o = {{}}, mineBag = {{ draught: 2, crwarm: 1, crsalt: 1, crpebble: 1 }}, gearOf = ['cr_broom', 'cr_slider', 'cr_polish', 'cr_charm'];
               const geared = () => {{ const T = __lab.mine(); T.roster = T.roster.map((m, i) => {{ const G = Object.assign({{ id: gearOf[i] }}, W_GEAR[gearOf[i]]); return Object.assign({{}}, m, {{ r: wGearRate(m.r, G, wCR.cap), gear: wGearTag(G) }}); }}); return T; }};

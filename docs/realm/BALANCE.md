@@ -1309,6 +1309,16 @@ same four on both sides: an Archmage beats a Knight 70%, a Knight beats a Squire
   low scoring, as club curling between careful skips is.
 - **Powers** (even level, both Knights): both 49%, neither 49%, yours only 64%, theirs only 34%.
 - **The pebble and the Shed** (an Archmage against a Knight): the wear on 68%, off 75%; the Shed's ways on 67%, off 72%.
+- **The frozen deep, Old Grey** (issue #108; `test/realm_shed_lab.py N '' deep`): each row plays the same seeds and the same fours with him off and on. Once he is on he draws from the random stream, so after the first stone the two games part ways: the rows are as noisy as two separate samples.
+
+  | Your four against theirs | Off | On | Bumps a game | Swings a game |
+  |---|---|---|---|---|
+  | Knight against Knight (650 games) | 51.5% | 50.8% | 4.1 | 0.02 |
+  | Knight against Squire (150) | 91.3% | 96.7% | 4.3 | 0.03 |
+  | Knight against Archmage (150) | 22.7% | 23.3% | 4.1 | 0.02 |
+  | Archmage against Knight (150) | 77.3% | 80.0% | 4.2 | 0.03 |
+
+  Even sides stay even. The first 150 even games read 54.7% against 42.7%, but 500 more read 50.6% against 53.2%: it was noise. A skill gap widens a little (a Squire doesn't see him, an Archmage reads his bumps). He nudges about four stones a game, and hardly ever changes an end's score on the spot (a swing: the score as the stones lay before and after the bump). What he changes is the next shot: a stone in the house moved off the button, a guard pushed wide. `CR_DEEP` is as first set (keen .1, curl cut .4, reach 30, bump up to 6 inches within 20, a swim of 40); nothing needed tuning.
 - **Gear and potions** move a game by a few points at most (tier 2: plain 44%, their bag 47%, both bags 48%, the full
   kit 45%); the side with the tier 3 bag in node: 45 to 49%.
 - **The Brass Broom** (Simulate every round, their bags in): won 15% before, 19% after; out in the quarter-final 17%,
