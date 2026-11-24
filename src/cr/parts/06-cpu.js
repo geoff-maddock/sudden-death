@@ -76,16 +76,20 @@ function crShots(s, sk) {
 function crMiss(s, aim, shot) { const S = crSk((G.skill || [])[s]), k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
+// (with the frozen deep, a skip that reads Old Grey's bumps, CR_DEEP_SEE 2, bumps the stones after as he will: 16-deep.js)
 function crTry(s, aim) {
   const r = crRun(G.stones, { id: 'try', s, x0: 0, ang: aim.ang, v: aim.v, h: aim.h }, { ice: crIceRead(s), cold: G.cold, plan: true });
   if (G.k < G.fgz && G.stones.some(b => b.s !== s && crInFgz(b) && !r.stones.some(a => a.id === b.id))) return G.stones.slice();
+  if (G.deep && CR_DEEP_SEE >= 2) { const out = r.stones.map(o => Object.assign({}, o)); crDeepBump(out); return out; }
   return r.stones;
 }
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
 // style: your rink's game under Manage ('draw' or 'hit': a little more for those shots), or none
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
 // only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
-function crPlan(s, style, only) {
+// (it sees as much of Old Grey as its skill reads, in a game with the frozen deep: crDeepSight, 16-deep.js)
+function crPlan(s, style, only) { return crDeepSight(s, () => crPlanIn(s, style, only)); }
+function crPlanIn(s, style, only) {
   const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 3), S = crSk(sk), kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
   // (the lab's fixShot holds a side to one shot where it can be played)
   const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs && (!only || (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only)) : [], list = held.length ? held : only && kind.length ? kind : all;

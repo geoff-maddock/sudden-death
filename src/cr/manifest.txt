@@ -18,3 +18,5 @@ src/cr/parts/13-powers.js
 src/cr/parts/14-kit.js
 # the Umbral (issue #99, phase 4h): the Lich (skill 3), the hexes, a curler's own ultimate
 src/cr/parts/15-umbral.js
+# the frozen deep (issue #108): Old Grey under the ice, in a game started with { deep: true }
+src/cr/parts/16-deep.js

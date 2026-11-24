@@ -20,9 +20,10 @@ const CR_STONE = { y0: -1116, a: 9, curl: .28, vc: 34, sweepMu: .16, sweepCurl: 
 // the stone's acceleration on the ice: friction against its motion, and the curl across it
 function crAccel(st, ice, cold, sw) {
   const v = Math.hypot(st.vx, st.vy); if (v < 1e-6) return [0, 0];
-  // (a cursed stone drags heavy, or turns stiff and hardly curls: its own drag and curl, 13-powers.js)
+  // (a cursed stone drags heavy, or turns stiff and hardly curls: its own drag and curl, 13-powers.js; over Old Grey,
+  // in a game with the frozen deep, the ice is keen and it curls less: 16-deep.js)
   const mu = crIceAt(ice, st.x, st.y, cold) * (st.drag || 1) * (1 - CR_STONE.sweepMu * sw), ux = st.vx / v, uy = st.vy / v;
-  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y)) * (st.curlK || 1);
+  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y)) * (st.curlK || 1) * crDeepCurl(st.x, st.y);
   // (the curl is across the motion: to the left of it for h = +1, and x is plus to the thrower's left, so the left of a
   // stone going (ux, uy) is (uy, -ux))
   return [-CR_STONE.a * mu * ux + lat * uy, -CR_STONE.a * mu * uy - lat * ux];

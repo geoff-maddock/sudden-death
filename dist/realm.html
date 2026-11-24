@@ -42237,8 +42237,9 @@ const CR_COLD = { heavy: { mu: 1.08, n: 'heavy', say: 'A warm day off the sea: f
 function crIceNew() { return Array(CR_ICE.cols * CR_ICE.rows).fill(1); }
 const crIceCell = (x, y) => { const C = CR_ICE, c = clamp(Math.floor((x + CR_SHEET.halfW) / (2 * CR_SHEET.halfW) * C.cols), 0, C.cols - 1), r = clamp(Math.floor((y - C.y0) / (C.y1 - C.y0) * C.rows), 0, C.rows - 1); return r * C.cols + c; };
 // the friction at (x, y): the pebble there and the day's cold
-// (and the frost along the boards, late in a game with the Shed's ways: crFrostAt, 12-shed.js)
-function crIceAt(ice, x, y, cold) { return (ice ? ice[crIceCell(x, y)] : 1) * ((CR_COLD[cold] || CR_COLD.mid).mu) * (1 + crFrostAt(x)); }
+// (and the frost along the boards, late in a game with the Shed's ways: crFrostAt, 12-shed.js; and the keen ice over
+// Old Grey, in a game with the frozen deep: crDeepMu, 16-deep.js)
+function crIceAt(ice, x, y, cold) { return (ice ? ice[crIceCell(x, y)] : 1) * ((CR_COLD[cold] || CR_COLD.mid).mu) * (1 + crFrostAt(x)) * crDeepMu(x, y); }
 // how worn the pebble is there, 0 (fresh) to 1 (as worn as it gets): worn pebble curls a little less
 const crWornAt = (ice, x, y) => ice ? (1 - ice[crIceCell(x, y)]) / (1 - CR_ICE.min) : 0;
 // a stone went down the sheet: path [[x, y, swept 0..1]]; each cell it crossed once
@@ -42269,9 +42270,10 @@ const CR_STONE = { y0: -1116, a: 9, curl: .28, vc: 34, sweepMu: .16, sweepCurl: 
 // the stone's acceleration on the ice: friction against its motion, and the curl across it
 function crAccel(st, ice, cold, sw) {
   const v = Math.hypot(st.vx, st.vy); if (v < 1e-6) return [0, 0];
-  // (a cursed stone drags heavy, or turns stiff and hardly curls: its own drag and curl, 13-powers.js)
+  // (a cursed stone drags heavy, or turns stiff and hardly curls: its own drag and curl, 13-powers.js; over Old Grey,
+  // in a game with the frozen deep, the ice is keen and it curls less: 16-deep.js)
   const mu = crIceAt(ice, st.x, st.y, cold) * (st.drag || 1) * (1 - CR_STONE.sweepMu * sw), ux = st.vx / v, uy = st.vy / v;
-  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y)) * (st.curlK || 1);
+  const lat = (st.h || 0) * CR_STONE.curl * CR_STONE.a * mu / (1 + v / CR_STONE.vc) * (1 - CR_STONE.sweepCurl * sw) * (1 - CR_ICE.curlWorn * .4 * crWornAt(ice, st.x, st.y)) * (st.curlK || 1) * crDeepCurl(st.x, st.y);
   // (the curl is across the motion: to the left of it for h = +1, and x is plus to the thrower's left, so the left of a
   // stone going (ux, uy) is (uy, -ux))
   return [-CR_STONE.a * mu * ux + lat * uy, -CR_STONE.a * mu * uy - lat * ux];
@@ -42488,16 +42490,20 @@ function crShots(s, sk) {
 function crMiss(s, aim, shot) { const S = crSk((G.skill || [])[s]), k = crErrK(s, shot), hit = ['takeout', 'peel', 'hitroll'].includes(shot); return { ang: aim.ang + gauss() * (hit ? S.hitAng : S.ang) * k.ang, v: aim.v * (1 + gauss() * S.v * k.v), h: aim.h }; }
 // play a shot out on the model (no sweeping, the stones as they lie, on the ice the skip reads): the stones after, as the
 // rules leave them (the free guard zone puts a taken guard back and removes the stone)
+// (with the frozen deep, a skip that reads Old Grey's bumps, CR_DEEP_SEE 2, bumps the stones after as he will: 16-deep.js)
 function crTry(s, aim) {
   const r = crRun(G.stones, { id: 'try', s, x0: 0, ang: aim.ang, v: aim.v, h: aim.h }, { ice: crIceRead(s), cold: G.cold, plan: true });
   if (G.k < G.fgz && G.stones.some(b => b.s !== s && crInFgz(b) && !r.stones.some(a => a.id === b.id))) return G.stones.slice();
+  if (G.deep && CR_DEEP_SEE >= 2) { const out = r.stones.map(o => Object.assign({}, o)); crDeepBump(out); return out; }
   return r.stones;
 }
 // the skip's call for side s: { shot, x, y, h, aim, target, why, val }
 // style: your rink's game under Manage ('draw' or 'hit': a little more for those shots), or none
 const CR_STYLE = { bonus: .3, draw: ['draw', 'guard', 'freeze'], hit: ['takeout', 'peel', 'hitroll'] };
 // only: 'draw' or 'hit', the shots of that kind alone (a power cast for the stone holds it to its kind)
-function crPlan(s, style, only) {
+// (it sees as much of Old Grey as its skill reads, in a game with the frozen deep: crDeepSight, 16-deep.js)
+function crPlan(s, style, only) { return crDeepSight(s, () => crPlanIn(s, style, only)); }
+function crPlanIn(s, style, only) {
   const sk = clamp(((G.skill || [])[s] ?? 1) | 0, 0, 3), S = crSk(sk), kAfter = G.k + 1, all = crShots(s, sk), kind = all.filter(c => (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only);
   // (the lab's fixShot holds a side to one shot where it can be played)
   const fs = G.fixShot && G.fixShot[s], held = fs ? all.filter(c => c.shot === fs && (!only || (CR_HIT.includes(c.shot) ? 'hit' : 'draw') === only)) : [], list = held.length ? held : only && kind.length ? kind : all;
@@ -42564,6 +42570,8 @@ function crStart(opts) {
   crShedStart(o); crPowersStart(o); crKitStart(o.bags);
   // (the Umbral's hexes, when a game asks for them: 15-umbral.js)
   crHexStart(o.hexes, o.hexOn);
+  // (the frozen deep, when a game asks for it, last: a game without it draws the same random numbers as before: 16-deep.js)
+  crDeepStart(o);
   // the lab's switches (phase 10): fixShot [shot or null, ...] (a side held to one shot where it can), noSweep [bool, ...]
   // (a side's sweepers never sweep), wear: false (the pebble never wears)
   G.fixShot = Array.isArray(o.fixShot) ? o.fixShot.slice() : null; G.noSweep = Array.isArray(o.noSweep) ? o.noSweep.map(Boolean) : null; G.wear = o.wear !== false;
@@ -42630,7 +42638,12 @@ function crThrowFinish(X) {
   const gust = run.stop || run.hits ? crGust(s, run.stones, X.fx) : '';
   // (the Drifting House: a hexed side's stone at rest in the house slides further out, before the rules look: 15-umbral.js)
   const drift = G.hex ? crHexDrift(s, run) : 0;
+  // (the frozen deep: Old Grey bumps the stones at rest where he swims next, before the rules score them: 16-deep.js)
+  const sc0 = G.deep ? crScoreEnd(run.stones) : null, bumps = G.deep ? crDeepBump(run.stones) : [], sc1 = bumps.length ? crScoreEnd(run.stones) : sc0;
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
+  // (he swims after every stone the rules take; a bump the free guard zone undid isn't kept, or counted)
+  const bumped = rule.fgz ? [] : bumps;
+  if (G.deep) { G.deep.bumps += bumped.length; if (bumped.length && (sc0.s !== sc1.s || sc0.n !== sc1.n)) G.deep.swings++; crDeepSwim(); }
   if (G.wear !== false) crWear(G.ice, run.path);
   // (Hoarfrost: the first of the other rink's stones an end to lie in the four-foot freezes there: 15-umbral.js)
   const froze = G.hex ? crHexFreeze() : false;
@@ -42639,6 +42652,7 @@ function crThrowFinish(X) {
   if (rule.end) { G.iceEnd = G.ice.slice(); crLegsNewEnd(); }
   // the Shed's ways: after a stone a frost sprite now and then; after an end the frost, and Hennock's pebble at the half
   G.hallSaid = rule.end ? crShedEnd(rule.end.end) : crShedAfter();
+  if (bumped.length) G.hallSaid = [G.hallSaid, crDeepSay(bumped)].filter(Boolean).join(' ');
   const B = G.st[s], P = G.pst[s][ri]; B.stones++; P.stones++; B.shots[plan.shot] = (B.shots[plan.shot] || 0) + 1;
   if (made) { B.made++; P.made++; B.madeBy[plan.shot] = (B.madeBy[plan.shot] || 0) + 1; }
   if (made && plan.shot === 'draw' && run.stop && Math.hypot(run.stop.x, run.stop.y) <= CR_BUTTON) B.buttons = (B.buttons || 0) + 1;
@@ -42647,6 +42661,7 @@ function crThrowFinish(X) {
   G.n++;
   const ev = { side: s, ri, pos, end: endNo + 1, plan, rel, stop: run.stop, hits: run.hits, out: run.out, made, rule, ham, gust: rule.fgz ? '' : gust, ghost: X.Q.T.ghostId || null };
   if (drift && !rule.fgz) ev.drift = drift;
+  if (bumped.length) ev.deep = bumped;
   if (froze) ev.froze = 1 - G.hex.on;
   crPowersAfter(s, ev, endNo, ham); crKitAfter(s, !!rule.end);
   G.last = { side: s, ri, plan: { shot: plan.shot, x: plan.x, y: plan.y, h: plan.h }, made, stop: run.stop, end: rule.end, fgz: rule.fgz };
@@ -42660,7 +42675,7 @@ function crThrowStone(s, plan, rel, sweep) {
 function crSummary() {
   if (!G) return null;
   return { win: G.over ? G.over.win : -1, over: G.over, board: crBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
-    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra };
+    tot: [crTotal(0), crTotal(1)], log: G.log.slice(), casts: (G.casts || []).slice(), pots: (G.pots || []).slice(), skill: G.skill.slice(), cold: G.cold, stones: G.n, extra: G.extra, deep: G.deep ? { bumps: G.deep.bumps, swings: G.deep.swings } : null };
 }
 // the game as it stands between stones, plain JSON (a match saved and left); and back
 // (each stone's path thinned to a point every five feet, so a long game doesn't swell the save; a path already thinned
@@ -42679,6 +42694,7 @@ function crResume(sn) {
   // (a game saved before a part added its state: that part's state as it starts)
   if (G.powers && !G.powWhich) G.powWhich = [null, null];
   if (!G.potEnd) { const b = G.bags; crKitStart(b); }
+  if (G.deep === undefined) { G.deep = null; G.deepSaid = ''; }
   crPlayStart({ mode: sn.mode });
   if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.autoPow = !!sn.autoPow; GP.paths = (sn.paths || []).slice();
   GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;
@@ -43816,6 +43832,74 @@ function crUltOf(s, ri) {
   const m = T.roster[ri == null ? crThrower(s) : ri];
   return CR_ULT[m && m.kind] || CR_ULT.goblin;
 }
+/* The Curling Shed: the frozen deep (issue #108). Old Grey, a great pike, lives under the Shed's ice. A game started with
+   { deep: true } has him (the Realm's wild club matches, about one in three: w139-sheddeep.js); the bare engine, its
+   tests and the labs don't, unless asked. A game without him draws nothing from the random stream for him, so it is the
+   same game as before.
+   - He lies in the far end, in CR_DEEP.box (inside the boards, from just past the far hog line to just short of the
+     back line), at (G.deep.x, G.deep.y). The ice over him is thin and keen: within CR_DEEP.reach inches a stone slides
+     further (crDeepMu, in crIceAt) and curls less (crDeepCurl, in crAccel), most where he lies.
+   - After every stone the rules take, he swims to his next spot (nx, ny: always known, and drawn as a ring), and picks
+     the one after (crDeepSwim: a heading that turns a little each swim and turns back off the box's edges). Before the
+     rules score the stones, every stone at rest within CR_DEEP.bumpR of that next spot is pushed straight away from it,
+     more the nearer it lies (crDeepBump); a push that would put it off the sheet, back over the hog line or into
+     another stone tries half the distance, then leaves it be.
+   - The CPU reads him by skill (CR_DEEP_SEE, set round the skip's call by crDeepSight): a Squire not at all, a Knight
+     the keen ice, an Archmage and the Lich the bumps too (its trial runs bump the stones as he will). The real stone
+     always meets him, and so do your own guide and your captain's sweepers.
+   G.deep = { x, y, nx, ny, hd, bumps, swings } (bumps: stones he has pushed; swings: pushes that changed the end's
+   score as the stones lay), or null. Plain JSON, so a match kept between stones keeps him. G.deepSaid is Hennock's
+   line at the start, for the page. */
+const CR_DEEP = { reach: 30, keen: .1, curlCut: .4, bumpR: 20, bump: 6, minBump: 1.5, step: 40, turn: .9,
+  box: { x: CR_SHEET.halfW - 24, y0: -CR_SHEET.hog + 24, y1: CR_SHEET.back - 12 },
+  say: 'Old Grey\'s under the ice today: the ice runs keen over him, and he bumps whatever lies where he swims next.' };
+// how much of him the skip planning a stone sees: 2 everything (the real stone, the page), 1 the keen ice, 0 nothing
+let CR_DEEP_SEE = 2;
+const crDeepSeeOf = s => { const sk = ((G && G.skill) || [])[s] ?? 1; return sk >= 2 ? 2 : sk === 1 ? 1 : 0; };
+function crDeepSight(s, fn) { const k = CR_DEEP_SEE; CR_DEEP_SEE = crDeepSeeOf(s); try { return fn(); } finally { CR_DEEP_SEE = k; } }
+const crR2 = v => +v.toFixed(2);
+// his next spot from where he is: the heading turns a little, and turns back off the box's edges
+function crDeepNext(d) {
+  const B = CR_DEEP.box, S = CR_DEEP.step;
+  d.hd += (R() - .5) * 2 * CR_DEEP.turn;
+  if (Math.abs(d.x + Math.cos(d.hd) * S) > B.x) d.hd = Math.PI - d.hd;
+  const y = d.y + Math.sin(d.hd) * S; if (y < B.y0 || y > B.y1) d.hd = -d.hd;
+  d.hd = crR2(((d.hd % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI));
+  d.nx = crR2(clamp(d.x + Math.cos(d.hd) * S, -B.x, B.x)); d.ny = crR2(clamp(d.y + Math.sin(d.hd) * S, B.y0, B.y1));
+}
+function crDeepStart(o) {
+  G.deep = null; G.deepSaid = '';
+  if (!o || !o.deep) return;
+  const B = CR_DEEP.box, d = { x: crR2((R() * 2 - 1) * B.x), y: crR2(B.y0 + R() * (B.y1 - B.y0)), nx: 0, ny: 0, hd: R() * 2 * Math.PI, bumps: 0, swings: 0 };
+  crDeepNext(d); G.deep = d; G.deepSaid = CR_DEEP.say;
+}
+// the keen ice over him at (x, y): friction times this (1 off his reach, or when he isn't seen)
+const crDeepNear = (x, y, cut) => { const d = G && G.deep; if (!d || CR_DEEP_SEE < 1) return 1; const r = Math.hypot(x - d.x, y - d.y) / CR_DEEP.reach; return r >= 1 ? 1 : 1 - cut * (1 - r * r); };
+const crDeepMu = (x, y) => crDeepNear(x, y, CR_DEEP.keen);
+const crDeepCurl = (x, y) => crDeepNear(x, y, CR_DEEP.curlCut);
+// the stones at rest near his next spot pushed away from it (mutates stones): [{ id, s, d }]
+function crDeepBump(stones) {
+  const D = CR_DEEP, d = G && G.deep, R2 = 2 * CR_SHEET.stoneR, out = []; if (!d) return out;
+  for (const st of stones) {
+    const dist = Math.hypot(st.x - d.nx, st.y - d.ny); if (dist >= D.bumpR) continue;
+    const ux = dist > 1e-6 ? (st.x - d.nx) / dist : Math.cos(d.hd), uy = dist > 1e-6 ? (st.y - d.ny) / dist : Math.sin(d.hd), amt = Math.max(D.minBump, D.bump * (1 - dist / D.bumpR));
+    for (const k of [amt, amt / 2]) {
+      const m = { x: crR2(st.x + ux * k), y: crR2(st.y + uy * k) };
+      if (!crOnSheet(m) || (crPastHog(st) && !crPastHog(m)) || stones.some(o => o !== st && Math.hypot(o.x - m.x, o.y - m.y) < R2)) continue;
+      st.x = m.x; st.y = m.y; out.push({ id: st.id, s: st.s, d: +k.toFixed(1) }); break;
+    }
+  }
+  return out;
+}
+// after a stone the rules took: he swims to his next spot, and picks the one after
+function crDeepSwim() { const d = G && G.deep; if (!d) return; d.x = d.nx; d.y = d.ny; crDeepNext(d); }
+// what the status line says of a bump
+function crDeepSay(bumps) {
+  if (!bumps.length) return '';
+  if (bumps.length > 1) return `Old Grey turns under the ice and nudges ${bumps.length} stones.`;
+  const b = bumps[0], T = G.teams[b.s] || {};
+  return `Old Grey turns under the ice and nudges ${T.name || 'a'}'s stone ${Math.max(1, Math.round(b.d))} inch${Math.round(b.d) === 1 ? '' : 'es'}.`;
+}
 /* The Curling Shed's superstars (issue #102, phase 8), inside the wCR scope: each superstar's curling ratings and
    powers, added to the engine's own tables after its parts load, as bowling's are (lanes/p0-stars.js). Plain
    assignments, nothing declared. Ratings are [draw, line, hit, sweep, nerve, read]; each has a draw power and a hit
@@ -44257,7 +44341,11 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    skills stays three); hexes (the table), hex() (a game's: { ids, on } or null), hexLine() (the line under the end
    board), lich (the Lich's row; lichSet and hexSet change them, for the lab), ultOwn (a curler's own ultimates), ultOf(s)
    (the ultimate side s's rink would cast), hexFx(s) (what side s's next stone takes, its hexes with its powers),
-   sweeper(s, plan) (side s's sweepers for a call, as its skill sweeps: (stone, t) => how hard, or null). */
+   sweeper(s, plan) (side s's sweepers for a call, as its skill sweeps: (stone, t) => how hard, or null).
+   The frozen deep (issue #108; 16-deep.js): start({ deep: true }) puts Old Grey under the ice; deep (G.deep: { x, y, nx,
+   ny, hd, bumps, swings } or null), deepRules (CR_DEEP, live: the lab tunes it), deepSee(s) (how much of him side s's
+   skip reads: 0, 1 the keen ice, 2 the bumps too), deepMu(x, y) (the keen ice's friction there); a summary carries deep
+   ({ bumps, swings } or null), and a stone's event deep (the stones he bumped). */
 return {
   rules: JSON.parse(JSON.stringify(CR_RULES)), sheet: JSON.parse(JSON.stringify(CR_SHEET)), get G() { return G; },
   newGame: o => crNewGame(o), up: () => crUp(), thrower: s => crThrower(s), pos: s => crPos(s), sideNo: s => crSideNo(s),
@@ -44298,6 +44386,7 @@ return {
   potions: JSON.parse(JSON.stringify(CR_POTIONS)), kitRules: JSON.parse(JSON.stringify(CR_KIT)), potion: id => crPotion(id), advice: bag => crPotionAdvice(bag), potionWhy: (s, id) => crPotionWhy(s, id), cpuPotion: (s, shot) => crCpuPotion(s, shot), gx: fx => crGx(fx),
   // the Umbral (15-umbral.js)
   hexes: JSON.parse(JSON.stringify(CR_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => crHexLine(), lich: JSON.parse(JSON.stringify(CR_LICH)),
+  get deep() { return G && G.deep ? JSON.parse(JSON.stringify(G.deep)) : null; }, deepRules: CR_DEEP, deepSee: s => G && G.teams ? crDeepSeeOf(s) : 0, deepMu: (x, y) => crDeepMu(x, y),
   lichSet: o => Object.assign(CR_LICH, o), hexSet: (id, o) => CR_HEX[id] && Object.assign(CR_HEX[id], o), ultOwn: JSON.parse(JSON.stringify(CR_ULT_OWN)),
   ultOf: (s, ri) => G && G.teams ? crUltOf(s, ri) : null, hexFx: s => G && G.teams ? crHexFx(s, crFxFor(s)) : null,
   sweeper: (s, plan) => G && G.teams ? crSweeper(s, plan) : null,
