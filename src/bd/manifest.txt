@@ -57,3 +57,4 @@ src/bd/parts/47-detail-pages.js
 src/bd/parts/48-pitch-clock.js
 src/bd/parts/49-dungeon-crawl-replay.js
 src/bd/parts/50-brawling.js
+src/bd/parts/51-kit.js

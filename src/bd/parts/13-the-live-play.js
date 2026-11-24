@@ -68,7 +68,7 @@ function effSpeed(r) {
 }
 function fSpeed(f) { if (f.stun > 0) return 0; return f.spd * (f.flight > 0 ? 2 : 1) * (1 - .2 * fk(f.p)) * (1 + .35 * (f.eff || 0)) * (f.flight > 0 ? 1 : zoneMult('fSpd', f.x, f.y)) * hurtMul(f.p, .25) * (1 - .12 * weakK(f.p, 'spd')); }
 function reachZ(f) { return (f.flight > 0 ? 25 : f.big ? 9.5 : 8) + (f.leapT > 0 ? 8 : 0); }
-function reachR(f) { return f.big ? 4.2 : 3.2; }
+function reachR(f) { return (f.big ? 4.2 : 3.2) + kitReach(f.p); }
 
 function trAt(t) { const P = PL.tr.pts, i = clamp(Math.floor(t / TDT), 0, P.length - 1); return P[i]; }
 
@@ -185,7 +185,7 @@ function takeBall(f) { const b = PL.ball; b.st = 'held'; b.holder = f; b.thr = n
 function fieldBall(f) {
   const L = PL, b = L.ball;
   const air = b.st === 'batted' && !trAt(b.bt).b && b.z > .4;
-  const bob = (10 - f.p.fld) * (air ? .011 : .006) * zoneMult('bobble', f.x, f.y) * (1 + hurtF(f.p)) * (1 + 2 * weakK(f.p, 'fld'));
+  const bob = (10 - f.p.fld) * (air ? .011 : .006) * zoneMult('bobble', f.x, f.y) * (1 + hurtF(f.p)) * (1 + 2 * weakK(f.p, 'fld')) * kitBob(f.p);
   if (R() < bob) {
     b.st = 'loose'; b.z = 0; f.stun = .6; L.bobbled = true; pst(f.p).e++;
     addFx('callout', { text: `${shortName(f.p)} bobbles it`, col: '#ffd27a', small: true });

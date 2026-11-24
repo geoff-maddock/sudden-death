@@ -219,6 +219,48 @@ Part 1 plays a fresh five-player journey at level 3 against a rival's nine at th
 
 A simulated cup costs about 8 gold on average (the 40 gold fee against the 150 gold prize) and pays about 112 XP across the roster. With 120 games a cell, a rate is good to about ±9%. A player who plays the pitches beats Squire and Knight far more often than a coin flip; nobody has measured that yet.
 
+### Gear and potions on the diamond (issue #115, phase 1)
+
+`python3 test/realm_diamond_lab.py 600 '' kits` (part 4; about 45 ms a game, 17 minutes for the lot). Your nine at level
+3 against a rival's at level 3, Simulate (both sides on the CPU at the tier's skill), four ways a tier as #61's labs do:
+**plain**; **their bag only** (`W_DIAMOND_KIT.opp`, as Simulate plays it: your bag stays shut); **both bags** (yours a
+Stamina Draught, a Brimstone Tonic, Owl-Eye Drops and Steadyhand Balm, given by your side's CPU at the tier's skill: a
+stand-in for giving them by hand); and **the full kit** (both bags, and a piece on every player: two Hornet-Nest Bats
+and a Splinter Bat, three gloves, two pairs of Iron Spikes, a Ghost Ball on the starter and a Rosin Bag on the
+reliever). Each journey draws new kinds, so a row of 600 is good to about ±4 points.
+
+| tier | plain | their bag only | both bags | both bags, your nine in gear |
+|---|---|---|---|---|
+| 1 | 55.5% | 53.7% (0–0.7) | 56.8% (2.1–0.7) | 63.7% (2.0–0.7) |
+| 2 | 58.7% | 51.8% (0–1.8) | 59.8% (3.4–1.9) | 66.3% (3.4–1.8) |
+| 3 | 29.5% | 27.2% (0–3.5) | 28.2% (3.5–3.6) | 34.5% (3.6–3.6) |
+
+(Potions given a game, yours–theirs, in brackets.) Each piece alone at tier 2, on every player it is for (bats and
+gloves on the eight in the field, balls and the Rosin Bag on the pitchers, spikes on all ten), against 58.7% with none:
+
+| piece | win | | piece | win |
+|---|---|---|---|---|
+| Splinter Bat | +3.7 | | Leaden Ball | +1.7 |
+| Hornet-Nest Bat | +1.0 | | Ghost Ball | −0.7 |
+| Thunderclap Bat | +15.7 | | Hellfire Ball | +1.3 |
+| Lodestone Bat | +8.5 | | Quicksilver Ball | −0.7 |
+| Dragonbone Bat | +20.5 | | Wyrm-Eye Ball | −1.7 |
+| Wyvern-Hide Glove | +1.7 | | Rosin Bag | −1.5 |
+| Iron Spikes | +5.8 | | | |
+
+Each potion alone, two in your bag: Stamina Draught +1.3 (given 0.95 a game), Brimstone Tonic +0.2 (2.0), Owl-Eye
+Drops +1.5 (1.55), Steadyhand Balm −2.2 (1.2).
+
+**What it comes to.** As in boxing and football, a bag is a small edge and never a game on its own: each potion and
+both bags sit inside the noise, and so does their bag in Simulate (−2 to −7, the tier 2 row the widest). Gear does
+more: a full nine in store gear is +5 to +8 at every tier and still leaves tier 3 near a third. The strong pieces are
+the costly bats: eight Dragonbone Bats would be +20, but there is one in the Realm (a chest, or the Diamond Cup) and it
+swings twice a game, so one wearer is worth about +2.5; the same holds for the Thunderclap and Lodestone Bats and the
+spikes (one each, in chests). The cheap store pieces, which you could buy for the whole nine, are +1 to +4. Pitching
+control (the balls' scatter, the Rosin Bag, the balm) hardly moves a CPU-against-CPU game, where batters chase by
+skill rather than by the pitch's spot; a player at the plate reads a pitch by its spot, so those may matter more by
+hand. Nobody has measured that yet. The numbers are as first set: no retune.
+
 ## Training spots (issue #6, phase 4)
 
 The bot drills a card and answers the challenge at each spot in every town it stops in, once a week (`opts.spots`). 140 journeys each, skilled bot, meals on:

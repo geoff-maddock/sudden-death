@@ -3,6 +3,7 @@
   python3 test/realm_diamond_lab.py 120            120 games at each level gap, and 120 cups
   python3 test/realm_diamond_lab.py 120 'W_DCUP.tiers = [1, 1, 2]'    a tuning override, run in the page first
   python3 test/realm_diamond_lab.py 300 '' umbral   only part 3, the Umbral (300 games for each row)
+  python3 test/realm_diamond_lab.py 200 '' kits     only part 4, gear and potions (200 games for each row)
 
 Every game is Brimstone Diamond's own engine played to a final (wBD.sim): both sides on the CPU at the same skill, so
 the result comes from the players' ratings, and the CPU skill of a tier makes no difference here. That is what
@@ -15,7 +16,13 @@ earns.
 Part 3, the Umbral (issue #99, 4a): tier U at level parity. The Lich against an Archmage on the same nine (the CPU
 skill alone); the champion's game as Simulate plays it (your nine as an Archmage against the Bone Nine: the Lich,
 W_BALL.oppBonus[4], and the champion on the mound), with no hexes, then each hex alone (no single one should move it
-by more than about 10 points), then two drawn at random as her game draws them. Writes /tmp/realm_diamond_lab.json."""
+by more than about 10 points), then two drawn at random as her game draws them.
+Part 4, gear and potions (issue #115, phase 1): your nine at level 3 against a rival's at the same level. By tier (the
+CPU skill both sides play at): plain; their bag only (as Simulate plays it: your bag stays shut); both bags (yours a
+Stamina Draught, a Brimstone Tonic, Owl-Eye Drops and Steadyhand Balm); and the full kit (both bags, and a piece of gear
+on every one of your players: three bats, a ball on the starter, a Rosin Bag on the reliever, gloves and spikes). Then
+at tier 2 each piece alone, on every player it is for (bats and gloves on the eight in the field, balls and the Rosin
+Bag on the pitchers, spikes on everyone), and each potion alone, two in your bag. Writes /tmp/realm_diamond_lab.json."""
 import asyncio, json, sys, os, time, collections
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -74,11 +81,57 @@ DLAB.umb = function (lvl, o) {
   const [a, h] = wBD.G.teams;
   return { us: a.R, them: h.R, win: a.R > h.R };
 };
+// gear and potions (part 4): a piece on the players of def that who picks, as wNineBdPlayer puts it on a roster player
+DLAB.wear = (def, id, who) => {
+  const G = Object.assign({ id }, W_GEAR[id]), gx = JSON.parse(JSON.stringify(G.fx || {})); delete gx.r;
+  for (const p of def.roster.concat(def.pen)) { if (who && !who(p)) continue; Object.assign(p, wGearRate(Object.fromEntries(wBD.stats.map(s => [s, p[s]])), G, W_BDR.cap)); p.gear = G.name; p.gx = gx; }
+  return def;
+};
+DLAB.pitcher = p => p.pos === 'P' || p.pos === 'RP';
+DLAB.fielder = p => !DLAB.pitcher(p);
+DLAB.forId = id => { const fx = W_GEAR[id].fx; return fx.ball || fx.ctrl ? DLAB.pitcher : fx.bat || fx.reach ? DLAB.fielder : null; };
+DLAB.FULL = { C: 'bd_glove', '1B': 'bd_splinter', '2B': 'bd_glove', '3B': 'bd_hornet', SS: 'bd_glove', LF: 'bd_spikes', CF: 'bd_hornet', RF: 'bd_spikes', P: 'bd_ghost', RP: 'bd_rosin' };
+DLAB.MINE = { draught: 1, bdtonic: 1, bdeye: 1, bdsteady: 1 };
+// o: { tier, bags: 'none'|'theirs'|'both'|{ mine bag }, gear: 'full'|gear id }
+DLAB.kit = function (lvl, o) {
+  DLAB.journey(lvl);
+  const club = Object.values(WG.rivals)[0], keep = wBallOppLvl, tier = o.tier || 2;
+  wBallOppLvl = () => wNineTier();
+  let opp; try { opp = wBallOpp(club, tier); } finally { wBallOppLvl = keep; }
+  const nine = wNineDef();
+  if (o.gear === 'full') for (const p of nine.roster.concat(nine.pen)) DLAB.wear({ roster: [p], pen: [] }, DLAB.FULL[p.pos]);
+  else if (o.gear) DLAB.wear(nine, o.gear, DLAB.forId(o.gear));
+  const theirs = Object.assign({}, W_DIAMOND_KIT.opp[tier]), mine = typeof o.bags === 'object' ? Object.assign({}, o.bags) : o.bags === 'both' ? Object.assign({}, DLAB.MINE) : null;
+  const bags = o.bags === 'none' || !o.bags ? null : [mine, typeof o.bags === 'object' ? null : theirs];
+  wBD.sim({ defs: [nine, opp], innings: W_BALL.innings, diff: W_BALL.diff[tier], rules: W_BALL.rules, bags });
+  const [a, h] = wBD.G.teams, K = wBD.kit;
+  return { us: a.R, them: h.R, win: a.R > h.R, pots: K ? K.pots.map(x => x.side + x.id) : [] };
+};
 // XP to date, levels included
 window.wXpTotal = p => { let n = p.xp; for (let l = 1; l < p.lvl; l++) n += wXpNeed(l); return n; };
 """
 
 def pct(a, b): return f"{100 * a / b:5.1f}%" if b else '   - '
+
+def print_kits(kits, gnames):
+    def w(k): rows = kits[k]; return sum(g['win'] for g in rows) / len(rows), len(rows), sum(g['us'] for g in rows) / len(rows), sum(g['them'] for g in rows) / len(rows)
+    print('\ngear and potions, your nine at level 3 against a rival\'s at level 3, Simulate (both sides on the CPU at the tier\'s skill)')
+    print('                                        n    win   runs for-against   potions a game (yours, theirs)')
+    for t in (1, 2, 3):
+        base = w(f't{t}:none')[0]
+        for key, label in ((f't{t}:none', 'plain'), (f't{t}:theirs', 'their bag only (Simulate)'), (f't{t}:both', 'both bags'), (f't{t}:both:full', 'both bags, and your nine in gear')):
+            r, n, us, th = w(key); rows = kits[key]
+            pm = sum(sum(1 for x in g['pots'] if x[0] == '0') for g in rows) / n; pt = sum(sum(1 for x in g['pots'] if x[0] == '1') for g in rows) / n
+            print(f"  tier {t} {label:30s} {n:5d}  {100 * r:5.1f}%   {us:.1f}-{th:.1f}   {pm:.2f}, {pt:.2f}" + ('' if key.endswith('none') else f"   {100 * (r - base):+5.1f} pts"))
+    base = w('t2:none')[0]
+    print(f"each piece alone, tier 2, on every player it is for (none {100 * base:.1f}%)")
+    for k in kits:
+        if k.startswith('g:'): r, n, us, th = w(k); print(f"  {gnames[k[2:]]:22s} {n:5d}  {100 * r:5.1f}%   {us:.1f}-{th:.1f}   {100 * (r - base):+5.1f} pts")
+    print(f"each potion alone, two in your bag, tier 2 (none {100 * base:.1f}%)")
+    for k in kits:
+        if k.startswith('p:'):
+            r, n, us, th = w(k); used = sum(len(g['pots']) for g in kits[k]) / n
+            print(f"  {k[2:]:22s} {n:5d}  {100 * r:5.1f}%   {us:.1f}-{th:.1f}   {100 * (r - base):+5.1f} pts   given {used:.2f} a game")
 
 async def main():
     async with async_playwright() as p:
@@ -95,6 +148,26 @@ async def main():
             for i in range(0, N, 20):
                 k = min(20, N - i)
                 umb[key] += await pg.evaluate(f"(() => {{ const o = []; for (let i = 0; i < {k}; i++) o.push(DLAB.umb(3, {json.dumps(o)})); return o; }})()")
+        kits = {}
+        async def krows(key, o):
+            kits[key] = []
+            for i in range(0, N, 20):
+                k = min(20, N - i)
+                kits[key] += await pg.evaluate(f"(() => {{ const o = []; for (let i = 0; i < {k}; i++) o.push(DLAB.kit(3, {json.dumps(o)})); return o; }})()")
+        if ONLY in ('', 'kits'):
+            for t in (1, 2, 3):
+                for b, gr in (('none', None), ('theirs', None), ('both', None), ('both', 'full')):
+                    await krows(f"t{t}:{b}{':full' if gr else ''}", {'tier': t, 'bags': b, 'gear': gr})
+            gids = await pg.evaluate("Object.keys(W_DIAMOND_GEAR)")
+            for gid in gids: await krows('g:' + gid, {'tier': 2, 'bags': 'none', 'gear': gid})
+            for pid in ('draught', 'bdtonic', 'bdeye', 'bdsteady'): await krows('p:' + pid, {'tier': 2, 'bags': {pid: 2}})
+            gnames = await pg.evaluate("Object.fromEntries(Object.entries(W_DIAMOND_GEAR).map(([k, v]) => [k, v.name]))")
+        if ONLY == 'kits':
+            await br.close()
+            json.dump({'kits': kits}, open('/tmp/realm_diamond_lab.json', 'w'))
+            print('override', PRE or '(none)', f' {time.time() - t0:.0f}s', ' page errors', len(errs), errs[:2])
+            print_kits(kits, gnames)
+            return
         await urows('arch', {'same': True, 'mine': 2, 'theirs': 2})
         await urows('lich', {'same': True, 'mine': 2, 'theirs': 3})
         await urows('none', {'mine': 2})
@@ -110,7 +183,8 @@ async def main():
             k = min(5, N - i)
             cups += await pg.evaluate(f"(() => {{ const o = []; for (let i = 0; i < {k}; i++) o.push(DLAB.cup(3)); return o; }})()")
         await br.close()
-    json.dump({'games': games, 'cups': cups, 'umbral': umb}, open('/tmp/realm_diamond_lab.json', 'w'))
+    json.dump({'games': games, 'cups': cups, 'umbral': umb, 'kits': kits}, open('/tmp/realm_diamond_lab.json', 'w'))
+    if kits: print_kits(kits, gnames)
     print('override', PRE or '(none)', f' {time.time() - t0:.0f}s' + (f', {sum(g["ms"] for g in games) / len(games):.0f} ms a game' if games else ''))
     print('page errors', len(errs), errs[:2])
     def wr(k): rows = umb[k]; return sum(g['win'] for g in rows), len(rows)

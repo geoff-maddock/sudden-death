@@ -58,6 +58,11 @@ function bdxHexes() { return Object.fromEntries(Object.entries(HEXES).map(([k, v
 function bdxKindsAt(pos) { return KINDS.filter(k => TEMPL[k].pos === pos); }
 // a founding club to play against, with a reliever warming up as a quick game gets one
 function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPen(d, innings || 3); return d; }
+/* gear and potions (issue #115, phase 1; 51-kit.js): the magic bats and balls the Realm turns into a player's gear, the
+   potions, your potion now (potion), why a side can't (potionWhy), your coach's word (advice), the game as it is now
+   saved through onSnap (snapNow: only at the start of a pitch, where a snapshot resumes) */
+function bdxGear() { return Object.fromEntries(Object.entries(GEAR).map(([k, g]) => [k, { n: g.name, type: g.type, uses: g.uses, desc: g.desc, base: g.base || null }])); }
+function bdxSnapNow() { if (gameOn() && G.phase === 'plate' && G.P && G.P.stage === 'select') exhSnap(); }
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
   get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; }, set onAuto(f) { BDX.onAuto = f; },
@@ -66,5 +71,10 @@ return {
   scr: (x, d, h) => { const p = proj(x, d || 0, h); return [p.x, p.y]; },
   get live() { return gameOn(); }, audio: (music, sfx) => { if (MUS.on !== !!music) setMusic(!!music, true); SND.on = !!sfx; }, get sound() { return { music: !!MUS.on, sfx: !!SND.on }; }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
   teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
-  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich']
+  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich'],
+  gear: bdxGear, potions: JSON.parse(JSON.stringify(BD_POTIONS)), kitRules: JSON.parse(JSON.stringify(BD_KIT)), potion: id => kitPotion(id), potionWhy: (s, id) => kitWhy(s, id),
+  advice: bag => kitAdvice(bag), snapNow: bdxSnapNow, get kit() { return G.kit || null; },
+  // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
+  step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
+  kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() }
 };

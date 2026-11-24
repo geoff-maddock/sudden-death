@@ -14587,6 +14587,7 @@ function newGame(opts) {
   if (typeof skyStart === 'function' && MOON) skyStart();
   if (typeof takeStart === 'function' && TAKE !== undefined) takeStart();
   for (const t of G.teams) for (const p of [...t.def.roster, ...t.pen]) initStamina(p);
+  kitStart(opts);
   G.inning = 1; G.half = 0; G.outs = 0; G.balls = 0; G.strikes = 0;
   G.bases = [null, null, null, null];
   G.log = []; G.full = []; G.archived = false; G.gameId = null; G.rolls = []; G.fx = []; G.banner = null; G.paused = false; G.slow = 0; G.lastPitch = null; G.abPitches = []; G.abTags = []; G.zones = [];
@@ -14658,7 +14659,7 @@ function stanceOpts(p, team) {
   const ph = physOf(p, 'bat'); if (ph) o.push({ k: 'phys', ph, name: AB[ph].name, stam: AB[ph].stam });
   if (p.bat) o.push({ k: 'ab', ab: p.bat, name: AB[p.bat].name + (tierOf(p, 'bat') > 1 ? ' ' + 'I'.repeat(tierOf(p, 'bat')) : ''), cost: abCost(p, p.bat) });
   const u = ultOption(p, team, 'bat'); if (u) o.push({ k: 'ult', ult: u.id, name: AB[u.id].name, cost: u.cost });
-  const gs = gearStance(team); if (gs) o.push(gs);
+  const gs = gearStance(team, p); if (gs) o.push(gs);
   return o;
 }
 function affordable(opt, team) { if (opt.stam && G.P !== undefined && typeof batter === 'function' && G.teams && fatigue(batter()) < .08) return false; return !opt.cost || team.mana >= opt.cost; }
@@ -14670,7 +14671,7 @@ function startPitch(newBatter) {
   const pt = pitcher(), bt = FT(), bat = batter();
   const pitches = pt.pitches.map(k => ({ k, ...PITCHES[k], cost: pitchCost(pt, PITCHES[k]) }));
   { const up = ultOption(pt, FT(), 'pitch'); if (up) pitches.push({ k: up.id, ...PITCHES[up.id], cost: pitchCost(pt, PITCHES[up.id]) }); }
-  { const gp = gearPitch(FT()); if (gp) pitches.push(gp); }
+  { const gp = gearPitch(FT(), pt); if (gp) pitches.push(gp); }
   G.P = {
     stage: 'select', t: 0, pitches, pi: 0,
     aim: { x: 0, h: 2.5 }, stances: stanceOpts(bat, BT()), si: 0,
@@ -15198,7 +15199,7 @@ function effSpeed(r) {
 }
 function fSpeed(f) { if (f.stun > 0) return 0; return f.spd * (f.flight > 0 ? 2 : 1) * (1 - .2 * fk(f.p)) * (1 + .35 * (f.eff || 0)) * (f.flight > 0 ? 1 : zoneMult('fSpd', f.x, f.y)) * hurtMul(f.p, .25) * (1 - .12 * weakK(f.p, 'spd')); }
 function reachZ(f) { return (f.flight > 0 ? 25 : f.big ? 9.5 : 8) + (f.leapT > 0 ? 8 : 0); }
-function reachR(f) { return f.big ? 4.2 : 3.2; }
+function reachR(f) { return (f.big ? 4.2 : 3.2) + kitReach(f.p); }
 
 function trAt(t) { const P = PL.tr.pts, i = clamp(Math.floor(t / TDT), 0, P.length - 1); return P[i]; }
 
@@ -15315,7 +15316,7 @@ function takeBall(f) { const b = PL.ball; b.st = 'held'; b.holder = f; b.thr = n
 function fieldBall(f) {
   const L = PL, b = L.ball;
   const air = b.st === 'batted' && !trAt(b.bt).b && b.z > .4;
-  const bob = (10 - f.p.fld) * (air ? .011 : .006) * zoneMult('bobble', f.x, f.y) * (1 + hurtF(f.p)) * (1 + 2 * weakK(f.p, 'fld'));
+  const bob = (10 - f.p.fld) * (air ? .011 : .006) * zoneMult('bobble', f.x, f.y) * (1 + hurtF(f.p)) * (1 + 2 * weakK(f.p, 'fld')) * kitBob(f.p);
   if (R() < bob) {
     b.st = 'loose'; b.z = 0; f.stun = .6; L.bobbled = true; pst(f.p).e++;
     addFx('callout', { text: `${shortName(f.p)} bobbles it`, col: '#ffd27a', small: true });
@@ -19866,14 +19867,14 @@ function gearMoment(forBall) {
 }
 function gearCpuStance() {
   const P = G.P, i = P.stances.findIndex(s => s.k === 'gear'); if (i < 0) return;
-  const s = P.stances[i], w = gearMoment(false) * (GEAR[s.gear].recharge ? 1.6 : .5);
+  const s = P.stances[i], w = gearMoment(false) * (GEAR[s.gear].recharge || s.kit ? 1.6 : .5);
   if (P.stances[P.si].k === 'ult') return;
   if (R() < w) { P.si = i; P.autoPick = true; }
 }
 function gearCpuPitch() {
   const P = G.P, i = P.pitches.findIndex(p => p.gear); if (i < 0) return;
   if (P.pitches[P.pi].ult) return;
-  const w = gearMoment(true) * (GEAR[P.pitches[i].gear].recharge ? 1.6 : .5);
+  const w = gearMoment(true) * (GEAR[P.pitches[i].gear].recharge || P.pitches[i].kit ? 1.6 : .5);
   if (R() < w) { P.pi = i; P.autoPick = true; }
 }
 
@@ -22428,6 +22429,151 @@ try { renderSetupRules(); if (PAGE === 'settings') renderSettings(); } catch (e)
 // every game starts with a clean slate: no brawl in progress, no cooldowns, the CPU's temper reset
 { const o = newGame; newGame = function () { BR = null; G.brawled = {}; G.brawlCPU = {}; G.brawlPending = null; return o.apply(this, arguments); }; }
 { const o = resumeSnap; resumeSnap = function () { BR = null; G.brawled = {}; G.brawlCPU = {}; G.brawlPending = null; return o.apply(this, arguments); }; }
+/* ================= Gear a player wears, and potions between half-innings (the Realm, issue #115) ================= */
+// Nothing here acts in the standalone game: it sends no gear on its players and no bags, and its club lockers (Magic
+// gear, above) are untouched. The Realm's side is src/realm/w140-diamondkit.js.
+// Gear: one piece a player, sent on the player itself: gear (its name) and gx (what it does, plain data):
+//   bat: a GEAR id. The wearer's own ⚒ batting stance, as a club's magic bat is, with its uses a game (they come back
+//        every game, kept on the player as p.kit = { id, uses } so a snapshot keeps them)
+//   ball: a GEAR id. The wearer's own ⚒ pitch when they pitch, the same way
+//   reach (feet more on their catch, in the field) and bob (× their bobble chance): a glove
+//   ctrl (× the scatter of every pitch they throw): a rosin bag
+// A rating a piece adds (its fx.r) is laid on the player by the Realm before the engine sees them.
+// Potions (BD_POTIONS): a side may give one at each break between half-innings, from the last out of a half to the
+// first pitch of the next (G.kit.open). G.kit.bags = [bag or null] by side: a null bag is kept by the page (the Realm
+// keeps yours and takes each one out as you give it), a bag here ({ id: n }) is the CPU's, given at its skill when the
+// break starts (kitCpuPotion). Every use goes in G.kit.pots ({ side, id, inning, half, why }) and the play-by-play (⚗).
+const BD_POTIONS = {
+  draught: { n: 'Stamina Draught', sta: .4, desc: 'Your pitcher gets two fifths of their stamina back.' },
+  bdtonic: { n: 'Brimstone Tonic', mana: 2, desc: 'Two mana for your side, now (up to six).' },
+  bdeye: { n: 'Owl-Eye Drops', r: 1.2, desc: 'Your batters\' swing circle a fifth bigger, the next time you bat (the whole half).' },
+  bdsteady: { n: 'Steadyhand Balm', ctrl: .8, desc: 'Your pitcher\'s scatter a fifth tighter, the next time you take the field (the whole half).' },
+};
+// a CPU gives a potion worth at least this much (by skill: a Squire now and then, whatever comes first)
+const BD_KIT = { take: [99, 2.5, 2, 1.8], squire: .3 };
+const kitPitcherOf = s => G.teams[s].def.roster.find(p => p.pos === 'P');
+const kitKey = () => G.inning * 2 + G.half;
+const kitGx = p => (p && p.gx) || {};
+function kitNew(bags) {
+  return { bags: [0, 1].map(s => bags && bags[s] ? Object.assign({}, bags[s]) : null), pots: [], open: true, key: 0, used: [-1, -1], eye: [false, false], steady: [false, false] };
+}
+// a bat's or a ball's uses for the game, on the player who wears it
+function kitArm(p) { const g = kitGx(p), id = g.bat || g.ball; p.kit = id && GEAR[id] ? { id, uses: GEAR[id].uses } : null; }
+function kitStart(opts) {
+  G.kit = kitNew(opts && opts.bags);
+  for (const t of G.teams) for (const p of [...t.def.roster, ...t.pen]) kitArm(p);
+}
+
+/* ---------- gear ---------- */
+// the wearer's own stance and pitch (a club's locker, when the rule has one, comes first)
+function kitStance(p) {
+  const it = p && p.kit, g = it && GEAR[it.id]; if (!g || g.type !== 'bat' || it.uses <= 0) return null;
+  return { k: 'gear', gear: it.id, it, kit: true, name: `⚒ ${g.name} ×${it.uses}` };
+}
+function kitPitch(p) {
+  const it = p && p.kit, g = it && GEAR[it.id]; if (!g || g.type !== 'ball' || it.uses <= 0) return null; const b = PITCHES[g.base];
+  return { ...b, k: 'gear:' + it.id, name: `⚒ ${g.name} ×${it.uses}`, cost: 0, magic: false, ult: false, fx: g.fx || b.fx, gear: it.id, it, kit: true };
+}
+const kitGearStance0 = gearStance, kitGearPitch0 = gearPitch;
+gearStance = function (team, p) { return kitGearStance0(team) || kitStance(p); };
+gearPitch = function (team, p) { return kitGearPitch0(team) || kitPitch(p); };
+// a glove: more reach, fewer bobbles
+const kitReach = p => kitGx(p).reach || 0;
+const kitBob = p => kitGx(p).bob || 1;
+// Owl-Eye Drops on the side at bat: the swing circle, on screen and when it swings
+const kitEye = () => G.kit && G.kit.eye[G.half] ? BD_POTIONS.bdeye.r : 1;
+const kitGearReach0 = gearReach, kitGearSwing0 = gearSwing;
+gearReach = function (k) { const o = kitGearReach0(k); return { ...o, r: o.r * kitEye() }; };
+gearSwing = function (pc) { const o = kitGearSwing0(pc); return { ...o, r: o.r * kitEye() }; };
+// at the release: the break is over, and a rosin bag and the Steadyhand Balm tighten the pitch
+const kitOnRelease0 = gearOnRelease;
+gearOnRelease = function (pc, pd, st, ctrl) {
+  ctrl = kitOnRelease0(pc, pd, st, ctrl);
+  let m = kitGx(pitcher()).ctrl || 1;
+  if (G.kit) { G.kit.open = false; if (G.kit.steady[1 - G.half]) m *= BD_POTIONS.bdsteady.ctrl; }
+  // (what gear and the balm did to this pitch's scatter, on the pitch: plain data)
+  if (m !== 1) pc.kitCtrl = +m.toFixed(4);
+  return ctrl * m;
+};
+
+/* ---------- potions ---------- */
+// why side s can't give potion id now ('' when it can)
+function kitWhy(s, id) {
+  const P = BD_POTIONS[id]; if (!P) return 'No such potion.';
+  if (!G.kit || !gameOn()) return 'There is no game on.';
+  const K = G.kit, T = G.teams[s], pt = kitPitcherOf(s);
+  if (!K.open) return 'Only between half-innings: from the last out until the first pitch of the next half.';
+  if (K.used[s] === K.key) return 'One potion a break.';
+  if (id === 'draught' && fatigue(pt) > .9) return `${shortName(pt)} is fresh.`;
+  if (id === 'bdtonic' && T.mana >= 6) return 'Your mana is full.';
+  if (id === 'bdeye' && K.eye[s]) return 'Your batters have the drops in already.';
+  if (id === 'bdsteady' && K.steady[s]) return 'Your pitcher has the balm on already.';
+  return '';
+}
+function kitGive(s, id, why) {
+  const P = BD_POTIONS[id], T = G.teams[s], K = G.kit, pt = kitPitcherOf(s);
+  if (id === 'draught') { pt.stam = Math.min(pt.maxStam, pt.stam + pt.maxStam * P.sta); if (fatigue(pt) >= .5) pt.warned = 0; }
+  if (id === 'bdtonic') T.mana = Math.min(6, T.mana + P.mana);
+  if (id === 'bdeye') K.eye[s] = true;
+  if (id === 'bdsteady') K.steady[s] = true;
+  if (K.bags[s]) { K.bags[s][id]--; if (K.bags[s][id] <= 0) delete K.bags[s][id]; }
+  K.used[s] = K.key;
+  K.pots.push({ side: s, id, inning: G.inning, half: G.half, why: why || '' });
+  logLine(`⚗ ${T.def.short || T.def.name}: ${P.n}${why ? ` (${why})` : ''}.`);
+  addFx('callout', { text: P.n, col: '#a8e6a0', small: true });
+  return '';
+}
+/* what each potion in bag would be worth to side s at this break: [{ id, v, why }], best first. A draught when their
+   pitcher is tiring; the tonic when mana is low; the drops when they bat next and the bats matter (late and close, or
+   behind); the balm when they take the field and a run matters (late and close, or ahead) */
+function kitValues(s, bag) {
+  const out = [], T = G.teams[s], bats = G.half === s, pt = kitPitcherOf(s), fat = fatigue(pt);
+  const late = G.inning >= G.innings - 1, d = T.R - G.teams[1 - s].R, close = Math.abs(d) <= 2;
+  if (bag.draught && fat < .6) out.push({ id: 'draught', v: (.7 - fat) * 8 + (bats ? 0 : 1), why: `${shortName(pt)} is down to ${Math.round(fat * 100)}% of their stamina` });
+  if (bag.bdtonic && T.mana <= 2) out.push({ id: 'bdtonic', v: 2 + (3 - T.mana) * .5 + (late && close ? .5 : 0), why: `only ${T.mana} mana` });
+  if (bag.bdeye && bats) out.push({ id: 'bdeye', v: 1.8 + (late && close ? 1 : 0) + (d < 0 ? .6 : 0), why: late && close ? 'late in a close game, at bat' : d < 0 ? `behind by ${-d}, at bat` : 'at bat' });
+  if (bag.bdsteady && !bats) out.push({ id: 'bdsteady', v: 1.8 + (late && close ? 1 : 0) + (d > 0 ? .6 : 0), why: late && close ? 'late in a close game, in the field' : d > 0 ? `ahead by ${d}, in the field` : 'in the field' });
+  return out.filter(o => !kitWhy(s, o.id)).sort((a, b) => b.v - a.v);
+}
+// a CPU's bag at the break, by its skill. Never yours: your bag is your own (a null bag here)
+function kitCpuPotion(s) {
+  const bag = G.kit && G.kit.bags[s]; if (!bag || !Object.keys(bag).length) return '';
+  const vals = kitValues(s, bag); if (!vals.length) return '';
+  const sk = dOf(G.teams[s]);
+  if (!sk) return R() < BD_KIT.squire ? kitGive(s, vals[0].id, vals[0].why) || vals[0].id : '';
+  return vals[0].v >= BD_KIT.take[Math.min(sk, 3)] ? kitGive(s, vals[0].id, vals[0].why) || vals[0].id : '';
+}
+// a new half: what the last one was for is spent (the drops on the side that batted, the balm on the side that
+// fielded), the break opens, and each CPU with a bag may give
+function kitHalf() {
+  const K = G.kit; if (!K) return;
+  if (K.key) { K.eye[1 - G.half] = false; K.steady[G.half] = false; }
+  K.open = true; K.key = kitKey();
+  for (const s of [0, 1]) kitCpuPotion(s);
+}
+const kitStartHalf0 = startHalf;
+startHalf = function () { const r = kitStartHalf0.apply(this, arguments); kitHalf(); return r; };
+// the page's side (yours): your potion now, '' when given (the page takes it out of your bag), or why not
+const kitYou = () => G.teams ? G.teams.findIndex(t => t.ctl !== 'cpu') : -1;
+function kitPotion(id) {
+  const s = kitYou(); if (s < 0) return 'Nobody here is yours.';
+  const why = kitWhy(s, id); if (why) return why;
+  return kitGive(s, id);
+}
+// what your coach would give from bag now: { id, why } or null (your coach says; they never give it)
+function kitAdvice(bag) { const s = kitYou(); if (s < 0 || !G.kit || !G.kit.open) return null; const o = kitValues(s, bag || {})[0]; return o && o.v >= BD_KIT.take[1] ? { id: o.id, why: o.why } : null; }
+
+/* ---------- saved with the game ---------- */
+const kitSnap0 = snapGame;
+snapGame = function () { const sn = kitSnap0.apply(this, arguments); if (sn && G.kit) sn.kit = JSON.parse(JSON.stringify(G.kit)); return sn; };
+const kitResume0 = resumeSnap;
+resumeSnap = function (sn) {
+  G.kit = sn && sn.kit ? JSON.parse(JSON.stringify(sn.kit)) : kitNew(sn && sn.opts && sn.opts.bags);
+  const r = kitResume0.apply(this, arguments);
+  // (a game saved before gear came in: its bats and balls are armed now)
+  for (const t of G.teams) for (const p of [...t.def.roster, ...t.pen, ...t.used]) if (p.kit === undefined) kitArm(p);
+  return r;
+};
 /* Brimstone Diamond's superstars (issue #24, phase 2), inside the wBD scope: each superstar's player template and
    ultimate, added to the engine's own tables after its parts load (an ultimate is also an ability, AB, as
    08-ultimates.js makes them). Plain assignments, nothing declared. A superstar
@@ -22762,6 +22908,11 @@ function bdxHexes() { return Object.fromEntries(Object.entries(HEXES).map(([k, v
 function bdxKindsAt(pos) { return KINDS.filter(k => TEMPL[k].pos === pos); }
 // a founding club to play against, with a reliever warming up as a quick game gets one
 function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPen(d, innings || 3); return d; }
+/* gear and potions (issue #115, phase 1; 51-kit.js): the magic bats and balls the Realm turns into a player's gear, the
+   potions, your potion now (potion), why a side can't (potionWhy), your coach's word (advice), the game as it is now
+   saved through onSnap (snapNow: only at the start of a pitch, where a snapshot resumes) */
+function bdxGear() { return Object.fromEntries(Object.entries(GEAR).map(([k, g]) => [k, { n: g.name, type: g.type, uses: g.uses, desc: g.desc, base: g.base || null }])); }
+function bdxSnapNow() { if (gameOn() && G.phase === 'plate' && G.P && G.P.stage === 'select') exhSnap(); }
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
   get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; }, set onAuto(f) { BDX.onAuto = f; },
@@ -22770,7 +22921,12 @@ return {
   scr: (x, d, h) => { const p = proj(x, d || 0, h); return [p.x, p.y]; },
   get live() { return gameOn(); }, audio: (music, sfx) => { if (MUS.on !== !!music) setMusic(!!music, true); SND.on = !!sfx; }, get sound() { return { music: !!MUS.on, sfx: !!SND.on }; }, pause: on => { if (gameOn() && !!G.paused !== !!on) togglePause(); },
   teams: () => Object.keys(TEAMS), rate: bdxRate, templ: bdxTempl, names: bdxNames, stats: STATS5.slice(),
-  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich']
+  kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich'],
+  gear: bdxGear, potions: JSON.parse(JSON.stringify(BD_POTIONS)), kitRules: JSON.parse(JSON.stringify(BD_KIT)), potion: id => kitPotion(id), potionWhy: (s, id) => kitWhy(s, id),
+  advice: bag => kitAdvice(bag), snapNow: bdxSnapNow, get kit() { return G.kit || null; },
+  // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
+  step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
+  kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() }
 };
 
 })();
@@ -54119,7 +54275,7 @@ const wW72RenderHelp = renderHelp;
 renderHelp = function () {
   wW72RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGear')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Players can wear one piece of gear in each sport that has its own game: one for boxing, one for football, one for basketball. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Players can wear one piece of gear in each sport that has its own game: one for each of ${Object.values(W_GEAR_CFG.sports).join(', ').replace(/, ([^,]*)$/, ' and $1')}. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
 };
 /* w73: boxing gear and potions (issue #61, phase 2), end to end. The engine's side is src/bx/parts/13-kit.js; the
    plumbing (W_GEAR, W_POTIONS, slots, the Bag) is w72.
@@ -63541,6 +63697,175 @@ renderHelp = function () {
   wW139RenderHelp();
   const after = $('wHelpShedGame'); if (!after || $('wHelpShedDeep')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedDeep"><b>Old Grey.</b> ${esc(W_DEEP.line)}</p>`);
+};
+/* w140: baseball gear and potions (issue #115, phase 1), by #61's conventions; the engine's side is
+   src/bd/parts/51-kit.js, the plumbing (W_GEAR, W_POTIONS, the slot, the Bag) is w72.
+   Gear (W_DIAMOND_GEAR, one piece a player, p.gear.diamond): Brimstone Diamond's own magic bats and balls, which the
+   Realm left off (W_BALL.rules.gear stays false: no club lockers), are now a player's gear. A bat is the wearer's own
+   ⚒ swing when they bat, a ball their own ⚒ pitch when they pitch, each with its uses a game (back every game). Three
+   more: a Wyvern-Hide Glove (the field), a Rosin Bag (the mound) and Iron Spikes (+1 speed). The Graftonbury store
+   sells six, chests hold seven, and the Diamond Cup adds the first piece you don't have. It reaches the engine through
+   wNineBdPlayer (the player's gear and gx; a rating the piece adds goes on the player the engine gets), never by
+   changing the player's own ratings (p.bd).
+   Potions: the Stamina Draught (football's item, serving the diamond too: your pitcher's stamina), and a Brimstone
+   Tonic, Owl-Eye Drops and Steadyhand Balm from the Graftonbury store. In a ball game you play (Play or Manage), between
+   half-innings (from the last out until the first pitch of the next half), from the Bag row above the field, one a
+   break, with your coach's word; each comes out of your bag when given. Your coach never gives one (Manage and Auto
+   powers don't), and Simulate leaves the bag alone. The other nine brings W_DIAMOND_KIT.opp[tier] and gives at its
+   skill, logged in the play-by-play with its reason (⚗); the game card says what each club brings.
+   Wraps: wGearLive (wW140GearLive: the diamond), wNineBdPlayer (wW140NineBdPlayer: gear's ratings and the piece),
+   wStartBall (wW140StartBall: their bag goes in), wResumeBall (wW140ResumeBall: an older save's bag), wNineStats
+   (wW140NineStats: the gear on the Nine tab), wOpenBallCard (wW140OpenBallCard: the bags on the card), wDcupWon
+   (wW140DcupWon: a piece of gear), renderHelp (wW140RenderHelp: #wHelpBallKit); and wBD.start, wBD.sim (the bags go
+   in). */
+
+W_GEAR_CFG.sports.diamond = 'baseball';
+W_GEAR_STATN.diamond = { pow: 'power', con: 'contact', spd: 'speed', arm: 'arm', fld: 'fielding' };
+const W_BD_ENGINE_GEAR = wBD.gear();
+// the engine's bats and balls, by id, at Realm prices
+const W_DIAMOND_MAGIC = { splinter: 35, hornet: 45, thunder: 55, lodestone: 90, dragonbone: 110, leaden: 35, ghost: 50, hellfire: 55, quicksilver: 95, wyrmeye: 85 };
+const W_DIAMOND_GEAR = {};
+for (const k of Object.keys(W_DIAMOND_MAGIC)) {
+  const E = W_BD_ENGINE_GEAR[k]; if (!E) continue;
+  const bat = E.type === 'bat';
+  W_DIAMOND_GEAR['bd_' + k] = { sport: 'diamond', name: E.n, price: W_DIAMOND_MAGIC[k],
+    desc: `${E.desc} Their own ⚒ ${bat ? 'swing when they bat' : 'pitch when they pitch'}: ${E.uses} a game.`, fx: bat ? { bat: k } : { ball: k } };
+}
+Object.assign(W_DIAMOND_GEAR, {
+  bd_glove: { sport: 'diamond', name: 'Wyvern-Hide Glove', price: 50, desc: 'A deep pocket: in the field they reach a foot further for the ball, and bobble a third less.', fx: { reach: 1, bob: .67 } },
+  bd_rosin: { sport: 'diamond', name: 'Rosin Bag', price: 40, desc: 'A dry grip on the mound: every pitch they throw scatters a tenth less.', fx: { ctrl: .9 } },
+  bd_spikes: { sport: 'diamond', name: 'Iron Spikes', price: 45, desc: 'They bite the dirt: +1 speed, on the bases and in the field.', fx: { r: { spd: 1 } } },
+});
+for (const id of Object.keys(W_DIAMOND_GEAR)) wGearAdd(id, W_DIAMOND_GEAR[id]);
+const W_DIAMOND_KIT = {
+  potions: { bdtonic: 35, bdeye: 40, bdsteady: 40 }, // prices (the Stamina Draught's is football's: one item, every sport)
+  store: ['bd_splinter', 'bd_hornet', 'bd_leaden', 'bd_ghost', 'bd_glove', 'bd_rosin'], // Graftonbury's (the hq shop)
+  cup: ['bd_dragonbone', 'bd_quicksilver', 'bd_lodestone', 'bd_wyrmeye', 'bd_thunder', 'bd_hellfire', 'bd_spikes', 'bd_glove', 'bd_rosin', 'bd_hornet', 'bd_ghost', 'bd_splinter', 'bd_leaden'], cupGold: 60,
+  // the other nine's bag by tier (4 is the Umbral's tier U)
+  opp: { 1: { draught: 1 }, 2: { draught: 1, bdtonic: 1 }, 3: { draught: 1, bdtonic: 1, bdeye: 1, bdsteady: 1 }, 4: { draught: 2, bdtonic: 1, bdeye: 1, bdsteady: 1 } },
+};
+for (const id of Object.keys(wBD.potions)) {
+  const P = wBD.potions[id];
+  if (id === 'draught') {
+    W_POTIONS[id].sports = (W_POTIONS[id].sports || ['grid']).concat('diamond');
+    DB.items[id].desc += ` On the diamond: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items[id].use += ' Or in a ball game, between half-innings, one a break.';
+    continue;
+  }
+  wPotionAdd(id, { sport: 'diamond' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a ball game, between half-innings: the Bag row above the field. One potion a break.', price: W_DIAMOND_KIT.potions[id] };
+}
+if (DB.shops.hq) { for (const id of Object.keys(W_DIAMOND_KIT.potions)) DB.shops.hq[id] = W_DIAMOND_KIT.potions[id]; for (const id of W_DIAMOND_KIT.store) DB.shops.hq[id] = W_DIAMOND_GEAR[id].price; }
+for (const [c, it] of [['deepseam_vault', 'bd_thunder'], ['emberdeep_vault', 'bd_hellfire'], ['genevault_vault', 'bd_lodestone'], ['hatchery_vault', 'bd_wyrmeye'], ['shrine_chest', 'bd_spikes'], ['emberdeep_prize', 'bd_dragonbone'], ['genevault_c6', 'bd_quicksilver'],
+  ['marigold_chest', 'bdtonic'], ['cottage_chest', 'bdeye'], ['chapel_chest', 'bdsteady']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wW140GearLive = wGearLive;
+wGearLive = function (sport) { return sport === 'diamond' ? wBallLive() : wW140GearLive(sport); };
+// a roster player's baseball gear: its ratings (past the cap by W_GEAR_CFG.over at most), and the piece (gear, gid, gx)
+const wW140NineBdPlayer = wNineBdPlayer;
+wNineBdPlayer = function (p, pos) {
+  const g = wW140NineBdPlayer(p, pos), G = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'diamond') : null;
+  if (G) {
+    Object.assign(g, wGearRate(Object.fromEntries(wBD.stats.map(s => [s, g[s]])), G, W_BDR.cap));
+    const gx = JSON.parse(JSON.stringify(G.fx || {})); delete gx.r;
+    g.gear = G.name; g.gid = G.id; g.gx = gx;
+  }
+  return g;
+};
+
+/* ---------- the bags go in ---------- */
+const WDK = { next: null };
+let W_BALL_KITMSG = '', W_BALL_KITKEY = '';
+const wBallBagMine = () => Object.fromEntries(wMatchBag('diamond').filter(x => wBD.potions[x.id]).map(x => [x.id, x.n]));
+const wBallBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wBD.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wBD.potions[id].n}`).join(', ') : 'nothing'; };
+const wBallBagTheirs = tier => Object.assign({}, W_DIAMOND_KIT.opp[tier] || {});
+const wW140StartBall = wStartBall;
+wStartBall = function (o) {
+  W_BALL_KITMSG = '';
+  const theirs = wBallBagTheirs((o && o.tier) || (o && o.club ? wBallTier(o.club) : 1));
+  WDK.next = o && o.home ? [theirs, null] : [null, theirs];
+  try { return wW140StartBall(o); } finally { WDK.next = null; }
+};
+// (only a game wStartBall starts: an exhibition, or a cup game between two other clubs, brings none)
+const wW140Start = wBD.start, wW140Sim = wBD.sim;
+// (taken once: a cup's other games, simulated when yours ends inside wStartBall, bring none)
+const wBallBagsNext = o => { const b = WDK.next; WDK.next = null; return b ? Object.assign({}, o, { bags: b }) : o; };
+wBD.start = o => wW140Start(wBallBagsNext(o));
+wBD.sim = o => wW140Sim(wBallBagsNext(o));
+// a game saved before bags came in: the other club's bag by its tier
+const wW140ResumeBall = wResumeBall;
+wResumeBall = function () {
+  wW140ResumeBall();
+  const L = wBallLive() && WG.ball.live, K = wBD.kit; if (!L || !K || !WD || !WD.ball) return;
+  const them = L.world.home ? 0 : 1;
+  if (!K.bags[them] && !K.pots.some(x => x.side === them)) K.bags[them] = wBallBagTheirs(L.world.tier || 1);
+};
+
+/* ---------- your Bag, between half-innings ---------- */
+function wBallPotion(id) {
+  const L = wBallLive() && WG.ball.live;
+  if (!L || !WD || !WD.ball || L.world.how === 'sim' || !wBD.live) return 'Potions are for ball games you play, not exhibitions.';
+  if (!wHas(id)) return `You have no ${(wBD.potions[id] || {}).n || 'such potion'}.`;
+  const r = wBD.potion(id); if (r) return r;
+  // (the save point is the start of this pitch with the potion given, when that is where the game is: a reload can't
+  // give it back; given in the break itself, the next pitch's save point has it)
+  wAddItem(id, -1); wBD.snapNow(); wSave(); return '';
+}
+$('wDiamondBar').insertAdjacentHTML('afterend', '<div id="wBallBagRow" class="wdbar wdbag" hidden><b>Bag</b><span id="wBallBag"></span></div>');
+function wBallBagRows(force) {
+  const row = $('wBallBagRow'), L = WD && WD.ball && wBallLive() && WG.ball.live, K = wBD.kit;
+  const show = UI.view === 'diamond' && !!L && L.world.how !== 'sim' && wBD.live && !!K;
+  if (row.hidden !== !show) row.hidden = !show;
+  if (!show) { W_BALL_KITKEY = ''; return; }
+  const you = L.world.home ? 1 : 0, bag = wBallBagMine(), ids = Object.keys(bag), given = K.open && K.used[you] === K.key, open = K.open && !given;
+  const adv = open ? wBD.advice(bag) : null;
+  const key = JSON.stringify([open, given, bag, adv && adv.id, W_BALL_KITMSG]);
+  if (!force && key === W_BALL_KITKEY) return;
+  W_BALL_KITKEY = key;
+  $('wBallBag').innerHTML = (ids.length ? ids.map(id => { const P = wBD.potions[id];
+      return `<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-bkuse="${id}" ${open ? '' : 'disabled'} title="${esc(P.desc)}">${esc(P.n)} (${bag[id]})</button>`; }).join(' ')
+    : '<small class="hint">No baseball potions in your bag. The Graftonbury store sells them.</small>')
+    + ` <small class="hint">${open ? 'Between half-innings: one potion now, before the first pitch.' : given ? 'Given for this break.' : 'The next break is after the third out.'}</small>`
+    + (W_BALL_KITMSG ? ` <small class="wbad">${esc(W_BALL_KITMSG)}</small>` : '')
+    + (adv ? ` <small class="hint">Your coach says: <b>${esc(wBD.potions[adv.id].n)}</b>, ${esc(adv.why)}.</small>` : '');
+}
+$('wBallBagRow').addEventListener('click', e => {
+  const b = e.target.closest('[data-bkuse]'); if (!b || b.disabled) return;
+  W_BALL_KITMSG = wBallPotion(b.dataset.bkuse); b.blur(); wBallBagRows(true);
+});
+// (a refusal is for its break: the next one clears it)
+let W_BALL_KITOPEN = false;
+setInterval(() => { const K = wBD.kit, o = !!(K && K.open); if (o && !W_BALL_KITOPEN) W_BALL_KITMSG = ''; W_BALL_KITOPEN = o; wBallBagRows(); }, 250);
+
+/* ---------- the Nine tab, the card and the cup ---------- */
+const wW140NineStats = wNineStats;
+wNineStats = function (p, pos) {
+  const html = wW140NineStats(p, pos), g = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'diamond') : null;
+  return g ? `${html} <small class="wnst" title="${esc(g.desc)}">Plays with the <b>${esc(g.name)}</b>.</small>` : html;
+};
+const wW140OpenBallCard = wOpenBallCard;
+wOpenBallCard = function (o) {
+  wW140OpenBallCard(o);
+  const ul = document.querySelector('#modalBox .wbclubs'); if (!ul) return;
+  ul.insertAdjacentHTML('afterend', `<p class="hint" data-bkbags>What their nines bring: ${[1, 2, 3].map(t => `tier ${t}, ${esc(wBallBagWords(W_DIAMOND_KIT.opp[t]))}`).join('; ')}. Yours is your bag (${esc(wBallBagWords(wBallBagMine()))}): give from it between half-innings, in the Bag row above the field, when you Play or Manage. Simulate leaves it alone.</p>`);
+};
+const wW140DcupWon = wDcupWon;
+wDcupWon = function () {
+  wW140DcupWon();
+  const have = id => (WG.items[id] || 0) > 0 || wRoster().some(p => p.gear && p.gear.diamond === id);
+  const id = W_DIAMOND_KIT.cup.find(x => !have(x));
+  if (id) { wAddItem(id, 1); wLog(`The Cup comes with gear: the ${W_DIAMOND_GEAR[id].name}. ${W_DIAMOND_GEAR[id].desc}`, 'g'); }
+  else { RUN.gold += W_DIAMOND_KIT.cupGold; wLog(`You have every piece of baseball gear, so the Cup pays ${W_DIAMOND_KIT.cupGold} gold more instead.`, 'g'); }
+};
+
+const wW140RenderHelp = renderHelp;
+renderHelp = function () {
+  wW140RenderHelp();
+  const after = $('wHelpBall'); if (!after || $('wHelpBallKit')) return;
+  const names = t => Object.values(W_DIAMOND_GEAR).filter(g => g.fx[t]).map(g => g.name);
+  const list = a => a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpBallKit"><b>Baseball gear and potions.</b> Each player can wear one piece of baseball gear. A magic bat (${list(names('bat'))}) gives them their own ⚒ swing when they bat, and a magic ball (${list(names('ball'))}) their own ⚒ pitch when they pitch: each has a few uses a game, back every game. A Wyvern-Hide Glove helps in the field, a Rosin Bag on the mound, and Iron Spikes add speed. The Graftonbury store sells the cheaper pieces, chests hold more, and the Diamond Cup adds a piece you don't have. Put gear on from the Bag on the Team screen. In a game you play or manage, between half-innings (from the last out until the next half's first pitch), give one potion from the Bag row above the field: the Stamina Draught (your pitcher's stamina back), a Brimstone Tonic (two mana), Owl-Eye Drops (a bigger swing circle the next time you bat) or Steadyhand Balm (a tighter pitch the next time you field). Esc stops the game while you choose. Your coach says which suits the moment but never opens your bag, and Simulate leaves it alone. The other nine brings potions by tier and uses them: the play-by-play says when, and why (⚗).</p>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.
