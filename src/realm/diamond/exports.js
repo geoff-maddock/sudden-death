@@ -69,6 +69,18 @@ function bdxGear() { return Object.fromEntries(Object.entries(GEAR).map(([k, g])
 const bdxPow = { sit: JSON.parse(JSON.stringify(BD_SIT)), crowd: JSON.parse(JSON.stringify(BD_CROWD)), amp: BD_AMP.slice() };
 function bdxSitFit(s, k) { return !!(G.bdp && G.bdp.sitOn && G.bdp.on[s] && gameOn() && !G.bdp.used[s][k] && !bdpMoment(s, k)); }
 function bdxSnapNow() { if (gameOn() && G.phase === 'plate' && G.P && G.P.stage === 'select') exhSnap(); }
+/* the ground's own ways (issue #115, phase 4; 53-ground.js): Graftonbury Ballpark's numbers (ground), the game's mound
+   grass and dim patch (gd), and for the checks: the grass now, a field point in the patch, a fly into it, what the
+   ground draws on a blank canvas (paint: the pixels it touches in the field and plate views) */
+function bdxPaint() {
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d'), out = {};
+  for (const [k, f] of [['field', gdDrawField], ['plate', gdDrawPlate], ['hud', gdDrawHud]]) {
+    c.clearRect(0, 0, W, H); f(c); const d = c.getImageData(0, 0, W, H).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; out[k] = n;
+  }
+  const D = G.gd, at = (x, y) => { c.clearRect(0, 0, W, H); gdDrawField(c); const p = fp(x, y); return c.getImageData(Math.round(p.x), Math.round(p.y), 1, 1).data[3]; };
+  out.dimAt = D && D.dim ? at(D.dim.x, D.dim.y) : 0; out.offAt = D && D.dim ? at(-D.dim.x * .2, 150) : 0;
+  return out;
+}
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
   get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; }, get onSnap() { return BDX.onSnap; }, set onAuto(f) { BDX.onAuto = f; },
@@ -83,6 +95,12 @@ return {
   sit: bdxPow.sit, crowdRules: bdxPow.crowd, ampable: id => bdxPow.amp.includes(id), get bdp() { return G.bdp || null; },
   sitWhy: (s, k) => bdpSitWhy(s, k), sitFit: bdxSitFit, castSit: k => bdpYouSit(k), arm: on => bdpArm(on),
   physOf: (p, cat) => physOf(p, cat), say: t => logLine(t), abPow: (p, id) => abPow(p, id),
+  ground: JSON.parse(JSON.stringify(Object.assign({}, GD, { say: undefined }))), get gd() { return G.gd || null; },
+  groundProbe: { grass: () => gdGrass(), inDim: (x, y) => gdInDim(x, y), where: () => G.gd && G.gd.dim ? gdWhere(G.gd.dim) : '', fly: (vx, vy, vz) => gdDimFly(simTraj(0, 2, 3, vx, vy, vz)), paint: bdxPaint,
+    // a fielder at (x, y) reading a fly into the patch (or not) t seconds in: their speed, and the chance they bobble a catch there
+    read: (dim, t, x, y) => { const pl = PL, f = { p: G.teams[1 - G.half].def.roster.find(p => p.pos === 'CF'), x, y, spd: 20, stun: 0, flight: 0 };
+      PL = { t, gdDim: dim, ball: { st: 'batted', holder: null, x, y } }; try { return { spd: fSpeed(f), react: zoneAdd('react', x, y) }; } finally { PL = pl; } },
+    bob: (x, y) => { const D = G.gd, was = gdBobK; gdBobK = D && D.dim && gdInDim(x, y) ? GD.bob : 1; try { return zoneMult('bobble', x, y); } finally { gdBobK = was; } } },
   // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
   step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
   kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() },
