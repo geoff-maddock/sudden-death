@@ -45947,19 +45947,189 @@ return {
 };
 
 })();
+const wJT = (function () {
+/* Utilities for the scoped engines (issue #86): boxing (src/bx), football (src/gf), basketball (src/bk), hockey
+   (src/hk) and golf (src/gl, issue #92; engRng seeds its course) each load this inside their own scope, so each has its own random stream. R is the engine's random
+   number: Math.random, or seeded (engSeed(n); engSeed(null) goes back) so a headless game can be played again exactly.
+   pick is seeded too: the page has a name like it, and that one would be its own, unseeded. It names no engine. */
+let engRand = Math.random;
+// a seeded stream of its own (mulberry32): the engine's R when seeded, and any stream that must not touch R
+function engRng(n) {
+  let a = n >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function engSeed(n) {
+  if (n == null) { engRand = Math.random; return; }
+  engRand = engRng(n);
+}
+const R = () => engRand();
+// is seat i in the stands taken? G.crowd (0 to 1, a start option; 1 when it isn't given) is how full they are. Drawing only
+const engSeat = i => typeof G === 'undefined' || !G || G.crowd == null || ((Math.imul(Math.round(i) + 7, 2654435761) >>> 0) % 1000) / 1000 < G.crowd;
+const engCrowd = o => o && o.crowd != null ? Math.max(0, Math.min(1, +o.crowd || 0)) : 1;
+// 1st, 2nd, 3rd, 4th, 11th, 21st
+function engOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const hyp = Math.hypot;
+const pick = a => a[(R() * a.length) | 0];
+// a weighted pick: { key: weight }
+function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r = R() * s; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
+function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+/* The Tilting Lists: the rules (issue #117, phase 0), as pure functions on a plain-JSON match (G). The Realm takes the
+   engine inside a scope (src/realm/lists/manifest.txt, through `scope wJT ...`), so none of these names reach the page.
+
+   A match is a tourney between two clubs. Each side names two riders (the rest of its four squire). Each side's first
+   rider meets the other side's first in a heat of JT_RULES.courses courses (3, or 5 by option), then the second riders
+   ride the second heat. A course is one pass down the tilt: both riders strike in the same instant, so both can score.
+   A strike is where the lance landed (JT_RULES.pts):
+   - broken on the shield or the body: 1; broken on the helm: 2; a glance or a miss: nothing;
+   - a foul (the mount, the barrier, or below the belt): a point off (-1), and it breaks nothing;
+   - an unhorsing (a fair strike, on the shield, body or helm, that throws the other rider): 3 in place of the break's
+     points, and the heat ends there. The unhorsed rider's remaining courses score nothing, and nor do the other's:
+     the heat's courses not ridden stay empty (null). Both riders can be unhorsed in the same course.
+   Points from both heats are added. Level after both heats: the tilt for the crown, one course at a time between
+   each side's best rider (opts.best, or the side's rider who scored more in their heat, the first heat's on a tie),
+   until a course leaves the totals apart. A match can't end level. The rules don't cap the tilt: the model (phase 1)
+   makes a course that scores nothing rare, and the sim stops a runaway.
+
+   G: { courses, riders: [2 × two roster indexes], roster: [2 × size], best: [2 × rider slot 0 | 1 | null], heat (0 or
+   1; 2 in the tilt), course (0-based within the heat; the tilt's courses count on), sc: [side][heat] = [points by
+   course, null when not ridden], tilt: [[points by tilt course], [...]], crown: [2 × roster index] in the tilt,
+   ended: [per heat: null | { course (1-based), unhorsed: [sides] }], log: [{ heat, course, tilt, at: [2], unhorse:
+   [2], pts: [2] }], over }. */
+const JT_RULES = { heats: 2, courses: 3, coursesAt: [3, 5], riders: 2, side: 4, unhorse: 3,
+  pts: { shield: 1, body: 1, helm: 2, glance: 0, miss: 0, mount: -1, barrier: -1, low: -1 },
+  fair: ['shield', 'body', 'helm'], fouls: ['mount', 'barrier', 'low'] };
+// what each strike is, in the herald's words
+const JT_AT = { shield: 'a lance broken on the shield', body: 'a lance broken on the body', helm: 'a lance broken on the helm',
+  glance: 'a glance', miss: 'a miss', mount: 'a foul: the mount struck', barrier: 'a foul: the barrier struck', low: 'a foul: a strike below the belt' };
+let G = null;
+
+function jtRidersOk(r, n) { return Array.isArray(r) && r.length === JT_RULES.riders && new Set(r).size === r.length && r.every(i => Number.isInteger(i) && i >= 0 && i < n); }
+// a new match: { courses: 3 | 5, riders: [two roster indexes a side], roster: [two sizes], best: [the slot (0 or 1) of each side's best rider] }
+function jtNewMatch(o) {
+  o = o || {};
+  const courses = JT_RULES.coursesAt.includes(o.courses) ? o.courses : JT_RULES.courses, roster = [0, 1].map(s => Math.max(JT_RULES.side, ((o.roster || [])[s]) | 0));
+  const riders = [0, 1].map(s => jtRidersOk((o.riders || [])[s], roster[s]) ? o.riders[s].slice() : [0, 1]);
+  const best = [0, 1].map(s => { const b = (o.best || [])[s]; return b === 0 || b === 1 ? b : null; });
+  const heats = () => Array.from({ length: JT_RULES.heats }, () => Array(courses).fill(null));
+  G = { courses, riders, roster, best, heat: 0, course: 0, sc: [heats(), heats()], tilt: [[], []], crown: null, ended: Array(JT_RULES.heats).fill(null), log: [], over: null };
+  return G;
+}
+const jtInTilt = () => !!G && G.heat >= JT_RULES.heats;
+// who rides the course now: [side 0's roster index, side 1's] (null before a match or once it is over)
+const jtRiders = () => !G || G.over ? null : jtInTilt() ? G.crown.slice() : [G.riders[0][G.heat], G.riders[1][G.heat]];
+const jtHeatTotal = (s, h) => G ? (h >= JT_RULES.heats ? G.tilt[s] : G.sc[s][h]).reduce((a, b) => a + (b || 0), 0) : 0;
+const jtTotal = s => G ? G.sc[s].reduce((a, h) => a + h.reduce((x, y) => x + (y || 0), 0), 0) + G.tilt[s].reduce((a, b) => a + b, 0) : 0;
+// the courses still to ride in this heat (0 in the tilt or when over)
+const jtLeft = () => !G || G.over || jtInTilt() ? 0 : G.courses - G.course;
+
+/* ---------- a strike ---------- */
+const jtFair = at => JT_RULES.fair.includes(at);
+const jtFoul = at => JT_RULES.fouls.includes(at);
+// a strike's points: { at, unhorse } (an unhorsing scores JT_RULES.unhorse in place of the break)
+const jtStrikePts = st => !st || !(st.at in JT_RULES.pts) ? 0 : st.unhorse && jtFair(st.at) ? JT_RULES.unhorse : JT_RULES.pts[st.at];
+function jtStrikeWhy(st) {
+  if (!st || typeof st !== 'object' || !(st.at in JT_RULES.pts)) return `A strike lands somewhere: ${Object.keys(JT_RULES.pts).join(', ')}.`;
+  if (st.unhorse && !jtFair(st.at)) return 'Only a fair strike, on the shield, body or helm, can unhorse.';
+  return '';
+}
+// why a course can't be scored ('' when it can): res is [side 0's strike, side 1's]
+function jtWhyNot(res) {
+  if (!G) return 'No match.';
+  if (G.over) return 'The match is over.';
+  if (!Array.isArray(res) || res.length !== 2) return 'A course is two strikes, one a side.';
+  return jtStrikeWhy(res[0]) || jtStrikeWhy(res[1]);
+}
+
+/* ---------- a course ---------- */
+/* the course ridden: res = [side 0's strike on side 1's rider, side 1's on side 0's], each { at, unhorse }. Scores
+   both, ends the heat on an unhorsing or after its last course, starts the tilt when the heats leave it level, and
+   ends the match when it is decided. Returns { ok, why?, heat, course, tilt, pts: [2], unhorsed: [sides], heatOver:
+   { heat, tot, by: 'unhorse' | 'courses' } | null, tiltNow (the tilt for the crown begins), over } */
+function jtCourse(res) {
+  const why = jtWhyNot(res); if (why) return { ok: false, why };
+  const at = res.map(st => st.at), un = res.map(st => !!st.unhorse && jtFair(st.at)), pts = res.map(jtStrikePts);
+  const h = G.heat, k = G.course, tilt = jtInTilt(), unhorsed = [0, 1].filter(s => un[1 - s]);
+  if (tilt) [0, 1].forEach(s => G.tilt[s].push(pts[s])); else [0, 1].forEach(s => { G.sc[s][h][k] = pts[s]; });
+  G.log.push({ heat: h, course: k, tilt, at, unhorse: un, pts: pts.slice() });
+  const out = { ok: true, heat: h, course: k, tilt, pts, unhorsed, heatOver: null, tiltNow: false, over: null };
+  G.course++;
+  if (tilt) { if (jtTotal(0) !== jtTotal(1)) jtDecide(); }
+  else if (unhorsed.length || G.course >= G.courses) {
+    if (unhorsed.length) G.ended[h] = { course: k + 1, unhorsed };
+    out.heatOver = { heat: h, tot: [jtHeatTotal(0, h), jtHeatTotal(1, h)], by: unhorsed.length ? 'unhorse' : 'courses' };
+    G.heat++; G.course = 0;
+    if (G.heat >= JT_RULES.heats) {
+      if (jtTotal(0) !== jtTotal(1)) jtDecide();
+      else { G.crown = [0, 1].map(s => G.riders[s][jtBestSlot(s)]); out.tiltNow = true; }
+    }
+  }
+  if (G.over) out.over = G.over;
+  return out;
+}
+// each side's best rider for the tilt: the one named, else the one who scored more in their heat (the first on a tie)
+function jtBestSlot(s) {
+  if (G.best[s] === 0 || G.best[s] === 1) return G.best[s];
+  return jtHeatTotal(s, 1) > jtHeatTotal(s, 0) ? 1 : 0;
+}
+function jtDecide() {
+  const a = jtTotal(0), b = jtTotal(1), n = G.tilt[0].length;
+  G.over = { win: a > b ? 0 : 1, tot: [a, b], tilt: n, text: `${Math.max(a, b)} to ${Math.min(a, b)}${n ? ' after the tilt for the crown' : ''}` };
+}
+// the tourney board: each side's points by heat and course (null not ridden), the tilt's, the totals, and where the match is
+function jtBoard() {
+  if (!G) return null;
+  return { sc: G.sc.map(hs => hs.map(c => c.slice())), tilt: G.tilt.map(t => t.slice()), heat: G.heat, course: G.course, courses: G.courses,
+    inTilt: jtInTilt(), ended: JSON.parse(JSON.stringify(G.ended)), tot: [jtTotal(0), jtTotal(1)] };
+}
+// the match from side s's point of view, in words
+function jtMatchText(s) {
+  if (!G) return '';
+  const t = s ? 1 : 0, o = 1 - t, a = jtTotal(t), b = jtTotal(o);
+  if (G.over) return `${G.over.win === t ? 'Won' : 'Lost'} ${G.over.tot[t]} to ${G.over.tot[o]}${G.over.tilt ? ' after the tilt for the crown' : ''}`;
+  const where = jtInTilt() ? `in the tilt for the crown, course ${G.course + 1}` : `heat ${G.heat + 1}, course ${G.course + 1} of ${G.courses}`;
+  return `${a === b ? 'Level' : a > b ? 'Ahead' : 'Behind'}, ${a} to ${b}, ${where}`;
+}
+// one strike in the herald's words ("a lance broken on the helm", "unhorsed!")
+const jtAtText = st => !st ? '' : st.unhorse && jtFair(st.at) ? `${JT_AT[st.at]}, and unhorsed` : JT_AT[st.at] || '';
+
+/* the end of the wJT scope: what the Realm may call (w19b-engines.js). Phase 0 is the rules: newMatch(opts) starts a
+   match ({ courses: 3 | 5, riders: [each side's two riders, as roster indexes], roster: [two roster sizes], best:
+   [the slot, 0 or 1, of each side's rider for the tilt for the crown; left out, the one who scored more] }); riders()
+   (who rides the course now, a roster index a side; null when over), inTilt, left (courses still to ride this heat),
+   course([side 0's strike, side 1's]) scores a course (a strike is { at, unhorse }: at one of rules.pts' keys; ends a
+   heat on an unhorsing or its last course, starts the tilt when level, ends the match, and says so), whyNot(res);
+   strikePts, fair, foul and atText read a strike; heatTotal(s, h), total(s), board() (the tourney board), matchText(s).
+   rules and at (the herald's words) are the tables. G is the match, plain JSON. The page comes in phase 2: until then
+   the lists are never on. */
+return {
+  rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
+  newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
+  course: res => jtCourse(res), whyNot: res => jtWhyNot(res),
+  strikePts: st => jtStrikePts(st), fair: at => jtFair(at), foul: at => jtFoul(at), atText: st => jtAtText(st),
+  heatTotal: (s, h) => jtHeatTotal(s, h), total: s => jtTotal(s), board: () => jtBoard(), matchText: s => jtMatchText(s),
+  show: () => {}, hide: () => {}, get on() { return false; }
+};
+
+})();
 /* w19b: the engines (issue #9, phase 0). Some sports have a game of their own beside the card game. Each is built in
    its own scope and talks to the Realm through the same small API (start, sim, box, show, hide, pause, audio, on,
    onOver, onQuit, onSnap). W_ENGINES lists them by id: the scope's API, the view it plays in and its sport.
    Brimstone Diamond (wBD, baseball), Cinder Gridiron (wGF, football; src/gf/), the Anvil Ring (wBX, boxing; src/bx/,
    issue #23), the Charter Court (wBK, basketball; src/bk/, issue #77) and Black Ice at the Pond Rink (wHK, hockey;
    src/hk/, issue #83), Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play), the
-   Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play) and the Curling Shed
-   (wCR, curling; src/cr/, issue #102: a game at the Shed, Watch or You play). Nothing here is saved. */
+   Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play), the Curling Shed
+   (wCR, curling; src/cr/, issue #102: a game at the Shed, Watch or You play) and the Tilting Lists (wJT, jousting;
+   src/jt/, issue #117: the rules so far, with no page, so never on). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' },
   rink: { api: wHK, view: 'rink', sport: 'hockey' }, links: { api: wGL, view: 'links', sport: 'golf' },
-  lanes: { api: wBL, view: 'lanes', sport: 'bowling' }, shed: { api: wCR, view: 'shed', sport: 'curling' } };
+  lanes: { api: wBL, view: 'lanes', sport: 'bowling' }, shed: { api: wCR, view: 'shed', sport: 'curling' },
+  lists: { api: wJT, view: 'lists', sport: 'jousting' } };
 /* an engine's question (Concede?) holds the game still until it closes: askConfirm hears only its two buttons, so this
    runs fn once the box closes however it closes (a button, Escape, a click outside) */
 function wAfterAsk(fn) { const t = setInterval(() => { if (!$('modal').hidden) return; clearInterval(t); try { fn(); } catch (e) { console.error(e); } }, 100); }

@@ -232,6 +232,10 @@ SPORTS = [
          play=dict(adv="wCR.tick(0.05)", over="wCR.phase === 'over'",
                    until={'auto': ('your side casts as the match goes on', "wCR.G.casts.some(c => c.side === 0)"),
                           'meter': ('the roar fills as the match goes on', "wCR.G.roar.some(v => v > 0)")})),
+
+    # jousting (issue #117): the parts come phase by phase (powers 6, gear and potions 7, the ground 8); until every
+    # one is named here and built, this row fails, naming what is missing. Never weaken the check to pass it.
+    dict(sport='jousting', engine='lists', scope='wJT', key='lists', home='the Tilting Lists: the churned sand, the pennant wind'),
 ]
 # the parts whose state a Realm game must have on (the others are checked on the player or in the tables)
 LIVE = ('resource', 'meter', 'ultimate', 'situations', 'potions', 'auto', 'ground')
