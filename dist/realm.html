@@ -15201,6 +15201,9 @@ function effSpeed(r) {
   return r.spd * m * (1 - .25 * fk(r.p)) * (1 + .45 * (r.eff || 0)) * zoneMult('rSpd', q.x, q.y, 'runner') * hurtMul(r.p, .3) * (1 - .15 * weakK(r.p, 'spd'));
 }
 function fSpeed(f) { if (f.stun > 0) return 0; return f.spd * (f.flight > 0 ? 2 : 1) * (1 - .2 * fk(f.p)) * (1 + .35 * (f.eff || 0)) * (f.flight > 0 ? 1 : zoneMult('fSpd', f.x, f.y)) * hurtMul(f.p, .25) * (1 - .12 * weakK(f.p, 'spd')); }
+// a fielder still reading the ball off the bat, who stands where they are (the holder never does; the ground can hold them
+// longer, 53-ground.js). Only the movement step reads it: what the runners and the CPU reckon with is fSpeed, the real speed
+function fStill(f) { return PL.t < (f.p.pos === 'P' ? .7 : .5) && PL.ball.holder !== f; }
 function reachZ(f) { return (f.flight > 0 ? 25 : f.big ? 9.5 : 8) + (f.leapT > 0 ? 8 : 0); }
 function reachR(f) { return (f.big ? 4.2 : 3.2) + kitReach(f.p); }
 
@@ -15277,7 +15280,7 @@ function playUpdate(dt) {
     else if (f === L.chaser && (b.st === 'batted' || b.st === 'loose') && L.chasePt) { tx = L.chasePt.x; ty = L.chasePt.y; sp = fSpeed(f); }
     else if (bi >= 0 && !L.homer) { tx = BASE[bi].x + (bi === 0 ? 0 : 0); ty = BASE[bi].y; sp = fSpeed(f); }
     else if (L.homer) { sp = fSpeed(f) * .3; }
-    if (L.t < (f.p.pos === 'P' ? .7 : .5) && b.holder !== f) sp = 0;
+    if (fStill(f)) sp = 0;
     const dx = tx - f.x, dy = ty - f.y, d = hyp(dx, dy);
     if (d > .3) { const m = Math.min(d, sp * dt); f.x += dx / d * m; f.y += dy / d * m; }
   }
@@ -22870,7 +22873,7 @@ resumeSnap = function (sn) {
 //   outfield, drawn at the start of the game from the random stream (a different place each game): GD.dimR feet round a
 //   spot GD.dimD feet out at up to GD.dimA degrees off center. A fly ball (one that rises GD.flyZ feet or more) that would
 //   land in it is harder to read: every fielder reads it GD.react seconds later (they plan for it, and stand still that
-//   much longer), and a catch in the air inside it bobbles GD.bob times as often. Drawn darker, under a lamp that
+//   much longer, in the movement step: fStill, so their speed stays real to the runners and the CPU), and a catch in the air inside it bobbles GD.bob times as often. Drawn darker, under a lamp that
 //   flickers, and in the conditions list (DIM PATCH). A day game has no patch: the lights are off.
 //   The CPU's batters read it by their skill (GD.aim): they time the swing to pull or push the ball toward it (a
 //   swing early or late costs some contact, so it is a trade, not a free hit).
@@ -22957,11 +22960,10 @@ const gdDimNow = () => !!(G.gd && !G.gd.inert && PL && PL.gdDim && PL.ball && PL
 // every fielder reads it later: their plan for it, and how long they stand still
 const gdZoneAdd0 = zoneAdd;
 zoneAdd = function (key) { const a = gdZoneAdd0.apply(this, arguments); return key === 'react' && gdDimNow() ? a + GD.react : a; };
-const gdFSpeed0 = fSpeed;
-fSpeed = function (f) {
-  if (gdDimNow() && PL.ball.holder !== f && PL.t < (f.p.pos === 'P' ? .7 : .5) + GD.react) return 0;
-  return gdFSpeed0.apply(this, arguments);
-};
+// (in the movement step only, as the engine's own read off the bat: fSpeed stays the real speed, so the runners' and the
+// CPU's reckoning of a close race isn't thrown by a fielder who is only standing still a moment)
+const gdFStill0 = fStill;
+fStill = function (f) { return gdFStill0.apply(this, arguments) || (gdDimNow() && PL.ball.holder !== f && PL.t < (f.p.pos === 'P' ? .7 : .5) + GD.react); };
 // a catch in the air inside the dim patch bobbles more (the same one roll for a bobble: nothing more drawn)
 let gdBobK = 1;
 const gdZoneMult0 = zoneMult;
@@ -23443,9 +23445,10 @@ return {
   physOf: (p, cat) => physOf(p, cat), say: t => logLine(t), abPow: (p, id) => abPow(p, id),
   ground: JSON.parse(JSON.stringify(Object.assign({}, GD, { say: undefined }))), get gd() { return G.gd || null; },
   groundProbe: { grass: () => gdGrass(), inDim: (x, y) => gdInDim(x, y), where: () => G.gd && G.gd.dim ? gdWhere(G.gd.dim) : '', fly: (vx, vy, vz) => gdDimFly(simTraj(0, 2, 3, vx, vy, vz)), paint: bdxPaint,
-    // a fielder at (x, y) reading a fly into the patch (or not) t seconds in: their speed, and the chance they bobble a catch there
+    // a fielder at (x, y) reading a fly into the patch (or not) t seconds in: their speed (what the runners and the CPU
+    // reckon with), whether the movement step holds them still, and how late they plan for it
     read: (dim, t, x, y) => { const pl = PL, f = { p: G.teams[1 - G.half].def.roster.find(p => p.pos === 'CF'), x, y, spd: 20, stun: 0, flight: 0 };
-      PL = { t, gdDim: dim, ball: { st: 'batted', holder: null, x, y } }; try { return { spd: fSpeed(f), react: zoneAdd('react', x, y) }; } finally { PL = pl; } },
+      PL = { t, gdDim: dim, ball: { st: 'batted', holder: null, x, y } }; try { return { spd: fSpeed(f), still: fStill(f), react: zoneAdd('react', x, y) }; } finally { PL = pl; } },
     bob: (x, y) => { const D = G.gd, was = gdBobK; gdBobK = D && D.dim && gdInDim(x, y) ? GD.bob : 1; try { return zoneMult('bobble', x, y); } finally { gdBobK = was; } } },
   // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
   step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },

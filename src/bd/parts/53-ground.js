@@ -19,7 +19,7 @@
 //   outfield, drawn at the start of the game from the random stream (a different place each game): GD.dimR feet round a
 //   spot GD.dimD feet out at up to GD.dimA degrees off center. A fly ball (one that rises GD.flyZ feet or more) that would
 //   land in it is harder to read: every fielder reads it GD.react seconds later (they plan for it, and stand still that
-//   much longer), and a catch in the air inside it bobbles GD.bob times as often. Drawn darker, under a lamp that
+//   much longer, in the movement step: fStill, so their speed stays real to the runners and the CPU), and a catch in the air inside it bobbles GD.bob times as often. Drawn darker, under a lamp that
 //   flickers, and in the conditions list (DIM PATCH). A day game has no patch: the lights are off.
 //   The CPU's batters read it by their skill (GD.aim): they time the swing to pull or push the ball toward it (a
 //   swing early or late costs some contact, so it is a trade, not a free hit).
@@ -106,11 +106,10 @@ const gdDimNow = () => !!(G.gd && !G.gd.inert && PL && PL.gdDim && PL.ball && PL
 // every fielder reads it later: their plan for it, and how long they stand still
 const gdZoneAdd0 = zoneAdd;
 zoneAdd = function (key) { const a = gdZoneAdd0.apply(this, arguments); return key === 'react' && gdDimNow() ? a + GD.react : a; };
-const gdFSpeed0 = fSpeed;
-fSpeed = function (f) {
-  if (gdDimNow() && PL.ball.holder !== f && PL.t < (f.p.pos === 'P' ? .7 : .5) + GD.react) return 0;
-  return gdFSpeed0.apply(this, arguments);
-};
+// (in the movement step only, as the engine's own read off the bat: fSpeed stays the real speed, so the runners' and the
+// CPU's reckoning of a close race isn't thrown by a fielder who is only standing still a moment)
+const gdFStill0 = fStill;
+fStill = function (f) { return gdFStill0.apply(this, arguments) || (gdDimNow() && PL.ball.holder !== f && PL.t < (f.p.pos === 'P' ? .7 : .5) + GD.react); };
 // a catch in the air inside the dim patch bobbles more (the same one roll for a bobble: nothing more drawn)
 let gdBobK = 1;
 const gdZoneMult0 = zoneMult;

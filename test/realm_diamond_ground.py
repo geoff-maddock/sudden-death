@@ -110,8 +110,11 @@ async def main():
           for (let v = 60; v < 170 && !fly; v += 1) { const th = 32 * Math.PI / 180, h = v * Math.cos(th); if (P.fly(h * Math.sin(A), h * Math.cos(A), v * Math.sin(th))) fly = v; }
           const ground = P.fly(90 * Math.sin(A), 90 * Math.cos(A), -5), hr = P.fly(170 * Math.cos(.5) * Math.sin(A), 170 * Math.cos(.5) * Math.cos(A), 170 * Math.sin(.5));
           return { inn, plain, late, bob, fly, ground, hr, react: Gd.react, bobK: Gd.bob }; })()""")
-        check(rd['inn']['spd'] == 0 and abs(rd['inn']['react'] - rd['react']) < 1e-9 and rd['plain']['spd'] > 0 and rd['plain']['react'] == 0 and rd['late']['spd'] > 0,
+        check(rd['inn'].get('still') is True and abs(rd['inn']['react'] - rd['react']) < 1e-9 and rd['plain'].get('still') is False and rd['plain']['react'] == 0 and rd['late'].get('still') is False,
               'a fly into the patch: every fielder reads it later (stands still a third of a second longer, and plans for it)', rd)
+        # (the freeze is in the movement step only: the runners' and the CPU's estimates still see the fielder's real speed)
+        check(rd['inn']['spd'] > 0 and rd['inn']['spd'] == rd['plain']['spd'] == rd['late']['spd'],
+              'while he stands still in the dim patch, his speed (what the runners and the CPU reckon with) is his real speed, not 0', rd)
         check(abs(rd['bob'][0] / rd['bob'][1] - rd['bobK']) < 1e-9, 'a catch in the air in the patch bobbles almost twice as often (the same one roll)', rd['bob'])
         check(rd['fly'] is not None and rd['ground'] is False and rd['hr'] is False, 'only a fly ball that would land in the patch counts (not a ground ball, not one hit out)', rd)
         tl = await pg.evaluate("""(() => { LAB = true; const t = { fly: 0, flyOut: 0, catches: 0, aims: 0 }, day = { fly: 0, aims: 0 }; const lines = [];

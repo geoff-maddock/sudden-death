@@ -97,9 +97,10 @@ return {
   physOf: (p, cat) => physOf(p, cat), say: t => logLine(t), abPow: (p, id) => abPow(p, id),
   ground: JSON.parse(JSON.stringify(Object.assign({}, GD, { say: undefined }))), get gd() { return G.gd || null; },
   groundProbe: { grass: () => gdGrass(), inDim: (x, y) => gdInDim(x, y), where: () => G.gd && G.gd.dim ? gdWhere(G.gd.dim) : '', fly: (vx, vy, vz) => gdDimFly(simTraj(0, 2, 3, vx, vy, vz)), paint: bdxPaint,
-    // a fielder at (x, y) reading a fly into the patch (or not) t seconds in: their speed, and the chance they bobble a catch there
+    // a fielder at (x, y) reading a fly into the patch (or not) t seconds in: their speed (what the runners and the CPU
+    // reckon with), whether the movement step holds them still, and how late they plan for it
     read: (dim, t, x, y) => { const pl = PL, f = { p: G.teams[1 - G.half].def.roster.find(p => p.pos === 'CF'), x, y, spd: 20, stun: 0, flight: 0 };
-      PL = { t, gdDim: dim, ball: { st: 'batted', holder: null, x, y } }; try { return { spd: fSpeed(f), react: zoneAdd('react', x, y) }; } finally { PL = pl; } },
+      PL = { t, gdDim: dim, ball: { st: 'batted', holder: null, x, y } }; try { return { spd: fSpeed(f), still: fStill(f), react: zoneAdd('react', x, y) }; } finally { PL = pl; } },
     bob: (x, y) => { const D = G.gd, was = gdBobK; gdBobK = D && D.dim && gdInDim(x, y) ? GD.bob : 1; try { return zoneMult('bobble', x, y); } finally { gdBobK = was; } } },
   // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
   step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
