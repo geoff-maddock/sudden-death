@@ -319,6 +319,40 @@ because their moments come most (a close last round; a hurt fighter late in a ro
 A curse is 30 spirit (more than a special), so it competes with the special and the ultimate; washing it costs a
 patch's worth of the cut-man, which keeps it honest. The numbers are as first set: no retune.
 
+### The Anvil Ring's own ways (issue #115, phase 4)
+
+`python3 test/realm_ring_lab.py 400 --anvil` (part 9; about a minute and a half). Your three at level 3 against a
+rival's at the tier's level, Simulate, situation powers and curses on for both sides (as the Realm's card boxes). **Off**
+leaves the forge corner and the slack ropes out (as LAB mode does); **on** passes `anvil: true`; **blind** is on with
+the CPU's read turned off for every skill (`wBX.anvilSet`). The rows box the same seeded cards; a row of 400 is good
+to about ±5 points.
+
+| tier | off | the forge and the ropes | in the heat a card, s (you, them) | on the slack ropes a card, s (you, them) |
+|---|---|---|---|---|
+| 1 (Squire) | 49.2% | 52.0% (+2.8) | 10.8, 19.8 | 5.5, 39.5 |
+| 2 (Knight) | 41.8% | 37.0% (−4.7) | 15.6, 18.7 | 15.6, 25.9 |
+| 3 (Archmage) | 22.8% | 19.8% (−3.0) | 11.7, 8.4 | 15.0, 11.3 |
+
+At tier 2 with the read off for everyone: 42.5% (+0.8; in the heat 12.7, 14.0; on the ropes 15.1, 24.1).
+
+A card is at most 360 seconds of boxing (three bouts of three 40-second rounds), less for stoppages. "In the heat" counts seconds at full heat (a second at half heat
+is half a second).
+
+**How it was set.** The first cut (the forge a 3.2-foot circle in the corner) did nothing: the fighters work side by
+side across the middle of the ring and almost never stand in a corner (a few tenths of a second a bout). So the heat
+reaches out: full within 3 feet of the corner, fading to nothing at 8, where fighters do pass. The first numbers with
+that reach (breath back at 40% and 3 stamina a second in full heat; feet at 70% and punches 7 points likelier on the
+slack ropes; a Squire blind to it all) moved a card by +11 to +15 points at tier 1, where your Knights read it and their
+Squires don't. The numbers now: breath back at 60% and 2 stamina a second in full heat; feet at 80% and punches 5
+points likelier on the slack ropes, all the way out; a Squire steps out of them a little (0.15) but never walks anyone
+in. That leaves a card within a few points either way at every tier.
+
+**What it comes to.** Skill shows: a Squire's three spend about 40 seconds a card stuck on the slack ropes, a Knight's
+about 15 to 25, and at tier 3 the Archmage walks your Knights into the forge more than they walk it. In mirror bouts
+(the same kind both sides, the same skill) the blue corner spends a fifth to a third longer on the slack ropes than the red,
+from the engine's own order of moving the fighters, not from the ropes; the forge is even. In Play the forge and the
+ropes are yours to use: drive them into the glow and onto the sagging side.
+
 ### The roar on the gridiron (issue #115, phase 3)
 
 `python3 test/realm_gridiron_lab.py 400 '' roar` (part 6; under 3 minutes). Your seven at level 3 against a rival's at

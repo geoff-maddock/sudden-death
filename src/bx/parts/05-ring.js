@@ -99,6 +99,8 @@ function bxLand(a, b, k) {
   const winding = bxPunching(b) && !b.a.done;
   if (winding) acc += .06;
   if (bxOnRopes(b)) acc += .08;
+  // (against the Anvil Ring's slack ropes, more: 16-anvil.js; 0 elsewhere)
+  acc += bxAnvilPin(b);
   if (ctr) acc += .2;
   if (b.a.k === 'stun' || b.a.k === 'grab') acc += .35;
   acc += Fa.acc;

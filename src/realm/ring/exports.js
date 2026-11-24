@@ -43,6 +43,13 @@ return {
   // scoreboard says of them (bxHexWords), and where the ropes are now; the Lich's numbers (06-cpu.js)
   hexes: Object.fromEntries(Object.entries(BX_HEXES).map(([k, H]) => [k, { n: H.n, short: H.short, desc: H.desc }])), get hex() { return G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null; },
   rope: () => bxRope(), hexWords: () => bxHexWords(), lich: Object.assign({}, BX_LICH),
+  // the Anvil Ring's own ways (issue #115, phase 4: 16-anvil.js): the numbers, the corners' and the ropes' names, the bout's
+  // ({ forge, slack, heat, rope, said } or null), where the forge corner is, how slack the loose side is now (0 to 1), and
+  // where a side's fighter stands ({ forge, heat, slack, pin }: in the forge corner's heat and how hot, on the slack ropes and
+  // how much more often punches find them there); feet(side) is the tests' handle on the footwork (f.mv after it)
+  anvilRules: JSON.parse(JSON.stringify(BX_ANVIL)), forgeNames: Object.assign({}, BX_FORGE_N), slackNames: BX_SLACK.map(S => S.n), get anvil() { return G && G.anvil ? JSON.parse(JSON.stringify(G.anvil)) : null; },
+  anvilSet: o => { for (const k in o) Object.assign(BX_ANVIL[k], o[k]); return JSON.parse(JSON.stringify(BX_ANVIL)); } /* the lab's tuning handle */,
+  forgeXY: () => G && G.anvil ? bxForgeXY() : null, slackNow: () => bxSlackNow(), anvilAt: side => G && G.F && G.anvil ? { forge: bxInForge(G.F[side]), heat: bxForgeHeat(G.F[side]), slack: bxOnSlack(G.F[side]), pin: bxAnvilPin(G.F[side]) } : null, feet: side => { const f = G.F[side]; bxFeet(f, G.F[1 - side]); return f.mv.slice(); },
   // each kind's nature in the ring (a trait for some, none for the rest): { kind: { n, desc } }
   traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],

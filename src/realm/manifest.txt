@@ -179,6 +179,7 @@ src/realm/w141-diamondpowers.js
 src/realm/w142-ringmore.js
 src/realm/w143-gfroar.js
 src/realm/w144-ashbowl.js
+src/realm/w145-anvilring.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js

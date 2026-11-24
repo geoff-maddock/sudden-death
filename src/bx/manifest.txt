@@ -15,3 +15,4 @@ src/bx/parts/12-save.js
 src/bx/parts/13-kit.js
 src/bx/parts/14-hexes.js
 src/bx/parts/15-more.js
+src/bx/parts/16-anvil.js
