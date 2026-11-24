@@ -268,7 +268,8 @@ function gfFx(pw) {
   for (const z of (G.zones || [])) if (GF_ULT_BY[z.id]) add(GF_ULT_BY[z.id].zone);
   for (const c of [pw && pw.off, pw && pw.def]) {
     if (!c) continue;
-    if (GF_POW_BY[c.id]) add(GF_POW_BY[c.id].fx);
+    // (lifted by the roar, half again as strong: 19-roar.js)
+    if (GF_POW_BY[c.id]) add(c.amp ? gfRoarAmp(GF_POW_BY[c.id].fx) : GF_POW_BY[c.id].fx);
     // an ultimate cast this down: its zone is already on the field (the handle in tests may skip that)
     const u = GF_ULT_BY[c.id]; if (u) { if (u.now) add(u.now); if (!(G.zones || []).some(z => z.id === c.id)) add(u.zone); }
   }

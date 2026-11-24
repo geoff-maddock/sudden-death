@@ -18,3 +18,4 @@ src/gf/parts/15-bench.js
 src/gf/parts/16-stance.js
 src/gf/parts/17-kit.js
 src/gf/parts/18-umbral.js
+src/gf/parts/19-roar.js

@@ -21,7 +21,11 @@ Part 5, the Umbral (issue #99, phase 4b): their CPU skill again, the Archmage be
 against the Cinder Pit's Nadir seven (wUmbGfTeam, the champion's game without hexes); each football hex alone against
 none on the champion's game (no single hex should swing it by more than about 10 points); and the champion's game as
 played, with W_NADIR.gridiron.hexes drawn at random. Only this part: a third argument 'umbral'
-(python3 test/realm_gridiron_lab.py 200 '' umbral). Writes /tmp/realm_gridiron_lab.json."""
+(python3 test/realm_gridiron_lab.py 200 '' umbral). Writes /tmp/realm_gridiron_lab.json.
+Part 6, the roar (issue #115, phase 3; only with a third argument 'roar'): at an even level, by tier: off (as the other
+parts play: LAB mode leaves it out), both sides (the Realm's game), yours only and theirs only. Each row plays the same
+seeded games, so the rows differ only in the roar (python3 test/realm_gridiron_lab.py 200 '' roar; writes
+/tmp/realm_gridiron_lab_roar.json)."""
 import asyncio, json, sys, os, time, collections
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -44,6 +48,8 @@ window.GLAB = {
   // one game: their level is yours plus the gap; tier sets their rating bonus and CPU skill (skill overrides the skill)
   game(lvl, gap, tier, o) {
     o = o || {};
+    // (seeded: the journey, their seven and the game from the seed, so rows that differ in one thing play the same games; part 6)
+    if (o.seed != null && !o.seeded) { const keep = Math.random; Math.random = mulberry(o.seed); try { return GLAB.game(lvl, gap, tier, Object.assign({}, o, { seeded: true })); } finally { Math.random = keep; } }
     GLAB.journey(lvl);
     // (gear: one piece each, round your own players; it goes in through wSevenPlayer as a player's own)
     if (o.gear) wRoster().forEach((p, i) => { p.gear = { grid: o.gear[i % o.gear.length] }; });
@@ -53,8 +59,9 @@ window.GLAB = {
     const sk = wGridSkill(tier); if (o.skill != null) sk[1] = o.skill;
     const t0 = performance.now();
     const bags = o.kit ? [o.kit === 'theirs' ? null : Object.assign({}, KIT_MINE), Object.assign({}, W_GRID_KIT.opp[tier] || {})] : null;
-    const g = wGF.simGame(Object.assign({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false, stance: o.stance ? [o.stance, null] : null }, bags ? { bags } : {}));
-    const out = { kit: o.kit || 'plain', used: [0, 1].map(s => (g.pots || []).filter(x => x.side === s).length), gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
+    const g = wGF.simGame(Object.assign({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false, stance: o.stance ? [o.stance, null] : null }, bags ? { bags } : {}, o.roar !== undefined ? { roar: o.roar } : {}, o.seed != null ? { seed: o.seed } : {}));
+    const Q = wGF.G.roar, roar = Q ? { lifts: [0, 1].map(s => Q.casts.filter(c => c.side === s).length), ult: [0, 1].map(s => Q.casts.filter(c => c.side === s && c.k === 'ult').length), tally: Q.tally } : null;
+    const out = { roar, kit: o.kit || 'plain', used: [0, 1].map(s => (g.pots || []).filter(x => x.side === s).length), gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
     if (o.stance) {
       const G = wGF.G, mine = g.box.filter(b => b.side === 0), sum = k => mine.reduce((a, b) => a + (b.line[k] || 0), 0), on = [...new Set(Object.values(G.teams[0].off).concat(Object.values(G.teams[0].def)))];
       Object.assign(out, { stance: o.stance, to: sum('fuml') + sum('pint'), take: sum('ints') + sum('fr'), sacked: g.box.filter(b => b.side === 1).reduce((a, b) => a + (b.line.sk || 0), 0),
@@ -118,6 +125,8 @@ async def main():
         t0 = time.time()
         if ONLY == 'umbral':
             await umbral(pg, errs, t0); await br.close(); return
+        if ONLY == 'roar':
+            await roar(pg, errs, t0); await br.close(); return
         games = []
         for gap in (-1, 0, 1, 2, 3):
             games += await batch(pg, N, f"GLAB.game(3, {gap}, 1 + i % 3)")
@@ -210,5 +219,27 @@ async def umbral(pg, errs, t0):
         w1 = sum(g['win'] for g in rs) / len(rs)
         row(h, rs); print(f"  {'':26s}       swing {100 * (w1 - w0):+5.1f} points; your turnovers {sum(g['to'] for g in rs) / len(rs):.2f} (none {sum(g['to'] for g in champ) / len(champ):.2f})")
     row(f"the champion, {await pg.evaluate('W_NADIR.gridiron.hexes')} drawn", drawn)
+
+ROAR_ROWS = [('off', 'off (as the other parts play)', None), ('all', 'both sides (the Realm\'s game)', {'on': [True, True]}),
+             ('mine', 'yours only', {'on': [True, False]}), ('theirs', 'theirs only', {'on': [False, True]})]
+
+async def roar(pg, errs, t0):
+    out = {}
+    for t in (1, 2, 3):
+        for key, label, P in ROAR_ROWS:
+            out[f't{t}:{key}'] = await batch(pg, N, f"GLAB.game(3, 0, {t}, {{ seed: 30011 + i, roar: {json.dumps(P)} }})")
+    json.dump(out, open('/tmp/realm_gridiron_lab_roar.json', 'w'))
+    print(f'{time.time() - t0:.0f}s   page errors', len(errs), errs[:2])
+    print('\nthe roar, your seven at level 3 against a rival\'s at level 3, Simulate (the same seeded games in every row)')
+    print('                                         n    win   draw   score    lifts a game (you, them)  of them ultimates')
+    for t in (1, 2, 3):
+        base = sum(g['win'] for g in out[f't{t}:off']) / len(out[f't{t}:off'])
+        for key, label, _ in ROAR_ROWS:
+            rs = out[f't{t}:{key}']; n = len(rs); w = sum(g['win'] for g in rs) / n
+            lf = [sum(g['roar']['lifts'][s] for g in rs if g['roar']) / n for s in (0, 1)]; ul = [sum(g['roar']['ult'][s] for g in rs if g['roar']) / n for s in (0, 1)]
+            print(f"  tier {t} {label:30s} {n:5d}  {pct(sum(g['win'] for g in rs), n)}  {pct(sum(g['tie'] for g in rs), n)}   {sum(g['us'] for g in rs) / n:4.1f}-{sum(g['them'] for g in rs) / n:4.1f}   {lf[0]:.2f}, {lf[1]:.2f}               {ul[0]:.2f}, {ul[1]:.2f}" + ('' if key == 'off' else f"   {100 * (w - base):+5.1f} pts"))
+    rs = [g for k in out if k.endswith(':all') for g in out[k]]; n = len(rs)
+    ty = collections.Counter(); [ty.update(g['roar']['tally']) for g in rs]
+    print(f"  in the Realm's game ({n} games, both sides), the stands saw a game: " + ', '.join(f"{k} {v / n:.2f}" for k, v in ty.items()))
 
 asyncio.run(main())

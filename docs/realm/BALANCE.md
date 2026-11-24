@@ -319,6 +319,29 @@ because their moments come most (a close last round; a hurt fighter late in a ro
 A curse is 30 spirit (more than a special), so it competes with the special and the ultimate; washing it costs a
 patch's worth of the cut-man, which keeps it honest. The numbers are as first set: no retune.
 
+### The roar on the gridiron (issue #115, phase 3)
+
+`python3 test/realm_gridiron_lab.py 400 '' roar` (part 6; under 3 minutes). Your seven at level 3 against a rival's at
+level 3, by tier (their bonus and CPU skill), Simulate. **Off** is how every other part plays (LAB mode leaves it out);
+the others pass `roar`. Every row plays the same 400 seeded games, so the rows differ only in the roar; a row of 400 is
+good to about ±5 points.
+
+| tier | off | both sides (the Realm's game) | yours only | theirs only |
+|---|---|---|---|---|
+| 1 (Squire) | 65.5% | 68.5% (+3.0) | 66.0% (+0.5) | 68.2% (+2.7) |
+| 2 (Knight) | 50.0% | 51.0% (+1.0) | 52.2% (+2.2) | 52.8% (+2.8) |
+| 3 (Archmage) | 30.5% | 25.2% (−5.2) | 31.5% (+1.0) | 28.5% (−2.0) |
+
+Lifts a game: your side (a Knight) about 3 (0.4 of them an ultimate's zone); theirs 2.4 as a Squire, 3.1 as a Knight,
+3.9 as an Archmage. In the Realm's game the stands saw, a game: 9.7 gains of 15 yards or more, 4.6 sacks, 0.35
+turnovers, 0.1 stops on downs, 4.4 touchdowns, 0.8 field goals and 0.1 safeties, so each side fills about 15 a game.
+
+**What it comes to.** Inside the noise. A lift is half again on one power for one play (or a zone a play longer), about
+three a game a side, and a power only moves a play by a yard or two; the Archmage, which lifts most (about four a game),
+is the one row near the edge (−5 at tier 3, both sides). The roar is felt, not a swing: a careful
+human calling for it on a third down or at the goal line gets more from it than the CPU's dice. The numbers are as first
+set: no retune.
+
 ## Training spots (issue #6, phase 4)
 
 The bot drills a card and answers the challenge at each spot in every town it stops in, once a week (`opts.spots`). 140 journeys each, skilled bot, meals on:
