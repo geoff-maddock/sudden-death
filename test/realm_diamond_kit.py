@@ -10,7 +10,9 @@
 # and three baseball potions in the store; a piece worn reaches the game (its rating and its tag) and not the player's
 # own ratings, shows on the Nine tab, and can't change during a ball game; in a game you play their bag goes in by tier
 # and yours stays your own; the Bag row gives a potion from your bag (it comes out), refuses a second one in the break
-# (it stays in the bag), and the save point keeps it; Simulate leaves your bag alone; an exhibition has no Bag row; the
+# (it stays in the bag), and the save point keeps it; a potion given in the break leaves the bag only with the half's first
+# save point (Save and leave before it gives it back, the game too), so the saved bag and game agree; a game saved
+# before potions resumes with the break shut; Simulate leaves your bag alone; an exhibition has no Bag row; the
 # game card says what each club brings; How to play explains it. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -128,15 +130,43 @@ async def main():
           row.querySelector('[data-bkuse="bdtonic"]').click(); out.used = n0 - (WG.items.bdtonic || 0); out.mana = G.teams[0].mana;
           const b = row.querySelector('[data-bkuse="draught"]'); out.off = !!b && b.disabled;
           out.refused = wBallPotion('draught'); out.kept = (WG.items.draught || 0) === d0;
-          __to(__sel); wBD.snapNow(); out.snap = L.snap && L.snap.kit ? [L.snap.kit.used[0] === L.snap.kit.key, L.snap.kit.pots.map(x => x.id)] : null;
+          __to(__sel); out.usedLater = n0 - (WG.items.bdtonic || 0); wBD.snapNow(); out.snap = L.snap && L.snap.kit ? [L.snap.kit.used[0] === L.snap.kit.key, L.snap.kit.pots.map(x => x.id)] : null;
           __to(__thrown); wBallBagRows(true); out.closed = !!row.querySelector('[data-bkuse]:not([disabled])') === false && /next break/.test(row.textContent);
           return out; })()""")
         check(mt['r'] == '' and mt['mine'] is None and mt['theirs'] == await pg.evaluate(f"W_DIAMOND_KIT.opp[{mt['tier']}]"), 'in a game you play their bag goes in by tier, and yours stays your own', mt)
-        check(mt['shown'] and mt['used'] == 1 and mt['mana'] == 3, 'the Bag row gives a potion from your bag, and it comes out', mt)
+        check(mt['shown'] and mt['used'] == 0 and mt['mana'] == 3 and mt['usedLater'] == 1, 'the Bag row gives a potion from your bag (in the break it is pending), and it comes out with the half\'s first save point', mt)
         check(mt['off'] and mt['refused'] == 'One potion a break.' and mt['kept'], 'a second potion in the same break is refused, and stays in the bag', mt)
         check(mt['snap'] == [True, ['bdtonic']], 'the save point keeps the potion given', mt)
         check(mt['closed'], 'once the half\'s first pitch is thrown, the Bag row waits for the next break', mt)
         check('Not while' in mt['during'], 'gear can\'t change during a ball game', mt)
+        await pg.evaluate("(() => { wBD.pause(false); $('wBallGive').click(); const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); if (b) b.click(); })()")
+        await pg.wait_for_function("!wBallLive() && UI.view === 'world'")
+
+        # a potion given in the break: the save point there is the last pitch of the half before, so the bag and the saved
+        # game must agree (it leaves the bag only with the save point that has it)
+        bk = await pg.evaluate("""(() => { const out = {}; wAddItem('bdtonic', 3); wBall().met = {}; wStartBall({ club: 'local', how: 'play' }); wBD.pause(true);
+          const G = wBD.G, n0 = WG.items.bdtonic; G.teams[0].mana = 1;
+          out.first = [wBallPotion('bdtonic'), !WG.ball.live.snap]; wBallLeave(); out.firstOff = !wBallLive(); out.firstKept = WG.items.bdtonic === n0;
+          wStartBall({ club: 'local', how: 'play' }); wBD.pause(true); const L = WG.ball.live;
+          __to(() => G.half === 1 && G.phase === 'between'); const n1 = WG.items.bdtonic; G.teams[0].mana = 1;
+          out.give = wBallPotion('bdtonic'); out.pend = WG.items.bdtonic === n1; out.left = n1 - 1; wBallBagRows(true);
+          const b = document.querySelector('#wBallBagRow [data-bkuse="bdtonic"]'); out.shows = b ? b.textContent : '';
+          wSave(); const S = wLoadSave(); out.savedAgree = S.WG.items.bdtonic === n1 && !(S.WG.ball.live.snap.kit.pots || []).some(x => x.side === 0 && x.id === 'bdtonic' && x.half === 1);
+          wBallLeave(); out.leaveKept = WG.items.bdtonic === n1;
+          wResumeBall(); wBD.pause(true);
+          out.resumed = { half: G.half, mine: wBD.kit.pots.filter(x => x.side === 0).length, kept: WG.items.bdtonic === n1 };
+          __to(() => G.half === 1 && G.phase === 'between'); G.teams[0].mana = 1; out.again = wBallPotion('bdtonic');
+          __to(__sel); out.taken = n1 - WG.items.bdtonic; out.snapHas = !!(L.snap && L.snap.kit && L.snap.kit.pots.some(x => x.side === 0 && x.id === 'bdtonic'));
+          wSave(); const S2 = wLoadSave(); out.saved2 = [S2.WG.items.bdtonic === n1 - 1, S2.WG.ball.live.snap.kit.pots.filter(x => x.side === 0).length];
+          // a game saved before potions came in (no kit in its snapshot) resumes with the break shut
+          const sn = JSON.parse(JSON.stringify(L.snap)); delete sn.kit; wBD.resume(sn); wBD.pause(true);
+          out.old = [wBD.kit.open, wBD.potionWhy(0, 'bdeye')];
+          return out; })()""")
+        check(bk['first'] == ['', True] and bk['firstOff'] and bk['firstKept'], 'a potion given in the first break, before any save point, stays in the bag when Save and leave calls the game off', bk)
+        check(bk['give'] == '' and bk['pend'] and bk['shows'] == f"Brimstone Tonic ({bk['left']})" and bk['savedAgree'], 'a potion given in the break stays in the saved bag until a save point has it (the Bag row counts it as given)', bk)
+        check(bk['leaveKept'] and bk['resumed'] == {'half': 0, 'mine': 0, 'kept': True}, 'Save and leave in the break, then Resume: the game is back before the potion, and so is the potion', bk)
+        check(bk['again'] == '' and bk['taken'] == 1 and bk['snapHas'] and bk['saved2'] == [True, 1], 'at the half\'s first pitch the save point has the potion, and it leaves the bag with it', bk)
+        check(bk['old'][0] is False and bk['old'][1].startswith('Only between half-innings'), 'a game saved before potions came in resumes with the break shut', bk)
         await pg.evaluate("(() => { wBD.pause(false); $('wBallGive').click(); const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); if (b) b.click(); })()")
         await pg.wait_for_function("!wBallLive() && UI.view === 'world'")
 

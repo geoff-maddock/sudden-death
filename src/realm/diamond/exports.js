@@ -65,7 +65,7 @@ function bdxGear() { return Object.fromEntries(Object.entries(GEAR).map(([k, g])
 function bdxSnapNow() { if (gameOn() && G.phase === 'plate' && G.P && G.P.stage === 'select') exhSnap(); }
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
-  get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; }, set onAuto(f) { BDX.onAuto = f; },
+  get on() { return BDX.on; }, set onOver(f) { BDX.onOver = f; }, set onQuit(f) { BDX.onQuit = f; }, set onSnap(f) { BDX.onSnap = f; }, get onSnap() { return BDX.onSnap; }, set onAuto(f) { BDX.onAuto = f; },
   // where a point of the field is drawn, in the canvas's own pixels (x across, d out from the plate, h up): read only, as golf's
   // wGL.scr (the Quick start's screenshots label things by it)
   scr: (x, d, h) => { const p = proj(x, d || 0, h); return [p.x, p.y]; },

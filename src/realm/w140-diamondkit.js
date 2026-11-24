@@ -17,7 +17,7 @@
    wStartBall (wW140StartBall: their bag goes in), wResumeBall (wW140ResumeBall: an older save's bag), wNineStats
    (wW140NineStats: the gear on the Nine tab), wOpenBallCard (wW140OpenBallCard: the bags on the card), wDcupWon
    (wW140DcupWon: a piece of gear), renderHelp (wW140RenderHelp: #wHelpBallKit); and wBD.start, wBD.sim (the bags go
-   in). */
+   in) and wBD.onSnap (a potion given in the break leaves the bag with the save point that has it). */
 
 W_GEAR_CFG.sports.diamond = 'baseball';
 W_GEAR_STATN.diamond = { pow: 'power', con: 'contact', spd: 'speed', arm: 'arm', fld: 'fielding' };
@@ -75,14 +75,19 @@ wNineBdPlayer = function (p, pos) {
 };
 
 /* ---------- the bags go in ---------- */
-const WDK = { next: null };
+const WDK = { next: null, pend: [] };
 let W_BALL_KITMSG = '', W_BALL_KITKEY = '';
-const wBallBagMine = () => Object.fromEntries(wMatchBag('diamond').filter(x => wBD.potions[x.id]).map(x => [x.id, x.n]));
+/* A potion given in the break between half-innings is in the game at once, but the save point there is still the last
+   pitch of the half before (a snapshot only resumes at the start of a pitch). So it stays in your bag, pending
+   (WDK.pend: [{ id, k }], k its place in the game's list of potions), until the first pitch of the half saves a
+   snapshot that has it: the saved bag and the saved game always agree. Leave in the break and it was never given. */
+const wBallPend = id => WDK.pend.filter(x => x.id === id).length;
+const wBallBagMine = () => Object.fromEntries(wMatchBag('diamond').filter(x => wBD.potions[x.id]).map(x => [x.id, x.n - wBallPend(x.id)]).filter(x => x[1] > 0));
 const wBallBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wBD.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wBD.potions[id].n}`).join(', ') : 'nothing'; };
 const wBallBagTheirs = tier => Object.assign({}, W_DIAMOND_KIT.opp[tier] || {});
 const wW140StartBall = wStartBall;
 wStartBall = function (o) {
-  W_BALL_KITMSG = '';
+  W_BALL_KITMSG = ''; WDK.pend = [];
   const theirs = wBallBagTheirs((o && o.tier) || (o && o.club ? wBallTier(o.club) : 1));
   WDK.next = o && o.home ? [theirs, null] : [null, theirs];
   try { return wW140StartBall(o); } finally { WDK.next = null; }
@@ -96,6 +101,7 @@ wBD.sim = o => wW140Sim(wBallBagsNext(o));
 // a game saved before bags came in: the other club's bag by its tier
 const wW140ResumeBall = wResumeBall;
 wResumeBall = function () {
+  WDK.pend = [];
   wW140ResumeBall();
   const L = wBallLive() && WG.ball.live, K = wBD.kit; if (!L || !K || !WD || !WD.ball) return;
   const them = L.world.home ? 0 : 1;
@@ -106,12 +112,25 @@ wResumeBall = function () {
 function wBallPotion(id) {
   const L = wBallLive() && WG.ball.live;
   if (!L || !WD || !WD.ball || L.world.how === 'sim' || !wBD.live) return 'Potions are for ball games you play, not exhibitions.';
-  if (!wHas(id)) return `You have no ${(wBD.potions[id] || {}).n || 'such potion'}.`;
-  const r = wBD.potion(id); if (r) return r;
-  // (the save point is the start of this pitch with the potion given, when that is where the game is: a reload can't
-  // give it back; given in the break itself, the next pitch's save point has it)
-  wAddItem(id, -1); wBD.snapNow(); wSave(); return '';
+  if ((WG.items[id] || 0) - wBallPend(id) <= 0) return `You have no ${(wBD.potions[id] || {}).n || 'such potion'}.`;
+  const k = wBD.kit.pots.length, r = wBD.potion(id); if (r) return r;
+  // at the start of a pitch the save point is taken again with it (snapNow), and it comes out of the bag now; in the
+  // break it waits for the half's first pitch (wBallPendTake)
+  WDK.pend.push({ id, k }); wBD.snapNow();
+  if (WDK.pend.length) wSave();
+  return '';
 }
+// a snapshot that has a pending potion takes it out of the bag, before the save point is kept (w20d's onSnap)
+function wBallPendTake(sn) {
+  if (!WDK.pend.length) return false;
+  const P = sn && sn.kit && sn.kit.pots, live = WD && WD.ball && wBallLive();
+  const got = live && P ? WDK.pend.filter(x => P[x.k] && P[x.k].id === x.id) : [];
+  for (const x of got) wAddItem(x.id, -1);
+  WDK.pend = live ? WDK.pend.filter(x => !got.includes(x)) : [];
+  return got.length > 0;
+}
+const wW140OnSnap = wBD.onSnap;
+wBD.onSnap = sn => { const took = wBallPendTake(sn); wW140OnSnap(sn); if (took) wSave(); };
 $('wDiamondBar').insertAdjacentHTML('afterend', '<div id="wBallBagRow" class="wdbar wdbag" hidden><b>Bag</b><span id="wBallBag"></span></div>');
 function wBallBagRows(force) {
   const row = $('wBallBagRow'), L = WD && WD.ball && wBallLive() && WG.ball.live, K = wBD.kit;

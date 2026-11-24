@@ -137,7 +137,8 @@ const kitSnap0 = snapGame;
 snapGame = function () { const sn = kitSnap0.apply(this, arguments); if (sn && G.kit) sn.kit = JSON.parse(JSON.stringify(G.kit)); return sn; };
 const kitResume0 = resumeSnap;
 resumeSnap = function (sn) {
-  G.kit = sn && sn.kit ? JSON.parse(JSON.stringify(sn.kit)) : kitNew(sn && sn.opts && sn.opts.bags);
+  // (a game saved before potions came in resumes mid-half: the break is shut until the next one opens)
+  G.kit = sn && sn.kit ? JSON.parse(JSON.stringify(sn.kit)) : Object.assign(kitNew(sn && sn.opts && sn.opts.bags), { open: false });
   const r = kitResume0.apply(this, arguments);
   // (a game saved before gear came in: its bats and balls are armed now)
   for (const t of G.teams) for (const p of [...t.def.roster, ...t.pen, ...t.used]) if (p.kit === undefined) kitArm(p);
