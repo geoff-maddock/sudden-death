@@ -5,7 +5,8 @@
    points on the cards.
    CD is the card, plain JSON (so a card can be saved between bouts): { sides: [2 × { name, short, color, light,
    fighters: [{ n, kind, num, r? }] }], pairs: [[mine, theirs] × 3] (fighter indices), bouts: [{ over, verdict, stats,
-   kd } × done], i (the bout on now), mode, you, seed, powers, skill, result }. A bout on the card ends into CD.bouts (bxCardRecord, from bxOver);
+   kd } × done], i (the bout on now), mode, you, seed, powers, skill, result, forge (the Anvil Ring's forge corner in the
+   last bout boxed, 16-anvil.js) }. A bout on the card ends into CD.bouts (bxCardRecord, from bxOver);
    bxCardNext boxes the next, and after the last CD.result is the card's. */
 let CD = null;
 // how a fighter's ratings stack up against another's for the corner's pairing: the ratings' total, with reach counted
@@ -38,6 +39,10 @@ function bxCardStart(opts) {
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [], fans: (o.fans || [0, 0]).slice(), crowd: o.crowd == null ? null : o.crowd };
   // (the hexes, for every bout on the card: 14-hexes.js)
   if (o.hexes && o.hexes.length) { CD.hexes = o.hexes.slice(); CD.hexOn = o.hexOn === 1 ? 1 : 0; }
+  // (situation powers and curses, for every bout on the card: 15-more.js)
+  if (o.bxpow) CD.bxpow = JSON.parse(JSON.stringify(o.bxpow));
+  // (the Anvil Ring's own ways, for every bout on the card: 16-anvil.js)
+  if (o.anvil) CD.anvil = true;
   bxCardBout();
   return CD;
 }
@@ -45,7 +50,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn, bxpow: CD.bxpow, anvil: CD.anvil, forgeLast: CD.forge });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
@@ -55,6 +60,8 @@ function bxCardRecord() {
   // the bags as this bout left them, for the next (13-kit.js)
   CD.bags = JSON.parse(JSON.stringify(G.bags || [{}, {}])); CD.pots = (CD.pots || []).concat((G.pots || []).map(p => Object.assign({ b: CD.i }, p)));
   CD.bouts[CD.i] = { over: { how: v.how, win: v.win, kind: v.kind || null, round: v.round, kd: v.kd.slice(), pts: v.pts.slice() }, verdict: bxVerdict(), stats: G.F.map(f => Object.assign({}, f.bs)), kd: G.kd.slice() };
+  // (the Anvil Ring's forge corner this bout: the next takes the other, 16-anvil.js)
+  if (G.anvil) CD.forge = G.anvil.forge;
   if (CD.bouts.length === CD.pairs.length) CD.result = bxCardResult(CD.bouts.map(b => b.over));
 }
 function bxCardNext() {
@@ -76,8 +83,8 @@ function bxSimCard(opts) {
     const order = fine(o.order, S[1 - you].fighters.length) ? o.order.slice() : [0, 1, 2];
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
-    let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}]));
-    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn }); bags = b.bags; return b; });
+    let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}])), forge = null;
+    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn, bxpow: o.bxpow, anvil: o.anvil, forgeLast: forge }); bags = b.bags; if (b.anvil) forge = b.anvil.forge; return b; });
     return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)), bags };
   } finally { CD = keep; }
 }

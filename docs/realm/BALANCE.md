@@ -219,6 +219,222 @@ Part 1 plays a fresh five-player journey at level 3 against a rival's nine at th
 
 A simulated cup costs about 8 gold on average (the 40 gold fee against the 150 gold prize) and pays about 112 XP across the roster. With 120 games a cell, a rate is good to about ±9%. A player who plays the pitches beats Squire and Knight far more often than a coin flip; nobody has measured that yet.
 
+### Gear and potions on the diamond (issue #115, phase 1)
+
+`python3 test/realm_diamond_lab.py 600 '' kits` (part 4; about 45 ms a game, 17 minutes for the lot). Your nine at level
+3 against a rival's at level 3, Simulate (both sides on the CPU at the tier's skill), four ways a tier as #61's labs do:
+**plain**; **their bag only** (`W_DIAMOND_KIT.opp`, as Simulate plays it: your bag stays shut); **both bags** (yours a
+Stamina Draught, a Brimstone Tonic, Owl-Eye Drops and Steadyhand Balm, given by your side's CPU at the tier's skill: a
+stand-in for giving them by hand); and **the full kit** (both bags, and a piece on every player: two Hornet-Nest Bats
+and a Splinter Bat, three gloves, two pairs of Iron Spikes, a Ghost Ball on the starter and a Rosin Bag on the
+reliever). Each journey draws new kinds, so a row of 600 is good to about ±4 points.
+
+| tier | plain | their bag only | both bags | both bags, your nine in gear |
+|---|---|---|---|---|
+| 1 | 55.5% | 53.7% (0–0.7) | 56.8% (2.1–0.7) | 63.7% (2.0–0.7) |
+| 2 | 58.7% | 51.8% (0–1.8) | 59.8% (3.4–1.9) | 66.3% (3.4–1.8) |
+| 3 | 29.5% | 27.2% (0–3.5) | 28.2% (3.5–3.6) | 34.5% (3.6–3.6) |
+
+(Potions given a game, yours–theirs, in brackets.) Each piece alone at tier 2, on every player it is for (bats and
+gloves on the eight in the field, balls and the Rosin Bag on the pitchers, spikes on all ten), against 58.7% with none:
+
+| piece | win | | piece | win |
+|---|---|---|---|---|
+| Splinter Bat | +3.7 | | Leaden Ball | +1.7 |
+| Hornet-Nest Bat | +1.0 | | Ghost Ball | −0.7 |
+| Thunderclap Bat | +15.7 | | Hellfire Ball | +1.3 |
+| Lodestone Bat | +8.5 | | Quicksilver Ball | −0.7 |
+| Dragonbone Bat | +20.5 | | Wyrm-Eye Ball | −1.7 |
+| Wyvern-Hide Glove | +1.7 | | Rosin Bag | −1.5 |
+| Iron Spikes | +5.8 | | | |
+
+Each potion alone, two in your bag: Stamina Draught +1.3 (given 0.95 a game), Brimstone Tonic +0.2 (2.0), Owl-Eye
+Drops +1.5 (1.55), Steadyhand Balm −2.2 (1.2).
+
+**What it comes to.** As in boxing and football, a bag is a small edge and never a game on its own: each potion and
+both bags sit inside the noise, and so does their bag in Simulate (−2 to −7, the tier 2 row the widest). Gear does
+more: a full nine in store gear is +5 to +8 at every tier and still leaves tier 3 near a third. The strong pieces are
+the costly bats: eight Dragonbone Bats would be +20, but there is one in the Realm (a chest, or the Diamond Cup) and it
+swings twice a game, so one wearer is worth about +2.5; the same holds for the Thunderclap and Lodestone Bats and the
+spikes (one each, in chests). The cheap store pieces, which you could buy for the whole nine, are +1 to +4. Pitching
+control (the balls' scatter, the Rosin Bag, the balm) hardly moves a CPU-against-CPU game, where batters chase by
+skill rather than by the pitch's spot; a player at the plate reads a pitch by its spot, so those may matter more by
+hand. Nobody has measured that yet. The numbers are as first set: no retune.
+
+### Picks, situation powers and the crowd on the diamond (issue #115, phase 2)
+
+`python3 test/realm_diamond_lab.py 200 '' powers` (part 5; about 4 minutes), and the tier 2 rows that mattered again at
+800 games. Your nine at level 3 against a rival's at level 3, Simulate (both sides on the CPU at the tier's skill).
+**Off** is how every other part plays (LAB mode leaves the powers and the picks out); the others pass `rules.bdpow`. A row
+of 200 is good to about ±7 points, a row of 800 to about ±3.5.
+
+| tier | off | both sides (the Realm's game) | yours only | theirs only |
+|---|---|---|---|---|
+| 1 | 53.5% | 47.5% | 52.0% | 53.5% |
+| 2 | 55.5% (800: 57.9%) | 56.0% | 55.0% (800: 54.2%) | 50.5% |
+| 3 | 33.0% | 27.5% | 25.0% | 27.0% |
+
+At tier 2, 800 games each: the picks alone (no powers either side, your nine on its magic, theirs by name) 53.5%;
+yours with the crowd alone 53.1% and 50.2% (two runs); yours with the situation powers alone 52.9%; your nine all magic
+50.9%, all physical skills (and second pitches) 57.9%. At 200: by name 55.0%, picks off (every kind everything) 57.5%.
+
+In the Realm's game, a game: situation powers 0.87 (Last Licks 0.38, Extra Innings 0.29, Bases Loaded 0.12, Full Count
+0.08), crowd spends 2.41 (Shriek, Pounce, Wolf Sprint, Glide and Take Flight most, and Stampede the ultimate most
+lifted); the stands saw 4.9 runs, 1.95 home runs, 3.7 strikeouts, 0.8 double plays and 0.6 stolen bases.
+
+**What it comes to.** Between two CPUs the situation powers and the crowd are a small edge and never a game on their
+own: one side's alone sits inside the noise (−2 to +1 at 800 games). They pay mana for a moment (two mana is an ability
+not cast), and the crowd's lift is half again on one cast, about one a game a side. The picks matter more. Every kind's
+physical skill beat its magic for the bot by about 7 points (57.9% against 50.9%), likely because a skill costs stamina
+rather than the mana an ultimate or a situation power wants; so the other nine, picking by name, brings about half its
+players on skills and is a touch better than it was (picks on, no powers: 53.5% against 57.9% off). Your nine still
+starts on its magic (the default pick is what every kind had), so the Nine tab is worth a look: a player who would
+rather save the mana can bring the skill. A careful human reads the moments far better than the CPU's dice. The numbers
+are as first set: no retune.
+
+### Graftonbury Ballpark's ways: the mound grass and the floodlight (issue #115, phase 4)
+
+`python3 test/realm_diamond_lab.py 200 '' ground` (part 6; about 3½ minutes). Your nine at level 3 against a rival's at
+level 3, Simulate (both sides on the CPU at the tier's skill). Every row plays the same seeds (game i is seed i). **Off**
+is how every other part plays (LAB mode leaves the ground out). Once the ground is on it draws two numbers at the start
+(which floodlight is faulty, drawn by day too), so the off row parts ways with the rest after the first pitch: compare
+the on rows with each other (**plain** is the ground on with the grass off and the lights off: the paired baseline).
+
+| tier | off | plain (paired) | a day game: the grass | a night game: grass and the patch |
+|---|---|---|---|---|
+| 1 | 52.0%, 2.85 runs | 59.5%, 3.00 | 53.0%, 2.92 | 56.5%, 2.91 |
+| 2 | 54.5%, 4.29 | 52.5%, 4.68 | 59.5%, 4.93 | 57.5%, 5.12 |
+| 3 | 38.5%, 6.55 | 33.0%, 6.80 | 32.5%, 6.67 | 31.0%, 6.25 |
+
+Tier 2, night: the patch inert (counted, doing nothing) 61.0%, 4.92 runs; the patch alone (no grass) 59.0%, 4.95; your
+CPU not reading either 61.0%, 4.89; neither CPU reading 60.5%, 4.97. A row of 200 is good to about ±7 points and about
+±0.3 runs a game.
+
+**The grass.** A half runs about 11 pitches, so the average pitch scatters about a twelfth more, and the last pitches of a long half up to
+half again. Between two CPUs that is inside the noise (−0.1 to +0.25 runs a game against plain, a few more walks): the
+CPU's batters chase by skill rather than by the pitch's spot, as the Rosin Bag and the balm found (phase 1). By hand the
+spot matters, so a long inning should hurt a human's pitcher more than this. The CPU pulls its pitcher for it about 0.05
+times a game (only a tiring pitcher, at least 15 pitches into a half, Knight and up).
+
+**The patch.** About one fly ball a game lands in it (0.9 at tier 2). With it inert 64.5% of those are caught; live,
+57.6%, and 2 to 5 in a hundred of the catches in it are bobbled: about 0.1 more hits a game, so a night game is a touch
+livelier and never decided by it. Aiming at it is a trade, not a free hit (an early or late swing costs contact): with
+a harder aim (an Archmage timing the swing four fifths of the way, tried once) the CPU put 35% more fly balls into the
+patch and scored 0.4 runs a game fewer, so the CPU aims lightly (a Knight a third of the way, an Archmage a little over
+half), which puts no more balls there than not aiming and costs nothing measurable. Getting under the ball to lift it
+toward the patch was tried and dropped: it was a plain batting boost (+0.6 runs a game) that had nothing to do with the
+light. A human who can place a fly ball does better from the patch than the CPU. The numbers are as first set: no
+retune.
+
+### Situation powers and curses in the ring (issue #115, phase 3)
+
+`python3 test/realm_ring_lab.py 400 --more` (part 8; under 2 minutes). Your three at level 3 against a rival's at the
+tier's level (their bonus and CPU skill by tier), Simulate. **Off** is how every other part boxes (LAB mode leaves them
+out); the others pass `bxpow`. Every row boxes the same 400 seeded cards (the journey, their side and the bouts from
+the card's number), so the rows differ only in what they change; a row of 400 is good to about ±5 points, a little
+better between rows.
+
+| tier | off | both sides (the Realm's card) | yours only | theirs only |
+|---|---|---|---|---|
+| 1 (Squire) | 49.0% | 47.2% (−1.8) | 48.2% (−0.8) | 47.2% (−1.8) |
+| 2 (Knight) | 39.0% | 41.5% (+2.5) | 42.2% (+3.2) | 33.8% (−5.2) |
+| 3 (Archmage) | 22.8% | 24.5% (+1.7) | 27.5% (+4.8) | 20.0% (−2.7) |
+
+At tier 2, both sides: the curses alone 37.8% (−1.3), the situation powers alone 37.8% (−1.3).
+
+In the Realm's card, a card (three bouts, both sides): Off the Canvas 1.00, the Last Round 2.77, Saved by the Bell
+2.81, curses 1.01, washes 0.73. Your side (a Knight) casts about 3.7 situation powers a card; a Squire about 1.8, a
+Knight 3.0, an Archmage 3.5 (the short windows, Off the Canvas and Saved by the Bell, are where skill shows). About
+seven curses in ten are washed off at the next break.
+
+**What it comes to.** A small edge for whoever has them and never a card on its own: one side's alone moves a card by
+3 to 5 points at tiers 2 and 3, both sides together by under 3. The Last Round and Saved by the Bell are cast most
+because their moments come most (a close last round; a hurt fighter late in a round), and each is worth a few seconds.
+A curse is 30 spirit (more than a special), so it competes with the special and the ultimate; washing it costs a
+patch's worth of the cut-man, which keeps it honest. The numbers are as first set: no retune.
+
+### The Anvil Ring's own ways (issue #115, phase 4)
+
+`python3 test/realm_ring_lab.py 400 --anvil` (part 9; about a minute and a half). Your three at level 3 against a
+rival's at the tier's level, Simulate, situation powers and curses on for both sides (as the Realm's card boxes). **Off**
+leaves the forge corner and the slack ropes out (as LAB mode does); **on** passes `anvil: true`; **blind** is on with
+the CPU's read turned off for every skill (`wBX.anvilSet`). The rows box the same seeded cards; a row of 400 is good
+to about ±5 points.
+
+| tier | off | the forge and the ropes | in the heat a card, s (you, them) | on the slack ropes a card, s (you, them) |
+|---|---|---|---|---|
+| 1 (Squire) | 49.2% | 52.0% (+2.8) | 10.8, 19.8 | 5.5, 39.5 |
+| 2 (Knight) | 41.8% | 37.0% (−4.7) | 15.6, 18.7 | 15.6, 25.9 |
+| 3 (Archmage) | 22.8% | 19.8% (−3.0) | 11.7, 8.4 | 15.0, 11.3 |
+
+At tier 2 with the read off for everyone: 42.5% (+0.8; in the heat 12.7, 14.0; on the ropes 15.1, 24.1).
+
+A card is at most 360 seconds of boxing (three bouts of three 40-second rounds), less for stoppages. "In the heat" counts seconds at full heat (a second at half heat
+is half a second).
+
+**How it was set.** The first cut (the forge a 3.2-foot circle in the corner) did nothing: the fighters work side by
+side across the middle of the ring and almost never stand in a corner (a few tenths of a second a bout). So the heat
+reaches out: full within 3 feet of the corner, fading to nothing at 8, where fighters do pass. The first numbers with
+that reach (breath back at 40% and 3 stamina a second in full heat; feet at 70% and punches 7 points likelier on the
+slack ropes; a Squire blind to it all) moved a card by +11 to +15 points at tier 1, where your Knights read it and their
+Squires don't. The numbers now: breath back at 60% and 2 stamina a second in full heat; feet at 80% and punches 5
+points likelier on the slack ropes, all the way out; a Squire steps out of them a little (0.15) but never walks anyone
+in. That leaves a card within a few points either way at every tier.
+
+**What it comes to.** Skill shows: a Squire's three spend about 40 seconds a card stuck on the slack ropes, a Knight's
+about 15 to 25, and at tier 3 the Archmage walks your Knights into the forge more than they walk it. In mirror bouts
+(the same kind both sides, the same skill) the blue corner spends a fifth to a third longer on the slack ropes than the red,
+from the engine's own order of moving the fighters, not from the ropes; the forge is even. In Play the forge and the
+ropes are yours to use: drive them into the glow and onto the sagging side.
+
+### The roar on the gridiron (issue #115, phase 3)
+
+`python3 test/realm_gridiron_lab.py 400 '' roar` (part 6; under 3 minutes). Your seven at level 3 against a rival's at
+level 3, by tier (their bonus and CPU skill), Simulate. **Off** is how every other part plays (LAB mode leaves it out);
+the others pass `roar`. Every row plays the same 400 seeded games, so the rows differ only in the roar; a row of 400 is
+good to about ±5 points.
+
+| tier | off | both sides (the Realm's game) | yours only | theirs only |
+|---|---|---|---|---|
+| 1 (Squire) | 65.5% | 68.5% (+3.0) | 66.0% (+0.5) | 68.2% (+2.7) |
+| 2 (Knight) | 50.0% | 51.0% (+1.0) | 52.2% (+2.2) | 52.8% (+2.8) |
+| 3 (Archmage) | 30.5% | 25.2% (−5.2) | 31.5% (+1.0) | 28.5% (−2.0) |
+
+Lifts a game: your side (a Knight) about 3 (0.4 of them an ultimate's zone); theirs 2.4 as a Squire, 3.1 as a Knight,
+3.9 as an Archmage. In the Realm's game the stands saw, a game: 9.7 gains of 15 yards or more, 4.6 sacks, 0.35
+turnovers, 0.1 stops on downs, 4.4 touchdowns, 0.8 field goals and 0.1 safeties, so each side fills about 15 a game.
+
+**What it comes to.** Inside the noise. A lift is half again on one power for one play (or a zone a play longer), about
+three a game a side, and a power only moves a play by a yard or two; the Archmage, which lifts most (about four a game),
+is the one row near the edge (−5 at tier 3, both sides). The roar is felt, not a swing: a careful
+human calling for it on a third down or at the goal line gets more from it than the CPU's dice. The numbers are as first
+set: no retune.
+
+### The Ash Bowl's ways (issue #115, phase 4)
+
+`python3 test/realm_gridiron_lab.py 400 '' ash` (part 7; about 90 seconds). Your seven at level 3 against a rival's at
+level 3, by tier, Simulate; yours a Knight. **Off** is how every other part plays (LAB mode leaves the ash out); **on** is
+the Realm's game (ashfall and the heat shimmer). Both rows play the same 400 seeded games; a row of 400 is good to about
+±5 points.
+
+| tier | off | on | swing | score off | score on |
+|---|---|---|---|---|---|
+| 1 (Squire) | 68.2% | 65.2% | −3.0 | 19.2–14.1 | 17.8–12.8 |
+| 2 (Knight) | 50.5% | 49.5% | −1.0 | 17.1–16.0 | 15.7–15.4 |
+| 3 (Archmage) | 30.5% | 30.2% | −0.3 | 14.5–20.4 | 13.4–19.0 |
+
+A game with it on: 12.5 throws and punts toward the heat wobble, about half a field goal is tried toward it, 0.1 to 0.2
+loose balls or punts die on the ash, and the carriers cut on the ash 0.77 times a game when their coach is a Squire (0.23
+of them a stumble), but only 0.12 to 0.16 when both coaches are Knights or better, who hold their line there. The CPU calls
+its timeout for a sweep about once a half from Knight up (2.5 a game, both sides; a Squire never does).
+
+**What it comes to.** Inside the noise on the result, and the same for both sides, as a ground's ways should be: the heat
+takes about 1.3 points a side off the score (deep balls and long kicks toward it go astray, and the coaches hold the deep
+shots back), and the ash is mostly a Squire's problem. In Play the ash is yours to steer round, and a careful human who
+saves the deep shots for the other end gets more from the heat than the coaches' rule. The numbers are as first set
+(patches 4.5 to 7 yards, a 30% stumble, 0.07 a yard of wobble past 12 yards, 0.7% a yard off a field goal past 25): no
+retune.
+
 ## Training spots (issue #6, phase 4)
 
 The bot drills a card and answers the challenge at each spot in every town it stops in, once a week (`opts.spots`). 140 journeys each, skilled bot, meals on:

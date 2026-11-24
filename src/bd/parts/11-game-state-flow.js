@@ -65,6 +65,7 @@ function newGame(opts) {
   if (typeof skyStart === 'function' && MOON) skyStart();
   if (typeof takeStart === 'function' && TAKE !== undefined) takeStart();
   for (const t of G.teams) for (const p of [...t.def.roster, ...t.pen]) initStamina(p);
+  kitStart(opts);
   G.inning = 1; G.half = 0; G.outs = 0; G.balls = 0; G.strikes = 0;
   G.bases = [null, null, null, null];
   G.log = []; G.full = []; G.archived = false; G.gameId = null; G.rolls = []; G.fx = []; G.banner = null; G.paused = false; G.slow = 0; G.lastPitch = null; G.abPitches = []; G.abTags = []; G.zones = [];
@@ -136,7 +137,7 @@ function stanceOpts(p, team) {
   const ph = physOf(p, 'bat'); if (ph) o.push({ k: 'phys', ph, name: AB[ph].name, stam: AB[ph].stam });
   if (p.bat) o.push({ k: 'ab', ab: p.bat, name: AB[p.bat].name + (tierOf(p, 'bat') > 1 ? ' ' + 'I'.repeat(tierOf(p, 'bat')) : ''), cost: abCost(p, p.bat) });
   const u = ultOption(p, team, 'bat'); if (u) o.push({ k: 'ult', ult: u.id, name: AB[u.id].name, cost: u.cost });
-  const gs = gearStance(team); if (gs) o.push(gs);
+  const gs = gearStance(team, p); if (gs) o.push(gs);
   return o;
 }
 function affordable(opt, team) { if (opt.stam && G.P !== undefined && typeof batter === 'function' && G.teams && fatigue(batter()) < .08) return false; return !opt.cost || team.mana >= opt.cost; }
@@ -148,7 +149,7 @@ function startPitch(newBatter) {
   const pt = pitcher(), bt = FT(), bat = batter();
   const pitches = pt.pitches.map(k => ({ k, ...PITCHES[k], cost: pitchCost(pt, PITCHES[k]) }));
   { const up = ultOption(pt, FT(), 'pitch'); if (up) pitches.push({ k: up.id, ...PITCHES[up.id], cost: pitchCost(pt, PITCHES[up.id]) }); }
-  { const gp = gearPitch(FT()); if (gp) pitches.push(gp); }
+  { const gp = gearPitch(FT(), pt); if (gp) pitches.push(gp); }
   G.P = {
     stage: 'select', t: 0, pitches, pi: 0,
     aim: { x: 0, h: 2.5 }, stances: stanceOpts(bat, BT()), si: 0,

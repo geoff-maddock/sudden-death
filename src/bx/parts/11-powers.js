@@ -24,7 +24,8 @@
 const BX_POW_STA = { sp: 8, ult: 15 };
 // (a fighter deals and takes about 50 damage a round, so a round of work fills about 35: a special most rounds, or an
 // ultimate saved for)
-const BX_SPIRIT = { max: 100, start: 10, sp: 25, ult: 60, land: .3, take: .4, block: .12 };
+// (cu: a curse, issue #115, 15-more.js)
+const BX_SPIRIT = { max: 100, start: 10, sp: 25, ult: 60, cu: 30, land: .3, take: .4, block: .12 };
 const BX_POW = {
   goblin:   { sp: { id: 'shadowstep', n: 'Shadowstep', when: 'close', desc: 'Blinks to their open side: the next punch is a counter, and for 2 seconds punches find them more often.', now: { ctr: 1.2 }, fx: { who: 'self', t: 2, acc: .2 } },
               ult: { id: 'flurry', n: 'Flurry', when: 'close', desc: 'Four quick jabs that all land, and a counter after.', now: { hits: 4, ctr: .8 } },
@@ -81,13 +82,15 @@ const BX_POW = {
               ult: { id: 'blizzard', n: 'Blizzard', when: 'any', desc: 'Snow on them: 20% slower at everything for 3 seconds.', fx: { who: 'them', t: 3, spd: .8, move: .8 } },
               sp2: { id: 'brew', n: 'Witch\'s Brew', when: 'tired', desc: 'A swig from the cauldron: 12 stamina back, and 2 more a second for 4 seconds.', now: { mySta: 12 }, fx: { who: 'self', t: 4, regSta: 2 } } },
 };
-const BX_FX_MUL = ['spd', 'move', 'dmgIn', 'dmgOut', 'nextMul'], BX_FX_ADD = ['acc', 'regSta', 'regHp', 'heal'], BX_FX_FLAG = ['root', 'noBack', 'miss', 'rampart', 'leaky', 'noReg', 'sight', 'undying', 'air'];
+// (regK and spDear are a curse's, 15-more.js: their breath back ×, and spirit more on their next special or ultimate)
+const BX_FX_MUL = ['spd', 'move', 'dmgIn', 'dmgOut', 'nextMul', 'regK'], BX_FX_ADD = ['acc', 'regSta', 'regHp', 'heal', 'spDear'], BX_FX_FLAG = ['root', 'noBack', 'miss', 'rampart', 'leaky', 'noReg', 'sight', 'undying', 'air'];
 // a fighter's statuses, combined (most of the time there are none: the same no-effect answer, built once)
 const BX_FX_NONE = (() => { const o = {}; for (const k of BX_FX_MUL) o[k] = 1; for (const k of BX_FX_ADD) o[k] = 0; for (const k of BX_FX_FLAG) o[k] = 0; return Object.freeze(o); })();
+// (a curse on the fighter, f.curse, counts with them: 15-more.js)
 function bxFx(f) {
-  if (!f.fx || !f.fx.length) return BX_FX_NONE;
+  if ((!f.fx || !f.fx.length) && !f.curse) return BX_FX_NONE;
   const o = {}; for (const k of BX_FX_MUL) o[k] = 1; for (const k of BX_FX_ADD) o[k] = 0; for (const k of BX_FX_FLAG) o[k] = 0;
-  for (const s of f.fx || []) { for (const k of BX_FX_MUL) if (s[k] != null) o[k] *= s[k]; for (const k of BX_FX_ADD) if (s[k] != null) o[k] += s[k]; for (const k of BX_FX_FLAG) if (s[k]) o[k] = 1; }
+  for (const s of f.curse ? (f.fx || []).concat([f.curse.fx]) : f.fx || []) { for (const k of BX_FX_MUL) if (s[k] != null) o[k] *= s[k]; for (const k of BX_FX_ADD) if (s[k] != null) o[k] += s[k]; for (const k of BX_FX_FLAG) if (s[k]) o[k] = 1; }
   return o;
 }
 const bxPowOn = () => !G || G.powers !== false;
@@ -105,6 +108,8 @@ function bxFansLate() {
   return out;
 }
 const bxSpirit = f => f.spirit == null ? BX_SPIRIT.max : f.spirit;
+// the spirit a special or ultimate costs f now: more under a curse that makes it dearer (15-more.js)
+const bxSpCost = (f, which) => f.curse ? BX_SPIRIT[which] + bxFx(f).spDear : BX_SPIRIT[which];
 // a punch landed (a: who threw it, b: who took it; blocked or clean): spirit for both
 function bxSpiritGain(a, b, dmg, blocked) {
   if (!bxPowOn()) return;
@@ -120,7 +125,7 @@ function bxCanCast(f, which) {
   if (['down', 'stun', 'clinch', 'grab'].includes(f.a.k) || bxPunching(f)) return { ok: false, why: 'busy' };
   if (o.a.k === 'down') return { ok: false, why: 'they are down' };
   if (f.sta < BX_POW_STA[which]) return { ok: false, why: 'no breath' };
-  if (bxSpirit(f) < BX_SPIRIT[which]) return { ok: false, why: 'needs spirit' };
+  if (bxSpirit(f) < bxSpCost(f, which)) return { ok: false, why: 'needs spirit' };
   return { ok: true, why: '' };
 }
 // a power with wishes (a superstar's: the Djinn's Three Wishes) grants the first that suits the moment: { when: 'hurt'
@@ -134,7 +139,9 @@ function bxWish(f, o, P) {
 function bxCast(f, which) {
   if (!bxCanCast(f, which).ok) return false;
   const o = G.F[1 - f.side], P = bxWish(f, o, bxPowOf(f, which)), N = P.now || {};
-  f.sta -= BX_POW_STA[which]; f.spirit = bxSpirit(f) - BX_SPIRIT[which]; if (which === 'sp') f.spUsed = G.round; else f.ultUsed = true;
+  f.sta -= BX_POW_STA[which]; f.spirit = bxSpirit(f) - bxSpCost(f, which); if (which === 'sp') f.spUsed = G.round; else f.ultUsed = true;
+  // (a curse that makes the next one dearer is paid now, and gone: 15-more.js)
+  if (f.curse && f.curse.fx.spDear) { bxLog(`${f.n} pays the ${f.curse.n} off.`); delete f.curse; }
   f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
   const d = bxDist(f, o), ux = (o.x - f.x) / (d || 1), uy = (o.y - f.y) / (d || 1);
   if (N.dash) { const step = Math.max(0, Math.min(N.dash, d - BX_RING.body)); f.x += ux * step; f.y += uy * step; }
@@ -201,6 +208,6 @@ function bxCpuCast(f, o) {
 // what the page shows of a fighter's powers: { sp, ult } with name, description and whether it can go now
 function bxPowState(f) {
   const one = which => { const P = bxPowOf(f, which); if (!P) return null; const c = bxCanCast(f, which); return { id: P.id, n: P.n, desc: P.desc, ok: c.ok, why: c.why, used: which === 'sp' ? f.spUsed === G.round : !!f.ultUsed }; };
-  return { sp: one('sp'), ult: one('ult'), pick: f.spPick || 'sp', spirit: Math.round(bxSpirit(f)), need: Object.assign({}, { sp: BX_SPIRIT.sp, ult: BX_SPIRIT.ult }), max: BX_SPIRIT.max,
-    fx: (f.fx || []).map(s => ({ id: s.id, n: s.n, t: Math.round(s.t * 10) / 10 })) };
+  return { sp: one('sp'), ult: one('ult'), pick: f.spPick || 'sp', spirit: Math.round(bxSpirit(f)), need: Object.assign({}, { sp: bxSpCost(f, 'sp'), ult: bxSpCost(f, 'ult') }), max: BX_SPIRIT.max,
+    fx: (f.fx || []).map(s => ({ id: s.id, n: s.n, t: Math.round(s.t * 10) / 10 })).concat(f.curse ? [{ id: f.curse.id, n: '☾ ' + f.curse.n, t: null, curse: true }] : []) };
 }

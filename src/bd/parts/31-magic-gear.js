@@ -100,14 +100,14 @@ function gearMoment(forBall) {
 }
 function gearCpuStance() {
   const P = G.P, i = P.stances.findIndex(s => s.k === 'gear'); if (i < 0) return;
-  const s = P.stances[i], w = gearMoment(false) * (GEAR[s.gear].recharge ? 1.6 : .5);
+  const s = P.stances[i], w = gearMoment(false) * (GEAR[s.gear].recharge || s.kit ? 1.6 : .5);
   if (P.stances[P.si].k === 'ult') return;
   if (R() < w) { P.si = i; P.autoPick = true; }
 }
 function gearCpuPitch() {
   const P = G.P, i = P.pitches.findIndex(p => p.gear); if (i < 0) return;
   if (P.pitches[P.pi].ult) return;
-  const w = gearMoment(true) * (GEAR[P.pitches[i].gear].recharge ? 1.6 : .5);
+  const w = gearMoment(true) * (GEAR[P.pitches[i].gear].recharge || P.pitches[i].kit ? 1.6 : .5);
   if (R() < w) { P.pi = i; P.autoPick = true; }
 }
 

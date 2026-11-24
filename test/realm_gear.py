@@ -111,7 +111,7 @@ async def main():
         await pg.evaluate("WCAMP.close && WCAMP.close()")
 
         h = await pg.evaluate("(() => { renderHelp(); const e = document.getElementById('wHelpGear'); return e ? e.textContent : ''; })()")
-        check('one for boxing, one for football, one for basketball' in h and 'Bag' in h, 'How to play explains gear', h[:160])
+        check(all(x in h for x in ('boxing', 'football', 'basketball', 'baseball')) and 'one for each of' in h and 'Bag' in h, 'How to play explains gear', h[:160])
         check(not errs, 'no page errors', errs[:4])
         print('errors:', errs[:4])
         await br.close()

@@ -67,8 +67,11 @@ function effSpeed(r) {
   return r.spd * m * (1 - .25 * fk(r.p)) * (1 + .45 * (r.eff || 0)) * zoneMult('rSpd', q.x, q.y, 'runner') * hurtMul(r.p, .3) * (1 - .15 * weakK(r.p, 'spd'));
 }
 function fSpeed(f) { if (f.stun > 0) return 0; return f.spd * (f.flight > 0 ? 2 : 1) * (1 - .2 * fk(f.p)) * (1 + .35 * (f.eff || 0)) * (f.flight > 0 ? 1 : zoneMult('fSpd', f.x, f.y)) * hurtMul(f.p, .25) * (1 - .12 * weakK(f.p, 'spd')); }
+// a fielder still reading the ball off the bat, who stands where they are (the holder never does; the ground can hold them
+// longer, 53-ground.js). Only the movement step reads it: what the runners and the CPU reckon with is fSpeed, the real speed
+function fStill(f) { return PL.t < (f.p.pos === 'P' ? .7 : .5) && PL.ball.holder !== f; }
 function reachZ(f) { return (f.flight > 0 ? 25 : f.big ? 9.5 : 8) + (f.leapT > 0 ? 8 : 0); }
-function reachR(f) { return f.big ? 4.2 : 3.2; }
+function reachR(f) { return (f.big ? 4.2 : 3.2) + kitReach(f.p); }
 
 function trAt(t) { const P = PL.tr.pts, i = clamp(Math.floor(t / TDT), 0, P.length - 1); return P[i]; }
 
@@ -143,7 +146,7 @@ function playUpdate(dt) {
     else if (f === L.chaser && (b.st === 'batted' || b.st === 'loose') && L.chasePt) { tx = L.chasePt.x; ty = L.chasePt.y; sp = fSpeed(f); }
     else if (bi >= 0 && !L.homer) { tx = BASE[bi].x + (bi === 0 ? 0 : 0); ty = BASE[bi].y; sp = fSpeed(f); }
     else if (L.homer) { sp = fSpeed(f) * .3; }
-    if (L.t < (f.p.pos === 'P' ? .7 : .5) && b.holder !== f) sp = 0;
+    if (fStill(f)) sp = 0;
     const dx = tx - f.x, dy = ty - f.y, d = hyp(dx, dy);
     if (d > .3) { const m = Math.min(d, sp * dt); f.x += dx / d * m; f.y += dy / d * m; }
   }
@@ -185,7 +188,7 @@ function takeBall(f) { const b = PL.ball; b.st = 'held'; b.holder = f; b.thr = n
 function fieldBall(f) {
   const L = PL, b = L.ball;
   const air = b.st === 'batted' && !trAt(b.bt).b && b.z > .4;
-  const bob = (10 - f.p.fld) * (air ? .011 : .006) * zoneMult('bobble', f.x, f.y) * (1 + hurtF(f.p)) * (1 + 2 * weakK(f.p, 'fld'));
+  const bob = (10 - f.p.fld) * (air ? .011 : .006) * zoneMult('bobble', f.x, f.y) * (1 + hurtF(f.p)) * (1 + 2 * weakK(f.p, 'fld')) * kitBob(f.p);
   if (R() < bob) {
     b.st = 'loose'; b.z = 0; f.stun = .6; L.bobbled = true; pst(f.p).e++;
     addFx('callout', { text: `${shortName(f.p)} bobbles it`, col: '#ffd27a', small: true });

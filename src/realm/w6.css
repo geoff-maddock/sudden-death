@@ -351,6 +351,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wsvr .wpa{flex-wrap:wrap;gap:6px}
 .wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
 .wsvl select{font:inherit;font-family:var(--hud);font-size:15px;padding:3px 4px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
+.wbdpick{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:2px}
+.wbdpick .wsvl select{max-width:100%}
 .wseven .wno{font-size:18px}
 /* w42: a call button's freshness (the playbook) */
 #wGridCalls [data-gcall],#wGridDefs [data-gdef]{background-image:linear-gradient(var(--torch),var(--torch));background-repeat:no-repeat;background-position:left bottom;background-size:var(--fresh,100%) 3px}

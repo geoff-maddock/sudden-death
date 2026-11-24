@@ -30,10 +30,26 @@ return {
   powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, Object.assign({ sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }, P.sp2 ? { sp2: { n: P.sp2.n, desc: P.sp2.desc } } : {})])),
   // spirit (issue #61, phase 4): the meter's rules
   spirit: Object.assign({}, BX_SPIRIT),
+  // situation powers and curses (issue #115, phase 3: 15-more.js): the tables ({ k: { n, desc, cost } }, { kind: { id, n,
+  // k, desc } } with the superstars'), what each kind of curse does, the bout's state (G.bxp, null without), a side's
+  // curse and situation powers now ({ cu, on, sit }), your situation power and curse (in You box; '' or why not), the
+  // cut-man's wash (your corner, between rounds), and the tests' handles: a side's curse or situation power cast now
+  sits: JSON.parse(JSON.stringify(BX_SIT)), curses: JSON.parse(JSON.stringify(BX_CURSE)), curseKinds: Object.assign({}, BX_CURSE_K), sitWin: Object.assign({}, BX_SIT_WIN),
+  get bxp() { return G && G.bxp ? JSON.parse(JSON.stringify(G.bxp)) : null; }, more: side => G && G.F && BD ? bxMoreState(G.F[side == null ? BD.you : side]) : null,
+  castSit: k => bxSitYou(k), castCurse: () => G && G.F && BD ? (bxCurse(G.F[BD.you], '') ? '' : bxCanCurse(G.F[BD.you]).why) : 'no bout on', wash: () => bxWash(),
+  sitAt: (side, k) => { const f = G.F[side], why = bxSitWhy(f, k); return why || (bxSitCast(f, k, 'the test'), ''); }, curseAt: side => bxCurse(G.F[side], 'the test'),
+  fxNow: side => G && G.F ? Object.assign({}, bxFx(G.F[side])) : null, tempo: side => bxTempo(G.F[side]),
   // hexes (issue #99, phase 4c: 14-hexes.js): the table ({ id: { n, short, desc } }), the bout's ({ ids, on } or null), what the
   // scoreboard says of them (bxHexWords), and where the ropes are now; the Lich's numbers (06-cpu.js)
   hexes: Object.fromEntries(Object.entries(BX_HEXES).map(([k, H]) => [k, { n: H.n, short: H.short, desc: H.desc }])), get hex() { return G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null; },
   rope: () => bxRope(), hexWords: () => bxHexWords(), lich: Object.assign({}, BX_LICH),
+  // the Anvil Ring's own ways (issue #115, phase 4: 16-anvil.js): the numbers, the corners' and the ropes' names, the bout's
+  // ({ forge, slack, heat, rope, said } or null), where the forge corner is, how slack the loose side is now (0 to 1), and
+  // where a side's fighter stands ({ forge, heat, slack, pin }: in the forge corner's heat and how hot, on the slack ropes and
+  // how much more often punches find them there); feet(side) is the tests' handle on the footwork (f.mv after it)
+  anvilRules: JSON.parse(JSON.stringify(BX_ANVIL)), forgeNames: Object.assign({}, BX_FORGE_N), slackNames: BX_SLACK.map(S => S.n), get anvil() { return G && G.anvil ? JSON.parse(JSON.stringify(G.anvil)) : null; },
+  anvilSet: o => { for (const k in o) Object.assign(BX_ANVIL[k], o[k]); return JSON.parse(JSON.stringify(BX_ANVIL)); } /* the lab's tuning handle */,
+  forgeXY: () => G && G.anvil ? bxForgeXY() : null, slackNow: () => bxSlackNow(), anvilAt: side => G && G.F && G.anvil ? { forge: bxInForge(G.F[side]), heat: bxForgeHeat(G.F[side]), slack: bxOnSlack(G.F[side]), pin: bxAnvilPin(G.F[side]) } : null, feet: side => { const f = G.F[side]; bxFeet(f, G.F[1 - side]); return f.mv.slice(); },
   // each kind's nature in the ring (a trait for some, none for the rest): { kind: { n, desc } }
   traits: Object.fromEntries(Object.entries(BX_TRAIT).map(([k, t]) => [k, { n: t.n, desc: t.desc }])),
   powerData: JSON.parse(JSON.stringify(BX_POW)), powerCost: Object.assign({}, BX_POW_STA), fx: side => G && G.F ? JSON.parse(JSON.stringify(G.F[side].fx || [])) : [],

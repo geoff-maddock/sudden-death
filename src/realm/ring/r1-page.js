@@ -30,7 +30,8 @@ function bxFrame(now) {
   BXP.raf = requestAnimationFrame(bxFrame);
 }
 const BX_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
-const BX_KEY_ACT = { j: 'jab', k: 'hook', l: 'body', shift: 'slip', e: 'clinch', q: 'sp', r: 'ult' };
+// (c: the curse, issue #115)
+const BX_KEY_ACT = { j: 'jab', k: 'hook', l: 'body', shift: 'slip', e: 'clinch', q: 'sp', r: 'ult', c: 'cu' };
 const BXK = new Set(), BXHELD = new Set();
 function bxKeySteer() { let x = 0, y = 0; for (const k of BXK) if (BX_KEYS[k]) { x += BX_KEYS[k][0]; y += BX_KEYS[k][1]; } return [x, y]; }
 function bxKey(e, down) {

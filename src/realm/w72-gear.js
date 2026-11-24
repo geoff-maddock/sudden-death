@@ -150,5 +150,5 @@ const wW72RenderHelp = renderHelp;
 renderHelp = function () {
   wW72RenderHelp();
   const h = $('wHelp'); if (!h || $('wHelpGear')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Players can wear one piece of gear in each sport that has its own game: one for boxing, one for football, one for basketball. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpGear"><b>Gear.</b> Players can wear one piece of gear in each sport that has its own game: one for each of ${Object.values(W_GEAR_CFG.sports).join(', ').replace(/, ([^,]*)$/, ' and $1')}. Gear is found in chests and dungeons, bought in towns and won in cups. Put it on from the Bag on the Team screen; it shows on the player's stats, with Take off. A piece changes how they play while they wear it (its card says how), and goes back in the bag when it comes off or the player leaves. You can't change gear in the middle of a match.</p>`);
 };

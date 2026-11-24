@@ -62,6 +62,17 @@ return {
   pickPower: key => gfPickPower(key), cyclePower: () => gfCyclePower(), setAuto: on => { if (GD) { GD.auto = !!on; GD.pow = on ? null : GD.pow; } return GD ? GD.auto : false; },
   tip: key => G && GD ? gfPowerTip(key) : null, zones: () => (G && G.zones || []).map(z => ({ id: z.id, n: z.n, left: z.left, side: z.side, team: G.teams[z.side].name, desc: GF_ULT_BY[z.id].desc })),
   powerBook: gfPowerBook(), ultPlays: GF_ULT_PLAYS, ultCost: GF_ULT_COST, mana: Object.assign({}, GF_MANA),
+  // the roar (issue #115, phase 3: 19-roar.js): the game's (null without: { on, v, arm, casts, tally }), your call for it
+  // on your next cast ('' or why not), its rules, and whether a cast could be lifted (for the page's tips)
+  roar: () => G && G.roar ? Object.assign(JSON.parse(JSON.stringify(G.roar)), { you: GD ? GD.you : 0 }) : null, armRoar: on => gfRoarArm(on), roarRules: Object.assign({}, GF_ROAR),
+  roarLifts: key => { const o = G && GD ? gfPowerOptions(GD.you).find(x => x.key === key) : null; return !!o && gfRoarLifts(o); }, roarAmp: fx => gfRoarAmp(fx), fxOf: pw => gfFx(pw),
+  castAt: (side, key) => { const o = G && G.mana ? gfPowerOptions(side).find(x => x.key === key && x.ok) : null; return o ? gfCast(side, o) : null; } /* the tests' handle */, options: side => G && G.mana ? gfPowerOptions(side) : [],
+  // the Ash Bowl's ways (issue #115, phase 4: 20-ash.js): the game's ash and heat (null without: { t, patches (each with
+  // r, its size now), hot, to, sweeps, tally, said, facing: [side 0 faces the heat, side 1] }), your timeout ('' or why
+  // not), the rules themselves (not a copy: the tests and the lab tune them), and the tests' handles: the patch at a field
+  // point, and a punt of y yards through the ash and the heat
+  ash: () => G && G.ash ? Object.assign(JSON.parse(JSON.stringify(G.ash)), { patches: G.ash.patches.map(P => Object.assign({}, P, { r: gfAshRad(P) })), facing: [gfAshFacing(0), gfAshFacing(1)], you: GD ? GD.you : 0 }) : null,
+  ashTimeout: () => G && GD ? gfAshTimeout(GD.you) : 'No game on.', ashRules: GF_ASHB, ashAt: (x, y) => G && G.ash ? !!gfAshAt(x, y) : false, ashPunt: y => G && G.ash ? gfAshPunt(y) : y,
   // the situation powers (issue #61, phase 5): { id: { n, role, cost, desc, when } }, and which a side has used
   situations: Object.fromEntries(Object.entries(GF_SIT).map(([k, P]) => [k, { n: P.n, role: P.role, cost: P.cost, desc: P.desc, when: P.when, zone: !!P.zone }])), sitUsed: side => G && G.sitUsed ? Object.assign({}, G.sitUsed[side]) : {},
   rate: kind => gfRate(kind), kinds: Object.keys(GF_KIND), offPos: GF_OFF_POS.slice(), defPos: GF_DEF_POS.slice(),

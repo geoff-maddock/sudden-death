@@ -99,9 +99,10 @@ async def main():
         await pg.click('[data-ugf="manage"]')
         await pg.wait_for_function("UI.view === 'gridiron' && wGridLive() && !!WG.gfg.live.snap")
         gm = await pg.evaluate("""(() => { const G = wGF.G, W = WG.gfg.live.world;
-          return { tier: W.tier, kind: W.kind, club: W.club, skill: G.skill, hex: wGF.hex(), opp: G.teams[1].name, bag: G.bags[1], log: WLOG.slice(-6).map(l => l[0]).join(' | ') }; })()""")
+          return { tier: W.tier, kind: W.kind, club: W.club, skill: G.skill, hex: wGF.hex(), ash: wGF.ash(), opp: G.teams[1].name, bag: G.bags[1], log: WLOG.slice(-6).map(l => l[0]).join(' | ') }; })()""")
         check(gm['tier'] == 4 and gm['kind'] == 'unadirgf' and gm['skill'] == [1, 3] and gm['opp'] == 'Cinder Pit Nadir' and sorted(gm['bag'].keys()) == sorted(tb['pots']),
               'kickoff starts the Realm\'s football game at tier U against the Nadir: the Lich coaching, a full bag', gm)
+        check(gm['ash'] is None, 'the Cinder Pit isn\'t the Ash Bowl: no ash and no heat shimmer in the Umbral', gm['ash'])
         check(gm['hex'] and gm['hex']['ids'] == cd['hx'] and 'draws the hexes' in gm['log'], 'the drawn hexes are on the game, and named in the log at kickoff', gm)
         await pg.wait_for_function("window.__ft.some(t => t.includes('Hexes:'))")
         ft = await pg.evaluate("window.__ft.filter(t => t.includes('Hexes:')).slice(-1)[0]")

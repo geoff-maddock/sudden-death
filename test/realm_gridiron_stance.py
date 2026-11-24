@@ -95,12 +95,12 @@ async def main():
         sm = await pg.evaluate("wGF.simGame({ teams: wGridTeams(), skill: [1, 1], seed: 5, stance: ['risky', null] }).stance")
         check(sm[0] == 'risky', "a game's summary has the stance each side used most", sm)
 
-        # ---------- fumbles in a game: lost, kept, run back ----------
+        # ---------- fumbles in a game: lost, kept, run back (off the Ash Bowl's ash, where a fumble can't be run back) ----------
         fm = await pg.evaluate("""(() => { const R = wGF.fumRules, was = Object.assign({}, R); R.base = 1;
           let out = null;
           try {
             for (let i = 0; i < 12 && !out; i++) {
-              wGF.simGame({ teams: wGridTeams(), skill: [1, 1], seed: 700 + i });
+              wGF.simGame({ teams: wGridTeams(), skill: [1, 1], seed: 700 + i, ash: false });
               const G = wGF.G, box = wGF.box(), plays = G.drives.flatMap(d => d.plays.map(e => Object.assign({ side: d.side, end: d.end }, e)));
               const td = G.drives.findIndex(d => d.end === 'fumtd');
               if (td < 0 || td + 1 >= G.drives.length) continue;

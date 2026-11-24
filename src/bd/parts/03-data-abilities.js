@@ -59,7 +59,8 @@ function abCost(p, id) {
   if (p && p.discount) c = Math.max(1, c - p.discount);
   return c;
 }
-const abPow = (p, id) => (1 + .3 * (tierOf(p, AB[id].type) - 1)) * (typeof moonSpell === 'function' && MOON ? moonSpell(id) : 1);
+// (the crowd can lift one cast half again: G.bdp, the Realm's powers, 52-powers.js; off, it is never read)
+const abPow = (p, id) => (1 + .3 * (tierOf(p, AB[id].type) - 1)) * (typeof moonSpell === 'function' && MOON ? moonSpell(id) : 1) * (G.bdp && G.bdp.amp ? bdpAmpK(p, id) : 1);
 function pitchCost(p, pd) { if (!pd.cost) return 0; let c = Math.max(1, pd.cost - (tierOf(p, 'pitch') - 1)); if (p && p.discount) c = Math.max(1, c - p.discount); return c; }
 const luck = p => (p && p.luck) || 0;
 // which physical skill a player falls back on, by category, decided by their current stats
