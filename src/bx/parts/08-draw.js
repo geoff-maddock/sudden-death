@@ -156,7 +156,7 @@ function bxDrawBody(c, f, p, flip, team, hpx, opt) {
 // while the bout waits for your corner: what they'd do, and why
 function bxDrawAsk(c, y) {
   if (!G.wait) return;
-  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}${G.wait.pot && BX_POTIONS[G.wait.pot.id] ? `, and the ${BX_POTIONS[G.wait.pot.id].n}` : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
+  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}${G.wait.wash ? ', and wash off the curse' : ''}${G.wait.pot && BX_POTIONS[G.wait.pot.id] ? `, and the ${BX_POTIONS[G.wait.pot.id].n}` : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 // words for what lands: drained from BXE
 // (the words come from Math.random, never the engine's seeded R: drawing must not change how a seeded bout goes)

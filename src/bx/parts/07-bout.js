@@ -138,12 +138,16 @@ function bxRoundEnd() {
   if (r === 'over') { bxLog(bxVerdict(), true); bxOver(); } else { for (const s of bxFansLate()) bxLog(`${G.corners[s].name}'s fans are still singing.`); bxCorner(); }
 }
 function bxCorner() {
+  // (situation powers and curses, 15-more.js: a curse whose time is up goes at the bell)
+  if (G.bxp) bxCurseBell();
   for (const f of G.F) {
     // (tainted water, 14-hexes.js: the hexed side gets back only a share of what the break would give)
     const wat = bxHex(f, 'water') ? BX_HEXES.water.corner : 1;
     f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35) * wat); f.sta = (bxTrait(f) || {}).corner ? (wat < 1 ? f.sta + (f.staMax - f.sta) * wat : f.staMax) : f.sta + (f.staMax - f.sta) * .75 * wat; f.ctr = 0; f.halt = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
+    // (the cut-man may wash a curse off instead of a patch: 15-more.js)
+    if (G.bxp && bxWashCpu(f, c)) c.patch = false;
     if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
     f.hp = Math.round(f.hp); f.sta = Math.round(f.sta);
   }

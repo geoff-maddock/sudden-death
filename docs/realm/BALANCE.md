@@ -292,6 +292,33 @@ starts on its magic (the default pick is what every kind had), so the Nine tab i
 rather save the mana can bring the skill. A careful human reads the moments far better than the CPU's dice. The numbers
 are as first set: no retune.
 
+### Situation powers and curses in the ring (issue #115, phase 3)
+
+`python3 test/realm_ring_lab.py 400 --more` (part 8; under 2 minutes). Your three at level 3 against a rival's at the
+tier's level (their bonus and CPU skill by tier), Simulate. **Off** is how every other part boxes (LAB mode leaves them
+out); the others pass `bxpow`. Every row boxes the same 400 seeded cards (the journey, their side and the bouts from
+the card's number), so the rows differ only in what they change; a row of 400 is good to about ±5 points, a little
+better between rows.
+
+| tier | off | both sides (the Realm's card) | yours only | theirs only |
+|---|---|---|---|---|
+| 1 (Squire) | 49.0% | 47.2% (−1.8) | 48.2% (−0.8) | 47.2% (−1.8) |
+| 2 (Knight) | 39.0% | 41.5% (+2.5) | 42.2% (+3.2) | 33.8% (−5.2) |
+| 3 (Archmage) | 22.8% | 24.5% (+1.7) | 27.5% (+4.8) | 20.0% (−2.7) |
+
+At tier 2, both sides: the curses alone 37.8% (−1.3), the situation powers alone 37.8% (−1.3).
+
+In the Realm's card, a card (three bouts, both sides): Off the Canvas 1.00, the Last Round 2.77, Saved by the Bell
+2.81, curses 1.01, washes 0.73. Your side (a Knight) casts about 3.7 situation powers a card; a Squire about 1.8, a
+Knight 3.0, an Archmage 3.5 (the short windows, Off the Canvas and Saved by the Bell, are where skill shows). About
+seven curses in ten are washed off at the next break.
+
+**What it comes to.** A small edge for whoever has them and never a card on its own: one side's alone moves a card by
+3 to 5 points at tiers 2 and 3, both sides together by under 3. The Last Round and Saved by the Bell are cast most
+because their moments come most (a close last round; a hurt fighter late in a round), and each is worth a few seconds.
+A curse is 30 spirit (more than a special), so it competes with the special and the ultimate; washing it costs a
+patch's worth of the cut-man, which keeps it honest. The numbers are as first set: no retune.
+
 ## Training spots (issue #6, phase 4)
 
 The bot drills a card and answers the challenge at each spot in every town it stops in, once a week (`opts.spots`). 140 journeys each, skilled bot, meals on:

@@ -27397,8 +27397,9 @@ function bxAdvance(f, o, dt) {
   const P = BX_PUNCH[f.a.k];
   if (P && !f.a.done && f.a.t >= f.a.hitAt) { f.a.done = true; bxLand(f, o, f.a.k); }
   if (f.a.k !== 'clinch' && f.a.k !== 'down' && f.a.t >= f.a.dur) f.a = { k: 'idle', t: 0, dur: 0, id: f.a.id };
-  const regen = (3.8 + f.r.sta * .3) * ((bxTrait(f) || {}).regen || 1) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
-  if (!bxFx(f).noReg) f.sta = clamp(f.sta + regen * dt, 0, f.staMax);
+  const regen = (3.8 + f.r.sta * .3) * ((bxTrait(f) || {}).regen || 1) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1), Fx = bxFx(f);
+  // (a curse may slow it: regK, 15-more.js; 1 otherwise)
+  if (!Fx.noReg) f.sta = clamp(f.sta + regen * Fx.regK * dt, 0, f.staMax);
   if (G.down == null) bxFxTick(f, dt);
   if (f.ctr > 0) f.ctr = Math.max(0, f.ctr - dt);
   if (f.halt > 0) f.halt = Math.max(0, f.halt - dt);
@@ -27689,12 +27690,16 @@ function bxRoundEnd() {
   if (r === 'over') { bxLog(bxVerdict(), true); bxOver(); } else { for (const s of bxFansLate()) bxLog(`${G.corners[s].name}'s fans are still singing.`); bxCorner(); }
 }
 function bxCorner() {
+  // (situation powers and curses, 15-more.js: a curse whose time is up goes at the bell)
+  if (G.bxp) bxCurseBell();
   for (const f of G.F) {
     // (tainted water, 14-hexes.js: the hexed side gets back only a share of what the break would give)
     const wat = bxHex(f, 'water') ? BX_HEXES.water.corner : 1;
     f.hp = Math.min(f.hpMax, f.hp + (f.hpMax - f.hp) * ((bxTrait(f) || {}).mend || .35) * wat); f.sta = (bxTrait(f) || {}).corner ? (wat < 1 ? f.sta + (f.staMax - f.sta) * wat : f.staMax) : f.sta + (f.staMax - f.sta) * .75 * wat; f.ctr = 0; f.halt = 0;
     if (bxYourCorner() && f.side === BD.you) { f.hp = Math.round(f.hp); f.sta = Math.round(f.sta); continue; }
     const c = bxCornerCpu(f); f.plan = c.plan;
+    // (the cut-man may wash a curse off instead of a patch: 15-more.js)
+    if (G.bxp && bxWashCpu(f, c)) c.patch = false;
     if (c.patch && f.patches > 0) { f.patches--; f.patched = G.round; f.hpMax = Math.min(BX_HP, f.hpMax + 5); f.hp = Math.min(f.hpMax, f.hp + 18); bxLog(`The cut-man works on ${f.n}.`); }
     f.hp = Math.round(f.hp); f.sta = Math.round(f.sta);
   }
@@ -27922,7 +27927,7 @@ function bxDrawBody(c, f, p, flip, team, hpx, opt) {
 // while the bout waits for your corner: what they'd do, and why
 function bxDrawAsk(c, y) {
   if (!G.wait) return;
-  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}${G.wait.pot && BX_POTIONS[G.wait.pot.id] ? `, and the ${BX_POTIONS[G.wait.pot.id].n}` : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
+  txt(c, `Your corner says: ${BX_PLAN[G.wait.plan].n} (${G.wait.why})${G.wait.patch ? ', and a patch' : ''}${G.wait.wash ? ', and wash off the curse' : ''}${G.wait.pot && BX_POTIONS[G.wait.pot.id] ? `, and the ${BX_POTIONS[G.wait.pot.id].n}` : ''}.`, 480, y, '700 13px "Alegreya Sans", sans-serif', '#ffd24a', 'center');
 }
 // words for what lands: drained from BXE
 // (the words come from Math.random, never the engine's seeded R: drawing must not change how a seeded bout goes)
@@ -28117,8 +28122,8 @@ function bxDrawOver(c) {
 const BX_BUFFER = .5, BX_INSTINCT = .6;
 const BXI = { steer: [0, 0], guard: false, q: null, qt: 0 };
 const bxHand = f => !!BD && BD.mode === 'play' && !BD.headless && f.side === BD.you;
-// (and the powers: 'sp' the special, 'ult' the ultimate; 11-powers.js)
-const BX_ACTS = ['jab', 'hook', 'body', 'slip', 'clinch', 'sp', 'ult'];
+// (and the powers: 'sp' the special, 'ult' the ultimate; 11-powers.js; 'cu' the curse, 15-more.js)
+const BX_ACTS = ['jab', 'hook', 'body', 'slip', 'clinch', 'sp', 'ult', 'cu'];
 // the page's keys and buttons: { steer: [x, y], guard: true | false, act: 'jab' | 'hook' | 'body' | 'slip' | 'clinch' }
 function bxInput(o) {
   if (o.steer) BXI.steer = [clamp(+o.steer[0] || 0, -1, 1), clamp(+o.steer[1] || 0, -1, 1)];
@@ -28129,7 +28134,7 @@ function bxInputClear() { BXI.steer = [0, 0]; BXI.guard = false; BXI.q = null; B
 function bxHandThink(f, o, dt) {
   if (BXI.steer[0] || BXI.steer[1]) f.mv = BXI.steer.slice(); else bxFeet(f, o);
   if (bxBusy(f)) return;
-  if (BXI.q) { const k = BXI.q; BXI.q = null; if (k === 'clinch') bxClinch(f, o); else if (k === 'sp' || k === 'ult') bxCast(f, k); else bxAct(f, k); return; }
+  if (BXI.q) { const k = BXI.q; BXI.q = null; if (k === 'clinch') bxClinch(f, o); else if (k === 'sp' || k === 'ult') bxCast(f, k); else if (k === 'cu') bxCurse(f, ''); else bxAct(f, k); return; }
   if (BXI.guard) { bxAct(f, 'guard'); return; }
   if (bxPunching(o) && !o.a.done && o.a.id !== f.seen) {
     f.seen = o.a.id;
@@ -28178,6 +28183,8 @@ function bxCardStart(opts) {
     bags: JSON.parse(JSON.stringify(o.bags || [{}, {}])), pots: [], fans: (o.fans || [0, 0]).slice(), crowd: o.crowd == null ? null : o.crowd };
   // (the hexes, for every bout on the card: 14-hexes.js)
   if (o.hexes && o.hexes.length) { CD.hexes = o.hexes.slice(); CD.hexOn = o.hexOn === 1 ? 1 : 0; }
+  // (situation powers and curses, for every bout on the card: 15-more.js)
+  if (o.bxpow) CD.bxpow = JSON.parse(JSON.stringify(o.bxpow));
   bxCardBout();
   return CD;
 }
@@ -28185,7 +28192,7 @@ function bxCardStart(opts) {
 function bxCardBout() {
   const p = CD.pairs[CD.i], S = CD.sides;
   bxStart({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], corners: S.map(s => ({ name: s.name, short: s.short, color: s.color, light: s.light })),
-    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn });
+    mode: CD.mode, you: CD.you, seed: CD.seed == null ? null : CD.seed + CD.i * 101, powers: CD.powers, skill: CD.skill, bags: CD.bags || [{}, {}], fans: CD.fans, crowd: CD.crowd, hexes: CD.hexes, hexOn: CD.hexOn, bxpow: CD.bxpow });
   G.card = { i: CD.i, n: CD.pairs.length };
   bxSnapNow();
 }
@@ -28217,7 +28224,7 @@ function bxSimCard(opts) {
     const picks = fine(o.picks, S[you].fighters.length) ? o.picks.slice() : bxCardAuto(S[you].fighters.map(rate), order.map(i => rate(S[1 - you].fighters[i])));
     const pairs = order.map((t, i) => you ? [t, picks[i]] : [picks[i], t]);
     let bags = JSON.parse(JSON.stringify(o.bags || [{}, {}]));
-    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn }); bags = b.bags; return b; });
+    const bouts = pairs.map((p, i) => { const b = bxSimBout({ fighters: [S[0].fighters[p[0]], S[1].fighters[p[1]]], seed: o.seed == null ? null : o.seed + i * 101, skill: o.skill, powers: o.powers, bags, hexes: o.hexes, hexOn: o.hexOn, bxpow: o.bxpow }); bags = b.bags; return b; });
     return { bouts, pairs, result: bxCardResult(bouts.map(b => b.over)), bags };
   } finally { CD = keep; }
 }
@@ -28254,7 +28261,8 @@ function bxCardVerdict() {
 const BX_POW_STA = { sp: 8, ult: 15 };
 // (a fighter deals and takes about 50 damage a round, so a round of work fills about 35: a special most rounds, or an
 // ultimate saved for)
-const BX_SPIRIT = { max: 100, start: 10, sp: 25, ult: 60, land: .3, take: .4, block: .12 };
+// (cu: a curse, issue #115, 15-more.js)
+const BX_SPIRIT = { max: 100, start: 10, sp: 25, ult: 60, cu: 30, land: .3, take: .4, block: .12 };
 const BX_POW = {
   goblin:   { sp: { id: 'shadowstep', n: 'Shadowstep', when: 'close', desc: 'Blinks to their open side: the next punch is a counter, and for 2 seconds punches find them more often.', now: { ctr: 1.2 }, fx: { who: 'self', t: 2, acc: .2 } },
               ult: { id: 'flurry', n: 'Flurry', when: 'close', desc: 'Four quick jabs that all land, and a counter after.', now: { hits: 4, ctr: .8 } },
@@ -28311,13 +28319,15 @@ const BX_POW = {
               ult: { id: 'blizzard', n: 'Blizzard', when: 'any', desc: 'Snow on them: 20% slower at everything for 3 seconds.', fx: { who: 'them', t: 3, spd: .8, move: .8 } },
               sp2: { id: 'brew', n: 'Witch\'s Brew', when: 'tired', desc: 'A swig from the cauldron: 12 stamina back, and 2 more a second for 4 seconds.', now: { mySta: 12 }, fx: { who: 'self', t: 4, regSta: 2 } } },
 };
-const BX_FX_MUL = ['spd', 'move', 'dmgIn', 'dmgOut', 'nextMul'], BX_FX_ADD = ['acc', 'regSta', 'regHp', 'heal'], BX_FX_FLAG = ['root', 'noBack', 'miss', 'rampart', 'leaky', 'noReg', 'sight', 'undying', 'air'];
+// (regK and spDear are a curse's, 15-more.js: their breath back ×, and spirit more on their next special or ultimate)
+const BX_FX_MUL = ['spd', 'move', 'dmgIn', 'dmgOut', 'nextMul', 'regK'], BX_FX_ADD = ['acc', 'regSta', 'regHp', 'heal', 'spDear'], BX_FX_FLAG = ['root', 'noBack', 'miss', 'rampart', 'leaky', 'noReg', 'sight', 'undying', 'air'];
 // a fighter's statuses, combined (most of the time there are none: the same no-effect answer, built once)
 const BX_FX_NONE = (() => { const o = {}; for (const k of BX_FX_MUL) o[k] = 1; for (const k of BX_FX_ADD) o[k] = 0; for (const k of BX_FX_FLAG) o[k] = 0; return Object.freeze(o); })();
+// (a curse on the fighter, f.curse, counts with them: 15-more.js)
 function bxFx(f) {
-  if (!f.fx || !f.fx.length) return BX_FX_NONE;
+  if ((!f.fx || !f.fx.length) && !f.curse) return BX_FX_NONE;
   const o = {}; for (const k of BX_FX_MUL) o[k] = 1; for (const k of BX_FX_ADD) o[k] = 0; for (const k of BX_FX_FLAG) o[k] = 0;
-  for (const s of f.fx || []) { for (const k of BX_FX_MUL) if (s[k] != null) o[k] *= s[k]; for (const k of BX_FX_ADD) if (s[k] != null) o[k] += s[k]; for (const k of BX_FX_FLAG) if (s[k]) o[k] = 1; }
+  for (const s of f.curse ? (f.fx || []).concat([f.curse.fx]) : f.fx || []) { for (const k of BX_FX_MUL) if (s[k] != null) o[k] *= s[k]; for (const k of BX_FX_ADD) if (s[k] != null) o[k] += s[k]; for (const k of BX_FX_FLAG) if (s[k]) o[k] = 1; }
   return o;
 }
 const bxPowOn = () => !G || G.powers !== false;
@@ -28335,6 +28345,8 @@ function bxFansLate() {
   return out;
 }
 const bxSpirit = f => f.spirit == null ? BX_SPIRIT.max : f.spirit;
+// the spirit a special or ultimate costs f now: more under a curse that makes it dearer (15-more.js)
+const bxSpCost = (f, which) => f.curse ? BX_SPIRIT[which] + bxFx(f).spDear : BX_SPIRIT[which];
 // a punch landed (a: who threw it, b: who took it; blocked or clean): spirit for both
 function bxSpiritGain(a, b, dmg, blocked) {
   if (!bxPowOn()) return;
@@ -28350,7 +28362,7 @@ function bxCanCast(f, which) {
   if (['down', 'stun', 'clinch', 'grab'].includes(f.a.k) || bxPunching(f)) return { ok: false, why: 'busy' };
   if (o.a.k === 'down') return { ok: false, why: 'they are down' };
   if (f.sta < BX_POW_STA[which]) return { ok: false, why: 'no breath' };
-  if (bxSpirit(f) < BX_SPIRIT[which]) return { ok: false, why: 'needs spirit' };
+  if (bxSpirit(f) < bxSpCost(f, which)) return { ok: false, why: 'needs spirit' };
   return { ok: true, why: '' };
 }
 // a power with wishes (a superstar's: the Djinn's Three Wishes) grants the first that suits the moment: { when: 'hurt'
@@ -28364,7 +28376,9 @@ function bxWish(f, o, P) {
 function bxCast(f, which) {
   if (!bxCanCast(f, which).ok) return false;
   const o = G.F[1 - f.side], P = bxWish(f, o, bxPowOf(f, which)), N = P.now || {};
-  f.sta -= BX_POW_STA[which]; f.spirit = bxSpirit(f) - BX_SPIRIT[which]; if (which === 'sp') f.spUsed = G.round; else f.ultUsed = true;
+  f.sta -= BX_POW_STA[which]; f.spirit = bxSpirit(f) - bxSpCost(f, which); if (which === 'sp') f.spUsed = G.round; else f.ultUsed = true;
+  // (a curse that makes the next one dearer is paid now, and gone: 15-more.js)
+  if (f.curse && f.curse.fx.spDear) { bxLog(`${f.n} pays the ${f.curse.n} off.`); delete f.curse; }
   f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
   const d = bxDist(f, o), ux = (o.x - f.x) / (d || 1), uy = (o.y - f.y) / (d || 1);
   if (N.dash) { const step = Math.max(0, Math.min(N.dash, d - BX_RING.body)); f.x += ux * step; f.y += uy * step; }
@@ -28431,8 +28445,8 @@ function bxCpuCast(f, o) {
 // what the page shows of a fighter's powers: { sp, ult } with name, description and whether it can go now
 function bxPowState(f) {
   const one = which => { const P = bxPowOf(f, which); if (!P) return null; const c = bxCanCast(f, which); return { id: P.id, n: P.n, desc: P.desc, ok: c.ok, why: c.why, used: which === 'sp' ? f.spUsed === G.round : !!f.ultUsed }; };
-  return { sp: one('sp'), ult: one('ult'), pick: f.spPick || 'sp', spirit: Math.round(bxSpirit(f)), need: Object.assign({}, { sp: BX_SPIRIT.sp, ult: BX_SPIRIT.ult }), max: BX_SPIRIT.max,
-    fx: (f.fx || []).map(s => ({ id: s.id, n: s.n, t: Math.round(s.t * 10) / 10 })) };
+  return { sp: one('sp'), ult: one('ult'), pick: f.spPick || 'sp', spirit: Math.round(bxSpirit(f)), need: Object.assign({}, { sp: bxSpCost(f, 'sp'), ult: bxSpCost(f, 'ult') }), max: BX_SPIRIT.max,
+    fx: (f.fx || []).map(s => ({ id: s.id, n: s.n, t: Math.round(s.t * 10) / 10 })).concat(f.curse ? [{ id: f.curse.id, n: '☾ ' + f.curse.n, t: null, curse: true }] : []) };
 }
 /* The Anvil Ring: save points (issue #23, phase 5). A bout (and the card it is on) can be kept and put back at three
    moments: the start of a bout on a card, each corner between rounds, and the end of a bout on a card (between bouts).
@@ -28553,6 +28567,227 @@ const bxHex = (f, k) => !!(G && G.hex && G.hex.ids.includes(k) && (f == null || 
 function bxRope() { return G && G.hex && G.hex.ids.includes('shrink') ? Math.max(BX_HEX_ROPE, BX_RING.rope - BX_HEXES.shrink.rope * (G.round - 1)) : BX_RING.rope; }
 // the hexes on now, short, for the scoreboard
 const bxHexWords = (long) => G && G.hex ? G.hex.ids.map(k => long ? BX_HEXES[k].n : BX_HEXES[k].short).join(' · ') : '';
+/* The Anvil Ring: situation powers and curses (issue #115, phase 3). Nothing here acts unless a bout is started with
+   opts.bxpow ({ on: [bool, bool] (which sides have them; both when left out), sit, curse (each on unless false) }; the
+   Realm sends it, a card passes it to every bout): with G.bxp
+   unset every hook passes straight through and nothing draws from the seeded stream, so a bout plays exactly as before.
+   G.bxp = { on, sit, curse, used: [{ k: true }, …], casts: [{ side, k, id, round, t, why }], wash: [n, n] }, plain data.
+   - Situation powers (BX_SIT), the corner's, once a bout each, paid with spirit (and a little stamina, as boxing's powers
+     are), in a round when the moment fits (bxSitMoment): Off the Canvas (just up from a knockdown), the Last Round
+     (behind or level on the cards) and Saved by the Bell (hurt, with the bell close). Each leaves a status on the
+     fighter (f.fx, as a special does; the bell clears it). The CPU casts them by its skill (bxSitCpu, from bxCpuCast),
+     and so does your fighter in You corner (a Knight's); in You box you press them (bxSitYou). Every cast goes in the
+     log with its reason (✦).
+   - Curses (BX_CURSE by kind; a superstar's in ring/r0-stars.js; a fighter bringing its own powers, f.pw, curses with
+     f.pw.cu or not at all): a third power beside the special and the ultimate, once a bout, for BX_SPIRIT.cu spirit and
+     no stamina, cast on the other fighter (not one already cursed). It stays on them (f.curse, plain JSON, so it is
+     saved with the bout) for the rest of the round and all of the next, unless their cut-man washes it off at the break
+     in place of a patch (the cut-man's one job that break: bxWash, bxWashCpu). It ends at the bell of its last round
+     (bxCurseBell); one cast in the last round lasts the bout. Four kinds (k), by what they do (fx, read by bxFx with the
+     statuses): slow (their punches and slips slower: spd), leaky (their guard lets twice as much through: leaky), tired
+     (their breath comes back slower: regK, 05-ring.js) and dear (their next special or ultimate costs more spirit:
+     spDear, bxSpCost in 11-powers.js; paid off, it is gone). The CPU casts by its skill (bxCurseCpu: early in a round,
+     never on a fighter already cursed) and washes by it; your corner says when to wash (G.wait.wash).
+   A curse shows on the fighter (a violet ☾ and its name over them) and on the bar with their statuses. */
+const BX_SIT = {
+  canvas: { n: 'Off the Canvas', cost: { spirit: 10, sta: 0 }, desc: 'Just up from a knockdown, with the crowd behind them: 20 stamina back, and for 5 seconds their punches do 20% more.', mySta: 20, fx: { t: 5, dmgOut: 1.2 } },
+  last: { n: 'The Last Round', cost: { spirit: 20, sta: 6 }, desc: 'The last round, behind or level on the cards: everything left, 15% quicker to punch and 10% quicker on their feet for 8 seconds.', fx: { t: 8, spd: 1.15, move: 1.1 } },
+  bell: { n: 'Saved by the Bell', cost: { spirit: 10, sta: 0 }, desc: 'Hurt (under a third of their health) with under 10 seconds left in the round: hands high and hold on, punches do 35% less to them till the bell.', fx: { t: 0, dmgIn: .65 } },
+};
+const BX_SIT_WIN = { canvas: 6, bell: 10, hurt: .34 };
+// what each kind of curse does (a curse's own fx may say otherwise)
+const BX_CURSE_K = { slow: 'their punches slower', leaky: 'their guard leakier', tired: 'their breath slower to come back', dear: 'their next special or ultimate dearer' };
+const BX_CURSE = {
+  witch:   { id: 'evileye', n: 'Evil Eye', k: 'dear', desc: 'The evil eye: their next special or ultimate costs 15 more spirit.', fx: { spDear: 15 } },
+  lich:    { id: 'withering', n: 'Withering Curse', k: 'tired', desc: 'Their breath comes back 35% slower.', fx: { regK: .65 } },
+  wraith:  { id: 'gravecurse', n: 'Grave Curse', k: 'slow', desc: 'A chill in their arms: their punches and slips 12% slower.', fx: { spd: .88 } },
+  vampire: { id: 'thrallmark', n: 'Thrall\'s Mark', k: 'leaky', desc: 'Half in thrall: their guard lets twice as much through.', fx: { leaky: 1 } },
+  gorgon:  { id: 'stonecurse', n: 'Stone Curse', k: 'slow', desc: 'Their arms half to stone: their punches and slips 12% slower.', fx: { spd: .88 } },
+  zombie:  { id: 'rotcurse', n: 'Rot Curse', k: 'tired', desc: 'The rot gets in: their breath comes back 35% slower.', fx: { regK: .65 } },
+  goblin:  { id: 'jinx', n: 'Jinx', k: 'leaky', desc: 'A goblin jinx: their guard lets twice as much through.', fx: { leaky: 1 } },
+};
+// the chance, by CPU skill, each time a fighter thinks while a situation power fits (a short window wants it soon), and a curse's
+const BX_POWK = { sit: [.02, .05, .1, .15], curse: [.02, .04, .07, .1] };
+const bxSkill = f => G.skill ? G.skill[f.side] : 1;
+
+function bxpNew(P) {
+  if (!P) return null;
+  return { on: Array.isArray(P.on) ? [!!P.on[0], !!P.on[1]] : [true, true], sit: P.sit !== false, curse: P.curse !== false, used: [{}, {}], casts: [], wash: [0, 0] };
+}
+const bxMoreStart0 = bxStart;
+bxStart = function (opts) {
+  const g = bxMoreStart0.apply(this, arguments), P = bxpNew(opts && opts.bxpow);
+  if (P) G.bxp = P;
+  return g;
+};
+// (the lab and the Realm read what was cast from the summary)
+const bxMoreSummary0 = bxSummary;
+bxSummary = function () { const s = bxMoreSummary0.apply(this, arguments); if (G.bxp) s.bxp = JSON.parse(JSON.stringify(G.bxp)); return s; };
+function bxMoreLog(f, k, id, n, why) {
+  G.bxp.casts.push({ side: f.side, k, id, round: G.round, t: Math.round((BX_RULES.secs - G.clock) * 10) / 10, why: why || '' });
+  f.rs.pw++;
+  bxEv('cast', f.side, { id, n, ult: false, k });
+  bxLog(`✦ ${f.n}: ${n}${why ? ` (${why})` : ''}.`, true);
+  if (!BD.headless && BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
+}
+// side s's lead on the judges' cards: + ahead, − behind, 0 level (by judges)
+const bxLead = s => bxTotals().reduce((n, t) => n + Math.sign(s ? t[1] - t[0] : t[0] - t[1]), 0);
+
+/* ---------- situation powers ---------- */
+// '' when the moment fits fighter f for power k (spirit and once a bout aside), or why not
+function bxSitMoment(f, k) {
+  if (k === 'canvas') return f.rose != null && G.secs - f.rose <= BX_SIT_WIN.canvas ? '' : 'only just up from a knockdown';
+  if (k === 'last') return G.round === G.rounds && bxLead(f.side) <= 0 ? '' : 'only in the last round, behind or level on the cards';
+  if (k === 'bell') return G.clock <= BX_SIT_WIN.bell && f.hp < f.hpMax * BX_SIT_WIN.hurt ? '' : 'only hurt, with the bell close';
+  return 'no such power';
+}
+function bxSitWhy(f, k) {
+  const B = G && G.bxp, S = BX_SIT[k]; if (!S) return 'no such power';
+  if (!B || !B.sit || !B.on[f.side] || !bxPowOn()) return 'situation powers are off';
+  if (B.used[f.side][k]) return 'once a bout';
+  if (!BD || BD.ph !== 'round') return 'only in a round';
+  if (f.a.k === 'down' || G.down != null) return 'not while down';
+  const m = bxSitMoment(f, k); if (m) return m;
+  if (bxSpirit(f) < S.cost.spirit) return 'needs spirit';
+  if (f.sta < S.cost.sta) return 'no breath';
+  return '';
+}
+// the moment, in words, for the log
+function bxSitNow(f, k) {
+  if (k === 'canvas') return `up from knockdown ${G.kd[f.side]}`;
+  if (k === 'last') { const l = bxLead(f.side); return l < 0 ? 'behind on the cards' : 'level on the cards'; }
+  if (k === 'bell') { const t = Math.ceil(G.clock); return `${Math.round(f.hp)} health, ${t} second${t === 1 ? '' : 's'} left`; }
+  return '';
+}
+function bxSitCast(f, k, why) {
+  const S = BX_SIT[k];
+  f.spirit = bxSpirit(f) - S.cost.spirit; f.sta = Math.max(0, f.sta - S.cost.sta); G.bxp.used[f.side][k] = true;
+  if (S.mySta) f.sta = Math.min(f.staMax, f.sta + S.mySta);
+  // (Saved by the Bell lasts till the bell)
+  const fx = Object.assign({ id: 'sit:' + k, n: S.n, from: f.side }, S.fx, k === 'bell' ? { t: G.clock + .1 } : {});
+  f.fx = (f.fx || []).filter(x => x.id !== fx.id).concat([fx]);
+  bxMoreLog(f, 'sit', k, S.n, why);
+  return true;
+}
+// the CPU's, and your fighter's in You corner (as a Knight would): when one fits, now or soon
+function bxSitCpu(f) {
+  const want = BX_POWK.sit[Math.min(3, bxSkill(f))];
+  for (const k of Object.keys(BX_SIT)) if (!bxSitWhy(f, k) && R() < want) return bxSitCast(f, k, bxSitNow(f, k));
+  return false;
+}
+// yours, pressed in You box: '' when it went, or why not
+function bxSitYou(k) {
+  if (!G || !G.F || !BD) return 'no bout on';
+  const f = G.F[BD.you], why = bxSitWhy(f, k); if (why) return why;
+  bxSitCast(f, k, bxSitNow(f, k)); return '';
+}
+// up from a knockdown: when, for Off the Canvas
+const bxMoreRise0 = bxRise;
+bxRise = function () { const s = G.down, r = bxMoreRise0.apply(this, arguments); if (G.bxp && s != null) G.F[s].rose = G.secs; return r; };
+
+/* ---------- curses ---------- */
+function bxCurseOf(f) {
+  if (!G || !G.bxp || !G.bxp.curse || !G.bxp.on[f.side] || !bxPowOn()) return null;
+  return f.pw ? f.pw.cu || null : BX_CURSE[f.kind] || null;
+}
+function bxCanCurse(f) {
+  const P = bxCurseOf(f), o = G.F[1 - f.side];
+  if (!P) return { ok: false, why: 'no curse' };
+  if (f.cuUsed) return { ok: false, why: 'used this bout' };
+  if (BD.ph !== 'round') return { ok: false, why: 'only in a round' };
+  if (['down', 'stun', 'clinch', 'grab'].includes(f.a.k) || bxPunching(f)) return { ok: false, why: 'busy' };
+  if (o.a.k === 'down') return { ok: false, why: 'they are down' };
+  if (o.curse) return { ok: false, why: 'they are cursed already' };
+  if (bxSpirit(f) < BX_SPIRIT.cu) return { ok: false, why: 'needs spirit' };
+  return { ok: true, why: '' };
+}
+function bxCurse(f, why) {
+  if (!bxCanCurse(f).ok) return false;
+  const P = bxCurseOf(f), o = G.F[1 - f.side];
+  f.spirit = bxSpirit(f) - BX_SPIRIT.cu; f.cuUsed = true;
+  f.a = { k: 'idle', t: 0, dur: 0, id: ++G.aid };
+  o.curse = { id: P.id, n: P.n, k: P.k, from: f.side, until: Math.min(G.round + 1, G.rounds), fx: Object.assign({ id: P.id, n: P.n }, P.fx) };
+  bxMoreLog(f, 'curse', P.id, `the ${P.n} on ${o.n}`, why);
+  return true;
+}
+function bxCurseCpu(f, o) {
+  if (!bxCanCurse(f).ok) return false;
+  const skill = bxSkill(f);
+  // (a Knight or better curses early in a round, when it has the longest to bite, and keeps the spirit for its ultimate in the last round)
+  if (skill > 0 && G.clock < 12) return false;
+  if (skill > 0 && !f.ultUsed && G.round === G.rounds && bxSpirit(f) - BX_SPIRIT.cu < BX_SPIRIT.ult) return false;
+  return R() < BX_POWK.curse[Math.min(3, skill)] ? bxCurse(f, G.round < G.rounds ? `round ${G.round}: it lasts into the next` : 'the last round') : false;
+}
+// the bell at the end of a round (from bxCorner, with the round moved on): a curse whose last round it was is gone
+function bxCurseBell() {
+  for (const f of G.F) if (f.curse && f.curse.until < G.round) { bxLog(`The ${f.curse.n} wears off ${f.n}.`); delete f.curse; }
+}
+// the cut-man washes the curse off f, in place of a patch this break
+function bxWashNow(f, why) {
+  const n = f.curse.n; delete f.curse; f.patched = G.round; G.bxp.wash[f.side]++;
+  bxLog(`The cut-man washes the ${n} off ${f.n}${why ? `: ${why}` : ''}.`);
+}
+// would the corner wash rather than patch? (your corner's advice is the Knight's, with no dice in it)
+function bxWashSays(f, c, skill) {
+  if (!f.curse || f.patched === G.round) return false;
+  const need = c.patch && f.patches > 0 && f.hp < f.hpMax * (skill >= 2 ? .4 : .5);
+  return !need;
+}
+function bxWashCpu(f, c) {
+  if (!f.curse || f.patched === G.round) return false;
+  const skill = bxSkill(f);
+  const go = skill === 0 ? R() < .5 : bxWashSays(f, c, skill);
+  if (go) bxWashNow(f, c.patch ? 'the curse before the cut' : 'nothing to patch');
+  return go;
+}
+// your cut-man: between rounds, once a break, instead of a patch
+function bxWash() {
+  const f = G && G.wait && BD.ph === 'corner' ? G.F[BD.you] : null;
+  if (!f || !f.curse || f.patched === G.round) return false;
+  bxWashNow(f, ''); G.wait.wash = false; G.wait.patch = false;
+  if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
+  return true;
+}
+const bxMoreAsk0 = bxAsk;
+bxAsk = function () {
+  bxMoreAsk0.apply(this, arguments);
+  const f = G.F[BD.you];
+  if (G.bxp && G.wait && BD.ph === 'corner' && f.curse && f.patched !== G.round) {
+    const c = bxCornerCpu(f), w = bxWashSays(f, c, 1);
+    G.wait.wash = w; if (w) G.wait.patch = false;
+    if (BX_HOOK.onPhase) BX_HOOK.onPhase(BD.ph);
+  }
+};
+// (switching to Corners mid-break takes your corner's advice: the wash too)
+const bxMoreSetMode0 = bxSetMode;
+bxSetMode = function (m) { if (m === 'watch' && G && G.wait && G.wait.wash) bxWash(); return bxMoreSetMode0.apply(this, arguments); };
+
+/* ---------- the CPU, and your fighter in You corner ---------- */
+const bxMoreCpu0 = bxCpuCast;
+bxCpuCast = function (f, o) {
+  if (G.bxp && BD.ph === 'round' && (bxSitCpu(f) || bxCurseCpu(f, o))) return true;
+  return bxMoreCpu0.apply(this, arguments);
+};
+
+/* ---------- what the page shows ---------- */
+// a fighter's curse and situation powers now: { cu: { id, n, desc, ok, why, used } | null, on: their curse or null, sit: [{ k, n, desc, ok, why, fits }] }
+function bxMoreState(f) {
+  const P = bxCurseOf(f), c = P ? bxCanCurse(f) : null, B = G.bxp;
+  return { cu: P ? { id: P.id, n: P.n, k: P.k, desc: P.desc, ok: c.ok, why: c.why, used: !!f.cuUsed } : null,
+    on: f.curse ? { id: f.curse.id, n: f.curse.n, k: f.curse.k, until: f.curse.until } : null,
+    sit: B && B.sit && B.on[f.side] ? Object.keys(BX_SIT).map(k => { const why = bxSitWhy(f, k); return { k, n: BX_SIT[k].n, desc: BX_SIT[k].desc, ok: !why, why, fits: !bxSitMoment(f, k) && !B.used[f.side][k] }; }) : [] };
+}
+// the curse over the cursed fighter: a violet ☾ and its name
+const bxMoreFighter0 = bxDrawFighter;
+bxDrawFighter = function (c, f, o) {
+  bxMoreFighter0.apply(this, arguments);
+  if (!f.curse || f.a.k === 'down') return;
+  const p = bxProj(f.x, f.y), y = p.y - (bxYourCorner() && f.side === BD.you ? 128 : 106) * p.k;
+  c.save(); c.globalAlpha = .82 + .18 * Math.sin(BXT.t * 3);
+  c.font = `800 ${Math.round(15 * p.k)}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.lineJoin = 'round'; c.lineWidth = 4; c.strokeStyle = 'rgba(24,10,40,.9)';
+  c.strokeText(`☾ ${f.curse.n}`, p.x, y); c.fillStyle = '#d4b8ff'; c.fillText(`☾ ${f.curse.n}`, p.x, y);
+  c.restore();
+};
 /* The Anvil Ring's superstars (issue #24, phase 2), inside the wBX scope: each superstar's ratings, nature and powers,
    added to the engine's own tables after its parts load. Plain assignments, nothing declared. A superstar is never
    picked for a CPU side by kind (the Realm only ever sends one as your own player). Each has a second special too
@@ -28621,6 +28856,15 @@ BX_POW.behemoth.sp2 = { id: 'mossbind', n: 'Moss Bind', when: 'close', desc: 'Mo
 BX_POW.djinn.sp2 = { id: 'lampsmoke', n: 'Lamp Smoke', when: 'tired', desc: 'A breath of smoke from the lamp: 10 stamina and 4 health back.', now: { mySta: 10, hp: 4 } };
 BX_POW.hydra.sp2 = { id: 'venomspit', n: 'Venom Spit', when: 'mid', desc: 'Spit through the guard (3), and venom: 1 health a second for 4 seconds.', now: { dmg: 3 }, fx: { who: 'them', t: 4, regHp: -1 } };
 BX_POW.frostwyrm.sp2 = { id: 'iceshield', n: 'Ice Shield', when: 'close', desc: 'A shell of ice: for 4 seconds punches do 45% less.', fx: { who: 'self', t: 4, dmgIn: .55 } };
+
+/* Their curses (issue #115, phase 3: 15-more.js), a third power beside the special and the ultimate: once a bout, for
+   spirit, on the other fighter for the rest of the round and the next, unless their cut-man washes it off. */
+BX_CURSE.phoenix = { id: 'cinderbrand', n: 'Cinder Brand', k: 'slow', desc: 'A brand of cinders on their arms: their punches and slips 12% slower.', fx: { spd: .88 } };
+BX_CURSE.kraken = { id: 'brinecurse', n: 'Brine Curse', k: 'tired', desc: 'Salt in their lungs: their breath comes back 35% slower.', fx: { regK: .65 } };
+BX_CURSE.behemoth = { id: 'mossweight', n: 'Moss Weight', k: 'slow', desc: 'Moss grows on their gloves: their punches and slips 12% slower.', fx: { spd: .88 } };
+BX_CURSE.djinn = { id: 'boundwish', n: 'Bound Wish', k: 'dear', desc: 'A wish bound against them: their next special or ultimate costs 15 more spirit.', fx: { spDear: 15 } };
+BX_CURSE.hydra = { id: 'hydrabane', n: 'Hydra\'s Bane', k: 'tired', desc: 'Old venom in their blood: their breath comes back 35% slower.', fx: { regK: .65 } };
+BX_CURSE.frostwyrm = { id: 'rimecurse', n: 'Rime Curse', k: 'leaky', desc: 'Rime on their guard, brittle as glass: it lets twice as much through.', fx: { leaky: 1 } };
 /* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
    src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
    gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
@@ -28873,7 +29117,8 @@ function bxFrame(now) {
   BXP.raf = requestAnimationFrame(bxFrame);
 }
 const BX_KEYS = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
-const BX_KEY_ACT = { j: 'jab', k: 'hook', l: 'body', shift: 'slip', e: 'clinch', q: 'sp', r: 'ult' };
+// (c: the curse, issue #115)
+const BX_KEY_ACT = { j: 'jab', k: 'hook', l: 'body', shift: 'slip', e: 'clinch', q: 'sp', r: 'ult', c: 'cu' };
 const BXK = new Set(), BXHELD = new Set();
 function bxKeySteer() { let x = 0, y = 0; for (const k of BXK) if (BX_KEYS[k]) { x += BX_KEYS[k][0]; y += BX_KEYS[k][1]; } return [x, y]; }
 function bxKey(e, down) {
@@ -28933,6 +29178,15 @@ return {
   powerBook: Object.fromEntries(Object.entries(BX_POW).map(([k, P]) => [k, Object.assign({ sp: { n: P.sp.n, desc: P.sp.desc }, ult: { n: P.ult.n, desc: P.ult.desc } }, P.sp2 ? { sp2: { n: P.sp2.n, desc: P.sp2.desc } } : {})])),
   // spirit (issue #61, phase 4): the meter's rules
   spirit: Object.assign({}, BX_SPIRIT),
+  // situation powers and curses (issue #115, phase 3: 15-more.js): the tables ({ k: { n, desc, cost } }, { kind: { id, n,
+  // k, desc } } with the superstars'), what each kind of curse does, the bout's state (G.bxp, null without), a side's
+  // curse and situation powers now ({ cu, on, sit }), your situation power and curse (in You box; '' or why not), the
+  // cut-man's wash (your corner, between rounds), and the tests' handles: a side's curse or situation power cast now
+  sits: JSON.parse(JSON.stringify(BX_SIT)), curses: JSON.parse(JSON.stringify(BX_CURSE)), curseKinds: Object.assign({}, BX_CURSE_K), sitWin: Object.assign({}, BX_SIT_WIN),
+  get bxp() { return G && G.bxp ? JSON.parse(JSON.stringify(G.bxp)) : null; }, more: side => G && G.F && BD ? bxMoreState(G.F[side == null ? BD.you : side]) : null,
+  castSit: k => bxSitYou(k), castCurse: () => G && G.F && BD ? (bxCurse(G.F[BD.you], '') ? '' : bxCanCurse(G.F[BD.you]).why) : 'no bout on', wash: () => bxWash(),
+  sitAt: (side, k) => { const f = G.F[side], why = bxSitWhy(f, k); return why || (bxSitCast(f, k, 'the test'), ''); }, curseAt: side => bxCurse(G.F[side], 'the test'),
+  fxNow: side => G && G.F ? Object.assign({}, bxFx(G.F[side])) : null, tempo: side => bxTempo(G.F[side]),
   // hexes (issue #99, phase 4c: 14-hexes.js): the table ({ id: { n, short, desc } }), the bout's ({ ids, on } or null), what the
   // scoreboard says of them (bxHexWords), and where the ropes are now; the Lich's numbers (06-cpu.js)
   hexes: Object.fromEntries(Object.entries(BX_HEXES).map(([k, H]) => [k, { n: H.n, short: H.short, desc: H.desc }])), get hex() { return G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null; },
@@ -64322,6 +64576,89 @@ renderHelp = function () {
   const after = $('wHelpBallKit') || $('wHelpBall'); if (!after || $('wHelpBallPow')) return;
   const C = wBD.crowdRules, S = wBD.sit;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpBallPow"><b>Baseball powers.</b> Each player brings one power of a pair in each role, picked on the Nine tab. In batting, running and fielding the pair is their kind's own magic (paid with mana) or the physical skill they'd have without it (paid with stamina); a kind without that magic keeps its skill. A pitcher with two magic pitches of a pair brings one of them. The other nine picks too, the same each time, and the play-by-play names each side's picks. Situation powers are your team's, once a game each, for mana, when the moment fits: ${Object.values(S).map(x => `<b>${esc(x.n)}</b> (${x.cost} mana): ${esc(x.desc.charAt(0).toLowerCase() + x.desc.slice(1))}`).join(' ')} The crowd fills on runs, home runs, strikeouts, double plays and stolen bases (up to ${C.max}, shown in gold under each side's mana). Press Crowd in the Powers row above the field to spend ${C.cost} on your next cast: an ability with a strength works half again as strongly, or an ultimate's zone lasts an at-bat more. Sure things like Shadowstep can't be lifted. The CPU casts and spends by its skill, and Auto powers lets your coach do it for you.</p>`);
+};
+/* w142: boxing's situation powers and curses (issue #115, phase 3), by the shape of the later sports; the engine's side
+   is src/bx/parts/15-more.js, and the superstars' curses are at the foot of ring/r0-stars.js.
+   On in every bout the Realm boxes (Play, Manage, Simulate, the Anvil Belt, the Umbral, the exhibition BOUT); in LAB mode
+   off unless the lab sets W_BXPOW.lab (the bxpow it boxes), so the other balance numbers stand. A bout whose options
+   already say (bxpow, even null) boxes them.
+   Situation powers (Off the Canvas, the Last Round, Saved by the Bell): your corner's, once a bout each, for spirit,
+   when the moment fits. In You box they light up on the pad when it is their moment; in You corner your fighter calls
+   them as a Knight would. Curses: seven league kinds and the six superstars have one, cast on the other fighter for
+   spirit (C, or Curse on the pad); in You corner your fighter casts it as a Knight would. Between rounds, Wash the
+   curse on the bar has the cut-man wash it off your fighter in place of a patch (your corner says which).
+   Wraps: wRingBarNote (wW142RingBarNote: the wash and the pad), wBxCard (wW142BxCard: the curse on the stats card),
+   renderHelp (wW142RenderHelp: #wHelpRingMore, and a section in Boxing: how it works); and wBX.start, wBX.cardStart,
+   wBX.simCard, wBX.simBout (bxpow goes in). */
+
+const W_BXPOW = { on: true, lab: null };
+function wBxPowRules() {
+  if (!W_BXPOW.on) return null;
+  if (LAB) return W_BXPOW.lab ? JSON.parse(JSON.stringify(W_BXPOW.lab)) : null;
+  return { sit: true, curse: true };
+}
+const wBxPowNext = o => { if (!o || o.bxpow !== undefined) return o; const P = wBxPowRules(); return P ? Object.assign({}, o, { bxpow: P }) : o; };
+const wW142Start = wBX.start, wW142CardStart = wBX.cardStart, wW142SimCard = wBX.simCard, wW142SimBout = wBX.simBout;
+wBX.start = o => wW142Start(wBxPowNext(o));
+wBX.cardStart = o => wW142CardStart(wBxPowNext(o));
+wBX.simCard = o => wW142SimCard(wBxPowNext(o));
+wBX.simBout = o => wW142SimBout(wBxPowNext(o));
+// a kind's curse (the superstars' too), or null
+const wRingCurseOf = kind => wBX.curses[kind] || null;
+
+/* ---------- the bar and the pad ---------- */
+$('wRingPatch').insertAdjacentHTML('afterend', '<button class="ghost" id="wRingWash" hidden></button>');
+$('wRingWash').addEventListener('click', () => { wBX.wash(); wRingBarNote(); });
+$('wRingPad').insertAdjacentHTML('beforeend', '<button class="ghost" data-rpad="cu" data-key="C" title="C" hidden>Curse</button><span id="wRingSits"></span>');
+$('wRingSits').addEventListener('click', e => { const b = e.target.closest('[data-rsit]'); if (!b || b.disabled) return; const why = wBX.castSit(b.dataset.rsit); if (why) b.title += ` (${why})`; W_RING_SITKEY = ''; wRingMorePad(); });
+let W_RING_SITKEY = '';
+function wRingMorePad() {
+  const G = wBX.G, M = G && G.F && wBX.bxp ? wBX.more(wBX.you) : null, cu = $('wRingPad').querySelector('[data-rpad="cu"]'), box = $('wRingSits');
+  cu.hidden = !M || !M.cu;
+  if (M && M.cu) { cu.textContent = M.cu.n; cu.disabled = !M.cu.ok; cu.title = `Curse (C, once a bout, ${wBX.spirit.cu} spirit): ${M.cu.desc} It lasts the rest of the round and the next, unless their cut-man washes it off.${M.cu.ok ? '' : ` (${M.cu.why})`}`; }
+  // the situation powers whose moment it is
+  const sits = M ? M.sit.filter(s => s.fits) : [], key = JSON.stringify(sits.map(s => [s.k, s.ok]));
+  if (key === W_RING_SITKEY) return;
+  W_RING_SITKEY = key;
+  box.innerHTML = sits.map(s => { const S = wBX.sits[s.k]; return `<button class="ghost wrsit" data-rsit="${s.k}" ${s.ok ? '' : 'disabled'} title="${esc(`${S.desc} Once a bout, ${S.cost.spirit} spirit${S.cost.sta ? ` and ${S.cost.sta} stamina` : ''}.${s.ok ? '' : ` (${s.why})`}`)}">✦ ${esc(S.n)}</button>`; }).join('');
+}
+setInterval(() => { if (WBX && UI.view === 'ring' && wBX.mode === 'play' && !$('wRingPad').hidden) wRingMorePad(); }, 250);
+const wW142RingBarNote = wRingBarNote;
+wRingBarNote = function () {
+  wW142RingBarNote();
+  if (!WBX) return;
+  const G = wBX.G, w = wBX.wait, me = G && G.F ? G.F[wBX.you] : null, b = $('wRingWash'), on = me && me.curse;
+  b.hidden = !on;
+  if (on) {
+    b.textContent = `Wash off the ${on.n}`;
+    b.disabled = !w || wBX.phase !== 'corner' || me.patched === G.round;
+    b.title = `The cut-man washes the ${on.n} off your fighter, in place of a patch this break (it would last all of round ${on.until} otherwise).${w && w.wash ? ' Your corner says now.' : ''}`;
+    b.classList.toggle('on', !!w && !!w.wash);
+    if (w && w.wash) $('wRingNote').textContent += ` And wash off the ${on.n}.`;
+  }
+  W_RING_SITKEY = ''; wRingMorePad();
+};
+
+/* ---------- the stats card ---------- */
+const wW142BxCard = wBxCard;
+wBxCard = function (p) {
+  const h = wW142BxCard(p), C = p && wRingCurseOf(p.kind); if (!h || !C) return h;
+  return h.replace('<div class="wbdbars">', `<p class="wbdpos" data-rcucard>Curse: <b>${esc(C.n)}</b>. ${esc(C.desc)}</p><div class="wbdbars">`);
+};
+
+/* ---------- How to play ---------- */
+function wRingMoreHTML(id) {
+  const S = wBX.sits, sp = wBX.spirit, C = Object.entries(wBX.curses);
+  return `<div${id ? ` id="${id}"` : ''}><p class="hint"><b>Situation powers.</b> Your corner's, once a bout each, paid with spirit, and only when the moment fits: ${Object.values(S).map(x => `<b>${esc(x.n)}</b> (${x.cost.spirit} spirit${x.cost.sta ? `, ${x.cost.sta} stamina` : ''}): ${esc(x.desc.charAt(0).toLowerCase() + x.desc.slice(1))}`).join(' ')} In You box they light up on the pad under the ring when it's their moment; in You corner your fighter calls them, as the other corner does.</p>
+  <p class="hint"><b>Curses.</b> Some kinds have a curse, a third power beside the special and the ultimate: once a bout, ${sp.cu} spirit and no stamina, cast on the other fighter. It stays on them for the rest of the round and all of the next (one cast in the last round lasts the bout), and shows over them in violet. A curse makes their punches slower, their guard leakier, their breath slower to come back, or their next special or ultimate dearer. Between rounds the cut-man can wash a curse off instead of patching a cut, so the corner chooses: <b>Wash off</b> on the bar, beside the cut-man (your corner says which). Press C or Curse on the pad to cast yours.</p>
+  <table class="wrsp2"><tr><th>Kind</th><th>Curse</th></tr>${C.map(([k, c]) => `<tr><td>${esc(wKindName(k))}</td><td><b>${esc(c.n)}</b>: ${esc(c.desc)}</td></tr>`).join('')}</table></div>`;
+}
+const wW142RenderHelp = renderHelp;
+renderHelp = function () {
+  wW142RenderHelp();
+  const how = $('wRingHow'); if (how && !$('wRingHowMore')) how.insertAdjacentHTML('beforeend', wRingMoreHTML('wRingHowMore'));
+  const h = $('wHelp'); if (!h || $('wHelpRingMore')) return;
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpRingMore"><b>Boxing: situation powers and curses.</b> Three powers belong to your corner, once a bout each, for spirit, when the moment fits: Off the Canvas just up from a knockdown, the Last Round when behind or level on the cards, and Saved by the Bell when hurt with the bell close. Seven kinds and the superstars also have a curse, cast on the other fighter for spirit: it lasts the rest of the round and the next, unless their cut-man washes it off between rounds in place of a patch. Boxing: how it works has them all.</p>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.

@@ -34,7 +34,8 @@ CLOSE_ALL = """(() => { for (let i = 0; i < 12 && !document.getElementById('moda
 PAIR = """((gear, N, kinds) => { const k = kinds || ['ogre', 'minotaur'];
   const mk = (kind, g) => Object.assign({ n: kind, kind, num: 1, r: wBX.rate(kind) }, g ? { gear: { id: 'x', name: 'X', fx: g } } : {});
   const run = g => { const out = { dmg: 0, hpMaxB: 0, taken: 0, rise: [], kdB: 0 };
-    for (let i = 0; i < N; i++) { const s = wBX.simBout({ fighters: [mk(k[0], g), mk(k[1], null)], seed: 9000 + i, skill: [1, 1] });
+    // (bxpow null: without the situation powers and curses, issue #115, which would shuffle the knockdowns this weighs)
+    for (let i = 0; i < N; i++) { const s = wBX.simBout({ fighters: [mk(k[0], g), mk(k[1], null)], seed: 9000 + i, skill: [1, 1], bxpow: null });
       out.dmg += s.stats[0].dmg; out.taken += s.stats[1].dmg; out.hpMaxB += s.fighters[1].hpMax; out.kdB += s.kd[1];
       for (const l of s.log) { const m = /^(.+) is up at (\\d+)\\.$/.exec(l.msg); if (m && m[1] === k[0]) out.rise.push(+m[2]); } }
     out.dmg /= N; out.taken /= N; out.hpMaxB /= N; out.riseAvg = out.rise.length ? out.rise.reduce((a, b) => a + b, 0) / out.rise.length : null; return out; };

@@ -133,8 +133,9 @@ function bxAdvance(f, o, dt) {
   const P = BX_PUNCH[f.a.k];
   if (P && !f.a.done && f.a.t >= f.a.hitAt) { f.a.done = true; bxLand(f, o, f.a.k); }
   if (f.a.k !== 'clinch' && f.a.k !== 'down' && f.a.t >= f.a.dur) f.a = { k: 'idle', t: 0, dur: 0, id: f.a.id };
-  const regen = (3.8 + f.r.sta * .3) * ((bxTrait(f) || {}).regen || 1) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1);
-  if (!bxFx(f).noReg) f.sta = clamp(f.sta + regen * dt, 0, f.staMax);
+  const regen = (3.8 + f.r.sta * .3) * ((bxTrait(f) || {}).regen || 1) * (f.a.k === 'guard' ? .55 : f.a.k === 'clinch' ? (f.a.lead ? 1.8 : 1.2) : P ? .3 : 1), Fx = bxFx(f);
+  // (a curse may slow it: regK, 15-more.js; 1 otherwise)
+  if (!Fx.noReg) f.sta = clamp(f.sta + regen * Fx.regK * dt, 0, f.staMax);
   if (G.down == null) bxFxTick(f, dt);
   if (f.ctr > 0) f.ctr = Math.max(0, f.ctr - dt);
   if (f.halt > 0) f.halt = Math.max(0, f.halt - dt);

@@ -66,3 +66,12 @@ BX_POW.behemoth.sp2 = { id: 'mossbind', n: 'Moss Bind', when: 'close', desc: 'Mo
 BX_POW.djinn.sp2 = { id: 'lampsmoke', n: 'Lamp Smoke', when: 'tired', desc: 'A breath of smoke from the lamp: 10 stamina and 4 health back.', now: { mySta: 10, hp: 4 } };
 BX_POW.hydra.sp2 = { id: 'venomspit', n: 'Venom Spit', when: 'mid', desc: 'Spit through the guard (3), and venom: 1 health a second for 4 seconds.', now: { dmg: 3 }, fx: { who: 'them', t: 4, regHp: -1 } };
 BX_POW.frostwyrm.sp2 = { id: 'iceshield', n: 'Ice Shield', when: 'close', desc: 'A shell of ice: for 4 seconds punches do 45% less.', fx: { who: 'self', t: 4, dmgIn: .55 } };
+
+/* Their curses (issue #115, phase 3: 15-more.js), a third power beside the special and the ultimate: once a bout, for
+   spirit, on the other fighter for the rest of the round and the next, unless their cut-man washes it off. */
+BX_CURSE.phoenix = { id: 'cinderbrand', n: 'Cinder Brand', k: 'slow', desc: 'A brand of cinders on their arms: their punches and slips 12% slower.', fx: { spd: .88 } };
+BX_CURSE.kraken = { id: 'brinecurse', n: 'Brine Curse', k: 'tired', desc: 'Salt in their lungs: their breath comes back 35% slower.', fx: { regK: .65 } };
+BX_CURSE.behemoth = { id: 'mossweight', n: 'Moss Weight', k: 'slow', desc: 'Moss grows on their gloves: their punches and slips 12% slower.', fx: { spd: .88 } };
+BX_CURSE.djinn = { id: 'boundwish', n: 'Bound Wish', k: 'dear', desc: 'A wish bound against them: their next special or ultimate costs 15 more spirit.', fx: { spDear: 15 } };
+BX_CURSE.hydra = { id: 'hydrabane', n: 'Hydra\'s Bane', k: 'tired', desc: 'Old venom in their blood: their breath comes back 35% slower.', fx: { regK: .65 } };
+BX_CURSE.frostwyrm = { id: 'rimecurse', n: 'Rime Curse', k: 'leaky', desc: 'Rime on their guard, brittle as glass: it lets twice as much through.', fx: { leaky: 1 } };

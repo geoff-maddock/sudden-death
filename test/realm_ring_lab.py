@@ -23,14 +23,20 @@ with each try's two as they are drawn.
 Part 7, hexes: the tier U card with each hex alone, against none. Parts 6 and 7 are seeded by the card's number (the
 journey, their side and the bouts), so each row boxes the same cards and differs only in what the row changes.
   python3 test/realm_ring_lab.py 120 --umbral   parts 6 and 7 only
-Writes /tmp/realm_ring_lab.json."""
+Part 8, situation powers and curses (issue #115, phase 3; only with --more): your three at level 3 against a rival's at
+the tier's level, by tier: off (as the other parts box: LAB mode leaves them out), both sides on (the Realm's card),
+yours only and theirs only; then at tier 2 both sides with the curses alone and the situation powers alone. Each row
+boxes the same seeded cards (as parts 6 and 7), so the rows differ only in what they change.
+  python3 test/realm_ring_lab.py 150 --more     part 8 only
+Writes /tmp/realm_ring_lab.json (part 8: /tmp/realm_ring_lab_more.json)."""
 import asyncio, json, sys, os, time
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
 from playwright.async_api import async_playwright
 
 UMB_ONLY = '--umbral' in sys.argv
-ARGS = [a for a in sys.argv[1:] if a != '--umbral']
+MORE_ONLY = '--more' in sys.argv
+ARGS = [a for a in sys.argv[1:] if a not in ('--umbral', '--more')]
 N = int(ARGS[0]) if len(ARGS) > 0 else 100
 PRE = ARGS[1] if len(ARGS) > 1 else ''
 
@@ -63,10 +69,12 @@ window.BLAB = {
     // ('drawn': the hexes a try would draw, a different try each card)
     let hexes = o.hexes;
     if (hexes === 'drawn') { const keep = WG.umbral; WG.umbral = { tries: { ring: BLAB.tries = (BLAB.tries || 0) + 1 } }; try { hexes = wUmbRingHexes('ring', W_NADIR.ring.hexes); } finally { WG.umbral = keep; } }
-    const r = wBX.simCard(Object.assign({ sides: [mine, opp], skill: sk, powers: o.powers !== false }, bags ? { bags } : {}, hexes && hexes.length ? { hexes } : {}, o.seed != null ? { seed: o.seed } : {}));
+    const r = wBX.simCard(Object.assign({ sides: [mine, opp], skill: sk, powers: o.powers !== false }, o.bxpow !== undefined ? { bxpow: o.bxpow } : {}, bags ? { bags } : {}, hexes && hexes.length ? { hexes } : {}, o.seed != null ? { seed: o.seed } : {}));
     const R = r.result, bouts = r.bouts;
+    // situation powers and curses (part 8): what each side cast a card, and its cut-man's washes
+    const more = [0, 1].map(s => bouts.reduce((m, b) => { if (b.bxp) { for (const c of b.bxp.casts) if (c.side === s) m[c.k === 'sit' ? c.id : 'cu']++; m.wash += b.bxp.wash[s]; } return m; }, { canvas: 0, last: 0, bell: 0, cu: 0, wash: 0 }));
     const used = r.bags && bags ? [0, 1].map(s => Object.keys(bags[s]).reduce((n, id) => n + bags[s][id] - ((r.bags[s] || {})[id] || 0), 0)) : [0, 0];
-    return { hexes: hexes || [], champ: !!o.champ, kit: o.kit || 'plain', used, gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
+    return { more, hexes: hexes || [], champ: !!o.champ, kit: o.kit || 'plain', used, gap, tier, skill: sk[1], powers: o.powers !== false, us: R.won[0], them: R.won[1], win: R.win === 0, tie: R.win == null, by: R.by,
       boutWins: bouts.filter(b => b.over.win === 0).length, stops: bouts.filter(b => b.over.how !== 'dec').length, myKos: bouts.filter(b => b.over.win === 1 && b.over.how !== 'dec').length, ms: performance.now() - t0 };
   },
   belt(lvl) {
@@ -115,6 +123,7 @@ async def main():
         await pg.add_script_tag(content=LAB_JS)
         if PRE: await pg.evaluate(PRE + "\n;0")
         t0 = time.time()
+        if MORE_ONLY: return await more(pg, errs, t0)
         cards, tiers, skills, nopow, belts, kits = [], [], [], [], [], []
         if not UMB_ONLY:
             for gap in (-1, 0, 1, 2, 3):
@@ -182,5 +191,32 @@ async def main():
             if not rs: continue
             u = [sum(g['used'][s] for g in rs) / len(rs) for s in (0, 1)]
             row(f"tier {t}: {name}", rs, f"   potions {u[0]:.1f}-{u[1]:.1f}")
+
+MORE_ROWS = [  # key, label, bxpow
+    ('off', 'off (as the other parts box)', None),
+    ('all', 'both sides (the Realm\'s card)', {'sit': True, 'curse': True}),
+    ('mine', 'yours only', {'on': [True, False]}),
+    ('theirs', 'theirs only', {'on': [False, True]}),
+]
+MORE_T2 = [('curse', 'both sides, curses alone', {'sit': False}), ('sit', 'both sides, situation powers alone', {'curse': False})]
+
+async def more(pg, errs, t0):
+    out = {}
+    for t in (1, 2, 3):
+        for key, label, P in MORE_ROWS + (MORE_T2 if t == 2 else []):
+            out[f't{t}:{key}'] = await batch(pg, N, f"BLAB.card(3, {t - 1}, {t}, {{ seed: 20011 + i, bxpow: {json.dumps(P)} }})")
+    json.dump(out, open('/tmp/realm_ring_lab_more.json', 'w'))
+    print(f'{time.time() - t0:.0f}s   page errors', len(errs), errs[:2])
+    print('\nsituation powers and curses, your three at level 3 against a rival\'s at the tier\'s level, Simulate (the same seeded cards in every row)')
+    print('                                             n    win   draw   a card: sits (you, them)  curses (you, them)  washes (you, them)')
+    for t in (1, 2, 3):
+        base = sum(g['win'] for g in out[f't{t}:off']) / len(out[f't{t}:off'])
+        for key, label, _ in MORE_ROWS + (MORE_T2 if t == 2 else []):
+            rs = out[f't{t}:{key}']; n = len(rs)
+            c = lambda s, k: sum(sum(g['more'][s][x] for x in k) for g in rs) / n
+            row(f"tier {t} {label}"[:40].ljust(40), rs, f"   sits {c(0, ('canvas', 'last', 'bell')):.2f}, {c(1, ('canvas', 'last', 'bell')):.2f}  curses {c(0, ('cu',)):.2f}, {c(1, ('cu',)):.2f}  washes {c(0, ('wash',)):.2f}, {c(1, ('wash',)):.2f}" + ('' if key == 'off' else f"   {100 * (sum(g['win'] for g in rs) / n - base):+5.1f} pts"))
+    rs = [g for k in out if k.endswith(':all') for g in out[k]]
+    n = len(rs)
+    print(f"  in the Realm's card ({n} cards, both sides), a card: " + ', '.join(f"{k} {sum(g['more'][s][k] for g in rs for s in (0, 1)) / n:.2f}" for k in ('canvas', 'last', 'bell', 'cu', 'wash')))
 
 asyncio.run(main())
