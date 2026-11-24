@@ -167,7 +167,7 @@ async def main():
         check(ls['tries'] == 1 and 'bowling' not in ls['pieces'] and ls['last']['r'] == 'lose' and ls['last']['tier'] == 4 and not ls['live'], 'a loss counts a try, and the pin stays with them', ls)
 
         # backing away from the card costs nothing, even on a retry
-        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('lanes'); const card = !!document.querySelector('[data-ubl]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 30 gold');
+        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('lanes'); const card = !!document.querySelector('[data-ubl]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 20 gold');
           document.getElementById('wUblNo').click(); return { why, card, toll, back: RUN.gold - g0, live: wLanesLive() }; })()""")
         check(bk['why'] == '' and bk['card'] and bk['toll'] and bk['back'] == 0 and not bk['live'], 'on a retry the card names the toll, and backing away costs nothing', bk)
 
@@ -179,8 +179,8 @@ async def main():
         tl = await pg.evaluate("({ paid: window.__g1 - RUN.gold, lines: WLOG.slice(window.__l0).filter(l => /pay the toll/.test(l[0])).length })")
         wn = await pg.evaluate("""(() => { const s = wBL.summary(); s.win = 0; s.text = '250 to 180'; wLanesSettle(s); WBL = null; wLeaveLanes(); wDrain();
           return { pieces: WG.umbral.pieces.slice(), beaten: !!WG.umbral.beaten.lanes, gold: RUN.gold - window.__g1, paid: WG.umbral.paid && WG.umbral.paid.lanes, again: wNadirMatch('lanes') }; })()""")
-        check(tl['paid'] == 30 and tl['lines'] == 1 and wn['paid'] == 1, 'the retry\'s toll is paid at the first ball, once', [tl, wn])
-        check('bowling' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 30 and 'yours' in wn['again'], 'a win pays the Drowned Pin and the gold, and they have nothing left to play for', wn)
+        check(tl['paid'] == 20 and tl['lines'] == 1 and wn['paid'] == 1, 'the retry\'s toll is paid at the first ball, once', [tl, wn])
+        check('bowling' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 20 and 'yours' in wn['again'], 'a win pays the Drowned Pin and the gold, and they have nothing left to play for', wn)
 
         # Simulate: the same game (the Lich against your Knight, the same hexes), at once, settled
         sm = await pg.evaluate("""(() => { const U = WG.umbral; U.pieces = []; U.tries = {}; U.paid = {}; delete U.beaten.lanes; wDrain(); const n0 = WG.lng.games.length, hx = wUmbBlHexes('lanes', W_NADIR.lanes.hexes); const why = wNadirMatch('lanes');

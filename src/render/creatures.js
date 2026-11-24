@@ -26,6 +26,30 @@ function rgbOf(h) {
 function tint(h, f) { const [r, g, b] = rgbOf(h), t = f < 0 ? 0 : 255, k = Math.abs(f); return `rgb(${Math.round(r + (t - r) * k)},${Math.round(g + (t - g) * k)},${Math.round(b + (t - b) * k)})`; }
 // a figure drawn in shadow (o.shade): drained, darkened, turned toward violet, with pale eyes that glow
 function shadeOf(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, m = (v, k) => Math.max(0, Math.min(255, Math.round((v + (l - v) * .6) * .55 + k))); return `rgb(${m(r, 20)},${m(g, 8)},${m(b, 30)})`; }
+// and its corrupted marks (issue #111): two short curved horns over the head (not on a kind that has its own) and two
+// or three thin cracks of light across the body, placed by a seed (the kind, the number, o.seed) so they stay put
+const SHADE_HORNED = ['minotaur', 'dwarf', 'kobold', 'fiend', 'behemoth', 'frostwyrm', 'hydra']; // (horns of their own, or no one head to put them on)
+function shadeRnd(d) { let h = 7; for (const ch of d.kind + ':' + (d.o.num ?? '') + ':' + (d.o.seed || 0)) h = (h * 31 + ch.charCodeAt(0)) % 1000003; return i => { const x = Math.sin(h * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); }; }
+function shadeCracks(c, d, torso) {
+  const r = shadeRnd(d), n = 2 + Math.floor(r(0) * 2), col = d.o.crack || '#c8b8ff';
+  c.save(); c.clip(torso); c.shadowColor = col; c.shadowBlur = Math.max(2, 4 * FSC); c.strokeStyle = col; c.lineWidth = Math.max(.8, LW * .55); c.lineCap = 'round'; c.lineJoin = 'round';
+  for (let k = 0; k < n; k++) {
+    const x0 = (r(k * 7 + 1) - .5) * d.shw * 1.4, y0 = d.shY + 6 + r(k * 7 + 2) * 26, a = (r(k * 7 + 3) - .5) * 2.2 + Math.PI / 2, L = 10 + r(k * 7 + 4) * 9;
+    c.beginPath(); c.moveTo(x0, y0);
+    for (let j = 1; j <= 3; j++) { const t = L * j / 3, jit = (r(k * 7 + 4 + j) - .5) * 5; c.lineTo(x0 + Math.cos(a) * t - Math.sin(a) * jit, y0 + Math.sin(a) * t + Math.cos(a) * jit); }
+    c.stroke();
+  }
+  c.restore();
+}
+function shadeHorns(c, d) {
+  if (SHADE_HORNED.includes(d.kind)) return;
+  const { hy, hr } = d, col = shadeOf('#efe3c6');
+  for (const s of [-1, 1]) {
+    const p = new Path2D(); p.moveTo(s * hr * .35, hy - hr * .8); p.quadraticCurveTo(s * hr * 1.25, hy - hr * 1.15, s * hr * 1.2, hy - hr * 1.95);
+    p.quadraticCurveTo(s * hr * .95, hy - hr * 1.2, s * hr * .72, hy - hr * .55); p.closePath();
+    ink(c, p, col, 0, true);
+  }
+}
 function grey(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, v = Math.round(92 + l * .42); return `rgb(${v},${v},${v - 4})`; }
 function pRR(x, y, w, h, r) { const p = new Path2D(); r = Math.min(r, w / 2, h / 2); p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + h, r); p.arcTo(x + w, y + h, x, y + h, r); p.arcTo(x, y + h, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); return p; }
 function pEl(x, y, rx, ry, rot = 0) { const p = new Path2D(); p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); return p; }
@@ -498,8 +522,8 @@ function torsoPath(d, K) {
 }
 
 function drawFig(c, kind, x, y, hpx, team, o = {}) {
-  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone, sh = !st && !!o.shade;
-  const C = v => st ? grey(v) : sh ? shadeOf(v) : v;
+  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone, sh = !!o.shade;
+  const C = v => st ? (sh ? shadeOf(grey(v)) : grey(v)) : sh ? shadeOf(v) : v; // (stone in shadow: an Umbral player turned to stone keeps its look)
   const hunch = K.hunch ? 6 : 0, shY = -70 + hunch, hipY = -36;
   const shw = 17 * w * (kind === 'ogre' ? .9 : 1);
   const hy = kind === 'ogre' ? -80 : kind === 'golem' ? -80 : -83 + hunch * 1.4;
@@ -558,6 +582,7 @@ function drawFig(c, kind, x, y, hpx, team, o = {}) {
     c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.strokeText(String(o.num ?? ''), 0, shY + 25); c.fillStyle = st ? '#ddd' : '#fbf6ea'; c.fillText(String(o.num ?? ''), 0, shY + 25);
     if (o.flip) c.restore();
   }
+  if (sh) shadeCracks(c, d, t);
   // arms
   const swing = run ? sw * 7 : 0;
   if (pose && pose.armR) {
@@ -588,6 +613,7 @@ function drawFig(c, kind, x, y, hpx, team, o = {}) {
   // neck + head
   if (!K.robe && kind !== 'golem') ink(c, capsule(0, shY + 1, 4.2, 0, hy + 9, 4.6), d.skin, 0, true);
   HEAD[kind] ? HEAD[kind](c, d) : ink(c, pEl(0, hy, 12, 12), d.skin);
+  if (sh) shadeHorns(c, d);
   if (wpn) {
     if (pose && pose.ghosts && pose.ghosts.length && !st) {
       const g0 = pose.ghosts[pose.ghosts.length - 1][0];

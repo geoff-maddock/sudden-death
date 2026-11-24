@@ -64,7 +64,7 @@ const W_UMB_PIECES = {
 };
 // the Nadir champions: where each waits, who they field, what they hold. Phase 4 adds the sports' champions.
 const W_NADIR = {
-  gate: { piece: 'card', char: 'nadir_gate', map: 'u:umbralden', at: [9, 4], region: 'rime', ids: ['u_gatekeeper', 'boneline'], type: 'elite', hexes: 2, toll: 30, gold: 80 },
+  gate: { piece: 'card', char: 'nadir_gate', map: 'u:umbralden', at: [9, 4], region: 'rime', ids: ['u_gatekeeper', 'boneline'], type: 'elite', hexes: 2, toll: 20, gold: 80 },
 };
 EN('u_gatekeeper', 'The Gatekeeper', 'lich', [150, 160], {
   stack: { n: 'Stack the Deck', ops: [['b', 14], ['s', 'str', 2]] },
@@ -79,7 +79,7 @@ DB.chars.nadir_gate = { name: 'Morrow Vane, the Gatekeeper', kind: 'lich', look:
     card: { t: 'The Cracked Card. One ninth of your Seal. Win a hand of ours and it is yours. Lose, and the next hand costs you a TOLL.' },
     rules: { t: 'Our cards, our rules. Everything here is harder: my side has more in it, you hold one card fewer, and before we start I draw the HEXES. Two, for you.' },
     hexes: { t: 'A little something extra on the table. Shades in your deck, a grudge, cold hands. You will see which before we start.' },
-    toll: { t: 'Thirty gold a hand, after the first. The first is free. Nothing else here is.' },
+    toll: { t: 'Twenty gold a hand, after the first. The first is free. Nothing else here is.' },
     play: { t: 'Then sit down.', act: 'unadir:gate' },
   } };
 

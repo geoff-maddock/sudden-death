@@ -62,8 +62,9 @@ return {
   changing: () => L ? L.pl.map((p, i) => p.chg ? [i, p.chg.to] : null).filter(Boolean) : [], changeNow: side => L ? hkChangeNow(side) : 0, get auto() { return GD ? GD.auto : true; },
   // penalties and the goalie (phase 3): the fouls' odds, the penalty that is coming, whether a goalie is in their net and
   // why not, who takes a side's face-offs, the shootout's try now; the tests' handles: a foul by player i, the fouls' odds
-  // changed, a goal by player i, a pull, the lines set again
-  fouls: Object.assign({}, HK_FOUL), pullRules: Object.assign({}, HK_PULL), get delay() { return GD && GD.delay ? Object.assign({}, GD.delay) : null; },
+  // changed, a goal by player i, a pull, the lines set again (fouls is the odds as the game loaded; foulsNow the odds as
+  // they are, after setFouls)
+  fouls: Object.assign({}, HK_FOUL), get foulsNow() { return Object.assign({}, HK_FOUL); }, pullRules: Object.assign({}, HK_PULL), get delay() { return GD && GD.delay ? Object.assign({}, GD.delay) : null; },
   inNet: side => !!L && hkInNet(side), pulled: side => L ? L.pl[hkGk(side)].pulled || '' : '', taker: side => L ? hkTaker(side) : -1,
   get soTry() { const U = GD && GD.so && GD.so.cur; return U ? { side: U.side, i: U.i, gi: U.gi, st: U.st, scored: U.scored, win: U.win } : null; },
   foul: (i, k) => { if (L) hkFoul(L.pl[i], k || 'tripping', null); }, setFouls: o => Object.assign(HK_FOUL, o || {}),

@@ -8,7 +8,10 @@ Each Crown winner: the Gatekeeper first, then each sport's champion in turn (its
 match, tried until beaten, at most TRIES each; the region's gate item taken as brought). A champion is tried until
 beaten, at most TRIES times, while the gold lasts for the toll. Rested by a lantern before every match (full HP).
 With all nine pieces, the Seal: three rounds, each tried at most TRIES times. Engine games are Simulated (the adapters
-in LAB), card matches played by the bot.
+in LAB), card matches played by the bot. The walk out there (#111): before each guard's and champion's try, a hungry
+shadow match by the Dread's stage (UJ_SHADOW_P; 'window.UJ_NOSHADOW = 1' as PRE turns it off). The corrupted legends
+(#111, phase F): when a piece wakes one, the bot fights it once, rested; each shard won is set on the Seal's rounds in
+order, for one hex fewer ('window.UJ_NOLEGEND = 1' as PRE: no legends fought).
 Prints: how many of the Crown winners forged the Seal, the pieces they held at the end, where the others stopped, and
 each champion's games won / played (and the guards' and the finale rounds'). Writes /tmp/realm_umbral_journey.json.
 The target (issue #99): the Seal on about 5 to 15% of journeys that reach the Crown."""
@@ -23,6 +26,7 @@ TRIES = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 PRE = sys.argv[3] if len(sys.argv) > 3 else ''
 
 LAB_JS = r"""
+window.UJ_SHADOW_P = [.35, .5, .65, .9];   // the Last Hour's .8 became .9 when the shadows went unseen until close
 window.UJLAB = function (TRIES) {
   const log = REALMLAB({}), out = { champion: log.result === 'champion', games: [], stop: null };
   if (!out.champion || !WG.umbral) return out;
@@ -39,35 +43,54 @@ window.UJLAB = function (TRIES) {
   const play = (id) => {
     const C = W_NADIR[id]; rest();
     if (C.cond && C.cond.k === 'night') WG.min = 23 * 60;   // (a champion who plays only after dark: the bot waits for night)
-    if (C.engine && id !== 'finale' || (id === 'finale' && C.engine)) { const t0 = (U.tries[id] || 0), p0 = U.pieces.length, f0 = U.finale || 0; const why = wNadirMatch(id); if (why) return null;
+    // the feats (#111): it waits for dark for a night feat, and tries a no-powers feat on the first try
+    const F = typeof wUmbFeat === 'function' && id !== 'finale' ? wUmbFeat(id) : null;
+    if (F && F.k === 'night') WG.min = 23 * 60;
+    if (F && F.k === 'nopowers' && !(U.tries[id] || 0) && !window.UJ_NOFEAT) U.nopow = id;
+    if (C.engine && id !== 'finale' || (id === 'finale' && C.engine)) { const t0 = (U.tries[id] || 0), p0 = U.pieces.length, f0 = U.finale || 0; const why = wNadirMatch(id); if (why) { out.why = why; return null; }
       return id === 'finale' ? ((U.finale || 0) > f0 ? 'win' : 'lose') : (U.pieces.length > p0 ? 'win' : 'lose'); }
     return card(() => wNadirMatch(id));
+  };
+  // the walk out there (issue #111, the Dread): before each try, a chance of a hungry shadow, by stage (window.UJ_NOSHADOW: off)
+  const trip = () => {
+    if (window.UJ_NOSHADOW || typeof wUmbDread !== 'function') return;
+    if (Math.random() < UJ_SHADOW_P[wUmbDread()]) { rest(); WG.map = 'u:world'; const r = card(() => wUmbShadowMatch({ id: 'lab', x: WG.x, y: WG.y })); out.games.push({ who: 'shadow', res: r }); }
+  };
+  // the corrupted legends (issue #111, phase F): each fought once, rested, when a piece has woken it (window.UJ_NOLEGEND: off)
+  const fought = {};
+  const legends = () => {
+    if (window.UJ_NOLEGEND || typeof wUmbLegendAwake !== 'function') return;
+    for (const k of Object.keys(W_UMB8I.legends)) if (!fought[k] && wUmbLegendAwake(k)) { fought[k] = 1; rest(); WG.map = 'u:world'; const r = card(() => wUmbLegendMatch(k)); out.games.push({ who: 'legend ' + k, res: r }); }
   };
   const champs = ['gate'].concat(Object.keys(W_NADIR).filter(k => W_NADIR[k].ground));
   for (const id of champs) {
     const C = W_NADIR[id]; WG.map = C.map || 'u:umbralden';
     if (C.ground) {
       U.guards = U.guards || {}; U.gates = U.gates || {}; U.gates[id] = WG.dayAbs;
-      for (const i of [0, 1]) for (let t = 0; t < TRIES && !U.guards[C.ground + ':' + i]; t++) { rest(); const r = card(() => wUmbGuardMatch(C.ground, i)); out.games.push({ who: 'guard', res: r }); }
+      for (const i of [0, 1]) for (let t = 0; t < TRIES && !U.guards[C.ground + ':' + i]; t++) { trip(); WG.map = C.map; rest(); const r = card(() => wUmbGuardMatch(C.ground, i)); out.games.push({ who: 'guard', res: r }); }
       if (![0, 1].every(i => U.guards[C.ground + ':' + i])) { out.stop = out.stop || 'guards of ' + id; break; }
     }
     let won = false;
     for (let t = 0; t < TRIES && !won; t++) {
       if ((U.tries[id] || 0) > 0 && RUN.gold < C.toll) { out.stop = out.stop || 'gold at ' + id; break; }
-      const r = play(id); if (r == null) { out.stop = out.stop || 'could not play ' + id; break; }
+      trip(); WG.map = C.map || 'u:umbralden';
+      const r = play(id); if (r == null) { out.stop = out.stop || 'could not play ' + id + ': ' + String(out.why || '').slice(0, 80); break; }
       out.games.push({ who: id, res: r }); won = r === 'win';
     }
     if (!won) { out.stop = out.stop || 'lost to ' + id; break; }
+    legends();
   }
+  out.shards = U.shards || 0;
   out.pieces = U.pieces.length;
   if (out.pieces === 9) {
     WG.map = 'u:coliseum';
     for (let round = 0; round < 3 && !U.sealed; round++) {
       let won = false;
-      for (let t = 0; t < TRIES && !won && !U.sealed; t++) { const r0 = U.finale || 0; wUmbFinaleEntry(); const r = play('finale'); out.games.push({ who: 'finale' + r0 + ':' + (W_NADIR.finale.engine || 'card'), res: r }); won = r === 'win' || (U.finale || 0) > r0 || !!U.sealed; }
+      for (let t = 0; t < TRIES && !won && !U.sealed; t++) { const r0 = U.finale || 0; if (typeof wUmbShardUse === 'function' && (U.shards || 0) > 0) wUmbShardUse('hex'); wUmbFinaleEntry(); const r = play('finale'); out.games.push({ who: 'finale' + r0 + ':' + (W_NADIR.finale.engine || 'card'), res: r }); won = r === 'win' || (U.finale || 0) > r0 || !!U.sealed; }
       if (!won && !U.sealed) { out.stop = 'the Seal, round ' + (round + 1); break; }
     }
   }
+  out.well = Object.keys(U.well || {}).length;
   out.sealed = !!U.sealed; out.lvl = wRoster().reduce((a, p) => a + p.lvl, 0) / wRoster().length;
   return out;
 };
@@ -92,6 +115,8 @@ async def main():
     ch = [l for l in logs if l.get('champion')]
     print(f"page errors {len(errs)} {errs[:2]}  run errors {len(bad)} {bad[:2]}")
     print(f"journeys {len(logs)}, Crown winners {len(ch)}, forged the Seal {sum(l.get('sealed', False) for l in ch)} ({100 * sum(l.get('sealed', False) for l in ch) / max(1, len(ch)):.0f}% of Crown winners)")
+    print('pieces won well:', sum(l.get('well', 0) for l in ch), 'of', sum(l.get('pieces', 0) for l in ch))
+    print('Legend\'s Shards won:', dict(sorted(collections.Counter(l.get('shards', 0) for l in ch).items())))
     print('pieces at the end:', dict(sorted(collections.Counter(l.get('pieces', 0) for l in ch).items())))
     print('where the others stopped:', dict(collections.Counter(l.get('stop') for l in ch if not l.get('sealed')).most_common()))
     games = collections.defaultdict(lambda: [0, 0])

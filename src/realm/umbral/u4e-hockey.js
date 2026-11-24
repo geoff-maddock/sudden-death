@@ -43,7 +43,7 @@ W_RINK_KIT.opp[4] = { draught: 3, hkanti: 2, hkcider: 2, hkliniment: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.rink = { piece: 'hockey', char: 'nadir_rink', ground: 'g_rink', map: 'u:g_rink', region: 'rime', engine: 'rink', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.rink = { piece: 'hockey', char: 'nadir_rink', ground: 'g_rink', map: 'u:g_rink', region: 'rime', engine: 'rink', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_rink = { name: 'Hollis Grael, the Drowned Captain', kind: 'wraith', look: { coat: '#2c2a44', acc: 'scarf', hair: '#d8e4f0' },
   greet: 'You crossed the cold for a game. I captain the Nadir on this pond, and I hold the PUCK. Say PLAY when you want to try to take it off me. Ask about the RULES first. The ice here has opinions.',
   topics: {
@@ -51,7 +51,7 @@ DB.chars.nadir_rink = { name: 'Hollis Grael, the Drowned Captain', kind: 'wraith
     puck: { t: 'The Dead Puck. One ninth of your Seal, frozen through. Beat my six at hockey and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real hockey, five skaters and a goalie, three periods, our pond. My six skate harder than anything you have met, a Lich calls our lines, and our bench carries a full bag. I keep a NIGHT of my own for when it matters. Before the puck drops I draw the HEXES.' },
     hexes: { t: 'The pond has moods. It opens under the puck and gives it back at centre ice. The net wanders off its line. The cold gets into your legs. The whistle forgets whose side it is on. You will hear which before the puck drops, and they stay up on the board.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid when the puck drops. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid when the puck drops. Walking away from the card costs nothing.' },
     night: { t: 'The Long Night. Once a game I put the lamps out. Your goalie cannot find the puck, and your skaters wade.' },
     play: { t: 'Then lace up.', act: 'unadir:rink' },
   } };

@@ -158,7 +158,7 @@ async def main():
         await pg.evaluate("wLeaveLinks(); wDrain()")
 
         # backing away from the card costs nothing, even on a retry
-        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('links'); const card = !!document.querySelector('[data-ugl]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 30 gold');
+        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('links'); const card = !!document.querySelector('[data-ugl]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 20 gold');
           document.getElementById('wUglNo').click(); return { why, card, toll, back: RUN.gold - g0, live: wLinksLive() }; })()""")
         check(bk['why'] == '' and bk['card'] and bk['toll'] and bk['back'] == 0 and not bk['live'], 'on a retry the card names the toll, and backing away costs nothing', bk)
 
@@ -172,8 +172,8 @@ async def main():
           wGL.speed = 8; wGL.setMode('watch')""")
         await pg.wait_for_function("!wLinksLive()", timeout=90000)
         wn = await pg.evaluate("({ pieces: WG.umbral.pieces.slice(), beaten: !!WG.umbral.beaten.links, gold: RUN.gold - window.__g1, paid: WG.umbral.paid && WG.umbral.paid.links, again: wNadirMatch('links') })")
-        check(tl['paid'] == 30 and tl['lines'] == 1 and wn['paid'] == 1, 'the retry\'s toll is paid at the first tee, once', [tl, wn])
-        check('golf' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 30 and 'yours' in wn['again'], 'a win pays the Hollow Flag and the gold, and they have nothing left to play for', wn)
+        check(tl['paid'] == 20 and tl['lines'] == 1 and wn['paid'] == 1, 'the retry\'s toll is paid at the first tee, once', [tl, wn])
+        check('golf' in wn['pieces'] and wn['beaten'] and wn['gold'] >= 100 - 20 and 'yours' in wn['again'], 'a win pays the Hollow Flag and the gold, and they have nothing left to play for', wn)
         await pg.evaluate("wLeaveLinks(); wDrain()")
 
         sm = await pg.evaluate("""(() => { const U = WG.umbral; U.pieces = []; U.tries = {}; U.paid = {}; delete U.beaten.links; wDrain(); const n0 = WG.lkg.games.length; const why = wNadirMatch('links');

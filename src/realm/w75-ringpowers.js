@@ -45,11 +45,11 @@ wRingTapeOf = function (f) {
   if (t.P && sp) t.P = Object.assign({}, t.P, { sp });
   return t;
 };
-// the pairing: the special each of theirs brings
+// the pairing: the special each of theirs brings (on their bout's row: the tale-of-the-tape rows between are skipped)
 const wW75RingPairing = wRingPairing;
 wRingPairing = function (o) {
   const r = wW75RingPairing(o), T = $('wRingPairT');
-  if (T && o && o.theirs) T.querySelectorAll('tr').forEach((tr, i) => { const f = o.theirs.fighters[i], sp = f && wRingSpPow(f), td = tr.querySelector('td');
+  if (T && o && o.theirs) T.querySelectorAll('tr:not(.wrtape)').forEach((tr, i) => { const f = o.theirs.fighters[i], sp = f && wRingSpPow(f), td = tr.querySelector('td');
     if (sp && td) td.insertAdjacentHTML('beforeend', `<br><small data-rsppair title="${esc(sp.desc)}">Special: <b>${esc(sp.n)}</b></small>`); });
   return r;
 };

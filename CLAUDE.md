@@ -55,10 +55,10 @@ python3 test/realm_quick_shots.py              # retake the Quick start screensh
 python3 test/realm_links_lab.py 400            # Realm golf balance: win rate by tier, level gap and caddie, powers on, off and one side's, each line and stance, gear and potions by tier, the enchanted course, the hitter rule, Divot Cups
 python3 test/realm_lanes_lab.py 200            # Realm bowling balance: win rate by tier, level gap and skill, powers on, off and one side's, each line and stance, gear and potions by tier, the hall and the tide, Gutter Cups, each power alone (single)
 python3 test/realm_shed_lab.py 100             # Realm curling balance: win rate by tier, level gap and skill, powers on, off and one side's, each shot held, sweeping on and off, the hammer and the ends, the pebble and the Shed, gear and potions by tier, Brass Brooms, each power alone (single); slow, about 0.6 s a game
-python3 test/realm_umbral_journey_lab.py 40 15  # Umbral balance (#99): the realm bot's Crown winners through the whole Umbral, the Seal's completion rate
+python3 test/realm_umbral_journey_lab.py 40 15  # Umbral balance (#99): the realm bot's Crown winners through the whole Umbral, the Seal's completion rate; the walk out (hungry shadows), the legends, the feats and pieces won well (#111); PRE 'window.UJ_NOSHADOW = 1' or 'window.UJ_NOLEGEND = 1' turns a part off
 python3 test/realm_umbral_shots.py             # Umbral screenshots (#99): every Umbral screen at desktop and phone width, with contact sheets, into /tmp/umbral-shots/ (also reports sideways scrolling)
 python3 test/realm_umbral_lab.py 40            # Umbral balance (#99): the realm bot's Crown winners against the dark side's card matches at tier U and the Nadir champions
-python3 test/realm_stars_lab.py 200            # Realm superstar balance: what each superstar adds in the card game, football, baseball, basketball, hockey, bowling and curling, against an ordinary player
+python3 test/realm_stars_lab.py 200            # Realm superstar balance: what each superstar adds in the card game, football, baseball, basketball, hockey, bowling, curling, boxing and golf, against an ordinary player (a redeemed Umbral champion by star id, e.g. nadir_ring)
 ```
 
 Tests need Python Playwright with Chromium (see `requirements-dev.txt`). Screenshots go to `/tmp/`.

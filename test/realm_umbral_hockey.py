@@ -96,7 +96,7 @@ async def main():
         check(s0['off'] == [0, 0] and s1['off'][0] == 0 and s1['off'][1] > .5 and s1['spot'] > s0['spot'] + .5 and s1['odds']['ang'] > s0['odds']['ang'] and s1['odds']['miss'] > s0['odds']['miss'],
               'The Wandering Net: the net you shoot at slides away from the puck (yours stays put), its goalie goes with it, and a shot from the wing comes at a worse angle', sl)
 
-        # Grave Cold: the same seconds of play, your skaters tire 35% faster (theirs as before); The Hollow Whistle: your fouls called twice as often
+        # Grave Cold: the same seconds of play, your skaters tire 35% faster (theirs as before); The Hollow Whistle: your fouls called up to twice as often (capped)
         cw = await pg.evaluate("""(() => { const drain = hx => { wHK.start({ seed: 3, skill: [1, 1], hexes: hx, powers: false }); let n = 0; while (wHK.phase !== 'live' && n++ < 400) wHK.step(); wHK.step(90);
             const S = wHK.sta(), on = wHK.play.pl.filter(q => !q.off && q.pos !== 'G'); return [0, 1].map(s => on.filter(q => q.side === s).reduce((a, q) => a + 1 - S[s][q.ri], 0)); };
           const pens = hx => { let a = 0, b = 0; for (let i = 0; i < 40; i++) { const g = wHK.simGame({ seed: 300 + i, skill: [1, 1], hexes: hx }); a += g.pens.filter(x => x.side === 0).length; b += g.pens.filter(x => x.side === 1).length; } return [a, b]; };
@@ -157,7 +157,7 @@ async def main():
         await pg.evaluate("wLeaveRink(); wDrain(); for (const b of document.querySelectorAll('#modalBox [data-close], #wRinkOk')) b.click()")
 
         # backing away from the card costs nothing, even on a retry; the toll is paid once, at the face-off
-        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('rink'); const card = !!document.querySelector('[data-uhk]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 30 gold');
+        bk = await pg.evaluate("""(() => { RUN.gold = 200; const g0 = RUN.gold; const why = wNadirMatch('rink'); const card = !!document.querySelector('[data-uhk]'); const toll = document.getElementById('modalBox').textContent.includes('toll, 20 gold');
           document.getElementById('wUhkNo').click(); return { why, card, toll, back: RUN.gold - g0, live: wRinkLive() }; })()""")
         check(bk['why'] == '' and bk['card'] and bk['toll'] and bk['back'] == 0 and not bk['live'], 'on a retry the card names the toll, and backing away costs nothing', bk)
         await pg.evaluate("RUN.gold = 200; wNadirMatch('rink')")
@@ -165,7 +165,7 @@ async def main():
         await pg.click('[data-uhk="play"]')
         await pg.wait_for_function("UI.view === 'rink' && wRinkLive() && wHK.on")
         tl = await pg.evaluate("""(() => { const g1 = RUN.gold; const again = wUmbTollAtKickoff('rink'); return { paid: 200 - g1, again, mode: wHK.mode }; })()""")
-        check(tl['paid'] == 30 and tl['again'] == 0 and tl['mode'] == 'play', 'the retry pays its toll once, as the puck drops (Play: you skate it)', tl)
+        check(tl['paid'] == 20 and tl['again'] == 0 and tl['mode'] == 'play', 'the retry pays its toll once, as the puck drops (Play: you skate it)', tl)
 
         # a win pays the Dead Puck (and its gold)
         await pg.evaluate("wHK.pause(true)"); await pg.evaluate("window.__g1 = RUN.gold"); await pg.evaluate(f"({END})(true)")

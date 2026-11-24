@@ -46,7 +46,7 @@ W_LANES_KIT.opp[4] = { draught: 2, blsteady: 2, blchalk: 2, bloil: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.lanes = { piece: 'bowling', char: 'nadir_lanes', ground: 'g_lanes', map: 'u:g_lanes', region: 'tide', engine: 'lanes', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.lanes = { piece: 'bowling', char: 'nadir_lanes', ground: 'g_lanes', map: 'u:g_lanes', region: 'tide', engine: 'lanes', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_lanes = { name: 'Ossery Brine, the Drowned Pinsetter', kind: 'zombie', look: { coat: '#1e3a44', acc: 'hat' },
   greet: 'The sea came in under these lanes a long time ago, and we kept bowling. I set the pins down here, and I keep the PIN. Say PLAY when you want to bowl for it. Ask about the RULES first; the water changes them.',
   topics: {
@@ -55,7 +55,7 @@ DB.chars.nadir_lanes = { name: 'Ossery Brine, the Drowned Pinsetter', kind: 'zom
     rules: { t: 'One team game, ten frames, the Baker format, your five against mine. My side bowls at your level and better at everything, a Lich reads the oil for us and weighs every ball before it leaves the hand, and we bring a full bag. Nobody goes home level: a roll-off. Before the first frame I draw the HEXES.' },
     hexes: { t: 'The water has its moods. Oil that turns to ichor under your ball, a pin too heavy to fall, gutters that pull, a black tide under your lane. You will hear which before the first frame.' },
     bell: { t: 'Once a game I ring the bell under the floor. The oil goes heavy for your five, and your ball carries less. Mind it.' },
-    toll: { t: 'Thirty gold a game, after the first. Paid at the first ball. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a game, after the first. Paid at the first ball. Walking away from the card costs nothing.' },
     play: { t: 'Then bring your five.', act: 'unadir:lanes' },
   } };
 

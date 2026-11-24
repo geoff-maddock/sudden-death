@@ -37,7 +37,7 @@ W_LINKS_KIT.opp[4] = { draught: 2, glstill: 1, glmoss: 1, gloil: 1 };
 if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
 if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
 
-W_NADIR.links = { piece: 'golf', char: 'nadir_links', ground: 'g_links', map: 'u:g_links', region: 'bloom', engine: 'links', hexes: 1, toll: 30, gold: 100 };
+W_NADIR.links = { piece: 'golf', char: 'nadir_links', ground: 'g_links', map: 'u:g_links', region: 'bloom', engine: 'links', hexes: 1, toll: 20, gold: 100 };
 DB.chars.nadir_links = { name: 'Sexton Vale, the Last Caddie', kind: 'wraith', look: { coat: '#2e3a28', acc: 'hat' },
   greet: 'Nobody finishes a round here. They just stop playing. I keep the FLAG on the last green. Say PLAY when you want to try for it, and ask about the RULES first. They change.',
   topics: {
@@ -46,7 +46,7 @@ DB.chars.nadir_links = { name: 'Sexton Vale, the Last Caddie', kind: 'wraith', l
     rules: { t: 'Match play, captain\'s choice, your four against my four, one ball a side. My side plays at your level and better at everything, a Lich carries our bag and reads every green for us, and we bring a full bag of potions. Before the first tee I draw the HEXES.' },
     hexes: { t: 'A green that will not lie still. A cup that wanders off. Fog over the flag. A wind that turns while you swing. One of them, for you. You will hear which before the first tee.' },
     hollow: { t: 'Once a round I let the flag go hollow. Your reads come up short, and your hands shake on the putts. Mind it.' },
-    toll: { t: 'Thirty gold a round, after the first. Paid on the first tee. Walking away from the card costs nothing.' },
+    toll: { t: 'Twenty gold a round, after the first. Paid on the first tee. Walking away from the card costs nothing.' },
     play: { t: 'Then pick your four.', act: 'unadir:links' },
   } };
 
@@ -89,7 +89,7 @@ function wUmbGlCard(C, id, hx) {
   const H = wUmbGlHexWords(hx), uo = wGL.ultOwn[W_UMB4F.champ.ult], champ = W_UMB4F.four.find(f => f.champ).n, piece = W_UMB_PIECES[C.piece];
   const toll = !C.toll ? '' : tries > 0 ? `This round costs the toll, ${C.toll} gold, on the first tee.` : `The first round is free; after a loss, each costs a toll of ${C.toll} gold.`;
   const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
-    <p><b>The Hollow Links: tier U.</b> Golf against the ${esc(W_UMB4F.team.name)}: level ${lvl}, in umbral form (${W_LKG.oppBonus[W_UMB4F.tier]} rating points on each of their four), their bag carried by a ${esc(W_BALL_SKILL[wLinksSkill(W_UMB4F.tier)[1]])}, who weighs every shot before they play it and reads the greens better than any caddie you have met, and a full bag of potions. ${esc(champ)} plays for them, and once a round lets ${esc(uo.n)} fly: ${esc(uo.desc)}</p>
+    <p><b>The Hollow Links: tier U.</b> Golf against the ${esc(W_UMB4F.team.name)}: level ${lvl}, in umbral form (${W_LKG.oppBonus[W_UMB4F.tier]} rating point${W_LKG.oppBonus[W_UMB4F.tier] === 1 ? "" : "s"} on each of their four), their bag carried by a ${esc(W_BALL_SKILL[wLinksSkill(W_UMB4F.tier)[1]])}, who weighs every shot before they play it and reads the greens better than any caddie you have met, and a full bag of potions. ${esc(champ)} plays for them, and once a round lets ${esc(uo.n)} fly: ${esc(uo.desc)}</p>
     <p class="hint wumbpg"><b>Hexes:</b> ${H.length ? H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ') : 'none'}</p>
     <p class="hint">Win, and ${C.piece ? `${esc(piece.n)} is yours, with ${C.gold} gold` : `${esc(piece.n)} is yours`}. ${toll} A golf match never ends level. <b>Play</b>: you swing every shot. <b>Manage</b>: you call the line and the stances; your four swing. <b>Simulate</b>: the result now.</p></div>
     <div class="row"><button class="btn" data-ugl="play">Play</button><button class="ghost" data-ugl="manage">Manage</button><button class="ghost" data-ugl="sim">Simulate</button><button class="ghost" id="wUglNo">Not now</button></div>`, () => wDrain());

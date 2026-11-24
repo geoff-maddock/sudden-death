@@ -198,3 +198,12 @@ src/realm/umbral/u4i-conds.js
 src/realm/umbral/u5-finale.js
 src/realm/umbral/u6-rewards.js
 src/realm/umbral/u7-feel.js
+src/realm/umbral/u8a-fixes.js
+src/realm/umbral/u8b-land.js
+src/realm/umbral/u8c-dread.js
+src/realm/umbral/u8d-gauntlet.js
+src/realm/umbral/u8e-forms.js
+src/realm/umbral/u8h-market.js
+src/realm/umbral/u8i-legends.js
+src/realm/umbral/u8j-feats.js
+src/realm/umbral/u9-redeemed.js

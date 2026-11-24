@@ -21,7 +21,7 @@
               the wings come at a worse angle (hkNetOff, read by hkShotOdds, hkRelease, hkGoalSpot and hkNets)
      cold     Grave Cold: that side's skaters tire HK_HEX.cold.k times as fast
      whistle  The Hollow Whistle: the referee is the other side's: that side's fouls are called HK_HEX.whistle.k times as
-              often (hkFoulK)
+              often (hkFoulK; interference too, hkWhistleK, at most HK_HEX.whistle.max of the time)
    The hexes are named over the opening face-off (the intro beat, and the line under the rink) and under the score bar
    all game; the holes are drawn on the ice and the net is drawn where it has slid.
    A captain's own ultimate: a roster player sent with { ult: id } brings that one (HK_ULT_BY) instead of their kind's
@@ -32,7 +32,7 @@ const HK_HEX = {
   holes: { n: 'The Ice Opens', d: 'Holes of open water in the end you attack, new ones each period: a puck that slides into one is gone, and the face-off goes back to centre ice.', count: 2, r: .9 },
   slide: { n: 'The Wandering Net', d: 'The net you shoot at slides along its goal line away from the puck, and the goalie goes with it: shots from the wings come at a worse angle.', max: 1.8, v: 1.6, k: .4 },
   cold: { n: 'Grave Cold', d: 'The cold of the pond gets into your skaters: they tire 30% faster.', k: 1.3 },
-  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called twice as often.', k: 2 },
+  whistle: { n: 'The Hollow Whistle', d: 'The referee skates for them: your fouls are called up to twice as often.', k: 2, max: .9 },
 };
 // the Nadir captain's own ultimate
 HK_ULT_OWN.longnight = hkU0('longnight', 'The Long Night', 'The lamps go out over the pond: their goalie is set late for everything, and they skate as if through deep snow.', { blind: .6, shot: .02 }, { slow: .86 }, 'slot');
@@ -81,8 +81,10 @@ const hkNetOff = side => G && G.hex && G.hex.slide && side === 1 - G.hex.on ? G.
 // the same, for the net whose goal line is near x (the nets' boxes, 05-live.js)
 function hkNetOffX(x) { if (!G || !G.hex || !G.hex.slide) return 0; const d = 1 - G.hex.on; return (hkGoalX(1 - d) < HK_RULES.len / 2) === (x < HK_RULES.len / 2) ? G.hex.slide : 0; }
 const hkHexTire = side => hkHexOn('cold', side) ? HK_HEX.cold.k : 1;
-// how often side's fouls are called: its Edge, and the Hollow Whistle
-const hkFoulK = side => hkEdgeSt(side).foul * (hkHexOn('whistle', side) ? HK_HEX.whistle.k : 1);
+// how often side's fouls are called: its Edge, and the Hollow Whistle (hkWhistleK alone for interference, which no
+// Edge changes: 09-hands.js)
+const hkWhistleK = side => hkHexOn('whistle', side) ? HK_HEX.whistle.k : 1;
+const hkFoulK = side => hkEdgeSt(side).foul * hkWhistleK(side);
 // each step: the net slides away from the puck
 function hkHexStep(dt) {
   if (!hkHexHas('slide')) return;

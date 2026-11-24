@@ -32,7 +32,7 @@ const bkSpotOk = (m, n) => !!m && BK_POS.every(k => Number.isInteger(m[k]) && m[
 function bkTeam(t) {
   const roster = (t.roster || t.kinds.map((kind, i) => ({ kind, n: kind[0].toUpperCase() + kind.slice(1), num: 3 + i * 7 }))).slice(0, BK_RULES.side + BK_RULES.bench)
     .map(p => Object.assign({ n: p.n, kind: p.kind, num: p.num, r: Object.assign(bkRate(p.kind), p.r || {}) }, p.pw ? { pw: { off: p.pw.off === 1 ? 1 : 0, def: p.pw.def === 1 ? 1 : 0 } } : {}, p.gear ? { gear: p.gear.name, gid: p.gear.id, gx: bkGx(p.gear.fx) } : {}, p.ult && BK_ULT_BY[p.ult] ? { ult: p.ult } : {}));
-  const T = { name: t.name, short: t.short, color: t.color, light: t.light, roster };
+  const T = Object.assign({ name: t.name, short: t.short, color: t.color, light: t.light, roster }, t.shade ? { shade: 1 } : {}); // (shade: an Umbral side, drawn in shadow)
   // the five's spots: the best handler at the point, the two biggest inside, then the better shooter on the wing
   const free = new Set(roster.slice(0, BK_RULES.side).map((_, i) => i)), by = f => { const i = [...free].sort((a, b) => f(roster[b].r) - f(roster[a].r))[0]; free.delete(i); return i; };
   T.spot = {}; T.spot.PG = by(r => r.hnd * 2 + r.spd - r.siz * .5); T.spot.C = by(r => r.siz * 2 + r.def * .5 + r.hop * .5); T.spot.PF = by(r => r.siz * 2 + r.hop);

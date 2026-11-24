@@ -1822,7 +1822,7 @@ about as hard as a rival's six at tier U.
 | The Ice Opens | -12.5 (three holes, the face-off in your own end) | -4.7 (three, at centre ice) | -2.3 (two, at centre ice) |
 | The Wandering Net (1.3 m, then 1.8 m) | -6.0 | -0.5 | +1.0 |
 | Grave Cold (35%, then 30% more tiring) | -10.0 | -1.3 | 0.0 |
-| The Hollow Whistle (your fouls twice as often) | -6.5 | +0.2 | +2.7 |
+| The Hollow Whistle (your fouls up to twice as often, capped) | -6.5 | +0.2 | +2.7 |
 
 The first 200-game look had a lucky base (21%) and read every hex as costly; at 600 games only The Ice Opens shows
 clearly, and it was the one that was cut (a face-off in your own end, three holes): no hex moves the game more than
@@ -1996,3 +1996,176 @@ after: 29 Crown winners, the Seal forged by 4 (14%, against 12% before: inside t
 made those two the hardest games in the Umbral: the Bone Diamond 22% to 10% a game, the Dead Pond 27% to 8% (a hockey
 game is low-scoring, so a two-goal margin is steep). The others as before, within the noise: the Gatekeeper 38%, the Cinder
 Pit 18%, the Black Court 17%, the Drowned Lanes 17%, the Hollow Links 9%, the Broken Ring 9%.
+
+### Umbral: corrupted forms (#111, E)
+
+Three card-game traits replaced their stand-ins (`src/realm/umbral/u8e-forms.js`): the wraith's Half There (the first
+hit from an attack against it each turn does nothing; was 1 Strength and 6 Block), the ogre's Won't Flinch (Weak and
+Exposed don't take; was 12 Block), the spider's Webs the Bench (a card in your hand costs 1 more that turn; was a Slimed
+in your draw pile). `python3 test/realm_umbral_lab.py 80`, the old traits put back by the override against the new,
+same build:
+
+| kind | old traits (80) | new traits (80) | old, after the review fixes (80) | new, after the fixes (80) |
+|---|---|---|---|---|
+| light3 | 99.5% | 97.9% | 98.9% | 98.7% |
+| dark | 92.3% | 95.4% | 91.4% | 94.9% |
+| light3 elite | 89.6% | 87.7% | 88.7% | 94.2% |
+| dark elite | 68.9% | 63.6% | 73.7% | 64.1% |
+| gate | 44.8% | 60.5% | 57.0% | 56.4% |
+
+The lab is noisy: each run is a fresh set of journeys, and the gate (no wraith, ogre or spider in it) moved 16 points
+between two runs with nothing changed for it, so a row moves about 10 points on its own. Only dark elite fell in both
+pairs; its elites are the Champ and the Spider Matriarch, and by the match ids the whole fall was the Matriarch. Paired
+(each Crown-winning team fights the dark Matriarch 10 times under each spider trait; 29 teams, 290 matches each):
+
+| spider trait | win |
+|---|---|
+| none | 63.4% |
+| a Slimed in your draw pile (the old) | 53.8% |
+| Webs the Bench every turn | 45.9% |
+| **Webs the Bench every other turn (the first, the third...)** | **50.0%** |
+
+Every turn was 8 points under the old trait, every other turn 4, inside the 10-point rule for a single trait: the web
+lands every other turn. These spider figures came from the realm bot as it was then, valuing a card by its printed
+cost; it now values one by `cardCost` (a webbed card 1 more, as a player sees it), so the final balance pass
+re-measures them. The wraith and the ogre don't come up in the lab's dark pools (their checks are in
+`test/realm_umbral_forms.py`, the realm bot beating a Wraith among them).
+
+After the review rounds (Half There narrowed to an attack's or a set play's hit, never a skill's or a raw blow; the
+web every other turn; the bot valuing a card by `cardCost`), `python3 test/realm_umbral_lab.py 100`, once: light3
+99.1%, dark 93.5%, light3 elite 88.4%, dark elite 64.4% (the Champ 79.8%, the Spider Matriarch 50.0%), gate 49.5%.
+Inside the spread of the runs above; the final balance pass measures it again.
+
+Set plays counted with attacks for Half There (round 4): `python3 test/realm_umbral_lab.py 100` on the build before
+it (`7053df1`) and after it (`7d4c391`, the run above), both before phases F and G were merged in:
+
+| kind | before (100) | after (100) |
+|---|---|---|
+| light3 | 96.4% | 99.1% |
+| dark | 92.7% | 93.5% |
+| light3 elite | 89.6% | 88.4% |
+| dark elite | 64.1% (the Champ 75.5%, the Matriarch 48.8%) | 64.4% (the Champ 79.8%, the Matriarch 50.0%) |
+| gate | 54.7% | 49.5% |
+
+No wraith comes up in the lab's dark matches, so the change can't move these: the two runs differ by the noise alone.
+
+### Umbral: the corrupted legends (#111, phase F)
+
+**The world legends.** Three card-game bosses, each a single player (boss HP, then tier U's quarter more), in two
+phases, waking with the Dread: the Corrupted Kraken (the Stirring), the Corrupted Phoenix (the Raging) and the
+Corrupted Frost Wyrm (the Last Hour). Played alone against a whole team, the first cut (no extra Strength, the Wyrm
+under curling's rules) was far too easy: the bot won 97%, 79% and 100% straight after the Crown. Curling made the
+Wyrm's Blizzard a gift (a frozen card left in hand is 2 Block), so the Wyrm plays golf. Each now starts with extra
+Strength (`W_UMB8I.str`: 11, 9 and 10) and a fifth more HP than the first cut. Measured with a scratch lab: N realm-bot
+journeys, and each Crown winner then fights each legend three times rested, with the pieces set to its stage, and the
+Gatekeeper three times for reference:
+
+| straight after the Crown | the Kraken | the Phoenix | the Wyrm | the Gatekeeper |
+|---|---|---|---|---|
+| first cut (50 journeys) | 97% | 79% | 100% | 56% |
+| Strength 9, 7, 8; the Wyrm at golf (60 journeys) | 52% | 45% | 33% | 51% |
+| **kept: Strength 11, 9, 10, a fifth more HP (80 journeys, 153 fights each)** | **36%** | **38%** | **30%** | 64% |
+
+All but a handful of fights reach the second phase; the Phoenix rose in 85 of its 153. By the time a journey meets
+them the team has grown (guards, shadows, cards), so they are easier there: in the journey lab with the 9, 7, 8 cut the
+bot won 9 of 10 Kraken fights, 4 of 4 Phoenix and 3 of 4 Wyrm; with the kept numbers 10 of 26, 1 of 8 and 1 of 2 (small
+numbers: few journeys reach six and eight pieces). Hard, optional, and harder as the Dread climbs, which is the point.
+
+**The Seal with and without them** (`python3 test/realm_umbral_journey_lab.py N 15`, and `'window.UJ_NOLEGEND = 1'`):
+the bot fights each legend once when it wakes and sets each shard on the Seal's rounds in order, for one hex fewer.
+A lost legend costs a blackout (a tenth of the gold), and gold for the tolls is where many runs stop.
+
+| run | with the legends | without |
+|---|---|---|
+| 30 journeys (the 9, 7, 8 cut) | 19 Crown winners, the Seal 2 (11%); shards 0: 10, 1: 5, 2: 1, 3: 3 | 19, the Seal 0 (0%) |
+| **60 journeys (kept)** | 48, the Seal 1 (2%); shards 0: 37, 1: 10, 2: 1 | 49, the Seal 2 (4%) |
+
+Pooled, 3 of 67 with them and 2 of 68 without: inside the noise. The legends neither make nor break the Seal; the Seal
+rate itself is under the 5 to 15% target on these runs with or without them (phase C's shadows came in since the last
+measured runs), which is phase I's to tune.
+
+**The three lineups.** Each lab's Umbral part, run on the same build with the legend in its row and with the player it
+replaced put back (an override), 400 games a row (300 for bowling). Bowling's lab is deterministic for a given five (the
+journey's kinds pinned to `elf, minotaur, werewolf, goblin, spider`), so its rows pair game for game; football's and
+basketball's differ by 2 to 3 points between runs, so the average of the six Nadir rows (no hex, each hex alone, as
+played) is the steadier number.
+
+| the champion's game | without the legend | with it, at the team's level | **kept** |
+|---|---|---|---|
+| football, the Cinder Pit (Slagheart, a golem lineman, for the Behemoth): six rows / as played | 14.6% / 15.1% (three runs) | 10.6% / 10.3% | **a level down: 10.4% / 11.5%** (two levels down: 11.5% / 11.0%) |
+| basketball, the Black Court (Cairn, a golem, for the Hydra) | 15.5% / 15.9% (two runs) | **11.8% / 13.0%** | at its level |
+| bowling, the Drowned Lanes (Pale Tallow, a wraith, for the Djinn): eight rows / no hex / as played | 17.2% / 20.0% / 14.7% | 13.8% / 14.7% / 16.0% | **a level down: 14.2% / 16.3% / 15.0%** |
+
+The Behemoth and the Djinn each took about 5 points off at their team's level, so both play a level under the rest
+(`W_UMB8I.lineups[k].down`); the Behemoth's ratings are high enough that a level (or two) barely shows, and it stays at
+one level down, about 4 points under the game without it. The Hydra took about 3 and keeps its level. The finale's
+round in those sports fields the same side.
+
+### Umbral: the redeemed (#111, I1)
+
+The redeemed captain plays as their own kind at your team's best level, with one change: their own ultimate in their own
+sport (and a signature card in the card game). Measured as the stars lab measures a superstar: the extra player at an
+even level against tier 2, Simulate. The redeemed (`nadir_*`, the lab's `wStar` finds them), a plain player of the same
+kind (`k:<kind>`), and the six legends. `python3 test/realm_stars_lab.py 200 '' <part> ctl,k:<kind>,nadir_<id>,phoenix,kraken,behemoth,djinn,hydra,wyrm`
+for football, baseball, basketball, hockey, bowling and curling (120 a side), and boxing (`bx`: a card of three bouts,
+two of your own and the extra player; the extra player's own bout) and golf (`gl`: three of your own and the extra player
+as your four), the lab's two parts added for this. Win rates:
+
+| Sport | Plain kind | Redeemed | Legends (lowest to highest) |
+|---|---|---|---|
+| Football (lich, Eclipse) | 34.0% | 34.0% | 42.0 to 49.5% |
+| Baseball (witch, the Dead Ball) | 48.5% | 47.0% | 50.5 to 61.0% |
+| Boxing (minotaur, The Last Bell; the bout) | 45.5% | 39.0% | 46.5 to 56.5% |
+| Basketball (vampire, Lights Out) | 38.5% | 32.5% | 34.5 to 40.5% |
+| Hockey (wraith, The Long Night) | 40.0% | 42.0% | 39.0 to 55.0% |
+| Hockey, 500 a side | 41.4% | 43.8% | Behemoth 44.0% |
+| Golf (wraith, The Hollow Flag) | 30.0% | 28.0% | 27.5 to 45.5% |
+| Bowling (zombie, The Drowning Bell) | 43.0% | 43.0% | 49.0 to 58.0% |
+| Curling (lich, The Sunken Stone; 120 a side) | 45.8% | 45.8% | 45.0 to 62.5% |
+
+No redeemed star is stronger than the legends in any engine: they sit with a plain player of their kind (every gap is
+within the noise, about 5 points at 200 a side), under the legends' range or at its bottom. The one near-overlap,
+hockey's Hollis Grael at 200 a side (42.0% against the Behemoth's 39.0%), is level at 500 a side (43.8% against 44.0%);
+golf's Sexton Vale sits with the Phoenix (28.0% against 27.5%, the Phoenix being golf's weakest legend), under a plain
+wraith (30.0%).
+Nothing tuned: the champions' ultimates were already balanced as opponents (#99) and are the same numbers here. The
+legends' own numbers are unchanged by this part (the redeemed are a separate table; nothing a legend uses was touched).
+
+### Umbral: the whole journey after #111 (the Dread, feats, legends, the toll)
+
+`python3 test/realm_umbral_journey_lab.py 80 15` on the full #111 build: the walk out to every try (a hungry shadow by
+the Dread's stage), the legends fought once each as they wake, the feats chased where the bot can (night, no powers),
+shards spent on the Seal's rounds.
+
+| run (80 journeys) | Crown winners | Seal forged | reached all nine pieces |
+|---|---|---|---|
+| tolls 30 (as #99 left them), first run | 61 | 2 (3%) | 5 |
+| tolls 30, second run | 44 | 1 (2%) | 4 |
+| **tolls 20 (kept)** | 52 | **6 (12%)** | 12 |
+
+With the tolls at 30, the Seal fell under the 5 to 15% target (3 of 105 Crown winners across the two runs; a 60-journey
+run before the toll question gave 4 of 40). Gold, not losing, was what stopped most runs: 'gold at …' and a toll that
+couldn't be paid ended more journeys than any one champion, and the football champion (now fielding the Behemoth) was
+where most stalled. A champion's toll after a loss is now 20 gold (the Broken Bell takes 10 or 20 off it), which puts the
+Seal back in the band. Elsewhere in the run: pieces won well about 55% (123 of 231), the shadows won about 95% of the
+time (they cost HP, and gold only on a blackout), the Kraken about 40%, the Phoenix and the Wyrm 15 to 20% (the bot
+meets them late, when it has fewer tries left).
+
+**The shadows unseen until close.** A shadow now shows plainly only within 6 steps (5 from the Raging), fades over two
+more and is otherwise a faint shimmer (`W_UMB8C.show`, `haze`). Measured first with a careful walker (a scratch script:
+150 to 300 long walks per stage on the dark world, re-planning every step around the shadows it can see):
+
+| stage | caught, shadows seen across the screen | 5/5/4/3 (first try) | **6/6/5/5 (kept)** |
+|---|---|---|---|
+| the Quiet | 2% | 1% | 2% |
+| the Stirring | 2% | 1% | 3% |
+| the Raging | 12–15% | 25% | 13% |
+| the Last Hour | 23–25% | 53% | 38% |
+
+The first try doubled the late stages, so the kept numbers keep the early stages as they were and make only the Last
+Hour sharper. The journey lab's shadow chance for the Last Hour went from .8 to .9 a try to match. Three runs of
+`realm_umbral_journey_lab.py 80 15` after it: the Seal for 3 of 51, 4 of 50 and 4 of 53 Crown winners (11 of 154, 7%),
+against 14 of 112 (12.5%) for the two runs at .8. Still in the band. Most of that gap is noise: the change only
+touches tries made at 8 pieces or more, yet fewer of these runs got that far (12% of Crown winners against 21%), and of
+those that held all nine pieces the Seal rate was the same (11 of 16, against 14 of 23). The bot still wins about
+92% of its shadow matches.
