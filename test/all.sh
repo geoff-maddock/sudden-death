@@ -6,10 +6,9 @@
 # Each check's output goes to /tmp/sd-<check>.log; the summary prints in list order once they're all done, with each
 # check's last lines, any failures, and the slowest checks. Checks start slowest first (from the last run's times,
 # kept in build/test-times.txt), so the long ones aren't left until the end. The checks don't rebuild (SD_BUILT=1,
-# test/paths.py). Works on macOS and Linux. Uses the project venv if present. Each check has 240 seconds (realm_music,
-# which renders a minute of audio for each of its palettes, 600): through GNU
-# timeout on Linux, gtimeout from `brew install coreutils` on macOS, or perl's alarm otherwise, so a stuck check fails
-# rather than holding up the suite. Ctrl-C stops the checks that are running too.
+# test/paths.py). Works on macOS and Linux. Uses the project venv if present. Each check has 240 seconds (a few
+# slow ones more, below): through GNU timeout on Linux, gtimeout from `brew install coreutils` on macOS, or perl's
+# alarm otherwise, so a stuck check fails rather than holding up the suite. Ctrl-C stops the checks that are running too.
 cd "$(dirname "$0")/.."
 PY=python3; [ -x .venv/bin/python ] && PY=.venv/bin/python
 if command -v timeout >/dev/null 2>&1; then TO=timeout
@@ -31,12 +30,9 @@ TIMES=build/test-times.txt; touch "$TIMES"
 # one check: its log, then "<exit code> <seconds>" in build/test-status/<check>
 run_one() {
   local t="$1" s=$(date +%s) code lim=240 nc=0
-  # (realm_music renders audio flat out: at the lowest priority, so the real-time checks beside it aren't starved of
-  # CPU and left waiting on a live game; it has the time to spare)
-  [ "$t" = realm_music ] && lim=600 && nc=19
   # (passes alone in under 90s, but with four other heavy checks beside it has run past 240)
   [ "$t" = realm_gridiron_bench ] && lim=420
-  # (nine champions through every engine, about 80 Simulated games: under 30s alone, past 240 beside realm_music)
+  # (nine champions through every engine, about 80 Simulated games: under 30s alone, past 240 beside other heavy checks)
   [ "$t" = realm_umbral_redeemed ] && lim=420
   if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
   else "$TO" --foreground -k 10 $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?
