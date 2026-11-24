@@ -684,3 +684,50 @@ Brimstone Diamond runs in `scope wBD src/realm/diamond/manifest.txt src/realm/di
 - The feel (phase 11): `slideHits`, `slideSwept`, `slideStone` (the stone sliding now), `button` (the button's radius, `CR_BUTTON`); a stone's record carries `ham`; the box score counts `buttons` (draws made that came to rest on the button). The Realm: `wShedSlideBeat`, `wShedEndSound`, `TIPS.w_shed`, `TIPS.w_broom`, the medals `w_shed`, `w_broom`, `w_steal`, `w_four`, `w_button`, `#wHelpShedFeel`; Quick start `W_QUICK` entry `shed` (w112) and its pictures `shed-aim`, `shed-weight`, `shed-sweep` (w112a, from `test/realm_quick_shots.py shed`).
 - The frozen deep (issue #108; `16-deep.js`): `wCR.start({ deep: true })` puts Old Grey under the ice: `G.deep` (`{ x, y, nx, ny, hd, bumps, swings }` or null, plain JSON), `G.deepSaid` (Hennock's line, the page's first message); `deep` (a copy), `deepRules` (`CR_DEEP`: `reach`, `keen`, `curlCut`, `bumpR`, `bump`, `minBump`, `step`, `turn`, `box`), `deepSee(s)` (0 a Squire, 1 a Knight, 2 an Archmage or the Lich), `deepMu(x, y)`; a summary's `deep` (`{ bumps, swings }` or null), a stone's event `deep` (`[{ id, s, d }]`, the stones he bumped). Off, a game draws nothing for him: the same seed plays the same game. The Realm (`w139`): `W_DEEP.p`, `WDEEP.next`, on only in wild club matches (`wStartShed` with no `cup`), `#wHelpShedDeep`.
 - Tilda Spindle (`w131`): the Shed's fan (`DB.chars.gf_shed`) has the topics ICE, SWEEP, PLAY and JOB; `wTildaReady()`, `wTildaJoin()`, `W_TILDA`, `WG.flags.tilda_joined`.
+
+## The shared set and each sport's own (issue #115)
+
+Every engine sport in the Realm (baseball, football, boxing, basketball, hockey, golf, bowling, curling) has one shared set of powers, gear and potions, and keeps what makes it its own. `test/realm_powers_parity.py` checks it against the built `dist/realm.html`: its `SPORTS` table has one row per engine sport naming where each part lives, every engine in `W_ENGINES` must have a row, and every row must name every part (`PARTS`) and its How to play text. A failure names the sport and the part. **A new engine sport adds its row there** and can't ship until every part is in place.
+
+The shared set:
+
+- **Everyday powers by role,** two a role for each kind, and each player brings one of each pair, picked on the sport's tab and kept on the player. The CPU's clubs bring one too (the same each time, by name), and the lineup shows it.
+- **A team resource** for everyday powers (mana, unless the sport has a reason for another), and **a crowd meter** the gallery fills on big moments. In most sports the meter pays for the ultimate; in baseball and football mana pays for everything and the crowd lifts a cast instead (an everyday power half again as strong, or an ultimate's zone one more at-bat or play).
+- **One ultimate a kind,** once a game a side.
+- **Situation powers,** the team's, once a game each, offered when the moment fits.
+- **The CPU casts by its skill,** and **Auto powers** lets your coach or captain cast for you. Every cast is logged with a reason.
+- **One piece of gear a player a sport** (`W_GEAR`, worn as `p.gear.<key>`, reaching the engine through the player, never by changing their ratings), **and potions in the bag** (`W_POTIONS` for the sport, each in the engine's own table). The CPU uses its bag at its skill; your coaches never open your bag; Simulate leaves it alone.
+- **The ground's own ways:** something only that ground has, which you can see coming and learn. On in every game the Realm plays there, off in the bare engines, their tests and the labs unless asked, drawn from the seeded random, and with a line from the keeper.
+- **Superstars, the Umbral's hexes, and How to play** for all of it.
+
+What stays each sport's own:
+
+- The roles and what the powers do: each sport's powers do things only that sport could have.
+- Stamina as a cost where the sport is about legs: football's casting, boxing, and baseball's physical skills.
+- Boxing's natures (`BX_TRAIT`) and curses (`BX_CURSE`, washed off by the cut-man), baseball's weaknesses and hexes, football's stances, playbook and bench.
+- Steady (no pressure on a stone or stroke) only in the turn-based sports (golf, bowling, curling).
+- Wild-only events such as the tide, Old Grey and golf's wild nines: a ground may have one, but it isn't required.
+
+Where each part lives (scope names are the engines' exports; `G` is the engine's game):
+
+| Sport | Picks (player key; the pairs) | Resource | Crowd meter (what it buys) | Ultimate | Situation powers |
+|---|---|---|---|---|---|
+| Baseball (`wBD`) | `p.bdPw { bat, run, field, pitch }`; `wBdPair(g, role)` (w141), from each kind's own abilities | mana (`G.teams[s].mana`; abilities' `cost`), stamina for physical skills | `crowdRules`, `G.bdp.crowd` (a lift: `amp`) | `wBD.names().ult`, a kind's `rate(kind).ult` | `sit` (`BD_SIT`), `G.bdp.used` |
+| Football (`wGF`) | `p.gfPw { off, def }`; `powerBook[kind].off/off2/def/def2` | `mana` (`G.mana`), and stamina | `roarRules`, `G.roar` (a lift: `amp`) | `powerBook[kind].ult`, `G.ultUsed` | `situations` (`GF_SIT`), `G.sitUsed` |
+| Boxing (`wBX`) | `p.bxSp` (`'sp'` or `'sp2'`); `powerBook[kind].sp/sp2` | stamina (`powerCost`, `F.sta`) and spirit | `spirit` (`BX_SPIRIT`), `F.spirit` (the ultimate) | `powerBook[kind].ult`, `F.ultUsed` | `sits` (`BX_SIT`), `G.bxp.used` |
+| Basketball (`wBK`) | `p.bkPw { off, def }`; `powerBook[kind].off/off2/def/def2` | `powerRules.mana`, `G.mana` | `powerRules.spirit`, `G.spirit` (the ultimate) | `powerBook[kind].ult`, `G.ultUsed` | `sits` (`BK_SIT`), `G.sitUsed` |
+| Hockey (`wHK`) | `p.hkPw { puck, chk }`; `pows[kind].one/two` | `powRules.mana`, `G.mana` | `powRules.spirit` (the bank's roar), `G.spirit` (the ultimate) | `pows[kind].ult`, `G.ultUsed` | `sits` (`HK_SIT`), `G.sitUsed` |
+| Golf (`wGL`) | `p.glPw { long, short }`; `pow[kind]`, `pow2[kind]` | `manaRules`, `G.mana` | `roarRules`, `G.roar` (the ultimate) | `ult[kind]`, `G.ultUsed` | `sit` (`GL_SIT`), `G.sitUsed` |
+| Bowling (`wBL`) | `p.blPw { strike, spare }`; `pow[kind]`, `pow2[kind]` | `manaRules`, `G.mana` | `roarRules`, `G.roar` (the ultimate) | `ult[kind]`, `G.ultUsed` | `sit` (`BL_SIT`), `G.sitUsed` |
+| Curling (`wCR`) | `p.crPw { draw, hit }`; `pow[kind]`, `pow2[kind]` | `manaRules`, `G.mana` | `roarRules`, `G.roar` (the ultimate) | `ult[kind]`, `G.ultUsed` | `sit` (`CR_SIT`), `G.sitUsed` |
+
+| Sport | Gear (`p.gear.<key>`, through) | Potions (engine table, bag) | Auto powers | The ground's ways (rules, in `G`) | How to play |
+|---|---|---|---|---|---|
+| Baseball | `diamond`, `wNineBdPlayer` | `potions` (`BD_POTIONS`), `G.kit.bags` | Manage (`W_BALL_HOW.manage`, the engine's `rules.auto`), T | Graftonbury Ballpark, the mound grass and the floodlight: `ground`, `G.gd` | `#wHelpBallKit`, `#wHelpBallPow`, `#wHelpBallGround` |
+| Football | `grid`, `wSevenPlayer` | `potions` (`GF_POTIONS`), `G.bags` | `setAuto`, `powers().auto`, T | the Ash Bowl, ashfall and the heat shimmer: `ashRules`, `G.ash` | `#wHelpGfPowers`, `#wHelpGfPow2`, `#wHelpGfRoar`, `#wHelpGridKit`, `#wHelpGfAsh`, `#wGridHow` |
+| Boxing | `ring`, `wBxFighter` | `potions` (`BX_POTIONS`), `G.bags` | You corner (`W_RING_MODES.call`): your fighter casts as the CPU would | the Anvil Ring, the forge corner and the slack ropes: `anvilRules`, `G.anvil` | `#wHelpRingSpirit`, `#wHelpRingKit`, `#wHelpRingMore`, `#wHelpRingAnvil`, `#wRingHow` |
+| Basketball | `court`, `wCourtPlayer` | `potions` (`BK_POTIONS`), `G.bags` | `auto` | the Charter Court, the waxed boards and the bent rim: `courtRules`, `G.court` | `#wHelpCourtPow`, `#wHelpCourtKit`, `#wHelpCourtGame`, `#wCourtPowHow` |
+| Hockey | `rink`, `wRinkPlayer` | `potions` (`HK_POTIONS`), `G.bags` | `autoPow` (on unless turned off) | the Pond Rink, the pond ice and the old boards: `pondRules`, `G.pond` | `#wHelpRinkTab`, `#wHelpRinkKit`, `#wHelpRinkGame`, `#wRinkHowPow` |
+| Golf | `links`, `wLinksPlayer` | `potions` (`GL_POTIONS`), `G.bags` | `autoPow` (Manage) | Mossgate Links, the wood and the enchanted course: `woodRules`, `enchRules`, `G.wood` (wild nines, wild only) | `#wHelpLinksTab`, `#wHelpLinksKit`, `#wLinksHow` |
+| Bowling | `lanes`, `wLanesPlayer` | `potions` (`BL_POTIONS`), `G.bags` | `autoPow` (Manage) | the Saltmere Lanes, the hall and the tide: `hallRules`, `G.hall`, `G.tide` | `#wHelpLanesTab`, `#wHelpLanesKit`, `#wLanesHow` |
+| Curling | `shed`, `wShedPlayer` | `potions` (`CR_POTIONS`), `G.bags` | `autoPow` (Manage) | the Curling Shed, the frost and the sprites: `hallRules`, `G.hall` (Old Grey, `deepRules`, `G.deep`, in deep games only) | `#wHelpShedTab`, `#wHelpShedPowers`, `#wHelpShedKit`, `#wShedHow` |
