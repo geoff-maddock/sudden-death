@@ -198,11 +198,9 @@ gfWhy = function () {
 };
 
 /* ---------- on the field ---------- */
-const gfAshField0 = gfDrawField;
-gfDrawField = function (c) {
-  gfAshField0.apply(this, arguments);
-  const A = G && G.ash; if (!A) return;
-  const top = gfScr(0, -GF_HALF).y, bot = gfScr(0, GF_HALF).y;
+// (gfDrawField calls it with the grass painted, before the line of scrimmage and the line to gain, so both stay on top)
+function gfAshDrawField(c, top, bot) {
+  const A = G.ash;
   c.save();
   // the heat: a warm wash over the last 30 yards at that end, and the air rippling
   const e0 = A.hot ? 110 : -10, e1 = A.hot ? 70 : 30, p0 = gfScr(e0, 0).x, p1 = gfScr(e1, 0).x;
@@ -229,7 +227,7 @@ gfDrawField = function (c) {
     }
   });
   c.restore();
-};
+}
 const gfAshHud0 = gfDrawHud;
 gfDrawHud = function (c) {
   gfAshHud0.apply(this, arguments);

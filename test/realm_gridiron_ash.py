@@ -149,6 +149,27 @@ async def main():
         check('Ash Bowl' in hp['a'] and 'Ashfall' in hp['how'] and 'heat shimmer' in hp['how'] and 'Timeout' in hp['how'] and 'ash' in hp['said'] and 'heat' in hp['said'],
               'How to play, Football: how it works and Clinker Dunn\'s GRIDIRON line explain the ash and the heat', hp)
 
+        # ---------- the lines over the ash ----------
+        # the line of scrimmage is drawn over a patch lying on it, as it is over the bare grass
+        ln = await pg.evaluate("""(() => { const G = wGF.G, A = G.ash, cv = document.querySelector('#v-gridiron canvas'), c = cv.getContext('2d'), d = wGF.view().px;
+          const los = G.poss === 0 ? G.ball : 100 - G.ball, keep = { patches: A.patches, t: A.t }, px = () => { wGF.render(); const [x, y] = wGF.scr(los, -22); return Array.from(c.getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data).slice(0, 3); };
+          for (let i = 0; i < 200; i++) px();
+          A.patches = []; const bare = px(); A.patches = [{ x: los, y: -22, at: 0, m: 6 }]; A.t = 999; const ash = px(), on = wGF.ashAt(los, -22);
+          A.patches = keep.patches; A.t = keep.t; return { bare, ash, on }; })()""")
+        check(ln['on'] and ln['bare'][2] - ln['bare'][0] > 80 and all(abs(a - b) <= 25 for a, b in zip(ln['ash'], ln['bare'])),
+              'the blue line of scrimmage is drawn over the ash, not under it', ln)
+
+        # ---------- the timeout is in the save point ----------
+        await pg.evaluate("(() => { wGF.pause(false); for (const kind of ['troll', 'harpy']) wRecruit({ kind, lvl: 2 }, 'tavern'); wGfg().met = {}; wGF.speed = 6; })()")
+        check(await pg.evaluate("wStartGrid({ club: 'local', how: 'manage' })") == '', 'a Realm game starts (Manage)')
+        await pg.wait_for_function("UI.view === 'gridiron' && wGridLive() && wGF.phase === 'call' && !!WG.gfg.live.snap && !!wGF.ash()", timeout=30000)
+        await pg.evaluate("(() => { const A = wGF.G.ash; A.to[wGF.ash().you] = 1; A.t = 150; wGridBar(); })()")
+        await pg.click('#wGridTimeout')
+        tk = await pg.evaluate("(() => { const A = wGF.ash(); return { to: A.to[A.you], sweeps: A.sweeps, t: A.t }; })()")
+        sv = await pg.evaluate("""(() => { wGridLeave(); const left = UI.view; wResumeGrid(); const A = wGF.ash(); return { left, back: UI.view, to: A.to[A.you], sweeps: A.sweeps, t: A.t }; })()""")
+        check(tk['to'] == 0 and sv['left'] != 'gridiron' and sv['back'] == 'gridiron' and sv['to'] == 0 and sv['sweeps'] == tk['sweeps'] and sv['t'] == tk['t'],
+              'your timeout is kept in the save point: Save and leave, then Resume, keeps it used and the ash swept', {'took': tk, 'resumed': sv})
+
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\nFAILED: ' + ', '.join(FAILS) if FAILS else '\nall passed')

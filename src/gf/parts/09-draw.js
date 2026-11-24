@@ -109,6 +109,7 @@ function gfDrawField(c) {
   for (let a = 10; a < 100; a += 10) { const n = String(a <= 50 ? a : 100 - a); for (const ny of [-19, 19]) { const p = gfScr(a, ny); if (p.x > -30 && p.x < 990) txt(c, n, p.x, p.y + 7, '700 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(240,236,224,.55)', 'center'); } }
   c.restore();
   if (G.hex) gfHexDrawField(c, top, bot);
+  if (G.ash) gfAshDrawField(c, top, bot); // the Ash Bowl's heat and ash (20-ash.js), under the two lines below
   for (const s of [0, 1]) { const p = gfScr(s ? 105 : -5, 0); if (p.x > -100 && p.x < 1060) { c.save(); c.translate(p.x, p.y); c.rotate(s ? Math.PI / 2 : -Math.PI / 2); txt(c, G.teams[s].name.toUpperCase(), 0, 8, '800 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(255,240,220,.35)', 'center'); c.restore(); } }
   // the goalposts, scorched at the top
   for (const a of [-10, 110]) {

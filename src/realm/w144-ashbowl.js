@@ -5,7 +5,8 @@
    (ash: true or false) plays them.
    - Ashfall: ash settles in a few grey patches through each half and grows; a carrier cutting on it slows and may
      stumble, and a loose ball or a punt that comes down on it dies there. Clinker sweeps at the half and at a timeout:
-     the Timeout button in the bar (one a half, at your call); the other coach calls its own by its skill.
+     the Timeout button in the bar (one a half, at your call; kept in the game's save point, as a swap is, w48 wGridResnap);
+     the other coach calls its own by its skill.
    - The heat shimmer at one end: a long pass, a field goal or a punt toward it wobbles, more the deeper it goes. The
      ends switch at the half. The bar says so at your call on offense.
    Clinker Dunn's GRIDIRON line names both; Football: how it works has them in full (W_GRID_HOW), and How to play a line
@@ -22,7 +23,7 @@ wGF.simGame = o => wW144SimGame(wGfAshNext(o));
 
 /* ---------- the bar: a timeout, and the heat ---------- */
 $('wGridCalls').insertAdjacentHTML('afterend', '<button class="ghost" id="wGridTimeout" hidden>Timeout</button>');
-$('wGridTimeout').addEventListener('click', e => { e.stopPropagation(); const msg = wGF.ashTimeout(); if (msg) $('wGridTimeout').title = msg; wGridBar(); });
+$('wGridTimeout').addEventListener('click', e => { e.stopPropagation(); const msg = wGF.ashTimeout(); if (msg) $('wGridTimeout').title = msg; else wGridResnap(); wGridBar(); });
 const wW144GridBar = wGridBar;
 wGridBar = function () {
   wW144GridBar();

@@ -24927,6 +24927,7 @@ function gfDrawField(c) {
   for (let a = 10; a < 100; a += 10) { const n = String(a <= 50 ? a : 100 - a); for (const ny of [-19, 19]) { const p = gfScr(a, ny); if (p.x > -30 && p.x < 990) txt(c, n, p.x, p.y + 7, '700 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(240,236,224,.55)', 'center'); } }
   c.restore();
   if (G.hex) gfHexDrawField(c, top, bot);
+  if (G.ash) gfAshDrawField(c, top, bot); // the Ash Bowl's heat and ash (20-ash.js), under the two lines below
   for (const s of [0, 1]) { const p = gfScr(s ? 105 : -5, 0); if (p.x > -100 && p.x < 1060) { c.save(); c.translate(p.x, p.y); c.rotate(s ? Math.PI / 2 : -Math.PI / 2); txt(c, G.teams[s].name.toUpperCase(), 0, 8, '800 22px "Alegreya Sans", system-ui, sans-serif', 'rgba(255,240,220,.35)', 'center'); c.restore(); } }
   // the goalposts, scorched at the top
   for (const a of [-10, 110]) {
@@ -26564,11 +26565,9 @@ gfWhy = function () {
 };
 
 /* ---------- on the field ---------- */
-const gfAshField0 = gfDrawField;
-gfDrawField = function (c) {
-  gfAshField0.apply(this, arguments);
-  const A = G && G.ash; if (!A) return;
-  const top = gfScr(0, -GF_HALF).y, bot = gfScr(0, GF_HALF).y;
+// (gfDrawField calls it with the grass painted, before the line of scrimmage and the line to gain, so both stay on top)
+function gfAshDrawField(c, top, bot) {
+  const A = G.ash;
   c.save();
   // the heat: a warm wash over the last 30 yards at that end, and the air rippling
   const e0 = A.hot ? 110 : -10, e1 = A.hot ? 70 : 30, p0 = gfScr(e0, 0).x, p1 = gfScr(e1, 0).x;
@@ -26595,7 +26594,7 @@ gfDrawField = function (c) {
     }
   });
   c.restore();
-};
+}
 const gfAshHud0 = gfDrawHud;
 gfDrawHud = function (c) {
   gfAshHud0.apply(this, arguments);
@@ -65534,7 +65533,8 @@ renderHelp = function () {
    (ash: true or false) plays them.
    - Ashfall: ash settles in a few grey patches through each half and grows; a carrier cutting on it slows and may
      stumble, and a loose ball or a punt that comes down on it dies there. Clinker sweeps at the half and at a timeout:
-     the Timeout button in the bar (one a half, at your call); the other coach calls its own by its skill.
+     the Timeout button in the bar (one a half, at your call; kept in the game's save point, as a swap is, w48 wGridResnap);
+     the other coach calls its own by its skill.
    - The heat shimmer at one end: a long pass, a field goal or a punt toward it wobbles, more the deeper it goes. The
      ends switch at the half. The bar says so at your call on offense.
    Clinker Dunn's GRIDIRON line names both; Football: how it works has them in full (W_GRID_HOW), and How to play a line
@@ -65551,7 +65551,7 @@ wGF.simGame = o => wW144SimGame(wGfAshNext(o));
 
 /* ---------- the bar: a timeout, and the heat ---------- */
 $('wGridCalls').insertAdjacentHTML('afterend', '<button class="ghost" id="wGridTimeout" hidden>Timeout</button>');
-$('wGridTimeout').addEventListener('click', e => { e.stopPropagation(); const msg = wGF.ashTimeout(); if (msg) $('wGridTimeout').title = msg; wGridBar(); });
+$('wGridTimeout').addEventListener('click', e => { e.stopPropagation(); const msg = wGF.ashTimeout(); if (msg) $('wGridTimeout').title = msg; else wGridResnap(); wGridBar(); });
 const wW144GridBar = wGridBar;
 wGridBar = function () {
   wW144GridBar();
