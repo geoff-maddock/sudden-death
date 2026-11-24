@@ -190,6 +190,9 @@ bxAsk = function () {
   }
 };
 // (switching to Corners mid-break takes your corner's advice: the wash too)
+// a patch in place of the wash your corner advised: it no longer says to wash
+const bxMorePatch0 = bxPatch;
+bxPatch = function () { const ok = bxMorePatch0.apply(this, arguments); if (ok && G.wait && G.wait.wash) G.wait.wash = false; return ok; };
 const bxMoreSetMode0 = bxSetMode;
 bxSetMode = function (m) { if (m === 'watch' && G && G.wait && G.wait.wash) bxWash(); return bxMoreSetMode0.apply(this, arguments); };
 

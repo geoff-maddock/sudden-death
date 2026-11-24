@@ -107,6 +107,14 @@ async def main():
         check(mine['ph'] == 'corner' and mine['wash'] and not mine['wpatch'] and mine['before'], 'your corner says to wash a curse off (and not to patch) when nothing needs patching', mine)
         check(mine['washed'] and not mine['after'] and not mine['patch'] and not mine['again'], 'Wash: the curse is gone, and the cut-man has done his job for the break (no patch after it)', mine)
 
+        alt = await pg.evaluate(f"""(() => {{ const G = __setup(3, ['golem', 'zombie'], {{ mode: 'call', you: 0 }}); if (wBX.wait) wBX.call(wBX.wait.plan);
+          for (let i = 0; i < 200 && wBX.phase !== 'round'; i++) wBX.step();
+          for (const f of G.F) {{ f.a = {{ k: 'idle', t: 0, dur: 0, id: 0 }}; f.think = 99; }} G.F[1].spirit = 100; wBX.curseAt(1); G.F[0].hp = G.F[0].hpMax;
+          for (let i = 0; i < 4000 && wBX.phase !== 'corner'; i++) {{ for (const f of G.F) {{ f.think = 99; }} wBX.step(); }}
+          const w = wBX.wait, said = !!(w && w.wash), patch = wBX.patch();
+          return {{ said, patch, after: !!(wBX.wait && wBX.wait.wash), cursed: !!G.F[0].curse }}; }})()""")
+        check(alt['said'] and alt['patch'] and not alt['after'] and alt['cursed'], 'Patch in place of the advised wash: the corner stops saying to wash, and the curse stays', alt)
+
         # ---------- situation powers ----------
         sit = await pg.evaluate("""(() => { const out = {};
           let G = __setup(3, ['golem', 'golem']); out.none = ['canvas', 'last', 'bell'].map(k => wBX.sitAt(0, k));
