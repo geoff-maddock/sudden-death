@@ -11,7 +11,8 @@
      more the nearer it lies (crDeepBump); a push that would put it off the sheet, back over the hog line or into
      another stone tries half the distance, then leaves it be.
    - The CPU reads him by skill (CR_DEEP_SEE, set round the skip's call by crDeepSight): a Squire not at all, a Knight
-     the keen ice, an Archmage and the Lich the bumps too (its trial runs bump the stones as he will). The real stone
+     the keen ice, an Archmage and the Lich the bumps too (its trial runs bump the stones as he will; its look at the
+     other rink's reply doesn't bump them again: crDeepNoBump). A Granite Stone at rest he leaves be. The real stone
      always meets him, and so do your own guide and your captain's sweepers.
    G.deep = { x, y, nx, ny, hd, bumps, swings } (bumps: stones he has pushed; swings: pushes that changed the end's
    score as the stones lay), or null. Plain JSON, so a match kept between stones keeps him. G.deepSaid is Hennock's
@@ -23,6 +24,9 @@ const CR_DEEP = { reach: 30, keen: .1, curlCut: .4, bumpR: 20, bump: 6, minBump:
 let CR_DEEP_SEE = 2;
 const crDeepSeeOf = s => { const sk = ((G && G.skill) || [])[s] ?? 1; return sk >= 2 ? 2 : sk === 1 ? 1 : 0; };
 function crDeepSight(s, fn) { const k = CR_DEEP_SEE; CR_DEEP_SEE = crDeepSeeOf(s); try { return fn(); } finally { CR_DEEP_SEE = k; } }
+// (an Archmage's look at the other rink's reply plays on stones its own trial has already bumped at his next spot, and by
+// then he has swum there and his spot after is unknown: the reply's trials read the keen ice, not a second bump)
+function crDeepNoBump(fn) { const k = CR_DEEP_SEE; CR_DEEP_SEE = Math.min(k, 1); try { return fn(); } finally { CR_DEEP_SEE = k; } }
 const crR2 = v => +v.toFixed(2);
 // his next spot from where he is: the heading turns a little, and turns back off the box's edges
 function crDeepNext(d) {
@@ -47,7 +51,8 @@ const crDeepCurl = (x, y) => crDeepNear(x, y, CR_DEEP.curlCut);
 function crDeepBump(stones) {
   const D = CR_DEEP, d = G && G.deep, R2 = 2 * CR_SHEET.stoneR, out = []; if (!d) return out;
   for (const st of stones) {
-    const dist = Math.hypot(st.x - d.nx, st.y - d.ny); if (dist >= D.bumpR) continue;
+    // (a Granite Stone at rest won't be moved: 13-powers.js)
+    const dist = Math.hypot(st.x - d.nx, st.y - d.ny); if (dist >= D.bumpR || st.g) continue;
     const ux = dist > 1e-6 ? (st.x - d.nx) / dist : Math.cos(d.hd), uy = dist > 1e-6 ? (st.y - d.ny) / dist : Math.sin(d.hd), amt = Math.max(D.minBump, D.bump * (1 - dist / D.bumpR));
     for (const k of [amt, amt / 2]) {
       const m = { x: crR2(st.x + ux * k), y: crR2(st.y + uy * k) };

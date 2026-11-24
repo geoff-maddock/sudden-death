@@ -139,10 +139,11 @@ function crRightDraw(c) {
   for (const [r, col] of [[72, '#3c78c8'], [48, '#f4f8fa'], [24, '#c83a3a'], [6, '#f4f8fa']]) { c.fillStyle = col; c.beginPath(); c.arc(V.hx, V.hy, r * k, 0, Math.PI * 2); c.fill(); }
   c.strokeStyle = '#2a3a48'; c.lineWidth = 1; c.beginPath(); c.moveTo(V.w, V.hy); c.lineTo(960, V.hy); c.moveTo(V.hx, 0); c.lineTo(V.hx, 330); c.stroke();
   const by = crHouseScr(0, CR_SHEET.back)[1]; c.beginPath(); c.moveTo(V.w, by); c.lineTo(960, by); c.stroke();
+  // Old Grey under the ice, under the path and the call (16-deep.js)
+  crDeepHouseDraw(c);
   // the path of the stone in play, and the call
   const X = GP && GP.X; if (X) { c.strokeStyle = 'rgba(40,60,90,.45)'; c.lineWidth = 1.5; c.beginPath(); X.Q.path.forEach(([x, y], i) => { const [px, py] = crHouseScr(x, y); i ? c.lineTo(px, py) : c.moveTo(px, py); }); const T = X.Q.T, [tx, ty] = crHouseScr(T.x, T.y); c.lineTo(tx, ty); c.stroke(); }
   const S = GP && GP.sel; if (GP && (GP.ph === 'aim' || GP.ph === 'swing') && S) { const [bx, by2] = crHouseScr(S.x, S.y); c.strokeStyle = '#d8a400'; c.lineWidth = 2.5; c.beginPath(); c.arc(bx, by2, 9, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.moveTo(bx - 13, by2); c.lineTo(bx + 13, by2); c.moveTo(bx, by2 - 13); c.lineTo(bx, by2 + 13); c.stroke(); }
-  crDeepHouseDraw(c);
   for (const [id, x, y] of crStonesNow()) { const [sx, sy] = crHouseScr(x, y); crStoneDraw(c, sx, sy, 1, G.teams[crSideOf(id === 'new' && X ? X.s : id)].color || '#888', k); }
   c.restore();
   // the whole sheet as a strip, the stones on it as dots

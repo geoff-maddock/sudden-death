@@ -100,9 +100,10 @@ function crThrowFinish(X) {
   // (the frozen deep: Old Grey bumps the stones at rest where he swims next, before the rules score them: 16-deep.js)
   const sc0 = G.deep ? crScoreEnd(run.stones) : null, bumps = G.deep ? crDeepBump(run.stones) : [], sc1 = bumps.length ? crScoreEnd(run.stones) : sc0;
   const rule = crThrow(s, run.stones, { hit: run.hits > 0 }); if (!rule.ok) { G.legs = X.legs0; console.warn('The Curling Shed: a stone refused by the rules:', rule.why); return crRefused(s, rule.why); }
-  // (he swims after every stone the rules take; a bump the free guard zone undid isn't kept, or counted)
+  // (he swims after every stone the rules take; a stone the free guard zone takes off changes nothing, so he stays where he
+  // is, his ring still where he goes next, and its bump isn't kept)
   const bumped = rule.fgz ? [] : bumps;
-  if (G.deep) { G.deep.bumps += bumped.length; if (bumped.length && (sc0.s !== sc1.s || sc0.n !== sc1.n)) G.deep.swings++; crDeepSwim(); }
+  if (G.deep && !rule.fgz) { G.deep.bumps += bumped.length; if (bumped.length && (sc0.s !== sc1.s || sc0.n !== sc1.n)) G.deep.swings++; crDeepSwim(); }
   if (G.wear !== false) crWear(G.ice, run.path);
   // (Hoarfrost: the first of the other rink's stones an end to lie in the four-foot freezes there: 15-umbral.js)
   const froze = G.hex ? crHexFreeze() : false;

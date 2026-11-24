@@ -53,13 +53,32 @@ async def main():
           const st = G.stones.find(o => o.id === '1:9'), moved = st ? Math.hypot(st.x - sx, st.y - ny) : -1, away = st ? Math.hypot(st.x - nx, st.y - ny) > 5 : false;
           return { ok: ev && ev.rule && ev.rule.ok, moved: +moved.toFixed(2), inRange: moved >= D.minBump - .01 && moved <= D.bump + .01, away, at: G.deep.x === nx && G.deep.y === ny, bumps: G.deep.bumps, said: /Old Grey/.test(G.hallSaid || '') }; })()""")
         check(b['ok'] and b['inRange'] and b['away'] and b['at'] and b['bumps'] == 1 and b['said'], 'after a stone, Old Grey swims to his next spot and bumps a stone lying there a few inches straight away from him, and the status line says so', b)
-        l = await pg.evaluate("""(() => { const D = wCR.deepRules, R = wCR.sheet.stoneR, H = wCR.sheet.halfW; wCR.start({ seed: 9, deep: true, hammer: 1 }); const G = wCR.G, d = G.deep;
-          // put his next spot by the boards, a stone against them, and two touching stones inside his reach
-          d.nx = H - 26; d.ny = -20; G.stones.push({ id: '1:7', s: 1, x: H - R - .2, y: -20 }, { id: '1:8', s: 1, x: H - 30, y: -20 - 3 }, { id: '0:9', s: 0, x: H - 30, y: -20 - 3 - 2 * R - .1 });
+        l = await pg.evaluate("""(() => { const R = wCR.sheet.stoneR, H = wCR.sheet.halfW; wCR.start({ seed: 9, deep: true, hammer: 1 }); const G = wCR.G, d = G.deep;
+          // his next spot by the boards: a stone against them, 12 inches off it (a push either way would take it off the
+          // sheet); and a stone 6 inches off it with another touching it on the far side (a push either way runs into it)
+          d.nx = H - 18; d.ny = -20; const A = { id: '1:7', s: 1, x: H - R - .2, y: -20 }, B = { id: '1:8', s: 1, x: H - 24, y: -20 }, C = { id: '0:9', s: 0, x: H - 24 - 2 * R - .05, y: -20 };
+          G.stones.push(Object.assign({}, A), Object.assign({}, B), Object.assign({}, C));
           const s = wCR.up(); wCR.throwStone(s, { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: 0, v: 60, h: 1 }, null);
+          const at = id => G.stones.find(o => o.id === id), still = (o, w) => !!o && o.x === w.x && o.y === w.y;
           const on = G.stones.every(o => wCR.onSheet(o)), n = G.stones.length, ov = G.stones.some((p, i) => G.stones.some((q, j) => j > i && Math.hypot(p.x - q.x, p.y - q.y) < 2 * R - 1e-3));
-          return { on, n, overlap: ov }; })()""")
-        check(l == {'on': True, 'n': 3, 'overlap': False}, 'a bump never puts a stone off the sheet or into another (it tries half, then leaves it be)', l)
+          return { on, n, overlap: ov, boards: still(at('1:7'), A), blocked: still(at('1:8'), B) }; })()""")
+        check(l == {'on': True, 'n': 3, 'overlap': False, 'boards': True, 'blocked': True}, 'a bump never puts a stone off the sheet or into another: a stone at the boards, or with one behind it, tries half and is left be', l)
+        fg = await pg.evaluate("""(() => { wCR.start({ seed: 6, deep: true, hammer: 1 }); const G = wCR.G, d = G.deep, s = wCR.up();
+          // their guard in the free guard zone, peeled by the first stone: the rules put it back and take the stone off
+          d.x = -50; d.y = -10; d.nx = -50; d.ny = 30; const W = { id: `${1 - s}:5`, s: 1 - s, x: -46, y: 30 };
+          G.stones.push({ id: `${1 - s}:6`, s: 1 - s, x: 0, y: -150 }, Object.assign({}, W)); const was = JSON.stringify(G.deep);
+          const ev = wCR.throwStone(s, { shot: 'peel', x: 0, y: -150, h: 1 }, { ang: 0, v: 220, h: 0 }, null);
+          const w = G.stones.find(o => o.id === W.id);
+          return { fgz: !!(ev && ev.rule && ev.rule.fgz), stays: JSON.stringify(G.deep) === was, ring: !!w && w.x === W.x && w.y === W.y }; })()""")
+        check(fg == {'fgz': True, 'stays': True, 'ring': True}, 'a stone the free guard zone takes off: Old Grey neither swims nor bumps (his ring still says where he goes next)', fg)
+        gr = await pg.evaluate("""(() => { wCR.start({ seed: 5, deep: true, hammer: 1 }); const G = wCR.G, d = G.deep; const W = { id: '1:9', s: 1, x: d.nx + (d.nx > 0 ? -5 : 5), y: d.ny, g: 1 };
+          G.stones.push(Object.assign({}, W)); const s = wCR.up(); wCR.throwStone(s, { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: 0, v: 60, h: 1 }, null);
+          const w = G.stones.find(o => o.id === '1:9'); return !!w && w.x === W.x && w.y === W.y; })()""")
+        check(gr, 'a Granite Stone at rest is not moved by Old Grey (the power says it won\'t be)', gr)
+        tr = await pg.evaluate("""(() => { const out = {}; for (const sk of [1, 2]) { wCR.start({ seed: 5, deep: true, hammer: 1, skill: [sk, sk] }); const G = wCR.G, d = G.deep;
+            G.stones.push({ id: '1:9', s: 1, x: d.nx + (d.nx > 0 ? -5 : 5), y: d.ny }); const st = wCR.deepTry(wCR.up(), { ang: 0, v: 60, h: 1 }).find(o => o.id === '1:9');
+            out[sk] = st.x !== G.stones.find(o => o.id === '1:9').x; } return out; })()""")
+        check(tr == {'1': False, '2': True}, "a skip's trial run bumps the stones as Old Grey will for an Archmage, not for a Knight", tr)
         r = await pg.evaluate("""(() => { wCR.start({ seed: 4, deep: true }); const before = JSON.stringify(wCR.G.deep), s = wCR.up();
           const ev = wCR.throwStone(1 - s, { shot: 'draw', x: 0, y: 0, h: 1 }, { ang: 0, v: 141, h: 1 }, null);
           return { refused: !!ev && ev.rule && ev.rule.ok === false, same: JSON.stringify(wCR.G.deep) === before }; })()""")
@@ -111,8 +130,8 @@ async def main():
         check(not rl['cup']['deep'] and not rl['fix']['deep'] and not rl['exh'], 'never in the Brass Broom, a league fixture or the exhibition, however the roll falls', rl)
         check(rl['sim'], 'Simulate plays him too: the sim game has the deep', rl)
         await pg.evaluate("showPage('help')")
-        hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpShedDeep'); return !!h && /Old Grey/.test(h.textContent) && /club matches/.test(h.textContent); })()")
-        check(hp, 'How to play names Old Grey (club matches only)', hp)
+        hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpShedDeep'), all = document.getElementById('pg-help'); return { pointer: !!h && /Old Grey/.test(h.textContent) && /club match/.test(h.textContent) && /how it works/i.test(h.textContent) && h.textContent.length < 240, once: (all.textContent.match(/nudges any stone lying there/g) || []).length }; })()")
+        check(hp == {'pointer': True, 'once': 1}, 'How to play names Old Grey in a line (club matches only) and explains him once, in Curling: how it works', hp)
         # (a frame of the Shed with him under the ice: nothing thrown, and a picture to look at)
         await pg.evaluate("showPage('play')")
         await pg.evaluate("(() => { wShedGame({ seed: 31, deep: true, ends: 2, mode: 'watch' }); wCR.pause(true); const G = wCR.G; G.stones.push({ id: '0:8', s: 0, x: 10, y: -10 }, { id: '1:8', s: 1, x: -30, y: 20 }); showView('shed'); })()")

@@ -5,10 +5,11 @@
    A match kept between stones keeps him (he is in the engine's game, G.deep).
    WDEEP.next   the match being started has him (set round wStartShed, read by the engine's start and simGame)
    Wraps: wStartShed (wW139StartShed: the roll), wCR.start and wCR.simGame (wW139Start, wW139SimGame: deep in),
-   wShedHowHTML (wW139ShedHow: a line on the Shed tab), renderHelp (wW139RenderHelp: #wHelpShedDeep after
-   #wHelpShedGame). */
+   wShedHowHTML (wW139ShedHow: Old Grey in full, in How to play's Curling: how it works), renderHelp (wW139RenderHelp:
+   #wHelpShedDeep after #wHelpShedGame, a line that points there). */
 
 const W_DEEP = { p: 1 / 3,
+  line: 'Some club matches have a great pike under the ice, who nudges stones: see Curling: how it works.',
   help: 'Old Grey. In some club matches (never a cup or a league fixture) Hennock says Old Grey, a great pike, is under the ice. He lies in the far end, and the ice over him runs keen: a stone crossing it slides further and curls less. After every stone he swims to his next spot, shown as a dashed ring, and nudges any stone lying there a few inches away from him, never off the sheet. Read him and play round him, or let him carry your stone in.' };
 const WDEEP = { next: false };
 const wW139StartShed = wStartShed;
@@ -25,5 +26,5 @@ const wW139RenderHelp = renderHelp;
 renderHelp = function () {
   wW139RenderHelp();
   const after = $('wHelpShedGame'); if (!after || $('wHelpShedDeep')) return;
-  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedDeep"><b>${esc(W_DEEP.help.split('. ')[0])}.</b> ${esc(W_DEEP.help.split('. ').slice(1).join('. '))}</p>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpShedDeep"><b>Old Grey.</b> ${esc(W_DEEP.line)}</p>`);
 };
