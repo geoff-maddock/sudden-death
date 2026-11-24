@@ -342,6 +342,31 @@ is the one row near the edge (−5 at tier 3, both sides). The roar is felt, not
 human calling for it on a third down or at the goal line gets more from it than the CPU's dice. The numbers are as first
 set: no retune.
 
+### The Ash Bowl's ways (issue #115, phase 4)
+
+`python3 test/realm_gridiron_lab.py 400 '' ash` (part 7; about 90 seconds). Your seven at level 3 against a rival's at
+level 3, by tier, Simulate; yours a Knight. **Off** is how every other part plays (LAB mode leaves the ash out); **on** is
+the Realm's game (ashfall and the heat shimmer). Both rows play the same 400 seeded games; a row of 400 is good to about
+±5 points.
+
+| tier | off | on | swing | score off | score on |
+|---|---|---|---|---|---|
+| 1 (Squire) | 68.2% | 65.2% | −3.0 | 19.2–14.1 | 17.8–12.8 |
+| 2 (Knight) | 50.5% | 49.5% | −1.0 | 17.1–16.0 | 15.7–15.4 |
+| 3 (Archmage) | 30.5% | 30.2% | −0.3 | 14.5–20.4 | 13.4–19.0 |
+
+A game with it on: 12.5 throws and punts toward the heat wobble, about half a field goal is tried toward it, 0.1 to 0.2
+loose balls or punts die on the ash, and the carriers cut on the ash 0.77 times a game when their coach is a Squire (0.23
+of them a stumble), but only 0.12 to 0.16 when both coaches are Knights or better, who hold their line there. The CPU calls
+its timeout for a sweep about once a half from Knight up (2.5 a game, both sides; a Squire never does).
+
+**What it comes to.** Inside the noise on the result, and the same for both sides, as a ground's ways should be: the heat
+takes about 1.3 points a side off the score (deep balls and long kicks toward it go astray, and the coaches hold the deep
+shots back), and the ash is mostly a Squire's problem. In Play the ash is yours to steer round, and a careful human who
+saves the deep shots for the other end gets more from the heat than the coaches' rule. The numbers are as first set
+(patches 4.5 to 7 yards, a 30% stumble, 0.07 a yard of wobble past 12 yards, 0.7% a yard off a field goal past 25): no
+retune.
+
 ## Training spots (issue #6, phase 4)
 
 The bot drills a card and answers the challenge at each spot in every town it stops in, once a week (`opts.spots`). 140 journeys each, skilled bot, meals on:

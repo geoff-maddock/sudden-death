@@ -25,7 +25,13 @@ played, with W_NADIR.gridiron.hexes drawn at random. Only this part: a third arg
 Part 6, the roar (issue #115, phase 3; only with a third argument 'roar'): at an even level, by tier: off (as the other
 parts play: LAB mode leaves it out), both sides (the Realm's game), yours only and theirs only. Each row plays the same
 seeded games, so the rows differ only in the roar (python3 test/realm_gridiron_lab.py 200 '' roar; writes
-/tmp/realm_gridiron_lab_roar.json)."""
+/tmp/realm_gridiron_lab_roar.json).
+Part 7, the Ash Bowl's ways (issue #115, phase 4; only with a third argument 'ash'): at an even level, by tier (their
+coach a Squire, a Knight, an Archmage; yours a Knight): off (as the other parts play: LAB mode leaves them out) against
+on (ashfall and the heat shimmer, as the Realm plays every game), the same seeded games in both rows; with what the ash
+and the heat did a game (cuts on the ash and stumbles, balls that died on it, wobbling throws and kicks, field goals
+toward the heat, the timeouts called for a sweep). python3 test/realm_gridiron_lab.py 120 '' ash; writes
+/tmp/realm_gridiron_lab_ash.json."""
 import asyncio, json, sys, os, time, collections
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -59,9 +65,10 @@ window.GLAB = {
     const sk = wGridSkill(tier); if (o.skill != null) sk[1] = o.skill;
     const t0 = performance.now();
     const bags = o.kit ? [o.kit === 'theirs' ? null : Object.assign({}, KIT_MINE), Object.assign({}, W_GRID_KIT.opp[tier] || {})] : null;
-    const g = wGF.simGame(Object.assign({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false, stance: o.stance ? [o.stance, null] : null }, bags ? { bags } : {}, o.roar !== undefined ? { roar: o.roar } : {}, o.seed != null ? { seed: o.seed } : {}));
+    const g = wGF.simGame(Object.assign({ teams: [typeof wGridSquad === 'function' ? wGridSquad().team : wSevenTeam(), opp], skill: sk, powers: o.powers !== false, stance: o.stance ? [o.stance, null] : null }, bags ? { bags } : {}, o.roar !== undefined ? { roar: o.roar } : {}, o.ash !== undefined ? { ash: o.ash } : {}, o.seed != null ? { seed: o.seed } : {}));
+    const A = wGF.G.ash, ash = A ? Object.assign({ to: A.sweeps - (g.half - 1) }, A.tally) : null;
     const Q = wGF.G.roar, roar = Q ? { lifts: [0, 1].map(s => Q.casts.filter(c => c.side === s).length), ult: [0, 1].map(s => Q.casts.filter(c => c.side === s && c.k === 'ult').length), tally: Q.tally } : null;
-    const out = { roar, kit: o.kit || 'plain', used: [0, 1].map(s => (g.pots || []).filter(x => x.side === s).length), gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
+    const out = { roar, ash, kit: o.kit || 'plain', used: [0, 1].map(s => (g.pots || []).filter(x => x.side === s).length), gap, tier, skill: sk[1], powers: o.powers !== false, us: g.score[0], them: g.score[1], win: g.score[0] > g.score[1], tie: g.score[0] === g.score[1], ms: performance.now() - t0 };
     if (o.stance) {
       const G = wGF.G, mine = g.box.filter(b => b.side === 0), sum = k => mine.reduce((a, b) => a + (b.line[k] || 0), 0), on = [...new Set(Object.values(G.teams[0].off).concat(Object.values(G.teams[0].def)))];
       Object.assign(out, { stance: o.stance, to: sum('fuml') + sum('pint'), take: sum('ints') + sum('fr'), sacked: g.box.filter(b => b.side === 1).reduce((a, b) => a + (b.line.sk || 0), 0),
@@ -127,6 +134,8 @@ async def main():
             await umbral(pg, errs, t0); await br.close(); return
         if ONLY == 'roar':
             await roar(pg, errs, t0); await br.close(); return
+        if ONLY == 'ash':
+            await ash(pg, errs, t0); await br.close(); return
         games = []
         for gap in (-1, 0, 1, 2, 3):
             games += await batch(pg, N, f"GLAB.game(3, {gap}, 1 + i % 3)")
@@ -241,5 +250,24 @@ async def roar(pg, errs, t0):
     rs = [g for k in out if k.endswith(':all') for g in out[k]]; n = len(rs)
     ty = collections.Counter(); [ty.update(g['roar']['tally']) for g in rs]
     print(f"  in the Realm's game ({n} games, both sides), the stands saw a game: " + ', '.join(f"{k} {v / n:.2f}" for k, v in ty.items()))
+
+async def ash(pg, errs, t0):
+    out = {}
+    for t in (1, 2, 3):
+        for key, on in (('off', False), ('on', True)):
+            out[f't{t}:{key}'] = await batch(pg, N, f"GLAB.game(3, 0, {t}, {{ seed: 50011 + i, ash: {'true' if on else 'false'} }})")
+    json.dump(out, open('/tmp/realm_gridiron_lab_ash.json', 'w'))
+    print(f'{time.time() - t0:.0f}s   page errors', len(errs), errs[:2])
+    print('\nthe Ash Bowl\'s ways, your seven at level 3 against a rival\'s at level 3, Simulate (the same seeded games in both rows)')
+    print('                              n    win   draw   score       a game: cuts on ash, stumbles, dead balls, wobbles, FGs toward the heat, timeouts')
+    for t in (1, 2, 3):
+        base = sum(g['win'] for g in out[f't{t}:off']) / len(out[f't{t}:off'])
+        for key in ('off', 'on'):
+            rs = out[f't{t}:{key}']; n = len(rs); w = sum(g['win'] for g in rs) / n
+            line = f"  tier {t} {'off' if key == 'off' else 'on (the Realm)':16s} {n:5d}  {pct(sum(g['win'] for g in rs), n)}  {pct(sum(g['tie'] for g in rs), n)}   {sum(g['us'] for g in rs) / n:4.1f}-{sum(g['them'] for g in rs) / n:4.1f}"
+            if key == 'on':
+                a = lambda k: sum(g['ash'][k] for g in rs) / n
+                line += f"   {a('cut'):.2f}, {a('slip'):.2f}, {a('dead'):.2f}, {a('wob'):.2f}, {a('fg'):.2f}, {a('to'):.2f}   {100 * (w - base):+5.1f} pts"
+            print(line)
 
 asyncio.run(main())
