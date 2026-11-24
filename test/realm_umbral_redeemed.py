@@ -84,7 +84,8 @@ window.U9 = {
     const g = wBK.simGame({ teams: [sq.team, opp], skill: wCourtSkill(2), mins: 5, court: true, ordered: [true, false] });
     wBK.start({ teams: [sq.team, opp], skill: wCourtSkill(2), mins: 5, court: true, ordered: [true, false], powers: true });
     const o = wBK.ultOptions(0).find(u => u.who === p.n);
-    return { on, ult: o && o.own ? o.id : null, offered: !!o, game: Array.isArray(g.score) && g.score[0] !== g.score[1] };
+    // (a whole game: points on the board; level after every overtime is a finished game too, and an unseeded sim can end so)
+    return { on, ult: o && o.own ? o.id : null, offered: !!o, game: Array.isArray(g.score) && g.score.every(n => n >= 0) && g.score.some(n => n > 0) };
   },
   hk(k) {
     const { p } = U9.team(k, 6); for (const q of wRoster()) { delete q.hk; wHkOf(q); } wSixSync();
