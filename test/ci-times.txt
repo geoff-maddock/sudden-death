@@ -201,7 +201,7 @@ realm_umbral_land 14
 realm_umbral_legends 13
 realm_umbral_market 15
 realm_umbral_monsters 24
-realm_umbral_redeemed 126
+realm_umbral_redeemed 240
 realm_umbral_rewards 11
 realm_umbral_world 16
 realm_ways 28

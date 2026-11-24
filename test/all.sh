@@ -34,6 +34,8 @@ run_one() {
   [ "$t" = realm_music ] && lim=600
   # (passes alone in under 90s, but with four other heavy checks beside it has run past 240)
   [ "$t" = realm_gridiron_bench ] && lim=420
+  # (nine champions through every engine, about 80 Simulated games: under 30s alone, past 240 beside realm_music)
+  [ "$t" = realm_umbral_redeemed ] && lim=420
   if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' $lim "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
   else "$TO" --foreground -k 10 $lim "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?
   echo "$code $(( $(date +%s) - s ))" > "build/test-status/$t"
