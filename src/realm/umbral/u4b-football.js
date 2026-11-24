@@ -17,7 +17,8 @@
 
    W_UMB4B, wUmbGfTeam, wUmbGfHexes, wUmbGfCard, wUmbGfKick
    Wraps: wBallRegion (wWU4BBallRegion), wBallTeam (wWU4BBallTeam), wGridOpp (wWU4BGridOpp): a 'nadir:<id>' club is the
-   champion's region and the Nadir seven; and wGF.game and wGF.simGame (wWU4BGame, wWU4BSimGame: the hexes go in). */
+   champion's region and the Nadir seven; and wGF.game and wGF.simGame (wWU4BGame, wWU4BSimGame: the hexes go in, and ash: false, as the Cinder Pit isn't the Ash
+   Bowl: its ways are the Ash Bowl's own, w144). */
 
 const W_UMB4B = {
   id: 'gridiron', club: 'nadir:gridiron', kind: 'unadirgf', labHow: 'sim',
@@ -77,8 +78,8 @@ wGridOpp = function (club, tier) { return club === W_UMB4B.club ? wUmbGfTeam() :
 /* ---------- the hexes ---------- */
 const WU4B = { next: null };
 const wWU4BGame = wGF.game, wWU4BSimGame = wGF.simGame;
-wGF.game = o => wWU4BGame(WU4B.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B) }) : o);
-wGF.simGame = o => wWU4BSimGame(WU4B.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B) }) : o);
+wGF.game = o => wWU4BGame(WU4B.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B), ash: false }) : o);
+wGF.simGame = o => wWU4BSimGame(WU4B.next && !(o && o.keep) ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4B), ash: false }) : o);
 // n of football's hexes for this try of the champion: fixed for the try (the same draw after a reload)
 function wUmbGfHexes(id, n) {
   const U = wUmb(), ks = Object.keys(wGF.hexes), r = mulberry(wUmbHash('gf:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1));

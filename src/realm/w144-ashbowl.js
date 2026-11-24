@@ -1,6 +1,6 @@
 /* w144: the Ash Bowl's own ways (issue #115, phase 4), football's ground; the engine's side is src/gf/parts/20-ash.js.
    On in every game and drive the Realm plays, since all of them are at the Ash Bowl (Play, Manage, Simulate, the Cinder
-   Cup and the fixtures, exhibitions, practice drives; the Umbral's Cinder Pit is its mirror, and the ash falls there too);
+   Cup and the fixtures, exhibitions, practice drives; never the Umbral's Cinder Pit, which isn't the Ash Bowl: u4b-football.js sends ash: false);
    in LAB mode off unless the lab sets W_GFASH.lab, so the other balance numbers stand. A game whose options already say
    (ash: true or false) plays them.
    - Ashfall: ash settles in a few grey patches through each half and grows; a carrier cutting on it slows and may
