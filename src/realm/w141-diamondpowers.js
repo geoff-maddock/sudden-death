@@ -116,7 +116,7 @@ $('wBallPowRow').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   const B = wBD.bdp, L = WG && WG.ball && WG.ball.live, you = L && L.world.home ? 1 : 0;
   if (b.dataset.bdsit) { W_BALL_POWMSG = wBD.castSit(b.dataset.bdsit); if (!W_BALL_POWMSG) wBD.snapNow(); }
-  else if (b.dataset.bdarm != null && B) W_BALL_POWMSG = wBD.arm(!B.arm[you]);
+  else if (b.dataset.bdarm != null && B) { W_BALL_POWMSG = wBD.arm(!B.arm[you]); if (!W_BALL_POWMSG) wBD.snapNow(); }
   b.blur(); wBallPowRows(true);
 });
 setInterval(() => wBallPowRows(), 250);

@@ -22673,6 +22673,20 @@ castField = function (o) {
   try { bdpCastField0.apply(this, arguments); } finally { B.amp = null; }
   bdpAmpSpend(s, `${shortName(o.f.p)}'s ${AB[o.ab].name}`, why, 'amp', o.ab);
 };
+// a magic steal, cast at the release without castRun: the crowd lifts its bonus (magicStealOpt reads abPow) the same way.
+// (the batter's lifted swing, set a moment before in the release, is kept for the swing)
+const bdpStealOnRelease0 = stealOnRelease;
+stealOnRelease = function () {
+  const B = G.bdp, S0 = G.run;
+  if (!B || !S0 || S0.steal !== 2 || !stealOn()) return bdpStealOnRelease0.apply(this, arguments);
+  const ch = stealChain(), r = ch.length ? G.bases[ch[0]] : null, m = r ? magicStealOpt(r) : null;
+  if (!m || !m.ok || m.phys || m.club || !BD_AMP.includes(m.id)) return bdpStealOnRelease0.apply(this, arguments);
+  const why = bdpAmpWant(G.half); if (!why) return bdpStealOnRelease0.apply(this, arguments);
+  const was = B.amp; B.amp = { id: m.id, n: r.n }; let res;
+  try { res = bdpStealOnRelease0.apply(this, arguments); } finally { B.amp = was; }
+  const go = G.run && G.run.go; if (go && go.magic && go.magic.id === m.id) bdpAmpSpend(G.half, `${shortName(r)}'s ${AB[m.id].name} on the steal`, why, 'amp', m.id);
+  return res;
+};
 const bdpCastRunUlt0 = castRunUlt;
 castRunUlt = function (o, r) {
   const B = G.bdp; if (B && o && o.ok && r) { const why = bdpAmpWant(G.half); if (why) B.ultAmp.push({ id: o.id, s: G.half, why }); }
@@ -22762,6 +22776,14 @@ gearOnRelease = function (pc, pd, st, ctrl) {
 /* ---------- the moments ---------- */
 const bdpScoreRun0 = scoreRun;
 scoreRun = function () { const r = bdpScoreRun0.apply(this, arguments); if (G.bdp) bdpCrowd(G.half, 'run'); return r; };
+// a run taken back on a force for the third out: the stands take it back too
+const bdpOutRunner0 = outRunner;
+outRunner = function () {
+  const L = PL, was = L ? L.negated || 0 : 0, r = bdpOutRunner0.apply(this, arguments), B = G.bdp;
+  const n = B && L ? (L.negated || 0) - was : 0;
+  if (n > 0) { B.tally.run -= n; if (B.crowdOn && B.on[G.half]) B.crowd[G.half] = Math.max(0, B.crowd[G.half] - n * BD_CROWD.run); }
+  return r;
+};
 const bdpShowResult0 = showResult;
 showResult = function (big, small, t, code) { if (G.bdp && code === 'K') bdpCrowd(1 - G.half, 'k'); return bdpShowResult0.apply(this, arguments); };
 const bdpStatInPlay0 = statInPlay;
@@ -64263,7 +64285,7 @@ $('wBallPowRow').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   const B = wBD.bdp, L = WG && WG.ball && WG.ball.live, you = L && L.world.home ? 1 : 0;
   if (b.dataset.bdsit) { W_BALL_POWMSG = wBD.castSit(b.dataset.bdsit); if (!W_BALL_POWMSG) wBD.snapNow(); }
-  else if (b.dataset.bdarm != null && B) W_BALL_POWMSG = wBD.arm(!B.arm[you]);
+  else if (b.dataset.bdarm != null && B) { W_BALL_POWMSG = wBD.arm(!B.arm[you]); if (!W_BALL_POWMSG) wBD.snapNow(); }
   b.blur(); wBallPowRows(true);
 });
 setInterval(() => wBallPowRows(), 250);

@@ -132,11 +132,16 @@ async def main():
             wBD.sim({ defs: [__club('ironmaw'), __club('mirewood')], innings: 3, diff: 1 + i % 3, rules: W_BALL.rules });
             const G = wBD.G, B = G.bdp, P = [...G.pstats.values()], sum = k => P.reduce((a, s) => a + (s[k] || 0), 0);
             for (const c of B.casts) { if (c.k === 'sit') out.sit[c.id] = (out.sit[c.id] || 0) + 1; else if (c.k === 'amp') out.amp++; else out.ult++; if (!c.why) out.why.push(c); }
-            out.ok.push(B.tally.k === sum('so') && B.tally.hr === sum('hr') && B.tally.sb === sum('sb') && B.tally.run >= G.teams[0].R + G.teams[1].R && B.crowd.every(v => v >= 0 && v <= 6));
+            out.ok.push(B.tally.k === sum('so') && B.tally.hr === sum('hr') && B.tally.sb === sum('sb') && B.tally.run === G.teams[0].R + G.teams[1].R && B.crowd.every(v => v >= 0 && v <= 6));
             if (i === 0) out.tally = [B.tally, sum('so'), sum('hr'), sum('sb'), G.teams[0].R + G.teams[1].R];
           }
           const L = wBD.G.full.map(l => l.text || l); out.lines = L.filter(t => /^(✦|♪)/.test(t)).slice(0, 4); return out; })()""")
         check(all(cpu2['ok']), 'the stands count every strikeout, home run, stolen base and run, and the crowd stays between 0 and 6', cpu2['tally'])
+        neg = await pg.evaluate("""(() => { for (let i = 0; i < 600; i++) {
+            wBD.sim({ defs: [__club('ironmaw'), __club('mirewood')], innings: 3, diff: 1 + i % 3, rules: W_BALL.rules });
+            const G = wBD.G; if (G.full.some(l => /doesn't count on the force/.test(l.text || l))) return { found: i + 1, run: G.bdp.tally.run, R: G.teams[0].R + G.teams[1].R };
+          } return { found: 0 }; })()""")
+        check(neg['found'] and neg['run'] == neg['R'], 'a run taken back on a force for the third out is taken back from the stands too', neg)
         check(len(cpu2['sit']) >= 3 and cpu2['amp'] > 0 and cpu2['ult'] > 0 and not cpu2['why'], 'the CPU casts situation powers and spends the crowd on abilities and ultimates, each with its reason', cpu2)
 
         # ---------- the crowd lifts a cast ----------
@@ -149,6 +154,12 @@ async def main():
           // not called for: your crowd stays put
           __game({ mode: '1p', defs: [__club('ironmaw', d => { d.roster[0].bat = 'axe'; }), __club('mirewood')], humanSide: 0 }); __to(__sel);
           wBD.bdp.crowd[0] = 3; wBD.G.teams[0].mana = 6; wBD.G.P.si = wBD.G.P.stances.findIndex(s => s.k === 'ab'); __to(__thrown); out.idle = [wBD.bdp.crowd[0], wBD.bdp.casts.filter(c => c.side === 0).length];
+          // a magic steal, called for: its bonus lifted, the crowd spent once
+          __game({ mode: '1p', defs: [__club('ironmaw'), __club('mirewood')], humanSide: 0 }); __to(__sel);
+          { const G = wBD.G, B = wBD.bdp, r = G.teams[0].def.roster[8];
+            r.run = 'fleet'; G.bases = [null, r, null, null]; G.teams[0].mana = 6; B.crowd[0] = 3; wBD.arm(true); G.P.si = 0;
+            const S0 = G.run; S0.sig = G.bases.map(p => p ? p.n + '#' + p.num : '-').join('|'); S0.steal = 2; __to(() => !!(G.run && G.run.go) || __thrown());
+            const go = G.run && G.run.go; out.steal = { bonus: go && go.magic && go.magic.bonus, id: go && go.magic && go.magic.id, casts: B.casts.map(c => [c.k, c.id, c.why]), crowd: B.crowd[0], arm: B.arm[0] }; }
           // an ultimate's zone an at-bat longer
           wBD.bdp.crowd[0] = 3; wBD.bdp.ultAmp = [{ id: 'howl', s: 0, why: 'called for' }]; wBD.powProbe.zone('howl');
           const z = wBD.G.zones.find(z => z.id === 'howl'); out.ult = [z && z.turns, wBD.bdp.crowd[0]];
@@ -157,6 +168,7 @@ async def main():
         check(amp['low'] != '' and amp['arm'] == '' and amp['armed'], 'Crowd needs 3 to call for, then it waits for your next cast', amp)
         check(amp['casts'] == [['amp', 'axe', 'called for']] and amp['crowd'] == 0 and amp['after'] is False, 'your Battle Axe takes it: 3 crowd spent, logged', amp)
         check(amp['idle'] == [3, 0], 'not called for, your crowd stays put', amp['idle'])
+        check(amp['steal'] == {'bonus': 6, 'id': 'fleet', 'casts': [['amp', 'fleet', 'called for']], 'crowd': 0, 'arm': False}, 'a magic steal, called for: Fleet Foot\'s bonus half again (4 to 6), the crowd spent once', amp['steal'])
         check(amp['ult'] == [4, 0], 'an ultimate\'s zone lasts an at-bat more (4) for 3 crowd', amp['ult'])
 
         # ---------- in a game you play: the Powers row, the save point ----------
@@ -171,6 +183,8 @@ async def main():
         await pg.evaluate("wBD.bdp.crowd[0] = 3; wBD.G.teams[0].mana = 6; { const R0 = wBD.G.teams[0].def.roster; wBD.G.bases = [null, R0[5], R0[6], R0[7]]; } wBallPowRows(true)")
         await pg.wait_for_selector('#wBallPowRow [data-bdsit="loaded"]:not([disabled])')
         await pg.click('#wBallPowRow [data-bdarm]')
+        armsnap = await pg.evaluate("(() => { const sn = WG.ball.live.snap; return !!(sn && sn.bdp && sn.bdp.arm[0]); })()")
+        check(armsnap, 'pressing Crowd is in the save point at once', armsnap)
         await pg.click('#wBallPowRow [data-bdsit="loaded"]')
         ui = await pg.evaluate("""(() => ({ arm: wBD.bdp.arm[0], used: !!wBD.bdp.used[0].loaded, mana: wBD.G.teams[0].mana, snap: WG.ball.live.snap && WG.ball.live.snap.bdp,
           gone: !document.querySelector('#wBallPowRow [data-bdsit="loaded"]') }))()""")
