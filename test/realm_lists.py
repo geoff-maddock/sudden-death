@@ -84,6 +84,13 @@ async def main():
         check(f['pts'] == [[-1, 1], [-1, -1]] and f['tot'] == [-2, 0], 'a foul (the mount, below the belt, the barrier) takes a point off and breaks nothing; the totals can go below nothing', f)
         check(f['bad'][0] is False and 'fair' in f['bad'][1] and all(w == [False, True] for w in f['worse']) and f['same'] == [2, 2, 2],
               'a foul can\'t unhorse, and a course that isn\'t two strikes is refused: each says why and changes nothing', f)
+        # (a strike's place is one of the table's own keys: nothing inherited, such as toString, gets through)
+        ih = await pg.evaluate("""(() => { wJT.newMatch({}); const keys = ['toString', '__proto__', 'constructor', 'hasOwnProperty', 'valueOf'];
+          const r = keys.map(k => wJT.course([{ at: k }, { at: 'miss' }])), un = wJT.course([{ at: 'miss' }, { at: 'toString', unhorse: true }]);
+          return { ok: r.map(x => x.ok).concat(un.ok), why: r.every(x => !!x.why), pts: keys.map(k => wJT.strikePts({ at: k })), text: keys.map(k => wJT.atText({ at: k })),
+            fair: keys.map(k => wJT.fair(k) || wJT.foul(k)), n: wJT.G.log.length, tot: [wJT.total(0), wJT.total(1)], json: JSON.stringify(wJT.G) === JSON.stringify(JSON.parse(JSON.stringify(wJT.G))) }; })()""")
+        check(ih['ok'] == [False] * 6 and ih['why'] and ih['pts'] == [0] * 5 and ih['text'] == [''] * 5 and ih['fair'] == [False] * 5 and ih['n'] == 0 and ih['tot'] == [0, 0] and ih['json'],
+              'a strike on an inherited name (toString, __proto__, constructor) is refused and scores nothing; the match stays plain JSON with number totals', ih)
 
         # ---------- a level match settled by the tilt ----------
         t = await pg.evaluate("""(() => { wJT.newMatch({ riders: [[0, 2], [3, 1]] });

@@ -127,6 +127,18 @@ async def main():
         check(m['even'][0] == 12 and m['even'][1]['marshal'] and m['even'][1]['win'] == 0 and 'marshal' in m['even'][2], 'the tilt stops at twelve courses still level; the marshal\'s count (the lance broken first, the rest even) settles it, and says so', m['even'])
         check(m['count'] == [12, 1, True], 'level at the cap, the side with more lances broken wins on the marshal\'s count', m['count'])
 
+        # ---------- outside keys: only a table's own (nothing inherited, such as toString) ----------
+        ok = await pg.evaluate("""(() => { const fin = o => Object.values(o).every(v => typeof v === 'number' && isFinite(v)), out = {};
+          out.rs = ['toString', 'constructor', '__proto__'].every(k => fin(wJT.rs(k)) && fin(wJT.rate(k)));
+          out.sway = ['toString', 'constructor', '__proto__'].every(k => fin(wJT.sway({ pace: k, mount: k })) && isFinite(wJT.speed({ pace: k, mount: k })));
+          const c = wJT.charge({ plan: { aim: 'toString', guard: 'valueOf', pace: 'constructor' }, rs: wJT.rs(''), mount: '__proto__', wind: 1 }, __rng(3));
+          out.charge = [isFinite(c.tip.x) && isFinite(c.tip.y) && isFinite(c.speed), c.aim, c.guard, c.pace, c.mount];
+          const st = wJT.strike(c, { guard: 'toString', rs: wJT.rs(''), mount: 'toString' }, __rng(4)); out.strike = isFinite(st.force) && isFinite(st.rock) && typeof st.at === 'string';
+          wJT.start({ seed: 2, mounts: [['toString', 'charger'], ['constructor', '__proto__']] }); out.mounts = wJT.G.mounts;
+          return out; })()""")
+        check(ok['rs'] and ok['sway'] and ok['strike'] and ok['charge'] == [True, 'shield', 'square', 'canter', 'destrier'] and ok['mounts'] == [['destrier', 'charger'], ['destrier', 'destrier']],
+              'a kind, pace, aim, guard or mount named by an inherited key (toString, constructor, __proto__) falls back to the default, and the numbers stay finite', ok)
+
         # ---------- the sim leaves the match alone ----------
         d = await pg.evaluate("""(() => { wJT.start({ seed: 9, skill: [1, 1] }); for (let i = 0; i < 2; i++) wJT.turn(); const want = JSON.stringify(wJT.G);
           const a = wJT.simMatch({ seed: 77 }), b = wJT.simMatch({ seed: 77 }), c = wJT.simMatch({ seed: 78 }); wJT.simMatch({});

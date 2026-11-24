@@ -28,7 +28,7 @@ const JT_KIND = { _: [6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5] };
 const JT_RCAP = 12;
 const jtScale = v => clamp((v - 1) / (JT_RCAP - 1), 0, 1.2);
 // a kind's ratings, 1 to 12, and as the model reads them (0 to 1)
-function jtRate(kind) { const k = JT_KIND[kind] || JT_KIND._; return Object.fromEntries(JT_STATS.map((s, i) => [s, k[i]])); }
+function jtRate(kind) { const k = jtOwn(JT_KIND, kind) ? JT_KIND[kind] : JT_KIND._; return Object.fromEntries(JT_STATS.map((s, i) => [s, k[i]])); }
 function jtRs(kind) { const r = jtRate(kind); return Object.fromEntries(JT_STATS.map(s => [s, jtScale(r[s])])); }
 
 const JT_PLAN = {
@@ -42,7 +42,10 @@ const JT_MOUNT = {
   courser: { n: 'Courser', speed: 1, hit: .9, sway: 1, steady: 0, rec: .3 }
 };
 const JT_MOUNT_DEF = 'destrier';
-const jtMount = id => JT_MOUNT[id] || JT_MOUNT[JT_MOUNT_DEF];
+const jtMount = id => JT_MOUNT[jtOwn(JT_MOUNT, id) ? id : JT_MOUNT_DEF];
+// a plan's choice, or the default when it isn't one of the table's own (aim, guard, pace)
+const jtPick = (kind, k, def) => jtOwn(JT_PLAN[kind], k) ? k : def;
+const jtPace = p => JT_PLAN.pace[jtPick('pace', p, 'canter')];
 
 // the target, by the defender's guard: the shield and the torso as boxes, the helm as a circle
 const JT_ZONE = {

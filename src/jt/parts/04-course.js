@@ -28,26 +28,27 @@ const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = 
 // the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
 // the lance and couch ratings and the couch's moment; hands scales the spread (a skill's, or 1 on Play)
 function jtSway(o) {
-  const P = JT_PLAN.pace[o.pace] || JT_PLAN.pace.canter, M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1), c = clamp(o.couch || 0, -1, 1);
+  const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1), c = clamp(o.couch || 0, -1, 1);
   const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5);
   const sigma = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)) * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * (o.hands ?? 1);
   return { sigma, droop: JT_SWAY.droop * Math.max(0, -c) * arm };
 }
 // the speed at impact: the pace, the mount, its wind (a blown mount slows) and the ride rating
 function jtSpeed(o) {
-  const P = JT_PLAN.pace[o.pace] || JT_PLAN.pace.canter, M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
+  const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
   return JT_LISTS.speed * P.speed * M.speed * (.8 + .2 * w) * (1 + .08 * ((r.ride ?? .5) - .5));
 }
 // the mount's wind a course spends at this pace (a good rider spends less)
-const jtWindCost = (pace, rs) => (JT_PLAN.pace[pace] || JT_PLAN.pace.canter).wind * (1.15 - .3 * ((rs || {}).ride ?? .5));
+const jtWindCost = (pace, rs) => jtPace(pace).wind * (1.15 - .3 * ((rs || {}).ride ?? .5));
 
 /* a CPU or sim rider's ride: o = { plan: { aim, guard, pace }, rs, mount, wind, hands: { aim, couch } (the skill's) } */
 function jtCharge(o, rnd) {
-  const plan = o.plan, H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {};
-  const speed = jtSpeed({ pace: plan.pace, mount: o.mount, rs, wind: o.wind }) * (1 + .03 * jtGauss(rnd));
+  const p = o.plan || {}, plan = { aim: jtPick('aim', p.aim, 'shield'), guard: jtPick('guard', p.guard, 'square'), pace: jtPick('pace', p.pace, 'canter') };
+  const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF;
+  const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind }) * (1 + .03 * jtGauss(rnd));
   const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)), -1, 1);
-  const sw = jtSway({ pace: plan.pace, mount: o.mount, rs, wind: o.wind, couch, hands: H.aim }), A = JT_PLAN.aim[plan.aim] || JT_PLAN.aim.shield;
-  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount: o.mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop } };
+  const sw = jtSway({ pace: plan.pace, mount, rs, wind: o.wind, couch, hands: H.aim }), A = JT_PLAN.aim[plan.aim];
+  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop } };
 }
 // the force of a ride's strike: its speed against a gallop's, the mount's weight, and a clean couch (0.5 to 1.3 or so)
 const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .25 * Math.abs(a.couch || 0));

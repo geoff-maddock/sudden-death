@@ -29,6 +29,9 @@ const JT_RULES = { heats: 2, courses: 3, coursesAt: [3, 5], riders: 2, side: 4, 
 const JT_AT = { shield: 'a lance broken on the shield', body: 'a lance broken on the body', helm: 'a lance broken on the helm',
   glance: 'a glance', miss: 'a miss', mount: 'a foul: the mount struck', barrier: 'a foul: the barrier struck', low: 'a foul: a strike below the belt' };
 let G = null;
+// is k one of table t's own keys? (never an inherited name such as toString, __proto__ or constructor): every table
+// looked up by a key from outside goes through this
+const jtOwn = (t, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(t, k);
 
 function jtRidersOk(r, n) { return Array.isArray(r) && r.length === JT_RULES.riders && new Set(r).size === r.length && r.every(i => Number.isInteger(i) && i >= 0 && i < n); }
 // a new match: { courses: 3 | 5, riders: [two roster indexes a side], roster: [two sizes], best: [the slot (0 or 1) of each side's best rider] }
@@ -53,9 +56,9 @@ const jtLeft = () => !G || G.over || jtInTilt() ? 0 : G.courses - G.course;
 const jtFair = at => JT_RULES.fair.includes(at);
 const jtFoul = at => JT_RULES.fouls.includes(at);
 // a strike's points: { at, unhorse } (an unhorsing scores JT_RULES.unhorse in place of the break)
-const jtStrikePts = st => !st || !(st.at in JT_RULES.pts) ? 0 : st.unhorse && jtFair(st.at) ? JT_RULES.unhorse : JT_RULES.pts[st.at];
+const jtStrikePts = st => !st || !jtOwn(JT_RULES.pts, st.at) ? 0 : st.unhorse && jtFair(st.at) ? JT_RULES.unhorse : JT_RULES.pts[st.at];
 function jtStrikeWhy(st) {
-  if (!st || typeof st !== 'object' || !(st.at in JT_RULES.pts)) return `A strike lands somewhere: ${Object.keys(JT_RULES.pts).join(', ')}.`;
+  if (!st || typeof st !== 'object' || !jtOwn(JT_RULES.pts, st.at)) return `A strike lands somewhere: ${Object.keys(JT_RULES.pts).join(', ')}.`;
   if (st.unhorse && !jtFair(st.at)) return 'Only a fair strike, on the shield, body or helm, can unhorse.';
   return '';
 }
@@ -129,4 +132,4 @@ function jtMatchText(s) {
   return `${a === b ? 'Level' : a > b ? 'Ahead' : 'Behind'}, ${a} to ${b}, ${where}`;
 }
 // one strike in the herald's words ("a lance broken on the helm", "unhorsed!")
-const jtAtText = st => !st ? '' : st.unhorse && jtFair(st.at) ? `${JT_AT[st.at]}, and unhorsed` : JT_AT[st.at] || '';
+const jtAtText = st => !st || !jtOwn(JT_AT, st.at) ? '' : st.unhorse && jtFair(st.at) ? `${JT_AT[st.at]}, and unhorsed` : JT_AT[st.at];
