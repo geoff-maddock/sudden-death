@@ -22775,13 +22775,18 @@ gearOnRelease = function (pc, pd, st, ctrl) {
 
 /* ---------- the moments ---------- */
 const bdpScoreRun0 = scoreRun;
-scoreRun = function () { const r = bdpScoreRun0.apply(this, arguments); if (G.bdp) bdpCrowd(G.half, 'run'); return r; };
-// a run taken back on a force for the third out: the stands take it back too
+// (what the runs of this play added to the meter, PL.bdpUp: a full meter adds nothing, so a run taken back takes back only that)
+scoreRun = function () {
+  const r = bdpScoreRun0.apply(this, arguments), B = G.bdp; if (!B) return r;
+  const was = B.crowd[G.half]; bdpCrowd(G.half, 'run'); if (PL) PL.bdpUp = (PL.bdpUp || 0) + B.crowd[G.half] - was;
+  return r;
+};
+// a run taken back on a force for the third out: the stands take back what it added
 const bdpOutRunner0 = outRunner;
 outRunner = function () {
   const L = PL, was = L ? L.negated || 0 : 0, r = bdpOutRunner0.apply(this, arguments), B = G.bdp;
   const n = B && L ? (L.negated || 0) - was : 0;
-  if (n > 0) { B.tally.run -= n; if (B.crowdOn && B.on[G.half]) B.crowd[G.half] = Math.max(0, B.crowd[G.half] - n * BD_CROWD.run); }
+  if (n > 0) { B.tally.run -= n; B.crowd[G.half] = Math.max(0, B.crowd[G.half] - (L.bdpUp || 0)); L.bdpUp = 0; }
   return r;
 };
 const bdpShowResult0 = showResult;
@@ -23206,7 +23211,10 @@ return {
   // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
   step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
   kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() },
-  powProbe: { zone: id => addZone(id, null, G.half) }
+  powProbe: { zone: id => addZone(id, null, G.half),
+    // (a run scored with the batting side's crowd at c, then taken back on a force for the third out: the crowd after each)
+    runBack: c => { const pl = PL, outs = G.outs, B = G.bdp; B.crowd[G.half] = c; PL = { outs: [], runsThisPlay: 1 }; G.outs = 2;
+      try { scoreRun(null); const up = B.crowd[G.half]; outRunner({ p: G.teams[G.half].def.roster[0] }, 'force'); return [up, B.crowd[G.half]]; } finally { PL = pl; G.outs = outs; } } }
 };
 
 })();

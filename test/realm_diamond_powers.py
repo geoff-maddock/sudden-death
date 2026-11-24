@@ -142,6 +142,8 @@ async def main():
             const G = wBD.G; if (G.full.some(l => /doesn't count on the force/.test(l.text || l))) return { found: i + 1, run: G.bdp.tally.run, R: G.teams[0].R + G.teams[1].R };
           } return { found: 0 }; })()""")
         check(neg['found'] and neg['run'] == neg['R'], 'a run taken back on a force for the third out is taken back from the stands too', neg)
+        rb = await pg.evaluate("(() => { wBall().met = {}; wStartBall({ club: 'local', how: 'play' }); wBD.pause(true); const out = [wBD.powProbe.runBack(6), wBD.powProbe.runBack(2)]; wBallLeave(); return out; })()")
+        check(rb == [[6, 6], [3, 2]], 'a run taken back gives back only what it added: nothing from a full crowd', rb)
         check(len(cpu2['sit']) >= 3 and cpu2['amp'] > 0 and cpu2['ult'] > 0 and not cpu2['why'], 'the CPU casts situation powers and spends the crowd on abilities and ultimates, each with its reason', cpu2)
 
         # ---------- the crowd lifts a cast ----------

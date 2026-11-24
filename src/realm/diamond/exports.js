@@ -86,5 +86,8 @@ return {
   // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
   step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
   kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() },
-  powProbe: { zone: id => addZone(id, null, G.half) }
+  powProbe: { zone: id => addZone(id, null, G.half),
+    // (a run scored with the batting side's crowd at c, then taken back on a force for the third out: the crowd after each)
+    runBack: c => { const pl = PL, outs = G.outs, B = G.bdp; B.crowd[G.half] = c; PL = { outs: [], runsThisPlay: 1 }; G.outs = 2;
+      try { scoreRun(null); const up = B.crowd[G.half]; outRunner({ p: G.teams[G.half].def.roster[0] }, 'force'); return [up, B.crowd[G.half]]; } finally { PL = pl; G.outs = outs; } } }
 };

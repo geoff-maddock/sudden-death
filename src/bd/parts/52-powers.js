@@ -195,13 +195,18 @@ gearOnRelease = function (pc, pd, st, ctrl) {
 
 /* ---------- the moments ---------- */
 const bdpScoreRun0 = scoreRun;
-scoreRun = function () { const r = bdpScoreRun0.apply(this, arguments); if (G.bdp) bdpCrowd(G.half, 'run'); return r; };
-// a run taken back on a force for the third out: the stands take it back too
+// (what the runs of this play added to the meter, PL.bdpUp: a full meter adds nothing, so a run taken back takes back only that)
+scoreRun = function () {
+  const r = bdpScoreRun0.apply(this, arguments), B = G.bdp; if (!B) return r;
+  const was = B.crowd[G.half]; bdpCrowd(G.half, 'run'); if (PL) PL.bdpUp = (PL.bdpUp || 0) + B.crowd[G.half] - was;
+  return r;
+};
+// a run taken back on a force for the third out: the stands take back what it added
 const bdpOutRunner0 = outRunner;
 outRunner = function () {
   const L = PL, was = L ? L.negated || 0 : 0, r = bdpOutRunner0.apply(this, arguments), B = G.bdp;
   const n = B && L ? (L.negated || 0) - was : 0;
-  if (n > 0) { B.tally.run -= n; if (B.crowdOn && B.on[G.half]) B.crowd[G.half] = Math.max(0, B.crowd[G.half] - n * BD_CROWD.run); }
+  if (n > 0) { B.tally.run -= n; B.crowd[G.half] = Math.max(0, B.crowd[G.half] - (L.bdpUp || 0)); L.bdpUp = 0; }
   return r;
 };
 const bdpShowResult0 = showResult;
