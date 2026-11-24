@@ -78,6 +78,47 @@ async def main():
           return { back, none, ok }; })()""")
         check(sn == {'back': True, 'none': True, 'ok': True}, 'a match kept and resumed keeps Old Grey where he was; an older save has none and plays on', sn)
 
+        # ---- the page ----
+        pgm = await pg.evaluate("""(() => { wCR.start({ seed: 21, deep: true, ends: 2, mode: 'watch', fixShot: ['guard', 'guard'] }); const G = wCR.G, d = G.deep; let open = '', n = 0;
+          // (a stone of theirs where he swims next; the first stone held to a guard, so it isn't taken out first)
+          G.stones.push({ id: '1:9', s: 1, x: d.nx + (d.nx > 0 ? -4 : 4), y: d.ny });
+          while (G.n < 1 && n++ < 20000) { wCR.tick(.05); if (!open && wCR.msg) open = wCR.msg; }
+          return { open: open.startsWith("Old Grey's under the ice today"), said: /Old Grey turns under the ice and nudges/.test(wCR.msg) }; })()""")
+        check(pgm == {'open': True, 'said': True}, "the page opens on Hennock's word about Old Grey, and says when he nudges a stone", pgm)
+
+        # ---- the Realm ----
+        await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
+        if await pg.evaluate("!!document.getElementById('cfYes')"): await pg.click('#cfYes')
+        await pg.wait_for_selector('#wGo'); await pg.click('#wGo')
+        await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
+        await pg.evaluate("(() => { for (const kind of ['elf', 'spider', 'gorgon']) if (wRoster().length < 5) wAddPlayer(wMakePlayer({ kind, lvl: 2 }, 'tavern')); SET.shedEnds = 4; })()")
+        rl = await pg.evaluate("""(() => { const mr = Math.random, out = {};
+          const go = (roll, o) => { Math.random = () => roll; try { wShg().met = {}; const r = wStartShed(Object.assign({ club: 'local', how: 'play' }, o || {})); wCR.pause(true); return { r, deep: !!(wCR.G && wCR.G.deep) }; } finally { Math.random = mr; } };
+          const off = () => { if (wShedLive()) wShedCallOff('Called off for the test.'); };
+          out.club = go(0); out.clubMsg = !!wCR.G.deepSaid; off();
+          out.noRoll = go(.99); off();
+          out.cup = go(0, { cup: true, kind: 'crcup', ref: { week: 0, round: 0 } }); off();
+          out.fix = go(0, { cup: true, kind: 'crfix', ref: { g: 'g_shed', club: 'local', day: 0 } }); off();
+          Math.random = () => 0; try { wShedGame({}); out.exh = !!wCR.G.deep; } finally { Math.random = mr; }
+          // Simulate: the engine's sim game is asked for the deep
+          const sg = wCR.simGame; let seen = null; wCR.simGame = o => { const r = sg(o); seen = r.deep; return r; };
+          Math.random = () => 0; try { wShg().met = {}; wStartShed({ club: 'local', how: 'sim' }); } finally { Math.random = mr; wCR.simGame = sg; }
+          for (let i = 0; i < 6 && !document.getElementById('modal').hidden; i++) document.querySelector('#modalBox .btn, #modalBox button').click();
+          out.sim = !!seen && typeof seen.bumps === 'number';
+          return out; })()""")
+        check(rl['club'] == {'r': '', 'deep': True} and rl['clubMsg'], 'a wild club match can have Old Grey (one in three: the roll under W_DEEP.p), with Hennock\'s word', rl)
+        check(rl['noRoll'] == {'r': '', 'deep': False}, 'a club match whose roll misses has no deep', rl)
+        check(not rl['cup']['deep'] and not rl['fix']['deep'] and not rl['exh'], 'never in the Brass Broom, a league fixture or the exhibition, however the roll falls', rl)
+        check(rl['sim'], 'Simulate plays him too: the sim game has the deep', rl)
+        await pg.evaluate("showPage('help')")
+        hp = await pg.evaluate("(() => { const h = document.getElementById('wHelpShedDeep'); return !!h && /Old Grey/.test(h.textContent) && /club matches/.test(h.textContent); })()")
+        check(hp, 'How to play names Old Grey (club matches only)', hp)
+        # (a frame of the Shed with him under the ice: nothing thrown, and a picture to look at)
+        await pg.evaluate("showPage('play')")
+        await pg.evaluate("(() => { wShedGame({ seed: 31, deep: true, ends: 2, mode: 'watch' }); wCR.pause(true); const G = wCR.G; G.stones.push({ id: '0:8', s: 0, x: 10, y: -10 }, { id: '1:8', s: 1, x: -30, y: 20 }); showView('shed'); })()")
+        await pg.wait_for_timeout(400)
+        await pg.screenshot(path='/tmp/shed-deep.png')
+
         if errs: check(False, 'no page errors', errs[:5])
         await br.close()
     print('FAILED: ' + '; '.join(FAILS) if FAILS else 'all ok')

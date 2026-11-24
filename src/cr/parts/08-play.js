@@ -202,7 +202,8 @@ function crPlayNext() {
   const s = crUp(); if (s < 0) { crGo('over'); return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
   // (the Umbral's hexes, named before the first stone: 15-umbral.js)
-  const hx = G.hex && !G.n ? `${crHexLine()}. ` : '';
+  // (and Hennock's word on Old Grey, in a game with the frozen deep: 16-deep.js)
+  const hx = (G.hex && !G.n ? `${crHexLine()}. ` : '') + (G.deepSaid && !G.n ? `${G.deepSaid} ` : '');
   if (crYours(s)) { crSelReset(); crGo('aim', 0, `${hx}End ${e}${G.end >= G.ends ? ' (an extra end)' : ''}, stone ${no} of 8${hm}: ${crName(s, ri)}, your ${crPosName(s)}. ${GP.sel.aim ? `Your skip calls ${GP.sel.why}${GP.sel.reason ? `: ${GP.sel.reason}` : ''}. Change the call if you like, then Space.` : 'Your skip can\'t find a line for that on this ice: change the shot, the broom or the handle.'}`); return; }
   // (your side under Manage: your captain's call, by the game you set; the CPU's own otherwise)
   const mgr = GP.mode === 'manage' && s === GP.you; let plan = Object.assign(crPlan(s, mgr ? GP.mgr.style : null), { s });
