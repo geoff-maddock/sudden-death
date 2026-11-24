@@ -183,7 +183,8 @@ SPORTS = [
          auto=dict(have="'autoPow' in wGL", live="wGL.mode === 'manage' && wGL.autoPow === true && wGL.G.powSides[wGL.you] === true",
                    help=('wLinksHow', [r'Auto powers'])),
          ground=dict(have="wGL.woodRules", live="!!wGL.G.wood", help=('wLinksHow', [r'old wood', r'enchanted'])),
-         play=dict(adv="wGL.tick(0.05)", over="wGL.phase === 'over'",
+         # (a full purse to start, so Auto powers' first cast comes well before nine holes are out: it isn't a race)
+         play=dict(adv="wGL.tick(0.05)", over="wGL.phase === 'over'", prep="wGL.G.mana[wGL.you] = wGL.manaRules.max",
                    until={'auto': ('your side casts as the match goes on', "wGL.G.casts.some(c => c.side === wGL.you)"),
                           'meter': ('the roar fills as the match goes on', "wGL.G.roar.some(v => v > 0)")})),
 
@@ -371,8 +372,10 @@ async def main():
                 check(ok is True, f"{s}: {part}: on in a game the Realm plays ({r[part]['live']})", err)
             # where it's cheap, the game is played on until the part is seen working
             pl = r.get('play')
+            if pl and pl.get('prep'): await ev(pg, f"(() => {{ {pl['prep']}; }})()")
             for part, (what, until) in (pl['until'].items() if pl else []):
                 res, err = await ev(pg, f"(() => {{ let n = 0; const done = () => !!({until}); while (!done() && n < {PLAY_STEPS} && !({pl['over']})) {{ {pl['adv']}; n++; }} return {{ ok: done(), n, over: !!({pl['over']}) }}; }})()")
+                if s == 'golf' and res: print(f'   (golf {part}: {res["n"]} steps)')
                 check(err is None and res['ok'], f"{s}: {part}: {what}, in a game the Realm plays", err or res)
             await ev(pg, f"(() => {{ try {{ {sc}.pause(true); }} catch (e) {{ }} }})()")
 
