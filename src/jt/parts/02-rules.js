@@ -12,15 +12,17 @@
      the heat's courses not ridden stay empty (null). Both riders can be unhorsed in the same course.
    Points from both heats are added. Level after both heats: the tilt for the crown, one course at a time between
    each side's best rider (opts.best, or the side's rider who scored more in their heat, the first heat's on a tie),
-   until a course leaves the totals apart. A match can't end level. The rules don't cap the tilt: the model (phase 1)
-   makes a course that scores nothing rare, and the sim stops a runaway.
+   until a course leaves the totals apart. A match can't end level. The tilt is capped (JT_RULES.tiltMax courses):
+   still level then, the marshal's count settles it (jtMarshal): more lances broken in the match, then fewer fouls,
+   then more helm breaks, then the side that broke the first lance; with nothing at all between them, the side named
+   first (side 0). On the model a run of level tilt courses that long is next to impossible.
 
    G: { courses, riders: [2 × two roster indexes], roster: [2 × size], best: [2 × rider slot 0 | 1 | null], heat (0 or
    1; 2 in the tilt), course (0-based within the heat; the tilt's courses count on), sc: [side][heat] = [points by
    course, null when not ridden], tilt: [[points by tilt course], [...]], crown: [2 × roster index] in the tilt,
    ended: [per heat: null | { course (1-based), unhorsed: [sides] }], log: [{ heat, course, tilt, at: [2], unhorse:
    [2], pts: [2] }], over }. */
-const JT_RULES = { heats: 2, courses: 3, coursesAt: [3, 5], riders: 2, side: 4, unhorse: 3,
+const JT_RULES = { heats: 2, courses: 3, coursesAt: [3, 5], riders: 2, side: 4, unhorse: 3, tiltMax: 12,
   pts: { shield: 1, body: 1, helm: 2, glance: 0, miss: 0, mount: -1, barrier: -1, low: -1 },
   fair: ['shield', 'body', 'helm'], fouls: ['mount', 'barrier', 'low'] };
 // what each strike is, in the herald's words
@@ -78,7 +80,7 @@ function jtCourse(res) {
   G.log.push({ heat: h, course: k, tilt, at, unhorse: un, pts: pts.slice() });
   const out = { ok: true, heat: h, course: k, tilt, pts, unhorsed, heatOver: null, tiltNow: false, over: null };
   G.course++;
-  if (tilt) { if (jtTotal(0) !== jtTotal(1)) jtDecide(); }
+  if (tilt) { if (jtTotal(0) !== jtTotal(1)) jtDecide(); else if (G.tilt[0].length >= JT_RULES.tiltMax) jtDecide(jtMarshal()); }
   else if (unhorsed.length || G.course >= G.courses) {
     if (unhorsed.length) G.ended[h] = { course: k + 1, unhorsed };
     out.heatOver = { heat: h, tot: [jtHeatTotal(0, h), jtHeatTotal(1, h)], by: unhorsed.length ? 'unhorse' : 'courses' };
@@ -96,9 +98,21 @@ function jtBestSlot(s) {
   if (G.best[s] === 0 || G.best[s] === 1) return G.best[s];
   return jtHeatTotal(s, 1) > jtHeatTotal(s, 0) ? 1 : 0;
 }
-function jtDecide() {
-  const a = jtTotal(0), b = jtTotal(1), n = G.tilt[0].length;
-  G.over = { win: a > b ? 0 : 1, tot: [a, b], tilt: n, text: `${Math.max(a, b)} to ${Math.min(a, b)}${n ? ' after the tilt for the crown' : ''}` };
+// the match decided: on the points, or (level at the tilt's cap) by the marshal's count, win
+function jtDecide(marshal) {
+  const a = jtTotal(0), b = jtTotal(1), n = G.tilt[0].length, win = marshal != null ? marshal : a > b ? 0 : 1;
+  G.over = { win, tot: [a, b], tilt: n, text: marshal != null ? `${a} to ${b} after the tilt for the crown, on the marshal's count` : `${Math.max(a, b)} to ${Math.min(a, b)}${n ? ' after the tilt for the crown' : ''}` };
+  if (marshal != null) G.over.marshal = true;
+}
+// the marshal's count, when the tilt runs to its cap level: the side with more lances broken, then fewer fouls, then
+// more helm breaks, then the side that broke the first lance; side 0 when nothing at all is between them
+function jtMarshal() {
+  const n = s => G.log.filter(e => JT_RULES.fair.includes(e.at[s])).length, f = s => G.log.filter(e => JT_RULES.fouls.includes(e.at[s])).length;
+  const h = s => G.log.filter(e => e.at[s] === 'helm').length, first = G.log.find(e => JT_RULES.fair.includes(e.at[0]) !== JT_RULES.fair.includes(e.at[1]));
+  if (n(0) !== n(1)) return n(0) > n(1) ? 0 : 1;
+  if (f(0) !== f(1)) return f(0) < f(1) ? 0 : 1;
+  if (h(0) !== h(1)) return h(0) > h(1) ? 0 : 1;
+  return first ? (JT_RULES.fair.includes(first.at[0]) ? 0 : 1) : 0;
 }
 // the tourney board: each side's points by heat and course (null not ridden), the tilt's, the totals, and where the match is
 function jtBoard() {
@@ -110,7 +124,7 @@ function jtBoard() {
 function jtMatchText(s) {
   if (!G) return '';
   const t = s ? 1 : 0, o = 1 - t, a = jtTotal(t), b = jtTotal(o);
-  if (G.over) return `${G.over.win === t ? 'Won' : 'Lost'} ${G.over.tot[t]} to ${G.over.tot[o]}${G.over.tilt ? ' after the tilt for the crown' : ''}`;
+  if (G.over) return `${G.over.win === t ? 'Won' : 'Lost'} ${G.over.tot[t]} to ${G.over.tot[o]}${G.over.tilt ? ' after the tilt for the crown' : ''}${G.over.marshal ? ', on the marshal\'s count' : ''}`;
   const where = jtInTilt() ? `in the tilt for the crown, course ${G.course + 1}` : `heat ${G.heat + 1}, course ${G.course + 1} of ${G.courses}`;
   return `${a === b ? 'Level' : a > b ? 'Ahead' : 'Behind'}, ${a} to ${b}, ${where}`;
 }

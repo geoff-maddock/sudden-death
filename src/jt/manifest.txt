@@ -2,3 +2,8 @@
 # them inside a scope (src/realm/lists/manifest.txt, through `scope wJT ...`), so none of their names reach the page.
 src/scoped/util.js
 src/jt/parts/02-rules.js
+# phase 1: the lists, the mounts, the plan and the ratings; the pure course model; the CPU's plan; a match headless
+src/jt/parts/03-lists.js
+src/jt/parts/04-course.js
+src/jt/parts/05-cpu.js
+src/jt/parts/06-game.js

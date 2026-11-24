@@ -45991,15 +45991,17 @@ function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w
      the heat's courses not ridden stay empty (null). Both riders can be unhorsed in the same course.
    Points from both heats are added. Level after both heats: the tilt for the crown, one course at a time between
    each side's best rider (opts.best, or the side's rider who scored more in their heat, the first heat's on a tie),
-   until a course leaves the totals apart. A match can't end level. The rules don't cap the tilt: the model (phase 1)
-   makes a course that scores nothing rare, and the sim stops a runaway.
+   until a course leaves the totals apart. A match can't end level. The tilt is capped (JT_RULES.tiltMax courses):
+   still level then, the marshal's count settles it (jtMarshal): more lances broken in the match, then fewer fouls,
+   then more helm breaks, then the side that broke the first lance; with nothing at all between them, the side named
+   first (side 0). On the model a run of level tilt courses that long is next to impossible.
 
    G: { courses, riders: [2 × two roster indexes], roster: [2 × size], best: [2 × rider slot 0 | 1 | null], heat (0 or
    1; 2 in the tilt), course (0-based within the heat; the tilt's courses count on), sc: [side][heat] = [points by
    course, null when not ridden], tilt: [[points by tilt course], [...]], crown: [2 × roster index] in the tilt,
    ended: [per heat: null | { course (1-based), unhorsed: [sides] }], log: [{ heat, course, tilt, at: [2], unhorse:
    [2], pts: [2] }], over }. */
-const JT_RULES = { heats: 2, courses: 3, coursesAt: [3, 5], riders: 2, side: 4, unhorse: 3,
+const JT_RULES = { heats: 2, courses: 3, coursesAt: [3, 5], riders: 2, side: 4, unhorse: 3, tiltMax: 12,
   pts: { shield: 1, body: 1, helm: 2, glance: 0, miss: 0, mount: -1, barrier: -1, low: -1 },
   fair: ['shield', 'body', 'helm'], fouls: ['mount', 'barrier', 'low'] };
 // what each strike is, in the herald's words
@@ -46057,7 +46059,7 @@ function jtCourse(res) {
   G.log.push({ heat: h, course: k, tilt, at, unhorse: un, pts: pts.slice() });
   const out = { ok: true, heat: h, course: k, tilt, pts, unhorsed, heatOver: null, tiltNow: false, over: null };
   G.course++;
-  if (tilt) { if (jtTotal(0) !== jtTotal(1)) jtDecide(); }
+  if (tilt) { if (jtTotal(0) !== jtTotal(1)) jtDecide(); else if (G.tilt[0].length >= JT_RULES.tiltMax) jtDecide(jtMarshal()); }
   else if (unhorsed.length || G.course >= G.courses) {
     if (unhorsed.length) G.ended[h] = { course: k + 1, unhorsed };
     out.heatOver = { heat: h, tot: [jtHeatTotal(0, h), jtHeatTotal(1, h)], by: unhorsed.length ? 'unhorse' : 'courses' };
@@ -46075,9 +46077,21 @@ function jtBestSlot(s) {
   if (G.best[s] === 0 || G.best[s] === 1) return G.best[s];
   return jtHeatTotal(s, 1) > jtHeatTotal(s, 0) ? 1 : 0;
 }
-function jtDecide() {
-  const a = jtTotal(0), b = jtTotal(1), n = G.tilt[0].length;
-  G.over = { win: a > b ? 0 : 1, tot: [a, b], tilt: n, text: `${Math.max(a, b)} to ${Math.min(a, b)}${n ? ' after the tilt for the crown' : ''}` };
+// the match decided: on the points, or (level at the tilt's cap) by the marshal's count, win
+function jtDecide(marshal) {
+  const a = jtTotal(0), b = jtTotal(1), n = G.tilt[0].length, win = marshal != null ? marshal : a > b ? 0 : 1;
+  G.over = { win, tot: [a, b], tilt: n, text: marshal != null ? `${a} to ${b} after the tilt for the crown, on the marshal's count` : `${Math.max(a, b)} to ${Math.min(a, b)}${n ? ' after the tilt for the crown' : ''}` };
+  if (marshal != null) G.over.marshal = true;
+}
+// the marshal's count, when the tilt runs to its cap level: the side with more lances broken, then fewer fouls, then
+// more helm breaks, then the side that broke the first lance; side 0 when nothing at all is between them
+function jtMarshal() {
+  const n = s => G.log.filter(e => JT_RULES.fair.includes(e.at[s])).length, f = s => G.log.filter(e => JT_RULES.fouls.includes(e.at[s])).length;
+  const h = s => G.log.filter(e => e.at[s] === 'helm').length, first = G.log.find(e => JT_RULES.fair.includes(e.at[0]) !== JT_RULES.fair.includes(e.at[1]));
+  if (n(0) !== n(1)) return n(0) > n(1) ? 0 : 1;
+  if (f(0) !== f(1)) return f(0) < f(1) ? 0 : 1;
+  if (h(0) !== h(1)) return h(0) > h(1) ? 0 : 1;
+  return first ? (JT_RULES.fair.includes(first.at[0]) ? 0 : 1) : 0;
 }
 // the tourney board: each side's points by heat and course (null not ridden), the tilt's, the totals, and where the match is
 function jtBoard() {
@@ -46089,12 +46103,285 @@ function jtBoard() {
 function jtMatchText(s) {
   if (!G) return '';
   const t = s ? 1 : 0, o = 1 - t, a = jtTotal(t), b = jtTotal(o);
-  if (G.over) return `${G.over.win === t ? 'Won' : 'Lost'} ${G.over.tot[t]} to ${G.over.tot[o]}${G.over.tilt ? ' after the tilt for the crown' : ''}`;
+  if (G.over) return `${G.over.win === t ? 'Won' : 'Lost'} ${G.over.tot[t]} to ${G.over.tot[o]}${G.over.tilt ? ' after the tilt for the crown' : ''}${G.over.marshal ? ', on the marshal\'s count' : ''}`;
   const where = jtInTilt() ? `in the tilt for the crown, course ${G.course + 1}` : `heat ${G.heat + 1}, course ${G.course + 1} of ${G.courses}`;
   return `${a === b ? 'Level' : a > b ? 'Ahead' : 'Behind'}, ${a} to ${b}, ${where}`;
 }
 // one strike in the herald's words ("a lance broken on the helm", "unhorsed!")
 const jtAtText = st => !st ? '' : st.unhorse && jtFair(st.at) ? `${JT_AT[st.at]}, and unhorsed` : JT_AT[st.at] || '';
+/* The Tilting Lists: the lists, the mounts, the plan and the riders' ratings (issue #117, phase 1).
+
+   The lists (JT_LISTS): a sand yard JT_LISTS.yards long with the tilt (the barrier) down the middle. The riders start
+   at opposite ends and pass left side to left side, so each meets the other halfway: a charge is half the yard.
+   Speed is in yards a second (a canter about 8, a gallop about 12; the mount scales it).
+   The target (JT_ZONE), as the oncoming lance tip sees the other rider at the moment of impact: inches across (x,
+   + to the rider's right, away from the shield) and up (y) from the middle of the chest. The shield hangs on the left;
+   the helm is small and high; the body is the part of the torso the shield leaves open. The guard moves the shield:
+   - square: the shield faces the lance and covers more of the torso (a strike on it is likely to break, but the rider
+     takes it and stays on);
+   - angled: the shield is turned edge-on to deflect (a strike on it mostly glances), it covers less of the torso,
+     and the head is out from behind it (the helm is a bigger mark).
+   Below the torso is below the belt (a foul, 'low'); lower again, the mount's neck (a foul, 'mount'); low and across
+   to the left, the barrier (a foul, 'barrier'); anywhere else, a miss.
+   The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
+   (canter or gallop). A gallop hits harder and spends more of the mount's wind, but the tip sways more.
+   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more), Destrier (steady, easy to aim, hits softer), Courser
+   (quick to get its wind back, light in the hit). The mount is picked per rider in phase 3; until then every rider
+   rides JT_MOUNT_DEF.
+   The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, the arm), seat (the
+   balance after a hit), shield (a strike on the shield breaks less), ride (pace and the mount's wind), nerve (the
+   pressure, phase 3), care (a squire's jobs, phase 3). Provisional until phase 3's ratings by kind: JT_KIND holds
+   them, a row of seven by kind (none yet), and every rider without a row is JT_KIND._ . A roster member may carry its
+   own (rs, 0 to 1), as the Realm will send. */
+const JT_LISTS = { yards: 60, speed: 12 };
+const JT_STATS = ['lance', 'couch', 'seat', 'shield', 'ride', 'nerve', 'care'];
+const JT_KIND = { _: [6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5] };
+const JT_RCAP = 12;
+const jtScale = v => clamp((v - 1) / (JT_RCAP - 1), 0, 1.2);
+// a kind's ratings, 1 to 12, and as the model reads them (0 to 1)
+function jtRate(kind) { const k = JT_KIND[kind] || JT_KIND._; return Object.fromEntries(JT_STATS.map((s, i) => [s, k[i]])); }
+function jtRs(kind) { const r = jtRate(kind); return Object.fromEntries(JT_STATS.map(s => [s, jtScale(r[s])])); }
+
+const JT_PLAN = {
+  aim: { shield: { n: 'the shield', x: -4, y: 4 }, body: { n: 'the body', x: 6.5, y: 2 }, helm: { n: 'the helm', x: 0, y: 20 } },
+  guard: { angled: { n: 'angled' }, square: { n: 'square' } },
+  pace: { canter: { n: 'a canter', speed: .68, sway: 1, wind: .12 }, gallop: { n: 'a gallop', speed: 1, sway: 1.35, wind: .3 } }
+};
+const JT_MOUNT = {
+  charger: { n: 'Charger', speed: 1.08, hit: 1.1, sway: 1.18, steady: 0, rec: .12 },
+  destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .85, steady: .06, rec: .12 },
+  courser: { n: 'Courser', speed: 1, hit: .9, sway: 1, steady: 0, rec: .3 }
+};
+const JT_MOUNT_DEF = 'destrier';
+const jtMount = id => JT_MOUNT[id] || JT_MOUNT[JT_MOUNT_DEF];
+
+// the target, by the defender's guard: the shield and the torso as boxes, the helm as a circle
+const JT_ZONE = {
+  torso: { x0: -8, x1: 10, y0: -10, y1: 14 },
+  shield: { square: { x0: -11, x1: 3, y0: -6, y1: 14 }, angled: { x0: -11, x1: -.5, y0: -4, y1: 12 } },
+  helm: { x: 0, y: 20, square: 4.2, angled: 5.6 },
+  low: -22, barrier: { x: -15, y: -6 }, mount: 15
+};
+const jtIn = (b, x, y) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1;
+// where a tip at (x, y) lands on a rider holding guard: shield, body, helm, low, mount, barrier or miss
+function jtZoneAt(x, y, guard) {
+  const Z = JT_ZONE, g = guard === 'angled' ? 'angled' : 'square';
+  if (Math.hypot(x - Z.helm.x, y - Z.helm.y) <= Z.helm[g]) return 'helm';
+  if (jtIn(Z.shield[g], x, y)) return 'shield';
+  if (jtIn(Z.torso, x, y)) return 'body';
+  if (x <= Z.barrier.x && y <= Z.barrier.y) return 'barrier';
+  if (y < Z.torso.y0 && y >= Z.low && Math.abs(x) <= Z.torso.x1 + 2) return 'low';
+  if (y < Z.low && Math.abs(x) <= Z.mount) return 'mount';
+  return 'miss';
+}
+// how near the edge of its zone a tip is: 0 in the middle, 1 on the edge (a strike near the edge glances more)
+function jtEdge(zone, x, y, guard) {
+  const Z = JT_ZONE, g = guard === 'angled' ? 'angled' : 'square';
+  if (zone === 'helm') return clamp(Math.hypot(x - Z.helm.x, y - Z.helm.y) / Z.helm[g], 0, 1);
+  const b = zone === 'shield' ? Z.shield[g] : zone === 'body' ? { x0: g === 'angled' ? Z.shield.angled.x1 : Z.shield.square.x1, x1: Z.torso.x1, y0: Z.torso.y0, y1: Z.torso.y1 } : null;
+  if (!b) return 1;
+  const ex = Math.abs(x - (b.x0 + b.x1) / 2) / ((b.x1 - b.x0) / 2), ey = Math.abs(y - (b.y0 + b.y1) / 2) / ((b.y1 - b.y0) / 2);
+  return clamp(Math.max(ex, ey), 0, 1);
+}
+/* The Tilting Lists: the course model (issue #117, phase 1). Pure: no game state is read or written, and every
+   random number comes from rnd, the function passed in (the engine's seeded R in a game), so Play (phase 2), the CPU
+   and the sim all ride the same model.
+
+   A rider's ride is the numbers a course turns on: { aim, guard, pace, speed, couch, tip: { x, y }, rs, mount }.
+   - speed: yards a second at impact (the pace, the mount, the mount's wind, the ride rating);
+   - couch: when the lance came down, as an error from the right moment, -1 (far too early) to 1 (far too late). Too
+     early and the arm tires: the tip droops (jtSway's droop) and wanders. Too late and the aim never settles;
+   - tip: where the lance tip is at impact, in the target's inches (03-lists.js), the aim point plus the sway's miss.
+   On Play these come from your hands: the spur's rhythm gives the speed, the couch its moment, and the tip is where
+   you held it as the stride threw it about. The CPU and the sim draw them (jtCharge) from the ratings, the mount and
+   their skill's hands, with jtSway's spread.
+   The impact (jtStrike): the tip lands in a zone of the other rider (jtZoneAt, by their guard). A foul or a miss is
+   that. On the shield, the body or the helm the lance breaks (JT_BREAK, by zone and guard: an angled shield turns most
+   strikes on it into glances; the helm is the hardest mark and breaks surest) with a chance that grows with the
+   force (speed and mount, a clean couch) and falls toward the zone's edge and with the defender's shield rating; it
+   doesn't break, it glances. A strike's rock is how hard it hits the other rider (JT_ROCK).
+   The seat (jtSeat): a rider rocked by a broken lance leans against it. Their hold (JT_SEAT: the seat rating, a
+   square guard taking the hit, a steady mount, the lean) against the rock, shaken a little: short of it, they are
+   unhorsed. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
+   broken lance can unhorse: a glance rocks, no more. */
+const JT_SWAY = { base: 3.6, lance: .55, wind: .5, late: .9, early: .35, droop: 7 };
+const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .88, angled: .88 }, helm: { square: .92, angled: .95 }, edge: .25, shieldR: .2, force: .3 };
+const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.3, glance: .3 };
+const JT_SEAT = { base: .59, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
+const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+
+// the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
+// the lance and couch ratings and the couch's moment; hands scales the spread (a skill's, or 1 on Play)
+function jtSway(o) {
+  const P = JT_PLAN.pace[o.pace] || JT_PLAN.pace.canter, M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1), c = clamp(o.couch || 0, -1, 1);
+  const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5);
+  const sigma = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)) * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * (o.hands ?? 1);
+  return { sigma, droop: JT_SWAY.droop * Math.max(0, -c) * arm };
+}
+// the speed at impact: the pace, the mount, its wind (a blown mount slows) and the ride rating
+function jtSpeed(o) {
+  const P = JT_PLAN.pace[o.pace] || JT_PLAN.pace.canter, M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
+  return JT_LISTS.speed * P.speed * M.speed * (.8 + .2 * w) * (1 + .08 * ((r.ride ?? .5) - .5));
+}
+// the mount's wind a course spends at this pace (a good rider spends less)
+const jtWindCost = (pace, rs) => (JT_PLAN.pace[pace] || JT_PLAN.pace.canter).wind * (1.15 - .3 * ((rs || {}).ride ?? .5));
+
+/* a CPU or sim rider's ride: o = { plan: { aim, guard, pace }, rs, mount, wind, hands: { aim, couch } (the skill's) } */
+function jtCharge(o, rnd) {
+  const plan = o.plan, H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {};
+  const speed = jtSpeed({ pace: plan.pace, mount: o.mount, rs, wind: o.wind }) * (1 + .03 * jtGauss(rnd));
+  const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)), -1, 1);
+  const sw = jtSway({ pace: plan.pace, mount: o.mount, rs, wind: o.wind, couch, hands: H.aim }), A = JT_PLAN.aim[plan.aim] || JT_PLAN.aim.shield;
+  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount: o.mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop } };
+}
+// the force of a ride's strike: its speed against a gallop's, the mount's weight, and a clean couch (0.5 to 1.3 or so)
+const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .25 * Math.abs(a.couch || 0));
+
+/* ride a's strike on rider d: { zone, at (for the rules: a zone, 'glance' or 'miss'), broke, force, rock, pb } */
+function jtStrike(a, d, rnd) {
+  const g = d.guard === 'angled' ? 'angled' : 'square', zone = jtZoneAt(a.tip.x, a.tip.y, g), force = jtForce(a);
+  if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0 };
+  const base = JT_BREAK[zone][g], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
+  const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
+  const pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK, 0, .98), broke = rnd() < pb;
+  const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance);
+  return { zone, at: broke ? zone : 'glance', broke, force, rock, pb };
+}
+/* rider d's seat against a strike st: lean is their balance (0 to 1). { unhorse, rocked, hold, margin } */
+function jtSeat(st, d, lean, rnd) {
+  const r = d.rs || {}, M = jtMount(d.mount);
+  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1);
+  const hit = st.rock * (1 + JT_SEAT.shake * jtGauss(rnd)), margin = hold - hit;
+  return { unhorse: !!st.broke && margin < 0, rocked: !!st.broke && st.rock >= JT_SEAT.rocked, hold, margin };
+}
+/* a course on the model: rides [a0, a1] and leans [l0, l1] (each side's balance if rocked). Returns { res (for the
+   rules: [{ at, unhorse }, ...]), st: [the strikes], seat: [each side's seat, against the other's strike] } */
+function jtImpact(rides, leans, rnd) {
+  const st = [jtStrike(rides[0], rides[1], rnd), jtStrike(rides[1], rides[0], rnd)];
+  const seat = [jtSeat(st[1], rides[0], leans[0], rnd), jtSeat(st[0], rides[1], leans[1], rnd)];
+  return { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
+}
+/* The Tilting Lists: the CPU's plan and its hands (issue #117, phase 1).
+   Before each course each CPU rider picks a plan (an aim, a guard and a pace), with the reason; then rides it with
+   its skill's hands (JT_SKILL: how far its tip strays, how well it times the couch, how well it leans into a hit).
+   - A Squire picks a plan at random and rides plainly (its hands stray most).
+   - A Knight reads the score and the heat. Behind by more than it can make up with plain breaks in the courses left
+     (and in the last course of the match behind at all): the helm at a gallop. Two or more ahead: the shield, a
+     square guard and a canter (take no chances, stay on). In the tilt for the crown: the body, square, at a gallop.
+     Otherwise the shield or the body, either guard, and a gallop while the mount has its wind.
+   - An Archmage reads the score as a Knight does, with surer hands, and saves its gallop for when it counts: the last
+     course of a heat, the tilt, or behind. Reading the other rider's habits comes in phase 4 (G.plans keeps them).
+   A plan is { aim, guard, pace, why }. */
+const JT_SKILL = [
+  { n: 'Squire', aim: 1.3, couch: .5, lean: .3 },
+  { n: 'Knight', aim: 1, couch: .3, lean: .5 },
+  { n: 'Archmage', aim: .85, couch: .2, lean: .62 }];
+const JT_GALLOP_WIND = .55;
+// what side s needs: { lead (points ahead, + or -), left (courses still to ride for its riders, this one included), last }
+function jtSituation(s) {
+  const lead = jtTotal(s) - jtTotal(1 - s), tilt = jtInTilt();
+  const left = tilt ? 1 : (G.courses - G.course) + (G.heat === 0 ? G.courses : 0);
+  return { lead, left, tilt, last: !tilt && G.course === G.courses - 1, lastOfMatch: !tilt && G.heat === JT_RULES.heats - 1 && G.course === G.courses - 1 };
+}
+function jtPlan(s) {
+  const sk = G.skill[s], W = G.wind[s], Q = jtSituation(s);
+  if (sk <= 0) {
+    const aim = wpick({ shield: 4, body: 3.5, helm: 2.5 }), guard = R() < .5 ? 'angled' : 'square', pace = R() < .5 ? 'gallop' : 'canter';
+    return { aim, guard, pace, why: 'it suits them' };
+  }
+  const saving = sk >= 2;
+  if (Q.tilt) return { aim: 'body', guard: 'square', pace: 'gallop', why: 'the tilt for the crown: a sure break and keep the seat' };
+  if (Q.lead < 0 && (-Q.lead > Q.left || Q.lastOfMatch)) return { aim: 'helm', guard: R() < .5 ? 'angled' : 'square', pace: 'gallop', why: `behind by ${-Q.lead} with ${Q.left === 1 ? 'one course' : Q.left + ' courses'} left: go for the helm` };
+  if (Q.lead >= 2) return { aim: 'shield', guard: 'square', pace: 'canter', why: `ahead by ${Q.lead}: take no chances and stay on` };
+  const aim = R() < .55 ? 'shield' : 'body';
+  const pace = saving ? (Q.last || Q.lead < 0 ? 'gallop' : 'canter') : (W >= JT_GALLOP_WIND ? 'gallop' : 'canter');
+  const guard = saving && (Q.last || Q.lead > 0) ? 'square' : R() < .5 ? 'angled' : 'square';
+  const why = saving && pace === 'gallop' ? (Q.last ? 'the last course of the heat: the gallop saved for it' : 'behind: time for the gallop')
+    : pace === 'gallop' ? 'the mount is fresh: a gallop' : saving ? 'a canter, the gallop saved for when it counts' : 'the mount is blown: a canter';
+  return { aim, guard, pace, why };
+}
+// side s's hands, by skill
+const jtHands = s => JT_SKILL[clamp(G.skill[s] | 0, 0, JT_SKILL.length - 1)];
+// side s's lean into a hit (0 to 1), by skill
+const jtLean = s => clamp(jtHands(s).lean + .2 * gauss(), 0, 1);
+/* The Tilting Lists: one match, CPU against CPU (issue #117, phase 1).
+   jtStart(opts) puts a match on the lists: { courses, teams: [2 × { name, short, color, roster: [{ n, kind, rs? }] }],
+   riders, best, skill: [2 skills, 0 to 2], mounts: [2 × [the two riders' mounts]], seed }. jtTurn() rides the next
+   course (both plans, both rides, the impact and the seats, the rules) and says what happened; jtRideCourse(plans,
+   rides, leans) is the same course with any side's ride or lean given (Play's, phase 2) and the rest drawn.
+   jtSimMatch(opts) rides a whole match headless and leaves the match on the lists (and the random stream) as it was;
+   jtSummary() is the match so far.
+   The mount's wind (G.wind, 0 to 1 a side): each heat's riders start on fresh mounts; a course spends some (a gallop
+   most, jtWindCost) and the mount gets a little back before the next (its rec). The tilt for the crown starts the
+   best riders' mounts at JT_TILT_WIND.
+   The box score (G.st by side, G.pst by rider): courses, lances broken, helm breaks, unhorsings (dealt), unhorsed,
+   glances, misses, fouls, rocked by a broken lance, seats kept after one. G.plans keeps each side's plans (the
+   herald's card and the Archmage's read, phase 4). G.last is the last course, for the page. */
+const JT_TILT_WIND = .8;
+let GB = null;   // the course between jtTurn() and the page's drawing (phase 2): not saved
+function jtStart(opts) {
+  const o = opts || {};
+  if (o.seed != null) engSeed(o.seed);
+  const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Mossgate', short: s ? 'SAL' : 'MOS', color: s ? '#2f7898' : '#3a5a9a' };
+    const roster = (T.roster && T.roster.length >= JT_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
+      .map(p => Object.assign({}, p, { rs: p.rs || jtRs(p.kind) }));
+    return Object.assign({}, T, { roster }); });
+  jtNewMatch({ courses: o.courses, riders: o.riders || teams.map(T => T.riders), roster: teams.map(T => T.roster.length), best: o.best });
+  const mounts = [0, 1].map(s => [0, 1].map(i => { const m = ((o.mounts || [])[s] || [])[i]; return JT_MOUNT[m] ? m : JT_MOUNT_DEF; }));
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), mounts, wind: [1, 1], n: 0,
+    st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0 }))), plans: [[], []], last: null });
+  GB = null;
+  return G;
+}
+const jtBox = () => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0, unhorsed: 0, glances: 0, misses: 0, fouls: 0, rocked: 0, kept: 0 });
+// the mount side s rides now (the heat's rider's; in the tilt, the best rider's)
+function jtMountOf(s) { const ri = (jtRiders() || [])[s]; const slot = G.riders[s].indexOf(ri); return G.mounts[s][slot < 0 ? 0 : slot]; }
+const jtRsOf = (s, ri) => G.teams[s].roster[ri].rs;
+// the next course, CPU against CPU: { heat, course, tilt, riders, plans, rides, imp, rule } or null when the match is over
+function jtTurn() {
+  if (!G || G.over) return null;
+  return jtRideCourse([jtPlan(0), jtPlan(1)]);
+}
+function jtRideCourse(plans, given, leans) {
+  const riders = jtRiders(); if (!riders) return null;
+  const heat = G.heat, course = G.course, tilt = jtInTilt();
+  const rides = [0, 1].map(s => (given && given[s]) || jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
+  const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : jtLean(s));
+  const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), imp = jtImpact(rides, lean, R), rule = jtCourse(imp.res);
+  // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
+  [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
+  if (rule.tiltNow) G.wind = [JT_TILT_WIND, JT_TILT_WIND]; else if (rule.heatOver) G.wind = [1, 1];
+  // the box score
+  [0, 1].forEach(s => {
+    const B = G.st[s], P = G.pst[s][riders[s]], st = imp.st[s], seat = imp.seat[s];
+    B.courses++; P.courses++;
+    if (st.broke) { B.breaks++; P.breaks++; if (st.zone === 'helm') { B.helms++; P.helms++; } }
+    else if (st.at === 'glance') B.glances++; else if (st.at === 'miss') B.misses++; else B.fouls++;
+    if (imp.res[s].unhorse) { B.unhorse++; P.unhorse++; G.st[1 - s].unhorsed++; }
+    if (seat.rocked) { B.rocked++; if (!seat.unhorse) B.kept++; }
+    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, at: st.at, lead: lead[s] });
+  });
+  G.n++;
+  const ev = { heat, course, tilt, riders, plans, rides, imp, rule };
+  G.last = { heat, course, tilt, riders, plans: plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: imp.res, pts: rule.pts };
+  GB = ev;
+  return ev;
+}
+function jtSummary() {
+  if (!G) return null;
+  return { over: G.over, board: jtBoard(), st: JSON.parse(JSON.stringify(G.st)), pst: JSON.parse(JSON.stringify(G.pst)), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })),
+    tot: [jtTotal(0), jtTotal(1)], log: JSON.parse(JSON.stringify(G.log)), skill: G.skill.slice(), mounts: JSON.parse(JSON.stringify(G.mounts)), courses: G.n, tilt: G.tilt[0].length };
+}
+// a whole match headless: leaves the match on the lists, and the random stream, as they were
+function jtSimMatch(opts) {
+  const keep = G, keepB = GB, keepR = engRand;
+  if (!opts || opts.seed == null) engRand = engRng((Math.random() * 4294967296) >>> 0);
+  try {
+    jtStart(opts);
+    let n = 0; while (!G.over && n++ < 200) jtTurn();
+    return Object.assign({ win: G.over ? G.over.win : -1 }, jtSummary());
+  } finally { G = keep; GB = keepB; engRand = keepR; }
+}
 
 /* the end of the wJT scope: what the Realm may call (w19b-engines.js). Phase 0 is the rules: newMatch(opts) starts a
    match ({ courses: 3 | 5, riders: [each side's two riders, as roster indexes], roster: [two roster sizes], best:
@@ -46104,13 +46391,28 @@ const jtAtText = st => !st ? '' : st.unhorse && jtFair(st.at) ? `${JT_AT[st.at]}
    heat on an unhorsing or its last course, starts the tilt when level, ends the match, and says so), whyNot(res);
    strikePts, fair, foul and atText read a strike; heatTotal(s, h), total(s), board() (the tourney board), matchText(s).
    rules and at (the herald's words) are the tables. G is the match, plain JSON. The page comes in phase 2: until then
-   the lists are never on. */
+   the lists are never on.
+   Phase 1 is the course model and one match, CPU against CPU: lists, plan, mounts, zones, stats, skills (the tables),
+   rate(kind) and rs(kind) (a kind's ratings, 1 to 12 and 0 to 1), zoneAt(x, y, guard), edge; the pure model, every
+   random number from the rnd passed in (Math.random when left out; planRules is the plan table): sway(o) and speed(o), charge(o, rnd) (a CPU
+   rider's ride), strike(a, d, rnd), seat(st, d, lean, rnd), impact(rides, leans, rnd); start(opts) puts a match on
+   the lists ({ courses, teams, riders, best, skill: [2], mounts, seed }), turn() rides the next course, rideCourse(plans,
+   rides, leans) one with any side's ride or lean given, plan(s) the CPU's plan, summary(), simMatch(opts) a whole
+   match headless (the match on the lists and the random stream left as they were). */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
   course: res => jtCourse(res), whyNot: res => jtWhyNot(res),
   strikePts: st => jtStrikePts(st), fair: at => jtFair(at), foul: at => jtFoul(at), atText: st => jtAtText(st),
   heatTotal: (s, h) => jtHeatTotal(s, h), total: s => jtTotal(s), board: () => jtBoard(), matchText: s => jtMatchText(s),
+  // the course model and a match (phase 1)
+  lists: JSON.parse(JSON.stringify(JT_LISTS)), planRules: JSON.parse(JSON.stringify(JT_PLAN)), mounts: JSON.parse(JSON.stringify(JT_MOUNT)), zones: JSON.parse(JSON.stringify(JT_ZONE)),
+  stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT },
+  rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
+  sway: o => jtSway(o), speed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
+  seat: (st, d, lean, rnd) => jtSeat(st, d, lean, rnd || Math.random), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
+  start: o => jtStart(o), turn: () => jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
+  summary: () => jtSummary(), simMatch: o => jtSimMatch(o),
   show: () => {}, hide: () => {}, get on() { return false; }
 };
 
@@ -46123,7 +46425,7 @@ return {
    src/hk/, issue #83), Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play), the
    Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play), the Curling Shed
    (wCR, curling; src/cr/, issue #102: a game at the Shed, Watch or You play) and the Tilting Lists (wJT, jousting;
-   src/jt/, issue #117: the rules so far, with no page, so never on). Nothing here is saved. */
+   src/jt/, issue #117: being built, with no page yet, so never on). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' },
