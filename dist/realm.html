@@ -67729,8 +67729,13 @@ renderHelp = function () {
    the dark world (WG.grace). The dark world's own wild matches come half as often: the danger is one you can see.
    Shadow Salt (DB.items.shadowsalt, sold in the dark shops for fans): the shadows can't see you for W_UMB8C.salt steps
    (WG.umbral.salt).
+   You see a shadow plainly only when it is close (W_UMB8C.show steps by stage, nearer as the Dread rises: from the
+   Raging they see you before you see them; measured with a careful walker, only the Last Hour
+   catches you more often, 38% of long walks against 23%). Over W_UMB8C.haze more steps it fades out, and farther off it is only a
+   shimmer now and then (wUmbShadowVis). Look finds it only where it shows. Only the drawing changes: the shadows' sight
+   and steps are the same.
 
-   W_UMB8C, wUmbDread, wUmbHazardAt, wUmbShadowsSync, wUmbShadowStep, wUmbDreadScene
+   W_UMB8C, wUmbDread, wUmbHazardAt, wUmbShadowsSync, wUmbShadowStep, wUmbShadowVis, wUmbDreadScene
    Wraps: buildAllMaps (wWU8CBuildAllMaps: the hazards), wTryMove (wWU8CTryMove: a shadow walked into, hazards, the
    shadows' step), wEncounterP (wWU8CEncounterP: half the dark world's wild matches), wEncounterRoll (wWU8CEncounterRoll: none on a live hazard), startMatch (wWU8CStartMatch:
    counts matches started, so a step that started one moves no shadows), wLookText (wWU8CLookText: hazards, shadows),
@@ -67742,6 +67747,7 @@ const W_UMB8C = {
   stages: [0, 3, 6, 8],
   names: ['The Quiet', 'The Stirring', 'The Raging', 'The Last Hour'],
   shadows: [3, 6, 10, 14], sight: [4, 5, 6, 7], hunt: 2,   // from this stage, two steps every third step
+  show: [6, 6, 5, 5], haze: 2,   // seen plainly within show steps, fading over haze more, then a shimmer at most
   lanternR: 3, minSpawn: 8, home: 3,
   spikes: { near: 4, far: 14 }, pits: 20, spikeHp: 2, pitHp: 3, pitDrop: 4,
   salt: 60, encMult: .5, started: 0,
@@ -67873,6 +67879,14 @@ function wUmbSees(m, s) {
 }
 // (u8j's resonance shortens it: it wraps this)
 function wUmbShadowSight() { return W_UMB8C.sight[wUmbDread()]; }
+// how plainly a shadow shows, 0 to 1: plain within W_UMB8C.show steps of you, fading over W_UMB8C.haze more, and past
+// that a faint shimmer now and then (t, seconds; none when t is left out)
+function wUmbShadowVis(s, t) {
+  const d = Math.abs(s.x - WG.x) + Math.abs(s.y - WG.y), r = W_UMB8C.show[wUmbDread()], hz = W_UMB8C.haze;
+  if (d <= r) return 1;
+  if (d <= r + hz) return 1 - (d - r) / (hz + 1);
+  return t == null ? 0 : Math.max(0, Math.sin(t * 1.1 + wHash(s.hx, s.hy, 91) * 6.28)) ** 6 * .18;   // (each its own beat)
+}
 // one step of one shadow: toward you if it sees you, else a drift near home. True when it reached you
 function wUmbShadowMove(m, s, r) {
   W_UMB8C_ANIM[s.id] = { px: s.x, py: s.y, mt: typeof performance !== 'undefined' ? performance.now() : 0 };
@@ -67954,7 +67968,9 @@ const wWU8CLookText = wLookText;
 wLookText = function (x, y) {
   const m = wCurMap();
   if (m && m.id === 'u:world') {
-    if (wUmbShadowAt(x, y)) return 'A shadow with nobody to cast it. It is looking at you.';
+    const s = wUmbShadowAt(x, y), v = s ? wUmbShadowVis(s) : 0;
+    if (v >= 1) return 'A shadow with nobody to cast it. It is looking at you.';
+    if (v > 0) return 'Something moves there, at the edge of seeing.';
     const h = wUmbHazardAt(m, x, y);
     if (h === 'spike') return `Spikes, black as old bone, a hand high. They cost ${wUmbSpikeHp()} HP to walk on.`;
     if (h === 'pit') return wUmbDread() >= 1 ? `A pit, open, with no bottom you can see. Falling in costs ${wUmbPitHp()} HP. Walk round it.` : 'Cracked ground. It holds, for now.';
@@ -67994,7 +68010,8 @@ W_ACTORS.push((acts, now, t) => {
     if (Math.abs(s.x - WG.x) > 24 || Math.abs(s.y - WG.y) > 16) continue;
     const a = W_UMB8C_ANIM[s.id]; let x = s.x, y = s.y;
     if (a && now - a.mt < WSTEP_MS * 1.6) { const k = (now - a.mt) / (WSTEP_MS * 1.6); x = a.px + (s.x - a.px) * k; y = a.py + (s.y - a.py) * k; }
-    acts.push({ x, y, who: { kind: 'wraith', shade: 1, col: '#1a1024', light: '#c8b8ff', face: WG.x < s.x ? 'l' : 'r', walk: t * 8, seed: s.x * 3 + s.y }, size: 30, alpha: .82 });
+    const v = wUmbShadowVis(s, t); if (v < .01) continue;
+    acts.push({ x, y, who: { kind: 'wraith', shade: 1, col: '#1a1024', light: '#c8b8ff', face: WG.x < s.x ? 'l' : 'r', walk: t * 8, seed: s.x * 3 + s.y }, size: 30, alpha: .82 * v });
   }
 });
 
@@ -68071,7 +68088,8 @@ renderHelp = function () {
   wWU8CRenderHelp.apply(this, arguments);
   const h = $('wHelpUmbral'); if (!h || !wUmbOn() || $('wHelpDread')) return;
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : '-9'} pieces)`).join(', ')}.
-    Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
+    Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match.
+    You only see one plainly when it is close: ${W_UMB8C.show[0]} steps in the Quiet and the Stirring, ${W_UMB8C.show[2]} from the Raging. Farther off it fades to a shimmer, so from the Raging they can see you before you see them. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
     Spikes cost ${wUmbSpikeHp()} HP to walk on. From the Stirring, the cracked ground opens into pits: ${wUmbPitHp()} HP, and you climb out somewhere else. Wild matches come half as often on that side; the danger is one you can see.</p>`);
 };
 /* u8d: the gauntlet on the dark grounds (issue #111, phase D). Loads after u7-feel.js; changes earlier parts only by
@@ -68474,9 +68492,9 @@ renderHelp = function () {
 
    wUmbShrug, wUmbShrugAll, wUmbWithout, wUmbWeb
    Wraps: wUmb4aNine, wUmbGfTeam, wUmbBkTeam, wUmbHkTeam, wUmbGlFour, wUmbBlFive, wUmbCrFour (wWU8ENine, wWU8EGfTeam,
-   wWU8EBkTeam, wWU8EHkTeam, wWU8EGlFour, wWU8EBlFive, wWU8ECrFour: the team goes with shade); atkDmg (wWU8EAtkDmg),
-   hurtEnemy (wWU8EHurtEnemy), enemyHitDmg (wWU8EEnemyHitDmg), resolve (wWU8EResolve), playCard (wWU8EPlayCard), useTonic (wWU8EUseTonic), endTurn (wWU8EEndTurn), doMove (wWU8EDoMove), playerTurnStart
-   (wWU8EPlayerTurnStart), cardCost (wWU8ECardCost), cardHTML (wWU8ECardHTML: Webbed), renderHelp (wWU8ERenderHelp),
+   wWU8EBkTeam, wWU8EHkTeam, wWU8EGlFour, wWU8EBlFive, wWU8ECrFour: the team goes with shade); atkDmg (wSdAtkDmg),
+   hurtEnemy (wSdHurtEnemy), enemyHitDmg (wSdEnemyHitDmg), resolve (wSdResolve), playCard (wSdPlayCard), useTonic (wSdUseTonic), endTurn (wSdEndTurn), doMove (wSdDoMove), playerTurnStart
+   (wSdPlayerTurnStart), cardCost (wSdCardCost), cardHTML (wSdCardHTML: Webbed), renderHelp (wWU8ERenderHelp),
    wUmbQuick (wWU8EQuick: the traits on the Quick start's Umbral tab). */
 
 /* ---------- every Nadir side in shadow ---------- */
@@ -68504,16 +68522,16 @@ function wUmbWithout(e, k, f) { const v = e.st[k]; if (!v) return f(); delete e.
 // (an Attack or a set play: grouped together here on purpose, as the sports layer groups them; most of the engine
 // checks 'atk' alone)
 const wUmbIsAtk = t => t === 'atk' || t === 'play';
-const wWU8EAtkDmg = atkDmg;
+const wSdAtkDmg = atkDmg;
 atkDmg = function (base, e, card) {
-  const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wWU8EAtkDmg.apply(this, args)) : wWU8EAtkDmg.apply(this, args);
+  const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wSdAtkDmg.apply(this, args)) : wSdAtkDmg.apply(this, args);
   // (a short note, not a multiplier: the total is the real hit; only an Attack's or a set play's)
   if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player' && card && wUmbIsAtk(def(card).type)) WHY.push(['Half There', '', 'Half There: 1st hit lost']);
   return n;
 };
 // Half There: the first hit from an Attack or a set play against it this turn does nothing (not poison, burn, or a raw blow:
 // an instant kill, Tempest, Haunt)
-const wWU8EHurtEnemy = hurtEnemy;
+const wSdHurtEnemy = hurtEnemy;
 hurtEnemy = function (e, dmg, o) {
   o = o || {};
   if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && B.inCard && wUmbIsAtk(B.curType) && !o.raw && !o.psn && !o.burn) {
@@ -68521,7 +68539,7 @@ hurtEnemy = function (e, dmg, o) {
     fx({ k: 'say', e: e.uid, t: 'Half There' });
     log(`${e.n} is Half There: the hit passes straight through.`, 'bad');
   }
-  return wWU8EHurtEnemy.call(this, e, dmg, o);
+  return wSdHurtEnemy.call(this, e, dmg, o);
 };
 // Won't Flinch: Weak and Exposed come off it at the game's own moments (after a card or a tonic, at the end and the start
 // of your turn, before its swing); in between, the sums ignore them
@@ -68532,19 +68550,19 @@ function wUmbShrug(e) {
   log(`${e.n} Won't Flinch: ${ks.map(k => ST[k].n).join(' and ')} doesn't take.`, 'bad');
 }
 function wUmbShrugAll() { if (B && B.umb && !B.over) for (const e of B.enemies) if (e.uStill && !e.dead && !e.fled) wUmbShrug(e); }
-const wWU8EEnemyHitDmg = enemyHitDmg;
-enemyHitDmg = function (e) { const args = arguments; return e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'weak', () => wWU8EEnemyHitDmg.apply(this, args)) : wWU8EEnemyHitDmg.apply(this, args); };
-const wWU8EResolve = resolve;
-resolve = function () { const r = wWU8EResolve.apply(this, arguments); wUmbShrugAll(); return r; };
+const wSdEnemyHitDmg = enemyHitDmg;
+enemyHitDmg = function (e) { const args = arguments; return e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'weak', () => wSdEnemyHitDmg.apply(this, args)) : wSdEnemyHitDmg.apply(this, args); };
+const wSdResolve = resolve;
+resolve = function () { const r = wSdResolve.apply(this, arguments); wUmbShrugAll(); return r; };
 // (and when a card or a tonic that went ahead is done, and when your turn ends: Weak or Exposed laid on outside a
 // card's ops, by a hook, a pet, Haunt or the end of your turn, comes off there; addSt is a constant, so this is the
 // moment after, never inside a sum. One laid on in the other side's turn shows until its next swing)
-const wWU8EPlayCard = playCard, wWU8EUseTonic = useTonic, wWU8EEndTurn = endTurn;
-playCard = function () { const r = wWU8EPlayCard.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
-useTonic = function () { const r = wWU8EUseTonic.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
-endTurn = function () { const mine = !!B && B.phase === 'player' && !B.over, r = wWU8EEndTurn.apply(this, arguments); if (mine) wUmbShrugAll(); return r; };
-const wWU8EDoMove = doMove;
-doMove = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wWU8EDoMove.apply(this, arguments); };
+const wSdPlayCard = playCard, wSdUseTonic = useTonic, wSdEndTurn = endTurn;
+playCard = function () { const r = wSdPlayCard.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
+useTonic = function () { const r = wSdUseTonic.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
+endTurn = function () { const mine = !!B && B.phase === 'player' && !B.over, r = wSdEndTurn.apply(this, arguments); if (mine) wUmbShrugAll(); return r; };
+const wSdDoMove = doMove;
+doMove = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wSdDoMove.apply(this, arguments); };
 // Webs the Bench: a card of the hand you drew costs 1 more this turn
 function wUmbWeb() {
   const sp = B.enemies.find(e => e.uWeb && !e.dead && !e.fled); if (!sp || B.turn % 2 === 0) return; // (every other turn: the first, the third...)
@@ -68553,19 +68571,19 @@ function wUmbWeb() {
   fx({ k: 'say', e: sp.uid, t: 'Webs the Bench' });
   log(`${sp.n} Webs the Bench: ${def(c).n} costs 1 more this turn.`, 'bad');
 }
-const wWU8EPlayerTurnStart = playerTurnStart;
+const wSdPlayerTurnStart = playerTurnStart;
 playerTurnStart = function () {
   if (B && B.uWeb != null) B.uWeb = null;
-  const r = wWU8EPlayerTurnStart.apply(this, arguments);
+  const r = wSdPlayerTurnStart.apply(this, arguments);
   if (B && B.umb && !B.over && B.phase === 'player') { wUmbShrugAll(); wUmbWeb(); }
   return r;
 };
-const wWU8ECardCost = cardCost;
+const wSdCardCost = cardCost;
 // (a turn of free Attacks wins: a webbed Attack is free with the rest)
-cardCost = function (card) { const n = wWU8ECardCost.apply(this, arguments); return n >= 0 && card && B && B.uWeb != null && card.uid === B.uWeb && !(B.freeAtk && def(card).type === 'atk') ? n + 1 : n; };
-const wWU8ECardHTML = cardHTML;
+cardCost = function (card) { const n = wSdCardCost.apply(this, arguments); return n >= 0 && card && B && B.uWeb != null && card.uid === B.uWeb && !(B.freeAtk && def(card).type === 'atk') ? n + 1 : n; };
+const wSdCardHTML = cardHTML;
 cardHTML = function (card, o) {
-  const h = wWU8ECardHTML.apply(this, arguments);
+  const h = wSdCardHTML.apply(this, arguments);
   if (!(o && o.live && B && B.uWeb != null && card && card.uid === B.uWeb)) return h;
   return h.replace('<div class="card ', '<div class="card uwebbed ').replace(/(<div class="art"[^>]*>)/, '$1<span class="uweb" title="Webs the Bench: it costs 1 more this turn">Webbed +1</span>');
 };
@@ -68801,9 +68819,9 @@ renderHelp = function () {
    Wraps: buildAllMaps (wWU8IBuildAllMaps: the lairs), wNpcAt (wWU8INpcAt: an awake legend stands there), wTalkTo
    (wWU8ITalkTo: its match card), wTryMove (wWU8ITryMove: walking into it), wUmbFreeAt (wWU8IFreeAt: shadows and pits
    keep off a lair), wLookText (wWU8ILookText), wPreGame (wWU8IPreGame: the phases and the prize on its card),
-   combatRewards (wWU8ICombatRewards: no trophy for a legend), killEnemy (wWU8IKillEnemy: the Phoenix rises),
-   playerTurnStart (wWU8IPlayerTurnStart: the drowned hand, the Blizzard), canPlay (wWU8ICanPlay: a frozen card),
-   cardHTML (wWU8ICardHTML: Frozen), wMakePlayer (wWU8IMakePlayer: a lineup's legend a level down), bossOp (wWU8IBossOp: the drowning), intentInfo (wWU8IIntentInfo), wUmbDreadDoes
+   combatRewards (wWU8ICombatRewards: no trophy for a legend), killEnemy (wSdKillEnemy: the Phoenix rises),
+   playerTurnStart (wWU8IPlayerTurnStart: the drowned hand, the Blizzard), canPlay (wSdCanPlay: a frozen card),
+   cardHTML (wWU8ICardHTML: Frozen), wMakePlayer (wWU8IMakePlayer: a lineup's legend a level down), bossOp (wSdBossOp: the drowning), intentInfo (wSdIntentInfo), wUmbDreadDoes
    (wWU8IDreadDoes: the stage's legend), wUmbHexCut (wWU8IHexCut: a shard's hex), W_ON_END.nadir (wWU8IOnNadir: a shard
    spent, legends woken), wStart (wWU8IStart: legends woken on a save past their stage), wUmbFinale (wWU8IFinale: the
    shard's question before a round), wUmbGfCard, wUmbBkCard, wUmbBlCard (wWU8IGfCard, wWU8IBkCard, wWU8IBlCard: the
@@ -68882,14 +68900,14 @@ onHook('fightStart', () => {
   }
 });
 // the Kraken's drowning: due at the start of your next turn (your hand is empty while it moves)
-const wWU8IBossOp = bossOp;
+const wSdBossOp = bossOp;
 bossOp = function (e, op) {
   if (op && op[0] === 'udrown') { B.uDrown = (B.uDrown || 0) + op[1]; fx({ k: 'say', e: e.uid, t: `Drowns ${op[1]}` }); log(`${e.n} drags at your bench: ${op[1]} cards will go under at the start of your turn.`, 'bad'); return; }
-  return wWU8IBossOp.apply(this, arguments);
+  return wSdBossOp.apply(this, arguments);
 };
-const wWU8IIntentInfo = intentInfo;
+const wSdIntentInfo = intentInfo;
 intentInfo = function (e) {
-  const r = wWU8IIntentInfo.apply(this, arguments);
+  const r = wSdIntentInfo.apply(this, arguments);
   if (r && r.kinds && (e.plan || (typeof planOps === 'function' ? planOps(e) : []) || []).some(o => o[0] === 'udrown') && !r.kinds.includes('debuff') && !e.disguised) r.kinds.push('debuff');
   return r;
 };
@@ -68922,8 +68940,8 @@ playerTurnStart = function () {
   if (B && !B.over && B.phase === 'player') { wUmbDrownNow(); wUmbBlizzard(); }
   return r;
 };
-const wWU8ICanPlay = canPlay;
-canPlay = function (card) { if (card && B && B.uFrost && B.uFrost.includes(card.uid)) return false; return wWU8ICanPlay.apply(this, arguments); };
+const wSdCanPlay = canPlay;
+canPlay = function (card) { if (card && B && B.uFrost && B.uFrost.includes(card.uid)) return false; return wSdCanPlay.apply(this, arguments); };
 const wWU8ICardHTML = cardHTML;
 cardHTML = function (card, o) {
   const h = wWU8ICardHTML.apply(this, arguments);
@@ -68932,7 +68950,7 @@ cardHTML = function (card, o) {
 };
 (() => { if (typeof document === 'undefined') return; const st = document.createElement('style'); st.textContent = `.card.ufrozen .art{box-shadow:inset 0 0 0 2px #9fffe8;filter:saturate(.35) brightness(1.15)}.card .ufrost{position:absolute;left:calc(var(--cw)*.03);top:calc(var(--cw)*.4);font-family:var(--hud);font-size:calc(var(--cw)*.075);line-height:1;color:#0e2a30;background:#9fffe8;padding:2px 4px 0;border-radius:3px;z-index:2}`; document.head.appendChild(st); })();
 // the Phoenix rises, once
-const wWU8IKillEnemy = killEnemy;
+const wSdKillEnemy = killEnemy;
 killEnemy = function (e) {
   if (e && !e.dead && e.uRise) {
     e.uRise = 0; delete e.st.u_rebirth;
@@ -68943,7 +68961,7 @@ killEnemy = function (e) {
     if (ENEMIES[e.id].phases) bossPhaseCheck(e);
     return;
   }
-  return wWU8IKillEnemy.apply(this, arguments);
+  return wSdKillEnemy.apply(this, arguments);
 };
 
 /* ---------- where they stand ---------- */

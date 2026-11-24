@@ -2150,3 +2150,22 @@ where most stalled. A champion's toll after a loss is now 20 gold (the Broken Be
 Seal back in the band. Elsewhere in the run: pieces won well about 55% (123 of 231), the shadows won about 95% of the
 time (they cost HP, and gold only on a blackout), the Kraken about 40%, the Phoenix and the Wyrm 15 to 20% (the bot
 meets them late, when it has fewer tries left).
+
+**The shadows unseen until close.** A shadow now shows plainly only within 6 steps (5 from the Raging), fades over two
+more and is otherwise a faint shimmer (`W_UMB8C.show`, `haze`). Measured first with a careful walker (a scratch script:
+150 to 300 long walks per stage on the dark world, re-planning every step around the shadows it can see):
+
+| stage | caught, shadows seen across the screen | 5/5/4/3 (first try) | **6/6/5/5 (kept)** |
+|---|---|---|---|
+| the Quiet | 2% | 1% | 2% |
+| the Stirring | 2% | 1% | 3% |
+| the Raging | 12–15% | 25% | 13% |
+| the Last Hour | 23–25% | 53% | 38% |
+
+The first try doubled the late stages, so the kept numbers keep the early stages as they were and make only the Last
+Hour sharper. The journey lab's shadow chance for the Last Hour went from .8 to .9 a try to match. Three runs of
+`realm_umbral_journey_lab.py 80 15` after it: the Seal for 3 of 51, 4 of 50 and 4 of 53 Crown winners (11 of 154, 7%),
+against 14 of 112 (12.5%) for the two runs at .8. Still in the band. Most of that gap is noise: the change only
+touches tries made at 8 pieces or more, yet fewer of these runs got that far (12% of Crown winners against 21%), and of
+those that held all nine pieces the Seal rate was the same (11 of 16, against 14 of 23). The bot still wins about
+92% of its shadow matches.

@@ -26,7 +26,7 @@ TRIES = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 PRE = sys.argv[3] if len(sys.argv) > 3 else ''
 
 LAB_JS = r"""
-window.UJ_SHADOW_P = [.35, .5, .65, .8];
+window.UJ_SHADOW_P = [.35, .5, .65, .9];   // the Last Hour's .8 became .9 when the shadows went unseen until close
 window.UJLAB = function (TRIES) {
   const log = REALMLAB({}), out = { champion: log.result === 'champion', games: [], stop: null };
   if (!out.champion || !WG.umbral) return out;

@@ -69,6 +69,9 @@ the plan:
   hex fewer (and 10 Block in a card round), not a potion.
 - The dark tiles keep their characters: only their drawing and words change, so every check that reads the map stands.
 - Hazards and shadows are an overlay (`W_ACTORS`), not new tiles.
+- Added after the PR opened: the shadows show plainly only when close (6 steps, 5 from the Raging), fading over two
+  more and then only a shimmer, for the spec's wraith that can't be seen coming (the Realm has no minimap). Look finds
+  one only where it shows.
 
 ---
 

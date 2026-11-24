@@ -33,9 +33,9 @@
    Wraps: buildAllMaps (wWU8IBuildAllMaps: the lairs), wNpcAt (wWU8INpcAt: an awake legend stands there), wTalkTo
    (wWU8ITalkTo: its match card), wTryMove (wWU8ITryMove: walking into it), wUmbFreeAt (wWU8IFreeAt: shadows and pits
    keep off a lair), wLookText (wWU8ILookText), wPreGame (wWU8IPreGame: the phases and the prize on its card),
-   combatRewards (wWU8ICombatRewards: no trophy for a legend), killEnemy (wWU8IKillEnemy: the Phoenix rises),
-   playerTurnStart (wWU8IPlayerTurnStart: the drowned hand, the Blizzard), canPlay (wWU8ICanPlay: a frozen card),
-   cardHTML (wWU8ICardHTML: Frozen), wMakePlayer (wWU8IMakePlayer: a lineup's legend a level down), bossOp (wWU8IBossOp: the drowning), intentInfo (wWU8IIntentInfo), wUmbDreadDoes
+   combatRewards (wWU8ICombatRewards: no trophy for a legend), killEnemy (wSdKillEnemy: the Phoenix rises),
+   playerTurnStart (wWU8IPlayerTurnStart: the drowned hand, the Blizzard), canPlay (wSdCanPlay: a frozen card),
+   cardHTML (wWU8ICardHTML: Frozen), wMakePlayer (wWU8IMakePlayer: a lineup's legend a level down), bossOp (wSdBossOp: the drowning), intentInfo (wSdIntentInfo), wUmbDreadDoes
    (wWU8IDreadDoes: the stage's legend), wUmbHexCut (wWU8IHexCut: a shard's hex), W_ON_END.nadir (wWU8IOnNadir: a shard
    spent, legends woken), wStart (wWU8IStart: legends woken on a save past their stage), wUmbFinale (wWU8IFinale: the
    shard's question before a round), wUmbGfCard, wUmbBkCard, wUmbBlCard (wWU8IGfCard, wWU8IBkCard, wWU8IBlCard: the
@@ -114,14 +114,14 @@ onHook('fightStart', () => {
   }
 });
 // the Kraken's drowning: due at the start of your next turn (your hand is empty while it moves)
-const wWU8IBossOp = bossOp;
+const wSdBossOp = bossOp;
 bossOp = function (e, op) {
   if (op && op[0] === 'udrown') { B.uDrown = (B.uDrown || 0) + op[1]; fx({ k: 'say', e: e.uid, t: `Drowns ${op[1]}` }); log(`${e.n} drags at your bench: ${op[1]} cards will go under at the start of your turn.`, 'bad'); return; }
-  return wWU8IBossOp.apply(this, arguments);
+  return wSdBossOp.apply(this, arguments);
 };
-const wWU8IIntentInfo = intentInfo;
+const wSdIntentInfo = intentInfo;
 intentInfo = function (e) {
-  const r = wWU8IIntentInfo.apply(this, arguments);
+  const r = wSdIntentInfo.apply(this, arguments);
   if (r && r.kinds && (e.plan || (typeof planOps === 'function' ? planOps(e) : []) || []).some(o => o[0] === 'udrown') && !r.kinds.includes('debuff') && !e.disguised) r.kinds.push('debuff');
   return r;
 };
@@ -154,8 +154,8 @@ playerTurnStart = function () {
   if (B && !B.over && B.phase === 'player') { wUmbDrownNow(); wUmbBlizzard(); }
   return r;
 };
-const wWU8ICanPlay = canPlay;
-canPlay = function (card) { if (card && B && B.uFrost && B.uFrost.includes(card.uid)) return false; return wWU8ICanPlay.apply(this, arguments); };
+const wSdCanPlay = canPlay;
+canPlay = function (card) { if (card && B && B.uFrost && B.uFrost.includes(card.uid)) return false; return wSdCanPlay.apply(this, arguments); };
 const wWU8ICardHTML = cardHTML;
 cardHTML = function (card, o) {
   const h = wWU8ICardHTML.apply(this, arguments);
@@ -164,7 +164,7 @@ cardHTML = function (card, o) {
 };
 (() => { if (typeof document === 'undefined') return; const st = document.createElement('style'); st.textContent = `.card.ufrozen .art{box-shadow:inset 0 0 0 2px #9fffe8;filter:saturate(.35) brightness(1.15)}.card .ufrost{position:absolute;left:calc(var(--cw)*.03);top:calc(var(--cw)*.4);font-family:var(--hud);font-size:calc(var(--cw)*.075);line-height:1;color:#0e2a30;background:#9fffe8;padding:2px 4px 0;border-radius:3px;z-index:2}`; document.head.appendChild(st); })();
 // the Phoenix rises, once
-const wWU8IKillEnemy = killEnemy;
+const wSdKillEnemy = killEnemy;
 killEnemy = function (e) {
   if (e && !e.dead && e.uRise) {
     e.uRise = 0; delete e.st.u_rebirth;
@@ -175,7 +175,7 @@ killEnemy = function (e) {
     if (ENEMIES[e.id].phases) bossPhaseCheck(e);
     return;
   }
-  return wWU8IKillEnemy.apply(this, arguments);
+  return wSdKillEnemy.apply(this, arguments);
 };
 
 /* ---------- where they stand ---------- */

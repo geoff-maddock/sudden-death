@@ -26,9 +26,9 @@
 
    wUmbShrug, wUmbShrugAll, wUmbWithout, wUmbWeb
    Wraps: wUmb4aNine, wUmbGfTeam, wUmbBkTeam, wUmbHkTeam, wUmbGlFour, wUmbBlFive, wUmbCrFour (wWU8ENine, wWU8EGfTeam,
-   wWU8EBkTeam, wWU8EHkTeam, wWU8EGlFour, wWU8EBlFive, wWU8ECrFour: the team goes with shade); atkDmg (wWU8EAtkDmg),
-   hurtEnemy (wWU8EHurtEnemy), enemyHitDmg (wWU8EEnemyHitDmg), resolve (wWU8EResolve), playCard (wWU8EPlayCard), useTonic (wWU8EUseTonic), endTurn (wWU8EEndTurn), doMove (wWU8EDoMove), playerTurnStart
-   (wWU8EPlayerTurnStart), cardCost (wWU8ECardCost), cardHTML (wWU8ECardHTML: Webbed), renderHelp (wWU8ERenderHelp),
+   wWU8EBkTeam, wWU8EHkTeam, wWU8EGlFour, wWU8EBlFive, wWU8ECrFour: the team goes with shade); atkDmg (wSdAtkDmg),
+   hurtEnemy (wSdHurtEnemy), enemyHitDmg (wSdEnemyHitDmg), resolve (wSdResolve), playCard (wSdPlayCard), useTonic (wSdUseTonic), endTurn (wSdEndTurn), doMove (wSdDoMove), playerTurnStart
+   (wSdPlayerTurnStart), cardCost (wSdCardCost), cardHTML (wSdCardHTML: Webbed), renderHelp (wWU8ERenderHelp),
    wUmbQuick (wWU8EQuick: the traits on the Quick start's Umbral tab). */
 
 /* ---------- every Nadir side in shadow ---------- */
@@ -56,16 +56,16 @@ function wUmbWithout(e, k, f) { const v = e.st[k]; if (!v) return f(); delete e.
 // (an Attack or a set play: grouped together here on purpose, as the sports layer groups them; most of the engine
 // checks 'atk' alone)
 const wUmbIsAtk = t => t === 'atk' || t === 'play';
-const wWU8EAtkDmg = atkDmg;
+const wSdAtkDmg = atkDmg;
 atkDmg = function (base, e, card) {
-  const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wWU8EAtkDmg.apply(this, args)) : wWU8EAtkDmg.apply(this, args);
+  const args = arguments, n = e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'vuln', () => wSdAtkDmg.apply(this, args)) : wSdAtkDmg.apply(this, args);
   // (a short note, not a multiplier: the total is the real hit; only an Attack's or a set play's)
   if (WHY && e && e.st && e.st.u_phase && B && B.phase === 'player' && card && wUmbIsAtk(def(card).type)) WHY.push(['Half There', '', 'Half There: 1st hit lost']);
   return n;
 };
 // Half There: the first hit from an Attack or a set play against it this turn does nothing (not poison, burn, or a raw blow:
 // an instant kill, Tempest, Haunt)
-const wWU8EHurtEnemy = hurtEnemy;
+const wSdHurtEnemy = hurtEnemy;
 hurtEnemy = function (e, dmg, o) {
   o = o || {};
   if (e && !e.dead && !e.fled && e.st && e.st.u_phase && B && B.phase === 'player' && B.inCard && wUmbIsAtk(B.curType) && !o.raw && !o.psn && !o.burn) {
@@ -73,7 +73,7 @@ hurtEnemy = function (e, dmg, o) {
     fx({ k: 'say', e: e.uid, t: 'Half There' });
     log(`${e.n} is Half There: the hit passes straight through.`, 'bad');
   }
-  return wWU8EHurtEnemy.call(this, e, dmg, o);
+  return wSdHurtEnemy.call(this, e, dmg, o);
 };
 // Won't Flinch: Weak and Exposed come off it at the game's own moments (after a card or a tonic, at the end and the start
 // of your turn, before its swing); in between, the sums ignore them
@@ -84,19 +84,19 @@ function wUmbShrug(e) {
   log(`${e.n} Won't Flinch: ${ks.map(k => ST[k].n).join(' and ')} doesn't take.`, 'bad');
 }
 function wUmbShrugAll() { if (B && B.umb && !B.over) for (const e of B.enemies) if (e.uStill && !e.dead && !e.fled) wUmbShrug(e); }
-const wWU8EEnemyHitDmg = enemyHitDmg;
-enemyHitDmg = function (e) { const args = arguments; return e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'weak', () => wWU8EEnemyHitDmg.apply(this, args)) : wWU8EEnemyHitDmg.apply(this, args); };
-const wWU8EResolve = resolve;
-resolve = function () { const r = wWU8EResolve.apply(this, arguments); wUmbShrugAll(); return r; };
+const wSdEnemyHitDmg = enemyHitDmg;
+enemyHitDmg = function (e) { const args = arguments; return e && e.uStill && e.st && B && B.umb ? wUmbWithout(e, 'weak', () => wSdEnemyHitDmg.apply(this, args)) : wSdEnemyHitDmg.apply(this, args); };
+const wSdResolve = resolve;
+resolve = function () { const r = wSdResolve.apply(this, arguments); wUmbShrugAll(); return r; };
 // (and when a card or a tonic that went ahead is done, and when your turn ends: Weak or Exposed laid on outside a
 // card's ops, by a hook, a pet, Haunt or the end of your turn, comes off there; addSt is a constant, so this is the
 // moment after, never inside a sum. One laid on in the other side's turn shows until its next swing)
-const wWU8EPlayCard = playCard, wWU8EUseTonic = useTonic, wWU8EEndTurn = endTurn;
-playCard = function () { const r = wWU8EPlayCard.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
-useTonic = function () { const r = wWU8EUseTonic.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
-endTurn = function () { const mine = !!B && B.phase === 'player' && !B.over, r = wWU8EEndTurn.apply(this, arguments); if (mine) wUmbShrugAll(); return r; };
-const wWU8EDoMove = doMove;
-doMove = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wWU8EDoMove.apply(this, arguments); };
+const wSdPlayCard = playCard, wSdUseTonic = useTonic, wSdEndTurn = endTurn;
+playCard = function () { const r = wSdPlayCard.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
+useTonic = function () { const r = wSdUseTonic.apply(this, arguments); if (r) wUmbShrugAll(); return r; };
+endTurn = function () { const mine = !!B && B.phase === 'player' && !B.over, r = wSdEndTurn.apply(this, arguments); if (mine) wUmbShrugAll(); return r; };
+const wSdDoMove = doMove;
+doMove = function (e) { if (e && e.uStill && B && B.umb) wUmbShrug(e); return wSdDoMove.apply(this, arguments); };
 // Webs the Bench: a card of the hand you drew costs 1 more this turn
 function wUmbWeb() {
   const sp = B.enemies.find(e => e.uWeb && !e.dead && !e.fled); if (!sp || B.turn % 2 === 0) return; // (every other turn: the first, the third...)
@@ -105,19 +105,19 @@ function wUmbWeb() {
   fx({ k: 'say', e: sp.uid, t: 'Webs the Bench' });
   log(`${sp.n} Webs the Bench: ${def(c).n} costs 1 more this turn.`, 'bad');
 }
-const wWU8EPlayerTurnStart = playerTurnStart;
+const wSdPlayerTurnStart = playerTurnStart;
 playerTurnStart = function () {
   if (B && B.uWeb != null) B.uWeb = null;
-  const r = wWU8EPlayerTurnStart.apply(this, arguments);
+  const r = wSdPlayerTurnStart.apply(this, arguments);
   if (B && B.umb && !B.over && B.phase === 'player') { wUmbShrugAll(); wUmbWeb(); }
   return r;
 };
-const wWU8ECardCost = cardCost;
+const wSdCardCost = cardCost;
 // (a turn of free Attacks wins: a webbed Attack is free with the rest)
-cardCost = function (card) { const n = wWU8ECardCost.apply(this, arguments); return n >= 0 && card && B && B.uWeb != null && card.uid === B.uWeb && !(B.freeAtk && def(card).type === 'atk') ? n + 1 : n; };
-const wWU8ECardHTML = cardHTML;
+cardCost = function (card) { const n = wSdCardCost.apply(this, arguments); return n >= 0 && card && B && B.uWeb != null && card.uid === B.uWeb && !(B.freeAtk && def(card).type === 'atk') ? n + 1 : n; };
+const wSdCardHTML = cardHTML;
 cardHTML = function (card, o) {
-  const h = wWU8ECardHTML.apply(this, arguments);
+  const h = wSdCardHTML.apply(this, arguments);
   if (!(o && o.live && B && B.uWeb != null && card && card.uid === B.uWeb)) return h;
   return h.replace('<div class="card ', '<div class="card uwebbed ').replace(/(<div class="art"[^>]*>)/, '$1<span class="uweb" title="Webs the Bench: it costs 1 more this turn">Webbed +1</span>');
 };

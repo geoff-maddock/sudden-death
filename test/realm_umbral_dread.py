@@ -4,7 +4,8 @@
 # road or beside a place, and the audit is clean. The hungry shadows: the count follows the stage, one in sight comes
 # toward you and one out of sight doesn't, one that reaches you (or you walk into) starts a 'shadow' match, none goes
 # into a lantern's light, Shadow Salt hides you, a win dissolves one, and they keep their spots through a reload. A
-# step through the portal with a shadow beside you starts nothing. Asserts; exits nonzero on failure.
+# step through the portal with a shadow beside you starts nothing. A shadow shows plainly only when close (nearer as the
+# Dread rises), fades, then is a shimmer at most; Look and the drawing follow. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -75,7 +76,10 @@ async def main():
         check(sp['closed'] == [True, 30] and not sp['open'][0] and sp['open'][1] == 27 and 2 <= sp['open'][2] <= 8, 'a pit holds in the Quiet; from the Stirring it costs 3 HP and you come up somewhere else', sp)
 
         # the shadows
+        # (no wild match or road event on these steps: either would stop the shadows, a match by design and an event's
+        # grace for six steps)
         sh = await pg.evaluate("""(() => { const m = MAPS['u:world'], U = WG.umbral, out = {}; W_UMB8C.shadows = [3, 6, 10, 14];
+          const em = W_UMB8C.encMult, ep = W_ROAD.eventP; W_UMB8C.encMult = 0; W_ROAD.eventP = 0; try {
           U.shadows = []; U.shadowWait = []; U.pieces = []; wEnterMap('u:world', 40, 40); WG.grace = 0; wUmbShadowsSync(); out.n0 = U.shadows.length;
           U.pieces = Object.keys(W_UMB_PIECES).slice(0, 6); wUmbShadowsSync(); out.n2 = U.shadows.length; U.pieces = [];
           wUmbShadowsSync(); out.back = U.shadows.length;
@@ -94,7 +98,7 @@ async def main():
           U.shadows = [{ id: 'sd', x: x + 1, y, hx: x + 1, hy: y }]; wEnterMap('u:world', x, y); WG.grace = 0; 
           const n1 = W_UMB8C.started, at = [WG.x, WG.y]; wTryMove(1, 0); out.into = [W_UMB8C.started - n1, WG.x === at[0] && WG.y === at[1]];
           out.kind = (document.querySelector('#modalBox') || {}).textContent ? 'card' : ''; document.getElementById('modal').hidden = true; MODAL_NOW = null;
-          return out; })()""")
+          return out; } finally { W_UMB8C.encMult = em; W_ROAD.eventP = ep; } })()""")
         check(sh['n0'] == 3 and sh['n2'] == 10 and sh['back'] == 3, 'the shadows number 3 in the Quiet and 10 in the Raging', sh)
         check(sh['started'] == 0 and sh['closer'] < 0 and sh['home'] <= 3, 'a shadow in sight comes closer; one out of sight drifts near home', sh)
         check(sh['salted'] and sh['saltLeft'] == 4, 'Shadow Salt: a shadow in sight cannot find you, and the salt counts down', sh)
@@ -138,8 +142,30 @@ async def main():
 
         sl = await pg.evaluate("(() => { const U = WG.umbral; U.shadows = [{ id: 'q', x: 30, y: 31, hx: 30, hy: 31 }]; U.sealed = 1; const n = wUmbShadows().length, at = !!wUmbShadowAt(30, 31); U.sealed = 0; return [n, at]; })()")
         check(sl == [0, False], 'once the Seal is forged, the shadows are gone', sl)
+        # unseen until close: plain within show steps, fading over haze more, then at most a shimmer; nearer as the
+        # Dread rises; Look finds one only where it shows, and the drawing follows
+        vs = await pg.evaluate("""(() => { const U = WG.umbral, m = MAPS['u:world'], out = {}; U.sealed = 0;
+          wEnterMap('u:world', 40, 40); WG.grace = 0; U.salt = 0;
+          const at = d => ({ id: 'v' + d, x: 40 + d, y: 40, hx: 40 + d, hy: 40 });
+          const drawn = () => { const acts = []; for (const f of W_ACTORS) { try { f(acts, performance.now(), 1.234); } catch (e) {} }
+            return acts.filter(a => a.who && a.who.kind === 'wraith' && a.who.shade).map(a => Math.round(a.x) + ':' + a.alpha.toFixed(2)); };
+          for (const [st, n] of [[0, 0], [2, 6], [3, 8]]) { U.pieces = Object.keys(W_UMB_PIECES).slice(0, n);
+            out['s' + st] = [3, 4, 5, 6, 7, 8, 12].map(d => +wUmbShadowVis(at(d)).toFixed(2)); }
+          U.pieces = Object.keys(W_UMB_PIECES).slice(0, 6);   // the Raging: plain within 5
+          U.shadows = [at(3), at(6), at(9)];
+          out.look = [wLookText(43, 40), wLookText(46, 40), wLookText(49, 40)];
+          out.drawn = drawn();
+          out.shimmer = Math.max(...Array.from({ length: 60 }, (_, i) => wUmbShadowVis(at(12), i * .1)));
+          U.shadows = []; U.pieces = []; return out; })()""")
+        check(vs['s0'] == [1, 1, 1, 1, 0.67, 0.33, 0] and vs['s2'] == [1, 1, 1, 0.67, 0.33, 0, 0] and vs['s3'] == vs['s2'],
+              'a shadow shows plainly within 6 steps (5 from the Raging), fades over 2 more, then is unseen', vs)
+        check('looking at you' in vs['look'][0] and 'edge of seeing' in vs['look'][1] and 'shadow' not in vs['look'][2].lower() and 'edge of seeing' not in vs['look'][2],
+              'Look finds a near shadow, half-sees a fading one and misses a far one', vs['look'])
+        check(len(vs['drawn']) >= 2 and vs['drawn'][0] == '43:0.82' and vs['drawn'][1] == '46:0.55' and all(not d.startswith('49:') or float(d[3:]) < .2 for d in vs['drawn']),
+              'the drawing follows: a near shadow plain, a fading one fainter, a far one a shimmer at most', vs['drawn'])
+        check(0.05 < vs['shimmer'] <= 0.18, 'a far shadow shimmers now and then, faintly', vs['shimmer'])
         hp = await pg.evaluate("(() => { renderHelp(); const h = document.getElementById('wHelpDread'); return h ? h.textContent : ''; })()")
-        check('Dread' in hp and 'Shadow Salt' in hp, 'How to play explains the Dread', hp[:200])
+        check('Dread' in hp and 'Shadow Salt' in hp and 'plainly when it is close' in hp, 'How to play explains the Dread, and that a shadow shows only when close', hp[:200])
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('\nall ok' if not FAILS else f'\n{len(FAILS)} FAILED'); sys.exit(1 if FAILS else 0)

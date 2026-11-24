@@ -24,8 +24,13 @@
    the dark world (WG.grace). The dark world's own wild matches come half as often: the danger is one you can see.
    Shadow Salt (DB.items.shadowsalt, sold in the dark shops for fans): the shadows can't see you for W_UMB8C.salt steps
    (WG.umbral.salt).
+   You see a shadow plainly only when it is close (W_UMB8C.show steps by stage, nearer as the Dread rises: from the
+   Raging they see you before you see them; measured with a careful walker, only the Last Hour
+   catches you more often, 38% of long walks against 23%). Over W_UMB8C.haze more steps it fades out, and farther off it is only a
+   shimmer now and then (wUmbShadowVis). Look finds it only where it shows. Only the drawing changes: the shadows' sight
+   and steps are the same.
 
-   W_UMB8C, wUmbDread, wUmbHazardAt, wUmbShadowsSync, wUmbShadowStep, wUmbDreadScene
+   W_UMB8C, wUmbDread, wUmbHazardAt, wUmbShadowsSync, wUmbShadowStep, wUmbShadowVis, wUmbDreadScene
    Wraps: buildAllMaps (wWU8CBuildAllMaps: the hazards), wTryMove (wWU8CTryMove: a shadow walked into, hazards, the
    shadows' step), wEncounterP (wWU8CEncounterP: half the dark world's wild matches), wEncounterRoll (wWU8CEncounterRoll: none on a live hazard), startMatch (wWU8CStartMatch:
    counts matches started, so a step that started one moves no shadows), wLookText (wWU8CLookText: hazards, shadows),
@@ -37,6 +42,7 @@ const W_UMB8C = {
   stages: [0, 3, 6, 8],
   names: ['The Quiet', 'The Stirring', 'The Raging', 'The Last Hour'],
   shadows: [3, 6, 10, 14], sight: [4, 5, 6, 7], hunt: 2,   // from this stage, two steps every third step
+  show: [6, 6, 5, 5], haze: 2,   // seen plainly within show steps, fading over haze more, then a shimmer at most
   lanternR: 3, minSpawn: 8, home: 3,
   spikes: { near: 4, far: 14 }, pits: 20, spikeHp: 2, pitHp: 3, pitDrop: 4,
   salt: 60, encMult: .5, started: 0,
@@ -168,6 +174,14 @@ function wUmbSees(m, s) {
 }
 // (u8j's resonance shortens it: it wraps this)
 function wUmbShadowSight() { return W_UMB8C.sight[wUmbDread()]; }
+// how plainly a shadow shows, 0 to 1: plain within W_UMB8C.show steps of you, fading over W_UMB8C.haze more, and past
+// that a faint shimmer now and then (t, seconds; none when t is left out)
+function wUmbShadowVis(s, t) {
+  const d = Math.abs(s.x - WG.x) + Math.abs(s.y - WG.y), r = W_UMB8C.show[wUmbDread()], hz = W_UMB8C.haze;
+  if (d <= r) return 1;
+  if (d <= r + hz) return 1 - (d - r) / (hz + 1);
+  return t == null ? 0 : Math.max(0, Math.sin(t * 1.1 + wHash(s.hx, s.hy, 91) * 6.28)) ** 6 * .18;   // (each its own beat)
+}
 // one step of one shadow: toward you if it sees you, else a drift near home. True when it reached you
 function wUmbShadowMove(m, s, r) {
   W_UMB8C_ANIM[s.id] = { px: s.x, py: s.y, mt: typeof performance !== 'undefined' ? performance.now() : 0 };
@@ -249,7 +263,9 @@ const wWU8CLookText = wLookText;
 wLookText = function (x, y) {
   const m = wCurMap();
   if (m && m.id === 'u:world') {
-    if (wUmbShadowAt(x, y)) return 'A shadow with nobody to cast it. It is looking at you.';
+    const s = wUmbShadowAt(x, y), v = s ? wUmbShadowVis(s) : 0;
+    if (v >= 1) return 'A shadow with nobody to cast it. It is looking at you.';
+    if (v > 0) return 'Something moves there, at the edge of seeing.';
     const h = wUmbHazardAt(m, x, y);
     if (h === 'spike') return `Spikes, black as old bone, a hand high. They cost ${wUmbSpikeHp()} HP to walk on.`;
     if (h === 'pit') return wUmbDread() >= 1 ? `A pit, open, with no bottom you can see. Falling in costs ${wUmbPitHp()} HP. Walk round it.` : 'Cracked ground. It holds, for now.';
@@ -289,7 +305,8 @@ W_ACTORS.push((acts, now, t) => {
     if (Math.abs(s.x - WG.x) > 24 || Math.abs(s.y - WG.y) > 16) continue;
     const a = W_UMB8C_ANIM[s.id]; let x = s.x, y = s.y;
     if (a && now - a.mt < WSTEP_MS * 1.6) { const k = (now - a.mt) / (WSTEP_MS * 1.6); x = a.px + (s.x - a.px) * k; y = a.py + (s.y - a.py) * k; }
-    acts.push({ x, y, who: { kind: 'wraith', shade: 1, col: '#1a1024', light: '#c8b8ff', face: WG.x < s.x ? 'l' : 'r', walk: t * 8, seed: s.x * 3 + s.y }, size: 30, alpha: .82 });
+    const v = wUmbShadowVis(s, t); if (v < .01) continue;
+    acts.push({ x, y, who: { kind: 'wraith', shade: 1, col: '#1a1024', light: '#c8b8ff', face: WG.x < s.x ? 'l' : 'r', walk: t * 8, seed: s.x * 3 + s.y }, size: 30, alpha: .82 * v });
   }
 });
 
@@ -366,6 +383,7 @@ renderHelp = function () {
   wWU8CRenderHelp.apply(this, arguments);
   const h = $('wHelpUmbral'); if (!h || !wUmbOn() || $('wHelpDread')) return;
   h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : '-9'} pieces)`).join(', ')}.
-    Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
+    Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match.
+    You only see one plainly when it is close: ${W_UMB8C.show[0]} steps in the Quiet and the Stirring, ${W_UMB8C.show[2]} from the Raging. Farther off it fades to a shimmer, so from the Raging they can see you before you see them. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
     Spikes cost ${wUmbSpikeHp()} HP to walk on. From the Stirring, the cracked ground opens into pits: ${wUmbPitHp()} HP, and you climb out somewhere else. Wild matches come half as often on that side; the danger is one you can see.</p>`);
 };
