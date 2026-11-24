@@ -109,7 +109,7 @@ realm_links_stars 16
 realm_links_world 14
 realm_map 23
 realm_match 61
-realm_music 408
+realm_music 150
 realm_name 18
 realm_notices 26
 realm_older_bugs 12

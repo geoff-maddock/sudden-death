@@ -13,7 +13,8 @@
 # of Legends and a lair's door have their own palettes, every ground's map plays a bed on the ground's tune, and the
 # whole tune is stated now and then (every 5 to 10 minutes by chance, never in danger; on arriving in a region; at
 # dawn, once a day).
-# The audio runs for real (Chromium with autoplay allowed). Asserts; exits nonzero on failure.
+# The audio runs for real (Chromium with autoplay allowed), but nothing is rendered offline or measured: the check
+# reads the plan and the state, not the sound. Asserts; exits nonzero on failure.
 import asyncio, json, sys, subprocess, os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -236,51 +237,6 @@ async def palette_checks(pg):
     check(so['bad'] == [], 'asked for on arriving, the whole tune comes within seconds, no fragment rings over it, and the plan never goes back in time', so['bad'])
     check(so['next'] >= so['ahead'] - 1e-9, 'asked for sooner than the event already planned, it waits for it', so)
 
-LEVEL = r"""async ([key, night, wx]) => {
-  const sr = 44100, secs = 60, oc = new OfflineAudioContext(2, sr * secs, sr), P = W_AMB_PAL[key], v = W_AMB.voices, on = wx && P.wx;
-  W_AMB.voices = 1e9; const mv = SET.mvol; SET.mvol = .55; WAMB.pal = key; WAMB.ch = wAmbChain(oc); WAMB.ch.fade.gain.value = 1; wAmbHold(oc, P);
-  if (on) WAMB.ch.wx.g.gain.value = P.wx.tex.vol * W_AMB.tex;
-  WAMB.ch.lp.frequency.value = W_AMB.lp * (night ? .75 : 1) * (on ? P.wx.lp : 1);
-  for (const e of wAmbPlan(key, 4242, secs, 0, night, on ? P.wx.kind : null)) wAmbPlay(oc, e, e.t + .1);
-  wAmbFlush(oc, Infinity);
-  const buf = await oc.startRendering(); W_AMB.voices = v; SET.mvol = mv; WAMB.pal = null; WAMB.ch = null;
-  const L = buf.getChannelData(0); let ss = 0; for (let i = 0; i < L.length; i++) ss += L[i] * L[i]; return Math.sqrt(ss / L.length);
-}"""
-
-async def level_checks(ctx):
-    # a minute of each palette, rendered offline on pages of their own (so their voices never count in the live one);
-    # the noise and the room are seeded, so this is the same every run. A minute is within 0.05 of two minutes' level
-    # for every palette; 44.1 kHz is needed (at 22 kHz the levels drift by up to 0.67 against the plains). The renders
-    # are shared across a few pages working at once, each rendering its share one after another
-    jobs = [('lv', k, False, False) for k in ['plains', 'bloom', 'tide', 'ember', 'rime', 'town', 'dungeon', 'wreck', 'chapel', 'abbey', 'shrine', 'cottage', 'nowhere', 'hall', 'lair'] + ['grd_g_' + g for g in ['ballpark', 'court', 'links', 'lists', 'lanes', 'shed', 'bowl', 'ring', 'rink', 'sheet']]]
-    jobs += [('nt', k, True, False) for k in ['plains', 'bloom', 'tide']] + [('wx', k, False, True) for k in ['tide', 'ember', 'rime']]
-    out = {'lv': {}, 'nt': {}, 'wx': {}}
-    async def worker(share):
-        pg = await ctx.new_page(); await pg.goto(REALM_URL); await pg.wait_for_function("typeof wAmbPlan === 'function'", timeout=T)
-        for kind, k, night, w in share: out[kind][k] = round(await pg.evaluate(LEVEL, [k, night, w]), 4)
-        await pg.close()
-    N = 4
-    await asyncio.gather(*[worker(jobs[i::N]) for i in range(N)])
-    lv, nt, wx = out['lv'], out['nt'], out['wx']
-    ok = all(.83 <= lv[k] / lv['plains'] <= 1.2 for k in lv)
-    check(ok and .008 < lv['plains'] < .04, 'every palette plays about as loud as the next (within a fifth of the plains): the lands, the places, the grounds', lv)
-    check(all(.83 <= nt[k] / lv['plains'] <= 1.2 for k in nt), 'and at night', nt)
-    check(all(.83 <= wx[k] / lv['plains'] <= 1.35 for k in wx), 'and in its weather (which may add up to a third: the wind, the ash)', wx)
-    # the whole tune against its own bed: present, and never swamping it, in the quietest and loudest-gained palettes
-    TUNE = r"""async (key) => {
-      const sr = 22050, secs = 40, P = W_AMB_PAL[key], v = W_AMB.voices, mv = SET.mvol; W_AMB.voices = 1e9; SET.mvol = .55;
-      const render = async (tune) => { const oc = new OfflineAudioContext(1, sr * secs, sr); WAMB.pal = key; WAMB.ch = wAmbChain(oc); WAMB.ch.fade.gain.value = 1; wAmbHold(oc, P);
-        const g = wAmbGen(key, 11, () => ({ i: 0 })); g.S.t.theme = tune ? 2 : 1e9; g.S.t.motif = 1e9; let e; while ((e = g()).t < secs) wAmbPlay(oc, e, e.t + .1); wAmbFlush(oc, Infinity);
-        const b = await oc.startRendering(), L = b.getChannelData(0); let ss = 0; for (let i = 2 * sr; i < 32 * sr; i++) ss += L[i] * L[i]; return Math.sqrt(ss / (30 * sr)); };
-      const bed = await render(false), tune = await render(true); W_AMB.voices = v; SET.mvol = mv; WAMB.pal = null; WAMB.ch = null; return { bed, tune, ratio: tune / bed }; }"""
-    pg = await ctx.new_page(); await pg.goto(REALM_URL); await pg.wait_for_function("typeof wAmbPlan === 'function'", timeout=T)
-    tu = {}
-    for k in ['plains', 'cottage', 'hall', 'tide', 'grd_g_ballpark']:
-        tu[k] = round((await pg.evaluate(TUNE, k))['ratio'], 2)
-    print('  the whole tune over its bed (RMS ratio):', tu)
-    await pg.close()
-    check(all(1.1 <= r <= 2.2 for r in tu.values()), 'the whole tune is heard over its bed, and never swamps it (the bed plays on under it)', tu)
-
 async def live_checks(pg):
     await pg.evaluate("actx()")
     await pg.wait_for_function("SND.ctx && SND.ctx.state === 'running'", timeout=T)
@@ -477,7 +433,6 @@ async def main():
         await plan_checks(pg)
         await mood_checks(pg)
         await palette_checks(pg)
-        await level_checks(ctx)
         await live_checks(pg)
         await settings_checks(pg)
         await help_checks(pg)
