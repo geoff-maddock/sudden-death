@@ -104,7 +104,7 @@ async def main():
 
         # ---------- the Nine tab ----------
         await pg.evaluate("wOpenCamp('nine')"); await pg.wait_for_selector('#modalBox .wnine')
-        ui = await pg.evaluate("""(() => { const b = document.getElementById('modalBox'); return { rows: b.querySelectorAll('.wnr').length, sel: b.querySelectorAll('.wnr select').length,
+        ui = await pg.evaluate("""(() => { const b = document.getElementById('modalBox'); return { rows: b.querySelectorAll('.wnr').length, sel: b.querySelectorAll('.wnr select[data-npos]').length,
           tab: b.querySelector('[data-ctab="nine"]').getAttribute('aria-selected'), cu: b.querySelectorAll('.wnr.wcu').length, watch: !b.querySelector('[data-nwatch]').disabled }; })()""")
         check(ui['rows'] == 9 and ui['sel'] == 9 and ui['tab'] == 'true' and ui['cu'] >= 1 and ui['watch'], 'the Nine tab shows the nine: nine rows, a position each, call-ups marked', ui)
         await pg.screenshot(path='/tmp/realm-nine-desk.png')

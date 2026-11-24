@@ -4,6 +4,7 @@
   python3 test/realm_diamond_lab.py 120 'W_DCUP.tiers = [1, 1, 2]'    a tuning override, run in the page first
   python3 test/realm_diamond_lab.py 300 '' umbral   only part 3, the Umbral (300 games for each row)
   python3 test/realm_diamond_lab.py 200 '' kits     only part 4, gear and potions (200 games for each row)
+  python3 test/realm_diamond_lab.py 200 '' powers   only part 5, picks, situation powers and the crowd (200 games a row)
 
 Every game is Brimstone Diamond's own engine played to a final (wBD.sim): both sides on the CPU at the same skill, so
 the result comes from the players' ratings, and the CPU skill of a tier makes no difference here. That is what
@@ -22,7 +23,12 @@ CPU skill both sides play at): plain; their bag only (as Simulate plays it: your
 Stamina Draught, a Brimstone Tonic, Owl-Eye Drops and Steadyhand Balm); and the full kit (both bags, and a piece of gear
 on every one of your players: three bats, a ball on the starter, a Rosin Bag on the reliever, gloves and spikes). Then
 at tier 2 each piece alone, on every player it is for (bats and gloves on the eight in the field, balls and the Rosin
-Bag on the pitchers, spikes on everyone), and each potion alone, two in your bag. Writes /tmp/realm_diamond_lab.json."""
+Bag on the pitchers, spikes on everyone), and each potion alone, two in your bag.
+Part 5, powers (issue #115, phase 2; only with 'powers'): your nine at level 3 against a rival's at the same level. By
+tier: off (as the other parts play: LAB mode leaves the powers out), both sides on (the Realm's game), yours only and
+theirs only (situation powers and the crowd); then at tier 2 yours with the situation powers alone and the crowd alone,
+and your nine's picks: every kind's magic, every physical skill (and second pitch), by name, and picks off. Writes
+/tmp/realm_diamond_lab.json."""
 import asyncio, json, sys, os, time, collections
 sys.path.insert(0, os.path.dirname(__file__))
 from paths import REALM_URL
@@ -107,6 +113,19 @@ DLAB.kit = function (lvl, o) {
   const [a, h] = wBD.G.teams, K = wBD.kit;
   return { us: a.R, them: h.R, win: a.R > h.R, pots: K ? K.pots.map(x => x.side + x.id) : [] };
 };
+// powers (part 5, issue #115 phase 2): your nine at level lvl against a rival's at the same level, tier o.tier; o.pow is
+// the game's rules.bdpow (null: off, as the other parts play), o.mine your nine's picks (0 every kind's magic, 1 every
+// physical skill and second pitch, 'name' by name as the other nine picks; left out: as the journey has them, 0)
+DLAB.pow = function (lvl, o) {
+  DLAB.journey(lvl);
+  const club = Object.values(WG.rivals)[0], keep = wBallOppLvl, tier = o.tier || 2;
+  wBallOppLvl = () => wNineTier();
+  let opp; try { opp = wBallOpp(club, tier); } finally { wBallOppLvl = keep; }
+  if (o.mine != null) for (const p of wRoster().concat(WG.nine.cu)) p.bdPw = o.mine === 'name' ? wBdPickByName(p.n) : { bat: o.mine, run: o.mine, field: o.mine, pitch: o.mine };
+  wBD.sim({ defs: [wNineDef(), opp], innings: W_BALL.innings, diff: W_BALL.diff[tier], rules: Object.assign({}, W_BALL.rules, { bdpow: o.pow || null }) });
+  const [a, h] = wBD.G.teams, B = wBD.G.bdp;
+  return { us: a.R, them: h.R, win: a.R > h.R, inn: wBD.G.inning, casts: B ? B.casts.map(c => [c.side, c.k, c.id]) : [], tally: B ? B.tally : null };
+};
 // XP to date, levels included
 window.wXpTotal = p => { let n = p.xp; for (let l = 1; l < p.lvl; l++) n += wXpNeed(l); return n; };
 """
@@ -132,6 +151,39 @@ def print_kits(kits, gnames):
         if k.startswith('p:'):
             r, n, us, th = w(k); used = sum(len(g['pots']) for g in kits[k]) / n
             print(f"  {k[2:]:22s} {n:5d}  {100 * r:5.1f}%   {us:.1f}-{th:.1f}   {100 * (r - base):+5.1f} pts   given {used:.2f} a game")
+
+POW_ROWS = [  # key, label, o
+    ('off', 'off (as before: no picks, no powers)', {'pow': None}),
+    ('all', 'both sides (the Realm\'s game)', {'pow': {'on': [True, True]}}),
+    ('mine', 'yours only: situation powers and crowd', {'pow': {'on': [True, False]}}),
+    ('theirs', 'theirs only', {'pow': {'on': [False, True]}}),
+    ('sit', 'yours only, situation powers alone', {'pow': {'on': [True, False], 'crowd': False}}),
+    ('crowd', 'yours only, the crowd alone', {'pow': {'on': [True, False], 'sit': False}}),
+    ('picks0', 'both sides, your nine all magic', {'pow': {'on': [True, True]}, 'mine': 0}),
+    ('picks1', 'both sides, your nine all physical', {'pow': {'on': [True, True]}, 'mine': 1}),
+    ('picksn', 'both sides, your nine by name', {'pow': {'on': [True, True]}, 'mine': 'name'}),
+    ('nopick', 'both sides, picks off (every kind all)', {'pow': {'on': [True, True], 'picks': False}}),
+]
+
+def print_pow(pw):
+    def w(k): rows = pw[k]; return sum(g['win'] for g in rows) / len(rows), len(rows), sum(g['us'] for g in rows) / len(rows), sum(g['them'] for g in rows) / len(rows)
+    print('\npowers, your nine at level 3 against a rival\'s at level 3, Simulate (both sides on the CPU at the tier\'s skill)')
+    print('                                                   n    win   runs for-against   a game: sit (you, them)  crowd (you, them)  extra inn.')
+    for t in (1, 2, 3):
+        base = w(f't{t}:off')[0]
+        for key, label, _ in POW_ROWS:
+            k = f't{t}:{key}'
+            if k not in pw: continue
+            r, n, us, th = w(k); rows = pw[k]
+            cnt = lambda side, kinds: sum(sum(1 for c in g['casts'] if c[0] == side and c[1] in kinds) for g in rows) / n
+            ex = sum(1 for g in rows if g['inn'] > 3) / n
+            print(f"  tier {t} {label:40s} {n:5d}  {100 * r:5.1f}%   {us:.2f}-{th:.2f}   {cnt(0, ('sit',)):.2f}, {cnt(1, ('sit',)):.2f}            {cnt(0, ('amp', 'ultamp')):.2f}, {cnt(1, ('amp', 'ultamp')):.2f}        {100 * ex:4.1f}%" + ('' if key == 'off' else f"   {100 * (r - base):+5.1f} pts"))
+    rows = [g for k in pw if k.endswith(':all') for g in pw[k]]
+    sits = collections.Counter(c[2] for g in rows for c in g['casts'] if c[1] == 'sit'); amps = collections.Counter(c[2] for g in rows for c in g['casts'] if c[1] != 'sit')
+    print(f"  in the Realm's game ({len(rows)} games, both sides): situation powers a game {', '.join(f'{k} {v / len(rows):.2f}' for k, v in sits.most_common())}")
+    print(f"  crowd spends a game {sum(amps.values()) / len(rows):.2f}: {', '.join(f'{k} {v / len(rows):.2f}' for k, v in amps.most_common(8))}")
+    ty = collections.Counter(); [ty.update(g['tally']) for g in rows if g['tally']]
+    print(f"  moments the stands saw a game: {', '.join(f'{k} {v / len(rows):.2f}' for k, v in ty.items())}")
 
 async def main():
     async with async_playwright() as p:
@@ -162,6 +214,22 @@ async def main():
             for gid in gids: await krows('g:' + gid, {'tier': 2, 'bags': 'none', 'gear': gid})
             for pid in ('draught', 'bdtonic', 'bdeye', 'bdsteady'): await krows('p:' + pid, {'tier': 2, 'bags': {pid: 2}})
             gnames = await pg.evaluate("Object.fromEntries(Object.entries(W_DIAMOND_GEAR).map(([k, v]) => [k, v.name]))")
+        pw = {}
+        async def prows(key, o):
+            pw[key] = []
+            for i in range(0, N, 20):
+                k = min(20, N - i)
+                pw[key] += await pg.evaluate(f"(() => {{ const o = []; for (let i = 0; i < {k}; i++) o.push(DLAB.pow(3, {json.dumps(o)})); return o; }})()")
+        if ONLY == 'powers':
+            for t in (1, 2, 3):
+                for key, _, o in POW_ROWS:
+                    if t != 2 and key not in ('off', 'all', 'mine', 'theirs'): continue
+                    await prows(f't{t}:{key}', dict(o, tier=t))
+            await br.close()
+            json.dump({'powers': pw}, open('/tmp/realm_diamond_lab.json', 'w'))
+            print('override', PRE or '(none)', f' {time.time() - t0:.0f}s', ' page errors', len(errs), errs[:2])
+            print_pow(pw)
+            return
         if ONLY == 'kits':
             await br.close()
             json.dump({'kits': kits}, open('/tmp/realm_diamond_lab.json', 'w'))

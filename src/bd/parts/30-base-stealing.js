@@ -240,7 +240,7 @@ function resolveSteal() {
   if (safe || wild) {
     const dest = wild && tgt < 4 ? tgt + 1 : tgt;
     if (dest >= 4) { scoreRun(r); pst(pt).ra++; runs++; } else b[dest] = r;
-    pst(r).sb++;
+    pst(r).sb++; bdpCrowd(G.half, 'sb');
     text = wild ? `${r.n} steals ${BNAME[tgt]} and takes ${BNAME[dest]} when ${cat.n}'s throw gets away` : tgt === 4 ? `${r.n} steals home!` : `${r.n} steals ${BNAME[tgt]}`;
     if (wild) pst(cat).e++;
     st.big = tgt === 4 ? 'Steal of home!' : wild ? 'Stolen base + error' : 'Stolen base!'; st.small = `${shortName(r)} is safe at ${BNAME[dest]}`;
@@ -252,7 +252,7 @@ function resolveSteal() {
     st.big = 'Caught stealing!'; st.small = `${shortName(cat)} guns down ${shortName(r)}`;
     sfx.bad(); G.shake = Math.max(G.shake, .12);
   }
-  for (const k of trail) { const p = b[k], d = k + 1; if (!p) continue; if (d >= 4) { b[k] = null; scoreRun(p); pst(pt).ra++; runs++; } else if (!b[d]) { b[k] = null; b[d] = p; } else continue; pst(p).sb++; text += `; ${p.n} takes ${BNAME[d]}`; }
+  for (const k of trail) { const p = b[k], d = k + 1; if (!p) continue; if (d >= 4) { b[k] = null; scoreRun(p); pst(pt).ra++; runs++; } else if (!b[d]) { b[k] = null; b[d] = p; } else continue; pst(p).sb++; bdpCrowd(G.half, 'sb'); text += `; ${p.n} takes ${BNAME[d]}`; }
   logLine(`${text}${G.outs >= 3 && !safe && !wild ? ' to end the inning' : ''}.`, false, tags);
   banner(st.big, st.small, 1.2);
   runState();

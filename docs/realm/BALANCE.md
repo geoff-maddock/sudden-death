@@ -261,6 +261,37 @@ control (the balls' scatter, the Rosin Bag, the balm) hardly moves a CPU-against
 skill rather than by the pitch's spot; a player at the plate reads a pitch by its spot, so those may matter more by
 hand. Nobody has measured that yet. The numbers are as first set: no retune.
 
+### Picks, situation powers and the crowd on the diamond (issue #115, phase 2)
+
+`python3 test/realm_diamond_lab.py 200 '' powers` (part 5; about 4 minutes), and the tier 2 rows that mattered again at
+800 games. Your nine at level 3 against a rival's at level 3, Simulate (both sides on the CPU at the tier's skill).
+**Off** is how every other part plays (LAB mode leaves the powers and the picks out); the others pass `rules.bdpow`. A row
+of 200 is good to about ±7 points, a row of 800 to about ±3.5.
+
+| tier | off | both sides (the Realm's game) | yours only | theirs only |
+|---|---|---|---|---|
+| 1 | 53.5% | 47.5% | 52.0% | 53.5% |
+| 2 | 55.5% (800: 57.9%) | 56.0% | 55.0% (800: 54.2%) | 50.5% |
+| 3 | 33.0% | 27.5% | 25.0% | 27.0% |
+
+At tier 2, 800 games each: the picks alone (no powers either side, your nine on its magic, theirs by name) 53.5%;
+yours with the crowd alone 53.1% and 50.2% (two runs); yours with the situation powers alone 52.9%; your nine all magic
+50.9%, all physical skills (and second pitches) 57.9%. At 200: by name 55.0%, picks off (every kind everything) 57.5%.
+
+In the Realm's game, a game: situation powers 0.87 (Last Licks 0.38, Extra Innings 0.29, Bases Loaded 0.12, Full Count
+0.08), crowd spends 2.41 (Shriek, Pounce, Wolf Sprint, Glide and Take Flight most, and Stampede the ultimate most
+lifted); the stands saw 4.9 runs, 1.95 home runs, 3.7 strikeouts, 0.8 double plays and 0.6 stolen bases.
+
+**What it comes to.** Between two CPUs the situation powers and the crowd are a small edge and never a game on their
+own: one side's alone sits inside the noise (−2 to +1 at 800 games). They pay mana for a moment (two mana is an ability
+not cast), and the crowd's lift is half again on one cast, about one a game a side. The picks matter more. Every kind's
+physical skill beat its magic for the bot by about 7 points (57.9% against 50.9%), likely because a skill costs stamina
+rather than the mana an ultimate or a situation power wants; so the other nine, picking by name, brings about half its
+players on skills and is a touch better than it was (picks on, no powers: 53.5% against 57.9% off). Your nine still
+starts on its magic (the default pick is what every kind had), so the Nine tab is worth a look: a player who would
+rather save the mana can bring the skill. A careful human reads the moments far better than the CPU's dice. The numbers
+are as first set: no retune.
+
 ## Training spots (issue #6, phase 4)
 
 The bot drills a card and answers the challenge at each spot in every town it stops in, once a week (`opts.spots`). 140 journeys each, skilled bot, meals on:

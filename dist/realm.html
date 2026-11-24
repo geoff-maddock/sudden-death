@@ -882,6 +882,8 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .wsvr .wpa{flex-wrap:wrap;gap:6px}
 .wsvl{display:flex;flex-direction:column;font-family:var(--hud);font-size:13px;color:var(--dim);gap:2px}
 .wsvl select{font:inherit;font-family:var(--hud);font-size:15px;padding:3px 4px;background:var(--stone2);color:var(--bone);border:1px solid var(--seam);border-radius:4px}
+.wbdpick{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:2px}
+.wbdpick .wsvl select{max-width:100%}
 .wseven .wno{font-size:18px}
 /* w42: a call button's freshness (the playbook) */
 #wGridCalls [data-gcall],#wGridDefs [data-gdef]{background-image:linear-gradient(var(--torch),var(--torch));background-repeat:no-repeat;background-position:left bottom;background-size:var(--fresh,100%) 3px}
@@ -14330,7 +14332,8 @@ function abCost(p, id) {
   if (p && p.discount) c = Math.max(1, c - p.discount);
   return c;
 }
-const abPow = (p, id) => (1 + .3 * (tierOf(p, AB[id].type) - 1)) * (typeof moonSpell === 'function' && MOON ? moonSpell(id) : 1);
+// (the crowd can lift one cast half again: G.bdp, the Realm's powers, 52-powers.js; off, it is never read)
+const abPow = (p, id) => (1 + .3 * (tierOf(p, AB[id].type) - 1)) * (typeof moonSpell === 'function' && MOON ? moonSpell(id) : 1) * (G.bdp && G.bdp.amp ? bdpAmpK(p, id) : 1);
 function pitchCost(p, pd) { if (!pd.cost) return 0; let c = Math.max(1, pd.cost - (tierOf(p, 'pitch') - 1)); if (p && p.discount) c = Math.max(1, c - p.discount); return c; }
 const luck = p => (p && p.luck) || 0;
 // which physical skill a player falls back on, by category, decided by their current stats
@@ -19687,7 +19690,7 @@ function resolveSteal() {
   if (safe || wild) {
     const dest = wild && tgt < 4 ? tgt + 1 : tgt;
     if (dest >= 4) { scoreRun(r); pst(pt).ra++; runs++; } else b[dest] = r;
-    pst(r).sb++;
+    pst(r).sb++; bdpCrowd(G.half, 'sb');
     text = wild ? `${r.n} steals ${BNAME[tgt]} and takes ${BNAME[dest]} when ${cat.n}'s throw gets away` : tgt === 4 ? `${r.n} steals home!` : `${r.n} steals ${BNAME[tgt]}`;
     if (wild) pst(cat).e++;
     st.big = tgt === 4 ? 'Steal of home!' : wild ? 'Stolen base + error' : 'Stolen base!'; st.small = `${shortName(r)} is safe at ${BNAME[dest]}`;
@@ -19699,7 +19702,7 @@ function resolveSteal() {
     st.big = 'Caught stealing!'; st.small = `${shortName(cat)} guns down ${shortName(r)}`;
     sfx.bad(); G.shake = Math.max(G.shake, .12);
   }
-  for (const k of trail) { const p = b[k], d = k + 1; if (!p) continue; if (d >= 4) { b[k] = null; scoreRun(p); pst(pt).ra++; runs++; } else if (!b[d]) { b[k] = null; b[d] = p; } else continue; pst(p).sb++; text += `; ${p.n} takes ${BNAME[d]}`; }
+  for (const k of trail) { const p = b[k], d = k + 1; if (!p) continue; if (d >= 4) { b[k] = null; scoreRun(p); pst(pt).ra++; runs++; } else if (!b[d]) { b[k] = null; b[d] = p; } else continue; pst(p).sb++; bdpCrowd(G.half, 'sb'); text += `; ${p.n} takes ${BNAME[d]}`; }
   logLine(`${text}${G.outs >= 3 && !safe && !wild ? ' to end the inning' : ''}.`, false, tags);
   banner(st.big, st.small, 1.2);
   runState();
@@ -22575,6 +22578,250 @@ resumeSnap = function (sn) {
   for (const t of G.teams) for (const p of [...t.def.roster, ...t.pen, ...t.used]) if (p.kit === undefined) kitArm(p);
   return r;
 };
+/* ================= the Realm's powers on the diamond: situation powers and the crowd (issue #115, phase 2) ================= */
+// Nothing here acts in the standalone game: it only wakes when a game's rules carry bdpow (the Realm sends it), and
+// with G.bdp null every hook below passes straight through, so a seeded game plays exactly as before.
+// rules.bdpow = { on: [bool, bool] (which sides have them; both when left out), sit, crowd (each on unless false) }
+// G.bdp = { on, sitOn, crowdOn, crowd: [n, n], arm: [bool, bool], used: [{ k: true }, …], fc: side | null,
+//           amp: { id, n } | null, ultAmp: [{ id, s, why }], casts: [{ side, k, id, inning, half, why }],
+//           tally: { moment: times } (every moment the stands saw, for the checks and the lab) }, plain data.
+// - Situation powers (BD_SIT), the team's, once a game each, for mana, when the moment fits (bdpMoment): Bases Loaded,
+//   Last Licks, Extra Innings (at bat) and Full Count (in the field). A zone power leaves a field condition (G.zones,
+//   as an ultimate does: it shows in the conditions list and fades on its at-bats). The CPU casts them by its skill at
+//   the start of a pitch, and Auto powers casts yours as a Knight would; every cast is logged with its reason (✦).
+// - The crowd: each side's stands fill it on big moments (a run, a home run, a strikeout, a double play, a stolen base),
+//   up to BD_CROWD.max. At BD_CROWD.cost it can lift a cast: an everyday ability with a strength (BD_AMP) works half
+//   again as strongly (abPow, through bdpAmpK), or an ultimate's zone lasts one more at-bat. You call for it (arm), the
+//   CPU spends it by its skill, Auto powers does too (♪ in the play-by-play). Mana pays for everything, as before.
+// The picks (each player bringing one of a pair) are made by the Realm before the game: a player who picks the
+// physical skill goes in with that role's ability left off, so physOf gives them the skill, and a pitcher with a pair
+// of magic pitches goes in with one of them.
+const BD_CROWD = { max: 6, cost: 3, run: 1, hr: 2, k: 1, dp: 2, sb: 1, amp: 1.5 };
+// per pitch while a situation power fits, and per cast while the crowd can lift it: the chance by CPU skill
+const BD_POWK = { sit: [.25, .5, .75, 1], amp: [.3, .55, .8, 1] };
+// the everyday abilities with a strength to lift (each reads abPow); the sure things (Shadowstep, Telekinesis…) have none
+const BD_AMP = ['axe', 'crush', 'sticky', 'pact', 'dispel', 'gaze', 'shriek', 'sprint', 'fleet', 'glide', 'swarm', 'invis', 'bullrush', 'pounce', 'quake', 'flight', 'haunt', 'mesmer', 'petrify', 'web'];
+const BD_SIT = {
+  loaded: { n: 'Bases Loaded', side: 'bat', cost: 2, turns: 1, zone: { shape: 'global', swing: 1.2, rSpd: 1.2 }, desc: 'The bases are full and the stands are up: for this at-bat your batter\'s swing circle is a fifth bigger and every runner runs a fifth faster.' },
+  lastlicks: { n: 'Last Licks', side: 'bat', cost: 2, turns: 3, zone: { shape: 'global', carry: 1.08, swing: 1.1 }, desc: 'The home side in the bottom of the last, behind or level: for three at-bats fly balls carry further and your batters\' swing circle is a tenth bigger.' },
+  extra: { n: 'Extra Innings', side: 'bat', cost: 1, desc: 'Extra innings, nobody out and second base empty: the last batter up starts the half on second.' },
+  fullcount: { n: 'Full Count', side: 'field', cost: 1, ctrl: .5, desc: 'Three balls and two strikes: your pitcher paints the corner. This pitch scatters half as much.' },
+};
+const bdpAmpK = (p, id) => G.bdp.amp.id === id && G.bdp.amp.n === p.n ? BD_CROWD.amp : 1;
+function bdpNew(P) {
+  if (!P) return null;
+  return { on: Array.isArray(P.on) ? [!!P.on[0], !!P.on[1]] : [true, true], sitOn: P.sit !== false, crowdOn: P.crowd !== false, crowd: [0, 0], arm: [false, false], used: [{}, {}], fc: null, amp: null, ultAmp: [], casts: [], tally: { run: 0, hr: 0, k: 0, dp: 0, sb: 0 } };
+}
+const bdpKitStart0 = kitStart;
+kitStart = function (opts) { bdpKitStart0.apply(this, arguments); G.bdp = bdpNew(G.rules && G.rules.bdpow); };
+
+/* ---------- the crowd ---------- */
+function bdpCrowd(s, k) {
+  const B = G.bdp; if (!B) return;
+  if (B.tally) B.tally[k] = (B.tally[k] || 0) + 1;
+  if (!B.crowdOn || !B.on[s]) return;
+  B.crowd[s] = Math.min(BD_CROWD.max, B.crowd[s] + (BD_CROWD[k] || 0));
+}
+// why side s lifts this cast ('' when it doesn't): you, when you called for it; the CPU and Auto powers by skill
+function bdpAmpWant(s) {
+  const B = G.bdp; if (!B || !B.crowdOn || !B.on[s] || B.crowd[s] < BD_CROWD.cost) return '';
+  const T = G.teams[s], hum = isHuman(T);
+  if (hum && B.arm[s]) return 'called for';
+  if (hum && !AUTO) return '';
+  if (B.crowd[s] >= BD_CROWD.max) return 'the stands are full';
+  return R() < BD_POWK.amp[Math.min(3, hum ? 1 : dOf(T))] ? `the crowd at ${B.crowd[s]}` : '';
+}
+function bdpAmpSpend(s, what, why, k, id) {
+  const B = G.bdp, T = G.teams[s];
+  B.crowd[s] -= BD_CROWD.cost; B.arm[s] = false;
+  B.casts.push({ side: s, k, id, inning: G.inning, half: G.half, why });
+  logLine(`♪ ${T.def.short || T.def.name}: the crowd lifts ${what} (${why}).`);
+  addFx('callout', { text: 'The crowd lifts it!', col: '#ffd34a', small: true });
+}
+// at the release: a bat ability or an ultimate in the stance, and an ultimate pitch
+const bdpRelease0 = release;
+release = function () {
+  const B = G.bdp, P = G.P;
+  if (B && P) {
+    const bt = BT(), ft = FT(), bat = batter();
+    let st = P.stances[P.si]; if (st && !affordable(st, bt)) st = P.stances[0];
+    if (st && st.k === 'ab' && BD_AMP.includes(st.ab)) { const why = bdpAmpWant(G.half); if (why) { B.amp = { id: st.ab, n: bat.n }; bdpAmpSpend(G.half, `${shortName(bat)}'s ${AB[st.ab].name}`, why, 'amp', st.ab); } }
+    else if (st && st.k === 'ult') { const why = bdpAmpWant(G.half); if (why) B.ultAmp.push({ id: st.ult, s: G.half, why }); }
+    let pd = P.pitches[P.pi]; if (pd && !affordable(pd, ft)) pd = P.pitches[0];
+    if (pd && pd.ult) { const why = bdpAmpWant(1 - G.half); if (why) B.ultAmp.push({ id: pd.k, s: 1 - G.half, why }); }
+  }
+  return bdpRelease0.apply(this, arguments);
+};
+const bdpCastRun0 = castRun;
+castRun = function (r) {
+  const B = G.bdp, ab = r && r.p && r.p.run;
+  if (!B || !ab || !BD_AMP.includes(ab) || r.used || r.out || r.scored || BT().mana < abCost(r.p, ab)) return bdpCastRun0.apply(this, arguments);
+  const why = bdpAmpWant(G.half); if (!why) return bdpCastRun0.apply(this, arguments);
+  B.amp = { id: ab, n: r.p.n }; let ok;
+  try { ok = bdpCastRun0.apply(this, arguments); } finally { B.amp = null; }
+  if (ok) bdpAmpSpend(G.half, `${shortName(r.p)}'s ${AB[ab].name}`, why, 'amp', ab);
+  return ok;
+};
+const bdpCastField0 = castField;
+castField = function (o) {
+  const B = G.bdp, s = 1 - G.half;
+  if (!B || !o || !o.ok) return bdpCastField0.apply(this, arguments);
+  if (o.ult) { const why = bdpAmpWant(s); if (why) B.ultAmp.push({ id: o.ab, s, why }); return bdpCastField0.apply(this, arguments); }
+  if (o.team || o.phys || !o.f || !BD_AMP.includes(o.ab)) return bdpCastField0.apply(this, arguments);
+  const why = bdpAmpWant(s); if (!why) return bdpCastField0.apply(this, arguments);
+  B.amp = { id: o.ab, n: o.f.p.n };
+  try { bdpCastField0.apply(this, arguments); } finally { B.amp = null; }
+  bdpAmpSpend(s, `${shortName(o.f.p)}'s ${AB[o.ab].name}`, why, 'amp', o.ab);
+};
+const bdpCastRunUlt0 = castRunUlt;
+castRunUlt = function (o, r) {
+  const B = G.bdp; if (B && o && o.ok && r) { const why = bdpAmpWant(G.half); if (why) B.ultAmp.push({ id: o.id, s: G.half, why }); }
+  return bdpCastRunUlt0.apply(this, arguments);
+};
+// an ultimate's zone, as it takes hold: one at-bat more, if the crowd lifted it (and still can)
+const bdpAddZone0 = addZone;
+addZone = function (id) {
+  const r = bdpAddZone0.apply(this, arguments), B = G.bdp; if (!B || !B.ultAmp.length) return r;
+  const i = B.ultAmp.findIndex(x => x.id === id), z = i >= 0 ? zones().find(q => q.id === id) : null; if (!z) return r;
+  const u = B.ultAmp.splice(i, 1)[0];
+  if (B.crowd[u.s] >= BD_CROWD.cost) { z.turns++; bdpAmpSpend(u.s, `the ${ULT[id].name} (an at-bat more)`, u.why, 'ultamp', id); }
+  return r;
+};
+
+/* ---------- situation powers ---------- */
+// '' when the moment fits side s for power k (mana and once a game aside), or why not
+function bdpMoment(s, k) {
+  const S = BD_SIT[k]; if (!S || !G.teams) return 'No such power.';
+  const pre = G.phase === 'between' || (G.phase === 'plate' && G.P && (G.P.stage === 'select' || G.P.stage === 'windup'));
+  if (!pre) return 'Only before a pitch.';
+  const bat = s === G.half, T = G.teams[s], O = G.teams[1 - s];
+  if (S.side === 'bat' && !bat) return 'Only at bat.';
+  if (S.side === 'field' && bat) return 'Only in the field.';
+  if (k === 'loaded') return G.phase === 'plate' && G.bases[1] && G.bases[2] && G.bases[3] ? '' : 'Only with the bases loaded.';
+  if (k === 'lastlicks') return s === 1 && G.inning >= G.innings && T.R <= O.R ? '' : 'Only for the home side in the bottom of the last inning or later, behind or level.';
+  if (k === 'extra') return G.inning > G.innings && G.outs === 0 && !G.bases[2] ? '' : 'Only in extra innings, with nobody out and second base empty.';
+  if (k === 'fullcount') return G.phase === 'plate' && G.balls === 3 && G.strikes === 2 ? '' : 'Only on a full count.';
+  return 'No such power.';
+}
+function bdpSitWhy(s, k) {
+  const B = G.bdp, S = BD_SIT[k]; if (!S) return 'No such power.';
+  if (!B || !B.sitOn || !B.on[s] || !gameOn()) return 'Situation powers are off.';
+  if (B.used[s][k]) return 'Once a game.';
+  const m = bdpMoment(s, k); if (m) return m;
+  if (G.teams[s].mana < S.cost) return `Needs ${S.cost} mana.`;
+  return '';
+}
+// the moment, in words, for the log
+function bdpWhyNow(s, k) {
+  const T = G.teams[s], O = G.teams[1 - s], d = T.R - O.R;
+  if (k === 'loaded') return `bases loaded, ${G.outs} out`;
+  if (k === 'lastlicks') return `${d < 0 ? `down by ${-d}` : 'level'} in the bottom of the ${ORD(G.inning)}`;
+  if (k === 'extra') return `the ${ORD(G.inning)} inning`;
+  if (k === 'fullcount') return 'three balls, two strikes';
+  return '';
+}
+function bdpSitCast(s, k, why) {
+  const B = G.bdp, S = BD_SIT[k], T = G.teams[s];
+  T.mana -= S.cost; B.used[s][k] = true;
+  if (S.zone) {
+    // a field condition, as an ultimate leaves; cast before the half's first batter, it waits for them
+    G.zones = zones().filter(z => z.id !== 'sit:' + k);
+    G.zones.push({ id: 'sit:' + k, name: S.n, fx: S.zone, turns: S.turns + (G.phase === 'between' ? 1 : 0), side: s, seed: 0, x: 0, y: 0, r: 0, born: G.time });
+  }
+  if (k === 'extra') {
+    // the last batter up who is fit and not already on base
+    const ros = T.def.roster, on = new Set(G.bases.filter(Boolean));
+    for (let j = 1; j < 9; j++) { const q = ros[(T.idx - j + 9) % 9]; if (q && !(q.ko > 0) && !on.has(q)) { G.bases[2] = q; logLine(`${q.n} starts the half on second.`); break; } }
+    if (G.phase === 'plate' && !bdpInPrep) bdpStealPrep0(false);
+  }
+  if (k === 'fullcount') B.fc = s;
+  B.casts.push({ side: s, k: 'sit', id: k, inning: G.inning, half: G.half, why: why || '' });
+  logLine(`✦ ${T.def.short || T.def.name}: ${S.n}${why ? ` (${why})` : ''}.`);
+  addFx('callout', { text: S.n + '!', col: '#ffd34a' });
+  sfx.magic();
+  return '';
+}
+// the CPU's, and yours with Auto powers on (as a Knight), at the start of each pitch
+function bdpCpuSits() {
+  for (const s of [G.half, 1 - G.half]) {
+    const T = G.teams[s], hum = isHuman(T); if (hum && !AUTO) continue;
+    const want = BD_POWK.sit[Math.min(3, hum ? 1 : dOf(T))];
+    for (const k of Object.keys(BD_SIT)) if (!bdpSitWhy(s, k) && R() < want) bdpSitCast(s, k, bdpWhyNow(s, k));
+  }
+}
+// Full Count, at the release (after gear and potions)
+const bdpOnRelease0 = gearOnRelease;
+gearOnRelease = function (pc, pd, st, ctrl) {
+  ctrl = bdpOnRelease0.apply(this, arguments);
+  const B = G.bdp; if (!B) return ctrl;
+  if (B.fc === 1 - G.half) { ctrl *= BD_SIT.fullcount.ctrl; pc.bdpFc = true; }
+  B.fc = null;
+  return ctrl;
+};
+
+/* ---------- the moments ---------- */
+const bdpScoreRun0 = scoreRun;
+scoreRun = function () { const r = bdpScoreRun0.apply(this, arguments); if (G.bdp) bdpCrowd(G.half, 'run'); return r; };
+const bdpShowResult0 = showResult;
+showResult = function (big, small, t, code) { if (G.bdp && code === 'K') bdpCrowd(1 - G.half, 'k'); return bdpShowResult0.apply(this, arguments); };
+const bdpStatInPlay0 = statInPlay;
+statInPlay = function (L, bat, batR, hit) {
+  // (an inside-the-park home run is one too)
+  if (G.bdp && L) { if (L.homer || (hit && batR && batR.scored)) bdpCrowd(G.half, 'hr'); if (L.outs && L.outs.length >= 2) bdpCrowd(1 - G.half, 'dp'); }
+  return bdpStatInPlay0.apply(this, arguments);
+};
+// a new pitch: what lifted the last one is spent; the CPU's situation powers come before the steal plans and the save point
+const bdpStartPitch0 = startPitch;
+startPitch = function () { if (G.bdp) { G.bdp.amp = null; G.bdp.ultAmp = []; } return bdpStartPitch0.apply(this, arguments); };
+const bdpStealPrep0 = stealPrep;
+let bdpInPrep = false;
+stealPrep = function () {
+  if (G.bdp && G.teams && G.P && G.phase === 'plate') { bdpInPrep = true; try { bdpCpuSits(); } finally { bdpInPrep = false; } }
+  return bdpStealPrep0.apply(this, arguments);
+};
+const bdpStartHalf0 = startHalf;
+startHalf = function () { if (G.bdp) G.bdp.fc = null; return bdpStartHalf0.apply(this, arguments); };
+
+/* ---------- yours, from the page ---------- */
+function bdpYouSit(k) {
+  const s = kitYou(); if (s < 0) return 'Nobody here is yours.';
+  const why = bdpSitWhy(s, k); if (why) return why;
+  return bdpSitCast(s, k, '');
+}
+function bdpArm(on) {
+  const s = kitYou(), B = G.bdp; if (s < 0 || !B || !B.crowdOn || !B.on[s]) return 'The crowd is off.';
+  if (on && B.crowd[s] < BD_CROWD.cost) return `The crowd needs ${BD_CROWD.cost} to lift a cast.`;
+  B.arm[s] = !!on; return '';
+}
+
+/* ---------- the meter, under each side's mana ---------- */
+const bdpManaGems0 = manaGems;
+manaGems = function (c, x, y, n, team) {
+  bdpManaGems0.apply(this, arguments);
+  const B = G.bdp, s = G.teams ? G.teams.indexOf(team) : -1; if (!B || !B.crowdOn || s < 0 || !B.on[s]) return;
+  const v = B.crowd[s], up = v >= BD_CROWD.cost;
+  c.save();
+  for (let i = 0; i < BD_CROWD.max; i++) { c.fillStyle = i < v ? (up ? '#ffd34a' : '#c99a4a') : 'rgba(255,211,74,.14)'; c.fillRect(x - 4 + i * 13, y + 7, 9, 3); }
+  if (B.arm[s]) { c.strokeStyle = '#ffd34a'; c.lineWidth = 1; c.strokeRect(x - 6.5, y + 5.5, BD_CROWD.max * 13, 6); }
+  c.restore();
+};
+
+/* ---------- saved with the game ---------- */
+const bdpSnap0 = snapGame;
+snapGame = function () {
+  const sn = bdpSnap0.apply(this, arguments);
+  // (with the field's conditions, which a snapshot otherwise leaves behind)
+  if (sn && G.bdp) sn.bdp = JSON.parse(JSON.stringify(Object.assign({}, G.bdp, { amp: null, ultAmp: [], zones: zones() })));
+  return sn;
+};
+const bdpResume0 = resumeSnap;
+resumeSnap = function (sn) {
+  const B = sn && sn.bdp ? JSON.parse(JSON.stringify(sn.bdp)) : null;
+  if (B) { G.zones = B.zones || []; delete B.zones; B.amp = null; B.ultAmp = []; }
+  // (a game saved before powers came in starts them fresh)
+  G.bdp = B || bdpNew(sn && sn.rules && sn.rules.bdpow);
+  return bdpResume0.apply(this, arguments);
+};
 /* Brimstone Diamond's superstars (issue #24, phase 2), inside the wBD scope: each superstar's player template and
    ultimate, added to the engine's own tables after its parts load (an ultimate is also an ability, AB, as
    08-ultimates.js makes them). Plain assignments, nothing declared. A superstar
@@ -22898,8 +23145,8 @@ function bdxTempl(kind) { const T = TEMPL[kind]; return T ? Object.fromEntries(S
 // the names and one-line descriptions the Realm shows for powers, ultimates and pitches
 function bdxNames() {
   const o = (src, f) => Object.fromEntries(Object.entries(src).map(([k, v]) => [k, f(v)]));
-  return { ab: o(AB, v => ({ n: v.name, type: v.type, desc: v.desc })), ult: o(ULT, v => ({ n: v.name, role: v.role, desc: v.desc })),
-    pitch: o(PITCHES, v => ({ n: v.name, magic: !!v.magic, desc: v.desc })) };
+  return { ab: o(AB, v => ({ n: v.name, type: v.type, desc: v.desc, cost: v.cost || 0, stam: v.stam || 0, passive: !!v.passive })), ult: o(ULT, v => ({ n: v.name, role: v.role, desc: v.desc })),
+    pitch: o(PITCHES, v => ({ n: v.name, magic: !!v.magic, desc: v.desc, cost: v.cost || 0 })) };
 }
 /* the Umbral (issue #99, 4a): the hexes a game can carry (opts.hexes, or rules.hexes, with hexBy the side casting them),
    and the Nadir champion's own pitch, the Dead Ball (the Phantom's vanish, faster and tighter; nobody else throws it) */
@@ -22913,6 +23160,12 @@ function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPe
    potions, your potion now (potion), why a side can't (potionWhy), your coach's word (advice), the game as it is now
    saved through onSnap (snapNow: only at the start of a pitch, where a snapshot resumes) */
 function bdxGear() { return Object.fromEntries(Object.entries(GEAR).map(([k, g]) => [k, { n: g.name, type: g.type, uses: g.uses, desc: g.desc, base: g.base || null }])); }
+/* powers (issue #115, phase 2; 52-powers.js): the situation powers and the crowd's numbers, why side s can't cast power k
+   now (sitWhy), whether its moment fits (sitFit: unused, and the moment is right, mana aside), your cast (castSit), calling
+   for the crowd on your next cast (arm), which abilities it can lift (ampable), a role's physical skill (physOf), a line in
+   the play-by-play (say) */
+const bdxPow = { sit: JSON.parse(JSON.stringify(BD_SIT)), crowd: JSON.parse(JSON.stringify(BD_CROWD)), amp: BD_AMP.slice() };
+function bdxSitFit(s, k) { return !!(G.bdp && G.bdp.sitOn && G.bdp.on[s] && gameOn() && !G.bdp.used[s][k] && !bdpMoment(s, k)); }
 function bdxSnapNow() { if (gameOn() && G.phase === 'plate' && G.P && G.P.stage === 'select') exhSnap(); }
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
@@ -22925,9 +23178,13 @@ return {
   kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich'],
   gear: bdxGear, potions: JSON.parse(JSON.stringify(BD_POTIONS)), kitRules: JSON.parse(JSON.stringify(BD_KIT)), potion: id => kitPotion(id), potionWhy: (s, id) => kitWhy(s, id),
   advice: bag => kitAdvice(bag), snapNow: bdxSnapNow, get kit() { return G.kit || null; },
+  sit: bdxPow.sit, crowdRules: bdxPow.crowd, ampable: id => bdxPow.amp.includes(id), get bdp() { return G.bdp || null; },
+  sitWhy: (s, k) => bdpSitWhy(s, k), sitFit: bdxSitFit, castSit: k => bdpYouSit(k), arm: on => bdpArm(on),
+  physOf: (p, cat) => physOf(p, cat), say: t => logLine(t), abPow: (p, id) => abPow(p, id),
   // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
   step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
-  kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() }
+  kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() },
+  powProbe: { zone: id => addZone(id, null, G.half) }
 };
 
 })();
@@ -63887,6 +64144,162 @@ renderHelp = function () {
   const names = t => Object.values(W_DIAMOND_GEAR).filter(g => g.fx[t]).map(g => g.name);
   const list = a => a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpBallKit"><b>Baseball gear and potions.</b> Each player can wear one piece of baseball gear. A magic bat (${list(names('bat'))}) gives them their own ⚒ swing when they bat, and a magic ball (${list(names('ball'))}) their own ⚒ pitch when they pitch: each has a few uses a game, back every game. A Wyvern-Hide Glove helps in the field, a Rosin Bag on the mound, and Iron Spikes add speed. The Graftonbury store sells the cheaper pieces, chests hold more, and the Diamond Cup adds a piece you don't have. Put gear on from the Bag on the Team screen. In a game you play or manage, between half-innings (from the last out until the next half's first pitch), give one potion from the Bag row above the field: the Stamina Draught (your pitcher's stamina back), a Brimstone Tonic (two mana), Owl-Eye Drops (a bigger swing circle the next time you bat) or Steadyhand Balm (a tighter pitch the next time you field). Esc stops the game while you choose. Your coach says which suits the moment but never opens your bag, and Simulate leaves it alone. The other nine brings potions by tier and uses them: the play-by-play says when, and why (⚗).</p>`);
+};
+/* w141: baseball's picks, situation powers and the crowd (issue #115, phase 2), by the shape of the later sports
+   (w126 is the Shed's); the engine's side is src/bd/parts/52-powers.js.
+   The picks: a kind's abilities stay as they are (no new ones), but each player brings one of a pair a role. In
+   batting, running and fielding the pair is the kind's own magic (mana) or the physical skill it would have without
+   it (stamina; Brimstone Diamond picks which by their ratings); a kind without that magic keeps its physical skill, and
+   a passive one (Stone Skin) has nothing to pick. A pitcher with a pair of magic pitches (W_BD_PAIRS: the Fireball or
+   the Meteor, the Hex Knuckler or the Phantom) brings one of them. Picked on the Nine tab, kept on the player
+   (p.bdPw { bat, run, field, pitch }, 0 the first, 1 the second); call-ups pick too. The other nine's players pick by
+   name (wBdPickByName: the same each time), and the play-by-play names each side's picks at the first pitch.
+   Situation powers (Bases Loaded, Last Licks, Extra Innings, Full Count) and the crowd that lifts a cast are on in every
+   ball game the Realm plays (Play, Manage, Simulate, the Diamond Cup, the Umbral, exhibitions); in LAB mode they are off
+   unless the lab sets W_BDPOW.lab (the rules it plays), so the other balance numbers stand. Your Powers row above the
+   field (under the Bag) shows mana and the crowd, the situation powers whose moment it is, and Crowd, to lift your next
+   cast; with Auto powers on your coach casts and spends as a Knight would.
+   Wraps: wNineBdPlayer (wW141NineBdPlayer: your pick goes with the player), wNineRow (wW141NineRow: the picks on the
+   Nine tab), wRenderCamp (wW141RenderCamp: their changes), wBdCard (wW141BdCard: the picks on the stats card),
+   renderHelp (wW141RenderHelp: #wHelpBallPow); and wBD.start, wBD.sim (the powers and the picks go in). */
+
+const W_BDPOW = { on: true, lab: null };
+const W_BD_PAIRS = [['fireball', 'meteor'], ['hex', 'phantom']];
+const W_BD_ROLES = { bat: 'Batting', run: 'Running', field: 'Fielding', pitch: 'Pitching' };
+
+/* ---------- the pairs ---------- */
+// the pair engine player g picks between in a role: [first, second] (ability or pitch ids), or null when there is none
+function wBdPair(g, role) {
+  if (!g || !W_BD_ROLES[role]) return null;
+  if (role === 'pitch') { const P = g.pitches || [], pr = W_BD_PAIRS.find(([a, b]) => P.includes(a) && P.includes(b)); return pr ? pr.slice() : null; }
+  const id = g[role], A = id && wBdNames().ab[id]; if (!A || A.passive) return null;
+  const ph = wBD.physOf(Object.assign({}, g, { [role]: null }), role);
+  return ph ? [id, ph] : null;
+}
+// the other nine's: the same each time, from the name
+function wBdPickByName(n) {
+  let h = 7; for (const ch of String(n || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return { bat: h & 1, run: (h >> 1) & 1, field: (h >> 2) & 1, pitch: (h >> 3) & 1 };
+}
+// g as it takes the field with its picks: the role's magic left off for the physical skill, one pitch of a pair (on g
+// itself, so a nine handed to the engine keeps its players)
+function wBdPickApply(g, pw) {
+  const out = g, took = [], pairs = Object.fromEntries(Object.keys(W_BD_ROLES).map(r => [r, wBdPair(g, r)]));
+  for (const role of Object.keys(W_BD_ROLES)) {
+    const pr = pairs[role]; if (!pr) continue;
+    const k = pw && pw[role] === 1 ? 1 : 0;
+    if (role === 'pitch') out.pitches = g.pitches.filter(x => x !== pr[1 - k]); else if (k) out[role] = null;
+    took.push(pr[k]);
+  }
+  out.bdPick = took;
+  return out;
+}
+// a nine with its picks: yours (the nine's id is 'realm') as you set them, any other by name
+function wBdPickDef(def) {
+  if (!def || !Array.isArray(def.roster) || def.bdPicked) return def;
+  const mine = def.id === 'realm';
+  for (const g of def.roster.concat(def.pen || [])) wBdPickApply(g, mine ? g.bdPw : wBdPickByName(g.n));
+  def.bdPicked = true;
+  return def;
+}
+const wBdPickName = id => { const N = wBdNames(); return (N.ab[id] || N.pitch[id] || { n: id }).n; };
+const wBdPickCost = id => { const N = wBdNames(), A = N.ab[id]; return A && A.stam ? `${A.stam} stamina` : `${(A || N.pitch[id] || {}).cost || 0} mana`; };
+function wBdSetPw(id, role, v) {
+  const p = wNineWho(id); if (!p || !W_BD_ROLES[role]) return '';
+  p.bdPw = Object.assign({ bat: 0, run: 0, field: 0, pitch: 0 }, p.bdPw, { [role]: v === 1 ? 1 : 0 });
+  wSave(); return '';
+}
+const wW141NineBdPlayer = wNineBdPlayer;
+wNineBdPlayer = function (p) { const g = wW141NineBdPlayer.apply(this, arguments); if (p && p.bdPw) g.bdPw = Object.assign({}, p.bdPw); return g; };
+
+/* ---------- the powers and the picks go in ---------- */
+function wBdPowRules() {
+  if (!W_BDPOW.on) return null;
+  if (LAB) return W_BDPOW.lab ? JSON.parse(JSON.stringify(W_BDPOW.lab)) : null;
+  return { on: [true, true], sit: true, crowd: true, picks: true };
+}
+// (a game whose rules already say, as a lab's may, plays them; the picks go in whenever the powers do)
+function wBdPowNext(o) {
+  if (!o) return o;
+  const own = o.rules && o.rules.bdpow !== undefined, P = own ? o.rules.bdpow : wBdPowRules(); if (!P) return o;
+  const r = own ? Object.assign({}, o) : Object.assign({}, o, { rules: Object.assign({}, o.rules || {}, { bdpow: P }) });
+  if (P.picks !== false && Array.isArray(o.defs)) r.defs = o.defs.map(wBdPickDef);
+  return r;
+}
+// each side's picks, in the play-by-play before the first pitch
+function wBdPickSay() {
+  const G = wBD.G; if (!G || !G.teams || !G.bdp) return;
+  for (const t of G.teams) {
+    const ps = t.def.roster.concat(t.pen || []).filter(g => g.bdPick && g.bdPick.length);
+    if (ps.length) wBD.say(`${t.def.short || t.def.name} bring: ${ps.map(g => `${g.n.split(' ').slice(-1)[0]} ${g.bdPick.map(wBdPickName).join(', ')}`).join('; ')}.`);
+  }
+}
+const wW141Start = wBD.start, wW141Sim = wBD.sim;
+wBD.start = o => { const r = wW141Start(wBdPowNext(o)); wBdPickSay(); return r; };
+wBD.sim = o => wW141Sim(wBdPowNext(o));
+
+/* ---------- your Powers row, above the field ---------- */
+$('wBallBagRow').insertAdjacentHTML('afterend', '<div id="wBallPowRow" class="wdbar wdbag" hidden><b>Powers</b><span id="wBallPow"></span></div>');
+let W_BALL_POWKEY = '', W_BALL_POWMSG = '';
+function wBallPowRows(force) {
+  const row = $('wBallPowRow'), L = WD && WD.ball && wBallLive() && WG.ball.live, B = wBD.bdp;
+  const show = UI.view === 'diamond' && !!L && L.world.how !== 'sim' && wBD.live && !!B;
+  if (row.hidden !== !show) row.hidden = !show;
+  if (!show) { W_BALL_POWKEY = ''; return; }
+  const G = wBD.G, you = L.world.home ? 1 : 0, C = wBD.crowdRules, S = wBD.sit, auto = L.world.how === 'manage';
+  const sits = B.sitOn && B.on[you] ? Object.keys(S).filter(k => wBD.sitFit(you, k)) : [];
+  const why = Object.fromEntries(sits.map(k => [k, wBD.sitWhy(you, k)]));
+  const key = JSON.stringify([G.teams[you].mana, B.crowd[you], B.arm[you], why, auto, W_BALL_POWMSG]);
+  if (!force && key === W_BALL_POWKEY) return;
+  W_BALL_POWKEY = key;
+  const crowd = B.crowd[you], up = crowd >= C.cost;
+  $('wBallPow').innerHTML = `<small class="hint" title="Mana pays for every power. The crowd: your stands fill it on runs, home runs, strikeouts, double plays and stolen bases.">Mana <b>${G.teams[you].mana}</b>/6 · Crowd <b>${crowd}</b>/${C.max}</small> `
+    + (B.crowdOn && B.on[you] ? `<button class="ghost${B.arm[you] ? ' on' : ''}" data-bdarm aria-pressed="${!!B.arm[you]}" ${up || B.arm[you] ? '' : 'disabled'} title="${esc(`${C.cost} crowd: your next ability with a strength works half again as strongly, or your next ultimate's zone lasts an at-bat more. Mana pays as usual.`)}">${B.arm[you] ? 'Crowd: on your next cast' : `Crowd (${C.cost})`}</button>` : '')
+    + sits.map(k => ` <button class="ghost" data-bdsit="${k}" ${why[k] ? 'disabled' : ''} title="${esc(why[k] ? `${S[k].desc} (${why[k]})` : S[k].desc)}">${esc(S[k].n)} (${S[k].cost})</button>`).join('')
+    + (auto ? ' <small class="hint">Auto powers: your coach calls the situation powers and the crowd too.</small>' : '')
+    + (W_BALL_POWMSG ? ` <small class="wbad">${esc(W_BALL_POWMSG)}</small>` : '');
+}
+$('wBallPowRow').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const B = wBD.bdp, L = WG && WG.ball && WG.ball.live, you = L && L.world.home ? 1 : 0;
+  if (b.dataset.bdsit) { W_BALL_POWMSG = wBD.castSit(b.dataset.bdsit); if (!W_BALL_POWMSG) wBD.snapNow(); }
+  else if (b.dataset.bdarm != null && B) W_BALL_POWMSG = wBD.arm(!B.arm[you]);
+  b.blur(); wBallPowRows(true);
+});
+setInterval(() => wBallPowRows(), 250);
+
+/* ---------- the Nine tab and the stats card ---------- */
+const wW141NineRow = wNineRow;
+wNineRow = function (r) {
+  const html = wW141NineRow.apply(this, arguments), p = wNineWho(r.id); if (!p) return html;
+  const g = wNineBdPlayer(p, r.pos), cur = p.bdPw || {};
+  const sel = Object.keys(W_BD_ROLES).map(role => {
+    const pr = wBdPair(g, role); if (!pr) return '';
+    const k = cur[role] === 1 ? 1 : 0, N = wBdNames(), d = id => (N.ab[id] || N.pitch[id] || {}).desc || '';
+    return `<label class="wsvl" title="${esc(pr.map(id => `${wBdPickName(id)} (${wBdPickCost(id)}): ${d(id)}`).join(' / '))}">${W_BD_ROLES[role]} <select data-bdpw="${role}" aria-label="${esc(p.n)}'s ${role === 'pitch' ? 'magic pitch' : W_BD_ROLES[role].toLowerCase() + ' power'}">${pr.map((id, j) => `<option value="${j}"${j === k ? ' selected' : ''}>${esc(wBdPickName(id))} (${esc(wBdPickCost(id))})</option>`).join('')}</select></label>`;
+  }).join('');
+  return sel ? html.replace(/(<\/div>\s*<div class="wpa">)/, `<div class="wbdpick">${sel}</div>$1`) : html;
+};
+const wW141RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW141RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'nine') return;
+  const idOf = el => { const k = el.closest('[data-nid]').dataset.nid; return /^c\d+$/.test(k) ? k : +k; };
+  body.querySelectorAll('[data-bdpw]').forEach(s => s.onchange = () => wCampSay(wBdSetPw(idOf(s), s.dataset.bdpw, +s.value)));
+};
+const wW141BdCard = wBdCard;
+wBdCard = function (p) {
+  const html = wW141BdCard.apply(this, arguments); if (!html || !p) return html;
+  const g = wNineBdPlayer(p, wBdOf(p).pos), took = wBdPickApply(g, p.bdPw).bdPick;
+  return took.length ? html.replace(/(<p class="hint">Each level)/, `<p class="wbdpos">Brings to the diamond (picked on the Nine tab): ${took.map(id => `<b>${esc(wBdPickName(id))}</b>`).join(', ')}.</p>$1`) : html;
+};
+
+const wW141RenderHelp = renderHelp;
+renderHelp = function () {
+  wW141RenderHelp();
+  const after = $('wHelpBallKit') || $('wHelpBall'); if (!after || $('wHelpBallPow')) return;
+  const C = wBD.crowdRules, S = wBD.sit;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpBallPow"><b>Baseball powers.</b> Each player brings one power of a pair in each role, picked on the Nine tab. In batting, running and fielding the pair is their kind's own magic (paid with mana) or the physical skill they'd have without it (paid with stamina); a kind without that magic keeps its skill. A pitcher with two magic pitches of a pair brings one of them. The other nine picks too, the same each time, and the play-by-play names each side's picks. Situation powers are your team's, once a game each, for mana, when the moment fits: ${Object.values(S).map(x => `<b>${esc(x.n)}</b> (${x.cost} mana): ${esc(x.desc.charAt(0).toLowerCase() + x.desc.slice(1))}`).join(' ')} The crowd fills on runs, home runs, strikeouts, double plays and stolen bases (up to ${C.max}, shown in gold under each side's mana). Press Crowd in the Powers row above the field to spend ${C.cost} on your next cast: an ability with a strength works half again as strongly, or an ultimate's zone lasts an at-bat more. Sure things like Shadowstep can't be lifted. The CPU casts and spends by its skill, and Auto powers lets your coach do it for you.</p>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.

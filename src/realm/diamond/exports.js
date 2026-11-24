@@ -47,8 +47,8 @@ function bdxTempl(kind) { const T = TEMPL[kind]; return T ? Object.fromEntries(S
 // the names and one-line descriptions the Realm shows for powers, ultimates and pitches
 function bdxNames() {
   const o = (src, f) => Object.fromEntries(Object.entries(src).map(([k, v]) => [k, f(v)]));
-  return { ab: o(AB, v => ({ n: v.name, type: v.type, desc: v.desc })), ult: o(ULT, v => ({ n: v.name, role: v.role, desc: v.desc })),
-    pitch: o(PITCHES, v => ({ n: v.name, magic: !!v.magic, desc: v.desc })) };
+  return { ab: o(AB, v => ({ n: v.name, type: v.type, desc: v.desc, cost: v.cost || 0, stam: v.stam || 0, passive: !!v.passive })), ult: o(ULT, v => ({ n: v.name, role: v.role, desc: v.desc })),
+    pitch: o(PITCHES, v => ({ n: v.name, magic: !!v.magic, desc: v.desc, cost: v.cost || 0 })) };
 }
 /* the Umbral (issue #99, 4a): the hexes a game can carry (opts.hexes, or rules.hexes, with hexBy the side casting them),
    and the Nadir champion's own pitch, the Dead Ball (the Phantom's vanish, faster and tighter; nobody else throws it) */
@@ -62,6 +62,12 @@ function bdxClub(id, innings) { const d = cloneDef(getTeam(id)); d.pen = quickPe
    potions, your potion now (potion), why a side can't (potionWhy), your coach's word (advice), the game as it is now
    saved through onSnap (snapNow: only at the start of a pitch, where a snapshot resumes) */
 function bdxGear() { return Object.fromEntries(Object.entries(GEAR).map(([k, g]) => [k, { n: g.name, type: g.type, uses: g.uses, desc: g.desc, base: g.base || null }])); }
+/* powers (issue #115, phase 2; 52-powers.js): the situation powers and the crowd's numbers, why side s can't cast power k
+   now (sitWhy), whether its moment fits (sitFit: unused, and the moment is right, mana aside), your cast (castSit), calling
+   for the crowd on your next cast (arm), which abilities it can lift (ampable), a role's physical skill (physOf), a line in
+   the play-by-play (say) */
+const bdxPow = { sit: JSON.parse(JSON.stringify(BD_SIT)), crowd: JSON.parse(JSON.stringify(BD_CROWD)), amp: BD_AMP.slice() };
+function bdxSitFit(s, k) { return !!(G.bdp && G.bdp.sitOn && G.bdp.on[s] && gameOn() && !G.bdp.used[s][k] && !bdpMoment(s, k)); }
 function bdxSnapNow() { if (gameOn() && G.phase === 'plate' && G.P && G.P.stage === 'select') exhSnap(); }
 return {
   G, newGame, simToEnd, start: bdxStart, resume: bdxResume, sim: bdxSim, box: bdxBox, show: bdxShow, hide: bdxHide,
@@ -74,7 +80,11 @@ return {
   kindsAt: bdxKindsAt, club: bdxClub, positions: POSITIONS.slice(), hexes: bdxHexes, skills: ['Squire', 'Knight', 'Archmage', 'Lich'],
   gear: bdxGear, potions: JSON.parse(JSON.stringify(BD_POTIONS)), kitRules: JSON.parse(JSON.stringify(BD_KIT)), potion: id => kitPotion(id), potionWhy: (s, id) => kitWhy(s, id),
   advice: bag => kitAdvice(bag), snapNow: bdxSnapNow, get kit() { return G.kit || null; },
+  sit: bdxPow.sit, crowdRules: bdxPow.crowd, ampable: id => bdxPow.amp.includes(id), get bdp() { return G.bdp || null; },
+  sitWhy: (s, k) => bdpSitWhy(s, k), sitFit: bdxSitFit, castSit: k => bdpYouSit(k), arm: on => bdpArm(on),
+  physOf: (p, cat) => physOf(p, cat), say: t => logLine(t), abPow: (p, id) => abPow(p, id),
   // for the checks: n frames of the game (1/30 s each), and what a player's gear and the drops do (test/realm_diamond_kit.py)
   step: n => { for (let i = 0; i < (n || 1) && gameOn(); i++) { update(1 / 30, 1 / 30); INP.p1.p = {}; INP.p2.p = {}; } },
-  kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() }
+  kitProbe: { reach: p => reachR({ p, big: false }), bob: p => kitBob(p), eye: () => kitEye() },
+  powProbe: { zone: id => addZone(id, null, G.half) }
 };
