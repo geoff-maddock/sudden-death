@@ -169,6 +169,13 @@ async def main():
         check(bk['old'][0] is False and bk['old'][1].startswith('Only between half-innings'), 'a game saved before potions came in resumes with the break shut', bk)
         await pg.evaluate("(() => { wBD.pause(false); $('wBallGive').click(); const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); if (b) b.click(); })()")
         await pg.wait_for_function("!wBallLive() && UI.view === 'world'")
+        # conceded in the break with a potion pending: it was never given, and the game card counts the whole bag
+        await pg.evaluate("""(() => { wBall().met = {}; wStartBall({ club: 'local', how: 'play' }); wBD.pause(true); const G = wBD.G;
+          __to(() => G.half === 1 && G.phase === 'between'); G.teams[0].mana = 1; window.__cg = wBallPotion('bdtonic');
+          wBD.pause(false); $('wBallGive').click(); const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); if (b) b.click(); })()""")
+        await pg.wait_for_function("!wBallLive() && UI.view === 'world'")
+        cg = await pg.evaluate("({ give: window.__cg, n: WG.items.bdtonic || 0, mine: wBallBagMine().bdtonic || 0 })")
+        check(cg['give'] == '' and cg['n'] > 0 and cg['mine'] == cg['n'], 'conceded in the break with a potion pending: the bag counts it as yours again', cg)
 
         sm = await pg.evaluate("""(() => { wBall().met = {}; const it0 = JSON.stringify([WG.items.bdtonic || 0, WG.items.draught || 0]); const r = wStartBall({ club: 'local', how: 'sim' });
           const ok = document.getElementById('wBallOk'); if (ok) ok.click();

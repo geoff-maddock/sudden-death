@@ -63782,7 +63782,8 @@ let W_BALL_KITMSG = '', W_BALL_KITKEY = '';
    pitch of the half before (a snapshot only resumes at the start of a pitch). So it stays in your bag, pending
    (WDK.pend: [{ id, k }], k its place in the game's list of potions), until the first pitch of the half saves a
    snapshot that has it: the saved bag and the saved game always agree. Leave in the break and it was never given. */
-const wBallPend = id => WDK.pend.filter(x => x.id === id).length;
+// (only while the game is on the field: left or conceded in the break, nothing is pending; a resume or a new game clears it)
+const wBallPend = id => WD && WD.ball && wBallLive() ? WDK.pend.filter(x => x.id === id).length : 0;
 const wBallBagMine = () => Object.fromEntries(wMatchBag('diamond').filter(x => wBD.potions[x.id]).map(x => [x.id, x.n - wBallPend(x.id)]).filter(x => x[1] > 0));
 const wBallBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wBD.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wBD.potions[id].n}`).join(', ') : 'nothing'; };
 const wBallBagTheirs = tier => Object.assign({}, W_DIAMOND_KIT.opp[tier] || {});
