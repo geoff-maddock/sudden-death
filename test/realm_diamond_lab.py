@@ -5,6 +5,7 @@
   python3 test/realm_diamond_lab.py 300 '' umbral   only part 3, the Umbral (300 games for each row)
   python3 test/realm_diamond_lab.py 200 '' kits     only part 4, gear and potions (200 games for each row)
   python3 test/realm_diamond_lab.py 200 '' powers   only part 5, picks, situation powers and the crowd (200 games a row)
+  python3 test/realm_diamond_lab.py 150 '' ground   only part 6, Graftonbury Ballpark's ways (150 games a row, seeded)
 
 Every game is Brimstone Diamond's own engine played to a final (wBD.sim): both sides on the CPU at the same skill, so
 the result comes from the players' ratings, and the CPU skill of a tier makes no difference here. That is what
@@ -27,7 +28,14 @@ Bag on the pitchers, spikes on everyone), and each potion alone, two in your bag
 Part 5, powers (issue #115, phase 2; only with 'powers'): your nine at level 3 against a rival's at the same level. By
 tier: off (as the other parts play: LAB mode leaves the powers out), both sides on (the Realm's game), yours only and
 theirs only (situation powers and the crowd); then at tier 2 yours with the situation powers alone and the crowd alone,
-and your nine's picks: every kind's magic, every physical skill (and second pitch), by name, and picks off. Writes
+and your nine's picks: every kind's magic, every physical skill (and second pitch), by name, and picks off.
+Part 6, the ground (issue #115, phase 4; only with 'ground'): Graftonbury Ballpark's mound grass and flickering
+floodlight, your nine at level 3 against a rival's at the same level, every row over the same seeds (game i is seed i
+in every row, so the rows differ only by the ground). By tier: off (as the other parts play), a day game (the mound
+grass alone: the lights are off) and a night game (the grass and the dim patch); then at tier 2 a night game with the
+patch inert (drawn and counted, doing nothing: what a fly into it does without it), the patch alone (no grass), and a
+night game where your side's CPU doesn't read them (no pulls, no aiming: yours against theirs), and neither side's.
+A day game and a night game from the same seed play the same random stream until the ground acts. Writes
 /tmp/realm_diamond_lab.json."""
 import asyncio, json, sys, os, time, collections
 sys.path.insert(0, os.path.dirname(__file__))
@@ -126,6 +134,17 @@ DLAB.pow = function (lvl, o) {
   const [a, h] = wBD.G.teams, B = wBD.G.bdp;
   return { us: a.R, them: h.R, win: a.R > h.R, inn: wBD.G.inning, casts: B ? B.casts.map(c => [c.side, c.k, c.id]) : [], tally: B ? B.tally : null };
 };
+// the ground (part 6): game seed, your nine at level lvl against a rival's at the same level, tier o.tier, o.ground the
+// game's rules.ground (null: off). The seed is set first, so every row plays the same journeys and nines
+DLAB.ground = function (seed, lvl, o) {
+  window.__rs = seed; DLAB.journey(lvl);
+  const club = Object.values(WG.rivals)[0], keep = wBallOppLvl, tier = o.tier || 2;
+  wBallOppLvl = () => wNineTier();
+  let opp; try { opp = wBallOpp(club, tier); } finally { wBallOppLvl = keep; }
+  wBD.sim({ defs: [wNineDef(), opp], innings: W_BALL.innings, diff: W_BALL.diff[tier], rules: Object.assign({}, W_BALL.rules, { ground: o.ground || null }) });
+  const G = wBD.G, [a, h] = G.teams, D = wBD.gd, P = [...G.pstats.values()], sum = k => P.reduce((n, s) => n + (s[k] || 0), 0);
+  return { us: a.R, them: h.R, win: a.R > h.R, inn: G.inning, bb: sum('bb'), so: sum('so'), tally: D ? D.tally : null };
+};
 // XP to date, levels included
 window.wXpTotal = p => { let n = p.xp; for (let l = 1; l < p.lvl; l++) n += wXpNeed(l); return n; };
 """
@@ -185,11 +204,40 @@ def print_pow(pw):
     ty = collections.Counter(); [ty.update(g['tally']) for g in rows if g['tally']]
     print(f"  moments the stands saw a game: {', '.join(f'{k} {v / len(rows):.2f}' for k, v in ty.items())}")
 
+GROUND_ROWS = [  # key, label, o
+    ('off', 'off (as before)', {'ground': None}),
+    ('plain', 'on, the grass off, a day game (paired)', {'ground': {'on': True, 'night': False, 'grass': False}}),
+    ('day', 'a day game: the mound grass', {'ground': {'on': True, 'night': False}}),
+    ('night', 'a night game: grass and the dim patch', {'ground': {'on': True, 'night': True}}),
+    ('inert', 'night, the patch inert (counted only)', {'ground': {'on': True, 'night': True, 'inert': True}}),
+    ('dim', 'night, the dim patch alone (no grass)', {'ground': {'on': True, 'night': True, 'grass': False}}),
+    ('noread', "night, your CPU doesn't read them", {'ground': {'on': True, 'night': True, 'read': [False, True]}}),
+    ('blind', 'night, neither CPU reads them', {'ground': {'on': True, 'night': True, 'read': [False, False]}}),
+]
+# Brimstone Diamond's own random draws are Math.random as the page loaded it, so the seed goes in before the page
+SEED = """window.__rs = 1; Math.random = function () { let t = (window.__rs = (window.__rs + 0x6D2B79F5) | 0); t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };"""
+
+def print_ground(gr):
+    def w(k): rows = gr[k]; n = len(rows); return sum(g['win'] for g in rows) / n, n, sum(g['us'] for g in rows) / n, sum(g['them'] for g in rows) / n
+    print("\nthe ground, Graftonbury Ballpark: your nine at level 3 against a rival's at level 3, Simulate, the same seeds in every row")
+    print('                                                n    win   runs for-against  runs a game    walks  strikeouts | a game: pulls  aims  flies into the patch (caught)  bobbles there')
+    for t in (1, 2, 3):
+        base = w(f't{t}:off')
+        for key, label, _ in GROUND_ROWS:
+            k = f't{t}:{key}'
+            if k not in gr: continue
+            r, n, us, th = w(k); rows = gr[k]
+            T = lambda f: sum((g['tally'] or {}).get(f, 0) for g in rows) / n
+            fly = T('fly'); cau = sum((g['tally'] or {}).get('flyOut', 0) for g in rows) / max(1, sum((g['tally'] or {}).get('fly', 0) for g in rows))
+            bb = sum(g['bb'] for g in rows) / n; so = sum(g['so'] for g in rows) / n
+            print(f"  tier {t} {label:38s} {n:5d}  {100 * r:5.1f}%   {us:.2f}-{th:.2f}   {us + th:5.2f} ({us + th - base[2] - base[3]:+.2f})  {bb:5.2f}  {so:5.2f}      |  {T('pulls'):.2f}  {T('aims'):5.1f}  {fly:.2f} ({100 * cau:4.1f}%)  {T('bob'):.3f}" + ('' if key == 'off' else f"   {100 * (r - base[0]):+5.1f} pts"))
+
 async def main():
     async with async_playwright() as p:
         br = await p.chromium.launch()
         pg = await br.new_page()
         errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+        if ONLY == 'ground': await pg.add_init_script(SEED)
         await pg.goto(REALM_URL); await pg.wait_for_function("typeof wDcupEnter === 'function'")
         await pg.add_script_tag(content=LAB_JS)
         if PRE: await pg.evaluate(PRE + "\n;0")
@@ -220,6 +268,20 @@ async def main():
             for i in range(0, N, 20):
                 k = min(20, N - i)
                 pw[key] += await pg.evaluate(f"(() => {{ const o = []; for (let i = 0; i < {k}; i++) o.push(DLAB.pow(3, {json.dumps(o)})); return o; }})()")
+        if ONLY == 'ground':
+            gr = {}
+            for t in (1, 2, 3):
+                for key, _, o in GROUND_ROWS:
+                    if t != 2 and key not in ('off', 'plain', 'day', 'night'): continue
+                    k = f't{t}:{key}'; gr[k] = []
+                    for i in range(0, N, 20):
+                        m = min(20, N - i)
+                        gr[k] += await pg.evaluate(f"(() => {{ const o = []; for (let i = 0; i < {m}; i++) o.push(DLAB.ground({1 + i} + i, 3, {json.dumps(dict(o, tier=t))})); return o; }})()")
+            await br.close()
+            json.dump({'ground': gr}, open('/tmp/realm_diamond_lab.json', 'w'))
+            print('override', PRE or '(none)', f' {time.time() - t0:.0f}s', ' page errors', len(errs), errs[:2])
+            print_ground(gr)
+            return
         if ONLY == 'powers':
             for t in (1, 2, 3):
                 for key, _, o in POW_ROWS:

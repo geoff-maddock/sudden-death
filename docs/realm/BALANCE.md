@@ -292,6 +292,40 @@ starts on its magic (the default pick is what every kind had), so the Nine tab i
 rather save the mana can bring the skill. A careful human reads the moments far better than the CPU's dice. The numbers
 are as first set: no retune.
 
+### Graftonbury Ballpark's ways: the mound grass and the floodlight (issue #115, phase 4)
+
+`python3 test/realm_diamond_lab.py 200 '' ground` (part 6; about 3½ minutes). Your nine at level 3 against a rival's at
+level 3, Simulate (both sides on the CPU at the tier's skill). Every row plays the same seeds (game i is seed i). **Off**
+is how every other part plays (LAB mode leaves the ground out). Once the ground is on it draws two numbers at the start
+(which floodlight is faulty, drawn by day too), so the off row parts ways with the rest after the first pitch: compare
+the on rows with each other (**plain** is the ground on with the grass off and the lights off: the paired baseline).
+
+| tier | off | plain (paired) | a day game: the grass | a night game: grass and the patch |
+|---|---|---|---|---|
+| 1 | 52.0%, 2.85 runs | 59.5%, 3.00 | 53.0%, 2.92 | 56.5%, 2.91 |
+| 2 | 54.5%, 4.29 | 52.5%, 4.68 | 59.5%, 4.93 | 57.5%, 5.12 |
+| 3 | 38.5%, 6.55 | 33.0%, 6.80 | 32.5%, 6.67 | 31.0%, 6.25 |
+
+Tier 2, night: the patch inert (counted, doing nothing) 61.0%, 4.92 runs; the patch alone (no grass) 59.0%, 4.95; your
+CPU not reading either 61.0%, 4.89; neither CPU reading 60.5%, 4.97. A row of 200 is good to about ±7 points and about
+±0.3 runs a game.
+
+**The grass.** A half runs about 11 pitches, so the average pitch scatters about a twelfth more, and the last pitches of a long half up to
+half again. Between two CPUs that is inside the noise (−0.1 to +0.25 runs a game against plain, a few more walks): the
+CPU's batters chase by skill rather than by the pitch's spot, as the Rosin Bag and the balm found (phase 1). By hand the
+spot matters, so a long inning should hurt a human's pitcher more than this. The CPU pulls its pitcher for it about 0.05
+times a game (only a tiring pitcher, at least 15 pitches into a half, Knight and up).
+
+**The patch.** About one fly ball a game lands in it (0.9 at tier 2). With it inert 64.5% of those are caught; live,
+57.6%, and 2 to 5 in a hundred of the catches in it are bobbled: about 0.1 more hits a game, so a night game is a touch
+livelier and never decided by it. Aiming at it is a trade, not a free hit (an early or late swing costs contact): with
+a harder aim (an Archmage timing the swing four fifths of the way, tried once) the CPU put 35% more fly balls into the
+patch and scored 0.4 runs a game fewer, so the CPU aims lightly (a Knight a third of the way, an Archmage a little over
+half), which puts no more balls there than not aiming and costs nothing measurable. Getting under the ball to lift it
+toward the patch was tried and dropped: it was a plain batting boost (+0.6 runs a game) that had nothing to do with the
+light. A human who can place a fly ball does better from the patch than the CPU. The numbers are as first set: no
+retune.
+
 ### Situation powers and curses in the ring (issue #115, phase 3)
 
 `python3 test/realm_ring_lab.py 400 --more` (part 8; under 2 minutes). Your three at level 3 against a rival's at the
