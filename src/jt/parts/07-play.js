@@ -96,7 +96,8 @@ function jtSpur() {
 function jtCouch(on) {
   const C = GP && GP.ch; if (!C || !C.mine || GP.ph !== 'charge') return false;
   if (on && C.p < JT_PLAY.spur.until) return false;
-  if (on && !C.down) { C.down = true; C.downAt = C.p; } else if (!on && C.down) { C.down = false; C.downAt = null; }
+  // (a lance let go keeps where its tip was: it reaches as far as it went, phase 4's review)
+  if (on && !C.down) { C.down = true; C.downAt = C.p; } else if (!on && C.down) { C.down = false; C.downAt = null; C.lowered = true; C.relTip = C.tipNow ? Object.assign({}, C.tipNow) : null; }
   return true;
 }
 // the hand on the lance: set where it holds the tip (inches off the mark), or move it at a speed (the arrows)
@@ -146,7 +147,9 @@ function jtYourRide(C) {
   const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), e = jtCouchErr(C);
   const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s] }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
   const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = { girth: X.girth, shaken: X.shaken };
-  if (e == null) return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true }, sq);
+  // (let go after it was lowered: up, but it reaches as far as its tip went, or its aim's height: lowered, reachY)
+  if (e == null) return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true },
+    C.lowered ? { lowered: true, reachY: C.relTip ? C.relTip.y : A.y } : {}, sq);
   const sw = jtYourSway(C), t = jtTipNow(C);
   return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: e, tip: { x: t.x + gauss() * sw.sigma * JT_PLAY.aim.noise, y: t.y + gauss() * sw.sigma * JT_PLAY.aim.noise }, spurQ: q }, sq);
 }
@@ -193,7 +196,7 @@ function jtFinish() {
   GP.P = null; GP.seatM = null; GP.ch = null; GP.keyV = { x: 0, y: 0 };
   if (!ev) { jtGo('next'); return; }
   GP.last = { heat: ev.heat, course: ev.course, tilt: ev.tilt, riders: ev.riders, plans: ev.plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: ev.imp.res,
-    pts: ev.rule.pts, zone: ev.imp.st.map(x => x.zone), broke: ev.imp.st.map(x => x.broke), lean: ev.lean, rides: ev.rides.map(r => ({ speed: r.speed, couch: r.couch, tip: r.tip, spurQ: r.spurQ ?? null, up: !!r.up })),
+    pts: ev.rule.pts, zone: ev.imp.st.map(x => x.zone), broke: ev.imp.st.map(x => x.broke), high: ev.imp.st.map(x => !!x.high), lean: ev.lean, rides: ev.rides.map(r => ({ speed: r.speed, couch: r.couch, tip: r.tip, spurQ: r.spurQ ?? null, up: !!r.up })),
     unhorsed: ev.rule.unhorsed, rule: { heatOver: ev.rule.heatOver, tiltNow: ev.rule.tiltNow, over: ev.rule.over } };
   GP.call = jtHerald(ev);
   const R0 = ev.rule;
@@ -285,7 +288,8 @@ function jtView() {
   if (!GP) return null;
   const C = GP.ch, M = GP.seatM, r = jtRiders();
   return { mode: GP.mode, you: GP.you, ph: GP.ph, mgrAuto: !!GP.mgrAuto, yard: !!G.yard, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
-    sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)) : null,
+    // (their plan is hidden in your plan beat, until both are committed: phase 4's review)
+    sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)).map((p, s) => GP.ph === 'plan' && s !== GP.you ? null : p) : null,
     jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
     seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice() };

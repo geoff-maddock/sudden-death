@@ -46869,7 +46869,8 @@ function jtEdge(zone, x, y, guard) {
    unhorsed. A rider whose tip went high (at the head: JT_SEAT.high inches up or more) and didn't break has reached
    past the head, and sits the other lance worse (JT_SEAT.reach off the hold): a strike at the helm scores big but its
    misses cost, whatever the plan said (a hand that drags a shield plan onto the helm pays it too: phase 2's review);
-   a lance never couched (a ride's up) points high but reaches for nothing. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
+   a lance never couched (a ride's up) points high but reaches for nothing, but one couched and let go (lowered, with
+   reachY, the height its tip had) reaches as far as it went. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
    broken lance can unhorse: a glance rocks, no more. */
 const JT_SWAY = { base: 3.6, lance: .35, wind: .5, late: .9, early: .35, droop: 7 };
 const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .95, angled: .95 }, helm: { square: .7, angled: .8 }, edge: .25, shieldR: .2, force: .3 };
@@ -46915,8 +46916,9 @@ const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .2
    at the head, for the reach) } */
 function jtStrike(a, d, rnd) {
   const g = d.guard === 'angled' ? 'angled' : 'square', zone = jtZoneAt(a.tip.x, a.tip.y, g), force = jtForce(a);
-  // (a lance never couched points high but reaches for nothing: it costs the strike, not the seat; phase 3's review)
-  const high = !a.up && a.tip.y >= JT_SEAT.high;
+  // (a lance never couched points high but reaches for nothing: it costs the strike, not the seat; phase 3's review. A
+  // lance couched and let go keeps the reach of where its tip was, or of its aim: phase 4's review)
+  const high = a.up ? !!a.lowered && (a.reachY ?? (JT_PLAN.aim[jtPick('aim', a.aim, 'shield')].y)) >= JT_SEAT.high : a.tip.y >= JT_SEAT.high;
   if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0, high };
   const base = JT_BREAK[zone][g], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
   const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
@@ -47366,7 +47368,8 @@ function jtSpur() {
 function jtCouch(on) {
   const C = GP && GP.ch; if (!C || !C.mine || GP.ph !== 'charge') return false;
   if (on && C.p < JT_PLAY.spur.until) return false;
-  if (on && !C.down) { C.down = true; C.downAt = C.p; } else if (!on && C.down) { C.down = false; C.downAt = null; }
+  // (a lance let go keeps where its tip was: it reaches as far as it went, phase 4's review)
+  if (on && !C.down) { C.down = true; C.downAt = C.p; } else if (!on && C.down) { C.down = false; C.downAt = null; C.lowered = true; C.relTip = C.tipNow ? Object.assign({}, C.tipNow) : null; }
   return true;
 }
 // the hand on the lance: set where it holds the tip (inches off the mark), or move it at a speed (the arrows)
@@ -47416,7 +47419,9 @@ function jtYourRide(C) {
   const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), e = jtCouchErr(C);
   const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s] }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
   const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = { girth: X.girth, shaken: X.shaken };
-  if (e == null) return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true }, sq);
+  // (let go after it was lowered: up, but it reaches as far as its tip went, or its aim's height: lowered, reachY)
+  if (e == null) return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true },
+    C.lowered ? { lowered: true, reachY: C.relTip ? C.relTip.y : A.y } : {}, sq);
   const sw = jtYourSway(C), t = jtTipNow(C);
   return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: e, tip: { x: t.x + gauss() * sw.sigma * JT_PLAY.aim.noise, y: t.y + gauss() * sw.sigma * JT_PLAY.aim.noise }, spurQ: q }, sq);
 }
@@ -47463,7 +47468,7 @@ function jtFinish() {
   GP.P = null; GP.seatM = null; GP.ch = null; GP.keyV = { x: 0, y: 0 };
   if (!ev) { jtGo('next'); return; }
   GP.last = { heat: ev.heat, course: ev.course, tilt: ev.tilt, riders: ev.riders, plans: ev.plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: ev.imp.res,
-    pts: ev.rule.pts, zone: ev.imp.st.map(x => x.zone), broke: ev.imp.st.map(x => x.broke), lean: ev.lean, rides: ev.rides.map(r => ({ speed: r.speed, couch: r.couch, tip: r.tip, spurQ: r.spurQ ?? null, up: !!r.up })),
+    pts: ev.rule.pts, zone: ev.imp.st.map(x => x.zone), broke: ev.imp.st.map(x => x.broke), high: ev.imp.st.map(x => !!x.high), lean: ev.lean, rides: ev.rides.map(r => ({ speed: r.speed, couch: r.couch, tip: r.tip, spurQ: r.spurQ ?? null, up: !!r.up })),
     unhorsed: ev.rule.unhorsed, rule: { heatOver: ev.rule.heatOver, tiltNow: ev.rule.tiltNow, over: ev.rule.over } };
   GP.call = jtHerald(ev);
   const R0 = ev.rule;
@@ -47555,7 +47560,8 @@ function jtView() {
   if (!GP) return null;
   const C = GP.ch, M = GP.seatM, r = jtRiders();
   return { mode: GP.mode, you: GP.you, ph: GP.ph, mgrAuto: !!GP.mgrAuto, yard: !!G.yard, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
-    sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)) : null,
+    // (their plan is hidden in your plan beat, until both are committed: phase 4's review)
+    sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)).map((p, s) => GP.ph === 'plan' && s !== GP.you ? null : p) : null,
     jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
     seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice() };
@@ -47715,7 +47721,8 @@ function jtRider(c, s, x, y, k, dir, o) {
   c.restore();
 }
 function jtShield(c, x, y, sc, col, guard, back) {
-  c.save(); c.translate(x, y); const w = guard === 'angled' ? .45 : 1; c.scale(w * sc, sc);
+  // (a shield not yet set, 'held', hangs between the two)
+  c.save(); c.translate(x, y); const w = guard === 'angled' ? .45 : guard === 'square' ? 1 : .72; c.scale(w * sc, sc);
   c.beginPath(); c.moveTo(-15, -22); c.lineTo(15, -22); c.quadraticCurveTo(16, 6, 0, 28); c.quadraticCurveTo(-16, 6, -15, -22); c.closePath();
   c.fillStyle = back ? tint(col, -.3) : col; c.fill(); c.lineWidth = 2.6 / sc; c.strokeStyle = '#17100e'; c.stroke();
   if (!back) { c.fillStyle = '#f2e6c4'; c.fillRect(-3, -18, 6, 36); c.fillRect(-12, -6, 24, 6); }
@@ -47735,14 +47742,15 @@ function jtLance(c, x, y, dir, ang, L, col, part) {
 function jtRidersDraw(c) {
   const r = jtRiders() || (GP && GP.last ? GP.last.riders : [0, 0]), R0 = jtRidersNow(), z = JTC.zoom, C = GP && GP.ch, L = GP && GP.last;
   const after = GP && (GP.ph === 'after' || GP.ph === 'over') && L, broken = after ? L.broke : GP && GP.P ? GP.P.st.map(x => x.broke) : [false, false];
-  const ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
+  // (in your plan beat their plan is hidden until both are committed: their shield hangs neutral; phase 4's review)
+  const hide = GP && GP.ph === 'plan', ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => hide && s !== GP.you ? null : p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
   for (const s of [1, 0]) {
     // (the tilting yard, phase 5: a straw target on a post stands at the meeting point on the far side)
     if (G.yard && s === 1) { jtStrawDraw(c, jtScrX(JT_VIEW.meet), jtScrY(JT_VIEW.far), Math.max(z, 26) * .94); jtTiltDraw(c); continue; }
     // (in the wide shot the riders are drawn a little larger than the yard's scale, so they read)
     const x = jtScrX(R0.x[s]), y = jtScrY(s ? JT_VIEW.far : JT_VIEW.near), dir = s ? -1 : 1, k = Math.max(z, 26) * (s ? .94 : 1);
     if (x < -4 * k || x > JT_VIEW.w + 4 * k) { if (s === 1) jtTiltDraw(c); continue; }
-    const plan = plans[s] || { guard: 'square', pace: 'canter' }, mount = G.mounts ? jtMountOf(s) : JT_MOUNT_DEF;
+    const plan = plans[s] || { guard: 'held', pace: 'canter' }, mount = G.mounts ? jtMountOf(s) : JT_MOUNT_DEF;
     const phase = JTC.t * (plan.pace === 'gallop' ? 15 : 11) + s * 1.7;
     const bob = jtHorse(c, x, y, k, dir, mount, G.teams[s].color || '#888', phase, R0.moving);
     // the couch: the CPU's from its ride (its moment from its couch error), yours as you hold it
@@ -47799,14 +47807,17 @@ function jtCallDraw(c) {
   lines.forEach((l, i) => txt(c, l, JT_VIEW.w / 2, y + 26 + i * 20, '700 16px "Alegreya Sans", sans-serif', '#fff4d8', 'center'));
   c.restore();
 }
-// the target as your lance sees it: their shield by their guard, the body, the helm, your mark and your tip
+// the target as your lance sees it: their shield by their guard, the body, the helm, your mark and your tip. guard null:
+// not known yet (your plan beat: their plan is hidden until both are committed), the shield and helm drawn faint between
+// the two guards and the guard not named (phase 4's review)
 function jtTargetDraw(c, plan, guard, tip) {
-  const Z = JT_ZONE, g = guard === 'angled' ? 'angled' : 'square', k = JT_TGT.k, P = (x, y) => jtAimScr(x, y);
+  const Z = JT_ZONE, known = guard === 'angled' || guard === 'square' || G.yard, g = guard === 'angled' ? 'angled' : 'square', k = JT_TGT.k, P = (x, y) => jtAimScr(x, y);
   c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, JT_TGT.x - JT_TGT.w / 2, JT_TGT.y - 124, JT_TGT.w, JT_TGT.h, 10); c.fill();
-  txt(c, G.yard ? 'The straw target' : `Their guard: ${g}`, JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
+  txt(c, G.yard ? 'The straw target' : known ? `Their guard: ${g}` : 'Their shield: you see it as they set off', JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
   const box = (b, col) => { const [a1, a2] = P(b.x0, b.y1), [b1, b2] = P(b.x1, b.y0); c.fillStyle = col; c.fillRect(a1, a2, b1 - a1, b2 - a2); };
-  box(Z.torso, '#8a7a66'); box(Z.shield[g], '#3a5a9a');
-  const [hx, hy] = P(Z.helm.x, Z.helm.y); c.fillStyle = '#9aa0aa'; c.beginPath(); c.arc(hx, hy, Z.helm[g] * k, 0, 6.28); c.fill();
+  box(Z.torso, '#8a7a66');
+  if (known) box(Z.shield[g], '#3a5a9a'); else { box(Z.shield.square, 'rgba(58,90,154,.45)'); box(Z.shield.angled, 'rgba(58,90,154,.45)'); }
+  const [hx, hy] = P(Z.helm.x, Z.helm.y); c.fillStyle = known ? '#9aa0aa' : 'rgba(154,160,170,.7)'; c.beginPath(); c.arc(hx, hy, (known ? Z.helm[g] : (Z.helm.square + Z.helm.angled) / 2) * k, 0, 6.28); c.fill();
   const [lx, ly] = P(-12, Z.torso.y0); c.fillStyle = 'rgba(184,58,42,.35)'; c.fillRect(lx, ly, 24 * k, (Z.torso.y0 - Z.low) * k);
   txt(c, 'below the belt', JT_TGT.x, ly + 14, '600 10px "Alegreya Sans", sans-serif', '#f2c0b0', 'center');
   if (plan) { const A = JT_PLAN.aim[plan.aim], [ax, ay] = P(A.x, A.y); c.strokeStyle = '#ffe08a'; c.lineWidth = 2; c.beginPath(); c.arc(ax, ay, 9, 0, 6.28); c.stroke(); c.beginPath(); c.moveTo(ax - 13, ay); c.lineTo(ax + 13, ay); c.moveTo(ax, ay - 13); c.lineTo(ax, ay + 13); c.stroke(); }
@@ -47817,7 +47828,7 @@ function jtBeatsDraw(c) {
   const V = jtView(); if (!V) return;
   const C = V.charge;
   if (V.ph === 'plan' && V.sel) {
-    jtTargetDraw(c, V.sel, V.plans && V.plans[1 - V.you] ? V.plans[1 - V.you].guard : 'square', null);
+    jtTargetDraw(c, V.sel, null, null);
     return;
   }
   if (C && C.mine && V.ph === 'charge') {
@@ -48133,12 +48144,19 @@ function jtCounts(o) {
 function jtCard(s) {
   if (!G || !G.teams) return null;
   const o = 1 - s, ri = (jtRiders() || [])[o], m = ri != null ? G.teams[o].roster[ri] : null, slot = ri != null ? G.riders[o].indexOf(ri) : -1;
-  const sk = clamp(G.skill[o] | 0, 0, 2), mix = sk <= 0 ? null : jtMixOf(o), usual = mix ? jtMarg(mix) : JT_SQUIRE_HABIT;
+  const sk = clamp(G.skill[o] | 0, 0, 2), usual = jtUsual(o);
   const P = (G.plans[o] || []).slice(-4).map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace, at: p.at, heat: p.heat, course: p.course, tilt: !!p.tilt, n: ri != null && p.ri === ri ? 'this rider' : (G.teams[o].roster[p.ri] || {}).n || '' }));
   const r2 = v => Math.round(v * 100) / 100;
   return { side: o, name: m ? m.n : '', kind: m ? m.kind || '' : '', mount: slot >= 0 ? JT_MOUNT[G.mounts[o][slot]].n : '', skill: JT_SKILL[sk].n, counts: jtCounts(o), last: P,
     usual: { angled: r2(usual.angled), gallop: r2(usual.gallop), aim: Object.fromEntries(JT_AIMS.map(a => [a, r2(usual.aim[a])])) }, read: jtHabitOf(s), text: jtCardText(s) };
 }
+// how side o's rider usually rides: the mix their rider would ride by the odds (a Squire's anything)
+function jtUsual(o) { const sk = clamp(G.skill[o] | 0, 0, 2), mix = sk <= 0 ? null : jtMixOf(o); return mix ? jtMarg(mix) : JT_SQUIRE_HABIT; }
+// a real lean, as the card reads one: a guard at .6 or more of the time ('angled' or 'square'; null for either), and an
+// aim at least JT_LEAN.aim ahead of the next (null when none is)
+const JT_LEAN = { guard: .6, aim: .15 };
+const jtGuardLean = a => a >= JT_LEAN.guard ? 'angled' : a <= 1 - JT_LEAN.guard ? 'square' : null;
+function jtAimLean(aim) { const A = JT_AIMS.slice().sort((x, y) => aim[y] - aim[x]); return aim[A[0]] - aim[A[1]] >= JT_LEAN.aim ? A[0] : null; }
 // the card in the herald's words: one line on their guard, one on their aim, one on their pace
 function jtCardText(s) {
   const o = 1 - s, C = jtCounts(o), n = C.n;
@@ -48151,13 +48169,14 @@ const jtTimes = (k, n) => k === n ? (n === 1 ? 'once' : n === 2 ? 'both times' :
    and what it makes each of your three choices */
 function jtWordWhy(s, P, h, Q, need, safe) {
   const o = 1 - s, C = jtCounts(o), n = C.n, read = n > 0;
-  const ang = read ? C.angled / n : h.angled, aimMost = JT_AIMS.slice().sort((a, b) => (read ? C[b] - C[a] : h.aim[b] - h.aim[a]))[0];
+  // (before anything is ridden, only a real lean in their usual, as the card says it: phase 4's review)
+  const U = read ? null : jtUsual(o), g = read ? (C.angled * 2 >= n ? 'angled' : 'square') : jtGuardLean(U.angled), aimL = read ? null : jtAimLean(U.aim);
   const say = [];
-  if (!read) say.push(`nothing to read yet: their rider usually ${h.angled >= .5 ? 'angles' : 'squares'} the shield and aims at the ${aimMost}`);
-  // the aim, by their guard
-  if (P.aim === 'body') say.push(ang >= .5 ? `${read ? `they've had the shield angled ${jtTimes(C.angled, n)}, so ` : ''}aim for the body, open beside an angled shield` : 'aim for the body, the surest break');
-  else if (P.aim === 'shield') say.push(ang < .5 ? `${read ? `their shield has been square ${jtTimes(C.square, n)}, so ` : ''}aim for the shield: square, it breaks clean` : 'aim for the shield, the biggest mark');
-  else say.push(need ? 'you need the points, and the helm is worth two' : ang >= .5 ? `${read ? `they've angled the shield ${jtTimes(C.angled, n)}, ` : ''}which leaves the helm open: go for it` : 'go for the helm');
+  if (!read) say.push(!g && !aimL ? 'nothing to read yet, and their rider has no habit to read' : `nothing to read yet: their rider ${[g ? `usually ${g === 'angled' ? 'angles' : 'squares'} the shield` : '', aimL ? `mostly aims at the ${aimL}` : ''].filter(Boolean).join(' and ')}`);
+  // the aim, by their guard (none known: the plain reason)
+  if (P.aim === 'body') say.push(g === 'angled' ? `${read ? `they've had the shield angled ${jtTimes(C.angled, n)}, so ` : ''}aim for the body, open beside an angled shield` : 'aim for the body, the surest break');
+  else if (P.aim === 'shield') say.push(g === 'square' ? `${read ? `their shield has been square ${jtTimes(C.square, n)}, so ` : ''}aim for the shield: square, it breaks clean` : 'aim for the shield, the biggest mark');
+  else say.push(need ? 'you need the points, and the helm is worth two' : g === 'angled' ? `${read ? `they've angled the shield ${jtTimes(C.angled, n)}, ` : ''}which leaves the helm open: go for it` : 'go for the helm');
   // the guard, by their aim
   const shieldAims = read ? C.shield / n : h.aim.shield;
   if (P.guard === 'angled') say.push(shieldAims >= .5 && read ? `they've aimed at your shield ${jtTimes(C.shield, n)}: angle it to turn their lance` : 'angle your shield to turn their lance');
@@ -48165,7 +48184,7 @@ function jtWordWhy(s, P, h, Q, need, safe) {
   // the pace
   if (Q.tilt) say.push(`at ${JT_PLAN.pace[P.pace].n}, for the crown`);
   else if (P.pace === 'gallop') say.push(Q.after ? 'gallop to hit harder' : 'gallop: no more courses this heat to save the wind for');
-  else say.push(safe ? 'canter: you\'re ahead, keep it steady' : 'canter for a steadier tip, and save the wind');
+  else say.push(safe ? 'canter: you\'re ahead, keep it steady' : Q.after ? 'canter for a steadier tip, and save the wind' : 'canter for a steadier tip');
   const t = say.join('; ');
   return t[0].toUpperCase() + t.slice(1);
 }

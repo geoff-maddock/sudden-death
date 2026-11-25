@@ -7,6 +7,9 @@
 # rides one plan is punished more by an Archmage than by a Knight. On Play an Archmage reads your own plans. The card
 # shows under the lists before each of your courses, at desktop and phone width (no sideways scroll), and not in the
 # charge or in Watch. How to play explains the plan's three choices, the card and reading the other rider.
+# Phase 4's review: a lance couched high and let go at the last instant keeps its reach (one never lowered doesn't); on
+# a heat's last course the squire never says to save the wind; before anything is ridden it claims a habit only on a
+# real lean (as the card does); their plan is hidden in your plan beat (the view, the drawing) and the charge shows it.
 # Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -127,6 +130,39 @@ async def main():
           const R = document.getElementById('wListsRowCard'), r = R.getBoundingClientRect(), d = document.documentElement;
           return { shown: !R.hidden, w: Math.round(r.right), side: d.scrollWidth - d.clientWidth, items: R.querySelectorAll('.wjtlast li').length }; })()""")
         check(pw['shown'] and pw['w'] <= 390 and pw['side'] <= 0 and pw['items'] >= 1, 'at phone width the card shows and fits, and the page doesn\'t scroll sideways', pw)
+
+        # ---------- phase 4's review ----------
+        # 1. a lance lowered and let go at the last instant keeps the reach of where its tip was; one never lowered doesn't
+        rl = await pg.evaluate("""(() => { const one = (seed, how) => { wJT.start({ seed, mode: 'play', skill: [1, 1] }); wJT.pause(true); __to('plan');
+            wJT.select({ aim: 'helm', guard: 'square', pace: 'canter' }); wJT.press(); let m = 0;
+            if (how !== 'never') { while (wJT.phase === 'charge' && wJT.view.charge.p < wJT.playRules.couch.ideal && m++ < 1000) wJT.tick(.01); wJT.couch(true);
+              m = 0; while (wJT.phase === 'charge' && wJT.view.charge.p < .985 && m++ < 1000) { wJT.aim(9, 6); wJT.tick(.01); } if (how === 'release') wJT.couch(false); }
+            m = 0; while (wJT.phase === 'charge' && m++ < 2000) wJT.tick(.01); m = 0; while (wJT.phase === 'seat' && m++ < 1000) wJT.tick(.02);
+            const L = wJT.last; return { high: L && L.high ? L.high[0] : null, up: L && L.rides[0].up }; };
+          const rel = [], never = [], held = []; for (let i = 0; i < 6; i++) { rel.push(one(300 + i, 'release')); never.push(one(300 + i, 'never')); held.push(one(300 + i, 'hold')); }
+          return { rel, never, held }; })()""")
+        check(all(r['high'] is True and r['up'] for r in rl['rel']) and all(r['high'] is True for r in rl['held']), 'a lance couched high and let go at the last instant still reaches past the head (the reach cost stays)', rl['rel'])
+        check(all(r['high'] is False and r['up'] for r in rl['never']), 'a lance never lowered reaches for nothing', rl['never'])
+        # 2. on a heat's last course there is no wind to save
+        lw = await pg.evaluate("""(() => { const bad = [], seen = { last: 0, canter: 0 }; for (let sd = 0; sd < 24; sd++) { wJT.start({ seed: 700 + sd, mode: 'play', skill: [1, sd % 3] }); wJT.pause(true);
+            let k = 0; while (!wJT.G.over && k++ < 20) { if (!__to('plan')) break; const G = wJT.G, last = !wJT.inTilt() && G.course === G.courses - 1, S = wJT.view.sel;
+              if (last) { seen.last++; if (S.pace === 'canter') { seen.canter++; if (/save the wind/.test(S.why)) bad.push(S.why); } }
+              wJT.press(); let m = 0; while (['charge', 'seat'].includes(wJT.phase) && m++ < 4000) { const C = wJT.view.charge; if (C && C.p >= wJT.playRules.couch.ideal && !C.down) wJT.couch(true); wJT.tick(.02); } } }
+          return { seen, bad: bad.slice(0, 3), n: bad.length }; })()""")
+        check(lw['seen']['canter'] >= 3 and lw['n'] == 0, 'on a heat\'s last course your squire never says to save the wind (fresh mounts next heat)', lw)
+        # 3. before anything is ridden, the squire claims a habit only when it is a real lean, as the card does
+        hb = await pg.evaluate("""(() => { const out = []; for (const sk of [0, 1, 2]) for (const sd of [5, 6, 7]) { wJT.start({ seed: sd, mode: 'play', skill: [1, sk] }); wJT.pause(true); __to('plan');
+            const K = wJT.card(0), U = K.usual, w = wJT.view.sel.why, lean = U.angled >= .6 ? 'angles' : U.angled <= .4 ? 'squares' : null;
+            out.push({ sk, angled: U.angled, lean, why: w, claims: /usually (angles|squares)/.test(w) ? w.match(/usually (angles|squares)/)[1] : null, leans: /open beside an angled shield|leaves the helm open|square, it breaks clean/.test(w), none: /no habit/.test(w) }); }
+          return out; })()""")
+        check(all(r['claims'] == r['lean'] for r in hb), 'before anything is ridden the squire claims a guard habit only when their usual leans that way (as the card says)', [r for r in hb if r['claims'] != r['lean']][:3])
+        check(all(not r['leans'] for r in hb if r['lean'] is None) and all(r['none'] for r in hb if r['lean'] is None) and any(r['lean'] is None for r in hb), 'with no lean to read, the squire says so and its aim doesn\'t lean on one', [r for r in hb if r['lean'] is None][:3])
+        # 4. their plan is hidden until both are committed: not in the view, not drawn, not printed
+        hd = await pg.evaluate("""(() => { wJT.start({ seed: 11, mode: 'play', skill: [1, 2] }); wJT.pause(true); __to('plan'); const V = wJT.view, said = [], ft = CanvasRenderingContext2D.prototype.fillText;
+            CanvasRenderingContext2D.prototype.fillText = function (t) { said.push(String(t)); return ft.apply(this, arguments); }; try { wJT.render(0); } finally { CanvasRenderingContext2D.prototype.fillText = ft; }
+            const plan = { theirs: V.plans ? V.plans[1] : null, printed: said.filter(t => /Their guard/.test(t)) };
+            wJT.press(); wJT.tick(.05); const C = wJT.view; return { plan, charge: C.plans && C.plans[1] ? C.plans[1].guard : null }; })()""")
+        check(hd['plan']['theirs'] is None and not hd['plan']['printed'] and hd['charge'] in ('angled', 'square'), 'their plan is hidden in your plan beat (not in the view, their guard not printed), and the charge reveals it', hd)
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()

@@ -153,7 +153,8 @@ function jtRider(c, s, x, y, k, dir, o) {
   c.restore();
 }
 function jtShield(c, x, y, sc, col, guard, back) {
-  c.save(); c.translate(x, y); const w = guard === 'angled' ? .45 : 1; c.scale(w * sc, sc);
+  // (a shield not yet set, 'held', hangs between the two)
+  c.save(); c.translate(x, y); const w = guard === 'angled' ? .45 : guard === 'square' ? 1 : .72; c.scale(w * sc, sc);
   c.beginPath(); c.moveTo(-15, -22); c.lineTo(15, -22); c.quadraticCurveTo(16, 6, 0, 28); c.quadraticCurveTo(-16, 6, -15, -22); c.closePath();
   c.fillStyle = back ? tint(col, -.3) : col; c.fill(); c.lineWidth = 2.6 / sc; c.strokeStyle = '#17100e'; c.stroke();
   if (!back) { c.fillStyle = '#f2e6c4'; c.fillRect(-3, -18, 6, 36); c.fillRect(-12, -6, 24, 6); }
@@ -173,14 +174,15 @@ function jtLance(c, x, y, dir, ang, L, col, part) {
 function jtRidersDraw(c) {
   const r = jtRiders() || (GP && GP.last ? GP.last.riders : [0, 0]), R0 = jtRidersNow(), z = JTC.zoom, C = GP && GP.ch, L = GP && GP.last;
   const after = GP && (GP.ph === 'after' || GP.ph === 'over') && L, broken = after ? L.broke : GP && GP.P ? GP.P.st.map(x => x.broke) : [false, false];
-  const ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
+  // (in your plan beat their plan is hidden until both are committed: their shield hangs neutral; phase 4's review)
+  const hide = GP && GP.ph === 'plan', ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => hide && s !== GP.you ? null : p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
   for (const s of [1, 0]) {
     // (the tilting yard, phase 5: a straw target on a post stands at the meeting point on the far side)
     if (G.yard && s === 1) { jtStrawDraw(c, jtScrX(JT_VIEW.meet), jtScrY(JT_VIEW.far), Math.max(z, 26) * .94); jtTiltDraw(c); continue; }
     // (in the wide shot the riders are drawn a little larger than the yard's scale, so they read)
     const x = jtScrX(R0.x[s]), y = jtScrY(s ? JT_VIEW.far : JT_VIEW.near), dir = s ? -1 : 1, k = Math.max(z, 26) * (s ? .94 : 1);
     if (x < -4 * k || x > JT_VIEW.w + 4 * k) { if (s === 1) jtTiltDraw(c); continue; }
-    const plan = plans[s] || { guard: 'square', pace: 'canter' }, mount = G.mounts ? jtMountOf(s) : JT_MOUNT_DEF;
+    const plan = plans[s] || { guard: 'held', pace: 'canter' }, mount = G.mounts ? jtMountOf(s) : JT_MOUNT_DEF;
     const phase = JTC.t * (plan.pace === 'gallop' ? 15 : 11) + s * 1.7;
     const bob = jtHorse(c, x, y, k, dir, mount, G.teams[s].color || '#888', phase, R0.moving);
     // the couch: the CPU's from its ride (its moment from its couch error), yours as you hold it
@@ -237,14 +239,17 @@ function jtCallDraw(c) {
   lines.forEach((l, i) => txt(c, l, JT_VIEW.w / 2, y + 26 + i * 20, '700 16px "Alegreya Sans", sans-serif', '#fff4d8', 'center'));
   c.restore();
 }
-// the target as your lance sees it: their shield by their guard, the body, the helm, your mark and your tip
+// the target as your lance sees it: their shield by their guard, the body, the helm, your mark and your tip. guard null:
+// not known yet (your plan beat: their plan is hidden until both are committed), the shield and helm drawn faint between
+// the two guards and the guard not named (phase 4's review)
 function jtTargetDraw(c, plan, guard, tip) {
-  const Z = JT_ZONE, g = guard === 'angled' ? 'angled' : 'square', k = JT_TGT.k, P = (x, y) => jtAimScr(x, y);
+  const Z = JT_ZONE, known = guard === 'angled' || guard === 'square' || G.yard, g = guard === 'angled' ? 'angled' : 'square', k = JT_TGT.k, P = (x, y) => jtAimScr(x, y);
   c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, JT_TGT.x - JT_TGT.w / 2, JT_TGT.y - 124, JT_TGT.w, JT_TGT.h, 10); c.fill();
-  txt(c, G.yard ? 'The straw target' : `Their guard: ${g}`, JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
+  txt(c, G.yard ? 'The straw target' : known ? `Their guard: ${g}` : 'Their shield: you see it as they set off', JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
   const box = (b, col) => { const [a1, a2] = P(b.x0, b.y1), [b1, b2] = P(b.x1, b.y0); c.fillStyle = col; c.fillRect(a1, a2, b1 - a1, b2 - a2); };
-  box(Z.torso, '#8a7a66'); box(Z.shield[g], '#3a5a9a');
-  const [hx, hy] = P(Z.helm.x, Z.helm.y); c.fillStyle = '#9aa0aa'; c.beginPath(); c.arc(hx, hy, Z.helm[g] * k, 0, 6.28); c.fill();
+  box(Z.torso, '#8a7a66');
+  if (known) box(Z.shield[g], '#3a5a9a'); else { box(Z.shield.square, 'rgba(58,90,154,.45)'); box(Z.shield.angled, 'rgba(58,90,154,.45)'); }
+  const [hx, hy] = P(Z.helm.x, Z.helm.y); c.fillStyle = known ? '#9aa0aa' : 'rgba(154,160,170,.7)'; c.beginPath(); c.arc(hx, hy, (known ? Z.helm[g] : (Z.helm.square + Z.helm.angled) / 2) * k, 0, 6.28); c.fill();
   const [lx, ly] = P(-12, Z.torso.y0); c.fillStyle = 'rgba(184,58,42,.35)'; c.fillRect(lx, ly, 24 * k, (Z.torso.y0 - Z.low) * k);
   txt(c, 'below the belt', JT_TGT.x, ly + 14, '600 10px "Alegreya Sans", sans-serif', '#f2c0b0', 'center');
   if (plan) { const A = JT_PLAN.aim[plan.aim], [ax, ay] = P(A.x, A.y); c.strokeStyle = '#ffe08a'; c.lineWidth = 2; c.beginPath(); c.arc(ax, ay, 9, 0, 6.28); c.stroke(); c.beginPath(); c.moveTo(ax - 13, ay); c.lineTo(ax + 13, ay); c.moveTo(ax, ay - 13); c.lineTo(ax, ay + 13); c.stroke(); }
@@ -255,7 +260,7 @@ function jtBeatsDraw(c) {
   const V = jtView(); if (!V) return;
   const C = V.charge;
   if (V.ph === 'plan' && V.sel) {
-    jtTargetDraw(c, V.sel, V.plans && V.plans[1 - V.you] ? V.plans[1 - V.you].guard : 'square', null);
+    jtTargetDraw(c, V.sel, null, null);
     return;
   }
   if (C && C.mine && V.ph === 'charge') {

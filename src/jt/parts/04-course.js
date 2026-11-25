@@ -21,7 +21,8 @@
    unhorsed. A rider whose tip went high (at the head: JT_SEAT.high inches up or more) and didn't break has reached
    past the head, and sits the other lance worse (JT_SEAT.reach off the hold): a strike at the helm scores big but its
    misses cost, whatever the plan said (a hand that drags a shield plan onto the helm pays it too: phase 2's review);
-   a lance never couched (a ride's up) points high but reaches for nothing. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
+   a lance never couched (a ride's up) points high but reaches for nothing, but one couched and let go (lowered, with
+   reachY, the height its tip had) reaches as far as it went. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
    broken lance can unhorse: a glance rocks, no more. */
 const JT_SWAY = { base: 3.6, lance: .35, wind: .5, late: .9, early: .35, droop: 7 };
 const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .95, angled: .95 }, helm: { square: .7, angled: .8 }, edge: .25, shieldR: .2, force: .3 };
@@ -67,8 +68,9 @@ const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .2
    at the head, for the reach) } */
 function jtStrike(a, d, rnd) {
   const g = d.guard === 'angled' ? 'angled' : 'square', zone = jtZoneAt(a.tip.x, a.tip.y, g), force = jtForce(a);
-  // (a lance never couched points high but reaches for nothing: it costs the strike, not the seat; phase 3's review)
-  const high = !a.up && a.tip.y >= JT_SEAT.high;
+  // (a lance never couched points high but reaches for nothing: it costs the strike, not the seat; phase 3's review. A
+  // lance couched and let go keeps the reach of where its tip was, or of its aim: phase 4's review)
+  const high = a.up ? !!a.lowered && (a.reachY ?? (JT_PLAN.aim[jtPick('aim', a.aim, 'shield')].y)) >= JT_SEAT.high : a.tip.y >= JT_SEAT.high;
   if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0, high };
   const base = JT_BREAK[zone][g], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
   const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
