@@ -6,8 +6,8 @@
    yours) and for the ice cracking, a quick slap for a poke or a pass picked off, a chime for a power or a potion and a
    bigger one for an ultimate (either side's), the whistle for a penalty, icing, a covered puck and a timeout, the
    bank's roar, the horn at each break, and the horn and the bank when you win. In a game you only watch, the first
-   side (the home one) is yours for the bank. Only while the rink is on screen. The realm's music plays on, as it does
-   at any ground.
+   side (the home one) is yours for the bank. Only while the rink is on screen. The ground's own tune plays on this view (w160), as on the
+   ground's map.
    Tips. TIPS.w_rink once your team can play hockey (W_HKG.minOwn players), TIPS.w_kettle once you have won a hockey
    game, from a watcher like w85's.
    Achievements, on SD's ACH: hockey games won (realmRinkWins), Pond Kettles (realmKettles), a hat trick by one of
@@ -86,5 +86,5 @@ const wW96RenderHelp = renderHelp;
 renderHelp = function () {
   wW96RenderHelp();
   const d = $('wHelpRinkKettle'); if (!d || $('wHelpRinkFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkFeel"><b>On the ice</b> you hear the horn and the bank for your goals, the pads for a save, the boards for a hit, the whistle for a penalty, icing and a covered puck, the bank's roar and the horn at each break; sounds follow your Sound effects setting, and the realm's music plays on. Hockey games won, Pond Kettles, a hat trick by one of your players and a win without conceding have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkFeel"><b>On the ice</b> you hear the horn and the bank for your goals, the pads for a save, the boards for a hit, the whistle for a penalty, icing and a covered puck, the bank's roar and the horn at each break; sounds follow your Sound effects setting, and the ground's own tune plays. Hockey games won, Pond Kettles, a hat trick by one of your players and a win without conceding have medals in the record book.</p>`);
 };

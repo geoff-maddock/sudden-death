@@ -4,7 +4,7 @@
    beats (wBX.onPhase): the bell at the start and the end of every round, a slap for a jab and a crunch for a big punch
    or a counter, a dull knock for a block and a swish for a slip, a groan and the crowd for a knockdown, the crowd for a
    fighter hurt, a shimmer for a power (a bright one for an ultimate), the count's ticks, and at the end the horn and the
-   crowd if your corner won, a groan if it lost. The realm's music plays on, as it does at any ground.
+   crowd if your corner won, a groan if it lost. The ground's own tune plays on this view (w160), as it does on the ground's map.
    Tips. TIPS.w_ring once your team can box (W_BXG.minOwn players), TIPS.w_bcup once you've won a card.
    Achievements. Cards won (realmRingWins), wins inside the distance by your fighters (realmRingKos) and Anvil Belts
    (realmBcups), on SD's ACH.
@@ -87,5 +87,5 @@ const wW55RenderHelp = renderHelp;
 renderHelp = function () {
   wW55RenderHelp();
   const d = $('wHelpBcup'); if (!d || $('wHelpRingFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRingFeel"><b>In the ring</b> you hear the bell at the start and end of every round, the punches, the blocks and the slips, the crowd for a knockdown, and a shimmer for a power. Sounds follow your Sound effects setting, and the realm's music plays on. Cards won, knockouts and Anvil Belts have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRingFeel"><b>In the ring</b> you hear the bell at the start and end of every round, the punches, the blocks and the slips, the crowd for a knockdown, and a shimmer for a power. Sounds follow your Sound effects setting, and the ground's own tune plays. Cards won, knockouts and Anvil Belts have medals in the record book.</p>`);
 };

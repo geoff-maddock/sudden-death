@@ -37732,7 +37732,7 @@ function glCpuConcede(by, s, d) {
    A turn is in parts so a shot can be struck by hand (07-play.js): glNext (who plays, and may their putt be given),
    glGive, glPlan, then glHit (the CPU's swing) or glStrike (yours), and glShoot counts it.
    glSimGame plays a whole game at once through glTurn, so the sim and the game on show can't drift apart. */
-const GL_HOOK = { onOver: null, onShot: null, onPhase: null, onPick: null };
+const GL_HOOK = { onOver: null, onShot: null, onPhase: null, onPick: null, onCommit: null };
 // the swing's spread, before the hitter's rating (k: 1.4 less it; 1.5 less it on the green) and the skill's: power (p) and
 // accuracy (e) on a full shot, the same for a chip (sp, se), and a putt's angle (pa, radians) and pace (pv)
 const GL_SWING = { p: 0.07, e: 0.8, sp: 0.17, se: 0.6, pa: 0.02, pv: 0.12 };
@@ -37968,6 +37968,9 @@ function glGo(ph, wait, msg) {
   GD.ph = ph; GD.t = 0; GD.wait = wait || 0;
   if (GL_HOOK.onPhase) try { GL_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
+// a choice a reload must not take back (the power of a full swing pressed, the caddie's word called, a power cast): onCommit
+// hears it, so the page can keep the game as it stands (issue #120)
+function glCommit() { if (GL_HOOK.onCommit) try { GL_HOOK.onCommit(); } catch (e) { console.error(e); } }
 const glName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const glYours = s => GD && GD.mode === 'play' && s === GD.you;
 
@@ -37985,7 +37988,8 @@ function glTick(dt) {
 function glPlayNext() {
   const n = glNext();
   glDispSync();
-  if (!n) { glGo('over'); return; }
+  // (a game kept after the shot that decided it, and resumed, says its end here: once, by G.overSaid)
+  if (!n) { glGo('over'); glSayOver(); return; }
   const s = n.side, o = 1 - s;
   if (glYours(s)) {
     if (glCpuGives(n)) { glGiven(o); return; }
@@ -38011,7 +38015,8 @@ function glGiven(by) {
   if (!ev) { glGo('next'); return; }
   GD.last = ev;
   const end = ev.res != null;
-  glGo('given', end ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
+  GD.said = `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev);
+  glGo('given', end ? GL_PACE.hole : GL_PACE.given, GD.said);
   if (end) glDispMatch();
   if (end) glSayOver();
 }
@@ -38153,9 +38158,11 @@ function glSelect(o) {
   }
   if (o.tempo && GL_STANCE[o.tempo] && (o.tempo === 'quick' || o.tempo === 'steady')) G.stance[GD.you].tempo = o.tempo;
   if (o.mood && (o.mood === 'bold' || o.mood === 'careful')) G.stance[GD.you].mood = o.mood;
-  if (o.word && G.word[GD.you] > 0 && !G.wordOn[GD.you]) { G.word[GD.you]--; G.wordOn[GD.you] = true; }
+  const word = !!o.word && G.word[GD.you] > 0 && !G.wordOn[GD.you];
+  if (word) { G.word[GD.you]--; G.wordOn[GD.you] = true; }
   glSelFix();
   GD.msg = glAimMsg();
+  if (word) glCommit();
   return true;
 }
 function glAimAt(x, y) { if (!GD || GD.ph !== 'aim') return false; GD.sel.aim = { x, y }; glSelFix(); return true; }
@@ -38222,7 +38229,7 @@ function glPress() {
   if (M.st === 'up') {
     M.pow = M.p;
     if (M.k === 'putt') { glStrikeMine({ pow: clamp(M.pow * (1 + glWobble(M)), 0, 1.05) }); return true; }
-    M.st = 'down'; return true;
+    M.st = 'down'; glCommit(); return true;
   }
   if (M.st === 'down') { M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); return true; }
   return false;
@@ -38235,7 +38242,7 @@ function glMeterTick(dt) {
     if (M.p >= 1) { M.p = 1; M.dir = -1; } else if (M.p <= 0) { M.p = 0; M.dir = 1; }
     return;
   }
-  if (M.st === 'up') { M.p += step / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
+  if (M.st === 'up') { M.p += step / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } glCommit(); } }
   else if (M.st === 'down') { M.p -= step / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); } }
 }
 // the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook). The
@@ -38294,18 +38301,34 @@ function glManage(o) {
   if (o.ri !== undefined) M.ri = o.ri == null ? null : (Number.isInteger(o.ri) && o.ri >= 0 && o.ri < GL_RULES.side ? o.ri : null);
   if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
   if (o.mood === 'bold' || o.mood === 'careful') G.stance[s].mood = o.mood;
-  if (o.word && G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; }
+  if (o.word && G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; glCommit(); }
   return true;
 }
-// the game between shots, to keep (plain JSON): the game, the mode and your call
-function glSnapshot() { return G && GD ? JSON.parse(JSON.stringify({ G, mode: GD.mode, mgr: GD.mgr, line: GD.line })) : null; }
-// back to a kept game: the next shot
+// the game between shots, to keep (plain JSON): the game, the mode, your call and the last shot's line (said); a full
+// swing of yours with its power pressed (swing: your shot and the meter as they stand), and a shot addressed (addr: the
+// shot called, its potion and powers already in the game, so a resume hits it rather than calling them again) (#120)
+function glSnapshot() {
+  if (!G || !GD) return null;
+  const M = GD.ph === 'swing' && GD.meter && GD.meter.k === 'full' && GD.meter.st === 'down' ? GD.meter : null;
+  return JSON.parse(JSON.stringify({ G, mode: GD.mode, mgr: GD.mgr, line: GD.line, said: GD.said || '', swing: M ? { sel: GD.sel, meter: M } : null, addr: GD.ph === 'addr' && GD.cpu ? GD.cpu : null }));
+}
+// back to a kept game: the last shot's line, then the next shot. A swing kept with its power pressed goes off now on that
+// power, as if the mark were never pressed: late, at the bottom of the meter (#120)
 function glResume(sn) {
   if (!sn || !sn.G) return false;
   G = JSON.parse(JSON.stringify(sn.G));
   glPlayStart({ mode: sn.mode, line: sn.line });
   if (sn.mgr) GD.mgr = Object.assign({ line: 'auto', ri: null }, sn.mgr);
-  GD.msg = `Back at hole ${G.h + 1}: ${G.teams[0].name} ${glMatchText(0).toLowerCase()}.`;
+  GD.said = sn.said || '';
+  const back = `${GD.said ? GD.said + ' ' : ''}Back at hole ${G.h + 1}: ${G.teams[0].name} ${glMatchText(0).toLowerCase()}.`, W = sn.swing;
+  if (W && W.sel && W.meter && GD.mode === 'play') {
+    GD.sel = W.sel; GD.meter = W.meter; GD.ph = 'swing'; GD.t = 0;
+    let n = 0; while (GD.ph === 'swing' && GD.meter && GD.meter.st === 'down' && n++ < 4000) glMeterTick(0.02);
+    GD.msg = `${back} The swing left at the top comes down without the mark. ${GD.msg}`;
+    return true;
+  }
+  if (sn.addr && sn.addr.plan) { GD.cpu = sn.addr; GD.ph = 'addr'; GD.t = 0; }
+  GD.msg = back;
   return true;
 }
 // your power: k 'pow' (the hitter's), 'ult', 'steady' or a situation power, cast for your stroke (in You play on your
@@ -38317,6 +38340,7 @@ function glCastMine(k) {
   const why = glCast(s, k, ri); if (why) return why;
   if (GD.sel) glSelFix();
   GD.msg = `${G.casts[G.casts.length - 1].n}! ` + (GD.sel ? glAimMsg() : '');
+  glCommit();
   return '';
 }
 
@@ -39554,7 +39578,8 @@ for (const ev of ['pointerup', 'pointercancel']) GLP.cv.addEventListener(ev, glP
    what the page needs: the phase, whose shot, your choice, the clubs and hitters you may pick, the meter), tick(dt)
    (the tests move the game on by hand). Your shot: select({ ri, club, shape, traj, spin }), aimAt, aimTurn, aimPush,
    press (Space), drag(pull, deg) (the phone's swing), offer(give), setMode; swingNums, win and readLine are the numbers
-   behind the meter and the read; scr and unscr map the picture; shown is the match as drawn (it waits for the ball, as the picture does). onPhase and onPick hear a new beat and a new choice. */
+   behind the meter and the read; scr and unscr map the picture; shown is the match as drawn (it waits for the ball, as the picture does). onPhase and onPick hear a new beat and a new choice;
+   onCommit a choice a reload must not take back (a full swing's power pressed, the caddie's word, a power cast: #120). */
 return {
   rules: JSON.parse(JSON.stringify(GL_RULES)), get G() { return G; },
   newGame: o => { GD = null; return glNewGame(o); }, pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
@@ -39613,6 +39638,7 @@ return {
   meterRules: Object.assign({}, GL_METER), pace: Object.assign({}, GL_PACE), hands: Object.assign({}, GL_HANDS), shapes: JSON.parse(JSON.stringify(GL_SHAPES)), trajs: JSON.parse(JSON.stringify(GL_TRAJ)),
   scr: (x, y) => glScr(x, y), unscr: (sx, sy) => glUnscr(sx, sy), cam: () => Object.assign({}, GLC), animBall: () => glAnimBall(),
   set onPhase(f) { GL_HOOK.onPhase = f; }, get onPhase() { return GL_HOOK.onPhase; }, set onPick(f) { GL_HOOK.onPick = f; }, get onPick() { return GL_HOOK.onPick; },
+  set onCommit(f) { GL_HOOK.onCommit = f; }, get onCommit() { return GL_HOOK.onCommit; },
 };
 
 })();
@@ -40943,7 +40969,8 @@ function blCount(s, stand, first, ball, roll) {
 // the game so far, short
 function blSummary() {
   if (!G) return null;
-  return { over: G.over, pst: JSON.parse(JSON.stringify(G.pst || [[], []])), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })), order: G.order.map(o => o.slice()), tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
+  // (win: who won, as the sim's result has always said; the page's end now says it too, issue #120's review)
+  return { win: G.over ? G.over.win : -1, over: G.over, pst: JSON.parse(JSON.stringify(G.pst || [[], []])), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })), order: G.order.map(o => o.slice()), tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
     marks: [blMarks(0), blMarks(1)], st: JSON.parse(JSON.stringify(G.st)), skill: G.skill.slice(), tide: G.tide, balls: G.n, casts: JSON.parse(JSON.stringify(G.casts || [])), pots: JSON.parse(JSON.stringify(G.pots || [])) };
 }
 // a whole game headless: leaves the game on the lanes (and the engine's random stream) as they were
@@ -40956,17 +40983,31 @@ function blSimGame(opts) {
   try {
     blStart(opts);
     let n = 0; while (!G.over && n++ < 400) blTurn();
-    return Object.assign({ win: G.over ? G.over.win : -1 }, blSummary());
+    return blSummary();
   } finally { G = keep; GB = keepB; GP = keepP; engRand = keepR; }
 }
 
 // the game as it stands between balls, plain JSON (a match saved and left); and back
-function blSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', streak: GP ? GP.streak : [0, 0], mgr: GP ? GP.mgr : null })); }
+// (said: the last ball's line; swing: a ball of yours with its speed pressed, your setup and the meter as they stand, #120)
+function blSnapshot() {
+  const M = GP && GP.ph === 'swing' && GP.meter && GP.meter.st === 'down' ? GP.meter : null;
+  return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', streak: GP ? GP.streak : [0, 0], mgr: GP ? GP.mgr : null, said: GP ? GP.said || '' : '', swing: M ? { sel: GP.sel, meter: M } : null }));
+}
+// back to a kept game: the last ball's line, then the next ball. A ball kept with its speed pressed is bowled now on that
+// speed, as if the mark were never pressed: released late, at the bottom of the meter (#120)
 function blResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null;
   blPlayStart({ mode: sn.mode });
   GP.streak = (sn.streak || [0, 0]).slice(); if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr);
-  GP.msg = `Back at the lanes: ${blMatchText(0).toLowerCase()}.`;
+  GP.said = sn.said || '';
+  const back = `${GP.said ? GP.said + ' ' : ''}Back at the lanes: ${blMatchText(0).toLowerCase()}.`, W = sn.swing;
+  if (W && W.sel && W.meter && GP.mode === 'play') {
+    GP.sel = W.sel; GP.meter = W.meter; GP.ph = 'swing'; GP.t = 0;
+    let n = 0; while (GP.ph === 'swing' && GP.meter && GP.meter.st === 'down' && n++ < 4000) blMeterTick(0.02);
+    GP.msg = `${back} The ball left at the top of the swing goes without the mark. ${GP.msg}`;
+    return G;
+  }
+  GP.msg = back;
   return G;
 }
 /* The Saltmere Lanes: the game on show, and bowling it by hand (issue #100, phase 2). GP is the game on the page (not
@@ -40991,7 +41032,7 @@ const BL_METER = { rise: .95, top: 1.1, fall: 1.25, low: -.22, win: .045, pwin: 
 const BL_PACE = { addr: .8, rest: 1.1, mark: 1.9, strike: 2.3, lane: 2.3, over: 2.6 };
 const BL_REVS = { less: .8, normal: 1, more: 1.2 };
 const BL_HANDS = { drag: 220, dragDeg: 10, bend: 14 };
-const BL_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
+const BL_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null, onCommit: null };
 const BL_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
@@ -41008,6 +41049,9 @@ function blGo(ph, wait, msg) {
   GP.ph = ph; GP.t = 0; GP.wait = wait || 0;
   if (BL_HOOK.onPhase) try { BL_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
+// a choice a reload must not take back (a ball's speed pressed, the coach's word, the pinch bowler, the re-rack, a power
+// cast): onCommit hears it, so the page can keep the game as it stands (issue #120)
+function blCommit() { if (BL_HOOK.onCommit) try { BL_HOOK.onCommit(); } catch (e) { console.error(e); } }
 const blName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const blYours = s => GP && GP.mode === 'play' && s === GP.you;
 
@@ -41025,7 +41069,7 @@ function blSelReset() { GP.sel = blSelFromPlan(blSuggest(GP.you)); GP.meter = nu
 function blSelect(o) {
   if (!GP || GP.ph !== 'aim' || !GP.sel) return false;
   const S = GP.sel, b = v => clamp(Math.round(v * 10) / 10, 1, BL_LANE.boards), s = GP.you;
-  let why = '', again = false;
+  let why = '', again = false, spent = false;
   if (o.stand != null) S.stand = b(o.stand);
   if (o.arrow != null) S.arrow = b(o.arrow);
   if (o.ball === 'strike' || o.ball === 'spare') S.ball = o.ball;
@@ -41034,12 +41078,13 @@ function blSelect(o) {
   if (o.split === 'safe' || o.split === 'convert') { G.split[s] = o.split; again = true; }
   if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
   if (o.weight === 'heavy' || o.weight === 'light') { G.stance[s].ball = o.weight; again = true; }
-  if (o.word) { if (G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; again = true; } else why = G.wordOn[s] ? 'The coach\'s word is on for this ball.' : 'One coach\'s word a game.'; }
-  if (o.rerack) { const r = blRerack(s); if (r.ok) { if (G.offspot) G.offspot[s] = null; GP.msg = 'Moll sets the rack again, every pin on its spot.'; } else why = r.why; }
-  if (o.pinch != null) { const r = blPinch(s, o.pinch); if (r.ok) { again = true; GP.msg = `${blName(s, o.pinch)} bowls this frame for ${blName(s, r.for)}.`; } else why = r.why; }
+  if (o.word) { if (G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; again = spent = true; } else why = G.wordOn[s] ? 'The coach\'s word is on for this ball.' : 'One coach\'s word a game.'; }
+  if (o.rerack) { const r = blRerack(s); if (r.ok) { if (G.offspot) G.offspot[s] = null; GP.msg = 'Moll sets the rack again, every pin on its spot.'; spent = true; } else why = r.why; }
+  if (o.pinch != null) { const r = blPinch(s, o.pinch); if (r.ok) { again = spent = true; GP.msg = `${blName(s, o.pinch)} bowls this frame for ${blName(s, r.for)}.`; } else why = r.why; }
   if (o.suggest) GP.sel = blSelFromPlan(blSuggest(s));
   else if (again) GP.sel = Object.assign(blSelFromPlan(blSuggest(s)), { revs: S.revs });
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
+  if (spent) blCommit();
   return why || true;
 }
 // cast one of your side's powers before your ball: k 'pow', 'ult', 'steady' or a situation power. '' or why not
@@ -41050,6 +41095,7 @@ function blCastMine(k) {
   // a power that changes the ball (more hook) changes the coach's setup too
   GP.sel = Object.assign(blSelFromPlan(blSuggest(GP.you)), { revs: GP.sel.revs });
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
+  blCommit();
   return '';
 }
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
@@ -41083,13 +41129,13 @@ function blPress() {
   if (GP.ph === 'aim') { GP.meter = Object.assign({ st: 'up', v: 0, p: null }, blMeterFor(GP.you)); blGo('swing', 0, `${blName(GP.you, blBowler(GP.you))} on the approach…`); return true; }
   if (GP.ph !== 'swing' || !GP.meter) return false;
   const M = GP.meter;
-  if (M.st === 'up') { M.p = M.v; M.st = 'down'; return true; }
+  if (M.st === 'up') { M.p = M.v; M.st = 'down'; blCommit(); return true; }
   if (M.st === 'down') { blRelease3(M.v); return true; }
   return false;
 }
 function blMeterTick(dt) {
   const M = GP.meter, K = BL_METER; if (!M) return;
-  if (M.st === 'up') { M.v += (M.rise || K.rise) * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
+  if (M.st === 'up') { M.v += (M.rise || K.rise) * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; blCommit(); } }
   else if (M.st === 'down') { M.v -= (M.fall || K.fall) * dt; if (M.v <= K.low) blRelease3(K.low); }
 }
 // the third press (or the bottom of the meter): the ball leaves the hand
@@ -41167,7 +41213,9 @@ function blTick(dt) {
 }
 function blPlayNext() {
   const s = blUp();
-  if (s < 0) { blGo('over'); return; }
+  // (a game kept after the ball that decided it, and resumed, says its end here: a game played on says it as that
+  // ball comes to rest, blAnimDone, and goes from its rest to over, never through next)
+  if (s < 0) { blGo('over'); if (G.over && BL_HOOK.onOver) try { BL_HOOK.onOver(blSummary()); } catch (e) { console.error(e); } return; }
   const ri = blBowler(s), fr = blFrameNo(s), now = blSheet(s)[blCur(s)] || [], tenth = blCur(s) === blSheetN() - 1;
   const ball = !now.length ? 'first ball' : tenth && (now.length === 2 || now[0] === 10) ? 'fill ball' : 'second ball';
   const chant = G.rb[s] === 0 && G.stand[s].length === 10 && GP.streak[s] === 2 ? 'The gallery chants: TUR-KEY! TUR-KEY! ' : '';
@@ -42867,7 +42915,9 @@ for (const ev of ['pointerup', 'pointercancel']) BLP.cv.addEventListener(ev, blP
    what the page needs), tick(dt) (the tests move the game on by hand). Your ball: select({ stand, arrow, ball, revs,
    suggest }), press (Space), drag(pull, deg) (the phone's throw), setMode; guide (a perfect ball's path on a fresh
    lane), swingNums and meterRules are the numbers behind the meter; scr and unscr map the lane to the picture and
-   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end.
+   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end;
+   onCommit a choice a reload must not take back (a ball's speed pressed, the word, the pinch bowler, the re-rack, a power
+   cast: #120).
    Phase 3 is ratings, the order's roles, arm and nerve: stats (the six, in order), rate(kind) (1 to 12), cap, roles
    (each slot of the order's role), fit(r, role) (r 0 to 1), autoOrder(roster), arm (G.arm), pressure(side),
    armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order.
@@ -42946,6 +42996,7 @@ return {
   hexes: JSON.parse(JSON.stringify(BL_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexPin: s => G && G.teams ? blHexPin(s) : null, hexLine: () => blHexLine(),
   ultOwn: JSON.parse(JSON.stringify(BL_ULT_OWN)), ultOf: (s, ri) => G && G.teams ? Object.assign({}, blUltOf(s, ri)) : null, lichRules: JSON.parse(JSON.stringify(BL_LICH)), carry: (d, e, v) => blLichCarry(d, e, v),
   set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; }, get onPhase() { return BL_HOOK.onPhase; }, get onPick() { return BL_HOOK.onPick; }, get onOver() { return BL_HOOK.onOver; },
+  set onCommit(f) { BL_HOOK.onCommit = f; }, get onCommit() { return BL_HOOK.onCommit; },
   show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: dt => blRender(dt || 0),
   pause: on => { BLP.paused = !!on; }, get paused() { return BLP.paused; }, get speed() { return BLP.speed; }, set speed(n) { BLP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };
@@ -44212,17 +44263,33 @@ const crThin = p => { const out = []; let D = null; p.forEach((q, i) => {
   if (!D || i === p.length - 1 || Math.hypot(q[0] - D[0], q[1] - D[1]) >= 59) { out.push([q[0], q[1]]); D = q; } else if (crTurnAt(p, i)) out.push([q[0], q[1], 1]); }); return out; };
 function crSnapshot() {
   // (a stone your captain has cast on and not thrown: kept as it was before the casts, so taking it back still undoes them)
-  const g = GP && GP.cpu && GP.cpu.pre ? Object.assign({}, G, JSON.parse(JSON.stringify(GP.cpu.pre))) : G;
-  return JSON.parse(JSON.stringify({ G: g, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, autoPow: !!(GP && GP.autoPow), paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
+  let g = GP && GP.cpu && GP.cpu.pre ? Object.assign({}, G, JSON.parse(JSON.stringify(GP.cpu.pre))) : G;
+  // (a stone sliding: the game as it was released, its sweepers' legs too, and the release, so a resume brings it to rest
+  // on that release (issue #120): your sweeping isn't kept, the CPU's sweepers sweep it as they would)
+  const X = GP && GP.ph === 'slide' && GP.X && GP.X.g === G ? GP.X : null;
+  if (X) g = Object.assign({}, g, { legs: X.legs0.slice() });
+  // (said: the last stone's line, said again on a resume, #120)
+  return JSON.parse(JSON.stringify({ G: g, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, autoPow: !!(GP && GP.autoPow), paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [],
+    slide: X ? { s: X.s, plan: X.plan, rel: X.rel, cpu: !!X.Q.O.sweep } : null, said: GP ? GP.said || '' : '' })); }
 function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
   // (a game saved before a part added its state: that part's state as it starts)
   if (G.powers && !G.powWhich) G.powWhich = [null, null];
   if (!G.potEnd) { const b = G.bags; crKitStart(b); }
   if (G.deep === undefined) { G.deep = null; G.deepSaid = ''; }
+  // (a stone kept sliding comes to rest on its release first, as the game goes on: never thrown again)
+  const sl = sn.slide; let ev = null, path = null, said = sn.said || '';
+  if (sl && sl.plan && sl.rel) {
+    GP = null;   // (the page's last game has no say in it: crPlayStart makes this one's)
+    const X = crThrowBegin(sl.s, sl.plan, sl.rel, sl.cpu ? crSweeper(sl.s, sl.plan) : null);
+    if (X) { while (crRunStep(X.Q)); ev = crThrowFinish(X); if (ev.rule.ok) { path = X.Q.path.map(p => [p[0], p[1]]); said = crSettleSay(ev, X.ham); } }
+  }
   crPlayStart({ mode: sn.mode });
   if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.autoPow = !!sn.autoPow; GP.paths = (sn.paths || []).slice();
-  GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;
+  if (path) { GP.paths.push({ s: ev.side, path }); GP.last = ev; }
+  // (the last stone's line first, the one left sliding's when there was one: #120)
+  GP.said = said;
+  GP.msg = `${said ? said + ' ' : ''}Back at the Shed${path ? `, the stone left sliding at rest` : ''}: ${crMatchText(0).toLowerCase()}.`;
   return G;
 }
 // a whole game headless: leaves the game on the ice, and the random stream, as they were
@@ -44255,7 +44322,7 @@ function crSimGame(opts) {
    - Watch: the CPU throws both sides, its own sweepers sweeping. You play: your side's stones are yours.
    The stone moves on the page at CR_PLAY.speed times real time, a step at a time, the same steps the sim takes. */
 const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .25, hitAng: .4, v: .01 } };
-const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
+const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null, onCommit: null };
 const CR_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
@@ -44268,6 +44335,9 @@ function crGo(ph, wait, msg) {
   GP.ph = ph; GP.t = 0; GP.wait = wait || 0; if (msg != null) GP.msg = msg;
   if (CR_HOOK.onPhase) try { CR_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
+// a choice a reload must not take back (a power cast before your stone): onCommit hears it, so the page can keep the
+// game as it stands (issue #120)
+function crCommit() { if (CR_HOOK.onCommit) try { CR_HOOK.onCommit(); } catch (e) { console.error(e); } }
 const crName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const crYours = s => GP.mode === 'play' && s === GP.you;
 const crPosName = s => CR_RULES.posN[crPos(s)];
@@ -44412,17 +44482,23 @@ function crSettle() {
   GP.last = ev;
   // (every stone's path this game, for the ice chart)
   GP.paths.push({ s: ev.side, path: X.Q.path.map(p => [p[0], p[1]]) });
+  const e = ev.rule.end, say = GP.said = crSettleSay(ev, X.ham);
+  crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
+  if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); }
+}
+
+// a stone come to rest, said plainly (ham: who had the hammer as it was thrown); kept as GP.said, the last stone's line
+function crSettleSay(ev, ham) {
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
-  if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
+  if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== ham ? ', a steal' : ''}.`;
   if (ev.ghost) say += ' It slid through the guard like smoke.';
   if (ev.gust) say += ` A gust pushes their stone back ${ev.gust} inches.`;
   // (the Drifting House and Hoarfrost, when they act: 15-umbral.js)
   if (G.hex) say += crHexSay(ev);
   if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
-  crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
-  if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); }
+  return say;
 }
 
 /* ---------- the beat ---------- */
@@ -44437,7 +44513,9 @@ function crTick(dt) {
   else if (P === 'rest') { if (GP.t >= GP.wait) crGo(G.over ? 'over' : 'next'); }
 }
 function crPlayNext() {
-  const s = crUp(); if (s < 0) { crGo('over'); return; }
+  // (a game kept after the stone that decided it, and resumed, says its end here: a game played on says it as that
+  // stone settles, crSettle, and goes from its rest to over, never through next)
+  const s = crUp(); if (s < 0) { crGo('over'); if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); } return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
   // (the Umbral's hexes, named before the first stone: 15-umbral.js)
   // (and Hennock's word on Old Grey, in a game with the frozen deep: 16-deep.js)
@@ -44466,7 +44544,7 @@ function crSetMode(m) {
 function crCastMine(k) {
   if (!GP || GP.mode !== 'play' || !['aim', 'swing'].includes(GP.ph) || (GP.meter && GP.meter.st === 'gone') || !crYours(crUp())) return 'Only before your stone.';
   const why = crCast(GP.you, k); if (why) return why;
-  const c = G.casts[G.casts.length - 1]; GP.msg = `${crName(GP.you, c.ri)} casts ${c.n}.`; crPick(); return '';
+  const c = G.casts[G.casts.length - 1]; GP.msg = `${crName(GP.you, c.ri)} casts ${c.n}.`; crPick(); crCommit(); return '';
 }
 // Manage: your rink's game ({ style: 'auto' | 'draw' | 'hit' })
 function crManage(o) { if (!GP) return false; if (['auto', 'draw', 'hit'].includes(o && o.style)) GP.mgr.style = o.style; crPick(); return true; }
@@ -45876,7 +45954,8 @@ window.addEventListener('pointerup', () => { CRP.sweepPtr = false; });
    what the page needs), tick(dt), live (the stone sliding now). Your stone: select({ shot, x, y, h, target, suggest
    }), press (Space: start, then the weight), drag(pull, deg) (the phone's throw), sweep (held: true while you hold
    Space), setMode; playRules (the meter, the pace); scr, unscr, houseScr and houseUn map the ice to the pictures and
-   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end.
+   back. onPhase, onPick and onOver hear a new beat, a change to your call and the end; onCommit a choice a reload must
+   not take back (a power cast before your stone: #120).
    Phase 3 is ratings, positions, the sweepers' legs and nerve: stats (the six, in order), rate(kind) (1 to 12), cap,
    fit(r, pos) (r 0 to 1, pos 0 lead to 3 skip), autoOrder(roster), legs (G.legs), pressure(side), sweepers(side) (who
    sweeps the stone now), sweepEff(side) (how hard they sweep against an average fresh pair: run's opts.legs applies it), errK(side, shot), and the
@@ -45953,6 +46032,7 @@ return {
   // games from the world (phase 5)
   hallRules: CR_HALL, frostAt: x => crFrostAt(x), snapshot: () => crSnapshot(), resume: sn => { const g = crResume(sn); CRC.drawn = false; return g; }, manage: o => crManage(o), get mgr() { return GP ? Object.assign({}, GP.mgr) : null; },
   set onPhase(f) { CR_HOOK.onPhase = f; }, set onPick(f) { CR_HOOK.onPick = f; }, set onOver(f) { CR_HOOK.onOver = f; }, get onPhase() { return CR_HOOK.onPhase; }, get onPick() { return CR_HOOK.onPick; }, get onOver() { return CR_HOOK.onOver; },
+  set onCommit(f) { CR_HOOK.onCommit = f; }, get onCommit() { return CR_HOOK.onCommit; },
   show: () => crShow(), hide: () => crHide(), get on() { return CRP.on; }, render: dt => crRender(dt || 0),
   pause: on => { CRP.paused = !!on; }, get paused() { return CRP.paused; }, get speed() { return CRP.speed; }, set speed(n) { CRP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };
@@ -46777,7 +46857,8 @@ const jtAtText = st => !st || !jtOwn(JT_AT, st.at) ? '' : st.unhorse && jtFair(s
    The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
    (canter or gallop). A gallop hits harder and spends more of the mount's wind, but the tip sways more.
    The mounts (JT_MOUNT): Charger (fast, hits hard, sways more, and its weight carries its rider through a hit),
-   Destrier (steady, easy to aim, hits softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
+   Destrier (steady, easy to aim, hits softer), Courser (light: it hits softest and sways under an ordinary rider, but
+   settles under a good one (ridden, the ride rating), gets its wind back quickly and is easy on it at a gallop). Each rider rides one
    (opts.mounts, picked on the Lists tab in the Realm); left out, JT_MOUNT_DEF.
    The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, and how long the
    arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace, the seat a little, and the
@@ -46815,10 +46896,17 @@ const JT_PLAN = {
 // against a Destrier's 16%, and the CPU gallops on it in 93% of courses. A Charger's weight now carries its own rider
 // through a hit (steady 0.06 to 0.2), and the ride rating sits a hit too (JT_SEAT.ride, 04-course.js): 42%, its case for
 // an elf in a short heat kept)
+// #120, phase 4: each mount the clear pick somewhere, on paired seeds at six seed bases (realm_lists_mounts, _destrier,
+// _courser). The Courser was the safe pick almost everywhere (it never blows), so the Destrier had no case of its own and
+// the Courser's was thin. A Courser is now light in a rider's hands: it sways more (0.97 to 1.1) under an ordinary
+// rider and less under a good one (ridden: the ride rating takes up to 0.28 of its sway, from an average ride's 0.5; a
+// ride of 12 sways 0.79, a troll's 6 1.11), and it hits softer (0.93 to 0.9). So a steady lance does best on a Charger,
+// a lance that sways on a Destrier, and a hard rider on a Courser, more so in a long heat. The Charger and the Destrier
+// are as they were (plain Knights on Destriers play exactly as before)
 const JT_MOUNT = {
   charger: { n: 'Charger', speed: 1.06, hit: 1.02, sway: 1.2, steady: .2, rec: .12, wind: 1.3 },
   destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .82, steady: .07, rec: .12, wind: 1 },
-  courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: .06, rec: .3, wind: .65 }
+  courser: { n: 'Courser', speed: 1.02, hit: .9, sway: 1.1, ridden: .28, steady: .06, rec: .3, wind: .65 }
 };
 const JT_MOUNT_DEF = 'destrier';
 const jtMount = id => JT_MOUNT[jtOwn(JT_MOUNT, id) ? id : JT_MOUNT_DEF];
@@ -46887,7 +46975,7 @@ const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.15, glanc
 const JT_SEAT = { reach: .3, high: 15, base: .55, seat: .45, ride: .35, square: .1, lean: .3, shake: .22, rocked: .7 };
 const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
-// the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
+// the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount (and, on a Courser, the ride rating) and its wind,
 // the lance and couch ratings and the couch's moment; hands scales the spread (a skill's, or 1 on Play)
 // (phase 3: a tired arm (o.arm, 0 to 1) sways more and sags; a rider still shaken by a rocking hit (o.shaken, 0 to 1)
 // sways more; pressure (o.press) sways them more by how little nerve they have: JT_ARM, JT_SHAKE and jtNerveK, 09-squad.js)
@@ -46897,7 +46985,9 @@ function jtSway(o) { return jtSwayAt(o)(o.couch); }
 function jtSwayAt(o) {
   const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
   const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5), tired = 1 - clamp(o.arm ?? 1, 0, 1);
-  const pre = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)), hands = o.hands ?? 1, armK = 1 + JT_ARM.sway * tired, shakeK = 1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1);
+  // (#120, phase 4: a light mount (ridden, the Courser) sways less under a good rider and more under a poor one)
+  const mk = M.ridden ? 1 - M.ridden * ((r.ride ?? .5) - .5) * 2 : 1;
+  const pre = JT_SWAY.base * P.sway * M.sway * mk * lance * (1 + JT_SWAY.wind * (1 - w)), hands = o.hands ?? 1, armK = 1 + JT_ARM.sway * tired, shakeK = 1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1);
   const nerveK = jtNerveK(o.press || 0, r.nerve), fxK = o.fx ? o.fx.sway : 1, droopK = 1 + JT_ARM.droop * tired, sag = JT_ARM.sag * tired;
   return couch => { const c = clamp(couch || 0, -1, 1);
     return { sigma: pre * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * hands * armK * shakeK * nerveK * fxK, droop: JT_SWAY.droop * Math.max(0, -c) * arm * droopK + sag }; };
@@ -48195,15 +48285,20 @@ function jtCornersDue(skip) {
 
 /* ---------- the mounts ---------- */
 // the mount a rider of these ratings rides best, with the reason (the Realm's captain; your choice on the Lists tab). By
-// the lab (seeded matches, a Knight a side, against Destriers): a steady lance does best on a Charger in a short heat
-// (an elf), a rider who keeps a gallop up on a Courser over a long one (a harpy), the rest on a Destrier (phase 12: a
-// Courser in a short heat was the captain's pick for every good rider, and it cost them; the Realm's matches saw an
-// unhorsing in most matches with the riders on Chargers and Coursers)
+// the lab (seeded matches, a Knight a side, a kind's four against vampires on Destriers, six seed bases; #120, phase 4):
+// a steady lance does best on a Charger in a short heat (an elf); a good rider on a Courser in a long heat (a minotaur); a
+// lance that sways on a Destrier (a troll), and the rest too. An elf wins more on a Charger in a long heat as well (about
+// 70 matches in 400), but the captain keeps it on a Destrier there: Chargers under every steady lance in five-course heats
+// raised the matches with an unhorsing by 5 to 14 points at every tier, on the same matches (#120, phase 4's review). A ride of 0.8 (a rating of about 10) is where a Courser pays: a werewolf's 10 does about as
+// well on one as on a Destrier, a minotaur's 12 far better. In a short heat a minotaur does better on a Courser too (by
+// 23 to 45 in 400), but the captain keeps the Destrier there: a Courser under every good rider in the Realm's three-course
+// heats raised its matches with an unhorsing by 9 to 12 points (#120, phase 4's lab), as Chargers did in phase 12
+// (phase 12: a Courser in a short heat was the captain's pick for every good rider, and it cost them)
 function jtMountFor(rs, courses) {
   const r = rs || {}, long = (courses || JT_RULES.courses) >= 5;
   if ((r.lance ?? .5) >= .8 && !long) return { m: 'charger', why: 'a lance that steady can take its sway for the harder hit' };
-  if ((r.ride ?? .5) >= .7 && long) return { m: 'courser', why: 'it keeps up a gallop all heat and gets its wind back quickly' };
-  return { m: 'destrier', why: long ? 'steady to aim from over a long heat' : 'steady to aim from' };
+  if ((r.ride ?? .5) >= .8 && long) return { m: 'courser', why: 'a good rider settles it, and it keeps its wind all heat' };
+  return { m: 'destrier', why: (r.lance ?? .5) < .5 ? 'steadier than a Charger, for a lance that sways' : long ? 'steady to aim from over a long heat, and a safe seat' : 'steady to aim from, for most riders' };
 }
 
 // what the page shows of each side's squad now (a copy)
@@ -55621,7 +55716,7 @@ renderHelp = function () {
    Sound. Sudden Death's own effects (sfx), following your Sound effects setting: a whistle at each kickoff (as the ball comes
    down; the game's first is set up before the field shows) and at the half, and at the end of each play a thud for a tackle, a crunch for a sack, a slap for an incompletion, the crowd
    for a big gain, a horn and the crowd for a touchdown or a field goal, and a groan when the ball is lost (an interception
-   or a fumble) or the other side scores. The realm's music plays on, as it does at any ground.
+   or a fumble) or the other side scores. The ground's own tune plays on this view (w160), as it does on the ground's map.
    Tips. TIPS.w_grid once your team can play football (W_GFG.minOwn players), TIPS.w_gcup once you have won a
    football game, from a watcher like w20f's.
    Achievements. Football games won (realmGridWins) and Cinder Cups (realmGcups), on SD's ACH.
@@ -55683,7 +55778,7 @@ const wW47RenderHelp = renderHelp;
 renderHelp = function () {
   wW47RenderHelp();
   const d = $('wHelpGcup'); if (!d || $('wHelpGfFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfFeel"><b>On the gridiron</b> you hear the whistle at each kickoff, the hits, and the crowd for a big gain or a score; sounds follow your Sound effects setting, and the realm's music plays on. Football games won and Cinder Cups have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfFeel"><b>On the gridiron</b> you hear the whistle at each kickoff, the hits, and the crowd for a big gain or a score; sounds follow your Sound effects setting, and the ground's own tune plays. Football games won and Cinder Cups have medals in the record book.</p>`);
 };
 /* w48: the bench and potions on the gridiron. Tired players can be got back three ways (src/gf/parts/15-bench.js):
    - Swaps: each side brings a bench (W_GFG.bench, w44: your players who sit out, then call-ups). Between plays, put a
@@ -57308,7 +57403,7 @@ renderHelp = function () {
    beats (wBX.onPhase): the bell at the start and the end of every round, a slap for a jab and a crunch for a big punch
    or a counter, a dull knock for a block and a swish for a slip, a groan and the crowd for a knockdown, the crowd for a
    fighter hurt, a shimmer for a power (a bright one for an ultimate), the count's ticks, and at the end the horn and the
-   crowd if your corner won, a groan if it lost. The realm's music plays on, as it does at any ground.
+   crowd if your corner won, a groan if it lost. The ground's own tune plays on this view (w160), as it does on the ground's map.
    Tips. TIPS.w_ring once your team can box (W_BXG.minOwn players), TIPS.w_bcup once you've won a card.
    Achievements. Cards won (realmRingWins), wins inside the distance by your fighters (realmRingKos) and Anvil Belts
    (realmBcups), on SD's ACH.
@@ -57391,7 +57486,7 @@ const wW55RenderHelp = renderHelp;
 renderHelp = function () {
   wW55RenderHelp();
   const d = $('wHelpBcup'); if (!d || $('wHelpRingFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRingFeel"><b>In the ring</b> you hear the bell at the start and end of every round, the punches, the blocks and the slips, the crowd for a knockdown, and a shimmer for a power. Sounds follow your Sound effects setting, and the realm's music plays on. Cards won, knockouts and Anvil Belts have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRingFeel"><b>In the ring</b> you hear the bell at the start and end of every round, the punches, the blocks and the slips, the crowd for a knockdown, and a shimmer for a power. Sounds follow your Sound effects setting, and the ground's own tune plays. Cards won, knockouts and Anvil Belts have medals in the record book.</p>`);
 };
 /* w56: boxing on the Team screen (issue #23, follow-up), as the Seven tab (w43) and the Football view (w44) are for
    football. The issue promised cards "from the Ring tab, or the keeper", and box scores as football keeps them.
@@ -61450,8 +61545,8 @@ renderHelp = function () {
    baskets (louder for a three, loudest for a dunk or an alley-oop), a click for theirs, a chime for a power and a
    bigger one for an ultimate (either side's), the whistle for a foul's free throws, a timeout and goaltending, the buzzer at each
    break, the yard's roar and a hot hand (either side's: the yard cheers a show), and a horn and the crowd when you
-   win. In a game you only watch, the first side (the home one) is yours for the crowd. Only while the court is on screen. The realm's music
-   plays on, as it does at any ground.
+   win. In a game you only watch, the first side (the home one) is yours for the crowd. Only while the court is on screen. The ground's own tune
+   plays on this view (w160), as on the ground's map.
    Tips. TIPS.w_court once your team can play basketball (W_BKG.minOwn players), TIPS.w_net once you have won a
    basketball game, from a watcher like w47's.
    Achievements. Basketball games won (realmCourtWins) and Charter Nets (realmNets), on SD's ACH.
@@ -61530,7 +61625,7 @@ const wW85RenderHelp = renderHelp;
 renderHelp = function () {
   wW85RenderHelp();
   const d = $('wHelpCourtNet'); if (!d || $('wHelpCourtFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtFeel"><b>On the court</b> you hear the rim, the blocks and steals, the crowd for your baskets (loudest for a dunk), the whistle for free throws and timeouts, the buzzer at each break and the walled yard's roar; sounds follow your Sound effects setting, and the realm's music plays on. Basketball games won and Charter Nets have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtFeel"><b>On the court</b> you hear the rim, the blocks and steals, the crowd for your baskets (loudest for a dunk), the whistle for free throws and timeouts, the buzzer at each break and the walled yard's roar; sounds follow your Sound effects setting, and the ground's own tune plays. Basketball games won and Charter Nets have medals in the record book.</p>`);
 };
 /* Champions of the Realm: a scoreboard you can read on a phone (issue #80). Football, boxing and basketball draw their
    score bar inside the canvas, 960 wide; on a phone the canvas is 370 wide and the bar's letters are a few pixels tall.
@@ -63013,8 +63108,8 @@ renderHelp = function () {
    yours) and for the ice cracking, a quick slap for a poke or a pass picked off, a chime for a power or a potion and a
    bigger one for an ultimate (either side's), the whistle for a penalty, icing, a covered puck and a timeout, the
    bank's roar, the horn at each break, and the horn and the bank when you win. In a game you only watch, the first
-   side (the home one) is yours for the bank. Only while the rink is on screen. The realm's music plays on, as it does
-   at any ground.
+   side (the home one) is yours for the bank. Only while the rink is on screen. The ground's own tune plays on this view (w160), as on the
+   ground's map.
    Tips. TIPS.w_rink once your team can play hockey (W_HKG.minOwn players), TIPS.w_kettle once you have won a hockey
    game, from a watcher like w85's.
    Achievements, on SD's ACH: hockey games won (realmRinkWins), Pond Kettles (realmKettles), a hat trick by one of
@@ -63093,7 +63188,7 @@ const wW96RenderHelp = renderHelp;
 renderHelp = function () {
   wW96RenderHelp();
   const d = $('wHelpRinkKettle'); if (!d || $('wHelpRinkFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkFeel"><b>On the ice</b> you hear the horn and the bank for your goals, the pads for a save, the boards for a hit, the whistle for a penalty, icing and a covered puck, the bank's roar and the horn at each break; sounds follow your Sound effects setting, and the realm's music plays on. Hockey games won, Pond Kettles, a hat trick by one of your players and a win without conceding have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpRinkFeel"><b>On the ice</b> you hear the horn and the bank for your goals, the pads for a save, the boards for a hit, the whistle for a penalty, icing and a covered puck, the bank's roar and the horn at each break; sounds follow your Sound effects setting, and the ground's own tune plays. Hockey games won, Pond Kettles, a hat trick by one of your players and a win without conceding have medals in the record book.</p>`);
 };
 /* w97: your following (issue #79, phase 1). Loads after w96-rinkfeel.js; changes earlier parts only by reassignment
    (saved originals carry the wW97 prefix).
@@ -65244,7 +65339,12 @@ renderHelp = function () {
    player of the match a little more; a loss a quarter of the XP and costs nothing else (no Team HP on the course). A
    golf match never ends level. Every match adds your players' lines to WG.lkstats, and goes in the head to head and the
    league table. Save and leave keeps the match between shots, and it is waiting when you come back, after a reload too.
-   Concede counts as a loss.
+   The match is kept from its first tee, and saved at once as each shot is struck or a putt given (issue #120): a
+   reload never brings a shot back, and a match that has begun is never called off. It is saved at once, too, as you
+   press a full swing's power (a reload before the mark plays that swing out late, at the bottom of the meter), call the
+   caddie's word or cast a power (wGL.onCommit): a reload gives none of them back. A match kept after the shot that
+   decided it is settled as the page comes back (wLinksKeptEnd, called by w159), its result card shown, never left
+   waiting. Concede counts as a loss.
 
    WG.lkg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_LKG.keep], w, l }
               world = { kind: 'lkgame', ref, club, tier, how, day, name, ids, wild, weather }, plain data; the end
@@ -65252,9 +65352,10 @@ renderHelp = function () {
               roster ids in role order (null for a call-up)
    WG.lkstats { pid: { rd, shots, putts, holed } }, this journey
    wLinksProblems(), wStartLinks({ club, how, tier?, kind?, ref?, wild? }), wResumeLinks(), wLinksLeaveGame(),
-   wLinksConcede(), wOpenLinksCard(), wLinksWeather()
+   wLinksConcede(), wOpenLinksCard(), wLinksWeather(), wLinksKeptOver(), wLinksKeptEnd()
    Wraps: wLinksBarNote (wW107LinksBarNote: Save and leave and Concede in a real match), wLeaveLinks (wW107LeaveLinks),
-   wGL.onOver and wGL.onPhase (a real match settles, and is kept between shots), wLinksGame (wW107LinksGame: the day's
+   wGL.onOver and wGL.onPhase (a real match settles, and is kept between shots), wGL.onCommit (kept as a choice is
+   committed), wLinksGame (wW107LinksGame: the day's
    weather and the wood), wRunAct (wW107RunAct: MATCH opens the card), wNextPrompt (wW107NextPrompt: a match waiting
    after a reload), wCampLinks and wRenderCamp (wW107CampLinks, wW107RenderCamp: Play a match and Resume on the Links
    tab), wCampStats (wW107CampStats: the Golf view's lines), wStatsCard (wW107StatsCard: the lines in words),
@@ -65265,9 +65366,11 @@ const W_LKG = {
   // extra rating points for each of their four, by tier; first guesses until the lab measures them (phase 10)
   oppBonus: { 1: 2, 2: 4, 3: 7 },
   minutes: 120, keep: 10, saveMs: 12000,
+  // the beats a shot is settled in (struck and counted, the ball still flying; a putt given): kept and saved at once
+  settled: ['fly', 'given'],
 };
 const W_LKG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WLKG = { saved: 0, asked: false, msg: '', wild: false };
+const WLKG = { saved: 0, asked: false, msg: '', wild: false, card: '' };
 
 function wLkg() {
   const B = WG.lkg = WG.lkg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0 };
@@ -65337,6 +65440,8 @@ function wStartLinks(o) {
   if (how === 'sim') { const s = wGL.simGame(opts); wLinksResultCard(wLinksSettle(s)); return ''; }
   wLinksGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WGL.world = true;
+  // (kept from the first tee: a reload before the first shot brings the match back, never calls it off: #120)
+  B.live.snap = wGL.snapshot();
   wLinksBarNote();
   wSave();
   return '';
@@ -65350,9 +65455,11 @@ function wResumeLinks() {
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }
-// Save and leave: the match as it was before the shot under way (kept at every shot)
+// Save and leave: the match after the shot under way (kept as each shot is struck); a shot that decided it is played
+// out and settled
 function wLinksLeaveGame() {
   const L = wLinksLive() && WG.lkg.live; if (!L) return wLeaveLinks();
+  if (wLinksWorld() && wGL.G.over) { let n = 0; while (wLinksLive() && n++ < 4000) wGL.tick(0.1); if (!wLinksLive()) { WGL = null; wW107LeaveLinks(); wSave(); return; } }
   const sn = L.snap;
   WLKG.asked = true;
   WGL = null; wW107LeaveLinks();
@@ -65377,17 +65484,44 @@ function wLinksConcede() {
   }, () => { if (WGL) wGL.pause(false); });
   wAfterAsk(() => { if (WGL) wGL.pause(false); });
 }
-function wLinksScore(sn) { const G = sn.G, up = G.won[0] - G.won[1], left = Math.max(0, G.holes - G.res.length); return `${up === 0 ? 'all square' : `${Math.abs(up)} ${up > 0 ? 'up' : 'down'}`}${left ? ` with ${left} to play` : ', a playoff'}, on the ${wOrd(G.h + 1)}`; }
+function wLinksScore(sn) {
+  const G = sn.G, up = G.won[0] - G.won[1], left = Math.max(0, G.holes - G.res.length);
+  // (a match its last shot decided is finished: who won it, not what is left to play)
+  if (G.over) return `finished: ${G.teams[G.over.win].name} won${G.over.text ? ` ${G.over.text}` : ''}`;
+  return `${up === 0 ? 'all square' : `${Math.abs(up)} ${up > 0 ? 'up' : 'down'}`}${left ? ` with ${left} to play` : ', a playoff'}, on the ${wOrd(G.h + 1)}`;
+}
 
 /* ---------- kept between shots, and settled at the end ---------- */
 const wW107OnPhase = wGL.onPhase;
 wGL.onPhase = ph => {
   if (wW107OnPhase) wW107OnPhase(ph);
-  if (ph !== 'next' || !wLinksWorld() || wGL.G.over) return;
+  if (!wLinksWorld() || !wGL.G) return;
+  const settled = W_LKG.settled.includes(ph);
+  if (!settled && (ph !== 'next' || wGL.G.over)) return;
   const L = WG.lkg.live, first = !L.snap; L.snap = wGL.snapshot();
-  // (saved at most every W_LKG.saveMs, so a reload can come back a few shots early; the first one always)
-  const now = Date.now(); if (first || now - WLKG.saved > W_LKG.saveMs) { WLKG.saved = now; wSave(); }
+  // (a shot struck or a putt given is saved at once, the deciding one too: a reload never brings a shot back, and a
+  // match it decided is settled on Resume (the engine says its end once). The next beat is saved at most every
+  // W_LKG.saveMs: nothing new is settled in it, #120)
+  const now = Date.now(); if (first || settled || now - WLKG.saved > W_LKG.saveMs) { WLKG.saved = now; wSave(); }
 };
+// a choice committed (a full swing's power pressed, the caddie's word, a power cast) is kept and saved at once (#120)
+const wW107OnCommit = wGL.onCommit;
+wGL.onCommit = () => {
+  if (wW107OnCommit) wW107OnCommit();
+  if (!wLinksWorld() || !wGL.G) return;
+  WG.lkg.live.snap = wGL.snapshot(); WLKG.saved = Date.now(); wSave();
+};
+// a match kept after the shot that decided it (the page went as that shot flew): settled now, as the shot would have
+// settled it, never left waiting; its result card waits for the world (wNextPrompt). Returns the result's words, or ''
+function wLinksKeptOver() { const L = wLinksLive() && WG.lkg.live; return !!(L && L.snap && L.snap.G && L.snap.G.over); }
+function wLinksKeptEnd() {
+  if (WGL || !wLinksKeptOver()) return '';
+  wGL.resume(WG.lkg.live.snap);
+  const s = wGL.summary(); if (!s) return '';
+  const msg = wLinksSettle(s);
+  WLKG.asked = true; if (!LAB) WLKG.card = msg;
+  return msg;
+}
 const wW107OnOver = wGL.onOver;
 wGL.onOver = s => {
   if (WGL && WGL.world && wLinksLive()) WGL.msg = wLinksSettle(s);
@@ -65505,7 +65639,12 @@ wRunAct = function (act, id) { if (act === 'lkcard') return wOpenLinksCard(); re
 /* after a reload, a saved match is waiting: ask once */
 const wW107NextPrompt = wNextPrompt;
 wNextPrompt = function () {
-  if (!LAB && wLinksLive() && !WLKG.asked && !WGL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+  // (a decided match is settled, not waiting: its result card, settled here if the page came back somewhere else first)
+  if (!LAB && !WGL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    if (!WKEPT.loading && wLinksKeptOver()) wKeptOne(wLinksKeptEnd);
+    if (WLKG.card) { const m = WLKG.card; WLKG.card = ''; wLinksResultCard(m); if (!$('modal').hidden) return true; }
+  }
+  if (!LAB && wLinksLive() && !WLKG.asked && !wLinksKeptOver() && !WGL && !WD && !WG.cardOffer && !WG.event && wActive()) {
     WLKG.asked = true;
     const L = WG.lkg.live, sn = L.snap;
     const close = modal(`<header><h3>A golf match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wLinksScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Links tab on the Team screen.</p></div>
@@ -65948,7 +66087,7 @@ renderHelp = function () {
    yours (a roar for a long putt or a chip that drops), a click for theirs; a splash for the water; a chime for a power,
    a potion or an enchantment (a bigger one for an ultimate, or the wyvern); and the horn and the gallery when you win.
    In a round you only watch, the first side (the home one) is yours for the gallery. Only while the course is on
-   screen. The realm's music plays on, as it does at any ground (the Links' own track, The Long Fairway, is w26's).
+   screen. The ground's own tune plays on this view (w160), as it does on the ground's map (the Links' own track, The Long Fairway, is w26's).
    Tips. TIPS.w_links once your team can play golf (W_LKG.minOwn players), TIPS.w_divot once you have won a golf match.
    Achievements, on SD's ACH: golf matches won (realmLinksWins), Divot Cups (realmDivots), a hole in one by your side in
    a match from the world (realmAces), an eagle (realmEagles) and a win by 5 and 4 or more (realmRouts).
@@ -66031,7 +66170,7 @@ const wW111RenderHelp = renderHelp;
 renderHelp = function () {
   wW111RenderHelp();
   const d = $('wHelpLinksCup'); if (!d || $('wHelpLinksFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksFeel"><b>On the course</b> you hear the strike of every shot and the tap of a putt, the ball in the cup and the gallery for your holed shots (a roar for a long one), the water, and a chime for a power, a potion or an enchantment; sounds follow your Sound effects setting, and the realm's music plays on. Golf matches won, Divot Cups, a hole in one, an eagle and a win by 5 and 4 or more have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksFeel"><b>On the course</b> you hear the strike of every shot and the tap of a putt, the ball in the cup and the gallery for your holed shots (a roar for a long one), the water, and a chime for a power, a potion or an enchantment; sounds follow your Sound effects setting, and the ground's own tune plays. Golf matches won, Divot Cups, a hole in one, an eagle and a win by 5 and 4 or more have medals in the record book.</p>`);
 };
 /* w112a: the Quick start screenshots (W_QUICK_IMG), taken from the game by test/realm_quick_shots.py. Generated: don't
    edit by hand; run the script again when a sport's look changes, then rebuild. */
@@ -66604,7 +66743,12 @@ wLanesHowHTML = function () {
    player of the match a little more; a loss a quarter of the XP and costs nothing else (no Team HP at the lanes). A
    bowling match never ends level (the roll-off). Every match adds your bowlers' lines to WG.lnstats, and goes in the
    head to head and the league table. Save and leave keeps the match between balls, and it is waiting when you come
-   back, after a reload too. Concede counts as a loss.
+   back, after a reload too. The match is kept from its first ball, and saved at once as each ball is bowled (issue
+   #120): a reload never brings a ball back, and a match that has begun is never called off. It is saved at once, too,
+   as you press a ball's speed (a reload before the mark bowls that ball, released late at the bottom of the meter),
+   call the coach's word, the pinch bowler or the re-rack, or cast a power (wBL.onCommit): a reload gives none of them
+   back. A match kept after the ball that decided it is settled as the page comes back (wLanesKeptEnd, called by w159),
+   its result card shown, never left waiting. Concede counts as a loss.
 
    WG.lng     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_LNG.keep], w, l }
               world = { kind: 'lngame', ref, club, tier, how, day, name, ids, tide }, plain data; the end dispatches
@@ -66612,9 +66756,10 @@ wLanesHowHTML = function () {
               ids in order (null for a call-up)
    WG.lnstats { pid: { g, frames, balls, strikes, spares, pins } }, this journey
    wLanesProblems(), wStartLanes({ club, how, tier?, kind?, ref? }), wResumeLanes(), wLanesLeaveGame(), wLanesConcede(),
-   wOpenLanesCard()
+   wOpenLanesCard(), wLanesKeptOver(), wLanesKeptEnd()
    Wraps: wLanesBarNote (wW116LanesBarNote: Save and leave and Concede in a real match), wLeaveLanes (wW116LeaveLanes),
-   wBL.onOver and wBL.onPhase (a real match settles, and is kept between balls), wLanesGame (wW116LanesGame: the hall),
+   wBL.onOver and wBL.onPhase (a real match settles, and is kept between balls), wBL.onCommit (kept as a choice is
+   committed), wLanesGame (wW116LanesGame: the hall),
    wLanesRows (wW116LanesRows: Manage's row; wW116LanesRows2: the re-rack), wRunAct (wW116RunAct: MATCH opens the card), wNextPrompt (wW116NextPrompt:
    a match waiting after a reload), wCampLanes and wRenderCamp (wW116CampLanes, wW116RenderCamp: Play a match and
    Resume on the Lanes tab), wCampStats (wW116CampStats: the Bowling view's lines), wStatsCard (wW116StatsCard: the
@@ -66625,9 +66770,11 @@ const W_LNG = {
   // extra rating points for each of their five, by tier (measured in phase 10: docs/realm/BALANCE.md)
   oppBonus: { 1: 1, 2: 1, 3: 1 },
   minutes: 120, keep: 10, saveMs: 12000,
+  // the beats a ball is settled in (bowled and counted, still rolling): kept and saved at once
+  settled: ['roll'],
 };
 const W_LNG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WLNG = { saved: 0, asked: false, msg: '' };
+const WLNG = { saved: 0, asked: false, msg: '', card: '' };
 W_LANES_MODES.manage = { n: 'Manage', title: 'Your captain bowls your side by your call: the line, the tempo and the ball, in the row under the lanes. Your five bowl on their ratings.' };
 (() => { const play = $('wLanesModes').querySelector('[data-nmode="play"]'); play.insertAdjacentHTML('beforebegin', `<button class="ghost" data-nmode="manage" title="${esc(W_LANES_MODES.manage.title)}">Manage</button>`); })();
 
@@ -66690,6 +66837,8 @@ function wStartLanes(o) {
   if (how === 'sim') { const s = wBL.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts)); wLanesResultCard(wLanesSettle(s)); return ''; }
   wLanesGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WBL.world = true;
+  // (kept from the first ball: a reload before it brings the match back, never calls it off: #120)
+  B.live.snap = wBL.snapshot();
   wLanesBarNote();
   wSave();
   return '';
@@ -66738,6 +66887,8 @@ function wLanesConcede() {
 function wLanesScore(sn) {
   const G = sn.G, sc = s => { const a = G.fr[s], n = G.frames; let t = 0; try { const v = wBL.score(a, n).filter(x => x != null); t = v.length ? v[v.length - 1] : 0; } catch (e) { /* */ } return t; };
   const done = Math.min(G.fr[0].length, G.fr[1].length), a = sc(0), b = sc(1);
+  // (a match its last ball decided is finished: who won it)
+  if (G.over) return `finished: ${G.teams[G.over.win].name} won${G.over.text ? `, ${G.over.text}` : ''}`;
   return `${a} to ${b}${done ? ` after ${done} frame${done === 1 ? '' : 's'}` : ''}`;
 }
 
@@ -66745,10 +66896,34 @@ function wLanesScore(sn) {
 const wW116OnPhase = wBL.onPhase;
 wBL.onPhase = ph => {
   wW116OnPhase(ph);
-  if (ph !== 'next' || !wLanesWorld() || wBL.G.over) return;
+  if (!wLanesWorld() || !wBL.G) return;
+  const settled = W_LNG.settled.includes(ph);
+  if (!settled && (ph !== 'next' || wBL.G.over)) return;
   const L = WG.lng.live, first = !L.snap; L.snap = wBL.snapshot();
-  const now = Date.now(); if (first || now - WLNG.saved > W_LNG.saveMs) { WLNG.saved = now; wSave(); }
+  // (a ball bowled is saved at once, the deciding one too: a reload never brings a ball back, and a match it decided is
+  // settled on Resume (the engine says its end). The next beat is saved at most every W_LNG.saveMs: nothing new is
+  // settled in it, #120)
+  const now = Date.now(); if (first || settled || now - WLNG.saved > W_LNG.saveMs) { WLNG.saved = now; wSave(); }
 };
+// a choice committed (a ball's speed pressed, the word, the pinch bowler, the re-rack, a power cast) is kept and saved at
+// once (#120)
+const wW116OnCommit = wBL.onCommit;
+wBL.onCommit = () => {
+  if (wW116OnCommit) wW116OnCommit();
+  if (!wLanesWorld() || !wBL.G) return;
+  WG.lng.live.snap = wBL.snapshot(); WLNG.saved = Date.now(); wSave();
+};
+// a match kept after the ball that decided it (the page went as it rolled): settled now, as that ball would have settled
+// it, never left waiting; its result card waits for the world (wNextPrompt). Returns the result's words, or ''
+function wLanesKeptOver() { const L = wLanesLive() && WG.lng.live; return !!(L && L.snap && L.snap.G && L.snap.G.over); }
+function wLanesKeptEnd() {
+  if (WBL || !wLanesKeptOver()) return '';
+  wBL.resume(WG.lng.live.snap);
+  const s = wBL.summary(); if (!s) return '';
+  const msg = wLanesSettle(s);
+  WLNG.asked = true; if (!LAB) WLNG.card = msg;
+  return msg;
+}
 const wW116OnOver = wBL.onOver;
 wBL.onOver = s => {
   if (WBL && WBL.world && wLanesLive()) WBL.msg = wLanesSettle(s);
@@ -66892,7 +67067,12 @@ wRunAct = function (act, id) { if (act === 'lncard') return wOpenLanesCard(); re
 
 const wW116NextPrompt = wNextPrompt;
 wNextPrompt = function () {
-  if (!LAB && wLanesLive() && !WLNG.asked && !WBL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+  // (a decided match is settled, not waiting: its result card, settled here if the page came back somewhere else first)
+  if (!LAB && !WBL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    if (!WKEPT.loading && wLanesKeptOver()) wKeptOne(wLanesKeptEnd);
+    if (WLNG.card) { const m = WLNG.card; WLNG.card = ''; wLanesResultCard(m); if (!$('modal').hidden) return true; }
+  }
+  if (!LAB && wLanesLive() && !WLNG.asked && !wLanesKeptOver() && !WBL && !WD && !WG.cardOffer && !WG.event && wActive()) {
     WLNG.asked = true;
     const L = WG.lng.live, sn = L.snap;
     const close = modal(`<header><h3>A bowling match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wLanesScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Lanes tab on the Team screen.</p></div>
@@ -67427,7 +67607,7 @@ renderHelp = function () {
      the 7 for a left-hander's ball);
    - the sea under the floor: a soft swell every few seconds, louder at high tide;
    - the end: the horn and the gallery when you win (or at the end of a game you only watch), a low note when you lose.
-   The realm's music plays on, as at any ground (the Lanes' own track, Strike Lamps, is w26's).
+   The ground's own tune plays on this view (w160), as on the ground's map (the Lanes' own track, Strike Lamps, is w26's).
    Tips. TIPS.w_lanes once your team can bowl (W_LNG.minOwn players), TIPS.w_gutter once you have won a bowling match.
    Medals, on SD's ACH, from matches from the world (exhibitions and practice don't count): bowling matches won
    (realmLanesWins), Gutter Cups (realmGutters), a turkey by your side (realmTurkeys), a clean game, every frame a mark
@@ -67515,7 +67695,7 @@ const wW121RenderHelp = renderHelp;
 renderHelp = function () {
   wW121RenderHelp();
   const d = $('wHelpLanesCup'); if (!d || $('wHelpLanesFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesFeel"><b>At the lanes</b> you hear the ball roll down the wood and the pins when it gets there (a crash for a strike), the gallery for a strike (louder for a double and a turkey), a bright pair of notes for a spare, the ring of a lone corner pin that won't fall, and the sea under the floor; sounds follow your Sound effects setting, and the realm's music plays on. Bowling matches won, Gutter Cups, a turkey, a clean game, the 7-10 converted and a 300 have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesFeel"><b>At the lanes</b> you hear the ball roll down the wood and the pins when it gets there (a crash for a strike), the gallery for a strike (louder for a double and a turkey), a bright pair of notes for a spare, the ring of a lone corner pin that won't fall, and the sea under the floor; sounds follow your Sound effects setting, and the ground's own tune plays. Bowling matches won, Gutter Cups, a turkey, a clean game, the 7-10 converted and a 300 have medals in the record book.</p>`);
 };
 /* w122: the Curling Shed (issue #102, phase 2). The Curling Shed, the curling engine, runs in the wCR scope (src/cr/ and
    src/realm/shed/: a canvas in #v-shed, and none of its names reach ours). This part gives it a view beside the world,
@@ -68013,8 +68193,13 @@ wShedHowHTML = function () {
    The result: a win pays XP to everyone who curled (half to the rest of the team), gold and fans by tier, and the player
    of the match a little more; a loss a quarter of the XP and costs nothing else. A curling match never ends level (the
    extra end). Every match adds your curlers' lines to WG.crstats, and goes in the head to head and the league table.
-   Save and leave keeps the match between stones, and it is waiting when you come back, after a reload too. Concede
-   counts as a loss.
+   Save and leave keeps the match between stones, and it is waiting when you come back, after a reload too. The match
+   is kept from its first stone, and saved at once as each stone is released (with its release: a reload mid-slide
+   brings it to rest on that release, without your sweeping) and as it comes to rest (issue #120): a reload never brings
+   a stone back, and a match that has begun is never called off. It is saved at once, too, as you cast a power before
+   your stone (wCR.onCommit): a reload doesn't give it back. A match kept after the stone that decided it (or with a
+   stone left sliding that decides it) is settled as the page comes back (wShedKeptEnd, called by w159), its result
+   card shown, never left waiting. Concede counts as a loss.
 
    WG.shg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_SHG.keep], w, l }
               world = { kind: 'shgame', ref, club, tier, how, day, name, ids, cold }, plain data; the end dispatches
@@ -68022,9 +68207,10 @@ wShedHowHTML = function () {
               in order (null for a call-up)
    WG.crstats { pid: { g, stones, made, ends } }, this journey
    wShedProblems(), wStartShed({ club, how, tier?, kind?, ref? }), wResumeShed(), wShedLeaveGame(), wShedConcede(),
-   wOpenShedCard()
+   wOpenShedCard(), wShedKeptOver(), wShedKeptEnd()
    Wraps: wShedBarNote (wW125ShedBarNote: Save and leave and Concede in a real match), wLeaveShed (wW125LeaveShed),
-   wCR.onOver and wCR.onPhase (a real match settles, and is kept between stones), wShedGame (wW125ShedGame: the Shed's
+   wCR.onOver and wCR.onPhase (a real match settles, and is kept between stones), wCR.onCommit (kept as a power is
+   cast), wShedGame (wW125ShedGame: the Shed's
    ways), wShedRows (wW125ShedRows: Manage's row), wRunAct (wW125RunAct: MATCH opens the card), wNextPrompt
    (wW125NextPrompt: a match waiting after a reload), wCampShed and wRenderCamp (wW125CampShed, wW125RenderCamp: Curl a
    match and Resume on the Shed tab), wCampStats (wW125CampStats: the Curling view's lines), wStatsCard (wW125StatsCard:
@@ -68035,9 +68221,11 @@ const W_SHG = {
   // extra rating points for each of their four, by tier; first guesses until the lab measures them (phase 10)
   oppBonus: { 1: 1, 2: 1, 3: 1 },
   minutes: 120, keep: 10, saveMs: 12000,
+  // the beats a stone is settled in: released (kept with its release, wCR.snapshot) and come to rest; kept and saved at once
+  settled: ['slide', 'rest'],
 };
 const W_SHG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WSHG = { saved: 0, asked: false, msg: '' };
+const WSHG = { saved: 0, asked: false, msg: '', card: '' };
 W_SHED_MODES.manage = { n: 'Manage', title: 'Your captain throws your side by your call: the draw game or the hitting game, in the row under the ice. Your four throw on their ratings.' };
 (() => { const play = $('wShedModes').querySelector('[data-cmode="play"]'); play.insertAdjacentHTML('beforebegin', `<button class="ghost" data-cmode="manage" title="${esc(W_SHED_MODES.manage.title)}">Manage</button>`); })();
 
@@ -68103,6 +68291,8 @@ function wStartShed(o) {
   if (how === 'sim') { const seed = (Math.random() * 1e9) | 0, s = wShedDecide(wCR.simGame(Object.assign({ seed }, opts)), seed); wShedResultCard(wShedSettle(s)); return ''; }
   wShedGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WCR.world = true;
+  // (kept from the first stone: a reload before it brings the match back, never calls it off: #120)
+  B.live.snap = wCR.snapshot();
   wShedBarNote();
   wSave();
   return '';
@@ -68115,6 +68305,8 @@ function wResumeShed() {
   if (WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
   W_SHED_MODE = L.snap.mode || W_SHED_MODE;
   wCR.resume(L.snap);
+  // (a stone left sliding has come to rest on its release: kept and saved at once, so a second reload can't throw it again)
+  if (L.snap.slide) { L.snap = wCR.snapshot(); wSave(); }
   $('wShedTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
   showView('shed');
   wShedBarNote(); wShedRows(); wShedBoard();
@@ -68155,6 +68347,8 @@ function wShedConcede() {
 }
 function wShedScore(sn) {
   const G = sn.G, t = s => G.sc[s].reduce((a, b) => a + (b || 0), 0), e = G.end;
+  // (a match its last stone decided is finished: who won it)
+  if (G.over) return `finished: ${G.teams[G.over.win].name} won${G.over.text ? `, ${G.over.text}` : ''}`;
   return `${t(0)} to ${t(1)}${e ? ` after ${e} end${e === 1 ? '' : 's'}` : ''}`;
 }
 
@@ -68162,10 +68356,35 @@ function wShedScore(sn) {
 const wW125OnPhase = wCR.onPhase;
 wCR.onPhase = ph => {
   wW125OnPhase(ph);
-  if (ph !== 'next' || !wShedWorld() || wCR.G.over) return;
+  if (!wShedWorld() || !wCR.G) return;
+  const settled = W_SHG.settled.includes(ph);
+  if (!settled && (ph !== 'next' || wCR.G.over)) return;
   const L = WG.shg.live, first = !L.snap; L.snap = wCR.snapshot();
-  const now = Date.now(); if (first || now - WSHG.saved > W_SHG.saveMs) { WSHG.saved = now; wSave(); }
+  // (a stone released, and come to rest, is saved at once, the deciding one too: a reload never brings a stone back. The
+  // next beat is saved at most every W_SHG.saveMs: nothing new is settled in it, #120)
+  const now = Date.now(); if (first || settled || now - WSHG.saved > W_SHG.saveMs) { WSHG.saved = now; wSave(); }
 };
+// a power cast before your stone is kept and saved at once (#120)
+const wW125OnCommit = wCR.onCommit;
+wCR.onCommit = () => {
+  if (wW125OnCommit) wW125OnCommit();
+  if (!wShedWorld() || !wCR.G) return;
+  WG.shg.live.snap = wCR.snapshot(); WSHG.saved = Date.now(); wSave();
+};
+// a match kept after the stone that decided it, or with a stone left sliding (the page went as it slid): the stone comes
+// to rest on its release first, and a match it decided is settled now, never left waiting; its result card waits for
+// the world (wNextPrompt). One it didn't decide is kept with the stone at rest, waiting. Returns the result's words, or ''
+function wShedKeptOver() { const L = wShedLive() && WG.shg.live; return !!(L && L.snap && L.snap.G && (L.snap.G.over || L.snap.slide)); }
+function wShedKeptEnd() {
+  if (WCR || !wShedKeptOver()) return '';
+  const L = WG.shg.live;
+  wCR.resume(L.snap);
+  if (!wCR.G.over) { L.snap = wCR.snapshot(); wSave(); return ''; }
+  const s = wCR.summary(); if (!s) return '';
+  const msg = wShedSettle(s);
+  WSHG.asked = true; if (!LAB) WSHG.card = msg;
+  return msg;
+}
 const wW125OnOver = wCR.onOver;
 wCR.onOver = s => {
   if (WCR && WCR.world && wShedLive()) { WCR.msg = wShedSettle(s); WCR.endMode = wCR.mode; wShedModeBack(); }
@@ -68301,7 +68520,12 @@ wRunAct = function (act, id) { if (act === 'shcard') return wOpenShedCard(); ret
 
 const wW125NextPrompt = wNextPrompt;
 wNextPrompt = function () {
-  if (!LAB && wShedLive() && !WSHG.asked && !WCR && !WD && !WG.cardOffer && !WG.event && wActive()) {
+  // (a decided match is settled, not waiting: its result card, settled here if the page came back somewhere else first)
+  if (!LAB && !WCR && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    if (!WKEPT.loading && wShedKeptOver()) wKeptOne(wShedKeptEnd);
+    if (WSHG.card) { const m = WSHG.card; WSHG.card = ''; wShedResultCard(m); if (!$('modal').hidden) return true; }
+  }
+  if (!LAB && wShedLive() && !WSHG.asked && !wShedKeptOver() && !WCR && !WD && !WG.cardOffer && !WG.event && wActive()) {
     WSHG.asked = true;
     const L = WG.shg.live, sn = L.snap;
     const close = modal(`<header><h3>A curling match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wShedScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Shed tab on the Team screen.</p></div>
@@ -68850,7 +69074,7 @@ renderHelp = function () {
    - the end of a game: a match from the world, and a practice game you curl, by the result (the horn and the gallery
      for a win, a low note for a loss); a practice game you only watch, the horn and the gallery. Your skip's call is
      heard on your own stones only.
-   The realm's music plays on, as at any ground (the Shed's own track is w26's).
+   The ground's own tune plays on this view (w160), as on the ground's map (the Shed's own track is w26's).
    Tips. TIPS.w_shed once your team can curl (W_SHG.minOwn players), TIPS.w_broom once you have won a curling match.
    Medals, on SD's ACH, from matches from the world (exhibitions and practice don't count; a conceded one doesn't):
    curling matches won (realmShedWins), Brass Brooms (realmBrooms), an end stolen by your rink (realmSteals), four or
@@ -69950,7 +70174,7 @@ const W_JTR = {
   cuKinds: ['spider', 'elf', 'golem', 'kobold', 'werewolf', 'witch'],
   stat: { lance: ['Lan', 'Lance: how little the tip sways'], couch: ['Cou', 'Couch: the moment to lower the lance, and how long the arm holds it'],
     seat: ['Sea', 'Seat: staying on after a hit'], shield: ['Shi', 'Shield: a lance on the shield breaks less'],
-    ride: ['Rid', 'Ride: pace, the mount\'s wind, and sitting a hit'], nerve: ['Ner', 'Nerve: steady in the last course when behind, and in the tilt for the crown'],
+    ride: ['Rid', 'Ride: pace, the mount\'s wind, sitting a hit, and settling a Courser'], nerve: ['Ner', 'Nerve: steady in the last course when behind, and in the tilt for the crown'],
     care: ['Car', 'Care: how much a squire does between courses'] },
   role: ['the first heat\'s rider', 'the second heat\'s rider', 'a squire', 'a squire'],
   short: ['1st', '2nd', 'Sq', 'Sq'],
@@ -70116,7 +70340,7 @@ function wListsRow(k, C) {
 function wCampLists(C) {
   const res = wListsReserves(C), M = wJT.mounts;
   return `<p class="hint">Your four at the Tilting Lists: two ride, one a heat (the first rider meets their first, then the second meets their second), and two squire. A rider wants a steady <b>lance</b>, a good <b>seat</b>, the <b>couch</b>, the <b>shield</b> and the <b>ride</b>; the second heat and the tilt for the crown want <b>nerve</b>. A squire wants <b>care</b>: between courses each squire does one job (tend the mount, steady the rider or tighten the girth), and care sets how much.</p>
-    <p class="hint">Each rider rides a mount from Sir Ruddock's stable: the <b>${M.charger.n}</b> is fast, hits hard and carries its rider through a hit, but sways more (for a steady lance), the <b>${M.destrier.n}</b> is the easiest to aim from but hits softer, the <b>${M.courser.n}</b> is light in the hit but gets its wind back quickly (for a long heat, or a rider who gallops).</p>
+    <p class="hint">Each rider rides a mount from Sir Ruddock's stable: the <b>${M.charger.n}</b> is fast, hits hard and carries its rider through a hit, but sways more (for a steady lance), the <b>${M.destrier.n}</b> is the easiest to aim from for most riders but hits softer (for a lance that sways), the <b>${M.courser.n}</b> is light: it hits softest and sways under an ordinary rider, but a good rider settles it, and it gets its wind back quickly (for a good <b>ride</b>, most of all in a long heat).</p>
     <h4>The four</h4><ol class="wroster wnine wcourt wlistsfour">${C.four.map(k => wListsRow(k, C)).join('')}</ol>
     <h4>Reserves</h4>${res.length ? `<ol class="wroster wnine wcourtb wlistsres">${res.map(k => wListsRow(k, C)).join('')}</ol>` : '<p class="hint">Nobody: every player you have is in the four.</p>'}
     <div class="row wnbtn"><button class="ghost" data-jauto>The captain's pick</button><button class="btn" data-jpractice>Practice match</button></div>`;
@@ -70195,9 +70419,9 @@ wListsRows = function () {
 /* ---------- How to play ---------- */
 const wW148ListsHow = wListsHowHTML;
 wListsHowHTML = function () {
-  return wW148ListsHow() + `<p class="hint"><b>Ratings.</b> Each player has seven: <b>lance</b> (how little the tip sways), <b>couch</b> (the moment to lower it, and how long the arm holds it), <b>seat</b> (staying on after a hit), <b>shield</b> (a lance on the shield breaks less), <b>ride</b> (pace, the mount's wind, and sitting a hit), <b>nerve</b> and <b>care</b> (a squire's). Each level adds a point, mostly to what their kind is good at.</p>
+  return wW148ListsHow() + `<p class="hint"><b>Ratings.</b> Each player has seven: <b>lance</b> (how little the tip sways), <b>couch</b> (the moment to lower it, and how long the arm holds it), <b>seat</b> (staying on after a hit), <b>shield</b> (a lance on the shield breaks less), <b>ride</b> (pace, the mount's wind, sitting a hit, and settling a Courser), <b>nerve</b> and <b>care</b> (a squire's). Each level adds a point, mostly to what their kind is good at.</p>
   <p class="hint"><b>Riders and squires.</b> The Lists tab on the Team screen sets your four: the first heat's rider, the second's, and two squires. Left alone, the captain picks the two best riders (the steadier nerve rides the second heat) and the two best squires. In the tilt for the crown your best rider by nerve and lance rides.</p>
-  <p class="hint"><b>Mounts.</b> Each rider rides one of Sir Ruddock's: the <b>Charger</b> (fast, hits hard, carries you through a hit, sways more), the <b>Destrier</b> (the easiest to aim from, hits softer) or the <b>Courser</b> (light in the hit, gets its wind back quickly). A course spends the mount's wind, a gallop most; a blown mount is slower and the tip sways more. Each heat's rider starts on a fresh mount.</p>
+  <p class="hint"><b>Mounts.</b> Each rider rides one of Sir Ruddock's: the <b>Charger</b> (fast, hits hard, carries you through a hit, sways more: for a steady lance in a short heat), the <b>Destrier</b> (the easiest to aim from for most riders, hits softer: for a lance that sways) or the <b>Courser</b> (light: hits softest and sways under an ordinary rider, but a good ride settles it, and it gets its wind back quickly: for a good rider, most of all in a long heat). Left alone, the captain picks by those. A course spends the mount's wind, a gallop most; a blown mount is slower and the tip sways more. Each heat's rider starts on a fresh mount.</p>
   <p class="hint"><b>The arm and the shake.</b> Every couch tires the lance arm, an early one most: a tired arm sways and the tip droops. A rider rocked by a broken lance who stays on is shaken for the next course: more sway and a worse seat.</p>
   <p class="hint"><b>Your squires.</b> Between courses each squire does one job, two of the three: <b>tend the mount</b> (some of its lost wind back), <b>steady the rider</b> (the shake gone, some of the arm back) or <b>tighten the girth</b> (a better seat next course). Their care sets how much. In You ride you pick the jobs before you ride (your corner suggests); the CPU's corner picks by its skill.</p>
   <p class="hint"><b>Nerve.</b> The last course of a heat when you're behind, and every course of the tilt for the crown, weigh on a rider: the tip sways more and the couch is harder to time, less for a steady nerve. The CPU's riders feel it too.</p>`;
@@ -71457,7 +71681,7 @@ renderHelp = function () {
   const g = $('wHelpListsStars') || $('wHelpListsGround') || $('wHelpListsKit') || $('wHelpListsGame'); if (!g || $('wHelpListsCup')) return;
   g.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsCup"><b>The Gilded Lance.</b> Jousting's cup, every week at the Tilting Lists: ask Sir Ruddock about the CUP, or use the Gilded Lance button on the Lists tab. ${W_LANCE.fee} gold to enter. Eight clubs, three rounds of one match each, the final too; nobody goes home level (the tilt for the crown, marked †), and lose and you're out. Win it for ${W_LANCE.prize.gold} gold, ${W_LANCE.prize.fans} fans, a pick of cards, a piece of jousting gear and ${wLancePotN()}. Save and leave keeps a cup match for later. A match you concede is a loss at the score when you gave up: marked ‡ in the bracket.</p>`);
 };
-/* w158: the feel of jousting (issue #117, phase 13), as w130 is curling's. Sound at the Lists, the Lists' own music,
+/* w158: the feel of jousting (issue #117, phase 13), as w130 is curling's. Sound at the Lists, the Lists' own music (w160's row now),
    tips, medals and the Quick start.
 
    Sound. Built from Sudden Death's own tone and noise (src/app/sound.js), following your Sound effects setting, only
@@ -71487,7 +71711,7 @@ renderHelp = function () {
    On a phone a squire's name stays with their job buttons (.wjtsq doesn't break).
    wListsHoofBeat() one beat of the charge's sound (the timer's), wListsCrack(k) a lance meeting ({ broke, zone, at }),
    wListsTrumpet(big) the herald's call
-   Wraps: wJT.onPhase (wW158OnPhase: the sounds), wJT.onOver (wW158OnOver: the end), musicWanted (wW158MusicWanted),
+   Wraps: wJT.onPhase (wW158OnPhase: the sounds), wJT.onOver (wW158OnOver: the end),
    wListsSettle (wW158ListsSettle: the medals), wLanceWon (wW158LanceWon), renderHelp (wW158RenderHelp: #wHelpListsFeel
    after #wHelpListsCup). */
 
@@ -71567,16 +71791,7 @@ wJT.onOver = s => {
   } catch (e) { console.error(e); }
 };
 
-/* ---------- music: the Lists' own theme on the Lists view ---------- */
-const wW158MusicWanted = musicWanted;
-musicWanted = function () {
-  const base = wW158MusicWanted();
-  if (!WG || !RUN || UI.screen !== 'run' || UI.view !== 'lists' || !THEMES.wg_g_lists) return base;
-  const G = wJT.G; if (G && (G.lich || G.hex)) return base;
-  const live = !!(G && G.teams && !G.over && !G.yard && WJT && !WJT.over), out = ['wg_g_lists', !live ? 'calm' : wJT.inTilt() ? 'hype' : 'fight'];
-  MUS.want = out[0];
-  return out;
-};
+/* (the Lists' own music on the Lists view: w160's W_GRD_MUSIC.lists, #120) */
 
 /* ---------- tips ---------- */
 Object.assign(TIPS, {
@@ -71624,6 +71839,52 @@ renderHelp = function () {
   wW158RenderHelp();
   const d = $('wHelpListsCup'); if (!d || $('wHelpListsFeel')) return;
   d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsFeel"><b>At the Lists</b> you hear the hoofbeats of the charge (a tick when you spur on the beat), the crack of a lance broken (a ring of steel on a helm break) and the thud of an unhorsing. The herald's trumpet opens each heat and the tilt for the crown, and the gallery cheers your points and groans at theirs. The Lists have their own music. Medals: jousting matches won, Gilded Lances, riders unhorsed, lances broken on the helm, and a heat without a point against.</p>`);
+};
+/* w160: each engine's own view plays its ground's music (issue #120, phase 2). Loads after w158-listsfeel.js.
+
+   Every ground has its own theme (w26's THEMES.wg_<ground>), heard while you walk the ground. Once a match opened an
+   engine's view, Sudden Death's act music took over (musicWanted falls back to ['act0', 'calm'] off the fight view).
+   Now the view plays its ground's theme: calm while no match is live there (the ground's tune, quietly: w50's ambient
+   bed stays on the maps), fight while one is, hype at the big moments an engine shows (a knockdown's count in the ring,
+   the tilt for the crown at the Lists; the other engines have no such moment in their state, so they stay on fight).
+   A boxing card is live between its bouts, until its result. Jousting's rule was w158's own wrapper; it is a row here
+   now, the same rule. Baseball's Diamond view is left alone: Brimstone Diamond plays its own organ there (w20f).
+
+   The Umbral has no music of its own: a match against the Nadir (its club 'nadir' or 'nadir:<id>', the finale's
+   rounds too), or the Lists' Lich or hexes, keeps the music it had, wherever you stand; a light-side match is the
+   ground's, even resumed on the dark side.
+
+   W_GRD_MUSIC: the view, its ground's theme, whether a match is live on it (the Realm's own record of the match, WBX,
+   WGF, ...: set when one starts, over once it ends, and the engine's own, through its exports), its big moment, and
+   its world record (WG.<k>.live, whose club says whether it is the Umbral's).
+   Wraps: musicWanted (wW160MusicWanted). */
+
+const W_GRD_MUSIC = {
+  ring: { g: 'g_ring', rec: 'bxg', live: () => !!(WBX && ((!WBX.over && wBX.live) || (WBX.card && wBX.card && !wBX.card.result))), hype: () => wBX.phase === 'kd' },
+  gridiron: { g: 'g_bowl', rec: 'gfg', live: () => !!(WGF && !WGF.over && wGF.live) },
+  court: { g: 'g_court', rec: 'bkg', live: () => !!(WBK && !WBK.over && wBK.live) },
+  rink: { g: 'g_rink', rec: 'hkg', live: () => !!(WHK && !WHK.over && wHK.live) },
+  links: { g: 'g_links', rec: 'lkg', live: () => !!(WGL && !WGL.over && wGL.G && !wGL.G.over) },
+  lanes: { g: 'g_lanes', rec: 'lng', live: () => !!(WBL && !WBL.over && wBL.G && !wBL.G.over) },
+  shed: { g: 'g_shed', rec: 'shg', live: () => !!(WCR && !WCR.over && wCR.G && !wCR.G.over) },
+  lists: { g: 'g_lists', rec: 'jtg', live: () => { const G = wJT.G; return !!(G && G.teams && !G.over && !G.yard && WJT && !WJT.over); },
+    hype: () => wJT.inTilt(), umb: () => { const G = wJT.G; return !!(G && (G.lich || G.hex)); } },
+};
+// a match against the Nadir: its world record's club, wherever you stand (and a view's own sign, the Lists' Lich)
+function wGrdMusicUmb(V) {
+  const L = WG && WG[V.rec] && WG[V.rec].live, club = String((L && L.world && L.world.club) || '');
+  if (/^nadir(:|$)/.test(club)) return true;
+  try { return !!(V.umb && V.umb()); } catch (e) { return false; }
+}
+const wW160MusicWanted = musicWanted;
+musicWanted = function () {
+  const base = wW160MusicWanted(), V = W_GRD_MUSIC[UI.view];
+  if (!V || !WG || !RUN || UI.screen !== 'run' || !THEMES['wg_' + V.g]) return base;
+  if (wGrdMusicUmb(V)) return base;
+  let live = false, hype = false; try { live = V.live(); hype = live && !!(V.hype && V.hype()); } catch (e) { live = false; }
+  const out = ['wg_' + V.g, hype ? 'hype' : live ? 'fight' : 'calm'];
+  MUS.want = out[0];
+  return out;
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.
@@ -73088,7 +73349,8 @@ wStart = function (save) {
 
    W_UMB1, wUmbScene, wUmbBlight, wUmbEclipse
    Wraps: wNextPrompt (wWU1NextPrompt: the scene, once, after the Crown's ending), wSay (wWU1Say: an innkeeper's hello
-   names the DREAMS; the herald's SEAL and PIECES count an older Umbral's nine, wUmbHeraldCount), wStart (wWU1Start: the herald in or out of the Coliseum),
+   names the DREAMS; the herald's SEAL and PIECES count an older Umbral's nine, wUmbHeraldCount; his GATE and Hollow Aurelia's
+   PIECES too, #120), wStart (wWU1Start: the herald in or out of the Coliseum),
    wUmbralUnlock (wWU1UmbralUnlock: the herald, the flag topics wait on), wDarkness (wWU1Darkness: the eclipse),
    wNewDay (wWU1NewDay: the eclipse said at dawn), wEncounterHook (wWU1EncounterHook: the blight's hunters), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
    statue), wOpenJournal (wWU1OpenJournal: the chapter shows once open), wRenderJournal (wWU1RenderJournal: its
@@ -73140,6 +73402,8 @@ wSay = function (id, kw) {
   if (!kw && r && r.text && wFlag('umbral_open') && wUmbOpen() && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
   // (an Umbral opened before jousting's champion: the herald counts the pieces its Seal asks for; phase 11's review)
   if (id === 'uherald' && r && (r.key === 'seal' || r.key === 'pieces')) { const t = wUmbHeraldCount(r.key); if (t) r.text = t; }
+  else if (id === 'uherald' && r && r.key === 'gate' && r.text) r.text = wUmbCount(r.text);   // ('the gentlest of the nine'; #120)
+  else if (id === 'nadir_aurelia' && r && r.key === 'pieces' && wUmbShort()) r.text = `${wCap(wUmbNum(wUmbNeed().length))}, for your Seal: one for every way there was to play when it broke. Without all ${wUmbNum(wUmbNeed().length)} there is nothing to forge, and nothing to play for.`;
   return r;
 };
 // the herald's SEAL and PIECES for a Seal that asks for fewer pieces than there are (u3's wUmbNeed), or '' as written
@@ -73193,7 +73457,7 @@ function wUmbScene(replay) {
   const say = (t, cls) => { lines.insertAdjacentHTML('beforeend', `<p class="${cls || ''}">${esc(t)}</p>`); lines.scrollTop = lines.scrollHeight; };
   const beats = [[1.2, 'Your captain lifts the crown. It cracks, a thin line of dark straight through it.', 'wumbn'], [3.6, 'At noon the sky over the Coliseum goes dark.', 'wumbn'],
     [6.4, 'The crowd falls silent. Beside the statue, the smooth block turns black.', 'wumbn'], [7.6, 'Something answers, far off to the north. The sand shakes.', 'wumbn'],
-    [9.2, 'A pale figure walks out of the dark and onto the pitch.', 'wumbn']].concat(W_UMB1.speech.map((s, i) => [12.4 + i * 3.4, s, 'wumbh']));
+    [9.2, 'A pale figure walks out of the dark and onto the pitch.', 'wumbn']].concat(W_UMB1.speech.map((s, i) => [12.4 + i * 3.4, wUmbCount(s), 'wumbh']));
   let said = 0, shook = false;
   const end = 12.4 + W_UMB1.speech.length * 3.4;
   const snd = (k) => { if (LAB || !SET.sfx) return; try {
@@ -73306,7 +73570,7 @@ function wUmbJournal() {
   // (the pieces this journey's Seal asks for: u3's wUmbNeed)
   const got = wUmbGot(), need = wUmbNeed().length, nw = wUmbNum(need);
   if (U.sealed) return ['sealed', `<div class="wumbj"><p>The Seal of the Crown is forged, in year ${U.sealedYear || WG.year}. You won back all ${nw} pieces and beat Hollow Aurelia's Nadir Athletic in the Hollow Coliseum; the portal at the end of the Road to Nowhere is shut, and the eclipses are over.</p><button class="ghost" data-umbscene="1">See the first night again</button></div>`];
-  return [`${got}/${need}`, `<div class="wumbj"><p>The Crown cracked in your hands, and the Coliseum went dark at noon. The Pale Herald says the Seal of the Crown is broken into ${nw} pieces, one for every way to play, and the Nadir hold them on the far side of a portal at the end of the Road to Nowhere, north of the Roost. Win them back, bring them to the portal, forge the Seal, and close the door. The herald waits by the statue in the Coliseum.</p>
+  return [`${got}/${need}`, `<div class="wumbj"><p>The Crown cracked in your hands, and the Coliseum went dark at noon. The Pale Herald says the Seal of the Crown is broken into ${nw} pieces, ${wUmbWays()}, and the Nadir hold them on the far side of a portal at the end of the Road to Nowhere, north of the Roost. Win them back, bring them to the portal, forge the Seal, and close the door. The herald waits by the statue in the Coliseum.</p>
     <p class="hint">Pieces won: ${got} of ${need}.${U.crossed ? ` You have crossed ${U.crossed} time${U.crossed === 1 ? '' : 's'}.` : ' You have not crossed yet.'}</p>
     <button class="ghost" data-umbscene="1">See it again</button></div>`];
 }
@@ -73675,7 +73939,7 @@ wAudit = function () {
    A new curse: the Umbral Shade (u_shade), unplayable, 1 HP lost if it is in your hand at the end of your turn, and it
    fades at the end of the match like any match-only card.
 
-   W_UMB3, W_UMB_PIECES, W_UMB_NINE, W_NADIR, wNadirMatch, wUmbHexes, wUmbNeed, wUmbGot, wUmbNum
+   W_UMB3, W_UMB_PIECES, W_UMB_NINE, W_NADIR, wNadirMatch, wUmbHexes, wUmbNeed, wUmbShort, wUmbCount, wUmbWays, wUmbGot, wUmbNum
    Wraps: wBuildEncounter (wWU3BuildEncounter: an Umbral match is tier 3 and carries its hexes), wPreGame (wWU3PreGame:
    the match card names tier U and the hexes), wRunAct (wWU3RunAct: PLAY), buildAllMaps (wWU3BuildAllMaps: the
    champions on their maps), wDrawActor (wWU3DrawActor: the dark side's people in shadow), wAudit (wWU3Audit: the
@@ -73729,6 +73993,17 @@ const W_UMB_PIECES = {
 const W_UMB_NINE = ['card', 'baseball', 'basketball', 'golf', 'bowling', 'curling', 'football', 'boxing', 'hockey'];
 // the pieces this journey's Seal asks for, in the pieces' own order
 function wUmbNeed() { const U = wUmb(), all = Object.keys(W_UMB_PIECES); return U && Array.isArray(U.need) ? all.filter(p => U.need.includes(p)) : all; }
+// words written for all ten pieces, in this journey's count: an Umbral opened before jousting's champion says nine (#120)
+// (only the count's own phrases: 'ten pieces', 'ten champions', 'of the ten'; any other ten is left as written)
+const wUmbShort = () => wUmbNeed().length < Object.keys(W_UMB_PIECES).length;
+function wUmbCount(s) {
+  if (!wUmbShort()) return s;
+  const w = wUmbNum(wUmbNeed().length);
+  return String(s).replace(/one for every way there is to play/g, 'one for every way there was to play')
+    .replace(/\b([Tt])en (pieces|champions)\b/g, (m, t, x) => (t === 'T' ? wCap(w) : w) + ' ' + x).replace(/\bof the ten\b/g, 'of the ' + w);
+}
+// how many ways to play the pieces are for: 'every way to play', or, for a short Seal, the ways there were when it broke
+const wUmbWays = () => wUmbShort() ? 'one for every way there was to play when it broke' : 'one for every way to play';
 const wUmbGot = () => { const U = wUmb(); return U ? wUmbNeed().filter(p => U.pieces.includes(p)).length : 0; };
 const wUmbNum = n => ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'][n] || String(n);
 // the Nadir champions: where each waits, who they field, what they hold. Phase 4 adds the sports' champions.
@@ -75766,11 +76041,11 @@ renderHelp = function () {
   const h = $('wHelp'); if (!h || $('wHelpUmbral')) return;
   if (!wUmbOn()) { h.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbral"><b>After the Crown.</b> There is more to the Realm after you win the Crown. Nobody in the league will say what.</p>'); return; }
   h.insertAdjacentHTML('beforeend', `<div id="wHelpUmbral"><h3>The Umbral Realm</h3>
-    <p class="hint"><b>The door.</b> Winning the Crown broke the Seal of the Crown into ten pieces, one for every way to play, and opened a portal at the end of the Road to Nowhere, north of the Roost. Through it is the Umbral: the same Realm, wrong. Same roads, the towns mirrored and dark, the people their own doubles. Time runs on both sides, and the portal works both ways.</p>
+    <p class="hint"><b>The door.</b> Winning the Crown broke the Seal of the Crown into ${wUmbNum(wUmbNeed().length)} pieces, ${wUmbWays()}, and opened a portal at the end of the Road to Nowhere, north of the Roost. Through it is the Umbral: the same Realm, wrong. Same roads, the towns mirrored and dark, the people their own doubles. Time runs on both sides, and the portal works both ways.</p>
     <p class="hint"><b>Harder everywhere.</b> Every match on the dark side is tier U: tier 3 and more (the other side has a quarter more HP and a point more Strength, and you draw a card fewer), and every player has its kind's dark trait. There are no inns: rest by a lantern, one in each region, and a match that goes badly wakes you by the last one you rested at. The dark shops sell for fans or a player's XP, never gold.</p>
-    <p class="hint"><b>The pieces.</b> Ten Nadir champions hold them. The Gatekeeper, just through the portal, plays the card game. The others wait at the far end of their sport's dark ground, past the cold, two guards (each a card match) and a gate: bring them something from the light side of their region. Their games are at tier U, with one or two hexes (dark twists, named before you start). Some want more than a win: two play only after dark, and two want it won by two or more (a narrower win pays as a win, but they keep the piece). Lose, and the next try costs a toll.</p>
+    <p class="hint"><b>The pieces.</b> ${wUmbShort() ? `Ten Nadir champions hold pieces, and your Seal asks for ${wUmbNum(wUmbNeed().length)} of them.` : 'Ten Nadir champions hold them.'} The Gatekeeper, just through the portal, plays the card game. The others wait at the far end of their sport's dark ground, past the cold, two guards (each a card match) and a gate: bring them something from the light side of their region. Their games are at tier U, with one or two hexes (dark twists, named before you start). Some want more than a win: two play only after dark, and two want it won by two or more (a narrower win pays as a win, but they keep the piece). Lose, and the next try costs a toll.</p>
     ${wUmbJtHelp()}
-    <p class="hint"><b>The Seal.</b> With all ten (an Umbral opened before the Hollow Lists had its champion asks only for the nine it opened with), Hollow Aurelia plays you for the Seal in the Hollow Coliseum: three games, in your three weakest ways to play on that side. A piece you won at the first try takes a hex off its game. Lose a game and you try that one again. Win all three and the door shuts.</p>
+    <p class="hint"><b>The Seal.</b> ${wUmbShort() ? `With all ${wUmbNum(wUmbNeed().length)} (your Umbral opened before the Hollow Lists had its champion, so its Seal asks for the ${wUmbNum(wUmbNeed().length)} it opened with)` : 'With all ten (an Umbral opened before the Hollow Lists had its champion asks only for the nine it opened with)'}, Hollow Aurelia plays you for the Seal in the Hollow Coliseum: three games, in your three weakest ways to play on that side. A piece you won at the first try takes a hex off its game. Lose a game and you try that one again. Win all three and the door shuts.</p>
     <p class="hint"><b>When it shuts.</b> Forge the Seal and you keep it, a trophy: every card match starts with 6 Block and a card more in your first hand. The Nadir captain you beat most cleanly asks to join you. Your team's portrait in the Hall of Legends says you sealed it, for every later journey to see, and your profile's medal (The Door Shut) fills: bronze for the first piece, silver for four, gold for the Seal.</p>
     <p class="hint"><b>On the light side.</b> While the portal stands open, the sun goes out at midday once a week, and more often the longer it stays open. The Pale Herald, by the statue in the Coliseum, will tell you anything twice.</p></div>`);
 };
@@ -78260,6 +78535,41 @@ renderHelp = function () {
   if (!p || p.dataset.u9) return;
   p.dataset.u9 = 1;
   p.innerHTML = p.innerHTML.replace('The Nadir captain you beat most cleanly asks to join you.', 'The Nadir captain you beat most cleanly asks to join you, as a superstar: their own number and signature card, their kind\'s powers in every game, and in their own game the ultimate they used against you. Turn them down and they wait at camp.');
+};
+/* w159: a match kept after its deciding result is settled as the page comes back (issue #120, phase 1's review). Loads
+   last, after the Umbral, so a result's end (a cup's round, a fixture, an Umbral champion's piece, a round of the Seal
+   and a Hardcore journey's loss) finds every part's state as the load left it. The load's own first world draw (the
+   base wStart shows the world, and each part's wNextPrompt runs) waits for it: WKEPT.loading is set through the whole
+   load, and the prompts settle a decided match only when it is not (a match the load could not settle, the world not
+   free, settles at the prompt after). A settle that throws is logged and leaves the match waiting (wKeptOne).
+
+   Golf, bowling and curling from the world save the match at once as a shot, a ball or a stone settles, the deciding
+   one too (w107, w116, w125). A page that went just then came back with a match already decided, and settled it only
+   on Resume: Later left it waiting, its rewards or its loss with it, its cup round or fixture lost to the calendar. Now
+   the load settles it, as the result would have in play (rewards, the head to head and the table, each player's line,
+   the cup's or the Umbral's end, and the log line); its result card shows when the world is free (each part's
+   wNextPrompt), never a match waiting. A curling stone left sliding comes to rest on its release first; one that
+   didn't decide the match leaves it waiting, the stone at rest.
+
+   WKEPT: { loading } while a journey loads. wKeptOne(f): one part's settle, guarded. wKeptEnds(): each part's
+   wLinksKeptEnd, wLanesKeptEnd and wShedKeptEnd, once.
+   Wraps: wStart (wW159Start: a journey loaded settles a decided match it kept). */
+
+const WKEPT = { loading: false };
+function wKeptOne(f) { try { f(); return true; } catch (e) { console.error(e); return false; } }
+function wKeptEnds() {
+  for (const f of [wLinksKeptEnd, wLanesKeptEnd, wShedKeptEnd]) {
+    if (!RUN || RUN.over) return;
+    wKeptOne(f);
+  }
+}
+const wW159Start = wStart;
+wStart = function (save) {
+  let r; WKEPT.loading = true;
+  try { r = wW159Start.apply(this, arguments); } finally { WKEPT.loading = false; }
+  // (only back in the world: a card match or its reward panel picked up first settles it later, at the prompt)
+  if (save && WG && RUN && !RUN.over && UI.view === 'world') wKeptEnds();
+  return r;
 };
 </script>
 </body></html>

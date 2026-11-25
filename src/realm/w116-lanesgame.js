@@ -11,7 +11,12 @@
    player of the match a little more; a loss a quarter of the XP and costs nothing else (no Team HP at the lanes). A
    bowling match never ends level (the roll-off). Every match adds your bowlers' lines to WG.lnstats, and goes in the
    head to head and the league table. Save and leave keeps the match between balls, and it is waiting when you come
-   back, after a reload too. Concede counts as a loss.
+   back, after a reload too. The match is kept from its first ball, and saved at once as each ball is bowled (issue
+   #120): a reload never brings a ball back, and a match that has begun is never called off. It is saved at once, too,
+   as you press a ball's speed (a reload before the mark bowls that ball, released late at the bottom of the meter),
+   call the coach's word, the pinch bowler or the re-rack, or cast a power (wBL.onCommit): a reload gives none of them
+   back. A match kept after the ball that decided it is settled as the page comes back (wLanesKeptEnd, called by w159),
+   its result card shown, never left waiting. Concede counts as a loss.
 
    WG.lng     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_LNG.keep], w, l }
               world = { kind: 'lngame', ref, club, tier, how, day, name, ids, tide }, plain data; the end dispatches
@@ -19,9 +24,10 @@
               ids in order (null for a call-up)
    WG.lnstats { pid: { g, frames, balls, strikes, spares, pins } }, this journey
    wLanesProblems(), wStartLanes({ club, how, tier?, kind?, ref? }), wResumeLanes(), wLanesLeaveGame(), wLanesConcede(),
-   wOpenLanesCard()
+   wOpenLanesCard(), wLanesKeptOver(), wLanesKeptEnd()
    Wraps: wLanesBarNote (wW116LanesBarNote: Save and leave and Concede in a real match), wLeaveLanes (wW116LeaveLanes),
-   wBL.onOver and wBL.onPhase (a real match settles, and is kept between balls), wLanesGame (wW116LanesGame: the hall),
+   wBL.onOver and wBL.onPhase (a real match settles, and is kept between balls), wBL.onCommit (kept as a choice is
+   committed), wLanesGame (wW116LanesGame: the hall),
    wLanesRows (wW116LanesRows: Manage's row; wW116LanesRows2: the re-rack), wRunAct (wW116RunAct: MATCH opens the card), wNextPrompt (wW116NextPrompt:
    a match waiting after a reload), wCampLanes and wRenderCamp (wW116CampLanes, wW116RenderCamp: Play a match and
    Resume on the Lanes tab), wCampStats (wW116CampStats: the Bowling view's lines), wStatsCard (wW116StatsCard: the
@@ -32,9 +38,11 @@ const W_LNG = {
   // extra rating points for each of their five, by tier (measured in phase 10: docs/realm/BALANCE.md)
   oppBonus: { 1: 1, 2: 1, 3: 1 },
   minutes: 120, keep: 10, saveMs: 12000,
+  // the beats a ball is settled in (bowled and counted, still rolling): kept and saved at once
+  settled: ['roll'],
 };
 const W_LNG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WLNG = { saved: 0, asked: false, msg: '' };
+const WLNG = { saved: 0, asked: false, msg: '', card: '' };
 W_LANES_MODES.manage = { n: 'Manage', title: 'Your captain bowls your side by your call: the line, the tempo and the ball, in the row under the lanes. Your five bowl on their ratings.' };
 (() => { const play = $('wLanesModes').querySelector('[data-nmode="play"]'); play.insertAdjacentHTML('beforebegin', `<button class="ghost" data-nmode="manage" title="${esc(W_LANES_MODES.manage.title)}">Manage</button>`); })();
 
@@ -97,6 +105,8 @@ function wStartLanes(o) {
   if (how === 'sim') { const s = wBL.simGame(Object.assign({ seed: (Math.random() * 1e9) | 0 }, opts)); wLanesResultCard(wLanesSettle(s)); return ''; }
   wLanesGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WBL.world = true;
+  // (kept from the first ball: a reload before it brings the match back, never calls it off: #120)
+  B.live.snap = wBL.snapshot();
   wLanesBarNote();
   wSave();
   return '';
@@ -145,6 +155,8 @@ function wLanesConcede() {
 function wLanesScore(sn) {
   const G = sn.G, sc = s => { const a = G.fr[s], n = G.frames; let t = 0; try { const v = wBL.score(a, n).filter(x => x != null); t = v.length ? v[v.length - 1] : 0; } catch (e) { /* */ } return t; };
   const done = Math.min(G.fr[0].length, G.fr[1].length), a = sc(0), b = sc(1);
+  // (a match its last ball decided is finished: who won it)
+  if (G.over) return `finished: ${G.teams[G.over.win].name} won${G.over.text ? `, ${G.over.text}` : ''}`;
   return `${a} to ${b}${done ? ` after ${done} frame${done === 1 ? '' : 's'}` : ''}`;
 }
 
@@ -152,10 +164,34 @@ function wLanesScore(sn) {
 const wW116OnPhase = wBL.onPhase;
 wBL.onPhase = ph => {
   wW116OnPhase(ph);
-  if (ph !== 'next' || !wLanesWorld() || wBL.G.over) return;
+  if (!wLanesWorld() || !wBL.G) return;
+  const settled = W_LNG.settled.includes(ph);
+  if (!settled && (ph !== 'next' || wBL.G.over)) return;
   const L = WG.lng.live, first = !L.snap; L.snap = wBL.snapshot();
-  const now = Date.now(); if (first || now - WLNG.saved > W_LNG.saveMs) { WLNG.saved = now; wSave(); }
+  // (a ball bowled is saved at once, the deciding one too: a reload never brings a ball back, and a match it decided is
+  // settled on Resume (the engine says its end). The next beat is saved at most every W_LNG.saveMs: nothing new is
+  // settled in it, #120)
+  const now = Date.now(); if (first || settled || now - WLNG.saved > W_LNG.saveMs) { WLNG.saved = now; wSave(); }
 };
+// a choice committed (a ball's speed pressed, the word, the pinch bowler, the re-rack, a power cast) is kept and saved at
+// once (#120)
+const wW116OnCommit = wBL.onCommit;
+wBL.onCommit = () => {
+  if (wW116OnCommit) wW116OnCommit();
+  if (!wLanesWorld() || !wBL.G) return;
+  WG.lng.live.snap = wBL.snapshot(); WLNG.saved = Date.now(); wSave();
+};
+// a match kept after the ball that decided it (the page went as it rolled): settled now, as that ball would have settled
+// it, never left waiting; its result card waits for the world (wNextPrompt). Returns the result's words, or ''
+function wLanesKeptOver() { const L = wLanesLive() && WG.lng.live; return !!(L && L.snap && L.snap.G && L.snap.G.over); }
+function wLanesKeptEnd() {
+  if (WBL || !wLanesKeptOver()) return '';
+  wBL.resume(WG.lng.live.snap);
+  const s = wBL.summary(); if (!s) return '';
+  const msg = wLanesSettle(s);
+  WLNG.asked = true; if (!LAB) WLNG.card = msg;
+  return msg;
+}
 const wW116OnOver = wBL.onOver;
 wBL.onOver = s => {
   if (WBL && WBL.world && wLanesLive()) WBL.msg = wLanesSettle(s);
@@ -299,7 +335,12 @@ wRunAct = function (act, id) { if (act === 'lncard') return wOpenLanesCard(); re
 
 const wW116NextPrompt = wNextPrompt;
 wNextPrompt = function () {
-  if (!LAB && wLanesLive() && !WLNG.asked && !WBL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+  // (a decided match is settled, not waiting: its result card, settled here if the page came back somewhere else first)
+  if (!LAB && !WBL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    if (!WKEPT.loading && wLanesKeptOver()) wKeptOne(wLanesKeptEnd);
+    if (WLNG.card) { const m = WLNG.card; WLNG.card = ''; wLanesResultCard(m); if (!$('modal').hidden) return true; }
+  }
+  if (!LAB && wLanesLive() && !WLNG.asked && !wLanesKeptOver() && !WBL && !WD && !WG.cardOffer && !WG.event && wActive()) {
     WLNG.asked = true;
     const L = WG.lng.live, sn = L.snap;
     const close = modal(`<header><h3>A bowling match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wLanesScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Lanes tab on the Team screen.</p></div>

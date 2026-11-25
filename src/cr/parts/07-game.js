@@ -147,17 +147,33 @@ const crThin = p => { const out = []; let D = null; p.forEach((q, i) => {
   if (!D || i === p.length - 1 || Math.hypot(q[0] - D[0], q[1] - D[1]) >= 59) { out.push([q[0], q[1]]); D = q; } else if (crTurnAt(p, i)) out.push([q[0], q[1], 1]); }); return out; };
 function crSnapshot() {
   // (a stone your captain has cast on and not thrown: kept as it was before the casts, so taking it back still undoes them)
-  const g = GP && GP.cpu && GP.cpu.pre ? Object.assign({}, G, JSON.parse(JSON.stringify(GP.cpu.pre))) : G;
-  return JSON.parse(JSON.stringify({ G: g, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, autoPow: !!(GP && GP.autoPow), paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [] })); }
+  let g = GP && GP.cpu && GP.cpu.pre ? Object.assign({}, G, JSON.parse(JSON.stringify(GP.cpu.pre))) : G;
+  // (a stone sliding: the game as it was released, its sweepers' legs too, and the release, so a resume brings it to rest
+  // on that release (issue #120): your sweeping isn't kept, the CPU's sweepers sweep it as they would)
+  const X = GP && GP.ph === 'slide' && GP.X && GP.X.g === G ? GP.X : null;
+  if (X) g = Object.assign({}, g, { legs: X.legs0.slice() });
+  // (said: the last stone's line, said again on a resume, #120)
+  return JSON.parse(JSON.stringify({ G: g, mode: GP ? GP.mode : 'watch', mgr: GP ? GP.mgr : null, autoPow: !!(GP && GP.autoPow), paths: GP ? GP.paths.map(q => ({ s: q.s, path: crThin(q.path) })) : [],
+    slide: X ? { s: X.s, plan: X.plan, rel: X.rel, cpu: !!X.Q.O.sweep } : null, said: GP ? GP.said || '' : '' })); }
 function crResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null; CR_LIVE = null;
   // (a game saved before a part added its state: that part's state as it starts)
   if (G.powers && !G.powWhich) G.powWhich = [null, null];
   if (!G.potEnd) { const b = G.bags; crKitStart(b); }
   if (G.deep === undefined) { G.deep = null; G.deepSaid = ''; }
+  // (a stone kept sliding comes to rest on its release first, as the game goes on: never thrown again)
+  const sl = sn.slide; let ev = null, path = null, said = sn.said || '';
+  if (sl && sl.plan && sl.rel) {
+    GP = null;   // (the page's last game has no say in it: crPlayStart makes this one's)
+    const X = crThrowBegin(sl.s, sl.plan, sl.rel, sl.cpu ? crSweeper(sl.s, sl.plan) : null);
+    if (X) { while (crRunStep(X.Q)); ev = crThrowFinish(X); if (ev.rule.ok) { path = X.Q.path.map(p => [p[0], p[1]]); said = crSettleSay(ev, X.ham); } }
+  }
   crPlayStart({ mode: sn.mode });
   if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr); GP.autoPow = !!sn.autoPow; GP.paths = (sn.paths || []).slice();
-  GP.msg = `Back at the Shed: ${crMatchText(0).toLowerCase()}.`;
+  if (path) { GP.paths.push({ s: ev.side, path }); GP.last = ev; }
+  // (the last stone's line first, the one left sliding's when there was one: #120)
+  GP.said = said;
+  GP.msg = `${said ? said + ' ' : ''}Back at the Shed${path ? `, the stone left sliding at rest` : ''}: ${crMatchText(0).toLowerCase()}.`;
   return G;
 }
 // a whole game headless: leaves the game on the ice, and the random stream, as they were

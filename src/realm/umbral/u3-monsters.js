@@ -18,7 +18,7 @@
    A new curse: the Umbral Shade (u_shade), unplayable, 1 HP lost if it is in your hand at the end of your turn, and it
    fades at the end of the match like any match-only card.
 
-   W_UMB3, W_UMB_PIECES, W_UMB_NINE, W_NADIR, wNadirMatch, wUmbHexes, wUmbNeed, wUmbGot, wUmbNum
+   W_UMB3, W_UMB_PIECES, W_UMB_NINE, W_NADIR, wNadirMatch, wUmbHexes, wUmbNeed, wUmbShort, wUmbCount, wUmbWays, wUmbGot, wUmbNum
    Wraps: wBuildEncounter (wWU3BuildEncounter: an Umbral match is tier 3 and carries its hexes), wPreGame (wWU3PreGame:
    the match card names tier U and the hexes), wRunAct (wWU3RunAct: PLAY), buildAllMaps (wWU3BuildAllMaps: the
    champions on their maps), wDrawActor (wWU3DrawActor: the dark side's people in shadow), wAudit (wWU3Audit: the
@@ -72,6 +72,17 @@ const W_UMB_PIECES = {
 const W_UMB_NINE = ['card', 'baseball', 'basketball', 'golf', 'bowling', 'curling', 'football', 'boxing', 'hockey'];
 // the pieces this journey's Seal asks for, in the pieces' own order
 function wUmbNeed() { const U = wUmb(), all = Object.keys(W_UMB_PIECES); return U && Array.isArray(U.need) ? all.filter(p => U.need.includes(p)) : all; }
+// words written for all ten pieces, in this journey's count: an Umbral opened before jousting's champion says nine (#120)
+// (only the count's own phrases: 'ten pieces', 'ten champions', 'of the ten'; any other ten is left as written)
+const wUmbShort = () => wUmbNeed().length < Object.keys(W_UMB_PIECES).length;
+function wUmbCount(s) {
+  if (!wUmbShort()) return s;
+  const w = wUmbNum(wUmbNeed().length);
+  return String(s).replace(/one for every way there is to play/g, 'one for every way there was to play')
+    .replace(/\b([Tt])en (pieces|champions)\b/g, (m, t, x) => (t === 'T' ? wCap(w) : w) + ' ' + x).replace(/\bof the ten\b/g, 'of the ' + w);
+}
+// how many ways to play the pieces are for: 'every way to play', or, for a short Seal, the ways there were when it broke
+const wUmbWays = () => wUmbShort() ? 'one for every way there was to play when it broke' : 'one for every way to play';
 const wUmbGot = () => { const U = wUmb(); return U ? wUmbNeed().filter(p => U.pieces.includes(p)).length : 0; };
 const wUmbNum = n => ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'][n] || String(n);
 // the Nadir champions: where each waits, who they field, what they hold. Phase 4 adds the sports' champions.

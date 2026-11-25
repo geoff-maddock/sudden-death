@@ -205,6 +205,7 @@ src/realm/w156-listsstars.js
 src/realm/w157-listscup.js
 # the feel of jousting: sound at the Lists, the Lists' music, tips, medals (issue #117, phase 13; its Quick start is w112's)
 src/realm/w158-listsfeel.js
+src/realm/w160-groundmusic.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js
@@ -240,3 +241,5 @@ src/realm/umbral/u8h-market.js
 src/realm/umbral/u8i-legends.js
 src/realm/umbral/u8j-feats.js
 src/realm/umbral/u9-redeemed.js
+# a decided match kept by golf, bowling or curling is settled at load (issue #120, phase 1 review): after the Umbral, so its end finds every part in place
+src/realm/w159-keptends.js

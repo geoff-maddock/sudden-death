@@ -13,7 +13,7 @@
    - the end of a game: a match from the world, and a practice game you curl, by the result (the horn and the gallery
      for a win, a low note for a loss); a practice game you only watch, the horn and the gallery. Your skip's call is
      heard on your own stones only.
-   The realm's music plays on, as at any ground (the Shed's own track is w26's).
+   The ground's own tune plays on this view (w160), as on the ground's map (the Shed's own track is w26's).
    Tips. TIPS.w_shed once your team can curl (W_SHG.minOwn players), TIPS.w_broom once you have won a curling match.
    Medals, on SD's ACH, from matches from the world (exhibitions and practice don't count; a conceded one doesn't):
    curling matches won (realmShedWins), Brass Brooms (realmBrooms), an end stolen by your rink (realmSteals), four or

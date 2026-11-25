@@ -5,7 +5,7 @@
    yours (a roar for a long putt or a chip that drops), a click for theirs; a splash for the water; a chime for a power,
    a potion or an enchantment (a bigger one for an ultimate, or the wyvern); and the horn and the gallery when you win.
    In a round you only watch, the first side (the home one) is yours for the gallery. Only while the course is on
-   screen. The realm's music plays on, as it does at any ground (the Links' own track, The Long Fairway, is w26's).
+   screen. The ground's own tune plays on this view (w160), as it does on the ground's map (the Links' own track, The Long Fairway, is w26's).
    Tips. TIPS.w_links once your team can play golf (W_LKG.minOwn players), TIPS.w_divot once you have won a golf match.
    Achievements, on SD's ACH: golf matches won (realmLinksWins), Divot Cups (realmDivots), a hole in one by your side in
    a match from the world (realmAces), an eagle (realmEagles) and a win by 5 and 4 or more (realmRouts).
@@ -88,5 +88,5 @@ const wW111RenderHelp = renderHelp;
 renderHelp = function () {
   wW111RenderHelp();
   const d = $('wHelpLinksCup'); if (!d || $('wHelpLinksFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksFeel"><b>On the course</b> you hear the strike of every shot and the tap of a putt, the ball in the cup and the gallery for your holed shots (a roar for a long one), the water, and a chime for a power, a potion or an enchantment; sounds follow your Sound effects setting, and the realm's music plays on. Golf matches won, Divot Cups, a hole in one, an eagle and a win by 5 and 4 or more have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLinksFeel"><b>On the course</b> you hear the strike of every shot and the tap of a putt, the ball in the cup and the gallery for your holed shots (a roar for a long one), the water, and a chime for a power, a potion or an enchantment; sounds follow your Sound effects setting, and the ground's own tune plays. Golf matches won, Divot Cups, a hole in one, an eagle and a win by 5 and 4 or more have medals in the record book.</p>`);
 };

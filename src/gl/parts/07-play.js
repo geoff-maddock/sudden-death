@@ -44,6 +44,9 @@ function glGo(ph, wait, msg) {
   GD.ph = ph; GD.t = 0; GD.wait = wait || 0;
   if (GL_HOOK.onPhase) try { GL_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
+// a choice a reload must not take back (the power of a full swing pressed, the caddie's word called, a power cast): onCommit
+// hears it, so the page can keep the game as it stands (issue #120)
+function glCommit() { if (GL_HOOK.onCommit) try { GL_HOOK.onCommit(); } catch (e) { console.error(e); } }
 const glName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const glYours = s => GD && GD.mode === 'play' && s === GD.you;
 
@@ -61,7 +64,8 @@ function glTick(dt) {
 function glPlayNext() {
   const n = glNext();
   glDispSync();
-  if (!n) { glGo('over'); return; }
+  // (a game kept after the shot that decided it, and resumed, says its end here: once, by G.overSaid)
+  if (!n) { glGo('over'); glSayOver(); return; }
   const s = n.side, o = 1 - s;
   if (glYours(s)) {
     if (glCpuGives(n)) { glGiven(o); return; }
@@ -87,7 +91,8 @@ function glGiven(by) {
   if (!ev) { glGo('next'); return; }
   GD.last = ev;
   const end = ev.res != null;
-  glGo('given', end ? GL_PACE.hole : GL_PACE.given, `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev));
+  GD.said = `${G.teams[by].name} give ${G.teams[s].name} the putt.` + glHoleSay(ev);
+  glGo('given', end ? GL_PACE.hole : GL_PACE.given, GD.said);
   if (end) glDispMatch();
   if (end) glSayOver();
 }
@@ -229,9 +234,11 @@ function glSelect(o) {
   }
   if (o.tempo && GL_STANCE[o.tempo] && (o.tempo === 'quick' || o.tempo === 'steady')) G.stance[GD.you].tempo = o.tempo;
   if (o.mood && (o.mood === 'bold' || o.mood === 'careful')) G.stance[GD.you].mood = o.mood;
-  if (o.word && G.word[GD.you] > 0 && !G.wordOn[GD.you]) { G.word[GD.you]--; G.wordOn[GD.you] = true; }
+  const word = !!o.word && G.word[GD.you] > 0 && !G.wordOn[GD.you];
+  if (word) { G.word[GD.you]--; G.wordOn[GD.you] = true; }
   glSelFix();
   GD.msg = glAimMsg();
+  if (word) glCommit();
   return true;
 }
 function glAimAt(x, y) { if (!GD || GD.ph !== 'aim') return false; GD.sel.aim = { x, y }; glSelFix(); return true; }
@@ -298,7 +305,7 @@ function glPress() {
   if (M.st === 'up') {
     M.pow = M.p;
     if (M.k === 'putt') { glStrikeMine({ pow: clamp(M.pow * (1 + glWobble(M)), 0, 1.05) }); return true; }
-    M.st = 'down'; return true;
+    M.st = 'down'; glCommit(); return true;
   }
   if (M.st === 'down') { M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); return true; }
   return false;
@@ -311,7 +318,7 @@ function glMeterTick(dt) {
     if (M.p >= 1) { M.p = 1; M.dir = -1; } else if (M.p <= 0) { M.p = 0; M.dir = 1; }
     return;
   }
-  if (M.st === 'up') { M.p += step / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } } }
+  if (M.st === 'up') { M.p += step / GL_METER.up; if (M.p >= GL_METER.top) { M.p = GL_METER.top; M.pow = M.p; M.st = 'down'; if (GL_HOOK.onPick) try { GL_HOOK.onPick(); } catch (e) { console.error(e); } glCommit(); } }
   else if (M.st === 'down') { M.p -= step / GL_METER.down; if (M.p <= GL_METER.low) { M.p = GL_METER.low; M.m = M.p - glShake(M); glStrikeMine(glSwingNums(M.pow, M.m, glRat(GD.you, GD.sel.ri), M.f, glGxOf(GD.you, GD.sel.ri).pshot)); } }
 }
 // the phone's swing: pull (0 to 1.1 of a full pull) and how far off the line it was let go (degrees, + a hook). The
@@ -370,18 +377,34 @@ function glManage(o) {
   if (o.ri !== undefined) M.ri = o.ri == null ? null : (Number.isInteger(o.ri) && o.ri >= 0 && o.ri < GL_RULES.side ? o.ri : null);
   if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
   if (o.mood === 'bold' || o.mood === 'careful') G.stance[s].mood = o.mood;
-  if (o.word && G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; }
+  if (o.word && G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; glCommit(); }
   return true;
 }
-// the game between shots, to keep (plain JSON): the game, the mode and your call
-function glSnapshot() { return G && GD ? JSON.parse(JSON.stringify({ G, mode: GD.mode, mgr: GD.mgr, line: GD.line })) : null; }
-// back to a kept game: the next shot
+// the game between shots, to keep (plain JSON): the game, the mode, your call and the last shot's line (said); a full
+// swing of yours with its power pressed (swing: your shot and the meter as they stand), and a shot addressed (addr: the
+// shot called, its potion and powers already in the game, so a resume hits it rather than calling them again) (#120)
+function glSnapshot() {
+  if (!G || !GD) return null;
+  const M = GD.ph === 'swing' && GD.meter && GD.meter.k === 'full' && GD.meter.st === 'down' ? GD.meter : null;
+  return JSON.parse(JSON.stringify({ G, mode: GD.mode, mgr: GD.mgr, line: GD.line, said: GD.said || '', swing: M ? { sel: GD.sel, meter: M } : null, addr: GD.ph === 'addr' && GD.cpu ? GD.cpu : null }));
+}
+// back to a kept game: the last shot's line, then the next shot. A swing kept with its power pressed goes off now on that
+// power, as if the mark were never pressed: late, at the bottom of the meter (#120)
 function glResume(sn) {
   if (!sn || !sn.G) return false;
   G = JSON.parse(JSON.stringify(sn.G));
   glPlayStart({ mode: sn.mode, line: sn.line });
   if (sn.mgr) GD.mgr = Object.assign({ line: 'auto', ri: null }, sn.mgr);
-  GD.msg = `Back at hole ${G.h + 1}: ${G.teams[0].name} ${glMatchText(0).toLowerCase()}.`;
+  GD.said = sn.said || '';
+  const back = `${GD.said ? GD.said + ' ' : ''}Back at hole ${G.h + 1}: ${G.teams[0].name} ${glMatchText(0).toLowerCase()}.`, W = sn.swing;
+  if (W && W.sel && W.meter && GD.mode === 'play') {
+    GD.sel = W.sel; GD.meter = W.meter; GD.ph = 'swing'; GD.t = 0;
+    let n = 0; while (GD.ph === 'swing' && GD.meter && GD.meter.st === 'down' && n++ < 4000) glMeterTick(0.02);
+    GD.msg = `${back} The swing left at the top comes down without the mark. ${GD.msg}`;
+    return true;
+  }
+  if (sn.addr && sn.addr.plan) { GD.cpu = sn.addr; GD.ph = 'addr'; GD.t = 0; }
+  GD.msg = back;
   return true;
 }
 // your power: k 'pow' (the hitter's), 'ult', 'steady' or a situation power, cast for your stroke (in You play on your
@@ -393,6 +416,7 @@ function glCastMine(k) {
   const why = glCast(s, k, ri); if (why) return why;
   if (GD.sel) glSelFix();
   GD.msg = `${G.casts[G.casts.length - 1].n}! ` + (GD.sel ? glAimMsg() : '');
+  glCommit();
   return '';
 }
 

@@ -12,7 +12,12 @@
    player of the match a little more; a loss a quarter of the XP and costs nothing else (no Team HP on the course). A
    golf match never ends level. Every match adds your players' lines to WG.lkstats, and goes in the head to head and the
    league table. Save and leave keeps the match between shots, and it is waiting when you come back, after a reload too.
-   Concede counts as a loss.
+   The match is kept from its first tee, and saved at once as each shot is struck or a putt given (issue #120): a
+   reload never brings a shot back, and a match that has begun is never called off. It is saved at once, too, as you
+   press a full swing's power (a reload before the mark plays that swing out late, at the bottom of the meter), call the
+   caddie's word or cast a power (wGL.onCommit): a reload gives none of them back. A match kept after the shot that
+   decided it is settled as the page comes back (wLinksKeptEnd, called by w159), its result card shown, never left
+   waiting. Concede counts as a loss.
 
    WG.lkg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_LKG.keep], w, l }
               world = { kind: 'lkgame', ref, club, tier, how, day, name, ids, wild, weather }, plain data; the end
@@ -20,9 +25,10 @@
               roster ids in role order (null for a call-up)
    WG.lkstats { pid: { rd, shots, putts, holed } }, this journey
    wLinksProblems(), wStartLinks({ club, how, tier?, kind?, ref?, wild? }), wResumeLinks(), wLinksLeaveGame(),
-   wLinksConcede(), wOpenLinksCard(), wLinksWeather()
+   wLinksConcede(), wOpenLinksCard(), wLinksWeather(), wLinksKeptOver(), wLinksKeptEnd()
    Wraps: wLinksBarNote (wW107LinksBarNote: Save and leave and Concede in a real match), wLeaveLinks (wW107LeaveLinks),
-   wGL.onOver and wGL.onPhase (a real match settles, and is kept between shots), wLinksGame (wW107LinksGame: the day's
+   wGL.onOver and wGL.onPhase (a real match settles, and is kept between shots), wGL.onCommit (kept as a choice is
+   committed), wLinksGame (wW107LinksGame: the day's
    weather and the wood), wRunAct (wW107RunAct: MATCH opens the card), wNextPrompt (wW107NextPrompt: a match waiting
    after a reload), wCampLinks and wRenderCamp (wW107CampLinks, wW107RenderCamp: Play a match and Resume on the Links
    tab), wCampStats (wW107CampStats: the Golf view's lines), wStatsCard (wW107StatsCard: the lines in words),
@@ -33,9 +39,11 @@ const W_LKG = {
   // extra rating points for each of their four, by tier; first guesses until the lab measures them (phase 10)
   oppBonus: { 1: 2, 2: 4, 3: 7 },
   minutes: 120, keep: 10, saveMs: 12000,
+  // the beats a shot is settled in (struck and counted, the ball still flying; a putt given): kept and saved at once
+  settled: ['fly', 'given'],
 };
 const W_LKG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WLKG = { saved: 0, asked: false, msg: '', wild: false };
+const WLKG = { saved: 0, asked: false, msg: '', wild: false, card: '' };
 
 function wLkg() {
   const B = WG.lkg = WG.lkg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0 };
@@ -105,6 +113,8 @@ function wStartLinks(o) {
   if (how === 'sim') { const s = wGL.simGame(opts); wLinksResultCard(wLinksSettle(s)); return ''; }
   wLinksGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WGL.world = true;
+  // (kept from the first tee: a reload before the first shot brings the match back, never calls it off: #120)
+  B.live.snap = wGL.snapshot();
   wLinksBarNote();
   wSave();
   return '';
@@ -118,9 +128,11 @@ function wResumeLinks() {
   showView('links');
   wLinksBarNote(); wLinksRows(); wLinksCard();
 }
-// Save and leave: the match as it was before the shot under way (kept at every shot)
+// Save and leave: the match after the shot under way (kept as each shot is struck); a shot that decided it is played
+// out and settled
 function wLinksLeaveGame() {
   const L = wLinksLive() && WG.lkg.live; if (!L) return wLeaveLinks();
+  if (wLinksWorld() && wGL.G.over) { let n = 0; while (wLinksLive() && n++ < 4000) wGL.tick(0.1); if (!wLinksLive()) { WGL = null; wW107LeaveLinks(); wSave(); return; } }
   const sn = L.snap;
   WLKG.asked = true;
   WGL = null; wW107LeaveLinks();
@@ -145,17 +157,44 @@ function wLinksConcede() {
   }, () => { if (WGL) wGL.pause(false); });
   wAfterAsk(() => { if (WGL) wGL.pause(false); });
 }
-function wLinksScore(sn) { const G = sn.G, up = G.won[0] - G.won[1], left = Math.max(0, G.holes - G.res.length); return `${up === 0 ? 'all square' : `${Math.abs(up)} ${up > 0 ? 'up' : 'down'}`}${left ? ` with ${left} to play` : ', a playoff'}, on the ${wOrd(G.h + 1)}`; }
+function wLinksScore(sn) {
+  const G = sn.G, up = G.won[0] - G.won[1], left = Math.max(0, G.holes - G.res.length);
+  // (a match its last shot decided is finished: who won it, not what is left to play)
+  if (G.over) return `finished: ${G.teams[G.over.win].name} won${G.over.text ? ` ${G.over.text}` : ''}`;
+  return `${up === 0 ? 'all square' : `${Math.abs(up)} ${up > 0 ? 'up' : 'down'}`}${left ? ` with ${left} to play` : ', a playoff'}, on the ${wOrd(G.h + 1)}`;
+}
 
 /* ---------- kept between shots, and settled at the end ---------- */
 const wW107OnPhase = wGL.onPhase;
 wGL.onPhase = ph => {
   if (wW107OnPhase) wW107OnPhase(ph);
-  if (ph !== 'next' || !wLinksWorld() || wGL.G.over) return;
+  if (!wLinksWorld() || !wGL.G) return;
+  const settled = W_LKG.settled.includes(ph);
+  if (!settled && (ph !== 'next' || wGL.G.over)) return;
   const L = WG.lkg.live, first = !L.snap; L.snap = wGL.snapshot();
-  // (saved at most every W_LKG.saveMs, so a reload can come back a few shots early; the first one always)
-  const now = Date.now(); if (first || now - WLKG.saved > W_LKG.saveMs) { WLKG.saved = now; wSave(); }
+  // (a shot struck or a putt given is saved at once, the deciding one too: a reload never brings a shot back, and a
+  // match it decided is settled on Resume (the engine says its end once). The next beat is saved at most every
+  // W_LKG.saveMs: nothing new is settled in it, #120)
+  const now = Date.now(); if (first || settled || now - WLKG.saved > W_LKG.saveMs) { WLKG.saved = now; wSave(); }
 };
+// a choice committed (a full swing's power pressed, the caddie's word, a power cast) is kept and saved at once (#120)
+const wW107OnCommit = wGL.onCommit;
+wGL.onCommit = () => {
+  if (wW107OnCommit) wW107OnCommit();
+  if (!wLinksWorld() || !wGL.G) return;
+  WG.lkg.live.snap = wGL.snapshot(); WLKG.saved = Date.now(); wSave();
+};
+// a match kept after the shot that decided it (the page went as that shot flew): settled now, as the shot would have
+// settled it, never left waiting; its result card waits for the world (wNextPrompt). Returns the result's words, or ''
+function wLinksKeptOver() { const L = wLinksLive() && WG.lkg.live; return !!(L && L.snap && L.snap.G && L.snap.G.over); }
+function wLinksKeptEnd() {
+  if (WGL || !wLinksKeptOver()) return '';
+  wGL.resume(WG.lkg.live.snap);
+  const s = wGL.summary(); if (!s) return '';
+  const msg = wLinksSettle(s);
+  WLKG.asked = true; if (!LAB) WLKG.card = msg;
+  return msg;
+}
 const wW107OnOver = wGL.onOver;
 wGL.onOver = s => {
   if (WGL && WGL.world && wLinksLive()) WGL.msg = wLinksSettle(s);
@@ -273,7 +312,12 @@ wRunAct = function (act, id) { if (act === 'lkcard') return wOpenLinksCard(); re
 /* after a reload, a saved match is waiting: ask once */
 const wW107NextPrompt = wNextPrompt;
 wNextPrompt = function () {
-  if (!LAB && wLinksLive() && !WLKG.asked && !WGL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+  // (a decided match is settled, not waiting: its result card, settled here if the page came back somewhere else first)
+  if (!LAB && !WGL && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    if (!WKEPT.loading && wLinksKeptOver()) wKeptOne(wLinksKeptEnd);
+    if (WLKG.card) { const m = WLKG.card; WLKG.card = ''; wLinksResultCard(m); if (!$('modal').hidden) return true; }
+  }
+  if (!LAB && wLinksLive() && !WLKG.asked && !wLinksKeptOver() && !WGL && !WD && !WG.cardOffer && !WG.event && wActive()) {
     WLKG.asked = true;
     const L = WG.lkg.live, sn = L.snap;
     const close = modal(`<header><h3>A golf match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wLinksScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Links tab on the Team screen.</p></div>

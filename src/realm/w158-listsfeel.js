@@ -1,4 +1,4 @@
-/* w158: the feel of jousting (issue #117, phase 13), as w130 is curling's. Sound at the Lists, the Lists' own music,
+/* w158: the feel of jousting (issue #117, phase 13), as w130 is curling's. Sound at the Lists, the Lists' own music (w160's row now),
    tips, medals and the Quick start.
 
    Sound. Built from Sudden Death's own tone and noise (src/app/sound.js), following your Sound effects setting, only
@@ -28,7 +28,7 @@
    On a phone a squire's name stays with their job buttons (.wjtsq doesn't break).
    wListsHoofBeat() one beat of the charge's sound (the timer's), wListsCrack(k) a lance meeting ({ broke, zone, at }),
    wListsTrumpet(big) the herald's call
-   Wraps: wJT.onPhase (wW158OnPhase: the sounds), wJT.onOver (wW158OnOver: the end), musicWanted (wW158MusicWanted),
+   Wraps: wJT.onPhase (wW158OnPhase: the sounds), wJT.onOver (wW158OnOver: the end),
    wListsSettle (wW158ListsSettle: the medals), wLanceWon (wW158LanceWon), renderHelp (wW158RenderHelp: #wHelpListsFeel
    after #wHelpListsCup). */
 
@@ -108,16 +108,7 @@ wJT.onOver = s => {
   } catch (e) { console.error(e); }
 };
 
-/* ---------- music: the Lists' own theme on the Lists view ---------- */
-const wW158MusicWanted = musicWanted;
-musicWanted = function () {
-  const base = wW158MusicWanted();
-  if (!WG || !RUN || UI.screen !== 'run' || UI.view !== 'lists' || !THEMES.wg_g_lists) return base;
-  const G = wJT.G; if (G && (G.lich || G.hex)) return base;
-  const live = !!(G && G.teams && !G.over && !G.yard && WJT && !WJT.over), out = ['wg_g_lists', !live ? 'calm' : wJT.inTilt() ? 'hype' : 'fight'];
-  MUS.want = out[0];
-  return out;
-};
+/* (the Lists' own music on the Lists view: w160's W_GRD_MUSIC.lists, #120) */
 
 /* ---------- tips ---------- */
 Object.assign(TIPS, {

@@ -17,7 +17,9 @@
    what the page needs), tick(dt) (the tests move the game on by hand). Your ball: select({ stand, arrow, ball, revs,
    suggest }), press (Space), drag(pull, deg) (the phone's throw), setMode; guide (a perfect ball's path on a fresh
    lane), swingNums and meterRules are the numbers behind the meter; scr and unscr map the lane to the picture and
-   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end.
+   back, ovScr the overhead strip. onPhase, onPick and onOver hear a new beat, a change to your ball and the end;
+   onCommit a choice a reload must not take back (a ball's speed pressed, the word, the pinch bowler, the re-rack, a power
+   cast: #120).
    Phase 3 is ratings, the order's roles, arm and nerve: stats (the six, in order), rate(kind) (1 to 12), cap, roles
    (each slot of the order's role), fit(r, role) (r 0 to 1), autoOrder(roster), arm (G.arm), pressure(side),
    armRules. A roster bowler may bring r (1 to 12) and hand; a team may bring its order.
@@ -96,6 +98,7 @@ return {
   hexes: JSON.parse(JSON.stringify(BL_HEX)), hex: () => G && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexPin: s => G && G.teams ? blHexPin(s) : null, hexLine: () => blHexLine(),
   ultOwn: JSON.parse(JSON.stringify(BL_ULT_OWN)), ultOf: (s, ri) => G && G.teams ? Object.assign({}, blUltOf(s, ri)) : null, lichRules: JSON.parse(JSON.stringify(BL_LICH)), carry: (d, e, v) => blLichCarry(d, e, v),
   set onPhase(f) { BL_HOOK.onPhase = f; }, set onPick(f) { BL_HOOK.onPick = f; }, set onOver(f) { BL_HOOK.onOver = f; }, get onPhase() { return BL_HOOK.onPhase; }, get onPick() { return BL_HOOK.onPick; }, get onOver() { return BL_HOOK.onOver; },
+  set onCommit(f) { BL_HOOK.onCommit = f; }, get onCommit() { return BL_HOOK.onCommit; },
   show: () => blShow(), hide: () => blHide(), get on() { return BLP.on; }, render: dt => blRender(dt || 0),
   pause: on => { BLP.paused = !!on; }, get paused() { return BLP.paused; }, get speed() { return BLP.speed; }, set speed(n) { BLP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };

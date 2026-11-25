@@ -261,15 +261,20 @@ function jtCornersDue(skip) {
 
 /* ---------- the mounts ---------- */
 // the mount a rider of these ratings rides best, with the reason (the Realm's captain; your choice on the Lists tab). By
-// the lab (seeded matches, a Knight a side, against Destriers): a steady lance does best on a Charger in a short heat
-// (an elf), a rider who keeps a gallop up on a Courser over a long one (a harpy), the rest on a Destrier (phase 12: a
-// Courser in a short heat was the captain's pick for every good rider, and it cost them; the Realm's matches saw an
-// unhorsing in most matches with the riders on Chargers and Coursers)
+// the lab (seeded matches, a Knight a side, a kind's four against vampires on Destriers, six seed bases; #120, phase 4):
+// a steady lance does best on a Charger in a short heat (an elf); a good rider on a Courser in a long heat (a minotaur); a
+// lance that sways on a Destrier (a troll), and the rest too. An elf wins more on a Charger in a long heat as well (about
+// 70 matches in 400), but the captain keeps it on a Destrier there: Chargers under every steady lance in five-course heats
+// raised the matches with an unhorsing by 5 to 14 points at every tier, on the same matches (#120, phase 4's review). A ride of 0.8 (a rating of about 10) is where a Courser pays: a werewolf's 10 does about as
+// well on one as on a Destrier, a minotaur's 12 far better. In a short heat a minotaur does better on a Courser too (by
+// 23 to 45 in 400), but the captain keeps the Destrier there: a Courser under every good rider in the Realm's three-course
+// heats raised its matches with an unhorsing by 9 to 12 points (#120, phase 4's lab), as Chargers did in phase 12
+// (phase 12: a Courser in a short heat was the captain's pick for every good rider, and it cost them)
 function jtMountFor(rs, courses) {
   const r = rs || {}, long = (courses || JT_RULES.courses) >= 5;
   if ((r.lance ?? .5) >= .8 && !long) return { m: 'charger', why: 'a lance that steady can take its sway for the harder hit' };
-  if ((r.ride ?? .5) >= .7 && long) return { m: 'courser', why: 'it keeps up a gallop all heat and gets its wind back quickly' };
-  return { m: 'destrier', why: long ? 'steady to aim from over a long heat' : 'steady to aim from' };
+  if ((r.ride ?? .5) >= .8 && long) return { m: 'courser', why: 'a good rider settles it, and it keeps its wind all heat' };
+  return { m: 'destrier', why: (r.lance ?? .5) < .5 ? 'steadier than a Charger, for a lance that sways' : long ? 'steady to aim from over a long heat, and a safe seat' : 'steady to aim from, for most riders' };
 }
 
 // what the page shows of each side's squad now (a copy)
