@@ -63,8 +63,8 @@ function jtSelect(o) {
     if (!GP.jobs) return 'Your squires have nothing to do before the first course of a heat.';
     if (o.corner) { GP.jobs = jtCornerPlan(GP.you, 1).jobs; jtPicked(); return ''; }
     let J = o.jobs;
-    if (o.job) { const [i, j] = o.job; if (!(i === 0 || i === 1) || !jtOwn(JT_JOB, j)) return 'No such job.'; J = GP.jobs.slice(); if (J[1 - i] === j) J[1 - i] = J[i]; J[i] = j; }
-    if (!jtJobsOk(J)) return 'Two squires, two different jobs.';
+    if (o.job) { const [i, j] = o.job; if (!(i === 0 || i === 1) || !jtJobOk(GP.you, j)) return 'No such job.'; J = GP.jobs.slice(); if (J[1 - i] === j) J[1 - i] = J[i]; J[i] = j; }
+    if (!jtJobsOk(J, GP.you)) return 'Two squires, two different jobs.';
     GP.jobs = J.slice(); jtPicked(); return '';
   }
   const S = Object.assign({}, GP.sel);
@@ -113,13 +113,15 @@ function jtCharge0() {
   // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's; a side you
   // manage, or leave to your squires, rides your squire's word or the plan you set)
   const plans = [0, 1].map(s => jtCalls(s) || (GP.mode === 'manage' && s === GP.you) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
+  // (phase 6: the CPU casts as the riders set off, your plan committed; and your squire, under Auto powers in Manage)
+  const cast = G.powers ? jtPowersAtCharge(plans) : '';
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
   const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge(jtRideOpts(s, plans[s]), R));
   const mine = jtYours(0) || jtYours(1), s = GP.you;
   GP.plans = plans; GP.cpuRides = cpuRides; GP.keyV = { x: 0, y: 0 };
   GP.ch = { p: 0, mine, pace: mine ? plans[s].pace : plans[0].pace, hit: [], taps: [], bad: 0, down: false, downAt: null, hand: { x: 0, y: 0 }, tipNow: null, riders };
   const sent = !mine && GP.mode === 'manage' ? `${jtName(s, riders[s])} rides your plan: ${JT_PLAN.aim[plans[s].aim].n}, ${plans[s].guard}, at ${JT_PLAN.pace[plans[s].pace].n}. ` : '';
-  jtGo('charge', 0, mine ? `${jtName(s, riders[s])} sets off. Tap with the hoofbeats to spur, then hold to couch the lance, and keep the tip on ${JT_PLAN.aim[plans[s].aim].n}.` : `${sent}${jtName(0, riders[0])} and ${jtName(1, riders[1])} set off down the lists…`);
+  jtGo('charge', 0, cast + (mine ? `${jtName(s, riders[s])} sets off. Tap with the hoofbeats to spur, then hold to couch the lance, and keep the tip on ${JT_PLAN.aim[plans[s].aim].n}.` : `${sent}${jtName(0, riders[0])} and ${jtName(1, riders[1])} set off down the lists…`));
 }
 // how well you spurred: on-beat taps over the beats there were, less the stumbles (0 to 1)
 function jtSpurQ(C) {
@@ -133,8 +135,10 @@ function jtEight(t, amp, pace) { const w = Math.PI / jtBeat(pace); return { x: a
 // your sway now: sway() for your plan, your rider and mount, and the couch as it stands (late if still up)
 function jtYourSway(C) {
   const s = GP.you, ri = C.riders[s], e = jtCouchErr(C);
-  const X = jtRideX(s);
-  return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : e, hands: 1, arm: X.arm, shaken: X.shaken, press: X.press });
+  const X = jtRideX(s), fx = G.powers ? jtFxFor(s) : null;
+  // (phase 6: with powers, what your rider has on this course: a curse's late couch, a sway, no pressure, no shake)
+  return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : fx ? clamp(e + fx.late, -1, 1) : e, hands: 1, arm: X.arm,
+    shaken: fx && fx.calm ? 0 : X.shaken, press: fx && fx.nerve ? 0 : X.press, fx });
 }
 // where your tip is now (inches, on their target), once couched; null while the lance is up
 function jtTipNow(C) {
@@ -144,9 +148,10 @@ function jtTipNow(C) {
 }
 // your ride at impact, for the model
 function jtYourRide(C) {
-  const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), e = jtCouchErr(C);
-  const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s] }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
-  const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = { girth: X.girth, shaken: X.shaken };
+  const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), fx = G.powers ? jtFxFor(s) : null, e0 = jtCouchErr(C), e = e0 != null && fx ? clamp(e0 + fx.late, -1, 1) : e0;
+  const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s], fx }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
+  // (phase 6: the ride carries its fx, for the strike and the seat)
+  const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = Object.assign({ girth: X.girth, shaken: fx && fx.calm ? 0 : X.shaken }, fx ? { fx } : {});
   // (let go after it was lowered: up, but it reaches as far as its tip went, or its aim's height: lowered, reachY)
   if (e == null) return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true },
     C.lowered ? { lowered: true, reachY: C.relTip ? C.relTip.y : A.y } : {}, sq);

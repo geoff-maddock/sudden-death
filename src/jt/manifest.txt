@@ -18,3 +18,6 @@ src/jt/parts/09-squad.js
 src/jt/parts/10-read.js
 # phase 5: matches from the world: kept between courses, Manage, the tilting yard
 src/jt/parts/11-world.js
+# phase 6: monster powers: mana, the lance and shield powers by kind, curses and the squire's lift, the gallery's cheer and
+# the ultimate, situation powers, the CPU's casts
+src/jt/parts/12-powers.js

@@ -38,13 +38,13 @@ function jtSway(o) {
   const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1), c = clamp(o.couch || 0, -1, 1);
   const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5), tired = 1 - clamp(o.arm ?? 1, 0, 1);
   const sigma = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)) * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * (o.hands ?? 1)
-    * (1 + JT_ARM.sway * tired) * (1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1)) * jtNerveK(o.press || 0, r.nerve);
+    * (1 + JT_ARM.sway * tired) * (1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1)) * jtNerveK(o.press || 0, r.nerve) * (o.fx ? o.fx.sway : 1);
   return { sigma, droop: JT_SWAY.droop * Math.max(0, -c) * arm * (1 + JT_ARM.droop * tired) + JT_ARM.sag * tired };
 }
 // the speed at impact: the pace, the mount, its wind (a blown mount slows) and the ride rating
 function jtSpeed(o) {
   const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
-  return JT_LISTS.speed * P.speed * M.speed * (.8 + .2 * w) * (1 + .08 * ((r.ride ?? .5) - .5));
+  return JT_LISTS.speed * P.speed * M.speed * (.8 + .2 * w) * (1 + .08 * ((r.ride ?? .5) - .5)) * (o.fx ? o.fx.speed : 1);
 }
 // the mount's wind a course spends at this pace (a good rider spends less)
 // (and the mount: a heavy Charger blows sooner, a Courser runs on less; phase 3)
@@ -55,11 +55,14 @@ const jtWindCost = (pace, rs, mount) => jtPace(pace).wind * (1.15 - .3 * ((rs ||
 function jtCharge(o, rnd) {
   const p = o.plan || {}, plan = { aim: jtPick('aim', p.aim, 'shield'), guard: jtPick('guard', p.guard, 'square'), pace: jtPick('pace', p.pace, 'canter') };
   const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF, x = { arm: o.arm, shaken: o.shaken, press: o.press };
-  const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind }) * (1 + .03 * jtGauss(rnd));
-  const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)) * jtNerveK(o.press || 0, rs.nerve), -1, 1);
-  const sw = jtSway(Object.assign({ pace: plan.pace, mount, rs, wind: o.wind, couch, hands: H.aim }, x)), A = JT_PLAN.aim[plan.aim];
-  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop },
+  const fx = o.fx || null, speed = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind, fx }) * (1 + .03 * jtGauss(rnd));
+  // (phase 6: a power's fx: a curse's late couch, its sway, its speed; the ride carries it to the strike and the seat)
+  const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)) * jtNerveK(o.press || 0, rs.nerve) + (fx ? fx.late : 0), -1, 1);
+  const sw = jtSway(Object.assign({ pace: plan.pace, mount, rs, wind: o.wind, couch, hands: H.aim, fx }, x)), A = JT_PLAN.aim[plan.aim];
+  const ride = { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop },
     girth: +o.girth || 0, shaken: clamp(+o.shaken || 0, 0, 1) };
+  if (fx) ride.fx = fx;
+  return ride;
 }
 // the force of a ride's strike: its speed against a gallop's, the mount's weight, and a clean couch (0.5 to 1.3 or so)
 const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .25 * Math.abs(a.couch || 0));
@@ -72,11 +75,18 @@ function jtStrike(a, d, rnd) {
   // lance couched and let go keeps the reach of where its tip was, or of its aim: phase 4's review)
   const high = a.up ? !!a.lowered && (a.reachY ?? (JT_PLAN.aim[jtPick('aim', a.aim, 'shield')].y)) >= JT_SEAT.high : a.tip.y >= JT_SEAT.high;
   if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0, high };
-  const base = JT_BREAK[zone][g], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
+  // (phase 6: a power's fx on the striker, fa, and the defender, fd: pierce breaks an angled shield as a square one,
+  // brk and turn the chance, splinter any fair touch, rock and soak the rock, helmUn a helm break that unhorses)
+  const fa = a.fx || null, fd = d.fx || null, gb = fa && fa.pierce && zone === 'shield' ? 'square' : g;
+  const base = JT_BREAK[zone][gb], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
   const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
-  const pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK, 0, .98), broke = rnd() < pb;
-  const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance);
-  return { zone, at: broke ? zone : 'glance', broke, force, rock, pb, high };
+  let pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK * (fa ? fa.brk : 1) * (fd ? fd.turn : 1), 0, .98);
+  if (fa && fa.splinter) pb = .98;
+  const broke = rnd() < pb;
+  const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance) * (fa ? fa.rock : 1) * (fd ? fd.soak : 1);
+  const out = { zone, at: broke ? zone : 'glance', broke, force, rock, pb, high };
+  if (fa && fa.helmUn && broke && zone === 'helm') out.helmUn = true;
+  return out;
 }
 /* rider d's seat against a strike st: lean is their balance (0 to 1); own is d's own strike this course (a rider who
    struck high (own.high; with no tip known, a helm aim) and didn't break has reached past the head and sits the hit
@@ -86,9 +96,10 @@ function jtSeat(st, d, lean, rnd, own) {
   const r = d.rs || {}, M = jtMount(d.mount), reach = !!own && !own.broke && (own.high != null ? !!own.high : d.aim === 'helm');
   // (phase 3: a girth tightened between courses holds them on; a rider still shaken from a rocking hit sits worse)
   const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0)
-    + clamp(+d.girth || 0, 0, .2) - JT_SHAKE.seat * clamp(+d.shaken || 0, 0, 1);
+    + clamp(+d.girth || 0, 0, .2) - JT_SHAKE.seat * clamp(+d.shaken || 0, 0, 1) + (d.fx ? d.fx.hold : 0);
   const hit = st.rock * (1 + JT_SEAT.shake * jtGauss(rnd)), margin = hold - hit;
-  return { unhorse: !!st.broke && margin < 0, rocked: !!st.broke && st.rock >= JT_SEAT.rocked, hold, margin, reach };
+  // (phase 6: a rider who can't be unhorsed this course (stay) isn't; a lance broken on the helm under a Grave Charge unhorses)
+  return { unhorse: !!st.broke && (margin < 0 || !!st.helmUn) && !(d.fx && d.fx.stay), rocked: !!st.broke && st.rock >= JT_SEAT.rocked, hold, margin, reach };
 }
 /* a course on the model: rides [a0, a1] and leans [l0, l1] (each side's balance if rocked). Returns { res (for the
    rules: [{ at, unhorse }, ...]), st: [the strikes], seat: [each side's seat, against the other's strike] } */

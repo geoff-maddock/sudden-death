@@ -41,7 +41,16 @@
    jobs are yours, then press sends them), manage({ auto }) leaves the calls to your squires or takes them back (mgrAuto);
    snapshot() (plain JSON, between courses; null in the yard) and resume(sn) keep a match; finishCourse() rides out a
    course being ridden (your side's own hands); start({ yard: { runs }, teams: [your side] }) is the tilting yard, runs
-   at a straw target with nothing at stake: yard (the runs so far and the summary), and onOver hears the summary. */
+   at a straw target with nothing at stake: yard (the runs so far and the summary), and onOver hears the summary.
+   Phase 6 is monster powers (12-powers.js): start(opts) and simMatch(opts) take powers (true, or [yours, theirs]) and
+   powOnly (lab: one power id a side, or null); pow and pow2 (by kind: [lance, shield]), ult (by kind), sit, manaRules,
+   cheerRules, fx0 (the effects' starting values) and lift (the squire's fourth job) are the tables; powOf(kind, role,
+   alt), pwByName(n) (the pick a rider who brings none brings), powNow(s, role, ri), ultOf(s, ri), powWhy(s, k), cast(s,
+   k, why) and castMine(k) ('lance', 'shield', 'ult', a situation power, or 'sit': the one that fits), sitFits(s, k),
+   fxFor(s), cpuPower(s, plan), tip(s), jobsFor(s) (the jobs side s's squires may do: the lift while cursed); autoPow
+   (Manage's Auto powers, kept in the snapshot). A roster member brings its pick as pw: { lance, shield } (0 or 1).
+   select({ job: [squire, 'lift'] }) lifts a curse in place of a job; card(s) adds the other rider's powers and the
+   curses (pow, curse); summary() adds powers (the casts, the mana, the cheer). */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -75,5 +84,12 @@ return {
   // matches from the world (phase 5)
   snapshot: () => jtSnapshot(), resume: sn => jtResume(sn), finishCourse: () => jtFinishCourse(), manage: o => jtManage(o), get mgrAuto() { return !!(GP && GP.mgrAuto); },
   get yard() { return G && G.yard ? jtYardSummary() : null; }, strawRules: JSON.parse(JSON.stringify(JT_STRAW)),
+  // monster powers (phase 6)
+  pow: JSON.parse(JSON.stringify(JT_POW)), pow2: JSON.parse(JSON.stringify(JT_POW2)), ult: JSON.parse(JSON.stringify(JT_ULT)), sit: JSON.parse(JSON.stringify(JT_SIT)),
+  manaRules: JSON.parse(JSON.stringify(JT_MANA)), cheerRules: JSON.parse(JSON.stringify(JT_CHEER)), fx0: JSON.parse(JSON.stringify(JT_FX0)), lift: JSON.parse(JSON.stringify(JT_LIFT)),
+  powOf: (k, r, alt) => JSON.parse(JSON.stringify(jtPowOf(k, r, alt))), pwByName: n => jtPwByName(n), powNow: (s, r, ri) => G && G.teams && G.powers ? jtPowNow(s, r, ri) : null,
+  ultOf: (s, ri) => G && G.teams ? jtUltOf(s, ri) : null, powWhy: (s, k) => jtPowWhy(s, k), cast: (s, k, why) => jtCast(s, k, why || 'by hand'), castMine: k => jtCastMine(k),
+  sitFits: (s, k) => jtSitFits(s, k), fxFor: s => jtFxFor(s), cpuPower: (s, plan) => G && G.teams ? jtCpuPower(s, plan || jtPlan(s)) : [], tip: s => jtPowerTip(s),
+  jobsFor: s => G && G.teams ? jtJobsFor(s).slice() : JT_JOBS.slice(), get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };

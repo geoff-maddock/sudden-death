@@ -101,7 +101,10 @@ function jtRideX(s) { return { arm: jtSq('arm', s, 1), shaken: jtSq('shaken', s,
 // everything jtCharge needs for side s's rider on plan
 function jtRideOpts(s, plan) {
   const ri = (jtRiders() || [])[s];
-  return Object.assign({ plan, rs: jtRsOf(s, ri), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, jtRideX(s));
+  const o = Object.assign({ plan, rs: jtRsOf(s, ri), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, jtRideX(s));
+  // (phase 6: with powers, what the rider has on this course; no pressure under nerve, no shake under calm)
+  if (G.powers) { const fx = jtFxFor(s); o.fx = fx; if (fx.nerve) o.press = 0; if (fx.calm) o.shaken = 0; }
+  return o;
 }
 // after a course (06-game.js, once the wind is done): the arm spent, the shake taken or wearing off, the girth used,
 // and the corner due when the same riders go again
@@ -131,11 +134,12 @@ const jtJobAmt = (job, care) => { const J = JT_JOB[job]; return J ? J.a + J.b * 
 const jtAfterNext = () => jtInTilt() ? 0 : Math.max(0, G.courses - G.course - 1);
 // the state side s's rider would set off in after jobs [a, b]: { wind, arm, shaken, girth }
 function jtAfterJobs(s, jobs) {
-  const X = { wind: jtSq('wind', s, 1), arm: jtSq('arm', s, 1), shaken: jtSq('shaken', s, 0), girth: 0 }, A = JT_JOB.steady.arm;
+  const X = { wind: jtSq('wind', s, 1), arm: jtSq('arm', s, 1), shaken: jtSq('shaken', s, 0), girth: 0, lift: false }, A = JT_JOB.steady.arm;
   jobs.forEach((job, i) => { const care = jtCare(s, i), amt = Math.min(1, jtJobAmt(job, care));
     if (job === 'tend') X.wind = clamp(X.wind + (1 - X.wind) * amt, 0, 1);
     else if (job === 'steady') { X.shaken = clamp(X.shaken * (1 - amt), 0, 1); X.arm = clamp(X.arm + (1 - X.arm) * Math.min(1, A[0] + A[1] * care), 0, 1); }
-    else X.girth = jtJobAmt(job, care); });
+    else if (job === 'girth') X.girth = jtJobAmt(job, care);
+    else if (job === 'lift') X.lift = true; });
   return X;
 }
 /* what one course is worth to side s (its points less the other side's, on average) with its rider in state X, riding
@@ -143,12 +147,14 @@ function jtAfterJobs(s, jobs) {
    played out JT_CORNER.n times on a stream of its own (the same numbers for every state, so the states are compared
    fairly; the match's random numbers are never touched) */
 function jtCornerM(s, X, op, mine) {
-  const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s;
+  const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s, cu = jtCursed(s) ? G.curse[s] : null;
   let rides;
   try {
     G.wind[s] = X.wind; G.arm[s] = X.arm; G.shaken[s] = X.shaken; G.girth[s] = X.girth;
+    // (phase 6: a curse lifted, as the rider would set off without it)
+    if (cu && X.lift) G.curse[s] = null;
     rides = mine.map(d => jtRideOpts(s, d.plan));
-  } finally { ['wind', 'arm', 'shaken', 'girth'].forEach((k, i) => { G[k][s] = keep[i]; }); }
+  } finally { ['wind', 'arm', 'shaken', 'girth'].forEach((k, i) => { G[k][s] = keep[i]; }); if (cu) G.curse[s] = cu; }
   const theirs = op.map(d => jtRideOpts(o, d.plan)), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
   const draw = D => { let r = rnd(); for (let i = 0; i < D.length; i++) { r -= D[i].w; if (r <= 0) return i; } return D.length - 1; };
   const pts = (I, x) => I.res[x].unhorse ? JT_RULES.unhorse : JT_RULES.pts[I.res[x].at] || 0;
@@ -178,7 +184,7 @@ function jtCornerOpp(s, sk) { return sk >= 2 ? jtPlansOf(1 - s) : jtMixDist(1 - 
 /* side s's corner, by a skill: { jobs: [squire 0's job, squire 1's], why } */
 function jtCornerPlan(s, sk, allow) {
   if (sk == null) { const lab = (G.lab || {}).cornerBy; sk = lab && typeof lab[s] === 'number' ? lab[s] : G.skill[s]; }
-  const jobs = allow || JT_JOBS;
+  const jobs = allow || jtJobsFor(s);
   if (sk <= 0) {
     const a = jobs[Math.floor(R() * jobs.length)], rest = jobs.filter(j => j !== a), b = rest[Math.floor(R() * rest.length)];
     return { jobs: [a, b], why: 'two jobs picked on a whim' };
@@ -186,10 +192,12 @@ function jtCornerPlan(s, sk, allow) {
   // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts
   // (the wind and the arm) for one more course when the heat has one (counting every course left did worse: measured)
   const op = jtCornerOpp(s, sk), mine = jtPlansOf(s), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op, mine);
+  // (phase 6: a curse left on that tires the mount costs its wind for the course after too)
+  const cw = jtCursed(s) ? (G.curse[s].fx.wind || 1) - 1 : 0, wk = cw > 0 ? cw * jtWindCost('canter', jtRsOf(s, (jtRiders() || [])[s]), jtMountOf(s)) : 0;
   let best = null;
   for (const a of jobs) for (const b of jobs) {
     if (a === b) continue;
-    const X = jtAfterJobs(s, [a, b]), v = jtCornerM(s, X, op, mine) + (after ? after * JT_CORNER.last * (jtCornerM(s, { wind: X.wind, arm: X.arm, shaken: 0, girth: 0 }, op, mine) - base) : 0);
+    const X = jtAfterJobs(s, [a, b]), v = jtCornerM(s, X, op, mine) + (after ? after * JT_CORNER.last * (jtCornerM(s, { wind: clamp(X.wind - (X.lift ? 0 : wk), 0, 1), arm: X.arm, shaken: 0, girth: 0, lift: X.lift }, op, mine) - base) : 0);
     if (!best || v > best.v + 1e-9) best = { jobs: [a, b], v };
   }
   return { jobs: best.jobs, why: jtCornerWhy(s, best.jobs) };
@@ -198,18 +206,23 @@ function jtCornerPlan(s, sk, allow) {
 function jtCornerWhy(s, jobs) {
   const w = Math.round(100 * jtSq('wind', s, 1)), arm = Math.round(100 * jtSq('arm', s, 1)), sh = jtSq('shaken', s, 0);
   const why = { tend: w < 80 ? `the mount's wind is down to ${w}%` : 'a breath for the mount', steady: sh > .05 ? 'the rider is still shaken from that hit' : arm < 85 ? `the lance arm is tiring (${arm}%)` : 'a word in the rider\'s ear',
-    girth: 'a tighter girth to sit the next hit' };
-  const left = JT_JOBS.find(j => !jobs.includes(j));
-  return `${jtSqName(s, 0)} ${JT_JOB[jobs[0]].v} (${why[jobs[0]]}); ${jtSqName(s, 1)} ${JT_JOB[jobs[1]].v} (${why[jobs[1]]}); nobody spare to ${JT_JOB[left].n.toLowerCase()}`;
+    girth: 'a tighter girth to sit the next hit', lift: jtCursed(s) ? `the ${G.curse[s].n} is on the rider` : 'the curse' };
+  const left = jtJobsFor(s).filter(j => !jobs.includes(j)).map(j => jtJobOf(j).n.toLowerCase()).join(' or ');
+  return `${jtSqName(s, 0)} ${jtJobOf(jobs[0]).v} (${why[jobs[0]]}); ${jtSqName(s, 1)} ${jtJobOf(jobs[1]).v} (${why[jobs[1]]}); nobody spare to ${left}`;
 }
-// a corner's jobs, if they are two of the three and not the same: [a, b], or null
-function jtJobsOk(jobs) { return Array.isArray(jobs) && jobs.length === 2 && jobs.every(j => jtOwn(JT_JOB, j)) && jobs[0] !== jobs[1] ? jobs.slice() : null; }
+// the jobs side s's squires may do: the three, and lifting a curse while their rider is cursed (phase 6)
+const jtJobsFor = s => jtCursed(s) ? JT_JOBS.concat(['lift']) : JT_JOBS;
+const jtJobOf = j => j === 'lift' ? JT_LIFT : JT_JOB[j];
+const jtJobOk = (s, j) => jtOwn(JT_JOB, j) || (j === 'lift' && s != null && jtCursed(s));
+// a corner's jobs, if they are two of the three (or the lift, for side s while cursed) and not the same: [a, b], or null
+function jtJobsOk(jobs, s) { return Array.isArray(jobs) && jobs.length === 2 && jobs.every(j => jtJobOk(s, j)) && jobs[0] !== jobs[1] ? jobs.slice() : null; }
 /* side s's squires do their jobs (jobs: [squire 0's, squire 1's]); returns '' or why not */
 function jtCornerDo(s, jobs, why) {
   if (!G || !G.teams || G.over) return 'No match.';
   if (!G.cornerDue || !G.cornerDue[s]) return 'Not between courses.';
-  const J = jtJobsOk(jobs); if (!J) return 'Two squires, two different jobs: tend the mount, steady the rider or tighten the girth.';
+  const J = jtJobsOk(jobs, s); if (!J) return `Two squires, two different jobs: tend the mount, steady the rider or tighten the girth${jtCursed(s) ? ', or lift the curse' : ''}.`;
   const X = jtAfterJobs(s, J), did = {};
+  if (X.lift) { did.lift = G.curse[s].n; G.curse[s] = null; }
   if (J.includes('tend')) did.tend = +(X.wind - G.wind[s]).toFixed(3);
   if (J.includes('steady')) did.steady = { shake: +(G.shaken[s] - X.shaken).toFixed(3), arm: +(X.arm - G.arm[s]).toFixed(3) };
   if (J.includes('girth')) did.girth = +X.girth.toFixed(3);

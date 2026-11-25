@@ -48,7 +48,10 @@ const jtRsOf = (s, ri) => G.teams[s].roster[ri].rs;
 function jtTurn() {
   if (!G || G.over) return null;
   jtCornersDue();
-  return jtRideCourse([jtPlan(0), jtPlan(1)]);
+  // (phase 6: with powers, each side casts after both plans are made)
+  const plans = [jtPlan(0), jtPlan(1)];
+  if (G.powers) [0, 1].forEach(s => jtCpuPower(s, plans[s]));
+  return jtRideCourse(plans);
 }
 function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given, leans); return P ? jtCourseClose(P) : null; }
 /* a course in two halves, so Play can hold the seat until your balance moment: jtCourseOpen draws any ride not given
@@ -70,10 +73,12 @@ function jtCourseClose(P, leans) {
   const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
   const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
-  [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs, rides[s].mount) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
+  [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs, rides[s].mount) * (rides[s].fx ? rides[s].fx.wind : 1) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
   if (rule.tiltNow) G.wind = [JT_TILT_WIND, JT_TILT_WIND]; else if (rule.heatOver) G.wind = [1, 1];
   // the rider's arm, a rocking hit's shake, the girth, and the squires' corner before the next course (09-squad.js)
   jtSquadAfter(rides, imp, rule);
+  // the powers' mana and cheer, and what the course spent (12-powers.js)
+  jtPowersAfter(rides, imp, rule);
   // the box score
   [0, 1].forEach(s => {
     const B = G.st[s], Pp = G.pst[s][riders[s]], sk = imp.st[s], se = imp.seat[s];

@@ -135,7 +135,7 @@ function jtHorse(c, x, y, k, dir, mount, col, phase, moving) {
   return bob * u;
 }
 // a rider in the saddle: the figure seated, the shield, the lance (raised, or couched toward the other rider)
-const JT_SIT = { legL: { a: -1.25, lift: .1 }, legR: { a: -1.05, lift: .1 }, armL: { x: -12, y: -46 }, armR: { x: 26, y: -50 }, lean: .08 };
+const JT_POSE = { legL: { a: -1.25, lift: .1 }, legR: { a: -1.05, lift: .1 }, armL: { x: -12, y: -46 }, armR: { x: 26, y: -50 }, lean: .08 };
 function jtRider(c, s, x, y, k, dir, o) {
   const T = G.teams[s], m = T.roster[o.ri] || {}, kind = m.kind && KIND[m.kind] ? m.kind : 'goblin', hpx = 1.55 * k, sc = hpx * (KIND[kind].h) / 100;
   const sy = y - 1.42 * k - o.bob, fy = sy + 34 * sc, team = { color: T.color || '#888', light: '#f2e6c4', short: T.short };
@@ -144,7 +144,7 @@ function jtRider(c, s, x, y, k, dir, o) {
   // their shield shows on the far rider (its face to us), a sliver on yours
   const shX = x + dir * 2 * sc, shY = fy - 58 * sc;
   if (s === 0) jtShield(c, shX - dir * 8 * sc, shY, sc * .8, T.color, o.guard, true);
-  drawFig(c, kind, x - dir * 4 * sc, fy, hpx, team, { flip: dir < 0, noShadow: true, pose: JT_SIT, num: '' });
+  drawFig(c, kind, x - dir * 4 * sc, fy, hpx, team, { flip: dir < 0, noShadow: true, pose: JT_POSE, num: '' });
   if (s === 1) jtShield(c, shX + dir * 6 * sc, shY, sc, T.color, o.guard, false);
   // the lance: from the hand, raised until couched, then level and pointing at the other rider
   const hx = x + dir * 22 * sc, hy = fy - 52 * sc, ang = o.couched ? (o.droop || 0) * .02 : -1.05 + (o.lower || 0) * 1.05, L = JT_VIEW.lance * k;
@@ -299,5 +299,5 @@ function jtDraw(c, dt) {
   JTC.t += dt; jtCamTo(dt);
   c.clearRect(0, 0, JT_VIEW.w, JT_VIEW.h);
   if (!G || !G.teams) { c.fillStyle = '#c9a46c'; c.fillRect(0, 0, JT_VIEW.w, JT_VIEW.h); return; }
-  jtListsDraw(c); jtRidersDraw(c); if (G.yard) jtYardBoardDraw(c); else jtBoardDraw(c); jtCallDraw(c); jtBeatsDraw(c);
+  jtListsDraw(c); jtRidersDraw(c); if (G.yard) jtYardBoardDraw(c); else { jtBoardDraw(c); jtPowersDraw(c); } jtCallDraw(c); jtBeatsDraw(c);
 }

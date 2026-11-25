@@ -239,7 +239,24 @@ SPORTS = [
          # (phase 5: a club game through the Realm, the league's kinds and a player as the engine takes one)
          start="wStartLists({ club: 'local', how: 'manage' })",
          kinds="Object.keys(wJT.kinds).filter(k => k !== '_')",
-         player="p => wListsPlayer(p)"),
+         player="p => wListsPlayer(p)",
+         # (phase 6) a lance power and a shield power a rider, one of two each, kept as p.jtPw
+         picks=dict(field='jtPw', roles=['lance', 'shield'], every_kind=True,
+                    opt="(k, r) => [0, 1].map(alt => wJT.powOf(k, r, alt))",
+                    set="p => { p.jtPw = { lance: 1, shield: 1 }; }",
+                    got="m => !!m.pw && m.pw.lance === 1 && m.pw.shield === 1",
+                    help=('wHelpListsPowers', [r'pick'])),
+         resource=dict(have="wJT.manaRules", live="wJT.G.powers === true && wJT.G.powSides.every(Boolean) && wJT.G.mana.length === 2", help=('wListsHowPow', [r'mana'])),
+         meter=dict(have="wJT.cheerRules", pays='ult', live="wJT.G.powers === true && wJT.G.powSides.every(Boolean) && wJT.G.cheer.length === 2", help=('wListsHowPow', [r'cheer'])),
+         ultimate=dict(of="k => wJT.ult[k]", live="wJT.G.powers === true && wJT.G.powSides.every(Boolean) && wJT.G.ultUsed.every(u => u === false)", help=('wListsHowPow', [r'ultimate'])),
+         situations=dict(have="wJT.sit", live="wJT.G.powers === true && wJT.G.powSides.every(Boolean) && wJT.G.sitUsed.length === 2", help=('wListsHowPow', [r'situation powers'])),
+         # (off until you press its button in Manage, as curling's: pressed here, through the page)
+         auto=dict(have="'autoPow' in wJT", live="(() => { const b = document.querySelector('[data-jtauto]'); if (!b || wJT.mode !== 'manage') return false; if (!wJT.autoPow) b.click(); return wJT.autoPow === true && wJT.G.powSides[0] === true; })()",
+                   help=('wListsHowPow', [r'Auto powers'])),
+         # (Manage waits at your plan beat for your calls: Send them, and on)
+         play=dict(adv="(() => { if (wJT.phase === 'plan') wJT.press(); wJT.tick(0.05); })()", over="wJT.phase === 'over'",
+                   until={'auto': ('your side casts as the match goes on', "wJT.G.casts.some(c => c.side === 0)"),
+                          'meter': ('the cheer fills as the match goes on', "wJT.G.cheer.some(v => v > 0)")})),
 ]
 # the parts whose state a Realm game must have on (the others are checked on the player or in the tables)
 LIVE = ('resource', 'meter', 'ultimate', 'situations', 'potions', 'auto', 'ground')
@@ -302,52 +319,58 @@ async def main():
             check(ok is True, f"{r['sport']}: {r['scope']} is the engine W_ENGINES plays", err)
 
         # ---------- the tables: each part exists and isn't empty ----------
-        for r in [r for r in SPORTS if all(isinstance(r.get(k), dict) for k in PARTS)]:
+        # (a row still missing parts has those named as failures above; the parts it has are checked here all the same)
+        for r in SPORTS:
             s, sc = r['sport'], r['scope']
             kinds, err = await ev(pg, r['kinds'])
             check(err is None and isinstance(kinds, list) and len(kinds) >= MIN_KINDS, f'{s}: the engine knows the league\'s kinds ({MIN_KINDS} or more)', err or kinds)
             kinds = kinds if isinstance(kinds, list) else []
 
             # picks: per role, a pair a kind
-            pk = r['picks']
-            res, err = await ev(pg, f"""(() => {{ const opt = {pk['opt']}, out = {{}};
+            pk = r.get('picks')
+            if pk: res, err = await ev(pg, f"""(() => {{ const opt = {pk['opt']}, out = {{}};
               for (const role of {json.dumps(pk['roles'])}) {{ const c = {{ two: [], one: [], none: [] }};
                 for (const k of {json.dumps(kinds)}) {{ const L = opt(k, role) || []; const n = new Set(L.map(__id)).size; (n >= 2 ? c.two : n === 1 ? c.one : c.none).push(k); }}
                 out[role] = c; }}
               return out; }})()""")
-            if check(err is None, f'{s}: picks: the options for each role can be read', err):
+            if pk and check(err is None, f'{s}: picks: the options for each role can be read', err):
                 for role, c in res.items():
                     if pk['every_kind']:
                         check(not c['one'] and not c['none'], f'{s}: picks: every kind has two {role} powers to pick between', {'one': c['one'], 'none': c['none']})
                     else:
                         check(len(c['two']) >= 1 and not c['one'], f'{s}: picks: in {role}, a kind has a pair to pick between or keeps what it has (never half a pair)', {'two': len(c['two']), 'one': c['one']})
 
-            await have(pg, f'{s}: resource', r['resource']['have'])
-            mr, err = await ev(pg, f"(() => {{ const m = {r['meter']['have']}; return m && m[{json.dumps(r['meter']['pays'])}]; }})()")
-            check(err is None and isinstance(mr, (int, float)) and mr > 0, f"{s}: meter: its rules say what it buys ({r['meter']['pays']})", err or mr)
+            if 'resource' in r: await have(pg, f'{s}: resource', r['resource']['have'])
+            if 'meter' in r:
+                mr, err = await ev(pg, f"(() => {{ const m = {r['meter']['have']}; return m && m[{json.dumps(r['meter']['pays'])}]; }})()")
+                check(err is None and isinstance(mr, (int, float)) and mr > 0, f"{s}: meter: its rules say what it buys ({r['meter']['pays']})", err or mr)
 
             # one ultimate a kind
-            res, err = await ev(pg, f"(() => {{ const of = {r['ultimate']['of']}; return {json.dumps(kinds)}.filter(k => {{ try {{ const u = of(k); return !(u && (u.n || u.name)); }} catch (e) {{ return true; }} }}); }})()")
-            check(err is None and res == [], f'{s}: ultimate: every kind has one, with a name', err or res)
+            if 'ultimate' in r:
+                res, err = await ev(pg, f"(() => {{ const of = {r['ultimate']['of']}; return {json.dumps(kinds)}.filter(k => {{ try {{ const u = of(k); return !(u && (u.n || u.name)); }} catch (e) {{ return true; }} }}); }})()")
+                check(err is None and res == [], f'{s}: ultimate: every kind has one, with a name', err or res)
 
             # situation powers: at least three, each named and described
-            res, err = await ev(pg, f"(() => {{ const t = {r['situations']['have']}; return {{ n: Object.keys(t || {{}}).length, bad: Object.entries(t || {{}}).filter(([k, v]) => !(v && v.n && v.desc)).map(([k]) => k) }}; }})()")
-            check(err is None and res['n'] >= MIN_SITS and not res['bad'], f'{s}: situations: {MIN_SITS} or more, each named and described ({r["situations"]["have"]})', err or res)
+            if 'situations' in r:
+                res, err = await ev(pg, f"(() => {{ const t = {r['situations']['have']}; return {{ n: Object.keys(t || {{}}).length, bad: Object.entries(t || {{}}).filter(([k, v]) => !(v && v.n && v.desc)).map(([k]) => k) }}; }})()")
+                check(err is None and res['n'] >= MIN_SITS and not res['bad'], f'{s}: situations: {MIN_SITS} or more, each named and described ({r["situations"]["have"]})', err or res)
 
             # gear: W_GEAR pieces for the sport key, each named, described, with effects, and an item
-            res, err = await ev(pg, f"""(() => {{ const ids = Object.keys(W_GEAR).filter(id => W_GEAR[id].sport === {json.dumps(r['key'])});
-              return {{ ids, bad: ids.filter(id => {{ const g = W_GEAR[id]; return !(g.name && g.desc && __ne(g.fx) && DB.items[id]); }}) }}; }})()""")
-            check(err is None and len(res['ids']) >= MIN_GEAR and not res['bad'], f"{s}: gear: {MIN_GEAR} or more pieces in W_GEAR for '{r['key']}', each named, described, with effects and an item", err or res)
+            if 'gear' in r:
+                res, err = await ev(pg, f"""(() => {{ const ids = Object.keys(W_GEAR).filter(id => W_GEAR[id].sport === {json.dumps(r['key'])});
+                  return {{ ids, bad: ids.filter(id => {{ const g = W_GEAR[id]; return !(g.name && g.desc && __ne(g.fx) && DB.items[id]); }}) }}; }})()""")
+                check(err is None and len(res['ids']) >= MIN_GEAR and not res['bad'], f"{s}: gear: {MIN_GEAR} or more pieces in W_GEAR for '{r['key']}', each named, described, with effects and an item", err or res)
 
             # potions: W_POTIONS for the sport, each in the engine's table and an item; the engine's table and bag function
-            pt = r['potions']
-            res, err = await ev(pg, f"""(() => {{ const T = {pt['table']} || {{}}, ids = Object.keys(W_POTIONS).filter(id => wPotionSports(id).includes({json.dumps(r['key'])}));
-              return {{ ids, notInEngine: ids.filter(id => !T[id]), notItem: ids.filter(id => !DB.items[id]), engine: Object.keys(T).length, fn: typeof {sc}[{json.dumps(pt['fn'])}] }}; }})()""")
-            check(err is None and len(res['ids']) >= MIN_POTIONS and not res['notInEngine'] and not res['notItem'] and res['fn'] == 'function',
-                  f"{s}: potions: {MIN_POTIONS} or more in W_POTIONS for '{r['key']}', each in the engine's table ({pt['table']}) and an item, and {sc}.{pt['fn']} for the bag", err or res)
+            if 'potions' in r:
+                pt = r['potions']
+                res, err = await ev(pg, f"""(() => {{ const T = {pt['table']} || {{}}, ids = Object.keys(W_POTIONS).filter(id => wPotionSports(id).includes({json.dumps(r['key'])}));
+                  return {{ ids, notInEngine: ids.filter(id => !T[id]), notItem: ids.filter(id => !DB.items[id]), engine: Object.keys(T).length, fn: typeof {sc}[{json.dumps(pt['fn'])}] }}; }})()""")
+                check(err is None and len(res['ids']) >= MIN_POTIONS and not res['notInEngine'] and not res['notItem'] and res['fn'] == 'function',
+                      f"{s}: potions: {MIN_POTIONS} or more in W_POTIONS for '{r['key']}', each in the engine's table ({pt['table']}) and an item, and {sc}.{pt['fn']} for the bag", err or res)
 
-            await have(pg, f'{s}: auto', r['auto']['have'])
-            await have(pg, f'{s}: ground ({r["home"]})', r['ground']['have'])
+            if 'auto' in r: await have(pg, f'{s}: auto', r['auto']['have'])
+            if 'ground' in r: await have(pg, f'{s}: ground ({r["home"]})', r['ground']['have'])
 
         # ---------- a journey: the player brings the pick and the gear; a Realm game has the set on ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
@@ -359,23 +382,26 @@ async def main():
         await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS))")
         check(await pg.evaluate("wRoster().length") >= 9, 'a journey with nine players of your own')
 
-        for r in [r for r in SPORTS if all(isinstance(r.get(k), dict) for k in PARTS)]:
-            s, sc, pk = r['sport'], r['scope'], r['picks']
-            res, err = await ev(pg, f"""(() => {{ const p = wRoster()[0], keep = JSON.stringify({{ pick: p[{json.dumps(pk['field'])}], gear: p.gear }});
+        # (a row still missing parts is played for the parts it has)
+        for r in [r for r in SPORTS if r.get('start')]:
+            s, sc, pk = r['sport'], r['scope'], r.get('picks')
+            gd, pkx = r.get('gear'), pk or dict(field='__none', set='p => {}', got='m => false')
+            worn = f"!!({gd['got']})(m, gid)" if gd else 'null'
+            res, err = await ev(pg, f"""(() => {{ const p = wRoster()[0], keep = JSON.stringify({{ pick: p[{json.dumps(pkx['field'])}], gear: p.gear }});
               const gid = Object.keys(W_GEAR).find(id => W_GEAR[id].sport === {json.dumps(r['key'])}), player = {r['player']};
               try {{
-                const before = player(p); ({pk['set']})(p); p.gear = Object.assign({{}}, p.gear, {{ [{json.dumps(r['key'])}]: gid }});
-                const m = player(p); return {{ picked: !!({pk['got']})(m), plain: !({pk['got']})(before), worn: !!({r['gear']['got']})(m, gid), field: {json.dumps(pk['field'])} in p }};
-              }} finally {{ const k = JSON.parse(keep); if (k.pick === undefined) delete p[{json.dumps(pk['field'])}]; else p[{json.dumps(pk['field'])}] = k.pick; if (k.gear === undefined) delete p.gear; else p.gear = k.gear; }} }})()""")
+                const before = player(p); ({pkx['set']})(p); p.gear = Object.assign({{}}, p.gear, {{ [{json.dumps(r['key'])}]: gid }});
+                const m = player(p); return {{ picked: !!({pkx['got']})(m), plain: !({pkx['got']})(before), worn: {worn}, field: {json.dumps(pkx['field'])} in p }};
+              }} finally {{ const k = JSON.parse(keep); if (k.pick === undefined) delete p[{json.dumps(pkx['field'])}]; else p[{json.dumps(pkx['field'])}] = k.pick; if (k.gear === undefined) delete p.gear; else p.gear = k.gear; }} }})()""")
             if check(err is None, f'{s}: a roster player goes into the engine', err):
-                check(res['field'] and res['picked'] and res['plain'], f"{s}: picks: kept on the player as p.{pk['field']}, and the engine's player brings the pick", res)
-                check(res['worn'], f"{s}: gear: a piece worn as p.gear.{r['key']} reaches the engine through the player", res)
+                if pk: check(res['field'] and res['picked'] and res['plain'], f"{s}: picks: kept on the player as p.{pk['field']}, and the engine's player brings the pick", res)
+                if gd: check(res['worn'], f"{s}: gear: a piece worn as p.gear.{r['key']} reaches the engine through the player", res)
 
             # a club game started through the Realm, as at the ground (Manage)
             res, err = await ev(pg, f"(() => {{ const why = {r['start']}; return {{ why: typeof why === 'string' ? why : '', view: UI.view, G: !!{sc}.G }}; }})()")
             if not check(err is None and res['G'] and not res['why'] and res['view'] == r['engine'], f"{s}: a club game starts through the Realm ({r['start']})", err or res): continue
             # (each part's own switch in the game, read before a step is played: a bag is as the Realm sent it)
-            for part in LIVE:
+            for part in [x for x in LIVE if x in r]:
                 ok, err = await ev(pg, f"!!({r[part]['live']})")
                 check(ok is True, f"{s}: {part}: on in a game the Realm plays ({r[part]['live']})", err)
             # where it's cheap, the game is played on until the part is seen working

@@ -7,6 +7,8 @@
    - the charge: Space tapped with the hoofbeats spurs; after the spur, Space held couches the lance (let go and it
      comes up); the arrows move your hand on the lance to hold the tip on your mark;
    - the seat: the left and right arrows lean.
+   With powers (phase 6), in your plan: P your rider's lance power, K the shield power, U the ultimate, M the situation
+   power that fits.
    The mouse or a finger: a tap on the lists spurs; after the spur a press held couches, and dragging while you hold
    moves the tip (the drag is your hand); in the balance moment a drag left or right leans. */
 const JTP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null, keys: {} };
@@ -45,6 +47,7 @@ function jtShow() { JTP.host.hidden = false; if (JTP.on) return; JTP.on = true; 
 function jtHide() { JTP.ptr = null; JTP.keys = {}; JTP.btn = null; if (GP) jtNudge(0, 0); JTP.host.hidden = true; JTP.on = false; cancelAnimationFrame(JTP.raf); }
 
 /* ---------- the keys ---------- */
+const JT_POWKEYS = { p: 'lance', k: 'shield', u: 'ult', m: 'sit' };
 const JT_KEYS = { 1: ['aim', 'shield'], 2: ['aim', 'body'], 3: ['aim', 'helm'], q: ['guard', 'angled'], w: ['guard', 'square'], e: ['pace', 'canter'], r: ['pace', 'gallop'] };
 function jtKeyOk(e) {
   if (!e.key) return false;
@@ -63,6 +66,7 @@ function jtKeyDown(e) {
   else if (k.startsWith('arrow')) { if (GP.ph === 'plan') took = false; else JTP.keys[k] = true; }
   else if (GP.ph === 'plan' && JT_KEYS[k]) { const [f, v] = JT_KEYS[k]; jtSelSay(jtSelect({ [f]: v })); }
   else if (GP.ph === 'plan' && k === 'g') jtSelSay(jtSelect({ suggest: true }));
+  else if (GP.ph === 'plan' && G.powers && JT_POWKEYS[k]) jtSelSay(jtCastMine(JT_POWKEYS[k]));
   else took = false;
   if (took) { e.preventDefault(); e.stopPropagation(); }
 }

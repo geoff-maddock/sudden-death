@@ -193,6 +193,8 @@ src/realm/w149-listscall.js
 src/realm/w150-listsgame.js
 src/realm/w151-listsyard.js
 src/realm/w152-listsfenna.js
+# powers at the Lists: mana, lance and shield powers, curses and the squire's lift, the cheer and the ultimate (issue #117, phase 6)
+src/realm/w153-listspowers.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js
