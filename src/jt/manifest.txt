@@ -23,3 +23,5 @@ src/jt/parts/11-world.js
 src/jt/parts/12-powers.js
 # phase 7: gear (a rider's piece, in the powers' vocabulary) and potions (one a side a course, the CPU's at its skill)
 src/jt/parts/13-kit.js
+# phase 8: the Tilting Lists' ways: the churned sand (a rut a lane, in it or beside it) and the pennant wind
+src/jt/parts/14-ground.js

@@ -197,6 +197,8 @@ src/realm/w152-listsfenna.js
 src/realm/w153-listspowers.js
 # jousting gear and potions: Sir Ruddock's rack, the Bag row (issue #117, phase 7)
 src/realm/w154-listskit.js
+# the Tilting Lists' ways: the churned sand and the pennant wind (issue #117, phase 8)
+src/realm/w155-listsground.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js

@@ -256,6 +256,9 @@ SPORTS = [
          # (phase 7) a rider's piece reaches the engine's copy of the rider; their bag by tier, yours the page's
          gear=dict(got="(m, id) => !!m.gear && m.gear.id === id", help=('wHelpListsKit', [r'gear'])),
          potions=dict(table="wJT.potions", fn='potionWhy', live="__bags(wJT.G.bags, Object.assign({}, W_LISTS_KIT.opp[wBallTier('local')] || {}), null)", help=('wHelpListsKit', [r'potion'])),
+         # (phase 8) the churned sand and the pennant wind, on in every match at the Lists (not the yard)
+         ground=dict(have="wJT.groundRules", live="!!wJT.G.ground && Array.isArray(wJT.G.ground.rut) && !!wJT.G.ground.wind && !!wJT.view.ground",
+                     help=('wListsHowGround', [r'churned sand', r'pennant wind'])),
          # (Manage waits at your plan beat for your calls: Send them, and on)
          play=dict(adv="(() => { if (wJT.phase === 'plan') wJT.press(); wJT.tick(0.05); })()", over="wJT.phase === 'over'",
                    until={'auto': ('your side casts as the match goes on', "wJT.G.casts.some(c => c.side === 0)"),

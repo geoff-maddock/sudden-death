@@ -46924,11 +46924,13 @@ function jtStrike(a, d, rnd) {
   const high = a.up ? !!a.lowered && (a.reachY ?? (JT_PLAN.aim[jtPick('aim', a.aim, 'shield')].y)) >= JT_SEAT.high : a.tip.y >= JT_SEAT.high;
   if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0, high };
   // (phase 6: a power's fx on the striker, fa, and the defender, fd: pierce breaks an angled shield as a square one,
-  // brk and turn the chance, splinter any fair touch, rock and soak the rock, helmUn a helm break that unhorses)
+  // brk and turn the chance (a Kite Shield's kite only on an angled shield the lance doesn't pass through: phase 7's
+  // review), splinter any fair touch, rock and soak the rock, helmUn a helm break that unhorses)
   const fa = a.fx || null, fd = d.fx || null, gb = fa && fa.pierce && zone === 'shield' ? 'square' : g;
   const base = JT_BREAK[zone][gb], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
   const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
-  let pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK * (fa ? fa.brk : 1) * (fd ? fd.turn : 1), 0, .98);
+  let pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK * (fa ? fa.brk : 1) * (fd ? fd.turn : 1)
+    * (fd && zone === 'shield' && gb === 'angled' ? fd.kite ?? 1 : 1) * (fd && zone === 'helm' ? fd.helmTurn ?? 1 : 1), 0, .98);
   if (fa && fa.splinter) pb = .98;
   const broke = rnd() < pb;
   const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance) * (fa ? fa.rock : 1) * (fd ? fd.soak : 1);
@@ -47234,18 +47236,19 @@ function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given
    (and each lean not given, unless wait[s] holds it back for the close), and strikes both lances; jtCourseClose(P,
    leans) takes the held leans, decides both seats, scores the course and keeps the box score. The random numbers
    come in the same order as jtImpact's: the rides, the leans, the two strikes, the two seats. P is plain data. */
-function jtCourseOpen(plans, given, leans, wait) {
+// (rnd: a stream of its own for the strikes, as a course ridden out on a resume uses: phase 6's review)
+function jtCourseOpen(plans, given, leans, wait, rnd) {
   const riders = jtRiders(); if (!riders) return null;
   jtCornersDue();
   const rides = [0, 1].map(s => (given && given[s]) || jtCharge(jtRideOpts(s, plans[s]), R));
   const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : wait && wait[s] ? null : jtLean(s));
-  const st = [jtStrike(rides[0], rides[1], R), jtStrike(rides[1], rides[0], R)];
+  const rr = rnd || R, st = [jtStrike(rides[0], rides[1], rr), jtStrike(rides[1], rides[0], rr)];
   return { heat: G.heat, course: G.course, tilt: jtInTilt(), riders, plans, rides, lean, st, n: G.n };
 }
-function jtCourseClose(P, leans) {
+function jtCourseClose(P, leans, rnd) {
   if (!P || P.n !== G.n || G.over) return null;
   const { heat, course, tilt, riders, plans, rides, st } = P, lean = [0, 1].map(s => leans && leans[s] != null ? clamp(+leans[s] || 0, 0, 1) : P.lean[s] != null ? P.lean[s] : .5);
-  const seat = [jtSeat(st[1], rides[0], lean[0], R, st[0]), jtSeat(st[0], rides[1], lean[1], R, st[1])];
+  const rr = rnd || R, seat = [jtSeat(st[1], rides[0], lean[0], rr, st[0]), jtSeat(st[0], rides[1], lean[1], rr, st[1])];
   const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
   const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
@@ -47423,10 +47426,10 @@ function jtEight(t, amp, pace) { const w = Math.PI / jtBeat(pace); return { x: a
 // your sway now: sway() for your plan, your rider and mount, and the couch as it stands (late if still up)
 function jtYourSway(C) {
   const s = GP.you, ri = C.riders[s], e = jtCouchErr(C);
-  const X = jtRideX(s), fx = G.powers ? jtFxFor(s) : null;
+  const X = jtRideX(s), fx = jtRideFx(s);
   // (phase 6: with powers, what your rider has on this course: a curse's late couch, a sway, no pressure, no shake)
   return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : fx ? clamp(e + fx.late, -1, 1) : e, hands: 1, arm: X.arm,
-    shaken: fx && fx.calm ? 0 : X.shaken, press: fx && fx.nerve ? 0 : X.press, fx });
+    shaken: fx && fx.calm ? 0 : X.shaken, press: fx ? X.press * (1 - fx.nerve) : X.press, fx });
 }
 // where your tip is now (inches, on their target), once couched; null while the lance is up
 function jtTipNow(C) {
@@ -47436,7 +47439,7 @@ function jtTipNow(C) {
 }
 // your ride at impact, for the model
 function jtYourRide(C) {
-  const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), fx = G.powers ? jtFxFor(s) : null, e0 = jtCouchErr(C), e = e0 != null && fx ? clamp(e0 + fx.late, -1, 1) : e0;
+  const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), fx = jtRideFx(s), e0 = jtCouchErr(C), e = e0 != null && fx ? clamp(e0 + fx.late, -1, 1) : e0;
   const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s], fx }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
   // (phase 6: the ride carries its fx, for the strike and the seat)
   const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = Object.assign({ girth: X.girth, shaken: fx && fx.calm ? 0 : X.shaken }, fx ? { fx } : {});
@@ -47551,7 +47554,7 @@ function jtPlayNext() {
   const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
   if (yours) {
     GP.sel = jtSuggest(GP.you);
-    const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${JT_JOB[j].v}`).join(', ')}.` : '';
+    const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${jtJobOf(j).v}`).join(', ')}.` : '';
     const go = jtYours(GP.you) ? 'Change the plan if you like, then Ride.' : 'Change the plan or the jobs if you like, then Send them: they ride on their ratings.';
     jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). ${go}`); return;
   }
@@ -48006,7 +48009,8 @@ function jtRideOpts(s, plan) {
   const ri = (jtRiders() || [])[s];
   const o = Object.assign({ plan, rs: jtRsOf(s, ri), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, jtRideX(s));
   // (phase 6: with powers, what the rider has on this course; no pressure under nerve, no shake under calm)
-  if (G.powers) { const fx = jtFxFor(s); o.fx = fx; if (fx.nerve) o.press = 0; if (fx.calm) o.shaken = 0; }
+  // (phase 7: and its gear and potions, jtRideFx; nerve takes that share of the pressure off)
+  const fx = jtRideFx(s); if (fx) { o.fx = fx; if (fx.nerve) o.press = o.press * (1 - fx.nerve); if (fx.calm) o.shaken = 0; }
   return o;
 }
 // after a course (06-game.js, once the wind is done): the arm spent, the shake taken or wearing off, the girth used,
@@ -48089,7 +48093,8 @@ function jtCornerPlan(s, sk, allow) {
   if (sk == null) { const lab = (G.lab || {}).cornerBy; sk = lab && typeof lab[s] === 'number' ? lab[s] : G.skill[s]; }
   const jobs = allow || jtJobsFor(s);
   if (sk <= 0) {
-    const a = jobs[Math.floor(R() * jobs.length)], rest = jobs.filter(j => j !== a), b = rest[Math.floor(R() * rest.length)];
+    // (from the course's own stream: a resume picks the same whims, jtKeyRnd; phase 7's review)
+    const rr = jtKeyRnd(s, 'corner'), a = jobs[Math.floor(rr() * jobs.length)], rest = jobs.filter(j => j !== a), b = rest[Math.floor(rr() * rest.length)];
     return { jobs: [a, b], why: 'two jobs picked on a whim' };
   }
   // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts
@@ -48239,8 +48244,11 @@ function jtWordWhy(s, P, h, Q, need, safe) {
    Kept between courses: jtSnapshot() is the match as it stands, plain JSON ({ G, mode, mgrAuto }); jtResume(sn) puts it
    back on the lists in the mode it was left in, and it plays on from there. A course being ridden when the match is
    left is ridden out first (jtFinishCourse: your charge and your balance moment handed to your side's own hands, as
-   Watch would), so leaving never takes back a course. A snapshot taken while a course is being ridden keeps the plans
-   committed (riding), and jtResume rides that course out on them first, so a reload never rides a course twice. The
+   Watch would), so leaving never takes back a course. A snapshot taken while a course is being ridden keeps it
+   (riding: the plans committed, the CPU's rides drawn as it set off, and once the lances have met the impact, P), and
+   jtResume rides that course out first (jtRideOut): from the impact when it was made, else from the CPU's rides with
+   your rider's own hands for yours, every random number from a stream of its own seeded by the snapshot, so a reload
+   never rides a course twice nor changes its result (phase 6's review). The
    CPU's plan for a course is drawn once and kept in G (G.cpuPlan, 07-play.js), so it survives a save too (phase 5's
    review).
    Manage (07-play.js): jtManage({ auto }) leaves the calls to your squires (your squire's word and your corner's word,
@@ -48263,19 +48271,37 @@ const JT_W5 = { start: jtStart, playNext: jtPlayNext, charge0: jtCharge0, impact
 function jtSnapshot() {
   if (!G || !G.teams || G.yard) return null;
   const sn = { G, mode: GP ? GP.mode : 'watch', mgrAuto: !!(GP && GP.mgrAuto) };
-  if (GP && ['charge', 'seat'].includes(GP.ph) && Array.isArray(GP.plans)) sn.riding = GP.plans.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace, why: p.why || '' });
+  if (GP && ['charge', 'seat'].includes(GP.ph) && Array.isArray(GP.plans)) sn.riding = { plans: GP.plans.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace, why: p.why || '' }),
+    cpuRides: Array.isArray(GP.cpuRides) ? GP.cpuRides : null, P: GP.ph === 'seat' && GP.P ? GP.P : null };
   return JSON.parse(JSON.stringify(sn));
 }
 function jtResume(sn) {
   if (!sn || !sn.G || !sn.G.teams) return null;
   G = JSON.parse(JSON.stringify(sn.G)); GB = null;
   // a course left being ridden: ridden out now, on the plans committed, by each side's own hands
-  const ev = Array.isArray(sn.riding) && !G.over && jtRiders() ? jtRideCourse([0, 1].map(s => sn.riding[s] || jtPlan(s))) : null;
+  const ev = sn.riding && !G.over && jtRiders() ? jtRideOut(sn.riding) : null;
   jtPlayStart({ mode: sn.mode, mgrAuto: sn.mgrAuto });
   if (ev) { GP.call = jtHerald(ev); GP.msg = `Back at the Lists. The course you were riding was ridden out: ${GP.call}`; }
   if (!GP.msg) GP.msg = `Back at the Lists: ${jtMatchText(0).toLowerCase()}.`;
   if (ev && G.over && JT_HOOK.onOver) try { JT_HOOK.onOver(jtSummary()); } catch (e) { console.error(e); }
   return G;
+}
+// a short hash of a string (FNV-1a), to seed a course's own stream
+function jtHash(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+/* a stream of its own for side s's decision (tag) before the course now, keyed on the match (G.key: its seed, or a
+   number drawn when it starts; a match kept before keys, its clubs' names) and the course, so a match resumed from a
+   snapshot taken before the decision decides the same again (phase 7's review: a Squire's corner and potion) */
+function jtKeyRnd(s, tag) { const k = G.key != null ? G.key : G.teams.map(T => T.name).join('|'); return engRng(jtHash(JSON.stringify([k, G.n, s, tag]))); }
+/* a course kept in a snapshot mid-ride, ridden out: from its impact (P) when the lances had met, else from the CPU's rides
+   as it set off (yours by your rider's own hands); every random number from a stream seeded by what was kept, so the
+   same snapshot always rides out the same (an older snapshot's riding is the plans alone) */
+function jtRideOut(K) {
+  const plans = Array.isArray(K) ? K : K.plans || [], rr = engRng(jtHash(JSON.stringify([K, G.n])));
+  const lean = s => clamp(jtHands(s).lean + .2 * jtGauss(rr), 0, 1);
+  if (K.P && K.P.n === G.n) return jtCourseClose(K.P, [0, 1].map(s => K.P.lean[s] != null ? null : lean(s)), rr);
+  const pl = [0, 1].map(s => plans[s] || jtPlanKept(s)), rides = [0, 1].map(s => (K.cpuRides && K.cpuRides[s]) || jtCharge(jtRideOpts(s, pl[s]), rr));
+  const P = jtCourseOpen(pl, rides, [lean(0), lean(1)], null, rr);
+  return P ? jtCourseClose(P, null, rr) : null;
 }
 // a course being ridden, ridden out now (your charge and balance moment by your side's own hands); true when nothing is
 // left mid-course
@@ -48417,7 +48443,9 @@ function jtYardBoardDraw(c) {
    - The gallery's cheer (G.cheer, by side, 0 to JT_CHEER.max): a lance broken fills it, a helm break more, an
      unhorsing most, and a rider who stays on after a rocking hit. It pays for the ultimate (JT_CHEER.ult).
    - The ultimate: one per kind (JT_ULT), once a match a side, cast before a course for the cheer. It marks the course
-     (G.mark): one set of effects on its side's rider (own), another on the other's (rival), for that course.
+     (G.marks, a side each): one set of effects on its side's rider (own), another on the other's (rival), for that
+     course. Both sides' ultimates may mark the same course, so whoever casts first never shuts the other out (phase 6's
+     review).
    - Situation powers (JT_SIT), the side's, once a match each, for mana, when the moment fits: The Last Course (behind
      in the match, a heat's last course), Back in the Saddle (the course after keeping your seat from a rocking hit) and
      For the Crown (the tilt for the crown). One a course.
@@ -48429,7 +48457,8 @@ function jtYardBoardDraw(c) {
    Effects (JT_FX0), read by the model (04-course.js) from a ride's fx (jtFxFor: the side's own power this course, what
    the other side laid on it this course, a curse on it, the course's mark, its situation power):
    - its own ride: sway (the tip's spread), speed (the mount's speed at impact) and wind (what the course costs the
-     mount) multiply; late adds to the couch's error (later); nerve (no pressure) and calm (any shake counts for nothing);
+     mount) multiply; late adds to the couch's error (later); nerve (the share of the pressure taken off: 1, none) and
+     calm (any shake counts for nothing);
    - its strike: brk (the chance the lance breaks) and rock (how hard a broken lance rocks them) multiply; pierce (a
      strike on an angled shield breaks as on a square one), splinter (a fair touch always breaks), helmUn (a helm break
      unhorses) and drain (a lance broken drinks this much of their cheer);
@@ -48438,8 +48467,9 @@ function jtYardBoardDraw(c) {
    The plan knows none of them: a power makes a lance truer or a seat firmer, never a different plan. */
 const JT_MANA = { start: 2, max: 6, brk: 1, kept: 1, clean: 1, pow: 2, curse: 2 };
 const JT_CHEER = { max: 100, ult: 50, brk: 10, helm: 10, unhorse: 30, kept: 15 };
-const JT_FX0 = { sway: 1, speed: 1, wind: 1, late: 0, nerve: 0, calm: 0, brk: 1, rock: 1, pierce: 0, splinter: 0, helmUn: 0, drain: 0, hold: 0, turn: 1, soak: 1, stay: 0 };
-const JT_FX_MUL = new Set(['sway', 'speed', 'wind', 'brk', 'rock', 'turn', 'soak']), JT_FX_ADD = new Set(['late', 'hold']);
+// (phase 7's gear adds kite, a strike on an angled shield's chance to break, and helmTurn, a strike on the helm's)
+const JT_FX0 = { sway: 1, speed: 1, wind: 1, late: 0, nerve: 0, calm: 0, brk: 1, rock: 1, pierce: 0, splinter: 0, helmUn: 0, drain: 0, hold: 0, turn: 1, soak: 1, stay: 0, kite: 1, helmTurn: 1 };
+const JT_FX_MUL = new Set(['sway', 'speed', 'wind', 'brk', 'rock', 'turn', 'soak', 'kite', 'helmTurn']), JT_FX_ADD = new Set(['late', 'hold']);
 const JT_PW_ROLES = ['lance', 'shield'];
 // the squire's fourth job, only while their rider is cursed
 const JT_LIFT = { n: 'Lift the curse', v: 'lifts the curse' };
@@ -48468,7 +48498,7 @@ const JT_POW = {
     jtP('gust', 'Gust', 'A gust off the wings as they come: it throws their tip about, a third more sway this course.', { on: { sway: 1.3 } })],
   elf: [jtP('truelance', 'True Lance', 'An elf\'s eye down the lance: the tip a quarter steadier this course.', { fx: { sway: .75 } }),
     jtP('glamour', 'Glamour', 'A glamour on the shield: they can\'t settle on it, a quarter more sway on their tip this course.', { on: { sway: 1.25 } })],
-  wraith: [jtP('ghostlance', 'Ghost Lance', 'It passes through an angled shield: a strike on one breaks as if the shield were square, this course.', { fx: { pierce: 1 } }),
+  wraith: [jtP('ghostlance', 'Ghost Lance', 'It passes through an angled shield: a strike on one breaks as if the shield were square (a Kite Shield turns it no more), this course.', { fx: { pierce: 1 } }),
     jtP('fade', 'Fade', 'Half there: their lance breaks on you a seventh less often this course.', { fx: { turn: .86 } })],
   vampire: [jtP('thirst', 'Thirsty Lance', 'A lance broken drinks 15 of their gallery\'s cheer, and it breaks a little more often, this course.', { fx: { brk: 1.1, drain: 15 } }),
     jtP('mist', 'Mist', 'Turns to mist at the impact: their lance breaks on you an eighth less often this course.', { fx: { turn: .87 } })],
@@ -48537,7 +48567,7 @@ const JT_ULT = {
   golem: jtU('monolith', 'Monolith', 'Set like a standing stone: they can\'t be unhorsed, a much firmer seat, and a steadier tip, this course.', { stay: 1, hold: .12, sway: .85 }),
   harpy: jtU('stormwing', 'Storm Wing', 'She owns the air over the lists: their tip sways half again as much this course.', null, { sway: 1.5 }),
   elf: jtU('feylance', 'Fey Lance', 'The lance knows its mark: the tip two fifths steadier this course.', { sway: .6 }),
-  wraith: jtU('haunting', 'Haunting', 'The lists are haunted: your lance passes through an angled shield, and their tip sways a quarter more, this course.', { pierce: 1 }, { sway: 1.25 }),
+  wraith: jtU('haunting', 'Haunting', 'The lists are haunted: your lance passes through an angled shield (a Kite Shield turns it no more), and their tip sways a quarter more, this course.', { pierce: 1 }, { sway: 1.25 }),
   vampire: jtU('eternalnight', 'Eternal Night', 'Night falls on the lists: your lance breaks more often, and they sit worse, this course.', { brk: 1.22 }, { hold: -.1 }),
   lich: jtU('gravecharge', 'Grave Charge', 'The dead don\'t fall: they can\'t be unhorsed, and a lance broken on the helm unhorses, this course.', { stay: 1, helmUn: 1 }),
   zombie: jtU('undying', 'Undying', 'The dead don\'t fall: they can\'t be unhorsed, and any shake counts for nothing, this course.', { stay: 1, calm: 1 }),
@@ -48578,7 +48608,7 @@ function jtPowersStart(o) {
   const on = !o.yard && (Array.isArray(o.powers) ? o.powers.some(Boolean) : !!o.powers);
   if (!on) return;
   Object.assign(G, { powers: true, powSides: Array.isArray(o.powers) ? [0, 1].map(s => !!o.powers[s]) : [true, true], mana: [JT_MANA.start, JT_MANA.start], cheer: [0, 0],
-    pfx: [null, null], ofx: [null, null], curse: [null, null], mark: null, ultUsed: [false, false], sitUsed: [{}, {}], sitOn: [null, null], powCourse: [-1, -1], saddle: [false, false], casts: [],
+    pfx: [null, null], ofx: [null, null], curse: [null, null], marks: [null, null], ultUsed: [false, false], sitUsed: [{}, {}], sitOn: [null, null], powCourse: [-1, -1], saddle: [false, false], casts: [],
     powOnly: Array.isArray(o.powOnly) ? [0, 1].map(s => typeof o.powOnly[s] === 'string' ? o.powOnly[s] : null) : null });
 }
 jtStart = function (opts) { const g = JT_W6.start(opts); jtPowersStart(opts || {}); return g; };
@@ -48588,10 +48618,13 @@ function jtFxFor(s) {
   if (!G || !G.powers) return f;
   const add = x => { if (!x) return; for (const k in x) { if (!jtOwn(JT_FX0, k)) continue; if (JT_FX_MUL.has(k)) f[k] *= x[k]; else if (JT_FX_ADD.has(k)) f[k] += x[k]; else f[k] = Math.max(f[k], x[k]); } };
   add(G.pfx[s]); add(G.ofx[s]); add(G.curse[s] && G.curse[s].fx);
-  const M = G.mark; if (M && M.at === G.n) add(M.side === s ? M.own : M.rival);
+  for (const M of G.marks || []) if (M && M.at === G.n) add(M.side === s ? M.own : M.rival);
   if (G.sitOn[s] && jtOwn(JT_SIT, G.sitOn[s])) add(JT_SIT[G.sitOn[s]].fx);
   return f;
 }
+// what side s's rider rides with this course, for the model: the powers' fx, or null without them (phase 7 adds gear and
+// potions)
+function jtRideFx(s) { return G && G.powers ? jtFxFor(s) : null; }
 const jtPowIdOf = (s, k) => k === 'lance' || k === 'shield' ? (jtPowNow(s, k) || {}).id : k === 'ult' ? jtUltOf(s).id : k;
 // '' when side s's moment fits situation power k, or why not
 function jtSitMoment(s, k) {
@@ -48613,7 +48646,7 @@ function jtPowWhy(s, k) {
     if (P.curse && G.curse[1 - s]) return 'They are cursed already.';
     return G.mana[s] < P.cost ? `It costs ${P.cost} mana.` : '';
   }
-  if (k === 'ult') { if (G.ultUsed[s]) return 'Once a match.'; if (G.mark && G.mark.at === G.n) return 'This course already bears a mark.'; return G.cheer[s] < JT_CHEER.ult ? `It takes ${JT_CHEER.ult} cheer.` : ''; }
+  if (k === 'ult') { if (G.ultUsed[s]) return 'Once a match.'; return G.cheer[s] < JT_CHEER.ult ? `It takes ${JT_CHEER.ult} cheer.` : ''; }
   if (!jtOwn(JT_SIT, k)) return 'No such power.';
   if (G.sitUsed[s][k]) return 'Once a match.';
   if (G.sitOn[s]) return 'One a course.';
@@ -48634,7 +48667,7 @@ function jtCast(s, k, why) {
   }
   if (k === 'ult') {
     const U = jtUltOf(s); G.cheer[s] -= JT_CHEER.ult; G.ultUsed[s] = true;
-    G.mark = { side: s, at: G.n, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
+    G.marks = G.marks || [null, null]; G.marks[s] = { side: s, at: G.n, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     rec(U.id, U.n); return '';
   }
   const S = JT_SIT[k]; G.mana[s] -= S.cost; G.sitUsed[s][k] = true; G.sitOn[s] = k;
@@ -48655,7 +48688,7 @@ function jtPowersAfter(rides, imp, rule) {
     G.saddle[s] = !ends && se.rocked && !se.unhorse;
   }
   G.pfx = [null, null]; G.ofx = [null, null]; G.sitOn = [null, null];
-  if (G.mark && G.mark.at <= G.n) G.mark = null;
+  G.marks = (G.marks || [null, null]).map(M => M && M.at > G.n ? M : null);
   if (ends) G.curse = [null, null];
 }
 // a situation power's moment, in words, for the log
@@ -48756,9 +48789,9 @@ jtCard = function (s) {
 function jtPowersDraw(c) {
   if (!G || !G.powers || G.yard) return;
   const L = GP && GP.last, after = GP && (GP.ph === 'after' || GP.ph === 'over');
-  const M = G.mark && G.mark.at === G.n ? G.mark : null, lines = [];
-  if (M) lines.push({ t: `✦ ${M.n} marks this course (${G.teams[M.side].short || G.teams[M.side].name})`, col: '#ffe08a' });
-  else if (after && L && Array.isArray(G.casts)) { const u = G.casts.find(x => x.k === 'ult' && x.at === G.n - 1); if (u) lines.push({ t: `✦ ${u.n} marked that course`, col: '#ffe08a' }); }
+  const Ms = (G.marks || []).filter(M => M && M.at === G.n), lines = [];
+  for (const M of Ms) lines.push({ t: `✦ ${M.n} marks this course (${G.teams[M.side].short || G.teams[M.side].name})`, col: '#ffe08a' });
+  if (Ms.length) { /* the marks above */ } else if (after && L && Array.isArray(G.casts)) { const u = G.casts.find(x => x.k === 'ult' && x.at === G.n - 1); if (u) lines.push({ t: `✦ ${u.n} marked that course`, col: '#ffe08a' }); }
   for (const s of [0, 1]) if (G.curse[s]) lines.push({ t: `☾ ${G.curse[s].n} on ${G.teams[s].short || G.teams[s].name}'s rider (to the end of the heat)`, col: '#d4b8ff' });
   if (!lines.length) return;
   c.save(); c.font = '700 12px "Alegreya Sans", sans-serif';
@@ -48767,6 +48800,422 @@ function jtPowersDraw(c) {
   lines.forEach((l, i) => txt(c, l.t, 20, 90 + i * 16, '700 12px "Alegreya Sans", sans-serif', l.col));
   c.restore();
 }
+/* The Tilting Lists: gear and potions (issue #117, phase 7), by #61's conventions; the Realm's side is w154-listskit.js.
+   Gear: a rider may wear one piece. A roster member sent with { gear: { id, name, fx } } keeps its name (gear) and the
+   effects the engine reads (gx: fx without r; fx.r is laid on the ratings by the Realm before the engine sees them).
+   gx is in the powers' vocabulary (JT_FX0, 12-powers.js) and joins the rider's fx each course they ride (jtRideFx):
+   sway (the tip's spread, ×), speed (×) and wind (what a course costs the mount, ×), hold (the seat, +), nerve (the
+   share of the pressure taken off), kite (a strike on their angled shield breaks less often, ×) and helmTurn (a strike
+   on their helm breaks less often, ×). A squire's gear does nothing at the tilt: only the rider rides.
+   Potions (JT_POTIONS): one a side a course (G.potCourse), before it. A match has potions when started with bags:
+   G.bags = [bag or null, ...] by side: a null bag is kept by the page (the Realm keeps yours and takes each one out as
+   you give it), and a bag here ({ id: n }) is the CPU's, given at its skill before its courses (jtCpuPotions, after
+   the corner: between courses, as the squires work). A match started without bags has no potions (the exhibition, the
+   bare engine), and nothing here acts or draws from the stream. Every use goes in G.pots ({ side, id, heat, course,
+   tilt, at, why }). What each does, all plain data in G:
+   draught (the Stamina Draught): the mount gets JT_POTIONS.draught.wind of its wind back; jttonic (a Steadying Tonic):
+   no pressure on the rider this course (G.tonic, the course's number); jtliniment (Ruddock's Liniment): the lance arm
+   gets JT_POTIONS.jtliniment.arm of its strength back; jtoil (Squire's Oil): the lance hardly ever glances this course
+   (its chance to break × JT_POTIONS.jtoil.brk; measured: a lance that always broke decided matches) (G.oil, the course's
+   number). */
+const JT_POTIONS = {
+  draught: { n: 'Stamina Draught', wind: .35, desc: 'The mount gets back over a third of its wind.' },
+  jttonic: { n: 'Steadying Tonic', desc: 'For a course that weighs on your rider (the last course of a heat when behind, or the tilt for the crown): no pressure on them this course.' },
+  jtliniment: { n: 'Ruddock\'s Liniment', arm: .4, desc: 'Rubbed into the lance arm: two fifths of its strength back.' },
+  jtoil: { n: 'Squire\'s Oil', brk: 1.3, desc: 'Oil on the tip: your lance hardly ever glances this course (a third likelier to break).' },
+};
+// a CPU gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
+const JT_KIT = { take: [99, 2.5, 2], squire: .25 };
+const JT_W7 = { rosterOne: jtRosterOne, start: jtStart, rideFx: jtRideFx, corners: jtCornersDue };
+function jtGx(fx) { if (!fx || typeof fx !== 'object') return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; for (const k in o) if (!jtOwn(JT_FX0, k) || !Number.isFinite(+o[k])) delete o[k]; return Object.keys(o).length ? o : null; }
+jtRosterOne = function (p) { const m = JT_W7.rosterOne(p); const gx = p && p.gear ? jtGx(p.gear.fx) : null; if (gx) m.gx = gx; else delete m.gx; return m; };
+jtStart = function (opts) {
+  const g = JT_W7.start(opts), o = opts || {};
+  // the match's key, for the streams of its own a decision before a course draws from (jtKeyRnd, 11-world.js)
+  G.key = (o.seed != null && Number.isFinite(+o.seed) ? +o.seed : Math.floor(Math.random() * 4294967296)) >>> 0;
+  if (Array.isArray(o.bags) && !G.yard) Object.assign(G, { bags: [0, 1].map(s => o.bags[s] && typeof o.bags[s] === 'object' ? Object.assign({}, o.bags[s]) : null), pots: [], potCourse: [-1, -1], potAsk: [-1, -1], tonic: [-1, -1], oil: [-1, -1] });
+  return g;
+};
+const jtGxOf = (s, ri) => { const m = G && G.teams && ri != null ? G.teams[s].roster[ri] : null; return (m && m.gx) || null; };
+// the rider's fx: the powers', then their gear's and the course's potions (null when there is nothing at all)
+jtRideFx = function (s) {
+  const pf = JT_W7.rideFx(s), gx = jtGxOf(s, (jtRiders() || [])[s]), tonic = !!(G.tonic && G.tonic[s] === G.n), oil = !!(G.oil && G.oil[s] === G.n);
+  if (!gx && !tonic && !oil) return pf;
+  const f = pf || Object.assign({}, JT_FX0);
+  if (gx) for (const k in gx) { if (JT_FX_MUL.has(k)) f[k] *= gx[k]; else if (JT_FX_ADD.has(k)) f[k] += gx[k]; else f[k] = Math.max(f[k], gx[k]); }
+  if (tonic) f.nerve = 1;
+  if (oil) f.brk *= JT_POTIONS.jtoil.brk;
+  return f;
+};
+
+/* ---------- potions ---------- */
+function jtPotionWhy(s, id) {
+  if (!jtOwn(JT_POTIONS, id)) return 'No such potion.';
+  if (!G || !G.teams || !G.bags) return 'No potions in this match.';
+  if (G.over || !jtRiders()) return 'The match is over.';
+  if (G.potCourse[s] === G.n) return 'One potion a course.';
+  if (id === 'draught' && G.wind[s] >= .95) return 'The mount has its wind.';
+  if (id === 'jtliniment' && jtSq('arm', s, 1) >= .95) return 'The lance arm is fresh.';
+  if (id === 'jttonic' && !jtPressure(s)) return 'Nothing weighs on them this course.';
+  if (id === 'jttonic' && G.tonic[s] === G.n) return 'Already steady.';
+  return '';
+}
+function jtPotionGive(s, id, why) {
+  const P = JT_POTIONS[id], T = G.teams[s];
+  if (id === 'draught') G.wind[s] = Math.min(1, +(G.wind[s] + P.wind).toFixed(3));
+  if (id === 'jtliniment') G.arm[s] = Math.min(1, +(G.arm[s] + P.arm).toFixed(3));
+  if (id === 'jttonic') G.tonic[s] = G.n;
+  if (id === 'jtoil') G.oil[s] = G.n;
+  if (G.bags[s]) { G.bags[s][id]--; if (G.bags[s][id] <= 0) delete G.bags[s][id]; }
+  G.potCourse[s] = G.n;
+  G.pots.push({ side: s, id, heat: G.heat, course: G.course, tilt: jtInTilt(), at: G.n, why: why || '' });
+  return `${T.name}: ${P.n}${why ? ` (${why})` : ''}.`;
+}
+// your potion now, in your plan beat: '' when given (the page takes it out of your bag), or why not
+function jtPotion(id) {
+  if (!GP || !G || !G.teams) return 'No match.';
+  if (GP.ph !== 'plan' || !jtCalls(GP.you)) return 'Only before your course, in your plan.';
+  const s = GP.you, why = jtPotionWhy(s, id); if (why) return why;
+  GP.msg = jtPotionGive(s, id); jtPicked();
+  return '';
+}
+/* what each potion in bag would be worth to side s now: [{ id, v, why }], best first. A draught when the mount is
+   blown, the liniment when the arm is tired, the tonic for a nervy rider when the course weighs on them, the oil for the
+   course that counts (the heat's last when not ahead, the match's last, the tilt) */
+function jtPotionValues(s, bag) {
+  const out = [], ri = (jtRiders() || [])[s], m = ri != null ? G.teams[s].roster[ri] : null, w = G.wind[s], arm = jtSq('arm', s, 1), Q = jtSituation(s), nerve = (m && m.rs && m.rs.nerve) ?? .5;
+  if (bag.draught && w < .6) out.push({ id: 'draught', v: (.7 - w) * 10 + (Q.after ? .5 : 0), why: `the mount's wind is down to ${Math.round(w * 100)}%` });
+  if (bag.jtliniment && arm < .7) out.push({ id: 'jtliniment', v: (.8 - arm) * 10, why: `the lance arm is down to ${Math.round(arm * 100)}%` });
+  if (bag.jttonic && jtPressure(s) && nerve < .75) out.push({ id: 'jttonic', v: 3 + 2 * (1 - clamp(nerve, 0, 1)), why: `${m ? m.n : 'their rider'} rides with the match on it` });
+  if (bag.jtoil && (Q.tilt || Q.lastOfMatch || (Q.last && Q.lead <= 0))) out.push({ id: 'jtoil', v: 2.6 + (Q.tilt ? 1 : 0), why: Q.tilt ? 'the tilt for the crown' : Q.lastOfMatch ? 'the last course of the match' : 'the heat\'s last course, and not ahead' });
+  return out.filter(o => !jtPotionWhy(s, o.id)).sort((a, c) => c.v - a.v);
+}
+// your squire's advice for your bag (null: nothing worth it)
+function jtPotionAdvice(bag) { if (!G || !GP || !G.bags) return null; const o = jtPotionValues(GP.you, bag || {})[0]; return o && o.v >= JT_KIT.take[1] ? { id: o.id, why: o.why } : null; }
+// the CPU before a course, once a course a side (G.potAsk). Never yours: your bag is your own (a null bag here).
+// Returns the words, or ''
+function jtCpuPotion(s) {
+  const bag = G.bags && G.bags[s]; if (!bag || !Object.keys(bag).length || G.over || G.potAsk[s] === G.n) return '';
+  G.potAsk[s] = G.n;
+  const vals = jtPotionValues(s, bag); if (!vals.length) return '';
+  const sk = clamp(G.skill[s] | 0, 0, 2);
+  // (a Squire's whim from the course's own stream: a resume decides the same, jtKeyRnd; phase 7's review)
+  if (!sk) return jtKeyRnd(s, 'potion')() < JT_KIT.squire ? jtPotionGive(s, vals[0].id, vals[0].why) : '';
+  return vals[0].v >= JT_KIT.take[sk] ? jtPotionGive(s, vals[0].id, vals[0].why) : '';
+}
+// after the corner, before every course: the CPU's potions
+jtCornersDue = function (skip) {
+  JT_W7.corners(skip);
+  if (G && G.teams && G.bags && !G.over && jtRiders()) for (const s of [0, 1]) jtCpuPotion(s);
+};
+/* The Tilting Lists: the ground's own ways (issue #117, phase 8), as the Ash Bowl's, the Anvil Ring's and Graftonbury's
+   are theirs. A match has them when started with { ground: true } (the Realm's matches at the Lists do; the bare engine,
+   its tests and the labs don't, unless asked; the tilting yard never). With them off nothing here acts and nothing draws
+   from the seeded stream, so a match plays exactly as before.
+   - The churned sand. Every course cuts each side's lane (G.ground.rut, 0 to 1 a side): a gallop cuts deep, a canter a
+     little (JT_GND.cut), and a rider who rides beside the rut cuts it only half as much. Before each course each rider
+     picks a line (the plan's line: JT_LINE): in the rut, the deep furrow steadies the tip but slows the mount (JT_GND.rut,
+     by the depth); beside it, the mount keeps its pace but the stride jolts the aim (JT_GND.jolt, by the depth). On
+     smooth sand the two are the same. Sir Ruddock rakes the lists at the end of every heat (and before the tilt for the
+     crown), so each heat starts smooth.
+   - The pennant wind. Before each course a crosswind is drawn from the seeded stream (G.ground.wind: { k, dir }; k 0 to
+     1, how hard; dir 1 blowing from the gallery toward the near side, -1 the other way), and it comes and goes: each
+     course keeps some of the last (JT_GND.wind.keep) and now and then turns (flip). As the gap closes it pushes each
+     lance tip sideways (jtGndPush: JT_GND.wind.push inches at full strength, more at a gallop), and its gusts throw the
+     tip about (jtGustK: more sway, which no hands aim into). The riders pass left side to left side, so the same wind
+     pushes one rider's tip toward the other's shield and the other's away from it. The CPU aims into it as far as its
+     hands can (JT_GND.into: a Squire not at all, a Knight most of it, an Archmage nearly all); on Play you see your tip
+     drift and hold it there yourself.
+   - The CPU reads both by skill (jtLineFor): a Squire picks a line on a whim and doesn't mind the wind; a Knight works
+     out both lines on the model (its own stream, never the match's) against a plain rider, and aims into the wind; an
+     Archmage works out both lines and how far to aim into the wind (none, half or all: a push from the shield onto the
+     body helps a shield lance, so it can let the wind carry it) against the rider it faces and its read of their guard.
+     Your squire's word does the Archmage's sum for your own hands, and says where to hold the tip.
+   Lab only: ground: { sand: false } or { wind: false } leaves one of the two out (the wind is still drawn), and lineBy
+   holds a side to one line.
+   It is drawn: the furrows on the sand in each lane, darker as they deepen; the pennants stream with the wind (limp when
+   it drops, taut and snapping when it blows); a panel names both; your tip's drift shows on the target as the wind
+   pushes it.
+   G.ground = { rut: [2], wind: { k, dir }, n (the course the wind is for), log: [{ n, heat, course, tilt, rut: [2], line:
+   [2], wind, push: [2] }], tally: { rut: [2], side: [2], rakes, winds }, said (Sir Ruddock's line, for the status line),
+   lineBy (lab only: a line a side, or null), sand, blow (lab only: false leaves the sand or the wind out) }, plain JSON
+   in G, so the snapshot keeps it. A plan carries line ('rut' or 'side') and, from an Archmage or your squire, into (the
+   share of the push it aims back).
+   Wraps (in this scope): jtStart (the sand raked, the first wind), jtPlan (the CPU's line, with the reason), jtSuggest
+   (your squire's line and the wind), jtSelect (line), jtRideOpts (the ground for the ride), jtCharge (the line's sway and
+   speed, the wind's push), jtYourSway, jtTipNow and jtYourRide (the same on Play), jtCourseClose (the ruts cut, the rake,
+   the next wind), jtHerald (the rake), jtPlayNext (Sir Ruddock's line), jtSnapshot (the line of a course being ridden),
+   jtSummary, jtView, jtPennant, jtListsDraw, jtTargetDraw and jtDraw (the drawing). */
+const JT_GND = {
+  cut: { canter: .12, gallop: .24 }, side: .5, max: 1,
+  rut: { sway: .22, speed: .25 }, jolt: { sway: .15 },
+  wind: { push: 6, gust: .25, gallop: 1.35, keep: .5, flip: .3, lo: .05, hi: 1, close: .42 },
+  into: [0, .7, .9],
+  read: { n: 240, seed: 1178 }
+};
+const JT_LINE = { rut: { n: 'in the rut', v: 'rides the rut' }, side: { n: 'beside the rut', v: 'rides beside the rut' } };
+const JT_LINES = Object.keys(JT_LINE);
+const JT_W13 = { start: jtStart, plan: jtPlan, suggest: jtSuggest, select: jtSelect, rideOpts: jtRideOpts, charge: jtCharge, yourSway: jtYourSway, tipNow: jtTipNow,
+  yourRide: jtYourRide, close: jtCourseClose, herald: jtHerald, playNext: jtPlayNext, snapshot: jtSnapshot, summary: jtSummary, view: jtView, pennant: jtPennant,
+  listsDraw: jtListsDraw, targetDraw: jtTargetDraw, draw: jtDraw };
+const jtGndR = v => Math.round(v * 1000) / 1000;
+const jtLineOk = l => jtOwn(JT_LINE, l);
+
+/* ---------- a match's ground ---------- */
+// the wind for the next course: some of the last kept, now and then turning (two draws from the match's stream)
+// (rnd: a resumed course's seeded stream, so a reload brings the same wind for the next course; R otherwise)
+function jtGndWind(prev, rnd) {
+  const W = JT_GND.wind, rr = rnd || R, a = rr(), b = rr();
+  if (!prev) return { k: jtGndR(W.lo + a * .8 * (W.hi - W.lo)), dir: b < .5 ? 1 : -1 };
+  return { k: jtGndR(clamp(W.keep * prev.k + (1 - W.keep) * a * .9 * W.hi, W.lo, W.hi)), dir: b < W.flip ? -prev.dir : prev.dir };
+}
+jtStart = function (opts) {
+  const g = JT_W13.start(opts), o = opts || {};
+  if (!o.ground || G.yard) return g;
+  const lb = Array.isArray(o.lineBy) ? [0, 1].map(s => jtLineOk(o.lineBy[s]) ? o.lineBy[s] : null) : null;
+  // (lab only: ground: { sand: false } or { wind: false } leaves one of the two out; the wind is drawn all the same)
+  const part = k => !(o.ground && typeof o.ground === 'object' && o.ground[k] === false);
+  G.ground = { rut: [0, 0], wind: jtGndWind(null), n: G.n, log: [], tally: { rut: [0, 0], side: [0, 0], rakes: 0, winds: 1 }, said: '', lineBy: lb, sand: part('sand'), blow: part('wind') };
+  G.ground.said = `Sir Ruddock: "Raked smooth for the first heat. ${jtWindWords(G.ground.wind, true)}; watch the pennants."`;
+  return g;
+};
+const jtGndOn = () => !!(G && G.teams && G.ground && !G.yard);
+// the wind in words: "a stiff wind from the gallery"
+function jtWindWords(w, cap) {
+  const k = w.k, how = k < .2 ? 'barely a breath of wind' : k < .45 ? 'a light wind' : k < .7 ? 'a fresh wind' : 'a stiff wind', t = `${how} ${w.dir > 0 ? 'from the gallery' : 'toward the gallery'}`;
+  return cap ? jtCap(t) : t;
+}
+// the wind's push on side s's tip at impact, in the target's inches (+ to the other rider's right, away from their
+// shield), on a pace. The wind from the gallery (dir 1) blows toward the near side: it pushes side 0's tip onto side 1's
+// shield and side 1's tip off side 0's shield, toward the body; toward the gallery, the other way round
+function jtGndPush(s, pace) {
+  if (!jtGndOn() || G.ground.blow === false) return 0;
+  const w = G.ground.wind, W = JT_GND.wind;
+  return (s === 0 ? -1 : 1) * w.dir * W.push * w.k * (jtPick('pace', pace, 'canter') === 'gallop' ? W.gallop : 1);
+}
+// the wind's gusts: they throw the tip about as well as pushing it, more the harder it blows and at a gallop (no hands aim
+// into a gust: 1 on a still day)
+function jtGustK(pace) {
+  if (!jtGndOn() || G.ground.blow === false) return 1;
+  return 1 + JT_GND.wind.gust * G.ground.wind.k * (jtPick('pace', pace, 'canter') === 'gallop' ? JT_GND.wind.gallop : 1);
+}
+// a line's sway and speed for side s at the depth of its rut: { sway, speed }
+function jtLineK(s, line) {
+  const d = jtGndOn() && G.ground.sand !== false ? clamp(G.ground.rut[s] || 0, 0, 1) : 0;
+  return line === 'side' ? { sway: 1 + JT_GND.jolt.sway * d, speed: 1 } : { sway: 1 - JT_GND.rut.sway * d, speed: 1 - JT_GND.rut.speed * d };
+}
+// the ground on side s's ride on plan: { line, sway, speed, push, into } (into: the inches its hands aim back into the
+// wind: plan.into, a share of the push, as far as its hands can (JT_GND.into by skill; free: a sum for your own hands),
+// and all they can when the plan doesn't say)
+function jtGndFor(s, plan) {
+  const line = jtLineOk(plan && plan.line) ? plan.line : 'rut', K = jtLineK(s, line), push = jtGndPush(s, plan && plan.pace);
+  const cap = plan && plan.free ? 1 : JT_GND.into[jtHandsK(s)], f = plan && Number.isFinite(plan.into) ? Math.min(clamp(plan.into, 0, 1), cap) : cap;
+  return { line, sway: K.sway * jtGustK(plan && plan.pace), speed: K.speed, push, into: push * f };
+}
+jtRideOpts = function (s, plan) { const o = JT_W13.rideOpts(s, plan); if (jtGndOn()) o.gnd = jtGndFor(s, plan); return o; };
+// the ride on the ground: the line's sway (through the hands' spread) and speed, and the wind's push less what the hands aim into it
+jtCharge = function (o, rnd) {
+  const g = o && o.gnd; if (!g) return JT_W13.charge(o, rnd);
+  const H = o.hands || { aim: 1, couch: .3 }, ride = JT_W13.charge(Object.assign({}, o, { hands: Object.assign({}, H, { aim: (H.aim ?? 1) * g.sway }) }), rnd);
+  ride.speed *= g.speed; ride.tip = { x: ride.tip.x + g.push - g.into, y: ride.tip.y };
+  ride.gnd = { line: g.line, push: jtGndR(g.push), into: jtGndR(g.into) };
+  return ride;
+};
+
+/* ---------- on Play ---------- */
+const jtYourLine = () => GP && GP.plans && GP.plans[GP.you] && jtLineOk(GP.plans[GP.you].line) ? GP.plans[GP.you].line : 'rut';
+jtYourSway = function (C) { const r = JT_W13.yourSway(C); if (jtGndOn()) r.sigma *= jtLineK(GP.you, jtYourLine()).sway * jtGustK(GP.plans[GP.you].pace); return r; };
+// your tip drifts with the wind as the gap closes (the whole push at the impact): hold it there yourself
+const jtGndClose = p => clamp((p - JT_GND.wind.close) / (1 - JT_GND.wind.close), 0, 1);
+jtTipNow = function (C) {
+  const t = JT_W13.tipNow(C); if (!t || !jtGndOn()) return t;
+  return { x: t.x + jtGndPush(GP.you, GP.plans[GP.you].pace) * jtGndClose(C.p), y: t.y };
+};
+jtYourRide = function (C) {
+  const r = JT_W13.yourRide(C); if (!jtGndOn()) return r;
+  const line = jtYourLine();
+  r.speed *= jtLineK(GP.you, line).speed; r.gnd = { line, push: jtGndR(r.up ? 0 : jtGndPush(GP.you, r.pace)), into: 0 };
+  return r;
+};
+
+/* ---------- the line and the wind, by skill ---------- */
+/* side s's line on plan, and how far into the wind it aims: { line, into (a share of the push, or undefined: all its
+   hands can), why, wind (the wind's part of the reason) }. sk: a skill, or 'word' (your squire's: the Archmage's sum,
+   for your own hands). A Squire picks a line on a whim and doesn't mind the wind; a Knight works out both lines on the
+   model against a plain rider with a square shield, and aims into the wind as far as its hands can; an Archmage (and
+   your squire) works out both lines and how far to aim into the wind (none, half, all: a wind carrying a shield lance
+   onto the body can be let carry it) against the rider it faces, their shield angled as often as it reads. On smooth
+   sand there is no line to pick, and on a breath of wind nothing to aim into */
+function jtLineFor(s, plan, sk) {
+  if (!jtGndOn() || !jtRiders()) return { line: 'rut', why: '', wind: '' };
+  if (sk == null) sk = G.skill[s];
+  const d = G.ground.sand === false ? 0 : G.ground.rut[s] || 0, pct = Math.round(100 * d), lb = G.ground.lineBy && G.ground.lineBy[s], push = jtGndPush(s, plan.pace), calm = Math.abs(push) < .6;
+  const word = sk === 'word', squire = sk === 0 || sk === '0', read = !squire && sk !== 1;
+  let line = 'rut', into;
+  if (lb) line = lb;
+  else if (d >= .04 && squire) line = R() < .5 ? 'rut' : 'side';
+  if (!squire) {
+    const lines = lb || d < .04 ? [line] : JT_LINES, shares = read && !calm ? [0, .5, 1] : [undefined];
+    let best = null;
+    for (const l of lines) for (const f of shares) {
+      const q = Object.assign({}, plan, { line: l }, f == null ? {} : { into: word ? f : f * JT_GND.into[2] }, word ? { free: true } : {});
+      const v = lines.length * shares.length > 1 ? jtLineVal(s, q, read) : 0;
+      if (!best || v > best.v + 1e-9) best = { l, f: q.into, v };
+    }
+    line = best.l; into = best.f;
+  }
+  const why = lb ? `held ${JT_LINE[lb].n} (a lab)` : d < .04 ? 'the sand smooth' : squire ? `${JT_LINE[line].n}, on a whim`
+    : line === 'rut' ? `in the rut (${pct}% deep: a steadier tip is worth the slower mount${plan.aim === 'helm' ? ' at the helm' : ''})` : `beside the rut (${pct}% deep: the speed is worth the jolt${plan.pace === 'gallop' ? ' at a gallop' : ''})`;
+  return { line, into, why, wind: calm ? '' : jtWindWhy(push, squire ? 0 : into != null ? into : JT_GND.into[jtHandsK(s)], squire, word) };
+}
+// the wind's part of the reason: f the share of the push aimed back into it
+function jtWindWhy(push, f, squire, word) {
+  const w = jtWindWords(G.ground.wind), n = v => `${Math.round(v * 10) / 10} inch${Math.round(v * 10) === 10 ? '' : 'es'}`, onto = push > 0 ? 'toward their body' : 'toward their shield arm';
+  if (squire) return `not minding ${w}`;
+  if (f < .05) return word ? `${w}: let it carry your tip about ${n(Math.abs(push))} ${onto}` : `letting ${w} carry the tip ${n(Math.abs(push))} ${onto}`;
+  // (on the target, + is right of your mark: aiming into a push toward their shield arm is aiming right)
+  if (word) return `${w}: hold your tip about ${n(Math.abs(push) * f)} ${push < 0 ? 'right' : 'left'} of your mark`;
+  return `aiming ${n(Math.abs(push) * f)} into ${w}`;
+}
+// side s's strike on plan, on the model (its points, an unhorsing three), JT_GND.read.n times on a stream of its own
+function jtLineVal(s, plan, read) {
+  const o = 1 - s, ri = jtRiders()[o], rnd = engRng(JT_GND.read.seed + G.n * 7 + s), ride = jtRideOpts(s, plan);
+  const ang = read ? jtHabitOf(s).angled : 0, d0 = { rs: read ? jtRsOf(o, ri) : jtRs(''), mount: read ? jtMountOf(o) : JT_MOUNT_DEF };
+  let v = 0;
+  for (let i = 0; i < JT_GND.read.n; i++) {
+    const a = jtCharge(ride, rnd), d = Object.assign({ guard: rnd() < ang ? 'angled' : 'square' }, d0), st = jtStrike(a, d, rnd), se = jtSeat(st, d, .5, rnd, { broke: true });
+    v += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0;
+  }
+  return v / JT_GND.read.n;
+}
+jtPlan = function (s) {
+  const P = JT_W13.plan(s); if (!jtGndOn() || !jtRiders()) return P;
+  const L = jtLineFor(s, P);
+  P.line = L.line; if (L.into != null) P.into = +L.into.toFixed(3);
+  P.why += `; ${L.why}` + (L.wind ? `; ${L.wind}` : '');
+  return P;
+};
+// your squire's word: the line and the wind by the Archmage's sum, for your own hands (on the target, where to hold the tip)
+jtSuggest = function (s) {
+  const P = JT_W13.suggest(s); if (!jtGndOn() || !jtRiders()) return P;
+  const L = jtLineFor(s, P, 'word');
+  P.line = L.line; if (L.into != null) P.into = +L.into.toFixed(3);
+  P.why += `; ${L.line === 'rut' ? 'ride the rut' : 'ride beside the rut'}${L.why === 'the sand smooth' ? ' (the sand is smooth)' : L.why.replace(/^(in|beside) the rut/, '')}` + (L.wind ? `; ${L.wind}` : '');
+  return P;
+};
+// your line in your plan beat: { line: 'rut' | 'side' }
+jtSelect = function (o) {
+  if (!o || o.line == null || o.suggest) return JT_W13.select(o);
+  if (!GP || GP.ph !== 'plan' || !GP.sel) return 'Not now.';
+  if (!jtGndOn()) return 'The sand is smooth today: no line to pick.';
+  if (!jtLineOk(o.line)) return 'No such line: in the rut, or beside it.';
+  const why = Object.keys(o).length > 1 ? JT_W13.select(Object.assign({}, o, { line: undefined })) : '';
+  if (why) return why;
+  GP.sel = Object.assign({}, GP.sel, { line: o.line }); jtPicked(); return '';
+};
+
+/* ---------- after a course ---------- */
+// (rnd: the seeded stream a resumed course rides out on, phase 6's review; passed through)
+jtCourseClose = function (P, leans, rnd) {
+  const ev = JT_W13.close(P, leans, rnd); if (!ev || !jtGndOn()) return ev;
+  const Gd = G.ground, line = [0, 1].map(s => ev.rides[s].gnd && jtLineOk(ev.rides[s].gnd.line) ? ev.rides[s].gnd.line : 'rut');
+  Gd.log.push({ n: G.n - 1, heat: ev.heat, course: ev.course, tilt: ev.tilt, rut: Gd.rut.map(jtGndR), line, wind: Object.assign({}, Gd.wind), push: [0, 1].map(s => ev.rides[s].gnd ? ev.rides[s].gnd.push : 0) });
+  // the ruts cut: a gallop deep, a canter a little, half beside the rut
+  [0, 1].forEach(s => { Gd.tally[line[s]][s]++; Gd.rut[s] = jtGndR(Math.min(JT_GND.max, Gd.rut[s] + JT_GND.cut[jtPick('pace', ev.rides[s].pace, 'canter')] * (line[s] === 'side' ? JT_GND.side : 1))); });
+  ev.gnd = { line, rake: false };
+  if ((ev.rule.heatOver || ev.rule.tiltNow) && !G.over) { Gd.rut = [0, 0]; Gd.tally.rakes++; ev.gnd.rake = true; Gd.said = `Sir Ruddock rakes the lists smooth${ev.rule.tiltNow ? ' for the tilt for the crown' : ' for the next heat'}.`; }
+  if (!G.over) { Gd.wind = jtGndWind(Gd.wind, rnd); Gd.n = G.n; Gd.tally.winds++; }
+  return ev;
+};
+jtHerald = function (ev) { const t = JT_W13.herald(ev); return ev && ev.gnd && ev.gnd.rake ? `${t} Sir Ruddock rakes the sand smooth.` : t; };
+// Sir Ruddock's line before the first course and after a rake, at the head of the status line
+jtPlayNext = function () {
+  JT_W13.playNext();
+  if (!jtGndOn() || !GP || !G.ground.said || !['plan', 'herald'].includes(GP.ph)) return;
+  GP.msg = `${G.ground.said} ${GP.msg}`; G.ground.said = '';
+};
+
+/* ---------- kept, summed up, shown ---------- */
+// (a course left being ridden is ridden out on the lines committed too)
+jtSnapshot = function () {
+  const sn = JT_W13.snapshot();
+  // (riding is { plans, cpuRides, P } since phase 6's review; an older one is the plans alone)
+  const pl = sn && sn.riding ? (Array.isArray(sn.riding) ? sn.riding : sn.riding.plans) : null;
+  if (Array.isArray(pl) && GP && Array.isArray(GP.plans)) pl.forEach((p, s) => { const q = GP.plans[s]; if (!p || !q) return; if (jtLineOk(q.line)) p.line = q.line; if (typeof q.into === 'number') p.into = q.into; });
+  return sn;
+};
+jtSummary = function () { const S = JT_W13.summary(); if (S && G.ground) S.ground = JSON.parse(JSON.stringify({ tally: G.ground.tally, log: G.ground.log, rut: G.ground.rut, wind: G.ground.wind })); return S; };
+// what the page needs of the ground: each lane's rut, the wind and its push on each tip at this pace, each side's line
+function jtGroundView() {
+  if (!jtGndOn()) return null;
+  // (the other side's line and pace stay hidden until the course is committed, as their plan does: null)
+  const Gd = G.ground, you = GP ? GP.you : 0, plans = GP && GP.plans, sel = GP && GP.sel, open = !GP || jtCommitted();
+  const plan = s => s === you && sel && !open ? sel : plans && plans[s] ? plans[s] : null, seen = s => s === you || open;
+  return { rut: Gd.rut.slice(), wind: Object.assign({}, Gd.wind), words: jtWindWords(Gd.wind, true),
+    push: [0, 1].map(s => seen(s) && plan(s) ? jtGndR(jtGndPush(s, plan(s).pace)) : null),
+    line: [0, 1].map(s => seen(s) && plan(s) && jtLineOk(plan(s).line) ? plan(s).line : null), said: Gd.said, tally: JSON.parse(JSON.stringify(Gd.tally)) };
+}
+jtView = function () { const V = JT_W13.view(); if (V) V.ground = jtGroundView(); return V; };
+
+/* ---------- drawing ---------- */
+// the pennants stream with the wind: limp on a breath, taut and snapping when it blows; toward us (from the gallery)
+// they swing down and broaden, away from us they lift and narrow
+jtPennant = function (c, x, zz, col, i) {
+  if (!jtGndOn()) return JT_W13.pennant(c, x, zz, col, i);
+  const sx = jtScrX(x), sy = jtScrY(zz), z = JTC.zoom; if (sx < -20 || sx > JT_VIEW.w + 20) return;
+  const w = G.ground.wind, k = w.k, top = sy - 2.6 * z;
+  c.strokeStyle = '#4a3420'; c.lineWidth = Math.max(1, z * .06); c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx, top); c.stroke();
+  const snap = Math.sin(JTC.t * (3 + 9 * k) + i * 1.3) * (.05 + .12 * k), len = (.5 + .8 * k) * z, droop = (1 - k) * .55 + (w.dir > 0 ? .25 : -.2) * k;
+  const ex = sx + len * Math.cos(droop + snap), ey = top + len * Math.sin(droop + snap) * (w.dir > 0 ? 1.15 : .8), wide = .42 * z * (w.dir > 0 ? 1 + .3 * k : 1 - .35 * k);
+  c.fillStyle = col; c.beginPath(); c.moveTo(sx, top); c.quadraticCurveTo((sx + ex) / 2, (top + ey) / 2 - wide * .3 + snap * z, ex, ey); c.lineTo(sx, top + wide); c.closePath(); c.fill();
+};
+// the furrows: each lane's rut along the tilt, darker and wider as it deepens
+function jtRutDraw(c) {
+  // (sized as the riders are in the wide shot, a little larger than the yard's scale, so the furrows read there too)
+  const Gd = G.ground, k = Math.max(JTC.zoom, 26);
+  c.save();
+  for (const s of [0, 1]) {
+    const d = Gd.rut[s]; if (d < .02) continue;
+    const lane = s ? JT_VIEW.far : JT_VIEW.near, x0 = jtScrX(1.5), x1 = jtScrX(JT_LISTS.yards - 1.5);
+    for (const [dz, a] of [[-.14, .55], [0, 1], [.14, .55]]) {
+      const y = jtScrY(lane + dz); c.strokeStyle = `rgba(88,58,28,${(.2 + .5 * d) * a})`; c.lineWidth = Math.max(1.5, k * (.06 + .12 * d)); c.beginPath(); c.moveTo(x0, y); c.lineTo(x1, y); c.stroke();
+    }
+    c.fillStyle = `rgba(66,42,20,${.18 + .4 * d})`;
+    for (let x = 2; x < JT_LISTS.yards - 2; x += 1.1) { const sx = jtScrX(x + (s ? .5 : 0)); if (sx < -6 || sx > JT_VIEW.w + 6) continue; c.beginPath(); c.ellipse(sx, jtScrY(lane + ((x * 7) % 3 - 1) * .05), Math.max(1.2, k * .1), Math.max(.8, k * .035), 0, 0, 6.28); c.fill(); }
+  }
+  c.restore();
+}
+jtListsDraw = function (c) { JT_W13.listsDraw(c); if (jtGndOn()) jtRutDraw(c); };
+// on the target, where the wind pushes your tip: an arrow from your mark, as long as the push at your pace
+jtTargetDraw = function (c, plan, guard, tip) {
+  JT_W13.targetDraw(c, plan, guard, tip);
+  if (!jtGndOn() || !plan || !GP) return;
+  const p = jtGndPush(GP.you, plan.pace); if (Math.abs(p) < .3) return;
+  const A = JT_PLAN.aim[plan.aim] || JT_PLAN.aim.shield, [ax, ay] = jtAimScr(A.x, A.y - 9), [bx] = jtAimScr(A.x + p, A.y);
+  c.save(); c.strokeStyle = '#bfe4ff'; c.fillStyle = '#bfe4ff'; c.lineWidth = 2; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, ay); c.stroke();
+  const dx = Math.sign(bx - ax); c.beginPath(); c.moveTo(bx, ay); c.lineTo(bx - dx * 7, ay - 4); c.lineTo(bx - dx * 7, ay + 4); c.closePath(); c.fill();
+  txt(c, 'wind', (ax + bx) / 2, ay - 6, '700 10px "Alegreya Sans", sans-serif', '#bfe4ff', 'center');
+  c.restore();
+};
+// the ground's panel, top right: the wind across a little plan of the lists, and each lane's rut
+function jtGroundDraw(c) {
+  const V = jtGroundView(); if (!V) return;
+  const x0 = JT_VIEW.w - 250, y0 = 10, w = 240, h = 56;
+  c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, x0, y0, w, h, 8); c.fill();
+  // the plan of the lists: the tilt down the middle, the gallery side on top; the wind's arrow across it
+  const px = x0 + 10, py = y0 + 10, pw = 60, ph = 36, mid = py + ph / 2;
+  c.strokeStyle = 'rgba(242,236,224,.5)'; c.lineWidth = 1; c.strokeRect(px, py, pw, ph);
+  c.strokeStyle = '#e8dcc0'; c.lineWidth = 2; c.beginPath(); c.moveTo(px + 4, mid); c.lineTo(px + pw - 4, mid); c.stroke();
+  const L = 6 + 12 * V.wind.k, ax = px + pw / 2, d = V.wind.dir;
+  c.strokeStyle = '#bfe4ff'; c.fillStyle = '#bfe4ff'; c.lineWidth = 1.5 + 2 * V.wind.k;
+  c.beginPath(); c.moveTo(ax, mid - d * L); c.lineTo(ax, mid + d * L); c.stroke();
+  c.beginPath(); c.moveTo(ax, mid + d * (L + 5)); c.lineTo(ax - 5, mid + d * (L - 2)); c.lineTo(ax + 5, mid + d * (L - 2)); c.closePath(); c.fill();
+  txt(c, V.words, px + pw + 10, y0 + 24, '700 12px "Alegreya Sans", sans-serif', '#f2ece0');
+  const r = s => V.rut[s] < .04 ? 'smooth' : `${Math.round(100 * V.rut[s])}% rut`;
+  txt(c, `Sand: ${(G.teams[0].short || 'Ours')} ${r(0)} · ${(G.teams[1].short || 'Theirs')} ${r(1)}`, px + pw + 10, y0 + 44, '600 11px "Alegreya Sans", sans-serif', '#d8c8a8');
+  c.restore();
+}
+jtDraw = function (c, dt) { JT_W13.draw(c, dt); if (jtGndOn()) jtGroundDraw(c); };
 /* The Lists' page in the Realm (issue #117, phase 2). A canvas in #v-lists, after the Shed's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the match on (jtTick) and draws it (jtDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -48927,7 +49376,21 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    fxFor(s), cpuPower(s, plan), tip(s), jobsFor(s) (the jobs side s's squires may do: the lift while cursed); autoPow
    (Manage's Auto powers, kept in the snapshot). A roster member brings its pick as pw: { lance, shield } (0 or 1).
    select({ job: [squire, 'lift'] }) lifts a curse in place of a job; card(s) adds the other rider's powers and the
-   curses (pow, curse); summary() adds powers (the casts, the mana, the cheer). */
+   curses (pow, curse); summary() adds powers (the casts, the mana, the cheer).
+   Phase 7 is gear and potions (13-kit.js): a roster member's gear ({ id, name, fx }) reaches the model as gx (fx without
+   r); start(opts) and simMatch(opts) take bags ([yours or null, theirs]: a match without bags has no potions); potions
+   (the table), kitRules, potionWhy(s, id), potion(id) (yours, in your plan beat: '' or why not), advice(bag) (your
+   squire's word), cpuPotion(s), potionValues(s, bag), rideFx(s) (what a rider rides with this course: powers, gear and
+   potions, or null), rideOpts(s, plan) (what the model is given for side s's rider on a plan).
+   Phase 8 is the Tilting Lists' ways (14-ground.js): start(opts) and simMatch(opts) take ground (true: the churned sand
+   and the pennant wind; lab: { sand: false } or { wind: false } leaves one out) and lineBy (lab: a line a side, 'rut' or
+   'side', or null); groundRules and lines are the tables; ground (G.ground, a copy: each lane's rut, the wind, the log
+   and the tally), gndPush(s, pace) (the wind's push on side s's tip, inches), gustK(pace) (its gusts on the sway),
+   lineK(s, line) (a line's sway and speed now), lineFor(s, plan, sk) (the line by a skill, and how far into the wind,
+   with the reason), windWords(w); select({ line }) picks your line; a plan carries its line (and into: the share of the
+   push it aims back); view adds ground (each rut, the wind
+   and its words, each side's push and line, the other side's hidden until the course is committed); summary() adds
+   ground (the tally and the log). */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -48968,6 +49431,13 @@ return {
   ultOf: (s, ri) => G && G.teams ? jtUltOf(s, ri) : null, powWhy: (s, k) => jtPowWhy(s, k), cast: (s, k, why) => jtCast(s, k, why || 'by hand'), castMine: k => jtCastMine(k),
   sitFits: (s, k) => jtSitFits(s, k), fxFor: s => jtFxFor(s), cpuPower: (s, plan) => G && G.teams ? jtCpuPower(s, plan || jtPlan(s)) : [], tip: s => jtPowerTip(s),
   jobsFor: s => G && G.teams ? jtJobsFor(s).slice() : JT_JOBS.slice(), get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // gear and potions (phase 7)
+  potions: JSON.parse(JSON.stringify(JT_POTIONS)), kitRules: JSON.parse(JSON.stringify(JT_KIT)), potionWhy: (s, id) => jtPotionWhy(s, id), potion: id => jtPotion(id),
+  advice: bag => jtPotionAdvice(bag), cpuPotion: s => G && G.teams && G.bags ? jtCpuPotion(s) : '', potionValues: (s, bag) => G && G.teams && G.bags ? jtPotionValues(s, bag || {}) : [],
+  rideFx: s => G && G.teams ? jtRideFx(s) : null, rideOpts: (s, plan) => G && G.teams && !G.over ? jtRideOpts(s, plan || { aim: 'shield', guard: 'square', pace: 'canter' }) : null,
+  // the Tilting Lists' ways (phase 8)
+  groundRules: JSON.parse(JSON.stringify(JT_GND)), lines: JSON.parse(JSON.stringify(JT_LINE)), get ground() { return G && G.ground ? JSON.parse(JSON.stringify(G.ground)) : null; },
+  gndPush: (s, pace) => jtGndPush(s, pace), gustK: pace => jtGustK(pace), lineK: (s, l) => jtLineK(s, l), lineFor: (s, plan, sk) => G && G.teams && !G.over ? jtLineFor(s, plan || jtPlanOwn(s), sk) : null, windWords: w => jtWindWords(w || { k: 0, dir: 1 }),
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };
 
@@ -69451,9 +69921,11 @@ function wListsScore(sn) {
 const wW150OnPhase = wJT.onPhase;
 wJT.onPhase = ph => {
   wW150OnPhase(ph);
-  if (!['next', 'charge', 'after'].includes(ph) || !wListsWorld() || !wJT.G || wJT.G.over) return;
+  if (!['next', 'plan', 'herald', 'charge', 'seat', 'after'].includes(ph) || !wListsWorld() || !wJT.G || wJT.G.over) return;
   const L = WG.jtg.live, first = !L.snap; L.snap = wJT.snapshot();
-  // (a course set off, or closed, is saved at once: a reload never brings an earlier course back, nor rides one twice,
+  // (the beat before a course (your plan, or the herald's: what was decided for it, their plan, corner and potion,
+  // comes back on a reload; phase 7's review), a course set off, its lances met (the balance moment: phase 6's review),
+  // or closed, is saved at once: a reload never brings an earlier course back, nor rides one twice,
   // nor calls off a match that has begun; the course being ridden is kept with the plans committed: phase 5's review)
   const now = Date.now(); if (first || ph !== 'next' || now - WJTG.saved > W_JTG.saveMs) { WJTG.saved = now; wSave(); }
 };
@@ -69982,6 +70454,268 @@ renderHelp = function () {
   wW153RenderHelp();
   const after = $('wHelpListsGame') || $('wHelpListsCall') || $('wHelpLists'); if (!after || $('wHelpListsPowers')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsPowers"><b>Powers at the Lists.</b> Every rider brings a lance power and a shield power (pick them on the Lists tab), cast before a course for team mana; some lay a curse for the rest of the heat, which a squire can lift. The gallery's cheer pays for one ultimate a match, which marks a course; The Last Course, Back in the Saddle and For the Crown fit their moments. See Jousting: how it works.</p>`);
+};
+/* w154: jousting gear and potions (issue #117, phase 7), by #61's conventions, as w127 is the Shed's; the engine's side
+   is src/jt/parts/13-kit.js, the plumbing (W_GEAR, W_POTIONS, the slot, the Bag) is w72.
+   Gear (W_LISTS_GEAR, one piece a player, p.gear.lists): an Ironwood Lance (the tip sways less), a Kite Shield (an
+   angled shield turns more) and a War Saddle (a firmer seat) from Sir Ruddock's rack at the Lists and the Mossgate
+   grocer's; Rowelled Spurs (a little faster, for less wind), a Crested Helm (a lance on your helm breaks less often) and
+   a Lucky Favour (pressure weighs less) from chests. Small effects (measured; phase 12's lab measures them again). Gear
+   only does anything for a rider (squires don't ride). It reaches the engine through wListsPlayer (the engine's copy
+   of the rider), never through p.jt, and shows on the stats card's Gear block and the Lists tab.
+   Potions: the Stamina Draught (football's item, serving the Lists too: here it gives the mount's wind back), and a
+   Steadying Tonic, Ruddock's Liniment and Squire's Oil from the same shops. In a real match, before one of your courses
+   (You ride, or Manage when the calls are yours), from the Bag row under the lists, one a course, with your squire's
+   advice; each comes out of your bag when given, and the match is saved with it at once, so the saved bag and the
+   saved match always agree. Your squires never open your bag (Watch, Manage left to your squires and Auto powers
+   don't), and Simulate leaves it alone. The other side brings W_LISTS_KIT.opp[tier] and gives at its skill, between
+   courses; every use goes in the course log with its reason, and the match card says what each club brings.
+   W_LISTS_KIT.prize lists what the Gilded Lance (phase 10) may hand out.
+   wListsPotion(id)   gives one of yours ('' or why not)
+   Wraps: wGearLive (wW154GearLive: the Lists), wListsPlayer (wW154ListsPlayer: gear's ratings and the piece),
+   wStartLists (wW154StartLists: their bag goes in), wResumeLists (wW154ResumeLists: an older save's bag), wListsRows
+   (wW154ListsRows: the Bag row), wListsRow (wW154ListsRow: the gear on the Lists tab), wOpenListsCard
+   (wW154OpenListsCard: the bags on the card), wListsLogHTML (wW154ListsLogHTML: the potions), wListsHowHTML
+   (wW154ListsHow: #wListsHowKit), renderHelp (wW154RenderHelp: #wHelpListsKit); wJT.start and wJT.simMatch (the bags go
+   in) and wJT.onPhase (a refusal goes with its course). */
+
+W_GEAR_CFG.sports.lists = 'jousting';
+W_GEAR_STATN.lists = { lance: 'lance', couch: 'couch', seat: 'seat', shield: 'shield', ride: 'ride', nerve: 'nerve', care: 'care' };
+const W_LISTS_GEAR = {
+  jt_ironwood: { sport: 'lists', name: 'Ironwood Lance', price: 55, desc: 'Ironwood, stiff and true: the tip sways a twentieth less.', fx: { sway: .95 } },
+  jt_kite: { sport: 'lists', name: 'Kite Shield', price: 50, desc: 'Long and tapered: angled, it turns a lance more (a lance on it breaks a sixth less often; not one that passes through an angled shield, as a wraith\'s does).', fx: { kite: .85 } },
+  jt_saddle: { sport: 'lists', name: 'War Saddle', price: 60, desc: 'A high cantle at your back: a firmer seat.', fx: { hold: .05 } },
+  jt_spurs: { sport: 'lists', name: 'Rowelled Spurs', price: 45, desc: 'A sharper word to the mount: a touch faster, and each course costs it a tenth less wind.', fx: { speed: 1.01, wind: .9 } },
+  jt_helm: { sport: 'lists', name: 'Crested Helm', price: 50, desc: 'A rounded crest: a lance on your helm breaks a fifth less often.', fx: { helmTurn: .8 } },
+  jt_favour: { sport: 'lists', name: 'Lucky Favour', price: 45, desc: 'A token from the gallery, tied to the lance: pressure weighs a third less on them.', fx: { nerve: .35 } },
+};
+for (const id of Object.keys(W_LISTS_GEAR)) wGearAdd(id, W_LISTS_GEAR[id]);
+const W_LISTS_KIT = {
+  potions: { jttonic: 35, jtliniment: 30, jtoil: 45 },
+  store: ['jt_ironwood', 'jt_kite', 'jt_saddle'],
+  opp: { 1: { draught: 1 }, 2: { draught: 1, jtliniment: 1 }, 3: { draught: 1, jtliniment: 1, jttonic: 1, jtoil: 1 } },
+  // (phase 10: the Gilded Lance's prizes come from here)
+  prize: ['jt_spurs', 'jt_helm', 'jt_favour', 'jtoil'],
+};
+for (const id of Object.keys(wJT.potions)) {
+  const P = wJT.potions[id];
+  if (id === 'draught') {
+    W_POTIONS[id].sports = (W_POTIONS[id].sports || ['grid']).concat('lists');
+    DB.items[id].desc += ` At the Lists: ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`;
+    DB.items[id].use += ' Or in a jousting match, before a course, one a course.';
+    continue;
+  }
+  wPotionAdd(id, { sport: 'lists' });
+  DB.items[id] = { name: P.n, desc: P.desc, use: 'In a jousting match, before one of your courses: the Bag row under the lists. One potion a course.', price: W_LISTS_KIT.potions[id] };
+}
+// Sir Ruddock's rack at the Lists, and the Mossgate grocer's
+DB.shops.lists = Object.assign({}, W_LISTS_KIT.potions, { draught: (DB.shops.hq || {}).draught || 30 });
+for (const id of W_LISTS_KIT.store) DB.shops.lists[id] = W_LISTS_GEAR[id].price;
+if (DB.shops.moss) { for (const id of Object.keys(W_LISTS_KIT.potions)) DB.shops.moss[id] = W_LISTS_KIT.potions[id]; for (const id of W_LISTS_KIT.store) DB.shops.moss[id] = W_LISTS_GEAR[id].price; }
+(() => {
+  const K = DB.chars.gk_lists; if (!K) return;
+  K.shop = 'lists';
+  K.topics.job.t += ' And I keep a rack of tilting KIT: lances, shields, saddles, and a few bottles.';
+  K.topics.kit = { t: 'Ironwood lances, kite shields, a war saddle or two. And my liniment: rub it in the arm and you can couch all day.', act: 'shop' };
+})();
+for (const [c, it] of [['hatchery_c6', 'jt_spurs'], ['deepseam_c3', 'jt_helm'], ['chapel_chest', 'jt_favour'], ['emberdeep_c6', 'jtoil'], ['genevault_c6', 'jttonic']]) {
+  const C = DB.chests[c]; if (C) { C.items = C.items || {}; C.items[it] = (C.items[it] || 0) + 1; }
+}
+const wW154GearLive = wGearLive;
+wGearLive = function (sport) { return sport === 'lists' ? wListsLive() : wW154GearLive(sport); };
+const wW154ListsPlayer = wListsPlayer;
+wListsPlayer = function (p) {
+  const m = wW154ListsPlayer(p), G = p && p.id != null && wPlayer(p.id) === p ? wGearOf(p, 'lists') : null;
+  if (G) { m.r = wGearRate(m.r, G, wJT.cap); m.gear = wGearTag(G); }
+  return m;
+};
+
+/* ---------- the bags go in ---------- */
+const WJTK = { next: null };
+let W_LISTS_KITMSG = '';
+const wListsBagMine = () => Object.fromEntries(wMatchBag('lists').filter(x => wJT.potions[x.id]).map(x => [x.id, x.n]));
+const wListsBagWords = bag => { const ks = Object.keys(bag).filter(id => bag[id] > 0 && wJT.potions[id]); return ks.length ? ks.map(id => `${bag[id]} ${wJT.potions[id].n}`).join(', ') : 'nothing'; };
+const wW154StartLists = wStartLists;
+wStartLists = function (o) {
+  W_LISTS_KITMSG = '';
+  WJTK.next = [null, Object.assign({}, W_LISTS_KIT.opp[(o && o.tier) || (o && o.club ? wBallTier(o.club) : 1)] || {})];
+  try { return wW154StartLists(o); } finally { WJTK.next = null; }
+};
+const wW154Start = wJT.start, wW154SimMatch = wJT.simMatch;
+wJT.start = o => wW154Start(WJTK.next ? Object.assign({}, o, { bags: WJTK.next }) : o);
+wJT.simMatch = o => wW154SimMatch(WJTK.next ? Object.assign({}, o, { bags: WJTK.next }) : o);
+// a match saved before bags came in: potions from here on (the other club's bag by its tier)
+const wW154ResumeLists = wResumeLists;
+wResumeLists = function () {
+  wW154ResumeLists();
+  const L = WG.jtg && WG.jtg.live, G = wJT.G;
+  if (L && L.world && G && G.teams && !G.bags && WJT && WJT.world) {
+    Object.assign(G, { bags: [null, Object.assign({}, W_LISTS_KIT.opp[L.world.tier || wBallTier(L.world.club) || 1] || {})], pots: [], potCourse: [-1, -1], potAsk: [-1, -1], tonic: [-1, -1], oil: [-1, -1] });
+    L.snap = wJT.snapshot(); wSave(); wListsRows();
+  }
+};
+
+/* ---------- your Bag, in a real match ---------- */
+// (the bag and the match are saved together, at once: a reload finds them agreeing)
+function wListsPotion(id) {
+  if (!wListsWorld()) return 'Potions are for real matches, not exhibitions or practice.';
+  if (!wHas(id)) return `You have no ${(wJT.potions[id] || {}).n || 'such potion'}.`;
+  const r = wJT.potion(id); if (r) return r;
+  wAddItem(id, -1); if (WG.jtg && WG.jtg.live) WG.jtg.live.snap = wJT.snapshot(); wSave(); return '';
+}
+$('wListsPowRow').insertAdjacentHTML('afterend', '<div id="wListsBagRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Bag</span><span id="wListsBag"></span></div></div>');
+const wW154ListsRows = wListsRows;
+wListsRows = function () {
+  wW154ListsRows();
+  const row = $('wListsBagRow'), V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null;
+  const calls = !!V && (V.mode === 'play' || (V.mode === 'manage' && !V.mgrAuto));
+  const show = !!V && wListsWorld() && !V.yard && ((calls && V.ph === 'plan' && !!V.sel) || V.mode === 'manage');
+  row.hidden = !show; if (!show) return;
+  const G = wJT.G, s = V.you, bag = wListsBagMine(), ids = Object.keys(bag), can = calls && V.ph === 'plan', adv = can ? wJT.advice(bag) : null;
+  const theirs = (G.pots || []).filter(x => x.side !== s && x.at === G.n).map(x => `${wJT.potions[x.id].n} (${x.why})`);
+  $('wListsBag').innerHTML = (ids.length ? ids.map(id => { const P = wJT.potions[id], why = can ? wJT.potionWhy(s, id) : 'Only before your course, when the calls are yours.';
+      return `<button class="ghost${adv && adv.id === id ? ' on' : ''}" data-jtkuse="${id}" ${can ? '' : 'disabled'} title="${esc(P.desc + (why ? ` (${why})` : ''))}">${esc(P.n)} (${bag[id]})</button>`; }).join(' ') : '<small class="hint">No jousting potions in your bag. Sir Ruddock\'s rack and the Mossgate grocer\'s sell them.</small>')
+    + (W_LISTS_KITMSG ? ` <small class="wbad">${esc(W_LISTS_KITMSG)}</small>` : '') + (adv ? ` <small class="hint">Your squire says: <b>${esc(wJT.potions[adv.id].n)}</b>, ${esc(adv.why)}.</small>` : '')
+    + (theirs.length ? ` <small class="hint">Their squire gives ${esc(theirs.join(' and '))}.</small>` : '');
+};
+// (a refusal is for the course it was about: a new course clears it)
+const wW154OnPhase = wJT.onPhase;
+wJT.onPhase = ph => { if (ph === 'next') W_LISTS_KITMSG = ''; wW154OnPhase(ph); };
+$('wListsBagRow').addEventListener('click', e => {
+  const b = e.target.closest('[data-jtkuse]'); if (!b || b.disabled) return;
+  W_LISTS_KITMSG = wListsPotion(b.dataset.jtkuse); wListsRows(); wListsBarNote();
+});
+// every potion given, in the course log (with the course it was given before)
+const wW154ListsLogHTML = wListsLogHTML;
+wListsLogHTML = function () {
+  const html = wW154ListsLogHTML(), G = wJT.G; if (!G || !G.pots || !G.pots.length || !G.log.length) return html;
+  const items = html.split('</li>').slice(0, G.log.length), n = G.log.length;
+  return items.map((li, j) => {
+    const at = n - 1 - j, P = G.pots.filter(x => x.at === at);
+    return li + (P.length ? ` <small class="wjtpot">${P.map(x => `⚗ ${esc(G.teams[x.side].short || G.teams[x.side].name)}: ${esc(wJT.potions[x.id].n)}${x.why ? ` (${esc(x.why)})` : ''}`).join('; ')}.</small>` : '') + '</li>';
+  }).join('');
+};
+
+/* ---------- the Lists tab and the card ---------- */
+const wW154ListsRow = wListsRow;
+wListsRow = function (k, C) {
+  const html = wW154ListsRow(k, C), p = wListsWho(k), g = p && typeof k === 'number' ? wGearOf(p, 'lists') : null;
+  return g ? html.replace('<small class="wnst"', `<small class="wnst" title="${esc(g.desc)}">Rides with the <b>${esc(g.name)}</b>.</small><small class="wnst"`) : html;
+};
+const wW154OpenListsCard = wOpenListsCard;
+wOpenListsCard = function () {
+  wW154OpenListsCard();
+  const ul = document.querySelector('#modalBox .wbclubs'); if (!ul) return;
+  ul.insertAdjacentHTML('afterend', `<p class="hint">What their squires bring: ${[1, 2, 3].map(t => `tier ${t}, ${esc(wListsBagWords(W_LISTS_KIT.opp[t]))}`).join('; ')}. Yours is your bag: give from it before a course, in the Bag row under the lists.</p>`);
+};
+
+const wW154ListsHow = wListsHowHTML;
+wListsHowHTML = function () {
+  return wW154ListsHow() + `<p class="hint" id="wListsHowKit"><b>Gear and potions.</b> Each player can carry one piece for the Lists, and it counts when they ride: an Ironwood Lance (the tip sways less), a Kite Shield (an angled shield turns more) and a War Saddle (a firmer seat) from Sir Ruddock's rack (ask him for KIT) and the Mossgate grocer's; Rowelled Spurs (a little faster, for less wind), a Crested Helm (a lance on your helm breaks less often) and a Lucky Favour (pressure weighs less) from chests. In a real match, before one of your courses, give a potion from the Bag row (one a course): the Stamina Draught (the mount's wind back), a Steadying Tonic (no pressure on your rider this course, when it weighs on them), Ruddock's Liniment (the lance arm's strength back) or Squire's Oil (your lance hardly ever glances this course). Your squire advises, but never opens your bag; their squires give theirs between courses.</p>`;
+};
+const wW154RenderHelp = renderHelp;
+renderHelp = function () {
+  wW154RenderHelp();
+  const after = $('wHelpListsPowers') || $('wHelpListsGame'); if (!after || $('wHelpListsKit')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsKit"><b>Jousting gear and potions.</b> One piece of jousting gear a player (Sir Ruddock's rack and the Mossgate grocer's sell an Ironwood Lance, a Kite Shield and a War Saddle; chests hold the rest), and jousting potions from your bag in a real match, one a course, from the Bag row under the lists. See Jousting: how it works.</p>`);
+};
+/* w155: the Tilting Lists' ways (issue #117, phase 8), jousting's ground; the engine's side is src/jt/parts/14-ground.js.
+   On in every match the Realm jousts at the Lists (Play, Manage, Simulate, the clubs' matches and league fixtures there,
+   the exhibition JOUST, the practice match); never in the tilting yard (the straw target has no lane), and in LAB mode off unless the lab sets
+   W_JTGND.lab, so the other balance numbers stand. A match whose options already say (ground, even false) jousts that:
+   the Umbral's lists (phase 11) must send ground: false, as the Umbral's other grounds send theirs.
+   - The churned sand: every course cuts a rut in each rider's lane, a gallop deep, a canter a little, and the furrows show
+     on the sand. Before each course you pick your line: in the rut (a steadier tip, a slower mount) or beside it (your
+     pace, but the stride jolts the aim). Sir Ruddock rakes the lists between heats.
+   - The pennant wind: before each course the pennants (and the panel on the lists) show which way and how hard the wind
+     blows across the lists. It pushes each tip sideways as the gap closes, more at a gallop, and its gusts throw it
+     about. On Play your tip drifts and you hold it into the wind; on the target an arrow shows the push.
+   On the Lists, before each of your courses (You ride, and Manage when the calls are yours): a Line row (In the rut,
+   Beside it; L swaps them) with each lane's rut and the wind, your squire's line first. The course log names each
+   course's wind and lines. Sir Ruddock has a line for the SAND and the WIND, and Jousting: how it works has both
+   (#wListsHowGround), with a line in How to play (#wHelpListsGround).
+   Wraps: wListsGame, wListsOpts (wW155ListsGame, wW155ListsOpts: the ground in, at the Realm's call sites, as w153's
+   powers; the engine called bare has none), wListsRows (wW155ListsRows: the Line row),
+   wListsLogHTML (wW155ListsLogHTML: the wind and the lines), wListsHowHTML (wW155ListsHow: #wListsHowGround), renderHelp
+   (wW155RenderHelp: #wHelpListsGround). */
+
+const W_JTGND = { on: true, lab: false };
+function wJtGndRules() {
+  if (!W_JTGND.on) return false;
+  if (LAB) return !!W_JTGND.lab;
+  return true;
+}
+const wJtGndNext = o => { o = o || {}; if (o.ground !== undefined || o.yard) return o; return wJtGndRules() ? Object.assign({}, o, { ground: true }) : o; };
+// (at the Realm's call sites, as w153's powers: the engine called bare, as its tests do, has none)
+const wW155ListsGame = wListsGame;
+wListsGame = function (opts) { return wW155ListsGame(wJtGndNext(opts)); };
+const wW155ListsOpts = wListsOpts;
+wListsOpts = function () { return wJtGndNext(wW155ListsOpts.apply(this, arguments)); };
+
+/* ---------- Sir Ruddock ---------- */
+(() => {
+  const K = DB.chars.gk_lists; if (!K) return;
+  K.topics.job.t += ' Ask me about the SAND and the WIND before you ride here.';
+  K.topics.sand = { t: 'Every gallop cuts my sand. By the end of a heat each lane has a rut you could lose a boot in, and you can see it. Ride in it and the furrow holds your lance steady, but the horse labours. Ride beside it and you keep your pace, but the stride jolts the tip. A canter cuts it less than a gallop. I rake it smooth between heats.' };
+  K.topics.wind = { t: 'The Mosswold\'s wind comes and goes along the tents. Watch the pennants before every course: they show which way it blows across the lists and how hard. It pushes your tip sideways as the gap closes, more at a gallop, and the gusts throw it about. Aim into it. From the gallery it blows our lances toward their shields and theirs toward our bodies; when it turns, the other way round.' };
+})();
+
+/* ---------- on the Lists: the Line row ---------- */
+(() => {
+  const go = $('wListsRowGo'); if (!go) return;
+  go.insertAdjacentHTML('beforebegin', '<div class="wccrow" id="wListsRowLine" hidden><span class="wccl">Line</span><span id="wListsLine"></span></div>');
+})();
+const W_JTLINE = { rut: ['In the rut', 'L: the furrow steadies your tip, but the mount is slower (more, the deeper the rut)'], side: ['Beside it', 'L: you keep your pace, but the stride jolts the aim (more, the deeper the rut)'] };
+const wW155ListsRows = wListsRows;
+wListsRows = function () {
+  wW155ListsRows();
+  const row = $('wListsRowLine'); if (!row) return;
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, g = V && V.ground;
+  const show = !!g && !$('wListsRows').hidden && V.ph === 'plan' && !!V.sel;
+  row.hidden = !show; if (!show) return;
+  const s = V.you, cur = V.sel.line === 'side' ? 'side' : 'rut', r = x => g.rut[x] < .04 ? 'smooth' : `a ${Math.round(100 * g.rut[x])}% rut`;
+  const p = g.push[s], wind = Math.abs(p || 0) < .6 ? `${g.words}` : `${g.words}: it pushes your tip ${Math.round(Math.abs(p) * 10) / 10} inches ${p > 0 ? 'toward their body' : 'toward their shield arm'}`;
+  $('wListsLine').innerHTML = Object.entries(W_JTLINE).map(([k, [n, t]]) => `<button class="ghost${k === cur ? ' on' : ''}" data-jf="line" data-jv="${k}" title="${esc(t)}">${n}</button>`).join(' ')
+    + ` <small class="hint">Your lane: ${r(s)}. ${esc(wind)}.</small>`;
+};
+// L swaps your line in your plan beat
+window.addEventListener('keydown', e => {
+  if ((e.key || '').toLowerCase() !== 'l' || e.ctrlKey || e.metaKey || e.altKey || e.repeat || !wJT.on || wJT.paused) return;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return;
+  const md = $('modal'); if (md && !md.hidden) return;
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null;
+  if (!V || !V.ground || V.ph !== 'plan' || !V.sel || !(V.mode === 'play' || (V.mode === 'manage' && !V.mgrAuto))) return;
+  const why = wJT.select({ line: V.sel.line === 'side' ? 'rut' : 'side' });
+  if (why) $('wListsNote').textContent = why; else wListsBarNote();
+  wListsRows(); e.preventDefault(); e.stopPropagation();
+}, true);
+
+/* ---------- the course log: the wind and the lines ---------- */
+const wW155ListsLogHTML = wListsLogHTML;
+wListsLogHTML = function () {
+  const html = wW155ListsLogHTML(), G = wJT.G; if (!G || !G.ground || !G.log.length) return html;
+  const items = html.split('</li>').slice(0, G.log.length), n = G.log.length, by = {};
+  for (const e of G.ground.log) by[e.n] = e;
+  return items.map((li, j) => {
+    const E = by[n - 1 - j]; if (!E) return li + '</li>';
+    const side = s => `${esc(G.teams[s].short || G.teams[s].name)} ${E.line[s] === 'side' ? 'beside the rut' : E.rut[s] < .04 ? 'on smooth sand' : 'in the rut'}`;
+    return li + ` <small class="wjtgnd">${esc(wJT.windWords(E.wind).replace(/^./, c => c.toUpperCase()))}; ${side(0)}, ${side(1)}.</small></li>`;
+  }).join('');
+};
+
+/* ---------- How to play ---------- */
+const wW155ListsHow = wListsHowHTML;
+wListsHowHTML = function () {
+  const R = wJT.groundRules;
+  return wW155ListsHow() + `<div id="wListsHowGround"><p class="hint"><b>The Tilting Lists' ways.</b> Every match at the Lists has two of its own (not the tilting yard). <b>The churned sand:</b> every course cuts a rut along each rider's lane, a gallop deep and a canter a little, and you can see the furrows darken on the sand. Before each course you pick your <b>line</b> (L): <b>in the rut</b>, the furrow holds your tip steadier but the mount is slower; <b>beside it</b>, you keep your pace but the stride jolts the aim. The deeper the rut, the bigger both. Riding beside it cuts the rut half as much. On smooth sand the two are the same. Sir Ruddock rakes the lists between heats (and before the tilt for the crown), so every heat starts smooth.</p>
+  <p class="hint"><b>The pennant wind:</b> the wind comes and goes across the lists. Before each course the pennants show which way and how hard it blows (they stream toward you when it blows from the gallery, and lift away when it blows toward it), and so does the panel at the top right. As the gap closes it pushes each lance tip sideways, up to ${R.wind.push} inches in a stiff wind (more at a gallop), and its gusts throw the tip about. You pass the other rider left side to left side, so the same wind pushes your tip one way on their target and theirs the other: from the gallery, yours toward their shield and theirs toward your body. On You ride your tip drifts as you close and you hold it into the wind (the arrow on the target shows the push); your squire says how far.</p>
+  <p class="hint">Their riders read both by skill: a Squire picks a line on a whim and doesn't mind the wind; a Knight works out the better line on the odds and aims into the wind; an Archmage works out the line and how far to aim into the wind against your rider (a wind that carries its lance from your shield onto your body it lets carry it). Sir Ruddock will tell you about the SAND and the WIND.</p></div>`;
+};
+const wW155RenderHelp = renderHelp;
+renderHelp = function () {
+  wW155RenderHelp();
+  const after = $('wHelpListsPowers') || $('wHelpListsGame') || $('wHelpLists'); if (!after || $('wHelpListsGround')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsGround"><b>The Tilting Lists' ways.</b> Every course cuts a rut in each rider's lane: ride in it for a steadier tip and a slower mount, or beside it for your pace and a jolting aim; Sir Ruddock rakes between heats. The pennants show the wind across the lists, which pushes your tip as the gap closes: aim into it. See Jousting: how it works.</p>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.
