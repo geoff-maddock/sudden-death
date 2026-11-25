@@ -1583,6 +1583,28 @@ at twice, its powers still at 2) read the control 37% and the Frost Wyrm 66%, an
 move about 10 points between runs, so a superstar adds from nothing to about 20 points as one player in four. The
 Djinn (+20 here, the best draw in the realm) is the one to watch; a run at 200 or more a cell would settle it.
 
+### Superstars at the Lists (issue #117, phase 9)
+
+`realm_stars_lab.py 400 '' jt` (three of your own and the extra player as your four, the captain's pick, a whole match
+Simulated at an even level against a Knight, tier 2, the Lists' ways and powers on). A cell of 400 is good to about 5
+points either way. The superstar rides a heat in 94-100% of matches, the control (a league kind) in about half.
+
+| | First try (ratings totalling 53-56) | Shipped (57-59) |
+|---|---|---|
+| Control | 49.0% | 47.0% |
+| Phoenix | 46.0% | 50.8% |
+| Kraken | 52.8% | 55.5% |
+| Behemoth | 49.0% | 52.5% |
+| Djinn | 48.8% | 55.8% |
+| Hydra | 48.2% | 54.2% |
+| Frost Wyrm | 52.5% | 53.8% |
+
+The first try's kinds were no better than the best league kinds (both riders of a kind against two average riders,
+400 matches each: the lich 60%, the golem 56%, the superstars 57-63%), so they added nothing. Each gained a point or
+two where a rider needs it (lance, seat, couch), which put two of them against two average riders at 60-66% (the lich
+56-58%). One superstar in a four now adds about 4 to 9 points. One rider of two rides each heat, and jousting is
+noisy, so a superstar moves a match less here than on the ice. Phase 12's lab will look again.
+
 ## Pets (issue #104, phase 8)
 
 The bot keeps a pet at its side from the start (`test/realm_lab.js`, `opts.pet`), feeds it when it goes hungry and
