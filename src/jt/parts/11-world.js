@@ -4,7 +4,10 @@
    Kept between courses: jtSnapshot() is the match as it stands, plain JSON ({ G, mode, mgrAuto }); jtResume(sn) puts it
    back on the lists in the mode it was left in, and it plays on from there. A course being ridden when the match is
    left is ridden out first (jtFinishCourse: your charge and your balance moment handed to your side's own hands, as
-   Watch would), so leaving never takes back a course.
+   Watch would), so leaving never takes back a course. A snapshot taken while a course is being ridden keeps the plans
+   committed (riding), and jtResume rides that course out on them first, so a reload never rides a course twice. The
+   CPU's plan for a course is drawn once and kept in G (G.cpuPlan, 07-play.js), so it survives a save too (phase 5's
+   review).
    Manage (07-play.js): jtManage({ auto }) leaves the calls to your squires (your squire's word and your corner's word,
    every course) or takes them back.
    The tilting yard (G.yard): jtStart({ yard: { runs }, teams: [your side] }) puts your first heat's rider on the lists
@@ -20,15 +23,23 @@ const JT_STRAW = { runs: 5, team: { name: 'The straw targets', short: 'STR', col
 const JT_W5 = { start: jtStart, playNext: jtPlayNext, charge0: jtCharge0, impact: jtImpactNow };
 
 /* ---------- kept between courses ---------- */
+// (a course being ridden is kept with it: riding, the plans committed, so a resume rides it out on them and never rides
+// it twice or takes it back: phase 5's review)
 function jtSnapshot() {
   if (!G || !G.teams || G.yard) return null;
-  return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgrAuto: !!(GP && GP.mgrAuto) }));
+  const sn = { G, mode: GP ? GP.mode : 'watch', mgrAuto: !!(GP && GP.mgrAuto) };
+  if (GP && ['charge', 'seat'].includes(GP.ph) && Array.isArray(GP.plans)) sn.riding = GP.plans.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace, why: p.why || '' });
+  return JSON.parse(JSON.stringify(sn));
 }
 function jtResume(sn) {
   if (!sn || !sn.G || !sn.G.teams) return null;
   G = JSON.parse(JSON.stringify(sn.G)); GB = null;
+  // a course left being ridden: ridden out now, on the plans committed, by each side's own hands
+  const ev = Array.isArray(sn.riding) && !G.over && jtRiders() ? jtRideCourse([0, 1].map(s => sn.riding[s] || jtPlan(s))) : null;
   jtPlayStart({ mode: sn.mode, mgrAuto: sn.mgrAuto });
+  if (ev) { GP.call = jtHerald(ev); GP.msg = `Back at the Lists. The course you were riding was ridden out: ${GP.call}`; }
   if (!GP.msg) GP.msg = `Back at the Lists: ${jtMatchText(0).toLowerCase()}.`;
+  if (ev && G.over && JT_HOOK.onOver) try { JT_HOOK.onOver(jtSummary()); } catch (e) { console.error(e); }
   return G;
 }
 // a course being ridden, ridden out now (your charge and balance moment by your side's own hands); true when nothing is

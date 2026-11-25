@@ -175,7 +175,8 @@ function jtRidersDraw(c) {
   const r = jtRiders() || (GP && GP.last ? GP.last.riders : [0, 0]), R0 = jtRidersNow(), z = JTC.zoom, C = GP && GP.ch, L = GP && GP.last;
   const after = GP && (GP.ph === 'after' || GP.ph === 'over') && L, broken = after ? L.broke : GP && GP.P ? GP.P.st.map(x => x.broke) : [false, false];
   // (in your plan beat their plan is hidden until both are committed: their shield hangs neutral; phase 4's review)
-  const hide = GP && GP.ph === 'plan', ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => hide && s !== GP.you ? null : p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
+  // (and in every beat before the course is committed: phase 5's review)
+  const hide = !!GP && !jtCommitted(), ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => hide && s !== GP.you ? null : p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
   for (const s of [1, 0]) {
     // (the tilting yard, phase 5: a straw target on a post stands at the meeting point on the far side)
     if (G.yard && s === 1) { jtStrawDraw(c, jtScrX(JT_VIEW.meet), jtScrY(JT_VIEW.far), Math.max(z, 26) * .94); jtTiltDraw(c); continue; }

@@ -12,7 +12,9 @@
    tilt for the crown). Every match adds your four's box lines to WG.jtstats (wJtRecord, w148: courses, lances broken,
    helm breaks, unhorsings, seats kept, squire's jobs), and goes in the head to head and the league table.
    Save and leave keeps the match between courses (a course being ridden is ridden out first, by your side's own
-   hands), and it is waiting when you come back, after a reload too. Concede counts as a loss.
+   hands), and it is waiting when you come back, after a reload too. The match is saved at once as each course sets
+   off and as it closes (phase 5's review): a reload never brings an earlier course back, a course being ridden is
+   ridden out on the plans committed, and a match that has begun is never called off. Concede counts as a loss.
    League fixtures at the Lists (w24): your fixture there is a jousting match (Play, Manage or Simulate) instead of a
    card match, and the clubs' own fixtures there are jousted on the engine. A win is two points on the table and the
    fixture's fans, and either way the fixture is done. (The Gilded Lance, the weekly cup, is phase 10.)
@@ -170,9 +172,11 @@ function wListsScore(sn) {
 const wW150OnPhase = wJT.onPhase;
 wJT.onPhase = ph => {
   wW150OnPhase(ph);
-  if (ph !== 'next' || !wListsWorld() || !wJT.G || wJT.G.over) return;
+  if (!['next', 'charge', 'after'].includes(ph) || !wListsWorld() || !wJT.G || wJT.G.over) return;
   const L = WG.jtg.live, first = !L.snap; L.snap = wJT.snapshot();
-  const now = Date.now(); if (first || now - WJTG.saved > W_JTG.saveMs) { WJTG.saved = now; wSave(); }
+  // (a course set off, or closed, is saved at once: a reload never brings an earlier course back, nor rides one twice,
+  // nor calls off a match that has begun; the course being ridden is kept with the plans committed: phase 5's review)
+  const now = Date.now(); if (first || ph !== 'next' || now - WJTG.saved > W_JTG.saveMs) { WJTG.saved = now; wSave(); }
 };
 const wW150OnOver = wJT.onOver;
 wJT.onOver = s => {

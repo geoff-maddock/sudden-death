@@ -28,6 +28,7 @@ window.__T = ks => ({ name: ks.join(''), short: ks[0].slice(0, 3), roster: ks.ma
 window.__A = () => __T(['elf', 'golem', 'spider', 'kobold']); window.__B = () => __T(['ogre', 'ogre', 'ogre', 'ogre']);
 window.__xp = f => { const got = {}, keep = wGiveXp; wGiveXp = (p, n) => { got[p.id] = (got[p.id] || 0) + n; return keep(p, n); }; try { f(); } finally { wGiveXp = keep; } return wRoster().map(p => got[p.id] || 0); };
 window.__to = (f, max) => { let n = 0; while (!f() && n++ < (max || 20000)) wJT.tick(0.05); return !!f(); };
+window.__go = () => { wJT.press(); __to(() => !['charge', 'seat'].includes(wJT.phase)); };
 0"""
 
 async def main():
@@ -79,6 +80,22 @@ async def main():
         check(sn['json'] and sn['same'] and sn['mode'] == 'watch' and sn['over'], 'a snapshot between courses is plain JSON, resumes as it was (in its mode) and plays on to the end', sn)
         check(sn['done'] and sn['mid'][0] == 'charge' and sn['mid'][2] == sn['mid'][1] + 1 and sn['mid'][3] in ('after', 'over'), 'a course left mid-charge is ridden out, never taken back', sn['mid'])
         check(sn['yard'] is None, 'the tilting yard is never kept', sn)
+        # (phase 5's review) the other rider's plan is drawn once a course and stays hidden until you've committed:
+        # switching modes in your plan beat (Watch and back, or Manage's Mine, Leave it, Mine) neither shows it nor draws
+        # it again, and nor does saving and resuming there
+        pv = await pg.evaluate("""(() => { const out = { hidden: [], same: 0, n: 0 }, P = { aim: 'body', guard: 'square', pace: 'canter' };
+          for (let sd = 0; sd < 12; sd++) { const mgr = sd % 2 === 1;
+            wJT.start({ seed: 400 + sd, mode: mgr ? 'manage' : 'play', skill: [1, 1], teams: [__A(), __B()] }); wJT.pause(true);
+            __to(() => wJT.phase === 'plan'); __go(); __to(() => wJT.phase === 'plan' || !!wJT.G.over); if (wJT.G.over) continue;
+            const S = JSON.parse(JSON.stringify(wJT.snapshot()));
+            for (let t = 0; t < 3; t++) { if (mgr) wJT.manage({ auto: true }); else wJT.setMode('watch'); out.hidden.push(wJT.view.plans ? wJT.view.plans[1] : 'none'); __to(() => wJT.phase === 'herald'); out.hidden.push(wJT.view.plans ? wJT.view.plans[1] : 'none');
+              if (mgr) wJT.manage({ auto: false }); else wJT.setMode('play'); __to(() => wJT.phase === 'plan'); }
+            wJT.select(P); wJT.press(); const a = JSON.stringify(wJT.view.plans[1]);
+            wJT.resume(S); wJT.pause(true); __to(() => wJT.phase === 'plan'); wJT.select(P); wJT.press(); const b = JSON.stringify(wJT.view.plans[1]);
+            out.n++; if (a === b) out.same++; else if (!out.ex) out.ex = [a, b]; }
+          return out; })()""")
+        check(pv['n'] >= 8 and all(h is None for h in pv['hidden']), 'the other rider\'s plan stays hidden until you\'ve committed (in the beat a switch goes to, and the herald\'s): switching modes in your plan beat doesn\'t show it', pv)
+        check(pv['n'] >= 8 and pv['same'] == pv['n'], 'the other rider\'s plan is drawn once a course: switching modes, or saving and resuming in your plan beat, never draws it again', pv)
 
         # ---------- the Realm ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
@@ -131,6 +148,32 @@ async def main():
         await pg.evaluate("(() => { const b = [...document.querySelectorAll('#modalBox button')].find(x => x.textContent.trim() === 'Concede'); b.click(); })()")
         cd = await pg.evaluate("({ live: wListsLive(), last: WG.jtg.games[0].r, text: WG.jtg.games[0].text, view: UI.view })")
         check(cd == {'live': False, 'last': 'lose', 'text': 'conceded', 'view': 'world'}, 'Concede counts as a loss, and leaves the Lists', cd)
+
+        # (phase 5's review) a course closed is saved at once, and a reload never brings back an earlier course, nor
+        # rides one twice: a course being ridden when the page goes is ridden out on the plans committed; and a match
+        # that has started is never called off (so the club has still jousted you today)
+        rl = await pg.evaluate("""(() => { wJtg().met = {}; W_LISTS_MODE = 'play'; wStartLists({ club: 'local', how: 'play' }); wJT.pause(true);
+          __to(() => wJT.phase === 'plan'); wJT.press(); __to(() => wJT.phase === 'after');
+          const st = JSON.parse(localStorage.getItem(wSaveKey())), L = st.WG.jtg.live;
+          return { n: wJT.G.n, stored: L && L.snap ? L.snap.G.n : null, tot: [wJT.total(0), wJT.total(1)] }; })()""")
+        check(rl['n'] == 1 and rl['stored'] == 1, 'a course closed is saved at once (not held back a few seconds)', rl)
+        async def reload():
+            await pg.reload(); await pg.wait_for_function("typeof W_ENGINES !== 'undefined' && typeof wJT !== 'undefined'")
+            await pg.evaluate("TIPS_SEEN.push(...Object.keys(TIPS)); SET.sfx = false; SET.music = false"); await pg.evaluate(HELP)
+            await pg.evaluate("wStart(wLoadSave())"); await pg.wait_for_function("UI.view === 'world' && !!WG")
+            await pg.evaluate(SKIP)
+            return await pg.evaluate("""(() => { const live = wListsLive(), met = (WG.jtg.met || {}).local === WG.dayAbs; const b = document.getElementById('wJtRes'); if (b) b.click(); else if (live) wResumeLists(); wJT.pause(true);
+              return { live, met, n: wJT.G ? wJT.G.n : null, tot: wJT.G ? [wJT.total(0), wJT.total(1)] : null, world: !!(WJT && WJT.world) }; })()""")
+        r1 = await reload()
+        check(r1['live'] and r1['met'] and r1['world'] and r1['n'] == 1 and r1['tot'] == rl['tot'], 'a reload after the first course brings the match back after it, still counted as met today', r1)
+        r2 = await pg.evaluate("""(() => { if (!wJT.G || !wJT.G.teams) return { ph: null, n: null }; __to(() => wJT.phase === 'plan'); wJT.select({ aim: 'helm', guard: 'angled', pace: 'gallop' }); wJT.press(); for (let i = 0; i < 10; i++) wJT.tick(.05);
+          return { ph: wJT.phase, n: wJT.G.n }; })()""")
+        r3 = await reload()
+        r4 = await pg.evaluate("""(() => { const G = wJT.G, P = G.plans[0][1] || {}; return { plan: [P.aim, P.guard, P.pace], log: G.log.length, courses: G.log.map(e => e.course) }; })()""")
+        check(r2['ph'] == 'charge' and r3['live'] and r3['n'] == 2 and r4['log'] == 2 and r4['plan'] == ['helm', 'angled', 'gallop'],
+              'a reload mid-charge rides that course out on the plan you committed: never ridden twice, never taken back', [r2, r3, r4])
+        await pg.evaluate("(() => { wJT.pause(true); const s = wJT.summary() || {}; s.win = 1; s.text = 'conceded'; wListsSettle(s); WJT = null; wListsModeBack(); wW150LeaveLists(); })()")
+        await pg.evaluate(SKIP)
 
         pw = await pg.evaluate("""(() => { wJtg().met = {}; W_LISTS_MODE = 'play'; const g0 = RUN.gold, w0 = WG.jtg.w; wStartLists({ club: 'local', how: 'manage' }); wJT.pause(true);
           const mgr = { mode: wJT.mode, row: (__to(() => wJT.phase === 'plan'), !$('wListsMgrRow').hidden), plan: !$('wListsRows').hidden, send: $('wListsRideBtn') ? $('wListsRideBtn').textContent : '' };

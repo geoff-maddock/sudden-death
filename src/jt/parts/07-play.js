@@ -112,7 +112,7 @@ function jtCharge0() {
   GP.jobs = null;
   // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's; a side you
   // manage, or leave to your squires, rides your squire's word or the plan you set)
-  const plans = [0, 1].map(s => jtCalls(s) || (GP.mode === 'manage' && s === GP.you) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
+  const plans = [0, 1].map(s => jtCalls(s) || (GP.mode === 'manage' && s === GP.you) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlanKept(s));
   // (phase 6: the CPU casts as the riders set off, your plan committed; and your squire, under Auto powers in Manage)
   const cast = G.powers ? jtPowersAtCharge(plans) : '';
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
@@ -258,7 +258,7 @@ function jtPlayNext() {
   jtCornersDue(yours && due ? GP.you : null);
   GP.jobs = yours && due ? jtCornerPlan(GP.you, 1).jobs : null;
   const left = GP.mode === 'manage' && GP.mgrAuto;
-  GP.plans = [0, 1].map(s => jtCalls(s) ? null : left && s === GP.you ? jtSuggest(s) : jtPlan(s));
+  GP.plans = [0, 1].map(s => jtCalls(s) ? null : left && s === GP.you ? jtSuggest(s) : jtPlanKept(s));
   if (left) GP.sel = Object.assign({}, GP.plans[GP.you]);
   const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
   if (yours) {
@@ -268,6 +268,15 @@ function jtPlayNext() {
     jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). ${go}`); return;
   }
   jtGo('herald', 0, `${jtWhere()}: ${vs}.${left ? ` Your squires call it: ${JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n}.` : ''}`);
+}
+// the course is committed: both riders have set off (the charge, the balance moment) or it has been ridden
+const jtCommitted = () => !!GP && ['charge', 'seat', 'after', 'over'].includes(GP.ph);
+/* the CPU's plan for side s this course: drawn once and kept in the match (G.cpuPlan, keyed on the course, so it is kept
+   in a snapshot too), so switching modes, or saving and resuming, never draws it again (phase 5's review) */
+function jtPlanKept(s) {
+  const K = G.cpuPlan && G.cpuPlan.n === G.n ? G.cpuPlan : (G.cpuPlan = { n: G.n, p: [null, null] });
+  if (!K.p[s]) K.p[s] = jtPlan(s);
+  return Object.assign({}, K.p[s]);
 }
 function jtSetMode(m) {
   if (!GP || !JT_MODES.includes(m)) return;
@@ -294,7 +303,8 @@ function jtView() {
   const C = GP.ch, M = GP.seatM, r = jtRiders();
   return { mode: GP.mode, you: GP.you, ph: GP.ph, mgrAuto: !!GP.mgrAuto, yard: !!G.yard, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
     // (their plan is hidden in your plan beat, until both are committed: phase 4's review)
-    sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)).map((p, s) => GP.ph === 'plan' && s !== GP.you ? null : p) : null,
+    // (and in every beat before the course is committed, the herald's and the one a switch of mode goes to: phase 5's review)
+    sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)).map((p, s) => !jtCommitted() && s !== GP.you ? null : p) : null,
     jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
     seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice() };
