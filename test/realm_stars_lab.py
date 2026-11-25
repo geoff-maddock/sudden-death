@@ -1,10 +1,10 @@
 """Realm superstar balance (issue #24, phase 4; basketball from issue #77, phase 8): what a superstar adds to a team, in
-the card game, football, baseball, basketball, hockey (issue #83, phase 11), bowling (issue #100, phase 11) and curling (issue #102, phase 10), against an ordinary player of the same level in the same place. (Boxing has its own round robin in
+the card game, football, baseball, basketball, hockey (issue #83, phase 11), bowling (issue #100, phase 11), curling (issue #102, phase 10) and jousting (issue #117, phase 9), against an ordinary player of the same level in the same place. (Boxing has its own round robin in
 docs/realm/BALANCE.md.)
 
   python3 test/realm_stars_lab.py 200                    200 of each test for each superstar and the control
   python3 test/realm_stars_lab.py 200 'W_KRK.lash = 2'   a tuning override, run in the page first
-  python3 test/realm_stars_lab.py 1000 '' gf,bd          only some tests (normal, elite, gf, bd, bk, hk, bl, cr, bx, gl)
+  python3 test/realm_stars_lab.py 1000 '' gf,bd          only some tests (normal, elite, gf, bd, bk, hk, bl, cr, bx, gl, jt)
   python3 test/realm_stars_lab.py 200 '' bx k:minotaur,nadir_ring,phoenix   a redeemed Umbral champion (#111, I1), by their star id
   python3 test/realm_stars_lab.py 300 '' elite ctl,kraken only some superstars (ctl: the control; k:zombie: one league kind)
 
@@ -27,6 +27,9 @@ else is captain, so this measures the power and the cards, not the captain's bon
   Boxing (issue #111, I1): a card of three bouts, Simulate, two of your own and the extra player, the other corner tier
     2. The extra player's own bout, and the card.
   Golf (issue #111, I1): a whole match, Simulate, three of your own and the extra player as your four, tier 2, powers on.
+  Jousting (issue #117, phase 9): a whole match, Simulate (wJT.simMatch), three of your own and the extra player as
+    your four (two riders, two squires, the captain's pick), at an even level, the other side a Knight (tier 2), the
+    Lists' ways and powers on. Win rate, the margin, and how often the extra player rides.
 Writes /tmp/realm_stars_lab.json."""
 import asyncio, json, sys, os, time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -36,7 +39,7 @@ from playwright.async_api import async_playwright
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 PRE = sys.argv[2] if len(sys.argv) > 2 else ''
-PARTS = (sys.argv[3] if len(sys.argv) > 3 else 'normal,elite,gf,bd,bk,hk,bl,cr,bx,gl').split(',')
+PARTS = (sys.argv[3] if len(sys.argv) > 3 else 'normal,elite,gf,bd,bk,hk,bl,cr,bx,gl,jt').split(',')
 
 LAB_JS = r"""
 window.SLAB = {
@@ -132,6 +135,15 @@ window.SLAB = {
     const g = wCR.simGame({ teams: [sq.team, opp], skill: wShedSkillOf(2), ends: 6, hall: true, powers: true, hammer: Math.random() < .5 ? 0 : 1 });
     // (no 'on': a four of four always puts the extra player on the ice)
     return { win: g.win === 0, d: g.tot[0] - g.tot[1] };
+  },
+  // jousting (issue #117, phase 9): a whole match, Simulate, three of your own and the extra player as your four; on:
+  // the extra player rides a heat (else they squire)
+  jt(who) {
+    const p = SLAB.team(3, who, 3); for (const q of wRoster()) { delete q.jt; wJtOf(q); } WG.lists = null; wListsSync();
+    const club = Object.values(WG.rivals)[0]; wJtg().opp = {};
+    const opp = wListsOpp(club, 2), sq = wListsSquad(opp);
+    const g = wJT.simMatch(Object.assign(wListsOpts(sq.team, opp, 2), { ground: true }));
+    return { win: g.win === 0, on: WG.lists.four.slice(0, 2).includes(p.id), d: g.tot[0] - g.tot[1] };
   }
 };
 """
@@ -164,15 +176,15 @@ async def main():
         if PRE: await pg.evaluate(PRE + "\n;0")
         res = {}
         for w in WHO:
-            run = {'normal': f"SLAB.card('{w}', 'normal')", 'elite': f"SLAB.card('{w}', 'elite')", 'gf': f"SLAB.gf('{w}')", 'bd': f"SLAB.bd('{w}')", 'bk': f"SLAB.bk('{w}')", 'hk': f"SLAB.hk('{w}')", 'bl': f"SLAB.bl('{w}')", 'cr': f"SLAB.cr('{w}')", 'bx': f"SLAB.bx('{w}')", 'gl': f"SLAB.gl('{w}')"}
+            run = {'normal': f"SLAB.card('{w}', 'normal')", 'elite': f"SLAB.card('{w}', 'elite')", 'gf': f"SLAB.gf('{w}')", 'bd': f"SLAB.bd('{w}')", 'bk': f"SLAB.bk('{w}')", 'hk': f"SLAB.hk('{w}')", 'bl': f"SLAB.bl('{w}')", 'cr': f"SLAB.cr('{w}')", 'bx': f"SLAB.bx('{w}')", 'gl': f"SLAB.gl('{w}')", 'jt': f"SLAB.jt('{w}')"}
             res[w] = {k: (await batch(pg, N, e) if k in PARTS else []) for k, e in run.items()}
             print(f"  {w} done, {time.time() - t0:.0f}s", flush=True)
         await br.close()
     json.dump(res, open('/tmp/realm_stars_lab.json', 'w'))
     bad = [(w, k, r['err']) for w in res for k in res[w] for r in res[w][k] if 'err' in r]
     if bad: print('ERRORS', len(bad), bad[0])
-    print(f"\n{N} of each. Card game at level 4, tier 2 (HP lost: in won pickup games). Football, baseball, basketball, hockey, bowling, curling, boxing (the extra player's bout, and the card) and golf at an even level, tier 2.")
-    print(f"{'':10} {'pickup win':>10} {'HP lost':>8} {'elite win':>10} {'HP lost':>8} {'football':>9} {'ties':>6} {'started':>8} {'baseball':>9} {'started':>8} {'basketball':>11} {'margin':>7} {'hockey':>8} {'margin':>7} {'in goal':>8} {'bowling':>8} {'margin':>7} {'curling':>8} {'margin':>7} {'bout':>7} {'card':>7} {'golf':>7}")
+    print(f"\n{N} of each. Card game at level 4, tier 2 (HP lost: in won pickup games). Football, baseball, basketball, hockey, bowling, curling, boxing (the extra player's bout, and the card), golf and jousting at an even level, tier 2.")
+    print(f"{'':10} {'pickup win':>10} {'HP lost':>8} {'elite win':>10} {'HP lost':>8} {'football':>9} {'ties':>6} {'started':>8} {'baseball':>9} {'started':>8} {'basketball':>11} {'margin':>7} {'hockey':>8} {'margin':>7} {'in goal':>8} {'bowling':>8} {'margin':>7} {'curling':>8} {'margin':>7} {'bout':>7} {'card':>7} {'golf':>7} {'joust':>7} {'margin':>7} {'rides':>7}")
     for w in WHO:
         R = {k: [r for r in v if 'err' not in r] for k, v in res[w].items()}
         won = [r for r in R['normal'] if r['win']]; wel = [r for r in R['elite'] if r['win']]
@@ -184,7 +196,8 @@ async def main():
               f"{pct(sum(r['win'] for r in R['hk']), len(R['hk'])):>8} {sum(r['d'] for r in R['hk']) / max(1, len(R['hk'])):7.2f} {pct(sum(r.get('at') == 'G' for r in R['hk']), len(R['hk'])):>8} "
               f"{pct(sum(r['win'] for r in R['bl']), len(R['bl'])):>8} {sum(r['d'] for r in R['bl']) / max(1, len(R['bl'])):7.1f} "
               f"{pct(sum(r['win'] for r in R['cr']), len(R['cr'])):>8} {sum(r['d'] for r in R['cr']) / max(1, len(R['cr'])):7.2f} "
-              f"{pct(sum(r['win'] for r in R['bx']), len(R['bx'])):>7} {pct(sum(r['card'] for r in R['bx']), len(R['bx'])):>7} {pct(sum(r['win'] for r in R['gl']), len(R['gl'])):>7}")
+              f"{pct(sum(r['win'] for r in R['bx']), len(R['bx'])):>7} {pct(sum(r['card'] for r in R['bx']), len(R['bx'])):>7} {pct(sum(r['win'] for r in R['gl']), len(R['gl'])):>7} "
+              f"{pct(sum(r['win'] for r in R['jt']), len(R['jt'])):>7} {sum(r['d'] for r in R['jt']) / max(1, len(R['jt'])):7.2f} {pct(sum(r['on'] for r in R['jt']), len(R['jt'])):>7}")
     print(f"total {time.time() - t0:.0f}s")
     if errs: print('page errors:', errs[:3])
 

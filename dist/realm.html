@@ -23136,9 +23136,9 @@ ULT.whiteout = { kind: 'frostwyrm', role: 'field', name: 'Whiteout', desc: 'Brin
 AB.whiteout = { name: '★ ' + ULT.whiteout.name, type: 'ult', role: ULT.whiteout.role, cost: ULT_COST, ult: true, desc: ULT.whiteout.desc };
 ULT_BY_KIND.frostwyrm = 'whiteout';
 MOON_KIND.frostwyrm = [6, ['arm', 'pow']];
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -26695,9 +26695,9 @@ GF_POW2.hydra = [{ id: 'threeway', n: 'Three-way Option', cost: 1, fits: 'run', 
 GF_POW2.frostwyrm = [{ id: 'iceglide', n: 'Ice Glide', cost: 1, fits: 'pass', desc: 'The ball glides on frost: 15% faster through the air, and the receivers 4% faster.', fx: { ballV: 1.15, rSpd: 1.04 } },
   { id: 'deepfreeze', n: 'Deep Freeze', cost: 1, fits: 'run', desc: 'The carrier freezes up: 12% slower, and tackles a little likelier.', fx: { cSpd: .88, tkl: .05 } }];
 for (const k of ['phoenix', 'kraken', 'behemoth', 'djinn', 'hydra', 'frostwyrm']) for (const p of GF_POW2[k]) GF_POW_BY[p.id] = p;
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -29692,9 +29692,9 @@ BX_CURSE.behemoth = { id: 'mossweight', n: 'Moss Weight', k: 'slow', desc: 'Moss
 BX_CURSE.djinn = { id: 'boundwish', n: 'Bound Wish', k: 'dear', desc: 'A wish bound against them: their next special or ultimate costs 15 more spirit.', fx: { spDear: 15 } };
 BX_CURSE.hydra = { id: 'hydrabane', n: 'Hydra\'s Bane', k: 'tired', desc: 'Old venom in their blood: their breath comes back 35% slower.', fx: { regK: .65 } };
 BX_CURSE.frostwyrm = { id: 'rimecurse', n: 'Rime Curse', k: 'leaky', desc: 'Rime on their guard, brittle as glass: it lets twice as much through.', fx: { leaky: 1 } };
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -33042,9 +33042,9 @@ for (const k of ['phoenix', 'kraken', 'behemoth', 'djinn', 'hydra', 'frostwyrm']
   for (const p of BK_POW[k].concat(BK_POW2[k])) BK_POW_BY[p.id] = p;
   BK_ULT_BY[BK_ULT[k].id] = BK_ULT[k];
 }
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -36619,9 +36619,9 @@ for (const k of ['phoenix', 'kraken', 'behemoth', 'djinn', 'hydra', 'frostwyrm']
   for (const p of HK_POW[k].concat(HK_POW2[k])) HK_POW_BY[p.id] = p;
   HK_ULT_BY[HK_ULT[k].id] = HK_ULT[k];
 }
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -42512,9 +42512,9 @@ BL_POW.frostwyrm = [blP('glacierbl', 'Glacier Ball', 'A ball of ice: it drives a
 BL_POW2.frostwyrm = [blP('icedbl', 'Iced Lane', 'A curse: the oil freezes slick for their next ball, and it skids long.', null, { skid: 1.04 }),
   blP('frostwingbl', 'Frost Wing', 'A breath of cold air steadies the ball: the miss a third smaller.', { err: .7 })];
 BL_ULT.frostwyrm = blU('whiteoutbl', 'Whiteout', 'A blizzard over the lanes for the other side: their balls this frame a third wilder, and they skid long.', null, { err: 1.25, skid: 1.04 });
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -45517,9 +45517,9 @@ CR_POW.frostwyrm = [crP('frostbreathcr', 'Frost Breath', 'A breath over the pebb
 CR_POW2.frostwyrm = [crP('frostwingcr', 'Frost Wing', 'A wingbeat of cold air steadies it: the miss a third smaller.', { err: .7 }),
   crP('rimecr', 'Rime', 'A curse: rime on their next stone, and it drags heavy.', null, { heavy: 1.04 })];
 CR_ULT.frostwyrm = crU('whiteoutcr', 'Whiteout', 'A blizzard over the sheet for the other rink: their stones this end a quarter wilder, and they drag.', null, { err: 1.25, heavy: 1.03 });
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -49216,6 +49216,286 @@ function jtGroundDraw(c) {
   c.restore();
 }
 jtDraw = function (c, dt) { JT_W13.draw(c, dt); if (jtGndOn()) jtGroundDraw(c); };
+/* The Tilting Lists' superstars (issue #117, phase 9), inside the wJT scope: each superstar's jousting ratings and
+   powers, added to the engine's own tables after its parts load, as curling's are (shed/s0-stars.js). Plain
+   assignments, nothing declared. Ratings are [lance, couch, seat, shield, ride, nerve, care] (JT_STATS); each has a
+   lance power and a shield power, a second of each (picked on the Lists tab), one of the four a curse, and an ultimate
+   that marks a course. Effects use only the engine's own (JT_FX0). Every id here ends in 'jt' so it is never one of
+   the engine's own (12-powers.js) or another's (test/realm_lists_stars.py asserts it). A superstar is never picked
+   for a CPU side by kind: the Realm only ever sends one as your own player. */
+
+// The Phoenix: fast, fearless, and hard to keep down. A lance tipped with fire; Rebirth: it can't be unhorsed this
+// course, rises above any shake, and its mount spends no wind.
+JT_KIND.phoenix = [9, 9, 7, 7, 11, 11, 5];
+JT_POW.phoenix = [jtP('flamelancejt', 'Flame Lance', 'A lance tipped with fire: it breaks a sixth more often, and rocks them a little harder, this course.', { fx: { brk: 1.16, rock: 1.06 } }),
+  jtP('risejt', 'Rise Again', 'Nothing to lose: no pressure, any shake counts for nothing, and a little firmer seat, this course.', { fx: { nerve: 1, calm: 1, hold: .05 } })];
+JT_POW2.phoenix = [jtP('ashjt', 'Ash Cloud', 'A curse: ash in their visor, and their tip sways a sixth more for the rest of the heat.', { curse: { sway: 1.15 } }),
+  jtP('heatjt', 'Wall of Heat', 'A shimmer of heat off the shield: their tip sways a quarter more this course.', { on: { sway: 1.25 } })];
+JT_ULT.phoenix = jtU('rebirthjt', 'Rebirth', 'It rises from the ashes: it can\'t be unhorsed, any shake counts for nothing, and the charge costs the mount no wind, this course.', { stay: 1, calm: 1, wind: 0 });
+
+// The Kraken: eight arms, a long reach and a grip nothing shifts; slow on a horse, and the best squire there is.
+// From the Depths: tentacles come up through the sand and take hold of the other rider.
+JT_KIND.kraken = [10, 9, 10, 8, 5, 7, 10];
+JT_POW.kraken = [jtP('tentaclejt', 'Tentacle Grip', 'Eight arms hold the lance still: the tip a fifth steadier this course.', { fx: { sway: .8 } }),
+  jtP('suckerjt', 'Suckers', 'Suckers on the saddle: a much firmer seat this course.', { fx: { hold: .13 } })];
+JT_POW2.kraken = [jtP('inkjt', 'Ink Cloud', 'A curse: ink in their visor, and their couch comes late for the rest of the heat.', { curse: { late: .2 } }),
+  jtP('undertowjt', 'Undertow', 'The blow is lost in the deep: their broken lance rocks you nearly a third softer this course.', { fx: { soak: .72 } })];
+JT_ULT.kraken = jtU('depthsjt', 'From the Depths', 'Tentacles rise through the sand: you sit firmer, and they sit much worse and come on slower, this course.', { hold: .08 }, { hold: -.12, speed: .94 });
+
+// The Behemoth: a wall that moves. It sits like a hill and its shield is a slab of moss-grown stone, but its lance is
+// slow to find a mark. Earthquake heaves the lists under the other rider.
+JT_KIND.behemoth = [8, 6, 12, 11, 6, 10, 4];
+JT_POW.behemoth = [jtP('tuskjt', 'Tusk Lance', 'A lance like a tusk: a broken one rocks them a quarter harder this course.', { fx: { rock: 1.25 } }),
+  jtP('mossbackjt', 'Mossback', 'A shield grown over with moss and stone: their lance breaks on you a seventh less often, and a little firmer seat, this course.', { fx: { turn: .86, hold: .04 } })];
+JT_POW2.behemoth = [jtP('stompjt', 'Stomp', 'A curse: the ground shakes under them, and they sit worse for the rest of the heat.', { curse: { hold: -.07 } }),
+  jtP('platedjt', 'Plated Hide', 'Plates like a hillside: their broken lance rocks you nearly a third softer this course.', { fx: { soak: .7 } })];
+JT_ULT.behemoth = jtU('quakejt', 'Earthquake', 'The lists heave under the other rider: they sit much worse, and their tip sways a quarter more, this course.', null, { hold: -.13, sway: 1.25 });
+
+// The Djinn: all guile, the truest lance in the realm and a light seat. Three Wishes grants three at once.
+JT_KIND.djinn = [11, 10, 6, 7, 8, 8, 7];
+JT_POW.djinn = [jtP('wishjt', 'Wish Lance', 'It goes where it was wished: the tip more than a quarter steadier this course.', { fx: { sway: .72 } }),
+  jtP('smokejt', 'Smoke Body', 'Half smoke at the impact: their lance breaks on you a seventh less often this course.', { fx: { turn: .86 } })];
+JT_POW2.djinn = [jtP('miragejt', 'Mirage', 'A curse: a mirage over the lists, and their tip sways more and their couch comes late for the rest of the heat.', { curse: { sway: 1.1, late: .1 } }),
+  jtP('lampjt', 'Lamp Smoke', 'Smoke pours off the shield: their tip sways a quarter more this course.', { on: { sway: 1.25 } })];
+JT_ULT.djinn = jtU('wishesjt', 'Three Wishes', 'Three wishes this course: a steadier tip, a lance that breaks more often, and a firmer seat.', { sway: .8, brk: 1.15, hold: .08 });
+
+// The Hydra: three heads and the nerves of nine, and harder to put down the more it is hit. Regrow: it can't be
+// unhorsed this course, shrugs off any shake, and its lance breaks more often.
+JT_KIND.hydra = [9, 8, 10, 8, 7, 10, 6];
+JT_POW.hydra = [jtP('threeheadjt', 'Three Heads', 'Three heads on one line: the lance breaks more often, and holds a little steadier, this course.', { fx: { brk: 1.12, sway: .9 } }),
+  jtP('coiljt', 'Coil', 'Coiled round the saddle: a much firmer seat this course.', { fx: { hold: .13 } })];
+JT_POW2.hydra = [jtP('venomjt', 'Venom Spit', 'A curse: venom in their mount, and it tires half again as fast for the rest of the heat.', { curse: { wind: 1.45 } }),
+  jtP('scalesjt', 'Hydra Scales', 'Scales that close over the blow: their lance breaks on you an eighth less often this course.', { fx: { turn: .88 } })];
+JT_ULT.hydra = jtU('regrowjt', 'Regrow', 'Cut one head off and two grow back: it can\'t be unhorsed, any shake counts for nothing, and its lance breaks more often, this course.', { stay: 1, calm: 1, brk: 1.12 });
+
+// The Frost Wyrm (kind frostwyrm): strong at everything, cold and steady. Blizzard slows the whole lists for the
+// other rider.
+JT_KIND.frostwyrm = [10, 9, 9, 8, 8, 9, 6];
+JT_POW.frostwyrm = [jtP('icelancejt', 'Ice Lance', 'A lance frozen hard: it breaks more often, and rocks them a little harder, this course.', { fx: { brk: 1.14, rock: 1.08 } }),
+  jtP('frostwingjt', 'Frost Wing', 'A wingbeat of cold air at the impact: their tip sways a quarter more this course.', { on: { sway: 1.25 } })];
+JT_POW2.frostwyrm = [jtP('rimejt', 'Rime', 'A curse: rime on their mount and their arm, and the mount tires faster and the couch comes late for the rest of the heat.', { curse: { wind: 1.3, late: .12 } }),
+  jtP('coldbloodjt', 'Cold Blood', 'No nerves at all: no pressure, any shake counts for nothing, and a little firmer seat, this course.', { fx: { nerve: 1, calm: 1, hold: .04 } })];
+JT_ULT.frostwyrm = jtU('blizzardjt', 'Blizzard', 'A blizzard over the lists for the other rider: their tip sways a third more, they come on slower, and their couch comes late, this course.', null, { sway: 1.3, speed: .94, late: .15 });
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+   INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
+   superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
+   their own (performance.now).
+
+   The Phoenix: a bird of fire. A harpy's frame (talons, bird legs, feathers), gold skin, wings of flame that flicker,
+   a crest of fire and a tail of it.
+   The Kraken: big and slow, deep-sea blue. A dome of a head with great gold eyes and a beard of tentacles, four more
+   tentacles curling up behind it, suckers along them, and arms a little long.
+   The Behemoth: the biggest thing on the field, mossy green-brown, hooves, horns that curl out and up, tusks, and a
+   hump of moss-grown plates with flowers in it.
+   The Djinn: violet, with no legs: a robe from the waist that turns into a tail of smoke, swirling down to a point
+   above the ground, with sparks in it. A gold-trimmed turban with a gem, pointed ears, a curled beard.
+   The Hydra: sea-green and scaled, a lizard's tail, and three serpent heads on three necks, the middle one highest,
+   each with its own eyes and fangs, the middle one's tongue flicking.
+   The Frost Wyrm (kind frostwyrm: "wyrm" is the Seam Wyrm boss already): a pale ice dragon. Wide membrane wings with frost on their edges, a spiked tail, a wedge of a snout
+   with horns swept back, ice-blue eyes, and frost on its breath. */
+(() => {
+  if (typeof KIND === 'undefined' || typeof HEAD === 'undefined') return;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  // a tongue of fire from (x, y), len long, leaning by lean; three colours, hottest inside
+  const flame = (c, d, x, y, len, lean, wide, ph) => {
+    const t = now(), fl = Math.sin(t * 9 + ph) * .14 + Math.sin(t * 15 + ph * 2) * .07, L = len * (1 + fl);
+    const cols = d.st ? [d.C('#c8562a'), d.C('#e88a3a'), d.C('#f5d27a')] : ['#d8402a', '#ff8a3c', '#ffe27a'];
+    cols.forEach((col, i) => {
+      const k = 1 - i * .3, w = wide * k, tip = [x + lean * L * k, y - L * k], p = new Path2D();
+      p.moveTo(x - w, y); p.quadraticCurveTo(x - w * 1.1 + lean * L * .4 * k, y - L * .55 * k, tip[0], tip[1]);
+      p.quadraticCurveTo(x + w * 1.1 + lean * L * .4 * k, y - L * .55 * k, x + w, y); p.closePath();
+      if (i === 0) ink(c, p, col, 0, true); else { c.fillStyle = col; c.fill(p); }
+    });
+  };
+  KIND.phoenix = { skin: '#f0b04a', h: 1, w: .9, eye: '#fff3a0', talon: true };
+  BODY.phoenix = { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true, tuft: '#e0502a', fea: ['#d8452a', '#ff9a3c'] };
+  BACK.phoenix = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 18) * 12 : Math.sin(t * 2.4) * 3, col = d.C('#d8452a'), col2 = d.C('#ff9a3c');
+    if (!d.st) { c.save(); c.globalAlpha *= .22; c.fillStyle = '#ff8a3c'; c.beginPath(); c.ellipse(0, d.shY - 6, 70, 40, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+    for (const s of [-1, 1]) {
+      // the wing: long primaries swept up and out, each tipped with fire
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 38, d.shY - 40 - f, s * 66, d.shY - 34 - f);
+      p.lineTo(s * 60, d.shY - 18 - f * .6); p.lineTo(s * 68, d.shY - 6 - f * .3); p.lineTo(s * 54, d.shY + 6); p.lineTo(s * 58, d.shY + 20); p.lineTo(s * 40, d.shY + 22); p.lineTo(s * 38, d.shY + 34); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 14 - f * .5 + i * 7]], col2, .8);
+      if (d.o.det !== false) [[66, -34, -.2], [68, -6, .2], [58, 20, .5]].forEach(([x, y, l], i) => flame(c, d, s * x, d.shY + y - f * (i === 2 ? 0 : .5), 14, s * (l + .3), 3.4, i + (s > 0 ? 3 : 0)));
+    }
+    // the tail: three tongues of fire falling behind the legs
+    for (let i = -1; i <= 1; i++) flame(c, d, i * 6, -30, -22 + Math.abs(i) * 5, i * .25, 4, i * 1.7);
+  };
+  HEAD.phoenix = function (c, d) {
+    const { hy, C, skin } = d;
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? C('#d8452a') : C('#ff8a3c')); }
+    // the crest: a fan of fire over the feathers, behind the face
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * .38; flame(c, d, Math.cos(a) * 8, hy - 9 + Math.sin(a) * 4, 22 - Math.abs(i - 2) * 4, Math.cos(a) * .8, 3.6, i * 1.3); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-2, hy + 1], [3, hy + 5.5], [0, hy + 9], [-2.5, hy + 5]]), C('#ffd84a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.4, d.eye, d.st); glowEye(c, 5, hy - 1, 2.4, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5.5], [-2.5, hy - 3]], INK, .8); inkLine(c, [[8, hy - 5.5], [2.5, hy - 3]], INK, .8);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.phoenix = 'Phoenix';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.phoenix = 'bat';
+
+  // a tapered tentacle along the points pts, w0 wide at the root, curling at the tip, with suckers on one side
+  const tentacle = (c, d, pts, w0, col, suck) => {
+    const L = [], R = [], n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], m = Math.hypot(dx, dy) || 1, w = w0 * (1 - i / n * .85);
+      L.push([pts[i][0] - dy / m * w, pts[i][1] + dx / m * w]); R.push([pts[i][0] + dy / m * w, pts[i][1] - dx / m * w]);
+    }
+    const p = new Path2D(); p.moveTo(L[0][0], L[0][1]); for (const q of L.slice(1)) p.lineTo(q[0], q[1]);
+    p.lineTo(pts[n - 1][0], pts[n - 1][1]); for (const q of R.slice().reverse()) p.lineTo(q[0], q[1]); p.closePath();
+    ink(c, p, col, 0, true);
+    if (suck) for (let i = 1; i < n - 1; i += 2) { const q = L[i], r = pts[i]; circ(c, (q[0] * 2 + r[0]) / 3, (q[1] * 2 + r[1]) / 3, Math.max(.8, w0 * .3 * (1 - i / n)), suck); }
+  };
+  // a wavy line of n points from (x, y), len long at angle a, curling by curl, swaying with the clock
+  const curve = (x, y, a, len, curl, ph, n = 9) => { const t = now(), out = []; let px = x, py = y, ang = a;
+    for (let i = 0; i < n; i++) { out.push([px, py]); ang += curl / n + Math.sin(t * 2.2 + ph + i * .6) * .07; px += Math.cos(ang) * len / n; py += Math.sin(ang) * len / n; }
+    return out; };
+  KIND.kraken = { skin: '#4a7fa8', h: 1.16, w: 1.3, eye: '#ffd84a' };
+  BODY.kraken = { foot: 'claw', musc: .5, armLen: 1.15, scales: true };
+  BACK.kraken = function (c, d) {
+    const col = d.C('#3d6c92'), suck = d.C('#e8c8a8');
+    [[-1, -2.5, 1.6], [-1, -2.0, 1.1], [1, -.64, -1.6], [1, -1.14, -1.1]].forEach(([s, a, cu], i) =>
+      tentacle(c, d, curve(s * 10, d.shY + 10, a, 64 - i % 2 * 10, cu, i * 1.9), 8, col, suck));
+  };
+  HEAD.kraken = function (c, d) {
+    const { hy, C, skin } = d, beard = C('#3d6c92'), suck = C('#e8c8a8');
+    // the beard: tentacles hanging from the jaw, swaying
+    for (let i = 0; i < 5; i++) tentacle(c, d, curve(-8 + i * 4, hy + 8, Math.PI / 2 + (i - 2) * .12, 20 + (i % 2) * 6, (i - 2) * .5, i * 1.3, 6), 3.2, beard, i % 2 ? null : suck);
+    // the mantle: a tall dome, ridged
+    ink(c, pEl(0, hy - 8, 15, 19), skin);
+    for (const k of [-6, 0, 6]) inkLine(c, [[k * .8, hy - 24], [k, hy - 2]], C(tint('#4a7fa8', -.25)), .6);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 6, hy + 1, 5, 4.4), C('#f4e9c8'), 0, true); glowEye(c, s * 6, hy + 1, 2.8, d.eye, d.st); if (!d.st) { c.fillStyle = INK; c.fillRect(s * 6 - 2.4, hy + .6, 4.8, 1); } }
+    inkLine(c, [[-10, hy - 4], [-3, hy - 2.5]], INK, .9); inkLine(c, [[10, hy - 4], [3, hy - 2.5]], INK, .9);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.kraken = 'Kraken';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.kraken = 'log';
+
+  // a little five-petal flower
+  const flower = (c, d, x, y, r, col) => { for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; circ(c, x + Math.cos(a) * r, y + Math.sin(a) * r, r * .75, col); } circ(c, x, y, r * .55, d.C('#ffe27a')); };
+  KIND.behemoth = { skin: '#7a8a52', h: 1.3, w: 1.7, eye: '#ffb03a', belly: true };
+  BODY.behemoth = { foot: 'hoof', musc: 1, moss: true, shinFur: '#4f5e2c', tuft: '#5a6a32' };
+  BACK.behemoth = function (c, d) {
+    const moss = d.C('#5a6a32'), plate = d.C('#8a7a5a');
+    // the hump: plates in a ridge over the shoulders, moss on top, flowers in the moss
+    ink(c, pEl(0, d.shY - 4, d.shw + 12, 22), moss);
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 11 - 7, d.shY - 6], [i * 11, d.shY - 28 + Math.abs(i) * 5], [i * 11 + 7, d.shY - 6]]), plate);
+    for (let i = -3; i <= 3; i++) ink(c, pEl(i * 8, d.shY - 10 + Math.abs(i) * 1.5, 6, 4), moss, 0, true);
+    [[-18, -14, '#ff8ab0'], [6, -18, '#f2f2ff'], [20, -10, '#ff8ab0'], [-6, -12, '#c8a8ff']].forEach(([x, y, col]) => flower(c, d, x, d.shY + y, 2.2, d.C(col)));
+  };
+  HEAD.behemoth = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#efe2c0');
+    // horns: out from the temples, then up
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 9, hy - 6); p.quadraticCurveTo(s * 30, hy - 4, s * 30, hy - 26); p.quadraticCurveTo(s * 25, hy - 12, s * 9, hy - 1); p.closePath(); ink(c, p, bone); }
+    // a broad low head under a heavy brow
+    ink(c, pRR(-15, hy - 10, 30, 24, 10), skin);
+    ink(c, pRR(-15, hy - 11, 30, 8, 4), C(tint('#7a8a52', -.18)), 0, true);
+    ink(c, pEl(0, hy - 13, 10, 4), C('#5a6a32'), 0, true); flower(c, d, 3, hy - 14, 1.6, C('#ff8ab0'));
+    glowEye(c, -6, hy - 3, 2.1, d.eye, d.st); glowEye(c, 6, hy - 3, 2.1, d.eye, d.st);
+    // tusks up from the jaw, and nostrils
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 8, hy + 10], [s * 13, hy + 1], [s * 11, hy + 11]]), bone, 0, true);
+    for (const s of [-1, 1]) circ(c, s * 3, hy + 5, 1.2, INK);
+    inkLine(c, [[-7, hy + 10], [7, hy + 10]], INK, .7);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.behemoth = 'Behemoth';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.behemoth = 'tree';
+
+  KIND.djinn = { skin: '#8a7ae0', h: 1.06, w: 1, eye: '#ffe27a', robe: '#4a3a98' };
+  BODY.djinn = { robe: true, slim: true };
+  BACK.djinn = function (c, d) {
+    const t = now(), col = d.C('#6a5ac8'), sm = d.C('#b8a8f0');
+    // the smoke tail: puffs from the waist down to a point, swaying, and the robe over its top
+    for (let i = 0; i < 9; i++) { const k = i / 8, y = -36 + k * 32, x = Math.sin(t * 2 + k * 4) * 7 * k, r = 17 * (1 - k * .8);
+      ink(c, pEl(x, y, r, r * .7), i % 2 ? col : sm, 0, true); }
+    const p = new Path2D(); p.moveTo(-d.shw + 2, d.shY + 10); p.lineTo(-d.shw - 5, -30); p.quadraticCurveTo(0, -22, d.shw + 5, -30); p.lineTo(d.shw - 2, d.shY + 10); p.closePath();
+    ink(c, p, d.C('#4a3a98'));
+    c.fillStyle = d.C('#d8b64a'); c.fillRect(-d.shw - 4, -32, 2 * d.shw + 8, 2.4);
+    if (!d.st) for (let i = 0; i < 5; i++) { const a = t * 3 + i * 1.3; circ(c, Math.cos(a) * 12, -20 + Math.sin(a * 1.7) * 12, 1.1, '#fff6c8'); }
+  };
+  HEAD.djinn = function (c, d) {
+    const { hy, C, skin } = d, gold = C('#d8b64a');
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 9, hy - 1], [s * 22, hy - 8], [s * 10, hy + 5]]), skin);
+    ink(c, pEl(0, hy + 2, 11, 12), skin);
+    // the curled beard
+    ink(c, pPoly([[-6, hy + 9], [6, hy + 9], [3, hy + 20], [5, hy + 24], [0, hy + 22], [-3, hy + 20]]), C('#2a1d4a'), 0, true);
+    // the turban, its trim and gem
+    ink(c, pEl(0, hy - 9, 15, 10), C('#2f8f96'));
+    inkLine(c, [[-13, hy - 6], [13, hy - 12]], C('#5fbfc6'), 1.2); inkLine(c, [[-12, hy - 12], [12, hy - 5]], C('#5fbfc6'), 1.2);
+    ink(c, pEl(0, hy - 6, 3.2, 4), C('#e0457b'), 0, true); circ(c, -.8, hy - 7, .9, '#fff');
+    ink(c, pRR(-14, hy - 3.5, 28, 3, 1.2), gold, 0, true);
+    glowEye(c, -4.5, hy + 2, 2.2, d.eye, d.st); glowEye(c, 4.5, hy + 2, 2.2, d.eye, d.st);
+    inkLine(c, [[-8, hy - 1], [-2.5, hy + .5]], INK, .8); inkLine(c, [[8, hy - 1], [2.5, hy + .5]], INK, .8);
+    for (const s of [-1, 1]) circ(c, s * 11, hy + 6, 1.3, gold);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.djinn = 'Djinn';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.djinn = 'staff';
+
+  // a serpent's head at (x, y), facing out by s (-1 left, 1 right, 0 ahead), r big
+  const serpent = (c, d, x, y, s, r, tongue) => {
+    const skin = d.skin, t = now();
+    ink(c, pPoly([[x - r, y - r * .5], [x - r * .7, y - r * .95], [x + r * .7, y - r * .95], [x + r, y - r * .5], [x + r * .8 + s * r * .5, y + r * .6], [x + s * r * .4, y + r], [x - r * .8 + s * r * .5, y + r * .6]]), skin);
+    for (const e of [-1, 1]) glowEye(c, x + e * r * .42 + s * r * .2, y - r * .3, r * .2, d.eye, d.st);
+    for (const e of [-1, 1]) ink(c, pPoly([[x + e * r * .32 + s * r * .3, y + r * .55], [x + e * r * .22 + s * r * .3, y + r * 1.05], [x + e * r * .12 + s * r * .3, y + r * .55]]), d.C('#f4ead0'), 0, true);
+    inkLine(c, [[x - r * .5, y - r * .62], [x - r * .15, y - r * .5]], INK, .7); inkLine(c, [[x + r * .5, y - r * .62], [x + r * .15, y - r * .5]], INK, .7);
+    if (tongue && !d.st && Math.sin(t * 3) > .2) inkLine(c, [[x, y + r], [x, y + r * 1.6], [x - r * .2, y + r * 1.9]], '#e0457b', .8);
+  };
+  KIND.hydra = { skin: '#3f8a6a', h: 1.12, w: 1.25, eye: '#ffe14a' };
+  BODY.hydra = { foot: 'claw', musc: .6, tail: 'lizard', scales: true, clawHand: true };
+  HEAD.hydra = function (c, d) {
+    const { hy, C } = d, t = now(), neck = C('#3f8a6a'), belly = C('#cfe0a0');
+    // the two side necks, swaying, behind the middle one
+    for (const s of [-1, 1]) {
+      const hx = s * 19 + Math.sin(t * 1.6 + s) * 1.5, hy2 = hy + 4 + Math.cos(t * 1.4 + s) * 1.2;
+      const n = new Path2D(); n.moveTo(s * 6, d.shY + 2); n.quadraticCurveTo(s * 18, d.shY - 6, hx - s * 2, hy2 + 6); n.lineTo(hx + s * 4, hy2 + 8); n.quadraticCurveTo(s * 24, d.shY - 2, s * 13, d.shY + 4); n.closePath();
+      ink(c, n, neck); serpent(c, d, hx, hy2, s, 8, false);
+    }
+    // the middle neck and head, highest
+    ink(c, capsule(0, d.shY + 1, 5, 0, hy - 4, 4.6), neck);
+    for (let i = 0; i < 3; i++) inkLine(c, [[-2.5, d.shY - 4 - i * 6], [2.5, d.shY - 4 - i * 6]], belly, .6);
+    serpent(c, d, 0, hy - 8, 0, 10, true);
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.hydra = 'Hydra';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.hydra = 'spiked';
+
+  KIND.frostwyrm = { skin: '#bfe0ee', h: 1.2, w: 1.3, eye: '#6ad8ff' };
+  BODY.frostwyrm = { foot: 'claw', musc: .7, tail: 'lizard', scales: true, clawHand: true };
+  BACK.frostwyrm = function (c, d) {
+    const t = now(), f = d.o.fly ? Math.sin(t * 16) * 10 : Math.sin(t * 1.8) * 3, mem = d.C('#6aa8c8'), bone = d.C('#e8f4fa');
+    for (const s of [-1, 1]) {
+      // the wing: a bony arm out and up, three fingers, and the membrane between them scalloped down to the body
+      const sh = [s * 10, d.shY + 2], el = [s * 40, d.shY - 30 - f], tips = [[s * 74, d.shY - 40 - f], [s * 80, d.shY - 6 - f * .5], [s * 66, d.shY + 22]];
+      const p = new Path2D(); p.moveTo(sh[0], sh[1]); p.lineTo(el[0], el[1]); p.lineTo(tips[0][0], tips[0][1]);
+      p.quadraticCurveTo(s * 64, d.shY - 18 - f, tips[1][0], tips[1][1]); p.quadraticCurveTo(s * 58, d.shY + 6, tips[2][0], tips[2][1]); p.quadraticCurveTo(s * 34, d.shY + 14, s * 10, d.shY + 24); p.closePath();
+      ink(c, p, mem, s > 0 ? -999 : 999);
+      for (const q of tips) inkLine(c, [el, q], bone, 1.2);
+      inkLine(c, [sh, el], bone, 1.6);
+      if (!d.st) for (const q of tips) circ(c, q[0], q[1], 1.6, '#ffffff');
+    }
+    // the tail, spiked, curling round behind the legs
+    const tl = []; for (let i = 0; i < 8; i++) tl.push([Math.sin(t * 1.5 + i * .5) * 3 + i * 4.5, -26 + i * 3.4]);
+    for (let i = 0; i < tl.length - 1; i++) inkLine(c, [tl[i], tl[i + 1]], d.C('#9ccbe0'), 3.2 - i * .3);
+    for (let i = 1; i < tl.length; i += 2) ink(c, pPoly([[tl[i][0] - 2, tl[i][1]], [tl[i][0], tl[i][1] - 5], [tl[i][0] + 2, tl[i][1]]]), bone, 0, true);
+  };
+  HEAD.frostwyrm = function (c, d) {
+    const { hy, C, skin } = d, bone = C('#e8f4fa'), t = now();
+    // horns swept back, a frill of ice spikes
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 7, hy - 9); p.quadraticCurveTo(s * 20, hy - 18, s * 26, hy - 30); p.quadraticCurveTo(s * 15, hy - 16, s * 4, hy - 6); p.closePath(); ink(c, p, bone); }
+    for (let i = -2; i <= 2; i++) ink(c, pPoly([[i * 4 - 2, hy - 10], [i * 4, hy - 17 + Math.abs(i)], [i * 4 + 2, hy - 10]]), C('#9ccbe0'), 0, true);
+    // a wedge of a head and snout
+    ink(c, pPoly([[-12, hy - 9], [12, hy - 9], [14, hy + 1], [7, hy + 13], [-7, hy + 13], [-14, hy + 1]]), skin);
+    ink(c, pPoly([[-6, hy + 6], [6, hy + 6], [5, hy + 13], [-5, hy + 13]]), C(tint('#bfe0ee', -.12)), 0, true);
+    for (const s of [-1, 1]) circ(c, s * 2.5, hy + 8.5, 1, INK);
+    glowEye(c, -6, hy - 2, 2.4, d.eye, d.st); glowEye(c, 6, hy - 2, 2.4, d.eye, d.st);
+    inkLine(c, [[-11, hy - 6], [-3, hy - 4]], INK, .9); inkLine(c, [[11, hy - 6], [3, hy - 4]], INK, .9);
+    // frost on its breath
+    if (!d.st) { c.save(); c.globalAlpha *= .45 + Math.sin(t * 2) * .15; for (let i = 0; i < 4; i++) circ(c, Math.sin(t + i) * 3, hy + 16 + i * 3.5, 2.5 + i * .8, '#e8f8ff'); c.restore(); }
+  };
+  if (typeof KIND_NAME !== 'undefined') KIND_NAME.frostwyrm = 'Frost Wyrm';
+  if (typeof KIND_WPN !== 'undefined') KIND_WPN.frostwyrm = 'spiked';
+})();
 /* The Lists' page in the Realm (issue #117, phase 2). A canvas in #v-lists, after the Shed's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the match on (jtTick) and draws it (jtDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -49390,7 +49670,10 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    with the reason), windWords(w); select({ line }) picks your line; a plan carries its line (and into: the share of the
    push it aims back); view adds ground (each rut, the wind
    and its words, each side's push and line, the other side's hidden until the course is committed); summary() adds
-   ground (the tally and the log). */
+   ground (the tally and the log).
+   Phase 9 is the superstars (j0-stars.js, in the tables: their kinds, powers, curses and ultimates) and their figures
+   (src/realm/stars/s1-figures.js, in this scope): figKinds() (the kinds the figures know; a rider of a kind they don't
+   is drawn as a goblin). */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -49438,6 +49721,8 @@ return {
   // the Tilting Lists' ways (phase 8)
   groundRules: JSON.parse(JSON.stringify(JT_GND)), lines: JSON.parse(JSON.stringify(JT_LINE)), get ground() { return G && G.ground ? JSON.parse(JSON.stringify(G.ground)) : null; },
   gndPush: (s, pace) => jtGndPush(s, pace), gustK: pace => jtGustK(pace), lineK: (s, l) => jtLineK(s, l), lineFor: (s, plan, sk) => G && G.teams && !G.over ? jtLineFor(s, plan || jtPlanOwn(s), sk) : null, windWords: w => jtWindWords(w || { k: 0, dir: 1 }),
+  // the superstars (phase 9)
+  figKinds: () => Object.keys(KIND),
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };
 
@@ -57144,9 +57429,9 @@ renderHelp = function () {
   const after = $('wHelpLegends'); if (!after || $('wHelpStars')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpStars"><b>Superstars.</b> Six monsters of kinds no club and no tavern has, each unlocked by a feat: win the Cinder Cup, win the Rimewatch cup, beat three legends, walk the Road to Nowhere to its end, hatch all five rare eggs, or win the Crown. Beating legends and hatching eggs add up over any number of journeys. An unlock is kept on your profile for every later journey. The Stars tab on the Team screen shows them all, and what each one still needs. Once unlocked, a superstar can be met in a later journey and signed, one a journey, at your team's average level.</p>`);
 };
-/* Superstars, drawn (issue #24, phase 2). One file, loaded eight times: in the Realm's own scope (after Sudden Death's
-   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR: their manifests in src/realm/diamond,
-   gridiron, ring, court, rink, lanes and shed), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
+/* Superstars, drawn (issue #24, phase 2). One file, loaded nine times: in the Realm's own scope (after Sudden Death's
+   src/render/creatures.js) and inside each engine's scope (wBD, wGF, wBX, wBK, wHK, wBL, wCR, wJT: their manifests in src/realm/diamond,
+   gridiron, ring, court, rink, lanes, shed and lists), where the same names (KIND, BACK, HEAD, BODY, ink, inkLine, pEl, pPoly, glowEye, circ, tint,
    INK) belong to that scope's own load of the renderer (the scoped engines but wBD share one file, src/figures/figures.js). So it declares nothing at the top: it only adds each
    superstar's entry to the tables already there. The animation clock differs from scope to scope, so the flames keep
    their own (performance.now).
@@ -70716,6 +71001,68 @@ renderHelp = function () {
   wW155RenderHelp();
   const after = $('wHelpListsPowers') || $('wHelpListsGame') || $('wHelpLists'); if (!after || $('wHelpListsGround')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsGround"><b>The Tilting Lists' ways.</b> Every course cuts a rut in each rider's lane: ride in it for a steadier tip and a slower mount, or beside it for your pace and a jolting aim; Sir Ruddock rakes between heats. The pennants show the wind across the lists, which pushes your tip as the gap closes: aim into it. See Jousting: how it works.</p>`);
+};
+/* w156: superstars at the Lists (issue #117, phase 9), the Realm's side of src/realm/lists/j0-stars.js, as w128 is the
+   Shed's. Each of the six superstars has a jousting kind there: ratings, two lance and two shield powers (one a curse),
+   and an ultimate. The rest follows by itself: wJtOf seeds p.jt from the kind, the Lists tab offers the two picks of
+   each pair (w153), the Powers row lists the power and the ultimate, the herald's card names them, and a superstar
+   riding is drawn as its own kind (08-draw.js, with the superstars' figures from src/realm/stars/s1-figures.js).
+   What this part adds:
+   - A superstar signed before this part had no jousting kind, so their p.jt was seeded as an average player's. Once,
+     when the journey is next loaded, it is made again from their own kind and grown to their level (p.jt.st marks it
+     done; a superstar made from now on has it from the start). Gear is untouched: it never changed the ratings.
+   - How to play: #wHelpListsStars, after jousting's gear and potions, each superstar's game at the Lists; and a line
+     in Jousting: how it works (#wListsHowStars).
+   The redeemed Umbral champions (u9-redeemed.js) are league kinds, so jousting already knows them; they are not
+   superstars here (W_STARS only).
+   wListsStarFix(p)   true when p's ratings were made again
+   wListsRepick(C)    the captain's four again on the new ratings, the call-ups kept
+   Wraps: wMakePlayer (wW156MakePlayer: the mark), wStart (wW156Start: older saves), wListsHowHTML (wW156ListsHow),
+   renderHelp (wW156RenderHelp). */
+
+const wListsStarKind = k => W_STARS.some(s => s.kind === k) && Object.prototype.hasOwnProperty.call(wJT.pow, k);
+function wListsStarFix(p) {
+  if (!p || !wListsStarKind(p.kind) || (p.jt && p.jt.st)) return false;
+  const had = !!p.jt;
+  delete p.jt; const b = wJtOf(p); b.st = 1;
+  return had;
+}
+function wListsRepick(C) {
+  const cu = C.cu.slice(); wListsAutoPick(C);
+  // (each open place takes the kept call-up that suits its role best)
+  for (let i = 0; i < 4 && cu.length; i++) if (C.four[i] == null) {
+    const role = i < 2 ? 'rider' : 'squire'; cu.sort((a, b) => wJtFit(b, role) - wJtFit(a, role));
+    const c = cu.shift(); C.four[i] = c.cid; C.cu.push(c);
+  }
+  wListsSync();
+}
+const wW156MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW156MakePlayer.apply(this, arguments); if (p && wListsStarKind(p.kind)) { const b = wJtOf(p); if (b) b.st = 1; } return p; };
+const wW156Start = wStart;
+wStart = function (save, opts) {
+  const r = wW156Start(save, opts);
+  // (ratings made again: the captain picks the four again from your roster, unless you set it yourself; the call-ups
+  // filling the rest are kept, with their ratings and picks)
+  if (WG) { let n = 0; for (const p of (WG.roster || []).concat(WG.wwait || [])) if (wListsStarFix(p)) n++; if (n && WG.lists && WG.lists.four && !WG.lists.mine) wListsRepick(WG.lists); if (n && save) wSave(); }
+  return r;
+};
+
+/* ---------- How to play ---------- */
+const W_JTSTAR_WORD = { lance: 'the lance', couch: 'the couch', seat: 'the seat', shield: 'the shield', ride: 'the ride', nerve: 'nerve', care: 'a squire\'s care' };
+function wListsStarLine(s) {
+  const A = wJT.pow[s.kind], B = wJT.pow2[s.kind], U = wJT.ult[s.kind], r = wJT.rate(s.kind), top = wJT.stats.slice().sort((a, b) => r[b] - r[a]).slice(0, 2).map(k => W_JTSTAR_WORD[k]);
+  return `<b>The ${esc(s.n)}</b> (${esc(top.join(' and '))}): ${esc(A[0].n)} or ${esc(B[0].n)} for the lance, ${esc(A[1].n)} or ${esc(B[1].n)} for the shield, and ${esc(U.n)}. ${esc(U.desc)}`;
+}
+const wListsStarsAll = () => W_STARS.filter(s => s.kind && wListsStarKind(s.kind));
+const wW156ListsHow = wListsHowHTML;
+wListsHowHTML = function () {
+  return wW156ListsHow() + `<p class="hint" id="wListsHowStars"><b>Superstars at the Lists.</b> A superstar on your team jousts as its own kind: its own ratings, two lance powers and two shield powers to pick from on the Lists tab (one of the four lays a curse), and an ultimate of its own that marks a course. ${wListsStarsAll().map(s => `${esc(s.n)}: ${esc(wJT.ult[s.kind].n)}.`).join(' ')}</p>`;
+};
+const wW156RenderHelp = renderHelp;
+renderHelp = function () {
+  wW156RenderHelp();
+  const after = $('wHelpListsKit') || $('wHelpListsGround') || $('wHelpListsPowers'); if (!after || $('wHelpListsStars')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsStars"><b>Superstars at the Lists.</b> A superstar on your team jousts as its own kind: its own ratings on the Stats tab, two lance powers and two shield powers to pick from on the Lists tab, and an ultimate. ${wListsStarsAll().map(wListsStarLine).join(' ')}</p>`);
 };
 /* w157: the Gilded Lance, the weekly jousting cup (issue #117, phase 10), as w129 is the Shed's Brass Broom. League
    fixtures at the Lists are already jousted on the engine (w150). Every week at the Tilting Lists (ask Sir Ruddock about

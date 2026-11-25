@@ -199,6 +199,8 @@ src/realm/w153-listspowers.js
 src/realm/w154-listskit.js
 # the Tilting Lists' ways: the churned sand and the pennant wind (issue #117, phase 8)
 src/realm/w155-listsground.js
+# superstars at the Lists: their kinds, powers, curses and ultimates, drawn as themselves (issue #117, phase 9)
+src/realm/w156-listsstars.js
 # the Gilded Lance, the weekly jousting cup (issue #117, phase 10)
 src/realm/w157-listscup.js
 src/realm/w132-pets.js

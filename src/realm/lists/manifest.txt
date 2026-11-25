@@ -1,4 +1,7 @@
 # The Realm's lists scope: ./build.sh src/realm/manifest.txt takes this through `scope wJT ...`.
-# The engine's parts first (they don't touch the page), then its page in the Realm: a canvas in #v-lists (phase 2).
+# The engine's parts first (they don't touch the page), then the superstars' jousting kinds and powers (phase 9) and
+# their figures (the file every engine's scope loads), then its page in the Realm: a canvas in #v-lists (phase 2).
 include src/jt/manifest.txt
+src/realm/lists/j0-stars.js
+src/realm/stars/s1-figures.js
 src/realm/lists/n1-page.js
