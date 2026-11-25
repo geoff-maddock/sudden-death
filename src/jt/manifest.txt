@@ -16,3 +16,5 @@ src/jt/parts/08-draw.js
 src/jt/parts/09-squad.js
 # phase 4: the plan and the read: the herald's card, your squire's reason
 src/jt/parts/10-read.js
+# phase 5: matches from the world: kept between courses, Manage, the tilting yard
+src/jt/parts/11-world.js

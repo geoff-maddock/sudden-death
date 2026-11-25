@@ -175,6 +175,8 @@ function jtRidersDraw(c) {
   const after = GP && (GP.ph === 'after' || GP.ph === 'over') && L, broken = after ? L.broke : GP && GP.P ? GP.P.st.map(x => x.broke) : [false, false];
   const ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
   for (const s of [1, 0]) {
+    // (the tilting yard, phase 5: a straw target on a post stands at the meeting point on the far side)
+    if (G.yard && s === 1) { jtStrawDraw(c, jtScrX(JT_VIEW.meet), jtScrY(JT_VIEW.far), Math.max(z, 26) * .94); jtTiltDraw(c); continue; }
     // (in the wide shot the riders are drawn a little larger than the yard's scale, so they read)
     const x = jtScrX(R0.x[s]), y = jtScrY(s ? JT_VIEW.far : JT_VIEW.near), dir = s ? -1 : 1, k = Math.max(z, 26) * (s ? .94 : 1);
     if (x < -4 * k || x > JT_VIEW.w + 4 * k) { if (s === 1) jtTiltDraw(c); continue; }
@@ -239,7 +241,7 @@ function jtCallDraw(c) {
 function jtTargetDraw(c, plan, guard, tip) {
   const Z = JT_ZONE, g = guard === 'angled' ? 'angled' : 'square', k = JT_TGT.k, P = (x, y) => jtAimScr(x, y);
   c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, JT_TGT.x - JT_TGT.w / 2, JT_TGT.y - 124, JT_TGT.w, JT_TGT.h, 10); c.fill();
-  txt(c, `Their guard: ${g}`, JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
+  txt(c, G.yard ? 'The straw target' : `Their guard: ${g}`, JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
   const box = (b, col) => { const [a1, a2] = P(b.x0, b.y1), [b1, b2] = P(b.x1, b.y0); c.fillStyle = col; c.fillRect(a1, a2, b1 - a1, b2 - a2); };
   box(Z.torso, '#8a7a66'); box(Z.shield[g], '#3a5a9a');
   const [hx, hy] = P(Z.helm.x, Z.helm.y); c.fillStyle = '#9aa0aa'; c.beginPath(); c.arc(hx, hy, Z.helm[g] * k, 0, 6.28); c.fill();
@@ -292,5 +294,5 @@ function jtDraw(c, dt) {
   JTC.t += dt; jtCamTo(dt);
   c.clearRect(0, 0, JT_VIEW.w, JT_VIEW.h);
   if (!G || !G.teams) { c.fillStyle = '#c9a46c'; c.fillRect(0, 0, JT_VIEW.w, JT_VIEW.h); return; }
-  jtListsDraw(c); jtRidersDraw(c); jtBoardDraw(c); jtCallDraw(c); jtBeatsDraw(c);
+  jtListsDraw(c); jtRidersDraw(c); if (G.yard) jtYardBoardDraw(c); else jtBoardDraw(c); jtCallDraw(c); jtBeatsDraw(c);
 }

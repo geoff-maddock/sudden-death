@@ -47288,15 +47288,19 @@ function jtSimMatch(opts) {
      Archmage's, a little truer at the helm; phase 2's review), less the droop.
    - the impact, then the seat: if their lance broke on you, a short balance moment follows: the rider wobbles and you
      lean against it (the arrows, drag, or the Lean buttons). How well you held it is your lean (0 to 1) for seat().
-   Watch: the CPU rides both. You ride: your side's courses are yours (side 0). */
+   Watch: the CPU rides both. You ride: your side's courses are yours (side 0).
+   Manage (phase 5): your side rides on its ratings (the CPU's hands at your side's skill), and the calls are yours:
+   before each of your courses the plan (your squire's word first) and your squires' jobs, then Send them. Leave it to
+   your squires (GP.mgrAuto, jtManage in 11-world.js) and they call every course themselves: your squire's word and your
+   corner's word. You ride takes the reins at any beat; Watch hands the calls back to the CPU. */
 const JT_PLAY = { charge: 3.6, spur: { until: .42, win: .09, min: .86, beat: { canter: .46, gallop: .34 } }, couch: { ideal: .66, span: .3, high: 40 },
   aim: { eight: 2.6, noise: .9, reach: 18, key: 40 }, seat: { time: 1.4, amp: 1, key: 2.6 }, pace: { herald: 1.2, after: 2.4, heat: 3.2, over: 3.4 } };
 const JT_HOOK = { onPhase: null, onPick: null, onOver: null };
-const JT_MODES = ['watch', 'play'];
+const JT_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
 function jtPlayStart(o) {
-  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, jobs: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [] };
+  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, jobs: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [], mgrAuto: !!(o && o.mgrAuto) };
   jtGo('next');
   return GP;
 }
@@ -47306,6 +47310,9 @@ function jtGo(ph, wait, msg) {
 }
 const jtName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const jtYours = s => GP.mode === 'play' && s === GP.you;
+// (phase 5: a side you manage, calling the plan and the squires yourself: not left to your squires)
+const jtMgr = s => GP.mode === 'manage' && s === GP.you && !GP.mgrAuto;
+const jtCalls = s => jtYours(s) || jtMgr(s);
 const jtSide = s => G.teams[s].name;
 function jtPicked() { if (JT_HOOK.onPick) try { JT_HOOK.onPick(); } catch (e) { console.error(e); } }
 
@@ -47340,8 +47347,9 @@ const jtBeat = pace => JT_PLAY.spur.beat[jtBeatPace(pace)];
 const jtBeatPace = pace => jtOwn(JT_PLAY.spur.beat, pace) ? pace : 'canter';
 // a press: in your plan it rides; in the spur a tap; after the spur it lowers the lance (held: jtCouch(false) lets go)
 function jtPress() {
-  if (!GP || GP.mode !== 'play') return false;
+  if (!GP || GP.mode === 'watch') return false;
   if (GP.ph === 'plan' && GP.sel) { jtCharge0(); return true; }
+  if (GP.mode !== 'play') return false;
   const C = GP.ch; if (GP.ph !== 'charge' || !C || !C.mine) return false;
   if (C.p < JT_PLAY.spur.until) return jtSpur();
   return jtCouch(true);
@@ -47369,16 +47377,18 @@ function jtLeanTo(v) { const M = GP && GP.seatM; if (!M) return false; M.lean = 
 function jtCharge0() {
   const riders = jtRiders(); if (!riders) return;
   // (phase 3: your squires do the jobs you gave them before you set off)
-  if (jtYours(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, 'your call');
+  if (jtCalls(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, jtYours(GP.you) ? 'your call' : 'your call, managing');
   GP.jobs = null;
-  // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's)
-  const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
+  // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's; a side you
+  // manage, or leave to your squires, rides your squire's word or the plan you set)
+  const plans = [0, 1].map(s => jtCalls(s) || (GP.mode === 'manage' && s === GP.you) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
   const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge(jtRideOpts(s, plans[s]), R));
   const mine = jtYours(0) || jtYours(1), s = GP.you;
   GP.plans = plans; GP.cpuRides = cpuRides; GP.keyV = { x: 0, y: 0 };
   GP.ch = { p: 0, mine, pace: mine ? plans[s].pace : plans[0].pace, hit: [], taps: [], bad: 0, down: false, downAt: null, hand: { x: 0, y: 0 }, tipNow: null, riders };
-  jtGo('charge', 0, mine ? `${jtName(s, riders[s])} sets off. Tap with the hoofbeats to spur, then hold to couch the lance, and keep the tip on ${JT_PLAN.aim[plans[s].aim].n}.` : `${jtName(0, riders[0])} and ${jtName(1, riders[1])} set off down the lists…`);
+  const sent = !mine && GP.mode === 'manage' ? `${jtName(s, riders[s])} rides your plan: ${JT_PLAN.aim[plans[s].aim].n}, ${plans[s].guard}, at ${JT_PLAN.pace[plans[s].pace].n}. ` : '';
+  jtGo('charge', 0, mine ? `${jtName(s, riders[s])} sets off. Tap with the hoofbeats to spur, then hold to couch the lance, and keep the tip on ${JT_PLAN.aim[plans[s].aim].n}.` : `${sent}${jtName(0, riders[0])} and ${jtName(1, riders[1])} set off down the lists…`);
 }
 // how well you spurred: on-beat taps over the beats there were, less the stumbles (0 to 1)
 function jtSpurQ(C) {
@@ -47505,27 +47515,32 @@ function jtWhere() { return jtInTilt() ? `The tilt for the crown, course ${G.cou
 function jtPlayNext() {
   const riders = jtRiders(); if (!riders) { jtGo('over'); return; }
   // (phase 3: the CPU's corners first, so its plan reads its rider and mount as they set off; yours waits for your call)
-  const yours = jtYours(GP.you), due = !!(G.cornerDue && G.cornerDue[GP.you]);
+  // (phase 5: a side you manage is yours to call too; left to your squires, its corner is its own, a Knight's)
+  const yours = jtCalls(GP.you), due = !!(G.cornerDue && G.cornerDue[GP.you]);
   jtCornersDue(yours && due ? GP.you : null);
   GP.jobs = yours && due ? jtCornerPlan(GP.you, 1).jobs : null;
-  GP.plans = [0, 1].map(s => jtYours(s) ? null : jtPlan(s));
+  const left = GP.mode === 'manage' && GP.mgrAuto;
+  GP.plans = [0, 1].map(s => jtCalls(s) ? null : left && s === GP.you ? jtSuggest(s) : jtPlan(s));
+  if (left) GP.sel = Object.assign({}, GP.plans[GP.you]);
   const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
-  if (jtYours(GP.you)) {
+  if (yours) {
     GP.sel = jtSuggest(GP.you);
     const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${JT_JOB[j].v}`).join(', ')}.` : '';
-    jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). Change the plan if you like, then Ride.`); return;
+    const go = jtYours(GP.you) ? 'Change the plan if you like, then Ride.' : 'Change the plan or the jobs if you like, then Send them: they ride on their ratings.';
+    jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). ${go}`); return;
   }
-  jtGo('herald', 0, `${jtWhere()}: ${vs}.`);
+  jtGo('herald', 0, `${jtWhere()}: ${vs}.${left ? ` Your squires call it: ${JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n}.` : ''}`);
 }
 function jtSetMode(m) {
   if (!GP || !JT_MODES.includes(m)) return;
   const was = GP.mode; GP.mode = m;
   if (m === was) return;
-  // a plan you were making goes back to the CPU in Watch; your course while the herald names the riders (You ride
-  // picked then) is yours, on a plan made for it; a charge of yours handed to Watch is ridden on by the CPU's hands for
-  // your side, and so is the balance moment (phase 2's review)
-  if (m !== 'play' && GP.ph === 'plan') jtGo('next');
-  else if (m === 'play' && GP.ph === 'herald') jtGo('next');
+  // a plan you were making goes back to the CPU in Watch (and in Manage left to your squires); your course while the
+  // herald names the riders (You ride or Manage picked then) is yours, on a plan made for it; a charge of yours handed
+  // to Watch or Manage is ridden on by the CPU's hands for your side, and so is the balance moment (phase 2's review;
+  // Manage, phase 5: a plan you were making in You ride stays yours to send, and the other way round)
+  if (!jtCalls(GP.you) && GP.ph === 'plan') jtGo('next');
+  else if (jtCalls(GP.you) && GP.ph === 'herald') jtGo('next');
   else if (m !== 'play' && GP.ph === 'charge' && GP.ch && GP.ch.mine) jtHandOver();
   else if (m !== 'play' && GP.ph === 'seat' && GP.P) { GP.P.lean[GP.you] = jtLean(GP.you); jtFinish(); }
 }
@@ -47539,7 +47554,7 @@ function jtHandOver() {
 function jtView() {
   if (!GP) return null;
   const C = GP.ch, M = GP.seatM, r = jtRiders();
-  return { mode: GP.mode, you: GP.you, ph: GP.ph, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
+  return { mode: GP.mode, you: GP.you, ph: GP.ph, mgrAuto: !!GP.mgrAuto, yard: !!G.yard, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
     sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)) : null,
     jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
@@ -47722,6 +47737,8 @@ function jtRidersDraw(c) {
   const after = GP && (GP.ph === 'after' || GP.ph === 'over') && L, broken = after ? L.broke : GP && GP.P ? GP.P.st.map(x => x.broke) : [false, false];
   const ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
   for (const s of [1, 0]) {
+    // (the tilting yard, phase 5: a straw target on a post stands at the meeting point on the far side)
+    if (G.yard && s === 1) { jtStrawDraw(c, jtScrX(JT_VIEW.meet), jtScrY(JT_VIEW.far), Math.max(z, 26) * .94); jtTiltDraw(c); continue; }
     // (in the wide shot the riders are drawn a little larger than the yard's scale, so they read)
     const x = jtScrX(R0.x[s]), y = jtScrY(s ? JT_VIEW.far : JT_VIEW.near), dir = s ? -1 : 1, k = Math.max(z, 26) * (s ? .94 : 1);
     if (x < -4 * k || x > JT_VIEW.w + 4 * k) { if (s === 1) jtTiltDraw(c); continue; }
@@ -47786,7 +47803,7 @@ function jtCallDraw(c) {
 function jtTargetDraw(c, plan, guard, tip) {
   const Z = JT_ZONE, g = guard === 'angled' ? 'angled' : 'square', k = JT_TGT.k, P = (x, y) => jtAimScr(x, y);
   c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, JT_TGT.x - JT_TGT.w / 2, JT_TGT.y - 124, JT_TGT.w, JT_TGT.h, 10); c.fill();
-  txt(c, `Their guard: ${g}`, JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
+  txt(c, G.yard ? 'The straw target' : `Their guard: ${g}`, JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
   const box = (b, col) => { const [a1, a2] = P(b.x0, b.y1), [b1, b2] = P(b.x1, b.y0); c.fillStyle = col; c.fillRect(a1, a2, b1 - a1, b2 - a2); };
   box(Z.torso, '#8a7a66'); box(Z.shield[g], '#3a5a9a');
   const [hx, hy] = P(Z.helm.x, Z.helm.y); c.fillStyle = '#9aa0aa'; c.beginPath(); c.arc(hx, hy, Z.helm[g] * k, 0, 6.28); c.fill();
@@ -47839,7 +47856,7 @@ function jtDraw(c, dt) {
   JTC.t += dt; jtCamTo(dt);
   c.clearRect(0, 0, JT_VIEW.w, JT_VIEW.h);
   if (!G || !G.teams) { c.fillStyle = '#c9a46c'; c.fillRect(0, 0, JT_VIEW.w, JT_VIEW.h); return; }
-  jtListsDraw(c); jtRidersDraw(c); jtBoardDraw(c); jtCallDraw(c); jtBeatsDraw(c);
+  jtListsDraw(c); jtRidersDraw(c); if (G.yard) jtYardBoardDraw(c); else jtBoardDraw(c); jtCallDraw(c); jtBeatsDraw(c);
 }
 /* The Tilting Lists: the four and their roles, the rider's arm, a rocking hit's shake, the squires' corner, pressure and
    nerve (issue #117, phase 3).
@@ -48152,6 +48169,160 @@ function jtWordWhy(s, P, h, Q, need, safe) {
   const t = say.join('; ');
   return t[0].toUpperCase() + t.slice(1);
 }
+/* The Tilting Lists: matches from the world (issue #117, phase 5). The Realm's matches are kept between courses, run in
+   Manage, and the tilting yard is a practice run at a straw target.
+
+   Kept between courses: jtSnapshot() is the match as it stands, plain JSON ({ G, mode, mgrAuto }); jtResume(sn) puts it
+   back on the lists in the mode it was left in, and it plays on from there. A course being ridden when the match is
+   left is ridden out first (jtFinishCourse: your charge and your balance moment handed to your side's own hands, as
+   Watch would), so leaving never takes back a course.
+   Manage (07-play.js): jtManage({ auto }) leaves the calls to your squires (your squire's word and your corner's word,
+   every course) or takes them back.
+   The tilting yard (G.yard): jtStart({ yard: { runs }, teams: [your side] }) puts your first heat's rider on the lists
+   against a straw target on a post (JT_STRAW: a quintain with a square shield) for a few runs, nothing at stake. Each
+   run is the plan (the aim and the pace), then the spur, the couch and the aim, by hand as on Play; the straw target
+   doesn't ride or strike back, nobody keeps a seat, the mount gets its wind back and the arm its strength between
+   runs, and no rules are scored. Each run is logged in G.yard.done ({ n, aim, pace, at, zone, broke, pts (what it would
+   have scored), spurQ, hits, bad, beats, couch, up, off (inches off the mark), speed, hand }), the herald says how it went
+   (jtYardCall), and after the last the yard's summary (jtYardSummary) goes to onOver. Watch shows a run ridden by your
+   rider's own hands. Wraps (in this scope): jtStart (the yard's straw side), jtPlayNext (the yard's runs), jtCharge0 (the
+   straw target stands still), jtImpactNow (a run's strike, and no seat). */
+const JT_STRAW = { runs: 5, team: { name: 'The straw targets', short: 'STR', color: '#b89a52' }, d: { guard: 'square', aim: 'shield', rs: { shield: .5, seat: 1 }, mount: 'destrier' } };
+const JT_W5 = { start: jtStart, playNext: jtPlayNext, charge0: jtCharge0, impact: jtImpactNow };
+
+/* ---------- kept between courses ---------- */
+function jtSnapshot() {
+  if (!G || !G.teams || G.yard) return null;
+  return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', mgrAuto: !!(GP && GP.mgrAuto) }));
+}
+function jtResume(sn) {
+  if (!sn || !sn.G || !sn.G.teams) return null;
+  G = JSON.parse(JSON.stringify(sn.G)); GB = null;
+  jtPlayStart({ mode: sn.mode, mgrAuto: sn.mgrAuto });
+  if (!GP.msg) GP.msg = `Back at the Lists: ${jtMatchText(0).toLowerCase()}.`;
+  return G;
+}
+// a course being ridden, ridden out now (your charge and balance moment by your side's own hands); true when nothing is
+// left mid-course
+function jtFinishCourse() {
+  if (!GP || !G || !G.teams) return false;
+  if (GP.ph === 'charge' && GP.ch) { if (GP.ch.mine) jtHandOver(); let n = 0; while (GP.ph === 'charge' && n++ < 2000) jtChargeTick(.05); }
+  if (GP.ph === 'seat' && GP.P) { if (GP.P.lean[GP.you] == null) GP.P.lean[GP.you] = jtLean(GP.you); jtFinish(); }
+  return !['charge', 'seat'].includes(GP.ph);
+}
+/* Manage: { auto: true } leaves the calls to your squires, false takes them back. Returns '' or why not */
+function jtManage(o) {
+  if (!GP) return 'No match.';
+  const was = !!GP.mgrAuto; GP.mgrAuto = !!(o && o.auto);
+  if (GP.mode !== 'manage' || was === GP.mgrAuto || G.over) return '';
+  // (your plan beat handed to your squires goes on at once; their call taken back before the charge is yours again)
+  if (GP.mgrAuto && GP.ph === 'plan') jtGo('next');
+  else if (!GP.mgrAuto && GP.ph === 'herald') jtGo('next');
+  return '';
+}
+
+/* ---------- the tilting yard ---------- */
+function jtStrawTeam() { return Object.assign({}, JT_STRAW.team, { roster: [0, 1, 2, 3].map(i => ({ n: i ? `Straw target ${i + 1}` : 'The straw target', kind: '' })) }); }
+jtStart = function (opts) {
+  const o = opts || {};
+  if (!o.yard) return JT_W5.start(o);
+  const mine = (o.teams || [])[0] || null, runs = clamp(((o.yard && o.yard.runs) | 0) || JT_STRAW.runs, 1, 20);
+  JT_W5.start(Object.assign({}, o, { teams: [mine, jtStrawTeam()], skill: [((o.skill || [])[0] ?? 1), 0], riders: [(o.riders || [])[0] || (mine && mine.riders) || null, [0, 1]], courses: 3 }));
+  G.yard = { runs, done: [] };
+  return G;
+};
+jtPlayNext = function () {
+  if (!G || !G.yard) return JT_W5.playNext();
+  const Y = G.yard;
+  if (Y.done.length >= Y.runs) { jtYardOver(); return; }
+  const riders = jtRiders(), s = GP.you, prev = GP.sel;
+  GP.jobs = null;
+  GP.sel = { aim: prev ? prev.aim : 'shield', guard: 'square', pace: prev ? prev.pace : 'canter', why: '' };
+  GP.plans = [jtCalls(s) ? null : Object.assign({}, GP.sel), Object.assign({}, JT_STRAW.d, { pace: 'canter' })];
+  const who = `${jtName(s, riders[s])} on a ${jtMount(jtMountOf(s)).n}`;
+  if (jtCalls(s)) { jtGo('plan', 0, `Run ${Y.done.length + 1} of ${Y.runs} at the straw target, ${who}. Pick your mark and your pace, then Ride: tap with the hoofbeats, hold to couch, and keep the tip on the mark.`); return; }
+  jtGo('herald', 0, `Run ${Y.done.length + 1} of ${Y.runs} at the straw target: ${who} shows you how.`);
+};
+jtCharge0 = function () {
+  JT_W5.charge0();
+  if (!G || !G.yard || !GP.cpuRides) return;
+  // (the straw target stands still with its lance up: it never strikes)
+  GP.cpuRides[1] = Object.assign({ pace: 'canter', speed: 0, couch: 0, tip: { x: 0, y: 60 }, up: true }, JT_STRAW.d);
+};
+jtImpactNow = function () {
+  if (!G || !G.yard) return JT_W5.impact();
+  const C = GP.ch, s = GP.you, Y = G.yard, ride = C.mine ? jtYourRide(C) : GP.cpuRides[s];
+  const st = jtStrike(ride, JT_STRAW.d, R), pts = jtStrikePts({ at: st.at, unhorse: false }), A = JT_PLAN.aim[ride.aim];
+  const beats = Math.max(1, Math.floor(JT_PLAY.spur.until * JT_PLAY.charge / jtBeat(C.pace)));
+  const run = { n: Y.done.length + 1, aim: ride.aim, pace: ride.pace, at: st.at, zone: st.zone, broke: st.broke, pts, spurQ: C.mine ? +jtSpurQ(C).toFixed(3) : null,
+    hits: C.mine ? C.hit.length : null, bad: C.mine ? C.bad : null, beats, couch: ride.up ? null : +(+ride.couch || 0).toFixed(3), up: !!ride.up, off: ride.up ? null : +Math.hypot(ride.tip.x - A.x, ride.tip.y - A.y).toFixed(1), speed: +ride.speed.toFixed(2), hand: !!C.mine };
+  Y.done.push(run); G.n++;
+  jtSplinters({ st: [st, { broke: false, at: 'miss' }] });
+  const miss = { at: 'miss', unhorse: false };
+  GP.last = { heat: 0, course: Y.done.length - 1, tilt: false, riders: C.riders, plans: GP.plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: [{ at: st.at, unhorse: false }, miss],
+    pts: [pts, 0], zone: [st.zone, 'miss'], broke: [st.broke, false], lean: [null, null], rides: [{ speed: ride.speed, couch: ride.couch, tip: ride.tip, spurQ: run.spurQ, up: run.up }, { speed: 0, couch: 0, tip: { x: 0, y: 60 }, spurQ: null, up: true }],
+    unhorsed: [], rule: { heatOver: null, tiltNow: false, over: null }, yard: run };
+  GP.call = jtYardCall(run);
+  GP.ch = null; GP.P = null; GP.seatM = null; GP.keyV = { x: 0, y: 0 };
+  jtGo('after', JT_PLAY.pace.after, GP.call);
+};
+// a run in the herald's words: where the lance went, then the spur, the couch and the aim
+function jtYardCall(r) {
+  const where = r.broke ? `A lance broken on the ${r.zone}! ${r.zone === 'helm' ? 'That would be two.' : 'That would be one.'}` : r.at === 'glance' ? 'It glances off the straw.'
+    : JT_RULES.fouls.includes(r.at) ? `${jtCap(JT_AT[r.at])}: that would be a point off.` : r.up ? 'The lance came up: a miss.' : 'A miss.';
+  if (!r.hand) return `${where} (Ridden by your rider's own hands.)`;
+  const spur = `Spur: ${r.hits} of ${r.beats} on the beat${r.bad ? `, ${r.bad} off it (a stumble costs)` : ''}`, c = r.couch;
+  const couch = c == null ? 'the lance never couched' : c < -.35 ? 'couched early (the arm tires and the tip droops)' : c > .35 ? 'couched late (the tip never settles)' : 'couched just right';
+  const aim = r.off == null ? '' : `, the tip ${r.off < 2 ? 'right on' : `${Math.round(r.off)} inch${Math.round(r.off) === 1 ? '' : 'es'} off`} your mark`;
+  return `${where} ${spur}, ${couch}${aim}.`;
+}
+function jtYardSummary() {
+  if (!G || !G.yard) return null;
+  const D = G.yard.done, n = D.length, by = f => D.filter(f).length, hand = D.filter(r => r.hand);
+  const out = { yard: true, runs: JSON.parse(JSON.stringify(D)), n, breaks: by(r => r.broke), helms: by(r => r.broke && r.zone === 'helm'), glances: by(r => r.at === 'glance'), misses: by(r => r.at === 'miss'),
+    fouls: by(r => JT_RULES.fouls.includes(r.at)), pts: D.reduce((a, r) => a + r.pts, 0), spur: hand.length ? +(hand.reduce((a, r) => a + r.spurQ, 0) / hand.length).toFixed(2) : null,
+    couched: hand.filter(r => r.couch != null && Math.abs(r.couch) <= .35).length, hand: hand.length };
+  out.text = `${n} run${n === 1 ? '' : 's'} at the straw target: ${out.breaks} lance${out.breaks === 1 ? '' : 's'} broken${out.helms ? ` (${out.helms} on the helm)` : ''}, ${out.glances} glance${out.glances === 1 ? '' : 's'}, ${out.misses} miss${out.misses === 1 ? '' : 'es'}${out.fouls ? `, ${out.fouls} foul${out.fouls === 1 ? '' : 's'}` : ''}.`
+    + (out.hand ? ` Spurred ${Math.round(100 * out.spur)}% on the beat, couched just right ${out.couched} of ${out.hand}.` : '');
+  return out;
+}
+function jtYardOver() {
+  const S = jtYardSummary();
+  G.over = { win: 0, tot: [S.pts, 0], tilt: 0, text: 'the tilting yard', yard: true };
+  GP.call = S.text;
+  jtGo('over', 0, S.text);
+  if (JT_HOOK.onOver) try { JT_HOOK.onOver(S); } catch (e) { console.error(e); }
+}
+
+/* ---------- drawing the yard ---------- */
+// the straw target on its post, at the meeting point on the far side; it rocks when a lance breaks on it
+function jtStrawDraw(c, x, y, k) {
+  const L = GP && GP.last, hit = GP && (GP.ph === 'after' || GP.ph === 'over') && L && L.broke && L.broke[0], rock = hit ? Math.sin(GP.t * 14) * Math.exp(-GP.t * 2.5) * .12 : 0;
+  c.save();
+  c.fillStyle = 'rgba(0,0,0,.2)'; c.beginPath(); c.ellipse(x, y, .5 * k, .08 * k, 0, 0, 6.28); c.fill();
+  c.fillStyle = '#6a4a2e'; c.fillRect(x - .06 * k, y - 2.3 * k, .12 * k, 2.3 * k);
+  c.translate(x, y - 2.3 * k); c.rotate(rock);
+  c.fillStyle = '#6a4a2e'; c.fillRect(-.06 * k, -.9 * k, .12 * k, .9 * k); c.fillRect(-.5 * k, -.62 * k, k, .08 * k);
+  c.fillStyle = '#e0c060'; c.strokeStyle = '#8a6a2a'; c.lineWidth = 2;
+  c.beginPath(); c.ellipse(0, -.45 * k, .3 * k, .42 * k, 0, 0, 6.28); c.fill(); c.stroke();
+  c.beginPath(); c.arc(0, -1.02 * k, .17 * k, 0, 6.28); c.fill(); c.stroke();
+  c.strokeStyle = '#b8962a'; c.lineWidth = 1.4;
+  for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(i * .07 * k, -.8 * k); c.lineTo(i * .09 * k, -.08 * k); c.stroke(); }
+  jtShield(c, -.04 * k, -.45 * k, k / 62, '#8a5a2a', 'square', false);
+  c.restore();
+}
+// the yard's board: a pennant a run, what it would have scored on it
+function jtYardBoardDraw(c) {
+  const Y = G.yard, x0 = 10, y0 = 10, w = 170 + Y.runs * 24 + 46, T = G.teams[0];
+  c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, x0, y0, Math.min(w, JT_VIEW.w - 20), 44, 8); c.fill();
+  c.fillStyle = T.color || '#888'; c.fillRect(x0 + 8, y0 + 18, 6, 18);
+  txt(c, 'The tilting yard', x0 + 20, y0 + 32, '700 13px "Alegreya Sans", sans-serif', '#f2ece0');
+  txt(c, 'Runs at the straw target', x0 + 170, y0 + 12, '600 9px "Alegreya Sans", sans-serif', '#c8bfae');
+  let x = x0 + 170;
+  for (let i = 0; i < Y.runs; i++, x += 24) { const r = Y.done[i]; jtFlag(c, x, y0 + 28, r ? r.pts : null, !r && i === Y.done.length && !G.over, T.color); }
+  txt(c, String(Y.done.reduce((a, r) => a + r.pts, 0)), x + 12, y0 + 33, '800 16px "Alegreya Sans", sans-serif', '#ffe08a', 'center');
+  c.restore();
+}
 /* The Lists' page in the Realm (issue #117, phase 2). A canvas in #v-lists, after the Shed's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the match on (jtTick) and draws it (jtDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -48202,8 +48373,9 @@ function jtHide() { JTP.ptr = null; JTP.keys = {}; JTP.btn = null; if (GP) jtNud
 const JT_KEYS = { 1: ['aim', 'shield'], 2: ['aim', 'body'], 3: ['aim', 'helm'], q: ['guard', 'angled'], w: ['guard', 'square'], e: ['pace', 'canter'], r: ['pace', 'gallop'] };
 function jtKeyOk(e) {
   if (!e.key) return false;
-  if (!JTP.on || !GP || GP.mode !== 'play' || JTP.paused || JTP.cv.offsetParent === null) return false;
-  if (!['plan', 'charge', 'seat'].includes(GP.ph)) return false;
+  if (!JTP.on || !GP || GP.mode === 'watch' || JTP.paused || JTP.cv.offsetParent === null) return false;
+  // (Manage, phase 5: only your plan beat's keys)
+  if (!['plan', 'charge', 'seat'].includes(GP.ph) || (GP.mode !== 'play' && GP.ph !== 'plan')) return false;
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return false;
   const m = document.getElementById('modal'); if (m && !m.hidden) return false;
@@ -48293,7 +48465,12 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    Phase 4 is the plan and the read: card(s) (the herald's card for side s: the other side's rider, name, kind, mount
    and skill, counts of what their side has ridden this match, their last four courses, their usual mix, the read and
    the card in words), counts(s) (what side s has ridden); the squire's word now says, in plain words, what they have
-   ridden and what it makes each choice. G.plans entries carry ri (the rider) and tilt. */
+   ridden and what it makes each choice. G.plans entries carry ri (the rider) and tilt.
+   Phase 5 is matches from the world: modes add 'manage' (your side rides on its ratings; the plan and your squires'
+   jobs are yours, then press sends them), manage({ auto }) leaves the calls to your squires or takes them back (mgrAuto);
+   snapshot() (plain JSON, between courses; null in the yard) and resume(sn) keep a match; finishCourse() rides out a
+   course being ridden (your side's own hands); start({ yard: { runs }, teams: [your side] }) is the tilting yard, runs
+   at a straw target with nothing at stake: yard (the runs so far and the summary), and onOver hears the summary. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -48324,6 +48501,9 @@ return {
   autoSquad: ro => jtAutoSquad((ro || []).map(m => jtRosterOne(m || {}))), bestOf: (ro, riders) => jtBestOf((ro || []).map(m => jtRosterOne(m || {})), riders),
   pressure: s => jtPressure(s), nerveK: (p, n) => jtNerveK(p, n), jobs: JSON.parse(JSON.stringify(JT_JOB)),
   cornerPlan: (s, sk) => G && G.teams && !G.over ? jtCornerPlan(s, sk) : null, cornerDo: (s, jobs) => jtCornerDo(s, jobs, 'by hand'), get squad() { return jtSquadView(); },
+  // matches from the world (phase 5)
+  snapshot: () => jtSnapshot(), resume: sn => jtResume(sn), finishCourse: () => jtFinishCourse(), manage: o => jtManage(o), get mgrAuto() { return !!(GP && GP.mgrAuto); },
+  get yard() { return G && G.yard ? jtYardSummary() : null; }, strawRules: JSON.parse(JSON.stringify(JT_STRAW)),
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };
 
@@ -68170,11 +68350,12 @@ function wListsRows() {
   const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, mine = V && V.mode === 'play';
   $('wListsChargeRow').hidden = !(mine && V.ph === 'charge' && V.charge && V.charge.mine);
   $('wListsSeatRow').hidden = !(mine && V.ph === 'seat');
-  const box = $('wListsRows'), plan = mine && V.ph === 'plan' && V.sel;
+  // (phase 5: Manage's plan beat too, unless it's left to your squires)
+  const box = $('wListsRows'), plan = V && (mine || (V.mode === 'manage' && !V.mgrAuto)) && V.ph === 'plan' && V.sel;
   box.hidden = !plan; if (!plan) return;
   const S = V.sel, on = (a, b) => a === b ? ' on' : '';
   for (const [f, id] of [['aim', 'wListsAim'], ['guard', 'wListsGuard'], ['pace', 'wListsPace']]) $(id).innerHTML = W_LISTS_ROWS[f].map(([k, n, t]) => `<button class="ghost${on(k, S[f])}" data-jf="${f}" data-jv="${k}" title="${esc(t)}">${n}</button>`).join(' ');
-  $('wListsGo').innerHTML = `<button class="ghost on" id="wListsRideBtn" data-jgo="1" title="Space">Ride</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
+  $('wListsGo').innerHTML = `<button class="ghost on" id="wListsRideBtn" data-jgo="1" title="${mine ? 'Space' : 'Space: your rider rides your plan on their ratings'}">${mine ? 'Ride' : 'Send them'}</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
 }
 // the two clubs; taken: names already in the match, so nobody shares one
 function wListsTeams(taken) {
@@ -68559,7 +68740,7 @@ $('wListsRows').addEventListener('click', e => {
 const wW148ListsRows = wListsRows;
 wListsRows = function () {
   wW148ListsRows();
-  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null; if (!V || V.mode !== 'play' || V.ph !== 'plan' || !V.sel || !V.squad || !V.riders) return;
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null; if (!V || V.mode === 'watch' || V.ph !== 'plan' || !V.sel || !V.squad || !V.riders) return;
   const s = V.you, Q = V.squad, G = wJT.G, m = G.teams[s].roster[V.riders[s]], slot = G.riders[s].indexOf(V.riders[s]), mount = wJT.mounts[Q.mounts[s][slot < 0 ? 0 : slot]] || {};
   const pct = v => Math.round(100 * v);
   $('wListsUp').innerHTML = `<b>${esc(m.n)}</b> <small>${esc(wKindName(m.kind) || '')}, on a ${esc(mount.n || '')}</small> · <span title="The mount's wind: a course spends some, a gallop most. A blown mount is slower and the tip sways more. A squire who tends the mount gets some back.">Wind <b>${pct(Q.wind[s])}%</b></span> · <span title="The lance arm: every couch tires it, an early one most. A tired arm sways and droops. A squire who steadies the rider gives some back.">Arm <b>${pct(Q.arm[s])}%</b></span>${Q.shaken[s] > .05 ? ' · <b class="wbad" title="Rocked by that hit: the tip sways more and the seat is worse. A squire can steady them.">Shaken</b>' : ''}${Q.girth[s] > 0 ? ' · <span title="The girth tightened: a better seat this course.">Girth tight</span>' : ''}${Q.press[s] ? ` · <b class="wbad" title="${esc(V.inTilt ? 'The tilt for the crown' : 'The last course of the heat, and behind')}: the tip sways more, less for a steady nerve.">${V.inTilt ? 'For the crown' : 'Behind, the last course'}</b>` : ''}`;
@@ -68614,7 +68795,7 @@ function wListsCardHTML(s) {
 const wW149ListsRows = wListsRows;
 wListsRows = function () {
   wW149ListsRows();
-  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, on = !!(V && V.mode === 'play' && V.ph === 'plan' && V.sel);
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, on = !!(V && V.mode !== 'watch' && !V.yard && V.ph === 'plan' && V.sel);
   $('wListsRowCard').hidden = !on;
   if (on) $('wListsCard').innerHTML = wListsCardHTML(V.you);
 };
@@ -68631,6 +68812,584 @@ renderHelp = function () {
   wW149RenderHelp();
   const after = $('wHelpListsTab') || $('wHelpLists'); if (!after || $('wHelpListsCall')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsCall"><b>The plan and the read.</b> Before each of your courses the herald's card shows the rider you're about to meet and how their side has ridden this match. Your squire's plan reads it and says why. An Archmage reads how you ride, so mix your plans against one; a Knight mixes its own so it can't be read.</p>`);
+};
+/* w150: jousting from the world (issue #117, phase 5), as w125 is curling's. Your four joust a rival club, or the local
+   side, at the Tilting Lists: Play (You ride: every course of yours by hand), Manage (your riders ride on their
+   ratings; before each of your courses the plan and your squires' jobs are your calls, your squire's word first, or
+   leave it all to your squires; You ride on the bar takes the reins at any time) or Simulate (the result at once).
+   Sir Ruddock's MATCH and the Lists tab open the match card: the clubs at your tier, each once a day, and the
+   exhibition (JOUST) as before. A match needs W_JTG.minOwn players of your own; call-ups fill the four.
+   Their four: at your level plus the tier, with W_JTG.oppBonus points spread over each; a rival keeps the same four
+   until it would be a different level. The captain's pick rides their two best riders, each on the mount that suits
+   them (wJT.mountFor). Their corner and their riders by tier (a Squire, a Knight, an Archmage), as on the sheet.
+   The result: a win pays XP to everyone in the four (half to the rest of the team), gold and fans by tier, and the
+   player of the match a little more; a loss a quarter of the XP and costs nothing else. A match never ends level (the
+   tilt for the crown). Every match adds your four's box lines to WG.jtstats (wJtRecord, w148: courses, lances broken,
+   helm breaks, unhorsings, seats kept, squire's jobs), and goes in the head to head and the league table.
+   Save and leave keeps the match between courses (a course being ridden is ridden out first, by your side's own
+   hands), and it is waiting when you come back, after a reload too. Concede counts as a loss.
+   League fixtures at the Lists (w24): your fixture there is a jousting match (Play, Manage or Simulate) instead of a
+   card match, and the clubs' own fixtures there are jousted on the engine. A win is two points on the table and the
+   fixture's fans, and either way the fixture is done. (The Gilded Lance, the weekly cup, is phase 10.)
+
+   WG.jtg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_JTG.keep], w, l }
+              world = { kind: 'jtgame' | 'jtfix', ref, club, tier, how, day, name, ids, cup }, plain data; the end
+              dispatches W_ON_END[kind] (which also gets us and them: the totals, and text: "5 to 3"). ids: your four's
+              roster ids in the engine's order (heat 1's rider, heat 2's, the squires; null for a call-up)
+   wListsProblems(), wStartLists({ club, how, tier?, kind?, ref?, cup? }), wResumeLists(), wListsLeaveGame(),
+   wListsConcede(), wOpenListsCard(), wListsSimClubs(a, b, tier), wJtfixPlay(how), W_ON_END.jtgame, W_ON_END.jtfix
+   Wraps: wListsBarNote (wW150ListsBarNote: Save and leave and Concede in a real match), wLeaveLists (wW150LeaveLists),
+   wListsRows (wW150ListsRows: Manage's row), wJT.onOver and wJT.onPhase (a real match settles, and is kept between
+   courses), wRunAct (wW150RunAct: MATCH opens the card), wNextPrompt (wW150NextPrompt: a match waiting after a reload),
+   wCampLists and wRenderCamp (wW150CampLists, wW150RenderCamp: Joust a match, Resume and the last matches on the Lists
+   tab), wOpenGrdCard (wW150OpenGrdCard: the Lists' fixture row jousts on the engine), wSimAt (wW150SimAt: the clubs'
+   matches at the Lists on the engine), wListsHowHTML (wW150ListsHow), renderHelp (wW150RenderHelp: #wHelpListsGame). */
+
+const W_JTG = {
+  minOwn: 2, xp: 12, gold: 15, fans: 3, lossShare: .25, benchShare: .5, mvpXp: 5,
+  // extra rating points for each of their four, by tier; first guesses until the lab measures them (phase 12)
+  oppBonus: { 1: 1, 2: 1, 3: 1 },
+  minutes: 120, keep: 10, saveMs: 12000,
+};
+const W_JTG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
+const W_JTFIX = { g: 'g_lists', tier: 2 };
+const WJTG = { saved: 0, asked: false, msg: '', keepMode: null };
+W_LISTS_MODES.manage = { n: 'Manage', title: 'Your riders ride on their ratings. Before each of your courses the plan and your squires\' jobs are your calls (or leave it to your squires). You ride takes the reins.' };
+(() => { const play = $('wListsModes').querySelector('[data-jmode="play"]'); play.insertAdjacentHTML('beforebegin', `<button class="ghost" data-jmode="manage" title="${esc(W_LISTS_MODES.manage.title)}">Manage</button>`); })();
+
+function wJtg() {
+  const B = WG.jtg = WG.jtg || { live: null, met: {}, opp: {}, games: [], w: 0, l: 0 };
+  B.met = B.met || {}; B.opp = B.opp || {}; B.games = B.games || [];
+  return B;
+}
+function wListsLive() { return !!(WG && WG.jtg && WG.jtg.live); }
+function wListsWorld() { return !!(WJT && WJT.world && wListsLive()); }
+function wListsProblems() {
+  const n = wRoster().length;
+  return n < W_JTG.minOwn ? [`Recruit ${W_JTG.minOwn - n} more player${W_JTG.minOwn - n === 1 ? '' : 's'}: a jousting match needs ${W_JTG.minOwn} of your own, and call-ups fill the rest of the four.`] : [];
+}
+// the CPU's skill by tier: your side's hands are a Knight's (Manage), theirs a Squire's, a Knight's or an Archmage's
+const wListsSkillOf = tier => [1, W_BALL.diff[tier] != null ? W_BALL.diff[tier] : 1];
+const wJtRsOfR = r => Object.fromEntries(wJT.stats.map(s => [s, (r[s] - 1) / (wJT.cap - 1)]));
+
+// a club's four: its own kinds first, at your level plus the tier with the bonus; a rival keeps the same four. The
+// captain's pick rides its two best riders, each on the mount that suits them
+function wListsOpp(club, tier) {
+  const B = wJtg(), lvl = wBallOppLvl(tier), C = club === 'apex' ? Object.assign({}, W_CUP.apexTeam) : wBallTeam(club), k = W_JTG.oppBonus[tier] || 0;
+  const cached = club !== 'local' && B.opp[club];
+  let team;
+  if (cached && cached.lvl === lvl) team = JSON.parse(JSON.stringify(cached.team));
+  else {
+    const rg = wBallRegion(club), own = rg ? (DB.regions[rg] || {}).kinds || [] : (C.roster || []).map(r => r[1]);
+    const all = own.filter(x => Object.prototype.hasOwnProperty.call(wJT.kinds, x)).concat(W_JTR.cuKinds).filter((x, i, a) => a.indexOf(x) === i);
+    const names = new Set(), mk = kind => {
+      const rn = (C.roster || []).find(r => r[1] === kind), free = (FA_NAMES[kind] || []).filter(x => !names.has(x));
+      const p = wMakePlayer({ kind, lvl, n: rn && !names.has(rn[0]) ? rn[0] : free.length ? pick(free) : undefined }, 'opp');
+      names.add(p.n);
+      return wListsPlayer(p);
+    };
+    team = { name: C.name, short: C.short, color: C.color, roster: all.slice(0, 4).map(mk) };
+    if (club !== 'local') B.opp[club] = { lvl, team: JSON.parse(JSON.stringify(team)) };
+  }
+  if (k) team.roster.forEach((p, j) => { const st = wJT.stats; for (let i = 0; i < k; i++) { const s = st[(i * 3 + j) % st.length]; p.r[s] = Math.min(wJT.cap, p.r[s] + 1); } });
+  const A = wJT.autoSquad(team.roster), n = wListsCourses();
+  return Object.assign(team, { riders: A.riders, squires: A.squires, mounts: A.riders.map(i => wJT.mountFor(wJtRsOfR(team.roster[i].r), n).m), best: wJT.bestOf(team.roster, A.riders) });
+}
+// your four for a match, named apart from theirs; ids: roster ids in the engine's order (null for a call-up)
+function wListsSquad(vs) {
+  const C = wListsSync(), team = wListsMine(), ids = C.four.map(k => typeof k === 'number' ? k : null), theirs = new Set(vs ? vs.roster.map(p => p.n) : []);
+  team.roster.forEach((p, i) => { if (ids[i] == null && theirs.has(p.n)) p.n += ' II'; });
+  return { team, ids };
+}
+// the match's options for the engine: both sides' four, riders, squires, mounts and best, their skill by tier
+function wListsOpts(mine, opp, tier) {
+  return { teams: [mine, opp], riders: [mine.riders, opp.riders], squires: [mine.squires, opp.squires], mounts: [mine.mounts, opp.mounts], best: [mine.best, opp.best], skill: wListsSkillOf(tier), courses: wListsCourses() };
+}
+
+/* ---------- starting, leaving, coming back ---------- */
+function wStartLists(o) {
+  if (!WG || !RUN) return '';
+  const probs = wListsProblems(); if (probs.length) return probs.join(' ');
+  const B = wJtg(), club = o.club;
+  if (B.live) return 'Finish the jousting match you started first.';
+  if (!wBallRegion(club) && !CLUBS[club] && club !== 'apex') return '';
+  if (!o.cup && B.met[club] === WG.dayAbs) return `${wCap(wBallName(club))} have already jousted you today. Come back tomorrow.`;
+  const how = W_JTG_HOW[o.how] ? o.how : 'play', tier = o.tier || wBallTier(club);
+  const opp = wListsOpp(club, tier), sq = wListsSquad(opp), mine = sq.team;
+  const world = { kind: o.kind || 'jtgame', ref: o.ref || null, club, tier, how, day: WG.dayAbs, name: opp.name, ids: sq.ids, cup: !!o.cup };
+  if (!o.cup) B.met[club] = WG.dayAbs;
+  B.live = { world, snap: null };
+  const opts = wListsOpts(mine, opp, tier);
+  if (how === 'sim') { const seed = (Math.random() * 1e9) | 0, s = wListsDecide(wJT.simMatch(Object.assign({ seed }, opts)), seed); wListsResultCard(wListsSettle(s)); return ''; }
+  // (your own Lists mode, back when the match is settled or you leave: wListsModeBack)
+  if (WJTG.keepMode == null) WJTG.keepMode = W_LISTS_MODE;
+  W_LISTS_MODE = how;
+  wListsGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
+  WJT.world = true;
+  wListsBarNote(); wListsRows();
+  wSave();
+  return '';
+}
+function wResumeLists() {
+  const L = wListsLive() && WG.jtg.live; if (!L) return;
+  if (!L.snap) { wListsCallOff('The match had not reached its first course, so it is called off.'); return; }
+  WJT = { over: null, world: true };
+  if (WJTG.keepMode == null) WJTG.keepMode = W_LISTS_MODE;
+  W_LISTS_MODE = L.snap.mode || W_LISTS_MODE;
+  wJT.resume(L.snap);
+  $('wListsTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
+  showView('lists');
+  wListsBarNote(); wListsRows(); wListsBoard();
+}
+function wListsLeaveGame() {
+  const L = wListsLive() && WG.jtg.live; if (!L) return wLeaveLists();
+  if (wListsWorld()) {
+    // a course being ridden is ridden out (a match it decided is settled), any other is kept after it
+    wJT.finishCourse();
+    if (!wListsLive()) { WJT = null; wListsModeBack(); wW150LeaveLists(); wSave(); return; }
+    if (!wJT.G.over) L.snap = wJT.snapshot();
+  }
+  const sn = L.snap;
+  WJTG.asked = true;
+  WJT = null; wListsModeBack(); wW150LeaveLists();
+  if (!sn) return wListsCallOff(`You leave before the first course, so the match against ${wBallName(L.world.club)} is called off.`);
+  wLog(`Your jousting match against ${wBallName(L.world.club)} is saved: ${wListsScore(sn)}. Resume it from the Lists tab on the Team screen.`, 'd');
+  wSave();
+}
+function wListsModeBack() { if (WJTG.keepMode != null) { W_LISTS_MODE = WJTG.keepMode; WJTG.keepMode = null; } }
+function wListsCallOff(why) {
+  const B = wJtg(), L = B.live; if (!L) return;
+  B.live = null; if (!L.world.cup) delete B.met[L.world.club];
+  wLog(why || `The jousting match against ${wBallName(L.world.club)} is called off. No result.`, 'd');
+  wSave();
+}
+function wListsConcede() {
+  if (!wListsWorld()) return;
+  wJT.pause(true);
+  askConfirm('Concede this match?', 'It counts as a loss. A loss at the Lists costs nothing, but you only get a quarter of the XP.', 'Concede', () => {
+    if (!wListsLive()) return;
+    const s = wJT.summary() || {}; s.win = 1; s.text = 'conceded';
+    wListsSettle(s);
+    WJT = null; wListsModeBack(); wW150LeaveLists();
+  }, () => { if (WJT) wJT.pause(false); });
+  wAfterAsk(() => { if (WJT) wJT.pause(false); });
+}
+// the score in a snapshot, in words
+function wListsScore(sn) {
+  const G = sn.G, t = s => G.sc[s].reduce((a, h) => a + h.reduce((x, y) => x + (y || 0), 0), 0) + (G.tilt[s] || []).reduce((a, b) => a + b, 0);
+  const where = G.heat >= 2 ? 'in the tilt for the crown' : `heat ${G.heat + 1}, after ${G.course} course${G.course === 1 ? '' : 's'}`;
+  return `${t(0)} to ${t(1)}, ${where}`;
+}
+
+/* ---------- kept between courses, and settled at the end ---------- */
+const wW150OnPhase = wJT.onPhase;
+wJT.onPhase = ph => {
+  wW150OnPhase(ph);
+  if (ph !== 'next' || !wListsWorld() || !wJT.G || wJT.G.over) return;
+  const L = WG.jtg.live, first = !L.snap; L.snap = wJT.snapshot();
+  const now = Date.now(); if (first || now - WJTG.saved > W_JTG.saveMs) { WJTG.saved = now; wSave(); }
+};
+const wW150OnOver = wJT.onOver;
+wJT.onOver = s => {
+  if (WJT && WJT.world && wListsLive()) { WJT.msg = wListsSettle(s); WJT.endMode = wJT.mode; wListsModeBack(); }
+  wW150OnOver(s);
+  wListsBarNote();
+};
+function wListsSettle(sum) {
+  const B = wJtg(), L = B.live, W = L.world, S0 = sum || {}, win = (S0.win != null ? S0.win : S0.over ? S0.over.win : -1) === 0;
+  B.live = null;
+  const r = win ? 'win' : 'lose', tot = S0.tot || [0, 0], us = tot[0], them = tot[1], text = S0.text || (S0.over && S0.over.text) || `${us} to ${them}`;
+  if (win) { B.w++; fire('matchWon', { engine: 'lists' }); } else B.l++;
+  const pst = (S0.pst || [[]])[0] || [], line = {}, played = new Set();
+  W.ids.forEach((id, i) => {
+    if (typeof id !== 'number' || !wPlayer(id)) return;
+    played.add(id);
+    const p = pst[i] || {};
+    line[id] = { courses: p.courses || 0, breaks: p.breaks || 0, helms: p.helms || 0, unhorse: p.unhorse || 0, kept: p.kept || 0, jobs: p.jobs || 0 };
+  });
+  wJtRecord(S0, 0, W.ids);
+  const mvp = wListsMvp(line);
+  const base = Math.round(W_JTG.xp * W.tier * (win ? 1 : W_JTG.lossShare));
+  for (const p of wRoster()) { const n = played.has(p.id) ? base + (win && mvp === p.id ? W_JTG.mvpXp : 0) : Math.round(base * W_JTG.benchShare); if (n > 0) wGiveXp(p, n); }
+  const bits = `XP +${base} for everyone in the four${wRoster().some(p => !played.has(p.id)) ? `, +${Math.round(base * W_JTG.benchShare)} for those who weren't` : ''}`;
+  let pay = '';
+  if (win) { const g = W_JTG.gold * W.tier, f = W_JTG.fans * W.tier; RUN.gold += g; RUN.fans = (RUN.fans || 0) + f; pay = ` +${g} gold, +${f} fans.`; }
+  if (CLUBS[W.club]) {
+    const H = wH2h(), h = H[W.club] = H[W.club] || { w: 0, l: 0 };
+    if (win) h.w++; else h.l++;
+    h.last = { r, us, them, sport: 'jousting', day: WG.dayAbs, text };
+    try { if (wIsRival(W.club)) wLeagueMine(r); } catch (e) { console.error(e); }
+  }
+  const tilt = S0.tilt || (S0.over && S0.over.tilt) ? 'tc' : '';
+  B.games.unshift({ day: WG.dayAbs, club: W.club, name: W.name, tier: W.tier, how: W.how, r, us, them, text, end: tilt, mvp, line });
+  B.games.length = Math.min(B.games.length, W_JTG.keep);
+  WG.lastMatch = { kind: W.kind, result: r, day: WG.dayAbs, tier: W.tier };
+  W.us = us; W.them = them; W.text = text;
+  const f = W_ON_END[W.kind]; if (f) { try { f(r, W.ref, W); } catch (e) { console.error(e); } }
+  wAdvance(W_JTG.minutes);
+  const who = mvp != null && wPlayer(mvp), how = text === 'conceded' ? ', conceded' : text ? `, ${text}` : '';
+  const msg = `Final: ${win ? 'you win' : 'you lose'}${how} against ${wBallName(W.club)}.${pay} ${bits}${win && who ? `, and +${W_JTG.mvpXp} for ${who.n}, player of the match` : ''}.`;
+  wLog(msg, win ? 'g' : 'b');
+  wSave();
+  return msg;
+}
+// a match the engine stopped before it was decided (it never should: the tilt for the crown has the marshal's count at
+// its end): the side ahead wins it; level, the side it falls to by the match's seed
+function wListsDecide(s, seed) {
+  if (!s || s.win === 0 || s.win === 1) return s;
+  const t = (s.tot || [0, 0]).slice(), k = t[0] === t[1] ? (seed != null ? Math.abs(seed | 0) % 2 : Math.random() < .5 ? 0 : 1) : t[0] > t[1] ? 0 : 1;
+  s.win = k; s.tot = t; s.text = `${Math.max(t[0], t[1])} to ${Math.min(t[0], t[1])}, on the marshal's count`;
+  return s;
+}
+// player of the match: an unhorsing counts most, then the lances broken (a helm break twice), the seats kept, and a
+// squire's jobs a little
+function wListsMvp(lines) {
+  let best = null, bs = 0;
+  for (const id in lines) { const s = lines[id], v = 3 * s.unhorse + s.breaks + s.helms + .5 * s.kept + .25 * s.jobs; if (v > bs + 1e-9) { bs = v; best = +id; } }
+  return best;
+}
+W_ON_END.jtgame = function () { };
+function wListsResultCard(msg) {
+  if (LAB) return;
+  const close = modal(`<header><h3>Final</h3></header><div class="wmsg"><p>${esc(msg)}</p></div><div class="row"><button class="btn" id="wListsOk">Done</button></div>`, () => wDrain());
+  $('wListsOk').focus(); $('wListsOk').onclick = () => close();
+}
+
+/* ---------- the bar in a real match, and Manage's row ---------- */
+$('wListsBack').insertAdjacentHTML('beforebegin', '<button class="ghost" id="wListsSave" hidden>Save and leave</button><button class="ghost" id="wListsGive" hidden>Concede</button>');
+$('wListsSave').onclick = () => wListsLeaveGame();
+$('wListsGive').onclick = () => wListsConcede();
+const wW150ListsBarNote = wListsBarNote;
+wListsBarNote = function () {
+  wW150ListsBarNote();
+  const real = !!(WJT && WJT.world), live = real && wListsLive();
+  $('wListsSave').hidden = $('wListsGive').hidden = !live;
+  $('wListsAgain').hidden = real; $('wListsBack').hidden = live; $('wListsCourses').parentElement.hidden = real; $('wListsSkill').parentElement.hidden = real;
+  if (real && !live && WJT.msg) $('wListsNote').textContent = WJT.msg;
+  // (a settled match still shows the mode it was played in; your own is back for the next game)
+  if (real && WJT.over && WJT.endMode) for (const b of $('wListsModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.jmode === WJT.endMode); b.setAttribute('aria-pressed', b.dataset.jmode === WJT.endMode); }
+};
+const wW150LeaveLists = wLeaveLists;
+wLeaveLists = function () { if (wListsWorld()) return wListsLeaveGame(); wListsModeBack(); wW150LeaveLists(); if (WG) { wSave(); wDrain(); } };
+$('wListsRows').insertAdjacentHTML('beforebegin', '<div id="wListsMgrRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Your calls</span><span id="wListsMgr"></span></div></div>');
+$('wListsMgrRow').addEventListener('click', e => { const b = e.target.closest('[data-jauto2]'); if (!b) return; wJT.manage({ auto: b.dataset.jauto2 === '1' }); wListsRows(); wListsBarNote(); });
+const wW150ListsRows = wListsRows;
+wListsRows = function () {
+  wW150ListsRows();
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, mgr = !!V && V.mode === 'manage' && !V.yard;
+  $('wListsMgrRow').hidden = !mgr; if (!mgr) return;
+  const A = !!V.mgrAuto;
+  $('wListsMgr').innerHTML = `<button class="ghost${A ? '' : ' on'}" data-jauto2="0" title="Before each of your courses, set the plan and your squires' jobs, then Send them">Mine</button> <button class="ghost${A ? ' on' : ''}" data-jauto2="1" title="Your squire's word for the plan and your corner's word for the jobs, every course">Leave it to your squires</button> <small class="hint">Your riders ride on their ratings. You ride on the bar takes the reins.</small>`;
+};
+
+/* ---------- picking a match ---------- */
+function wListsH2h(club) { const L = ((WG.h2h || {})[club] || {}).last; return L && L.sport === 'jousting' ? L : null; }
+function wOpenListsCard() {
+  const probs = wListsProblems(), B = wJtg(), live = wListsLive(), f = wJtfixHere();
+  const rows = wBallClubs().map(c => {
+    const T = wBallTeam(c), tier = wBallTier(c), met = B.met[c] === WG.dayAbs, last = wListsH2h(c);
+    const btns = Object.keys(W_JTG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-jtclub="${c}" data-jthow="${how}" ${probs.length || met || live ? 'disabled' : ''}>${W_JTG_HOW[how]}</button>`).join('');
+    return `<li class="wbcl"><span class="wbsw" style="background:${T.color}"></span><div><b>${esc(T.name)}</b>
+      <small>Tier ${tier}: their riders are level ${wBallOppLvl(tier)}, and ride like a ${W_BALL_SKILL[wListsSkillOf(tier)[1]]}.${last ? ` Last jousting match: ${last.r === 'win' ? 'won' : 'lost'}${last.text ? ' ' + esc(last.text) : ''}.` : ''}${met ? ' <b>Jousted you today.</b>' : ''}</small></div>
+      <div class="row">${btns}</div></li>`;
+  }).join('');
+  const close = modal(`<header><h3>Joust a match</h3><button class="ghost" data-close>Done</button></header>
+    ${probs.length ? `<p class="wbad" role="alert">${probs.map(esc).join(' ')}</p>` : ''}${WJTG.msg ? `<p class="wbad">${esc(WJTG.msg)}</p>` : ''}
+    ${live ? `<p class="wbad">You have a jousting match waiting. <button class="btn" id="wJtResume">Resume it</button></p>` : ''}
+    <p class="hint">A tourney at the Tilting Lists with your four (the Lists tab sets who rides and who squires): two heats of ${wListsCourses()} courses (Settings has the length), and the tilt for the crown if level. <b>Play</b>: you ride every course of yours. <b>Manage</b>: your riders ride on their ratings; the plan and your squires' jobs are your calls, or leave them to your squires. <b>Simulate</b>: the result now. A win pays ${W_JTG.xp} XP to everyone in the four, ${W_JTG.gold} gold and ${W_JTG.fans} fans, times the tier; a loss pays a quarter of the XP and costs nothing else. Each club jousts you once a day, and a match takes a couple of hours.</p>
+    <ul class="wbclubs">${rows}</ul>
+    ${f ? `<p class="hint">Your league fixture against ${esc(wTheClub(f.club))} is here at the Tilting Lists, by day ${f.day}: joust it from the ground's card.</p>` : ''}
+    <p class="hint">Or watch a tourney: <button class="ghost" id="wJtExhib">Mossgate against Cinderhold</button></p>`);
+  WJTG.msg = '';
+  $('modalBox').querySelectorAll('[data-jtclub]').forEach(b => b.onclick = () => {
+    close();
+    const r = wStartLists({ club: b.dataset.jtclub, how: b.dataset.jthow });
+    if (r) { WJTG.msg = r; wOpenListsCard(); }
+  });
+  const ex = $('wJtExhib'); if (ex) ex.onclick = () => { close(); wListsGame(); };
+  const rs = $('wJtResume'); if (rs) rs.onclick = () => { close(); wResumeLists(); };
+}
+(() => {
+  const K = DB.chars.gk_lists; if (!K) return;
+  K.topics.job.t += ' Bring your four for a MATCH and I will find you a club to joust for real.';
+  K.topics.match = { t: 'Real jousting, your four against a club at your tier. Two ride, two squire. I judge every course, and I see everything. Strike the barrier and it is a point off, and I make you mend it.', act: 'jtcard' };
+})();
+const wW150RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'jtcard') return wOpenListsCard(); return wW150RunAct.apply(this, arguments); };
+
+const wW150NextPrompt = wNextPrompt;
+wNextPrompt = function () {
+  if (!LAB && wListsLive() && !WJTG.asked && !WJT && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    WJTG.asked = true;
+    const L = WG.jtg.live, sn = L.snap;
+    const close = modal(`<header><h3>A jousting match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wListsScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Lists tab on the Team screen.</p></div>
+      <div class="row"><button class="btn" id="wJtRes">Resume</button><button class="ghost" id="wJtLater">Later</button></div>`, () => wDrain());
+    $('wJtRes').focus();
+    $('wJtRes').onclick = () => { close(); wResumeLists(); };
+    $('wJtLater').onclick = () => close();
+    return true;
+  }
+  return wW150NextPrompt();
+};
+
+/* ---------- the Lists tab: Joust a match, Resume, and the last matches ---------- */
+const wW150CampLists = wCampLists;
+wCampLists = function (C) {
+  const html = wW150CampLists(C), probs = wListsProblems(), live = wListsLive();
+  const play = live ? `<button class="btn" data-jtresume>Resume the match</button>` : `<button class="btn" data-jtplay ${probs.length ? 'disabled' : ''}>Joust a match</button>`;
+  const gate = !live && probs.length ? `<p class="hint wball">${esc(probs[0])}</p>` : '';
+  return html.replace('<button class="btn" data-jpractice', `${play}<button class="ghost" data-jpractice`).replace(/<\/div>\s*$/, `</div>${gate}${wListsRecent()}`);
+};
+function wListsRecent() {
+  const B = WG.jtg; if (!B || !B.games.length) return '';
+  return `<h5 class="wbrh">Last jousting matches: ${B.w}&ndash;${B.l}</h5><ol class="wstlog">${B.games.slice(0, 5).map(g => `<li><b class="${g.r === 'win' ? 'wgood' : 'wbad'}">${g.r === 'win' ? 'Won' : 'Lost'}</b>${g.text ? ' ' + esc(g.text) : ''} against ${esc(g.name)}<small>day ${g.day}${g.mvp != null && wPlayer(g.mvp) ? `, player of the match ${esc(wPlayer(g.mvp).n)}` : ''}</small></li>`).join('')}</ol>`;
+}
+const wW150RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  wW150RenderCamp();
+  const body = $('wCampBody'); if (!body || WCAMP.tab !== 'lists') return;
+  const p = body.querySelector('[data-jtplay]'); if (p) p.onclick = () => { WCAMP.close(); wOpenListsCard(); };
+  const r = body.querySelector('[data-jtresume]'); if (r) r.onclick = () => { WCAMP.close(); wResumeLists(); };
+};
+
+/* ---------- league fixtures at the Lists, on the sand ---------- */
+const wJtfixHere = () => wFixHere(W_JTFIX.g) || null;
+function wJtfixPlay(how) {
+  const f = wJtfixHere(); if (!f) return 'Your league fixture is not at the Tilting Lists.';
+  return wStartLists({ club: f.club, how, tier: wFixTier(f.club, W_JTFIX.g), kind: 'jtfix', ref: { g: W_JTFIX.g, club: f.club, day: f.day }, cup: true });
+}
+// the fixture's end: as a fixture at any ground (w24's W_ON_END.ground), with the points; a rival's league row, and the
+// head to head of any club in CLUBS, are counted in wListsSettle already. (A conceded fixture says so in the results:
+// w129's wResultText reads cd for every sport.)
+W_ON_END.jtfix = function (r, ref, W) {
+  if (!ref) return;
+  const L = wLeague(), F = wFixtures(), club = ref.club;
+  const f = F.games.find(x => (x.a === club && x.b === 'me') || (x.a === 'me' && x.b === club));
+  if (F.day !== ref.day || !f || f.done) { wLog('That fixture was postponed on its round day, so this match is no longer the fixture: it counts as any other match.', 'd'); return; }
+  f.done = 1;
+  if (!wIsRival(club)) { wLeagueMine(r); if (!CLUBS[club]) wH2hRecord(club, r, { us: W.us, them: W.them, sport: 'jousting' }); }
+  if (L.table[club]) { if (r === 'win') L.table[club].l++; else L.table[club].w++; }
+  const res = r === 'win' ? { a: 'me', b: club, sa: W.us, sb: W.them } : { a: club, b: 'me', sa: W.them, sb: W.us };
+  L.results.unshift(Object.assign(res, { day: WG.dayAbs, sport: 'jousting', g: ref.g }, W.text === 'conceded' ? { cd: 1 } : {}));
+  L.results.length = Math.min(L.results.length, W_LEAGUE.keep);
+  if (r === 'win') {
+    RUN.fans = (RUN.fans || 0) + W_FIX.fans;
+    wLog(`Two points on the table. The gallery throws its favours onto the sand, and stays: ${W_FIX.fans} fans.`, 'g');
+    wMaybeBid(club);
+  }
+};
+// two clubs' match at the Lists on the engine, both at a tier's level and skill: { ra, rb, w, end ('tc': the tilt) }
+function wListsSimClubs(a, b, tier) {
+  const B = wJtg(), kept = JSON.parse(JSON.stringify(B.opp)), A = wListsOpp(a, tier), Bt = wListsOpp(b, tier);
+  B.opp = kept;
+  const sk = wListsSkillOf(tier)[1], seed = (Math.random() * 1e9) | 0, o = wListsOpts(A, Bt, tier);
+  const s = wListsDecide(wJT.simMatch(Object.assign(o, { skill: [sk, sk], seed })), seed), t = s.tot || [0, 0];
+  return { ra: t[0], rb: t[1], w: s.win === 0 ? a : b, end: s.tilt ? 'tc' : '' };
+}
+const wW150SimAt = wSimAt;
+wSimAt = function (a, b, g) {
+  if (g !== W_JTFIX.g || LAB) return wW150SimAt(a, b, g);
+  const L = wLeague(), s = wListsSimClubs(a, b, W_JTFIX.tier), w = s.w, l = w === a ? b : a;
+  L.table[w].w++; L.table[l].l++;
+  const res = { day: WG.dayAbs, a: w, b: l, sport: 'jousting', sa: Math.max(s.ra, s.rb), sb: Math.min(s.ra, s.rb), g };
+  L.results.unshift(res); L.results.length = Math.min(L.results.length, W_LEAGUE.keep);
+  return res;
+};
+const wW150OpenGrdCard = wOpenGrdCard;
+wOpenGrdCard = function (id, msg) {
+  wW150OpenGrdCard(id, msg);
+  if (id !== W_JTFIX.g) return;
+  const b = document.querySelector('#modalBox [data-gfix]'), f = wJtfixHere(); if (!b || !f) return;
+  const probs = wListsProblems().concat(wListsLive() ? ['Finish the jousting match you started first.'] : []), row = b.closest('.row');
+  row.innerHTML = Object.keys(W_JTG_HOW).map(how => `<button class="${how === 'play' ? 'btn' : 'ghost'}" data-jtfixhow="${how}" ${probs.length ? 'disabled' : ''}>${W_JTG_HOW[how]}</button>`).join('');
+  const small = row.closest('li').querySelector('small'); if (small) small.insertAdjacentHTML('beforeend', ` Jousted on the sand with your four.${probs.length ? ' ' + esc(probs[0]) : ''}`);
+  row.querySelectorAll('[data-jtfixhow]').forEach(x => x.onclick = () => { $('modalBox').querySelector('[data-close]').click(); const r = wJtfixPlay(x.dataset.jtfixhow); if (r) wOpenGrdCard(id, r); });
+};
+
+/* ---------- How to play ---------- */
+const wW150ListsHow = wListsHowHTML;
+wListsHowHTML = function () {
+  return wW150ListsHow() + `<p class="hint" id="wListsHowGame"><b>Matches.</b> Ask Sir Ruddock for a MATCH, or use the Lists tab: your four against a club at your tier, once a day each. <b>Play</b> is You ride. <b>Manage</b>: your riders ride on their ratings, and before each of your courses the plan and your squires' jobs are your calls (your squire's word first), or leave it all to your squires; You ride on the bar takes the reins at any time. <b>Simulate</b> gives the result at once. Their riders ride like a Squire, a Knight or an Archmage by the tier. A win pays XP, gold and fans by the tier; a loss pays a quarter of the XP and costs nothing else. <b>Save and leave</b> keeps the match between courses (a course being ridden is ridden out first), and it waits for you, after a reload too; <b>Concede</b> counts as a loss. Your league fixture at the Lists is jousted on the sand too.</p>`;
+};
+const wW150RenderHelp = renderHelp;
+renderHelp = function () {
+  wW150RenderHelp();
+  const after = $('wHelpListsCall') || $('wHelpListsTab') || $('wHelpLists'); if (!after || $('wHelpListsGame')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsGame"><b>Jousting matches.</b> Sir Ruddock's MATCH, or Joust a match on the Lists tab: your four against a club at your tier, once a day each, in Play, Manage or Simulate. A win pays XP, gold and fans by the tier; a loss pays a quarter of the XP and costs nothing else. Save and leave keeps the match for later, and your league fixture at the Lists is jousted on the sand.</p>`);
+};
+/* w151: the tilting yard as a practice run (issue #117, phase 5). Dame Ferrow's tilting yard in Mossgate (sp_tilt, w23)
+   has straw targets on posts, and now you can ride at them: from the yard's card, A run at the straw targets puts your
+   four's first rider (the Lists tab's) on the Tilting Lists' engine for W_JTYARD.runs runs at a straw target. Each run
+   is your plan (the mark and the pace), then the spur, the couch and the aim by hand, as on Play; the target doesn't
+   strike back, so there is no seat to keep. After each run the herald says where the lance went and how you spurred,
+   couched and aimed; after the last, the yard's summary. Nothing is at stake: no rewards, no time, no box lines, and
+   as often as you like (the week's drill and challenge are the yard's as before).
+   wListsYard()   starts the runs ('' or why not)
+   Wraps: wOpenSpot (wW151OpenSpot: the yard's row), wListsBarNote (wW151ListsBarNote: the yard's bar), wListsRows
+   (wW151ListsRows: no guard to pick at a straw target), wListsBoard (wW151ListsBoard: the runs), wListsHowHTML
+   (wW151ListsHow), renderHelp (wW151RenderHelp: a line in #wHelpSpots). */
+
+const W_JTYARD = { spot: 'sp_tilt', runs: 5 };
+function wListsYard() {
+  if (!WG) return '';
+  const mine = wListsMine();
+  wListsGame({ yard: { runs: W_JTYARD.runs }, teams: [mine], riders: [mine.riders, null], squires: [mine.squires, null], mounts: [mine.mounts, null], best: [mine.best, null], mode: 'play',
+    title: 'The tilting yard: runs at the straw target' });
+  WJT.yard = true;
+  wListsBarNote(); wListsRows(); wListsBoard();
+  return '';
+}
+const wW151OpenSpot = wOpenSpot;
+wOpenSpot = function (id, msg) {
+  wW151OpenSpot(id, msg);
+  if (id !== W_JTYARD.spot || !WG) return;
+  const list = document.querySelector('#modalBox .wbclubs'); if (!list) return;
+  list.insertAdjacentHTML('beforeend', `<li class="wbcl"><span class="wbsw" style="background:${W_GRD_COL.jousting}"></span><div><b>A run at the straw targets</b><small>Your first rider (the Lists tab's) rides ${W_JTYARD.runs} runs at a straw target: tap with the hoofbeats to spur, hold to couch, and keep the tip on your mark. Nothing at stake: no rewards, as often as you like.</small></div>
+    <div class="row"><button class="ghost" id="wSpotYard">Ride at the targets</button></div></li>`);
+  $('wSpotYard').onclick = () => { $('modalBox').querySelector('[data-close]').click(); wListsYard(); };
+};
+$('wListsAgain').insertAdjacentHTML('beforebegin', '<button class="ghost" id="wListsYardAgain" hidden>Ride again</button>');
+$('wListsYardAgain').onclick = () => wListsYard();
+const wW151ListsBarNote = wListsBarNote;
+wListsBarNote = function () {
+  wW151ListsBarNote();
+  const y = !!(WJT && WJT.yard);
+  $('wListsYardAgain').hidden = !y || !WJT.over;
+  if (!y) { $('wListsModes').querySelector('[data-jmode="manage"]').hidden = false; return; }
+  $('wListsAgain').hidden = true; $('wListsCourses').parentElement.hidden = true; $('wListsSkill').parentElement.hidden = true;
+  $('wListsModes').querySelector('[data-jmode="manage"]').hidden = true;
+  if (WJT.over && WJT.over.text) $('wListsNote').textContent = `${WJT.over.text} Nothing at stake. Ride again, or go back to the world.`;
+};
+const wW151ListsRows = wListsRows;
+wListsRows = function () {
+  wW151ListsRows();
+  const y = !!(WJT && WJT.yard);
+  $('wListsGuard').closest('.wccrow').hidden = y;
+};
+const wW151ListsBoard = wListsBoard;
+wListsBoard = function () {
+  if (!(WJT && WJT.yard)) return wW151ListsBoard();
+  const Y = wJT.yard; if (!Y) { $('wListsBoard').innerHTML = ''; $('wListsLog').innerHTML = ''; return; }
+  const R = wJT.strawRules, n = (wJT.G.yard || {}).runs || W_JTYARD.runs, cell = r => !r ? '' : r.pts > 0 ? `<b>${r.pts}</b>` : String(r.pts);
+  $('wListsBoard').innerHTML = `<div style="overflow-x:auto;max-width:100%"><table class="wrpow wcboxt"><caption>The tilting yard: ${esc(R.team.name.toLowerCase())}, what each run would score</caption><tr><th></th>${Array.from({ length: n }, (_, i) => `<th>Run ${i + 1}</th>`).join('')}<th>Total</th></tr>
+    <tr><td>${esc(wJT.G.teams[0].name)}</td>${Array.from({ length: n }, (_, i) => `<td>${cell(Y.runs[i])}</td>`).join('')}<td><b>${Y.pts}</b></td></tr></table></div>`;
+  $('wListsLog').innerHTML = Y.runs.length ? Y.runs.slice().reverse().map(r => `<li><small>Run ${r.n}</small> ${esc(W_JT_CARD.aim[r.aim])}, ${r.pace === 'gallop' ? 'a gallop' : 'a canter'}: ${esc(wJT.atText({ at: r.at }))}${r.hand ? ` <small>(spur ${r.hits} of ${r.beats}${r.couch == null ? ', never couched' : `, couch ${Math.abs(r.couch) <= .35 ? 'right' : r.couch < 0 ? 'early' : 'late'}`}${r.off != null ? `, ${Math.round(r.off)} in off the mark` : ''})</small>` : ''}</li>`).join('') : '<li class="hint">No runs yet.</li>';
+};
+
+/* ---------- How to play ---------- */
+const wW151ListsHow = wListsHowHTML;
+wListsHowHTML = function () {
+  return wW151ListsHow() + `<p class="hint" id="wListsHowYard"><b>The tilting yard.</b> Dame Ferrow's yard in Mossgate has straw targets on posts: from the yard's card, ride ${W_JTYARD.runs} runs at one with your first rider, by hand. Pick a mark and a pace, then spur, couch and aim; the herald says where the lance went and how you spurred, couched and aimed. The target doesn't strike back, and nothing is at stake.</p>`;
+};
+const wW151RenderHelp = renderHelp;
+renderHelp = function () {
+  wW151RenderHelp();
+  const s = $('wHelpSpots'); if (!s || s.querySelector('.wjtyard')) return;
+  s.insertAdjacentHTML('beforeend', ` <span class="wjtyard">At the tilting yard you can also ride runs at the straw targets on the Tilting Lists' engine, as often as you like, with nothing at stake.</span>`);
+};
+/* w152: Fenna Moss at the Tilting Lists (issue #117, phase 5's fan), as w131 is the Shed's Tilda Spindle. Fenna is the
+   Lists' fan, an elf: "I come for the lances breaking. The sound. Nobody else understands." She stands at the rail for
+   every match at the Lists (the exhibition, the practice match and the matches from the world; not the tilting yard)
+   and cheers from it: a line under the lists after a course with a lance broken, a helm break or an unhorsing
+   (W_FENNA_RAIL, the biggest moment of the course; nothing for a glance or a miss). Ask her about the SOUND, or where
+   she stands at the RAIL.
+   Ask her to PLAY: until your four has won a jousting match from the world she doesn't believe you have a side. Once
+   you have, she joins your team, once a journey: an elf at the team's level (wStarLvl), the steadiest lance there is
+   (her jousting lance at the cap). A full roster asks who goes, as any recruit does; turned down, she waits at camp
+   (sign her there). After that she greets you as one of your own; let go, she goes back to the rail. Her greeting
+   names her topics.
+   WG.flags: fenna_joined (she has joined: once a journey)
+   WJT.rail   her lines this match (for the page and the checks)
+   wFennaReady(), wFennaState() ('team', 'camp', 'gone', 'ready' or 'no'), wFennaJoin() (the PLAY topic's act,
+   'fennaplay'), wFennaRail(last) (her line for a course, or '')
+   Wraps: wJT.onPhase (wW152OnPhase: her line after a course), wListsGame (wW152ListsGame: the rail cleared), wSay
+   (wW152Say: her greeting and the PLAY answer, which change), wRunAct (wW152RunAct: 'fennaplay'), wAddPlayer
+   (wW152AddPlayer: her lance), wListsHowHTML (wW152ListsHow), renderHelp (wW152RenderHelp: a line in #wHelpListsGame). */
+
+const W_FENNA = { n: 'Fenna Moss', kind: 'elf', flav: 'The Lists\' loudest fan, at last on the sand herself. She came for the sound.' };
+const W_FENNA_RAIL = {
+  unhorse: ['Down! Right down in the sand! Did you hear that? Did you HEAR that?', 'Unhorsed! Oh, the crash of it. I felt that in my teeth.', 'Out of the saddle! That is the best sound in the world, and it is mine.'],
+  helm: ['On the helm! That ringing. Oh, that ringing.', 'A helm break! It sang. Did anybody else hear it sing?', 'Right on the helm! I will be humming that all week.'],
+  both: ['Both lances at once! Two cracks, one sound. I will dream about that.', 'Two at once! Nobody else understands. Nobody.'],
+  brk: ['Crack! That is the sound. That is the one.', 'There it is! Ash wood, all over the sand.', 'Snap! Lovely. Again, again!', 'A clean break! You could hear it in Graftonbury.'],
+};
+// her line for a course (wJT.last), the biggest moment of it; '' for a course of glances and misses
+function wFennaRail(L) {
+  if (!L || !L.broke) return '';
+  const k = L.unhorsed && L.unhorsed.length ? 'unhorse' : L.broke.some((b, s) => b && L.zone[s] === 'helm') ? 'helm' : L.broke[0] && L.broke[1] ? 'both' : L.broke.some(Boolean) ? 'brk' : '';
+  return k ? pick(W_FENNA_RAIL[k]) : '';
+}
+$('wListsBoard').previousElementSibling.insertAdjacentHTML('beforebegin', '<p id="wListsRail" class="hint wjtrail" hidden></p>');
+const wW152OnPhase = wJT.onPhase;
+wJT.onPhase = ph => {
+  wW152OnPhase(ph);
+  if (ph !== 'after' || !WJT || WJT.yard) return;
+  const said = wFennaRail(wJT.last); if (!said) return;
+  WJT.rail = (WJT.rail || []).concat(said);
+  const el = $('wListsRail'); el.innerHTML = `<b>${esc(W_FENNA.n)}</b>, at the rail: "${esc(said)}"`; el.hidden = false;
+};
+const wW152ListsGame = wListsGame;
+wListsGame = function (opts) { const r = wW152ListsGame(opts); $('wListsRail').hidden = true; $('wListsRail').textContent = ''; if (WJT) WJT.rail = []; return r; };
+
+(() => {
+  const F = DB.chars.gf_lists; if (!F) return;
+  F.topics.sound = { t: 'A lance breaking on a shield. Ash wood, a crack, then the splinters all coming down at once. A helm break rings, too, like a bell somebody dropped. I have heard them all. I keep count.' };
+  F.topics.rail = { t: 'Front of the gallery, at the rail by the tilt, every match. You will hear me. Everyone hears me. Sir Ruddock asked me to stand further back once. I did not.' };
+  F.topics.play = { t: 'You want me to PLAY? To ride, for your side?', act: 'fennaplay' };
+  F.topics.job = { t: 'I watch. I listen, mostly. Ask me about the SOUND, or where I stand at the RAIL. Or ask me to PLAY. Nobody ever has.' };
+})();
+const wFennaReady = () => !!(WG && WG.jtg && WG.jtg.w > 0);
+const wFennaIs = p => p && p.n === W_FENNA.n && p.kind === W_FENNA.kind;
+function wFennaState() {
+  if (wRoster().some(wFennaIs)) return 'team';
+  if ((WG.wwait || []).some(wFennaIs)) return 'camp';
+  if (wFlag('fenna_joined')) return 'gone';
+  return wFennaReady() ? 'ready' : 'no';
+}
+const W_FENNA_SAY = {
+  no: 'Ride for you? Win a jousting match here first, a real one against a club, and I will believe you have a side.',
+  ready: 'You mean it? I have been practising on the straw targets for years. Nobody watches the straw targets. I will be at the Lists before you are.',
+  full: 'You mean it? Your team is full, though. Make room for me and I am yours.',
+  camp: 'I am waiting at your camp with my lance. Sign me there when you have room.',
+  team: 'I am on your team already. Put me on a horse.',
+  gone: 'You let me go. I am back at the rail. It is still the best seat in the house.',
+};
+function wFennaPlaySay() { const st = wFennaState(); return st === 'ready' && wRoster().length >= W_PARTY.max ? W_FENNA_SAY.full : W_FENNA_SAY[st]; }
+function wFennaJoin() {
+  if (!WG) return '';
+  if (wFennaState() !== 'ready') return wFennaPlaySay();
+  // (the flag is set when she really joins, in wAddPlayer: a full roster you won't make room on sends her to camp)
+  wRecruitTopic({ kind: W_FENNA.kind, n: W_FENNA.n, lvl: wStarLvl(), flav: W_FENNA.flav });
+  return '';
+}
+const wW152RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'fennaplay') { wFennaJoin(); return; } return wW152RunAct.apply(this, arguments); };
+const wW152Say = wSay;
+wSay = function (id, kw) {
+  const r = wW152Say(id, kw);
+  if (id !== 'gf_lists' || !WG || !r) return r;
+  if (!(kw || '').trim()) { const st = wFennaState();
+    return Object.assign({}, r, { text: st === 'team' ? 'Back at the Lists? I still come early, for the sound. Then I get to make it.'
+      : st === 'camp' ? 'My lance is packed and waiting at your camp. Ask me about the SOUND, while you are here.'
+      : st === 'gone' ? 'Back at the rail, me. Ask me about the SOUND, if you joust today.'
+      : `${r.text} Ask me about the SOUND, or where I stand at the RAIL. Or ask me to PLAY.` }); }
+  if (r.key === 'play') return Object.assign({}, r, { text: wFennaPlaySay() });
+  return r;
+};
+const wW152AddPlayer = wAddPlayer;
+wAddPlayer = function (p) {
+  const q = wW152AddPlayer(p);
+  // (she joins once: the flag, her lance at the cap, off the camp list if she was on it, and saved with all of it)
+  if (wFennaIs(q) && !wFlag('fenna_joined')) { wSetFlag('fenna_joined'); WG.wwait = (WG.wwait || []).filter(x => !wFennaIs(x)); const b = wJtOf(q); if (b) b.lance = Math.max(b.lance, wJtCap()); wSave(); }
+  return q;
+};
+const wW152ListsHow = wListsHowHTML;
+wListsHowHTML = function () { return wW152ListsHow() + `<p class="hint" id="wListsHowFenna"><b>Fenna Moss</b>, the Lists' fan, cheers from the rail after a lance broken, a helm break or an unhorsing. Win a jousting match from the world and she will PLAY for you.</p>`; };
+const wW152RenderHelp = renderHelp;
+renderHelp = function () {
+  wW152RenderHelp();
+  const g = $('wHelpListsGame'); if (!g || g.querySelector('.wfenna')) return;
+  g.insertAdjacentHTML('beforeend', ` <span class="wfenna">Fenna Moss, the Lists' fan, cheers the breaks from the rail; win a match there and she will PLAY for you.</span>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.

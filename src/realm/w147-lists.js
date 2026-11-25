@@ -82,11 +82,12 @@ function wListsRows() {
   const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, mine = V && V.mode === 'play';
   $('wListsChargeRow').hidden = !(mine && V.ph === 'charge' && V.charge && V.charge.mine);
   $('wListsSeatRow').hidden = !(mine && V.ph === 'seat');
-  const box = $('wListsRows'), plan = mine && V.ph === 'plan' && V.sel;
+  // (phase 5: Manage's plan beat too, unless it's left to your squires)
+  const box = $('wListsRows'), plan = V && (mine || (V.mode === 'manage' && !V.mgrAuto)) && V.ph === 'plan' && V.sel;
   box.hidden = !plan; if (!plan) return;
   const S = V.sel, on = (a, b) => a === b ? ' on' : '';
   for (const [f, id] of [['aim', 'wListsAim'], ['guard', 'wListsGuard'], ['pace', 'wListsPace']]) $(id).innerHTML = W_LISTS_ROWS[f].map(([k, n, t]) => `<button class="ghost${on(k, S[f])}" data-jf="${f}" data-jv="${k}" title="${esc(t)}">${n}</button>`).join(' ');
-  $('wListsGo').innerHTML = `<button class="ghost on" id="wListsRideBtn" data-jgo="1" title="Space">Ride</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
+  $('wListsGo').innerHTML = `<button class="ghost on" id="wListsRideBtn" data-jgo="1" title="${mine ? 'Space' : 'Space: your rider rides your plan on their ratings'}">${mine ? 'Ride' : 'Send them'}</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
 }
 // the two clubs; taken: names already in the match, so nobody shares one
 function wListsTeams(taken) {

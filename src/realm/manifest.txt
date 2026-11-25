@@ -189,6 +189,10 @@ src/realm/w147-lists.js
 src/realm/w148-listsfour.js
 # the plan and the read: the herald's card, your squire's reason (issue #117, phase 4)
 src/realm/w149-listscall.js
+# jousting from the world: matches, Manage, save and resume, fixtures; the tilting yard; Fenna Moss (issue #117, phase 5)
+src/realm/w150-listsgame.js
+src/realm/w151-listsyard.js
+src/realm/w152-listsfenna.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js

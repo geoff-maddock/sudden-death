@@ -18,15 +18,19 @@
      Archmage's, a little truer at the helm; phase 2's review), less the droop.
    - the impact, then the seat: if their lance broke on you, a short balance moment follows: the rider wobbles and you
      lean against it (the arrows, drag, or the Lean buttons). How well you held it is your lean (0 to 1) for seat().
-   Watch: the CPU rides both. You ride: your side's courses are yours (side 0). */
+   Watch: the CPU rides both. You ride: your side's courses are yours (side 0).
+   Manage (phase 5): your side rides on its ratings (the CPU's hands at your side's skill), and the calls are yours:
+   before each of your courses the plan (your squire's word first) and your squires' jobs, then Send them. Leave it to
+   your squires (GP.mgrAuto, jtManage in 11-world.js) and they call every course themselves: your squire's word and your
+   corner's word. You ride takes the reins at any beat; Watch hands the calls back to the CPU. */
 const JT_PLAY = { charge: 3.6, spur: { until: .42, win: .09, min: .86, beat: { canter: .46, gallop: .34 } }, couch: { ideal: .66, span: .3, high: 40 },
   aim: { eight: 2.6, noise: .9, reach: 18, key: 40 }, seat: { time: 1.4, amp: 1, key: 2.6 }, pace: { herald: 1.2, after: 2.4, heat: 3.2, over: 3.4 } };
 const JT_HOOK = { onPhase: null, onPick: null, onOver: null };
-const JT_MODES = ['watch', 'play'];
+const JT_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
 function jtPlayStart(o) {
-  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, jobs: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [] };
+  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, jobs: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [], mgrAuto: !!(o && o.mgrAuto) };
   jtGo('next');
   return GP;
 }
@@ -36,6 +40,9 @@ function jtGo(ph, wait, msg) {
 }
 const jtName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const jtYours = s => GP.mode === 'play' && s === GP.you;
+// (phase 5: a side you manage, calling the plan and the squires yourself: not left to your squires)
+const jtMgr = s => GP.mode === 'manage' && s === GP.you && !GP.mgrAuto;
+const jtCalls = s => jtYours(s) || jtMgr(s);
 const jtSide = s => G.teams[s].name;
 function jtPicked() { if (JT_HOOK.onPick) try { JT_HOOK.onPick(); } catch (e) { console.error(e); } }
 
@@ -70,8 +77,9 @@ const jtBeat = pace => JT_PLAY.spur.beat[jtBeatPace(pace)];
 const jtBeatPace = pace => jtOwn(JT_PLAY.spur.beat, pace) ? pace : 'canter';
 // a press: in your plan it rides; in the spur a tap; after the spur it lowers the lance (held: jtCouch(false) lets go)
 function jtPress() {
-  if (!GP || GP.mode !== 'play') return false;
+  if (!GP || GP.mode === 'watch') return false;
   if (GP.ph === 'plan' && GP.sel) { jtCharge0(); return true; }
+  if (GP.mode !== 'play') return false;
   const C = GP.ch; if (GP.ph !== 'charge' || !C || !C.mine) return false;
   if (C.p < JT_PLAY.spur.until) return jtSpur();
   return jtCouch(true);
@@ -99,16 +107,18 @@ function jtLeanTo(v) { const M = GP && GP.seatM; if (!M) return false; M.lean = 
 function jtCharge0() {
   const riders = jtRiders(); if (!riders) return;
   // (phase 3: your squires do the jobs you gave them before you set off)
-  if (jtYours(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, 'your call');
+  if (jtCalls(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, jtYours(GP.you) ? 'your call' : 'your call, managing');
   GP.jobs = null;
-  // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's)
-  const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
+  // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's; a side you
+  // manage, or leave to your squires, rides your squire's word or the plan you set)
+  const plans = [0, 1].map(s => jtCalls(s) || (GP.mode === 'manage' && s === GP.you) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
   const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge(jtRideOpts(s, plans[s]), R));
   const mine = jtYours(0) || jtYours(1), s = GP.you;
   GP.plans = plans; GP.cpuRides = cpuRides; GP.keyV = { x: 0, y: 0 };
   GP.ch = { p: 0, mine, pace: mine ? plans[s].pace : plans[0].pace, hit: [], taps: [], bad: 0, down: false, downAt: null, hand: { x: 0, y: 0 }, tipNow: null, riders };
-  jtGo('charge', 0, mine ? `${jtName(s, riders[s])} sets off. Tap with the hoofbeats to spur, then hold to couch the lance, and keep the tip on ${JT_PLAN.aim[plans[s].aim].n}.` : `${jtName(0, riders[0])} and ${jtName(1, riders[1])} set off down the lists…`);
+  const sent = !mine && GP.mode === 'manage' ? `${jtName(s, riders[s])} rides your plan: ${JT_PLAN.aim[plans[s].aim].n}, ${plans[s].guard}, at ${JT_PLAN.pace[plans[s].pace].n}. ` : '';
+  jtGo('charge', 0, mine ? `${jtName(s, riders[s])} sets off. Tap with the hoofbeats to spur, then hold to couch the lance, and keep the tip on ${JT_PLAN.aim[plans[s].aim].n}.` : `${sent}${jtName(0, riders[0])} and ${jtName(1, riders[1])} set off down the lists…`);
 }
 // how well you spurred: on-beat taps over the beats there were, less the stumbles (0 to 1)
 function jtSpurQ(C) {
@@ -235,27 +245,32 @@ function jtWhere() { return jtInTilt() ? `The tilt for the crown, course ${G.cou
 function jtPlayNext() {
   const riders = jtRiders(); if (!riders) { jtGo('over'); return; }
   // (phase 3: the CPU's corners first, so its plan reads its rider and mount as they set off; yours waits for your call)
-  const yours = jtYours(GP.you), due = !!(G.cornerDue && G.cornerDue[GP.you]);
+  // (phase 5: a side you manage is yours to call too; left to your squires, its corner is its own, a Knight's)
+  const yours = jtCalls(GP.you), due = !!(G.cornerDue && G.cornerDue[GP.you]);
   jtCornersDue(yours && due ? GP.you : null);
   GP.jobs = yours && due ? jtCornerPlan(GP.you, 1).jobs : null;
-  GP.plans = [0, 1].map(s => jtYours(s) ? null : jtPlan(s));
+  const left = GP.mode === 'manage' && GP.mgrAuto;
+  GP.plans = [0, 1].map(s => jtCalls(s) ? null : left && s === GP.you ? jtSuggest(s) : jtPlan(s));
+  if (left) GP.sel = Object.assign({}, GP.plans[GP.you]);
   const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
-  if (jtYours(GP.you)) {
+  if (yours) {
     GP.sel = jtSuggest(GP.you);
     const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${JT_JOB[j].v}`).join(', ')}.` : '';
-    jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). Change the plan if you like, then Ride.`); return;
+    const go = jtYours(GP.you) ? 'Change the plan if you like, then Ride.' : 'Change the plan or the jobs if you like, then Send them: they ride on their ratings.';
+    jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). ${go}`); return;
   }
-  jtGo('herald', 0, `${jtWhere()}: ${vs}.`);
+  jtGo('herald', 0, `${jtWhere()}: ${vs}.${left ? ` Your squires call it: ${JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n}.` : ''}`);
 }
 function jtSetMode(m) {
   if (!GP || !JT_MODES.includes(m)) return;
   const was = GP.mode; GP.mode = m;
   if (m === was) return;
-  // a plan you were making goes back to the CPU in Watch; your course while the herald names the riders (You ride
-  // picked then) is yours, on a plan made for it; a charge of yours handed to Watch is ridden on by the CPU's hands for
-  // your side, and so is the balance moment (phase 2's review)
-  if (m !== 'play' && GP.ph === 'plan') jtGo('next');
-  else if (m === 'play' && GP.ph === 'herald') jtGo('next');
+  // a plan you were making goes back to the CPU in Watch (and in Manage left to your squires); your course while the
+  // herald names the riders (You ride or Manage picked then) is yours, on a plan made for it; a charge of yours handed
+  // to Watch or Manage is ridden on by the CPU's hands for your side, and so is the balance moment (phase 2's review;
+  // Manage, phase 5: a plan you were making in You ride stays yours to send, and the other way round)
+  if (!jtCalls(GP.you) && GP.ph === 'plan') jtGo('next');
+  else if (jtCalls(GP.you) && GP.ph === 'herald') jtGo('next');
   else if (m !== 'play' && GP.ph === 'charge' && GP.ch && GP.ch.mine) jtHandOver();
   else if (m !== 'play' && GP.ph === 'seat' && GP.P) { GP.P.lean[GP.you] = jtLean(GP.you); jtFinish(); }
 }
@@ -269,7 +284,7 @@ function jtHandOver() {
 function jtView() {
   if (!GP) return null;
   const C = GP.ch, M = GP.seatM, r = jtRiders();
-  return { mode: GP.mode, you: GP.you, ph: GP.ph, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
+  return { mode: GP.mode, you: GP.you, ph: GP.ph, mgrAuto: !!GP.mgrAuto, yard: !!G.yard, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
     sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)) : null,
     jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,

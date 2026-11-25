@@ -81,11 +81,14 @@ async def main():
         # (a card match: a fixture drawn at the Ash Bowl is a football game, in test/realm_gridiron_cup.py, one at the
         # Anvil Ring a boxing card, in test/realm_ring_cup.py, and one at the Charter Court a basketball game, in
         # test/realm_court_cup.py, one at the Pond Rink a hockey game, in test/realm_rink_kettle.py, and one at Mossgate
-        # Links a golf match, in test/realm_links_cup.py; each has its own engine and its own card)
-        OWN = "['g_bowl', 'g_ring', 'g_court', 'g_rink', 'g_links', 'g_lanes', 'g_shed']"
+        # Links a golf match, in test/realm_links_cup.py, and one at the Tilting Lists a jousting match, in
+        # test/realm_lists_game.py; each has its own engine and its own card)
+        OWN = "['g_bowl', 'g_ring', 'g_court', 'g_rink', 'g_links', 'g_lanes', 'g_shed', 'g_lists']"
         mine = await pg.evaluate(f"""(() => {{ const F = wFixtures(), f = F.games.find(x => x.a === 'me' || x.b === 'me'), own = {OWN};
           if (own.includes(f.g)) f.g = W_GRDS.find(g => !own.includes(g.id) && g.sport !== 'baseball').id; return wMyFixture(); }})()""")
-        other = await pg.evaluate(f"W_GRDS.find(g => g.id !== '{mine['g']}' && !{OWN}.includes(g.id) && g.sport !== 'baseball').id")
+        # (another card ground if there is one; since jousting, the sheet is the only one, so any other ground: its card
+        # says where your fixture is too)
+        other = await pg.evaluate(f"(W_GRDS.find(g => g.id !== '{mine['g']}' && !{OWN}.includes(g.id) && g.sport !== 'baseball') || W_GRDS.find(g => g.id !== '{mine['g']}' && g.sport !== 'baseball')).id")
         await pg.evaluate(ENTER + f"('{other}')")
         await pg.evaluate(f"wOpenGrdCard('{other}')")
         elsewhere = await pg.evaluate("({ row: !!document.querySelector('[data-gfix]'), text: document.getElementById('modalBox').textContent })")

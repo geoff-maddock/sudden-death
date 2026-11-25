@@ -36,7 +36,12 @@
    Phase 4 is the plan and the read: card(s) (the herald's card for side s: the other side's rider, name, kind, mount
    and skill, counts of what their side has ridden this match, their last four courses, their usual mix, the read and
    the card in words), counts(s) (what side s has ridden); the squire's word now says, in plain words, what they have
-   ridden and what it makes each choice. G.plans entries carry ri (the rider) and tilt. */
+   ridden and what it makes each choice. G.plans entries carry ri (the rider) and tilt.
+   Phase 5 is matches from the world: modes add 'manage' (your side rides on its ratings; the plan and your squires'
+   jobs are yours, then press sends them), manage({ auto }) leaves the calls to your squires or takes them back (mgrAuto);
+   snapshot() (plain JSON, between courses; null in the yard) and resume(sn) keep a match; finishCourse() rides out a
+   course being ridden (your side's own hands); start({ yard: { runs }, teams: [your side] }) is the tilting yard, runs
+   at a straw target with nothing at stake: yard (the runs so far and the summary), and onOver hears the summary. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -67,5 +72,8 @@ return {
   autoSquad: ro => jtAutoSquad((ro || []).map(m => jtRosterOne(m || {}))), bestOf: (ro, riders) => jtBestOf((ro || []).map(m => jtRosterOne(m || {})), riders),
   pressure: s => jtPressure(s), nerveK: (p, n) => jtNerveK(p, n), jobs: JSON.parse(JSON.stringify(JT_JOB)),
   cornerPlan: (s, sk) => G && G.teams && !G.over ? jtCornerPlan(s, sk) : null, cornerDo: (s, jobs) => jtCornerDo(s, jobs, 'by hand'), get squad() { return jtSquadView(); },
+  // matches from the world (phase 5)
+  snapshot: () => jtSnapshot(), resume: sn => jtResume(sn), finishCourse: () => jtFinishCourse(), manage: o => jtManage(o), get mgrAuto() { return !!(GP && GP.mgrAuto); },
+  get yard() { return G && G.yard ? jtYardSummary() : null; }, strawRules: JSON.parse(JSON.stringify(JT_STRAW)),
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };

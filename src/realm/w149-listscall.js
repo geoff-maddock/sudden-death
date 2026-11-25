@@ -26,7 +26,7 @@ function wListsCardHTML(s) {
 const wW149ListsRows = wListsRows;
 wListsRows = function () {
   wW149ListsRows();
-  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, on = !!(V && V.mode === 'play' && V.ph === 'plan' && V.sel);
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, on = !!(V && V.mode !== 'watch' && !V.yard && V.ph === 'plan' && V.sel);
   $('wListsRowCard').hidden = !on;
   if (on) $('wListsCard').innerHTML = wListsCardHTML(V.you);
 };

@@ -265,7 +265,7 @@ $('wListsRows').addEventListener('click', e => {
 const wW148ListsRows = wListsRows;
 wListsRows = function () {
   wW148ListsRows();
-  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null; if (!V || V.mode !== 'play' || V.ph !== 'plan' || !V.sel || !V.squad || !V.riders) return;
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null; if (!V || V.mode === 'watch' || V.ph !== 'plan' || !V.sel || !V.squad || !V.riders) return;
   const s = V.you, Q = V.squad, G = wJT.G, m = G.teams[s].roster[V.riders[s]], slot = G.riders[s].indexOf(V.riders[s]), mount = wJT.mounts[Q.mounts[s][slot < 0 ? 0 : slot]] || {};
   const pct = v => Math.round(100 * v);
   $('wListsUp').innerHTML = `<b>${esc(m.n)}</b> <small>${esc(wKindName(m.kind) || '')}, on a ${esc(mount.n || '')}</small> · <span title="The mount's wind: a course spends some, a gallop most. A blown mount is slower and the tip sways more. A squire who tends the mount gets some back.">Wind <b>${pct(Q.wind[s])}%</b></span> · <span title="The lance arm: every couch tires it, an early one most. A tired arm sways and droops. A squire who steadies the rider gives some back.">Arm <b>${pct(Q.arm[s])}%</b></span>${Q.shaken[s] > .05 ? ' · <b class="wbad" title="Rocked by that hit: the tip sways more and the seat is worse. A squire can steady them.">Shaken</b>' : ''}${Q.girth[s] > 0 ? ' · <span title="The girth tightened: a better seat this course.">Girth tight</span>' : ''}${Q.press[s] ? ` · <b class="wbad" title="${esc(V.inTilt ? 'The tilt for the crown' : 'The last course of the heat, and behind')}: the tip sways more, less for a steady nerve.">${V.inTilt ? 'For the crown' : 'Behind, the last course'}</b>` : ''}`;

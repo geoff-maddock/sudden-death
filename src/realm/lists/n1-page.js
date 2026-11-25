@@ -48,8 +48,9 @@ function jtHide() { JTP.ptr = null; JTP.keys = {}; JTP.btn = null; if (GP) jtNud
 const JT_KEYS = { 1: ['aim', 'shield'], 2: ['aim', 'body'], 3: ['aim', 'helm'], q: ['guard', 'angled'], w: ['guard', 'square'], e: ['pace', 'canter'], r: ['pace', 'gallop'] };
 function jtKeyOk(e) {
   if (!e.key) return false;
-  if (!JTP.on || !GP || GP.mode !== 'play' || JTP.paused || JTP.cv.offsetParent === null) return false;
-  if (!['plan', 'charge', 'seat'].includes(GP.ph)) return false;
+  if (!JTP.on || !GP || GP.mode === 'watch' || JTP.paused || JTP.cv.offsetParent === null) return false;
+  // (Manage, phase 5: only your plan beat's keys)
+  if (!['plan', 'charge', 'seat'].includes(GP.ph) || (GP.mode !== 'play' && GP.ph !== 'plan')) return false;
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return false;
   const m = document.getElementById('modal'); if (m && !m.hidden) return false;
